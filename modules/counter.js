@@ -35,26 +35,31 @@ const Counter = (() => {
   }
 
   async function render() {
-    const numberEl = document.getElementById('counter-number');
-    const sinceEl = document.getElementById('counter-since');
-
     const startDate = await loadStartDate();
 
+    const homeNumber = document.getElementById('counter-number');
+    const homeSince = document.getElementById('counter-since');
+    const calNumber = document.getElementById('counter-number-cal');
+    const calSince = document.getElementById('counter-since-cal');
+
     if (!startDate) {
-      numberEl.textContent = '?';
-      sinceEl.textContent = 'дата ще не вказана';
+      [homeNumber, calNumber].forEach(el => el && (el.textContent = '?'));
+      [homeSince, calSince].forEach(el => el && (el.textContent = 'дата ще не вказана'));
       return;
     }
 
     const days = daysBetween(startDate);
-    numberEl.textContent = days.toLocaleString('uk-UA');
-    sinceEl.textContent = `з ${formatSinceDate(startDate)}`;
+    const daysStr = days.toLocaleString('uk-UA');
+    const sinceStr = `з ${formatSinceDate(startDate)}`;
+
+    [homeNumber, calNumber].forEach(el => el && (el.textContent = daysStr));
+    [homeSince, calSince].forEach(el => el && (el.textContent = sinceStr));
   }
 
   function init() {
     window.addEventListener('portal:auth', render);
     window.addEventListener('portal:view', (e) => {
-      if (e.detail.view === 'calendar') render();
+      if (e.detail.view === 'calendar' || e.detail.view === 'home') render();
     });
   }
 

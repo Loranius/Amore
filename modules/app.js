@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
   Auth.init();
   Router.init();
   Counter.init();
+  Greeting.init();
+  Photos.init();
   CalendarModule.init();
   Wishlist.init();
   Budget.init();
