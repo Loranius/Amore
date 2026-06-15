@@ -12,4 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
   Budget.init();
   Capsule.init();
   DailyQuestion.init();
+  Media.init();
+  RandomModule.init();
 });

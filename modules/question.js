@@ -101,20 +101,53 @@ const DailyQuestion = (() => {
       return;
     }
 
+    const user = Auth.getCurrentUser();
+    const myField = answerFieldForUser(user);
+
+    const dimaDelete = (myField === 'answer_dima' && logEntry.answer_dima)
+      ? `<button class="delete-btn" data-delete-field="answer_dima" title="Видалити відповідь">×</button>` : '';
+    const lenaDelete = (myField === 'answer_lena' && logEntry.answer_lena)
+      ? `<button class="delete-btn" data-delete-field="answer_lena" title="Видалити відповідь">×</button>` : '';
+
     wrap.innerHTML = `
       <div class="answer-block">
+        ${dimaDelete}
         <p class="answer-name">Діма</p>
         ${logEntry.answer_dima
           ? `<p class="answer-text">${escapeHtml(logEntry.answer_dima)}</p>`
           : `<p class="answer-text empty">Ще не відповів</p>`}
       </div>
       <div class="answer-block">
+        ${lenaDelete}
         <p class="answer-name">Лєна</p>
         ${logEntry.answer_lena
           ? `<p class="answer-text">${escapeHtml(logEntry.answer_lena)}</p>`
           : `<p class="answer-text empty">Ще не відповіла</p>`}
       </div>
     `;
+
+    wrap.querySelectorAll('[data-delete-field]').forEach(btn => {
+      btn.addEventListener('click', () => deleteAnswer(btn.dataset.deleteField));
+    });
+  }
+
+  async function deleteAnswer(field) {
+    if (!confirm('Видалити свою відповідь?')) return;
+
+    const { error } = await supabase
+      .from('daily_question_log')
+      .update({ [field]: null })
+      .eq('date', todayStr);
+
+    if (error) {
+      console.error('Помилка видалення відповіді:', error);
+      alert('Не вдалось видалити відповідь');
+      return;
+    }
+
+    logEntry[field] = null;
+    renderAnswers();
+    renderInput();
   }
 
   function renderInput() {

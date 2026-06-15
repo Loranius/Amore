@@ -52,8 +52,11 @@ const Capsule = (() => {
       const card = document.createElement('div');
       card.className = 'capsule-card' + (unlocked ? '' : ' locked');
 
+      const deleteBtn = `<button class="delete-btn" data-delete-id="${c.id}" title="Видалити">×</button>`;
+
       if (unlocked) {
         card.innerHTML = `
+          ${deleteBtn}
           <span class="capsule-icon">✉️</span>
           <p class="capsule-title">${escapeHtml(c.title)}</p>
           <span class="capsule-date">Відкрито ${formatDate(c.open_date)}</span>
@@ -61,6 +64,7 @@ const Capsule = (() => {
         `;
       } else {
         card.innerHTML = `
+          ${deleteBtn}
           <span class="capsule-icon">🔒</span>
           <p class="capsule-title">${escapeHtml(c.title)}</p>
           <span class="capsule-date">Відкриється ${formatDate(c.open_date)}</span>
@@ -70,6 +74,22 @@ const Capsule = (() => {
 
       grid.appendChild(card);
     });
+
+    grid.querySelectorAll('[data-delete-id]').forEach(btn => {
+      btn.addEventListener('click', () => deleteCapsule(btn.dataset.deleteId));
+    });
+  }
+
+  async function deleteCapsule(id) {
+    if (!confirm('Видалити цей лист?')) return;
+
+    const { error } = await supabase.from('time_capsules').delete().eq('id', id);
+    if (error) {
+      console.error('Помилка видалення капсули:', error);
+      alert('Не вдалось видалити лист');
+      return;
+    }
+    refresh();
   }
 
   async function refresh() {

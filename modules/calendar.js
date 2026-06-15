@@ -5,7 +5,8 @@
 
 const CalendarModule = (() => {
 
-  const MONTHS_SHORT = ['січ', 'лют', 'бер', 'кві', 'тра', 'чер', 'лип', 'сер', 'вер', 'жов', 'лис', 'гру'];
+  const MONTHS_FULL = ['січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
+                        'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня'];
 
   async function loadEvents() {
     const { data, error } = await supabase
@@ -34,17 +35,31 @@ const CalendarModule = (() => {
       const item = document.createElement('div');
       item.className = 'event-item';
       item.innerHTML = `
-        <div class="event-date">
-          <span class="event-day">${d.getDate()}</span>
-          <span class="event-month">${MONTHS_SHORT[d.getMonth()]}</span>
-        </div>
         <div class="event-info">
           <p class="event-title">${escapeHtml(ev.title)}</p>
           ${ev.description ? `<p class="event-desc">${escapeHtml(ev.description)}</p>` : ''}
+          <p class="event-meta">${d.getDate()} ${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()}</p>
         </div>
+        <button class="delete-btn" data-delete-id="${ev.id}" title="Видалити">×</button>
       `;
       wrap.appendChild(item);
     });
+
+    wrap.querySelectorAll('[data-delete-id]').forEach(btn => {
+      btn.addEventListener('click', () => deleteEvent(btn.dataset.deleteId));
+    });
+  }
+
+  async function deleteEvent(id) {
+    if (!confirm('Видалити цю подію?')) return;
+
+    const { error } = await supabase.from('events').delete().eq('id', id);
+    if (error) {
+      console.error('Помилка видалення події:', error);
+      alert('Не вдалось видалити подію');
+      return;
+    }
+    refresh();
   }
 
   function escapeHtml(str) {

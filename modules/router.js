@@ -4,7 +4,7 @@
 // ============================================================
 
 const Router = (() => {
-  let currentView = 'counter';
+  let currentView = 'calendar';
 
   function showView(viewName) {
     document.querySelectorAll('.view').forEach(el => {
@@ -20,6 +20,10 @@ const Router = (() => {
   function init() {
     document.querySelectorAll('.nav-btn').forEach(btn => {
       btn.addEventListener('click', () => showView(btn.dataset.view));
+    });
+    // ініціалізувати дані для стартового view після логіну
+    window.addEventListener('portal:auth', () => {
+      window.dispatchEvent(new CustomEvent('portal:view', { detail: { view: currentView } }));
     });
   }
 

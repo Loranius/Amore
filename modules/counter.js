@@ -54,7 +54,7 @@ const Counter = (() => {
   function init() {
     window.addEventListener('portal:auth', render);
     window.addEventListener('portal:view', (e) => {
-      if (e.detail.view === 'counter') render();
+      if (e.detail.view === 'calendar') render();
     });
   }
 
