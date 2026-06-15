@@ -1,0 +1,255 @@
+/* ============================================================
+   ДИЗАЙН-ТОКЕНИ
+   ============================================================ */
+:root {
+  /* Палітра */
+  --bg:           #FFF5F7;
+  --surface:      #FFFFFF;
+  --surface-soft: #FFE9EF;
+  --accent:       #E8829C;
+  --accent-bright:#FF6B9D;
+  --accent-deep:  #C45B79;
+  --text:         #4A3540;
+  --text-muted:   #B98A9A;
+  --line:         #F6D9E2;
+  --danger:       #E2647A;
+
+  /* Типографіка */
+  --font-display: "Fraunces", serif;
+  --font-body:    "Inter", system-ui, sans-serif;
+
+  /* Радіуси / тіні */
+  --radius-lg: 28px;
+  --radius-md: 18px;
+  --radius-sm: 12px;
+  --shadow-card: 0 8px 30px -10px rgba(232, 130, 156, 0.35);
+  --shadow-soft: 0 4px 16px -6px rgba(232, 130, 156, 0.25);
+
+  /* Шкала */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+}
+
+.hidden { display: none !important; }
+
+/* ============================================================
+   ТИПОГРАФІКА
+   ============================================================ */
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.display-xl {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  font-weight: 600;
+  font-size: clamp(32px, 8vw, 48px);
+  line-height: 1.1;
+  margin: 0 0 var(--space-4);
+  color: var(--text);
+}
+
+.display-md {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(22px, 5vw, 30px);
+  line-height: 1.2;
+  margin: 0;
+  color: var(--text);
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(255, 245, 247, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.logout-btn:hover {
+  background: var(--surface-soft);
+  color: var(--accent-deep);
+}
+
+.content {
+  flex: 1;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--space-4);
+  padding-bottom: 100px; /* простір під bottom-nav */
+}
+
+.view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+  gap: var(--space-3);
+}
+
+/* ============================================================
+   BOTTOM NAV
+   ============================================================ */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom));
+}
+
+.nav-btn {
+  flex: 1;
+  max-width: 90px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.nav-btn .nav-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.nav-btn.active {
+  color: var(--accent-deep);
+  background: var(--surface-soft);
+}
+
+/* ---------- Home button (центральна кругла іконка) ---------- */
+.nav-btn-home {
+  flex: 0 0 auto;
+  width: 60px;
+  height: 60px;
+  max-width: 60px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 6px 16px -4px rgba(232,130,156,0.5);
+  margin-top: -22px;
+  justify-content: center;
+  align-items: center;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.nav-btn-home:active { transform: scale(0.95); }
+
+.nav-btn-home .nav-icon-home {
+  font-size: 30px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-btn-home.active,
+.nav-btn-home {
+  background: var(--accent-bright);
+  color: #fff;
+}
+
+/* ============================================================
+   FOCUS / MOTION
+   ============================================================ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
