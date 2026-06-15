@@ -66,11 +66,54 @@
   </header>
 
   <main class="content" id="content">
+    <!-- ---------- Головна (Полароїд-стіна) ---------- -->
+    <section class="view" id="view-home" data-view="home">
+      <div class="counter-sticker">
+        <p class="greeting-text" id="greeting-text">Привіт!</p>
+        <p class="counter-eyebrow" id="counter-since">з якогось дня</p>
+        <div class="counter-num" id="counter-number">—</div>
+        <p class="counter-label">днів разом</p>
+      </div>
+
+      <h1 class="page-title">Наш маленький світ</h1>
+
+      <div class="wall">
+        <a href="#" class="polaroid" data-view-link="calendar">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" data-photo-slot="1"></div>
+          <p class="polaroid-caption">Календар 🗓️</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="wishlist">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" data-photo-slot="2"></div>
+          <p class="polaroid-caption">Wishlist ♡</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="budget">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" data-photo-slot="3"></div>
+          <p class="polaroid-caption">Фінанси ₴</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="capsule">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" data-photo-slot="4"></div>
+          <p class="polaroid-caption">Капсула ✉</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="question">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" data-photo-slot="5"></div>
+          <p class="polaroid-caption">Питання дня ?</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="media">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" data-photo-slot="6"></div>
+          <p class="polaroid-caption">Список ▶</p>
+        </a>
+        <a href="#" class="polaroid wide" data-view-link="random">
+          <div class="polaroid-photo"><img src="https://placehold.co/600x270/FFE9EF/C45B79?text=…" alt="" data-photo-slot="7"></div>
+          <p class="polaroid-caption">Рандом 🎲</p>
+        </a>
+      </div>
+    </section>
+
     <!-- ---------- Календар + лічильник ---------- -->
-    <section class="view" id="view-calendar" data-view="calendar">
+    <section class="view hidden" id="view-calendar" data-view="calendar">
       <div class="counter-card card">
-        <p class="eyebrow" id="counter-since">з якогось дня</p>
-        <div class="counter-number" id="counter-number">—</div>
+        <p class="eyebrow" id="counter-since-cal">з якогось дня</p>
+        <div class="counter-number" id="counter-number-cal">—</div>
         <p class="counter-label">днів разом</p>
         <svg class="pulse-line" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
           <path d="M0,20 Q75,5 150,20 T300,20" />
@@ -224,9 +267,13 @@
   </main>
 
   <nav class="bottom-nav" id="bottom-nav">
-    <button class="nav-btn active" data-view="calendar">
+    <button class="nav-btn active" data-view="home">
+      <span class="nav-icon">♡</span>
+      <span class="nav-label">Головна</span>
+    </button>
+    <button class="nav-btn" data-view="calendar">
       <span class="nav-icon">▤</span>
-      <span class="nav-label">Разом</span>
+      <span class="nav-label">Календар</span>
     </button>
     <button class="nav-btn" data-view="wishlist">
       <span class="nav-icon">♡</span>
@@ -266,6 +313,8 @@
 <script src="modules/auth.js"></script>
 <script src="modules/router.js"></script>
 <script src="modules/counter.js"></script>
+<script src="modules/greeting.js"></script>
+<script src="modules/photos.js"></script>
 <script src="modules/calendar.js"></script>
 <script src="modules/wishlist.js"></script>
 <script src="modules/budget.js"></script>
