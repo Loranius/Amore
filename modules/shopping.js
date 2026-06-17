@@ -46,25 +46,53 @@ const Shopping = (() => {
 
   // ── ПАРСИНГ ВВЕДЕННЯ ──
   // Розбиває "молоко, хліб, два яблука" або текст з нових рядків
-  // на окремі позиції. Без ШІ: розділювачі — кома та \n.
-  function parseInput(raw) {
+  // на окремі позиції. Це fallback-парсинг (без ШІ): розділювачі — кома та \n.
+  function parseInputFallback(raw) {
     return raw
       .split(/[,\n]/)
       .map(s => s.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .map(title => ({ title, qty: null, category: 'Інше' }));
+  }
+
+  // Розумний парсинг через Groq (Supabase Edge Function "shopping-parse").
+  // Повертає масив {title, qty, category} або null, якщо щось пішло не так
+  // (немає мережі, функція не задеплоєна, помилка ШІ тощо) —
+  // тоді викликаючий код сам впаде на parseInputFallback.
+  async function parseInputSmart(raw) {
+    try {
+      const { data, error } = await supabase.functions.invoke('shopping-parse', {
+        body: { text: raw },
+      });
+      if (error) { console.warn('Shopping: shopping-parse error', error); return null; }
+      if (!data || !Array.isArray(data.items) || !data.items.length) return null;
+      return data.items;
+    } catch (e) {
+      console.warn('Shopping: shopping-parse недоступний', e);
+      return null;
+    }
   }
 
   // ── ДОДАВАННЯ ──
   async function addFromInput() {
     const input = el('sl-input');
+    const addBtn = el('sl-add-btn');
     const raw = input.value;
-    const titles = parseInput(raw);
-    if (!titles.length) return;
+    if (!raw.trim()) return;
+
+    if (addBtn) { addBtn.disabled = true; addBtn.textContent = '…'; }
+
+    let items = await parseInputSmart(raw);
+    if (!items) items = parseInputFallback(raw);
+
+    if (addBtn) { addBtn.disabled = false; addBtn.textContent = '+'; }
+    if (!items.length) return;
 
     const user = Auth.getCurrentUser();
-    const rows = titles.map(title => ({
-      title,
-      category: 'Інше',
+    const rows = items.map(i => ({
+      title: i.title,
+      qty: i.qty || null,
+      category: i.category || 'Інше',
       created_by: user ? user.id : null,
     }));
 
