@@ -512,7 +512,7 @@ const Budget = (() => {
             <button class="btn-primary" style="padding:5px 12px;font-size:12px" data-confirm="${g.id}">✓</button>
             <button class="btn-secondary" style="padding:5px 12px;font-size:12px" data-reject="${g.id}">✕</button>
           </div>`:''}
-          ${!isPending?`<button class="fin-del-btn" data-gid="${g.id}">×</button>`:''}
+          ${(!isPending || g.proposed_by===user?.name)?`<button class="fin-del-btn" data-gid="${g.id}">×</button>`:''}
         </div>`;
       wrap.appendChild(item);
     });
