@@ -57,6 +57,15 @@ const Photos = (() => {
     return copy;
   }
 
+  // Preload масиву URL — повертає Promise що резолвиться коли всі завантажились
+  function preloadImages(urls) {
+    return Promise.all(urls.map(url => new Promise(resolve => {
+      const img = new Image();
+      img.onload = img.onerror = resolve; // resolve навіть при помилці
+      img.src = url;
+    })));
+  }
+
   function render() {
     const images = document.querySelectorAll('.polaroid-photo img[data-photo-slot]');
     const polaroids = document.querySelectorAll('.polaroid');
@@ -73,31 +82,41 @@ const Photos = (() => {
       picks = picks.slice(0, needed);
     }
 
-    const STAGGER = 50;   // ms між картками
-    const FADE = 280;     // ms тривалість fade
+    const STAGGER = 60;    // ms між картками
+    const FADE_OUT = 220;  // ms зникнення
+    const FADE_IN = 350;   // ms появи (повільніше = плавніше)
 
-    // Staggered fade OUT
+    // 1. Починаємо preload одразу — паралельно з анімацією виходу
+    const preloadPromise = preloadImages(picks);
+
+    // 2. Staggered fade OUT + легке зменшення
     polaroids.forEach((p, i) => {
       setTimeout(() => {
-        p.style.transition = `opacity ${FADE}ms ease, transform ${FADE}ms ease`;
+        p.style.transition = `opacity ${FADE_OUT}ms ease, transform ${FADE_OUT}ms ease`;
         p.style.opacity = '0';
-        p.style.transform = (p.style.transform || '').replace(/scale\([^)]+\)/, '') + ' scale(0.95)';
+        p.style.transform = (p.style.transform || '') + ' scale(0.93)';
       }, i * STAGGER);
     });
 
-    // Після того як всі зникли — міняємо фото і fade IN
-    const totalOut = FADE + (polaroids.length - 1) * STAGGER + 30;
+    const totalOut = FADE_OUT + (polaroids.length - 1) * STAGGER + 40;
 
+    // 3. Після зникнення — чекаємо preload (якщо ще не готовий) і міняємо src
     setTimeout(() => {
-      images.forEach((img, i) => { img.src = picks[i]; });
+      preloadPromise.then(() => {
+        // Міняємо src поки картки невидимі — без кліпання
+        images.forEach((img, i) => {
+          img.style.transition = 'none';
+          img.src = picks[i];
+        });
 
-      polaroids.forEach((p, i) => {
-        setTimeout(() => {
-          p.style.transition = `opacity ${FADE}ms ease, transform ${FADE}ms cubic-bezier(.34,1.4,.64,1)`;
-          p.style.opacity = '1';
-          // повертаємо оригінальний transform (nth-child rotation)
-          p.style.transform = '';
-        }, i * STAGGER);
+        // 4. Staggered fade IN з пружним easing
+        polaroids.forEach((p, i) => {
+          setTimeout(() => {
+            p.style.transition = `opacity ${FADE_IN}ms ease, transform ${FADE_IN}ms cubic-bezier(.34,1.35,.64,1)`;
+            p.style.opacity = '1';
+            p.style.transform = ''; // повертає CSS nth-child rotation
+          }, i * STAGGER);
+        });
       });
     }, totalOut);
   }
