@@ -3050,3 +3050,161 @@ a.wl-card-title:hover { text-decoration: underline; color: var(--accent-deep); }
   transition: transform 0.2s ease;
 }
 .tg-toggle.on .tg-toggle-knob { transform: translateX(22px); }
+
+/* ============================================================
+   SETTINGS — PHOTO MANAGER
+   ============================================================ */
+
+.settings-modal-card {
+  max-height: 90dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0 16px;
+}
+
+.settings-section-title {
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.settings-section-desc {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+/* Upload zone */
+.photo-upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 2px dashed var(--line);
+  border-radius: 12px;
+  padding: 18px 12px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 12px;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.photo-upload-zone:hover,
+.photo-upload-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(232,130,156,0.06);
+}
+.photo-upload-zone.uploading {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.photo-upload-icon {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--accent);
+}
+.photo-upload-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Progress bar */
+.photo-upload-progress {
+  margin-bottom: 12px;
+}
+.photo-upload-bar {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--accent);
+  width: 0%;
+  transition: width 0.3s ease;
+  margin-bottom: 6px;
+}
+.photo-upload-status {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Photo grid */
+.photo-manager-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+  min-height: 60px;
+}
+
+.photo-manager-loading,
+.photo-manager-empty {
+  grid-column: 1 / -1;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 20px 0 8px;
+}
+
+.photo-manager-thumb {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface-soft);
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(.34,1.35,.64,1);
+}
+.photo-manager-thumb.new-thumb {
+  opacity: 0;
+  transform: scale(0.85);
+}
+.photo-manager-thumb.deleting {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.photo-manager-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.25s ease;
+}
+.photo-manager-thumb:hover img {
+  transform: scale(1.05);
+}
+
+.photo-manager-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.55);
+  border: none;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  padding: 0;
+}
+.photo-manager-thumb:hover .photo-manager-del {
+  opacity: 1;
+}
+/* На мобільному — завжди видно кнопку delete */
+@media (hover: none) {
+  .photo-manager-del { opacity: 1; }
+}
