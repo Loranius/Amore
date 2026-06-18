@@ -106,7 +106,7 @@ const Settings = (() => {
           <p class="settings-section-desc">Фото з'являються на головному екрані. Рекомендований формат — квадрат.</p>
 
           <!-- Upload зона -->
-          <label class="photo-upload-zone" id="photo-upload-zone" for="photo-file-input">
+          <label class="photo-upload-zone" id="photo-upload-zone">
             <span class="photo-upload-icon">＋</span>
             <span class="photo-upload-label">Додати фото</span>
             <input type="file" id="photo-file-input" accept="image/*" multiple style="display:none">

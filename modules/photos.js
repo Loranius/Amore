@@ -127,5 +127,5 @@ const Photos = (() => {
     });
   }
 
-  return { init, reloadPool };
+  return { init, reloadPool, render: (pool) => render(pool !== undefined ? pool : (_pool || [])) };
 })();
