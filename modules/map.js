@@ -36,12 +36,77 @@ const MapModule = (() => {
   }
 
   // ---------- Фото ----------
+
+  // Стиснення зображення через Canvas без втрати видимої якості
+  // maxW/maxH — максимальний розмір сторони (px), quality — JPEG якість 0..1
+  function compressImage(file, maxW, maxH, quality) {
+    maxW = maxW || 1920;
+    maxH = maxH || 1920;
+    quality = quality || 0.82;
+
+    return new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onerror = reject;
+        img.onload = function() {
+          var w = img.naturalWidth;
+          var h = img.naturalHeight;
+
+          // Масштабуємо пропорційно, якщо потрібно
+          if (w > maxW || h > maxH) {
+            var ratio = Math.min(maxW / w, maxH / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+
+          var canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+
+          var ctx = canvas.getContext('2d');
+          // Легке згладжування для зменшеного зображення
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, w, h);
+
+          canvas.toBlob(
+            function(blob) {
+              if (!blob) { reject(new Error('Canvas toBlob failed')); return; }
+              resolve(blob);
+            },
+            'image/jpeg',
+            quality
+          );
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   async function uploadMapPhoto(file, pinId) {
-    var ext = file.name.split('.').pop() || 'jpg';
-    var path = 'pin-' + pinId + '-' + Date.now() + '.' + ext;
+    var path = 'pin-' + pinId + '-' + Date.now() + '.jpg';
+
+    var blob;
+    try {
+      // Стискаємо до макс. 1920px по довшій стороні, JPEG 82%
+      blob = await compressImage(file, 1920, 1920, 0.82);
+      console.log(
+        'Фото стиснуто: ' + (file.size / 1024).toFixed(0) + ' KB → ' +
+        (blob.size / 1024).toFixed(0) + ' KB'
+      );
+    } catch (err) {
+      console.warn('Стиснення не вдалося, завантажуємо оригінал:', err);
+      blob = file;
+      path = 'pin-' + pinId + '-' + Date.now() + '.' + (file.name.split('.').pop() || 'jpg');
+    }
+
     var { error } = await supabase.storage
       .from(MAP_PHOTO_BUCKET)
-      .upload(path, file, { upsert: true, contentType: file.type });
+      .upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+
     if (error) { console.error('uploadMapPhoto error:', error); return null; }
     return SUPA_URL + '/storage/v1/object/public/' + MAP_PHOTO_BUCKET + '/' + path;
   }
