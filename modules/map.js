@@ -57,12 +57,11 @@ const MapModule = (() => {
 
   // ---------- Фото ----------
 
-  // Стиснення зображення через Canvas без втрати видимої якості
-  // maxW/maxH — максимальний розмір сторони (px), quality — JPEG якість 0..1
-  function compressImage(file, maxW, maxH, quality) {
-    maxW = maxW || 1920;
-    maxH = maxH || 1920;
-    quality = quality || 0.82;
+  // Стиснення зображення через Canvas
+  // maxSide — максимальний розмір довшої сторони (px), quality — JPEG 0..1
+  function compressImage(file, maxSide, quality) {
+    maxSide = maxSide || 1080;
+    quality = quality || 0.75;
 
     return new Promise(function(resolve, reject) {
       var reader = new FileReader();
@@ -74,9 +73,8 @@ const MapModule = (() => {
           var w = img.naturalWidth;
           var h = img.naturalHeight;
 
-          // Масштабуємо пропорційно, якщо потрібно
-          if (w > maxW || h > maxH) {
-            var ratio = Math.min(maxW / w, maxH / h);
+          if (w > maxSide || h > maxSide) {
+            var ratio = Math.min(maxSide / w, maxSide / h);
             w = Math.round(w * ratio);
             h = Math.round(h * ratio);
           }
@@ -86,7 +84,6 @@ const MapModule = (() => {
           canvas.height = h;
 
           var ctx = canvas.getContext('2d');
-          // Легке згладжування для зменшеного зображення
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, w, h);
@@ -106,22 +103,26 @@ const MapModule = (() => {
     });
   }
 
-  async function uploadMapPhoto(file, pinId) {
+  // onProgress(msg) — необов'язковий колбек для UI
+  async function uploadMapPhoto(file, pinId, onProgress) {
     var path = 'pin-' + pinId + '-' + Date.now() + '.jpg';
+
+    if (onProgress) onProgress('Стискаємо фото…');
 
     var blob;
     try {
-      // Стискаємо до макс. 1920px по довшій стороні, JPEG 82%
-      blob = await compressImage(file, 1920, 1920, 0.82);
-      console.log(
-        'Фото стиснуто: ' + (file.size / 1024).toFixed(0) + ' KB → ' +
-        (blob.size / 1024).toFixed(0) + ' KB'
-      );
+      // 1080px по довшій стороні, JPEG 75% — достатньо для перегляду на телефоні
+      blob = await compressImage(file, 1080, 0.75);
+      var origKb = (file.size / 1024).toFixed(0);
+      var newKb  = (blob.size  / 1024).toFixed(0);
+      console.log('Фото стиснуто: ' + origKb + ' KB → ' + newKb + ' KB');
     } catch (err) {
       console.warn('Стиснення не вдалося, завантажуємо оригінал:', err);
       blob = file;
       path = 'pin-' + pinId + '-' + Date.now() + '.' + (file.name.split('.').pop() || 'jpg');
     }
+
+    if (onProgress) onProgress('Завантажуємо фото…');
 
     var { error } = await supabase.storage
       .from(MAP_PHOTO_BUCKET)
@@ -395,16 +396,18 @@ const MapModule = (() => {
       if (!title) { alert('Вкажи назву'); return; }
 
       var saveBtn = document.getElementById('pin-edit-save');
-      saveBtn.textContent = 'Зберігаємо...';
       saveBtn.disabled = true;
 
       var update = { title: title, review: review || null, rating: selectedRating || null };
 
       if (photoInput.files && photoInput.files[0]) {
-        var url = await uploadMapPhoto(photoInput.files[0], pin.id);
+        var url = await uploadMapPhoto(photoInput.files[0], pin.id, function(msg) {
+          saveBtn.textContent = msg;
+        });
         if (url) update.photo_url = url;
       }
 
+      saveBtn.textContent = 'Зберігаємо...';
       var { error } = await supabase.from('map_pins').update(update).eq('id', pin.id);
       if (error) { alert('Помилка збереження'); saveBtn.textContent = 'Зберегти'; saveBtn.disabled = false; return; }
       closeModal();
@@ -436,6 +439,10 @@ const MapModule = (() => {
           '<div class="form-field">' +
             '<label for="pin-photo">Фото місця</label>' +
             '<input type="file" id="pin-photo" accept="image/*">' +
+            '<div id="pin-photo-preview" style="display:none;margin-top:8px;">' +
+              '<img id="pin-photo-preview-img" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;">' +
+              '<p id="pin-photo-preview-size" style="font-size:12px;color:#999;margin:4px 0 0;"></p>' +
+            '</div>' +
           '</div>' +
           '<div class="form-field">' +
             '<label for="pin-note">Нотатка</label>' +
@@ -465,6 +472,19 @@ const MapModule = (() => {
     document.getElementById('pin-save').addEventListener('click', function() {
       savePin(lat, lng, selectedCat);
     });
+
+    // Preview фото після вибору
+    document.getElementById('pin-photo').addEventListener('change', function(e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var preview = document.getElementById('pin-photo-preview');
+      var previewImg = document.getElementById('pin-photo-preview-img');
+      var previewSize = document.getElementById('pin-photo-preview-size');
+      var url = URL.createObjectURL(file);
+      previewImg.src = url;
+      previewSize.textContent = 'Оригінал: ' + (file.size / 1024).toFixed(0) + ' KB → буде стиснуто до ~1080px';
+      preview.style.display = 'block';
+    });
   }
 
   async function savePin(lat, lng, category) {
@@ -492,7 +512,9 @@ const MapModule = (() => {
     if (error) { alert('Помилка збереження'); saveBtn.textContent = 'Зберегти'; saveBtn.disabled = false; return; }
 
     if (photoInput && photoInput.files && photoInput.files[0]) {
-      var photoUrl = await uploadMapPhoto(photoInput.files[0], pinData.id);
+      var photoUrl = await uploadMapPhoto(photoInput.files[0], pinData.id, function(msg) {
+        saveBtn.textContent = msg;
+      });
       if (photoUrl) {
         await supabase.from('map_pins').update({ photo_url: photoUrl }).eq('id', pinData.id);
       }
