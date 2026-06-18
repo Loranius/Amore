@@ -18,7 +18,7 @@ const Photos = (() => {
   async function fetchPool() {
     const { data, error } = await supabase.storage
       .from(BUCKET)
-      .list('', { limit: 200, sortBy: { column: 'created_at', order: 'desc' } });
+      .list('', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
 
     if (error || !data || !data.length) {
       console.warn('Photos: не вдалось завантажити список фото або бакет порожній', error);
@@ -38,15 +38,6 @@ const Photos = (() => {
       [copy[i], copy[j]] = [copy[j], copy[i]];
     }
     return copy;
-  }
-
-  // ---------- Preload ----------
-  function preloadImages(urls) {
-    return Promise.all(urls.map(url => new Promise(resolve => {
-      const img = new Image();
-      img.onload = img.onerror = resolve;
-      img.src = url;
-    })));
   }
 
   // ---------- Вибрати N фото з пулу ----------
@@ -71,17 +62,13 @@ const Photos = (() => {
 
     const picks = pickPhotos(pool, images.length);
 
-    // Якщо пул порожній — лишаємо плейсхолдери без анімації
     if (!picks.length) return;
 
     const STAGGER  = 60;
     const FADE_OUT = 200;
     const FADE_IN  = 360;
 
-    // 1. Preload паралельно з анімацією виходу
-    const preloadPromise = preloadImages(picks);
-
-    // 2. Staggered fade out
+    // 1. Staggered fade out
     polaroids.forEach((p, i) => {
       setTimeout(() => {
         p.style.transition = `opacity ${FADE_OUT}ms ease, transform ${FADE_OUT}ms ease`;
@@ -92,21 +79,20 @@ const Photos = (() => {
 
     const totalOut = FADE_OUT + (polaroids.length - 1) * STAGGER + 40;
 
-    // 3. Міняємо src коли картки невидимі, потім fade in
+    // 2. Міняємо src після fade-out, без примусового preload
     setTimeout(() => {
-      preloadPromise.then(() => {
-        images.forEach((img, i) => {
-          img.style.transition = 'none';
-          img.src = picks[i] || img.src;
-        });
+      images.forEach((img, i) => {
+        img.style.transition = 'none';
+        img.src = picks[i] || img.src;
+        img.loading = 'lazy';
+      });
 
-        polaroids.forEach((p, i) => {
-          setTimeout(() => {
-            p.style.transition = `opacity ${FADE_IN}ms ease, transform ${FADE_IN}ms cubic-bezier(.34,1.35,.64,1)`;
-            p.style.opacity = '1';
-            p.style.transform = '';
-          }, i * STAGGER);
-        });
+      polaroids.forEach((p, i) => {
+        setTimeout(() => {
+          p.style.transition = `opacity ${FADE_IN}ms ease, transform ${FADE_IN}ms cubic-bezier(.34,1.35,.64,1)`;
+          p.style.opacity = '1';
+          p.style.transform = '';
+        }, i * STAGGER);
       });
     }, totalOut);
   }

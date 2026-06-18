@@ -19,7 +19,27 @@ const MapModule = (() => {
   let markers = [];
   let allPins = [];
   let mapInitialized = false;
+  let mapboxLoaded = false;
   const DEFAULT_CENTER = [30.5234, 50.4501];
+
+  // ── Динамічне завантаження Mapbox (лише при першому відкритті вкладки) ──
+  function loadMapboxResources() {
+    return new Promise(function(resolve) {
+      if (mapboxLoaded) { resolve(); return; }
+
+      // CSS
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css';
+      document.head.appendChild(link);
+
+      // JS
+      var script = document.createElement('script');
+      script.src = 'https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js';
+      script.onload = function() { mapboxLoaded = true; resolve(); };
+      document.head.appendChild(script);
+    });
+  }
 
   function escapeHtml(str) {
     var div = document.createElement('div');
@@ -504,7 +524,9 @@ const MapModule = (() => {
   // ---------- Init ----------
   function refresh() {
     if (!mapInitialized) {
-      setTimeout(function() { initMap(); }, 100);
+      loadMapboxResources().then(function() {
+        setTimeout(function() { initMap(); }, 100);
+      });
     } else {
       map.resize();
       loadAndRender();

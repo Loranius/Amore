@@ -29,7 +29,8 @@ const Budget = (() => {
   async function fetchAll() {
     const {data} = await supabase.from('transactions')
       .select('id,amount,type,category,description,date,created_by')
-      .order('date',{ascending:false});
+      .order('date',{ascending:false})
+      .limit(500);
     allTx = data||[];
   }
 
