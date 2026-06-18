@@ -19,4 +19,5 @@ document.addEventListener('DOMContentLoaded', () => {
   Swipe.init();
   MapModule.init();
   Shopping.init();
+  Settings.init();
 });
