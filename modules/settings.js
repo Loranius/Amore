@@ -53,11 +53,16 @@ const Settings = (() => {
 
   // Завантажує один файл; повертає { name, url } або null
   async function uploadPhoto(file) {
-    const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
+    let blob = file, ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
+    try {
+      const out = await Img.compress(file, 1280, 0.78); // ~1280px, WebP/JPEG
+      blob = out.blob; ext = out.ext; contentType = out.contentType;
+    } catch (e) { console.warn('uploadPhoto: стиснення не вдалося, заливаю оригінал', e); }
+
     const safeName = `photo_${Date.now()}_${Math.random().toString(36).slice(2,7)}.${ext}`;
     const { error } = await supabase.storage
       .from(BUCKET)
-      .upload(safeName, file, { upsert: false, contentType: file.type });
+      .upload(safeName, blob, { upsert: false, contentType });
     if (error) { console.error('uploadPhoto error:', error); return null; }
     return { name: safeName, url: `${STORAGE_BASE}/${safeName}` };
   }

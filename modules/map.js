@@ -232,7 +232,7 @@ const MapModule = (() => {
       card.className = 'pin-card';
 
       var photoHtml = pin.photo_url
-        ? '<img class="pin-card-photo" src="' + pin.photo_url + '" alt="' + escapeHtml(pin.title) + '">'
+        ? '<img class="pin-card-photo" loading="lazy" src="' + pin.photo_url + '" alt="' + escapeHtml(pin.title) + '">'
         : '<div class="pin-card-photo-placeholder">' + cat.emoji + '</div>';
 
       var ratingHtml = '';

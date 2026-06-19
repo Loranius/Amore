@@ -59,12 +59,16 @@ const Media = (() => {
 
   // ---------- Завантаження постера ----------
   async function uploadPoster(file, itemId) {
-    const ext = file.name.split('.').pop() || 'jpg';
-    const path = `${activeType}-${itemId}-${Date.now()}.${ext}`;
+    let blob = file, ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
+    try {
+      const out = await Img.compress(file, 900, 0.78); // постер невеликий — 900px досить
+      blob = out.blob; ext = out.ext; contentType = out.contentType;
+    } catch (e) { console.warn('uploadPoster: стиснення не вдалося, заливаю оригінал', e); }
 
+    const path = `${activeType}-${itemId}-${Date.now()}.${ext}`;
     const { error } = await supabase.storage
       .from(STORAGE_BUCKET)
-      .upload(path, file, { upsert: true, contentType: file.type });
+      .upload(path, blob, { upsert: true, contentType });
 
     if (error) { console.error('uploadPoster error:', error); return null; }
 

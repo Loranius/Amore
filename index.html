@@ -6,6 +6,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="theme-color" content="#FFF3F6">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Наш портал</title>
 
@@ -90,27 +92,27 @@
           <p class="polaroid-caption">Events 🗓️</p>
         </a>
         <a href="#" class="polaroid" data-view-link="wishlist">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" data-photo-slot="2"></div>
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="2"></div>
           <p class="polaroid-caption">Wishlist ♡</p>
         </a>
         <a href="#" class="polaroid" data-view-link="budget">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" data-photo-slot="3"></div>
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="3"></div>
           <p class="polaroid-caption">Finance ₴</p>
         </a>
         <a href="#" class="polaroid" data-view-link="capsule">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" data-photo-slot="4"></div>
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="4"></div>
           <p class="polaroid-caption">Time message ✉</p>
         </a>
         <a href="#" class="polaroid" data-view-link="question">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" data-photo-slot="5"></div>
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="5"></div>
           <p class="polaroid-caption">Question ?</p>
         </a>
         <a href="#" class="polaroid" data-view-link="media">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" data-photo-slot="6"></div>
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="6"></div>
           <p class="polaroid-caption">Watchlist ▶</p>
         </a>
         <a href="#" class="polaroid wide" data-view-link="random">
-          <div class="polaroid-photo"><img src="https://placehold.co/600x270/FFE9EF/C45B79?text=…" alt="" data-photo-slot="7"></div>
+          <div class="polaroid-photo"><img src="https://placehold.co/600x270/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="7"></div>
           <p class="polaroid-caption">Random 🎲</p>
         </a>
       </div>
@@ -617,9 +619,9 @@
 
 <!-- ===================== SCRIPTS ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <!-- Mapbox GL JS завантажується динамічно в map.js -->
 <script src="lib/supabase.js"></script>
+<script src="lib/img.js"></script>
 <script src="modules/auth.js"></script>
 <script src="modules/router.js"></script>
 <script src="modules/counter.js"></script>
@@ -637,5 +639,16 @@
 <script src="modules/shopping.js"></script>
 <script src="modules/settings.js"></script>
 <script src="modules/app.js"></script>
+
+<!-- PWA: реєстрація service worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(err =>
+        console.warn('SW registration failed:', err)
+      );
+    });
+  }
+</script>
 </body>
 </html>

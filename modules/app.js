@@ -4,6 +4,14 @@
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
+  // ── Легкий haptic-відгук на ключові натискання (Android Chrome) ──
+  document.addEventListener('click', (e) => {
+    if (!navigator.vibrate) return;
+    if (e.target.closest('.nav-btn, .more-menu-item, .btn-primary')) {
+      navigator.vibrate(8);
+    }
+  }, { passive: true });
+
   // ── CORE: потрібні одразу ──
   Auth.init();
   Router.init();
