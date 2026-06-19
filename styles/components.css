@@ -449,9 +449,8 @@
   padding: var(--space-5);
   width: 100%;
   max-width: 420px;
-  max-height: 90dvh;
+  max-height: calc(100dvh - 48px);
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   animation: pop-in 0.28s cubic-bezier(.34,1.4,.64,1) both;
 }
 
@@ -2707,10 +2706,9 @@
   bottom: 0;
   z-index: 2;
   background: var(--surface);
-  /* м'яке затінення над кнопкою, щоб було видно що є контент вище */
   box-shadow: 0 -16px 20px 4px var(--surface);
-  margin-bottom: calc(-28px - env(safe-area-inset-bottom, 0px));
-  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  margin-bottom: 0;
+  padding-bottom: 14px;
 }
 
 /* ── Chips категорій ── */
