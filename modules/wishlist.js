@@ -140,11 +140,15 @@ const Wishlist = (() => {
         </div>`;
     } else {
       const isReserved = item.reserved;
-      actions = `
+      actions = isReserved
+        ? `
+        <div class="wl-card-actions wl-reserved-row">
+          <div class="wl-reserved-status">✅ Вже купив(ла)</div>
+          <button class="wl-cancel-reserve-btn" data-id="${item.id}">Скасувати бронь</button>
+        </div>`
+        : `
         <div class="wl-card-actions">
-          <button class="wl-reserve-btn ${isReserved?'reserved':''}" data-id="${item.id}" data-reserved="${isReserved}">
-            ${isReserved ? '✅ Вже купив(ла)' : '🎁 Забронювати'}
-          </button>
+          <button class="wl-reserve-btn" data-id="${item.id}">🎁 Забронювати</button>
         </div>`;
     }
 
@@ -182,7 +186,8 @@ const Wishlist = (() => {
 
     card.querySelector('.wl-edit-btn')?.addEventListener('click', () => openEditModal(item));
     card.querySelector('.wl-del-btn')?.addEventListener('click',  () => deleteItem(item.id));
-    card.querySelector('.wl-reserve-btn')?.addEventListener('click', () => reserveItem(item.id, item.reserved));
+    card.querySelector('.wl-reserve-btn')?.addEventListener('click', () => reserveItem(item.id, false));
+    card.querySelector('.wl-cancel-reserve-btn')?.addEventListener('click', () => cancelReserve(item.id));
   }
 
   // ── ДОДАТИ / РЕДАГУВАТИ ──
@@ -289,6 +294,12 @@ const Wishlist = (() => {
       .eq('id', id);
     if(error){ alert('Помилка: '+error.message); return; }
     renderGrid();
+  }
+
+  // Скасування броні — з підтвердженням, щоб не зняти випадково
+  async function cancelReserve(id) {
+    if(!confirm('Скасувати бронювання цього подарунка?')) return;
+    await reserveItem(id, true); // true → newVal=false (знімаємо бронь)
   }
 
   // ── РОЗМІРИ ──
