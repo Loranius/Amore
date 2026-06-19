@@ -79,6 +79,7 @@
         <p class="counter-eyebrow" id="counter-since">з якогось дня</p>
         <div class="counter-num" id="counter-number">—</div>
         <p class="counter-label">днів разом</p>
+        <p class="counter-next-anniversary" id="counter-next-anniversary"></p>
       </div>
 
       <div id="next-event-widget" class="next-event-widget"></div>
@@ -140,12 +141,6 @@
     <!-- ---------- Wishlist ---------- -->
     <section class="view hidden" id="view-wishlist" data-view="wishlist">
 
-      <!-- Вкладки -->
-      <div class="wl-tabs">
-        <button class="wl-tab active" data-tab="wishes" id="wl-tab-wishes">💫 Бажання</button>
-        <button class="wl-tab" data-tab="sizes" id="wl-tab-sizes">📐 Заміри</button>
-      </div>
-
       <!-- Панель бажань -->
       <div id="wl-panel-wishes">
         <div class="view-header" style="margin-bottom:12px">
@@ -153,14 +148,6 @@
           <button class="btn-primary" id="add-wish-btn">+ Додати бажання</button>
         </div>
         <div id="wishlist-grid"></div>
-      </div>
-
-      <!-- Панель розмірів -->
-      <div id="wl-panel-sizes" class="hidden">
-        <div class="view-header" style="margin-bottom:12px">
-          <h2 class="display-md">Розміри</h2>
-        </div>
-        <div id="wishlist-sizes-grid"></div>
       </div>
 
     </section>
@@ -444,6 +431,10 @@
         <span class="map-legend-item"><span class="map-legend-dot favorite"></span>Улюблене</span>
       </div>
 
+      <div class="map-search-wrap">
+        <input type="search" id="pin-search" class="fin-inp" placeholder="🔍 Пошук місць…" style="width:100%;margin-bottom:8px">
+      </div>
+
       <div id="map-container" class="map-container"></div>
 
       <div id="pin-list" class="pin-list"></div>
@@ -546,9 +537,9 @@
     <button class="nav-btn nav-btn-home active" data-view="home">
       <span class="nav-icon-home">♡</span>
     </button>
-    <button class="nav-btn" data-view="random">
-      <span class="nav-icon">🎲</span>
-      <span class="nav-label">Random</span>
+    <button class="nav-btn" data-view="shopping">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">Покупки</span>
     </button>
     <button class="nav-btn" id="more-nav-btn">
       <span class="nav-icon">⋯</span>
@@ -566,6 +557,9 @@
       <button class="more-menu-item" data-view="media">
         <span class="nav-icon">🃏</span> Watchlist
       </button>
+      <button class="more-menu-item" data-view="random">
+        <span class="nav-icon">🎲</span> Random
+      </button>
       <button class="more-menu-item" data-view="capsule">
         <span class="nav-icon">✉</span> Time message
       </button>
@@ -574,9 +568,6 @@
       </button>
       <button class="more-menu-item" data-view="map">
         <span class="nav-icon">🗺</span> Наша карта
-      </button>
-      <button class="more-menu-item" data-view="shopping">
-        <span class="nav-icon">🛒</span> Список покупок
       </button>
       <button class="more-menu-item more-menu-settings-btn" id="more-menu-settings">
         <span class="nav-icon">⚙</span> Налаштування
