@@ -20,6 +20,7 @@ const MapModule = (() => {
   let allPins = [];
   let mapInitialized = false;
   let mapboxLoaded = false;
+  let searchDebounce = null;
   const DEFAULT_CENTER = [30.5234, 50.4501];
 
   // ── Динамічне завантаження Mapbox (лише при першому відкритті вкладки) ──
@@ -261,12 +262,85 @@ const MapModule = (() => {
     });
   }
 
+  // ---------- Геокодинг (пошук місць через Mapbox) ----------
+  async function geocodePlaces(query) {
+    var url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/' +
+      encodeURIComponent(query) + '.json' +
+      '?access_token=' + MAPBOX_TOKEN +
+      '&limit=5&language=uk';
+    try {
+      var res = await fetch(url);
+      if (!res.ok) { console.error('geocode HTTP', res.status); return []; }
+      var json = await res.json();
+      return json.features || [];
+    } catch (e) {
+      console.error('geocode error:', e);
+      return [];
+    }
+  }
+
+  function renderGeoResults(features, dropdown, input) {
+    if (!features.length) {
+      dropdown.innerHTML = '<div style="padding:10px 12px;color:#999;font-size:14px;">Нічого не знайдено 🔍</div>';
+      dropdown.style.display = 'block';
+      return;
+    }
+    dropdown.innerHTML = '';
+    features.forEach(function(f) {
+      var item = document.createElement('div');
+      item.style.cssText = 'padding:10px 12px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,0.06);font-size:14px;line-height:1.3;';
+      item.innerHTML = '<b>' + escapeHtml(f.text || '') + '</b>' +
+        '<div style="color:#888;font-size:12px;">' + escapeHtml(f.place_name || '') + '</div>';
+      item.addEventListener('mouseenter', function(){ item.style.background = 'rgba(232,130,156,0.12)'; });
+      item.addEventListener('mouseleave', function(){ item.style.background = ''; });
+      item.addEventListener('click', function() {
+        var lng = f.center[0], lat = f.center[1];
+        dropdown.style.display = 'none';
+        input.value = '';
+        if (map) map.flyTo({ center: [lng, lat], zoom: 14 });
+        openAddModal(lat, lng);
+        var titleInp = document.getElementById('pin-title');
+        if (titleInp) titleInp.value = f.text || f.place_name || '';
+      });
+      dropdown.appendChild(item);
+    });
+    dropdown.style.display = 'block';
+  }
+
   function bindPinSearch() {
     var input = document.getElementById('pin-search');
     if (!input || input.dataset.bound) return;
     input.dataset.bound = '1';
+
+    // Випадаючий список результатів пошуку
+    var wrap = input.parentNode;
+    wrap.style.position = 'relative';
+    var dropdown = document.createElement('div');
+    dropdown.id = 'pin-search-results';
+    dropdown.style.cssText =
+      'position:absolute;left:0;right:0;top:' + (input.offsetHeight || 40) + 'px;' +
+      'background:#fff;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.18);' +
+      'z-index:60;display:none;max-height:260px;overflow-y:auto;';
+    wrap.appendChild(dropdown);
+
     input.addEventListener('input', function() {
+      var q = input.value.trim();
+      // паралельно фільтруємо власні збережені піни внизу
       renderPinCards(input.value);
+
+      clearTimeout(searchDebounce);
+      if (q.length < 3) { dropdown.style.display = 'none'; dropdown.innerHTML = ''; return; }
+      searchDebounce = setTimeout(async function() {
+        var feats = await geocodePlaces(q);
+        renderGeoResults(feats, dropdown, input);
+      }, 350);
+    });
+
+    // Закриття списку при кліку поза ним
+    document.addEventListener('click', function(e) {
+      if (e.target !== input && !dropdown.contains(e.target)) {
+        dropdown.style.display = 'none';
+      }
     });
   }
 
