@@ -2444,6 +2444,121 @@
    ============================================================ */
 
 /* ── Огляд ── */
+/* ═══════════════════════════════════════════════════════════
+   FINANCE v6 — Тумбочка · Ліміт · Цілі
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Тумбочка: hero-карта ── */
+.tumbo-hero-card {
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
+  border-radius: var(--radius-lg);
+  padding: 24px 20px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 24px -6px rgba(196,91,121,0.35);
+}
+.tumbo-hero-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.tumbo-hero-icon {
+  font-size: 40px;
+  line-height: 1;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
+}
+.tumbo-hero-label {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.8);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.tumbo-hero-amount {
+  font-family: var(--font-display);
+  font-size: 36px;
+  font-weight: 900;
+  color: #fff;
+  line-height: 1.1;
+}
+.tumbo-hero-btn {
+  background: rgba(255,255,255,0.22) !important;
+  color: #fff !important;
+  border: 1.5px solid rgba(255,255,255,0.45) !important;
+  font-size: 15px !important;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s;
+}
+.tumbo-hero-btn:active { background: rgba(255,255,255,0.32) !important; }
+
+/* ── Тумбочка: модалка ── */
+.tumbo-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 16px;
+  border-bottom: 1.5px solid var(--line);
+  margin-bottom: 4px;
+}
+.tumbo-modal-icon-wrap { font-size: 34px; line-height: 1; }
+.tumbo-modal-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.tumbo-modal-balance {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 900;
+  color: #2E7D32;
+}
+
+/* ── Секційні картки (ліміт, цілі) ── */
+.fin-section-card {
+  padding: 18px 16px 20px;
+  margin-bottom: 16px;
+}
+.fin-section-head {
+  margin-bottom: 14px;
+}
+.fin-section-head--row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fin-section-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.fin-section-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 0;
+}
+.fin-add-goal-btn {
+  flex-shrink: 0;
+  padding: 7px 14px !important;
+  font-size: 13px !important;
+  margin-top: 2px;
+}
+
+/* ── tumbo-mode-panel: default hidden ── */
+.tumbo-mode-panel { display: none; }
+.tumbo-mode-panel.active { display: block; }
+
+/* ════════════════════════════════════════════════════════════
+   Нижче — старий Finance CSS (залишено для зворотної сумісності
+   з іншими стилями, що можуть посилатись на ці класи)
+   ════════════════════════════════════════════════════════════ */
 .fin-overview { padding: 0 0 16px; }
 
 .fin-balance-card {
