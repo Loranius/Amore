@@ -2582,6 +2582,19 @@
 }
 .fin-sheet-balance { font-size: 22px; color: #2E7D32; }
 
+/* ── Кнопка збереження: липне до низу шторки при скролі форми ── */
+.fin-form > .btn-primary,
+.tumbo-mode-panel .btn-primary {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background: var(--surface);
+  /* м'яке затінення над кнопкою, щоб було видно що є контент вище */
+  box-shadow: 0 -16px 20px 4px var(--surface);
+  margin-bottom: calc(-28px - env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+
 /* ── Chips категорій ── */
 .fin-cat-chips {
   display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px;
