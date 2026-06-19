@@ -430,7 +430,7 @@
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   padding: 24px 16px 32px;
   z-index: 100;
@@ -449,7 +449,6 @@
   padding: var(--space-5);
   width: 100%;
   max-width: 420px;
-  margin-top: 25%;
   animation: pop-in 0.28s cubic-bezier(.34,1.4,.64,1) both;
 }
 
