@@ -27,7 +27,7 @@ const Budget = (() => {
         </div>
       </div>
       <div class="tumbo-mode-tabs" style="margin:16px 0 8px">
-        <button class="tumbo-mode-btn active" data-mode="manual">Є відкладені</button>
+        <button class="tumbo-mode-btn active" data-mode="manual">Поповнити</button>
         <button class="tumbo-mode-btn" data-mode="income">З доходу</button>
         <button class="tumbo-mode-btn" data-mode="withdraw">Зняти</button>
       </div>
