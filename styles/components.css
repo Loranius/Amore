@@ -2480,9 +2480,10 @@
   gap: 4px; padding: 14px 8px;
   border: none; border-radius: var(--radius-md);
   font-family: var(--font-body); font-size: 12px; font-weight: 700;
-  cursor: pointer; transition: transform 0.15s, opacity 0.15s;
+  cursor: pointer; box-shadow: var(--shadow-soft);
+  transition: transform 0.15s, opacity 0.15s, box-shadow 0.15s;
 }
-.fin-action-btn:active { transform: scale(0.95); opacity: 0.8; }
+.fin-action-btn:active { transform: scale(0.95); opacity: 0.8; box-shadow: var(--shadow-card); }
 .fin-action-icon { font-size: 22px; }
 .fin-action-income  { background: #E8F5E9; color: #2E7D32; }
 .fin-action-expense { background: #FFEBEE; color: #C62828; }
