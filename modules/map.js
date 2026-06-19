@@ -175,6 +175,7 @@ const MapModule = (() => {
     markers = [];
     allPins.forEach(function(pin) { addMarker(pin); });
     renderPinCards();
+    bindPinSearch();
   }
 
   // ---------- Маркер ----------
@@ -199,18 +200,32 @@ const MapModule = (() => {
   }
 
   // ---------- Картки пінів внизу ----------
-  function renderPinCards() {
+  function renderPinCards(filterText) {
     var wrap = document.getElementById('pin-list');
     if (!wrap) return;
+
+    var query = (filterText || '').toLowerCase().trim();
+    var pins = query
+      ? allPins.filter(function(p) {
+          return (p.title || '').toLowerCase().includes(query) ||
+                 (p.review || '').toLowerCase().includes(query) ||
+                 (p.note || '').toLowerCase().includes(query);
+        })
+      : allPins;
 
     if (!allPins.length) {
       wrap.innerHTML = '<p class="empty-state">Натисни на карту щоб додати місце</p>';
       return;
     }
 
+    if (query && !pins.length) {
+      wrap.innerHTML = '<p class="empty-state">Нічого не знайдено 🔍</p>';
+      return;
+    }
+
     wrap.innerHTML = '';
 
-    allPins.forEach(function(pin) {
+    pins.forEach(function(pin) {
       var cat = CATEGORIES[pin.category] || CATEGORIES.visited;
       var card = document.createElement('div');
       card.className = 'pin-card';
@@ -243,6 +258,15 @@ const MapModule = (() => {
       });
 
       wrap.appendChild(card);
+    });
+  }
+
+  function bindPinSearch() {
+    var input = document.getElementById('pin-search');
+    if (!input || input.dataset.bound) return;
+    input.dataset.bound = '1';
+    input.addEventListener('input', function() {
+      renderPinCards(input.value);
     });
   }
 

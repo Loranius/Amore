@@ -163,13 +163,48 @@ const RandomModule = (() => {
       row.className = 'dish-row';
       row.innerHTML = `
         <p class="dish-title">${escapeHtml(d.title)}</p>
-        <button class="delete-btn" data-delete-dish-id="${d.id}" title="Видалити">×</button>
+        <div class="dish-row-actions">
+          <button class="dish-edit-btn" data-edit-dish-id="${d.id}" data-title="${escapeHtml(d.title)}" title="Редагувати">✏️</button>
+          <button class="delete-btn" data-delete-dish-id="${d.id}" title="Видалити">×</button>
+        </div>
       `;
       wrap.appendChild(row);
     });
 
     wrap.querySelectorAll('[data-delete-dish-id]').forEach(btn => {
       btn.addEventListener('click', () => deleteDish(btn.dataset.deleteDishId));
+    });
+    wrap.querySelectorAll('[data-edit-dish-id]').forEach(btn => {
+      btn.addEventListener('click', () => openEditDishModal(btn.dataset.editDishId, btn.dataset.title));
+    });
+  }
+
+  function openEditDishModal(id, currentTitle) {
+    const root = document.getElementById('modal-root');
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <h3>Редагувати страву</h3>
+        <div class="form-field">
+          <label>Назва</label>
+          <input type="text" id="edit-dish-title" class="fin-inp" value="${currentTitle}">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="edit-dish-cancel">Скасувати</button>
+          <button class="btn-primary" id="edit-dish-save">Зберегти</button>
+        </div>
+      </div>`;
+    root.innerHTML = ''; root.appendChild(overlay);
+    overlay.querySelector('#edit-dish-cancel').addEventListener('click', () => root.innerHTML = '');
+    overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
+    overlay.querySelector('#edit-dish-save').addEventListener('click', async () => {
+      const title = overlay.querySelector('#edit-dish-title').value.trim();
+      if (!title) return;
+      const { error } = await supabase.from('dishes').update({ title }).eq('id', id);
+      if (error) { alert('Помилка збереження'); return; }
+      root.innerHTML = '';
+      refreshDishes();
     });
   }
 

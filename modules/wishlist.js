@@ -6,9 +6,8 @@ const Wishlist = (() => {
   let allUsers     = [];
   let currentUser  = null;
   let partnerUser  = null;
-  let activeTab    = 'wishes'; // 'wishes' | 'sizes'
+  let activeTab    = 'wishes';
   let wishingFor   = 'me';     // 'me' | 'partner'
-  let sizesOwnerId = null;
 
   const el  = id => document.getElementById(id);
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
@@ -125,20 +124,15 @@ const Wishlist = (() => {
     const card = document.createElement('div');
     card.className = 'wl-card';
 
-    const img = item.image_url
-      ? `<div class="wl-card-img"><img src="${esc(item.image_url)}" alt="" loading="lazy"></div>`
-      : '';
-
-    const titleEl = item.link
+    const price    = item.price ? `<span class="wl-card-price">${(+item.price).toLocaleString('uk-UA')} ₴</span>` : '';
+    const priority = item.priority ? `<span class="wl-card-priority">${PRIORITY_LABELS[item.priority]||''}</span>` : '';
+    const comment  = item.description ? `<p class="wl-card-comment">${esc(item.description)}</p>` : '';
+    const titleEl  = item.link
       ? `<a class="wl-card-title" href="${esc(item.link)}" target="_blank" rel="noopener">${esc(item.title)}</a>`
       : `<span class="wl-card-title">${esc(item.title)}</span>`;
 
-    const price    = item.price    ? `<span class="wl-card-price">${(+item.price).toLocaleString('uk-UA')} ₴</span>` : '';
-    const priority = item.priority ? `<span class="wl-card-priority">${PRIORITY_LABELS[item.priority]||''}</span>` : '';
-    const comment  = item.description ? `<p class="wl-card-comment">${esc(item.description)}</p>` : '';
-
     let actions = '';
-    if(isOwn) {
+    if (isOwn) {
       actions = `
         <div class="wl-card-actions">
           <button class="btn-secondary wl-edit-btn" data-id="${item.id}">✏️ Редагувати</button>
@@ -154,7 +148,7 @@ const Wishlist = (() => {
         </div>`;
     }
 
-    card.innerHTML = `${img}
+    card.innerHTML = `
       <div class="wl-card-body">
         <div class="wl-card-header">${titleEl}${price}</div>
         <div class="wl-card-meta">${priority}</div>
@@ -162,12 +156,33 @@ const Wishlist = (() => {
         ${actions}
       </div>`;
 
+    // Свайп вліво для швидкого видалення (тільки свої)
+    if (isOwn) {
+      let startX = 0, dx = 0, swiping = false;
+      card.addEventListener('touchstart', e => { startX = e.touches[0].clientX; swiping = true; dx = 0; }, { passive: true });
+      card.addEventListener('touchmove', e => {
+        if (!swiping) return;
+        dx = e.touches[0].clientX - startX;
+        if (dx < 0) card.style.transform = `translateX(${Math.max(dx, -80)}px)`;
+      }, { passive: true });
+      card.addEventListener('touchend', () => {
+        swiping = false;
+        if (dx < -60) {
+          card.style.transition = 'transform 0.2s';
+          card.style.transform = 'translateX(-80px)';
+          card.querySelector('.wl-del-btn')?.classList.add('swipe-visible');
+        } else {
+          card.style.transition = 'transform 0.2s';
+          card.style.transform = '';
+        }
+      });
+    }
+
     container.appendChild(card);
 
-    // Bind
     card.querySelector('.wl-edit-btn')?.addEventListener('click', () => openEditModal(item));
     card.querySelector('.wl-del-btn')?.addEventListener('click',  () => deleteItem(item.id));
-    card.querySelector('.wl-reserve-btn')?.addEventListener('click', btn => reserveItem(item.id, item.reserved));
+    card.querySelector('.wl-reserve-btn')?.addEventListener('click', () => reserveItem(item.id, item.reserved));
   }
 
   // ── ДОДАТИ / РЕДАГУВАТИ ──
@@ -440,11 +455,8 @@ const Wishlist = (() => {
     allUsers    = await loadUsers();
     currentUser = Auth.getCurrentUser();
     partnerUser = allUsers.find(u => u.id !== currentUser?.id) || null;
-    sizesOwnerId = sizesOwnerId || currentUser?.id;
-    activeTab = 'wishes';
     wishingFor = 'me';
-    setupTabs();
-    switchTab('wishes');
+    renderWishes();
     el('add-wish-btn')?.addEventListener('click', openAddModal);
   }
 

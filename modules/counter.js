@@ -81,6 +81,34 @@ const Counter = (() => {
       '</div>';
   }
 
+  async function renderNextAnniversary(startDate) {
+    const el = document.getElementById('counter-next-anniversary');
+    if (!el || !startDate) return;
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const start = new Date(startDate);
+
+    // Наступна річниця відносин (щорічно від startDate)
+    let nextAnn = new Date(start);
+    nextAnn.setFullYear(now.getFullYear());
+    if (nextAnn <= now) nextAnn.setFullYear(now.getFullYear() + 1);
+
+    const diffDays = Math.round((nextAnn - now) / (1000 * 60 * 60 * 24));
+    const years = nextAnn.getFullYear() - start.getFullYear();
+
+    let label;
+    if (diffDays === 0) label = `🎉 Сьогодні ${years} рік разом!`;
+    else if (diffDays === 1) label = `💕 Завтра ${years} рік разом`;
+    else if (diffDays <= 30) label = `💕 Річниця через ${diffDays} дн. (${years} р.)`;
+    else {
+      const months = Math.round(diffDays / 30);
+      label = `Річниця через ~${months} міс.`;
+    }
+
+    el.textContent = label;
+  }
+
   async function render() {
     const startDate = await loadStartDate();
 
@@ -103,6 +131,7 @@ const Counter = (() => {
     [homeSince, calSince].forEach(el => el && (el.textContent = sinceStr));
 
     renderNextEvent();
+    renderNextAnniversary(startDate);
   }
 
   function init() {
