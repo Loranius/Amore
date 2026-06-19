@@ -3209,3 +3209,52 @@ a.wl-card-title:hover { text-decoration: underline; color: var(--accent-deep); }
 @media (hover: none) {
   .photo-manager-del { opacity: 1; }
 }
+
+/* ============================================================
+   PATCH — UI improvements
+   ============================================================ */
+
+/* Річниця під лічильником */
+.counter-next-anniversary {
+  font-size: 12px;
+  color: var(--accent);
+  margin-top: 6px;
+  opacity: 0.85;
+  font-weight: 500;
+  min-height: 16px;
+}
+
+/* Пошук на карті */
+.map-search-wrap { margin-bottom: 4px; }
+
+/* Рядок страви з кнопкою редагування */
+.dish-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.dish-row:last-child { border-bottom: none; }
+.dish-title { flex: 1; margin: 0; font-size: 15px; }
+.dish-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.dish-edit-btn {
+  background: none; border: none; font-size: 15px;
+  cursor: pointer; padding: 2px 6px; border-radius: 6px;
+  opacity: 0.6; transition: opacity 0.15s;
+}
+.dish-edit-btn:hover { opacity: 1; }
+
+/* Wishlist — картка без зображення, компактніша */
+.wl-card {
+  overflow: hidden;
+  transition: transform 0.2s;
+}
+.wl-card .wl-card-img { display: none; } /* ховаємо зображення в компактному режимі */
+
+/* Свайп-видалення */
+.wl-del-btn.swipe-visible {
+  animation: pulse-del 0.3s ease;
+}
+@keyframes pulse-del {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+/* Розміри в налаштуваннях */
+.settings-sizes-wrap .sizes-grid { margin-top: 0; }
