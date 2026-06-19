@@ -29,6 +29,7 @@ const Budget = (() => {
       <div class="tumbo-mode-tabs" style="margin:16px 0 8px">
         <button class="tumbo-mode-btn active" data-mode="manual">Є відкладені</button>
         <button class="tumbo-mode-btn" data-mode="income">З доходу</button>
+        <button class="tumbo-mode-btn" data-mode="withdraw">Зняти</button>
       </div>
 
       <div class="tumbo-mode-panel active" id="tumbo-panel-manual">
@@ -37,6 +38,16 @@ const Budget = (() => {
                placeholder="0 ₴" min="0" inputmode="decimal" style="text-align:center">
         <button class="btn-primary" id="tumbo-manual-btn" style="width:100%;margin-top:14px">
           Додати до тумбочки
+        </button>
+      </div>
+
+      <div class="tumbo-mode-panel" id="tumbo-panel-withdraw">
+        <p class="tumbo-hint">Вкажіть суму яку хочете зняти з тумбочки — баланс зменшиться.</p>
+        <input type="number" id="tumbo-withdraw-inp" class="fin-inp fin-inp-big"
+               placeholder="0 ₴" min="0" inputmode="decimal" style="text-align:center">
+        <p class="tumbo-hint" style="margin-top:8px;color:var(--text-muted)">Доступно: <b>${fmtN(balance)}</b></p>
+        <button class="btn-secondary" id="tumbo-withdraw-btn" style="width:100%;margin-top:14px;background:#fce4ec;color:#c62828;border-color:#ef9a9a">
+          Зняти з тумбочки
         </button>
       </div>
 
@@ -116,6 +127,20 @@ const Budget = (() => {
       if(toSave>0) await supabase.from('transactions').insert({
         amount:toSave, type:'expense', category:'Тумбочка',
         date:today(), description:'Відкладено з доходу', created_by:user?.id||null
+      });
+      closeModal();
+      fetchTumboBalance();
+    });
+
+    // Режим 3: зняти з тумбочки
+    const wdInp = el('tumbo-withdraw-inp');
+    el('tumbo-withdraw-btn')?.addEventListener('click',async()=>{
+      const v = parseFloat(wdInp?.value);
+      if(!v||v<=0){ shake(wdInp); return; }
+      const user = Auth.getCurrentUser();
+      await supabase.from('transactions').insert({
+        amount:v, type:'expense', category:'Тумбочка',
+        date:today(), description:'Знято з тумбочки', created_by:user?.id||null
       });
       closeModal();
       fetchTumboBalance();
