@@ -449,6 +449,9 @@
   padding: var(--space-5);
   width: 100%;
   max-width: 420px;
+  max-height: 90dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   animation: pop-in 0.28s cubic-bezier(.34,1.4,.64,1) both;
 }
 
