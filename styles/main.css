@@ -349,10 +349,10 @@ body {
 }
 
 .view.slide-in-right {
-  animation: slide-in-right 0.32s cubic-bezier(.22,.61,.36,1) both;
+  animation: slide-in-right 0.32s cubic-bezier(.22,.61,.36,1) backwards;
 }
 .view.slide-in-left {
-  animation: slide-in-left 0.32s cubic-bezier(.22,.61,.36,1) both;
+  animation: slide-in-left 0.32s cubic-bezier(.22,.61,.36,1) backwards;
 }
 
 @keyframes slide-in-right {
