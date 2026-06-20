@@ -1,11 +1,15 @@
 // ============================================================
-// FINANCE MODULE v6 — Тумбочка · Ліміт · Спільні цілі
+// FINANCE MODULE v7 — Тумбочка · Ліміт · Спільні цілі
 // ============================================================
 const Budget = (() => {
   const el  = id => document.getElementById(id);
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
   const fmtN = n => Math.round(Math.abs(n)).toLocaleString('uk-UA')+' ₴';
   const today = () => new Date().toISOString().slice(0,10);
+  const fmtDate = s => {
+    const d = new Date(s);
+    return isNaN(d) ? s : d.toLocaleDateString('uk-UA',{day:'numeric',month:'short',year:'numeric'});
+  };
 
   // ── ТУМБОЧКА: баланс ──────────────────────────────────────
   async function fetchTumboBalance() {
@@ -26,31 +30,27 @@ const Budget = (() => {
           <div class="tumbo-modal-balance">${fmtN(balance)}</div>
         </div>
       </div>
+
       <div class="tumbo-mode-tabs" style="margin:16px 0 8px">
         <button class="tumbo-mode-btn active" data-mode="manual">Поповнити</button>
         <button class="tumbo-mode-btn" data-mode="income">З доходу</button>
         <button class="tumbo-mode-btn" data-mode="withdraw">Зняти</button>
+        <button class="tumbo-mode-btn" data-mode="journal">📋</button>
       </div>
 
+      <!-- Поповнити -->
       <div class="tumbo-mode-panel active" id="tumbo-panel-manual">
         <p class="tumbo-hint">Внесіть суму яка вже є у вас відкладена — вона просто додасться до тумбочки.</p>
         <input type="number" id="tumbo-manual-inp" class="fin-inp fin-inp-big"
                placeholder="0 ₴" min="0" inputmode="decimal" style="text-align:center">
+        <input type="text" id="tumbo-manual-comment" class="fin-inp" style="margin-top:8px"
+               placeholder="Коментар (необов'язково)">
         <button class="btn-primary" id="tumbo-manual-btn" style="width:100%;margin-top:14px">
           Додати до тумбочки
         </button>
       </div>
 
-      <div class="tumbo-mode-panel" id="tumbo-panel-withdraw">
-        <p class="tumbo-hint">Вкажіть суму яку хочете зняти з тумбочки — баланс зменшиться.</p>
-        <input type="number" id="tumbo-withdraw-inp" class="fin-inp fin-inp-big"
-               placeholder="0 ₴" min="0" inputmode="decimal" style="text-align:center">
-        <p class="tumbo-hint" style="margin-top:8px;color:var(--text-muted)">Доступно: <b>${fmtN(balance)}</b></p>
-        <button class="btn-secondary" id="tumbo-withdraw-btn" style="width:100%;margin-top:14px;background:#fce4ec;color:#c62828;border-color:#ef9a9a">
-          Зняти з тумбочки
-        </button>
-      </div>
-
+      <!-- З доходу -->
       <div class="tumbo-mode-panel" id="tumbo-panel-income">
         <p class="tumbo-hint">Введіть суму доходу — система відкладе вибраний % і запише решту як дохід.</p>
         <input type="number" id="tumbo-income-inp" class="fin-inp fin-inp-big"
@@ -69,6 +69,27 @@ const Budget = (() => {
           ✓ Підтвердити
         </button>
       </div>
+
+      <!-- Зняти -->
+      <div class="tumbo-mode-panel" id="tumbo-panel-withdraw">
+        <p class="tumbo-hint">Вкажіть суму яку хочете зняти з тумбочки — баланс зменшиться.</p>
+        <input type="number" id="tumbo-withdraw-inp" class="fin-inp fin-inp-big"
+               placeholder="0 ₴" min="0" inputmode="decimal" style="text-align:center">
+        <p class="tumbo-hint" style="margin-top:8px;color:var(--text-muted)">Доступно: <b>${fmtN(balance)}</b></p>
+        <input type="text" id="tumbo-withdraw-comment" class="fin-inp" style="margin-top:8px"
+               placeholder="Навіщо знімаємо? (необов'язково)">
+        <button class="btn-secondary" id="tumbo-withdraw-btn"
+                style="width:100%;margin-top:14px;background:#fce4ec;color:#c62828;border-color:#ef9a9a">
+          Зняти з тумбочки
+        </button>
+      </div>
+
+      <!-- Журнал -->
+      <div class="tumbo-mode-panel tumbo-journal-panel" id="tumbo-panel-journal">
+        <div id="tumbo-journal-list">
+          <p class="tumbo-hint" style="text-align:center;padding:20px 0">Завантаження…</p>
+        </div>
+      </div>
     `);
     bindTumboModal();
   }
@@ -81,24 +102,26 @@ const Budget = (() => {
         document.querySelectorAll('.tumbo-mode-panel').forEach(p=>p.classList.remove('active'));
         btn.classList.add('active');
         el('tumbo-panel-'+btn.dataset.mode)?.classList.add('active');
+        if(btn.dataset.mode==='journal') renderTumboJournal();
       });
     });
 
-    // Режим 1: є кошти
-    const manInp = el('tumbo-manual-inp');
+    // Режим 1: Поповнити
+    const manInp     = el('tumbo-manual-inp');
+    const manComment = el('tumbo-manual-comment');
     el('tumbo-manual-btn')?.addEventListener('click',async()=>{
       const v = parseFloat(manInp?.value);
       if(!v||v<=0){ shake(manInp); return; }
-      const user = Auth.getCurrentUser();
+      const user    = Auth.getCurrentUser();
+      const comment = manComment?.value.trim();
       await supabase.from('transactions').insert({
         amount:v, type:'income', category:'Тумбочка',
-        date:today(), description:'Вже відкладено', created_by:user?.id||null
+        date:today(), description:comment||'Поповнення', created_by:user?.id||null
       });
-      closeModal();
-      fetchTumboBalance();
+      closeModal(); fetchTumboBalance();
     });
 
-    // Режим 2: з доходу
+    // Режим 2: З доходу
     const incInp = el('tumbo-income-inp');
     let curAmt=0, curPct=15;
     const upd = ()=>{
@@ -118,8 +141,8 @@ const Budget = (() => {
     el('tumbo-confirm')?.addEventListener('click',async()=>{
       const v = parseFloat(incInp?.value);
       if(!v||v<=0){ shake(incInp); return; }
-      const user = Auth.getCurrentUser();
-      const toSave = Math.round(v*curPct/100);
+      const user    = Auth.getCurrentUser();
+      const toSave  = Math.round(v*curPct/100);
       await supabase.from('transactions').insert({
         amount:v, type:'income', category:'Зарплата',
         date:today(), description:null, created_by:user?.id||null
@@ -128,23 +151,88 @@ const Budget = (() => {
         amount:toSave, type:'expense', category:'Тумбочка',
         date:today(), description:'Відкладено з доходу', created_by:user?.id||null
       });
-      closeModal();
-      fetchTumboBalance();
+      closeModal(); fetchTumboBalance();
     });
 
-    // Режим 3: зняти з тумбочки
-    const wdInp = el('tumbo-withdraw-inp');
+    // Режим 3: Зняти
+    const wdInp     = el('tumbo-withdraw-inp');
+    const wdComment = el('tumbo-withdraw-comment');
     el('tumbo-withdraw-btn')?.addEventListener('click',async()=>{
       const v = parseFloat(wdInp?.value);
       if(!v||v<=0){ shake(wdInp); return; }
-      const user = Auth.getCurrentUser();
+      const user    = Auth.getCurrentUser();
+      const comment = wdComment?.value.trim();
       await supabase.from('transactions').insert({
         amount:v, type:'expense', category:'Тумбочка',
-        date:today(), description:'Знято з тумбочки', created_by:user?.id||null
+        date:today(), description:comment||'Зняття', created_by:user?.id||null
       });
-      closeModal();
-      fetchTumboBalance();
+      closeModal(); fetchTumboBalance();
     });
+  }
+
+  // ── ЖУРНАЛ ТУМБОЧКИ ───────────────────────────────────────
+  async function renderTumboJournal() {
+    const wrap = el('tumbo-journal-list'); if(!wrap) return;
+    wrap.innerHTML = '<p class="tumbo-hint" style="text-align:center;padding:16px 0">Завантаження…</p>';
+
+    const [{data:txs},{data:users}] = await Promise.all([
+      supabase.from('transactions')
+        .select('id,amount,type,date,description,created_by,created_at')
+        .eq('category','Тумбочка')
+        .order('created_at',{ascending:false})
+        .limit(100),
+      supabase.from('users').select('id,name')
+    ]);
+
+    if(!txs?.length){
+      wrap.innerHTML='<p class="empty-state" style="padding:20px 0 8px">Журнал ще порожній</p>';
+      return;
+    }
+
+    const userMap = (users||[]).reduce((m,u)=>{ m[u.id]=u.name; return m; },{});
+
+    // Поточний баланс по рядках (починаємо з нуля, читаємо у зворотному порядку)
+    const sorted = [...txs].reverse();
+    const running = [];
+    let acc = 0;
+    sorted.forEach(t=>{
+      acc += t.type==='income' ? +t.amount : -+t.amount;
+      running.unshift(acc); // prepend, щоб відповідало порядку txs
+    });
+
+    wrap.innerHTML = txs.map((t,i)=>{
+      const isIn  = t.type==='income';
+      const emoji = isIn ? '📥' : '📤';
+      const sign  = isIn ? '+' : '−';
+      const amtCls= isIn ? 'pos' : 'neg';
+      const bal   = running[i];
+
+      // Тип операції — людська назва
+      const desc = t.description||'';
+      let label = isIn ? 'Поповнення' : 'Зняття';
+      if(desc==='Відкладено з доходу') label='З доходу';
+
+      // Коментар (те, що ввів юзер) — все крім системних фраз
+      const SYSTEM = ['Поповнення','Зняття','Відкладено з доходу','Вже відкладено','Знято з тумбочки'];
+      const comment = SYSTEM.includes(desc) ? '' : desc;
+
+      const who  = userMap[t.created_by] ? ` · ${esc(userMap[t.created_by])}` : '';
+      const date = fmtDate(t.date || t.created_at);
+
+      return `
+        <div class="tumbo-log-row">
+          <div class="tumbo-log-icon">${emoji}</div>
+          <div class="tumbo-log-info">
+            <span class="tumbo-log-label">${label}${who}</span>
+            ${comment?`<span class="tumbo-log-comment">${esc(comment)}</span>`:''}
+            <span class="tumbo-log-date">${date}</span>
+          </div>
+          <div class="tumbo-log-right">
+            <span class="tumbo-log-amount ${amtCls}">${sign}${fmtN(t.amount)}</span>
+            <span class="tumbo-log-balance">${fmtN(bal)}</span>
+          </div>
+        </div>`;
+    }).join('');
   }
 
   // ── ЛІМІТ ─────────────────────────────────────────────────
@@ -302,11 +390,28 @@ const Budget = (() => {
       <div class="modal-overlay" id="fin-modal-ov">
         <div class="modal-card">${html}</div>
       </div>`;
-    el('fin-modal-ov')?.addEventListener('click',e=>{
-      if(e.target.id==='fin-modal-ov') closeModal();
-    });
+    const ov = el('fin-modal-ov');
+    ov?.addEventListener('click',e=>{ if(e.target.id==='fin-modal-ov') closeModal(); });
+    if(window.visualViewport && ov){
+      const sync = ()=>{
+        const vv = window.visualViewport;
+        ov.style.height  = vv.height+'px';
+        ov.style.top     = vv.offsetTop+'px';
+      };
+      sync();
+      window.visualViewport.addEventListener('resize',sync);
+      window.visualViewport.addEventListener('scroll',sync);
+      ov._syncVV = sync;
+    }
   }
-  function closeModal(){ el('modal-root').innerHTML=''; }
+  function closeModal(){
+    const ov = el('fin-modal-ov');
+    if(window.visualViewport && ov?._syncVV){
+      window.visualViewport.removeEventListener('resize',ov._syncVV);
+      window.visualViewport.removeEventListener('scroll',ov._syncVV);
+    }
+    el('modal-root').innerHTML='';
+  }
 
   function shake(inp){
     if(!inp) return;
@@ -330,14 +435,9 @@ const Budget = (() => {
       const total = (data||[]).reduce((s,t)=>s+(t.type==='income'?+t.amount:-+t.amount),0);
       openTumboModal(total);
     });
-
     bindAddGoal();
-
     window.addEventListener('portal:view',e=>{
-      if(e.detail.view==='budget'){
-        bindAddGoal();
-        refresh();
-      }
+      if(e.detail.view==='budget'){ bindAddGoal(); refresh(); }
     });
   }
 
