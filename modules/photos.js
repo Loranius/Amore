@@ -83,8 +83,8 @@ const Photos = (() => {
     setTimeout(() => {
       images.forEach((img, i) => {
         img.style.transition = 'none';
+        img.loading = 'lazy';        // має стояти ДО зміни src
         img.src = picks[i] || img.src;
-        img.loading = 'lazy';
       });
 
       polaroids.forEach((p, i) => {

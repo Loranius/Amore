@@ -87,11 +87,12 @@ const DailyQuestion = (() => {
 
   // ---------- Рендер ----------
   function answerFieldForUser(user) {
-    // ім'я "Діма" -> answer_dima, "Лєна" -> answer_lena
     if (!user) return null;
-    const name = user.name.toLowerCase();
-    if (name.startsWith('д')) return 'answer_dima';
-    return 'answer_lena';
+    const name = user.name;
+    if (name === 'Діма') return 'answer_dima';
+    if (name === 'Лєна') return 'answer_lena';
+    // Невідомий користувач — не показувати поле вводу
+    return null;
   }
 
   function renderAnswers() {

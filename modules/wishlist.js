@@ -8,6 +8,7 @@ const Wishlist = (() => {
   let partnerUser  = null;
   let activeTab    = 'wishes';
   let wishingFor   = 'me';     // 'me' | 'partner'
+  let sizesOwnerId = null;     // id користувача у вкладці розмірів
 
   const el  = id => document.getElementById(id);
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
@@ -457,21 +458,19 @@ const Wishlist = (() => {
     });
   }
 
-  // ── SQL для нових колонок ──
-  // alter table wishlist_items add column if not exists price numeric(12,2);
-  // alter table wishlist_items add column if not exists priority text;
-
   // ── INIT ──
   async function refresh() {
     allUsers    = await loadUsers();
     currentUser = Auth.getCurrentUser();
     partnerUser = allUsers.find(u => u.id !== currentUser?.id) || null;
     wishingFor = 'me';
+    sizesOwnerId = currentUser?.id || null;
     renderWishes();
-    el('add-wish-btn')?.addEventListener('click', openAddModal);
   }
 
   function init() {
+    el('add-wish-btn')?.addEventListener('click', openAddModal);
+    setupTabs();
     window.addEventListener('portal:view', e => {
       if(e.detail.view === 'wishlist') refresh();
     });

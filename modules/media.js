@@ -413,6 +413,7 @@ const Media = (() => {
   // ---------- Refresh ----------
   async function refresh() {
     allItems = await loadItems(activeType);
+    renderTabs();
     renderStats();
     renderFilters();
     renderGrid();

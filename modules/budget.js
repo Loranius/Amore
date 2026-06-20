@@ -247,11 +247,15 @@ const Budget = (() => {
       el('free-limit-current').textContent = limit>0 ? fmtN(limit) : 'не встановлено';
 
     const slider=el('free-limit-slider'), display=el('free-limit-display');
-    if(slider&&!slider.dataset.bound){
-      slider.dataset.bound='1';
+    if(slider){
+      // Значення слайдера оновлюємо при кожному рендері (ліміт міг змінитись)
       slider.value = limit||2000;
       if(display) display.textContent = fmtN(slider.value);
-      slider.addEventListener('input',()=>{ if(display) display.textContent=fmtN(slider.value); });
+      // Обробник input прив'язуємо лише один раз
+      if(!slider.dataset.bound){
+        slider.dataset.bound='1';
+        slider.addEventListener('input',()=>{ if(display) display.textContent=fmtN(slider.value); });
+      }
     }
 
     const propBtn = el('free-limit-propose');
