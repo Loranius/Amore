@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="styles/main.css?v=2">
-<link rel="stylesheet" href="styles/components.css?v=11">
+<link rel="stylesheet" href="styles/components.css?v=12">
 </head>
 <body>
 
@@ -292,32 +292,47 @@
     <!-- ---------- Медіа (Фільми/Серіали/Книги) + Свайп ---------- -->
     <section class="view hidden" id="view-media" data-view="media">
 
-      <!-- Свайп зверху -->
       <div class="view-header">
         <h2 class="display-md">Watchlist</h2>
       </div>
 
-      <div class="swipe-type-tabs">
-        <button class="swipe-type-btn active" data-swipe-type="movie">🎬 Фільми</button>
-        <button class="swipe-type-btn" data-swipe-type="series">📺 Серіали</button>
+      <!-- Кнопка-тогл: показати / сховати свайп -->
+      <button class="swipe-toggle-btn" id="swipe-toggle-btn">
+        <span class="swipe-toggle-icon">🃏</span>
+        <span>Свайп фільмів</span>
+        <span class="swipe-toggle-arrow">›</span>
+      </button>
+
+      <!-- Колапсований блок свайпу -->
+      <div class="swipe-panel" id="swipe-panel">
+        <div class="swipe-panel-inner">
+          <div class="swipe-type-tabs">
+            <button class="swipe-type-btn active" data-swipe-type="movie">🎬 Фільми</button>
+            <button class="swipe-type-btn" data-swipe-type="series">📺 Серіали</button>
+          </div>
+          <div class="swipe-legend">
+            <span>⬆ Переглянуто</span>
+            <span>⬇ Дивимось</span>
+            <span>⬅ Плануємо</span>
+            <span>➡ Пропустити</span>
+          </div>
+          <div class="swipe-stack-wrap">
+            <div id="swipe-stack" class="swipe-stack"></div>
+          </div>
+          <div class="swipe-actions">
+            <button class="swipe-action-btn swipe-btn-left" id="swipe-btn-left">📋</button>
+            <button class="swipe-action-btn swipe-btn-skip" id="swipe-btn-skip">✕</button>
+            <button class="swipe-action-btn swipe-btn-down" id="swipe-btn-down">▶</button>
+            <button class="swipe-action-btn swipe-btn-up" id="swipe-btn-up">✅</button>
+          </div>
+        </div>
       </div>
 
-      <div class="swipe-legend">
-        <span>⬆ Переглянуто</span>
-        <span>⬇ Дивимось</span>
-        <span>⬅ Плануємо</span>
-        <span>➡ Пропустити</span>
-      </div>
-
-      <div class="swipe-stack-wrap">
-        <div id="swipe-stack" class="swipe-stack"></div>
-      </div>
-
-      <div class="swipe-actions">
-        <button class="swipe-action-btn swipe-btn-left" id="swipe-btn-left">📋</button>
-        <button class="swipe-action-btn swipe-btn-skip" id="swipe-btn-skip">✕</button>
-        <button class="swipe-action-btn swipe-btn-down" id="swipe-btn-down">▶</button>
-        <button class="swipe-action-btn swipe-btn-up" id="swipe-btn-up">✅</button>
+      <!-- Пошук TMDB -->
+      <div class="media-search-wrap" id="media-search-wrap">
+        <input type="search" class="media-search-inp" id="media-search-inp"
+               placeholder="🔍 Пошук фільму або серіалу…" inputmode="search" autocomplete="off">
+        <div id="media-search-results" class="media-search-results hidden"></div>
       </div>
 
       <!-- Роздільник -->

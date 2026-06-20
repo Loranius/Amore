@@ -3800,3 +3800,236 @@ a.wl-card-title:hover { text-decoration: underline; color: var(--accent-deep); }
   /* Підтримка жесту pinch-zoom на мобільних */
   touch-action: pinch-zoom;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   WATCHLIST v4 — Swipe toggle · TMDB Search
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Кнопка-тогл свайпу ── */
+.swipe-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 13px 16px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-bottom: 4px;
+}
+.swipe-toggle-btn:active { background: var(--surface-soft); }
+.swipe-toggle-icon { font-size: 18px; }
+.swipe-toggle-btn span:nth-child(2) { flex: 1; text-align: left; }
+.swipe-toggle-arrow {
+  font-size: 18px;
+  color: var(--text-muted);
+  transition: transform 0.3s cubic-bezier(.34,1.4,.64,1);
+  display: inline-block;
+}
+.swipe-toggle-btn.open .swipe-toggle-arrow  { transform: rotate(90deg); }
+.swipe-toggle-btn.open { border-color: var(--accent); color: var(--accent-deep); }
+
+/* ── Колапсована панель свайпу ── */
+.swipe-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-bottom: 0;
+}
+.swipe-panel.open {
+  max-height: 620px;          /* достатньо для стека + кнопок */
+  margin-bottom: 8px;
+}
+.swipe-panel-inner {
+  padding-top: 8px;
+  padding-bottom: 4px;
+}
+
+/* ── TMDB Пошук ── */
+.media-search-wrap {
+  position: relative;
+  margin-bottom: 4px;
+}
+.media-search-inp {
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px 16px 12px 40px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+  box-sizing: border-box;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23B98A9A' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: 14px center;
+  transition: border-color 0.15s;
+}
+.media-search-inp:focus { border-color: var(--accent); }
+.media-search-inp::placeholder { color: var(--text-muted); }
+
+/* Результати пошуку */
+.media-search-results {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px -6px rgba(61,43,53,0.2);
+  z-index: 50;
+  max-height: 340px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.media-search-results.hidden { display: none; }
+
+.media-search-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  cursor: default;
+}
+.media-search-card:last-child { border-bottom: none; }
+
+.media-search-poster {
+  width: 38px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+  background: var(--surface-soft);
+}
+.media-search-poster-empty {
+  width: 38px;
+  height: 56px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.media-search-info {
+  flex: 1;
+  min-width: 0;
+}
+.media-search-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.media-search-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+.media-search-overview {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.media-search-add-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  font-size: 20px;
+  font-weight: 300;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s, transform 0.1s;
+}
+.media-search-add-btn:active {
+  background: var(--accent-deep);
+  transform: scale(0.92);
+}
+.media-search-empty {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ── Модалка додавання з пошуку ── */
+.media-search-modal-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding-bottom: 16px;
+  border-bottom: 1.5px solid var(--line);
+  margin-bottom: 16px;
+}
+.media-search-modal-poster {
+  width: 54px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.media-search-modal-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+  font-family: var(--font-display);
+  line-height: 1.3;
+}
+.media-search-modal-year {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Чіпи статусу */
+.media-status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.media-status-chip {
+  padding: 8px 14px;
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.media-status-chip.active {
+  border-color: var(--accent);
+  background: var(--accent-pale);
+  color: var(--accent-deep);
+}
+.media-status-chip:active { transform: scale(0.96); }
