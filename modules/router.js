@@ -45,11 +45,19 @@ const Router = (() => {
   }
 
   function openMoreMenu() {
-    document.getElementById('more-menu-overlay').classList.remove('hidden');
+    const ov = document.getElementById('more-menu-overlay');
+    ov.classList.remove('hidden');
+    // rAF потрібен щоб браузер встиг застосувати display:flex перед transition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => ov.classList.add('more-menu--open'));
+    });
   }
 
   function closeMoreMenu() {
-    document.getElementById('more-menu-overlay').classList.add('hidden');
+    const ov = document.getElementById('more-menu-overlay');
+    ov.classList.remove('more-menu--open');
+    // Ховаємо після завершення анімації (довша transition — 340мс шторка)
+    setTimeout(() => ov.classList.add('hidden'), 350);
   }
 
   function init() {

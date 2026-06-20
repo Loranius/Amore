@@ -1269,6 +1269,12 @@
   align-items: flex-end;
   justify-content: center;
   z-index: 100;
+  /* Фон — плавний фейд */
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+.more-menu-overlay.more-menu--open {
+  opacity: 1;
 }
 
 .more-menu-sheet {
@@ -1278,6 +1284,12 @@
   max-width: 480px;
   padding: 20px 20px calc(20px + env(safe-area-inset-bottom));
   box-shadow: 0 -10px 30px -10px rgba(74,53,64,0.25);
+  /* Шторка — слайд знизу */
+  transform: translateY(100%);
+  transition: transform 0.34s cubic-bezier(.32,.72,0,1);
+}
+.more-menu-overlay.more-menu--open .more-menu-sheet {
+  transform: translateY(0);
 }
 
 .more-menu-title {
