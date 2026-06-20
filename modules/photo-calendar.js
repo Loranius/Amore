@@ -218,6 +218,12 @@ const PhotoCalendar = (() => {
     });
     el('pcal-modal-close')?.addEventListener('click', closeDayModal);
 
+    // Клік на фото → повноекранний lightbox
+    el('modal-root')?.querySelectorAll('.pcal-thumb').forEach(img => {
+      img.style.cursor = 'zoom-in';
+      img.addEventListener('click', () => openLightbox(img.src));
+    });
+
     // Прихований файловий input — одним екземпляром на всю модалку
     const fileInp = document.createElement('input');
     fileInp.type = 'file'; fileInp.accept = 'image/*'; fileInp.style.display = 'none';
@@ -311,7 +317,40 @@ const PhotoCalendar = (() => {
     }
   }
 
+  // ── LIGHTBOX ─────────────────────────────────────────────────
+  function openLightbox(src) {
+    // Закриваємо попередній якщо є
+    document.getElementById('pcal-lightbox')?.remove();
+
+    const lb = document.createElement('div');
+    lb.id = 'pcal-lightbox';
+    lb.className = 'pcal-lightbox';
+    lb.innerHTML = `
+      <button class="pcal-lb-close" aria-label="Закрити">✕</button>
+      <img class="pcal-lb-img" src="${esc(src)}" alt="">`;
+    document.body.appendChild(lb);
+
+    // Закрити по тапу на фон або кнопку ✕
+    lb.addEventListener('click', e => {
+      if (e.target === lb || e.target.classList.contains('pcal-lb-close')) {
+        lb.classList.add('pcal-lightbox--closing');
+        setTimeout(() => lb.remove(), 180);
+      }
+    });
+
+    // Закрити по свайпу вниз (мобільний жест)
+    let startY = 0;
+    lb.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+    lb.addEventListener('touchend', e => {
+      if (e.changedTouches[0].clientY - startY > 80) {
+        lb.classList.add('pcal-lightbox--closing');
+        setTimeout(() => lb.remove(), 180);
+      }
+    }, { passive: true });
+  }
+
   function closeDayModal() {
+    document.getElementById('pcal-lightbox')?.remove(); // на всяк випадок
     const ov = el('pcal-ov');
     ov?._cleanup?.();
     if (window.visualViewport && ov?._syncVV) {
