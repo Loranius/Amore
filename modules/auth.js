@@ -1,12 +1,12 @@
 // ============================================================
 // AUTH MODULE
-// Вибір користувача + PIN-код, зберігання сесії в localStorage
+// Вибір користувача + PIN-код + тихий Supabase Auth
 // ============================================================
 
 const Auth = (() => {
-  let users = [];          // [{id, name, pin_hash}]
+  let users        = [];   // [{id, name, pin_hash, email}]
   let selectedUser = null;
-  let pinBuffer = '';
+  let pinBuffer    = '';
 
   const SESSION_KEY = 'portal_session_user_id';
 
@@ -14,7 +14,7 @@ const Auth = (() => {
   async function loadUsers() {
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, pin_hash')
+      .select('id, name, pin_hash, email')
       .order('id', { ascending: true });
 
     if (error) {
@@ -46,7 +46,7 @@ const Auth = (() => {
 
   function selectUser(user) {
     selectedUser = user;
-    pinBuffer = '';
+    pinBuffer    = '';
     document.getElementById('user-select').classList.add('hidden');
     document.getElementById('pin-pad').classList.remove('hidden');
     document.getElementById('pin-name').textContent = user.name;
@@ -73,9 +73,8 @@ const Auth = (() => {
       return;
     }
     if (key === 'back') {
-      // повернутись до вибору користувача
       selectedUser = null;
-      pinBuffer = '';
+      pinBuffer    = '';
       document.getElementById('pin-pad').classList.add('hidden');
       document.getElementById('user-select').classList.remove('hidden');
       return;
@@ -91,10 +90,11 @@ const Auth = (() => {
   }
 
   async function verifyPin() {
-    // Простий хеш для порівняння (узгоджено з тим, як зберігається pin_hash)
     const hash = await sha256(pinBuffer);
 
     if (hash === selectedUser.pin_hash) {
+      // Тихий логін у Supabase Auth (для RLS)
+      await signInSupabase(selectedUser.email, hash);
       localStorage.setItem(SESSION_KEY, selectedUser.id);
       enterApp(selectedUser);
     } else {
@@ -106,6 +106,13 @@ const Auth = (() => {
         updatePinDots();
       }, 600);
     }
+  }
+
+  // ---------- Supabase Auth (тихо, юзер не бачить) ----------
+  async function signInSupabase(email, password) {
+    if (!email) return; // email ще не налаштований — пропускаємо
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) console.warn('Supabase Auth login failed (RLS буде недоступний):', error.message);
   }
 
   async function sha256(text) {
@@ -121,6 +128,7 @@ const Auth = (() => {
   }
 
   function logout() {
+    supabase.auth.signOut().catch(() => {}); // розлогіниться з Supabase Auth
     localStorage.removeItem(SESSION_KEY);
     location.reload();
   }
@@ -130,13 +138,26 @@ const Auth = (() => {
     const savedId = localStorage.getItem(SESSION_KEY);
     if (!savedId) return false;
 
+    // Перевіряємо чи Supabase-сесія ще жива
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      // Сесія витекла або ще не була — треба перелогінитись через PIN
+      localStorage.removeItem(SESSION_KEY);
+      return false;
+    }
+
+    // Сесія жива — відновлюємо UI-стан без повторного PIN
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, pin_hash')
+      .select('id, name, pin_hash, email')
       .eq('id', savedId)
       .single();
 
-    if (error || !data) return false;
+    if (error || !data) {
+      localStorage.removeItem(SESSION_KEY);
+      return false;
+    }
 
     selectedUser = data;
     enterApp(data);
