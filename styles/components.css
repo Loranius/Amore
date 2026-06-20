@@ -1284,35 +1284,66 @@
   font-family: var(--font-display);
   font-weight: 600;
   font-size: 16px;
-  color: var(--text-muted);
+  color: var(--accent-deep);
   text-align: center;
   margin: 0 0 16px;
 }
 
+/* 2×3 сітка для основних розділів */
+.more-menu-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
 .more-menu-item {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  width: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: var(--surface-soft);
   border: none;
   border-radius: var(--radius-md);
-  padding: 14px 16px;
-  margin-bottom: 10px;
+  padding: 16px 12px;
   font-family: var(--font-body);
   font-weight: 600;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--text);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
+  text-align: center;
+  width: 100%;
 }
 
-.more-menu-item:hover { background: var(--line); }
-
-.more-menu-item .nav-icon {
-  font-size: 18px;
-  color: var(--accent-deep);
+.more-menu-item:active {
+  background: var(--accent-pale);
+  transform: scale(0.97);
 }
+
+/* Налаштування — повна ширина (окремо від гріда) */
+.more-menu-settings-btn {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 0;
+}
+
+.more-menu-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+.more-menu-settings-btn .more-menu-icon { font-size: 20px; }
+
+.more-menu-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+}
+.more-menu-settings-btn .more-menu-label { font-size: 15px; }
 
 .more-menu-close {
   display: block;
@@ -1323,7 +1354,7 @@
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 14px;
-  padding: 12px;
+  padding: 14px;
   cursor: pointer;
   text-align: center;
 }

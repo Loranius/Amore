@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="styles/main.css?v=2">
-<link rel="stylesheet" href="styles/components.css?v=7">
+<link rel="stylesheet" href="styles/components.css?v=8">
 </head>
 <body>
 
@@ -399,26 +399,35 @@
   <div id="more-menu-overlay" class="more-menu-overlay hidden">
     <div class="more-menu-sheet">
       <p class="more-menu-title">Інші розділи</p>
-      <button class="more-menu-item" data-view="calendar">
-        <span class="nav-icon">▤</span> Events
-      </button>
-      <button class="more-menu-item" data-view="media">
-        <span class="nav-icon">🃏</span> Watchlist
-      </button>
-      <button class="more-menu-item" data-view="random">
-        <span class="nav-icon">🎲</span> Random
-      </button>
-      <button class="more-menu-item" data-view="capsule">
-        <span class="nav-icon">✉</span> Time message
-      </button>
-      <button class="more-menu-item" data-view="question">
-        <span class="nav-icon">?</span> Question
-      </button>
-      <button class="more-menu-item" data-view="map">
-        <span class="nav-icon">🗺</span> Наша карта
-      </button>
+      <div class="more-menu-grid">
+        <button class="more-menu-item" data-view="calendar">
+          <span class="more-menu-icon">📅</span>
+          <span class="more-menu-label">Календар</span>
+        </button>
+        <button class="more-menu-item" data-view="media">
+          <span class="more-menu-icon">🎬</span>
+          <span class="more-menu-label">Вотчліст</span>
+        </button>
+        <button class="more-menu-item" data-view="random">
+          <span class="more-menu-icon">🍽️</span>
+          <span class="more-menu-label">Що їмо?</span>
+        </button>
+        <button class="more-menu-item" data-view="capsule">
+          <span class="more-menu-icon">💌</span>
+          <span class="more-menu-label">Капсула</span>
+        </button>
+        <button class="more-menu-item" data-view="question">
+          <span class="more-menu-icon">💬</span>
+          <span class="more-menu-label">Питання</span>
+        </button>
+        <button class="more-menu-item" data-view="map">
+          <span class="more-menu-icon">📍</span>
+          <span class="more-menu-label">Наша карта</span>
+        </button>
+      </div>
       <button class="more-menu-item more-menu-settings-btn" id="more-menu-settings">
-        <span class="nav-icon">⚙</span> Налаштування
+        <span class="more-menu-icon">⚙️</span>
+        <span class="more-menu-label">Налаштування</span>
       </button>
       <button class="more-menu-close" id="more-menu-close">Закрити</button>
     </div>

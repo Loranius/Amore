@@ -9,8 +9,8 @@ const Router = (() => {
   // Порядок вкладок для визначення напрямку slide
   const VIEW_ORDER = ['home', 'wishlist', 'budget', 'random', 'calendar', 'capsule', 'question', 'media', 'map', 'shopping'];
 
-  // Розділи, що живуть під кнопкою "Ще"
-  const MORE_VIEWS = ['calendar', 'capsule', 'question', 'media', 'shopping'];
+  // Розділи, що живуть під кнопкою «Ще» (мають підсвічувати «Ще»)
+  const MORE_VIEWS = ['calendar', 'capsule', 'question', 'media', 'map', 'random'];
 
   function updateActiveStates(viewName) {
     document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
