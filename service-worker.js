@@ -6,12 +6,12 @@
 //  • Supabase / Mapbox / шрифти / CDN → напряму в мережу (не кешуємо)
 // Щоб скинути кеш — підніми версію в CACHE нижче.
 // ============================================================
-const CACHE = 'amore-v26';
+const CACHE = 'amore-v21';
 const SHELL = [
   './',
   './index.html',
   './styles/main.css?v=3',
-  './styles/components.css?v=18',
+  './styles/components.css?v=16',
 ];
 
 self.addEventListener('install', (e) => {

@@ -97,7 +97,7 @@ const Wishlist = (() => {
     }).eq('id', item.id);
 
     if (error) {
-      ErrorBoundary.showToast('Помилка: ' + error.message);
+      alert('Помилка: ' + error.message);
       if (btn) { btn.disabled = false; btn.textContent = '✅ Вже купив(ла)'; }
       return;
     }
@@ -454,7 +454,7 @@ const Wishlist = (() => {
       }
 
       if (error) {
-        ErrorBoundary.showToast('Помилка: ' + error.message);
+        alert('Помилка: ' + error.message);
         saveBtn.disabled = false;
         saveBtn.textContent = isEdit ? 'Зберегти' : 'Додати';
         return;
@@ -467,71 +467,20 @@ const Wishlist = (() => {
 
   async function deleteItem(id) {
     if (!confirm('Видалити бажання?')) return;
-    const ownerId = currentUser?.id;
-
-    // Оптимістично прибираємо
-    const cached = DataCache.get('wishlist:' + ownerId);
-    if (cached) {
-      const snapshot = [...cached];
-      DataCache.set('wishlist:' + ownerId, cached.filter(i => i.id !== id));
-      renderGrid();
-
-      const { error } = await Retry.query(() =>
-        supabase.from('wishlist_items').delete().eq('id', id)
-      );
-      if (error) {
-        DataCache.set('wishlist:' + ownerId, snapshot);
-        renderGrid();
-        ErrorBoundary.showToast('Не вдалось видалити бажання. Спробуй ще.');
-        return;
-      }
-    } else {
-      const {error} = await supabase.from('wishlist_items').delete().eq('id', id);
-      if (error) { ErrorBoundary.showToast('Помилка: ' + error.message); return; }
-      invalidateWishes();
-      renderGrid();
-    }
+    const {error} = await supabase.from('wishlist_items').delete().eq('id', id);
+    if (error) { alert('Помилка: ' + error.message); return; }
+    invalidateWishes();
+    renderGrid();
   }
 
   async function reserveItem(id, isReserved) {
     const newVal = !isReserved;
-    const ownerId = wishingFor === 'me' ? currentUser?.id : partnerUser?.id;
-
-    // 1. Оптимістично оновлюємо кеш
-    const cached = DataCache.get('wishlist:' + ownerId);
-    if (cached) {
-      const snapshot = cached.map(i => ({...i}));
-      const target = cached.find(i => i.id === id);
-      if (target) {
-        target.reserved    = newVal;
-        target.reserved_by = newVal ? currentUser.id : null;
-      }
-      DataCache.set('wishlist:' + ownerId, cached);
-      renderGrid(); // миттєво
-
-      // 2. Пишемо в БД (з retry)
-      const { error } = await Retry.query(() =>
-        supabase.from('wishlist_items')
-          .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
-          .eq('id', id)
-      );
-
-      if (error) {
-        // Відкочуємо
-        DataCache.set('wishlist:' + ownerId, snapshot);
-        renderGrid();
-        ErrorBoundary.showToast('Не вдалось оновити бажання. Спробуй ще.');
-        return;
-      }
-    } else {
-      // Кешу немає — звичайний шлях
-      const { error } = await supabase.from('wishlist_items')
-        .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
-        .eq('id', id);
-      if (error) { ErrorBoundary.showToast('Помилка: ' + error.message); return; }
-      invalidateWishes();
-      renderGrid();
-    }
+    const {error} = await supabase.from('wishlist_items')
+      .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
+      .eq('id', id);
+    if (error) { alert('Помилка: ' + error.message); return; }
+    invalidateWishes();
+    renderGrid();
   }
 
   async function cancelReserve(id) {
@@ -700,7 +649,7 @@ const Wishlist = (() => {
         ring_ring:  g('sz-ring')?.value.trim()||null,
         ring_index: g('sz-ring-idx')?.value.trim()||null,
       }, { onConflict: 'user_id' });
-      if (error) { ErrorBoundary.showToast('Помилка: ' + error.message); return; }
+      if (error) { alert('Помилка: ' + error.message); return; }
       DataCache.invalidate('sizes:' + userId);
       root.innerHTML = '';
       renderSizes();

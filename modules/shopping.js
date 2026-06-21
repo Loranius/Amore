@@ -96,100 +96,45 @@ const Shopping = (() => {
       created_by: user ? user.id : null,
     }));
 
-    // 1. Оптимістично показуємо нові товари (з temp id)
-    const tempItems = rows.map((r, i) => ({
-      ...r, id: 'temp_' + Date.now() + '_' + i,
-      bought: false, bought_by: null, bought_at: null,
-    }));
-    allItems = [...tempItems, ...allItems];
-    input.value = '';
-    renderActiveList();
-
-    // 2. Пишемо в БД (з retry)
-    const { error } = await Retry.query(() =>
-      supabase.from('shopping_items').insert(rows)
-    );
-
+    const { error } = await supabase.from('shopping_items').insert(rows);
     if (error) {
-      // Відкочуємо temp-елементи
-      allItems = allItems.filter(i => !String(i.id).startsWith('temp_'));
-      renderActiveList();
-      ErrorBoundary.showToast('Не вдалось додати товар. Спробуй ще.');
       console.error('Shopping: помилка додавання', error);
+      alert('Не вдалось додати товар(и)');
       return;
     }
 
-    // Підтягуємо реальні id з БД
-    DataCache.invalidate('shopping:items');
-    refresh();
+    input.value = '';
+    DataCache.invalidate('shopping:items'); await refresh();
   }
 
   // ── ЗМІНА СТАТУСУ (купити / повернути) ──
-  // ── ЗМІНА СТАТУСУ (купити / повернути) — оптимістично ──
   async function toggleBought(item) {
     const user = Auth.getCurrentUser();
     const nowBought = !item.bought;
-
-    // 1. Оновлюємо локально — одразу без чекання БД
-    const snapshot = allItems.map(i => ({...i})); // резервна копія
-    const target = allItems.find(i => i.id === item.id);
-    if (target) {
-      target.bought    = nowBought;
-      target.bought_by = nowBought ? (user?.id ?? null) : null;
-      target.bought_at = nowBought ? new Date().toISOString() : null;
-    }
-    renderActiveList();
-    renderArchive();
-
-    // 2. Пишемо в БД (з retry)
-    const { error } = await Retry.query(() =>
-      supabase.from('shopping_items').update({
-        bought:    nowBought,
-        bought_by: nowBought ? (user?.id ?? null) : null,
+    const { error } = await supabase
+      .from('shopping_items')
+      .update({
+        bought: nowBought,
+        bought_by: nowBought ? (user ? user.id : null) : null,
         bought_at: nowBought ? new Date().toISOString() : null,
-      }).eq('id', item.id)
-    );
-
+      })
+      .eq('id', item.id);
     if (error) {
-      // Відкочуємо
-      allItems.splice(0, allItems.length, ...snapshot);
-      renderActiveList();
-      renderArchive();
-      ErrorBoundary.showToast('Не вдалось оновити товар. Спробуй ще.');
       console.error('Shopping: помилка зміни статусу', error);
       return;
     }
-
-    // Синхронізуємо кеш
-    DataCache.set('shopping:items', [...allItems]);
+    DataCache.invalidate('shopping:items'); await refresh();
   }
 
   async function deleteItem(id) {
     if (!confirm('Видалити цей товар зі списку?')) return;
-
-    // 1. Оптимістично прибираємо з UI
-    const snapshot = allItems.map(i => ({...i}));
-    const idx = allItems.findIndex(i => i.id === id);
-    if (idx !== -1) allItems.splice(idx, 1);
-    renderActiveList();
-    renderArchive();
-
-    // 2. Видаляємо в БД (з retry)
-    const { error } = await Retry.query(() =>
-      supabase.from('shopping_items').delete().eq('id', id)
-    );
-
+    const { error } = await supabase.from('shopping_items').delete().eq('id', id);
     if (error) {
-      // Відкочуємо
-      allItems.splice(0, allItems.length, ...snapshot);
-      renderActiveList();
-      renderArchive();
-      ErrorBoundary.showToast('Не вдалось видалити товар. Спробуй ще.');
       console.error('Shopping: помилка видалення', error);
+      alert('Не вдалось видалити товар');
       return;
     }
-
-    DataCache.set('shopping:items', [...allItems]);
+    DataCache.invalidate('shopping:items'); await refresh();
   }
 
   // ── РЕДАГУВАННЯ (категорія / кількість) ──
@@ -241,7 +186,7 @@ const Shopping = (() => {
 
     if (error) {
       console.error('Shopping: помилка редагування', error);
-      ErrorBoundary.showToast('Не вдалось зберегти зміни');
+      alert('Не вдалось зберегти зміни');
       return;
     }
     closeModal();
