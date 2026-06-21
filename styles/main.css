@@ -168,6 +168,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-top: var(--space-4);
   margin-bottom: var(--space-4);
   gap: var(--space-3);
 }
@@ -635,9 +636,8 @@ body {
   transition: background-color 0.25s ease, color 0.2s ease, border-color 0.2s ease,
               box-shadow 0.2s ease;
 }
-/* Але не для анімацій руху */
-.view, .modal-overlay, .more-menu-overlay,
-[style*="transform"], .confetti-piece {
+/* Не чіпаємо елементи з анімаціями руху (але НЕ [style*=transform] — це ламає polaroid) */
+.view, .modal-overlay, .more-menu-overlay, .confetti-piece {
   transition: none !important;
 }
 
