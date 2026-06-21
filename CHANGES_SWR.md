@@ -34,3 +34,35 @@
 
 ## Що НЕ чіпали
 Логіку БД, RLS, Edge Functions, дизайн/CSS, Telegram, TMDB/Mapbox-інтеграції.
+
+---
+
+# Етап 2 — Realtime (живі оновлення від партнера)
+
+## Новий файл
+- `lib/realtime.js` — `Realtime`: підписка на зміни в таблицях через Supabase Realtime.
+  При зміні скидає відповідний ключ кешу і, якщо вкладка відкрита, перемальовує її наживо.
+
+## Змінені файли
+- index.html        — підключено lib/realtime.js, бамп app.js?v=swr2
+- service-worker.js  — CACHE: amore-v13 → amore-v14
+- modules/app.js     — Realtime.init() у core-bootstrap
+- modules/wishlist.js — додано refreshLive() (не скидає під-вкладку «Мої/Партнера»)
+- modules/question.js — додано refreshLive() (не стирає набраний текст відповіді)
+
+## ⚠️ ОБОВ'ЯЗКОВО на боці Supabase
+Realtime працює лише для таблиць у публікації `supabase_realtime`.
+Виконай у SQL Editor (один раз):
+
+    alter publication supabase_realtime add table
+      events, transactions, free_limit, savings_goals, time_capsules,
+      daily_question_log, media_items, randomizer_categories, dishes,
+      wishlist_items, user_sizes, shopping_items, photo_calendar, map_pins;
+
+(Якщо якась таблиця вже додана — Postgres дасть помилку лише на неї; додавай по одній за потреби.)
+RLS-політики мають дозволяти SELECT — інакше realtime мовчки не спрацює.
+
+## Перевірка
+Відкрий портал на двох пристроях під різними юзерами. Зміна (нове бажання,
+позначка «куплено», відповідь дня тощо) має з'явитись у партнера без оновлення сторінки.
+У консолі при вході має бути: `[Realtime] підключено ✓`.

@@ -222,6 +222,22 @@ const DailyQuestion = (() => {
     renderAnswers();
   }
 
+  // Live-оновлення (realtime): оновлюємо відповіді, але НЕ чіпаємо поле вводу,
+  // якщо користувач саме в ньому пише.
+  function refreshLive() {
+    if (!currentQuestion) { refresh(); return; }
+    DataCache.swr(
+      logKey(),
+      () => ensureLogEntry(todayStr, currentQuestion.id),
+      (entry) => {
+        logEntry = entry;
+        renderAnswers();
+        const inp = document.getElementById('question-input');
+        if (!inp || document.activeElement !== inp) renderInput();
+      }
+    );
+  }
+
   function init() {
     document.getElementById('question-save').addEventListener('click', saveAnswer);
     window.addEventListener('portal:view', (e) => {
@@ -229,5 +245,5 @@ const DailyQuestion = (() => {
     });
   }
 
-  return { init, refresh };
+  return { init, refresh, refreshLive };
 })();

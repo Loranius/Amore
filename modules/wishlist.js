@@ -484,6 +484,14 @@ const Wishlist = (() => {
     if (partnerUser) DataCache.invalidate('wishlist:' + partnerUser.id);
   }
 
+  // Live-оновлення (realtime): перемальовуємо ПОТОЧНУ під-вкладку,
+  // не скидаючи вибір «Мої / Партнера» і не смикаючи користувача.
+  function refreshLive() {
+    if (!currentUser) return;
+    if (activeTab === 'sizes') renderSizes();
+    else renderWishes();
+  }
+
   function init() {
     el('add-wish-btn')?.addEventListener('click', openAddModal);
     setupTabs();
@@ -492,5 +500,5 @@ const Wishlist = (() => {
     });
   }
 
-  return { init, refresh };
+  return { init, refresh, refreshLive };
 })();

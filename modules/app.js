@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Greeting.init();
   Photos.init();
   Settings.init();
+  Realtime.init();   // живі оновлення від партнера (стартує після входу)
 
   // ── LAZY: ініціалізуємо після успішного входу ──
   let heavyInitDone = false;
