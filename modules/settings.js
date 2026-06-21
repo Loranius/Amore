@@ -376,7 +376,7 @@ const Settings = (() => {
         <button class="btn-secondary" id="settings-sizes-edit" style="width:100%;margin-top:8px">✏️ Редагувати розміри</button>`;
 
       wrap.querySelectorAll('.sz-user-btn').forEach(btn => {
-        btn.addEventListener('click', () => { activeSizesUserId = btn.dataset.uid; loadAndRender(); });
+        btn.addEventListener('click', () => { activeSizesUserId = +btn.dataset.uid; loadAndRender(); });
       });
 
       wrap.querySelector('#settings-sizes-edit')?.addEventListener('click', () => {
