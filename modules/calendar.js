@@ -10,7 +10,7 @@ const CalendarModule = (() => {
     birthday:    { icon: '🎂', label: 'День народження', color: '#FF6B9D' },
     anniversary: { icon: '💕', label: 'Річниця',         color: '#E8829C' },
     holiday:     { icon: '🎉', label: 'Свято',           color: '#F4A6BE' },
-    other:       { icon: '📅', label: 'Інше',            color: '#B98A9A' },
+    other:       { icon: '📅', label: 'Плани',            color: '#B98A9A' },
   };
 
   const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
