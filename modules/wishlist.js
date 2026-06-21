@@ -94,10 +94,9 @@ const Wishlist = (() => {
     renderGrid();
   }
 
-  async function renderGrid() {
+  function renderGrid() {
     const wrap = el('wishlist-grid'); if(!wrap) return;
 
-    // Оновлюємо заголовок і кнопку
     const rawName = partnerUser?.name || 'Партнера';
     const partnerName = rawName === 'Діма' ? 'Діми' : rawName === 'Лєна' ? 'Лєни' : rawName;
     const isOwnList   = wishingFor === 'me';
@@ -107,16 +106,23 @@ const Wishlist = (() => {
     if(title)  title.textContent  = isOwnList ? 'Мої бажання' : `Бажання ${partnerName}`;
     if(addBtn) addBtn.style.display = isOwnList ? 'flex' : 'none';
 
-    wrap.innerHTML = '<p class="empty-state" style="opacity:0.4">Завантаження...</p>';
-    const items = await loadItems(ownerId);
+    if(ownerId == null){ wrap.innerHTML = '<p class="empty-state">Користувача не знайдено.</p>'; return; }
 
-    if(!items.length) {
+    // Заглушку показуємо лише якщо кешу ще немає
+    if(DataCache.get('wishlist:'+ownerId) === undefined){
+      wrap.innerHTML = '<p class="empty-state" style="opacity:0.4">Завантаження...</p>';
+    }
+    DataCache.swr('wishlist:'+ownerId, () => loadItems(ownerId), (items) => paintGrid(items, isOwnList));
+  }
+
+  function paintGrid(items, isOwnList) {
+    const wrap = el('wishlist-grid'); if(!wrap) return;
+    if(!items || !items.length) {
       wrap.innerHTML = `<p class="empty-state">${isOwnList
         ? 'Твій список порожній. Час додати нову забаганку.'
         : 'Партнер ще не додав жодного бажання.'}</p>`;
       return;
     }
-
     wrap.innerHTML = '';
     items.forEach(item => renderCard(item, isOwnList, wrap));
   }
@@ -276,6 +282,7 @@ const Wishlist = (() => {
       }
 
       if(error){ alert('Помилка: '+error.message); saveBtn.disabled=false; saveBtn.textContent=isEdit?'Зберегти':'Додати'; return; }
+      invalidateWishes();
       root.innerHTML = '';
       renderGrid();
     });
@@ -285,7 +292,7 @@ const Wishlist = (() => {
     if(!confirm('Видалити бажання?')) return;
     const {error} = await supabase.from('wishlist_items').delete().eq('id', id);
     if(error){ alert('Помилка: '+error.message); return; }
-    renderGrid();
+    invalidateWishes(); renderGrid();
   }
 
   async function reserveItem(id, isReserved) {
@@ -294,7 +301,7 @@ const Wishlist = (() => {
       .update({reserved: newVal, reserved_by: newVal ? currentUser.id : null})
       .eq('id', id);
     if(error){ alert('Помилка: '+error.message); return; }
-    renderGrid();
+    invalidateWishes(); renderGrid();
   }
 
   // Скасування броні — з підтвердженням, щоб не зняти випадково
@@ -304,12 +311,16 @@ const Wishlist = (() => {
   }
 
   // ── РОЗМІРИ ──
-  async function renderSizes() {
+  function renderSizes() {
     const wrap = el('wishlist-sizes-grid'); if(!wrap) return;
     if(!sizesOwnerId) sizesOwnerId = currentUser?.id;
+    if(sizesOwnerId == null) return;
+    DataCache.swr('sizes:'+sizesOwnerId, () => loadSizes(sizesOwnerId), (sizes) => paintSizes(sizes || {}));
+  }
 
+  function paintSizes(sizes) {
+    const wrap = el('wishlist-sizes-grid'); if(!wrap) return;
     const user     = allUsers.find(u=>u.id===sizesOwnerId);
-    const sizes    = await loadSizes(sizesOwnerId);
     const isFemale = user?.name === 'Лєна';
 
     wrap.innerHTML = `
@@ -454,18 +465,23 @@ const Wishlist = (() => {
         ring_ring:g('sz-ring')?.value.trim()||null,ring_index:g('sz-ring-idx')?.value.trim()||null,
       },{onConflict:'user_id'});
       if(error){alert('Помилка: '+error.message);return;}
-      root.innerHTML=''; renderSizes();
+      DataCache.invalidate('sizes:'+userId); root.innerHTML=''; renderSizes();
     });
   }
 
   // ── INIT ──
   async function refresh() {
-    allUsers    = await loadUsers();
+    allUsers    = await Auth.getUsers();
     currentUser = Auth.getCurrentUser();
     partnerUser = allUsers.find(u => u.id !== currentUser?.id) || null;
     wishingFor = 'me';
     sizesOwnerId = currentUser?.id || null;
     renderWishes();
+  }
+
+  function invalidateWishes() {
+    if (currentUser) DataCache.invalidate('wishlist:' + currentUser.id);
+    if (partnerUser) DataCache.invalidate('wishlist:' + partnerUser.id);
   }
 
   function init() {

@@ -439,6 +439,7 @@ const Settings = (() => {
         ring_ring: g('sz-ring')?.value.trim()||null, ring_index: g('sz-ring-idx')?.value.trim()||null,
       }, { onConflict: 'user_id' });
       if (error) { alert('Помилка: ' + error.message); return; }
+      if (window.DataCache) DataCache.invalidate('sizes:' + userId);
       root.innerHTML = '';
       if (onSave) onSave();
     });

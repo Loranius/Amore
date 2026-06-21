@@ -181,5 +181,15 @@ const Auth = (() => {
     return selectedUser;
   }
 
-  return { init, getCurrentUser, _getUsers: () => users };
+  // Спільний кешований список користувачів (id, name).
+  // Використовується іншими модулями замість власних запитів до 'users'.
+  async function getUsers() {
+    return DataCache.ensure('users', async () => {
+      const { data } = await supabase
+        .from('users').select('id, name').order('id', { ascending: true });
+      return data || [];
+    });
+  }
+
+  return { init, getCurrentUser, getUsers, _getUsers: () => users };
 })();

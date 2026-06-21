@@ -12,12 +12,24 @@ const Budget = (() => {
   };
 
   // ── ТУМБОЧКА: баланс ──────────────────────────────────────
-  async function fetchTumboBalance() {
+  async function fetchTumboTxs() {
     const {data} = await supabase.from('transactions')
       .select('amount,type').eq('category','Тумбочка');
-    const total = (data||[]).reduce((s,t)=>s+(t.type==='income'?+t.amount:-+t.amount),0);
-    if(el('tumbo-balance')) el('tumbo-balance').textContent = fmtN(total);
-    return total;
+    return data || [];
+  }
+  function tumboTotal(rows) {
+    return (rows||[]).reduce((s,t)=>s+(t.type==='income'?+t.amount:-+t.amount),0);
+  }
+  function paintTumboBalance(rows) {
+    if(el('tumbo-balance')) el('tumbo-balance').textContent = fmtN(tumboTotal(rows));
+  }
+  function refreshTumboBalance() {
+    DataCache.swr('tumbo:txs', fetchTumboTxs, paintTumboBalance);
+  }
+  // Скинути кеш тумбочки після будь-якої транзакції
+  function invalidateTumbo() {
+    DataCache.invalidate('tumbo:txs');
+    DataCache.invalidate('tumbo:journal');
   }
 
   // ── ТУМБОЧКА: модалка ─────────────────────────────────────
@@ -118,7 +130,7 @@ const Budget = (() => {
         amount:v, type:'income', category:'Тумбочка',
         date:today(), description:comment||'Поповнення', created_by:user?.id||null
       });
-      closeModal(); fetchTumboBalance();
+      invalidateTumbo(); closeModal(); refreshTumboBalance();
     });
 
     // Режим 2: З доходу
@@ -151,7 +163,7 @@ const Budget = (() => {
         amount:toSave, type:'expense', category:'Тумбочка',
         date:today(), description:'Відкладено з доходу', created_by:user?.id||null
       });
-      closeModal(); fetchTumboBalance();
+      invalidateTumbo(); closeModal(); refreshTumboBalance();
     });
 
     // Режим 3: Зняти
@@ -166,23 +178,25 @@ const Budget = (() => {
         amount:v, type:'expense', category:'Тумбочка',
         date:today(), description:comment||'Зняття', created_by:user?.id||null
       });
-      closeModal(); fetchTumboBalance();
+      invalidateTumbo(); closeModal(); refreshTumboBalance();
     });
   }
 
   // ── ЖУРНАЛ ТУМБОЧКИ ───────────────────────────────────────
-  async function renderTumboJournal() {
-    const wrap = el('tumbo-journal-list'); if(!wrap) return;
-    wrap.innerHTML = '<p class="tumbo-hint" style="text-align:center;padding:16px 0">Завантаження…</p>';
-
+  async function fetchJournal() {
     const [{data:txs},{data:users}] = await Promise.all([
       supabase.from('transactions')
         .select('id,amount,type,date,description,created_by,created_at')
         .eq('category','Тумбочка')
         .order('created_at',{ascending:false})
         .limit(100),
-      supabase.from('users').select('id,name')
+      Auth.getUsers()
     ]);
+    return { txs: txs||[], users: users||[] };
+  }
+
+  function paintJournal({txs, users}) {
+    const wrap = el('tumbo-journal-list'); if(!wrap) return;
 
     if(!txs?.length){
       wrap.innerHTML='<p class="empty-state" style="padding:20px 0 8px">Журнал ще порожній</p>';
@@ -191,13 +205,13 @@ const Budget = (() => {
 
     const userMap = (users||[]).reduce((m,u)=>{ m[u.id]=u.name; return m; },{});
 
-    // Поточний баланс по рядках (починаємо з нуля, читаємо у зворотному порядку)
+    // Поточний баланс по рядках
     const sorted = [...txs].reverse();
     const running = [];
     let acc = 0;
     sorted.forEach(t=>{
       acc += t.type==='income' ? +t.amount : -+t.amount;
-      running.unshift(acc); // prepend, щоб відповідало порядку txs
+      running.unshift(acc);
     });
 
     wrap.innerHTML = txs.map((t,i)=>{
@@ -207,12 +221,10 @@ const Budget = (() => {
       const amtCls= isIn ? 'pos' : 'neg';
       const bal   = running[i];
 
-      // Тип операції — людська назва
       const desc = t.description||'';
       let label = isIn ? 'Поповнення' : 'Зняття';
       if(desc==='Відкладено з доходу') label='З доходу';
 
-      // Коментар (те, що ввів юзер) — все крім системних фраз
       const SYSTEM = ['Поповнення','Зняття','Відкладено з доходу','Вже відкладено','Знято з тумбочки'];
       const comment = SYSTEM.includes(desc) ? '' : desc;
 
@@ -235,10 +247,24 @@ const Budget = (() => {
     }).join('');
   }
 
+  function renderTumboJournal() {
+    const wrap = el('tumbo-journal-list'); if(!wrap) return;
+    if(DataCache.get('tumbo:journal') === undefined){
+      wrap.innerHTML = '<p class="tumbo-hint" style="text-align:center;padding:16px 0">Завантаження…</p>';
+    }
+    DataCache.swr('tumbo:journal', fetchJournal, paintJournal);
+  }
+
   // ── ЛІМІТ ─────────────────────────────────────────────────
-  async function renderFreeLimit() {
+  async function fetchFreeLimit() {
+    const {data} = await supabase.from('free_limit').select('*').eq('id',1).single();
+    return data || {};
+  }
+  function renderFreeLimit() {
+    DataCache.swr('free_limit', fetchFreeLimit, paintFreeLimit);
+  }
+  function paintFreeLimit(fl) {
     const user = Auth.getCurrentUser();
-    const {data:fl} = await supabase.from('free_limit').select('*').eq('id',1).single();
     const limit    = fl?.limit_value||0;
     const proposal = fl?.proposal_value
       ? {value:fl.proposal_value, proposedBy:fl.proposed_by} : null;
@@ -266,7 +292,7 @@ const Budget = (() => {
         await supabase.from('free_limit').update({
           proposal_value:v, proposed_by:user?.name||'?'
         }).eq('id',1);
-        renderFreeLimit();
+        DataCache.invalidate('free_limit'); renderFreeLimit();
       });
     }
 
@@ -285,7 +311,7 @@ const Budget = (() => {
             limit_value:proposal.value, proposal_value:null, proposed_by:null,
             tg_chat_id:null, tg_message_id:null
           }).eq('id',1);
-          renderFreeLimit();
+          DataCache.invalidate('free_limit'); renderFreeLimit();
         });
       }
       if(propRej&&!propRej.dataset.bound){
@@ -294,7 +320,7 @@ const Budget = (() => {
           await supabase.from('free_limit').update({
             proposal_value:null, proposed_by:null, tg_chat_id:null, tg_message_id:null
           }).eq('id',1);
-          renderFreeLimit();
+          DataCache.invalidate('free_limit'); renderFreeLimit();
         });
       }
     } else {
@@ -303,11 +329,17 @@ const Budget = (() => {
   }
 
   // ── ГЛОБАЛЬНІ ЦІЛІ ────────────────────────────────────────
-  async function renderGlobalGoals() {
-    const wrap = el('global-goals-list'); if(!wrap) return;
+  async function fetchGoals() {
     const {data} = await supabase.from('savings_goals')
       .select('id,name,target_amount,url,description,status,proposed_by')
       .order('created_at',{ascending:false});
+    return data || [];
+  }
+  function renderGlobalGoals() {
+    DataCache.swr('savings_goals', fetchGoals, paintGoals);
+  }
+  function paintGoals(data) {
+    const wrap = el('global-goals-list'); if(!wrap) return;
     if(!data?.length){
       wrap.innerHTML='<p class="empty-state">Спільних цілей ще немає.</p>';
       return;
@@ -339,17 +371,17 @@ const Budget = (() => {
     });
     wrap.querySelectorAll('[data-confirm]').forEach(b=>b.addEventListener('click',async()=>{
       await supabase.from('savings_goals').update({status:'confirmed'}).eq('id',b.dataset.confirm);
-      renderGlobalGoals();
+      DataCache.invalidate('savings_goals'); renderGlobalGoals();
     }));
     wrap.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click',async()=>{
       if(!confirm('Відхилити?')) return;
       await supabase.from('savings_goals').delete().eq('id',b.dataset.reject);
-      renderGlobalGoals();
+      DataCache.invalidate('savings_goals'); renderGlobalGoals();
     }));
     wrap.querySelectorAll('[data-gid]').forEach(b=>b.addEventListener('click',async()=>{
       if(!confirm('Видалити?')) return;
       await supabase.from('savings_goals').delete().eq('id',b.dataset.gid);
-      renderGlobalGoals();
+      DataCache.invalidate('savings_goals'); renderGlobalGoals();
     }));
   }
 
@@ -383,7 +415,7 @@ const Budget = (() => {
           url: el('gg-url').value.trim()||null,
           status:'pending', proposed_by:user?.name||null, saved_amount:0
         });
-        closeModal(); renderGlobalGoals();
+        DataCache.invalidate('savings_goals'); closeModal(); renderGlobalGoals();
       });
     });
   }
@@ -425,8 +457,8 @@ const Budget = (() => {
   }
 
   // ── РЕФРЕШ ────────────────────────────────────────────────
-  async function refresh(){
-    await fetchTumboBalance();
+  function refresh(){
+    refreshTumboBalance();
     renderFreeLimit();
     renderGlobalGoals();
   }
@@ -434,10 +466,8 @@ const Budget = (() => {
   // ── ІНІТ ──────────────────────────────────────────────────
   function init(){
     el('open-tumbo-modal')?.addEventListener('click',async()=>{
-      const {data} = await supabase.from('transactions')
-        .select('amount,type').eq('category','Тумбочка');
-      const total = (data||[]).reduce((s,t)=>s+(t.type==='income'?+t.amount:-+t.amount),0);
-      openTumboModal(total);
+      const rows = await DataCache.ensure('tumbo:txs', fetchTumboTxs);
+      openTumboModal(tumboTotal(rows));
     });
     bindAddGoal();
     window.addEventListener('portal:view',e=>{

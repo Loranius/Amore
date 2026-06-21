@@ -147,6 +147,7 @@ const DailyQuestion = (() => {
     }
 
     logEntry[field] = null;
+    DataCache.set(logKey(), logEntry);
     renderAnswers();
     renderInput();
   }
@@ -166,6 +167,8 @@ const DailyQuestion = (() => {
     wrap.classList.remove('hidden');
   }
 
+  function logKey() { return 'question:log:' + todayStr; }
+
   async function refresh() {
     todayStr = getTodayStr();
     document.getElementById('question-date').textContent = formatToday();
@@ -184,10 +187,12 @@ const DailyQuestion = (() => {
     currentQuestion = pickQuestionForDate(questionsPool, todayStr);
     document.getElementById('question-text').textContent = currentQuestion.text;
 
-    logEntry = await ensureLogEntry(todayStr, currentQuestion.id);
-
-    renderAnswers();
-    renderInput();
+    // Запис відповідей дня — миттєво з кешу, потім ревалідація
+    DataCache.swr(
+      logKey(),
+      () => ensureLogEntry(todayStr, currentQuestion.id),
+      (entry) => { logEntry = entry; renderAnswers(); renderInput(); }
+    );
   }
 
   async function saveAnswer() {
@@ -213,6 +218,7 @@ const DailyQuestion = (() => {
     }
 
     logEntry[field] = text;
+    DataCache.set(logKey(), logEntry);
     renderAnswers();
   }
 

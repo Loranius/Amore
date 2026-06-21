@@ -104,7 +104,7 @@ const Shopping = (() => {
     }
 
     input.value = '';
-    await refresh();
+    DataCache.invalidate('shopping:items'); await refresh();
   }
 
   // ── ЗМІНА СТАТУСУ (купити / повернути) ──
@@ -123,7 +123,7 @@ const Shopping = (() => {
       console.error('Shopping: помилка зміни статусу', error);
       return;
     }
-    await refresh();
+    DataCache.invalidate('shopping:items'); await refresh();
   }
 
   async function deleteItem(id) {
@@ -134,7 +134,7 @@ const Shopping = (() => {
       alert('Не вдалось видалити товар');
       return;
     }
-    await refresh();
+    DataCache.invalidate('shopping:items'); await refresh();
   }
 
   // ── РЕДАГУВАННЯ (категорія / кількість) ──
@@ -190,7 +190,7 @@ const Shopping = (() => {
       return;
     }
     closeModal();
-    await refresh();
+    DataCache.invalidate('shopping:items'); await refresh();
   }
 
   function closeModal() { el('modal-root').innerHTML = ''; }
@@ -361,12 +361,16 @@ const Shopping = (() => {
 
   // ── INIT / REFRESH ──
   async function refresh() {
-    await loadUsers();
-    allItems = await loadItems();
-    renderActiveList();
-    renderArchive();
+    const users = await Auth.getUsers();
+    usersMap = {};
+    users.forEach(u => { usersMap[u.id] = u.name; });
     bindInputEvents();
     bindArchiveToggle();
+    DataCache.swr('shopping:items', loadItems, (items) => {
+      allItems = items || [];
+      renderActiveList();
+      renderArchive();
+    });
   }
 
   function init() {

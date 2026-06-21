@@ -72,9 +72,8 @@ const RandomModule = (() => {
     }
   }
 
-  async function refreshCategories() {
-    const categories = await loadCategories();
-    renderCategories(categories);
+  function refreshCategories() {
+    DataCache.swr('randcats', loadCategories, renderCategories);
   }
 
   async function deleteCategory(id) {
@@ -86,6 +85,7 @@ const RandomModule = (() => {
       alert('Не вдалось видалити категорію');
       return;
     }
+    DataCache.invalidate('randcats');
     refreshCategories();
   }
 
@@ -130,6 +130,7 @@ const RandomModule = (() => {
     }
 
     closeModal();
+    DataCache.invalidate('randcats');
     refreshCategories();
   }
 
@@ -204,6 +205,7 @@ const RandomModule = (() => {
       const { error } = await supabase.from('dishes').update({ title }).eq('id', id);
       if (error) { alert('Помилка збереження'); return; }
       root.innerHTML = '';
+      DataCache.invalidate('dishes');
       refreshDishes();
     });
   }
@@ -219,9 +221,8 @@ const RandomModule = (() => {
     resultEl.classList.add('rolled');
   }
 
-  async function refreshDishes() {
-    dishes = await loadDishes();
-    renderDishes(dishes);
+  function refreshDishes() {
+    DataCache.swr('dishes', loadDishes, (items) => { dishes = items || []; renderDishes(dishes); });
   }
 
   async function deleteDish(id) {
@@ -233,6 +234,7 @@ const RandomModule = (() => {
       alert('Не вдалось видалити страву');
       return;
     }
+    DataCache.invalidate('dishes');
     refreshDishes();
   }
 
@@ -282,6 +284,7 @@ const RandomModule = (() => {
     }
 
     closeModal();
+    DataCache.invalidate('dishes');
     refreshDishes();
   }
 
@@ -292,9 +295,9 @@ const RandomModule = (() => {
     document.getElementById('modal-root').innerHTML = '';
   }
 
-  async function refresh() {
-    await refreshCategories();
-    await refreshDishes();
+  function refresh() {
+    refreshCategories();
+    refreshDishes();
     document.getElementById('dish-result').textContent = 'Натисни «Рандом»';
     document.getElementById('dish-result').classList.remove('rolled');
   }

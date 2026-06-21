@@ -326,7 +326,7 @@ const Media = (() => {
     if (!confirm('Видалити цей елемент?')) return;
     const { error } = await supabase.from('media_items').delete().eq('id', id);
     if (error) { alert('Помилка видалення'); return; }
-    refresh();
+    invalidateMedia(); refresh();
   }
 
   // ── ДОДАТИ вручну ----------
@@ -384,7 +384,7 @@ const Media = (() => {
       if (url) await supabase.from('media_items').update({ poster_url: url }).eq('id', data.id);
     }
     el('modal-root').innerHTML = '';
-    refresh();
+    invalidateMedia(); refresh();
   }
 
   // ── РЕДАГУВАТИ ----------
@@ -441,7 +441,7 @@ const Media = (() => {
     const { error } = await supabase.from('media_items').update(update).eq('id', id);
     if (error) { alert('Помилка збереження'); saveBtn.textContent='Зберегти'; saveBtn.disabled=false; return; }
     el('modal-root').innerHTML = '';
-    refresh();
+    invalidateMedia(); refresh();
   }
 
   // ── ОЦІНКИ ----------
@@ -494,7 +494,7 @@ const Media = (() => {
       update[commentField] = comment || null;
       const { error } = await supabase.from('media_items').update(update).eq('id', id);
       if (error) { alert('Помилка збереження'); return; }
-      closeModal(); refresh();
+      invalidateMedia(); closeModal(); refresh();
     });
   }
 
@@ -505,12 +505,16 @@ const Media = (() => {
   }
 
   // ── REFRESH ----------
-  async function refresh() {
-    allItems = await loadItems(activeType);
+  function invalidateMedia() { DataCache.invalidate('media:' + activeType); }
+
+  function refresh() {
     renderTabs();
-    renderStats();
-    renderFilters();
-    renderGrid();
+    DataCache.swr('media:' + activeType, () => loadItems(activeType), (items) => {
+      allItems = items || [];
+      renderStats();
+      renderFilters();
+      renderGrid();
+    });
   }
 
   // ── INIT ----------

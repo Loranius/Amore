@@ -125,13 +125,15 @@ const Capsule = (() => {
       alert('Не вдалось видалити лист');
       return;
     }
+    DataCache.invalidate('time_capsules');
     refresh();
   }
 
   async function refresh() {
-    await loadUsers();
-    const capsules = await loadCapsules();
-    render(capsules);
+    const users = await Auth.getUsers();
+    usersMap = {};
+    users.forEach(u => { usersMap[u.id] = u.name; });
+    DataCache.swr('time_capsules', loadCapsules, render);
   }
 
   // ---------- Модалка редагування листа ----------
@@ -193,6 +195,7 @@ const Capsule = (() => {
     }
 
     closeModal();
+    DataCache.invalidate('time_capsules');
     refresh();
   }
 
@@ -260,6 +263,7 @@ const Capsule = (() => {
     }
 
     closeModal();
+    DataCache.invalidate('time_capsules');
     refresh();
   }
 

@@ -117,20 +117,25 @@ const MapModule = (() => {
   }
 
   // ---------- Завантаження ----------
-  async function loadAndRender() {
+  async function fetchPins() {
     var { data, error } = await supabase
       .from('map_pins')
       .select('id, title, note, category, lat, lng, photo_url, rating, review')
       .order('created_at', { ascending: false });
+    if (error) { console.error('map_pins error:', error); return []; }
+    return data || [];
+  }
 
-    if (error) { console.error('map_pins error:', error); return; }
-    allPins = data || [];
-
-    markers.forEach(function(m) { m.remove(); });
-    markers = [];
-    allPins.forEach(function(pin) { addMarker(pin); });
-    renderPinCards();
-    bindPinSearch();
+  function loadAndRender() {
+    // Миттєво з кешу, потім фонова ревалідація
+    DataCache.swr('map_pins', fetchPins, function(pins) {
+      allPins = pins || [];
+      markers.forEach(function(m) { m.remove(); });
+      markers = [];
+      allPins.forEach(function(pin) { addMarker(pin); });
+      renderPinCards();
+      bindPinSearch();
+    });
   }
 
   // ---------- Маркер ----------
@@ -462,6 +467,7 @@ const MapModule = (() => {
       saveBtn.textContent = 'Зберігаємо...';
       var { error } = await supabase.from('map_pins').update(update).eq('id', pin.id);
       if (error) { alert('Помилка збереження'); saveBtn.textContent = 'Зберегти'; saveBtn.disabled = false; return; }
+      DataCache.invalidate('map_pins');
       closeModal();
       loadAndRender();
     });
@@ -580,6 +586,7 @@ const MapModule = (() => {
       .eq('id', pinData.id)
       .single();
 
+    DataCache.invalidate('map_pins');
     loadAndRender();
     if (newPin) openPinModal(newPin);
   }
@@ -587,6 +594,7 @@ const MapModule = (() => {
   async function deletePin(id) {
     if (!confirm('Видалити це місце?')) return;
     await supabase.from('map_pins').delete().eq('id', id);
+    DataCache.invalidate('map_pins');
     closeModal();
     loadAndRender();
   }

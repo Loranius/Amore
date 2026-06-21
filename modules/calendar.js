@@ -183,6 +183,7 @@ const CalendarModule = (() => {
   async function deleteEvent(id) {
     if(!confirm('Видалити подію?')) return;
     await supabase.from('events').delete().eq('id', id);
+    DataCache.invalidate('events');
     refresh();
   }
 
@@ -259,13 +260,14 @@ const CalendarModule = (() => {
       });
       if(error){ alert('Помилка: '+error.message); return; }
       root.innerHTML = '';
+      DataCache.invalidate('events');
       refresh();
     });
   }
 
-  async function refresh() {
-    const events = await loadEvents();
-    renderEvents(events);
+  function refresh() {
+    // Миттєво з кешу, потім фонова ревалідація
+    DataCache.swr('events', loadEvents, renderEvents);
   }
 
   function init() {

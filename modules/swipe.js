@@ -97,6 +97,8 @@ const Swipe = (() => {
         status: status,
         created_by: user.id,
       });
+      // Список медіа змінився — скидаємо кеш відповідного типу
+      if (window.DataCache) DataCache.invalidate('media:' + mediaType);
     }
 
     // Оновлюємо список внизу тільки якщо вкладка media активна

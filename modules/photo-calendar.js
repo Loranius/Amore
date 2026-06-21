@@ -31,28 +31,38 @@ const PhotoCalendar = (() => {
 
   // ── ДАНІ ────────────────────────────────────────────────────
   async function fetchUsers() {
-    const { data } = await supabase
-      .from('users').select('id,name').order('id');
-    const all = data || [];
+    const all = await Auth.getUsers();
     currentUser = Auth.getCurrentUser();
     partnerUser = all.find(u => u.id !== currentUser?.id) || null;
   }
 
-  async function loadMonthPhotos() {
+  function monthKey() { return 'pcal:' + yr + '-' + pad(mo); }
+
+  async function fetchMonthRows() {
     const lastDay = new Date(yr, mo, 0).getDate();
     const from = dstr(yr, mo, 1);
     const to   = dstr(yr, mo, lastDay);
-
     const { data, error } = await supabase
       .from('photo_calendar')
       .select('id,date,user_id,photo_url,comment,created_at')
       .gte('date', from).lte('date', to);
+    if (error) { console.error('pcal load error:', error); return []; }
+    return data || [];
+  }
 
-    if (error) { console.error('pcal load error:', error); }
+  function buildMonthMap(rows) {
     monthPhotos = {};
-    (data || []).forEach(p => {
+    (rows || []).forEach(p => {
       if (!monthPhotos[p.date]) monthPhotos[p.date] = [];
       monthPhotos[p.date].push(p);
+    });
+  }
+
+  // Миттєво з кешу місяця, потім ревалідація; рендер у колбеку.
+  function loadMonthPhotos() {
+    return DataCache.swr(monthKey(), fetchMonthRows, (rows) => {
+      buildMonthMap(rows || []);
+      renderCalendar();
     });
   }
 
@@ -252,6 +262,7 @@ const PhotoCalendar = (() => {
       await supabase.from('photo_calendar').update({ comment }).eq('id', pid);
       const p = (monthPhotos[ds] || []).find(x => String(x.id) === String(pid));
       if (p) p.comment = comment;
+      DataCache.invalidate(monthKey());
       closeDayModal();
       renderCalendar();
     });
@@ -306,9 +317,9 @@ const PhotoCalendar = (() => {
       );
       if (dbErr) throw dbErr;
 
+      DataCache.invalidate(monthKey());
       await loadMonthPhotos();
       closeDayModal();
-      renderCalendar();
 
     } catch (e) {
       console.error('pcal upload error:', e);
@@ -380,7 +391,6 @@ const PhotoCalendar = (() => {
     if (mo > 12) { mo = 1; yr++; }
     if (mo < 1)  { mo = 12; yr--; }
     await loadMonthPhotos();
-    renderCalendar();
   }
 
   // ── РЕФРЕШ / ІНІТ ───────────────────────────────────────────
@@ -393,7 +403,6 @@ const PhotoCalendar = (() => {
       mo = now.getMonth() + 1;
     }
     await loadMonthPhotos();
-    renderCalendar();
   }
 
   function init() {
