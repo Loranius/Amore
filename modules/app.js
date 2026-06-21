@@ -1,6 +1,21 @@
 // ============================================================
 // APP BOOTSTRAP — lazy init
-// Core модулі запускаються одразу, важкі — після авторизації
+// ============================================================
+// ПОРЯДОК КРИТИЧНИЙ:
+//   Auth.init() запускає async tryAutoLogin(), яка після завершення
+//   стріляє 'portal:auth'. Обидва слухачі portal:auth (важкий init
+//   і Router) реєструються синхронно ДО того як portal:auth вистрілить,
+//   але спрацьовують у порядку реєстрації.
+//
+//   Проблема (стара): Router реєструвався першим → при portal:auth він
+//   одразу диспатчив portal:view, але модулі ще не мали своїх
+//   portal:view-слухачів (вони init-яться в lazy-блоку, який іде другим).
+//   Результат: порожній екран при F5 не на головній.
+//
+//   Рішення: lazy-init слухач реєструємо ДО Router.init().
+//   Тоді при portal:auth:
+//     1) Спочатку важкий init → модулі реєструють portal:view-слухачі.
+//     2) Потім Router → диспатчить portal:view → модулі вже готові. ✓
 // ============================================================
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,16 +27,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }, { passive: true });
 
-  // ── CORE: потрібні одразу ──
   Auth.init();
-  Router.init();
-  Counter.init();
-  Greeting.init();
-  Photos.init();
-  Settings.init();
-  Realtime.init();   // живі оновлення від партнера (стартує після входу)
 
-  // ── LAZY: ініціалізуємо після успішного входу ──
+  // ── LAZY: реєструємо ПЕРШИМ — до Router.init() ──────────────────
+  // Router у своєму portal:auth-хендлері диспатчить portal:view,
+  // тому до того моменту модулі вже мають зареєструвати свої слухачі.
   let heavyInitDone = false;
   window.addEventListener('portal:auth', () => {
     if (heavyInitDone) return;
@@ -39,4 +49,12 @@ document.addEventListener('DOMContentLoaded', () => {
     Shopping.init();
     PhotoCalendar.init();
   });
+
+  // ── CORE: Router ПІСЛЯ lazy-init, щоб portal:view знайшов готові модулі ──
+  Router.init();
+  Counter.init();
+  Greeting.init();
+  Photos.init();
+  Settings.init();
+  Realtime.init();
 });

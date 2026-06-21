@@ -129,3 +129,35 @@ RLS-політики мають дозволяти SELECT — інакше realt
 - styles/components.css    — .pin-card--active, .pin-delete-action
 - index.html              — map.js?v=swr2, components.css?v=14
 - service-worker.js        — SHELL ?v=14, CACHE amore-v16 → amore-v17
+
+---
+
+# Етап 6 — Фікс порожнього екрану при F5 не на головній
+
+## Симптом
+Оновлення сторінки (F5 / pull-to-refresh) коли відкрита будь-яка вкладка
+окрім головної → вміст не малювався, екран був порожній.
+Повернення на головну і потім назад — все з'являлось.
+
+## Причина: race condition у bootstrap-порядку (modules/app.js)
+1. `Auth.init()` запускає async `tryAutoLogin()`.
+2. Коли вона завершується — стріляє `portal:auth`.
+3. Слухачі `portal:auth` спрацьовують у порядку РЕЄСТРАЦІЇ.
+4. Стара реєстрація:
+     a. `Router.init()` — 1-й слухач → при `portal:auth` одразу
+        диспатчить `portal:view` для збереженої вкладки.
+     b. Важкий lazy-init — 2-й слухач → реєструє `portal:view`-слухачі
+        модулів (Calendar, Budget тощо).
+5. Результат: `portal:view` вже відстріляв, коли модулі лише
+   почали `init()` → жодного обробника не спрацювало → порожній екран.
+
+## Рішення (modules/app.js)
+Lazy-init слухач реєструємо ДО `Router.init()`.
+Тепер при `portal:auth`:
+  1) Важкий init → модулі реєструють `portal:view`-слухачі ✓
+  2) Router → диспатчить `portal:view` → модулі вже готові ✓
+
+## Змінені файли
+- modules/app.js     — порядок: lazy-init listener перед Router.init()
+- index.html         — app.js?v=swr3
+- service-worker.js   — CACHE amore-v17 → amore-v18
