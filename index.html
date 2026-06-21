@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="theme-color" content="#FFF3F6">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Наш портал</title>
+
+<!-- Mapbox CSS завантажується динамічно в map.js при першому відкритті вкладки -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="styles/main.css?v=4">
+<link rel="stylesheet" href="styles/components.css?v=20">
+<!-- Темна тема: застосовуємо ДО рендеру, щоб уникнути блимання -->
+<script>
+  (function(){
+    const t = localStorage.getItem('amore:theme');
+    if (t) document.documentElement.dataset.theme = t;
+  })();
+</script>
+</head>
+<body>
+
+<!-- ===================== AUTH SCREEN ===================== -->
+<div id="auth-screen" class="screen">
+  <div class="auth-card">
+    <p class="eyebrow">Привіт</p>
+    <h1 class="display-xl">Хто заходить?</h1>
+
+    <div id="user-select" class="user-select">
+      <!-- кнопки користувачів рендеряться через auth.js -->
+    </div>
+
+    <div id="pin-pad" class="pin-pad hidden">
+      <p class="pin-name" id="pin-name"></p>
+      <div class="pin-dots" id="pin-dots">
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+        <span class="pin-dot"></span>
+      </div>
+      <div class="pin-keys">
+        <button class="pin-key" data-key="1">1</button>
+        <button class="pin-key" data-key="2">2</button>
+        <button class="pin-key" data-key="3">3</button>
+        <button class="pin-key" data-key="4">4</button>
+        <button class="pin-key" data-key="5">5</button>
+        <button class="pin-key" data-key="6">6</button>
+        <button class="pin-key" data-key="7">7</button>
+        <button class="pin-key" data-key="8">8</button>
+        <button class="pin-key" data-key="9">9</button>
+        <button class="pin-key ghost" data-key="back">Назад</button>
+        <button class="pin-key" data-key="0">0</button>
+        <button class="pin-key ghost" data-key="clear">⌫</button>
+      </div>
+      <p class="pin-error hidden" id="pin-error">Невірний PIN, спробуй ще</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== MAIN APP ===================== -->
+<div id="app" class="app hidden">
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <span class="brand">Портал бубосів</span>
+      <button class="logout-btn" id="logout-btn" title="Вийти">Вийти</button>
+    </div>
+  </header>
+
+  <main class="content" id="content">
+    <!-- ---------- Головна (Полароїд-стіна) ---------- -->
+    <section class="view" id="view-home" data-view="home">
+      <div class="counter-sticker">
+        <p class="greeting-text" id="greeting-text">Привіт!</p>
+        <p class="counter-eyebrow" id="counter-since">з якогось дня</p>
+        <div class="counter-num" id="counter-number">—</div>
+        <p class="counter-label">днів разом</p>
+        <p class="counter-next-anniversary" id="counter-next-anniversary"></p>
+      </div>
+
+      <div id="next-event-widget" class="next-event-widget"></div>
+
+
+      <div class="wall">
+        <a href="#" class="polaroid" data-view-link="calendar">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" data-photo-slot="1"></div>
+          <p class="polaroid-caption">Events 🗓️</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="wishlist">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="2"></div>
+          <p class="polaroid-caption">Wishlist ♡</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="budget">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="3"></div>
+          <p class="polaroid-caption">Finance ₴</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="capsule">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="4"></div>
+          <p class="polaroid-caption">Time message ✉</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="question">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="5"></div>
+          <p class="polaroid-caption">Question ?</p>
+        </a>
+        <a href="#" class="polaroid" data-view-link="media">
+          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="6"></div>
+          <p class="polaroid-caption">Watchlist ▶</p>
+        </a>
+        <a href="#" class="polaroid wide" data-view-link="random">
+          <div class="polaroid-photo"><img src="https://placehold.co/600x270/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="7"></div>
+          <p class="polaroid-caption">Random 🎲</p>
+        </a>
+      </div>
+
+    </section>
+
+    <!-- ---------- Календар + лічильник ---------- -->
+    <section class="view hidden" id="view-calendar" data-view="calendar">
+      <div class="counter-card card">
+        <p class="eyebrow" id="counter-since-cal">з якогось дня</p>
+        <div class="counter-number" id="counter-number-cal">—</div>
+        <p class="counter-label">днів разом</p>
+        <svg class="pulse-line" viewBox="0 0 300 40" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,20 Q75,5 150,20 T300,20" />
+        </svg>
+      </div>
+
+      <div class="view-header">
+        <h2 class="display-md">Events</h2>
+        <button class="btn-primary" id="add-event-btn">+ Подія</button>
+      </div>
+      <div class="card" id="calendar-list">
+        <!-- список подій рендериться через calendar.js -->
+      </div>
+
+    </section>
+
+    <!-- ---------- Wishlist ---------- -->
+    <section class="view hidden" id="view-wishlist" data-view="wishlist">
+
+      <!-- Панель бажань -->
+      <div id="wl-panel-wishes">
+        <div class="view-header" style="margin-bottom:12px">
+          <h2 class="display-md" id="wl-title">Бажання</h2>
+          <button class="btn-primary" id="add-wish-btn">+ Додати бажання</button>
+        </div>
+        <div id="wishlist-grid"></div>
+      </div>
+
+    </section>
+
+    <!-- ---------- Фінанси ---------- -->
+    <section class="view hidden" id="view-budget" data-view="budget">
+
+      <!-- Тумбочка — головна карта -->
+      <div class="tumbo-hero-card">
+        <div class="tumbo-hero-top">
+          <div class="tumbo-hero-icon">🗄️</div>
+          <div class="tumbo-hero-info">
+            <div class="tumbo-hero-label">Тумбочка</div>
+            <div class="tumbo-hero-amount" id="tumbo-balance">0 ₴</div>
+          </div>
+        </div>
+        <button class="btn-primary tumbo-hero-btn" id="open-tumbo-modal">Поповнити тумбочку</button>
+      </div>
+
+      <!-- Ліміт вільного рішення -->
+      <div class="card fin-section-card">
+        <div class="fin-section-head">
+          <div class="fin-section-title">🤝 Ліміт вільного рішення</div>
+          <div class="fin-section-sub">Раз на місяць — на свої забаганки, без звітності</div>
+        </div>
+        <div class="fin-limit-current">Поточний: <b id="free-limit-current">не встановлено</b></div>
+        <input type="range" class="fin-slider" id="free-limit-slider" min="500" max="15000" step="500" value="2000">
+        <div class="fin-slider-display" id="free-limit-display">2 000 ₴</div>
+        <button class="btn-secondary" id="free-limit-propose" style="width:100%;margin-top:10px">Запропонувати →</button>
+        <div class="fin-proposal-panel" id="free-limit-proposal-panel">
+          <div class="fin-proposal-text" id="free-limit-proposal-text"></div>
+          <div class="fin-row-gap" style="margin-top:10px">
+            <button class="btn-primary" id="free-limit-proposal-confirm">✓ Так</button>
+            <button class="btn-secondary" id="free-limit-proposal-reject">✕ Ні</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Спільні цілі -->
+      <div class="card fin-section-card">
+        <div class="fin-section-head fin-section-head--row">
+          <div>
+            <div class="fin-section-title">🎯 Спільні цілі</div>
+            <div class="fin-section-sub">Великі плани на двох</div>
+          </div>
+          <button class="btn-secondary fin-add-goal-btn" id="add-goal-btn">+ Ціль</button>
+        </div>
+        <div id="global-goals-list" style="margin-top:12px"></div>
+      </div>
+
+    </section>
+
+    <!-- ---------- Капсула часу ---------- -->
+    <section class="view hidden" id="view-capsule" data-view="capsule">
+      <div class="view-header">
+        <h2 class="display-md">Time message</h2>
+        <button class="btn-primary" id="add-capsule-btn">+ Лист</button>
+      </div>
+      <div class="card-grid" id="capsule-grid">
+        <!-- картки листів -->
+      </div>
+
+    </section>
+
+    <!-- ---------- Питання дня ---------- -->
+    <section class="view hidden" id="view-question" data-view="question">
+      <div class="view-header">
+        <h2 class="display-md">Question</h2>
+      </div>
+      <div class="card question-card">
+        <p class="eyebrow" id="question-date">—</p>
+        <p class="question-text" id="question-text">Завантаження…</p>
+
+        <div class="question-answers" id="question-answers">
+          <!-- відповіді обох -->
+        </div>
+
+        <div class="form-field hidden" id="question-input-wrap">
+          <label for="question-input">Твоя відповідь</label>
+          <textarea id="question-input" rows="3" placeholder="Напиши відповідь..."></textarea>
+          <button class="btn-primary" id="question-save" style="margin-top: var(--space-2); align-self: flex-start;">Зберегти</button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- ---------- Список покупок ---------- -->
+    <section class="view hidden" id="view-shopping" data-view="shopping">
+      <div class="view-header">
+        <h2 class="display-md">Список покупок</h2>
+      </div>
+
+      <!-- Зона введення -->
+      <div class="card sl-input-card">
+        <div class="sl-input-row">
+          <input type="text" id="sl-input" class="sl-input" placeholder="Напр.: молоко, хліб, два яблука...">
+          <button class="btn-primary sl-add-btn" id="sl-add-btn">+</button>
+        </div>
+        <p class="sl-input-hint">Пиши природньою мовою, напр.: "молоко, десяток яєць і щось солоденьке"</p>
+      </div>
+
+      <!-- Активний список (категорії-акордеони) -->
+      <div class="sl-accordion" id="sl-active-list"></div>
+
+      <!-- Архів / куплене -->
+      <div class="sl-archive-wrap">
+        <button class="sl-archive-toggle" id="sl-archive-toggle">
+          <span>✓ Куплено</span>
+          <span class="sl-archive-count" id="sl-archive-count">0</span>
+          <span class="fin-acc-arrow" id="sl-archive-arrow">›</span>
+        </button>
+        <div class="sl-archive-body hidden" id="sl-archive-body"></div>
+      </div>
+    </section>
+
+    <!-- ---------- Карта спогадів ---------- -->
+    <section class="view hidden" id="view-map" data-view="map">
+      <div class="view-header">
+        <h2 class="display-md">Наша карта</h2>
+        <button class="btn-primary" id="add-pin-btn">+ Місце</button>
+      </div>
+
+      <div class="map-legend">
+        <span class="map-legend-item"><span class="map-legend-dot visited"></span>Були</span>
+        <span class="map-legend-item"><span class="map-legend-dot restaurant"></span>Ресторан</span>
+        <span class="map-legend-item"><span class="map-legend-dot plan"></span>Плануємо</span>
+        <span class="map-legend-item"><span class="map-legend-dot favorite"></span>Улюблене</span>
+      </div>
+
+      <div class="map-search-wrap">
+        <input type="search" id="pin-search" class="fin-inp" placeholder="🔍 Пошук місць…" style="width:100%;margin-bottom:8px">
+      </div>
+
+      <div id="map-container" class="map-container"></div>
+
+      <div id="pin-list" class="pin-list"></div>
+
+    </section>
+
+    <!-- ---------- Медіа (Фільми/Серіали/Книги) + Свайп ---------- -->
+    <section class="view hidden" id="view-media" data-view="media">
+
+      <div class="view-header">
+        <h2 class="display-md">Watchlist</h2>
+      </div>
+
+      <!-- Кнопка-тогл: показати / сховати свайп -->
+      <button class="swipe-toggle-btn" id="swipe-toggle-btn">
+        <span class="swipe-toggle-icon">🃏</span>
+        <span>Свайп фільмів</span>
+        <span class="swipe-toggle-arrow">›</span>
+      </button>
+
+      <!-- Колапсований блок свайпу -->
+      <div class="swipe-panel" id="swipe-panel">
+        <div class="swipe-panel-inner">
+          <div class="swipe-type-tabs">
+            <button class="swipe-type-btn active" data-swipe-type="movie">🎬 Фільми</button>
+            <button class="swipe-type-btn" data-swipe-type="series">📺 Серіали</button>
+          </div>
+          <div class="swipe-legend">
+            <span>⬆ Переглянуто</span>
+            <span>⬇ Дивимось</span>
+            <span>⬅ Плануємо</span>
+            <span>➡ Пропустити</span>
+          </div>
+          <div class="swipe-stack-wrap">
+            <div id="swipe-stack" class="swipe-stack"></div>
+          </div>
+          <div class="swipe-actions">
+            <button class="swipe-action-btn swipe-btn-left" id="swipe-btn-left">📋</button>
+            <button class="swipe-action-btn swipe-btn-skip" id="swipe-btn-skip">✕</button>
+            <button class="swipe-action-btn swipe-btn-down" id="swipe-btn-down">▶</button>
+            <button class="swipe-action-btn swipe-btn-up" id="swipe-btn-up">✅</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Пошук TMDB -->
+      <div class="media-search-wrap" id="media-search-wrap">
+        <input type="search" class="media-search-inp" id="media-search-inp"
+               placeholder="🔍 Пошук фільму або серіалу…" inputmode="search" autocomplete="off">
+        <div id="media-search-results" class="media-search-results hidden"></div>
+      </div>
+
+      <!-- Роздільник -->
+      <div class="media-section-divider">
+        <span>Ваш список</span>
+      </div>
+
+      <!-- Список знизу -->
+      <div class="view-header" style="margin-top: 0;">
+        <button class="btn-primary" id="add-media-btn">+ Додати</button>
+      </div>
+      <div class="media-tabs" id="media-tabs">
+        <button class="media-tab active" data-media-type="movie">Фільми</button>
+        <button class="media-tab" data-media-type="series">Серіали</button>
+        <button class="media-tab" data-media-type="book">Книги</button>
+      </div>
+      <div class="card media-stats-card">
+        <div id="media-stats" class="media-stats-row"></div>
+      </div>
+      <div class="media-filters-wrap" id="media-filters"></div>
+      <div id="media-list"></div>
+    </section>
+    <section class="view hidden" id="view-random" data-view="random">
+      <div class="view-header">
+        <h2 class="display-md">Random</h2>
+      </div>
+
+      <!-- Рандомайзер дій -->
+      <div class="card random-block">
+        <div class="random-block-header">
+          <h3 class="display-md-sm">Хто/Що</h3>
+          <button class="btn-secondary" id="add-randcat-btn">+ Категорія</button>
+        </div>
+        <div id="randcat-list">
+          <!-- категорії з кнопкою рандому -->
+        </div>
+      </div>
+
+      <!-- Рандомайзер страв -->
+      <div class="card random-block">
+        <div class="random-block-header">
+          <h3 class="display-md-sm">Що приготувати</h3>
+          <button class="btn-secondary" id="add-dish-btn">+ Страва</button>
+        </div>
+        <div class="dish-roll-area">
+          <div class="dish-result" id="dish-result">Натисни «Random»</div>
+          <button class="btn-primary" id="roll-dish-btn">🎲 Random</button>
+        </div>
+        <div id="dish-list">
+          <!-- список страв з можливістю видалення -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ ФОТО-КАЛЕНДАР ══════════ -->
+    <section class="view hidden" id="view-photo-calendar" data-view="photo-calendar">
+      <div class="pcal-header">
+        <button class="month-arrow" id="pcal-prev">‹</button>
+        <span id="pcal-month-label" class="pcal-month-label">—</span>
+        <button class="month-arrow" id="pcal-next">›</button>
+      </div>
+      <div class="card pcal-card">
+        <div id="pcal-grid" class="pcal-grid"></div>
+      </div>
+      <div class="pcal-legend">
+        <span class="pcal-legend-item">
+          <span class="pcal-dot pcal-dot--me"></span> Моє фото
+        </span>
+        <span class="pcal-legend-item">
+          <span class="pcal-dot pcal-dot--partner"></span> Фото партнера
+        </span>
+      </div>
+    </section>
+
+  </main>
+
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="nav-btn" data-view="wishlist">
+      <span class="nav-icon">♡</span>
+      <span class="nav-label">Wishlist</span>
+    </button>
+    <button class="nav-btn" data-view="budget">
+      <span class="nav-icon">₴</span>
+      <span class="nav-label">Finance</span>
+    </button>
+    <button class="nav-btn nav-btn-home active" data-view="home">
+      <span class="nav-icon-home">♡</span>
+    </button>
+    <button class="nav-btn" data-view="shopping">
+      <span class="nav-icon">🛒</span>
+      <span class="nav-label">Покупки</span>
+    </button>
+    <button class="nav-btn" id="more-nav-btn">
+      <span class="nav-icon">⋯</span>
+      <span class="nav-label">Ще</span>
+    </button>
+  </nav>
+
+  <!-- ===================== MORE MENU ===================== -->
+  <div id="more-menu-overlay" class="more-menu-overlay hidden">
+    <div class="more-menu-sheet">
+      <p class="more-menu-title">Інші розділи</p>
+      <div class="more-menu-grid">
+        <button class="more-menu-item" data-view="calendar">
+          <span class="more-menu-icon">📅</span>
+          <span class="more-menu-label">Календар</span>
+        </button>
+        <button class="more-menu-item" data-view="media">
+          <span class="more-menu-icon">🎬</span>
+          <span class="more-menu-label">Вотчліст</span>
+        </button>
+        <button class="more-menu-item" data-view="random">
+          <span class="more-menu-icon">🍽️</span>
+          <span class="more-menu-label">Що їмо?</span>
+        </button>
+        <button class="more-menu-item" data-view="capsule">
+          <span class="more-menu-icon">💌</span>
+          <span class="more-menu-label">Капсула</span>
+        </button>
+        <button class="more-menu-item" data-view="question">
+          <span class="more-menu-icon">💬</span>
+          <span class="more-menu-label">Питання</span>
+        </button>
+        <button class="more-menu-item" data-view="map">
+          <span class="more-menu-icon">📍</span>
+          <span class="more-menu-label">Наша карта</span>
+        </button>
+        <button class="more-menu-item" data-view="photo-calendar">
+          <span class="more-menu-icon">📸</span>
+          <span class="more-menu-label">Фото-календар</span>
+        </button>
+      </div>
+      <button class="more-menu-item more-menu-settings-btn" id="more-menu-settings">
+        <span class="more-menu-icon">⚙️</span>
+        <span class="more-menu-label">Налаштування</span>
+      </button>
+      <button class="more-menu-close" id="more-menu-close">Закрити</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== MODAL ROOT ===================== -->
+<div id="modal-root"></div>
+
+<!-- ===================== БОТАНІЧНИЙ ДЕКОР ===================== -->
+<div class="deco deco-branch-tl" aria-hidden="true">
+  <svg viewBox="0 0 140 100" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#E8829C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 10 C30 25, 50 35, 90 45 C110 50, 125 55, 135 65" />
+    <path d="M30 22 C25 12, 30 5, 38 8 C44 10, 42 20, 32 23 Z" fill="#FFE9EF" />
+    <path d="M55 33 C50 22, 56 14, 65 18 C72 21, 70 32, 58 35 Z" fill="#FFE9EF" />
+    <path d="M85 44 C80 33, 87 25, 96 29 C103 32, 100 43, 88 46 Z" fill="#FFE9EF" />
+    <path d="M115 56 C110 45, 117 37, 126 41 C133 44, 130 55, 118 58 Z" fill="#FFE9EF" />
+  </svg>
+</div>
+<div class="deco deco-branch-br" aria-hidden="true">
+  <svg viewBox="0 0 140 100" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#E8829C" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 10 C30 25, 50 35, 90 45 C110 50, 125 55, 135 65" />
+    <path d="M30 22 C25 12, 30 5, 38 8 C44 10, 42 20, 32 23 Z" fill="#FFE9EF" />
+    <path d="M55 33 C50 22, 56 14, 65 18 C72 21, 70 32, 58 35 Z" fill="#FFE9EF" />
+    <path d="M85 44 C80 33, 87 25, 96 29 C103 32, 100 43, 88 46 Z" fill="#FFE9EF" />
+    <path d="M115 56 C110 45, 117 37, 126 41 C133 44, 130 55, 118 58 Z" fill="#FFE9EF" />
+  </svg>
+</div>
+<div class="deco deco-flower-tr" aria-hidden="true">
+  <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#FF6B9D" stroke-width="2" stroke-linejoin="round">
+    <circle cx="20" cy="13" r="7" fill="#FFE9EF" />
+    <circle cx="29" cy="20" r="7" fill="#FFE9EF" />
+    <circle cx="20" cy="27" r="7" fill="#FFE9EF" />
+    <circle cx="11" cy="20" r="7" fill="#FFE9EF" />
+    <circle cx="20" cy="20" r="4" fill="#FF6B9D" stroke="none" />
+  </svg>
+</div>
+<div class="confetti c1" aria-hidden="true"></div>
+<div class="confetti c2" aria-hidden="true"></div>
+<div class="confetti c3" aria-hidden="true"></div>
+<div class="confetti c4" aria-hidden="true"></div>
+<div class="confetti c5" aria-hidden="true"></div>
+
+<!-- ===================== SCRIPTS ===================== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Mapbox GL JS завантажується динамічно в map.js -->
+<script src="lib/supabase.js"></script>
+<script src="lib/retry.js?v=1"></script>
+<script src="lib/error-boundary.js?v=1"></script>
+<script src="lib/cache.js?v=2"></script>
+<script src="lib/img.js?v=swr"></script>
+<script src="modules/auth.js?v=swr"></script>
+<script src="modules/router.js?v=swr"></script>
+<script src="modules/counter.js?v=swr"></script>
+<script src="modules/greeting.js?v=swr"></script>
+<script src="modules/photos.js?v=swr2"></script>
+<script src="modules/calendar.js?v=swr"></script>
+<script src="modules/wishlist.js?v=v8"></script>
+<script src="modules/budget.js?v=swr"></script>
+<script src="modules/capsule.js?v=swr"></script>
+<script src="modules/question.js?v=swr"></script>
+<script src="modules/media.js?v=swr"></script>
+<script src="modules/random.js?v=swr"></script>
+<script src="modules/swipe.js?v=swr"></script>
+<script src="modules/map.js?v=swr2"></script>
+<script src="modules/shopping.js?v=swr3"></script>
+<script src="modules/settings.js?v=swr2"></script>
+<script src="modules/photo-calendar.js?v=swr2"></script>
+<script src="lib/confetti.js?v=1"></script>
+<script src="lib/gestures.js?v=1"></script>
+<script src="lib/pwa.js?v=1"></script>
+<script src="lib/realtime.js?v=2"></script>
+<script src="modules/app.js?v=swr6"></script>
+
+<!-- PWA: реєстрація service worker -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(err =>
+        console.warn('SW registration failed:', err)
+      );
+    });
+  }
+</script>
+</body>
+</html>
