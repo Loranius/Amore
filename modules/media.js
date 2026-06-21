@@ -26,6 +26,9 @@ const Media = (() => {
   let activeFilter = 'all';
   let allItems     = [];
   let searchTimer  = null;
+  const PAGE_SIZE  = 20;   // інфінітний скрол — порціями по 20
+  let visibleCount = PAGE_SIZE;
+  let scrollSentinel = null;
 
   const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
   const el  = id => document.getElementById(id);
@@ -273,11 +276,15 @@ const Media = (() => {
 
     if (!items.length) { wrap.innerHTML='<p class="empty-state">Тут порожньо. Додай щось!</p>'; return; }
 
+    // Відображаємо лише visibleCount елементів
+    const visible = items.slice(0, visibleCount);
+    const hasMore = items.length > visibleCount;
+
     wrap.innerHTML = '';
     const grid = document.createElement('div');
     grid.className = 'media-grid';
 
-    items.forEach(item => {
+    visible.forEach(item => {
       const card = document.createElement('div');
       card.className = 'media-card';
       const statusLabel = conf[item.status] || item.status;
@@ -313,6 +320,23 @@ const Media = (() => {
     });
 
     wrap.appendChild(grid);
+
+    // ── Інфінітний скрол: sentinel внизу ──────────────────
+    if (scrollSentinel) scrollSentinel.disconnect();
+    if (hasMore) {
+      const sentinel = document.createElement('div');
+      sentinel.className = 'media-load-more-sentinel';
+      sentinel.style.height = '40px';
+      wrap.appendChild(sentinel);
+
+      scrollSentinel = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          visibleCount += PAGE_SIZE;
+          renderGrid();
+        }
+      }, { rootMargin: '100px' });
+      scrollSentinel.observe(sentinel);
+    }
     wrap.querySelectorAll('[data-delete-id]').forEach(btn =>
       btn.addEventListener('click', () => deleteItem(btn.dataset.deleteId)));
     wrap.querySelectorAll('[data-rate-id]').forEach(btn =>
@@ -507,8 +531,24 @@ const Media = (() => {
   // ── REFRESH ----------
   function invalidateMedia() { DataCache.invalidate('media:' + activeType); }
 
-  function refresh() {
+  function showSkeleton() {
+    const wrap = el('media-list');
+    if (!wrap || DataCache.get('media:' + activeType) !== undefined) return;
+    wrap.innerHTML = `<div class="skeleton-grid">${Array(4).fill(`
+      <div class="skeleton-card">
+        <div class="skeleton skeleton-avatar" style="border-radius:8px;width:56px;height:80px"></div>
+        <div class="skeleton-body">
+          <div class="skeleton skeleton-line mid"></div>
+          <div class="skeleton skeleton-line short"></div>
+          <div class="skeleton skeleton-line full"></div>
+        </div>
+      </div>`).join('')}</div>`;
+  }
+
+  function refresh(){
+    visibleCount = PAGE_SIZE;
     renderTabs();
+    showSkeleton();
     DataCache.swr('media:' + activeType, () => loadItems(activeType), (items) => {
       allItems = items || [];
       renderStats();

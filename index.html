@@ -17,8 +17,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="styles/main.css?v=2">
+<link rel="stylesheet" href="styles/main.css?v=3">
 <link rel="stylesheet" href="styles/components.css?v=16">
+<!-- Темна тема: застосовуємо ДО рендеру, щоб уникнути блимання -->
+<script>
+  (function(){
+    const t = localStorage.getItem('amore:theme');
+    if (t) document.documentElement.dataset.theme = t;
+  })();
+</script>
 </head>
 <body>
 
@@ -85,6 +92,8 @@
       </div>
 
       <div id="next-event-widget" class="next-event-widget"></div>
+
+      <div id="home-stats" class="home-stats"></div>
 
       <div class="wall">
         <a href="#" class="polaroid" data-view-link="calendar">
@@ -535,8 +544,12 @@
 <script src="modules/shopping.js?v=swr"></script>
 <script src="modules/settings.js?v=swr2"></script>
 <script src="modules/photo-calendar.js?v=swr"></script>
+<script src="lib/confetti.js?v=1"></script>
+<script src="lib/gestures.js?v=1"></script>
+<script src="lib/pwa.js?v=1"></script>
+<script src="modules/stats.js?v=1"></script>
 <script src="lib/realtime.js?v=2"></script>
-<script src="modules/app.js?v=swr3"></script>
+<script src="modules/app.js?v=swr4"></script>
 
 <!-- PWA: реєстрація service worker -->
 <script>

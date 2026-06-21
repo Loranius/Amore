@@ -104,6 +104,17 @@ const Settings = (() => {
             </button>
           </div>
 
+          <!-- Темна тема toggle -->
+          <div class="settings-row" id="theme-row">
+            <div class="settings-row-text">
+              <span class="settings-row-title">Темна тема 🌙</span>
+              <span class="settings-row-desc">Нічний режим для зручності</span>
+            </div>
+            <button class="tg-toggle" id="theme-toggle" role="switch" aria-checked="false">
+              <span class="tg-toggle-knob"></span>
+            </button>
+          </div>
+
           <div class="settings-divider"></div>
 
           <!-- Розміри -->
@@ -155,6 +166,22 @@ const Settings = (() => {
         toggle.setAttribute('aria-checked', String(!newState));
       }
     });
+
+    // --- Темна тема toggle ---
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const themeToggle = el('theme-toggle');
+    if (themeToggle) {
+      themeToggle.classList.toggle('on', isDark);
+      themeToggle.setAttribute('aria-checked', String(isDark));
+      themeToggle.addEventListener('click', () => {
+        const nowDark = document.documentElement.dataset.theme === 'dark';
+        const next    = nowDark ? 'light' : 'dark';
+        document.documentElement.dataset.theme = next;
+        localStorage.setItem('amore:theme', next);
+        themeToggle.classList.toggle('on', next === 'dark');
+        themeToggle.setAttribute('aria-checked', String(next === 'dark'));
+      });
+    }
 
     // --- Закрити ---
     el('settings-close').addEventListener('click', closeModal);

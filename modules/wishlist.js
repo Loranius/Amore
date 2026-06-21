@@ -105,6 +105,9 @@ const Wishlist = (() => {
     // Надсилаємо сповіщення (не блокуємо UI)
     sendFulfilledNotification(item, owner || { name: '?', id: item.owner }, currentUser);
 
+    // Святкові конфеті 🎉
+    if (window.Confetti) Confetti.burst();
+
     // Скидаємо кеш і перемальовуємо
     invalidateWishes();
     DataCache.invalidate('wishlist:archive:' + item.owner);
