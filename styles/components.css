@@ -2066,6 +2066,21 @@
 
 .pin-card:active { box-shadow: var(--shadow-card); }
 
+/* Картка, до якої «наведено» (1-й клік) — перед відкриттям модалки 2-м кліком */
+.pin-card--active {
+  box-shadow: 0 0 0 2px var(--accent-bright), var(--shadow-card);
+}
+
+/* Кнопка «Видалити» в модалці місця — як btn-secondary, але з акцентом небезпеки.
+   (Раніше помилково використовувався клас .delete-btn — кругла 32px кнопка-×,
+    через що текст вилазив під «Зберегти».) */
+.pin-delete-action {
+  background: #FCE8EE;
+  color: var(--danger);
+  border-color: rgba(229,115,115,0.35);
+}
+.pin-delete-action:hover { background: #F9D9E2; }
+
 .pin-card-photo {
   width: 90px;
   min-height: 90px;

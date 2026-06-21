@@ -109,3 +109,23 @@ RLS-політики мають дозволяти SELECT — інакше realt
 - styles/components.css  — три правила align-items
 - index.html             — components.css?v=12 → ?v=13
 - service-worker.js       — SHELL ?v=13, CACHE amore-v15 → amore-v16
+
+---
+
+# Етап 5 — Карта: двоступеневий клік + фікс кнопки видалення
+
+## Картки місць (modules/map.js)
+- 1-й клік по картці → карта плавно переноситься до місця (flyTo, zoom 15) і картка підсвічується.
+- 2-й клік по тій самій картці → відкривається модалка.
+- При відкритті модалки фокус скидається, тож після її закриття цикл знову починається з польоту.
+
+## Модалка місця — кнопка «Видалити» (modules/map.js + components.css)
+- Прибрано хибний клас `.delete-btn` (це кругла 32px кнопка-×) → текст більше не вилазить під «Зберегти».
+- Додано `.pin-delete-action` — звичайна кнопка з акцентом небезпеки.
+- Додано `.pin-card--active` — підсвітка наведеної картки.
+
+## Змінені файли
+- modules/map.js          — focusedPinId, двоступеневий клік, клас кнопки
+- styles/components.css    — .pin-card--active, .pin-delete-action
+- index.html              — map.js?v=swr2, components.css?v=14
+- service-worker.js        — SHELL ?v=14, CACHE amore-v16 → amore-v17

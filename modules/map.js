@@ -18,6 +18,7 @@ const MapModule = (() => {
   let map = null;
   let markers = [];
   let allPins = [];
+  let focusedPinId = null;   // картка, на яку зараз «наведено» (1-й клік — політ, 2-й — модалка)
   let mapInitialized = false;
   let mapboxLoaded = false;
   let searchDebounce = null;
@@ -188,7 +189,7 @@ const MapModule = (() => {
     pins.forEach(function(pin) {
       var cat = CATEGORIES[pin.category] || CATEGORIES.visited;
       var card = document.createElement('div');
-      card.className = 'pin-card';
+      card.className = 'pin-card' + (pin.id === focusedPinId ? ' pin-card--active' : '');
 
       var photoHtml = pin.photo_url
         ? '<img class="pin-card-photo" loading="lazy" src="' + pin.photo_url + '" alt="' + escapeHtml(pin.title) + '">'
@@ -213,8 +214,16 @@ const MapModule = (() => {
         '</div>';
 
       card.addEventListener('click', function() {
-        openPinModal(pin);
-        map.flyTo({ center: [pin.lng, pin.lat], zoom: 13 });
+        if (focusedPinId === pin.id) {
+          // Другий клік по тій самій картці → відкриваємо модалку
+          openPinModal(pin);
+        } else {
+          // Перший клік → переносимо карту до місця і підсвічуємо картку
+          focusedPinId = pin.id;
+          wrap.querySelectorAll('.pin-card').forEach(function(c) { c.classList.remove('pin-card--active'); });
+          card.classList.add('pin-card--active');
+          if (map) map.flyTo({ center: [pin.lng, pin.lat], zoom: 15 });
+        }
       });
 
       wrap.appendChild(card);
@@ -374,6 +383,7 @@ const MapModule = (() => {
 
   // ---------- Модалка перегляду/редагування піна ----------
   function openPinModal(pin) {
+    focusedPinId = null; // після закриття модалки знову працює «1-й клік = політ»
     var cat = CATEGORIES[pin.category] || CATEGORIES.visited;
     var root = document.getElementById('modal-root');
     var selectedRating = pin.rating || 0;
@@ -411,7 +421,7 @@ const MapModule = (() => {
               '<input type="file" id="pin-edit-photo" accept="image/*">' +
             '</div>' +
             '<div class="modal-actions">' +
-              '<button class="btn-secondary delete-btn" id="pin-delete-btn">Видалити</button>' +
+              '<button class="btn-secondary pin-delete-action" id="pin-delete-btn">Видалити</button>' +
               '<button class="btn-primary" id="pin-edit-save">Зберегти</button>' +
             '</div>' +
           '</div>' +
