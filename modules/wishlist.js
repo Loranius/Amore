@@ -60,38 +60,20 @@ const Wishlist = (() => {
   }
 
   // ── TELEGRAM СПОВІЩЕННЯ ───────────────────────────────────
-  // Викликає Edge Function 'db-notify'.
-  // Параметри підлаштуй під свою реалізацію db-notify:
-  //   type:      тип події (для маршрутизації у функції)
-  //   ownerMsg:  текст для власника бажання (Markdown)
-  //   buyerMsg:  текст для покупця (Markdown)
-  //   ownerId:   id власника бажання (щоб знайти chat_id)
-  //   buyerId:   id покупця
+  // Надсилаємо лише мінімум даних — текст будує Edge Function,
+  // щоб HTML-форматування і імена були централізовані на сервері.
   async function sendFulfilledNotification(item, owner, buyer) {
-    const isBuyerDima = buyer.name === 'Діма';
-    const title = item.title;
-
-    const ownerMsg = owner.name === 'Лєна'
-      ? `🎁 *Лєнусік!* Твоє бажання *«${title}»* виконано!\n💝 Дімусік подбав про тебе ✨🌸`
-      : `🎁 *Дімусік!* Твоє бажання *«${title}»* виконано!\n💝 Лєнусік подбала про тебе ✨💙`;
-
-    const buyerMsg = isBuyerDima
-      ? `🌟 *Молодець, Дімусік!* Ти виконав бажання Лєнусіка —\n*«${title}»*! Вона точно буде щасливою 💕`
-      : `🌟 *Молодець, Лєнусік!* Ти виконала бажання Дімусіка —\n*«${title}»*! Він точно буде щасливим 💙`;
-
     try {
       await supabase.functions.invoke('db-notify', {
         body: {
-          type:     'wish_fulfilled',
-          ownerMsg,
-          buyerMsg,
-          ownerId:  owner.id,
-          buyerId:  buyer.id,
+          type:      'wish_fulfilled',
+          itemTitle: item.title,
+          ownerId:   owner?.id,
+          buyerId:   buyer.id,
         },
       });
     } catch (e) {
       console.warn('[Wishlist] db-notify error:', e);
-      // Не кидаємо помилку — покупка вже збережена в БД
     }
   }
 
