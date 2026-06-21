@@ -56,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
   Greeting.init();
   Photos.init();
   Settings.init();
-  Stats.init();
   Realtime.init();
   Gestures.init();
   PWABanner.init();

@@ -807,40 +807,6 @@ img.lazy.loaded {
 }
 
 /* ============================================================
-   СТАТИСТИКА НА ГОЛОВНІЙ
-   ============================================================ */
-.home-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  margin: 16px 0;
-}
-.home-stat-card {
-  background: var(--surface);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-soft);
-  padding: 14px 10px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-.home-stat-emoji { font-size: 22px; line-height: 1; }
-.home-stat-num {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 22px;
-  color: var(--accent-deep);
-  line-height: 1;
-}
-.home-stat-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
 
 /* Тема-тогл кнопка в налаштуваннях */
 .theme-toggle-row {
