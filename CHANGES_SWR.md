@@ -88,3 +88,24 @@ RLS-політики мають дозволяти SELECT — інакше realt
 - service-worker.js  — CACHE: amore-v14 → amore-v15
 
 Жодних додаткових кроків на боці Supabase цей етап не потребує.
+
+---
+
+# Етап 4 — Фікс вирівнювання іконок (CSS)
+
+## Симптом
+Маркери на карті виглядали зміщеними вгору; іконки на кнопках свайпу «вилазили» зверху.
+
+## Причина
+У круглих елементах стояло `align-items: flex-start` → вміст притискався до верху кружечка
+замість центру. (Не пов'язано з кешем/realtime — це окремий давній CSS-нюанс.)
+
+## Виправлено (styles/components.css: flex-start → center)
+- .map-marker            (емодзі категорії в маркері)
+- .swipe-action-btn      (📋 ✕ ▶ ✅ під карткою свайпу)
+- .swipe-poster-placeholder (🎬, коли немає постера)
+
+## Змінені файли
+- styles/components.css  — три правила align-items
+- index.html             — components.css?v=12 → ?v=13
+- service-worker.js       — SHELL ?v=13, CACHE amore-v15 → amore-v16
