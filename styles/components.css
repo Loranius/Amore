@@ -3082,6 +3082,19 @@ a.wl-card-title:hover { text-decoration: underline; color: var(--accent-deep); }
   background: #E8F5E9; color: #2E7D32;
   font-family: var(--font-body); font-size: 14px; font-weight: 700;
 }
+
+/* «Вже купив(ла)» — тепер клікабельна кнопка (замість div .wl-reserved-status) */
+.wl-fulfill-btn {
+  width: 100%; padding: 10px 0;
+  border: 2px solid #4CAF50; border-radius: var(--radius-sm);
+  background: #E8F5E9; color: #2E7D32;
+  font-family: var(--font-body); font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: background 0.15s, transform 0.1s;
+}
+.wl-fulfill-btn:hover  { background: #C8E6C9; }
+.wl-fulfill-btn:active { transform: scale(0.98); }
+.wl-fulfill-btn:disabled { opacity: 0.65; cursor: default; }
+
 .wl-cancel-reserve-btn {
   width: 100%; padding: 7px 0;
   border: none; background: transparent;
@@ -3091,6 +3104,43 @@ a.wl-card-title:hover { text-decoration: underline; color: var(--accent-deep); }
   transition: opacity 0.15s;
 }
 .wl-cancel-reserve-btn:active { opacity: 1; }
+
+/* ── Архів виконаних бажань ── */
+.wl-archive-wrap {
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 4px;
+}
+.wl-archive-toggle {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 4px;
+  border: none; background: transparent; cursor: pointer;
+  font-family: var(--font-body); font-size: 14px; color: var(--text-muted);
+}
+.wl-archive-toggle-label { font-weight: 700; }
+.wl-archive-toggle-arrow { font-size: 10px; }
+.wl-archive-body { display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px; }
+.wl-archive-body.hidden { display: none; }
+
+.wl-archive-card {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: #F9FFF9; border: 1px solid #D4EDDA;
+  border-radius: var(--radius-md); padding: 12px 14px;
+  opacity: 0.82;
+}
+.wl-archive-check { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+.wl-archive-info  { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.wl-archive-header { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.wl-archive-title {
+  font-family: var(--font-body); font-size: 14px; font-weight: 700;
+  color: var(--text); text-decoration: none;
+}
+a.wl-archive-title:hover { text-decoration: underline; }
+.wl-archive-price { font-size: 13px; font-weight: 700; color: #4CAF50; white-space: nowrap; }
+.wl-archive-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+.wl-archive-by, .wl-archive-date {
+  font-size: 11px; color: var(--text-muted);
+}
 
 /* ── Calendar v2 ── */
 .cal-next-banner {

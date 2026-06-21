@@ -1,5 +1,11 @@
 // ============================================================
-// WISHLIST MODULE v4 — Бажання + Розміри
+// WISHLIST MODULE v5 — Бажання + Розміри + Архів
+// ============================================================
+// SQL (виконати один раз у Supabase SQL Editor):
+//   ALTER TABLE wishlist_items
+//     ADD COLUMN IF NOT EXISTS fulfilled      BOOLEAN DEFAULT FALSE,
+//     ADD COLUMN IF NOT EXISTS fulfilled_by   INTEGER,
+//     ADD COLUMN IF NOT EXISTS fulfilled_at   TIMESTAMPTZ;
 // ============================================================
 const Wishlist = (() => {
 
@@ -8,7 +14,8 @@ const Wishlist = (() => {
   let partnerUser  = null;
   let activeTab    = 'wishes';
   let wishingFor   = 'me';     // 'me' | 'partner'
-  let sizesOwnerId = null;     // id користувача у вкладці розмірів
+  let sizesOwnerId = null;
+  let archiveOpen  = false;    // чи розгорнутий архів у «Мої бажання»
 
   const el  = id => document.getElementById(id);
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
@@ -19,18 +26,31 @@ const Wishlist = (() => {
     low:    '🟢 Низький',
   };
 
-  // ── ДАНІ ──
+  // ── ДАНІ ──────────────────────────────────────────────────
   async function loadUsers() {
     const {data} = await supabase.from('users').select('id,name').order('id',{ascending:true});
     return data||[];
   }
 
+  // Активні бажання (не виконані)
   async function loadItems(ownerId) {
     const {data} = await supabase
       .from('wishlist_items')
-      .select('id,title,description,link,image_url,gift_date,owner,reserved,reserved_by,price,priority')
+      .select('id,title,description,link,image_url,gift_date,owner,reserved,reserved_by,price,priority,fulfilled,fulfilled_by,fulfilled_at')
       .eq('owner', ownerId)
+      .or('fulfilled.is.null,fulfilled.eq.false')
       .order('id', {ascending:false});
+    return data||[];
+  }
+
+  // Виконані бажання (архів)
+  async function loadFulfilledItems(ownerId) {
+    const {data} = await supabase
+      .from('wishlist_items')
+      .select('id,title,description,link,image_url,price,priority,fulfilled_at,fulfilled_by')
+      .eq('owner', ownerId)
+      .eq('fulfilled', true)
+      .order('fulfilled_at', {ascending:false});
     return data||[];
   }
 
@@ -39,7 +59,77 @@ const Wishlist = (() => {
     return data||{};
   }
 
-  // ── ВКЛАДКИ ──
+  // ── TELEGRAM СПОВІЩЕННЯ ───────────────────────────────────
+  // Викликає Edge Function 'db-notify'.
+  // Параметри підлаштуй під свою реалізацію db-notify:
+  //   type:      тип події (для маршрутизації у функції)
+  //   ownerMsg:  текст для власника бажання (Markdown)
+  //   buyerMsg:  текст для покупця (Markdown)
+  //   ownerId:   id власника бажання (щоб знайти chat_id)
+  //   buyerId:   id покупця
+  async function sendFulfilledNotification(item, owner, buyer) {
+    const isBuyerDima = buyer.name === 'Діма';
+    const title = item.title;
+
+    const ownerMsg = owner.name === 'Лєна'
+      ? `🎁 *Льонка!* Твоє бажання *«${title}»* виконано!\n💝 Дімко подбав про тебе ✨🌸`
+      : `🎁 *Дімо!* Твоє бажання *«${title}»* виконано!\n💝 Льонка подбала про тебе ✨💙`;
+
+    const buyerMsg = isBuyerDima
+      ? `🌟 *Молодець, Діма!* Ти виконав бажання Лєни —\n*«${title}»*! Вона точно буде щасливою 💕`
+      : `🌟 *Молодець, Льонка!* Ти виконала бажання Діми —\n*«${title}»*! Він точно буде щасливим 💙`;
+
+    try {
+      await supabase.functions.invoke('db-notify', {
+        body: {
+          type:     'wish_fulfilled',
+          ownerMsg,
+          buyerMsg,
+          ownerId:  owner.id,
+          buyerId:  buyer.id,
+        },
+      });
+    } catch (e) {
+      console.warn('[Wishlist] db-notify error:', e);
+      // Не кидаємо помилку — покупка вже збережена в БД
+    }
+  }
+
+  // ── ВИКОНАННЯ БАЖАННЯ ─────────────────────────────────────
+  async function fulfillWish(item) {
+    const owner = allUsers.find(u => u.id === item.owner);
+    const confirmMsg =
+      `Підтверджуєш, що купив(ла) «${item.title}»? 🎁\n\nОбидва отримають сповіщення ✉️`;
+    if (!confirm(confirmMsg)) return;
+
+    // Знаходимо кнопку і ставимо лоадер
+    const btn = document.querySelector(`[data-fulfill-id="${item.id}"]`);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Збереження…'; }
+
+    const { error } = await supabase.from('wishlist_items').update({
+      fulfilled:    true,
+      fulfilled_by: currentUser.id,
+      fulfilled_at: new Date().toISOString(),
+      reserved:     true,
+      reserved_by:  currentUser.id,
+    }).eq('id', item.id);
+
+    if (error) {
+      alert('Помилка: ' + error.message);
+      if (btn) { btn.disabled = false; btn.textContent = '✅ Вже купив(ла)'; }
+      return;
+    }
+
+    // Надсилаємо сповіщення (не блокуємо UI)
+    sendFulfilledNotification(item, owner || { name: '?', id: item.owner }, currentUser);
+
+    // Скидаємо кеш і перемальовуємо
+    invalidateWishes();
+    DataCache.invalidate('wishlist:archive:' + item.owner);
+    renderGrid();
+  }
+
+  // ── ВКЛАДКИ (Бажання / Розміри) ───────────────────────────
   function setupTabs() {
     document.querySelectorAll('.wl-tab').forEach(btn => {
       btn.addEventListener('click', () => switchTab(btn.dataset.tab));
@@ -52,16 +142,16 @@ const Wishlist = (() => {
       b.classList.toggle('active', b.dataset.tab === tab));
     el('wl-panel-wishes')?.classList.toggle('hidden', tab !== 'wishes');
     el('wl-panel-sizes')?.classList.toggle('hidden',  tab !== 'sizes');
-    if(tab === 'wishes') renderWishes();
-    if(tab === 'sizes')  renderSizes();
+    if (tab === 'wishes') renderWishes();
+    if (tab === 'sizes')  renderSizes();
   }
 
-  // ── ПІДВКЛАДКИ: МОЄ / ПАРТНЕР ──
+  // ── ПІДВКЛАДКИ МОЄ / ПАРТНЕР ──────────────────────────────
   function renderSubTabs() {
     const rawName = partnerUser?.name || 'Партнера';
     const partnerName = rawName === 'Діма' ? 'Діми' : rawName === 'Лєна' ? 'Лєни' : rawName;
     const existing = el('wl-sub-tabs');
-    if(existing) existing.remove();
+    if (existing) existing.remove();
 
     const bar = document.createElement('div');
     bar.id = 'wl-sub-tabs';
@@ -76,64 +166,87 @@ const Wishlist = (() => {
     bar.querySelectorAll('.wl-sub-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         wishingFor = btn.dataset.for;
-        bar.querySelectorAll('.wl-sub-btn').forEach(b => b.classList.toggle('active', b.dataset.for === wishingFor));
+        bar.querySelectorAll('.wl-sub-btn').forEach(b =>
+          b.classList.toggle('active', b.dataset.for === wishingFor));
         renderGrid();
       });
     });
 
-    // Оновлюємо заголовок і кнопку
-    const title = el('wl-title');
+    const title  = el('wl-title');
     const addBtn = el('add-wish-btn');
-    if(title) title.textContent = wishingFor === 'me' ? 'Мої бажання' : `Бажання ${partnerName}`;
-    if(addBtn) addBtn.style.display = wishingFor === 'me' ? 'flex' : 'none';
+    if (title)  title.textContent  = wishingFor === 'me' ? 'Мої бажання' : `Бажання ${partnerName}`;
+    if (addBtn) addBtn.style.display = wishingFor === 'me' ? 'flex' : 'none';
   }
 
-  // ── СІТКА БАЖАНЬ ──
   async function renderWishes() {
     renderSubTabs();
     renderGrid();
   }
 
+  // ── АКТИВНА СІТКА БАЖАНЬ ──────────────────────────────────
   function renderGrid() {
-    const wrap = el('wishlist-grid'); if(!wrap) return;
+    const wrap = el('wishlist-grid'); if (!wrap) return;
 
-    const rawName = partnerUser?.name || 'Партнера';
+    const rawName     = partnerUser?.name || 'Партнера';
     const partnerName = rawName === 'Діма' ? 'Діми' : rawName === 'Лєна' ? 'Лєни' : rawName;
     const isOwnList   = wishingFor === 'me';
     const ownerId     = isOwnList ? currentUser?.id : partnerUser?.id;
     const title       = el('wl-title');
     const addBtn      = el('add-wish-btn');
-    if(title)  title.textContent  = isOwnList ? 'Мої бажання' : `Бажання ${partnerName}`;
-    if(addBtn) addBtn.style.display = isOwnList ? 'flex' : 'none';
 
-    if(ownerId == null){ wrap.innerHTML = '<p class="empty-state">Користувача не знайдено.</p>'; return; }
+    if (title)  title.textContent   = isOwnList ? 'Мої бажання' : `Бажання ${partnerName}`;
+    if (addBtn) addBtn.style.display = isOwnList ? 'flex' : 'none';
 
-    // Заглушку показуємо лише якщо кешу ще немає
-    if(DataCache.get('wishlist:'+ownerId) === undefined){
-      wrap.innerHTML = '<p class="empty-state" style="opacity:0.4">Завантаження...</p>';
-    }
-    DataCache.swr('wishlist:'+ownerId, () => loadItems(ownerId), (items) => paintGrid(items, isOwnList));
-  }
-
-  function paintGrid(items, isOwnList) {
-    const wrap = el('wishlist-grid'); if(!wrap) return;
-    if(!items || !items.length) {
-      wrap.innerHTML = `<p class="empty-state">${isOwnList
-        ? 'Твій список порожній. Час додати нову забаганку.'
-        : 'Партнер ще не додав жодного бажання.'}</p>`;
+    if (ownerId == null) {
+      wrap.innerHTML = '<p class="empty-state">Користувача не знайдено.</p>';
       return;
     }
-    wrap.innerHTML = '';
-    items.forEach(item => renderCard(item, isOwnList, wrap));
+
+    if (DataCache.get('wishlist:' + ownerId) === undefined) {
+      wrap.innerHTML = '<p class="empty-state" style="opacity:0.4">Завантаження...</p>';
+    }
+
+    DataCache.swr('wishlist:' + ownerId, () => loadItems(ownerId), (items) => {
+      paintGrid(items || [], isOwnList, ownerId);
+    });
   }
 
-  function renderCard(item, isOwn, container) {
+  function paintGrid(items, isOwnList, ownerId) {
+    const wrap = el('wishlist-grid'); if (!wrap) return;
+
+    const frag = document.createDocumentFragment();
+
+    if (!items.length) {
+      const p = document.createElement('p');
+      p.className = 'empty-state';
+      p.textContent = isOwnList
+        ? 'Твій список порожній. Час додати нову забаганку.'
+        : 'Партнер ще не додав жодного бажання.';
+      frag.appendChild(p);
+    } else {
+      items.forEach(item => frag.appendChild(makeCard(item, isOwnList)));
+    }
+
+    // Архів бажань — тільки у своїй вкладці
+    if (isOwnList) {
+      frag.appendChild(makeArchiveBlock(ownerId));
+    }
+
+    wrap.innerHTML = '';
+    wrap.appendChild(frag);
+  }
+
+  // ── КАРТКА БАЖАННЯ ────────────────────────────────────────
+  function makeCard(item, isOwn) {
     const card = document.createElement('div');
     card.className = 'wl-card';
 
-    const price    = item.price ? `<span class="wl-card-price">${(+item.price).toLocaleString('uk-UA')} ₴</span>` : '';
-    const priority = item.priority ? `<span class="wl-card-priority">${PRIORITY_LABELS[item.priority]||''}</span>` : '';
-    const comment  = item.description ? `<p class="wl-card-comment">${esc(item.description)}</p>` : '';
+    const price    = item.price
+      ? `<span class="wl-card-price">${(+item.price).toLocaleString('uk-UA')} ₴</span>` : '';
+    const priority = item.priority
+      ? `<span class="wl-card-priority">${PRIORITY_LABELS[item.priority]||''}</span>` : '';
+    const comment  = item.description
+      ? `<p class="wl-card-comment">${esc(item.description)}</p>` : '';
     const titleEl  = item.link
       ? `<a class="wl-card-title" href="${esc(item.link)}" target="_blank" rel="noopener">${esc(item.title)}</a>`
       : `<span class="wl-card-title">${esc(item.title)}</span>`;
@@ -147,16 +260,19 @@ const Wishlist = (() => {
         </div>`;
     } else {
       const isReserved = item.reserved;
-      actions = isReserved
-        ? `
-        <div class="wl-card-actions wl-reserved-row">
-          <div class="wl-reserved-status">✅ Вже купив(ла)</div>
-          <button class="wl-cancel-reserve-btn" data-id="${item.id}">Скасувати бронь</button>
-        </div>`
-        : `
-        <div class="wl-card-actions">
-          <button class="wl-reserve-btn" data-id="${item.id}">🎁 Забронювати</button>
-        </div>`;
+      if (isReserved) {
+        // "Вже купив(ла)" — тепер справжня клікабельна кнопка
+        actions = `
+          <div class="wl-card-actions wl-reserved-row">
+            <button class="wl-fulfill-btn" data-fulfill-id="${item.id}">✅ Вже купив(ла)</button>
+            <button class="wl-cancel-reserve-btn" data-id="${item.id}">Скасувати бронь</button>
+          </div>`;
+      } else {
+        actions = `
+          <div class="wl-card-actions">
+            <button class="wl-reserve-btn" data-id="${item.id}">🎁 Забронювати</button>
+          </div>`;
+      }
     }
 
     card.innerHTML = `
@@ -171,7 +287,7 @@ const Wishlist = (() => {
     if (isOwn) {
       let startX = 0, dx = 0, swiping = false;
       card.addEventListener('touchstart', e => { startX = e.touches[0].clientX; swiping = true; dx = 0; }, { passive: true });
-      card.addEventListener('touchmove', e => {
+      card.addEventListener('touchmove',  e => {
         if (!swiping) return;
         dx = e.touches[0].clientX - startX;
         if (dx < 0) card.style.transform = `translateX(${Math.max(dx, -80)}px)`;
@@ -180,30 +296,100 @@ const Wishlist = (() => {
         swiping = false;
         if (dx < -60) {
           card.style.transition = 'transform 0.2s';
-          card.style.transform = 'translateX(-80px)';
+          card.style.transform  = 'translateX(-80px)';
           card.querySelector('.wl-del-btn')?.classList.add('swipe-visible');
         } else {
           card.style.transition = 'transform 0.2s';
-          card.style.transform = '';
+          card.style.transform  = '';
         }
       });
     }
 
-    container.appendChild(card);
-
     card.querySelector('.wl-edit-btn')?.addEventListener('click', () => openEditModal(item));
     card.querySelector('.wl-del-btn')?.addEventListener('click',  () => deleteItem(item.id));
-    card.querySelector('.wl-reserve-btn')?.addEventListener('click', () => reserveItem(item.id, false));
+    card.querySelector('.wl-reserve-btn')?.addEventListener('click',  () => reserveItem(item.id, false));
     card.querySelector('.wl-cancel-reserve-btn')?.addEventListener('click', () => cancelReserve(item.id));
+    card.querySelector('.wl-fulfill-btn')?.addEventListener('click', () => fulfillWish(item));
+
+    return card;
   }
 
-  // ── ДОДАТИ / РЕДАГУВАТИ ──
+  // ── АРХІВ (виконані бажання) ───────────────────────────────
+  function makeArchiveBlock(ownerId) {
+    const wrap = document.createElement('div');
+    wrap.className = 'wl-archive-wrap';
+
+    // Заголовок-тоглер
+    const toggle = document.createElement('button');
+    toggle.className = 'wl-archive-toggle';
+    toggle.innerHTML = `<span class="wl-archive-toggle-label">✅ Виконані бажання</span><span class="wl-archive-toggle-arrow">${archiveOpen ? '▲' : '▼'}</span>`;
+    wrap.appendChild(toggle);
+
+    // Контейнер для карток
+    const body = document.createElement('div');
+    body.className = 'wl-archive-body' + (archiveOpen ? '' : ' hidden');
+    wrap.appendChild(body);
+
+    toggle.addEventListener('click', () => {
+      archiveOpen = !archiveOpen;
+      body.classList.toggle('hidden', !archiveOpen);
+      toggle.querySelector('.wl-archive-toggle-arrow').textContent = archiveOpen ? '▲' : '▼';
+      if (archiveOpen) loadAndPaintArchive(ownerId, body);
+    });
+
+    // Якщо вже відкритий — одразу вантажимо
+    if (archiveOpen) loadAndPaintArchive(ownerId, body);
+
+    return wrap;
+  }
+
+  function loadAndPaintArchive(ownerId, body) {
+    body.innerHTML = '<p class="empty-state" style="opacity:0.4;padding:12px 0">Завантаження…</p>';
+    DataCache.swr('wishlist:archive:' + ownerId, () => loadFulfilledItems(ownerId), (items) => {
+      paintArchive(items || [], body);
+    });
+  }
+
+  function paintArchive(items, body) {
+    if (!items.length) {
+      body.innerHTML = '<p class="empty-state" style="padding:12px 0">Поки жодного виконаного бажання 🌸</p>';
+      return;
+    }
+    body.innerHTML = '';
+    const buyerMap = allUsers.reduce((m, u) => { m[u.id] = u.name; return m; }, {});
+
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'wl-archive-card';
+
+      const price = item.price
+        ? `<span class="wl-archive-price">${(+item.price).toLocaleString('uk-UA')} ₴</span>` : '';
+      const who = item.fulfilled_by
+        ? `<span class="wl-archive-by">Купив(ла): ${esc(buyerMap[item.fulfilled_by] || '?')}</span>` : '';
+      const when = item.fulfilled_at
+        ? `<span class="wl-archive-date">${new Date(item.fulfilled_at).toLocaleDateString('uk-UA', {day:'numeric',month:'long',year:'numeric'})}</span>` : '';
+
+      const titleEl = item.link
+        ? `<a class="wl-archive-title" href="${esc(item.link)}" target="_blank" rel="noopener">${esc(item.title)}</a>`
+        : `<span class="wl-archive-title">${esc(item.title)}</span>`;
+
+      card.innerHTML = `
+        <div class="wl-archive-check">✅</div>
+        <div class="wl-archive-info">
+          <div class="wl-archive-header">${titleEl}${price}</div>
+          <div class="wl-archive-meta">${who}${when}</div>
+        </div>`;
+      body.appendChild(card);
+    });
+  }
+
+  // ── МОДАЛКИ БАЖАНЬ ────────────────────────────────────────
   function openAddModal()       { openWishModal(null); }
   function openEditModal(item)  { openWishModal(item); }
 
   function openWishModal(item) {
-    const isEdit = !!item;
-    const root   = el('modal-root');
+    const isEdit  = !!item;
+    const root    = el('modal-root');
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
 
@@ -249,12 +435,12 @@ const Wishlist = (() => {
     root.appendChild(overlay);
 
     overlay.querySelector('#wm-cancel').addEventListener('click', () => root.innerHTML='');
-    overlay.addEventListener('click', e => { if(e.target===overlay) root.innerHTML=''; });
+    overlay.addEventListener('click', e => { if (e.target===overlay) root.innerHTML=''; });
 
     overlay.querySelector('#wm-save').addEventListener('click', async () => {
-      const g    = id => overlay.querySelector('#'+id);
+      const g     = id => overlay.querySelector('#' + id);
       const title = g('wm-title').value.trim();
-      if(!title){ g('wm-title').style.borderColor='var(--danger)'; return; }
+      if (!title) { g('wm-title').style.borderColor='var(--danger)'; return; }
 
       const saveBtn = g('wm-save');
       saveBtn.disabled = true;
@@ -270,7 +456,7 @@ const Wishlist = (() => {
       };
 
       let error;
-      if(isEdit) {
+      if (isEdit) {
         ({error} = await supabase.from('wishlist_items').update(payload).eq('id', item.id));
       } else {
         ({error} = await supabase.from('wishlist_items').insert({
@@ -278,10 +464,16 @@ const Wishlist = (() => {
           owner:       currentUser.id,
           reserved:    false,
           reserved_by: null,
+          fulfilled:   false,
         }));
       }
 
-      if(error){ alert('Помилка: '+error.message); saveBtn.disabled=false; saveBtn.textContent=isEdit?'Зберегти':'Додати'; return; }
+      if (error) {
+        alert('Помилка: ' + error.message);
+        saveBtn.disabled = false;
+        saveBtn.textContent = isEdit ? 'Зберегти' : 'Додати';
+        return;
+      }
       invalidateWishes();
       root.innerHTML = '';
       renderGrid();
@@ -289,38 +481,39 @@ const Wishlist = (() => {
   }
 
   async function deleteItem(id) {
-    if(!confirm('Видалити бажання?')) return;
+    if (!confirm('Видалити бажання?')) return;
     const {error} = await supabase.from('wishlist_items').delete().eq('id', id);
-    if(error){ alert('Помилка: '+error.message); return; }
-    invalidateWishes(); renderGrid();
+    if (error) { alert('Помилка: ' + error.message); return; }
+    invalidateWishes();
+    renderGrid();
   }
 
   async function reserveItem(id, isReserved) {
     const newVal = !isReserved;
     const {error} = await supabase.from('wishlist_items')
-      .update({reserved: newVal, reserved_by: newVal ? currentUser.id : null})
+      .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
       .eq('id', id);
-    if(error){ alert('Помилка: '+error.message); return; }
-    invalidateWishes(); renderGrid();
+    if (error) { alert('Помилка: ' + error.message); return; }
+    invalidateWishes();
+    renderGrid();
   }
 
-  // Скасування броні — з підтвердженням, щоб не зняти випадково
   async function cancelReserve(id) {
-    if(!confirm('Скасувати бронювання цього подарунка?')) return;
-    await reserveItem(id, true); // true → newVal=false (знімаємо бронь)
+    if (!confirm('Скасувати бронювання цього подарунка?')) return;
+    await reserveItem(id, true);
   }
 
-  // ── РОЗМІРИ ──
+  // ── РОЗМІРИ ───────────────────────────────────────────────
   function renderSizes() {
-    const wrap = el('wishlist-sizes-grid'); if(!wrap) return;
-    if(!sizesOwnerId) sizesOwnerId = currentUser?.id;
-    if(sizesOwnerId == null) return;
-    DataCache.swr('sizes:'+sizesOwnerId, () => loadSizes(sizesOwnerId), (sizes) => paintSizes(sizes || {}));
+    const wrap = el('wishlist-sizes-grid'); if (!wrap) return;
+    if (!sizesOwnerId) sizesOwnerId = currentUser?.id;
+    if (sizesOwnerId == null) return;
+    DataCache.swr('sizes:' + sizesOwnerId, () => loadSizes(sizesOwnerId), (sizes) => paintSizes(sizes || {}));
   }
 
   function paintSizes(sizes) {
-    const wrap = el('wishlist-sizes-grid'); if(!wrap) return;
-    const user     = allUsers.find(u=>u.id===sizesOwnerId);
+    const wrap = el('wishlist-sizes-grid'); if (!wrap) return;
+    const user     = allUsers.find(u => u.id === sizesOwnerId);
     const isFemale = user?.name === 'Лєна';
 
     wrap.innerHTML = `
@@ -367,7 +560,7 @@ const Wishlist = (() => {
     wrap.querySelectorAll('.sz-user-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = +btn.dataset.idx;
-        if(allUsers[idx]){ sizesOwnerId = allUsers[idx].id; renderSizes(); }
+        if (allUsers[idx]) { sizesOwnerId = allUsers[idx].id; renderSizes(); }
       });
     });
   }
@@ -377,7 +570,7 @@ const Wishlist = (() => {
     const w  = sizes.waist  ? sizes.waist+' см'  : '';
     const h  = sizes.hips   ? sizes.hips+' см'   : '';
     const ht = sizes.height ? sizes.height+' см' : '';
-    if(isFemale){
+    if (isFemale) {
       return `<svg class="body-svg" viewBox="0 0 260 340" fill="none" xmlns="http://www.w3.org/2000/svg">
         <circle cx="130" cy="26" r="19" fill="#F6B9CC" stroke="#E8829C" stroke-width="1.5"/>
         <path d="M111 20 Q112 6 130 5 Q148 6 149 20 Q152 10 148 26 Q144 8 130 8 Q116 8 112 26 Q108 10 111 20Z" fill="#C45B79"/>
@@ -414,7 +607,7 @@ const Wishlist = (() => {
 
   function openSizesModal(sizes, userId) {
     const root = el('modal-root');
-    const isFemale = allUsers.find(u=>u.id===userId)?.name==='Лєна';
+    const isFemale = allUsers.find(u => u.id === userId)?.name === 'Лєна';
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -449,43 +642,57 @@ const Wishlist = (() => {
           <button class="btn-primary" id="sz-save">Зберегти</button>
         </div>
       </div>`;
-    root.innerHTML=''; root.appendChild(overlay);
-    overlay.querySelector('#sz-cancel').addEventListener('click',()=>root.innerHTML='');
-    overlay.addEventListener('click',e=>{ if(e.target===overlay) root.innerHTML=''; });
-    overlay.querySelector('#sz-save').addEventListener('click',async()=>{
-      const g=id=>overlay.querySelector('#'+id);
-      const {error}=await supabase.from('user_sizes').upsert({
-        user_id:userId,
-        height:parseFloat(g('sz-height')?.value)||null,chest:parseFloat(g('sz-chest')?.value)||null,
-        waist:parseFloat(g('sz-waist')?.value)||null,hips:parseFloat(g('sz-hips')?.value)||null,
-        intl_size:g('sz-intl')?.value.trim()||null,eu_size:g('sz-eu')?.value.trim()||null,
-        ua_size:g('sz-ua')?.value.trim()||null,insole_cm:parseFloat(g('sz-insole')?.value)||null,
-        shoe_eu:g('sz-shoe-eu')?.value.trim()||null,shoe_us:g('sz-shoe-us')?.value.trim()||null,
-        bra:g('sz-bra')?.value.trim()||null,underwear:g('sz-underwear')?.value.trim()||null,
-        ring_ring:g('sz-ring')?.value.trim()||null,ring_index:g('sz-ring-idx')?.value.trim()||null,
-      },{onConflict:'user_id'});
-      if(error){alert('Помилка: '+error.message);return;}
-      DataCache.invalidate('sizes:'+userId); root.innerHTML=''; renderSizes();
+    root.innerHTML = ''; root.appendChild(overlay);
+    overlay.querySelector('#sz-cancel').addEventListener('click', () => root.innerHTML='');
+    overlay.addEventListener('click', e => { if (e.target===overlay) root.innerHTML=''; });
+    overlay.querySelector('#sz-save').addEventListener('click', async () => {
+      const g = id => overlay.querySelector('#' + id);
+      const {error} = await supabase.from('user_sizes').upsert({
+        user_id:    userId,
+        height:     parseFloat(g('sz-height')?.value)||null,
+        chest:      parseFloat(g('sz-chest')?.value)||null,
+        waist:      parseFloat(g('sz-waist')?.value)||null,
+        hips:       parseFloat(g('sz-hips')?.value)||null,
+        intl_size:  g('sz-intl')?.value.trim()||null,
+        eu_size:    g('sz-eu')?.value.trim()||null,
+        ua_size:    g('sz-ua')?.value.trim()||null,
+        insole_cm:  parseFloat(g('sz-insole')?.value)||null,
+        shoe_eu:    g('sz-shoe-eu')?.value.trim()||null,
+        shoe_us:    g('sz-shoe-us')?.value.trim()||null,
+        bra:        g('sz-bra')?.value.trim()||null,
+        underwear:  g('sz-underwear')?.value.trim()||null,
+        ring_ring:  g('sz-ring')?.value.trim()||null,
+        ring_index: g('sz-ring-idx')?.value.trim()||null,
+      }, { onConflict: 'user_id' });
+      if (error) { alert('Помилка: ' + error.message); return; }
+      DataCache.invalidate('sizes:' + userId);
+      root.innerHTML = '';
+      renderSizes();
     });
   }
 
-  // ── INIT ──
+  // ── INIT ──────────────────────────────────────────────────
   async function refresh() {
     allUsers    = await Auth.getUsers();
     currentUser = Auth.getCurrentUser();
     partnerUser = allUsers.find(u => u.id !== currentUser?.id) || null;
-    wishingFor = 'me';
+    wishingFor   = 'me';
     sizesOwnerId = currentUser?.id || null;
+    archiveOpen  = false;
     renderWishes();
   }
 
   function invalidateWishes() {
-    if (currentUser) DataCache.invalidate('wishlist:' + currentUser.id);
-    if (partnerUser) DataCache.invalidate('wishlist:' + partnerUser.id);
+    if (currentUser) {
+      DataCache.invalidate('wishlist:' + currentUser.id);
+      DataCache.invalidate('wishlist:archive:' + currentUser.id);
+    }
+    if (partnerUser) {
+      DataCache.invalidate('wishlist:' + partnerUser.id);
+      DataCache.invalidate('wishlist:archive:' + partnerUser.id);
+    }
   }
 
-  // Live-оновлення (realtime): перемальовуємо ПОТОЧНУ під-вкладку,
-  // не скидаючи вибір «Мої / Партнера» і не смикаючи користувача.
   function refreshLive() {
     if (!currentUser) return;
     if (activeTab === 'sizes') renderSizes();
@@ -496,7 +703,7 @@ const Wishlist = (() => {
     el('add-wish-btn')?.addEventListener('click', openAddModal);
     setupTabs();
     window.addEventListener('portal:view', e => {
-      if(e.detail.view === 'wishlist') refresh();
+      if (e.detail.view === 'wishlist') refresh();
     });
   }
 
