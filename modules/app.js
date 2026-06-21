@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }, { passive: true });
 
   Auth.init();
+  ErrorBoundary.init(); // якомога раніше — щоб ловити помилки з перших секунд
 
   // ── LAZY: реєструємо ПЕРШИМ — до Router.init() ──────────────────
   // Router у своєму portal:auth-хендлері диспатчить portal:view,

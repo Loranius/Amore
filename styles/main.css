@@ -822,3 +822,49 @@ img.lazy.loaded {
 .theme-toggle-row-sub {
   font-size: 12px; color: var(--text-muted); margin-top: 2px;
 }
+/* ============================================================
+   ERROR BOUNDARY
+   ============================================================ */
+.eb-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  padding: var(--space-4);
+}
+.eb-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 40px 32px;
+  text-align: center;
+  max-width: 360px; width: 100%;
+  display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+.eb-icon  { font-size: 52px; line-height: 1; }
+.eb-title { font-family: var(--font-display); font-size: 22px;
+            font-weight: 700; color: var(--text); margin: 0; }
+.eb-desc  { font-size: 14px; color: var(--text-muted);
+            line-height: 1.6; margin: 0; }
+.eb-reload-btn   { width: 100%; }
+.eb-continue-btn { width: 100%; margin-top: 4px; }
+
+/* Тост */
+.eb-toast {
+  position: fixed;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%) translateY(16px);
+  background: var(--text); color: var(--bg);
+  font-family: var(--font-body); font-size: 13px; font-weight: 600;
+  padding: 10px 18px; border-radius: 20px;
+  box-shadow: 0 4px 20px -4px rgba(0,0,0,0.3);
+  white-space: nowrap; max-width: calc(100vw - 32px);
+  overflow: hidden; text-overflow: ellipsis;
+  z-index: 9998; opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+.eb-toast--show {
+  opacity: 1; transform: translateX(-50%) translateY(0);
+}
+.eb-toast--success { background: #2E7D32; color: #fff; }
+.eb-toast--warn    { background: #E65100; color: #fff; }

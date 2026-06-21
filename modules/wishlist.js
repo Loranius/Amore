@@ -467,20 +467,71 @@ const Wishlist = (() => {
 
   async function deleteItem(id) {
     if (!confirm('Видалити бажання?')) return;
-    const {error} = await supabase.from('wishlist_items').delete().eq('id', id);
-    if (error) { alert('Помилка: ' + error.message); return; }
-    invalidateWishes();
-    renderGrid();
+    const ownerId = currentUser?.id;
+
+    // Оптимістично прибираємо
+    const cached = DataCache.get('wishlist:' + ownerId);
+    if (cached) {
+      const snapshot = [...cached];
+      DataCache.set('wishlist:' + ownerId, cached.filter(i => i.id !== id));
+      renderGrid();
+
+      const { error } = await Retry.query(() =>
+        supabase.from('wishlist_items').delete().eq('id', id)
+      );
+      if (error) {
+        DataCache.set('wishlist:' + ownerId, snapshot);
+        renderGrid();
+        ErrorBoundary.showToast('Не вдалось видалити бажання. Спробуй ще.');
+        return;
+      }
+    } else {
+      const {error} = await supabase.from('wishlist_items').delete().eq('id', id);
+      if (error) { alert('Помилка: ' + error.message); return; }
+      invalidateWishes();
+      renderGrid();
+    }
   }
 
   async function reserveItem(id, isReserved) {
     const newVal = !isReserved;
-    const {error} = await supabase.from('wishlist_items')
-      .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
-      .eq('id', id);
-    if (error) { alert('Помилка: ' + error.message); return; }
-    invalidateWishes();
-    renderGrid();
+    const ownerId = wishingFor === 'me' ? currentUser?.id : partnerUser?.id;
+
+    // 1. Оптимістично оновлюємо кеш
+    const cached = DataCache.get('wishlist:' + ownerId);
+    if (cached) {
+      const snapshot = cached.map(i => ({...i}));
+      const target = cached.find(i => i.id === id);
+      if (target) {
+        target.reserved    = newVal;
+        target.reserved_by = newVal ? currentUser.id : null;
+      }
+      DataCache.set('wishlist:' + ownerId, cached);
+      renderGrid(); // миттєво
+
+      // 2. Пишемо в БД (з retry)
+      const { error } = await Retry.query(() =>
+        supabase.from('wishlist_items')
+          .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
+          .eq('id', id)
+      );
+
+      if (error) {
+        // Відкочуємо
+        DataCache.set('wishlist:' + ownerId, snapshot);
+        renderGrid();
+        ErrorBoundary.showToast('Не вдалось оновити бажання. Спробуй ще.');
+        return;
+      }
+    } else {
+      // Кешу немає — звичайний шлях
+      const { error } = await supabase.from('wishlist_items')
+        .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
+        .eq('id', id);
+      if (error) { alert('Помилка: ' + error.message); return; }
+      invalidateWishes();
+      renderGrid();
+    }
   }
 
   async function cancelReserve(id) {
