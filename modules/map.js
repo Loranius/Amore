@@ -103,10 +103,28 @@ const MapModule = (() => {
     });
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    map.addControl(new mapboxgl.GeolocateControl({
+
+    var geolocateControl = new mapboxgl.GeolocateControl({
       positionOptions: { enableHighAccuracy: true },
       trackUserLocation: false,
-    }), 'top-right');
+      showAccuracyCircle: true,
+      showUserLocation: true,
+    });
+    map.addControl(geolocateControl, 'top-right');
+
+    // Fallback: якщо GeolocateControl не показав позицію після дозволу —
+    // вручну летимо до координат через navigator.geolocation
+    geolocateControl.on('error', function() {
+      if (!navigator.geolocation) return;
+      navigator.geolocation.getCurrentPosition(function(pos) {
+        map.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 14 });
+      }, null, { enableHighAccuracy: true, timeout: 10000 });
+    });
+
+    // Після успішної геолокації — переконуємось що карта відцентрована
+    geolocateControl.on('geolocate', function(e) {
+      map.flyTo({ center: [e.coords.longitude, e.coords.latitude], zoom: 14 });
+    });
 
     map.on('click', function(e) {
       openAddModal(e.lngLat.lat, e.lngLat.lng);
