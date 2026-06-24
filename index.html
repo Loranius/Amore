@@ -418,6 +418,9 @@
   </main>
 
   <nav class="bottom-nav" id="bottom-nav">
+    <button class="nav-btn nav-btn-home active" data-view="home">
+      <span class="nav-icon-home">♡</span>
+    </button>
     <button class="nav-btn" data-view="wishlist">
       <span class="nav-icon">♡</span>
       <span class="nav-label">Wishlist</span>
@@ -426,13 +429,44 @@
       <span class="nav-icon">₴</span>
       <span class="nav-label">Finance</span>
     </button>
-    <button class="nav-btn nav-btn-home active" data-view="home">
-      <span class="nav-icon-home">♡</span>
-    </button>
     <button class="nav-btn" data-view="shopping">
       <span class="nav-icon">🛒</span>
       <span class="nav-label">Покупки</span>
     </button>
+    <!-- Desktop-only nav items -->
+    <button class="nav-btn desktop-nav-item" data-view="calendar">
+      <span class="nav-icon">📅</span>
+      <span class="nav-label">Календар</span>
+    </button>
+    <button class="nav-btn desktop-nav-item" data-view="media">
+      <span class="nav-icon">🎬</span>
+      <span class="nav-label">Вотчліст</span>
+    </button>
+    <button class="nav-btn desktop-nav-item" data-view="random">
+      <span class="nav-icon">🍽️</span>
+      <span class="nav-label">Що їмо?</span>
+    </button>
+    <button class="nav-btn desktop-nav-item" data-view="capsule">
+      <span class="nav-icon">💌</span>
+      <span class="nav-label">Капсула</span>
+    </button>
+    <button class="nav-btn desktop-nav-item" data-view="question">
+      <span class="nav-icon">💬</span>
+      <span class="nav-label">Питання</span>
+    </button>
+    <button class="nav-btn desktop-nav-item" data-view="map">
+      <span class="nav-icon">📍</span>
+      <span class="nav-label">Наша карта</span>
+    </button>
+    <button class="nav-btn desktop-nav-item" data-view="photo-calendar">
+      <span class="nav-icon">📸</span>
+      <span class="nav-label">Фото-календар</span>
+    </button>
+    <button class="nav-btn desktop-nav-item desktop-settings-trigger" id="desktop-settings-btn">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Налаштування</span>
+    </button>
+    <!-- Mobile-only -->
     <button class="nav-btn" id="more-nav-btn">
       <span class="nav-icon">⋯</span>
       <span class="nav-label">Ще</span>

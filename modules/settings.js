@@ -485,6 +485,14 @@ const Settings = (() => {
         openSettingsModal();
       });
     }
+
+    // Desktop sidebar settings button
+    const desktopBtn = el('desktop-settings-btn');
+    if (desktopBtn) {
+      desktopBtn.addEventListener('click', () => {
+        openSettingsModal();
+      });
+    }
   }
 
   return { init };

@@ -455,80 +455,196 @@ body {
   }
 }
 
+/* Desktop-only nav items — hidden on mobile */
+.desktop-nav-item {
+  display: none;
+}
+
 /* ── ПК (≥ 960px) ── */
 @media (min-width: 960px) {
+  :root {
+    --sidebar-w: 240px;
+  }
+
   .app {
     flex-direction: row;
   }
 
-  /* Topbar стає лівою sidebar */
+  /* Topbar — верхня частина лівої sidebar */
   .topbar {
     position: fixed;
     top: 0; left: 0; bottom: 0;
-    width: 220px;
+    width: var(--sidebar-w);
     border-bottom: none;
-    border-right: 1px solid rgba(246,217,226,0.7);
+    border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
+    background: rgba(255, 243, 246, 0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    z-index: 20;
   }
 
   .topbar-inner {
     flex-direction: column;
     align-items: flex-start;
-    padding: var(--space-5) var(--space-4);
-    gap: var(--space-3);
+    padding: 28px 20px 16px;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
   }
 
-  /* Bottom nav стає sidebar nav */
+  .brand {
+    font-size: 20px;
+    line-height: 1.2;
+  }
+
+  .logout-btn {
+    font-size: 12px;
+    padding: 4px 8px;
+    margin-left: -8px;
+  }
+
+  /* Bottom nav — стає вертикальним nav у sidebar під topbar */
   .bottom-nav {
     position: fixed;
-    top: 80px; left: 0; bottom: 0;
-    width: 220px;
+    top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
     flex-direction: column;
     justify-content: flex-start;
     align-items: stretch;
-    gap: 4px;
-    padding: var(--space-3) var(--space-3);
+    gap: 2px;
+    padding: 12px 12px 20px;
+    padding-top: calc(88px + 12px); /* висота topbar-inner */
     border-top: none;
-    border-right: 1px solid rgba(246,217,226,0.7);
+    border-right: none; /* вже є на topbar */
     box-shadow: none;
-    background: rgba(255,243,246,0.95);
+    background: transparent; /* сам блок прозорий — фон дає topbar */
     overflow-y: auto;
+    scrollbar-width: none;
+    z-index: 19;
   }
 
+  .bottom-nav::-webkit-scrollbar { display: none; }
+
+  /* NAV кнопки — горизонтальний рядок (іконка + текст) */
   .nav-btn {
     flex-direction: row;
     justify-content: flex-start;
     max-width: none;
-    padding: var(--space-3) var(--space-3);
-    gap: 10px;
-    font-size: 13px;
+    padding: 10px 14px;
+    gap: 12px;
+    font-size: 14px;
+    font-weight: 600;
     border-radius: var(--radius-md);
+    color: var(--text-muted);
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .nav-btn:hover {
+    background: var(--surface-soft);
+    color: var(--text);
+  }
+
+  .nav-btn.active {
+    background: var(--accent-pale);
+    color: var(--accent-deep);
   }
 
   .nav-btn .nav-icon {
-    font-size: 18px;
+    font-size: 19px;
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
   }
 
-  /* Центральна кнопка-серце на ПК — прибираємо special */
-  .nav-center-btn {
-    background: var(--accent-pale) !important;
+  .nav-label {
+    flex: 1;
+  }
+
+  /* Центральна home-кнопка-серце — без спеціального стилю */
+  .nav-btn-home {
     width: auto !important;
     height: auto !important;
+    max-width: none !important;
     border-radius: var(--radius-md) !important;
+    background: var(--accent-pale) !important;
+    color: var(--accent-deep) !important;
     box-shadow: none !important;
+    margin-top: 0 !important;
+    animation: none !important;
+    padding: 10px 14px !important;
+    flex-direction: row !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
   }
 
-  /* Контент зсувається вправо */
+  .nav-btn-home .nav-icon-home {
+    font-size: 19px;
+    width: 24px;
+    text-align: center;
+    flex-shrink: 0;
+    display: block;
+  }
+
+  /* Додаємо текст "Головна" до home-кнопки через псевдо */
+  .nav-btn-home::after {
+    content: "Головна";
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  /* Показуємо desktop-only пункти */
+  .desktop-nav-item {
+    display: flex;
+  }
+
+  /* Розділювач перед першим desktop-only пунктом */
+  .desktop-nav-item:first-of-type {
+    margin-top: 8px;
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+  }
+
+  /* Кнопка "Ще" на ПК — прихована (всі пункти вже видимі в sidebar) */
+  #more-nav-btn {
+    display: none;
+  }
+
+  /* ── Контент зсувається вправо від sidebar ── */
   .content {
-    margin-left: 220px;
-    max-width: calc(720px + 220px);
-    padding-left: calc(220px + var(--space-5));
-    padding-right: var(--space-5);
+    margin-left: var(--sidebar-w);
+    width: calc(100% - var(--sidebar-w));
+    max-width: 900px;
+    padding: var(--space-5) var(--space-6);
     padding-bottom: var(--space-6);
+    /* прибираємо мобільний bottom-padding */
   }
 
-  /* Двоколонковий лейаут для деяких секцій */
+  /* ── Головна сторінка — двоколонковий layout ── */
+  #view-home {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  .counter-sticker {
+    grid-column: 1 / -1;
+  }
+
+  #next-event-widget {
+    grid-column: 1 / -1;
+  }
+
+  .wall {
+    grid-column: 1 / -1;
+  }
+
+  /* ── Двоколонковий лейаут для секцій ── */
   .fin-accordion {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -549,20 +665,21 @@ body {
   #wishlist-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 12px;
+    gap: 16px;
   }
 
   .wl-sub-tabs {
-    max-width: 400px;
+    max-width: 420px;
   }
 
   .cal-type-filter-bar {
     grid-template-columns: repeat(4, 1fr);
   }
 
-  /* Модалки і шити на ПК — по центру */
+  /* ── Модалки і шити на ПК — по центру ── */
   .modal-overlay {
     align-items: center;
+    padding-left: var(--sidebar-w);
   }
   .modal-card {
     max-width: 520px;
@@ -571,22 +688,29 @@ body {
 
   .fin-sheet-overlay {
     align-items: center;
+    padding-left: var(--sidebar-w);
   }
   .fin-sheet {
     max-width: 480px;
     border-radius: var(--radius-lg) !important;
     margin-bottom: 0;
   }
+
+  /* More menu на ПК теж центрується з урахуванням sidebar */
+  .more-menu-overlay {
+    padding-left: var(--sidebar-w);
+  }
 }
 
 /* ── Великий ПК (≥ 1280px) ── */
 @media (min-width: 1280px) {
-  .topbar { width: 260px; }
-  .bottom-nav { width: 260px; top: 90px; }
+  :root {
+    --sidebar-w: 260px;
+  }
+
   .content {
-    margin-left: 260px;
-    padding-left: calc(260px + var(--space-6));
-    max-width: 1100px;
+    max-width: 1000px;
+    padding: var(--space-6) 48px;
   }
 }
 
@@ -618,13 +742,15 @@ body {
 }
 
 [data-theme="dark"] .topbar {
-  background: rgba(26, 18, 24, 0.88);
+  background: rgba(26, 18, 24, 0.96);
   border-bottom-color: rgba(58, 42, 51, 0.8);
+  border-right-color: rgba(58, 42, 51, 0.8);
 }
 
 [data-theme="dark"] .bottom-nav {
-  background: rgba(36, 27, 32, 0.95);
+  background: rgba(26, 18, 24, 0.96);
   border-top-color: rgba(58, 42, 51, 0.7);
+  border-right-color: rgba(58, 42, 51, 0.7);
 }
 
 [data-theme="dark"] img {
