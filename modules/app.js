@@ -51,7 +51,36 @@ document.addEventListener('DOMContentLoaded', () => {
     PhotoCalendar.init();
   });
 
-  // ── CORE: Router ПІСЛЯ lazy-init, щоб portal:view знайшов готові модулі ──
+  // ── SIDEBAR TOGGLE (desktop only) ──
+  (function() {
+    const btn = document.getElementById('sidebar-toggle');
+    if (!btn) return;
+
+    const app = document.getElementById('app');
+    const STORAGE_KEY = 'amore:sidebar-collapsed';
+
+    // Відновлюємо стан
+    if (localStorage.getItem(STORAGE_KEY) === '1') {
+      app.classList.add('sidebar-collapsed');
+      btn.textContent = '☰';
+      btn.title = 'Показати меню';
+    }
+
+    btn.addEventListener('click', () => {
+      const collapsed = app.classList.toggle('sidebar-collapsed');
+      btn.textContent = collapsed ? '☰' : '✕';
+      btn.title = collapsed ? 'Показати меню' : 'Приховати меню';
+      localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+    });
+
+    // Ховаємо кнопку на мобільному (CSS display:none, але на всяк випадок)
+    function syncVisibility() {
+      btn.style.display = window.innerWidth >= 960 ? '' : 'none';
+    }
+    syncVisibility();
+    window.addEventListener('resize', syncVisibility);
+  })();
+
   Router.init();
   Counter.init();
   Greeting.init();

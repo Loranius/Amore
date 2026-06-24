@@ -10,7 +10,23 @@ const CalendarModule = (() => {
     birthday:    { icon: '🎂', label: 'День народження', color: '#FF6B9D' },
     anniversary: { icon: '💕', label: 'Річниця',         color: '#E8829C' },
     holiday:     { icon: '🎉', label: 'Свято',           color: '#F4A6BE' },
-    other:       { icon: '📅', label: 'Плани',            color: '#B98A9A' },
+    other:       { icon: '🗺️', label: 'Плани',           color: '#9B6EA8' },
+  };
+
+  // Категорії для вкладки "Плани"
+  const PLAN_CATS = {
+    date:  { icon: '💑', label: 'Побачення', color: '#FF6B9D', gradient: 'linear-gradient(135deg,#FF6B9D,#E8829C)' },
+    dream: { icon: '✨', label: 'Мрії',      color: '#9B6EA8', gradient: 'linear-gradient(135deg,#9B6EA8,#C084D4)' },
+    trip:  { icon: '✈️', label: 'Подорожі', color: '#5BA3D9', gradient: 'linear-gradient(135deg,#5BA3D9,#7EC8E3)' },
+    goal:  { icon: '🎯', label: 'Цілі',      color: '#E8829C', gradient: 'linear-gradient(135deg,#E8829C,#F4A6BE)' },
+    other: { icon: '🗺️', label: 'Інше',     color: '#B98A9A', gradient: 'linear-gradient(135deg,#B98A9A,#D4B0BC)' },
+  };
+
+  // Статуси планів
+  const PLAN_STATUS = {
+    planned: { label: 'Планується', icon: '⏳', cls: 'plan-status-planned' },
+    active:  { label: 'В процесі',  icon: '🔥', cls: 'plan-status-active'  },
+    done:    { label: 'Виконано!',  icon: '✅', cls: 'plan-status-done'    },
   };
 
   const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
@@ -88,7 +104,7 @@ const CalendarModule = (() => {
       { type:'anniversary', label:'💕 Наші свята'     },
       { type:'birthday',    label:'🎂 Дні народження' },
       { type:'holiday',     label:'🎉 Свята'          },
-      { type:'other',       label:'📅 Інше'           },
+      { type:'other',       label:'🗺️ Плани'          },
     ];
 
     const tabBar = document.createElement('div');
@@ -106,6 +122,12 @@ const CalendarModule = (() => {
       tabBar.appendChild(btn);
     });
     wrap.appendChild(tabBar);
+
+    // Вкладка Плани — окремий рендер
+    if(activeTypeFilter === 'other') {
+      renderPlans(wrap, enriched.filter(e => (e.type||'other') === 'other'));
+      return;
+    }
 
     // Фільтруємо по типу
     const filtered = enriched.filter(e => (e.type||'other') === activeTypeFilter);
@@ -178,6 +200,247 @@ const CalendarModule = (() => {
 
     section.querySelectorAll('[data-id]').forEach(btn =>
       btn.addEventListener('click', () => deleteEvent(btn.dataset.id)));
+  }
+
+  // ── ПЛАНИ — окремий рендер ──
+  function renderPlans(wrap, plans) {
+    // Статистика
+    const total = plans.length;
+    const done  = plans.filter(p => (p.description||'').startsWith('[done]')).length;
+
+    // Витягуємо мета з description: [cat:date][status:planned]Текст опису
+    function parsePlan(ev) {
+      let desc = ev.description || '';
+      let cat    = 'other';
+      let status = 'planned';
+      const mCat    = desc.match(/\[cat:(\w+)\]/);
+      const mStatus = desc.match(/\[status:(\w+)\]/);
+      if(mCat)    { cat    = mCat[1];    desc = desc.replace(mCat[0], ''); }
+      if(mStatus) { status = mStatus[1]; desc = desc.replace(mStatus[0], ''); }
+      return { cat, status, note: desc.trim() };
+    }
+
+    // Прогрес-банер
+    const pct = total ? Math.round(done/total*100) : 0;
+    const statEl = document.createElement('div');
+    statEl.className = 'plans-stat-banner';
+    statEl.innerHTML = `
+      <div class="plans-stat-row">
+        <div class="plans-stat-info">
+          <span class="plans-stat-num">${done}</span>
+          <span class="plans-stat-sep">/</span>
+          <span class="plans-stat-total">${total}</span>
+          <span class="plans-stat-label">планів виконано</span>
+        </div>
+        <div class="plans-stat-pct">${pct}%</div>
+      </div>
+      <div class="plans-progress-bar">
+        <div class="plans-progress-fill" style="width:${pct}%"></div>
+      </div>`;
+    wrap.appendChild(statEl);
+
+    if(!total) {
+      const empty = document.createElement('div');
+      empty.className = 'plans-empty';
+      empty.innerHTML = `<div class="plans-empty-icon">🗺️</div>
+        <p class="plans-empty-title">Тут живуть ваші плани</p>
+        <p class="plans-empty-sub">Побачення, мрії, подорожі — додай перший!</p>`;
+      wrap.appendChild(empty);
+      return;
+    }
+
+    // Групуємо по категорії
+    const bycat = {};
+    plans.forEach(ev => {
+      const { cat, status, note } = parsePlan(ev);
+      if(!bycat[cat]) bycat[cat] = [];
+      bycat[cat].push({ ...ev, _cat: cat, _status: status, _note: note });
+    });
+
+    // Порядок відображення категорій
+    const catOrder = ['date','dream','trip','goal','other'];
+    catOrder.forEach(catKey => {
+      const items = bycat[catKey];
+      if(!items || !items.length) return;
+
+      const cat = PLAN_CATS[catKey] || PLAN_CATS.other;
+
+      const section = document.createElement('div');
+      section.className = 'plans-section';
+
+      const sHdr = document.createElement('div');
+      sHdr.className = 'plans-section-hdr';
+      sHdr.innerHTML = `
+        <span class="plans-section-icon" style="background:${cat.gradient}">${cat.icon}</span>
+        <span class="plans-section-title">${cat.label}</span>
+        <span class="plans-section-count">${items.length}</span>`;
+      section.appendChild(sHdr);
+
+      const grid = document.createElement('div');
+      grid.className = 'plans-grid';
+
+      items.forEach(ev => {
+        const st    = PLAN_STATUS[ev._status] || PLAN_STATUS.planned;
+        const isDone = ev._status === 'done';
+        const orig   = new Date(ev.date);
+        const dateStr = `${orig.getDate()} ${MONTHS[orig.getMonth()]} ${orig.getFullYear()} р.`;
+        const daysN   = ev.days;
+
+        const card = document.createElement('div');
+        card.className = 'plans-card' + (isDone ? ' plans-card--done' : '');
+
+        card.innerHTML = `
+          <div class="plans-card-top" style="background:${cat.gradient}">
+            <span class="plans-card-cat-icon">${cat.icon}</span>
+            <span class="plans-card-status ${st.cls}">${st.icon} ${st.label}</span>
+          </div>
+          <div class="plans-card-body">
+            <div class="plans-card-title">${esc(ev.title)}</div>
+            ${ev._note ? `<div class="plans-card-note">${esc(ev._note)}</div>` : ''}
+            <div class="plans-card-footer">
+              <span class="plans-card-date">📅 ${dateStr}</span>
+              ${!isDone && daysN >= 0
+                ? `<span class="plans-card-countdown" style="color:${cat.color}">${daysLabel(daysN)}</span>`
+                : isDone ? `<span class="plans-card-done-badge">🎉 виконано!</span>` : ''}
+            </div>
+          </div>
+          <div class="plans-card-actions">
+            ${ev._status !== 'done'
+              ? `<button class="plans-action-btn plans-done-btn" data-id="${ev.id}" data-ev='${JSON.stringify({...ev})}' title="Позначити виконаним">✅</button>`
+              : `<button class="plans-action-btn plans-undo-btn" data-id="${ev.id}" data-ev='${JSON.stringify({...ev})}' title="Повернути">↩️</button>`}
+            <button class="plans-action-btn plans-del-btn" data-id="${ev.id}" title="Видалити">🗑</button>
+          </div>`;
+
+        grid.appendChild(card);
+      });
+
+      section.appendChild(grid);
+      wrap.appendChild(section);
+    });
+
+    // Events на кнопках
+    wrap.querySelectorAll('.plans-done-btn').forEach(btn => {
+      btn.addEventListener('click', () => markPlanStatus(btn.dataset.id, 'done'));
+    });
+    wrap.querySelectorAll('.plans-undo-btn').forEach(btn => {
+      btn.addEventListener('click', () => markPlanStatus(btn.dataset.id, 'planned'));
+    });
+    wrap.querySelectorAll('.plans-del-btn').forEach(btn => {
+      btn.addEventListener('click', () => deleteEvent(btn.dataset.id));
+    });
+  }
+
+  async function markPlanStatus(id, newStatus) {
+    // Читаємо поточний опис і оновлюємо тег status
+    const { data } = await supabase.from('events').select('description').eq('id', id).single();
+    let desc = (data?.description || '').replace(/\[status:\w+\]/, '');
+    desc = `[status:${newStatus}]` + desc;
+    await supabase.from('events').update({ description: desc }).eq('id', id);
+    DataCache.invalidate('events');
+    refresh();
+  }
+
+  // ── МОДАЛКА ДОДАТИ ПЛАН ──
+  function openAddPlanModal() {
+    const root = document.getElementById('modal-root');
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+
+    overlay.innerHTML = `
+      <div class="modal-card">
+        <h3>Новий план 🗺️</h3>
+
+        <div class="form-field">
+          <label>Категорія</label>
+          <div class="plans-cat-chips">
+            ${Object.entries(PLAN_CATS).map(([key, c], i) =>
+              `<button class="plans-cat-chip${i===0?' active':''}" data-cat="${key}" style="${i===0?`--chip-color:${c.color};background:${c.gradient};color:#fff`:''}">${c.icon} ${c.label}</button>`
+            ).join('')}
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>Назва</label>
+          <input class="fin-inp" type="text" id="plan-title" placeholder="Наприклад, поїхати на море разом">
+        </div>
+
+        <div class="form-field">
+          <label>Дата / дедлайн</label>
+          <input class="fin-inp" type="date" id="plan-date">
+        </div>
+
+        <div class="form-field">
+          <label>Нотатка (необов'язково)</label>
+          <textarea class="fin-inp" id="plan-note" rows="2" placeholder="Деталі, що хочете зробити..." style="resize:vertical"></textarea>
+        </div>
+
+        <div class="form-field">
+          <label>Статус</label>
+          <div class="plans-status-chips">
+            <button class="plans-status-chip active" data-status="planned">⏳ Планується</button>
+            <button class="plans-status-chip" data-status="active">🔥 В процесі</button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn-secondary" id="plan-cancel">Скасувати</button>
+          <button class="btn-primary" id="plan-save">Зберегти</button>
+        </div>
+      </div>`;
+
+    root.innerHTML = '';
+    root.appendChild(overlay);
+
+    let selectedCat    = Object.keys(PLAN_CATS)[0];
+    let selectedStatus = 'planned';
+
+    // Cat chips
+    overlay.querySelectorAll('.plans-cat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        overlay.querySelectorAll('.plans-cat-chip').forEach(c => {
+          c.classList.remove('active');
+          c.removeAttribute('style');
+        });
+        chip.classList.add('active');
+        const c = PLAN_CATS[chip.dataset.cat];
+        chip.style.cssText = `background:${c.gradient};color:#fff`;
+        selectedCat = chip.dataset.cat;
+      });
+    });
+
+    // Status chips
+    overlay.querySelectorAll('.plans-status-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        overlay.querySelectorAll('.plans-status-chip').forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        selectedStatus = chip.dataset.status;
+      });
+    });
+
+    overlay.querySelector('#plan-cancel').addEventListener('click', () => root.innerHTML='');
+    overlay.addEventListener('click', e => { if(e.target===overlay) root.innerHTML=''; });
+
+    overlay.querySelector('#plan-save').addEventListener('click', async () => {
+      const title = overlay.querySelector('#plan-title').value.trim();
+      const date  = overlay.querySelector('#plan-date').value;
+      const note  = overlay.querySelector('#plan-note').value.trim();
+      if(!title || !date) { alert('Заповни назву та дату'); return; }
+
+      const desc = `[cat:${selectedCat}][status:${selectedStatus}]${note}`;
+      const user = Auth.getCurrentUser();
+
+      const {error} = await supabase.from('events').insert({
+        title, date,
+        description: desc,
+        type: 'other',
+        yearly: false,
+        created_by: user?.id || null,
+      });
+      if(error) { alert('Помилка: '+error.message); return; }
+      root.innerHTML = '';
+      DataCache.invalidate('events');
+      refresh();
+    });
   }
 
   async function deleteEvent(id) {
@@ -271,7 +534,10 @@ const CalendarModule = (() => {
   }
 
   function init() {
-    document.getElementById('add-event-btn')?.addEventListener('click', openAddModal);
+    document.getElementById('add-event-btn')?.addEventListener('click', () => {
+      if(activeTypeFilter === 'other') openAddPlanModal();
+      else openAddModal();
+    });
     window.addEventListener('portal:view', e => {
       if(e.detail.view==='calendar') refresh();
     });
