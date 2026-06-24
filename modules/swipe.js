@@ -211,80 +211,115 @@ const Swipe = (() => {
     return el;
   }
 
-  // ---------- Touch ----------
+  // ---------- Pointer events (миша + тач) ----------
   function attachTouch(el, card) {
     var dragging = false;
-    var moved = false;
-    var x0 = 0;
-    var y0 = 0;
+    var moved    = false;
+    var x0 = 0, y0 = 0;
 
-    el.addEventListener('touchstart', function(e) {
-      x0 = e.touches[0].clientX;
-      y0 = e.touches[0].clientY;
+    // Єдиний хелпер витягує координати з будь-якої події
+    function coords(e) {
+      return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
+                       : { x: e.clientX,             y: e.clientY             };
+    }
+    function endCoords(e) {
+      return e.changedTouches ? { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }
+                              : { x: e.clientX,                    y: e.clientY                    };
+    }
+
+    function onStart(e) {
+      // Ігноруємо не-лівий клік мишки
+      if (e.type === 'mousedown' && e.button !== 0) return;
+      var c = coords(e);
+      x0 = c.x; y0 = c.y;
       dragging = true;
-      moved = false;
+      moved    = false;
       el.style.transition = 'none';
-      el.style.zIndex = '10'; // підіймаємо над іншими під час свайпу
-    }, { passive: true });
+      el.style.zIndex = '10';
+      // Для миші — слухаємо рух і відпускання на document
+      if (e.type === 'mousedown') {
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup',   onEnd);
+      }
+    }
 
-    el.addEventListener('touchmove', function(e) {
+    function onMove(e) {
       if (!dragging) return;
-      var dx = e.touches[0].clientX - x0;
-      var dy = e.touches[0].clientY - y0;
-      if (Math.abs(dx) > 15 || Math.abs(dy) > 15) moved = true;
+      // Зупиняємо браузерний drag зображення
+      if (e.type === 'mousemove') e.preventDefault();
+
+      var c  = coords(e);
+      var dx = c.x - x0;
+      var dy = c.y - y0;
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) moved = true;
       if (!moved) return;
 
       var rotate = Math.abs(dy) > Math.abs(dx) ? 0 : dx * 0.06;
       el.style.transform = 'translateX(' + dx + 'px) translateY(' + dy + 'px) rotate(' + rotate + 'deg)';
 
-      // Сховати всі оверлеї і хінти
+      // Ховаємо всі хінти та оверлеї
       el.querySelectorAll('.swipe-hint, .swipe-overlay').forEach(function(h) { h.style.opacity = '0'; });
 
       var SHOW = 40;
       if (Math.abs(dy) > Math.abs(dx)) {
         if (dy < -SHOW) {
-          el.querySelector('.swipe-hint-up').style.opacity = '1';
+          el.querySelector('.swipe-hint-up').style.opacity    = '1';
           el.querySelector('.swipe-overlay-up').style.opacity = String(Math.min(Math.abs(dy) / 150, 0.6));
         } else if (dy > SHOW) {
-          el.querySelector('.swipe-hint-down').style.opacity = '1';
+          el.querySelector('.swipe-hint-down').style.opacity    = '1';
           el.querySelector('.swipe-overlay-down').style.opacity = String(Math.min(dy / 150, 0.6));
         }
       } else {
         if (dx < -SHOW) {
-          el.querySelector('.swipe-hint-left').style.opacity = '1';
+          el.querySelector('.swipe-hint-left').style.opacity    = '1';
           el.querySelector('.swipe-overlay-left').style.opacity = String(Math.min(Math.abs(dx) / 150, 0.6));
         } else if (dx > SHOW) {
-          el.querySelector('.swipe-hint-right').style.opacity = '1';
+          el.querySelector('.swipe-hint-right').style.opacity    = '1';
           el.querySelector('.swipe-overlay-right').style.opacity = String(Math.min(dx / 150, 0.6));
         }
       }
-    }, { passive: true });
+    }
 
-    el.addEventListener('touchend', function(e) {
+    function onEnd(e) {
       if (!dragging) return;
       dragging = false;
+      // Знімаємо document-слухачі (тільки для миші)
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onEnd);
 
-      var dx = e.changedTouches[0].clientX - x0;
-      var dy = e.changedTouches[0].clientY - y0;
-      var T = 80;
+      var c  = endCoords(e);
+      var dx = c.x - x0;
+      var dy = c.y - y0;
+      var T  = 80;
 
       if (!moved) {
         el.style.transition = 'transform 0.3s ease';
-        el.style.transform = '';
+        el.style.transform  = '';
         openDetailModal(card);
         return;
       }
 
       if (Math.abs(dy) > Math.abs(dx)) {
-        if (dy < -T) flyOut(el, 'up', card);
-        else if (dy > T) flyOut(el, 'down', card);
-        else resetCard(el);
+        if      (dy < -T) flyOut(el, 'up',   card);
+        else if (dy >  T) flyOut(el, 'down', card);
+        else              resetCard(el);
       } else {
-        if (dx < -T) flyOut(el, 'left', card);
-        else if (dx > T) flyOut(el, 'right', card);
-        else resetCard(el);
+        if      (dx < -T) flyOut(el, 'left',  card);
+        else if (dx >  T) flyOut(el, 'right', card);
+        else              resetCard(el);
       }
-    }, { passive: true });
+    }
+
+    // Touch
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove',  onMove,  { passive: true });
+    el.addEventListener('touchend',   onEnd,   { passive: true });
+
+    // Mouse
+    el.addEventListener('mousedown', onStart);
+
+    // Блокуємо браузерний drag зображень на картці
+    el.addEventListener('dragstart', function(e) { e.preventDefault(); });
   }
 
   function updateStackPositions(stack) {
@@ -358,23 +393,6 @@ const Swipe = (() => {
     updateStackPositions(stack);
   }
 
-  // ---------- Кнопки ----------
-  function bindButtons() {
-    function top() { return document.querySelector('#swipe-stack .swipe-card:last-child'); }
-    function cur() { return cards[currentIndex]; }
-
-    var u = document.getElementById('swipe-btn-up');
-    var d = document.getElementById('swipe-btn-down');
-    var l = document.getElementById('swipe-btn-left');
-    var s = document.getElementById('swipe-btn-skip');
-
-    if (u) u.addEventListener('click', function() { var t = top(); if (t && cur()) flyOut(t, 'up',    cur()); });
-    if (d) d.addEventListener('click', function() { var t = top(); if (t && cur()) flyOut(t, 'down',  cur()); });
-    if (l) l.addEventListener('click', function() { var t = top(); if (t && cur()) flyOut(t, 'left',  cur()); });
-    if (s) s.addEventListener('click', function() { var t = top(); if (t && cur()) flyOut(t, 'right', cur()); });
-  }
-
-  // ---------- Стек ----------
   async function initStack() {
     if (isLoading) return;
     isLoading = true;
@@ -449,8 +467,6 @@ const Swipe = (() => {
         initStack();
       });
     });
-
-    bindButtons();
 
     window.addEventListener('portal:auth', function() {
       initialized = false;

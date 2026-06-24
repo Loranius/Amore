@@ -17,8 +17,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="styles/main.css?v=6">
-<link rel="stylesheet" href="styles/components.css?v=21">
+<link rel="stylesheet" href="styles/main.css?v=7">
+<link rel="stylesheet" href="styles/components.css?v=24">
 <!-- Темна тема: застосовуємо ДО рендеру, щоб уникнути блимання -->
 <script>
   (function(){
@@ -86,49 +86,58 @@
   <main class="content" id="content">
     <!-- ---------- Головна (Полароїд-стіна) ---------- -->
     <section class="view" id="view-home" data-view="home">
-      <div class="counter-sticker">
-        <p class="greeting-text" id="greeting-text">Привіт!</p>
-        <p class="counter-eyebrow" id="counter-since">з якогось дня</p>
-        <div class="counter-num" id="counter-number">—</div>
-        <p class="counter-label">днів разом</p>
-        <p class="counter-next-anniversary" id="counter-next-anniversary"></p>
+
+      <!-- Desktop: ліва колонка -->
+      <div class="home-left">
+        <div class="counter-sticker">
+          <p class="greeting-text" id="greeting-text">Привіт!</p>
+          <p class="counter-eyebrow" id="counter-since">з якогось дня</p>
+          <div class="counter-num" id="counter-number">—</div>
+          <p class="counter-label">днів разом</p>
+          <p class="counter-next-anniversary" id="counter-next-anniversary"></p>
+        </div>
+
+        <div id="next-event-widget" class="next-event-widget"></div>
+
+        <!-- Виджет "На цей тиждень" -->
+        <div id="week-widget" class="week-widget"></div>
       </div>
 
-      <div id="next-event-widget" class="next-event-widget"></div>
-
-
-      <div class="wall">
-        <a href="#" class="polaroid" data-view-link="calendar">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" data-photo-slot="1"></div>
-          <p class="polaroid-caption">Events 🗓️</p>
-        </a>
-        <a href="#" class="polaroid" data-view-link="wishlist">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="2"></div>
-          <p class="polaroid-caption">Wishlist ♡</p>
-        </a>
-        <a href="#" class="polaroid" data-view-link="budget">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="3"></div>
-          <p class="polaroid-caption">Finance ₴</p>
-        </a>
-        <a href="#" class="polaroid" data-view-link="capsule">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="4"></div>
-          <p class="polaroid-caption">Time message ✉</p>
-        </a>
-        <a href="#" class="polaroid" data-view-link="question">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="5"></div>
-          <p class="polaroid-caption">Question ?</p>
-        </a>
-        <a href="#" class="polaroid" data-view-link="media">
-          <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="6"></div>
-          <p class="polaroid-caption">Watchlist ▶</p>
-        </a>
-        <a href="#" class="polaroid wide" data-view-link="random">
-          <div class="polaroid-photo"><img src="https://placehold.co/600x270/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="7"></div>
-          <p class="polaroid-caption">Random 🎲</p>
-        </a>
+      <!-- Desktop: права колонка (стіна полароїдів) -->
+      <div class="home-right">
+        <div class="wall">
+          <a href="#" class="polaroid" data-view-link="calendar">
+            <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" data-photo-slot="1"></div>
+            <p class="polaroid-caption">Events 🗓️</p>
+          </a>
+          <a href="#" class="polaroid" data-view-link="wishlist">
+            <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="2"></div>
+            <p class="polaroid-caption">Wishlist ♡</p>
+          </a>
+          <a href="#" class="polaroid" data-view-link="budget">
+            <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="3"></div>
+            <p class="polaroid-caption">Finance ₴</p>
+          </a>
+          <a href="#" class="polaroid" data-view-link="capsule">
+            <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="4"></div>
+            <p class="polaroid-caption">Time message ✉</p>
+          </a>
+          <a href="#" class="polaroid" data-view-link="question">
+            <div class="polaroid-photo"><img src="https://placehold.co/300x300/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="5"></div>
+            <p class="polaroid-caption">Question ?</p>
+          </a>
+          <a href="#" class="polaroid" data-view-link="media">
+            <div class="polaroid-photo"><img src="https://placehold.co/300x300/F6D9E2/C45B79?text=…" alt="" loading="lazy" data-photo-slot="6"></div>
+            <p class="polaroid-caption">Watchlist ▶</p>
+          </a>
+          <a href="#" class="polaroid wide" data-view-link="random">
+            <div class="polaroid-photo"><img src="https://placehold.co/600x270/FFE9EF/C45B79?text=…" alt="" loading="lazy" data-photo-slot="7"></div>
+            <p class="polaroid-caption">Random 🎲</p>
+          </a>
+        </div>
       </div>
 
-    </section>
+    </section>    </section>
 
     <!-- ---------- Календар + лічильник ---------- -->
     <section class="view hidden" id="view-calendar" data-view="calendar">
@@ -321,20 +330,8 @@
             <button class="swipe-type-btn active" data-swipe-type="movie">🎬 Фільми</button>
             <button class="swipe-type-btn" data-swipe-type="series">📺 Серіали</button>
           </div>
-          <div class="swipe-legend">
-            <span>⬆ Переглянуто</span>
-            <span>⬇ Дивимось</span>
-            <span>⬅ Плануємо</span>
-            <span>➡ Пропустити</span>
-          </div>
           <div class="swipe-stack-wrap">
             <div id="swipe-stack" class="swipe-stack"></div>
-          </div>
-          <div class="swipe-actions">
-            <button class="swipe-action-btn swipe-btn-left" id="swipe-btn-left">📋</button>
-            <button class="swipe-action-btn swipe-btn-skip" id="swipe-btn-skip">✕</button>
-            <button class="swipe-action-btn swipe-btn-down" id="swipe-btn-down">▶</button>
-            <button class="swipe-action-btn swipe-btn-up" id="swipe-btn-up">✅</button>
           </div>
         </div>
       </div>
@@ -561,30 +558,31 @@
 <script src="lib/supabase.js"></script>
 <script src="lib/retry.js?v=1"></script>
 <script src="lib/error-boundary.js?v=1"></script>
-<script src="lib/cache.js?v=2"></script>
+<script src="lib/cache.js?v=3"></script>
 <script src="lib/img.js?v=swr"></script>
 <script src="modules/auth.js?v=swr"></script>
 <script src="modules/router.js?v=swr"></script>
-<script src="modules/counter.js?v=swr"></script>
+<script src="modules/counter.js?v=swr3"></script>
+<script src="modules/week-widget.js?v=1"></script>
 <script src="modules/greeting.js?v=swr"></script>
 <script src="modules/photos.js?v=swr3"></script>
-<script src="modules/calendar.js?v=desktop2"></script>
-<script src="modules/wishlist.js?v=v8"></script>
+<script src="modules/calendar.js?v=desktop3"></script>
+<script src="modules/wishlist.js?v=desktop2"></script>
 <script src="modules/budget.js?v=swr"></script>
 <script src="modules/capsule.js?v=swr"></script>
 <script src="modules/question.js?v=swr"></script>
-<script src="modules/media.js?v=desktop2"></script>
+<script src="modules/media.js?v=desktop3"></script>
 <script src="modules/random.js?v=swr"></script>
-<script src="modules/swipe.js?v=swr"></script>
+<script src="modules/swipe.js?v=desktop3"></script>
 <script src="modules/map.js?v=swr2"></script>
-<script src="modules/shopping.js?v=swr3"></script>
+<script src="modules/shopping.js?v=desktop2"></script>
 <script src="modules/settings.js?v=swr2"></script>
 <script src="modules/photo-calendar.js?v=swr2"></script>
 <script src="lib/confetti.js?v=1"></script>
 <script src="lib/gestures.js?v=1"></script>
 <script src="lib/pwa.js?v=1"></script>
 <script src="lib/realtime.js?v=2"></script>
-<script src="modules/app.js?v=desktop2"></script>
+<script src="modules/app.js?v=desktop3"></script>
 
 <!-- PWA: реєстрація service worker -->
 <script>

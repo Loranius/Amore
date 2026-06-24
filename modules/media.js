@@ -741,12 +741,13 @@ const Media = (() => {
     visibleCount = PAGE_SIZE;
     renderTabs();
     showSkeleton();
-    DataCache.swr('media:' + activeType, () => loadItems(activeType), (items) => {
-      allItems = items || [];
-      renderStats();
-      renderFilters();
-      renderGrid();
-    });
+    DataCache.swr('media:' + activeType, () => loadItems(activeType),
+      DataCache.fadeRender(el('media-list'), (items) => {
+        allItems = items || [];
+        renderStats();
+        renderFilters();
+        renderGrid();
+      }));
   }
 
   // ── INIT ----------

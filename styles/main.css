@@ -159,6 +159,23 @@ body {
   color: var(--accent-deep);
 }
 
+/* ── Skeleton → Content fade ──────────────────────────────── */
+@keyframes content-fade-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.content-loaded {
+  animation: content-fade-in 0.28s cubic-bezier(.22,.61,.36,1) both;
+}
+
+/* Skeleton poster для медіа */
+.skeleton-poster {
+  width: 100%;
+  aspect-ratio: 2/3;
+  border-radius: var(--radius-sm);
+}
+
 .content {
   flex: 1;
   max-width: 720px;
@@ -716,21 +733,34 @@ body {
   /* ── Головна сторінка — двоколонковий layout ── */
   #view-home {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    grid-template-columns: 360px 1fr;
+    grid-template-rows: auto;
+    gap: 0 28px;
     align-items: start;
   }
 
-  .counter-sticker {
-    grid-column: 1 / -1;
+  .home-left {
+    grid-column: 1;
+    position: sticky;
+    top: 24px;
   }
 
-  #next-event-widget {
-    grid-column: 1 / -1;
+  .home-right {
+    grid-column: 2;
   }
 
-  .wall {
-    grid-column: 1 / -1;
+  /* Прибираємо відступ у лічильника — він вже в колонці */
+  #view-home .counter-sticker {
+    margin-bottom: 0;
+  }
+
+  #view-home .next-event-widget {
+    margin-top: 16px;
+  }
+
+  /* На desktop стіна займає повну ширину правої колонки */
+  #view-home .wall {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   /* ── Двоколонковий лейаут для секцій ── */
@@ -800,6 +830,10 @@ body {
   .content {
     max-width: 1000px;
     padding: var(--space-6) 48px;
+  }
+
+  #view-home {
+    grid-template-columns: 400px 1fr;
   }
 }
 /* ============================================================

@@ -421,11 +421,12 @@ const Shopping = (() => {
     users.forEach(u => { usersMap[u.id] = u.name; });
     bindInputEvents();
     bindArchiveToggle();
-    DataCache.swr('shopping:items', loadItems, (items) => {
-      allItems = items || [];
-      renderActiveList();
-      renderArchive();
-    });
+    DataCache.swr('shopping:items', loadItems,
+      DataCache.fadeRender(el('sl-active-list'), (items) => {
+        allItems = items || [];
+        renderActiveList();
+        renderArchive();
+      }));
   }
 
   function init() {

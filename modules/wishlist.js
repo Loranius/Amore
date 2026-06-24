@@ -188,12 +188,23 @@ const Wishlist = (() => {
     }
 
     if (DataCache.get('wishlist:' + ownerId) === undefined) {
-      wrap.innerHTML = '<p class="empty-state" style="opacity:0.4">Завантаження...</p>';
+      wrap.innerHTML = '<div class="skeleton-grid">' +
+        Array(4).fill(
+          '<div class="skeleton-card">' +
+            '<div class="skeleton skeleton-avatar" style="border-radius:8px;width:56px;height:80px"></div>' +
+            '<div class="skeleton-body">' +
+              '<div class="skeleton skeleton-line mid"></div>' +
+              '<div class="skeleton skeleton-line short"></div>' +
+            '</div>' +
+          '</div>'
+        ).join('') +
+        '</div>';
     }
 
-    DataCache.swr('wishlist:' + ownerId, () => loadItems(ownerId), (items) => {
-      paintGrid(items || [], isOwnList, ownerId);
-    });
+    DataCache.swr('wishlist:' + ownerId, () => loadItems(ownerId),
+      DataCache.fadeRender(el('wishlist-grid'), (items) => {
+        paintGrid(items || [], isOwnList, ownerId);
+      }));
   }
 
   function paintGrid(items, isOwnList, ownerId) {

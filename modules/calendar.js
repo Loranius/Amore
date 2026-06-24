@@ -671,8 +671,25 @@ const CalendarModule = (() => {
   }
 
   function refresh() {
-    // Миттєво з кешу, потім фонова ревалідація
-    DataCache.swr('events', loadEvents, renderEvents);
+    // Показуємо skeleton якщо кеш порожній
+    if (DataCache.get('events') === undefined) {
+      const wrap = document.getElementById('calendar-list');
+      if (wrap) {
+        wrap.innerHTML = '<div class="skeleton-grid">' +
+          Array(4).fill(
+            '<div class="skeleton-card">' +
+              '<div class="skeleton skeleton-avatar" style="width:44px;height:44px;border-radius:50%"></div>' +
+              '<div class="skeleton-body">' +
+                '<div class="skeleton skeleton-line mid"></div>' +
+                '<div class="skeleton skeleton-line short"></div>' +
+              '</div>' +
+            '</div>'
+          ).join('') +
+          '</div>';
+      }
+    }
+    DataCache.swr('events', loadEvents,
+      DataCache.fadeRender(document.getElementById('calendar-list'), renderEvents));
   }
 
   function init() {

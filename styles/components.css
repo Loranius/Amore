@@ -1605,14 +1605,13 @@
 
 .swipe-stack-wrap {
   position: relative;
-  height: 480px;
-  margin-bottom: var(--space-4);
+  height: 520px;
+  margin-bottom: 8px;
 }
 
 .swipe-stack {
-  position: relative;
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 0;
 }
 
 .swipe-card {
@@ -1625,6 +1624,11 @@
   user-select: none;
   touch-action: none;
   will-change: transform;
+  /* GPU-шар для плавного touch */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .swipe-card:active { cursor: grabbing; }
@@ -1670,7 +1674,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 24px 16px 32px;
+  padding: 24px 16px 16px;
   pointer-events: none;
 }
 
@@ -1761,35 +1765,6 @@
   background: rgba(33,150,243,0.2);
   border-color: #2196F3;
 }
-
-/* Кнопки-дії */
-.swipe-actions {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
-.swipe-action-btn {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  border: none;
-  font-size: 22px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  box-shadow: var(--shadow-soft);
-}
-
-.swipe-action-btn:active { transform: scale(0.88); }
-
-.swipe-btn-left  { background: #FFF0F4; color: var(--accent-bright); box-shadow: 0 4px 16px -4px rgba(232,130,156,0.4); }
-.swipe-btn-skip  { background: #F0F0F0; color: #999; }
-.swipe-btn-down  { background: #EEF6FF; color: #2196F3; box-shadow: 0 4px 16px -4px rgba(33,150,243,0.3); }
-.swipe-btn-up    { background: #F0FFF0; color: #4CAF50; box-shadow: 0 4px 16px -4px rgba(76,175,80,0.3); }
 
 /* Матч-банер */
 .swipe-match-banner {
@@ -3883,6 +3858,169 @@ a.wl-archive-title:hover { text-decoration: underline; }
 }
 
 /* ============================================================
+   WEEK WIDGET — «На цей тиждень»
+   ============================================================ */
+
+.week-widget {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-top: 16px;
+  /* Старт невидимий — fade-in через клас */
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.35s ease, transform 0.35s cubic-bezier(.22,.61,.36,1);
+}
+
+.week-widget.hidden { display: none; }
+
+.week-widget--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.week-widget-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.week-widget-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.week-widget-count {
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--accent-pale);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.week-widget-list {
+  padding: 8px 0 4px;
+}
+
+.week-skeleton-list {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Роздільник дня */
+.week-day-hdr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px 4px;
+}
+
+.week-day-hdr::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+  border-radius: 1px;
+}
+
+.week-day-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.week-day-hdr--today .week-day-label {
+  color: var(--accent-deep);
+}
+
+.week-day-hdr--today::before {
+  content: '●';
+  font-size: 8px;
+  color: var(--accent);
+}
+
+/* Рядок події */
+.week-event-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 16px;
+  transition: background 0.12s;
+}
+
+.week-event-row:hover {
+  background: var(--surface-soft);
+}
+
+.week-event-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+  width: 26px;
+  text-align: center;
+  line-height: 1;
+}
+
+.week-event-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.week-event-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.week-event-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.week-event-badge {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.week-badge-event {
+  background: var(--accent-pale);
+  color: var(--accent-deep);
+}
+
+.week-badge-plan {
+  background: rgba(155, 110, 168, 0.12);
+  color: #7B5EA7;
+}
+
+[data-theme="dark"] .week-badge-plan {
+  background: rgba(155, 110, 168, 0.22);
+  color: #C084D4;
+}
+
+/* ============================================================
    SHOPPING LIST VIEW
    ============================================================ */
 .sl-input-card {
@@ -4544,18 +4682,25 @@ a.wl-archive-title:hover { text-decoration: underline; }
 
 /* ── Колапсована панель свайпу ── */
 .swipe-panel {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Grid trick — найплавніша анімація розгортання без знання висоти */
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.38s cubic-bezier(.4,0,.2,1),
+    opacity            0.25s ease;
   margin-bottom: 0;
 }
-.swipe-panel.open {
-  max-height: 620px;          /* достатньо для стека + кнопок */
-  margin-bottom: 8px;
-}
-.swipe-panel-inner {
+.swipe-panel > .swipe-panel-inner {
+  overflow: hidden;
+  min-height: 0;
   padding-top: 8px;
-  padding-bottom: 4px;
+  padding-bottom: 12px;
+}
+.swipe-panel.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-bottom: 8px;
 }
 
 /* ── TMDB Пошук ── */

@@ -135,7 +135,10 @@ const Counter = (() => {
     });
 
     // 2) Найближча подія — зі спільного кешу подій
-    DataCache.swr('events', loadEventsFull, (events) => renderNextEvent(events || []));
+    DataCache.swr('events', loadEventsFull, (events) => {
+      renderNextEvent(events || []);
+      window.dispatchEvent(new CustomEvent('cache:events'));
+    });
   }
 
   function init() {
