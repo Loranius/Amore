@@ -58,19 +58,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const app = document.getElementById('app');
     const STORAGE_KEY = 'amore:sidebar-collapsed';
+    const safeGet = () => { try { return localStorage.getItem(STORAGE_KEY); } catch { return null; } };
+    const safeSet = (v) => { try { localStorage.setItem(STORAGE_KEY, v); } catch {} };
 
     // Відновлюємо стан
-    if (localStorage.getItem(STORAGE_KEY) === '1') {
+    if (safeGet() === '1') {
       app.classList.add('sidebar-collapsed');
       btn.textContent = '☰';
       btn.title = 'Показати меню';
+    } else {
+      btn.textContent = '✕';
+      btn.title = 'Приховати меню';
     }
 
     btn.addEventListener('click', () => {
       const collapsed = app.classList.toggle('sidebar-collapsed');
       btn.textContent = collapsed ? '☰' : '✕';
       btn.title = collapsed ? 'Показати меню' : 'Приховати меню';
-      localStorage.setItem(STORAGE_KEY, collapsed ? '1' : '0');
+      safeSet(collapsed ? '1' : '0');
     });
 
     // Ховаємо кнопку на мобільному (CSS display:none, але на всяк випадок)

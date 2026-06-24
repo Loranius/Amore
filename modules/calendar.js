@@ -78,6 +78,7 @@ const CalendarModule = (() => {
 
   // ── РЕНДЕР ──
   function renderEvents(events) {
+    renderEvents._lastEvents = events;
     const wrap = document.getElementById('calendar-list');
     if(!wrap) return;
 
@@ -203,31 +204,61 @@ const CalendarModule = (() => {
   }
 
   // ── ПЛАНИ — окремий рендер ──
-  function renderPlans(wrap, plans) {
-    // Статистика
-    const total = plans.length;
-    const done  = plans.filter(p => (p.description||'').startsWith('[done]')).length;
+  let plansTab = 'active'; // 'active' | 'archive'
 
-    // Витягуємо мета з description: [cat:date][status:planned]Текст опису
+  function renderPlans(wrap, plans) {
     function parsePlan(ev) {
       let desc = ev.description || '';
       let cat    = 'other';
       let status = 'planned';
+      let doneAt = null;
       const mCat    = desc.match(/\[cat:(\w+)\]/);
       const mStatus = desc.match(/\[status:(\w+)\]/);
-      if(mCat)    { cat    = mCat[1];    desc = desc.replace(mCat[0], ''); }
-      if(mStatus) { status = mStatus[1]; desc = desc.replace(mStatus[0], ''); }
-      return { cat, status, note: desc.trim() };
+      const mDoneAt = desc.match(/\[doneAt:([^\]]+)\]/);
+      if (mCat)    { cat    = mCat[1];    desc = desc.replace(mCat[0], ''); }
+      if (mStatus) { status = mStatus[1]; desc = desc.replace(mStatus[0], ''); }
+      if (mDoneAt) { doneAt = mDoneAt[1]; desc = desc.replace(mDoneAt[0], ''); }
+      return { cat, status, doneAt, note: desc.trim() };
     }
 
-    // Прогрес-банер
-    const pct = total ? Math.round(done/total*100) : 0;
+    // Розбиваємо на активні / архів
+    const parsed = plans.map(ev => ({ ...ev, ...parsePlan(ev) }));
+    const active  = parsed.filter(p => p.status !== 'done');
+    const archive = parsed.filter(p => p.status === 'done');
+
+    // ── Tab switcher ──
+    const tabBar = document.createElement('div');
+    tabBar.className = 'plans-tab-bar';
+    tabBar.innerHTML = `
+      <button class="plans-tab-btn${plansTab==='active'?' active':''}" data-tab="active">
+        🗺️ Активні <span class="plans-tab-count">${active.length}</span>
+      </button>
+      <button class="plans-tab-btn${plansTab==='archive'?' active':''}" data-tab="archive">
+        ✅ Архів <span class="plans-tab-count">${archive.length}</span>
+      </button>`;
+    wrap.appendChild(tabBar);
+    tabBar.querySelectorAll('.plans-tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        plansTab = btn.dataset.tab;
+        if (renderEvents._lastEvents) {
+          renderEvents(renderEvents._lastEvents);
+        } else {
+          refresh();
+        }
+      });
+    });
+
+    const total = plans.length;
+    const doneCount = archive.length;
+    const pct = total ? Math.round(doneCount / total * 100) : 0;
+
+    // ── Прогрес-банер ──
     const statEl = document.createElement('div');
     statEl.className = 'plans-stat-banner';
     statEl.innerHTML = `
       <div class="plans-stat-row">
         <div class="plans-stat-info">
-          <span class="plans-stat-num">${done}</span>
+          <span class="plans-stat-num">${doneCount}</span>
           <span class="plans-stat-sep">/</span>
           <span class="plans-stat-total">${total}</span>
           <span class="plans-stat-label">планів виконано</span>
@@ -239,7 +270,23 @@ const CalendarModule = (() => {
       </div>`;
     wrap.appendChild(statEl);
 
-    if(!total) {
+    // ── Архів ──
+    if (plansTab === 'archive') {
+      if (!archive.length) {
+        const empty = document.createElement('div');
+        empty.className = 'plans-empty';
+        empty.innerHTML = `<div class="plans-empty-icon">📦</div>
+          <p class="plans-empty-title">Архів порожній</p>
+          <p class="plans-empty-sub">Виконані плани зберігатимуться тут</p>`;
+        wrap.appendChild(empty);
+        return;
+      }
+      renderPlanCards(wrap, archive, true);
+      return;
+    }
+
+    // ── Активні ──
+    if (!active.length) {
       const empty = document.createElement('div');
       empty.className = 'plans-empty';
       empty.innerHTML = `<div class="plans-empty-icon">🗺️</div>
@@ -248,21 +295,21 @@ const CalendarModule = (() => {
       wrap.appendChild(empty);
       return;
     }
+    renderPlanCards(wrap, active, false);
+  }
 
+  function renderPlanCards(wrap, plans, isArchive) {
     // Групуємо по категорії
     const bycat = {};
     plans.forEach(ev => {
-      const { cat, status, note } = parsePlan(ev);
-      if(!bycat[cat]) bycat[cat] = [];
-      bycat[cat].push({ ...ev, _cat: cat, _status: status, _note: note });
+      if (!bycat[ev.cat]) bycat[ev.cat] = [];
+      bycat[ev.cat].push(ev);
     });
 
-    // Порядок відображення категорій
-    const catOrder = ['date','dream','trip','goal','other'];
+    const catOrder = ['date', 'dream', 'trip', 'goal', 'other'];
     catOrder.forEach(catKey => {
       const items = bycat[catKey];
-      if(!items || !items.length) return;
-
+      if (!items || !items.length) return;
       const cat = PLAN_CATS[catKey] || PLAN_CATS.other;
 
       const section = document.createElement('div');
@@ -280,14 +327,22 @@ const CalendarModule = (() => {
       grid.className = 'plans-grid';
 
       items.forEach(ev => {
-        const st    = PLAN_STATUS[ev._status] || PLAN_STATUS.planned;
-        const isDone = ev._status === 'done';
-        const orig   = new Date(ev.date);
+        const st    = PLAN_STATUS[ev.status] || PLAN_STATUS.planned;
+        const orig  = new Date(ev.date);
         const dateStr = `${orig.getDate()} ${MONTHS[orig.getMonth()]} ${orig.getFullYear()} р.`;
-        const daysN   = ev.days;
 
         const card = document.createElement('div');
-        card.className = 'plans-card' + (isDone ? ' plans-card--done' : '');
+        card.className = 'plans-card' + (isArchive ? ' plans-card--done' : '');
+
+        // Час виконання
+        let doneInfo = '';
+        if (isArchive && ev.doneAt) {
+          const doneDate = new Date(ev.doneAt);
+          const createdDate = new Date(ev.date);
+          const diffMs  = doneDate - createdDate;
+          const diffDay = Math.max(0, Math.round(diffMs / 86400000));
+          doneInfo = `<span class="plans-card-done-time">✅ ${doneDate.getDate()} ${MONTHS[doneDate.getMonth()]} ${doneDate.getFullYear()} р. · ${diffDay} дн.</span>`;
+        }
 
         card.innerHTML = `
           <div class="plans-card-top" style="background:${cat.gradient}">
@@ -296,18 +351,19 @@ const CalendarModule = (() => {
           </div>
           <div class="plans-card-body">
             <div class="plans-card-title">${esc(ev.title)}</div>
-            ${ev._note ? `<div class="plans-card-note">${esc(ev._note)}</div>` : ''}
+            ${ev.note ? `<div class="plans-card-note">${esc(ev.note)}</div>` : ''}
             <div class="plans-card-footer">
               <span class="plans-card-date">📅 ${dateStr}</span>
-              ${!isDone && daysN >= 0
-                ? `<span class="plans-card-countdown" style="color:${cat.color}">${daysLabel(daysN)}</span>`
-                : isDone ? `<span class="plans-card-done-badge">🎉 виконано!</span>` : ''}
+              ${!isArchive && ev.days >= 0
+                ? `<span class="plans-card-countdown" style="color:${cat.color}">${daysLabel(ev.days)}</span>`
+                : doneInfo}
             </div>
           </div>
           <div class="plans-card-actions">
-            ${ev._status !== 'done'
-              ? `<button class="plans-action-btn plans-done-btn" data-id="${ev.id}" data-ev='${JSON.stringify({...ev})}' title="Позначити виконаним">✅</button>`
-              : `<button class="plans-action-btn plans-undo-btn" data-id="${ev.id}" data-ev='${JSON.stringify({...ev})}' title="Повернути">↩️</button>`}
+            ${isArchive
+              ? `<button class="plans-action-btn plans-view-btn" data-id="${ev.id}" title="Переглянути">👁</button>
+                 <button class="plans-action-btn plans-undo-btn" data-id="${ev.id}" title="Повернути">↩️</button>`
+              : `<button class="plans-action-btn plans-done-btn plans-done-big" data-id="${ev.id}" title="Виконано!">✅ Виконано</button>`}
             <button class="plans-action-btn plans-del-btn" data-id="${ev.id}" title="Видалити">🗑</button>
           </div>`;
 
@@ -318,9 +374,9 @@ const CalendarModule = (() => {
       wrap.appendChild(section);
     });
 
-    // Events на кнопках
+    // Обробники
     wrap.querySelectorAll('.plans-done-btn').forEach(btn => {
-      btn.addEventListener('click', () => markPlanStatus(btn.dataset.id, 'done'));
+      btn.addEventListener('click', () => markPlanDone(btn.dataset.id));
     });
     wrap.querySelectorAll('.plans-undo-btn').forEach(btn => {
       btn.addEventListener('click', () => markPlanStatus(btn.dataset.id, 'planned'));
@@ -328,16 +384,102 @@ const CalendarModule = (() => {
     wrap.querySelectorAll('.plans-del-btn').forEach(btn => {
       btn.addEventListener('click', () => deleteEvent(btn.dataset.id));
     });
+    wrap.querySelectorAll('.plans-view-btn').forEach(btn => {
+      btn.addEventListener('click', () => openPlanArchiveModal(btn.dataset.id));
+    });
+  }
+
+  async function markPlanDone(id) {
+    const { data } = await supabase.from('events').select('description').eq('id', id).single();
+    let desc = (data?.description || '')
+      .replace(/\[status:\w+\]/, '')
+      .replace(/\[doneAt:[^\]]*\]/, '');
+    const now = new Date().toISOString();
+    desc = `[status:done][doneAt:${now}]` + desc;
+    await supabase.from('events').update({ description: desc }).eq('id', id);
+    DataCache.invalidate('events');
+    plansTab = 'archive'; // відразу переходимо в архів
+    refresh();
   }
 
   async function markPlanStatus(id, newStatus) {
-    // Читаємо поточний опис і оновлюємо тег status
     const { data } = await supabase.from('events').select('description').eq('id', id).single();
-    let desc = (data?.description || '').replace(/\[status:\w+\]/, '');
+    let desc = (data?.description || '')
+      .replace(/\[status:\w+\]/, '')
+      .replace(/\[doneAt:[^\]]*\]/, '');
     desc = `[status:${newStatus}]` + desc;
     await supabase.from('events').update({ description: desc }).eq('id', id);
     DataCache.invalidate('events');
     refresh();
+  }
+
+  function openPlanArchiveModal(id) {
+    // Знаходимо план у поточних даних
+    DataCache.swr('events', loadEvents, (events) => {
+      const ev = events.find(e => String(e.id) === String(id));
+      if (!ev) return;
+
+      let desc = ev.description || '';
+      let cat = 'other', status = 'done', doneAt = null;
+      const mCat    = desc.match(/\[cat:(\w+)\]/);
+      const mDoneAt = desc.match(/\[doneAt:([^\]]+)\]/);
+      if (mCat)    { cat    = mCat[1];    desc = desc.replace(mCat[0], ''); }
+      if (mDoneAt) { doneAt = mDoneAt[1]; desc = desc.replace(mDoneAt[0], ''); }
+      desc = desc.replace(/\[status:\w+\]/, '').trim();
+
+      const catInfo = PLAN_CATS[cat] || PLAN_CATS.other;
+      const orig    = new Date(ev.date);
+      const dateStr = `${orig.getDate()} ${MONTHS[orig.getMonth()]} ${orig.getFullYear()} р.`;
+
+      let doneStr = '—', durationStr = '';
+      if (doneAt) {
+        const doneDate = new Date(doneAt);
+        doneStr = `${doneDate.getDate()} ${MONTHS[doneDate.getMonth()]} ${doneDate.getFullYear()} р.`;
+        const diffDay = Math.max(0, Math.round((doneDate - orig) / 86400000));
+        if (diffDay === 0)      durationStr = 'Виконано в той самий день';
+        else if (diffDay === 1) durationStr = 'Виконано за 1 день';
+        else if (diffDay < 30)  durationStr = `Виконано за ${diffDay} днів`;
+        else if (diffDay < 365) durationStr = `Виконано за ${Math.floor(diffDay/30)} міс.`;
+        else                    durationStr = `Виконано за ${Math.floor(diffDay/365)} р. ${Math.floor((diffDay%365)/30)} міс.`;
+      }
+
+      const root = document.getElementById('modal-root');
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal-card plan-archive-modal">
+          <div class="plan-archive-header" style="background:${catInfo.gradient}">
+            <span class="plan-archive-cat-icon">${catInfo.icon}</span>
+            <div>
+              <div class="plan-archive-cat-label">${catInfo.label}</div>
+              <div class="plan-archive-title">${esc(ev.title)}</div>
+            </div>
+            <span class="plan-archive-done-badge">✅ Виконано</span>
+          </div>
+          <div class="plan-archive-body">
+            ${desc ? `<div class="plan-archive-note">${esc(desc)}</div>` : ''}
+            <div class="plan-archive-meta-row">
+              <div class="plan-archive-meta-item">
+                <div class="plan-archive-meta-label">📅 Дата плану</div>
+                <div class="plan-archive-meta-val">${dateStr}</div>
+              </div>
+              <div class="plan-archive-meta-item">
+                <div class="plan-archive-meta-label">🏁 Виконано</div>
+                <div class="plan-archive-meta-val">${doneStr}</div>
+              </div>
+            </div>
+            ${durationStr ? `<div class="plan-archive-duration">${durationStr}</div>` : ''}
+          </div>
+          <div class="modal-actions">
+            <button class="btn-primary" id="plan-arch-close">Закрити</button>
+          </div>
+        </div>`;
+
+      root.innerHTML = '';
+      root.appendChild(overlay);
+      root.querySelector('#plan-arch-close').addEventListener('click', () => root.innerHTML = '');
+      overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
+    });
   }
 
   // ── МОДАЛКА ДОДАТИ ПЛАН ──

@@ -276,7 +276,6 @@ const Media = (() => {
 
     if (!items.length) { wrap.innerHTML='<p class="empty-state">Тут порожньо. Додай щось!</p>'; return; }
 
-    // Відображаємо лише visibleCount елементів
     const visible = items.slice(0, visibleCount);
     const hasMore = items.length > visibleCount;
 
@@ -288,64 +287,311 @@ const Media = (() => {
       const card = document.createElement('div');
       card.className = 'media-card';
       const statusLabel = conf[item.status] || item.status;
-      const poster = item.poster_url
-        ? `<img class="media-poster" src="${esc(item.poster_url)}" alt="${esc(item.title)}" loading="lazy" onerror="this.style.display='none'">`
-        : `<div class="media-poster-placeholder">🎬</div>`;
-      const rDima = item.rating_dima ? `${item.rating_dima}/10` : '—';
-      const rLena = item.rating_lena ? `${item.rating_lena}/10` : '—';
+      const rDima = item.rating_dima ? `★ ${item.rating_dima}/10` : null;
+      const rLena = item.rating_lena ? `★ ${item.rating_lena}/10` : null;
+      const hasReviews = rDima || rLena || item.comment_dima || item.comment_lena;
 
-      card.innerHTML = `
-        <button class="delete-btn media-card-delete" data-delete-id="${item.id}">×</button>
-        <button class="media-edit-icon" data-edit-id="${item.id}">✏️</button>
-        ${poster}
-        <div class="media-card-body">
-          <p class="media-card-title">${esc(item.title)}</p>
-          <span class="media-status-badge">${statusLabel}</span>
-          <div class="media-ratings">
-            <div class="media-rating-row">
-              <span class="media-rating-name">Діма</span>
-              <span class="${item.rating_dima?'media-rating-val':'media-rating-empty'}">${rDima}</span>
-              <button class="media-rate-btn" data-rate-id="${item.id}" data-rate-who="dima">✏️</button>
-            </div>
-            <div class="media-rating-row">
-              <span class="media-rating-name">Лєна</span>
-              <span class="${item.rating_lena?'media-rating-val':'media-rating-empty'}">${rLena}</span>
-              <button class="media-rate-btn" data-rate-id="${item.id}" data-rate-who="lena">✏️</button>
-            </div>
-          </div>
-          ${item.comment_dima?`<p class="media-comment"><b>Діма:</b> ${esc(item.comment_dima)}</p>`:''}
-          ${item.comment_lena?`<p class="media-comment"><b>Лєна:</b> ${esc(item.comment_lena)}</p>`:''}
-        </div>`;
+      // Клікабельний постер
+      const posterEl = document.createElement('div');
+      posterEl.className = 'media-poster-wrap';
+      posterEl.title = 'Детальніше';
+      if (item.poster_url) {
+        const img = document.createElement('img');
+        img.className = 'media-poster';
+        img.src = item.poster_url;
+        img.alt = item.title;
+        img.loading = 'lazy';
+        posterEl.appendChild(img);
+      } else {
+        const ph = document.createElement('div');
+        ph.className = 'media-poster-placeholder';
+        ph.textContent = '🎬';
+        posterEl.appendChild(ph);
+      }
+      posterEl.addEventListener('click', () => openMediaDetailModal(item));
+      card.appendChild(posterEl);
+
+      // Body
+      const body = document.createElement('div');
+      body.className = 'media-card-body';
+
+      const titleEl = document.createElement('p');
+      titleEl.className = 'media-card-title';
+      titleEl.textContent = item.title;
+      body.appendChild(titleEl);
+
+      const badge = document.createElement('span');
+      badge.className = 'media-status-badge';
+      badge.textContent = statusLabel;
+      body.appendChild(badge);
+
+      // Кнопка відгук
+      const reviewBtn = document.createElement('button');
+      reviewBtn.className = 'media-review-btn';
+      reviewBtn.innerHTML = hasReviews ? '✏️ Відгук' : '+ Відгук';
+      reviewBtn.addEventListener('click', () => openReviewPanel(item));
+      body.appendChild(reviewBtn);
+
+      // Міні рейтинги
+      if (rDima || rLena) {
+        const ratingsEl = document.createElement('div');
+        ratingsEl.className = 'media-ratings-mini';
+        ratingsEl.innerHTML = [
+          rDima ? `<span class="media-rating-mini">Д: ${rDima}</span>` : '',
+          rLena ? `<span class="media-rating-mini">Л: ${rLena}</span>` : '',
+        ].join('');
+        body.appendChild(ratingsEl);
+      }
+      card.appendChild(body);
+
+      // Видалити
+      const delBtn = document.createElement('button');
+      delBtn.className = 'delete-btn media-card-delete';
+      delBtn.textContent = '×';
+      delBtn.addEventListener('click', () => deleteItem(item.id));
+      card.appendChild(delBtn);
+
       grid.appendChild(card);
     });
 
     wrap.appendChild(grid);
 
-    // ── Інфінітний скрол: sentinel внизу ──────────────────
     if (scrollSentinel) scrollSentinel.disconnect();
     if (hasMore) {
       const sentinel = document.createElement('div');
       sentinel.className = 'media-load-more-sentinel';
       sentinel.style.height = '40px';
       wrap.appendChild(sentinel);
-
       scrollSentinel = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-          visibleCount += PAGE_SIZE;
-          renderGrid();
-        }
+        if (entries[0].isIntersecting) { visibleCount += PAGE_SIZE; renderGrid(); }
       }, { rootMargin: '100px' });
       scrollSentinel.observe(sentinel);
     }
-    wrap.querySelectorAll('[data-delete-id]').forEach(btn =>
-      btn.addEventListener('click', () => deleteItem(btn.dataset.deleteId)));
-    wrap.querySelectorAll('[data-rate-id]').forEach(btn =>
-      btn.addEventListener('click', () => openRatingModal(btn.dataset.rateId, btn.dataset.rateWho)));
-    wrap.querySelectorAll('[data-edit-id]').forEach(btn =>
-      btn.addEventListener('click', () => openEditModal(btn.dataset.editId)));
   }
 
-  // ── ВИДАЛЕННЯ ----------
+  // ── TMDB деталі ──
+  async function fetchTmdbDetails(item) {
+    const tmdbType = item.type === 'series' ? 'tv' : 'movie';
+    try {
+      const [ukRes, enRes] = await Promise.all([
+        fetch(`${TMDB_BASE}/search/${tmdbType}?api_key=${TMDB_KEY}&query=${encodeURIComponent(item.title)}&language=uk-UA&page=1`).then(r=>r.json()),
+        fetch(`${TMDB_BASE}/search/${tmdbType}?api_key=${TMDB_KEY}&query=${encodeURIComponent(item.title)}&language=en-US&page=1`).then(r=>r.json()),
+      ]);
+      const first = ukRes.results?.[0] || enRes.results?.[0];
+      if (!first) return null;
+      const tmdbId = first.id;
+      const [details, videos] = await Promise.all([
+        fetch(`${TMDB_BASE}/${tmdbType}/${tmdbId}?api_key=${TMDB_KEY}&language=uk-UA`).then(r=>r.json()),
+        fetch(`${TMDB_BASE}/${tmdbType}/${tmdbId}/videos?api_key=${TMDB_KEY}&language=en-US`).then(r=>r.json()),
+      ]);
+      const trailer = (videos.results||[]).find(v => v.site==='YouTube' && (v.type==='Trailer'||v.type==='Teaser'));
+      return {
+        title:      details.title || details.name || item.title,
+        overview:   details.overview || first.overview || '',
+        year:       (details.release_date || details.first_air_date || '').slice(0,4),
+        rating:     details.vote_average ? details.vote_average.toFixed(1) : null,
+        runtime:    details.runtime || null,
+        genres:     (details.genres||[]).slice(0,3).map(g=>g.name),
+        backdrop:   details.backdrop_path  ? 'https://image.tmdb.org/t/p/w780'  + details.backdrop_path  : null,
+        poster:     details.poster_path    ? 'https://image.tmdb.org/t/p/w342'  + details.poster_path    : item.poster_url,
+        youtubeKey: trailer ? trailer.key : null,
+      };
+    } catch(e) { console.error('fetchTmdbDetails:', e); return null; }
+  }
+
+  // ── Модалка деталей фільму ──
+  async function openMediaDetailModal(item) {
+    const root = el('modal-root');
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'media-detail-overlay';
+
+    overlay.innerHTML = `
+      <div class="modal-card media-detail-modal">
+        <div class="media-detail-backdrop">
+          <div class="media-detail-hero">
+            ${item.poster_url
+              ? `<img class="media-detail-poster" src="${esc(item.poster_url)}" alt="">`
+              : `<div class="media-detail-poster-ph">🎬</div>`}
+            <div class="media-detail-hero-info">
+              <div class="media-detail-title">${esc(item.title)}</div>
+              <div class="media-detail-meta">
+                <span class="media-detail-badge">⏳ Завантаження…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="media-detail-body">
+          <div class="media-detail-trailer-loading">🎬 Шукаємо трейлер…</div>
+          <div class="media-detail-reviews" id="mdr-reviews"></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" id="mdr-close">Закрити</button>
+          <button class="btn-primary"   id="mdr-edit">✏️ Редагувати</button>
+        </div>
+      </div>`;
+
+    root.innerHTML = '';
+    root.appendChild(overlay);
+
+    overlay.querySelector('#mdr-close').addEventListener('click', () => root.innerHTML='');
+    overlay.querySelector('#mdr-edit').addEventListener('click', () => { root.innerHTML=''; openEditModal(item.id); });
+    overlay.addEventListener('click', e => { if(e.target.id==='media-detail-overlay') root.innerHTML=''; });
+
+    renderDetailReviews(overlay.querySelector('#mdr-reviews'), item);
+
+    const details = await fetchTmdbDetails(item);
+    if (!root.querySelector('#media-detail-overlay')) return;
+
+    if (details) {
+      const backdrop = overlay.querySelector('.media-detail-backdrop');
+      if (details.backdrop) {
+        const bImg = document.createElement('img');
+        bImg.className = 'media-detail-backdrop-img';
+        bImg.src = details.backdrop;
+        backdrop.insertBefore(bImg, backdrop.firstChild);
+        const grad = document.createElement('div');
+        grad.className = 'media-detail-backdrop-grad';
+        backdrop.appendChild(grad);
+      }
+      if (details.poster) {
+        const old = overlay.querySelector('.media-detail-poster, .media-detail-poster-ph');
+        if (old) {
+          const img = document.createElement('img');
+          img.className = 'media-detail-poster';
+          img.src = details.poster;
+          old.replaceWith(img);
+        }
+      }
+      overlay.querySelector('.media-detail-title').textContent = details.title;
+      overlay.querySelector('.media-detail-meta').innerHTML = [
+        details.year   ? `<span class="media-detail-badge">${details.year}</span>` : '',
+        details.rating ? `<span class="media-detail-rating-star">★ ${details.rating}</span>` : '',
+        details.runtime? `<span class="media-detail-badge">${details.runtime} хв</span>` : '',
+        ...details.genres.map(g=>`<span class="media-detail-badge">${g}</span>`),
+      ].join('');
+
+      const bodyEl = overlay.querySelector('.media-detail-body');
+      const loadingEl = bodyEl.querySelector('.media-detail-trailer-loading');
+
+      if (details.overview) {
+        const ov = document.createElement('p');
+        ov.className = 'media-detail-overview';
+        ov.textContent = details.overview;
+        bodyEl.insertBefore(ov, loadingEl);
+      }
+      if (details.youtubeKey) {
+        const btn = document.createElement('button');
+        btn.className = 'media-detail-trailer-btn';
+        btn.innerHTML = '▶ Дивитись трейлер на YouTube';
+        btn.addEventListener('click', () => {
+          const frame = document.createElement('div');
+          frame.className = 'media-detail-trailer';
+          frame.innerHTML = `<iframe src="https://www.youtube.com/embed/${details.youtubeKey}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+          btn.replaceWith(frame);
+        });
+        loadingEl.replaceWith(btn);
+      } else {
+        loadingEl.textContent = 'Трейлер не знайдено';
+      }
+    } else {
+      const l = overlay.querySelector('.media-detail-trailer-loading');
+      if (l) l.textContent = 'Не вдалось завантажити дані TMDB';
+    }
+  }
+
+  // ── Блок відгуків у деталях ──
+  function renderDetailReviews(container, item) {
+    const root = el('modal-root');
+    container.innerHTML = '<div class="media-detail-reviews-title">Відгуки</div>';
+    ['dima', 'lena'].forEach(who => {
+      const label   = who === 'dima' ? 'Діма' : 'Лєна';
+      const rating  = item[`rating_${who}`];
+      const comment = item[`comment_${who}`];
+      const row = document.createElement('div');
+      row.className = 'media-detail-review-row';
+      row.innerHTML = `
+        <span class="media-detail-review-who">${label}</span>
+        ${rating ? `<span class="media-detail-review-rating">★ ${rating}/10</span>` : '<span class="media-detail-review-rating" style="color:var(--text-muted)">—</span>'}
+        <span class="media-detail-review-comment">${comment ? esc(comment) : '<i style="color:var(--text-muted)">Немає відгуку</i>'}</span>
+        <button class="media-detail-review-edit" data-who="${who}">✏️ Відгук</button>`;
+      row.querySelector('.media-detail-review-edit').addEventListener('click', () => {
+        root.innerHTML = '';
+        openReviewPanel(item, who);
+      });
+      container.appendChild(row);
+    });
+  }
+
+  // ── Панель відгуку ──
+  function openReviewPanel(item, preselectedWho) {
+    const root = el('modal-root');
+    let selectedWho = preselectedWho || 'dima';
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.id = 'review-panel-overlay';
+    root.innerHTML = '';
+    root.appendChild(overlay);
+
+    const render = () => {
+      const who        = selectedWho;
+      const curRating  = item[`rating_${who}`] || null;
+      const curComment = item[`comment_${who}`] || '';
+      overlay.innerHTML = `
+        <div class="modal-card">
+          <h3>Відгук — ${esc(item.title)}</h3>
+          <div class="form-field">
+            <label>Хто залишає відгук</label>
+            <div class="plans-status-chips">
+              <button class="plans-status-chip${who==='dima'?' active':''}" data-who="dima">Діма</button>
+              <button class="plans-status-chip${who==='lena'?' active':''}" data-who="lena">Лєна</button>
+            </div>
+          </div>
+          <div class="form-field">
+            <label>Оцінка (1–10)</label>
+            <div class="rate-number-row">
+              ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="rate-num-btn${curRating==n?' active':''}" data-score="${n}">${n}</button>`).join('')}
+            </div>
+          </div>
+          <div class="form-field">
+            <label>Коментар</label>
+            <textarea id="review-comment" rows="3" placeholder="Враження, думки...">${esc(curComment)}</textarea>
+          </div>
+          <div class="modal-actions">
+            <button class="btn-secondary" id="review-cancel">Скасувати</button>
+            <button class="btn-primary"   id="review-save">Зберегти</button>
+          </div>
+        </div>`;
+
+      overlay.querySelectorAll('[data-who]').forEach(b => {
+        b.addEventListener('click', () => { selectedWho = b.dataset.who; render(); });
+      });
+      let selectedScore = curRating;
+      overlay.querySelectorAll('.rate-num-btn').forEach(b => {
+        b.addEventListener('click', () => {
+          selectedScore = parseInt(b.dataset.score);
+          overlay.querySelectorAll('.rate-num-btn').forEach(x => x.classList.toggle('active', x.dataset.score==selectedScore));
+        });
+      });
+      overlay.querySelector('#review-cancel').addEventListener('click', () => root.innerHTML='');
+      overlay.addEventListener('click', e => { if(e.target.id==='review-panel-overlay') root.innerHTML=''; });
+      overlay.querySelector('#review-save').addEventListener('click', async () => {
+        const comment = overlay.querySelector('#review-comment').value.trim();
+        const update  = {};
+        if (selectedScore) update[`rating_${selectedWho}`]  = selectedScore;
+        update[`comment_${selectedWho}`] = comment || null;
+        const { error } = await supabase.from('media_items').update(update).eq('id', item.id);
+        if (error) { alert('Помилка збереження'); return; }
+        Object.assign(item, update);
+        invalidateMedia();
+        root.innerHTML = '';
+        refresh();
+      });
+    };
+    render();
+  }
+
+    // ── ВИДАЛЕННЯ ----------
   async function deleteItem(id) {
     if (!confirm('Видалити цей елемент?')) return;
     const { error } = await supabase.from('media_items').delete().eq('id', id);
@@ -466,60 +712,6 @@ const Media = (() => {
     if (error) { alert('Помилка збереження'); saveBtn.textContent='Зберегти'; saveBtn.disabled=false; return; }
     el('modal-root').innerHTML = '';
     invalidateMedia(); refresh();
-  }
-
-  // ── ОЦІНКИ ----------
-  function openRatingModal(id, who) {
-    const item = allItems.find(i => String(i.id)===String(id));
-    if (!item) return;
-    const whoLabel     = who === 'dima' ? 'Діма' : 'Лєна';
-    const ratingField  = `rating_${who}`;
-    const commentField = `comment_${who}`;
-    const curRating    = item[ratingField] || null;
-    const curComment   = item[commentField] || '';
-    const root = el('modal-root');
-
-    root.innerHTML = `
-      <div class="modal-overlay" id="rate-modal-overlay">
-        <div class="modal-card">
-          <h3>${esc(whoLabel)} — ${esc(item.title)}</h3>
-          <div class="form-field">
-            <label>Оцінка (1–10)</label>
-            <div class="rate-number-row">
-              ${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button class="rate-num-btn${curRating==n?' active':''}" data-score="${n}">${n}</button>`).join('')}
-            </div>
-          </div>
-          <div class="form-field">
-            <label for="rate-comment">Коментар</label>
-            <textarea id="rate-comment" rows="3" placeholder="Враження...">${esc(curComment)}</textarea>
-          </div>
-          <div class="modal-actions">
-            <button class="btn-secondary" id="rate-cancel">Скасувати</button>
-            <button class="btn-primary"   id="rate-save">Зберегти</button>
-          </div>
-        </div>
-      </div>`;
-
-    let selectedScore = curRating;
-    root.querySelectorAll('.rate-num-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        selectedScore = parseInt(btn.dataset.score);
-        root.querySelectorAll('.rate-num-btn').forEach(b => b.classList.toggle('active', b.dataset.score==selectedScore));
-      });
-    });
-
-    const closeModal = () => root.innerHTML = '';
-    el('rate-cancel').addEventListener('click', closeModal);
-    el('rate-modal-overlay').addEventListener('click', e => { if (e.target.id==='rate-modal-overlay') closeModal(); });
-    el('rate-save').addEventListener('click', async () => {
-      const comment = el('rate-comment').value.trim();
-      const update  = {};
-      if (selectedScore) update[ratingField] = selectedScore;
-      update[commentField] = comment || null;
-      const { error } = await supabase.from('media_items').update(update).eq('id', id);
-      if (error) { alert('Помилка збереження'); return; }
-      invalidateMedia(); closeModal(); refresh();
-    });
   }
 
   // ── ВКЛАДКИ ----------

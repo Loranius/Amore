@@ -62,6 +62,10 @@ body {
 
 .hidden { display: none !important; }
 
+/* Кнопка-тогл сайдбара — прихована на мобільному за замовчуванням,
+   показується лише в desktop медіа-запиті (≥960px) */
+.sidebar-toggle { display: none; }
+
 /* ============================================================
    ТИПОГРАФІКА
    ============================================================ */
@@ -600,6 +604,17 @@ body {
     transition: background 0.15s, color 0.15s;
   }
 
+  /* Home кнопка — перша в sidebar */
+  .nav-btn-home { order: -3; }
+  /* Wishlist, Budget, Shopping — після home */
+  .nav-btn[data-view="wishlist"] { order: -2; }
+  .nav-btn[data-view="budget"]   { order: -1; }
+  .nav-btn[data-view="shopping"] { order: 0; }
+  /* Desktop items */
+  .desktop-nav-item { order: 1; }
+  /* more-btn — прихований, але на всяк випадок в кінці */
+  #more-nav-btn { order: 99; }
+
   .nav-btn:hover {
     background: var(--surface-soft);
     color: var(--text);
@@ -674,11 +689,11 @@ body {
     display: flex;
   }
 
-  /* Розділювач перед першим desktop-only пунктом */
-  .desktop-nav-item:first-of-type {
+  /* Розділювач перед блоком desktop-only пунктів */
+  .nav-btn[data-view="calendar"] {
     margin-top: 8px;
     border-top: 1px solid var(--line);
-    padding-top: 10px;
+    padding-top: 18px;
   }
 
   /* Кнопка "Ще" на ПК — прихована (всі пункти вже видимі в sidebar) */

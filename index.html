@@ -17,8 +17,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="styles/main.css?v=5">
-<link rel="stylesheet" href="styles/components.css?v=20">
+<link rel="stylesheet" href="styles/main.css?v=6">
+<link rel="stylesheet" href="styles/components.css?v=21">
 <!-- Темна тема: застосовуємо ДО рендеру, щоб уникнути блимання -->
 <script>
   (function(){
@@ -421,9 +421,6 @@
   </main>
 
   <nav class="bottom-nav" id="bottom-nav">
-    <button class="nav-btn nav-btn-home active" data-view="home">
-      <span class="nav-icon-home">♡</span>
-    </button>
     <button class="nav-btn" data-view="wishlist">
       <span class="nav-icon">♡</span>
       <span class="nav-label">Wishlist</span>
@@ -432,11 +429,18 @@
       <span class="nav-icon">₴</span>
       <span class="nav-label">Finance</span>
     </button>
+    <button class="nav-btn nav-btn-home active" data-view="home">
+      <span class="nav-icon-home">♡</span>
+    </button>
     <button class="nav-btn" data-view="shopping">
       <span class="nav-icon">🛒</span>
       <span class="nav-label">Покупки</span>
     </button>
-    <!-- Desktop-only nav items -->
+    <button class="nav-btn" id="more-nav-btn">
+      <span class="nav-icon">⋯</span>
+      <span class="nav-label">Ще</span>
+    </button>
+    <!-- Desktop-only nav items (hidden on mobile) -->
     <button class="nav-btn desktop-nav-item" data-view="calendar">
       <span class="nav-icon">📅</span>
       <span class="nav-label">Календар</span>
@@ -469,13 +473,7 @@
       <span class="nav-icon">⚙️</span>
       <span class="nav-label">Налаштування</span>
     </button>
-    <!-- Mobile-only -->
-    <button class="nav-btn" id="more-nav-btn">
-      <span class="nav-icon">⋯</span>
-      <span class="nav-label">Ще</span>
-    </button>
   </nav>
-
   <!-- ===================== MORE MENU ===================== -->
   <div id="more-menu-overlay" class="more-menu-overlay hidden">
     <div class="more-menu-sheet">
@@ -570,12 +568,12 @@
 <script src="modules/counter.js?v=swr"></script>
 <script src="modules/greeting.js?v=swr"></script>
 <script src="modules/photos.js?v=swr3"></script>
-<script src="modules/calendar.js?v=swr"></script>
+<script src="modules/calendar.js?v=desktop2"></script>
 <script src="modules/wishlist.js?v=v8"></script>
 <script src="modules/budget.js?v=swr"></script>
 <script src="modules/capsule.js?v=swr"></script>
 <script src="modules/question.js?v=swr"></script>
-<script src="modules/media.js?v=swr"></script>
+<script src="modules/media.js?v=desktop2"></script>
 <script src="modules/random.js?v=swr"></script>
 <script src="modules/swipe.js?v=swr"></script>
 <script src="modules/map.js?v=swr2"></script>
@@ -586,7 +584,7 @@
 <script src="lib/gestures.js?v=1"></script>
 <script src="lib/pwa.js?v=1"></script>
 <script src="lib/realtime.js?v=2"></script>
-<script src="modules/app.js?v=swr6"></script>
+<script src="modules/app.js?v=desktop2"></script>
 
 <!-- PWA: реєстрація service worker -->
 <script>

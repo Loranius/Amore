@@ -1034,6 +1034,31 @@
   border-radius: 50%;
 }
 
+.media-poster-wrap {
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  transition: opacity 0.15s;
+}
+.media-poster-wrap:hover { opacity: 0.88; }
+.media-poster-wrap::after {
+  content: '🔍';
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 26px; height: 26px;
+  background: rgba(0,0,0,0.52);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+.media-poster-wrap:hover::after { opacity: 1; }
+
 .media-poster {
   width: 100%;
   aspect-ratio: 2/3;
@@ -1055,7 +1080,7 @@
   padding: var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
 }
 
@@ -1064,6 +1089,21 @@
   font-size: 13px;
   margin: 0;
   line-height: 1.3;
+}
+
+.media-ratings-mini {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+.media-rating-mini {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent-deep);
+  background: var(--accent-pale);
+  border-radius: 999px;
+  padding: 2px 6px;
 }
 
 .media-status-select {
@@ -3438,19 +3478,175 @@ a.wl-archive-title:hover { text-decoration: underline; }
 
 .plans-card-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 0 8px 8px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 10px 10px;
 }
 .plans-action-btn {
   background: none; border: none;
-  font-size: 16px; cursor: pointer;
-  padding: 4px 6px;
+  font-size: 15px; cursor: pointer;
+  padding: 5px 7px;
   border-radius: var(--radius-sm);
   transition: background 0.12s;
   line-height: 1;
+  color: var(--text-muted);
 }
 .plans-action-btn:hover { background: var(--surface-soft); }
+
+/* Велика кнопка "Виконано" */
+.plans-done-big {
+  flex: 1;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #2E7D32, #43A047) !important;
+  border-radius: var(--radius-sm) !important;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.12s;
+}
+.plans-done-big:hover { opacity: 0.9; transform: scale(1.02); }
+.plans-done-big:active { transform: scale(0.97); }
+
+/* Tab switcher Активні / Архів */
+.plans-tab-bar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.plans-tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: 13px; font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.plans-tab-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-pale);
+  color: var(--accent-deep);
+}
+.plans-tab-count {
+  background: var(--surface-soft);
+  color: var(--text-muted);
+  border-radius: 999px;
+  font-size: 11px; font-weight: 700;
+  padding: 1px 7px;
+}
+.plans-tab-btn.active .plans-tab-count {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Картка в архіві */
+.plans-card-done-time {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2E7D32;
+}
+
+/* ── Модалка перегляду архівного плану ── */
+.plan-archive-modal {
+  padding: 0 !important;
+  overflow: hidden;
+}
+.plan-archive-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 20px 16px;
+  position: relative;
+}
+.plan-archive-cat-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+.plan-archive-cat-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.75);
+  margin-bottom: 3px;
+}
+.plan-archive-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.2;
+  flex: 1;
+}
+.plan-archive-done-badge {
+  position: absolute;
+  top: 14px; right: 14px;
+  background: rgba(255,255,255,0.22);
+  color: #fff;
+  font-size: 11px; font-weight: 700;
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+.plan-archive-body {
+  padding: 18px 20px;
+}
+.plan-archive-note {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+}
+.plan-archive-meta-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.plan-archive-meta-item {
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.plan-archive-meta-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.plan-archive-meta-val {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.plan-archive-duration {
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #2E7D32;
+  background: rgba(46,125,50,0.08);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+}
+.plan-archive-modal .modal-actions {
+  padding: 0 20px 20px;
+}
 
 /* Chips для модалки */
 .plans-cat-chips {
@@ -3489,6 +3685,201 @@ a.wl-archive-title:hover { text-decoration: underline; }
   border-color: var(--accent);
   background: var(--accent-pale);
   color: var(--accent-deep);
+}
+
+/* ============================================================
+   MEDIA — Постер-модалка (TMDB деталі + трейлер)
+   ============================================================ */
+.media-detail-modal {
+  padding: 0 !important;
+  overflow: hidden;
+  max-width: 560px !important;
+}
+.media-detail-backdrop {
+  position: relative;
+  min-height: 160px;
+  background: linear-gradient(135deg, #1a1a2e, #2d1b2e);
+  overflow: hidden;
+}
+.media-detail-backdrop-img {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  opacity: 0.35;
+}
+.media-detail-backdrop-grad {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.7));
+}
+.media-detail-hero {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 16px 18px 14px;
+}
+.media-detail-poster {
+  width: 72px;
+  height: 108px;
+  border-radius: 10px;
+  object-fit: cover;
+  box-shadow: 0 6px 20px -4px rgba(0,0,0,0.5);
+  flex-shrink: 0;
+}
+.media-detail-poster-ph {
+  width: 72px; height: 108px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.1);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; flex-shrink: 0;
+}
+.media-detail-hero-info { flex: 1; }
+.media-detail-title {
+  font-family: var(--font-display);
+  font-size: 19px; font-weight: 700;
+  color: #fff; line-height: 1.2;
+  margin-bottom: 4px;
+}
+.media-detail-meta {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  align-items: center;
+}
+.media-detail-badge {
+  font-size: 11px; font-weight: 700;
+  background: rgba(255,255,255,0.15);
+  color: rgba(255,255,255,0.9);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.media-detail-rating-star {
+  font-size: 12px; font-weight: 700;
+  color: #FFD700;
+}
+
+.media-detail-body {
+  padding: 16px 18px;
+}
+.media-detail-overview {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.65;
+  margin-bottom: 14px;
+}
+
+/* Трейлер embed */
+.media-detail-trailer {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 16px;
+  background: #000;
+}
+.media-detail-trailer iframe {
+  width: 100%; height: 100%;
+  border: none;
+}
+.media-detail-trailer-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px;
+  background: #FF0000;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  margin-bottom: 14px;
+  transition: opacity 0.15s;
+}
+.media-detail-trailer-btn:hover { opacity: 0.88; }
+.media-detail-trailer-loading {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+/* Відгуки секція */
+.media-detail-reviews {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+.media-detail-reviews-title {
+  font-size: 12px; font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+.media-detail-review-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--surface-soft);
+}
+.media-detail-review-row:last-child { border-bottom: none; }
+.media-detail-review-who {
+  font-size: 12px; font-weight: 700;
+  color: var(--text-muted);
+  min-width: 44px;
+}
+.media-detail-review-rating {
+  font-size: 13px; font-weight: 700;
+  color: var(--accent-deep);
+}
+.media-detail-review-comment {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.media-detail-review-edit {
+  background: none; border: none;
+  font-size: 12px; font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--accent-pale);
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+.media-detail-review-edit:hover { background: var(--accent-pale); }
+.media-detail-modal .modal-actions {
+  padding: 4px 18px 18px;
+}
+
+/* Кнопка "Відгук" під назвою картки */
+.media-review-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 4px 10px;
+  border: 1.5px solid var(--accent-pale);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  font-family: var(--font-body);
+  font-size: 11px; font-weight: 700;
+  color: var(--accent-deep);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.media-review-btn:hover {
+  background: var(--accent-pale);
+  border-color: var(--accent);
 }
 
 /* ============================================================
