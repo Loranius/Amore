@@ -1605,13 +1605,19 @@
 
 .swipe-stack-wrap {
   position: relative;
+  /* Висота фіксована, ширина картки обмежена нижче */
   height: 520px;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .swipe-stack {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  /* Картка 2:3 від висоти 520px = ~347px + запас для тіней карток позаду */
+  width: min(calc(520px * 2 / 3), 100%);
+  height: 100%;
 }
 
 .swipe-card {
@@ -1624,7 +1630,6 @@
   user-select: none;
   touch-action: none;
   will-change: transform;
-  /* GPU-шар для плавного touch */
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
   backface-visibility: hidden;

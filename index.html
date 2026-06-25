@@ -17,8 +17,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="styles/main.css?v=7">
-<link rel="stylesheet" href="styles/components.css?v=24">
+<link rel="stylesheet" href="styles/main.css?v=8">
+<link rel="stylesheet" href="styles/components.css?v=25">
 <!-- Темна тема: застосовуємо ДО рендеру, щоб уникнути блимання -->
 <script>
   (function(){
@@ -76,11 +76,66 @@
   <!-- Кнопка приховати/показати sidebar (тільки десктоп) -->
   <button class="sidebar-toggle" id="sidebar-toggle" title="Приховати/показати меню">☰</button>
 
-  <header class="topbar">
+  <header class="topbar" id="topbar">
     <div class="topbar-inner">
       <span class="brand">Портал бубосів</span>
       <button class="logout-btn" id="logout-btn" title="Вийти">Вийти</button>
     </div>
+    <!-- На десктопі nav живе всередині topbar як єдиний sidebar -->
+    <nav class="bottom-nav" id="bottom-nav">
+      <button class="nav-btn nav-btn-home active" data-view="home">
+        <span class="nav-icon-home">♡</span>
+      </button>
+      <button class="nav-btn" data-view="wishlist">
+        <span class="nav-icon">♡</span>
+        <span class="nav-label">Wishlist</span>
+      </button>
+      <button class="nav-btn" data-view="budget">
+        <span class="nav-icon">₴</span>
+        <span class="nav-label">Finance</span>
+      </button>
+      <button class="nav-btn" data-view="shopping">
+        <span class="nav-icon">🛒</span>
+        <span class="nav-label">Покупки</span>
+      </button>
+      <button class="nav-btn" id="more-nav-btn">
+        <span class="nav-icon">⋯</span>
+        <span class="nav-label">Ще</span>
+      </button>
+      <!-- Desktop-only nav items (hidden on mobile) -->
+      <button class="nav-btn desktop-nav-item" data-view="calendar">
+        <span class="nav-icon">📅</span>
+        <span class="nav-label">Календар</span>
+      </button>
+      <button class="nav-btn desktop-nav-item" data-view="media">
+        <span class="nav-icon">🎬</span>
+        <span class="nav-label">Вотчліст</span>
+      </button>
+      <button class="nav-btn desktop-nav-item" data-view="random">
+        <span class="nav-icon">🍽️</span>
+        <span class="nav-label">Що їмо?</span>
+      </button>
+      <button class="nav-btn desktop-nav-item" data-view="capsule">
+        <span class="nav-icon">💌</span>
+        <span class="nav-label">Капсула</span>
+      </button>
+      <button class="nav-btn desktop-nav-item" data-view="question">
+        <span class="nav-icon">💬</span>
+        <span class="nav-label">Питання</span>
+      </button>
+      <button class="nav-btn desktop-nav-item" data-view="map">
+        <span class="nav-icon">📍</span>
+        <span class="nav-label">Наша карта</span>
+      </button>
+      <button class="nav-btn desktop-nav-item" data-view="photo-calendar">
+        <span class="nav-icon">📸</span>
+        <span class="nav-label">Фото-календар</span>
+      </button>
+      <button class="nav-btn desktop-nav-item desktop-settings-trigger" id="desktop-settings-btn">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Налаштування</span>
+      </button>
+    </nav>
   </header>
 
   <main class="content" id="content">
@@ -417,60 +472,6 @@
 
   </main>
 
-  <nav class="bottom-nav" id="bottom-nav">
-    <button class="nav-btn" data-view="wishlist">
-      <span class="nav-icon">♡</span>
-      <span class="nav-label">Wishlist</span>
-    </button>
-    <button class="nav-btn" data-view="budget">
-      <span class="nav-icon">₴</span>
-      <span class="nav-label">Finance</span>
-    </button>
-    <button class="nav-btn nav-btn-home active" data-view="home">
-      <span class="nav-icon-home">♡</span>
-    </button>
-    <button class="nav-btn" data-view="shopping">
-      <span class="nav-icon">🛒</span>
-      <span class="nav-label">Покупки</span>
-    </button>
-    <button class="nav-btn" id="more-nav-btn">
-      <span class="nav-icon">⋯</span>
-      <span class="nav-label">Ще</span>
-    </button>
-    <!-- Desktop-only nav items (hidden on mobile) -->
-    <button class="nav-btn desktop-nav-item" data-view="calendar">
-      <span class="nav-icon">📅</span>
-      <span class="nav-label">Календар</span>
-    </button>
-    <button class="nav-btn desktop-nav-item" data-view="media">
-      <span class="nav-icon">🎬</span>
-      <span class="nav-label">Вотчліст</span>
-    </button>
-    <button class="nav-btn desktop-nav-item" data-view="random">
-      <span class="nav-icon">🍽️</span>
-      <span class="nav-label">Що їмо?</span>
-    </button>
-    <button class="nav-btn desktop-nav-item" data-view="capsule">
-      <span class="nav-icon">💌</span>
-      <span class="nav-label">Капсула</span>
-    </button>
-    <button class="nav-btn desktop-nav-item" data-view="question">
-      <span class="nav-icon">💬</span>
-      <span class="nav-label">Питання</span>
-    </button>
-    <button class="nav-btn desktop-nav-item" data-view="map">
-      <span class="nav-icon">📍</span>
-      <span class="nav-label">Наша карта</span>
-    </button>
-    <button class="nav-btn desktop-nav-item" data-view="photo-calendar">
-      <span class="nav-icon">📸</span>
-      <span class="nav-label">Фото-календар</span>
-    </button>
-    <button class="nav-btn desktop-nav-item desktop-settings-trigger" id="desktop-settings-btn">
-      <span class="nav-icon">⚙️</span>
-      <span class="nav-label">Налаштування</span>
-    </button>
-  </nav>
   <!-- ===================== MORE MENU ===================== -->
   <div id="more-menu-overlay" class="more-menu-overlay hidden">
     <div class="more-menu-sheet">

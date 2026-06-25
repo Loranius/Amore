@@ -496,7 +496,7 @@ body {
     display: none; /* прихована на мобільному */
   }
 
-  /* Topbar — верхня частина лівої sidebar */
+  /* Topbar = повний sidebar: fixed зліва, flex-column */
   .topbar {
     position: fixed;
     top: 0; left: 0; bottom: 0;
@@ -505,17 +505,16 @@ body {
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
-    background: rgba(255, 243, 246, 0.96);
+    background: rgba(255, 243, 246, 0.97);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     z-index: 20;
-    transition: transform 0.28s cubic-bezier(.22,.61,.36,1),
-                box-shadow 0.28s ease;
+    transition: transform 0.28s cubic-bezier(.22,.61,.36,1);
+    overflow: hidden;
   }
 
-  /* Collapsed sidebar */
-  .app.sidebar-collapsed .topbar,
-  .app.sidebar-collapsed .bottom-nav {
+  /* Collapsed */
+  .app.sidebar-collapsed .topbar {
     transform: translateX(calc(-1 * var(--sidebar-w)));
   }
 
@@ -525,84 +524,69 @@ body {
     max-width: 1040px;
   }
 
-  /* Кнопка-тогл — завжди видима */
+  /* Toggle кнопка */
   .sidebar-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
     position: fixed;
     top: 16px;
-    left: 12px;
+    left: calc(var(--sidebar-w) - 18px);
     z-index: 30;
     width: 36px;
     height: 36px;
     border-radius: 10px;
     border: none;
-    background: rgba(255, 243, 246, 0.92);
+    background: rgba(255, 243, 246, 0.95);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     box-shadow: 0 2px 12px -2px rgba(232,130,156,0.28),
-                0 0 0 1px rgba(246,217,226,0.7);
+                0 0 0 1px rgba(246,217,226,0.8);
     cursor: pointer;
     color: var(--accent-deep);
     font-size: 17px;
     line-height: 1;
-    transition: background 0.15s, transform 0.15s, left 0.28s cubic-bezier(.22,.61,.36,1);
+    transition: background 0.15s, left 0.28s cubic-bezier(.22,.61,.36,1);
   }
 
-  .sidebar-toggle:hover {
-    background: var(--accent-pale);
-  }
+  .sidebar-toggle:hover { background: var(--accent-pale); }
 
-  /* Коли sidebar відкритий — кнопка поруч з sidebar */
-  .sidebar-toggle {
-    left: calc(var(--sidebar-w) - 18px);
-  }
+  .app.sidebar-collapsed .sidebar-toggle { left: 12px; }
 
-  /* Коли collapsed — кнопка у лівому куті */
-  .app.sidebar-collapsed .sidebar-toggle {
-    left: 12px;
-  }
-
+  /* Шапка sidebar */
   .topbar-inner {
     flex-direction: column;
     align-items: flex-start;
-    padding: 28px 20px 16px;
-    gap: 4px;
+    padding: 24px 20px 14px;
+    gap: 2px;
     border-bottom: 1px solid var(--line);
     flex-shrink: 0;
   }
 
-  .brand {
-    font-size: 20px;
-    line-height: 1.2;
-  }
+  .brand { font-size: 20px; line-height: 1.2; }
 
-  .logout-btn {
-    font-size: 12px;
-    padding: 4px 8px;
-    margin-left: -8px;
-  }
+  .logout-btn { font-size: 12px; padding: 4px 8px; margin-left: -8px; }
 
-  /* Bottom nav — стає вертикальним nav у sidebar під topbar */
+  /* Nav — flex child всередині topbar, заповнює решту висоти */
   .bottom-nav {
-    position: fixed;
-    top: 0; left: 0; bottom: 0;
-    width: var(--sidebar-w);
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: stretch;
-    gap: 2px;
-    padding: 12px 12px 20px;
-    padding-top: calc(88px + 12px); /* висота topbar-inner */
-    border-top: none;
-    border-right: none;
-    box-shadow: none;
-    background: transparent;
+    position: static !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    width: 100% !important;
+    border-top: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    flex: 1;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
+    gap: 2px !important;
+    padding: 10px 12px 20px !important;
     overflow-y: auto;
     scrollbar-width: none;
-    z-index: 19;
-    transition: transform 0.28s cubic-bezier(.22,.61,.36,1);
+    z-index: auto !important;
+    transition: none !important;
   }
 
   .bottom-nav::-webkit-scrollbar { display: none; }
@@ -864,20 +848,13 @@ body {
 }
 
 [data-theme="dark"] .topbar {
-  background: rgba(26, 18, 24, 0.96);
-  border-bottom-color: rgba(58, 42, 51, 0.8);
+  background: rgba(26, 18, 24, 0.97);
   border-right-color: rgba(58, 42, 51, 0.8);
 }
 
-[data-theme="dark"] .bottom-nav {
-  background: rgba(26, 18, 24, 0.96);
-  border-top-color: rgba(58, 42, 51, 0.7);
-  border-right-color: rgba(58, 42, 51, 0.7);
-}
-
 [data-theme="dark"] .sidebar-toggle {
-  background: rgba(36, 27, 32, 0.92);
-  border: 1px solid rgba(58, 42, 51, 0.7);
+  background: rgba(36, 27, 32, 0.95);
+  box-shadow: 0 2px 12px -2px rgba(0,0,0,0.4), 0 0 0 1px rgba(58,42,51,0.7);
   color: var(--accent);
 }
 
