@@ -182,7 +182,7 @@ body {
   width: 100%;
   margin: 0 auto;
   padding: var(--space-4);
-  padding-bottom: 100px; /* простір під bottom-nav */
+  padding-bottom: calc(var(--nav-height, 72px) + 8px + env(safe-area-inset-bottom));
 }
 
 .view-header {
@@ -200,6 +200,12 @@ body {
   margin: 0;
   line-height: 1;
   align-self: center;
+}
+
+/* home-left/home-right — мобільний базовий стиль (flex-column) */
+.home-left,
+.home-right {
+  width: 100%;
 }
 
 /* ============================================================
@@ -420,7 +426,6 @@ body {
 .content {
   padding-left:  max(var(--space-4), env(safe-area-inset-left));
   padding-right: max(var(--space-4), env(safe-area-inset-right));
-  padding-bottom: calc(100px + env(safe-area-inset-bottom));
 }
 
 .bottom-nav {
@@ -485,15 +490,11 @@ body {
 @media (min-width: 960px) {
   :root {
     --sidebar-w: 240px;
+    --nav-height: 0px; /* sidebar зліва, не знизу */
   }
 
   .app {
     flex-direction: row;
-  }
-
-  /* ── Кнопка-тогл сайдбара ── */
-  .sidebar-toggle {
-    display: none; /* прихована на мобільному */
   }
 
   /* Topbar = повний sidebar: fixed зліва, flex-column */
@@ -782,7 +783,8 @@ body {
   /* ── Модалки і шити на ПК — по центру ── */
   .modal-overlay {
     align-items: center;
-    padding-left: var(--sidebar-w);
+    /* рівний відступ з усіх боків, компенсуємо sidebar зліва */
+    padding: 24px 24px 24px calc(var(--sidebar-w) + 24px);
   }
   .modal-card {
     max-width: 520px;
@@ -813,7 +815,7 @@ body {
 
   .content {
     max-width: 1000px;
-    padding: var(--space-6) 48px;
+    padding: var(--space-6) 48px var(--space-6);
   }
 
   #view-home {
@@ -849,7 +851,14 @@ body {
 
 [data-theme="dark"] .topbar {
   background: rgba(26, 18, 24, 0.97);
-  border-right-color: rgba(58, 42, 51, 0.8);
+  border-bottom-color: rgba(58, 42, 51, 0.8); /* мобільна межа знизу */
+  border-right-color: rgba(58, 42, 51, 0.8);  /* desktop межа справа */
+}
+
+/* dark theme мобільний bottom-nav */
+[data-theme="dark"] .bottom-nav {
+  background: rgba(26, 18, 24, 0.95) !important;
+  border-top-color: rgba(58, 42, 51, 0.7) !important;
 }
 
 [data-theme="dark"] .sidebar-toggle {
@@ -862,13 +871,15 @@ body {
   opacity: 0.92;
 }
 
-/* Плавний перехід теми */
+/* Плавний перехід теми — тільки кольорові властивості, НЕ transform */
 *, *::before, *::after {
-  transition: background-color 0.25s ease, color 0.2s ease, border-color 0.2s ease,
-              box-shadow 0.2s ease;
+  transition: background-color 0.25s ease, color 0.2s ease,
+              border-color 0.2s ease, box-shadow 0.2s ease;
 }
-/* Не чіпаємо елементи з анімаціями руху (але НЕ [style*=transform] — це ламає polaroid) */
-.view, .modal-overlay, .more-menu-overlay, .confetti-piece {
+/* Елементи з власними transition/animation — скидаємо glob перехід */
+.view, .modal-overlay, .more-menu-overlay, .confetti-piece,
+.swipe-card, .polaroid, .plans-card, .media-card,
+.week-widget, .counter-sticker {
   transition: none !important;
 }
 
@@ -979,7 +990,7 @@ img.lazy.loaded {
    ============================================================ */
 .pwa-banner {
   position: fixed;
-  bottom: calc(72px + env(safe-area-inset-bottom));
+  bottom: calc(var(--nav-height, 72px) + 8px + env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%) translateY(20px);
   opacity: 0;
@@ -1023,6 +1034,8 @@ img.lazy.loaded {
 }
 
 /* ============================================================
+   SETTINGS
+   ============================================================ */
 
 /* Тема-тогл кнопка в налаштуваннях */
 .theme-toggle-row {
@@ -1067,7 +1080,7 @@ img.lazy.loaded {
 /* Тост */
 .eb-toast {
   position: fixed;
-  bottom: calc(80px + env(safe-area-inset-bottom));
+  bottom: calc(var(--nav-height, 72px) + 8px + env(safe-area-inset-bottom));
   left: 50%; transform: translateX(-50%) translateY(16px);
   background: var(--text); color: var(--bg);
   font-family: var(--font-body); font-size: 13px; font-weight: 600;

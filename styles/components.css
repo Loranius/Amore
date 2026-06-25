@@ -446,7 +446,7 @@
   background: var(--surface);
   border-radius: var(--radius-lg);
   box-shadow: 0 24px 60px -12px rgba(61,43,53,0.28), 0 0 0 1px rgba(246,217,226,0.4);
-  padding: var(--space-5);
+  padding: var(--space-4);
   width: 100%;
   max-width: 420px;
   max-height: 85dvh;
@@ -484,7 +484,8 @@
 .form-field input,
 .form-field textarea {
   font-family: var(--font-body);
-  font-size: 14px;
+  font-size: 16px; /* ≥16px — iOS не зумує поле */
+  /* На десктопі зменшуємо через @media нижче */
   padding: 10px var(--space-3);
   border: 1.5px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1605,19 +1606,17 @@
 
 .swipe-stack-wrap {
   position: relative;
-  /* Висота фіксована, ширина картки обмежена нижче */
   height: 520px;
   margin-bottom: 8px;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
 }
 
 .swipe-stack {
   position: relative;
-  /* Картка 2:3 від висоти 520px = ~347px + запас для тіней карток позаду */
   width: min(calc(520px * 2 / 3), 100%);
-  height: 100%;
+  flex-shrink: 0;
 }
 
 .swipe-card {
@@ -2421,7 +2420,7 @@
   border-radius: var(--radius-sm);
   padding: 7px 10px;
   font-family: var(--font-body);
-  font-size: 13px;
+  font-size: 16px; /* iOS no-zoom */
   color: var(--text);
   background: var(--surface);
   outline: none;
@@ -2450,7 +2449,7 @@
   border-radius: var(--radius-sm);
   padding: 11px 14px;
   font-family: var(--font-body);
-  font-size: 15px;
+  font-size: 16px; /* iOS no-zoom */
   color: var(--text);
   background: var(--surface);
   outline: none;
@@ -2895,7 +2894,7 @@
 .fin-inp {
   width: 100%; padding: 12px 14px;
   border: 1.5px solid var(--line); border-radius: var(--radius-sm);
-  font-family: var(--font-body); font-size: 15px; color: var(--text);
+  font-family: var(--font-body); font-size: 16px; /* iOS no-zoom */ color: var(--text);
   background: var(--surface); outline: none; transition: border-color 0.15s;
   box-sizing: border-box;
 }
@@ -3382,7 +3381,8 @@ a.wl-archive-title:hover { text-decoration: underline; }
   gap: 10px;
 }
 
-@media (min-width: 600px) {
+/* Плани — 2 колонки від 480px (вміщується на більшості телефонів горизонтально) */
+@media (min-width: 480px) {
   .plans-grid { grid-template-columns: 1fr 1fr; }
 }
 
@@ -3871,7 +3871,7 @@ a.wl-archive-title:hover { text-decoration: underline; }
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  margin-top: 16px;
+  margin-top: 12px;
   /* Старт невидимий — fade-in через клас */
   opacity: 0;
   transform: translateY(8px);
@@ -4037,7 +4037,7 @@ a.wl-archive-title:hover { text-decoration: underline; }
 .sl-input {
   flex: 1; padding: 12px 14px;
   border: 1.5px solid var(--line); border-radius: var(--radius-sm);
-  font-family: var(--font-body); font-size: 15px; color: var(--text);
+  font-family: var(--font-body); font-size: 16px; /* iOS no-zoom */ color: var(--text);
   background: var(--surface-glow); outline: none; transition: border-color 0.15s;
 }
 .sl-input:focus { border-color: var(--accent); }
@@ -4318,6 +4318,14 @@ a.wl-archive-title:hover { text-decoration: underline; }
   opacity: 1;
 }
 /* На мобільному — завжди видно кнопку delete */
+
+/* ── Desktop: зменшуємо font-size інпутів (на мобільному ≥16px для no-zoom) ── */
+@media (min-width: 960px) {
+  .form-field input,
+  .form-field textarea { font-size: 14px; }
+  .pocket-quota-input  { font-size: 13px; }
+}
+
 @media (hover: none) {
   .photo-manager-del { opacity: 1; }
 }
