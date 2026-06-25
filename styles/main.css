@@ -491,18 +491,20 @@ body {
   :root {
     --sidebar-w: 240px;
     --nav-height: 0px; /* sidebar зліва, не знизу */
+    --topbar-h: 80px;  /* висота шапки sidebar */
   }
 
   .app {
     flex-direction: row;
   }
 
-  /* Topbar = повний sidebar: fixed зліва, flex-column */
+  /* Topbar — шапка sidebar, fixed зліва зверху */
   .topbar {
     position: fixed;
-    top: 0; left: 0; bottom: 0;
+    top: 0; left: 0;
     width: var(--sidebar-w);
-    border-bottom: none;
+    /* висота — авто по контенту */
+    border-bottom: 1px solid var(--line);
     border-right: 1px solid var(--line);
     display: flex;
     flex-direction: column;
@@ -511,11 +513,25 @@ body {
     -webkit-backdrop-filter: blur(20px);
     z-index: 20;
     transition: transform 0.28s cubic-bezier(.22,.61,.36,1);
-    overflow: hidden;
+  }
+
+  /* Sidebar фон — псевдоелемент щоб закрити всю ліву смугу */
+  .topbar::after {
+    content: '';
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: var(--sidebar-w);
+    background: rgba(255, 243, 246, 0.97);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid var(--line);
+    z-index: -1;
+    transition: transform 0.28s cubic-bezier(.22,.61,.36,1);
   }
 
   /* Collapsed */
-  .app.sidebar-collapsed .topbar {
+  .app.sidebar-collapsed .topbar,
+  .app.sidebar-collapsed .topbar::after {
     transform: translateX(calc(-1 * var(--sidebar-w)));
   }
 
@@ -568,26 +584,36 @@ body {
 
   .logout-btn { font-size: 12px; padding: 4px 8px; margin-left: -8px; }
 
-  /* Nav — flex child всередині topbar, заповнює решту висоти */
+  /* Nav — на десктопі fixed під topbar, імітує продовження sidebar */
   .bottom-nav {
-    position: static !important;
-    bottom: auto !important;
-    left: auto !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
     right: auto !important;
-    width: 100% !important;
+    width: var(--sidebar-w) !important;
     border-top: none !important;
+    border-right: none !important;
     box-shadow: none !important;
     background: transparent !important;
-    flex: 1;
+    /* відступ = висота topbar-inner, задається через --topbar-h */
+    padding-top: var(--topbar-h, 80px) !important;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-bottom: 20px !important;
     flex-direction: column !important;
     justify-content: flex-start !important;
     align-items: stretch !important;
     gap: 2px !important;
-    padding: 10px 12px 20px !important;
     overflow-y: auto;
     scrollbar-width: none;
-    z-index: auto !important;
-    transition: none !important;
+    z-index: 19 !important;
+    transition: transform 0.28s cubic-bezier(.22,.61,.36,1) !important;
+  }
+
+  /* Collapsed — nav ховається разом з topbar */
+  .app.sidebar-collapsed .bottom-nav {
+    transform: translateX(calc(-1 * var(--sidebar-w)));
   }
 
   .bottom-nav::-webkit-scrollbar { display: none; }
@@ -851,8 +877,13 @@ body {
 
 [data-theme="dark"] .topbar {
   background: rgba(26, 18, 24, 0.97);
-  border-bottom-color: rgba(58, 42, 51, 0.8); /* мобільна межа знизу */
-  border-right-color: rgba(58, 42, 51, 0.8);  /* desktop межа справа */
+  border-bottom-color: rgba(58, 42, 51, 0.8);
+  border-right-color: rgba(58, 42, 51, 0.8);
+}
+
+[data-theme="dark"] .topbar::after {
+  background: rgba(26, 18, 24, 0.97);
+  border-right-color: rgba(58, 42, 51, 0.8);
 }
 
 /* dark theme мобільний bottom-nav */
