@@ -54,9 +54,6 @@ const Photos = (() => {
   }
 
   // ---------- Анімований рендер ----------
-  // ВАЖЛИВО: НЕ використовуємо style.transform в inline стилях.
-  // CSS-правило [style*="transform"] { transition: none !important }
-  // вбивало б анімацію. Тому — тільки opacity + plавний stagger.
   async function render(pool) {
     const images    = document.querySelectorAll('.polaroid-photo img[data-photo-slot]');
     const polaroids = document.querySelectorAll('.polaroid');
@@ -65,47 +62,59 @@ const Photos = (() => {
     const picks = pickPhotos(pool, images.length);
     if (!picks.length) return;
 
-    const STAGGER  = 90;
-    const FADE_OUT = 200;
-    const FADE_IN  = 480;
+    const STAGGER  = 65;
+    const FADE_OUT = 160;
+    const FADE_IN  = 400;
 
-    // 1. Staggered fade-out — тільки opacity
-    polaroids.forEach((p, i) => {
-      setTimeout(() => {
-        p.style.transition = `opacity ${FADE_OUT}ms ease`;
-        p.style.opacity = '0';
-      }, i * STAGGER);
-    });
+    // Перевіряємо чи полароїди вже видимі (не перший рендер)
+    const alreadyVisible = parseFloat(getComputedStyle(polaroids[0]).opacity) > 0.1;
 
-    const totalOut = FADE_OUT + (polaroids.length - 1) * STAGGER + 80;
+    if (alreadyVisible) {
+      // 1. Staggered fade-out
+      polaroids.forEach((p, i) => {
+        setTimeout(() => {
+          p.style.transition = `opacity ${FADE_OUT}ms ease`;
+          p.style.opacity = '0';
+        }, i * STAGGER);
+      });
+      await new Promise(r => setTimeout(r, FADE_OUT + (polaroids.length - 1) * STAGGER + 50));
+    }
 
-    // 2. Після fade-out: міняємо src і ЧЕКАЄМО реального завантаження
-    await new Promise(r => setTimeout(r, totalOut));
+    // 2. Міняємо src і чекаємо реального завантаження (перш ніж показати)
+    images.forEach(img => { img.loading = 'eager'; });
 
-    images.forEach((img, i) => {
-      img.style.transition = 'none';
-      img.loading = 'eager';
-      img.src = picks[i] || img.src;
-    });
-
-    // Чекаємо поки КОЖНЕ фото завантажиться (або timeout 3с)
-    await Promise.all(Array.from(images).map(img =>
+    await Promise.all(Array.from(images).map((img, i) =>
       new Promise(resolve => {
-        if (img.complete && img.naturalWidth > 0) { resolve(); return; }
+        const newSrc = picks[i] || img.src;
+        if (img.src === newSrc && img.complete && img.naturalWidth > 0) { resolve(); return; }
         const done = () => { img.onload = img.onerror = null; resolve(); };
         img.onload  = done;
         img.onerror = done;
         setTimeout(done, 3000);
+        img.src = newSrc;
       })
     ));
 
-    // 3. Плавний staggered fade-in — фото вже готові, без snap-ів
+    // 3. Staggered fade-in з легким підйомом
     polaroids.forEach((p, i) => {
       setTimeout(() => {
-        p.style.transition = `opacity ${FADE_IN}ms ease`;
-        p.style.opacity = '1';
-        // Знімаємо inline transition після завершення — CSS знову керує
-        setTimeout(() => { p.style.transition = ''; }, FADE_IN + 60);
+        p.style.transition = `opacity ${FADE_IN}ms cubic-bezier(.25,.8,.25,1), transform ${FADE_IN}ms cubic-bezier(.25,.8,.25,1)`;
+        // Крадемо поточний rotate з CSS і додаємо translateY для появи знизу
+        const cssRotate = window.getComputedStyle(p).transform;
+        p.style.transform = (cssRotate && cssRotate !== 'none' ? cssRotate + ' ' : '') + 'translateY(12px)';
+        p.style.opacity = '0';
+
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          p.style.opacity = '1';
+          p.style.transform = cssRotate && cssRotate !== 'none' ? cssRotate : '';
+        }));
+
+        // Прибираємо inline стилі після завершення — CSS знову керує rotation
+        setTimeout(() => {
+          p.style.transition = '';
+          p.style.transform  = '';
+          p.style.opacity    = '';
+        }, FADE_IN + 80);
       }, i * STAGGER);
     });
   }

@@ -234,7 +234,7 @@ const Capsule = (() => {
   }
 
   function closeModal() {
-    document.getElementById('modal-root').innerHTML = '';
+    closeModalAnimated();
   }
 
   async function saveCapsule() {

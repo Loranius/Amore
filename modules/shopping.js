@@ -248,7 +248,7 @@ const Shopping = (() => {
     DataCache.invalidate('shopping:items'); await refresh();
   }
 
-  function closeModal() { el('modal-root').innerHTML = ''; }
+  function closeModal() { closeModalAnimated(); }
 
   // ── РЕНДЕР ──
   function authorName(userId) {

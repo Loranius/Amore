@@ -446,7 +446,7 @@ const Budget = (() => {
       window.visualViewport.removeEventListener('resize',ov._syncVV);
       window.visualViewport.removeEventListener('scroll',ov._syncVV);
     }
-    el('modal-root').innerHTML='';
+    closeModalAnimated();
   }
 
   function shake(inp){

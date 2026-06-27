@@ -159,7 +159,7 @@ const Media = (() => {
       });
     });
 
-    const closeModal = () => root.innerHTML = '';
+    const closeModal = () => closeModalAnimated();
     el('sm-cancel').addEventListener('click', closeModal);
     el('sm-ov').addEventListener('click', e => { if (e.target.id === 'sm-ov') closeModal(); });
 
@@ -431,7 +431,7 @@ const Media = (() => {
         </div>
       </div>`;
 
-    root.innerHTML = '';
+    closeModalAnimated();
     root.appendChild(overlay);
 
     overlay.querySelector('#mdr-close').addEventListener('click', () => root.innerHTML='');
@@ -516,7 +516,7 @@ const Media = (() => {
         <span class="media-detail-review-comment">${comment ? esc(comment) : '<i style="color:var(--text-muted)">Немає відгуку</i>'}</span>
         <button class="media-detail-review-edit" data-who="${who}">✏️ Відгук</button>`;
       row.querySelector('.media-detail-review-edit').addEventListener('click', () => {
-        root.innerHTML = '';
+        closeModalAnimated();
         openReviewPanel(item, who);
       });
       container.appendChild(row);
@@ -530,7 +530,7 @@ const Media = (() => {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'review-panel-overlay';
-    root.innerHTML = '';
+    closeModalAnimated();
     root.appendChild(overlay);
 
     const render = () => {
@@ -584,7 +584,7 @@ const Media = (() => {
         if (error) { alert('Помилка збереження'); return; }
         Object.assign(item, update);
         invalidateMedia();
-        root.innerHTML = '';
+        closeModalAnimated();
         refresh();
       });
     };
@@ -628,7 +628,7 @@ const Media = (() => {
         </div>
       </div>`;
 
-    const closeModal = () => root.innerHTML = '';
+    const closeModal = () => closeModalAnimated();
     el('media-cancel').addEventListener('click', closeModal);
     el('media-modal-overlay').addEventListener('click', e => { if (e.target.id==='media-modal-overlay') closeModal(); });
     el('media-save').addEventListener('click', saveItem);
@@ -653,7 +653,7 @@ const Media = (() => {
       const url = await uploadPoster(file, data.id);
       if (url) await supabase.from('media_items').update({ poster_url: url }).eq('id', data.id);
     }
-    el('modal-root').innerHTML = '';
+    closeModalAnimated();
     invalidateMedia(); refresh();
   }
 
@@ -690,7 +690,7 @@ const Media = (() => {
         </div>
       </div>`;
 
-    const closeModal = () => root.innerHTML = '';
+    const closeModal = () => closeModalAnimated();
     el('edit-cancel').addEventListener('click', closeModal);
     el('media-edit-overlay').addEventListener('click', e => { if (e.target.id==='media-edit-overlay') closeModal(); });
     el('edit-save').addEventListener('click', () => saveEdit(id, item));
@@ -710,7 +710,7 @@ const Media = (() => {
 
     const { error } = await supabase.from('media_items').update(update).eq('id', id);
     if (error) { alert('Помилка збереження'); saveBtn.textContent='Зберегти'; saveBtn.disabled=false; return; }
-    el('modal-root').innerHTML = '';
+    closeModalAnimated();
     invalidateMedia(); refresh();
   }
 

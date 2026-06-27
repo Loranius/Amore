@@ -344,7 +344,10 @@
     <section class="view hidden" id="view-map" data-view="map">
       <div class="view-header">
         <h2 class="display-md">Наша карта</h2>
-        <button class="btn-primary" id="add-pin-btn">+ Місце</button>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <button class="btn-secondary" id="checkin-btn" title="Поділитись своїм місцезнаходженням">📍 Я тут</button>
+          <button class="btn-primary" id="add-pin-btn">+ Місце</button>
+        </div>
       </div>
 
       <div class="map-legend">
@@ -557,6 +560,23 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <!-- Mapbox GL JS завантажується динамічно в map.js -->
 <script defer src="lib/supabase.js"></script>
+<script>
+// ── Глобальна анімована закривалка модалок ──────────────────
+// Використовується всіма модулями замість `el('modal-root').innerHTML = ''`
+function closeModalAnimated(rootId) {
+  var root = document.getElementById(rootId || 'modal-root');
+  if (!root) return;
+  var overlay = root.querySelector('.modal-overlay');
+  if (!overlay) { root.innerHTML = ''; return; }
+  overlay.classList.add('is-closing');
+  // Fallback: якщо animationend не стріляє (напр. reduced-motion) — прибираємо через 200ms
+  var fallback = setTimeout(function() { root.innerHTML = ''; }, 220);
+  overlay.addEventListener('animationend', function() {
+    clearTimeout(fallback);
+    root.innerHTML = '';
+  }, { once: true });
+}
+</script>
 <script defer src="lib/retry.js?v=1"></script>
 <script defer src="lib/error-boundary.js?v=1"></script>
 <script defer src="lib/cache.js?v=3"></script>

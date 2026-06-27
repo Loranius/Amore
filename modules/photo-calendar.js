@@ -378,7 +378,7 @@ const PhotoCalendar = (() => {
       window.visualViewport.removeEventListener('resize', ov._syncVV);
       window.visualViewport.removeEventListener('scroll', ov._syncVV);
     }
-    el('modal-root').innerHTML = '';
+    closeModalAnimated();
     pendingFile = null;
   }
 

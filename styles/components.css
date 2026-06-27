@@ -8,11 +8,13 @@
   box-shadow: var(--shadow-card);
   padding: var(--space-5);
   border: 1px solid rgba(246, 217, 226, 0.5);
-  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  transition: box-shadow 0.2s ease, transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .card:active {
-  transform: scale(0.99);
+  transform: scale(0.985);
+  transition-duration: 0.06s;
 }
 
 .card-grid {
@@ -35,12 +37,20 @@
   border-radius: var(--radius-sm);
   cursor: pointer;
   box-shadow: var(--shadow-btn);
-  transition: opacity 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+  transition: opacity 0.12s ease, transform 0.1s ease, box-shadow 0.12s ease;
   letter-spacing: 0.01em;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .btn-primary:hover { opacity: 0.92; }
-.btn-primary:active { transform: scale(0.96); box-shadow: 0 3px 10px -4px rgba(232,130,156,0.4); }
+.btn-primary:active {
+  transform: scale(0.94);
+  box-shadow: 0 3px 10px -4px rgba(232,130,156,0.4);
+  opacity: 0.88;
+  transition-duration: 0.06s;
+}
 
 .btn-secondary {
   background: var(--surface-soft);
@@ -52,11 +62,17 @@
   padding: 10px 20px;
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.12s ease;
+  transition: background 0.12s ease, transform 0.1s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
 .btn-secondary:hover { background: var(--accent-pale); }
-.btn-secondary:active { transform: scale(0.97); }
+.btn-secondary:active {
+  transform: scale(0.95);
+  transition-duration: 0.06s;
+}
 
 /* Delete btn — повний стиль нижче в секції DELETE BUTTON */
 
@@ -423,7 +439,30 @@
 
 @keyframes fade-in-overlay {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-out-overlay {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.92) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+@keyframes pop-out {
+  from { opacity: 1; transform: scale(1)    translateY(0); }
+  to   { opacity: 0; transform: scale(0.94) translateY(8px); }
+}
+
+/* Клас для закриття (додати через JS перед removeChild) */
+.modal-overlay.is-closing {
+  animation: fade-out-overlay 0.18s ease both;
+}
+.modal-overlay.is-closing .modal-card {
+  animation: pop-out 0.18s cubic-bezier(.4,0,.6,1) both;
 }
 
 .modal-card {
@@ -437,7 +476,7 @@
   max-height: 85vh;  /* fallback */
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  animation: pop-in 0.28s cubic-bezier(.34,1.4,.64,1) both;
+  animation: pop-in 0.32s cubic-bezier(.22,1.2,.36,1) both;
 }
 @supports (max-height: 1dvh) {
   .modal-card { max-height: 85dvh; }
@@ -1458,8 +1497,10 @@
   text-decoration: none;
   color: var(--text);
   display: block;
-  transition: transform 0.2s cubic-bezier(.34,1.4,.64,1), box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(.34,1.4,.64,1), box-shadow 0.2s ease, opacity 0.48s ease;
   will-change: transform, opacity;
+  /* Починаємо невидимими — JS проявить після завантаження фото */
+  opacity: 0;
 }
 
 [data-theme="dark"] .polaroid {
@@ -1846,6 +1887,35 @@
 }
 
 .map-marker:hover { transform: scale(1.15); }
+
+/* ── Маркери геолокації партнерів ── */
+@keyframes loc-pulse {
+  0%, 100% { box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 0 rgba(255,255,255,0.5); }
+  50%       { box-shadow: 0 2px 8px rgba(0,0,0,0.3), 0 0 0 8px rgba(255,255,255,0); }
+}
+
+.location-marker {
+  transition: transform 0.2s ease;
+}
+.location-marker:hover { transform: scale(1.15); }
+
+.loc-popup-wrap .mapboxgl-popup-content {
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 10px;
+  padding: 8px 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  font-size: 13px;
+  font-family: var(--font-body);
+  color: var(--text-primary);
+  border: none;
+}
+.loc-popup-wrap .mapboxgl-popup-tip { border-top-color: rgba(255,255,255,0.95); }
+.loc-popup .loc-time {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-left: 4px;
+}
 
 /* Popup */
 .map-popup {

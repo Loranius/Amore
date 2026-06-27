@@ -24,6 +24,16 @@ const MapModule = (() => {
   let searchDebounce = null;
   const DEFAULT_CENTER = [30.5234, 50.4501];
 
+  // ── Геолокація партнерів ────────────────────────────────────
+  // user_id -> { marker: mapboxgl.Marker, popup: mapboxgl.Popup }
+  const locationMarkers = {};
+  // Конфігурація зовнішнього вигляду для кожного користувача
+  // (перший user за алфавітом — Діма 💙, другий — Лєна 💗)
+  const USER_LOCATION_STYLES = [
+    { emoji: '💙', color: '#4A90D9', label: 'Дімусік' },
+    { emoji: '💗', color: '#E8829C', label: 'Лєнусік' },
+  ];
+
   // ── Динамічне завантаження Mapbox (лише при першому відкритті вкладки) ──
   function loadMapboxResources() {
     return new Promise(function(resolve) {
@@ -132,6 +142,7 @@ const MapModule = (() => {
 
     map.on('load', function() {
       loadAndRender();
+      renderLocationMarkers();
     });
   }
 
@@ -627,8 +638,165 @@ const MapModule = (() => {
     loadAndRender();
   }
 
+  // ============================================================
+  // ГЕОЛОКАЦІЯ ПАРТНЕРІВ
+  // ============================================================
+
+  // Відправити своє поточне місцезнаходження в Supabase
+  async function checkinLocation() {
+    var btn = document.getElementById('checkin-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
+
+    if (!navigator.geolocation) {
+      alert('Геолокація не підтримується браузером');
+      if (btn) { btn.disabled = false; btn.textContent = '📍 Я тут'; }
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async function(pos) {
+      var lat = pos.coords.latitude;
+      var lng = pos.coords.longitude;
+      var user = Auth.getCurrentUser();
+      if (!user) return;
+
+      var { error } = await supabase.from('user_locations').upsert({
+        user_id: user.id,
+        lat: lat,
+        lng: lng,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'user_id' });
+
+      if (error) {
+        console.error('checkin error:', error);
+        alert('Не вдалось надіслати місцезнаходження 😔');
+      } else {
+        // Відразу показуємо свій маркер (не чекаємо realtime)
+        if (map) map.flyTo({ center: [lng, lat], zoom: 14 });
+        renderLocationMarkers();
+      }
+
+      if (btn) { btn.disabled = false; btn.textContent = '📍 Я тут'; }
+    }, function(err) {
+      console.warn('geolocation error:', err);
+      var msg = err.code === 1
+        ? 'Дозвіл на геолокацію відхилено. Надай доступ у налаштуваннях браузера.'
+        : 'Не вдалось отримати геолокацію. Спробуй ще раз.';
+      alert(msg);
+      if (btn) { btn.disabled = false; btn.textContent = '📍 Я тут'; }
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  }
+
+  // Завантажити всі check-in координати і намалювати маркери на карті
+  async function renderLocationMarkers() {
+    if (!map) return;
+
+    // Отримуємо список юзерів (для визначення стилю за порядком)
+    var users = await Auth.getUsers();
+
+    var { data, error } = await supabase
+      .from('user_locations')
+      .select('user_id, lat, lng, updated_at');
+
+    if (error) { console.error('user_locations fetch error:', error); return; }
+    if (!data || !data.length) return;
+
+    data.forEach(function(loc) {
+      // Визначаємо стиль за індексом юзера у загальному списку
+      var userIdx = users.findIndex(function(u) { return u.id === loc.user_id; });
+      var style = USER_LOCATION_STYLES[userIdx] || USER_LOCATION_STYLES[0];
+
+      // Час «X хв тому»
+      var diffMs = Date.now() - new Date(loc.updated_at).getTime();
+      var diffMin = Math.round(diffMs / 60000);
+      var timeAgo = diffMin < 1
+        ? 'щойно'
+        : diffMin < 60
+          ? diffMin + ' хв тому'
+          : Math.round(diffMin / 60) + ' год тому';
+
+      var userName = (users[userIdx] || {}).name || style.label;
+
+      if (locationMarkers[loc.user_id]) {
+        // Оновлюємо позицію існуючого маркера
+        locationMarkers[loc.user_id].marker.setLngLat([loc.lng, loc.lat]);
+        // Оновлюємо popup
+        var el = locationMarkers[loc.user_id].popupEl;
+        if (el) {
+          el.querySelector('.loc-time').textContent = timeAgo;
+        }
+      } else {
+        // Створюємо новий маркер
+        var el = document.createElement('div');
+        el.className = 'location-marker';
+        el.style.cssText =
+          'background:' + style.color + ';' +
+          'width:40px;height:40px;border-radius:50%;' +
+          'display:flex;align-items:center;justify-content:center;' +
+          'font-size:20px;box-shadow:0 2px 8px rgba(0,0,0,0.3);' +
+          'border:3px solid #fff;cursor:pointer;' +
+          'animation:loc-pulse 2s ease-in-out infinite;';
+        el.textContent = style.emoji;
+
+        var popupEl = document.createElement('div');
+        popupEl.className = 'loc-popup';
+        popupEl.innerHTML =
+          '<b>' + escapeHtml(userName) + '</b>' +
+          ' <span class="loc-time">' + timeAgo + '</span>';
+
+        var popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          className: 'loc-popup-wrap',
+        }).setDOMContent(popupEl);
+
+        var marker = new mapboxgl.Marker(el)
+          .setLngLat([loc.lng, loc.lat])
+          .setPopup(popup)
+          .addTo(map);
+
+        // Клік — показати popup і підлетіти
+        el.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (popup.isOpen()) {
+            popup.remove();
+          } else {
+            map.flyTo({ center: [loc.lng, loc.lat], zoom: 15 });
+            marker.togglePopup();
+          }
+        });
+
+        locationMarkers[loc.user_id] = { marker: marker, popupEl: popupEl };
+      }
+    });
+  }
+
+  // Видалити своє місцезнаходження (скидання check-in)
+  async function clearMyLocation() {
+    var user = Auth.getCurrentUser();
+    if (!user) return;
+    await supabase.from('user_locations').delete().eq('user_id', user.id);
+
+    // Прибираємо маркер з карти
+    if (locationMarkers[user.id]) {
+      locationMarkers[user.id].marker.remove();
+      delete locationMarkers[user.id];
+    }
+    DataCache.invalidate('user_locations');
+  }
+
+  // Публічний метод для Realtime — оновити маркери партнерів
+  function refreshLocations() {
+    renderLocationMarkers();
+  }
+
   function closeModal() {
-    document.getElementById('modal-root').innerHTML = '';
+    var root = document.getElementById('modal-root');
+    var overlay = root.querySelector('.modal-overlay');
+    if (!overlay) { root.innerHTML = ''; return; }
+    overlay.classList.add('is-closing');
+    overlay.addEventListener('animationend', function() {
+      root.innerHTML = '';
+    }, { once: true });
   }
 
   // ---------- Init ----------
@@ -648,10 +816,16 @@ const MapModule = (() => {
       openAddModal(DEFAULT_CENTER[1], DEFAULT_CENTER[0]);
     });
 
+    // Check-in кнопка (додати в HTML поруч з add-pin-btn)
+    var checkinBtn = document.getElementById('checkin-btn');
+    if (checkinBtn) {
+      checkinBtn.addEventListener('click', checkinLocation);
+    }
+
     window.addEventListener('portal:view', function(e) {
       if (e.detail.view === 'map') refresh();
     });
   }
 
-  return { init: init, refresh: refresh };
+  return { init: init, refresh: refresh, refreshLocations: refreshLocations };
 })();

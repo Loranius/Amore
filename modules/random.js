@@ -292,7 +292,7 @@ const RandomModule = (() => {
   // ЗАГАЛЬНЕ
   // ============================================================
   function closeModal() {
-    document.getElementById('modal-root').innerHTML = '';
+    closeModalAnimated();
   }
 
   function refresh() {
