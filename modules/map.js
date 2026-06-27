@@ -811,19 +811,27 @@ const MapModule = (() => {
     }
   }
 
+  function bindCheckinBtn() {
+    var checkinBtn = document.getElementById('checkin-btn');
+    if (checkinBtn && !checkinBtn.dataset.bound) {
+      checkinBtn.dataset.bound = '1';
+      checkinBtn.addEventListener('click', checkinLocation);
+    }
+  }
+
   function init() {
     document.getElementById('add-pin-btn').addEventListener('click', function() {
       openAddModal(DEFAULT_CENTER[1], DEFAULT_CENTER[0]);
     });
 
-    // Check-in кнопка (додати в HTML поруч з add-pin-btn)
-    var checkinBtn = document.getElementById('checkin-btn');
-    if (checkinBtn) {
-      checkinBtn.addEventListener('click', checkinLocation);
-    }
+    // Прив'язуємо одразу + через rAF як fallback якщо DOM ще не готовий
+    bindCheckinBtn();
+    requestAnimationFrame(bindCheckinBtn);
 
     window.addEventListener('portal:view', function(e) {
-      if (e.detail.view === 'map') refresh();
+      if (e.detail.view !== 'map') return;
+      bindCheckinBtn(); // ще один fallback при навігації на карту
+      refresh();
     });
   }
 
