@@ -60,7 +60,11 @@ const Photos = (() => {
     if (!images.length) return;
 
     const picks = pickPhotos(pool, images.length);
-    if (!picks.length) return;
+    if (!picks.length) {
+      // Пул порожній — просто показуємо полароїди (з поточними фото або placeholder)
+      polaroids.forEach(p => { p.style.opacity = '1'; });
+      return;
+    }
 
     const STAGGER  = 65;
     const FADE_OUT = 160;
@@ -133,5 +137,9 @@ const Photos = (() => {
     });
   }
 
-  return { init, reloadPool, render: (pool) => render(pool !== undefined ? pool : (_pool || [])) };
+  return { init, reloadPool, render: async (pool) => {
+    if (pool !== undefined) return render(pool);
+    if (_pool === null) _pool = await fetchPool();
+    return render(_pool);
+  }};
 })();
