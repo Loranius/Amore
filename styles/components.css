@@ -1510,10 +1510,6 @@
   color: var(--text);
 }
 
-.polaroid:active {
-  transform: scale(0.96) rotate(0deg) !important;
-  box-shadow: 0 4px 12px -4px rgba(74,53,64,0.18);
-}
 
 .polaroid:nth-child(1) { transform: rotate(-3deg); }
 .polaroid:nth-child(2) { transform: rotate(2deg); margin-top: 16px; }

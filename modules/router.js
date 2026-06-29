@@ -99,14 +99,6 @@ const Router = (() => {
       if (e.target.id === 'more-menu-overlay') closeMoreMenu();
     });
 
-    // Полароїд-картки на головній — навігація до відповідних view
-    document.querySelectorAll('[data-view-link]').forEach(link => {
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        showView(link.dataset.viewLink);
-      });
-    });
-
     // ініціалізувати дані для стартового view після логіну
     window.addEventListener('portal:auth', () => {
       const saved = sessionStorage.getItem('portal:lastView');
