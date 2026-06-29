@@ -1499,8 +1499,6 @@
   display: block;
   transition: transform 0.2s cubic-bezier(.34,1.4,.64,1), box-shadow 0.2s ease, opacity 0.48s ease;
   will-change: transform, opacity;
-  /* Починаємо невидимими — JS проявить після завантаження фото */
-  opacity: 0;
 }
 
 [data-theme="dark"] .polaroid {

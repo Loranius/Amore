@@ -67,7 +67,7 @@ const Photos = (() => {
     const FADE_IN  = 400;
 
     // Перевіряємо чи полароїди вже видимі (не перший рендер)
-    const alreadyVisible = parseFloat(getComputedStyle(polaroids[0]).opacity) > 0.1;
+    const alreadyVisible = parseFloat(polaroids[0].style.opacity) > 0.1;
 
     if (alreadyVisible) {
       // 1. Staggered fade-out
@@ -78,6 +78,9 @@ const Photos = (() => {
         }, i * STAGGER);
       });
       await new Promise(r => setTimeout(r, FADE_OUT + (polaroids.length - 1) * STAGGER + 50));
+    } else {
+      // Перший рендер — ставимо opacity:0 щоб підготуватись до fade-in
+      polaroids.forEach(p => { p.style.opacity = '0'; });
     }
 
     // 2. Міняємо src і чекаємо реального завантаження (перш ніж показати)
@@ -99,22 +102,17 @@ const Photos = (() => {
     polaroids.forEach((p, i) => {
       setTimeout(() => {
         p.style.transition = `opacity ${FADE_IN}ms cubic-bezier(.25,.8,.25,1), transform ${FADE_IN}ms cubic-bezier(.25,.8,.25,1)`;
-        // Крадемо поточний rotate з CSS і додаємо translateY для появи знизу
-        const cssRotate = window.getComputedStyle(p).transform;
-        p.style.transform = (cssRotate && cssRotate !== 'none' ? cssRotate + ' ' : '') + 'translateY(12px)';
-        p.style.opacity = '0';
+        p.style.opacity    = '0';
+        p.style.transform  = 'translateY(12px)';
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
-          p.style.opacity = '1';
-          p.style.transform = cssRotate && cssRotate !== 'none' ? cssRotate : '';
+          p.style.opacity   = '1';
+          p.style.transform = '';
+          // Після завершення анімації — прибираємо transition, але opacity:1 ЗАЛИШАЄМО
+          setTimeout(() => {
+            p.style.transition = '';
+          }, FADE_IN + 80);
         }));
-
-        // Прибираємо inline стилі після завершення — CSS знову керує rotation
-        setTimeout(() => {
-          p.style.transition = '';
-          p.style.transform  = '';
-          p.style.opacity    = '';
-        }, FADE_IN + 80);
       }, i * STAGGER);
     });
   }
