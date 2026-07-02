@@ -66,15 +66,28 @@ const Counter = (() => {
     [homeSince, calSince].forEach(el => el && (el.textContent = sinceStr));
   }
 
+  // Плани (type:'other') зберігають статус прямо в description у вигляді
+  // [status:done] — саме так calendar.js позначає план як архівний.
+  // Такі плани мають ігноруватись при виборі "найближчої події" на головній.
+  function isArchivedPlan(ev) {
+    if ((ev.type || 'other') !== 'other') return false;
+    return /\[status:done\]/.test(ev.description || '');
+  }
+
   function renderNextEvent(events) {
     const widget = document.getElementById('next-event-widget');
     if (!widget) return;
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const todayStr = today.toISOString().slice(0, 10);
+    // Локальна дата (а не toISOString, яка переводить у UTC і може
+    // "з'їсти" день ближче до півночі в часових поясах з позитивним зсувом)
+    const todayStr = today.getFullYear() + '-' +
+      String(today.getMonth() + 1).padStart(2, '0') + '-' +
+      String(today.getDate()).padStart(2, '0');
 
-    // Найближча подія з датою >= сьогодні (events вже відсортовані за датою)
-    const data = (events || []).find(e => e.date >= todayStr);
+    // Найближча подія з датою >= сьогодні, що не є завершеним/архівним планом
+    // (events вже відсортовані за датою)
+    const data = (events || []).find(e => e.date >= todayStr && !isArchivedPlan(e));
 
     if (!data) {
       widget.innerHTML = '<div class="next-event-empty">📅 Найближчих подій немає</div>';
