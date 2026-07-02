@@ -1517,13 +1517,6 @@
 .polaroid:nth-child(4) { transform: rotate(-2deg); }
 .polaroid:nth-child(5) { transform: rotate(-2deg); margin-top: 10px; }
 .polaroid:nth-child(6) { transform: rotate(1deg); margin-top: -6px; }
-.polaroid.wide {
-  transform: rotate(-1deg);
-  margin-top: 4px;
-  grid-column: 1 / -1;
-  justify-self: center;
-  width: calc(50% - 8px);
-}
 
 .polaroid-photo {
   width: 100%;
@@ -3094,7 +3087,7 @@
 .wish-row-price { font-family: var(--font-display); font-size: 15px; font-weight: 900; white-space: nowrap; }
 .goal-row { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .goal-row:last-child { border-bottom: none; }
-.goal-pending { background: #FFFDE7; border-radius: var(--radius-sm); padding: 10px; }
+.goal-pending { background: var(--surface-glow); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px; }
 .goal-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .goal-row-name { font-size: 14px; font-weight: 700; }
 .goal-row-desc { font-size: 12px; color: var(--text-muted); }
