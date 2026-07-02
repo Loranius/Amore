@@ -275,7 +275,11 @@ const Wishlist = (() => {
       }
     }
 
+    const photo = item.image_url
+      ? `<div class="wl-card-img"><img src="${esc(item.image_url)}" alt=""></div>` : '';
+
     card.innerHTML = `
+      ${photo}
       <div class="wl-card-body">
         <div class="wl-card-header">${titleEl}${price}</div>
         <div class="wl-card-meta">${priority}</div>
@@ -283,6 +287,7 @@ const Wishlist = (() => {
         ${actions}
       </div>`;
 
+    card.querySelector('.wl-card-img img')?.addEventListener('click', () => openPhotoLightbox(item.image_url));
     card.querySelector('.wl-edit-btn')?.addEventListener('click', () => openEditModal(item));
     card.querySelector('.wl-del-btn')?.addEventListener('click',  () => deleteItem(item.id));
     card.querySelector('.wl-reserve-btn')?.addEventListener('click',  () => reserveItem(item.id, false));

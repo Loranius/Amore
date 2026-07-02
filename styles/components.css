@@ -4525,8 +4525,8 @@ a.wl-archive-title:hover { text-decoration: underline; }
 }
 .dish-edit-btn:hover { opacity: 1; }
 
-/* Wishlist — картка без зображення, компактніша */
-.wl-card .wl-card-img { display: none; } /* ховаємо зображення в компактному режимі */
+/* Wishlist — фото на картці бажання */
+.wl-card-img img { cursor: zoom-in; }
 
 /* Свайп-видалення */
 .wl-del-btn.swipe-visible {
