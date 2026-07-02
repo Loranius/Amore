@@ -9,6 +9,9 @@
 // ============================================================
 const Wishlist = (() => {
 
+  const SUPA_URL = 'https://yicalgoqegluzuagxssk.supabase.co';
+  const WISH_PHOTO_BUCKET = 'wishlist-photos';
+
   let allUsers     = [];
   let currentUser  = null;
   let partnerUser  = null;
@@ -16,6 +19,7 @@ const Wishlist = (() => {
   let wishingFor   = 'me';     // 'me' | 'partner'
   let sizesOwnerId = null;
   let archiveOpen  = false;    // чи розгорнутий архів у «Мої бажання»
+  let pendingPhotoFile = null; // обране з пристрою фото, ще не завантажене
 
   const el  = id => document.getElementById(id);
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
@@ -358,6 +362,56 @@ const Wishlist = (() => {
   }
 
   // ── МОДАЛКИ БАЖАНЬ ────────────────────────────────────────
+  // ── LIGHTBOX (перегляд фото на весь екран, pinch-zoom) ─────
+  function openPhotoLightbox(src) {
+    document.getElementById('wl-lightbox')?.remove();
+
+    const lb = document.createElement('div');
+    lb.id = 'wl-lightbox';
+    lb.className = 'wl-lightbox';
+    lb.innerHTML = `
+      <button class="wl-lb-close" aria-label="Закрити">✕</button>
+      <img class="wl-lb-img" src="${esc(src)}" alt="">`;
+    document.body.appendChild(lb);
+
+    const closeLb = () => {
+      lb.classList.add('wl-lightbox--closing');
+      setTimeout(() => lb.remove(), 180);
+    };
+
+    lb.addEventListener('click', e => {
+      if (e.target === lb || e.target.classList.contains('wl-lb-close')) closeLb();
+    });
+
+    // Закрити свайпом вниз
+    let startY = 0;
+    lb.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+    lb.addEventListener('touchend', e => {
+      if (e.changedTouches[0].clientY - startY > 80) closeLb();
+    }, { passive: true });
+  }
+
+  // ── ФОТО З ПРИСТРОЮ ───────────────────────────────────────
+  // Стискаємо на клієнті (Img.compress з lib/img.js) і вантажимо у Storage.
+  async function uploadWishPhoto(file) {
+    let blob = file, ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
+    try {
+      const out = await Img.compress(file, 1080, 0.78);
+      blob = out.blob; ext = out.ext; contentType = out.contentType;
+    } catch (e) {
+      console.warn('[Wishlist] стиснення не вдалося, вантажимо оригінал:', e);
+    }
+
+    const path = `wish-${currentUser.id}-${Date.now()}.${ext}`;
+    const { error } = await supabase.storage
+      .from(WISH_PHOTO_BUCKET)
+      .upload(path, blob, { upsert: true, contentType });
+    if (error) throw error;
+
+    const { data } = supabase.storage.from(WISH_PHOTO_BUCKET).getPublicUrl(path);
+    return data.publicUrl;
+  }
+
   function openAddModal()       { openWishModal(null); }
   function openEditModal(item)  { openWishModal(item); }
 
@@ -366,6 +420,7 @@ const Wishlist = (() => {
     const root    = el('modal-root');
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
+    pendingPhotoFile = null;
 
     overlay.innerHTML = `
       <div class="modal-card">
@@ -379,8 +434,20 @@ const Wishlist = (() => {
           <input class="fin-inp" id="wm-link" type="url" placeholder="https://..." value="${esc(item?.link||'')}">
         </div>
         <div class="form-field">
-          <label>Фото (URL)</label>
-          <input class="fin-inp" id="wm-img" type="url" placeholder="https://..." value="${esc(item?.image_url||'')}">
+          <label>Фото</label>
+          <div class="wm-photo-picker">
+            <div class="wm-photo-preview" id="wm-photo-preview">
+              ${item?.image_url
+                ? `<img src="${esc(item.image_url)}" alt="">`
+                : `<span class="wm-photo-placeholder">📷</span>`}
+            </div>
+            <div class="wm-photo-actions">
+              <button type="button" class="btn-secondary" id="wm-photo-pick">🖼 Обрати з пристрою</button>
+              <button type="button" class="btn-secondary" id="wm-photo-clear" style="display:${item?.image_url?'inline-flex':'none'}">✕ Прибрати</button>
+              <input type="file" id="wm-photo-file" accept="image/*" style="display:none">
+            </div>
+          </div>
+          <input class="fin-inp" id="wm-img" type="url" placeholder="або встав посилання на фото" value="${esc(item?.image_url||'')}" style="margin-top:8px">
         </div>
         <div class="form-field">
           <label>Орієнтовна ціна, ₴</label>
@@ -408,6 +475,48 @@ const Wishlist = (() => {
     root.innerHTML = '';
     root.appendChild(overlay);
 
+    // ── Фото з пристрою ─────────────────────────────────────
+    const photoPreview = overlay.querySelector('#wm-photo-preview');
+    const photoFileInp = overlay.querySelector('#wm-photo-file');
+    const photoClearBtn = overlay.querySelector('#wm-photo-clear');
+    const urlInp = overlay.querySelector('#wm-img');
+
+    overlay.querySelector('#wm-photo-pick').addEventListener('click', () => photoFileInp.click());
+
+    photoPreview.addEventListener('click', e => {
+      const img = e.target.closest('img');
+      if (img) openPhotoLightbox(img.src);
+    });
+
+    photoFileInp.addEventListener('change', () => {
+      const file = photoFileInp.files[0];
+      if (!file) return;
+      pendingPhotoFile = file;
+      const reader = new FileReader();
+      reader.onload = e => {
+        photoPreview.innerHTML = `<img src="${e.target.result}" alt="">`;
+      };
+      reader.readAsDataURL(file);
+      // Файл з пристрою має пріоритет над посиланням
+      urlInp.value = '';
+      photoClearBtn.style.display = 'inline-flex';
+    });
+
+    photoClearBtn.addEventListener('click', () => {
+      pendingPhotoFile = null;
+      photoFileInp.value = '';
+      urlInp.value = '';
+      photoPreview.innerHTML = `<span class="wm-photo-placeholder">📷</span>`;
+      photoClearBtn.style.display = 'none';
+    });
+
+    urlInp.addEventListener('input', () => {
+      // Якщо користувач вручну вписує посилання — скидаємо обраний файл
+      if (pendingPhotoFile) { pendingPhotoFile = null; photoFileInp.value = ''; }
+      photoClearBtn.style.display = urlInp.value.trim() ? 'inline-flex' : 'none';
+      if (urlInp.value.trim()) photoPreview.innerHTML = `<img src="${esc(urlInp.value.trim())}" alt="">`;
+    });
+
     overlay.querySelector('#wm-cancel').addEventListener('click', () => root.innerHTML='');
     overlay.addEventListener('click', e => { if (e.target===overlay) root.innerHTML=''; });
 
@@ -420,10 +529,25 @@ const Wishlist = (() => {
       saveBtn.disabled = true;
       saveBtn.textContent = 'Збереження...';
 
+      let imageUrl = g('wm-img').value.trim() || null;
+
+      if (pendingPhotoFile) {
+        saveBtn.textContent = 'Завантаження фото…';
+        try {
+          imageUrl = await uploadWishPhoto(pendingPhotoFile);
+        } catch (e) {
+          ErrorBoundary.showToast('Помилка завантаження фото: ' + e.message);
+          saveBtn.disabled = false;
+          saveBtn.textContent = isEdit ? 'Зберегти' : 'Додати';
+          return;
+        }
+        saveBtn.textContent = 'Збереження...';
+      }
+
       const payload = {
         title,
         link:        g('wm-link').value.trim()||null,
-        image_url:   g('wm-img').value.trim()||null,
+        image_url:   imageUrl,
         price:       parseFloat(g('wm-price').value)||null,
         priority:    g('wm-priority').value||null,
         description: g('wm-desc').value.trim()||null,
