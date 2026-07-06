@@ -4894,9 +4894,10 @@ a.wl-archive-title:hover { text-decoration: underline; }
 .sched-mark--work { background: var(--accent); color: #fff; }
 .sched-mark--off  { background: #9c6bb5; color: #fff; }
 .sched-mark--common {
-  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
-  color: #fff;
-  font-size: 11px;
+  background: #FFC94D;
+  color: #FF3B5C;
+  font-size: 13px;
+  box-shadow: 0 0 0 2px #FF3B5C;
 }
 
 /* ── Панель редагування ── */
@@ -4925,21 +4926,23 @@ a.wl-archive-title:hover { text-decoration: underline; }
   box-shadow: 0 0 0 2px var(--accent-bright), var(--shadow-card);
 }
 
-/* ── Спільний вихідний (обоє мають "Х" в один день) ── */
+/* ── Спільний вихідний (обоє мають "Х" в один день) ──
+   Навмисно інший колір (золото + малиновий), не рожевий/бузковий,
+   щоб не зливатись з позначками Р/Х і "сьогодні". */
 .sched-cell--common-off .sched-cell-num {
-  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
-  color: #fff;
+  background: #FFC94D;
+  color: #5B3A00;
   font-weight: 800;
-  box-shadow: 0 0 10px rgba(255, 107, 157, 0.65);
+  box-shadow: 0 0 0 2px #FF3B5C, 0 0 12px rgba(255, 59, 92, 0.55);
 }
 .sched-cell--common-off::after {
   content: '♥';
   position: absolute;
-  top: 0;
-  right: 6px;
-  font-size: 9px;
-  color: var(--accent-bright);
-  line-height: 1;
+  top: -6px;
+  right: 1px;
+  font-size: 16px;
+  color: #FF3B5C;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
 }
 
 /* ═══════════════════════════════════════════════════════════
