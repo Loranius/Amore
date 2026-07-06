@@ -49,6 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
     MapModule.init();
     Shopping.init();
     PhotoCalendar.init();
+    Schedule.init();
   });
 
   // ── SIDEBAR TOGGLE (desktop only) ──

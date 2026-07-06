@@ -7,10 +7,10 @@ const Router = (() => {
   let currentView = 'home';
 
   // Порядок вкладок для визначення напрямку slide
-  const VIEW_ORDER = ['home', 'wishlist', 'budget', 'random', 'calendar', 'capsule', 'question', 'media', 'map', 'shopping', 'photo-calendar'];
+  const VIEW_ORDER = ['home', 'wishlist', 'budget', 'random', 'calendar', 'capsule', 'question', 'media', 'map', 'shopping', 'photo-calendar', 'schedule'];
 
   // Розділи, що живуть під кнопкою «Ще» (мають підсвічувати «Ще»)
-  const MORE_VIEWS = ['calendar', 'capsule', 'question', 'media', 'map', 'random', 'photo-calendar'];
+  const MORE_VIEWS = ['calendar', 'capsule', 'question', 'media', 'map', 'random', 'photo-calendar', 'schedule'];
 
   function updateActiveStates(viewName) {
     document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
