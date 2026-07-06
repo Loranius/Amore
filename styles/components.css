@@ -4872,8 +4872,12 @@ a.wl-archive-title:hover { text-decoration: underline; }
   line-height: 1;
 }
 .sched-cell--today .sched-cell-num {
-  color: var(--accent-deep);
+  background: var(--accent-bright);
+  color: #fff;
   font-weight: 800;
+}
+.sched-cell--today .sched-cell-heart {
+  color: #fff;
 }
 
 .sched-cell-letter {
