@@ -4816,6 +4816,8 @@ a.wl-archive-title:hover { text-decoration: underline; }
 
 /* ═══════════════════════════════════════════════════════════
    ГРАФІК — робочі календарі (Р/Х) обох користувачів
+   Комірка = "розділений чіп": верх — число, низ — смужка
+   з кольором позначки (Р/Х), об'єднані в один елемент.
    ═══════════════════════════════════════════════════════════ */
 .sched-boards {
   display: grid;
@@ -4839,65 +4841,74 @@ a.wl-archive-title:hover { text-decoration: underline; }
 .sched-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 2px;
+  gap: 4px;
 }
 
 .sched-cell {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 3px;
-  padding: 4px 0 6px;
   border: none;
-  background: none;
+  padding: 0;
   border-radius: 10px;
   cursor: pointer;
-  min-height: 54px;
-  transition: background 0.12s;
+  min-height: 44px;
+  overflow: hidden;
+  background: var(--surface-soft);
   font-family: var(--font-body);
+  transition: box-shadow 0.12s;
 }
-.sched-cell:not(.sched-cell--empty):active { background: var(--accent-pale); }
-.sched-cell--empty { cursor: default; pointer-events: none; }
+.sched-cell--empty { background: transparent; cursor: default; pointer-events: none; }
 
 .sched-cell-num {
-  width: 26px;
-  height: 26px;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  gap: 2px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
   line-height: 1;
 }
 .sched-cell--today .sched-cell-num {
-  background: var(--accent);
-  color: #fff;
+  color: var(--accent-deep);
   font-weight: 800;
 }
 
-.sched-mark {
-  width: 22px;
-  height: 22px;
+.sched-cell-letter {
+  height: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 7px;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
   line-height: 1;
   color: transparent;
 }
+.sched-cell-letter--work { background: var(--accent);   color: #fff; }
+.sched-cell-letter--off  { background: #9c6bb5;         color: #fff; }
+
+/* Значки в легенді під графіком (окремі від класів усередині сітки) */
+.sched-mark {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+}
 .sched-mark--work { background: var(--accent); color: #fff; }
 .sched-mark--off  { background: #9c6bb5; color: #fff; }
+
 .sched-mark--common {
   background: #FFC94D;
-  color: #FF3B5C;
+  color: #C9700E;
   font-size: 13px;
-  box-shadow: 0 0 0 2px #FF3B5C;
+  box-shadow: inset 0 0 0 2px #D9A441;
 }
 
 /* ── Панель редагування ── */
@@ -4920,29 +4931,25 @@ a.wl-archive-title:hover { text-decoration: underline; }
   cursor: default;
 }
 .sched-boards:not(.sched-boards--editing) .sched-cell:not(.sched-cell--empty):active {
-  background: none;
+  box-shadow: none;
+}
+.sched-boards--editing .sched-cell:not(.sched-cell--empty):active {
+  box-shadow: inset 0 0 0 2px var(--accent-pale);
 }
 .sched-boards--editing .sched-board {
   box-shadow: 0 0 0 2px var(--accent-bright), var(--shadow-card);
 }
 
 /* ── Спільний вихідний (обоє мають "Х" в один день) ──
-   Навмисно інший колір (золото + малиновий), не рожевий/бузковий,
-   щоб не зливатись з позначками Р/Х і "сьогодні". */
-.sched-cell--common-off .sched-cell-num {
-  background: #FFC94D;
-  color: #5B3A00;
-  font-weight: 800;
-  box-shadow: 0 0 0 2px #FF3B5C, 0 0 12px rgba(255, 59, 92, 0.55);
+   Спокійний акцент: тонка золота рамка навколо комірки +
+   маленьке серце поруч із числом. Без світіння/неону. */
+.sched-cell--common-off {
+  box-shadow: inset 0 0 0 2px #D9A441;
 }
-.sched-cell--common-off::after {
-  content: '♥';
-  position: absolute;
-  top: -6px;
-  right: 1px;
-  font-size: 16px;
-  color: #FF3B5C;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+.sched-cell-heart {
+  font-size: 9px;
+  color: #D9A441;
+  line-height: 1;
 }
 
 /* ═══════════════════════════════════════════════════════════
