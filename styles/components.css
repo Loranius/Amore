@@ -4843,6 +4843,7 @@ a.wl-archive-title:hover { text-decoration: underline; }
 }
 
 .sched-cell {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -4892,6 +4893,54 @@ a.wl-archive-title:hover { text-decoration: underline; }
 }
 .sched-mark--work { background: var(--accent); color: #fff; }
 .sched-mark--off  { background: #9c6bb5; color: #fff; }
+.sched-mark--common {
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
+  color: #fff;
+  font-size: 11px;
+}
+
+/* ── Панель редагування ── */
+.sched-toolbar {
+  display: flex;
+  justify-content: center;
+  padding: 0 0 14px;
+}
+.sched-edit-btn.is-active {
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: var(--shadow-btn);
+}
+
+/* Поки редагування вимкнене — графік лише для перегляду:
+   без курсору-руки і без тап-підсвітки, щоб випадковий дотик
+   (напр. під час свайпу між вкладками) нічого не міняв. */
+.sched-boards:not(.sched-boards--editing) .sched-cell:not(.sched-cell--empty) {
+  cursor: default;
+}
+.sched-boards:not(.sched-boards--editing) .sched-cell:not(.sched-cell--empty):active {
+  background: none;
+}
+.sched-boards--editing .sched-board {
+  box-shadow: 0 0 0 2px var(--accent-bright), var(--shadow-card);
+}
+
+/* ── Спільний вихідний (обоє мають "Х" в один день) ── */
+.sched-cell--common-off .sched-cell-num {
+  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 0 10px rgba(255, 107, 157, 0.65);
+}
+.sched-cell--common-off::after {
+  content: '♥';
+  position: absolute;
+  top: 0;
+  right: 6px;
+  font-size: 9px;
+  color: var(--accent-bright);
+  line-height: 1;
+}
 
 /* ═══════════════════════════════════════════════════════════
    WATCHLIST v4 — Swipe toggle · TMDB Search

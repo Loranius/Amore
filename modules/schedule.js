@@ -5,12 +5,12 @@
 // Діми і Лєни, зберігається одразу в Supabase при кожній зміні.
 // Таблиця: public.work_schedule (date, user_id, mark)
 // ------------------------------------------------------------
-// SQL для Supabase (виконати один раз у SQL editor, ще не створено):
+// SQL для Supabase (вже виконано, лишаю для довідки):
 //
 //   create table public.work_schedule (
 //     id bigint generated always as identity primary key,
 //     date date not null,
-//     user_id text not null references public.users(id) on delete cascade,
+//     user_id integer not null references public.users(id) on delete cascade,
 //     mark text not null check (mark in ('Р','Х')),
 //     updated_at timestamptz not null default now(),
 //     unique (date, user_id)
@@ -44,6 +44,7 @@ const Schedule = (() => {
   let yr = 0, mo = 0;      // поточні рік і місяць
   let users = [];          // [{id, name}] — обидва користувачі, стабільний порядок
   let marks = {};          // { user_id: { 'YYYY-MM-DD': 'Р'|'Х' } }
+  let editMode = false;    // false = лише перегляд (захист від випадкових тапів при свайпі)
   const saving = new Set();// ключі "userId:date" що зараз зберігаються (анти-даблклік)
 
   function monthKey() { return 'sched:' + yr + '-' + pad(mo); }
@@ -101,12 +102,26 @@ const Schedule = (() => {
 
   function renderAll() {
     ensureBoards();
-    users.forEach(u => renderGrid(u.id));
+    const daysInMonth = new Date(yr, mo, 0).getDate();
+    const commonOff = computeCommonOff(daysInMonth);
+    users.forEach(u => renderGrid(u.id, commonOff));
     const lbl = el('sched-month-label');
     if (lbl) lbl.textContent = `${MONTHS_UA[mo - 1]} ${yr}`;
   }
 
-  function renderGrid(userId) {
+  // Дати, коли в ОБОХ користувачів стоїть "Х" — спільний вихідний
+  function computeCommonOff(daysInMonth) {
+    const set = new Set();
+    if (users.length < 2) return set;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = dstr(yr, mo, d);
+      const allOff = users.every(u => (marks[u.id] || {})[ds] === 'Х');
+      if (allOff) set.add(ds);
+    }
+    return set;
+  }
+
+  function renderGrid(userId, commonOff) {
     const grid = el('sched-grid-' + userId);
     if (!grid) return;
     const today = todayStr();
@@ -136,9 +151,12 @@ const Schedule = (() => {
       const ds     = dstr(yr, mo, d);
       const mark   = userMarks[ds] || '';
       const isToday = ds === today;
+      const isCommon = !!(commonOff && commonOff.has(ds));
 
       const cell = document.createElement('button');
-      cell.className = 'sched-cell' + (isToday ? ' sched-cell--today' : '');
+      cell.className = 'sched-cell'
+        + (isToday  ? ' sched-cell--today'      : '')
+        + (isCommon ? ' sched-cell--common-off' : '');
       cell.dataset.date = ds;
       cell.dataset.user = userId;
       cell.innerHTML = `
@@ -152,16 +170,19 @@ const Schedule = (() => {
 
   // ── ЗМІНА ПОЗНАЧКИ (миттєве збереження) ──────────────────────
   async function onCellClick(userId, ds, currentMark) {
+    if (!editMode) return; // захист від випадкових тапів (напр. під час свайпу між вкладками)
+
     const lockKey = userId + ':' + ds;
     if (saving.has(lockKey)) return;
     saving.add(lockKey);
 
     const next = CYCLE[currentMark] ?? 'Р';
 
-    // Оптимістичний рендер одразу, без очікування відповіді сервера
+    // Оптимістичний рендер одразу, без очікування відповіді сервера.
+    // Перемальовуємо ОБИДВІ картки — позначка спільного вихідного залежить від обох.
     if (!marks[userId]) marks[userId] = {};
     if (next) marks[userId][ds] = next; else delete marks[userId][ds];
-    renderGrid(userId);
+    renderAll();
 
     try {
       if (!next) {
@@ -181,11 +202,25 @@ const Schedule = (() => {
       console.error('schedule save error:', e);
       // Відкат UI при помилці збереження
       if (currentMark) marks[userId][ds] = currentMark; else delete (marks[userId] || {})[ds];
-      renderGrid(userId);
+      renderAll();
       alert('Не вдалося зберегти позначку: ' + (e.message || String(e)));
     } finally {
       saving.delete(lockKey);
     }
+  }
+
+  // ── РЕЖИМ РЕДАГУВАННЯ ─────────────────────────────────────────
+  // За замовчуванням графік лише для перегляду — тапи нічого не міняють.
+  // Явне увімкнення захищає від випадкових змін під час свайпу/скролу.
+  function setEditMode(v) {
+    editMode = v;
+    const btn = el('sched-edit-toggle');
+    const boards = el('sched-boards');
+    if (btn) {
+      btn.textContent = v ? '✅ Завершити редагування' : '✏️ Редагувати графік';
+      btn.classList.toggle('is-active', v);
+    }
+    if (boards) boards.classList.toggle('sched-boards--editing', v);
   }
 
   // ── НАВІГАЦІЯ ПО МІСЯЦЯХ ──────────────────────────────────────
@@ -204,6 +239,7 @@ const Schedule = (() => {
       yr = now.getFullYear();
       mo = now.getMonth() + 1;
     }
+    setEditMode(false); // при кожному вході на вкладку — знову режим перегляду
     ensureBoards();
     await loadMonth();
   }
@@ -211,8 +247,10 @@ const Schedule = (() => {
   function init() {
     el('sched-prev')?.addEventListener('click', () => changeMonth(-1));
     el('sched-next')?.addEventListener('click', () => changeMonth(+1));
+    el('sched-edit-toggle')?.addEventListener('click', () => setEditMode(!editMode));
     window.addEventListener('portal:view', e => {
       if (e.detail.view === 'schedule') refresh();
+      else if (editMode) setEditMode(false); // вийшли з вкладки — вимикаємо редагування
     });
   }
 
