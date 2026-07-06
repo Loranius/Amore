@@ -160,8 +160,8 @@ const Schedule = (() => {
       cell.dataset.date = ds;
       cell.dataset.user = userId;
       cell.innerHTML = `
-        <span class="sched-cell-num">${d}</span>
-        <span class="sched-mark${mark === 'Р' ? ' sched-mark--work' : ''}${mark === 'Х' ? ' sched-mark--off' : ''}">${mark}</span>
+        <span class="sched-cell-num">${d}${isCommon ? '<span class="sched-cell-heart">♥</span>' : ''}</span>
+        <span class="sched-cell-letter${mark === 'Р' ? ' sched-cell-letter--work' : ''}${mark === 'Х' ? ' sched-cell-letter--off' : ''}">${mark}</span>
       `;
       cell.addEventListener('click', () => onCellClick(userId, ds, mark));
       grid.appendChild(cell);
