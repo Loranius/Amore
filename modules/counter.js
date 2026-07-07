@@ -52,18 +52,16 @@ const Counter = (() => {
   function paintCounter(startDate) {
     const homeNumber = document.getElementById('counter-number');
     const homeSince  = document.getElementById('counter-since');
-    const calNumber  = document.getElementById('counter-number-cal');
-    const calSince   = document.getElementById('counter-since-cal');
 
     if (!startDate) {
-      [homeNumber, calNumber].forEach(el => el && (el.textContent = '?'));
-      [homeSince, calSince].forEach(el => el && (el.textContent = 'дата ще не вказана'));
+      if (homeNumber) homeNumber.textContent = '?';
+      if (homeSince) homeSince.textContent = 'дата ще не вказана';
       return;
     }
     const daysStr  = daysBetween(startDate).toLocaleString('uk-UA');
     const sinceStr = `з ${formatSinceDate(startDate)}`;
-    [homeNumber, calNumber].forEach(el => el && (el.textContent = daysStr));
-    [homeSince, calSince].forEach(el => el && (el.textContent = sinceStr));
+    if (homeNumber) homeNumber.textContent = daysStr;
+    if (homeSince) homeSince.textContent = sinceStr;
   }
 
   // Плани (type:'other') зберігають статус прямо в description у вигляді

@@ -11,7 +11,6 @@ const Shopping = (() => {
 
   let usersMap   = {};   // id -> name
   let allItems   = [];   // всі товари (активні + куплені)
-  let openedCats = new Set(); // які категорії акордеону розкриті
   let archiveOpen = false;
 
   const CATEGORIES = [
@@ -278,17 +277,15 @@ const Shopping = (() => {
       .filter(cat => byCat[cat] && byCat[cat].length)
       .map(cat => {
         const items = byCat[cat];
-        const isOpen = openedCats.has(cat);
         const rows = items.map(i => itemRowHtml(i)).join('');
         return `
-          <div class="sl-acc-item${isOpen ? ' open' : ''}" data-cat="${esc(cat)}">
-            <button class="sl-acc-head" data-acc-cat="${esc(cat)}">
+          <div class="sl-acc-item" data-cat="${esc(cat)}">
+            <div class="sl-acc-head">
               <span>${esc(cat)}</span>
               <span class="sl-acc-meta">
                 <span class="sl-acc-count">${items.length}</span>
-                <span class="fin-acc-arrow">›</span>
               </span>
-            </button>
+            </div>
             <div class="sl-acc-body">${rows}</div>
           </div>`;
       }).join('');
@@ -343,15 +340,6 @@ const Shopping = (() => {
 
   function bindActiveListEvents() {
     const wrap = el('sl-active-list');
-
-    wrap.querySelectorAll('[data-acc-cat]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const cat = btn.dataset.accCat;
-        if (openedCats.has(cat)) openedCats.delete(cat);
-        else openedCats.add(cat);
-        renderActiveList();
-      });
-    });
 
     wrap.querySelectorAll('[data-toggle-id]').forEach(btn => {
       btn.addEventListener('click', (e) => {

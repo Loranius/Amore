@@ -4209,7 +4209,7 @@ a.wl-archive-title:hover { text-decoration: underline; }
   font-size: 12px; color: var(--text-muted); margin: 0;
 }
 
-/* Акордеон категорій */
+/* Категорії списку покупок — завжди розгорнуті, групування без згортання */
 .sl-accordion { display: flex; flex-direction: column; gap: 8px; margin-bottom: var(--space-3); }
 .sl-acc-item {
   background: var(--surface);
@@ -4221,7 +4221,7 @@ a.wl-archive-title:hover { text-decoration: underline; }
   width: 100%; display: flex; justify-content: space-between; align-items: center;
   padding: 16px 20px; background: none; border: none;
   font-family: var(--font-display); font-size: 15px; font-weight: 700;
-  color: var(--text); cursor: pointer; text-align: left;
+  color: var(--text); text-align: left;
 }
 .sl-acc-meta { display: flex; align-items: center; gap: 8px; }
 .sl-acc-count {
@@ -4229,15 +4229,7 @@ a.wl-archive-title:hover { text-decoration: underline; }
   font-size: 12px; font-weight: 700; border-radius: 999px;
   padding: 2px 9px;
 }
-.sl-acc-item .fin-acc-arrow { transition: transform 0.25s ease; display: inline-block; }
-.sl-acc-item.open .fin-acc-arrow { transform: rotate(90deg); }
 .sl-acc-body {
-  max-height: 0; overflow: hidden;
-  transition: max-height 0.3s ease, padding 0.3s ease;
-  padding: 0 12px;
-}
-.sl-acc-item.open .sl-acc-body {
-  max-height: 2000px;
   padding: 0 12px 8px;
 }
 
