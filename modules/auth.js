@@ -124,7 +124,13 @@ const Auth = (() => {
   function enterApp(user) {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
+    hideBootLoader();
     window.dispatchEvent(new CustomEvent('portal:auth', { detail: { user } }));
+  }
+
+  function hideBootLoader() {
+    const loader = document.getElementById('boot-loader');
+    if (loader) loader.classList.add('hidden');
   }
 
   function logout() {
@@ -172,8 +178,16 @@ const Auth = (() => {
       btn.addEventListener('click', () => handlePinKey(btn.dataset.key));
     });
 
-    tryAutoLogin().then(loggedIn => {
-      if (!loggedIn) loadUsers();
+    tryAutoLogin().then(async loggedIn => {
+      if (!loggedIn) {
+        await loadUsers();
+        hideBootLoader();
+      }
+    }).catch(err => {
+      // Мережева помилка чи збій Supabase під час автологіну —
+      // не даємо завантажувачу зависнути назавжди.
+      console.error('Auth: tryAutoLogin впав з помилкою', err);
+      loadUsers().finally(hideBootLoader);
     });
   }
 

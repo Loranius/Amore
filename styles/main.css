@@ -109,6 +109,29 @@ body {
   padding: var(--space-4);
 }
 
+/* Екран завантаження перед авторизацією — ніжний рожевий фон
+   з пульсуючим серцем по центру, поки триває перевірка сесії. */
+.boot-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+}
+.boot-loader.hidden { display: none; }
+.boot-heart {
+  font-size: 64px;
+  line-height: 1;
+  color: var(--accent-deep);
+  animation: boot-heart-pulse 1.1s ease-in-out infinite;
+}
+@keyframes boot-heart-pulse {
+  0%, 100% { transform: scale(1);   opacity: 0.85; }
+  50%      { transform: scale(1.14); opacity: 1;    }
+}
+
 .app {
   min-height: 100vh;
   display: flex;
