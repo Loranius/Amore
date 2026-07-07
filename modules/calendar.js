@@ -161,11 +161,12 @@ const CalendarModule = (() => {
     // Список
     const upcoming = filtered.filter(e => !e.passed);
     const past     = filtered.filter(e =>  e.passed);
-    if(upcoming.length) renderSection(wrap, null, upcoming);
+    // Найближча подія вже показана в банері вище — не дублюємо її "через X" в списку
+    if(upcoming.length) renderSection(wrap, null, upcoming, false, nextUp?.id);
     if(past.length)     renderSection(wrap, '✓ Минулі', past, true);
   }
 
-  function renderSection(wrap, title, events, muted=false) {
+  function renderSection(wrap, title, events, muted=false, hideBadgeForId=null) {
     const section = document.createElement('div');
     section.className = 'cal-section';
 
@@ -190,7 +191,7 @@ const CalendarModule = (() => {
           <div class="cal-event-meta">
             <span>${dateStr}</span>
             ${ev.yearly ? '<span class="cal-yearly-badge">↻ щороку</span>' : ''}
-            ${!muted ? `<span class="cal-days-badge" style="color:${t.color}">${daysLabel(ev.days)}</span>` : ''}
+            ${(!muted && ev.id !== hideBadgeForId) ? `<span class="cal-days-badge" style="color:${t.color}">${daysLabel(ev.days)}</span>` : ''}
           </div>
         </div>
         <button class="cal-del-btn" data-id="${ev.id}">×</button>`;
@@ -363,7 +364,7 @@ const CalendarModule = (() => {
             ${isArchive
               ? `<button class="plans-action-btn plans-view-btn" data-id="${ev.id}" title="Переглянути">👁</button>
                  <button class="plans-action-btn plans-undo-btn" data-id="${ev.id}" title="Повернути">↩️</button>`
-              : `<button class="plans-action-btn plans-done-btn plans-done-big" data-id="${ev.id}" title="Виконано!">✅ Виконано</button>`}
+              : `<button class="plans-action-btn plans-done-btn plans-done-big" data-id="${ev.id}" title="Позначити виконаним">✅ Позначити виконано</button>`}
             <button class="plans-action-btn plans-del-btn" data-id="${ev.id}" title="Видалити">🗑</button>
           </div>`;
 

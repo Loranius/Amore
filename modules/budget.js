@@ -1,5 +1,5 @@
 // ============================================================
-// FINANCE MODULE v7 — Тумбочка · Ліміт · Спільні цілі
+// FINANCE MODULE v8 — Ліміт · Спільні цілі
 // ============================================================
 const Budget = (() => {
   const el  = id => document.getElementById(id);
@@ -10,250 +10,6 @@ const Budget = (() => {
     const d = new Date(s);
     return isNaN(d) ? s : d.toLocaleDateString('uk-UA',{day:'numeric',month:'short',year:'numeric'});
   };
-
-  // ── ТУМБОЧКА: баланс ──────────────────────────────────────
-  async function fetchTumboTxs() {
-    const {data} = await supabase.from('transactions')
-      .select('amount,type').eq('category','Тумбочка');
-    return data || [];
-  }
-  function tumboTotal(rows) {
-    return (rows||[]).reduce((s,t)=>s+(t.type==='income'?+t.amount:-+t.amount),0);
-  }
-  function paintTumboBalance(rows) {
-    if(el('tumbo-balance')) el('tumbo-balance').textContent = fmtN(tumboTotal(rows));
-  }
-  function refreshTumboBalance() {
-    DataCache.swr('tumbo:txs', fetchTumboTxs, paintTumboBalance);
-  }
-  // Скинути кеш тумбочки після будь-якої транзакції
-  function invalidateTumbo() {
-    DataCache.invalidate('tumbo:txs');
-    DataCache.invalidate('tumbo:journal');
-  }
-
-  // ── ТУМБОЧКА: модалка ─────────────────────────────────────
-  function openTumboModal(balance) {
-    openModal(`
-      <div class="tumbo-modal-header">
-        <div class="tumbo-modal-icon-wrap">🗄️</div>
-        <div>
-          <div class="tumbo-modal-label">Тумбочка</div>
-          <div class="tumbo-modal-balance">${fmtN(balance)}</div>
-        </div>
-      </div>
-
-      <div class="tumbo-mode-tabs" style="margin:16px 0 8px">
-        <button class="tumbo-mode-btn active" data-mode="manual">Поповнити</button>
-        <button class="tumbo-mode-btn" data-mode="income">З доходу</button>
-        <button class="tumbo-mode-btn" data-mode="withdraw">Зняти</button>
-        <button class="tumbo-mode-btn" data-mode="journal">📋</button>
-      </div>
-
-      <!-- Поповнити -->
-      <div class="tumbo-mode-panel active" id="tumbo-panel-manual">
-        <p class="tumbo-hint">Внесіть суму яка вже є у вас відкладена — вона просто додасться до тумбочки.</p>
-        <input type="number" id="tumbo-manual-inp" class="fin-inp fin-inp-big"
-               placeholder="0 ₴" min="0" inputmode="decimal" style="text-align:center">
-        <input type="text" id="tumbo-manual-comment" class="fin-inp" style="margin-top:8px"
-               placeholder="Коментар (необов'язково)">
-        <button class="btn-primary" id="tumbo-manual-btn" style="width:100%;margin-top:14px">
-          Додати до тумбочки
-        </button>
-      </div>
-
-      <!-- З доходу -->
-      <div class="tumbo-mode-panel" id="tumbo-panel-income">
-        <p class="tumbo-hint">Введіть суму доходу — система відкладе вибраний % і запише решту як дохід.</p>
-        <input type="number" id="tumbo-income-inp" class="fin-inp fin-inp-big"
-               placeholder="0 ₴" min="0" inputmode="decimal" style="text-align:center">
-        <div class="tumbo-pct-grid" style="margin-top:12px">
-          <button class="tumbo-pct-btn" data-pct="10">10%</button>
-          <button class="tumbo-pct-btn active" data-pct="15">15%</button>
-          <button class="tumbo-pct-btn" data-pct="20">20%</button>
-          <button class="tumbo-pct-btn" data-pct="50">50%</button>
-        </div>
-        <div class="tumbo-calc-preview" style="margin-top:14px">
-          <span class="tumbo-calc-line"><span>В тумбочку</span><b id="tumbo-calc">0 ₴</b></span>
-          <span class="tumbo-calc-line tumbo-calc-rest"><span>Залишок (дохід)</span><b id="tumbo-rest">0 ₴</b></span>
-        </div>
-        <button class="btn-primary" id="tumbo-confirm" style="width:100%;margin-top:14px">
-          ✓ Підтвердити
-        </button>
-      </div>
-
-      <!-- Зняти -->
-      <div class="tumbo-mode-panel" id="tumbo-panel-withdraw">
-        <p class="tumbo-hint">Вкажіть суму яку хочете зняти з тумбочки — баланс зменшиться.</p>
-        <input type="number" id="tumbo-withdraw-inp" class="fin-inp fin-inp-big"
-               placeholder="0 ₴" min="0" inputmode="decimal" style="text-align:center">
-        <p class="tumbo-hint" style="margin-top:8px;color:var(--text-muted)">Доступно: <b>${fmtN(balance)}</b></p>
-        <input type="text" id="tumbo-withdraw-comment" class="fin-inp" style="margin-top:8px"
-               placeholder="Навіщо знімаємо? (необов'язково)">
-        <button class="btn-secondary" id="tumbo-withdraw-btn"
-                style="width:100%;margin-top:14px;background:#fce4ec;color:#c62828;border-color:#ef9a9a">
-          Зняти з тумбочки
-        </button>
-      </div>
-
-      <!-- Журнал -->
-      <div class="tumbo-mode-panel tumbo-journal-panel" id="tumbo-panel-journal">
-        <div id="tumbo-journal-list">
-          <p class="tumbo-hint" style="text-align:center;padding:20px 0">Завантаження…</p>
-        </div>
-      </div>
-    `);
-    bindTumboModal();
-  }
-
-  function bindTumboModal() {
-    // Перемикач вкладок
-    document.querySelectorAll('.tumbo-mode-btn').forEach(btn=>{
-      btn.addEventListener('click',()=>{
-        document.querySelectorAll('.tumbo-mode-btn').forEach(b=>b.classList.remove('active'));
-        document.querySelectorAll('.tumbo-mode-panel').forEach(p=>p.classList.remove('active'));
-        btn.classList.add('active');
-        el('tumbo-panel-'+btn.dataset.mode)?.classList.add('active');
-        if(btn.dataset.mode==='journal') renderTumboJournal();
-      });
-    });
-
-    // Режим 1: Поповнити
-    const manInp     = el('tumbo-manual-inp');
-    const manComment = el('tumbo-manual-comment');
-    el('tumbo-manual-btn')?.addEventListener('click',async()=>{
-      const v = parseFloat(manInp?.value);
-      if(!v||v<=0){ shake(manInp); return; }
-      const user    = Auth.getCurrentUser();
-      const comment = manComment?.value.trim();
-      await supabase.from('transactions').insert({
-        amount:v, type:'income', category:'Тумбочка',
-        date:today(), description:comment||'Поповнення', created_by:user?.id||null
-      });
-      invalidateTumbo(); closeModal(); refreshTumboBalance();
-    });
-
-    // Режим 2: З доходу
-    const incInp = el('tumbo-income-inp');
-    let curAmt=0, curPct=15;
-    const upd = ()=>{
-      const save = Math.round(curAmt*curPct/100);
-      if(el('tumbo-calc')) el('tumbo-calc').textContent = fmtN(save);
-      if(el('tumbo-rest')) el('tumbo-rest').textContent = fmtN(curAmt-save);
-    };
-    incInp?.addEventListener('input',()=>{ curAmt=parseFloat(incInp.value)||0; upd(); });
-    document.querySelectorAll('.tumbo-pct-btn').forEach(b=>{
-      b.addEventListener('click',()=>{
-        curPct = parseInt(b.dataset.pct)||0;
-        document.querySelectorAll('.tumbo-pct-btn').forEach(x=>x.classList.remove('active'));
-        b.classList.add('active');
-        upd();
-      });
-    });
-    el('tumbo-confirm')?.addEventListener('click',async()=>{
-      const v = parseFloat(incInp?.value);
-      if(!v||v<=0){ shake(incInp); return; }
-      const user    = Auth.getCurrentUser();
-      const toSave  = Math.round(v*curPct/100);
-      await supabase.from('transactions').insert({
-        amount:v, type:'income', category:'Зарплата',
-        date:today(), description:null, created_by:user?.id||null
-      });
-      if(toSave>0) await supabase.from('transactions').insert({
-        amount:toSave, type:'expense', category:'Тумбочка',
-        date:today(), description:'Відкладено з доходу', created_by:user?.id||null
-      });
-      invalidateTumbo(); closeModal(); refreshTumboBalance();
-    });
-
-    // Режим 3: Зняти
-    const wdInp     = el('tumbo-withdraw-inp');
-    const wdComment = el('tumbo-withdraw-comment');
-    el('tumbo-withdraw-btn')?.addEventListener('click',async()=>{
-      const v = parseFloat(wdInp?.value);
-      if(!v||v<=0){ shake(wdInp); return; }
-      const user    = Auth.getCurrentUser();
-      const comment = wdComment?.value.trim();
-      await supabase.from('transactions').insert({
-        amount:v, type:'expense', category:'Тумбочка',
-        date:today(), description:comment||'Зняття', created_by:user?.id||null
-      });
-      invalidateTumbo(); closeModal(); refreshTumboBalance();
-    });
-  }
-
-  // ── ЖУРНАЛ ТУМБОЧКИ ───────────────────────────────────────
-  async function fetchJournal() {
-    const [{data:txs},{data:users}] = await Promise.all([
-      supabase.from('transactions')
-        .select('id,amount,type,date,description,created_by,created_at')
-        .eq('category','Тумбочка')
-        .order('created_at',{ascending:false})
-        .limit(100),
-      Auth.getUsers()
-    ]);
-    return { txs: txs||[], users: users||[] };
-  }
-
-  function paintJournal({txs, users}) {
-    const wrap = el('tumbo-journal-list'); if(!wrap) return;
-
-    if(!txs?.length){
-      wrap.innerHTML='<p class="empty-state" style="padding:20px 0 8px">Журнал ще порожній</p>';
-      return;
-    }
-
-    const userMap = (users||[]).reduce((m,u)=>{ m[u.id]=u.name; return m; },{});
-
-    // Поточний баланс по рядках
-    const sorted = [...txs].reverse();
-    const running = [];
-    let acc = 0;
-    sorted.forEach(t=>{
-      acc += t.type==='income' ? +t.amount : -+t.amount;
-      running.unshift(acc);
-    });
-
-    wrap.innerHTML = txs.map((t,i)=>{
-      const isIn  = t.type==='income';
-      const emoji = isIn ? '📥' : '📤';
-      const sign  = isIn ? '+' : '−';
-      const amtCls= isIn ? 'pos' : 'neg';
-      const bal   = running[i];
-
-      const desc = t.description||'';
-      let label = isIn ? 'Поповнення' : 'Зняття';
-      if(desc==='Відкладено з доходу') label='З доходу';
-
-      const SYSTEM = ['Поповнення','Зняття','Відкладено з доходу','Вже відкладено','Знято з тумбочки'];
-      const comment = SYSTEM.includes(desc) ? '' : desc;
-
-      const who  = userMap[t.created_by] ? ` · ${esc(userMap[t.created_by])}` : '';
-      const date = fmtDate(t.date || t.created_at);
-
-      return `
-        <div class="tumbo-log-row">
-          <div class="tumbo-log-icon">${emoji}</div>
-          <div class="tumbo-log-info">
-            <span class="tumbo-log-label">${label}${who}</span>
-            ${comment?`<span class="tumbo-log-comment">${esc(comment)}</span>`:''}
-            <span class="tumbo-log-date">${date}</span>
-          </div>
-          <div class="tumbo-log-right">
-            <span class="tumbo-log-amount ${amtCls}">${sign}${fmtN(t.amount)}</span>
-            <span class="tumbo-log-balance">${fmtN(bal)}</span>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  function renderTumboJournal() {
-    const wrap = el('tumbo-journal-list'); if(!wrap) return;
-    if(DataCache.get('tumbo:journal') === undefined){
-      wrap.innerHTML = '<p class="tumbo-hint" style="text-align:center;padding:16px 0">Завантаження…</p>';
-    }
-    DataCache.swr('tumbo:journal', fetchJournal, paintJournal);
-  }
 
   // ── ЛІМІТ ─────────────────────────────────────────────────
   async function fetchFreeLimit() {
@@ -331,7 +87,7 @@ const Budget = (() => {
   // ── ГЛОБАЛЬНІ ЦІЛІ ────────────────────────────────────────
   async function fetchGoals() {
     const {data} = await supabase.from('savings_goals')
-      .select('id,name,target_amount,url,description,status,proposed_by')
+      .select('id,name,target_amount,url,description,status,proposed_by,saved_amount')
       .order('created_at',{ascending:false});
     return data || [];
   }
@@ -349,6 +105,9 @@ const Budget = (() => {
     data.forEach(g=>{
       const isPending = g.status==='pending';
       const canVote   = isPending && g.proposed_by!==user?.name;
+      const target    = g.target_amount||0;
+      const saved     = Math.max(0, g.saved_amount||0);
+      const pct       = target>0 ? Math.min(100, Math.round(saved/target*100)) : 0;
       const item = document.createElement('div');
       item.className = `goal-row${isPending?' goal-pending':''}`;
       item.innerHTML = `
@@ -358,13 +117,22 @@ const Budget = (() => {
           ${g.url?`<a class="wish-row-link" href="${esc(g.url)}" target="_blank" rel="noopener">🔗</a>`:''}
           ${isPending?`<span class="goal-status-badge">⏳ Очікує ${esc(g.proposed_by==='Діма'?'Лєни':'Діми')}</span>`:''}
           ${g.status==='confirmed'?'<span class="goal-status-badge goal-confirmed">✅ Підтверджено</span>':''}
+          ${g.status==='confirmed'?`
+            <div class="goal-progress-wrap">
+              <div class="goal-progress-bar"><div class="goal-progress-fill" style="width:${pct}%"></div></div>
+              <div class="goal-progress-meta">
+                <span>${fmtN(saved)} / ${fmtN(target)}</span>
+                <span class="goal-progress-pct">${pct}%</span>
+              </div>
+            </div>`:''}
         </div>
         <div class="goal-row-right">
-          <span class="goal-row-price">${fmtN(g.target_amount||0)}</span>
+          <span class="goal-row-price">${fmtN(target)}</span>
           ${canVote?`<div class="goal-vote-btns">
             <button class="btn-primary" style="padding:5px 12px;font-size:12px" data-confirm="${g.id}">✓</button>
             <button class="btn-secondary" style="padding:5px 12px;font-size:12px" data-reject="${g.id}">✕</button>
           </div>`:''}
+          ${g.status==='confirmed'?`<button class="btn-secondary goal-add-funds-btn" style="padding:5px 12px;font-size:12px" data-addfunds="${g.id}">+ Внести</button>`:''}
           ${(!isPending||g.proposed_by===user?.name)?`<button class="fin-del-btn" data-gid="${g.id}">×</button>`:''}
         </div>`;
       wrap.appendChild(item);
@@ -383,6 +151,31 @@ const Budget = (() => {
       await supabase.from('savings_goals').delete().eq('id',b.dataset.gid);
       DataCache.invalidate('savings_goals'); renderGlobalGoals();
     }));
+    wrap.querySelectorAll('[data-addfunds]').forEach(b=>b.addEventListener('click',()=>{
+      openAddFundsModal(b.dataset.addfunds, data.find(g=>String(g.id)===String(b.dataset.addfunds)));
+    }));
+  }
+
+  function openAddFundsModal(id, goal) {
+    if(!goal) return;
+    const saved  = Math.max(0, goal.saved_amount||0);
+    const target = goal.target_amount||0;
+    openModal(`
+      <h3>Внесок у ціль</h3>
+      <p class="tumbo-hint">«${esc(goal.name)}» — накопичено ${fmtN(saved)} з ${fmtN(target)}</p>
+      <div class="form-field"><label>Сума внеску, ₴</label>
+        <input id="gf-amount" type="number" class="fin-inp fin-inp-big" min="0" placeholder="0 ₴" style="text-align:center"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="gf-cancel">Скасувати</button>
+        <button class="btn-primary" id="gf-save">Додати</button>
+      </div>`);
+    el('gf-cancel')?.addEventListener('click',closeModal);
+    el('gf-save')?.addEventListener('click',async()=>{
+      const v = parseFloat(el('gf-amount')?.value);
+      if(!v||v<=0){ shake(el('gf-amount')); return; }
+      await supabase.from('savings_goals').update({ saved_amount: saved + v }).eq('id', id);
+      DataCache.invalidate('savings_goals'); closeModal(); renderGlobalGoals();
+    });
   }
 
   function bindAddGoal() {
@@ -458,17 +251,12 @@ const Budget = (() => {
 
   // ── РЕФРЕШ ────────────────────────────────────────────────
   function refresh(){
-    refreshTumboBalance();
     renderFreeLimit();
     renderGlobalGoals();
   }
 
   // ── ІНІТ ──────────────────────────────────────────────────
   function init(){
-    el('open-tumbo-modal')?.addEventListener('click',async()=>{
-      const rows = await DataCache.ensure('tumbo:txs', fetchTumboTxs);
-      openTumboModal(tumboTotal(rows));
-    });
     bindAddGoal();
     window.addEventListener('portal:view',e=>{
       if(e.detail.view==='budget'){ bindAddGoal(); refresh(); }

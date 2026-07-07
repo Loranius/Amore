@@ -22,7 +22,18 @@ const MapModule = (() => {
   let mapInitialized = false;
   let mapboxLoaded = false;
   let searchDebounce = null;
+  let activeCatFilter = 'all'; // 'all' | ключ з CATEGORIES
   const DEFAULT_CENTER = [30.5234, 50.4501];
+
+  function directionsUrl(lat, lng) {
+    return 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng;
+  }
+
+  function visiblePins() {
+    return activeCatFilter === 'all'
+      ? allPins
+      : allPins.filter(function(p) { return (p.category || 'visited') === activeCatFilter; });
+  }
 
   // ── Геолокація партнерів ────────────────────────────────────
   // user_id -> { marker: mapboxgl.Marker, popup: mapboxgl.Popup }
@@ -160,12 +171,59 @@ const MapModule = (() => {
     // Миттєво з кешу, потім фонова ревалідація
     DataCache.swr('map_pins', fetchPins, function(pins) {
       allPins = pins || [];
-      markers.forEach(function(m) { m.remove(); });
-      markers = [];
-      allPins.forEach(function(pin) { addMarker(pin); });
-      renderPinCards();
+      renderCatFilterBar();
+      renderMarkersAndCards();
       bindPinSearch();
     });
+  }
+
+  function renderMarkersAndCards() {
+    markers.forEach(function(m) { m.remove(); });
+    markers = [];
+    var pins = visiblePins();
+    pins.forEach(function(pin) { addMarker(pin); });
+    renderPinCards();
+    fitBoundsToPins(pins);
+  }
+
+  // Авто-зум карти під наявні мітки (замість статичного вигляду всієї країни)
+  function fitBoundsToPins(pins) {
+    if (!map || !pins.length) return;
+    if (pins.length === 1) {
+      map.flyTo({ center: [pins[0].lng, pins[0].lat], zoom: 12 });
+      return;
+    }
+    var bounds = new mapboxgl.LngLatBounds();
+    pins.forEach(function(p) { bounds.extend([p.lng, p.lat]); });
+    map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 600 });
+  }
+
+  // Панель фільтрів за категорією
+  function renderCatFilterBar() {
+    var wrap = document.getElementById('map-cat-filter');
+    if (!wrap) return;
+
+    var bar = document.createElement('div');
+    bar.className = 'map-cat-filter-bar';
+
+    var allBtn = document.createElement('button');
+    allBtn.className = 'map-cat-chip' + (activeCatFilter === 'all' ? ' active' : '');
+    allBtn.innerHTML = '🗺️ Всі <span class="map-cat-chip-count">' + allPins.length + '</span>';
+    allBtn.addEventListener('click', function() { activeCatFilter = 'all'; renderMarkersAndCards(); renderCatFilterBar(); });
+    bar.appendChild(allBtn);
+
+    Object.keys(CATEGORIES).forEach(function(key) {
+      var cat = CATEGORIES[key];
+      var count = allPins.filter(function(p) { return (p.category || 'visited') === key; }).length;
+      var btn = document.createElement('button');
+      btn.className = 'map-cat-chip' + (activeCatFilter === key ? ' active' : '');
+      btn.innerHTML = cat.emoji + ' ' + cat.label + ' <span class="map-cat-chip-count">' + count + '</span>';
+      btn.addEventListener('click', function() { activeCatFilter = key; renderMarkersAndCards(); renderCatFilterBar(); });
+      bar.appendChild(btn);
+    });
+
+    wrap.innerHTML = '';
+    wrap.appendChild(bar);
   }
 
   // ---------- Маркер ----------
@@ -195,16 +253,22 @@ const MapModule = (() => {
     if (!wrap) return;
 
     var query = (filterText || '').toLowerCase().trim();
+    var base = visiblePins();
     var pins = query
-      ? allPins.filter(function(p) {
+      ? base.filter(function(p) {
           return (p.title || '').toLowerCase().includes(query) ||
                  (p.review || '').toLowerCase().includes(query) ||
                  (p.note || '').toLowerCase().includes(query);
         })
-      : allPins;
+      : base;
 
     if (!allPins.length) {
       wrap.innerHTML = '<p class="empty-state">Натисни на карту щоб додати місце</p>';
+      return;
+    }
+
+    if (!base.length) {
+      wrap.innerHTML = '<p class="empty-state">У цій категорії поки немає місць 🔍</p>';
       return;
     }
 
@@ -240,7 +304,10 @@ const MapModule = (() => {
           '</div>' +
           (ratingHtml ? '<div class="pin-card-rating">' + ratingHtml + '</div>' : '') +
           (pin.review ? '<p class="pin-card-review">' + escapeHtml(pin.review) + '</p>' : '') +
+          '<a class="pin-route-btn" href="' + directionsUrl(pin.lat, pin.lng) + '" target="_blank" rel="noopener">🧭 Маршрут</a>' +
         '</div>';
+
+      card.querySelector('.pin-route-btn').addEventListener('click', function(e) { e.stopPropagation(); });
 
       card.addEventListener('click', function() {
         if (focusedPinId === pin.id) {
@@ -450,6 +517,7 @@ const MapModule = (() => {
               '<input type="file" id="pin-edit-photo" accept="image/*">' +
             '</div>' +
             '<div class="modal-actions">' +
+              '<a class="btn-secondary" href="' + directionsUrl(pin.lat, pin.lng) + '" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;">🧭 Маршрут</a>' +
               '<button class="btn-secondary pin-delete-action" id="pin-delete-btn">Видалити</button>' +
               '<button class="btn-primary" id="pin-edit-save">Зберегти</button>' +
             '</div>' +

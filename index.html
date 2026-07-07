@@ -199,7 +199,7 @@
     <!-- ---------- Календар + лічильник ---------- -->
     <section class="view hidden" id="view-calendar" data-view="calendar">
       <div class="view-header">
-        <h2 class="display-md">Events</h2>
+        <h2 class="display-md">Події</h2>
         <button class="btn-primary" id="add-event-btn">+ Подія</button>
       </div>
       <div class="card" id="calendar-list">
@@ -224,18 +224,6 @@
 
     <!-- ---------- Фінанси ---------- -->
     <section class="view hidden" id="view-budget" data-view="budget">
-
-      <!-- Тумбочка — головна карта -->
-      <div class="tumbo-hero-card">
-        <div class="tumbo-hero-top">
-          <div class="tumbo-hero-icon">🗄️</div>
-          <div class="tumbo-hero-info">
-            <div class="tumbo-hero-label">Тумбочка</div>
-            <div class="tumbo-hero-amount" id="tumbo-balance">0 ₴</div>
-          </div>
-        </div>
-        <button class="btn-primary tumbo-hero-btn" id="open-tumbo-modal">Поповнити тумбочку</button>
-      </div>
 
       <!-- Ліміт вільного рішення -->
       <div class="card fin-section-card">
@@ -273,7 +261,7 @@
     <!-- ---------- Капсула часу ---------- -->
     <section class="view hidden" id="view-capsule" data-view="capsule">
       <div class="view-header">
-        <h2 class="display-md">Time message</h2>
+        <h2 class="display-md">Капсула часу</h2>
         <button class="btn-primary" id="add-capsule-btn">+ Лист</button>
       </div>
       <div class="card-grid" id="capsule-grid">
@@ -285,7 +273,7 @@
     <!-- ---------- Питання дня ---------- -->
     <section class="view hidden" id="view-question" data-view="question">
       <div class="view-header">
-        <h2 class="display-md">Question</h2>
+        <h2 class="display-md">Питання дня</h2>
       </div>
       <div class="card question-card">
         <p class="eyebrow" id="question-date">—</p>
@@ -345,11 +333,8 @@
         </div>
       </div>
 
-      <div class="map-legend">
-        <span class="map-legend-item"><span class="map-legend-dot visited"></span>Були</span>
-        <span class="map-legend-item"><span class="map-legend-dot restaurant"></span>Ресторан</span>
-        <span class="map-legend-item"><span class="map-legend-dot plan"></span>Плануємо</span>
-        <span class="map-legend-item"><span class="map-legend-dot favorite"></span>Улюблене</span>
+      <div class="map-legend" id="map-cat-filter">
+        <!-- фільтр за категоріями рендериться через map.js -->
       </div>
 
       <div class="map-search-wrap">
@@ -366,7 +351,7 @@
     <section class="view hidden" id="view-media" data-view="media">
 
       <div class="view-header">
-        <h2 class="display-md">Watchlist</h2>
+        <h2 class="display-md">Вотчліст</h2>
       </div>
 
       <!-- Кнопка-тогл: показати / сховати свайп -->
@@ -418,7 +403,7 @@
     </section>
     <section class="view hidden" id="view-random" data-view="random">
       <div class="view-header">
-        <h2 class="display-md">Random</h2>
+        <h2 class="display-md">Рандом</h2>
       </div>
 
       <!-- Рандомайзер дій -->
@@ -438,6 +423,7 @@
           <h3 class="display-md-sm">Що приготувати</h3>
           <button class="btn-secondary" id="add-dish-btn">+ Страва</button>
         </div>
+        <div class="dish-cat-tabs" id="dish-cat-tabs"></div>
         <div class="dish-roll-area">
           <div class="dish-result" id="dish-result">Натисни «Random»</div>
           <button class="btn-primary" id="roll-dish-btn">🎲 Random</button>

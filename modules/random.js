@@ -8,6 +8,14 @@
 const RandomModule = (() => {
 
   let dishes = [];
+  let activeDishCat = 'all'; // 'all' | 'meat' | 'vegan' | 'fast' | 'other'
+
+  const DISH_CATS = {
+    meat:  { label: '🥩 М\'ясне',  color: '#C45B79' },
+    vegan: { label: '🥦 Вега',     color: '#5FA777' },
+    fast:  { label: '⚡ Швидке',   color: '#D9A441' },
+    other: { label: '🍽️ Інше',    color: '#9B6EA8' },
+  };
 
   function escapeHtml(str) {
     const div = document.createElement('div');
@@ -138,34 +146,67 @@ const RandomModule = (() => {
   // РАНДОМАЙЗЕР СТРАВ
   // ============================================================
   async function loadDishes() {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('dishes')
-      .select('id, title')
+      .select('id, title, category')
       .order('id', { ascending: false });
 
     if (error) {
-      console.error('Помилка завантаження страв:', error);
-      return [];
+      // Колонка category ще не додана в Supabase — працюємо без категорій,
+      // поки не виконано: alter table dishes add column category text default 'other';
+      const fallback = await supabase.from('dishes').select('id, title').order('id', { ascending: false });
+      if (fallback.error) {
+        console.error('Помилка завантаження страв:', fallback.error);
+        return [];
+      }
+      return (fallback.data || []).map(d => ({ ...d, category: 'other' }));
     }
-    return data || [];
+    return (data || []).map(d => ({ ...d, category: d.category || 'other' }));
+  }
+
+  function visibleDishes() {
+    return activeDishCat === 'all'
+      ? dishes
+      : dishes.filter(d => (d.category || 'other') === activeDishCat);
+  }
+
+  function renderDishCatTabs() {
+    const wrap = document.getElementById('dish-cat-tabs');
+    if (!wrap) return;
+    const defs = [{ key: 'all', label: '🎲 Всі' }, ...Object.entries(DISH_CATS).map(([key, c]) => ({ key, label: c.label }))];
+    wrap.innerHTML = defs.map(d => {
+      const count = d.key === 'all' ? dishes.length : dishes.filter(x => (x.category || 'other') === d.key).length;
+      return `<button class="dish-cat-tab${activeDishCat === d.key ? ' active' : ''}" data-cat="${d.key}">${d.label} <span class="dish-cat-count">${count}</span></button>`;
+    }).join('');
+    wrap.querySelectorAll('[data-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeDishCat = btn.dataset.cat;
+        renderDishCatTabs();
+        renderDishes(visibleDishes());
+      });
+    });
   }
 
   function renderDishes(items) {
     const wrap = document.getElementById('dish-list');
 
     if (!items.length) {
-      wrap.innerHTML = '<p class="empty-state">Пул страв порожній. Додай свої улюблені!</p>';
+      wrap.innerHTML = dishes.length
+        ? '<p class="empty-state">У цій категорії поки порожньо.</p>'
+        : '<p class="empty-state">Пул страв порожній. Додай свої улюблені!</p>';
       return;
     }
 
     wrap.innerHTML = '';
     items.forEach(d => {
+      const cat = DISH_CATS[d.category] || DISH_CATS.other;
       const row = document.createElement('div');
       row.className = 'dish-row';
       row.innerHTML = `
+        <span class="dish-cat-dot" style="background:${cat.color}" title="${cat.label}"></span>
         <p class="dish-title">${escapeHtml(d.title)}</p>
         <div class="dish-row-actions">
-          <button class="dish-edit-btn" data-edit-dish-id="${d.id}" data-title="${escapeHtml(d.title)}" title="Редагувати">✏️</button>
+          <button class="dish-edit-btn" data-edit-dish-id="${d.id}" data-title="${escapeHtml(d.title)}" data-cat="${d.category || 'other'}" title="Редагувати">✏️</button>
           <button class="delete-btn" data-delete-dish-id="${d.id}" title="Видалити">×</button>
         </div>
       `;
@@ -176,11 +217,11 @@ const RandomModule = (() => {
       btn.addEventListener('click', () => deleteDish(btn.dataset.deleteDishId));
     });
     wrap.querySelectorAll('[data-edit-dish-id]').forEach(btn => {
-      btn.addEventListener('click', () => openEditDishModal(btn.dataset.editDishId, btn.dataset.title));
+      btn.addEventListener('click', () => openEditDishModal(btn.dataset.editDishId, btn.dataset.title, btn.dataset.cat));
     });
   }
 
-  function openEditDishModal(id, currentTitle) {
+  function openEditDishModal(id, currentTitle, currentCat) {
     const root = document.getElementById('modal-root');
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -191,18 +232,38 @@ const RandomModule = (() => {
           <label>Назва</label>
           <input type="text" id="edit-dish-title" class="fin-inp" value="${currentTitle}">
         </div>
+        <div class="form-field">
+          <label>Категорія</label>
+          <div class="dish-cat-chips" id="edit-dish-cat-chips">
+            ${Object.entries(DISH_CATS).map(([key, c]) =>
+              `<button type="button" class="dish-cat-chip${key === (currentCat || 'other') ? ' active' : ''}" data-cat="${key}" style="${key === (currentCat || 'other') ? `border-color:${c.color};background:${c.color};color:#fff` : ''}">${c.label}</button>`
+            ).join('')}
+          </div>
+        </div>
         <div class="modal-actions">
           <button class="btn-secondary" id="edit-dish-cancel">Скасувати</button>
           <button class="btn-primary" id="edit-dish-save">Зберегти</button>
         </div>
       </div>`;
     root.innerHTML = ''; root.appendChild(overlay);
+
+    let selectedCat = currentCat || 'other';
+    overlay.querySelectorAll('.dish-cat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        overlay.querySelectorAll('.dish-cat-chip').forEach(c => { c.classList.remove('active'); c.removeAttribute('style'); });
+        chip.classList.add('active');
+        const c = DISH_CATS[chip.dataset.cat];
+        chip.style.cssText = `border-color:${c.color};background:${c.color};color:#fff`;
+        selectedCat = chip.dataset.cat;
+      });
+    });
+
     overlay.querySelector('#edit-dish-cancel').addEventListener('click', () => root.innerHTML = '');
     overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
     overlay.querySelector('#edit-dish-save').addEventListener('click', async () => {
       const title = overlay.querySelector('#edit-dish-title').value.trim();
       if (!title) return;
-      const { error } = await supabase.from('dishes').update({ title }).eq('id', id);
+      const { error } = await supabase.from('dishes').update({ title, category: selectedCat }).eq('id', id);
       if (error) { alert('Помилка збереження'); return; }
       root.innerHTML = '';
       DataCache.invalidate('dishes');
@@ -212,17 +273,24 @@ const RandomModule = (() => {
 
   function rollDish() {
     const resultEl = document.getElementById('dish-result');
-    if (!dishes.length) {
-      resultEl.textContent = 'Пул страв порожній';
+    const pool = visibleDishes();
+    if (!pool.length) {
+      resultEl.textContent = dishes.length ? 'У цій категорії порожньо' : 'Пул страв порожній';
       return;
     }
-    const pick = dishes[Math.floor(Math.random() * dishes.length)];
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    const cat = DISH_CATS[pick.category] || DISH_CATS.other;
     resultEl.textContent = pick.title;
+    resultEl.title = cat.label;
     resultEl.classList.add('rolled');
   }
 
   function refreshDishes() {
-    DataCache.swr('dishes', loadDishes, (items) => { dishes = items || []; renderDishes(dishes); });
+    DataCache.swr('dishes', loadDishes, (items) => {
+      dishes = items || [];
+      renderDishCatTabs();
+      renderDishes(visibleDishes());
+    });
   }
 
   async function deleteDish(id) {
@@ -248,6 +316,14 @@ const RandomModule = (() => {
             <label for="dish-title">Назва страви</label>
             <input type="text" id="dish-title" placeholder="Наприклад, Паста болоньєзе">
           </div>
+          <div class="form-field">
+            <label>Категорія</label>
+            <div class="dish-cat-chips" id="add-dish-cat-chips">
+              ${Object.entries(DISH_CATS).map(([key, c], i) =>
+                `<button type="button" class="dish-cat-chip${i === 0 ? ' active' : ''}" data-cat="${key}" style="${i === 0 ? `border-color:${c.color};background:${c.color};color:#fff` : ''}">${c.label}</button>`
+              ).join('')}
+            </div>
+          </div>
           <div class="modal-actions">
             <button class="btn-secondary" id="dish-cancel">Скасувати</button>
             <button class="btn-primary" id="dish-save">Зберегти</button>
@@ -256,14 +332,25 @@ const RandomModule = (() => {
       </div>
     `;
 
+    let selectedCat = Object.keys(DISH_CATS)[0];
+    document.querySelectorAll('#add-dish-cat-chips .dish-cat-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('#add-dish-cat-chips .dish-cat-chip').forEach(c => { c.classList.remove('active'); c.removeAttribute('style'); });
+        chip.classList.add('active');
+        const c = DISH_CATS[chip.dataset.cat];
+        chip.style.cssText = `border-color:${c.color};background:${c.color};color:#fff`;
+        selectedCat = chip.dataset.cat;
+      });
+    });
+
     document.getElementById('dish-cancel').addEventListener('click', closeModal);
     document.getElementById('dish-modal-overlay').addEventListener('click', (e) => {
       if (e.target.id === 'dish-modal-overlay') closeModal();
     });
-    document.getElementById('dish-save').addEventListener('click', saveDish);
+    document.getElementById('dish-save').addEventListener('click', () => saveDish(selectedCat));
   }
 
-  async function saveDish() {
+  async function saveDish(category) {
     const title = document.getElementById('dish-title').value.trim();
     if (!title) {
       alert('Вкажи назву страви');
@@ -274,6 +361,7 @@ const RandomModule = (() => {
 
     const { error } = await supabase.from('dishes').insert({
       title,
+      category: category || 'other',
       created_by: user ? user.id : null
     });
 

@@ -1266,6 +1266,37 @@
   flex-shrink: 0;
 }
 
+.dish-cat-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.dish-cat-tab {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.dish-cat-tab:hover { border-color: var(--accent-bright); color: var(--text); }
+.dish-cat-tab.active {
+  background: var(--accent-bright);
+  border-color: var(--accent-bright);
+  color: #fff;
+}
+.dish-cat-count { font-size: 10px; opacity: 0.75; }
+
 .dish-roll-area {
   text-align: center;
   margin-bottom: var(--space-3);
@@ -1828,6 +1859,63 @@
   flex-wrap: wrap;
   margin-bottom: var(--space-3);
 }
+
+/* ── Фільтр за категоріями ── */
+.map-cat-filter-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.map-cat-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.map-cat-chip:hover { border-color: var(--accent-bright); color: var(--text); }
+
+.map-cat-chip.active {
+  background: var(--accent-bright);
+  border-color: var(--accent-bright);
+  color: #fff;
+  box-shadow: var(--shadow-btn);
+}
+
+.map-cat-chip-count {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+/* ── Кнопка маршруту ── */
+.pin-route-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent-deep);
+  background: var(--surface-soft);
+  border: none;
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.pin-route-btn:hover { background: var(--accent-pale); }
 
 .map-legend-item {
   display: flex;
@@ -2507,73 +2595,6 @@
 }
 .pocket-quota-input:focus { border-color: var(--accent); }
 
-/* Тумбочка */
-.tumbo-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 14px;
-}
-.tumbo-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; }
-.tumbo-sub { font-size: 12px; color: var(--text-muted); }
-.tumbo-total {
-  font-family: var(--font-display);
-  font-size: 24px;
-  font-weight: 900;
-  color: #388E3C;
-}
-.tumbo-income-row { display: flex; gap: 8px; margin-bottom: 0; }
-.tumbo-input {
-  flex: 1;
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-sm);
-  padding: 11px 14px;
-  font-family: var(--font-body);
-  font-size: 16px; /* iOS no-zoom */
-  color: var(--text);
-  background: var(--surface);
-  outline: none;
-}
-.tumbo-input:focus { border-color: var(--accent); }
-.tumbo-btn { white-space: nowrap; padding: 11px 18px; }
-.tumbo-modal {
-  display: none;
-  margin-top: 14px;
-  background: var(--surface-soft);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  animation: fadeSlideIn 0.2s ease;
-}
-.tumbo-modal.visible { display: block; }
-.tumbo-modal-title { font-family: var(--font-display); font-size: 15px; font-weight: 700; margin-bottom: 4px; color: #388E3C; }
-.tumbo-modal-desc { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; }
-.tumbo-opts { display: flex; gap: 6px; margin-bottom: 12px; }
-.tumbo-opt {
-  flex: 1;
-  padding: 8px 0;
-  border: 1.5px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.tumbo-opt.active { border-color: #4CAF50; background: #E8F5E9; color: #388E3C; }
-.tumbo-calc {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  background: var(--surface);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  margin-bottom: 12px;
-}
-.tumbo-calc-label { font-size: 12px; color: var(--text-muted); }
-.tumbo-calc-amount { font-family: var(--font-display); font-size: 20px; font-weight: 900; color: #388E3C; }
-
 /* Трешхолд */
 .threshold-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; margin-bottom: 2px; }
 .threshold-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 10px; }
@@ -2625,137 +2646,6 @@
    FINANCE v6 — Тумбочка · Ліміт · Цілі
    ═══════════════════════════════════════════════════════════ */
 
-/* ── Тумбочка: hero-карта ── */
-.tumbo-hero-card {
-  background: linear-gradient(135deg, var(--accent-bright), var(--accent-deep));
-  border-radius: var(--radius-lg);
-  padding: 24px 20px 20px;
-  margin-bottom: 16px;
-  box-shadow: 0 8px 24px -6px rgba(196,91,121,0.35);
-}
-.tumbo-hero-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-.tumbo-hero-icon {
-  font-size: 40px;
-  line-height: 1;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.15));
-}
-.tumbo-hero-label {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.8);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 2px;
-}
-.tumbo-hero-amount {
-  font-family: var(--font-display);
-  font-size: 36px;
-  font-weight: 900;
-  color: #fff;
-  line-height: 1.1;
-}
-.tumbo-hero-btn {
-  background: rgba(255,255,255,0.22) !important;
-  color: #fff !important;
-  border: 1.5px solid rgba(255,255,255,0.45) !important;
-  font-size: 15px !important;
-  backdrop-filter: blur(6px);
-  transition: background 0.15s;
-}
-.tumbo-hero-btn:active { background: rgba(255,255,255,0.32) !important; }
-
-/* ── Тумбочка: модалка ── */
-.tumbo-modal-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  padding-bottom: 16px;
-  border-bottom: 1.5px solid var(--line);
-  margin-bottom: 4px;
-}
-.tumbo-modal-icon-wrap { font-size: 34px; line-height: 1; }
-.tumbo-modal-label {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin-bottom: 2px;
-}
-.tumbo-modal-balance {
-  font-family: var(--font-display);
-  font-size: 26px;
-  font-weight: 900;
-  color: #2E7D32;
-}
-
-/* ── Журнал тумбочки ── */
-.tumbo-journal-panel {
-  max-height: 52vh;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  margin: 0 calc(-1 * var(--space-5));      /* виходимо за padding картки */
-  padding: 0 var(--space-5);
-}
-.tumbo-log-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--line);
-}
-.tumbo-log-row:last-child { border-bottom: none; }
-.tumbo-log-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
-.tumbo-log-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.tumbo-log-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tumbo-log-comment {
-  font-size: 12px;
-  color: var(--accent-deep);
-  font-style: italic;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.tumbo-log-date { font-size: 11px; color: var(--text-muted); }
-.tumbo-log-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  flex-shrink: 0;
-}
-.tumbo-log-amount {
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 800;
-}
-.tumbo-log-amount.pos { color: #2E7D32; }
-.tumbo-log-amount.neg { color: var(--danger); }
-.tumbo-log-balance {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
 /* ── Секційні картки (ліміт, цілі) ── */
 .fin-section-card {
   padding: 18px 16px 20px;
@@ -2788,10 +2678,6 @@
   font-size: 13px !important;
   margin-top: 2px;
 }
-
-/* ── tumbo-mode-panel: default hidden ── */
-.tumbo-mode-panel { display: none; }
-.tumbo-mode-panel.active { display: block; }
 
 /* ════════════════════════════════════════════════════════════
    Нижче — старий Finance CSS (залишено для зворотної сумісності
@@ -2840,7 +2726,6 @@
 .fin-action-icon { font-size: 22px; }
 .fin-action-income  { background: #E8F5E9; color: #2E7D32; }
 .fin-action-expense { background: #FFEBEE; color: #C62828; }
-.fin-action-tumbo   { background: var(--surface-soft); color: var(--text); }
 
 /* ── Календар ── */
 .fin-cal-card { padding: 16px; margin-bottom: 16px; }
@@ -2945,15 +2830,6 @@
   padding-bottom: 14px;
 }
 
-/* ── Кнопка в модалці тумбочки — звичайна, без sticky ── */
-.tumbo-mode-panel .btn-primary {
-  position: static;
-  margin-top: 14px;
-  margin-bottom: 0;
-  padding-bottom: 14px;
-  box-shadow: none;
-}
-
 /* ── Chips категорій ── */
 .fin-cat-chips {
   display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px;
@@ -3001,52 +2877,11 @@
 }
 .fin-del-btn:hover { color: var(--danger); }
 
-/* ── Тумбочка ── */
+/* ── Ліміт ── */
 .fin-row-gap { display: flex; gap: 8px; margin-bottom: 0; }
-
-/* Тумбочка — режими */
-.tumbo-mode-tabs {
-  display: flex; gap: 6px; margin-bottom: 16px;
-}
-.tumbo-mode-btn {
-  flex: 1; padding: 10px 0;
-  border: 1.5px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--surface); font-family: var(--font-body);
-  font-size: 13px; font-weight: 700; color: var(--text-muted);
-  cursor: pointer; transition: all 0.15s;
-}
-.tumbo-mode-btn.active {
-  border-color: #4CAF50; background: #E8F5E9; color: #2E7D32;
-}
 .tumbo-hint {
   font-size: 12px; color: var(--text-muted); margin-bottom: 14px; line-height: 1.5;
 }
-.tumbo-pct-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 8px; margin-bottom: 14px;
-}
-.tumbo-pct-btn {
-  padding: 12px 0; border: 1.5px solid var(--line); border-radius: var(--radius-sm);
-  background: var(--surface); font-family: var(--font-body);
-  font-size: 15px; font-weight: 700; color: var(--text-muted);
-  cursor: pointer; transition: all 0.15s;
-}
-.tumbo-pct-btn.active { border-color: #4CAF50; background: #E8F5E9; color: #2E7D32; }
-.tumbo-calc-row { margin-top: 4px; }
-.tumbo-calc-preview {
-  background: var(--surface-soft); border-radius: var(--radius-sm);
-  padding: 12px 14px; display: flex; flex-direction: column; gap: 8px;
-}
-.tumbo-calc-line {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 14px;
-}
-.tumbo-calc-line b { font-family: var(--font-display); font-size: 18px; font-weight: 900; }
-.tumbo-calc-amt { color: #2E7D32; }
-.tumbo-calc-rest { color: var(--text-muted); }
-.tumbo-calc-rest b { font-size: 16px; color: var(--text-muted); }
-
-/* ── Ліміт ── */
 .fin-card-sub { font-size: 12px; color: var(--text-muted); }
 .fin-limit-current { font-size: 13px; margin: 8px 0 14px; }
 .fin-slider {
@@ -3096,6 +2931,24 @@
 .goal-row-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
 .goal-row-price { font-family: var(--font-display); font-size: 15px; font-weight: 900; }
 .goal-vote-btns { display: flex; gap: 6px; }
+.goal-add-funds-btn { padding: 5px 12px !important; font-size: 12px !important; }
+
+/* ── Прогрес накопичення на ціль ── */
+.goal-progress-wrap { width: 100%; margin-top: 6px; }
+.goal-progress-bar {
+  width: 100%; height: 8px; border-radius: 999px;
+  background: var(--surface-soft); overflow: hidden;
+}
+.goal-progress-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent-bright), var(--accent-deep));
+  transition: width 0.4s ease;
+}
+.goal-progress-meta {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 4px; font-size: 11px; color: var(--text-muted);
+}
+.goal-progress-pct { font-weight: 800; color: var(--accent-deep); }
 
 @keyframes fadeSlideIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
 @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 60%{transform:translateX(6px)} }
@@ -4501,8 +4354,19 @@ a.wl-archive-title:hover { text-decoration: underline; }
 /* Рядок страви з кнопкою редагування */
 .dish-row { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
 .dish-row:last-child { border-bottom: none; }
+.dish-cat-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .dish-title { flex: 1; margin: 0; font-size: 15px; }
 .dish-row-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+/* Chips вибору категорії у формі додавання/редагування страви */
+.dish-cat-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dish-cat-chip {
+  padding: 7px 12px; border: 1.5px solid var(--line);
+  border-radius: 999px; background: var(--surface);
+  font-family: var(--font-body); font-size: 12px; font-weight: 700;
+  color: var(--text-muted); cursor: pointer; transition: all 0.15s;
+  white-space: nowrap;
+}
 .dish-edit-btn {
   background: none; border: none; font-size: 15px;
   cursor: pointer; padding: 2px 6px; border-radius: 6px;
