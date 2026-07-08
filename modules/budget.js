@@ -5,11 +5,12 @@ const Budget = (() => {
   const el  = id => document.getElementById(id);
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
   const fmtN = n => Math.round(Math.abs(n)).toLocaleString('uk-UA')+' ₴';
-  const today = () => new Date().toISOString().slice(0,10);
-  const fmtDate = s => {
-    const d = new Date(s);
-    return isNaN(d) ? s : d.toLocaleDateString('uk-UA',{day:'numeric',month:'short',year:'numeric'});
-  };
+
+  // Актуальна пропозиція ліміту. Обробники кнопок ✓/✕ прив'язуються
+  // лише один раз (dataset.bound), тому читають значення звідси,
+  // а не з замикання першого рендеру — інакше підтвердження другої
+  // пропозиції записувало б суму з першої (старий баг).
+  let currentProposal = null;
 
   // ── ЛІМІТ ─────────────────────────────────────────────────
   async function fetchFreeLimit() {
@@ -24,6 +25,7 @@ const Budget = (() => {
     const limit    = fl?.limit_value||0;
     const proposal = fl?.proposal_value
       ? {value:fl.proposal_value, proposedBy:fl.proposed_by} : null;
+    currentProposal = proposal;
 
     if(el('free-limit-current'))
       el('free-limit-current').textContent = limit>0 ? fmtN(limit) : 'не встановлено';
@@ -63,8 +65,9 @@ const Budget = (() => {
       if(propConf&&!propConf.dataset.bound){
         propConf.dataset.bound='1';
         propConf.addEventListener('click',async()=>{
+          if(!currentProposal) return;
           await supabase.from('free_limit').update({
-            limit_value:proposal.value, proposal_value:null, proposed_by:null,
+            limit_value:currentProposal.value, proposal_value:null, proposed_by:null,
             tg_chat_id:null, tg_message_id:null
           }).eq('id',1);
           DataCache.invalidate('free_limit'); renderFreeLimit();

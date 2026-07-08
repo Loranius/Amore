@@ -13,7 +13,6 @@ const Swipe = (() => {
   var currentIndex = 0;
   var page = 1;
   var isLoading = false;
-  var initialized = false;
 
   // ---------- TMDB ----------
   async function fetchTmdb(endpoint) {
@@ -462,26 +461,20 @@ const Swipe = (() => {
       btn.addEventListener('click', function() {
         activeType = btn.dataset.swipeType || 'movie';
         isLoading = false;
-        initialized = false;
         renderTypeTabs();
         initStack();
       });
     });
 
     window.addEventListener('portal:auth', function() {
-      initialized = false;
       isLoading = false;
       cards = [];
     });
 
-    window.addEventListener('portal:view', function(e) {
-      if (e.detail.view === 'media') {
-        if (!initialized) {
-          initialized = true;
-          refresh();
-        }
-      }
-    });
+    // Стек НЕ вантажиться при вході у «Вотчліст» — панель свайпу
+    // за замовчуванням згорнута, тож TMDB-запити (до 12 сторінок)
+    // робимо лише коли юзер реально відкриває панель:
+    // Media.bindSwipeToggle → Swipe.refresh().
   }
 
   return { init: init, refresh: refresh };

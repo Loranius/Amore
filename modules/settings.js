@@ -79,8 +79,7 @@ const Settings = (() => {
   // ============================================================
 
   function closeModal() {
-    const root = el('modal-root');
-    if (root) root.innerHTML = '';
+    closeModalAnimated(); // плавне закриття, як у решті модулів
   }
 
   async function openSettingsModal() {

@@ -170,10 +170,12 @@ const CalendarModule = (() => {
     const section = document.createElement('div');
     section.className = 'cal-section';
 
-    const hdr = document.createElement('div');
-    hdr.className = 'cal-section-title' + (muted?' cal-muted':'');
-    hdr.textContent = title;
-    section.appendChild(hdr);
+    if (title) {
+      const hdr = document.createElement('div');
+      hdr.className = 'cal-section-title' + (muted?' cal-muted':'');
+      hdr.textContent = title;
+      section.appendChild(hdr);
+    }
 
     events.forEach(ev => {
       const t   = TYPES[ev.type]||TYPES.other;

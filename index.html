@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="styles/main.css?v=10">
-<link rel="stylesheet" href="styles/components.css?v=31">
+<link rel="stylesheet" href="styles/components.css?v=32">
 <!-- Темна тема: застосовуємо ДО рендеру, щоб уникнути блимання -->
 <script>
   (function(){
@@ -194,7 +194,7 @@
         </div>
       </div>
 
-    </section>    </section>
+    </section>
 
     <!-- ---------- Календар + лічильник ---------- -->
     <section class="view hidden" id="view-calendar" data-view="calendar">
@@ -577,14 +577,18 @@
 function closeModalAnimated(rootId) {
   var root = document.getElementById(rootId || 'modal-root');
   if (!root) return;
-  var overlay = root.querySelector('.modal-overlay');
-  if (!overlay) { root.innerHTML = ''; return; }
+  var overlay = root.querySelector('.modal-overlay:not(.is-closing)');
+  if (!overlay) return;
   overlay.classList.add('is-closing');
-  // Fallback: якщо animationend не стріляє (напр. reduced-motion) — прибираємо через 200ms
-  var fallback = setTimeout(function() { root.innerHTML = ''; }, 220);
+  // ВАЖЛИВО: прибираємо лише САМ overlay, а не root.innerHTML = ''.
+  // Інакше нова модалка, відкрита одразу після закриття старої
+  // (напр. «Деталі фільму» → «Відгук»), зникала б через 200мс
+  // разом зі старою — це був реальний баг.
+  // Fallback: якщо animationend не стріляє (напр. reduced-motion) — прибираємо через 250ms
+  var fallback = setTimeout(function() { overlay.remove(); }, 250);
   overlay.addEventListener('animationend', function() {
     clearTimeout(fallback);
-    root.innerHTML = '';
+    overlay.remove();
   }, { once: true });
 }
 </script>
@@ -593,29 +597,28 @@ function closeModalAnimated(rootId) {
 <script defer src="lib/cache.js?v=3"></script>
 <script defer src="lib/img.js?v=swr"></script>
 <script defer src="modules/auth.js?v=swr"></script>
-<script defer src="modules/router.js?v=swr"></script>
+<script defer src="modules/router.js?v=swr2"></script>
 <script defer src="modules/counter.js?v=swr3"></script>
-<script defer src="modules/week-widget.js?v=1"></script>
+<script defer src="modules/week-widget.js?v=2"></script>
 <script defer src="modules/greeting.js?v=swr"></script>
 <script defer src="modules/photos.js?v=swr3"></script>
-<script defer src="modules/calendar.js?v=desktop3"></script>
-<script defer src="modules/wishlist.js?v=desktop2"></script>
-<script defer src="modules/budget.js?v=swr"></script>
+<script defer src="modules/calendar.js?v=desktop4"></script>
+<script defer src="modules/wishlist.js?v=desktop3"></script>
+<script defer src="modules/budget.js?v=swr2"></script>
 <script defer src="modules/capsule.js?v=swr"></script>
-<script defer src="modules/question.js?v=swr"></script>
+<script defer src="modules/question.js?v=swr2"></script>
 <script defer src="modules/media.js?v=desktop3"></script>
 <script defer src="modules/random.js?v=swr"></script>
-<script defer src="modules/swipe.js?v=desktop3"></script>
-<script defer src="modules/map.js?v=swr2"></script>
+<script defer src="modules/swipe.js?v=desktop4"></script>
+<script defer src="modules/map.js?v=swr3"></script>
 <script defer src="modules/shopping.js?v=desktop2"></script>
-<script defer src="modules/settings.js?v=swr2"></script>
-<script defer src="modules/photo-calendar.js?v=swr2"></script>
-<script defer src="modules/schedule.js?v=3"></script>
+<script defer src="modules/settings.js?v=swr3"></script>
+<script defer src="modules/photo-calendar.js?v=swr3"></script>
+<script defer src="modules/schedule.js?v=4"></script>
 <script defer src="lib/confetti.js?v=1"></script>
-<script defer src="lib/gestures.js?v=1"></script>
 <script defer src="lib/pwa.js?v=1"></script>
-<script defer src="lib/realtime.js?v=2"></script>
-<script defer src="modules/app.js?v=desktop3"></script>
+<script defer src="lib/realtime.js?v=3"></script>
+<script defer src="modules/app.js?v=desktop4"></script>
 
 <!-- PWA: реєстрація service worker -->
 <script>

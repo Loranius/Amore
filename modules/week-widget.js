@@ -34,13 +34,26 @@ const WeekWidget = (() => {
     const r = new Date(d); r.setHours(0, 0, 0, 0); return r;
   }
 
+  // Той самий канонічний select, що в counter.js/calendar.js —
+  // усі три модулі ділять один кеш-ключ 'events' і один мережевий запит
+  // (одночасні виклики дедуплікуються в DataCache.inflight).
+  async function loadEventsFull() {
+    const { data } = await supabase.from('events')
+      .select('id,title,description,date,created_by,type,yearly')
+      .order('date', { ascending: true });
+    return data || [];
+  }
+
   function render(events) {
     const wrap = document.getElementById('week-widget');
     if (!wrap) return;
 
     const today  = startOfDay(new Date());
     const sunday = new Date(today);
-    sunday.setDate(today.getDate() + (7 - today.getDay())); // кінець поточного тижня (нд включно)
+    // Кінець поточного тижня — неділя включно.
+    // (7 - day) % 7: у неділю тиждень закінчується СЬОГОДНІ,
+    // а не показує події наступних семи днів.
+    sunday.setDate(today.getDate() + ((7 - today.getDay()) % 7));
     sunday.setHours(23, 59, 59, 999);
 
     // Фільтруємо: тільки цього тижня, не виконані плани і всі звичайні події
@@ -164,10 +177,9 @@ const WeekWidget = (() => {
 
   function refresh() {
     showSkeleton();
-    DataCache.swr('events', null, (events) => {
+    DataCache.swr('events', loadEventsFull, (events) => {
       if (events) render(events);
     });
-    // Якщо кешу немає — просто ховаємо (counter.js завантажить events і render викличеться)
   }
 
   function init() {

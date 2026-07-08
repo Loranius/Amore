@@ -1029,13 +1029,8 @@ const MapModule = (() => {
   }
 
   function closeModal() {
-    var root = document.getElementById('modal-root');
-    var overlay = root.querySelector('.modal-overlay');
-    if (!overlay) { root.innerHTML = ''; return; }
-    overlay.classList.add('is-closing');
-    overlay.addEventListener('animationend', function() {
-      root.innerHTML = '';
-    }, { once: true });
+    // Глобальна закривалка з fallback-таймером (reduced-motion тощо)
+    closeModalAnimated();
   }
 
   // ---------- Init ----------
@@ -1070,7 +1065,13 @@ const MapModule = (() => {
 
   function init() {
     document.getElementById('add-pin-btn').addEventListener('click', function() {
-      openAddModal(DEFAULT_CENTER[1], DEFAULT_CENTER[0]);
+      // Точка за замовчуванням — поточний центр карти (а не завжди Київ)
+      if (map) {
+        var c = map.getCenter();
+        openAddModal(c.lat, c.lng);
+      } else {
+        openAddModal(DEFAULT_CENTER[1], DEFAULT_CENTER[0]);
+      }
     });
 
     // Прив'язуємо одразу + через rAF як fallback якщо DOM ще не готовий

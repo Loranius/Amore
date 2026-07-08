@@ -84,12 +84,8 @@ const Router = (() => {
         if (!view) return; // напр. кнопка "Налаштування" — обробляється окремим модулем
         showView(view);
         closeMoreMenu();
-        if (view === 'media' && typeof Swipe !== 'undefined') {
-          Swipe.refresh();
-        }
-        if (view === 'map' && typeof MapModule !== 'undefined') {
-          MapModule.refresh();
-        }
+        // Swipe/Map самі реагують: MapModule слухає portal:view,
+        // а свайп-стек вантажиться лише при відкритті панелі (економія TMDB-запитів)
       });
     });
 

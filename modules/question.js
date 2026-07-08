@@ -10,8 +10,11 @@ const DailyQuestion = (() => {
   let todayStr, questionsPool, currentQuestion, logEntry;
 
   function getTodayStr() {
+    // Локальна дата, а не toISOString (яка дає UTC): у Києві до 02:00/03:00
+    // ночі UTC-дата — ще вчорашня, і питання дня "відкочувалось" назад.
     const d = new Date();
-    return d.toISOString().slice(0, 10);
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
   function formatToday() {

@@ -94,6 +94,5 @@ document.addEventListener('DOMContentLoaded', () => {
   Photos.init();
   Settings.init();
   Realtime.init();
-  Gestures.init();
   PWABanner.init();
 });

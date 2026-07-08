@@ -302,71 +302,7 @@
    WISHLIST v2
    ============================================================ */
 
-/* Вкладки */
-.wl-tabs {
-  display: flex; gap: 8px; margin-bottom: 16px;
-}
-.wl-tab {
-  flex: 1; padding: 11px 8px;
-  border: 2px solid var(--line); border-radius: var(--radius-md);
-  background: var(--surface); font-family: var(--font-body);
-  font-size: 13px; font-weight: 700; color: var(--text-muted);
-  cursor: pointer; transition: all 0.15s;
-}
-.wl-tab.active {
-  border-color: var(--accent-bright);
-  background: var(--accent-pale); color: var(--accent-deep);
-}
 
-/* Сітка карток */
-.wish-grid-v2 {
-  display: flex; flex-direction: column; gap: 12px;
-}
-
-/* Картка бажання */
-.wish-card-v2 {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-  border: 1px solid var(--line);
-}
-.wish-img-wrap { width: 100%; aspect-ratio: 16/9; overflow: hidden; background: var(--surface-soft); }
-.wish-img { width: 100%; height: 100%; object-fit: cover; }
-.wish-card-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
-.wish-card-top {
-  display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
-}
-.wish-title-v2 { font-family: var(--font-display); font-size: 16px; font-weight: 700; flex: 1; }
-.wish-desc-v2 { font-size: 13px; color: var(--text-muted); line-height: 1.5; }
-.wish-card-footer { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.wish-date {
-  font-size: 12px; font-weight: 700; color: var(--accent-deep);
-  background: var(--accent-pale); padding: 4px 10px; border-radius: 999px;
-}
-.wish-date-any { color: var(--text-muted); background: var(--surface-soft); }
-.wish-link-v2 {
-  font-size: 13px; font-weight: 700; color: var(--accent-deep);
-  text-decoration: none;
-}
-.wish-link-v2:hover { text-decoration: underline; }
-.wish-del-btn {
-  background: none; border: none; font-size: 20px;
-  color: var(--text-muted); cursor: pointer; padding: 0; line-height: 1; flex-shrink: 0;
-}
-.wish-del-btn:hover { color: var(--danger); }
-.wish-reserve-btn {
-  align-self: flex-start; padding: 7px 16px;
-  background: var(--accent-pale); border: 1.5px solid var(--accent);
-  border-radius: 999px; font-family: var(--font-body); font-size: 12px;
-  font-weight: 700; color: var(--accent-deep); cursor: pointer; transition: all 0.15s;
-}
-.wish-reserve-btn:active { background: var(--accent); color: white; }
-.wish-reserved-badge {
-  align-self: flex-start; padding: 6px 14px;
-  background: var(--accent); border-radius: 999px;
-  font-size: 12px; font-weight: 700; color: white;
-}
 
 /* Розміри — перемикач юзера */
 .sz-user-switcher {
@@ -382,21 +318,6 @@
   border-color: var(--accent-bright); background: var(--accent-pale); color: var(--accent-deep);
 }
 
-/* Розміри — сторінка */
-.sizes-page { display: flex; flex-direction: column; gap: 16px; }
-
-.sizes-body-wrap {
-  display: flex; justify-content: center;
-  background: var(--surface); border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card); padding: 16px 8px;
-  overflow: visible;
-}
-.body-svg { width: 100%; max-width: 260px; height: auto; }
-
-.sizes-body-labels {
-  position: absolute; inset: 0; pointer-events: none;
-}
-/* sz-labels moved into SVG */
 
 /* Розміри — сітка груп */
 .sizes-grid {

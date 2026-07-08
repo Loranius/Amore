@@ -29,7 +29,9 @@ const Schedule = (() => {
   const esc = s  => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
   const pad = n  => String(n).padStart(2, '0');
   const dstr = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
-  const todayStr = () => new Date().toISOString().slice(0, 10);
+  // Локальна дата (не toISOString/UTC): інакше вночі до 02:00–03:00
+  // "сьогодні" визначалось як учора (невірна підсвітка/блокування днів).
+  const todayStr = () => { const d = new Date(); return dstr(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
 
   const MONTHS_UA = [
     'Січень','Лютий','Березень','Квітень','Травень','Червень',
