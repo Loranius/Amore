@@ -5229,3 +5229,15 @@ a.wl-archive-title:hover { text-decoration: underline; }
   .hero-cloud { height: 460px; }
   .float-photo { width: 118px; }
 }
+
+/* Хіро: лічильник компактніший, число не обрізається */
+.hero-cloud .counter-sticker {
+  width: max-content;
+  max-width: min(260px, 64vw);
+  padding: 20px 20px 16px;
+}
+.hero-cloud .counter-num {
+  font-size: clamp(42px, 13vw, 60px);
+  white-space: nowrap;
+}
+.hero-cloud .greeting-text { font-size: clamp(18px, 5.5vw, 24px); }

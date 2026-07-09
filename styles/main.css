@@ -1166,3 +1166,15 @@ img.lazy.loaded {
 }
 .eb-toast--success { background: #2E7D32; color: #fff; }
 .eb-toast--warn    { background: #E65100; color: #fff; }
+
+/* Прибираємо системну блакитну підсвітку тапів (Android/Chrome) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Фото в хіро: без виділення при тапах/лонгпресах */
+.float-photo,
+.float-photo img {
+  -webkit-user-select: none;
+  user-select: none;
+}
