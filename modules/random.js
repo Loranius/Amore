@@ -443,11 +443,40 @@ const RandomModule = (() => {
   let culDish = null;        // згенерована страва
   let culAvoid = [];         // назви вже запропонованих страв (для "ще варіант")
 
+  const CUL_LS_KEY = 'amore:culinary';
+
+  function culPersist() {
+    try {
+      localStorage.setItem(CUL_LS_KEY, JSON.stringify({
+        dish: culDish, answers: culAnswers, avoid: culAvoid
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  // Відновлення після перезавантаження: якщо є збережена страва — показуємо її
+  function culRestore() {
+    try {
+      const raw = localStorage.getItem(CUL_LS_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved && saved.dish && saved.dish.title) {
+          culDish = saved.dish;
+          culAnswers = saved.answers || {};
+          culAvoid = saved.avoid || [];
+          renderCulResult();
+          return;
+        }
+      }
+    } catch (e) { /* ignore */ }
+    renderCulStep();
+  }
+
   function culReset() {
     culStep = 0;
     culAnswers = {};
     culDish = null;
     culAvoid = [];
+    try { localStorage.removeItem(CUL_LS_KEY); } catch (e) { /* ignore */ }
     renderCulStep();
   }
 
@@ -513,17 +542,32 @@ const RandomModule = (() => {
 
       culDish = data;
       culAvoid.push(data.title);
+      culPersist();
       renderCulResult();
     } catch (e) {
       console.error('culinary-ai:', e);
+      // Дістаємо реальну причину з відповіді функції, якщо вона є
+      let detail = '';
+      try {
+        if (e && e.context && typeof e.context.json === 'function') {
+          const j = await e.context.json();
+          if (j && j.error) detail = String(j.error);
+        } else if (e && e.message) {
+          detail = e.message;
+        }
+      } catch (_) { /* ignore */ }
+
       card.innerHTML = `
         <div class="cul-loading">
           <div class="cul-loading-emoji">😔</div>
           <p class="cul-loading-text">Не вийшло приготувати ідею</p>
-          <p class="cul-step-hint">Перевір, чи задеплоєна функція culinary-ai</p>
+          <p class="cul-step-hint">${detail ? escapeHtml(detail) : 'Спробуй ще раз за хвилину'}</p>
           <button class="btn-primary" id="cul-retry">Спробувати ще</button>
+          ${culDish ? '<button class="btn-secondary" id="cul-back-dish">‹ До попередньої страви</button>' : ''}
         </div>`;
       card.querySelector('#cul-retry').addEventListener('click', culGenerate);
+      const backBtn = card.querySelector('#cul-back-dish');
+      if (backBtn) backBtn.addEventListener('click', renderCulResult);
     }
   }
 
@@ -596,7 +640,7 @@ const RandomModule = (() => {
     if (error) {
       console.error('Улюблені: помилка збереження', error);
       btn.disabled = false; btn.textContent = '❤️ В улюблені';
-      ErrorBoundary.showToast('Не вдалось зберегти');
+      ErrorBoundary.showToast('Не вдалось зберегти: ' + (error.message || 'невідома помилка'));
       return;
     }
 
@@ -636,7 +680,7 @@ const RandomModule = (() => {
     document.getElementById('add-dish-btn').addEventListener('click', openAddDishModal);
     document.getElementById('roll-dish-btn').addEventListener('click', rollDish);
     initCulTabs();
-    renderCulStep();
+    culRestore();
     document.getElementById('dish-result-recipe-btn')?.addEventListener('click', (e) => {
       const dish = dishes.find(x => String(x.id) === String(e.currentTarget.dataset.dishId));
       if (dish) openRecipeModal(dish);

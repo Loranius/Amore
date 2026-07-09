@@ -83,8 +83,10 @@ Deno.serve(async (req) => {
     let raw = (out.content ?? [])
       .map((b: { type: string; text?: string }) => b.type === "text" ? b.text : "")
       .join("");
-    raw = raw.replace(/```json|```/g, "").trim();
-    const parsed = JSON.parse(raw);
+    const jStart = raw.indexOf("{");
+    const jEnd = raw.lastIndexOf("}");
+    if (jStart === -1 || jEnd === -1) return json({ error: "не вдалось розібрати відповідь" }, 502);
+    const parsed = JSON.parse(raw.slice(jStart, jEnd + 1));
 
     if (!Array.isArray(parsed.items)) return json({ error: "bad structure" }, 502);
 
