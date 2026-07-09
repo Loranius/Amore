@@ -17,8 +17,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="styles/main.css?v=10">
-<link rel="stylesheet" href="styles/components.css?v=35">
+<link rel="stylesheet" href="styles/main.css?v=11">
+<link rel="stylesheet" href="styles/components.css?v=36">
 <!-- Темна тема: застосовуємо ДО рендеру, щоб уникнути блимання -->
 <script>
   (function(){
@@ -142,44 +142,35 @@
     <!-- ---------- Головна (Полароїд-стіна) ---------- -->
     <section class="view" id="view-home" data-view="home">
 
-      <!-- Desktop: ліва колонка -->
       <div class="home-left">
-        <div class="counter-sticker">
-          <p class="greeting-text" id="greeting-text">Привіт!</p>
-          <p class="counter-eyebrow" id="counter-since">з якогось дня</p>
-          <div class="counter-num" id="counter-number">—</div>
-          <p class="counter-label">днів разом</p>
-          <p class="counter-next-anniversary" id="counter-next-anniversary"></p>
+        <!-- Хіро: лічильник у центрі, фото левітують навколо -->
+        <div class="hero-cloud" id="hero-cloud">
+          <div class="float-photo fp-1"><img src="" alt="" loading="lazy" data-photo-slot="1"></div>
+          <div class="float-photo fp-2"><img src="" alt="" loading="lazy" data-photo-slot="2"></div>
+          <div class="float-photo fp-3"><img src="" alt="" loading="lazy" data-photo-slot="3"></div>
+          <div class="float-photo fp-4"><img src="" alt="" loading="lazy" data-photo-slot="4"></div>
+          <div class="float-photo fp-5"><img src="" alt="" loading="lazy" data-photo-slot="5"></div>
+          <div class="float-photo fp-6"><img src="" alt="" loading="lazy" data-photo-slot="6"></div>
+
+          <div class="counter-sticker">
+            <p class="greeting-text" id="greeting-text">Привіт!</p>
+            <p class="counter-eyebrow" id="counter-since">з якогось дня</p>
+            <div class="counter-num" id="counter-number">—</div>
+            <p class="counter-label">днів разом</p>
+            <p class="counter-next-anniversary" id="counter-next-anniversary"></p>
+          </div>
+        </div>
+
+        <!-- Міні-віджети -->
+        <div class="home-mini-row">
+          <button type="button" id="question-teaser" class="mini-widget hidden"></button>
+          <button type="button" id="dayoff-widget" class="mini-widget hidden"></button>
         </div>
 
         <div id="next-event-widget" class="next-event-widget"></div>
 
         <!-- Виджет "На цей тиждень" -->
         <div id="week-widget" class="week-widget"></div>
-      </div>
-
-      <!-- Desktop: права колонка (стіна полароїдів) -->
-      <div class="home-right">
-        <div class="wall">
-          <div class="polaroid">
-            <div class="polaroid-photo"><img src="" alt="" loading="lazy" data-photo-slot="1"></div>
-          </div>
-          <div class="polaroid">
-            <div class="polaroid-photo"><img src="" alt="" loading="lazy" data-photo-slot="2"></div>
-          </div>
-          <div class="polaroid">
-            <div class="polaroid-photo"><img src="" alt="" loading="lazy" data-photo-slot="3"></div>
-          </div>
-          <div class="polaroid">
-            <div class="polaroid-photo"><img src="" alt="" loading="lazy" data-photo-slot="4"></div>
-          </div>
-          <div class="polaroid">
-            <div class="polaroid-photo"><img src="" alt="" loading="lazy" data-photo-slot="5"></div>
-          </div>
-          <div class="polaroid">
-            <div class="polaroid-photo"><img src="" alt="" loading="lazy" data-photo-slot="6"></div>
-          </div>
-        </div>
       </div>
 
     </section>
@@ -595,8 +586,9 @@ function closeModalAnimated(rootId) {
 <script defer src="modules/router.js?v=hub1"></script>
 <script defer src="modules/counter.js?v=swr3"></script>
 <script defer src="modules/week-widget.js?v=2"></script>
+<script defer src="modules/home-widgets.js?v=1"></script>
 <script defer src="modules/greeting.js?v=swr"></script>
-<script defer src="modules/photos.js?v=swr3"></script>
+<script defer src="modules/photos.js?v=cloud1"></script>
 <script defer src="modules/calendar.js?v=desktop4"></script>
 <script defer src="modules/wishlist.js?v=desktop3"></script>
 <script defer src="modules/budget.js?v=swr2"></script>
