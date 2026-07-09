@@ -5,27 +5,31 @@
 
 const Greeting = (() => {
 
-  const PHRASES = [
-    name => `Привіт, ${name}! 💛`,
-    name => `Раді тебе бачити, ${name}`,
-    name => `${name}, як справи? 🌸`,
-    name => `Вітаємо, ${name}!`,
-    name => `${name}, гарного дня!`,
-    name => `Знову ти, ${name}? Чудово!`,
-    name => `${name}, тут затишно і тепло`,
-    name => `Привіт-привіт, ${name} 🌷`,
-    name => `${name}, ми на тебе чекали`,
-    name => `Раді бачити тебе тут, ${name}`
+  // Спільні фрази + персональні для кожного
+  const COMMON = [
+    'Хай, бубос 💛',
+    'Привіт, пупс 🌸',
   ];
+
+  const PERSONAL = {
+    'Лєна': [
+      'Привіт, Лєнок 🌷',
+      'Привіт, Лєнусік 💕',
+      'Привіт, Лєнчик ✨',
+    ],
+    'Діма': [
+      'Як справи, Дімасік? 😎',
+      'Привіт, Дімонич 🤙',
+    ],
+  };
 
   function render() {
     const user = Auth.getCurrentUser();
     const el = document.getElementById('greeting-text');
     if (!el) return;
 
-    const name = user ? user.name : 'друже';
-    const phrase = PHRASES[Math.floor(Math.random() * PHRASES.length)];
-    el.textContent = phrase(name);
+    const pool = [...COMMON, ...(PERSONAL[user ? user.name : ''] || [])];
+    el.textContent = pool[Math.floor(Math.random() * pool.length)];
   }
 
   function init() {
