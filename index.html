@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="styles/main.css?v=10">
-<link rel="stylesheet" href="styles/components.css?v=34">
+<link rel="stylesheet" href="styles/components.css?v=35">
 <!-- Темна тема: застосовуємо ДО рендеру, щоб уникнути блимання -->
 <script>
   (function(){
@@ -121,8 +121,8 @@
       <span class="nav-label">Вотчліст</span>
     </button>
     <button class="nav-btn desktop-nav-item" data-view="random">
-      <span class="nav-icon">🍽️</span>
-      <span class="nav-label">Що їмо?</span>
+      <span class="nav-icon">👨‍🍳</span>
+      <span class="nav-label">Кулінарія</span>
     </button>
     <button class="nav-btn desktop-nav-item" data-view="question">
       <span class="nav-icon">💞</span>
@@ -452,34 +452,37 @@
     </section>
     <section class="view hidden" id="view-random" data-view="random">
       <div class="view-header">
-        <h2 class="display-md">Рандом</h2>
+        <h2 class="display-md">Кулінарія</h2>
       </div>
 
-      <!-- Рандомайзер дій -->
-      <div class="card random-block">
-        <div class="random-block-header">
-          <h3 class="display-md-sm">Хто/Що</h3>
-          <button class="btn-secondary" id="add-randcat-btn">+ Категорія</button>
-        </div>
-        <div id="randcat-list">
-          <!-- категорії з кнопкою рандому -->
+      <div class="cul-tabs">
+        <button class="cul-tab active" data-cultab="constructor">🔮 Конструктор</button>
+        <button class="cul-tab" data-cultab="favorites">❤️ Улюблені</button>
+      </div>
+
+      <!-- Підвкладка: Конструктор -->
+      <div class="cul-panel" data-culpanel="constructor">
+        <div class="card" id="cul-card">
+          <!-- рендериться через random.js: кроки конструктора / результат -->
         </div>
       </div>
 
-      <!-- Рандомайзер страв -->
-      <div class="card random-block">
-        <div class="random-block-header">
-          <h3 class="display-md-sm">Що приготувати</h3>
-          <button class="btn-secondary" id="add-dish-btn">+ Страва</button>
-        </div>
-        <div class="dish-cat-tabs" id="dish-cat-tabs"></div>
-        <div class="dish-roll-area">
-          <div class="dish-result" id="dish-result">Натисни «Random»</div>
-          <button class="btn-secondary hidden dish-result-recipe" id="dish-result-recipe-btn">📖 Рецепт</button>
-          <button class="btn-primary" id="roll-dish-btn">🎲 Random</button>
-        </div>
-        <div id="dish-list">
-          <!-- список страв з можливістю видалення -->
+      <!-- Підвкладка: Улюблені -->
+      <div class="cul-panel hidden" data-culpanel="favorites">
+        <div class="card random-block">
+          <div class="random-block-header">
+            <h3 class="display-md-sm">Наші страви</h3>
+            <button class="btn-secondary" id="add-dish-btn">+ Страва</button>
+          </div>
+          <div class="dish-cat-tabs" id="dish-cat-tabs"></div>
+          <div class="dish-roll-area">
+            <div class="dish-result" id="dish-result">Натисни «Random»</div>
+            <button class="btn-secondary hidden dish-result-recipe" id="dish-result-recipe-btn">📖 Рецепт</button>
+            <button class="btn-primary" id="roll-dish-btn">🎲 Random</button>
+          </div>
+          <div id="dish-list">
+            <!-- список страв з можливістю видалення -->
+          </div>
         </div>
       </div>
     </section>
@@ -500,8 +503,8 @@
           <span class="more-menu-label">Вотчліст</span>
         </button>
         <button class="more-menu-item" data-view="random">
-          <span class="more-menu-icon">🍽️</span>
-          <span class="more-menu-label">Що їмо?</span>
+          <span class="more-menu-icon">👨‍🍳</span>
+          <span class="more-menu-label">Кулінарія</span>
         </button>
         <button class="more-menu-item" data-view="question">
           <span class="more-menu-icon">💞</span>
@@ -600,10 +603,10 @@ function closeModalAnimated(rootId) {
 <script defer src="modules/capsule.js?v=swr"></script>
 <script defer src="modules/question.js?v=swr2"></script>
 <script defer src="modules/media.js?v=desktop3"></script>
-<script defer src="modules/random.js?v=recipes1"></script>
+<script defer src="modules/random.js?v=culinary1"></script>
 <script defer src="modules/swipe.js?v=desktop4"></script>
 <script defer src="modules/map.js?v=swr3"></script>
-<script defer src="modules/shopping.js?v=desktop2"></script>
+<script defer src="modules/shopping.js?v=claude1"></script>
 <script defer src="modules/settings.js?v=swr3"></script>
 <script defer src="modules/photo-calendar.js?v=swr3"></script>
 <script defer src="modules/schedule.js?v=4"></script>

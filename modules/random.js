@@ -1,10 +1,9 @@
 // ============================================================
-// RANDOM MODULE
-// 1) Рандомайзер "хто/що" — редаговані категорії,
-//    кожна категорія рандомить між Дімою та Лєною
-// 2) Рандомайзер страв — редагований пул, кнопка "Рандом"
+// CULINARY MODULE (вкладка "Кулінарія")
+// 1) Конструктор: майстер питань → Claude (Edge Function culinary-ai)
+//    генерує страву під смаки, обладнання і українські супермаркети
+// 2) Улюблені: пул страв з рецептами (таблиця dishes) + рандом
 // ============================================================
-
 const RandomModule = (() => {
 
   let dishes = [];
@@ -21,174 +20,6 @@ const RandomModule = (() => {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
-  }
-
-  // ============================================================
-  // КАТЕГОРІЇ "ХТО/ЩО"
-  // ============================================================
-  async function loadCategories() {
-    const { data, error } = await supabase
-      .from('randomizer_categories')
-      .select('id, title')
-      .order('id', { ascending: true });
-
-    if (error) {
-      console.error('Помилка завантаження категорій:', error);
-      return [];
-    }
-    return data || [];
-  }
-
-  function renderCategories(categories) {
-    const wrap = document.getElementById('randcat-list');
-
-    if (!categories.length) {
-      wrap.innerHTML = '<p class="empty-state">Категорій ще немає. Додай першу!</p>';
-      return;
-    }
-
-    wrap.innerHTML = '';
-    categories.forEach(cat => {
-      const row = document.createElement('div');
-      row.className = 'randcat-row';
-      row.innerHTML = `
-        <div class="randcat-info">
-          <p class="randcat-title">${escapeHtml(cat.title)}</p>
-          <p class="randcat-result" id="randcat-result-${cat.id}"></p>
-        </div>
-        <button class="btn-secondary randcat-roll" data-roll-id="${cat.id}">🎲</button>
-        <button class="delete-btn" data-delete-cat-id="${cat.id}" title="Видалити">×</button>
-      `;
-      wrap.appendChild(row);
-    });
-
-    wrap.querySelectorAll('[data-roll-id]').forEach(btn => {
-      btn.addEventListener('click', () => rollCategory(btn.dataset.rollId));
-    });
-
-    wrap.querySelectorAll('[data-delete-cat-id]').forEach(btn => {
-      btn.addEventListener('click', () => deleteCategory(btn.dataset.deleteCatId));
-    });
-  }
-
-  function rollCategory(id) {
-    const result = Math.random() < 0.5 ? 'Діма' : 'Лєна';
-    const el = document.getElementById(`randcat-result-${id}`);
-    if (el) {
-      el.textContent = '→ ' + result;
-      el.classList.add('rolled');
-    }
-  }
-
-  function refreshCategories() {
-    DataCache.swr('randcats', loadCategories, renderCategories);
-  }
-
-  async function deleteCategory(id) {
-    if (!confirm('Видалити цю категорію?')) return;
-
-    const { error } = await supabase.from('randomizer_categories').delete().eq('id', id);
-    if (error) {
-      console.error('Помилка видалення категорії:', error);
-      alert('Не вдалось видалити категорію');
-      return;
-    }
-    DataCache.invalidate('randcats');
-    refreshCategories();
-  }
-
-  function openAddCategoryModal() {
-    const root = document.getElementById('modal-root');
-    root.innerHTML = `
-      <div class="modal-overlay" id="randcat-modal-overlay">
-        <div class="modal-card">
-          <h3>Нова категорія</h3>
-          <div class="form-field">
-            <label for="randcat-title">Назва</label>
-            <input type="text" id="randcat-title" placeholder="Наприклад, Хто вибирає музику">
-          </div>
-          <div class="modal-actions">
-            <button class="btn-secondary" id="randcat-cancel">Скасувати</button>
-            <button class="btn-primary" id="randcat-save">Зберегти</button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.getElementById('randcat-cancel').addEventListener('click', closeModal);
-    document.getElementById('randcat-modal-overlay').addEventListener('click', (e) => {
-      if (e.target.id === 'randcat-modal-overlay') closeModal();
-    });
-    document.getElementById('randcat-save').addEventListener('click', saveCategory);
-  }
-
-  async function saveCategory() {
-    const title = document.getElementById('randcat-title').value.trim();
-    if (!title) {
-      alert('Вкажи назву категорії');
-      return;
-    }
-
-    const { error } = await supabase.from('randomizer_categories').insert({ title });
-
-    if (error) {
-      console.error('Помилка збереження категорії:', error);
-      alert('Не вдалось зберегти категорію');
-      return;
-    }
-
-    closeModal();
-    DataCache.invalidate('randcats');
-    refreshCategories();
-  }
-
-  // ============================================================
-  // РАНДОМАЙЗЕР СТРАВ
-  // ============================================================
-  async function loadDishes() {
-    let { data, error } = await supabase
-      .from('dishes')
-      .select('id, title, category, recipe')
-      .order('id', { ascending: false });
-
-    if (error) {
-      // Колонка recipe ще не додана в Supabase — пробуємо без неї,
-      // поки не виконано: alter table dishes add column recipe jsonb;
-      let fb = await supabase.from('dishes').select('id, title, category').order('id', { ascending: false });
-      if (fb.error) {
-        // Немає і category — зовсім старий варіант таблиці
-        fb = await supabase.from('dishes').select('id, title').order('id', { ascending: false });
-        if (fb.error) {
-          console.error('Помилка завантаження страв:', fb.error);
-          return [];
-        }
-      }
-      return (fb.data || []).map(d => ({ ...d, category: d.category || 'other', recipe: d.recipe || null }));
-    }
-    return (data || []).map(d => ({ ...d, category: d.category || 'other', recipe: d.recipe || null }));
-  }
-
-  function visibleDishes() {
-    return activeDishCat === 'all'
-      ? dishes
-      : dishes.filter(d => (d.category || 'other') === activeDishCat);
-  }
-
-  function renderDishCatTabs() {
-    const wrap = document.getElementById('dish-cat-tabs');
-    if (!wrap) return;
-    const defs = [{ key: 'all', label: '🎲 Всі' }, ...Object.entries(DISH_CATS).map(([key, c]) => ({ key, label: c.label }))];
-    wrap.innerHTML = defs.map(d => {
-      const count = d.key === 'all' ? dishes.length : dishes.filter(x => (x.category || 'other') === d.key).length;
-      return `<button class="dish-cat-tab${activeDishCat === d.key ? ' active' : ''}" data-cat="${d.key}">${d.label} <span class="dish-cat-count">${count}</span></button>`;
-    }).join('');
-    wrap.querySelectorAll('[data-cat]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        activeDishCat = btn.dataset.cat;
-        renderDishCatTabs();
-        renderDishes(visibleDishes());
-      });
-    });
   }
 
   // ============================================================
@@ -324,7 +155,7 @@ const RandomModule = (() => {
       qty: i.unit === 'за смаком'
         ? 'за смаком'
         : ([i.amount, i.unit].filter(Boolean).join(' ') || null),
-      category: 'Продукти',
+      category: i.shop_cat || 'Інше',
       created_by: user ? user.id : null
     }));
 
@@ -578,6 +409,216 @@ const RandomModule = (() => {
   }
 
   // ============================================================
+  // КОНСТРУКТОР СТРАВ (Claude через Edge Function culinary-ai)
+  // ============================================================
+  const CUL_STEPS = [
+    {
+      key: 'type', title: 'Що готуємо?', hint: 'Один варіант', multi: false,
+      options: ['Основна страва', 'Суп', 'Салат', 'Сніданок', 'Швидкий перекус', 'Десерт']
+    },
+    {
+      key: 'taste', title: 'Якого смаку хочеться?', hint: 'До двох варіантів', multi: true, max: 2,
+      options: ['Солоне', 'Кисле', 'Солодке', 'Гостре-пряне', 'Вершкове-ніжне', 'Копчено-димне', 'Кисло-солодке']
+    },
+    {
+      key: 'base', title: 'Основа страви', hint: 'До трьох варіантів', multi: true, max: 3,
+      options: ['Курка', 'Свинина', 'Яловичина', 'Риба', 'Морепродукти', 'Овочі', 'Гриби', 'Злаки та крупи', 'Боби', 'Яйця', 'Сир']
+    },
+    {
+      key: 'ingredients', title: 'Наскільки прості інгредієнти?', hint: 'Один варіант', multi: false,
+      options: ['Тільки базові — все є в АТБ, Сільпо чи Варусі', 'Можна щось особливе, пошукаємо']
+    },
+    {
+      key: 'effort', title: 'Час і складність', hint: 'Один варіант', multi: false,
+      options: ['Просте, до 30 хвилин', 'Середнє, до години', 'Можна заморочитись']
+    },
+    {
+      key: 'cuisine', title: 'Кухня світу', hint: 'Один варіант', multi: false,
+      options: ['Здивуй мене', 'Українська', 'Італійська', 'Грузинська', 'Азійська', 'Мексиканська', 'Близькосхідна', 'Французька', '✨ Авторська вигадка Клода']
+    },
+  ];
+
+  let culStep = 0;
+  let culAnswers = {};       // key → [обрані опції]
+  let culDish = null;        // згенерована страва
+  let culAvoid = [];         // назви вже запропонованих страв (для "ще варіант")
+
+  function culReset() {
+    culStep = 0;
+    culAnswers = {};
+    culDish = null;
+    culAvoid = [];
+    renderCulStep();
+  }
+
+  function renderCulStep() {
+    const card = document.getElementById('cul-card');
+    if (!card) return;
+    const step = CUL_STEPS[culStep];
+    const chosen = culAnswers[step.key] || [];
+
+    card.innerHTML = `
+      <div class="cul-progress">
+        ${CUL_STEPS.map((_, i) => `<span class="cul-progress-dot${i <= culStep ? ' filled' : ''}"></span>`).join('')}
+      </div>
+      <p class="cul-step-title">${step.title}</p>
+      <p class="cul-step-hint">${step.hint}</p>
+      <div class="cul-chips">
+        ${step.options.map(o => `<button type="button" class="cul-chip${chosen.includes(o) ? ' active' : ''}" data-opt="${escapeHtml(o)}">${escapeHtml(o)}</button>`).join('')}
+      </div>
+      <div class="cul-nav">
+        <button class="btn-secondary${culStep === 0 ? ' hidden' : ''}" id="cul-back">‹ Назад</button>
+        <button class="btn-primary" id="cul-next" ${chosen.length ? '' : 'disabled'}>
+          ${culStep === CUL_STEPS.length - 1 ? '🔮 Створити страву' : 'Далі ›'}
+        </button>
+      </div>`;
+
+    card.querySelectorAll('.cul-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const opt = chip.dataset.opt;
+        let sel = culAnswers[step.key] || [];
+        if (step.multi) {
+          if (sel.includes(opt)) sel = sel.filter(x => x !== opt);
+          else if (sel.length < (step.max || 99)) sel = [...sel, opt];
+        } else {
+          sel = [opt];
+        }
+        culAnswers[step.key] = sel;
+        renderCulStep();
+      });
+    });
+
+    card.querySelector('#cul-back').addEventListener('click', () => { culStep--; renderCulStep(); });
+    card.querySelector('#cul-next').addEventListener('click', () => {
+      if (culStep === CUL_STEPS.length - 1) culGenerate();
+      else { culStep++; renderCulStep(); }
+    });
+  }
+
+  async function culGenerate() {
+    const card = document.getElementById('cul-card');
+    card.innerHTML = `
+      <div class="cul-loading">
+        <div class="cul-loading-emoji">👨‍🍳</div>
+        <p class="cul-loading-text">Клод вигадує вам страву…</p>
+        <p class="cul-step-hint">Аналізую смаки, підбираю інгредієнти з АТБ і Сільпо</p>
+      </div>`;
+
+    try {
+      const { data, error } = await supabase.functions.invoke('culinary-ai', {
+        body: { answers: culAnswers, avoid: culAvoid },
+      });
+      if (error) throw error;
+      if (!data || !data.title || !Array.isArray(data.ingredients)) throw new Error('bad structure');
+
+      culDish = data;
+      culAvoid.push(data.title);
+      renderCulResult();
+    } catch (e) {
+      console.error('culinary-ai:', e);
+      card.innerHTML = `
+        <div class="cul-loading">
+          <div class="cul-loading-emoji">😔</div>
+          <p class="cul-loading-text">Не вийшло приготувати ідею</p>
+          <p class="cul-step-hint">Перевір, чи задеплоєна функція culinary-ai</p>
+          <button class="btn-primary" id="cul-retry">Спробувати ще</button>
+        </div>`;
+      card.querySelector('#cul-retry').addEventListener('click', culGenerate);
+    }
+  }
+
+  function renderCulResult() {
+    const card = document.getElementById('cul-card');
+    const d = culDish;
+    const metaLine = [d.cuisine, d.time_minutes ? `⏱ ${d.time_minutes} хв` : '', d.difficulty]
+      .filter(Boolean).join(' · ');
+
+    card.innerHTML = `
+      <p class="discover-title">${escapeHtml(d.title)}</p>
+      ${metaLine ? `<p class="discover-meta">${escapeHtml(metaLine)}</p>` : ''}
+      ${d.description ? `<p class="cul-desc">${escapeHtml(d.description)}</p>` : ''}
+      ${d.tools && d.tools.length ? `<p class="cul-tools">🍳 ${escapeHtml(d.tools.join(', '))}</p>` : ''}
+      <p class="rcp-view-subtitle">Інгредієнти ${d.servings ? `(на ${d.servings} порції)` : ''}</p>
+      <div class="rcp-view-ings">
+        ${d.ingredients.map(i => `
+          <div class="rcp-view-ing">
+            <span class="rcp-view-ing-name">${escapeHtml(i.name)}</span>
+            <span class="rcp-view-ing-dots"></span>
+            <span class="rcp-view-ing-amount">${escapeHtml([i.amount, i.unit].filter(Boolean).join(' '))}</span>
+          </div>`).join('')}
+      </div>
+      <p class="rcp-view-subtitle">Приготування</p>
+      <ol class="rcp-view-steps">
+        ${(d.steps || []).map(st => `<li>${escapeHtml(st)}</li>`).join('')}
+      </ol>
+      <div class="discover-actions">
+        <button class="btn-secondary" id="cul-fav-btn">❤️ В улюблені</button>
+        <button class="btn-secondary" id="cul-shop-btn">🛒 В покупки</button>
+      </div>
+      <div class="discover-actions">
+        <button class="btn-secondary" id="cul-again-btn">🔁 Інший варіант</button>
+        <button class="btn-secondary" id="cul-restart-btn">✨ Спочатку</button>
+      </div>`;
+
+    card.querySelector('#cul-fav-btn').addEventListener('click', culSaveFavorite);
+    card.querySelector('#cul-shop-btn').addEventListener('click', (e) =>
+      addIngredientsToShopping({ recipe: { ingredients: d.ingredients } }, e.currentTarget));
+    card.querySelector('#cul-again-btn').addEventListener('click', culGenerate);
+    card.querySelector('#cul-restart-btn').addEventListener('click', culReset);
+  }
+
+  function culMapCategory(d) {
+    const bases = (culAnswers.base || []).join(' ').toLowerCase();
+    if (/курка|свинина|яловичина|риба|морепродукти/.test(bases)) return 'meat';
+    if (/овочі|гриби|боби/.test(bases)) return 'vegan';
+    if ((culAnswers.effort || [])[0] === 'Просте, до 30 хвилин') return 'fast';
+    return 'other';
+  }
+
+  async function culSaveFavorite() {
+    if (!culDish) return;
+    const btn = document.getElementById('cul-fav-btn');
+    btn.disabled = true; btn.textContent = '⏳…';
+
+    const user = Auth.getCurrentUser();
+    const row = {
+      title: culDish.title,
+      category: culMapCategory(culDish),
+      recipe: {
+        servings: culDish.servings || 2,
+        ingredients: culDish.ingredients,
+        steps: culDish.steps || []
+      },
+      created_by: user ? user.id : null
+    };
+
+    const { error } = await supabase.from('dishes').insert(row);
+    if (error) {
+      console.error('Улюблені: помилка збереження', error);
+      btn.disabled = false; btn.textContent = '❤️ В улюблені';
+      ErrorBoundary.showToast('Не вдалось зберегти');
+      return;
+    }
+
+    btn.textContent = '✅ В улюблених';
+    DataCache.invalidate('dishes');
+    refreshDishes();
+    ErrorBoundary.showToast(`❤️ «${culDish.title}» збережено`, 'success');
+  }
+
+  // ── Сабтаби Кулінарії ──
+  function initCulTabs() {
+    document.querySelectorAll('.cul-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.cul-tab').forEach(t =>
+          t.classList.toggle('active', t === tab));
+        document.querySelectorAll('.cul-panel').forEach(p =>
+          p.classList.toggle('hidden', p.dataset.culpanel !== tab.dataset.cultab));
+      });
+    });
+  }
+
+  // ============================================================
   // ЗАГАЛЬНЕ
   // ============================================================
   function closeModal() {
@@ -585,7 +626,6 @@ const RandomModule = (() => {
   }
 
   function refresh() {
-    refreshCategories();
     refreshDishes();
     document.getElementById('dish-result').textContent = 'Натисни «Рандом»';
     document.getElementById('dish-result').classList.remove('rolled');
@@ -593,9 +633,10 @@ const RandomModule = (() => {
   }
 
   function init() {
-    document.getElementById('add-randcat-btn').addEventListener('click', openAddCategoryModal);
     document.getElementById('add-dish-btn').addEventListener('click', openAddDishModal);
     document.getElementById('roll-dish-btn').addEventListener('click', rollDish);
+    initCulTabs();
+    renderCulStep();
     document.getElementById('dish-result-recipe-btn')?.addEventListener('click', (e) => {
       const dish = dishes.find(x => String(x.id) === String(e.currentTarget.dataset.dishId));
       if (dish) openRecipeModal(dish);

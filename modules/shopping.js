@@ -14,14 +14,17 @@ const Shopping = (() => {
   let archiveOpen = false;
 
   const CATEGORIES = [
-    'Продукти',
+    'Овочі',
+    'Фрукти',
     "М'ясо",
-    'Молочне',
-    'Бакалія',
-    'Випічка',
+    'Морепродукти',
     'Напої',
     'Побут',
-    'Аптека',
+    'Посуд',
+    'Гігієна',
+    'Косметика',
+    'Канцелярія',
+    'Спорт',
     'Інше',
   ];
 
@@ -54,7 +57,7 @@ const Shopping = (() => {
       .map(title => ({ title, qty: null, category: 'Інше' }));
   }
 
-  // Розумний парсинг через Groq (Supabase Edge Function "shopping-parse").
+  // Розумний парсинг через Claude (Supabase Edge Function "shopping-parse").
   // Повертає масив {title, qty, category} або null, якщо щось пішло не так
   // (немає мережі, функція не задеплоєна, помилка ШІ тощо) —
   // тоді викликаючий код сам впаде на parseInputFallback.
@@ -194,7 +197,10 @@ const Shopping = (() => {
   // ── РЕДАГУВАННЯ (категорія / кількість) ──
   function openEditModal(item) {
     const root = el('modal-root');
-    const catOptions = CATEGORIES.map(c =>
+    const catList = CATEGORIES.includes(item.category) || !item.category
+      ? CATEGORIES
+      : [...CATEGORIES, item.category]; // стара категорія айтема, якої вже немає в списку
+    const catOptions = catList.map(c =>
       `<option value="${esc(c)}"${c === item.category ? ' selected' : ''}>${esc(c)}</option>`
     ).join('');
 

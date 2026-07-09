@@ -1151,42 +1151,6 @@
   color: var(--text);
 }
 
-.randcat-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--space-2) 0;
-  border-bottom: 1px solid var(--line);
-}
-
-.randcat-row:last-child { border-bottom: none; }
-
-.randcat-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.randcat-title {
-  font-weight: 600;
-  font-size: 14px;
-  margin: 0;
-}
-
-.randcat-result {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--accent-deep);
-  margin: 2px 0 0;
-  min-height: 18px;
-}
-
-.randcat-roll {
-  font-size: 16px;
-  padding: 8px 12px;
-  flex-shrink: 0;
-}
-
 .dish-cat-tabs {
   display: flex;
   gap: 6px;
@@ -5088,3 +5052,142 @@ a.wl-archive-title:hover { text-decoration: underline; }
 .rcp-view-ing-amount { flex-shrink: 0; font-weight: 600; color: var(--accent-deep); }
 .rcp-view-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.45; }
 .dish-title--link { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+
+/* ════════════════════════════════════════════
+   КУЛІНАРІЯ — сабтаби, конструктор, результат
+   ════════════════════════════════════════════ */
+.cul-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.cul-tab {
+  flex: 1;
+  background: var(--surface-soft);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cul-tab.active { background: var(--accent); color: #fff; }
+
+.cul-panel { animation: hub-panel-in 0.18s ease; }
+@keyframes hub-panel-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Прогрес конструктора */
+.cul-progress {
+  display: flex;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+.cul-progress-dot {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-soft);
+  transition: background 0.2s ease;
+}
+.cul-progress-dot.filled { background: var(--accent); }
+
+.cul-step-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(18px, 5vw, 22px);
+  margin: 0 0 2px;
+  color: var(--text);
+}
+.cul-step-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-3);
+}
+
+.cul-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--space-4);
+}
+.cul-chip {
+  background: var(--surface-soft);
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cul-chip.active {
+  background: var(--accent);
+  border-color: var(--accent-deep);
+  color: #fff;
+}
+
+.cul-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.cul-nav .btn-primary { margin-left: auto; }
+.cul-nav .btn-primary:disabled { opacity: 0.45; cursor: default; }
+
+/* Завантаження */
+.cul-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-5) 0;
+  text-align: center;
+}
+.cul-loading-emoji {
+  font-size: 44px;
+  animation: cul-bounce 1s ease infinite;
+}
+@keyframes cul-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.cul-loading-text {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 17px;
+  margin: 0;
+}
+
+/* Результат */
+.cul-desc { font-size: 14px; line-height: 1.5; color: var(--text); margin: var(--space-2) 0 0; }
+.cul-tools { font-size: 13px; color: var(--text-muted); margin: 4px 0 0; }
+
+.discover-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(18px, 5vw, 24px);
+  color: var(--accent-deep);
+  margin: 0;
+}
+.discover-meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+.discover-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.discover-actions .btn-secondary { flex: 1; }
