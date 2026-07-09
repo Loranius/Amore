@@ -90,6 +90,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Router.init();
   Counter.init();
   WeekWidget.init();
+  HomeWidgets.init();
   Greeting.init();
   Photos.init();
   Settings.init();

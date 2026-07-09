@@ -1,9 +1,10 @@
 // ============================================================
 // PHOTOS MODULE
-// Пул фото для головної сторінки (полароїд-стіна).
-// При кожному вході завантажується список з Supabase Storage,
-// обирається 6 випадкових без повторів і розкидається по картках.
-// reloadPool() — викликається з Settings після upload/delete
+// Хмарка левітуючих фото навколо лічильника на головній.
+// При вході завантажується список з Supabase Storage,
+// 6 випадкових без повторів розкидаються по слотах.
+// Тап по фото — заміна на наступне з колоди (без повторів,
+// поки не покажемо весь пул). reloadPool() — із Settings.
 // ============================================================
 
 const Photos = (() => {
@@ -55,8 +56,8 @@ const Photos = (() => {
 
   // ---------- Анімований рендер ----------
   async function render(pool) {
-    const images    = document.querySelectorAll('.polaroid-photo img[data-photo-slot]');
-    const polaroids = document.querySelectorAll('.polaroid');
+    const images    = document.querySelectorAll('.float-photo img[data-photo-slot]');
+    const polaroids = document.querySelectorAll('.float-photo');
     if (!images.length) return;
 
     const picks = pickPhotos(pool, images.length);
@@ -121,17 +122,82 @@ const Photos = (() => {
     });
   }
 
+  // ---------- Колода для тап-свапу (без повторів) ----------
+  let deck = [];
+  let deckIdx = 0;
+
+  function currentShown() {
+    return new Set(
+      [...document.querySelectorAll('.float-photo img[data-photo-slot]')]
+        .map(i => i.src).filter(Boolean)
+    );
+  }
+
+  function rebuildDeck() {
+    const shown = currentShown();
+    deck = shuffle((_pool || []).filter(u => !shown.has(u)));
+    deckIdx = 0;
+  }
+
+  // Наступне фото, якого зараз немає на екрані; null — якщо пул ≤ 6
+  function nextPhoto() {
+    if (!_pool || _pool.length <= document.querySelectorAll('.float-photo').length) return null;
+    const shown = currentShown();
+    for (let attempts = 0; attempts < 2; attempts++) {
+      while (deckIdx < deck.length) {
+        const cand = deck[deckIdx++];
+        if (!shown.has(cand)) return cand;
+      }
+      rebuildDeck(); // колода скінчилась — тасуємо все, що не на екрані
+    }
+    return null;
+  }
+
+  // ---------- Тап по фото: свап на наступне ----------
+  function bindTapSwap() {
+    document.querySelectorAll('.float-photo').forEach(fp => {
+      fp.addEventListener('click', () => {
+        const img = fp.querySelector('img');
+        const next = nextPhoto();
+        if (!img || !next) return;
+
+        // Прелоад, потім анімована заміна (scale+fade на img,
+        // щоб не конфліктувати з keyframes левітації на контейнері)
+        const pre = new Image();
+        const doSwap = () => {
+          img.style.transition = 'opacity .16s ease, transform .16s ease';
+          img.style.opacity = '0';
+          img.style.transform = 'scale(.82) rotate(-5deg)';
+          setTimeout(() => {
+            img.src = next;
+            requestAnimationFrame(() => {
+              img.style.opacity = '1';
+              img.style.transform = '';
+              setTimeout(() => { img.style.transition = ''; }, 200);
+            });
+          }, 160);
+        };
+        pre.onload = doSwap;
+        pre.onerror = () => {}; // биту URL просто пропускаємо
+        pre.src = next;
+      });
+    });
+  }
+
   // ---------- Публічний: перезавантажити пул і перерисувати ----------
   async function reloadPool() {
     _pool = await fetchPool();
+    rebuildDeck();
     render(_pool);
   }
 
   // ---------- Init ----------
   function init() {
+    bindTapSwap();
     window.addEventListener('portal:auth', async () => {
       if (_pool === null) {
         _pool = await fetchPool();
+        rebuildDeck();
       }
       render(_pool);
     });
