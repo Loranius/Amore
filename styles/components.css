@@ -1399,73 +1399,7 @@
   transform: rotate(-1deg);
 }
 
-.wall {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px 16px;
-}
 
-.polaroid {
-  background: #fff;
-  border-radius: 4px;
-  padding: 10px 10px 30px;
-  box-shadow: 0 10px 28px -8px rgba(74,53,64,0.22), 0 2px 8px -4px rgba(232,130,156,0.15);
-  text-decoration: none;
-  color: var(--text);
-  display: block;
-  transition: transform 0.2s cubic-bezier(.34,1.4,.64,1), box-shadow 0.2s ease, opacity 0.48s ease;
-  will-change: transform, opacity;
-}
-
-[data-theme="dark"] .polaroid {
-  background: #2C2028;
-  box-shadow: 0 10px 28px -8px rgba(0,0,0,0.5), 0 2px 8px -4px rgba(232,130,156,0.1);
-}
-
-[data-theme="dark"] .polaroid-caption {
-  color: var(--text);
-}
-
-
-.polaroid:nth-child(1) { transform: rotate(-3deg); }
-.polaroid:nth-child(2) { transform: rotate(2deg); margin-top: 16px; }
-.polaroid:nth-child(3) { transform: rotate(2deg); margin-top: -8px; }
-.polaroid:nth-child(4) { transform: rotate(-2deg); }
-.polaroid:nth-child(5) { transform: rotate(-2deg); margin-top: 10px; }
-.polaroid:nth-child(6) { transform: rotate(1deg); margin-top: -6px; }
-
-.polaroid-photo {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  border-radius: 2px;
-  background: linear-gradient(135deg, var(--surface-soft), var(--line));
-  overflow: hidden;
-}
-
-.polaroid-photo img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.3s ease;
-}
-
-.polaroid:hover .polaroid-photo img {
-  transform: scale(1.03);
-}
-
-.polaroid-caption {
-  font-family: var(--font-hand);
-  font-size: 19px;
-  font-weight: 700;
-  text-align: center;
-  margin: 10px 0 0;
-  color: var(--text);
-}
-
-/* ============================================================
-   SWIPE VIEW (Tinder-стиль)
-   ============================================================ */
 .swipe-type-tabs {
   display: flex;
   gap: var(--space-2);
@@ -5191,3 +5125,107 @@ a.wl-archive-title:hover { text-decoration: underline; }
   margin-top: var(--space-2);
 }
 .discover-actions .btn-secondary { flex: 1; }
+
+/* ════════════════════════════════════════════
+   HERO CLOUD — фото левітують навколо лічильника
+   ════════════════════════════════════════════ */
+.hero-cloud {
+  position: relative;
+  height: 380px;
+  margin-bottom: var(--space-3);
+}
+
+.hero-cloud .counter-sticker {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  margin: 0;
+  max-width: 210px;
+}
+
+.float-photo {
+  position: absolute;
+  width: 86px;
+  padding: 5px 5px 14px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  z-index: 1;
+  animation: fp-levitate 6s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+[data-theme="dark"] .float-photo {
+  background: #2A2027;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.float-photo img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 3px;
+  background: var(--surface-soft);
+}
+
+/* Розкидання по слотах: позиція, нахил, свій темп левітації */
+.fp-1 { top: 2%;   left: 2%;   --fp-rot: -7deg; animation-duration: 5.6s; }
+.fp-2 { top: 0;    right: 4%;  --fp-rot: 5deg;  animation-duration: 7.2s; animation-delay: -1.8s; }
+.fp-3 { top: 38%;  left: -1%;  --fp-rot: 4deg;  animation-duration: 6.4s; animation-delay: -3.1s; }
+.fp-4 { top: 40%;  right: -1%; --fp-rot: -5deg; animation-duration: 5.9s; animation-delay: -0.9s; }
+.fp-5 { bottom: 1%; left: 8%;  --fp-rot: 6deg;  animation-duration: 6.9s; animation-delay: -2.4s; }
+.fp-6 { bottom: 0;  right: 8%; --fp-rot: -4deg; animation-duration: 6.1s; animation-delay: -4.2s; }
+
+@keyframes fp-levitate {
+  from { transform: rotate(var(--fp-rot, 0deg)) translateY(0); }
+  to   { transform: rotate(var(--fp-rot, 0deg)) translateY(-9px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float-photo { animation: none; transform: rotate(var(--fp-rot, 0deg)); }
+}
+
+/* ── Міні-віджети під хіро ── */
+.home-mini-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.home-mini-row:empty { display: none; }
+
+.mini-widget {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: none;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-sm, 0 2px 8px rgba(0,0,0,0.06));
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-body);
+  color: var(--text);
+  animation: hub-panel-in 0.2s ease;
+}
+.mini-widget.hidden { display: none; }
+.mini-widget-icon { font-size: 22px; flex-shrink: 0; }
+.mini-widget-text { font-size: 12px; line-height: 1.35; }
+.mini-widget-text b { font-size: 13px; }
+
+/* Desktop: одна колонка по центру, хіро більший */
+@media (min-width: 900px) {
+  #view-home {
+    display: block;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  .home-left { position: static; }
+  .hero-cloud { height: 460px; }
+  .float-photo { width: 118px; }
+}
