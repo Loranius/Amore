@@ -9,6 +9,7 @@ const Greeting = (() => {
   const COMMON = [
     'Хай, бубос 💛',
     'Привіт, пупс 🌸',
+    'Шо ти там, крошка? 😏',
   ];
 
   const PERSONAL = {
