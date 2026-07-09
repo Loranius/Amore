@@ -6,15 +6,29 @@
 const Router = (() => {
   let currentView = 'home';
 
-  // Порядок вкладок для визначення напрямку slide
-  const VIEW_ORDER = ['home', 'wishlist', 'budget', 'random', 'calendar', 'capsule', 'question', 'media', 'map', 'shopping', 'photo-calendar', 'schedule'];
+  // Сабв'ю → хаб-секція, в якій вони живуть.
+  // Модулі (calendar.js, schedule.js, ...) далі слухають portal:view
+  // за своїми старими іменами — для них нічого не змінилось.
+  const SUBVIEWS = {
+    'calendar':       'calendar-hub',
+    'schedule':       'calendar-hub',
+    'photo-calendar': 'calendar-hub',
+    'question':       'us-hub',
+    'capsule':        'us-hub'
+  };
+
+  const sectionOf = v => SUBVIEWS[v] || v;
+
+  // Порядок СЕКЦІЙ для визначення напрямку slide
+  const VIEW_ORDER = ['home', 'wishlist', 'budget', 'calendar-hub', 'us-hub', 'media', 'map', 'shopping', 'random'];
 
   // Розділи, що живуть під кнопкою «Ще» (мають підсвічувати «Ще»)
-  const MORE_VIEWS = ['calendar', 'capsule', 'question', 'media', 'map', 'random', 'photo-calendar', 'schedule'];
+  const MORE_VIEWS = ['calendar', 'schedule', 'photo-calendar', 'question', 'capsule', 'media', 'map', 'random'];
 
   function updateActiveStates(viewName) {
+    const section = sectionOf(viewName);
     document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.view === viewName);
+      btn.classList.toggle('active', sectionOf(btn.dataset.view) === section);
     });
     const moreBtn = document.getElementById('more-nav-btn');
     if (moreBtn) {
@@ -22,22 +36,41 @@ const Router = (() => {
     }
   }
 
+  // Перемикання сабтабів та панелей всередині хабу
+  function updateHubTabs(viewName) {
+    const section = sectionOf(viewName);
+    if (section === viewName) return; // звичайний view, не хаб
+    const hub = document.querySelector(`.view[data-view="${section}"]`);
+    if (!hub) return;
+    hub.querySelectorAll('.hub-tab').forEach(t =>
+      t.classList.toggle('active', t.dataset.view === viewName));
+    hub.querySelectorAll('.hub-panel').forEach(p =>
+      p.classList.toggle('hidden', p.dataset.panel !== viewName));
+  }
+
   function showView(viewName) {
-    const prevIndex = VIEW_ORDER.indexOf(currentView);
-    const nextIndex = VIEW_ORDER.indexOf(viewName);
-    const direction = nextIndex >= prevIndex ? 'slide-in-right' : 'slide-in-left';
+    const prevSection = sectionOf(currentView);
+    const nextSection = sectionOf(viewName);
 
-    document.querySelectorAll('.view').forEach(el => {
-      el.classList.remove('slide-in-right', 'slide-in-left');
-      const isTarget = el.dataset.view === viewName;
-      el.classList.toggle('hidden', !isTarget);
-      if (isTarget && currentView !== viewName) {
-        // force reflow щоб анімація рестартувала
-        void el.offsetWidth;
-        el.classList.add(direction);
-      }
-    });
+    // Slide-анімація — тільки коли реально змінюється секція.
+    // Перемикання сабтабу всередині хабу відбувається без слайду.
+    if (prevSection !== nextSection) {
+      const direction = VIEW_ORDER.indexOf(nextSection) >= VIEW_ORDER.indexOf(prevSection)
+        ? 'slide-in-right' : 'slide-in-left';
 
+      document.querySelectorAll('.view').forEach(el => {
+        el.classList.remove('slide-in-right', 'slide-in-left');
+        const isTarget = el.dataset.view === nextSection;
+        el.classList.toggle('hidden', !isTarget);
+        if (isTarget) {
+          // force reflow щоб анімація рестартувала
+          void el.offsetWidth;
+          el.classList.add(direction);
+        }
+      });
+    }
+
+    updateHubTabs(viewName);
     updateActiveStates(viewName);
     currentView = viewName;
     sessionStorage.setItem('portal:lastView', viewName);
@@ -89,6 +122,11 @@ const Router = (() => {
       });
     });
 
+    // Сабтаби всередині хабів (Календар: Події/Графік/Фото, Ми: Питання/Капсула)
+    document.querySelectorAll('.hub-tab[data-view]').forEach(btn => {
+      btn.addEventListener('click', () => showView(btn.dataset.view));
+    });
+
     // Закриття меню
     document.getElementById('more-menu-close').addEventListener('click', closeMoreMenu);
     document.getElementById('more-menu-overlay').addEventListener('click', (e) => {
@@ -98,7 +136,7 @@ const Router = (() => {
     // ініціалізувати дані для стартового view після логіну
     window.addEventListener('portal:auth', () => {
       const saved = sessionStorage.getItem('portal:lastView');
-      if (saved && VIEW_ORDER.includes(saved) && saved !== 'home') {
+      if (saved && (VIEW_ORDER.includes(saved) || SUBVIEWS[saved]) && saved !== 'home') {
         showView(saved);
       } else {
         window.dispatchEvent(new CustomEvent('portal:view', { detail: { view: currentView } }));
