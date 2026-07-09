@@ -5016,3 +5016,75 @@ a.wl-archive-title:hover { text-decoration: underline; }
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: none; }
 }
+
+/* ════════════════════════════════════════════
+   РЕЦЕПТИ (Рандом → страви)
+   ════════════════════════════════════════════ */
+.rcp-modal-card {
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+/* Тогл секції рецепта в модалці */
+.rcp-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--surface-soft);
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.rcp-toggle--filled { color: var(--accent-deep); }
+.rcp-toggle .fin-acc-arrow { transition: transform 0.2s ease; }
+.rcp-toggle .fin-acc-arrow.open { transform: rotate(90deg); }
+
+.rcp-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+}
+.rcp-editor label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.rcp-hint { font-weight: 400; opacity: 0.7; }
+.rcp-servings-inp { width: 80px; }
+
+.rcp-ing-row {
+  display: grid;
+  grid-template-columns: 1fr 64px 88px 28px;
+  gap: 6px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.rcp-ing-row .fin-inp { min-width: 0; }
+.rcp-add-ing-btn { align-self: flex-start; font-size: 13px; padding: 6px 12px; }
+
+/* Кнопка рецепта біля результату рандому */
+.dish-result-recipe { margin-bottom: var(--space-3); }
+
+/* Перегляд рецепта */
+.rcp-view-card { max-height: 85vh; overflow-y: auto; }
+.rcp-servings-line { color: var(--text-muted); font-size: 14px; margin-bottom: var(--space-2); }
+.rcp-view-subtitle {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--accent-deep);
+  margin: var(--space-3) 0 var(--space-2);
+}
+.rcp-view-ings { display: flex; flex-direction: column; gap: 6px; }
+.rcp-view-ing { display: flex; align-items: baseline; gap: 6px; font-size: 14px; }
+.rcp-view-ing-name { flex-shrink: 0; }
+.rcp-view-ing-dots { flex: 1; border-bottom: 1px dotted var(--text-muted); opacity: 0.4; transform: translateY(-3px); }
+.rcp-view-ing-amount { flex-shrink: 0; font-weight: 600; color: var(--accent-deep); }
+.rcp-view-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.45; }
+.dish-title--link { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }

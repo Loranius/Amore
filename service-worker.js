@@ -7,12 +7,12 @@
 // Щоб скинути кеш — підніми версію в CACHE нижче.
 // ============================================================
 // ⚠️ ОНОВЛЮВАТИ РАЗОМ З index.html при кожній зміні CSS!
-const CACHE = 'amore-v44';
+const CACHE = 'amore-v45';
 const SHELL = [
   './',
   './index.html',
   './styles/main.css?v=10',
-  './styles/components.css?v=33',
+  './styles/components.css?v=34',
 ];
 
 self.addEventListener('install', (e) => {
