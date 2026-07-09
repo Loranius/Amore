@@ -55,7 +55,19 @@ const Photos = (() => {
   }
 
   // ---------- Анімований рендер ----------
+  let _busy = false; // захист від накладання анімацій при швидких повторних викликах
+
   async function render(pool) {
+    if (_busy) return;
+    _busy = true;
+    try {
+      await renderInner(pool);
+    } finally {
+      _busy = false;
+    }
+  }
+
+  async function renderInner(pool) {
     const images    = document.querySelectorAll('.float-photo img[data-photo-slot]');
     const polaroids = document.querySelectorAll('.float-photo');
     if (!images.length) return;
@@ -63,7 +75,10 @@ const Photos = (() => {
     const picks = pickPhotos(pool, images.length);
     if (!picks.length) {
       // Пул порожній — просто показуємо полароїди (з поточними фото або placeholder)
-      polaroids.forEach(p => { p.style.opacity = '1'; });
+      polaroids.forEach(p => {
+        p.style.transition = 'opacity 300ms ease';
+        p.style.opacity = '1';
+      });
       return;
     }
 
@@ -84,7 +99,7 @@ const Photos = (() => {
       });
       await new Promise(r => setTimeout(r, FADE_OUT + (polaroids.length - 1) * STAGGER + 50));
     } else {
-      // Перший рендер — ставимо opacity:0 щоб підготуватись до fade-in
+      // Перший рендер — полароїди вже приховані CSS-правилом (opacity:0)
       polaroids.forEach(p => { p.style.opacity = '0'; });
     }
 
@@ -103,19 +118,30 @@ const Photos = (() => {
       })
     ));
 
-    // 3. Staggered fade-in з легким підйомом
+    // 3. Staggered fade-in. Opacity — на самому полароїді (.float-photo), легкий
+    // підйом — на img всередині: контейнер має нескінченну CSS-анімацію
+    // левітації (fp-levitate), яка керує його transform, тож інлайновий
+    // transform на контейнері конфліктував би з нею й смикався.
     polaroids.forEach((p, i) => {
+      const img = p.querySelector('img');
       setTimeout(() => {
-        p.style.transition = `opacity ${FADE_IN}ms cubic-bezier(.25,.8,.25,1), transform ${FADE_IN}ms cubic-bezier(.25,.8,.25,1)`;
+        p.style.transition = `opacity ${FADE_IN}ms cubic-bezier(.25,.8,.25,1)`;
         p.style.opacity    = '0';
-        p.style.transform  = 'translateY(12px)';
+        if (img) {
+          img.style.transition = 'none';
+          img.style.transform  = 'translateY(12px)';
+        }
 
         requestAnimationFrame(() => requestAnimationFrame(() => {
-          p.style.opacity   = '1';
-          p.style.transform = '';
+          p.style.opacity = '1';
+          if (img) {
+            img.style.transition = `transform ${FADE_IN}ms cubic-bezier(.25,.8,.25,1)`;
+            img.style.transform  = '';
+          }
           // Після завершення анімації — прибираємо transition, але opacity:1 ЗАЛИШАЄМО
           setTimeout(() => {
             p.style.transition = '';
+            if (img) img.style.transition = '';
           }, FADE_IN + 80);
         }));
       }, i * STAGGER);
@@ -165,17 +191,17 @@ const Photos = (() => {
         // щоб не конфліктувати з keyframes левітації на контейнері)
         const pre = new Image();
         const doSwap = () => {
-          img.style.transition = 'opacity .16s ease, transform .16s ease';
+          img.style.transition = 'opacity .22s cubic-bezier(.25,.8,.25,1), transform .22s cubic-bezier(.25,.8,.25,1)';
           img.style.opacity = '0';
-          img.style.transform = 'scale(.82) rotate(-5deg)';
+          img.style.transform = 'scale(.9) rotate(-3deg)';
           setTimeout(() => {
             img.src = next;
             requestAnimationFrame(() => {
               img.style.opacity = '1';
               img.style.transform = '';
-              setTimeout(() => { img.style.transition = ''; }, 200);
+              setTimeout(() => { img.style.transition = ''; }, 260);
             });
-          }, 160);
+          }, 220);
         };
         pre.onload = doSwap;
         pre.onerror = () => {}; // биту URL просто пропускаємо

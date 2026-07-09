@@ -5155,8 +5155,9 @@ a.wl-archive-title:hover { text-decoration: underline; }
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.14);
   cursor: pointer;
   z-index: 1;
+  opacity: 0; /* приховані до першого рендеру JS — без спалаху порожніх плейсхолдерів */
   animation: fp-levitate 6s ease-in-out infinite alternate;
-  will-change: transform;
+  will-change: transform, opacity;
 }
 
 [data-theme="dark"] .float-photo {
@@ -5178,8 +5179,8 @@ a.wl-archive-title:hover { text-decoration: underline; }
 .fp-2 { top: 0;    right: 4%;  --fp-rot: 5deg;  animation-duration: 7.2s; animation-delay: -1.8s; }
 .fp-3 { top: 38%;  left: -1%;  --fp-rot: 4deg;  animation-duration: 6.4s; animation-delay: -3.1s; }
 .fp-4 { top: 40%;  right: -1%; --fp-rot: -5deg; animation-duration: 5.9s; animation-delay: -0.9s; }
-.fp-5 { bottom: 1%; left: 8%;  --fp-rot: 6deg;  animation-duration: 6.9s; animation-delay: -2.4s; }
-.fp-6 { bottom: 0;  right: 8%; --fp-rot: -4deg; animation-duration: 6.1s; animation-delay: -4.2s; }
+.fp-5 { bottom: 1%; left: 3%;  --fp-rot: 6deg;  animation-duration: 6.9s; animation-delay: -2.4s; }
+.fp-6 { bottom: 0;  right: 3%; --fp-rot: -4deg; animation-duration: 6.1s; animation-delay: -4.2s; }
 
 @keyframes fp-levitate {
   from { transform: rotate(var(--fp-rot, 0deg)) translateY(0); }
