@@ -23,6 +23,55 @@ const RandomModule = (() => {
   }
 
   // ============================================================
+  // ДАНІ СТРАВ
+  // ============================================================
+  async function loadDishes() {
+    let { data, error } = await supabase
+      .from('dishes')
+      .select('id, title, category, recipe')
+      .order('id', { ascending: false });
+
+    if (error) {
+      // Колонка recipe ще не додана в Supabase — пробуємо без неї,
+      // поки не виконано: alter table dishes add column recipe jsonb;
+      let fb = await supabase.from('dishes').select('id, title, category').order('id', { ascending: false });
+      if (fb.error) {
+        // Немає і category — зовсім старий варіант таблиці
+        fb = await supabase.from('dishes').select('id, title').order('id', { ascending: false });
+        if (fb.error) {
+          console.error('Помилка завантаження страв:', fb.error);
+          return [];
+        }
+      }
+      return (fb.data || []).map(d => ({ ...d, category: d.category || 'other', recipe: d.recipe || null }));
+    }
+    return (data || []).map(d => ({ ...d, category: d.category || 'other', recipe: d.recipe || null }));
+  }
+
+  function visibleDishes() {
+    return activeDishCat === 'all'
+      ? dishes
+      : dishes.filter(d => (d.category || 'other') === activeDishCat);
+  }
+
+  function renderDishCatTabs() {
+    const wrap = document.getElementById('dish-cat-tabs');
+    if (!wrap) return;
+    const defs = [{ key: 'all', label: '🎲 Всі' }, ...Object.entries(DISH_CATS).map(([key, c]) => ({ key, label: c.label }))];
+    wrap.innerHTML = defs.map(d => {
+      const count = d.key === 'all' ? dishes.length : dishes.filter(x => (x.category || 'other') === d.key).length;
+      return `<button class="dish-cat-tab${activeDishCat === d.key ? ' active' : ''}" data-cat="${d.key}">${d.label} <span class="dish-cat-count">${count}</span></button>`;
+    }).join('');
+    wrap.querySelectorAll('[data-cat]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        activeDishCat = btn.dataset.cat;
+        renderDishCatTabs();
+        renderDishes(visibleDishes());
+      });
+    });
+  }
+
+  // ============================================================
   // РЕЦЕПТИ
   // recipe (jsonb): { servings, ingredients:[{name,amount,unit}], steps:[...] }
   // ============================================================
