@@ -20,10 +20,10 @@ const Router = (() => {
   const sectionOf = v => SUBVIEWS[v] || v;
 
   // Порядок СЕКЦІЙ для визначення напрямку slide
-  const VIEW_ORDER = ['home', 'wishlist', 'budget', 'calendar-hub', 'us-hub', 'media', 'map', 'shopping', 'random'];
+  const VIEW_ORDER = ['home', 'wishlist', 'budget', 'calendar-hub', 'us-hub', 'media', 'whereto', 'map', 'shopping', 'random'];
 
   // Розділи, що живуть під кнопкою «Ще» (мають підсвічувати «Ще»)
-  const MORE_VIEWS = ['calendar', 'schedule', 'photo-calendar', 'question', 'capsule', 'media', 'map', 'random'];
+  const MORE_VIEWS = ['calendar', 'schedule', 'photo-calendar', 'question', 'capsule', 'media', 'whereto', 'map', 'random'];
 
   function updateActiveStates(viewName) {
     const section = sectionOf(viewName);
