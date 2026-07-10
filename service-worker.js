@@ -6,13 +6,12 @@
 //  • Supabase / Mapbox / шрифти / CDN → напряму в мережу (не кешуємо)
 // Щоб скинути кеш — підніми версію в CACHE нижче.
 // ============================================================
-// ⚠️ ОНОВЛЮВАТИ РАЗОМ З index.html при кожній зміні CSS!
-const CACHE = 'amore-v55';
+// CSS/JS у прекеші не тримаємо — їх підхоплює runtime-кеш (SWR)
+// за повними URL з ?v=, тож синхронізувати нічого не треба.
+const CACHE = 'amore-v56';
 const SHELL = [
   './',
   './index.html',
-  './styles/main.css?v=10',
-  './styles/components.css?v=34',
 ];
 
 self.addEventListener('install', (e) => {
