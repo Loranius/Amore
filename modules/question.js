@@ -1,8 +1,11 @@
 // ============================================================
 // DAILY QUESTION MODULE
-// Випадкове питання на день з пулу (детермінований вибір
-// за датою, щоб обоє бачили те саме питання)
-// Кожен пише свою відповідь окремо
+// Унікальне питання дня генерує Claude (Edge Function
+// daily-question-ai): перший, хто відкрив вкладку, тригерить
+// генерацію; питання пишеться в БД, тож обоє бачать те саме.
+// Fallback: якщо функція недоступна — детермінований вибір
+// зі старого пулу за хешем дати (як раніше).
+// Кожен пише свою відповідь окремо.
 // ============================================================
 
 const DailyQuestion = (() => {
@@ -35,6 +38,25 @@ const DailyQuestion = (() => {
     if (!pool.length) return null;
     const idx = hashStringToInt(dateStr) % pool.length;
     return pool[idx];
+  }
+
+  // ---------- Питання дня від Claude ----------
+  // Ідемпотентний виклик: функція сама створює лог-запис дня,
+  // тож повторні виклики і гонка двох користувачів безпечні.
+  async function fetchAiQuestion(dateStr) {
+    try {
+      const { data, error } = await supabase.functions.invoke('daily-question-ai', {
+        body: { date: dateStr },
+      });
+      if (error || !data || !data.text) {
+        console.warn('daily-question-ai недоступна, fallback на пул', error);
+        return null;
+      }
+      return { id: data.id, text: data.text };
+    } catch (e) {
+      console.warn('daily-question-ai:', e);
+      return null;
+    }
   }
 
   // ---------- Завантаження ----------
@@ -176,18 +198,29 @@ const DailyQuestion = (() => {
     todayStr = getTodayStr();
     document.getElementById('question-date').textContent = formatToday();
 
-    if (!questionsPool) {
-      questionsPool = await loadPool();
+    // Питання дня — миттєво з кешу, ревалідація у фоні
+    const qKey = 'question:today:' + todayStr;
+    const cached = DataCache.get ? DataCache.get(qKey) : null;
+    if (cached) {
+      currentQuestion = cached;
+    } else {
+      document.getElementById('question-text').textContent = '🔮 Клод вигадує питання…';
+      currentQuestion = await fetchAiQuestion(todayStr);
+      // Fallback: старий пул з детермінованим вибором за датою
+      if (!currentQuestion) {
+        if (!questionsPool) questionsPool = await loadPool();
+        currentQuestion = pickQuestionForDate(questionsPool, todayStr);
+      }
+      if (currentQuestion && DataCache.set) DataCache.set(qKey, currentQuestion);
     }
 
-    if (!questionsPool.length) {
-      document.getElementById('question-text').textContent = 'Пул питань поки порожній.';
+    if (!currentQuestion) {
+      document.getElementById('question-text').textContent = 'Не вдалось отримати питання дня.';
       document.getElementById('question-answers').innerHTML = '';
       document.getElementById('question-input-wrap').classList.add('hidden');
       return;
     }
 
-    currentQuestion = pickQuestionForDate(questionsPool, todayStr);
     document.getElementById('question-text').textContent = currentQuestion.text;
 
     // Запис відповідей дня — миттєво з кешу, потім ревалідація
