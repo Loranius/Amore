@@ -3,6 +3,11 @@
 // Claude з web search (Edge Function events-finder) шукає
 // 3 актуальні події/місця у місті пари. Місто+область
 // зберігаються в settings (key: whereto_location).
+// Перед пошуком підтягуємо графік (work_schedule) обох на
+// найближчі SCHEDULE_WINDOW_DAYS днів і шлемо в Edge Function
+// список дат, коли хтось із двох вільний (freeDays) — Клод має
+// пропонувати події лише на ці дати, на дні коли в ОБОХ "Р" —
+// нічого не пропонувати.
 // Квитки: спроба відкрити у вбудованому вікні (iframe) з
 // fallback «Відкрити у браузері» — квиткові сайти часто
 // забороняють embed.
@@ -12,6 +17,7 @@ const WhereTo = (() => {
 
   const el = id => document.getElementById(id);
   const SETTING_KEY = 'whereto_location';
+  const SCHEDULE_WINDOW_DAYS = 30;
 
   // Повна Україна (кордони до 2014): 24 області + АР Крим + міста
   const OBLASTS = [
@@ -99,6 +105,41 @@ const WhereTo = (() => {
     });
   }
 
+  // ── Графік: дати найближчих SCHEDULE_WINDOW_DAYS днів, коли
+  // хтось із двох вільний ("Х"). null — не вдалось завантажити
+  // графік (тоді шукаємо без обмеження за датами).
+  const pad = n => String(n).padStart(2, '0');
+  const dstr = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  async function fetchFreeDays() {
+    const today = new Date();
+    const from = dstr(today);
+    const lastDay = new Date(today);
+    lastDay.setDate(lastDay.getDate() + SCHEDULE_WINDOW_DAYS);
+    const to = dstr(lastDay);
+
+    const [{ data: rows, error }, users] = await Promise.all([
+      supabase.from('work_schedule').select('date,user_id,mark').gte('date', from).lte('date', to),
+      Auth.getUsers(),
+    ]);
+    if (error || !users || !users.length) return null;
+
+    const byDate = {};
+    (rows || []).forEach(r => {
+      if (!byDate[r.date]) byDate[r.date] = {};
+      byDate[r.date][r.user_id] = r.mark;
+    });
+
+    const freeDays = [];
+    for (let i = 0; i <= SCHEDULE_WINDOW_DAYS; i++) {
+      const d = new Date(today); d.setDate(d.getDate() + i);
+      const ds = dstr(d);
+      const dayMarks = byDate[ds] || {};
+      if (users.some(u => dayMarks[u.id] === 'Х')) freeDays.push(ds);
+    }
+    return freeDays;
+  }
+
   // ── Пошук подій ────────────────────────────────────────────
   async function search(more = false) {
     if (!location) { openCityModal(); return; }
@@ -113,13 +154,26 @@ const WhereTo = (() => {
         <div class="cul-loading">
           <div class="cul-loading-emoji">🗺️</div>
           <p class="cul-loading-text">Клод моніторить ${esc(location.city)}…</p>
-          <p class="cul-step-hint">Шукаю події і цікаві місця на найближчі дні</p>
+          <p class="cul-step-hint">Підбираю під ваш графік вихідних</p>
         </div>`;
+    }
+
+    const freeDays = await fetchFreeDays();
+    if (freeDays !== null && !freeDays.length) {
+      box.innerHTML = `
+        <div class="cul-loading">
+          <div class="cul-loading-emoji">📅</div>
+          <p class="cul-loading-text">Найближчим часом немає жодного вихідного</p>
+          <p class="cul-step-hint">Заповніть графік у вкладці «Графік» — і я підберу події на вільні дні</p>
+        </div>`;
+      btn.disabled = false;
+      btn.textContent = '🔎 Пошук подій';
+      return;
     }
 
     try {
       const { data, error } = await supabase.functions.invoke('events-finder', {
-        body: { city: location.city, region: location.region, avoid },
+        body: { city: location.city, region: location.region, avoid, freeDays: freeDays || [] },
       });
       if (error) throw error;
       if (!data || !Array.isArray(data.events) || !data.events.length) {
