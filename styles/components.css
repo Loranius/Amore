@@ -5309,3 +5309,15 @@ a.wl-archive-title:hover { text-decoration: underline; }
   margin: 6px 12px; text-align: center;
 }
 .wt-embed-frame { flex: 1; border: none; width: 100%; background: #fff; }
+
+/* Куди піти: примітка про вихідні */
+.wt-offnote {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-deep);
+  background: var(--surface-soft);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  margin: 0 0 8px;
+  display: inline-block;
+}
