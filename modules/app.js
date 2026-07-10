@@ -91,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Counter.init();
   WeekWidget.init();
   HomeWidgets.init();
+  WhereTo.init();
   Greeting.init();
   Photos.init();
   Settings.init();
