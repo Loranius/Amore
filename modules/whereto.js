@@ -99,6 +99,32 @@ const WhereTo = (() => {
     });
   }
 
+  // ── Денний кеш результатів (щоб не палити пошук повторно) ──
+  const CACHE_PREFIX = 'amore:whereto:';
+
+  function cacheKey() {
+    return CACHE_PREFIX + wtDateStr(0) + ':' + (location ? location.city : '');
+  }
+
+  function readCache() {
+    try {
+      const raw = localStorage.getItem(cacheKey());
+      if (!raw) return null;
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) && arr.length ? arr : null;
+    } catch (e) { return null; }
+  }
+
+  function writeCache(events) {
+    try {
+      // прибираємо вчорашні ключі, щоб не смітити
+      Object.keys(localStorage)
+        .filter(k => k.startsWith(CACHE_PREFIX) && k !== cacheKey())
+        .forEach(k => localStorage.removeItem(k));
+      localStorage.setItem(cacheKey(), JSON.stringify(events));
+    } catch (e) { /* ignore */ }
+  }
+
   // ── Вихідні пари на найближчі 7 днів (з графіка) ───────────
   function wtDateStr(offsetDays = 0) {
     const d = new Date();
@@ -147,6 +173,18 @@ const WhereTo = (() => {
 
     const btn = el('wt-search-btn');
     const box = el('wt-results');
+
+    // Кеш дня: звичайний «Пошук подій» показує вже знайдене сьогодні
+    // без нового (платного) веб-пошуку. Свіжий пошук — «Ще варіанти».
+    if (!more) {
+      const cached = readCache();
+      if (cached) {
+        lastResults = cached;
+        avoid = cached.map(ev => ev.title);
+        renderResults(box);
+        return;
+      }
+    }
     btn.disabled = true;
     btn.textContent = '🔎 Шукаю…';
     if (!more) {
@@ -175,6 +213,7 @@ const WhereTo = (() => {
 
       lastResults = data.events;
       data.events.forEach(ev => avoid.push(ev.title));
+      if (!more) writeCache(data.events);
       renderResults(box);
     } catch (e) {
       console.error('events-finder:', e);
@@ -250,9 +289,19 @@ const WhereTo = (() => {
 
     window.addEventListener('portal:auth', loadLocation);
     window.addEventListener('portal:view', (e) => {
-      if (e.detail && e.detail.view === 'whereto' && !location) {
-        // перший вхід — одразу пропонуємо обрати місто
-        setTimeout(openCityModal, 300);
+      if (e.detail && e.detail.view === 'whereto') {
+        if (!location) {
+          // перший вхід — одразу пропонуємо обрати місто
+          setTimeout(openCityModal, 300);
+        } else {
+          const cached = readCache();
+          const box = el('wt-results');
+          if (cached && box && !box.children.length) {
+            lastResults = cached;
+            avoid = cached.map(ev => ev.title);
+            renderResults(box);
+          }
+        }
       }
     });
   }
