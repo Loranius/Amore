@@ -238,7 +238,7 @@ const PhotoCalendar = (() => {
 
     // Прихований файловий input — одним екземпляром на всю модалку
     const fileInp = document.createElement('input');
-    fileInp.type = 'file'; fileInp.accept = 'image/*'; fileInp.style.display = 'none';
+    fileInp.type = 'file'; fileInp.accept = 'image/*,.heic,.heif'; fileInp.style.display = 'none';
     document.body.appendChild(fileInp);
     fileInp.addEventListener('change', e => onFileSelected(e.target.files?.[0]));
 
@@ -273,8 +273,16 @@ const PhotoCalendar = (() => {
     el('pcal-ov')._cleanup = () => fileInp.remove();
   }
 
-  function onFileSelected(file) {
+  async function onFileSelected(file) {
     if (!file) return;
+    // HEIC з iPhone конвертуємо в JPEG одразу — інакше прев'ю і стиснення не спрацюють
+    try {
+      file = await Img.normalize(file);
+    } catch (e) {
+      console.error('[PhotoCalendar] конвертація HEIC не вдалася:', e);
+      ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + e.message);
+      return;
+    }
     pendingFile = file;
     // Прев'ю
     const reader = new FileReader();

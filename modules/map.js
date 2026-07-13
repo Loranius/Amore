@@ -81,6 +81,18 @@ const MapModule = (() => {
   // ---------- Фото ----------
   // onProgress(msg) — необов'язковий колбек для UI
   async function uploadMapPhoto(file, pinId, onProgress) {
+    // HEIC з iPhone → JPEG (інакше canvas не декодує, а сирий HEIC не відобразиться)
+    if (Img.isHeic(file)) {
+      if (onProgress) onProgress('Конвертуємо HEIC…');
+      try {
+        file = await Img.normalize(file);
+      } catch (err) {
+        console.error('uploadMapPhoto: конвертація HEIC не вдалася', err);
+        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + err.message);
+        return null;
+      }
+    }
+
     if (onProgress) onProgress('Стискаємо фото…');
 
     let blob = file;
@@ -514,7 +526,7 @@ const MapModule = (() => {
             '</div>' +
             '<div class="form-field">' +
               '<label for="pin-edit-photo">Замінити фото</label>' +
-              '<input type="file" id="pin-edit-photo" accept="image/*">' +
+              '<input type="file" id="pin-edit-photo" accept="image/*,.heic,.heif">' +
             '</div>' +
             '<div class="modal-actions">' +
               '<a class="btn-secondary" href="' + directionsUrl(pin.lat, pin.lng) + '" target="_blank" rel="noopener" style="text-decoration:none;text-align:center;">🧭 Маршрут</a>' +
@@ -603,7 +615,7 @@ const MapModule = (() => {
           '</div>' +
           '<div class="form-field">' +
             '<label for="pin-photo">Фото місця</label>' +
-            '<input type="file" id="pin-photo" accept="image/*">' +
+            '<input type="file" id="pin-photo" accept="image/*,.heic,.heif">' +
             '<div id="pin-photo-preview" style="display:none;margin-top:8px;">' +
               '<img id="pin-photo-preview-img" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;">' +
               '<p id="pin-photo-preview-size" style="font-size:12px;color:#999;margin:4px 0 0;"></p>' +
@@ -639,9 +651,21 @@ const MapModule = (() => {
     });
 
     // Preview фото після вибору
-    document.getElementById('pin-photo').addEventListener('change', function(e) {
-      var file = e.target.files && e.target.files[0];
+    document.getElementById('pin-photo').addEventListener('change', async function(e) {
+      var inp = e.target;
+      var file = inp.files && inp.files[0];
+      inp._normFile = null;
       if (!file) return;
+      // HEIC → JPEG одразу, інакше прев'ю у <img> не відрендериться
+      try {
+        file = await Img.normalize(file);
+      } catch (err) {
+        console.error('[Map] конвертація HEIC не вдалася:', err);
+        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + err.message);
+        inp.value = '';
+        return;
+      }
+      inp._normFile = file; // savePin бере вже конвертований файл
       var preview = document.getElementById('pin-photo-preview');
       var previewImg = document.getElementById('pin-photo-preview-img');
       var previewSize = document.getElementById('pin-photo-preview-size');
@@ -676,8 +700,9 @@ const MapModule = (() => {
 
     if (error) { alert('Помилка збереження'); saveBtn.textContent = 'Зберегти'; saveBtn.disabled = false; return; }
 
-    if (photoInput && photoInput.files && photoInput.files[0]) {
-      var photoUrl = await uploadMapPhoto(photoInput.files[0], pinData.id, function(msg) {
+    var pinPhotoFile = photoInput && (photoInput._normFile || (photoInput.files && photoInput.files[0]));
+    if (pinPhotoFile) {
+      var photoUrl = await uploadMapPhoto(pinPhotoFile, pinData.id, function(msg) {
         saveBtn.textContent = msg;
       });
       if (photoUrl) {

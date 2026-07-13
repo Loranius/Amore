@@ -370,6 +370,8 @@ const Wishlist = (() => {
   // ── ФОТО З ПРИСТРОЮ ───────────────────────────────────────
   // Стискаємо на клієнті (Img.compress з lib/img.js) і вантажимо у Storage.
   async function uploadWishPhoto(file) {
+    // Страховка: HEIC → JPEG (кине помилку — обробник збереження покаже тост)
+    file = await Img.normalize(file);
     let blob = file, ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
     try {
       const out = await Img.compress(file, 1080, 0.78);
@@ -420,7 +422,7 @@ const Wishlist = (() => {
             <div class="wm-photo-actions">
               <button type="button" class="btn-secondary" id="wm-photo-pick">🖼 Обрати з пристрою</button>
               <button type="button" class="btn-secondary" id="wm-photo-clear" style="display:${item?.image_url?'inline-flex':'none'}">✕ Прибрати</button>
-              <input type="file" id="wm-photo-file" accept="image/*" style="display:none">
+              <input type="file" id="wm-photo-file" accept="image/*,.heic,.heif" style="display:none">
             </div>
           </div>
           <input class="fin-inp" id="wm-img" type="url" placeholder="або встав посилання на фото" value="${esc(item?.image_url||'')}" style="margin-top:8px">
@@ -464,9 +466,18 @@ const Wishlist = (() => {
       if (img) openPhotoLightbox(img.src);
     });
 
-    photoFileInp.addEventListener('change', () => {
-      const file = photoFileInp.files[0];
+    photoFileInp.addEventListener('change', async () => {
+      let file = photoFileInp.files[0];
       if (!file) return;
+      // HEIC з iPhone → JPEG одразу: інакше прев'ю не відрендериться
+      try {
+        file = await Img.normalize(file);
+      } catch (e) {
+        console.error('[Wishlist] конвертація HEIC не вдалася:', e);
+        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + e.message);
+        photoFileInp.value = '';
+        return;
+      }
       pendingPhotoFile = file;
       const reader = new FileReader();
       reader.onload = e => {

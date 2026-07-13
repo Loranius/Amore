@@ -228,6 +228,14 @@ const Media = (() => {
 
   // ── ПОСТЕР ----------
   async function uploadPoster(file, itemId) {
+    // HEIC → JPEG до стиснення; сирий HEIC не ллємо — не відобразиться в браузері
+    try {
+      file = await Img.normalize(file);
+    } catch (e) {
+      console.error('uploadPoster: конвертація HEIC не вдалася', e);
+      ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + e.message);
+      return null;
+    }
     let blob = file, ext = (file.name.split('.').pop()||'jpg').toLowerCase(), contentType = file.type;
     try {
       const out = await Img.compress(file, 900, 0.78);
@@ -613,7 +621,7 @@ const Media = (() => {
           </div>
           <div class="form-field">
             <label for="media-poster-file">Постер (фото)</label>
-            <input type="file" id="media-poster-file" accept="image/*">
+            <input type="file" id="media-poster-file" accept="image/*,.heic,.heif">
           </div>
           <div class="form-field">
             <label for="media-status-new">Статус</label>
@@ -675,7 +683,7 @@ const Media = (() => {
             <label>Поточний постер</label>
             ${item.poster_url ? `<img src="${esc(item.poster_url)}" style="width:60px;border-radius:8px;display:block;margin-bottom:8px;">` : '<p style="font-size:13px;color:var(--text-muted)">Немає постера</p>'}
             <label>Замінити постер</label>
-            <input type="file" id="edit-poster-file" accept="image/*">
+            <input type="file" id="edit-poster-file" accept="image/*,.heic,.heif">
           </div>
           <div class="form-field">
             <label>Статус</label>

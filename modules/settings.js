@@ -53,6 +53,15 @@ const Settings = (() => {
 
   // Завантажує один файл; повертає { name, url } або null
   async function uploadPhoto(file) {
+    // HEIC → JPEG до всього іншого. Якщо конвертація впала — сирий HEIC не ллємо:
+    // він не відобразиться в браузері і його відфільтрує listPhotos за розширенням.
+    try {
+      file = await Img.normalize(file);
+    } catch (e) {
+      console.error('uploadPhoto: конвертація HEIC не вдалася', e);
+      ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + e.message);
+      return null;
+    }
     let blob = file, ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
     try {
       const out = await Img.compress(file, 1280, 0.78); // ~1280px, WebP/JPEG
@@ -130,7 +139,7 @@ const Settings = (() => {
           <label class="photo-upload-zone" id="photo-upload-zone">
             <span class="photo-upload-icon">＋</span>
             <span class="photo-upload-label">Додати фото</span>
-            <input type="file" id="photo-file-input" accept="image/*" multiple style="display:none">
+            <input type="file" id="photo-file-input" accept="image/*,.heic,.heif" multiple style="display:none">
           </label>
 
           <!-- Прогрес -->
@@ -260,7 +269,7 @@ const Settings = (() => {
     zone.addEventListener('drop', e => {
       e.preventDefault();
       zone.classList.remove('drag-over');
-      handleFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+      handleFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/') || Img.isHeic(f)));
     });
 
     input.addEventListener('change', () => {
