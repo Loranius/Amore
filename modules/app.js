@@ -50,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Shopping.init();
     PhotoCalendar.init();
     Schedule.init();
+    Game.init();
   });
 
   // ── SIDEBAR TOGGLE (desktop only) ──

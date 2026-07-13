@@ -20,7 +20,7 @@
 - `index.html` — вся розмітка view-секцій + глобальні хелпери (`closeModalAnimated`).
 - `modules/*.js` — по модулю на вкладку (router, auth, calendar, shopping, random=Кулінарія,
   wishlist, budget, media, map, schedule, photo-calendar, question, capsule, counter,
-  greeting, photos, home-widgets, week-widget, settings, swipe, app).
+  greeting, photos, home-widgets, week-widget, settings, swipe, game=вкладка «Гра» (game.html в iframe), app).
 - `lib/*.js` — cache (SWR), realtime, error-boundary (тости: `ErrorBoundary.showToast(msg, 'success'|'warn'|тип за замовч. error)`), img (компресія), pwa, retry, confetti.
 - `styles/main.css` — токени/теми (світла + `[data-theme="dark"]`), базове. `styles/components.css` — компоненти.
 - `supabase/functions/*/index.ts` — вихідники Edge Functions (ДЕПЛОЯТЬСЯ ВРУЧНУ через
