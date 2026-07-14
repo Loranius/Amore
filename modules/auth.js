@@ -4,17 +4,18 @@
 // ============================================================
 
 const Auth = (() => {
-  let users        = [];   // [{id, name, pin_hash, email}]
+  let users        = [];   // [{id, name}]
   let selectedUser = null;
   let pinBuffer    = '';
 
   const SESSION_KEY = 'portal_session_user_id';
+  const DEFAULT_PIN_ERROR = 'Невірний PIN, спробуй ще';
 
   // ---------- Завантаження користувачів з Supabase ----------
   async function loadUsers() {
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, pin_hash, email')
+      .select('id, name')
       .order('id', { ascending: true });
 
     if (error) {
@@ -89,23 +90,39 @@ const Auth = (() => {
     }
   }
 
+  // PIN звіряється на сервері (Edge Function auth-pin) — клієнт більше не
+  // бачить pin_hash жодного користувача (revoke select у Supabase),
+  // тому офлайн-перебір PIN з devtools більше неможливий. Функція також
+  // рахує невдалі спроби і блокує на 15хв після 5 підряд помилок.
   async function verifyPin() {
-    const hash = await sha256(pinBuffer);
+    const pin = pinBuffer;
+    const { data, error } = await supabase.functions.invoke('auth-pin', {
+      body: { user_id: selectedUser.id, pin },
+    });
 
-    if (hash === selectedUser.pin_hash) {
-      // Тихий логін у Supabase Auth (для RLS)
-      await signInSupabase(selectedUser.email, hash);
+    if (!error && data && data.ok) {
+      await signInSupabase(data.email, data.password);
       localStorage.setItem(SESSION_KEY, selectedUser.id);
       enterApp(selectedUser);
-    } else {
-      document.getElementById('pin-error').classList.remove('hidden');
-      updatePinDots('error');
-      setTimeout(() => {
-        pinBuffer = '';
-        document.getElementById('pin-error').classList.add('hidden');
-        updatePinDots();
-      }, 600);
+      return;
     }
+
+    const errCode = data && data.error;
+    const errEl = document.getElementById('pin-error');
+    if (errCode === 'locked') {
+      const mins = Math.max(1, Math.ceil((data.retryAfterSeconds || 900) / 60));
+      errEl.textContent = `Забагато спроб, спробуй через ${mins} хв`;
+    } else {
+      errEl.textContent = DEFAULT_PIN_ERROR;
+    }
+    errEl.classList.remove('hidden');
+    updatePinDots('error');
+    setTimeout(() => {
+      pinBuffer = '';
+      errEl.classList.add('hidden');
+      errEl.textContent = DEFAULT_PIN_ERROR;
+      updatePinDots();
+    }, errCode === 'locked' ? 2000 : 600);
   }
 
   // ---------- Supabase Auth (тихо, юзер не бачить) ----------
@@ -113,11 +130,6 @@ const Auth = (() => {
     if (!email) return; // email ще не налаштований — пропускаємо
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) console.warn('Supabase Auth login failed (RLS буде недоступний):', error.message);
-  }
-
-  async function sha256(text) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
   }
 
   // ---------- Перехід в апку ----------
@@ -156,7 +168,7 @@ const Auth = (() => {
     // Сесія жива — відновлюємо UI-стан без повторного PIN
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, pin_hash, email')
+      .select('id, name')
       .eq('id', savedId)
       .single();
 
