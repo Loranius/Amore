@@ -40,7 +40,7 @@ const Shopping = (() => {
   async function loadItems() {
     const { data, error } = await supabase
       .from('shopping_items')
-      .select('id,title,qty,category,bought,created_by,bought_by,created_at,bought_at')
+      .select('id,title,qty,category,bought,created_by,bought_by,bought_at')
       .order('created_at', { ascending: false });
     if (error) { console.error('Shopping: помилка завантаження', error); return []; }
     return data || [];

@@ -46,7 +46,7 @@ const PhotoCalendar = (() => {
     const to   = dstr(yr, mo, lastDay);
     const { data, error } = await supabase
       .from('photo_calendar')
-      .select('id,date,user_id,photo_url,comment,created_at')
+      .select('id,date,user_id,photo_url,comment')
       .gte('date', from).lte('date', to);
     if (error) { console.error('pcal load error:', error); return []; }
     return data || [];

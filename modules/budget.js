@@ -14,7 +14,7 @@ const Budget = (() => {
 
   // ── ЛІМІТ ─────────────────────────────────────────────────
   async function fetchFreeLimit() {
-    const {data} = await supabase.from('free_limit').select('*').eq('id',1).single();
+    const {data} = await supabase.from('free_limit').select('limit_value,proposal_value,proposed_by').eq('id',1).single();
     return data || {};
   }
   function renderFreeLimit() {
