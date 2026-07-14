@@ -106,35 +106,37 @@ end $$;
 -- працювати — це знімає лише неявний грант "усім".
 
 -- ------------------------------------------------------------
--- 2026-07-14: звузити листинг у storage.objects. Була одна policy
--- auth_storage_full (ALL, authenticated, USING/WITH CHECK true) на ВСІ
--- бакети — тобто будь-який з двох залогінених міг перелічити файли в
--- будь-якому бакеті. Для map-photos/media-posters/photo-calendar/
--- wishlist-photos клієнт ніколи не викликає .list() (лише upload/
--- getPublicUrl по відомому шляху) — і саме wishlist-photos критичний:
--- лістинг дозволив би власнику побачити фото заброньованого подарунка
--- й зіпсувати сюрприз. family_photos лишаємо як є — його реально лістить
--- фотоменеджер (settings.js/photos.js).
-drop policy if exists auth_storage_full on storage.objects;
-
-create policy family_photos_full on storage.objects
-  for all to authenticated
-  using (bucket_id = 'family_photos')
-  with check (bucket_id = 'family_photos');
-
-create policy other_buckets_write on storage.objects
-  for insert to authenticated
-  with check (bucket_id in ('map-photos', 'media-posters', 'photo-calendar', 'wishlist-photos'));
-
-create policy other_buckets_update on storage.objects
-  for update to authenticated
-  using (bucket_id in ('map-photos', 'media-posters', 'photo-calendar', 'wishlist-photos'))
-  with check (bucket_id in ('map-photos', 'media-posters', 'photo-calendar', 'wishlist-photos'));
-
-create policy other_buckets_delete on storage.objects
-  for delete to authenticated
-  using (bucket_id in ('map-photos', 'media-posters', 'photo-calendar', 'wishlist-photos'));
--- Свідомо без SELECT-policy для цих 4 бакетів — прямий доступ по URL
--- (getPublicUrl) працює й без неї, бо бакети public і не йдуть через
--- storage.objects RLS.
+-- 2026-07-14: СПРОБА звузити листинг у storage.objects — СКАСОВАНО,
+-- не відтворювати без переробки шляхів завантаження фото.
+--
+-- Задум був: прибрати SELECT-policy для map-photos/media-posters/
+-- photo-calendar/wishlist-photos (лишити тільки insert/update/delete),
+-- бо клієнт ніколи не викликає .list() на них — лише upload/getPublicUrl
+-- по відомому шляху. Мотив — wishlist-photos: без листингу власник
+-- подарунка не зміг би підглянути фото заброньованого сюрпризу.
+--
+-- Зламало продакшн двічі: upload(..., {upsert:true}) в Supabase Storage
+-- це `INSERT ... ON CONFLICT (bucket_id, name) DO UPDATE`, а Postgres RLS
+-- для визначення "чи є конфлікт" перевіряє видимість наявного рядка саме
+-- через SELECT-policy (не через UPDATE-policy, як здавалось логічним).
+-- Без SELECT-policy будь-яке повторне завантаження на той самий шлях
+-- (заміна фото існуючого піна/бажання) падало з "new row violates
+-- row-level security policy".
+--
+-- Звузити SELECT так, щоб дозволити upsert-конфлікт-чек, але заборонити
+-- .list(), не вийде без зміни коду: RLS policy фільтрує РЯДКИ за умовою
+-- (bucket_id in (...)), а не залежить від того, як сформований запит —
+-- та сама policy, що дозволяє перевірку одного відомого шляху, однаково
+-- дозволить і повний листинг бакету. Щоб це розв'язати по-справжньому,
+-- шлях завантаження фото мав би включати owner_id і policy звужувалась
+-- би по ньому — окрема задача, що чіпає modules/*.js, а не лише SQL.
+--
+-- Відкачено назад до єдиної policy на всі бакети (як було до цього
+-- пункту):
+-- drop policy if exists family_photos_full on storage.objects;
+-- drop policy if exists other_buckets_write on storage.objects;
+-- drop policy if exists other_buckets_update on storage.objects;
+-- drop policy if exists other_buckets_delete on storage.objects;
+-- create policy auth_storage_full on storage.objects
+--   for all to authenticated using (true) with check (true);
 -- ------------------------------------------------------------
