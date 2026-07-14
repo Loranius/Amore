@@ -13,6 +13,7 @@ const Swipe = (() => {
   var currentIndex = 0;
   var page = 1;
   var isLoading = false;
+  var isRefilling = false; // guard: не дає швидким свайпам стартувати кілька TMDB-дозавантажень паралельно
 
   // ---------- TMDB ----------
   async function fetchTmdb(endpoint) {
@@ -367,9 +368,17 @@ const Swipe = (() => {
   async function addNextCard() {
     currentIndex++;
 
-    if (currentIndex + 5 >= cards.length) {
-      var more = await loadCards();
-      if (more.length) cards = cards.concat(more);
+    // Дозавантаження з захистом від паралельних запитів: при швидких свайпах
+    // кілька addNextCard підряд не повинні стартувати кілька TMDB-запитів одночасно
+    // (інакше page++ проскакує сторінки й марно палить запити).
+    if (currentIndex + 5 >= cards.length && !isRefilling) {
+      isRefilling = true;
+      try {
+        var more = await loadCards();
+        if (more.length) cards = cards.concat(more);
+      } finally {
+        isRefilling = false;
+      }
     }
 
     var stack = document.getElementById('swipe-stack');
