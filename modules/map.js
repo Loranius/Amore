@@ -173,7 +173,7 @@ const MapModule = (() => {
   async function fetchPins() {
     var { data, error } = await supabase
       .from('map_pins')
-      .select('id, title, note, category, lat, lng, photo_url, rating, review')
+      .select('id, title, note, category, lat, lng, photo_url, rating, review, city')
       .order('created_at', { ascending: false });
     if (error) { console.error('map_pins error:', error); return []; }
     return data || [];
@@ -186,7 +186,53 @@ const MapModule = (() => {
       renderCatFilterBar();
       renderMarkersAndCards();
       bindPinSearch();
+      backfillMissingCities();
     });
+  }
+
+  // ---------- Групування списку за містом ----------
+  var NO_CITY_LABEL = 'Інші місця';
+
+  function groupPinsByCity(pins) {
+    var groups = {};
+    var order = [];
+    pins.forEach(function(pin) {
+      var key = pin.city || NO_CITY_LABEL;
+      if (!groups[key]) { groups[key] = []; order.push(key); }
+      groups[key].push(pin);
+    });
+    // Міста за алфавітом, "Інші місця" завжди в кінці
+    order.sort(function(a, b) {
+      if (a === NO_CITY_LABEL) return 1;
+      if (b === NO_CITY_LABEL) return -1;
+      return a.localeCompare(b, 'uk');
+    });
+    return order.map(function(city) { return { city: city, pins: groups[city] }; });
+  }
+
+  // Ліниво дотягуємо місто для пінів, збережених до появи цієї фічі
+  // (або якщо reverse-geocode при збереженні не спрацював).
+  var backfilling = false;
+  async function backfillMissingCities() {
+    if (backfilling) return;
+    var todo = allPins.filter(function(p) { return !p.city; });
+    if (!todo.length) return;
+    backfilling = true;
+    try {
+      for (var i = 0; i < todo.length; i++) {
+        var pin = todo[i];
+        var geo = await reverseGeocode(pin.lat, pin.lng);
+        if (geo.city) {
+          await supabase.from('map_pins').update({ city: geo.city }).eq('id', pin.id);
+          pin.city = geo.city; // оновлюємо в пам'яті одразу, без повного перезавантаження
+        }
+        if (i < todo.length - 1) await new Promise(function(r) { setTimeout(r, 300); });
+      }
+      DataCache.invalidate('map_pins');
+      renderPinCards();
+    } finally {
+      backfilling = false;
+    }
   }
 
   function renderMarkersAndCards() {
@@ -291,51 +337,68 @@ const MapModule = (() => {
 
     wrap.innerHTML = '';
 
-    pins.forEach(function(pin) {
-      var cat = CATEGORIES[pin.category] || CATEGORIES.visited;
-      var card = document.createElement('div');
-      card.className = 'pin-card' + (pin.id === focusedPinId ? ' pin-card--active' : '');
-
-      var photoHtml = pin.photo_url
-        ? '<img class="pin-card-photo" loading="lazy" src="' + pin.photo_url + '" alt="' + escapeHtml(pin.title) + '">'
-        : '<div class="pin-card-photo-placeholder">' + cat.emoji + '</div>';
-
-      var ratingHtml = '';
-      if (pin.rating) {
-        for (var i = 1; i <= 5; i++) {
-          ratingHtml += '<span class="' + (i <= pin.rating ? 'map-star filled' : 'map-star') + '">★</span>';
-        }
-      }
-
-      card.innerHTML =
-        photoHtml +
-        '<div class="pin-card-body">' +
-          '<div class="pin-card-header">' +
-            '<p class="pin-card-title">' + escapeHtml(pin.title) + '</p>' +
-            '<span class="pin-card-cat">' + cat.emoji + ' ' + cat.label + '</span>' +
-          '</div>' +
-          (ratingHtml ? '<div class="pin-card-rating">' + ratingHtml + '</div>' : '') +
-          (pin.review ? '<p class="pin-card-review">' + escapeHtml(pin.review) + '</p>' : '') +
-          '<a class="pin-route-btn" href="' + directionsUrl(pin.lat, pin.lng) + '" target="_blank" rel="noopener">🧭 Маршрут</a>' +
-        '</div>';
-
-      card.querySelector('.pin-route-btn').addEventListener('click', function(e) { e.stopPropagation(); });
-
-      card.addEventListener('click', function() {
-        if (focusedPinId === pin.id) {
-          // Другий клік по тій самій картці → відкриваємо модалку
-          openPinModal(pin);
-        } else {
-          // Перший клік → переносимо карту до місця і підсвічуємо картку
-          focusedPinId = pin.id;
-          wrap.querySelectorAll('.pin-card').forEach(function(c) { c.classList.remove('pin-card--active'); });
-          card.classList.add('pin-card--active');
-          if (map) map.flyTo({ center: [pin.lng, pin.lat], zoom: 15 });
-        }
+    // Без пошуку — групуємо за містом (щоб Одеса не зливалась з Вінницею
+    // в один суцільний список). При пошуку показуємо пласким списком —
+    // групи заважали б швидко проглянути збіги.
+    if (query) {
+      pins.forEach(function(pin) { wrap.appendChild(buildPinCard(pin, wrap)); });
+    } else {
+      groupPinsByCity(pins).forEach(function(group) {
+        var header = document.createElement('div');
+        header.className = 'pin-city-header';
+        header.innerHTML =
+          '<span class="pin-city-name">📍 ' + escapeHtml(group.city) + '</span>' +
+          '<span class="pin-city-count">' + group.pins.length + '</span>';
+        wrap.appendChild(header);
+        group.pins.forEach(function(pin) { wrap.appendChild(buildPinCard(pin, wrap)); });
       });
+    }
+  }
 
-      wrap.appendChild(card);
+  function buildPinCard(pin, wrap) {
+    var cat = CATEGORIES[pin.category] || CATEGORIES.visited;
+    var card = document.createElement('div');
+    card.className = 'pin-card' + (pin.id === focusedPinId ? ' pin-card--active' : '');
+
+    var photoHtml = pin.photo_url
+      ? '<img class="pin-card-photo" loading="lazy" src="' + pin.photo_url + '" alt="' + escapeHtml(pin.title) + '">'
+      : '<div class="pin-card-photo-placeholder">' + cat.emoji + '</div>';
+
+    var ratingHtml = '';
+    if (pin.rating) {
+      for (var i = 1; i <= 5; i++) {
+        ratingHtml += '<span class="' + (i <= pin.rating ? 'map-star filled' : 'map-star') + '">★</span>';
+      }
+    }
+
+    card.innerHTML =
+      photoHtml +
+      '<div class="pin-card-body">' +
+        '<div class="pin-card-header">' +
+          '<p class="pin-card-title">' + escapeHtml(pin.title) + '</p>' +
+          '<span class="pin-card-cat">' + cat.emoji + ' ' + cat.label + '</span>' +
+        '</div>' +
+        (ratingHtml ? '<div class="pin-card-rating">' + ratingHtml + '</div>' : '') +
+        (pin.review ? '<p class="pin-card-review">' + escapeHtml(pin.review) + '</p>' : '') +
+        '<a class="pin-route-btn" href="' + directionsUrl(pin.lat, pin.lng) + '" target="_blank" rel="noopener">🧭 Маршрут</a>' +
+      '</div>';
+
+    card.querySelector('.pin-route-btn').addEventListener('click', function(e) { e.stopPropagation(); });
+
+    card.addEventListener('click', function() {
+      if (focusedPinId === pin.id) {
+        // Другий клік по тій самій картці → відкриваємо модалку
+        openPinModal(pin);
+      } else {
+        // Перший клік → переносимо карту до місця і підсвічуємо картку
+        focusedPinId = pin.id;
+        wrap.querySelectorAll('.pin-card').forEach(function(c) { c.classList.remove('pin-card--active'); });
+        card.classList.add('pin-card--active');
+        if (map) map.flyTo({ center: [pin.lng, pin.lat], zoom: 15 });
+      }
     });
+
+    return card;
   }
 
   // ---------- Геокодинг (пошук місць через Mapbox) ----------
@@ -688,6 +751,7 @@ const MapModule = (() => {
     saveBtn.disabled = true;
 
     var user = Auth.getCurrentUser();
+    var geo = await reverseGeocode(lat, lng); // місто — для групування списку нижче
 
     var { data: pinData, error } = await supabase.from('map_pins').insert({
       title: title,
@@ -695,6 +759,7 @@ const MapModule = (() => {
       category: category,
       lat: lat,
       lng: lng,
+      city: geo.city || null,
       created_by: user ? user.id : null,
     }).select('id').single();
 
