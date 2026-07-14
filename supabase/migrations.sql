@@ -79,3 +79,62 @@ revoke execute on function public.register_pin_attempt(integer, boolean) from pu
 -- Лишається виконуваною лише для service_role (використовується
 -- виключно з Edge Function auth-pin).
 -- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- 2026-07-14: pg_net — прибрати EXECUTE від PUBLIC (звідси й anon/
+-- authenticated). extension_in_public (get_advisors) пропонує перенести
+-- розширення в окрему схему, але pg_net має relocatable=false — ALTER
+-- EXTENSION ... SET SCHEMA падає з "does not support SET SCHEMA".
+-- DROP+CREATE ризикований (db-notify, ймовірно, лежить на pg_net під
+-- капотом Database Webhooks). Реальна ціль лінтера — не дати anon/
+-- authenticated самим викликати net.http_post/http_get (SSRF-вектор),
+-- а не саму назву схеми. Робимо це напряму, без переносу розширення:
+do $$
+declare
+  r record;
+begin
+  for r in
+    select p.oid::regprocedure as sig
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'net'
+  loop
+    execute format('revoke execute on function %s from public', r.sig);
+  end loop;
+end $$;
+-- Webhook-тригери (SECURITY DEFINER, власник — не PUBLIC) продовжують
+-- працювати — це знімає лише неявний грант "усім".
+
+-- ------------------------------------------------------------
+-- 2026-07-14: звузити листинг у storage.objects. Була одна policy
+-- auth_storage_full (ALL, authenticated, USING/WITH CHECK true) на ВСІ
+-- бакети — тобто будь-який з двох залогінених міг перелічити файли в
+-- будь-якому бакеті. Для map-photos/media-posters/photo-calendar/
+-- wishlist-photos клієнт ніколи не викликає .list() (лише upload/
+-- getPublicUrl по відомому шляху) — і саме wishlist-photos критичний:
+-- лістинг дозволив би власнику побачити фото заброньованого подарунка
+-- й зіпсувати сюрприз. family_photos лишаємо як є — його реально лістить
+-- фотоменеджер (settings.js/photos.js).
+drop policy if exists auth_storage_full on storage.objects;
+
+create policy family_photos_full on storage.objects
+  for all to authenticated
+  using (bucket_id = 'family_photos')
+  with check (bucket_id = 'family_photos');
+
+create policy other_buckets_write on storage.objects
+  for insert to authenticated
+  with check (bucket_id in ('map-photos', 'media-posters', 'photo-calendar', 'wishlist-photos'));
+
+create policy other_buckets_update on storage.objects
+  for update to authenticated
+  using (bucket_id in ('map-photos', 'media-posters', 'photo-calendar', 'wishlist-photos'))
+  with check (bucket_id in ('map-photos', 'media-posters', 'photo-calendar', 'wishlist-photos'));
+
+create policy other_buckets_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id in ('map-photos', 'media-posters', 'photo-calendar', 'wishlist-photos'));
+-- Свідомо без SELECT-policy для цих 4 бакетів — прямий доступ по URL
+-- (getPublicUrl) працює й без неї, бо бакети public і не йдуть через
+-- storage.objects RLS.
+-- ------------------------------------------------------------
