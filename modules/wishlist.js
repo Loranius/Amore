@@ -247,7 +247,7 @@ const Wishlist = (() => {
     }
 
     const photo = item.image_url
-      ? `<div class="wl-card-img"><img src="${esc(item.image_url)}" alt=""></div>` : '';
+      ? `<div class="wl-card-img"><img src="${esc(item.image_url)}" loading="lazy" alt=""></div>` : '';
 
     card.innerHTML = `
       ${photo}
