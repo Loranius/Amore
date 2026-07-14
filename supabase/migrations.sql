@@ -59,12 +59,23 @@ end;
 $$;
 
 -- ------------------------------------------------------------
--- КРОК 2 (виконати ПІСЛЯ ручного деплою Edge Function auth-pin і
--- пуша оновленого modules/auth.js — інакше поточний логін зламається,
--- бо клієнт ще читає pin_hash/email напряму):
---
--- revoke select (pin_hash, email) on public.users from anon, authenticated;
---
--- Rollback, якщо після цього щось піде не так:
--- grant select (pin_hash, email) on public.users to anon, authenticated;
+-- КРОК 2 — застосовано. ВАЖЛИВО: колонковий revoke сам по собі не
+-- спрацював — у anon/authenticated був табличний (не колонковий) grant
+-- ALL на users (relacl: anon=arwdDxtm/postgres), а табличний SELECT
+-- дає доступ до всіх колонок незалежно від колонкових revoke. Довелось
+-- зняти табличний SELECT і видати назад лише на потрібні колонки:
+revoke select on public.users from anon, authenticated;
+grant select (id, name) on public.users to anon, authenticated;
+
+-- Rollback, якщо щось піде не так:
+-- grant select on public.users to anon, authenticated;
+
+-- ------------------------------------------------------------
+-- Побічна знахідка через get_advisors: SECURITY DEFINER функції за
+-- замовчуванням отримують EXECUTE від PUBLIC (тому й register_pin_attempt
+-- був викликаний напряму через /rest/v1/rpc/... будь-ким — це дозволило б
+-- скинути собі лічильник блокування в обхід auth-pin). Закрито:
+revoke execute on function public.register_pin_attempt(integer, boolean) from public, anon, authenticated;
+-- Лишається виконуваною лише для service_role (використовується
+-- виключно з Edge Function auth-pin).
 -- ------------------------------------------------------------
