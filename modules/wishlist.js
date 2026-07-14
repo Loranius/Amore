@@ -569,69 +569,58 @@ const Wishlist = (() => {
     if (!confirm('Видалити бажання?')) return;
     const ownerId = currentUser?.id;
 
-    // Оптимістично прибираємо
+    // Оптимістично малюємо картку без цього айтема НАПРЯМУ (без
+    // проміжного renderGrid()/DataCache.swr) — інакше фонова
+    // ревалідація SWR могла б завершитись раніше за сам DELETE,
+    // підтягнути ще-не-видалений рядок і затерти оптимістичний стан
+    // назавжди (нічого не перемальовує після успішного DELETE).
     const cached = DataCache.get('wishlist:' + ownerId);
-    if (cached) {
-      const snapshot = [...cached];
-      DataCache.set('wishlist:' + ownerId, cached.filter(i => i.id !== id));
-      renderGrid();
+    if (cached) paintGrid(cached.filter(i => i.id !== id), true, ownerId);
 
-      const { error } = await Retry.query(() =>
-        supabase.from('wishlist_items').delete().eq('id', id)
-      );
-      if (error) {
-        DataCache.set('wishlist:' + ownerId, snapshot);
-        renderGrid();
-        ErrorBoundary.showToast('Не вдалось видалити бажання. Спробуй ще.');
-        return;
-      }
-    } else {
-      const {error} = await supabase.from('wishlist_items').delete().eq('id', id);
-      if (error) { ErrorBoundary.showToast('Помилка: ' + error.message); return; }
-      invalidateWishes();
-      renderGrid();
+    const { error } = await Retry.query(() =>
+      supabase.from('wishlist_items').delete().eq('id', id)
+    );
+
+    if (error) {
+      if (cached) paintGrid(cached, true, ownerId);
+      ErrorBoundary.showToast('Не вдалось видалити бажання. Спробуй ще.');
+      return;
     }
+
+    invalidateWishes();
+    renderGrid();
   }
 
   async function reserveItem(id, isReserved) {
     const newVal = !isReserved;
     const ownerId = wishingFor === 'me' ? currentUser?.id : partnerUser?.id;
 
-    // 1. Оптимістично оновлюємо кеш
+    // Оптимістично малюємо НАПРЯМУ (не через renderGrid()/DataCache.swr —
+    // та сама причина, що й у deleteItem: фонова ревалідація може
+    // «перегнати» сам UPDATE і затерти оптимістичний стан без відкату).
     const cached = DataCache.get('wishlist:' + ownerId);
+    let optimistic = null;
     if (cached) {
-      const snapshot = cached.map(i => ({...i}));
-      const target = cached.find(i => i.id === id);
-      if (target) {
-        target.reserved    = newVal;
-        target.reserved_by = newVal ? currentUser.id : null;
-      }
-      DataCache.set('wishlist:' + ownerId, cached);
-      renderGrid(); // миттєво
-
-      // 2. Пишемо в БД (з retry)
-      const { error } = await Retry.query(() =>
-        supabase.from('wishlist_items')
-          .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
-          .eq('id', id)
-      );
-
-      if (error) {
-        // Відкочуємо
-        DataCache.set('wishlist:' + ownerId, snapshot);
-        renderGrid();
-        ErrorBoundary.showToast('Не вдалось оновити бажання. Спробуй ще.');
-        return;
-      }
-    } else {
-      // Кешу немає — звичайний шлях
-      const { error } = await supabase.from('wishlist_items')
-        .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
-        .eq('id', id);
-      if (error) { ErrorBoundary.showToast('Помилка: ' + error.message); return; }
-      invalidateWishes();
-      renderGrid();
+      optimistic = cached.map(i => i.id === id
+        ? { ...i, reserved: newVal, reserved_by: newVal ? currentUser.id : null }
+        : i);
+      paintGrid(optimistic, wishingFor === 'me', ownerId);
     }
+
+    const { error } = await Retry.query(() =>
+      supabase.from('wishlist_items')
+        .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
+        .eq('id', id)
+    );
+
+    if (error) {
+      if (cached) paintGrid(cached, wishingFor === 'me', ownerId);
+      ErrorBoundary.showToast('Не вдалось оновити бажання. Спробуй ще.');
+      return;
+    }
+
+    DataCache.invalidate('wishlist:' + ownerId);
+    renderGrid();
   }
 
   async function cancelReserve(id) {
