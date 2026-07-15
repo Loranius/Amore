@@ -304,9 +304,19 @@ interface UserSizes {
 
 /** Рядок таблиці `daily_question_log`. */
 interface DailyQuestionLog {
+  id: number;
   date: string;
+  question_id: number | null;
   answer_dima: string | null;
   answer_lena: string | null;
+}
+
+type AnswerField = 'answer_dima' | 'answer_lena';
+
+/** Рядок таблиці `daily_questions`, або те саме з Edge Function daily-question-ai. */
+interface QuestionPoolItem {
+  id: number;
+  text: string;
 }
 
 // ---------- Графік (modules/schedule.js) ----------

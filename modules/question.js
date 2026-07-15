@@ -10,22 +10,39 @@
 
 const DailyQuestion = (() => {
 
-  let todayStr, questionsPool, currentQuestion, logEntry;
+  /**
+   * Елемент гарантовано присутній — рендериться лише коли активна
+   * вкладка "Питання дня".
+   * @param {string} id @returns {HTMLElement}
+   */
+  const el = id => /** @type {HTMLElement} */ (document.getElementById(id));
 
+  /** @type {string} */
+  let todayStr;
+  /** @type {QuestionPoolItem[] | undefined} */
+  let questionsPool;
+  /** @type {QuestionPoolItem | null | undefined} */
+  let currentQuestion;
+  /** @type {DailyQuestionLog | null | undefined} */
+  let logEntry;
+
+  /** @returns {string} */
   function getTodayStr() {
     // Локальна дата, а не toISOString (яка дає UTC): у Києві до 02:00/03:00
     // ночі UTC-дата — ще вчорашня, і питання дня "відкочувалось" назад.
     const d = new Date();
-    const p = n => String(n).padStart(2, '0');
+    const p = (/** @type {number} */ n) => String(n).padStart(2, '0');
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
+  /** @returns {string} */
   function formatToday() {
     const d = new Date();
     return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
   // ---------- Детермінований вибір питання за датою ----------
+  /** @param {string} str @returns {number} */
   function hashStringToInt(str) {
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
@@ -34,6 +51,7 @@ const DailyQuestion = (() => {
     return hash;
   }
 
+  /** @param {QuestionPoolItem[]} pool @param {string} dateStr @returns {QuestionPoolItem | null} */
   function pickQuestionForDate(pool, dateStr) {
     if (!pool.length) return null;
     const idx = hashStringToInt(dateStr) % pool.length;
@@ -43,6 +61,7 @@ const DailyQuestion = (() => {
   // ---------- Питання дня від Claude ----------
   // Ідемпотентний виклик: функція сама створює лог-запис дня,
   // тож повторні виклики і гонка двох користувачів безпечні.
+  /** @param {string} dateStr @returns {Promise<QuestionPoolItem | null>} */
   async function fetchAiQuestion(dateStr) {
     try {
       const { data, error } = await supabase.functions.invoke('daily-question-ai', {
@@ -60,11 +79,12 @@ const DailyQuestion = (() => {
   }
 
   // ---------- Завантаження ----------
+  /** @returns {Promise<QuestionPoolItem[]>} */
   async function loadPool() {
-    const { data, error } = await supabase
+    const { data, error } = /** @type {SupaResult<QuestionPoolItem[]>} */ (await supabase
       .from('daily_questions')
       .select('id, text')
-      .order('id', { ascending: true });
+      .order('id', { ascending: true }));
 
     if (error) {
       console.error('Помилка завантаження пулу питань:', error);
@@ -73,12 +93,13 @@ const DailyQuestion = (() => {
     return data || [];
   }
 
+  /** @param {string} dateStr @returns {Promise<DailyQuestionLog | null>} */
   async function loadLog(dateStr) {
-    const { data, error } = await supabase
+    const { data, error } = /** @type {SupaResult<DailyQuestionLog>} */ (await supabase
       .from('daily_question_log')
       .select('id, date, question_id, answer_dima, answer_lena')
       .eq('date', dateStr)
-      .maybeSingle();
+      .maybeSingle());
 
     if (error) {
       console.error('Помилка завантаження відповідей:', error);
@@ -87,13 +108,14 @@ const DailyQuestion = (() => {
     return data;
   }
 
+  /** @param {string} dateStr @param {number} questionId @returns {Promise<DailyQuestionLog | null>} */
   async function ensureLogEntry(dateStr, questionId) {
     // якщо запису ще немає — створюємо
-    const { data, error } = await supabase
+    const { data, error } = /** @type {SupaResult<DailyQuestionLog>} */ (await supabase
       .from('daily_question_log')
       .upsert({ date: dateStr, question_id: questionId }, { onConflict: 'date', ignoreDuplicates: true })
       .select('id, date, question_id, answer_dima, answer_lena')
-      .maybeSingle();
+      .maybeSingle());
 
     if (error) {
       console.error('Помилка створення запису питання дня:', error);
@@ -104,6 +126,7 @@ const DailyQuestion = (() => {
     return await loadLog(dateStr);
   }
 
+  /** @param {string} str @returns {string} */
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -111,6 +134,7 @@ const DailyQuestion = (() => {
   }
 
   // ---------- Рендер ----------
+  /** @param {AppUser | null} user @returns {AnswerField | null} */
   function answerFieldForUser(user) {
     if (!user) return null;
     const name = user.name;
@@ -121,7 +145,7 @@ const DailyQuestion = (() => {
   }
 
   function renderAnswers() {
-    const wrap = document.getElementById('question-answers');
+    const wrap = el('question-answers');
     if (!logEntry) {
       wrap.innerHTML = '';
       return;
@@ -153,10 +177,12 @@ const DailyQuestion = (() => {
     `;
 
     wrap.querySelectorAll('[data-delete-field]').forEach(btn => {
-      btn.addEventListener('click', () => deleteAnswer(btn.dataset.deleteField));
+      const field = /** @type {HTMLElement} */ (btn).dataset.deleteField;
+      if (field) deleteAnswer(/** @type {AnswerField} */ (field));
     });
   }
 
+  /** @param {AnswerField} field @returns {Promise<void>} */
   async function deleteAnswer(field) {
     if (!confirm('Видалити свою відповідь?')) return;
 
@@ -171,14 +197,14 @@ const DailyQuestion = (() => {
       return;
     }
 
-    logEntry[field] = null;
+    if (logEntry) logEntry[field] = null;
     DataCache.set(logKey(), logEntry);
     renderAnswers();
     renderInput();
   }
 
   function renderInput() {
-    const wrap = document.getElementById('question-input-wrap');
+    const wrap = el('question-input-wrap');
     const user = Auth.getCurrentUser();
     const field = answerFieldForUser(user);
 
@@ -188,23 +214,25 @@ const DailyQuestion = (() => {
     }
 
     const existing = logEntry ? logEntry[field] : null;
-    document.getElementById('question-input').value = existing || '';
+    /** @type {HTMLInputElement} */ (el('question-input')).value = existing || '';
     wrap.classList.remove('hidden');
   }
 
+  /** @returns {string} */
   function logKey() { return 'question:log:' + todayStr; }
 
+  /** @returns {Promise<void>} */
   async function refresh() {
     todayStr = getTodayStr();
-    document.getElementById('question-date').textContent = formatToday();
+    el('question-date').textContent = formatToday();
 
     // Питання дня — миттєво з кешу, ревалідація у фоні
     const qKey = 'question:today:' + todayStr;
-    const cached = DataCache.get ? DataCache.get(qKey) : null;
+    const cached = /** @type {QuestionPoolItem | null} */ (DataCache.get ? DataCache.get(qKey) : null);
     if (cached) {
       currentQuestion = cached;
     } else {
-      document.getElementById('question-text').textContent = '🔮 Клод вигадує питання…';
+      el('question-text').textContent = '🔮 Клод вигадує питання…';
       currentQuestion = await fetchAiQuestion(todayStr);
       // Fallback: старий пул з детермінованим вибором за датою
       if (!currentQuestion) {
@@ -215,28 +243,30 @@ const DailyQuestion = (() => {
     }
 
     if (!currentQuestion) {
-      document.getElementById('question-text').textContent = 'Не вдалось отримати питання дня.';
-      document.getElementById('question-answers').innerHTML = '';
-      document.getElementById('question-input-wrap').classList.add('hidden');
+      el('question-text').textContent = 'Не вдалось отримати питання дня.';
+      el('question-answers').innerHTML = '';
+      el('question-input-wrap').classList.add('hidden');
       return;
     }
 
-    document.getElementById('question-text').textContent = currentQuestion.text;
+    el('question-text').textContent = currentQuestion.text;
+    const question = currentQuestion;
 
     // Запис відповідей дня — миттєво з кешу, потім ревалідація
     DataCache.swr(
       logKey(),
-      () => ensureLogEntry(todayStr, currentQuestion.id),
+      () => ensureLogEntry(todayStr, question.id),
       (entry) => { logEntry = entry; renderAnswers(); renderInput(); }
     );
   }
 
+  /** @returns {Promise<void>} */
   async function saveAnswer() {
     const user = Auth.getCurrentUser();
     const field = answerFieldForUser(user);
     if (!field || !logEntry) return;
 
-    const text = document.getElementById('question-input').value.trim();
+    const text = /** @type {HTMLInputElement} */ (el('question-input')).value.trim();
     if (!text) {
       alert('Напиши відповідь перед збереженням');
       return;
@@ -262,9 +292,10 @@ const DailyQuestion = (() => {
   // якщо користувач саме в ньому пише.
   function refreshLive() {
     if (!currentQuestion) { refresh(); return; }
+    const question = currentQuestion;
     DataCache.swr(
       logKey(),
-      () => ensureLogEntry(todayStr, currentQuestion.id),
+      () => ensureLogEntry(todayStr, question.id),
       (entry) => {
         logEntry = entry;
         renderAnswers();
@@ -275,9 +306,9 @@ const DailyQuestion = (() => {
   }
 
   function init() {
-    document.getElementById('question-save').addEventListener('click', saveAnswer);
+    el('question-save').addEventListener('click', saveAnswer);
     window.addEventListener('portal:view', (e) => {
-      if (e.detail.view === 'question') refresh();
+      if (/** @type {any} */ (e).detail.view === 'question') refresh();
     });
   }
 
