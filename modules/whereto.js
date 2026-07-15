@@ -10,6 +10,7 @@
 
 const WhereTo = (() => {
 
+  /** @param {string} id @returns {HTMLElement | null} */
   const el = id => document.getElementById(id);
   const SETTING_KEY = 'whereto_location';
 
@@ -23,10 +24,14 @@ const WhereTo = (() => {
     'АР Крим', 'м. Київ', 'м. Севастополь',
   ];
 
+  /** @type {WhereToLocation | null} */
   let location = null;   // {region, city}
+  /** @type {WhereToEvent[]} */
   let lastResults = [];  // останні знайдені події
+  /** @type {string[]} */
   let avoid = [];        // назви вже показаних (для «ще варіанти»)
 
+  /** @param {string | null | undefined} str @returns {string} */
   function esc(str) {
     const div = document.createElement('div');
     div.textContent = str ?? '';
@@ -34,15 +39,17 @@ const WhereTo = (() => {
   }
 
   // ── Локація: load/save у settings ──────────────────────────
+  /** @returns {Promise<void>} */
   async function loadLocation() {
-    const { data } = await supabase
-      .from('settings').select('value').eq('key', SETTING_KEY).maybeSingle();
+    const { data } = /** @type {SupaResult<AppSettingRow>} */ (await supabase
+      .from('settings').select('value').eq('key', SETTING_KEY).maybeSingle());
     if (data && data.value) {
-      try { location = JSON.parse(data.value); } catch (e) { location = null; }
+      try { location = JSON.parse(/** @type {string} */ (data.value)); } catch (e) { location = null; }
     }
     renderCityChip();
   }
 
+  /** @param {string} region @param {string} city @returns {Promise<boolean>} */
   async function saveLocation(region, city) {
     location = { region, city };
     const { error } = await supabase
@@ -66,7 +73,7 @@ const WhereTo = (() => {
 
   // ── Модалка вибору міста ────────────────────────────────────
   function openCityModal() {
-    const root = document.getElementById('modal-root');
+    const root = /** @type {HTMLElement} */ (document.getElementById('modal-root'));
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -89,11 +96,11 @@ const WhereTo = (() => {
       </div>`;
     root.innerHTML = ''; root.appendChild(overlay);
 
-    overlay.querySelector('#wt-city-cancel').addEventListener('click', () => root.innerHTML = '');
+    /** @type {HTMLElement} */ (overlay.querySelector('#wt-city-cancel')).addEventListener('click', () => root.innerHTML = '');
     overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
-    overlay.querySelector('#wt-city-save').addEventListener('click', async () => {
-      const region = overlay.querySelector('#wt-region').value;
-      const city = overlay.querySelector('#wt-city').value.trim();
+    /** @type {HTMLElement} */ (overlay.querySelector('#wt-city-save')).addEventListener('click', async () => {
+      const region = /** @type {HTMLSelectElement} */ (overlay.querySelector('#wt-region')).value;
+      const city = /** @type {HTMLInputElement} */ (overlay.querySelector('#wt-city')).value.trim();
       if (!city) { ErrorBoundary.showToast('Вкажи місто'); return; }
       if (await saveLocation(region, city)) root.innerHTML = '';
     });
@@ -102,10 +109,12 @@ const WhereTo = (() => {
   // ── Денний кеш результатів (щоб не палити пошук повторно) ──
   const CACHE_PREFIX = 'amore:whereto:';
 
+  /** @returns {string} */
   function cacheKey() {
     return CACHE_PREFIX + wtDateStr(0) + ':' + (location ? location.city : '');
   }
 
+  /** @returns {WhereToEvent[] | null} */
   function readCache() {
     try {
       const raw = localStorage.getItem(cacheKey());
@@ -115,6 +124,7 @@ const WhereTo = (() => {
     } catch (e) { return null; }
   }
 
+  /** @param {WhereToEvent[]} events @returns {void} */
   function writeCache(events) {
     try {
       // прибираємо вчорашні ключі, щоб не смітити
@@ -126,29 +136,32 @@ const WhereTo = (() => {
   }
 
   // ── Вихідні пари на найближчі 7 днів (з графіка) ───────────
+  /** @param {number} [offsetDays] @returns {string} */
   function wtDateStr(offsetDays = 0) {
     const d = new Date();
     d.setDate(d.getDate() + offsetDays);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
 
+  /** @returns {Promise<FreeDayInfo[]>} */
   async function loadFreeDays() {
     try {
       const users = Auth.getUsers ? await Auth.getUsers() : [];
       if (!users.length) return [];
-      const { data } = await supabase
+      const { data } = /** @type {SupaResult<Pick<WorkScheduleRow, 'date' | 'user_id'>[]>} */ (await supabase
         .from('work_schedule')
         .select('date,user_id')
         .eq('mark', 'Х')
         .gte('date', wtDateStr(0))
-        .lte('date', wtDateStr(7));
+        .lte('date', wtDateStr(7)));
+      /** @type {Record<string, number[]>} */
       const byDate = {};
       (data || []).forEach(r => (byDate[r.date] ||= []).push(r.user_id));
       return Object.keys(byDate).sort().map(d => ({
         date: d,
-        off: byDate[d]
-          .map(id => (users.find(u => u.id === id) || {}).name)
-          .filter(Boolean),
+        off: /** @type {string[]} */ (byDate[d]
+          .map(id => users.find(u => u.id === id)?.name)
+          .filter(Boolean)),
       }));
     } catch (e) {
       console.warn('WhereTo: графік недоступний', e);
@@ -158,6 +171,7 @@ const WhereTo = (() => {
 
   // Виклик функції з одним авторетраєм: свіжозадеплоєний slug або
   // блимнула мережа → "Failed to send a request" лікується повтором
+  /** @param {EventsFinderRequest} body @returns {Promise<any>} */
   async function invokeFinder(body) {
     try {
       return await supabase.functions.invoke('events-finder', { body });
@@ -168,11 +182,13 @@ const WhereTo = (() => {
   }
 
   // ── Пошук подій ────────────────────────────────────────────
+  /** @param {boolean} [more] @returns {Promise<void>} */
   async function search(more = false) {
     if (!location) { openCityModal(); return; }
 
-    const btn = el('wt-search-btn');
+    const btn = /** @type {HTMLButtonElement | null} */ (el('wt-search-btn'));
     const box = el('wt-results');
+    if (!btn || !box) return;
 
     // Кеш дня: звичайний «Пошук подій» показує вже знайдене сьогодні
     // без нового (платного) веб-пошуку. Свіжий пошук — «Ще варіанти».
@@ -212,17 +228,18 @@ const WhereTo = (() => {
       }
 
       lastResults = data.events;
-      data.events.forEach(ev => avoid.push(ev.title));
+      data.events.forEach((/** @type {WhereToEvent} */ ev) => avoid.push(ev.title));
       if (!more) writeCache(data.events);
       renderResults(box);
     } catch (e) {
       console.error('events-finder:', e);
       let detail = '';
       try {
-        if (e && e.context && typeof e.context.json === 'function') {
-          const j = await e.context.json();
+        const err = /** @type {any} */ (e);
+        if (err && err.context && typeof err.context.json === 'function') {
+          const j = await err.context.json();
           if (j && j.error) detail = String(j.error);
-        } else if (e && e.message) detail = e.message;
+        } else if (err && err.message) detail = err.message;
       } catch (_) { /* ignore */ }
       box.innerHTML = `
         <div class="cul-loading">
@@ -236,12 +253,14 @@ const WhereTo = (() => {
     }
   }
 
+  /** @param {EventKind} kind @returns {string} */
   function kindBadge(kind) {
     return kind === 'місце'
       ? '<span class="wt-badge wt-badge--place">🌳 місце</span>'
       : '<span class="wt-badge wt-badge--event">🎫 подія</span>';
   }
 
+  /** @param {HTMLElement} box @returns {void} */
   function renderResults(box) {
     box.innerHTML = lastResults.map((ev, i) => `
       <div class="card wt-card">
@@ -258,14 +277,16 @@ const WhereTo = (() => {
       <button class="btn-secondary wt-more-btn" id="wt-more-btn">🔄 Ще варіанти</button>`;
 
     box.querySelectorAll('.wt-open-btn').forEach(b => {
-      b.addEventListener('click', () => openEmbed(lastResults[b.dataset.idx]));
+      const idx = /** @type {HTMLElement} */ (b).dataset.idx;
+      b.addEventListener('click', () => openEmbed(lastResults[Number(idx)]));
     });
-    el('wt-more-btn').addEventListener('click', () => search(true));
+    /** @type {HTMLElement} */ (el('wt-more-btn')).addEventListener('click', () => search(true));
   }
 
   // ── Вбудований перегляд сайту (з fallback у браузер) ───────
+  /** @param {WhereToEvent} ev @returns {void} */
   function openEmbed(ev) {
-    const root = document.getElementById('modal-root');
+    const root = /** @type {HTMLElement} */ (document.getElementById('modal-root'));
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay wt-embed-overlay';
     overlay.innerHTML = `
@@ -279,7 +300,7 @@ const WhereTo = (() => {
         <iframe class="wt-embed-frame" src="${esc(ev.url)}" referrerpolicy="no-referrer"></iframe>
       </div>`;
     root.innerHTML = ''; root.appendChild(overlay);
-    overlay.querySelector('#wt-embed-close').addEventListener('click', () => root.innerHTML = '');
+    /** @type {HTMLElement} */ (overlay.querySelector('#wt-embed-close')).addEventListener('click', () => root.innerHTML = '');
   }
 
   // ── Init ────────────────────────────────────────────────────
@@ -289,7 +310,8 @@ const WhereTo = (() => {
 
     window.addEventListener('portal:auth', loadLocation);
     window.addEventListener('portal:view', (e) => {
-      if (e.detail && e.detail.view === 'whereto') {
+      const detail = /** @type {any} */ (e).detail;
+      if (detail && detail.view === 'whereto') {
         if (!location) {
           // перший вхід — одразу пропонуємо обрати місто
           setTimeout(openCityModal, 300);

@@ -368,6 +368,42 @@ interface SavingsGoal {
   saved_amount: number | null;
 }
 
+// ---------- Куди піти (modules/whereto.js) ----------
+
+/** Локація пари, збережена в settings (key: whereto_location, значення — JSON). */
+interface WhereToLocation {
+  region: string;
+  city: string;
+}
+
+type EventKind = 'подія' | 'місце';
+
+/** Один результат від Edge Function events-finder. */
+interface WhereToEvent {
+  kind: EventKind;
+  title: string;
+  price: string | null;
+  when: string | null;
+  place: string | null;
+  off_note: string | null;
+  description: string | null;
+  url: string | null;
+}
+
+/** Спільний вихідний на найближчі дні (з work_schedule), для підказки events-finder. */
+interface FreeDayInfo {
+  date: string;
+  off: string[];
+}
+
+/** Тіло запиту до events-finder. */
+interface EventsFinderRequest {
+  city: string;
+  region: string;
+  avoid: string[];
+  freeDays: FreeDayInfo[];
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.

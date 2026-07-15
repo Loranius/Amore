@@ -33,6 +33,7 @@
     "modules/question.js",
     "modules/schedule.js",
     "modules/photo-calendar.js",
-    "modules/budget.js"
+    "modules/budget.js",
+    "modules/whereto.js"
   ]
 }
