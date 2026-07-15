@@ -415,6 +415,14 @@ interface RealtimeTableConfig {
   onChange?: () => void;
 }
 
+// ---------- PWA install banner (lib/pwa.js) ----------
+
+/** Нестандартна DOM-подія, якої немає в lib.dom.d.ts. */
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.
