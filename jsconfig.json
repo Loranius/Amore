@@ -40,6 +40,8 @@
     "lib/pwa.js",
     "modules/random.js",
     "modules/router.js",
-    "modules/app.js"
+    "modules/app.js",
+    "lib/gestures.js",
+    "lib/supabase.js"
   ]
 }
