@@ -13,6 +13,9 @@
     "types.d.ts",
     "lib/cache.js",
     "lib/retry.js",
+    "lib/img.js",
+    "lib/error-boundary.js",
+    "lib/confetti.js",
     "modules/wishlist.js",
     "modules/map.js",
     "modules/auth.js"

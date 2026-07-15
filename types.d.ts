@@ -12,13 +12,13 @@
 //
 // Стратегія "поступово": jsconfig.json підключає до перевірки лише файли,
 // які вже типізовані (зростаючий allowlist — наразі lib/cache.js,
-// lib/retry.js, modules/wishlist.js, modules/map.js, modules/auth.js).
-// Для модулів, які ЩЕ не підключені (img.js, error-boundary.js,
-// confetti.js, mapboxgl/supabase з CDN) — нижче є мінімальні
+// lib/retry.js, lib/img.js, lib/error-boundary.js, lib/confetti.js,
+// modules/wishlist.js, modules/map.js, modules/auth.js). Для модулів,
+// які ЩЕ не підключені (mapboxgl/supabase з CDN) — нижче є мінімальні
 // `declare const` контракти, щоб типізовані файли могли їх викликати.
 // Коли дійде черга типізувати самі ці модулі — відповідний declare тут
 // видаляється, і jsconfig.json підхоплює РЕАЛЬНИЙ виведений тип із
-// самого файла (так уже сталось із Auth і Retry).
+// самого файла (так уже сталось із Auth, Retry, Img, ErrorBoundary, Confetti).
 // ============================================================
 
 // ---------- Користувачі ----------
@@ -162,24 +162,6 @@ declare const supabase: any;
  * свідомий виняток, що й supabase.
  */
 declare const mapboxgl: any;
-
-declare const Img: {
-  isHeic(file: File): boolean;
-  normalize(file: File): Promise<File>;
-  compress(
-    file: File,
-    maxSize: number,
-    quality: number
-  ): Promise<{ blob: Blob; ext: string; contentType: string }>;
-};
-
-declare const ErrorBoundary: {
-  showToast(message: string, kind?: 'success' | 'warn' | 'error'): void;
-};
-
-declare const Confetti: {
-  burst(count?: number): void;
-};
 
 /** Глобальний хелпер закриття модалок, оголошений inline-скриптом у index.html. */
 declare function closeModalAnimated(rootId?: string): void;
