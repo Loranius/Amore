@@ -3,6 +3,8 @@
 // — Колапсований свайп (toggle)
 // — Пошук TMDB будь-якою мовою
 // — Статуси, постери, рейтинги
+//
+// Типізація: JSDoc + types.d.ts (див. jsconfig.json). Рантайму не торкається.
 // ============================================================
 
 const Media = (() => {
@@ -14,26 +16,37 @@ const Media = (() => {
   const TMDB_IMG_SM    = 'https://image.tmdb.org/t/p/w185';
 
   // ---------- Статуси ----------
+  /** @type {Record<MediaType, Record<MediaStatus, string>>} */
   const STATUS_CONFIG = {
     movie:  { want:'В планах', watching:'Дивимось', done:'Бачили', dropped:'Кинули' },
     series: { want:'В планах', watching:'Дивимось', done:'Бачили', dropped:'Кинули' },
     book:   { want:'Планую',   watching:'Читаю',    done:'Прочитала/в', dropped:'Кинула/в' },
   };
+  /** @type {MediaStatus[]} */
   const STATUS_ORDER = ['watching', 'want', 'done', 'dropped'];
+  /** @type {Record<MediaType, string>} */
   const TYPE_LABELS  = { movie: 'Фільм', series: 'Серіал', book: 'Книга' };
 
+  /** @type {MediaType} */
   let activeType   = 'movie';
+  /** @type {'all' | MediaStatus} */
   let activeFilter = 'all';
+  /** @type {MediaItem[]} */
   let allItems     = [];
+  /** @type {number | null} */
   let searchTimer  = null;
   const PAGE_SIZE  = 20;   // інфінітний скрол — порціями по 20
   let visibleCount = PAGE_SIZE;
+  /** @type {IntersectionObserver | null} */
   let scrollSentinel = null;
 
+  /** @param {string | null | undefined} s @returns {string} */
   const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
+  /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
 
   // ── SWIPE TOGGLE ──────────────────────────────────────────
+  /** @returns {void} */
   function bindSwipeToggle() {
     const btn   = el('swipe-toggle-btn');
     const panel = el('swipe-panel');
@@ -50,6 +63,11 @@ const Media = (() => {
   }
 
   // ── TMDB SEARCH ───────────────────────────────────────────
+  /**
+   * @param {string} query
+   * @param {MediaType} type
+   * @returns {Promise<TmdbSearchResult[]>}
+   */
   async function tmdbSearch(query, type) {
     const tmdbType = type === 'series' ? 'tv' : 'movie';
     try {
@@ -59,6 +77,7 @@ const Media = (() => {
         fetch(`${TMDB_BASE}/search/${tmdbType}?api_key=${TMDB_KEY}&query=${encodeURIComponent(query)}&language=en-US&page=1`).then(r=>r.json()),
       ]);
       const seen  = new Set();
+      /** @type {TmdbSearchResult[]} */
       const items = [];
       for (const r of [...(ukRes.results||[]), ...(enRes.results||[])]) {
         if (seen.has(r.id)) continue;
@@ -80,6 +99,10 @@ const Media = (() => {
     }
   }
 
+  /**
+   * @param {TmdbSearchResult[]} results
+   * @returns {void}
+   */
   function renderSearchResults(results) {
     const wrap = el('media-search-results');
     if (!wrap) return;
@@ -105,7 +128,7 @@ const Media = (() => {
           ${item.overview ? `<div class="media-search-overview">${esc(item.overview.slice(0,90))}${item.overview.length>90?'…':''}</div>` : ''}
         </div>
         <button class="media-search-add-btn" aria-label="Додати">+</button>`;
-      card.querySelector('.media-search-add-btn').addEventListener('click', e => {
+      card.querySelector('.media-search-add-btn')?.addEventListener('click', e => {
         e.stopPropagation();
         openAddFromSearchModal(item);
       });
@@ -114,14 +137,20 @@ const Media = (() => {
     wrap.classList.remove('hidden');
   }
 
+  /** @returns {void} */
   function hideSearchResults() {
     const res = el('media-search-results');
     if (res) res.classList.add('hidden');
   }
 
+  /**
+   * @param {TmdbSearchResult} item
+   * @returns {void}
+   */
   function openAddFromSearchModal(item) {
     const conf = STATUS_CONFIG[activeType] || STATUS_CONFIG.movie;
     const root = el('modal-root');
+    if (!root) return;
     root.innerHTML = `
       <div class="modal-overlay" id="sm-ov">
         <div class="modal-card">
@@ -149,24 +178,26 @@ const Media = (() => {
         </div>
       </div>`;
 
-    let chosen = Object.keys(conf)[0];
+    /** @type {MediaStatus} */
+    let chosen = /** @type {MediaStatus} */ (Object.keys(conf)[0]);
 
     root.querySelectorAll('.media-status-chip').forEach(btn => {
       btn.addEventListener('click', () => {
         root.querySelectorAll('.media-status-chip').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        chosen = btn.dataset.status;
+        chosen = /** @type {MediaStatus} */ (/** @type {HTMLElement} */ (btn).dataset.status);
       });
     });
 
     const closeModal = () => closeModalAnimated();
-    el('sm-cancel').addEventListener('click', closeModal);
-    el('sm-ov').addEventListener('click', e => { if (e.target.id === 'sm-ov') closeModal(); });
+    el('sm-cancel')?.addEventListener('click', closeModal);
+    el('sm-ov')?.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).id === 'sm-ov') closeModal(); });
 
-    el('sm-save').addEventListener('click', async () => {
-      const saveBtn = el('sm-save');
+    el('sm-save')?.addEventListener('click', async () => {
+      const saveBtn = /** @type {HTMLButtonElement} */ (el('sm-save'));
       saveBtn.disabled = true; saveBtn.textContent = 'Додаємо…';
       const user = Auth.getCurrentUser();
+      /** @type {{ error: SupaError | null }} */
       const { error } = await supabase.from('media_items').insert({
         type: activeType, title: item.title,
         status: chosen, poster_url: item.poster_url || null,
@@ -178,21 +209,22 @@ const Media = (() => {
         return;
       }
       closeModal();
-      const inp = el('media-search-inp');
+      const inp = /** @type {HTMLInputElement | null} */ (el('media-search-inp'));
       if (inp) inp.value = '';
       hideSearchResults();
       refresh();
     });
   }
 
+  /** @returns {void} */
   function bindSearch() {
-    const inp = el('media-search-inp');
+    const inp = /** @type {HTMLInputElement | null} */ (el('media-search-inp'));
     if (!inp || inp.dataset.bound) return;
     inp.dataset.bound = '1';
 
     inp.addEventListener('input', () => {
       const q = inp.value.trim();
-      clearTimeout(searchTimer);
+      if (searchTimer) clearTimeout(searchTimer);
       if (!q) { hideSearchResults(); return; }
       if (activeType === 'book') { hideSearchResults(); return; }
       searchTimer = setTimeout(async () => {
@@ -204,10 +236,11 @@ const Media = (() => {
     // Закрити при кліку поза блоком пошуку
     document.addEventListener('click', e => {
       const wrap = el('media-search-wrap');
-      if (wrap && !wrap.contains(e.target)) hideSearchResults();
+      if (wrap && !wrap.contains(/** @type {Node} */ (e.target))) hideSearchResults();
     });
   }
 
+  /** @returns {void} */
   function updateSearchVisibility() {
     const wrap = el('media-search-wrap');
     if (!wrap) return;
@@ -217,7 +250,12 @@ const Media = (() => {
   }
 
   // ── ЗАВАНТАЖЕННЯ ----------
+  /**
+   * @param {MediaType} type
+   * @returns {Promise<MediaItem[]>}
+   */
   async function loadItems(type) {
+    /** @type {SupaResult<MediaItem[]>} */
     const { data, error } = await supabase
       .from('media_items')
       .select('id,type,title,status,poster_url,rating_dima,rating_lena,comment_dima,comment_lena,created_by')
@@ -227,27 +265,36 @@ const Media = (() => {
   }
 
   // ── ПОСТЕР ----------
+  /**
+   * @param {File} file
+   * @param {number} itemId
+   * @returns {Promise<string | null>}
+   */
   async function uploadPoster(file, itemId) {
     // HEIC → JPEG до стиснення; сирий HEIC не ллємо — не відобразиться в браузері
     try {
       file = await Img.normalize(file);
     } catch (e) {
       console.error('uploadPoster: конвертація HEIC не вдалася', e);
-      ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + e.message);
+      ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + /** @type {Error} */ (e).message);
       return null;
     }
-    let blob = file, ext = (file.name.split('.').pop()||'jpg').toLowerCase(), contentType = file.type;
+    /** @type {File | Blob} */
+    let blob = file;
+    let ext = (file.name.split('.').pop()||'jpg').toLowerCase(), contentType = file.type;
     try {
       const out = await Img.compress(file, 900, 0.78);
       blob = out.blob; ext = out.ext; contentType = out.contentType;
     } catch (e) { console.warn('uploadPoster: стиснення не вдалося', e); }
     const path = `${activeType}-${itemId}-${Date.now()}.${ext}`;
+    /** @type {{ error: SupaError | null }} */
     const { error } = await supabase.storage.from(STORAGE_BUCKET).upload(path, blob, { upsert: true, contentType });
     if (error) { console.error('uploadPoster error:', error); return null; }
     return `${SUPA_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${path}`;
   }
 
   // ── ФІЛЬТРИ ----------
+  /** @returns {void} */
   function renderFilters() {
     const wrap = el('media-filters');
     if (!wrap) return;
@@ -261,22 +308,30 @@ const Media = (() => {
     });
     wrap.innerHTML = html;
     wrap.querySelectorAll('.media-filter-btn').forEach(btn => {
-      btn.addEventListener('click', () => { activeFilter = btn.dataset.filter; renderFilters(); renderGrid(); });
+      btn.addEventListener('click', () => {
+        const f = /** @type {HTMLElement} */ (btn).dataset.filter;
+        activeFilter = f === 'all' ? 'all' : /** @type {MediaStatus} */ (f);
+        renderFilters(); renderGrid();
+      });
     });
   }
 
   // ── СТАТИСТИКА ----------
+  /** @returns {void} */
   function renderStats() {
     const wrap = el('media-stats');
     if (!wrap) return;
-    const ratings = [...allItems.map(i=>i.rating_dima), ...allItems.map(i=>i.rating_lena)].filter(Boolean);
+    const ratings = [...allItems.map(i=>i.rating_dima), ...allItems.map(i=>i.rating_lena)]
+      .filter(/** @returns {r is number} */ (r) => !!r);
     const avg = ratings.length ? (ratings.reduce((a,b)=>a+b,0)/ratings.length).toFixed(1) : null;
     wrap.innerHTML = avg ? `<div class="media-stat"><span class="media-stat-num">★ ${avg}</span><span class="media-stat-label">сер. рейтинг</span></div>` : '';
   }
 
   // ── СІТКА ----------
+  /** @returns {void} */
   function renderGrid() {
     const wrap = el('media-list');
+    if (!wrap) return;
     const conf = STATUS_CONFIG[activeType];
     const items = activeFilter === 'all'
       ? [...allItems].sort((a,b) => STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status))
@@ -378,6 +433,10 @@ const Media = (() => {
   }
 
   // ── TMDB деталі ──
+  /**
+   * @param {MediaItem} item
+   * @returns {Promise<TmdbDetails | null>}
+   */
   async function fetchTmdbDetails(item) {
     const tmdbType = item.type === 'series' ? 'tv' : 'movie';
     try {
@@ -392,14 +451,14 @@ const Media = (() => {
         fetch(`${TMDB_BASE}/${tmdbType}/${tmdbId}?api_key=${TMDB_KEY}&language=uk-UA`).then(r=>r.json()),
         fetch(`${TMDB_BASE}/${tmdbType}/${tmdbId}/videos?api_key=${TMDB_KEY}&language=en-US`).then(r=>r.json()),
       ]);
-      const trailer = (videos.results||[]).find(v => v.site==='YouTube' && (v.type==='Trailer'||v.type==='Teaser'));
+      const trailer = (videos.results||[]).find((/** @type {any} */ v) => v.site==='YouTube' && (v.type==='Trailer'||v.type==='Teaser'));
       return {
         title:      details.title || details.name || item.title,
         overview:   details.overview || first.overview || '',
         year:       (details.release_date || details.first_air_date || '').slice(0,4),
         rating:     details.vote_average ? details.vote_average.toFixed(1) : null,
         runtime:    details.runtime || null,
-        genres:     (details.genres||[]).slice(0,3).map(g=>g.name),
+        genres:     (details.genres||[]).slice(0,3).map((/** @type {any} */ g) => g.name),
         backdrop:   details.backdrop_path  ? 'https://image.tmdb.org/t/p/w780'  + details.backdrop_path  : null,
         poster:     details.poster_path    ? 'https://image.tmdb.org/t/p/w342'  + details.poster_path    : item.poster_url,
         youtubeKey: trailer ? trailer.key : null,
@@ -408,8 +467,13 @@ const Media = (() => {
   }
 
   // ── Модалка деталей фільму ──
+  /**
+   * @param {MediaItem} item
+   * @returns {Promise<void>}
+   */
   async function openMediaDetailModal(item) {
     const root = el('modal-root');
+    if (!root) return;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.id = 'media-detail-overlay';
@@ -442,18 +506,19 @@ const Media = (() => {
     closeModalAnimated();
     root.appendChild(overlay);
 
-    overlay.querySelector('#mdr-close').addEventListener('click', () => root.innerHTML='');
-    overlay.querySelector('#mdr-edit').addEventListener('click', () => { root.innerHTML=''; openEditModal(item.id); });
-    overlay.addEventListener('click', e => { if(e.target.id==='media-detail-overlay') root.innerHTML=''; });
+    overlay.querySelector('#mdr-close')?.addEventListener('click', () => root.innerHTML='');
+    overlay.querySelector('#mdr-edit')?.addEventListener('click', () => { root.innerHTML=''; openEditModal(item.id); });
+    overlay.addEventListener('click', e => { if(/** @type {HTMLElement} */ (e.target).id==='media-detail-overlay') root.innerHTML=''; });
 
-    renderDetailReviews(overlay.querySelector('#mdr-reviews'), item);
+    const reviewsContainer = overlay.querySelector('#mdr-reviews');
+    if (reviewsContainer) renderDetailReviews(reviewsContainer, item);
 
     const details = await fetchTmdbDetails(item);
     if (!root.querySelector('#media-detail-overlay')) return;
 
     if (details) {
       const backdrop = overlay.querySelector('.media-detail-backdrop');
-      if (details.backdrop) {
+      if (details.backdrop && backdrop) {
         const bImg = document.createElement('img');
         bImg.className = 'media-detail-backdrop-img';
         bImg.src = details.backdrop;
@@ -471,8 +536,10 @@ const Media = (() => {
           old.replaceWith(img);
         }
       }
-      overlay.querySelector('.media-detail-title').textContent = details.title;
-      overlay.querySelector('.media-detail-meta').innerHTML = [
+      const titleEl = overlay.querySelector('.media-detail-title');
+      if (titleEl) titleEl.textContent = details.title;
+      const metaEl = overlay.querySelector('.media-detail-meta');
+      if (metaEl) metaEl.innerHTML = [
         details.year   ? `<span class="media-detail-badge">${details.year}</span>` : '',
         details.rating ? `<span class="media-detail-rating-star">★ ${details.rating}</span>` : '',
         details.runtime? `<span class="media-detail-badge">${details.runtime} хв</span>` : '',
@@ -480,27 +547,30 @@ const Media = (() => {
       ].join('');
 
       const bodyEl = overlay.querySelector('.media-detail-body');
-      const loadingEl = bodyEl.querySelector('.media-detail-trailer-loading');
+      const loadingEl = bodyEl?.querySelector('.media-detail-trailer-loading');
 
-      if (details.overview) {
+      if (details.overview && bodyEl && loadingEl) {
         const ov = document.createElement('p');
         ov.className = 'media-detail-overview';
         ov.textContent = details.overview;
         bodyEl.insertBefore(ov, loadingEl);
       }
-      if (details.youtubeKey) {
-        const btn = document.createElement('button');
-        btn.className = 'media-detail-trailer-btn';
-        btn.innerHTML = '▶ Дивитись трейлер на YouTube';
-        btn.addEventListener('click', () => {
-          const frame = document.createElement('div');
-          frame.className = 'media-detail-trailer';
-          frame.innerHTML = `<iframe src="https://www.youtube.com/embed/${details.youtubeKey}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-          btn.replaceWith(frame);
-        });
-        loadingEl.replaceWith(btn);
-      } else {
-        loadingEl.textContent = 'Трейлер не знайдено';
+      if (loadingEl) {
+        if (details.youtubeKey) {
+          const key = details.youtubeKey;
+          const btn = document.createElement('button');
+          btn.className = 'media-detail-trailer-btn';
+          btn.innerHTML = '▶ Дивитись трейлер на YouTube';
+          btn.addEventListener('click', () => {
+            const frame = document.createElement('div');
+            frame.className = 'media-detail-trailer';
+            frame.innerHTML = `<iframe src="https://www.youtube.com/embed/${key}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+            btn.replaceWith(frame);
+          });
+          loadingEl.replaceWith(btn);
+        } else {
+          loadingEl.textContent = 'Трейлер не знайдено';
+        }
       }
     } else {
       const l = overlay.querySelector('.media-detail-trailer-loading');
@@ -509,13 +579,21 @@ const Media = (() => {
   }
 
   // ── Блок відгуків у деталях ──
+  /**
+   * @param {Element} container
+   * @param {MediaItem} item
+   * @returns {void}
+   */
   function renderDetailReviews(container, item) {
-    const root = el('modal-root');
     container.innerHTML = '<div class="media-detail-reviews-title">Відгуки</div>';
-    ['dima', 'lena'].forEach(who => {
+    /** @type {Array<'dima' | 'lena'>} */
+    (['dima', 'lena']).forEach(who => {
       const label   = who === 'dima' ? 'Діма' : 'Лєна';
-      const rating  = item[`rating_${who}`];
-      const comment = item[`comment_${who}`];
+      // Динамічний ключ (rating_dima/rating_lena) — MediaItem не має
+      // індекс-сигнатури (навмисно, щоб не пускати довільні поля), тому
+      // явна розгалузка замість item[`rating_${who}`].
+      const rating  = who === 'dima' ? item.rating_dima : item.rating_lena;
+      const comment = who === 'dima' ? item.comment_dima : item.comment_lena;
       const row = document.createElement('div');
       row.className = 'media-detail-review-row';
       row.innerHTML = `
@@ -523,7 +601,7 @@ const Media = (() => {
         ${rating ? `<span class="media-detail-review-rating">★ ${rating}/10</span>` : '<span class="media-detail-review-rating" style="color:var(--text-muted)">—</span>'}
         <span class="media-detail-review-comment">${comment ? esc(comment) : '<i style="color:var(--text-muted)">Немає відгуку</i>'}</span>
         <button class="media-detail-review-edit" data-who="${who}">✏️ Відгук</button>`;
-      row.querySelector('.media-detail-review-edit').addEventListener('click', () => {
+      row.querySelector('.media-detail-review-edit')?.addEventListener('click', () => {
         closeModalAnimated();
         openReviewPanel(item, who);
       });
@@ -532,8 +610,15 @@ const Media = (() => {
   }
 
   // ── Панель відгуку ──
+  /**
+   * @param {MediaItem} item
+   * @param {'dima' | 'lena'} [preselectedWho]
+   * @returns {void}
+   */
   function openReviewPanel(item, preselectedWho) {
     const root = el('modal-root');
+    if (!root) return;
+    /** @type {'dima' | 'lena'} */
     let selectedWho = preselectedWho || 'dima';
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -543,8 +628,9 @@ const Media = (() => {
 
     const render = () => {
       const who        = selectedWho;
-      const curRating  = item[`rating_${who}`] || null;
-      const curComment = item[`comment_${who}`] || '';
+      // Динамічний ключ — те саме, що й у renderDetailReviews.
+      const curRating  = (who === 'dima' ? item.rating_dima : item.rating_lena) || null;
+      const curComment = (who === 'dima' ? item.comment_dima : item.comment_lena) || '';
       overlay.innerHTML = `
         <div class="modal-card">
           <h3>Відгук — ${esc(item.title)}</h3>
@@ -572,22 +658,35 @@ const Media = (() => {
         </div>`;
 
       overlay.querySelectorAll('[data-who]').forEach(b => {
-        b.addEventListener('click', () => { selectedWho = b.dataset.who; render(); });
+        b.addEventListener('click', () => {
+          const w = /** @type {HTMLElement} */ (b).dataset.who;
+          selectedWho = w === 'lena' ? 'lena' : 'dima';
+          render();
+        });
       });
+      /** @type {number | null} */
       let selectedScore = curRating;
       overlay.querySelectorAll('.rate-num-btn').forEach(b => {
         b.addEventListener('click', () => {
-          selectedScore = parseInt(b.dataset.score);
-          overlay.querySelectorAll('.rate-num-btn').forEach(x => x.classList.toggle('active', x.dataset.score==selectedScore));
+          const scoreStr = /** @type {HTMLElement} */ (b).dataset.score || '0';
+          selectedScore = parseInt(scoreStr);
+          overlay.querySelectorAll('.rate-num-btn').forEach(x => x.classList.toggle('active', /** @type {HTMLElement} */ (x).dataset.score == String(selectedScore)));
         });
       });
-      overlay.querySelector('#review-cancel').addEventListener('click', () => root.innerHTML='');
-      overlay.addEventListener('click', e => { if(e.target.id==='review-panel-overlay') root.innerHTML=''; });
-      overlay.querySelector('#review-save').addEventListener('click', async () => {
-        const comment = overlay.querySelector('#review-comment').value.trim();
+      overlay.querySelector('#review-cancel')?.addEventListener('click', () => root.innerHTML='');
+      overlay.addEventListener('click', e => { if(/** @type {HTMLElement} */ (e.target).id==='review-panel-overlay') root.innerHTML=''; });
+      overlay.querySelector('#review-save')?.addEventListener('click', async () => {
+        const commentInp = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#review-comment'));
+        const comment = commentInp.value.trim();
+        // Динамічний ключ на запис — тут дійсно потрібен рядковий
+        // індекс (rating_dima/rating_lena/comment_dima/comment_lena
+        // обираються за selectedWho), тому Record<string,...> замість
+        // точного інтерфейсу MediaItem.
+        /** @type {Record<string, string | number | null>} */
         const update  = {};
         if (selectedScore) update[`rating_${selectedWho}`]  = selectedScore;
         update[`comment_${selectedWho}`] = comment || null;
+        /** @type {{ error: SupaError | null }} */
         const { error } = await supabase.from('media_items').update(update).eq('id', item.id);
         if (error) { alert('Помилка збереження'); return; }
         Object.assign(item, update);
@@ -600,6 +699,10 @@ const Media = (() => {
   }
 
     // ── ВИДАЛЕННЯ ----------
+  /**
+   * @param {number} id
+   * @returns {Promise<void>}
+   */
   async function deleteItem(id) {
     if (!confirm('Видалити цей елемент?')) return;
     const { error } = await supabase.from('media_items').delete().eq('id', id);
@@ -608,9 +711,11 @@ const Media = (() => {
   }
 
   // ── ДОДАТИ вручну ----------
+  /** @returns {void} */
   function openAddModal() {
     const conf = STATUS_CONFIG[activeType];
     const root = el('modal-root');
+    if (!root) return;
     root.innerHTML = `
       <div class="modal-overlay" id="media-modal-overlay">
         <div class="modal-card">
@@ -637,25 +742,30 @@ const Media = (() => {
       </div>`;
 
     const closeModal = () => closeModalAnimated();
-    el('media-cancel').addEventListener('click', closeModal);
-    el('media-modal-overlay').addEventListener('click', e => { if (e.target.id==='media-modal-overlay') closeModal(); });
-    el('media-save').addEventListener('click', saveItem);
+    el('media-cancel')?.addEventListener('click', closeModal);
+    el('media-modal-overlay')?.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).id==='media-modal-overlay') closeModal(); });
+    el('media-save')?.addEventListener('click', saveItem);
   }
 
+  /** @returns {Promise<void>} */
   async function saveItem() {
-    const title  = el('media-title').value.trim();
-    const status = el('media-status-new').value;
-    const file   = el('media-poster-file').files?.[0];
+    const titleInp = /** @type {HTMLInputElement} */ (el('media-title'));
+    const statusInp = /** @type {HTMLSelectElement} */ (el('media-status-new'));
+    const fileInp = /** @type {HTMLInputElement} */ (el('media-poster-file'));
+    const title  = titleInp.value.trim();
+    const status = /** @type {MediaStatus} */ (statusInp.value);
+    const file   = fileInp.files?.[0];
     if (!title) { alert('Вкажи назву'); return; }
 
-    const saveBtn = el('media-save');
+    const saveBtn = /** @type {HTMLButtonElement} */ (el('media-save'));
     saveBtn.textContent = 'Зберігаємо…'; saveBtn.disabled = true;
     const user = Auth.getCurrentUser();
 
+    /** @type {SupaResult<{ id: number }>} */
     const { data, error } = await supabase.from('media_items')
       .insert({ type: activeType, title, status, created_by: user?.id||null })
       .select('id').single();
-    if (error) { alert('Не вдалось зберегти'); saveBtn.textContent='Зберегти'; saveBtn.disabled=false; return; }
+    if (error || !data) { alert('Не вдалось зберегти'); saveBtn.textContent='Зберегти'; saveBtn.disabled=false; return; }
 
     if (file) {
       const url = await uploadPoster(file, data.id);
@@ -666,11 +776,16 @@ const Media = (() => {
   }
 
   // ── РЕДАГУВАТИ ----------
+  /**
+   * @param {number} id
+   * @returns {void}
+   */
   function openEditModal(id) {
     const item = allItems.find(i => String(i.id)===String(id));
     if (!item) return;
     const conf = STATUS_CONFIG[activeType];
     const root = el('modal-root');
+    if (!root) return;
     root.innerHTML = `
       <div class="modal-overlay" id="media-edit-overlay">
         <div class="modal-card">
@@ -699,20 +814,29 @@ const Media = (() => {
       </div>`;
 
     const closeModal = () => closeModalAnimated();
-    el('edit-cancel').addEventListener('click', closeModal);
-    el('media-edit-overlay').addEventListener('click', e => { if (e.target.id==='media-edit-overlay') closeModal(); });
-    el('edit-save').addEventListener('click', () => saveEdit(id, item));
+    el('edit-cancel')?.addEventListener('click', closeModal);
+    el('media-edit-overlay')?.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).id==='media-edit-overlay') closeModal(); });
+    el('edit-save')?.addEventListener('click', () => saveEdit(id, item));
   }
 
+  /**
+   * @param {number} id
+   * @param {MediaItem} item
+   * @returns {Promise<void>}
+   */
   async function saveEdit(id, item) {
-    const title  = el('edit-title').value.trim();
-    const status = el('edit-status').value;
-    const file   = el('edit-poster-file').files?.[0];
+    const titleInp = /** @type {HTMLInputElement} */ (el('edit-title'));
+    const statusInp = /** @type {HTMLSelectElement} */ (el('edit-status'));
+    const fileInp = /** @type {HTMLInputElement} */ (el('edit-poster-file'));
+    const title  = titleInp.value.trim();
+    const status = /** @type {MediaStatus} */ (statusInp.value);
+    const file   = fileInp.files?.[0];
     if (!title) { alert('Вкажи назву'); return; }
 
-    const saveBtn = el('edit-save');
+    const saveBtn = /** @type {HTMLButtonElement} */ (el('edit-save'));
     saveBtn.textContent = 'Зберігаємо…'; saveBtn.disabled = true;
 
+    /** @type {{ title: string, status: MediaStatus, poster_url?: string }} */
     const update = { title, status };
     if (file) { const url = await uploadPoster(file, id); if (url) update.poster_url = url; }
 
@@ -723,14 +847,17 @@ const Media = (() => {
   }
 
   // ── ВКЛАДКИ ----------
+  /** @returns {void} */
   function renderTabs() {
     document.querySelectorAll('.media-tab').forEach(btn =>
-      btn.classList.toggle('active', btn.dataset.mediaType === activeType));
+      btn.classList.toggle('active', /** @type {HTMLElement} */ (btn).dataset.mediaType === activeType));
   }
 
   // ── REFRESH ----------
+  /** @returns {void} */
   function invalidateMedia() { DataCache.invalidate('media:' + activeType); }
 
+  /** @returns {void} */
   function showSkeleton() {
     const wrap = el('media-list');
     if (!wrap || DataCache.get('media:' + activeType) !== undefined) return;
@@ -745,6 +872,7 @@ const Media = (() => {
       </div>`).join('')}</div>`;
   }
 
+  /** @returns {void} */
   function refresh(){
     visibleCount = PAGE_SIZE;
     renderTabs();
@@ -759,15 +887,17 @@ const Media = (() => {
   }
 
   // ── INIT ----------
+  /** @returns {void} */
   function init() {
     el('add-media-btn')?.addEventListener('click', openAddModal);
 
     document.querySelectorAll('.media-tab').forEach(btn => {
       btn.addEventListener('click', () => {
-        activeType   = btn.dataset.mediaType;
+        const t = /** @type {HTMLElement} */ (btn).dataset.mediaType;
+        activeType   = t === 'series' || t === 'book' ? t : 'movie';
         activeFilter = 'all';
         // Очищуємо пошук при зміні вкладки
-        const inp = el('media-search-inp');
+        const inp = /** @type {HTMLInputElement | null} */ (el('media-search-inp'));
         if (inp) inp.value = '';
         hideSearchResults();
         updateSearchVisibility();
@@ -777,7 +907,7 @@ const Media = (() => {
     });
 
     window.addEventListener('portal:view', e => {
-      if (e.detail.view === 'media') {
+      if (/** @type {CustomEvent} */ (e).detail.view === 'media') {
         bindSwipeToggle();
         bindSearch();
         updateSearchVisibility();

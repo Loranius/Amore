@@ -2,14 +2,19 @@
 // TIME CAPSULE MODULE
 // Листи з датою відкриття: до дати показуємо лише
 // повідомлення "лист є", контент закритий
+//
+// Типізація: JSDoc + types.d.ts (див. jsconfig.json). Рантайму не торкається.
 // ============================================================
 
 const Capsule = (() => {
 
-  let usersMap = {}; // id -> name
+  /** @type {Record<number, string>} id -> name */
+  let usersMap = {};
 
+  /** @returns {Promise<Record<number, string>>} */
   async function loadUsers() {
     if (Object.keys(usersMap).length) return usersMap;
+    /** @type {SupaResult<AppUser[]>} */
     const { data, error } = await supabase
       .from('users')
       .select('id, name');
@@ -22,7 +27,9 @@ const Capsule = (() => {
     return usersMap;
   }
 
+  /** @returns {Promise<TimeCapsule[]>} */
   async function loadCapsules() {
+    /** @type {SupaResult<TimeCapsule[]>} */
     const { data, error } = await supabase
       .from('time_capsules')
       .select('id, title, content, open_date, created_by')
@@ -35,17 +42,20 @@ const Capsule = (() => {
     return data || [];
   }
 
+  /** @param {string | null | undefined} str @returns {string} */
   function escapeHtml(str) {
     const div = document.createElement('div');
-    div.textContent = str;
+    div.textContent = str || '';
     return div.innerHTML;
   }
 
+  /** @param {string} dateStr @returns {string} */
   function formatDate(dateStr) {
     const d = new Date(dateStr);
     return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
+  /** @param {string} openDate @returns {boolean} */
   function isUnlocked(openDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -54,8 +64,13 @@ const Capsule = (() => {
     return today >= open;
   }
 
+  /**
+   * @param {TimeCapsule[]} capsules
+   * @returns {void}
+   */
   function render(capsules) {
     const grid = document.getElementById('capsule-grid');
+    if (!grid) return;
     const currentUser = Auth.getCurrentUser();
 
     if (!capsules.length) {
@@ -66,8 +81,8 @@ const Capsule = (() => {
     grid.innerHTML = '';
     capsules.forEach(c => {
       const unlocked = isUnlocked(c.open_date);
-      const isOwner = currentUser && c.created_by === currentUser.id;
-      const authorName = usersMap[c.created_by] || 'Хтось';
+      const isOwner = !!currentUser && c.created_by === currentUser.id;
+      const authorName = (c.created_by !== null ? usersMap[c.created_by] : null) || 'Хтось';
 
       const card = document.createElement('div');
       card.className = 'capsule-card' + (unlocked ? '' : ' locked');
@@ -108,14 +123,20 @@ const Capsule = (() => {
     });
 
     grid.querySelectorAll('[data-delete-id]').forEach(btn => {
-      btn.addEventListener('click', () => deleteCapsule(btn.dataset.deleteId));
+      const id = /** @type {HTMLElement} */ (btn).dataset.deleteId;
+      if (id) btn.addEventListener('click', () => deleteCapsule(id));
     });
 
     grid.querySelectorAll('[data-edit-id]').forEach(btn => {
-      btn.addEventListener('click', () => openEditModal(btn.dataset.editId, capsules));
+      const id = /** @type {HTMLElement} */ (btn).dataset.editId;
+      if (id) btn.addEventListener('click', () => openEditModal(id, capsules));
     });
   }
 
+  /**
+   * @param {string} id
+   * @returns {Promise<void>}
+   */
   async function deleteCapsule(id) {
     if (!confirm('Видалити цей лист?')) return;
 
@@ -129,19 +150,28 @@ const Capsule = (() => {
     refresh();
   }
 
+  /** @returns {Promise<void>} */
   async function refresh() {
     const users = await Auth.getUsers();
     usersMap = {};
     users.forEach(u => { usersMap[u.id] = u.name; });
-    DataCache.swr('time_capsules', loadCapsules, render);
+    // capsules || [] — без цього render(null) після невдалого першого
+    // фетчу (без кешу) впав би на capsules.length.
+    DataCache.swr('time_capsules', loadCapsules, (capsules) => render(capsules || []));
   }
 
   // ---------- Модалка редагування листа ----------
+  /**
+   * @param {string} id
+   * @param {TimeCapsule[]} capsules
+   * @returns {void}
+   */
   function openEditModal(id, capsules) {
     const capsule = capsules.find(c => String(c.id) === String(id));
     if (!capsule) return;
 
     const root = document.getElementById('modal-root');
+    if (!root) return;
     root.innerHTML = `
       <div class="modal-overlay" id="capsule-edit-modal-overlay">
         <div class="modal-card">
@@ -166,17 +196,24 @@ const Capsule = (() => {
       </div>
     `;
 
-    document.getElementById('capsule-edit-cancel').addEventListener('click', closeModal);
-    document.getElementById('capsule-edit-modal-overlay').addEventListener('click', (e) => {
-      if (e.target.id === 'capsule-edit-modal-overlay') closeModal();
+    document.getElementById('capsule-edit-cancel')?.addEventListener('click', closeModal);
+    document.getElementById('capsule-edit-modal-overlay')?.addEventListener('click', (e) => {
+      if (/** @type {HTMLElement} */ (e.target).id === 'capsule-edit-modal-overlay') closeModal();
     });
-    document.getElementById('capsule-edit-save').addEventListener('click', () => saveEdit(id));
+    document.getElementById('capsule-edit-save')?.addEventListener('click', () => saveEdit(id));
   }
 
+  /**
+   * @param {string} id
+   * @returns {Promise<void>}
+   */
   async function saveEdit(id) {
-    const title = document.getElementById('capsule-edit-title').value.trim();
-    const openDate = document.getElementById('capsule-edit-date').value;
-    const content = document.getElementById('capsule-edit-content').value.trim();
+    const titleInp   = /** @type {HTMLInputElement} */ (document.getElementById('capsule-edit-title'));
+    const dateInp    = /** @type {HTMLInputElement} */ (document.getElementById('capsule-edit-date'));
+    const contentInp = /** @type {HTMLTextAreaElement} */ (document.getElementById('capsule-edit-content'));
+    const title = titleInp.value.trim();
+    const openDate = dateInp.value;
+    const content = contentInp.value.trim();
 
     if (!title || !openDate || !content) {
       alert('Заповни назву, дату та текст листа');
@@ -200,8 +237,10 @@ const Capsule = (() => {
   }
 
   // ---------- Модалка додавання листа ----------
+  /** @returns {void} */
   function openAddModal() {
     const root = document.getElementById('modal-root');
+    if (!root) return;
     root.innerHTML = `
       <div class="modal-overlay" id="capsule-modal-overlay">
         <div class="modal-card">
@@ -226,21 +265,26 @@ const Capsule = (() => {
       </div>
     `;
 
-    document.getElementById('capsule-cancel').addEventListener('click', closeModal);
-    document.getElementById('capsule-modal-overlay').addEventListener('click', (e) => {
-      if (e.target.id === 'capsule-modal-overlay') closeModal();
+    document.getElementById('capsule-cancel')?.addEventListener('click', closeModal);
+    document.getElementById('capsule-modal-overlay')?.addEventListener('click', (e) => {
+      if (/** @type {HTMLElement} */ (e.target).id === 'capsule-modal-overlay') closeModal();
     });
-    document.getElementById('capsule-save').addEventListener('click', saveCapsule);
+    document.getElementById('capsule-save')?.addEventListener('click', saveCapsule);
   }
 
+  /** @returns {void} */
   function closeModal() {
     closeModalAnimated();
   }
 
+  /** @returns {Promise<void>} */
   async function saveCapsule() {
-    const title = document.getElementById('capsule-title').value.trim();
-    const openDate = document.getElementById('capsule-date').value;
-    const content = document.getElementById('capsule-content').value.trim();
+    const titleInp   = /** @type {HTMLInputElement} */ (document.getElementById('capsule-title'));
+    const dateInp    = /** @type {HTMLInputElement} */ (document.getElementById('capsule-date'));
+    const contentInp = /** @type {HTMLTextAreaElement} */ (document.getElementById('capsule-content'));
+    const title = titleInp.value.trim();
+    const openDate = dateInp.value;
+    const content = contentInp.value.trim();
 
     if (!title || !openDate || !content) {
       alert('Заповни назву, дату та текст листа');
@@ -267,10 +311,11 @@ const Capsule = (() => {
     refresh();
   }
 
+  /** @returns {void} */
   function init() {
-    document.getElementById('add-capsule-btn').addEventListener('click', openAddModal);
+    document.getElementById('add-capsule-btn')?.addEventListener('click', openAddModal);
     window.addEventListener('portal:view', (e) => {
-      if (e.detail.view === 'capsule') refresh();
+      if (/** @type {CustomEvent} */ (e).detail.view === 'capsule') refresh();
     });
   }
 

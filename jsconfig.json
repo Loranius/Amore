@@ -18,6 +18,9 @@
     "lib/confetti.js",
     "modules/wishlist.js",
     "modules/map.js",
-    "modules/auth.js"
+    "modules/auth.js",
+    "modules/calendar.js",
+    "modules/capsule.js",
+    "modules/media.js"
   ]
 }

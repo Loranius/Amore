@@ -1,11 +1,14 @@
 // ============================================================
 // CALENDAR MODULE v2
+//
+// Типізація: JSDoc + types.d.ts (див. jsconfig.json). Рантайму не торкається.
 // ============================================================
 const CalendarModule = (() => {
 
   const MONTHS = ['січня','лютого','березня','квітня','травня','червня',
                   'липня','серпня','вересня','жовтня','листопада','грудня'];
 
+  /** @type {Record<EventType, { icon: string, label: string, color: string }>} */
   const TYPES = {
     birthday:    { icon: '🎂', label: 'День народження', color: '#FF6B9D' },
     anniversary: { icon: '💕', label: 'Річниця',         color: '#E8829C' },
@@ -14,6 +17,7 @@ const CalendarModule = (() => {
   };
 
   // Категорії для вкладки "Плани"
+  /** @type {Record<PlanCategory, { icon: string, label: string, color: string, gradient: string }>} */
   const PLAN_CATS = {
     date:  { icon: '💑', label: 'Побачення', color: '#FF6B9D', gradient: 'linear-gradient(135deg,#FF6B9D,#E8829C)' },
     dream: { icon: '✨', label: 'Мрії',      color: '#9B6EA8', gradient: 'linear-gradient(135deg,#9B6EA8,#C084D4)' },
@@ -23,16 +27,20 @@ const CalendarModule = (() => {
   };
 
   // Статуси планів
+  /** @type {Record<PlanStatus, { label: string, icon: string, cls: string }>} */
   const PLAN_STATUS = {
     planned: { label: 'Планується', icon: '⏳', cls: 'plan-status-planned' },
     active:  { label: 'В процесі',  icon: '🔥', cls: 'plan-status-active'  },
     done:    { label: 'Виконано!',  icon: '✅', cls: 'plan-status-done'    },
   };
 
+  /** @param {string | null | undefined} s @returns {string} */
   const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
 
   // ── ДАНІ ──
+  /** @returns {Promise<CalendarEvent[]>} */
   async function loadEvents() {
+    /** @type {SupaResult<CalendarEvent[]>} */
     const {data} = await supabase.from('events')
       .select('id,title,description,date,created_by,type,yearly')
       .order('date', {ascending:true});
@@ -40,6 +48,10 @@ const CalendarModule = (() => {
   }
 
   // ── ЛОГІКА ДАТ ──
+  /**
+   * @param {CalendarEvent} ev
+   * @returns {{ date: Date, passed: boolean }}
+   */
   function nextOccurrence(ev) {
     const now   = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -57,13 +69,15 @@ const CalendarModule = (() => {
     return { date: next, passed: false };
   }
 
+  /** @param {Date} dateObj @returns {number} */
   function daysUntil(dateObj) {
     const today = new Date();
     today.setHours(0,0,0,0);
-    const diff = dateObj - today;
+    const diff = dateObj.getTime() - today.getTime();
     return Math.round(diff / 86400000);
   }
 
+  /** @param {number} n @returns {string} */
   function daysLabel(n) {
     if(n === 0) return '🎊 Сьогодні!';
     if(n === 1) return 'завтра';
@@ -74,9 +88,14 @@ const CalendarModule = (() => {
     return `через ${Math.floor(n/365)} р.`;
   }
 
+  /** @type {EventType} */
   let activeTypeFilter = 'anniversary'; // дефолт — Наші свята
 
   // ── РЕНДЕР ──
+  /**
+   * @param {CalendarEvent[]} events
+   * @returns {void}
+   */
   function renderEvents(events) {
     renderEvents._lastEvents = events;
     const wrap = document.getElementById('calendar-list');
@@ -88,6 +107,7 @@ const CalendarModule = (() => {
     }
 
     // Enriched
+    /** @type {EnrichedEvent[]} */
     const enriched = events.map(ev => {
       const {date: nextDate, passed} = nextOccurrence(ev);
       const days = daysUntil(nextDate);
@@ -101,6 +121,7 @@ const CalendarModule = (() => {
     wrap.innerHTML = '';
 
     // Кнопки фільтру по типу
+    /** @type {Array<{ type: EventType, label: string }>} */
     const TAB_DEFS = [
       { type:'anniversary', label:'💕 Наші свята'     },
       { type:'birthday',    label:'🎂 Дні народження' },
@@ -144,7 +165,7 @@ const CalendarModule = (() => {
     // Банер найближчої події
     const nextUp = filtered.find(e => !e.passed);
     if(nextUp) {
-      const t = TYPES[nextUp.type]||TYPES.other;
+      const t = TYPES[nextUp.type || 'other']||TYPES.other;
       const banner = document.createElement('div');
       banner.className = 'cal-next-banner';
       banner.style.borderColor = t.color;
@@ -165,7 +186,17 @@ const CalendarModule = (() => {
     if(upcoming.length) renderSection(wrap, null, upcoming, false, nextUp?.id);
     if(past.length)     renderSection(wrap, '✓ Минулі', past, true);
   }
+  /** @type {CalendarEvent[] | undefined} */
+  renderEvents._lastEvents = undefined;
 
+  /**
+   * @param {HTMLElement} wrap
+   * @param {string | null} title
+   * @param {EnrichedEvent[]} events
+   * @param {boolean} [muted]
+   * @param {number | null} [hideBadgeForId]
+   * @returns {void}
+   */
   function renderSection(wrap, title, events, muted=false, hideBadgeForId=null) {
     const section = document.createElement('div');
     section.className = 'cal-section';
@@ -178,7 +209,7 @@ const CalendarModule = (() => {
     }
 
     events.forEach(ev => {
-      const t   = TYPES[ev.type]||TYPES.other;
+      const t   = TYPES[ev.type || 'other']||TYPES.other;
       const orig = new Date(ev.date);
       const dateStr = `${orig.getDate()} ${MONTHS[orig.getMonth()]} ${orig.getFullYear()} р.`;
 
@@ -202,29 +233,45 @@ const CalendarModule = (() => {
 
     wrap.appendChild(section);
 
-    section.querySelectorAll('[data-id]').forEach(btn =>
-      btn.addEventListener('click', () => deleteEvent(btn.dataset.id)));
+    section.querySelectorAll('[data-id]').forEach(btn => {
+      const id = /** @type {HTMLElement} */ (btn).dataset.id;
+      if (id) btn.addEventListener('click', () => deleteEvent(id));
+    });
   }
 
   // ── ПЛАНИ — окремий рендер ──
-  let plansTab = 'active'; // 'active' | 'archive'
+  /** @type {'active' | 'archive'} */
+  let plansTab = 'active';
 
+  /**
+   * @param {HTMLElement} wrap
+   * @param {EnrichedEvent[]} plans
+   * @returns {void}
+   */
   function renderPlans(wrap, plans) {
+    /**
+     * @param {EnrichedEvent} ev
+     * @returns {{ cat: PlanCategory, status: PlanStatus, doneAt: string | null, note: string }}
+     */
     function parsePlan(ev) {
       let desc = ev.description || '';
+      /** @type {PlanCategory} */
       let cat    = 'other';
+      /** @type {PlanStatus} */
       let status = 'planned';
+      /** @type {string | null} */
       let doneAt = null;
       const mCat    = desc.match(/\[cat:(\w+)\]/);
       const mStatus = desc.match(/\[status:(\w+)\]/);
       const mDoneAt = desc.match(/\[doneAt:([^\]]+)\]/);
-      if (mCat)    { cat    = mCat[1];    desc = desc.replace(mCat[0], ''); }
-      if (mStatus) { status = mStatus[1]; desc = desc.replace(mStatus[0], ''); }
+      if (mCat)    { cat    = /** @type {PlanCategory} */ (mCat[1]);    desc = desc.replace(mCat[0], ''); }
+      if (mStatus) { status = /** @type {PlanStatus} */ (mStatus[1]); desc = desc.replace(mStatus[0], ''); }
       if (mDoneAt) { doneAt = mDoneAt[1]; desc = desc.replace(mDoneAt[0], ''); }
       return { cat, status, doneAt, note: desc.trim() };
     }
 
     // Розбиваємо на активні / архів
+    /** @type {ParsedPlan[]} */
     const parsed = plans.map(ev => ({ ...ev, ...parsePlan(ev) }));
     const active  = parsed.filter(p => p.status !== 'done');
     const archive = parsed.filter(p => p.status === 'done');
@@ -242,7 +289,8 @@ const CalendarModule = (() => {
     wrap.appendChild(tabBar);
     tabBar.querySelectorAll('.plans-tab-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        plansTab = btn.dataset.tab;
+        const tab = /** @type {HTMLElement} */ (btn).dataset.tab;
+        plansTab = tab === 'archive' ? 'archive' : 'active';
         if (renderEvents._lastEvents) {
           renderEvents(renderEvents._lastEvents);
         } else {
@@ -301,14 +349,22 @@ const CalendarModule = (() => {
     renderPlanCards(wrap, active, false);
   }
 
+  /**
+   * @param {HTMLElement} wrap
+   * @param {ParsedPlan[]} plans
+   * @param {boolean} isArchive
+   * @returns {void}
+   */
   function renderPlanCards(wrap, plans, isArchive) {
     // Групуємо по категорії
+    /** @type {Record<string, ParsedPlan[]>} */
     const bycat = {};
     plans.forEach(ev => {
       if (!bycat[ev.cat]) bycat[ev.cat] = [];
       bycat[ev.cat].push(ev);
     });
 
+    /** @type {PlanCategory[]} */
     const catOrder = ['date', 'dream', 'trip', 'goal', 'other'];
     catOrder.forEach(catKey => {
       const items = bycat[catKey];
@@ -342,7 +398,7 @@ const CalendarModule = (() => {
         if (isArchive && ev.doneAt) {
           const doneDate = new Date(ev.doneAt);
           const createdDate = new Date(ev.date);
-          const diffMs  = doneDate - createdDate;
+          const diffMs  = doneDate.getTime() - createdDate.getTime();
           const diffDay = Math.max(0, Math.round(diffMs / 86400000));
           doneInfo = `<span class="plans-card-done-time">✅ ${doneDate.getDate()} ${MONTHS[doneDate.getMonth()]} ${doneDate.getFullYear()} р. · ${diffDay} дн.</span>`;
         }
@@ -379,20 +435,29 @@ const CalendarModule = (() => {
 
     // Обробники
     wrap.querySelectorAll('.plans-done-btn').forEach(btn => {
-      btn.addEventListener('click', () => markPlanDone(btn.dataset.id));
+      const id = /** @type {HTMLElement} */ (btn).dataset.id;
+      if (id) btn.addEventListener('click', () => markPlanDone(id));
     });
     wrap.querySelectorAll('.plans-undo-btn').forEach(btn => {
-      btn.addEventListener('click', () => markPlanStatus(btn.dataset.id, 'planned'));
+      const id = /** @type {HTMLElement} */ (btn).dataset.id;
+      if (id) btn.addEventListener('click', () => markPlanStatus(id, 'planned'));
     });
     wrap.querySelectorAll('.plans-del-btn').forEach(btn => {
-      btn.addEventListener('click', () => deleteEvent(btn.dataset.id));
+      const id = /** @type {HTMLElement} */ (btn).dataset.id;
+      if (id) btn.addEventListener('click', () => deleteEvent(id));
     });
     wrap.querySelectorAll('.plans-view-btn').forEach(btn => {
-      btn.addEventListener('click', () => openPlanArchiveModal(btn.dataset.id));
+      const id = /** @type {HTMLElement} */ (btn).dataset.id;
+      if (id) btn.addEventListener('click', () => openPlanArchiveModal(id));
     });
   }
 
+  /**
+   * @param {string} id
+   * @returns {Promise<void>}
+   */
   async function markPlanDone(id) {
+    /** @type {SupaResult<{ description: string | null }>} */
     const { data } = await supabase.from('events').select('description').eq('id', id).single();
     let desc = (data?.description || '')
       .replace(/\[status:\w+\]/, '')
@@ -405,7 +470,13 @@ const CalendarModule = (() => {
     refresh();
   }
 
+  /**
+   * @param {string} id
+   * @param {PlanStatus} newStatus
+   * @returns {Promise<void>}
+   */
   async function markPlanStatus(id, newStatus) {
+    /** @type {SupaResult<{ description: string | null }>} */
     const { data } = await supabase.from('events').select('description').eq('id', id).single();
     let desc = (data?.description || '')
       .replace(/\[status:\w+\]/, '')
@@ -416,17 +487,24 @@ const CalendarModule = (() => {
     refresh();
   }
 
+  /**
+   * @param {string} id
+   * @returns {void}
+   */
   function openPlanArchiveModal(id) {
     // Знаходимо план у поточних даних
     DataCache.swr('events', loadEvents, (events) => {
-      const ev = events.find(e => String(e.id) === String(id));
+      const ev = (events || []).find(e => String(e.id) === String(id));
       if (!ev) return;
 
       let desc = ev.description || '';
-      let cat = 'other', status = 'done', doneAt = null;
+      /** @type {PlanCategory} */
+      let cat = 'other';
+      /** @type {string | null} */
+      let doneAt = null;
       const mCat    = desc.match(/\[cat:(\w+)\]/);
       const mDoneAt = desc.match(/\[doneAt:([^\]]+)\]/);
-      if (mCat)    { cat    = mCat[1];    desc = desc.replace(mCat[0], ''); }
+      if (mCat)    { cat    = /** @type {PlanCategory} */ (mCat[1]); desc = desc.replace(mCat[0], ''); }
       if (mDoneAt) { doneAt = mDoneAt[1]; desc = desc.replace(mDoneAt[0], ''); }
       desc = desc.replace(/\[status:\w+\]/, '').trim();
 
@@ -438,7 +516,7 @@ const CalendarModule = (() => {
       if (doneAt) {
         const doneDate = new Date(doneAt);
         doneStr = `${doneDate.getDate()} ${MONTHS[doneDate.getMonth()]} ${doneDate.getFullYear()} р.`;
-        const diffDay = Math.max(0, Math.round((doneDate - orig) / 86400000));
+        const diffDay = Math.max(0, Math.round((doneDate.getTime() - orig.getTime()) / 86400000));
         if (diffDay === 0)      durationStr = 'Виконано в той самий день';
         else if (diffDay === 1) durationStr = 'Виконано за 1 день';
         else if (diffDay < 30)  durationStr = `Виконано за ${diffDay} днів`;
@@ -447,6 +525,7 @@ const CalendarModule = (() => {
       }
 
       const root = document.getElementById('modal-root');
+      if (!root) return;
       const overlay = document.createElement('div');
       overlay.className = 'modal-overlay';
       overlay.innerHTML = `
@@ -480,14 +559,16 @@ const CalendarModule = (() => {
 
       root.innerHTML = '';
       root.appendChild(overlay);
-      root.querySelector('#plan-arch-close').addEventListener('click', () => root.innerHTML = '');
+      root.querySelector('#plan-arch-close')?.addEventListener('click', () => root.innerHTML = '');
       overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
     });
   }
 
   // ── МОДАЛКА ДОДАТИ ПЛАН ──
+  /** @returns {void} */
   function openAddPlanModal() {
     const root = document.getElementById('modal-root');
+    if (!root) return;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
 
@@ -536,7 +617,9 @@ const CalendarModule = (() => {
     root.innerHTML = '';
     root.appendChild(overlay);
 
-    let selectedCat    = Object.keys(PLAN_CATS)[0];
+    /** @type {PlanCategory} */
+    let selectedCat    = /** @type {PlanCategory} */ (Object.keys(PLAN_CATS)[0]);
+    /** @type {'planned' | 'active'} */
     let selectedStatus = 'planned';
 
     // Cat chips
@@ -547,9 +630,10 @@ const CalendarModule = (() => {
           c.removeAttribute('style');
         });
         chip.classList.add('active');
-        const c = PLAN_CATS[chip.dataset.cat];
-        chip.style.cssText = `background:${c.gradient};color:#fff`;
-        selectedCat = chip.dataset.cat;
+        const catKey = /** @type {PlanCategory} */ (/** @type {HTMLElement} */ (chip).dataset.cat);
+        const c = PLAN_CATS[catKey];
+        /** @type {HTMLElement} */ (chip).style.cssText = `background:${c.gradient};color:#fff`;
+        selectedCat = catKey;
       });
     });
 
@@ -558,22 +642,27 @@ const CalendarModule = (() => {
       chip.addEventListener('click', () => {
         overlay.querySelectorAll('.plans-status-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
-        selectedStatus = chip.dataset.status;
+        const s = /** @type {HTMLElement} */ (chip).dataset.status;
+        selectedStatus = s === 'active' ? 'active' : 'planned';
       });
     });
 
-    overlay.querySelector('#plan-cancel').addEventListener('click', () => root.innerHTML='');
+    overlay.querySelector('#plan-cancel')?.addEventListener('click', () => root.innerHTML='');
     overlay.addEventListener('click', e => { if(e.target===overlay) root.innerHTML=''; });
 
-    overlay.querySelector('#plan-save').addEventListener('click', async () => {
-      const title = overlay.querySelector('#plan-title').value.trim();
-      const date  = overlay.querySelector('#plan-date').value;
-      const note  = overlay.querySelector('#plan-note').value.trim();
+    overlay.querySelector('#plan-save')?.addEventListener('click', async () => {
+      const titleInp = /** @type {HTMLInputElement} */ (overlay.querySelector('#plan-title'));
+      const dateInp  = /** @type {HTMLInputElement} */ (overlay.querySelector('#plan-date'));
+      const noteInp  = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#plan-note'));
+      const title = titleInp.value.trim();
+      const date  = dateInp.value;
+      const note  = noteInp.value.trim();
       if(!title || !date) { alert('Заповни назву та дату'); return; }
 
       const desc = `[cat:${selectedCat}][status:${selectedStatus}]${note}`;
       const user = Auth.getCurrentUser();
 
+      /** @type {{ error: SupaError | null }} */
       const {error} = await supabase.from('events').insert({
         title, date,
         description: desc,
@@ -588,6 +677,10 @@ const CalendarModule = (() => {
     });
   }
 
+  /**
+   * @param {string} id
+   * @returns {Promise<void>}
+   */
   async function deleteEvent(id) {
     if(!confirm('Видалити подію?')) return;
     await supabase.from('events').delete().eq('id', id);
@@ -596,8 +689,10 @@ const CalendarModule = (() => {
   }
 
   // ── МОДАЛКА ──
+  /** @returns {void} */
   function openAddModal() {
     const root = document.getElementById('modal-root');
+    if (!root) return;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
 
@@ -639,26 +734,32 @@ const CalendarModule = (() => {
     root.appendChild(overlay);
 
     // Type chips
+    /** @type {EventType} */
     let selectedType = 'birthday';
     overlay.querySelectorAll('.cal-type-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         overlay.querySelectorAll('.cal-type-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
-        selectedType = chip.dataset.type;
+        selectedType = /** @type {EventType} */ (/** @type {HTMLElement} */ (chip).dataset.type);
       });
     });
 
-    overlay.querySelector('#ev-cancel').addEventListener('click', () => root.innerHTML='');
+    overlay.querySelector('#ev-cancel')?.addEventListener('click', () => root.innerHTML='');
     overlay.addEventListener('click', e => { if(e.target===overlay) root.innerHTML=''; });
 
-    overlay.querySelector('#ev-save').addEventListener('click', async () => {
-      const title  = overlay.querySelector('#ev-title').value.trim();
-      const date   = overlay.querySelector('#ev-date').value;
-      const desc   = overlay.querySelector('#ev-desc').value.trim();
-      const yearly = overlay.querySelector('#ev-yearly').checked;
+    overlay.querySelector('#ev-save')?.addEventListener('click', async () => {
+      const titleInp  = /** @type {HTMLInputElement} */ (overlay.querySelector('#ev-title'));
+      const dateInp   = /** @type {HTMLInputElement} */ (overlay.querySelector('#ev-date'));
+      const descInp   = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#ev-desc'));
+      const yearlyInp = /** @type {HTMLInputElement} */ (overlay.querySelector('#ev-yearly'));
+      const title  = titleInp.value.trim();
+      const date   = dateInp.value;
+      const desc   = descInp.value.trim();
+      const yearly = yearlyInp.checked;
       if(!title||!date){ alert('Заповни назву та дату'); return; }
 
       const user = Auth.getCurrentUser();
+      /** @type {{ error: SupaError | null }} */
       const {error} = await supabase.from('events').insert({
         title, date,
         description: desc||null,
@@ -673,6 +774,7 @@ const CalendarModule = (() => {
     });
   }
 
+  /** @returns {void} */
   function refresh() {
     // Показуємо skeleton якщо кеш порожній
     if (DataCache.get('events') === undefined) {
@@ -691,17 +793,20 @@ const CalendarModule = (() => {
           '</div>';
       }
     }
+    // events || [] — без цього виклик renderEvents(null) після невдалого
+    // першого фетчу (без кешу) впав би на events.length.
     DataCache.swr('events', loadEvents,
-      DataCache.fadeRender(document.getElementById('calendar-list'), renderEvents));
+      DataCache.fadeRender(document.getElementById('calendar-list'), (events) => renderEvents(events || [])));
   }
 
+  /** @returns {void} */
   function init() {
     document.getElementById('add-event-btn')?.addEventListener('click', () => {
       if(activeTypeFilter === 'other') openAddPlanModal();
       else openAddModal();
     });
     window.addEventListener('portal:view', e => {
-      if(e.detail.view==='calendar') refresh();
+      if(/** @type {CustomEvent} */ (e).detail.view==='calendar') refresh();
     });
   }
 

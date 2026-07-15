@@ -142,6 +142,96 @@ interface UserLocationRow {
   updated_at: string;
 }
 
+// ---------- Календар (modules/calendar.js) ----------
+
+type EventType = 'birthday' | 'anniversary' | 'holiday' | 'other';
+
+/** Рядок таблиці `events`. */
+interface CalendarEvent {
+  id: number;
+  title: string;
+  description: string | null;
+  date: string;
+  created_by: number | null;
+  type: EventType | null;
+  yearly: boolean | null;
+}
+
+/** events + обчислена дата найближчого настання (renderEvents). */
+interface EnrichedEvent extends CalendarEvent {
+  nextDate: Date;
+  days: number;
+  passed: boolean;
+}
+
+type PlanCategory = 'date' | 'dream' | 'trip' | 'goal' | 'other';
+type PlanStatus = 'planned' | 'active' | 'done';
+
+/**
+ * "План" — це CalendarEvent з type:'other', де cat/status/doneAt
+ * закодовані як [cat:x][status:y][doneAt:z]-теги всередині description
+ * (parsePlan у calendar.js їх звідти витягує й прибирає з тексту нотатки).
+ */
+interface ParsedPlan extends EnrichedEvent {
+  cat: PlanCategory;
+  status: PlanStatus;
+  doneAt: string | null;
+  note: string;
+}
+
+// ---------- Капсула часу (modules/capsule.js) ----------
+
+/** Рядок таблиці `time_capsules`. */
+interface TimeCapsule {
+  id: number;
+  title: string;
+  content: string;
+  open_date: string;
+  created_by: number | null;
+}
+
+// ---------- Медіа (modules/media.js) ----------
+
+type MediaType = 'movie' | 'series' | 'book';
+type MediaStatus = 'want' | 'watching' | 'done' | 'dropped';
+
+/** Рядок таблиці `media_items`. */
+interface MediaItem {
+  id: number;
+  type: MediaType;
+  title: string;
+  status: MediaStatus;
+  poster_url: string | null;
+  rating_dima: number | null;
+  rating_lena: number | null;
+  comment_dima: string | null;
+  comment_lena: string | null;
+  created_by: number | null;
+}
+
+/** Результат пошуку TMDB (tmdbSearch), уже приведений до нашої форми. */
+interface TmdbSearchResult {
+  tmdb_id: number;
+  title: string;
+  poster_url: string | null;
+  year: string;
+  rating: string | null;
+  overview: string;
+}
+
+/** Деталі фільму/серіалу з TMDB (fetchTmdbDetails) — те, що реально використовується. */
+interface TmdbDetails {
+  title: string;
+  overview: string;
+  year: string;
+  rating: string | null;
+  runtime: number | null;
+  genres: string[];
+  backdrop: string | null;
+  poster: string | null;
+  youtubeKey: string | null;
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.
@@ -165,3 +255,8 @@ declare const mapboxgl: any;
 
 /** Глобальний хелпер закриття модалок, оголошений inline-скриптом у index.html. */
 declare function closeModalAnimated(rootId?: string): void;
+
+/** modules/swipe.js — ще не типізований, мінімальний контракт для Media. */
+declare const Swipe: {
+  refresh(): void;
+};
