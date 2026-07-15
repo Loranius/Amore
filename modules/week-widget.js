@@ -11,6 +11,7 @@ const WeekWidget = (() => {
   const UA_MONTHS = ['січ', 'лют', 'бер', 'кві', 'тра', 'чер',
                      'лип', 'сер', 'вер', 'жов', 'лис', 'гру'];
 
+  /** @type {Record<string, string>} */
   const TYPE_ICON = {
     birthday:    '🎂',
     anniversary: '💕',
@@ -18,18 +19,21 @@ const WeekWidget = (() => {
     other:       '🗺️',
   };
 
+  /** @param {string} s @returns {string} */
   const esc = s => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
 
   // Розбираємо мета-теги планів із description
+  /** @param {string | null} desc @returns {{cat: PlanCategory, status: PlanStatus}} */
   function parsePlanMeta(desc) {
-    let cat = 'other', status = 'planned';
+    let cat = /** @type {PlanCategory} */ ('other'), status = /** @type {PlanStatus} */ ('planned');
     const mCat    = (desc || '').match(/\[cat:(\w+)\]/);
     const mStatus = (desc || '').match(/\[status:(\w+)\]/);
-    if (mCat)    cat    = mCat[1];
-    if (mStatus) status = mStatus[1];
+    if (mCat)    cat    = /** @type {PlanCategory} */ (mCat[1]);
+    if (mStatus) status = /** @type {PlanStatus} */ (mStatus[1]);
     return { cat, status };
   }
 
+  /** @param {Date} d @returns {Date} */
   function startOfDay(d) {
     const r = new Date(d); r.setHours(0, 0, 0, 0); return r;
   }
@@ -37,13 +41,15 @@ const WeekWidget = (() => {
   // Той самий канонічний select, що в counter.js/calendar.js —
   // усі три модулі ділять один кеш-ключ 'events' і один мережевий запит
   // (одночасні виклики дедуплікуються в DataCache.inflight).
+  /** @returns {Promise<CalendarEvent[]>} */
   async function loadEventsFull() {
-    const { data } = await supabase.from('events')
+    const { data } = /** @type {SupaResult<CalendarEvent[]>} */ (await supabase.from('events')
       .select('id,title,description,date,created_by,type,yearly')
-      .order('date', { ascending: true });
+      .order('date', { ascending: true }));
     return data || [];
   }
 
+  /** @param {CalendarEvent[]} events @returns {void} */
   function render(events) {
     const wrap = document.getElementById('week-widget');
     if (!wrap) return;
@@ -77,6 +83,7 @@ const WeekWidget = (() => {
     wrap.classList.remove('hidden');
 
     // Групуємо по даті
+    /** @type {Record<string, CalendarEvent[]>} */
     const byDay = {};
     week.forEach(ev => {
       const key = ev.date;
@@ -117,10 +124,12 @@ const WeekWidget = (() => {
 
       byDay[dateStr].forEach(ev => {
         const isPlan = ev.type === 'other';
-        const { cat } = isPlan ? parsePlanMeta(ev.description) : {};
+        const cat = isPlan ? parsePlanMeta(ev.description).cat : null;
+        /** @type {Record<string, string>} */
+        const planIcons = { date: '💑', dream: '✨', trip: '✈️', goal: '🎯', other: '🗺️' };
         const icon = isPlan
-          ? ({ date: '💑', dream: '✨', trip: '✈️', goal: '🎯', other: '🗺️' }[cat] || '🗺️')
-          : (TYPE_ICON[ev.type] || '📅');
+          ? (planIcons[cat || ''] || '🗺️')
+          : (TYPE_ICON[ev.type || ''] || '📅');
 
         // Підпис — чистий опис без тегів
         let note = '';
@@ -185,11 +194,11 @@ const WeekWidget = (() => {
   function init() {
     window.addEventListener('portal:auth', refresh);
     window.addEventListener('portal:view', e => {
-      if (e.detail.view === 'home') refresh();
+      if (/** @type {any} */ (e).detail.view === 'home') refresh();
     });
     // Слухаємо оновлення кешу подій від інших модулів
     window.addEventListener('cache:events', () => {
-      const cached = DataCache.get('events');
+      const cached = /** @type {CalendarEvent[] | undefined} */ (DataCache.get('events'));
       if (cached) render(cached);
     });
   }

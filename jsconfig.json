@@ -25,6 +25,7 @@
     "modules/swipe.js",
     "modules/shopping.js",
     "modules/settings.js",
-    "modules/photos.js"
+    "modules/photos.js",
+    "modules/week-widget.js"
   ]
 }
