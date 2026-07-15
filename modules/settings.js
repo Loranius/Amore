@@ -6,6 +6,7 @@
 
 const Settings = (() => {
 
+  /** @param {string} id @returns {HTMLElement | null} */
   const el = id => document.getElementById(id);
   const SETTING_KEY = 'telegram_notifications_enabled';
   const STORAGE_BASE = 'https://yicalgoqegluzuagxssk.supabase.co/storage/v1/object/public/family_photos';
@@ -15,16 +16,18 @@ const Settings = (() => {
   // TELEGRAM TOGGLE
   // ============================================================
 
+  /** @returns {Promise<boolean>} */
   async function loadEnabled() {
-    const { data, error } = await supabase
+    const { data, error } = /** @type {SupaResult<AppSettingRow>} */ (await supabase
       .from('settings')
       .select('value')
       .eq('key', SETTING_KEY)
-      .single();
+      .single());
     if (error || !data) return true;
     return data.value === 'true' || data.value === true;
   }
 
+  /** @param {boolean} enabled @returns {Promise<boolean>} */
   async function saveEnabled(enabled) {
     const { error } = await supabase
       .from('settings')
@@ -42,16 +45,18 @@ const Settings = (() => {
   // ============================================================
 
   // Повертає список файлів із бакету
+  /** @returns {Promise<StorageFile[]>} */
   async function listPhotos() {
-    const { data, error } = await supabase.storage
+    const { data, error } = /** @type {SupaResult<StorageFile[]>} */ (await supabase.storage
       .from(BUCKET)
-      .list('', { limit: 200, sortBy: { column: 'created_at', order: 'desc' } });
+      .list('', { limit: 200, sortBy: { column: 'created_at', order: 'desc' } }));
     if (error) { console.error('listPhotos error:', error); return []; }
     // Фільтруємо лише зображення
     return (data || []).filter(f => f.name && /\.(jpe?g|png|webp|gif)$/i.test(f.name));
   }
 
   // Завантажує один файл; повертає { name, url } або null
+  /** @param {File} file @returns {Promise<{name: string, url: string} | null>} */
   async function uploadPhoto(file) {
     // HEIC → JPEG до всього іншого. Якщо конвертація впала — сирий HEIC не ллємо:
     // він не відобразиться в браузері і його відфільтрує listPhotos за розширенням.
@@ -59,10 +64,12 @@ const Settings = (() => {
       file = await Img.normalize(file);
     } catch (e) {
       console.error('uploadPhoto: конвертація HEIC не вдалася', e);
-      ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + e.message);
+      ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + /** @type {Error} */ (e).message);
       return null;
     }
-    let blob = file, ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
+    /** @type {File | Blob} */
+    let blob = file;
+    let ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
     try {
       const out = await Img.compress(file, 1280, 0.78); // ~1280px, WebP/JPEG
       blob = out.blob; ext = out.ext; contentType = out.contentType;
@@ -77,6 +84,7 @@ const Settings = (() => {
   }
 
   // Видаляє файл
+  /** @param {string} name @returns {Promise<boolean>} */
   async function deletePhoto(name) {
     const { error } = await supabase.storage.from(BUCKET).remove([name]);
     if (error) { console.error('deletePhoto error:', error); return false; }
@@ -91,6 +99,7 @@ const Settings = (() => {
     closeModalAnimated(); // плавне закриття, як у решті модулів
   }
 
+  /** @returns {Promise<void>} */
   async function openSettingsModal() {
     const root = el('modal-root');
     if (!root) return;
@@ -161,7 +170,7 @@ const Settings = (() => {
 
     // --- Telegram toggle ---
     const enabled = await loadEnabled();
-    const toggle = el('tg-toggle');
+    const toggle = /** @type {HTMLElement} */ (el('tg-toggle'));
     toggle.classList.toggle('on', enabled);
     toggle.setAttribute('aria-checked', String(enabled));
     toggle.addEventListener('click', async () => {
@@ -192,9 +201,9 @@ const Settings = (() => {
     }
 
     // --- Закрити ---
-    el('settings-close').addEventListener('click', closeModal);
-    el('settings-overlay').addEventListener('click', e => {
-      if (e.target.id === 'settings-overlay') closeModal();
+    /** @type {HTMLElement} */ (el('settings-close')).addEventListener('click', closeModal);
+    /** @type {HTMLElement} */ (el('settings-overlay')).addEventListener('click', e => {
+      if (/** @type {HTMLElement} */ (e.target).id === 'settings-overlay') closeModal();
     });
 
     // --- Розміри ---
@@ -206,6 +215,7 @@ const Settings = (() => {
   }
 
   // ---- Сітка завантажених фото ----
+  /** @returns {Promise<void>} */
   async function renderPhotoGrid() {
     const grid = el('photo-manager-grid');
     if (!grid) return;
@@ -225,7 +235,7 @@ const Settings = (() => {
       thumb.innerHTML = `
         <img src="${url}" alt="" loading="lazy">
         <button class="photo-manager-del" data-name="${photo.name}" title="Видалити">✕</button>`;
-      thumb.querySelector('.photo-manager-del').addEventListener('click', async e => {
+      /** @type {HTMLElement} */ (thumb.querySelector('.photo-manager-del')).addEventListener('click', async e => {
         e.stopPropagation();
         if (!confirm('Видалити це фото з полароїда?')) return;
         thumb.classList.add('deleting');
@@ -251,11 +261,11 @@ const Settings = (() => {
   // ---- Upload ----
   function setupUpload() {
     const zone = el('photo-upload-zone');
-    const input = el('photo-file-input');
+    const input = /** @type {HTMLInputElement | null} */ (el('photo-file-input'));
     const progress = el('photo-upload-progress');
     const bar = el('photo-upload-bar');
     const status = el('photo-upload-status');
-    if (!zone || !input) return;
+    if (!zone || !input || !progress || !bar || !status) return;
 
     // Клік по зоні
     zone.addEventListener('click', () => input.click());
@@ -269,15 +279,17 @@ const Settings = (() => {
     zone.addEventListener('drop', e => {
       e.preventDefault();
       zone.classList.remove('drag-over');
-      handleFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/') || Img.isHeic(f)));
+      const dt = /** @type {DragEvent} */ (e).dataTransfer;
+      handleFiles(Array.from(dt?.files || []).filter(f => f.type.startsWith('image/') || Img.isHeic(f)));
     });
 
     input.addEventListener('change', () => {
-      handleFiles([...input.files]);
+      handleFiles(Array.from(input.files || []));
       input.value = '';
     });
 
-    async function handleFiles(files) {
+    /** @param {File[]} files @returns {Promise<void>} */
+    const handleFiles = async (files) => {
       if (!files.length) return;
 
       zone.classList.add('uploading');
@@ -314,9 +326,10 @@ const Settings = (() => {
       if (newUrls.length) {
         Photos.reloadPool();
       }
-    }
+    };
   }
 
+  /** @param {string} name @param {string} url @returns {void} */
   function addThumbToGrid(name, url) {
     const grid = el('photo-manager-grid');
     if (!grid) return;
@@ -333,7 +346,7 @@ const Settings = (() => {
     // Анімація появи
     requestAnimationFrame(() => thumb.classList.remove('new-thumb'));
 
-    thumb.querySelector('.photo-manager-del').addEventListener('click', async e => {
+    /** @type {HTMLElement} */ (thumb.querySelector('.photo-manager-del')).addEventListener('click', async e => {
       e.stopPropagation();
       if (!confirm('Видалити це фото з полароїда?')) return;
       thumb.classList.add('deleting');
@@ -356,20 +369,22 @@ const Settings = (() => {
   // РОЗМІРИ В НАЛАШТУВАННЯХ
   // ============================================================
 
+  /** @returns {Promise<void>} */
   async function renderSizesInSettings() {
     const wrap = el('settings-sizes-wrap');
     if (!wrap) return;
 
     // Отримуємо юзерів
-    const { data: users } = await supabase.from('users').select('id,name').order('id', { ascending: true });
+    const { data: users } = /** @type {SupaResult<AppUser[]>} */ (await supabase.from('users').select('id,name').order('id', { ascending: true }));
     if (!users || !users.length) return;
 
     const currentUser = Auth.getCurrentUser();
     let activeSizesUserId = currentUser?.id || users[0].id;
 
-    async function loadAndRender() {
-      const { data: sizes } = await supabase.from('user_sizes').select('*').eq('user_id', activeSizesUserId).single();
-      const sz = sizes || {};
+    /** @returns {Promise<void>} */
+    const loadAndRender = async () => {
+      const { data: sizes } = /** @type {SupaResult<UserSizes>} */ (await supabase.from('user_sizes').select('*').eq('user_id', activeSizesUserId).single());
+      const sz = /** @type {Partial<UserSizes>} */ (sizes || {});
       const activeUser = users.find(u => u.id === activeSizesUserId);
       const isFemale = activeUser?.name === 'Лєна';
 
@@ -411,19 +426,26 @@ const Settings = (() => {
         <button class="btn-secondary" id="settings-sizes-edit" style="width:100%;margin-top:8px">✏️ Редагувати розміри</button>`;
 
       wrap.querySelectorAll('.sz-user-btn').forEach(btn => {
-        btn.addEventListener('click', () => { activeSizesUserId = +btn.dataset.uid; loadAndRender(); });
+        btn.addEventListener('click', () => { activeSizesUserId = +(/** @type {HTMLElement} */ (btn).dataset.uid || 0); loadAndRender(); });
       });
 
       wrap.querySelector('#settings-sizes-edit')?.addEventListener('click', () => {
         openSizesEditModal(sz, activeSizesUserId, isFemale, () => loadAndRender());
       });
-    }
+    };
 
     loadAndRender();
   }
 
+  /**
+   * @param {Partial<UserSizes>} sizes
+   * @param {number} userId
+   * @param {boolean} isFemale
+   * @param {() => void} onSave
+   * @returns {void}
+   */
   function openSizesEditModal(sizes, userId, isFemale, onSave) {
-    const root = el('modal-root');
+    const root = /** @type {HTMLElement} */ (el('modal-root'));
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -459,22 +481,23 @@ const Settings = (() => {
         </div>
       </div>`;
     root.innerHTML = ''; root.appendChild(overlay);
-    overlay.querySelector('#sz-cancel').addEventListener('click', () => root.innerHTML = '');
+    /** @type {HTMLElement} */ (overlay.querySelector('#sz-cancel')).addEventListener('click', () => root.innerHTML = '');
     overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
-    overlay.querySelector('#sz-save').addEventListener('click', async () => {
-      const g = id => overlay.querySelector('#' + id);
-      const { error } = await supabase.from('user_sizes').upsert({
+    /** @type {HTMLElement} */ (overlay.querySelector('#sz-save')).addEventListener('click', async () => {
+      /** @param {string} id @returns {HTMLInputElement | null} */
+      const g = id => /** @type {HTMLInputElement | null} */ (overlay.querySelector('#' + id));
+      const { error } = /** @type {SupaResult<unknown>} */ (await supabase.from('user_sizes').upsert({
         user_id: userId,
-        height: parseFloat(g('sz-height')?.value)||null, chest: parseFloat(g('sz-chest')?.value)||null,
-        waist: parseFloat(g('sz-waist')?.value)||null, hips: parseFloat(g('sz-hips')?.value)||null,
+        height: parseFloat(g('sz-height')?.value || '')||null, chest: parseFloat(g('sz-chest')?.value || '')||null,
+        waist: parseFloat(g('sz-waist')?.value || '')||null, hips: parseFloat(g('sz-hips')?.value || '')||null,
         intl_size: g('sz-intl')?.value.trim()||null, eu_size: g('sz-eu')?.value.trim()||null,
-        ua_size: g('sz-ua')?.value.trim()||null, insole_cm: parseFloat(g('sz-insole')?.value)||null,
+        ua_size: g('sz-ua')?.value.trim()||null, insole_cm: parseFloat(g('sz-insole')?.value || '')||null,
         shoe_eu: g('sz-shoe-eu')?.value.trim()||null, shoe_us: g('sz-shoe-us')?.value.trim()||null,
         bra: g('sz-bra')?.value.trim()||null, underwear: g('sz-underwear')?.value.trim()||null,
         ring_ring: g('sz-ring')?.value.trim()||null, ring_index: g('sz-ring-idx')?.value.trim()||null,
-      }, { onConflict: 'user_id' });
+      }, { onConflict: 'user_id' }));
       if (error) { alert('Помилка: ' + error.message); return; }
-      if (window.DataCache) DataCache.invalidate('sizes:' + userId);
+      if (/** @type {any} */ (window).DataCache) DataCache.invalidate('sizes:' + userId);
       root.innerHTML = '';
       if (onSave) onSave();
     });

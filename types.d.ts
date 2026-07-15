@@ -232,6 +232,74 @@ interface TmdbDetails {
   youtubeKey: string | null;
 }
 
+// ---------- Свайп-вотчліст (modules/swipe.js) ----------
+
+type SwipeType = 'movie' | 'series';
+type SwipeDirection = 'up' | 'down' | 'left' | 'right';
+
+/** Картка з TMDB-фіда, приведена до форми, яку рендерить renderCard(). */
+interface SwipeCard {
+  tmdb_id: number;
+  title: string;
+  overview: string;
+  poster_path: string | null;
+  year: string;
+  rating: string | null;
+}
+
+// ---------- Список покупок (modules/shopping.js) ----------
+
+/** Рядок таблиці `shopping_items`. id — рядок лише для оптимістичних temp_-записів до відповіді БД. */
+interface ShoppingItem {
+  id: number | string;
+  title: string;
+  qty: string | null;
+  category: string;
+  bought: boolean;
+  created_by: number | null;
+  bought_by: number | null;
+  bought_at: string | null;
+}
+
+/** Одна позиція з fallback- чи AI-парсингу вводу (ще без id — до insert). */
+interface ParsedShoppingLine {
+  title: string;
+  qty: string | null;
+  category: string;
+}
+
+// ---------- Налаштування (modules/settings.js) ----------
+
+/** Рядок таблиці `settings` (key/value; value або 'true'/'false', або boolean). */
+interface AppSettingRow {
+  key: string;
+  value: string | boolean;
+}
+
+/** Мінімум полів файла зі Supabase Storage list(), які реально читаються. */
+interface StorageFile {
+  name: string;
+}
+
+/** Рядок таблиці `user_sizes`. */
+interface UserSizes {
+  user_id: number;
+  height: number | null;
+  chest: number | null;
+  waist: number | null;
+  hips: number | null;
+  intl_size: string | null;
+  eu_size: string | null;
+  ua_size: string | null;
+  insole_cm: number | null;
+  shoe_eu: string | null;
+  shoe_us: string | null;
+  bra: string | null;
+  underwear: string | null;
+  ring_ring: string | null;
+  ring_index: string | null;
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.
@@ -256,7 +324,7 @@ declare const mapboxgl: any;
 /** Глобальний хелпер закриття модалок, оголошений inline-скриптом у index.html. */
 declare function closeModalAnimated(rootId?: string): void;
 
-/** modules/swipe.js — ще не типізований, мінімальний контракт для Media. */
-declare const Swipe: {
-  refresh(): void;
+/** modules/photos.js — ще не типізований, мінімальний контракт для Settings. */
+declare const Photos: {
+  reloadPool(): void;
 };

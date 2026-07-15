@@ -6,10 +6,18 @@
 
 const Shopping = (() => {
 
-  const el  = id => document.getElementById(id);
+  /**
+   * Елемент гарантовано присутній у розмітці — вкладка "Покупки"
+   * рендериться цілком статично в index.html.
+   * @param {string} id @returns {HTMLElement}
+   */
+  const el  = id => /** @type {HTMLElement} */ (document.getElementById(id));
+  /** @param {string} s @returns {string} */
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
 
+  /** @type {Record<number, string>} */
   let usersMap   = {};   // id -> name
+  /** @type {ShoppingItem[]} */
   let allItems   = [];   // всі товари (активні + куплені)
   let archiveOpen = false;
 
@@ -29,19 +37,21 @@ const Shopping = (() => {
   ];
 
   // ── ДАНІ ──
+  /** @returns {Promise<Record<number, string>>} */
   async function loadUsers() {
     if (Object.keys(usersMap).length) return usersMap;
-    const { data, error } = await supabase.from('users').select('id, name');
+    const { data, error } = /** @type {SupaResult<AppUser[]>} */ (await supabase.from('users').select('id, name'));
     if (error) { console.error('Shopping: помилка users', error); return {}; }
     (data || []).forEach(u => { usersMap[u.id] = u.name; });
     return usersMap;
   }
 
+  /** @returns {Promise<ShoppingItem[]>} */
   async function loadItems() {
-    const { data, error } = await supabase
+    const { data, error } = /** @type {SupaResult<ShoppingItem[]>} */ (await supabase
       .from('shopping_items')
       .select('id,title,qty,category,bought,created_by,bought_by,bought_at')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false }));
     if (error) { console.error('Shopping: помилка завантаження', error); return []; }
     return data || [];
   }
@@ -49,6 +59,7 @@ const Shopping = (() => {
   // ── ПАРСИНГ ВВЕДЕННЯ ──
   // Розбиває "молоко, хліб, два яблука" або текст з нових рядків
   // на окремі позиції. Це fallback-парсинг (без ШІ): розділювачі — кома та \n.
+  /** @param {string} raw @returns {ParsedShoppingLine[]} */
   function parseInputFallback(raw) {
     return raw
       .split(/[,\n]/)
@@ -61,6 +72,7 @@ const Shopping = (() => {
   // Повертає масив {title, qty, category} або null, якщо щось пішло не так
   // (немає мережі, функція не задеплоєна, помилка ШІ тощо) —
   // тоді викликаючий код сам впаде на parseInputFallback.
+  /** @param {string} raw @returns {Promise<ParsedShoppingLine[] | null>} */
   async function parseInputSmart(raw) {
     try {
       const { data, error } = await supabase.functions.invoke('shopping-parse', {
@@ -76,9 +88,10 @@ const Shopping = (() => {
   }
 
   // ── ДОДАВАННЯ ──
+  /** @returns {Promise<void>} */
   async function addFromInput() {
-    const input = el('sl-input');
-    const addBtn = el('sl-add-btn');
+    const input = /** @type {HTMLInputElement} */ (el('sl-input'));
+    const addBtn = /** @type {HTMLButtonElement} */ (el('sl-add-btn'));
     const raw = input.value;
     if (!raw.trim()) return;
 
@@ -99,6 +112,7 @@ const Shopping = (() => {
     }));
 
     // 1. Оптимістично показуємо нові товари (з temp id)
+    /** @type {ShoppingItem[]} */
     const tempItems = rows.map((r, i) => ({
       ...r, id: 'temp_' + Date.now() + '_' + i,
       bought: false, bought_by: null, bought_at: null,
@@ -128,6 +142,7 @@ const Shopping = (() => {
 
   // ── ЗМІНА СТАТУСУ (купити / повернути) ──
   // ── ЗМІНА СТАТУСУ (купити / повернути) — оптимістично ──
+  /** @param {ShoppingItem} item @returns {Promise<void>} */
   async function toggleBought(item) {
     const user = Auth.getCurrentUser();
     const nowBought = !item.bought;
@@ -166,6 +181,7 @@ const Shopping = (() => {
     DataCache.set('shopping:items', [...allItems]);
   }
 
+  /** @param {number | string} id @returns {Promise<void>} */
   async function deleteItem(id) {
     if (!confirm('Видалити цей товар зі списку?')) return;
 
@@ -195,6 +211,7 @@ const Shopping = (() => {
   }
 
   // ── РЕДАГУВАННЯ (категорія / кількість) ──
+  /** @param {ShoppingItem} item @returns {void} */
   function openEditModal(item) {
     const root = el('modal-root');
     const catList = CATEGORIES.includes(item.category) || !item.category
@@ -228,14 +245,15 @@ const Shopping = (() => {
       </div>`;
 
     el('sl-edit-cancel').addEventListener('click', closeModal);
-    el('sl-edit-overlay').addEventListener('click', e => { if (e.target.id === 'sl-edit-overlay') closeModal(); });
+    el('sl-edit-overlay').addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).id === 'sl-edit-overlay') closeModal(); });
     el('sl-edit-save').addEventListener('click', () => saveEdit(item.id));
   }
 
+  /** @param {number | string} id @returns {Promise<void>} */
   async function saveEdit(id) {
-    const title = el('sl-edit-title').value.trim();
-    const qty   = el('sl-edit-qty').value.trim();
-    const category = el('sl-edit-cat').value;
+    const title = /** @type {HTMLInputElement} */ (el('sl-edit-title')).value.trim();
+    const qty   = /** @type {HTMLInputElement} */ (el('sl-edit-qty')).value.trim();
+    const category = /** @type {HTMLSelectElement} */ (el('sl-edit-cat')).value;
 
     if (!title) { alert('Назва не може бути порожньою'); return; }
 
@@ -256,8 +274,9 @@ const Shopping = (() => {
   function closeModal() { closeModalAnimated(); }
 
   // ── РЕНДЕР ──
+  /** @param {number | null} userId @returns {string} */
   function authorName(userId) {
-    return usersMap[userId] || 'Хтось';
+    return (userId !== null && usersMap[userId]) || 'Хтось';
   }
 
   function renderActiveList() {
@@ -272,6 +291,7 @@ const Shopping = (() => {
     }
 
     // групування за категорією, з порядком як у CATEGORIES (+ невідомі в кінці)
+    /** @type {Record<string, ShoppingItem[]>} */
     const byCat = {};
     active.forEach(i => {
       const cat = i.category || 'Інше';
@@ -299,6 +319,7 @@ const Shopping = (() => {
     bindActiveListEvents();
   }
 
+  /** @param {ShoppingItem} item @returns {string} */
   function itemRowHtml(item) {
     return `
       <div class="sl-item-row" data-id="${item.id}">
@@ -315,13 +336,13 @@ const Shopping = (() => {
   function renderArchive() {
     const body  = el('sl-archive-body');
     const count = el('sl-archive-count');
-    const arrow = el('sl-archive-arrow');
+    const arrow = document.getElementById('sl-archive-arrow');
     if (!body) return;
 
     const bought = allItems.filter(i => i.bought)
-      .sort((a, b) => new Date(b.bought_at || 0) - new Date(a.bought_at || 0));
+      .sort((a, b) => new Date(b.bought_at || 0).getTime() - new Date(a.bought_at || 0).getTime());
 
-    count.textContent = bought.length;
+    count.textContent = String(bought.length);
     body.classList.toggle('hidden', !archiveOpen);
     if (arrow) arrow.style.transform = archiveOpen ? 'rotate(90deg)' : 'rotate(0deg)';
 
@@ -350,7 +371,8 @@ const Shopping = (() => {
     wrap.querySelectorAll('[data-toggle-id]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const item = allItems.find(i => String(i.id) === btn.dataset.toggleId);
+        const toggleId = /** @type {HTMLElement} */ (btn).dataset.toggleId;
+        const item = allItems.find(i => String(i.id) === toggleId);
         if (item) toggleBought(item);
       });
     });
@@ -358,13 +380,15 @@ const Shopping = (() => {
     wrap.querySelectorAll('[data-delete-id]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        deleteItem(btn.dataset.deleteId);
+        const id = /** @type {HTMLElement} */ (btn).dataset.deleteId;
+        if (id) deleteItem(id);
       });
     });
 
     wrap.querySelectorAll('[data-edit-id]').forEach(info => {
       info.addEventListener('click', () => {
-        const item = allItems.find(i => String(i.id) === info.dataset.editId);
+        const editId = /** @type {HTMLElement} */ (info).dataset.editId;
+        const item = allItems.find(i => String(i.id) === editId);
         if (item) openEditModal(item);
       });
     });
@@ -374,17 +398,21 @@ const Shopping = (() => {
     const body = el('sl-archive-body');
     body.querySelectorAll('[data-toggle-id]').forEach(btn => {
       btn.addEventListener('click', () => {
-        const item = allItems.find(i => String(i.id) === btn.dataset.toggleId);
+        const toggleId = /** @type {HTMLElement} */ (btn).dataset.toggleId;
+        const item = allItems.find(i => String(i.id) === toggleId);
         if (item) toggleBought(item);
       });
     });
     body.querySelectorAll('[data-delete-id]').forEach(btn => {
-      btn.addEventListener('click', () => deleteItem(btn.dataset.deleteId));
+      btn.addEventListener('click', () => {
+        const id = /** @type {HTMLElement} */ (btn).dataset.deleteId;
+        if (id) deleteItem(id);
+      });
     });
   }
 
   function bindArchiveToggle() {
-    const toggle = el('sl-archive-toggle');
+    const toggle = document.getElementById('sl-archive-toggle');
     if (!toggle || toggle.dataset.bound) return;
     toggle.dataset.bound = '1';
     toggle.addEventListener('click', () => {
@@ -394,8 +422,8 @@ const Shopping = (() => {
   }
 
   function bindInputEvents() {
-    const addBtn = el('sl-add-btn');
-    const input  = el('sl-input');
+    const addBtn = document.getElementById('sl-add-btn');
+    const input  = /** @type {HTMLInputElement | null} */ (document.getElementById('sl-input'));
     if (addBtn && !addBtn.dataset.bound) {
       addBtn.dataset.bound = '1';
       addBtn.addEventListener('click', addFromInput);
@@ -409,6 +437,7 @@ const Shopping = (() => {
   }
 
   // ── INIT / REFRESH ──
+  /** @returns {Promise<void>} */
   async function refresh() {
     const users = await Auth.getUsers();
     usersMap = {};
@@ -425,7 +454,7 @@ const Shopping = (() => {
 
   function init() {
     window.addEventListener('portal:view', e => {
-      if (e.detail.view === 'shopping') refresh();
+      if (/** @type {any} */ (e).detail.view === 'shopping') refresh();
     });
   }
 

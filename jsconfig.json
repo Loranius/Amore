@@ -21,6 +21,9 @@
     "modules/auth.js",
     "modules/calendar.js",
     "modules/capsule.js",
-    "modules/media.js"
+    "modules/media.js",
+    "modules/swipe.js",
+    "modules/shopping.js",
+    "modules/settings.js"
   ]
 }
