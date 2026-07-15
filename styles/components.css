@@ -2727,7 +2727,6 @@
 }
 .fin-inp:focus { border-color: var(--accent); }
 .fin-inp-big { font-size: 24px; font-weight: 700; text-align: center; }
-.hidden { display: none !important; }
 
 /* ── Транзакції ── */
 .tx-row {
@@ -2821,7 +2820,6 @@
 }
 .goal-progress-pct { font-weight: 800; color: var(--accent-deep); }
 
-@keyframes fadeSlideIn { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
 @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 60%{transform:translateX(6px)} }
 .shake { animation: shake 0.4s ease; }
 
@@ -5067,10 +5065,6 @@ a.wl-archive-title:hover { text-decoration: underline; }
 .cul-tab.active { background: var(--accent); color: #fff; }
 
 .cul-panel { animation: hub-panel-in 0.18s ease; }
-@keyframes hub-panel-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: none; }
-}
 
 /* Прогрес конструктора */
 .cul-progress {

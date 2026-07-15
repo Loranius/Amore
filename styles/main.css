@@ -578,14 +578,17 @@ body {
     max-width: 1040px;
   }
 
-  /* Toggle кнопка */
+  /* Toggle кнопка. Позиція фіксована на "collapsed"-місці (left:12px),
+     зсув до "expanded"-місця йде через transform:translateX — без цього
+     анімація left форсувала б layout щокадру на fixed-елементі. */
   .sidebar-toggle {
     display: flex;
     align-items: center;
     justify-content: center;
     position: fixed;
     top: 16px;
-    left: calc(var(--sidebar-w) - 18px);
+    left: 12px;
+    transform: translateX(calc(var(--sidebar-w) - 30px));
     z-index: 30;
     width: 36px;
     height: 36px;
@@ -600,12 +603,12 @@ body {
     color: var(--accent-deep);
     font-size: 17px;
     line-height: 1;
-    transition: background 0.15s, left 0.28s cubic-bezier(.22,.61,.36,1);
+    transition: background 0.15s, transform 0.28s cubic-bezier(.22,.61,.36,1);
   }
 
   .sidebar-toggle:hover { background: var(--accent-pale); }
 
-  .app.sidebar-collapsed .sidebar-toggle { left: 12px; }
+  .app.sidebar-collapsed .sidebar-toggle { transform: translateX(0); }
 
   /* Шапка sidebar */
   .topbar-inner {
@@ -1032,9 +1035,13 @@ img.lazy.loaded {
   100% { transform: translateY(110vh) rotate(720deg) scale(0.6); opacity: 0; }
 }
 @keyframes confetti-sway {
-  0%,100% { margin-left: 0; }
-  25% { margin-left: 30px; }
-  75% { margin-left: -30px; }
+  /* translate — окрема від transform властивість (CSS Transforms L2),
+     композиційна з transform: обидві анімації рахує лише compositor,
+     без layout. Раніше тут був margin-left — форсував reflow на
+     кожному кадрі одразу для всіх ~60 елементів вибуху конфеті. */
+  0%,100% { translate: 0 0; }
+  25% { translate: 30px 0; }
+  75% { translate: -30px 0; }
 }
 
 .confetti-piece {
@@ -1045,6 +1052,7 @@ img.lazy.loaded {
   border-radius: 2px;
   pointer-events: none;
   z-index: 9999;
+  will-change: transform;
   animation: confetti-fall var(--fall-dur, 1.8s) var(--fall-delay, 0s) ease-in forwards,
              confetti-sway var(--sway-dur, 0.9s) var(--fall-delay, 0s) ease-in-out infinite;
 }
