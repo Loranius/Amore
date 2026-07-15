@@ -37,6 +37,7 @@
     "modules/whereto.js",
     "modules/game.js",
     "lib/realtime.js",
-    "lib/pwa.js"
+    "lib/pwa.js",
+    "modules/random.js"
   ]
 }

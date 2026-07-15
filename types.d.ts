@@ -423,6 +423,56 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 }
 
+// ---------- Кулінарія (modules/random.js) ----------
+
+type DishCategory = 'meat' | 'vegan' | 'fast' | 'other';
+
+/** Один інгредієнт у recipe.ingredients (jsonb). shop_cat — лише від culinary-ai. */
+interface RecipeIngredient {
+  name: string;
+  amount: string;
+  unit: string;
+  shop_cat?: string;
+}
+
+/** Форма jsonb-колонки `dishes.recipe`. */
+interface Recipe {
+  servings: number;
+  ingredients: RecipeIngredient[];
+  steps: string[];
+}
+
+/** Рядок таблиці `dishes`, приведений до нормалізованої форми (loadDishes). */
+interface Dish {
+  id: number;
+  title: string;
+  category: DishCategory;
+  recipe: Recipe | null;
+}
+
+/** Один крок майстра конструктора страв (CUL_STEPS). */
+interface CulinaryStepDef {
+  key: string;
+  title: string;
+  hint: string;
+  multi: boolean;
+  max?: number;
+  options: string[];
+}
+
+/** Страва, згенерована Edge Function culinary-ai. */
+interface CulinaryDish {
+  title: string;
+  description?: string;
+  cuisine?: string;
+  time_minutes?: number;
+  difficulty?: string;
+  tools?: string[];
+  servings?: number;
+  ingredients: RecipeIngredient[];
+  steps?: string[];
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.
@@ -453,7 +503,3 @@ declare const Router: {
   getCurrentView(): string;
 };
 
-/** modules/random.js (Кулінарія) — ще не типізований, мінімальний контракт для Realtime. */
-declare const RandomModule: {
-  refresh(): void;
-};

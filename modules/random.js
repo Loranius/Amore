@@ -6,9 +6,12 @@
 // ============================================================
 const RandomModule = (() => {
 
+  /** @type {Dish[]} */
   let dishes = [];
+  /** @type {'all' | DishCategory} */
   let activeDishCat = 'all'; // 'all' | 'meat' | 'vegan' | 'fast' | 'other'
 
+  /** @type {Record<DishCategory, {label: string, color: string}>} */
   const DISH_CATS = {
     meat:  { label: '🥩 М\'ясне',  color: '#C45B79' },
     vegan: { label: '🥦 Вега',     color: '#5FA777' },
@@ -16,6 +19,7 @@ const RandomModule = (() => {
     other: { label: '🍽️ Інше',    color: '#9B6EA8' },
   };
 
+  /** @param {string} str @returns {string} */
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
@@ -25,11 +29,12 @@ const RandomModule = (() => {
   // ============================================================
   // ДАНІ СТРАВ
   // ============================================================
+  /** @returns {Promise<Dish[]>} */
   async function loadDishes() {
-    let { data, error } = await supabase
+    let { data, error } = /** @type {SupaResult<any[]>} */ (await supabase
       .from('dishes')
       .select('id, title, category, recipe')
-      .order('id', { ascending: false });
+      .order('id', { ascending: false }));
 
     if (error) {
       // Колонка recipe ще не додана в Supabase — пробуємо без неї,
@@ -43,11 +48,12 @@ const RandomModule = (() => {
           return [];
         }
       }
-      return (fb.data || []).map(d => ({ ...d, category: d.category || 'other', recipe: d.recipe || null }));
+      return (fb.data || []).map((/** @type {any} */ d) => /** @type {Dish} */ ({ ...d, category: d.category || 'other', recipe: d.recipe || null }));
     }
-    return (data || []).map(d => ({ ...d, category: d.category || 'other', recipe: d.recipe || null }));
+    return (data || []).map((/** @type {any} */ d) => /** @type {Dish} */ ({ ...d, category: d.category || 'other', recipe: d.recipe || null }));
   }
 
+  /** @returns {Dish[]} */
   function visibleDishes() {
     return activeDishCat === 'all'
       ? dishes
@@ -64,7 +70,7 @@ const RandomModule = (() => {
     }).join('');
     wrap.querySelectorAll('[data-cat]').forEach(btn => {
       btn.addEventListener('click', () => {
-        activeDishCat = btn.dataset.cat;
+        activeDishCat = /** @type {'all' | DishCategory} */ (/** @type {HTMLElement} */ (btn).dataset.cat);
         renderDishCatTabs();
         renderDishes(visibleDishes());
       });
@@ -77,6 +83,7 @@ const RandomModule = (() => {
   // ============================================================
   const RCP_UNITS = ['г', 'кг', 'мл', 'л', 'шт', 'ст.л', 'ч.л', 'пучок', 'за смаком'];
 
+  /** @param {Partial<RecipeIngredient>} [ing] @returns {string} */
   function rcpIngRowHtml(ing = {}) {
     return `
       <div class="rcp-ing-row">
@@ -90,8 +97,9 @@ const RandomModule = (() => {
   }
 
   // HTML секції рецепта всередині модалки страви
+  /** @param {Recipe | null} [recipe] @returns {string} */
   function recipeEditorHtml(recipe) {
-    const r = recipe || {};
+    const r = recipe || /** @type {Partial<Recipe>} */ ({});
     const ings = (r.ingredients && r.ingredients.length) ? r.ingredients : [{}];
     const hasRecipe = !!(recipe && ((recipe.ingredients || []).length || (recipe.steps || []).length));
     return `
@@ -113,48 +121,51 @@ const RandomModule = (() => {
   }
 
   // Обробники редактора рецепта (кличемо після вставки HTML у DOM)
+  /** @param {ParentNode} scope @returns {void} */
   function bindRecipeEditor(scope) {
-    const editor = scope.querySelector('#rcp-editor');
-    scope.querySelector('#rcp-toggle').addEventListener('click', () => {
+    const editor = /** @type {HTMLElement} */ (scope.querySelector('#rcp-editor'));
+    /** @type {HTMLElement} */ (scope.querySelector('#rcp-toggle')).addEventListener('click', () => {
       editor.classList.toggle('hidden');
-      scope.querySelector('#rcp-toggle-arrow').classList.toggle('open', !editor.classList.contains('hidden'));
+      /** @type {HTMLElement} */ (scope.querySelector('#rcp-toggle-arrow')).classList.toggle('open', !editor.classList.contains('hidden'));
     });
-    const ingList = scope.querySelector('#rcp-ing-list');
-    scope.querySelector('#rcp-add-ing').addEventListener('click', () => {
+    const ingList = /** @type {HTMLElement} */ (scope.querySelector('#rcp-ing-list'));
+    /** @type {HTMLElement} */ (scope.querySelector('#rcp-add-ing')).addEventListener('click', () => {
       ingList.insertAdjacentHTML('beforeend', rcpIngRowHtml());
     });
     // Делегування видалення рядків
     ingList.addEventListener('click', (e) => {
-      const del = e.target.closest('.rcp-ing-del');
-      if (del) del.closest('.rcp-ing-row').remove();
+      const del = /** @type {HTMLElement} */ (e.target).closest('.rcp-ing-del');
+      if (del) del.closest('.rcp-ing-row')?.remove();
     });
   }
 
   // Збирає recipe-об'єкт з редактора; null — якщо рецепт порожній
+  /** @param {ParentNode} scope @returns {Recipe | null} */
   function collectRecipe(scope) {
     const ingredients = [...scope.querySelectorAll('.rcp-ing-row')]
       .map(row => ({
-        name:   row.querySelector('.rcp-ing-name').value.trim(),
-        amount: row.querySelector('.rcp-ing-amount').value.trim(),
-        unit:   row.querySelector('.rcp-ing-unit').value
+        name:   /** @type {HTMLInputElement} */ (row.querySelector('.rcp-ing-name')).value.trim(),
+        amount: /** @type {HTMLInputElement} */ (row.querySelector('.rcp-ing-amount')).value.trim(),
+        unit:   /** @type {HTMLSelectElement} */ (row.querySelector('.rcp-ing-unit')).value
       }))
       .filter(i => i.name);
 
-    const steps = scope.querySelector('#rcp-steps').value
+    const steps = /** @type {HTMLTextAreaElement} */ (scope.querySelector('#rcp-steps')).value
       .split('\n').map(s => s.trim()).filter(Boolean);
 
     if (!ingredients.length && !steps.length) return null;
 
-    const servings = parseInt(scope.querySelector('#rcp-servings').value, 10) || 2;
+    const servings = parseInt(/** @type {HTMLInputElement} */ (scope.querySelector('#rcp-servings')).value, 10) || 2;
     return { servings, ingredients, steps };
   }
 
   // ── Перегляд рецепта ──
+  /** @param {Dish} dish @returns {void} */
   function openRecipeModal(dish) {
-    const r = dish.recipe || {};
+    const r = dish.recipe || /** @type {Partial<Recipe>} */ ({});
     const ings  = r.ingredients || [];
     const steps = r.steps || [];
-    const root = document.getElementById('modal-root');
+    const root = /** @type {HTMLElement} */ (document.getElementById('modal-root'));
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -183,14 +194,15 @@ const RandomModule = (() => {
       </div>`;
     root.innerHTML = ''; root.appendChild(overlay);
 
-    overlay.querySelector('#rcp-view-close').addEventListener('click', closeModal);
+    /** @type {HTMLElement} */ (overlay.querySelector('#rcp-view-close')).addEventListener('click', closeModal);
     overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
 
     const toShop = overlay.querySelector('#rcp-to-shopping');
-    if (toShop) toShop.addEventListener('click', () => addIngredientsToShopping(dish, toShop));
+    if (toShop) toShop.addEventListener('click', () => addIngredientsToShopping(dish, /** @type {HTMLButtonElement} */ (toShop)));
   }
 
   // ── Інгредієнти → список покупок ──
+  /** @param {{recipe: {ingredients: RecipeIngredient[]} | Recipe | null}} dish @param {HTMLButtonElement} btn @returns {Promise<void>} */
   async function addIngredientsToShopping(dish, btn) {
     const ings = (dish.recipe && dish.recipe.ingredients) || [];
     if (!ings.length) return;
@@ -222,8 +234,9 @@ const RandomModule = (() => {
     ErrorBoundary.showToast(`🛒 ${rows.length} інгр. додано в покупки`, 'success');
   }
 
+  /** @param {Dish[]} items @returns {void} */
   function renderDishes(items) {
-    const wrap = document.getElementById('dish-list');
+    const wrap = /** @type {HTMLElement} */ (document.getElementById('dish-list'));
 
     if (!items.length) {
       wrap.innerHTML = dishes.length
@@ -251,25 +264,33 @@ const RandomModule = (() => {
     });
 
     wrap.querySelectorAll('[data-delete-dish-id]').forEach(btn => {
-      btn.addEventListener('click', () => deleteDish(btn.dataset.deleteDishId));
+      btn.addEventListener('click', () => {
+        const id = /** @type {HTMLElement} */ (btn).dataset.deleteDishId;
+        if (id) deleteDish(id);
+      });
     });
     wrap.querySelectorAll('[data-edit-dish-id]').forEach(btn => {
-      btn.addEventListener('click', () => openEditDishModal(btn.dataset.editDishId));
+      btn.addEventListener('click', () => {
+        const id = /** @type {HTMLElement} */ (btn).dataset.editDishId;
+        if (id) openEditDishModal(id);
+      });
     });
     wrap.querySelectorAll('[data-recipe-id]').forEach(elm => {
       elm.addEventListener('click', () => {
-        const dish = dishes.find(x => String(x.id) === String(elm.dataset.recipeId));
+        const recipeId = /** @type {HTMLElement} */ (elm).dataset.recipeId;
+        const dish = dishes.find(x => String(x.id) === String(recipeId));
         if (dish) openRecipeModal(dish);
       });
     });
   }
 
+  /** @param {string} id @returns {void} */
   function openEditDishModal(id) {
     const dish = dishes.find(x => String(x.id) === String(id));
     if (!dish) return;
     const currentCat = dish.category || 'other';
 
-    const root = document.getElementById('modal-root');
+    const root = /** @type {HTMLElement} */ (document.getElementById('modal-root'));
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -297,21 +318,24 @@ const RandomModule = (() => {
 
     bindRecipeEditor(overlay);
 
+    /** @type {DishCategory} */
     let selectedCat = currentCat;
     overlay.querySelectorAll('.dish-cat-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         overlay.querySelectorAll('.dish-cat-chip').forEach(c => { c.classList.remove('active'); c.removeAttribute('style'); });
         chip.classList.add('active');
-        const c = DISH_CATS[chip.dataset.cat];
-        chip.style.cssText = `border-color:${c.color};background:${c.color};color:#fff`;
-        selectedCat = chip.dataset.cat;
+        const chipEl = /** @type {HTMLElement} */ (chip);
+        const catKey = /** @type {DishCategory} */ (chipEl.dataset.cat);
+        const c = DISH_CATS[catKey];
+        chipEl.style.cssText = `border-color:${c.color};background:${c.color};color:#fff`;
+        selectedCat = catKey;
       });
     });
 
-    overlay.querySelector('#edit-dish-cancel').addEventListener('click', () => root.innerHTML = '');
+    /** @type {HTMLElement} */ (overlay.querySelector('#edit-dish-cancel')).addEventListener('click', () => root.innerHTML = '');
     overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
-    overlay.querySelector('#edit-dish-save').addEventListener('click', async () => {
-      const title = overlay.querySelector('#edit-dish-title').value.trim();
+    /** @type {HTMLElement} */ (overlay.querySelector('#edit-dish-save')).addEventListener('click', async () => {
+      const title = /** @type {HTMLInputElement} */ (overlay.querySelector('#edit-dish-title')).value.trim();
       if (!title) return;
       const recipe = collectRecipe(overlay);
       let { error } = await supabase.from('dishes').update({ title, category: selectedCat, recipe }).eq('id', id);
@@ -328,7 +352,7 @@ const RandomModule = (() => {
   }
 
   function rollDish() {
-    const resultEl = document.getElementById('dish-result');
+    const resultEl = /** @type {HTMLElement} */ (document.getElementById('dish-result'));
     const recipeBtn = document.getElementById('dish-result-recipe-btn');
     const pool = visibleDishes();
     if (!pool.length) {
@@ -348,7 +372,7 @@ const RandomModule = (() => {
     if (recipeBtn) {
       const hasRecipe = !!(pick.recipe && ((pick.recipe.ingredients || []).length || (pick.recipe.steps || []).length));
       recipeBtn.classList.toggle('hidden', !hasRecipe);
-      recipeBtn.dataset.dishId = pick.id;
+      recipeBtn.dataset.dishId = String(pick.id);
     }
   }
 
@@ -360,6 +384,7 @@ const RandomModule = (() => {
     });
   }
 
+  /** @param {string} id @returns {Promise<void>} */
   async function deleteDish(id) {
     if (!confirm('Видалити цю страву з пулу?')) return;
 
@@ -374,7 +399,7 @@ const RandomModule = (() => {
   }
 
   function openAddDishModal() {
-    const root = document.getElementById('modal-root');
+    const root = /** @type {HTMLElement} */ (document.getElementById('modal-root'));
     root.innerHTML = `
       <div class="modal-overlay" id="dish-modal-overlay">
         <div class="modal-card rcp-modal-card">
@@ -402,33 +427,37 @@ const RandomModule = (() => {
 
     bindRecipeEditor(root);
 
-    let selectedCat = Object.keys(DISH_CATS)[0];
+    /** @type {DishCategory} */
+    let selectedCat = /** @type {DishCategory} */ (Object.keys(DISH_CATS)[0]);
     document.querySelectorAll('#add-dish-cat-chips .dish-cat-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         document.querySelectorAll('#add-dish-cat-chips .dish-cat-chip').forEach(c => { c.classList.remove('active'); c.removeAttribute('style'); });
         chip.classList.add('active');
-        const c = DISH_CATS[chip.dataset.cat];
-        chip.style.cssText = `border-color:${c.color};background:${c.color};color:#fff`;
-        selectedCat = chip.dataset.cat;
+        const chipEl = /** @type {HTMLElement} */ (chip);
+        const catKey = /** @type {DishCategory} */ (chipEl.dataset.cat);
+        const c = DISH_CATS[catKey];
+        chipEl.style.cssText = `border-color:${c.color};background:${c.color};color:#fff`;
+        selectedCat = catKey;
       });
     });
 
-    document.getElementById('dish-cancel').addEventListener('click', closeModal);
-    document.getElementById('dish-modal-overlay').addEventListener('click', (e) => {
-      if (e.target.id === 'dish-modal-overlay') closeModal();
+    /** @type {HTMLElement} */ (document.getElementById('dish-cancel')).addEventListener('click', closeModal);
+    /** @type {HTMLElement} */ (document.getElementById('dish-modal-overlay')).addEventListener('click', (e) => {
+      if (/** @type {HTMLElement} */ (e.target).id === 'dish-modal-overlay') closeModal();
     });
-    document.getElementById('dish-save').addEventListener('click', () => saveDish(selectedCat));
+    /** @type {HTMLElement} */ (document.getElementById('dish-save')).addEventListener('click', () => saveDish(selectedCat));
   }
 
+  /** @param {DishCategory} category @returns {Promise<void>} */
   async function saveDish(category) {
-    const title = document.getElementById('dish-title').value.trim();
+    const title = /** @type {HTMLInputElement} */ (document.getElementById('dish-title')).value.trim();
     if (!title) {
       alert('Вкажи назву страви');
       return;
     }
 
     const user = Auth.getCurrentUser();
-    const recipe = collectRecipe(document.getElementById('modal-root'));
+    const recipe = collectRecipe(/** @type {HTMLElement} */ (document.getElementById('modal-root')));
 
     let { error } = await supabase.from('dishes').insert({
       title,
@@ -460,6 +489,7 @@ const RandomModule = (() => {
   // ============================================================
   // КОНСТРУКТОР СТРАВ (Claude через Edge Function culinary-ai)
   // ============================================================
+  /** @type {CulinaryStepDef[]} */
   const CUL_STEPS = [
     {
       key: 'type', title: 'Що готуємо?', hint: 'Один варіант', multi: false,
@@ -488,8 +518,11 @@ const RandomModule = (() => {
   ];
 
   let culStep = 0;
+  /** @type {Record<string, string[]>} */
   let culAnswers = {};       // key → [обрані опції]
+  /** @type {CulinaryDish | null} */
   let culDish = null;        // згенерована страва
+  /** @type {string[]} */
   let culAvoid = [];         // назви вже запропонованих страв (для "ще варіант")
 
   const CUL_LS_KEY = 'amore:culinary';
@@ -507,7 +540,7 @@ const RandomModule = (() => {
     try {
       const raw = localStorage.getItem(CUL_LS_KEY);
       if (raw) {
-        const saved = JSON.parse(raw);
+        const saved = /** @type {{dish?: CulinaryDish, answers?: Record<string, string[]>, avoid?: string[]}} */ (JSON.parse(raw));
         if (saved && saved.dish && saved.dish.title) {
           culDish = saved.dish;
           culAnswers = saved.answers || {};
@@ -553,28 +586,30 @@ const RandomModule = (() => {
 
     card.querySelectorAll('.cul-chip').forEach(chip => {
       chip.addEventListener('click', () => {
-        const opt = chip.dataset.opt;
+        const opt = /** @type {HTMLElement} */ (chip).dataset.opt;
         let sel = culAnswers[step.key] || [];
         if (step.multi) {
-          if (sel.includes(opt)) sel = sel.filter(x => x !== opt);
-          else if (sel.length < (step.max || 99)) sel = [...sel, opt];
+          if (sel.includes(opt || '')) sel = sel.filter(x => x !== opt);
+          else if (sel.length < (step.max || 99) && opt) sel = [...sel, opt];
         } else {
-          sel = [opt];
+          sel = opt ? [opt] : [];
         }
         culAnswers[step.key] = sel;
         renderCulStep();
       });
     });
 
-    card.querySelector('#cul-back').addEventListener('click', () => { culStep--; renderCulStep(); });
-    card.querySelector('#cul-next').addEventListener('click', () => {
+    /** @type {HTMLElement} */ (card.querySelector('#cul-back')).addEventListener('click', () => { culStep--; renderCulStep(); });
+    /** @type {HTMLElement} */ (card.querySelector('#cul-next')).addEventListener('click', () => {
       if (culStep === CUL_STEPS.length - 1) culGenerate();
       else { culStep++; renderCulStep(); }
     });
   }
 
+  /** @returns {Promise<void>} */
   async function culGenerate() {
     const card = document.getElementById('cul-card');
+    if (!card) return;
     card.innerHTML = `
       <div class="cul-loading">
         <div class="cul-loading-emoji">👨‍🍳</div>
@@ -598,11 +633,12 @@ const RandomModule = (() => {
       // Дістаємо реальну причину з відповіді функції, якщо вона є
       let detail = '';
       try {
-        if (e && e.context && typeof e.context.json === 'function') {
-          const j = await e.context.json();
+        const err = /** @type {any} */ (e);
+        if (err && err.context && typeof err.context.json === 'function') {
+          const j = await err.context.json();
           if (j && j.error) detail = String(j.error);
-        } else if (e && e.message) {
-          detail = e.message;
+        } else if (err && err.message) {
+          detail = err.message;
         }
       } catch (_) { /* ignore */ }
 
@@ -614,7 +650,7 @@ const RandomModule = (() => {
           <button class="btn-primary" id="cul-retry">Спробувати ще</button>
           ${culDish ? '<button class="btn-secondary" id="cul-back-dish">‹ До попередньої страви</button>' : ''}
         </div>`;
-      card.querySelector('#cul-retry').addEventListener('click', culGenerate);
+      /** @type {HTMLElement} */ (card.querySelector('#cul-retry')).addEventListener('click', culGenerate);
       const backBtn = card.querySelector('#cul-back-dish');
       if (backBtn) backBtn.addEventListener('click', renderCulResult);
     }
@@ -623,6 +659,7 @@ const RandomModule = (() => {
   function renderCulResult() {
     const card = document.getElementById('cul-card');
     const d = culDish;
+    if (!card || !d) return;
     const metaLine = [d.cuisine, d.time_minutes ? `⏱ ${d.time_minutes} хв` : '', d.difficulty]
       .filter(Boolean).join(' · ');
 
@@ -653,13 +690,14 @@ const RandomModule = (() => {
         <button class="btn-secondary" id="cul-restart-btn">✨ Спочатку</button>
       </div>`;
 
-    card.querySelector('#cul-fav-btn').addEventListener('click', culSaveFavorite);
-    card.querySelector('#cul-shop-btn').addEventListener('click', (e) =>
-      addIngredientsToShopping({ recipe: { ingredients: d.ingredients } }, e.currentTarget));
-    card.querySelector('#cul-again-btn').addEventListener('click', culGenerate);
-    card.querySelector('#cul-restart-btn').addEventListener('click', culReset);
+    /** @type {HTMLElement} */ (card.querySelector('#cul-fav-btn')).addEventListener('click', culSaveFavorite);
+    /** @type {HTMLElement} */ (card.querySelector('#cul-shop-btn')).addEventListener('click', (e) =>
+      addIngredientsToShopping({ recipe: { ingredients: d.ingredients } }, /** @type {HTMLButtonElement} */ (e.currentTarget)));
+    /** @type {HTMLElement} */ (card.querySelector('#cul-again-btn')).addEventListener('click', culGenerate);
+    /** @type {HTMLElement} */ (card.querySelector('#cul-restart-btn')).addEventListener('click', culReset);
   }
 
+  /** @param {CulinaryDish} d @returns {DishCategory} */
   function culMapCategory(d) {
     const bases = (culAnswers.base || []).join(' ').toLowerCase();
     if (/курка|свинина|яловичина|риба|морепродукти/.test(bases)) return 'meat';
@@ -668,9 +706,10 @@ const RandomModule = (() => {
     return 'other';
   }
 
+  /** @returns {Promise<void>} */
   async function culSaveFavorite() {
     if (!culDish) return;
-    const btn = document.getElementById('cul-fav-btn');
+    const btn = /** @type {HTMLButtonElement} */ (document.getElementById('cul-fav-btn'));
     btn.disabled = true; btn.textContent = '⏳…';
 
     const user = Auth.getCurrentUser();
@@ -705,8 +744,10 @@ const RandomModule = (() => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.cul-tab').forEach(t =>
           t.classList.toggle('active', t === tab));
-        document.querySelectorAll('.cul-panel').forEach(p =>
-          p.classList.toggle('hidden', p.dataset.culpanel !== tab.dataset.cultab));
+        document.querySelectorAll('.cul-panel').forEach(p => {
+          const panelEl = /** @type {HTMLElement} */ (p);
+          panelEl.classList.toggle('hidden', panelEl.dataset.culpanel !== /** @type {HTMLElement} */ (tab).dataset.cultab);
+        });
       });
     });
   }
@@ -720,23 +761,25 @@ const RandomModule = (() => {
 
   function refresh() {
     refreshDishes();
-    document.getElementById('dish-result').textContent = 'Натисни «Рандом»';
-    document.getElementById('dish-result').classList.remove('rolled');
+    const resultEl = /** @type {HTMLElement} */ (document.getElementById('dish-result'));
+    resultEl.textContent = 'Натисни «Рандом»';
+    resultEl.classList.remove('rolled');
     document.getElementById('dish-result-recipe-btn')?.classList.add('hidden');
   }
 
   function init() {
-    document.getElementById('add-dish-btn').addEventListener('click', openAddDishModal);
-    document.getElementById('roll-dish-btn').addEventListener('click', rollDish);
+    /** @type {HTMLElement} */ (document.getElementById('add-dish-btn')).addEventListener('click', openAddDishModal);
+    /** @type {HTMLElement} */ (document.getElementById('roll-dish-btn')).addEventListener('click', rollDish);
     initCulTabs();
     culRestore();
     document.getElementById('dish-result-recipe-btn')?.addEventListener('click', (e) => {
-      const dish = dishes.find(x => String(x.id) === String(e.currentTarget.dataset.dishId));
+      const dishId = /** @type {HTMLElement} */ (e.currentTarget).dataset.dishId;
+      const dish = dishes.find(x => String(x.id) === String(dishId));
       if (dish) openRecipeModal(dish);
     });
 
     window.addEventListener('portal:view', (e) => {
-      if (e.detail.view === 'random') refresh();
+      if (/** @type {any} */ (e).detail.view === 'random') refresh();
     });
   }
 
