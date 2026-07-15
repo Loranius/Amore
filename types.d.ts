@@ -404,6 +404,17 @@ interface EventsFinderRequest {
   freeDays: FreeDayInfo[];
 }
 
+// ---------- Realtime (lib/realtime.js) ----------
+
+/** Один запис карти MAP у realtime.js: як реагувати на зміну таблиці. */
+interface RealtimeTableConfig {
+  keys?: string[];
+  prefix?: string;
+  views?: string[];
+  refresh?: () => void;
+  onChange?: () => void;
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.
@@ -431,4 +442,10 @@ declare function closeModalAnimated(rootId?: string): void;
 /** modules/router.js — ще не типізований, мінімальний контракт для інших модулів. */
 declare const Router: {
   showView(name: string): void;
+  getCurrentView(): string;
+};
+
+/** modules/random.js (Кулінарія) — ще не типізований, мінімальний контракт для Realtime. */
+declare const RandomModule: {
+  refresh(): void;
 };

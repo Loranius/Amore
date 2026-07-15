@@ -35,6 +35,7 @@
     "modules/photo-calendar.js",
     "modules/budget.js",
     "modules/whereto.js",
-    "modules/game.js"
+    "modules/game.js",
+    "lib/realtime.js"
   ]
 }
