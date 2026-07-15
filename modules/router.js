@@ -9,6 +9,7 @@ const Router = (() => {
   // Сабв'ю → хаб-секція, в якій вони живуть.
   // Модулі (calendar.js, schedule.js, ...) далі слухають portal:view
   // за своїми старими іменами — для них нічого не змінилось.
+  /** @type {Record<string, string>} */
   const SUBVIEWS = {
     'calendar':       'calendar-hub',
     'schedule':       'calendar-hub',
@@ -17,6 +18,7 @@ const Router = (() => {
     'capsule':        'us-hub'
   };
 
+  /** @param {string} v @returns {string} */
   const sectionOf = v => SUBVIEWS[v] || v;
 
   // Порядок СЕКЦІЙ для визначення напрямку slide
@@ -25,10 +27,12 @@ const Router = (() => {
   // Розділи, що живуть під кнопкою «Ще» (мають підсвічувати «Ще»)
   const MORE_VIEWS = ['calendar', 'schedule', 'photo-calendar', 'question', 'capsule', 'media', 'whereto', 'map', 'random', 'game'];
 
+  /** @param {string} viewName @returns {void} */
   function updateActiveStates(viewName) {
     const section = sectionOf(viewName);
     document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
-      btn.classList.toggle('active', sectionOf(btn.dataset.view) === section);
+      const view = /** @type {string} */ (/** @type {HTMLElement} */ (btn).dataset.view);
+      btn.classList.toggle('active', sectionOf(view) === section);
     });
     const moreBtn = document.getElementById('more-nav-btn');
     if (moreBtn) {
@@ -37,17 +41,19 @@ const Router = (() => {
   }
 
   // Перемикання сабтабів та панелей всередині хабу
+  /** @param {string} viewName @returns {void} */
   function updateHubTabs(viewName) {
     const section = sectionOf(viewName);
     if (section === viewName) return; // звичайний view, не хаб
     const hub = document.querySelector(`.view[data-view="${section}"]`);
     if (!hub) return;
     hub.querySelectorAll('.hub-tab').forEach(t =>
-      t.classList.toggle('active', t.dataset.view === viewName));
+      /** @type {HTMLElement} */ (t).classList.toggle('active', /** @type {HTMLElement} */ (t).dataset.view === viewName));
     hub.querySelectorAll('.hub-panel').forEach(p =>
-      p.classList.toggle('hidden', p.dataset.panel !== viewName));
+      /** @type {HTMLElement} */ (p).classList.toggle('hidden', /** @type {HTMLElement} */ (p).dataset.panel !== viewName));
   }
 
+  /** @param {string} viewName @returns {void} */
   function showView(viewName) {
     const prevSection = sectionOf(currentView);
     const nextSection = sectionOf(viewName);
@@ -59,13 +65,14 @@ const Router = (() => {
         ? 'slide-in-right' : 'slide-in-left';
 
       document.querySelectorAll('.view').forEach(el => {
-        el.classList.remove('slide-in-right', 'slide-in-left');
-        const isTarget = el.dataset.view === nextSection;
-        el.classList.toggle('hidden', !isTarget);
+        const elH = /** @type {HTMLElement} */ (el);
+        elH.classList.remove('slide-in-right', 'slide-in-left');
+        const isTarget = elH.dataset.view === nextSection;
+        elH.classList.toggle('hidden', !isTarget);
         if (isTarget) {
           // force reflow щоб анімація рестартувала
-          void el.offsetWidth;
-          el.classList.add(direction);
+          void elH.offsetWidth;
+          elH.classList.add(direction);
         }
       });
     }
@@ -78,7 +85,7 @@ const Router = (() => {
   }
 
   function openMoreMenu() {
-    const ov = document.getElementById('more-menu-overlay');
+    const ov = /** @type {HTMLElement} */ (document.getElementById('more-menu-overlay'));
     ov.classList.remove('hidden');
     // rAF потрібен щоб браузер встиг застосувати display:flex перед transition
     requestAnimationFrame(() => {
@@ -87,7 +94,7 @@ const Router = (() => {
   }
 
   function closeMoreMenu() {
-    const ov = document.getElementById('more-menu-overlay');
+    const ov = /** @type {HTMLElement} */ (document.getElementById('more-menu-overlay'));
     ov.classList.remove('more-menu--open');
     // Ховаємо після завершення анімації (довша transition — 340мс шторка)
     setTimeout(() => ov.classList.add('hidden'), 350);
@@ -96,9 +103,10 @@ const Router = (() => {
   function init() {
     document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {
       btn.addEventListener('click', () => {
-        showView(btn.dataset.view);
+        const view = /** @type {string} */ (/** @type {HTMLElement} */ (btn).dataset.view);
+        showView(view);
         // Оновлення фото при кожному поверненні на головну
-        if (btn.dataset.view === 'home' && typeof Photos !== 'undefined') {
+        if (view === 'home' && typeof Photos !== 'undefined') {
           Photos.render();
         }
       });
@@ -113,7 +121,7 @@ const Router = (() => {
     // Пункти меню "Ще"
     document.querySelectorAll('.more-menu-item').forEach(item => {
       item.addEventListener('click', () => {
-        const view = item.dataset.view;
+        const view = /** @type {HTMLElement} */ (item).dataset.view;
         if (!view) return; // напр. кнопка "Налаштування" — обробляється окремим модулем
         showView(view);
         closeMoreMenu();
@@ -124,13 +132,13 @@ const Router = (() => {
 
     // Сабтаби всередині хабів (Календар: Події/Графік/Фото, Ми: Питання/Капсула)
     document.querySelectorAll('.hub-tab[data-view]').forEach(btn => {
-      btn.addEventListener('click', () => showView(btn.dataset.view));
+      btn.addEventListener('click', () => showView(/** @type {string} */ (/** @type {HTMLElement} */ (btn).dataset.view)));
     });
 
     // Закриття меню
-    document.getElementById('more-menu-close').addEventListener('click', closeMoreMenu);
-    document.getElementById('more-menu-overlay').addEventListener('click', (e) => {
-      if (e.target.id === 'more-menu-overlay') closeMoreMenu();
+    /** @type {HTMLElement} */ (document.getElementById('more-menu-close')).addEventListener('click', closeMoreMenu);
+    /** @type {HTMLElement} */ (document.getElementById('more-menu-overlay')).addEventListener('click', (e) => {
+      if (/** @type {HTMLElement} */ (e.target).id === 'more-menu-overlay') closeMoreMenu();
     });
 
     // ініціалізувати дані для стартового view після логіну
@@ -144,6 +152,7 @@ const Router = (() => {
     });
   }
 
+  /** @returns {string} */
   function getCurrentView() {
     return currentView;
   }

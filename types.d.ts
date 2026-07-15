@@ -497,9 +497,3 @@ declare const mapboxgl: any;
 /** Глобальний хелпер закриття модалок, оголошений inline-скриптом у index.html. */
 declare function closeModalAnimated(rootId?: string): void;
 
-/** modules/router.js — ще не типізований, мінімальний контракт для інших модулів. */
-declare const Router: {
-  showView(name: string): void;
-  getCurrentView(): string;
-};
-

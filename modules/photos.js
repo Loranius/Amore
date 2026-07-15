@@ -212,7 +212,7 @@ const Photos = (() => {
     });
   }
 
-  return { init, reloadPool, render: async (/** @type {string[] | undefined} */ pool) => {
+  return { init, reloadPool, render: async (/** @type {string[] | undefined} */ pool = undefined) => {
     if (pool !== undefined) return render(pool);
     if (_pool === null) _pool = await fetchPool();
     return render(_pool);

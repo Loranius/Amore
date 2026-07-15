@@ -38,6 +38,7 @@
     "modules/game.js",
     "lib/realtime.js",
     "lib/pwa.js",
-    "modules/random.js"
+    "modules/random.js",
+    "modules/router.js"
   ]
 }
