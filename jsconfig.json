@@ -30,6 +30,7 @@
     "modules/home-widgets.js",
     "modules/greeting.js",
     "modules/counter.js",
-    "modules/question.js"
+    "modules/question.js",
+    "modules/schedule.js"
   ]
 }

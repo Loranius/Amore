@@ -25,12 +25,17 @@
 const Schedule = (() => {
 
   // ── УТИЛІТИ ─────────────────────────────────────────────────
+  /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
-  const esc = s  => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
+  /** @param {string | number} s @returns {string} */
+  const esc = s  => { const d = document.createElement('div'); d.textContent = String(s || ''); return d.innerHTML; };
+  /** @param {number} n @returns {string} */
   const pad = n  => String(n).padStart(2, '0');
+  /** @param {number} y @param {number} m @param {number} d @returns {string} */
   const dstr = (y, m, d) => `${y}-${pad(m)}-${pad(d)}`;
   // Локальна дата (не toISOString/UTC): інакше вночі до 02:00–03:00
   // "сьогодні" визначалось як учора (невірна підсвітка/блокування днів).
+  /** @returns {string} */
   const todayStr = () => { const d = new Date(); return dstr(d.getFullYear(), d.getMonth() + 1, d.getDate()); };
 
   const MONTHS_UA = [
@@ -40,36 +45,43 @@ const Schedule = (() => {
   const DAYS_UA = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','НД'];
 
   // Цикл позначки при кожному тапі: пусто → Р → Х → пусто
+  /** @type {Record<string, string>} */
   const CYCLE = { '': 'Р', 'Р': 'Х', 'Х': '' };
 
   // ── СТАН ────────────────────────────────────────────────────
   let yr = 0, mo = 0;      // поточні рік і місяць
+  /** @type {AppUser[]} */
   let users = [];          // [{id, name}] — обидва користувачі, стабільний порядок
+  /** @type {Record<number, Record<string, string>>} */
   let marks = {};          // { user_id: { 'YYYY-MM-DD': 'Р'|'Х' } }
   let editMode = false;    // false = лише перегляд (захист від випадкових тапів при свайпі)
   const saving = new Set();// ключі "userId:date" що зараз зберігаються (анти-даблклік)
 
+  /** @returns {string} */
   function monthKey() { return 'sched:' + yr + '-' + pad(mo); }
 
   // ── ДАНІ ────────────────────────────────────────────────────
+  /** @returns {Promise<AppUser[]>} */
   async function fetchUsers() {
     if (users.length) return users;
     users = await Auth.getUsers();
     return users;
   }
 
+  /** @returns {Promise<WorkScheduleRow[]>} */
   async function fetchMonthRows() {
     const lastDay = new Date(yr, mo, 0).getDate();
     const from = dstr(yr, mo, 1);
     const to   = dstr(yr, mo, lastDay);
-    const { data, error } = await supabase
+    const { data, error } = /** @type {SupaResult<WorkScheduleRow[]>} */ (await supabase
       .from('work_schedule')
       .select('date,user_id,mark')
-      .gte('date', from).lte('date', to);
+      .gte('date', from).lte('date', to));
     if (error) { console.error('schedule load error:', error); return []; }
     return data || [];
   }
 
+  /** @param {WorkScheduleRow[]} rows @returns {void} */
   function buildMonthMap(rows) {
     marks = {};
     (rows || []).forEach(r => {
@@ -79,6 +91,7 @@ const Schedule = (() => {
   }
 
   // Миттєво з кешу місяця, потім ревалідація; рендер у колбеку.
+  /** @returns {Promise<WorkScheduleRow[] | null>} */
   function loadMonth() {
     return DataCache.swr(monthKey(), fetchMonthRows, (rows) => {
       buildMonthMap(rows || []);
@@ -112,6 +125,7 @@ const Schedule = (() => {
   }
 
   // Дати, коли в ОБОХ користувачів стоїть "Х" — спільний вихідний
+  /** @param {number} daysInMonth @returns {Set<string>} */
   function computeCommonOff(daysInMonth) {
     const set = new Set();
     if (users.length < 2) return set;
@@ -123,6 +137,7 @@ const Schedule = (() => {
     return set;
   }
 
+  /** @param {number} userId @param {Set<string>} commonOff @returns {void} */
   function renderGrid(userId, commonOff) {
     const grid = el('sched-grid-' + userId);
     if (!grid) return;
@@ -160,7 +175,7 @@ const Schedule = (() => {
         + (isToday  ? ' sched-cell--today'      : '')
         + (isCommon ? ' sched-cell--common-off' : '');
       cell.dataset.date = ds;
-      cell.dataset.user = userId;
+      cell.dataset.user = String(userId);
       cell.innerHTML = `
         <span class="sched-cell-num">${d}${isCommon ? '<span class="sched-cell-heart">♥</span>' : ''}</span>
         <span class="sched-cell-letter${mark === 'Р' ? ' sched-cell-letter--work' : ''}${mark === 'Х' ? ' sched-cell-letter--off' : ''}">${mark}</span>
@@ -171,6 +186,7 @@ const Schedule = (() => {
   }
 
   // ── ЗМІНА ПОЗНАЧКИ (миттєве збереження) ──────────────────────
+  /** @param {number} userId @param {string} ds @param {string} currentMark @returns {Promise<void>} */
   async function onCellClick(userId, ds, currentMark) {
     if (!editMode) return; // захист від випадкових тапів (напр. під час свайпу між вкладками)
 
@@ -205,7 +221,8 @@ const Schedule = (() => {
       // Відкат UI при помилці збереження
       if (currentMark) marks[userId][ds] = currentMark; else delete (marks[userId] || {})[ds];
       renderAll();
-      alert('Не вдалося зберегти позначку: ' + (e.message || String(e)));
+      const msg = /** @type {{message?: unknown}} */ (e).message;
+      alert('Не вдалося зберегти позначку: ' + (msg || String(e)));
     } finally {
       saving.delete(lockKey);
     }
@@ -214,6 +231,7 @@ const Schedule = (() => {
   // ── РЕЖИМ РЕДАГУВАННЯ ─────────────────────────────────────────
   // За замовчуванням графік лише для перегляду — тапи нічого не міняють.
   // Явне увімкнення захищає від випадкових змін під час свайпу/скролу.
+  /** @param {boolean} v @returns {void} */
   function setEditMode(v) {
     editMode = v;
     const btn = el('sched-edit-toggle');
@@ -226,6 +244,7 @@ const Schedule = (() => {
   }
 
   // ── НАВІГАЦІЯ ПО МІСЯЦЯХ ──────────────────────────────────────
+  /** @param {number} delta @returns {Promise<void>} */
   async function changeMonth(delta) {
     mo += delta;
     if (mo > 12) { mo = 1; yr++; }
@@ -234,6 +253,7 @@ const Schedule = (() => {
   }
 
   // ── РЕФРЕШ / ІНІТ ─────────────────────────────────────────────
+  /** @returns {Promise<void>} */
   async function refresh() {
     await fetchUsers();
     if (!yr) {
@@ -251,7 +271,7 @@ const Schedule = (() => {
     el('sched-next')?.addEventListener('click', () => changeMonth(+1));
     el('sched-edit-toggle')?.addEventListener('click', () => setEditMode(!editMode));
     window.addEventListener('portal:view', e => {
-      if (e.detail.view === 'schedule') refresh();
+      if (/** @type {any} */ (e).detail.view === 'schedule') refresh();
       else if (editMode) setEditMode(false); // вийшли з вкладки — вимикаємо редагування
     });
   }
