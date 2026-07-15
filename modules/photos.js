@@ -12,13 +12,15 @@ const Photos = (() => {
   const STORAGE_BASE = 'https://yicalgoqegluzuagxssk.supabase.co/storage/v1/object/public/family_photos';
   const BUCKET = 'family_photos';
 
+  /** @type {string[] | null} */
   let _pool = null; // null = ще не завантажено
 
   // ---------- Завантаження пулу зі Storage ----------
+  /** @returns {Promise<string[]>} */
   async function fetchPool() {
-    const { data, error } = await supabase.storage
+    const { data, error } = /** @type {SupaResult<StorageFile[]>} */ (await supabase.storage
       .from(BUCKET)
-      .list('', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
+      .list('', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } }));
 
     if (error || !data || !data.length) {
       console.warn('Photos: не вдалось завантажити список фото або бакет порожній', error);
@@ -31,6 +33,7 @@ const Photos = (() => {
   }
 
   // ---------- Перемішування (Fisher-Yates) ----------
+  /** @template T @param {T[]} arr @returns {T[]} */
   function shuffle(arr) {
     const copy = [...arr];
     for (let i = copy.length - 1; i > 0; i--) {
@@ -41,6 +44,7 @@ const Photos = (() => {
   }
 
   // ---------- Вибрати N фото ----------
+  /** @param {string[]} pool @param {number} needed @returns {string[]} */
   function pickPhotos(pool, needed) {
     if (!pool.length) return [];
     let picks;
@@ -55,9 +59,10 @@ const Photos = (() => {
   }
 
   // ---------- Анімований рендер ----------
+  /** @param {string[]} pool @returns {Promise<void>} */
   async function render(pool) {
-    const images    = document.querySelectorAll('.float-photo img[data-photo-slot]');
-    const polaroids = document.querySelectorAll('.float-photo');
+    const images    = /** @type {NodeListOf<HTMLImageElement>} */ (document.querySelectorAll('.float-photo img[data-photo-slot]'));
+    const polaroids = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll('.float-photo'));
     if (!images.length) return;
 
     const picks = pickPhotos(pool, images.length);
@@ -92,7 +97,7 @@ const Photos = (() => {
     images.forEach(img => { img.loading = 'eager'; });
 
     await Promise.all(Array.from(images).map((img, i) =>
-      new Promise(resolve => {
+      /** @type {Promise<void>} */ (new Promise(resolve => {
         const newSrc = picks[i] || img.src;
         if (img.src === newSrc && img.complete && img.naturalWidth > 0) { resolve(); return; }
         const done = () => { img.onload = img.onerror = null; resolve(); };
@@ -100,7 +105,7 @@ const Photos = (() => {
         img.onerror = done;
         setTimeout(done, 3000);
         img.src = newSrc;
-      })
+      }))
     ));
 
     // 3. Staggered fade-in з легким підйомом
@@ -123,12 +128,14 @@ const Photos = (() => {
   }
 
   // ---------- Колода для тап-свапу (без повторів) ----------
+  /** @type {string[]} */
   let deck = [];
   let deckIdx = 0;
 
+  /** @returns {Set<string>} */
   function currentShown() {
     return new Set(
-      [...document.querySelectorAll('.float-photo img[data-photo-slot]')]
+      [.../** @type {NodeListOf<HTMLImageElement>} */ (document.querySelectorAll('.float-photo img[data-photo-slot]'))]
         .map(i => i.src).filter(Boolean)
     );
   }
@@ -140,6 +147,7 @@ const Photos = (() => {
   }
 
   // Наступне фото, якого зараз немає на екрані; null — якщо пул ≤ 6
+  /** @returns {string | null} */
   function nextPhoto() {
     if (!_pool || _pool.length <= document.querySelectorAll('.float-photo').length) return null;
     const shown = currentShown();
@@ -185,6 +193,7 @@ const Photos = (() => {
   }
 
   // ---------- Публічний: перезавантажити пул і перерисувати ----------
+  /** @returns {Promise<void>} */
   async function reloadPool() {
     _pool = await fetchPool();
     rebuildDeck();
@@ -203,7 +212,7 @@ const Photos = (() => {
     });
   }
 
-  return { init, reloadPool, render: async (pool) => {
+  return { init, reloadPool, render: async (/** @type {string[] | undefined} */ pool) => {
     if (pool !== undefined) return render(pool);
     if (_pool === null) _pool = await fetchPool();
     return render(_pool);

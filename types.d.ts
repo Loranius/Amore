@@ -323,8 +323,3 @@ declare const mapboxgl: any;
 
 /** Глобальний хелпер закриття модалок, оголошений inline-скриптом у index.html. */
 declare function closeModalAnimated(rootId?: string): void;
-
-/** modules/photos.js — ще не типізований, мінімальний контракт для Settings. */
-declare const Photos: {
-  reloadPool(): void;
-};

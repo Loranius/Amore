@@ -24,6 +24,7 @@
     "modules/media.js",
     "modules/swipe.js",
     "modules/shopping.js",
-    "modules/settings.js"
+    "modules/settings.js",
+    "modules/photos.js"
   ]
 }
