@@ -10,8 +10,8 @@ const Game = (() => {
 
   function init() {
     window.addEventListener('portal:view', (e) => {
-      if (e.detail.view !== 'game' || loaded) return;
-      const frame = document.getElementById('game-frame');
+      if (/** @type {any} */ (e).detail.view !== 'game' || loaded) return;
+      const frame = /** @type {HTMLIFrameElement | null} */ (document.getElementById('game-frame'));
       if (!frame) return;
       frame.src = 'game.html?v=1';
       loaded = true;

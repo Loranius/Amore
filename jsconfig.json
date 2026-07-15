@@ -34,6 +34,7 @@
     "modules/schedule.js",
     "modules/photo-calendar.js",
     "modules/budget.js",
-    "modules/whereto.js"
+    "modules/whereto.js",
+    "modules/game.js"
   ]
 }
