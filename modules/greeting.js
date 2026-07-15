@@ -12,6 +12,7 @@ const Greeting = (() => {
     'Шо ти там, крошка? 😏',
   ];
 
+  /** @type {Record<string, string[]>} */
   const PERSONAL = {
     'Лєна': [
       'Привіт, Лєнок 🌷',
@@ -36,7 +37,7 @@ const Greeting = (() => {
   function init() {
     window.addEventListener('portal:auth', render);
     window.addEventListener('portal:view', (e) => {
-      if (e.detail.view === 'home') render();
+      if (/** @type {any} */ (e).detail.view === 'home') render();
     });
   }
 
