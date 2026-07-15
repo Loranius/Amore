@@ -300,6 +300,24 @@ interface UserSizes {
   ring_index: string | null;
 }
 
+// ---------- Питання дня (modules/question.js) ----------
+
+/** Рядок таблиці `daily_question_log`. */
+interface DailyQuestionLog {
+  date: string;
+  answer_dima: string | null;
+  answer_lena: string | null;
+}
+
+// ---------- Графік (modules/schedule.js) ----------
+
+/** Рядок таблиці `work_schedule`. */
+interface WorkScheduleRow {
+  date: string;
+  user_id: number;
+  mark: string;
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.
@@ -323,3 +341,8 @@ declare const mapboxgl: any;
 
 /** Глобальний хелпер закриття модалок, оголошений inline-скриптом у index.html. */
 declare function closeModalAnimated(rootId?: string): void;
+
+/** modules/router.js — ще не типізований, мінімальний контракт для інших модулів. */
+declare const Router: {
+  showView(name: string): void;
+};

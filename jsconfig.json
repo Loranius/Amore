@@ -26,6 +26,7 @@
     "modules/shopping.js",
     "modules/settings.js",
     "modules/photos.js",
-    "modules/week-widget.js"
+    "modules/week-widget.js",
+    "modules/home-widgets.js"
   ]
 }
