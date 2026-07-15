@@ -11,12 +11,14 @@
 // JSDoc будь-якого .js-файлу просто за іменем, без @typedef {import(...)}.
 //
 // Стратегія "поступово": jsconfig.json підключає до перевірки лише файли,
-// які вже типізовані (зростаючий allowlist). Для модулів, які ЩЕ не
-// підключені (auth.js, img.js, error-boundary.js, confetti.js, retry.js,
-// mapboxgl/supabase з CDN) — нижче є мінімальні `declare const` контракти,
-// щоб типізовані файли могли їх викликати. Коли дійде черга типізувати
-// самі ці модулі — відповідний declare тут видаляється, і jsconfig.json
-// підхоплює РЕАЛЬНИЙ виведений тип із самого файла.
+// які вже типізовані (зростаючий allowlist — наразі lib/cache.js,
+// lib/retry.js, modules/wishlist.js, modules/map.js, modules/auth.js).
+// Для модулів, які ЩЕ не підключені (img.js, error-boundary.js,
+// confetti.js, mapboxgl/supabase з CDN) — нижче є мінімальні
+// `declare const` контракти, щоб типізовані файли могли їх викликати.
+// Коли дійде черга типізувати самі ці модулі — відповідний declare тут
+// видаляється, і jsconfig.json підхоплює РЕАЛЬНИЙ виведений тип із
+// самого файла (так уже сталось із Auth і Retry).
 // ============================================================
 
 // ---------- Користувачі ----------
@@ -161,12 +163,6 @@ declare const supabase: any;
  */
 declare const mapboxgl: any;
 
-declare const Auth: {
-  getCurrentUser(): AppUser | null;
-  getUsers(): Promise<AppUser[]>;
-  init(): void;
-};
-
 declare const Img: {
   isHeic(file: File): boolean;
   normalize(file: File): Promise<File>;
@@ -179,18 +175,6 @@ declare const Img: {
 
 declare const ErrorBoundary: {
   showToast(message: string, kind?: 'success' | 'warn' | 'error'): void;
-};
-
-declare const Retry: {
-  run<T>(
-    fn: () => Promise<T>,
-    options?: { attempts?: number; onRetry?: (attempt: number, delay: number) => void }
-  ): Promise<T>;
-  query<T>(
-    fn: () => Promise<T>,
-    options?: { attempts?: number; onRetry?: (attempt: number, delay: number) => void }
-  ): Promise<T>;
-  isRetryable(err: unknown): boolean;
 };
 
 declare const Confetti: {

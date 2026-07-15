@@ -12,7 +12,9 @@
   "include": [
     "types.d.ts",
     "lib/cache.js",
+    "lib/retry.js",
     "modules/wishlist.js",
-    "modules/map.js"
+    "modules/map.js",
+    "modules/auth.js"
   ]
 }

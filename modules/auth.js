@@ -1,18 +1,30 @@
 // ============================================================
 // AUTH MODULE
 // Вибір користувача + PIN-код + тихий Supabase Auth
+//
+// Типізація: JSDoc + types.d.ts (див. jsconfig.json). Рантайму не торкається.
 // ============================================================
 
 const Auth = (() => {
-  let users        = [];   // [{id, name}]
+  /** @type {AppUser[]} */
+  let users        = [];
+  /** @type {AppUser | null} */
   let selectedUser = null;
   let pinBuffer    = '';
 
   const SESSION_KEY = 'portal_session_user_id';
   const DEFAULT_PIN_ERROR = 'Невірний PIN, спробуй ще';
 
+  // Статичні елементи auth-екрану (#auth-screen) — частина розмітки
+  // index.html, присутні в DOM від першого рендеру, тому тут доречно
+  // саме асертувати не-null, а не проносити | null по всьому файлу.
+  /** @param {string} id @returns {HTMLElement} */
+  const el = id => /** @type {HTMLElement} */ (document.getElementById(id));
+
   // ---------- Завантаження користувачів з Supabase ----------
+  /** @returns {Promise<void>} */
   async function loadUsers() {
+    /** @type {SupaResult<AppUser[]>} */
     const { data, error } = await supabase
       .from('users')
       .select('id, name')
@@ -27,14 +39,15 @@ const Auth = (() => {
     renderUserSelect();
   }
 
+  /** @param {string} msg @returns {void} */
   function renderError(msg) {
-    const wrap = document.getElementById('user-select');
-    wrap.innerHTML = `<p class="empty-state">${msg}</p>`;
+    el('user-select').innerHTML = `<p class="empty-state">${msg}</p>`;
   }
 
   // ---------- Екран вибору користувача ----------
+  /** @returns {void} */
   function renderUserSelect() {
-    const wrap = document.getElementById('user-select');
+    const wrap = el('user-select');
     wrap.innerHTML = '';
     users.forEach(u => {
       const btn = document.createElement('button');
@@ -45,17 +58,19 @@ const Auth = (() => {
     });
   }
 
+  /** @param {AppUser} user @returns {void} */
   function selectUser(user) {
     selectedUser = user;
     pinBuffer    = '';
-    document.getElementById('user-select').classList.add('hidden');
-    document.getElementById('pin-pad').classList.remove('hidden');
-    document.getElementById('pin-name').textContent = user.name;
-    document.getElementById('pin-error').classList.add('hidden');
+    el('user-select').classList.add('hidden');
+    el('pin-pad').classList.remove('hidden');
+    el('pin-name').textContent = user.name;
+    el('pin-error').classList.add('hidden');
     updatePinDots();
   }
 
   // ---------- PIN-pad ----------
+  /** @param {'error'} [state] @returns {void} */
   function updatePinDots(state) {
     const dots = document.querySelectorAll('.pin-dot');
     dots.forEach((dot, i) => {
@@ -66,18 +81,19 @@ const Auth = (() => {
     });
   }
 
+  /** @param {string} key @returns {Promise<void>} */
   async function handlePinKey(key) {
     if (key === 'clear') {
       pinBuffer = '';
-      document.getElementById('pin-error').classList.add('hidden');
+      el('pin-error').classList.add('hidden');
       updatePinDots();
       return;
     }
     if (key === 'back') {
       selectedUser = null;
       pinBuffer    = '';
-      document.getElementById('pin-pad').classList.add('hidden');
-      document.getElementById('user-select').classList.remove('hidden');
+      el('pin-pad').classList.add('hidden');
+      el('user-select').classList.remove('hidden');
       return;
     }
     if (pinBuffer.length >= 8) return;
@@ -94,23 +110,42 @@ const Auth = (() => {
   // бачить pin_hash жодного користувача (revoke select у Supabase),
   // тому офлайн-перебір PIN з devtools більше неможливий. Функція також
   // рахує невдалі спроби і блокує на 15хв після 5 підряд помилок.
+  /** @returns {Promise<void>} */
+  /**
+   * Реальний контракт Edge Function auth-pin (supabase/functions/auth-pin) —
+   * дискримінована унія за `ok`, а не набір опціональних полів. Так TS сам
+   * звужує data.email/data.password до обов'язкових рівно в тій гілці,
+   * де auth-pin їх дійсно повертає (ok:true), і не дає прочитати .error
+   * там, де відповідь могла бути успішною.
+   * @typedef {{ ok: true, email: string, password: string }
+   *   | { ok?: false, error: 'invalid' | 'locked' | 'bad_request' | 'server_error', retryAfterSeconds?: number }} AuthPinResponse
+   */
+
+  /** @returns {Promise<void>} */
   async function verifyPin() {
+    // Без обраного користувача перевіряти нема що — теоретично можливо
+    // лише якщо клік по .pin-key якось пройшов повз приховану pin-pad
+    // (у нормальному UI-потоці selectedUser тут завжди заданий).
+    if (!selectedUser) return;
+    const user = selectedUser;
+
     const pin = pinBuffer;
+    /** @type {{ data: AuthPinResponse | null, error: SupaError | null }} */
     const { data, error } = await supabase.functions.invoke('auth-pin', {
-      body: { user_id: selectedUser.id, pin },
+      body: { user_id: user.id, pin },
     });
 
     if (!error && data && data.ok) {
       await signInSupabase(data.email, data.password);
-      localStorage.setItem(SESSION_KEY, selectedUser.id);
-      enterApp(selectedUser);
+      localStorage.setItem(SESSION_KEY, String(user.id));
+      enterApp(user);
       return;
     }
 
-    const errCode = data && data.error;
-    const errEl = document.getElementById('pin-error');
+    const errCode = data && !data.ok ? data.error : undefined;
+    const errEl = el('pin-error');
     if (errCode === 'locked') {
-      const mins = Math.max(1, Math.ceil((data.retryAfterSeconds || 900) / 60));
+      const mins = Math.max(1, Math.ceil(((data && !data.ok && data.retryAfterSeconds) || 900) / 60));
       errEl.textContent = `Забагато спроб, спробуй через ${mins} хв`;
     } else {
       errEl.textContent = DEFAULT_PIN_ERROR;
@@ -126,25 +161,34 @@ const Auth = (() => {
   }
 
   // ---------- Supabase Auth (тихо, юзер не бачить) ----------
+  /**
+   * @param {string | null | undefined} email
+   * @param {string} password
+   * @returns {Promise<void>}
+   */
   async function signInSupabase(email, password) {
     if (!email) return; // email ще не налаштований — пропускаємо
+    /** @type {{ error: SupaError | null }} */
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) console.warn('Supabase Auth login failed (RLS буде недоступний):', error.message);
   }
 
   // ---------- Перехід в апку ----------
+  /** @param {AppUser} user @returns {void} */
   function enterApp(user) {
-    document.getElementById('auth-screen').classList.add('hidden');
-    document.getElementById('app').classList.remove('hidden');
+    el('auth-screen').classList.add('hidden');
+    el('app').classList.remove('hidden');
     hideBootLoader();
     window.dispatchEvent(new CustomEvent('portal:auth', { detail: { user } }));
   }
 
+  /** @returns {void} */
   function hideBootLoader() {
     const loader = document.getElementById('boot-loader');
     if (loader) loader.classList.add('hidden');
   }
 
+  /** @returns {void} */
   function logout() {
     supabase.auth.signOut().catch(() => {}); // розлогіниться з Supabase Auth
     localStorage.removeItem(SESSION_KEY);
@@ -152,11 +196,15 @@ const Auth = (() => {
   }
 
   // ---------- Авто-логін за збереженою сесією ----------
+  /** @returns {Promise<boolean>} */
   async function tryAutoLogin() {
     const savedId = localStorage.getItem(SESSION_KEY);
     if (!savedId) return false;
 
-    // Перевіряємо чи Supabase-сесія ще жива
+    // Перевіряємо чи Supabase-сесія ще жива. Реальна форма відповіді
+    // Supabase Auth (не наш SupaResult) — нам важлива лише наявність
+    // сесії, тому session типізовано як unknown, без вигаданих полів.
+    /** @type {{ data: { session: unknown } }} */
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session) {
@@ -166,6 +214,7 @@ const Auth = (() => {
     }
 
     // Сесія жива — відновлюємо UI-стан без повторного PIN
+    /** @type {SupaResult<AppUser>} */
     const { data, error } = await supabase
       .from('users')
       .select('id, name')
@@ -183,11 +232,13 @@ const Auth = (() => {
   }
 
   // ---------- Init ----------
+  /** @returns {void} */
   function init() {
-    document.getElementById('logout-btn').addEventListener('click', logout);
+    el('logout-btn').addEventListener('click', logout);
 
     document.querySelectorAll('.pin-key').forEach(btn => {
-      btn.addEventListener('click', () => handlePinKey(btn.dataset.key));
+      const key = /** @type {HTMLElement} */ (btn).dataset.key;
+      btn.addEventListener('click', () => { if (key) handlePinKey(key); });
     });
 
     tryAutoLogin().then(async loggedIn => {
@@ -203,14 +254,17 @@ const Auth = (() => {
     });
   }
 
+  /** @returns {AppUser | null} */
   function getCurrentUser() {
     return selectedUser;
   }
 
   // Спільний кешований список користувачів (id, name).
   // Використовується іншими модулями замість власних запитів до 'users'.
+  /** @returns {Promise<AppUser[]>} */
   async function getUsers() {
     return DataCache.ensure('users', async () => {
+      /** @type {SupaResult<AppUser[]>} */
       const { data } = await supabase
         .from('users').select('id, name').order('id', { ascending: true });
       return data || [];
