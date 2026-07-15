@@ -130,7 +130,7 @@ const DailyQuestion = (() => {
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str;
-    return div.innerHTML;
+    return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   // ---------- Рендер ----------
@@ -178,7 +178,9 @@ const DailyQuestion = (() => {
 
     wrap.querySelectorAll('[data-delete-field]').forEach(btn => {
       const field = /** @type {HTMLElement} */ (btn).dataset.deleteField;
-      if (field) deleteAnswer(/** @type {AnswerField} */ (field));
+      // Саме обробник кліку, а НЕ прямий виклик: раніше deleteAnswer
+      // спрацьовував одразу при рендері й показував confirm без кліку.
+      if (field) btn.addEventListener('click', () => deleteAnswer(/** @type {AnswerField} */ (field)));
     });
   }
 

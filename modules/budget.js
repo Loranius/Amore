@@ -7,7 +7,7 @@ const Budget = (() => {
   /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
   /** @param {string} s @returns {string} */
-  const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
+  const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
   /** @param {number | string} n @returns {string} */
   const fmtN = n => Math.round(Math.abs(Number(n))).toLocaleString('uk-UA')+' ₴';
 

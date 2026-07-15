@@ -26,7 +26,7 @@ const PhotoCalendar = (() => {
   /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
   /** @param {string} s @returns {string} */
-  const esc = s  => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
+  const esc = s  => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
   /** @param {number} n @returns {string} */
   const pad = n  => String(n).padStart(2, '0');
   /** @param {number} y @param {number} m @param {number} d @returns {string} */
@@ -332,11 +332,23 @@ const PhotoCalendar = (() => {
         blob = out.blob; ext = out.ext; contentType = out.contentType;
       } catch (e) { console.warn('compress failed, uploading original:', e); }
 
-      // Шлях у Storage: фіксований без розширення → завжди один файл на (дата, юзер)
-      // Не включаємо ext у шлях щоб upsert не створював дублі при різних форматах
+      // Шлях у Storage. Розширення залежить від формату стиснення (WebP/JPEG),
+      // а він різниться між браузерами — тому при заміні фото шлях може
+      // змінитись (napr. .jpg → .webp) і старий файл лишився б сиротою в
+      // бакеті. Прибираємо інші можливі розширення того самого (дата, юзер)
+      // ПЕРЕД завантаженням. remove() на неіснуючий шлях у Supabase Storage
+      // не помилка, тож перелічити кандидатів безпечно.
       const [y, m] = ds.split('-');
       const basePath = `${y}/${m}/${ds}_${currentUser.id}`;
       const path     = `${basePath}.${ext}`;
+
+      const staleVariants = ['jpg', 'webp', 'jpeg', 'png']
+        .map(e => `${basePath}.${e}`)
+        .filter(p => p !== path);
+      if (staleVariants.length) {
+        try { await supabase.storage.from(BUCKET).remove(staleVariants); }
+        catch (e) { console.warn('pcal: не вдалось прибрати старе фото:', e); }
+      }
 
       const { error: upErr } = await supabase.storage
         .from(BUCKET).upload(path, blob, { upsert: true, contentType });

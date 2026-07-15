@@ -41,7 +41,7 @@ const Media = (() => {
   let scrollSentinel = null;
 
   /** @param {string | null | undefined} s @returns {string} */
-  const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
+  const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
   /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
 
@@ -228,7 +228,11 @@ const Media = (() => {
       if (!q) { hideSearchResults(); return; }
       if (activeType === 'book') { hideSearchResults(); return; }
       searchTimer = setTimeout(async () => {
-        const results = await tmdbSearch(q, activeType);
+        // Той самий захист від гонки, що й у refresh(): за час запиту вкладку
+        // могли перемкнути — тоді результати старого типу показувати не треба.
+        const reqType = activeType;
+        const results = await tmdbSearch(q, reqType);
+        if (reqType !== activeType) return;
         renderSearchResults(results);
       }, 400);
     });
@@ -877,8 +881,14 @@ const Media = (() => {
     visibleCount = PAGE_SIZE;
     renderTabs();
     showSkeleton();
-    DataCache.swr('media:' + activeType, () => loadItems(activeType),
+    // Фіксуємо тип на момент запиту. SWR-колбек асинхронний: якщо за час
+    // фетчу користувач перемкнув вкладку (activeType вже інший), застарілий
+    // колбек не має перетирати allItems і рендерити чужі дані під новою
+    // вкладкою — тому рано виходимо.
+    const reqType = activeType;
+    DataCache.swr('media:' + reqType, () => loadItems(reqType),
       DataCache.fadeRender(el('media-list'), (items) => {
+        if (reqType !== activeType) return;
         allItems = items || [];
         renderStats();
         renderFilters();

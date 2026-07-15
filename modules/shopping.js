@@ -13,7 +13,7 @@ const Shopping = (() => {
    */
   const el  = id => /** @type {HTMLElement} */ (document.getElementById(id));
   /** @param {string} s @returns {string} */
-  const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
+  const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
 
   /** @type {Record<number, string>} */
   let usersMap   = {};   // id -> name
@@ -187,7 +187,9 @@ const Shopping = (() => {
 
     // 1. Оптимістично прибираємо з UI
     const snapshot = allItems.map(i => ({...i}));
-    const idx = allItems.findIndex(i => i.id === id);
+    // String-порівняння: id з dataset — рядок, а з БД — число (строге ===
+    // не збігалось, товар лишався в UI і кеші після видалення)
+    const idx = allItems.findIndex(i => String(i.id) === String(id));
     if (idx !== -1) allItems.splice(idx, 1);
     renderActiveList();
     renderArchive();

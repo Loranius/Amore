@@ -35,7 +35,7 @@ const CalendarModule = (() => {
   };
 
   /** @param {string | null | undefined} s @returns {string} */
-  const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
+  const esc = s => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
 
   // ── ДАНІ ──
   /** @returns {Promise<CalendarEvent[]>} */
@@ -492,76 +492,80 @@ const CalendarModule = (() => {
    * @returns {void}
    */
   function openPlanArchiveModal(id) {
-    // Знаходимо план у поточних даних
-    DataCache.swr('events', loadEvents, (events) => {
-      const ev = (events || []).find(e => String(e.id) === String(id));
-      if (!ev) return;
+    // Дані вже відрендерені у списку планів, тож беремо їх напряму з кешу.
+    // Раніше тут був DataCache.swr — його колбек викликається двічі (кеш +
+    // ревалідація), і другий (fresh) виклик після закриття модалки відкривав
+    // її повторно. Прямий доступ до кешу уникає цього.
+    const events = renderEvents._lastEvents
+      || /** @type {CalendarEvent[] | undefined} */ (DataCache.get('events'))
+      || [];
+    const ev = events.find(e => String(e.id) === String(id));
+    if (!ev) return;
 
-      let desc = ev.description || '';
-      /** @type {PlanCategory} */
-      let cat = 'other';
-      /** @type {string | null} */
-      let doneAt = null;
-      const mCat    = desc.match(/\[cat:(\w+)\]/);
-      const mDoneAt = desc.match(/\[doneAt:([^\]]+)\]/);
-      if (mCat)    { cat    = /** @type {PlanCategory} */ (mCat[1]); desc = desc.replace(mCat[0], ''); }
-      if (mDoneAt) { doneAt = mDoneAt[1]; desc = desc.replace(mDoneAt[0], ''); }
-      desc = desc.replace(/\[status:\w+\]/, '').trim();
+    let desc = ev.description || '';
+    /** @type {PlanCategory} */
+    let cat = 'other';
+    /** @type {string | null} */
+    let doneAt = null;
+    const mCat    = desc.match(/\[cat:(\w+)\]/);
+    const mDoneAt = desc.match(/\[doneAt:([^\]]+)\]/);
+    if (mCat)    { cat    = /** @type {PlanCategory} */ (mCat[1]); desc = desc.replace(mCat[0], ''); }
+    if (mDoneAt) { doneAt = mDoneAt[1]; desc = desc.replace(mDoneAt[0], ''); }
+    desc = desc.replace(/\[status:\w+\]/, '').trim();
 
-      const catInfo = PLAN_CATS[cat] || PLAN_CATS.other;
-      const orig    = new Date(ev.date);
-      const dateStr = `${orig.getDate()} ${MONTHS[orig.getMonth()]} ${orig.getFullYear()} р.`;
+    const catInfo = PLAN_CATS[cat] || PLAN_CATS.other;
+    const orig    = new Date(ev.date);
+    const dateStr = `${orig.getDate()} ${MONTHS[orig.getMonth()]} ${orig.getFullYear()} р.`;
 
-      let doneStr = '—', durationStr = '';
-      if (doneAt) {
-        const doneDate = new Date(doneAt);
-        doneStr = `${doneDate.getDate()} ${MONTHS[doneDate.getMonth()]} ${doneDate.getFullYear()} р.`;
-        const diffDay = Math.max(0, Math.round((doneDate.getTime() - orig.getTime()) / 86400000));
-        if (diffDay === 0)      durationStr = 'Виконано в той самий день';
-        else if (diffDay === 1) durationStr = 'Виконано за 1 день';
-        else if (diffDay < 30)  durationStr = `Виконано за ${diffDay} днів`;
-        else if (diffDay < 365) durationStr = `Виконано за ${Math.floor(diffDay/30)} міс.`;
-        else                    durationStr = `Виконано за ${Math.floor(diffDay/365)} р. ${Math.floor((diffDay%365)/30)} міс.`;
-      }
+    let doneStr = '—', durationStr = '';
+    if (doneAt) {
+      const doneDate = new Date(doneAt);
+      doneStr = `${doneDate.getDate()} ${MONTHS[doneDate.getMonth()]} ${doneDate.getFullYear()} р.`;
+      const diffDay = Math.max(0, Math.round((doneDate.getTime() - orig.getTime()) / 86400000));
+      if (diffDay === 0)      durationStr = 'Виконано в той самий день';
+      else if (diffDay === 1) durationStr = 'Виконано за 1 день';
+      else if (diffDay < 30)  durationStr = `Виконано за ${diffDay} днів`;
+      else if (diffDay < 365) durationStr = `Виконано за ${Math.floor(diffDay/30)} міс.`;
+      else                    durationStr = `Виконано за ${Math.floor(diffDay/365)} р. ${Math.floor((diffDay%365)/30)} міс.`;
+    }
 
-      const root = document.getElementById('modal-root');
-      if (!root) return;
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `
-        <div class="modal-card plan-archive-modal">
-          <div class="plan-archive-header" style="background:${catInfo.gradient}">
-            <span class="plan-archive-cat-icon">${catInfo.icon}</span>
-            <div>
-              <div class="plan-archive-cat-label">${catInfo.label}</div>
-              <div class="plan-archive-title">${esc(ev.title)}</div>
+    const root = document.getElementById('modal-root');
+    if (!root) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-card plan-archive-modal">
+        <div class="plan-archive-header" style="background:${catInfo.gradient}">
+          <span class="plan-archive-cat-icon">${catInfo.icon}</span>
+          <div>
+            <div class="plan-archive-cat-label">${catInfo.label}</div>
+            <div class="plan-archive-title">${esc(ev.title)}</div>
+          </div>
+          <span class="plan-archive-done-badge">✅ Виконано</span>
+        </div>
+        <div class="plan-archive-body">
+          ${desc ? `<div class="plan-archive-note">${esc(desc)}</div>` : ''}
+          <div class="plan-archive-meta-row">
+            <div class="plan-archive-meta-item">
+              <div class="plan-archive-meta-label">📅 Дата плану</div>
+              <div class="plan-archive-meta-val">${dateStr}</div>
             </div>
-            <span class="plan-archive-done-badge">✅ Виконано</span>
-          </div>
-          <div class="plan-archive-body">
-            ${desc ? `<div class="plan-archive-note">${esc(desc)}</div>` : ''}
-            <div class="plan-archive-meta-row">
-              <div class="plan-archive-meta-item">
-                <div class="plan-archive-meta-label">📅 Дата плану</div>
-                <div class="plan-archive-meta-val">${dateStr}</div>
-              </div>
-              <div class="plan-archive-meta-item">
-                <div class="plan-archive-meta-label">🏁 Виконано</div>
-                <div class="plan-archive-meta-val">${doneStr}</div>
-              </div>
+            <div class="plan-archive-meta-item">
+              <div class="plan-archive-meta-label">🏁 Виконано</div>
+              <div class="plan-archive-meta-val">${doneStr}</div>
             </div>
-            ${durationStr ? `<div class="plan-archive-duration">${durationStr}</div>` : ''}
           </div>
-          <div class="modal-actions">
-            <button class="btn-primary" id="plan-arch-close">Закрити</button>
-          </div>
-        </div>`;
+          ${durationStr ? `<div class="plan-archive-duration">${durationStr}</div>` : ''}
+        </div>
+        <div class="modal-actions">
+          <button class="btn-primary" id="plan-arch-close">Закрити</button>
+        </div>
+      </div>`;
 
-      root.innerHTML = '';
-      root.appendChild(overlay);
-      root.querySelector('#plan-arch-close')?.addEventListener('click', () => root.innerHTML = '');
-      overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
-    });
+    root.innerHTML = '';
+    root.appendChild(overlay);
+    root.querySelector('#plan-arch-close')?.addEventListener('click', () => root.innerHTML = '');
+    overlay.addEventListener('click', e => { if (e.target === overlay) root.innerHTML = ''; });
   }
 
   // ── МОДАЛКА ДОДАТИ ПЛАН ──

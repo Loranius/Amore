@@ -20,7 +20,7 @@ const WeekWidget = (() => {
   };
 
   /** @param {string} s @returns {string} */
-  const esc = s => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; };
+  const esc = s => { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
 
   // Розбираємо мета-теги планів із description
   /** @param {string | null} desc @returns {{cat: PlanCategory, status: PlanStatus}} */

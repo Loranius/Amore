@@ -31,7 +31,7 @@ const Wishlist = (() => {
   /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
   /** @param {string | null | undefined} s @returns {string} */
-  const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
+  const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
 
   /** @type {Record<WishPriority, string>} */
   const PRIORITY_LABELS = {

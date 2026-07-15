@@ -28,7 +28,7 @@ const Schedule = (() => {
   /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
   /** @param {string | number} s @returns {string} */
-  const esc = s  => { const d = document.createElement('div'); d.textContent = String(s || ''); return d.innerHTML; };
+  const esc = s  => { const d = document.createElement('div'); d.textContent = String(s || ''); return d.innerHTML.replace(/"/g,'&quot;').replace(/'/g,'&#39;'); };
   /** @param {number} n @returns {string} */
   const pad = n  => String(n).padStart(2, '0');
   /** @param {number} y @param {number} m @param {number} d @returns {string} */
