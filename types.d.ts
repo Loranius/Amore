@@ -328,6 +328,17 @@ interface WorkScheduleRow {
   mark: string;
 }
 
+// ---------- Фотокалендар (modules/photo-calendar.js) ----------
+
+/** Рядок таблиці `photo_calendar`. */
+interface PhotoCalendarRow {
+  id: number;
+  date: string;
+  user_id: number;
+  photo_url: string;
+  comment: string | null;
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.
