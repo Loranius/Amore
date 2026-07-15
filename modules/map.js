@@ -1,5 +1,12 @@
 // ============================================================
 // MAP MODULE v2 — Карта спогадів та планів
+//
+// Типізація: JSDoc + types.d.ts (глобальні інтерфейси, без import/export —
+// див. jsconfig.json). Рантайму не торкається, лише .js-коментарі.
+//
+// mapboxgl і supabase лишаються `any` (свідомий виняток, задокументований
+// у types.d.ts — CDN-бібліотеки без npm-типів). Усе, що з них повертається
+// й реально використовується (піни, гео-результати), типізоване строго.
 // ============================================================
 
 const MapModule = (() => {
@@ -8,6 +15,7 @@ const MapModule = (() => {
   const SUPA_URL = 'https://yicalgoqegluzuagxssk.supabase.co';
   const MAP_PHOTO_BUCKET = 'map-photos';
 
+  /** @type {Record<PinCategory, { label: string, emoji: string, color: string }>} */
   const CATEGORIES = {
     visited:    { label: 'Були',      emoji: '📍', color: '#E8829C' },
     restaurant: { label: 'Ресторан',  emoji: '🍽',  color: '#FF6B9D' },
@@ -15,20 +23,33 @@ const MapModule = (() => {
     favorite:   { label: 'Улюблене', emoji: '⭐',  color: '#F6B9CC' },
   };
 
+  /** @type {any} mapboxgl.Map — див. виняток для mapboxgl у types.d.ts */
   let map = null;
+  /** @type {any[]} mapboxgl.Marker[] */
   let markers = [];
+  /** @type {MapPin[]} */
   let allPins = [];
-  let focusedPinId = null;   // картка, на яку зараз «наведено» (1-й клік — політ, 2-й — модалка)
+  /** @type {number | null} картка, на яку зараз «наведено» (1-й клік — політ, 2-й — модалка) */
+  let focusedPinId = null;
   let mapInitialized = false;
   let mapboxLoaded = false;
+  /** @type {number | null} */
   let searchDebounce = null;
-  let activeCatFilter = 'all'; // 'all' | ключ з CATEGORIES
+  /** @type {'all' | PinCategory} */
+  let activeCatFilter = 'all';
+  /** @type {[number, number]} */
   const DEFAULT_CENTER = [30.5234, 50.4501];
 
+  /**
+   * @param {number} lat
+   * @param {number} lng
+   * @returns {string}
+   */
   function directionsUrl(lat, lng) {
     return 'https://www.google.com/maps/dir/?api=1&destination=' + lat + ',' + lng;
   }
 
+  /** @returns {MapPin[]} */
   function visiblePins() {
     return activeCatFilter === 'all'
       ? allPins
@@ -36,16 +57,19 @@ const MapModule = (() => {
   }
 
   // ── Геолокація партнерів ────────────────────────────────────
-  // user_id -> { marker: mapboxgl.Marker, popup: mapboxgl.Popup }
+  /** @typedef {{ marker: any, popupEl: HTMLElement }} LocationMarkerEntry */
+  /** @type {Record<number, LocationMarkerEntry>} user_id -> { marker: mapboxgl.Marker, popupEl } */
   const locationMarkers = {};
   // Конфігурація зовнішнього вигляду для кожного користувача
   // (перший user за алфавітом — Діма 💙, другий — Лєна 💗)
+  /** @type {Array<{ emoji: string, color: string, label: string }>} */
   const USER_LOCATION_STYLES = [
     { emoji: '💙', color: '#4A90D9', label: 'Дімусік' },
     { emoji: '💗', color: '#E8829C', label: 'Лєнусік' },
   ];
 
   // ── Динамічне завантаження Mapbox (лише при першому відкритті вкладки) ──
+  /** @returns {Promise<void>} */
   function loadMapboxResources() {
     return new Promise(function(resolve) {
       if (mapboxLoaded) { resolve(); return; }
@@ -64,12 +88,20 @@ const MapModule = (() => {
     });
   }
 
+  /**
+   * @param {string | null | undefined} str
+   * @returns {string}
+   */
   function escapeHtml(str) {
     var div = document.createElement('div');
     div.textContent = str || '';
     return div.innerHTML;
   }
 
+  /**
+   * @param {number | null} rating
+   * @returns {string}
+   */
   function starsHtml(rating) {
     var html = '';
     for (var i = 1; i <= 5; i++) {
@@ -79,7 +111,12 @@ const MapModule = (() => {
   }
 
   // ---------- Фото ----------
-  // onProgress(msg) — необов'язковий колбек для UI
+  /**
+   * @param {File} file
+   * @param {number} pinId
+   * @param {(msg: string) => void} [onProgress] необов'язковий колбек для UI
+   * @returns {Promise<string | null>}
+   */
   async function uploadMapPhoto(file, pinId, onProgress) {
     // HEIC з iPhone → JPEG (інакше canvas не декодує, а сирий HEIC не відобразиться)
     if (Img.isHeic(file)) {
@@ -88,13 +125,14 @@ const MapModule = (() => {
         file = await Img.normalize(file);
       } catch (err) {
         console.error('uploadMapPhoto: конвертація HEIC не вдалася', err);
-        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + err.message);
+        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + /** @type {Error} */ (err).message);
         return null;
       }
     }
 
     if (onProgress) onProgress('Стискаємо фото…');
 
+    /** @type {File | Blob} стискання (Img.compress) повертає Blob, не File */
     let blob = file;
     let ext  = (file.name.split('.').pop() || 'jpg').toLowerCase();
     let contentType = file.type;
@@ -113,6 +151,7 @@ const MapModule = (() => {
 
     if (onProgress) onProgress('Завантажуємо фото…');
 
+    /** @type {{ error: SupaError | null }} */
     var { error } = await supabase.storage
       .from(MAP_PHOTO_BUCKET)
       .upload(path, blob, { upsert: true, contentType });
@@ -122,6 +161,7 @@ const MapModule = (() => {
   }
 
   // ---------- Карта ----------
+  /** @returns {void} */
   function initMap() {
     if (mapInitialized) return;
     mapInitialized = true;
@@ -154,12 +194,13 @@ const MapModule = (() => {
       }, null, { enableHighAccuracy: true, timeout: 10000 });
     });
 
-    // Після успішної геолокації — переконуємось що карта відцентрована
-    geolocateControl.on('geolocate', function(e) {
+    // Після успішної геолокації — переконуємось що карта відцентрована.
+    // Payload події — з нетипізованого mapboxgl (див. виняток у types.d.ts).
+    geolocateControl.on('geolocate', function(/** @type {any} */ e) {
       map.flyTo({ center: [e.coords.longitude, e.coords.latitude], zoom: 14 });
     });
 
-    map.on('click', function(e) {
+    map.on('click', function(/** @type {any} */ e) {
       openAddModal(e.lngLat.lat, e.lngLat.lng);
     });
 
@@ -170,7 +211,9 @@ const MapModule = (() => {
   }
 
   // ---------- Завантаження ----------
+  /** @returns {Promise<MapPin[]>} */
   async function fetchPins() {
+    /** @type {SupaResult<MapPin[]>} */
     var { data, error } = await supabase
       .from('map_pins')
       .select('id, title, note, category, lat, lng, photo_url, rating, review, city')
@@ -179,6 +222,7 @@ const MapModule = (() => {
     return data || [];
   }
 
+  /** @returns {void} */
   function loadAndRender() {
     // Миттєво з кешу, потім фонова ревалідація
     DataCache.swr('map_pins', fetchPins, function(pins) {
@@ -193,8 +237,14 @@ const MapModule = (() => {
   // ---------- Групування списку за містом ----------
   var NO_CITY_LABEL = 'Інші місця';
 
+  /**
+   * @param {MapPin[]} pins
+   * @returns {PinCityGroup[]}
+   */
   function groupPinsByCity(pins) {
+    /** @type {Record<string, MapPin[]>} */
     var groups = {};
+    /** @type {string[]} */
     var order = [];
     pins.forEach(function(pin) {
       var key = pin.city || NO_CITY_LABEL;
@@ -213,6 +263,7 @@ const MapModule = (() => {
   // Ліниво дотягуємо місто для пінів, збережених до появи цієї фічі
   // (або якщо reverse-geocode при збереженні не спрацював).
   var backfilling = false;
+  /** @returns {Promise<void>} */
   async function backfillMissingCities() {
     if (backfilling) return;
     var todo = allPins.filter(function(p) { return !p.city; });
@@ -235,6 +286,7 @@ const MapModule = (() => {
     }
   }
 
+  /** @returns {void} */
   function renderMarkersAndCards() {
     markers.forEach(function(m) { m.remove(); });
     markers = [];
@@ -245,6 +297,10 @@ const MapModule = (() => {
   }
 
   // Авто-зум карти під наявні мітки (замість статичного вигляду всієї країни)
+  /**
+   * @param {MapPin[]} pins
+   * @returns {void}
+   */
   function fitBoundsToPins(pins) {
     if (!map || !pins.length) return;
     if (pins.length === 1) {
@@ -257,6 +313,7 @@ const MapModule = (() => {
   }
 
   // Панель фільтрів за категорією
+  /** @returns {void} */
   function renderCatFilterBar() {
     var wrap = document.getElementById('map-cat-filter');
     if (!wrap) return;
@@ -270,7 +327,9 @@ const MapModule = (() => {
     allBtn.addEventListener('click', function() { activeCatFilter = 'all'; renderMarkersAndCards(); renderCatFilterBar(); });
     bar.appendChild(allBtn);
 
-    Object.keys(CATEGORIES).forEach(function(key) {
+    /** @type {PinCategory[]} */
+    var keys = /** @type {PinCategory[]} */ (Object.keys(CATEGORIES));
+    keys.forEach(function(key) {
       var cat = CATEGORIES[key];
       var count = allPins.filter(function(p) { return (p.category || 'visited') === key; }).length;
       var btn = document.createElement('button');
@@ -285,6 +344,10 @@ const MapModule = (() => {
   }
 
   // ---------- Маркер ----------
+  /**
+   * @param {MapPin} pin
+   * @returns {void}
+   */
   function addMarker(pin) {
     var cat = CATEGORIES[pin.category] || CATEGORIES.visited;
 
@@ -306,8 +369,14 @@ const MapModule = (() => {
   }
 
   // ---------- Картки пінів внизу ----------
+  /**
+   * @param {string} [filterText]
+   * @returns {void}
+   */
   function renderPinCards(filterText) {
-    var wrap = document.getElementById('pin-list');
+    // const, не var: нижче wrap використовується у вкладених forEach-колбеках,
+    // а TS не звужує var/let (могли б теоретично переприсвоїтись) — лише const.
+    const wrap = document.getElementById('pin-list');
     if (!wrap) return;
 
     var query = (filterText || '').toLowerCase().trim();
@@ -355,6 +424,11 @@ const MapModule = (() => {
     }
   }
 
+  /**
+   * @param {MapPin} pin
+   * @param {HTMLElement} wrap
+   * @returns {HTMLDivElement}
+   */
   function buildPinCard(pin, wrap) {
     var cat = CATEGORIES[pin.category] || CATEGORIES.visited;
     var card = document.createElement('div');
@@ -383,7 +457,7 @@ const MapModule = (() => {
         '<a class="pin-route-btn" href="' + directionsUrl(pin.lat, pin.lng) + '" target="_blank" rel="noopener">🧭 Маршрут</a>' +
       '</div>';
 
-    card.querySelector('.pin-route-btn').addEventListener('click', function(e) { e.stopPropagation(); });
+    card.querySelector('.pin-route-btn')?.addEventListener('click', function(e) { e.stopPropagation(); });
 
     card.addEventListener('click', function() {
       if (focusedPinId === pin.id) {
@@ -402,6 +476,10 @@ const MapModule = (() => {
   }
 
   // ---------- Геокодинг (пошук місць через Mapbox) ----------
+  /**
+   * @param {string} query
+   * @returns {Promise<MapboxFeature[]>}
+   */
   async function geocodePlaces(query) {
     var url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/' +
       encodeURIComponent(query) + '.json' +
@@ -418,6 +496,12 @@ const MapModule = (() => {
     }
   }
 
+  /**
+   * @param {MapboxFeature[]} features
+   * @param {HTMLElement} dropdown
+   * @param {HTMLInputElement} input
+   * @returns {void}
+   */
   function renderGeoResults(features, dropdown, input) {
     if (!features.length) {
       dropdown.innerHTML = '<div style="padding:10px 12px;color:#999;font-size:14px;">Нічого не знайдено 🔍</div>';
@@ -438,7 +522,7 @@ const MapModule = (() => {
         input.value = '';
         if (map) map.flyTo({ center: [lng, lat], zoom: 14 });
         openAddModal(lat, lng);
-        var titleInp = document.getElementById('pin-title');
+        var titleInp = /** @type {HTMLInputElement | null} */ (document.getElementById('pin-title'));
         if (titleInp) titleInp.value = f.text || f.place_name || '';
       });
       dropdown.appendChild(item);
@@ -446,13 +530,17 @@ const MapModule = (() => {
     dropdown.style.display = 'block';
   }
 
+  /** @returns {void} */
   function bindPinSearch() {
-    var input = document.getElementById('pin-search');
+    // const: використовується у вкладених addEventListener-колбеках нижче,
+    // а TS звужує null-перевірку для var/let лише в одразу наступному коді,
+    // не всередині замикань (могли б теоретично переприсвоїтись) — const так.
+    const input = /** @type {HTMLInputElement | null} */ (document.getElementById('pin-search'));
     if (!input || input.dataset.bound) return;
     input.dataset.bound = '1';
 
     // Випадаючий список результатів пошуку
-    var wrap = input.parentNode;
+    const wrap = /** @type {HTMLElement} */ (input.parentNode);
     wrap.style.position = 'relative';
     var dropdown = document.createElement('div');
     dropdown.id = 'pin-search-results';
@@ -467,7 +555,7 @@ const MapModule = (() => {
       // паралельно фільтруємо власні збережені піни внизу
       renderPinCards(input.value);
 
-      clearTimeout(searchDebounce);
+      if (searchDebounce) clearTimeout(searchDebounce);
       if (q.length < 3) { dropdown.style.display = 'none'; dropdown.innerHTML = ''; return; }
       searchDebounce = setTimeout(async function() {
         var feats = await geocodePlaces(q);
@@ -477,13 +565,18 @@ const MapModule = (() => {
 
     // Закриття списку при кліку поза ним
     document.addEventListener('click', function(e) {
-      if (e.target !== input && !dropdown.contains(e.target)) {
+      if (e.target !== input && !dropdown.contains(/** @type {Node} */ (e.target))) {
         dropdown.style.display = 'none';
       }
     });
   }
 
   // ---------- Повноекранний перегляд фото ----------
+  /**
+   * @param {string} url
+   * @param {string} [title]
+   * @returns {void}
+   */
   function openFullscreenPhoto(url, title) {
     var fs = document.createElement('div');
     fs.id = 'photo-fullscreen';
@@ -499,10 +592,10 @@ const MapModule = (() => {
       (title ? '<p style="color:#fff;text-align:center;padding:12px 16px;font-size:14px;margin:0;">' + escapeHtml(title) + '</p>' : '');
 
     document.body.appendChild(fs);
-    document.getElementById('fs-close').addEventListener('click', function() { fs.remove(); });
+    document.getElementById('fs-close')?.addEventListener('click', function() { fs.remove(); });
 
     // Пінч-зум
-    var img = document.getElementById('fs-img');
+    var img = /** @type {HTMLElement} */ (document.getElementById('fs-img'));
     var scale = 1;
     var lastDist = 0;
 
@@ -553,10 +646,15 @@ const MapModule = (() => {
   }
 
   // ---------- Модалка перегляду/редагування піна ----------
+  /**
+   * @param {MapPin} pin
+   * @returns {void}
+   */
   function openPinModal(pin) {
     focusedPinId = null; // після закриття модалки знову працює «1-й клік = політ»
     var cat = CATEGORIES[pin.category] || CATEGORIES.visited;
     var root = document.getElementById('modal-root');
+    if (!root) return;
     var selectedRating = pin.rating || 0;
 
     root.innerHTML =
@@ -600,43 +698,55 @@ const MapModule = (() => {
         '</div>' +
       '</div>';
 
-    // Тап на фото → повноекранний перегляд
+    // Тап на фото → повноекранний перегляд. pin.photo_url тут може
+    // лишатись string|null з погляду типів (нема прямого типового
+    // зв'язку з тим, чи є #pin-view-img у DOM), але querySelector
+    // поверне елемент лише якщо блок вище дійсно рендерився — тобто
+    // лише коли photo_url справді задано.
     if (pin.photo_url) {
-      document.getElementById('pin-view-img').addEventListener('click', function() {
-        openFullscreenPhoto(pin.photo_url, pin.title);
+      var photoUrl = pin.photo_url;
+      document.getElementById('pin-view-img')?.addEventListener('click', function() {
+        openFullscreenPhoto(photoUrl, pin.title);
       });
     }
 
     // Зірки
     function bindStars() {
-      document.getElementById('pin-rating-row').querySelectorAll('.map-star').forEach(function(star) {
+      var row = document.getElementById('pin-rating-row');
+      if (!row) return;
+      row.querySelectorAll('.map-star').forEach(function(star) {
         star.addEventListener('click', function() {
-          selectedRating = parseInt(star.dataset.star);
-          document.getElementById('pin-rating-row').innerHTML = starsHtml(selectedRating);
+          selectedRating = parseInt(/** @type {HTMLElement} */ (star).dataset.star || '0');
+          var row2 = document.getElementById('pin-rating-row');
+          if (row2) row2.innerHTML = starsHtml(selectedRating);
           bindStars();
         });
       });
     }
     bindStars();
 
-    document.getElementById('pin-view-overlay').addEventListener('click', function(e) {
-      if (e.target.id === 'pin-view-overlay') closeModal();
+    document.getElementById('pin-view-overlay')?.addEventListener('click', function(e) {
+      if (/** @type {HTMLElement} */ (e.target).id === 'pin-view-overlay') closeModal();
     });
 
-    document.getElementById('pin-delete-btn').addEventListener('click', function() {
+    document.getElementById('pin-delete-btn')?.addEventListener('click', function() {
       deletePin(pin.id);
     });
 
-    document.getElementById('pin-edit-save').addEventListener('click', async function() {
-      var title = document.getElementById('pin-edit-title').value.trim();
-      var review = document.getElementById('pin-edit-review').value.trim();
-      var photoInput = document.getElementById('pin-edit-photo');
+    document.getElementById('pin-edit-save')?.addEventListener('click', async function() {
+      var titleInp = /** @type {HTMLInputElement} */ (document.getElementById('pin-edit-title'));
+      var reviewInp = /** @type {HTMLTextAreaElement} */ (document.getElementById('pin-edit-review'));
+      var photoInput = /** @type {HTMLInputElement} */ (document.getElementById('pin-edit-photo'));
+
+      var title = titleInp.value.trim();
+      var review = reviewInp.value.trim();
 
       if (!title) { alert('Вкажи назву'); return; }
 
-      var saveBtn = document.getElementById('pin-edit-save');
+      var saveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('pin-edit-save'));
       saveBtn.disabled = true;
 
+      /** @type {{ title: string, review: string | null, rating: number | null, photo_url?: string }} */
       var update = { title: title, review: review || null, rating: selectedRating || null };
 
       if (photoInput.files && photoInput.files[0]) {
@@ -647,6 +757,7 @@ const MapModule = (() => {
       }
 
       saveBtn.textContent = 'Зберігаємо...';
+      /** @type {{ error: SupaError | null }} */
       var { error } = await supabase.from('map_pins').update(update).eq('id', pin.id);
       if (error) { alert('Помилка збереження'); saveBtn.textContent = 'Зберегти'; saveBtn.disabled = false; return; }
       DataCache.invalidate('map_pins');
@@ -656,8 +767,16 @@ const MapModule = (() => {
   }
 
   // ---------- Модалка додавання ----------
+  /** @typedef {HTMLInputElement & { _normFile?: File | null }} PinPhotoInput */
+
+  /**
+   * @param {number} lat
+   * @param {number} lng
+   * @returns {void}
+   */
   function openAddModal(lat, lng) {
     var root = document.getElementById('modal-root');
+    if (!root) return;
     root.innerHTML =
       '<div class="modal-overlay" id="pin-add-overlay">' +
         '<div class="modal-card">' +
@@ -696,26 +815,28 @@ const MapModule = (() => {
         '</div>' +
       '</div>';
 
+    /** @type {PinCategory} */
     var selectedCat = 'visited';
     document.querySelectorAll('.pin-cat-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        selectedCat = btn.dataset.cat;
+        selectedCat = /** @type {PinCategory} */ (/** @type {HTMLElement} */ (btn).dataset.cat);
         document.querySelectorAll('.pin-cat-btn').forEach(function(b) { b.classList.remove('active'); });
         btn.classList.add('active');
       });
     });
 
-    document.getElementById('pin-cancel').addEventListener('click', closeModal);
-    document.getElementById('pin-add-overlay').addEventListener('click', function(e) {
-      if (e.target.id === 'pin-add-overlay') closeModal();
+    document.getElementById('pin-cancel')?.addEventListener('click', closeModal);
+    document.getElementById('pin-add-overlay')?.addEventListener('click', function(e) {
+      if (/** @type {HTMLElement} */ (e.target).id === 'pin-add-overlay') closeModal();
     });
-    document.getElementById('pin-save').addEventListener('click', function() {
+    document.getElementById('pin-save')?.addEventListener('click', function() {
       savePin(lat, lng, selectedCat);
     });
 
     // Preview фото після вибору
-    document.getElementById('pin-photo').addEventListener('change', async function(e) {
-      var inp = e.target;
+    var photoInputEl = /** @type {PinPhotoInput} */ (document.getElementById('pin-photo'));
+    photoInputEl.addEventListener('change', async function(e) {
+      var inp = /** @type {PinPhotoInput} */ (e.target);
       var file = inp.files && inp.files[0];
       inp._normFile = null;
       if (!file) return;
@@ -724,35 +845,45 @@ const MapModule = (() => {
         file = await Img.normalize(file);
       } catch (err) {
         console.error('[Map] конвертація HEIC не вдалася:', err);
-        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + err.message);
+        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + /** @type {Error} */ (err).message);
         inp.value = '';
         return;
       }
       inp._normFile = file; // savePin бере вже конвертований файл
       var preview = document.getElementById('pin-photo-preview');
-      var previewImg = document.getElementById('pin-photo-preview-img');
+      var previewImg = /** @type {HTMLImageElement} */ (document.getElementById('pin-photo-preview-img'));
       var previewSize = document.getElementById('pin-photo-preview-size');
       var url = URL.createObjectURL(file);
       previewImg.src = url;
-      previewSize.textContent = 'Оригінал: ' + (file.size / 1024).toFixed(0) + ' KB → буде стиснуто до ~1080px';
-      preview.style.display = 'block';
+      if (previewSize) previewSize.textContent = 'Оригінал: ' + (file.size / 1024).toFixed(0) + ' KB → буде стиснуто до ~1080px';
+      if (preview) /** @type {HTMLElement} */ (preview).style.display = 'block';
     });
   }
 
+  /**
+   * @param {number} lat
+   * @param {number} lng
+   * @param {PinCategory} category
+   * @returns {Promise<void>}
+   */
   async function savePin(lat, lng, category) {
-    var title = document.getElementById('pin-title').value.trim();
-    var note = document.getElementById('pin-note').value.trim();
-    var photoInput = document.getElementById('pin-photo');
+    var titleInp = /** @type {HTMLInputElement} */ (document.getElementById('pin-title'));
+    var noteInp = /** @type {HTMLTextAreaElement} */ (document.getElementById('pin-note'));
+    var photoInput = /** @type {PinPhotoInput} */ (document.getElementById('pin-photo'));
+
+    var title = titleInp.value.trim();
+    var note = noteInp.value.trim();
 
     if (!title) { alert('Вкажи назву місця'); return; }
 
-    var saveBtn = document.getElementById('pin-save');
+    var saveBtn = /** @type {HTMLButtonElement} */ (document.getElementById('pin-save'));
     saveBtn.textContent = 'Зберігаємо...';
     saveBtn.disabled = true;
 
     var user = Auth.getCurrentUser();
     var geo = await reverseGeocode(lat, lng); // місто — для групування списку нижче
 
+    /** @type {{ data: { id: number } | null, error: SupaError | null }} */
     var { data: pinData, error } = await supabase.from('map_pins').insert({
       title: title,
       note: note || null,
@@ -763,7 +894,7 @@ const MapModule = (() => {
       created_by: user ? user.id : null,
     }).select('id').single();
 
-    if (error) { alert('Помилка збереження'); saveBtn.textContent = 'Зберегти'; saveBtn.disabled = false; return; }
+    if (error || !pinData) { alert('Помилка збереження'); saveBtn.textContent = 'Зберегти'; saveBtn.disabled = false; return; }
 
     var pinPhotoFile = photoInput && (photoInput._normFile || (photoInput.files && photoInput.files[0]));
     if (pinPhotoFile) {
@@ -777,6 +908,7 @@ const MapModule = (() => {
 
     closeModal();
     // Одразу відкриваємо модалку редагування для нового піна
+    /** @type {SupaResult<MapPin>} */
     var { data: newPin } = await supabase
       .from('map_pins')
       .select('id, title, note, category, lat, lng, photo_url, rating, review')
@@ -788,6 +920,10 @@ const MapModule = (() => {
     if (newPin) openPinModal(newPin);
   }
 
+  /**
+   * @param {number} id
+   * @returns {Promise<void>}
+   */
   async function deletePin(id) {
     if (!confirm('Видалити це місце?')) return;
     await supabase.from('map_pins').delete().eq('id', id);
@@ -801,7 +937,12 @@ const MapModule = (() => {
   // ============================================================
 
   // Відправити своє поточне місцезнаходження в Supabase
-  // Геокодинг: lat/lng → { address, city }
+  /**
+   * Геокодинг: lat/lng → { address, city }.
+   * @param {number} lat
+   * @param {number} lng
+   * @returns {Promise<GeocodeResult>}
+   */
   async function reverseGeocode(lat, lng) {
     try {
       var url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/' +
@@ -809,6 +950,7 @@ const MapModule = (() => {
         '.json?types=address,place&language=uk&access_token=' + MAPBOX_TOKEN;
       var res = await fetch(url);
       var data = await res.json();
+      /** @type {MapboxFeature[]} */
       var features = data.features || [];
 
       var address = '';
@@ -844,8 +986,9 @@ const MapModule = (() => {
     }
   }
 
+  /** @returns {Promise<void>} */
   async function checkinLocation() {
-    var btn = document.getElementById('checkin-btn');
+    var btn = /** @type {HTMLButtonElement | null} */ (document.getElementById('checkin-btn'));
     if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
 
     if (!navigator.geolocation) {
@@ -866,6 +1009,7 @@ const MapModule = (() => {
       var now = new Date().toISOString();
 
       // 1. Оновлюємо поточне місцезнаходження
+      /** @type {{ error: SupaError | null }} */
       var { error: upsertErr } = await supabase.from('user_locations').upsert({
         user_id: user.id,
         lat: lat,
@@ -906,8 +1050,10 @@ const MapModule = (() => {
   }
 
   // Показати модалку з архівом місцезнаходжень
+  /** @returns {Promise<void>} */
   async function openLocationHistory() {
     var root = document.getElementById('modal-root');
+    if (!root) return;
     root.innerHTML = '<div class="modal-overlay"><div class="modal-card"><p style="text-align:center;padding:24px">⏳ Завантаження...</p></div></div>';
 
     // Чистимо записи старші 24г і завантажуємо свіжі
@@ -915,6 +1061,7 @@ const MapModule = (() => {
     await supabase.from('location_history').delete().lt('created_at', cutoff);
 
     var users = await Auth.getUsers();
+    /** @type {SupaResult<LocationHistoryRecord[]>} */
     var { data, error } = await supabase
       .from('location_history')
       .select('user_id, lat, lng, address, city, created_at')
@@ -957,36 +1104,37 @@ const MapModule = (() => {
       '</div>';
     }).join('');
 
-    if (!rows) {
-      rows = '<p class="loc-hist-empty">Ще немає записів за останні 24 години 🗺️</p>';
-    }
+    var rowsHtml = rows || '<p class="loc-hist-empty">Ще немає записів за останні 24 години 🗺️</p>';
 
     root.innerHTML =
       '<div class="modal-overlay" id="loc-hist-overlay">' +
         '<div class="modal-card">' +
           '<h3>📋 Архів за 24 год</h3>' +
-          '<div class="loc-hist-list">' + rows + '</div>' +
+          '<div class="loc-hist-list">' + rowsHtml + '</div>' +
           '<div class="modal-actions">' +
             '<button class="btn-secondary" id="loc-hist-close">Закрити</button>' +
           '</div>' +
         '</div>' +
       '</div>';
 
-    document.getElementById('loc-hist-close').addEventListener('click', closeModal);
-    document.getElementById('loc-hist-overlay').addEventListener('click', function(e) {
-      if (e.target.id === 'loc-hist-overlay') closeModal();
+    document.getElementById('loc-hist-close')?.addEventListener('click', closeModal);
+    document.getElementById('loc-hist-overlay')?.addEventListener('click', function(e) {
+      if (/** @type {HTMLElement} */ (e.target).id === 'loc-hist-overlay') closeModal();
     });
   }
 
   // Скидає всі маркери геолокації (викликати при refresh карти)
+  /** @returns {void} */
   function clearLocationMarkers() {
-    Object.keys(locationMarkers).forEach(function(uid) {
+    Object.keys(locationMarkers).forEach(function(uidStr) {
+      var uid = Number(uidStr);
       try { locationMarkers[uid].marker.remove(); } catch(e) {}
       delete locationMarkers[uid];
     });
   }
 
   // Завантажити всі check-in координати і намалювати маркери на карті
+  /** @returns {Promise<void>} */
   async function renderLocationMarkers() {
     if (!map) return;
 
@@ -996,6 +1144,7 @@ const MapModule = (() => {
     var users = await Auth.getUsers();
     var currentUser = Auth.getCurrentUser();
 
+    /** @type {SupaResult<UserLocationRow[]>} */
     var { data, error } = await supabase
       .from('user_locations')
       .select('user_id, lat, lng, updated_at');
@@ -1004,6 +1153,7 @@ const MapModule = (() => {
     if (!data || !data.length) return;
 
     // Зберігаємо дані партнера для кнопки "Де партнер"
+    /** @type {{ lat: number, lng: number, name: string } | null} */
     var partnerLoc = null;
 
     data.forEach(function(loc) {
@@ -1075,21 +1225,29 @@ const MapModule = (() => {
   }
 
   // Оновлює кнопку "Де [ім'я партнера]"
+  /**
+   * @param {{ lat: number, lng: number, name: string } | null} partnerLoc
+   * @returns {void}
+   */
   function updateFindPartnerBtn(partnerLoc) {
-    var btn = document.getElementById('find-partner-btn');
+    var btn = /** @type {HTMLButtonElement | null} */ (document.getElementById('find-partner-btn'));
     if (!btn) return;
     if (partnerLoc) {
+      var loc = partnerLoc;
       btn.style.display = '';
-      btn.title = 'Де ' + partnerLoc.name;
+      btn.title = 'Де ' + loc.name;
       btn.textContent = '🧭';
       btn.onclick = function() {
-        map.flyTo({ center: [partnerLoc.lng, partnerLoc.lat], zoom: 15 });
-        // Відкриваємо popup партнера
-        var currentUser = Auth.getCurrentUser();
+        map.flyTo({ center: [loc.lng, loc.lat], zoom: 15 });
+        // Відкриваємо popup партнера. const (не var) — використовується
+        // всередині forEach-колбека нижче, TS звужує null-перевірку лише
+        // для const.
+        const currentUser = Auth.getCurrentUser();
         if (!currentUser) return;
         // Знаходимо маркер партнера
-        Object.keys(locationMarkers).forEach(function(uid) {
-          if (parseInt(uid) !== currentUser.id) {
+        Object.keys(locationMarkers).forEach(function(uidStr) {
+          var uid = Number(uidStr);
+          if (uid !== currentUser.id) {
             locationMarkers[uid].marker.togglePopup();
           }
         });
@@ -1100,6 +1258,7 @@ const MapModule = (() => {
   }
 
   // Видалити своє місцезнаходження (скидання check-in)
+  /** @returns {Promise<void>} */
   async function clearMyLocation() {
     var user = Auth.getCurrentUser();
     if (!user) return;
@@ -1114,16 +1273,19 @@ const MapModule = (() => {
   }
 
   // Публічний метод для Realtime — оновити маркери партнерів
+  /** @returns {void} */
   function refreshLocations() {
     renderLocationMarkers();
   }
 
+  /** @returns {void} */
   function closeModal() {
     // Глобальна закривалка з fallback-таймером (reduced-motion тощо)
     closeModalAnimated();
   }
 
   // ---------- Init ----------
+  /** @returns {void} */
   function refresh() {
     if (!mapInitialized) {
       loadMapboxResources().then(function() {
@@ -1138,8 +1300,9 @@ const MapModule = (() => {
     }
   }
 
+  /** @returns {void} */
   function bindCheckinBtn() {
-    var checkinBtn = document.getElementById('checkin-btn');
+    var checkinBtn = /** @type {HTMLElement | null} */ (document.getElementById('checkin-btn'));
     if (checkinBtn && !checkinBtn.dataset.bound) {
       checkinBtn.dataset.bound = '1';
       checkinBtn.addEventListener('click', checkinLocation);
@@ -1153,8 +1316,9 @@ const MapModule = (() => {
     // нічого прив'язувати тут не потрібно
   }
 
+  /** @returns {void} */
   function init() {
-    document.getElementById('add-pin-btn').addEventListener('click', function() {
+    document.getElementById('add-pin-btn')?.addEventListener('click', function() {
       // Точка за замовчуванням — поточний центр карти (а не завжди Київ)
       if (map) {
         var c = map.getCenter();
@@ -1169,7 +1333,7 @@ const MapModule = (() => {
     requestAnimationFrame(bindCheckinBtn);
 
     window.addEventListener('portal:view', function(e) {
-      if (e.detail.view !== 'map') return;
+      if (/** @type {CustomEvent} */ (e).detail.view !== 'map') return;
       bindCheckinBtn(); // ще один fallback при навігації на карту
       refresh();
     });

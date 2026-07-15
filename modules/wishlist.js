@@ -6,22 +6,34 @@
 //     ADD COLUMN IF NOT EXISTS fulfilled      BOOLEAN DEFAULT FALSE,
 //     ADD COLUMN IF NOT EXISTS fulfilled_by   INTEGER,
 //     ADD COLUMN IF NOT EXISTS fulfilled_at   TIMESTAMPTZ;
+//
+// Типізація: JSDoc + types.d.ts (глобальні інтерфейси, без import/export —
+// див. jsconfig.json). Рантайму не торкається, лише .js-коментарі.
 // ============================================================
 const Wishlist = (() => {
 
   const SUPA_URL = 'https://yicalgoqegluzuagxssk.supabase.co';
   const WISH_PHOTO_BUCKET = 'wishlist-photos';
 
+  /** @type {AppUser[]} */
   let allUsers     = [];
+  /** @type {AppUser | null} */
   let currentUser  = null;
+  /** @type {AppUser | null} */
   let partnerUser  = null;
-  let wishingFor   = 'me';     // 'me' | 'partner'
-  let archiveOpen  = false;    // чи розгорнутий архів у «Мої бажання»
-  let pendingPhotoFile = null; // обране з пристрою фото, ще не завантажене
+  /** @type {'me' | 'partner'} */
+  let wishingFor   = 'me';
+  /** @type {boolean} чи розгорнутий архів у «Мої бажання» */
+  let archiveOpen  = false;
+  /** @type {File | null} обране з пристрою фото, ще не завантажене */
+  let pendingPhotoFile = null;
 
+  /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
+  /** @param {string | null | undefined} s @returns {string} */
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
 
+  /** @type {Record<WishPriority, string>} */
   const PRIORITY_LABELS = {
     high:   '🔥 Високий',
     medium: '🟡 Середній',
@@ -29,8 +41,13 @@ const Wishlist = (() => {
   };
 
   // ── ДАНІ ──────────────────────────────────────────────────
-  // Активні бажання (не виконані)
+  /**
+   * Активні бажання (не виконані).
+   * @param {number} ownerId
+   * @returns {Promise<WishlistItem[]>}
+   */
   async function loadItems(ownerId) {
+    /** @type {SupaResult<WishlistItem[]>} */
     const {data} = await supabase
       .from('wishlist_items')
       .select('id,title,description,link,image_url,gift_date,owner,reserved,reserved_by,price,priority,fulfilled,fulfilled_by,fulfilled_at')
@@ -40,8 +57,13 @@ const Wishlist = (() => {
     return data||[];
   }
 
-  // Виконані бажання (архів)
+  /**
+   * Виконані бажання (архів).
+   * @param {number} ownerId
+   * @returns {Promise<FulfilledWishlistItem[]>}
+   */
   async function loadFulfilledItems(ownerId) {
+    /** @type {SupaResult<FulfilledWishlistItem[]>} */
     const {data} = await supabase
       .from('wishlist_items')
       .select('id,title,description,link,image_url,price,priority,fulfilled_at,fulfilled_by')
@@ -54,6 +76,12 @@ const Wishlist = (() => {
   // ── TELEGRAM СПОВІЩЕННЯ ───────────────────────────────────
   // Надсилаємо лише мінімум даних — текст будує Edge Function,
   // щоб HTML-форматування і імена були централізовані на сервері.
+  /**
+   * @param {WishlistItem} item
+   * @param {AppUser} owner
+   * @param {AppUser} buyer
+   * @returns {Promise<void>}
+   */
   async function sendFulfilledNotification(item, owner, buyer) {
     try {
       await supabase.functions.invoke('db-notify', {
@@ -70,16 +98,27 @@ const Wishlist = (() => {
   }
 
   // ── ВИКОНАННЯ БАЖАННЯ ─────────────────────────────────────
+  /**
+   * @param {WishlistItem} item
+   * @returns {Promise<void>}
+   */
   async function fulfillWish(item) {
+    // Без відомого currentUser немає кого записати як покупця —
+    // раніше тут було пряме currentUser.id без перевірки (падало б
+    // при null). Типізація currentUser як AppUser | null змусила
+    // явно це врахувати.
+    if (!currentUser) return;
+
     const owner = allUsers.find(u => u.id === item.owner);
     const confirmMsg =
       `Підтверджуєш, що купив(ла) «${item.title}»? 🎁\n\nОбидва отримають сповіщення ✉️`;
     if (!confirm(confirmMsg)) return;
 
     // Знаходимо кнопку і ставимо лоадер
-    const btn = document.querySelector(`[data-fulfill-id="${item.id}"]`);
+    const btn = /** @type {HTMLButtonElement | null} */ (document.querySelector(`[data-fulfill-id="${item.id}"]`));
     if (btn) { btn.disabled = true; btn.textContent = '⏳ Збереження…'; }
 
+    /** @type {{ error: SupaError | null }} */
     const { error } = await supabase.from('wishlist_items').update({
       fulfilled:    true,
       fulfilled_by: currentUser.id,
@@ -98,7 +137,9 @@ const Wishlist = (() => {
     sendFulfilledNotification(item, owner || { name: '?', id: item.owner }, currentUser);
 
     // Святкові конфеті 🎉
-    if (window.Confetti) Confetti.burst();
+    // window-каст — та сама причина, що й DataCache у lib/cache.js
+    // (публікація глобалі через window.X = X, без модулів/build).
+    if (/** @type {any} */ (window).Confetti) Confetti.burst();
 
     // Скидаємо кеш і перемальовуємо
     invalidateWishes();
@@ -107,6 +148,7 @@ const Wishlist = (() => {
   }
 
   // ── ПІДВКЛАДКИ МОЄ / ПАРТНЕР ──────────────────────────────
+  /** @returns {void} */
   function renderSubTabs() {
     const rawName = partnerUser?.name || 'Партнера';
     const partnerName = rawName === 'Діма' ? 'Діми' : rawName === 'Лєна' ? 'Лєни' : rawName;
@@ -121,13 +163,14 @@ const Wishlist = (() => {
       <button class="wl-sub-btn${wishingFor==='partner'?' active':''}" data-for="partner">Бажання ${esc(partnerName)}</button>`;
 
     const panel = el('wl-panel-wishes');
-    panel.insertBefore(bar, panel.firstChild);
+    panel?.insertBefore(bar, panel.firstChild);
 
     bar.querySelectorAll('.wl-sub-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        wishingFor = btn.dataset.for;
+        const forVal = /** @type {HTMLElement} */ (btn).dataset.for;
+        wishingFor = forVal === 'partner' ? 'partner' : 'me';
         bar.querySelectorAll('.wl-sub-btn').forEach(b =>
-          b.classList.toggle('active', b.dataset.for === wishingFor));
+          b.classList.toggle('active', /** @type {HTMLElement} */ (b).dataset.for === wishingFor));
         renderGrid();
       });
     });
@@ -135,15 +178,17 @@ const Wishlist = (() => {
     const title  = el('wl-title');
     const addBtn = el('add-wish-btn');
     if (title)  title.textContent  = wishingFor === 'me' ? 'Мої бажання' : `Бажання ${partnerName}`;
-    if (addBtn) addBtn.style.display = wishingFor === 'me' ? 'flex' : 'none';
+    if (addBtn) /** @type {HTMLElement} */ (addBtn).style.display = wishingFor === 'me' ? 'flex' : 'none';
   }
 
+  /** @returns {Promise<void>} */
   async function renderWishes() {
     renderSubTabs();
     renderGrid();
   }
 
   // ── АКТИВНА СІТКА БАЖАНЬ ──────────────────────────────────
+  /** @returns {void} */
   function renderGrid() {
     const wrap = el('wishlist-grid'); if (!wrap) return;
 
@@ -155,7 +200,7 @@ const Wishlist = (() => {
     const addBtn      = el('add-wish-btn');
 
     if (title)  title.textContent   = isOwnList ? 'Мої бажання' : `Бажання ${partnerName}`;
-    if (addBtn) addBtn.style.display = isOwnList ? 'flex' : 'none';
+    if (addBtn) /** @type {HTMLElement} */ (addBtn).style.display = isOwnList ? 'flex' : 'none';
 
     if (ownerId == null) {
       wrap.innerHTML = '<p class="empty-state">Користувача не знайдено.</p>';
@@ -182,6 +227,12 @@ const Wishlist = (() => {
       }));
   }
 
+  /**
+   * @param {WishlistItem[]} items
+   * @param {boolean} isOwnList
+   * @param {number} ownerId
+   * @returns {void}
+   */
   function paintGrid(items, isOwnList, ownerId) {
     const wrap = el('wishlist-grid'); if (!wrap) return;
 
@@ -208,6 +259,11 @@ const Wishlist = (() => {
   }
 
   // ── КАРТКА БАЖАННЯ ────────────────────────────────────────
+  /**
+   * @param {WishlistItem} item
+   * @param {boolean} isOwn
+   * @returns {HTMLDivElement}
+   */
   function makeCard(item, isOwn) {
     const card = document.createElement('div');
     card.className = 'wl-card';
@@ -258,6 +314,10 @@ const Wishlist = (() => {
         ${actions}
       </div>`;
 
+    // item.image_url тут може лишатись string|null з погляду типів (нема
+    // прямого типового зв'язку між ним і тим, чи знайдеться .wl-card-img
+    // img у DOM), але querySelector поверне елемент лише якщо photo вище
+    // не порожній рядок — тобто лише коли image_url справді задано.
     card.querySelector('.wl-card-img img')?.addEventListener('click', () => openPhotoLightbox(item.image_url));
     card.querySelector('.wl-edit-btn')?.addEventListener('click', () => openEditModal(item));
     card.querySelector('.wl-del-btn')?.addEventListener('click',  () => deleteItem(item.id));
@@ -269,6 +329,10 @@ const Wishlist = (() => {
   }
 
   // ── АРХІВ (виконані бажання) ───────────────────────────────
+  /**
+   * @param {number} ownerId
+   * @returns {HTMLDivElement}
+   */
   function makeArchiveBlock(ownerId) {
     const wrap = document.createElement('div');
     wrap.className = 'wl-archive-wrap';
@@ -287,7 +351,8 @@ const Wishlist = (() => {
     toggle.addEventListener('click', () => {
       archiveOpen = !archiveOpen;
       body.classList.toggle('hidden', !archiveOpen);
-      toggle.querySelector('.wl-archive-toggle-arrow').textContent = archiveOpen ? '▲' : '▼';
+      const arrow = toggle.querySelector('.wl-archive-toggle-arrow');
+      if (arrow) arrow.textContent = archiveOpen ? '▲' : '▼';
       if (archiveOpen) loadAndPaintArchive(ownerId, body);
     });
 
@@ -297,6 +362,11 @@ const Wishlist = (() => {
     return wrap;
   }
 
+  /**
+   * @param {number} ownerId
+   * @param {HTMLElement} body
+   * @returns {void}
+   */
   function loadAndPaintArchive(ownerId, body) {
     body.innerHTML = '<p class="empty-state" style="opacity:0.4;padding:12px 0">Завантаження…</p>';
     DataCache.swr('wishlist:archive:' + ownerId, () => loadFulfilledItems(ownerId), (items) => {
@@ -304,13 +374,19 @@ const Wishlist = (() => {
     });
   }
 
+  /**
+   * @param {FulfilledWishlistItem[]} items
+   * @param {HTMLElement} body
+   * @returns {void}
+   */
   function paintArchive(items, body) {
     if (!items.length) {
       body.innerHTML = '<p class="empty-state" style="padding:12px 0">Поки жодного виконаного бажання 🌸</p>';
       return;
     }
     body.innerHTML = '';
-    const buyerMap = allUsers.reduce((m, u) => { m[u.id] = u.name; return m; }, {});
+    /** @type {Record<number, string>} */
+    const buyerMap = allUsers.reduce((m, u) => { m[u.id] = u.name; return m; }, /** @type {Record<number, string>} */ ({}));
 
     items.forEach(item => {
       const card = document.createElement('div');
@@ -339,6 +415,10 @@ const Wishlist = (() => {
 
   // ── МОДАЛКИ БАЖАНЬ ────────────────────────────────────────
   // ── LIGHTBOX (перегляд фото на весь екран, pinch-zoom) ─────
+  /**
+   * @param {string | null} src
+   * @returns {void}
+   */
   function openPhotoLightbox(src) {
     document.getElementById('wl-lightbox')?.remove();
 
@@ -356,7 +436,8 @@ const Wishlist = (() => {
     };
 
     lb.addEventListener('click', e => {
-      if (e.target === lb || e.target.classList.contains('wl-lb-close')) closeLb();
+      const target = /** @type {HTMLElement} */ (e.target);
+      if (target === lb || target.classList.contains('wl-lb-close')) closeLb();
     });
 
     // Закрити свайпом вниз
@@ -369,10 +450,18 @@ const Wishlist = (() => {
 
   // ── ФОТО З ПРИСТРОЮ ───────────────────────────────────────
   // Стискаємо на клієнті (Img.compress з lib/img.js) і вантажимо у Storage.
+  /**
+   * @param {File} file
+   * @returns {Promise<string>} публічний URL завантаженого фото
+   */
   async function uploadWishPhoto(file) {
+    if (!currentUser) throw new Error('Немає активного користувача');
+
     // Страховка: HEIC → JPEG (кине помилку — обробник збереження покаже тост)
     file = await Img.normalize(file);
-    let blob = file, ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
+    /** @type {File | Blob} стискання (Img.compress) повертає Blob, не File */
+    let blob = file;
+    let ext = (file.name.split('.').pop() || 'jpg').toLowerCase(), contentType = file.type;
     try {
       const out = await Img.compress(file, 1080, 0.78);
       blob = out.blob; ext = out.ext; contentType = out.contentType;
@@ -381,21 +470,30 @@ const Wishlist = (() => {
     }
 
     const path = `wish-${currentUser.id}-${Date.now()}.${ext}`;
+    /** @type {{ error: SupaError | null }} */
     const { error } = await supabase.storage
       .from(WISH_PHOTO_BUCKET)
       .upload(path, blob, { upsert: true, contentType });
     if (error) throw error;
 
+    /** @type {{ data: { publicUrl: string } }} */
     const { data } = supabase.storage.from(WISH_PHOTO_BUCKET).getPublicUrl(path);
     return data.publicUrl;
   }
 
+  /** @returns {void} */
   function openAddModal()       { openWishModal(null); }
+  /** @param {WishlistItem} item @returns {void} */
   function openEditModal(item)  { openWishModal(item); }
 
+  /**
+   * @param {WishlistItem | null} item
+   * @returns {void}
+   */
   function openWishModal(item) {
     const isEdit  = !!item;
     const root    = el('modal-root');
+    if (!root) return;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     pendingPhotoFile = null;
@@ -454,34 +552,34 @@ const Wishlist = (() => {
     root.appendChild(overlay);
 
     // ── Фото з пристрою ─────────────────────────────────────
-    const photoPreview = overlay.querySelector('#wm-photo-preview');
-    const photoFileInp = overlay.querySelector('#wm-photo-file');
-    const photoClearBtn = overlay.querySelector('#wm-photo-clear');
-    const urlInp = overlay.querySelector('#wm-img');
+    const photoPreview  = /** @type {HTMLElement} */ (overlay.querySelector('#wm-photo-preview'));
+    const photoFileInp  = /** @type {HTMLInputElement} */ (overlay.querySelector('#wm-photo-file'));
+    const photoClearBtn = /** @type {HTMLElement} */ (overlay.querySelector('#wm-photo-clear'));
+    const urlInp         = /** @type {HTMLInputElement} */ (overlay.querySelector('#wm-img'));
 
-    overlay.querySelector('#wm-photo-pick').addEventListener('click', () => photoFileInp.click());
+    overlay.querySelector('#wm-photo-pick')?.addEventListener('click', () => photoFileInp.click());
 
     photoPreview.addEventListener('click', e => {
-      const img = e.target.closest('img');
+      const img = /** @type {HTMLElement} */ (e.target).closest('img');
       if (img) openPhotoLightbox(img.src);
     });
 
     photoFileInp.addEventListener('change', async () => {
-      let file = photoFileInp.files[0];
+      let file = photoFileInp.files?.[0];
       if (!file) return;
       // HEIC з iPhone → JPEG одразу: інакше прев'ю не відрендериться
       try {
         file = await Img.normalize(file);
       } catch (e) {
         console.error('[Wishlist] конвертація HEIC не вдалася:', e);
-        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + e.message);
+        ErrorBoundary.showToast('Не вдалося обробити HEIC-фото: ' + /** @type {Error} */ (e).message);
         photoFileInp.value = '';
         return;
       }
       pendingPhotoFile = file;
       const reader = new FileReader();
       reader.onload = e => {
-        photoPreview.innerHTML = `<img src="${e.target.result}" alt="">`;
+        photoPreview.innerHTML = `<img src="${e.target?.result}" alt="">`;
       };
       reader.readAsDataURL(file);
       // Файл з пристрою має пріоритет над посиланням
@@ -504,15 +602,20 @@ const Wishlist = (() => {
       if (urlInp.value.trim()) photoPreview.innerHTML = `<img src="${esc(urlInp.value.trim())}" alt="">`;
     });
 
-    overlay.querySelector('#wm-cancel').addEventListener('click', () => root.innerHTML='');
+    overlay.querySelector('#wm-cancel')?.addEventListener('click', () => root.innerHTML='');
     overlay.addEventListener('click', e => { if (e.target===overlay) root.innerHTML=''; });
 
-    overlay.querySelector('#wm-save').addEventListener('click', async () => {
-      const g     = id => overlay.querySelector('#' + id);
+    overlay.querySelector('#wm-save')?.addEventListener('click', async () => {
+      // Без відомого currentUser нове бажання нема кому приписати —
+      // раніше тут було пряме currentUser.id без перевірки на null.
+      if (!isEdit && !currentUser) return;
+
+      /** @typedef {HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement} FormField — wm-save (button) через g() не йде, бо .value є лише в цих трьох */
+      const g     = (/** @type {string} */ id) => /** @type {FormField} */ (overlay.querySelector('#' + id));
       const title = g('wm-title').value.trim();
       if (!title) { g('wm-title').style.borderColor='var(--danger)'; return; }
 
-      const saveBtn = g('wm-save');
+      const saveBtn = /** @type {HTMLButtonElement} */ (overlay.querySelector('#wm-save'));
       saveBtn.disabled = true;
       saveBtn.textContent = 'Збереження...';
 
@@ -523,7 +626,7 @@ const Wishlist = (() => {
         try {
           imageUrl = await uploadWishPhoto(pendingPhotoFile);
         } catch (e) {
-          ErrorBoundary.showToast('Помилка завантаження фото: ' + e.message);
+          ErrorBoundary.showToast('Помилка завантаження фото: ' + /** @type {Error} */ (e).message);
           saveBtn.disabled = false;
           saveBtn.textContent = isEdit ? 'Зберегти' : 'Додати';
           return;
@@ -531,19 +634,20 @@ const Wishlist = (() => {
         saveBtn.textContent = 'Збереження...';
       }
 
+      /** @type {WishlistItemPayload} */
       const payload = {
         title,
         link:        g('wm-link').value.trim()||null,
         image_url:   imageUrl,
         price:       parseFloat(g('wm-price').value)||null,
-        priority:    g('wm-priority').value||null,
+        priority:    /** @type {WishPriority | null} */ (g('wm-priority').value||null),
         description: g('wm-desc').value.trim()||null,
       };
 
-      let error;
-      if (isEdit) {
+      let error = /** @type {SupaError | null} */ (null);
+      if (isEdit && item) {
         ({error} = await supabase.from('wishlist_items').update(payload).eq('id', item.id));
-      } else {
+      } else if (currentUser) {
         ({error} = await supabase.from('wishlist_items').insert({
           ...payload,
           owner:       currentUser.id,
@@ -565,18 +669,24 @@ const Wishlist = (() => {
     });
   }
 
+  /**
+   * @param {number} id
+   * @returns {Promise<void>}
+   */
   async function deleteItem(id) {
     if (!confirm('Видалити бажання?')) return;
     const ownerId = currentUser?.id;
+    if (ownerId == null) return;
 
     // Оптимістично малюємо картку без цього айтема НАПРЯМУ (без
     // проміжного renderGrid()/DataCache.swr) — інакше фонова
     // ревалідація SWR могла б завершитись раніше за сам DELETE,
     // підтягнути ще-не-видалений рядок і затерти оптимістичний стан
     // назавжди (нічого не перемальовує після успішного DELETE).
-    const cached = DataCache.get('wishlist:' + ownerId);
+    const cached = /** @type {WishlistItem[] | undefined} */ (DataCache.get('wishlist:' + ownerId));
     if (cached) paintGrid(cached.filter(i => i.id !== id), true, ownerId);
 
+    /** @type {{ error: SupaError | null }} */
     const { error } = await Retry.query(() =>
       supabase.from('wishlist_items').delete().eq('id', id)
     );
@@ -591,25 +701,33 @@ const Wishlist = (() => {
     renderGrid();
   }
 
+  /**
+   * @param {number} id
+   * @param {boolean} isReserved поточний стан (перед перемиканням)
+   * @returns {Promise<void>}
+   */
   async function reserveItem(id, isReserved) {
     const newVal = !isReserved;
     const ownerId = wishingFor === 'me' ? currentUser?.id : partnerUser?.id;
+    if (ownerId == null) return;
 
     // Оптимістично малюємо НАПРЯМУ (не через renderGrid()/DataCache.swr —
     // та сама причина, що й у deleteItem: фонова ревалідація може
     // «перегнати» сам UPDATE і затерти оптимістичний стан без відкату).
-    const cached = DataCache.get('wishlist:' + ownerId);
-    let optimistic = null;
+    const cached = /** @type {WishlistItem[] | undefined} */ (DataCache.get('wishlist:' + ownerId));
     if (cached) {
-      optimistic = cached.map(i => i.id === id
-        ? { ...i, reserved: newVal, reserved_by: newVal ? currentUser.id : null }
+      // reserved_by пишеться лише коли currentUser відомий — раніше тут
+      // було пряме currentUser.id без перевірки (падало б при null).
+      const optimistic = cached.map(i => i.id === id
+        ? { ...i, reserved: newVal, reserved_by: newVal ? (currentUser?.id ?? null) : null }
         : i);
       paintGrid(optimistic, wishingFor === 'me', ownerId);
     }
 
+    /** @type {{ error: SupaError | null }} */
     const { error } = await Retry.query(() =>
       supabase.from('wishlist_items')
-        .update({ reserved: newVal, reserved_by: newVal ? currentUser.id : null })
+        .update({ reserved: newVal, reserved_by: newVal ? (currentUser?.id ?? null) : null })
         .eq('id', id)
     );
 
@@ -623,12 +741,17 @@ const Wishlist = (() => {
     renderGrid();
   }
 
+  /**
+   * @param {number} id
+   * @returns {Promise<void>}
+   */
   async function cancelReserve(id) {
     if (!confirm('Скасувати бронювання цього подарунка?')) return;
     await reserveItem(id, true);
   }
 
   // ── INIT ──────────────────────────────────────────────────
+  /** @returns {Promise<void>} */
   async function refresh() {
     allUsers    = await Auth.getUsers();
     currentUser = Auth.getCurrentUser();
@@ -638,6 +761,7 @@ const Wishlist = (() => {
     renderWishes();
   }
 
+  /** @returns {void} */
   function invalidateWishes() {
     if (currentUser) {
       DataCache.invalidate('wishlist:' + currentUser.id);
@@ -649,15 +773,17 @@ const Wishlist = (() => {
     }
   }
 
+  /** @returns {void} */
   function refreshLive() {
     if (!currentUser) return;
     renderWishes();
   }
 
+  /** @returns {void} */
   function init() {
     el('add-wish-btn')?.addEventListener('click', openAddModal);
     window.addEventListener('portal:view', e => {
-      if (e.detail.view === 'wishlist') refresh();
+      if (/** @type {CustomEvent} */ (e).detail.view === 'wishlist') refresh();
     });
   }
 
