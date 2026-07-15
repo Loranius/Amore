@@ -28,6 +28,7 @@
     "modules/photos.js",
     "modules/week-widget.js",
     "modules/home-widgets.js",
-    "modules/greeting.js"
+    "modules/greeting.js",
+    "modules/counter.js"
   ]
 }

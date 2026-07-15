@@ -12,36 +12,41 @@ const Counter = (() => {
 
   // Канонічний завантажувач подій — ТОЙ САМИЙ select, що в calendar.js,
   // щоб обидва модулі ділили один кеш-ключ 'events' без розбіжностей.
+  /** @returns {Promise<CalendarEvent[]>} */
   async function loadEventsFull() {
-    const { data } = await supabase.from('events')
+    const { data } = /** @type {SupaResult<CalendarEvent[]>} */ (await supabase.from('events')
       .select('id,title,description,date,created_by,type,yearly')
-      .order('date', { ascending: true });
+      .order('date', { ascending: true }));
     return data || [];
   }
 
+  /** @returns {Promise<string | null>} */
   async function fetchStartDate() {
-    const { data, error } = await supabase
+    const { data, error } = /** @type {SupaResult<AppSettingRow>} */ (await supabase
       .from('settings')
       .select('value')
       .eq('key', 'relationship_start_date')
-      .single();
+      .single());
     if (error || !data) { console.warn('Дата старту стосунків не налаштована'); return null; }
-    return data.value; // 'YYYY-MM-DD'
+    return /** @type {string} */ (data.value); // 'YYYY-MM-DD'
   }
 
+  /** @param {string} dateStr @returns {string} */
   function formatSinceDate(dateStr) {
     const d = new Date(dateStr);
     return d.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' });
   }
 
+  /** @param {string} dateStr @returns {number} */
   function daysBetween(dateStr) {
     const start = new Date(dateStr);
     const now = new Date();
     start.setHours(0, 0, 0, 0);
     now.setHours(0, 0, 0, 0);
-    return Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    return Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
   }
 
+  /** @param {string} str @returns {string} */
   function escapeHtml(str) {
     const div = document.createElement('div');
     div.textContent = str || '';
@@ -49,6 +54,7 @@ const Counter = (() => {
   }
 
   // Малює числа лічильника (на головній і в календарі)
+  /** @param {string | null} startDate @returns {void} */
   function paintCounter(startDate) {
     const homeNumber = document.getElementById('counter-number');
     const homeSince  = document.getElementById('counter-since');
@@ -67,11 +73,13 @@ const Counter = (() => {
   // Плани (type:'other') зберігають статус прямо в description у вигляді
   // [status:done] — саме так calendar.js позначає план як архівний.
   // Такі плани мають ігноруватись при виборі "найближчої події" на головній.
+  /** @param {CalendarEvent} ev @returns {boolean} */
   function isArchivedPlan(ev) {
     if ((ev.type || 'other') !== 'other') return false;
     return /\[status:done\]/.test(ev.description || '');
   }
 
+  /** @param {CalendarEvent[]} events @returns {void} */
   function renderNextEvent(events) {
     const widget = document.getElementById('next-event-widget');
     if (!widget) return;
@@ -93,7 +101,7 @@ const Counter = (() => {
     }
 
     const eventDate = new Date(data.date + 'T00:00:00');
-    const diffDays  = Math.round((eventDate - today) / (1000 * 60 * 60 * 24));
+    const diffDays  = Math.round((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     const dateStr   = eventDate.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' });
     const daysLabel = diffDays === 0 ? 'сьогодні! 🎉'
       : diffDays === 1 ? 'завтра'
@@ -110,6 +118,7 @@ const Counter = (() => {
       '</div>';
   }
 
+  /** @param {string | null} startDate @returns {void} */
   function renderNextAnniversary(startDate) {
     const el = document.getElementById('counter-next-anniversary');
     if (!el || !startDate) return;
@@ -121,7 +130,7 @@ const Counter = (() => {
     nextAnn.setFullYear(now.getFullYear());
     if (nextAnn <= now) nextAnn.setFullYear(now.getFullYear() + 1);
 
-    const diffDays = Math.round((nextAnn - now) / (1000 * 60 * 60 * 24));
+    const diffDays = Math.round((nextAnn.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
     const years = nextAnn.getFullYear() - start.getFullYear();
 
     let label;
@@ -155,7 +164,8 @@ const Counter = (() => {
   function init() {
     window.addEventListener('portal:auth', render);
     window.addEventListener('portal:view', (e) => {
-      if (e.detail.view === 'calendar' || e.detail.view === 'home') render();
+      const detail = /** @type {any} */ (e).detail;
+      if (detail.view === 'calendar' || detail.view === 'home') render();
     });
   }
 
