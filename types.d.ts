@@ -339,6 +339,35 @@ interface PhotoCalendarRow {
   comment: string | null;
 }
 
+// ---------- Фінанси (modules/budget.js) ----------
+
+/** Рядок таблиці `free_limit` (єдиний рядок, id=1). */
+interface FreeLimitRow {
+  limit_value: number | null;
+  proposal_value: number | null;
+  proposed_by: string | null;
+}
+
+/** Локально обчислена пропозиція ліміту (з FreeLimitRow, коли proposal_value є). */
+interface FreeLimitProposal {
+  value: number;
+  proposedBy: string | null;
+}
+
+type GoalStatus = 'pending' | 'confirmed';
+
+/** Рядок таблиці `savings_goals`. */
+interface SavingsGoal {
+  id: number;
+  name: string;
+  target_amount: number | null;
+  url: string | null;
+  description: string | null;
+  status: GoalStatus;
+  proposed_by: string | null;
+  saved_amount: number | null;
+}
+
 // ---------- Ще не типізовані глобалі з інших модулів ----------
 // Мінімальні контракти — прибрати звідси, коли відповідний файл
 // приєднається до jsconfig.json "include" зі своєю справжньою JSDoc-типізацією.

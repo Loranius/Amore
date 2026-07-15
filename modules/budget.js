@@ -2,38 +2,46 @@
 // FINANCE MODULE v8 — Ліміт · Спільні цілі
 // ============================================================
 const Budget = (() => {
+  /** @typedef {HTMLElement & {_syncVV?: () => void}} FinOverlay */
+
+  /** @param {string} id @returns {HTMLElement | null} */
   const el  = id => document.getElementById(id);
+  /** @param {string} s @returns {string} */
   const esc = s  => { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; };
-  const fmtN = n => Math.round(Math.abs(n)).toLocaleString('uk-UA')+' ₴';
+  /** @param {number | string} n @returns {string} */
+  const fmtN = n => Math.round(Math.abs(Number(n))).toLocaleString('uk-UA')+' ₴';
 
   // Актуальна пропозиція ліміту. Обробники кнопок ✓/✕ прив'язуються
   // лише один раз (dataset.bound), тому читають значення звідси,
   // а не з замикання першого рендеру — інакше підтвердження другої
   // пропозиції записувало б суму з першої (старий баг).
+  /** @type {FreeLimitProposal | null} */
   let currentProposal = null;
 
   // ── ЛІМІТ ─────────────────────────────────────────────────
+  /** @returns {Promise<Partial<FreeLimitRow>>} */
   async function fetchFreeLimit() {
-    const {data} = await supabase.from('free_limit').select('limit_value,proposal_value,proposed_by').eq('id',1).single();
+    const {data} = /** @type {SupaResult<FreeLimitRow>} */ (await supabase.from('free_limit').select('limit_value,proposal_value,proposed_by').eq('id',1).single());
     return data || {};
   }
   function renderFreeLimit() {
     DataCache.swr('free_limit', fetchFreeLimit, paintFreeLimit);
   }
+  /** @param {Partial<FreeLimitRow> | null} fl @returns {void} */
   function paintFreeLimit(fl) {
     const user = Auth.getCurrentUser();
     const limit    = fl?.limit_value||0;
     const proposal = fl?.proposal_value
-      ? {value:fl.proposal_value, proposedBy:fl.proposed_by} : null;
+      ? {value:fl.proposal_value, proposedBy:fl.proposed_by ?? null} : null;
     currentProposal = proposal;
 
-    if(el('free-limit-current'))
-      el('free-limit-current').textContent = limit>0 ? fmtN(limit) : 'не встановлено';
+    const curEl = el('free-limit-current');
+    if(curEl) curEl.textContent = limit>0 ? fmtN(limit) : 'не встановлено';
 
-    const slider=el('free-limit-slider'), display=el('free-limit-display');
+    const slider = /** @type {HTMLInputElement | null} */ (el('free-limit-slider')), display=el('free-limit-display');
     if(slider){
       // Значення слайдера оновлюємо при кожному рендері (ліміт міг змінитись)
-      slider.value = limit||2000;
+      slider.value = String(limit||2000);
       if(display) display.textContent = fmtN(slider.value);
       // Обробник input прив'язуємо лише один раз
       if(!slider.dataset.bound){
@@ -46,7 +54,7 @@ const Budget = (() => {
     if(propBtn&&!propBtn.dataset.bound){
       propBtn.dataset.bound='1';
       propBtn.addEventListener('click',async()=>{
-        const v = parseInt(slider?.value||2000);
+        const v = parseInt(String(slider?.value||2000));
         await supabase.from('free_limit').update({
           proposal_value:v, proposed_by:user?.name||'?'
         }).eq('id',1);
@@ -88,15 +96,17 @@ const Budget = (() => {
   }
 
   // ── ГЛОБАЛЬНІ ЦІЛІ ────────────────────────────────────────
+  /** @returns {Promise<SavingsGoal[]>} */
   async function fetchGoals() {
-    const {data} = await supabase.from('savings_goals')
+    const {data} = /** @type {SupaResult<SavingsGoal[]>} */ (await supabase.from('savings_goals')
       .select('id,name,target_amount,url,description,status,proposed_by,saved_amount')
-      .order('created_at',{ascending:false});
+      .order('created_at',{ascending:false}));
     return data || [];
   }
   function renderGlobalGoals() {
     DataCache.swr('savings_goals', fetchGoals, paintGoals);
   }
+  /** @param {SavingsGoal[] | null} data @returns {void} */
   function paintGoals(data) {
     const wrap = el('global-goals-list'); if(!wrap) return;
     if(!data?.length){
@@ -141,24 +151,29 @@ const Budget = (() => {
       wrap.appendChild(item);
     });
     wrap.querySelectorAll('[data-confirm]').forEach(b=>b.addEventListener('click',async()=>{
-      await supabase.from('savings_goals').update({status:'confirmed'}).eq('id',b.dataset.confirm);
+      const id = /** @type {HTMLElement} */ (b).dataset.confirm;
+      await supabase.from('savings_goals').update({status:'confirmed'}).eq('id',id);
       DataCache.invalidate('savings_goals'); renderGlobalGoals();
     }));
     wrap.querySelectorAll('[data-reject]').forEach(b=>b.addEventListener('click',async()=>{
       if(!confirm('Відхилити?')) return;
-      await supabase.from('savings_goals').delete().eq('id',b.dataset.reject);
+      const id = /** @type {HTMLElement} */ (b).dataset.reject;
+      await supabase.from('savings_goals').delete().eq('id',id);
       DataCache.invalidate('savings_goals'); renderGlobalGoals();
     }));
     wrap.querySelectorAll('[data-gid]').forEach(b=>b.addEventListener('click',async()=>{
       if(!confirm('Видалити?')) return;
-      await supabase.from('savings_goals').delete().eq('id',b.dataset.gid);
+      const id = /** @type {HTMLElement} */ (b).dataset.gid;
+      await supabase.from('savings_goals').delete().eq('id',id);
       DataCache.invalidate('savings_goals'); renderGlobalGoals();
     }));
     wrap.querySelectorAll('[data-addfunds]').forEach(b=>b.addEventListener('click',()=>{
-      openAddFundsModal(b.dataset.addfunds, data.find(g=>String(g.id)===String(b.dataset.addfunds)));
+      const addFundsId = /** @type {HTMLElement} */ (b).dataset.addfunds;
+      openAddFundsModal(addFundsId, data.find(g=>String(g.id)===String(addFundsId)));
     }));
   }
 
+  /** @param {string | undefined} id @param {SavingsGoal | undefined} goal @returns {void} */
   function openAddFundsModal(id, goal) {
     if(!goal) return;
     const saved  = Math.max(0, goal.saved_amount||0);
@@ -174,8 +189,9 @@ const Budget = (() => {
       </div>`);
     el('gf-cancel')?.addEventListener('click',closeModal);
     el('gf-save')?.addEventListener('click',async()=>{
-      const v = parseFloat(el('gf-amount')?.value);
-      if(!v||v<=0){ shake(el('gf-amount')); return; }
+      const amountEl = /** @type {HTMLInputElement | null} */ (el('gf-amount'));
+      const v = parseFloat(amountEl?.value || '');
+      if(!v||v<=0){ shake(amountEl); return; }
       await supabase.from('savings_goals').update({ saved_amount: saved + v }).eq('id', id);
       DataCache.invalidate('savings_goals'); closeModal(); renderGlobalGoals();
     });
@@ -202,13 +218,17 @@ const Budget = (() => {
         </div>`);
       el('gg-cancel')?.addEventListener('click',closeModal);
       el('gg-save')?.addEventListener('click',async()=>{
-        const name = el('gg-name').value.trim();
-        if(!name){ shake(el('gg-name')); return; }
+        const nameEl  = /** @type {HTMLInputElement} */ (el('gg-name'));
+        const descEl  = /** @type {HTMLInputElement} */ (el('gg-desc'));
+        const priceEl = /** @type {HTMLInputElement} */ (el('gg-price'));
+        const urlEl   = /** @type {HTMLInputElement} */ (el('gg-url'));
+        const name = nameEl.value.trim();
+        if(!name){ shake(nameEl); return; }
         await supabase.from('savings_goals').insert({
           name,
-          description: el('gg-desc').value.trim()||null,
-          target_amount: parseFloat(el('gg-price').value)||0,
-          url: el('gg-url').value.trim()||null,
+          description: descEl.value.trim()||null,
+          target_amount: parseFloat(priceEl.value)||0,
+          url: urlEl.value.trim()||null,
           status:'pending', proposed_by:user?.name||null, saved_amount:0
         });
         DataCache.invalidate('savings_goals'); closeModal(); renderGlobalGoals();
@@ -217,27 +237,28 @@ const Budget = (() => {
   }
 
   // ── МОДАЛКИ ───────────────────────────────────────────────
+  /** @param {string} html @returns {void} */
   function openModal(html){
-    el('modal-root').innerHTML=`
+    /** @type {HTMLElement} */ (el('modal-root')).innerHTML=`
       <div class="modal-overlay" id="fin-modal-ov">
         <div class="modal-card">${html}</div>
       </div>`;
-    const ov = el('fin-modal-ov');
-    ov?.addEventListener('click',e=>{ if(e.target.id==='fin-modal-ov') closeModal(); });
+    const ov = /** @type {FinOverlay | null} */ (el('fin-modal-ov'));
+    ov?.addEventListener('click',e=>{ if(/** @type {HTMLElement} */ (e.target).id==='fin-modal-ov') closeModal(); });
     if(window.visualViewport && ov){
+      const vv = window.visualViewport;
       const sync = ()=>{
-        const vv = window.visualViewport;
         ov.style.height  = vv.height+'px';
         ov.style.top     = vv.offsetTop+'px';
       };
       sync();
-      window.visualViewport.addEventListener('resize',sync);
-      window.visualViewport.addEventListener('scroll',sync);
+      vv.addEventListener('resize',sync);
+      vv.addEventListener('scroll',sync);
       ov._syncVV = sync;
     }
   }
   function closeModal(){
-    const ov = el('fin-modal-ov');
+    const ov = /** @type {FinOverlay | null} */ (el('fin-modal-ov'));
     if(window.visualViewport && ov?._syncVV){
       window.visualViewport.removeEventListener('resize',ov._syncVV);
       window.visualViewport.removeEventListener('scroll',ov._syncVV);
@@ -245,6 +266,7 @@ const Budget = (() => {
     closeModalAnimated();
   }
 
+  /** @param {HTMLElement | null} inp @returns {void} */
   function shake(inp){
     if(!inp) return;
     inp.style.borderColor='var(--danger)';
@@ -262,7 +284,7 @@ const Budget = (() => {
   function init(){
     bindAddGoal();
     window.addEventListener('portal:view',e=>{
-      if(e.detail.view==='budget'){ bindAddGoal(); refresh(); }
+      if(/** @type {any} */ (e).detail.view==='budget'){ bindAddGoal(); refresh(); }
     });
   }
 

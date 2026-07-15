@@ -32,6 +32,7 @@
     "modules/counter.js",
     "modules/question.js",
     "modules/schedule.js",
-    "modules/photo-calendar.js"
+    "modules/photo-calendar.js",
+    "modules/budget.js"
   ]
 }
