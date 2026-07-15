@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Легкий haptic-відгук на ключові натискання (Android Chrome) ──
   document.addEventListener('click', (e) => {
     if (!navigator.vibrate) return;
-    if (e.target.closest('.nav-btn, .more-menu-item, .btn-primary')) {
+    if (/** @type {HTMLElement} */ (e.target).closest('.nav-btn, .more-menu-item, .btn-primary')) {
       navigator.vibrate(8);
     }
   }, { passive: true });
@@ -58,9 +58,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const btn = document.getElementById('sidebar-toggle');
     if (!btn) return;
 
-    const app = document.getElementById('app');
+    const app = /** @type {HTMLElement} */ (document.getElementById('app'));
     const STORAGE_KEY = 'amore:sidebar-collapsed';
+    /** @returns {string | null} */
     const safeGet = () => { try { return localStorage.getItem(STORAGE_KEY); } catch { return null; } };
+    /** @param {string} v @returns {void} */
     const safeSet = (v) => { try { localStorage.setItem(STORAGE_KEY, v); } catch {} };
 
     // Відновлюємо стан
@@ -81,9 +83,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Ховаємо кнопку на мобільному (CSS display:none, але на всяк випадок)
-    function syncVisibility() {
+    const syncVisibility = () => {
       btn.style.display = window.innerWidth >= 960 ? '' : 'none';
-    }
+    };
     syncVisibility();
     window.addEventListener('resize', syncVisibility);
   })();

@@ -39,6 +39,7 @@
     "lib/realtime.js",
     "lib/pwa.js",
     "modules/random.js",
-    "modules/router.js"
+    "modules/router.js",
+    "modules/app.js"
   ]
 }
