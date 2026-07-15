@@ -445,6 +445,34 @@
   box-shadow: 0 0 0 3px rgba(232,130,156,0.12);
 }
 
+/* Нативний input[type=file] (вибір фото) — рамку/фон дає .form-field
+   input вище, тут стилізуємо лише саму кнопку вибору файлу під btn-secondary */
+.form-field input[type="file"] {
+  font-size: 13px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.form-field input[type="file"]::file-selector-button,
+.form-field input[type="file"]::-webkit-file-upload-button {
+  background: var(--surface-soft);
+  color: var(--accent-deep);
+  border: 1px solid rgba(232,130,156,0.2);
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  margin-right: var(--space-2);
+  transition: background 0.12s ease;
+}
+
+.form-field input[type="file"]:hover::file-selector-button,
+.form-field input[type="file"]:hover::-webkit-file-upload-button {
+  background: var(--accent-pale);
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;
