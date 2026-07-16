@@ -39,6 +39,8 @@ let allPins = [];
 let focusedPinId = null;
 let mapInitialized = false;
 let mapboxLoaded = false;
+/** @type {Promise<void> | null} */
+let mapboxPromise = null;
 /** @type {number | null} */
 let searchDebounce = null;
 /** @type {'all' | PinCategory} */
@@ -77,7 +79,11 @@ const USER_LOCATION_STYLES = [
 // ── Динамічне завантаження Mapbox (лише при першому відкритті вкладки) ──
 /** @returns {Promise<void>} */
 function loadMapboxResources() {
-  return new Promise(function(resolve) {
+  // Кешуємо сам Promise: якщо loadMapboxResources викликати двічі до того,
+  // як onload встиг виставити mapboxLoaded, обидва виклики отримають ОДИН
+  // Promise — без вставки двох <script>/<link> і подвійної ініціалізації.
+  if (mapboxPromise) return mapboxPromise;
+  mapboxPromise = new Promise(function(resolve) {
     if (mapboxLoaded) { resolve(); return; }
 
     // CSS
@@ -92,6 +98,7 @@ function loadMapboxResources() {
     script.onload = function() { mapboxLoaded = true; resolve(); };
     document.head.appendChild(script);
   });
+  return mapboxPromise;
 }
 
 /**
@@ -1261,21 +1268,6 @@ function updateFindPartnerBtn(partnerLoc) {
   } else {
     btn.style.display = 'none';
   }
-}
-
-// Видалити своє місцезнаходження (скидання check-in)
-/** @returns {Promise<void>} */
-async function clearMyLocation() {
-  var user = Auth.getCurrentUser();
-  if (!user) return;
-  await supabase.from('user_locations').delete().eq('user_id', user.id);
-
-  // Прибираємо маркер з карти
-  if (locationMarkers[user.id]) {
-    locationMarkers[user.id].marker.remove();
-    delete locationMarkers[user.id];
-  }
-  DataCache.invalidate('user_locations');
 }
 
 // Публічний метод для Realtime — оновити маркери партнерів

@@ -44,9 +44,13 @@ function paintFreeLimit(fl) {
 
   const slider = /** @type {HTMLInputElement | null} */ (el('free-limit-slider')), display=el('free-limit-display');
   if(slider){
-    // Значення слайдера оновлюємо при кожному рендері (ліміт міг змінитись)
-    slider.value = String(limit||2000);
-    if(display) display.textContent = fmtN(slider.value);
+    // Значення слайдера оновлюємо при кожному рендері (ліміт міг змінитись),
+    // але НЕ поки користувач його тягне — інакше realtime-подія від партнера
+    // збила б позицію просто під пальцем.
+    if(document.activeElement !== slider){
+      slider.value = String(limit||2000);
+      if(display) display.textContent = fmtN(slider.value);
+    }
     // Обробник input прив'язуємо лише один раз
     if(!slider.dataset.bound){
       slider.dataset.bound='1';

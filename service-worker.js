@@ -1,14 +1,17 @@
 // ============================================================
 // Service Worker — Amore
-// Стратегія підібрана під часті деплої (GitHub Pages):
-//  • HTML-навігація → network-first (свіжий деплій видно одразу, офлайн — з кешу)
-//  • Своя статика (css/js/img) → stale-while-revalidate (миттєво з кешу, оновлення у фоні)
+// Стратегія підібрана під часті деплої (GitHub Pages) БЕЗ ручного бампу:
+//  • HTML-навігація  → network-first (свіжий деплій видно одразу, офлайн — кеш)
+//  • Своя статика JS/CSS/img → network-first з таймаутом 2с (свіже при онлайні,
+//    кеш якщо мережа тупить). Модулі підхоплюють новий код самі — бампати
+//    CACHE при кожному деплої більше НЕ треба.
 //  • Supabase / Mapbox / шрифти / CDN → напряму в мережу (не кешуємо)
-// Щоб скинути кеш — підніми версію в CACHE нижче.
+//
+// CACHE-версію піднімай лише зрідка — коли треба примусово викинути ВЕСЬ
+// старий кеш у всіх (напр. зламаний закешований файл). Для звичайних
+// деплоїв модулів/стилів цього робити не потрібно.
 // ============================================================
-// CSS/JS у прекеші не тримаємо — їх підхоплює runtime-кеш (SWR)
-// за повними URL з ?v=, тож синхронізувати нічого не треба.
-const CACHE = 'amore-v99';
+const CACHE = 'amore-v100';
 const SHELL = [
   './',
   './index.html',
@@ -51,19 +54,46 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
-  // Своя статика: stale-while-revalidate
-  e.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  // Своя статика (JS/CSS/img): network-first з таймаутом.
+  // • Мережа встигла за NET_TIMEOUT → віддаємо свіже (і кешуємо).
+  // • Мережа тупить/офлайн → віддаємо кеш, а мережевий запит НЕ скасовуємо:
+  //   коли він дійде, тихо оновить кеш на наступний раз.
+  // Так модулі підхоплюють свіжий код при онлайні без ручного бампу CACHE,
+  // а на поганому з'єднанні застосунок лишається швидким (кеш).
+  const NET_TIMEOUT = 2000;
+
+  e.respondWith((async () => {
+    const cachedPromise = caches.match(req);
+
+    // Мережевий запит: завжди оновлює кеш при успіху (навіть якщо ми вже
+    // віддали кеш через таймаут — оновлення осяде на майбутнє).
+    const networkPromise = fetch(req)
+      .then((res) => {
+        if (res && res.status === 200) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy));
+        }
+        return res;
+      })
+      .catch(() => undefined);
+
+    // Гонка: мережа проти таймера. Таймер «перемагає» значенням undefined —
+    // це сигнал «час вийшов, спробуй кеш», а не помилка.
+    const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(undefined), NET_TIMEOUT));
+
+    const winner = await Promise.race([networkPromise, timeoutPromise]);
+    if (winner) return winner; // мережа встигла
+
+    // Таймаут або мережева помилка → пробуємо кеш
+    const cached = await cachedPromise;
+    if (cached) return cached;
+
+    // Кешу нема (перший візит на повільному з'єднанні) — вибору нема,
+    // дочікуємось мережу попри таймаут.
+    const late = await networkPromise;
+    if (late) return late;
+
+    // Зовсім нічого — коректна відмова замість undefined-респонсу.
+    return new Response('', { status: 504, statusText: 'Gateway Timeout' });
+  })());
 });

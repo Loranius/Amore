@@ -144,9 +144,7 @@ async function fulfillWish(item) {
   sendFulfilledNotification(item, owner || { name: '?', id: item.owner }, currentUser);
 
   // Святкові конфеті 🎉
-  // window-каст — та сама причина, що й DataCache у lib/cache.js
-  // (публікація глобалі через window.X = X, без модулів/build).
-  if (/** @type {any} */ (window).Confetti) Confetti.burst();
+  Confetti.burst();
 
   // Скидаємо кеш і перемальовуємо
   invalidateWishes();

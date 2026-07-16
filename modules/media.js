@@ -637,6 +637,11 @@ function openReviewPanel(item, preselectedWho) {
   closeModalAnimated();
   root.appendChild(overlay);
 
+  // Навішуємо ОДИН раз: overlay не перестворюється між викликами render()
+  // (перемикання Діма/Лєна лише оновлює innerHTML), тож усередині render()
+  // цей listener накопичувався б.
+  overlay.addEventListener('click', e => { if(/** @type {HTMLElement} */ (e.target).id==='review-panel-overlay') root.innerHTML=''; });
+
   const render = () => {
     const who        = selectedWho;
     // Динамічний ключ — те саме, що й у renderDetailReviews.
@@ -685,7 +690,6 @@ function openReviewPanel(item, preselectedWho) {
       });
     });
     overlay.querySelector('#review-cancel')?.addEventListener('click', () => root.innerHTML='');
-    overlay.addEventListener('click', e => { if(/** @type {HTMLElement} */ (e.target).id==='review-panel-overlay') root.innerHTML=''; });
     overlay.querySelector('#review-save')?.addEventListener('click', async () => {
       const commentInp = /** @type {HTMLTextAreaElement} */ (overlay.querySelector('#review-comment'));
       const comment = commentInp.value.trim();

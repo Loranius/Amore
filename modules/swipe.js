@@ -20,6 +20,8 @@ let currentIndex = 0;
 let page = 1;
 let isLoading = false;
 let isRefilling = false; // guard: не дає швидким свайпам стартувати кілька TMDB-дозавантажень паралельно
+/** @type {number[]} — id вже свайпнутих, кешуються в initStack, щоб addNextCard теж їх фільтрував */
+let swipedIdsCache = [];
 
 /** @param {ParentNode} root @param {string} sel @returns {HTMLElement} */
 function q(root, sel) {
@@ -99,14 +101,14 @@ async function saveVote(card, direction) {
   // up=Подивились(done), right=Дивимось(watching), left=В планах(want), down=Пропустити(skip)
   const status = direction === 'up' ? 'done' : direction === 'right' ? 'watching' : 'want';
 
-  const existing = /** @type {SupaResult<Pick<MediaItem, 'id'>>} */ (await supabase
+  const existing = /** @type {SupaResult<Pick<MediaItem, 'id'>[]>} */ (await supabase
     .from('media_items')
     .select('id')
     .eq('type', mediaType)
     .eq('title', card.title)
-    .maybeSingle());
+    .limit(1));
 
-  if (!existing.data) {
+  if (!existing.data || existing.data.length === 0) {
     await supabase.from('media_items').insert({
       type: mediaType,
       title: card.title,
@@ -115,7 +117,7 @@ async function saveVote(card, direction) {
       created_by: user.id,
     });
     // Список медіа змінився — скидаємо кеш відповідного типу
-    if (/** @type {any} */ (window).DataCache) DataCache.invalidate('media:' + mediaType);
+    DataCache.invalidate('media:' + mediaType);
   }
 
   // Оновлюємо список внизу тільки якщо вкладка media активна
@@ -393,6 +395,9 @@ function flyOut(el, direction, card) {
   }, { once: true });
 
   saveVote(card, direction);
+  // Запам'ятовуємо картку як свайпнуту й у сесійному кеші — щоб дозавантаження
+  // (addNextCard→loadCards) не повернуло її знову до перезапуску стека.
+  if (swipedIdsCache.indexOf(card.tmdb_id) === -1) swipedIdsCache.push(card.tmdb_id);
   addNextCard();
 }
 
@@ -407,7 +412,12 @@ async function addNextCard() {
     isRefilling = true;
     try {
       const more = await loadCards();
-      if (more.length) cards = cards.concat(more);
+      // Фільтруємо вже свайпнуті — раніше дозавантаження їх не відсіювало
+      // й у стек могли повертатись картки, які користувач уже оцінив.
+      const fresh = more.filter(function(c) {
+        return swipedIdsCache.indexOf(c.tmdb_id) === -1;
+      });
+      if (fresh.length) cards = cards.concat(fresh);
     } finally {
       isRefilling = false;
     }
@@ -448,7 +458,7 @@ async function initStack() {
     currentIndex = 0;
     cards = [];
 
-    const swipedIds = await getSwipedIds();
+    swipedIdsCache = await getSwipedIds();
 
     let attempts = 0;
     while (cards.length < 15 && attempts < 12) {
@@ -459,7 +469,7 @@ async function initStack() {
         continue;
       }
       const fresh = batch.filter(function(c) {
-        return swipedIds.indexOf(c.tmdb_id) === -1;
+        return swipedIdsCache.indexOf(c.tmdb_id) === -1;
       });
       cards = cards.concat(fresh);
     }

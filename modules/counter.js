@@ -129,8 +129,15 @@ function renderNextAnniversary(startDate) {
   const start = new Date(startDate);
 
   let nextAnn = new Date(start);
+  const startMonth = start.getMonth();
   nextAnn.setFullYear(now.getFullYear());
-  if (nextAnn <= now) nextAnn.setFullYear(now.getFullYear() + 1);
+  // 29 лютого у невисокосний рік setFullYear зсуває на 1 березня — повертаємо
+  // на 28 лютого, щоб річниця не «стрибала» на інший місяць.
+  if (nextAnn.getMonth() !== startMonth) nextAnn.setDate(0);
+  if (nextAnn <= now) {
+    nextAnn.setFullYear(now.getFullYear() + 1);
+    if (nextAnn.getMonth() !== startMonth) nextAnn.setDate(0);
+  }
 
   const diffDays = Math.round((nextAnn.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   const years = nextAnn.getFullYear() - start.getFullYear();

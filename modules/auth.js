@@ -273,4 +273,4 @@ async function getUsers() {
   });
 }
 
-export const Auth = { init, getCurrentUser, getUsers, _getUsers: () => users };
+export const Auth = { init, getCurrentUser, getUsers };

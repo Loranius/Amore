@@ -504,7 +504,7 @@ function openSizesEditModal(sizes, userId, isFemale, onSave) {
       ring_ring: g('sz-ring')?.value.trim()||null, ring_index: g('sz-ring-idx')?.value.trim()||null,
     }, { onConflict: 'user_id' }));
     if (error) { alert('Помилка: ' + error.message); return; }
-    if (/** @type {any} */ (window).DataCache) DataCache.invalidate('sizes:' + userId);
+    DataCache.invalidate('sizes:' + userId);
     root.innerHTML = '';
     if (onSave) onSave();
   });
