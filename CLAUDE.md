@@ -5,23 +5,43 @@
 
 ## Стек і жорсткі правила
 
-- **Vanilla JS без збірки.** Немає npm, бандлера, транспіляції. Ніяких import/export —
-  модулі це IIFE, що кладуть об'єкт у глобальну область (`const Foo = (() => {...})()`),
-  підключаються через `<script defer>` в index.html. Порядок скриптів важливий.
+- **Vanilla JS без збірки.** Немає npm, бандлера, транспіляції — все виконується браузером
+  як є. Але з переходу на ES-модулі (липень 2026) модулі — це справжні `export`/`import`,
+  а не IIFE-глобалі: `export const Foo = {...}` у файлі, `import { Foo } from './foo.js'`
+  там, де користуються. Єдина точка входу в index.html —
+  `<script type="module" src="modules/app.js?v=N">`; він статично імпортує всі інші модулі
+  (порядок import-рядків у app.js важливий — визначає порядок реєстрації portal:auth/
+  portal:view-слухачів, як раніше визначав порядок `<script>`-тегів). ES-модулі не
+  виконуються через `file://` — локально тестувати тільки через http(s)-сервер
+  (напр. `python3 -m http.server`).
 - **Після зміни БУДЬ-ЯКОГО js/css файлу обов'язково:**
-  1. Бампни його query-параметр `?v=` у index.html (напр. `random.js?v=culinary3` → `culinary4`).
-  2. Бампни `const CACHE = 'amore-vNN'` у service-worker.js (+1). Список SHELL не чіпай — CSS/JS кешуються в рантаймі.
+  1. Якщо міняв стилі — бампни їхній `?v=` у index.html (`styles/main.css?v=13` тощо).
+     Якщо міняв `modules/app.js` — бампни його `?v=` (`?v=esm1` → `esm2`). Решта `.js`-файлів
+     імпортуються БЕЗ `?v=` (звичайні ES-import шляхи), тому наступний пункт — головний.
+  2. Бампни `const CACHE = 'amore-vNN'` у service-worker.js (+1). Список SHELL не чіпай —
+     CSS/JS кешуються в рантаймі; бамп CACHE видаляє ВЕСЬ старий рантайм-кеш при activate,
+     тож наступний фетч будь-якого імпортованого модуля (навіть без власного `?v=`) піде
+     в мережу за свіжим.
   Без цього користувачі отримають старий кеш і зміни «не працюватимуть».
 - **Мова:** весь UI, коментарі і комміти — українською.
 - **Не переписуй файли цілком** без потреби — точкові правки.
+- **JSDoc-типізація:** частина файлів має строгі `@param`/`@returns`/`@type` анотації,
+  перевіряються через `tsc -p jsconfig.json` (опційно, нуль впливу на рантайм/деплой —
+  GitHub Pages про jsconfig.json/types.d.ts не знає). `types.d.ts` — спільні
+  інтерфейси/типи (глобальний ambient-скрипт, без import/export у самому файлі, тому
+  видний звідусіль). Новий типізований файл — додай у `jsconfig.json` → `include`.
 
 ## Структура
 
-- `index.html` — вся розмітка view-секцій + глобальні хелпери (`closeModalAnimated`).
+- `index.html` — вся розмітка view-секцій. Єдиний скрипт-тег —
+  `<script type="module" src="modules/app.js">`; решта підключається через import-граф.
 - `modules/*.js` — по модулю на вкладку (router, auth, calendar, shopping, random=Кулінарія,
   wishlist, budget, media, map, schedule, photo-calendar, question, capsule, counter,
-  greeting, photos, home-widgets, week-widget, settings, swipe, game=вкладка «Гра» (game.html в iframe), app).
-- `lib/*.js` — cache (SWR), realtime, error-boundary (тости: `ErrorBoundary.showToast(msg, 'success'|'warn'|тип за замовч. error)`), img (компресія), pwa, retry, confetti.
+  greeting, photos, home-widgets, week-widget, settings, swipe, game=вкладка «Гра» (game.html в iframe)).
+  Кожен експортує іменований об'єкт (`export const Auth = {...}`) і сам імпортує свої
+  залежності. `app.js` — точка входу: імпортує всі модулі й вручну кличе `.init()` кожного
+  (порядок імпортів/викликів критичний — див. коментар на початку файла).
+- `lib/*.js` — cache (SWR), realtime, error-boundary (тости: `ErrorBoundary.showToast(msg, 'success'|'warn'|тип за замовч. error)`), img (компресія), pwa, retry, confetti, modal (`closeModalAnimated` — раніше жила inline в index.html, тепер `export function` тут).
 - `styles/main.css` — токени/теми (світла + `[data-theme="dark"]`), базове. `styles/components.css` — компоненти.
 - `supabase/functions/*/index.ts` — вихідники Edge Functions (ДЕПЛОЯТЬСЯ ВРУЧНУ через
   Dashboard, НЕ з цього репо автоматично). `supabase/migrations.sql` — довідково.
