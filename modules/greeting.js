@@ -3,43 +3,43 @@
 // Рандомна тепла фраза з ім'ям користувача на головній
 // ============================================================
 
-const Greeting = (() => {
 
-  // Спільні фрази + персональні для кожного
-  const COMMON = [
-    'Хай, бубос 💛',
-    'Привіт, пупс 🌸',
-    'Шо ти там, крошка? 😏',
-  ];
+// Спільні фрази + персональні для кожного
+import { Auth } from './auth.js';
 
-  /** @type {Record<string, string[]>} */
-  const PERSONAL = {
-    'Лєна': [
-      'Привіт, Лєнок 🌷',
-      'Привіт, Лєнусік 💕',
-      'Привіт, Лєнчик ✨',
-    ],
-    'Діма': [
-      'Як справи, Дімасік? 😎',
-      'Привіт, Дімонич 🤙',
-    ],
-  };
+const COMMON = [
+  'Хай, бубос 💛',
+  'Привіт, пупс 🌸',
+  'Шо ти там, крошка? 😏',
+];
 
-  function render() {
-    const user = Auth.getCurrentUser();
-    const el = document.getElementById('greeting-text');
-    if (!el) return;
+/** @type {Record<string, string[]>} */
+const PERSONAL = {
+  'Лєна': [
+    'Привіт, Лєнок 🌷',
+    'Привіт, Лєнусік 💕',
+    'Привіт, Лєнчик ✨',
+  ],
+  'Діма': [
+    'Як справи, Дімасік? 😎',
+    'Привіт, Дімонич 🤙',
+  ],
+};
 
-    const pool = [...COMMON, ...(PERSONAL[user ? user.name : ''] || [])];
-    el.textContent = pool[Math.floor(Math.random() * pool.length)];
-  }
+function render() {
+  const user = Auth.getCurrentUser();
+  const el = document.getElementById('greeting-text');
+  if (!el) return;
 
-  function init() {
-    window.addEventListener('portal:auth', render);
-    window.addEventListener('portal:view', (e) => {
-      if (/** @type {any} */ (e).detail.view === 'home') render();
-    });
-  }
+  const pool = [...COMMON, ...(PERSONAL[user ? user.name : ''] || [])];
+  el.textContent = pool[Math.floor(Math.random() * pool.length)];
+}
 
-  return { init, render };
-})();
+function init() {
+  window.addEventListener('portal:auth', render);
+  window.addEventListener('portal:view', (e) => {
+    if (/** @type {any} */ (e).detail.view === 'home') render();
+  });
+}
+
+export const Greeting = { init, render };
