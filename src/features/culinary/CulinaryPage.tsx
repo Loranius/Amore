@@ -1,0 +1,37 @@
+// ============================================================
+// CulinaryPage — «Кулінарія» (порт вкладок random.js)
+// ------------------------------------------------------------
+// Дві сабвкладки: Конструктор (AI-майстер) і Улюблені (пул страв).
+// ============================================================
+import { useState } from 'react';
+import { Constructor } from './Constructor';
+import { Favorites } from './Favorites';
+
+type Tab = 'constructor' | 'favorites';
+
+export function CulinaryPage() {
+  const [tab, setTab] = useState<Tab>('constructor');
+
+  return (
+    <section className="culinary">
+      <div className="cul-tabs">
+        <button
+          type="button"
+          className={`cul-tab${tab === 'constructor' ? ' active' : ''}`}
+          onClick={() => setTab('constructor')}
+        >
+          🔮 Конструктор
+        </button>
+        <button
+          type="button"
+          className={`cul-tab${tab === 'favorites' ? ' active' : ''}`}
+          onClick={() => setTab('favorites')}
+        >
+          ❤️ Улюблені
+        </button>
+      </div>
+
+      {tab === 'constructor' ? <Constructor /> : <Favorites />}
+    </section>
+  );
+}
