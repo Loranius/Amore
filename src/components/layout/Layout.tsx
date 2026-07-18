@@ -32,7 +32,8 @@ export function Layout() {
   return (
     <div className="app-shell">
       <div className="bg-video-layer" aria-hidden="true">
-        <video src="/bg-loop.mp4" autoPlay muted loop playsInline />
+        {/* BASE_URL — щоб шлях працював і під підкаталогом (GitHub Pages /Amore/) */}
+        <video src={`${import.meta.env.BASE_URL}bg-loop.mp4`} autoPlay muted loop playsInline />
       </div>
 
       <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
