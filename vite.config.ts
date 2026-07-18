@@ -36,7 +36,7 @@ export default defineConfig({
       },
       workbox: {
         // game.html — окремий документ в iframe; хай кешується як навігація.
-        navigateFallbackDenylist: [/^\/game\.html$/],
+        maximumFileSizeToCacheInBytes: 5000000,
         runtimeCaching: [
           {
             // Публічні фото зі Storage — cache-first, вони незмінні за URL.
