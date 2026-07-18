@@ -90,6 +90,8 @@ export function MediaPage() {
       {type !== 'book' && (
         <div className="media-search-wrap">
           <input
+            id="media-search"
+            name="search"
             type="text"
             className="media-search-inp"
             placeholder="Пошук на TMDB…"

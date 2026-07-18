@@ -79,6 +79,8 @@ export function ShoppingPage() {
       {/* Введення */}
       <div className="sl-input-row">
         <input
+          id="shopping-input"
+          name="input"
           type="text"
           className="sl-input"
           placeholder="Молоко, хліб, 2 яблука…"

@@ -168,7 +168,7 @@ function CityModal({
         <h2 className="modal-title">Де ви зараз?</h2>
         <label className="form-field">
           <span>Область</span>
-          <select value={region} onChange={(e) => setRegion(e.target.value)}>
+          <select id="wt-region" name="region" value={region} onChange={(e) => setRegion(e.target.value)}>
             {OBLASTS.map((o) => (
               <option key={o} value={o}>
                 {o}
@@ -179,6 +179,8 @@ function CityModal({
         <label className="form-field">
           <span>Місто</span>
           <input
+            id="wt-city"
+            name="city"
             type="text"
             value={city}
             onChange={(e) => setCity(e.target.value)}

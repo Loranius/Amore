@@ -98,12 +98,14 @@ export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFor
 
         <label className="form-field">
           <span>Назва *</span>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          <input id="wish-title" name="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
         </label>
 
         <label className="form-field">
           <span>Посилання</span>
           <input
+            id="wish-link"
+            name="link"
             type="url"
             placeholder="https://…"
             value={link}
@@ -125,6 +127,8 @@ export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFor
               <label className="btn-secondary">
                 🖼 Обрати з пристрою
                 <input
+                  id="wish-photo-file"
+                  name="photoFile"
                   type="file"
                   accept="image/*,.heic,.heif"
                   hidden
@@ -143,6 +147,8 @@ export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFor
             </div>
           </div>
           <input
+            id="wish-image-url"
+            name="imageUrl"
             type="url"
             placeholder="або встав посилання на фото"
             value={imgUrl}
@@ -154,6 +160,8 @@ export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFor
         <label className="form-field">
           <span>Орієнтовна ціна, ₴</span>
           <input
+            id="wish-price"
+            name="price"
             type="number"
             min="0"
             placeholder="0"
@@ -165,6 +173,8 @@ export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFor
         <label className="form-field">
           <span>Пріоритет</span>
           <select
+            id="wish-priority"
+            name="priority"
             value={priority}
             onChange={(e) => setPriority(e.target.value as WishPriority | '')}
           >
@@ -178,6 +188,8 @@ export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFor
         <label className="form-field">
           <span>Коментар / деталі</span>
           <textarea
+            id="wish-description"
+            name="description"
             rows={2}
             placeholder="Розмір, колір, деталі…"
             value={description}

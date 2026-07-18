@@ -50,6 +50,8 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
         <label className="form-field">
           <span>Назва</span>
           <input
+            id="pin-title"
+            name="title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -80,6 +82,8 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
         <div className="form-field">
           <span>Фото місця</span>
           <input
+            id="pin-photo-file"
+            name="photoFile"
             type="file"
             accept="image/*,.heic,.heif"
             onChange={(e) => {
@@ -92,7 +96,7 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
 
         <label className="form-field">
           <span>Нотатка</span>
-          <textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Враження, деталі…" />
+          <textarea id="pin-note" name="note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Враження, деталі…" />
         </label>
 
         <p className="pin-coords">📌 {lat.toFixed(4)}, {lng.toFixed(4)}</p>

@@ -75,6 +75,8 @@ export function ReviewPanel({ item, preselect = 'dima', onClose, onSave }: Revie
         <label className="form-field">
           <span>Коментар</span>
           <textarea
+            id="media-review-comment"
+            name="comment"
             rows={3}
             placeholder="Враження, думки…"
             value={comment}

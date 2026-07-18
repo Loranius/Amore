@@ -135,6 +135,8 @@ export function DishModal({ dish, onClose, onAdd, onEdit }: DishModalProps) {
         <label className="form-field">
           <span>Назва страви</span>
           <input
+            id="dish-title"
+            name="title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -172,8 +174,10 @@ export function DishModal({ dish, onClose, onAdd, onEdit }: DishModalProps) {
 
           {showRecipe && (
             <div className="rcp-editor">
-              <label>Порції</label>
+              <label htmlFor="dish-servings">Порції</label>
               <input
+                id="dish-servings"
+                name="servings"
                 type="number"
                 min={1}
                 max={20}
@@ -186,12 +190,16 @@ export function DishModal({ dish, onClose, onAdd, onEdit }: DishModalProps) {
               {rows.map((r, idx) => (
                 <div key={idx} className="rcp-ing-row">
                   <input
+                    id={`dish-ing-name-${idx}`}
+                    name={`ingredientName-${idx}`}
                     className="rcp-ing-name"
                     placeholder="Інгредієнт"
                     value={r.name}
                     onChange={(e) => updateRow(idx, { name: e.target.value })}
                   />
                   <input
+                    id={`dish-ing-amount-${idx}`}
+                    name={`ingredientAmount-${idx}`}
                     className="rcp-ing-amount"
                     placeholder="200"
                     inputMode="decimal"
@@ -199,6 +207,8 @@ export function DishModal({ dish, onClose, onAdd, onEdit }: DishModalProps) {
                     onChange={(e) => updateRow(idx, { amount: e.target.value })}
                   />
                   <select
+                    id={`dish-ing-unit-${idx}`}
+                    name={`ingredientUnit-${idx}`}
                     className="rcp-ing-unit"
                     value={r.unit}
                     onChange={(e) => updateRow(idx, { unit: e.target.value })}
@@ -223,10 +233,12 @@ export function DishModal({ dish, onClose, onAdd, onEdit }: DishModalProps) {
                 + Інгредієнт
               </button>
 
-              <label>
+              <label htmlFor="dish-steps">
                 Приготування <span className="rcp-hint">(один крок — один рядок)</span>
               </label>
               <textarea
+                id="dish-steps"
+                name="steps"
                 rows={5}
                 value={stepsText}
                 onChange={(e) => setStepsText(e.target.value)}

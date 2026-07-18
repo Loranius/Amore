@@ -115,22 +115,39 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* ── Нижня навігація (мобільна) ─────────────────────────────── */
+/* ── Нижня навігація (мобільна) — плаваюча пігулка ──────────── */
 .bottom-nav {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: 14px;
+  right: 14px;
+  bottom: calc(env(safe-area-inset-bottom, 0) + 14px);
   z-index: 50;
+  padding: 8px;
+  border-radius: 32px;
+  background: var(--surface);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+}
+.bottom-nav-inner {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-around;
   gap: 4px;
-  padding: 8px 10px calc(env(safe-area-inset-bottom, 0) + 8px);
-  background: var(--surface);
-  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.bottom-nav-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 0;
 }
 .nav-btn {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
   appearance: none;
   border: 0;
   background: transparent;
@@ -141,7 +158,7 @@ body {
   align-items: center;
   gap: 2px;
   padding: 6px 10px;
-  border-radius: 12px;
+  border-radius: 22px;
   cursor: pointer;
   text-decoration: none;
 }
@@ -199,17 +216,27 @@ body {
   .bottom-nav { display: none; }
 }
 
-/* ── Хаби (сабтаби) ─────────────────────────────────────────── */
+/* ── Хаби (сабтаби) — сегментований контрол зі слайд-індикатором */
 .hub-tabs {
-  display: flex;
-  gap: 6px;
+  display: inline-flex;
+  max-width: 100%;
   margin-bottom: 16px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface);
   overflow-x: auto;
 }
+.hub-tabs-track {
+  position: relative;
+  display: flex;
+  gap: 2px;
+}
 .hub-tab {
+  position: relative;
+  z-index: 1;
   appearance: none;
   border: 0;
-  background: var(--surface);
+  background: transparent;
   color: var(--muted);
   font: inherit;
   padding: 8px 14px;
@@ -217,8 +244,17 @@ body {
   white-space: nowrap;
   cursor: pointer;
   text-decoration: none;
+  transition: color 0.3s ease;
 }
-.hub-tab.active { background: var(--accent); color: #fff; }
+.hub-tab.active { color: #fff; }
+.hub-tabs-indicator {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 0;
+}
 
 /* ── Меню «Ще» (шторка) ─────────────────────────────────────── */
 .more-menu-overlay {
@@ -1735,8 +1771,9 @@ a.wl-card-title { color: var(--accent); }
   background: var(--glass-bg-strong);
   backdrop-filter: blur(24px) saturate(180%);
   -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-top: 1px solid var(--glass-border);
+  border: 1px solid var(--glass-border);
 }
+.bottom-nav-indicator { background: rgba(255, 255, 255, 0.28); }
 .nav-btn { color: var(--glass-text-muted); }
 .nav-btn.active { color: #fff; }
 .nav-btn-home .nav-icon-home { color: #fff; }
@@ -1755,18 +1792,18 @@ a.wl-card-title { color: var(--accent); }
   color: #fff;
 }
 
-/* ── Хаб-таби (Календар / Ми) → скляні пігулки ──────────────── */
-.hub-tab {
+/* ── Хаб-таби (Календар / Ми) → скляний сегментований контрол ─ */
+.hub-tabs {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   backdrop-filter: blur(16px) saturate(180%);
   -webkit-backdrop-filter: blur(16px) saturate(180%);
-  color: var(--glass-text-muted);
 }
-.hub-tab.active {
-  background: rgba(255, 255, 255, 0.85);
-  color: #2a2030;
-  border-color: transparent;
+.hub-tab { color: var(--glass-text-muted); }
+.hub-tab.active { color: #2a2030; }
+.hub-tabs-indicator {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
 }
 
 /* ── Меню «Ще» → скло ───────────────────────────────────────── */

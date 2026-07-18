@@ -76,15 +76,17 @@ export function AddEventModal({
 
       <label className="form-field">
         <span>Назва</span>
-        <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+        <input id="event-title" name="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
       </label>
       <label className="form-field">
         <span>Дата</span>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input id="event-date" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </label>
       <label className="form-field">
         <span>Опис (необов'язково)</span>
         <textarea
+          id="event-description"
+          name="description"
           rows={2}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -92,7 +94,7 @@ export function AddEventModal({
         />
       </label>
       <label className="cal-yearly-toggle">
-        <input type="checkbox" checked={yearly} onChange={(e) => setYearly(e.target.checked)} />
+        <input id="event-yearly" name="yearly" type="checkbox" checked={yearly} onChange={(e) => setYearly(e.target.checked)} />
         <span>Повторюється щороку</span>
       </label>
 
@@ -154,6 +156,8 @@ export function AddPlanModal({
       <label className="form-field">
         <span>Назва</span>
         <input
+          id="plan-title"
+          name="title"
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -163,11 +167,13 @@ export function AddPlanModal({
       </label>
       <label className="form-field">
         <span>Дата / дедлайн</span>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input id="plan-date" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
       </label>
       <label className="form-field">
         <span>Нотатка (необов'язково)</span>
         <textarea
+          id="plan-note"
+          name="note"
           rows={2}
           value={note}
           onChange={(e) => setNote(e.target.value)}

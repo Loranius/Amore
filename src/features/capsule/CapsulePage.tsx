@@ -143,6 +143,8 @@ function CapsuleModal({
         <label className="form-field">
           <span>Назва</span>
           <input
+            id="capsule-title"
+            name="title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -152,11 +154,13 @@ function CapsuleModal({
         </label>
         <label className="form-field">
           <span>Дата відкриття</span>
-          <input type="date" value={openDate} onChange={(e) => setOpenDate(e.target.value)} />
+          <input id="capsule-open-date" name="openDate" type="date" value={openDate} onChange={(e) => setOpenDate(e.target.value)} />
         </label>
         <label className="form-field">
           <span>Текст листа</span>
           <textarea
+            id="capsule-content"
+            name="content"
             rows={5}
             value={content}
             onChange={(e) => setContent(e.target.value)}
