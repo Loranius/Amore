@@ -1,0 +1,71 @@
+name: Deploy to GitHub Pages
+
+# Автодеплой при пуші в main + ручний запуск із вкладки Actions.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Права, потрібні офіційним Pages-екшенам.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Не даємо паралельним деплоям накладатись; поточний не переривається.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # base для Vite: кореневий репо <user>.github.io → '/', інакше '/<repo>/'.
+      - name: Compute base path
+        id: base
+        run: |
+          if [[ "${{ github.event.repository.name }}" == *.github.io ]]; then
+            echo "base=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=/${{ github.event.repository.name }}/" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `npm run build` = `tsc -b && vite build`, тож тут же проганяється
+      # повний тайпчек. VITE_*-секрети вшиваються у бандл на цьому кроці.
+      - name: Build
+        run: npm run build
+        env:
+          BASE_PATH: ${{ steps.base.outputs.base }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_TMDB_KEY: ${{ secrets.VITE_TMDB_KEY }}
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
