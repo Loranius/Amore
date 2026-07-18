@@ -31,6 +31,10 @@ export function Layout() {
 
   return (
     <div className="app-shell">
+      <div className="bg-video-layer" aria-hidden="true">
+        <video src="/bg-loop.mp4" autoPlay muted loop playsInline />
+      </div>
+
       <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
 
       <main className="content">
