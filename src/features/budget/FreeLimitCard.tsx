@@ -42,6 +42,8 @@ export function FreeLimitCard() {
 
       <div className="fin-slider-display">{fmtMoney(sliderVal)}</div>
       <input
+        id="free-limit-slider"
+        name="freeLimit"
         type="range"
         className="fin-slider"
         min={SLIDER_MIN}

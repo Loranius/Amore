@@ -155,19 +155,19 @@ function AddGoalModal({
         <h2 className="modal-title">Спільна ціль</h2>
         <label className="form-field">
           <span>Назва</span>
-          <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Що плануємо?" autoFocus />
+          <input id="goal-name" name="name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Що плануємо?" autoFocus />
         </label>
         <label className="form-field">
           <span>Навіщо</span>
-          <input type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Опис" />
+          <input id="goal-description" name="description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Опис" />
         </label>
         <label className="form-field">
           <span>Вартість, ₴</span>
-          <input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />
+          <input id="goal-price" name="price" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />
         </label>
         <label className="form-field">
           <span>Посилання</span>
-          <input type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
+          <input id="goal-url" name="url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
         </label>
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
@@ -212,6 +212,8 @@ function AddFundsModal({
         <label className="form-field">
           <span>Сума внеску, ₴</span>
           <input
+            id="goal-funds-amount"
+            name="amount"
             type="number"
             min={0}
             value={amount}

@@ -46,6 +46,8 @@ export function EditItemModal({ item, onClose, onSave }: EditItemModalProps) {
         <label className="form-field">
           <span>Назва</span>
           <input
+            id="shopping-item-title"
+            name="title"
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -56,6 +58,8 @@ export function EditItemModal({ item, onClose, onSave }: EditItemModalProps) {
         <label className="form-field">
           <span>Кількість / примітка</span>
           <input
+            id="shopping-item-qty"
+            name="qty"
             type="text"
             placeholder="напр. 2 л, десяток"
             value={qty}
@@ -66,6 +70,8 @@ export function EditItemModal({ item, onClose, onSave }: EditItemModalProps) {
         <label className="form-field">
           <span>Категорія</span>
           <select
+            id="shopping-item-category"
+            name="category"
             value={category}
             onChange={(e) => setCategory(toShoppingCategory(e.target.value))}
           >

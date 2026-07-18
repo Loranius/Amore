@@ -15,6 +15,11 @@ export interface NavItem {
   end?: boolean;
 }
 
+/** Чи активний пункт навігації для поточного шляху (для NavLink-сумісної підсвітки поза NavLink). */
+export function isNavItemActive(item: NavItem, pathname: string): boolean {
+  return item.end ? pathname === item.to : pathname === item.to || pathname.startsWith(item.to + '/');
+}
+
 /** Ліва пара нижньої навігації (до центральної кнопки «дім»). */
 export const BOTTOM_LEFT: NavItem[] = [
   { to: '/wishlist', icon: '♡', label: 'Wishlist' },
@@ -45,6 +50,7 @@ export const MORE_ITEMS: NavItem[] = [
 
 /** Шляхи, які мають підсвічувати кнопку «Ще» в нижній навігації. */
 export const MORE_PREFIXES: string[] = MORE_ITEMS.map((i) => i.to);
+
 
 /** Сабтаби хабу «Календар» (/calendar). */
 export const CALENDAR_TABS: NavItem[] = [

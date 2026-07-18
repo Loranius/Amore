@@ -100,10 +100,10 @@ export function PhotoDayModal({
                     alt=""
                     onClick={() => onPhotoClick(myPhoto.photo_url)}
                   />
-                  <FilePicker label="Замінити фото" onPick={pickFile} />
+                  <FilePicker id="pcal-photo-replace" label="Замінити фото" onPick={pickFile} />
                 </>
               ) : (
-                <FilePicker label="📷 Додати фото" big onPick={pickFile} />
+                <FilePicker id="pcal-photo-add" label="📷 Додати фото" big onPick={pickFile} />
               )}
             </div>
           </div>
@@ -137,6 +137,8 @@ export function PhotoDayModal({
         {myPhoto && !pendingFile && (
           <div className="pcal-comment-block">
             <input
+              id="pcal-comment"
+              name="comment"
               type="text"
               placeholder="Коментар до твого фото…"
               value={comment}
@@ -157,6 +159,8 @@ export function PhotoDayModal({
           <div className="pcal-upload-form">
             {previewSrc && <img className="pcal-preview-img" src={previewSrc} alt="" />}
             <input
+              id="pcal-new-comment"
+              name="newComment"
               type="text"
               placeholder="Коментар (необов'язково)"
               value={newComment}
@@ -187,10 +191,12 @@ export function PhotoDayModal({
 }
 
 function FilePicker({
+  id,
   label,
   big = false,
   onPick,
 }: {
+  id: string;
   label: string;
   big?: boolean;
   onPick: (file: File) => void;
@@ -199,6 +205,8 @@ function FilePicker({
     <label className={big ? 'pcal-upload-btn' : 'pcal-replace-btn'}>
       {label}
       <input
+        id={id}
+        name={id}
         type="file"
         accept="image/*,.heic,.heif"
         hidden

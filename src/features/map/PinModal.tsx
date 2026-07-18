@@ -61,7 +61,7 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
         <div className="pin-view-body">
           <label className="form-field">
             <span>Назва</span>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
+            <input id="pin-edit-title" name="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
           </label>
 
           <div className="form-field">
@@ -84,6 +84,8 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
           <label className="form-field">
             <span>Враження</span>
             <textarea
+              id="pin-edit-review"
+              name="review"
               rows={3}
               value={review}
               onChange={(e) => setReview(e.target.value)}
@@ -95,6 +97,8 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
           <label className="form-field">
             <span>Замінити фото</span>
             <input
+              id="pin-edit-photo-file"
+              name="photoFile"
               type="file"
               accept="image/*,.heic,.heif"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}

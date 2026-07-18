@@ -163,6 +163,8 @@ export function MapPage() {
     <section className="map">
       <div className="map-search-wrap">
         <input
+          id="map-search"
+          name="search"
           type="text"
           className="map-search-inp"
           placeholder="Пошук місця або фільтр збережених…"

@@ -38,7 +38,7 @@ export function MediaFormModal({ type, item, onClose, onAdd, onEdit }: MediaForm
 
         <label className="form-field">
           <span>Назва</span>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          <input id="media-title" name="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
         </label>
 
         {item?.poster_url && (
@@ -48,6 +48,8 @@ export function MediaFormModal({ type, item, onClose, onAdd, onEdit }: MediaForm
         <label className="form-field">
           <span>{isEdit ? 'Замінити постер' : 'Постер (фото)'}</span>
           <input
+            id="media-poster-file"
+            name="posterFile"
             type="file"
             accept="image/*,.heic,.heif"
             onChange={(e) => setFile(e.target.files?.[0])}
@@ -56,7 +58,7 @@ export function MediaFormModal({ type, item, onClose, onAdd, onEdit }: MediaForm
 
         <label className="form-field">
           <span>Статус</span>
-          <select value={status} onChange={(e) => setStatus(e.target.value as MediaStatus)}>
+          <select id="media-status" name="status" value={status} onChange={(e) => setStatus(e.target.value as MediaStatus)}>
             {statusEntries(type).map(([val, label]) => (
               <option key={val} value={val}>
                 {label}
