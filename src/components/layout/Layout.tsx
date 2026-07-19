@@ -38,7 +38,6 @@ export function Layout() {
   const { pathname } = useLocation();
 
   const contentRef = useRef<HTMLElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0 });
@@ -48,30 +47,8 @@ export function Layout() {
     if (contentRef.current) contentRef.current.style.overflowY = moreOpen || settingsOpen ? 'hidden' : '';
   }, [moreOpen, settingsOpen]);
 
-  useEffect(() => {
-    // iOS іноді ставить фонове відео на паузу (перехід у бекграунд,
-    // Low Power Mode) і не відновлює його само після повернення.
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') videoRef.current?.play().catch(() => {});
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
-
   return (
     <div className="app-shell">
-      <div className="bg-video-layer" aria-hidden="true">
-        {/* BASE_URL — щоб шлях працював і під підкаталогом (GitHub Pages /Amore/) */}
-        <video
-          ref={videoRef}
-          src={`${import.meta.env.BASE_URL}bg-loop.mp4`}
-          autoPlay
-          muted
-          loop
-          playsInline
-        />
-      </div>
-
       <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
 
       <main className="content" ref={contentRef}>

@@ -1,13 +1,19 @@
 // ============================================================
-// LoginPage — вибір користувача + PIN (порт auth-екрану)
+// LoginPage — вибір користувача + PIN («Pink Portal» дизайн)
 // ------------------------------------------------------------
-// Робочий каркас Кроку 3: тягне список користувачів через React
-// Query, викликає useAuth().login(). Візуальне полірування пін-паду —
-// у Кроці 4, але флоу (вибір → 8 цифр → locked/invalid) уже живий.
+// Флоу лишається тим самим (вибір → 8 цифр → успіх/помилка/locked),
+// лише візуал: градієнтний рожевий фон з декором (PortalDecor),
+// картка зі склом, Fredoka/Nunito. "Портал відкрито"-екран з
+// хендофу свідомо не реалізований: RedirectIfAuthed одразу
+// перемикає на / щойно useAuth().status стає 'authenticated' —
+// щоб показати проміжний celebratory-екран, довелось би штучно
+// затримувати сам редірект в auth-гварді, а це вже зміна
+// безпекочутливого флоу входу, не суто візуальна правка.
 // ============================================================
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useUsers } from '@/features/_shared/useUsers';
+import { PortalDecor } from './PortalDecor';
 import type { AppUser } from '@/types';
 
 export function LoginPage() {
@@ -17,6 +23,13 @@ export function LoginPage() {
   const [selected, setSelected] = useState<AppUser | null>(null);
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
+
+  useEffect(() => {
+    if (!shake) return;
+    const t = setTimeout(() => setShake(false), 400);
+    return () => clearTimeout(t);
+  }, [shake]);
 
   const submit = async (userId: number, fullPin: string) => {
     const res = await login(userId, fullPin);
@@ -27,6 +40,7 @@ export function LoginPage() {
     } else {
       setError('Невірний PIN, спробуй ще');
     }
+    setShake(true);
     setPin('');
   };
 
@@ -38,11 +52,19 @@ export function LoginPage() {
     if (next.length === 8) void submit(selected.id, next);
   };
 
-  if (isPending) return <div className="auth-screen">Завантаження…</div>;
+  if (isPending) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">Завантаження…</div>
+      </div>
+    );
+  }
   if (isError) {
     return (
       <div className="auth-screen">
-        <p className="empty-state">Не вдалось завантажити користувачів. Перевір Supabase.</p>
+        <div className="auth-card">
+          <p className="empty-state">Не вдалось завантажити користувачів. Перевір Supabase.</p>
+        </div>
       </div>
     );
   }
@@ -50,22 +72,26 @@ export function LoginPage() {
   if (!selected) {
     return (
       <div className="auth-screen">
-        <h1 className="auth-title">Хто ти?</h1>
-        <div className="user-select">
-          {users?.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              className="user-btn"
-              onClick={() => {
-                setSelected(u);
-                setPin('');
-                setError(null);
-              }}
-            >
-              {u.name}
-            </button>
-          ))}
+        <PortalDecor />
+        <div className="auth-card">
+          <div className="auth-kicker">Amore</div>
+          <h1 className="auth-title">Хто сьогодні заходить у портал? 💗</h1>
+          <div className="user-select">
+            {users?.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                className="user-btn"
+                onClick={() => {
+                  setSelected(u);
+                  setPin('');
+                  setError(null);
+                }}
+              >
+                {u.name}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -73,48 +99,52 @@ export function LoginPage() {
 
   return (
     <div className="auth-screen">
-      <h1 className="auth-title">{selected.name}</h1>
+      <PortalDecor />
+      <div className={`auth-card${shake ? ' shake' : ''}`}>
+        <div className="auth-kicker">Amore</div>
+        <h1 className="auth-title">{selected.name}</h1>
 
-      <div className="pin-dots" aria-hidden="true">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <span
-            key={i}
-            className={`pin-dot${i < pin.length ? ' filled' : ''}${error ? ' error' : ''}`}
-          />
-        ))}
-      </div>
-      {error && <p className="pin-error">{error}</p>}
+        <div className="pin-dots" aria-hidden="true">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <span
+              key={i}
+              className={`pin-dot${i < pin.length ? ' filled' : ''}${error ? ' error' : ''}`}
+            />
+          ))}
+        </div>
+        {error && <p className="pin-error">{error}</p>}
 
-      <div className="pin-pad">
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-          <button key={d} type="button" className="pin-key" onClick={() => press(d)}>
-            {d}
+        <div className="pin-pad">
+          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
+            <button key={d} type="button" className="pin-key" onClick={() => press(d)}>
+              {d}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="pin-key pin-key--dim"
+            onClick={() => {
+              setSelected(null);
+              setPin('');
+              setError(null);
+            }}
+          >
+            ‹
           </button>
-        ))}
-        <button
-          type="button"
-          className="pin-key"
-          onClick={() => {
-            setSelected(null);
-            setPin('');
-            setError(null);
-          }}
-        >
-          ‹
-        </button>
-        <button type="button" className="pin-key" onClick={() => press('0')}>
-          0
-        </button>
-        <button
-          type="button"
-          className="pin-key"
-          onClick={() => {
-            setPin('');
-            setError(null);
-          }}
-        >
-          ✕
-        </button>
+          <button type="button" className="pin-key" onClick={() => press('0')}>
+            0
+          </button>
+          <button
+            type="button"
+            className="pin-key pin-key--dim"
+            onClick={() => {
+              setPin('');
+              setError(null);
+            }}
+          >
+            ✕
+          </button>
+        </div>
       </div>
     </div>
   );
