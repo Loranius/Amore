@@ -943,10 +943,12 @@ textarea {
   cursor: pointer;
 }
 .wl-sub-btn.active { background: var(--accent); color: #fff; }
+.wl-sub-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .wl-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .wl-head .btn { flex: 0 0 auto; padding: 8px 16px; }
 .wl-title { margin: 0; font-size: 20px; }
+.wl-year-stat { margin: 8px 0 0; font-size: 13px; color: var(--muted); text-align: center; }
 
 .wishlist-grid {
   display: grid;
@@ -1343,6 +1345,27 @@ a.wl-card-title { color: var(--accent); }
 .sched-cell-letter { font-size: 15px; font-weight: 700; min-height: 18px; }
 .sched-cell-letter--work { color: #4a86e8; }
 .sched-cell-letter--off { color: var(--accent); }
+
+/* Теплова карта спільних вихідних (Календар → Спільні вихідні) */
+.heat-summary { text-align: center; font-size: 14px; color: var(--text); margin: 0 0 10px; }
+.heat-cell--both-off { background: color-mix(in srgb, #3fae56 55%, transparent); }
+.heat-cell--one-off { background: color-mix(in srgb, #e0b23f 45%, transparent); }
+.heat-cell--none-off { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.heat-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.heat-swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+.heat-swatch--both-off { background: #3fae56; }
+.heat-swatch--one-off { background: #e0b23f; }
+.heat-swatch--none-off { background: color-mix(in srgb, var(--text) 18%, transparent); }
+.heat-hint { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
 /* Фото-календар */
 .pcal-cell {

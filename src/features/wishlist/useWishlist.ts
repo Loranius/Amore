@@ -33,7 +33,7 @@ export { usePartner };
 
 // ── Запити ───────────────────────────────────────────────────
 const ACTIVE_COLS =
-  'id,title,description,link,image_url,gift_date,owner,reserved,reserved_by,price,priority,fulfilled,fulfilled_by,fulfilled_at';
+  'id,title,description,link,image_url,gift_date,owner,is_shared,reserved,reserved_by,price,priority,fulfilled,fulfilled_by,fulfilled_at';
 
 export function useWishlistItems(ownerId: number | null) {
   return useQuery({
@@ -44,11 +44,51 @@ export function useWishlistItems(ownerId: number | null) {
         .from('wishlist_items')
         .select(ACTIVE_COLS)
         .eq('owner', ownerId!)
+        .eq('is_shared', false)
         .or('fulfilled.is.null,fulfilled.eq.false')
         .order('id', { ascending: false })
         .returns<WishlistItemRow[]>();
       if (error) throw error;
       return data ?? [];
+    },
+  });
+}
+
+/** Спільні бажання («Спільне») — видимі обом, незалежно від owner. */
+export function useSharedWishlistItems() {
+  return useQuery({
+    queryKey: qk.wishlistShared(),
+    queryFn: async (): Promise<WishlistItemRow[]> => {
+      const { data, error } = await supabase
+        .from('wishlist_items')
+        .select(ACTIVE_COLS)
+        .eq('is_shared', true)
+        .or('fulfilled.is.null,fulfilled.eq.false')
+        .order('id', { ascending: false })
+        .returns<WishlistItemRow[]>();
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+/** Прогрес пари: скільки бажань (усіх, обох) виконано загалом і цього року. */
+export function useCoupleWishStats() {
+  return useQuery({
+    queryKey: qk.wishlistStats(),
+    queryFn: async (): Promise<{ total: number; done: number; doneThisYear: number }> => {
+      const { data, error } = await supabase
+        .from('wishlist_items')
+        .select('fulfilled,fulfilled_at')
+        .returns<{ fulfilled: boolean; fulfilled_at: string | null }[]>();
+      if (error) throw error;
+      const rows = data ?? [];
+      const thisYear = new Date().getFullYear();
+      const done = rows.filter((r) => r.fulfilled).length;
+      const doneThisYear = rows.filter(
+        (r) => r.fulfilled && r.fulfilled_at && new Date(r.fulfilled_at).getFullYear() === thisYear,
+      ).length;
+      return { total: rows.length, done, doneThisYear };
     },
   });
 }
@@ -111,7 +151,7 @@ export function useWishlistMutations(ownerId: number | null) {
   const me = useCurrentUser();
   const toast = useToast();
   const { data: users } = useUsers();
-  const key = qk.wishlist(ownerId ?? -1);
+  const key = ownerId !== null ? qk.wishlist(ownerId) : qk.wishlistShared();
 
   const snapshot = () => client.getQueryData<WishlistItemRow[]>(key);
   const rollback = (prev: WishlistItemRow[] | undefined) => {
@@ -122,8 +162,15 @@ export function useWishlistMutations(ownerId: number | null) {
   };
 
   // ДОДАТИ / РЕДАГУВАТИ (фото вантажиться в компоненті до виклику).
+  // owner/isShared — лише для створення (вибір «Моє/Для партнера/Спільне»);
+  // на редагуванні ігноруються, власність не міняється.
   const save = useMutation({
-    mutationFn: async (input: { id: number | null; payload: WishFormPayload }) => {
+    mutationFn: async (input: {
+      id: number | null;
+      payload: WishFormPayload;
+      owner?: number;
+      isShared?: boolean;
+    }) => {
       if (input.id !== null) {
         const { error } = await supabase
           .from('wishlist_items')
@@ -133,7 +180,8 @@ export function useWishlistMutations(ownerId: number | null) {
       } else {
         const row: InsertRow<'wishlist_items'> = {
           ...input.payload,
-          owner: me.id,
+          owner: input.owner ?? me.id,
+          is_shared: input.isShared ?? false,
           reserved: false,
           reserved_by: null,
           fulfilled: false,
