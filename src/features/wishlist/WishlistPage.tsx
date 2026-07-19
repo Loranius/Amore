@@ -9,8 +9,10 @@
 import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
+import { PortalDecor } from '@/features/auth/PortalDecor';
 import { WishCard } from './WishCard';
 import { WishFormModal } from './WishFormModal';
+import { MoveWishModal } from './MoveWishModal';
 import { WishArchive } from './WishArchive';
 import {
   usePartner,
@@ -43,10 +45,11 @@ export function WishlistPage() {
   const isPending = tab === 'shared' ? sharedPending : ownPending;
   const isError = tab === 'shared' ? sharedError : ownError;
 
-  const { save, remove, setReserved, fulfill } = useWishlistMutations(ownerId);
+  const { save, remove, setReserved, fulfill, changeScope } = useWishlistMutations(ownerId);
 
   const [editing, setEditing] = useState<WishlistItemRow | null>(null);
   const [adding, setAdding] = useState(false);
+  const [moving, setMoving] = useState<WishlistItemRow | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   const submit = (
@@ -74,7 +77,8 @@ export function WishlistPage() {
   const pct = stats && stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
 
   return (
-    <section className="wishlist">
+    <section className="wishlist pink-page">
+      <PortalDecor density="light" parallax={false} />
       <div className="wl-sub-tabs">
         <button
           type="button"
@@ -156,6 +160,7 @@ export function WishlistPage() {
                   onDelete={onDelete}
                   onReserve={onReserve}
                   onFulfill={onFulfill}
+                  onMove={setMoving}
                 />
               ))
             )}
@@ -176,6 +181,15 @@ export function WishlistPage() {
           }}
           onSubmit={submit}
           onPhotoClick={setLightbox}
+        />
+      )}
+
+      {moving && (
+        <MoveWishModal
+          item={moving}
+          partner={partner}
+          onClose={() => setMoving(null)}
+          onMove={(owner, isShared) => changeScope.mutate({ id: moving.id, owner, isShared })}
         />
       )}
 

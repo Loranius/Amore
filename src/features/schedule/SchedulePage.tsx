@@ -2,8 +2,10 @@
 // SchedulePage — «Графік» (порт schedule.js UI)
 // ------------------------------------------------------------
 // Дошка на кожного користувача; тап циклічно міняє позначку лише в
-// режимі редагування (захист від випадкових тапів). Спільний вихідний
-// (обидва «Х») підсвічується серцем.
+// режимі редагування (захист від випадкових тапів). Кожна клітинка
+// пофарбована за статусом дня (обоє вільні / один вільний / зайняті) —
+// те саме кольорове кодування, що раніше було на окремій тепловій
+// карті «Спільні вихідні» в Календарі (звідти й перенесене сюди).
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
@@ -20,6 +22,8 @@ import {
 import { useSchedule, useScheduleMutation, MARK_CYCLE, type MarksMap } from './useSchedule';
 import type { AppUser } from '@/types';
 
+type DayStatus = 'both-off' | 'one-off' | 'none-off';
+
 export function SchedulePage() {
   const { data: users = [] } = useUsers();
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
@@ -31,16 +35,22 @@ export function SchedulePage() {
   const total = daysInMonth(yr, mo);
   const today = todayLocal();
 
-  // Дати, де в ОБОХ стоїть «Х» — спільний вихідний.
-  const commonOff = useMemo(() => {
-    const set = new Set<string>();
-    if (users.length < 2) return set;
+  // Статус кожного дня за кількістю «Х»: обоє/один/жоден.
+  const statusOf = useMemo(() => {
+    const map = new Map<string, DayStatus>();
     for (let d = 1; d <= total; d++) {
       const ds = ymd(yr, mo, d);
-      if (users.every((u) => marks[u.id]?.[ds] === 'Х')) set.add(ds);
+      const offCount = users.filter((u) => marks[u.id]?.[ds] === 'Х').length;
+      map.set(ds, offCount >= 2 ? 'both-off' : offCount === 1 ? 'one-off' : 'none-off');
     }
-    return set;
+    return map;
   }, [users, marks, yr, mo, total]);
+
+  const bothOffCount = useMemo(() => {
+    let n = 0;
+    for (const s of statusOf.values()) if (s === 'both-off') n++;
+    return n;
+  }, [statusOf]);
 
   const onCell = (userId: number, date: string, current: string) => {
     if (!editMode || mutation.isPending) return;
@@ -71,6 +81,12 @@ export function SchedulePage() {
         </button>
       </div>
 
+      {users.length >= 2 && bothOffCount > 0 && (
+        <p className="heat-summary">
+          💚 {bothOffCount} {bothOffCount === 1 ? 'спільний вихідний' : 'спільних вихідних'} цього місяця
+        </p>
+      )}
+
       <button
         type="button"
         className={`sched-edit-toggle${editMode ? ' is-active' : ''}`}
@@ -88,11 +104,19 @@ export function SchedulePage() {
             mo={mo}
             marks={marks}
             today={today}
-            commonOff={commonOff}
+            statusOf={statusOf}
             onCell={onCell}
           />
         ))}
       </div>
+
+      {users.length >= 2 && (
+        <div className="heat-legend">
+          <span><i className="heat-swatch heat-swatch--both-off" /> обоє вільні</span>
+          <span><i className="heat-swatch heat-swatch--one-off" /> один вільний</span>
+          <span><i className="heat-swatch heat-swatch--none-off" /> зайняті</span>
+        </div>
+      )}
     </section>
   );
 }
@@ -103,11 +127,11 @@ interface BoardProps {
   mo: number;
   marks: MarksMap;
   today: string;
-  commonOff: Set<string>;
+  statusOf: Map<string, DayStatus>;
   onCell: (userId: number, date: string, current: string) => void;
 }
 
-function Board({ user, yr, mo, marks, today, commonOff, onCell }: BoardProps) {
+function Board({ user, yr, mo, marks, today, statusOf, onCell }: BoardProps) {
   const total = daysInMonth(yr, mo);
   const offset = firstMondayOffset(yr, mo);
   const userMarks = marks[user.id] ?? {};
@@ -129,21 +153,21 @@ function Board({ user, yr, mo, marks, today, commonOff, onCell }: BoardProps) {
           const ds = ymd(yr, mo, day);
           const mark = userMarks[ds] ?? '';
           const isToday = ds === today;
-          const isCommon = commonOff.has(ds);
+          const status = statusOf.get(ds) ?? 'none-off';
           return (
             <button
               key={ds}
               type="button"
               className={
-                'sched-cell' +
-                (isToday ? ' sched-cell--today' : '') +
-                (isCommon ? ' sched-cell--common-off' : '')
+                'sched-cell heat-cell' +
+                ` heat-cell--${status}` +
+                (isToday ? ' sched-cell--today' : '')
               }
               onClick={() => onCell(user.id, ds, mark)}
             >
               <span className="sched-cell-num">
                 {day}
-                {isCommon && <span className="sched-cell-heart">♥</span>}
+                {status === 'both-off' && <span className="sched-cell-heart">♥</span>}
               </span>
               <span
                 className={

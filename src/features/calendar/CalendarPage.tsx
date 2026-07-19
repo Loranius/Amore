@@ -1,36 +1,32 @@
 // ============================================================
 // CalendarPage — «Події» (індекс хабу /calendar; порт renderEvents)
 // ------------------------------------------------------------
-// Фільтр по типу (Наші свята / Дні народження / Свята / Плани /
-// Спільні вихідні) — локальний стан, як старий activeTypeFilter.
-// «Плани» рендеряться окремою дошкою, «Спільні вихідні» — тепловою
-// картою (SharedDaysOffHeatmap, дані з work_schedule, не з events).
-// Кнопка «+» відкриває модалку події або плану (ховається на тепловій карті).
+// Фільтр по типу (Наші свята / Дні народження / Свята / Плани) —
+// локальний стан, як старий activeTypeFilter. «Плани» рендеряться
+// окремою дошкою. Кнопка «+» відкриває модалку події або плану.
+// (Раніше тут була ще й вкладка «Спільні вихідні» — теплова карта;
+// прибрано, кольорове оформлення перенесене на вкладку «Графік».)
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useEvents, useCalendarMutations } from './useCalendar';
 import { enrichEvent, sortEnriched } from './calendarUtils';
 import { EventList } from './EventList';
 import { PlansBoard } from './PlansBoard';
-import { SharedDaysOffHeatmap } from './SharedDaysOffHeatmap';
 import { AddEventModal, AddPlanModal } from './AddEventModal';
 import type { EventType } from '@/types';
 
-type Filter = EventType | 'shared-days-off';
-
-const TAB_DEFS: { type: Filter; label: string }[] = [
+const TAB_DEFS: { type: EventType; label: string }[] = [
   { type: 'anniversary', label: '💕 Наші свята' },
   { type: 'birthday', label: '🎂 Дні народження' },
   { type: 'holiday', label: '🎉 Свята' },
   { type: 'other', label: '🗺️ Плани' },
-  { type: 'shared-days-off', label: '🌿 Спільні вихідні' },
 ];
 
 export function CalendarPage() {
   const { data: events = [], isPending, isError } = useEvents();
   const { addEvent, addPlan, setPlanStatus, deleteEvent } = useCalendarMutations();
 
-  const [filter, setFilter] = useState<Filter>('anniversary');
+  const [filter, setFilter] = useState<EventType>('anniversary');
   const [modal, setModal] = useState<'event' | 'plan' | null>(null);
 
   const enriched = useMemo(
@@ -47,22 +43,19 @@ export function CalendarPage() {
     if (confirm('Видалити подію?')) deleteEvent.mutate(id);
   };
 
-  const isHeatmap = filter === 'shared-days-off';
-  const filtered = isHeatmap ? [] : enriched.filter((e) => (e.type ?? 'other') === filter);
+  const filtered = enriched.filter((e) => (e.type ?? 'other') === filter);
 
   return (
     <section className="calendar">
       <div className="cal-head">
         <h1>Календар</h1>
-        {!isHeatmap && (
-          <button
-            type="button"
-            className="btn"
-            onClick={() => setModal(filter === 'other' ? 'plan' : 'event')}
-          >
-            + Додати
-          </button>
-        )}
+        <button
+          type="button"
+          className="btn"
+          onClick={() => setModal(filter === 'other' ? 'plan' : 'event')}
+        >
+          + Додати
+        </button>
       </div>
 
       <div className="cal-type-filter-bar">
@@ -74,16 +67,12 @@ export function CalendarPage() {
             onClick={() => setFilter(def.type)}
           >
             {def.label}
-            {def.type !== 'shared-days-off' && (
-              <span className="cal-type-count">{counts[def.type]}</span>
-            )}
+            <span className="cal-type-count">{counts[def.type]}</span>
           </button>
         ))}
       </div>
 
-      {isHeatmap ? (
-        <SharedDaysOffHeatmap />
-      ) : isPending ? (
+      {isPending ? (
         <p className="empty-state">Завантаження…</p>
       ) : isError ? (
         <p className="empty-state">Не вдалось завантажити події.</p>

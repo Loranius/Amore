@@ -243,6 +243,20 @@ export function useWishlistMutations(ownerId: number | null) {
     onSettled: invalidateBoth,
   });
 
+  // ПЕРЕНЕСТИ (моє / партнеру / спільне) — на вже створеному бажанні,
+  // на відміну від owner/isShared у save (там це лише вибір при СТВОРЕННІ).
+  const changeScope = useMutation({
+    mutationFn: async (v: { id: number; owner: number; isShared: boolean }) => {
+      const { error } = await supabase
+        .from('wishlist_items')
+        .update({ owner: v.owner, is_shared: v.isShared })
+        .eq('id', v.id);
+      if (error) throw error;
+    },
+    onSuccess: invalidateBoth,
+    onError: (e) => toast.show('Не вдалось перенести бажання: ' + (e as Error).message),
+  });
+
   // ВИКОНАТИ БАЖАННЯ (+ db-notify + конфеті).
   const fulfill = useMutation({
     mutationFn: async (item: WishlistItemRow) => {
@@ -278,5 +292,5 @@ export function useWishlistMutations(ownerId: number | null) {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
-  return { save, remove, setReserved, fulfill };
+  return { save, remove, setReserved, fulfill, changeScope };
 }
