@@ -1819,3 +1819,19 @@ a.wl-card-title { color: var(--accent); }
 /* Відео-фон має проглядати: прибираємо суцільний фон body,
    базовий колір/затемнення дає .bg-video-layer::after */
 body { background: transparent; }
+
+/* ── Меню «Ще»: щільна шторка, щоб контент під нею не просвічував ── */
+.more-menu-sheet {
+  background: var(--surface);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+.more-menu-overlay,
+.more-menu-backdrop {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  z-index: 999;
+}
