@@ -6,7 +6,7 @@
 // відкрито цей роут. BASE_URL — щоб шлях працював і під підкаталогом
 // на GitHub Pages.
 // ============================================================
-const GAME_SRC = `${import.meta.env.BASE_URL}game.html?v=1`;
+const GAME_SRC = `${import.meta.env.BASE_URL}game.html?v=2`;
 
 export function GamePage() {
   return (
