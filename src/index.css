@@ -1360,11 +1360,23 @@ a.wl-card-title { color: var(--accent); }
 .sched-cell-letter--work { color: #4a86e8; }
 .sched-cell-letter--off { color: var(--accent); }
 
-/* Теплова карта спільних вихідних (Календар → Спільні вихідні) */
+/* Спільний графік (Календар → Графік): хто вільний якого дня.
+   both-off — темно-рожевий (найпомітніший, «побачення»), lena-off/
+   dima-off — два м'які пастельні тони під стиль Pink Portal,
+   none — колір НЕ міняється (лишається base .sched-cell). */
 .heat-summary { text-align: center; font-size: 14px; color: var(--text); margin: 0 0 10px; }
-.heat-cell--both-off { background: color-mix(in srgb, #3fae56 55%, transparent); }
-.heat-cell--one-off { background: color-mix(in srgb, #e0b23f 45%, transparent); }
-.heat-cell--none-off { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.sched-cell--both-off { background: #d1477a; }
+.sched-cell--both-off .sched-cell-num,
+.sched-cell--both-off .sched-cell-heart { color: #fff; }
+.sched-cell--lena-off { background: #f6c6a8; }
+.sched-cell--dima-off { background: #b7c3ea; }
+.sched-cell-who {
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 2px;
+  color: var(--text);
+  opacity: 0.7;
+}
 .heat-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1376,9 +1388,9 @@ a.wl-card-title { color: var(--accent); }
 }
 .heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .heat-swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
-.heat-swatch--both-off { background: #3fae56; }
-.heat-swatch--one-off { background: #e0b23f; }
-.heat-swatch--none-off { background: color-mix(in srgb, var(--text) 18%, transparent); }
+.heat-swatch--both-off { background: #d1477a; }
+.heat-swatch--lena-off { background: #f6c6a8; }
+.heat-swatch--dima-off { background: #b7c3ea; }
 
 /* Фото-календар */
 .pcal-cell {

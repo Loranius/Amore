@@ -1,11 +1,12 @@
 // ============================================================
 // SchedulePage — «Графік» (порт schedule.js UI)
 // ------------------------------------------------------------
-// Дошка на кожного користувача; тап циклічно міняє позначку лише в
-// режимі редагування (захист від випадкових тапів). Кожна клітинка
-// пофарбована за статусом дня (обоє вільні / один вільний / зайняті) —
-// те саме кольорове кодування, що раніше було на окремій тепловій
-// карті «Спільні вихідні» в Календарі (звідти й перенесене сюди).
+// За замовчуванням (перегляд) — ОДИН спільний графік: клітинка дня
+// пофарбована за тим, хто вільний («Х») — обоє (темно-рожевий),
+// лише Лєна, лише Діма; де обоє працюють — колір не міняється.
+// У режимі редагування — окремі дошки на кожного (тап циклічно
+// міняє позначку саме тій людині; спільний вигляд для цього не
+// підходить — треба однозначно знати, чию мітку міняєш).
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
@@ -22,7 +23,16 @@ import {
 import { useSchedule, useScheduleMutation, MARK_CYCLE, type MarksMap } from './useSchedule';
 import type { AppUser } from '@/types';
 
-type DayStatus = 'both-off' | 'one-off' | 'none-off';
+type DayStatus = 'both-off' | 'lena-off' | 'dima-off' | 'none';
+
+function dayStatus(lena: AppUser | undefined, dima: AppUser | undefined, marks: MarksMap, ds: string): DayStatus {
+  const lenaOff = !!lena && marks[lena.id]?.[ds] === 'Х';
+  const dimaOff = !!dima && marks[dima.id]?.[ds] === 'Х';
+  if (lenaOff && dimaOff) return 'both-off';
+  if (lenaOff) return 'lena-off';
+  if (dimaOff) return 'dima-off';
+  return 'none';
+}
 
 export function SchedulePage() {
   const { data: users = [] } = useUsers();
@@ -33,18 +43,20 @@ export function SchedulePage() {
   const mutation = useScheduleMutation(yr, mo);
 
   const total = daysInMonth(yr, mo);
+  const offset = firstMondayOffset(yr, mo);
   const today = todayLocal();
 
-  // Статус кожного дня за кількістю «Х»: обоє/один/жоден.
+  const lena = users.find((u) => u.name === 'Лєна');
+  const dima = users.find((u) => u.name === 'Діма');
+
   const statusOf = useMemo(() => {
     const map = new Map<string, DayStatus>();
     for (let d = 1; d <= total; d++) {
       const ds = ymd(yr, mo, d);
-      const offCount = users.filter((u) => marks[u.id]?.[ds] === 'Х').length;
-      map.set(ds, offCount >= 2 ? 'both-off' : offCount === 1 ? 'one-off' : 'none-off');
+      map.set(ds, dayStatus(lena, dima, marks, ds));
     }
     return map;
-  }, [users, marks, yr, mo, total]);
+  }, [lena, dima, marks, yr, mo, total]);
 
   const bothOffCount = useMemo(() => {
     let n = 0;
@@ -83,7 +95,7 @@ export function SchedulePage() {
 
       {users.length >= 2 && bothOffCount > 0 && (
         <p className="heat-summary">
-          💚 {bothOffCount} {bothOffCount === 1 ? 'спільний вихідний' : 'спільних вихідних'} цього місяця
+          💗 {bothOffCount} {bothOffCount === 1 ? 'спільний вихідний' : 'спільних вихідних'} цього місяця
         </p>
       )}
 
@@ -95,26 +107,64 @@ export function SchedulePage() {
         {editMode ? '✅ Завершити редагування' : '✏️ Редагувати графік'}
       </button>
 
-      <div className={`sched-boards${editMode ? ' sched-boards--editing' : ''}`}>
-        {users.map((u) => (
-          <Board
-            key={u.id}
-            user={u}
-            yr={yr}
-            mo={mo}
-            marks={marks}
-            today={today}
-            statusOf={statusOf}
-            onCell={onCell}
-          />
-        ))}
-      </div>
+      {editMode ? (
+        <div className="sched-boards sched-boards--editing">
+          {users.map((u) => (
+            <Board
+              key={u.id}
+              user={u}
+              yr={yr}
+              mo={mo}
+              marks={marks}
+              today={today}
+              statusOf={statusOf}
+              onCell={onCell}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="card sched-board">
+          <div className="sched-grid">
+            {DAYS_UA.map((d) => (
+              <div key={d} className="pcal-dow">
+                {d}
+              </div>
+            ))}
+            {Array.from({ length: offset }).map((_, i) => (
+              <div key={`e${i}`} className="sched-cell sched-cell--empty" />
+            ))}
+            {Array.from({ length: total }).map((_, i) => {
+              const day = i + 1;
+              const ds = ymd(yr, mo, day);
+              const isToday = ds === today;
+              const status = statusOf.get(ds) ?? 'none';
+              return (
+                <div
+                  key={ds}
+                  className={
+                    'sched-cell' +
+                    ` sched-cell--${status}` +
+                    (isToday ? ' sched-cell--today' : '')
+                  }
+                >
+                  <span className="sched-cell-num">
+                    {day}
+                    {status === 'both-off' && <span className="sched-cell-heart">♥</span>}
+                    {status === 'lena-off' && <span className="sched-cell-who">Л</span>}
+                    {status === 'dima-off' && <span className="sched-cell-who">Д</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {users.length >= 2 && (
         <div className="heat-legend">
           <span><i className="heat-swatch heat-swatch--both-off" /> обоє вільні</span>
-          <span><i className="heat-swatch heat-swatch--one-off" /> один вільний</span>
-          <span><i className="heat-swatch heat-swatch--none-off" /> зайняті</span>
+          <span><i className="heat-swatch heat-swatch--lena-off" /> Лєна вільна</span>
+          <span><i className="heat-swatch heat-swatch--dima-off" /> Діма вільний</span>
         </div>
       )}
     </section>
@@ -153,14 +203,14 @@ function Board({ user, yr, mo, marks, today, statusOf, onCell }: BoardProps) {
           const ds = ymd(yr, mo, day);
           const mark = userMarks[ds] ?? '';
           const isToday = ds === today;
-          const status = statusOf.get(ds) ?? 'none-off';
+          const status = statusOf.get(ds) ?? 'none';
           return (
             <button
               key={ds}
               type="button"
               className={
-                'sched-cell heat-cell' +
-                ` heat-cell--${status}` +
+                'sched-cell' +
+                ` sched-cell--${status}` +
                 (isToday ? ' sched-cell--today' : '')
               }
               onClick={() => onCell(user.id, ds, mark)}
