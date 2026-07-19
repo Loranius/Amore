@@ -1,25 +1,27 @@
 // ============================================================
 // LoginPage — вибір користувача + PIN («Pink Portal» дизайн)
 // ------------------------------------------------------------
-// Флоу лишається тим самим (вибір → 8 цифр → успіх/помилка/locked),
-// лише візуал: градієнтний рожевий фон з декором (PortalDecor),
-// картка зі склом, Fredoka/Nunito. "Портал відкрито"-екран з
-// хендофу свідомо не реалізований: RedirectIfAuthed одразу
-// перемикає на / щойно useAuth().status стає 'authenticated' —
-// щоб показати проміжний celebratory-екран, довелось би штучно
-// затримувати сам редірект в auth-гварді, а це вже зміна
-// безпекочутливого флоу входу, не суто візуальна правка.
+// Флоу: вибір → пін-пад → успіх (портал-вайп + конфеті) / помилка
+// (shake) / locked. Сам вхід (auth-pin, rate-limit) — без змін у
+// AuthProvider.login(). "Портал відкрито" встигає дограти завдяки
+// короткій, суто косметичній затримці редіректу в
+// RequireAuth.tsx → RedirectIfAuthed (SUCCESS_HOLD_MS) — вона не
+// впливає на саму перевірку PIN, лише на момент, коли роутер
+// фактично перемикає на /.
 // ============================================================
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useUsers } from '@/features/_shared/useUsers';
-import { PortalDecor } from './PortalDecor';
+import { PortalDecor, PortalConfetti } from './PortalDecor';
 import type { AppUser } from '@/types';
+
+type Screen = 'select' | 'pin' | 'portal';
 
 export function LoginPage() {
   const { login } = useAuth();
   const { data: users, isPending, isError } = useUsers();
 
+  const [screen, setScreen] = useState<Screen>('select');
   const [selected, setSelected] = useState<AppUser | null>(null);
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +35,10 @@ export function LoginPage() {
 
   const submit = async (userId: number, fullPin: string) => {
     const res = await login(userId, fullPin);
-    if (res.ok) return; // RequireAuth перемкне на /
+    if (res.ok) {
+      setScreen('portal'); // RequireAuth тримає нас тут ще мить, потім сам перемкне на /
+      return;
+    }
     if (res.reason === 'locked') {
       const mins = Math.max(1, Math.ceil(res.retryAfterSeconds / 60));
       setError(`Забагато спроб, спробуй через ${mins} хв`);
@@ -50,6 +55,13 @@ export function LoginPage() {
     setPin(next);
     setError(null);
     if (next.length === 8) void submit(selected.id, next);
+  };
+
+  const restart = () => {
+    setScreen('select');
+    setSelected(null);
+    setPin('');
+    setError(null);
   };
 
   if (isPending) {
@@ -69,7 +81,7 @@ export function LoginPage() {
     );
   }
 
-  if (!selected) {
+  if (screen === 'select') {
     return (
       <div className="auth-screen">
         <PortalDecor />
@@ -86,6 +98,7 @@ export function LoginPage() {
                   setSelected(u);
                   setPin('');
                   setError(null);
+                  setScreen('pin');
                 }}
               >
                 {u.name}
@@ -97,12 +110,29 @@ export function LoginPage() {
     );
   }
 
+  if (screen === 'portal') {
+    return (
+      <div className="auth-screen">
+        <PortalDecor />
+        <PortalConfetti />
+        <div className="auth-card">
+          <div className="auth-success-heart" aria-hidden="true" />
+          <h1 className="auth-success-title">Портал відкрито, {selected?.name} 💗</h1>
+          <p className="auth-success-sub">Ласкаво просимо додому</p>
+          <button type="button" className="auth-success-btn" onClick={restart}>
+            Спробувати ще раз
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="auth-screen">
       <PortalDecor />
       <div className={`auth-card${shake ? ' shake' : ''}`}>
         <div className="auth-kicker">Amore</div>
-        <h1 className="auth-title">{selected.name}</h1>
+        <h1 className="auth-title">{selected?.name}</h1>
 
         <div className="pin-dots" aria-hidden="true">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -124,6 +154,7 @@ export function LoginPage() {
             type="button"
             className="pin-key pin-key--dim"
             onClick={() => {
+              setScreen('select');
               setSelected(null);
               setPin('');
               setError(null);

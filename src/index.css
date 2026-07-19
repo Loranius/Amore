@@ -532,6 +532,78 @@ textarea {
   .auth-card.shake { animation: none; }
 }
 
+/* ── Auth-екран: «Портал відкрито» (успіх) ────────────────────── */
+.auth-success-heart {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  background: var(--accent);
+  animation: portalIn 0.6s ease both;
+}
+.auth-success-heart::before,
+.auth-success-heart::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: inherit;
+}
+.auth-success-heart::before { top: -50%; left: 0; }
+.auth-success-heart::after { top: 0; left: 50%; }
+.auth-success-title { font-family: 'Fredoka', sans-serif; font-size: 25px; margin: 14px 0 0; color: var(--text); }
+.auth-success-sub { margin: 0; color: var(--muted); font-size: 14px; }
+.auth-success-btn {
+  margin-top: 8px;
+  appearance: none;
+  border: 0;
+  border-radius: 16px;
+  padding: 12px 22px;
+  font: inherit;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: var(--accent);
+}
+.auth-success-btn:hover { filter: brightness(0.95); }
+
+@keyframes portalIn {
+  from { clip-path: circle(0% at 50% 50%); opacity: 0.3; }
+  to { clip-path: circle(150% at 50% 50%); opacity: 1; }
+}
+
+.auth-confetti-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.auth-confetti-piece {
+  position: absolute;
+  top: 0;
+  width: var(--size);
+  height: var(--size);
+  background: var(--piece-color);
+  animation: confettiFall var(--dur) linear var(--delay) infinite;
+}
+.auth-confetti-piece::before,
+.auth-confetti-piece::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: inherit;
+}
+.auth-confetti-piece::before { top: -50%; left: 0; }
+.auth-confetti-piece::after { top: 0; left: 50%; }
+
+@keyframes confettiFall {
+  from { transform: translateY(-10vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 1; }
+  to { transform: translateY(110vh) rotate(400deg); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-success-heart { animation: none; clip-path: none; }
+  .auth-confetti-piece { animation: none; display: none; }
+}
+
 .empty-state { color: var(--muted); }
 
 /* ── Auth-екран: декоративний фон (серця/квіти/торти/хвильки) ─

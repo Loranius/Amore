@@ -169,3 +169,34 @@ export function PortalDecor() {
     </div>
   );
 }
+
+const CONFETTI_COLORS = ['#f2a6bb', '#f6b8c8', '#eb8fab', '#fbd6e4'];
+const CONFETTI = Array.from({ length: 10 }, (_, i) => ({
+  x: (i * 97) % 100,
+  size: 8 + (i % 3) * 3,
+  dur: 3 + (i % 4) * 0.6,
+  delay: i * 0.25,
+  color: CONFETTI_COLORS[i % CONFETTI_COLORS.length]!,
+}));
+
+/** Падаючі серця-конфеті на екрані «Портал відкрито». */
+export function PortalConfetti() {
+  return (
+    <div className="auth-confetti-layer" aria-hidden="true">
+      {CONFETTI.map((cf, i) => (
+        <div
+          key={i}
+          className="auth-confetti-piece"
+          style={{
+            left: `${cf.x}%`,
+            background: cf.color,
+            ['--size' as string]: `${cf.size}px`,
+            ['--piece-color' as string]: cf.color,
+            ['--dur' as string]: `${cf.dur}s`,
+            ['--delay' as string]: `${cf.delay}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
