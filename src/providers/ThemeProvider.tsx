@@ -37,6 +37,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem(THEME_KEY, theme);
+    // Android бере theme-color для тонування статус-бару/панелі задач
+    // (на відміну від iOS, де за це відповідає apple-mobile-web-app-...
+    // status-bar-style в index.html) — тримаємо його синхронним з темою.
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute('content', theme === 'dark' ? '#171717' : '#faf7f5');
   }, [theme]);
 
   const setTheme = useCallback((t: Theme) => setThemeState(t), []);

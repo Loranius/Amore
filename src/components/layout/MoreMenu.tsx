@@ -19,18 +19,14 @@ interface MoreMenuProps {
 }
 
 export function MoreMenu({ open, onClose, onOpenSettings }: MoreMenuProps) {
-  // Escape закриває; блокуємо скрол фону поки відкрито.
+  // Escape закриває. Блокування скролу фону — в Layout (там же .content).
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
   return (
