@@ -618,6 +618,23 @@ textarea {
   pointer-events: none;
   transition: transform 0.25s ease-out;
 }
+/* Фігури-декор — "інтерактивні моменти": підсвічуються на ховер,
+   попри те, що .portal-decor (контейнер) сам pointer-events:none. */
+.portal-heart,
+.portal-flower,
+.portal-cake,
+.portal-diamond {
+  pointer-events: auto;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+.portal-heart:hover,
+.portal-flower:hover,
+.portal-cake:hover,
+.portal-diamond:hover {
+  filter: brightness(1.12) saturate(1.15);
+}
+
 .portal-heart {
   position: absolute;
   width: var(--size);
@@ -697,6 +714,15 @@ textarea {
   transform: rotate(45deg);
 }
 
+/* Ромбик — просто квадрат, нахил 45° уже "зашитий" у --r (як і в сердець). */
+.portal-diamond {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 3px;
+  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
+}
+
 .portal-squiggle {
   position: absolute;
   display: flex;
@@ -712,7 +738,7 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .portal-heart, .portal-flower, .portal-cake, .portal-squiggle { animation: none; }
+  .portal-heart, .portal-flower, .portal-cake, .portal-diamond, .portal-squiggle { animation: none; }
   .portal-decor { transition: none; transform: none !important; }
 }
 

@@ -1,10 +1,17 @@
 // ============================================================
-// PortalDecor — декоративний фон auth-екрану (серця/квіти/торти/
+// PortalDecor — декоративний фон (серця/квіти/торти/ромбики/
 // хвильки) з парал акс-ефектом за курсором миші.
 // ------------------------------------------------------------
 // Дані (позиції/кольори/тайминги) портовані 1:1 з дизайн-хендофу
-// «Pink Portal» (Amore Portal.dc.html). Суто декоративно — aria-hidden,
-// pointer-events:none (крім самих фігур — лишаємо easter-egg hover).
+// «Pink Portal» (Amore Portal.dc.html) + ромбики додані під той
+// самий стиль. Суто декоративно (aria-hidden), але кожна фігура —
+// "інтерактивний момент": підсвічується на ховер (pointer-events:auto
+// саме на фігурах, не на контейнері).
+//
+// density/parallax — ті самі твіки, що були прапорцями редактора в
+// прототипі: density скорочує кількість фігур (для менших ділянок,
+// напр. хмари фото на головній, де 100% декору вже задорого), а
+// parallax можна вимкнути там, де рух фону за курсором зайвий.
 // ============================================================
 import { useEffect, useState } from 'react';
 
@@ -17,6 +24,9 @@ interface Flower {
 }
 interface Cake {
   x: number; y: number; size: number; rot: number; dur: number; delay: number;
+}
+interface Diamond {
+  x: number; y: number; size: number; rot: number; dur: number; delay: number; color: string;
 }
 interface Squiggle {
   x: number; y: number; size: number; dur: number; delay: number; color: string; dots: number[];
@@ -42,6 +52,12 @@ const CAKES: Cake[] = [
   { x: 4, y: 38, size: 42, rot: -6, dur: 7, delay: 0.3 },
   { x: 90, y: 40, size: 38, rot: 8, dur: 8, delay: 1.2 },
   { x: 46, y: 4, size: 30, rot: 0, dur: 6.5, delay: 0.6 },
+];
+
+const DIAMONDS: Diamond[] = [
+  { x: 50, y: 14, size: 14, rot: 45, dur: 7, delay: 0.4, color: '#e6879f' },
+  { x: 30, y: 92, size: 12, rot: 45, dur: 6.5, delay: 1.1, color: '#f2a6bb' },
+  { x: 96, y: 20, size: 10, rot: 45, dur: 7.5, delay: 1.8, color: '#eb8fab' },
 ];
 
 const SQUIGGLES: Squiggle[] = [
@@ -71,18 +87,36 @@ function useMouseParallax(enabled: boolean) {
   return pos;
 }
 
-export function PortalDecor() {
+function take<T>(arr: T[], factor: number): T[] {
+  return arr.slice(0, Math.max(1, Math.round(arr.length * factor)));
+}
+
+interface PortalDecorProps {
+  /** Частка фігур, що рендериться: lively = 100%, medium = 75%, light = 50%. */
+  density?: 'light' | 'medium' | 'lively';
+  /** Легкий зсув шару за курсором миші (вимкнено — фігури лише "дихають"). */
+  parallax?: boolean;
+}
+
+export function PortalDecor({ density = 'lively', parallax = true }: PortalDecorProps) {
   const reduceMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const { mx, my } = useMouseParallax(!reduceMotion);
+  const { mx, my } = useMouseParallax(parallax && !reduceMotion);
+
+  const factor = density === 'light' ? 0.5 : density === 'medium' ? 0.75 : 1;
+  const hearts = take(HEARTS, factor);
+  const flowers = take(FLOWERS, factor);
+  const cakes = take(CAKES, factor);
+  const diamonds = take(DIAMONDS, factor);
+  const squiggles = take(SQUIGGLES, factor);
 
   return (
     <div
       className="portal-decor"
       aria-hidden="true"
-      style={{ transform: `translate(${mx * 14}px, ${my * 10}px)` }}
+      style={parallax ? { transform: `translate(${mx * 14}px, ${my * 10}px)` } : undefined}
     >
-      {HEARTS.map((h, i) => (
+      {hearts.map((h, i) => (
         <div
           key={i}
           className="portal-heart"
@@ -98,7 +132,7 @@ export function PortalDecor() {
         />
       ))}
 
-      {FLOWERS.map((f, i) => (
+      {flowers.map((f, i) => (
         <div
           key={i}
           className="portal-flower"
@@ -122,7 +156,7 @@ export function PortalDecor() {
         </div>
       ))}
 
-      {CAKES.map((c, i) => (
+      {cakes.map((c, i) => (
         <div
           key={i}
           className="portal-cake"
@@ -142,7 +176,23 @@ export function PortalDecor() {
         </div>
       ))}
 
-      {SQUIGGLES.map((sq, i) => (
+      {diamonds.map((d, i) => (
+        <div
+          key={i}
+          className="portal-diamond"
+          style={{
+            left: `${d.x}%`,
+            top: `${d.y}%`,
+            background: d.color,
+            ['--size' as string]: `${d.size}px`,
+            ['--r' as string]: `${d.rot}deg`,
+            ['--dur' as string]: `${d.dur}s`,
+            ['--delay' as string]: `${d.delay}s`,
+          }}
+        />
+      ))}
+
+      {squiggles.map((sq, i) => (
         <div
           key={i}
           className="portal-squiggle"
