@@ -1,10 +1,12 @@
 'use strict';
 /* ============================================================
-   GAME SCHOOL — 4 класи × 3 предмети (математика/мова/фізкультура)
-   зростаючої складності + перерви з іграми подвір'я між уроками.
-   Викликається і зі стандартного розділу-меню (окремий клас), і з
-   лінійної історії (stage 2, класи 1-4 — класи 5-9 лишаються
-   старим простим "зайди в школу" циклом).
+   GAME SCHOOL — Садочок (кімната з 8 дітьми на 4 станціях) та
+   4 класи × 3 предмети (математика/мова/фізкультура) зростаючої
+   складності + перерви з іграми подвір'я між уроками.
+   Обидва входи (Садочок і клас) активуються, коли аватар Лєни
+   доходить пішки до відповідного будинку в Жилинцях — і зі
+   стандартного розділу-меню, і з лінійної історії (stage 2, класи
+   1-4 — класи 5-9 лишаються старим простим "зайди в школу" циклом).
    ============================================================ */
 const rndInt=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 
@@ -111,13 +113,62 @@ async function runRecess(){
   await pickRandomGames(1)[0].play();
 }
 
-/* ---------- Садочок: один візит = 2 випадкові гри подвір'я ---------- */
-async function runSadokVisit(){
-  await showCard('🧸 Ще один день у садочку!',1200);
-  for(const g of pickRandomGames(2)){
-    await showCard('Зіграймо: '+g.label+' 🙂',1000);
-    await g.play();
-  }
+/* ---------- Кімната садочка: 8 дітей на 4 станціях подвір'я-ігор ----------
+   Гравець вільно ходить по кімнаті (звичайний рух рушія); підійшовши
+   до пари дітей, що грають у щось конкретне, автоматично стартує та
+   міні-гра (той самий механізм zones/onZoneFn, що й у світі, лише
+   свій, кімнатний, набір станцій). Один візит = будь-які 2 з 4 станцій. */
+const SADOK_KIDS=[NPC_KIDS[0],NPC_KIDS[1],bakeKidVariant('#c46bd1','#3a2b1a'),bakeKidVariant('#5fb8e0','#6e4a2a')];
+makeMap('sadokRoom','Садочок · ігрова кімната',18,13,'#2a2318',(g,m)=>{
+  outlineG(g,'w');
+  FR(g,1,1,16,11,'o');
+  m.props.push({type:'kidnpc',x:4,y:3,sprite:SADOK_KIDS[0],dir:0});
+  m.props.push({type:'kidnpc',x:6,y:3,sprite:SADOK_KIDS[1],dir:0});
+  Zn(m,'st_rope','station',3,2,4,3,'🪢');
+  m.props.push({type:'kidnpc',x:12,y:3,sprite:SADOK_KIDS[2],dir:0});
+  m.props.push({type:'kidnpc',x:14,y:3,sprite:SADOK_KIDS[3],dir:0});
+  Pr(m,'hopscotch',13,4);
+  Zn(m,'st_classics','station',11,2,5,3,'👣');
+  Pr(m,'bush',3,8); Pr(m,'bush',6,9);
+  m.props.push({type:'kidnpc',x:4,y:9,sprite:SADOK_KIDS[1],dir:0});
+  m.props.push({type:'kidnpc',x:6,y:8,sprite:SADOK_KIDS[0],dir:0});
+  Zn(m,'st_mole','station',3,7,4,4,'🙈');
+  Pr(m,'hoop',13,7);
+  m.props.push({type:'kidnpc',x:12,y:9,sprite:SADOK_KIDS[3],dir:0});
+  m.props.push({type:'kidnpc',x:14,y:9,sprite:SADOK_KIDS[2],dir:0});
+  Zn(m,'st_ball','station',11,7,5,4,'🏀');
+});
+const SADOK_STATIONS={
+  st_rope:{label:'Скакалка',play:()=>playJumpRope()},
+  st_classics:{label:'Класики',play:()=>playClassics()},
+  st_mole:{label:'Хованки в кущах',play:()=>playHideSeek()},
+  st_ball:{label:'М\'яч',play:()=>playBallThrow()},
+};
+/** Один візит до садочку: вхід у кімнату, вільна ходьба до дітей, 2 з 4 станцій — і назад. */
+async function enterSadokRoom(){
+  const prevOnZone=G.onZoneFn, prevRefresh=G.refreshObjFn;
+  const completed=new Set();
+  G.refreshObjFn=()=>{ setObj('🧸 Підійди до дітей і пограй ('+completed.size+'/2)'); G.target=null; };
+  await new Promise(async resolveRoom=>{
+    G.onZoneFn=async(z)=>{
+      if(G.busy||z.kind!=='station') return;
+      if(completed.has(z.id)){ toast('Вже пограли в цю гру сьогодні 🙂'); return; }
+      G.busy=true;
+      const st=SADOK_STATIONS[z.id];
+      await showCard('Зіграймо: '+st.label+' 🙂',900);
+      await st.play();
+      completed.add(z.id);
+      if(completed.size>=2){
+        await showCard('🧸 Гарно погралися! Час додому 🏠',1400);
+        resolveRoom(); return;
+      }
+      refreshObj(); G.busy=false;
+    };
+    await travel('sadokRoom',9,10,null);
+    G.active=true; G.busy=false;
+  });
+  G.onZoneFn=prevOnZone; G.refreshObjFn=prevRefresh; G.busy=true;
+  await travel('zhyl',5,12,null);
 }
 
 /* ---------- вхідні точки для розділів (menu.js) ---------- */
@@ -131,26 +182,38 @@ async function startSadokChapter(){
   initAudio();
   $('title').style.display='none';
   $('mute').style.display='flex';
-  G.mode='sadok'; G.active=true; G.busy=false; G.adult=false;
-  G.onZoneFn=null; G.refreshObjFn=()=>setObj('🧸 Садочок');
+  G.mode='sadok'; G.active=true; G.busy=false; G.adult=false; G.c=0;
+  G.refreshObjFn=()=>{ setObj('🧸 Йди до садочку: візит '+(G.c+1)+'/2'); G.target=['zhyl','sadok']; };
+  G.onZoneFn=async z=>{
+    if(G.busy||z.id!=='sadok') return;
+    G.busy=true; G.c++; sfxOk();
+    await enterSadokRoom();
+    if(G.c>=2){
+      G.busy=true;
+      await showCard('🧸 Розділ «Садочок» пройдено ❤️',1800);
+      returnToTitle(); return;
+    }
+    refreshObj(); G.busy=false;
+  };
   G.map=MAPS.zhyl; spawnAt(5,12);
+  refreshObj();
   await fadeIn();
-  await runSadokVisit();
-  await runSadokVisit();
-  G.busy=true;
-  await showCard('🧸 Розділ «Садочок» пройдено ❤️',1800);
-  returnToTitle();
 }
 async function startSchoolChapter(grade){
   initAudio();
   $('title').style.display='none';
   $('mute').style.display='flex';
   G.mode='school'; G.active=true; G.busy=false; G.adult=false;
-  G.onZoneFn=null; G.refreshObjFn=()=>setObj('🎒 '+grade+' клас');
-  G.map=MAPS.zhyl; spawnAt(21,12);
+  G.refreshObjFn=()=>{ setObj('🎒 Йди до школи: '+grade+' клас'); G.target=['zhyl','school']; };
+  G.onZoneFn=async z=>{
+    if(G.busy||z.id!=='school') return;
+    G.busy=true; sfxOk();
+    await runSchoolGrade(grade);
+    G.busy=true;
+    await showCard('🎒 Розділ «'+grade+' клас» пройдено ✓',1800);
+    returnToTitle();
+  };
+  G.map=MAPS.zhyl; spawnAt(5,12);
+  refreshObj();
   await fadeIn();
-  await runSchoolGrade(grade);
-  G.busy=true;
-  await showCard('🎒 Розділ «'+grade+' клас» пройдено ✓',1800);
-  returnToTitle();
 }

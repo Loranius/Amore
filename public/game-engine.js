@@ -145,7 +145,7 @@ function bakeKidVariant(topColor,hairColor){
 }
 
 /* ---------- тайли ---------- */
-const SOLID=new Set(['#','~','f','R']);
+const SOLID=new Set(['#','~','f','R','w']);
 const hashT=(i,j)=>((i*7349+j*9151)>>>0)%97;
 
 function drawTileAt(t,i,j,time){
@@ -221,6 +221,19 @@ function drawTileAt(t,i,j,time){
       if(n%4===0) ctx.fillRect(x+(n%13),y+(n%11),3,1);
       break;
     }
+    case 'w': { // стіна кімнати (садочок-інтер'єр)
+      ctx.fillStyle='#8a6f52'; ctx.fillRect(x,y,16,16);
+      ctx.fillStyle='#6e5640'; ctx.fillRect(x,y+7,16,1);
+      ctx.fillRect(x+((i+j)%2?8:0),y,1,7); ctx.fillRect(x+((i+j)%2?0:8),y+8,1,7);
+      break;
+    }
+    case 'o': { // дерев'яна підлога (садочок-інтер'єр)
+      ctx.fillStyle='#e8d2a0'; ctx.fillRect(x,y,16,16);
+      ctx.fillStyle='#dcc48c';
+      if(n%4===0) ctx.fillRect(x+2,y+2,11,1);
+      if(n%7===0) ctx.fillRect(x+4,y+9,9,1);
+      break;
+    }
   }
 }
 
@@ -281,6 +294,25 @@ function drawProp(p,time){
     ctx.fillStyle='#8a7a5a'; ctx.fillRect(px+7,py,2,20);
     ctx.fillStyle='#e5471f'; ctx.fillRect(px-2,py+2,14,2);
     ctx.fillStyle='#dfe3ea'; ctx.fillRect(px-2,py+4,14,6);
+  }
+  if(p.type==='kidnpc'){ // статична дитина-NPC (садочок-інтер'єр) — легке погойдування
+    const f=Math.floor(time*2)%2;
+    const img=p.sprite[p.dir||0][f];
+    ctx.drawImage(img,px+8-img.width/2,py+16-img.height);
+  }
+  if(p.type==='hopscotch'){ // крейдяна розмітка «класиків» на підлозі — декор
+    ctx.strokeStyle='#e9e2cf'; ctx.lineWidth=1;
+    const rows=[[0],[1],[2],[3,4],[5],[6,7],[8],[9]];
+    const sw=9, sh=6;
+    for(let r=0;r<rows.length;r++){
+      const cells=rows[r], ry=py+30-r*sh;
+      if(cells.length===1) ctx.strokeRect(px+8-sw/2,ry,sw,sh-1);
+      else { ctx.strokeRect(px+8-sw,ry,sw,sh-1); ctx.strokeRect(px+8,ry,sw,sh-1); }
+    }
+  }
+  if(p.type==='bush'){ // кущ (садочок-інтер'єр, гра «крот у кущах»)
+    ctx.fillStyle='#2f6b33'; ctx.beginPath(); ctx.arc(px+8,py+10,10,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle='#3f8a43'; ctx.beginPath(); ctx.arc(px+3,py+6,6,0,Math.PI*2); ctx.arc(px+13,py+7,5,0,Math.PI*2); ctx.fill();
   }
 }
 

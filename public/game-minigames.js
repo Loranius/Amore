@@ -1,6 +1,7 @@
 'use strict';
 /* ============================================================
-   GAME MINIGAMES — 4 гри подвір'я: скакалка, квач, м'яч, хованки.
+   GAME MINIGAMES — 4 гри подвір'я: скакалка, класики, м'яч, хованки
+   в кущах (крот).
    ------------------------------------------------------------
    Спільний принцип: async-функція playXxx() встановлює G.activity
    ({update,render,onTap,onKey}), яка бере на себе весь екран (движок
@@ -86,66 +87,82 @@ function playJumpRope(target){
 function spawnHeartsScreen(){ spawnHearts(W/2,H*0.5,4,40); }
 
 /* ============================================================
-   2. ПЯТНАШКИ (КВАЧ) — доганялки
+   2. КЛАСИКИ — кидок битки, стрибки по клітинках 1-10 (4-5 і 7-8
+   поряд, здвоєні), розворот у "раю", підбір битки на зворотному шляху.
+   Спрощено до одного повного проходу (не 10 раундів) — щоб влізти
+   в той самий темп, що й інші ігри подвір'я.
    ============================================================ */
-function playTag(count,seconds){
-  count=count||3; seconds=seconds||20;
+const CLASSICS_ROWS=[[1],[2],[3],[4,5],[6],[7,8],[9],[10]]; // знизу вгору, [0]="рай"
+function classicsRowRect(r){
+  const sw=64, sh=42, gap=3, groundY=H*0.86;
+  const y=groundY-(r+1)*(sh+gap);
+  const cells=CLASSICS_ROWS[r];
+  if(cells.length===1) return [{x:W/2-sw/2,y,w:sw,h:sh,n:cells[0]}];
+  const w2=sw*0.62;
+  return [{x:W/2-w2-1,y,w:w2,h:sh,n:cells[0]},{x:W/2+1,y,w:w2,h:sh,n:cells[1]}];
+}
+function playClassics(){
   return new Promise(resolve=>{
-    const W0=280,H0=180; // умовний "дворик" у власних координатах міні-гри
-    const me={x:W0/2,y:H0/2};
-    const kids=Array.from({length:count},(_,i)=>({
-      x:40+((i*97)%(W0-80)), y:30+((i*53)%(H0-60)), tagged:false, spriteIdx:i%NPC_KIDS.length,
-      wx:Math.random()*2-1, wy:Math.random()*2-1, wt:0,
-    }));
-    let tagged=0, timeLeft=seconds;
+    // playerRow: -1 = ще не стрибала (перед клітинкою 1); 0..7 — індекс рядка КЛАСИКИ_РЯДКИ.
+    let phase='throw', playerRow=-1, stonePlaced=false, turnT=0, flashT=0;
     G.busy=true;
     G.activity={
       update(dt){
-        timeLeft-=dt;
-        let vx=0,vy=0;
-        if(keys['arrowleft']||keys['a']) vx-=1;
-        if(keys['arrowright']||keys['d']) vx+=1;
-        if(keys['arrowup']||keys['w']) vy-=1;
-        if(keys['arrowdown']||keys['s']) vy+=1;
-        if(joy.active){ vx=Math.abs(joy.dx)>0.15?joy.dx:0; vy=Math.abs(joy.dy)>0.15?joy.dy:0; }
-        const l=Math.hypot(vx,vy);
-        if(l>0.05){ vx/=Math.max(1,l); vy/=Math.max(1,l);
-          me.x=clamp(me.x+vx*70*dt,10,W0-10); me.y=clamp(me.y+vy*70*dt,10,H0-10); }
-        for(const k of kids){
-          if(k.tagged) continue;
-          k.wt-=dt;
-          if(k.wt<=0){ k.wx=Math.random()*2-1; k.wy=Math.random()*2-1; k.wt=0.6+Math.random()*0.8; }
-          // легка втеча від гравця + випадкове блукання
-          const dx=k.x-me.x, dy=k.y-me.y, d=Math.hypot(dx,dy)||1;
-          const flee=d<60?1:0;
-          const mx=flee?dx/d:k.wx, my=flee?dy/d:k.wy;
-          k.x=clamp(k.x+mx*40*dt,10,W0-10); k.y=clamp(k.y+my*40*dt,10,H0-10);
-          if(d<12){ k.tagged=true; tagged++; sfxGood(); spawnHeartsScreen(); }
+        if(flashT>0) flashT-=dt;
+        if(phase==='turn'){ turnT-=dt; if(turnT<=0) phase='down'; }
+      },
+      onTap(){
+        flashT=0.2;
+        if(phase==='throw'){ stonePlaced=true; sfxGood(); phase='up'; return; }
+        if(phase==='up'){
+          playerRow++; sfxGood();
+          if(Math.random()<0.4) spawnHeartsScreen();
+          if(playerRow>=CLASSICS_ROWS.length-1){ phase='turn'; turnT=0.55; }
+          return;
         }
-        if(tagged>=count||timeLeft<=0) finish();
+        if(phase==='down'){
+          if(playerRow>0){ playerRow--; sfxGood(); if(Math.random()<0.4) spawnHeartsScreen(); }
+          else phase='pickup';
+          return;
+        }
+        if(phase==='pickup'){
+          stonePlaced=false; sfxTada(); spawnHeartsScreen();
+          setTimeout(finish,500);
+          phase='done';
+        }
       },
       render(){
-        mgBg('#8fce6a','#4f9e46');
-        mgTitle('🏃 Пятнашки');
-        mgProgress('Спіймано: '+tagged+'/'+count+'  ·  час: '+Math.max(0,Math.ceil(timeLeft))+'с');
-        const ox=(W-W0*SC)/2, oy=(H-H0*SC)/2*1.1+30;
-        const toScreen=(x,y)=>[ox+x*SC,oy+y*SC];
-        for(const k of kids){
-          if(k.tagged) continue;
-          const [sx,sy]=toScreen(k.x,k.y);
-          const img=NPC_KIDS[k.spriteIdx][2][0];
-          ctx.drawImage(img,sx-img.width*SC/2,sy-img.height*SC,img.width*SC,img.height*SC);
+        mgBg('#8a8a92','#5f5f68');
+        mgTitle('👣 Класики');
+        const hint={throw:'Тапни, щоб кинути битку в 1 ▼',up:'Тапни — стрибай далі вгору ▲',
+          turn:'Розворот у "раю"! 🔄',down:'Тапни — стрибай вниз ▼',pickup:'Тапни, щоб підняти битку ✊',done:''}[phase];
+        mgProgress(phase==='throw'?'Кидок битки':'Клітинка '+(playerRow>=0?CLASSICS_ROWS[playerRow].join('-'):'старт'));
+        for(let r=0;r<CLASSICS_ROWS.length;r++){
+          for(const cell of classicsRowRect(r)){
+            const active=flashT>0&&playerRow===r&&phase!=='throw';
+            ctx.fillStyle=active?'#d8d0b8':'#76767e';
+            ctx.fillRect(cell.x,cell.y,cell.w,cell.h);
+            ctx.strokeStyle='#e9e2cf'; ctx.lineWidth=2; ctx.strokeRect(cell.x,cell.y,cell.w,cell.h);
+            ctx.fillStyle='#2a2a30'; ctx.font='bold 15px monospace'; ctx.textAlign='center';
+            ctx.fillText(String(cell.n),cell.x+cell.w/2,cell.y+cell.h/2+5); ctx.textAlign='left';
+          }
         }
-        const [px,py]=toScreen(me.x,me.y);
-        const img=SP_KID[2][Math.floor(G.time*6)%2];
-        ctx.drawImage(img,px-img.width*SC/2,py-img.height*SC,img.width*SC,img.height*SC);
-        mgTapHint('Рухайся джойстиком/стрілками — торкнись дітей');
+        if(stonePlaced){
+          const c=classicsRowRect(0)[0];
+          ctx.fillStyle='#5a4a34'; ctx.beginPath(); ctx.arc(c.x+c.w/2,c.y+c.h/2,7,0,Math.PI*2); ctx.fill();
+        }
+        // персонаж: outside(playerRow<0)/пікап — стоїть перед 1; інакше — у своєму рядку
+        const standRow=playerRow<0||phase==='pickup'||phase==='done'?-1:playerRow;
+        const rect=standRow<0?classicsRowRect(0)[0]:classicsRowRect(standRow)[0];
+        const py0=standRow<0?rect.y+rect.h+30:rect.y+rect.h*0.5;
+        const img=SP_KID[0][Math.floor(G.time*5)%2];
+        ctx.drawImage(img,W/2-img.width*SC*0.5,py0-img.height*SC*0.7,img.width*SC*0.85,img.height*SC*0.85);
+        if(hint) mgTapHint(hint);
       },
     };
     function finish(){
-      G.activity=null; G.busy=false; sfxTada();
-      const msg=tagged>=count?'🏃 Всіх спіймала!':'🏃 Весело побігали: '+tagged+'/'+count;
-      showCard(msg,1400).then(()=>resolve({game:'tag',score:tagged}));
+      G.activity=null; G.busy=false;
+      showCard('👣 Класики — вдало пройдено! ✓',1400).then(()=>resolve({game:'classics'}));
     }
   });
 }
@@ -219,41 +236,53 @@ function playBallThrow(throws){
 }
 
 /* ============================================================
-   4. ХОВАНКИ — знайди друзів у дворі
+   4. ХОВАНКИ В КУЩАХ — гра типу "ударь крота": друзі на мить
+   визирають із випадкового куща, тапни поки видно.
    ============================================================ */
 function playHideSeek(count,seconds){
-  count=count||3; seconds=seconds||25;
+  count=count||5; seconds=seconds||22;
   return new Promise(resolve=>{
-    const spots=[{x:0.18,y:0.62},{x:0.5,y:0.7},{x:0.82,y:0.6},{x:0.32,y:0.42},{x:0.68,y:0.45}];
-    const chosen=[...spots].sort(()=>Math.random()-0.5).slice(0,count).map(s=>({...s,found:false}));
-    let found=0, timeLeft=seconds;
+    const spots=[{x:0.18,y:0.62},{x:0.5,y:0.7},{x:0.82,y:0.6},{x:0.32,y:0.42},{x:0.68,y:0.45}]
+      .map(s=>({...s,up:false,upT:0}));
+    let found=0, timeLeft=seconds, spawnT=0.6;
     G.busy=true;
     G.activity={
-      update(dt){ timeLeft-=dt; if(timeLeft<=0) finish(); },
+      update(dt){
+        timeLeft-=dt;
+        if(timeLeft<=0) return finish();
+        spawnT-=dt;
+        if(spawnT<=0){
+          const down=spots.filter(s=>!s.up);
+          if(down.length){ const s=down[Math.floor(Math.random()*down.length)]; s.up=true; s.upT=0.85+Math.random()*0.45; }
+          spawnT=0.5+Math.random()*0.5;
+        }
+        for(const s of spots) if(s.up){ s.upT-=dt; if(s.upT<=0) s.up=false; }
+      },
       onTap(x,y){
-        for(const s of chosen){
-          if(s.found) continue;
+        for(const s of spots){
           const sx=s.x*W, sy=s.y*H;
-          if(Math.hypot(x-sx,y-sy)<38){ s.found=true; found++; sfxGood(); spawnHearts(sx,sy-20,5,26);
-            if(found>=count) finish(); return; }
+          if(Math.hypot(x-sx,y-sy)<38){
+            if(s.up){ s.up=false; found++; sfxGood(); spawnHearts(sx,sy-20,5,26); if(found>=count) finish(); }
+            else { sfxBlip(); toast('Нікого немає 🙂',450); }
+            return;
+          }
         }
       },
       render(){
         mgBg('#79c96b','#3f8a3a');
-        mgTitle('🙈 Хованки');
+        mgTitle('🙈 Хованки в кущах');
         mgProgress('Знайдено: '+found+'/'+count+'  ·  час: '+Math.max(0,Math.ceil(timeLeft))+'с');
-        for(const s of chosen){
+        for(const s of spots){
           const sx=s.x*W, sy=s.y*H;
-          if(s.found){
+          ctx.fillStyle='#2f6b33'; ctx.beginPath(); ctx.arc(sx,sy,30,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#3f8a43'; ctx.beginPath(); ctx.arc(sx-8,sy-10,16,0,Math.PI*2); ctx.arc(sx+10,sy-6,14,0,Math.PI*2); ctx.fill();
+          if(s.up){
+            const bounce=Math.sin(G.time*10)*2;
             const img=NPC_KIDS[0][0][0];
-            ctx.drawImage(img,sx-img.width*SC/2,sy-img.height*SC,img.width*SC,img.height*SC);
-          } else {
-            ctx.fillStyle='#2f6b33'; ctx.beginPath();
-            ctx.arc(sx,sy,30,0,Math.PI*2); ctx.fill();
-            ctx.fillStyle='#3f8a43'; ctx.beginPath(); ctx.arc(sx-8,sy-10,16,0,Math.PI*2); ctx.arc(sx+10,sy-6,14,0,Math.PI*2); ctx.fill();
+            ctx.drawImage(img,sx-img.width*SC/2,sy-img.height*SC+bounce,img.width*SC,img.height*SC);
           }
         }
-        mgTapHint('Тапай по кущах — там ховаються друзі');
+        mgTapHint('Тапни, коли друг визирне з куща!');
       },
     };
     function finish(){
@@ -263,10 +292,10 @@ function playHideSeek(count,seconds){
   });
 }
 
-/** Реєстр усіх ігор подвір'я — для випадкового вибору 2 з 4 (Садочок) і перерв у школі. */
+/** Реєстр усіх ігор подвір'я — для перерв у школі (випадковий вибір 1) і станцій кімнати садочка. */
 const PLAYGROUND_GAMES=[
   {id:'rope',label:'Скакалка',play:()=>playJumpRope()},
-  {id:'tag',label:'Пятнашки',play:()=>playTag()},
+  {id:'classics',label:'Класики',play:()=>playClassics()},
   {id:'ball',label:'М\'яч',play:()=>playBallThrow()},
   {id:'hide',label:'Хованки',play:()=>playHideSeek()},
 ];
