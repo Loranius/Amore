@@ -9,8 +9,16 @@
 //   • Settings  — модалка (локальний стан; не роут, як і в старому коді).
 // sessionStorage 'portal:lastView' більше не потрібен — стан вкладки
 // тримає сам URL (F5 відкриє ту саму сторінку).
+//
+// .content — єдиний скрол-контейнер застосунку (.app-shell фіксований,
+// сам ніколи не скролиться, див. index.css). Тому тут же:
+//   • скидаємо scrollTop .content при зміні сторінки (інакше нова
+//     сторінка могла відкритись "серед скролу" попередньої);
+//   • блокуємо скрол .content, поки відкрита шторка «Ще» чи Налаштування
+//     (звичайний div коректно реагує на overflow:hidden навіть на iOS,
+//     на відміну від document.body під час активного тача).
 // ============================================================
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
@@ -29,16 +37,44 @@ export function Layout() {
   // старого роутера; напрямок slide за VIEW_ORDER — окремий крок полірування).
   const { pathname } = useLocation();
 
+  const contentRef = useRef<HTMLElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [pathname]);
+
+  useEffect(() => {
+    if (contentRef.current) contentRef.current.style.overflowY = moreOpen || settingsOpen ? 'hidden' : '';
+  }, [moreOpen, settingsOpen]);
+
+  useEffect(() => {
+    // iOS іноді ставить фонове відео на паузу (перехід у бекграунд,
+    // Low Power Mode) і не відновлює його само після повернення.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') videoRef.current?.play().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+
   return (
     <div className="app-shell">
       <div className="bg-video-layer" aria-hidden="true">
         {/* BASE_URL — щоб шлях працював і під підкаталогом (GitHub Pages /Amore/) */}
-        <video src={`${import.meta.env.BASE_URL}bg-loop.mp4`} autoPlay muted loop playsInline />
+        <video
+          ref={videoRef}
+          src={`${import.meta.env.BASE_URL}bg-loop.mp4`}
+          autoPlay
+          muted
+          loop
+          playsInline
+        />
       </div>
 
       <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
 
-      <main className="content">
+      <main className="content" ref={contentRef}>
         <div key={pathname} className="page-fade">
           <Outlet />
         </div>
