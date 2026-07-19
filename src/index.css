@@ -261,7 +261,16 @@ textarea {
   min-height: 100dvh;
   background: linear-gradient(160deg, #fff7f9 0%, #fff0f4 50%, #ffe9ef 100%);
 }
-.pink-page > :not(.portal-decor) { position: relative; z-index: 1; }
+/* Негативний z-index замість "підняти всіх сусідів" — так модалки/
+   Lightbox (position:fixed, рендеряться тут же прямими дітьми .pink-page)
+   не втрачають свій fixed/z-index через вищу специфічність попереднього
+   правила (.pink-page > :not(.portal-decor) мало специфічність 2 класи
+   проти 1 в .modal-overlay — і "перемагало", тож модалка малювалась
+   у звичайному потоці сторінки замість фулскріна оверлея). Від'ємний
+   z-index у власному stacking context .pink-page (position:relative)
+   малює декор НАД фоном, але ПІД звичайним статичним контентом — без
+   жодних змін для дітей. */
+.pink-page > .portal-decor { z-index: -1; }
 
 /* ── Хаби (сабтаби) — сегментований контрол зі слайд-індикатором */
 .hub-tabs {
