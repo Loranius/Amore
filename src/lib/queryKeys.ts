@@ -19,6 +19,8 @@ export const qk = {
   wishlist: (ownerId?: number) =>
     (ownerId === undefined ? (['wishlist'] as const) : (['wishlist', ownerId] as const)),
   wishlistFulfilled: (ownerId: number) => ['wishlist', 'fulfilled', ownerId] as const,
+  wishlistShared: () => ['wishlist', 'shared'] as const,
+  wishlistStats: () => ['wishlist', 'stats'] as const,
 
   media: (type?: MediaType) =>
     (type === undefined ? (['media'] as const) : (['media', type] as const)),

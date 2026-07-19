@@ -315,6 +315,7 @@ export interface WishlistItemRow {
   image_url: string | null;
   gift_date: string | null;
   owner: number;
+  is_shared: boolean;
   reserved: boolean;
   reserved_by: number | null;
   price: number | null;

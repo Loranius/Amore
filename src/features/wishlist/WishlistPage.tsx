@@ -1,9 +1,10 @@
 // ============================================================
 // WishlistPage — вкладка «Бажання» (порт wishlist.js UI)
 // ------------------------------------------------------------
-// Дві підвкладки: «Мої бажання» (редаговані, з архівом) і «Бажання
-// партнера» (бронь/виконання). Confirm-діалоги на видалення/бронь/
-// виконання збережені як у старому UX.
+// Три підвкладки: «Мої бажання» (редаговані, з архівом), «Бажання
+// партнера» (бронь/виконання) і «Спільне» (видимо обом, isOwn — по
+// кожній картці окремо, бо власники змішані). Прогрес-бар і річна
+// статистика — для пари загалом, показуються на всіх вкладках.
 // ============================================================
 import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -15,29 +16,44 @@ import {
   usePartner,
   partnerGenitive,
   useWishlistItems,
+  useSharedWishlistItems,
+  useCoupleWishStats,
   useWishlistMutations,
   type WishFormPayload,
 } from './useWishlist';
 import type { WishlistItemRow } from '@/types';
 
-type Tab = 'me' | 'partner';
+type Tab = 'me' | 'partner' | 'shared';
 
 export function WishlistPage() {
   const me = useCurrentUser();
   const partner = usePartner();
   const [tab, setTab] = useState<Tab>('me');
 
-  const isOwn = tab === 'me';
-  const ownerId = isOwn ? me.id : (partner?.id ?? null);
+  const isOwnTab = tab === 'me';
+  const ownerId = tab === 'shared' ? null : isOwnTab ? me.id : (partner?.id ?? null);
 
-  const { data: items = [], isPending, isError } = useWishlistItems(ownerId);
+  const { data: ownItems = [], isPending: ownPending, isError: ownError } =
+    useWishlistItems(ownerId);
+  const { data: sharedItems = [], isPending: sharedPending, isError: sharedError } =
+    useSharedWishlistItems();
+  const { data: stats } = useCoupleWishStats();
+
+  const items = tab === 'shared' ? sharedItems : ownItems;
+  const isPending = tab === 'shared' ? sharedPending : ownPending;
+  const isError = tab === 'shared' ? sharedError : ownError;
+
   const { save, remove, setReserved, fulfill } = useWishlistMutations(ownerId);
 
   const [editing, setEditing] = useState<WishlistItemRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
-  const submit = (id: number | null, payload: WishFormPayload) => save.mutate({ id, payload });
+  const submit = (
+    id: number | null,
+    payload: WishFormPayload,
+    scope: { owner: number; isShared: boolean },
+  ) => save.mutate({ id, payload, owner: scope.owner, isShared: scope.isShared });
 
   const onDelete = (id: number) => {
     if (confirm('Видалити бажання?')) remove.mutate(id);
@@ -53,36 +69,66 @@ export function WishlistPage() {
   };
 
   const partnerName = partnerGenitive(partner?.name);
+  const isItemOwn = (item: WishlistItemRow) => (tab === 'shared' ? item.owner === me.id : isOwnTab);
+
+  const pct = stats && stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
 
   return (
     <section className="wishlist">
       <div className="wl-sub-tabs">
         <button
           type="button"
-          className={`wl-sub-btn${isOwn ? ' active' : ''}`}
+          className={`wl-sub-btn${tab === 'me' ? ' active' : ''}`}
           onClick={() => setTab('me')}
         >
           Мої бажання
         </button>
         <button
           type="button"
-          className={`wl-sub-btn${!isOwn ? ' active' : ''}`}
+          className={`wl-sub-btn${tab === 'partner' ? ' active' : ''}`}
           onClick={() => setTab('partner')}
         >
           Бажання {partnerName}
         </button>
+        <button
+          type="button"
+          className={`wl-sub-btn${tab === 'shared' ? ' active' : ''}`}
+          onClick={() => setTab('shared')}
+        >
+          🎁 Спільне
+        </button>
       </div>
 
       <div className="wl-head">
-        <h1 className="wl-title">{isOwn ? 'Мої бажання' : `Бажання ${partnerName}`}</h1>
-        {isOwn && (
-          <button type="button" className="btn" onClick={() => setAdding(true)}>
-            + Додати
-          </button>
-        )}
+        <h1 className="wl-title">
+          {tab === 'me' ? 'Мої бажання' : tab === 'partner' ? `Бажання ${partnerName}` : '🎁 Спільні бажання'}
+        </h1>
+        <button type="button" className="btn" onClick={() => setAdding(true)}>
+          + Додати
+        </button>
       </div>
 
-      {ownerId === null ? (
+      {stats && stats.total > 0 && (
+        <div className="plans-stat-banner">
+          <div className="plans-stat-row">
+            <div className="plans-stat-info">
+              <span className="plans-stat-num">{stats.done}</span>
+              <span className="plans-stat-sep">/</span>
+              <span className="plans-stat-total">{stats.total}</span>
+              <span className="plans-stat-label">бажань виконано</span>
+            </div>
+            <div className="plans-stat-pct">{pct}%</div>
+          </div>
+          <div className="plans-progress-bar">
+            <div className="plans-progress-fill" style={{ width: `${pct}%` }} />
+          </div>
+          {stats.doneThisYear > 0 && (
+            <p className="wl-year-stat">Ви виконали {stats.doneThisYear} бажань разом цього року ❤️</p>
+          )}
+        </div>
+      )}
+
+      {ownerId === null && tab !== 'shared' ? (
         <p className="empty-state">Користувача не знайдено.</p>
       ) : isPending ? (
         <p className="empty-state">Завантаження…</p>
@@ -93,16 +139,18 @@ export function WishlistPage() {
           <div className="wishlist-grid">
             {items.length === 0 ? (
               <p className="empty-state">
-                {isOwn
+                {tab === 'me'
                   ? 'Твій список порожній. Час додати нову забаганку.'
-                  : 'Партнер ще не додав жодного бажання.'}
+                  : tab === 'partner'
+                    ? 'Партнер ще не додав жодного бажання.'
+                    : 'Спільних бажань ще немає. Додайте перше!'}
               </p>
             ) : (
               items.map((item) => (
                 <WishCard
                   key={item.id}
                   item={item}
-                  isOwn={isOwn}
+                  isOwn={isItemOwn(item)}
                   onPhotoClick={setLightbox}
                   onEdit={setEditing}
                   onDelete={onDelete}
@@ -113,13 +161,15 @@ export function WishlistPage() {
             )}
           </div>
 
-          {isOwn && <WishArchive ownerId={me.id} />}
+          {tab === 'me' && <WishArchive ownerId={me.id} />}
         </>
       )}
 
       {(adding || editing) && (
         <WishFormModal
           item={editing}
+          partner={partner}
+          defaultScope={tab}
           onClose={() => {
             setAdding(false);
             setEditing(null);

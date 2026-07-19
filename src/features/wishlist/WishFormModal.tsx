@@ -10,19 +10,35 @@ import { normalize } from '@/lib/images';
 import { uploadWishPhoto, type WishFormPayload } from './useWishlist';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import type { WishlistItemRow, WishPriority } from '@/types';
+import type { WishlistItemRow, WishPriority, AppUser } from '@/types';
+
+type Scope = 'me' | 'partner' | 'shared';
 
 interface WishFormModalProps {
   item: WishlistItemRow | null; // null → додавання
+  partner: AppUser | null;
+  defaultScope: Scope;
   onClose: () => void;
-  onSubmit: (id: number | null, payload: WishFormPayload) => void;
+  onSubmit: (
+    id: number | null,
+    payload: WishFormPayload,
+    scope: { owner: number; isShared: boolean },
+  ) => void;
   onPhotoClick: (src: string) => void;
 }
 
-export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFormModalProps) {
+export function WishFormModal({
+  item,
+  partner,
+  defaultScope,
+  onClose,
+  onSubmit,
+  onPhotoClick,
+}: WishFormModalProps) {
   const isEdit = item !== null;
   const me = useCurrentUser();
   const toast = useToast();
+  const [scope, setScope] = useState<Scope>(defaultScope);
 
   const [title, setTitle] = useState(item?.title ?? '');
   const [link, setLink] = useState(item?.link ?? '');
@@ -71,14 +87,19 @@ export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFor
       if (pendingFile) {
         image_url = await uploadWishPhoto(pendingFile, me.id);
       }
-      onSubmit(item?.id ?? null, {
-        title: t,
-        link: link.trim() || null,
-        image_url,
-        price: parseFloat(price) || null,
-        priority: priority || null,
-        description: description.trim() || null,
-      });
+      const owner = scope === 'partner' && partner ? partner.id : me.id;
+      onSubmit(
+        item?.id ?? null,
+        {
+          title: t,
+          link: link.trim() || null,
+          image_url,
+          price: parseFloat(price) || null,
+          priority: priority || null,
+          description: description.trim() || null,
+        },
+        { owner, isShared: scope === 'shared' },
+      );
       onClose();
     } catch (e) {
       toast.show('Помилка завантаження фото: ' + (e as Error).message);
@@ -95,6 +116,36 @@ export function WishFormModal({ item, onClose, onSubmit, onPhotoClick }: WishFor
     >
       <div className="modal-sheet" role="dialog" aria-modal="true">
         <h2 className="modal-title">{isEdit ? 'Редагувати бажання' : 'Нове бажання'}</h2>
+
+        {!isEdit && (
+          <div className="form-field">
+            <span>Для кого</span>
+            <div className="wl-sub-tabs">
+              <button
+                type="button"
+                className={`wl-sub-btn${scope === 'me' ? ' active' : ''}`}
+                onClick={() => setScope('me')}
+              >
+                Моє
+              </button>
+              <button
+                type="button"
+                className={`wl-sub-btn${scope === 'partner' ? ' active' : ''}`}
+                onClick={() => setScope('partner')}
+                disabled={!partner}
+              >
+                Для {partner?.name ?? 'партнера'}
+              </button>
+              <button
+                type="button"
+                className={`wl-sub-btn${scope === 'shared' ? ' active' : ''}`}
+                onClick={() => setScope('shared')}
+              >
+                🎁 Спільне
+              </button>
+            </div>
+          </div>
+        )}
 
         <label className="form-field">
           <span>Назва *</span>
