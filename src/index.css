@@ -110,16 +110,13 @@ textarea {
    до користування вже зараз.
    ============================================================ */
 
-/* app-shell — фіксована рамка (не документ) на весь visual viewport.
-   КРИТИЧНО для iOS: якщо натомість скролиться body/html, Safari під
-   час скролу проміж інерції інколи компонує фіксований відео-шар
-   (.bg-video-layer, z-index:-1) в окремий шар ПІД непрозорим шаром
-   контенту, що скролиться, — відео зникає за "порталом". Коли сам
-   app-shell фіксований і не скролиться, а скролиться лише .content
-   (звичайний div, не документ), цей ефект не виникає в принципі —
-   і заразом зникає "гумовий" bounce-скрол і протікання скролу за
-   відкриту шторку/модалку (iOS ігнорує body.style.overflow='hidden'
-   під час активного тача, а для звичайного div — ні). */
+/* app-shell — фіксована рамка (не документ) на весь visual viewport,
+   .content — єдиний скрол-контейнер. Раніше це рятувало фіксований
+   відео-шар (прибраний) від зникання за портáлом на iOS; лишається
+   актуальним і без відео — прибирає "гумовий" bounce-скрол і
+   протікання скролу за відкриту шторку/модалку (iOS ігнорує
+   body.style.overflow='hidden' під час активного тача, а для
+   звичайного div — ні). */
 .app-shell {
   position: fixed;
   inset: 0;
@@ -134,7 +131,7 @@ textarea {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding: calc(env(safe-area-inset-top, 0) + 16px) 16px calc(env(safe-area-inset-bottom, 0) + 88px);
+  padding: 16px 16px calc(env(safe-area-inset-bottom, 0) + 88px);
 }
 
 /* fill-mode: backwards (не both!) — щоб після завершення переходу
@@ -245,7 +242,7 @@ textarea {
     width: 240px;
     /* position:sticky не потрібен — .app-shell фіксований і сам не
        скролиться, тож сайдбару нема відносно чого "прилипати". */
-    padding: calc(env(safe-area-inset-top, 0) + 16px) 12px calc(env(safe-area-inset-bottom, 0) + 16px);
+    padding: 16px 12px calc(env(safe-area-inset-bottom, 0) + 16px);
     background: var(--surface);
     border-right: 1px solid rgba(0, 0, 0, 0.06);
   }
@@ -419,43 +416,93 @@ textarea {
   white-space: nowrap; border: 0;
 }
 
-/* ── Auth-екран (робочий каркас) ────────────────────────────── */
+/* ── Auth-екран «Pink Portal» ────────────────────────────────
+   Токени навмисно локальні (--accent/--text/--muted переоголошені
+   лише в .auth-screen) і ігнорують [data-theme='dark'] — дизайн
+   заданий як світлий незалежно від теми, як у хендофі. */
 .auth-screen {
+  --accent: #d98aa8;
+  --text: #3a2530;
+  --muted: #8a6b76;
+  position: relative;
   min-height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  background: linear-gradient(160deg, #fff4f7 0%, #ffe7ee 45%, #fbd6e4 100%);
+  font-family: 'Nunito', system-ui, sans-serif;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+.auth-card {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  max-width: 380px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 32px;
+  box-shadow: 0 24px 60px rgba(219, 112, 147, 0.28);
+  padding: 40px 32px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 20px;
-  padding: 24px;
+  text-align: center;
 }
-.auth-title { margin: 0; }
-.user-select { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+.auth-card.shake { animation: shakeX 0.4s ease; }
+.auth-kicker {
+  font-size: 13px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 800;
+}
+.auth-title {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 27px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text);
+  line-height: 1.25;
+}
+.user-select { display: flex; flex-direction: column; gap: 14px; width: 100%; margin-top: 6px; }
 .user-btn {
   appearance: none;
   border: 0;
-  border-radius: 16px;
-  padding: 18px 28px;
+  border-radius: 20px;
+  padding: 18px 24px;
   font: inherit;
-  font-size: 18px;
-  cursor: pointer;
-  background: var(--surface);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 19px;
+  font-weight: 600;
   color: var(--text);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  background: linear-gradient(180deg, #ffffff, #fff0f5);
+  box-shadow: 0 8px 22px rgba(219, 112, 147, 0.18);
+  transition: transform 0.15s ease, background 0.15s ease;
 }
+.user-btn:hover { background: linear-gradient(180deg, #fff5f8, #ffe3ec); transform: translateY(-2px); }
+.user-btn:active { transform: translateY(0); }
+
 .pin-dots { display: flex; gap: 10px; }
 .pin-dot {
-  width: 14px; height: 14px;
+  width: 13px; height: 13px;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--text) 18%, transparent);
+  background: rgba(58, 37, 48, 0.14);
+  transition: background 0.15s ease;
 }
 .pin-dot.filled { background: var(--accent); }
-.pin-dot.error { background: var(--danger); }
-.pin-error { color: var(--danger); margin: 0; font-size: 14px; }
+.pin-dot.error { background: #e2636b; }
+.pin-error { color: #d9534f; margin: 0; font-size: 14px; font-weight: 600; }
 .pin-pad {
   display: grid;
-  grid-template-columns: repeat(3, 72px);
+  grid-template-columns: repeat(3, 64px);
   gap: 12px;
+  margin-top: 6px;
 }
 .pin-key {
   appearance: none;
@@ -463,13 +510,140 @@ textarea {
   border-radius: 50%;
   aspect-ratio: 1;
   font: inherit;
-  font-size: 22px;
-  cursor: pointer;
-  background: var(--surface);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 21px;
+  font-weight: 600;
   color: var(--text);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(58, 37, 48, 0.08);
+  transition: background 0.15s ease, transform 0.1s ease;
 }
+.pin-key:hover { background: #fff0f5; }
+.pin-key:active { background: #ffe3ec; transform: scale(0.95); }
+.pin-key--dim { opacity: 0.6; }
+
+@keyframes shakeX {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-card.shake { animation: none; }
+}
+
 .empty-state { color: var(--muted); }
+
+/* ── Auth-екран: декоративний фон (серця/квіти/торти/хвильки) ─
+   Позиції/кольори — data-масиви в PortalDecor.tsx, тут лише форми. */
+@keyframes floatBob {
+  0%, 100% { transform: rotate(var(--r, 0deg)) translateY(0); }
+  50% { transform: rotate(var(--r, 0deg)) translateY(-14px); }
+}
+.portal-decor {
+  position: absolute;
+  inset: -40px;
+  pointer-events: none;
+  transition: transform 0.25s ease-out;
+}
+.portal-heart {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
+}
+.portal-heart::before,
+.portal-heart::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: inherit;
+}
+.portal-heart::before { top: -50%; left: 0; }
+.portal-heart::after { top: 0; left: 50%; }
+
+.portal-flower {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
+}
+.portal-flower-petal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 42%;
+  height: 42%;
+  margin: -21% 0 0 -21%;
+  border-radius: 50%;
+}
+.portal-flower-center {
+  position: absolute;
+  top: 32%;
+  left: 32%;
+  width: 36%;
+  height: 36%;
+  border-radius: 50%;
+}
+
+.portal-cake {
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
+}
+.portal-cake-base {
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 100%; height: 55%;
+  background: #f7cdd6;
+  border-radius: 6px 6px 16px 16px;
+  box-shadow: 0 3px 8px rgba(58, 37, 48, 0.1);
+}
+.portal-cake-top {
+  position: absolute;
+  bottom: 50%; left: 15%;
+  width: 70%; height: 32%;
+  background: #fde3ea;
+  border-radius: 10px 10px 4px 4px;
+}
+.portal-cake-candle {
+  position: absolute;
+  top: 6%; left: 46%;
+  width: 8%; height: 22%;
+  background: #e7b8cb;
+  border-radius: 2px;
+}
+.portal-cake-flame {
+  position: absolute;
+  top: -6%; left: 42%;
+  width: 16%; height: 16%;
+  background: #f6ad55;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(45deg);
+}
+
+.portal-squiggle {
+  position: absolute;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
+}
+.portal-squiggle-dot {
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: var(--dot-color);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-heart, .portal-flower, .portal-cake, .portal-squiggle { animation: none; }
+  .portal-decor { transition: none; transform: none !important; }
+}
+
 .page-placeholder h1 { margin-top: 0; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1380,16 +1554,56 @@ a.wl-card-title { color: var(--accent); }
 .dish-edit-btn { border: 0; background: transparent; font-size: 16px; cursor: pointer; padding: 4px; }
 
 /* ============================================================
-   ГОЛОВНА (home) — привітання, лічильник, фото-хмарка, віджети
+   ГОЛОВНА (home) — «Pink Portal»: привітання, лічильник,
+   фото-хмарка, віджети.
+   Токени локальні (як у .auth-screen) і теж ігнорують dark-тему —
+   дизайн-хендоф світлий, без темного варіанту.
    ============================================================ */
-.home { display: flex; flex-direction: column; gap: 16px; }
-.greeting-text { font-size: 22px; font-weight: 700; margin: 4px 0 0; }
+.home {
+  --accent: #d98aa8;
+  --text: #3a2530;
+  --muted: #8a6b76;
+  --surface: #ffffff;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'Nunito', system-ui, sans-serif;
+  color: var(--text);
+  /* Бліди у padding .content, щоб градієнт сягав країв видимої області. */
+  margin: -16px -16px calc(-1 * (env(safe-area-inset-bottom, 0) + 88px));
+  padding: 20px 16px calc(env(safe-area-inset-bottom, 0) + 88px);
+  min-height: 100%;
+  background: linear-gradient(160deg, #fff7f9 0%, #fff0f4 50%, #ffe9ef 100%);
+}
+.greeting-text {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 21px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 6px 0 0;
+}
 
-.home-counter-wrap { position: relative; padding: 40px 0 30px; display: grid; place-items: center; min-height: 260px; }
+.home-counter-wrap { position: relative; display: grid; place-items: center; min-height: 270px; }
 .counter { text-align: center; position: relative; z-index: 2; }
-.counter-number { font-size: 64px; font-weight: 800; line-height: 1; color: var(--accent); letter-spacing: -2px; }
-.counter-since { color: var(--muted); margin-top: 6px; }
-.counter-next-anniversary { margin-top: 10px; font-size: 14px; color: var(--text); }
+.counter-number {
+  font-family: 'Fredoka', sans-serif;
+  font-size: 56px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent);
+  letter-spacing: -1px;
+}
+.counter-since { color: var(--muted); margin-top: 6px; font-size: 14px; }
+.counter-next-anniversary {
+  margin-top: 10px;
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
 
 /* Полароїд-хмарка */
 .photo-cloud { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
@@ -1397,50 +1611,56 @@ a.wl-card-title { color: var(--accent); }
   position: absolute;
   width: 74px;
   height: 84px;
-  padding: 5px 5px 14px;
+  padding: 5px 5px 12px;
   background: #fff;
-  border-radius: 4px;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+  box-shadow: 0 8px 20px rgba(58, 37, 48, 0.16);
   transform: rotate(var(--rot, 0deg));
   transition: opacity 0.4s ease, transform 0.2s ease;
   animation: float-bob 5s ease-in-out infinite;
   cursor: pointer;
   pointer-events: auto;
   overflow: hidden;
+  box-sizing: border-box;
 }
 .float-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; display: block; user-select: none; }
-.float-photo--0 { top: 6%; left: 4%; }
-.float-photo--1 { top: 2%; right: 8%; }
-.float-photo--2 { top: 40%; left: 0; }
-.float-photo--3 { top: 44%; right: 2%; }
-.float-photo--4 { bottom: 4%; left: 12%; }
-.float-photo--5 { bottom: 0; right: 14%; }
+.float-photo--0 { top: 4%; left: 2%; }
+.float-photo--1 { top: 0%; right: 6%; }
+.float-photo--2 { top: 42%; left: 0; }
+.float-photo--3 { top: 46%; right: 0; }
+.float-photo--4 { bottom: 2%; left: 10%; }
+.float-photo--5 { bottom: 0; right: 12%; }
 @keyframes float-bob {
   0%, 100% { transform: rotate(var(--rot, 0deg)) translateY(0); }
-  50% { transform: rotate(var(--rot, 0deg)) translateY(-10px); }
+  50% { transform: rotate(var(--rot, 0deg)) translateY(-9px); }
 }
 @media (prefers-reduced-motion: reduce) {
   .float-photo { animation: none; }
 }
 
 /* Міні-віджети */
-.mini-widgets { display: flex; flex-direction: column; gap: 10px; }
+.mini-widgets { display: flex; gap: 10px; flex-wrap: wrap; }
 .mini-widget {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
+  gap: 10px;
+  flex: 1;
+  min-width: 150px;
   text-align: left;
   border: 0;
-  border-radius: 14px;
+  border-radius: 18px;
   padding: 14px 16px;
   background: var(--surface);
   color: var(--text);
   font: inherit;
+  font-size: 13px;
   cursor: pointer;
+  box-shadow: 0 6px 18px rgba(58, 37, 48, 0.08);
+  transition: background 0.15s ease;
 }
-.mini-widget-icon { font-size: 26px; }
-.mini-widget-text { line-height: 1.35; }
+.mini-widget:hover { background: #fff5f8; }
+.mini-widget-icon { font-size: 22px; }
+.mini-widget-text { line-height: 1.3; }
 
 /* Найближча подія */
 .next-event-widget {
@@ -1448,30 +1668,31 @@ a.wl-card-title { color: var(--accent); }
   align-items: center;
   gap: 12px;
   background: var(--surface);
-  border-radius: 14px;
+  border: 2px solid var(--accent);
+  border-radius: 20px;
   padding: 14px 16px;
 }
 .next-event-empty { background: var(--surface); border-radius: 14px; padding: 16px; text-align: center; color: var(--muted); }
-.next-event-icon { font-size: 26px; }
-.next-event-label { font-size: 12px; color: var(--muted); margin: 0; text-transform: uppercase; }
-.next-event-title { font-weight: 600; margin: 2px 0; }
+.next-event-icon { font-size: 30px; }
+.next-event-label { font-size: 11px; color: var(--muted); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
+.next-event-title { font-size: 17px; font-weight: 700; margin: 2px 0; }
 .next-event-date { font-size: 13px; color: var(--muted); margin: 0; }
 
 /* Тиждень */
-.week-widget { background: var(--surface); border-radius: 16px; padding: 14px 16px; }
+.week-widget { background: var(--surface); border-radius: 20px; padding: 16px 18px 8px; }
 .week-widget-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.week-widget-title { font-weight: 700; }
-.week-widget-count { background: var(--accent); color: #fff; border-radius: 999px; padding: 1px 9px; font-size: 12px; }
+.week-widget-title { font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 600; }
+.week-widget-count { background: var(--accent); color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
 .week-widget-list { display: flex; flex-direction: column; gap: 4px; }
-.week-day-hdr { padding: 8px 0 4px; font-size: 12px; color: var(--muted); }
-.week-day-hdr--today .week-day-label { color: var(--accent); font-weight: 700; }
-.week-event-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
-.week-event-icon { font-size: 20px; }
+.week-day-hdr { padding: 8px 0 6px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.week-day-hdr--today .week-day-label { color: var(--accent); }
+.week-event-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(58, 37, 48, 0.06); }
+.week-event-icon { font-size: 18px; }
 .week-event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.week-event-title { font-weight: 500; }
+.week-event-title { font-size: 14px; font-weight: 600; }
 .week-event-note { font-size: 12px; color: var(--muted); }
-.week-event-badge { font-size: 11px; border-radius: 999px; padding: 2px 8px; }
-.week-badge-plan { background: color-mix(in srgb, #9B6EA8 20%, transparent); color: #9B6EA8; }
+.week-event-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
+.week-badge-plan { background: rgba(122, 138, 94, 0.14); color: #5c6a47; }
 .week-badge-event { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 
 /* ============================================================
@@ -1775,130 +1996,6 @@ a.wl-card-title { color: var(--accent); }
    ============================================================ */
 .game { margin: -16px; height: calc(100dvh - var(--bottom-nav-h, 64px)); }
 .game-frame { width: 100%; height: 100%; border: 0; display: block; }
-
-/* ============================================================
-   GLASSMORPHISM + ВІДЕО-ФОН — додати в кінець src/index.css
-   ============================================================ */
-
-/* Відео-шар фону: fixed позаду всього контенту застосунку */
-.bg-video-layer {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  overflow: hidden;
-  /* Фолбек-колір, поки відео не завантажилось або якщо автоплей
-     заблоковано (iOS Low Power Mode ігнорує playsInline+muted) —
-     замість спалаху білого фону браузера. */
-  background: var(--bg);
-}
-.bg-video-layer video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.bg-video-layer::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.42) 70%, rgba(0, 0, 0, 0.58));
-}
-[data-theme='dark'] .bg-video-layer::after {
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.6) 70%, rgba(0, 0, 0, 0.72));
-}
-
-/* Базовий скляний рецепт — перевикористовуйте через var() */
-:root {
-  --glass-bg: rgba(255, 255, 255, 0.14);
-  --glass-bg-strong: rgba(255, 255, 255, 0.22);
-  --glass-border: rgba(255, 255, 255, 0.35);
-  --glass-text: #ffffff;
-  --glass-text-muted: rgba(255, 255, 255, 0.72);
-}
-
-.glass {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
-  color: var(--glass-text);
-}
-
-/* Картки (--surface) на екранах з відео-фоном → скло замість пласкої заливки.
-   Додайте клас glass поряд з існуючими (наприклад: card glass, wl-card glass,
-   mini-widget glass) там, де хочете перенести на скло. */
-
-/* ── Нижня навігація → скло ─────────────────────────────────── */
-.bottom-nav {
-  background: var(--glass-bg-strong);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid var(--glass-border);
-}
-.bottom-nav-indicator { background: rgba(255, 255, 255, 0.28); }
-.nav-btn { color: var(--glass-text-muted); }
-.nav-btn.active { color: #fff; }
-.nav-btn-home .nav-icon-home { color: #fff; }
-
-/* ── Сайдбар (десктоп) → скло ───────────────────────────────── */
-.sidebar {
-  background: var(--glass-bg-strong);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-right: 1px solid var(--glass-border);
-}
-.sidebar-brand,
-.sidebar-item { color: var(--glass-text); }
-.sidebar-item.active {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-}
-
-/* ── Хаб-таби (Календар / Ми) → скляний сегментований контрол ─ */
-.hub-tabs {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
-}
-.hub-tab { color: var(--glass-text-muted); }
-.hub-tab.active { color: #2a2030; }
-.hub-tabs-indicator {
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-}
-
-/* ── Меню «Ще» → скло ───────────────────────────────────────── */
-.more-menu-sheet {
-  background: var(--glass-bg-strong);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border-top: 1px solid var(--glass-border);
-}
-.more-menu-title,
-.more-menu-label { color: var(--glass-text); }
-
-/* Відео-фон має проглядати: прибираємо суцільний фон body,
-   базовий колір/затемнення дає .bg-video-layer::after */
-body { background: transparent; }
-
-/* ── Меню «Ще»: щільна шторка, щоб контент під нею не просвічував ── */
-.more-menu-sheet {
-  background: var(--surface);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-}
-.more-menu-overlay,
-.more-menu-backdrop {
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-  z-index: 999;
-}
 
 /* ============================================================
    НАЛАШТУВАННЯ — розміри + фото-менеджер полароїда
