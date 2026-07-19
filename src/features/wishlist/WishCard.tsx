@@ -20,6 +20,7 @@ interface WishCardProps {
   onDelete: (id: number) => void;
   onReserve: (id: number, reserved: boolean) => void;
   onFulfill: (item: WishlistItemRow) => void;
+  onMove: (item: WishlistItemRow) => void;
 }
 
 export function WishCard({
@@ -30,6 +31,7 @@ export function WishCard({
   onDelete,
   onReserve,
   onFulfill,
+  onMove,
 }: WishCardProps) {
   return (
     <div className="wl-card">
@@ -70,6 +72,9 @@ export function WishCard({
           <div className="wl-card-actions">
             <button type="button" className="btn-secondary" onClick={() => onEdit(item)}>
               ✏️ Редагувати
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => onMove(item)}>
+              ↔️ Перенести
             </button>
             <button type="button" className="btn-secondary" onClick={() => onDelete(item.id)}>
               🗑 Видалити

@@ -250,6 +250,19 @@ textarea {
   .bottom-nav { display: none; }
 }
 
+/* ── «Pink Portal» фон для інших сторінок (пілот: Календар-хаб,
+   Вішлист) — той самий градієнт+PortalDecor, що на Home, як окрема
+   утилітарна обгортка (без .home flex-розкладки — тільки фон/бліди). */
+.pink-page {
+  --accent: #d98aa8;
+  position: relative;
+  margin: -16px -16px calc(-1 * (env(safe-area-inset-bottom, 0) + 88px));
+  padding: 16px 16px calc(env(safe-area-inset-bottom, 0) + 88px);
+  min-height: 100dvh;
+  background: linear-gradient(160deg, #fff7f9 0%, #fff0f4 50%, #ffe9ef 100%);
+}
+.pink-page > :not(.portal-decor) { position: relative; z-index: 1; }
+
 /* ── Хаби (сабтаби) — сегментований контрол зі слайд-індикатором */
 .hub-tabs {
   display: inline-flex;
@@ -932,6 +945,8 @@ textarea {
    CSS-прохід.
    ============================================================ */
 .wl-sub-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.wl-sub-tabs--col { flex-direction: column; margin-bottom: 0; }
+.wl-sub-tabs--col .wl-sub-btn { text-align: left; }
 .wl-sub-btn {
   flex: 1;
   border: 0;
@@ -1339,7 +1354,6 @@ a.wl-card-title { color: var(--accent); }
 .sched-boards--editing .sched-cell { cursor: pointer; }
 .sched-cell--empty { background: transparent; }
 .sched-cell--today { outline: 2px solid var(--accent); }
-.sched-cell--common-off { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .sched-cell-num { font-size: 12px; color: var(--muted); position: relative; }
 .sched-cell-heart { color: var(--accent); font-size: 9px; margin-left: 1px; }
 .sched-cell-letter { font-size: 15px; font-weight: 700; min-height: 18px; }
@@ -1365,7 +1379,6 @@ a.wl-card-title { color: var(--accent); }
 .heat-swatch--both-off { background: #3fae56; }
 .heat-swatch--one-off { background: #e0b23f; }
 .heat-swatch--none-off { background: color-mix(in srgb, var(--text) 18%, transparent); }
-.heat-hint { text-align: center; font-size: 12px; color: var(--muted); margin-top: 10px; }
 
 /* Фото-календар */
 .pcal-cell {
@@ -1690,10 +1703,15 @@ a.wl-card-title { color: var(--accent); }
   gap: 18px;
   font-family: 'Nunito', system-ui, sans-serif;
   color: var(--text);
-  /* Бліди у padding .content, щоб градієнт сягав країв видимої області. */
+  /* Бліди у padding .content, щоб градієнт сягав країв видимої області.
+     min-height:100% тут НЕ резолвиться — прямий батько (.page-fade у
+     Layout.tsx) має height:auto (без явної висоти), а проценти від
+     auto-висоти браузер ігнорує (=> нижче контенту фон обривався й
+     проглядав сірий --bg із .content). 100dvh не залежить від
+     предків — рахується від фактичного viewport. */
   margin: -16px -16px calc(-1 * (env(safe-area-inset-bottom, 0) + 88px));
   padding: 20px 16px calc(env(safe-area-inset-bottom, 0) + 88px);
-  min-height: 100%;
+  min-height: 100dvh;
   background: linear-gradient(160deg, #fff7f9 0%, #fff0f4 50%, #ffe9ef 100%);
 }
 .greeting-text {
