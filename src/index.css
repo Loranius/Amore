@@ -1815,3 +1815,7 @@ a.wl-card-title { color: var(--accent); }
 }
 .more-menu-title,
 .more-menu-label { color: var(--glass-text); }
+
+/* Відео-фон має проглядати: прибираємо суцільний фон body,
+   базовий колір/затемнення дає .bg-video-layer::after */
+body { background: transparent; }
