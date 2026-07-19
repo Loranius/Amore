@@ -9,14 +9,17 @@
    помилок, які треба стирати; Backspace лишається для охайності,
    якщо схотілось перетапати слово.
    ============================================================ */
-const UA_ROWS=[
-  ['й','ц','у','к','е','н','г','ш','щ','з','х','ї'],
-  ['ф','і','в','а','п','р','о','л','д','ж','є'],
-  ['я','ч','с','м','и','т','ь','б','ю'],
-];
+const UA_LETTERS=['й','ц','у','к','е','н','г','ш','щ','з','х','ї','ф','і','в','а','п','р','о',
+  'л','д','ж','є','я','ч','с','м','и','т','ь','б','ю','.'];
+/** Перемішана (не класична ЙЦУКЕН) розкладка — своя на кожен урок письма. */
+function shuffledUaRows(){
+  const arr=[...UA_LETTERS];
+  for(let i=arr.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; }
+  return [arr.slice(0,12),arr.slice(12,23),arr.slice(23)];
+}
 
-function kbLayout(){
-  const rows=UA_ROWS, kbTop=H*0.56, kbH=H*0.34, rowH=kbH/(rows.length+1);
+function kbLayout(rows){
+  const kbTop=H*0.56, kbH=H*0.34, rowH=kbH/(rows.length+1);
   const keys=[];
   rows.forEach((row,ri)=>{
     const kw=Math.min(46,(W-20)/row.length-4);
@@ -34,6 +37,7 @@ function kbLayout(){
 
 function playTypeSentence(sentence){
   const target=sentence.toLowerCase();
+  const rows=shuffledUaRows(); // своя перемішана розкладка на цей урок
   return new Promise(resolve=>{
     let typed='', flashKey=null, flashT=0, badFlash=0;
     G.busy=true;
@@ -46,7 +50,7 @@ function playTypeSentence(sentence){
     G.activity={
       update(dt){ if(flashT>0) flashT-=dt; if(badFlash>0) badFlash-=dt; },
       onTap(x,y){
-        for(const k of kbLayout()){
+        for(const k of kbLayout(rows)){
           if(x>=k.x&&x<=k.x+k.w&&y>=k.y&&y<=k.y+k.h){
             flashKey=k; flashT=0.12;
             if(k.isBack) backspace(); else pressChar(k.char);
@@ -56,13 +60,13 @@ function playTypeSentence(sentence){
       },
       onKey(k){
         if(k==='backspace'){ backspace(); return; }
-        if(k===' '||k.length===1) pressChar(k===' '?' ':k.toLowerCase());
+        if(k===' '||k==='.'||k.length===1) pressChar(k===' '?' ':k.toLowerCase());
       },
       render(){
-        mgBg('#eef2ff','#c7d2f0');
+        mgClassroomBg(['А  Б  В']);
         mgTitle('✏️ Українська мова');
         ctx.font='16px "Courier New",monospace'; ctx.textAlign='center';
-        const y=H*0.22;
+        const y=H*0.49; // між партами і клавіатурою
         ctx.lineWidth=3; ctx.strokeStyle='rgba(10,12,24,.7)';
         ctx.strokeText(target,W/2,y); ctx.fillStyle='#3a2b1a'; ctx.fillText(target,W/2,y);
         // набраний префікс — підсвічений поверх
@@ -70,7 +74,7 @@ function playTypeSentence(sentence){
         ctx.fillStyle=badFlash>0?'#ff5d5d':'#2f8a4a';
         ctx.fillText(typedShown,W/2,y+26);
         ctx.textAlign='left';
-        for(const k of kbLayout()){
+        for(const k of kbLayout(rows)){
           const active=flashKey===k&&flashT>0;
           ctx.fillStyle=active?'#f7c94b':'#2a2e44';
           ctx.fillRect(k.x,k.y,k.w,k.h);

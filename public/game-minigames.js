@@ -40,6 +40,30 @@ function mgTapHint(text){
   ctx.fillStyle='#f7c94b'; ctx.fillText(text,W/2,H-28);
   ctx.globalAlpha=1; ctx.textAlign='left';
 }
+/** Фон-клас для уроків (математика/мова): дошка з крейдою + вчитель з указкою + діти за партами. */
+function mgClassroomBg(boardLines){
+  mgBg('#dbe8f5','#b7cee6');
+  const bw=Math.min(W*0.66,340), bh=H*0.15, bx=(W-bw)/2, by=H*0.09;
+  ctx.fillStyle='#6e5640'; ctx.fillRect(bx-7,by-7,bw+14,bh+14);
+  ctx.fillStyle='#2f4a34'; ctx.fillRect(bx,by,bw,bh);
+  ctx.fillStyle='#8a7256'; ctx.fillRect(bx-4,by+bh+8,bw+8,6);
+  ctx.fillStyle='#eaf2e6'; ctx.font='bold 22px "Courier New",monospace'; ctx.textAlign='center';
+  (boardLines||[]).forEach((ln,i)=>ctx.fillText(ln,bx+bw/2,by+bh*0.5+i*24-(boardLines.length-1)*12));
+  ctx.textAlign='left';
+  // вчителька з указкою
+  const CS=2.4, timg=SP_HER[2][0], tx=bx+bw+18, ty=by+bh+10;
+  ctx.drawImage(timg,tx,ty-timg.height*CS,timg.width*CS,timg.height*CS);
+  ctx.strokeStyle='#8a6f52'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(tx+timg.width*CS*0.3,ty-timg.height*CS*0.4); ctx.lineTo(bx+bw-8,by+bh*0.65); ctx.stroke();
+  // парти з дітьми, що пишуть
+  const deskY=H*0.36;
+  [[W*0.22,0],[W*0.5,1],[W*0.78,0]].forEach(([dx,vi])=>{
+    ctx.fillStyle='#8a6f52'; ctx.fillRect(dx-26,deskY,52,10);
+    ctx.fillStyle='#6e5640'; ctx.fillRect(dx-22,deskY+10,5,16); ctx.fillRect(dx+17,deskY+10,5,16);
+    const kimg=NPC_KIDS[vi][0][0];
+    ctx.drawImage(kimg,dx-kimg.width*CS/2,deskY-kimg.height*CS+8,kimg.width*CS,kimg.height*CS);
+  });
+}
 
 /* ============================================================
    1. СТРИБКИ НА СКАКАЛЦІ — тайминг-тап у ритм

@@ -61,12 +61,9 @@ function playMathLesson(grade,count){
         }
       },
       render(){
-        mgBg('#fde9d0','#e8b25a');
+        mgClassroomBg([cur.q+' = ?']);
         mgTitle('➕ Математика · '+grade+' клас');
         mgProgress('Приклад '+(idx+1)+'/'+count);
-        ctx.font='bold 34px "Courier New",monospace'; ctx.textAlign='center';
-        ctx.fillStyle='#3a2b1a'; ctx.fillText(cur.q+' = ?',W/2,H*0.38);
-        ctx.textAlign='left';
         mathChoiceRects(choices).forEach((r,i)=>{
           const active=flashT>0&&flashIdx===i;
           ctx.fillStyle=active?(choices[i]===cur.answer?'#bff2c9':'#ffb3b3'):'#ffffff';

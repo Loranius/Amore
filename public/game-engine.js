@@ -574,7 +574,7 @@ function drawActor(a){
   ctx.drawImage(img,Math.round(a.x-img.width/2),Math.round(a.y-img.height+1));
 }
 function render(){
-  if(G.activity){ G.activity.render(); return; }
+  if(G.activity){ hudEl.style.display='none'; G.activity.render(); return; }
   const m=G.map;
   ctx.fillStyle=m?m.bg:'#101326';
   ctx.fillRect(0,0,W,H);
