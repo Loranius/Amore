@@ -134,6 +134,24 @@ export async function normalize(file: File): Promise<File> {
   throw new Error(msg);
 }
 
+/**
+ * normalize() + прев'ю як data URL — той самий блок коду був
+ * продубльований у WishFormModal.tsx і PhotoDayModal.tsx (HEIC →
+ * нормалізація → FileReader → dataURL для миттєвого прев'ю ще до
+ * завантаження). Кидає з тим самим текстом помилки, що й раніше —
+ * виклик обгортає try/catch і сам показує тост.
+ */
+export async function normalizeToPreview(file: File): Promise<{ file: File; previewSrc: string }> {
+  const normalized = await normalize(file);
+  const previewSrc = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error ?? new Error('Не вдалося прочитати файл'));
+    reader.onload = (e) => resolve((e.target?.result as string) ?? '');
+    reader.readAsDataURL(normalized);
+  });
+  return { file: normalized, previewSrc };
+}
+
 // ── compress: canvas, WebP з фолбеком на JPEG ────────────────
 export interface CompressResult {
   blob: Blob;

@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { normalize } from '@/lib/images';
 import { CATEGORIES, CATEGORY_ORDER } from './mapConstants';
 import { useToast } from '@/providers/ToastProvider';
+import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import type { PinCategory } from '@/types';
 
 interface AddPinModalProps {
@@ -81,16 +82,9 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
 
         <div className="form-field">
           <span>Фото місця</span>
-          <input
-            id="pin-photo-file"
-            name="photoFile"
-            type="file"
-            accept="image/*,.heic,.heif"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void pickFile(f);
-            }}
-          />
+          <FilePickerButton id="pin-photo-file" onPick={(f) => void pickFile(f)}>
+            🖼 Обрати з пристрою
+          </FilePickerButton>
           {preview && <img className="pin-add-preview" src={preview} alt="" />}
         </div>
 

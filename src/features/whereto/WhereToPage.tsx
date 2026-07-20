@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { OBLASTS, readWhereToCache, writeWhereToCache } from './whereToConstants';
 import { useWhereToLocation, useSaveLocation, useEventsSearch } from './useWhereTo';
 import { PortalDecor } from '@/features/auth/PortalDecor';
+import { Card } from '@/components/ui/Card';
 import type { WhereToLocation, WhereToEvent } from '@/types';
 
 export function WhereToPage() {
@@ -80,19 +81,19 @@ export function WhereToPage() {
 
       <div className="wt-results">
         {searchMut.isPending ? (
-          <div className="cul-card cul-loading">
+          <Card className="cul-loading">
             <div className="cul-loading-emoji">🗺️</div>
             <p className="cul-loading-text">Клод моніторить {location?.city}…</p>
             <p className="cul-step-hint">Шукаю події й цікаві місця на найближчі дні</p>
-          </div>
+          </Card>
         ) : searchMut.isError ? (
-          <div className="cul-card cul-loading">
+          <Card className="cul-loading">
             <div className="cul-loading-emoji">😕</div>
             <p className="cul-loading-text">Не вдалось знайти події</p>
             <p className="cul-step-hint">
               {searchMut.error instanceof Error ? searchMut.error.message : 'Спробуй ще раз за хвилину'}
             </p>
-          </div>
+          </Card>
         ) : results.length > 0 ? (
           <>
             {results.map((ev, i) => (

@@ -6,6 +6,7 @@
 // ============================================================
 import { useCulinaryConstructor } from './useCulinaryConstructor';
 import { useDishMutations } from './useDishes';
+import { Card } from '@/components/ui/Card';
 
 export function Constructor() {
   const c = useCulinaryConstructor();
@@ -13,24 +14,24 @@ export function Constructor() {
 
   if (c.status === 'loading') {
     return (
-      <div className="cul-card cul-loading">
+      <Card className="cul-loading">
         <div className="cul-loading-emoji">👨‍🍳</div>
         <p className="cul-loading-text">Клод вигадує вам страву…</p>
         <p className="cul-step-hint">Аналізую смаки, підбираю інгредієнти з АТБ і Сільпо</p>
-      </div>
+      </Card>
     );
   }
 
   if (c.status === 'error') {
     return (
-      <div className="cul-card cul-loading">
+      <Card className="cul-loading">
         <div className="cul-loading-emoji">😔</div>
         <p className="cul-loading-text">Не вийшло приготувати ідею</p>
         <p className="cul-step-hint">{c.error ?? 'Спробуй ще раз за хвилину'}</p>
         <button type="button" className="btn" onClick={c.generate}>
           Спробувати ще
         </button>
-      </div>
+      </Card>
     );
   }
 
@@ -40,7 +41,7 @@ export function Constructor() {
       .filter(Boolean)
       .join(' · ');
     return (
-      <div className="cul-card">
+      <Card>
         <p className="discover-title">{d.title}</p>
         {meta && <p className="discover-meta">{meta}</p>}
         {d.description && <p className="cul-desc">{d.description}</p>}
@@ -90,14 +91,14 @@ export function Constructor() {
             ✨ Спочатку
           </button>
         </div>
-      </div>
+      </Card>
     );
   }
 
   // status === 'wizard'
   const step = c.current;
   return (
-    <div className="cul-card">
+    <Card>
       <div className="cul-progress">
         {c.steps.map((_, i) => (
           <span key={i} className={`cul-progress-dot${i <= c.step ? ' filled' : ''}`} />
@@ -134,6 +135,6 @@ export function Constructor() {
           {c.isLast ? '🔮 Створити страву' : 'Далі ›'}
         </button>
       </div>
-    </div>
+    </Card>
   );
 }

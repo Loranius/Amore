@@ -9,6 +9,7 @@
 import { useEffect, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth, useCurrentUser } from '@/providers/AuthProvider';
+import { useConfirm } from '@/providers/ConfirmProvider';
 import { useUsers } from '@/features/_shared/useUsers';
 import { usePhotoManager, usePhotoMutations, useUserSizes, useSaveSizes } from './useSettings';
 import type { InsertRow, UserName, UserSizesRow } from '@/types';
@@ -370,6 +371,7 @@ function SizesEditForm({
 function PhotosSection() {
   const { data: photos = [], isPending } = usePhotoManager();
   const { upload, remove } = usePhotoMutations();
+  const confirmDialog = useConfirm();
   const [dragOver, setDragOver] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [deletingName, setDeletingName] = useState<string | null>(null);
@@ -404,7 +406,7 @@ function PhotosSection() {
   };
 
   const onDelete = async (name: string) => {
-    if (!confirm('Видалити це фото з полароїда?')) return;
+    if (!(await confirmDialog('Видалити це фото з полароїда?'))) return;
     setDeletingName(name);
     try {
       await remove.mutateAsync(name);

@@ -5,6 +5,8 @@
 // видалити), додавання. Рецепт → перегляд/в покупки.
 // ============================================================
 import { useMemo, useState } from 'react';
+import { useConfirm } from '@/providers/ConfirmProvider';
+import { TabBar } from '@/components/ui/TabBar';
 import { DISH_CATS, DISH_CAT_ORDER } from './culinaryConstants';
 import { useDishes, useDishMutations } from './useDishes';
 import { DishModal, RecipeModal } from './DishModal';
@@ -18,6 +20,7 @@ const hasRecipe = (d: DishRow) =>
 export function Favorites() {
   const { data: dishes = [], isPending } = useDishes();
   const { add, edit, remove, toShopping } = useDishMutations();
+  const confirmDialog = useConfirm();
 
   const [cat, setCat] = useState<CatFilter>('all');
   const [rolled, setRolled] = useState<DishRow | null>(null);
@@ -38,35 +41,26 @@ export function Favorites() {
     setRolled(visible[Math.floor(Math.random() * visible.length)]!);
   };
 
-  const onDelete = (id: number) => {
-    if (confirm('Видалити страву?')) remove.mutate(id);
+  const onDelete = async (id: number) => {
+    if (await confirmDialog('Видалити страву?')) remove.mutate(id);
   };
 
   return (
     <div className="favorites">
       {/* Категорійні таби */}
-      <div className="dish-cat-tabs">
-        <button
-          type="button"
-          className={`dish-cat-tab${cat === 'all' ? ' active' : ''}`}
-          onClick={() => setCat('all')}
-        >
-          🎲 Всі <span className="dish-cat-count">{dishes.length}</span>
-        </button>
-        {DISH_CAT_ORDER.map((key) => (
-          <button
-            key={key}
-            type="button"
-            className={`dish-cat-tab${cat === key ? ' active' : ''}`}
-            onClick={() => setCat(key)}
-          >
-            {DISH_CATS[key].label}{' '}
-            <span className="dish-cat-count">
-              {dishes.filter((d) => (d.category ?? 'other') === key).length}
-            </span>
-          </button>
-        ))}
-      </div>
+      <TabBar<CatFilter>
+        variant="scroll"
+        value={cat}
+        onChange={setCat}
+        items={[
+          { value: 'all', label: 'Всі', icon: '🎲', count: dishes.length },
+          ...DISH_CAT_ORDER.map((key) => ({
+            value: key as CatFilter,
+            label: DISH_CATS[key].label,
+            count: dishes.filter((d) => (d.category ?? 'other') === key).length,
+          })),
+        ]}
+      />
 
       {/* Рандом */}
       <div className="dish-roll">

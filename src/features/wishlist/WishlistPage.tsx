@@ -8,7 +8,9 @@
 // ============================================================
 import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
+import { useConfirm } from '@/providers/ConfirmProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
+import { TabBar } from '@/components/ui/TabBar';
 import { PortalDecor } from '@/features/auth/PortalDecor';
 import { WishCard } from './WishCard';
 import { WishFormModal } from './WishFormModal';
@@ -46,6 +48,7 @@ export function WishlistPage() {
   const isError = tab === 'shared' ? sharedError : ownError;
 
   const { save, remove, setReserved, fulfill, changeScope } = useWishlistMutations(ownerId);
+  const confirmDialog = useConfirm();
 
   const [editing, setEditing] = useState<WishlistItemRow | null>(null);
   const [adding, setAdding] = useState(false);
@@ -58,15 +61,15 @@ export function WishlistPage() {
     scope: { owner: number; isShared: boolean },
   ) => save.mutate({ id, payload, owner: scope.owner, isShared: scope.isShared });
 
-  const onDelete = (id: number) => {
-    if (confirm('Видалити бажання?')) remove.mutate(id);
+  const onDelete = async (id: number) => {
+    if (await confirmDialog('Видалити бажання?')) remove.mutate(id);
   };
-  const onReserve = (id: number, reserved: boolean) => {
-    if (!reserved && !confirm('Скасувати бронювання цього подарунка?')) return;
+  const onReserve = async (id: number, reserved: boolean) => {
+    if (!reserved && !(await confirmDialog('Скасувати бронювання цього подарунка?'))) return;
     setReserved.mutate({ id, reserved });
   };
-  const onFulfill = (item: WishlistItemRow) => {
-    if (confirm(`Підтверджуєш, що купив(ла) «${item.title}»? 🎁\n\nОбидва отримають сповіщення ✉️`)) {
+  const onFulfill = async (item: WishlistItemRow) => {
+    if (await confirmDialog(`Підтверджуєш, що купив(ла) «${item.title}»? 🎁\n\nОбидва отримають сповіщення ✉️`)) {
       fulfill.mutate(item);
     }
   };
@@ -79,29 +82,15 @@ export function WishlistPage() {
   return (
     <section className="wishlist pink-page">
       <PortalDecor density="light" parallax={false} />
-      <div className="wl-sub-tabs">
-        <button
-          type="button"
-          className={`wl-sub-btn${tab === 'me' ? ' active' : ''}`}
-          onClick={() => setTab('me')}
-        >
-          Мої бажання
-        </button>
-        <button
-          type="button"
-          className={`wl-sub-btn${tab === 'partner' ? ' active' : ''}`}
-          onClick={() => setTab('partner')}
-        >
-          Бажання {partnerName}
-        </button>
-        <button
-          type="button"
-          className={`wl-sub-btn${tab === 'shared' ? ' active' : ''}`}
-          onClick={() => setTab('shared')}
-        >
-          🎁 Спільне
-        </button>
-      </div>
+      <TabBar<Tab>
+        value={tab}
+        onChange={setTab}
+        items={[
+          { value: 'me', label: 'Мої бажання' },
+          { value: 'partner', label: `Бажання ${partnerName}` },
+          { value: 'shared', label: 'Спільне', icon: '🎁' },
+        ]}
+      />
 
       <div className="wl-head">
         <h1 className="wl-title">

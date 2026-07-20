@@ -6,6 +6,7 @@
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
+import { Card } from '@/components/ui/Card';
 import { fmtMoney, useFreeLimit, useFreeLimitMutations } from './useBudget';
 
 const SLIDER_MIN = 0;
@@ -33,7 +34,7 @@ export function FreeLimitCard() {
   const incoming = proposalValue !== null && proposedBy !== me.name ? proposalValue : null;
 
   return (
-    <div className="fin-card">
+    <Card className="fin-card">
       <div className="fin-card-hdr">
         <span className="fin-card-title">💳 Вільний ліміт</span>
         <span className="fin-limit-current">{limit > 0 ? fmtMoney(limit) : 'не встановлено'}</span>
@@ -82,6 +83,6 @@ export function FreeLimitCard() {
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

@@ -8,6 +8,8 @@
 // прибрано, кольорове оформлення перенесене на вкладку «Графік».)
 // ============================================================
 import { useMemo, useState } from 'react';
+import { useConfirm } from '@/providers/ConfirmProvider';
+import { TabBar } from '@/components/ui/TabBar';
 import { useEvents, useCalendarMutations } from './useCalendar';
 import { enrichEvent, sortEnriched } from './calendarUtils';
 import { EventList } from './EventList';
@@ -25,6 +27,7 @@ const TAB_DEFS: { type: EventType; label: string }[] = [
 export function CalendarPage() {
   const { data: events = [], isPending, isError } = useEvents();
   const { addEvent, addPlan, setPlanStatus, deleteEvent } = useCalendarMutations();
+  const confirmDialog = useConfirm();
 
   const [filter, setFilter] = useState<EventType>('anniversary');
   const [modal, setModal] = useState<'event' | 'plan' | null>(null);
@@ -39,8 +42,8 @@ export function CalendarPage() {
     return c;
   }, [enriched]);
 
-  const onDelete = (id: number) => {
-    if (confirm('Видалити подію?')) deleteEvent.mutate(id);
+  const onDelete = async (id: number) => {
+    if (await confirmDialog('Видалити подію?')) deleteEvent.mutate(id);
   };
 
   const filtered = enriched.filter((e) => (e.type ?? 'other') === filter);
@@ -58,19 +61,12 @@ export function CalendarPage() {
         </button>
       </div>
 
-      <div className="cal-type-filter-bar">
-        {TAB_DEFS.map((def) => (
-          <button
-            key={def.type}
-            type="button"
-            className={`cal-type-filter-btn${filter === def.type ? ' active' : ''}`}
-            onClick={() => setFilter(def.type)}
-          >
-            {def.label}
-            <span className="cal-type-count">{counts[def.type]}</span>
-          </button>
-        ))}
-      </div>
+      <TabBar<EventType>
+        variant="scroll"
+        value={filter}
+        onChange={setFilter}
+        items={TAB_DEFS.map((def) => ({ value: def.type, label: def.label, count: counts[def.type] }))}
+      />
 
       {isPending ? (
         <p className="empty-state">Завантаження…</p>

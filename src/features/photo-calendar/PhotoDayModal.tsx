@@ -6,9 +6,10 @@
 // відредагувати коментар до наявного. Клік по фото → lightbox.
 // ============================================================
 import { useEffect, useState } from 'react';
-import { normalize } from '@/lib/images';
+import { normalizeToPreview } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
 import { MONTHS_UA } from '@/features/_shared/month';
+import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import type { PhotoCalendarRow, AppUser } from '@/types';
 
 interface PhotoDayModalProps {
@@ -52,17 +53,13 @@ export function PhotoDayModal({
   const label = `${parseInt(d!, 10)} ${MONTHS_UA[parseInt(m!, 10) - 1]} ${y}`;
 
   const pickFile = async (file: File) => {
-    let normalized = file;
     try {
-      normalized = await normalize(file);
+      const { file: normalized, previewSrc: src } = await normalizeToPreview(file);
+      setPendingFile(normalized);
+      setPreviewSrc(src);
     } catch (e) {
       toast.show('Не вдалося обробити HEIC-фото: ' + (e as Error).message);
-      return;
     }
-    setPendingFile(normalized);
-    const reader = new FileReader();
-    reader.onload = (e) => setPreviewSrc((e.target?.result as string) ?? null);
-    reader.readAsDataURL(normalized);
   };
 
   const confirmUpload = () => {
@@ -100,10 +97,14 @@ export function PhotoDayModal({
                     alt=""
                     onClick={() => onPhotoClick(myPhoto.photo_url)}
                   />
-                  <FilePicker id="pcal-photo-replace" label="Замінити фото" onPick={pickFile} />
+                  <FilePickerButton id="pcal-photo-replace" className="pcal-replace-btn" onPick={(f) => void pickFile(f)}>
+                    Замінити фото
+                  </FilePickerButton>
                 </>
               ) : (
-                <FilePicker id="pcal-photo-add" label="📷 Додати фото" big onPick={pickFile} />
+                <FilePickerButton id="pcal-photo-add" className="pcal-upload-btn" onPick={(f) => void pickFile(f)}>
+                  📷 Додати фото
+                </FilePickerButton>
               )}
             </div>
           </div>
@@ -187,35 +188,5 @@ export function PhotoDayModal({
         </button>
       </div>
     </div>
-  );
-}
-
-function FilePicker({
-  id,
-  label,
-  big = false,
-  onPick,
-}: {
-  id: string;
-  label: string;
-  big?: boolean;
-  onPick: (file: File) => void;
-}) {
-  return (
-    <label className={big ? 'pcal-upload-btn' : 'pcal-replace-btn'}>
-      {label}
-      <input
-        id={id}
-        name={id}
-        type="file"
-        accept="image/*,.heic,.heif"
-        hidden
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onPick(f);
-          e.target.value = '';
-        }}
-      />
-    </label>
   );
 }

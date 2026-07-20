@@ -3,6 +3,7 @@
 // ============================================================
 import { useState } from 'react';
 import { Lightbox } from '@/components/ui/Lightbox';
+import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { CATEGORIES } from './mapConstants';
 import { directionsUrl } from '@/lib/mapbox';
 import { uploadPinPhoto, type PinUpdate } from './useMapPins';
@@ -94,16 +95,12 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
             />
           </label>
 
-          <label className="form-field">
+          <div className="form-field">
             <span>Замінити фото</span>
-            <input
-              id="pin-edit-photo-file"
-              name="photoFile"
-              type="file"
-              accept="image/*,.heic,.heif"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-            />
-          </label>
+            <FilePickerButton id="pin-edit-photo-file" onPick={setFile}>
+              🖼 Обрати з пристрою
+            </FilePickerButton>
+          </div>
 
           <div className="modal-actions pin-view-actions">
             <a

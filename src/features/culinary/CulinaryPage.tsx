@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Constructor } from './Constructor';
 import { Favorites } from './Favorites';
 import { PortalDecor } from '@/features/auth/PortalDecor';
+import { TabBar } from '@/components/ui/TabBar';
 
 type Tab = 'constructor' | 'favorites';
 
@@ -16,22 +17,14 @@ export function CulinaryPage() {
   return (
     <section className="culinary pink-page">
       <PortalDecor density="light" parallax={false} />
-      <div className="cul-tabs">
-        <button
-          type="button"
-          className={`cul-tab${tab === 'constructor' ? ' active' : ''}`}
-          onClick={() => setTab('constructor')}
-        >
-          🔮 Конструктор
-        </button>
-        <button
-          type="button"
-          className={`cul-tab${tab === 'favorites' ? ' active' : ''}`}
-          onClick={() => setTab('favorites')}
-        >
-          ❤️ Улюблені
-        </button>
-      </div>
+      <TabBar<Tab>
+        value={tab}
+        onChange={setTab}
+        items={[
+          { value: 'constructor', label: 'Конструктор', icon: '🔮' },
+          { value: 'favorites', label: 'Улюблені', icon: '❤️' },
+        ]}
+      />
 
       {tab === 'constructor' ? <Constructor /> : <Favorites />}
     </section>

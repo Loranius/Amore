@@ -22,6 +22,7 @@ import { PinModal } from './PinModal';
 import { AddPinModal } from './AddPinModal';
 import { LocationHistoryModal } from './LocationHistoryModal';
 import { PortalDecor } from '@/features/auth/PortalDecor';
+import { useConfirm } from '@/providers/ConfirmProvider';
 import type { MapPinRow, PinCategory, MapboxFeature } from '@/types';
 
 export function MapPage() {
@@ -35,6 +36,7 @@ export function MapPage() {
   const { data: locations = [] } = useUserLocations();
   const { add, update, remove } = useMapPinMutations();
   const checkin = useCheckin();
+  const confirmDialog = useConfirm();
   useCityBackfill(pins);
 
   const [filter, setFilter] = useState<'all' | PinCategory>('all');
@@ -226,8 +228,8 @@ export function MapPage() {
           pin={viewPin}
           onClose={() => setViewPin(null)}
           onSave={(patch) => update.mutate({ id: viewPin.id, patch })}
-          onDelete={() => {
-            if (confirm('Видалити це місце?')) {
+          onDelete={async () => {
+            if (await confirmDialog('Видалити це місце?')) {
               remove.mutate(viewPin.id);
               setViewPin(null);
             }

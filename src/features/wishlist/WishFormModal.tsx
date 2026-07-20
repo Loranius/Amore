@@ -6,10 +6,12 @@
 // Файл має пріоритет над посиланням (як у старому коді).
 // ============================================================
 import { useState } from 'react';
-import { normalize } from '@/lib/images';
+import { normalizeToPreview } from '@/lib/images';
 import { uploadWishPhoto, type WishFormPayload } from './useWishlist';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
+import { TabBar } from '@/components/ui/TabBar';
+import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import type { WishlistItemRow, WishPriority, AppUser } from '@/types';
 
 type Scope = 'me' | 'partner' | 'shared';
@@ -52,18 +54,14 @@ export function WishFormModal({
   const [saving, setSaving] = useState(false);
 
   const pickFile = async (file: File) => {
-    let normalized = file;
     try {
-      normalized = await normalize(file); // HEIC → JPEG для коректного прев'ю
+      const { file: normalized, previewSrc: src } = await normalizeToPreview(file);
+      setPendingFile(normalized);
+      setPreviewSrc(src);
+      setImgUrl(''); // файл важливіший за посилання
     } catch (e) {
       toast.show('Не вдалося обробити HEIC-фото: ' + (e as Error).message);
-      return;
     }
-    setPendingFile(normalized);
-    const reader = new FileReader();
-    reader.onload = (e) => setPreviewSrc((e.target?.result as string) ?? null);
-    reader.readAsDataURL(normalized);
-    setImgUrl(''); // файл важливіший за посилання
   };
 
   const clearPhoto = () => {
@@ -120,30 +118,15 @@ export function WishFormModal({
         {!isEdit && (
           <div className="form-field">
             <span>Для кого</span>
-            <div className="wl-sub-tabs">
-              <button
-                type="button"
-                className={`wl-sub-btn${scope === 'me' ? ' active' : ''}`}
-                onClick={() => setScope('me')}
-              >
-                Моє
-              </button>
-              <button
-                type="button"
-                className={`wl-sub-btn${scope === 'partner' ? ' active' : ''}`}
-                onClick={() => setScope('partner')}
-                disabled={!partner}
-              >
-                Для {partner?.name ?? 'партнера'}
-              </button>
-              <button
-                type="button"
-                className={`wl-sub-btn${scope === 'shared' ? ' active' : ''}`}
-                onClick={() => setScope('shared')}
-              >
-                🎁 Спільне
-              </button>
-            </div>
+            <TabBar<Scope>
+              value={scope}
+              onChange={setScope}
+              items={[
+                { value: 'me', label: 'Моє' },
+                { value: 'partner', label: `Для ${partner?.name ?? 'партнера'}`, disabled: !partner },
+                { value: 'shared', label: 'Спільне', icon: '🎁' },
+              ]}
+            />
           </div>
         )}
 
@@ -175,21 +158,9 @@ export function WishFormModal({
               )}
             </div>
             <div className="wm-photo-actions">
-              <label className="btn-secondary">
+              <FilePickerButton id="wish-photo-file" onPick={(f) => void pickFile(f)}>
                 🖼 Обрати з пристрою
-                <input
-                  id="wish-photo-file"
-                  name="photoFile"
-                  type="file"
-                  accept="image/*,.heic,.heif"
-                  hidden
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void pickFile(f);
-                    e.target.value = '';
-                  }}
-                />
-              </label>
+              </FilePickerButton>
               {previewSrc && (
                 <button type="button" className="btn-secondary" onClick={clearPhoto}>
                   ✕ Прибрати

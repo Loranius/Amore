@@ -7,7 +7,8 @@
 // ============================================================
 import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { TintedRow } from '@/components/ui/TintedRow';
+import { Card } from '@/components/ui/Card';
+import { ProposalCard } from '@/components/ui/ProposalCard';
 import { fmtMoney, useGoals, useGoalMutations, type NewGoalInput } from './useBudget';
 import type { SavingsGoalRow } from '@/types';
 
@@ -19,10 +20,8 @@ export function GoalsList() {
   const [adding, setAdding] = useState(false);
   const [funding, setFunding] = useState<SavingsGoalRow | null>(null);
 
-  const partnerGen = me.name === 'Діма' ? 'Лєни' : 'Діми';
-
   return (
-    <div className="fin-card">
+    <Card className="fin-card">
       <div className="fin-card-hdr">
         <span className="fin-card-title">🎯 Спільні цілі</span>
         <button type="button" className="btn fin-add-goal-btn" onClick={() => setAdding(true)}>
@@ -38,16 +37,19 @@ export function GoalsList() {
         <div className="goals-list">
           {goals.map((g) => {
             const pending = g.status === 'pending';
-            const canVote = pending && g.proposed_by !== me.name;
             const target = g.target_amount ?? 0;
             const saved = Math.max(0, g.saved_amount ?? 0);
             const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
-            const canDelete = !pending || g.proposed_by === me.name;
 
             return (
-              <TintedRow
+              <ProposalCard
                 key={g.id}
                 pending={pending}
+                proposedBy={g.proposed_by ?? ''}
+                meName={me.name}
+                onConfirm={() => confirm.mutate(g.id)}
+                onReject={() => remove.mutate(g.id)}
+                onDelete={() => remove.mutate(g.id)}
                 info={
                   <>
                     <span className="goal-row-name">{g.name}</span>
@@ -57,55 +59,32 @@ export function GoalsList() {
                         🔗
                       </a>
                     )}
-                    {pending && <span className="goal-status-badge">⏳ Очікує {partnerGen}</span>}
-                    {g.status === 'confirmed' && (
-                      <>
-                        <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
-                        <div className="goal-progress-wrap">
-                          <div className="goal-progress-bar">
-                            <div className="goal-progress-fill" style={{ width: `${pct}%` }} />
-                          </div>
-                          <div className="goal-progress-meta">
-                            <span>
-                              {fmtMoney(saved)} / {fmtMoney(target)}
-                            </span>
-                            <span className="goal-progress-pct">{pct}%</span>
-                          </div>
-                        </div>
-                      </>
-                    )}
                   </>
                 }
-                actions={
+                badge={
+                  g.status === 'confirmed' ? (
+                    <>
+                      <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
+                      <div className="goal-progress-wrap">
+                        <div className="goal-progress-bar">
+                          <div className="goal-progress-fill" style={{ width: `${pct}%` }} />
+                        </div>
+                        <div className="goal-progress-meta">
+                          <span>
+                            {fmtMoney(saved)} / {fmtMoney(target)}
+                          </span>
+                          <span className="goal-progress-pct">{pct}%</span>
+                        </div>
+                      </div>
+                    </>
+                  ) : undefined
+                }
+                extraActions={
                   <>
                     <span className="goal-row-price">{fmtMoney(target)}</span>
-                    {canVote && (
-                      <div className="goal-vote-btns">
-                        <button type="button" className="btn goal-vote-yes" onClick={() => confirm.mutate(g.id)}>
-                          ✓
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary goal-vote-no"
-                          onClick={() => window.confirm('Відхилити?') && remove.mutate(g.id)}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
                     {g.status === 'confirmed' && (
                       <button type="button" className="btn-secondary goal-add-funds-btn" onClick={() => setFunding(g)}>
                         + Внести
-                      </button>
-                    )}
-                    {canDelete && (
-                      <button
-                        type="button"
-                        className="fin-del-btn"
-                        onClick={() => window.confirm('Видалити?') && remove.mutate(g.id)}
-                        aria-label="Видалити"
-                      >
-                        ×
                       </button>
                     )}
                   </>
@@ -126,7 +105,7 @@ export function GoalsList() {
           }
         />
       )}
-    </div>
+    </Card>
   );
 }
 

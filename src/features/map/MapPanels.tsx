@@ -3,6 +3,7 @@
 // ============================================================
 import { CATEGORIES, CATEGORY_ORDER, groupPinsByCity } from './mapConstants';
 import { directionsUrl } from '@/lib/mapbox';
+import { TabBar } from '@/components/ui/TabBar';
 import type { MapPinRow, PinCategory } from '@/types';
 
 // ── Фільтр за категорією ─────────────────────────────────────
@@ -16,29 +17,20 @@ export function CatFilterBar({
   onChange: (v: 'all' | PinCategory) => void;
 }) {
   return (
-    <div className="map-cat-filter-bar">
-      <button
-        type="button"
-        className={`map-cat-chip${active === 'all' ? ' active' : ''}`}
-        onClick={() => onChange('all')}
-      >
-        🗺️ Всі <span className="map-cat-chip-count">{pins.length}</span>
-      </button>
-      {CATEGORY_ORDER.map((key) => {
-        const cat = CATEGORIES[key];
-        const count = pins.filter((p) => p.category === key).length;
-        return (
-          <button
-            key={key}
-            type="button"
-            className={`map-cat-chip${active === key ? ' active' : ''}`}
-            onClick={() => onChange(key)}
-          >
-            {cat.emoji} {cat.label} <span className="map-cat-chip-count">{count}</span>
-          </button>
-        );
-      })}
-    </div>
+    <TabBar<'all' | PinCategory>
+      variant="scroll"
+      value={active}
+      onChange={onChange}
+      items={[
+        { value: 'all', label: 'Всі', icon: '🗺️', count: pins.length },
+        ...CATEGORY_ORDER.map((key) => ({
+          value: key as 'all' | PinCategory,
+          label: CATEGORIES[key].label,
+          icon: CATEGORIES[key].emoji,
+          count: pins.filter((p) => p.category === key).length,
+        })),
+      ]}
+    />
   );
 }
 

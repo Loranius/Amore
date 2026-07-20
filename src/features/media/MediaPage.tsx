@@ -6,6 +6,8 @@
 // деталі, відгук, додати/редагувати, додати з пошуку.
 // ============================================================
 import { useMemo, useState } from 'react';
+import { useConfirm } from '@/providers/ConfirmProvider';
+import { TabBar } from '@/components/ui/TabBar';
 import { STATUS_CONFIG, STATUS_ORDER, MEDIA_TYPES, TYPE_LABELS } from './mediaConstants';
 import { useMediaItems, useMediaMutations, type ReviewWho } from './useMedia';
 import { useTmdbSearch } from './useTmdb';
@@ -35,6 +37,7 @@ export function MediaPage() {
   const { data: items = [], isPending } = useMediaItems(type);
   const { add, addFromSearch, saveReview, edit, remove } = useMediaMutations(type);
   const { data: searchResults = [], isFetching: searching } = useTmdbSearch(query, type);
+  const confirmDialog = useConfirm();
 
   const switchType = (t: MediaType) => {
     setType(t);
@@ -60,8 +63,8 @@ export function MediaPage() {
     return items.filter((i) => i.status === filter);
   }, [items, filter]);
 
-  const onDelete = (id: number) => {
-    if (confirm('Видалити цей елемент?')) remove.mutate(id);
+  const onDelete = async (id: number) => {
+    if (await confirmDialog('Видалити цей елемент?')) remove.mutate(id);
   };
 
   return (
@@ -75,18 +78,11 @@ export function MediaPage() {
       </div>
 
       {/* Вкладки типу */}
-      <div className="media-tabs">
-        {MEDIA_TYPES.map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={`media-tab${type === t ? ' active' : ''}`}
-            onClick={() => switchType(t)}
-          >
-            {TYPE_LABELS[t]}
-          </button>
-        ))}
-      </div>
+      <TabBar<MediaType>
+        value={type}
+        onChange={switchType}
+        items={MEDIA_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
+      />
 
       {/* Пошук TMDB — лише фільми/серіали */}
       {type !== 'book' && (

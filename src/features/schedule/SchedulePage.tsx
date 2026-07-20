@@ -24,7 +24,7 @@ import {
 import { useSchedule, useScheduleMutation, MARK_CYCLE, type MarksMap } from './useSchedule';
 import { useSharedDaysOff, useDatePlans, useDateMutations } from './useDates';
 import { PlanDateModal } from './PlanDateModal';
-import { TintedRow } from '@/components/ui/TintedRow';
+import { ProposalCard } from '@/components/ui/ProposalCard';
 import type { AppUser, DateRow } from '@/types';
 
 type DayStatus = 'both-off' | 'lena-off' | 'dima-off' | 'none';
@@ -227,12 +227,16 @@ function DatePlanCard({
   onReject: () => void;
 }) {
   const pending = plan.status === 'pending';
-  const canVote = pending && plan.proposed_by !== meName;
-  const partnerGen = meName === 'Діма' ? 'Лєни' : 'Діми';
 
   return (
-    <TintedRow
+    <ProposalCard
       pending={pending}
+      proposedBy={plan.proposed_by}
+      meName={meName}
+      onConfirm={onConfirm}
+      onReject={onReject}
+      onDelete={onReject}
+      deleteConfirmMessage="Видалити побачення?"
       info={
         <>
           <span className="date-plan-card-title">{plan.title}</span>
@@ -243,39 +247,6 @@ function DatePlanCard({
             <a className="date-plan-card-link" href={plan.url} target="_blank" rel="noopener noreferrer">
               🔗
             </a>
-          )}
-          {pending ? (
-            <span className="goal-status-badge">⏳ Очікує {partnerGen}</span>
-          ) : (
-            <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
-          )}
-        </>
-      }
-      actions={
-        <>
-          {canVote && (
-            <div className="goal-vote-btns">
-              <button type="button" className="btn goal-vote-yes" onClick={onConfirm}>
-                ✓
-              </button>
-              <button
-                type="button"
-                className="btn-secondary goal-vote-no"
-                onClick={() => confirm('Відхилити?') && onReject()}
-              >
-                ✕
-              </button>
-            </div>
-          )}
-          {(!pending || plan.proposed_by === meName) && (
-            <button
-              type="button"
-              className="fin-del-btn"
-              onClick={() => confirm('Видалити побачення?') && onReject()}
-              aria-label="Видалити"
-            >
-              ×
-            </button>
           )}
         </>
       }
