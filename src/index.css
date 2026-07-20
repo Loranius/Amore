@@ -1956,56 +1956,6 @@ a.wl-card-title { color: var(--accent); }
 .fin-del-btn:hover { color: var(--danger); }
 
 /* ============================================================
-   МИ · Питання дня (question) + Капсули часу (capsule)
-   ============================================================ */
-.question { display: flex; flex-direction: column; gap: 14px; }
-.question-date { text-align: center; color: var(--muted); font-size: 13px; margin: 0; }
-.question-card { background: var(--surface); border-radius: 18px; padding: 22px 18px; text-align: center; }
-.question-text { font-size: 20px; font-weight: 700; margin: 0; line-height: 1.4; }
-
-.question-answers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.answer-block { position: relative; background: var(--surface); border-radius: 14px; padding: 12px 14px; }
-.answer-name { font-weight: 700; color: var(--accent); margin: 0 0 4px; }
-.answer-text { margin: 0; white-space: pre-wrap; word-break: break-word; }
-.answer-text.empty { color: var(--muted); font-style: italic; }
-
-.question-input-wrap { display: flex; flex-direction: column; gap: 8px; }
-.question-input {
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  border-radius: 12px;
-  background: var(--surface);
-  color: var(--text);
-  font: inherit;
-  resize: vertical;
-}
-.question-save { width: 100%; }
-
-/* Капсули */
-.capsule-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-.capsule-head h1 { margin: 0; }
-.capsule-head .btn { flex: 0 0 auto; padding: 8px 16px; }
-.capsule-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 12px; }
-.capsule-card {
-  position: relative;
-  background: var(--surface);
-  border-radius: 16px;
-  padding: 18px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.capsule-card.locked { background: color-mix(in srgb, var(--text) 5%, transparent); }
-.capsule-icon { font-size: 30px; }
-.capsule-title { font-weight: 700; margin: 0; }
-.capsule-date { font-size: 12px; color: var(--muted); }
-.capsule-content { margin: 6px 0 0; white-space: pre-wrap; word-break: break-word; }
-.capsule-locked-note { margin: 6px 0 0; color: var(--muted); font-style: italic; font-size: 13px; }
-.capsule-edit-btn { position: absolute; top: 8px; right: 40px; border: 0; background: transparent; cursor: pointer; font-size: 16px; }
-.capsule-card .delete-btn { position: absolute; top: 8px; right: 10px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--text) 10%, transparent); color: var(--text); font-size: 16px; cursor: pointer; }
-
-/* ============================================================
    НАША КАРТА (map) — mapbox + піни + геолокація
    ============================================================ */
 .map { display: flex; flex-direction: column; gap: 12px; }

@@ -42,7 +42,6 @@ export const MORE_ITEMS: NavItem[] = [
   { to: '/calendar', icon: '📅', label: 'Календар' },
   { to: '/media', icon: '🎬', label: 'Вотчліст' },
   { to: '/culinary', icon: '👨‍🍳', label: 'Кулінарія' },
-  { to: '/us', icon: '💞', label: 'Ми' },
   { to: '/whereto', icon: '🎈', label: 'Куди піти' },
   { to: '/map', icon: '📍', label: 'Наша карта' },
   { to: '/game', icon: '🕹️', label: 'Гра' },
@@ -57,10 +56,4 @@ export const CALENDAR_TABS: NavItem[] = [
   { to: '/calendar', icon: '📅', label: 'Події', end: true },
   { to: '/calendar/schedule', icon: '🗓️', label: 'Графік' },
   { to: '/calendar/photos', icon: '📸', label: 'Фото' },
-];
-
-/** Сабтаби хабу «Ми» (/us). */
-export const US_TABS: NavItem[] = [
-  { to: '/us/question', icon: '💬', label: 'Питання дня' },
-  { to: '/us/capsule', icon: '💌', label: 'Капсула' },
 ];

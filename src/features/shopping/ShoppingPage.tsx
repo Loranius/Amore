@@ -15,6 +15,7 @@ import {
   parseShoppingInput,
 } from './useShoppingItems';
 import { EditItemModal } from './EditItemModal';
+import { PortalDecor } from '@/features/auth/PortalDecor';
 import type { ShoppingItemRow, ShoppingCategory } from '@/types';
 
 export function ShoppingPage() {
@@ -73,7 +74,8 @@ export function ShoppingPage() {
   };
 
   return (
-    <section className="shopping">
+    <section className="shopping pink-page">
+      <PortalDecor density="light" parallax={false} />
       <h1>Покупки</h1>
 
       {/* Введення */}

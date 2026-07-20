@@ -1,5 +1,5 @@
 // ============================================================
-// HubLayout — обгортка хабів (Календар / Ми)
+// HubLayout — обгортка хаба «Календар»
 // ------------------------------------------------------------
 // HubTabs + <Outlet/> для сабсторінки. Замінює хаб-секцію старого
 // index.html, де сабпанелі перемикались класом hidden.
@@ -9,23 +9,13 @@
 import { Outlet } from 'react-router-dom';
 import { HubTabs } from './HubTabs';
 import { PortalDecor } from '@/features/auth/PortalDecor';
-import { CALENDAR_TABS, US_TABS } from '@/app/nav';
+import { CALENDAR_TABS } from '@/app/nav';
 
 export function CalendarHub() {
   return (
     <div className="hub pink-page">
       <PortalDecor density="light" parallax={false} />
       <HubTabs items={CALENDAR_TABS} />
-      <Outlet />
-    </div>
-  );
-}
-
-export function UsHub() {
-  return (
-    <div className="hub pink-page">
-      <PortalDecor density="light" parallax={false} />
-      <HubTabs items={US_TABS} />
       <Outlet />
     </div>
   );

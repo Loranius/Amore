@@ -131,15 +131,6 @@ export interface EventRow {
   metadata: PlanMetadata | null;
 }
 
-export interface TimeCapsuleRow {
-  id: number;
-  title: string;
-  content: string;
-  /** 'YYYY-MM-DD' — дата, після якої капсулу можна відкрити. */
-  open_date: string;
-  created_by: number | null;
-}
-
 export interface MediaItemRow {
   id: number;
   type: MediaType;
@@ -216,23 +207,6 @@ export interface UserSizesRow {
   underwear: string | null;
   ring_ring: string | null;
   ring_index: string | null;
-}
-
-export interface DailyQuestionLogRow {
-  id: number;
-  /** 'YYYY-MM-DD' — один рядок на день. */
-  date: string;
-  question_id: number | null;
-  answer_dima: string | null;
-  answer_lena: string | null;
-}
-
-/** Колонка відповіді поточного користувача (обчислюється з AppUser.name). */
-export type AnswerField = 'answer_dima' | 'answer_lena';
-
-export interface DailyQuestionRow {
-  id: number;
-  text: string;
 }
 
 export interface WorkScheduleRow {
@@ -357,14 +331,11 @@ export interface Database {
     Tables: {
       users:              TableDef<UsersRow, 'name'>;
       events:             TableDef<EventRow, 'title' | 'date'>;
-      time_capsules:      TableDef<TimeCapsuleRow, 'title' | 'content' | 'open_date'>;
       media_items:        TableDef<MediaItemRow, 'type' | 'title' | 'status'>;
       swipe_votes:        TableDef<SwipeVoteRow, 'user_id' | 'tmdb_id' | 'title' | 'direction'>;
       shopping_items:     TableDef<ShoppingItemRow, 'title' | 'category'>;
       settings:           TableDef<SettingsRow, 'key' | 'value'>;
       user_sizes:         TableDef<UserSizesRow, 'user_id'>;
-      daily_question_log: TableDef<DailyQuestionLogRow, 'date'>;
-      daily_questions:    TableDef<DailyQuestionRow, 'text'>;
       work_schedule:      TableDef<WorkScheduleRow, 'date' | 'user_id' | 'mark'>;
       photo_calendar:     TableDef<PhotoCalendarRow, 'date' | 'user_id' | 'photo_url'>;
       free_limit:         TableDef<FreeLimitRow, 'id'>;
@@ -478,16 +449,6 @@ export interface ShoppingParseResponse {
   items: ParsedShoppingLine[];
 }
 
-export interface DailyQuestionAiRequest {
-  /** 'YYYY-MM-DD' */
-  date: string;
-}
-
-export interface DailyQuestionAiResponse {
-  id: number;
-  text: string;
-}
-
 /** Локація пари, збережена в settings.whereto_location. */
 export interface WhereToLocation {
   region: string;
@@ -538,7 +499,6 @@ export interface EdgeFunctions {
   'auth-pin':          { Body: AuthPinRequest; Response: AuthPinResponse };
   'culinary-ai':       { Body: CulinaryAiRequest; Response: CulinaryDish };
   'shopping-parse':    { Body: ShoppingParseRequest; Response: ShoppingParseResponse };
-  'daily-question-ai': { Body: DailyQuestionAiRequest; Response: DailyQuestionAiResponse };
   'events-finder':     { Body: EventsFinderRequest; Response: EventsFinderResponse };
   'db-notify':         { Body: DbNotifyRequest; Response: DbNotifyResponse };
 }
@@ -551,8 +511,8 @@ export type EdgeFunctionName = keyof EdgeFunctions;
 
 /** Таблиці, на які підписується клієнт (публікація supabase_realtime). */
 export type RealtimeTable =
-  | 'events' | 'free_limit' | 'savings_goals' | 'time_capsules'
-  | 'daily_question_log' | 'media_items' | 'dishes' | 'wishlist_items'
+  | 'events' | 'free_limit' | 'savings_goals'
+  | 'media_items' | 'dishes' | 'wishlist_items'
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
   | 'map_pins' | 'user_locations';
 
@@ -689,7 +649,6 @@ export type Optimistic<T> = T & { readonly __optimistic?: true };
 export type ViewName =
   | 'home' | 'wishlist' | 'budget'
   | 'calendar' | 'schedule' | 'photo-calendar'
-  | 'question' | 'capsule'
   | 'media' | 'whereto' | 'map' | 'shopping'
   | 'random' | 'game';
 

@@ -5,7 +5,6 @@ import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, publicUrl } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
-import { useCurrentUser } from '@/providers/AuthProvider';
 import { useUsers } from '@/features/_shared/useUsers';
 import { todayStr } from './homeUtils';
 
@@ -45,25 +44,6 @@ export function useStartDate(): string | null {
   }, [query.data]);
 
   return query.data ?? cached;
-}
-
-/** Чи відповів поточний користувач на питання дня (для тизера). */
-export function useQuestionAnswered(): boolean {
-  const me = useCurrentUser();
-  const { data } = useQuery({
-    queryKey: ['home', 'questionTeaser', todayStr(), me.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('daily_question_log')
-        .select('answer_dima,answer_lena')
-        .eq('date', todayStr())
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) return false;
-      return me.name === 'Діма' ? !!data.answer_dima : !!data.answer_lena;
-    },
-  });
-  return data ?? true; // поки не знаємо — тизер ховаємо
 }
 
 /** Найближчий спільний вихідний (обидва «Х» у графіку) або null. */

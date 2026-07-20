@@ -27,9 +27,6 @@ export const qk = {
 
   dishes: () => ['dishes'] as const,
 
-  question: (date: string) => ['question', date] as const,
-  capsules: () => ['capsules'] as const,
-
   schedule: (month: string) => ['schedule', month] as const,
   photoCalendar: (month: string) => ['photoCalendar', month] as const,
   photos: () => ['photos'] as const,
@@ -56,8 +53,6 @@ export const realtimeInvalidation: Record<
   events: [qk.events(), qk.plans()],
   free_limit: [qk.freeLimit()],
   savings_goals: [qk.savingsGoals()],
-  time_capsules: [qk.capsules()],
-  daily_question_log: [['question']],
   media_items: [qk.media()],
   dishes: [qk.dishes()],
   wishlist_items: [['wishlist']],

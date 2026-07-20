@@ -1,9 +1,9 @@
 // ============================================================
-// MiniWidgets (тизер питання + спільний вихідний) + WeekWidget
+// MiniWidgets (спільний вихідний) + WeekWidget
 // ============================================================
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuestionAnswered, useSharedDayoff } from './useHome';
+import { useSharedDayoff } from './useHome';
 import { todayStr } from './homeUtils';
 import { planMetadataOf } from '@/features/_shared/events';
 import type { EventRow } from '@/types';
@@ -11,7 +11,6 @@ import type { EventRow } from '@/types';
 // ── Міні-віджети ─────────────────────────────────────────────
 export function MiniWidgets() {
   const navigate = useNavigate();
-  const answered = useQuestionAnswered();
   const dayoff = useSharedDayoff();
 
   const dayoffLabel = useMemo(() => {
@@ -25,16 +24,6 @@ export function MiniWidgets() {
 
   return (
     <div className="mini-widgets">
-      {!answered && (
-        <button type="button" className="mini-widget" onClick={() => navigate('/us/question')}>
-          <span className="mini-widget-icon">💬</span>
-          <span className="mini-widget-text">
-            <b>Питання дня</b>
-            <br />
-            чекає на відповідь
-          </span>
-        </button>
-      )}
       {dayoffLabel && (
         <button type="button" className="mini-widget" onClick={() => navigate('/calendar/schedule')}>
           <span className="mini-widget-icon">🏖</span>
