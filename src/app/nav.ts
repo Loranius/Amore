@@ -34,18 +34,42 @@ export const BOTTOM_RIGHT: NavItem[] = [
   { to: '/shopping', icon: '🛒', label: 'Покупки' },
 ];
 
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
 /**
- * Розділи під кнопкою «Ще» (мобільне меню) і в десктоп-сайдбарі —
- * той самий список. `/calendar` і `/us` — хаби з сабтабами.
+ * Розділи під кнопкою «Ще» (мобільне меню) і в десктоп-сайдбарі, згруповані
+ * за частотою використання (лише для легкого візуального розділення в
+ * MoreMenu — не нові хаби/роути). `/calendar` — хаб із сабтабами.
  */
-export const MORE_ITEMS: NavItem[] = [
-  { to: '/calendar', icon: '📅', label: 'Календар' },
-  { to: '/media', icon: '🎬', label: 'Вотчліст' },
-  { to: '/culinary', icon: '👨‍🍳', label: 'Кулінарія' },
-  { to: '/whereto', icon: '🎈', label: 'Куди піти' },
-  { to: '/map', icon: '📍', label: 'Наша карта' },
-  { to: '/game', icon: '🕹️', label: 'Гра' },
+export const MORE_GROUPS: NavGroup[] = [
+  {
+    label: 'Часто',
+    items: [
+      { to: '/calendar', icon: '📅', label: 'Календар' },
+      { to: '/media', icon: '🎬', label: 'Вотчліст' },
+    ],
+  },
+  {
+    label: 'Ідеї',
+    items: [
+      { to: '/culinary', icon: '👨‍🍳', label: 'Кулінарія' },
+      { to: '/whereto', icon: '🎈', label: 'Куди піти' },
+    ],
+  },
+  {
+    label: 'Інше',
+    items: [
+      { to: '/map', icon: '📍', label: 'Наша карта' },
+      { to: '/game', icon: '🕹️', label: 'Гра' },
+    ],
+  },
 ];
+
+/** Плаский список — для десктоп-сайдбара й похідних (MORE_PREFIXES). */
+export const MORE_ITEMS: NavItem[] = MORE_GROUPS.flatMap((g) => g.items);
 
 /** Шляхи, які мають підсвічувати кнопку «Ще» в нижній навігації. */
 export const MORE_PREFIXES: string[] = MORE_ITEMS.map((i) => i.to);

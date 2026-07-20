@@ -9,7 +9,7 @@
 // ============================================================
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { MORE_ITEMS } from '@/app/nav';
+import { MORE_GROUPS } from '@/app/nav';
 import { cn } from '@/lib/utils';
 
 interface MoreMenuProps {
@@ -41,22 +41,27 @@ export function MoreMenu({ open, onClose, onOpenSettings }: MoreMenuProps) {
       <div className="more-menu-sheet" role="dialog" aria-modal="true" aria-label="Інші розділи">
         <p className="more-menu-title">Інші розділи</p>
 
-        <div className="more-menu-grid">
-          {MORE_ITEMS.map((i) => (
-            <NavLink
-              key={i.to}
-              to={i.to}
-              end={i.end ?? false}
-              className="more-menu-item"
-              onClick={onClose}
-            >
-              <span className="more-menu-icon" aria-hidden="true">
-                {i.icon}
-              </span>
-              <span className="more-menu-label">{i.label}</span>
-            </NavLink>
-          ))}
-        </div>
+        {MORE_GROUPS.map((group) => (
+          <div key={group.label} className="more-menu-group">
+            <p className="more-menu-group-label">{group.label}</p>
+            <div className="more-menu-grid">
+              {group.items.map((i) => (
+                <NavLink
+                  key={i.to}
+                  to={i.to}
+                  end={i.end ?? false}
+                  className="more-menu-item"
+                  onClick={onClose}
+                >
+                  <span className="more-menu-icon" aria-hidden="true">
+                    {i.icon}
+                  </span>
+                  <span className="more-menu-label">{i.label}</span>
+                </NavLink>
+              ))}
+            </div>
+          </div>
+        ))}
 
         <button
           type="button"
