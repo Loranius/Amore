@@ -22,12 +22,12 @@ export function isNavItemActive(item: NavItem, pathname: string): boolean {
 
 /** Ліва пара нижньої навігації (до центральної кнопки «дім»). */
 export const BOTTOM_LEFT: NavItem[] = [
-  { to: '/wishlist', icon: '♡', label: 'Wishlist' },
-  { to: '/budget', icon: '₴', label: 'Finance' },
+  { to: '/wishlist', icon: '♡', label: 'Вішлист' },
+  { to: '/budget', icon: '₴', label: 'Фінанси' },
 ];
 
 /** Центральна кнопка — головна. */
-export const HOME_ITEM: NavItem = { to: '/', icon: '♡', label: 'Home', end: true };
+export const HOME_ITEM: NavItem = { to: '/', icon: '♡', label: 'Головна', end: true };
 
 /** Права пара нижньої навігації (після центру, перед «Ще»). */
 export const BOTTOM_RIGHT: NavItem[] = [
