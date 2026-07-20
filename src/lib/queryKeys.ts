@@ -33,6 +33,8 @@ export const qk = {
 
   freeLimit: () => ['freeLimit'] as const,
   savingsGoals: () => ['savingsGoals'] as const,
+  dates: () => ['dates'] as const,
+  sharedDaysOff: () => ['sharedDaysOff'] as const,
 
   mapPins: () => ['mapPins'] as const,
   userLocations: () => ['userLocations'] as const,
@@ -53,12 +55,13 @@ export const realtimeInvalidation: Record<
   events: [qk.events(), qk.plans()],
   free_limit: [qk.freeLimit()],
   savings_goals: [qk.savingsGoals()],
+  dates: [qk.dates()],
   media_items: [qk.media()],
   dishes: [qk.dishes()],
   wishlist_items: [['wishlist']],
   shopping_items: [qk.shopping()],
   photo_calendar: [['photoCalendar']],
-  work_schedule: [['schedule']],
+  work_schedule: [['schedule'], qk.sharedDaysOff()],
   map_pins: [qk.mapPins()],
   user_locations: [qk.userLocations()],
 };

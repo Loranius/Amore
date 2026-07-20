@@ -23,6 +23,8 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
 import { MoreMenu } from './MoreMenu';
+import { NotificationBell } from './NotificationBell';
+import { NotificationsPanel } from './NotificationsPanel';
 import { SettingsModal } from '@/features/settings/SettingsModal';
 import { useRealtime } from '@/lib/realtime';
 
@@ -33,6 +35,7 @@ export function Layout() {
 
   const [moreOpen, setMoreOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
   // key за pathname → легкий fade-in при зміні сторінки (заміна slide-анімації
   // старого роутера; напрямок slide за VIEW_ORDER — окремий крок полірування).
   const { pathname } = useLocation();
@@ -44,12 +47,16 @@ export function Layout() {
   }, [pathname]);
 
   useEffect(() => {
-    if (contentRef.current) contentRef.current.style.overflowY = moreOpen || settingsOpen ? 'hidden' : '';
-  }, [moreOpen, settingsOpen]);
+    if (contentRef.current) {
+      contentRef.current.style.overflowY = moreOpen || settingsOpen || notifOpen ? 'hidden' : '';
+    }
+  }, [moreOpen, settingsOpen, notifOpen]);
 
   return (
     <div className="app-shell">
       <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
+
+      <NotificationBell onClick={() => setNotifOpen(true)} />
 
       <main className="content" ref={contentRef}>
         <div key={pathname} className="page-fade">
@@ -66,6 +73,8 @@ export function Layout() {
       />
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+
+      <NotificationsPanel open={notifOpen} onClose={() => setNotifOpen(false)} />
     </div>
   );
 }

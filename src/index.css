@@ -232,6 +232,42 @@ textarea {
 .sidebar-settings { margin-top: auto; }
 .sidebar-icon { width: 22px; text-align: center; }
 
+/* ── Дзвіночок сповіщень (плаваюча кнопка, правий верхній кут) ──
+   Топ-бару в застосунку немає — тому fixed, поверх усього контенту,
+   під модалками (z-index:200) і над bottom-nav (z-index:50). */
+.notif-bell {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0) + 14px);
+  right: 14px;
+  z-index: 60;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+  font-size: 20px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.notif-bell-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
 @media (min-width: 900px) {
   .app-shell {
     flex-direction: row;
@@ -1452,6 +1488,41 @@ a.wl-card-title { color: var(--accent); }
 .heat-swatch--both-off { background: #d1477a; }
 .heat-swatch--lena-off { background: #f6c6a8; }
 .heat-swatch--dima-off { background: #b7c3ea; }
+
+/* ── Заплановані побачення (Графік) — той самий патерн, що .goal-row ── */
+.date-plan-cta { margin-bottom: 14px; width: 100%; }
+.date-plans { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.date-plans-title { margin: 0 0 4px; font-size: 16px; }
+.date-plan-card {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.date-plan-card--pending { border: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent); }
+.date-plan-card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.date-plan-card-title { font-weight: 600; }
+.date-plan-card-date, .date-plan-card-place { font-size: 13px; color: var(--muted); }
+.date-plan-card-desc { font-size: 13px; color: var(--muted); }
+.date-plan-card-link { font-size: 14px; width: fit-content; }
+.date-plan-card-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+
+/* ── Панель сповіщень (дзвіночок) ─────────────────────────────── */
+.notif-list { display: flex; flex-direction: column; gap: 10px; }
+.notif-item {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.notif-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.notif-item-title { font-weight: 600; }
+.notif-item-detail { font-size: 13px; color: var(--muted); }
 
 /* Фото-календар */
 .pcal-cell {

@@ -10,6 +10,7 @@
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
+import { useCurrentUser } from '@/providers/AuthProvider';
 import {
   MONTHS_UA,
   DAYS_UA,
@@ -21,7 +22,9 @@ import {
   stepMonth,
 } from '@/features/_shared/month';
 import { useSchedule, useScheduleMutation, MARK_CYCLE, type MarksMap } from './useSchedule';
-import type { AppUser } from '@/types';
+import { useSharedDaysOff, useDatePlans, useDateMutations } from './useDates';
+import { PlanDateModal } from './PlanDateModal';
+import type { AppUser, DateRow } from '@/types';
 
 type DayStatus = 'both-off' | 'lena-off' | 'dima-off' | 'none';
 
@@ -36,11 +39,17 @@ function dayStatus(lena: AppUser | undefined, dima: AppUser | undefined, marks: 
 
 export function SchedulePage() {
   const { data: users = [] } = useUsers();
+  const me = useCurrentUser();
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
   const [editMode, setEditMode] = useState(false);
+  const [planModalOpen, setPlanModalOpen] = useState(false);
 
   const { data: marks = {} } = useSchedule(yr, mo);
   const mutation = useScheduleMutation(yr, mo);
+
+  const { data: sharedDates = [] } = useSharedDaysOff();
+  const { data: datePlans = [] } = useDatePlans();
+  const dateMutations = useDateMutations();
 
   const total = daysInMonth(yr, mo);
   const offset = firstMondayOffset(yr, mo);
@@ -97,6 +106,12 @@ export function SchedulePage() {
         <p className="heat-summary">
           💗 {bothOffCount} {bothOffCount === 1 ? 'спільний вихідний' : 'спільних вихідних'} цього місяця
         </p>
+      )}
+
+      {sharedDates.length > 0 && (
+        <button type="button" className="btn date-plan-cta" onClick={() => setPlanModalOpen(true)}>
+          💗 Запланувати побачення
+        </button>
       )}
 
       <button
@@ -167,7 +182,99 @@ export function SchedulePage() {
           <span><i className="heat-swatch heat-swatch--dima-off" /> Діма вільний</span>
         </div>
       )}
+
+      {datePlans.length > 0 && (
+        <div className="date-plans">
+          <h2 className="date-plans-title">💗 Заплановані побачення</h2>
+          {datePlans.map((d) => (
+            <DatePlanCard
+              key={d.id}
+              plan={d}
+              meName={me.name}
+              onConfirm={() => dateMutations.confirm.mutate(d.id)}
+              onReject={() => dateMutations.remove.mutate(d.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {planModalOpen && (
+        <PlanDateModal
+          sharedDates={sharedDates}
+          onClose={() => setPlanModalOpen(false)}
+          onSubmit={(input) => dateMutations.propose.mutate(input)}
+        />
+      )}
     </section>
+  );
+}
+
+function fmtDatePlanDate(d: string): string {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', weekday: 'short' });
+}
+
+function DatePlanCard({
+  plan,
+  meName,
+  onConfirm,
+  onReject,
+}: {
+  plan: DateRow;
+  meName: string;
+  onConfirm: () => void;
+  onReject: () => void;
+}) {
+  const pending = plan.status === 'pending';
+  const canVote = pending && plan.proposed_by !== meName;
+  const partnerGen = meName === 'Діма' ? 'Лєни' : 'Діми';
+
+  return (
+    <div className={`date-plan-card${pending ? ' date-plan-card--pending' : ''}`}>
+      <div className="date-plan-card-info">
+        <span className="date-plan-card-title">{plan.title}</span>
+        <span className="date-plan-card-date">📅 {fmtDatePlanDate(plan.date)}{plan.time ? ` · ${plan.time.slice(0, 5)}` : ''}</span>
+        {plan.place && <span className="date-plan-card-place">📍 {plan.place}</span>}
+        {plan.description && <span className="date-plan-card-desc">{plan.description}</span>}
+        {plan.url && (
+          <a className="date-plan-card-link" href={plan.url} target="_blank" rel="noopener noreferrer">
+            🔗
+          </a>
+        )}
+        {pending ? (
+          <span className="goal-status-badge">⏳ Очікує {partnerGen}</span>
+        ) : (
+          <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
+        )}
+      </div>
+
+      <div className="date-plan-card-actions">
+        {canVote && (
+          <div className="goal-vote-btns">
+            <button type="button" className="btn goal-vote-yes" onClick={onConfirm}>
+              ✓
+            </button>
+            <button
+              type="button"
+              className="btn-secondary goal-vote-no"
+              onClick={() => confirm('Відхилити?') && onReject()}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+        {(!pending || plan.proposed_by === meName) && (
+          <button
+            type="button"
+            className="fin-del-btn"
+            onClick={() => confirm('Видалити побачення?') && onReject()}
+            aria-label="Видалити"
+          >
+            ×
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

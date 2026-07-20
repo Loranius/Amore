@@ -249,6 +249,23 @@ export interface SavingsGoalRow {
   saved_amount: number | null;
 }
 
+/** Побачення на спільний вихідний (pending/confirmed, той самий патерн, що savings_goals). */
+export interface DateRow {
+  id: number;
+  title: string;
+  place: string | null;
+  /** 'YYYY-MM-DD', обов'язково спільний вихідний (перевіряється на клієнті). */
+  date: string;
+  /** 'HH:MM:SS' або null. */
+  time: string | null;
+  description: string | null;
+  url: string | null;
+  status: GoalStatus;
+  /** Ім'я того, хто запропонував. */
+  proposed_by: string;
+  created_at: string;
+}
+
 export interface MapPinRow {
   id: number;
   title: string;
@@ -345,6 +362,7 @@ export interface Database {
       user_locations:     TableDef<UserLocationRow, 'user_id' | 'lat' | 'lng'>;
       wishlist_items:     TableDef<WishlistItemRow, 'title' | 'owner'>;
       dishes:             TableDef<DishRow, 'title' | 'category'>;
+      dates:              TableDef<DateRow, 'title' | 'date' | 'proposed_by'>;
       // pin_attempts і закриті колонки users — лише service_role
       // (Edge Function auth-pin); у клієнтському контракті їх немає.
     };
@@ -511,7 +529,7 @@ export type EdgeFunctionName = keyof EdgeFunctions;
 
 /** Таблиці, на які підписується клієнт (публікація supabase_realtime). */
 export type RealtimeTable =
-  | 'events' | 'free_limit' | 'savings_goals'
+  | 'events' | 'free_limit' | 'savings_goals' | 'dates'
   | 'media_items' | 'dishes' | 'wishlist_items'
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
   | 'map_pins' | 'user_locations';
