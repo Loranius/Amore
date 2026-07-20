@@ -73,9 +73,6 @@ export function WishCard({
             <button type="button" className="btn-secondary" onClick={() => onEdit(item)}>
               ✏️ Редагувати
             </button>
-            <button type="button" className="btn-secondary" onClick={() => onMove(item)}>
-              ↔️ Перенести
-            </button>
             <button type="button" className="btn-secondary" onClick={() => onDelete(item.id)}>
               🗑 Видалити
             </button>
@@ -104,6 +101,13 @@ export function WishCard({
             </button>
           </div>
         )}
+        {/* «Перенести» — завжди, незалежно від зони/власника: інакше випадковий
+            перенос у чужу зону стає пасткою без шляху назад (звідси й баг). */}
+        <div className="wl-card-actions">
+          <button type="button" className="btn-secondary wl-move-btn" onClick={() => onMove(item)}>
+            ↔️ Перенести
+          </button>
+        </div>
       </div>
     </div>
   );
