@@ -954,8 +954,6 @@ textarea {
    CSS-прохід.
    ============================================================ */
 .wl-sub-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-.wl-sub-tabs--col { flex-direction: column; margin-bottom: 0; }
-.wl-sub-tabs--col .wl-sub-btn { text-align: left; }
 .wl-sub-btn {
   flex: 1;
   border: 0;
@@ -1028,6 +1026,49 @@ a.wl-card-title { color: var(--accent); }
   text-decoration: underline;
 }
 .wl-reserved-row { align-items: center; }
+.wl-move-btn {
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent);
+}
+
+/* ── MoveWishModal — оформлення під Pink Portal (градієнт + виразні
+   кнопки-варіанти замість непомітних текстових пілюль). ──────── */
+.wl-move-sheet {
+  background: linear-gradient(160deg, #fff7f9 0%, #fff0f4 60%, #ffe9ef 100%);
+  border: 1px solid color-mix(in srgb, #d98aa8 25%, transparent);
+}
+.wl-move-title { color: #d98aa8; }
+.wl-move-sub { margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.wl-move-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 6px; }
+.wl-move-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 2px solid color-mix(in srgb, #d98aa8 35%, transparent);
+  background: color-mix(in srgb, #d98aa8 10%, #fff);
+  color: #3a2530;
+  font: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+.wl-move-option:active { background: color-mix(in srgb, #d98aa8 22%, #fff); transform: scale(0.98); }
+.wl-move-option-icon {
+  font-size: 20px;
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #fff;
+  flex: 0 0 auto;
+}
 
 .wl-archive-wrap { margin-top: 20px; }
 .wl-archive-toggle {

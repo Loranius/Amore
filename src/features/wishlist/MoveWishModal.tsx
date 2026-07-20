@@ -1,7 +1,11 @@
 // ============================================================
 // MoveWishModal — перенести вже створене бажання (Моє / партнеру /
 // Спільне). Той самий трипозиційний вибір, що й при створенні
-// (WishFormModal), але для існуючого запису — окрема дія в WishCard.
+// (WishFormModal), але для існуючого запису — окрема дія в WishCard,
+// доступна на БУДЬ-ЯКІЙ картці (не лише «своїй»), інакше випадковий
+// перенос у чужу зону — пастка без шляху назад.
+// Оформлення — під стиль Pink Portal: градієнтний аркуш, великі
+// виразні кнопки-варіанти замість непомітних текстових пілюль.
 // ============================================================
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { AppUser, WishlistItemRow } from '@/types';
@@ -17,15 +21,16 @@ export function MoveWishModal({ item, partner, onClose, onMove }: MoveWishModalP
   const me = useCurrentUser();
 
   const allOptions = [
-    { key: 'me', label: 'Мені', owner: me.id, isShared: false, possible: true },
+    { key: 'me', label: 'Мені', icon: '📥', owner: me.id, isShared: false, possible: true },
     {
       key: 'partner',
       label: `Для ${partner?.name ?? 'партнера'}`,
+      icon: '👤',
       owner: partner?.id ?? me.id,
       isShared: false,
       possible: !!partner,
     },
-    { key: 'shared', label: '🎁 Спільне', owner: item.owner, isShared: true, possible: true },
+    { key: 'shared', label: 'Спільне', icon: '🎁', owner: item.owner, isShared: true, possible: true },
   ] as const;
 
   const isCurrent = (opt: (typeof allOptions)[number]) =>
@@ -42,25 +47,24 @@ export function MoveWishModal({ item, partner, onClose, onMove }: MoveWishModalP
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="modal-sheet" role="dialog" aria-modal="true">
-        <h2 className="modal-title">Перенести «{item.title}»</h2>
-        <div className="form-field">
-          <span>Куди перенести</span>
-          <div className="wl-sub-tabs wl-sub-tabs--col">
-            {options.map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                className="wl-sub-btn"
-                onClick={() => {
-                  onMove(opt.owner, opt.isShared);
-                  onClose();
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+      <div className="modal-sheet wl-move-sheet" role="dialog" aria-modal="true">
+        <h2 className="modal-title wl-move-title">↔️ Перенести «{item.title}»</h2>
+        <p className="wl-move-sub">Куди перенести:</p>
+        <div className="wl-move-options">
+          {options.map((opt) => (
+            <button
+              key={opt.key}
+              type="button"
+              className="wl-move-option"
+              onClick={() => {
+                onMove(opt.owner, opt.isShared);
+                onClose();
+              }}
+            >
+              <span className="wl-move-option-icon">{opt.icon}</span>
+              {opt.label}
+            </button>
+          ))}
         </div>
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
