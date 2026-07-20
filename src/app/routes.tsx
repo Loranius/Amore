@@ -12,7 +12,7 @@
 // ============================================================
 import { createHashRouter, Navigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { CalendarHub, UsHub } from '@/components/layout/HubLayout';
+import { CalendarHub } from '@/components/layout/HubLayout';
 import { RequireAuth, RedirectIfAuthed } from '@/components/guards/RequireAuth';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { ShoppingPage } from '@/features/shopping/ShoppingPage';
@@ -24,8 +24,6 @@ import { MediaPage } from '@/features/media/MediaPage';
 import { CulinaryPage } from '@/features/culinary/CulinaryPage';
 import { HomePage } from '@/features/home/HomePage';
 import { BudgetPage } from '@/features/budget/BudgetPage';
-import { QuestionPage } from '@/features/question/QuestionPage';
-import { CapsulePage } from '@/features/capsule/CapsulePage';
 import { MapPage } from '@/features/map/MapPage';
 import { WhereToPage } from '@/features/whereto/WhereToPage';
 import { GamePage } from '@/features/game/GamePage';
@@ -59,17 +57,6 @@ export const router = createHashRouter([
               { index: true, element: <CalendarPage /> },
               { path: 'schedule', element: <SchedulePage /> },
               { path: 'photos', element: <PhotoCalendarPage /> },
-            ],
-          },
-
-          // Хаб «Ми»: /us → /us/question · /us/capsule
-          {
-            path: 'us',
-            element: <UsHub />,
-            children: [
-              { index: true, element: <Navigate to="question" replace /> },
-              { path: 'question', element: <QuestionPage /> },
-              { path: 'capsule', element: <CapsulePage /> },
             ],
           },
 
