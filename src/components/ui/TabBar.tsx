@@ -46,7 +46,7 @@ export function TabBar<T extends string>({
         >
           {it.icon && <span aria-hidden="true">{it.icon} </span>}
           {it.label}
-          {it.count !== undefined && <span className="tab-bar-count"> {it.count}</span>}
+          {it.count !== undefined && <span className="tab-bar-count">{it.count}</span>}
         </button>
       ))}
     </div>

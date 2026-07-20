@@ -1384,7 +1384,15 @@ a.wl-card-title { color: var(--accent); }
 .tab-bar--scroll .tab-bar-btn { flex: 0 0 auto; white-space: nowrap; }
 .tab-bar-btn.active { background: var(--accent); color: #fff; }
 .tab-bar-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.tab-bar-count { opacity: 0.8; }
+.tab-bar-count {
+  display: inline-block;
+  margin-left: 5px;
+  background: color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: var(--radius-pill);
+  padding: 0 7px;
+  font-size: 12px;
+}
+.tab-bar-btn.active .tab-bar-count { background: color-mix(in srgb, #fff 25%, transparent); }
 
 /* ============================================================
    ГРАФІК (schedule) + ФОТО-КАЛЕНДАР (photo-calendar)
