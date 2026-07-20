@@ -250,16 +250,27 @@ textarea {
   .bottom-nav { display: none; }
 }
 
-/* ── «Pink Portal» фон для інших сторінок (пілот: Календар-хаб,
-   Вішлист) — той самий градієнт+PortalDecor, що на Home, як окрема
-   утилітарна обгортка (без .home flex-розкладки — тільки фон/бліди). */
+/* ── «Pink Portal» фон для інших сторінок (Календар-хаб, Вішлист,
+   Фінанси, Покупки, Кулінарія, Куди піти, Карта, Вотчліст) — той
+   самий градієнт+PortalDecor, що на Home, як окрема утилітарна
+   обгортка (без .home flex-розкладки — тільки фон/бліди). Токени й
+   шрифт продубльовані з .home/.auth-screen навмисно (а не через
+   спадкування) — це один і той самий світлий хендоф незалежно від
+   [data-theme='dark'], інакше на цих сторінках "холодні" глобальні
+   --text/--muted/--surface з темної теми лягали б на світло-рожевий
+   фон і ламали контраст. */
 .pink-page {
   --accent: #d98aa8;
+  --text: #3a2530;
+  --muted: #8a6b76;
+  --surface: #ffffff;
   position: relative;
   margin: -16px -16px calc(-1 * (env(safe-area-inset-bottom, 0) + 88px));
   padding: 16px 16px calc(env(safe-area-inset-bottom, 0) + 88px);
   min-height: 100dvh;
   background: linear-gradient(160deg, #fff7f9 0%, #fff0f4 50%, #ffe9ef 100%);
+  font-family: 'Nunito', system-ui, sans-serif;
+  color: var(--text);
 }
 /* Негативний z-index замість "підняти всіх сусідів" — так модалки/
    Lightbox (position:fixed, рендеряться тут же прямими дітьми .pink-page)
