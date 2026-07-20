@@ -12,7 +12,7 @@ import { PortalDecor } from '@/features/auth/PortalDecor';
 
 export function HomePage() {
   const startDate = useStartDate();
-  const { data: events = [] } = useEvents();
+  const { data: events = [], isPending, isError } = useEvents();
 
   return (
     <section className="home">
@@ -27,8 +27,20 @@ export function HomePage() {
       </div>
 
       <MiniWidgets />
-      <NextEvent events={events} />
-      <WeekWidget events={events} />
+
+      {/* Єдина сторінка без цього стану раніше — "Найближчих подій
+          немає" показувалось і під час завантаження, і коли подій
+          справді нема, невідрізнювано одне від одного. */}
+      {isPending ? (
+        <p className="empty-state">Завантаження…</p>
+      ) : isError ? (
+        <p className="empty-state">Не вдалось завантажити події.</p>
+      ) : (
+        <>
+          <NextEvent events={events} />
+          <WeekWidget events={events} />
+        </>
+      )}
     </section>
   );
 }

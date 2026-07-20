@@ -3,7 +3,9 @@
 // ------------------------------------------------------------
 // mapbox-gl керується імперативно через refs; піни/маркери синкаються
 // в ефектах під стан React. Клік по карті → додати місце. Клік по
-// картці: 1-й — політ, 2-й — модалка (focusedPinId).
+// картці чи маркеру — одразу летимо туди й відкриваємо модалку
+// (раніше перший тап лише летів, другий відкривав — неочевидно;
+// focusedPinId лишився тільки для підсвітки картки на списку).
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
@@ -92,7 +94,7 @@ export function MapPage() {
       elMarker.textContent = cat.emoji;
       elMarker.addEventListener('click', (e) => {
         e.stopPropagation();
-        focusedPinId.current = null;
+        focusedPinId.current = pin.id;
         setViewPin(pin);
       });
       const marker = new mapboxgl.Marker(elMarker).setLngLat([pin.lng, pin.lat]).addTo(map);
@@ -145,13 +147,9 @@ export function MapPage() {
     mapRef.current?.flyTo({ center: [lng, lat], zoom });
 
   const onCardClick = (pin: MapPinRow) => {
-    if (focusedPinId.current === pin.id) {
-      focusedPinId.current = null;
-      setViewPin(pin);
-    } else {
-      focusedPinId.current = pin.id;
-      flyTo(pin.lng, pin.lat);
-    }
+    focusedPinId.current = pin.id;
+    flyTo(pin.lng, pin.lat);
+    setViewPin(pin);
   };
 
   const pickGeoResult = (f: MapboxFeature) => {

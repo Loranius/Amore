@@ -11,6 +11,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useAuth, useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useUsers } from '@/features/_shared/useUsers';
+import { TabBar } from '@/components/ui/TabBar';
 import { usePhotoManager, usePhotoMutations, useUserSizes, useSaveSizes } from './useSettings';
 import type { InsertRow, UserName, UserSizesRow } from '@/types';
 
@@ -19,9 +20,12 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
+type Section = 'theme' | 'sizes' | 'photos';
+
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { theme, toggle } = useTheme();
   const { user, logout } = useAuth();
+  const [section, setSection] = useState<Section>('theme');
 
   useEffect(() => {
     if (!open) return;
@@ -50,15 +54,23 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         <h2 className="modal-title">Налаштування</h2>
         {user && <p className="modal-sub">Профіль: {user.name}</p>}
 
-        <button type="button" className="btn" onClick={toggle}>
-          Тема: {theme === 'dark' ? 'темна' : 'світла'}
-        </button>
+        <TabBar<Section>
+          value={section}
+          onChange={setSection}
+          items={[
+            { value: 'theme', label: 'Тема', icon: '🎨' },
+            { value: 'sizes', label: 'Розміри', icon: '📏' },
+            { value: 'photos', label: 'Фото', icon: '🖼' },
+          ]}
+        />
 
-        <div className="settings-divider" />
-        <SizesSection />
-
-        <div className="settings-divider" />
-        <PhotosSection />
+        {section === 'theme' && (
+          <button type="button" className="btn" onClick={toggle}>
+            Тема: {theme === 'dark' ? 'темна' : 'світла'}
+          </button>
+        )}
+        {section === 'sizes' && <SizesSection />}
+        {section === 'photos' && <PhotosSection />}
 
         <div className="settings-divider" />
 

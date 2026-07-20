@@ -203,12 +203,7 @@ function ItemRow({ item, bought = false, authorName, onToggle, onDelete, onEdit 
         {bought ? '✓' : ''}
       </button>
 
-      <button
-        type="button"
-        className="sl-item-info"
-        onClick={onEdit}
-        disabled={!onEdit}
-      >
+      <div className="sl-item-info">
         <span className="sl-item-title">{item.title}</span>
         {item.qty && <span className="sl-item-qty">{item.qty}</span>}
         <span className="sl-item-author">
@@ -216,8 +211,13 @@ function ItemRow({ item, bought = false, authorName, onToggle, onDelete, onEdit 
             ? `купив(ла) ${authorName(item.bought_by)}`
             : `від ${authorName(item.created_by)}`}
         </span>
-      </button>
+      </div>
 
+      {onEdit && (
+        <button type="button" className="sl-edit-btn" onClick={onEdit} aria-label="Редагувати">
+          ✏️
+        </button>
+      )}
       <button type="button" className="sl-del-btn" onClick={onDelete} aria-label="Видалити">
         ×
       </button>

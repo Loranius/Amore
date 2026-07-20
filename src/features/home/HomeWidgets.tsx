@@ -6,21 +6,39 @@ import { useNavigate } from 'react-router-dom';
 import { useSharedDayoff } from './useHome';
 import { todayStr } from './homeUtils';
 import { planMetadataOf } from '@/features/_shared/events';
+import { useDatePlans } from '@/features/schedule/useDates';
 import type { EventRow } from '@/types';
 
 // ── Міні-віджети ─────────────────────────────────────────────
-export function MiniWidgets() {
-  const navigate = useNavigate();
-  const dayoff = useSharedDayoff();
-
-  const dayoffLabel = useMemo(() => {
-    if (!dayoff) return null;
-    const dt = new Date(dayoff + 'T00:00:00');
+// Раніше тут завжди рендерився лише 0-1 віджет (спільний вихідний) —
+// недовикористаний простір. Додано другий: найближче ПІДТВЕРДЖЕНЕ
+// побачення (features/schedule) — те саме "разом" з реальним планом,
+// а не лише вихідним днем.
+function useCountdownLabel(dateStr: string | null): { when: string; label: string } | null {
+  return useMemo(() => {
+    if (!dateStr) return null;
+    const dt = new Date(dateStr + 'T00:00:00');
     const label = dt.toLocaleDateString('uk-UA', { weekday: 'short', day: 'numeric', month: 'long' });
     const diff = Math.round((dt.getTime() - new Date(todayStr() + 'T00:00:00').getTime()) / 86_400_000);
     const when = diff === 0 ? 'сьогодні! 🎉' : diff === 1 ? 'завтра' : `через ${diff} дн.`;
     return { when, label };
-  }, [dayoff]);
+  }, [dateStr]);
+}
+
+export function MiniWidgets() {
+  const navigate = useNavigate();
+  const dayoff = useSharedDayoff();
+  const { data: datePlans = [] } = useDatePlans();
+
+  const dayoffLabel = useCountdownLabel(dayoff);
+
+  const nextDate = useMemo(() => {
+    const ts = todayStr();
+    return datePlans.find((d) => d.status === 'confirmed' && d.date >= ts) ?? null;
+  }, [datePlans]);
+  const nextDateLabel = useCountdownLabel(nextDate?.date ?? null);
+
+  if (!dayoffLabel && !nextDateLabel) return null;
 
   return (
     <div className="mini-widgets">
@@ -31,6 +49,17 @@ export function MiniWidgets() {
             <b>Разом {dayoffLabel.when}</b>
             <br />
             {dayoffLabel.label}
+          </span>
+        </button>
+      )}
+      {nextDate && nextDateLabel && (
+        <button type="button" className="mini-widget" onClick={() => navigate('/calendar/schedule')}>
+          <span className="mini-widget-icon">💗</span>
+          <span className="mini-widget-text">
+            <b>{nextDate.title} — {nextDateLabel.when}</b>
+            <br />
+            {nextDateLabel.label}
+            {nextDate.place ? ` · ${nextDate.place}` : ''}
           </span>
         </button>
       )}
