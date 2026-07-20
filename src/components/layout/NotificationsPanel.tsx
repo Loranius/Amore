@@ -8,6 +8,7 @@
 import { useNotifications } from '@/features/notifications/useNotifications';
 import { useDateMutations } from '@/features/schedule/useDates';
 import { useGoalMutations } from '@/features/budget/useBudget';
+import { TintedRow } from '@/components/ui/TintedRow';
 
 const KIND_ICON: Record<string, string> = { date: '💗', goal: '🎯' };
 
@@ -37,27 +38,32 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
         ) : (
           <div className="notif-list">
             {items.map((item) => (
-              <div key={`${item.kind}-${item.id}`} className="notif-item">
-                <div className="notif-item-info">
-                  <span className="notif-item-title">
-                    {KIND_ICON[item.kind]} {item.title}
-                  </span>
-                  <span className="notif-item-detail">{item.detail}</span>
-                  <span className="goal-status-badge">від {item.proposedBy}</span>
-                </div>
-                <div className="goal-vote-btns">
-                  <button type="button" className="btn goal-vote-yes" onClick={() => confirmItem(item.kind, item.id)}>
-                    ✓
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary goal-vote-no"
-                    onClick={() => confirm('Відхилити?') && rejectItem(item.kind, item.id)}
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
+              <TintedRow
+                key={`${item.kind}-${item.id}`}
+                info={
+                  <>
+                    <span className="notif-item-title">
+                      {KIND_ICON[item.kind]} {item.title}
+                    </span>
+                    <span className="notif-item-detail">{item.detail}</span>
+                    <span className="goal-status-badge">від {item.proposedBy}</span>
+                  </>
+                }
+                actions={
+                  <div className="goal-vote-btns">
+                    <button type="button" className="btn goal-vote-yes" onClick={() => confirmItem(item.kind, item.id)}>
+                      ✓
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-secondary goal-vote-no"
+                      onClick={() => confirm('Відхилити?') && rejectItem(item.kind, item.id)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                }
+              />
             ))}
           </div>
         )}

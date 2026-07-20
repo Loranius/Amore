@@ -7,6 +7,7 @@
 // ============================================================
 import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
+import { TintedRow } from '@/components/ui/TintedRow';
 import { fmtMoney, useGoals, useGoalMutations, type NewGoalInput } from './useBudget';
 import type { SavingsGoalRow } from '@/types';
 
@@ -44,67 +45,72 @@ export function GoalsList() {
             const canDelete = !pending || g.proposed_by === me.name;
 
             return (
-              <div key={g.id} className={`goal-row${pending ? ' goal-pending' : ''}`}>
-                <div className="goal-row-info">
-                  <span className="goal-row-name">{g.name}</span>
-                  {g.description && <span className="goal-row-desc">{g.description}</span>}
-                  {g.url && (
-                    <a className="goal-row-link" href={g.url} target="_blank" rel="noopener noreferrer">
-                      🔗
-                    </a>
-                  )}
-                  {pending && <span className="goal-status-badge">⏳ Очікує {partnerGen}</span>}
-                  {g.status === 'confirmed' && (
-                    <>
-                      <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
-                      <div className="goal-progress-wrap">
-                        <div className="goal-progress-bar">
-                          <div className="goal-progress-fill" style={{ width: `${pct}%` }} />
+              <TintedRow
+                key={g.id}
+                pending={pending}
+                info={
+                  <>
+                    <span className="goal-row-name">{g.name}</span>
+                    {g.description && <span className="goal-row-desc">{g.description}</span>}
+                    {g.url && (
+                      <a className="goal-row-link" href={g.url} target="_blank" rel="noopener noreferrer">
+                        🔗
+                      </a>
+                    )}
+                    {pending && <span className="goal-status-badge">⏳ Очікує {partnerGen}</span>}
+                    {g.status === 'confirmed' && (
+                      <>
+                        <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
+                        <div className="goal-progress-wrap">
+                          <div className="goal-progress-bar">
+                            <div className="goal-progress-fill" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="goal-progress-meta">
+                            <span>
+                              {fmtMoney(saved)} / {fmtMoney(target)}
+                            </span>
+                            <span className="goal-progress-pct">{pct}%</span>
+                          </div>
                         </div>
-                        <div className="goal-progress-meta">
-                          <span>
-                            {fmtMoney(saved)} / {fmtMoney(target)}
-                          </span>
-                          <span className="goal-progress-pct">{pct}%</span>
-                        </div>
+                      </>
+                    )}
+                  </>
+                }
+                actions={
+                  <>
+                    <span className="goal-row-price">{fmtMoney(target)}</span>
+                    {canVote && (
+                      <div className="goal-vote-btns">
+                        <button type="button" className="btn goal-vote-yes" onClick={() => confirm.mutate(g.id)}>
+                          ✓
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary goal-vote-no"
+                          onClick={() => window.confirm('Відхилити?') && remove.mutate(g.id)}
+                        >
+                          ✕
+                        </button>
                       </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="goal-row-right">
-                  <span className="goal-row-price">{fmtMoney(target)}</span>
-                  {canVote && (
-                    <div className="goal-vote-btns">
-                      <button type="button" className="btn goal-vote-yes" onClick={() => confirm.mutate(g.id)}>
-                        ✓
+                    )}
+                    {g.status === 'confirmed' && (
+                      <button type="button" className="btn-secondary goal-add-funds-btn" onClick={() => setFunding(g)}>
+                        + Внести
                       </button>
+                    )}
+                    {canDelete && (
                       <button
                         type="button"
-                        className="btn-secondary goal-vote-no"
-                        onClick={() => window.confirm('Відхилити?') && remove.mutate(g.id)}
+                        className="fin-del-btn"
+                        onClick={() => window.confirm('Видалити?') && remove.mutate(g.id)}
+                        aria-label="Видалити"
                       >
-                        ✕
+                        ×
                       </button>
-                    </div>
-                  )}
-                  {g.status === 'confirmed' && (
-                    <button type="button" className="btn-secondary goal-add-funds-btn" onClick={() => setFunding(g)}>
-                      + Внести
-                    </button>
-                  )}
-                  {canDelete && (
-                    <button
-                      type="button"
-                      className="fin-del-btn"
-                      onClick={() => window.confirm('Видалити?') && remove.mutate(g.id)}
-                      aria-label="Видалити"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              </div>
+                    )}
+                  </>
+                }
+              />
             );
           })}
         </div>
