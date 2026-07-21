@@ -1,187 +1,138 @@
 // ============================================================
-// CrystalScene — 3D-рендер кристала (Three.js / React Three Fiber)
+// CrystalScene — 3D-рендер артефакту (Three.js / React Three Fiber)
 // ------------------------------------------------------------
-// Основний рендер «Crystal Engine v1.0»; SVG Crystal.tsx лишається
-// фолбеком (WebGL недоступний або ця сцена впала — див.
-// CrystalErrorBoundary у HomePage.tsx). ДНК/пороги категорій ідентичні
-// SVG-версії (crystalGeometry.ts). Кристал — кластер гранованих шипів
-// (buildSpikes), що ростуть із «підошви»; поки в парі взагалі немає
-// даних — лише бліда жовта «насінина» (CrystalSeed), яка чекає на ріст.
+// «Artifact Engine»: справжній мінеральний друз (crystalCluster.ts — рендер-
+// адаптер, ../artifact/ — renderer-agnostic процедурний рушій), що
+// ЛЕВІТУЄ без жодної видимої основи (жодного каменю/п'єдесталу — див.
+// deriveClusterBranch/буld*Domain у artifact/artifactNodes.ts). SVG
+// Crystal.tsx лишається фолбеком (WebGL недоступний або ця сцена впала —
+// див. CrystalErrorBoundary у HomePage.tsx) і досі на старій v1-геометрії
+// (crystalGeometry.ts) — 2D-контур не потребує переписаної процедурної
+// анатомії.
 // ============================================================
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Sparkles } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import type * as THREE from 'three';
-import { useCrystalDNA, useMilestoneEvents } from '../useCrystal';
-import type { CrystalDNA } from '../useCrystal';
-import { useCrystalSeen, MILESTONE_SEEN_KEY } from '../useCrystalSeen';
+import {
+  useCrystalDNA,
+  useMilestoneEvents,
+  useCrystalPlaces,
+  useCrystalWishes,
+  useAchievedGoals,
+  useAnniversaryEvents,
+  useCreationSources,
+} from '../useCrystal';
 import { useCrystalSeed } from '../useHome';
 import { useMemories } from '../useMemories';
+import { useClusterGrowthFlash } from '../useCrystalSeen';
 import { hashSeedString } from '../mulberry32';
-import { CATEGORY_DEFS, isDnaEmpty } from '../crystalGeometry';
 import { CrystalStats } from '../CrystalStats';
 import { MemoryModal } from '../MemoryModal';
 import {
-  buildSpikes,
-  buildSpikeGeometry,
-  buildMilestoneSpikes,
-  totalRichness,
-  stageForRichness,
-  stageLabel,
-  type SpikeSpec,
-  type MilestoneSpike,
-} from './crystalGeometry3d';
+  generateArtifactDNA,
+  computeEvolutionPressures,
+  buildArtifactNodes,
+  isArtifactEmpty,
+  type ArtifactInput,
+} from '../artifact';
+import { deriveClusterBranch, deriveClusterMaterial, buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
 
-const BASE_Y = -1.3;
+/** Центр вертикального «дихання» левітації — немає більше каменя, що заякорює композицію низько. */
+const BOB_CENTER_Y = 0;
 
-interface SpikeProps {
-  spec: SpikeSpec;
+interface BranchProps {
+  branch: ClusterBranch;
   geometry: THREE.BufferGeometry;
-  roughness: number;
-  clearcoat: number;
+  material: ClusterMaterial;
   reduceMotion: boolean;
   onOpen: () => void;
 }
 
 /**
- * Один шип-грань. Власний useFrame замість групового scale — кожен шип
- * дихає своєю фазою/швидкістю (SpikeSpec.breathePhase/breatheSpeed), тож
+ * Один вузол артефакту. Власний useFrame замість групового scale — кожен
+ * вузол дихає своєю фазою/швидкістю (breathePhase/breatheSpeed), тож
  * колонія пульсує не в унісон, а органічною хвилею. Розтяг лише по Y
  * (геометрія має основу в y=0) — виглядає як «підростання», не роздування.
+ * Milestone-вузли (emissive) — золоте світіння замість фото-полірування,
+ * щоб читались як веха, а не черговий приріст. 'core'-вузли отримують
+ * додатковий, слабший luminosity-підсвіт (§4 левітації — світіння ядра
+ * замінює світіння вже видаленої кам'яної основи).
  */
-function Spike({ spec, geometry, roughness, clearcoat, reduceMotion, onOpen }: SpikeProps) {
+function Branch({ branch, geometry, material, reduceMotion, onOpen }: BranchProps) {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
   useFrame((state) => {
     const mesh = meshRef.current;
     if (!mesh || reduceMotion) return;
     const t = state.clock.elapsedTime;
-    const micro = 1 + Math.sin(t * spec.breatheSpeed + spec.breathePhase) * 0.018;
+    const micro = 1 + Math.sin(t * branch.breatheSpeed + branch.breathePhase) * 0.018;
     mesh.scale.set(1, micro, 1);
   });
+
+  const coreGlow = branch.kind === 'core' ? material.glow * 0.5 : 0;
 
   return (
     <mesh
       ref={meshRef}
       geometry={geometry}
-      position={[spec.posX, BASE_Y, spec.posZ]}
-      rotation={[spec.tiltX, spec.rotY, spec.tiltZ]}
+      position={[branch.posX, branch.posY, branch.posZ]}
+      rotation={[branch.tiltX, branch.rotY, branch.tiltZ]}
       onClick={onOpen}
     >
       <meshPhysicalMaterial
         vertexColors
-        roughness={roughness}
-        metalness={0}
-        transmission={0.4}
-        thickness={0.7}
-        clearcoat={clearcoat}
-        clearcoatRoughness={0.08}
+        roughness={branch.emissive ? 0.15 : material.roughness}
+        metalness={branch.emissive ? 0.1 : 0}
+        transmission={branch.emissive ? 0.15 : material.transmission}
+        thickness={0.6}
+        clearcoat={branch.emissive ? 0.9 : material.clearcoat}
+        clearcoatRoughness={0.06}
         ior={1.6}
-        reflectivity={0.6}
-      />
-    </mesh>
-  );
-}
-
-/**
- * Шпиль великої життєвої події (заручини/весілля/переїзд тощо) — та сама
- * механіка дихання, що й Spike, але з теплим золотим світінням (emissive),
- * щоб він явно читався як «веха», а не черговий шип категорії.
- */
-function MilestoneSpikeMesh({
-  spec,
-  geometry,
-  reduceMotion,
-  onOpen,
-}: {
-  spec: MilestoneSpike;
-  geometry: THREE.BufferGeometry;
-  reduceMotion: boolean;
-  onOpen: () => void;
-}) {
-  const meshRef = useRef<THREE.Mesh | null>(null);
-
-  useFrame((state) => {
-    const mesh = meshRef.current;
-    if (!mesh || reduceMotion) return;
-    const t = state.clock.elapsedTime;
-    const micro = 1 + Math.sin(t * spec.breatheSpeed + spec.breathePhase) * 0.02;
-    mesh.scale.set(1, micro, 1);
-  });
-
-  return (
-    <mesh
-      ref={meshRef}
-      geometry={geometry}
-      position={[spec.posX, BASE_Y, spec.posZ]}
-      rotation={[spec.tiltX, spec.rotY, spec.tiltZ]}
-      onClick={onOpen}
-    >
-      <meshPhysicalMaterial
-        vertexColors
-        roughness={0.15}
-        metalness={0.1}
-        transmission={0.15}
-        thickness={0.5}
-        clearcoat={0.9}
-        clearcoatRoughness={0.05}
-        ior={1.6}
-        reflectivity={0.7}
-        emissive="#e8b23d"
-        emissiveIntensity={0.4}
+        reflectivity={branch.emissive ? 0.7 : 0.6}
+        emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
+        emissiveIntensity={branch.emissive ? 0.4 : coreGlow}
       />
     </mesh>
   );
 }
 
 interface ClusterProps {
-  dna: CrystalDNA;
-  seedNum: number;
-  milestones: ReadonlyArray<{ id: number; title: string }>;
-  memoriesCount: number;
+  material: ClusterMaterial;
+  branches: ClusterBranch[];
   reduceMotion: boolean;
   grew: boolean;
   onOpen: () => void;
 }
 
-function CrystalCluster({ dna, seedNum, milestones, memoriesCount, reduceMotion, grew, onOpen }: ClusterProps) {
+function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: ClusterProps) {
   const groupRef = useRef<THREE.Group | null>(null);
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
   const flashDuration = useRef(1300);
   const flashPeak = useRef(2.2);
+  // Спокійна «підлога» світіння від Luminosity Pressure — раніше спалах
+  // стрибав з нуля, тепер додається поверх завжди трохи теплого ядра
+  // (заміна світінню вже видаленої кам'яної основи).
+  const baseIntensity = material.glow * 0.6;
 
-  // Дотик/тап — короткий теплий спалах (реакція «кристал відчув доторк»),
-  // окремий від довшого/яскравішого спалаху на «виросла нова грань».
+  // Дотик/тап — короткий теплий спалах (реакція «артефакт відчув доторк»),
+  // окремий від довшого/яскравішого спалаху на «виріс новий вузол».
   const onTouch = () => {
     flashUntil.current = performance.now() + 450;
     flashDuration.current = 450;
     flashPeak.current = 1.1;
   };
 
-  const spikeMeshes = useMemo(
-    () => buildSpikes(dna, seedNum).map((spec) => ({ spec, geometry: buildSpikeGeometry(spec) })),
-    [dna, seedNum],
-  );
-  const milestoneMeshes = useMemo(
-    () => buildMilestoneSpikes(milestones, seedNum).map((spec) => ({ spec, geometry: buildSpikeGeometry(spec) })),
-    [milestones, seedNum],
+  const branchMeshes = useMemo(
+    () => branches.map((branch) => ({ branch, geometry: buildBranchGeometry(branch, material) })),
+    [branches, material],
   );
 
-  // Досягнуті цілі «полірують» кристал — нижчий roughness, вищий clearcoat.
-  const roughness = Math.max(0.08, 0.24 - dna.goalsAchieved * 0.015);
-  const clearcoat = Math.min(0.95, 0.7 + dna.goalsAchieved * 0.02);
-  // Спогади «зігрівають» ядро зсередини — чим більше, тим тепліше й яскравіше світіння.
-  const memoryGlow = Math.min(0.85, memoriesCount * 0.035);
-
   useEffect(
-    () => () => spikeMeshes.forEach(({ geometry }) => geometry.dispose()),
-    [spikeMeshes],
-  );
-  useEffect(
-    () => () => milestoneMeshes.forEach(({ geometry }) => geometry.dispose()),
-    [milestoneMeshes],
+    () => () => branchMeshes.forEach(({ geometry }) => geometry.dispose()),
+    [branchMeshes],
   );
 
   useFrame((state, delta) => {
@@ -192,54 +143,32 @@ function CrystalCluster({ dna, seedNum, milestones, memoriesCount, reduceMotion,
       // рухається» поверх постійного обертання навколо Y.
       group.rotation.x = Math.sin(state.clock.elapsedTime * 0.17) * 0.025;
       group.rotation.z = Math.sin(state.clock.elapsedTime * 0.13 + 1.7) * 0.018;
-      // Легкий колективний подих усієї колонії — поверх нього кожен Spike
-      // додає власну мікро-фазу (SpikeSpec.breathePhase), тому рух не в унісон.
+      // Легкий колективний подих усієї колонії — поверх нього кожен вузол
+      // додає власну мікро-фазу, тому рух не в унісон.
       const breathe = 1 + Math.sin(state.clock.elapsedTime * 0.35) * 0.008;
       group.scale.setScalar(breathe);
+      // Левітація: артефакт повільно гойдається вгору-вниз, без жодної
+      // видимої опори (§4 — «no visible foundation»).
+      group.position.y = BOB_CENTER_Y + Math.sin(state.clock.elapsedTime * 0.18) * 0.12;
     }
     const light = flashLightRef.current;
-    if (light && flashUntil.current) {
+    if (light) {
       const remain = flashUntil.current - performance.now();
-      light.intensity = Math.max(0, (remain / flashDuration.current) * flashPeak.current);
-      if (remain <= 0) flashUntil.current = 0;
+      const flash = flashUntil.current && remain > 0 ? (remain / flashDuration.current) * flashPeak.current : 0;
+      light.intensity = baseIntensity + flash;
+      if (flashUntil.current && remain <= 0) flashUntil.current = 0;
     }
   });
 
   return (
     <group ref={groupRef} onPointerDown={onTouch}>
-      <pointLight
-        ref={flashLightRef}
-        position={[0, BASE_Y + 0.5, 0]}
-        color="#fff2cf"
-        intensity={0}
-        distance={4}
-      />
-      <mesh position={[0, BASE_Y, 0]}>
-        <sphereGeometry args={[0.34, 24, 16]} />
-        <meshPhysicalMaterial
-          color="#4a3f52"
-          roughness={0.85}
-          clearcoat={0.15}
-          emissive="#ff9d5c"
-          emissiveIntensity={memoryGlow}
-        />
-      </mesh>
-      {spikeMeshes.map(({ spec, geometry }) => (
-        <Spike
-          key={spec.key}
-          spec={spec}
+      <pointLight ref={flashLightRef} position={[0, 0.5, 0]} color="#fff2cf" intensity={baseIntensity} distance={4} />
+      {branchMeshes.map(({ branch, geometry }) => (
+        <Branch
+          key={branch.key}
+          branch={branch}
           geometry={geometry}
-          roughness={roughness}
-          clearcoat={clearcoat}
-          reduceMotion={reduceMotion}
-          onOpen={onOpen}
-        />
-      ))}
-      {milestoneMeshes.map(({ spec, geometry }) => (
-        <MilestoneSpikeMesh
-          key={spec.key}
-          spec={spec}
-          geometry={geometry}
+          material={material}
           reduceMotion={reduceMotion}
           onOpen={onOpen}
         />
@@ -248,7 +177,7 @@ function CrystalCluster({ dna, seedNum, milestones, memoriesCount, reduceMotion,
   );
 }
 
-/** Кристал ще «не почав рости» — бліда жовта насінина, що чекає на перші дані. */
+/** Артефакт ще «не почав рости» — бліда жовта насінина, що чекає на перші дані. */
 function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
@@ -276,25 +205,83 @@ export default function CrystalScene() {
   const { dna, deltas, isPending: dnaPending } = useCrystalDNA();
   const { seed, isPending: seedPending } = useCrystalSeed();
   const { milestones, isPending: milestonesPending } = useMilestoneEvents();
+  const { countries, cities, isPending: placesPending } = useCrystalPlaces();
+  const { wishes, isPending: wishesPending } = useCrystalWishes();
   const { data: memories, isPending: memoriesPending } = useMemories();
-  const isPending = dnaPending || seedPending || milestonesPending || memoriesPending;
+  const { achievedGoals, isPending: goalsPending } = useAchievedGoals();
+  const { anniversaries, isPending: anniversariesPending } = useAnniversaryEvents();
+  const { recipes, movies, books, isPending: creationPending } = useCreationSources();
+
+  const isPending =
+    dnaPending ||
+    seedPending ||
+    milestonesPending ||
+    placesPending ||
+    wishesPending ||
+    memoriesPending ||
+    goalsPending ||
+    anniversariesPending ||
+    creationPending;
+
   const seedNum = useMemo(() => hashSeedString(seed ?? ''), [seed]);
-  const empty = !isPending && isDnaEmpty(dna);
-  const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending, milestones.length);
+  const artifactDNA = useMemo(() => generateArtifactDNA(seed ?? ''), [seed]);
+  const memoriesCount = memories?.length ?? 0;
+  const memoryItems = useMemo(
+    () => (memories ?? []).map((m) => ({ id: m.id, date: m.date })),
+    [memories],
+  );
+
+  const input: ArtifactInput = useMemo(
+    () => ({
+      seedNum,
+      dna: artifactDNA,
+      usage: dna,
+      countries,
+      cities,
+      milestones,
+      wishes,
+      achievedGoals,
+      anniversaries,
+      recipes,
+      movies,
+      books,
+      memoriesCount,
+      memories: memoryItems,
+    }),
+    [
+      seedNum,
+      artifactDNA,
+      dna,
+      countries,
+      cities,
+      milestones,
+      wishes,
+      achievedGoals,
+      anniversaries,
+      recipes,
+      movies,
+      books,
+      memoriesCount,
+      memoryItems,
+    ],
+  );
+
+  const empty = !isPending && isArtifactEmpty(input);
+  const pressures = useMemo(() => computeEvolutionPressures(input), [input]);
+  const material = useMemo(() => deriveClusterMaterial(pressures), [pressures]);
+  const branches = useMemo(
+    () => (empty ? [] : buildArtifactNodes(input, pressures).map((node) => deriveClusterBranch(node, artifactDNA))),
+    [empty, input, pressures, artifactDNA],
+  );
+  const branchKeys = useMemo(() => branches.map((b) => b.key), [branches]);
+  const { grew } = useClusterGrowthFlash(branchKeys, isPending || empty);
+
   const [open, setOpen] = useState(false);
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
 
-  const grew =
-    !isPending &&
-    !empty &&
-    (isFirstVisit ||
-      CATEGORY_DEFS.some((cat) => cat.facetsFor(cat.metric(dna)) > (seenSnapshot?.[cat.key] ?? 0)) ||
-      milestones.length > (seenSnapshot?.[MILESTONE_SEEN_KEY] ?? 0));
-
-  const sparkleCount = Math.min(60, 10 + Math.round(dna.photos / 2));
-  const stage = !isPending && !empty ? stageForRichness(totalRichness(dna)) : null;
+  const sparkleCount = Math.min(60, 14 + branches.length * 1.2);
 
   const openModal = () => setOpen(true);
   const onKeyDownOpen = (e: KeyboardEvent) => {
@@ -322,10 +309,8 @@ export default function CrystalScene() {
               <CrystalSeed reduceMotion={reduceMotion} />
             ) : (
               <CrystalCluster
-                dna={dna}
-                seedNum={seedNum}
-                milestones={milestones}
-                memoriesCount={memories?.length ?? 0}
+                material={material}
+                branches={branches}
                 reduceMotion={reduceMotion}
                 grew={grew}
                 onOpen={openModal}
@@ -351,8 +336,6 @@ export default function CrystalScene() {
           </EffectComposer>
         </Canvas>
       </div>
-
-      {stage && <p className="crystal-stage-label">🔮 Стадія: {stageLabel(stage)}</p>}
 
       <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />
 

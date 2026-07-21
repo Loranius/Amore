@@ -6,6 +6,9 @@
 // вузький select, обчислення агрегату на клієнті.
 // ============================================================
 import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/lib/supabase';
+import { qk } from '@/lib/queryKeys';
 import { useStartDate, usePhotoPool } from './useHome';
 import { daysBetween } from './homeUtils';
 import { useMapPins } from '@/features/map/useMapPins';
@@ -152,19 +155,174 @@ export function useCrystalDNA(): {
 export interface MilestoneEvent {
   id: number;
   title: string;
+  /** 'YYYY-MM-DD' — «день народження» гілки, звідти рахується її вік/зрілість. */
+  date: string;
 }
 
 /**
  * Великі життєві події (events.is_milestone) — заручини/весілля/переїзд
  * тощо. На відміну від решти ДНК (лише агреговані числа), кожна подія тут
- * росте власним окремим «великим шпилем» у кристалі (crystalGeometry3d.ts),
+ * росте власним окремим «великим шпилем» у кристалі (crystalCluster.ts),
  * тому потрібен сам список, а не просто count.
  */
 export function useMilestoneEvents(): { milestones: MilestoneEvent[]; isPending: boolean } {
   const events = useEvents();
   const milestones = useMemo(
-    () => (events.data ?? []).filter((e) => e.is_milestone).map((e) => ({ id: e.id, title: e.title })),
+    () =>
+      (events.data ?? [])
+        .filter((e) => e.is_milestone)
+        .map((e) => ({ id: e.id, title: e.title, date: e.date })),
     [events.data],
   );
   return { milestones, isPending: events.isPending };
+}
+
+export interface CrystalPlace {
+  /** Стабільний ключ для seed геометрії (назва — бо саме вона унікальна, не id першого піна). */
+  name: string;
+  /** Дата першого візиту — звідси рахується «вік»/зрілість гілки. */
+  firstVisit: string;
+}
+
+/**
+ * Країни й міста, згруповані з окремою датою ПЕРШОГО візиту кожного —
+ * «Країни → величезні структурні мутації», «Міста → середні структурні
+ * мутації» (crystalCluster.ts). Дата першого піна в місці = «день
+ * народження» відповідної гілки кристала — звідти рахується її вік/зрілість.
+ */
+export function useCrystalPlaces(): {
+  countries: CrystalPlace[];
+  cities: CrystalPlace[];
+  isPending: boolean;
+} {
+  const pins = useMapPins();
+
+  return useMemo(() => {
+    if (pins.isPending) return { countries: [], cities: [], isPending: true };
+
+    const firstByName = (getName: (p: NonNullable<typeof pins.data>[number]) => string | null) => {
+      const map = new Map<string, string>();
+      for (const p of pins.data ?? []) {
+        const name = getName(p);
+        if (!name) continue;
+        const prev = map.get(name);
+        if (!prev || p.created_at < prev) map.set(name, p.created_at);
+      }
+      return Array.from(map, ([name, firstVisit]) => ({ name, firstVisit }));
+    };
+
+    return {
+      countries: firstByName((p) => p.country),
+      cities: firstByName((p) => p.city),
+      isPending: false,
+    };
+  }, [pins.data, pins.isPending]);
+}
+
+export interface CrystalWish {
+  id: number;
+  fulfilledAt: string;
+}
+
+/**
+ * Виконані бажання ОБОХ партнерів (на відміну від useFulfilledWishes —
+ * той власницький, для сторінки вішліста). «Бажання → нові маленькі
+ * бічні кристали» (crystalCluster.ts): кожне виконане бажання — окремий
+ * маленький супутній кристалик, вік якого рахується від fulfilled_at.
+ */
+export function useCrystalWishes(): { wishes: CrystalWish[]; isPending: boolean } {
+  const query = useQuery({
+    queryKey: [...qk.wishlist(), 'fulfilled-all'],
+    queryFn: async (): Promise<CrystalWish[]> => {
+      const { data, error } = await supabase
+        .from('wishlist_items')
+        .select('id,fulfilled_at')
+        .eq('fulfilled', true)
+        .returns<{ id: number; fulfilled_at: string | null }[]>();
+      if (error) throw error;
+      return (data ?? [])
+        .filter((r): r is { id: number; fulfilled_at: string } => !!r.fulfilled_at)
+        .map((r) => ({ id: r.id, fulfilledAt: r.fulfilled_at }));
+    },
+  });
+  return { wishes: query.data ?? [], isPending: query.isPending };
+}
+
+/** id+дата — «сировина» для доменних білдерів Artifact Engine (artifact/artifactNodes.ts). */
+export interface DatedItem {
+  id: number;
+  date: string;
+}
+
+/**
+ * Досягнуті спільні цілі (Connection domain — «Goals → Stability Pressure»
+ * + власна гілка-goal). useGoals() не вибирає created_at (не потрібен решті
+ * фічі бюджету), тому окремий вузький запит — той самий патерн, що
+ * useCrystalWishes. Немає окремої дати «досягнення» в схемі — created_at
+ * (дата пропозиції цілі) чесний доступний проксі.
+ */
+export function useAchievedGoals(): { achievedGoals: DatedItem[]; isPending: boolean } {
+  const query = useQuery({
+    queryKey: [...qk.savingsGoals(), 'achieved-dated'],
+    queryFn: async (): Promise<DatedItem[]> => {
+      const { data, error } = await supabase
+        .from('savings_goals')
+        .select('id,saved_amount,target_amount,status,created_at')
+        .returns<
+          { id: number; saved_amount: number | null; target_amount: number | null; status: string; created_at: string }[]
+        >();
+      if (error) throw error;
+      return (data ?? [])
+        .filter(
+          (g) =>
+            g.status === 'confirmed' &&
+            g.saved_amount != null &&
+            g.target_amount != null &&
+            g.saved_amount >= g.target_amount,
+        )
+        .map((g) => ({ id: g.id, date: g.created_at }));
+    },
+  });
+  return { achievedGoals: query.data ?? [], isPending: query.isPending };
+}
+
+/** Річниці (Connection domain) — events.type === 'anniversary'. */
+export function useAnniversaryEvents(): { anniversaries: DatedItem[]; isPending: boolean } {
+  const events = useEvents();
+  const anniversaries = useMemo(
+    () => (events.data ?? []).filter((e) => e.type === 'anniversary').map((e) => ({ id: e.id, date: e.date })),
+    [events.data],
+  );
+  return { anniversaries, isPending: events.isPending };
+}
+
+/**
+ * Рецепти/фільми/книги (Creation domain) — уже наявні хуки (useDishes,
+ * useMediaItems), лише спроєктовані до {id, date}. Жодного нового запиту
+ * до Supabase — тонка проекція наявних рядків.
+ */
+export function useCreationSources(): {
+  recipes: DatedItem[];
+  movies: DatedItem[];
+  books: DatedItem[];
+  isPending: boolean;
+} {
+  const dishes = useDishes();
+  const movies = useMediaItems('movie');
+  const series = useMediaItems('series');
+  const books = useMediaItems('book');
+
+  return useMemo(() => {
+    const isPending = [dishes, movies, series, books].some((q) => q.isPending);
+    if (isPending) return { recipes: [], movies: [], books: [], isPending: true };
+    return {
+      recipes: (dishes.data ?? []).map((d) => ({ id: d.id, date: d.created_at })),
+      movies: [...(movies.data ?? []), ...(series.data ?? [])]
+        .filter((m) => m.status === 'done')
+        .map((m) => ({ id: m.id, date: m.created_at })),
+      books: (books.data ?? []).filter((b) => b.status === 'done').map((b) => ({ id: b.id, date: b.created_at })),
+      isPending: false,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dishes.data, dishes.isPending, movies.data, movies.isPending, series.data, series.isPending, books.data, books.isPending]);
 }
