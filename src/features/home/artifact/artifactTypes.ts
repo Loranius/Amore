@@ -79,6 +79,9 @@ export interface ArtifactNode {
   growthEnergy: number;
   role: ColonyRole;
   stage: LifeCycleStage;
+  /** true рівно для ОДНОГО тіла — монарха друзи: найстаріше центральне
+   *  відкладення, найтовще/найвище/найчистіше. Око одразу бачить центр. */
+  primary: boolean;
   /** true для milestone-вузлів — золоте світіння в рендерері. */
   emphasized?: boolean;
 }
@@ -122,6 +125,8 @@ export interface DepositedCrystal {
   growthEnergy: number;
   colonyId: string;
   role: ColonyRole;
+  /** Монарх друзи (див. ArtifactNode.primary). */
+  primary: boolean;
   emphasized?: boolean;
   breathePhase: number;
   breatheSpeed: number;

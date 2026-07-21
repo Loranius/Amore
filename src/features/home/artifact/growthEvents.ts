@@ -88,7 +88,9 @@ const age = (date: string): number => Math.max(0, daysBetween(date));
 const CORE_INTERVAL_DAYS = 40;
 const MAX_CORE_BRANCHES = 22;
 const BASELINE_INTERVAL_DAYS = 260;
-const MAX_BASELINE_PER_DOMAIN = 3;
+// 2 (було 3): амбіентний трикл лишається, але композиція «дихає» — менше
+// дрібних тіл, що конкурують за увагу.
+const MAX_BASELINE_PER_DOMAIN = 2;
 
 const DOMAIN_IDS: GrowthDomainId[] = ['exploration', 'memory', 'connection', 'creation', 'future'];
 const BASELINE_KIND: Record<GrowthDomainId, NodeKind> = {

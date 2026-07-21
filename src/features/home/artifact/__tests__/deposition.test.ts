@@ -227,23 +227,42 @@ describe('депозиція мінеральної маси', () => {
     });
   });
 
-  it('колонії: іноді домінант + 2-5 супутників майже з тієї самої точки', () => {
+  it('колонії: іноді домінант + 2-3 супутники, що майже торкаються його', () => {
     const nodes = build(makeInput());
     const satellites = nodes.filter((n) => n.role === 'satellite');
     expect(satellites.length).toBeGreaterThan(0);
     const dominants = byKey(nodes.filter((n) => n.role === 'dominant'));
+    const perColony = new Map<string, number>();
     for (const sat of satellites) {
       const domKey = sat.key.split('~')[0]!;
+      perColony.set(domKey, (perColony.get(domKey) ?? 0) + 1);
       const dom = dominants.get(domKey);
       expect(dom, `супутник ${sat.key} без домінанта`).toBeDefined();
       if (!dom) continue;
-      // Супутник ділить точку зародження з домінантом (та сама колонія).
+      // Компаньйон майже торкається домінанта (жодних самотніх плавунів).
       const dx = sat.anchor.x - dom.anchor.x;
       const dy = sat.anchor.y - dom.anchor.y;
       const dz = sat.anchor.z - dom.anchor.z;
-      expect(Math.sqrt(dx * dx + dy * dy + dz * dz)).toBeLessThan(0.6);
+      expect(Math.sqrt(dx * dx + dy * dy + dz * dz)).toBeLessThan(0.45);
       expect(sat.growthScale).toBeLessThan(dom.growthScale);
     }
+    for (const [key, count] of perColony) expect(count, `колонія ${key} завелика`).toBeLessThanOrEqual(3);
+  });
+
+  it('монарх: рівно один primary — найвищий, центральний, майже вертикальний', () => {
+    const nodes = build(makeInput());
+    const primaries = nodes.filter((n) => n.primary);
+    expect(primaries).toHaveLength(1);
+    const monarch = primaries[0]!;
+    expect(monarch.key).toBe('core-0');
+    // Стеля висоти: ніхто не переростає монарха.
+    for (const n of nodes) {
+      if (n.key === monarch.key) continue;
+      expect(n.growthScale, `${n.key} вищий за монарха`).toBeLessThanOrEqual(monarch.growthScale * 0.91);
+    }
+    // Центральний і найпряміший — око одразу бачить серце друзи.
+    expect(Math.hypot(monarch.anchor.x, monarch.anchor.z)).toBeLessThan(0.4);
+    expect(monarch.direction.y).toBeGreaterThan(0.85);
   });
 
   it('публічний псевдонім buildArtifactNodes — те саме відкладення', () => {

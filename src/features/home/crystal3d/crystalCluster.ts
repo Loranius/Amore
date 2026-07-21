@@ -46,6 +46,11 @@ export interface ClusterBranch {
   maturity: number;
   /** Роль у колонії — супутники рендеряться простіше (менше сегментів). */
   role: ColonyRole;
+  /** Монарх друзи — найвища оптична якість (чистіші грані, глибший блиск).
+   *  Справжньої прозорості немає навмисно: transmission вмикає баговий
+   *  mobile-рендерпас (див. заголовок CrystalScene.tsx), а opacity на
+   *  невідсортованих перетинних мешах дає артефакти. */
+  primary: boolean;
   /** Золоте світіння для milestone-вузлів. */
   emissive?: boolean;
 }
@@ -111,7 +116,11 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
   const keepFixed = node.kind === 'milestone';
   const colorA = keepFixed ? baseA : applyFamilyHue(baseA, dna.hueRotation);
   let colorB = keepFixed ? baseB : applyFamilyHue(baseB, dna.hueRotation);
-  if (node.growthEnergy < 1) {
+  if (node.primary) {
+    // Монарх — чистіший і світліший до вістря, без жодного тінявого гашення.
+    const lifted = new THREE.Color(colorB).lerp(new THREE.Color('#ffffff'), 0.18);
+    colorB = `#${lifted.getHexString()}`;
+  } else if (node.growthEnergy < 1) {
     const dulled = new THREE.Color(colorB).lerp(new THREE.Color(colorA), (1 - node.growthEnergy) * 0.45);
     colorB = `#${dulled.getHexString()}`;
   }
@@ -142,6 +151,7 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
     breatheSpeed: node.breatheSpeed,
     maturity: node.maturity,
     role: node.role,
+    primary: node.primary,
     ...(node.emphasized !== undefined ? { emissive: node.emphasized } : {}),
   };
 }
@@ -240,8 +250,11 @@ export function buildBranchGeometry(
   // 5 точок профілю (не 4) — довга майже-паралельна «призматична» ділянка
   // (p1→p2) окремо від пірамідального вістря (p2→p3→p4): справжній кристал
   // читається саме як призма+вістря, а не суцільний плавний конус.
+  // Основа (row 0) РОЗШИРЕНА понад радіус призми — «спідниця», що ховається
+  // в тілі субстрату: стик двох тіл читається зрощеним мінералом, а не
+  // перетином двох мешів.
   const profile = [
-    new THREE.Vector2(Math.max(0.001, r * (0.88 + shapeRng() * 0.1)), 0),
+    new THREE.Vector2(Math.max(0.001, r * (1.06 + shapeRng() * 0.1)), 0),
     new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
     new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * prismEnd),
     new THREE.Vector2(r * (0.9 + shapeRng() * 0.06), h * pointStart),
@@ -260,9 +273,11 @@ export function buildBranchGeometry(
   // всю грань (не на вершину), тому разом із flatShading (Branch у
   // CrystalScene.tsx) кожна грань читається як окрема, відмінна від сусідньої
   // — це і прибирає «картонний» ефект гладкого суцільного градієнта.
+  // Монарх — оптично найчистіший: вузький розкид тону граней (майже
+  // однорідний самоцвіт), решта — звичайна мінеральна неоднорідність.
   const facetTints = Array.from({ length: segments }, (_, idx) => {
     const tintRng = mulberry32(hashSeedString(`${branch.key}:facet:${idx}`));
-    return 0.82 + tintRng() * 0.36;
+    return branch.primary ? 0.92 + tintRng() * 0.16 : 0.82 + tintRng() * 0.36;
   });
 
   // THREE.LatheGeometry будує вершини у фіксованому порядку: зовнішній цикл
@@ -291,9 +306,13 @@ export function buildBranchGeometry(
     // а не стрибати випадково.
     if (row !== 0 && row !== profileLen - 1) {
       const jitterRng = mulberry32(hashSeedString(`${branch.key}:jitter:${facetIdx}:${row}`));
-      // ±8% — природна нерівність грані; «Фото → Polishing Pressure» гамує
-      // її (стадія полірування життєвого циклу — грані вирівнюються).
-      const amp = 0.08 * (1 - material.polish * 0.6);
+      // ±8% базово — природна нерівність грані; «Фото → Polishing Pressure»
+      // гамує її глобально, а ієрархія — локально: старі великі тіла чисті
+      // (монарх майже ідеальний), крихітні супутники — грубші. Це і робить
+      // ієрархію читабельною: велике = чисте, дрібне = шорстке.
+      const hierarchy =
+        (branch.primary ? 0.15 : branch.role === 'satellite' ? 1.25 : 1) * (1 - 0.4 * branch.maturity);
+      const amp = 0.08 * (1 - material.polish * 0.6) * hierarchy;
       const j = 1 + (jitterRng() * 2 - 1) * amp;
       pos.setXYZ(i, pos.getX(i) * j, pos.getY(i), pos.getZ(i) * j);
     }
