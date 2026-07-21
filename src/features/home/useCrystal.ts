@@ -27,6 +27,8 @@ export interface CrystalDNA {
   recipesSaved: number;
   distinctCountries: number;
   milestones: number;
+  /** Сума saved_amount по всіх спільних цілях — «фінанси потовщують основу». */
+  totalSaved: number;
 }
 
 /** Дельти «за цей місяць» — лише там, де це можна порахувати чесно. */
@@ -50,6 +52,7 @@ const EMPTY_DNA: CrystalDNA = {
   recipesSaved: 0,
   distinctCountries: 0,
   milestones: 0,
+  totalSaved: 0,
 };
 
 const EMPTY_DELTAS: CrystalDeltas = {
@@ -109,6 +112,7 @@ export function useCrystalDNA(): {
         (pins.data ?? []).map((p) => p.country).filter((c): c is string => !!c),
       ).size,
       milestones: (events.data ?? []).filter((e) => e.is_milestone).length,
+      totalSaved: (goals.data ?? []).reduce((sum, g) => sum + (g.saved_amount ?? 0), 0),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -143,4 +147,24 @@ export function useCrystalDNA(): {
   }, [isPending, pins.data, movies.data, series.data, books.data, wishStats.data, dishes.data]);
 
   return { dna, deltas, isPending, isError };
+}
+
+export interface MilestoneEvent {
+  id: number;
+  title: string;
+}
+
+/**
+ * Великі життєві події (events.is_milestone) — заручини/весілля/переїзд
+ * тощо. На відміну від решти ДНК (лише агреговані числа), кожна подія тут
+ * росте власним окремим «великим шпилем» у кристалі (crystalGeometry3d.ts),
+ * тому потрібен сам список, а не просто count.
+ */
+export function useMilestoneEvents(): { milestones: MilestoneEvent[]; isPending: boolean } {
+  const events = useEvents();
+  const milestones = useMemo(
+    () => (events.data ?? []).filter((e) => e.is_milestone).map((e) => ({ id: e.id, title: e.title })),
+    [events.data],
+  );
+  return { milestones, isPending: events.isPending };
 }

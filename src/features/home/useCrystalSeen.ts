@@ -20,7 +20,10 @@ function readSeen(): Record<string, number> | null {
   }
 }
 
-export function useCrystalSeen(dna: CrystalDNA, isPending: boolean) {
+/** Спеціальний ключ снепшоту — кількість великих життєвих подій (не категорія). */
+export const MILESTONE_SEEN_KEY = '__milestoneCount';
+
+export function useCrystalSeen(dna: CrystalDNA, isPending: boolean, milestoneCount = 0) {
   const [seenSnapshot] = useState(readSeen);
   const isFirstVisit = seenSnapshot === null;
 
@@ -31,6 +34,7 @@ export function useCrystalSeen(dna: CrystalDNA, isPending: boolean) {
     const t = setTimeout(() => {
       const next: Record<string, number> = {};
       for (const cat of CATEGORY_DEFS) next[cat.key] = cat.facetsFor(cat.metric(dna));
+      next[MILESTONE_SEEN_KEY] = milestoneCount;
       try {
         localStorage.setItem(SEEN_KEY, JSON.stringify(next));
       } catch {
@@ -38,7 +42,7 @@ export function useCrystalSeen(dna: CrystalDNA, isPending: boolean) {
       }
     }, 1600);
     return () => clearTimeout(t);
-  }, [dna, isPending]);
+  }, [dna, isPending, milestoneCount]);
 
   return { seenSnapshot, isFirstVisit };
 }

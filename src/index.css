@@ -1906,19 +1906,23 @@ a.wl-card-title { color: var(--accent); }
 .crystal-facet {
   transform-box: fill-box;
   transform-origin: center;
-  animation: crystal-glint 5s ease-in-out infinite;
-  animation-delay: var(--glint-delay, 0s);
+  /* scale — окрема від transform властивість: композиційно накладається на
+     crystal-materialize (яка анімує transform), тому кожна грань «дихає»
+     власною фазою (--breathe-delay) без конфлікту з анімацією появи. */
+  animation: crystal-glint 5s ease-in-out infinite, crystal-facet-breathe 6s ease-in-out infinite;
+  animation-delay: var(--glint-delay, 0s), var(--breathe-delay, 0s);
 }
 .crystal-facet--enter {
   animation: crystal-materialize 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both,
-    crystal-glint 5s ease-in-out infinite;
-  animation-delay: calc(var(--facet-i) * 35ms), var(--glint-delay, 0s);
+    crystal-glint 5s ease-in-out infinite, crystal-facet-breathe 6s ease-in-out infinite;
+  animation-delay: calc(var(--facet-i) * 35ms), var(--glint-delay, 0s), var(--breathe-delay, 0s);
 }
 .crystal-anim-off { animation: none !important; }
 .crystal-seed { transform-box: fill-box; transform-origin: center; animation: crystal-seed-pulse 4.5s ease-in-out infinite; }
 @keyframes crystal-spin { to { transform: rotate(360deg); } }
 @keyframes crystal-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.018); } }
 @keyframes crystal-glint { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.12); } }
+@keyframes crystal-facet-breathe { 0%, 100% { scale: 1; } 50% { scale: 1.022; } }
 @keyframes crystal-materialize {
   from { opacity: 0; transform: scale(0.3); }
   to { opacity: 1; transform: scale(1); }
@@ -1965,30 +1969,18 @@ a.wl-card-title { color: var(--accent); }
 .crystal-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .crystal-stat-delta { font-size: 9px; color: var(--ok); font-weight: 600; }
 
-/* Модалка «Місця на нашій карті» */
-.crystal-places-city {
-  padding: 8px 0 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.crystal-place-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* Модалка «Спогад» (клік по кристалу) */
+.memory-card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.memory-photo {
   width: 100%;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  padding: 8px 0;
-  border-top: 1px solid rgba(58, 37, 48, 0.06);
-  cursor: pointer;
-  color: var(--text);
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(58, 37, 48, 0.15);
 }
-.crystal-place-title { flex: 1; }
+.memory-date { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 4px 0 0; }
+.memory-comment { font-size: 15px; font-style: italic; color: var(--text); margin: 0; }
+.memory-author { font-size: 12px; color: var(--muted); margin: 0; }
 
 /* ============================================================
    ФІНАНСИ (budget) — вільний ліміт + спільні цілі
