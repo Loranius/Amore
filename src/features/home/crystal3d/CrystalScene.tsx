@@ -19,7 +19,13 @@ import { useCrystalSeen } from '../useCrystalSeen';
 import { CATEGORY_DEFS, isDnaEmpty } from '../crystalGeometry';
 import { CrystalStats } from '../CrystalStats';
 import { PlacesModal } from '../PlacesModal';
-import { buildSpikes, buildSpikeGeometry } from './crystalGeometry3d';
+import {
+  buildSpikes,
+  buildSpikeGeometry,
+  totalRichness,
+  stageForRichness,
+  stageLabel,
+} from './crystalGeometry3d';
 
 const BASE_Y = -1.3;
 
@@ -39,6 +45,10 @@ function CrystalCluster({ dna, reduceMotion, grew, onOpen }: ClusterProps) {
     () => buildSpikes(dna).map((spec) => ({ spec, geometry: buildSpikeGeometry(spec) })),
     [dna],
   );
+
+  // Досягнуті цілі «полірують» кристал — нижчий roughness, вищий clearcoat.
+  const roughness = Math.max(0.08, 0.24 - dna.goalsAchieved * 0.015);
+  const clearcoat = Math.min(0.95, 0.7 + dna.goalsAchieved * 0.02);
 
   useEffect(
     () => () => spikeMeshes.forEach(({ geometry }) => geometry.dispose()),
@@ -83,11 +93,11 @@ function CrystalCluster({ dna, reduceMotion, grew, onOpen }: ClusterProps) {
         >
           <meshPhysicalMaterial
             vertexColors
-            roughness={0.12}
+            roughness={roughness}
             metalness={0}
             transmission={0.4}
             thickness={0.7}
-            clearcoat={0.85}
+            clearcoat={clearcoat}
             clearcoatRoughness={0.08}
             ior={1.6}
             reflectivity={0.6}
@@ -138,6 +148,7 @@ export default function CrystalScene() {
       CATEGORY_DEFS.some((cat) => cat.facetsFor(cat.metric(dna)) > (seenSnapshot?.[cat.key] ?? 0)));
 
   const sparkleCount = Math.min(60, 10 + Math.round(dna.photos / 2));
+  const stage = !isPending && !empty ? stageForRichness(totalRichness(dna)) : null;
 
   const openModal = () => setOpen(true);
   const onKeyDownOpen = (e: KeyboardEvent) => {
@@ -180,6 +191,8 @@ export default function CrystalScene() {
           </EffectComposer>
         </Canvas>
       </div>
+
+      {stage && <p className="crystal-stage-label">🔮 Стадія: {stageLabel(stage)}</p>}
 
       <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />
 

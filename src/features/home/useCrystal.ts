@@ -25,6 +25,8 @@ export interface CrystalDNA {
   goalsAchieved: number;
   anniversaries: number;
   recipesSaved: number;
+  distinctCountries: number;
+  milestones: number;
 }
 
 /** Дельти «за цей місяць» — лише там, де це можна порахувати чесно. */
@@ -46,6 +48,8 @@ const EMPTY_DNA: CrystalDNA = {
   goalsAchieved: 0,
   anniversaries: 0,
   recipesSaved: 0,
+  distinctCountries: 0,
+  milestones: 0,
 };
 
 const EMPTY_DELTAS: CrystalDeltas = {
@@ -101,6 +105,10 @@ export function useCrystalDNA(): {
       ).length,
       anniversaries: (events.data ?? []).filter((e) => e.type === 'anniversary').length,
       recipesSaved: (dishes.data ?? []).length,
+      distinctCountries: new Set(
+        (pins.data ?? []).map((p) => p.country).filter((c): c is string => !!c),
+      ).size,
+      milestones: (events.data ?? []).filter((e) => e.is_milestone).length,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

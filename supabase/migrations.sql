@@ -140,3 +140,11 @@ end $$;
 -- create policy auth_storage_full on storage.objects
 --   for all to authenticated using (true) with check (true);
 -- ------------------------------------------------------------
+
+-- ------------------------------------------------------------
+-- 2026-07-20: Crystal Colony — country-рівень геокодування місць +
+-- позначення «великих» подій. Обидві живлять вагу категорій кристала
+-- (Місця/Досягнення) на Головній, без окремого спецкейсу в геометрії.
+-- ------------------------------------------------------------
+alter table public.map_pins add column if not exists country text;
+alter table public.events add column if not exists is_milestone boolean not null default false;

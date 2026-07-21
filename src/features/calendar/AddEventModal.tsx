@@ -49,10 +49,18 @@ export function AddEventModal({
   const [date, setDate] = useState('');
   const [description, setDescription] = useState('');
   const [yearly, setYearly] = useState(true);
+  const [isMilestone, setIsMilestone] = useState(false);
 
   const save = () => {
     if (!title.trim() || !date) return;
-    onSubmit({ title: title.trim(), date, description: description.trim() || null, type, yearly });
+    onSubmit({
+      title: title.trim(),
+      date,
+      description: description.trim() || null,
+      type,
+      yearly,
+      is_milestone: isMilestone,
+    });
     onClose();
   };
 
@@ -96,6 +104,16 @@ export function AddEventModal({
       <label className="cal-yearly-toggle">
         <input id="event-yearly" name="yearly" type="checkbox" checked={yearly} onChange={(e) => setYearly(e.target.checked)} />
         <span>Повторюється щороку</span>
+      </label>
+      <label className="cal-yearly-toggle">
+        <input
+          id="event-milestone"
+          name="is_milestone"
+          type="checkbox"
+          checked={isMilestone}
+          onChange={(e) => setIsMilestone(e.target.checked)}
+        />
+        <span>💍 Велика подія (заручини, весілля, важлива віха)</span>
       </label>
 
       <div className="modal-actions">

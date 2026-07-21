@@ -14,13 +14,22 @@ import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useCrystalDNA } from './useCrystal';
 import { useCrystalSeen } from './useCrystalSeen';
-import { buildFacets, CATEGORY_DEFS, isDnaEmpty, type Facet } from './crystalGeometry';
+import {
+  buildFacets,
+  CATEGORY_DEFS,
+  isDnaEmpty,
+  totalRichness,
+  stageForRichness,
+  stageLabel,
+  type Facet,
+} from './crystalGeometry';
 import { CrystalStats } from './CrystalStats';
 import { PlacesModal } from './PlacesModal';
 
 export function Crystal() {
   const { dna, deltas, isPending } = useCrystalDNA();
   const empty = !isPending && isDnaEmpty(dna);
+  const stage = !isPending && !empty ? stageForRichness(totalRichness(dna)) : null;
   const facets = useMemo(() => buildFacets(dna), [dna]);
   const [open, setOpen] = useState(false);
   const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending);
@@ -90,6 +99,8 @@ export function Crystal() {
           )}
         </svg>
       </button>
+
+      {stage && <p className="crystal-stage-label">🔮 Стадія: {stageLabel(stage)}</p>}
 
       <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />
 

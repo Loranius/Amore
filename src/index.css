@@ -1931,6 +1931,22 @@ a.wl-card-title { color: var(--accent); }
   .crystal-spin, .crystal-breathe, .crystal-facet, .crystal-seed { animation: none !important; }
 }
 
+/* Підпис стадії росту («Crystal Colony») */
+.crystal-stage-label {
+  margin: 6px 0 0;
+  text-align: center;
+  display: block;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-radius: 999px;
+  padding: 3px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text);
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 /* Смужка статистики під кристалом */
 .crystal-stats { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
 .crystal-stat-chip {

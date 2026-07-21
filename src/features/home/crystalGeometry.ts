@@ -46,7 +46,9 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     label: 'Місця',
     colorA: '#2fb6a8',
     colorB: '#8fe0d6',
-    metric: (d) => d.places,
+    // Кожна нова країна важить як 4 звичайних місця — «великий рідкісний
+    // кристал» ефект без окремого спецкейсу в геометрії.
+    metric: (d) => d.places + d.distinctCountries * 4,
     facetsFor: (m) => grown(m, 2),
   },
   {
@@ -70,7 +72,9 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     label: 'Досягнення',
     colorA: '#d9a441',
     colorB: '#f3d78a',
-    metric: (d) => d.goalsAchieved + d.anniversaries,
+    // Велика подія (заручини/весілля/важлива віха) важить як 6 звичайних
+    // досягнень — вагоміший, помітний ріст без окремого спецкейсу.
+    metric: (d) => d.goalsAchieved + d.anniversaries + d.milestones * 6,
     facetsFor: (m) => grown(m, 1),
   },
   {
@@ -94,6 +98,34 @@ export const CATEGORY_DEFS: CategoryDef[] = [
 /** Чи немає в порталі взагалі жодних даних пари — кристал ще не почав рости. */
 export function isDnaEmpty(dna: CrystalDNA): boolean {
   return CATEGORY_DEFS.every((cat) => cat.metric(dna) <= 0);
+}
+
+// ── Стадії росту («Crystal Colony») — спільні для SVG і 3D ─────
+export type CrystalStage = 1 | 2 | 3 | 4 | 5;
+
+const STAGE_LABELS: Record<CrystalStage, string> = {
+  1: 'Зародження',
+  2: 'Ріст',
+  3: 'Колонія',
+  4: 'Зрілий кластер',
+  5: 'Нескінченний розвиток',
+};
+
+/** Сума ваг усіх 7 категорій (0..7) — «наскільки багате» життя пари. */
+export function totalRichness(dna: CrystalDNA): number {
+  return CATEGORY_DEFS.reduce((sum, cat) => sum + cat.facetsFor(cat.metric(dna)) / MAX_SLOTS, 0);
+}
+
+export function stageForRichness(richness: number): CrystalStage {
+  if (richness <= 0) return 1;
+  if (richness <= 1.5) return 2;
+  if (richness <= 3.5) return 3;
+  if (richness <= 5.5) return 4;
+  return 5;
+}
+
+export function stageLabel(stage: CrystalStage): string {
+  return STAGE_LABELS[stage];
 }
 
 export interface Facet {

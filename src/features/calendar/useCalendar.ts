@@ -23,6 +23,7 @@ export interface NewEventInput {
   description: string | null;
   type: EventRow['type'];
   yearly: boolean;
+  is_milestone: boolean;
 }
 
 export interface NewPlanInput {
@@ -47,6 +48,7 @@ export function useCalendarMutations() {
         description: input.description,
         type: input.type,
         yearly: input.yearly,
+        is_milestone: input.is_milestone,
         created_by: user.id,
       };
       const { error } = await supabase.from('events').insert(row);

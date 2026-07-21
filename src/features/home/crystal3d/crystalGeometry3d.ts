@@ -1,19 +1,22 @@
 // ============================================================
 // crystalGeometry3d — кластер гранованих «шипів» (як природний
-// друз кристалу), а не суцільна деформована куля.
+// друз кристалу), що росте за стадіями (Crystal Colony).
 // ------------------------------------------------------------
 // Один центральний стрижень («час разом», завжди вертикальний) +
-// до 6 бічних шипів навколо — по одному на кожну іншу категорію
-// ДНК, що нахилені назовні під різними кутами. Висота/товщина
-// шипа росте з вагою категорії; шип ще не з'являється, поки
-// метрика категорії дорівнює нулю (органічний ріст — «з нічого»,
-// а не крихітний пеньок). Позиція/нахил кожного шипа детерміновані
-// лише індексом категорії — не «перетасовуються» при рості.
+// до 6 категорій навколо — кожна категорія тепер може мати ВІД 1 ДО
+// 7 дрібних шипів (не рівно один) залежно від стадії росту («Ріст» —
+// по одному, «Колонія»/«Зрілий кластер»/«Нескінченний розвиток» —
+// дедалі більше супутніх шипів). Кожен шип-слот (категорія, індекс)
+// має ФІКСОВАНУ позицію/кут/розмір-профіль, що не залежить від
+// поточної кількості видимих шипів у категорії — тому коли з'являється
+// новий шип, старі не «перетасовуються» й не зсуваються.
 // ============================================================
 import * as THREE from 'three';
-import { CATEGORY_DEFS, MAX_SLOTS } from '../crystalGeometry';
+import { CATEGORY_DEFS, MAX_SLOTS, totalRichness, stageForRichness, type CrystalStage } from '../crystalGeometry';
 import { mulberry32 } from '../mulberry32';
 import type { CrystalDNA } from '../useCrystal';
+
+export { totalRichness, stageForRichness, stageLabel, type CrystalStage } from '../crystalGeometry';
 
 function categoryWeight(cat: (typeof CATEGORY_DEFS)[number], dna: CrystalDNA): number {
   return cat.facetsFor(cat.metric(dna)) / MAX_SLOTS;
@@ -37,7 +40,11 @@ export interface SpikeSpec {
 const CORE_COLOR_A = '#6d4fa8';
 const CORE_COLOR_B = '#e9ddff';
 
-/** Центральний стрижень («час разом») + до 6 бічних шипів навколо нього. */
+// Скільки дрібних шипів МОЖЕ вирости в одній категорії на цій стадії.
+const CAP_FOR_STAGE: Record<CrystalStage, number> = { 1: 0, 2: 1, 3: 3, 4: 5, 5: 7 };
+const MAX_CAP = 7;
+
+/** Центральний стрижень («час разом») + «колонія» дрібних шипів на решту категорій. */
 export function buildSpikes(dna: CrystalDNA): SpikeSpec[] {
   const spikes: SpikeSpec[] = [];
   const [timeCat, ...restCats] = CATEGORY_DEFS;
@@ -60,31 +67,44 @@ export function buildSpikes(dna: CrystalDNA): SpikeSpec[] {
     });
   }
 
+  const stage = stageForRichness(totalRichness(dna));
+  const cap = CAP_FOR_STAGE[stage];
   const arc = 360 / restCats.length;
-  restCats.forEach((cat, i) => {
+  const slotArc = arc / MAX_CAP;
+
+  restCats.forEach((cat, catIdx) => {
     const weight = categoryWeight(cat, dna);
-    if (weight <= 0) return;
+    if (weight <= 0 || cap <= 0) return;
 
-    const rng = mulberry32(i * 991 + 17);
-    const angleDeg = arc * i + (rng() - 0.5) * arc * 0.5;
-    const rad = (angleDeg * Math.PI) / 180;
-    const dist = 0.16 + rng() * 0.07;
-    const tilt = 0.22 + rng() * 0.3;
+    const count = Math.min(cap, Math.max(1, Math.round(weight * cap)));
+    const arcStart = arc * catIdx;
 
-    spikes.push({
-      key: cat.key,
-      isCore: false,
-      height: 0.5 + weight * 1.35 + rng() * 0.1,
-      radiusBottom: 0.17 + weight * 0.08,
-      radiusTop: 0.035,
-      posX: Math.cos(rad) * dist,
-      posZ: Math.sin(rad) * dist,
-      tiltX: Math.sin(rad) * tilt,
-      tiltZ: -Math.cos(rad) * tilt,
-      rotY: rng() * Math.PI * 2,
-      colorA: cat.colorA,
-      colorB: cat.colorB,
-    });
+    for (let i = 0; i < count; i++) {
+      // Детерміновано лише за (категорія, слот) — НЕ за count/cap, тому
+      // позиція/кут/розмір слота i ніколи не змінюються, коли з'являється
+      // слот i+1.
+      const rng = mulberry32(catIdx * 991 + 17 + i * 131);
+      const sizeFactor = Math.max(0.35, 1 - i * 0.12);
+      const angleDeg = arcStart + (i + 0.5) * slotArc + (rng() - 0.5) * slotArc * 0.4;
+      const rad = (angleDeg * Math.PI) / 180;
+      const dist = 0.14 + i * 0.025 + rng() * 0.03;
+      const tilt = 0.2 + rng() * 0.35;
+
+      spikes.push({
+        key: `${cat.key}-${i}`,
+        isCore: false,
+        height: (0.5 + weight * 1.35) * sizeFactor + rng() * 0.08,
+        radiusBottom: (0.17 + weight * 0.08) * sizeFactor,
+        radiusTop: 0.035 * sizeFactor,
+        posX: Math.cos(rad) * dist,
+        posZ: Math.sin(rad) * dist,
+        tiltX: Math.sin(rad) * tilt,
+        tiltZ: -Math.cos(rad) * tilt,
+        rotY: rng() * Math.PI * 2,
+        colorA: cat.colorA,
+        colorB: cat.colorB,
+      });
+    }
   });
 
   return spikes;

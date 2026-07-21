@@ -57,10 +57,17 @@ export async function reverseGeocode(lat: number, lng: number): Promise<GeocodeR
       city = cityFeat.text ?? '';
     }
 
-    return { address, city };
+    // Mapbox завжди додає повну контекстну ієрархію (включно з країною)
+    // до кожної фічі, незалежно від фільтру types= у запиті.
+    const countryCtx = (cityFeat?.context ?? addr?.context ?? []).find((c) =>
+      c.id.startsWith('country'),
+    );
+    const country = countryCtx?.text ?? '';
+
+    return { address, city, country };
   } catch (e) {
     console.warn('reverseGeocode error:', e);
-    return { address: '', city: '' };
+    return { address: '', city: '', country: '' };
   }
 }
 

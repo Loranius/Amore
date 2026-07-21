@@ -32,6 +32,8 @@ export function CrystalStats({
     { icon: '🎯', label: 'цілей', value: dna.goalsAchieved },
     { icon: '🎂', label: 'річниць', value: dna.anniversaries },
     { icon: '🍲', label: 'рецептів', value: dna.recipesSaved, delta: deltas.recipesSavedThisMonth },
+    { icon: '🌍', label: 'країн', value: dna.distinctCountries },
+    { icon: '💍', label: 'великих подій', value: dna.milestones },
   ];
 
   return (

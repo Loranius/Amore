@@ -20,7 +20,7 @@ const BUCKET = 'map-photos';
 async function fetchPins(): Promise<MapPinRow[]> {
   const { data, error } = await supabase
     .from('map_pins')
-    .select('id,title,note,category,lat,lng,photo_url,rating,review,city,created_by,created_at')
+    .select('id,title,note,category,lat,lng,photo_url,rating,review,city,country,created_by,created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
@@ -90,6 +90,7 @@ export function useMapPinMutations() {
         lat: v.lat,
         lng: v.lng,
         city: geo.city || null,
+        country: geo.country || null,
         created_by: user.id,
       };
       const { data, error } = await supabase.from('map_pins').insert(row).select('id').single();
@@ -101,7 +102,7 @@ export function useMapPinMutations() {
       }
       const { data: fresh } = await supabase
         .from('map_pins')
-        .select('id,title,note,category,lat,lng,photo_url,rating,review,city,created_by,created_at')
+        .select('id,title,note,category,lat,lng,photo_url,rating,review,city,country,created_by,created_at')
         .eq('id', data.id)
         .single();
       return fresh ?? null;
@@ -131,13 +132,13 @@ export function useMapPinMutations() {
   return { add, update, remove };
 }
 
-/** Лінивий бекфіл міста для пінів, збережених без city. */
+/** Лінивий бекфіл міста/країни для пінів, збережених без них. */
 export function useCityBackfill(pins: MapPinRow[]) {
   const client = useQueryClient();
   const running = useRef(false);
 
   useEffect(() => {
-    const todo = pins.filter((p) => !p.city);
+    const todo = pins.filter((p) => !p.city || !p.country);
     if (!todo.length || running.current) return;
     running.current = true;
     let cancelled = false;
@@ -146,7 +147,10 @@ export function useCityBackfill(pins: MapPinRow[]) {
       for (const pin of todo) {
         if (cancelled) break;
         const geo = await reverseGeocode(pin.lat, pin.lng);
-        if (geo.city) await supabase.from('map_pins').update({ city: geo.city }).eq('id', pin.id);
+        const patch: { city?: string; country?: string } = {};
+        if (!pin.city && geo.city) patch.city = geo.city;
+        if (!pin.country && geo.country) patch.country = geo.country;
+        if (Object.keys(patch).length) await supabase.from('map_pins').update(patch).eq('id', pin.id);
         await new Promise((r) => setTimeout(r, 300)); // не спамимо геокодер
       }
       if (!cancelled) void client.invalidateQueries({ queryKey: qk.mapPins() });
@@ -157,7 +161,7 @@ export function useCityBackfill(pins: MapPinRow[]) {
       cancelled = true;
       running.current = false;
     };
-    // Лише коли змінюється множина «без міста».
+    // Лише коли змінюється множина «без міста/країни».
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pins.map((p) => (p.city ? '' : p.id)).join(',')]);
+  }, [pins.map((p) => (!p.city || !p.country ? p.id : '')).join(',')]);
 }

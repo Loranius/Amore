@@ -129,6 +129,8 @@ export interface EventRow {
   yearly: boolean | null;
   /** Плани: заповнено лише для type:'other', інакше null. Див. PlanMetadata. */
   metadata: PlanMetadata | null;
+  /** Заручини/весілля/народження дитини тощо — окремо від metadata (та зайнята під плани). */
+  is_milestone: boolean;
 }
 
 export interface MediaItemRow {
@@ -278,6 +280,7 @@ export interface MapPinRow {
   rating: number | null;
   review: string | null;
   city: string | null;
+  country: string | null;
   created_by: number | null;
   created_at: string;
 }
@@ -602,6 +605,7 @@ export interface MapboxFeature {
 export interface GeocodeResult {
   address: string;
   city: string;
+  country: string;
 }
 
 // ────────────────────────────────────────────────────────────
