@@ -247,3 +247,82 @@ export function useCrystalWishes(): { wishes: CrystalWish[]; isPending: boolean 
   });
   return { wishes: query.data ?? [], isPending: query.isPending };
 }
+
+/** id+дата — «сировина» для доменних білдерів Artifact Engine (artifact/artifactNodes.ts). */
+export interface DatedItem {
+  id: number;
+  date: string;
+}
+
+/**
+ * Досягнуті спільні цілі (Connection domain — «Goals → Stability Pressure»
+ * + власна гілка-goal). useGoals() не вибирає created_at (не потрібен решті
+ * фічі бюджету), тому окремий вузький запит — той самий патерн, що
+ * useCrystalWishes. Немає окремої дати «досягнення» в схемі — created_at
+ * (дата пропозиції цілі) чесний доступний проксі.
+ */
+export function useAchievedGoals(): { achievedGoals: DatedItem[]; isPending: boolean } {
+  const query = useQuery({
+    queryKey: [...qk.savingsGoals(), 'achieved-dated'],
+    queryFn: async (): Promise<DatedItem[]> => {
+      const { data, error } = await supabase
+        .from('savings_goals')
+        .select('id,saved_amount,target_amount,status,created_at')
+        .returns<
+          { id: number; saved_amount: number | null; target_amount: number | null; status: string; created_at: string }[]
+        >();
+      if (error) throw error;
+      return (data ?? [])
+        .filter(
+          (g) =>
+            g.status === 'confirmed' &&
+            g.saved_amount != null &&
+            g.target_amount != null &&
+            g.saved_amount >= g.target_amount,
+        )
+        .map((g) => ({ id: g.id, date: g.created_at }));
+    },
+  });
+  return { achievedGoals: query.data ?? [], isPending: query.isPending };
+}
+
+/** Річниці (Connection domain) — events.type === 'anniversary'. */
+export function useAnniversaryEvents(): { anniversaries: DatedItem[]; isPending: boolean } {
+  const events = useEvents();
+  const anniversaries = useMemo(
+    () => (events.data ?? []).filter((e) => e.type === 'anniversary').map((e) => ({ id: e.id, date: e.date })),
+    [events.data],
+  );
+  return { anniversaries, isPending: events.isPending };
+}
+
+/**
+ * Рецепти/фільми/книги (Creation domain) — уже наявні хуки (useDishes,
+ * useMediaItems), лише спроєктовані до {id, date}. Жодного нового запиту
+ * до Supabase — тонка проекція наявних рядків.
+ */
+export function useCreationSources(): {
+  recipes: DatedItem[];
+  movies: DatedItem[];
+  books: DatedItem[];
+  isPending: boolean;
+} {
+  const dishes = useDishes();
+  const movies = useMediaItems('movie');
+  const series = useMediaItems('series');
+  const books = useMediaItems('book');
+
+  return useMemo(() => {
+    const isPending = [dishes, movies, series, books].some((q) => q.isPending);
+    if (isPending) return { recipes: [], movies: [], books: [], isPending: true };
+    return {
+      recipes: (dishes.data ?? []).map((d) => ({ id: d.id, date: d.created_at })),
+      movies: [...(movies.data ?? []), ...(series.data ?? [])]
+        .filter((m) => m.status === 'done')
+        .map((m) => ({ id: m.id, date: m.created_at })),
+      books: (books.data ?? []).filter((b) => b.status === 'done').map((b) => ({ id: b.id, date: b.created_at })),
+      isPending: false,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dishes.data, dishes.isPending, movies.data, movies.isPending, series.data, series.isPending, books.data, books.isPending]);
+}
