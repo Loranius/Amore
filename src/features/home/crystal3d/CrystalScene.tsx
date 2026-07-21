@@ -95,6 +95,8 @@ function Branch({ branch, geometry, material, reduceMotion, useTransmission, onO
         // Bloom (спостережено як повністю чорний кадр на одному з ракурсів).
         <MeshTransmissionMaterial
           vertexColors
+          flatShading
+          envMapIntensity={1.4}
           transmissionSampler
           transmission={1}
           thickness={0.6}
@@ -113,6 +115,8 @@ function Branch({ branch, geometry, material, reduceMotion, useTransmission, onO
       ) : (
         <meshPhysicalMaterial
           vertexColors
+          flatShading
+          envMapIntensity={1.4}
           roughness={branch.emissive ? 0.15 : material.roughness}
           metalness={branch.emissive ? 0.1 : 0}
           transmission={branch.emissive ? 0.15 : material.transmission}

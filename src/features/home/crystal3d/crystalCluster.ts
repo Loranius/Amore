@@ -198,19 +198,29 @@ export function buildBranchGeometry(
   material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix' | 'surfaceComplexity'>,
 ): THREE.BufferGeometry {
   const shapeRng = mulberry32(hashSeedString(branch.key));
-  // Книги («складність поверхні») додають шанс на зайву грань понад базові 5–7.
-  const segments = 5 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+  // 6-9 граней — мінімум навмисно 6 (не 5), бо гексагональна призма читається
+  // однозначно «кристал» (справжній кварц), а не довільний багатокутник.
+  // Книги («складність поверхні») додають шанс на зайву грань понад базові 6–8.
+  const segments = 6 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
   const m = branch.maturity;
 
   const h = branch.height * (0.32 + m * 0.68);
   const r = branch.radiusBottom * (0.4 + m * 0.6);
   const tipR = r * (0.14 - m * 0.12); // молоді — тупіші вістря, зрілі — майже гострі
-  const pointStart = 0.72 - m * 0.2 + shapeRng() * 0.08;
+  const prismEnd = 0.46 + shapeRng() * 0.08; // кінець «призматичної» ділянки, 0.46-0.54
+  // pointStart МУСИТЬ бути помітно вище prismEnd (інакше профіль самоперетнеться
+  // при високій maturity, де 0.72-m*0.2 може впасти аж до 0.52) — тому явно
+  // прив'язаний до prismEnd з запасом, а не рахується незалежно.
+  const pointStart = Math.max(prismEnd + 0.14, 0.72 - m * 0.2 + shapeRng() * 0.08);
 
+  // 5 точок профілю (не 4) — довга майже-паралельна «призматична» ділянка
+  // (p1→p2) окремо від пірамідального вістря (p2→p3→p4): справжній кристал
+  // читається саме як призма+вістря, а не суцільний плавний конус.
   const profile = [
     new THREE.Vector2(Math.max(0.001, r * (0.88 + shapeRng() * 0.1)), 0),
-    new THREE.Vector2(r, h * (0.08 + shapeRng() * 0.05)),
-    new THREE.Vector2(r * (0.94 + shapeRng() * 0.06), h * pointStart),
+    new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
+    new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * prismEnd),
+    new THREE.Vector2(r * (0.9 + shapeRng() * 0.06), h * pointStart),
     new THREE.Vector2(Math.max(0.001, tipR), h),
   ];
 
@@ -220,12 +230,26 @@ export function buildBranchGeometry(
   const { colorA, colorB } = tintBranchColors(branch, material);
   const c = new THREE.Color();
 
+  // Легка per-facet варіація тону (справжній мінерал не має ідеально рівного
+  // забарвлення грані до грані — тонкі домішки/включення). Тон фіксований на
+  // всю грань (не на вершину), тому разом із flatShading (Branch у
+  // CrystalScene.tsx) кожна грань читається як окрема, відмінна від сусідньої
+  // — це і прибирає «картонний» ефект гладкого суцільного градієнта.
+  const facetTints = Array.from({ length: segments }, (_, idx) => {
+    const tintRng = mulberry32(hashSeedString(`${branch.key}:facet:${idx}`));
+    return 0.82 + tintRng() * 0.36;
+  });
+  const facetStep = (Math.PI * 2) / segments;
+
   for (let i = 0; i < pos.count; i++) {
     const t = h > 0 ? pos.getY(i) / h : 0;
     c.lerpColors(colorA, colorB, Math.min(1, Math.max(0, t)));
-    colors[i * 3] = c.r;
-    colors[i * 3 + 1] = c.g;
-    colors[i * 3 + 2] = c.b;
+    const angle = Math.atan2(pos.getZ(i), pos.getX(i));
+    const facetIdx = Math.round(((angle + Math.PI * 2) % (Math.PI * 2)) / facetStep) % segments;
+    const tint = facetTints[facetIdx]!;
+    colors[i * 3] = c.r * tint;
+    colors[i * 3 + 1] = c.g * tint;
+    colors[i * 3 + 2] = c.b * tint;
   }
 
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
