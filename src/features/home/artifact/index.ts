@@ -36,6 +36,10 @@ export type {
 } from './evolution';
 export { buildEvolutionTimeline, historyAt, solveForces } from './evolution';
 
+// Species Layer (Volume II) — SDK виду: перекладач історії у Growth Instructions.
+export type { GrowthInstruction, Species, CrystalConstraints, CrystalInstruction, CrystalState } from './species';
+export { crystalSpecies } from './species';
+
 export { generateArtifactDNA } from './artifactDNA';
 export { maturityCurve } from './maturity';
 export { computeEvolutionPressures } from './evolutionPressure';
