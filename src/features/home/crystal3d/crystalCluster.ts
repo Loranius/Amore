@@ -135,10 +135,14 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
 
 // ── Матеріал: фото/фільми/рецепти/книги/спогади = НЕ форма ───────
 export interface ClusterMaterial {
-  /** Фото → полірування/прозорість (Refinement Pressure). */
+  /** Фото → полірування (Refinement Pressure). Немає окремого поля
+   *  transmission — реального заломлення (material.transmission) свідомо
+   *  немає ніде в рендері: воно вмикає власний "transmission render pass"
+   *  THREE.WebGLRenderer для ВСІЄЇ сцени, який підставляє суцільний білий
+   *  clear-колір при прозорому canvas (WebGLRenderer.js::renderTransmissionPass)
+   *  — саме це спричиняло білий фон на реальних пристроях (CrystalScene.tsx). */
   roughness: number;
   clearcoat: number;
-  transmission: number;
   /** Рецепти → теплий відтінок (Warmth Pressure). */
   warmthMix: number;
   /** Фільми → внутрішні кольорові переливи. */
@@ -161,7 +165,6 @@ export function deriveClusterMaterial(pressures: EvolutionPressures): ClusterMat
   return {
     roughness: Math.max(0.06, 0.32 - pressures.refinement * 0.216),
     clearcoat: Math.min(0.95, 0.55 + pressures.refinement * 0.36),
-    transmission: Math.min(0.75, 0.3 + pressures.refinement * 0.36),
     warmthMix: pressures.warmth,
     movieMix: pressures.movieMix,
     glow: pressures.luminosity,
