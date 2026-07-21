@@ -260,25 +260,29 @@ export function buildBranchGeometry(
   // прив'язаний до prismEnd з запасом, а не рахується незалежно.
   const pointStart = Math.max(prismEnd + 0.14, 0.72 - m * 0.2 + shapeRng() * 0.08);
 
-  // 5 точок профілю (не 4) — довга майже-паралельна «призматична» ділянка
-  // (p1→p2) окремо від пірамідального вістря (p2→p3→p4): справжній кристал
-  // читається саме як призма+вістря, а не суцільний плавний конус.
-  // Основа РОЗШИРЕНА понад радіус призми — «спідниця», що ховається в тілі
-  // субстрату: стик двох тіл читається зрощеним мінералом, а не перетином
-  // двох мешів. 'broken' — зрізана верхівка (обламаний кристал): профіль
-  // завершується широким уступом і пласкою «кришкою» нижче повної висоти.
+  // Профіль: ЗАОКРУГЛЕНА ВУЗЬКА основа → призматична ділянка → пірамідальне
+  // вістря. Основа тепер НЕ широка пласка «спідниця» з гострим кутом (яка
+  // читалась як обрубок), а вужча за призму й плавно скруглена вгору
+  // (r·0.6 → біля-повний радіус через м'який bevel) — низ кристала
+  // виглядає обточеним, як у справжнього мінералу, і займає менше місця
+  // (менше налазить на сусідів). 'broken' — зрізана верхівка нижче повної
+  // висоти.
+  const baseR = r * 0.6;
+  const bevelR = r * 0.9;
   const side =
     arch === 'broken'
       ? [
-          new THREE.Vector2(Math.max(0.001, r * (1.06 + shapeRng() * 0.1)), 0),
-          new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
+          new THREE.Vector2(baseR, 0),
+          new THREE.Vector2(bevelR, h * 0.05),
+          new THREE.Vector2(r, h * (0.13 + shapeRng() * 0.03)),
           new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * Math.min(prismEnd, 0.6)),
           new THREE.Vector2(r * (0.3 + shapeRng() * 0.08), h * 0.84),
           new THREE.Vector2(0.06 * r, h * 0.85),
         ]
       : [
-          new THREE.Vector2(Math.max(0.001, r * (1.06 + shapeRng() * 0.1)), 0),
-          new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
+          new THREE.Vector2(baseR, 0),
+          new THREE.Vector2(bevelR, h * 0.05),
+          new THREE.Vector2(r, h * (0.13 + shapeRng() * 0.03)),
           new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * prismEnd),
           new THREE.Vector2(r * (0.9 + shapeRng() * 0.06), h * pointStart),
           new THREE.Vector2(Math.max(0.001, tipR), h),
