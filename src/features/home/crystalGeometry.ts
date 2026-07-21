@@ -72,9 +72,10 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     label: 'Досягнення',
     colorA: '#d9a441',
     colorB: '#f3d78a',
-    // Велика подія (заручини/весілля/важлива віха) важить як 6 звичайних
-    // досягнень — вагоміший, помітний ріст без окремого спецкейсу.
-    metric: (d) => d.goalsAchieved + d.anniversaries + d.milestones * 6,
+    // Велика подія (заручини/весілля/важлива віха) тепер росте й власним
+    // окремим «великим шпилем» (buildMilestoneSpikes) — тут лишається лише
+    // легкий внесок у загальний ріст категорії, без подвійного дублювання.
+    metric: (d) => d.goalsAchieved + d.anniversaries + d.milestones * 2,
     facetsFor: (m) => grown(m, 1),
   },
   {

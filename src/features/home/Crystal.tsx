@@ -37,7 +37,9 @@ export function Crystal() {
   const stage = !isPending && !empty ? stageForRichness(totalRichness(dna)) : null;
   const facets = useMemo(() => buildFacets(dna, seedNum), [dna, seedNum]);
   const [open, setOpen] = useState(false);
-  const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending);
+  // dna.milestones (не список подій — SVG-фолбек не малює окремих шпилів
+  // для великих подій) лише щоб не затерти лічильник у спільному снепшоті.
+  const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending, dna.milestones);
   const reduceMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 

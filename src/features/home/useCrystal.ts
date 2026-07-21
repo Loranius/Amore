@@ -144,3 +144,23 @@ export function useCrystalDNA(): {
 
   return { dna, deltas, isPending, isError };
 }
+
+export interface MilestoneEvent {
+  id: number;
+  title: string;
+}
+
+/**
+ * Великі життєві події (events.is_milestone) — заручини/весілля/переїзд
+ * тощо. На відміну від решти ДНК (лише агреговані числа), кожна подія тут
+ * росте власним окремим «великим шпилем» у кристалі (crystalGeometry3d.ts),
+ * тому потрібен сам список, а не просто count.
+ */
+export function useMilestoneEvents(): { milestones: MilestoneEvent[]; isPending: boolean } {
+  const events = useEvents();
+  const milestones = useMemo(
+    () => (events.data ?? []).filter((e) => e.is_milestone).map((e) => ({ id: e.id, title: e.title })),
+    [events.data],
+  );
+  return { milestones, isPending: events.isPending };
+}

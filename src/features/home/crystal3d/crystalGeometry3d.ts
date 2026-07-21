@@ -129,6 +129,55 @@ export function buildSpikes(dna: CrystalDNA, seedNum = 0): SpikeSpec[] {
   return spikes;
 }
 
+export interface MilestoneSpike extends SpikeSpec {
+  eventId: number;
+  title: string;
+}
+
+const MILESTONE_COLOR_A = '#c9971f';
+const MILESTONE_COLOR_B = '#fff3c9';
+/** Скільки останніх великих подій показувати окремими шпилями — щоб роками не захаращувати кристал. */
+const MAX_MILESTONE_SPIKES = 6;
+
+/**
+ * Великі життєві події (заручини/весілля/переїзд тощо, events.is_milestone)
+ * — на відміну від решти категорій, кожна така подія росте ВЛАСНИМ окремим
+ * золотим шпилем, що стирчить далі від центру за звичайну колонію. Позиція
+ * детермінована за (seed, event.id) — не за порядковим індексом, тому стара
+ * подія не зсувається, коли з'являється нова.
+ */
+export function buildMilestoneSpikes(
+  milestones: ReadonlyArray<{ id: number; title: string }>,
+  seedNum = 0,
+): MilestoneSpike[] {
+  return milestones.slice(-MAX_MILESTONE_SPIKES).map((m) => {
+    const rng = mulberry32(seedNum + 7789 + m.id * 97);
+    const angleDeg = rng() * 360;
+    const rad = (angleDeg * Math.PI) / 180;
+    const dist = 0.5 + rng() * 0.18;
+    const tilt = 0.32 + rng() * 0.28;
+
+    return {
+      key: `milestone-${m.id}`,
+      eventId: m.id,
+      title: m.title,
+      isCore: false,
+      height: 1.15 + rng() * 0.45,
+      radiusBottom: 0.2 + rng() * 0.06,
+      radiusTop: 0.045,
+      posX: Math.cos(rad) * dist,
+      posZ: Math.sin(rad) * dist,
+      tiltX: Math.sin(rad) * tilt,
+      tiltZ: -Math.cos(rad) * tilt,
+      rotY: rng() * Math.PI * 2,
+      colorA: MILESTONE_COLOR_A,
+      colorB: MILESTONE_COLOR_B,
+      breathePhase: rng() * Math.PI * 2,
+      breatheSpeed: 0.3 + rng() * 0.15,
+    };
+  });
+}
+
 /** Гранований шестигранний шип із вершинним градієнтом (темніша основа → світліший вістря). */
 export function buildSpikeGeometry(spec: SpikeSpec): THREE.BufferGeometry {
   const geo = new THREE.CylinderGeometry(spec.radiusTop, spec.radiusBottom, spec.height, 6, 1);

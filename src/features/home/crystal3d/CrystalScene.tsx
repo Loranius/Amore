@@ -13,9 +13,9 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Sparkles } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import type * as THREE from 'three';
-import { useCrystalDNA } from '../useCrystal';
+import { useCrystalDNA, useMilestoneEvents } from '../useCrystal';
 import type { CrystalDNA } from '../useCrystal';
-import { useCrystalSeen } from '../useCrystalSeen';
+import { useCrystalSeen, MILESTONE_SEEN_KEY } from '../useCrystalSeen';
 import { useCrystalSeed } from '../useHome';
 import { hashSeedString } from '../mulberry32';
 import { CATEGORY_DEFS, isDnaEmpty } from '../crystalGeometry';
@@ -24,10 +24,12 @@ import { MemoryModal } from '../MemoryModal';
 import {
   buildSpikes,
   buildSpikeGeometry,
+  buildMilestoneSpikes,
   totalRichness,
   stageForRichness,
   stageLabel,
   type SpikeSpec,
+  type MilestoneSpike,
 } from './crystalGeometry3d';
 
 const BASE_Y = -1.3;
@@ -81,15 +83,67 @@ function Spike({ spec, geometry, roughness, clearcoat, reduceMotion, onOpen }: S
   );
 }
 
+/**
+ * Шпиль великої життєвої події (заручини/весілля/переїзд тощо) — та сама
+ * механіка дихання, що й Spike, але з теплим золотим світінням (emissive),
+ * щоб він явно читався як «веха», а не черговий шип категорії.
+ */
+function MilestoneSpikeMesh({
+  spec,
+  geometry,
+  reduceMotion,
+  onOpen,
+}: {
+  spec: MilestoneSpike;
+  geometry: THREE.BufferGeometry;
+  reduceMotion: boolean;
+  onOpen: () => void;
+}) {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+
+  useFrame((state) => {
+    const mesh = meshRef.current;
+    if (!mesh || reduceMotion) return;
+    const t = state.clock.elapsedTime;
+    const micro = 1 + Math.sin(t * spec.breatheSpeed + spec.breathePhase) * 0.02;
+    mesh.scale.set(1, micro, 1);
+  });
+
+  return (
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      position={[spec.posX, BASE_Y, spec.posZ]}
+      rotation={[spec.tiltX, spec.rotY, spec.tiltZ]}
+      onClick={onOpen}
+    >
+      <meshPhysicalMaterial
+        vertexColors
+        roughness={0.15}
+        metalness={0.1}
+        transmission={0.15}
+        thickness={0.5}
+        clearcoat={0.9}
+        clearcoatRoughness={0.05}
+        ior={1.6}
+        reflectivity={0.7}
+        emissive="#e8b23d"
+        emissiveIntensity={0.4}
+      />
+    </mesh>
+  );
+}
+
 interface ClusterProps {
   dna: CrystalDNA;
   seedNum: number;
+  milestones: ReadonlyArray<{ id: number; title: string }>;
   reduceMotion: boolean;
   grew: boolean;
   onOpen: () => void;
 }
 
-function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterProps) {
+function CrystalCluster({ dna, seedNum, milestones, reduceMotion, grew, onOpen }: ClusterProps) {
   const groupRef = useRef<THREE.Group | null>(null);
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
@@ -108,6 +162,10 @@ function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterPro
     () => buildSpikes(dna, seedNum).map((spec) => ({ spec, geometry: buildSpikeGeometry(spec) })),
     [dna, seedNum],
   );
+  const milestoneMeshes = useMemo(
+    () => buildMilestoneSpikes(milestones, seedNum).map((spec) => ({ spec, geometry: buildSpikeGeometry(spec) })),
+    [milestones, seedNum],
+  );
 
   // Досягнуті цілі «полірують» кристал — нижчий roughness, вищий clearcoat.
   const roughness = Math.max(0.08, 0.24 - dna.goalsAchieved * 0.015);
@@ -116,6 +174,10 @@ function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterPro
   useEffect(
     () => () => spikeMeshes.forEach(({ geometry }) => geometry.dispose()),
     [spikeMeshes],
+  );
+  useEffect(
+    () => () => milestoneMeshes.forEach(({ geometry }) => geometry.dispose()),
+    [milestoneMeshes],
   );
 
   useFrame((state, delta) => {
@@ -163,6 +225,15 @@ function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterPro
           onOpen={onOpen}
         />
       ))}
+      {milestoneMeshes.map(({ spec, geometry }) => (
+        <MilestoneSpikeMesh
+          key={spec.key}
+          spec={spec}
+          geometry={geometry}
+          reduceMotion={reduceMotion}
+          onOpen={onOpen}
+        />
+      ))}
     </group>
   );
 }
@@ -194,10 +265,11 @@ function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
 export default function CrystalScene() {
   const { dna, deltas, isPending: dnaPending } = useCrystalDNA();
   const { seed, isPending: seedPending } = useCrystalSeed();
-  const isPending = dnaPending || seedPending;
+  const { milestones, isPending: milestonesPending } = useMilestoneEvents();
+  const isPending = dnaPending || seedPending || milestonesPending;
   const seedNum = useMemo(() => hashSeedString(seed ?? ''), [seed]);
   const empty = !isPending && isDnaEmpty(dna);
-  const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending);
+  const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending, milestones.length);
   const [open, setOpen] = useState(false);
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -207,7 +279,8 @@ export default function CrystalScene() {
     !isPending &&
     !empty &&
     (isFirstVisit ||
-      CATEGORY_DEFS.some((cat) => cat.facetsFor(cat.metric(dna)) > (seenSnapshot?.[cat.key] ?? 0)));
+      CATEGORY_DEFS.some((cat) => cat.facetsFor(cat.metric(dna)) > (seenSnapshot?.[cat.key] ?? 0)) ||
+      milestones.length > (seenSnapshot?.[MILESTONE_SEEN_KEY] ?? 0));
 
   const sparkleCount = Math.min(60, 10 + Math.round(dna.photos / 2));
   const stage = !isPending && !empty ? stageForRichness(totalRichness(dna)) : null;
@@ -240,6 +313,7 @@ export default function CrystalScene() {
               <CrystalCluster
                 dna={dna}
                 seedNum={seedNum}
+                milestones={milestones}
                 reduceMotion={reduceMotion}
                 grew={grew}
                 onOpen={openModal}
