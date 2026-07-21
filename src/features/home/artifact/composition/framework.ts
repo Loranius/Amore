@@ -292,11 +292,13 @@ function agePass(bodies: ComposedBody[], seedNum: number): void {
     b.radius *= 1 + 0.15 * b.age;
     b.anchor = add(b.anchor, scale(b.direction, -0.04 * b.length * b.age));
     if (b.age < 0.75 && !b.primary) {
+      // Легка «кривизна молодості» — делікатна, щоб не ламати вертикальну
+      // друзу референсу (молоді ледь похилені, не лежачі).
       const crookRng = keyedRng(seedNum, `crook:${b.key}`);
       const [u, w] = perpendicularBasis(b.direction);
       const az = crookRng() * Math.PI * 2;
       const side = add(scale(u, Math.cos(az)), scale(w, Math.sin(az)));
-      b.direction = bendToward(b.direction, side, 0.22 * (1 - b.age) * (0.5 + crookRng() * 0.5));
+      b.direction = bendToward(b.direction, side, 0.1 * (1 - b.age) * (0.5 + crookRng() * 0.5));
     }
   }
 }
@@ -317,16 +319,18 @@ function competitionPass(bodies: ComposedBody[], strength: number): void {
       const dy = a.anchor.y - b.anchor.y;
       const dz = a.anchor.z - b.anchor.z;
       const distSq = dx * dx + dy * dy + dz * dz;
-      if (distSq > 0.36 || dot(a.direction, b.direction) < 0.86) continue;
+      // У вертикальній друзі паралельність — норма, тож конкуренцію вмикає
+      // лише ТІСНЕ сусідство двох великих майже-паралельних тіл.
+      if (distSq > 0.05 || dot(a.direction, b.direction) < 0.9) continue;
       // Поступається МОЛОДШИЙ (старші тіла не змінюються ніколи — append-only);
       // король не поступається нікому.
       let loser = a.age < b.age ? a : b.age < a.age ? b : a.key > b.key ? a : b;
       if (loser.primary) loser = loser === a ? b : a;
       if (loser.primary) continue;
       const winner = loser === a ? b : a;
-      loser.length *= strength > 1 ? 0.62 : 0.7; // сильніший другий прохід
-      loser.direction = normalize(add(loser.direction, scale(winner.direction, -0.3)));
-      if (distSq < 0.09) loser.archetype = loser.length > loser.radius * 6 ? 'broken' : 'stub';
+      loser.length *= strength > 1 ? 0.68 : 0.76; // сильніший другий прохід
+      loser.direction = normalize(add(loser.direction, scale(winner.direction, -0.18)));
+      if (distSq < 0.02) loser.archetype = loser.length > loser.radius * 6 ? 'broken' : 'stub';
     }
   }
 }
@@ -430,12 +434,14 @@ function microPass(bodies: ComposedBody[], seedNum: number, config: CompositionC
       const [lenMin, lenMax] = config.micro.lengthRange;
       const [radMin, radMax] = config.micro.radiusRange;
       const radius = radMin + mrng() * (radMax - radMin);
+      // Мікро завжди відчутно менше за батька — навіть якщо той сам крихітний.
+      const length = Math.min(lenMin + mrng() * (lenMax - lenMin), parent.length * 0.55);
       micro.push({
         key: `${parent.key}~m${i}`,
         parentKey: parent.key,
         anchor: add(surface, scale(side, -radius * 0.6)),
         direction: bendToward(parent.direction, side, 0.35 + mrng() * 0.4),
-        length: lenMin + mrng() * (lenMax - lenMin),
+        length,
         radius,
         age: parent.age,
         energy: parent.energy,

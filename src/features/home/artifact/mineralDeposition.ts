@@ -92,26 +92,34 @@ import type {
 
 /** Кандидатів на місце росту за подію — фіксовано (детермінізм draw-порядку). */
 const SITE_CANDIDATES = 12;
-/** Частка бічної поверхні, де нуклеюється нове тіло: низ/середина, не вістря. */
-const SITE_T_MIN = 0.06;
-const SITE_T_MAX = 0.62;
+/** Частка бічної поверхні, де нуклеюється нове тіло: біля ОСНОВИ — дочірні
+ *  кристали виростають з-під підніжжя маси і тягнуться вгору (референс:
+ *  вертикальна друза, не «гілки на стовбурах»). */
+const SITE_T_MIN = 0.03;
+const SITE_T_MAX = 0.42;
 /** Глибина поховання основи, у власних радіусах нового тіла. Глибоко —
  *  перехідна зона між тілами повністю ховається, стики читаються зрощеними. */
 const BURIAL = 0.62;
-/** Мінімальна вертикальна складова напрямку — друза росте вгору-назовні;
- *  зрідка (RARE) дозволяється майже горизонтальне тіло, як у кварцових друз. */
-const MIN_UPWARD_MAIN = 0.34;
-const MIN_UPWARD_RARE = 0.12;
-const HORIZONTAL_CHANCE = 0.15;
+/** Мінімальна вертикальна складова напрямку: друза з референсу — майже
+ *  вертикальні призми (нахил ≤ ~35°); зрідка (RARE) — діагональне тіло. */
+const MIN_UPWARD_MAIN = 0.82;
+const MIN_UPWARD_RARE = 0.55;
+const DIAGONAL_CHANCE = 0.14;
 /** A/B-вимикач колоній (перф-запобіжник для слабких мобільних GPU). */
 const COLONIES_ENABLED = true;
 
-/** Монарх: підсилення розмірів найстарішого центрального відкладення і
- *  стеля висоти для всіх інших — око одразу бачить центр друзи. */
-const MONARCH_LENGTH_BOOST = 1.45;
-const MONARCH_RADIUS_BOOST = 2.0;
-const MONARCH_MIN_RAW_LENGTH = 1.35;
+/** Монарх: центральний головний кристал. Висота росте РІВНОМІРНО з днями
+ *  разом (лінійно до MONARCH_GROWTH_DAYS), не стрибком; стеля висоти для
+ *  всіх інших — око одразу бачить центр друзи. */
+const MONARCH_BASE_LENGTH = 1.15;
+const MONARCH_LENGTH_GAIN = 1.5;
+const MONARCH_GROWTH_DAYS = 1200;
+const MONARCH_RADIUS_BOOST = 1.5;
 const MONARCH_HEIGHT_CEILING = 0.9;
+
+/** Профіль «кургану»: що далі від осі, то нижчі дочірні кристали —
+ *  висоти спадають від центру, як у музейній друзі з референсів. */
+const moundFalloff = (horiz: number): number => 0.34 + 0.66 / (1 + horiz * 2.3);
 
 /** Базовий шанс колонії за видом відкладення (великі події нуклеюють охочіше;
  *  дрібні види — стриманіше, щоб композиція «дихала», а не шуміла). */
@@ -194,17 +202,23 @@ function perturbVec(rng: () => number): Vec3 {
   return v3(Math.cos(az) * r, y, Math.sin(az) * r);
 }
 
-/** Успадкування напрямку (3 draw): нормаль поверхні + вісь субстрату +
- *  явний потяг угору + мале збурення. Кварцова друза росте вгору-навскіс;
- *  майже горизонтальні тіла — лише зрідка (HORIZONTAL_CHANCE). */
-function inheritDirection(normal: Vec3, substrateDirection: Vec3, rng: () => number): Vec3 {
+/** Успадкування напрямку (3 draw): вертикальна друза з референсу — кожен
+ *  кристал тягнеться ВГОРУ, зовнішні ледь віялом назовні (нахил росте з
+ *  відстанню від осі), нормаль/вісь субстрату дають лише органічний
+ *  відтінок. Діагональні тіла — зрідка (DIAGONAL_CHANCE). */
+function inheritDirection(normal: Vec3, substrateDirection: Vec3, at: Vec3, rng: () => number): Vec3 {
+  const perturb = perturbVec(rng);
+  const rare = rng();
+  const horiz = Math.hypot(at.x, at.z);
+  const radial = horiz > 1e-6 ? v3(at.x / horiz, 0, at.z / horiz) : v3(0, 0, 0);
+  const lean = 0.1 + 0.32 * Math.min(1, horiz / 0.85);
   const dir = normalize(
     add(
-      add(add(scale(normal, 0.42), scale(substrateDirection, 0.2)), scale(v3(0, 1, 0), 0.27)),
-      scale(perturbVec(rng), 0.11),
+      add(v3(0, 1, 0), scale(radial, lean)),
+      add(add(scale(normal, 0.12), scale(substrateDirection, 0.08)), scale(perturb, 0.07)),
     ),
   );
-  const minUp = rng() < HORIZONTAL_CHANCE ? MIN_UPWARD_RARE : MIN_UPWARD_MAIN;
+  const minUp = rare < DIAGONAL_CHANCE ? MIN_UPWARD_RARE : MIN_UPWARD_MAIN;
   if (dir.y >= minUp) return dir;
   // М'яке підняття до мінімальної вертикалі — без стрибка напрямку.
   return normalize(v3(dir.x, minUp + (dir.y < 0 ? 0.08 : 0), dir.z));
@@ -267,7 +281,10 @@ function depositMineral(
   const girth = Math.max(bigKind ? 0.8 : 0.65, 0.65 + girthDraw * girthDraw * 1.3);
   rawRadius *= girth;
   if (isMonarch) {
-    rawLength = Math.max(rawLength, MONARCH_MIN_RAW_LENGTH) * MONARCH_LENGTH_BOOST;
+    // Головний кристал росте РІВНОМІРНО з кількістю днів разом: висота —
+    // лінійна функція віку стосунків (ageDays монарха = daysTogether),
+    // а не випадковий draw. Щодня — трошки вищий.
+    rawLength = MONARCH_BASE_LENGTH + (Math.min(event.ageDays, MONARCH_GROWTH_DAYS) / MONARCH_GROWTH_DAYS) * MONARCH_LENGTH_GAIN;
     rawRadius *= MONARCH_RADIUS_BOOST;
   }
   const spin = rng() * Math.PI * 2;
@@ -299,20 +316,27 @@ function depositMineral(
       break;
     }
   }
+  // Монарх ігнорує рулетку МІСЦЯ (draw однаково витрачені — форма потоку
+  // фіксована): він сидить точно ПО ЦЕНТРУ, на осі ядра-нуклеуса — головний
+  // кристал композиції, з-під основи якого росте решта друзи.
+  if (isMonarch) chosen = { idx: 0, t: 0.45, angle: chosen.angle, score: chosen.score };
   const host = substrate[chosen.idx]!;
   const hostBody = bodies[chosen.idx]!;
 
-  // Growth Shadow → енергія; розміри звужуються в тіні великих сусідів.
+  // Growth Shadow → енергія; розміри звужуються в тіні великих сусідів;
+  // профіль кургану — що далі від осі, то нижче тіло (референсна друза).
   const probe = sampleSurfacePoint(hostBody.skeletal, chosen.t, chosen.angle);
   const energy = growthEnergyAt(probe.point, substrate);
-  let length = rawLength * (0.55 + 0.45 * energy) * heightDamp(probe.point.y);
+  const falloff = isMonarch ? 1 : moundFalloff(Math.hypot(probe.point.x, probe.point.z));
+  let length = rawLength * (0.55 + 0.45 * energy) * heightDamp(probe.point.y) * falloff;
+  if (isMonarch) length = rawLength; // рівномірний ріст без випадкових модуляцій
   const radius = rawRadius * (0.7 + 0.3 * energy);
   // Ієрархія: ніхто не переростає монарха (той відкладається найпершим).
   if (!isMonarch && monarch.length !== null) length = Math.min(length, monarch.length * MONARCH_HEIGHT_CEILING);
 
-  // Успадкування напрямку (3 draw); монарх — найпряміший кристал друзи.
-  let direction = inheritDirection(probe.normal, host.direction, rng);
-  if (isMonarch) direction = normalize(add(scale(direction, 0.3), scale(v3(0, 1, 0), 0.7)));
+  // Успадкування напрямку (3 draw); монарх — ідеально вертикальний стрижень.
+  let direction = inheritDirection(probe.normal, host.direction, probe.point, rng);
+  if (isMonarch) direction = normalize(add(scale(direction, 0.06), scale(v3(0, 1, 0), 0.94)));
 
   const maturity = maturityCurve(event.ageDays, event.maturityHalfLife);
   const { anchor, renderedAnchor } = buriedAnchors(hostBody, chosen.t, chosen.angle, radius, maturity);
@@ -377,8 +401,10 @@ function depositMineral(
     const satLength = Math.max(0.1, length * lenFactor);
     // Супутники діляться майже тією самою точкою зародження (кварцова
     // друза): той самий хост, ледь помітний зсув по t/куту, вузьке віяло
-    // напрямків навколо осі домінанта — компаньйони, що торкаються його.
-    const satDirection = normalize(add(scale(direction, 0.8), scale(dirJitter, 0.16)));
+    // ВГОРУ навколо осі домінанта — компаньйони теж тягнуться до неба.
+    const satDirection = normalize(
+      add(add(scale(direction, 0.68), scale(v3(0, 1, 0), 0.25)), scale(dirJitter, 0.1)),
+    );
     const sat = buriedAnchors(hostBody, st, sAngle, satRadius, maturity);
 
     colony.push({

@@ -129,13 +129,19 @@ export function surfaceStress(seedNum: number, point: Vec3): number {
 // ── Growth Potential уздовж тіла ─────────────────────────────────
 
 /**
- * Потенціал росту бічної поверхні: пік у нижній/середній частині тіла
- * (кристали нуклеюються біля основ і стиків, не на вістрях) — щільна
- * зростаюча маса замість «гілок на гілках».
+ * Потенціал росту бічної поверхні: пік БІЛЯ ОСНОВИ тіла (референсна друза:
+ * дочірні кристали виходять з-під підніжжя головного і тягнуться вгору) —
+ * щільний курган замість «гілок на гілках».
  */
 export function growthPotential(t: number): number {
-  const d = (t - 0.26) / 0.24;
-  return 0.22 + 0.78 * Math.exp(-d * d);
+  const d = (t - 0.14) / 0.18;
+  return 0.18 + 0.82 * Math.exp(-d * d);
+}
+
+/** Тяжіння до «ґрунту» маси: місця біля рівня основи різко привабливіші —
+ *  друза росте від підніжжя вгору, а не поверхами. */
+export function groundTerm(y: number): number {
+  return 1 / (1 + Math.max(0, y + 0.3) * 2.2);
 }
 
 // ── Local Density і Growth Shadow ────────────────────────────────
@@ -286,6 +292,7 @@ export function scoreGrowthSite(
     domainAffinity(ctx, event, point) *
     compactness(point) *
     silhouetteAnisotropy(ctx, point) *
-    centerPull(point)
+    centerPull(point) *
+    groundTerm(point.y)
   );
 }

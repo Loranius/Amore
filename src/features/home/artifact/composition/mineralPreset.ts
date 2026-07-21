@@ -24,67 +24,41 @@ import {
 import type { CompositionScore } from './score';
 
 // ── Силуети (Stage 3): читабельні навіть як чорна тінь ───────────
-// envelope(alignment 0..1, horiz, y) → цільовий множник довжини ~0.7..1.15.
+// envelope(alignment 0..1, horiz, y) → цільовий множник довжини ~0.7..1.1.
+// Уся бібліотека — родина «центрального кургану» (референс: вертикальна
+// друза з головним кристалом по центру і дочірніми, що спадають висотою
+// назовні); пресети різняться лише крутизною/фланками, не типом композиції.
 
 const SILHOUETTES: SilhouettePreset[] = [
   {
-    // Вежа: одна домінантна вертикаль, все інше — п'єдестал.
+    // Вежа: стрімкий вузький курган — король різко домінує.
     id: 'tower',
     supportAxes: [
-      { azimuthOffset: 0, tilt: 0.3 },
-      { azimuthOffset: Math.PI, tilt: 0.35 },
+      { azimuthOffset: 0, tilt: 0.18 },
+      { azimuthOffset: Math.PI, tilt: 0.2 },
     ],
-    envelope: (a, horiz) => 0.78 + a * 0.32 - Math.min(0.12, horiz * 0.12),
+    envelope: (a, horiz) => 0.78 + a * 0.32 - Math.min(0.16, horiz * 0.16),
   },
   {
-    // Стріла: домінанта + два «пера» під нею з одного боку.
-    id: 'arrow',
-    supportAxes: [
-      { azimuthOffset: -0.55, tilt: 0.55 },
-      { azimuthOffset: 0.55, tilt: 0.55 },
-    ],
-    envelope: (a) => 0.8 + a * 0.3,
-  },
-  {
-    // Діамант: маса найширша в середині висоти, звужується догори й донизу.
-    id: 'diamond',
-    supportAxes: [
-      { azimuthOffset: 0, tilt: 0.65 },
-      { azimuthOffset: (Math.PI * 2) / 3, tilt: 0.65 },
-      { azimuthOffset: (Math.PI * 4) / 3, tilt: 0.65 },
-    ],
-    envelope: (a, _h, y) => (0.82 + a * 0.2) * (1 - Math.min(0.18, Math.abs(y - 0.15) * 0.35)),
-  },
-  {
-    // Каскад: висоти «сходинками» спадають в один seed-бік.
-    id: 'cascade',
-    supportAxes: [
-      { azimuthOffset: 0.5, tilt: 0.45 },
-      { azimuthOffset: 1.0, tilt: 0.7 },
-      { azimuthOffset: 1.5, tilt: 0.95 },
-    ],
-    envelope: (a, horiz) => 0.75 + a * 0.35 - Math.min(0.1, horiz * 0.08),
-  },
-  {
-    // Собор: центральний шпиль і два фланкуючі, майже вертикальні.
+    // Собор: центральний шпиль і два високі фланкуючі, майже вертикальні.
     id: 'cathedral',
     supportAxes: [
-      { azimuthOffset: -1.35, tilt: 0.28 },
-      { azimuthOffset: 1.35, tilt: 0.28 },
+      { azimuthOffset: -1.2, tilt: 0.22 },
+      { azimuthOffset: 1.2, tilt: 0.22 },
     ],
-    envelope: (a) => 0.76 + a * 0.36,
+    envelope: (a, horiz) => 0.78 + a * 0.32 - Math.min(0.1, horiz * 0.1),
   },
   {
-    // Друза: багато коротких, король лише трохи вищий — щільний «їжачок».
+    // Друза: широкий рівний курган — багато середніх, король трохи вищий.
     id: 'druse',
     supportAxes: [
-      { azimuthOffset: 0, tilt: 0.5 },
-      { azimuthOffset: (Math.PI * 2) / 5, tilt: 0.5 },
-      { azimuthOffset: (Math.PI * 4) / 5, tilt: 0.5 },
-      { azimuthOffset: (Math.PI * 6) / 5, tilt: 0.5 },
-      { azimuthOffset: (Math.PI * 8) / 5, tilt: 0.5 },
+      { azimuthOffset: 0, tilt: 0.35 },
+      { azimuthOffset: (Math.PI * 2) / 5, tilt: 0.35 },
+      { azimuthOffset: (Math.PI * 4) / 5, tilt: 0.35 },
+      { azimuthOffset: (Math.PI * 6) / 5, tilt: 0.35 },
+      { azimuthOffset: (Math.PI * 8) / 5, tilt: 0.35 },
     ],
-    envelope: (a) => 0.72 + a * 0.18,
+    envelope: (a, horiz) => 0.76 + a * 0.22 - Math.min(0.08, horiz * 0.08),
   },
 ];
 
