@@ -24,7 +24,6 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^6.26.0",
-    "simplex-noise": "^4.0.3",
     "tailwind-merge": "^2.4.0",
     "three": "^0.170.0"
   },

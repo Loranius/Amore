@@ -91,6 +91,11 @@ export const CATEGORY_DEFS: CategoryDef[] = [
   },
 ];
 
+/** Чи немає в порталі взагалі жодних даних пари — кристал ще не почав рости. */
+export function isDnaEmpty(dna: CrystalDNA): boolean {
+  return CATEGORY_DEFS.every((cat) => cat.metric(dna) <= 0);
+}
+
 export interface Facet {
   id: string;
   category: CrystalCategoryKey;

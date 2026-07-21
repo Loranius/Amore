@@ -1886,6 +1886,7 @@ a.wl-card-title { color: var(--accent); }
   animation-delay: calc(var(--facet-i) * 35ms), var(--glint-delay, 0s);
 }
 .crystal-anim-off { animation: none !important; }
+.crystal-seed { transform-box: fill-box; transform-origin: center; animation: crystal-seed-pulse 4.5s ease-in-out infinite; }
 @keyframes crystal-spin { to { transform: rotate(360deg); } }
 @keyframes crystal-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.018); } }
 @keyframes crystal-glint { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.12); } }
@@ -1893,8 +1894,12 @@ a.wl-card-title { color: var(--accent); }
   from { opacity: 0; transform: scale(0.3); }
   to { opacity: 1; transform: scale(1); }
 }
+@keyframes crystal-seed-pulse {
+  0%, 100% { opacity: 0.72; transform: scale(1); }
+  50% { opacity: 0.95; transform: scale(1.05); }
+}
 @media (prefers-reduced-motion: reduce) {
-  .crystal-spin, .crystal-breathe, .crystal-facet { animation: none !important; }
+  .crystal-spin, .crystal-breathe, .crystal-facet, .crystal-seed { animation: none !important; }
 }
 
 /* Смужка статистики під кристалом */

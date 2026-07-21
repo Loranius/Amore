@@ -14,12 +14,13 @@ import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useCrystalDNA } from './useCrystal';
 import { useCrystalSeen } from './useCrystalSeen';
-import { buildFacets, CATEGORY_DEFS, type Facet } from './crystalGeometry';
+import { buildFacets, CATEGORY_DEFS, isDnaEmpty, type Facet } from './crystalGeometry';
 import { CrystalStats } from './CrystalStats';
 import { PlacesModal } from './PlacesModal';
 
 export function Crystal() {
   const { dna, isPending } = useCrystalDNA();
+  const empty = !isPending && isDnaEmpty(dna);
   const facets = useMemo(() => buildFacets(dna), [dna]);
   const [open, setOpen] = useState(false);
   const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending);
@@ -46,6 +47,10 @@ export function Crystal() {
               <stop offset="0%" stopColor="#fff7ea" />
               <stop offset="100%" stopColor="#f6c9da" />
             </radialGradient>
+            <radialGradient id="crystal-grad-seed" cx="40%" cy="35%" r="70%">
+              <stop offset="0%" stopColor="#fffbe6" />
+              <stop offset="100%" stopColor="#f3dfa0" />
+            </radialGradient>
             {CATEGORY_DEFS.map((c) => (
               <radialGradient key={c.key} id={`crystal-grad-${c.key}`} cx="30%" cy="30%" r="80%">
                 <stop offset="0%" stopColor={c.colorA} />
@@ -53,26 +58,36 @@ export function Crystal() {
               </radialGradient>
             ))}
           </defs>
-          <g className={cn('crystal-spin', reduceMotion && 'crystal-anim-off')}>
-            <g className={cn('crystal-breathe', reduceMotion && 'crystal-anim-off')}>
-              {facets.map((f, i) => (
-                <polygon
-                  key={f.id}
-                  points={f.points}
-                  fill={`url(#${f.fillId})`}
-                  className={cn(
-                    'crystal-facet',
-                    !reduceMotion && isNewFacet(f) && 'crystal-facet--enter',
-                    reduceMotion && 'crystal-anim-off',
-                  )}
-                  style={{
-                    ['--facet-i' as string]: i,
-                    ['--glint-delay' as string]: `${(i % 9) * 0.6}s`,
-                  }}
-                />
-              ))}
+          {empty ? (
+            <circle
+              cx="100"
+              cy="100"
+              r="42"
+              fill="url(#crystal-grad-seed)"
+              className={cn('crystal-seed', reduceMotion && 'crystal-anim-off')}
+            />
+          ) : (
+            <g className={cn('crystal-spin', reduceMotion && 'crystal-anim-off')}>
+              <g className={cn('crystal-breathe', reduceMotion && 'crystal-anim-off')}>
+                {facets.map((f, i) => (
+                  <polygon
+                    key={f.id}
+                    points={f.points}
+                    fill={`url(#${f.fillId})`}
+                    className={cn(
+                      'crystal-facet',
+                      !reduceMotion && isNewFacet(f) && 'crystal-facet--enter',
+                      reduceMotion && 'crystal-anim-off',
+                    )}
+                    style={{
+                      ['--facet-i' as string]: i,
+                      ['--glint-delay' as string]: `${(i % 9) * 0.6}s`,
+                    }}
+                  />
+                ))}
+              </g>
             </g>
-          </g>
+          )}
         </svg>
       </button>
 
