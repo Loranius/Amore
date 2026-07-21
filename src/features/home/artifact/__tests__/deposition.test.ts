@@ -197,10 +197,10 @@ describe('депозиція мінеральної маси', () => {
   it('Evolution Memory: наступного місяця та сама ідентичність, лише доросліша', () => {
     const base = build(makeInput());
 
-    // +40 днів: годинник і daysTogether ростуть синхронно (як у житті),
-    // дати записів БД незмінні.
-    vi.setSystemTime(new Date(NOW.getTime() + 40 * 86_400_000));
-    const later = build(makeInput({ usage: { ...makeInput().usage, daysTogether: 540 } }));
+    // +100 днів: годинник і daysTogether ростуть синхронно (як у житті),
+    // дати записів БД незмінні (перетинаємо межу core-інтервалу 70 днів).
+    vi.setSystemTime(new Date(NOW.getTime() + 100 * 86_400_000));
+    const later = build(makeInput({ usage: { ...makeInput().usage, daysTogether: 600 } }));
     const laterByKey = byKey(later);
 
     for (const node of base) {
@@ -219,9 +219,9 @@ describe('депозиція мінеральної маси', () => {
       // асимптотична крива, тому нестрого).
       expect(grown.maturity).toBeGreaterThanOrEqual(node.maturity);
     }
-    // Час народив нове bedrock-відкладення (500/40=13 → 540/40=14).
-    expect(laterByKey.has('core-13')).toBe(true);
-    // Головний кристал росте рівномірно з днями разом: за 40 днів — вищий.
+    // Час народив нове bedrock-відкладення (floor(500/70)+1=8 → floor(600/70)+1=9).
+    expect(laterByKey.has('core-8')).toBe(true);
+    // Головний кристал росте рівномірно з днями разом: за 100 днів — вищий.
     const kingBefore = base.find((n) => n.primary)!;
     const kingAfter = laterByKey.get(kingBefore.key)!;
     expect(kingAfter.growthScale).toBeGreaterThan(kingBefore.growthScale);

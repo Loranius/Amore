@@ -58,8 +58,10 @@ const CRYSTAL_CONSTRAINTS: CrystalConstraints = {
   // кристали чіпляються на різній висоті й розходяться віялом, а не
   // збиваються в одну колону.
   siteTMin: 0.04,
-  siteTMax: 0.55,
-  burial: 0.55,
+  siteTMax: 0.5,
+  // Менше поховання — тіла НЕ тонуть одне в одному в суцільний ком; видно
+  // окремі шпилі з проміжками (референс — кристали, а не оплавлена брила).
+  burial: 0.4,
   // Кристал не росте вниз, але друза — це ВІЯЛО спрямованих шпилів під
   // різними кутами, а не пучок вертикалей: мінімальна вертикаль низька,
   // діагоналі часті. Саме це дає органічний «сплеск», а не моноліт.
@@ -67,29 +69,31 @@ const CRYSTAL_CONSTRAINTS: CrystalConstraints = {
   minUpwardRare: 0.2,
   diagonalChance: 0.28,
   coloniesEnabled: true,
+  // Менше колоній (було вдвічі більше): супутники збивали композицію в
+  // кущ; кілька окремих шпилів читаються як кристали краще за клуб.
   colonyChance: {
-    core: 0.12,
-    country: 0.45,
-    city: 0.35,
-    milestone: 0.45,
-    goal: 0.25,
-    anniversary: 0.25,
-    creation: 0.25,
-    memory: 0.25,
-    wish: 0.2,
+    core: 0.08,
+    country: 0.22,
+    city: 0.18,
+    milestone: 0.25,
+    goal: 0.12,
+    anniversary: 0.12,
+    creation: 0.12,
+    memory: 0.12,
+    wish: 0.1,
   },
-  colonyShareBoost: 0.25,
-  colonyMaxChance: 0.55,
+  colonyShareBoost: 0.15,
+  colonyMaxChance: 0.35,
   // Головний кристал — виразно найбільший, АЛЕ один шпиль серед друзи, а не
-  // моноліт: помірна довжина (≈1.6 у зрілої пари), струнка призма (не колона),
-  // і кілька сусідів дозволено сягати ~80% його висоти (високі бічні шпилі).
-  monarch: { baseLength: 0.95, lengthGain: 0.75, growthDays: 1200, radiusBoost: 1.2, heightCeiling: 0.82 },
+  // моноліт: помірна довжина (≈1.6 у зрілої пари), струнка призма (не колона).
+  monarch: { baseLength: 0.95, lengthGain: 0.75, growthDays: 1200, radiusBoost: 1.05, heightCeiling: 0.82 },
   // М'який профіль кургану: бічні шпилі лишаються ВИСОКИМИ (друза-віяло, не
   // конус, що прибиває все навколо центру до землі).
   moundFalloff: (horiz) => 0.62 + 0.38 / (1 + horiz * 1.4),
   heightDamp: (anchorY) => 1 / (1 + 0.5 * Math.max(0, anchorY + 0.1)),
+  // Стрункіші тіла — шпилі, не самоцвіти-галька.
   slenderness: 8,
-  monarchSlenderness: 7,
+  monarchSlenderness: 6.5,
 };
 
 /** Внутрішній стан виду (§13) — описовий, для UI/телеметрії/майбутніх

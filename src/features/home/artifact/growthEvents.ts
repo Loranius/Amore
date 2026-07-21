@@ -87,12 +87,14 @@ export interface DepositionStream {
 const age = (date: string): number => Math.max(0, daysBetween(date));
 
 // ── bedrock: core + доменні baseline, породжені часом разом ─────
-const CORE_INTERVAL_DAYS = 40;
-const MAX_CORE_BRANCHES = 22;
+// Менше стрижневих тіл (було 40дн/22): 22 коротких core-кристали збивались
+// у щільний ком у центрі. Тепер їх ~10 — серце друзи, а не блоб.
+const CORE_INTERVAL_DAYS = 70;
+const MAX_CORE_BRANCHES = 10;
 const BASELINE_INTERVAL_DAYS = 260;
-// 2 (було 3): амбіентний трикл лишається, але композиція «дихає» — менше
-// дрібних тіл, що конкурують за увагу.
-const MAX_BASELINE_PER_DOMAIN = 2;
+// 1 (було 3→2): лише натяк на присутність кожного домену — композиція має
+// «дихати» окремими шпилями, а не збиватись у щільну масу.
+const MAX_BASELINE_PER_DOMAIN = 1;
 
 const DOMAIN_IDS: GrowthDomainId[] = ['exploration', 'memory', 'connection', 'creation', 'future'];
 const BASELINE_KIND: Record<GrowthDomainId, NodeKind> = {
@@ -166,8 +168,8 @@ function buildBedrockStream(daysTogether: number): DepositionStream {
 
 // ── Стріми даних ─────────────────────────────────────────────────
 
-const MAX_COUNTRY_BRANCHES = 6;
-const MAX_CITY_BRANCHES = 10;
+const MAX_COUNTRY_BRANCHES = 5;
+const MAX_CITY_BRANCHES = 7;
 
 function buildPlaceStream(
   id: string,
@@ -175,8 +177,10 @@ function buildPlaceStream(
   kind: 'country' | 'city',
 ): DepositionStream {
   const cap = kind === 'country' ? MAX_COUNTRY_BRANCHES : MAX_CITY_BRANCHES;
-  const [lengthMin, lengthRange] = kind === 'country' ? [1.9, 0.7] : [1.05, 0.5];
-  const [radiusMin, radiusRange] = kind === 'country' ? [0.3, 0.12] : [0.16, 0.08];
+  // Стрункі шпилі-супутники короля, а не товсті блоки, вищі за нього
+  // (було country 1.9×0.3 — тіло, товще й вище за монарха).
+  const [lengthMin, lengthRange] = kind === 'country' ? [1.1, 0.4] : [0.8, 0.35];
+  const [radiusMin, radiusRange] = kind === 'country' ? [0.15, 0.06] : [0.1, 0.045];
   // Ранг у стрімі: (перший візит, назва) — у CrystalPlace немає id БД.
   const events = [...places.slice(0, cap)]
     .sort((a, b) => a.firstVisit.localeCompare(b.firstVisit) || a.name.localeCompare(b.name))

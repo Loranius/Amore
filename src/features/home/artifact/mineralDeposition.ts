@@ -230,7 +230,8 @@ function depositMineral(
   // помітну масивність — сильна варіація пропорцій замість клонів.
   const girthDraw = rng();
   const bigKind = event.kind === 'core' || event.kind === 'country' || event.kind === 'milestone';
-  const girth = Math.max(bigKind ? 0.8 : 0.65, 0.65 + girthDraw * girthDraw * 1.3);
+  // Стрункіше: менший розкид обхвату — тіла-шпилі, не роздуті самоцвіти.
+  const girth = Math.max(bigKind ? 0.7 : 0.55, 0.55 + girthDraw * girthDraw * 0.75);
   rawRadius *= girth;
   if (isMonarch) {
     // Головний кристал росте РІВНОМІРНО з кількістю днів разом: висота —

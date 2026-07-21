@@ -273,7 +273,7 @@ function silhouetteAnisotropy(ctx: GrowthFieldContext, point: Vec3): number {
  *  збивається в одну колону замість віяла окремих шпилів. */
 function centerPull(point: Vec3): number {
   const horizSq = point.x * point.x + point.z * point.z;
-  return 1 + 0.28 * Math.exp(-horizSq / 0.5);
+  return 1 + 0.12 * Math.exp(-horizSq / 0.5);
 }
 
 export function scoreGrowthSite(
