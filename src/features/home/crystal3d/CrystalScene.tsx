@@ -108,7 +108,7 @@ export default function CrystalScene() {
         aria-label="Кристал Amore — показати відвідані місця"
         onKeyDown={onKeyDownOpen}
       >
-        <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 3.4], fov: 42 }}>
+        <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 6.5], fov: 42 }}>
           <ambientLight intensity={0.5} />
           <directionalLight position={[3, 4, 2]} intensity={1.1} />
           <pointLight position={[-3, -2, -2]} intensity={0.4} color="#e6a0bd" />
