@@ -1,18 +1,26 @@
 // ============================================================
 // crystalCluster — Crystal-специфічний рендер-шар «Artifact Engine».
 // ------------------------------------------------------------
-// Уся процедурна логіка (де росте вузол, з якою датою, скільки їх) тепер
+// Уся геологічна логіка (де відклалось тіло, з якою датою, скільки їх)
 // живе в ../artifact/ і не знає про THREE/Lathe-геометрію взагалі. Цей файл
 // — єдиний адаптер: deriveClusterBranch перекладає абстрактний ArtifactNode
-// (theta/phi/distance/verticalJitter) у Crystal-конкретні Euler-кути та
-// позицію, deriveClusterMaterial перекладає EvolutionPressures у PBR-
+// (anchor/direction у просторі рушія) у Crystal-конкретні позицію та
+// кватерніон, deriveClusterMaterial перекладає EvolutionPressures у PBR-
 // параметри матеріалу. Навмисно функція-адаптер, а не `extends`/успадкування
 // — так ClusterBranch не може непомітно "просочити" crystal-специфічні поля
 // назад у спільний ArtifactNode-контракт.
 // ============================================================
 import * as THREE from 'three';
 import { mulberry32, hashSeedString } from '../mulberry32';
-import type { ArtifactDNA, ArtifactNode, DominantSystem, EvolutionPressures, GrowthDomainId, NodeKind } from '../artifact';
+import type {
+  ArtifactDNA,
+  ArtifactNode,
+  ColonyRole,
+  DominantSystem,
+  EvolutionPressures,
+  GrowthDomainId,
+  NodeKind,
+} from '../artifact';
 
 export interface ClusterBranch {
   key: string;
@@ -25,15 +33,19 @@ export interface ClusterBranch {
   posX: number;
   posY: number;
   posZ: number;
-  tiltX: number;
-  tiltZ: number;
-  rotY: number;
+  /** Орієнтація тіла: локальна вісь Y меша → напрямок росту + власний spin. */
+  quatX: number;
+  quatY: number;
+  quatZ: number;
+  quatW: number;
   colorA: string;
   colorB: string;
   breathePhase: number;
   breatheSpeed: number;
   /** 0 (щойно з'явився) .. ~1 (давно росте) — див. maturityCurve(). */
   maturity: number;
+  /** Роль у колонії — супутники рендеряться простіше (менше сегментів). */
+  role: ColonyRole;
   /** Золоте світіння для milestone-вузлів. */
   emissive?: boolean;
 }
@@ -58,28 +70,14 @@ const CREATION_PALETTE: Record<CreationSourceLabel, [string, string]> = {
 };
 
 /**
- * Спільна коренева зона друзи — низько, ближче до дна композиції; ВСІ
- * гілки «сидять» тут своєю основою (лише невеликий per-kind джиттер, не
- * розкид по всьому об'єму), а тягнуться вгору/назовні вже через нахил
- * (phi) і довжину (growthScale) — так само, як росте справжній кристалічний
- * друз із єдиної матриці, а не бризки навсібіч.
+ * Вертикальний зсув усієї маси в сцені: рушій кладе ядро-нуклеус біля
+ * y≈-0.6 власного простору, тож композиція вже «сидить» низько — тут лише
+ * дрібне вирівнювання під камеру/орбіту (стара коренева зона мала базу на
+ * ROOT_Y=-0.34; нове дно маси лягає приблизно туди ж).
  */
-const ROOT_Y = -0.34;
+const CLUSTER_Y = 0.08;
 
-/** Дрібний джиттер основи всередині кореневої зони (verticalJitter → posY),
- *  per-kind — «core» лишається найтіснішим, доменні супутники трохи
- *  вільніші (природна нерівність матриці), але завжди мала величина. */
-const ROOT_JITTER: Record<NodeKind, number> = {
-  core: 0.05,
-  country: 0.1,
-  city: 0.1,
-  milestone: 0.09,
-  goal: 0.1,
-  anniversary: 0.1,
-  creation: 0.11,
-  memory: 0.11,
-  wish: 0.12,
-};
+const UP = new THREE.Vector3(0, 1, 0);
 
 function basePalette(node: ArtifactNode): [string, string] {
   if (node.kind === 'creation') {
@@ -99,17 +97,30 @@ export function applyFamilyHue(hex: string, hueRotationDeg: number): string {
 }
 
 /**
- * Переклад абстрактного вузла в Crystal-конкретну гілку: theta/phi/distance
- * (сферичні, "куди росте") → posX/posY/posZ + tiltX/tiltZ (Euler, "як лежить
- * Lathe-меш"). Golden milestone-колір НЕ обертається hueRotation — це
- * навмисно фіксований, впізнаваний бейдж «великої події» для будь-якої пари.
+ * Переклад абстрактного вузла в Crystal-конкретну гілку: anchor/direction
+ * (простір рушія, «де на масі відклалось і куди росте») → позиція +
+ * кватерніон «вісь Y меша ↦ напрямок росту» з обертом spin навколо власної
+ * осі — точний setFromUnitVectors, без Euler-гімнастики. Golden milestone-
+ * колір НЕ обертається hueRotation — це навмисно фіксований, впізнаваний
+ * бейдж «великої події» для будь-якої пари. Затінені конкуренцією тіла
+ * (growthEnergy < 1) тьмяніші: верхній колір градієнта присідає до
+ * базового — Growth Shadow видно й у кольорі, не лише в розмірі.
  */
 export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): ClusterBranch {
   const [baseA, baseB] = basePalette(node);
   const keepFixed = node.kind === 'milestone';
   const colorA = keepFixed ? baseA : applyFamilyHue(baseA, dna.hueRotation);
-  const colorB = keepFixed ? baseB : applyFamilyHue(baseB, dna.hueRotation);
-  const jitter = ROOT_JITTER[node.kind];
+  let colorB = keepFixed ? baseB : applyFamilyHue(baseB, dna.hueRotation);
+  if (node.growthEnergy < 1) {
+    const dulled = new THREE.Color(colorB).lerp(new THREE.Color(colorA), (1 - node.growthEnergy) * 0.45);
+    colorB = `#${dulled.getHexString()}`;
+  }
+
+  const quat = new THREE.Quaternion().setFromUnitVectors(
+    UP,
+    new THREE.Vector3(node.direction.x, node.direction.y, node.direction.z).normalize(),
+  );
+  quat.multiply(new THREE.Quaternion().setFromAxisAngle(UP, node.spin));
 
   return {
     key: node.key,
@@ -118,17 +129,19 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
     ...(node.label !== undefined ? { label: node.label } : {}),
     height: node.growthScale,
     radiusBottom: node.massScale,
-    posX: Math.cos(node.theta) * node.distance,
-    posY: ROOT_Y + node.verticalJitter * jitter,
-    posZ: Math.sin(node.theta) * node.distance,
-    tiltX: Math.sin(node.theta) * node.phi,
-    tiltZ: -Math.cos(node.theta) * node.phi,
-    rotY: node.spin,
+    posX: node.anchor.x,
+    posY: CLUSTER_Y + node.anchor.y,
+    posZ: node.anchor.z,
+    quatX: quat.x,
+    quatY: quat.y,
+    quatZ: quat.z,
+    quatW: quat.w,
     colorA,
     colorB,
     breathePhase: node.breathePhase,
     breatheSpeed: node.breatheSpeed,
     maturity: node.maturity,
+    role: node.role,
     ...(node.emphasized !== undefined ? { emissive: node.emphasized } : {}),
   };
 }
@@ -143,6 +156,8 @@ export interface ClusterMaterial {
    *  — саме це спричиняло білий фон на реальних пристроях (CrystalScene.tsx). */
   roughness: number;
   clearcoat: number;
+  /** Фото → стадія полірування: гамує per-facet джиттер граней (buildBranchGeometry). */
+  polish: number;
   /** Рецепти → теплий відтінок (Warmth Pressure). */
   warmthMix: number;
   /** Фільми → внутрішні кольорові переливи. */
@@ -165,6 +180,7 @@ export function deriveClusterMaterial(pressures: EvolutionPressures): ClusterMat
   return {
     roughness: Math.max(0.06, 0.32 - pressures.refinement * 0.216),
     clearcoat: Math.min(0.95, 0.55 + pressures.refinement * 0.36),
+    polish: pressures.refinement,
     warmthMix: pressures.warmth,
     movieMix: pressures.movieMix,
     glow: pressures.luminosity,
@@ -198,14 +214,18 @@ export function tintBranchColors(
 // молода гілка — тупіша/тонша/коротша, зріла — гостра/товста/повна).
 export function buildBranchGeometry(
   branch: ClusterBranch,
-  material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix' | 'surfaceComplexity'>,
+  material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix' | 'surfaceComplexity' | 'polish'>,
 ): THREE.BufferGeometry {
   const shapeRng = mulberry32(hashSeedString(branch.key));
   // 7-11 граней — мінімум навмисно 6+ (гексагон+ читається однозначно
   // «кристал», не довільний багатокутник), верхня межа піднята для помітно
   // багатшої полігональності. Книги («складність поверхні») додають шанс
-  // на зайву грань понад базові 7–10.
-  const segments = 7 + Math.floor(shapeRng() * 4) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+  // на зайву грань понад базові 7–10. Супутники колоній — дрібні й численні,
+  // тому дешевші: 5-6 граней (перф на мобільних GPU).
+  const segments =
+    branch.role === 'satellite'
+      ? 5 + Math.floor(shapeRng() * 2)
+      : 7 + Math.floor(shapeRng() * 4) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
   const m = branch.maturity;
 
   const h = branch.height * (0.32 + m * 0.68);
@@ -271,7 +291,10 @@ export function buildBranchGeometry(
     // а не стрибати випадково.
     if (row !== 0 && row !== profileLen - 1) {
       const jitterRng = mulberry32(hashSeedString(`${branch.key}:jitter:${facetIdx}:${row}`));
-      const j = 0.92 + jitterRng() * 0.16; // ±8% — природна нерівність грані
+      // ±8% — природна нерівність грані; «Фото → Polishing Pressure» гамує
+      // її (стадія полірування життєвого циклу — грані вирівнюються).
+      const amp = 0.08 * (1 - material.polish * 0.6);
+      const j = 1 + (jitterRng() * 2 - 1) * amp;
       pos.setXYZ(i, pos.getX(i) * j, pos.getY(i), pos.getZ(i) * j);
     }
   }
