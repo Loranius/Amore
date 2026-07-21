@@ -12,7 +12,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Sparkles, MeshTransmissionMaterial } from '@react-three/drei';
+import { OrbitControls, Sparkles, MeshTransmissionMaterial, Environment, Lightformer } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import type * as THREE from 'three';
 import {
@@ -98,13 +98,13 @@ function Branch({ branch, geometry, material, reduceMotion, useTransmission, onO
           transmissionSampler
           transmission={1}
           thickness={0.6}
-          roughness={branch.emissive ? 0.1 : 0.04}
+          roughness={branch.emissive ? 0.08 : 0.02}
           ior={1.6}
-          chromaticAberration={0.06}
-          anisotropicBlur={0.3}
-          distortion={0.15}
-          distortionScale={0.3}
-          temporalDistortion={0.1}
+          chromaticAberration={0.25}
+          anisotropicBlur={0.4}
+          distortion={0.4}
+          distortionScale={0.4}
+          temporalDistortion={0.15}
           clearcoat={branch.emissive ? 0.9 : material.clearcoat}
           clearcoatRoughness={0.06}
           emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
@@ -348,6 +348,18 @@ export default function CrystalScene() {
           <ambientLight intensity={0.5} />
           <directionalLight position={[3, 4, 2]} intensity={1.1} />
           <pointLight position={[-3, -2, -2]} intensity={0.4} color="#e6a0bd" />
+          {/* Заломлення (MeshTransmissionMaterial) гне те, що ПОЗАДУ об'єкта —
+              без цього тут лише рівний рожевий фон, тож ефект технічно працює,
+              але візуально непомітний («просто звичайна модель»). Ця
+              процедурна (без зовнішніх HDRI-файлів) підсвітка лише годує
+              заломлення/відбиття кольором — на видимий рожевий фон сторінки
+              не впливає (background={false}). */}
+          <Environment resolution={128} background={false}>
+            <Lightformer form="ring" color="#ffd9a8" intensity={6} scale={5} position={[2.5, 1.2, -2]} />
+            <Lightformer form="ring" color="#7fd8d1" intensity={5} scale={4} position={[-2.5, -1, -1.5]} />
+            <Lightformer form="rect" color="#e8b23d" intensity={4} scale={[4, 1.5, 1]} position={[0, 3, -1]} />
+            <Lightformer form="rect" color="#ffffff" intensity={3} scale={[2, 2, 1]} position={[0, 0.5, 3]} rotation={[0, Math.PI, 0]} />
+          </Environment>
           {!isPending &&
             (empty ? (
               <CrystalSeed reduceMotion={reduceMotion} />
