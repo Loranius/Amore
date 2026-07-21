@@ -176,11 +176,12 @@ function valueNoise(seedNum: number, p: Vec3): number {
   return acc;
 }
 
-/** 0.4..1.6 — локальна «напруга поверхні»: де їй високо, там мінерал охочіше відкладається. */
+/** 0.3..1.8 — локальна «напруга поверхні»: де їй високо, там мінерал охочіше
+ *  відкладається. Контраст навмисно різкий — саме він лишає «мертві зони». */
 export function surfaceStress(seedNum: number, point: Vec3): number {
   const n1 = valueNoise(seedNum, scale(point, STRESS_FREQ));
   const n2 = valueNoise(seedNum, add(scale(point, STRESS_FREQ * 2.7), v3(11.7, 5.3, 8.9)));
-  return 0.4 + 1.2 * (n1 * 0.65 + n2 * 0.35);
+  return 0.3 + 1.5 * (n1 * 0.65 + n2 * 0.35);
 }
 
 // ── Growth Potential уздовж тіла ─────────────────────────────────
@@ -231,6 +232,11 @@ export interface GrowthFieldContext {
   substrate: readonly DepositedCrystal[];
   /** Центроїд середин тіл субстрату — «звідки» міряється expansion. */
   centroid: Vec3;
+  /** Азимутальна анізотропія друзи (проти «морської зірки»): два протилежні
+   *  напрямки стиснені, перпендикулярні — розкриті. Раз назавжди з seed
+   *  (реєстр: +hash('anisotropy')). */
+  anisoAzimuth: number;
+  anisoAmp: number;
 }
 
 export function makeFieldContext(
@@ -244,7 +250,10 @@ export function makeFieldContext(
     for (const c of substrate) centroid = add(centroid, bodyMid(c));
     centroid = scale(centroid, 1 / substrate.length);
   }
-  return { seedNum, dna, field, substrate, centroid };
+  const anisoRng = mulberry32(seedNum + hashSeedString('anisotropy'));
+  const anisoAzimuth = anisoRng() * Math.PI * 2;
+  const anisoAmp = 0.35 + anisoRng() * 0.2;
+  return { seedNum, dna, field, substrate, centroid, anisoAzimuth, anisoAmp };
 }
 
 /**
@@ -301,6 +310,22 @@ function compactness(point: Vec3): number {
   return 1 / (1 + Math.max(0, lengthOf(point) - 1.25) * 2.4);
 }
 
+/** Анізотропія силуету: cos(2·Δaz) стискає два протилежні азимути, лишаючи
+ *  «важкий» нерівний профіль замість рівномірної зірки. Біля осі — нейтрально. */
+function silhouetteAnisotropy(ctx: GrowthFieldContext, point: Vec3): number {
+  const horiz = Math.hypot(point.x, point.z);
+  if (horiz < 0.08) return 1;
+  const az = Math.atan2(point.z, point.x);
+  const squeeze = 0.5 + 0.5 * Math.cos(2 * (az - ctx.anisoAzimuth));
+  return 1 - Math.min(1, horiz / 0.3) * ctx.anisoAmp * squeeze;
+}
+
+/** Доцентрове тяжіння: серце друзи щільне, назовні — поступово легше. */
+function centerPull(point: Vec3): number {
+  const horizSq = point.x * point.x + point.z * point.z;
+  return 1 + 0.55 * Math.exp(-horizSq / 0.45);
+}
+
 export function scoreGrowthSite(
   ctx: GrowthFieldContext,
   event: DepositionEvent,
@@ -317,6 +342,8 @@ export function scoreGrowthSite(
     densityTerm *
     growthEnergyAt(point, ctx.substrate) *
     domainAffinity(ctx, event, point) *
-    compactness(point)
+    compactness(point) *
+    silhouetteAnisotropy(ctx, point) *
+    centerPull(point)
   );
 }
