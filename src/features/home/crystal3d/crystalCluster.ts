@@ -220,12 +220,26 @@ export function buildBranchGeometry(
   const { colorA, colorB } = tintBranchColors(branch, material);
   const c = new THREE.Color();
 
+  // Легка per-facet варіація тону (справжній мінерал не має ідеально рівного
+  // забарвлення грані до грані — тонкі домішки/включення). Тон фіксований на
+  // всю грань (не на вершину), тому разом із flatShading (Branch у
+  // CrystalScene.tsx) кожна грань читається як окрема, відмінна від сусідньої
+  // — це і прибирає «картонний» ефект гладкого суцільного градієнта.
+  const facetTints = Array.from({ length: segments }, (_, idx) => {
+    const tintRng = mulberry32(hashSeedString(`${branch.key}:facet:${idx}`));
+    return 0.82 + tintRng() * 0.36;
+  });
+  const facetStep = (Math.PI * 2) / segments;
+
   for (let i = 0; i < pos.count; i++) {
     const t = h > 0 ? pos.getY(i) / h : 0;
     c.lerpColors(colorA, colorB, Math.min(1, Math.max(0, t)));
-    colors[i * 3] = c.r;
-    colors[i * 3 + 1] = c.g;
-    colors[i * 3 + 2] = c.b;
+    const angle = Math.atan2(pos.getZ(i), pos.getX(i));
+    const facetIdx = Math.round(((angle + Math.PI * 2) % (Math.PI * 2)) / facetStep) % segments;
+    const tint = facetTints[facetIdx]!;
+    colors[i * 3] = c.r * tint;
+    colors[i * 3 + 1] = c.g * tint;
+    colors[i * 3 + 2] = c.b * tint;
   }
 
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
