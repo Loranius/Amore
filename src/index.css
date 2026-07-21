@@ -1891,6 +1891,7 @@ a.wl-card-title { color: var(--accent); }
 
 /* Кристал — SVG, анімація чисто CSS (без per-frame JS-рендеру). */
 .crystal-wrap {
+  position: relative;
   display: block;
   width: min(78vw, 320px);
   aspect-ratio: 1;
@@ -1899,6 +1900,35 @@ a.wl-card-title { color: var(--accent); }
   background: transparent;
   padding: 0;
   cursor: pointer;
+}
+/* Кнопка перегенерації — поруч із кристалом (нижній правий кут сцени). */
+.crystal-regen {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #c15a86;
+  box-shadow: 0 2px 8px rgba(193, 90, 134, 0.22);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.crystal-regen:hover { background: #fff; transform: scale(1.06); }
+.crystal-regen:active { transform: scale(0.94); }
+.crystal-regen:active svg { transform: rotate(-90deg); transition: transform 0.3s ease; }
+.crystal-regen--reset {
+  right: 50px;
+  font-size: 20px;
+  line-height: 1;
 }
 .crystal-svg { width: 100%; height: 100%; overflow: visible; }
 .crystal-spin { transform-origin: 100px 100px; animation: crystal-spin 140s linear infinite; }

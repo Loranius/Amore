@@ -54,12 +54,18 @@ export interface CrystalConstraints {
 }
 
 const CRYSTAL_CONSTRAINTS: CrystalConstraints = {
-  siteTMin: 0.03,
-  siteTMax: 0.42,
-  burial: 0.62,
-  minUpwardMain: 0.82,
-  minUpwardRare: 0.55,
-  diagonalChance: 0.14,
+  // Нуклеація вздовж більшої частини тіла (не лише біля основи) — дочірні
+  // кристали чіпляються на різній висоті й розходяться віялом, а не
+  // збиваються в одну колону.
+  siteTMin: 0.04,
+  siteTMax: 0.55,
+  burial: 0.55,
+  // Кристал не росте вниз, але друза — це ВІЯЛО спрямованих шпилів під
+  // різними кутами, а не пучок вертикалей: мінімальна вертикаль низька,
+  // діагоналі часті. Саме це дає органічний «сплеск», а не моноліт.
+  minUpwardMain: 0.42,
+  minUpwardRare: 0.2,
+  diagonalChance: 0.28,
   coloniesEnabled: true,
   colonyChance: {
     core: 0.12,
@@ -74,11 +80,16 @@ const CRYSTAL_CONSTRAINTS: CrystalConstraints = {
   },
   colonyShareBoost: 0.25,
   colonyMaxChance: 0.55,
-  monarch: { baseLength: 1.15, lengthGain: 1.5, growthDays: 1200, radiusBoost: 1.5, heightCeiling: 0.9 },
-  moundFalloff: (horiz) => 0.34 + 0.66 / (1 + horiz * 2.3),
+  // Головний кристал — виразно найбільший, АЛЕ один шпиль серед друзи, а не
+  // моноліт: помірна довжина (≈1.6 у зрілої пари), струнка призма (не колона),
+  // і кілька сусідів дозволено сягати ~80% його висоти (високі бічні шпилі).
+  monarch: { baseLength: 0.95, lengthGain: 0.75, growthDays: 1200, radiusBoost: 1.2, heightCeiling: 0.82 },
+  // М'який профіль кургану: бічні шпилі лишаються ВИСОКИМИ (друза-віяло, не
+  // конус, що прибиває все навколо центру до землі).
+  moundFalloff: (horiz) => 0.62 + 0.38 / (1 + horiz * 1.4),
   heightDamp: (anchorY) => 1 / (1 + 0.5 * Math.max(0, anchorY + 0.1)),
-  slenderness: 7.5,
-  monarchSlenderness: 5.5,
+  slenderness: 8,
+  monarchSlenderness: 7,
 };
 
 /** Внутрішній стан виду (§13) — описовий, для UI/телеметрії/майбутніх

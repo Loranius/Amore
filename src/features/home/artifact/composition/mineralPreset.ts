@@ -31,34 +31,36 @@ import type { CompositionScore } from './score';
 
 const SILHOUETTES: SilhouettePreset[] = [
   {
-    // Вежа: стрімкий вузький курган — король різко домінує.
-    id: 'tower',
+    // Віяло: центральний шпиль і кілька бічних, що явно розходяться —
+    // органічний «сплеск» кристалів (референс: золоті шпилі веером).
+    id: 'fan',
     supportAxes: [
-      { azimuthOffset: 0, tilt: 0.18 },
-      { azimuthOffset: Math.PI, tilt: 0.2 },
+      { azimuthOffset: -0.7, tilt: 0.7 },
+      { azimuthOffset: 0.5, tilt: 0.55 },
+      { azimuthOffset: 1.5, tilt: 0.8 },
     ],
-    envelope: (a, horiz) => 0.78 + a * 0.32 - Math.min(0.16, horiz * 0.16),
+    envelope: (a, horiz) => 0.82 + a * 0.28 - Math.min(0.12, horiz * 0.12),
   },
   {
-    // Собор: центральний шпиль і два високі фланкуючі, майже вертикальні.
+    // Собор: центральний шпиль і два високі фланкуючі під помірним кутом.
     id: 'cathedral',
     supportAxes: [
-      { azimuthOffset: -1.2, tilt: 0.22 },
-      { azimuthOffset: 1.2, tilt: 0.22 },
+      { azimuthOffset: -1.15, tilt: 0.5 },
+      { azimuthOffset: 1.15, tilt: 0.5 },
     ],
-    envelope: (a, horiz) => 0.78 + a * 0.32 - Math.min(0.1, horiz * 0.1),
+    envelope: (a, horiz) => 0.8 + a * 0.3 - Math.min(0.1, horiz * 0.1),
   },
   {
-    // Друза: широкий рівний курган — багато середніх, король трохи вищий.
+    // Друза: широкий розкидистий кущ шпилів на всі боки.
     id: 'druse',
     supportAxes: [
-      { azimuthOffset: 0, tilt: 0.35 },
-      { azimuthOffset: (Math.PI * 2) / 5, tilt: 0.35 },
-      { azimuthOffset: (Math.PI * 4) / 5, tilt: 0.35 },
-      { azimuthOffset: (Math.PI * 6) / 5, tilt: 0.35 },
-      { azimuthOffset: (Math.PI * 8) / 5, tilt: 0.35 },
+      { azimuthOffset: 0, tilt: 0.65 },
+      { azimuthOffset: (Math.PI * 2) / 5, tilt: 0.6 },
+      { azimuthOffset: (Math.PI * 4) / 5, tilt: 0.7 },
+      { azimuthOffset: (Math.PI * 6) / 5, tilt: 0.55 },
+      { azimuthOffset: (Math.PI * 8) / 5, tilt: 0.65 },
     ],
-    envelope: (a, horiz) => 0.76 + a * 0.22 - Math.min(0.08, horiz * 0.08),
+    envelope: (a, horiz) => 0.78 + a * 0.24 - Math.min(0.08, horiz * 0.08),
   },
 ];
 

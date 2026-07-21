@@ -289,14 +289,15 @@ describe('депозиція мінеральної маси', () => {
       if (n.key === monarch.key) continue;
       expect(n.growthScale, `${n.key} вищий за монарха`).toBeLessThanOrEqual(monarch.growthScale * 0.91);
     }
-    // Точно по центру і практично вертикальний — головний кристал друзи
-    // (референс: центральна колона, з-під основи якої росте решта).
+    // Точно по центру і практично вертикальний — головний кристал друзи.
     expect(Math.hypot(monarch.anchor.x, monarch.anchor.z)).toBeLessThan(0.15);
-    expect(monarch.direction.y).toBeGreaterThan(0.95);
-    // Дочірні кристали тягнуться вгору: майже всі близькі до вертикалі
-    // (виняток — базовий мікропил і рідкісні діагональні тіла).
-    const upright = nodes.filter((n) => n.direction.y >= 0.55).length;
-    expect(upright / nodes.length).toBeGreaterThan(0.85);
+    expect(monarch.direction.y).toBeGreaterThan(0.9);
+    // Друза — ВІЯЛО шпилів: кристали розходяться під різними кутами, але
+    // жоден не росте вниз («кристал не росте вниз», Species constraint).
+    for (const n of nodes) expect(n.direction.y, `${n.key} росте вниз`).toBeGreaterThan(0);
+    // Водночас це не пучок вертикалей: є відчутний розкид нахилів (віяло).
+    const leaned = nodes.filter((n) => n.direction.y < 0.85).length;
+    expect(leaned / nodes.length, 'занадто вертикально — знову моноліт').toBeGreaterThan(0.15);
   });
 
   it('публічний псевдонім buildArtifactNodes — те саме відкладення', () => {
