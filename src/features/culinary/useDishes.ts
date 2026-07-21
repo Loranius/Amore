@@ -24,7 +24,7 @@ import type {
 async function loadDishes(): Promise<DishRow[]> {
   const { data, error } = await supabase
     .from('dishes')
-    .select('id,title,category,recipe,created_by')
+    .select('id,title,category,recipe,created_by,created_at')
     .order('id', { ascending: false });
   if (error) throw error;
   return (data ?? []).map((d) => ({

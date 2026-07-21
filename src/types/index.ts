@@ -142,6 +142,7 @@ export interface MediaItemRow {
   comment_dima: string | null;
   comment_lena: string | null;
   created_by: number | null;
+  created_at: string;
 }
 
 /** PK — композитний (user_id, tmdb_id): upsert з onConflict: 'user_id,tmdb_id'. */
@@ -278,6 +279,7 @@ export interface MapPinRow {
   review: string | null;
   city: string | null;
   created_by: number | null;
+  created_at: string;
 }
 
 /** Архів чекінів (останні 24 год). */
@@ -322,6 +324,7 @@ export interface DishRow {
   category: DishCategory;
   recipe: Recipe | null;
   created_by: number | null;
+  created_at: string;
 }
 
 // ────────────────────────────────────────────────────────────

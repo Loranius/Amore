@@ -20,7 +20,7 @@ const BUCKET = 'map-photos';
 async function fetchPins(): Promise<MapPinRow[]> {
   const { data, error } = await supabase
     .from('map_pins')
-    .select('id,title,note,category,lat,lng,photo_url,rating,review,city,created_by')
+    .select('id,title,note,category,lat,lng,photo_url,rating,review,city,created_by,created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
@@ -101,7 +101,7 @@ export function useMapPinMutations() {
       }
       const { data: fresh } = await supabase
         .from('map_pins')
-        .select('id,title,note,category,lat,lng,photo_url,rating,review,city,created_by')
+        .select('id,title,note,category,lat,lng,photo_url,rating,review,city,created_by,created_at')
         .eq('id', data.id)
         .single();
       return fresh ?? null;

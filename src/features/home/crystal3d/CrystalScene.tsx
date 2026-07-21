@@ -123,7 +123,7 @@ function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
 }
 
 export default function CrystalScene() {
-  const { dna, isPending } = useCrystalDNA();
+  const { dna, deltas, isPending } = useCrystalDNA();
   const empty = !isPending && isDnaEmpty(dna);
   const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending);
   const [open, setOpen] = useState(false);
@@ -181,7 +181,7 @@ export default function CrystalScene() {
         </Canvas>
       </div>
 
-      <CrystalStats dna={dna} isPending={isPending} />
+      <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />
 
       {open && <PlacesModal onClose={() => setOpen(false)} />}
     </>

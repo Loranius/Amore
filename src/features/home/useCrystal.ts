@@ -27,6 +27,15 @@ export interface CrystalDNA {
   recipesSaved: number;
 }
 
+/** Дельти «за цей місяць» — лише там, де це можна порахувати чесно. */
+export interface CrystalDeltas {
+  wishesDoneThisMonth: number;
+  placesThisMonth: number;
+  moviesWatchedThisMonth: number;
+  booksReadThisMonth: number;
+  recipesSavedThisMonth: number;
+}
+
 const EMPTY_DNA: CrystalDNA = {
   daysTogether: 0,
   photos: 0,
@@ -39,7 +48,25 @@ const EMPTY_DNA: CrystalDNA = {
   recipesSaved: 0,
 };
 
-export function useCrystalDNA(): { dna: CrystalDNA; isPending: boolean; isError: boolean } {
+const EMPTY_DELTAS: CrystalDeltas = {
+  wishesDoneThisMonth: 0,
+  placesThisMonth: 0,
+  moviesWatchedThisMonth: 0,
+  booksReadThisMonth: 0,
+  recipesSavedThisMonth: 0,
+};
+
+function isThisMonth(dateStr: string, now: Date): boolean {
+  const d = new Date(dateStr);
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+}
+
+export function useCrystalDNA(): {
+  dna: CrystalDNA;
+  deltas: CrystalDeltas;
+  isPending: boolean;
+  isError: boolean;
+} {
   const startDate = useStartDate();
   const photos = usePhotoPool();
   const pins = useMapPins();
@@ -90,5 +117,22 @@ export function useCrystalDNA(): { dna: CrystalDNA; isPending: boolean; isError:
     dishes.data,
   ]);
 
-  return { dna, isPending, isError };
+  const deltas = useMemo<CrystalDeltas>(() => {
+    if (isPending) return EMPTY_DELTAS;
+    const now = new Date();
+    return {
+      wishesDoneThisMonth: wishStats.data?.doneThisMonth ?? 0,
+      placesThisMonth: (pins.data ?? []).filter((p) => isThisMonth(p.created_at, now)).length,
+      moviesWatchedThisMonth: [...(movies.data ?? []), ...(series.data ?? [])].filter(
+        (m) => m.status === 'done' && isThisMonth(m.created_at, now),
+      ).length,
+      booksReadThisMonth: (books.data ?? []).filter(
+        (b) => b.status === 'done' && isThisMonth(b.created_at, now),
+      ).length,
+      recipesSavedThisMonth: (dishes.data ?? []).filter((d) => isThisMonth(d.created_at, now)).length,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPending, pins.data, movies.data, series.data, books.data, wishStats.data, dishes.data]);
+
+  return { dna, deltas, isPending, isError };
 }

@@ -19,7 +19,7 @@ async function loadItems(type: MediaType): Promise<MediaItemRow[]> {
   const { data, error } = await supabase
     .from('media_items')
     .select(
-      'id,type,title,status,poster_url,rating_dima,rating_lena,comment_dima,comment_lena,created_by',
+      'id,type,title,status,poster_url,rating_dima,rating_lena,comment_dima,comment_lena,created_by,created_at',
     )
     .eq('type', type);
   if (error) throw error;

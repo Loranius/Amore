@@ -19,7 +19,7 @@ import { CrystalStats } from './CrystalStats';
 import { PlacesModal } from './PlacesModal';
 
 export function Crystal() {
-  const { dna, isPending } = useCrystalDNA();
+  const { dna, deltas, isPending } = useCrystalDNA();
   const empty = !isPending && isDnaEmpty(dna);
   const facets = useMemo(() => buildFacets(dna), [dna]);
   const [open, setOpen] = useState(false);
@@ -91,7 +91,7 @@ export function Crystal() {
         </svg>
       </button>
 
-      <CrystalStats dna={dna} isPending={isPending} />
+      <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />
 
       {open && <PlacesModal onClose={() => setOpen(false)} />}
     </>
