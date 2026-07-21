@@ -425,10 +425,38 @@ function microPass(bodies: ComposedBody[], seedNum: number, config: CompositionC
     const mrng = keyedRng(seedNum, `micro:${parent.key}`);
     const n = 1 + Math.floor(mrng() * config.micro.maxPerParent);
     const [u, w] = perpendicularBasis(parent.direction);
+    // «Тріщина»: азимут до найближчого іншого великого тіла — стик двох
+    // кристалів, куди справжня мікродруза й набивається. Детермінований
+    // вибір (відстань, tie-break за ключем).
+    let crackAngle: number | null = null;
+    {
+      let best: ComposedBody | null = null;
+      let bestD = Infinity;
+      for (const other of parents) {
+        if (other === parent) continue;
+        const ddx = other.anchor.x - parent.anchor.x;
+        const ddy = other.anchor.y - parent.anchor.y;
+        const ddz = other.anchor.z - parent.anchor.z;
+        const d = ddx * ddx + ddy * ddy + ddz * ddz;
+        if (d < bestD - 1e-12 || (Math.abs(d - bestD) <= 1e-12 && best !== null && other.key < best.key)) {
+          bestD = d;
+          best = other;
+        }
+      }
+      if (best !== null) {
+        const toN = v3(best.anchor.x - parent.anchor.x, 0, best.anchor.z - parent.anchor.z);
+        if (toN.x * toN.x + toN.z * toN.z > 1e-9) {
+          crackAngle = Math.atan2(dot(toN, w), dot(toN, u));
+        }
+      }
+    }
     for (let i = 0; i < n && micro.length < config.micro.globalCap; i++) {
       // Строго біля основи батька — мікродруза «обліплює» підніжжя.
       const t = 0.03 + mrng() * 0.12;
-      const angle = mrng() * Math.PI * 2;
+      const angleDraw = mrng() * Math.PI * 2;
+      // Перший мікрокристал кожного батька росте В ТРІЩИНІ (стик із
+      // найближчим сусідом), решта — вільно довкола основи.
+      const angle = i === 0 && crackAngle !== null ? crackAngle + (angleDraw / Math.PI - 1) * 0.3 : angleDraw;
       const side = add(scale(u, Math.cos(angle)), scale(w, Math.sin(angle)));
       const surface = add(add(parent.anchor, scale(parent.direction, t * parent.length)), scale(side, bodyRadiusAt(parent.radius, t)));
       const [lenMin, lenMax] = config.micro.lengthRange;
@@ -475,6 +503,19 @@ function runPipeline(input: readonly CompositionBody[], seedNum: number, config:
   competitionPass(bodies, strength);
   massPass(bodies, original);
   colonyPass(bodies);
+  // Узгодження ієрархії розмірів: «виточене» тіло (компаньйон архетипу)
+  // ніколи не переростає свого батька — той міг вкоротитись пізнішими
+  // проходами (конкуренція/силует) уже після спавну компаньйона.
+  const finalByKey = new Map(bodies.map((b) => [b.key, b]));
+  for (const b of bodies) {
+    // Правдоподібні пропорції: довге тіло не буває голкою-волосиною —
+    // стрункість обмежена й ПІСЛЯ архетипів (needle лишається струнким,
+    // але в межах мінералогічно віригідного).
+    if (b.role !== 'micro' && b.length > 0.6) b.radius = Math.max(b.radius, b.length / 8);
+    if (b.parentKey === undefined) continue;
+    const parent = finalByKey.get(b.parentKey);
+    if (parent) b.length = Math.min(b.length, parent.length * 0.85);
+  }
   const removed = densityPass(bodies, seedNum, config, strength);
   // Каскад поховання: тіло, «виточене» з похованого (компаньйон/мікро),
   // ховається разом із батьком — жодних осиротілих плавунів.

@@ -235,17 +235,18 @@ export function buildBranchGeometry(
   material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix' | 'surfaceComplexity' | 'polish'>,
 ): THREE.BufferGeometry {
   const shapeRng = mulberry32(hashSeedString(branch.key));
-  // 7-11 граней — мінімум навмисно 6+ (гексагон+ читається однозначно
-  // «кристал», не довільний багатокутник), верхня межа піднята для помітно
-  // багатшої полігональності. Книги («складність поверхні») додають шанс
-  // на зайву грань понад базові 7–10. Супутники колоній — дрібні й численні,
+  // Великі тіла — ВЕЛИКІ чисті грані (референс: кварцовий гексагон, 6-7
+  // граней — кожна читається площиною); середні — 7-9 (+шанс зайвої від
+  // «складності поверхні»/книг); супутники колоній — дрібні й численні,
   // тому дешевші: 5-6 граней; мікрошар — 4-5 (перф на мобільних GPU).
   const segments =
     branch.role === 'micro'
       ? 4 + Math.floor(shapeRng() * 2)
       : branch.role === 'satellite'
         ? 5 + Math.floor(shapeRng() * 2)
-        : 7 + Math.floor(shapeRng() * 4) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+        : branch.radiusBottom > 0.22
+          ? 6 + Math.floor(shapeRng() * 2)
+          : 7 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
   const m = branch.maturity;
 
   const h = branch.height * (0.32 + m * 0.68);
