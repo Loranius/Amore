@@ -129,6 +129,17 @@ function kite(innerR: number, midR: number, outerR: number, angle: number, halfW
   return pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
 }
 
+/** Трапецієподібна грань (кільцевий сегмент) — виглядає як справжня огранка, не «шип». */
+function wedge(innerR: number, outerR: number, angleStart: number, angleEnd: number): string {
+  const pts = [
+    polar(innerR, angleStart),
+    polar(outerR, angleStart),
+    polar(outerR, angleEnd),
+    polar(innerR, angleEnd),
+  ];
+  return pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+}
+
 // Фіксоване 8-гранне ядро — завжди присутнє, однакове для кожної пари
 // (символ «дні разом»), не залежить від ДНК.
 const BASE_SEED_FACETS: Facet[] = Array.from({ length: 8 }, (_, i) => {
@@ -142,24 +153,30 @@ const BASE_SEED_FACETS: Facet[] = Array.from({ length: 8 }, (_, i) => {
   };
 });
 
+// Кожна нова грань у категорії — це концентричне кільце навколо ядра
+// (шар за шаром, як росте справжній кристал), а не тонкий промінь —
+// сектор категорії лишається широким на всю свою дугу.
+const ARC_GAP = 3;
+const RING_STEP = 9;
+const RING_DEPTH = 9;
+
 /** Будує повний набір граней кристала з ДНК пари. Детерміновано за (категорія, слот). */
 export function buildFacets(dna: CrystalDNA): Facet[] {
   const facets: Facet[] = [...BASE_SEED_FACETS];
   CATEGORY_DEFS.forEach((cat, catIdx) => {
     const count = cat.facetsFor(cat.metric(dna));
-    const arcStart = catIdx * ARC;
-    const slotArc = ARC / MAX_SLOTS;
+    const arcStart = catIdx * ARC + ARC_GAP / 2;
+    const arcEnd = (catIdx + 1) * ARC - ARC_GAP / 2;
     for (let i = 0; i < count; i++) {
       const rng = mulberry32(catIdx * 1000 + i);
-      const angle = arcStart + (i + 0.5) * slotArc + (rng() - 0.5) * slotArc * 0.3;
-      const outerR = CORE_R + 20 + i * 16 + rng() * 8;
-      const midR = CORE_R + 8 + i * 14 + rng() * 6;
-      const halfWidth = slotArc * (0.3 + rng() * 0.15);
+      const jitterA = (rng() - 0.5) * 2.5;
+      const innerR = CORE_R + i * RING_STEP + (rng() - 0.5) * 2;
+      const outerR = innerR + RING_DEPTH + rng() * 3;
       facets.push({
         id: `${cat.key}-${i}`,
         category: cat.key,
         slotIndex: i,
-        points: kite(CORE_R * 0.5, midR, outerR, angle, halfWidth),
+        points: wedge(innerR, outerR, arcStart + jitterA, arcEnd + jitterA),
         fillId: `crystal-grad-${cat.key}`,
       });
     }
