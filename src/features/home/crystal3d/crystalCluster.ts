@@ -57,18 +57,28 @@ const CREATION_PALETTE: Record<CreationSourceLabel, [string, string]> = {
   book: ['#6b4fa8', '#cbb8f0'],
 };
 
-/** Об'ємний розкид по висоті (verticalJitter → posY) — per-kind, «core» лишається
- *  компактним центром маси, доменні супутники розкидані ширше (не плаский диск). */
-const VERTICAL_SPREAD: Record<NodeKind, number> = {
-  core: 0.5,
-  country: 0.9,
-  city: 0.85,
-  milestone: 0.8,
-  goal: 0.85,
-  anniversary: 0.85,
-  creation: 0.9,
-  memory: 0.9,
-  wish: 0.9,
+/**
+ * Спільна коренева зона друзи — низько, ближче до дна композиції; ВСІ
+ * гілки «сидять» тут своєю основою (лише невеликий per-kind джиттер, не
+ * розкид по всьому об'єму), а тягнуться вгору/назовні вже через нахил
+ * (phi) і довжину (growthScale) — так само, як росте справжній кристалічний
+ * друз із єдиної матриці, а не бризки навсібіч.
+ */
+const ROOT_Y = -0.34;
+
+/** Дрібний джиттер основи всередині кореневої зони (verticalJitter → posY),
+ *  per-kind — «core» лишається найтіснішим, доменні супутники трохи
+ *  вільніші (природна нерівність матриці), але завжди мала величина. */
+const ROOT_JITTER: Record<NodeKind, number> = {
+  core: 0.05,
+  country: 0.1,
+  city: 0.1,
+  milestone: 0.09,
+  goal: 0.1,
+  anniversary: 0.1,
+  creation: 0.11,
+  memory: 0.11,
+  wish: 0.12,
 };
 
 function basePalette(node: ArtifactNode): [string, string] {
@@ -99,7 +109,7 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
   const keepFixed = node.kind === 'milestone';
   const colorA = keepFixed ? baseA : applyFamilyHue(baseA, dna.hueRotation);
   const colorB = keepFixed ? baseB : applyFamilyHue(baseB, dna.hueRotation);
-  const spread = VERTICAL_SPREAD[node.kind];
+  const jitter = ROOT_JITTER[node.kind];
 
   return {
     key: node.key,
@@ -109,7 +119,7 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
     height: node.growthScale,
     radiusBottom: node.massScale,
     posX: Math.cos(node.theta) * node.distance,
-    posY: node.verticalJitter * spread,
+    posY: ROOT_Y + node.verticalJitter * jitter,
     posZ: Math.sin(node.theta) * node.distance,
     tiltX: Math.sin(node.theta) * node.phi,
     tiltZ: -Math.cos(node.theta) * node.phi,

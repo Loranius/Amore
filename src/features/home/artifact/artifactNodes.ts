@@ -12,6 +12,17 @@
 // біля краю клину) — суто косметичний шар поверх цієї вже безумовної
 // гарантії, не колізійна фізика.
 //
+// «Друза, не вибух» — реальні кристалічні друзи (кварц/аметист) НЕ ростуть
+// сферичним вибухом навсібіч: усі кристали нуклеюються на спільній тісній
+// кореневій ділянці (одна матриця), і звідти вже ростуть угору й назовні —
+// той, кому дісталось найкраще місце (центр), росте найвищим і найрівнішим
+// («core» — головний стовбур), а сусідні кристали, змагаючись за простір,
+// віялом відхиляються тим більше, чим ближче до краю. Тому тут `distance`
+// означає НЕ «як далеко розташована основа гілки від центру» (як було
+// раніше — це й давало хаотичний розкид), а «наскільки тісно основа сидить
+// у спільній кореневій зоні» — завжди мала; сам «розмах» назовні дає нахил
+// (phi) і довжина (growthScale), так само як у справжньому кристалі.
+//
 // Реєстр seed-офсетів (щоб нові додавання не колізували з існуючими):
 //   +5100 + i*173        — core-гілка i
 //   +7789 + id*97         — milestone
@@ -64,7 +75,9 @@ function placeInDomain(
   const distFromStart = theta - start;
   const distFromEnd = start + WEDGE_WIDTH - theta;
   const edgeProximity = 1 - Math.min(distFromStart, distFromEnd) / (WEDGE_WIDTH / 2);
-  const phi = rng() * dampedMax + edgeProximity * 0.25;
+  // Кут нахилу обмежено ~80° — навіть найпериферійніший супутник у справжній
+  // друзі ще росте «вгору-вбік», а не вниз чи горизонтально.
+  const phi = Math.min(1.4, rng() * dampedMax + edgeProximity * 0.25);
   return { theta, phi, edgeProximity };
 }
 
@@ -139,14 +152,16 @@ function buildCoreBranches(
     const rng = mulberry32(seedNum + 5100 + i * 173);
     const birthDay = i * CORE_INTERVAL_DAYS;
     const maturity = maturityCurve(daysTogether - birthDay);
-    const { theta, phi } = computeLean(rng, 0.95, dna, symmetry, pressures.stability, i, count);
-    const distance = 0.04 + rng() * 0.2; // тісно скупчені — стовбур кластера, не віночок
+    // Головний стовбур — найбільш вертикальний (реальний домінантний кристал
+    // друзи, що дістав найкраще місце для нуклеації, росте найпрямішим).
+    const { theta, phi } = computeLean(rng, 0.4, dna, symmetry, pressures.stability, i, count);
+    const distance = 0.03 + rng() * 0.1; // спільна коренева зона — тісно, не віночок
 
     nodes.push({
       key: `core-${i}`,
       kind: 'core',
       domain: null,
-      growthScale: 0.6 + rng() * 1.0,
+      growthScale: 0.75 + rng() * 1.15,
       massScale: 0.06 + rng() * 0.07,
       theta,
       phi,
@@ -175,16 +190,19 @@ function buildPlaceBranches(
   const cap = kind === 'country' ? MAX_COUNTRY_BRANCHES : MAX_CITY_BRANCHES;
   const [growthMin, growthRange] = kind === 'country' ? [1.9, 0.7] : [1.05, 0.5];
   const [massMin, massRange] = kind === 'country' ? [0.3, 0.12] : [0.16, 0.08];
-  const [distMin, distRange] = kind === 'country' ? [0.28, 0.18] : [0.4, 0.22];
-  const maxTilt = kind === 'country' ? 0.55 : 0.75;
+  const [distMin, distRange] = kind === 'country' ? [0.04, 0.1] : [0.05, 0.09];
+  const maxTilt = kind === 'country' ? 0.7 : 0.85;
   const sliced = places.slice(0, cap);
 
   return sliced.map(({ name, firstVisit }) => {
     const rng = mulberry32(seedNum + hashSeedString(`${kind}:${name}`));
     const maturity = maturityCurve(daysBetween(firstVisit), kind === 'country' ? 30 : 22);
     const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'exploration', maxTilt, pressures.stability);
-    // «Подорожі → Expansion Pressure»: реальний структурний ефект — ширший радіус.
-    const distance = (distMin! + rng() * distRange! + pressures.expansion * 0.15) * (1 - edgeProximity * 0.15);
+    const distance = (distMin! + rng() * distRange!) * (1 - edgeProximity * 0.15);
+    // «Подорожі → Expansion Pressure»: реальний структурний ефект — гілка
+    // тягнеться далі НАЗОВНІ (більший нахил), а не основа розповзається
+    // від спільної кореневої зони.
+    const expandedPhi = Math.min(1.4, phi + pressures.expansion * 0.3);
 
     return {
       key: `${kind}-${name}`,
@@ -194,7 +212,7 @@ function buildPlaceBranches(
       growthScale: growthMin! + rng() * growthRange!,
       massScale: massMin! + rng() * massRange!,
       theta,
-      phi,
+      phi: expandedPhi,
       distance,
       verticalJitter: rng() * 2 - 1,
       spin: rng() * Math.PI * 2,
@@ -218,8 +236,8 @@ function buildMilestoneBranches(
   return sliced.map((m) => {
     const rng = mulberry32(seedNum + 7789 + m.id * 97);
     const maturity = maturityCurve(daysBetween(m.date), 6); // одразу вагомі, лиш трохи «доростають»
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'connection', 0.5, pressures.stability);
-    const distance = (0.48 + rng() * 0.2) * (1 - edgeProximity * 0.15);
+    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'connection', 0.55, pressures.stability);
+    const distance = (0.05 + rng() * 0.09) * (1 - edgeProximity * 0.15);
 
     return {
       key: `milestone-${m.id}`,
@@ -252,8 +270,8 @@ function buildConnectionExtras(
     items.map((item) => {
       const rng = mulberry32(seedNum + seedBase + item.id * 41);
       const maturity = maturityCurve(daysBetween(item.date), 20);
-      const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'connection', 0.65, pressures.stability);
-      const distance = (0.42 + rng() * 0.18) * (1 - edgeProximity * 0.15);
+      const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'connection', 0.8, pressures.stability);
+      const distance = (0.04 + rng() * 0.08) * (1 - edgeProximity * 0.15);
       return {
         key: `${kind}-${item.id}`,
         kind,
@@ -288,8 +306,8 @@ function buildMemoryBranches(
   return buckets.map(({ index, repDate }) => {
     const rng = mulberry32(seedNum + hashSeedString('memory') + index * 71);
     const maturity = maturityCurve(daysBetween(repDate), 14);
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'memory', 0.7, pressures.stability);
-    const distance = (0.35 + rng() * 0.2) * (1 - edgeProximity * 0.15);
+    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'memory', 0.85, pressures.stability);
+    const distance = (0.04 + rng() * 0.08) * (1 - edgeProximity * 0.15);
 
     return {
       key: `memory-bucket-${index}`,
@@ -325,8 +343,8 @@ function buildCreationSource(
   return buckets.map(({ index, repDate }) => {
     const rng = mulberry32(seedNum + hashSeedString(`creation:${source}`) + index * 83);
     const maturity = maturityCurve(daysBetween(repDate), 16);
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'creation', 0.7, pressures.stability);
-    const distance = (0.35 + rng() * 0.2) * (1 - edgeProximity * 0.15);
+    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'creation', 0.85, pressures.stability);
+    const distance = (0.04 + rng() * 0.08) * (1 - edgeProximity * 0.15);
 
     return {
       key: `creation-${source}-bucket-${index}`,
@@ -377,8 +395,8 @@ function buildWishBranches(
   return sliced.map((w) => {
     const rng = mulberry32(seedNum + 3311 + w.id * 53);
     const maturity = maturityCurve(daysBetween(w.fulfilledAt), 10); // маленька подія — дозріває швидко
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'future', 0.85, pressures.stability);
-    const distance = (0.35 + rng() * 0.25) * (1 - edgeProximity * 0.15);
+    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'future', 0.95, pressures.stability);
+    const distance = (0.04 + rng() * 0.09) * (1 - edgeProximity * 0.15);
 
     return {
       key: `wish-${w.id}`,
@@ -399,8 +417,12 @@ function buildWishBranches(
 }
 
 // ── «Жоден домен ніколи повністю не мовчить» — амбіентний трикл ──
-const BASELINE_INTERVAL_DAYS = 180;
-const MAX_BASELINE_PER_DOMAIN = 6;
+// Це НЕ окремі конкуруючі шипи, а дрібна кристалічна «текстура» самої
+// кореневої зони (як нерівна матриця біля основи справжньої друзи) — тому
+// тісно (мала distance), низько (мала growthScale) і, свідомо, небагато
+// (щоб не забивати реальні дані), рідше (довший інтервал).
+const BASELINE_INTERVAL_DAYS = 260;
+const MAX_BASELINE_PER_DOMAIN = 3;
 const BASELINE_KIND: Record<GrowthDomainId, NodeKind> = {
   exploration: 'city',
   memory: 'memory',
@@ -431,15 +453,15 @@ function buildDomainBaseline(
     const rng = mulberry32(seedNum + hashSeedString(`baseline:${domain}`) + i * 61);
     const birthDay = i * BASELINE_INTERVAL_DAYS;
     const maturity = maturityCurve(daysTogether - birthDay, 45);
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, domain, 0.6, pressures.stability);
-    const distance = (0.3 + rng() * 0.15) * (1 - edgeProximity * 0.15);
+    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, domain, 0.9, pressures.stability);
+    const distance = (0.02 + rng() * 0.05) * (1 - edgeProximity * 0.15);
 
     nodes.push({
       key: `baseline-${domain}-${i}`,
       kind: BASELINE_KIND[domain],
       domain,
-      growthScale: 0.35 + rng() * 0.25,
-      massScale: 0.08 + rng() * 0.05,
+      growthScale: 0.16 + rng() * 0.12,
+      massScale: 0.06 + rng() * 0.04,
       theta,
       phi,
       distance,
