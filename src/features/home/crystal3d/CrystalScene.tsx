@@ -12,7 +12,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Sparkles, MeshTransmissionMaterial, Environment, Lightformer } from '@react-three/drei';
+import { OrbitControls, Sparkles, Environment, Lightformer } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import type * as THREE from 'three';
 import {
@@ -47,7 +47,6 @@ interface BranchProps {
   geometry: THREE.BufferGeometry;
   material: ClusterMaterial;
   reduceMotion: boolean;
-  useTransmission: boolean;
   onOpen: () => void;
 }
 
@@ -61,12 +60,18 @@ interface BranchProps {
  * додатковий, слабший luminosity-підсвіт (§4 левітації — світіння ядра
  * замінює світіння вже видаленої кам'яної основи).
  *
- * `useTransmission`: справжнє заломлення світла (MeshTransmissionMaterial)
- * коштує окремого рендеру всієї сцени в текстуру НА КОЖЕН інстанс щокадру —
- * тому це лише для головного стовбура й milestone-вузлів (CrystalCluster
- * вирішує, кому саме), а не для всіх ~40-70 гілок кластера.
+ * `transmission` НАВМИСНО завжди 0 — THREE.WebGLRenderer вмикає окремий
+ * "transmission render pass" (WebGLRenderer.js: renderTransmissionPass) для
+ * ВСІЄЇ сцени, щойно бодай один матеріал має transmission>0, і цей прохід
+ * жорстко підставляє `setClearColor(0xffffff, 0.5)` замість прозорого
+ * clear, коли поточний clearAlpha<1 (як у нас, alpha:true canvas) —
+ * підтверджено в коді three.js. Саме це й давало суцільний білий
+ * прямокутник на реальних пристроях (не відтворювалось на headless
+ * Chromium цієї сесії, але зникло разом із transmission). «Скляний»
+ * вигляд лишається через високий clearcoat/низький roughness/
+ * envMapIntensity — тобто відбиття, не заломлення.
  */
-function Branch({ branch, geometry, material, reduceMotion, useTransmission, onOpen }: BranchProps) {
+function Branch({ branch, geometry, material, reduceMotion, onOpen }: BranchProps) {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
   useFrame((state) => {
@@ -87,48 +92,20 @@ function Branch({ branch, geometry, material, reduceMotion, useTransmission, onO
       rotation={[branch.tiltX, branch.rotY, branch.tiltZ]}
       onClick={onOpen}
     >
-      {useTransmission ? (
-        // transmissionSampler=true делегує заломлення в рідний, ОДИН-НА-СЦЕНУ
-        // механізм THREE.WebGLRenderer (той самий, що вже безпечно працює в
-        // звичайному meshPhysicalMaterial нижче) — власний per-інстанс
-        // FBO-рендер MeshTransmissionMaterial конфліктував з EffectComposer/
-        // Bloom (спостережено як повністю чорний кадр на одному з ракурсів).
-        <MeshTransmissionMaterial
-          vertexColors
-          flatShading
-          envMapIntensity={1.4}
-          transmissionSampler
-          transmission={1}
-          thickness={0.6}
-          roughness={branch.emissive ? 0.08 : 0.02}
-          ior={1.6}
-          chromaticAberration={0.25}
-          anisotropicBlur={0.4}
-          distortion={0.4}
-          distortionScale={0.4}
-          temporalDistortion={0.15}
-          clearcoat={branch.emissive ? 0.9 : material.clearcoat}
-          clearcoatRoughness={0.06}
-          emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
-          emissiveIntensity={branch.emissive ? 0.4 : coreGlow}
-        />
-      ) : (
-        <meshPhysicalMaterial
-          vertexColors
-          flatShading
-          envMapIntensity={1.4}
-          roughness={branch.emissive ? 0.15 : material.roughness}
-          metalness={branch.emissive ? 0.1 : 0}
-          transmission={branch.emissive ? 0.15 : material.transmission}
-          thickness={0.6}
-          clearcoat={branch.emissive ? 0.9 : material.clearcoat}
-          clearcoatRoughness={0.06}
-          ior={1.6}
-          reflectivity={branch.emissive ? 0.7 : 0.6}
-          emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
-          emissiveIntensity={branch.emissive ? 0.4 : coreGlow}
-        />
-      )}
+      <meshPhysicalMaterial
+        vertexColors
+        flatShading
+        envMapIntensity={branch.emissive ? 1.8 : 1.4}
+        roughness={branch.emissive ? 0.06 : Math.max(0.04, material.roughness * 0.5)}
+        metalness={branch.emissive ? 0.1 : 0}
+        transmission={0}
+        clearcoat={branch.emissive ? 0.95 : Math.min(1, material.clearcoat + 0.25)}
+        clearcoatRoughness={0.04}
+        ior={1.6}
+        reflectivity={branch.emissive ? 0.8 : 0.7}
+        emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
+        emissiveIntensity={branch.emissive ? 0.4 : coreGlow}
+      />
     </mesh>
   );
 }
@@ -164,18 +141,6 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
     () => branches.map((branch) => ({ branch, geometry: buildBranchGeometry(branch, material) })),
     [branches, material],
   );
-
-  // Найвищий 'core'-вузол читається як головний стовбур друзи — саме йому
-  // (плюс усім milestone-вузлам) дістається дороге справжнє заломлення
-  // світла (MeshTransmissionMaterial), решта ~40-70 гілок лишається на
-  // дешевшому meshPhysicalMaterial.
-  const heroCoreKey = useMemo(() => {
-    let best: ClusterBranch | null = null;
-    for (const b of branches) {
-      if (b.kind === 'core' && (!best || b.height > best.height)) best = b;
-    }
-    return best?.key ?? null;
-  }, [branches]);
 
   useEffect(
     () => () => branchMeshes.forEach(({ geometry }) => geometry.dispose()),
@@ -217,32 +182,11 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
           geometry={geometry}
           material={material}
           reduceMotion={reduceMotion}
-          useTransmission={branch.kind === 'milestone' || branch.key === heroCoreKey}
           onOpen={onOpen}
         />
       ))}
     </group>
   );
-}
-
-/**
- * Захист прозорості канвасу — на реальному пристрої користувача фон
- * .crystal-wrap іноді ставав суцільним білим прямокутником замість
- * прозорого рожевого фону сторінки, хоча .crystal-wrap явно
- * `background: transparent`, а @react-three/fiber створює WebGLRenderer з
- * `alpha: true` за замовчуванням. Підозра — одноразовий рендер кубічної
- * камери <Environment> (frames=1) міг лишити clearColor/clearAlpha
- * рендерера зміненими без відновлення. <EffectComposer> рендерить на
- * пріоритеті 1 (@react-three/postprocessing/EffectComposer.tsx), тож
- * useFrame за замовчуванням (пріоритет 0) тут гарантовано виконується
- * РАНІШЕ — щокадру примусово повертає прозорий clearColor перед фінальним
- * композитним рендером, незалежно від того, що саме й де його зіпсувало.
- */
-function TransparencyGuard() {
-  useFrame(({ gl }) => {
-    gl.setClearColor(0x000000, 0);
-  });
-  return null;
 }
 
 /** Артефакт ще «не почав рости» — бліда жовта насінина, що чекає на перші дані. */
@@ -262,7 +206,7 @@ function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
         emissive="#fdeaa0"
         emissiveIntensity={0.25}
         roughness={0.55}
-        transmission={0.08}
+        transmission={0}
         clearcoat={0.3}
       />
     </mesh>
@@ -369,16 +313,19 @@ export default function CrystalScene() {
         onKeyDown={onKeyDownOpen}
       >
         <Canvas dpr={[1, 2]} camera={{ position: [0, 0.2, 5.4], fov: 42 }}>
-          <TransparencyGuard />
           <ambientLight intensity={0.5} />
           <directionalLight position={[3, 4, 2]} intensity={1.1} />
           <pointLight position={[-3, -2, -2]} intensity={0.4} color="#e6a0bd" />
-          {/* Заломлення (MeshTransmissionMaterial) гне те, що ПОЗАДУ об'єкта —
-              без цього тут лише рівний рожевий фон, тож ефект технічно працює,
-              але візуально непомітний («просто звичайна модель»). Ця
-              процедурна (без зовнішніх HDRI-файлів) підсвітка лише годує
-              заломлення/відбиття кольором — на видимий рожевий фон сторінки
-              не впливає (background={false}). */}
+          {/* Процедурна (без зовнішніх HDRI-файлів) підсвітка — без неї
+              позаду об'єкта лише рівний рожевий фон, тож відбиття на
+              clearcoat-гранях майже непомітні. Годує лише відбиття
+              кольором, на видимий рожевий фон сторінки не впливає
+              (background={false}); реального заломлення (material.
+              transmission) свідомо немає ніде в сцені — воно вмикає
+              власний "transmission render pass" THREE.WebGLRenderer, який
+              підставляє суцільний білий clear-колір, коли canvas
+              прозорий — саме це й спричиняло білий фон на реальних
+              пристроях. */}
           <Environment resolution={128} background={false}>
             <Lightformer form="ring" color="#ffd9a8" intensity={6} scale={5} position={[2.5, 1.2, -2]} />
             <Lightformer form="ring" color="#7fd8d1" intensity={5} scale={4} position={[-2.5, -1, -1.5]} />
