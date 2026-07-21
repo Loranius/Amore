@@ -2,9 +2,9 @@
 // CrystalScene — 3D-рендер артефакту (Three.js / React Three Fiber)
 // ------------------------------------------------------------
 // «Artifact Engine»: справжній мінеральний друз (crystalCluster.ts — рендер-
-// адаптер, ../artifact/ — renderer-agnostic процедурний рушій), що
-// ЛЕВІТУЄ без жодної видимої основи (жодного каменю/п'єдесталу — див.
-// deriveClusterBranch/буld*Domain у artifact/artifactNodes.ts). SVG
+// адаптер, ../artifact/ — renderer-agnostic геологічний симулятор
+// mineralDeposition.ts), що ЛЕВІТУЄ без жодної видимої основи (жодного
+// каменю/п'єдесталу — див. deriveClusterBranch). SVG
 // Crystal.tsx лишається фолбеком (WebGL недоступний або ця сцена впала —
 // див. CrystalErrorBoundary у HomePage.tsx) і досі на старій v1-геометрії
 // (crystalGeometry.ts) — 2D-контур не потребує переписаної процедурної
@@ -60,43 +60,38 @@ interface BranchProps {
   branch: ClusterBranch;
   geometry: THREE.BufferGeometry;
   material: ClusterMaterial;
-  reduceMotion: boolean;
+  registerMesh: (key: string, mesh: THREE.Mesh | null) => void;
   onOpen: () => void;
 }
 
 /**
- * Один вузол артефакту. Власний useFrame замість групового scale — кожен
- * вузол дихає своєю фазою/швидкістю (breathePhase/breatheSpeed), тож
- * колонія пульсує не в унісон, а органічною хвилею. Розтяг лише по Y
- * (геометрія має основу в y=0) — виглядає як «підростання», не роздування.
- * Milestone-вузли (emissive) — золоте світіння замість фото-полірування,
- * щоб читались як веха, а не черговий приріст. 'core'-вузли отримують
+ * Одне тіло мінеральної маси. Дихання анімує ЄДИНИЙ useFrame у
+ * CrystalCluster (кожне тіло — своєю фазою/швидкістю через registerMesh);
+ * раніше кожен меш тримав власний RAF-колбек — з колоніями супутників це
+ * було б ~сотня зайвих підписок щокадру. Розтяг лише по Y (геометрія має
+ * основу в y=0) — виглядає як «підростання», не роздування.
+ * Milestone-тіла (emissive) — золоте світіння замість фото-полірування,
+ * щоб читались як веха, а не черговий приріст. 'core'-тіла отримують
  * додатковий, слабший luminosity-підсвіт (§4 левітації — світіння ядра
  * замінює світіння вже видаленої кам'яної основи).
+ *
+ * Позиція+кватерніон приходять готовими з deriveClusterBranch: основа
+ * сидить трохи ПІД поверхнею свого субстрату (base burial), тож мешi
+ * навмисно перетинаються — око бачить одну зрощену мінеральну масу.
  *
  * `transmission` НАВМИСНО завжди 0 (реального заломлення в сцені немає —
  * див. заголовок файлу). «Скляний» вигляд — лише через високий clearcoat/
  * низький roughness (пряме+ambient світло, без environment map).
  */
-function Branch({ branch, geometry, material, reduceMotion, onOpen }: BranchProps) {
-  const meshRef = useRef<THREE.Mesh | null>(null);
-
-  useFrame((state) => {
-    const mesh = meshRef.current;
-    if (!mesh || reduceMotion) return;
-    const t = state.clock.elapsedTime;
-    const micro = 1 + Math.sin(t * branch.breatheSpeed + branch.breathePhase) * 0.018;
-    mesh.scale.set(1, micro, 1);
-  });
-
+function Branch({ branch, geometry, material, registerMesh, onOpen }: BranchProps) {
   const coreGlow = branch.kind === 'core' ? material.glow * 0.5 : 0;
 
   return (
     <mesh
-      ref={meshRef}
+      ref={(mesh: THREE.Mesh | null) => registerMesh(branch.key, mesh)}
       geometry={geometry}
       position={[branch.posX, branch.posY, branch.posZ]}
-      rotation={[branch.tiltX, branch.rotY, branch.tiltZ]}
+      quaternion={[branch.quatX, branch.quatY, branch.quatZ, branch.quatW]}
       onClick={onOpen}
     >
       <meshPhysicalMaterial
@@ -126,6 +121,7 @@ interface ClusterProps {
 
 function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: ClusterProps) {
   const groupRef = useRef<THREE.Group | null>(null);
+  const meshRefs = useRef(new Map<string, THREE.Mesh>());
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
   const flashDuration = useRef(1300);
@@ -141,6 +137,11 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
     flashUntil.current = performance.now() + 450;
     flashDuration.current = 450;
     flashPeak.current = 1.1;
+  };
+
+  const registerMesh = (key: string, mesh: THREE.Mesh | null) => {
+    if (mesh) meshRefs.current.set(key, mesh);
+    else meshRefs.current.delete(key);
   };
 
   const branchMeshes = useMemo(
@@ -168,6 +169,14 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
       // Левітація: артефакт повільно гойдається вгору-вниз, без жодної
       // видимої опори (§4 — «no visible foundation»).
       group.position.y = BOB_CENTER_Y + Math.sin(state.clock.elapsedTime * 0.18) * 0.12;
+      // Мікро-дихання кожного тіла (власна фаза/швидкість) — один спільний
+      // цикл замість useFrame-підписки на кожен меш (див. Branch).
+      const t = state.clock.elapsedTime;
+      for (const { branch } of branchMeshes) {
+        const mesh = meshRefs.current.get(branch.key);
+        if (!mesh) continue;
+        mesh.scale.set(1, 1 + Math.sin(t * branch.breatheSpeed + branch.breathePhase) * 0.018, 1);
+      }
     }
     const light = flashLightRef.current;
     if (light) {
@@ -187,7 +196,7 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
           branch={branch}
           geometry={geometry}
           material={material}
-          reduceMotion={reduceMotion}
+          registerMesh={registerMesh}
           onOpen={onOpen}
         />
       ))}
