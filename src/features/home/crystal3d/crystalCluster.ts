@@ -198,10 +198,11 @@ export function buildBranchGeometry(
   material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix' | 'surfaceComplexity'>,
 ): THREE.BufferGeometry {
   const shapeRng = mulberry32(hashSeedString(branch.key));
-  // 6-9 граней — мінімум навмисно 6 (не 5), бо гексагональна призма читається
-  // однозначно «кристал» (справжній кварц), а не довільний багатокутник.
-  // Книги («складність поверхні») додають шанс на зайву грань понад базові 6–8.
-  const segments = 6 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+  // 7-11 граней — мінімум навмисно 6+ (гексагон+ читається однозначно
+  // «кристал», не довільний багатокутник), верхня межа піднята для помітно
+  // багатшої полігональності. Книги («складність поверхні») додають шанс
+  // на зайву грань понад базові 7–10.
+  const segments = 7 + Math.floor(shapeRng() * 4) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
   const m = branch.maturity;
 
   const h = branch.height * (0.32 + m * 0.68);
@@ -229,6 +230,7 @@ export function buildBranchGeometry(
   const colors = new Float32Array(pos.count * 3);
   const { colorA, colorB } = tintBranchColors(branch, material);
   const c = new THREE.Color();
+  const profileLen = profile.length;
 
   // Легка per-facet варіація тону (справжній мінерал не має ідеально рівного
   // забарвлення грані до грані — тонкі домішки/включення). Тон фіксований на
@@ -239,17 +241,36 @@ export function buildBranchGeometry(
     const tintRng = mulberry32(hashSeedString(`${branch.key}:facet:${idx}`));
     return 0.82 + tintRng() * 0.36;
   });
-  const facetStep = (Math.PI * 2) / segments;
 
+  // THREE.LatheGeometry будує вершини у фіксованому порядку: зовнішній цикл
+  // по (segments+1) кутових «колонках» (остання — шов, що дублює колонку 0),
+  // внутрішній — по profile.length рядках профілю (LatheGeometry.js: `for i
+  // <= segments { for j < points.length { push vertex } }`). Тому i-та
+  // вершина = колонка Math.floor(i/profileLen), рядок i%profileLen — точний
+  // розклад, без наближення через atan2.
   for (let i = 0; i < pos.count; i++) {
+    const row = i % profileLen;
+    const col = Math.floor(i / profileLen);
+    const facetIdx = col % segments;
+
     const t = h > 0 ? pos.getY(i) / h : 0;
     c.lerpColors(colorA, colorB, Math.min(1, Math.max(0, t)));
-    const angle = Math.atan2(pos.getZ(i), pos.getX(i));
-    const facetIdx = Math.round(((angle + Math.PI * 2) % (Math.PI * 2)) / facetStep) % segments;
     const tint = facetTints[facetIdx]!;
     colors[i * 3] = c.r * tint;
     colors[i * 3 + 1] = c.g * tint;
     colors[i * 3 + 2] = c.b * tint;
+
+    // Органічний радіальний джиттер — детермінований по (facetIdx, row), тож
+    // вершина шва (col===segments) дублює точнісінько той самий джиттер, що
+    // й col===0 (facetIdx===0 в обох) — жодних щілин/тріщин у мешi. База
+    // (row 0) і вістря (останній row) лишаються без джиттера — вони мають
+    // сходитись у спільній кореневій зоні/гострій точці (artifactNodes.ts),
+    // а не стрибати випадково.
+    if (row !== 0 && row !== profileLen - 1) {
+      const jitterRng = mulberry32(hashSeedString(`${branch.key}:jitter:${facetIdx}:${row}`));
+      const j = 0.92 + jitterRng() * 0.16; // ±8% — природна нерівність грані
+      pos.setXYZ(i, pos.getX(i) * j, pos.getY(i), pos.getZ(i) * j);
+    }
   }
 
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));

@@ -225,6 +225,26 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
   );
 }
 
+/**
+ * Захист прозорості канвасу — на реальному пристрої користувача фон
+ * .crystal-wrap іноді ставав суцільним білим прямокутником замість
+ * прозорого рожевого фону сторінки, хоча .crystal-wrap явно
+ * `background: transparent`, а @react-three/fiber створює WebGLRenderer з
+ * `alpha: true` за замовчуванням. Підозра — одноразовий рендер кубічної
+ * камери <Environment> (frames=1) міг лишити clearColor/clearAlpha
+ * рендерера зміненими без відновлення. <EffectComposer> рендерить на
+ * пріоритеті 1 (@react-three/postprocessing/EffectComposer.tsx), тож
+ * useFrame за замовчуванням (пріоритет 0) тут гарантовано виконується
+ * РАНІШЕ — щокадру примусово повертає прозорий clearColor перед фінальним
+ * композитним рендером, незалежно від того, що саме й де його зіпсувало.
+ */
+function TransparencyGuard() {
+  useFrame(({ gl }) => {
+    gl.setClearColor(0x000000, 0);
+  });
+  return null;
+}
+
 /** Артефакт ще «не почав рости» — бліда жовта насінина, що чекає на перші дані. */
 function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
   const meshRef = useRef<THREE.Mesh | null>(null);
@@ -349,6 +369,7 @@ export default function CrystalScene() {
         onKeyDown={onKeyDownOpen}
       >
         <Canvas dpr={[1, 2]} camera={{ position: [0, 0.2, 5.4], fov: 42 }}>
+          <TransparencyGuard />
           <ambientLight intensity={0.5} />
           <directionalLight position={[3, 4, 2]} intensity={1.1} />
           <pointLight position={[-3, -2, -2]} intensity={0.4} color="#e6a0bd" />
