@@ -9,11 +9,25 @@
 // див. CrystalErrorBoundary у HomePage.tsx) і досі на старій v1-геометрії
 // (crystalGeometry.ts) — 2D-контур не потребує переписаної процедурної
 // анатомії.
+// ------------------------------------------------------------
+// Навмисно БЕЗ <Environment>/<Lightformer> (drei) і БЕЗ <EffectComposer>/
+// <Bloom> (@react-three/postprocessing): на реальному пристрої користувача
+// фон .crystal-wrap ставав суцільним білим прямокутником залежно від кута
+// камери (зникав лише коли дивитись знизу, де в кадрі взагалі нема
+// геометрії) — виміряно напряму по пікселях у надісланих скріншотах
+// (справжній колір сторінки ~rgb(255,244,247), «баг» — точний rgb(255,255,255)).
+// Не відтворюється в headless Chromium цієї сесії (ні npm run dev, ні
+// продакшн-білд через vite preview), тож це, найімовірніше, специфічна для
+// мобільного GPU/драйвера поведінка навколо HalfFloat-рендер-таргетів, які
+// використовують і Environment (кубічна карта), і EffectComposer (внутрішні
+// таргети) — обидва одразу прибрані як найбільш підозрілі, оскільки два
+// попередні точкові фікси (скидання clearColor щокадру; повне прибирання
+// material.transmission) НЕ допомогли. «Скляний» вигляд лишається на самих
+// PBR-параметрах (clearcoat/roughness/ior) без глобальної підсвітки ззовні.
 // ============================================================
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Sparkles, Environment, Lightformer } from '@react-three/drei';
-import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import { OrbitControls, Sparkles } from '@react-three/drei';
 import type * as THREE from 'three';
 import {
   useCrystalDNA,
@@ -60,16 +74,9 @@ interface BranchProps {
  * додатковий, слабший luminosity-підсвіт (§4 левітації — світіння ядра
  * замінює світіння вже видаленої кам'яної основи).
  *
- * `transmission` НАВМИСНО завжди 0 — THREE.WebGLRenderer вмикає окремий
- * "transmission render pass" (WebGLRenderer.js: renderTransmissionPass) для
- * ВСІЄЇ сцени, щойно бодай один матеріал має transmission>0, і цей прохід
- * жорстко підставляє `setClearColor(0xffffff, 0.5)` замість прозорого
- * clear, коли поточний clearAlpha<1 (як у нас, alpha:true canvas) —
- * підтверджено в коді three.js. Саме це й давало суцільний білий
- * прямокутник на реальних пристроях (не відтворювалось на headless
- * Chromium цієї сесії, але зникло разом із transmission). «Скляний»
- * вигляд лишається через високий clearcoat/низький roughness/
- * envMapIntensity — тобто відбиття, не заломлення.
+ * `transmission` НАВМИСНО завжди 0 (реального заломлення в сцені немає —
+ * див. заголовок файлу). «Скляний» вигляд — лише через високий clearcoat/
+ * низький roughness (пряме+ambient світло, без environment map).
  */
 function Branch({ branch, geometry, material, reduceMotion, onOpen }: BranchProps) {
   const meshRef = useRef<THREE.Mesh | null>(null);
@@ -95,7 +102,6 @@ function Branch({ branch, geometry, material, reduceMotion, onOpen }: BranchProp
       <meshPhysicalMaterial
         vertexColors
         flatShading
-        envMapIntensity={branch.emissive ? 1.8 : 1.4}
         roughness={branch.emissive ? 0.06 : Math.max(0.04, material.roughness * 0.5)}
         metalness={branch.emissive ? 0.1 : 0}
         transmission={0}
@@ -316,22 +322,6 @@ export default function CrystalScene() {
           <ambientLight intensity={0.5} />
           <directionalLight position={[3, 4, 2]} intensity={1.1} />
           <pointLight position={[-3, -2, -2]} intensity={0.4} color="#e6a0bd" />
-          {/* Процедурна (без зовнішніх HDRI-файлів) підсвітка — без неї
-              позаду об'єкта лише рівний рожевий фон, тож відбиття на
-              clearcoat-гранях майже непомітні. Годує лише відбиття
-              кольором, на видимий рожевий фон сторінки не впливає
-              (background={false}); реального заломлення (material.
-              transmission) свідомо немає ніде в сцені — воно вмикає
-              власний "transmission render pass" THREE.WebGLRenderer, який
-              підставляє суцільний білий clear-колір, коли canvas
-              прозорий — саме це й спричиняло білий фон на реальних
-              пристроях. */}
-          <Environment resolution={128} background={false}>
-            <Lightformer form="ring" color="#ffd9a8" intensity={6} scale={5} position={[2.5, 1.2, -2]} />
-            <Lightformer form="ring" color="#7fd8d1" intensity={5} scale={4} position={[-2.5, -1, -1.5]} />
-            <Lightformer form="rect" color="#e8b23d" intensity={4} scale={[4, 1.5, 1]} position={[0, 3, -1]} />
-            <Lightformer form="rect" color="#ffffff" intensity={3} scale={[2, 2, 1]} position={[0, 0.5, 3]} rotation={[0, Math.PI, 0]} />
-          </Environment>
           {!isPending &&
             (empty ? (
               <CrystalSeed reduceMotion={reduceMotion} />
@@ -359,9 +349,6 @@ export default function CrystalScene() {
             dampingFactor={0.08}
             target={[0, 0.2, 0]}
           />
-          <EffectComposer>
-            <Bloom intensity={0.6} luminanceThreshold={0.3} luminanceSmoothing={0.4} mipmapBlur />
-          </EffectComposer>
         </Canvas>
       </div>
 
