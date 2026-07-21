@@ -4,77 +4,33 @@
 // ------------------------------------------------------------
 // Форма кожної грані детермінована (crystalGeometry.ts) — рандом
 // впливає лише на те, ЩО з'являється, а не як виглядають наявні
-// грані. localStorage запам'ятовує, скільки граней бачили востаннє,
-// щоб «матеріалізація» програвалась лише для нових — старі
-// рендеряться вже усталеними (ефект «історія жила, поки портал був
-// закритий»).
+// грані. useCrystalSeen запам'ятовує, скільки граней бачили
+// востаннє, щоб «матеріалізація» програвалась лише для нових —
+// старі рендеряться вже усталеними (ефект «історія жила, поки
+// портал був закритий»). Це фолбек для CrystalScene (3D) — якщо
+// WebGL недоступний або сцена впала.
 // ============================================================
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useCrystalDNA } from './useCrystal';
+import { useCrystalSeen } from './useCrystalSeen';
 import { buildFacets, CATEGORY_DEFS, type Facet } from './crystalGeometry';
+import { CrystalStats } from './CrystalStats';
 import { PlacesModal } from './PlacesModal';
-
-const SEEN_KEY = 'amore:crystalSeen';
-
-function readSeen(): Record<string, number> | null {
-  try {
-    const raw = localStorage.getItem(SEEN_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, number>) : null;
-  } catch {
-    return null;
-  }
-}
-
-interface StatItem {
-  icon: string;
-  label: string;
-  value: number;
-}
 
 export function Crystal() {
   const { dna, isPending } = useCrystalDNA();
   const facets = useMemo(() => buildFacets(dna), [dna]);
   const [open, setOpen] = useState(false);
-  const [seenSnapshot] = useState(readSeen);
-  const isFirstVisit = seenSnapshot === null;
+  const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending);
   const reduceMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-  // Запам'ятовуємо поточну кількість граней ПІСЛЯ того, як анімація
-  // матеріалізації встигла відіграти — щоб наступний візит вважав їх
-  // уже «баченими».
-  useEffect(() => {
-    if (isPending) return;
-    const t = setTimeout(() => {
-      const next: Record<string, number> = {};
-      for (const cat of CATEGORY_DEFS) next[cat.key] = cat.facetsFor(cat.metric(dna));
-      try {
-        localStorage.setItem(SEEN_KEY, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-    }, 1600);
-    return () => clearTimeout(t);
-  }, [dna, isPending]);
 
   const isNewFacet = (f: Facet): boolean => {
     if (f.slotIndex === -1) return isFirstVisit;
     const seenCount = seenSnapshot?.[f.category] ?? 0;
     return f.slotIndex >= seenCount;
   };
-
-  const stats: StatItem[] = [
-    { icon: '💞', label: 'разом, дн.', value: dna.daysTogether },
-    { icon: '📍', label: 'місць', value: dna.places },
-    { icon: '📷', label: 'фото', value: dna.photos },
-    { icon: '🎬', label: 'переглянуто', value: dna.moviesWatched },
-    { icon: '📚', label: 'прочитано', value: dna.booksRead },
-    { icon: '💗', label: 'бажань', value: dna.wishesDone },
-    { icon: '🎯', label: 'цілей', value: dna.goalsAchieved },
-    { icon: '🎂', label: 'річниць', value: dna.anniversaries },
-    { icon: '🍲', label: 'рецептів', value: dna.recipesSaved },
-  ];
 
   return (
     <>
@@ -120,17 +76,7 @@ export function Crystal() {
         </svg>
       </button>
 
-      <div className="crystal-stats">
-        {stats.map((s) => (
-          <div key={s.label} className="crystal-stat-chip">
-            <span className="crystal-stat-icon" aria-hidden="true">
-              {s.icon}
-            </span>
-            <span className="crystal-stat-value">{isPending ? '…' : s.value.toLocaleString('uk-UA')}</span>
-            <span className="crystal-stat-label">{s.label}</span>
-          </div>
-        ))}
-      </div>
+      <CrystalStats dna={dna} isPending={isPending} />
 
       {open && <PlacesModal onClose={() => setOpen(false)} />}
     </>

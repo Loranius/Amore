@@ -7,17 +7,7 @@
 // а не мерехтить по-новому щоразу.
 // ============================================================
 import type { CrystalDNA } from './useCrystal';
-
-/** mulberry32 — детермінований 32-бітний PRNG, без нової залежності. */
-function mulberry32(seed: number) {
-  let s = seed | 0;
-  return function rand() {
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
+import { mulberry32 } from './mulberry32';
 
 export type CrystalCategoryKey =
   | 'time'
@@ -37,7 +27,7 @@ interface CategoryDef {
   facetsFor: (metric: number) => number;
 }
 
-const MAX_SLOTS = 7;
+export const MAX_SLOTS = 7;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const grown = (metric: number, per: number) =>
   metric <= 0 ? 0 : clamp(Math.ceil(metric / per), 1, MAX_SLOTS);

@@ -40,8 +40,12 @@ jobs:
             echo "base=/${{ github.event.repository.name }}/" >> "$GITHUB_OUTPUT"
           fi
 
+      # npm install (не ci) — лок-файл після ручного додавання нових
+      # пакетів (three/@react-three/*) локально не перегенерований (немає
+      # node/npm у робочому середовищі), install сам дорезолвить і
+      # оновить package-lock.json під час білда.
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       # `npm run build` = `tsc -b && vite build`, тож тут же проганяється
       # повний тайпчек. VITE_*-секрети вшиваються у бандл на цьому кроці.
