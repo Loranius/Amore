@@ -90,6 +90,10 @@ function Branch({ branch, geometry, material, registerMesh, onOpen }: BranchProp
   // — лише найглибший clearcoat/найнижчий roughness у сцені + легке власне
   // світіння серця.
   const primary = branch.primary && !branch.emissive;
+  // Ярусне полірування композиції: support ледь глибший блиск, мікрошар —
+  // матовіший «пил» (ієрархія читається і в оптиці, не лише в розмірах).
+  const micro = branch.tier === 'micro';
+  const support = branch.tier === 'support' && !branch.emissive;
 
   return (
     <mesh
@@ -102,10 +106,10 @@ function Branch({ branch, geometry, material, registerMesh, onOpen }: BranchProp
       <meshPhysicalMaterial
         vertexColors
         flatShading
-        roughness={branch.emissive ? 0.06 : primary ? 0.03 : Math.max(0.04, material.roughness * 0.5)}
+        roughness={branch.emissive ? 0.06 : primary ? 0.03 : micro ? Math.min(0.5, material.roughness * 1.6) : Math.max(0.04, material.roughness * 0.5)}
         metalness={branch.emissive ? 0.1 : 0}
         transmission={0}
-        clearcoat={branch.emissive ? 0.95 : primary ? 1 : Math.min(1, material.clearcoat + 0.25)}
+        clearcoat={branch.emissive ? 0.95 : primary ? 1 : support ? Math.min(1, material.clearcoat + 0.35) : micro ? material.clearcoat * 0.4 : Math.min(1, material.clearcoat + 0.25)}
         clearcoatRoughness={primary ? 0.02 : 0.04}
         ior={1.6}
         reflectivity={branch.emissive ? 0.8 : primary ? 0.9 : 0.7}

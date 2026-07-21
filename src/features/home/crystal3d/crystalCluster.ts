@@ -16,6 +16,8 @@ import type {
   ArtifactDNA,
   ArtifactNode,
   ColonyRole,
+  CompositionTier,
+  CrystalArchetype,
   DominantSystem,
   EvolutionPressures,
   GrowthDomainId,
@@ -44,8 +46,12 @@ export interface ClusterBranch {
   breatheSpeed: number;
   /** 0 (щойно з'явився) .. ~1 (давно росте) — див. maturityCurve(). */
   maturity: number;
-  /** Роль у колонії — супутники рендеряться простіше (менше сегментів). */
+  /** Роль у колонії — супутники/мікро рендеряться простіше (менше сегментів). */
   role: ColonyRole;
+  /** Ярус композиції (Composition Framework) — полірування, не розміри. */
+  tier: CompositionTier;
+  /** Архетип форми — вістря/сплющення/шорсткість реалізує buildBranchGeometry. */
+  archetype: CrystalArchetype;
   /** Монарх друзи — найвища оптична якість (чистіші грані, глибший блиск).
    *  Справжньої прозорості немає навмисно: transmission вмикає баговий
    *  mobile-рендерпас (див. заголовок CrystalScene.tsx), а opacity на
@@ -151,6 +157,8 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
     breatheSpeed: node.breatheSpeed,
     maturity: node.maturity,
     role: node.role,
+    tier: node.tier,
+    archetype: node.archetype,
     primary: node.primary,
     ...(node.emphasized !== undefined ? { emissive: node.emphasized } : {}),
   };
@@ -231,17 +239,23 @@ export function buildBranchGeometry(
   // «кристал», не довільний багатокутник), верхня межа піднята для помітно
   // багатшої полігональності. Книги («складність поверхні») додають шанс
   // на зайву грань понад базові 7–10. Супутники колоній — дрібні й численні,
-  // тому дешевші: 5-6 граней (перф на мобільних GPU).
+  // тому дешевші: 5-6 граней; мікрошар — 4-5 (перф на мобільних GPU).
   const segments =
-    branch.role === 'satellite'
-      ? 5 + Math.floor(shapeRng() * 2)
-      : 7 + Math.floor(shapeRng() * 4) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+    branch.role === 'micro'
+      ? 4 + Math.floor(shapeRng() * 2)
+      : branch.role === 'satellite'
+        ? 5 + Math.floor(shapeRng() * 2)
+        : 7 + Math.floor(shapeRng() * 4) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
   const m = branch.maturity;
 
   const h = branch.height * (0.32 + m * 0.68);
   const r = branch.radiusBottom * (0.4 + m * 0.6);
-  const tipR = r * (0.14 - m * 0.12); // молоді — тупіші вістря, зрілі — майже гострі
-  const prismEnd = 0.46 + shapeRng() * 0.08; // кінець «призматичної» ділянки, 0.46-0.54
+  // Архетип (Composition Framework) реалізується тут ЛИШЕ формою профілю —
+  // пропорції вже виставив композитор, матеріали його не обходять.
+  const arch = branch.archetype;
+  const blunt = arch === 'prismatic' || arch === 'tabular' || arch === 'massive';
+  const tipR = blunt ? r * 0.28 : r * (0.14 - m * 0.12); // молоді — тупіші вістря, зрілі — майже гострі
+  const prismEnd = (arch === 'prismatic' ? 0.6 : 0.46) + shapeRng() * 0.08;
   // pointStart МУСИТЬ бути помітно вище prismEnd (інакше профіль самоперетнеться
   // при високій maturity, де 0.72-m*0.2 може впасти аж до 0.52) — тому явно
   // прив'язаний до prismEnd з запасом, а не рахується незалежно.
@@ -252,14 +266,25 @@ export function buildBranchGeometry(
   // читається саме як призма+вістря, а не суцільний плавний конус.
   // Основа (row 0) РОЗШИРЕНА понад радіус призми — «спідниця», що ховається
   // в тілі субстрату: стик двох тіл читається зрощеним мінералом, а не
-  // перетином двох мешів.
-  const profile = [
-    new THREE.Vector2(Math.max(0.001, r * (1.06 + shapeRng() * 0.1)), 0),
-    new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
-    new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * prismEnd),
-    new THREE.Vector2(r * (0.9 + shapeRng() * 0.06), h * pointStart),
-    new THREE.Vector2(Math.max(0.001, tipR), h),
-  ];
+  // перетином двох мешів. 'broken' — зрізана верхівка (обламаний кристал):
+  // профіль завершується широким уступом і пласкою «кришкою» нижче повної
+  // висоти.
+  const profile =
+    arch === 'broken'
+      ? [
+          new THREE.Vector2(Math.max(0.001, r * (1.06 + shapeRng() * 0.1)), 0),
+          new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
+          new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * Math.min(prismEnd, 0.6)),
+          new THREE.Vector2(r * (0.3 + shapeRng() * 0.08), h * 0.84),
+          new THREE.Vector2(0.001, h * 0.85),
+        ]
+      : [
+          new THREE.Vector2(Math.max(0.001, r * (1.06 + shapeRng() * 0.1)), 0),
+          new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
+          new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * prismEnd),
+          new THREE.Vector2(r * (0.9 + shapeRng() * 0.06), h * pointStart),
+          new THREE.Vector2(Math.max(0.001, tipR), h),
+        ];
 
   const geo = new THREE.LatheGeometry(profile, segments);
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
@@ -311,14 +336,20 @@ export function buildBranchGeometry(
       // (монарх майже ідеальний), крихітні супутники — грубші. Це і робить
       // ієрархію читабельною: велике = чисте, дрібне = шорстке.
       const hierarchy =
-        (branch.primary ? 0.15 : branch.role === 'satellite' ? 1.25 : 1) * (1 - 0.4 * branch.maturity);
-      const amp = 0.08 * (1 - material.polish * 0.6) * hierarchy;
+        (branch.primary ? 0.15 : branch.role !== 'dominant' ? 1.25 : 1) * (1 - 0.4 * branch.maturity);
+      // 'etched' — протравлені грані: шорсткість поверх усіх правил.
+      const amp = 0.08 * (1 - material.polish * 0.6) * hierarchy * (branch.archetype === 'etched' ? 1.7 : 1);
       const j = 1 + (jitterRng() * 2 - 1) * amp;
       pos.setXYZ(i, pos.getX(i) * j, pos.getY(i), pos.getZ(i) * j);
     }
   }
 
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  // Пласкі архетипи: blade — лезо (сильний сплюск по X), tabular — таблитчастий
+  // (ширший і нижчий, помірний сплюск). Це геометрія, не матеріал — сплюск
+  // «запікається» в позиції і обертається разом зі spin-кватерніоном.
+  if (branch.archetype === 'blade') geo.scale(0.45, 1, 1);
+  else if (branch.archetype === 'tabular') geo.scale(1.1, 1, 0.5);
   geo.computeVertexNormals();
   return geo;
 }

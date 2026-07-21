@@ -18,6 +18,7 @@ import {
   buildArtifactNodes,
   computeEvolutionPressures,
   depositMineralMass,
+  depositMineralMassWithScore,
   distanceToSurface,
   generateArtifactDNA,
   isArtifactEmpty,
@@ -100,6 +101,17 @@ function build(input: ArtifactInput): ArtifactNode[] {
 
 const byKey = (nodes: ArtifactNode[]): Map<string, ArtifactNode> => new Map(nodes.map((n) => [n.key, n]));
 
+/** Ярус ієрархії — єдине поле, якому ДОЗВОЛЕНО дрейфувати при нових даних
+ *  (він ранговий і суто візуальний) — тому порівнюємо без нього. */
+const stripTier = (n: ArtifactNode): Omit<ArtifactNode, 'tier'> => {
+  const { tier: _tier, ...rest } = n;
+  return rest;
+};
+
+/** Декоративні тіла (композитор може їх «ховати» при нових даних):
+ *  супутники/компаньйони/мікрошар (`~`) і амбіентний baseline-трикл. */
+const isDecorativeKey = (key: string): boolean => key.includes('~') || key.startsWith('baseline-');
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
@@ -147,8 +159,14 @@ describe('депозиція мінеральної маси', () => {
     const grownByKey = byKey(grown);
 
     for (const node of base) {
-      expect(grownByKey.get(node.key), `вузол ${node.key} зник`).toBeDefined();
-      expect(grownByKey.get(node.key), `вузол ${node.key} зрушив`).toEqual(node);
+      const after = grownByKey.get(node.key);
+      if (after === undefined) {
+        // Композитор має право «поховати» лише декоративне тіло.
+        expect(isDecorativeKey(node.key), `дата-вузол ${node.key} зник`).toBe(true);
+        continue;
+      }
+      // Дрейфувати дозволено лише ярусу ієрархії (ранговий, візуальний).
+      expect(stripTier(after), `вузол ${node.key} зрушив`).toEqual(stripTier(node));
     }
     const baseKeys = new Set(base.map((n) => n.key));
     const newKeys = grown.filter((n) => !baseKeys.has(n.key)).map((n) => n.key);
@@ -166,11 +184,14 @@ describe('депозиція мінеральної маси', () => {
     // (вік 500/460/420… ні, 420 не строго старше — беремо 500 і 460),
     // city-Kyiv (450). Їхні субстрат, історичне поле й ранги заморожені.
     for (const key of ['core-0', 'core-1', 'city-Kyiv']) {
-      expect(withBackfill.get(key), `${key} зрушив через backfill`).toEqual(base.get(key));
+      expect(stripTier(withBackfill.get(key)!), `${key} зрушив через backfill`).toEqual(stripTier(base.get(key)!));
     }
     expect(withBackfill.has('country-Georgia')).toBe(true);
-    // Жоден ключ не зник — backfill не «випаровує» кристали.
-    for (const key of base.keys()) expect(withBackfill.has(key), `ключ ${key} зник`).toBe(true);
+    // Жоден дата-ключ не зник — backfill не «випаровує» кристали даних
+    // (декоративні тіла композитор перерозподіляє — це дозволено).
+    for (const key of base.keys()) {
+      if (!isDecorativeKey(key)) expect(withBackfill.has(key), `ключ ${key} зник`).toBe(true);
+    }
   });
 
   it('Evolution Memory: наступного місяця та сама ідентичність, лише доросліша', () => {
@@ -184,16 +205,18 @@ describe('депозиція мінеральної маси', () => {
 
     for (const node of base) {
       const grown = laterByKey.get(node.key);
-      expect(grown, `вузол ${node.key} зник із часом`).toBeDefined();
-      if (!grown) continue;
-      // Ідентичність і «скелет» стабільні…
-      expect(grown.direction).toEqual(node.direction);
+      if (grown === undefined) {
+        // Декоративне тіло могло «поховатись» під новим bedrock-ростом.
+        expect(isDecorativeKey(node.key), `дата-вузол ${node.key} зник із часом`).toBe(true);
+        continue;
+      }
+      // Ідентичність стабільна; композиція навмисно СТАРІШАЄ тіла разом із
+      // віком (товщі/пряміші — Stage 5), тому геометрія еволюціонує плавно,
+      // а незалежні від віку поля — незмінні.
       expect(grown.spin).toBe(node.spin);
-      expect(grown.growthScale).toBeCloseTo(node.growthScale, 10);
-      expect(grown.growthEnergy).toBeCloseTo(node.growthEnergy, 10);
-      // …а зрілість лише росте (rendered-позиція може плавно «їхати» разом
-      // із ростом субстрату — це і є геологічна еволюція). Давно насичені
-      // тіла лишаються на ~1 (асимптотична крива) — тому нестрого.
+      expect(grown.breathePhase).toBe(node.breathePhase);
+      // Зрілість лише росте (давно насичені тіла лишаються на ~1 —
+      // асимптотична крива, тому нестрого).
       expect(grown.maturity).toBeGreaterThanOrEqual(node.maturity);
     }
     // Час народив нове bedrock-відкладення (500/40=13 → 540/40=14).
@@ -218,35 +241,37 @@ describe('депозиція мінеральної маси', () => {
     ];
 
     nodes.forEach((node, idx) => {
-      // Основа лежить на/під поверхнею ІНШОГО тіла (субстрату) — з
-      // невеликим допуском на конусну апроксимацію.
+      // Основа лежить на/під поверхнею ІНШОГО тіла (субстрату) — «жодних
+      // плаваючих кристалів». Допуск ширший за конусну апроксимацію, бо
+      // композитор міг злегка перекроїти розміри субстрату (архетипи/вік).
       const minDist = Math.min(
         ...bodies.filter((_, b) => b !== idx + 1).map((body) => distanceToSurface(body, node.anchor)),
       );
-      expect(minDist, `тіло ${node.key} висить у повітрі`).toBeLessThan(0.05);
+      expect(minDist, `тіло ${node.key} висить у повітрі`).toBeLessThan(0.12);
     });
   });
 
-  it('колонії: іноді домінант + 2-3 супутники, що майже торкаються його', () => {
+  it('колонії та компаньйони тримаються свого батька — жодних самотніх плавунів', () => {
     const nodes = build(makeInput());
-    const satellites = nodes.filter((n) => n.role === 'satellite');
+    const all = byKey(nodes);
+    const satellites = nodes.filter((n) => n.role !== 'dominant');
     expect(satellites.length).toBeGreaterThan(0);
-    const dominants = byKey(nodes.filter((n) => n.role === 'dominant'));
-    const perColony = new Map<string, number>();
     for (const sat of satellites) {
-      const domKey = sat.key.split('~')[0]!;
-      perColony.set(domKey, (perColony.get(domKey) ?? 0) + 1);
-      const dom = dominants.get(domKey);
-      expect(dom, `супутник ${sat.key} без домінанта`).toBeDefined();
-      if (!dom) continue;
-      // Компаньйон майже торкається домінанта (жодних самотніх плавунів).
-      const dx = sat.anchor.x - dom.anchor.x;
-      const dy = sat.anchor.y - dom.anchor.y;
-      const dz = sat.anchor.z - dom.anchor.z;
-      expect(Math.sqrt(dx * dx + dy * dy + dz * dz)).toBeLessThan(0.45);
-      expect(sat.growthScale).toBeLessThan(dom.growthScale);
+      // `X~s0` (колонія), `X~t0/~f0` (архетипні компаньйони), `X~m0` (мікро):
+      // батько — усе до останнього «~».
+      const parentKey = sat.key.slice(0, sat.key.lastIndexOf('~'));
+      const parent = all.get(parentKey);
+      expect(parent, `тіло ${sat.key} без батька`).toBeDefined();
+      if (!parent) continue;
+      const dx = sat.anchor.x - parent.anchor.x;
+      const dy = sat.anchor.y - parent.anchor.y;
+      const dz = sat.anchor.z - parent.anchor.z;
+      // Сидить на ТІЛІ батька: відстань від основи батька обмежена його ж
+      // габаритами (товстий батько → його поверхня далі від власної основи).
+      const hugDistance = 0.45 + parent.massScale;
+      expect(Math.sqrt(dx * dx + dy * dy + dz * dz), `${sat.key} відлетів від ${parentKey}`).toBeLessThan(hugDistance);
+      expect(sat.growthScale, `${sat.key} не менший за батька`).toBeLessThan(parent.growthScale);
     }
-    for (const [key, count] of perColony) expect(count, `колонія ${key} завелика`).toBeLessThanOrEqual(3);
   });
 
   it('монарх: рівно один primary — найвищий, центральний, майже вертикальний', () => {
@@ -269,6 +294,40 @@ describe('депозиція мінеральної маси', () => {
     const input = makeInput();
     const pressures = computeEvolutionPressures(input);
     expect(buildArtifactNodes(input, pressures)).toEqual(depositMineralMass(input, pressures));
+  });
+
+  it('композиція: ієрархія ярусів і мікрошар, що «продає» масштаб', () => {
+    const nodes = build(makeInput());
+    expect(nodes.filter((n) => n.tier === 'king')).toHaveLength(1);
+    expect(nodes.find((n) => n.tier === 'king')!.primary).toBe(true);
+    expect(nodes.filter((n) => n.tier === 'support').length).toBeGreaterThanOrEqual(1);
+    const micro = nodes.filter((n) => n.role === 'micro');
+    expect(micro.length).toBeGreaterThan(0);
+    expect(micro.length).toBeLessThanOrEqual(30);
+    for (const m of micro) {
+      expect(m.tier).toBe('micro');
+      expect(m.key).toContain('~m');
+      expect(m.growthScale).toBeLessThan(0.2);
+    }
+  });
+
+  it('композиція: бібліотека архетипів замість «усі — списи»', () => {
+    const nodes = build(makeInput());
+    const archetypes = new Set(nodes.map((n) => n.archetype));
+    expect(archetypes.size, `лише ${[...archetypes].join(', ')}`).toBeGreaterThanOrEqual(4);
+    // Король — масивний/призматичний, ніколи голка чи уламок.
+    const king = nodes.find((n) => n.primary)!;
+    expect(['massive', 'prismatic']).toContain(king.archetype);
+  });
+
+  it('композиція: самооцінка зразка не нижча за поріг (максимум два проходи)', () => {
+    for (const seed of ['8264-3607-EEA8', 'AAAA-BBBB-CCCC', '1111-2222-3333']) {
+      const raw = makeInput();
+      const input = { ...raw, seedNum: hashSeedString(seed), dna: generateArtifactDNA(seed) };
+      const { score, passes } = depositMineralMassWithScore(input, computeEvolutionPressures(input));
+      expect(passes).toBeLessThanOrEqual(2);
+      expect(score.total, `seed ${seed}: ${JSON.stringify(score)}`).toBeGreaterThanOrEqual(0.5);
+    }
   });
 });
 

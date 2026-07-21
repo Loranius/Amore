@@ -50,6 +50,14 @@
 //   +hash('stress')           — value-noise Surface Stress (growthField.ts)
 //   +hash('anisotropy')       — азимутальна анізотропія силуету (growthField.ts)
 //   +hash('satellite:KEY')+s*29 — супутник s колонії події KEY
+//   Composition Framework (composition/):
+//   +hash('silhouette')       — вибір силуету і базовий азимут осей
+//   +hash('sectors')          — seeded-багатство секторів щільності
+//   +hash('archetype:KEY')    — тайбрейк архетипу тіла KEY
+//   +hash('companion:KEY')    — компаньйони архетипу (twin/fan/split)
+//   +hash('crook:KEY')        — «кривизна молодості» тіла KEY
+//   +hash('micro:KEY')        — мікрошар на тілі KEY
+//   +hash('composed:KEY')     — дихання/spin синтезованих композитором тіл
 // ============================================================
 import { mulberry32, hashSeedString } from '../mulberry32';
 import { maturityCurve } from './maturity';
@@ -70,6 +78,8 @@ import {
   type PlacementField,
 } from './growthField';
 import { buildDepositionStreams } from './growthEvents';
+import { composeMineralCluster } from './composition/mineralPreset';
+import type { CompositionScore } from './composition/score';
 import type {
   ArtifactInput,
   ArtifactNode,
@@ -99,7 +109,7 @@ const COLONIES_ENABLED = true;
 /** Монарх: підсилення розмірів найстарішого центрального відкладення і
  *  стеля висоти для всіх інших — око одразу бачить центр друзи. */
 const MONARCH_LENGTH_BOOST = 1.45;
-const MONARCH_RADIUS_BOOST = 1.7;
+const MONARCH_RADIUS_BOOST = 2.0;
 const MONARCH_MIN_RAW_LENGTH = 1.35;
 const MONARCH_HEIGHT_CEILING = 0.9;
 
@@ -414,6 +424,8 @@ const toArtifactNode = (c: DepositedCrystal, pressures: EvolutionPressures): Art
   role: c.role,
   stage: lifeCycleStage(c.maturity, c.growthEnergy, pressures.refinement),
   primary: c.primary,
+  tier: c.tier ?? (c.primary ? 'king' : 'family'),
+  archetype: c.archetype ?? 'spear',
   ...(c.emphasized !== undefined ? { emphasized: c.emphasized } : {}),
 });
 
@@ -436,12 +448,9 @@ function chooseMonarchKey(streams: readonly { events: readonly DepositionEvent[]
   return best?.key ?? null;
 }
 
-/**
- * Відкладає всю мінеральну масу. pressures обчислюється окремо
- * (computeEvolutionPressures) і передається сюди — та сама структура
- * споживається й deriveClusterMaterial, тому рахується лише один раз.
- */
-export function depositMineralMass(input: ArtifactInput, pressures: EvolutionPressures): ArtifactNode[] {
+/** Прогін Growth Engine: сирі відкладення до композиції. (Тисків тут нема —
+ *  розміщення керує ІСТОРИЧНЕ поле, живі pressures лишаються рендеру.) */
+function runDeposition(input: ArtifactInput): DepositedCrystal[] {
   const { seedNum, dna } = input;
   const nucleus = makeNucleus(seedNum);
   const streams = buildDepositionStreams(input);
@@ -476,5 +485,28 @@ export function depositMineralMass(input: ArtifactInput, pressures: EvolutionPre
     }
   }
 
-  return deposited.map((c) => toArtifactNode(c, pressures));
+  return deposited;
+}
+
+/**
+ * Відкладає всю мінеральну масу і компонує її. pressures обчислюється окремо
+ * (computeEvolutionPressures) і передається сюди — та сама структура
+ * споживається й deriveClusterMaterial, тому рахується лише один раз.
+ * Composition Framework (composition/) — фінальний художній шар поверх
+ * недоторканного Growth Engine: перетворює коректну геологію на «музейний
+ * зразок».
+ */
+export function depositMineralMass(input: ArtifactInput, pressures: EvolutionPressures): ArtifactNode[] {
+  return depositMineralMassWithScore(input, pressures).nodes;
+}
+
+/** Той самий результат + самооцінка композиції (Stage 10) — для тестів,
+ *  дев-проб і майбутньої телеметрії якості. */
+export function depositMineralMassWithScore(
+  input: ArtifactInput,
+  pressures: EvolutionPressures,
+): { nodes: ArtifactNode[]; score: CompositionScore; passes: number } {
+  const deposited = runDeposition(input);
+  const { crystals, score, passes } = composeMineralCluster(deposited, input.seedNum, input.dna.compactnessBias);
+  return { nodes: crystals.map((c) => toArtifactNode(c, pressures)), score, passes };
 }

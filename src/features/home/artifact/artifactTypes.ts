@@ -18,9 +18,30 @@ export type GrowthDomainId = 'exploration' | 'memory' | 'connection' | 'creation
  *  жодного окремого збереженого стану. */
 export type LifeCycleStage = 'nucleation' | 'growth' | 'competition' | 'polishing' | 'stabilization';
 
-/** Роль у колонії нуклеації: домінантний кристал або 2-5 його супутників,
- *  що ділять майже ту саму точку зародження (кварцова друза). */
-export type ColonyRole = 'dominant' | 'satellite';
+/** Роль у колонії нуклеації: домінантний кристал, його супутники (майже та
+ *  сама точка зародження, кварцова друза) або мікрокристал композиційного
+ *  шару («пил», що продає масштаб). */
+export type ColonyRole = 'dominant' | 'satellite' | 'micro';
+
+/** Ярус композиційної ієрархії (Composition Framework, Stage 1). */
+export type CompositionTier = 'king' | 'support' | 'family' | 'micro';
+
+/** Кристалічний архетип (Stage 4) — форма замість «усі — списи». Обирається
+ *  детерміновано з ознак (вік/розмір/енергія/напруга/seed), ніколи випадково. */
+export type CrystalArchetype =
+  | 'spear'
+  | 'massive'
+  | 'prismatic'
+  | 'needle'
+  | 'stub'
+  | 'broken'
+  | 'twin'
+  | 'blade'
+  | 'tabular'
+  | 'fan'
+  | 'split'
+  | 'intergrown'
+  | 'etched';
 
 /**
  * Датований первинний факт із БД — «сировина» для доменних білдерів
@@ -82,6 +103,10 @@ export interface ArtifactNode {
   /** true рівно для ОДНОГО тіла — монарха друзи: найстаріше центральне
    *  відкладення, найтовще/найвище/найчистіше. Око одразу бачить центр. */
   primary: boolean;
+  /** Ярус композиційної ієрархії — рендерне полірування (НЕ розміри). */
+  tier: CompositionTier;
+  /** Архетип форми — рендерер реалізує вістря/сплющення/шорсткість. */
+  archetype: CrystalArchetype;
   /** true для milestone-вузлів — золоте світіння в рендерері. */
   emphasized?: boolean;
 }
@@ -127,6 +152,9 @@ export interface DepositedCrystal {
   role: ColonyRole;
   /** Монарх друзи (див. ArtifactNode.primary). */
   primary: boolean;
+  /** Заповнюються Composition Framework (mineralPreset.ts) після відкладення. */
+  tier?: CompositionTier;
+  archetype?: CrystalArchetype;
   emphasized?: boolean;
   breathePhase: number;
   breatheSpeed: number;
