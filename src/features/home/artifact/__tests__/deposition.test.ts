@@ -221,6 +221,10 @@ describe('депозиція мінеральної маси', () => {
     }
     // Час народив нове bedrock-відкладення (500/40=13 → 540/40=14).
     expect(laterByKey.has('core-13')).toBe(true);
+    // Головний кристал росте рівномірно з днями разом: за 40 днів — вищий.
+    const kingBefore = base.find((n) => n.primary)!;
+    const kingAfter = laterByKey.get(kingBefore.key)!;
+    expect(kingAfter.growthScale).toBeGreaterThan(kingBefore.growthScale);
   });
 
   it('кожне тіло нуклеювало на поверхні іншого тіла маси', () => {
@@ -285,9 +289,14 @@ describe('депозиція мінеральної маси', () => {
       if (n.key === monarch.key) continue;
       expect(n.growthScale, `${n.key} вищий за монарха`).toBeLessThanOrEqual(monarch.growthScale * 0.91);
     }
-    // Центральний і найпряміший — око одразу бачить серце друзи.
-    expect(Math.hypot(monarch.anchor.x, monarch.anchor.z)).toBeLessThan(0.4);
-    expect(monarch.direction.y).toBeGreaterThan(0.85);
+    // Точно по центру і практично вертикальний — головний кристал друзи
+    // (референс: центральна колона, з-під основи якої росте решта).
+    expect(Math.hypot(monarch.anchor.x, monarch.anchor.z)).toBeLessThan(0.15);
+    expect(monarch.direction.y).toBeGreaterThan(0.95);
+    // Дочірні кристали тягнуться вгору: майже всі близькі до вертикалі
+    // (виняток — базовий мікропил і рідкісні діагональні тіла).
+    const upright = nodes.filter((n) => n.direction.y >= 0.55).length;
+    expect(upright / nodes.length).toBeGreaterThan(0.85);
   });
 
   it('публічний псевдонім buildArtifactNodes — те саме відкладення', () => {
