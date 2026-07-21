@@ -93,6 +93,16 @@ function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterPro
   const groupRef = useRef<THREE.Group | null>(null);
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
+  const flashDuration = useRef(1300);
+  const flashPeak = useRef(2.2);
+
+  // Дотик/тап — короткий теплий спалах (реакція «кристал відчув доторк»),
+  // окремий від довшого/яскравішого спалаху на «виросла нова грань».
+  const onTouch = () => {
+    flashUntil.current = performance.now() + 450;
+    flashDuration.current = 450;
+    flashPeak.current = 1.1;
+  };
 
   const spikeMeshes = useMemo(
     () => buildSpikes(dna, seedNum).map((spec) => ({ spec, geometry: buildSpikeGeometry(spec) })),
@@ -112,6 +122,10 @@ function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterPro
     const group = groupRef.current;
     if (group && !reduceMotion) {
       group.rotation.y += delta * 0.1;
+      // Легке погойдування по X/Z (незалежні повільні хвилі) — «трохи
+      // рухається» поверх постійного обертання навколо Y.
+      group.rotation.x = Math.sin(state.clock.elapsedTime * 0.17) * 0.025;
+      group.rotation.z = Math.sin(state.clock.elapsedTime * 0.13 + 1.7) * 0.018;
       // Легкий колективний подих усієї колонії — поверх нього кожен Spike
       // додає власну мікро-фазу (SpikeSpec.breathePhase), тому рух не в унісон.
       const breathe = 1 + Math.sin(state.clock.elapsedTime * 0.35) * 0.008;
@@ -120,13 +134,13 @@ function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterPro
     const light = flashLightRef.current;
     if (light && flashUntil.current) {
       const remain = flashUntil.current - performance.now();
-      light.intensity = Math.max(0, (remain / 1300) * 2.2);
+      light.intensity = Math.max(0, (remain / flashDuration.current) * flashPeak.current);
       if (remain <= 0) flashUntil.current = 0;
     }
   });
 
   return (
-    <group ref={groupRef}>
+    <group ref={groupRef} onPointerDown={onTouch}>
       <pointLight
         ref={flashLightRef}
         position={[0, BASE_Y + 0.5, 0]}
@@ -239,7 +253,13 @@ export default function CrystalScene() {
             color="#ffe9f2"
             position={[0, 0.2, 0]}
           />
-          <OrbitControls enablePan={false} enableZoom={false} target={[0, 0.2, 0]} />
+          <OrbitControls
+            enablePan={false}
+            enableZoom={false}
+            enableDamping={!reduceMotion}
+            dampingFactor={0.08}
+            target={[0, 0.2, 0]}
+          />
           <EffectComposer>
             <Bloom intensity={0.6} luminanceThreshold={0.3} luminanceSmoothing={0.4} mipmapBlur />
           </EffectComposer>
