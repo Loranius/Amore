@@ -1,12 +1,6 @@
 // ============================================================
-// Home — чисті утиліти лічильника (порт counter.js)
+// Home — чисті утиліти для дати старту стосунків (кристал/підпис)
 // ============================================================
-
-/** Локальна 'YYYY-MM-DD' (не UTC — щоб уночі не «з'їдало» день). */
-export function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 export function daysBetween(dateStr: string): number {
   const start = new Date(dateStr);

@@ -1830,14 +1830,15 @@ a.wl-card-title { color: var(--accent); }
 .dish-edit-btn { border: 0; background: transparent; font-size: 16px; cursor: pointer; padding: 4px; }
 
 /* ============================================================
-   ГОЛОВНА (home) — «Pink Portal»: привітання, лічильник,
-   фото-хмарка, віджети. Токени/шрифт — з :root/[data-theme]
-   (єдине джерело правди на весь застосунок).
+   ГОЛОВНА (home) — Кристал Amore: генеративний SVG-артефакт спільної
+   історії пари. Токени/шрифт — з :root/[data-theme] (єдине джерело
+   правди на весь застосунок).
    ============================================================ */
 .home {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  align-items: center;
+  gap: 10px;
   /* Бліди у padding .content, щоб градієнт сягав країв видимої області.
      min-height:100% тут НЕ резолвиться — прямий батько (.page-fade у
      Layout.tsx) має height:auto (без явної висоти), а проценти від
@@ -1849,125 +1850,94 @@ a.wl-card-title { color: var(--accent); }
   min-height: 100dvh;
   background: var(--page-gradient);
 }
-.greeting-text {
+.home-title {
   font-family: 'Fredoka', sans-serif;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text);
-  margin: 6px 0 0;
+  margin: 4px 0 0;
+  text-align: center;
 }
+.home-subtitle { color: var(--muted); font-size: 13px; text-align: center; margin: 0; }
 
-.home-counter-wrap { position: relative; display: grid; place-items: center; min-height: 270px; }
-.counter { text-align: center; position: relative; z-index: 2; }
-.counter-number {
-  font-family: 'Fredoka', sans-serif;
-  font-size: 56px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--accent);
-  letter-spacing: -1px;
-}
-.counter-since { color: var(--muted); margin-top: 6px; font-size: 14px; }
-.counter-next-anniversary {
-  margin-top: 10px;
-  display: inline-block;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 999px;
-  padding: 6px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-/* Полароїд-хмарка */
-.photo-cloud { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
-.float-photo {
-  position: absolute;
-  width: 74px;
-  height: 84px;
-  padding: 5px 5px 12px;
-  background: #fff;
-  border-radius: 6px;
-  box-shadow: 0 8px 20px rgba(58, 37, 48, 0.16);
-  transform: rotate(var(--rot, 0deg));
-  transition: opacity 0.4s ease, transform 0.2s ease;
-  animation: float-bob 5s ease-in-out infinite;
+/* Кристал — SVG, анімація чисто CSS (без per-frame JS-рендеру). */
+.crystal-wrap {
+  display: block;
+  width: min(78vw, 320px);
+  aspect-ratio: 1;
+  margin: 12px auto 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
   cursor: pointer;
-  pointer-events: auto;
-  overflow: hidden;
-  box-sizing: border-box;
 }
-.float-photo img { width: 100%; height: 100%; object-fit: cover; border-radius: 2px; display: block; user-select: none; }
-.float-photo--0 { top: 4%; left: 2%; }
-.float-photo--1 { top: 0%; right: 6%; }
-.float-photo--2 { top: 42%; left: 0; }
-.float-photo--3 { top: 46%; right: 0; }
-.float-photo--4 { bottom: 2%; left: 10%; }
-.float-photo--5 { bottom: 0; right: 12%; }
-@keyframes float-bob {
-  0%, 100% { transform: rotate(var(--rot, 0deg)) translateY(0); }
-  50% { transform: rotate(var(--rot, 0deg)) translateY(-9px); }
+.crystal-svg { width: 100%; height: 100%; overflow: visible; }
+.crystal-spin { transform-origin: 100px 100px; animation: crystal-spin 140s linear infinite; }
+.crystal-breathe { transform-origin: 100px 100px; animation: crystal-breathe 7s ease-in-out infinite; }
+.crystal-facet {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: crystal-glint 5s ease-in-out infinite;
+  animation-delay: var(--glint-delay, 0s);
+}
+.crystal-facet--enter {
+  animation: crystal-materialize 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both,
+    crystal-glint 5s ease-in-out infinite;
+  animation-delay: calc(var(--facet-i) * 35ms), var(--glint-delay, 0s);
+}
+.crystal-anim-off { animation: none !important; }
+@keyframes crystal-spin { to { transform: rotate(360deg); } }
+@keyframes crystal-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.018); } }
+@keyframes crystal-glint { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.12); } }
+@keyframes crystal-materialize {
+  from { opacity: 0; transform: scale(0.3); }
+  to { opacity: 1; transform: scale(1); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .float-photo { animation: none; }
+  .crystal-spin, .crystal-breathe, .crystal-facet { animation: none !important; }
 }
 
-/* Міні-віджети */
-.mini-widgets { display: flex; gap: 10px; flex-wrap: wrap; }
-.mini-widget {
+/* Смужка статистики під кристалом */
+.crystal-stats { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
+.crystal-stat-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 8px 12px;
+  min-width: 64px;
+  box-shadow: 0 4px 12px rgba(58, 37, 48, 0.08);
+}
+.crystal-stat-icon { font-size: 16px; }
+.crystal-stat-value { font-weight: 700; font-size: 15px; }
+.crystal-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+
+/* Модалка «Місця на нашій карті» */
+.crystal-places-city {
+  padding: 8px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.crystal-place-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
-  min-width: 150px;
-  text-align: left;
+  width: 100%;
   border: 0;
-  border-radius: 18px;
-  padding: 14px 16px;
-  background: var(--surface);
-  color: var(--text);
+  background: transparent;
   font: inherit;
-  font-size: 13px;
+  text-align: left;
+  padding: 8px 0;
+  border-top: 1px solid rgba(58, 37, 48, 0.06);
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(58, 37, 48, 0.08);
-  transition: background 0.15s ease;
+  color: var(--text);
 }
-.mini-widget:hover { background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
-.mini-widget-icon { font-size: 22px; }
-.mini-widget-text { line-height: 1.3; }
-
-/* Найближча подія */
-.next-event-widget {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--surface);
-  border: 2px solid var(--accent);
-  border-radius: 20px;
-  padding: 14px 16px;
-}
-.next-event-empty { background: var(--surface); border-radius: 14px; padding: 16px; text-align: center; color: var(--muted); }
-.next-event-icon { font-size: 30px; }
-.next-event-label { font-size: 11px; color: var(--muted); margin: 0; text-transform: uppercase; letter-spacing: 0.05em; }
-.next-event-title { font-size: 17px; font-weight: 700; margin: 2px 0; }
-.next-event-date { font-size: 13px; color: var(--muted); margin: 0; }
-
-/* Тиждень */
-.week-widget { background: var(--surface); border-radius: 20px; padding: 16px 18px 8px; }
-.week-widget-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.week-widget-title { font-family: 'Fredoka', sans-serif; font-size: 16px; font-weight: 600; }
-.week-widget-count { background: var(--accent); color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
-.week-widget-list { display: flex; flex-direction: column; gap: 4px; }
-.week-day-hdr { padding: 8px 0 6px; font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
-.week-day-hdr--today .week-day-label { color: var(--accent); }
-.week-event-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(58, 37, 48, 0.06); }
-.week-event-icon { font-size: 18px; }
-.week-event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.week-event-title { font-size: 14px; font-weight: 600; }
-.week-event-note { font-size: 12px; color: var(--muted); }
-.week-event-badge { font-size: 11px; font-weight: 700; border-radius: 999px; padding: 3px 9px; white-space: nowrap; }
-.week-badge-plan { background: rgba(122, 138, 94, 0.14); color: #5c6a47; }
-.week-badge-event { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+.crystal-place-title { flex: 1; }
 
 /* ============================================================
    ФІНАНСИ (budget) — вільний ліміт + спільні цілі

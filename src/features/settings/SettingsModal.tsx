@@ -4,7 +4,8 @@
 // Порт modules/settings.js: розміри (user_sizes, per-user, upsert)
 // і менеджер фото Storage-бакету family_photos (HEIC-normalize +
 // compress → upload/видалення). useSettings.ts інвалідує qk.photos()
-// на кожній зміні, тож PhotoCloud на головній одразу підхоплює нове.
+// на кожній зміні, тож грань «Фотографії» кристала на головній одразу
+// підхоплює нове.
 // ============================================================
 import { useEffect, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useTheme } from '@/providers/ThemeProvider';
