@@ -12,7 +12,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Sparkles } from '@react-three/drei';
+import { OrbitControls, Sparkles, MeshTransmissionMaterial } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import type * as THREE from 'three';
 import {
@@ -47,6 +47,7 @@ interface BranchProps {
   geometry: THREE.BufferGeometry;
   material: ClusterMaterial;
   reduceMotion: boolean;
+  useTransmission: boolean;
   onOpen: () => void;
 }
 
@@ -59,8 +60,13 @@ interface BranchProps {
  * щоб читались як веха, а не черговий приріст. 'core'-вузли отримують
  * додатковий, слабший luminosity-підсвіт (§4 левітації — світіння ядра
  * замінює світіння вже видаленої кам'яної основи).
+ *
+ * `useTransmission`: справжнє заломлення світла (MeshTransmissionMaterial)
+ * коштує окремого рендеру всієї сцени в текстуру НА КОЖЕН інстанс щокадру —
+ * тому це лише для головного стовбура й milestone-вузлів (CrystalCluster
+ * вирішує, кому саме), а не для всіх ~40-70 гілок кластера.
  */
-function Branch({ branch, geometry, material, reduceMotion, onOpen }: BranchProps) {
+function Branch({ branch, geometry, material, reduceMotion, useTransmission, onOpen }: BranchProps) {
   const meshRef = useRef<THREE.Mesh | null>(null);
 
   useFrame((state) => {
@@ -81,19 +87,44 @@ function Branch({ branch, geometry, material, reduceMotion, onOpen }: BranchProp
       rotation={[branch.tiltX, branch.rotY, branch.tiltZ]}
       onClick={onOpen}
     >
-      <meshPhysicalMaterial
-        vertexColors
-        roughness={branch.emissive ? 0.15 : material.roughness}
-        metalness={branch.emissive ? 0.1 : 0}
-        transmission={branch.emissive ? 0.15 : material.transmission}
-        thickness={0.6}
-        clearcoat={branch.emissive ? 0.9 : material.clearcoat}
-        clearcoatRoughness={0.06}
-        ior={1.6}
-        reflectivity={branch.emissive ? 0.7 : 0.6}
-        emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
-        emissiveIntensity={branch.emissive ? 0.4 : coreGlow}
-      />
+      {useTransmission ? (
+        // transmissionSampler=true делегує заломлення в рідний, ОДИН-НА-СЦЕНУ
+        // механізм THREE.WebGLRenderer (той самий, що вже безпечно працює в
+        // звичайному meshPhysicalMaterial нижче) — власний per-інстанс
+        // FBO-рендер MeshTransmissionMaterial конфліктував з EffectComposer/
+        // Bloom (спостережено як повністю чорний кадр на одному з ракурсів).
+        <MeshTransmissionMaterial
+          vertexColors
+          transmissionSampler
+          transmission={1}
+          thickness={0.6}
+          roughness={branch.emissive ? 0.1 : 0.04}
+          ior={1.6}
+          chromaticAberration={0.06}
+          anisotropicBlur={0.3}
+          distortion={0.15}
+          distortionScale={0.3}
+          temporalDistortion={0.1}
+          clearcoat={branch.emissive ? 0.9 : material.clearcoat}
+          clearcoatRoughness={0.06}
+          emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
+          emissiveIntensity={branch.emissive ? 0.4 : coreGlow}
+        />
+      ) : (
+        <meshPhysicalMaterial
+          vertexColors
+          roughness={branch.emissive ? 0.15 : material.roughness}
+          metalness={branch.emissive ? 0.1 : 0}
+          transmission={branch.emissive ? 0.15 : material.transmission}
+          thickness={0.6}
+          clearcoat={branch.emissive ? 0.9 : material.clearcoat}
+          clearcoatRoughness={0.06}
+          ior={1.6}
+          reflectivity={branch.emissive ? 0.7 : 0.6}
+          emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
+          emissiveIntensity={branch.emissive ? 0.4 : coreGlow}
+        />
+      )}
     </mesh>
   );
 }
@@ -129,6 +160,18 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
     () => branches.map((branch) => ({ branch, geometry: buildBranchGeometry(branch, material) })),
     [branches, material],
   );
+
+  // Найвищий 'core'-вузол читається як головний стовбур друзи — саме йому
+  // (плюс усім milestone-вузлам) дістається дороге справжнє заломлення
+  // світла (MeshTransmissionMaterial), решта ~40-70 гілок лишається на
+  // дешевшому meshPhysicalMaterial.
+  const heroCoreKey = useMemo(() => {
+    let best: ClusterBranch | null = null;
+    for (const b of branches) {
+      if (b.kind === 'core' && (!best || b.height > best.height)) best = b;
+    }
+    return best?.key ?? null;
+  }, [branches]);
 
   useEffect(
     () => () => branchMeshes.forEach(({ geometry }) => geometry.dispose()),
@@ -170,6 +213,7 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
           geometry={geometry}
           material={material}
           reduceMotion={reduceMotion}
+          useTransmission={branch.kind === 'milestone' || branch.key === heroCoreKey}
           onOpen={onOpen}
         />
       ))}

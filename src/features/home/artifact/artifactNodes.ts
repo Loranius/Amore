@@ -51,16 +51,28 @@ import type {
 const DOMAIN_IDS: GrowthDomainId[] = ['exploration', 'memory', 'connection', 'creation', 'future'];
 const WEDGE_WIDTH = (Math.PI * 2) / DOMAIN_IDS.length;
 
+/**
+ * 'core' росте у вузькому, майже вертикальному конусі (computeLean, maxTilt
+ * нижче в buildCoreBranches). Домени НЕ мають власного клину по phi — лише
+ * по theta (wedge) — тож без цієї нижньої межі periферійна гілка домену
+ * могла б випадково «зайти» майже вертикально й перетнути стовбур 'core'.
+ * DOMAIN_MIN_TILT гарантує розділення по phi так само конструктивно, як
+ * WEDGE_WIDTH гарантує розділення по theta між доменами.
+ */
+const DOMAIN_MIN_TILT = 0.5;
+
 function wedgeStart(dna: ArtifactDNA, domain: GrowthDomainId): number {
   return dna.domainOrder.indexOf(domain) * WEDGE_WIDTH;
 }
 
 /**
- * Розміщення вузла всередині клину свого домену. Тверда гарантія:
+ * Розміщення вузла всередині клину свого домену. Тверда гарантія по theta:
  * theta завжди в [wedgeStart, wedgeStart+WEDGE_WIDTH) — інші домени фізично
- * недосяжні. «М'яка межа»: чим ближче до краю клину (edgeProximity→1), тим
- * більше вузол «нахиляється»/«сплощується» (вищий phi) — природний вигляд
- * «опору» без жодної колізійної перевірки.
+ * недосяжні. Тверда гарантія по phi: завжди >= DOMAIN_MIN_TILT — 'core'
+ * (маленький, майже вертикальний конус) фізично недосяжний жодному домену.
+ * «М'яка межа»: чим ближче до краю клину (edgeProximity→1), тим більше
+ * вузол «нахиляється»/«сплощується» (вищий phi) — природний вигляд «опору»
+ * без жодної колізійної перевірки.
  */
 function placeInDomain(
   rng: () => number,
@@ -71,13 +83,15 @@ function placeInDomain(
 ): { theta: number; phi: number; edgeProximity: number } {
   const start = wedgeStart(dna, domain);
   const theta = start + rng() * WEDGE_WIDTH;
-  const dampedMax = maxTiltRad * (1 - stability * 0.35);
+  // Демпінг стабільності стискає лише варіативність ПОНАД нижню межу, тому
+  // навіть найстабільніша пара ніколи не «просяде» назад у зону 'core'.
+  const range = Math.max(0.05, (maxTiltRad - DOMAIN_MIN_TILT) * (1 - stability * 0.35));
   const distFromStart = theta - start;
   const distFromEnd = start + WEDGE_WIDTH - theta;
   const edgeProximity = 1 - Math.min(distFromStart, distFromEnd) / (WEDGE_WIDTH / 2);
   // Кут нахилу обмежено ~80° — навіть найпериферійніший супутник у справжній
   // друзі ще росте «вгору-вбік», а не вниз чи горизонтально.
-  const phi = Math.min(1.4, rng() * dampedMax + edgeProximity * 0.25);
+  const phi = Math.min(1.4, DOMAIN_MIN_TILT + rng() * range + edgeProximity * 0.25);
   return { theta, phi, edgeProximity };
 }
 
@@ -153,8 +167,10 @@ function buildCoreBranches(
     const birthDay = i * CORE_INTERVAL_DAYS;
     const maturity = maturityCurve(daysTogether - birthDay);
     // Головний стовбур — найбільш вертикальний (реальний домінантний кристал
-    // друзи, що дістав найкраще місце для нуклеації, росте найпрямішим).
-    const { theta, phi } = computeLean(rng, 0.4, dna, symmetry, pressures.stability, i, count);
+    // друзи, що дістав найкраще місце для нуклеації, росте найпрямішим);
+    // maxTilt=0.3 лишається чітко нижче DOMAIN_MIN_TILT=0.5, тож жоден
+    // домен геометрично не може перетнути конус стовбура (placeInDomain).
+    const { theta, phi } = computeLean(rng, 0.3, dna, symmetry, pressures.stability, i, count);
     const distance = 0.03 + rng() * 0.1; // спільна коренева зона — тісно, не віночок
 
     nodes.push({
@@ -236,7 +252,7 @@ function buildMilestoneBranches(
   return sliced.map((m) => {
     const rng = mulberry32(seedNum + 7789 + m.id * 97);
     const maturity = maturityCurve(daysBetween(m.date), 6); // одразу вагомі, лиш трохи «доростають»
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'connection', 0.55, pressures.stability);
+    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'connection', 0.68, pressures.stability);
     const distance = (0.05 + rng() * 0.09) * (1 - edgeProximity * 0.15);
 
     return {
