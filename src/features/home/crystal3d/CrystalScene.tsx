@@ -259,8 +259,19 @@ export default function CrystalScene() {
     anniversariesPending ||
     creationPending;
 
-  const seedNum = useMemo(() => hashSeedString(seed ?? ''), [seed]);
-  const artifactDNA = useMemo(() => generateArtifactDNA(seed ?? ''), [seed]);
+  // Регенерація: кнопка перекочує лише «генетику» (seed) — та сама історія
+  // пари (дні/місця/спогади) проявляється в новій композиції друзи, як того
+  // хоче рушій. Ефемерно (не чіпає збережений couple-seed): reload повертає
+  // справжній кристал.
+  const [seedOverride, setSeedOverride] = useState<string | null>(null);
+  const effectiveSeed = seedOverride ?? seed ?? '';
+  const regenerate = () => {
+    const chunk = () => Math.floor(Math.random() * 0x10000).toString(16).toUpperCase().padStart(4, '0');
+    setSeedOverride(`${chunk()}-${chunk()}-${chunk()}`);
+  };
+
+  const seedNum = useMemo(() => hashSeedString(effectiveSeed), [effectiveSeed]);
+  const artifactDNA = useMemo(() => generateArtifactDNA(effectiveSeed), [effectiveSeed]);
   const memoriesCount = memories?.length ?? 0;
   const memoryItems = useMemo(
     () => (memories ?? []).map((m) => ({ id: m.id, date: m.date })),
@@ -368,6 +379,41 @@ export default function CrystalScene() {
             target={[0, 0.2, 0]}
           />
         </Canvas>
+        <button
+          type="button"
+          className="crystal-regen"
+          aria-label="Перегенерувати кристал"
+          title="Перегенерувати кристал"
+          onClick={(e) => {
+            e.stopPropagation();
+            regenerate();
+          }}
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+            <path
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M20 11a8 8 0 1 0-.9 4.5M20 4v5h-5"
+            />
+          </svg>
+        </button>
+        {seedOverride !== null && (
+          <button
+            type="button"
+            className="crystal-regen crystal-regen--reset"
+            aria-label="Повернути справжній кристал"
+            title="Повернути справжній кристал"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSeedOverride(null);
+            }}
+          >
+            ↩
+          </button>
+        )}
       </div>
 
       <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />

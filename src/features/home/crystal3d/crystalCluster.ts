@@ -244,9 +244,7 @@ export function buildBranchGeometry(
       ? 4 + Math.floor(shapeRng() * 2)
       : branch.role === 'satellite'
         ? 5 + Math.floor(shapeRng() * 2)
-        : branch.radiusBottom > 0.22
-          ? 6 + Math.floor(shapeRng() * 2)
-          : 7 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+        : 6 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
   const m = branch.maturity;
 
   const h = branch.height * (0.32 + m * 0.68);

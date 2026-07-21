@@ -163,11 +163,14 @@ function inheritDirection(
   const rare = rng();
   const horiz = Math.hypot(at.x, at.z);
   const radial = horiz > 1e-6 ? v3(at.x / horiz, 0, at.z / horiz) : v3(0, 0, 0);
-  const lean = 0.1 + 0.32 * Math.min(1, horiz / 0.85);
+  // Сильний нахил НАЗОВНІ, що росте з відстанню від осі — саме він робить
+  // друзу віялом шпилів (референс), а не пучком вертикалей. Плюс відчутне
+  // азимутальне збурення (perturb) — сплеск об'ємний, а не плаский.
+  const lean = 0.5 + Math.min(1, horiz / 0.7);
   const dir = normalize(
     add(
       add(v3(0, 1, 0), scale(radial, lean)),
-      add(add(scale(normal, 0.12), scale(substrateDirection, 0.08)), scale(perturb, 0.07)),
+      add(add(scale(normal, 0.15), scale(substrateDirection, 0.08)), scale(perturb, 0.35)),
     ),
   );
   const minUp = rare < c.diagonalChance ? c.minUpwardRare : c.minUpwardMain;

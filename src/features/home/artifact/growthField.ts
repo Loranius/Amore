@@ -138,10 +138,11 @@ export function growthPotential(t: number): number {
   return 0.18 + 0.82 * Math.exp(-d * d);
 }
 
-/** Тяжіння до «ґрунту» маси: місця біля рівня основи різко привабливіші —
- *  друза росте від підніжжя вгору, а не поверхами. */
+/** Тяжіння до «ґрунту» маси: підніжжя привабливіше, але не настільки, щоб
+ *  усе злипалось в одну точку — дочірні шпилі чіпляються й трохи вище,
+ *  утворюючи об'ємне віяло. */
 export function groundTerm(y: number): number {
-  return 1 / (1 + Math.max(0, y + 0.3) * 2.2);
+  return 1 / (1 + Math.max(0, y + 0.3) * 1.3);
 }
 
 // ── Local Density і Growth Shadow ────────────────────────────────
@@ -268,10 +269,11 @@ function silhouetteAnisotropy(ctx: GrowthFieldContext, point: Vec3): number {
   return 1 - Math.min(1, horiz / 0.3) * ctx.anisoAmp * squeeze;
 }
 
-/** Доцентрове тяжіння: серце друзи щільне, назовні — поступово легше. */
+/** Доцентрове тяжіння: серце друзи щільніше, але помірно — інакше все
+ *  збивається в одну колону замість віяла окремих шпилів. */
 function centerPull(point: Vec3): number {
   const horizSq = point.x * point.x + point.z * point.z;
-  return 1 + 0.55 * Math.exp(-horizSq / 0.45);
+  return 1 + 0.28 * Math.exp(-horizSq / 0.5);
 }
 
 export function scoreGrowthSite(

@@ -464,11 +464,15 @@ function microPass(bodies: ComposedBody[], seedNum: number, config: CompositionC
       const radius = radMin + mrng() * (radMax - radMin);
       // Мікро завжди відчутно менше за батька — навіть якщо той сам крихітний.
       const length = Math.min(lenMin + mrng() * (lenMax - lenMin), parent.length * 0.55);
+      // Кристал не росте вниз (Species constraint) — навіть мікропил: якщо
+      // нахил у тріщину завів би вістря нижче горизонту, підіймаємо його.
+      let microDir = bendToward(parent.direction, side, 0.35 + mrng() * 0.4);
+      if (microDir.y < 0.06) microDir = normalize(v3(microDir.x, 0.06, microDir.z));
       micro.push({
         key: `${parent.key}~m${i}`,
         parentKey: parent.key,
         anchor: add(surface, scale(side, -radius * 0.6)),
-        direction: bendToward(parent.direction, side, 0.35 + mrng() * 0.4),
+        direction: microDir,
         length,
         radius,
         age: parent.age,
