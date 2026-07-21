@@ -330,7 +330,10 @@ function depositMineral(
   const falloff = isMonarch ? 1 : moundFalloff(Math.hypot(probe.point.x, probe.point.z));
   let length = rawLength * (0.55 + 0.45 * energy) * heightDamp(probe.point.y) * falloff;
   if (isMonarch) length = rawLength; // рівномірний ріст без випадкових модуляцій
-  const radius = rawRadius * (0.7 + 0.3 * energy);
+  let radius = rawRadius * (0.7 + 0.3 * energy);
+  // Правдоподібні кварцові пропорції (референс): довге тіло не буває
+  // голкою-волосиною — стрункість обмежена, король особливо кремезний.
+  if (length > 0.6) radius = Math.max(radius, length / (isMonarch ? 5.5 : 7.5));
   // Ієрархія: ніхто не переростає монарха (той відкладається найпершим).
   if (!isMonarch && monarch.length !== null) length = Math.min(length, monarch.length * MONARCH_HEIGHT_CEILING);
 
