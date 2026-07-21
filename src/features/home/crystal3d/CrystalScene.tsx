@@ -16,9 +16,11 @@ import type * as THREE from 'three';
 import { useCrystalDNA } from '../useCrystal';
 import type { CrystalDNA } from '../useCrystal';
 import { useCrystalSeen } from '../useCrystalSeen';
+import { useCrystalSeed } from '../useHome';
+import { hashSeedString } from '../mulberry32';
 import { CATEGORY_DEFS, isDnaEmpty } from '../crystalGeometry';
 import { CrystalStats } from '../CrystalStats';
-import { PlacesModal } from '../PlacesModal';
+import { MemoryModal } from '../MemoryModal';
 import {
   buildSpikes,
   buildSpikeGeometry,
@@ -31,19 +33,20 @@ const BASE_Y = -1.3;
 
 interface ClusterProps {
   dna: CrystalDNA;
+  seedNum: number;
   reduceMotion: boolean;
   grew: boolean;
   onOpen: () => void;
 }
 
-function CrystalCluster({ dna, reduceMotion, grew, onOpen }: ClusterProps) {
+function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterProps) {
   const groupRef = useRef<THREE.Group | null>(null);
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
 
   const spikeMeshes = useMemo(
-    () => buildSpikes(dna).map((spec) => ({ spec, geometry: buildSpikeGeometry(spec) })),
-    [dna],
+    () => buildSpikes(dna, seedNum).map((spec) => ({ spec, geometry: buildSpikeGeometry(spec) })),
+    [dna, seedNum],
   );
 
   // Досягнуті цілі «полірують» кристал — нижчий roughness, вищий clearcoat.
@@ -133,7 +136,10 @@ function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
 }
 
 export default function CrystalScene() {
-  const { dna, deltas, isPending } = useCrystalDNA();
+  const { dna, deltas, isPending: dnaPending } = useCrystalDNA();
+  const { seed, isPending: seedPending } = useCrystalSeed();
+  const isPending = dnaPending || seedPending;
+  const seedNum = useMemo(() => hashSeedString(seed ?? ''), [seed]);
   const empty = !isPending && isDnaEmpty(dna);
   const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending);
   const [open, setOpen] = useState(false);
@@ -164,7 +170,7 @@ export default function CrystalScene() {
         className="crystal-wrap"
         role="button"
         tabIndex={0}
-        aria-label="Кристал Amore — показати відвідані місця"
+        aria-label="Кристал Amore — показати випадковий спогад"
         onKeyDown={onKeyDownOpen}
       >
         <Canvas dpr={[1, 2]} camera={{ position: [0, 0.2, 5.4], fov: 42 }}>
@@ -175,7 +181,13 @@ export default function CrystalScene() {
             (empty ? (
               <CrystalSeed reduceMotion={reduceMotion} />
             ) : (
-              <CrystalCluster dna={dna} reduceMotion={reduceMotion} grew={grew} onOpen={openModal} />
+              <CrystalCluster
+                dna={dna}
+                seedNum={seedNum}
+                reduceMotion={reduceMotion}
+                grew={grew}
+                onOpen={openModal}
+              />
             ))}
           <Sparkles
             count={sparkleCount}
@@ -196,7 +208,7 @@ export default function CrystalScene() {
 
       <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />
 
-      {open && <PlacesModal onClose={() => setOpen(false)} />}
+      {open && <MemoryModal onClose={() => setOpen(false)} />}
     </>
   );
 }

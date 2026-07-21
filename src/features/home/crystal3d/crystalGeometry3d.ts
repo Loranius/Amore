@@ -44,24 +44,35 @@ const CORE_COLOR_B = '#e9ddff';
 const CAP_FOR_STAGE: Record<CrystalStage, number> = { 1: 0, 2: 1, 3: 3, 4: 5, 5: 7 };
 const MAX_CAP = 7;
 
-/** Центральний стрижень («час разом») + «колонія» дрібних шипів на решту категорій. */
-export function buildSpikes(dna: CrystalDNA): SpikeSpec[] {
+/**
+ * Центральний стрижень («час разом») + «колонія» дрібних шипів на решту
+ * категорій. seedNum — персистентна couple-«генетика» (0, якщо ще не
+ * завантажена): зміщує позицію/кут кожного слота, повертає весь віночок
+ * категорій і трохи нахиляє/масштабує ядро — тому дві пари з ідентичною
+ * ДНК все одно ростуть у різні форми.
+ */
+export function buildSpikes(dna: CrystalDNA, seedNum = 0): SpikeSpec[] {
   const spikes: SpikeSpec[] = [];
   const [timeCat, ...restCats] = CATEGORY_DEFS;
+
+  const coreRng = mulberry32(seedNum + 7);
+  const density = 0.85 + coreRng() * 0.3; // «щільність кристалу» — унікальна per couple
+  const coreTilt = 0.03 + coreRng() * 0.05;
+  const coreTiltAngle = coreRng() * Math.PI * 2;
 
   const timeWeight = timeCat ? categoryWeight(timeCat, dna) : 0;
   if (timeCat && timeCat.metric(dna) > 0) {
     spikes.push({
       key: 'core',
       isCore: true,
-      height: 1.5 + timeWeight * 1.5,
-      radiusBottom: 0.4,
+      height: (1.5 + timeWeight * 1.5) * density,
+      radiusBottom: 0.4 * density,
       radiusTop: 0.08,
       posX: 0,
       posZ: 0,
-      tiltX: 0,
-      tiltZ: 0,
-      rotY: 0,
+      tiltX: Math.sin(coreTiltAngle) * coreTilt,
+      tiltZ: Math.cos(coreTiltAngle) * coreTilt,
+      rotY: coreRng() * Math.PI * 2,
       colorA: CORE_COLOR_A,
       colorB: CORE_COLOR_B,
     });
@@ -71,19 +82,20 @@ export function buildSpikes(dna: CrystalDNA): SpikeSpec[] {
   const cap = CAP_FOR_STAGE[stage];
   const arc = 360 / restCats.length;
   const slotArc = arc / MAX_CAP;
+  const rotOffset = ((seedNum % 360) + 360) % 360;
 
   restCats.forEach((cat, catIdx) => {
     const weight = categoryWeight(cat, dna);
     if (weight <= 0 || cap <= 0) return;
 
     const count = Math.min(cap, Math.max(1, Math.round(weight * cap)));
-    const arcStart = arc * catIdx;
+    const arcStart = arc * catIdx + rotOffset;
 
     for (let i = 0; i < count; i++) {
-      // Детерміновано лише за (категорія, слот) — НЕ за count/cap, тому
+      // Детерміновано за (seed, категорія, слот) — НЕ за count/cap, тому
       // позиція/кут/розмір слота i ніколи не змінюються, коли з'являється
-      // слот i+1.
-      const rng = mulberry32(catIdx * 991 + 17 + i * 131);
+      // слот i+1 (для цього ж couple-seed).
+      const rng = mulberry32(seedNum + catIdx * 991 + 17 + i * 131);
       const sizeFactor = Math.max(0.35, 1 - i * 0.12);
       const angleDeg = arcStart + (i + 0.5) * slotArc + (rng() - 0.5) * slotArc * 0.4;
       const rad = (angleDeg * Math.PI) / 180;
@@ -93,8 +105,8 @@ export function buildSpikes(dna: CrystalDNA): SpikeSpec[] {
       spikes.push({
         key: `${cat.key}-${i}`,
         isCore: false,
-        height: (0.5 + weight * 1.35) * sizeFactor + rng() * 0.08,
-        radiusBottom: (0.17 + weight * 0.08) * sizeFactor,
+        height: ((0.5 + weight * 1.35) * sizeFactor + rng() * 0.08) * density,
+        radiusBottom: (0.17 + weight * 0.08) * sizeFactor * density,
         radiusTop: 0.035 * sizeFactor,
         posX: Math.cos(rad) * dist,
         posZ: Math.sin(rad) * dist,

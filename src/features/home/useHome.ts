@@ -44,6 +44,44 @@ export function useStartDate(): string | null {
   return query.data ?? cached;
 }
 
+const CRYSTAL_SEED_LS = 'amore:crystalSeed';
+
+/** Персистентна «генетика» кристала (settings.crystal_seed) — миттєво з localStorage. */
+export function useCrystalSeed(): { seed: string | null; isPending: boolean } {
+  let cached: string | null = null;
+  try {
+    cached = localStorage.getItem(CRYSTAL_SEED_LS);
+  } catch {
+    /* ignore */
+  }
+
+  const query = useQuery({
+    queryKey: [...qk.settings(), 'crystal_seed'],
+    staleTime: Infinity,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'crystal_seed')
+        .maybeSingle();
+      if (error) throw error;
+      return typeof data?.value === 'string' ? data.value : null;
+    },
+  });
+
+  useEffect(() => {
+    if (query.data) {
+      try {
+        localStorage.setItem(CRYSTAL_SEED_LS, query.data);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [query.data]);
+
+  return { seed: query.data ?? cached, isPending: query.isPending && !cached };
+}
+
 /** Пул фото зі Storage (для грані «Фотографії» кристала). */
 const PHOTO_BUCKET = 'family_photos';
 export function usePhotoPool() {

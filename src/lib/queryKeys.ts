@@ -29,6 +29,7 @@ export const qk = {
 
   schedule: (month: string) => ['schedule', month] as const,
   photoCalendar: (month: string) => ['photoCalendar', month] as const,
+  photoCalendarAll: () => ['photoCalendar', 'all'] as const,
   photos: () => ['photos'] as const,
 
   freeLimit: () => ['freeLimit'] as const,

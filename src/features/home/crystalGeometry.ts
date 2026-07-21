@@ -187,15 +187,20 @@ const ARC_GAP = 3;
 const RING_STEP = 9;
 const RING_DEPTH = 9;
 
-/** Будує повний набір граней кристала з ДНК пари. Детерміновано за (категорія, слот). */
-export function buildFacets(dna: CrystalDNA): Facet[] {
+/**
+ * Будує повний набір граней кристала з ДНК пари. Детерміновано за
+ * (категорія, слот), зміщено персистентним couple-seed (0, якщо ще не
+ * завантажений) — тому дві пари з однаковою ДНК все одно ростуть по-різному.
+ */
+export function buildFacets(dna: CrystalDNA, seedNum = 0): Facet[] {
   const facets: Facet[] = [...BASE_SEED_FACETS];
+  const rotOffset = ((seedNum % 360) + 360) % 360;
   CATEGORY_DEFS.forEach((cat, catIdx) => {
     const count = cat.facetsFor(cat.metric(dna));
-    const arcStart = catIdx * ARC + ARC_GAP / 2;
-    const arcEnd = (catIdx + 1) * ARC - ARC_GAP / 2;
+    const arcStart = catIdx * ARC + ARC_GAP / 2 + rotOffset;
+    const arcEnd = (catIdx + 1) * ARC - ARC_GAP / 2 + rotOffset;
     for (let i = 0; i < count; i++) {
-      const rng = mulberry32(catIdx * 1000 + i);
+      const rng = mulberry32(seedNum + catIdx * 1000 + i);
       const jitterA = (rng() - 0.5) * 2.5;
       const innerR = CORE_R + i * RING_STEP + (rng() - 0.5) * 2;
       const outerR = innerR + RING_DEPTH + rng() * 3;

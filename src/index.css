@@ -1965,30 +1965,18 @@ a.wl-card-title { color: var(--accent); }
 .crystal-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
 .crystal-stat-delta { font-size: 9px; color: var(--ok); font-weight: 600; }
 
-/* Модалка «Місця на нашій карті» */
-.crystal-places-city {
-  padding: 8px 0 6px;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.crystal-place-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+/* Модалка «Спогад» (клік по кристалу) */
+.memory-card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+.memory-photo {
   width: 100%;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  text-align: left;
-  padding: 8px 0;
-  border-top: 1px solid rgba(58, 37, 48, 0.06);
-  cursor: pointer;
-  color: var(--text);
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(58, 37, 48, 0.15);
 }
-.crystal-place-title { flex: 1; }
+.memory-date { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 4px 0 0; }
+.memory-comment { font-size: 15px; font-style: italic; color: var(--text); margin: 0; }
+.memory-author { font-size: 12px; color: var(--muted); margin: 0; }
 
 /* ============================================================
    ФІНАНСИ (budget) — вільний ліміт + спільні цілі

@@ -14,6 +14,8 @@ import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useCrystalDNA } from './useCrystal';
 import { useCrystalSeen } from './useCrystalSeen';
+import { useCrystalSeed } from './useHome';
+import { hashSeedString } from './mulberry32';
 import {
   buildFacets,
   CATEGORY_DEFS,
@@ -24,13 +26,16 @@ import {
   type Facet,
 } from './crystalGeometry';
 import { CrystalStats } from './CrystalStats';
-import { PlacesModal } from './PlacesModal';
+import { MemoryModal } from './MemoryModal';
 
 export function Crystal() {
-  const { dna, deltas, isPending } = useCrystalDNA();
+  const { dna, deltas, isPending: dnaPending } = useCrystalDNA();
+  const { seed, isPending: seedPending } = useCrystalSeed();
+  const isPending = dnaPending || seedPending;
+  const seedNum = useMemo(() => hashSeedString(seed ?? ''), [seed]);
   const empty = !isPending && isDnaEmpty(dna);
   const stage = !isPending && !empty ? stageForRichness(totalRichness(dna)) : null;
-  const facets = useMemo(() => buildFacets(dna), [dna]);
+  const facets = useMemo(() => buildFacets(dna, seedNum), [dna, seedNum]);
   const [open, setOpen] = useState(false);
   const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending);
   const reduceMotion =
@@ -48,7 +53,7 @@ export function Crystal() {
         type="button"
         className="crystal-wrap"
         onClick={() => setOpen(true)}
-        aria-label="Кристал Amore — показати відвідані місця"
+        aria-label="Кристал Amore — показати випадковий спогад"
       >
         <svg viewBox="0 0 200 200" className="crystal-svg" aria-hidden="true">
           <defs>
@@ -104,7 +109,7 @@ export function Crystal() {
 
       <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />
 
-      {open && <PlacesModal onClose={() => setOpen(false)} />}
+      {open && <MemoryModal onClose={() => setOpen(false)} />}
     </>
   );
 }
