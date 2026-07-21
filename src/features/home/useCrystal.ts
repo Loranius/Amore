@@ -27,6 +27,8 @@ export interface CrystalDNA {
   recipesSaved: number;
   distinctCountries: number;
   milestones: number;
+  /** Сума saved_amount по всіх спільних цілях — «фінанси потовщують основу». */
+  totalSaved: number;
 }
 
 /** Дельти «за цей місяць» — лише там, де це можна порахувати чесно. */
@@ -50,6 +52,7 @@ const EMPTY_DNA: CrystalDNA = {
   recipesSaved: 0,
   distinctCountries: 0,
   milestones: 0,
+  totalSaved: 0,
 };
 
 const EMPTY_DELTAS: CrystalDeltas = {
@@ -109,6 +112,7 @@ export function useCrystalDNA(): {
         (pins.data ?? []).map((p) => p.country).filter((c): c is string => !!c),
       ).size,
       milestones: (events.data ?? []).filter((e) => e.is_milestone).length,
+      totalSaved: (goals.data ?? []).reduce((sum, g) => sum + (g.saved_amount ?? 0), 0),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [

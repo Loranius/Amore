@@ -59,7 +59,11 @@ export function buildSpikes(dna: CrystalDNA, seedNum = 0): SpikeSpec[] {
   const [timeCat, ...restCats] = CATEGORY_DEFS;
 
   const coreRng = mulberry32(seedNum + 7);
-  const density = 0.85 + coreRng() * 0.3; // «щільність кристалу» — унікальна per couple
+  // «Щільність кристалу»: базово унікальна per couple (seed) + «фінанси
+  // потовщують основу» — накопичені спільні заощадження додають вагу й
+  // стабільність усій колонії (лог-шкала, щоб не рости необмежено).
+  const financeBoost = 1 + Math.min(0.3, Math.log10(1 + dna.totalSaved) * 0.045);
+  const density = (0.85 + coreRng() * 0.3) * financeBoost;
   const coreTilt = 0.03 + coreRng() * 0.05;
   const coreTiltAngle = coreRng() * Math.PI * 2;
 

@@ -17,6 +17,7 @@ import { useCrystalDNA, useMilestoneEvents } from '../useCrystal';
 import type { CrystalDNA } from '../useCrystal';
 import { useCrystalSeen, MILESTONE_SEEN_KEY } from '../useCrystalSeen';
 import { useCrystalSeed } from '../useHome';
+import { useMemories } from '../useMemories';
 import { hashSeedString } from '../mulberry32';
 import { CATEGORY_DEFS, isDnaEmpty } from '../crystalGeometry';
 import { CrystalStats } from '../CrystalStats';
@@ -138,12 +139,13 @@ interface ClusterProps {
   dna: CrystalDNA;
   seedNum: number;
   milestones: ReadonlyArray<{ id: number; title: string }>;
+  memoriesCount: number;
   reduceMotion: boolean;
   grew: boolean;
   onOpen: () => void;
 }
 
-function CrystalCluster({ dna, seedNum, milestones, reduceMotion, grew, onOpen }: ClusterProps) {
+function CrystalCluster({ dna, seedNum, milestones, memoriesCount, reduceMotion, grew, onOpen }: ClusterProps) {
   const groupRef = useRef<THREE.Group | null>(null);
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
@@ -170,6 +172,8 @@ function CrystalCluster({ dna, seedNum, milestones, reduceMotion, grew, onOpen }
   // Досягнуті цілі «полірують» кристал — нижчий roughness, вищий clearcoat.
   const roughness = Math.max(0.08, 0.24 - dna.goalsAchieved * 0.015);
   const clearcoat = Math.min(0.95, 0.7 + dna.goalsAchieved * 0.02);
+  // Спогади «зігрівають» ядро зсередини — чим більше, тим тепліше й яскравіше світіння.
+  const memoryGlow = Math.min(0.85, memoriesCount * 0.035);
 
   useEffect(
     () => () => spikeMeshes.forEach(({ geometry }) => geometry.dispose()),
@@ -212,7 +216,13 @@ function CrystalCluster({ dna, seedNum, milestones, reduceMotion, grew, onOpen }
       />
       <mesh position={[0, BASE_Y, 0]}>
         <sphereGeometry args={[0.34, 24, 16]} />
-        <meshPhysicalMaterial color="#4a3f52" roughness={0.85} clearcoat={0.15} />
+        <meshPhysicalMaterial
+          color="#4a3f52"
+          roughness={0.85}
+          clearcoat={0.15}
+          emissive="#ff9d5c"
+          emissiveIntensity={memoryGlow}
+        />
       </mesh>
       {spikeMeshes.map(({ spec, geometry }) => (
         <Spike
@@ -266,7 +276,8 @@ export default function CrystalScene() {
   const { dna, deltas, isPending: dnaPending } = useCrystalDNA();
   const { seed, isPending: seedPending } = useCrystalSeed();
   const { milestones, isPending: milestonesPending } = useMilestoneEvents();
-  const isPending = dnaPending || seedPending || milestonesPending;
+  const { data: memories, isPending: memoriesPending } = useMemories();
+  const isPending = dnaPending || seedPending || milestonesPending || memoriesPending;
   const seedNum = useMemo(() => hashSeedString(seed ?? ''), [seed]);
   const empty = !isPending && isDnaEmpty(dna);
   const { seenSnapshot, isFirstVisit } = useCrystalSeen(dna, isPending, milestones.length);
@@ -314,6 +325,7 @@ export default function CrystalScene() {
                 dna={dna}
                 seedNum={seedNum}
                 milestones={milestones}
+                memoriesCount={memories?.length ?? 0}
                 reduceMotion={reduceMotion}
                 grew={grew}
                 onOpen={openModal}
