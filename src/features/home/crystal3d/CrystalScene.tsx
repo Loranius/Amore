@@ -156,7 +156,7 @@ export default function CrystalScene() {
         aria-label="Кристал Amore — показати відвідані місця"
         onKeyDown={onKeyDownOpen}
       >
-        <Canvas dpr={[1, 2]} camera={{ position: [0, 0.2, 6.5], fov: 42 }}>
+        <Canvas dpr={[1, 2]} camera={{ position: [0, 0.2, 6], fov: 42 }}>
           <ambientLight intensity={0.5} />
           <directionalLight position={[3, 4, 2]} intensity={1.1} />
           <pointLight position={[-3, -2, -2]} intensity={0.4} color="#e6a0bd" />
@@ -172,8 +172,9 @@ export default function CrystalScene() {
             size={2}
             speed={reduceMotion ? 0 : 0.2}
             color="#ffe9f2"
+            position={[0, 0.2, 0]}
           />
-          <OrbitControls enablePan={false} enableZoom={false} />
+          <OrbitControls enablePan={false} enableZoom={false} target={[0, 0.2, 0]} />
           <EffectComposer>
             <Bloom intensity={0.6} luminanceThreshold={0.3} luminanceSmoothing={0.4} mipmapBlur />
           </EffectComposer>
