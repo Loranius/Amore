@@ -13,7 +13,7 @@
 // ============================================================
 import * as THREE from 'three';
 import { CATEGORY_DEFS, MAX_SLOTS, totalRichness, stageForRichness, type CrystalStage } from '../crystalGeometry';
-import { mulberry32 } from '../mulberry32';
+import { mulberry32, hashSeedString } from '../mulberry32';
 import type { CrystalDNA } from '../useCrystal';
 
 export { totalRichness, stageForRichness, stageLabel, type CrystalStage } from '../crystalGeometry';
@@ -74,7 +74,7 @@ export function buildSpikes(dna: CrystalDNA, seedNum = 0): SpikeSpec[] {
       isCore: true,
       height: (1.5 + timeWeight * 1.5) * density,
       radiusBottom: 0.4 * density,
-      radiusTop: 0.08,
+      radiusTop: 0,
       posX: 0,
       posZ: 0,
       tiltX: Math.sin(coreTiltAngle) * coreTilt,
@@ -116,7 +116,7 @@ export function buildSpikes(dna: CrystalDNA, seedNum = 0): SpikeSpec[] {
         isCore: false,
         height: ((0.5 + weight * 1.35) * sizeFactor + rng() * 0.08) * density,
         radiusBottom: (0.17 + weight * 0.08) * sizeFactor * density,
-        radiusTop: 0.035 * sizeFactor,
+        radiusTop: 0,
         posX: Math.cos(rad) * dist,
         posZ: Math.sin(rad) * dist,
         tiltX: Math.sin(rad) * tilt,
@@ -168,7 +168,7 @@ export function buildMilestoneSpikes(
       isCore: false,
       height: 1.15 + rng() * 0.45,
       radiusBottom: 0.2 + rng() * 0.06,
-      radiusTop: 0.045,
+      radiusTop: 0,
       posX: Math.cos(rad) * dist,
       posZ: Math.sin(rad) * dist,
       tiltX: Math.sin(rad) * tilt,
@@ -182,9 +182,33 @@ export function buildMilestoneSpikes(
   });
 }
 
-/** Гранований шестигранний шип із вершинним градієнтом (темніша основа → світліший вістря). */
+/**
+ * Природна анатомія кристала: пряма гранована призма (стовбур) знизу, що
+ * переходить у гранену пірамідальну верхівку — так насправді росте кварц/
+ * діамант «у сирому вигляді», а не рівномірно звужений конус зі зрізаною
+ * маківкою (стара CylinderGeometry-версія). LatheGeometry обертає профіль
+ * (радіус, y) навколо осі Y — segments={5..7} дає гранований, не круглий,
+ * переріз; вершини НЕ шаряться між гранями (як і в старій версії), тому
+ * computeVertexNormals() дає тверді, «скляні» ребра, а не згладжену трубу.
+ * shapeRng деталі (кількість граней, де починається вістря, лінія стовбура)
+ * бере зі spec.key — стабільно для цього шипа, незалежно від DNA/seed
+ * офсетів, які вже витрачені на позицію/нахил/дихання.
+ */
 export function buildSpikeGeometry(spec: SpikeSpec): THREE.BufferGeometry {
-  const geo = new THREE.CylinderGeometry(spec.radiusTop, spec.radiusBottom, spec.height, 6, 1);
+  const shapeRng = mulberry32(hashSeedString(spec.key));
+  const segments = 5 + Math.floor(shapeRng() * 3); // 5–7 граней — не завжди ідеальний шестигранник
+  const pointStart = 0.52 + shapeRng() * 0.22; // де стовбур закінчується і починається гранена верхівка
+  const r = spec.radiusBottom;
+  const h = spec.height;
+
+  const profile = [
+    new THREE.Vector2(Math.max(0.001, r * (0.88 + shapeRng() * 0.1)), 0),
+    new THREE.Vector2(r, h * (0.08 + shapeRng() * 0.05)), // ледь помітне «плече» стовбура
+    new THREE.Vector2(r * (0.94 + shapeRng() * 0.06), h * pointStart), // верх прямого стовбура
+    new THREE.Vector2(Math.max(0, spec.radiusTop), h), // гранена верхівка (майже вістря)
+  ];
+
+  const geo = new THREE.LatheGeometry(profile, segments);
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
   const colors = new Float32Array(pos.count * 3);
   const colorA = new THREE.Color(spec.colorA);
@@ -192,7 +216,7 @@ export function buildSpikeGeometry(spec: SpikeSpec): THREE.BufferGeometry {
   const c = new THREE.Color();
 
   for (let i = 0; i < pos.count; i++) {
-    const t = (pos.getY(i) + spec.height / 2) / spec.height;
+    const t = pos.getY(i) / h;
     c.lerpColors(colorA, colorB, Math.min(1, Math.max(0, t)));
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
@@ -200,7 +224,6 @@ export function buildSpikeGeometry(spec: SpikeSpec): THREE.BufferGeometry {
   }
 
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  geo.translate(0, spec.height / 2, 0); // основа шипа — у локальному y=0.
   geo.computeVertexNormals();
   return geo;
 }
