@@ -9,6 +9,8 @@ export type {
   ArtifactNode,
   ArtifactInput,
   ColonyRole,
+  CompositionTier,
+  CrystalArchetype,
   DatedItem,
   DepositedCrystal,
   DepositionEvent,
@@ -20,12 +22,14 @@ export type {
   NodeKind,
 } from './artifactTypes';
 export type { Vec3 } from './vec3';
+export type { CompositionScore } from './composition/score';
+export { composeMineralCluster } from './composition/mineralPreset';
 
 export { generateArtifactDNA } from './artifactDNA';
 export { maturityCurve } from './maturity';
 export { computeEvolutionPressures } from './evolutionPressure';
 export { isArtifactEmpty, bucketByFixedSize } from './growthEvents';
-export { depositMineralMass } from './mineralDeposition';
+export { depositMineralMass, depositMineralMassWithScore } from './mineralDeposition';
 export { MATURITY_HEIGHT_SCALE, MATURITY_RADIUS_SCALE, distanceToSurface } from './growthSurface';
 
 /** Історичний псевдонім публічного API: рендерери викликали buildArtifactNodes —
