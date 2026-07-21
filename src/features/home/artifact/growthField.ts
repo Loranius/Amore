@@ -28,9 +28,9 @@
 // див. політику в growthEvents.ts.
 // ============================================================
 import { mulberry32, hashSeedString } from '../mulberry32';
-import { daysBetween } from '../homeUtils';
 import { type Vec3, dot, distSq, lengthOf, v3, add, scale } from './vec3';
 import type { ArtifactDNA, ArtifactInput, DepositedCrystal, DepositionEvent, GrowthDomainId } from './artifactTypes';
+import { buildEvolutionTimeline, categoryShares, evenness, historyAt, type EvolutionTimeline } from './evolution';
 
 const DOMAIN_IDS: GrowthDomainId[] = ['exploration', 'memory', 'connection', 'creation', 'future'];
 const WEDGE_WIDTH = (Math.PI * 2) / DOMAIN_IDS.length;
@@ -41,61 +41,17 @@ export function domainAzimuth(dna: ArtifactDNA, domain: GrowthDomainId): number 
 }
 
 // ── Історичне ймовірнісне поле ───────────────────────────────────
+// Volume I: єдине джерело правди про «стан історії на вік N» — Evolution
+// Engine (evolution/pressureSolver.ts::historyAt). Тут лишається тільки
+// КРИСТАЛІЧНА проєкція цих рахунків у тиски розміщення.
 
-/** Віки (у днях, клемплені ≥0) усіх датованих записів кожного джерела —
- *  рахується один раз на побудову, потім фільтрується по віку події. */
+/** Обгортка таймлайна Evolution Engine — рахується один раз на побудову. */
 export interface FieldHistory {
-  countries: number[];
-  cities: number[];
-  memories: number[];
-  milestones: number[];
-  goals: number[];
-  anniversaries: number[];
-  recipes: number[];
-  movies: number[];
-  books: number[];
-  wishes: number[];
-  daysTogether: number;
+  timeline: EvolutionTimeline;
 }
-
-const ages = (items: readonly { date: string }[]): number[] =>
-  items.map((i) => Math.max(0, daysBetween(i.date)));
 
 export function makeFieldHistory(input: ArtifactInput): FieldHistory {
-  return {
-    countries: ages(input.countries.map((p) => ({ date: p.firstVisit }))),
-    cities: ages(input.cities.map((p) => ({ date: p.firstVisit }))),
-    memories: ages(input.memories),
-    milestones: ages(input.milestones),
-    goals: ages(input.achievedGoals),
-    anniversaries: ages(input.anniversaries),
-    recipes: ages(input.recipes),
-    movies: ages(input.movies),
-    books: ages(input.books),
-    wishes: ages(input.wishes.map((w) => ({ date: w.fulfilledAt }))),
-    daysTogether: input.usage.daysTogether,
-  };
-}
-
-/** Скільки записів джерела вже існувало на дату події (вік ≥ вік події). */
-const countAtLeast = (list: readonly number[], ageDays: number): number => {
-  let n = 0;
-  for (const a of list) if (a >= ageDays) n++;
-  return n;
-};
-
-/** Pielou-подібна рівномірність — та сама формула, що в evolutionPressure.ts. */
-function evenness(values: readonly number[]): number {
-  const total = values.reduce((a, b) => a + b, 0);
-  if (total <= 0) return 0;
-  let entropy = 0;
-  for (const value of values) {
-    if (value > 0) {
-      const p = value / total;
-      entropy -= p * Math.log(p);
-    }
-  }
-  return entropy / Math.log(values.length);
+  return { timeline: buildEvolutionTimeline(input) };
 }
 
 /** Тиски, що керують РОЗМІЩЕННЯМ, станом на дату події. Формули дзеркалять
@@ -109,36 +65,22 @@ export interface PlacementField {
 }
 
 export function placementFieldAt(h: FieldHistory, ageDays: number): PlacementField {
-  const countries = countAtLeast(h.countries, ageDays);
-  const cities = countAtLeast(h.cities, ageDays);
-  const memories = countAtLeast(h.memories, ageDays);
-  const milestones = countAtLeast(h.milestones, ageDays);
-  const goals = countAtLeast(h.goals, ageDays);
-  const anniversaries = countAtLeast(h.anniversaries, ageDays);
-  const creation =
-    countAtLeast(h.recipes, ageDays) + countAtLeast(h.movies, ageDays) + countAtLeast(h.books, ageDays);
-  const wishes = countAtLeast(h.wishes, ageDays);
-  const daysTogetherThen = Math.max(0, h.daysTogether - ageDays);
-
-  const shares: Record<GrowthDomainId, number> = {
-    exploration: countries * 3 + cities,
-    memory: memories,
-    connection: milestones * 6 + goals + anniversaries,
-    creation,
-    future: wishes,
-  };
+  const c = historyAt(h.timeline, ageDays);
+  const shares = categoryShares(c);
   const total = DOMAIN_IDS.reduce((acc, id) => acc + shares[id], 0) || 1;
   const domainShare = {} as Record<GrowthDomainId, number>;
   for (const id of DOMAIN_IDS) domainShare[id] = shares[id] / total;
 
   return {
-    expansion: Math.min(1, (countries * 3 + cities) / 28),
-    luminosity: Math.min(0.85, memories * 0.035),
+    expansion: Math.min(1, (c.countries * 3 + c.cities) / 28),
+    luminosity: Math.min(0.85, c.memories * 0.035),
     stability: Math.max(
       0,
       Math.min(
         1,
-        (goals / 8) * 0.5 + (Math.min(anniversaries, 4) / 4) * 0.3 + (Math.min(daysTogetherThen, 1000) / 1000) * 0.2,
+        (c.goals / 8) * 0.5 +
+          (Math.min(c.anniversaries, 4) / 4) * 0.3 +
+          (Math.min(c.daysTogetherThen, 1000) / 1000) * 0.2,
       ),
     ),
     harmony: evenness(DOMAIN_IDS.map((id) => shares[id])),

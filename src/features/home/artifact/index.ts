@@ -25,6 +25,17 @@ export type { Vec3 } from './vec3';
 export type { CompositionScore } from './composition/score';
 export { composeMineralCluster } from './composition/mineralPreset';
 
+// Evolution Engine (Volume I) — універсальна історія і канонічні сили.
+export type {
+  EvolutionCategory,
+  EvolutionEvent,
+  EvolutionForces,
+  EvolutionHistoryCounts,
+  EvolutionSource,
+  EvolutionTimeline,
+} from './evolution';
+export { buildEvolutionTimeline, historyAt, solveForces } from './evolution';
+
 export { generateArtifactDNA } from './artifactDNA';
 export { maturityCurve } from './maturity';
 export { computeEvolutionPressures } from './evolutionPressure';
