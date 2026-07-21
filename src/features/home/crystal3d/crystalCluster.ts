@@ -1,14 +1,16 @@
 // ============================================================
 // crystalCluster — Crystal-специфічний рендер-шар «Artifact Engine».
 // ------------------------------------------------------------
-// Уся процедурна логіка (де росте вузол, з якою датою, скільки їх) тепер
-// живе в ../artifact/ і не знає про THREE/Lathe-геометрію взагалі. Цей файл
-// — єдиний адаптер: deriveClusterBranch перекладає абстрактний ArtifactNode
-// (theta/phi/distance/verticalJitter) у Crystal-конкретні Euler-кути та
-// позицію, deriveClusterMaterial перекладає EvolutionPressures у PBR-
-// параметри матеріалу. Навмисно функція-адаптер, а не `extends`/успадкування
-// — так ClusterBranch не може непомітно "просочити" crystal-специфічні поля
-// назад у спільний ArtifactNode-контракт.
+// Уся процедурна логіка (де росте вузол, з якою датою, скільки їх, ХТО
+// чий батько) тепер живе в ../artifact/ і не знає про THREE/Lathe-
+// геометрію взагалі. Цей файл — єдиний адаптер: deriveClusterBranch
+// перекладає абстрактний ArtifactNode (originX/Y/Z — світова точка
+// прикріплення, dirX/Y/Z — світовий напрямок росту) у Crystal-конкретні
+// позицію та quaternion («вирівняти локальну вісь +Y Lathe-мешу вздовж
+// dir, потім твіст на spin»), deriveClusterMaterial перекладає
+// EvolutionPressures у PBR-параметри матеріалу. Навмисно функція-адаптер,
+// а не `extends`/успадкування — так ClusterBranch не може непомітно
+// "просочити" crystal-специфічні поля назад у спільний ArtifactNode-контракт.
 // ============================================================
 import * as THREE from 'three';
 import { mulberry32, hashSeedString } from '../mulberry32';
@@ -25,9 +27,11 @@ export interface ClusterBranch {
   posX: number;
   posY: number;
   posZ: number;
-  tiltX: number;
-  tiltZ: number;
-  rotY: number;
+  /** Орієнтація Lathe-мешу (локальна вісь +Y вирівняна вздовж напрямку
+   *  росту вузла + твіст навколо власної осі) — замінює попередню пару
+   *  Euler-кутів tiltX/tiltZ, оскільки напрямок тепер довільний 3D-вектор
+   *  (успадкований від батька), а не «нахил від вертикалі» з одним theta. */
+  quaternion: THREE.Quaternion;
   colorA: string;
   colorB: string;
   breathePhase: number;
@@ -57,29 +61,7 @@ const CREATION_PALETTE: Record<CreationSourceLabel, [string, string]> = {
   book: ['#6b4fa8', '#cbb8f0'],
 };
 
-/**
- * Спільна коренева зона друзи — низько, ближче до дна композиції; ВСІ
- * гілки «сидять» тут своєю основою (лише невеликий per-kind джиттер, не
- * розкид по всьому об'єму), а тягнуться вгору/назовні вже через нахил
- * (phi) і довжину (growthScale) — так само, як росте справжній кристалічний
- * друз із єдиної матриці, а не бризки навсібіч.
- */
-const ROOT_Y = -0.34;
-
-/** Дрібний джиттер основи всередині кореневої зони (verticalJitter → posY),
- *  per-kind — «core» лишається найтіснішим, доменні супутники трохи
- *  вільніші (природна нерівність матриці), але завжди мала величина. */
-const ROOT_JITTER: Record<NodeKind, number> = {
-  core: 0.05,
-  country: 0.1,
-  city: 0.1,
-  milestone: 0.09,
-  goal: 0.1,
-  anniversary: 0.1,
-  creation: 0.11,
-  memory: 0.11,
-  wish: 0.12,
-};
+const UP = new THREE.Vector3(0, 1, 0);
 
 function basePalette(node: ArtifactNode): [string, string] {
   if (node.kind === 'creation') {
@@ -99,17 +81,22 @@ export function applyFamilyHue(hex: string, hueRotationDeg: number): string {
 }
 
 /**
- * Переклад абстрактного вузла в Crystal-конкретну гілку: theta/phi/distance
- * (сферичні, "куди росте") → posX/posY/posZ + tiltX/tiltZ (Euler, "як лежить
- * Lathe-меш"). Golden milestone-колір НЕ обертається hueRotation — це
- * навмисно фіксований, впізнаваний бейдж «великої події» для будь-якої пари.
+ * Переклад абстрактного вузла в Crystal-конкретну гілку: origin/dir (світова
+ * точка прикріплення + одиничний вектор росту) → posX/Y/Z + quaternion
+ * (вирівняти локальну вісь +Y Lathe-мешу вздовж dir, потім твіст навколо
+ * власної осі на spin). Golden milestone-колір НЕ обертається hueRotation —
+ * це навмисно фіксований, впізнаваний бейдж «великої події» для будь-якої пари.
  */
 export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): ClusterBranch {
   const [baseA, baseB] = basePalette(node);
   const keepFixed = node.kind === 'milestone';
   const colorA = keepFixed ? baseA : applyFamilyHue(baseA, dna.hueRotation);
   const colorB = keepFixed ? baseB : applyFamilyHue(baseB, dna.hueRotation);
-  const jitter = ROOT_JITTER[node.kind];
+
+  const dir = new THREE.Vector3(node.dirX, node.dirY, node.dirZ).normalize();
+  const alignQuat = new THREE.Quaternion().setFromUnitVectors(UP, dir);
+  const twistQuat = new THREE.Quaternion().setFromAxisAngle(UP, node.spin);
+  const quaternion = alignQuat.multiply(twistQuat);
 
   return {
     key: node.key,
@@ -118,12 +105,10 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
     ...(node.label !== undefined ? { label: node.label } : {}),
     height: node.growthScale,
     radiusBottom: node.massScale,
-    posX: Math.cos(node.theta) * node.distance,
-    posY: ROOT_Y + node.verticalJitter * jitter,
-    posZ: Math.sin(node.theta) * node.distance,
-    tiltX: Math.sin(node.theta) * node.phi,
-    tiltZ: -Math.cos(node.theta) * node.phi,
-    rotY: node.spin,
+    posX: node.originX,
+    posY: node.originY,
+    posZ: node.originZ,
+    quaternion,
     colorA,
     colorB,
     breathePhase: node.breathePhase,

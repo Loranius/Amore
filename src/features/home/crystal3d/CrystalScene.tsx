@@ -96,7 +96,7 @@ function Branch({ branch, geometry, material, reduceMotion, onOpen }: BranchProp
       ref={meshRef}
       geometry={geometry}
       position={[branch.posX, branch.posY, branch.posZ]}
-      rotation={[branch.tiltX, branch.rotY, branch.tiltZ]}
+      quaternion={branch.quaternion}
       onClick={onOpen}
     >
       <meshPhysicalMaterial

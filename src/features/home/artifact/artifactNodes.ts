@@ -1,30 +1,45 @@
 // ============================================================
-// artifactNodes — процедурна побудова вузлів еволюції з реальних даних.
+// artifactNodes — процедурна побудова ІЄРАРХІЇ росту з реальних даних.
 // ------------------------------------------------------------
-// Growth Domains (Artifact Engine — Technical Addendum v2): 5 тематичних
-// доменів (Exploration/Memory/Connection/Creation/Future) навколо
-// центрального 'core'-стовбура (час разом — поза системою доменів, «one
-// dominant crystal»). Просторовий поділ — ТВЕРДА гарантія через непересічні
-// кутові клини (dna.domainOrder), а не runtime-колізії: theta вузла
-// малюється ВІД НАРОДЖЕННЯ в межах клину свого домену, тож перетин гілок
-// різних доменів геометрично неможливий за побудовою, незалежно від того,
-// наскільки виросте якийсь один домен. «М'які межі» (уповільнення/нахил
-// біля краю клину) — суто косметичний шар поверх цієї вже безумовної
-// гарантії, не колізійна фізика.
+// Organic Growth Rules (переписано за прямим запитом користувача — «looks
+// like a collection of separate spikes», не «assembled»):
 //
-// «Друза, не вибух» — реальні кристалічні друзи (кварц/аметист) НЕ ростуть
-// сферичним вибухом навсібіч: усі кристали нуклеюються на спільній тісній
-// кореневій ділянці (одна матриця), і звідти вже ростуть угору й назовні —
-// той, кому дісталось найкраще місце (центр), росте найвищим і найрівнішим
-// («core» — головний стовбур), а сусідні кристали, змагаючись за простір,
-// віялом відхиляються тим більше, чим ближче до краю. Тому тут `distance`
-// означає НЕ «як далеко розташована основа гілки від центру» (як було
-// раніше — це й давало хаотичний розкид), а «наскільки тісно основа сидить
-// у спільній кореневій зоні» — завжди мала; сам «розмах» назовні дає нахил
-// (phi) і довжина (growthScale), так само як у справжньому кристалі.
+// 1. Жоден вузол не з'являється в порожнечі. Кожна гілка (крім самої
+//    першої, насіннєвої) виростає з ПОВЕРХНІ конкретного старшого вузла
+//    (`parentKey`) — точка появи (origin) обчислюється з РЕАЛЬНОЇ позиції
+//    й напрямку батька, а не зі спільної абстрактної «кореневої зони».
+// 2. Напрямок успадковується від батька з малою випадковою мутацією
+//    (vec3.ts::randomConePerturbation), а не рахується незалежно — тому
+//    в межах одного «роду» гілки схожі за орієнтацією («growth families»).
+// 3. Точка прикріплення зсунута вбік від осі батька на частку його
+//    товщини (не по центру) і рідко «в мінус» — тому основа дочірньої
+//    гілки візуально перекривається/ховається в батьківській поверхні
+//    («embedded bases», «hide each other's base»), а не стоїть поруч.
+// 4. Хто кому стає батьком — детерміновано-випадковий вибір із «пулу
+//    недавніх» вузлів, із перевагою (а) недавності (recency bias — це і
+//    дає природні скупчення в одному місці, а не рівномірний розподіл)
+//    і (б) того самого домену, коли є з чого вибрати. Домени БІЛЬШЕ НЕ
+//    мають жорсткого кутового клину (див. artifactTypes.ts::domainOrder) —
+//    вони можуть вільно зростатися один в одного, як справжній друз.
+// 5. Увесь артефакт — ОДНЕ дерево (єдина хронологія: core-тики й реальні
+//    події одного домену впереміш, відсортовані за віком), а не 5+1
+//    незалежних систем — «one continuously evolving mineral organism».
+//
+// Детермінізм / «ніколи не перебудовувати»: кожен елемент має ВЛАСНИЙ,
+// незалежний seed (той самий реєстр офсетів, що й раніше) — вибір батька,
+// точка прикріплення, мутація напрямку тощо ВСІ тягнуться з ЦЬОГО ОДНОГО
+// потоку, а не з якогось спільного глобального лічильника draw'ів. Це
+// означає, що вигляд вузла X залежить лише від (а) його власного seed і
+// (б) ЯКІ інші вузли існують хронологічно ДО нього — не від того, скільки
+// випадкових чисел «спожили» інші, незв'язані вузли. Єдине визнане
+// обмеження: якщо в БД заднім числом з'являється подія зі СТАРОЮ датою
+// (ретроактивний backfill), вона вставиться РАНІШЕ в хронологію і змінить
+// пул можливих батьків для всього, що йде після неї — прийнятний
+// компроміс, що вже існував і раніше (maturity/вік теж перераховується
+// заднім числом), а не нова крихкість.
 //
 // Реєстр seed-офсетів (щоб нові додавання не колізували з існуючими):
-//   +5100 + i*173        — core-гілка i
+//   +5100 + i*173        — core-тик i
 //   +7789 + id*97         — milestone
 //   +3311 + id*53         — wish
 //   +6203 + id*41         — goal
@@ -38,6 +53,16 @@ import { mulberry32, hashSeedString } from '../mulberry32';
 import { daysBetween } from '../homeUtils';
 import type { CrystalWish } from '../useCrystal';
 import { maturityCurve } from './maturity';
+import {
+  addVec,
+  length,
+  randomConePerturbation,
+  randomPerpendicular,
+  scaleVec,
+  sphericalToVec3,
+  subtractVec,
+  type Vec3,
+} from './vec3';
 import type {
   ArtifactDNA,
   ArtifactInput,
@@ -49,76 +74,6 @@ import type {
 } from './artifactTypes';
 
 const DOMAIN_IDS: GrowthDomainId[] = ['exploration', 'memory', 'connection', 'creation', 'future'];
-const WEDGE_WIDTH = (Math.PI * 2) / DOMAIN_IDS.length;
-
-/**
- * 'core' росте у вузькому, майже вертикальному конусі (computeLean, maxTilt
- * нижче в buildCoreBranches). Домени НЕ мають власного клину по phi — лише
- * по theta (wedge) — тож без цієї нижньої межі periферійна гілка домену
- * могла б випадково «зайти» майже вертикально й перетнути стовбур 'core'.
- * DOMAIN_MIN_TILT гарантує розділення по phi так само конструктивно, як
- * WEDGE_WIDTH гарантує розділення по theta між доменами.
- */
-const DOMAIN_MIN_TILT = 0.5;
-
-function wedgeStart(dna: ArtifactDNA, domain: GrowthDomainId): number {
-  return dna.domainOrder.indexOf(domain) * WEDGE_WIDTH;
-}
-
-/**
- * Розміщення вузла всередині клину свого домену. Тверда гарантія по theta:
- * theta завжди в [wedgeStart, wedgeStart+WEDGE_WIDTH) — інші домени фізично
- * недосяжні. Тверда гарантія по phi: завжди >= DOMAIN_MIN_TILT — 'core'
- * (маленький, майже вертикальний конус) фізично недосяжний жодному домену.
- * «М'яка межа»: чим ближче до краю клину (edgeProximity→1), тим більше
- * вузол «нахиляється»/«сплощується» (вищий phi) — природний вигляд «опору»
- * без жодної колізійної перевірки.
- */
-function placeInDomain(
-  rng: () => number,
-  dna: ArtifactDNA,
-  domain: GrowthDomainId,
-  maxTiltRad: number,
-  stability: number,
-): { theta: number; phi: number; edgeProximity: number } {
-  const start = wedgeStart(dna, domain);
-  const theta = start + rng() * WEDGE_WIDTH;
-  // Демпінг стабільності стискає лише варіативність ПОНАД нижню межу, тому
-  // навіть найстабільніша пара ніколи не «просяде» назад у зону 'core'.
-  const range = Math.max(0.05, (maxTiltRad - DOMAIN_MIN_TILT) * (1 - stability * 0.35));
-  const distFromStart = theta - start;
-  const distFromEnd = start + WEDGE_WIDTH - theta;
-  const edgeProximity = 1 - Math.min(distFromStart, distFromEnd) / (WEDGE_WIDTH / 2);
-  // Кут нахилу обмежено ~80° — навіть найпериферійніший супутник у справжній
-  // друзі ще росте «вгору-вбік», а не вниз чи горизонтально.
-  const phi = Math.min(1.4, DOMAIN_MIN_TILT + rng() * range + edgeProximity * 0.25);
-  return { theta, phi, edgeProximity };
-}
-
-/**
- * Той самий механізм, що v1 randomLean, тепер лише для 'core' — єдиного
- * kind поза системою доменів, тому досі потребує власного вільного
- * напрямкового зміщення (dna.attractorDirections). harmonySymmetry
- * («Рівномірність використання модулів → Harmony») тягне азимут до
- * рівномірного розташування по колу; ніколи не ідеально механічно.
- */
-function computeLean(
-  rng: () => number,
-  maxTiltRad: number,
-  dna: ArtifactDNA,
-  harmonySymmetry: number,
-  stability: number,
-  slot: number,
-  slotCount: number,
-): { theta: number; phi: number } {
-  const dampedMax = maxTiltRad * (1 - stability * 0.35);
-  const groupOffset = dna.attractorDirections[slot % dna.attractorDirections.length]!;
-  const rawTheta = rng() * Math.PI * 2;
-  const slotTheta = groupOffset + (slot / slotCount) * Math.PI * 2;
-  const theta = rawTheta * (1 - harmonySymmetry) + slotTheta * harmonySymmetry;
-  const phi = rng() * dampedMax;
-  return { theta, phi };
-}
 
 interface Bucket {
   /** Абсолютний (не після зрізання капом) індекс — саме він і йде в key, тому
@@ -147,296 +102,215 @@ export function bucketByFixedSize(items: readonly DatedItem[], bucketSize: numbe
   return buckets;
 }
 
-// ── 'core' — базовий приріст від самого часу разом (поза доменами) ──
+// ── Крок 1: «сировина» росту — kind-незалежний опис події ще без позиції ──
+interface GrowthEvent {
+  key: string;
+  kind: NodeKind;
+  domain: GrowthDomainId | null;
+  label?: string;
+  /** Дні від початку стосунків (спільна вісь часу для сортування ВСІХ
+   *  подій разом — і core-тиків, і реальних дат). */
+  birthDay: number;
+  maturityHalfLife: number;
+  growthRange: readonly [number, number];
+  massRange: readonly [number, number];
+  breatheSpeedRange: readonly [number, number];
+  /** Максимальний кут (рад) мутації напрямку відносно батька для цього kind. */
+  maxMutationRad: number;
+  emphasized?: boolean;
+  /** Власний, незалежний seed цієї події — єдине джерело всіх її випадкових рішень. */
+  seed: number;
+}
+
+function daysSinceStart(daysTogether: number, realDate: string): number {
+  return daysTogether - daysBetween(realDate);
+}
+
+// ── 'core' — базовий приріст від самого часу разом ────────────────
 const CORE_INTERVAL_DAYS = 40;
 const MAX_CORE_BRANCHES = 22;
 
-function buildCoreBranches(
-  seedNum: number,
-  daysTogether: number,
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+function coreEvents(seedNum: number, daysTogether: number): GrowthEvent[] {
   if (daysTogether <= 0) return [];
   const count = Math.min(MAX_CORE_BRANCHES, Math.floor(daysTogether / CORE_INTERVAL_DAYS) + 1);
-  const symmetry = Math.min(0.6, pressures.harmony * 0.6);
-  const nodes: ArtifactNode[] = [];
-
-  for (let i = 0; i < count; i++) {
-    const rng = mulberry32(seedNum + 5100 + i * 173);
-    const birthDay = i * CORE_INTERVAL_DAYS;
-    const maturity = maturityCurve(daysTogether - birthDay);
-    // Головний стовбур — найбільш вертикальний (реальний домінантний кристал
-    // друзи, що дістав найкраще місце для нуклеації, росте найпрямішим);
-    // maxTilt=0.3 лишається чітко нижче DOMAIN_MIN_TILT=0.5, тож жоден
-    // домен геометрично не може перетнути конус стовбура (placeInDomain).
-    const { theta, phi } = computeLean(rng, 0.3, dna, symmetry, pressures.stability, i, count);
-    const distance = 0.03 + rng() * 0.1; // спільна коренева зона — тісно, не віночок
-
-    nodes.push({
-      key: `core-${i}`,
-      kind: 'core',
-      domain: null,
-      growthScale: 0.75 + rng() * 1.15,
-      massScale: 0.06 + rng() * 0.07,
-      theta,
-      phi,
-      distance,
-      verticalJitter: rng() * 2 - 1,
-      spin: rng() * Math.PI * 2,
-      maturity,
-      breathePhase: rng() * Math.PI * 2,
-      breatheSpeed: 0.35 + rng() * 0.3,
-    });
-  }
-  return nodes;
+  return Array.from({ length: count }, (_, i) => ({
+    key: `core-${i}`,
+    kind: 'core' as const,
+    domain: null,
+    birthDay: i * CORE_INTERVAL_DAYS,
+    maturityHalfLife: 18,
+    growthRange: [0.4, 0.75] as const,
+    massRange: [0.06, 0.13] as const,
+    breatheSpeedRange: [0.35, 0.65] as const,
+    // Стовбур лишається найпрямішим — реальний домінантний кристал друзи,
+    // що дістав найкраще місце для нуклеації, росте найрівніше.
+    maxMutationRad: 0.32,
+    seed: seedNum + 5100 + i * 173,
+  }));
 }
 
-// ── Exploration domain: country/city — географія як структурні мутації ──
+// ── Exploration: country/city ─────────────────────────────────────
 const MAX_COUNTRY_BRANCHES = 6;
 const MAX_CITY_BRANCHES = 10;
 
-function buildPlaceBranches(
+function placeEvents(
   seedNum: number,
+  daysTogether: number,
   places: readonly { name: string; firstVisit: string }[],
   kind: 'country' | 'city',
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+): GrowthEvent[] {
   const cap = kind === 'country' ? MAX_COUNTRY_BRANCHES : MAX_CITY_BRANCHES;
-  const [growthMin, growthRange] = kind === 'country' ? [1.9, 0.7] : [1.05, 0.5];
-  const [massMin, massRange] = kind === 'country' ? [0.3, 0.12] : [0.16, 0.08];
-  const [distMin, distRange] = kind === 'country' ? [0.04, 0.1] : [0.05, 0.09];
-  const maxTilt = kind === 'country' ? 0.7 : 0.85;
   const sliced = places.slice(0, cap);
+  const growthRange: readonly [number, number] = kind === 'country' ? [0.8, 1.1] : [0.45, 0.68];
+  const massRange: readonly [number, number] = kind === 'country' ? [0.3, 0.42] : [0.16, 0.24];
+  const maxMutationRad = kind === 'country' ? 0.55 : 0.62;
 
-  return sliced.map(({ name, firstVisit }) => {
-    const rng = mulberry32(seedNum + hashSeedString(`${kind}:${name}`));
-    const maturity = maturityCurve(daysBetween(firstVisit), kind === 'country' ? 30 : 22);
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'exploration', maxTilt, pressures.stability);
-    const distance = (distMin! + rng() * distRange!) * (1 - edgeProximity * 0.15);
-    // «Подорожі → Expansion Pressure»: реальний структурний ефект — гілка
-    // тягнеться далі НАЗОВНІ (більший нахил), а не основа розповзається
-    // від спільної кореневої зони.
-    const expandedPhi = Math.min(1.4, phi + pressures.expansion * 0.3);
-
-    return {
-      key: `${kind}-${name}`,
-      kind,
-      domain: 'exploration',
-      label: name,
-      growthScale: growthMin! + rng() * growthRange!,
-      massScale: massMin! + rng() * massRange!,
-      theta,
-      phi: expandedPhi,
-      distance,
-      verticalJitter: rng() * 2 - 1,
-      spin: rng() * Math.PI * 2,
-      maturity,
-      breathePhase: rng() * Math.PI * 2,
-      breatheSpeed: 0.22 + rng() * 0.12,
-    };
-  });
+  return sliced.map(({ name, firstVisit }) => ({
+    key: `${kind}-${name}`,
+    kind,
+    domain: 'exploration' as const,
+    label: name,
+    birthDay: daysSinceStart(daysTogether, firstVisit),
+    maturityHalfLife: kind === 'country' ? 30 : 22,
+    growthRange,
+    massRange,
+    breatheSpeedRange: [0.22, 0.34] as const,
+    maxMutationRad,
+    seed: seedNum + hashSeedString(`${kind}:${name}`),
+  }));
 }
 
-// ── Connection domain: milestone/goal/anniversary ────────────────
+// ── Connection: milestone/goal/anniversary ────────────────────────
 const MAX_MILESTONE_BRANCHES = 6;
 
-function buildMilestoneBranches(
+function milestoneEvents(
   seedNum: number,
+  daysTogether: number,
   milestones: readonly { id: number; title: string; date: string }[],
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+): GrowthEvent[] {
   const sliced = milestones.slice(-MAX_MILESTONE_BRANCHES);
-  return sliced.map((m) => {
-    const rng = mulberry32(seedNum + 7789 + m.id * 97);
-    const maturity = maturityCurve(daysBetween(m.date), 6); // одразу вагомі, лиш трохи «доростають»
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'connection', 0.68, pressures.stability);
-    const distance = (0.05 + rng() * 0.09) * (1 - edgeProximity * 0.15);
-
-    return {
-      key: `milestone-${m.id}`,
-      kind: 'milestone',
-      domain: 'connection',
-      label: m.title,
-      growthScale: 1.2 + rng() * 0.5,
-      massScale: 0.2 + rng() * 0.06,
-      theta,
-      phi,
-      distance,
-      verticalJitter: rng() * 2 - 1,
-      spin: rng() * Math.PI * 2,
-      maturity,
-      breathePhase: rng() * Math.PI * 2,
-      breatheSpeed: 0.3 + rng() * 0.15,
-      emphasized: true,
-    };
-  });
+  return sliced.map((m) => ({
+    key: `milestone-${m.id}`,
+    kind: 'milestone' as const,
+    domain: 'connection' as const,
+    label: m.title,
+    birthDay: daysSinceStart(daysTogether, m.date),
+    maturityHalfLife: 6, // одразу вагомі, лиш трохи «доростають»
+    growthRange: [0.55, 0.75] as const,
+    massRange: [0.2, 0.26] as const,
+    breatheSpeedRange: [0.3, 0.45] as const,
+    maxMutationRad: 0.45,
+    emphasized: true,
+    seed: seedNum + 7789 + m.id * 97,
+  }));
 }
 
-function buildConnectionExtras(
+function connectionExtraEvents(
   seedNum: number,
+  daysTogether: number,
   achievedGoals: readonly DatedItem[],
   anniversaries: readonly DatedItem[],
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+): GrowthEvent[] {
   const build = (kind: 'goal' | 'anniversary', items: readonly DatedItem[], seedBase: number) =>
-    items.map((item) => {
-      const rng = mulberry32(seedNum + seedBase + item.id * 41);
-      const maturity = maturityCurve(daysBetween(item.date), 20);
-      const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'connection', 0.8, pressures.stability);
-      const distance = (0.04 + rng() * 0.08) * (1 - edgeProximity * 0.15);
-      return {
-        key: `${kind}-${item.id}`,
-        kind,
-        domain: 'connection' as const,
-        growthScale: 0.55 + rng() * 0.3,
-        massScale: 0.1 + rng() * 0.05,
-        theta,
-        phi,
-        distance,
-        verticalJitter: rng() * 2 - 1,
-        spin: rng() * Math.PI * 2,
-        maturity,
-        breathePhase: rng() * Math.PI * 2,
-        breatheSpeed: 0.3 + rng() * 0.15,
-      };
-    });
+    items.map((item) => ({
+      key: `${kind}-${item.id}`,
+      kind,
+      domain: 'connection' as const,
+      birthDay: daysSinceStart(daysTogether, item.date),
+      maturityHalfLife: 20,
+      growthRange: [0.55, 0.85] as const,
+      massRange: [0.1, 0.15] as const,
+      breatheSpeedRange: [0.3, 0.45] as const,
+      maxMutationRad: 0.6,
+      seed: seedNum + seedBase + item.id * 41,
+    }));
 
   return [...build('goal', achievedGoals, 6203), ...build('anniversary', anniversaries, 8317)];
 }
 
-// ── Memory domain: photo_calendar bucketed ────────────────────────
+// ── Memory: photo_calendar bucketed ───────────────────────────────
 const MEMORY_BUCKET_SIZE = 6;
 const MAX_MEMORY_BUCKETS = 8;
 
-function buildMemoryBranches(
-  seedNum: number,
-  memories: readonly DatedItem[],
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+function memoryEvents(seedNum: number, daysTogether: number, memories: readonly DatedItem[]): GrowthEvent[] {
   const buckets = bucketByFixedSize(memories, MEMORY_BUCKET_SIZE).slice(-MAX_MEMORY_BUCKETS);
-  return buckets.map(({ index, repDate }) => {
-    const rng = mulberry32(seedNum + hashSeedString('memory') + index * 71);
-    const maturity = maturityCurve(daysBetween(repDate), 14);
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'memory', 0.85, pressures.stability);
-    const distance = (0.04 + rng() * 0.08) * (1 - edgeProximity * 0.15);
-
-    return {
-      key: `memory-bucket-${index}`,
-      kind: 'memory',
-      domain: 'memory',
-      growthScale: 0.4 + rng() * 0.3,
-      massScale: 0.07 + rng() * 0.04,
-      theta,
-      phi,
-      distance,
-      verticalJitter: rng() * 2 - 1,
-      spin: rng() * Math.PI * 2,
-      maturity,
-      breathePhase: rng() * Math.PI * 2,
-      breatheSpeed: 0.4 + rng() * 0.25,
-    };
-  });
+  return buckets.map(({ index, repDate }) => ({
+    key: `memory-bucket-${index}`,
+    kind: 'memory' as const,
+    domain: 'memory' as const,
+    birthDay: daysSinceStart(daysTogether, repDate),
+    maturityHalfLife: 14,
+    growthRange: [0.4, 0.7] as const,
+    massRange: [0.07, 0.11] as const,
+    breatheSpeedRange: [0.4, 0.65] as const,
+    maxMutationRad: 0.65,
+    seed: seedNum + hashSeedString('memory') + index * 71,
+  }));
 }
 
-// ── Creation domain: recipes/movies/books, per-source bucketed ───
+// ── Creation: recipes/movies/books, per-source bucketed ───────────
 type CreationSource = 'recipe' | 'movie' | 'book';
 const CREATION_BUCKET_SIZE: Record<CreationSource, number> = { recipe: 3, movie: 15, book: 3 };
 const MAX_CREATION_BUCKETS_PER_SOURCE = 4;
 
-function buildCreationSource(
+function creationSourceEvents(
   seedNum: number,
+  daysTogether: number,
   source: CreationSource,
   items: readonly DatedItem[],
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+): GrowthEvent[] {
   const buckets = bucketByFixedSize(items, CREATION_BUCKET_SIZE[source]).slice(-MAX_CREATION_BUCKETS_PER_SOURCE);
-  return buckets.map(({ index, repDate }) => {
-    const rng = mulberry32(seedNum + hashSeedString(`creation:${source}`) + index * 83);
-    const maturity = maturityCurve(daysBetween(repDate), 16);
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'creation', 0.85, pressures.stability);
-    const distance = (0.04 + rng() * 0.08) * (1 - edgeProximity * 0.15);
-
-    return {
-      key: `creation-${source}-bucket-${index}`,
-      kind: 'creation',
-      domain: 'creation',
-      // Джерело-специфічний тон (теплий/фільмовий/гранований) читає рендерер
-      // із label — ArtifactNode лишається generic, це вже інтерпретація Crystal.
-      label: source,
-      growthScale: 0.4 + rng() * 0.3,
-      massScale: 0.07 + rng() * 0.04,
-      theta,
-      phi,
-      distance,
-      verticalJitter: rng() * 2 - 1,
-      spin: rng() * Math.PI * 2,
-      maturity,
-      breathePhase: rng() * Math.PI * 2,
-      breatheSpeed: 0.4 + rng() * 0.25,
-    };
-  });
+  return buckets.map(({ index, repDate }) => ({
+    key: `creation-${source}-bucket-${index}`,
+    kind: 'creation' as const,
+    domain: 'creation' as const,
+    // Джерело-специфічний тон (теплий/фільмовий/гранований) читає рендерер
+    // із label — ArtifactNode лишається generic, це вже інтерпретація Crystal.
+    label: source,
+    birthDay: daysSinceStart(daysTogether, repDate),
+    maturityHalfLife: 16,
+    growthRange: [0.4, 0.7] as const,
+    massRange: [0.07, 0.11] as const,
+    breatheSpeedRange: [0.4, 0.65] as const,
+    maxMutationRad: 0.65,
+    seed: seedNum + hashSeedString(`creation:${source}`) + index * 83,
+  }));
 }
 
-function buildCreationBranches(
+function creationEvents(
   seedNum: number,
+  daysTogether: number,
   recipes: readonly DatedItem[],
   movies: readonly DatedItem[],
   books: readonly DatedItem[],
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+): GrowthEvent[] {
   return [
-    ...buildCreationSource(seedNum, 'recipe', recipes, dna, pressures),
-    ...buildCreationSource(seedNum, 'movie', movies, dna, pressures),
-    ...buildCreationSource(seedNum, 'book', books, dna, pressures),
+    ...creationSourceEvents(seedNum, daysTogether, 'recipe', recipes),
+    ...creationSourceEvents(seedNum, daysTogether, 'movie', movies),
+    ...creationSourceEvents(seedNum, daysTogether, 'book', books),
   ];
 }
 
-// ── Future domain: wish — виконані бажання = маленькі супутні кристалики ──
+// ── Future: wish — виконані бажання = маленькі супутні кристалики ─
 const MAX_WISH_BRANCHES = 14;
 
-function buildWishBranches(
-  seedNum: number,
-  wishes: readonly CrystalWish[],
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+function wishEvents(seedNum: number, daysTogether: number, wishes: readonly CrystalWish[]): GrowthEvent[] {
   const sliced = wishes.slice(0, MAX_WISH_BRANCHES);
-  return sliced.map((w) => {
-    const rng = mulberry32(seedNum + 3311 + w.id * 53);
-    const maturity = maturityCurve(daysBetween(w.fulfilledAt), 10); // маленька подія — дозріває швидко
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, 'future', 0.95, pressures.stability);
-    const distance = (0.04 + rng() * 0.09) * (1 - edgeProximity * 0.15);
-
-    return {
-      key: `wish-${w.id}`,
-      kind: 'wish',
-      domain: 'future',
-      growthScale: 0.3 + rng() * 0.25,
-      massScale: 0.05 + rng() * 0.03,
-      theta,
-      phi,
-      distance,
-      verticalJitter: rng() * 2 - 1,
-      spin: rng() * Math.PI * 2,
-      maturity,
-      breathePhase: rng() * Math.PI * 2,
-      breatheSpeed: 0.5 + rng() * 0.3,
-    };
-  });
+  return sliced.map((w) => ({
+    key: `wish-${w.id}`,
+    kind: 'wish' as const,
+    domain: 'future' as const,
+    birthDay: daysSinceStart(daysTogether, w.fulfilledAt),
+    maturityHalfLife: 10, // маленька подія — дозріває швидко
+    growthRange: [0.3, 0.55] as const,
+    massRange: [0.05, 0.08] as const,
+    breatheSpeedRange: [0.5, 0.8] as const,
+    maxMutationRad: 0.7,
+    seed: seedNum + 3311 + w.id * 53,
+  }));
 }
 
 // ── «Жоден домен ніколи повністю не мовчить» — амбіентний трикл ──
-// Це НЕ окремі конкуруючі шипи, а дрібна кристалічна «текстура» самої
-// кореневої зони (як нерівна матриця біля основи справжньої друзи) — тому
-// тісно (мала distance), низько (мала growthScale) і, свідомо, небагато
-// (щоб не забивати реальні дані), рідше (довший інтервал).
 const BASELINE_INTERVAL_DAYS = 260;
 const MAX_BASELINE_PER_DOMAIN = 3;
 const BASELINE_KIND: Record<GrowthDomainId, NodeKind> = {
@@ -447,48 +321,170 @@ const BASELINE_KIND: Record<GrowthDomainId, NodeKind> = {
   future: 'wish',
 };
 
-/**
- * Незалежно від активності самого домену, щохвилини (BASELINE_INTERVAL_DAYS)
- * часу разом додає йому один малесенький амбієнтний вузол — та сама ідея,
- * що й 'core', узагальнена на всі 5 доменів. Пара, яка ніколи не подорожувала,
- * все одно бачить ледь помітну, повільно густішаючу присутність Exploration
- * лише завдяки Time/Memory Pressure — без жодної окремої fallback-логіки.
- */
-function buildDomainBaseline(
-  seedNum: number,
-  domain: GrowthDomainId,
-  daysTogether: number,
-  dna: ArtifactDNA,
-  pressures: EvolutionPressures,
-): ArtifactNode[] {
+function baselineEvents(seedNum: number, domain: GrowthDomainId, daysTogether: number): GrowthEvent[] {
   if (daysTogether <= 0) return [];
   const count = Math.min(MAX_BASELINE_PER_DOMAIN, Math.floor(daysTogether / BASELINE_INTERVAL_DAYS) + 1);
-  const nodes: ArtifactNode[] = [];
+  return Array.from({ length: count }, (_, i) => ({
+    key: `baseline-${domain}-${i}`,
+    kind: BASELINE_KIND[domain],
+    domain,
+    birthDay: i * BASELINE_INTERVAL_DAYS,
+    maturityHalfLife: 45,
+    growthRange: [0.16, 0.28] as const,
+    massRange: [0.06, 0.1] as const,
+    breatheSpeedRange: [0.4, 0.6] as const,
+    maxMutationRad: 0.55,
+    seed: seedNum + hashSeedString(`baseline:${domain}`) + i * 61,
+  }));
+}
 
-  for (let i = 0; i < count; i++) {
-    const rng = mulberry32(seedNum + hashSeedString(`baseline:${domain}`) + i * 61);
-    const birthDay = i * BASELINE_INTERVAL_DAYS;
-    const maturity = maturityCurve(daysTogether - birthDay, 45);
-    const { theta, phi, edgeProximity } = placeInDomain(rng, dna, domain, 0.9, pressures.stability);
-    const distance = (0.02 + rng() * 0.05) * (1 - edgeProximity * 0.15);
+// ── Крок 2: розв'язання дерева — origin/dir/spin/maturity кожного вузла ──
 
-    nodes.push({
-      key: `baseline-${domain}-${i}`,
-      kind: BASELINE_KIND[domain],
-      domain,
-      growthScale: 0.16 + rng() * 0.12,
-      massScale: 0.06 + rng() * 0.04,
-      theta,
-      phi,
-      distance,
-      verticalJitter: rng() * 2 - 1,
-      spin: rng() * Math.PI * 2,
-      maturity,
-      breathePhase: rng() * Math.PI * 2,
-      breatheSpeed: 0.4 + rng() * 0.2,
+/** Насіннєва (коренева) точка — низько, ближче до дна композиції; звідти
+ *  все дерево росте вгору/назовні. Немає більше видимої опори під нею
+ *  (§4 левітації) — це просто математичний початок координат росту. */
+const SEED_ORIGIN: Vec3 = [0, -0.34, 0];
+/** Початковий полярний кут (від вертикалі) НАСІННЄВОГО напрямку — майже
+ *  прямовисно вгору, з ледь помітним нахилом для органічності. */
+const SEED_POLAR = 0.12;
+
+const RECENT_POOL = 12;
+const SAME_DOMAIN_PROB = 0.7;
+
+/** «Стінки геоди» — реальний друз росте всередині обмеженої порожнини, не
+ *  безмежно; м'яке проєктування точки прикріплення назад на цю сферу
+ *  навколо насіннєвої точки, коли ланцюжок (за багато поколінь/років
+ *  стосунків) відніс би її далі. Не чіпає growthScale/напрямок самого
+ *  вузла — лише те, ЗВІДКИ він росте, тож вістря все одно може ледь
+ *  «проколоти» межу, як і личить кристалу, що впирається у стінку каверни. */
+const MAX_RADIUS_FROM_SEED = 1.6;
+
+/**
+ * Обирає батька для нового вузла з «пулу недавніх» уже розв'язаних вузлів:
+ * перевага (а) тому самому домену, коли є з чого вибрати, і (б) НЕДАВНІМ —
+ * не рівномірно випадковим — вузлам усередині обраного пулу. Саме ця
+ * недавня упередженість і дає природні скупчення («3-4 branches grow close
+ * together»), а не рівномірний розподіл по всьому артефакту.
+ */
+function pickParentIndex(
+  rng: () => number,
+  resolved: readonly ArtifactNode[],
+  domain: GrowthDomainId | null,
+  skewPower: number,
+): number {
+  const n = resolved.length;
+  const poolStart = Math.max(0, n - RECENT_POOL);
+  const sameDomain: number[] = [];
+  for (let i = poolStart; i < n; i++) {
+    if (resolved[i]!.domain === domain) sameDomain.push(i);
+  }
+
+  const useSameDomain = sameDomain.length > 0 && rng() < SAME_DOMAIN_PROB;
+  const pool: number[] = useSameDomain
+    ? sameDomain
+    : Array.from({ length: n - poolStart }, (_, k) => poolStart + k);
+
+  // skew ближче до 0 частіше (при skewPower>1) → offsetFromEnd мале →
+  // обраний індекс близький до КІНЦЯ пулу (найновіший).
+  const skew = Math.pow(rng(), skewPower);
+  const offsetFromEnd = Math.floor(skew * pool.length);
+  const poolIdx = Math.max(0, pool.length - 1 - offsetFromEnd);
+  return pool[poolIdx]!;
+}
+
+/**
+ * Розв'язує ОДНЕ дерево росту з відсортованого за віком списку подій:
+ * перша подія — насіннєва (parent=null), кожна наступна виростає з
+ * поверхні вибраного старшого вузла, успадковуючи його напрямок із малою
+ * мутацією. `pressures.stability` глушить мутацію (стабільніші стосунки →
+ * рівніший ріст); `pressures.harmony` керує «ступенем ланцюжка» вибору
+ * батька (вища гармонія → рівномірніше по пулу, розлогіший кущ; нижча →
+ * сильна упередженість до найновішого, тонший ланцюжок).
+ */
+function resolveGrowthTree(
+  daysTogether: number,
+  dna: ArtifactDNA,
+  events: readonly GrowthEvent[],
+  pressures: EvolutionPressures,
+): ArtifactNode[] {
+  const sorted = [...events].sort((a, b) => a.birthDay - b.birthDay || a.key.localeCompare(b.key));
+  const skewPower = 2.2 - pressures.harmony * 1.2;
+  const resolved: ArtifactNode[] = [];
+
+  for (let i = 0; i < sorted.length; i++) {
+    const ev = sorted[i]!;
+    const rng = mulberry32(ev.seed);
+
+    let origin: Vec3;
+    let dir: Vec3;
+    let parentKey: string | null;
+
+    if (i === 0) {
+      origin = SEED_ORIGIN;
+      const seedAzimuth = dna.attractorDirections[0] ?? 0;
+      dir = sphericalToVec3(seedAzimuth, SEED_POLAR);
+      parentKey = null;
+    } else {
+      const parentIdx = pickParentIndex(rng, resolved, ev.domain, skewPower);
+      const parent = resolved[parentIdx]!;
+      parentKey = parent.key;
+      const parentDir: Vec3 = [parent.dirX, parent.dirY, parent.dirZ];
+      const parentOrigin: Vec3 = [parent.originX, parent.originY, parent.originZ];
+
+      const attachT = 0.2 + rng() * 0.45; // де вздовж батька (0=основа,1=вістря)
+      const perp = randomPerpendicular(rng, parentDir);
+      // 10-60% товщини батька — бічний зсув, що ГАРАНТУЄ візуальне
+      // перекриття/embedding основи дочірньої гілки в батьківську поверхню.
+      const embedMag = parent.massScale * (0.1 + rng() * 0.5);
+
+      const rawOrigin = addVec(
+        addVec(parentOrigin, scaleVec(parentDir, parent.growthScale * attachT)),
+        scaleVec(perp, embedMag),
+      );
+      const fromSeed = subtractVec(rawOrigin, SEED_ORIGIN);
+      const distFromSeed = length(fromSeed);
+      origin =
+        distFromSeed > MAX_RADIUS_FROM_SEED
+          ? addVec(SEED_ORIGIN, scaleVec(fromSeed, MAX_RADIUS_FROM_SEED / distFromSeed))
+          : rawOrigin;
+
+      const mutation = Math.max(0.06, ev.maxMutationRad * (1 - pressures.stability * 0.35));
+      dir = randomConePerturbation(rng, parentDir, mutation);
+    }
+
+    const growthScale = ev.growthRange[0] + rng() * (ev.growthRange[1] - ev.growthRange[0]);
+    const massScale = ev.massRange[0] + rng() * (ev.massRange[1] - ev.massRange[0]);
+    const breatheSpeed = ev.breatheSpeedRange[0] + rng() * (ev.breatheSpeedRange[1] - ev.breatheSpeedRange[0]);
+    const spin = rng() * Math.PI * 2;
+    const breathePhase = rng() * Math.PI * 2;
+    // Вік = «зараз» мінус момент народження на спільній осі часу — той
+    // самий maturityCurve(daysBetween(...)) механізм, що й раніше, лише
+    // birthDay тепер спільний для core-тиків і реальних дат одночасно.
+    const ageDays = daysTogether - ev.birthDay;
+
+    resolved.push({
+      key: ev.key,
+      kind: ev.kind,
+      domain: ev.domain,
+      parentKey,
+      ...(ev.label !== undefined ? { label: ev.label } : {}),
+      growthScale,
+      massScale,
+      originX: origin[0],
+      originY: origin[1],
+      originZ: origin[2],
+      dirX: dir[0],
+      dirY: dir[1],
+      dirZ: dir[2],
+      spin,
+      maturity: maturityCurve(ageDays, ev.maturityHalfLife),
+      breathePhase,
+      breatheSpeed,
+      ...(ev.emphasized !== undefined ? { emphasized: ev.emphasized } : {}),
     });
   }
-  return nodes;
+
+  return resolved;
 }
 
 export function isArtifactEmpty(input: ArtifactInput): boolean {
@@ -507,23 +503,26 @@ export function isArtifactEmpty(input: ArtifactInput): boolean {
   );
 }
 
-/** Будує весь список вузлів артефакту. pressures обчислюється окремо
- *  (computeEvolutionPressures) і передається сюди — та сама структура
- *  споживається й deriveClusterMaterial, тому рахується лише один раз. */
+/** Будує весь список вузлів артефакту — ОДНЕ ієрархічне дерево. pressures
+ *  обчислюється окремо (computeEvolutionPressures) і передається сюди —
+ *  та сама структура споживається й deriveClusterMaterial. */
 export function buildArtifactNodes(input: ArtifactInput, pressures: EvolutionPressures): ArtifactNode[] {
   const { seedNum, dna, usage } = input;
+  const daysTogether = usage.daysTogether;
 
-  const nodes: ArtifactNode[] = [
-    ...buildCoreBranches(seedNum, usage.daysTogether, dna, pressures),
-    ...buildPlaceBranches(seedNum, input.countries, 'country', dna, pressures),
-    ...buildPlaceBranches(seedNum, input.cities, 'city', dna, pressures),
-    ...buildMilestoneBranches(seedNum, input.milestones, dna, pressures),
-    ...buildConnectionExtras(seedNum, input.achievedGoals, input.anniversaries, dna, pressures),
-    ...buildMemoryBranches(seedNum, input.memories, dna, pressures),
-    ...buildCreationBranches(seedNum, input.recipes, input.movies, input.books, dna, pressures),
-    ...buildWishBranches(seedNum, input.wishes, dna, pressures),
-    ...DOMAIN_IDS.flatMap((d) => buildDomainBaseline(seedNum, d, usage.daysTogether, dna, pressures)),
+  const events: GrowthEvent[] = [
+    ...coreEvents(seedNum, daysTogether),
+    ...placeEvents(seedNum, daysTogether, input.countries, 'country'),
+    ...placeEvents(seedNum, daysTogether, input.cities, 'city'),
+    ...milestoneEvents(seedNum, daysTogether, input.milestones),
+    ...connectionExtraEvents(seedNum, daysTogether, input.achievedGoals, input.anniversaries),
+    ...memoryEvents(seedNum, daysTogether, input.memories),
+    ...creationEvents(seedNum, daysTogether, input.recipes, input.movies, input.books),
+    ...wishEvents(seedNum, daysTogether, input.wishes),
+    ...DOMAIN_IDS.flatMap((d) => baselineEvents(seedNum, d, daysTogether)),
   ];
+
+  const nodes = resolveGrowthTree(daysTogether, dna, events, pressures);
 
   // «Цілі/річниці/тривалість стосунків → Stability»: товщає ВСЕ, постфактум —
   // одна точка застосування замість дублювання в кожному білдері.
