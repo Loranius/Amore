@@ -96,6 +96,7 @@ export function Crystal() {
                     style={{
                       ['--facet-i' as string]: i,
                       ['--glint-delay' as string]: `${(i % 9) * 0.6}s`,
+                      ['--breathe-delay' as string]: `${(i % 5) * 1.3}s`,
                     }}
                   />
                 ))}

@@ -1906,19 +1906,23 @@ a.wl-card-title { color: var(--accent); }
 .crystal-facet {
   transform-box: fill-box;
   transform-origin: center;
-  animation: crystal-glint 5s ease-in-out infinite;
-  animation-delay: var(--glint-delay, 0s);
+  /* scale — окрема від transform властивість: композиційно накладається на
+     crystal-materialize (яка анімує transform), тому кожна грань «дихає»
+     власною фазою (--breathe-delay) без конфлікту з анімацією появи. */
+  animation: crystal-glint 5s ease-in-out infinite, crystal-facet-breathe 6s ease-in-out infinite;
+  animation-delay: var(--glint-delay, 0s), var(--breathe-delay, 0s);
 }
 .crystal-facet--enter {
   animation: crystal-materialize 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both,
-    crystal-glint 5s ease-in-out infinite;
-  animation-delay: calc(var(--facet-i) * 35ms), var(--glint-delay, 0s);
+    crystal-glint 5s ease-in-out infinite, crystal-facet-breathe 6s ease-in-out infinite;
+  animation-delay: calc(var(--facet-i) * 35ms), var(--glint-delay, 0s), var(--breathe-delay, 0s);
 }
 .crystal-anim-off { animation: none !important; }
 .crystal-seed { transform-box: fill-box; transform-origin: center; animation: crystal-seed-pulse 4.5s ease-in-out infinite; }
 @keyframes crystal-spin { to { transform: rotate(360deg); } }
 @keyframes crystal-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.018); } }
 @keyframes crystal-glint { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.12); } }
+@keyframes crystal-facet-breathe { 0%, 100% { scale: 1; } 50% { scale: 1.022; } }
 @keyframes crystal-materialize {
   from { opacity: 0; transform: scale(0.3); }
   to { opacity: 1; transform: scale(1); }

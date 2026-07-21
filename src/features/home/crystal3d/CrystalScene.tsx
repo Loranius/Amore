@@ -27,9 +27,59 @@ import {
   totalRichness,
   stageForRichness,
   stageLabel,
+  type SpikeSpec,
 } from './crystalGeometry3d';
 
 const BASE_Y = -1.3;
+
+interface SpikeProps {
+  spec: SpikeSpec;
+  geometry: THREE.BufferGeometry;
+  roughness: number;
+  clearcoat: number;
+  reduceMotion: boolean;
+  onOpen: () => void;
+}
+
+/**
+ * Один шип-грань. Власний useFrame замість групового scale — кожен шип
+ * дихає своєю фазою/швидкістю (SpikeSpec.breathePhase/breatheSpeed), тож
+ * колонія пульсує не в унісон, а органічною хвилею. Розтяг лише по Y
+ * (геометрія має основу в y=0) — виглядає як «підростання», не роздування.
+ */
+function Spike({ spec, geometry, roughness, clearcoat, reduceMotion, onOpen }: SpikeProps) {
+  const meshRef = useRef<THREE.Mesh | null>(null);
+
+  useFrame((state) => {
+    const mesh = meshRef.current;
+    if (!mesh || reduceMotion) return;
+    const t = state.clock.elapsedTime;
+    const micro = 1 + Math.sin(t * spec.breatheSpeed + spec.breathePhase) * 0.018;
+    mesh.scale.set(1, micro, 1);
+  });
+
+  return (
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      position={[spec.posX, BASE_Y, spec.posZ]}
+      rotation={[spec.tiltX, spec.rotY, spec.tiltZ]}
+      onClick={onOpen}
+    >
+      <meshPhysicalMaterial
+        vertexColors
+        roughness={roughness}
+        metalness={0}
+        transmission={0.4}
+        thickness={0.7}
+        clearcoat={clearcoat}
+        clearcoatRoughness={0.08}
+        ior={1.6}
+        reflectivity={0.6}
+      />
+    </mesh>
+  );
+}
 
 interface ClusterProps {
   dna: CrystalDNA;
@@ -62,7 +112,9 @@ function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterPro
     const group = groupRef.current;
     if (group && !reduceMotion) {
       group.rotation.y += delta * 0.1;
-      const breathe = 1 + Math.sin(state.clock.elapsedTime * 0.6) * 0.012;
+      // Легкий колективний подих усієї колонії — поверх нього кожен Spike
+      // додає власну мікро-фазу (SpikeSpec.breathePhase), тому рух не в унісон.
+      const breathe = 1 + Math.sin(state.clock.elapsedTime * 0.35) * 0.008;
       group.scale.setScalar(breathe);
     }
     const light = flashLightRef.current;
@@ -87,25 +139,15 @@ function CrystalCluster({ dna, seedNum, reduceMotion, grew, onOpen }: ClusterPro
         <meshPhysicalMaterial color="#4a3f52" roughness={0.85} clearcoat={0.15} />
       </mesh>
       {spikeMeshes.map(({ spec, geometry }) => (
-        <mesh
+        <Spike
           key={spec.key}
+          spec={spec}
           geometry={geometry}
-          position={[spec.posX, BASE_Y, spec.posZ]}
-          rotation={[spec.tiltX, spec.rotY, spec.tiltZ]}
-          onClick={onOpen}
-        >
-          <meshPhysicalMaterial
-            vertexColors
-            roughness={roughness}
-            metalness={0}
-            transmission={0.4}
-            thickness={0.7}
-            clearcoat={clearcoat}
-            clearcoatRoughness={0.08}
-            ior={1.6}
-            reflectivity={0.6}
-          />
-        </mesh>
+          roughness={roughness}
+          clearcoat={clearcoat}
+          reduceMotion={reduceMotion}
+          onOpen={onOpen}
+        />
       ))}
     </group>
   );

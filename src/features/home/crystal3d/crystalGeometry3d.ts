@@ -35,6 +35,9 @@ export interface SpikeSpec {
   rotY: number;
   colorA: string;
   colorB: string;
+  /** Власна фаза й швидкість «дихання» — щоб шипи пульсували не в унісон, а органічно, хвилею. */
+  breathePhase: number;
+  breatheSpeed: number;
 }
 
 const CORE_COLOR_A = '#6d4fa8';
@@ -75,6 +78,8 @@ export function buildSpikes(dna: CrystalDNA, seedNum = 0): SpikeSpec[] {
       rotY: coreRng() * Math.PI * 2,
       colorA: CORE_COLOR_A,
       colorB: CORE_COLOR_B,
+      breathePhase: coreRng() * Math.PI * 2,
+      breatheSpeed: 0.4 + coreRng() * 0.1,
     });
   }
 
@@ -115,6 +120,8 @@ export function buildSpikes(dna: CrystalDNA, seedNum = 0): SpikeSpec[] {
         rotY: rng() * Math.PI * 2,
         colorA: cat.colorA,
         colorB: cat.colorB,
+        breathePhase: rng() * Math.PI * 2,
+        breatheSpeed: 0.5 + rng() * 0.4,
       });
     }
   });
