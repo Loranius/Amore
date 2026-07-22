@@ -21,6 +21,7 @@ import {
   type WishFormPayload,
 } from './useWishlist';
 import type { WishlistItemRow } from '@/types';
+import './wishlistV3.mobile.css';
 
 type Tab = 'me' | 'partner' | 'shared';
 
