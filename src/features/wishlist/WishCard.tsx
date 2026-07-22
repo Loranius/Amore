@@ -1,3 +1,6 @@
+// ============================================================
+// WishCard — dream-board картка Wishlist v3
+// ============================================================
 import { useState } from 'react';
 import type { WishlistItemRow } from '@/types';
 import './wishlistV3.css';
@@ -41,9 +44,10 @@ export function WishCard({
 }: WishCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const canEdit = isOwn && !item.reserved;
+  const closeMenu = () => setMenuOpen(false);
 
   const runMenuAction = (action: () => void) => {
-    setMenuOpen(false);
+    closeMenu();
     action();
   };
 
