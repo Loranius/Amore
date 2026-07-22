@@ -1,9 +1,9 @@
 // ============================================================
 // useWishlist — дані вкладки «Бажання»
 // ------------------------------------------------------------
-// Wishlist v3 читає активні записи через role-safe RPC: власник не
-// отримує reserved_by та не бачить стадію preparing_surprise.
-// Усі доменні зміни виконуються серверними RPC із перевіркою ролі й стану.
+// Wishlist v3 читає дані лише через role-safe RPC: власник не отримує
+// reserved_by та не бачить стадію preparing_surprise. Усі доменні зміни
+// виконуються серверними RPC із перевіркою ролі й стану.
 // ============================================================
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, invokeFn, publicUrl } from '@/lib/supabase';
@@ -17,6 +17,7 @@ import {
   cancelWishlistReservation,
   completeWishlistGift,
   createWishlistItem,
+  fetchWishlistStatsV3,
   fetchWishlistV3,
   moveWishlistItem,
   reserveWishlistItem,
@@ -53,35 +54,11 @@ export function useSharedWishlistItems() {
   });
 }
 
-/** Прогрес пари: скільки бажань виконано загалом і цього року. */
+/** Прогрес пари без прямого читання таблиці або приватних полів бронювання. */
 export function useCoupleWishStats() {
   return useQuery({
     queryKey: qk.wishlistStats(),
-    queryFn: async (): Promise<{
-      total: number;
-      done: number;
-      doneThisYear: number;
-      doneThisMonth: number;
-    }> => {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select('fulfilled,fulfilled_at')
-        .is('deleted_at', null)
-        .returns<{ fulfilled: boolean; fulfilled_at: string | null }[]>();
-      if (error) throw error;
-      const rows = data ?? [];
-      const now = new Date();
-      const done = rows.filter((r) => r.fulfilled).length;
-      const doneThisYear = rows.filter(
-        (r) => r.fulfilled && r.fulfilled_at && new Date(r.fulfilled_at).getFullYear() === now.getFullYear(),
-      ).length;
-      const doneThisMonth = rows.filter((r) => {
-        if (!r.fulfilled || !r.fulfilled_at) return false;
-        const d = new Date(r.fulfilled_at);
-        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-      }).length;
-      return { total: rows.length, done, doneThisYear, doneThisMonth };
-    },
+    queryFn: fetchWishlistStatsV3,
   });
 }
 
@@ -90,16 +67,26 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
     queryKey: qk.wishlistFulfilled(ownerId ?? -1),
     enabled: enabled && ownerId !== null,
     queryFn: async (): Promise<FulfilledWishlistItem[]> => {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select('id,title,description,link,image_url,price,priority,fulfilled_at,fulfilled_by')
-        .eq('owner', ownerId!)
-        .eq('fulfilled', true)
-        .is('deleted_at', null)
-        .order('fulfilled_at', { ascending: false })
-        .returns<FulfilledWishlistItem[]>();
-      if (error) throw error;
-      return data ?? [];
+      const rows = await fetchWishlistV3({
+        ownerId,
+        shared: false,
+        includeArchived: true,
+      });
+
+      return rows
+        .filter((row) => row.fulfilled)
+        .sort((a, b) => (b.fulfilled_at ?? '').localeCompare(a.fulfilled_at ?? ''))
+        .map((row) => ({
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          link: row.link,
+          image_url: row.image_url,
+          price: row.price,
+          priority: row.priority,
+          fulfilled_at: row.fulfilled_at,
+          fulfilled_by: row.fulfilled_by,
+        }));
     },
   });
 }

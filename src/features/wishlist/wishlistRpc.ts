@@ -14,6 +14,13 @@ export interface WishlistItemV3 extends WishlistItemRow {
   archived_at: string | null;
 }
 
+export interface WishlistStatsV3 {
+  total: number;
+  done: number;
+  doneThisYear: number;
+  doneThisMonth: number;
+}
+
 export interface WishlistMutationPayload {
   title: string;
   description: string | null;
@@ -32,6 +39,20 @@ const rpc = supabase.rpc.bind(supabase) as unknown as RpcCaller;
 function assertRows(data: unknown): WishlistItemV3[] {
   if (!Array.isArray(data)) throw new Error('Wishlist RPC returned an invalid payload');
   return data as WishlistItemV3[];
+}
+
+function assertStats(data: unknown): WishlistStatsV3 {
+  if (!Array.isArray(data) || data.length !== 1 || typeof data[0] !== 'object' || data[0] === null) {
+    throw new Error('Wishlist stats RPC returned an invalid payload');
+  }
+
+  const row = data[0] as Record<string, unknown>;
+  return {
+    total: Number(row.total ?? 0),
+    done: Number(row.done ?? 0),
+    doneThisYear: Number(row.done_this_year ?? 0),
+    doneThisMonth: Number(row.done_this_month ?? 0),
+  };
 }
 
 async function callVoid(fn: string, args: Record<string, unknown>): Promise<void> {
@@ -62,6 +83,12 @@ export async function fetchWishlistV3(input: {
   });
   if (error) throw new Error(error.message);
   return assertRows(data);
+}
+
+export async function fetchWishlistStatsV3(): Promise<WishlistStatsV3> {
+  const { data, error } = await rpc('get_wishlist_stats_v3');
+  if (error) throw new Error(error.message);
+  return assertStats(data);
 }
 
 export async function createWishlistItem(input: {
