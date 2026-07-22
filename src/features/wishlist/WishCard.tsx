@@ -4,12 +4,13 @@
 // Власник не бачить, хто забронював мрію. Керувати бронюванням і
 // завершувати подарунок може лише користувач, який створив бронювання.
 // ============================================================
-import type { WishlistItemRow, WishPriority } from '@/types';
+import type { WishlistItemRow } from '@/types';
 
-const PRIORITY_LABELS: Record<WishPriority, string> = {
+const PRIORITY_LABELS: Record<string, string> = {
+  dream: '❤️ Dream',
   high: '🔥 Високий',
-  medium: '🟡 Середній',
-  low: '🟢 Низький',
+  medium: '⭐ Середній',
+  low: '○ Низький',
 };
 
 interface WishCardProps {
@@ -64,7 +65,9 @@ export function WishCard({
 
         {item.priority && (
           <div className="wl-card-meta">
-            <span className="wl-card-priority">{PRIORITY_LABELS[item.priority]}</span>
+            <span className="wl-card-priority">
+              {PRIORITY_LABELS[item.priority] ?? item.priority}
+            </span>
           </div>
         )}
 
