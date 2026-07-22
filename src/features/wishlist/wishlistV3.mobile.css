@@ -1,0 +1,37 @@
+/* Mobile-only polishing for Wishlist v3. */
+
+@media (max-width: 719px) {
+  .wishlist {
+    padding-bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .wl-card-v3-menu-wrap {
+    margin-left: auto;
+  }
+
+  .wishlist-grid > .wl-card-v3:first-child .wl-card-v3-menu-wrap {
+    margin-right: 54px;
+  }
+
+  .wl-card-v3-photo img {
+    max-height: 460px;
+  }
+}
+
+@media (max-width: 420px) {
+  .wl-card-v3-heading {
+    flex-wrap: wrap;
+  }
+
+  .wl-card-v3-title {
+    flex: 1 1 210px;
+  }
+
+  .wl-card-v3-price {
+    margin-left: auto;
+  }
+
+  .wl-card-v3-reservation-actions {
+    grid-template-columns: 1fr;
+  }
+}
