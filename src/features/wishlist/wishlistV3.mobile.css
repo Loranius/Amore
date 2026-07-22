@@ -1,3 +1,5 @@
+@import './wishlistLinkPreview.css';
+
 /* Mobile-only polishing for Wishlist v3. */
 
 @media (max-width: 719px) {
