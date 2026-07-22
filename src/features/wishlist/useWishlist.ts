@@ -3,7 +3,7 @@
 // ------------------------------------------------------------
 // Wishlist v3 читає активні записи через role-safe RPC: власник не
 // отримує reserved_by та не бачить стадію preparing_surprise.
-// Бронювання і завершення виконуються атомарними серверними RPC.
+// Усі доменні зміни виконуються серверними RPC із перевіркою ролі й стану.
 // ============================================================
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, invokeFn, publicUrl } from '@/lib/supabase';
@@ -16,15 +16,14 @@ import { useUsers, usePartner } from '@/features/_shared/useUsers';
 import {
   cancelWishlistReservation,
   completeWishlistGift,
+  createWishlistItem,
   fetchWishlistV3,
+  moveWishlistItem,
   reserveWishlistItem,
+  softDeleteWishlistItem,
+  updateWishlistItem,
 } from './wishlistRpc';
-import type {
-  WishlistItemRow,
-  FulfilledWishlistItem,
-  InsertRow,
-  UserName,
-} from '@/types';
+import type { WishlistItemRow, FulfilledWishlistItem, UserName } from '@/types';
 
 const BUCKET = 'wishlist-photos';
 
@@ -67,6 +66,7 @@ export function useCoupleWishStats() {
       const { data, error } = await supabase
         .from('wishlist_items')
         .select('fulfilled,fulfilled_at')
+        .is('deleted_at', null)
         .returns<{ fulfilled: boolean; fulfilled_at: string | null }[]>();
       if (error) throw error;
       const rows = data ?? [];
@@ -95,6 +95,7 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
         .select('id,title,description,link,image_url,price,priority,fulfilled_at,fulfilled_by')
         .eq('owner', ownerId!)
         .eq('fulfilled', true)
+        .is('deleted_at', null)
         .order('fulfilled_at', { ascending: false })
         .returns<FulfilledWishlistItem[]>();
       if (error) throw error;
@@ -161,40 +162,28 @@ export function useWishlistMutations(ownerId: number | null) {
       isShared?: boolean;
     }) => {
       if (input.id !== null) {
-        const { error } = await supabase
-          .from('wishlist_items')
-          .update(input.payload)
-          .eq('id', input.id)
-          .eq('status', 'visible');
-        if (error) throw error;
+        await updateWishlistItem(input.id, input.payload);
       } else {
-        const row: InsertRow<'wishlist_items'> = {
-          ...input.payload,
-          owner: input.owner ?? me.id,
-          is_shared: input.isShared ?? false,
-          reserved: false,
-          reserved_by: null,
-          fulfilled: false,
-        };
-        const { error } = await supabase.from('wishlist_items').insert(row);
-        if (error) throw error;
+        await createWishlistItem({
+          payload: input.payload,
+          ownerId: input.owner ?? me.id,
+          shared: input.isShared ?? false,
+        });
       }
     },
     onSuccess: invalidateBoth,
-    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
+    onError: (e) => {
+      const message = (e as Error).message;
+      toast.show(
+        message.includes('wish_not_editable')
+          ? 'Цю мрію вже не можна редагувати.'
+          : 'Не вдалося зберегти бажання. Спробуй ще.',
+      );
+    },
   });
 
-  // Тимчасово лишаємо фізичне видалення лише для visible-записів.
-  // Серверна soft-delete дія буде наступною міграцією.
   const remove = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await supabase
-        .from('wishlist_items')
-        .delete()
-        .eq('id', id)
-        .eq('status', 'visible');
-      if (error) throw error;
-    },
+    mutationFn: softDeleteWishlistItem,
     onMutate: async (id) => {
       await client.cancelQueries({ queryKey: key });
       const prev = snapshot();
@@ -203,9 +192,13 @@ export function useWishlistMutations(ownerId: number | null) {
       );
       return { prev };
     },
-    onError: (_e, _v, ctx) => {
+    onError: (e, _v, ctx) => {
       rollback(ctx?.prev);
-      toast.show('Не вдалось видалити бажання. Спробуй ще.');
+      toast.show(
+        (e as Error).message.includes('wish_not_deletable')
+          ? 'Заброньовану або завершену мрію видалити не можна.'
+          : 'Не вдалося видалити бажання. Спробуй ще.',
+      );
     },
     onSettled: invalidateBoth,
   });
@@ -222,22 +215,22 @@ export function useWishlistMutations(ownerId: number | null) {
       toast.show(
         message.includes('wish_not_reservable')
           ? 'Цю мрію вже хтось узяв на себе.'
-          : 'Не вдалось оновити бронювання. Спробуй ще.',
+          : 'Не вдалося оновити бронювання. Спробуй ще.',
       );
     },
   });
 
   const changeScope = useMutation({
     mutationFn: async (v: { id: number; owner: number; isShared: boolean }) => {
-      const { error } = await supabase
-        .from('wishlist_items')
-        .update({ owner: v.owner, is_shared: v.isShared })
-        .eq('id', v.id)
-        .eq('status', 'visible');
-      if (error) throw error;
+      await moveWishlistItem(v.id, v.owner, v.isShared);
     },
     onSuccess: invalidateBoth,
-    onError: (e) => toast.show('Не вдалось перенести бажання: ' + (e as Error).message),
+    onError: (e) =>
+      toast.show(
+        (e as Error).message.includes('wish_not_movable')
+          ? 'Цю мрію вже не можна переносити.'
+          : 'Не вдалося перенести бажання. Спробуй ще.',
+      ),
   });
 
   // Поточний UI має одну кнопку «Вже купив(ла)», тому адаптер виконує
