@@ -55,20 +55,6 @@ function assertStats(data: unknown): WishlistStatsV3 {
   };
 }
 
-function assertStats(data: unknown): WishlistStatsV3 {
-  if (!Array.isArray(data) || data.length !== 1 || typeof data[0] !== 'object' || data[0] === null) {
-    throw new Error('Wishlist stats RPC returned an invalid payload');
-  }
-
-  const row = data[0] as Record<string, unknown>;
-  return {
-    total: Number(row.total ?? 0),
-    done: Number(row.done ?? 0),
-    doneThisYear: Number(row.done_this_year ?? 0),
-    doneThisMonth: Number(row.done_this_month ?? 0),
-  };
-}
-
 async function callVoid(fn: string, args: Record<string, unknown>): Promise<void> {
   const { error } = await rpc(fn, args);
   if (error) throw new Error(error.message);
@@ -113,12 +99,6 @@ export async function fetchFulfilledWishlistV3(
   });
   if (error) throw new Error(error.message);
   return assertRows<FulfilledWishlistItem>(data, 'Wishlist archive');
-}
-
-export async function fetchWishlistStatsV3(): Promise<WishlistStatsV3> {
-  const { data, error } = await rpc('get_wishlist_stats_v3');
-  if (error) throw new Error(error.message);
-  return assertStats(data);
 }
 
 export async function createWishlistItem(input: {
