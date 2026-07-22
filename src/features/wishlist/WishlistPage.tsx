@@ -20,6 +20,7 @@ import {
   useWishlistMutations,
   type WishFormPayload,
 } from './useWishlist';
+import type { WishlistItemV3 } from './wishlistRpc';
 import type { WishlistItemRow } from '@/types';
 import './wishlistV3.mobile.css';
 
@@ -43,7 +44,15 @@ export function WishlistPage() {
   const isPending = tab === 'shared' ? sharedPending : ownPending;
   const isError = tab === 'shared' ? sharedError : ownError;
 
-  const { save, remove, setReserved, fulfill, changeScope } = useWishlistMutations(ownerId);
+  const {
+    save,
+    remove,
+    setReserved,
+    markPurchased,
+    markPreparing,
+    fulfill,
+    changeScope,
+  } = useWishlistMutations(ownerId);
   const confirmDialog = useConfirm();
 
   const [editing, setEditing] = useState<WishlistItemRow | null>(null);
@@ -62,11 +71,27 @@ export function WishlistPage() {
   const onDelete = async (id: number) => {
     if (await confirmDialog('Видалити бажання?')) remove.mutate(id);
   };
+
   const onReserve = async (id: number, reserved: boolean) => {
     if (!reserved && !(await confirmDialog('Скасувати бронювання цього подарунка?'))) return;
     setReserved.mutate({ id, reserved });
   };
-  const onFulfill = async (item: WishlistItemRow) => {
+
+  const onPurchased = async (item: WishlistItemV3) => {
+    if (
+      await confirmDialog(
+        `Позначити «${item.title}» як куплений подарунок?\n\nПісля цього скасувати бронювання вже не можна.`,
+      )
+    ) {
+      markPurchased.mutate(item.id);
+    }
+  };
+
+  const onPreparing = (item: WishlistItemV3) => {
+    markPreparing.mutate(item.id);
+  };
+
+  const onFulfill = async (item: WishlistItemV3) => {
     if (
       await confirmDialog(
         `Підтверджуєш, що подарунок «${item.title}» уже вручено? 🎁\n\nОбидва отримають сповіщення ✉️`,
@@ -77,9 +102,9 @@ export function WishlistPage() {
   };
 
   const partnerName = partnerGenitive(partner?.name);
-  const isItemOwn = (item: WishlistItemRow) =>
+  const isItemOwn = (item: WishlistItemV3) =>
     tab === 'shared' ? item.owner === me.id : isOwnTab;
-  const canManageReservation = (item: WishlistItemRow) => item.reserved_by === me.id;
+  const canManageReservation = (item: WishlistItemV3) => item.reserved_by === me.id;
 
   const pct = stats && stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
 
@@ -159,6 +184,8 @@ export function WishlistPage() {
                   onEdit={setEditing}
                   onDelete={onDelete}
                   onReserve={onReserve}
+                  onPurchased={onPurchased}
+                  onPreparing={onPreparing}
                   onFulfill={onFulfill}
                   onMove={setMoving}
                 />
