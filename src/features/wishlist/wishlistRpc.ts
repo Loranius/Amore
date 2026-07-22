@@ -5,6 +5,7 @@ export type WishlistStatus =
   | 'created'
   | 'visible'
   | 'reserved'
+  | 'purchased'
   | 'preparing_surprise'
   | 'gifted'
   | 'archived';
@@ -147,9 +148,15 @@ export async function cancelWishlistReservation(wishId: number): Promise<void> {
   await callVoid('cancel_wishlist_reservation', { p_wish_id: wishId });
 }
 
-export async function completeWishlistGift(wishId: number): Promise<void> {
-  await callVoid('mark_wishlist_preparing', { p_wish_id: wishId });
+export async function markWishlistPurchased(wishId: number): Promise<void> {
+  await callVoid('mark_wishlist_purchased', { p_wish_id: wishId });
+}
 
+export async function markWishlistPreparing(wishId: number): Promise<void> {
+  await callVoid('mark_wishlist_preparing', { p_wish_id: wishId });
+}
+
+export async function completeWishlistGift(wishId: number): Promise<void> {
   const { error } = await rpc('complete_wishlist_gift', {
     p_wish_id: wishId,
     p_idempotency_key: crypto.randomUUID(),
