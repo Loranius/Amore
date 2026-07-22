@@ -1,10 +1,9 @@
 // ============================================================
-// useWishlist — дані вкладки «Бажання» (порт wishlist.js)
+// useWishlist — дані вкладки «Бажання»
 // ------------------------------------------------------------
-// Активні бажання, архів виконаних, партнер, завантаження фото у
-// Storage і мутації (додати/редагувати/видалити/бронь/виконати).
-// Оптимістика — там, де стара версія малювала «напряму» (бронь,
-// видалення), решта — invalidate. db-notify і конфеті на fulfill.
+// Wishlist v3 читає активні записи через role-safe RPC: власник не
+// отримує reserved_by та не бачить стадію preparing_surprise.
+// Бронювання і завершення виконуються атомарними серверними RPC.
 // ============================================================
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, invokeFn, publicUrl } from '@/lib/supabase';
@@ -14,6 +13,12 @@ import { burstConfetti } from '@/lib/confetti';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useUsers, usePartner } from '@/features/_shared/useUsers';
+import {
+  cancelWishlistReservation,
+  completeWishlistGift,
+  fetchWishlistV3,
+  reserveWishlistItem,
+} from './wishlistRpc';
 import type {
   WishlistItemRow,
   FulfilledWishlistItem,
@@ -23,7 +28,6 @@ import type {
 
 const BUCKET = 'wishlist-photos';
 
-// Присвійна форма імені партнера («Бажання Діми / Лєни»).
 const GENITIVE: Record<UserName, string> = { Діма: 'Діми', Лєна: 'Лєни' };
 export function partnerGenitive(name: string | undefined): string {
   return name && name in GENITIVE ? GENITIVE[name as UserName] : (name ?? 'Партнера');
@@ -32,25 +36,12 @@ export function partnerGenitive(name: string | undefined): string {
 export { usePartner };
 
 // ── Запити ───────────────────────────────────────────────────
-const ACTIVE_COLS =
-  'id,title,description,link,image_url,gift_date,owner,is_shared,reserved,reserved_by,price,priority,fulfilled,fulfilled_by,fulfilled_at';
-
 export function useWishlistItems(ownerId: number | null) {
   return useQuery({
     queryKey: qk.wishlist(ownerId ?? -1),
     enabled: ownerId !== null,
-    queryFn: async (): Promise<WishlistItemRow[]> => {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select(ACTIVE_COLS)
-        .eq('owner', ownerId!)
-        .eq('is_shared', false)
-        .or('fulfilled.is.null,fulfilled.eq.false')
-        .order('id', { ascending: false })
-        .returns<WishlistItemRow[]>();
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async (): Promise<WishlistItemRow[]> =>
+      fetchWishlistV3({ ownerId, shared: false }),
   });
 }
 
@@ -58,21 +49,12 @@ export function useWishlistItems(ownerId: number | null) {
 export function useSharedWishlistItems() {
   return useQuery({
     queryKey: qk.wishlistShared(),
-    queryFn: async (): Promise<WishlistItemRow[]> => {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select(ACTIVE_COLS)
-        .eq('is_shared', true)
-        .or('fulfilled.is.null,fulfilled.eq.false')
-        .order('id', { ascending: false })
-        .returns<WishlistItemRow[]>();
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async (): Promise<WishlistItemRow[]> =>
+      fetchWishlistV3({ ownerId: null, shared: true }),
   });
 }
 
-/** Прогрес пари: скільки бажань (усіх, обох) виконано загалом і цього року. */
+/** Прогрес пари: скільки бажань виконано загалом і цього року. */
 export function useCoupleWishStats() {
   return useQuery({
     queryKey: qk.wishlistStats(),
@@ -121,9 +103,9 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
   });
 }
 
-// ── Завантаження фото (HEIC-normalize + compress → Storage) ──
+// ── Завантаження фото ────────────────────────────────────────
 export async function uploadWishPhoto(file: File, userId: number): Promise<string> {
-  const normalized = await normalize(file); // HEIC → JPEG (може кинути)
+  const normalized = await normalize(file);
 
   let blob: Blob = normalized;
   let ext = (normalized.name.split('.').pop() || 'jpg').toLowerCase();
@@ -171,9 +153,6 @@ export function useWishlistMutations(ownerId: number | null) {
     void client.invalidateQueries({ queryKey: ['wishlist'] });
   };
 
-  // ДОДАТИ / РЕДАГУВАТИ (фото вантажиться в компоненті до виклику).
-  // owner/isShared — лише для створення (вибір «Моє/Для партнера/Спільне»);
-  // на редагуванні ігноруються, власність не міняється.
   const save = useMutation({
     mutationFn: async (input: {
       id: number | null;
@@ -185,7 +164,8 @@ export function useWishlistMutations(ownerId: number | null) {
         const { error } = await supabase
           .from('wishlist_items')
           .update(input.payload)
-          .eq('id', input.id);
+          .eq('id', input.id)
+          .eq('status', 'visible');
         if (error) throw error;
       } else {
         const row: InsertRow<'wishlist_items'> = {
@@ -204,10 +184,15 @@ export function useWishlistMutations(ownerId: number | null) {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
-  // ВИДАЛИТИ — оптимістично.
+  // Тимчасово лишаємо фізичне видалення лише для visible-записів.
+  // Серверна soft-delete дія буде наступною міграцією.
   const remove = useMutation({
     mutationFn: async (id: number) => {
-      const { error } = await supabase.from('wishlist_items').delete().eq('id', id);
+      const { error } = await supabase
+        .from('wishlist_items')
+        .delete()
+        .eq('id', id)
+        .eq('status', 'visible');
       if (error) throw error;
     },
     onMutate: async (id) => {
@@ -225,64 +210,42 @@ export function useWishlistMutations(ownerId: number | null) {
     onSettled: invalidateBoth,
   });
 
-  // БРОНЬ / СКАСУВАННЯ БРОНІ — оптимістично.
+  // Без оптимістики: сервер спочатку підтверджує атомарне бронювання.
   const setReserved = useMutation({
     mutationFn: async (v: { id: number; reserved: boolean }) => {
-      const { error } = await supabase
-        .from('wishlist_items')
-        .update({ reserved: v.reserved, reserved_by: v.reserved ? me.id : null })
-        .eq('id', v.id);
-      if (error) throw error;
+      if (v.reserved) await reserveWishlistItem(v.id);
+      else await cancelWishlistReservation(v.id);
     },
-    onMutate: async (v) => {
-      await client.cancelQueries({ queryKey: key });
-      const prev = snapshot();
-      client.setQueryData<WishlistItemRow[]>(key, (old) =>
-        (old ?? []).map((i) =>
-          i.id === v.id
-            ? { ...i, reserved: v.reserved, reserved_by: v.reserved ? me.id : null }
-            : i,
-        ),
+    onSuccess: invalidateBoth,
+    onError: (e) => {
+      const message = (e as Error).message;
+      toast.show(
+        message.includes('wish_not_reservable')
+          ? 'Цю мрію вже хтось узяв на себе.'
+          : 'Не вдалось оновити бронювання. Спробуй ще.',
       );
-      return { prev };
     },
-    onError: (_e, _v, ctx) => {
-      rollback(ctx?.prev);
-      toast.show('Не вдалось оновити бажання. Спробуй ще.');
-    },
-    onSettled: invalidateBoth,
   });
 
-  // ПЕРЕНЕСТИ (моє / партнеру / спільне) — на вже створеному бажанні,
-  // на відміну від owner/isShared у save (там це лише вибір при СТВОРЕННІ).
   const changeScope = useMutation({
     mutationFn: async (v: { id: number; owner: number; isShared: boolean }) => {
       const { error } = await supabase
         .from('wishlist_items')
         .update({ owner: v.owner, is_shared: v.isShared })
-        .eq('id', v.id);
+        .eq('id', v.id)
+        .eq('status', 'visible');
       if (error) throw error;
     },
     onSuccess: invalidateBoth,
     onError: (e) => toast.show('Не вдалось перенести бажання: ' + (e as Error).message),
   });
 
-  // ВИКОНАТИ БАЖАННЯ (+ db-notify + конфеті).
+  // Поточний UI має одну кнопку «Вже купив(ла)», тому адаптер виконує
+  // reserved → preparing_surprise → archived послідовно на сервері.
   const fulfill = useMutation({
     mutationFn: async (item: WishlistItemRow) => {
-      const { error } = await supabase
-        .from('wishlist_items')
-        .update({
-          fulfilled: true,
-          fulfilled_by: me.id,
-          fulfilled_at: new Date().toISOString(),
-          reserved: true,
-          reserved_by: me.id,
-        })
-        .eq('id', item.id);
-      if (error) throw error;
+      await completeWishlistGift(item.id);
 
-      // Сповіщення в Telegram — не блокує успіх (текст будує Edge Function).
       const owner = (users ?? []).find((u) => u.id === item.owner);
       try {
         await invokeFn('db-notify', {
