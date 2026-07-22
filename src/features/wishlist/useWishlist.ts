@@ -2,8 +2,8 @@
 // useWishlist — дані вкладки «Бажання»
 // ------------------------------------------------------------
 // Wishlist v3 читає дані лише через role-safe RPC: власник не отримує
-// reserved_by та не бачить стадію preparing_surprise. Усі доменні зміни
-// виконуються серверними RPC із перевіркою ролі й стану.
+// reserved_by та не бачить приватні стадії purchased/preparing_surprise.
+// Усі доменні зміни виконуються серверними RPC із перевіркою ролі й стану.
 // ============================================================
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, invokeFn, publicUrl } from '@/lib/supabase';
@@ -17,12 +17,16 @@ import {
   cancelWishlistReservation,
   completeWishlistGift,
   createWishlistItem,
+  fetchFulfilledWishlistV3,
   fetchWishlistStatsV3,
   fetchWishlistV3,
+  markWishlistPreparing,
+  markWishlistPurchased,
   moveWishlistItem,
   reserveWishlistItem,
   softDeleteWishlistItem,
   updateWishlistItem,
+  type WishlistItemV3,
 } from './wishlistRpc';
 import type { WishlistItemRow, FulfilledWishlistItem, UserName } from '@/types';
 
@@ -40,7 +44,7 @@ export function useWishlistItems(ownerId: number | null) {
   return useQuery({
     queryKey: qk.wishlist(ownerId ?? -1),
     enabled: ownerId !== null,
-    queryFn: async (): Promise<WishlistItemRow[]> =>
+    queryFn: async (): Promise<WishlistItemV3[]> =>
       fetchWishlistV3({ ownerId, shared: false }),
   });
 }
@@ -49,7 +53,7 @@ export function useWishlistItems(ownerId: number | null) {
 export function useSharedWishlistItems() {
   return useQuery({
     queryKey: qk.wishlistShared(),
-    queryFn: async (): Promise<WishlistItemRow[]> =>
+    queryFn: async (): Promise<WishlistItemV3[]> =>
       fetchWishlistV3({ ownerId: null, shared: true }),
   });
 }
@@ -66,28 +70,8 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
   return useQuery({
     queryKey: qk.wishlistFulfilled(ownerId ?? -1),
     enabled: enabled && ownerId !== null,
-    queryFn: async (): Promise<FulfilledWishlistItem[]> => {
-      const rows = await fetchWishlistV3({
-        ownerId,
-        shared: false,
-        includeArchived: true,
-      });
-
-      return rows
-        .filter((row) => row.fulfilled)
-        .sort((a, b) => (b.fulfilled_at ?? '').localeCompare(a.fulfilled_at ?? ''))
-        .map((row) => ({
-          id: row.id,
-          title: row.title,
-          description: row.description,
-          link: row.link,
-          image_url: row.image_url,
-          price: row.price,
-          priority: row.priority,
-          fulfilled_at: row.fulfilled_at,
-          fulfilled_by: row.fulfilled_by,
-        }));
-    },
+    queryFn: async (): Promise<FulfilledWishlistItem[]> =>
+      fetchFulfilledWishlistV3(ownerId!),
   });
 }
 
@@ -133,8 +117,8 @@ export function useWishlistMutations(ownerId: number | null) {
   const { data: users } = useUsers();
   const key = ownerId !== null ? qk.wishlist(ownerId) : qk.wishlistShared();
 
-  const snapshot = () => client.getQueryData<WishlistItemRow[]>(key);
-  const rollback = (prev: WishlistItemRow[] | undefined) => {
+  const snapshot = () => client.getQueryData<WishlistItemV3[]>(key);
+  const rollback = (prev: WishlistItemV3[] | undefined) => {
     if (prev) client.setQueryData(key, prev);
   };
   const invalidateBoth = () => {
@@ -174,7 +158,7 @@ export function useWishlistMutations(ownerId: number | null) {
     onMutate: async (id) => {
       await client.cancelQueries({ queryKey: key });
       const prev = snapshot();
-      client.setQueryData<WishlistItemRow[]>(key, (old) =>
+      client.setQueryData<WishlistItemV3[]>(key, (old) =>
         (old ?? []).filter((i) => i.id !== id),
       );
       return { prev };
@@ -207,6 +191,28 @@ export function useWishlistMutations(ownerId: number | null) {
     },
   });
 
+  const markPurchased = useMutation({
+    mutationFn: (id: number) => markWishlistPurchased(id),
+    onSuccess: invalidateBoth,
+    onError: (e) =>
+      toast.show(
+        (e as Error).message.includes('wish_not_purchasable')
+          ? 'Цей подарунок уже не можна позначити як куплений.'
+          : 'Не вдалося оновити етап покупки. Спробуй ще.',
+      ),
+  });
+
+  const markPreparing = useMutation({
+    mutationFn: (id: number) => markWishlistPreparing(id),
+    onSuccess: invalidateBoth,
+    onError: (e) =>
+      toast.show(
+        (e as Error).message.includes('wish_not_preparable')
+          ? 'Спочатку познач подарунок як куплений.'
+          : 'Не вдалося почати підготовку сюрпризу.',
+      ),
+  });
+
   const changeScope = useMutation({
     mutationFn: async (v: { id: number; owner: number; isShared: boolean }) => {
       await moveWishlistItem(v.id, v.owner, v.isShared);
@@ -220,10 +226,8 @@ export function useWishlistMutations(ownerId: number | null) {
       ),
   });
 
-  // Поточний UI має одну кнопку «Вже купив(ла)», тому адаптер виконує
-  // reserved → preparing_surprise → archived послідовно на сервері.
   const fulfill = useMutation({
-    mutationFn: async (item: WishlistItemRow) => {
+    mutationFn: async (item: WishlistItemV3) => {
       await completeWishlistGift(item.id);
 
       const owner = (users ?? []).find((u) => u.id === item.owner);
@@ -245,5 +249,13 @@ export function useWishlistMutations(ownerId: number | null) {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
-  return { save, remove, setReserved, fulfill, changeScope };
+  return {
+    save,
+    remove,
+    setReserved,
+    markPurchased,
+    markPreparing,
+    fulfill,
+    changeScope,
+  };
 }

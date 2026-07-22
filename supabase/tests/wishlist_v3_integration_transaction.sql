@@ -248,6 +248,59 @@ select pg_temp.set_actor((select email from pg_temp.wishlist_test_users where sl
 select public.reserve_wishlist_item(
   (select wish_id from pg_temp.wishlist_test_wishes where label = 'lifecycle')
 );
+
+select pg_temp.expect_error(
+  'cannot_prepare_before_purchase',
+  'wish_not_preparable',
+  format(
+    'select public.mark_wishlist_preparing(%s)',
+    (select wish_id from pg_temp.wishlist_test_wishes where label = 'lifecycle')
+  )
+);
+
+select public.mark_wishlist_purchased(
+  (select wish_id from pg_temp.wishlist_test_wishes where label = 'lifecycle')
+);
+
+select pg_temp.assert_true(
+  'reserver_sees_purchased_state',
+  (
+    select status::text = 'purchased'
+      and reserved
+      and reserved_by = (select id from pg_temp.wishlist_test_users where slot = 2)
+    from public.get_wishlist_items_v3(
+      (select id from pg_temp.wishlist_test_users where slot = 1),
+      false,
+      false
+    )
+    where id = (select wish_id from pg_temp.wishlist_test_wishes where label = 'lifecycle')
+  )
+);
+
+select pg_temp.set_actor((select email from pg_temp.wishlist_test_users where slot = 1));
+select pg_temp.assert_true(
+  'owner_sees_purchased_as_reserved',
+  (
+    select status::text = 'reserved' and reserved and reserved_by is null
+    from public.get_wishlist_items_v3(
+      (select id from pg_temp.wishlist_test_users where slot = 1),
+      false,
+      false
+    )
+    where id = (select wish_id from pg_temp.wishlist_test_wishes where label = 'lifecycle')
+  )
+);
+
+select pg_temp.set_actor((select email from pg_temp.wishlist_test_users where slot = 2));
+select pg_temp.expect_error(
+  'purchased_reservation_cannot_cancel',
+  'wish_not_reserved',
+  format(
+    'select public.cancel_wishlist_reservation(%s)',
+    (select wish_id from pg_temp.wishlist_test_wishes where label = 'lifecycle')
+  )
+);
+
 select public.mark_wishlist_preparing(
   (select wish_id from pg_temp.wishlist_test_wishes where label = 'lifecycle')
 );

@@ -2,7 +2,7 @@
 // WishCard — dream-board картка Wishlist v3
 // ============================================================
 import { useEffect, useState } from 'react';
-import type { WishlistItemRow } from '@/types';
+import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistV3.css';
 
 const PRIORITY_LABELS: Record<string, string> = {
@@ -20,15 +20,17 @@ const PRIORITY_ICONS: Record<string, string> = {
 };
 
 interface WishCardProps {
-  item: WishlistItemRow;
+  item: WishlistItemV3;
   isOwn: boolean;
   canManageReservation: boolean;
   onPhotoClick: (src: string) => void;
-  onEdit: (item: WishlistItemRow) => void;
+  onEdit: (item: WishlistItemV3) => void;
   onDelete: (id: number) => void;
   onReserve: (id: number, reserved: boolean) => void;
-  onFulfill: (item: WishlistItemRow) => void;
-  onMove: (item: WishlistItemRow) => void;
+  onPurchased: (item: WishlistItemV3) => void;
+  onPreparing: (item: WishlistItemV3) => void;
+  onFulfill: (item: WishlistItemV3) => void;
+  onMove: (item: WishlistItemV3) => void;
 }
 
 export function WishCard({
@@ -39,12 +41,14 @@ export function WishCard({
   onEdit,
   onDelete,
   onReserve,
+  onPurchased,
+  onPreparing,
   onFulfill,
   onMove,
 }: WishCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
-  const canEdit = isOwn && !item.reserved;
+  const canEdit = isOwn && item.status === 'visible';
   const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
@@ -57,6 +61,103 @@ export function WishCard({
   };
 
   const hasVisibleImage = Boolean(item.image_url) && !imageFailed;
+
+  const reservationControls = () => {
+    if (canManageReservation && item.reserved) {
+      if (item.status === 'reserved') {
+        return (
+          <div className="wl-card-v3-lifecycle">
+            <div className="wl-card-v3-stage">
+              <span aria-hidden="true">♡</span>
+              Заброньовано тобою
+            </div>
+            <div className="wl-card-v3-reservation-actions">
+              <button
+                type="button"
+                className="wl-card-v3-primary"
+                onClick={() => onPurchased(item)}
+              >
+                <span aria-hidden="true">✓</span>
+                Подарунок куплено
+              </button>
+              <button
+                type="button"
+                className="wl-card-v3-secondary"
+                onClick={() => onReserve(item.id, false)}
+              >
+                Скасувати
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      if (item.status === 'purchased') {
+        return (
+          <div className="wl-card-v3-lifecycle">
+            <div className="wl-card-v3-stage wl-card-v3-stage--purchased">
+              <span aria-hidden="true">✓</span>
+              Подарунок куплено
+            </div>
+            <button
+              type="button"
+              className="wl-card-v3-primary"
+              onClick={() => onPreparing(item)}
+            >
+              <span aria-hidden="true">✨</span>
+              Готую сюрприз
+            </button>
+          </div>
+        );
+      }
+
+      if (item.status === 'preparing_surprise') {
+        return (
+          <div className="wl-card-v3-lifecycle">
+            <div className="wl-card-v3-stage wl-card-v3-stage--preparing">
+              <span aria-hidden="true">✨</span>
+              Сюрприз готується
+            </div>
+            <button
+              type="button"
+              className="wl-card-v3-primary wl-card-v3-primary--success"
+              onClick={() => onFulfill(item)}
+            >
+              <span aria-hidden="true">🎁</span>
+              Подарунок вручено
+            </button>
+          </div>
+        );
+      }
+    }
+
+    if (isOwn) {
+      return item.reserved ? (
+        <div className="wl-card-v3-status wl-card-v3-status--owner">
+          <span aria-hidden="true">✦</span>
+          Хтось уже готує цю мрію
+        </div>
+      ) : (
+        <span className="wl-card-v3-hint">Твоя мрія</span>
+      );
+    }
+
+    if (item.reserved) {
+      return (
+        <div className="wl-card-v3-status">
+          <span aria-hidden="true">♡</span>
+          Цю мрію вже взяли на себе
+        </div>
+      );
+    }
+
+    return (
+      <button type="button" className="wl-card-v3-primary" onClick={() => onReserve(item.id, true)}>
+        <span aria-hidden="true">🎁</span>
+        Беру на себе
+      </button>
+    );
+  };
 
   return (
     <article className={`wl-card wl-card-v3${item.reserved ? ' wl-card-v3--reserved' : ''}`}>
@@ -140,39 +241,7 @@ export function WishCard({
 
         {item.description && <p className="wl-card-v3-description">{item.description}</p>}
 
-        <div className="wl-card-v3-footer">
-          {isOwn ? (
-            item.reserved ? (
-              <div className="wl-card-v3-status wl-card-v3-status--owner">
-                <span aria-hidden="true">✦</span>
-                Хтось уже готує цю мрію
-              </div>
-            ) : (
-              <span className="wl-card-v3-hint">Твоя мрія</span>
-            )
-          ) : item.reserved ? (
-            canManageReservation ? (
-              <div className="wl-card-v3-reservation-actions">
-                <button type="button" className="wl-card-v3-primary wl-card-v3-primary--success" onClick={() => onFulfill(item)}>
-                  Подарунок вручено
-                </button>
-                <button type="button" className="wl-card-v3-secondary" onClick={() => onReserve(item.id, false)}>
-                  Скасувати
-                </button>
-              </div>
-            ) : (
-              <div className="wl-card-v3-status">
-                <span aria-hidden="true">♡</span>
-                Цю мрію вже взяли на себе
-              </div>
-            )
-          ) : (
-            <button type="button" className="wl-card-v3-primary" onClick={() => onReserve(item.id, true)}>
-              <span aria-hidden="true">🎁</span>
-              Беру на себе
-            </button>
-          )}
-        </div>
+        <div className="wl-card-v3-footer">{reservationControls()}</div>
       </div>
     </article>
   );
