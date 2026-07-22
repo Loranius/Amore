@@ -21,7 +21,6 @@ import {
   type WishFormPayload,
 } from './useWishlist';
 import type { WishlistItemRow } from '@/types';
-import './wishlist-v3.css';
 
 type Tab = 'me' | 'partner' | 'shared';
 
@@ -51,11 +50,13 @@ export function WishlistPage() {
   const [moving, setMoving] = useState<WishlistItemRow | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
-  const submit = (
+  const submit = async (
     id: number | null,
     payload: WishFormPayload,
     scope: { owner: number; isShared: boolean },
-  ) => save.mutateAsync({ id, payload, owner: scope.owner, isShared: scope.isShared });
+  ): Promise<void> => {
+    await save.mutateAsync({ id, payload, owner: scope.owner, isShared: scope.isShared });
+  };
 
   const onDelete = async (id: number) => {
     if (await confirmDialog('Видалити бажання?')) remove.mutate(id);

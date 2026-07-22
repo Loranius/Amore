@@ -3,12 +3,20 @@
 // ============================================================
 import { useState } from 'react';
 import type { WishlistItemRow } from '@/types';
+import './wishlistV3.css';
 
 const PRIORITY_LABELS: Record<string, string> = {
-  dream: '❤️ Dream',
-  high: '🔥 Високий',
-  medium: '⭐ Середній',
-  low: '○ Низький',
+  dream: 'Dream',
+  high: 'Високий',
+  medium: 'Середній',
+  low: 'Низький',
+};
+
+const PRIORITY_ICONS: Record<string, string> = {
+  dream: '♥',
+  high: '✦',
+  medium: '◆',
+  low: '○',
 };
 
 interface WishCardProps {
@@ -35,6 +43,7 @@ export function WishCard({
   onMove,
 }: WishCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const canEdit = isOwn && !item.reserved;
   const closeMenu = () => setMenuOpen(false);
 
   const runMenuAction = (action: () => void) => {
@@ -48,7 +57,7 @@ export function WishCard({
         {item.image_url ? (
           <button
             type="button"
-            className="wl-card-v3-photo-button"
+            className="wl-card-v3-photo"
             onClick={() => onPhotoClick(item.image_url!)}
             aria-label={`Відкрити фото: ${item.title}`}
           >
@@ -60,12 +69,13 @@ export function WishCard({
 
         <div className="wl-card-v3-topline">
           {item.priority && (
-            <span className={`wl-card-v3-priority wl-card-v3-priority--${item.priority}`}>
+            <span className={`wl-priority-v3 wl-priority-v3--${item.priority}`}>
+              <span aria-hidden="true">{PRIORITY_ICONS[item.priority] ?? '•'}</span>
               {PRIORITY_LABELS[item.priority] ?? item.priority}
             </span>
           )}
 
-          {isOwn && !item.reserved && (
+          {canEdit && (
             <div className="wl-card-v3-menu-wrap">
               <button
                 type="button"
@@ -76,14 +86,13 @@ export function WishCard({
               >
                 ⋯
               </button>
-
               {menuOpen && (
                 <div className="wl-card-v3-menu" role="menu">
                   <button type="button" role="menuitem" onClick={() => runMenuAction(() => onEdit(item))}>
-                    ✏️ Редагувати
+                    Редагувати
                   </button>
                   <button type="button" role="menuitem" onClick={() => runMenuAction(() => onMove(item))}>
-                    ↔️ Перенести
+                    Перенести
                   </button>
                   <button
                     type="button"
@@ -91,19 +100,13 @@ export function WishCard({
                     className="wl-card-v3-menu-danger"
                     onClick={() => runMenuAction(() => onDelete(item.id))}
                   >
-                    🗑 Видалити
+                    Видалити
                   </button>
                 </div>
               )}
             </div>
           )}
         </div>
-
-        {item.reserved && (
-          <span className="wl-card-v3-reserved-badge" aria-label="Мрію вже взяли на себе">
-            🎁
-          </span>
-        )}
       </div>
 
       <div className="wl-card-v3-content">
@@ -115,7 +118,6 @@ export function WishCard({
           ) : (
             <h2 className="wl-card-v3-title">{item.title}</h2>
           )}
-
           {item.price != null && (
             <span className="wl-card-v3-price">{item.price.toLocaleString('uk-UA')} ₴</span>
           )}
@@ -126,26 +128,33 @@ export function WishCard({
         <div className="wl-card-v3-footer">
           {isOwn ? (
             item.reserved ? (
-              <p className="wl-card-v3-status">Хтось уже готує цю мрію для тебе ❤️</p>
+              <div className="wl-card-v3-status wl-card-v3-status--owner">
+                <span aria-hidden="true">✦</span>
+                Хтось уже готує цю мрію
+              </div>
             ) : (
-              <p className="wl-card-v3-hint">Мрія чекає на свій особливий момент</p>
+              <span className="wl-card-v3-hint">Твоя мрія</span>
             )
           ) : item.reserved ? (
             canManageReservation ? (
-              <div className="wl-card-v3-actions wl-card-v3-actions--stacked">
+              <div className="wl-card-v3-reservation-actions">
                 <button type="button" className="wl-card-v3-primary wl-card-v3-primary--success" onClick={() => onFulfill(item)}>
-                  Подарунок уже вручено
+                  Подарунок вручено
                 </button>
-                <button type="button" className="wl-card-v3-link-action" onClick={() => onReserve(item.id, false)}>
-                  Скасувати бронювання
+                <button type="button" className="wl-card-v3-secondary" onClick={() => onReserve(item.id, false)}>
+                  Скасувати
                 </button>
               </div>
             ) : (
-              <p className="wl-card-v3-status">Цю мрію вже хтось узяв на себе ❤️</p>
+              <div className="wl-card-v3-status">
+                <span aria-hidden="true">♡</span>
+                Цю мрію вже взяли на себе
+              </div>
             )
           ) : (
             <button type="button" className="wl-card-v3-primary" onClick={() => onReserve(item.id, true)}>
-              🎁 Беру цю мрію на себе
+              <span aria-hidden="true">🎁</span>
+              Беру на себе
             </button>
           )}
         </div>
