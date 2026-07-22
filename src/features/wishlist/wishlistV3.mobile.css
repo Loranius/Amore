@@ -9,10 +9,6 @@
     margin-left: auto;
   }
 
-  .wishlist-grid > .wl-card-v3:first-child .wl-card-v3-menu-wrap {
-    margin-right: 54px;
-  }
-
   .wl-card-v3-photo img {
     max-height: 460px;
   }
