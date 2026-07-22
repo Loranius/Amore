@@ -44,9 +44,12 @@ export { generateArtifactDNA } from './artifactDNA';
 export { maturityCurve } from './maturity';
 export { computeEvolutionPressures } from './evolutionPressure';
 export { isArtifactEmpty, bucketByFixedSize } from './growthEvents';
-export { depositMineralMass, depositMineralMassWithScore } from './mineralDeposition';
 export { MATURITY_HEIGHT_SCALE, MATURITY_RADIUS_SCALE, distanceToSurface } from './growthSurface';
 
+// Growth Engine (Volume III) — ЯК росте: Growth Instructions → Growth State.
+export type { GrowthState, GrowthBody } from './growth';
+export { runGrowth, depositMineralMass, depositMineralMassWithScore } from './growth';
+
 /** Історичний псевдонім публічного API: рендерери викликали buildArtifactNodes —
- *  тепер це те саме відкладення мінеральної маси (mineralDeposition.ts). */
-export { depositMineralMass as buildArtifactNodes } from './mineralDeposition';
+ *  тепер це той самий вихід Growth Engine (growth/growthEngine.ts). */
+export { depositMineralMass as buildArtifactNodes } from './growth';

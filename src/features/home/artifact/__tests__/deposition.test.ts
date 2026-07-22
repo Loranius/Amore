@@ -27,7 +27,7 @@ import {
   type ArtifactInput,
   type ArtifactNode,
 } from '../index';
-import { makeNucleus } from '../mineralDeposition';
+import { makeNucleus } from '../growth';
 import { hashSeedString } from '../../mulberry32';
 
 const SEED = '8264-3607-EEA8';
@@ -311,6 +311,10 @@ describe('депозиція мінеральної маси', () => {
     expect(nodes.filter((n) => n.tier === 'king')).toHaveLength(1);
     expect(nodes.find((n) => n.tier === 'king')!.primary).toBe(true);
     expect(nodes.filter((n) => n.tier === 'support').length).toBeGreaterThanOrEqual(1);
+    // Vol IV: 5-рівнева ієрархія — супутники колоній стають 'companion'.
+    const companions = nodes.filter((n) => n.tier === 'companion');
+    expect(companions.length).toBeGreaterThan(0);
+    for (const c of companions) expect(c.role).toBe('satellite');
     const micro = nodes.filter((n) => n.role === 'micro');
     expect(micro.length).toBeGreaterThan(0);
     expect(micro.length).toBeLessThanOrEqual(30);

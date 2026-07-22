@@ -23,8 +23,12 @@ export type LifeCycleStage = 'nucleation' | 'growth' | 'competition' | 'polishin
  *  шару («пил», що продає масштаб). */
 export type ColonyRole = 'dominant' | 'satellite' | 'micro';
 
-/** Ярус композиційної ієрархії (Composition Framework, Stage 1). */
-export type CompositionTier = 'king' | 'support' | 'family' | 'micro';
+/** Ярус композиційної ієрархії (Composition Framework, Volume IV — Hierarchy
+ *  Engine): King → Support → Family → Companion → Micro. Рівно один фокус
+ *  (king). Companion — «виточені» супутники/близнюки колоній (менші за
+ *  family, більші за micro). Мусить збігатися з CompositionTier у
+ *  composition/framework.ts (той — generic, цей — контракт ArtifactNode). */
+export type CompositionTier = 'king' | 'support' | 'family' | 'companion' | 'micro';
 
 /** Кристалічний архетип (Stage 4) — форма замість «усі — списи». Обирається
  *  детерміновано з ознак (вік/розмір/енергія/напруга/seed), ніколи випадково. */

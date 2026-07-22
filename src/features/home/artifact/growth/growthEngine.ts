@@ -1,6 +1,21 @@
 // ============================================================
-// mineralDeposition — геологічний симулятор росту кристалічної маси.
+// growthEngine — Growth Engine (Volume III): універсальний процедурний
+// рушій росту. Species Layer визначає ЩО росте, Growth Engine — ЯК.
 // ------------------------------------------------------------
+// Внутрішні модулі (Vol III) → тут і в сусідніх файлах:
+//   Growth Sites / Surface Map → ../growthSurface.ts (sampleSurfacePoint)
+//   Stress Solver              → ../growthField.ts::surfaceStress
+//   Density Solver             → ../growthField.ts::localDensity
+//   Competition Solver         → ../growthField.ts::growthEnergyAt (+ composition)
+//   Attachment Solver          → рулетка scoreGrowthSite + buriedAnchors/inheritDirection
+//   Colony Solver              → блок колонії в depositMineral
+//   Generation Solver          → розміри тіла в depositMineral (за CrystalConstraints)
+//   Growth Order               → ітерація instruction.streams нижче
+//   Growth State               → growthTypes.ts (runGrowth → GrowthState)
+//   Hierarchy/Stabilization/Aging → ../composition/ (пост-проходи)
+// Принципи: детермінований, append-only, renderer-/physics-незалежний,
+// surface-based, species-agnostic (усе видове — крізь GrowthInstruction).
+//
 // Рушій НЕ «створює кристали» — він ТРАНСПОРТУЄ І ВІДКЛАДАЄ мінеральну
 // речовину: артефакт — одне безперервно зростаюче геологічне тіло, кожен
 // видимий кристал — лише поточний вираз однієї живої системи.
@@ -59,27 +74,28 @@
 //   +hash('micro:KEY')        — мікрошар на тілі KEY
 //   +hash('composed:KEY')     — дихання/spin синтезованих композитором тіл
 // ============================================================
-import { mulberry32, hashSeedString } from '../mulberry32';
-import { maturityCurve } from './maturity';
-import { type Vec3, add, scale, normalize, v3 } from './vec3';
+import { mulberry32, hashSeedString } from '../../mulberry32';
+import { maturityCurve } from '../maturity';
+import { type Vec3, add, scale, normalize, v3 } from '../vec3';
 import {
   MATURITY_HEIGHT_SCALE,
   MATURITY_RADIUS_SCALE,
   radiusAtT,
   sampleSurfacePoint,
   type SurfaceBody,
-} from './growthSurface';
-import { growthEnergyAt, makeFieldContext, scoreGrowthSite, type PlacementField } from './growthField';
-import { composeMineralCluster } from './composition/mineralPreset';
-import type { CompositionScore } from './composition/score';
-import { crystalSpecies, type CrystalConstraints } from './species';
+} from '../growthSurface';
+import { growthEnergyAt, makeFieldContext, scoreGrowthSite, type PlacementField } from '../growthField';
+import { composeMineralCluster } from '../composition/mineralPreset';
+import type { CompositionScore } from '../composition/score';
+import { crystalSpecies, type CrystalConstraints } from '../species';
 import type {
   ArtifactInput,
   ArtifactNode,
   DepositedCrystal,
   DepositionEvent,
   EvolutionPressures,
-} from './artifactTypes';
+} from '../artifactTypes';
+import type { GrowthState } from './growthTypes';
 
 /** Кандидатів на місце росту за подію — фіксовано (детермінізм draw-порядку).
  *  Це МЕХАНІКА рушія, не біологія виду — тому лишається тут. */
@@ -419,9 +435,10 @@ const toArtifactNode = (c: DepositedCrystal, pressures: EvolutionPressures): Art
   ...(c.emphasized !== undefined ? { emphasized: c.emphasized } : {}),
 });
 
-/** Прогін Growth Engine: сирі відкладення до композиції. Volume II: рушій
- *  отримує від Species Layer лише GrowthInstruction (стріми, історичне
- *  поле, ієрархію, обмеження) — і не знає, що саме він вирощує. */
+/** Нуклеація + Attachment + Colony + Growth Order: сирі відкладення до
+ *  композиції. Volume II: рушій отримує від Species Layer лише
+ *  GrowthInstruction (стріми, історичне поле, ієрархію, обмеження) — і не
+ *  знає, що саме він вирощує. */
 function runDeposition(input: ArtifactInput): DepositedCrystal[] {
   const { seedNum, dna } = input;
   const nucleus = makeNucleus(seedNum);
@@ -461,15 +478,25 @@ function runDeposition(input: ArtifactInput): DepositedCrystal[] {
 }
 
 /**
- * Відкладає всю мінеральну масу і компонує її. pressures обчислюється окремо
- * (computeEvolutionPressures) і передається сюди — та сама структура
- * споживається й deriveClusterMaterial, тому рахується лише один раз.
- * Composition Framework (composition/) — фінальний художній шар поверх
- * недоторканного Growth Engine: перетворює коректну геологію на «музейний
- * зразок».
+ * Species-agnostic вхід Growth Engine (Vol III): нуклеація/attachment/colony
+ * (runDeposition) → композиція (Hierarchy/Competition/Aging/Stabilization,
+ * composition/) → явний GROWTH STATE. Рушій не будує мешів — це вже
+ * territory Geometry Engine (toArtifactNode → crystal3d/).
+ */
+export function runGrowth(input: ArtifactInput): GrowthState {
+  const deposited = runDeposition(input);
+  const { crystals, score, passes } = composeMineralCluster(deposited, input.seedNum, input.dna.compactnessBias);
+  return { bodies: crystals, order: crystals.map((c) => c.key), score, passes };
+}
+
+/**
+ * Geometry-Engine handoff: Growth State → ArtifactNode[] (контракт рендерера).
+ * pressures обчислюється окремо (computeEvolutionPressures) і передається сюди
+ * — та сама структура споживається й deriveClusterMaterial, тому рахується
+ * лише один раз.
  */
 export function depositMineralMass(input: ArtifactInput, pressures: EvolutionPressures): ArtifactNode[] {
-  return depositMineralMassWithScore(input, pressures).nodes;
+  return runGrowth(input).bodies.map((c) => toArtifactNode(c, pressures));
 }
 
 /** Той самий результат + самооцінка композиції (Stage 10) — для тестів,
@@ -478,7 +505,6 @@ export function depositMineralMassWithScore(
   input: ArtifactInput,
   pressures: EvolutionPressures,
 ): { nodes: ArtifactNode[]; score: CompositionScore; passes: number } {
-  const deposited = runDeposition(input);
-  const { crystals, score, passes } = composeMineralCluster(deposited, input.seedNum, input.dna.compactnessBias);
-  return { nodes: crystals.map((c) => toArtifactNode(c, pressures)), score, passes };
+  const state = runGrowth(input);
+  return { nodes: state.bodies.map((c) => toArtifactNode(c, pressures)), score: state.score, passes: state.passes };
 }
