@@ -1,5 +1,10 @@
 // ============================================================
-// growthField — ймовірнісне поле росту над поверхнею мінеральної маси.
+// growthField — Stress / Density / Competition solvers Growth Engine
+// (Volume III) + ймовірнісне поле росту над поверхнею мінеральної маси.
+// (surfaceStress=Stress Solver, localDensity=Density Solver,
+//  growthEnergyAt=Competition Solver/Growth Shadow, scoreGrowthSite=оцінка
+//  Attachment; placementFieldAt — історичне поле, яке Species Layer замикає
+//  в instruction.fieldAt.)
 // ------------------------------------------------------------
 // Модулі застосунку НІКОЛИ не породжують геометрію напряму: Evolution
 // Pressures (evolutionPressure.ts) лише перерозподіляють, ДЕ наступне

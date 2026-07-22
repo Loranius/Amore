@@ -27,7 +27,7 @@ import {
   type ArtifactInput,
   type ArtifactNode,
 } from '../index';
-import { makeNucleus } from '../mineralDeposition';
+import { makeNucleus } from '../growth';
 import { hashSeedString } from '../../mulberry32';
 
 const SEED = '8264-3607-EEA8';
