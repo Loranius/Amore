@@ -260,30 +260,43 @@ export function buildBranchGeometry(
   // прив'язаний до prismEnd з запасом, а не рахується незалежно.
   const pointStart = Math.max(prismEnd + 0.14, 0.72 - m * 0.2 + shapeRng() * 0.08);
 
-  // 5 точок профілю (не 4) — довга майже-паралельна «призматична» ділянка
-  // (p1→p2) окремо від пірамідального вістря (p2→p3→p4): справжній кристал
-  // читається саме як призма+вістря, а не суцільний плавний конус.
-  // Основа (row 0) РОЗШИРЕНА понад радіус призми — «спідниця», що ховається
-  // в тілі субстрату: стик двох тіл читається зрощеним мінералом, а не
-  // перетином двох мешів. 'broken' — зрізана верхівка (обламаний кристал):
-  // профіль завершується широким уступом і пласкою «кришкою» нижче повної
+  // Профіль: ЗАОКРУГЛЕНА ВУЗЬКА основа → призматична ділянка → пірамідальне
+  // вістря. Основа тепер НЕ широка пласка «спідниця» з гострим кутом (яка
+  // читалась як обрубок), а вужча за призму й плавно скруглена вгору
+  // (r·0.6 → біля-повний радіус через м'який bevel) — низ кристала
+  // виглядає обточеним, як у справжнього мінералу, і займає менше місця
+  // (менше налазить на сусідів). 'broken' — зрізана верхівка нижче повної
   // висоти.
-  const profile =
+  const baseR = r * 0.6;
+  const bevelR = r * 0.9;
+  const side =
     arch === 'broken'
       ? [
-          new THREE.Vector2(Math.max(0.001, r * (1.06 + shapeRng() * 0.1)), 0),
-          new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
+          new THREE.Vector2(baseR, 0),
+          new THREE.Vector2(bevelR, h * 0.05),
+          new THREE.Vector2(r, h * (0.13 + shapeRng() * 0.03)),
           new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * Math.min(prismEnd, 0.6)),
           new THREE.Vector2(r * (0.3 + shapeRng() * 0.08), h * 0.84),
-          new THREE.Vector2(0.001, h * 0.85),
+          new THREE.Vector2(0.06 * r, h * 0.85),
         ]
       : [
-          new THREE.Vector2(Math.max(0.001, r * (1.06 + shapeRng() * 0.1)), 0),
-          new THREE.Vector2(r, h * (0.06 + shapeRng() * 0.04)),
+          new THREE.Vector2(baseR, 0),
+          new THREE.Vector2(bevelR, h * 0.05),
+          new THREE.Vector2(r, h * (0.13 + shapeRng() * 0.03)),
           new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * prismEnd),
           new THREE.Vector2(r * (0.9 + shapeRng() * 0.06), h * pointStart),
           new THREE.Vector2(Math.max(0.001, tipR), h),
         ];
+
+  // ЗАКРИТІ торці: LatheGeometry — поверхня обертання з ВІДКРИТИМИ кінцями,
+  // тож без кришок видно наскрізь у порожнє нутро — саме ці «діри без
+  // текстури» на вершині й під основою. Додаємо осьову точку (r≈0) перед
+  // основою і після вістря: між нею й кільцем торця лате будує суцільний
+  // диск-кришку. Тепер тіло замкнене з обох боків (низ ховається в
+  // субстраті, верх — грань термінації кристала).
+  const first = side[0]!;
+  const last = side[side.length - 1]!;
+  const profile = [new THREE.Vector2(0.0001, first.y), ...side, new THREE.Vector2(0.0001, last.y)];
 
   const geo = new THREE.LatheGeometry(profile, segments);
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
@@ -324,11 +337,13 @@ export function buildBranchGeometry(
 
     // Органічний радіальний джиттер — детермінований по (facetIdx, row), тож
     // вершина шва (col===segments) дублює точнісінько той самий джиттер, що
-    // й col===0 (facetIdx===0 в обох) — жодних щілин/тріщин у мешi. База
-    // (row 0) і вістря (останній row) лишаються без джиттера — вони мають
-    // сходитись у спільній кореневій зоні/гострій точці (artifactNodes.ts),
-    // а не стрибати випадково.
-    if (row !== 0 && row !== profileLen - 1) {
+    // й col===0 (facetIdx===0 в обох) — жодних щілин/тріщин у мешi. БЕЗ
+    // джиттера лишаються 4 крайні рядки: осьові кришки торців (row 0,
+    // profileLen-1) та прилеглі до них кільця основи/вістря (row 1,
+    // profileLen-2) — щоб основа сиділа flush у субстраті, вістря лишалось
+    // гострим, а диски-кришки точно збігались зі своїми кільцями (жодних
+    // щілин по краю кришки).
+    if (row > 1 && row < profileLen - 2) {
       const jitterRng = mulberry32(hashSeedString(`${branch.key}:jitter:${facetIdx}:${row}`));
       // ±8% базово — природна нерівність грані; «Фото → Polishing Pressure»
       // гамує її глобально, а ієрархія — локально: старі великі тіла чисті

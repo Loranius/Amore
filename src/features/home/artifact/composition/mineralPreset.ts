@@ -116,8 +116,8 @@ function mineralConfig(seedNum: number, compactnessBias: number): CompositionCon
     silhouetteBias: compactnessBias,
     archetypes: ARCHETYPES,
     kingArchetypes: ['massive', 'prismatic'],
-    micro: { minParentVolume: 0.02, maxPerParent: 3, globalCap: 30, lengthRange: [0.05, 0.16], radiusRange: [0.02, 0.045] },
-    sectors: { count: 8, maxSmallPerSector: 4 },
+    micro: { minParentVolume: 0.03, maxPerParent: 2, globalCap: 10, lengthRange: [0.05, 0.14], radiusRange: [0.02, 0.04] },
+    sectors: { count: 8, maxSmallPerSector: 3 },
     scoreThreshold: 0.62,
     stress: (p) => surfaceStress(seedNum, p),
   };

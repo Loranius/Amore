@@ -163,14 +163,22 @@ function inheritDirection(
   const rare = rng();
   const horiz = Math.hypot(at.x, at.z);
   const radial = horiz > 1e-6 ? v3(at.x / horiz, 0, at.z / horiz) : v3(0, 0, 0);
-  // Сильний нахил НАЗОВНІ, що росте з відстанню від осі — саме він робить
-  // друзу віялом шпилів (референс), а не пучком вертикалей. Плюс відчутне
-  // азимутальне збурення (perturb) — сплеск об'ємний, а не плаский.
-  const lean = 0.5 + Math.min(1, horiz / 0.7);
+  // Кожен шпиль тягнеться НАЗОВНІ від осі (нахил росте з відстанню) — друза
+  // розходиться віялом, тож сусіди РОЗБІГАЮТЬСЯ, а не перетинають один
+  // одного. Збурення (perturb) навмисно МАЛЕ й переважно азимутальне: воно
+  // додає об'єму, але не завертає шпиль ПРОТИ віяла (саме такі зустрічні
+  // нахили й давали кліпінг тіл один в одного).
+  const lean = 0.55 + Math.min(1, horiz / 0.65) * 1.05;
+  // Азимутальна складова збурення (перпендикуляр до radial у площині XZ) —
+  // розводить сусідні шпилі вбік по колу, а не назустріч.
+  const tangent = v3(-radial.z, 0, radial.x);
   const dir = normalize(
     add(
       add(v3(0, 1, 0), scale(radial, lean)),
-      add(add(scale(normal, 0.15), scale(substrateDirection, 0.08)), scale(perturb, 0.35)),
+      add(
+        add(scale(normal, 0.1), scale(substrateDirection, 0.05)),
+        add(scale(tangent, (perturb.x) * 0.16), scale(v3(0, 1, 0), perturb.y * 0.06)),
+      ),
     ),
   );
   const minUp = rare < c.diagonalChance ? c.minUpwardRare : c.minUpwardMain;
@@ -230,7 +238,8 @@ function depositMineral(
   // помітну масивність — сильна варіація пропорцій замість клонів.
   const girthDraw = rng();
   const bigKind = event.kind === 'core' || event.kind === 'country' || event.kind === 'milestone';
-  const girth = Math.max(bigKind ? 0.8 : 0.65, 0.65 + girthDraw * girthDraw * 1.3);
+  // Стрункіше: менший розкид обхвату — тіла-шпилі, не роздуті самоцвіти.
+  const girth = Math.max(bigKind ? 0.7 : 0.55, 0.55 + girthDraw * girthDraw * 0.75);
   rawRadius *= girth;
   if (isMonarch) {
     // Головний кристал росте РІВНОМІРНО з кількістю днів разом: висота —

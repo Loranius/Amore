@@ -8,3 +8,8 @@ dist-ssr
 .DS_Store
 *.log
 .vite
+
+# dev-only crystal render harness (never committed)
+crystal-preview.html
+src/crystal-preview.tsx
+NIGHT_PROGRESS.md
