@@ -1,9 +1,8 @@
 // ============================================================
-// WishFormModal — додавання/редагування бажання (порт openWishModal)
+// WishFormModal — додавання/редагування бажання
 // ------------------------------------------------------------
-// Керована форма. Фото: або файл із пристрою (HEIC одразу нормалізуємо
-// для прев'ю; стиснення й аплоад — на збереженні), або посилання.
-// Файл має пріоритет над посиланням (як у старому коді).
+// Керована форма. Фото: або файл із пристрою, або посилання.
+// Форма закривається лише після успішного підтвердження сервера.
 // ============================================================
 import { useState } from 'react';
 import { normalizeToPreview } from '@/lib/images';
@@ -12,12 +11,13 @@ import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { TabBar } from '@/components/ui/TabBar';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
-import type { WishlistItemRow, WishPriority, AppUser } from '@/types';
+import type { WishlistItemRow, AppUser } from '@/types';
 
 type Scope = 'me' | 'partner' | 'shared';
+type WishlistPriorityV3 = 'dream' | 'high' | 'medium' | 'low';
 
 interface WishFormModalProps {
-  item: WishlistItemRow | null; // null → додавання
+  item: WishlistItemRow | null;
   partner: AppUser | null;
   defaultScope: Scope;
   onClose: () => void;
@@ -25,7 +25,7 @@ interface WishFormModalProps {
     id: number | null,
     payload: WishFormPayload,
     scope: { owner: number; isShared: boolean },
-  ) => void;
+  ) => Promise<void>;
   onPhotoClick: (src: string) => void;
 }
 
@@ -46,7 +46,9 @@ export function WishFormModal({
   const [link, setLink] = useState(item?.link ?? '');
   const [imgUrl, setImgUrl] = useState(item?.image_url ?? '');
   const [price, setPrice] = useState(item?.price != null ? String(item.price) : '');
-  const [priority, setPriority] = useState<WishPriority | ''>(item?.priority ?? '');
+  const [priority, setPriority] = useState<WishlistPriorityV3 | ''>(
+    (item?.priority as WishlistPriorityV3 | null) ?? '',
+  );
   const [description, setDescription] = useState(item?.description ?? '');
 
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -58,9 +60,9 @@ export function WishFormModal({
       const { file: normalized, previewSrc: src } = await normalizeToPreview(file);
       setPendingFile(normalized);
       setPreviewSrc(src);
-      setImgUrl(''); // файл важливіший за посилання
+      setImgUrl('');
     } catch (e) {
-      toast.show('Не вдалося обробити HEIC-фото: ' + (e as Error).message);
+      toast.show('Не вдалося обробити фото: ' + (e as Error).message);
     }
   };
 
@@ -70,37 +72,51 @@ export function WishFormModal({
     setPreviewSrc(null);
   };
 
-  const onUrlChange = (v: string) => {
-    if (pendingFile) setPendingFile(null); // ручне посилання скидає файл
-    setImgUrl(v);
-    setPreviewSrc(v.trim() || null);
+  const onUrlChange = (value: string) => {
+    if (pendingFile) setPendingFile(null);
+    setImgUrl(value);
+    setPreviewSrc(value.trim() || null);
   };
 
   const save = async () => {
-    const t = title.trim();
-    if (!t || saving) return;
+    const normalizedTitle = title.trim();
+    if (!normalizedTitle || saving) return;
+
     setSaving(true);
     try {
-      let image_url: string | null = imgUrl.trim() || null;
-      if (pendingFile) {
-        image_url = await uploadWishPhoto(pendingFile, me.id);
+      let imageUrl: string | null = imgUrl.trim() || null;
+      if (pendingFile) imageUrl = await uploadWishPhoto(pendingFile, me.id);
+
+      if (!imageUrl) {
+        toast.show('Додай фото мрії — воно допоможе партнеру не помилитися.');
+        return;
       }
+
+      const rawPrice = price.trim();
+      const parsedPrice = rawPrice === '' ? null : Number(rawPrice);
+      if (parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
+        toast.show('Вкажи коректну ціну або залиш поле порожнім.');
+        return;
+      }
+
       const owner = scope === 'partner' && partner ? partner.id : me.id;
-      onSubmit(
+      await onSubmit(
         item?.id ?? null,
         {
-          title: t,
+          title: normalizedTitle,
           link: link.trim() || null,
-          image_url,
-          price: parseFloat(price) || null,
-          priority: priority || null,
+          image_url: imageUrl,
+          price: parsedPrice,
+          priority: (priority || null) as WishFormPayload['priority'],
           description: description.trim() || null,
         },
         { owner, isShared: scope === 'shared' },
       );
+
       onClose();
     } catch (e) {
-      toast.show('Помилка завантаження фото: ' + (e as Error).message);
+      toast.show('Не вдалося зберегти бажання: ' + (e as Error).message);
+    } finally {
       setSaving(false);
     }
   };
@@ -108,12 +124,14 @@ export function WishFormModal({
   return (
     <div
       className="modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+      onClick={(event) => {
+        if (event.target === event.currentTarget && !saving) onClose();
       }}
     >
-      <div className="modal-sheet" role="dialog" aria-modal="true">
-        <h2 className="modal-title">{isEdit ? 'Редагувати бажання' : 'Нове бажання'}</h2>
+      <div className="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="wish-modal-title">
+        <h2 id="wish-modal-title" className="modal-title">
+          {isEdit ? 'Редагувати бажання' : 'Нова мрія'}
+        </h2>
 
         {!isEdit && (
           <div className="form-field">
@@ -132,7 +150,15 @@ export function WishFormModal({
 
         <label className="form-field">
           <span>Назва *</span>
-          <input id="wish-title" name="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          <input
+            id="wish-title"
+            name="title"
+            type="text"
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            autoFocus
+            maxLength={160}
+          />
         </label>
 
         <label className="form-field">
@@ -143,26 +169,26 @@ export function WishFormModal({
             type="url"
             placeholder="https://…"
             value={link}
-            onChange={(e) => setLink(e.target.value)}
+            onChange={(event) => setLink(event.target.value)}
           />
         </label>
 
         <div className="form-field">
-          <span>Фото</span>
+          <span>Фото *</span>
           <div className="wm-photo-picker">
             <div className="wm-photo-preview">
               {previewSrc ? (
-                <img src={previewSrc} alt="" onClick={() => onPhotoClick(previewSrc)} />
+                <img src={previewSrc} alt={`Попередній перегляд: ${title || 'мрія'}`} onClick={() => onPhotoClick(previewSrc)} />
               ) : (
-                <span className="wm-photo-placeholder">📷</span>
+                <span className="wm-photo-placeholder" aria-hidden="true">📷</span>
               )}
             </div>
             <div className="wm-photo-actions">
-              <FilePickerButton id="wish-photo-file" onPick={(f) => void pickFile(f)}>
+              <FilePickerButton id="wish-photo-file" onPick={(file) => void pickFile(file)}>
                 🖼 Обрати з пристрою
               </FilePickerButton>
               {previewSrc && (
-                <button type="button" className="btn-secondary" onClick={clearPhoto}>
+                <button type="button" className="btn-secondary" onClick={clearPhoto} disabled={saving}>
                   ✕ Прибрати
                 </button>
               )}
@@ -174,7 +200,7 @@ export function WishFormModal({
             type="url"
             placeholder="або встав посилання на фото"
             value={imgUrl}
-            onChange={(e) => onUrlChange(e.target.value)}
+            onChange={(event) => onUrlChange(event.target.value)}
             style={{ marginTop: 8 }}
           />
         </div>
@@ -186,9 +212,10 @@ export function WishFormModal({
             name="price"
             type="number"
             min="0"
-            placeholder="0"
+            step="0.01"
+            placeholder="Ціна невідома"
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(event) => setPrice(event.target.value)}
           />
         </label>
 
@@ -198,12 +225,13 @@ export function WishFormModal({
             id="wish-priority"
             name="priority"
             value={priority}
-            onChange={(e) => setPriority(e.target.value as WishPriority | '')}
+            onChange={(event) => setPriority(event.target.value as WishlistPriorityV3 | '')}
           >
             <option value="">— не вказано —</option>
+            <option value="dream">❤️ Dream</option>
             <option value="high">🔥 Високий</option>
-            <option value="medium">🟡 Середній</option>
-            <option value="low">🟢 Низький</option>
+            <option value="medium">⭐ Середній</option>
+            <option value="low">○ Низький</option>
           </select>
         </label>
 
@@ -213,9 +241,10 @@ export function WishFormModal({
             id="wish-description"
             name="description"
             rows={2}
-            placeholder="Розмір, колір, деталі…"
+            maxLength={1000}
+            placeholder="Модель, розмір, колір або інші важливі деталі…"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(event) => setDescription(event.target.value)}
             style={{ resize: 'vertical' }}
           />
         </label>
@@ -224,8 +253,13 @@ export function WishFormModal({
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>
             Скасувати
           </button>
-          <button type="button" className="btn" onClick={() => void save()} disabled={!title.trim() || saving}>
-            {saving ? 'Збереження…' : isEdit ? 'Зберегти' : 'Додати'}
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void save()}
+            disabled={!title.trim() || !previewSrc || saving}
+          >
+            {saving ? 'Збереження…' : isEdit ? 'Зберегти' : 'Створити мрію'}
           </button>
         </div>
       </div>

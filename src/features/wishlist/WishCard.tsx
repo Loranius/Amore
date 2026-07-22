@@ -1,20 +1,22 @@
 // ============================================================
-// WishCard — картка бажання (порт makeCard)
+// WishCard — картка бажання
 // ------------------------------------------------------------
-// У своєму списку: редагувати / видалити. У списку партнера:
-// забронювати, або (якщо заброньовано) виконати / скасувати бронь.
+// Власник не бачить, хто забронював мрію. Керувати бронюванням і
+// завершувати подарунок може лише користувач, який створив бронювання.
 // ============================================================
-import type { WishlistItemRow, WishPriority } from '@/types';
+import type { WishlistItemRow } from '@/types';
 
-const PRIORITY_LABELS: Record<WishPriority, string> = {
+const PRIORITY_LABELS: Record<string, string> = {
+  dream: '❤️ Dream',
   high: '🔥 Високий',
-  medium: '🟡 Середній',
-  low: '🟢 Низький',
+  medium: '⭐ Середній',
+  low: '○ Низький',
 };
 
 interface WishCardProps {
   item: WishlistItemRow;
   isOwn: boolean;
+  canManageReservation: boolean;
   onPhotoClick: (src: string) => void;
   onEdit: (item: WishlistItemRow) => void;
   onDelete: (id: number) => void;
@@ -26,6 +28,7 @@ interface WishCardProps {
 export function WishCard({
   item,
   isOwn,
+  canManageReservation,
   onPhotoClick,
   onEdit,
   onDelete,
@@ -40,7 +43,7 @@ export function WishCard({
           <img
             src={item.image_url}
             loading="lazy"
-            alt=""
+            alt={item.title}
             onClick={() => onPhotoClick(item.image_url!)}
           />
         </div>
@@ -62,34 +65,51 @@ export function WishCard({
 
         {item.priority && (
           <div className="wl-card-meta">
-            <span className="wl-card-priority">{PRIORITY_LABELS[item.priority]}</span>
+            <span className="wl-card-priority">
+              {PRIORITY_LABELS[item.priority] ?? item.priority}
+            </span>
           </div>
         )}
 
         {item.description && <p className="wl-card-comment">{item.description}</p>}
 
         {isOwn ? (
-          <div className="wl-card-actions">
-            <button type="button" className="btn-secondary" onClick={() => onEdit(item)}>
-              ✏️ Редагувати
-            </button>
-            <button type="button" className="btn-secondary" onClick={() => onDelete(item.id)}>
-              🗑 Видалити
-            </button>
-          </div>
+          item.reserved ? (
+            <p className="wl-reserved-note">Хтось уже працює над твоєю мрією ❤️</p>
+          ) : (
+            <>
+              <div className="wl-card-actions">
+                <button type="button" className="btn-secondary" onClick={() => onEdit(item)}>
+                  ✏️ Редагувати
+                </button>
+                <button type="button" className="btn-secondary" onClick={() => onDelete(item.id)}>
+                  🗑 Видалити
+                </button>
+              </div>
+              <div className="wl-card-actions">
+                <button type="button" className="btn-secondary wl-move-btn" onClick={() => onMove(item)}>
+                  ↔️ Перенести
+                </button>
+              </div>
+            </>
+          )
         ) : item.reserved ? (
-          <div className="wl-card-actions wl-reserved-row">
-            <button type="button" className="wl-fulfill-btn" onClick={() => onFulfill(item)}>
-              ✅ Вже купив(ла)
-            </button>
-            <button
-              type="button"
-              className="wl-cancel-reserve-btn"
-              onClick={() => onReserve(item.id, false)}
-            >
-              Скасувати бронь
-            </button>
-          </div>
+          canManageReservation ? (
+            <div className="wl-card-actions wl-reserved-row">
+              <button type="button" className="wl-fulfill-btn" onClick={() => onFulfill(item)}>
+                ✅ Вже купив(ла)
+              </button>
+              <button
+                type="button"
+                className="wl-cancel-reserve-btn"
+                onClick={() => onReserve(item.id, false)}
+              >
+                Скасувати бронь
+              </button>
+            </div>
+          ) : (
+            <p className="wl-reserved-note">Цю мрію вже хтось узяв на себе ❤️</p>
+          )
         ) : (
           <div className="wl-card-actions">
             <button
@@ -97,17 +117,10 @@ export function WishCard({
               className="wl-reserve-btn"
               onClick={() => onReserve(item.id, true)}
             >
-              🎁 Забронювати
+              🎁 Беру на себе
             </button>
           </div>
         )}
-        {/* «Перенести» — завжди, незалежно від зони/власника: інакше випадковий
-            перенос у чужу зону стає пасткою без шляху назад (звідси й баг). */}
-        <div className="wl-card-actions">
-          <button type="button" className="btn-secondary wl-move-btn" onClick={() => onMove(item)}>
-            ↔️ Перенести
-          </button>
-        </div>
       </div>
     </div>
   );
