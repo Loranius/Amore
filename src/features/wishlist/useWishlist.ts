@@ -1,9 +1,9 @@
 // ============================================================
 // useWishlist — дані вкладки «Бажання»
 // ------------------------------------------------------------
-// Wishlist v3 читає активні записи через role-safe RPC: власник не
-// отримує reserved_by та не бачить стадію preparing_surprise.
-// Усі доменні зміни виконуються серверними RPC із перевіркою ролі й стану.
+// Wishlist v3 читає дані лише через role-safe RPC: власник не отримує
+// reserved_by та не бачить стадію preparing_surprise. Усі доменні зміни
+// виконуються серверними RPC із перевіркою ролі й стану.
 // ============================================================
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, invokeFn, publicUrl } from '@/lib/supabase';
@@ -17,7 +17,6 @@ import {
   cancelWishlistReservation,
   completeWishlistGift,
   createWishlistItem,
-  fetchFulfilledWishlistV3,
   fetchWishlistStatsV3,
   fetchWishlistV3,
   moveWishlistItem,
@@ -55,7 +54,7 @@ export function useSharedWishlistItems() {
   });
 }
 
-/** Прогрес пари: сервер повертає лише агрегати, без приватних полів бронювання. */
+/** Прогрес пари без прямого читання таблиці або приватних полів бронювання. */
 export function useCoupleWishStats() {
   return useQuery({
     queryKey: qk.wishlistStats(),
@@ -67,8 +66,28 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
   return useQuery({
     queryKey: qk.wishlistFulfilled(ownerId ?? -1),
     enabled: enabled && ownerId !== null,
-    queryFn: async (): Promise<FulfilledWishlistItem[]> =>
-      fetchFulfilledWishlistV3(ownerId!),
+    queryFn: async (): Promise<FulfilledWishlistItem[]> => {
+      const rows = await fetchWishlistV3({
+        ownerId,
+        shared: false,
+        includeArchived: true,
+      });
+
+      return rows
+        .filter((row) => row.fulfilled)
+        .sort((a, b) => (b.fulfilled_at ?? '').localeCompare(a.fulfilled_at ?? ''))
+        .map((row) => ({
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          link: row.link,
+          image_url: row.image_url,
+          price: row.price,
+          priority: row.priority,
+          fulfilled_at: row.fulfilled_at,
+          fulfilled_by: row.fulfilled_by,
+        }));
+    },
   });
 }
 
