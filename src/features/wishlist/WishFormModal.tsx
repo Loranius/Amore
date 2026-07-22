@@ -1,12 +1,13 @@
 // ============================================================
 // WishFormModal — додавання/редагування бажання
 // ------------------------------------------------------------
-// Керована форма. Фото: або файл із пристрою, або посилання.
-// Форма закривається лише після успішного підтвердження сервера.
+// Фото необов'язкове: воно може бути витягнуте з товарного посилання,
+// вставлене прямим URL або завантажене з пристрою.
 // ============================================================
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { normalizeToPreview } from '@/lib/images';
 import { uploadWishPhoto, type WishFormPayload } from './useWishlist';
+import { fetchWishlistLinkPreview } from './wishlistLinkPreview';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { TabBar } from '@/components/ui/TabBar';
@@ -15,6 +16,7 @@ import type { WishlistItemRow, AppUser } from '@/types';
 
 type Scope = 'me' | 'partner' | 'shared';
 type WishlistPriorityV3 = 'dream' | 'high' | 'medium' | 'low';
+type LinkPreviewStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error';
 
 interface WishFormModalProps {
   item: WishlistItemRow | null;
@@ -27,6 +29,15 @@ interface WishFormModalProps {
     scope: { owner: number; isShared: boolean },
   ) => Promise<void>;
   onPhotoClick: (src: string) => void;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 export function WishFormModal({
@@ -54,8 +65,17 @@ export function WishFormModal({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(item?.image_url ?? null);
   const [saving, setSaving] = useState(false);
+  const [linkPreviewStatus, setLinkPreviewStatus] = useState<LinkPreviewStatus>('idle');
+  const [linkPreviewSite, setLinkPreviewSite] = useState<string | null>(null);
+
+  const previewRequestVersion = useRef(0);
+  const lastFetchedLink = useRef(item?.link?.trim() ?? '');
 
   const pickFile = async (file: File) => {
+    previewRequestVersion.current += 1;
+    setLinkPreviewStatus('idle');
+    setLinkPreviewSite(null);
+
     try {
       const { file: normalized, previewSrc: src } = await normalizeToPreview(file);
       setPendingFile(normalized);
@@ -67,15 +87,80 @@ export function WishFormModal({
   };
 
   const clearPhoto = () => {
+    previewRequestVersion.current += 1;
     setPendingFile(null);
     setImgUrl('');
     setPreviewSrc(null);
   };
 
-  const onUrlChange = (value: string) => {
+  const onImageUrlChange = (value: string) => {
+    previewRequestVersion.current += 1;
     if (pendingFile) setPendingFile(null);
     setImgUrl(value);
     setPreviewSrc(value.trim() || null);
+  };
+
+  const loadLinkPreview = useCallback(async (rawUrl: string, force = false) => {
+    const normalizedUrl = rawUrl.trim();
+    if (!isHttpUrl(normalizedUrl)) return;
+    if (!force && lastFetchedLink.current === normalizedUrl) return;
+
+    const requestId = previewRequestVersion.current + 1;
+    previewRequestVersion.current = requestId;
+    lastFetchedLink.current = normalizedUrl;
+    setLinkPreviewStatus('loading');
+    setLinkPreviewSite(null);
+
+    try {
+      const result = await fetchWishlistLinkPreview(normalizedUrl);
+      if (previewRequestVersion.current !== requestId) return;
+
+      if (!result.ok) {
+        setLinkPreviewStatus(result.error === 'no_metadata' ? 'empty' : 'error');
+        return;
+      }
+
+      setLinkPreviewSite(result.siteName);
+      setTitle((current) => current.trim() ? current : (result.title ?? current));
+
+      const productImageUrl = result.imageUrl;
+      if (productImageUrl) {
+        setImgUrl((current) => {
+          if (current.trim()) return current;
+          setPreviewSrc(productImageUrl);
+          return productImageUrl;
+        });
+      }
+
+      const currency = result.currency?.toUpperCase() ?? null;
+      const isHryvnia = currency === null || currency === 'UAH' || currency === '₴' || currency === 'ГРН';
+      if (result.price !== null && isHryvnia) {
+        setPrice((current) => current.trim() ? current : String(result.price));
+      }
+
+      setLinkPreviewStatus('success');
+    } catch {
+      if (previewRequestVersion.current === requestId) setLinkPreviewStatus('error');
+    }
+  }, []);
+
+  useEffect(() => {
+    const normalizedUrl = link.trim();
+    if (!isHttpUrl(normalizedUrl) || normalizedUrl === lastFetchedLink.current) return;
+
+    const timer = window.setTimeout(() => {
+      void loadLinkPreview(normalizedUrl);
+    }, 850);
+
+    return () => window.clearTimeout(timer);
+  }, [link, loadLinkPreview]);
+
+  const onLinkChange = (value: string) => {
+    previewRequestVersion.current += 1;
+    setLink(value);
+    setLinkPreviewStatus('idle');
+    setLinkPreviewSite(null);
+    if (!value.trim()) lastFetchedLink.current = '';
   };
 
   const save = async () => {
@@ -86,11 +171,6 @@ export function WishFormModal({
     try {
       let imageUrl: string | null = imgUrl.trim() || null;
       if (pendingFile) imageUrl = await uploadWishPhoto(pendingFile, me.id);
-
-      if (!imageUrl) {
-        toast.show('Додай фото мрії — воно допоможе партнеру не помилитися.');
-        return;
-      }
 
       const rawPrice = price.trim();
       const parsedPrice = rawPrice === '' ? null : Number(rawPrice);
@@ -161,26 +241,69 @@ export function WishFormModal({
           />
         </label>
 
-        <label className="form-field">
-          <span>Посилання</span>
-          <input
-            id="wish-link"
-            name="link"
-            type="url"
-            placeholder="https://…"
-            value={link}
-            onChange={(event) => setLink(event.target.value)}
-          />
-        </label>
+        <div className="form-field">
+          <span>Посилання на товар</span>
+          <div className="wm-link-row">
+            <input
+              id="wish-link"
+              name="link"
+              type="url"
+              inputMode="url"
+              placeholder="https://…"
+              value={link}
+              onChange={(event) => onLinkChange(event.target.value)}
+            />
+            <button
+              type="button"
+              className="btn-secondary wm-link-preview-button"
+              disabled={!isHttpUrl(link.trim()) || linkPreviewStatus === 'loading' || saving}
+              onClick={() => void loadLinkPreview(link, true)}
+            >
+              {linkPreviewStatus === 'loading' ? 'Шукаємо…' : 'Підтягнути'}
+            </button>
+          </div>
+
+          {linkPreviewStatus === 'loading' && (
+            <small className="wm-link-status">Отримуємо назву, ціну та фото…</small>
+          )}
+          {linkPreviewStatus === 'success' && (
+            <small className="wm-link-status wm-link-status--success">
+              Дані підтягнуто{linkPreviewSite ? ` з ${linkPreviewSite}` : ''}.
+            </small>
+          )}
+          {linkPreviewStatus === 'empty' && (
+            <small className="wm-link-status">
+              Магазин не віддав дані. Бажання все одно можна зберегти без фото.
+            </small>
+          )}
+          {linkPreviewStatus === 'error' && (
+            <small className="wm-link-status wm-link-status--error">
+              Не вдалося відкрити сторінку. Перевір посилання або заповни поля вручну.
+            </small>
+          )}
+        </div>
 
         <div className="form-field">
-          <span>Фото *</span>
+          <span>Фото — необов’язково</span>
+          <small className="wm-field-hint">
+            Спершу спробуємо взяти фото з посилання. Також можна додати власне або залишити картку без фото.
+          </small>
           <div className="wm-photo-picker">
             <div className="wm-photo-preview">
               {previewSrc ? (
-                <img src={previewSrc} alt={`Попередній перегляд: ${title || 'мрія'}`} onClick={() => onPhotoClick(previewSrc)} />
+                <img
+                  src={previewSrc}
+                  alt={`Попередній перегляд: ${title || 'мрія'}`}
+                  onClick={() => onPhotoClick(previewSrc)}
+                  onError={() => {
+                    if (!pendingFile) {
+                      setImgUrl('');
+                      setPreviewSrc(null);
+                    }
+                  }}
+                />
               ) : (
-                <span className="wm-photo-placeholder" aria-hidden="true">📷</span>
+                <span className="wm-photo-placeholder" aria-hidden="true">♡</span>
               )}
             </div>
             <div className="wm-photo-actions">
@@ -198,9 +321,10 @@ export function WishFormModal({
             id="wish-image-url"
             name="imageUrl"
             type="url"
-            placeholder="або встав посилання на фото"
+            inputMode="url"
+            placeholder="або встав пряме посилання на фото"
             value={imgUrl}
-            onChange={(event) => onUrlChange(event.target.value)}
+            onChange={(event) => onImageUrlChange(event.target.value)}
             style={{ marginTop: 8 }}
           />
         </div>
@@ -257,7 +381,7 @@ export function WishFormModal({
             type="button"
             className="btn"
             onClick={() => void save()}
-            disabled={!title.trim() || !previewSrc || saving}
+            disabled={!title.trim() || saving}
           >
             {saving ? 'Збереження…' : isEdit ? 'Зберегти' : 'Створити мрію'}
           </button>
