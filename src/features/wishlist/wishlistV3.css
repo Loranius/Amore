@@ -1,0 +1,297 @@
+.wishlist-grid {
+  align-items: start;
+  gap: 16px;
+}
+
+.wl-card-v3 {
+  position: relative;
+  overflow: visible;
+  border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--text) 10%, transparent);
+  isolation: isolate;
+}
+
+.wl-card-v3::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 8%, transparent), transparent 42%);
+  pointer-events: none;
+}
+
+.wl-card-v3--reserved {
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.wl-card-v3-media {
+  position: relative;
+  overflow: hidden;
+  border-radius: 23px 23px 0 0;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.wl-card-v3-photo {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.wl-card-v3-photo img {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  object-fit: cover;
+  object-position: center;
+}
+
+.wl-card-v3-placeholder {
+  display: grid;
+  min-height: 230px;
+  place-items: center;
+  font-size: 54px;
+  color: color-mix(in srgb, var(--accent) 54%, transparent);
+}
+
+.wl-card-v3-topline {
+  position: absolute;
+  inset: 14px 14px auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.wl-priority-v3,
+.wl-card-v3-menu-wrap {
+  pointer-events: auto;
+}
+
+.wl-priority-v3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: #553342;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 7px 20px rgba(53, 30, 41, 0.14);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.wl-priority-v3--dream { color: #c34f7b; }
+.wl-priority-v3--high { color: #a45a33; }
+.wl-priority-v3--medium { color: #85651f; }
+.wl-priority-v3--low { color: #597066; }
+
+.wl-card-v3-menu-wrap { position: relative; }
+
+.wl-card-v3-menu-button {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.88);
+  color: #553342;
+  font: 700 24px/1 system-ui, sans-serif;
+  box-shadow: 0 7px 20px rgba(53, 30, 41, 0.14);
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.wl-card-v3-menu {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  z-index: 10;
+  width: 154px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.wl-card-v3-menu button {
+  display: block;
+  width: 100%;
+  padding: 11px 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wl-card-v3-menu button + button {
+  border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.wl-card-v3-menu button:active {
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.wl-card-v3-menu .wl-card-v3-menu-danger { color: var(--danger); }
+
+.wl-card-v3-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 17px 18px 18px;
+}
+
+.wl-card-v3-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wl-card-v3-title {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.wl-card-v3-title[href] { color: var(--accent); }
+
+.wl-card-v3-price {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wl-card-v3-description {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.wl-card-v3-footer { margin-top: 2px; }
+
+.wl-card-v3-primary,
+.wl-card-v3-secondary {
+  min-height: 46px;
+  border-radius: 15px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wl-card-v3-primary {
+  display: inline-flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #ae4d78));
+  color: #fff;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.wl-card-v3-primary--success {
+  background: linear-gradient(135deg, var(--ok), color-mix(in srgb, var(--ok) 74%, #1d6e4a));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ok) 24%, transparent);
+}
+
+.wl-card-v3-secondary {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: transparent;
+  color: var(--muted);
+}
+
+.wl-card-v3-reservation-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.wl-card-v3-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.wl-card-v3-status--owner {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.wl-card-v3-hint {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+@media (min-width: 720px) {
+  .wishlist-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1120px) {
+  .wishlist-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 540px) {
+  .wishlist-grid { gap: 18px; }
+  .wl-card-v3 { border-radius: 22px; }
+  .wl-card-v3-media { border-radius: 21px 21px 0 0; }
+  .wl-card-v3-photo img { max-height: none; }
+  .wl-card-v3-content { padding: 16px; }
+  .wl-card-v3-title { font-size: 18px; }
+  .wl-card-v3-price { font-size: 15px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-card-v3-primary,
+  .wl-card-v3-secondary,
+  .wl-card-v3-menu-button { transition: none; }
+}
