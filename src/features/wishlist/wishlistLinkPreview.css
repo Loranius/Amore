@@ -1,0 +1,64 @@
+.wl-card-v3-placeholder {
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: 6px;
+  padding: 30px 18px;
+  text-align: center;
+}
+
+.wl-card-v3-placeholder small {
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.wm-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.wm-link-row input {
+  min-width: 0;
+}
+
+.wm-link-preview-button {
+  min-width: 108px;
+  padding-inline: 12px;
+  white-space: nowrap;
+}
+
+.wm-link-status,
+.wm-field-hint {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.wm-field-hint {
+  margin-top: -2px;
+  margin-bottom: 8px;
+}
+
+.wm-link-status--success {
+  color: var(--ok);
+}
+
+.wm-link-status--error {
+  color: var(--danger);
+}
+
+@media (max-width: 460px) {
+  .wm-link-row {
+    grid-template-columns: 1fr;
+  }
+
+  .wm-link-preview-button {
+    width: 100%;
+  }
+}
