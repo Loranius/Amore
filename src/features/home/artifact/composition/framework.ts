@@ -12,7 +12,7 @@
 // конфіг.
 //
 // Конвеєр (кожен прохід розв'язує одну візуальну проблему):
-//   1. Hierarchy   — king / support / family / micro (tier).
+//   1. Hierarchy   — king / support / family / companion / micro (tier).
 //   2. Silhouette  — один впізнаваний силует (вежа/стріла/каскад/...),
 //                    читабельний навіть як чорна тінь.
 //   3. Archetypes  — бібліотека форм замість «усі — списи»; вибір ЛИШЕ з
@@ -49,7 +49,10 @@ import { mulberry32, hashSeedString } from '../../mulberry32';
 import { type Vec3, add, scale, normalize, lerpVec, dot, v3, perpendicularBasis } from '../vec3';
 import { scoreComposition, type CompositionScore } from './score';
 
-export type CompositionTier = 'king' | 'support' | 'family' | 'micro';
+// Hierarchy Engine (Vol IV): рівно один фокус (king), далі support/family
+// (незалежні домінанти) → companion (супутники колоній) → micro (пил).
+// Мусить збігатися з CompositionTier у ../artifactTypes.ts.
+export type CompositionTier = 'king' | 'support' | 'family' | 'companion' | 'micro';
 export type CompositionRole = 'dominant' | 'satellite' | 'micro';
 
 /** Генеричне тіло: звужений конус (frustum) із основою, віссю і розмірами. */
@@ -162,18 +165,30 @@ const bendToward = (dir: Vec3, target: Vec3, amount: number): Vec3 =>
 
 const keyedRng = (seedNum: number, tag: string): (() => number) => mulberry32(seedNum + hashSeedString(tag));
 
-// ── Прохід 1: ієрархія ───────────────────────────────────────────
+// ── Прохід 1: Hierarchy Engine (Vol IV #1) ───────────────────────
+// 5 рівнів важливості; рівно один фокус. King=монарх, Support=2 найбільші
+// незалежні домінанти, Family=решта домінантів, Companion=супутники колоній
+// (role 'satellite'), Micro=пил. Ярус — суто візуальний, не впливає на
+// розміри/позиції (щоб дрейф ярусу не ламав append-only).
 function assignTiers(bodies: ComposedBody[]): void {
   const dominants = bodies
     .filter((b) => b.role === 'dominant' && !b.primary)
     .sort((a, b) => volumeOf(b) - volumeOf(a) || a.key.localeCompare(b.key));
   const supports = new Set(dominants.slice(0, 2).map((b) => b.key));
   for (const b of bodies) {
-    b.tier = b.primary ? 'king' : b.role === 'micro' ? 'micro' : supports.has(b.key) ? 'support' : 'family';
+    b.tier = b.primary
+      ? 'king'
+      : b.role === 'micro'
+        ? 'micro'
+        : b.role === 'satellite'
+          ? 'companion'
+          : supports.has(b.key)
+            ? 'support'
+            : 'family';
   }
 }
 
-// ── Прохід 2: силует ─────────────────────────────────────────────
+// ── Прохід 2: Silhouette Engine (Vol IV #2) ──────────────────────
 interface SilhouetteFrame {
   axes: Vec3[];
   preset: SilhouettePreset;
@@ -224,7 +239,7 @@ function silhouettePass(bodies: ComposedBody[], original: Map<string, Compositio
   }
 }
 
-// ── Прохід 3: архетипи ───────────────────────────────────────────
+// ── Прохід 3: Archetype Engine (Vol IV #6) ───────────────────────
 function archetypePass(bodies: ComposedBody[], original: Map<string, CompositionBody>, seedNum: number, config: CompositionConfig): ComposedBody[] {
   const spawned: ComposedBody[] = [];
   for (const b of bodies) {
@@ -284,7 +299,7 @@ function archetypePass(bodies: ComposedBody[], original: Map<string, Composition
   return spawned;
 }
 
-// ── Прохід 4: геологічний вік ────────────────────────────────────
+// ── Прохід 4: Aging (Vol IV — Geological realism) ────────────────
 function agePass(bodies: ComposedBody[], seedNum: number): void {
   for (const b of bodies) {
     if (b.shielded || b.role === 'micro') continue;
@@ -303,7 +318,7 @@ function agePass(bodies: ComposedBody[], seedNum: number): void {
   }
 }
 
-// ── Прохід 5: конкуренція ────────────────────────────────────────
+// ── Прохід 5: Competition Engine (Vol IV #4) — молодший поступається
 const MIN_COMPETITOR_VOLUME = 0.012;
 
 function competitionPass(bodies: ComposedBody[], strength: number): void {
@@ -335,7 +350,7 @@ function competitionPass(bodies: ComposedBody[], strength: number): void {
   }
 }
 
-// ── Прохід 6: геологічна маса ────────────────────────────────────
+// ── Прохід 6: Geological Mass Engine (Vol IV #7) ─────────────────
 function massPass(bodies: ComposedBody[], original: Map<string, CompositionBody>): void {
   for (const b of bodies) {
     if (b.shielded || b.role === 'micro') continue;
@@ -354,7 +369,7 @@ function massPass(bodies: ComposedBody[], original: Map<string, CompositionBody>
   }
 }
 
-// ── Прохід 7: піраміда колоній ───────────────────────────────────
+// ── Прохід 7: Colony Engine (Vol IV #5) ──────────────────────────
 function colonyPass(bodies: ComposedBody[]): void {
   const dominants = new Map<string, ComposedBody>();
   for (const b of bodies) if (b.role === 'dominant') dominants.set(b.colonyId, b);
@@ -374,7 +389,7 @@ function colonyPass(bodies: ComposedBody[]): void {
   }
 }
 
-// ── Прохід 8: оптимізатор щільності ──────────────────────────────
+// ── Прохід 8: Density + Negative Space Engines (Vol IV #3, #8) ───
 function densityPass(bodies: ComposedBody[], seedNum: number, config: CompositionConfig, strength: number): Set<string> {
   const rng = keyedRng(seedNum, 'sectors');
   const { count, maxSmallPerSector } = config.sectors;
@@ -409,7 +424,7 @@ function sectorRichness(seedNum: number, config: CompositionConfig): number[] {
   return Array.from({ length: config.sectors.count }, () => rng());
 }
 
-// ── Прохід 9: мікрошар ───────────────────────────────────────────
+// ── Прохід 9: Micro Detail Engine (Vol IV #9) ────────────────────
 function microPass(bodies: ComposedBody[], seedNum: number, config: CompositionConfig): ComposedBody[] {
   const richness = sectorRichness(seedNum, config);
   const sectorCount = config.sectors.count;
