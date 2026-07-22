@@ -14,6 +14,15 @@ export interface WishlistItemV3 extends WishlistItemRow {
   archived_at: string | null;
 }
 
+export interface WishlistMutationPayload {
+  title: string;
+  description: string | null;
+  link: string | null;
+  image_url: string | null;
+  price: number | null;
+  priority: WishlistItemRow['priority'];
+}
+
 type RpcError = { message: string };
 type RpcResponse = Promise<{ data: unknown; error: RpcError | null }>;
 type RpcCaller = (fn: string, args?: Record<string, unknown>) => RpcResponse;
@@ -30,6 +39,17 @@ async function callVoid(fn: string, args: Record<string, unknown>): Promise<void
   if (error) throw new Error(error.message);
 }
 
+function mutationArgs(payload: WishlistMutationPayload): Record<string, unknown> {
+  return {
+    p_title: payload.title,
+    p_description: payload.description,
+    p_link: payload.link,
+    p_image_url: payload.image_url,
+    p_price: payload.price,
+    p_priority: payload.priority,
+  };
+}
+
 export async function fetchWishlistV3(input: {
   ownerId: number | null;
   shared: boolean;
@@ -42,6 +62,44 @@ export async function fetchWishlistV3(input: {
   });
   if (error) throw new Error(error.message);
   return assertRows(data);
+}
+
+export async function createWishlistItem(input: {
+  payload: WishlistMutationPayload;
+  ownerId: number;
+  shared: boolean;
+}): Promise<void> {
+  await callVoid('create_wishlist_item_v3', {
+    ...mutationArgs(input.payload),
+    p_owner_id: input.ownerId,
+    p_is_shared: input.shared,
+  });
+}
+
+export async function updateWishlistItem(
+  wishId: number,
+  payload: WishlistMutationPayload,
+): Promise<void> {
+  await callVoid('update_wishlist_item_v3', {
+    p_wish_id: wishId,
+    ...mutationArgs(payload),
+  });
+}
+
+export async function moveWishlistItem(
+  wishId: number,
+  ownerId: number,
+  shared: boolean,
+): Promise<void> {
+  await callVoid('move_wishlist_item_v3', {
+    p_wish_id: wishId,
+    p_owner_id: ownerId,
+    p_is_shared: shared,
+  });
+}
+
+export async function softDeleteWishlistItem(wishId: number): Promise<void> {
+  await callVoid('soft_delete_wishlist_item_v3', { p_wish_id: wishId });
 }
 
 export async function reserveWishlistItem(wishId: number): Promise<void> {
