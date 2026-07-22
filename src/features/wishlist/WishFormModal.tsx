@@ -123,11 +123,12 @@ export function WishFormModal({
       setLinkPreviewSite(result.siteName);
       setTitle((current) => current.trim() ? current : (result.title ?? current));
 
-      if (result.imageUrl) {
+      const productImageUrl = result.imageUrl;
+      if (productImageUrl) {
         setImgUrl((current) => {
           if (current.trim()) return current;
-          setPreviewSrc(result.imageUrl);
-          return result.imageUrl;
+          setPreviewSrc(productImageUrl);
+          return productImageUrl;
         });
       }
 
