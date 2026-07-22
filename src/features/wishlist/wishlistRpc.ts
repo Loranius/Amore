@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { WishlistItemRow } from '@/types';
+import type { FulfilledWishlistItem, WishlistItemRow } from '@/types';
 
 export type WishlistStatus =
   | 'created'
@@ -36,9 +36,9 @@ type RpcCaller = (fn: string, args?: Record<string, unknown>) => RpcResponse;
 
 const rpc = supabase.rpc.bind(supabase) as unknown as RpcCaller;
 
-function assertRows(data: unknown): WishlistItemV3[] {
-  if (!Array.isArray(data)) throw new Error('Wishlist RPC returned an invalid payload');
-  return data as WishlistItemV3[];
+function assertRows<T>(data: unknown, label: string): T[] {
+  if (!Array.isArray(data)) throw new Error(`${label} RPC returned an invalid payload`);
+  return data as T[];
 }
 
 function assertStats(data: unknown): WishlistStatsV3 {
@@ -82,13 +82,23 @@ export async function fetchWishlistV3(input: {
     p_include_archived: input.includeArchived ?? false,
   });
   if (error) throw new Error(error.message);
-  return assertRows(data);
+  return assertRows<WishlistItemV3>(data, 'Wishlist');
 }
 
 export async function fetchWishlistStatsV3(): Promise<WishlistStatsV3> {
   const { data, error } = await rpc('get_wishlist_stats_v3');
   if (error) throw new Error(error.message);
   return assertStats(data);
+}
+
+export async function fetchFulfilledWishlistV3(
+  ownerId: number,
+): Promise<FulfilledWishlistItem[]> {
+  const { data, error } = await rpc('get_fulfilled_wishlist_items_v3', {
+    p_owner_id: ownerId,
+  });
+  if (error) throw new Error(error.message);
+  return assertRows<FulfilledWishlistItem>(data, 'Wishlist archive');
 }
 
 export async function createWishlistItem(input: {
