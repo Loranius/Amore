@@ -1,10 +1,5 @@
 // ============================================================
-// WishlistPage — вкладка «Бажання» (порт wishlist.js UI)
-// ------------------------------------------------------------
-// Три підвкладки: «Мої бажання» (редаговані, з архівом), «Бажання
-// партнера» (бронь/виконання) і «Спільне» (видимо обом, isOwn — по
-// кожній картці окремо, бо власники змішані). Прогрес-бар і річна
-// статистика — для пари загалом, показуються на всіх вкладках.
+// WishlistPage — вкладка «Бажання»
 // ============================================================
 import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -69,13 +64,19 @@ export function WishlistPage() {
     setReserved.mutate({ id, reserved });
   };
   const onFulfill = async (item: WishlistItemRow) => {
-    if (await confirmDialog(`Підтверджуєш, що купив(ла) «${item.title}»? 🎁\n\nОбидва отримають сповіщення ✉️`)) {
+    if (
+      await confirmDialog(
+        `Підтверджуєш, що подарунок «${item.title}» уже вручено? 🎁\n\nОбидва отримають сповіщення ✉️`,
+      )
+    ) {
       fulfill.mutate(item);
     }
   };
 
   const partnerName = partnerGenitive(partner?.name);
-  const isItemOwn = (item: WishlistItemRow) => (tab === 'shared' ? item.owner === me.id : isOwnTab);
+  const isItemOwn = (item: WishlistItemRow) =>
+    tab === 'shared' ? item.owner === me.id : isOwnTab;
+  const canManageReservation = (item: WishlistItemRow) => item.reserved_by === me.id;
 
   const pct = stats && stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
 
@@ -94,7 +95,11 @@ export function WishlistPage() {
 
       <div className="wl-head">
         <h1 className="wl-title">
-          {tab === 'me' ? 'Мої бажання' : tab === 'partner' ? `Бажання ${partnerName}` : '🎁 Спільні бажання'}
+          {tab === 'me'
+            ? 'Мої бажання'
+            : tab === 'partner'
+              ? `Бажання ${partnerName}`
+              : '🎁 Спільні бажання'}
         </h1>
         <button type="button" className="btn" onClick={() => setAdding(true)}>
           + Додати
@@ -116,7 +121,9 @@ export function WishlistPage() {
             <div className="plans-progress-fill" style={{ width: `${pct}%` }} />
           </div>
           {stats.doneThisYear > 0 && (
-            <p className="wl-year-stat">Ви виконали {stats.doneThisYear} бажань разом цього року ❤️</p>
+            <p className="wl-year-stat">
+              Ви виконали {stats.doneThisYear} бажань разом цього року ❤️
+            </p>
           )}
         </div>
       )}
@@ -144,6 +151,7 @@ export function WishlistPage() {
                   key={item.id}
                   item={item}
                   isOwn={isItemOwn(item)}
+                  canManageReservation={canManageReservation(item)}
                   onPhotoClick={setLightbox}
                   onEdit={setEditing}
                   onDelete={onDelete}
