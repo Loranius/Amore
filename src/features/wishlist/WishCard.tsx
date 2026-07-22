@@ -1,7 +1,7 @@
 // ============================================================
 // WishCard — dream-board картка Wishlist v3
 // ============================================================
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { WishlistItemRow } from '@/types';
 import './wishlistV3.css';
 
@@ -43,28 +43,43 @@ export function WishCard({
   onMove,
 }: WishCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const canEdit = isOwn && !item.reserved;
   const closeMenu = () => setMenuOpen(false);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [item.image_url]);
 
   const runMenuAction = (action: () => void) => {
     closeMenu();
     action();
   };
 
+  const hasVisibleImage = Boolean(item.image_url) && !imageFailed;
+
   return (
     <article className={`wl-card wl-card-v3${item.reserved ? ' wl-card-v3--reserved' : ''}`}>
       <div className="wl-card-v3-media">
-        {item.image_url ? (
+        {hasVisibleImage ? (
           <button
             type="button"
             className="wl-card-v3-photo"
             onClick={() => onPhotoClick(item.image_url!)}
             aria-label={`Відкрити фото: ${item.title}`}
           >
-            <img src={item.image_url} loading="lazy" alt={item.title} />
+            <img
+              src={item.image_url!}
+              loading="lazy"
+              alt={item.title}
+              onError={() => setImageFailed(true)}
+            />
           </button>
         ) : (
-          <div className="wl-card-v3-placeholder" aria-hidden="true">♡</div>
+          <div className="wl-card-v3-placeholder" aria-label="Бажання без фото">
+            <span aria-hidden="true">♡</span>
+            <small>Мрія без фото</small>
+          </div>
         )}
 
         <div className="wl-card-v3-topline">
