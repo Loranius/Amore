@@ -8,14 +8,14 @@ import { useConfirm } from '@/providers/ConfirmProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { TabBar } from '@/components/ui/TabBar';
 import { PortalDecor } from '@/features/auth/PortalDecor';
+import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { WishCard } from './WishCard';
 import { WishFormModal } from './WishFormModal';
 import { MoveWishModal } from './MoveWishModal';
 import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
 import { WishArchive } from './WishArchive';
+import { partnerWishlistTitle } from './partnerLabel';
 import {
-  usePartner,
-  partnerGenitive,
   useWishlistItems,
   useSharedWishlistItems,
   useCoupleWishStats,
@@ -40,7 +40,12 @@ function requestedWishId(value: string | null): number | null {
 
 export function WishlistPage() {
   const me = useCurrentUser();
-  const partner = usePartner();
+  const {
+    partner,
+    isPending: partnerPending,
+    isError: partnerError,
+    refetch: refetchPartner,
+  } = usePartnerQuery();
   const [searchParams] = useSearchParams();
   const tabFromUrl = requestedTab(searchParams.get('tab'));
   const archiveRequested = searchParams.get('archive') === '1';
@@ -174,12 +179,40 @@ export function WishlistPage() {
     setCompleting(null);
   };
 
-  const partnerName = partnerGenitive(partner?.name);
   const isItemOwn = (item: WishlistItemV3) =>
     tab === 'shared' ? item.owner === me.id : isOwnTab;
   const canManageReservation = (item: WishlistItemV3) => item.reserved_by === me.id;
 
   const pct = stats && stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
+
+  // Не будуємо вкладку партнера до отримання фактичного іншого користувача.
+  // Так у DOM ніколи не з'являється тимчасове «Бажання Партнера».
+  if (partnerPending) {
+    return (
+      <section className="wishlist pink-page" aria-busy="true">
+        <PortalDecor density="light" parallax={false} />
+        <p className="empty-state" role="status" aria-live="polite">
+          Завантаження списку бажань…
+        </p>
+      </section>
+    );
+  }
+
+  if (partnerError || !partner) {
+    return (
+      <section className="wishlist pink-page">
+        <PortalDecor density="light" parallax={false} />
+        <div className="empty-state" role="alert">
+          <p>Не вдалося визначити іншого користувача в парі.</p>
+          <button type="button" className="btn btn-secondary" onClick={() => void refetchPartner()}>
+            Спробувати ще
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const partnerTitle = partnerWishlistTitle(partner.name);
 
   return (
     <section className="wishlist pink-page" aria-busy={isPending || mutationBusy}>
@@ -189,7 +222,7 @@ export function WishlistPage() {
         onChange={setTab}
         items={[
           { value: 'me', label: 'Мої бажання' },
-          { value: 'partner', label: `Бажання ${partnerName}` },
+          { value: 'partner', label: partnerTitle },
           { value: 'shared', label: 'Спільне', icon: '🎁' },
         ]}
       />
@@ -199,7 +232,7 @@ export function WishlistPage() {
           {tab === 'me'
             ? 'Мої бажання'
             : tab === 'partner'
-              ? `Бажання ${partnerName}`
+              ? partnerTitle
               : '🎁 Спільні бажання'}
         </h1>
         <button type="button" className="btn" disabled={mutationBusy} onClick={() => setAdding(true)}>
