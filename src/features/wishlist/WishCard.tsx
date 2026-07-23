@@ -1,10 +1,15 @@
 // ============================================================
-// WishCard — dream-board картка Wishlist v3
+// WishCard — editorial dream-board card
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
 import { ProgressivePhoto } from './ProgressivePhoto';
+import {
+  wishCardStatusChip,
+  type WishCardContext,
+} from './wishCardPresentation';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistV3.css';
+import './wishlistCardRedesign.css';
 
 const PRIORITY_LABELS: Record<string, string> = {
   dream: 'Dream',
@@ -22,6 +27,7 @@ const PRIORITY_ICONS: Record<string, string> = {
 
 interface WishCardProps {
   item: WishlistItemV3;
+  context: WishCardContext;
   isOwn: boolean;
   canManageReservation: boolean;
   busy: boolean;
@@ -36,6 +42,7 @@ interface WishCardProps {
 
 export function WishCard({
   item,
+  context,
   isOwn,
   canManageReservation,
   busy,
@@ -52,6 +59,13 @@ export function WishCard({
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const hasMenuActions = item.can_edit || item.can_move || item.can_delete;
   const closeMenu = () => setMenuOpen(false);
+  const statusChip = wishCardStatusChip({
+    context,
+    completionMode: item.completion_mode,
+    status: item.status,
+    reserved: item.reserved,
+    canManageReservation,
+  });
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -85,97 +99,71 @@ export function WishCard({
 
   const lifecycleControls = () => {
     if (item.completion_mode === 'shared') {
-      return (
-        <div className="wl-card-v3-lifecycle">
-          <div className="wl-card-v3-stage wl-card-v3-stage--preparing">
-            <span aria-hidden="true">♡</span>
-            Спільна мрія
-          </div>
-          {item.can_complete && (
-            <button
-              type="button"
-              className="wl-card-v3-primary wl-card-v3-primary--success"
-              disabled={busy}
-              onClick={() => onFulfill(item)}
-            >
-              <span aria-hidden="true">✨</span>
-              Виконати разом
-            </button>
-          )}
-        </div>
+      return item.can_complete ? (
+        <button
+          type="button"
+          className="wl-card-v3-primary wl-card-v3-primary--success"
+          disabled={busy}
+          onClick={() => onFulfill(item)}
+        >
+          <span aria-hidden="true">✨</span>
+          Виконати разом
+        </button>
+      ) : (
+        <span className="wl-card-v3-hint">Спільна мрія</span>
       );
     }
 
     if (canManageReservation && item.reserved) {
       if (item.status === 'reserved') {
         return (
-          <div className="wl-card-v3-lifecycle">
-            <div className="wl-card-v3-stage">
-              <span aria-hidden="true">♡</span>
-              Подарунок заплановано
-            </div>
-            <div className="wl-card-v3-reservation-actions">
-              <button
-                type="button"
-                className="wl-card-v3-primary"
-                disabled={busy}
-                onClick={() => onPurchased(item)}
-              >
-                <span aria-hidden="true">✓</span>
-                Подарунок куплено
-              </button>
-              <button
-                type="button"
-                className="wl-card-v3-secondary"
-                disabled={busy}
-                onClick={() => onReserve(item.id, false)}
-              >
-                Скасувати
-              </button>
-            </div>
+          <div className="wl-card-v3-reservation-actions">
+            <button
+              type="button"
+              className="wl-card-v3-primary"
+              disabled={busy}
+              onClick={() => onPurchased(item)}
+            >
+              <span aria-hidden="true">✓</span>
+              Подарунок куплено
+            </button>
+            <button
+              type="button"
+              className="wl-card-v3-secondary"
+              disabled={busy}
+              onClick={() => onReserve(item.id, false)}
+            >
+              Скасувати
+            </button>
           </div>
         );
       }
 
       if (item.status === 'purchased' || item.status === 'preparing_surprise') {
         return (
-          <div className="wl-card-v3-lifecycle">
-            <div className="wl-card-v3-stage wl-card-v3-stage--purchased">
-              <span aria-hidden="true">✓</span>
-              Подарунок куплено
-            </div>
-            <button
-              type="button"
-              className="wl-card-v3-primary wl-card-v3-primary--success"
-              disabled={busy}
-              onClick={() => onFulfill(item)}
-            >
-              <span aria-hidden="true">🎁</span>
-              Подарунок вручено
-            </button>
-          </div>
+          <button
+            type="button"
+            className="wl-card-v3-primary wl-card-v3-primary--success"
+            disabled={busy}
+            onClick={() => onFulfill(item)}
+          >
+            <span aria-hidden="true">🎁</span>
+            Подарунок вручено
+          </button>
         );
       }
     }
 
     if (isOwn) {
-      return item.reserved ? (
-        <div className="wl-card-v3-status wl-card-v3-status--owner">
-          <span aria-hidden="true">✦</span>
-          Це бажання вже здійснюють
-        </div>
-      ) : (
-        <span className="wl-card-v3-hint">Твоя мрія</span>
+      return (
+        <span className="wl-card-v3-hint">
+          {item.reserved ? 'Це бажання вже здійснюють' : 'Додано до твоїх мрій'}
+        </span>
       );
     }
 
     if (item.reserved) {
-      return (
-        <div className="wl-card-v3-status">
-          <span aria-hidden="true">♡</span>
-          Це бажання вже здійснюють
-        </div>
-      );
+      return <span className="wl-card-v3-hint">Це бажання вже здійснюють</span>;
     }
 
     if (!item.can_reserve) return <span className="wl-card-v3-hint">Бажання партнера</span>;
@@ -195,7 +183,7 @@ export function WishCard({
 
   return (
     <article
-      className={`wl-card wl-card-v3${item.reserved ? ' wl-card-v3--reserved' : ''}`}
+      className={`wl-card wl-card-v3 wl-card-v3--${context}${item.reserved ? ' wl-card-v3--reserved' : ''}`}
       aria-busy={busy}
     >
       <div className="wl-card-v3-media">
@@ -220,6 +208,8 @@ export function WishCard({
             <small>Мрія без фото</small>
           </div>
         )}
+
+        <div className="wl-card-v3-media-shade" aria-hidden="true" />
 
         <div className="wl-card-v3-topline">
           {item.priority && (
@@ -270,6 +260,13 @@ export function WishCard({
             </div>
           )}
         </div>
+
+        {statusChip && (
+          <span className={`wl-card-v3-state-chip wl-card-v3-state-chip--${statusChip.tone}`}>
+            <span aria-hidden="true">{statusChip.icon}</span>
+            {statusChip.label}
+          </span>
+        )}
       </div>
 
       <div className="wl-card-v3-content">
@@ -277,6 +274,7 @@ export function WishCard({
           {item.link ? (
             <a className="wl-card-v3-title" href={item.link} target="_blank" rel="noopener noreferrer">
               {item.title}
+              <span className="wl-card-v3-external" aria-hidden="true">↗</span>
             </a>
           ) : (
             <h2 className="wl-card-v3-title">{item.title}</h2>
