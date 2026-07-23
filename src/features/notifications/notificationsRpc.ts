@@ -4,7 +4,8 @@ export type AppNotificationKind =
   | 'wishlist_new_wish'
   | 'wishlist_shared_wish'
   | 'wishlist_gift_completed'
-  | 'wishlist_gift_memory';
+  | 'wishlist_gift_memory'
+  | 'wishlist_shared_completed';
 
 export interface AppNotification {
   id: number;
