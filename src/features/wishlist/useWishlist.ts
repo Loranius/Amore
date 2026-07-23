@@ -140,6 +140,15 @@ export interface CompleteGiftInput extends GiftMemoryFiles {
   idempotencyKey: string;
 }
 
+function wishMatchesPayload(item: WishlistItemV3, payload: WishFormPayload): boolean {
+  return item.title === payload.title
+    && item.description === payload.description
+    && item.link === payload.link
+    && item.image_url === payload.image_url
+    && item.price === payload.price
+    && item.priority === payload.priority;
+}
+
 export function useWishlistMutations(ownerId: number | null) {
   const client = useQueryClient();
   const me = useCurrentUser();
@@ -162,14 +171,42 @@ export function useWishlistMutations(ownerId: number | null) {
       owner?: number;
       isShared?: boolean;
     }) => {
-      if (input.id !== null) {
-        await updateWishlistItem(input.id, input.payload);
-      } else {
-        await createWishlistItem({
-          payload: input.payload,
-          ownerId: input.owner ?? me.id,
-          shared: input.isShared ?? false,
-        });
+      const shared = input.isShared ?? ownerId === null;
+      const targetOwner = input.owner ?? ownerId ?? me.id;
+
+      try {
+        if (input.id !== null) {
+          await updateWishlistItem(input.id, input.payload);
+        } else {
+          await createWishlistItem({
+            payload: input.payload,
+            ownerId: targetOwner,
+            shared,
+          });
+        }
+      } catch (error) {
+        if (!isAmbiguousWishlistTransportError(error)) throw error;
+
+        // Відповідь могла загубитися після commit. Перечитуємо серверний
+        // список до того, як дозволити повтор, щоб не створити дублікат.
+        try {
+          const serverItems = await fetchWishlistV3({
+            ownerId: shared ? null : targetOwner,
+            shared,
+          });
+          const committed = serverItems.some((item) =>
+            input.id !== null
+              ? item.id === input.id && wishMatchesPayload(item, input.payload)
+              : item.owner === targetOwner
+                && item.is_shared === shared
+                && wishMatchesPayload(item, input.payload),
+          );
+          if (committed) return;
+        } catch {
+          // Не замінюємо первинну transport-помилку помилкою reconciliation.
+        }
+
+        throw error;
       }
     },
     onError: (e) => {
