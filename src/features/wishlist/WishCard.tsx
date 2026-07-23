@@ -2,6 +2,7 @@
 // WishCard — dream-board картка Wishlist v3
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
+import { ProgressivePhoto } from './ProgressivePhoto';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistV3.css';
 
@@ -49,15 +50,10 @@ export function WishCard({
   onMove,
 }: WishCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [imageFailed, setImageFailed] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const hasMenuActions = item.can_edit || item.can_move || item.can_delete;
   const closeMenu = () => setMenuOpen(false);
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [item.image_url]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -88,8 +84,6 @@ export function WishCard({
     closeMenu();
     action();
   };
-
-  const hasVisibleImage = Boolean(item.image_url) && !imageFailed;
 
   const lifecycleControls = () => {
     if (item.completion_mode === 'shared') {
@@ -227,20 +221,21 @@ export function WishCard({
       aria-busy={busy}
     >
       <div className="wl-card-v3-media">
-        {hasVisibleImage ? (
-          <button
-            type="button"
-            className="wl-card-v3-photo"
-            onClick={() => onPhotoClick(item.image_url!)}
-            aria-label={`Відкрити фото: ${item.title}`}
-          >
-            <img
-              src={item.image_url!}
-              loading="lazy"
-              alt={item.title}
-              onError={() => setImageFailed(true)}
-            />
-          </button>
+        {item.image_url ? (
+          <ProgressivePhoto
+            src={item.image_url}
+            alt={item.title}
+            ariaLabel={`Відкрити фото: ${item.title}`}
+            buttonClassName="wl-card-v3-photo"
+            revealDelayMs={(item.id % 8) * 35}
+            onOpen={onPhotoClick}
+            fallback={(
+              <span className="wl-card-v3-placeholder" aria-label="Фото не вдалося завантажити">
+                <span aria-hidden="true">♡</span>
+                <small>Фото недоступне</small>
+              </span>
+            )}
+          />
         ) : (
           <div className="wl-card-v3-placeholder" aria-label="Бажання без фото">
             <span aria-hidden="true">♡</span>
