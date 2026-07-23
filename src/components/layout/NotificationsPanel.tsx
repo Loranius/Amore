@@ -29,6 +29,11 @@ function eventTime(value: string): string {
     : date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
 }
 
+function notificationHref(href: string, id: number): string {
+  const separator = href.includes('?') ? '&' : '?';
+  return `${href}${separator}notification=${id}`;
+}
+
 export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const me = useCurrentUser();
   const navigate = useNavigate();
@@ -60,10 +65,8 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
   const openEvent = (id: number, href: string, unread: boolean) => {
     if (unread) markRead.mutate(id);
     onClose();
-    if (href.startsWith('/')) navigate(href);
+    if (href.startsWith('/')) navigate(notificationHref(href, id));
   };
-
-  const completelyEmpty = items.length === 0 && events.length === 0 && !isEventsPending;
 
   return (
     <div className="modal-overlay" onClick={(event) => event.target === event.currentTarget && onClose()}>
@@ -162,8 +165,6 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
             </div>
           )}
         </section>
-
-        {completelyEmpty && <p className="empty-state">Сповіщень немає 💗</p>}
 
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>
