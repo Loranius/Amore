@@ -13,4 +13,9 @@ JWT-protected maintenance function for Wishlist Storage.
 - stalled runs are recoverable after 30 minutes;
 - every terminal run is recorded in `wishlist_storage_cleanup_runs`.
 
-Deploy with `verify_jwt = true`.
+## Deploy
+
+1. Apply `20260723_wishlist_storage_cleanup.sql`.
+2. Run the rollback-only SQL suite.
+3. Deploy this function with `verify_jwt = true`.
+4. Deploy the frontend trigger only after the function is active.
