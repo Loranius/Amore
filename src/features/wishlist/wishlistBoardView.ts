@@ -20,16 +20,20 @@ export const DEFAULT_WISHLIST_BOARD_VIEW: WishlistBoardViewState = {
   sort: 'newest',
 };
 
+function priorityValue(item: WishlistItemV3): string {
+  return String(item.priority ?? '');
+}
+
 function matchesPriority(item: WishlistItemV3, filter: WishlistPriorityFilter): boolean {
   if (filter === 'all') return true;
   if (filter === 'withoutPhoto') return !item.image_url;
-  return item.priority === filter;
+  return priorityValue(item) === filter;
 }
 
 function compareBySort(a: WishlistItemV3, b: WishlistItemV3, sort: WishlistSort): number {
   if (sort === 'priority') {
-    const rankDifference = (PRIORITY_RANK[a.priority ?? ''] ?? 99)
-      - (PRIORITY_RANK[b.priority ?? ''] ?? 99);
+    const rankDifference = (PRIORITY_RANK[priorityValue(a)] ?? 99)
+      - (PRIORITY_RANK[priorityValue(b)] ?? 99);
     return rankDifference || b.id - a.id;
   }
 
@@ -55,8 +59,8 @@ export function applyWishlistBoardView(
 export function wishlistPriorityFilterCounts(items: WishlistItemV3[]) {
   return {
     all: items.length,
-    dream: items.filter((item) => item.priority === 'dream').length,
-    high: items.filter((item) => item.priority === 'high').length,
+    dream: items.filter((item) => priorityValue(item) === 'dream').length,
+    high: items.filter((item) => priorityValue(item) === 'high').length,
     withoutPhoto: items.filter((item) => !item.image_url).length,
   } satisfies Record<WishlistPriorityFilter, number>;
 }
