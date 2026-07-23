@@ -62,4 +62,18 @@ describe('Wishlist create idempotency', () => {
     tracker.release(first.key);
     expect(tracker.acquire(baseInput).requestId).not.toBe(first.requestId);
   });
+
+  it('rotates a stale request id after the retry window', () => {
+    let counter = 0;
+    let now = 1_000;
+    const tracker = new WishlistCreateRequestTracker(
+      () => `request-${++counter}`,
+      () => now,
+      500,
+    );
+
+    const first = tracker.acquire(baseInput);
+    now += 501;
+    expect(tracker.acquire(baseInput).requestId).not.toBe(first.requestId);
+  });
 });
