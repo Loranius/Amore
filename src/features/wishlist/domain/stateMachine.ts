@@ -31,7 +31,11 @@ const TRANSITIONS: Readonly<
     cancel_reservation: 'visible',
     mark_purchased: 'purchased',
   },
-  purchased: { start_preparing: 'preparing_surprise' },
+  purchased: {
+    complete_gift: 'gifted',
+    // Legacy compatibility only. New UI completes directly from purchased.
+    start_preparing: 'preparing_surprise',
+  },
   preparing_surprise: { complete_gift: 'gifted' },
   gifted: { archive: 'archived' },
   archived: {},
