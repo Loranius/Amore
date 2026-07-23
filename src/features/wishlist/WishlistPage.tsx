@@ -277,9 +277,10 @@ export function WishlistPage() {
             )}
           </div>
 
-          {tab === 'me' && (
+          {(tab === 'me' || tab === 'shared') && (
             <WishArchive
-              ownerId={me.id}
+              scope={tab === 'shared' ? 'shared' : 'personal'}
+              ownerId={tab === 'me' ? me.id : null}
               onPhotoClick={setLightbox}
               openRequested={archiveRequested}
               openRequestKey={notificationRequest}
