@@ -18,8 +18,7 @@ describe('wishlist v3 state machine', () => {
     ['visible', 'reserve', 'reserved'],
     ['reserved', 'cancel_reservation', 'visible'],
     ['reserved', 'mark_purchased', 'purchased'],
-    ['purchased', 'start_preparing', 'preparing_surprise'],
-    ['preparing_surprise', 'complete_gift', 'gifted'],
+    ['purchased', 'complete_gift', 'gifted'],
     ['gifted', 'archive', 'archived'],
   ] satisfies Array<[WishStatus, WishTransitionAction, WishStatus]>) (
     '%s --%s--> %s',
@@ -28,6 +27,11 @@ describe('wishlist v3 state machine', () => {
       expect(transitionWish(from, action)).toBe(expected);
     },
   );
+
+  it('keeps the old preparing stage completion-compatible without requiring it', () => {
+    expect(transitionWish('purchased', 'start_preparing')).toBe('preparing_surprise');
+    expect(transitionWish('preparing_surprise', 'complete_gift')).toBe('gifted');
+  });
 
   it.each([
     ['created', 'reserve'],

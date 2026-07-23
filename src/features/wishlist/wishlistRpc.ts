@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { createGiftMemorySignedUrl } from './giftMemory';
 import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
 import { WishlistCreateRequestTracker } from './wishlistCreateIdempotency';
+import { WishlistQuickCompletionTracker } from './wishlistQuickCompletion';
 import type { WishlistItemRow } from '@/types';
 
 export type WishlistStatus =
@@ -80,6 +81,7 @@ type RpcCaller = (fn: string, args?: Record<string, unknown>) => RpcResponse;
 
 const rpc = supabase.rpc.bind(supabase) as unknown as RpcCaller;
 const createRequestTracker = new WishlistCreateRequestTracker();
+const quickCompletionTracker = new WishlistQuickCompletionTracker();
 
 function assertRows<T>(data: unknown, label: string): T[] {
   if (!Array.isArray(data)) throw new Error(`${label} RPC returned an invalid payload`);
@@ -237,6 +239,7 @@ export async function markWishlistPurchased(wishId: number): Promise<void> {
   await callVoid('mark_wishlist_purchased', { p_wish_id: wishId });
 }
 
+/** Legacy compatibility. New UI completes directly from purchased. */
 export async function markWishlistPreparing(wishId: number): Promise<void> {
   await callVoid('mark_wishlist_preparing', { p_wish_id: wishId });
 }
@@ -250,4 +253,24 @@ export async function completeWishlistGift(payload: CompleteWishlistGiftPayload)
     p_comment: payload.comment,
   });
   if (error) throw new Error(error.message);
+}
+
+export async function completeWishlistGiftWithoutMemory(wishId: number): Promise<void> {
+  const idempotencyKey = quickCompletionTracker.acquire(wishId);
+
+  try {
+    await completeWishlistGift({
+      wishId,
+      idempotencyKey,
+      reactionPhotoPath: null,
+      reactionVideoPath: null,
+      comment: null,
+    });
+    quickCompletionTracker.release(wishId);
+  } catch (error) {
+    if (!isAmbiguousWishlistTransportError(error)) {
+      quickCompletionTracker.release(wishId);
+    }
+    throw error;
+  }
 }

@@ -15,6 +15,7 @@ import { MoveWishModal } from './MoveWishModal';
 import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
 import { WishArchive } from './WishArchive';
 import { partnerWishlistTitle } from './partnerLabel';
+import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import {
   useWishlistItems,
   useSharedWishlistItems,
@@ -88,10 +89,10 @@ export function WishlistPage() {
     remove,
     setReserved,
     markPurchased,
-    markPreparing,
     fulfill,
     changeScope,
   } = useWishlistMutations(ownerId);
+  const quickFulfill = useQuickWishlistCompletion();
   const confirmDialog = useConfirm();
 
   const [editing, setEditing] = useState<WishlistItemV3 | null>(null);
@@ -105,7 +106,7 @@ export function WishlistPage() {
     || remove.isPending
     || setReserved.isPending
     || markPurchased.isPending
-    || markPreparing.isPending
+    || quickFulfill.isPending
     || fulfill.isPending
     || changeScope.isPending;
 
@@ -150,7 +151,7 @@ export function WishlistPage() {
 
   const onReserve = async (id: number, reserved: boolean) => {
     await runAction(async () => {
-      if (!reserved && !(await confirmDialog('Скасувати бронювання цього подарунка?'))) return;
+      if (!reserved && !(await confirmDialog('Скасувати планування цього подарунка?'))) return;
       await setReserved.mutateAsync({ id, reserved });
     });
   };
@@ -159,7 +160,7 @@ export function WishlistPage() {
     await runAction(async () => {
       if (
         await confirmDialog(
-          `Позначити «${item.title}» як куплений подарунок?\n\nПісля цього скасувати бронювання вже не можна.`,
+          `Позначити «${item.title}» як куплений подарунок?\n\nПісля цього скасувати виконання вже не можна.`,
         )
       ) {
         await markPurchased.mutateAsync(item.id);
@@ -167,9 +168,14 @@ export function WishlistPage() {
     });
   };
 
-  const onPreparing = async (item: WishlistItemV3) => {
+  const onFulfill = async (item: WishlistItemV3) => {
+    if (item.completion_mode === 'shared') {
+      setCompleting(item);
+      return;
+    }
+
     await runAction(async () => {
-      await markPreparing.mutateAsync(item.id);
+      await quickFulfill.mutateAsync(item);
     });
   };
 
@@ -302,8 +308,7 @@ export function WishlistPage() {
                   onDelete={onDelete}
                   onReserve={onReserve}
                   onPurchased={onPurchased}
-                  onPreparing={onPreparing}
-                  onFulfill={setCompleting}
+                  onFulfill={(wish) => void onFulfill(wish)}
                   onMove={setMoving}
                 />
               ))
