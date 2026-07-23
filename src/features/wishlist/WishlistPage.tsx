@@ -16,6 +16,12 @@ import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionM
 import { WishArchive } from './WishArchive';
 import { WishlistGridSkeleton, WishlistPageSkeleton } from './WishlistSkeleton';
 import { WishlistHero } from './WishlistHero';
+import { WishlistPartnerToolbar } from './WishlistPartnerToolbar';
+import {
+  filterPartnerWishes,
+  partnerWishFilterCounts,
+  type PartnerWishFilter,
+} from './partnerWishFilter';
 import { partnerGenitive } from './partnerLabel';
 import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import {
@@ -43,6 +49,30 @@ function requestedWishId(value: string | null): number | null {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
+function partnerEmptyState(filter: PartnerWishFilter) {
+  if (filter === 'available') {
+    return {
+      icon: '✓',
+      title: 'Усі активні бажання вже заплановані',
+      description: 'Переглянь «Мої подарунки» або відкрий повний список.',
+    };
+  }
+
+  if (filter === 'mine') {
+    return {
+      icon: '🎁',
+      title: 'Ти ще не запланував жодного подарунка',
+      description: 'У вкладці «Доступні» можна обрати бажання партнера.',
+    };
+  }
+
+  return {
+    icon: '♡',
+    title: 'У партнера поки немає активних бажань',
+    description: 'Нові мрії з’являться тут одразу після додавання.',
+  };
+}
+
 export function WishlistPage() {
   const me = useCurrentUser();
   const {
@@ -57,6 +87,7 @@ export function WishlistPage() {
   const notificationRequest = searchParams.get('notification');
   const archiveFocusWishId = requestedWishId(searchParams.get('wish'));
   const [tab, setTab] = useState<Tab>(tabFromUrl);
+  const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
   const actionLock = useRef(false);
 
   useEffect(() => {
@@ -86,6 +117,10 @@ export function WishlistPage() {
   const isFetching = activeQuery.isFetching;
   const isError = activeQuery.isError;
   const refetchItems = activeQuery.refetch;
+  const partnerCounts = partnerWishFilterCounts(partnerItems, me.id);
+  const visibleItems = tab === 'partner'
+    ? filterPartnerWishes(partnerItems, partnerFilter, me.id)
+    : items;
 
   const {
     save,
@@ -230,6 +265,8 @@ export function WishlistPage() {
     },
   ];
 
+  const emptyCopy = tab === 'partner' ? partnerEmptyState(partnerFilter) : null;
+
   return (
     <section className="wishlist pink-page" aria-busy={isPending || mutationBusy}>
       <PortalDecor density="light" parallax={false} />
@@ -245,6 +282,14 @@ export function WishlistPage() {
       />
 
       <TabBar<Tab> value={tab} onChange={setTab} items={tabs} />
+
+      {tab === 'partner' && !isPending && !isError && (
+        <WishlistPartnerToolbar
+          value={partnerFilter}
+          counts={partnerCounts}
+          onChange={setPartnerFilter}
+        />
+      )}
 
       {ownerId === null && tab !== 'shared' ? (
         <p className="empty-state">Користувача не знайдено.</p>
@@ -267,16 +312,24 @@ export function WishlistPage() {
       ) : (
         <>
           <div className="wishlist-grid">
-            {items.length === 0 ? (
-              <p className="empty-state">
-                {tab === 'me'
-                  ? 'Твій список порожній. Час додати нову забаганку.'
-                  : tab === 'partner'
-                    ? 'Партнер ще не додав жодного бажання.'
+            {visibleItems.length === 0 ? (
+              tab === 'partner' && emptyCopy ? (
+                <div className="wl-partner-empty">
+                  <div>
+                    <span aria-hidden="true">{emptyCopy.icon}</span>
+                    <strong>{emptyCopy.title}</strong>
+                    <p>{emptyCopy.description}</p>
+                  </div>
+                </div>
+              ) : (
+                <p className="empty-state">
+                  {tab === 'me'
+                    ? 'Твій список порожній. Час додати нову забаганку.'
                     : 'Спільних бажань ще немає. Додайте перше!'}
-              </p>
+                </p>
+              )
             ) : (
-              items.map((item) => (
+              visibleItems.map((item) => (
                 <WishCard
                   key={item.id}
                   item={item}
