@@ -74,7 +74,12 @@ export function GiftCompletionModal({
 
   const submit = async () => {
     if (saving) return;
-    await onSubmit({ photo, video, comment: comment.trim() });
+    try {
+      await onSubmit({ photo, video, comment: comment.trim() });
+    } catch {
+      // useMutation already shows the grounded error toast. Keep the modal open
+      // so the user can retry without losing the selected files and comment.
+    }
   };
 
   return (
@@ -185,7 +190,7 @@ export function GiftCompletionModal({
 
         <div className="gift-memory-note">
           <span aria-hidden="true">🔒</span>
-          Медіа зберігаються у приватному bucket і відкриваються лише через тимчасові посилання.
+          Медіа зберігаються у приватному bucket, а в архіві відкриваються через тимчасові посилання.
         </div>
 
         <div className="modal-actions gift-memory-actions">
