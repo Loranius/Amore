@@ -1,4 +1,5 @@
 import type { PartnerWishFilter } from './partnerWishFilter';
+import './wishlistPartnerToolbar.css';
 
 interface WishlistPartnerToolbarProps {
   value: PartnerWishFilter;
