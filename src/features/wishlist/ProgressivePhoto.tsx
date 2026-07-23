@@ -24,8 +24,8 @@ interface ProgressivePhotoProps {
 const MAX_REVEAL_DELAY_MS = 280;
 
 export function normalizeRevealDelay(delayMs: number | undefined): number {
-  if (!Number.isFinite(delayMs)) return 0;
-  return Math.max(0, Math.min(MAX_REVEAL_DELAY_MS, Math.round(delayMs ?? 0)));
+  if (delayMs == null || !Number.isFinite(delayMs)) return 0;
+  return Math.max(0, Math.min(MAX_REVEAL_DELAY_MS, Math.round(delayMs)));
 }
 
 export function ProgressivePhoto({
