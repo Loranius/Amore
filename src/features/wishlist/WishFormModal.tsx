@@ -440,10 +440,10 @@ export function WishFormModal({
             onChange={(event) => setPriority(event.target.value as WishlistPriorityV3 | '')}
           >
             <option value="">— не вказано —</option>
-            <option value="dream">❤️ Dream</option>
-            <option value="high">🔥 Високий</option>
-            <option value="medium">⭐ Середній</option>
-            <option value="low">○ Низький</option>
+            <option value="dream">❤️ Мрія</option>
+            <option value="high">✨ Дуже хочу</option>
+            <option value="medium">◆ Хочу</option>
+            <option value="low">○ Колись</option>
           </select>
         </label>
 
