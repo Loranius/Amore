@@ -88,7 +88,12 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
 }
 
 // ── Завантаження фото ────────────────────────────────────────
-export async function uploadWishPhoto(file: File, userId: number): Promise<string> {
+export interface UploadedWishPhoto {
+  url: string;
+  path: string;
+}
+
+export async function uploadWishPhoto(file: File, userId: number): Promise<UploadedWishPhoto> {
   const normalized = await normalize(file);
 
   let blob: Blob = normalized;
@@ -103,13 +108,20 @@ export async function uploadWishPhoto(file: File, userId: number): Promise<strin
     console.warn('[Wishlist] стиснення не вдалося, вантажимо оригінал:', e);
   }
 
-  const path = `wish-${userId}-${Date.now()}.${ext}`;
+  const path = `${userId}/wish-${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-    upsert: true,
+    upsert: false,
     contentType,
   });
   if (error) throw error;
-  return publicUrl(BUCKET, path);
+  return { path, url: publicUrl(BUCKET, path) };
+}
+
+/** Прибирає лише щойно завантажені, але не прив'язані до бажання файли. */
+export async function removeWishPhotoAssets(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const { error } = await supabase.storage.from(BUCKET).remove(paths);
+  if (error) console.warn('[Wishlist] не вдалося прибрати незбережене фото:', error);
 }
 
 // ── Мутації ──────────────────────────────────────────────────
@@ -125,6 +137,7 @@ export interface WishFormPayload {
 export interface CompleteGiftInput extends GiftMemoryFiles {
   item: WishlistItemV3;
   comment: string;
+  idempotencyKey: string;
 }
 
 export function useWishlistMutations(ownerId: number | null) {
@@ -244,8 +257,7 @@ export function useWishlistMutations(ownerId: number | null) {
   });
 
   const fulfill = useMutation({
-    mutationFn: async ({ item, photo, video, comment }: CompleteGiftInput) => {
-      const idempotencyKey = crypto.randomUUID();
+    mutationFn: async ({ item, photo, video, comment, idempotencyKey }: CompleteGiftInput) => {
       const uploaded = await uploadGiftMemoryAssets({
         wishId: item.id,
         userId: me.id,
