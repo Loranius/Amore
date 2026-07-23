@@ -30,10 +30,10 @@ import {
   type WishlistItemV3,
 } from './wishlistRpc';
 import {
-  removeGiftMemoryAssets,
   uploadGiftMemoryAssets,
   type GiftMemoryFiles,
 } from './giftMemory';
+import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
 import type { WishlistItemRow, UserName } from '@/types';
 
 const BUCKET = 'wishlist-photos';
@@ -88,7 +88,12 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
 }
 
 // ── Завантаження фото ────────────────────────────────────────
-export async function uploadWishPhoto(file: File, userId: number): Promise<string> {
+export interface UploadedWishPhoto {
+  url: string;
+  path: string;
+}
+
+export async function uploadWishPhoto(file: File, userId: number): Promise<UploadedWishPhoto> {
   const normalized = await normalize(file);
 
   let blob: Blob = normalized;
@@ -103,13 +108,20 @@ export async function uploadWishPhoto(file: File, userId: number): Promise<strin
     console.warn('[Wishlist] стиснення не вдалося, вантажимо оригінал:', e);
   }
 
-  const path = `wish-${userId}-${Date.now()}.${ext}`;
+  const path = `${userId}/wish-${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-    upsert: true,
+    upsert: false,
     contentType,
   });
   if (error) throw error;
-  return publicUrl(BUCKET, path);
+  return { path, url: publicUrl(BUCKET, path) };
+}
+
+/** Прибирає лише щойно завантажені, але не прив'язані до бажання файли. */
+export async function removeWishPhotoAssets(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const { error } = await supabase.storage.from(BUCKET).remove(paths);
+  if (error) console.warn('[Wishlist] не вдалося прибрати незбережене фото:', error);
 }
 
 // ── Мутації ──────────────────────────────────────────────────
@@ -125,6 +137,16 @@ export interface WishFormPayload {
 export interface CompleteGiftInput extends GiftMemoryFiles {
   item: WishlistItemV3;
   comment: string;
+  idempotencyKey: string;
+}
+
+function wishMatchesPayload(item: WishlistItemV3, payload: WishFormPayload): boolean {
+  return item.title === payload.title
+    && item.description === payload.description
+    && item.link === payload.link
+    && item.image_url === payload.image_url
+    && item.price === payload.price
+    && item.priority === payload.priority;
 }
 
 export function useWishlistMutations(ownerId: number | null) {
@@ -149,25 +171,55 @@ export function useWishlistMutations(ownerId: number | null) {
       owner?: number;
       isShared?: boolean;
     }) => {
-      if (input.id !== null) {
-        await updateWishlistItem(input.id, input.payload);
-      } else {
-        await createWishlistItem({
-          payload: input.payload,
-          ownerId: input.owner ?? me.id,
-          shared: input.isShared ?? false,
-        });
+      const shared = input.isShared ?? ownerId === null;
+      const targetOwner = input.owner ?? ownerId ?? me.id;
+
+      try {
+        if (input.id !== null) {
+          await updateWishlistItem(input.id, input.payload);
+        } else {
+          await createWishlistItem({
+            payload: input.payload,
+            ownerId: targetOwner,
+            shared,
+          });
+        }
+      } catch (error) {
+        if (!isAmbiguousWishlistTransportError(error)) throw error;
+
+        // Відповідь могла загубитися після commit. Перечитуємо серверний
+        // список до того, як дозволити повтор, щоб не створити дублікат.
+        try {
+          const serverItems = await fetchWishlistV3({
+            ownerId: shared ? null : targetOwner,
+            shared,
+          });
+          const committed = serverItems.some((item) =>
+            input.id !== null
+              ? item.id === input.id && wishMatchesPayload(item, input.payload)
+              : item.owner === targetOwner
+                && item.is_shared === shared
+                && wishMatchesPayload(item, input.payload),
+          );
+          if (committed) return;
+        } catch {
+          // Не замінюємо первинну transport-помилку помилкою reconciliation.
+        }
+
+        throw error;
       }
     },
-    onSuccess: invalidateBoth,
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
-        message.includes('wish_not_editable')
-          ? 'Цю мрію вже не можна редагувати.'
-          : 'Не вдалося зберегти бажання. Спробуй ще.',
+        isAmbiguousWishlistTransportError(e)
+          ? 'З’єднання обірвалося. Перевір список перед повторним створенням мрії.'
+          : message.includes('wish_not_editable')
+            ? 'Цю мрію вже не можна редагувати.'
+            : 'Не вдалося зберегти бажання. Спробуй ще.',
       );
     },
+    onSettled: invalidateBoth,
   });
 
   const remove = useMutation({
@@ -197,7 +249,6 @@ export function useWishlistMutations(ownerId: number | null) {
       if (v.reserved) await reserveWishlistItem(v.id);
       else await cancelWishlistReservation(v.id);
     },
-    onSuccess: invalidateBoth,
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
@@ -206,46 +257,46 @@ export function useWishlistMutations(ownerId: number | null) {
           : 'Не вдалося оновити бронювання. Спробуй ще.',
       );
     },
+    onSettled: invalidateBoth,
   });
 
   const markPurchased = useMutation({
     mutationFn: (id: number) => markWishlistPurchased(id),
-    onSuccess: invalidateBoth,
     onError: (e) =>
       toast.show(
         (e as Error).message.includes('wish_not_purchasable')
           ? 'Цей подарунок уже не можна позначити як куплений.'
           : 'Не вдалося оновити етап покупки. Спробуй ще.',
       ),
+    onSettled: invalidateBoth,
   });
 
   const markPreparing = useMutation({
     mutationFn: (id: number) => markWishlistPreparing(id),
-    onSuccess: invalidateBoth,
     onError: (e) =>
       toast.show(
         (e as Error).message.includes('wish_not_preparable')
           ? 'Спочатку познач подарунок як куплений.'
           : 'Не вдалося почати підготовку сюрпризу.',
       ),
+    onSettled: invalidateBoth,
   });
 
   const changeScope = useMutation({
     mutationFn: async (v: { id: number; owner: number; isShared: boolean }) => {
       await moveWishlistItem(v.id, v.owner, v.isShared);
     },
-    onSuccess: invalidateBoth,
     onError: (e) =>
       toast.show(
         (e as Error).message.includes('wish_not_movable')
           ? 'Цю мрію вже не можна переносити.'
           : 'Не вдалося перенести бажання. Спробуй ще.',
       ),
+    onSettled: invalidateBoth,
   });
 
   const fulfill = useMutation({
-    mutationFn: async ({ item, photo, video, comment }: CompleteGiftInput) => {
-      const idempotencyKey = crypto.randomUUID();
+    mutationFn: async ({ item, photo, video, comment, idempotencyKey }: CompleteGiftInput) => {
       const uploaded = await uploadGiftMemoryAssets({
         wishId: item.id,
         userId: me.id,
@@ -253,18 +304,17 @@ export function useWishlistMutations(ownerId: number | null) {
         files: { photo, video },
       });
 
-      try {
-        await completeWishlistGift({
-          wishId: item.id,
-          idempotencyKey,
-          reactionPhotoPath: uploaded.photoPath,
-          reactionVideoPath: uploaded.videoPath,
-          comment: comment.trim() || null,
-        });
-      } catch (error) {
-        await removeGiftMemoryAssets(uploaded.uploadedPaths);
-        throw error;
-      }
+      // Не видаляємо повністю завантажені файли після помилки RPC: при
+      // втраченій відповіді сервер міг уже зафіксувати completion. Повторна
+      // спроба використовує той самий idempotency key, а справжні сироти
+      // безпечно прибере wishlist-storage-cleanup після grace period.
+      await completeWishlistGift({
+        wishId: item.id,
+        idempotencyKey,
+        reactionPhotoPath: uploaded.photoPath,
+        reactionVideoPath: uploaded.videoPath,
+        comment: comment.trim() || null,
+      });
 
       const owner = (users ?? []).find((u) => u.id === item.owner);
       try {
@@ -278,10 +328,7 @@ export function useWishlistMutations(ownerId: number | null) {
         console.warn('[Wishlist] db-notify error:', e);
       }
     },
-    onSuccess: () => {
-      burstConfetti();
-      invalidateBoth();
-    },
+    onSuccess: () => burstConfetti(),
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
@@ -290,6 +337,7 @@ export function useWishlistMutations(ownerId: number | null) {
           : 'Не вдалося завершити подарунок: ' + message,
       );
     },
+    onSettled: invalidateBoth,
   });
 
   return {

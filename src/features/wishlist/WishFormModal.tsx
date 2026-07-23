@@ -6,7 +6,12 @@
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { normalizeToPreview } from '@/lib/images';
-import { uploadWishPhoto, type WishFormPayload } from './useWishlist';
+import {
+  removeWishPhotoAssets,
+  uploadWishPhoto,
+  type WishFormPayload,
+} from './useWishlist';
+import { canRemoveWishPhotoAfterSaveError } from './wishlistFailurePolicy';
 import { fetchWishlistLinkPreview } from './wishlistLinkPreview';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -69,25 +74,50 @@ export function WishFormModal({
   const [linkPreviewSite, setLinkPreviewSite] = useState<string | null>(null);
 
   const previewRequestVersion = useRef(0);
+  const photoRequestVersion = useRef(0);
+  const saveLock = useRef(false);
   const lastFetchedLink = useRef(item?.link?.trim() ?? '');
 
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose, saving]);
+
   const pickFile = async (file: File) => {
+    if (saving) return;
     previewRequestVersion.current += 1;
     setLinkPreviewStatus('idle');
     setLinkPreviewSite(null);
 
+    const requestId = photoRequestVersion.current + 1;
+    photoRequestVersion.current = requestId;
     try {
       const { file: normalized, previewSrc: src } = await normalizeToPreview(file);
+      if (photoRequestVersion.current !== requestId) return;
       setPendingFile(normalized);
       setPreviewSrc(src);
       setImgUrl('');
     } catch (e) {
-      toast.show('Не вдалося обробити фото: ' + (e as Error).message);
+      if (photoRequestVersion.current === requestId) {
+        toast.show('Не вдалося обробити фото: ' + (e as Error).message);
+      }
     }
   };
 
   const clearPhoto = () => {
     previewRequestVersion.current += 1;
+    photoRequestVersion.current += 1;
     setPendingFile(null);
     setImgUrl('');
     setPreviewSrc(null);
@@ -95,6 +125,7 @@ export function WishFormModal({
 
   const onImageUrlChange = (value: string) => {
     previewRequestVersion.current += 1;
+    photoRequestVersion.current += 1;
     if (pendingFile) setPendingFile(null);
     setImgUrl(value);
     setPreviewSrc(value.trim() || null);
@@ -165,26 +196,46 @@ export function WishFormModal({
 
   const save = async () => {
     const normalizedTitle = title.trim();
-    if (!normalizedTitle || saving) return;
+    if (!normalizedTitle || saving || saveLock.current) return;
 
+    const normalizedLink = link.trim();
+    const normalizedImageUrl = imgUrl.trim();
+    if (normalizedLink && !isHttpUrl(normalizedLink)) {
+      toast.show('Посилання на товар має починатися з http:// або https://.');
+      return;
+    }
+    if (normalizedImageUrl && !isHttpUrl(normalizedImageUrl)) {
+      toast.show('Посилання на фото має починатися з http:// або https://.');
+      return;
+    }
+
+    const rawPrice = price.trim();
+    const parsedPrice = rawPrice === '' ? null : Number(rawPrice);
+    if (parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
+      toast.show('Вкажи коректну ціну або залиш поле порожнім.');
+      return;
+    }
+
+    saveLock.current = true;
     setSaving(true);
-    try {
-      let imageUrl: string | null = imgUrl.trim() || null;
-      if (pendingFile) imageUrl = await uploadWishPhoto(pendingFile, me.id);
+    let uploadedPath: string | null = null;
+    let submitStarted = false;
 
-      const rawPrice = price.trim();
-      const parsedPrice = rawPrice === '' ? null : Number(rawPrice);
-      if (parsedPrice !== null && (!Number.isFinite(parsedPrice) || parsedPrice < 0)) {
-        toast.show('Вкажи коректну ціну або залиш поле порожнім.');
-        return;
+    try {
+      let imageUrl: string | null = normalizedImageUrl || null;
+      if (pendingFile) {
+        const uploaded = await uploadWishPhoto(pendingFile, me.id);
+        uploadedPath = uploaded.path;
+        imageUrl = uploaded.url;
       }
 
       const owner = scope === 'partner' && partner ? partner.id : me.id;
+      submitStarted = true;
       await onSubmit(
         item?.id ?? null,
         {
           title: normalizedTitle,
-          link: link.trim() || null,
+          link: normalizedLink || null,
           image_url: imageUrl,
           price: parsedPrice,
           priority: (priority || null) as WishFormPayload['priority'],
@@ -195,8 +246,16 @@ export function WishFormModal({
 
       onClose();
     } catch (e) {
-      toast.show('Не вдалося зберегти бажання: ' + (e as Error).message);
+      if (uploadedPath && canRemoveWishPhotoAfterSaveError(e)) {
+        await removeWishPhotoAssets([uploadedPath]);
+      }
+      // save mutation already shows its domain-aware toast. Upload/processing
+      // errors happen before mutation and need their own message here.
+      if (!submitStarted) {
+        toast.show('Не вдалося завантажити фото: ' + (e as Error).message);
+      }
     } finally {
+      saveLock.current = false;
       setSaving(false);
     }
   };
@@ -208,7 +267,23 @@ export function WishFormModal({
         if (event.target === event.currentTarget && !saving) onClose();
       }}
     >
-      <div className="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="wish-modal-title">
+      <div
+        className="modal-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="wish-modal-title"
+        aria-busy={saving}
+      >
+        <button
+          type="button"
+          className="gift-memory-close"
+          aria-label="Закрити"
+          disabled={saving}
+          onClick={onClose}
+        >
+          ×
+        </button>
+
         <h2 id="wish-modal-title" className="modal-title">
           {isEdit ? 'Редагувати бажання' : 'Нова мрія'}
         </h2>
@@ -218,7 +293,9 @@ export function WishFormModal({
             <span>Для кого</span>
             <TabBar<Scope>
               value={scope}
-              onChange={setScope}
+              onChange={(value) => {
+                if (!saving) setScope(value);
+              }}
               items={[
                 { value: 'me', label: 'Моє' },
                 { value: 'partner', label: `Для ${partner?.name ?? 'партнера'}`, disabled: !partner },
@@ -235,6 +312,7 @@ export function WishFormModal({
             name="title"
             type="text"
             value={title}
+            disabled={saving}
             onChange={(event) => setTitle(event.target.value)}
             autoFocus
             maxLength={160}
@@ -251,6 +329,7 @@ export function WishFormModal({
               inputMode="url"
               placeholder="https://…"
               value={link}
+              disabled={saving}
               onChange={(event) => onLinkChange(event.target.value)}
             />
             <button
@@ -263,24 +342,26 @@ export function WishFormModal({
             </button>
           </div>
 
-          {linkPreviewStatus === 'loading' && (
-            <small className="wm-link-status">Отримуємо назву, ціну та фото…</small>
-          )}
-          {linkPreviewStatus === 'success' && (
-            <small className="wm-link-status wm-link-status--success">
-              Дані підтягнуто{linkPreviewSite ? ` з ${linkPreviewSite}` : ''}.
-            </small>
-          )}
-          {linkPreviewStatus === 'empty' && (
-            <small className="wm-link-status">
-              Магазин не віддав дані. Бажання все одно можна зберегти без фото.
-            </small>
-          )}
-          {linkPreviewStatus === 'error' && (
-            <small className="wm-link-status wm-link-status--error">
-              Не вдалося відкрити сторінку. Перевір посилання або заповни поля вручну.
-            </small>
-          )}
+          <div role="status" aria-live="polite">
+            {linkPreviewStatus === 'loading' && (
+              <small className="wm-link-status">Отримуємо назву, ціну та фото…</small>
+            )}
+            {linkPreviewStatus === 'success' && (
+              <small className="wm-link-status wm-link-status--success">
+                Дані підтягнуто{linkPreviewSite ? ` з ${linkPreviewSite}` : ''}.
+              </small>
+            )}
+            {linkPreviewStatus === 'empty' && (
+              <small className="wm-link-status">
+                Магазин не віддав дані. Бажання все одно можна зберегти без фото.
+              </small>
+            )}
+            {linkPreviewStatus === 'error' && (
+              <small className="wm-link-status wm-link-status--error">
+                Не вдалося відкрити сторінку. Перевір посилання або заповни поля вручну.
+              </small>
+            )}
+          </div>
         </div>
 
         <div className="form-field">
@@ -307,7 +388,11 @@ export function WishFormModal({
               )}
             </div>
             <div className="wm-photo-actions">
-              <FilePickerButton id="wish-photo-file" onPick={(file) => void pickFile(file)}>
+              <FilePickerButton
+                id="wish-photo-file"
+                disabled={saving}
+                onPick={(file) => void pickFile(file)}
+              >
                 🖼 Обрати з пристрою
               </FilePickerButton>
               {previewSrc && (
@@ -324,6 +409,7 @@ export function WishFormModal({
             inputMode="url"
             placeholder="або встав пряме посилання на фото"
             value={imgUrl}
+            disabled={saving}
             onChange={(event) => onImageUrlChange(event.target.value)}
             style={{ marginTop: 8 }}
           />
@@ -339,6 +425,7 @@ export function WishFormModal({
             step="0.01"
             placeholder="Ціна невідома"
             value={price}
+            disabled={saving}
             onChange={(event) => setPrice(event.target.value)}
           />
         </label>
@@ -349,6 +436,7 @@ export function WishFormModal({
             id="wish-priority"
             name="priority"
             value={priority}
+            disabled={saving}
             onChange={(event) => setPriority(event.target.value as WishlistPriorityV3 | '')}
           >
             <option value="">— не вказано —</option>
@@ -368,10 +456,15 @@ export function WishFormModal({
             maxLength={1000}
             placeholder="Модель, розмір, колір або інші важливі деталі…"
             value={description}
+            disabled={saving}
             onChange={(event) => setDescription(event.target.value)}
             style={{ resize: 'vertical' }}
           />
         </label>
+
+        <p className="sr-only" role="status" aria-live="polite">
+          {saving ? 'Зберігаємо бажання. Не закривай сторінку.' : ''}
+        </p>
 
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>

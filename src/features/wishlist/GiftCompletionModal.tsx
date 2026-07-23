@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { normalizeToPreview } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
@@ -11,6 +11,7 @@ import {
 
 export interface GiftCompletionDraft extends GiftMemoryFiles {
   comment: string;
+  idempotencyKey: string;
 }
 
 interface GiftCompletionModalProps {
@@ -37,6 +38,11 @@ export function GiftCompletionModal({
   const [video, setVideo] = useState<File | null>(null);
   const [videoPreview, setVideoPreview] = useState<string | null>(null);
   const [comment, setComment] = useState('');
+  const submitLock = useRef(false);
+  const photoRequestVersion = useRef(0);
+  // Один ключ живе весь час, поки відкрита модалка. Повтор після timeout
+  // потрапить у той самий idempotent server operation, а не створить новий.
+  const idempotencyKey = useRef(crypto.randomUUID());
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -63,17 +69,29 @@ export function GiftCompletionModal({
   }, [videoPreview]);
 
   const pickPhoto = async (file: File) => {
+    if (saving) return;
+    const requestId = photoRequestVersion.current + 1;
+    photoRequestVersion.current = requestId;
+
     try {
       validateGiftMemoryPhoto(file);
       const normalized = await normalizeToPreview(file);
+      if (photoRequestVersion.current !== requestId) return;
       setPhoto(normalized.file);
       setPhotoPreview(normalized.previewSrc);
     } catch (error) {
-      toast.show((error as Error).message);
+      if (photoRequestVersion.current === requestId) toast.show((error as Error).message);
     }
   };
 
+  const clearPhoto = () => {
+    photoRequestVersion.current += 1;
+    setPhoto(null);
+    setPhotoPreview(null);
+  };
+
   const pickVideo = (file: File) => {
+    if (saving) return;
     try {
       validateGiftMemoryVideo(file);
       if (videoPreview) URL.revokeObjectURL(videoPreview);
@@ -91,12 +109,19 @@ export function GiftCompletionModal({
   };
 
   const submit = async () => {
-    if (saving) return;
+    if (saving || submitLock.current) return;
+    submitLock.current = true;
     try {
-      await onSubmit({ photo, video, comment: comment.trim() });
+      await onSubmit({
+        photo,
+        video,
+        comment: comment.trim(),
+        idempotencyKey: idempotencyKey.current,
+      });
     } catch {
       // useMutation already shows the grounded error toast. Keep the modal open
-      // so the user can retry without losing the selected files and comment.
+      // so the user can retry without losing files, comment or idempotency key.
+      submitLock.current = false;
     }
   };
 
@@ -156,7 +181,11 @@ export function GiftCompletionModal({
               )}
             </div>
             <div className="gift-memory-file-actions">
-              <FilePickerButton id="gift-memory-photo" onPick={(file) => void pickPhoto(file)}>
+              <FilePickerButton
+                id="gift-memory-photo"
+                disabled={saving}
+                onPick={(file) => void pickPhoto(file)}
+              >
                 {photo ? 'Замінити фото' : 'Додати фото'}
               </FilePickerButton>
               {photo && (
@@ -164,10 +193,7 @@ export function GiftCompletionModal({
                   type="button"
                   className="btn-secondary"
                   disabled={saving}
-                  onClick={() => {
-                    setPhoto(null);
-                    setPhotoPreview(null);
-                  }}
+                  onClick={clearPhoto}
                 >
                   Прибрати
                 </button>
@@ -192,6 +218,7 @@ export function GiftCompletionModal({
               <FilePickerButton
                 id="gift-memory-video"
                 accept="video/mp4,video/webm,video/quicktime,.mov"
+                disabled={saving}
                 onPick={pickVideo}
               >
                 {video ? 'Замінити відео' : 'Додати відео'}
@@ -223,6 +250,10 @@ export function GiftCompletionModal({
           <span aria-hidden="true">🔒</span>
           Медіа зберігаються у приватному bucket, а в архіві відкриваються через тимчасові посилання.
         </div>
+
+        <p className="sr-only" role="status" aria-live="polite">
+          {saving ? 'Зберігаємо спогад. Не закривай сторінку.' : ''}
+        </p>
 
         <div className="modal-actions gift-memory-actions">
           <button type="button" className="btn btn-ghost" disabled={saving} onClick={onClose}>

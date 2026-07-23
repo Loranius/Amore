@@ -1,7 +1,7 @@
 // ============================================================
 // WishlistPage — вкладка «Бажання»
 // ============================================================
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
@@ -48,6 +48,7 @@ export function WishlistPage() {
   const notificationRequest = searchParams.get('notification');
   const archiveFocusWishId = requestedWishId(searchParams.get('wish'));
   const [tab, setTab] = useState<Tab>(tabFromUrl);
+  const actionLock = useRef(false);
 
   useEffect(() => {
     setTab(tabFromUrl);
@@ -56,15 +57,27 @@ export function WishlistPage() {
   const isOwnTab = tab === 'me';
   const ownerId = tab === 'shared' ? null : isOwnTab ? me.id : (partner?.id ?? null);
 
-  const { data: ownItems = [], isPending: ownPending, isError: ownError } =
-    useWishlistItems(ownerId);
-  const { data: sharedItems = [], isPending: sharedPending, isError: sharedError } =
-    useSharedWishlistItems();
+  const {
+    data: ownItems = [],
+    isPending: ownPending,
+    isFetching: ownFetching,
+    isError: ownError,
+    refetch: refetchOwn,
+  } = useWishlistItems(ownerId);
+  const {
+    data: sharedItems = [],
+    isPending: sharedPending,
+    isFetching: sharedFetching,
+    isError: sharedError,
+    refetch: refetchShared,
+  } = useSharedWishlistItems();
   const { data: stats } = useCoupleWishStats();
 
   const items = tab === 'shared' ? sharedItems : ownItems;
   const isPending = tab === 'shared' ? sharedPending : ownPending;
+  const isFetching = tab === 'shared' ? sharedFetching : ownFetching;
   const isError = tab === 'shared' ? sharedError : ownError;
+  const refetchItems = tab === 'shared' ? refetchShared : refetchOwn;
 
   const {
     save,
@@ -83,6 +96,25 @@ export function WishlistPage() {
   const [completing, setCompleting] = useState<WishlistItemV3 | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
+  const mutationBusy =
+    save.isPending
+    || remove.isPending
+    || setReserved.isPending
+    || markPurchased.isPending
+    || markPreparing.isPending
+    || fulfill.isPending
+    || changeScope.isPending;
+
+  const runAction = async (action: () => Promise<void>) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    try {
+      await action();
+    } finally {
+      actionLock.current = false;
+    }
+  };
+
   const submit = async (
     id: number | null,
     payload: WishFormPayload,
@@ -92,26 +124,34 @@ export function WishlistPage() {
   };
 
   const onDelete = async (id: number) => {
-    if (await confirmDialog('Видалити бажання?')) remove.mutate(id);
+    await runAction(async () => {
+      if (await confirmDialog('Видалити бажання?')) await remove.mutateAsync(id);
+    });
   };
 
   const onReserve = async (id: number, reserved: boolean) => {
-    if (!reserved && !(await confirmDialog('Скасувати бронювання цього подарунка?'))) return;
-    setReserved.mutate({ id, reserved });
+    await runAction(async () => {
+      if (!reserved && !(await confirmDialog('Скасувати бронювання цього подарунка?'))) return;
+      await setReserved.mutateAsync({ id, reserved });
+    });
   };
 
   const onPurchased = async (item: WishlistItemV3) => {
-    if (
-      await confirmDialog(
-        `Позначити «${item.title}» як куплений подарунок?\n\nПісля цього скасувати бронювання вже не можна.`,
-      )
-    ) {
-      markPurchased.mutate(item.id);
-    }
+    await runAction(async () => {
+      if (
+        await confirmDialog(
+          `Позначити «${item.title}» як куплений подарунок?\n\nПісля цього скасувати бронювання вже не можна.`,
+        )
+      ) {
+        await markPurchased.mutateAsync(item.id);
+      }
+    });
   };
 
-  const onPreparing = (item: WishlistItemV3) => {
-    markPreparing.mutate(item.id);
+  const onPreparing = async (item: WishlistItemV3) => {
+    await runAction(async () => {
+      await markPreparing.mutateAsync(item.id);
+    });
   };
 
   const completeGift = async (draft: GiftCompletionDraft) => {
@@ -128,7 +168,7 @@ export function WishlistPage() {
   const pct = stats && stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
 
   return (
-    <section className="wishlist pink-page">
+    <section className="wishlist pink-page" aria-busy={isPending || mutationBusy}>
       <PortalDecor density="light" parallax={false} />
       <TabBar<Tab>
         value={tab}
@@ -148,7 +188,7 @@ export function WishlistPage() {
               ? `Бажання ${partnerName}`
               : '🎁 Спільні бажання'}
         </h1>
-        <button type="button" className="btn" onClick={() => setAdding(true)}>
+        <button type="button" className="btn" disabled={mutationBusy} onClick={() => setAdding(true)}>
           + Додати
         </button>
       </div>
@@ -178,9 +218,19 @@ export function WishlistPage() {
       {ownerId === null && tab !== 'shared' ? (
         <p className="empty-state">Користувача не знайдено.</p>
       ) : isPending ? (
-        <p className="empty-state">Завантаження…</p>
+        <p className="empty-state" role="status" aria-live="polite">Завантаження…</p>
       ) : isError ? (
-        <p className="empty-state">Не вдалось завантажити бажання.</p>
+        <div className="empty-state" role="alert">
+          <p>Не вдалось завантажити бажання. Перевір з’єднання й повтори.</p>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={isFetching}
+            onClick={() => void refetchItems()}
+          >
+            {isFetching ? 'Повторюємо…' : 'Спробувати ще'}
+          </button>
+        </div>
       ) : (
         <>
           <div className="wishlist-grid">
@@ -199,6 +249,7 @@ export function WishlistPage() {
                   item={item}
                   isOwn={isItemOwn(item)}
                   canManageReservation={canManageReservation(item)}
+                  busy={mutationBusy}
                   onPhotoClick={setLightbox}
                   onEdit={setEditing}
                   onDelete={onDelete}
@@ -242,8 +293,13 @@ export function WishlistPage() {
         <MoveWishModal
           item={moving}
           partner={partner}
-          onClose={() => setMoving(null)}
-          onMove={(owner, isShared) => changeScope.mutate({ id: moving.id, owner, isShared })}
+          saving={changeScope.isPending}
+          onClose={() => {
+            if (!changeScope.isPending) setMoving(null);
+          }}
+          onMove={async (owner, isShared) => {
+            await changeScope.mutateAsync({ id: moving.id, owner, isShared });
+          }}
         />
       )}
 

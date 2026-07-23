@@ -1,5 +1,9 @@
 import { supabase } from '@/lib/supabase';
 import { compress, normalize } from '@/lib/images';
+import {
+  giftMemoryAssetFingerprint,
+  isStorageObjectAlreadyExistsError,
+} from './giftMemoryRetry';
 
 const BUCKET = 'wishlist-memories';
 const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
@@ -20,6 +24,7 @@ export interface GiftMemoryFiles {
 export interface UploadedGiftMemoryAssets {
   photoPath: string | null;
   videoPath: string | null;
+  /** Лише об'єкти, реально створені поточною спробою. */
   uploadedPaths: string[];
 }
 
@@ -62,6 +67,20 @@ async function removePaths(paths: string[]): Promise<void> {
   if (error) console.warn('[Wishlist] не вдалося прибрати незбережені memory-файли:', error);
 }
 
+async function uploadOrReuse(
+  path: string,
+  body: Blob,
+  options: { cacheControl: string; contentType: string },
+): Promise<'uploaded' | 'existing'> {
+  const { error } = await supabase.storage.from(BUCKET).upload(path, body, {
+    ...options,
+    upsert: false,
+  });
+  if (!error) return 'uploaded';
+  if (isStorageObjectAlreadyExistsError(error)) return 'existing';
+  throw error;
+}
+
 export async function uploadGiftMemoryAssets(input: {
   wishId: number;
   userId: number;
@@ -76,6 +95,7 @@ export async function uploadGiftMemoryAssets(input: {
   try {
     if (input.files.photo) {
       validateGiftMemoryPhoto(input.files.photo);
+      const fingerprint = giftMemoryAssetFingerprint(input.files.photo);
       const normalized = await normalize(input.files.photo);
 
       let body: Blob = normalized;
@@ -91,31 +111,30 @@ export async function uploadGiftMemoryAssets(input: {
         console.warn('[Wishlist] memory-фото не стиснулося, завантажуємо нормалізований файл:', error);
       }
 
-      photoPath = `${prefix}/photo.${ext}`;
-      const { error } = await supabase.storage.from(BUCKET).upload(photoPath, body, {
+      photoPath = `${prefix}/photo-${fingerprint}.${ext}`;
+      const result = await uploadOrReuse(photoPath, body, {
         cacheControl: '3600',
         contentType,
-        upsert: false,
       });
-      if (error) throw error;
-      uploadedPaths.push(photoPath);
+      if (result === 'uploaded') uploadedPaths.push(photoPath);
     }
 
     if (input.files.video) {
       validateGiftMemoryVideo(input.files.video);
       const ext = videoExtension(input.files.video);
-      videoPath = `${prefix}/video.${ext}`;
-      const { error } = await supabase.storage.from(BUCKET).upload(videoPath, input.files.video, {
+      const fingerprint = giftMemoryAssetFingerprint(input.files.video);
+      videoPath = `${prefix}/video-${fingerprint}.${ext}`;
+      const result = await uploadOrReuse(videoPath, input.files.video, {
         cacheControl: '3600',
         contentType: videoContentType(input.files.video, ext),
-        upsert: false,
       });
-      if (error) throw error;
-      uploadedPaths.push(videoPath);
+      if (result === 'uploaded') uploadedPaths.push(videoPath);
     }
 
     return { photoPath, videoPath, uploadedPaths };
   } catch (error) {
+    // Не видаляємо об'єкти, які існували до цієї спроби: вони можуть бути
+    // частиною completion, чия успішна відповідь загубилася в мережі.
     await removePaths(uploadedPaths);
     throw error;
   }

@@ -1,7 +1,7 @@
 // ============================================================
 // WishCard — dream-board картка Wishlist v3
 // ============================================================
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistV3.css';
 
@@ -23,6 +23,7 @@ interface WishCardProps {
   item: WishlistItemV3;
   isOwn: boolean;
   canManageReservation: boolean;
+  busy: boolean;
   onPhotoClick: (src: string) => void;
   onEdit: (item: WishlistItemV3) => void;
   onDelete: (id: number) => void;
@@ -37,6 +38,7 @@ export function WishCard({
   item,
   isOwn,
   canManageReservation,
+  busy,
   onPhotoClick,
   onEdit,
   onDelete,
@@ -48,12 +50,39 @@ export function WishCard({
 }: WishCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const canEdit = isOwn && item.status === 'visible';
   const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
     setImageFailed(false);
   }, [item.image_url]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) closeMenu();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeMenu();
+        menuButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => {
+    if (busy) closeMenu();
+  }, [busy]);
 
   const runMenuAction = (action: () => void) => {
     closeMenu();
@@ -75,6 +104,7 @@ export function WishCard({
               <button
                 type="button"
                 className="wl-card-v3-primary"
+                disabled={busy}
                 onClick={() => onPurchased(item)}
               >
                 <span aria-hidden="true">✓</span>
@@ -83,6 +113,7 @@ export function WishCard({
               <button
                 type="button"
                 className="wl-card-v3-secondary"
+                disabled={busy}
                 onClick={() => onReserve(item.id, false)}
               >
                 Скасувати
@@ -102,6 +133,7 @@ export function WishCard({
             <button
               type="button"
               className="wl-card-v3-primary"
+              disabled={busy}
               onClick={() => onPreparing(item)}
             >
               <span aria-hidden="true">✨</span>
@@ -121,6 +153,7 @@ export function WishCard({
             <button
               type="button"
               className="wl-card-v3-primary wl-card-v3-primary--success"
+              disabled={busy}
               onClick={() => onFulfill(item)}
             >
               <span aria-hidden="true">🎁</span>
@@ -152,7 +185,12 @@ export function WishCard({
     }
 
     return (
-      <button type="button" className="wl-card-v3-primary" onClick={() => onReserve(item.id, true)}>
+      <button
+        type="button"
+        className="wl-card-v3-primary"
+        disabled={busy}
+        onClick={() => onReserve(item.id, true)}
+      >
         <span aria-hidden="true">🎁</span>
         Беру на себе
       </button>
@@ -160,7 +198,10 @@ export function WishCard({
   };
 
   return (
-    <article className={`wl-card wl-card-v3${item.reserved ? ' wl-card-v3--reserved' : ''}`}>
+    <article
+      className={`wl-card wl-card-v3${item.reserved ? ' wl-card-v3--reserved' : ''}`}
+      aria-busy={busy}
+    >
       <div className="wl-card-v3-media">
         {hasVisibleImage ? (
           <button
@@ -192,12 +233,15 @@ export function WishCard({
           )}
 
           {canEdit && (
-            <div className="wl-card-v3-menu-wrap">
+            <div className="wl-card-v3-menu-wrap" ref={menuRef}>
               <button
+                ref={menuButtonRef}
                 type="button"
                 className="wl-card-v3-menu-button"
                 aria-label="Дії з мрією"
+                aria-haspopup="menu"
                 aria-expanded={menuOpen}
+                disabled={busy}
                 onClick={() => setMenuOpen((open) => !open)}
               >
                 ⋯
