@@ -1,0 +1,288 @@
+.wl-card-v3-menu-backdrop,
+.wl-card-v3-menu-mobile-head {
+  display: none;
+}
+
+.wl-card-v3-menu > button[role='menuitem'] > span {
+  display: none;
+}
+
+.wishlist :is(button, a, select, input, textarea):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 44%, transparent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 719px) {
+  body.wl-card-menu-open {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  .wishlist {
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+
+  .wishlist > .tab-bar {
+    top: max(6px, env(safe-area-inset-top));
+  }
+
+  .wl-card-v3-menu-wrap {
+    position: relative;
+    z-index: 50;
+  }
+
+  .wl-card-v3-menu-backdrop {
+    position: fixed;
+    z-index: 200;
+    display: block;
+    inset: 0;
+    width: 100vw;
+    height: 100dvh;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgba(34, 18, 27, 0.46);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    cursor: default;
+    animation: wl-mobile-backdrop-in 180ms ease both;
+  }
+
+  .wl-card-v3-menu {
+    position: fixed;
+    z-index: 201;
+    right: max(10px, env(safe-area-inset-right));
+    bottom: max(10px, env(safe-area-inset-bottom));
+    left: max(10px, env(safe-area-inset-left));
+    width: auto;
+    max-height: min(72dvh, 520px);
+    padding: 10px;
+    overflow-y: auto;
+    border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+    border-radius: 27px;
+    background: color-mix(in srgb, var(--surface) 98%, transparent);
+    box-shadow: 0 30px 80px rgba(26, 14, 21, 0.34);
+    transform-origin: bottom center;
+    animation: wl-mobile-sheet-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .wl-card-v3-menu-mobile-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 2px 10px;
+    align-items: center;
+    padding: 8px 8px 13px;
+    border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  }
+
+  .wl-card-v3-menu-mobile-head > span {
+    grid-column: 1;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .wl-card-v3-menu-mobile-head > strong {
+    grid-column: 1;
+    overflow: hidden;
+    color: var(--text);
+    font-family: 'Fredoka', 'Nunito', sans-serif;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .wl-card-v3-menu-close {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    display: grid;
+    width: 44px;
+    height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--surface) 78%, transparent);
+    color: var(--muted);
+    font: 500 25px/1 system-ui, sans-serif;
+  }
+
+  .wl-card-v3-menu > button[role='menuitem'] {
+    display: flex;
+    width: 100%;
+    min-height: 52px;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+    padding: 12px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+  }
+
+  .wl-card-v3-menu > button[role='menuitem'] > span {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    border-radius: 9px;
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+    color: var(--accent);
+    font-size: 15px;
+  }
+
+  .wl-card-v3-menu > .wl-card-v3-menu-danger > span {
+    background: color-mix(in srgb, var(--danger) 9%, transparent);
+    color: var(--danger);
+  }
+
+  .wishlist :is(
+    .wl-card-v3-primary,
+    .wl-card-v3-secondary,
+    .wl-card-v3-menu-button,
+    .wl-partner-filter,
+    .wl-shared-filter,
+    .wl-board-filter,
+    .wl-archive-back,
+    .wl-archive-entry,
+    .btn,
+    .btn-secondary,
+    .btn-ghost
+  ) {
+    min-height: 44px;
+  }
+
+  .wl-board-filter,
+  .wl-partner-filter,
+  .wl-shared-filter {
+    padding-block: 9px;
+  }
+
+  .wishlist .modal-overlay {
+    align-items: flex-end;
+    padding: max(10px, env(safe-area-inset-top)) 0 0;
+    overscroll-behavior: contain;
+  }
+
+  .wishlist .modal-sheet {
+    width: 100%;
+    max-width: none;
+    max-height: calc(100dvh - max(10px, env(safe-area-inset-top)));
+    margin: 0;
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+    border-radius: 28px 28px 0 0;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .wishlist .gift-memory-modal {
+    max-width: none;
+  }
+
+  .wishlist .gift-memory-assets {
+    grid-template-columns: 1fr;
+  }
+
+  .wishlist .gift-memory-preview {
+    min-height: 180px;
+  }
+
+  .wishlist .modal-actions {
+    position: sticky;
+    z-index: 4;
+    bottom: calc(-1 * max(20px, env(safe-area-inset-bottom)));
+    margin-inline: -2px;
+    padding-block: 12px max(20px, env(safe-area-inset-bottom));
+    background: linear-gradient(to top, var(--surface) 76%, color-mix(in srgb, var(--surface) 92%, transparent));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .wishlist .modal-actions > button {
+    min-height: 48px;
+  }
+
+  .wishlist :is(input, select, textarea) {
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .wishlist textarea {
+    min-height: 108px;
+  }
+
+  .wishlist .gift-memory-close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .wishlist .wl-move-options {
+    grid-template-columns: 1fr;
+  }
+
+  .wishlist .wl-move-option {
+    min-height: 54px;
+  }
+
+  .wl-archive-entry-action {
+    min-height: 44px;
+    align-items: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .wishlist .modal-overlay {
+    padding-top: 0;
+  }
+
+  .wishlist .modal-sheet {
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    padding-top: max(20px, env(safe-area-inset-top));
+  }
+
+  .wishlist .wl-move-sheet {
+    height: auto;
+    max-height: min(78dvh, 620px);
+    padding-top: 24px;
+    border-radius: 28px 28px 0 0;
+  }
+
+  .wl-card-v3-reservation-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .wl-card-v3-reservation-actions .wl-card-v3-secondary {
+    min-height: 44px;
+  }
+}
+
+@keyframes wl-mobile-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes wl-mobile-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-card-v3-menu,
+  .wl-card-v3-menu-backdrop {
+    animation: none;
+  }
+
+  .wishlist :is(*, *::before, *::after) {
+    scroll-behavior: auto !important;
+  }
+}

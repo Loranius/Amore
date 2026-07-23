@@ -58,9 +58,15 @@ export function WishCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const usersMap = useUsersMap();
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuPanelRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const hasMenuActions = item.can_edit || item.can_move || item.can_delete;
-  const closeMenu = () => setMenuOpen(false);
+  const closeMenu = (restoreFocus = false) => {
+    setMenuOpen(false);
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => menuButtonRef.current?.focus());
+    }
+  };
   const resolvedContext: WishCardContext = context
     ?? (item.completion_mode === 'shared' ? 'shared' : isOwn ? 'me' : 'partner');
   const creatorName = resolvedContext === 'shared' ? usersMap[item.owner] : null;
@@ -75,19 +81,45 @@ export function WishCard({
   useEffect(() => {
     if (!menuOpen) return;
 
+    const compactMenu = window.matchMedia('(max-width: 719px)').matches;
+    if (compactMenu) document.body.classList.add('wl-card-menu-open');
+
+    const focusTimer = window.requestAnimationFrame(() => {
+      menuPanelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    });
+
     const onPointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) closeMenu();
+      if (!menuRef.current?.contains(event.target as Node)) closeMenu(true);
     };
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        closeMenu();
-        menuButtonRef.current?.focus();
+        event.preventDefault();
+        closeMenu(true);
+        return;
+      }
+
+      if (event.key !== 'Tab' || !compactMenu || !menuPanelRef.current) return;
+      const controls = Array.from(
+        menuPanelRef.current.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'),
+      );
+      if (controls.length === 0) return;
+
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
       }
     };
 
     document.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('keydown', onKeyDown);
     return () => {
+      window.cancelAnimationFrame(focusTimer);
+      document.body.classList.remove('wl-card-menu-open');
       document.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKeyDown);
     };
@@ -239,28 +271,57 @@ export function WishCard({
                 ⋯
               </button>
               {menuOpen && (
-                <div className="wl-card-v3-menu" role="menu">
-                  {item.can_edit && (
-                    <button type="button" role="menuitem" onClick={() => runMenuAction(() => onEdit(item))}>
-                      Редагувати
-                    </button>
-                  )}
-                  {item.can_move && (
-                    <button type="button" role="menuitem" onClick={() => runMenuAction(() => onMove(item))}>
-                      Перенести
-                    </button>
-                  )}
-                  {item.can_delete && (
-                    <button
-                      type="button"
-                      role="menuitem"
-                      className="wl-card-v3-menu-danger"
-                      onClick={() => runMenuAction(() => onDelete(item.id))}
-                    >
-                      Видалити
-                    </button>
-                  )}
-                </div>
+                <>
+                  <button
+                    type="button"
+                    className="wl-card-v3-menu-backdrop"
+                    aria-label="Закрити меню дій"
+                    tabIndex={-1}
+                    onClick={() => closeMenu(true)}
+                  />
+                  <div
+                    ref={menuPanelRef}
+                    className="wl-card-v3-menu"
+                    role="menu"
+                    aria-label={`Дії з мрією «${item.title}»`}
+                  >
+                    <div className="wl-card-v3-menu-mobile-head">
+                      <span>Дії з мрією</span>
+                      <strong>{item.title}</strong>
+                      <button
+                        type="button"
+                        className="wl-card-v3-menu-close"
+                        aria-label="Закрити"
+                        onClick={() => closeMenu(true)}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    {item.can_edit && (
+                      <button type="button" role="menuitem" onClick={() => runMenuAction(() => onEdit(item))}>
+                        <span aria-hidden="true">✎</span>
+                        Редагувати
+                      </button>
+                    )}
+                    {item.can_move && (
+                      <button type="button" role="menuitem" onClick={() => runMenuAction(() => onMove(item))}>
+                        <span aria-hidden="true">↔</span>
+                        Перенести
+                      </button>
+                    )}
+                    {item.can_delete && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="wl-card-v3-menu-danger"
+                        onClick={() => runMenuAction(() => onDelete(item.id))}
+                      >
+                        <span aria-hidden="true">⌫</span>
+                        Видалити
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           )}

@@ -4,6 +4,7 @@ import type {
   WishlistSort,
 } from './wishlistBoardView';
 import './wishlistBoardToolbar.css';
+import './wishlistMobilePolish.css';
 
 interface WishlistBoardToolbarProps {
   value: WishlistBoardViewState;
