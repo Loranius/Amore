@@ -33,6 +33,7 @@ export function GiftCompletionModal({
   onSubmit,
 }: GiftCompletionModalProps) {
   const toast = useToast();
+  const isShared = item.completion_mode === 'shared';
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [video, setVideo] = useState<File | null>(null);
@@ -152,10 +153,16 @@ export function GiftCompletionModal({
         </button>
 
         <div className="gift-memory-heading">
-          <div className="gift-memory-icon" aria-hidden="true">🎁</div>
+          <div className="gift-memory-icon" aria-hidden="true">{isShared ? '✨' : '🎁'}</div>
           <div>
-            <h2 id="gift-memory-title" className="modal-title">Подарунок вручено</h2>
-            <p>Збережемо цей момент у Gift Archive?</p>
+            <h2 id="gift-memory-title" className="modal-title">
+              {isShared ? 'Спільну мрію виконано' : 'Подарунок вручено'}
+            </h2>
+            <p>
+              {isShared
+                ? 'Збережемо цей спільний момент у Gift Archive?'
+                : 'Збережемо цей момент у Gift Archive?'}
+            </p>
           </div>
         </div>
 
@@ -170,12 +177,12 @@ export function GiftCompletionModal({
         <div className="gift-memory-assets">
           <section className="gift-memory-asset">
             <div className="gift-memory-asset-head">
-              <strong>Фото реакції</strong>
+              <strong>{isShared ? 'Фото моменту' : 'Фото реакції'}</strong>
               <small>до 15 МБ</small>
             </div>
             <div className="gift-memory-preview gift-memory-preview--photo">
               {photoPreview ? (
-                <img src={photoPreview} alt="Попередній перегляд реакції" />
+                <img src={photoPreview} alt="Попередній перегляд моменту" />
               ) : (
                 <span aria-hidden="true">📸</span>
               )}
@@ -240,7 +247,9 @@ export function GiftCompletionModal({
             maxLength={1000}
             value={comment}
             disabled={saving}
-            placeholder="Наприклад: вона зовсім не очікувала і дуже зраділа ❤️"
+            placeholder={isShared
+              ? 'Наприклад: ми так довго про це мріяли ❤️'
+              : 'Наприклад: вона зовсім не очікувала і дуже зраділа ❤️'}
             onChange={(event) => setComment(event.target.value)}
           />
           <small>{comment.length}/1000</small>
@@ -260,7 +269,11 @@ export function GiftCompletionModal({
             Назад
           </button>
           <button type="button" className="btn" disabled={saving} onClick={() => void submit()}>
-            {saving ? 'Зберігаємо спогад…' : 'Завершити й зберегти'}
+            {saving
+              ? 'Зберігаємо спогад…'
+              : isShared
+                ? 'Виконати й зберегти'
+                : 'Завершити й зберегти'}
           </button>
         </div>
       </div>
