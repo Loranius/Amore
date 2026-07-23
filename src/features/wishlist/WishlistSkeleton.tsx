@@ -1,3 +1,5 @@
+import './wishlistHeroSkeleton.css';
+
 interface WishlistGridSkeletonProps {
   cards?: number;
 }
