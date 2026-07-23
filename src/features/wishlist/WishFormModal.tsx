@@ -11,6 +11,7 @@ import {
   uploadWishPhoto,
   type WishFormPayload,
 } from './useWishlist';
+import { canRemoveWishPhotoAfterSaveError } from './wishlistFailurePolicy';
 import { fetchWishlistLinkPreview } from './wishlistLinkPreview';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -245,7 +246,9 @@ export function WishFormModal({
 
       onClose();
     } catch (e) {
-      if (uploadedPath) await removeWishPhotoAssets([uploadedPath]);
+      if (uploadedPath && canRemoveWishPhotoAfterSaveError(e)) {
+        await removeWishPhotoAssets([uploadedPath]);
+      }
       // save mutation already shows its domain-aware toast. Upload/processing
       // errors happen before mutation and need their own message here.
       if (!submitStarted) {
