@@ -19,6 +19,7 @@ import { WishlistGridSkeleton, WishlistPageSkeleton } from './WishlistSkeleton';
 import { WishlistHero } from './WishlistHero';
 import { WishlistPartnerToolbar } from './WishlistPartnerToolbar';
 import { WishlistSharedToolbar } from './WishlistSharedToolbar';
+import { WishlistBoardToolbar } from './WishlistBoardToolbar';
 import {
   filterPartnerWishes,
   partnerWishFilterCounts,
@@ -29,6 +30,12 @@ import {
   sharedWishFilterCounts,
   type SharedWishFilter,
 } from './sharedWishFilter';
+import {
+  applyWishlistBoardView,
+  DEFAULT_WISHLIST_BOARD_VIEW,
+  wishlistPriorityFilterCounts,
+  type WishlistBoardViewState,
+} from './wishlistBoardView';
 import { partnerGenitive } from './partnerLabel';
 import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import {
@@ -46,6 +53,7 @@ import './wishlistFoundation.css';
 import './wishlistHero.css';
 
 type Tab = 'me' | 'partner' | 'shared';
+type BoardViews = Record<Tab, WishlistBoardViewState>;
 
 function requestedTab(value: string | null): Tab {
   return value === 'partner' || value === 'shared' ? value : 'me';
@@ -55,6 +63,14 @@ function requestedWishId(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function initialBoardViews(): BoardViews {
+  return {
+    me: { ...DEFAULT_WISHLIST_BOARD_VIEW },
+    partner: { ...DEFAULT_WISHLIST_BOARD_VIEW },
+    shared: { ...DEFAULT_WISHLIST_BOARD_VIEW },
+  };
 }
 
 function partnerEmptyState(filter: PartnerWishFilter) {
@@ -122,6 +138,7 @@ export function WishlistPage() {
   );
   const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
   const [sharedFilter, setSharedFilter] = useState<SharedWishFilter>('all');
+  const [boardViews, setBoardViews] = useState<BoardViews>(initialBoardViews);
   const actionLock = useRef(false);
 
   useEffect(() => {
@@ -158,11 +175,14 @@ export function WishlistPage() {
   const refetchItems = activeQuery.refetch;
   const partnerCounts = partnerWishFilterCounts(partnerItems, me.id);
   const sharedCounts = sharedWishFilterCounts(sharedItems, me.id, partner?.id ?? -1);
-  const visibleItems = tab === 'partner'
+  const contextItems = tab === 'partner'
     ? filterPartnerWishes(partnerItems, partnerFilter, me.id)
     : tab === 'shared' && partner
       ? filterSharedWishes(sharedItems, sharedFilter, me.id, partner.id)
       : items;
+  const activeBoardView = boardViews[tab];
+  const boardFilterCounts = wishlistPriorityFilterCounts(contextItems);
+  const visibleItems = applyWishlistBoardView(contextItems, activeBoardView);
 
   const {
     save,
@@ -318,8 +338,15 @@ export function WishlistPage() {
     if (nextTab === 'partner') setArchiveOpen(false);
   };
 
+  const changeBoardView = (nextView: WishlistBoardViewState) => {
+    setBoardViews((current) => ({ ...current, [tab]: nextView }));
+  };
+
   return (
-    <section className="wishlist pink-page" aria-busy={isPending || mutationBusy}>
+    <section
+      className="wishlist pink-page"
+      aria-busy={(!archiveOpen && isPending) || mutationBusy}
+    >
       <PortalDecor density="light" parallax={false} />
 
       {!archiveOpen && (
@@ -366,6 +393,15 @@ export function WishlistPage() {
             />
           )}
 
+          {!isPending && !isError && contextItems.length > 0 && (
+            <WishlistBoardToolbar
+              value={activeBoardView}
+              counts={boardFilterCounts}
+              resultCount={visibleItems.length}
+              onChange={changeBoardView}
+            />
+          )}
+
           {ownerId === null && tab !== 'shared' ? (
             <p className="empty-state">Користувача не знайдено.</p>
           ) : isPending ? (
@@ -388,7 +424,15 @@ export function WishlistPage() {
             <>
               <div className="wishlist-grid">
                 {visibleItems.length === 0 ? (
-                  tab === 'partner' && partnerEmptyCopy ? (
+                  contextItems.length > 0 ? (
+                    <div className="wl-board-filter-empty">
+                      <div>
+                        <span aria-hidden="true">✦</span>
+                        <strong>За цим фільтром бажань немає</strong>
+                        <p>Обери «Усі» або зміни пріоритет, щоб повернути картки.</p>
+                      </div>
+                    </div>
+                  ) : tab === 'partner' && partnerEmptyCopy ? (
                     <div className="wl-partner-empty">
                       <div>
                         <span aria-hidden="true">{partnerEmptyCopy.icon}</span>
