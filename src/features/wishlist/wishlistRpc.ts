@@ -14,6 +14,7 @@ export type WishlistStatus =
   | 'archived';
 
 export type WishlistCompletionMode = 'gift' | 'shared';
+export type WishlistArchiveScope = 'personal' | 'shared';
 
 export interface WishlistItemV3 extends WishlistItemRow {
   status: WishlistStatus;
@@ -115,6 +116,26 @@ function mutationArgs(payload: WishlistMutationPayload): Record<string, unknown>
   };
 }
 
+async function hydrateArchiveRows(
+  data: unknown,
+  label: string,
+): Promise<GiftMemoryArchiveItem[]> {
+  const rows = assertRows<GiftMemoryArchiveRpcRow>(data, label);
+  return Promise.all(
+    rows.map(async (row) => {
+      const [reactionPhotoUrl, reactionVideoUrl] = await Promise.all([
+        createGiftMemorySignedUrl(row.reaction_photo_path),
+        createGiftMemorySignedUrl(row.reaction_video_path),
+      ]);
+      return {
+        ...row,
+        reaction_photo_url: reactionPhotoUrl,
+        reaction_video_url: reactionVideoUrl,
+      };
+    }),
+  );
+}
+
 export async function fetchWishlistV3(input: {
   ownerId: number | null;
   shared: boolean;
@@ -142,21 +163,13 @@ export async function fetchFulfilledWishlistV3(
     p_owner_id: ownerId,
   });
   if (error) throw new Error(error.message);
+  return hydrateArchiveRows(data, 'Wishlist archive');
+}
 
-  const rows = assertRows<GiftMemoryArchiveRpcRow>(data, 'Wishlist archive');
-  return Promise.all(
-    rows.map(async (row) => {
-      const [reactionPhotoUrl, reactionVideoUrl] = await Promise.all([
-        createGiftMemorySignedUrl(row.reaction_photo_path),
-        createGiftMemorySignedUrl(row.reaction_video_path),
-      ]);
-      return {
-        ...row,
-        reaction_photo_url: reactionPhotoUrl,
-        reaction_video_url: reactionVideoUrl,
-      };
-    }),
-  );
+export async function fetchSharedWishlistArchiveV3(): Promise<GiftMemoryArchiveItem[]> {
+  const { data, error } = await rpc('get_shared_wishlist_archive_v3');
+  if (error) throw new Error(error.message);
+  return hydrateArchiveRows(data, 'Shared Wishlist archive');
 }
 
 export async function createWishlistItem(input: {

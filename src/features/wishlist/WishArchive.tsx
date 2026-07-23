@@ -1,13 +1,16 @@
 // ============================================================
-// WishArchive — Gift Archive подарованих мрій
+// WishArchive — Gift Archive подарованих і спільно виконаних мрій
 // ------------------------------------------------------------
 // Архів відкривається ліниво, групує спогади хронологічно та може
 // сфокусувати конкретну мрію після переходу зі сповіщення.
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useFulfilledWishes } from './useWishlist';
 import { useUsersMap } from '@/features/_shared/useUsers';
-import type { GiftMemoryArchiveItem } from './wishlistRpc';
+import { useWishlistArchive } from './useWishlistArchive';
+import type {
+  GiftMemoryArchiveItem,
+  WishlistArchiveScope,
+} from './wishlistRpc';
 
 type ArchiveGroup = {
   key: string;
@@ -55,32 +58,40 @@ function groupArchive(items: GiftMemoryArchiveItem[]): ArchiveGroup[] {
   return [...groups.values()];
 }
 
-function archiveCountText(count: number): string {
+function archiveCountText(count: number, shared: boolean): string {
   const lastTwo = count % 100;
   const last = count % 10;
-  if (last === 1 && lastTwo !== 11) return `${count} подарована мрія`;
+  const one = shared ? 'виконана мрія' : 'подарована мрія';
+  const few = shared ? 'виконані мрії' : 'подаровані мрії';
+  const many = shared ? 'виконаних мрій' : 'подарованих мрій';
+
+  if (last === 1 && lastTwo !== 11) return `${count} ${one}`;
   if (last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)) {
-    return `${count} подаровані мрії`;
+    return `${count} ${few}`;
   }
-  return `${count} подарованих мрій`;
+  return `${count} ${many}`;
 }
 
 export function WishArchive({
-  ownerId,
+  scope,
+  ownerId = null,
   onPhotoClick,
   openRequested = false,
   openRequestKey = null,
   focusWishId = null,
 }: {
-  ownerId: number;
+  scope: WishlistArchiveScope;
+  ownerId?: number | null;
   onPhotoClick: (src: string) => void;
   openRequested?: boolean;
   openRequestKey?: string | null;
   focusWishId?: number | null;
 }) {
+  const isShared = scope === 'shared';
   const [open, setOpen] = useState(openRequested);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const { data: items = [], isPending, isError, refetch } = useFulfilledWishes(ownerId, open);
+  const { data: items = [], isPending, isError, refetch } =
+    useWishlistArchive(scope, ownerId, open);
   const usersMap = useUsersMap();
   const groups = useMemo(() => groupArchive(items), [items]);
   const latestMoment = groups[0]?.items[0] ? momentValue(groups[0].items[0]) : null;
@@ -111,11 +122,19 @@ export function WishArchive({
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >
-        <span className="wl-archive-toggle-icon" aria-hidden="true">🎁</span>
+        <span className="wl-archive-toggle-icon" aria-hidden="true">
+          {isShared ? '✨' : '🎁'}
+        </span>
         <span className="wl-archive-toggle-copy">
-          <span className="wl-archive-toggle-label">Gift Archive</span>
+          <span className="wl-archive-toggle-label">
+            {isShared ? 'Shared Archive' : 'Gift Archive'}
+          </span>
           <span className="wl-archive-toggle-subtitle">
-            {items.length > 0 ? archiveCountText(items.length) : 'Подаровані мрії та ваші спогади'}
+            {items.length > 0
+              ? archiveCountText(items.length, isShared)
+              : isShared
+                ? 'Мрії, які ви здійснили разом'
+                : 'Подаровані мрії та ваші спогади'}
           </span>
         </span>
         <span className="wl-archive-toggle-arrow" aria-hidden="true">{open ? '−' : '+'}</span>
@@ -131,7 +150,7 @@ export function WishArchive({
           ) : isError ? (
             <div className="wl-archive-state">
               <span className="wl-archive-state-icon" aria-hidden="true">♡</span>
-              <strong>Не вдалося відкрити Gift Archive</strong>
+              <strong>Не вдалося відкрити {isShared ? 'Shared Archive' : 'Gift Archive'}</strong>
               <p>Спогади на місці — спробуй завантажити їх ще раз.</p>
               <button type="button" className="btn-secondary" onClick={() => void refetch()}>
                 Спробувати ще
@@ -139,36 +158,48 @@ export function WishArchive({
             </div>
           ) : items.length === 0 ? (
             <div className="wl-archive-state wl-archive-state--empty">
-              <span className="wl-archive-state-icon" aria-hidden="true">🎀</span>
-              <strong>Перший подарований спогад ще попереду</strong>
-              <p>Після вручення мрія назавжди залишиться тут із фото, відео та вашими словами.</p>
+              <span className="wl-archive-state-icon" aria-hidden="true">
+                {isShared ? '✨' : '🎀'}
+              </span>
+              <strong>
+                {isShared
+                  ? 'Перша виконана разом мрія ще попереду'
+                  : 'Перший подарований спогад ще попереду'}
+              </strong>
+              <p>
+                {isShared
+                  ? 'Після виконання спільна мрія залишиться тут із фото, відео та вашими словами.'
+                  : 'Після вручення мрія назавжди залишиться тут із фото, відео та вашими словами.'}
+              </p>
             </div>
           ) : (
             <>
               <div className="wl-archive-summary">
                 <span className="wl-archive-summary-icon" aria-hidden="true">✦</span>
                 <span className="wl-archive-summary-copy">
-                  <strong>{archiveCountText(items.length)}</strong>
+                  <strong>{archiveCountText(items.length, isShared)}</strong>
                   <small>
                     {latestMoment
                       ? `Останній спогад — ${formatMoment(latestMoment)}`
-                      : 'Ваша спільна історія подарунків'}
+                      : isShared
+                        ? 'Ваша спільна історія здійснених мрій'
+                        : 'Ваша спільна історія подарунків'}
                   </small>
                 </span>
               </div>
 
               <div className="wl-archive-timeline">
                 {groups.map((group) => (
-                  <section className="wl-archive-year" key={group.key} aria-labelledby={`archive-year-${group.key}`}>
+                  <section className="wl-archive-year" key={group.key} aria-labelledby={`${scope}-archive-year-${group.key}`}>
                     <header className="wl-archive-year-heading">
-                      <span id={`archive-year-${group.key}`}>{group.label}</span>
+                      <span id={`${scope}-archive-year-${group.key}`}>{group.label}</span>
                       <small>{group.items.length}</small>
                     </header>
 
                     <div className="wl-gift-memory-grid">
                       {group.items.map((item) => {
                         const momentDate = momentValue(item);
-                        const giverName = item.fulfilled_by != null
+                        const actorName = item.fulfilled_by != null
                           ? usersMap[item.fulfilled_by] ?? 'Партнер'
                           : 'Партнер';
                         const hasPhoto = Boolean(item.reaction_photo_url);
@@ -188,12 +219,12 @@ export function WishArchive({
                                   type="button"
                                   className="wl-gift-memory-photo"
                                   onClick={() => onPhotoClick(item.reaction_photo_url!)}
-                                  aria-label={`Відкрити фото реакції: ${item.title}`}
+                                  aria-label={`Відкрити фото моменту: ${item.title}`}
                                 >
                                   <img
                                     src={item.reaction_photo_url}
                                     loading="lazy"
-                                    alt={`Реакція на подарунок «${item.title}»`}
+                                    alt={`Спогад про мрію «${item.title}»`}
                                   />
                                 </button>
                               ) : item.reaction_video_url ? (
@@ -204,14 +235,14 @@ export function WishArchive({
                                   controls
                                   playsInline
                                   preload="metadata"
-                                  aria-label={`Відео реакції: ${item.title}`}
+                                  aria-label={`Відео моменту: ${item.title}`}
                                 />
                               ) : item.image_url ? (
                                 <button
                                   type="button"
                                   className="wl-gift-memory-photo"
                                   onClick={() => onPhotoClick(item.image_url!)}
-                                  aria-label={`Відкрити фото подарунка: ${item.title}`}
+                                  aria-label={`Відкрити фото мрії: ${item.title}`}
                                 >
                                   <img
                                     className="wl-gift-memory-product"
@@ -225,7 +256,11 @@ export function WishArchive({
                               )}
 
                               <div className="wl-gift-memory-badge">
-                                {hasPersonalMemory ? 'Наш момент' : 'Подарована мрія'}
+                                {isShared
+                                  ? 'Спільний момент'
+                                  : hasPersonalMemory
+                                    ? 'Наш момент'
+                                    : 'Подарована мрія'}
                               </div>
                               <time className="wl-gift-memory-date" dateTime={momentDate ?? undefined}>
                                 {formatMoment(momentDate)}
@@ -257,14 +292,14 @@ export function WishArchive({
                                   controls
                                   playsInline
                                   preload="metadata"
-                                  aria-label={`Відео реакції: ${item.title}`}
+                                  aria-label={`Відео моменту: ${item.title}`}
                                 />
                               )}
 
                               <footer className="wl-gift-memory-footer">
                                 <span className="wl-gift-memory-giver">
-                                  <span aria-hidden="true">🎁</span>
-                                  Подарував(ла): <strong>{giverName}</strong>
+                                  <span aria-hidden="true">{isShared ? '✨' : '🎁'}</span>
+                                  {isShared ? 'Виконав(ла):' : 'Подарував(ла):'} <strong>{actorName}</strong>
                                 </span>
                                 {item.link && (
                                   <a href={item.link} target="_blank" rel="noopener noreferrer">
