@@ -30,7 +30,6 @@ interface WishCardProps {
   onDelete: (id: number) => void;
   onReserve: (id: number, reserved: boolean) => void;
   onPurchased: (item: WishlistItemV3) => void;
-  onPreparing: (item: WishlistItemV3) => void;
   onFulfill: (item: WishlistItemV3) => void;
   onMove: (item: WishlistItemV3) => void;
 }
@@ -45,7 +44,6 @@ export function WishCard({
   onDelete,
   onReserve,
   onPurchased,
-  onPreparing,
   onFulfill,
   onMove,
 }: WishCardProps) {
@@ -114,7 +112,7 @@ export function WishCard({
           <div className="wl-card-v3-lifecycle">
             <div className="wl-card-v3-stage">
               <span aria-hidden="true">♡</span>
-              Заброньовано тобою
+              Подарунок заплановано
             </div>
             <div className="wl-card-v3-reservation-actions">
               <button
@@ -139,32 +137,12 @@ export function WishCard({
         );
       }
 
-      if (item.status === 'purchased') {
+      if (item.status === 'purchased' || item.status === 'preparing_surprise') {
         return (
           <div className="wl-card-v3-lifecycle">
             <div className="wl-card-v3-stage wl-card-v3-stage--purchased">
               <span aria-hidden="true">✓</span>
               Подарунок куплено
-            </div>
-            <button
-              type="button"
-              className="wl-card-v3-primary"
-              disabled={busy}
-              onClick={() => onPreparing(item)}
-            >
-              <span aria-hidden="true">✨</span>
-              Готую сюрприз
-            </button>
-          </div>
-        );
-      }
-
-      if (item.status === 'preparing_surprise') {
-        return (
-          <div className="wl-card-v3-lifecycle">
-            <div className="wl-card-v3-stage wl-card-v3-stage--preparing">
-              <span aria-hidden="true">✨</span>
-              Сюрприз готується
             </div>
             <button
               type="button"
@@ -184,7 +162,7 @@ export function WishCard({
       return item.reserved ? (
         <div className="wl-card-v3-status wl-card-v3-status--owner">
           <span aria-hidden="true">✦</span>
-          Хтось уже готує цю мрію
+          Це бажання вже здійснюють
         </div>
       ) : (
         <span className="wl-card-v3-hint">Твоя мрія</span>
@@ -195,12 +173,12 @@ export function WishCard({
       return (
         <div className="wl-card-v3-status">
           <span aria-hidden="true">♡</span>
-          Цю мрію вже взяли на себе
+          Це бажання вже здійснюють
         </div>
       );
     }
 
-    if (!item.can_reserve) return <span className="wl-card-v3-hint">Мрія партнера</span>;
+    if (!item.can_reserve) return <span className="wl-card-v3-hint">Бажання партнера</span>;
 
     return (
       <button
@@ -210,7 +188,7 @@ export function WishCard({
         onClick={() => onReserve(item.id, true)}
       >
         <span aria-hidden="true">🎁</span>
-        Беру на себе
+        Здійснити бажання
       </button>
     );
   };
