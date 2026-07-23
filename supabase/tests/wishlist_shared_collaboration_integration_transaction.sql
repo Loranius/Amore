@@ -69,14 +69,14 @@ select pg_temp.sc_assert(
   (select count(*) = 2 from pg_temp.shared_collaboration_users)
 );
 
-select pg_temp.sc_set_actor((select email from pg_temp.shared_collaboration_users where slot = 1));
+select pg_temp.sc_set_actor((select u.email from pg_temp.shared_collaboration_users u where u.slot = 1));
 
 insert into pg_temp.shared_collaboration_state(wish_id, completion_key)
 select
   public.create_wishlist_item_idempotent_v3(
     gen_random_uuid(),
     'Shared collaborative wish',
-    (select id from pg_temp.shared_collaboration_users where slot = 1),
+    (select u.id from pg_temp.shared_collaboration_users u where u.slot = 1),
     true,
     'Initial description',
     null,
@@ -89,25 +89,25 @@ select
 select pg_temp.sc_assert(
   'owner_receives_shared_capabilities',
   (
-    select can_edit and can_complete and not can_reserve
-      and can_delete and can_move
-      and completion_mode = 'shared'
-      and version = 1
-    from public.get_wishlist_items_v3(null, true, false)
-    where id = (select wish_id from pg_temp.shared_collaboration_state)
+    select w.can_edit and w.can_complete and not w.can_reserve
+      and w.can_delete and w.can_move
+      and w.completion_mode = 'shared'
+      and w.version = 1
+    from public.get_wishlist_items_v3(null, true, false) w
+    where w.id = (select s.wish_id from pg_temp.shared_collaboration_state s)
   )
 );
 
-select pg_temp.sc_set_actor((select email from pg_temp.shared_collaboration_users where slot = 2));
+select pg_temp.sc_set_actor((select u.email from pg_temp.shared_collaboration_users u where u.slot = 2));
 
 select pg_temp.sc_assert(
   'partner_receives_shared_capabilities',
   (
-    select can_edit and can_complete and not can_reserve
-      and not can_delete and not can_move
-      and completion_mode = 'shared'
-    from public.get_wishlist_items_v3(null, true, false)
-    where id = (select wish_id from pg_temp.shared_collaboration_state)
+    select w.can_edit and w.can_complete and not w.can_reserve
+      and not w.can_delete and not w.can_move
+      and w.completion_mode = 'shared'
+    from public.get_wishlist_items_v3(null, true, false) w
+    where w.id = (select s.wish_id from pg_temp.shared_collaboration_state s)
   )
 );
 
@@ -116,14 +116,14 @@ select pg_temp.sc_expect_error(
   'shared_wish_not_reservable',
   format(
     'select public.reserve_wishlist_item(%s)',
-    (select wish_id from pg_temp.shared_collaboration_state)
+    (select s.wish_id from pg_temp.shared_collaboration_state s)
   )
 );
 
 select pg_temp.sc_assert(
   'partner_can_edit_shared_wish',
   public.update_wishlist_item_collaborative_v3(
-    (select wish_id from pg_temp.shared_collaboration_state),
+    (select s.wish_id from pg_temp.shared_collaboration_state s),
     1,
     'Shared collaborative wish',
     'Edited by partner',
@@ -134,7 +134,7 @@ select pg_temp.sc_assert(
   ) = 2
 );
 
-select pg_temp.sc_set_actor((select email from pg_temp.shared_collaboration_users where slot = 1));
+select pg_temp.sc_set_actor((select u.email from pg_temp.shared_collaboration_users u where u.slot = 1));
 
 select pg_temp.sc_expect_error(
   'stale_edit_rejected',
@@ -143,14 +143,14 @@ select pg_temp.sc_expect_error(
     $sql$select public.update_wishlist_item_collaborative_v3(
       %s, 1, 'Stale edit', null, null, null, null, 'low'
     )$sql$,
-    (select wish_id from pg_temp.shared_collaboration_state)
+    (select s.wish_id from pg_temp.shared_collaboration_state s)
   )
 );
 
 select pg_temp.sc_assert(
   'owner_can_edit_latest_shared_version',
   public.update_wishlist_item_collaborative_v3(
-    (select wish_id from pg_temp.shared_collaboration_state),
+    (select s.wish_id from pg_temp.shared_collaboration_state s),
     2,
     'Shared collaborative wish updated',
     'Edited by owner after refresh',
@@ -161,20 +161,20 @@ select pg_temp.sc_assert(
   ) = 3
 );
 
-select pg_temp.sc_set_actor((select email from pg_temp.shared_collaboration_users where slot = 2));
+select pg_temp.sc_set_actor((select u.email from pg_temp.shared_collaboration_users u where u.slot = 2));
 
-update pg_temp.shared_collaboration_state
+update pg_temp.shared_collaboration_state as s
 set photo_path = format(
   '%s/%s/%s/photo-deadbeef.webp',
-  (select id from pg_temp.shared_collaboration_users where slot = 2),
-  wish_id,
-  completion_key
+  (select u.id from pg_temp.shared_collaboration_users u where u.slot = 2),
+  s.wish_id,
+  s.completion_key
 );
 
 select pg_temp.sc_assert(
   'shared_memory_upload_allowed_without_reservation',
   public.wishlist_memory_upload_allowed(
-    (select photo_path from pg_temp.shared_collaboration_state)
+    (select s.photo_path from pg_temp.shared_collaboration_state s)
   )
 );
 
@@ -182,13 +182,13 @@ select pg_temp.sc_assert(
   'partner_can_complete_shared_wish',
   (
     select public.complete_wishlist_gift(
-      wish_id,
-      completion_key,
-      photo_path,
+      s.wish_id,
+      s.completion_key,
+      s.photo_path,
       null,
       'Здійснили разом'
     ) is not null
-    from pg_temp.shared_collaboration_state
+    from pg_temp.shared_collaboration_state s
   )
 );
 
@@ -196,9 +196,9 @@ select pg_temp.sc_assert(
   'shared_completion_is_idempotent',
   (
     select public.complete_wishlist_gift(
-      wish_id,
-      completion_key,
-      photo_path,
+      s.wish_id,
+      s.completion_key,
+      s.photo_path,
       null,
       'Ignored retry'
     ) = wgc.id
@@ -212,10 +212,10 @@ select pg_temp.sc_assert(
   (
     select wi.status = 'archived'
       and wi.fulfilled
-      and wi.fulfilled_by = (select id from pg_temp.shared_collaboration_users where slot = 2)
+      and wi.fulfilled_by = (select u.id from pg_temp.shared_collaboration_users u where u.slot = 2)
       and wi.version = 4
     from public.wishlist_items wi
-    where wi.id = (select wish_id from pg_temp.shared_collaboration_state)
+    where wi.id = (select s.wish_id from pg_temp.shared_collaboration_state s)
   )
 );
 
@@ -224,7 +224,7 @@ select pg_temp.sc_assert(
   exists (
     select 1
     from public.wishlist_history wh
-    where wh.wish_id = (select wish_id from pg_temp.shared_collaboration_state)
+    where wh.wish_id = (select s.wish_id from pg_temp.shared_collaboration_state s)
       and wh.event_type = 'shared_wish_completed'
       and not wh.is_private
   )
@@ -234,8 +234,8 @@ select pg_temp.sc_assert(
   'completed_shared_wish_removed_from_active_list',
   not exists (
     select 1
-    from public.get_wishlist_items_v3(null, true, false)
-    where id = (select wish_id from pg_temp.shared_collaboration_state)
+    from public.get_wishlist_items_v3(null, true, false) w
+    where w.id = (select s.wish_id from pg_temp.shared_collaboration_state s)
   )
 );
 
