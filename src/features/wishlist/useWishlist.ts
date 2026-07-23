@@ -37,6 +37,8 @@ import {
 import type { WishlistItemRow, UserName } from '@/types';
 
 const BUCKET = 'wishlist-photos';
+const ARCHIVE_SIGNED_URL_REFRESH_MS = 5 * 60 * 60 * 1000;
+const ARCHIVE_STALE_TIME_MS = 4 * 60 * 60 * 1000;
 
 const GENITIVE: Record<UserName, string> = { Діма: 'Діми', Лєна: 'Лєни' };
 export function partnerGenitive(name: string | undefined): string {
@@ -78,6 +80,10 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
     enabled: enabled && ownerId !== null,
     queryFn: async (): Promise<GiftMemoryArchiveItem[]> =>
       fetchFulfilledWishlistV3(ownerId!),
+    staleTime: ARCHIVE_STALE_TIME_MS,
+    refetchInterval: enabled ? ARCHIVE_SIGNED_URL_REFRESH_MS : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 }
 
