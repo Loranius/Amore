@@ -328,7 +328,7 @@ export function useWishlistMutations(ownerId: number | null) {
         console.warn('[Wishlist] db-notify error:', e);
       }
     },
-    onSuccess: burstConfetti,
+    onSuccess: () => burstConfetti(),
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
