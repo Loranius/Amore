@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 export function FilePickerButton({
   id,
   className = 'btn-secondary',
+  accept = 'image/*,.heic,.heif',
   children,
   onPick,
 }: {
@@ -20,6 +21,8 @@ export function FilePickerButton({
   /** Клас обгортки-label — кожна фіча стилізує по-своєму (btn-secondary,
       pcal-upload-btn/pcal-replace-btn тощо), тому дефолт лише розумний, не єдиний. */
   className?: string;
+  /** MIME/extension filter для нативного file picker. */
+  accept?: string;
   children: ReactNode;
   onPick: (file: File) => void;
 }) {
@@ -30,7 +33,7 @@ export function FilePickerButton({
         id={id}
         name={id}
         type="file"
-        accept="image/*,.heic,.heif"
+        accept={accept}
         hidden
         onChange={(e) => {
           const f = e.target.files?.[0];

@@ -10,6 +10,7 @@ import { PortalDecor } from '@/features/auth/PortalDecor';
 import { WishCard } from './WishCard';
 import { WishFormModal } from './WishFormModal';
 import { MoveWishModal } from './MoveWishModal';
+import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
 import { WishArchive } from './WishArchive';
 import {
   usePartner,
@@ -58,6 +59,7 @@ export function WishlistPage() {
   const [editing, setEditing] = useState<WishlistItemRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [moving, setMoving] = useState<WishlistItemRow | null>(null);
+  const [completing, setCompleting] = useState<WishlistItemV3 | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
   const submit = async (
@@ -91,14 +93,10 @@ export function WishlistPage() {
     markPreparing.mutate(item.id);
   };
 
-  const onFulfill = async (item: WishlistItemV3) => {
-    if (
-      await confirmDialog(
-        `Підтверджуєш, що подарунок «${item.title}» уже вручено? 🎁\n\nОбидва отримають сповіщення ✉️`,
-      )
-    ) {
-      fulfill.mutate(item);
-    }
+  const completeGift = async (draft: GiftCompletionDraft) => {
+    if (!completing) return;
+    await fulfill.mutateAsync({ item: completing, ...draft });
+    setCompleting(null);
   };
 
   const partnerName = partnerGenitive(partner?.name);
@@ -186,14 +184,14 @@ export function WishlistPage() {
                   onReserve={onReserve}
                   onPurchased={onPurchased}
                   onPreparing={onPreparing}
-                  onFulfill={onFulfill}
+                  onFulfill={setCompleting}
                   onMove={setMoving}
                 />
               ))
             )}
           </div>
 
-          {tab === 'me' && <WishArchive ownerId={me.id} />}
+          {tab === 'me' && <WishArchive ownerId={me.id} onPhotoClick={setLightbox} />}
         </>
       )}
 
@@ -217,6 +215,17 @@ export function WishlistPage() {
           partner={partner}
           onClose={() => setMoving(null)}
           onMove={(owner, isShared) => changeScope.mutate({ id: moving.id, owner, isShared })}
+        />
+      )}
+
+      {completing && (
+        <GiftCompletionModal
+          item={completing}
+          saving={fulfill.isPending}
+          onClose={() => {
+            if (!fulfill.isPending) setCompleting(null);
+          }}
+          onSubmit={completeGift}
         />
       )}
 

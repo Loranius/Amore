@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import type { FulfilledWishlistItem, WishlistItemRow } from '@/types';
+import { createGiftMemorySignedUrl } from './giftMemory';
+import type { WishlistItemRow } from '@/types';
 
 export type WishlistStatus =
   | 'created'
@@ -29,6 +30,36 @@ export interface WishlistMutationPayload {
   image_url: string | null;
   price: number | null;
   priority: WishlistItemRow['priority'];
+}
+
+interface GiftMemoryArchiveRpcRow {
+  id: number;
+  title: string;
+  description: string | null;
+  link: string | null;
+  image_url: string | null;
+  price: number | null;
+  priority: WishlistItemRow['priority'];
+  fulfilled_at: string | null;
+  fulfilled_by: number | null;
+  completion_id: number | null;
+  completed_at: string | null;
+  reaction_photo_path: string | null;
+  reaction_video_path: string | null;
+  memory_comment: string | null;
+}
+
+export interface GiftMemoryArchiveItem extends GiftMemoryArchiveRpcRow {
+  reaction_photo_url: string | null;
+  reaction_video_url: string | null;
+}
+
+export interface CompleteWishlistGiftPayload {
+  wishId: number;
+  idempotencyKey: string;
+  reactionPhotoPath: string | null;
+  reactionVideoPath: string | null;
+  comment: string | null;
 }
 
 type RpcError = { message: string };
@@ -94,12 +125,26 @@ export async function fetchWishlistStatsV3(): Promise<WishlistStatsV3> {
 
 export async function fetchFulfilledWishlistV3(
   ownerId: number,
-): Promise<FulfilledWishlistItem[]> {
+): Promise<GiftMemoryArchiveItem[]> {
   const { data, error } = await rpc('get_fulfilled_wishlist_items_v3', {
     p_owner_id: ownerId,
   });
   if (error) throw new Error(error.message);
-  return assertRows<FulfilledWishlistItem>(data, 'Wishlist archive');
+
+  const rows = assertRows<GiftMemoryArchiveRpcRow>(data, 'Wishlist archive');
+  return Promise.all(
+    rows.map(async (row) => {
+      const [reactionPhotoUrl, reactionVideoUrl] = await Promise.all([
+        createGiftMemorySignedUrl(row.reaction_photo_path),
+        createGiftMemorySignedUrl(row.reaction_video_path),
+      ]);
+      return {
+        ...row,
+        reaction_photo_url: reactionPhotoUrl,
+        reaction_video_url: reactionVideoUrl,
+      };
+    }),
+  );
 }
 
 export async function createWishlistItem(input: {
@@ -156,13 +201,13 @@ export async function markWishlistPreparing(wishId: number): Promise<void> {
   await callVoid('mark_wishlist_preparing', { p_wish_id: wishId });
 }
 
-export async function completeWishlistGift(wishId: number): Promise<void> {
+export async function completeWishlistGift(payload: CompleteWishlistGiftPayload): Promise<void> {
   const { error } = await rpc('complete_wishlist_gift', {
-    p_wish_id: wishId,
-    p_idempotency_key: crypto.randomUUID(),
-    p_reaction_photo: null,
-    p_reaction_video: null,
-    p_comment: null,
+    p_wish_id: payload.wishId,
+    p_idempotency_key: payload.idempotencyKey,
+    p_reaction_photo: payload.reactionPhotoPath,
+    p_reaction_video: payload.reactionVideoPath,
+    p_comment: payload.comment,
   });
   if (error) throw new Error(error.message);
 }

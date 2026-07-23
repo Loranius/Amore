@@ -26,9 +26,15 @@ import {
   reserveWishlistItem,
   softDeleteWishlistItem,
   updateWishlistItem,
+  type GiftMemoryArchiveItem,
   type WishlistItemV3,
 } from './wishlistRpc';
-import type { WishlistItemRow, FulfilledWishlistItem, UserName } from '@/types';
+import {
+  removeGiftMemoryAssets,
+  uploadGiftMemoryAssets,
+  type GiftMemoryFiles,
+} from './giftMemory';
+import type { WishlistItemRow, UserName } from '@/types';
 
 const BUCKET = 'wishlist-photos';
 
@@ -70,7 +76,7 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
   return useQuery({
     queryKey: qk.wishlistFulfilled(ownerId ?? -1),
     enabled: enabled && ownerId !== null,
-    queryFn: async (): Promise<FulfilledWishlistItem[]> =>
+    queryFn: async (): Promise<GiftMemoryArchiveItem[]> =>
       fetchFulfilledWishlistV3(ownerId!),
   });
 }
@@ -108,6 +114,11 @@ export interface WishFormPayload {
   price: number | null;
   priority: WishlistItemRow['priority'];
   description: string | null;
+}
+
+export interface CompleteGiftInput extends GiftMemoryFiles {
+  item: WishlistItemV3;
+  comment: string;
 }
 
 export function useWishlistMutations(ownerId: number | null) {
@@ -227,8 +238,27 @@ export function useWishlistMutations(ownerId: number | null) {
   });
 
   const fulfill = useMutation({
-    mutationFn: async (item: WishlistItemV3) => {
-      await completeWishlistGift(item.id);
+    mutationFn: async ({ item, photo, video, comment }: CompleteGiftInput) => {
+      const idempotencyKey = crypto.randomUUID();
+      const uploaded = await uploadGiftMemoryAssets({
+        wishId: item.id,
+        userId: me.id,
+        idempotencyKey,
+        files: { photo, video },
+      });
+
+      try {
+        await completeWishlistGift({
+          wishId: item.id,
+          idempotencyKey,
+          reactionPhotoPath: uploaded.photoPath,
+          reactionVideoPath: uploaded.videoPath,
+          comment: comment.trim() || null,
+        });
+      } catch (error) {
+        await removeGiftMemoryAssets(uploaded.uploadedPaths);
+        throw error;
+      }
 
       const owner = (users ?? []).find((u) => u.id === item.owner);
       try {
@@ -246,7 +276,14 @@ export function useWishlistMutations(ownerId: number | null) {
       burstConfetti();
       invalidateBoth();
     },
-    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
+    onError: (e) => {
+      const message = (e as Error).message;
+      toast.show(
+        message.includes('invalid_reaction_')
+          ? 'Не вдалося зберегти медіа реакції. Спробуй обрати файл ще раз.'
+          : 'Не вдалося завершити подарунок: ' + message,
+      );
+    },
   });
 
   return {
