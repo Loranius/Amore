@@ -1,6 +1,11 @@
 -- Storage RLS rollback-only integration suite.
--- Exercises the policies as the real authenticated Postgres role and rolls
+-- Exercises policy predicates as the real authenticated Postgres role and rolls
 -- back every temporary wish/object/completion.
+--
+-- Hosted Supabase protects direct SQL DELETE on storage.objects with
+-- storage.protect_delete(); actual deletes must go through the Storage API.
+-- Therefore DELETE policy behavior is verified through the exact policy/helper
+-- predicates rather than issuing a forbidden direct table delete.
 
 begin;
 
@@ -134,6 +139,21 @@ select pg_temp.assert_true(
   )
 );
 
+select pg_temp.assert_true(
+  'shared_delete_policy_is_bucket_scoped',
+  exists (
+    select 1
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname = 'storage_shared_assets_delete'
+      and cmd = 'DELETE'
+      and qual ilike '%family_photos%'
+      and qual ilike '%wishlist-photos%'
+      and qual not ilike '%wishlist-memories%'
+  )
+);
+
 -- Owner creates a wish; partner takes it through preparing_surprise.
 select pg_temp.set_actor(
   (select email from pg_temp.storage_test_users where slot = 1),
@@ -209,6 +229,13 @@ select pg_temp.assert_true(
   )
 );
 
+select pg_temp.assert_true(
+  'uploader_cleanup_allowed_before_completion',
+  public.wishlist_memory_delete_allowed(
+    (select memory_path from pg_temp.storage_test_state)
+  )
+);
+
 insert into storage.objects(bucket_id, name, owner_id, metadata)
 select
   'wishlist-photos',
@@ -217,13 +244,9 @@ select
   '{}'::jsonb
 from pg_temp.storage_test_state;
 
-delete from storage.objects
-where bucket_id = 'wishlist-photos'
-  and name = (select shared_path from pg_temp.storage_test_state);
-
 select pg_temp.assert_true(
-  'shared_bucket_insert_delete_works',
-  not exists (
+  'shared_bucket_insert_select_works',
+  exists (
     select 1
     from storage.objects
     where bucket_id = 'wishlist-photos'
@@ -283,22 +306,16 @@ select pg_temp.assert_true(
 );
 reset role;
 
--- Even the uploader cannot delete media after it became an archived memory.
+-- After completion even the uploader no longer passes the DELETE predicate.
 select pg_temp.set_actor(
   (select email from pg_temp.storage_test_users where slot = 2),
   (select auth_user_id from pg_temp.storage_test_users where slot = 2)
 );
 
 set local role authenticated;
-select pg_temp.expect_error(
-  'committed_memory_cannot_be_deleted',
-  'row-level security',
-  format(
-    $sql$
-      delete from storage.objects
-      where bucket_id = 'wishlist-memories' and name = %L
-      returning id
-    $sql$,
+select pg_temp.assert_true(
+  'committed_memory_cleanup_is_denied',
+  not public.wishlist_memory_delete_allowed(
     (select memory_path from pg_temp.storage_test_state)
   )
 );
