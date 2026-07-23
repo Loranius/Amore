@@ -7,7 +7,7 @@ interface WishlistHeroProps {
   tab: WishlistHeroTab;
   meName: string;
   partnerName: string;
-  activeCount: number;
+  activeCount: number | null;
   stats: WishlistStatsV3 | undefined;
   busy: boolean;
   onAdd: () => void;
@@ -47,7 +47,7 @@ function heroCopy(tab: WishlistHeroTab, meName: string, partnerName: string): He
   };
 }
 
-function activeLabel(count: number): string {
+export function activeWishlistLabel(count: number): string {
   const lastTwo = count % 100;
   const last = count % 10;
   if (lastTwo >= 11 && lastTwo <= 14) return 'активних бажань';
@@ -75,9 +75,9 @@ export function WishlistHero({
         <p className="wl-hero-description">{copy.description}</p>
 
         <div className="wl-hero-metrics" aria-label="Статистика списку бажань">
-          <span className="wl-hero-metric">
-            <strong>{activeCount}</strong>
-            {activeLabel(activeCount)}
+          <span className={`wl-hero-metric${activeCount === null ? ' wl-hero-metric--pending' : ''}`}>
+            <strong>{activeCount ?? '—'}</strong>
+            {activeCount === null ? 'завантаження' : activeWishlistLabel(activeCount)}
           </span>
           {stats && stats.total > 0 && (
             <span className="wl-hero-metric wl-hero-metric--muted">
