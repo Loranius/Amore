@@ -1,12 +1,10 @@
--- Replace the legacy authenticated ALL/true policy with explicit bucket policies.
--- Public product/app assets remain shared by the couple; Gift Memory objects are
--- private and governed by the Wishlist domain state.
+-- Wishlist Gift Memory Storage helpers.
 --
--- IMPORTANT FOR HOSTED SUPABASE:
--- storage.objects is owned by supabase_storage_admin. In environments where the
--- migration runner cannot alter Storage policies, create these policies through
--- Dashboard → Storage → Policies → storage.objects. The helper functions below
--- can still be deployed through the normal migration runner.
+-- Hosted Supabase owns storage.objects through supabase_storage_admin, so the
+-- normal migration runner may not create or drop Storage policies. The seven
+-- bucket-scoped policies are maintained in:
+--   supabase/manual/20260723_storage_rls_policies.sql
+-- and are applied through Dashboard → Storage → Policies.
 
 begin;
 
@@ -24,8 +22,6 @@ end $$;
 
 -- A valid upload path is:
 --   <uploader_app_user_id>/<wish_id>/<completion_uuid>/<photo|video>.<ext>
--- Upload is allowed only while that user owns the active reservation and the
--- wish is in preparing_surprise.
 create or replace function public.wishlist_memory_upload_allowed(p_name text)
 returns boolean
 language plpgsql
@@ -125,8 +121,7 @@ end;
 $$;
 
 -- Cleanup is allowed only to the uploader and only before the path is committed
--- to an archived Gift Memory. This supports frontend rollback after RPC failure
--- without allowing completed memories to be removed from Storage.
+-- to an archived Gift Memory.
 create or replace function public.wishlist_memory_delete_allowed(p_name text)
 returns boolean
 language plpgsql
@@ -162,114 +157,28 @@ grant execute on function public.wishlist_memory_upload_allowed(text) to authent
 grant execute on function public.wishlist_memory_read_allowed(text) to authenticated;
 grant execute on function public.wishlist_memory_delete_allowed(text) to authenticated;
 
--- The following policy DDL is the canonical source of truth. On hosted projects
--- it may need to be applied via Dashboard because storage.objects is owned by
--- supabase_storage_admin.
-alter table storage.objects enable row level security;
+-- Informative only: policy ownership is managed through the Storage Dashboard.
+do $$
+declare
+  v_count integer;
+begin
+  select count(*) into v_count
+  from pg_policies
+  where schemaname = 'storage'
+    and tablename = 'objects'
+    and policyname in (
+      'storage_shared_assets_select',
+      'storage_shared_assets_insert',
+      'storage_shared_assets_update',
+      'storage_shared_assets_delete',
+      'wishlist_memories_select',
+      'wishlist_memories_insert',
+      'wishlist_memories_delete'
+    );
 
-drop policy if exists auth_storage_full on storage.objects;
-drop policy if exists storage_shared_assets_select on storage.objects;
-drop policy if exists storage_shared_assets_insert on storage.objects;
-drop policy if exists storage_shared_assets_update on storage.objects;
-drop policy if exists storage_shared_assets_delete on storage.objects;
-drop policy if exists wishlist_memories_select on storage.objects;
-drop policy if exists wishlist_memories_insert on storage.objects;
-drop policy if exists wishlist_memories_delete on storage.objects;
-
-create policy storage_shared_assets_select
-on storage.objects
-for select
-to authenticated
-using (
-  bucket_id in (
-    'family_photos',
-    'map-photos',
-    'media-posters',
-    'photo-calendar',
-    'wishlist-photos'
-  )
-);
-
-create policy storage_shared_assets_insert
-on storage.objects
-for insert
-to authenticated
-with check (
-  bucket_id in (
-    'family_photos',
-    'map-photos',
-    'media-posters',
-    'photo-calendar',
-    'wishlist-photos'
-  )
-  and name is not null
-  and char_length(name) between 1 and 512
-);
-
-create policy storage_shared_assets_update
-on storage.objects
-for update
-to authenticated
-using (
-  bucket_id in (
-    'family_photos',
-    'map-photos',
-    'media-posters',
-    'photo-calendar',
-    'wishlist-photos'
-  )
-)
-with check (
-  bucket_id in (
-    'family_photos',
-    'map-photos',
-    'media-posters',
-    'photo-calendar',
-    'wishlist-photos'
-  )
-  and name is not null
-  and char_length(name) between 1 and 512
-);
-
-create policy storage_shared_assets_delete
-on storage.objects
-for delete
-to authenticated
-using (
-  bucket_id in (
-    'family_photos',
-    'map-photos',
-    'media-posters',
-    'photo-calendar',
-    'wishlist-photos'
-  )
-);
-
-create policy wishlist_memories_select
-on storage.objects
-for select
-to authenticated
-using (
-  bucket_id = 'wishlist-memories'
-  and public.wishlist_memory_read_allowed(name)
-);
-
-create policy wishlist_memories_insert
-on storage.objects
-for insert
-to authenticated
-with check (
-  bucket_id = 'wishlist-memories'
-  and public.wishlist_memory_upload_allowed(name)
-);
-
-create policy wishlist_memories_delete
-on storage.objects
-for delete
-to authenticated
-using (
-  bucket_id = 'wishlist-memories'
-  and public.wishlist_memory_delete_allowed(name)
-);
+  if v_count <> 7 then
+    raise notice 'Storage policy setup incomplete: found % of 7 expected policies. Apply supabase/manual/20260723_storage_rls_policies.sql through Dashboard.', v_count;
+  end if;
+end $$;
 
 commit;
