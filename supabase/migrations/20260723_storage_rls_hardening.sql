@@ -1,6 +1,12 @@
 -- Replace the legacy authenticated ALL/true policy with explicit bucket policies.
 -- Public product/app assets remain shared by the couple; Gift Memory objects are
 -- private and governed by the Wishlist domain state.
+--
+-- IMPORTANT FOR HOSTED SUPABASE:
+-- storage.objects is owned by supabase_storage_admin. In environments where the
+-- migration runner cannot alter Storage policies, create these policies through
+-- Dashboard → Storage → Policies → storage.objects. The helper functions below
+-- can still be deployed through the normal migration runner.
 
 begin;
 
@@ -156,6 +162,9 @@ grant execute on function public.wishlist_memory_upload_allowed(text) to authent
 grant execute on function public.wishlist_memory_read_allowed(text) to authenticated;
 grant execute on function public.wishlist_memory_delete_allowed(text) to authenticated;
 
+-- The following policy DDL is the canonical source of truth. On hosted projects
+-- it may need to be applied via Dashboard because storage.objects is owned by
+-- supabase_storage_admin.
 alter table storage.objects enable row level security;
 
 drop policy if exists auth_storage_full on storage.objects;
@@ -167,9 +176,6 @@ drop policy if exists wishlist_memories_select on storage.objects;
 drop policy if exists wishlist_memories_insert on storage.objects;
 drop policy if exists wishlist_memories_delete on storage.objects;
 
--- Existing public buckets are intentionally shared inside the authenticated
--- couple portal. Restrict access to this explicit allow-list instead of every
--- current and future bucket.
 create policy storage_shared_assets_select
 on storage.objects
 for select
