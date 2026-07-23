@@ -22,6 +22,10 @@ export const qk = {
   wishlistShared: () => ['wishlist', 'shared'] as const,
   wishlistStats: () => ['wishlist', 'stats'] as const,
 
+  notifications: () => ['notifications'] as const,
+  notificationsFeed: () => ['notifications', 'feed'] as const,
+  notificationsUnread: () => ['notifications', 'unread'] as const,
+
   media: (type?: MediaType) =>
     (type === undefined ? (['media'] as const) : (['media', type] as const)),
 
@@ -60,6 +64,7 @@ export const realtimeInvalidation: Record<
   media_items: [qk.media()],
   dishes: [qk.dishes()],
   wishlist_items: [['wishlist']],
+  app_notifications: [qk.notifications()],
   shopping_items: [qk.shopping()],
   photo_calendar: [['photoCalendar']],
   work_schedule: [['schedule'], qk.sharedDaysOff()],
