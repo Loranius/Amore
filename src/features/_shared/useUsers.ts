@@ -37,9 +37,23 @@ export function useUsersMap(): Record<number, string> {
   return map;
 }
 
-/** Партнер = єдиний інший користувач (окрім поточного). */
-export function usePartner(): AppUser | null {
+/**
+ * Партнер = інший користувач у поточній парі.
+ * Повертаємо також стан запиту, щоб UI не показував вигаданий fallback,
+ * поки справжнє ім'я ще завантажується.
+ */
+export function usePartnerQuery() {
   const me = useCurrentUser();
-  const { data } = useUsers();
-  return useMemo(() => (data ?? []).find((u) => u.id !== me.id) ?? null, [data, me.id]);
+  const query = useUsers();
+  const partner = useMemo(
+    () => (query.data ?? []).find((u) => u.id !== me.id) ?? null,
+    [query.data, me.id],
+  );
+
+  return { ...query, partner };
+}
+
+/** Партнер без метаданих запиту — для форм, де loading уже оброблено вище. */
+export function usePartner(): AppUser | null {
+  return usePartnerQuery().partner;
 }
