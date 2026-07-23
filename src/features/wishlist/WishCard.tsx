@@ -52,7 +52,7 @@ export function WishCard({
   const [imageFailed, setImageFailed] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const canEdit = isOwn && item.status === 'visible';
+  const hasMenuActions = item.can_edit || item.can_move || item.can_delete;
   const closeMenu = () => setMenuOpen(false);
 
   useEffect(() => {
@@ -91,7 +91,29 @@ export function WishCard({
 
   const hasVisibleImage = Boolean(item.image_url) && !imageFailed;
 
-  const reservationControls = () => {
+  const lifecycleControls = () => {
+    if (item.completion_mode === 'shared') {
+      return (
+        <div className="wl-card-v3-lifecycle">
+          <div className="wl-card-v3-stage wl-card-v3-stage--preparing">
+            <span aria-hidden="true">♡</span>
+            Спільна мрія
+          </div>
+          {item.can_complete && (
+            <button
+              type="button"
+              className="wl-card-v3-primary wl-card-v3-primary--success"
+              disabled={busy}
+              onClick={() => onFulfill(item)}
+            >
+              <span aria-hidden="true">✨</span>
+              Виконати разом
+            </button>
+          )}
+        </div>
+      );
+    }
+
     if (canManageReservation && item.reserved) {
       if (item.status === 'reserved') {
         return (
@@ -184,6 +206,8 @@ export function WishCard({
       );
     }
 
+    if (!item.can_reserve) return <span className="wl-card-v3-hint">Мрія партнера</span>;
+
     return (
       <button
         type="button"
@@ -232,7 +256,7 @@ export function WishCard({
             </span>
           )}
 
-          {canEdit && (
+          {hasMenuActions && (
             <div className="wl-card-v3-menu-wrap" ref={menuRef}>
               <button
                 ref={menuButtonRef}
@@ -248,20 +272,26 @@ export function WishCard({
               </button>
               {menuOpen && (
                 <div className="wl-card-v3-menu" role="menu">
-                  <button type="button" role="menuitem" onClick={() => runMenuAction(() => onEdit(item))}>
-                    Редагувати
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => runMenuAction(() => onMove(item))}>
-                    Перенести
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="wl-card-v3-menu-danger"
-                    onClick={() => runMenuAction(() => onDelete(item.id))}
-                  >
-                    Видалити
-                  </button>
+                  {item.can_edit && (
+                    <button type="button" role="menuitem" onClick={() => runMenuAction(() => onEdit(item))}>
+                      Редагувати
+                    </button>
+                  )}
+                  {item.can_move && (
+                    <button type="button" role="menuitem" onClick={() => runMenuAction(() => onMove(item))}>
+                      Перенести
+                    </button>
+                  )}
+                  {item.can_delete && (
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="wl-card-v3-menu-danger"
+                      onClick={() => runMenuAction(() => onDelete(item.id))}
+                    >
+                      Видалити
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -285,7 +315,7 @@ export function WishCard({
 
         {item.description && <p className="wl-card-v3-description">{item.description}</p>}
 
-        <div className="wl-card-v3-footer">{reservationControls()}</div>
+        <div className="wl-card-v3-footer">{lifecycleControls()}</div>
       </div>
     </article>
   );

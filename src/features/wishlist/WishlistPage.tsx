@@ -23,7 +23,6 @@ import {
   type WishFormPayload,
 } from './useWishlist';
 import type { WishlistItemV3 } from './wishlistRpc';
-import type { WishlistItemRow } from '@/types';
 import './wishlistV3.mobile.css';
 import './wishlistGiftArchive.css';
 
@@ -90,9 +89,9 @@ export function WishlistPage() {
   } = useWishlistMutations(ownerId);
   const confirmDialog = useConfirm();
 
-  const [editing, setEditing] = useState<WishlistItemRow | null>(null);
+  const [editing, setEditing] = useState<WishlistItemV3 | null>(null);
   const [adding, setAdding] = useState(false);
-  const [moving, setMoving] = useState<WishlistItemRow | null>(null);
+  const [moving, setMoving] = useState<WishlistItemV3 | null>(null);
   const [completing, setCompleting] = useState<WishlistItemV3 | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
@@ -120,7 +119,22 @@ export function WishlistPage() {
     payload: WishFormPayload,
     scope: { owner: number; isShared: boolean },
   ): Promise<void> => {
-    await save.mutateAsync({ id, payload, owner: scope.owner, isShared: scope.isShared });
+    try {
+      await save.mutateAsync({
+        id,
+        payload,
+        owner: scope.owner,
+        isShared: scope.isShared,
+        expectedVersion: editing?.version ?? 0,
+      });
+    } catch (error) {
+      if (id !== null && (error as Error).message.includes('wish_version_conflict')) {
+        const refreshed = await refetchItems();
+        const freshItem = (refreshed.data ?? []).find((item) => item.id === id);
+        if (freshItem) setEditing(freshItem);
+      }
+      throw error;
+    }
   };
 
   const onDelete = async (id: number) => {
@@ -277,6 +291,7 @@ export function WishlistPage() {
 
       {(adding || editing) && (
         <WishFormModal
+          key={editing ? `edit-${editing.id}-${editing.version}` : 'new-wish'}
           item={editing}
           partner={partner}
           defaultScope={tab}

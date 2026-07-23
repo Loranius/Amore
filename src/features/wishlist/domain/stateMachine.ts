@@ -19,6 +19,9 @@ export type WishTransitionAction =
   | 'complete_gift'
   | 'archive';
 
+export type SharedWishTransitionAction = 'complete_shared';
+export type WishlistTransitionAction = WishTransitionAction | SharedWishTransitionAction;
+
 const TRANSITIONS: Readonly<
   Record<WishStatus, Partial<Record<WishTransitionAction, WishStatus>>>
 > = {
@@ -37,7 +40,7 @@ const TRANSITIONS: Readonly<
 export class InvalidWishTransitionError extends Error {
   constructor(
     public readonly status: WishStatus,
-    public readonly action: WishTransitionAction,
+    public readonly action: WishlistTransitionAction,
   ) {
     super(`Cannot perform ${action} while wish is ${status}`);
     this.name = 'InvalidWishTransitionError';
@@ -58,6 +61,24 @@ export function transitionWish(
   const next = TRANSITIONS[status][action];
   if (!next) throw new InvalidWishTransitionError(status, action);
   return next;
+}
+
+/** Shared wishes skip the private reservation/purchase lifecycle. */
+export function canTransitionSharedWish(
+  status: WishStatus,
+  action: SharedWishTransitionAction,
+): boolean {
+  return action === 'complete_shared' && status === 'visible';
+}
+
+export function transitionSharedWish(
+  status: WishStatus,
+  action: SharedWishTransitionAction,
+): WishStatus {
+  if (!canTransitionSharedWish(status, action)) {
+    throw new InvalidWishTransitionError(status, action);
+  }
+  return 'archived';
 }
 
 export function isWishEditable(status: WishStatus): boolean {

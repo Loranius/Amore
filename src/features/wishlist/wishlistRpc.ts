@@ -13,9 +13,18 @@ export type WishlistStatus =
   | 'gifted'
   | 'archived';
 
+export type WishlistCompletionMode = 'gift' | 'shared';
+
 export interface WishlistItemV3 extends WishlistItemRow {
   status: WishlistStatus;
   archived_at: string | null;
+  version: number;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_move: boolean;
+  can_reserve: boolean;
+  can_complete: boolean;
+  completion_mode: WishlistCompletionMode;
 }
 
 export interface WishlistStatsV3 {
@@ -167,9 +176,6 @@ export async function createWishlistItem(input: {
     createRequestTracker.release(tracked.key);
   } catch (error) {
     if (isAmbiguousWishlistTransportError(error)) {
-      // Prevent the outer mutation layer from treating this as the old
-      // field-based reconciliation flow. The modal remains open and the next
-      // click reuses the same server request UUID.
       throw new Error('wishlist_create_retry_safe');
     }
 
@@ -180,10 +186,12 @@ export async function createWishlistItem(input: {
 
 export async function updateWishlistItem(
   wishId: number,
+  expectedVersion: number,
   payload: WishlistMutationPayload,
 ): Promise<void> {
-  await callVoid('update_wishlist_item_v3', {
+  await callVoid('update_wishlist_item_collaborative_v3', {
     p_wish_id: wishId,
+    p_expected_version: expectedVersion,
     ...mutationArgs(payload),
   });
 }

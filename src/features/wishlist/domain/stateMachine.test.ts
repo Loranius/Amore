@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   InvalidWishTransitionError,
+  canTransitionSharedWish,
   canTransitionWish,
   isWishDeletable,
   isWishEditable,
   isWishImmutable,
+  transitionSharedWish,
   transitionWish,
   type WishStatus,
   type WishTransitionAction,
@@ -42,6 +44,16 @@ describe('wishlist v3 state machine', () => {
       expect(() => transitionWish(from, action)).toThrow(InvalidWishTransitionError);
     },
   );
+
+  it('completes a shared wish directly without private gift stages', () => {
+    expect(canTransitionSharedWish('visible', 'complete_shared')).toBe(true);
+    expect(transitionSharedWish('visible', 'complete_shared')).toBe('archived');
+
+    for (const status of ['created', 'reserved', 'purchased', 'preparing_surprise', 'gifted', 'archived'] as WishStatus[]) {
+      expect(canTransitionSharedWish(status, 'complete_shared')).toBe(false);
+      expect(() => transitionSharedWish(status, 'complete_shared')).toThrow(InvalidWishTransitionError);
+    }
+  });
 
   it('only allows editing and deletion before reservation', () => {
     expect(isWishEditable('created')).toBe(true);
