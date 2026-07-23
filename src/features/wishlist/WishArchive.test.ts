@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { archiveCountText } from './WishArchive';
+import { archiveCountText } from './wishlistArchivePresentation';
 
 describe('archiveCountText', () => {
   it('formats personal memory counts', () => {
