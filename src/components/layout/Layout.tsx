@@ -26,12 +26,14 @@ import { MoreMenu } from './MoreMenu';
 import { NotificationBell } from './NotificationBell';
 import { NotificationsPanel } from './NotificationsPanel';
 import { SettingsModal } from '@/features/settings/SettingsModal';
+import { useWishlistStorageCleanup } from '@/features/wishlist/useWishlistStorageCleanup';
 import { useRealtime } from '@/lib/realtime';
 
 export function Layout() {
   // Realtime живе весь час автентифікованої сесії: Layout — батьківський
   // роут під RequireAuth, монтується один раз і від'єднується на logout.
   useRealtime();
+  useWishlistStorageCleanup();
 
   const [moreOpen, setMoreOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);

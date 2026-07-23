@@ -4,6 +4,7 @@ import { compress, normalize } from '@/lib/images';
 const BUCKET = 'wishlist-memories';
 const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+const SIGNED_URL_TTL_SECONDS = 12 * 60 * 60;
 const ALLOWED_VIDEO_TYPES = new Set([
   'video/mp4',
   'video/webm',
@@ -126,7 +127,9 @@ export async function removeGiftMemoryAssets(paths: string[]): Promise<void> {
 
 export async function createGiftMemorySignedUrl(path: string | null): Promise<string | null> {
   if (!path) return null;
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 6 * 60 * 60);
+  const { data, error } = await supabase.storage
+    .from(BUCKET)
+    .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
   if (error) {
     console.warn('[Wishlist] не вдалося підписати memory-файл:', error);
     return null;
