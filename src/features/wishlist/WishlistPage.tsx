@@ -32,6 +32,12 @@ function requestedTab(value: string | null): Tab {
   return value === 'partner' || value === 'shared' ? value : 'me';
 }
 
+function requestedWishId(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
 export function WishlistPage() {
   const me = useCurrentUser();
   const partner = usePartner();
@@ -39,6 +45,7 @@ export function WishlistPage() {
   const tabFromUrl = requestedTab(searchParams.get('tab'));
   const archiveRequested = searchParams.get('archive') === '1';
   const notificationRequest = searchParams.get('notification');
+  const archiveFocusWishId = requestedWishId(searchParams.get('wish'));
   const [tab, setTab] = useState<Tab>(tabFromUrl);
 
   useEffect(() => {
@@ -210,6 +217,7 @@ export function WishlistPage() {
               onPhotoClick={setLightbox}
               openRequested={archiveRequested}
               openRequestKey={notificationRequest}
+              focusWishId={archiveFocusWishId}
             />
           )}
         </>
