@@ -64,7 +64,6 @@ export const realtimeInvalidation: Record<
   media_items: [qk.media()],
   dishes: [qk.dishes()],
   wishlist_items: [['wishlist']],
-  app_notifications: [qk.notifications()],
   shopping_items: [qk.shopping()],
   photo_calendar: [['photoCalendar']],
   work_schedule: [['schedule'], qk.sharedDaysOff()],
