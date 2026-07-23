@@ -1,10 +1,12 @@
 import type { WishlistItemV3 } from './wishlistRpc';
 
-export type WishlistPriorityFilter = 'all' | 'dream' | 'high' | 'withoutPhoto';
+export type WishlistPriorityFilter = 'all' | 'dream' | 'high' | 'medium' | 'low';
 export type WishlistSort = 'newest' | 'priority' | 'price';
 
 export interface WishlistBoardViewState {
   priority: WishlistPriorityFilter;
+  // Sorting is no longer exposed in the UI. Keep the stable default internally
+  // for backward-compatible per-tab state without changing WishlistPage orchestration.
   sort: WishlistSort;
 }
 
@@ -26,7 +28,6 @@ function priorityValue(item: WishlistItemV3): string {
 
 function matchesPriority(item: WishlistItemV3, filter: WishlistPriorityFilter): boolean {
   if (filter === 'all') return true;
-  if (filter === 'withoutPhoto') return !item.image_url;
   return priorityValue(item) === filter;
 }
 
@@ -61,6 +62,7 @@ export function wishlistPriorityFilterCounts(items: WishlistItemV3[]) {
     all: items.length,
     dream: items.filter((item) => priorityValue(item) === 'dream').length,
     high: items.filter((item) => priorityValue(item) === 'high').length,
-    withoutPhoto: items.filter((item) => !item.image_url).length,
+    medium: items.filter((item) => priorityValue(item) === 'medium').length,
+    low: items.filter((item) => priorityValue(item) === 'low').length,
   } satisfies Record<WishlistPriorityFilter, number>;
 }

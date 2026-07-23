@@ -13,10 +13,10 @@ import './wishlistV3.css';
 import './wishlistCardRedesign.css';
 
 const PRIORITY_LABELS: Record<string, string> = {
-  dream: 'Dream',
-  high: 'Високий',
-  medium: 'Середній',
-  low: 'Низький',
+  dream: 'Мрія',
+  high: 'Дуже хочу',
+  medium: 'Хочу',
+  low: 'Колись',
 };
 
 const PRIORITY_ICONS: Record<string, string> = {

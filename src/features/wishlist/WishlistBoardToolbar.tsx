@@ -1,7 +1,6 @@
 import type {
   WishlistBoardViewState,
   WishlistPriorityFilter,
-  WishlistSort,
 } from './wishlistBoardView';
 import './wishlistBoardToolbar.css';
 import './wishlistMobilePolish.css';
@@ -15,21 +14,15 @@ interface WishlistBoardToolbarProps {
 
 const PRIORITY_FILTERS: Array<{ value: WishlistPriorityFilter; label: string; icon: string }> = [
   { value: 'all', label: 'Усі', icon: '✦' },
-  { value: 'dream', label: 'Dream', icon: '♥' },
-  { value: 'high', label: 'Високий', icon: '◆' },
-  { value: 'withoutPhoto', label: 'Без фото', icon: '○' },
-];
-
-const SORT_OPTIONS: Array<{ value: WishlistSort; label: string }> = [
-  { value: 'newest', label: 'Нові спочатку' },
-  { value: 'priority', label: 'За пріоритетом' },
-  { value: 'price', label: 'За ціною' },
+  { value: 'dream', label: 'Мрія', icon: '♥' },
+  { value: 'high', label: 'Дуже хочу', icon: '✦' },
+  { value: 'medium', label: 'Хочу', icon: '◆' },
+  { value: 'low', label: 'Колись', icon: '○' },
 ];
 
 export function WishlistBoardToolbar({
   value,
   counts,
-  resultCount,
   onChange,
 }: WishlistBoardToolbarProps) {
   return (
@@ -48,23 +41,6 @@ export function WishlistBoardToolbar({
             <small>{counts[filter.value]}</small>
           </button>
         ))}
-      </div>
-
-      <div className="wl-board-sort-wrap">
-        <label htmlFor="wishlist-board-sort">Сортування</label>
-        <select
-          id="wishlist-board-sort"
-          className="wl-board-sort"
-          value={value.sort}
-          onChange={(event) => onChange({ ...value, sort: event.target.value as WishlistSort })}
-        >
-          {SORT_OPTIONS.map((option) => (
-            <option key={option.value} value={option.value}>{option.label}</option>
-          ))}
-        </select>
-        <span className="wl-board-result-count" aria-live="polite">
-          {resultCount}
-        </span>
       </div>
     </div>
   );
