@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
+import { useToast } from '@/providers/ToastProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
 import { PortalDecor } from '@/features/auth/PortalDecor';
@@ -17,11 +18,17 @@ import { WishArchive } from './WishArchive';
 import { WishlistGridSkeleton, WishlistPageSkeleton } from './WishlistSkeleton';
 import { WishlistHero } from './WishlistHero';
 import { WishlistPartnerToolbar } from './WishlistPartnerToolbar';
+import { WishlistSharedToolbar } from './WishlistSharedToolbar';
 import {
   filterPartnerWishes,
   partnerWishFilterCounts,
   type PartnerWishFilter,
 } from './partnerWishFilter';
+import {
+  filterSharedWishes,
+  sharedWishFilterCounts,
+  type SharedWishFilter,
+} from './sharedWishFilter';
 import { partnerGenitive } from './partnerLabel';
 import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import {
@@ -73,8 +80,30 @@ function partnerEmptyState(filter: PartnerWishFilter) {
   };
 }
 
+function sharedEmptyState(filter: SharedWishFilter, partnerName: string) {
+  if (filter === 'mine') {
+    return {
+      title: 'Ти ще не додав спільних ідей',
+      description: 'Створи мрію, яку ви зможете редагувати й здійснити разом.',
+    };
+  }
+
+  if (filter === 'partner') {
+    return {
+      title: `${partnerName} ще не додавав(ла) спільних ідей`,
+      description: 'Ідеї партнера з’являться тут одразу після створення.',
+    };
+  }
+
+  return {
+    title: 'Спільних мрій поки немає',
+    description: 'Додайте першу ідею для подорожі, враження або спільної покупки.',
+  };
+}
+
 export function WishlistPage() {
   const me = useCurrentUser();
+  const toast = useToast();
   const {
     partner,
     isPending: partnerPending,
@@ -88,6 +117,7 @@ export function WishlistPage() {
   const archiveFocusWishId = requestedWishId(searchParams.get('wish'));
   const [tab, setTab] = useState<Tab>(tabFromUrl);
   const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
+  const [sharedFilter, setSharedFilter] = useState<SharedWishFilter>('all');
   const actionLock = useRef(false);
 
   useEffect(() => {
@@ -118,9 +148,12 @@ export function WishlistPage() {
   const isError = activeQuery.isError;
   const refetchItems = activeQuery.refetch;
   const partnerCounts = partnerWishFilterCounts(partnerItems, me.id);
+  const sharedCounts = sharedWishFilterCounts(sharedItems, me.id, partner?.id ?? -1);
   const visibleItems = tab === 'partner'
     ? filterPartnerWishes(partnerItems, partnerFilter, me.id)
-    : items;
+    : tab === 'shared' && partner
+      ? filterSharedWishes(sharedItems, sharedFilter, me.id, partner.id)
+      : items;
 
   const {
     save,
@@ -176,6 +209,8 @@ export function WishlistPage() {
         const refreshed = await refetchItems();
         const freshItem = (refreshed.data ?? []).find((item) => item.id === id);
         if (freshItem) setEditing(freshItem);
+        toast.show('Партнер щойно оновив цю мрію. Ми завантажили актуальну версію.');
+        throw new Error('Перевір оновлені дані та збережи мрію ще раз.');
       }
       throw error;
     }
@@ -265,7 +300,8 @@ export function WishlistPage() {
     },
   ];
 
-  const emptyCopy = tab === 'partner' ? partnerEmptyState(partnerFilter) : null;
+  const partnerEmptyCopy = tab === 'partner' ? partnerEmptyState(partnerFilter) : null;
+  const sharedEmptyCopy = tab === 'shared' ? sharedEmptyState(sharedFilter, partner.name) : null;
 
   return (
     <section className="wishlist pink-page" aria-busy={isPending || mutationBusy}>
@@ -291,6 +327,15 @@ export function WishlistPage() {
         />
       )}
 
+      {tab === 'shared' && !isPending && !isError && (
+        <WishlistSharedToolbar
+          value={sharedFilter}
+          partnerName={partner.name}
+          counts={sharedCounts}
+          onChange={setSharedFilter}
+        />
+      )}
+
       {ownerId === null && tab !== 'shared' ? (
         <p className="empty-state">Користувача не знайдено.</p>
       ) : isPending ? (
@@ -313,20 +358,24 @@ export function WishlistPage() {
         <>
           <div className="wishlist-grid">
             {visibleItems.length === 0 ? (
-              tab === 'partner' && emptyCopy ? (
+              tab === 'partner' && partnerEmptyCopy ? (
                 <div className="wl-partner-empty">
                   <div>
-                    <span aria-hidden="true">{emptyCopy.icon}</span>
-                    <strong>{emptyCopy.title}</strong>
-                    <p>{emptyCopy.description}</p>
+                    <span aria-hidden="true">{partnerEmptyCopy.icon}</span>
+                    <strong>{partnerEmptyCopy.title}</strong>
+                    <p>{partnerEmptyCopy.description}</p>
+                  </div>
+                </div>
+              ) : tab === 'shared' && sharedEmptyCopy ? (
+                <div className="wl-shared-empty">
+                  <div>
+                    <span aria-hidden="true">✨</span>
+                    <strong>{sharedEmptyCopy.title}</strong>
+                    <p>{sharedEmptyCopy.description}</p>
                   </div>
                 </div>
               ) : (
-                <p className="empty-state">
-                  {tab === 'me'
-                    ? 'Твій список порожній. Час додати нову забаганку.'
-                    : 'Спільних бажань ще немає. Додайте перше!'}
-                </p>
+                <p className="empty-state">Твій список порожній. Час додати нову забаганку.</p>
               )
             ) : (
               visibleItems.map((item) => (
