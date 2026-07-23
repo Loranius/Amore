@@ -73,6 +73,11 @@
   transform: scale(1);
 }
 
+.wl-progressive-photo--ready img.wl-gift-memory-product {
+  opacity: 0.9;
+  filter: saturate(0.9);
+}
+
 .wl-progressive-photo-fallback {
   position: absolute;
   inset: 0;
@@ -124,5 +129,10 @@
     transition-delay: 0ms;
     filter: none;
     transform: none;
+  }
+
+  .wl-progressive-photo--ready img.wl-gift-memory-product {
+    opacity: 0.9;
+    filter: saturate(0.9);
   }
 }
