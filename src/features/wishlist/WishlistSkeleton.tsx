@@ -1,3 +1,5 @@
+import './wishlistHeroSkeleton.css';
+
 interface WishlistGridSkeletonProps {
   cards?: number;
 }
@@ -27,15 +29,22 @@ export function WishlistGridSkeleton({ cards = 3 }: WishlistGridSkeletonProps) {
 export function WishlistPageSkeleton() {
   return (
     <section className="wishlist pink-page wl-page-skeleton" aria-busy="true">
-      <div className="wl-skeleton-tabs wl-skeleton-shimmer" aria-hidden="true" />
-      <div className="wl-skeleton-heading" aria-hidden="true">
-        <div>
+      <div className="wl-skeleton-hero-card" aria-hidden="true">
+        <div className="wl-skeleton-hero-copy">
           <div className="wl-skeleton-line wl-skeleton-line--eyebrow wl-skeleton-shimmer" />
           <div className="wl-skeleton-line wl-skeleton-line--hero wl-skeleton-shimmer" />
+          <div className="wl-skeleton-line wl-skeleton-line--medium wl-skeleton-shimmer" />
+          <div className="wl-skeleton-metrics">
+            <div className="wl-skeleton-metric wl-skeleton-shimmer" />
+            <div className="wl-skeleton-metric wl-skeleton-shimmer" />
+          </div>
         </div>
-        <div className="wl-skeleton-cta wl-skeleton-shimmer" />
+        <div className="wl-skeleton-hero-actions">
+          <div className="wl-skeleton-symbol wl-skeleton-shimmer" />
+          <div className="wl-skeleton-cta wl-skeleton-shimmer" />
+        </div>
       </div>
-      <div className="wl-skeleton-stat wl-skeleton-shimmer" aria-hidden="true" />
+      <div className="wl-skeleton-tabs wl-skeleton-shimmer" aria-hidden="true" />
       <WishlistGridSkeleton />
       <p className="sr-only" role="status" aria-live="polite">
         Завантаження списку бажань…

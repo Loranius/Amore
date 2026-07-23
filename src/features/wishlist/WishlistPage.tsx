@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
-import { TabBar } from '@/components/ui/TabBar';
+import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
 import { PortalDecor } from '@/features/auth/PortalDecor';
 import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { WishCard } from './WishCard';
@@ -15,7 +15,8 @@ import { MoveWishModal } from './MoveWishModal';
 import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
 import { WishArchive } from './WishArchive';
 import { WishlistGridSkeleton, WishlistPageSkeleton } from './WishlistSkeleton';
-import { partnerWishlistTitle } from './partnerLabel';
+import { WishlistHero } from './WishlistHero';
+import { partnerGenitive } from './partnerLabel';
 import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import {
   useWishlistItems,
@@ -28,6 +29,7 @@ import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistV3.mobile.css';
 import './wishlistGiftArchive.css';
 import './wishlistFoundation.css';
+import './wishlistHero.css';
 
 type Tab = 'me' | 'partner' | 'shared';
 
@@ -64,27 +66,26 @@ export function WishlistPage() {
   const isOwnTab = tab === 'me';
   const ownerId = tab === 'shared' ? null : isOwnTab ? me.id : (partner?.id ?? null);
 
-  const {
-    data: ownItems = [],
-    isPending: ownPending,
-    isFetching: ownFetching,
-    isError: ownError,
-    refetch: refetchOwn,
-  } = useWishlistItems(ownerId);
-  const {
-    data: sharedItems = [],
-    isPending: sharedPending,
-    isFetching: sharedFetching,
-    isError: sharedError,
-    refetch: refetchShared,
-  } = useSharedWishlistItems();
+  // All three active scopes load in parallel. This keeps tab counters accurate
+  // and makes switching tabs instant without changing the RPC contract.
+  const ownQuery = useWishlistItems(me.id);
+  const partnerWishlistQuery = useWishlistItems(partner?.id ?? null);
+  const sharedQuery = useSharedWishlistItems();
   const { data: stats } = useCoupleWishStats();
 
-  const items = tab === 'shared' ? sharedItems : ownItems;
-  const isPending = tab === 'shared' ? sharedPending : ownPending;
-  const isFetching = tab === 'shared' ? sharedFetching : ownFetching;
-  const isError = tab === 'shared' ? sharedError : ownError;
-  const refetchItems = tab === 'shared' ? refetchShared : refetchOwn;
+  const ownItems = ownQuery.data ?? [];
+  const partnerItems = partnerWishlistQuery.data ?? [];
+  const sharedItems = sharedQuery.data ?? [];
+  const activeQuery = tab === 'me'
+    ? ownQuery
+    : tab === 'partner'
+      ? partnerWishlistQuery
+      : sharedQuery;
+  const items = tab === 'me' ? ownItems : tab === 'partner' ? partnerItems : sharedItems;
+  const isPending = activeQuery.isPending;
+  const isFetching = activeQuery.isFetching;
+  const isError = activeQuery.isError;
+  const refetchItems = activeQuery.refetch;
 
   const {
     save,
@@ -191,8 +192,6 @@ export function WishlistPage() {
     tab === 'shared' ? item.owner === me.id : isOwnTab;
   const canManageReservation = (item: WishlistItemV3) => item.reserved_by === me.id;
 
-  const pct = stats && stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
-
   // Не будуємо вкладку партнера до отримання фактичного іншого користувача.
   // Так у DOM ніколи не з'являється тимчасове «Бажання Партнера».
   if (partnerPending) return <WishlistPageSkeleton />;
@@ -211,55 +210,41 @@ export function WishlistPage() {
     );
   }
 
-  const partnerTitle = partnerWishlistTitle(partner.name);
+  const tabs: TabBarItem<Tab>[] = [
+    {
+      value: 'me',
+      label: 'Мої',
+      ...(!ownQuery.isPending && !ownQuery.isError ? { count: ownItems.length } : {}),
+    },
+    {
+      value: 'partner',
+      label: partnerGenitive(partner.name),
+      ...(!partnerWishlistQuery.isPending && !partnerWishlistQuery.isError
+        ? { count: partnerItems.length }
+        : {}),
+    },
+    {
+      value: 'shared',
+      label: 'Спільні',
+      ...(!sharedQuery.isPending && !sharedQuery.isError ? { count: sharedItems.length } : {}),
+    },
+  ];
 
   return (
     <section className="wishlist pink-page" aria-busy={isPending || mutationBusy}>
       <PortalDecor density="light" parallax={false} />
-      <TabBar<Tab>
-        value={tab}
-        onChange={setTab}
-        items={[
-          { value: 'me', label: 'Мої бажання' },
-          { value: 'partner', label: partnerTitle },
-          { value: 'shared', label: 'Спільне', icon: '🎁' },
-        ]}
+
+      <WishlistHero
+        tab={tab}
+        meName={me.name}
+        partnerName={partner.name}
+        activeCount={isPending || isError ? null : items.length}
+        stats={stats}
+        busy={mutationBusy}
+        onAdd={() => setAdding(true)}
       />
 
-      <div className="wl-head">
-        <h1 className="wl-title">
-          {tab === 'me'
-            ? 'Мої бажання'
-            : tab === 'partner'
-              ? partnerTitle
-              : '🎁 Спільні бажання'}
-        </h1>
-        <button type="button" className="btn" disabled={mutationBusy} onClick={() => setAdding(true)}>
-          + Додати
-        </button>
-      </div>
-
-      {stats && stats.total > 0 && (
-        <div className="plans-stat-banner">
-          <div className="plans-stat-row">
-            <div className="plans-stat-info">
-              <span className="plans-stat-num">{stats.done}</span>
-              <span className="plans-stat-sep">/</span>
-              <span className="plans-stat-total">{stats.total}</span>
-              <span className="plans-stat-label">бажань виконано</span>
-            </div>
-            <div className="plans-stat-pct">{pct}%</div>
-          </div>
-          <div className="plans-progress-bar">
-            <div className="plans-progress-fill" style={{ width: `${pct}%` }} />
-          </div>
-          {stats.doneThisYear > 0 && (
-            <p className="wl-year-stat">
-              Ви виконали {stats.doneThisYear} бажань разом цього року ❤️
-            </p>
-          )}
-        </div>
-      )}
+      <TabBar<Tab> value={tab} onChange={setTab} items={tabs} />
 
       {ownerId === null && tab !== 'shared' ? (
         <p className="empty-state">Користувача не знайдено.</p>
