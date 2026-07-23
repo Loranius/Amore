@@ -170,13 +170,15 @@ export function useWishlistMutations(ownerId: number | null) {
       payload: WishFormPayload;
       owner?: number;
       isShared?: boolean;
+      expectedVersion?: number;
     }) => {
       const shared = input.isShared ?? ownerId === null;
       const targetOwner = input.owner ?? ownerId ?? me.id;
 
       try {
         if (input.id !== null) {
-          await updateWishlistItem(input.id, input.payload);
+          if (input.expectedVersion == null) throw new Error('wish_version_required');
+          await updateWishlistItem(input.id, input.expectedVersion, input.payload);
         } else {
           await createWishlistItem({
             payload: input.payload,
@@ -187,8 +189,8 @@ export function useWishlistMutations(ownerId: number | null) {
       } catch (error) {
         if (!isAmbiguousWishlistTransportError(error)) throw error;
 
-        // Відповідь могла загубитися після commit. Перечитуємо серверний
-        // список до того, як дозволити повтор, щоб не створити дублікат.
+        // Update may have committed before the response was lost. Read the
+        // server state before allowing another edit with an obsolete version.
         try {
           const serverItems = await fetchWishlistV3({
             ownerId: shared ? null : targetOwner,
@@ -212,11 +214,15 @@ export function useWishlistMutations(ownerId: number | null) {
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
-        isAmbiguousWishlistTransportError(e)
-          ? 'З’єднання обірвалося. Перевір список перед повторним створенням мрії.'
-          : message.includes('wish_not_editable')
-            ? 'Цю мрію вже не можна редагувати.'
-            : 'Не вдалося зберегти бажання. Спробуй ще.',
+        message.includes('wish_version_conflict')
+          ? 'Партнер щойно змінив цю мрію. Форму оновлено до нової версії.'
+          : message.includes('wishlist_create_retry_safe')
+            ? 'Не вдалося підтвердити створення. Натисни «Зберегти» ще раз — дублікат не з’явиться.'
+            : isAmbiguousWishlistTransportError(e)
+              ? 'З’єднання обірвалося. Перевір список перед повторною спробою.'
+              : message.includes('wish_not_editable')
+                ? 'Цю мрію вже не можна редагувати.'
+                : 'Не вдалося зберегти бажання. Спробуй ще.',
       );
     },
     onSettled: invalidateBoth,
@@ -252,9 +258,11 @@ export function useWishlistMutations(ownerId: number | null) {
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
-        message.includes('wish_not_reservable')
-          ? 'Цю мрію вже хтось узяв на себе.'
-          : 'Не вдалося оновити бронювання. Спробуй ще.',
+        message.includes('shared_wish_not_reservable')
+          ? 'Спільну мрію не потрібно бронювати — її можна виконати разом.'
+          : message.includes('wish_not_reservable')
+            ? 'Цю мрію вже хтось узяв на себе.'
+            : 'Не вдалося оновити бронювання. Спробуй ще.',
       );
     },
     onSettled: invalidateBoth,
@@ -316,25 +324,33 @@ export function useWishlistMutations(ownerId: number | null) {
         comment: comment.trim() || null,
       });
 
-      const owner = (users ?? []).find((u) => u.id === item.owner);
-      try {
-        await invokeFn('db-notify', {
-          type: 'wish_fulfilled',
-          itemTitle: item.title,
-          ownerId: owner?.id,
-          buyerId: me.id,
-        });
-      } catch (e) {
-        console.warn('[Wishlist] db-notify error:', e);
+      // Shared completion notifications are emitted from wishlist_history in
+      // the next inbox migration. Keep the legacy notification only for gifts.
+      if (!item.is_shared) {
+        const owner = (users ?? []).find((u) => u.id === item.owner);
+        try {
+          await invokeFn('db-notify', {
+            type: 'wish_fulfilled',
+            itemTitle: item.title,
+            ownerId: owner?.id,
+            buyerId: me.id,
+          });
+        } catch (e) {
+          console.warn('[Wishlist] db-notify error:', e);
+        }
       }
     },
     onSuccess: () => burstConfetti(),
-    onError: (e) => {
+    onError: (e, input) => {
       const message = (e as Error).message;
       toast.show(
         message.includes('invalid_reaction_')
-          ? 'Не вдалося зберегти медіа реакції. Спробуй обрати файл ще раз.'
-          : 'Не вдалося завершити подарунок: ' + message,
+          ? 'Не вдалося зберегти медіа. Спробуй обрати файл ще раз.'
+          : message.includes('shared_wish_not_completable')
+            ? 'Цю спільну мрію вже виконав партнер або її стан змінився.'
+            : input.item.is_shared
+              ? 'Не вдалося виконати спільну мрію: ' + message
+              : 'Не вдалося завершити подарунок: ' + message,
       );
     },
     onSettled: invalidateBoth,
