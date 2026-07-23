@@ -6,6 +6,7 @@
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useUsersMap } from '@/features/_shared/useUsers';
+import { ProgressivePhoto } from './ProgressivePhoto';
 import { useWishlistArchive } from './useWishlistArchive';
 import type {
   GiftMemoryArchiveItem,
@@ -206,6 +207,7 @@ export function WishArchive({
                         const hasVideo = Boolean(item.reaction_video_url);
                         const hasPersonalMemory = hasPhoto || hasVideo || Boolean(item.memory_comment);
                         const isFocused = focusWishId === item.id;
+                        const revealDelayMs = (item.id % 8) * 35;
 
                         return (
                           <article
@@ -215,18 +217,15 @@ export function WishArchive({
                           >
                             <div className="wl-gift-memory-media">
                               {item.reaction_photo_url ? (
-                                <button
-                                  type="button"
-                                  className="wl-gift-memory-photo"
-                                  onClick={() => onPhotoClick(item.reaction_photo_url!)}
-                                  aria-label={`Відкрити фото моменту: ${item.title}`}
-                                >
-                                  <img
-                                    src={item.reaction_photo_url}
-                                    loading="lazy"
-                                    alt={`Спогад про мрію «${item.title}»`}
-                                  />
-                                </button>
+                                <ProgressivePhoto
+                                  src={item.reaction_photo_url}
+                                  alt={`Спогад про мрію «${item.title}»`}
+                                  ariaLabel={`Відкрити фото моменту: ${item.title}`}
+                                  buttonClassName="wl-gift-memory-photo"
+                                  revealDelayMs={revealDelayMs}
+                                  onOpen={onPhotoClick}
+                                  fallback={<span className="wl-gift-memory-placeholder" aria-hidden="true">♡</span>}
+                                />
                               ) : item.reaction_video_url ? (
                                 <video
                                   className="wl-gift-memory-cover-video"
@@ -238,19 +237,16 @@ export function WishArchive({
                                   aria-label={`Відео моменту: ${item.title}`}
                                 />
                               ) : item.image_url ? (
-                                <button
-                                  type="button"
-                                  className="wl-gift-memory-photo"
-                                  onClick={() => onPhotoClick(item.image_url!)}
-                                  aria-label={`Відкрити фото мрії: ${item.title}`}
-                                >
-                                  <img
-                                    className="wl-gift-memory-product"
-                                    src={item.image_url}
-                                    loading="lazy"
-                                    alt={item.title}
-                                  />
-                                </button>
+                                <ProgressivePhoto
+                                  src={item.image_url}
+                                  alt={item.title}
+                                  ariaLabel={`Відкрити фото мрії: ${item.title}`}
+                                  buttonClassName="wl-gift-memory-photo"
+                                  imageClassName="wl-gift-memory-product"
+                                  revealDelayMs={revealDelayMs}
+                                  onOpen={onPhotoClick}
+                                  fallback={<span className="wl-gift-memory-placeholder" aria-hidden="true">♡</span>}
+                                />
                               ) : (
                                 <div className="wl-gift-memory-placeholder" aria-hidden="true">♡</div>
                               )}
