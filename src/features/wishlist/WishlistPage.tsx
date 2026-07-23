@@ -14,6 +14,7 @@ import { WishFormModal } from './WishFormModal';
 import { MoveWishModal } from './MoveWishModal';
 import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
 import { WishArchive } from './WishArchive';
+import { WishlistGridSkeleton, WishlistPageSkeleton } from './WishlistSkeleton';
 import { partnerWishlistTitle } from './partnerLabel';
 import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import {
@@ -26,6 +27,7 @@ import {
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistV3.mobile.css';
 import './wishlistGiftArchive.css';
+import './wishlistFoundation.css';
 
 type Tab = 'me' | 'partner' | 'shared';
 
@@ -193,16 +195,7 @@ export function WishlistPage() {
 
   // Не будуємо вкладку партнера до отримання фактичного іншого користувача.
   // Так у DOM ніколи не з'являється тимчасове «Бажання Партнера».
-  if (partnerPending) {
-    return (
-      <section className="wishlist pink-page" aria-busy="true">
-        <PortalDecor density="light" parallax={false} />
-        <p className="empty-state" role="status" aria-live="polite">
-          Завантаження списку бажань…
-        </p>
-      </section>
-    );
-  }
+  if (partnerPending) return <WishlistPageSkeleton />;
 
   if (partnerError || !partner) {
     return (
@@ -271,7 +264,9 @@ export function WishlistPage() {
       {ownerId === null && tab !== 'shared' ? (
         <p className="empty-state">Користувача не знайдено.</p>
       ) : isPending ? (
-        <p className="empty-state" role="status" aria-live="polite">Завантаження…</p>
+        <div role="status" aria-live="polite" aria-label="Завантаження бажань">
+          <WishlistGridSkeleton />
+        </div>
       ) : isError ? (
         <div className="empty-state" role="alert">
           <p>Не вдалось завантажити бажання. Перевір з’єднання й повтори.</p>
