@@ -9,6 +9,7 @@ const ALLOWED_VIDEO_TYPES = new Set([
   'video/webm',
   'video/quicktime',
 ]);
+const ALLOWED_VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov']);
 
 export interface GiftMemoryFiles {
   photo: File | null;
@@ -26,6 +27,21 @@ function extensionFromName(name: string, fallback: string): string {
   return match?.[1] ?? fallback;
 }
 
+function videoExtension(file: File): 'mp4' | 'webm' | 'mov' {
+  const fromName = extensionFromName(file.name, '');
+  if (ALLOWED_VIDEO_EXTENSIONS.has(fromName)) return fromName as 'mp4' | 'webm' | 'mov';
+  if (file.type === 'video/webm') return 'webm';
+  if (file.type === 'video/quicktime') return 'mov';
+  return 'mp4';
+}
+
+function videoContentType(file: File, ext: 'mp4' | 'webm' | 'mov'): string {
+  if (file.type) return file.type;
+  if (ext === 'webm') return 'video/webm';
+  if (ext === 'mov') return 'video/quicktime';
+  return 'video/mp4';
+}
+
 export function validateGiftMemoryPhoto(file: File): void {
   const isImage = file.type.startsWith('image/') || /\.(heic|heif)$/i.test(file.name);
   if (!isImage) throw new Error('Обери файл зображення.');
@@ -33,9 +49,9 @@ export function validateGiftMemoryPhoto(file: File): void {
 }
 
 export function validateGiftMemoryVideo(file: File): void {
-  if (!ALLOWED_VIDEO_TYPES.has(file.type)) {
-    throw new Error('Підтримуються відео MP4, WebM або MOV.');
-  }
+  const ext = extensionFromName(file.name, '');
+  const supported = ALLOWED_VIDEO_TYPES.has(file.type) || ALLOWED_VIDEO_EXTENSIONS.has(ext);
+  if (!supported) throw new Error('Підтримуються відео MP4, WebM або MOV.');
   if (file.size > MAX_VIDEO_BYTES) throw new Error('Відео має бути не більше 50 МБ.');
 }
 
@@ -86,14 +102,11 @@ export async function uploadGiftMemoryAssets(input: {
 
     if (input.files.video) {
       validateGiftMemoryVideo(input.files.video);
-      const ext = extensionFromName(
-        input.files.video.name,
-        input.files.video.type === 'video/quicktime' ? 'mov' : 'mp4',
-      );
+      const ext = videoExtension(input.files.video);
       videoPath = `${prefix}/video.${ext}`;
       const { error } = await supabase.storage.from(BUCKET).upload(videoPath, input.files.video, {
         cacheControl: '3600',
-        contentType: input.files.video.type,
+        contentType: videoContentType(input.files.video, ext),
         upsert: false,
       });
       if (error) throw error;
@@ -113,7 +126,7 @@ export async function removeGiftMemoryAssets(paths: string[]): Promise<void> {
 
 export async function createGiftMemorySignedUrl(path: string | null): Promise<string | null> {
   if (!path) return null;
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 60 * 60);
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 6 * 60 * 60);
   if (error) {
     console.warn('[Wishlist] не вдалося підписати memory-файл:', error);
     return null;
