@@ -29,9 +29,11 @@ function eventTime(value: string): string {
     : date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
 }
 
-function notificationHref(href: string, id: number): string {
+function notificationHref(href: string, id: number, entityId: number | null): string {
   const separator = href.includes('?') ? '&' : '?';
-  return `${href}${separator}notification=${id}`;
+  const params = [`notification=${id}`];
+  if (entityId !== null) params.push(`wish=${entityId}`);
+  return `${href}${separator}${params.join('&')}`;
 }
 
 export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -62,10 +64,15 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
     else goalMutations.remove.mutate(id);
   };
 
-  const openEvent = (id: number, href: string, unread: boolean) => {
+  const openEvent = (
+    id: number,
+    href: string,
+    entityId: number | null,
+    unread: boolean,
+  ) => {
     if (unread) markRead.mutate(id);
     onClose();
-    if (href.startsWith('/')) navigate(notificationHref(href, id));
+    if (href.startsWith('/')) navigate(notificationHref(href, id, entityId));
   };
 
   return (
@@ -145,7 +152,7 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
                     key={event.id}
                     type="button"
                     className={`notification-event${unread ? ' notification-event--unread' : ''}`}
-                    onClick={() => openEvent(event.id, event.href, unread)}
+                    onClick={() => openEvent(event.id, event.href, event.entity_id, unread)}
                   >
                     <span className="notification-event-icon" aria-hidden="true">
                       {EVENT_ICON[event.kind]}
