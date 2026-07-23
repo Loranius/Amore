@@ -2,6 +2,7 @@
 // WishCard — editorial dream-board card
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
+import { useUsersMap } from '@/features/_shared/useUsers';
 import { ProgressivePhoto } from './ProgressivePhoto';
 import {
   wishCardStatusChip,
@@ -55,12 +56,14 @@ export function WishCard({
   onMove,
 }: WishCardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const usersMap = useUsersMap();
   const menuRef = useRef<HTMLDivElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const hasMenuActions = item.can_edit || item.can_move || item.can_delete;
   const closeMenu = () => setMenuOpen(false);
   const resolvedContext: WishCardContext = context
     ?? (item.completion_mode === 'shared' ? 'shared' : isOwn ? 'me' : 'partner');
+  const creatorName = resolvedContext === 'shared' ? usersMap[item.owner] : null;
   const statusChip = wishCardStatusChip({
     context: resolvedContext,
     completionMode: item.completion_mode,
@@ -272,6 +275,10 @@ export function WishCard({
       </div>
 
       <div className="wl-card-v3-content">
+        {creatorName && (
+          <span className="wl-card-v3-attribution">Автор мрії — {creatorName}</span>
+        )}
+
         <div className="wl-card-v3-heading">
           {item.link ? (
             <a className="wl-card-v3-title" href={item.link} target="_blank" rel="noopener noreferrer">
