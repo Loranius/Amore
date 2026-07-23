@@ -22,12 +22,21 @@ function errorMessage(error: unknown): string {
 }
 
 /**
+ * `true` означає, що клієнт не знає, чи сервер устиг закомітити операцію.
+ * Невідома форма помилки теж вважається неоднозначною — безпечніше
+ * звірити список із сервером, ніж повторити create або видалити медіа.
+ */
+export function isAmbiguousWishlistTransportError(error: unknown): boolean {
+  const message = errorMessage(error);
+  if (!message) return true;
+  return AMBIGUOUS_NETWORK_MARKERS.some((marker) => message.includes(marker));
+}
+
+/**
  * Після підтвердженої серверної відмови транзакція не закомічена, тому
  * щойно завантажене фото можна прибрати одразу. Після transport failure
  * результат невідомий: відповідь могла загубитися вже після commit.
  */
 export function canRemoveWishPhotoAfterSaveError(error: unknown): boolean {
-  const message = errorMessage(error);
-  if (!message) return false;
-  return !AMBIGUOUS_NETWORK_MARKERS.some((marker) => message.includes(marker));
+  return !isAmbiguousWishlistTransportError(error);
 }
