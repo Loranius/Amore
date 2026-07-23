@@ -33,6 +33,7 @@ import {
   uploadGiftMemoryAssets,
   type GiftMemoryFiles,
 } from './giftMemory';
+import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
 import type { WishlistItemRow, UserName } from '@/types';
 
 const BUCKET = 'wishlist-photos';
@@ -171,15 +172,17 @@ export function useWishlistMutations(ownerId: number | null) {
         });
       }
     },
-    onSuccess: invalidateBoth,
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
-        message.includes('wish_not_editable')
-          ? 'Цю мрію вже не можна редагувати.'
-          : 'Не вдалося зберегти бажання. Спробуй ще.',
+        isAmbiguousWishlistTransportError(e)
+          ? 'З’єднання обірвалося. Перевір список перед повторним створенням мрії.'
+          : message.includes('wish_not_editable')
+            ? 'Цю мрію вже не можна редагувати.'
+            : 'Не вдалося зберегти бажання. Спробуй ще.',
       );
     },
+    onSettled: invalidateBoth,
   });
 
   const remove = useMutation({
@@ -209,7 +212,6 @@ export function useWishlistMutations(ownerId: number | null) {
       if (v.reserved) await reserveWishlistItem(v.id);
       else await cancelWishlistReservation(v.id);
     },
-    onSuccess: invalidateBoth,
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
@@ -218,41 +220,42 @@ export function useWishlistMutations(ownerId: number | null) {
           : 'Не вдалося оновити бронювання. Спробуй ще.',
       );
     },
+    onSettled: invalidateBoth,
   });
 
   const markPurchased = useMutation({
     mutationFn: (id: number) => markWishlistPurchased(id),
-    onSuccess: invalidateBoth,
     onError: (e) =>
       toast.show(
         (e as Error).message.includes('wish_not_purchasable')
           ? 'Цей подарунок уже не можна позначити як куплений.'
           : 'Не вдалося оновити етап покупки. Спробуй ще.',
       ),
+    onSettled: invalidateBoth,
   });
 
   const markPreparing = useMutation({
     mutationFn: (id: number) => markWishlistPreparing(id),
-    onSuccess: invalidateBoth,
     onError: (e) =>
       toast.show(
         (e as Error).message.includes('wish_not_preparable')
           ? 'Спочатку познач подарунок як куплений.'
           : 'Не вдалося почати підготовку сюрпризу.',
       ),
+    onSettled: invalidateBoth,
   });
 
   const changeScope = useMutation({
     mutationFn: async (v: { id: number; owner: number; isShared: boolean }) => {
       await moveWishlistItem(v.id, v.owner, v.isShared);
     },
-    onSuccess: invalidateBoth,
     onError: (e) =>
       toast.show(
         (e as Error).message.includes('wish_not_movable')
           ? 'Цю мрію вже не можна переносити.'
           : 'Не вдалося перенести бажання. Спробуй ще.',
       ),
+    onSettled: invalidateBoth,
   });
 
   const fulfill = useMutation({
@@ -288,10 +291,7 @@ export function useWishlistMutations(ownerId: number | null) {
         console.warn('[Wishlist] db-notify error:', e);
       }
     },
-    onSuccess: () => {
-      burstConfetti();
-      invalidateBoth();
-    },
+    onSuccess: burstConfetti,
     onError: (e) => {
       const message = (e as Error).message;
       toast.show(
@@ -300,6 +300,7 @@ export function useWishlistMutations(ownerId: number | null) {
           : 'Не вдалося завершити подарунок: ' + message,
       );
     },
+    onSettled: invalidateBoth,
   });
 
   return {
