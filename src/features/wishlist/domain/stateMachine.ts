@@ -2,6 +2,7 @@ export const WISH_STATUSES = [
   'created',
   'visible',
   'reserved',
+  'purchased',
   'preparing_surprise',
   'gifted',
   'archived',
@@ -13,6 +14,7 @@ export type WishTransitionAction =
   | 'publish'
   | 'reserve'
   | 'cancel_reservation'
+  | 'mark_purchased'
   | 'start_preparing'
   | 'complete_gift'
   | 'archive';
@@ -24,8 +26,9 @@ const TRANSITIONS: Readonly<
   visible: { reserve: 'reserved' },
   reserved: {
     cancel_reservation: 'visible',
-    start_preparing: 'preparing_surprise',
+    mark_purchased: 'purchased',
   },
+  purchased: { start_preparing: 'preparing_surprise' },
   preparing_surprise: { complete_gift: 'gifted' },
   gifted: { archive: 'archived' },
   archived: {},
