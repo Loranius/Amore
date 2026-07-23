@@ -13,10 +13,12 @@ export function WishArchive({
   ownerId,
   onPhotoClick,
   openRequested = false,
+  openRequestKey = null,
 }: {
   ownerId: number;
   onPhotoClick: (src: string) => void;
   openRequested?: boolean;
+  openRequestKey?: string | null;
 }) {
   const [open, setOpen] = useState(openRequested);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -30,7 +32,7 @@ export function WishArchive({
       wrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 120);
     return () => window.clearTimeout(timer);
-  }, [openRequested]);
+  }, [openRequested, openRequestKey]);
 
   return (
     <div className="wl-archive-wrap" ref={wrapRef}>
