@@ -27,7 +27,7 @@ const PRIORITY_ICONS: Record<string, string> = {
 
 interface WishCardProps {
   item: WishlistItemV3;
-  context: WishCardContext;
+  context?: WishCardContext;
   isOwn: boolean;
   canManageReservation: boolean;
   busy: boolean;
@@ -59,8 +59,10 @@ export function WishCard({
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const hasMenuActions = item.can_edit || item.can_move || item.can_delete;
   const closeMenu = () => setMenuOpen(false);
+  const resolvedContext: WishCardContext = context
+    ?? (item.completion_mode === 'shared' ? 'shared' : isOwn ? 'me' : 'partner');
   const statusChip = wishCardStatusChip({
-    context,
+    context: resolvedContext,
     completionMode: item.completion_mode,
     status: item.status,
     reserved: item.reserved,
@@ -183,7 +185,7 @@ export function WishCard({
 
   return (
     <article
-      className={`wl-card wl-card-v3 wl-card-v3--${context}${item.reserved ? ' wl-card-v3--reserved' : ''}`}
+      className={`wl-card wl-card-v3 wl-card-v3--${resolvedContext}${item.reserved ? ' wl-card-v3--reserved' : ''}`}
       aria-busy={busy}
     >
       <div className="wl-card-v3-media">
