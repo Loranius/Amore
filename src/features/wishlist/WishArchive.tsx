@@ -105,7 +105,9 @@ export function WishArchive({
                           className="wl-gift-memory-video"
                           src={item.reaction_video_url}
                           controls
+                          playsInline
                           preload="metadata"
+                          aria-label={`Відео реакції: ${item.title}`}
                         />
                       )}
 
