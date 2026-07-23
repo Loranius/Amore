@@ -20,6 +20,7 @@ export const qk = {
     (ownerId === undefined ? (['wishlist'] as const) : (['wishlist', ownerId] as const)),
   wishlistFulfilled: (ownerId: number) => ['wishlist', 'fulfilled', ownerId] as const,
   wishlistShared: () => ['wishlist', 'shared'] as const,
+  wishlistSharedFulfilled: () => ['wishlist', 'shared', 'fulfilled'] as const,
   wishlistStats: () => ['wishlist', 'stats'] as const,
 
   notifications: () => ['notifications'] as const,
@@ -69,4 +70,4 @@ export const realtimeInvalidation: Record<
   work_schedule: [['schedule'], qk.sharedDaysOff()],
   map_pins: [qk.mapPins()],
   user_locations: [qk.userLocations()],
-};
+} as const;
