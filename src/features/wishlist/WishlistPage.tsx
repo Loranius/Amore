@@ -41,6 +41,7 @@ import {
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistV3.mobile.css';
 import './wishlistGiftArchive.css';
+import './wishlistArchiveRedesign.css';
 import './wishlistFoundation.css';
 import './wishlistHero.css';
 
@@ -90,7 +91,7 @@ function sharedEmptyState(filter: SharedWishFilter, partnerName: string) {
 
   if (filter === 'partner') {
     return {
-      title: `${partnerName} ще не додавав(ла) спільних ідей`,
+      title: `Ідей від ${partnerGenitive(partnerName)} поки немає`,
       description: 'Ідеї партнера з’являться тут одразу після створення.',
     };
   }
@@ -116,13 +117,21 @@ export function WishlistPage() {
   const notificationRequest = searchParams.get('notification');
   const archiveFocusWishId = requestedWishId(searchParams.get('wish'));
   const [tab, setTab] = useState<Tab>(tabFromUrl);
+  const [archiveOpen, setArchiveOpen] = useState(
+    archiveRequested && tabFromUrl !== 'partner',
+  );
   const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
   const [sharedFilter, setSharedFilter] = useState<SharedWishFilter>('all');
   const actionLock = useRef(false);
 
   useEffect(() => {
     setTab(tabFromUrl);
+    if (tabFromUrl === 'partner') setArchiveOpen(false);
   }, [tabFromUrl]);
+
+  useEffect(() => {
+    if (archiveRequested && tabFromUrl !== 'partner') setArchiveOpen(true);
+  }, [archiveRequested, notificationRequest, tabFromUrl]);
 
   const isOwnTab = tab === 'me';
   const ownerId = tab === 'shared' ? null : isOwnTab ? me.id : (partner?.id ?? null);
@@ -302,110 +311,135 @@ export function WishlistPage() {
 
   const partnerEmptyCopy = tab === 'partner' ? partnerEmptyState(partnerFilter) : null;
   const sharedEmptyCopy = tab === 'shared' ? sharedEmptyState(sharedFilter, partner.name) : null;
+  const canShowArchive = tab === 'me' || tab === 'shared';
+
+  const changeTab = (nextTab: Tab) => {
+    setTab(nextTab);
+    if (nextTab === 'partner') setArchiveOpen(false);
+  };
 
   return (
     <section className="wishlist pink-page" aria-busy={isPending || mutationBusy}>
       <PortalDecor density="light" parallax={false} />
 
-      <WishlistHero
-        tab={tab}
-        meName={me.name}
-        partnerName={partner.name}
-        activeCount={isPending || isError ? null : items.length}
-        stats={stats}
-        busy={mutationBusy}
-        onAdd={() => setAdding(true)}
-      />
-
-      <TabBar<Tab> value={tab} onChange={setTab} items={tabs} />
-
-      {tab === 'partner' && !isPending && !isError && (
-        <WishlistPartnerToolbar
-          value={partnerFilter}
-          counts={partnerCounts}
-          onChange={setPartnerFilter}
-        />
-      )}
-
-      {tab === 'shared' && !isPending && !isError && (
-        <WishlistSharedToolbar
-          value={sharedFilter}
+      {!archiveOpen && (
+        <WishlistHero
+          tab={tab}
+          meName={me.name}
           partnerName={partner.name}
-          counts={sharedCounts}
-          onChange={setSharedFilter}
+          activeCount={isPending || isError ? null : items.length}
+          stats={stats}
+          busy={mutationBusy}
+          onAdd={() => setAdding(true)}
         />
       )}
 
-      {ownerId === null && tab !== 'shared' ? (
-        <p className="empty-state">Користувача не знайдено.</p>
-      ) : isPending ? (
-        <div role="status" aria-live="polite" aria-label="Завантаження бажань">
-          <WishlistGridSkeleton />
-        </div>
-      ) : isError ? (
-        <div className="empty-state" role="alert">
-          <p>Не вдалось завантажити бажання. Перевір з’єднання й повтори.</p>
-          <button
-            type="button"
-            className="btn btn-secondary"
-            disabled={isFetching}
-            onClick={() => void refetchItems()}
-          >
-            {isFetching ? 'Повторюємо…' : 'Спробувати ще'}
-          </button>
-        </div>
+      <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
+
+      {archiveOpen && canShowArchive ? (
+        <WishArchive
+          scope={tab === 'shared' ? 'shared' : 'personal'}
+          ownerId={tab === 'me' ? me.id : null}
+          onPhotoClick={setLightbox}
+          openRequested={archiveRequested}
+          openRequestKey={notificationRequest}
+          focusWishId={archiveFocusWishId}
+          open
+          onOpenChange={setArchiveOpen}
+        />
       ) : (
         <>
-          <div className="wishlist-grid">
-            {visibleItems.length === 0 ? (
-              tab === 'partner' && partnerEmptyCopy ? (
-                <div className="wl-partner-empty">
-                  <div>
-                    <span aria-hidden="true">{partnerEmptyCopy.icon}</span>
-                    <strong>{partnerEmptyCopy.title}</strong>
-                    <p>{partnerEmptyCopy.description}</p>
-                  </div>
-                </div>
-              ) : tab === 'shared' && sharedEmptyCopy ? (
-                <div className="wl-shared-empty">
-                  <div>
-                    <span aria-hidden="true">✨</span>
-                    <strong>{sharedEmptyCopy.title}</strong>
-                    <p>{sharedEmptyCopy.description}</p>
-                  </div>
-                </div>
-              ) : (
-                <p className="empty-state">Твій список порожній. Час додати нову забаганку.</p>
-              )
-            ) : (
-              visibleItems.map((item) => (
-                <WishCard
-                  key={item.id}
-                  item={item}
-                  isOwn={isItemOwn(item)}
-                  canManageReservation={canManageReservation(item)}
-                  busy={mutationBusy}
-                  onPhotoClick={setLightbox}
-                  onEdit={setEditing}
-                  onDelete={onDelete}
-                  onReserve={onReserve}
-                  onPurchased={onPurchased}
-                  onFulfill={(wish) => void onFulfill(wish)}
-                  onMove={setMoving}
-                />
-              ))
-            )}
-          </div>
-
-          {(tab === 'me' || tab === 'shared') && (
-            <WishArchive
-              scope={tab === 'shared' ? 'shared' : 'personal'}
-              ownerId={tab === 'me' ? me.id : null}
-              onPhotoClick={setLightbox}
-              openRequested={archiveRequested}
-              openRequestKey={notificationRequest}
-              focusWishId={archiveFocusWishId}
+          {tab === 'partner' && !isPending && !isError && (
+            <WishlistPartnerToolbar
+              value={partnerFilter}
+              counts={partnerCounts}
+              onChange={setPartnerFilter}
             />
+          )}
+
+          {tab === 'shared' && !isPending && !isError && (
+            <WishlistSharedToolbar
+              value={sharedFilter}
+              partnerName={partner.name}
+              counts={sharedCounts}
+              onChange={setSharedFilter}
+            />
+          )}
+
+          {ownerId === null && tab !== 'shared' ? (
+            <p className="empty-state">Користувача не знайдено.</p>
+          ) : isPending ? (
+            <div role="status" aria-live="polite" aria-label="Завантаження бажань">
+              <WishlistGridSkeleton />
+            </div>
+          ) : isError ? (
+            <div className="empty-state" role="alert">
+              <p>Не вдалось завантажити бажання. Перевір з’єднання й повтори.</p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isFetching}
+                onClick={() => void refetchItems()}
+              >
+                {isFetching ? 'Повторюємо…' : 'Спробувати ще'}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="wishlist-grid">
+                {visibleItems.length === 0 ? (
+                  tab === 'partner' && partnerEmptyCopy ? (
+                    <div className="wl-partner-empty">
+                      <div>
+                        <span aria-hidden="true">{partnerEmptyCopy.icon}</span>
+                        <strong>{partnerEmptyCopy.title}</strong>
+                        <p>{partnerEmptyCopy.description}</p>
+                      </div>
+                    </div>
+                  ) : tab === 'shared' && sharedEmptyCopy ? (
+                    <div className="wl-shared-empty">
+                      <div>
+                        <span aria-hidden="true">✨</span>
+                        <strong>{sharedEmptyCopy.title}</strong>
+                        <p>{sharedEmptyCopy.description}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="empty-state">Твій список порожній. Час додати нову забаганку.</p>
+                  )
+                ) : (
+                  visibleItems.map((item) => (
+                    <WishCard
+                      key={item.id}
+                      item={item}
+                      isOwn={isItemOwn(item)}
+                      canManageReservation={canManageReservation(item)}
+                      busy={mutationBusy}
+                      onPhotoClick={setLightbox}
+                      onEdit={setEditing}
+                      onDelete={onDelete}
+                      onReserve={onReserve}
+                      onPurchased={onPurchased}
+                      onFulfill={(wish) => void onFulfill(wish)}
+                      onMove={setMoving}
+                    />
+                  ))
+                )}
+              </div>
+
+              {canShowArchive && (
+                <WishArchive
+                  scope={tab === 'shared' ? 'shared' : 'personal'}
+                  ownerId={tab === 'me' ? me.id : null}
+                  onPhotoClick={setLightbox}
+                  openRequested={archiveRequested}
+                  openRequestKey={notificationRequest}
+                  focusWishId={archiveFocusWishId}
+                  open={false}
+                  onOpenChange={setArchiveOpen}
+                />
+              )}
+            </>
           )}
         </>
       )}
