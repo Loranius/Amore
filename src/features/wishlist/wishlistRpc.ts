@@ -166,11 +166,14 @@ export async function createWishlistItem(input: {
     });
     createRequestTracker.release(tracked.key);
   } catch (error) {
-    // A transport failure may have happened after commit. Keep the same request
-    // UUID so the next retry safely returns the already-created wish.
-    if (!isAmbiguousWishlistTransportError(error)) {
-      createRequestTracker.release(tracked.key);
+    if (isAmbiguousWishlistTransportError(error)) {
+      // Prevent the outer mutation layer from treating this as the old
+      // field-based reconciliation flow. The modal remains open and the next
+      // click reuses the same server request UUID.
+      throw new Error('wishlist_create_retry_safe');
     }
+
+    createRequestTracker.release(tracked.key);
     throw error;
   }
 }
