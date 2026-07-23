@@ -125,7 +125,7 @@ export function WishlistPage() {
         payload,
         owner: scope.owner,
         isShared: scope.isShared,
-        expectedVersion: id !== null ? editing?.version : undefined,
+        expectedVersion: editing?.version ?? 0,
       });
     } catch (error) {
       if (id !== null && (error as Error).message.includes('wish_version_conflict')) {
