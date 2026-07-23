@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   giftMemoryAssetFingerprint,
   isStorageObjectAlreadyExistsError,
-} from './giftMemory';
+} from './giftMemoryRetry';
 
 describe('Gift Memory retry paths', () => {
   it('keeps the same fingerprint for the same file metadata', () => {
