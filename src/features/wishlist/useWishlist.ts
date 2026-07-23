@@ -30,7 +30,6 @@ import {
   type WishlistItemV3,
 } from './wishlistRpc';
 import {
-  removeGiftMemoryAssets,
   uploadGiftMemoryAssets,
   type GiftMemoryFiles,
 } from './giftMemory';
@@ -265,18 +264,17 @@ export function useWishlistMutations(ownerId: number | null) {
         files: { photo, video },
       });
 
-      try {
-        await completeWishlistGift({
-          wishId: item.id,
-          idempotencyKey,
-          reactionPhotoPath: uploaded.photoPath,
-          reactionVideoPath: uploaded.videoPath,
-          comment: comment.trim() || null,
-        });
-      } catch (error) {
-        await removeGiftMemoryAssets(uploaded.uploadedPaths);
-        throw error;
-      }
+      // Не видаляємо повністю завантажені файли після помилки RPC: при
+      // втраченій відповіді сервер міг уже зафіксувати completion. Повторна
+      // спроба використовує той самий idempotency key, а справжні сироти
+      // безпечно прибере wishlist-storage-cleanup після grace period.
+      await completeWishlistGift({
+        wishId: item.id,
+        idempotencyKey,
+        reactionPhotoPath: uploaded.photoPath,
+        reactionVideoPath: uploaded.videoPath,
+        comment: comment.trim() || null,
+      });
 
       const owner = (users ?? []).find((u) => u.id === item.owner);
       try {
