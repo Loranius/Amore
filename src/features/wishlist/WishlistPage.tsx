@@ -38,6 +38,7 @@ export function WishlistPage() {
   const [searchParams] = useSearchParams();
   const tabFromUrl = requestedTab(searchParams.get('tab'));
   const archiveRequested = searchParams.get('archive') === '1';
+  const notificationRequest = searchParams.get('notification');
   const [tab, setTab] = useState<Tab>(tabFromUrl);
 
   useEffect(() => {
@@ -208,6 +209,7 @@ export function WishlistPage() {
               ownerId={me.id}
               onPhotoClick={setLightbox}
               openRequested={archiveRequested}
+              openRequestKey={notificationRequest}
             />
           )}
         </>
