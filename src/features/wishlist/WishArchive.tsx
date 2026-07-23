@@ -8,7 +8,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFulfilledWishes } from './useWishlist';
 import { useUsersMap } from '@/features/_shared/useUsers';
 import type { GiftMemoryArchiveItem } from './wishlistRpc';
-import './wishlistGiftArchive.css';
 
 type ArchiveGroup = {
   key: string;
@@ -247,7 +246,7 @@ export function WishArchive({
 
                               {item.memory_comment && (
                                 <blockquote className="wl-gift-memory-comment">
-                                  “{item.memory_comment}”
+                                  {item.memory_comment}”
                                 </blockquote>
                               )}
 
