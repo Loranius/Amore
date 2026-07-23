@@ -25,6 +25,7 @@ import {
 import type { WishlistItemV3 } from './wishlistRpc';
 import type { WishlistItemRow } from '@/types';
 import './wishlistV3.mobile.css';
+import './wishlistGiftArchive.css';
 
 type Tab = 'me' | 'partner' | 'shared';
 
