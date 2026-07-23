@@ -70,7 +70,10 @@ Deno.serve(async (request: Request) => {
     return response({ ok: false, error: "not_authenticated" }, 401);
   }
 
-  const body = await request.json().catch(() => ({})) as CleanupBody;
+  const parsedBody = await request.json().catch(() => ({})) as unknown;
+  const body: CleanupBody = parsedBody && typeof parsedBody === "object"
+    ? parsedBody as CleanupBody
+    : {};
   const dryRun = body.dryRun === true;
 
   const { data: claimedRun, error: claimError } = await userClient.rpc(
@@ -99,6 +102,16 @@ Deno.serve(async (request: Request) => {
     if (error) throw error;
 
     const candidates = Array.isArray(data) ? data as CleanupCandidate[] : [];
+    const candidateMemories = candidates.filter(
+      (item) => item.bucket_id === "wishlist-memories",
+    ).length;
+    const candidatePhotos = candidates.filter(
+      (item) => item.bucket_id === "wishlist-photos",
+    ).length;
+    const candidateBytes = candidates.reduce(
+      (sum, item) => sum + Math.max(Number(item.size_bytes ?? 0) || 0, 0),
+      0,
+    );
 
     if (!dryRun) {
       for (const bucketId of ["wishlist-memories", "wishlist-photos"] as const) {
@@ -121,37 +134,37 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    const candidateMemories = candidates.filter(
-      (item) => item.bucket_id === "wishlist-memories",
-    ).length;
-    const candidatePhotos = candidates.filter(
-      (item) => item.bucket_id === "wishlist-photos",
-    ).length;
-    const candidateBytes = candidates.reduce(
-      (sum, item) => sum + Math.max(Number(item.size_bytes ?? 0) || 0, 0),
-      0,
-    );
-
     const { error: finishError } = await admin.rpc("finish_wishlist_storage_cleanup", {
       p_run_id: runId,
       p_status: dryRun ? "dry_run" : "succeeded",
-      p_memories_deleted: dryRun ? candidateMemories : memoriesDeleted,
-      p_photos_deleted: dryRun ? candidatePhotos : photosDeleted,
-      p_bytes_deleted: dryRun ? candidateBytes : bytesDeleted,
+      p_memories_deleted: dryRun ? 0 : memoriesDeleted,
+      p_photos_deleted: dryRun ? 0 : photosDeleted,
+      p_bytes_deleted: dryRun ? 0 : bytesDeleted,
       p_error_summary: null,
     });
     if (finishError) throw finishError;
 
-    return response({
-      ok: true,
-      status: dryRun ? "dry_run" : "completed",
-      runId,
-      memoriesDeleted: dryRun ? candidateMemories : memoriesDeleted,
-      photosDeleted: dryRun ? candidatePhotos : photosDeleted,
-      bytesDeleted: dryRun ? candidateBytes : bytesDeleted,
-      cutoff,
-      capped: candidates.length >= CANDIDATE_LIMIT,
-    });
+    return response(dryRun
+      ? {
+          ok: true,
+          status: "dry_run",
+          runId,
+          memoriesFound: candidateMemories,
+          photosFound: candidatePhotos,
+          bytesFound: candidateBytes,
+          cutoff,
+          capped: candidates.length >= CANDIDATE_LIMIT,
+        }
+      : {
+          ok: true,
+          status: "completed",
+          runId,
+          memoriesDeleted,
+          photosDeleted,
+          bytesDeleted,
+          cutoff,
+          capped: candidates.length >= CANDIDATE_LIMIT,
+        });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[wishlist-storage-cleanup] failed", error);
