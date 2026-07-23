@@ -39,6 +39,24 @@ export function GiftCompletionModal({
   const [comment, setComment] = useState('');
 
   useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) onClose();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose, saving]);
+
+  useEffect(() => {
     return () => {
       if (videoPreview) URL.revokeObjectURL(videoPreview);
     };
@@ -94,7 +112,20 @@ export function GiftCompletionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="gift-memory-title"
+        aria-busy={saving}
       >
+        <div className="gift-memory-drag-handle" aria-hidden="true" />
+
+        <button
+          type="button"
+          className="gift-memory-close"
+          aria-label="Закрити"
+          disabled={saving}
+          onClick={onClose}
+        >
+          ×
+        </button>
+
         <div className="gift-memory-heading">
           <div className="gift-memory-icon" aria-hidden="true">🎁</div>
           <div>
@@ -152,7 +183,7 @@ export function GiftCompletionModal({
             </div>
             <div className="gift-memory-preview gift-memory-preview--video">
               {videoPreview ? (
-                <video src={videoPreview} controls preload="metadata" />
+                <video src={videoPreview} controls playsInline preload="metadata" />
               ) : (
                 <span aria-hidden="true">🎬</span>
               )}
