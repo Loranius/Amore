@@ -5,6 +5,19 @@
 
 /* Mobile-only polishing for Wishlist v3. */
 
+.wishlist .is-disabled,
+.wishlist button:disabled,
+.wishlist input:disabled,
+.wishlist textarea:disabled,
+.wishlist select:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.wishlist .is-disabled {
+  pointer-events: none;
+}
+
 @media (max-width: 719px) {
   .wishlist {
     padding-bottom: calc(132px + env(safe-area-inset-bottom, 0px));
