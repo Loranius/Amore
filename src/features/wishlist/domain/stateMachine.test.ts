@@ -15,7 +15,8 @@ describe('wishlist v3 state machine', () => {
     ['created', 'publish', 'visible'],
     ['visible', 'reserve', 'reserved'],
     ['reserved', 'cancel_reservation', 'visible'],
-    ['reserved', 'start_preparing', 'preparing_surprise'],
+    ['reserved', 'mark_purchased', 'purchased'],
+    ['purchased', 'start_preparing', 'preparing_surprise'],
     ['preparing_surprise', 'complete_gift', 'gifted'],
     ['gifted', 'archive', 'archived'],
   ] satisfies Array<[WishStatus, WishTransitionAction, WishStatus]>) (
@@ -29,7 +30,8 @@ describe('wishlist v3 state machine', () => {
   it.each([
     ['created', 'reserve'],
     ['visible', 'complete_gift'],
-    ['reserved', 'archive'],
+    ['reserved', 'start_preparing'],
+    ['purchased', 'cancel_reservation'],
     ['preparing_surprise', 'cancel_reservation'],
     ['gifted', 'reserve'],
     ['archived', 'publish'],
@@ -45,13 +47,16 @@ describe('wishlist v3 state machine', () => {
     expect(isWishEditable('created')).toBe(true);
     expect(isWishEditable('visible')).toBe(true);
     expect(isWishEditable('reserved')).toBe(false);
+    expect(isWishEditable('purchased')).toBe(false);
 
     expect(isWishDeletable('created')).toBe(true);
     expect(isWishDeletable('visible')).toBe(true);
+    expect(isWishDeletable('purchased')).toBe(false);
     expect(isWishDeletable('preparing_surprise')).toBe(false);
   });
 
   it('marks gifted history as immutable', () => {
+    expect(isWishImmutable('purchased')).toBe(false);
     expect(isWishImmutable('preparing_surprise')).toBe(false);
     expect(isWishImmutable('gifted')).toBe(true);
     expect(isWishImmutable('archived')).toBe(true);

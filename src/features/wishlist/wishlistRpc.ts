@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { createGiftMemorySignedUrl } from './giftMemory';
+import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
+import { WishlistCreateRequestTracker } from './wishlistCreateIdempotency';
 import type { WishlistItemRow } from '@/types';
 
 export type WishlistStatus =
@@ -67,6 +69,7 @@ type RpcResponse = Promise<{ data: unknown; error: RpcError | null }>;
 type RpcCaller = (fn: string, args?: Record<string, unknown>) => RpcResponse;
 
 const rpc = supabase.rpc.bind(supabase) as unknown as RpcCaller;
+const createRequestTracker = new WishlistCreateRequestTracker();
 
 function assertRows<T>(data: unknown, label: string): T[] {
   if (!Array.isArray(data)) throw new Error(`${label} RPC returned an invalid payload`);
@@ -152,11 +155,27 @@ export async function createWishlistItem(input: {
   ownerId: number;
   shared: boolean;
 }): Promise<void> {
-  await callVoid('create_wishlist_item_v3', {
-    ...mutationArgs(input.payload),
-    p_owner_id: input.ownerId,
-    p_is_shared: input.shared,
-  });
+  const tracked = createRequestTracker.acquire(input);
+
+  try {
+    await callVoid('create_wishlist_item_idempotent_v3', {
+      p_request_id: tracked.requestId,
+      ...mutationArgs(input.payload),
+      p_owner_id: input.ownerId,
+      p_is_shared: input.shared,
+    });
+    createRequestTracker.release(tracked.key);
+  } catch (error) {
+    if (isAmbiguousWishlistTransportError(error)) {
+      // Prevent the outer mutation layer from treating this as the old
+      // field-based reconciliation flow. The modal remains open and the next
+      // click reuses the same server request UUID.
+      throw new Error('wishlist_create_retry_safe');
+    }
+
+    createRequestTracker.release(tracked.key);
+    throw error;
+  }
 }
 
 export async function updateWishlistItem(
