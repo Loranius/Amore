@@ -81,6 +81,34 @@
   place-items: stretch;
 }
 
+/* Wishlist cards keep their final height before any network bytes arrive. */
+.wl-card-v3-media {
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+}
+
+.wl-card-v3-photo.wl-card-v3-photo {
+  height: 100%;
+}
+
+.wl-card-v3-photo .wl-card-v3-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Gift/Shared Archive already uses 4:3; the progressive wrapper fills it. */
+.wl-gift-memory-photo .wl-progressive-photo {
+  position: absolute;
+  inset: 0;
+}
+
+.wl-gift-memory-photo .wl-gift-memory-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
 @keyframes wl-photo-shimmer {
   0% { transform: translateX(0); }
   56%, 100% { transform: translateX(290%); }
