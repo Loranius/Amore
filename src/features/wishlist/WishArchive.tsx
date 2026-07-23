@@ -5,27 +5,41 @@
 // тільки коли блок розгорнуто (enabled). Медіа completion-запису
 // приходять як короткоживучі signed URLs із приватного bucket.
 // ============================================================
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFulfilledWishes } from './useWishlist';
 import { useUsersMap } from '@/features/_shared/useUsers';
 
 export function WishArchive({
   ownerId,
   onPhotoClick,
+  openRequested = false,
+  openRequestKey = null,
 }: {
   ownerId: number;
   onPhotoClick: (src: string) => void;
+  openRequested?: boolean;
+  openRequestKey?: string | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(openRequested);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const { data: items = [], isPending, isError, refetch } = useFulfilledWishes(ownerId, open);
   const usersMap = useUsersMap();
 
+  useEffect(() => {
+    if (!openRequested) return;
+    setOpen(true);
+    const timer = window.setTimeout(() => {
+      wrapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [openRequested, openRequestKey]);
+
   return (
-    <div className="wl-archive-wrap">
+    <div className="wl-archive-wrap" ref={wrapRef}>
       <button
         type="button"
         className="wl-archive-toggle"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
       >
         <span className="wl-archive-toggle-label">🎁 Gift Archive</span>

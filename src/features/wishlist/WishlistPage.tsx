@@ -1,7 +1,8 @@
 // ============================================================
 // WishlistPage — вкладка «Бажання»
 // ============================================================
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
@@ -27,10 +28,22 @@ import './wishlistV3.mobile.css';
 
 type Tab = 'me' | 'partner' | 'shared';
 
+function requestedTab(value: string | null): Tab {
+  return value === 'partner' || value === 'shared' ? value : 'me';
+}
+
 export function WishlistPage() {
   const me = useCurrentUser();
   const partner = usePartner();
-  const [tab, setTab] = useState<Tab>('me');
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = requestedTab(searchParams.get('tab'));
+  const archiveRequested = searchParams.get('archive') === '1';
+  const notificationRequest = searchParams.get('notification');
+  const [tab, setTab] = useState<Tab>(tabFromUrl);
+
+  useEffect(() => {
+    setTab(tabFromUrl);
+  }, [tabFromUrl]);
 
   const isOwnTab = tab === 'me';
   const ownerId = tab === 'shared' ? null : isOwnTab ? me.id : (partner?.id ?? null);
@@ -191,7 +204,14 @@ export function WishlistPage() {
             )}
           </div>
 
-          {tab === 'me' && <WishArchive ownerId={me.id} onPhotoClick={setLightbox} />}
+          {tab === 'me' && (
+            <WishArchive
+              ownerId={me.id}
+              onPhotoClick={setLightbox}
+              openRequested={archiveRequested}
+              openRequestKey={notificationRequest}
+            />
+          )}
         </>
       )}
 

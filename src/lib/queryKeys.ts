@@ -22,6 +22,10 @@ export const qk = {
   wishlistShared: () => ['wishlist', 'shared'] as const,
   wishlistStats: () => ['wishlist', 'stats'] as const,
 
+  notifications: () => ['notifications'] as const,
+  notificationsFeed: () => ['notifications', 'feed'] as const,
+  notificationsUnread: () => ['notifications', 'unread'] as const,
+
   media: (type?: MediaType) =>
     (type === undefined ? (['media'] as const) : (['media', type] as const)),
 
