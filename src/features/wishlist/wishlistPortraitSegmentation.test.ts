@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { portraitMaskLooksUsable } from './wishlistPortraitSegmentation';
+import { portraitMaskLooksUsable } from './wishlistPortraitMask';
 
 function mask(size: number, foregroundCount: number, value = 0.9): Float32Array {
   const values = new Float32Array(size);
