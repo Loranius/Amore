@@ -5,6 +5,7 @@ import { WishlistCreateRequestTracker } from './wishlistCreateIdempotency';
 import { WishlistQuickCompletionTracker } from './wishlistQuickCompletion';
 import { registerWishlistProcessedRows } from './wishlistProcessedImageRegistry';
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
+import type { WishlistImagePreference } from './wishlistImagePreference';
 import type { WishlistItemRow } from '@/types';
 
 export type WishlistStatus =
@@ -22,6 +23,8 @@ export type WishlistArchiveScope = 'personal' | 'shared';
 export interface WishlistItemV3 extends WishlistItemRow {
   processed_image_url: string | null;
   image_mode: WishlistImageDisplayMode | null;
+  image_preference: WishlistImagePreference;
+  image_processing_revision: number;
   status: WishlistStatus;
   archived_at: string | null;
   version: number;
@@ -45,6 +48,7 @@ export interface WishlistMutationPayload {
   description: string | null;
   link: string | null;
   image_url: string | null;
+  image_preference: WishlistImagePreference;
   price: number | null;
   priority: WishlistItemRow['priority'];
 }
@@ -111,6 +115,16 @@ async function callVoid(fn: string, args: Record<string, unknown>): Promise<void
   if (error) throw new Error(error.message);
 }
 
+async function callNumber(fn: string, args: Record<string, unknown>): Promise<number> {
+  const { data, error } = await rpc(fn, args);
+  if (error) throw new Error(error.message);
+  const value = Number(data);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${fn} RPC returned an invalid numeric payload`);
+  }
+  return value;
+}
+
 function mutationArgs(payload: WishlistMutationPayload): Record<string, unknown> {
   return {
     p_title: payload.title,
@@ -119,6 +133,7 @@ function mutationArgs(payload: WishlistMutationPayload): Record<string, unknown>
     p_image_url: payload.image_url,
     p_price: payload.price,
     p_priority: payload.priority,
+    p_image_preference: payload.image_preference,
   };
 }
 
@@ -184,17 +199,18 @@ export async function createWishlistItem(input: {
   payload: WishlistMutationPayload;
   ownerId: number;
   shared: boolean;
-}): Promise<void> {
+}): Promise<number> {
   const tracked = createRequestTracker.acquire(input);
 
   try {
-    await callVoid('create_wishlist_item_idempotent_v3', {
+    const wishId = await callNumber('create_wishlist_item_idempotent_v4', {
       p_request_id: tracked.requestId,
       ...mutationArgs(input.payload),
       p_owner_id: input.ownerId,
       p_is_shared: input.shared,
     });
     createRequestTracker.release(tracked.key);
+    return wishId;
   } catch (error) {
     if (isAmbiguousWishlistTransportError(error)) {
       throw new Error('wishlist_create_retry_safe');
@@ -210,10 +226,24 @@ export async function updateWishlistItem(
   expectedVersion: number,
   payload: WishlistMutationPayload,
 ): Promise<void> {
-  await callVoid('update_wishlist_item_collaborative_v3', {
+  await callVoid('update_wishlist_item_collaborative_v4', {
     p_wish_id: wishId,
     p_expected_version: expectedVersion,
     ...mutationArgs(payload),
+  });
+}
+
+export async function setWishlistImagePreference(input: {
+  wishId: number;
+  sourceImageUrl: string;
+  imagePreference: WishlistImagePreference;
+  forceReprocess?: boolean;
+}): Promise<number> {
+  return callNumber('set_wishlist_image_preference_v3', {
+    p_wish_id: input.wishId,
+    p_source_image_url: input.sourceImageUrl,
+    p_image_preference: input.imagePreference,
+    p_force_reprocess: input.forceReprocess ?? false,
   });
 }
 

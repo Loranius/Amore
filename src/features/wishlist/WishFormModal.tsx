@@ -5,6 +5,7 @@
 // вставлене прямим URL або завантажене з пристрою.
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { normalizeToPreview } from '@/lib/images';
 import {
   removeWishPhotoAssets,
@@ -22,16 +23,30 @@ import { useCurrentUser } from '@/providers/AuthProvider';
 import { TabBar } from '@/components/ui/TabBar';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { WishlistPriorityPicker } from './WishlistPriorityPicker';
-import type { WishlistItemRow, AppUser } from '@/types';
+import { WishlistProductVisual } from './WishlistProductVisual';
+import { WishlistImageModePicker } from './WishlistImageModePicker';
+import {
+  DEFAULT_WISHLIST_IMAGE_PREFERENCE,
+  normalizeWishlistImagePreference,
+  type WishlistImagePreference,
+} from './wishlistImagePreference';
+import { clearWishlistStoredVisual } from './wishlistProcessedImageRegistry';
+import {
+  setWishlistImagePreference,
+  type WishlistItemV3,
+} from './wishlistRpc';
+import type { WishlistImageDisplayMode } from './wishlistImageModes';
+import type { AppUser } from '@/types';
 import './wishlistFormSections.css';
 import './wishlistUnsavedChanges.css';
 
 type Scope = 'me' | 'partner' | 'shared';
 type WishlistPriorityV3 = 'high' | 'medium' | 'low';
 type LinkPreviewStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error';
+type ImageReprocessStatus = 'idle' | 'processing' | 'success' | 'error';
 
 interface WishFormModalProps {
-  item: WishlistItemRow | null;
+  item: WishlistItemV3 | null;
   partner: AppUser | null;
   defaultScope: Scope;
   onClose: () => void;
@@ -68,11 +83,28 @@ export function WishFormModal({
   const isEdit = item !== null;
   const me = useCurrentUser();
   const toast = useToast();
+  const queryClient = useQueryClient();
+  const initialImagePreference = normalizeWishlistImagePreference(item?.image_preference);
   const [scope, setScope] = useState<Scope>(defaultScope);
 
   const [title, setTitle] = useState(item?.title ?? '');
   const [link, setLink] = useState(item?.link ?? '');
   const [imgUrl, setImgUrl] = useState(item?.image_url ?? '');
+  const [imagePreference, setImagePreference] = useState<WishlistImagePreference>(
+    initialImagePreference,
+  );
+  const [serverImagePreference, setServerImagePreference] = useState<WishlistImagePreference>(
+    initialImagePreference,
+  );
+  const [imageProcessingRevision, setImageProcessingRevision] = useState(
+    item?.image_processing_revision ?? 0,
+  );
+  const [processedPreviewSrc, setProcessedPreviewSrc] = useState<string | null>(
+    item?.processed_image_url ?? null,
+  );
+  const [processedPreviewMode, setProcessedPreviewMode] = useState<WishlistImageDisplayMode | null>(
+    item?.image_mode ?? null,
+  );
   const [price, setPrice] = useState(item?.price != null ? String(item.price) : '');
   const [priority, setPriority] = useState<WishlistPriorityV3 | ''>(
     normalizeWishlistPriority(item?.priority),
@@ -82,6 +114,8 @@ export function WishFormModal({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewSrc, setPreviewSrc] = useState<string | null>(item?.image_url ?? null);
   const [saving, setSaving] = useState(false);
+  const [imageProcessing, setImageProcessing] = useState(false);
+  const [imageReprocessStatus, setImageReprocessStatus] = useState<ImageReprocessStatus>('idle');
   const [linkPreviewStatus, setLinkPreviewStatus] = useState<LinkPreviewStatus>('idle');
   const [linkPreviewSite, setLinkPreviewSite] = useState<string | null>(null);
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
@@ -96,10 +130,25 @@ export function WishFormModal({
     title: item?.title ?? '',
     link: item?.link ?? '',
     imageUrl: item?.image_url ?? '',
+    imagePreference: initialImagePreference,
     price: item?.price != null ? String(item.price) : '',
     priority: normalizeWishlistPriority(item?.priority),
     description: item?.description ?? '',
   });
+
+  const savedImageUrl = item?.image_url?.trim() ?? '';
+  const currentImageUrl = pendingFile ? '' : imgUrl.trim();
+  const imageChanged = pendingFile !== null || currentImageUrl !== savedImageUrl;
+  const hasSavedImage = Boolean(item?.id && savedImageUrl && !imageChanged);
+  const canPersistPreview = Boolean(
+    item?.id
+      && hasSavedImage
+      && imagePreference === serverImagePreference,
+  );
+  const canUseSavedProcessed = Boolean(
+    hasSavedImage
+      && imagePreference === serverImagePreference,
+  );
 
   const isDirty = hasUnsavedWishChanges(
     initialSnapshot.current,
@@ -108,6 +157,7 @@ export function WishFormModal({
       title,
       link,
       imageUrl: imgUrl,
+      imagePreference,
       price,
       priority,
       description,
@@ -143,6 +193,24 @@ export function WishFormModal({
     setDiscardPromptOpen(true);
   }, [discardPromptOpen, isDirty, onClose, saving]);
 
+  const handleImageProcessingChange = useCallback((processing: boolean) => {
+    setImageProcessing(processing);
+  }, []);
+
+  const handleImagePersisted = useCallback((visual: {
+    src: string;
+    mode: WishlistImageDisplayMode;
+  }) => {
+    setProcessedPreviewSrc(visual.mode === 'photo-cover' ? null : visual.src);
+    setProcessedPreviewMode(visual.mode);
+    setImageReprocessStatus('success');
+    void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+  }, [queryClient]);
+
+  const handleImagePersistenceError = useCallback(() => {
+    setImageReprocessStatus('error');
+  }, []);
+
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -177,6 +245,12 @@ export function WishFormModal({
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, [isDirty, saving]);
 
+  const resetProcessedPreview = () => {
+    setProcessedPreviewSrc(null);
+    setProcessedPreviewMode(null);
+    setImageReprocessStatus('idle');
+  };
+
   const pickFile = async (file: File) => {
     if (saving) return;
     previewRequestVersion.current += 1;
@@ -191,6 +265,7 @@ export function WishFormModal({
       setPendingFile(normalized);
       setPreviewSrc(src);
       setImgUrl('');
+      resetProcessedPreview();
     } catch (e) {
       if (photoRequestVersion.current === requestId) {
         toast.show('Не вдалося обробити фото: ' + (e as Error).message);
@@ -204,6 +279,8 @@ export function WishFormModal({
     setPendingFile(null);
     setImgUrl('');
     setPreviewSrc(null);
+    setImagePreference(DEFAULT_WISHLIST_IMAGE_PREFERENCE);
+    resetProcessedPreview();
   };
 
   const onImageUrlChange = (value: string) => {
@@ -212,6 +289,48 @@ export function WishFormModal({
     if (pendingFile) setPendingFile(null);
     setImgUrl(value);
     setPreviewSrc(value.trim() || null);
+    resetProcessedPreview();
+  };
+
+  const onImagePreferenceChange = (value: WishlistImagePreference) => {
+    setImagePreference(value);
+    setImageReprocessStatus('idle');
+    if (value === serverImagePreference && !imageChanged) {
+      setProcessedPreviewSrc(item?.processed_image_url ?? null);
+      setProcessedPreviewMode(item?.image_mode ?? null);
+      setImageProcessingRevision(item?.image_processing_revision ?? imageProcessingRevision);
+      return;
+    }
+    setProcessedPreviewMode(null);
+  };
+
+  const reprocessSavedImage = async () => {
+    if (
+      !item?.id
+      || !savedImageUrl
+      || imageChanged
+      || saving
+      || imageProcessing
+      || imageReprocessStatus === 'processing'
+    ) return;
+
+    setImageReprocessStatus('processing');
+    try {
+      const revision = await setWishlistImagePreference({
+        wishId: item.id,
+        sourceImageUrl: savedImageUrl,
+        imagePreference,
+        forceReprocess: true,
+      });
+      clearWishlistStoredVisual(item.id, savedImageUrl, imagePreference, revision);
+      setServerImagePreference(imagePreference);
+      setImageProcessingRevision(revision);
+      setProcessedPreviewMode(null);
+      initialSnapshot.current.imagePreference = imagePreference;
+      void queryClient.invalidateQueries({ queryKey: ['wishlist'] });
+    } catch {
+      setImageReprocessStatus('error');
+    }
   };
 
   const loadLinkPreview = useCallback(async (rawUrl: string, force = false) => {
@@ -242,6 +361,7 @@ export function WishFormModal({
         setImgUrl((current) => {
           if (current.trim()) return current;
           setPreviewSrc(productImageUrl);
+          resetProcessedPreview();
           return productImageUrl;
         });
       }
@@ -320,6 +440,9 @@ export function WishFormModal({
           title: normalizedTitle,
           link: normalizedLink || null,
           image_url: imageUrl,
+          image_preference: imageUrl
+            ? imagePreference
+            : DEFAULT_WISHLIST_IMAGE_PREFERENCE,
           price: parsedPrice,
           priority: (priority || null) as WishFormPayload['priority'],
           description: description.trim() || null,
@@ -482,14 +605,24 @@ export function WishFormModal({
             <div className="wm-photo-picker">
               <div className="wm-photo-preview">
                 {previewSrc ? (
-                  <img
+                  <WishlistProductVisual
                     src={previewSrc}
                     alt={`Попередній перегляд: ${title || 'мрія'}`}
-                    onClick={() => onPhotoClick(previewSrc)}
+                    wishId={canPersistPreview ? item?.id : undefined}
+                    processedSrc={canUseSavedProcessed ? processedPreviewSrc : null}
+                    modeHint={canUseSavedProcessed ? processedPreviewMode : null}
+                    preference={imagePreference}
+                    processingRevision={imageProcessingRevision}
+                    persistenceEnabled={canPersistPreview}
+                    onActivate={() => onPhotoClick(previewSrc)}
+                    onProcessingChange={canPersistPreview ? handleImageProcessingChange : undefined}
+                    onPersisted={canPersistPreview ? handleImagePersisted : undefined}
+                    onPersistenceError={canPersistPreview ? handleImagePersistenceError : undefined}
                     onError={() => {
                       if (!pendingFile) {
                         setImgUrl('');
                         setPreviewSrc(null);
+                        resetProcessedPreview();
                       }
                     }}
                   />
@@ -523,6 +656,19 @@ export function WishFormModal({
               onChange={(event) => onImageUrlChange(event.target.value)}
               style={{ marginTop: 8 }}
             />
+
+            {previewSrc && (
+              <WishlistImageModePicker
+                value={imagePreference}
+                disabled={saving}
+                hasSavedImage={hasSavedImage}
+                imageChanged={imageChanged}
+                processing={imageProcessing || imageReprocessStatus === 'processing'}
+                status={imageReprocessStatus}
+                onChange={onImagePreferenceChange}
+                onReprocess={() => void reprocessSavedImage()}
+              />
+            )}
           </div>
         </section>
 

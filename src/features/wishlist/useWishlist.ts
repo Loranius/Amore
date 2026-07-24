@@ -34,6 +34,7 @@ import {
   type GiftMemoryFiles,
 } from './giftMemory';
 import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
+import type { WishlistImagePreference } from './wishlistImagePreference';
 import type { WishlistItemRow, UserName } from '@/types';
 
 const BUCKET = 'wishlist-photos';
@@ -129,6 +130,7 @@ export interface WishFormPayload {
   title: string;
   link: string | null;
   image_url: string | null;
+  image_preference: WishlistImagePreference;
   price: number | null;
   priority: WishlistItemRow['priority'];
   description: string | null;
@@ -145,6 +147,7 @@ function wishMatchesPayload(item: WishlistItemV3, payload: WishFormPayload): boo
     && item.description === payload.description
     && item.link === payload.link
     && item.image_url === payload.image_url
+    && item.image_preference === payload.image_preference
     && item.price === payload.price
     && item.priority === payload.priority;
 }
