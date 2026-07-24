@@ -239,53 +239,56 @@ export function WishCard({
               ×
             </button>
 
-            <div className="wl-cloud-sheet-hero">
-              {imageAvailable ? (
-                <button
-                  type="button"
-                  className="wl-cloud-sheet-photo"
-                  aria-label={`Відкрити фото: ${item.title}`}
-                  onClick={() => closeAndRun(() => onPhotoClick(item.image_url ?? ''))}
-                >
-                  <img src={item.image_url ?? ''} alt={item.title} />
-                </button>
-              ) : (
-                <div className="wl-cloud-sheet-photo" aria-label="Мрія без фото">
-                  <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true">♡</span>
-                </div>
-              )}
-            </div>
-
             <div className="wl-cloud-sheet-content">
-              <div className="wl-cloud-sheet-meta">
-                <span className="wl-cloud-sheet-priority">
-                  <span aria-hidden="true">{priorityPresentation.icon}</span>
-                  {priorityPresentation.label}
-                </span>
-                {statusChip && (
-                  <span className="wl-cloud-sheet-state" data-tone={statusChip.tone}>
-                    <span aria-hidden="true">{statusChip.icon}</span>
-                    {statusChip.label}
-                  </span>
-                )}
+              <div className="wl-cloud-sheet-top">
+                <div className="wl-cloud-sheet-hero">
+                  {imageAvailable ? (
+                    <button
+                      type="button"
+                      className="wl-cloud-sheet-photo"
+                      aria-label={`Відкрити фото: ${item.title}`}
+                      onClick={() => closeAndRun(() => onPhotoClick(item.image_url ?? ''))}
+                    >
+                      <img src={item.image_url ?? ''} alt={item.title} />
+                    </button>
+                  ) : (
+                    <div className="wl-cloud-sheet-photo" aria-label="Мрія без фото">
+                      <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true">♡</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="wl-cloud-sheet-summary">
+                  <div className="wl-cloud-sheet-meta">
+                    <span className="wl-cloud-sheet-priority">
+                      <span aria-hidden="true">{priorityPresentation.icon}</span>
+                      {priorityPresentation.label}
+                    </span>
+                    {statusChip && (
+                      <span className="wl-cloud-sheet-state" data-tone={statusChip.tone}>
+                        <span aria-hidden="true">{statusChip.icon}</span>
+                        {statusChip.label}
+                      </span>
+                    )}
+                  </div>
+
+                  {creatorName && (
+                    <p className="wl-cloud-sheet-attribution">Автор мрії — {creatorName}</p>
+                  )}
+
+                  <h2 id={dialogTitleId} className="wl-cloud-sheet-title">{item.title}</h2>
+
+                  {item.price != null && (
+                    <span className="wl-cloud-sheet-price">
+                      {item.price.toLocaleString('uk-UA')} ₴
+                    </span>
+                  )}
+
+                  {item.description && (
+                    <p className="wl-cloud-sheet-description">{item.description}</p>
+                  )}
+                </div>
               </div>
-
-              {creatorName && (
-                <p className="wl-cloud-sheet-attribution">Автор мрії — {creatorName}</p>
-              )}
-
-              <div className="wl-cloud-sheet-title-row">
-                <h2 id={dialogTitleId} className="wl-cloud-sheet-title">{item.title}</h2>
-                {item.price != null && (
-                  <span className="wl-cloud-sheet-price">
-                    {item.price.toLocaleString('uk-UA')} ₴
-                  </span>
-                )}
-              </div>
-
-              {item.description && (
-                <p className="wl-cloud-sheet-description">{item.description}</p>
-              )}
 
               {item.link && (
                 <a
