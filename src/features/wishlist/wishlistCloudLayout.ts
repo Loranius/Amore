@@ -1,5 +1,4 @@
-import './wishlistBubbleModel.css';
-import './wishlistBubbleModelRuntime';
+import './wishlistGiftPortrait.css';
 
 export type WishlistCloudPriority = 'high' | 'medium' | 'low';
 
