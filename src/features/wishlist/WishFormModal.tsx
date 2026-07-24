@@ -17,6 +17,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { TabBar } from '@/components/ui/TabBar';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
+import { WishlistPriorityPicker } from './WishlistPriorityPicker';
 import type { WishlistItemRow, AppUser } from '@/types';
 
 type Scope = 'me' | 'partner' | 'shared';
@@ -435,21 +436,14 @@ export function WishFormModal({
           />
         </label>
 
-        <label className="form-field">
+        <div className="form-field">
           <span>Пріоритет</span>
-          <select
-            id="wish-priority"
-            name="priority"
+          <WishlistPriorityPicker
             value={priority}
             disabled={saving}
-            onChange={(event) => setPriority(event.target.value as WishlistPriorityV3 | '')}
-          >
-            <option value="">— не вказано —</option>
-            <option value="high">✨ Дуже хочу</option>
-            <option value="medium">◆ Хочу</option>
-            <option value="low">○ Колись</option>
-          </select>
-        </label>
+            onChange={setPriority}
+          />
+        </div>
 
         <label className="form-field">
           <span>Коментар / деталі</span>
