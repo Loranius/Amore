@@ -1,0 +1,205 @@
+/* Volumetric glass shell for the Weighted Cloud. */
+.wl-cloud-item::after {
+  position: absolute;
+  z-index: -1;
+  right: 15%;
+  bottom: -8%;
+  left: 15%;
+  height: 16%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 24%, transparent);
+  content: '';
+  filter: blur(clamp(5px, calc(var(--wl-cloud-size) * 0.055), 12px));
+  opacity: 0.36;
+  pointer-events: none;
+  transform: translateY(12%) scaleX(0.88);
+}
+
+.wl-cloud-bubble {
+  border-color: rgba(255, 255, 255, 0.72);
+  background:
+    radial-gradient(circle at 31% 23%, rgba(255, 255, 255, 0.72), transparent 19%),
+    radial-gradient(circle at 72% 78%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 42%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--surface) 73%, white 27%),
+      color-mix(in srgb, var(--accent) 12%, var(--surface))
+    );
+  box-shadow:
+    0 24px 46px color-mix(in srgb, var(--accent) 19%, transparent),
+    0 9px 18px color-mix(in srgb, var(--text) 15%, transparent),
+    inset 8px 10px 18px rgba(255, 255, 255, 0.48),
+    inset -12px -15px 22px rgba(92, 42, 67, 0.13),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.46);
+}
+
+.wl-cloud-bubble::before {
+  position: absolute;
+  z-index: 4;
+  top: 8%;
+  left: 15%;
+  width: 42%;
+  height: 22%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse,
+    rgba(255, 255, 255, 0.86) 0%,
+    rgba(255, 255, 255, 0.36) 48%,
+    transparent 73%
+  );
+  content: '';
+  filter: blur(clamp(1px, calc(var(--wl-cloud-size) * 0.012), 3px));
+  opacity: 0.86;
+  pointer-events: none;
+  transform: rotate(-18deg);
+}
+
+.wl-cloud-bubble::after {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse at 68% 88%, rgba(255, 255, 255, 0.36), transparent 27%),
+    radial-gradient(circle at 78% 64%, transparent 56%, rgba(91, 43, 66, 0.11) 78%, transparent 91%),
+    linear-gradient(142deg, rgba(255, 255, 255, 0.18), transparent 37%);
+  content: '';
+  pointer-events: none;
+}
+
+.wl-cloud-bubble[data-priority='high'],
+.wl-cloud-bubble[data-priority='medium'],
+.wl-cloud-bubble[data-priority='low'] {
+  box-shadow:
+    0 24px 46px color-mix(in srgb, var(--accent) 19%, transparent),
+    0 9px 18px color-mix(in srgb, var(--text) 15%, transparent),
+    inset 8px 10px 18px rgba(255, 255, 255, 0.48),
+    inset -12px -15px 22px rgba(92, 42, 67, 0.13),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.46);
+}
+
+.wl-cloud-bubble[data-priority='high'] {
+  box-shadow:
+    0 30px 58px color-mix(in srgb, var(--accent) 25%, transparent),
+    0 10px 22px color-mix(in srgb, var(--text) 16%, transparent),
+    inset 10px 12px 22px rgba(255, 255, 255, 0.5),
+    inset -14px -17px 26px rgba(92, 42, 67, 0.14),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.wl-cloud-bubble:hover,
+.wl-cloud-bubble:focus-visible {
+  box-shadow:
+    0 34px 66px color-mix(in srgb, var(--accent) 29%, transparent),
+    0 12px 24px color-mix(in srgb, var(--text) 17%, transparent),
+    inset 10px 12px 22px rgba(255, 255, 255, 0.54),
+    inset -14px -17px 26px rgba(92, 42, 67, 0.13),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.58);
+}
+
+.wl-product-visual {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  isolation: isolate;
+}
+
+.wl-product-visual::before {
+  position: absolute;
+  z-index: 0;
+  inset: 7%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 42% 38%, rgba(255, 255, 255, 0.68), transparent 46%),
+    radial-gradient(circle at 55% 62%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 64%);
+  content: '';
+  filter: blur(clamp(5px, calc(var(--wl-cloud-size) * 0.04), 10px));
+  opacity: 0.78;
+  pointer-events: none;
+}
+
+.wl-product-visual::after {
+  position: absolute;
+  z-index: 2;
+  right: 13%;
+  bottom: 6%;
+  left: 13%;
+  height: 13%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255, 255, 255, 0.3), transparent 70%);
+  content: '';
+  filter: blur(2px);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.wl-product-visual > img {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  object-position: center;
+  transition:
+    opacity 220ms ease,
+    filter 240ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wl-cloud-bubble-media[data-image-mode='cover'] > img {
+  padding: 0;
+  object-fit: cover;
+  transform: scale(1.015);
+}
+
+.wl-cloud-bubble-media[data-image-mode='cutout'] > img {
+  box-sizing: border-box;
+  padding: clamp(7px, calc(var(--wl-cloud-size) * 0.065), 13px);
+  border-radius: 0;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 12px 10px rgba(45, 24, 36, 0.2))
+    drop-shadow(0 3px 3px rgba(255, 255, 255, 0.24));
+  transform: translateY(-1%);
+}
+
+.wl-cloud-bubble-media[data-processing='true'] > img {
+  opacity: 0.92;
+}
+
+.wl-cloud-bubble:hover .wl-cloud-bubble-media[data-image-mode='cutout'] > img,
+.wl-cloud-bubble:focus-visible .wl-cloud-bubble-media[data-image-mode='cutout'] > img {
+  transform: translateY(-3%) scale(1.035);
+}
+
+.wl-cloud-bubble:hover .wl-cloud-bubble-media[data-image-mode='cover'] > img,
+.wl-cloud-bubble:focus-visible .wl-cloud-bubble-media[data-image-mode='cover'] > img {
+  transform: scale(1.045);
+}
+
+/* The modal uses the same cutout, but without the small-bubble padding. */
+.wl-cloud-sheet-photo .wl-product-visual {
+  border-radius: 50%;
+}
+
+.wl-cloud-sheet-photo .wl-product-visual[data-image-mode='cover'] > img {
+  object-fit: cover;
+}
+
+.wl-cloud-sheet-photo .wl-product-visual[data-image-mode='cutout'] > img {
+  box-sizing: border-box;
+  padding: 7%;
+  border-radius: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 14px rgba(45, 24, 36, 0.2));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-product-visual > img {
+    transition: none;
+  }
+}
