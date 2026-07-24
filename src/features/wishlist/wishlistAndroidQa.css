@@ -1,0 +1,37 @@
+/* Stage 6: touch and paint safeguards for Android/PWA rendering. */
+.wl-cloud-bubble,
+.wl-product-visual[role='button'] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wl-product-visual {
+  contain: paint;
+}
+
+/* Android Chrome can retain :hover after a tap. Keep keyboard focus effects,
+   but return touch-only hover transforms to their resting state. */
+@media (hover: none) and (pointer: coarse) {
+  .wl-cloud-bubble:hover .wl-cloud-bubble-media[data-image-mode='product-cutout'] > img,
+  .wl-cloud-bubble:hover .wl-cloud-bubble-media[data-image-mode='cutout'] > img {
+    transform: translateY(-1%);
+  }
+
+  .wl-cloud-bubble:hover .wl-cloud-bubble-media[data-image-mode='portrait-cutout'] > img {
+    transform: translateY(3%) scale(1.035);
+  }
+
+  .wl-cloud-bubble:hover .wl-cloud-bubble-media[data-image-mode='photo-cover'] > img,
+  .wl-cloud-bubble:hover .wl-cloud-bubble-media[data-image-mode='cover'] > img {
+    transform: scale(1.018);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-cloud-bubble,
+  .wl-product-visual,
+  .wl-product-visual > img {
+    scroll-behavior: auto;
+    transition: none;
+  }
+}
