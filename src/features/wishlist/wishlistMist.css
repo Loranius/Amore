@@ -1,0 +1,55 @@
+/* Soft portal-style pink haze around active wishlist thumbnails. */
+.wishlist .wl-cloud-item::before {
+  position: absolute;
+  z-index: -1;
+  inset: -19%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle at 48% 46%,
+      rgba(251, 214, 228, 0.58) 0 25%,
+      rgba(246, 184, 200, 0.43) 43%,
+      rgba(235, 143, 171, 0.2) 61%,
+      transparent 76%
+    ),
+    radial-gradient(
+      circle at 35% 30%,
+      rgba(255, 255, 255, 0.5),
+      transparent 38%
+    );
+  content: '';
+  opacity: 0.72;
+  pointer-events: none;
+  filter: blur(clamp(12px, calc(var(--wl-cloud-size) * 0.09), 20px));
+  transform:
+    translate(var(--wl-cloud-x), var(--wl-cloud-y))
+    rotate(var(--wl-cloud-rotate))
+    scale(0.98);
+  animation: wl-cloud-mist-breathe var(--wl-cloud-duration) ease-in-out infinite;
+  animation-delay: var(--wl-cloud-delay);
+  transition: opacity 240ms ease, filter 240ms ease;
+}
+
+.wishlist .wl-cloud-item:hover::before,
+.wishlist .wl-cloud-item:focus-within::before {
+  opacity: 0.9;
+  filter: blur(clamp(14px, calc(var(--wl-cloud-size) * 0.105), 23px));
+}
+
+@keyframes wl-cloud-mist-breathe {
+  0%, 100% {
+    translate: 0 0;
+    scale: 0.98;
+  }
+  50% {
+    translate: 0 -6px;
+    scale: 1.045;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wishlist .wl-cloud-item::before {
+    animation: none;
+    transition: none;
+  }
+}
