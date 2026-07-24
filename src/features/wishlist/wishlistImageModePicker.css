@@ -1,3 +1,14 @@
+.wm-photo-preview .wl-product-visual[role='button'] {
+  cursor: zoom-in;
+  outline: none;
+}
+
+.wm-photo-preview .wl-product-visual[role='button']:focus-visible {
+  border-radius: inherit;
+  outline: 3px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  outline-offset: 3px;
+}
+
 .wm-image-mode-editor {
   display: grid;
   gap: 12px;
