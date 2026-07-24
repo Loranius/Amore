@@ -13,6 +13,10 @@ import {
 } from './useWishlist';
 import { canRemoveWishPhotoAfterSaveError } from './wishlistFailurePolicy';
 import { fetchWishlistLinkPreview } from './wishlistLinkPreview';
+import {
+  hasUnsavedWishChanges,
+  type WishFormDraftSnapshot,
+} from './wishFormDirtyState';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { TabBar } from '@/components/ui/TabBar';
@@ -20,6 +24,7 @@ import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { WishlistPriorityPicker } from './WishlistPriorityPicker';
 import type { WishlistItemRow, AppUser } from '@/types';
 import './wishlistFormSections.css';
+import './wishlistUnsavedChanges.css';
 
 type Scope = 'me' | 'partner' | 'shared';
 type WishlistPriorityV3 = 'high' | 'medium' | 'low';
@@ -79,11 +84,64 @@ export function WishFormModal({
   const [saving, setSaving] = useState(false);
   const [linkPreviewStatus, setLinkPreviewStatus] = useState<LinkPreviewStatus>('idle');
   const [linkPreviewSite, setLinkPreviewSite] = useState<string | null>(null);
+  const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
 
   const previewRequestVersion = useRef(0);
   const photoRequestVersion = useRef(0);
   const saveLock = useRef(false);
   const lastFetchedLink = useRef(item?.link?.trim() ?? '');
+  const lastFocusedBeforeClose = useRef<HTMLElement | null>(null);
+  const initialSnapshot = useRef<WishFormDraftSnapshot>({
+    scope: defaultScope,
+    title: item?.title ?? '',
+    link: item?.link ?? '',
+    imageUrl: item?.image_url ?? '',
+    price: item?.price != null ? String(item.price) : '',
+    priority: normalizeWishlistPriority(item?.priority),
+    description: item?.description ?? '',
+  });
+
+  const isDirty = hasUnsavedWishChanges(
+    initialSnapshot.current,
+    {
+      scope,
+      title,
+      link,
+      imageUrl: imgUrl,
+      price,
+      priority,
+      description,
+    },
+    pendingFile !== null,
+  );
+
+  const restoreCloseFocus = useCallback(() => {
+    window.requestAnimationFrame(() => lastFocusedBeforeClose.current?.focus());
+  }, []);
+
+  const cancelDiscard = useCallback(() => {
+    setDiscardPromptOpen(false);
+    restoreCloseFocus();
+  }, [restoreCloseFocus]);
+
+  const confirmDiscard = useCallback(() => {
+    setDiscardPromptOpen(false);
+    onClose();
+  }, [onClose]);
+
+  const requestClose = useCallback(() => {
+    if (saving || discardPromptOpen) return;
+
+    if (!isDirty) {
+      onClose();
+      return;
+    }
+
+    lastFocusedBeforeClose.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setDiscardPromptOpen(true);
+  }, [discardPromptOpen, isDirty, onClose, saving]);
 
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
@@ -95,11 +153,29 @@ export function WishFormModal({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !saving) onClose();
+      if (event.key !== 'Escape' || saving) return;
+
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (discardPromptOpen) cancelDiscard();
+      else requestClose();
     };
+
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose, saving]);
+  }, [cancelDiscard, discardPromptOpen, requestClose, saving]);
+
+  useEffect(() => {
+    if (!isDirty || saving) return;
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, [isDirty, saving]);
 
   const pickFile = async (file: File) => {
     if (saving) return;
@@ -271,7 +347,7 @@ export function WishFormModal({
     <div
       className="modal-overlay"
       onClick={(event) => {
-        if (event.target === event.currentTarget && !saving) onClose();
+        if (event.target === event.currentTarget) requestClose();
       }}
     >
       <div
@@ -286,7 +362,7 @@ export function WishFormModal({
           className="gift-memory-close"
           aria-label="Закрити"
           disabled={saving}
-          onClick={onClose}
+          onClick={requestClose}
         >
           ×
         </button>
@@ -506,7 +582,7 @@ export function WishFormModal({
         </p>
 
         <div className="modal-actions">
-          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={saving}>
+          <button type="button" className="btn btn-ghost" onClick={requestClose} disabled={saving}>
             Скасувати
           </button>
           <button
@@ -519,6 +595,37 @@ export function WishFormModal({
           </button>
         </div>
       </div>
+
+      {discardPromptOpen && (
+        <div
+          className="wm-unsaved-overlay"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) cancelDiscard();
+          }}
+        >
+          <div
+            className="wm-unsaved-dialog"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="wm-unsaved-title"
+            aria-describedby="wm-unsaved-description"
+          >
+            <span className="wm-unsaved-icon" aria-hidden="true">!</span>
+            <h3 id="wm-unsaved-title">Не зберігати зміни?</h3>
+            <p id="wm-unsaved-description">
+              У формі є незбережені зміни. Після виходу вони будуть втрачені.
+            </p>
+            <div className="wm-unsaved-actions">
+              <button type="button" className="btn btn-ghost" onClick={cancelDiscard}>
+                Продовжити редагування
+              </button>
+              <button type="button" className="btn btn-danger" onClick={confirmDiscard} autoFocus>
+                Вийти без збереження
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
