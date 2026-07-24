@@ -136,6 +136,7 @@ export function WishlistProductVisual({
   onError,
 }: WishlistProductVisualProps) {
   const registered = wishlistRegisteredImage(wishId, src);
+  const effectiveWishId = wishId ?? registered?.wishId;
   const effectiveProcessedSrc = processedSrc ?? registered?.processedSrc ?? null;
   const effectiveModeHint = modeHint ?? registered?.mode ?? null;
   const effectivePreference = preference
@@ -145,7 +146,7 @@ export function WishlistProductVisual({
 
   const initial = initialVisual({
     src,
-    wishId,
+    wishId: effectiveWishId,
     processedSrc: effectiveProcessedSrc,
     modeHint: effectiveModeHint,
     preference: effectivePreference,
@@ -162,7 +163,7 @@ export function WishlistProductVisual({
       modeHint: effectiveModeHint,
       preference: effectivePreference,
     });
-    const stored = direct ? null : wishlistStoredVisual(wishId, src);
+    const stored = direct ? null : wishlistStoredVisual(effectiveWishId, src);
 
     if (direct || (stored && wishlistResultMatchesPreference(effectivePreference, stored.mode))) {
       const visual = direct ?? stored!;
@@ -191,7 +192,7 @@ export function WishlistProductVisual({
 
       try {
         await persistWishlistProcessedVisual({
-          wishId,
+          wishId: effectiveWishId,
           sourceUrl: src,
           visual,
           processingRevision: effectiveRevision,
@@ -225,11 +226,11 @@ export function WishlistProductVisual({
     effectivePreference,
     effectiveProcessedSrc,
     effectiveRevision,
+    effectiveWishId,
     onPersisted,
     onPersistenceError,
     onProcessingChange,
     src,
-    wishId,
   ]);
 
   return (
