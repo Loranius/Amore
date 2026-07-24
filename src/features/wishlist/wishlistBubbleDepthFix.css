@@ -1,0 +1,104 @@
+/* Strong mobile-visible sphere lighting. Imported last so older cloud styles
+   cannot flatten the glass shell. */
+
+.wl-cloud-item {
+  isolation: isolate;
+  overflow: visible;
+}
+
+.wl-cloud-item::before {
+  inset: -13%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 27%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 13%, transparent) 48%,
+    transparent 73%
+  );
+  filter: blur(clamp(9px, calc(var(--wl-cloud-size, 160px) * 0.085), 19px));
+  opacity: 0.95;
+}
+
+.wl-cloud-item::after {
+  right: 11%;
+  bottom: -12%;
+  left: 11%;
+  height: 22%;
+  background: radial-gradient(
+    ellipse,
+    rgba(72, 28, 51, 0.34) 0%,
+    rgba(72, 28, 51, 0.17) 46%,
+    transparent 75%
+  );
+  filter: blur(clamp(7px, calc(var(--wl-cloud-size, 160px) * 0.07), 15px));
+  opacity: 0.86;
+  transform: translateY(18%) scaleX(0.92);
+}
+
+.wl-cloud-bubble {
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  background:
+    radial-gradient(ellipse at 27% 16%, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.72) 9%, transparent 25%),
+    radial-gradient(circle at 31% 27%, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.2) 29%, transparent 52%),
+    radial-gradient(circle at 72% 79%, rgba(119, 46, 82, 0.37) 0%, rgba(153, 65, 108, 0.18) 30%, transparent 58%),
+    radial-gradient(circle at 48% 45%, rgba(255, 248, 252, 0.68) 0%, rgba(255, 225, 239, 0.52) 49%, rgba(224, 139, 181, 0.61) 78%, rgba(142, 57, 99, 0.52) 100%);
+  box-shadow:
+    0 28px 48px color-mix(in srgb, var(--accent) 31%, transparent),
+    0 12px 20px rgba(69, 27, 48, 0.25),
+    inset 13px 15px 23px rgba(255, 255, 255, 0.78),
+    inset -17px -21px 31px rgba(100, 36, 69, 0.34),
+    inset 0 -7px 15px rgba(91, 29, 61, 0.2),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.48);
+}
+
+.wl-cloud-bubble::before {
+  top: 4%;
+  left: 10%;
+  width: 55%;
+  height: 28%;
+  background: radial-gradient(
+    ellipse,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0.82) 31%,
+    rgba(255, 255, 255, 0.31) 58%,
+    transparent 77%
+  );
+  filter: blur(clamp(0.5px, calc(var(--wl-bubble-size) * 0.008), 2px));
+  opacity: 1;
+}
+
+.wl-cloud-bubble::after {
+  background:
+    radial-gradient(ellipse at 69% 91%, rgba(255, 255, 255, 0.76) 0%, rgba(255, 255, 255, 0.25) 20%, transparent 34%),
+    radial-gradient(circle at 78% 72%, transparent 49%, rgba(82, 27, 56, 0.2) 68%, transparent 88%),
+    radial-gradient(circle, transparent 68%, rgba(255, 255, 255, 0.82) 88%, rgba(255, 255, 255, 0.28) 100%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.34), transparent 39%);
+  opacity: 1;
+}
+
+.wl-cloud-bubble[data-priority='high'] {
+  box-shadow:
+    0 34px 58px color-mix(in srgb, var(--accent) 38%, transparent),
+    0 14px 24px rgba(69, 27, 48, 0.27),
+    inset 15px 17px 27px rgba(255, 255, 255, 0.82),
+    inset -20px -24px 36px rgba(100, 36, 69, 0.38),
+    inset 0 -8px 18px rgba(91, 29, 61, 0.23),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.54);
+}
+
+/* Keep the subject above the darker lower hemisphere. */
+.wl-cloud-bubble .wl-product-visual {
+  z-index: 2;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .wl-cloud-bubble:active {
+    transform: translateY(1px) scale(0.985);
+    filter: brightness(0.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-cloud-bubble:active {
+    transform: none;
+  }
+}
