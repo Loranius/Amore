@@ -3,12 +3,19 @@ import {
   clearWishlistStoredVisual,
   registerWishlistProcessedRows,
   updateWishlistStoredVisual,
+  wishlistRegisteredImage,
   wishlistStoredVisual,
 } from './wishlistProcessedImageRegistry';
 
 const DEFAULTS = {
   image_preference: 'auto' as const,
   image_processing_revision: 0,
+  image_processing_status: 'ready' as const,
+  image_processor_version: 1,
+  image_processing_target_version: null,
+  image_processing_attempts: 1,
+  image_processing_error_code: null,
+  image_processing_lease_expires_at: null,
 };
 
 describe('wishlist processed image registry', () => {
@@ -26,6 +33,8 @@ describe('wishlist processed image registry', () => {
       src: 'https://project.supabase.co/storage/v1/object/public/wishlist-photos/processed/101/a.webp',
       mode: 'product-cutout',
     });
+    expect(wishlistRegisteredImage(101, source)?.processingStatus).toBe('ready');
+    expect(wishlistRegisteredImage(101, source)?.processorVersion).toBe(1);
     expect(wishlistStoredVisual(999, source)).toBeNull();
   });
 
@@ -52,6 +61,7 @@ describe('wishlist processed image registry', () => {
         image_mode: 'photo-cover',
         image_preference: 'photo-cover',
         image_processing_revision: 1,
+        ...DEFAULTS,
       },
       {
         id: 104,
@@ -60,6 +70,7 @@ describe('wishlist processed image registry', () => {
         image_mode: 'portrait-cutout',
         image_preference: 'portrait-cutout',
         image_processing_revision: 2,
+        ...DEFAULTS,
       },
     ]);
 
@@ -75,6 +86,8 @@ describe('wishlist processed image registry', () => {
       processed_image_url: null,
       image_mode: null,
       ...DEFAULTS,
+      image_processing_status: 'pending',
+      image_processor_version: 0,
     }]);
 
     updateWishlistStoredVisual(source, 105, {
@@ -82,8 +95,16 @@ describe('wishlist processed image registry', () => {
       mode: 'product-cutout',
     });
     expect(wishlistStoredVisual(105, source)?.mode).toBe('product-cutout');
+    expect(wishlistRegisteredImage(105, source)?.processingStatus).toBe('ready');
 
     clearWishlistStoredVisual(105, source, 'portrait-cutout', 3);
     expect(wishlistStoredVisual(105, source)).toBeNull();
+    expect(wishlistRegisteredImage(105, source)).toMatchObject({
+      preference: 'portrait-cutout',
+      revision: 3,
+      processingStatus: 'pending',
+      processorVersion: 0,
+      processingAttempts: 0,
+    });
   });
 });
