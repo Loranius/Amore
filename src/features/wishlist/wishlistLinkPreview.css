@@ -26,9 +26,50 @@
 }
 
 .wm-link-preview-button {
-  min-width: 108px;
+  min-width: 148px;
   padding-inline: 12px;
   white-space: nowrap;
+}
+
+/*
+ * Keep the existing request logic untouched while replacing the vague
+ * "Підтягнути" wording with a clear action label. The actual loading text
+ * remains visible while the request is in progress.
+ */
+.wm-link-preview-button:not(:disabled) {
+  font-size: 0;
+}
+
+.wm-link-preview-button:not(:disabled)::after {
+  content: 'Отримати дані';
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* Before a valid URL exists, explain why the button cannot be pressed. */
+.form-field:has(.wm-link-row):not(:has(.wm-link-status))
+  .wm-link-preview-button:disabled {
+  font-size: 0;
+}
+
+.form-field:has(.wm-link-row):not(:has(.wm-link-status))
+  .wm-link-preview-button:disabled::after {
+  content: 'Встав посилання';
+  font-size: 12px;
+  font-weight: 800;
+}
+
+/* After a completed request, make the next available action explicit. */
+.form-field:has(.wm-link-status--success)
+  .wm-link-preview-button:not(:disabled)::after {
+  content: 'Оновити дані';
+}
+
+.form-field:has(.wm-link-status--error)
+  .wm-link-preview-button:not(:disabled)::after,
+.form-field:has(.wm-link-status:not(.wm-link-status--success):not(.wm-link-status--error))
+  .wm-link-preview-button:not(:disabled)::after {
+  content: 'Спробувати ще';
 }
 
 .wm-link-status,
@@ -45,12 +86,65 @@
   margin-bottom: 8px;
 }
 
+/* Status messages read as small product feedback cards instead of plain text. */
+.wm-link-status {
+  position: relative;
+  min-height: 34px;
+  padding: 8px 10px 8px 36px;
+  border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.wm-link-status::before {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  content: 'i';
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* The unmodified status class represents loading while the button is disabled. */
+.form-field:has(.wm-link-preview-button:disabled)
+  .wm-link-status:not(.wm-link-status--success):not(.wm-link-status--error)::before {
+  border: 2px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-top-color: var(--accent);
+  background: transparent;
+  content: '';
+  animation: wm-link-status-spin 720ms linear infinite;
+}
+
 .wm-link-status--success {
+  border-color: color-mix(in srgb, var(--ok) 20%, transparent);
+  background: color-mix(in srgb, var(--ok) 7%, var(--surface));
   color: var(--ok);
 }
 
+.wm-link-status--success::before {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+  color: var(--ok);
+  content: '✓';
+}
+
 .wm-link-status--error {
+  border-color: color-mix(in srgb, var(--danger) 18%, transparent);
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface));
   color: var(--danger);
+}
+
+.wm-link-status--error::before {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  content: '!';
 }
 
 /*
@@ -86,6 +180,12 @@
   -webkit-backdrop-filter: blur(10px);
 }
 
+@keyframes wm-link-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 460px) {
   .wm-link-row {
     grid-template-columns: 1fr;
@@ -100,5 +200,10 @@
   .wm-photo-preview:has(img)::after {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+
+  .form-field:has(.wm-link-preview-button:disabled)
+    .wm-link-status:not(.wm-link-status--success):not(.wm-link-status--error)::before {
+    animation: none;
   }
 }
