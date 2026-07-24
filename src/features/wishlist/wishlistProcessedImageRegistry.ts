@@ -16,6 +16,7 @@ export interface WishlistStoredVisual {
 }
 
 export interface WishlistRegisteredImageSettings {
+  wishId: number;
   processedSrc: string | null;
   mode: WishlistImageDisplayMode | null;
   preference: WishlistImagePreference;
@@ -23,7 +24,6 @@ export interface WishlistRegisteredImageSettings {
 }
 
 interface RegisteredWishImage extends WishlistRegisteredImageSettings {
-  wishId: number;
   source: string;
 }
 
@@ -57,10 +57,27 @@ export function wishlistRegisteredImage(
   wishId: number | undefined,
   sourceUrl: string,
 ): WishlistRegisteredImageSettings | null {
-  if (wishId == null) return null;
-  const record = recordsByWish.get(wishId);
-  if (!record || record.source !== sourceUrl.trim()) return null;
+  const source = sourceUrl.trim();
+  if (wishId != null) {
+    const exact = recordsByWish.get(wishId);
+    if (!exact || exact.source !== source) return null;
+    return {
+      wishId: exact.wishId,
+      processedSrc: exact.processedSrc,
+      mode: exact.mode,
+      preference: exact.preference,
+      revision: exact.revision,
+    };
+  }
+
+  // Older call sites only know the image URL. Resolve them safely when the URL
+  // belongs to exactly one wish; ambiguous duplicate URLs never borrow settings.
+  const matches = [...recordsByWish.values()].filter((record) => record.source === source);
+  if (matches.length !== 1) return null;
+  const [record] = matches;
+  if (!record) return null;
   return {
+    wishId: record.wishId,
     processedSrc: record.processedSrc,
     mode: record.mode,
     preference: record.preference,
