@@ -1,0 +1,130 @@
+/* Final volumetric shell. Imported after wishlistCloud.css so the base cloud
+   cannot flatten the glass sphere through equal-specificity overrides. */
+.wishlist .wl-cloud-item::before,
+.wishlist .wl-cloud-item::after {
+  position: absolute;
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+
+.wishlist .wl-cloud-item::before {
+  z-index: -2;
+  inset: -12%;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 24%, transparent) 0%,
+    color-mix(in srgb, var(--accent) 12%, transparent) 42%,
+    transparent 72%
+  );
+  filter: blur(clamp(9px, calc(var(--wl-cloud-size, 160px) * 0.075), 18px));
+  opacity: 0.92;
+  transform: scale(1.05);
+}
+
+.wishlist .wl-cloud-item::after {
+  z-index: -1;
+  right: 12%;
+  bottom: -10%;
+  left: 12%;
+  height: 19%;
+  background: radial-gradient(
+    ellipse,
+    color-mix(in srgb, var(--text) 34%, transparent) 0%,
+    color-mix(in srgb, var(--text) 17%, transparent) 44%,
+    transparent 74%
+  );
+  filter: blur(clamp(7px, calc(var(--wl-cloud-size, 160px) * 0.065), 15px));
+  opacity: 0.62;
+  transform: translateY(15%) scaleX(0.9);
+}
+
+.wishlist .wl-cloud-bubble {
+  --wl-bubble-size: var(--wl-cloud-size, 160px);
+  border: 1px solid rgba(255, 255, 255, 0.88);
+  background:
+    radial-gradient(circle at 27% 19%, rgba(255, 255, 255, 0.96), transparent 15%),
+    radial-gradient(circle at 35% 31%, rgba(255, 255, 255, 0.42), transparent 33%),
+    radial-gradient(circle at 70% 78%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 42%),
+    radial-gradient(circle at 50% 52%, rgba(255, 255, 255, 0.16), transparent 64%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--surface) 70%, white 30%),
+      color-mix(in srgb, var(--accent) 18%, var(--surface))
+    );
+  box-shadow:
+    0 30px 58px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 12px 24px color-mix(in srgb, var(--text) 20%, transparent),
+    inset 13px 15px 26px rgba(255, 255, 255, 0.64),
+    inset -17px -20px 32px rgba(82, 37, 60, 0.22),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.42),
+    inset 0 0 30px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.wishlist .wl-cloud-bubble::before {
+  position: absolute;
+  z-index: 6;
+  top: 5%;
+  left: 10%;
+  width: 52%;
+  height: 27%;
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      ellipse,
+      rgba(255, 255, 255, 1) 0%,
+      rgba(255, 255, 255, 0.72) 32%,
+      rgba(255, 255, 255, 0.24) 61%,
+      transparent 78%
+    );
+  content: '';
+  filter: blur(clamp(1px, calc(var(--wl-bubble-size) * 0.012), 3px));
+  opacity: 0.94;
+  pointer-events: none;
+  transform: rotate(-20deg);
+}
+
+.wishlist .wl-cloud-bubble::after {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse at 68% 91%, rgba(255, 255, 255, 0.66), transparent 22%),
+    radial-gradient(circle at 76% 68%, transparent 50%, rgba(80, 34, 57, 0.18) 73%, transparent 90%),
+    radial-gradient(circle, transparent 68%, rgba(255, 255, 255, 0.78) 89%, rgba(255, 255, 255, 0.2) 100%),
+    linear-gradient(140deg, rgba(255, 255, 255, 0.28), transparent 38%);
+  content: '';
+  pointer-events: none;
+}
+
+.wishlist .wl-cloud-bubble[data-priority='high'] {
+  box-shadow:
+    0 36px 70px color-mix(in srgb, var(--accent) 34%, transparent),
+    0 14px 28px color-mix(in srgb, var(--text) 21%, transparent),
+    inset 14px 16px 28px rgba(255, 255, 255, 0.68),
+    inset -18px -22px 35px rgba(82, 37, 60, 0.23),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.46),
+    inset 0 0 34px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.wishlist .wl-cloud-bubble[data-priority='medium'] {
+  box-shadow:
+    0 31px 62px color-mix(in srgb, var(--accent) 29%, transparent),
+    0 12px 25px color-mix(in srgb, var(--text) 20%, transparent),
+    inset 13px 15px 27px rgba(255, 255, 255, 0.65),
+    inset -17px -20px 32px rgba(82, 37, 60, 0.22),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.43),
+    inset 0 0 31px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.wishlist .wl-cloud-bubble[data-priority='low'] {
+  border-color: rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 25px 48px color-mix(in srgb, var(--accent) 23%, transparent),
+    0 10px 21px color-mix(in srgb, var(--text) 18%, transparent),
+    inset 11px 13px 23px rgba(255, 255, 255, 0.58),
+    inset -15px -18px 28px rgba(82, 37, 60, 0.19),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4),
+    inset 0 0 27px color-mix(in srgb, var(--accent) 12%, transparent);
+}
