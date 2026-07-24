@@ -8,8 +8,8 @@
     color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
 
-.wl-cloud-bubble-aura,
-.wl-cloud-bubble-product {
+.wl-cloud-bubble-media .wl-cloud-bubble-aura,
+.wl-cloud-bubble-media .wl-cloud-bubble-product {
   position: absolute;
   inset: 0;
   display: block;
@@ -18,7 +18,7 @@
   border-radius: inherit;
 }
 
-.wl-cloud-bubble-aura {
+.wl-cloud-bubble-media .wl-cloud-bubble-aura {
   z-index: 0;
   object-fit: cover;
   object-position: center;
@@ -39,7 +39,7 @@
   pointer-events: none;
 }
 
-.wl-cloud-bubble-product {
+.wl-cloud-bubble-media .wl-cloud-bubble-product {
   z-index: 2;
   box-sizing: border-box;
   padding: clamp(5px, calc(var(--wl-cloud-size) * 0.055), 10px);
@@ -64,16 +64,16 @@
   transform: scale(1.025);
 }
 
-.wl-cloud-bubble-aura,
-.wl-cloud-bubble-product {
+.wl-cloud-bubble-media .wl-cloud-bubble-aura,
+.wl-cloud-bubble-media .wl-cloud-bubble-product {
   transition:
     opacity 220ms ease,
     transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wl-cloud-bubble-aura,
-  .wl-cloud-bubble-product {
+  .wl-cloud-bubble-media .wl-cloud-bubble-aura,
+  .wl-cloud-bubble-media .wl-cloud-bubble-product {
     transition: none;
   }
 }
