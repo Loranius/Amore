@@ -136,8 +136,10 @@ declare
   v_couple_id bigint := app_private.current_couple_id();
   v_source text := nullif(btrim(p_source_image_url), '');
   v_preference text := nullif(btrim(p_image_preference), '');
-  v_wish public.wishlist_items%rowtype;
+  v_existing_image_url text;
+  v_existing_preference text;
   v_should_reset boolean;
+  v_revision bigint;
 begin
   if v_actor is null then raise exception 'not_authenticated' using errcode = '28000'; end if;
   if v_couple_id is null then raise exception 'couple_membership_required' using errcode = '42501'; end if;
@@ -146,7 +148,8 @@ begin
     raise exception 'invalid_image_preference' using errcode = '22023';
   end if;
 
-  select * into v_wish
+  select wi.image_url, wi.image_preference
+  into v_existing_image_url, v_existing_preference
   from public.wishlist_items wi
   where wi.id = p_wish_id
     and wi.couple_id = v_couple_id
@@ -154,11 +157,11 @@ begin
   for update;
 
   if not found then raise exception 'wish_not_found' using errcode = 'P0002'; end if;
-  if v_wish.image_url is distinct from v_source then
+  if v_existing_image_url is distinct from v_source then
     raise exception 'image_preference_source_changed' using errcode = '40001';
   end if;
 
-  v_should_reset := v_wish.image_preference is distinct from v_preference
+  v_should_reset := v_existing_preference is distinct from v_preference
     or coalesce(p_force_reprocess, false);
 
   update public.wishlist_items wi
@@ -170,9 +173,9 @@ begin
         else wi.image_processing_revision
       end
   where wi.id = p_wish_id
-  returning wi.image_processing_revision into v_wish.image_processing_revision;
+  returning wi.image_processing_revision into v_revision;
 
-  return v_wish.image_processing_revision;
+  return v_revision;
 end;
 $$;
 
