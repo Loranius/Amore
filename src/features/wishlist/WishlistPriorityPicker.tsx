@@ -74,6 +74,7 @@ export function WishlistPriorityPicker({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        event.stopImmediatePropagation();
         close(true);
         return;
       }
@@ -97,10 +98,10 @@ export function WishlistPriorityPicker({
       }
     };
 
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
     return () => {
       window.cancelAnimationFrame(focusFrame);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
       document.body.style.overflow = previousOverflow;
     };
   }, [open, value]);
