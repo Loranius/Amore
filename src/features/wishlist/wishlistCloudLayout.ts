@@ -1,5 +1,3 @@
-import './wishlistSoapBubble.css';
-import './wishlistSoapBubbleStatic.css';
 import './wishlistBubbleModel.css';
 import './wishlistBubbleModelRuntime';
 
