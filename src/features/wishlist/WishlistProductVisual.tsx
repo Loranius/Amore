@@ -1,4 +1,4 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import {
   wishlistImageMode,
   type WishlistImageMode,
@@ -20,6 +20,10 @@ import {
   type WishlistImageProcessingStatus,
 } from './wishlistImageProcessingState';
 import { runWishlistImageProcessing } from './wishlistImageProcessingRunner';
+import {
+  currentWishlistImageProcessingEnvironment,
+  wishlistImageProcessingEnvironmentReady,
+} from './wishlistImageProcessingScheduler';
 import {
   wishlistRegisteredImage,
   wishlistStoredVisual,
@@ -48,6 +52,8 @@ interface VisualState {
   mode: WishlistImageDisplayMode;
   processing: boolean;
 }
+
+const TRANSIENT_RETRY_DELAYS_MS = [1500, 4500] as const;
 
 function persistedVisual(input: {
   source: string;
@@ -155,6 +161,27 @@ export function WishlistProductVisual({
   const [mode, setMode] = useState<WishlistImageDisplayMode>(initial.mode);
   const [processing, setProcessing] = useState(initial.processing);
   const [retryNonce, setRetryNonce] = useState(0);
+  const transientRetryCount = useRef(0);
+
+  useEffect(() => {
+    transientRetryCount.current = 0;
+  }, [effectivePreference, effectiveRevision, src]);
+
+  useEffect(() => {
+    const resumeProcessing = () => {
+      const environment = currentWishlistImageProcessingEnvironment();
+      if (!wishlistImageProcessingEnvironmentReady(environment)) return;
+      transientRetryCount.current = 0;
+      setRetryNonce((current) => current + 1);
+    };
+
+    window.addEventListener('online', resumeProcessing);
+    document.addEventListener('visibilitychange', resumeProcessing);
+    return () => {
+      window.removeEventListener('online', resumeProcessing);
+      document.removeEventListener('visibilitychange', resumeProcessing);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -189,6 +216,7 @@ export function WishlistProductVisual({
     }
 
     if (persistenceEnabled && fresh) {
+      transientRetryCount.current = 0;
       setProcessing(false);
       onProcessingChange?.(false);
       return () => {
@@ -221,6 +249,7 @@ export function WishlistProductVisual({
         return;
       }
 
+      transientRetryCount.current = 0;
       setDisplaySrc(result.visual.src);
       setMode(result.visual.mode);
       setProcessing(false);
@@ -236,6 +265,15 @@ export function WishlistProductVisual({
       setProcessing(false);
       onProcessingChange?.(false);
       onPersistenceError?.();
+
+      const environment = currentWishlistImageProcessingEnvironment();
+      const delay = TRANSIENT_RETRY_DELAYS_MS[transientRetryCount.current];
+      if (delay !== undefined && wishlistImageProcessingEnvironmentReady(environment)) {
+        transientRetryCount.current += 1;
+        retryTimer = window.setTimeout(() => {
+          if (active) setRetryNonce((current) => current + 1);
+        }, delay);
+      }
     });
 
     return () => {
@@ -273,6 +311,7 @@ export function WishlistProductVisual({
       role={onActivate ? 'button' : undefined}
       tabIndex={onActivate ? 0 : undefined}
       aria-label={onActivate ? `Відкрити фото: ${alt}` : undefined}
+      aria-busy={processing}
       onClick={onActivate}
       onKeyDown={handleKeyDown}
     >
