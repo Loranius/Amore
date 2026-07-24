@@ -176,9 +176,13 @@ export function WishlistProductVisual({
     };
 
     window.addEventListener('online', resumeProcessing);
+    window.addEventListener('pageshow', resumeProcessing);
+    window.addEventListener('focus', resumeProcessing);
     document.addEventListener('visibilitychange', resumeProcessing);
     return () => {
       window.removeEventListener('online', resumeProcessing);
+      window.removeEventListener('pageshow', resumeProcessing);
+      window.removeEventListener('focus', resumeProcessing);
       document.removeEventListener('visibilitychange', resumeProcessing);
     };
   }, []);
