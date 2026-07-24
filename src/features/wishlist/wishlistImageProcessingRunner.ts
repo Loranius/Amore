@@ -11,6 +11,11 @@ import {
   wishlistImageProcessingErrorCode,
   type WishlistImageProcessingStatus,
 } from './wishlistImageProcessingState';
+import {
+  currentWishlistImageProcessingEnvironment,
+  scheduleWishlistImageProcessing,
+  wishlistImageProcessingEnvironmentReady,
+} from './wishlistImageProcessingScheduler';
 import { resolveWishlistPortrait } from './wishlistPortraitSegmentation';
 import { persistWishlistProcessedVisual } from './wishlistProcessedImagePersistence';
 import {
@@ -77,6 +82,14 @@ function runKey(input: {
     input.preference,
     input.sourceUrl,
   ].join(':');
+}
+
+function environmentDeferred(): WishlistImageProcessingRunResult {
+  return {
+    kind: 'deferred',
+    status: 'pending',
+    retryAfterMs: null,
+  };
 }
 
 async function runPersistedProcessing(input: {
@@ -169,13 +182,17 @@ export async function runWishlistImageProcessing(input: {
     ?? CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION;
 
   if (!input.persistenceEnabled || input.wishId == null) {
-    const visual = await processByPreference(
-      input.sourceUrl,
-      input.preference,
-      input.processingRevision,
-      processorVersion,
-    );
-    return { kind: 'ready', visual };
+    return scheduleWishlistImageProcessing(async () => {
+      const environment = currentWishlistImageProcessingEnvironment();
+      if (!environment.visible) return environmentDeferred();
+      const visual = await processByPreference(
+        input.sourceUrl,
+        input.preference,
+        input.processingRevision,
+        processorVersion,
+      );
+      return { kind: 'ready', visual };
+    });
   }
 
   const key = runKey({
@@ -188,12 +205,16 @@ export async function runWishlistImageProcessing(input: {
   const current = pendingRuns.get(key);
   if (current) return current;
 
-  const task = runPersistedProcessing({
-    wishId: input.wishId,
-    sourceUrl: input.sourceUrl,
-    preference: input.preference,
-    processingRevision: input.processingRevision,
-    processorVersion,
+  const task = scheduleWishlistImageProcessing(async () => {
+    const environment = currentWishlistImageProcessingEnvironment();
+    if (!wishlistImageProcessingEnvironmentReady(environment)) return environmentDeferred();
+    return runPersistedProcessing({
+      wishId: input.wishId!,
+      sourceUrl: input.sourceUrl,
+      preference: input.preference,
+      processingRevision: input.processingRevision,
+      processorVersion,
+    });
   }).finally(() => {
     pendingRuns.delete(key);
   });
