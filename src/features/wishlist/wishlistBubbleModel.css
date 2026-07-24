@@ -1,4 +1,4 @@
-/* The uploaded GLB is the only bubble shell. All previous CSS/WebGL shells are reset. */
+/* The GLB canvas is the only Wishlist bubble shell. */
 .wishlist .wishlist-grid .wl-cloud-bubble,
 .wishlist .wishlist-grid .wl-cloud-bubble[data-priority='high'],
 .wishlist .wishlist-grid .wl-cloud-bubble[data-priority='medium'],
@@ -24,12 +24,12 @@
 .wishlist .wl-cloud-bubble-model-canvas {
   position: absolute;
   z-index: 3;
-  inset: -4%;
+  inset: -5%;
   display: block;
-  width: 108%;
-  height: 108%;
+  width: 110%;
+  height: 110%;
   border-radius: 50%;
-  opacity: 0.98;
+  opacity: 1;
   pointer-events: none;
   transform: translateZ(1px);
 }
@@ -43,20 +43,8 @@
   transform-origin: center;
 }
 
-.wishlist .wishlist-grid .wl-cloud-bubble[data-priority='medium'] .wl-cloud-bubble-model-canvas {
-  opacity: 0.94;
-}
-
-.wishlist .wishlist-grid .wl-cloud-bubble[data-priority='low'] .wl-cloud-bubble-model-canvas {
-  opacity: 0.88;
-}
-
-[data-theme='dark'] .wishlist .wl-cloud-bubble-model-canvas {
-  filter: brightness(1.08) saturate(1.06);
-}
-
 @media (prefers-reduced-transparency: reduce) {
   .wishlist .wl-cloud-bubble-model-canvas {
-    opacity: 0.7;
+    opacity: 0.65;
   }
 }
