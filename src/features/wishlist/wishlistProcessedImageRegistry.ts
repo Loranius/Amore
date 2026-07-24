@@ -1,5 +1,9 @@
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
 import type { WishlistImagePreference } from './wishlistImagePreference';
+import {
+  CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION,
+  type WishlistImageProcessingStatus,
+} from './wishlistImageProcessingState';
 
 export interface WishlistProcessedImageRow {
   id: number;
@@ -8,6 +12,12 @@ export interface WishlistProcessedImageRow {
   image_mode: WishlistImageDisplayMode | null;
   image_preference: WishlistImagePreference;
   image_processing_revision: number;
+  image_processing_status: WishlistImageProcessingStatus;
+  image_processor_version: number;
+  image_processing_target_version: number | null;
+  image_processing_attempts: number;
+  image_processing_error_code: string | null;
+  image_processing_lease_expires_at: string | null;
 }
 
 export interface WishlistStoredVisual {
@@ -21,6 +31,12 @@ export interface WishlistRegisteredImageSettings {
   mode: WishlistImageDisplayMode | null;
   preference: WishlistImagePreference;
   revision: number;
+  processingStatus: WishlistImageProcessingStatus;
+  processorVersion: number;
+  processingTargetVersion: number | null;
+  processingAttempts: number;
+  processingErrorCode: string | null;
+  processingLeaseExpiresAt: string | null;
 }
 
 interface RegisteredWishImage extends WishlistRegisteredImageSettings {
@@ -32,6 +48,15 @@ const recordsByWish = new Map<number, RegisteredWishImage>();
 function normalizedSource(value: string | null | undefined): string | null {
   const normalized = value?.trim() ?? '';
   return normalized || null;
+}
+
+function normalizedStatus(value: unknown): WishlistImageProcessingStatus {
+  return value === 'pending'
+    || value === 'processing'
+    || value === 'ready'
+    || value === 'failed'
+    ? value
+    : 'idle';
 }
 
 export function registerWishlistProcessedRows(rows: WishlistProcessedImageRow[]): void {
@@ -49,6 +74,14 @@ export function registerWishlistProcessedRows(rows: WishlistProcessedImageRow[])
       mode: row.image_mode,
       preference: row.image_preference,
       revision: Number(row.image_processing_revision ?? 0),
+      processingStatus: normalizedStatus(row.image_processing_status),
+      processorVersion: Number(row.image_processor_version ?? 0),
+      processingTargetVersion: row.image_processing_target_version == null
+        ? null
+        : Number(row.image_processing_target_version),
+      processingAttempts: Number(row.image_processing_attempts ?? 0),
+      processingErrorCode: normalizedSource(row.image_processing_error_code),
+      processingLeaseExpiresAt: normalizedSource(row.image_processing_lease_expires_at),
     });
   }
 }
@@ -61,13 +94,8 @@ export function wishlistRegisteredImage(
   if (wishId != null) {
     const exact = recordsByWish.get(wishId);
     if (!exact || exact.source !== source) return null;
-    return {
-      wishId: exact.wishId,
-      processedSrc: exact.processedSrc,
-      mode: exact.mode,
-      preference: exact.preference,
-      revision: exact.revision,
-    };
+    const { source: _source, ...settings } = exact;
+    return settings;
   }
 
   // Older call sites only know the image URL. Resolve them safely when the URL
@@ -76,13 +104,8 @@ export function wishlistRegisteredImage(
   if (matches.length !== 1) return null;
   const [record] = matches;
   if (!record) return null;
-  return {
-    wishId: record.wishId,
-    processedSrc: record.processedSrc,
-    mode: record.mode,
-    preference: record.preference,
-    revision: record.revision,
-  };
+  const { source: _source, ...settings } = record;
+  return settings;
 }
 
 export function wishlistStoredVisual(
@@ -109,6 +132,7 @@ export function updateWishlistStoredVisual(
   sourceUrl: string,
   wishId: number,
   visual: WishlistStoredVisual,
+  processorVersion = CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION,
 ): void {
   const source = sourceUrl.trim();
   if (!source) return;
@@ -121,7 +145,32 @@ export function updateWishlistStoredVisual(
     mode: visual.mode,
     preference: current?.preference ?? 'auto',
     revision: current?.revision ?? 0,
+    processingStatus: 'ready',
+    processorVersion,
+    processingTargetVersion: null,
+    processingAttempts: current?.processingAttempts ?? 0,
+    processingErrorCode: null,
+    processingLeaseExpiresAt: null,
   });
+}
+
+export function updateWishlistProcessingState(
+  wishId: number,
+  sourceUrl: string,
+  patch: Partial<Pick<
+    WishlistRegisteredImageSettings,
+    | 'processingStatus'
+    | 'processorVersion'
+    | 'processingTargetVersion'
+    | 'processingAttempts'
+    | 'processingErrorCode'
+    | 'processingLeaseExpiresAt'
+  >>,
+): void {
+  const source = sourceUrl.trim();
+  const current = recordsByWish.get(wishId);
+  if (!source || !current || current.source !== source) return;
+  recordsByWish.set(wishId, { ...current, ...patch });
 }
 
 export function clearWishlistStoredVisual(
@@ -144,5 +193,11 @@ export function clearWishlistStoredVisual(
     mode: null,
     preference: preference ?? current?.preference ?? 'auto',
     revision: revision ?? current?.revision ?? 0,
+    processingStatus: 'pending',
+    processorVersion: 0,
+    processingTargetVersion: null,
+    processingAttempts: 0,
+    processingErrorCode: null,
+    processingLeaseExpiresAt: null,
   });
 }
