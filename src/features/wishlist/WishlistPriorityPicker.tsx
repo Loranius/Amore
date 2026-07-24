@@ -50,7 +50,7 @@ export function WishlistPriorityPicker({
   const titleId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
-  const selected = OPTIONS.find((option) => option.value === value) ?? OPTIONS[0];
+  const selected = OPTIONS.find((option) => option.value === value) ?? OPTIONS[0]!;
 
   const close = (restoreFocus = false) => {
     setOpen(false);
@@ -86,6 +86,8 @@ export function WishlistPriorityPicker({
 
       const first = controls[0];
       const last = controls[controls.length - 1];
+      if (!first || !last) return;
+
       if (event.shiftKey && document.activeElement === first) {
         event.preventDefault();
         last.focus();
