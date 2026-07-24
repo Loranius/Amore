@@ -2,6 +2,7 @@
 // WishCard — Weighted Cloud bubble + premium detail sheet
 // ============================================================
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { useUsersMap } from '@/features/_shared/useUsers';
 import {
   wishCardStatusChip,
@@ -14,6 +15,7 @@ import {
 } from './wishlistCloudLayout';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistCloud.css';
+import './wishlistCloudModalFix.css';
 
 interface WishCardProps {
   item: WishlistItemV3;
@@ -96,7 +98,10 @@ export function WishCard({
     if (!detailsOpen) return;
 
     const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
     document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    document.body.classList.add('wl-cloud-sheet-open');
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
@@ -105,10 +110,12 @@ export function WishCard({
       setDetailsOpen(false);
     };
 
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
       document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+      document.body.classList.remove('wl-cloud-sheet-open');
     };
   }, [detailsOpen]);
 
@@ -142,7 +149,7 @@ export function WishCard({
               type="button"
               className="wl-cloud-sheet-primary"
               disabled={busy}
-              onClick={() => onPurchased(item)}
+              onClick={() => closeAndRun(() => onPurchased(item))}
             >
               <span aria-hidden="true">✓</span>
               Подарунок куплено
@@ -151,7 +158,7 @@ export function WishCard({
               type="button"
               className="wl-cloud-sheet-secondary"
               disabled={busy}
-              onClick={() => onReserve(item.id, false)}
+              onClick={() => closeAndRun(() => onReserve(item.id, false))}
             >
               Скасувати
             </button>
@@ -195,7 +202,7 @@ export function WishCard({
         type="button"
         className="wl-cloud-sheet-primary"
         disabled={busy}
-        onClick={() => onReserve(item.id, true)}
+        onClick={() => closeAndRun(() => onReserve(item.id, true))}
       >
         <span aria-hidden="true">🎁</span>
         Здійснити бажання
@@ -205,35 +212,8 @@ export function WishCard({
 
   const imageAvailable = Boolean(item.image_url) && !imageFailed;
 
-  return (
-    <article className="wl-cloud-item" style={bubbleStyle} aria-busy={busy}>
-      <button
-        type="button"
-        className="wl-cloud-bubble"
-        data-priority={priority}
-        aria-label={`Відкрити мрію «${item.title}». ${priorityPresentation.label}`}
-        aria-haspopup="dialog"
-        aria-expanded={detailsOpen}
-        aria-busy={busy}
-        disabled={busy}
-        onClick={() => setDetailsOpen(true)}
-      >
-        {imageAvailable ? (
-          <span className="wl-cloud-bubble-media">
-            <img
-              src={item.image_url ?? ''}
-              alt=""
-              loading="lazy"
-              decoding="async"
-              onError={() => setImageFailed(true)}
-            />
-          </span>
-        ) : (
-          <span className="wl-cloud-bubble-placeholder" aria-hidden="true">♡</span>
-        )}
-      </button>
-
-      {detailsOpen && (
+  const detailsSheet = detailsOpen && typeof document !== 'undefined'
+    ? createPortal(
         <div
           className="wl-cloud-sheet-overlay"
           onPointerDown={(event) => {
@@ -246,6 +226,7 @@ export function WishCard({
             role="dialog"
             aria-modal="true"
             aria-labelledby={dialogTitleId}
+            onPointerDown={(event) => event.stopPropagation()}
           >
             <div className="wl-cloud-sheet-handle" aria-hidden="true" />
             <button
@@ -253,6 +234,7 @@ export function WishCard({
               className="wl-cloud-sheet-close"
               aria-label="Закрити деталі мрії"
               onClick={() => setDetailsOpen(false)}
+              autoFocus
             >
               ×
             </button>
@@ -371,8 +353,41 @@ export function WishCard({
               </div>
             </div>
           </section>
-        </div>
-      )}
-    </article>
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <>
+      <article className="wl-cloud-item" style={bubbleStyle} aria-busy={busy}>
+        <button
+          type="button"
+          className="wl-cloud-bubble"
+          data-priority={priority}
+          aria-label={`Відкрити мрію «${item.title}». ${priorityPresentation.label}`}
+          aria-haspopup="dialog"
+          aria-expanded={detailsOpen}
+          aria-busy={busy}
+          disabled={busy}
+          onClick={() => setDetailsOpen(true)}
+        >
+          {imageAvailable ? (
+            <span className="wl-cloud-bubble-media">
+              <img
+                src={item.image_url ?? ''}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={() => setImageFailed(true)}
+              />
+            </span>
+          ) : (
+            <span className="wl-cloud-bubble-placeholder" aria-hidden="true">♡</span>
+          )}
+        </button>
+      </article>
+      {detailsSheet}
+    </>
   );
 }

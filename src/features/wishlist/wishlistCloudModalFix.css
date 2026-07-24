@@ -1,0 +1,230 @@
+/*
+ * Cloud detail sheet hotfix.
+ * The sheet is rendered through a React portal, so these rules intentionally
+ * live outside the `.wishlist` stacking context and app shell.
+ */
+body.wl-cloud-sheet-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body.wl-cloud-sheet-open .bottom-nav {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(calc(100% + 28px));
+}
+
+.wl-cloud-sheet-overlay {
+  position: fixed;
+  z-index: 10000;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  padding: max(10px, env(safe-area-inset-top, 0px)) 0 0;
+  background: rgba(35, 25, 33, 0.48);
+  backdrop-filter: blur(14px) saturate(0.86);
+  -webkit-backdrop-filter: blur(14px) saturate(0.86);
+  isolation: isolate;
+  touch-action: pan-y;
+}
+
+.wl-cloud-sheet {
+  position: relative;
+  display: flex;
+  width: min(100%, 720px);
+  max-height: min(88dvh, 820px);
+  min-height: 0;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-bottom: 0;
+  border-radius: 30px 30px 0 0;
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--surface) 96%, white 4%),
+      color-mix(in srgb, var(--surface) 91%, #f9edf3 9%)
+    );
+  box-shadow:
+    0 -24px 72px rgba(44, 25, 36, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(30px) saturate(1.06);
+  -webkit-backdrop-filter: blur(30px) saturate(1.06);
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+.wl-cloud-sheet-handle {
+  position: relative;
+  z-index: 3;
+  width: 42px;
+  height: 5px;
+  flex: 0 0 5px;
+  margin: 10px auto 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.wl-cloud-sheet-close {
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  border-color: rgba(255, 255, 255, 0.64);
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 14%, transparent);
+  font-size: 21px;
+}
+
+.wl-cloud-sheet-hero {
+  display: grid;
+  min-height: 0;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 8px 54px 10px;
+}
+
+.wl-cloud-sheet-photo {
+  width: min(46vw, 184px);
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+  border-color: rgba(255, 255, 255, 0.76);
+  box-shadow:
+    0 18px 42px color-mix(in srgb, var(--wl-cloud-sheet-accent) 20%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.wl-cloud-sheet-photo img {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  object-fit: cover;
+  object-position: center;
+}
+
+.wl-cloud-sheet-content {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  align-content: start;
+  gap: 11px;
+  overflow-y: auto;
+  padding: 8px 18px calc(18px + env(safe-area-inset-bottom, 0px));
+  scrollbar-width: thin;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wl-cloud-sheet-title {
+  font-size: clamp(24px, 7.2vw, 32px);
+}
+
+.wl-cloud-sheet-link {
+  min-height: 46px;
+}
+
+.wl-cloud-sheet-lifecycle {
+  padding-top: 0;
+}
+
+.wl-cloud-sheet-actions {
+  position: relative;
+  z-index: 2;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: 6px;
+  margin-top: 0;
+  padding: 10px 0 0;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--surface) 93%, transparent) 28%);
+}
+
+.wl-cloud-sheet-action {
+  min-height: 70px;
+  gap: 5px;
+  padding-block: 6px;
+}
+
+.wl-cloud-sheet-action > span {
+  width: 44px;
+  height: 44px;
+}
+
+@media (max-width: 430px) {
+  .wl-cloud-sheet {
+    max-height: 90dvh;
+    padding-inline: 0;
+    border-radius: 28px 28px 0 0;
+  }
+
+  .wl-cloud-sheet-hero {
+    padding-top: 5px;
+    padding-bottom: 8px;
+  }
+
+  .wl-cloud-sheet-photo {
+    width: min(45vw, 176px);
+  }
+
+  .wl-cloud-sheet-content {
+    padding-inline: 16px;
+  }
+
+  .wl-cloud-sheet-title-row {
+    gap: 7px;
+  }
+}
+
+@media (min-width: 720px) {
+  .wl-cloud-sheet-overlay {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .wl-cloud-sheet {
+    display: grid;
+    width: min(92vw, 760px);
+    max-height: min(84dvh, 720px);
+    grid-template-columns: minmax(250px, 0.86fr) minmax(0, 1.14fr);
+    gap: 18px;
+    padding: 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.56);
+    border-radius: 30px;
+  }
+
+  .wl-cloud-sheet-handle {
+    display: none;
+  }
+
+  .wl-cloud-sheet-close {
+    top: 16px;
+    right: 16px;
+  }
+
+  .wl-cloud-sheet-hero {
+    min-height: 100%;
+    padding: 24px;
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.7), transparent 52%),
+      color-mix(in srgb, var(--wl-cloud-sheet-accent) 8%, var(--surface));
+  }
+
+  .wl-cloud-sheet-photo {
+    width: min(28vw, 248px);
+  }
+
+  .wl-cloud-sheet-content {
+    align-content: center;
+    padding: 30px 8px 12px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.wl-cloud-sheet-open .bottom-nav {
+    transition: none;
+  }
+}
