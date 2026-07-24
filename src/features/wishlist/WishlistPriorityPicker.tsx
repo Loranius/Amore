@@ -19,25 +19,25 @@ const OPTIONS: Array<{
     value: '',
     icon: '—',
     label: 'Не вказано',
-    description: 'Без окремого пріоритету',
+    description: 'Бульбашка середнього розміру',
   },
   {
     value: 'high',
-    icon: '✨',
-    label: 'Дуже хочу',
-    description: 'Хочу найближчим часом',
+    icon: '✦',
+    label: 'Жадане',
+    description: 'Найбільша фокусна бульбашка',
   },
   {
     value: 'medium',
-    icon: '◆',
-    label: 'Хочу',
-    description: 'Звичайне бажання',
+    icon: '♡',
+    label: 'Бажане',
+    description: 'Середня бульбашка у хмарі',
   },
   {
     value: 'low',
-    icon: '○',
-    label: 'Колись',
-    description: 'Без конкретного терміну',
+    icon: '❀',
+    label: 'Приємне',
+    description: 'Маленька легка бульбашка',
   },
 ];
 
@@ -143,8 +143,8 @@ export function WishlistPriorityPicker({
             <div className="wl-priority-picker-handle" aria-hidden="true" />
             <div className="wl-priority-picker-header">
               <div>
-                <span className="wl-priority-picker-eyebrow">Пріоритет</span>
-                <h3 id={titleId}>Оберіть пріоритет</h3>
+                <span className="wl-priority-picker-eyebrow">Вага мрії</span>
+                <h3 id={titleId}>Оберіть розмір бульбашки</h3>
               </div>
               <button
                 type="button"
