@@ -1,18 +1,15 @@
 name: Deploy to GitHub Pages
 
-# Автодеплой при пуші в main + ручний запуск із вкладки Actions.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
-# Права, потрібні офіційним Pages-екшенам.
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# Не даємо паралельним деплоям накладатись; поточний не переривається.
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -27,10 +24,9 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      # base для Vite: кореневий репо <user>.github.io → '/', інакше '/<repo>/'.
       - name: Compute base path
         id: base
         run: |
@@ -40,15 +36,9 @@ jobs:
             echo "base=/${{ github.event.repository.name }}/" >> "$GITHUB_OUTPUT"
           fi
 
-      # npm install (не ci) — лок-файл після ручного додавання нових
-      # пакетів (three/@react-three/*) локально не перегенерований (немає
-      # node/npm у робочому середовищі), install сам дорезолвить і
-      # оновить package-lock.json під час білда.
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      # `npm run build` = `tsc -b && vite build`, тож тут же проганяється
-      # повний тайпчек. VITE_*-секрети вшиваються у бандл на цьому кроці.
       - name: Build
         run: npm run build
         env:
@@ -57,6 +47,9 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_TMDB_KEY: ${{ secrets.VITE_TMDB_KEY }}
           VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
+
+      - name: Verify PWA and base-path output
+        run: npm run verify:pages-build -- --base="${{ steps.base.outputs.base }}"
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -73,3 +66,14 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Smoke test deployed PWA
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          root="${PAGE_URL%/}/"
+          curl --fail --location --retry 10 --retry-delay 5 --retry-all-errors "$root" --output /tmp/amore-index.html
+          grep -q 'id="root"' /tmp/amore-index.html
+          curl --fail --location --retry 10 --retry-delay 5 --retry-all-errors "${root}manifest.webmanifest" --output /tmp/amore-manifest.webmanifest
+          curl --fail --location --retry 10 --retry-delay 5 --retry-all-errors "${root}sw.js" --output /tmp/amore-sw.js

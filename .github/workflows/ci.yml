@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Typecheck, tests and build
+    name: Typecheck, tests and Pages build
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -52,5 +52,10 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build production bundle
+      - name: Build GitHub Pages bundle
         run: npm run build
+        env:
+          BASE_PATH: /Amore/
+
+      - name: Verify PWA and base-path output
+        run: npm run verify:pages-build -- --base=/Amore/

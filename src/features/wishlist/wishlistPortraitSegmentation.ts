@@ -57,6 +57,21 @@ function smoothstep(edge0: number, edge1: number, value: number): number {
   return t * t * (3 - 2 * t);
 }
 
+function portraitProcessingError(error: unknown): Error {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes('image_fetch')
+    || normalized.includes('image_proxy')
+    || normalized.includes('image_load')
+    || normalized.includes('image_decode')
+    || normalized.includes('failed to fetch')
+  ) {
+    return new Error('image_load_failed');
+  }
+  return new Error('portrait_segmentation_failed');
+}
+
 async function importTasksVision(): Promise<TasksVisionModule> {
   return import(/* @vite-ignore */ `${TASKS_VISION_URL}/+esm`) as Promise<TasksVisionModule>;
 }
@@ -219,8 +234,8 @@ async function segmentPortrait(src: string): Promise<WishlistPortraitResult> {
       ? { src: cutout, mode: 'portrait-cutout' }
       : { src, mode: 'photo-cover' };
   } catch (error) {
-    console.info('[Wishlist] portrait segmentation skipped:', error);
-    return { src, mode: 'photo-cover' };
+    console.info('[Wishlist] portrait segmentation failed safely:', error);
+    throw portraitProcessingError(error);
   } finally {
     for (const mask of masks) mask.close?.();
     if (decoded && 'close' in decoded && typeof decoded.close === 'function') decoded.close();
@@ -230,7 +245,10 @@ async function segmentPortrait(src: string): Promise<WishlistPortraitResult> {
 export function resolveWishlistPortrait(src: string): Promise<WishlistPortraitResult> {
   const cached = portraitCache.get(src);
   if (cached) return cached;
-  const promise = segmentPortrait(src);
+  const promise = segmentPortrait(src).catch((error) => {
+    portraitCache.delete(src);
+    throw error;
+  });
   portraitCache.set(src, promise);
   return promise;
 }
