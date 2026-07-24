@@ -20,7 +20,7 @@ import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import type { WishlistItemRow, AppUser } from '@/types';
 
 type Scope = 'me' | 'partner' | 'shared';
-type WishlistPriorityV3 = 'dream' | 'high' | 'medium' | 'low';
+type WishlistPriorityV3 = 'high' | 'medium' | 'low';
 type LinkPreviewStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error';
 
 interface WishFormModalProps {
@@ -45,6 +45,11 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+function normalizeWishlistPriority(value: unknown): WishlistPriorityV3 | '' {
+  if (value === 'dream') return 'high';
+  return value === 'high' || value === 'medium' || value === 'low' ? value : '';
+}
+
 export function WishFormModal({
   item,
   partner,
@@ -63,7 +68,7 @@ export function WishFormModal({
   const [imgUrl, setImgUrl] = useState(item?.image_url ?? '');
   const [price, setPrice] = useState(item?.price != null ? String(item.price) : '');
   const [priority, setPriority] = useState<WishlistPriorityV3 | ''>(
-    (item?.priority as WishlistPriorityV3 | null) ?? '',
+    normalizeWishlistPriority(item?.priority),
   );
   const [description, setDescription] = useState(item?.description ?? '');
 
@@ -440,7 +445,6 @@ export function WishFormModal({
             onChange={(event) => setPriority(event.target.value as WishlistPriorityV3 | '')}
           >
             <option value="">— не вказано —</option>
-            <option value="dream">❤️ Мрія</option>
             <option value="high">✨ Дуже хочу</option>
             <option value="medium">◆ Хочу</option>
             <option value="low">○ Колись</option>
