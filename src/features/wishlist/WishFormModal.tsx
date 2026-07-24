@@ -614,6 +614,7 @@ export function WishFormModal({
                     preference={imagePreference}
                     processingRevision={imageProcessingRevision}
                     persistenceEnabled={canPersistPreview}
+                    onActivate={() => onPhotoClick(previewSrc)}
                     onProcessingChange={canPersistPreview ? handleImageProcessingChange : undefined}
                     onPersisted={canPersistPreview ? handleImagePersisted : undefined}
                     onPersistenceError={canPersistPreview ? handleImagePersistenceError : undefined}
