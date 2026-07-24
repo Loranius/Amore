@@ -22,10 +22,6 @@ async function dataUrlBlob(src: string): Promise<Blob> {
   return blob;
 }
 
-function cacheBustedUrl(path: string): string {
-  return `${publicUrl(BUCKET, path)}?v=${Date.now()}`;
-}
-
 async function persistForWish(input: {
   wishId: number;
   sourceUrl: string;
@@ -43,14 +39,17 @@ async function persistForWish(input: {
       if (input.visual.mode !== 'photo-cover') {
         const blob = await dataUrlBlob(input.visual.src);
         const extension = blob.type.includes('png') ? 'png' : 'webp';
-        uploadedPath = `processed/wish-${input.wishId}.${extension}`;
+        // Current bucket policies are shared by authenticated users. A random
+        // object name prevents another session from guessing and overwriting a
+        // processed asset by wish id alone.
+        uploadedPath = `processed/${input.wishId}/visual-${crypto.randomUUID()}.${extension}`;
         const { error } = await supabase.storage.from(BUCKET).upload(uploadedPath, blob, {
-          upsert: true,
+          upsert: false,
           contentType: blob.type,
           cacheControl: '31536000',
         });
         if (error) throw error;
-        processedImageUrl = cacheBustedUrl(uploadedPath);
+        processedImageUrl = publicUrl(BUCKET, uploadedPath);
       }
 
       await setWishlistProcessedImage({
