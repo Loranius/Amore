@@ -1,3 +1,5 @@
+import './wishlistSoapBubble.css';
+
 export type WishlistCloudPriority = 'high' | 'medium' | 'low';
 
 export interface WishlistCloudPriorityPresentation {
