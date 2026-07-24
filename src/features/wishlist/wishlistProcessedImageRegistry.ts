@@ -15,13 +15,16 @@ export interface WishlistStoredVisual {
   mode: WishlistImageDisplayMode;
 }
 
-interface RegisteredWishImage {
-  wishId: number;
-  source: string;
+export interface WishlistRegisteredImageSettings {
   processedSrc: string | null;
   mode: WishlistImageDisplayMode | null;
   preference: WishlistImagePreference;
   revision: number;
+}
+
+interface RegisteredWishImage extends WishlistRegisteredImageSettings {
+  wishId: number;
+  source: string;
 }
 
 const recordsByWish = new Map<number, RegisteredWishImage>();
@@ -50,13 +53,27 @@ export function registerWishlistProcessedRows(rows: WishlistProcessedImageRow[])
   }
 }
 
+export function wishlistRegisteredImage(
+  wishId: number | undefined,
+  sourceUrl: string,
+): WishlistRegisteredImageSettings | null {
+  if (wishId == null) return null;
+  const record = recordsByWish.get(wishId);
+  if (!record || record.source !== sourceUrl.trim()) return null;
+  return {
+    processedSrc: record.processedSrc,
+    mode: record.mode,
+    preference: record.preference,
+    revision: record.revision,
+  };
+}
+
 export function wishlistStoredVisual(
   wishId: number | undefined,
   sourceUrl: string,
 ): WishlistStoredVisual | null {
-  if (wishId == null) return null;
-  const record = recordsByWish.get(wishId);
-  if (!record || record.source !== sourceUrl.trim()) return null;
+  const record = wishlistRegisteredImage(wishId, sourceUrl);
+  if (!record) return null;
 
   if (record.processedSrc && (
     record.mode === 'product-cutout' || record.mode === 'portrait-cutout'
