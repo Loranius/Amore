@@ -4,12 +4,18 @@ import {
   wishlistImageMode,
   type WishlistImageMode,
 } from './wishlistImageCutout';
+import {
+  inferWishlistImageDisplayMode,
+  isWishlistTransparentDisplayMode,
+  type WishlistImageDisplayMode,
+} from './wishlistImageModes';
 
 interface WishlistProductVisualProps {
   src: string;
   alt: string;
   className?: string;
   loading?: 'eager' | 'lazy';
+  modeHint?: WishlistImageDisplayMode;
   onError?: () => void;
 }
 
@@ -18,36 +24,52 @@ export function WishlistProductVisual({
   alt,
   className = '',
   loading = 'lazy',
+  modeHint,
   onError,
 }: WishlistProductVisualProps) {
-  const initialMode = wishlistImageMode(src);
+  const initialProcessingMode = wishlistImageMode(src);
+  const initialDisplayMode = inferWishlistImageDisplayMode(
+    src,
+    initialProcessingMode,
+    modeHint,
+  );
   const [displaySrc, setDisplaySrc] = useState(src);
-  const [mode, setMode] = useState<WishlistImageMode>(initialMode);
-  const [processing, setProcessing] = useState(initialMode !== 'cutout');
+  const [mode, setMode] = useState<WishlistImageDisplayMode>(initialDisplayMode);
+  const [processing, setProcessing] = useState(
+    modeHint === undefined && initialProcessingMode !== 'cutout',
+  );
 
   useEffect(() => {
     let active = true;
-    const nextInitialMode = wishlistImageMode(src);
+    const nextProcessingMode: WishlistImageMode = wishlistImageMode(src);
     setDisplaySrc(src);
-    setMode(nextInitialMode);
-    setProcessing(nextInitialMode !== 'cutout');
+    setMode(inferWishlistImageDisplayMode(src, nextProcessingMode, modeHint));
 
+    if (modeHint !== undefined) {
+      setProcessing(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    setProcessing(nextProcessingMode !== 'cutout');
     void resolveWishlistImage(src).then((result) => {
       if (!active) return;
       setDisplaySrc(result.src);
-      setMode(result.mode);
+      setMode(inferWishlistImageDisplayMode(result.src, result.mode));
       setProcessing(false);
     });
 
     return () => {
       active = false;
     };
-  }, [src]);
+  }, [modeHint, src]);
 
   return (
     <span
       className={`wl-product-visual ${className}`.trim()}
       data-image-mode={mode}
+      data-image-transparent={isWishlistTransparentDisplayMode(mode) ? 'true' : 'false'}
       data-processing={processing ? 'true' : 'false'}
     >
       <img
