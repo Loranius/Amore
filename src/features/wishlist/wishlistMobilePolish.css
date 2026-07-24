@@ -28,9 +28,33 @@
   outline-offset: 2px;
 }
 
+/*
+ * Wishlist dialogs are task-focused screens. The global BottomNav must not sit
+ * above the editor or compete with its own sticky Save/Cancel actions.
+ */
+.bottom-nav {
+  transition:
+    opacity 180ms ease,
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0s;
+}
+
+.app-shell:has(.wishlist .modal-overlay) > .bottom-nav {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(100% + 40px));
+  transition:
+    opacity 160ms ease,
+    transform 200ms ease,
+    visibility 0s linear 200ms;
+}
+
 @media (max-width: 719px) {
+  /* Keep active cards above the floating BottomNav. This must match the larger
+     Wishlist page reserve and must not be reset to the old 20px value. */
   .wishlist {
-    padding-bottom: max(20px, env(safe-area-inset-bottom));
+    padding-bottom: calc(132px + env(safe-area-inset-bottom, 0px));
   }
 
   .wishlist > .tab-bar {
@@ -112,6 +136,7 @@
   }
 
   .wishlist .modal-overlay {
+    z-index: 300;
     align-items: flex-end;
     padding: max(10px, env(safe-area-inset-top)) 0 0;
     overscroll-behavior: contain;
@@ -124,6 +149,7 @@
     margin: 0;
     padding-bottom: max(20px, env(safe-area-inset-bottom));
     overflow-y: auto;
+    scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
     border-radius: 28px 28px 0 0;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
@@ -147,7 +173,9 @@
     bottom: calc(-1 * max(20px, env(safe-area-inset-bottom)));
     margin-inline: -2px;
     padding-block: 12px max(20px, env(safe-area-inset-bottom));
+    border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
     background: linear-gradient(to top, var(--surface) 76%, color-mix(in srgb, var(--surface) 92%, transparent));
+    box-shadow: 0 -12px 28px color-mix(in srgb, var(--text) 7%, transparent);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
@@ -226,6 +254,11 @@
 @media (prefers-reduced-motion: reduce) {
   .wl-card-v3-menu {
     animation: none;
+  }
+
+  .bottom-nav,
+  .app-shell:has(.wishlist .modal-overlay) > .bottom-nav {
+    transition: none;
   }
 
   .wishlist :is(*, *::before, *::after) {
