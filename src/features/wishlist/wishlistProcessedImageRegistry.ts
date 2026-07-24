@@ -1,10 +1,13 @@
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
+import type { WishlistImagePreference } from './wishlistImagePreference';
 
 export interface WishlistProcessedImageRow {
   id: number;
   image_url: string | null;
   processed_image_url: string | null;
   image_mode: WishlistImageDisplayMode | null;
+  image_preference: WishlistImagePreference;
+  image_processing_revision: number;
 }
 
 export interface WishlistStoredVisual {
@@ -14,11 +17,14 @@ export interface WishlistStoredVisual {
 
 interface RegisteredWishImage {
   wishId: number;
+  source: string;
   processedSrc: string | null;
   mode: WishlistImageDisplayMode | null;
+  preference: WishlistImagePreference;
+  revision: number;
 }
 
-const recordsBySource = new Map<string, Map<number, RegisteredWishImage>>();
+const recordsByWish = new Map<number, RegisteredWishImage>();
 
 function normalizedSource(value: string | null | undefined): string | null {
   const normalized = value?.trim() ?? '';
@@ -28,42 +34,41 @@ function normalizedSource(value: string | null | undefined): string | null {
 export function registerWishlistProcessedRows(rows: WishlistProcessedImageRow[]): void {
   for (const row of rows) {
     const source = normalizedSource(row.image_url);
-    if (!source) continue;
+    if (!source) {
+      recordsByWish.delete(row.id);
+      continue;
+    }
 
-    const records = recordsBySource.get(source) ?? new Map<number, RegisteredWishImage>();
-    records.set(row.id, {
+    recordsByWish.set(row.id, {
       wishId: row.id,
+      source,
       processedSrc: normalizedSource(row.processed_image_url),
       mode: row.image_mode,
+      preference: row.image_preference,
+      revision: Number(row.image_processing_revision ?? 0),
     });
-    recordsBySource.set(source, records);
   }
 }
 
-export function wishlistStoredVisual(sourceUrl: string): WishlistStoredVisual | null {
-  const records = recordsBySource.get(sourceUrl.trim());
-  if (!records) return null;
+export function wishlistStoredVisual(
+  wishId: number | undefined,
+  sourceUrl: string,
+): WishlistStoredVisual | null {
+  if (wishId == null) return null;
+  const record = recordsByWish.get(wishId);
+  if (!record || record.source !== sourceUrl.trim()) return null;
 
-  // A transparent persisted visual is more informative than a fallback marker.
-  for (const record of records.values()) {
-    if (record.processedSrc && (
-      record.mode === 'product-cutout' || record.mode === 'portrait-cutout'
-    )) {
-      return { src: record.processedSrc, mode: record.mode };
-    }
+  if (record.processedSrc && (
+    record.mode === 'product-cutout' || record.mode === 'portrait-cutout'
+  )) {
+    return { src: record.processedSrc, mode: record.mode };
   }
 
-  for (const record of records.values()) {
-    if (record.mode === 'photo-cover') {
-      return { src: sourceUrl, mode: 'photo-cover' };
-    }
+  if (record.mode === 'photo-cover') {
+    return { src: sourceUrl, mode: 'photo-cover' };
   }
 
   return null;
-}
-
-export function wishlistIdsForImageSource(sourceUrl: string): number[] {
-  return [...(recordsBySource.get(sourceUrl.trim())?.keys() ?? [])];
 }
 
 export function updateWishlistStoredVisual(
@@ -74,11 +79,36 @@ export function updateWishlistStoredVisual(
   const source = sourceUrl.trim();
   if (!source) return;
 
-  const records = recordsBySource.get(source) ?? new Map<number, RegisteredWishImage>();
-  records.set(wishId, {
+  const current = recordsByWish.get(wishId);
+  recordsByWish.set(wishId, {
     wishId,
+    source,
     processedSrc: visual.mode === 'photo-cover' ? null : visual.src,
     mode: visual.mode,
+    preference: current?.preference ?? 'auto',
+    revision: current?.revision ?? 0,
   });
-  recordsBySource.set(source, records);
+}
+
+export function clearWishlistStoredVisual(
+  wishId: number,
+  sourceUrl: string,
+  preference?: WishlistImagePreference,
+  revision?: number,
+): void {
+  const source = sourceUrl.trim();
+  if (!source) {
+    recordsByWish.delete(wishId);
+    return;
+  }
+
+  const current = recordsByWish.get(wishId);
+  recordsByWish.set(wishId, {
+    wishId,
+    source,
+    processedSrc: null,
+    mode: null,
+    preference: preference ?? current?.preference ?? 'auto',
+    revision: revision ?? current?.revision ?? 0,
+  });
 }
