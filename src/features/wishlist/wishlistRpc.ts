@@ -6,6 +6,10 @@ import { WishlistQuickCompletionTracker } from './wishlistQuickCompletion';
 import { registerWishlistProcessedRows } from './wishlistProcessedImageRegistry';
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
 import type { WishlistImagePreference } from './wishlistImagePreference';
+import type {
+  WishlistImageProcessingDecision,
+  WishlistImageProcessingStatus,
+} from './wishlistImageProcessingState';
 import type { WishlistItemRow } from '@/types';
 
 export type WishlistStatus =
@@ -25,6 +29,14 @@ export interface WishlistItemV3 extends WishlistItemRow {
   image_mode: WishlistImageDisplayMode | null;
   image_preference: WishlistImagePreference;
   image_processing_revision: number;
+  image_processing_status: WishlistImageProcessingStatus;
+  image_processor_version: number;
+  image_processing_target_version: number | null;
+  image_processing_attempts: number;
+  image_processing_started_at: string | null;
+  image_processing_completed_at: string | null;
+  image_processing_error_code: string | null;
+  image_processing_lease_expires_at: string | null;
   status: WishlistStatus;
   archived_at: string | null;
   version: number;
@@ -70,6 +82,14 @@ interface GiftMemoryArchiveRpcRow {
   memory_comment: string | null;
 }
 
+interface BeginImageProcessingRpcRow {
+  session_id: string | null;
+  lease_expires_at: string | null;
+  should_process: boolean;
+  retry_after_ms: number | null;
+  processing_status: WishlistImageProcessingStatus;
+}
+
 export interface GiftMemoryArchiveItem extends GiftMemoryArchiveRpcRow {
   reaction_photo_url: string | null;
   reaction_video_url: string | null;
@@ -107,6 +127,38 @@ function assertStats(data: unknown): WishlistStatsV3 {
     done: Number(row.done ?? 0),
     doneThisYear: Number(row.done_this_year ?? 0),
     doneThisMonth: Number(row.done_this_month ?? 0),
+  };
+}
+
+function assertProcessingDecision(data: unknown): WishlistImageProcessingDecision {
+  const rows = assertRows<BeginImageProcessingRpcRow>(data, 'Wishlist image processing begin');
+  if (rows.length !== 1) throw new Error('Wishlist image processing begin returned an invalid payload');
+  const row = rows[0];
+  if (!row) throw new Error('Wishlist image processing begin returned an empty payload');
+
+  const status = row.processing_status;
+  if (!['idle', 'pending', 'processing', 'ready', 'failed'].includes(status)) {
+    throw new Error('Wishlist image processing begin returned an invalid status');
+  }
+
+  if (row.should_process) {
+    if (!row.session_id || !row.lease_expires_at) {
+      throw new Error('Wishlist image processing begin returned an invalid lease');
+    }
+    return {
+      status,
+      claim: {
+        sessionId: row.session_id,
+        leaseExpiresAt: row.lease_expires_at,
+      },
+      retryAfterMs: null,
+    };
+  }
+
+  return {
+    status,
+    claim: null,
+    retryAfterMs: row.retry_after_ms == null ? null : Number(row.retry_after_ms),
   };
 }
 
@@ -247,6 +299,69 @@ export async function setWishlistImagePreference(input: {
   });
 }
 
+export async function beginWishlistImageProcessing(input: {
+  wishId: number;
+  sourceImageUrl: string;
+  imagePreference: WishlistImagePreference;
+  processingRevision: number;
+  processorVersion: number;
+}): Promise<WishlistImageProcessingDecision> {
+  const { data, error } = await rpc('begin_wishlist_image_processing_v5', {
+    p_wish_id: input.wishId,
+    p_source_image_url: input.sourceImageUrl,
+    p_image_preference: input.imagePreference,
+    p_processing_revision: input.processingRevision,
+    p_processor_version: input.processorVersion,
+  });
+  if (error) throw new Error(error.message);
+  return assertProcessingDecision(data);
+}
+
+export async function completeWishlistImageProcessing(input: {
+  wishId: number;
+  sourceImageUrl: string;
+  imagePreference: WishlistImagePreference;
+  processingRevision: number;
+  processorVersion: number;
+  sessionId: string;
+  processedImageUrl: string | null;
+  imageMode: WishlistImageDisplayMode;
+}): Promise<string | null> {
+  const { data, error } = await rpc('complete_wishlist_image_processing_v5', {
+    p_wish_id: input.wishId,
+    p_source_image_url: input.sourceImageUrl,
+    p_image_preference: input.imagePreference,
+    p_processing_revision: input.processingRevision,
+    p_processor_version: input.processorVersion,
+    p_session_id: input.sessionId,
+    p_processed_image_url: input.processedImageUrl,
+    p_image_mode: input.imageMode,
+  });
+  if (error) throw new Error(error.message);
+  return typeof data === 'string' && data.trim() ? data : null;
+}
+
+export async function failWishlistImageProcessing(input: {
+  wishId: number;
+  sourceImageUrl: string;
+  imagePreference: WishlistImagePreference;
+  processingRevision: number;
+  processorVersion: number;
+  sessionId: string;
+  errorCode: string;
+}): Promise<void> {
+  await callVoid('fail_wishlist_image_processing_v5', {
+    p_wish_id: input.wishId,
+    p_source_image_url: input.sourceImageUrl,
+    p_image_preference: input.imagePreference,
+    p_processing_revision: input.processingRevision,
+    p_processor_version: input.processorVersion,
+    p_session_id: input.sessionId,
+    p_error_code: input.errorCode,
+  });
+}
+
+/** Compatibility path for older clients. New code uses the leased v5 pipeline. */
 export async function setWishlistProcessedImage(input: {
   wishId: number;
   sourceImageUrl: string;
