@@ -1,3 +1,4 @@
+import { WishlistBubblePhysics } from './WishlistBubblePhysics';
 import { partnerGenitive } from './partnerLabel';
 import type { WishlistStatsV3 } from './wishlistRpc';
 
@@ -66,35 +67,59 @@ export function WishlistHero({
   onAdd,
 }: WishlistHeroProps) {
   const copy = heroCopy(tab, meName, partnerName);
+  const canOpenCompleted = tab !== 'partner';
+
+  const openCompleted = () => {
+    document
+      .querySelector<HTMLButtonElement>('.wishlist .wl-archive-entry')
+      ?.click();
+  };
 
   return (
-    <header className={`wl-hero wl-hero--${tab}`}>
-      <div className="wl-hero-copy">
-        <span className="wl-hero-eyebrow">{copy.eyebrow}</span>
-        <h1 className="wl-hero-title">{copy.title}</h1>
-        <p className="wl-hero-description">{copy.description}</p>
+    <>
+      <WishlistBubblePhysics />
+      <header className={`wl-hero wl-hero--${tab}`}>
+        <div className="wl-hero-copy">
+          <span className="wl-hero-eyebrow">{copy.eyebrow}</span>
+          <h1 className="wl-hero-title">{copy.title}</h1>
+          <p className="wl-hero-description">{copy.description}</p>
 
-        <div className="wl-hero-metrics" aria-label="Статистика списку бажань">
-          <span className={`wl-hero-metric${activeCount === null ? ' wl-hero-metric--pending' : ''}`}>
-            <strong>{activeCount ?? '—'}</strong>
-            {activeCount === null ? 'завантаження' : activeWishlistLabel(activeCount)}
-          </span>
-          {stats && stats.total > 0 && (
-            <span className="wl-hero-metric wl-hero-metric--muted">
-              <strong>{stats.done}</strong>
-              здійснено разом
+          <div className="wl-hero-metrics" aria-label="Статистика списку бажань">
+            <span className={`wl-hero-metric${activeCount === null ? ' wl-hero-metric--pending' : ''}`}>
+              <strong>{activeCount ?? '—'}</strong>
+              {activeCount === null ? 'завантаження' : activeWishlistLabel(activeCount)}
             </span>
-          )}
+            {stats && stats.total > 0 && (
+              <span className="wl-hero-metric wl-hero-metric--muted">
+                <strong>{stats.done}</strong>
+                здійснено разом
+              </span>
+            )}
+          </div>
         </div>
-      </div>
 
-      <div className="wl-hero-actions">
-        <span className="wl-hero-symbol" aria-hidden="true">{copy.symbol}</span>
-        <button type="button" className="btn wl-hero-add" disabled={busy} onClick={onAdd}>
-          <span aria-hidden="true">＋</span>
-          Додати мрію
-        </button>
-      </div>
-    </header>
+        <div className={`wl-hero-actions${canOpenCompleted ? ' wl-hero-actions--with-completed' : ''}`}>
+          <span className="wl-hero-symbol" aria-hidden="true">{copy.symbol}</span>
+          <div className="wl-hero-action-row">
+            <button type="button" className="btn wl-hero-add" disabled={busy} onClick={onAdd}>
+              <span aria-hidden="true">＋</span>
+              Додати мрію
+            </button>
+            {canOpenCompleted && (
+              <button
+                type="button"
+                className="wl-hero-completed"
+                disabled={busy || activeCount === null}
+                onClick={openCompleted}
+                aria-label="Відкрити здійснені мрії та подаровані спогади"
+              >
+                <span aria-hidden="true">✓</span>
+                Здійснене
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+    </>
   );
 }
