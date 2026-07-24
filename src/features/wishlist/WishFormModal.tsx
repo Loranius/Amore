@@ -19,6 +19,7 @@ import { TabBar } from '@/components/ui/TabBar';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { WishlistPriorityPicker } from './WishlistPriorityPicker';
 import type { WishlistItemRow, AppUser } from '@/types';
+import './wishlistFormSections.css';
 
 type Scope = 'me' | 'partner' | 'shared';
 type WishlistPriorityV3 = 'high' | 'medium' | 'low';
@@ -274,7 +275,7 @@ export function WishFormModal({
       }}
     >
       <div
-        className="modal-sheet"
+        className="modal-sheet wm-form-modal"
         role="dialog"
         aria-modal="true"
         aria-labelledby="wish-modal-title"
@@ -290,175 +291,215 @@ export function WishFormModal({
           ×
         </button>
 
-        <h2 id="wish-modal-title" className="modal-title">
-          {isEdit ? 'Редагувати бажання' : 'Нова мрія'}
-        </h2>
+        <div className="wm-form-heading">
+          <span className="wm-form-eyebrow">Wishlist</span>
+          <h2 id="wish-modal-title" className="modal-title">
+            {isEdit ? 'Редагувати бажання' : 'Нова мрія'}
+          </h2>
+          <p>
+            {isEdit
+              ? 'Онови головні деталі — решту можна залишити без змін.'
+              : 'Додай лише назву або заповни картку детальніше.'}
+          </p>
+        </div>
 
-        {!isEdit && (
-          <div className="form-field">
-            <span>Для кого</span>
-            <TabBar<Scope>
-              value={scope}
-              onChange={(value) => {
-                if (!saving) setScope(value);
-              }}
-              items={[
-                { value: 'me', label: 'Моє' },
-                { value: 'partner', label: `Для ${partner?.name ?? 'партнера'}`, disabled: !partner },
-                { value: 'shared', label: 'Спільне', icon: '🎁' },
-              ]}
-            />
+        <section className="wm-form-section" aria-labelledby="wish-section-main">
+          <div className="wm-form-section-head">
+            <span className="wm-form-section-index" aria-hidden="true">1</span>
+            <div>
+              <h3 id="wish-section-main">Основне</h3>
+              <p>Назва та сторінка товару.</p>
+            </div>
           </div>
-        )}
 
-        <label className="form-field">
-          <span>Назва *</span>
-          <input
-            id="wish-title"
-            name="title"
-            type="text"
-            value={title}
-            disabled={saving}
-            onChange={(event) => setTitle(event.target.value)}
-            autoFocus
-            maxLength={160}
-          />
-        </label>
+          {!isEdit && (
+            <div className="form-field">
+              <span>Для кого</span>
+              <TabBar<Scope>
+                value={scope}
+                onChange={(value) => {
+                  if (!saving) setScope(value);
+                }}
+                items={[
+                  { value: 'me', label: 'Моє' },
+                  { value: 'partner', label: `Для ${partner?.name ?? 'партнера'}`, disabled: !partner },
+                  { value: 'shared', label: 'Спільне', icon: '🎁' },
+                ]}
+              />
+            </div>
+          )}
 
-        <div className="form-field">
-          <span>Посилання на товар</span>
-          <div className="wm-link-row">
+          <label className="form-field">
+            <span>Назва *</span>
             <input
-              id="wish-link"
-              name="link"
+              id="wish-title"
+              name="title"
+              type="text"
+              value={title}
+              disabled={saving}
+              onChange={(event) => setTitle(event.target.value)}
+              autoFocus
+              maxLength={160}
+            />
+          </label>
+
+          <div className="form-field">
+            <span>Посилання на товар</span>
+            <div className="wm-link-row">
+              <input
+                id="wish-link"
+                name="link"
+                type="url"
+                inputMode="url"
+                placeholder="https://…"
+                value={link}
+                disabled={saving}
+                onChange={(event) => onLinkChange(event.target.value)}
+              />
+              <button
+                type="button"
+                className="btn-secondary wm-link-preview-button"
+                disabled={!isHttpUrl(link.trim()) || linkPreviewStatus === 'loading' || saving}
+                onClick={() => void loadLinkPreview(link, true)}
+              >
+                {linkPreviewStatus === 'loading' ? 'Шукаємо…' : 'Підтягнути'}
+              </button>
+            </div>
+
+            <div role="status" aria-live="polite">
+              {linkPreviewStatus === 'loading' && (
+                <small className="wm-link-status">Отримуємо назву, ціну та фото…</small>
+              )}
+              {linkPreviewStatus === 'success' && (
+                <small className="wm-link-status wm-link-status--success">
+                  Дані підтягнуто{linkPreviewSite ? ` з ${linkPreviewSite}` : ''}.
+                </small>
+              )}
+              {linkPreviewStatus === 'empty' && (
+                <small className="wm-link-status">
+                  Магазин не віддав дані. Бажання все одно можна зберегти без фото.
+                </small>
+              )}
+              {linkPreviewStatus === 'error' && (
+                <small className="wm-link-status wm-link-status--error">
+                  Не вдалося відкрити сторінку. Перевір посилання або заповни поля вручну.
+                </small>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="wm-form-section" aria-labelledby="wish-section-photo">
+          <div className="wm-form-section-head">
+            <span className="wm-form-section-index" aria-hidden="true">2</span>
+            <div>
+              <h3 id="wish-section-photo">Фото</h3>
+              <p>Необов’язкове — картка працює і без нього.</p>
+            </div>
+          </div>
+
+          <div className="form-field">
+            <span>Зображення мрії</span>
+            <small className="wm-field-hint">
+              Спершу спробуємо взяти фото з посилання. Також можна додати власне або залишити картку без фото.
+            </small>
+            <div className="wm-photo-picker">
+              <div className="wm-photo-preview">
+                {previewSrc ? (
+                  <img
+                    src={previewSrc}
+                    alt={`Попередній перегляд: ${title || 'мрія'}`}
+                    onClick={() => onPhotoClick(previewSrc)}
+                    onError={() => {
+                      if (!pendingFile) {
+                        setImgUrl('');
+                        setPreviewSrc(null);
+                      }
+                    }}
+                  />
+                ) : (
+                  <span className="wm-photo-placeholder" aria-hidden="true">♡</span>
+                )}
+              </div>
+              <div className="wm-photo-actions">
+                <FilePickerButton
+                  id="wish-photo-file"
+                  disabled={saving}
+                  onPick={(file) => void pickFile(file)}
+                >
+                  🖼 Обрати з пристрою
+                </FilePickerButton>
+                {previewSrc && (
+                  <button type="button" className="btn-secondary" onClick={clearPhoto} disabled={saving}>
+                    ✕ Прибрати
+                  </button>
+                )}
+              </div>
+            </div>
+            <input
+              id="wish-image-url"
+              name="imageUrl"
               type="url"
               inputMode="url"
-              placeholder="https://…"
-              value={link}
+              placeholder="або встав пряме посилання на фото"
+              value={imgUrl}
               disabled={saving}
-              onChange={(event) => onLinkChange(event.target.value)}
+              onChange={(event) => onImageUrlChange(event.target.value)}
+              style={{ marginTop: 8 }}
             />
-            <button
-              type="button"
-              className="btn-secondary wm-link-preview-button"
-              disabled={!isHttpUrl(link.trim()) || linkPreviewStatus === 'loading' || saving}
-              onClick={() => void loadLinkPreview(link, true)}
-            >
-              {linkPreviewStatus === 'loading' ? 'Шукаємо…' : 'Підтягнути'}
-            </button>
           </div>
+        </section>
 
-          <div role="status" aria-live="polite">
-            {linkPreviewStatus === 'loading' && (
-              <small className="wm-link-status">Отримуємо назву, ціну та фото…</small>
-            )}
-            {linkPreviewStatus === 'success' && (
-              <small className="wm-link-status wm-link-status--success">
-                Дані підтягнуто{linkPreviewSite ? ` з ${linkPreviewSite}` : ''}.
-              </small>
-            )}
-            {linkPreviewStatus === 'empty' && (
-              <small className="wm-link-status">
-                Магазин не віддав дані. Бажання все одно можна зберегти без фото.
-              </small>
-            )}
-            {linkPreviewStatus === 'error' && (
-              <small className="wm-link-status wm-link-status--error">
-                Не вдалося відкрити сторінку. Перевір посилання або заповни поля вручну.
-              </small>
-            )}
-          </div>
-        </div>
-
-        <div className="form-field">
-          <span>Фото — необов’язково</span>
-          <small className="wm-field-hint">
-            Спершу спробуємо взяти фото з посилання. Також можна додати власне або залишити картку без фото.
-          </small>
-          <div className="wm-photo-picker">
-            <div className="wm-photo-preview">
-              {previewSrc ? (
-                <img
-                  src={previewSrc}
-                  alt={`Попередній перегляд: ${title || 'мрія'}`}
-                  onClick={() => onPhotoClick(previewSrc)}
-                  onError={() => {
-                    if (!pendingFile) {
-                      setImgUrl('');
-                      setPreviewSrc(null);
-                    }
-                  }}
-                />
-              ) : (
-                <span className="wm-photo-placeholder" aria-hidden="true">♡</span>
-              )}
+        <section className="wm-form-section" aria-labelledby="wish-section-details">
+          <div className="wm-form-section-head">
+            <span className="wm-form-section-index" aria-hidden="true">3</span>
+            <div>
+              <h3 id="wish-section-details">Деталі</h3>
+              <p>Ціна, важливість і уточнення.</p>
             </div>
-            <div className="wm-photo-actions">
-              <FilePickerButton
-                id="wish-photo-file"
+          </div>
+
+          <div className="wm-form-detail-grid">
+            <label className="form-field">
+              <span>Орієнтовна ціна, ₴</span>
+              <input
+                id="wish-price"
+                name="price"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="Ціна невідома"
+                value={price}
                 disabled={saving}
-                onPick={(file) => void pickFile(file)}
-              >
-                🖼 Обрати з пристрою
-              </FilePickerButton>
-              {previewSrc && (
-                <button type="button" className="btn-secondary" onClick={clearPhoto} disabled={saving}>
-                  ✕ Прибрати
-                </button>
-              )}
+                onChange={(event) => setPrice(event.target.value)}
+              />
+            </label>
+
+            <div className="form-field">
+              <span>Пріоритет</span>
+              <WishlistPriorityPicker
+                value={priority}
+                disabled={saving}
+                onChange={setPriority}
+              />
             </div>
           </div>
-          <input
-            id="wish-image-url"
-            name="imageUrl"
-            type="url"
-            inputMode="url"
-            placeholder="або встав пряме посилання на фото"
-            value={imgUrl}
-            disabled={saving}
-            onChange={(event) => onImageUrlChange(event.target.value)}
-            style={{ marginTop: 8 }}
-          />
-        </div>
 
-        <label className="form-field">
-          <span>Орієнтовна ціна, ₴</span>
-          <input
-            id="wish-price"
-            name="price"
-            type="number"
-            min="0"
-            step="0.01"
-            placeholder="Ціна невідома"
-            value={price}
-            disabled={saving}
-            onChange={(event) => setPrice(event.target.value)}
-          />
-        </label>
-
-        <div className="form-field">
-          <span>Пріоритет</span>
-          <WishlistPriorityPicker
-            value={priority}
-            disabled={saving}
-            onChange={setPriority}
-          />
-        </div>
-
-        <label className="form-field">
-          <span>Коментар / деталі</span>
-          <textarea
-            id="wish-description"
-            name="description"
-            rows={2}
-            maxLength={1000}
-            placeholder="Модель, розмір, колір або інші важливі деталі…"
-            value={description}
-            disabled={saving}
-            onChange={(event) => setDescription(event.target.value)}
-            style={{ resize: 'vertical' }}
-          />
-        </label>
+          <label className="form-field">
+            <span>Коментар / деталі</span>
+            <textarea
+              id="wish-description"
+              name="description"
+              rows={2}
+              maxLength={1000}
+              placeholder="Модель, розмір, колір або інші важливі деталі…"
+              value={description}
+              disabled={saving}
+              onChange={(event) => setDescription(event.target.value)}
+              style={{ resize: 'vertical' }}
+            />
+          </label>
+        </section>
 
         <p className="sr-only" role="status" aria-live="polite">
           {saving ? 'Зберігаємо бажання. Не закривай сторінку.' : ''}
