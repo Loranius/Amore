@@ -15,9 +15,9 @@ interface WishlistBoardToolbarProps {
 
 const PRIORITY_FILTERS: Array<{ value: WishlistPriorityFilter; label: string; icon: string }> = [
   { value: 'all', label: 'Усі', icon: '✦' },
-  { value: 'high', label: 'Дуже хочу', icon: '✨' },
-  { value: 'medium', label: 'Хочу', icon: '◆' },
-  { value: 'low', label: 'Колись', icon: '○' },
+  { value: 'high', label: 'Жадане', icon: '✦' },
+  { value: 'medium', label: 'Бажане', icon: '♡' },
+  { value: 'low', label: 'Приємне', icon: '❀' },
 ];
 
 export function WishlistBoardToolbar({
@@ -91,9 +91,9 @@ export function WishlistBoardToolbar({
   return (
     <div className="wl-board-toolbar">
       <div className="wl-board-toolbar-head">
-        <span className="wl-board-toolbar-label">Пріоритет</span>
+        <span className="wl-board-toolbar-label">Вага мрії</span>
         <span className="wl-board-toolbar-result" role="status" aria-live="polite">
-          Показано: <strong>{resultCount}</strong>
+          У хмарі: <strong>{resultCount}</strong>
         </span>
       </div>
 
@@ -102,7 +102,7 @@ export function WishlistBoardToolbar({
           ref={scrollRef}
           className="wl-board-filter-scroll"
           role="group"
-          aria-label="Фільтр бажань за пріоритетом"
+          aria-label="Фільтр хмари за вагою мрії"
           onScroll={() => updateScrollHints()}
         >
           {PRIORITY_FILTERS.map((filter) => {

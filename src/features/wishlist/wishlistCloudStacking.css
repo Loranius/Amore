@@ -1,0 +1,21 @@
+/* Keep the fixed detail sheet in the page-level stacking context. */
+.wishlist .wishlist-grid {
+  isolation: auto !important;
+}
+
+.wishlist .wishlist-grid::before,
+.wishlist .wishlist-grid::after {
+  z-index: 0 !important;
+}
+
+.wishlist .wl-cloud-item {
+  z-index: auto !important;
+}
+
+.wishlist .wl-cloud-bubble {
+  z-index: var(--wl-cloud-z, 1);
+}
+
+.wishlist .wl-cloud-sheet-overlay {
+  z-index: 1400;
+}
