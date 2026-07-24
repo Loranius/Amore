@@ -1,6 +1,6 @@
 import {
   AdditiveBlending,
-  BufferGeometry,
+  type BufferGeometry,
   DoubleSide,
   Mesh,
   PerspectiveCamera,
@@ -8,10 +8,10 @@ import {
   ShaderMaterial,
   WebGLRenderer,
 } from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createWishlistBubbleGeometry } from './wishlistBubbleModelData';
 
 const BUBBLE_SELECTOR = '.wishlist .wl-cloud-bubble';
-const MODEL_URL = `${import.meta.env.BASE_URL}models/wishlist-soap-bubble.glb`;
+const LOCAL_BUBBLE_SELECTOR = '.wl-cloud-bubble';
 const MAX_DEVICE_PIXEL_RATIO = 1.35;
 
 const vertexShader = /* glsl */ `
@@ -64,12 +64,16 @@ const fragmentShader = /* glsl */ `
 
 interface BubbleController {
   visible: boolean;
-  generation: number;
   disposeRenderer: (() => void) | null;
 }
 
-let bubbleGeometryPromise: Promise<BufferGeometry> | null = null;
+let bubbleGeometry: BufferGeometry | null = null;
 const controllers = new Map<HTMLElement, BubbleController>();
+
+function geometry(): BufferGeometry {
+  bubbleGeometry ??= createWishlistBubbleGeometry();
+  return bubbleGeometry;
+}
 
 function priorityOpacity(element: HTMLElement): number {
   if (element.dataset.priority === 'high') return 1;
@@ -77,33 +81,7 @@ function priorityOpacity(element: HTMLElement): number {
   return 0.88;
 }
 
-function loadBubbleGeometry(): Promise<BufferGeometry> {
-  if (bubbleGeometryPromise) return bubbleGeometryPromise;
-
-  bubbleGeometryPromise = new GLTFLoader().loadAsync(MODEL_URL).then((gltf) => {
-    let source: BufferGeometry | null = null;
-
-    gltf.scene.traverse((object) => {
-      if (!source && object instanceof Mesh) source = object.geometry;
-    });
-
-    if (!source) throw new Error('wishlist_bubble_model_missing_geometry');
-
-    const geometry = source.clone();
-    if (!geometry.getAttribute('normal')) geometry.computeVertexNormals();
-    geometry.center();
-    geometry.computeBoundingSphere();
-    return geometry;
-  }).catch((error) => {
-    bubbleGeometryPromise = null;
-    console.info('[Wishlist] 3D bubble model unavailable; CSS fallback remains active.', error);
-    throw error;
-  });
-
-  return bubbleGeometryPromise;
-}
-
-function mountRenderer(element: HTMLElement, geometry: BufferGeometry): () => void {
+function mountRenderer(element: HTMLElement): () => void {
   const canvas = document.createElement('canvas');
   canvas.className = 'wl-cloud-bubble-model-canvas';
   canvas.setAttribute('aria-hidden', 'true');
@@ -144,7 +122,7 @@ function mountRenderer(element: HTMLElement, geometry: BufferGeometry): () => vo
     blending: AdditiveBlending,
   });
 
-  const shell = new Mesh(geometry, material);
+  const shell = new Mesh(geometry(), material);
   shell.scale.setScalar(1.08);
   shell.rotation.set(-0.035, 0.045, -0.018);
   scene.add(shell);
@@ -160,12 +138,16 @@ function mountRenderer(element: HTMLElement, geometry: BufferGeometry): () => vo
     renderer.render(scene, camera);
   };
 
-  const resizeObserver = new ResizeObserver(render);
-  resizeObserver.observe(element);
+  const resizeObserver = typeof ResizeObserver === 'undefined'
+    ? null
+    : new ResizeObserver(render);
+  resizeObserver?.observe(element);
+  window.addEventListener('resize', render, { passive: true });
   render();
 
   return () => {
-    resizeObserver.disconnect();
+    resizeObserver?.disconnect();
+    window.removeEventListener('resize', render);
     scene.remove(shell);
     material.dispose();
     renderer.dispose();
@@ -174,32 +156,16 @@ function mountRenderer(element: HTMLElement, geometry: BufferGeometry): () => vo
   };
 }
 
-async function activate(element: HTMLElement): Promise<void> {
+function activate(element: HTMLElement): void {
   const controller = controllers.get(element);
   if (!controller || controller.disposeRenderer || !controller.visible) return;
-
-  const generation = ++controller.generation;
-  try {
-    const geometry = await loadBubbleGeometry();
-    const current = controllers.get(element);
-    if (
-      !current
-      || current.generation !== generation
-      || !current.visible
-      || !element.isConnected
-    ) return;
-
-    current.disposeRenderer = mountRenderer(element, geometry);
-  } catch {
-    // The existing CSS sphere intentionally remains the no-WebGL/load fallback.
-  }
+  controller.disposeRenderer = mountRenderer(element);
 }
 
 function deactivate(element: HTMLElement): void {
   const controller = controllers.get(element);
   if (!controller) return;
   controller.visible = false;
-  controller.generation += 1;
   controller.disposeRenderer?.();
   controller.disposeRenderer = null;
 }
@@ -207,8 +173,8 @@ function deactivate(element: HTMLElement): void {
 function bubblesWithin(node: Node): HTMLElement[] {
   if (!(node instanceof Element)) return [];
   const matches: HTMLElement[] = [];
-  if (node.matches(BUBBLE_SELECTOR)) matches.push(node as HTMLElement);
-  node.querySelectorAll<HTMLElement>(BUBBLE_SELECTOR).forEach((element) => matches.push(element));
+  if (node.matches(LOCAL_BUBBLE_SELECTOR)) matches.push(node as HTMLElement);
+  node.querySelectorAll<HTMLElement>(LOCAL_BUBBLE_SELECTOR).forEach((element) => matches.push(element));
   return matches;
 }
 
@@ -221,7 +187,7 @@ function startBubbleRuntime(): void {
             const controller = controllers.get(element);
             if (!controller) continue;
             controller.visible = entry.isIntersecting;
-            if (entry.isIntersecting) void activate(element);
+            if (entry.isIntersecting) activate(element);
             else deactivate(element);
           }
         },
@@ -230,14 +196,13 @@ function startBubbleRuntime(): void {
     : null;
 
   const observe = (element: HTMLElement) => {
-    if (controllers.has(element)) return;
+    if (controllers.has(element) || !element.closest('.wishlist')) return;
     controllers.set(element, {
       visible: intersectionObserver === null,
-      generation: 0,
       disposeRenderer: null,
     });
     if (intersectionObserver) intersectionObserver.observe(element);
-    else void activate(element);
+    else activate(element);
   };
 
   const remove = (element: HTMLElement) => {
@@ -256,7 +221,7 @@ function startBubbleRuntime(): void {
         if (controller?.disposeRenderer) {
           controller.disposeRenderer();
           controller.disposeRenderer = null;
-          void activate(element);
+          activate(element);
         }
         continue;
       }
