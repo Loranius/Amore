@@ -27,7 +27,7 @@ export function createWishlistBubbleGeometry(): BufferGeometry {
   );
   const positions = new Float32Array(vertexCount * 3);
   for (let index = 0; index < quantized.length; index += 1) {
-    positions[index] = (quantized[index] / 32767) * scale;
+    positions[index] = (quantized[index]! / 32767) * scale;
   }
 
   const indices = new Uint16Array(
