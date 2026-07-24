@@ -1,14 +1,12 @@
 import { remoteImageFile } from './wishlistImageCutout';
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
+import { portraitMaskLooksUsable } from './wishlistPortraitMask';
 
 const MEDIAPIPE_VERSION = '0.10.31';
 const TASKS_VISION_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}`;
 const WASM_URL = `${TASKS_VISION_URL}/wasm`;
 const MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
 const MAX_SIDE = 760;
-const MIN_FOREGROUND_RATIO = 0.06;
-const MAX_FOREGROUND_RATIO = 0.92;
-const MIN_STRONG_FOREGROUND_RATIO = 0.018;
 
 export interface WishlistPortraitResult {
   src: string;
@@ -118,23 +116,6 @@ function chooseForegroundMask(masks: MediaPipeMask[]): MediaPipeMask | null {
   // Selfie Segmenter exposes one person-confidence mask. For models that expose
   // background + foreground channels, the final channel is the foreground.
   return masks[masks.length - 1] ?? null;
-}
-
-export function portraitMaskLooksUsable(values: Float32Array): boolean {
-  if (values.length === 0) return false;
-
-  let foreground = 0;
-  let strongForeground = 0;
-  for (const value of values) {
-    if (value >= 0.34) foreground += 1;
-    if (value >= 0.72) strongForeground += 1;
-  }
-
-  const foregroundRatio = foreground / values.length;
-  const strongRatio = strongForeground / values.length;
-  return foregroundRatio >= MIN_FOREGROUND_RATIO
-    && foregroundRatio <= MAX_FOREGROUND_RATIO
-    && strongRatio >= MIN_STRONG_FOREGROUND_RATIO;
 }
 
 function buildPortraitCutout(
