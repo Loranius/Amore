@@ -14,7 +14,6 @@ interface WishlistBoardToolbarProps {
 
 const PRIORITY_FILTERS: Array<{ value: WishlistPriorityFilter; label: string; icon: string }> = [
   { value: 'all', label: 'Усі', icon: '✦' },
-  { value: 'dream', label: 'Мрія', icon: '♥' },
   { value: 'high', label: 'Дуже хочу', icon: '✦' },
   { value: 'medium', label: 'Хочу', icon: '◆' },
   { value: 'low', label: 'Колись', icon: '○' },
