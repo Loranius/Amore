@@ -3,6 +3,7 @@ export interface WishFormDraftSnapshot {
   title: string;
   link: string;
   imageUrl: string;
+  imagePreference: string;
   price: string;
   priority: string;
   description: string;
@@ -13,6 +14,7 @@ const SNAPSHOT_KEYS = [
   'title',
   'link',
   'imageUrl',
+  'imagePreference',
   'price',
   'priority',
   'description',
