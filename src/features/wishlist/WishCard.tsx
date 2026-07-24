@@ -1,28 +1,19 @@
 // ============================================================
-// WishCard — editorial dream-board card
+// WishCard — Weighted Cloud bubble + premium detail sheet
 // ============================================================
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { useUsersMap } from '@/features/_shared/useUsers';
-import { ProgressivePhoto } from './ProgressivePhoto';
 import {
   wishCardStatusChip,
   type WishCardContext,
 } from './wishCardPresentation';
+import {
+  normalizeWishlistCloudPriority,
+  wishlistCloudPlacement,
+  wishlistCloudPriorityPresentation,
+} from './wishlistCloudLayout';
 import type { WishlistItemV3 } from './wishlistRpc';
-import './wishlistV3.css';
-import './wishlistCardRedesign.css';
-
-const PRIORITY_LABELS: Record<string, string> = {
-  high: 'Дуже хочу',
-  medium: 'Хочу',
-  low: 'Колись',
-};
-
-const PRIORITY_ICONS: Record<string, string> = {
-  high: '✦',
-  medium: '◆',
-  low: '○',
-};
+import './wishlistCloud.css';
 
 interface WishCardProps {
   item: WishlistItemV3;
@@ -39,6 +30,14 @@ interface WishCardProps {
   onMove: (item: WishlistItemV3) => void;
 }
 
+function productHost(link: string): string {
+  try {
+    return new URL(link).hostname.replace(/^www\./, '');
+  } catch {
+    return link;
+  }
+}
+
 export function WishCard({
   item,
   context,
@@ -53,21 +52,19 @@ export function WishCard({
   onFulfill,
   onMove,
 }: WishCardProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const usersMap = useUsersMap();
-  const menuRef = useRef<HTMLDivElement>(null);
-  const menuPanelRef = useRef<HTMLDivElement>(null);
-  const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const hasMenuActions = item.can_edit || item.can_move || item.can_delete;
-  const closeMenu = (restoreFocus = false) => {
-    setMenuOpen(false);
-    if (restoreFocus) {
-      window.requestAnimationFrame(() => menuButtonRef.current?.focus());
-    }
-  };
+
   const resolvedContext: WishCardContext = context
     ?? (item.completion_mode === 'shared' ? 'shared' : isOwn ? 'me' : 'partner');
   const creatorName = resolvedContext === 'shared' ? usersMap[item.owner] : null;
+  const priority = normalizeWishlistCloudPriority(item.priority);
+  const priorityPresentation = wishlistCloudPriorityPresentation(item.priority);
+  const placement = useMemo(
+    () => wishlistCloudPlacement(item.id, item.id % 19),
+    [item.id],
+  );
   const statusChip = wishCardStatusChip({
     context: resolvedContext,
     completionMode: item.completion_mode,
@@ -75,90 +72,75 @@ export function WishCard({
     reserved: item.reserved,
     canManageReservation,
   });
-  const displayPriority = item.priority && String(item.priority) === 'dream'
-    ? 'high'
-    : item.priority;
+  const dialogTitleId = `wl-cloud-sheet-title-${item.id}`;
+
+  const bubbleStyle = {
+    '--wl-cloud-size': `${priorityPresentation.size}px`,
+    '--wl-cloud-margin-top': `${placement.marginTop}px`,
+    '--wl-cloud-margin-right': `${placement.marginRight}px`,
+    '--wl-cloud-margin-bottom': `${placement.marginBottom}px`,
+    '--wl-cloud-margin-left': `${placement.marginLeft}px`,
+    '--wl-cloud-x': `${placement.translateX}px`,
+    '--wl-cloud-y': `${placement.translateY}px`,
+    '--wl-cloud-rotate': `${placement.rotate}deg`,
+    '--wl-cloud-delay': `${placement.delay}s`,
+    '--wl-cloud-duration': `${placement.duration}s`,
+    '--wl-cloud-z': placement.zIndex,
+  } as CSSProperties;
 
   useEffect(() => {
-    if (!menuOpen) return;
+    setImageFailed(false);
+  }, [item.image_url]);
 
-    const compactMenu = window.matchMedia('(max-width: 719px)').matches;
-    if (compactMenu) document.body.classList.add('wl-card-menu-open');
+  useEffect(() => {
+    if (!detailsOpen) return;
 
-    const focusTimer = window.requestAnimationFrame(() => {
-      menuPanelRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
-    });
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
 
-    const onPointerDown = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) closeMenu(true);
-    };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        closeMenu(true);
-        return;
-      }
-
-      if (event.key !== 'Tab' || !compactMenu || !menuPanelRef.current) return;
-      const controls = Array.from(
-        menuPanelRef.current.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'),
-      );
-      if (controls.length === 0) return;
-
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last?.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first?.focus();
-      }
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      setDetailsOpen(false);
     };
 
-    document.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('keydown', onKeyDown);
     return () => {
-      window.cancelAnimationFrame(focusTimer);
-      document.body.classList.remove('wl-card-menu-open');
-      document.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = previousOverflow;
     };
-  }, [menuOpen]);
+  }, [detailsOpen]);
 
-  useEffect(() => {
-    if (busy) closeMenu();
-  }, [busy]);
-
-  const runMenuAction = (action: () => void) => {
-    closeMenu();
+  const closeAndRun = (action: () => void) => {
+    setDetailsOpen(false);
     action();
   };
 
-  const lifecycleControls = () => {
+  const lifecycleControls = (): ReactNode => {
     if (item.completion_mode === 'shared') {
       return item.can_complete ? (
         <button
           type="button"
-          className="wl-card-v3-primary wl-card-v3-primary--success"
+          className="wl-cloud-sheet-primary wl-cloud-sheet-primary--success"
           disabled={busy}
-          onClick={() => onFulfill(item)}
+          onClick={() => closeAndRun(() => onFulfill(item))}
         >
           <span aria-hidden="true">✨</span>
           Виконати разом
         </button>
       ) : (
-        <span className="wl-card-v3-hint">Спільна мрія</span>
+        <span className="wl-cloud-sheet-hint">Спільна мрія для вас обох</span>
       );
     }
 
     if (canManageReservation && item.reserved) {
       if (item.status === 'reserved') {
         return (
-          <div className="wl-card-v3-reservation-actions">
+          <div className="wl-cloud-sheet-reservation-actions">
             <button
               type="button"
-              className="wl-card-v3-primary"
+              className="wl-cloud-sheet-primary"
               disabled={busy}
               onClick={() => onPurchased(item)}
             >
@@ -167,7 +149,7 @@ export function WishCard({
             </button>
             <button
               type="button"
-              className="wl-card-v3-secondary"
+              className="wl-cloud-sheet-secondary"
               disabled={busy}
               onClick={() => onReserve(item.id, false)}
             >
@@ -181,9 +163,9 @@ export function WishCard({
         return (
           <button
             type="button"
-            className="wl-card-v3-primary wl-card-v3-primary--success"
+            className="wl-cloud-sheet-primary wl-cloud-sheet-primary--success"
             disabled={busy}
-            onClick={() => onFulfill(item)}
+            onClick={() => closeAndRun(() => onFulfill(item))}
           >
             <span aria-hidden="true">🎁</span>
             Подарунок вручено
@@ -194,22 +176,24 @@ export function WishCard({
 
     if (isOwn) {
       return (
-        <span className="wl-card-v3-hint">
-          {item.reserved ? 'Це бажання вже здійснюють' : 'Додано до твоїх мрій'}
+        <span className="wl-cloud-sheet-hint">
+          {item.reserved ? 'Цю мрію вже готуються здійснити' : 'Додано до твоєї хмари мрій'}
         </span>
       );
     }
 
     if (item.reserved) {
-      return <span className="wl-card-v3-hint">Це бажання вже здійснюють</span>;
+      return <span className="wl-cloud-sheet-hint">Цю мрію вже готуються здійснити</span>;
     }
 
-    if (!item.can_reserve) return <span className="wl-card-v3-hint">Бажання партнера</span>;
+    if (!item.can_reserve) {
+      return <span className="wl-cloud-sheet-hint">Мрія партнера</span>;
+    }
 
     return (
       <button
         type="button"
-        className="wl-card-v3-primary"
+        className="wl-cloud-sheet-primary"
         disabled={busy}
         onClick={() => onReserve(item.id, true)}
       >
@@ -219,146 +203,176 @@ export function WishCard({
     );
   };
 
+  const imageAvailable = Boolean(item.image_url) && !imageFailed;
+
   return (
-    <article
-      className={`wl-card wl-card-v3 wl-card-v3--${resolvedContext}${item.reserved ? ' wl-card-v3--reserved' : ''}`}
-      aria-busy={busy}
-    >
-      <div className="wl-card-v3-media">
-        {item.image_url ? (
-          <ProgressivePhoto
-            src={item.image_url}
-            alt={item.title}
-            ariaLabel={`Відкрити фото: ${item.title}`}
-            buttonClassName="wl-card-v3-photo"
-            revealDelayMs={(item.id % 8) * 35}
-            onOpen={onPhotoClick}
-            fallback={(
-              <span className="wl-card-v3-placeholder" aria-label="Фото не вдалося завантажити">
-                <span aria-hidden="true">♡</span>
-                <small>Фото недоступне</small>
-              </span>
-            )}
-          />
+    <article className="wl-cloud-item" style={bubbleStyle} aria-busy={busy}>
+      <button
+        type="button"
+        className="wl-cloud-bubble"
+        data-priority={priority}
+        aria-label={`Відкрити мрію «${item.title}». ${priorityPresentation.label}`}
+        aria-haspopup="dialog"
+        aria-expanded={detailsOpen}
+        aria-busy={busy}
+        disabled={busy}
+        onClick={() => setDetailsOpen(true)}
+      >
+        {imageAvailable ? (
+          <span className="wl-cloud-bubble-media">
+            <img
+              src={item.image_url ?? ''}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              onError={() => setImageFailed(true)}
+            />
+          </span>
         ) : (
-          <div className="wl-card-v3-placeholder" aria-label="Бажання без фото">
-            <span aria-hidden="true">♡</span>
-            <small>Мрія без фото</small>
-          </div>
+          <span className="wl-cloud-bubble-placeholder" aria-hidden="true">♡</span>
         )}
+      </button>
 
-        <div className="wl-card-v3-media-shade" aria-hidden="true" />
+      {detailsOpen && (
+        <div
+          className="wl-cloud-sheet-overlay"
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) setDetailsOpen(false);
+          }}
+        >
+          <section
+            className="wl-cloud-sheet"
+            data-priority={priority}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={dialogTitleId}
+          >
+            <div className="wl-cloud-sheet-handle" aria-hidden="true" />
+            <button
+              type="button"
+              className="wl-cloud-sheet-close"
+              aria-label="Закрити деталі мрії"
+              onClick={() => setDetailsOpen(false)}
+            >
+              ×
+            </button>
 
-        <div className="wl-card-v3-topline">
-          {displayPriority && (
-            <span className={`wl-priority-v3 wl-priority-v3--${displayPriority}`}>
-              <span aria-hidden="true">{PRIORITY_ICONS[displayPriority] ?? '•'}</span>
-              {PRIORITY_LABELS[displayPriority] ?? displayPriority}
-            </span>
-          )}
-
-          {hasMenuActions && (
-            <div className="wl-card-v3-menu-wrap" ref={menuRef}>
-              <button
-                ref={menuButtonRef}
-                type="button"
-                className="wl-card-v3-menu-button"
-                aria-label="Дії з мрією"
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                disabled={busy}
-                onClick={() => setMenuOpen((open) => !open)}
-              >
-                ⋯
-              </button>
-              {menuOpen && (
-                <>
-                  <button
-                    type="button"
-                    className="wl-card-v3-menu-backdrop"
-                    aria-label="Закрити меню дій"
-                    tabIndex={-1}
-                    onClick={() => closeMenu(true)}
-                  />
-                  <div
-                    ref={menuPanelRef}
-                    className="wl-card-v3-menu"
-                    role="menu"
-                    aria-label={`Дії з мрією «${item.title}»`}
-                  >
-                    <div className="wl-card-v3-menu-mobile-head">
-                      <span>Дії з мрією</span>
-                      <strong>{item.title}</strong>
-                      <button
-                        type="button"
-                        className="wl-card-v3-menu-close"
-                        aria-label="Закрити"
-                        onClick={() => closeMenu(true)}
-                      >
-                        ×
-                      </button>
-                    </div>
-                    {item.can_edit && (
-                      <button type="button" role="menuitem" onClick={() => runMenuAction(() => onEdit(item))}>
-                        <span aria-hidden="true">✎</span>
-                        Редагувати
-                      </button>
-                    )}
-                    {item.can_move && (
-                      <button type="button" role="menuitem" onClick={() => runMenuAction(() => onMove(item))}>
-                        <span aria-hidden="true">↔</span>
-                        Перенести
-                      </button>
-                    )}
-                    {item.can_delete && (
-                      <button
-                        type="button"
-                        role="menuitem"
-                        className="wl-card-v3-menu-danger"
-                        onClick={() => runMenuAction(() => onDelete(item.id))}
-                      >
-                        <span aria-hidden="true">⌫</span>
-                        Видалити
-                      </button>
-                    )}
-                  </div>
-                </>
+            <div className="wl-cloud-sheet-hero">
+              {imageAvailable ? (
+                <button
+                  type="button"
+                  className="wl-cloud-sheet-photo"
+                  aria-label={`Відкрити фото: ${item.title}`}
+                  onClick={() => closeAndRun(() => onPhotoClick(item.image_url ?? ''))}
+                >
+                  <img src={item.image_url ?? ''} alt={item.title} />
+                </button>
+              ) : (
+                <div className="wl-cloud-sheet-photo" aria-label="Мрія без фото">
+                  <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true">♡</span>
+                </div>
               )}
             </div>
-          )}
+
+            <div className="wl-cloud-sheet-content">
+              <div className="wl-cloud-sheet-meta">
+                <span className="wl-cloud-sheet-priority">
+                  <span aria-hidden="true">{priorityPresentation.icon}</span>
+                  {priorityPresentation.label}
+                </span>
+                {statusChip && (
+                  <span className="wl-cloud-sheet-state" data-tone={statusChip.tone}>
+                    <span aria-hidden="true">{statusChip.icon}</span>
+                    {statusChip.label}
+                  </span>
+                )}
+              </div>
+
+              {creatorName && (
+                <p className="wl-cloud-sheet-attribution">Автор мрії — {creatorName}</p>
+              )}
+
+              <div className="wl-cloud-sheet-title-row">
+                <h2 id={dialogTitleId} className="wl-cloud-sheet-title">{item.title}</h2>
+                {item.price != null && (
+                  <span className="wl-cloud-sheet-price">
+                    {item.price.toLocaleString('uk-UA')} ₴
+                  </span>
+                )}
+              </div>
+
+              {item.description && (
+                <p className="wl-cloud-sheet-description">{item.description}</p>
+              )}
+
+              {item.link && (
+                <a
+                  className="wl-cloud-sheet-link"
+                  href={item.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span aria-hidden="true">↗</span>
+                  <span>{productHost(item.link)}</span>
+                  <span aria-hidden="true">›</span>
+                </a>
+              )}
+
+              <div className="wl-cloud-sheet-lifecycle">{lifecycleControls()}</div>
+
+              <div className="wl-cloud-sheet-actions">
+                {item.can_edit && (
+                  <button
+                    type="button"
+                    className="wl-cloud-sheet-action"
+                    disabled={busy}
+                    onClick={() => closeAndRun(() => onEdit(item))}
+                  >
+                    <span aria-hidden="true">✎</span>
+                    Редагувати
+                  </button>
+                )}
+
+                {item.can_move && (
+                  <button
+                    type="button"
+                    className="wl-cloud-sheet-action"
+                    disabled={busy}
+                    onClick={() => closeAndRun(() => onMove(item))}
+                  >
+                    <span aria-hidden="true">↔</span>
+                    Перенести
+                  </button>
+                )}
+
+                {item.can_delete && (
+                  <button
+                    type="button"
+                    className="wl-cloud-sheet-action wl-cloud-sheet-action--danger"
+                    disabled={busy}
+                    onClick={() => closeAndRun(() => onDelete(item.id))}
+                  >
+                    <span aria-hidden="true">⌫</span>
+                    Видалити
+                  </button>
+                )}
+
+                {item.link && (
+                  <a
+                    className="wl-cloud-sheet-action"
+                    href={item.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <span aria-hidden="true">🛍</span>
+                    Купити
+                  </a>
+                )}
+              </div>
+            </div>
+          </section>
         </div>
-
-        {statusChip && (
-          <span className={`wl-card-v3-state-chip wl-card-v3-state-chip--${statusChip.tone}`}>
-            <span aria-hidden="true">{statusChip.icon}</span>
-            {statusChip.label}
-          </span>
-        )}
-      </div>
-
-      <div className="wl-card-v3-content">
-        {creatorName && (
-          <span className="wl-card-v3-attribution">Автор мрії — {creatorName}</span>
-        )}
-
-        <div className="wl-card-v3-heading">
-          {item.link ? (
-            <a className="wl-card-v3-title" href={item.link} target="_blank" rel="noopener noreferrer">
-              {item.title}
-              <span className="wl-card-v3-external" aria-hidden="true">↗</span>
-            </a>
-          ) : (
-            <h2 className="wl-card-v3-title">{item.title}</h2>
-          )}
-          {item.price != null && (
-            <span className="wl-card-v3-price">{item.price.toLocaleString('uk-UA')} ₴</span>
-          )}
-        </div>
-
-        {item.description && <p className="wl-card-v3-description">{item.description}</p>}
-
-        <div className="wl-card-v3-footer">{lifecycleControls()}</div>
-      </div>
+      )}
     </article>
   );
 }
