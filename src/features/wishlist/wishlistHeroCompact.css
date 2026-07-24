@@ -1,0 +1,110 @@
+/* Mobile density pass for the Wishlist hero.
+ * Keeps the same visual hierarchy while bringing tabs and cards onto the
+ * first viewport sooner. The skeleton mirrors the final geometry to avoid
+ * layout jumps when data resolves.
+ */
+@media (max-width: 719px) {
+  .wl-hero,
+  .wl-skeleton-hero-card {
+    gap: 12px;
+    margin-top: 12px;
+    margin-bottom: 14px;
+    padding: 18px 16px 16px;
+    border-radius: 24px;
+  }
+
+  .wl-hero::before {
+    right: -112px;
+    bottom: -166px;
+    width: 280px;
+    height: 280px;
+  }
+
+  .wl-hero::after {
+    right: 42px;
+    bottom: -122px;
+    width: 180px;
+    height: 180px;
+  }
+
+  .wl-hero-eyebrow {
+    min-height: 24px;
+    padding: 4px 9px;
+    font-size: 10px;
+  }
+
+  .wl-hero-title {
+    margin: 9px 0 5px;
+    font-size: clamp(29px, 9vw, 38px);
+    line-height: 1.04;
+  }
+
+  .wl-hero-description {
+    font-size: 13px;
+    line-height: 1.43;
+  }
+
+  .wl-hero-metrics,
+  .wl-skeleton-metrics {
+    gap: 6px;
+    margin-top: 13px;
+  }
+
+  .wl-hero-metric {
+    min-height: 31px;
+    gap: 6px;
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+
+  .wl-hero-metric strong {
+    font-size: 14px;
+  }
+
+  .wl-skeleton-hero-copy {
+    gap: 9px;
+  }
+
+  .wl-skeleton-metric {
+    width: 132px;
+    height: 31px;
+  }
+
+  .wl-hero-actions,
+  .wl-skeleton-hero-actions {
+    gap: 9px;
+  }
+
+  .wl-hero-symbol,
+  .wl-skeleton-symbol {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+  }
+
+  .wl-hero-symbol {
+    font-size: 23px;
+  }
+
+  .wl-hero-add {
+    min-height: 44px;
+    max-width: 200px;
+    padding-inline: 15px;
+  }
+}
+
+@media (max-width: 390px) {
+  .wl-hero,
+  .wl-skeleton-hero-card {
+    padding-inline: 15px;
+  }
+
+  .wl-hero-title {
+    font-size: clamp(28px, 9vw, 35px);
+  }
+
+  .wl-hero-add {
+    max-width: 188px;
+    font-size: 13px;
+  }
+}
