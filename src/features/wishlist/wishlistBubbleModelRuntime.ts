@@ -1,20 +1,24 @@
 import {
-  DoubleSide,
+  AdditiveBlending,
+  Box3,
+  FrontSide,
+  Group,
+  type Material,
   Mesh,
   MeshBasicMaterial,
   OrthographicCamera,
   Scene,
-  SphereGeometry,
   SRGBColorSpace,
   type Texture,
-  TextureLoader,
+  Vector3,
   WebGLRenderer,
 } from 'three';
-import { WISHLIST_BUBBLE_TEXTURE_URL } from './wishlistBubbleModelData';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const BUBBLE_SELECTOR = '.wishlist .wl-cloud-bubble';
 const LOCAL_BUBBLE_SELECTOR = '.wl-cloud-bubble';
 const CANVAS_CLASS = 'wl-cloud-bubble-model-canvas';
+const MODEL_URL = `${import.meta.env.BASE_URL}assets/soap-bubble.glb`;
 const MAX_DEVICE_PIXEL_RATIO = 1.5;
 
 interface BubbleController {
@@ -23,31 +27,17 @@ interface BubbleController {
   disposeRenderer: (() => void) | null;
 }
 
+interface TexturedMaterial extends Material {
+  map?: Texture | null;
+}
+
+interface BubbleInstance {
+  root: Group;
+  materials: MeshBasicMaterial[];
+}
+
 const controllers = new Map<HTMLElement, BubbleController>();
-let bubbleGeometry: SphereGeometry | null = null;
-let bubbleTexturePromise: Promise<Texture> | null = null;
-
-function geometry(): SphereGeometry {
-  bubbleGeometry ??= new SphereGeometry(1, 32, 20);
-  return bubbleGeometry;
-}
-
-function texture(): Promise<Texture> {
-  bubbleTexturePromise ??= new Promise((resolve, reject) => {
-    new TextureLoader().load(
-      WISHLIST_BUBBLE_TEXTURE_URL,
-      (loadedTexture) => {
-        loadedTexture.colorSpace = SRGBColorSpace;
-        loadedTexture.flipY = false;
-        loadedTexture.needsUpdate = true;
-        resolve(loadedTexture);
-      },
-      undefined,
-      reject,
-    );
-  });
-  return bubbleTexturePromise;
-}
+let bubbleModelPromise: Promise<Group> | null = null;
 
 function priorityOpacity(element: HTMLElement): number {
   if (element.dataset.priority === 'high') return 0.34;
@@ -55,7 +45,75 @@ function priorityOpacity(element: HTMLElement): number {
   return 0.29;
 }
 
-function mountRenderer(element: HTMLElement, bubbleTexture: Texture): () => void {
+function normalizeModel(root: Group): Group {
+  root.updateMatrixWorld(true);
+
+  const bounds = new Box3().setFromObject(root);
+  const size = bounds.getSize(new Vector3());
+  const center = bounds.getCenter(new Vector3());
+  const largestDimension = Math.max(size.x, size.y, size.z, 0.0001);
+
+  const scale = 1.92 / largestDimension;
+  root.position.copy(center).multiplyScalar(-scale);
+  root.scale.setScalar(scale);
+  root.rotation.set(-0.035, 0.055, -0.018);
+  root.updateMatrixWorld(true);
+  return root;
+}
+
+function model(): Promise<Group> {
+  bubbleModelPromise ??= new GLTFLoader()
+    .loadAsync(MODEL_URL)
+    .then((gltf) => normalizeModel(gltf.scene));
+  return bubbleModelPromise;
+}
+
+function createBubbleMaterial(source: Material, opacity: number): MeshBasicMaterial {
+  const map = (source as TexturedMaterial).map ?? null;
+  if (map) {
+    map.colorSpace = SRGBColorSpace;
+    map.needsUpdate = true;
+  }
+
+  return new MeshBasicMaterial({
+    map,
+    color: 0xffffff,
+    transparent: true,
+    opacity,
+    depthWrite: false,
+    depthTest: false,
+    side: FrontSide,
+    blending: AdditiveBlending,
+    toneMapped: false,
+  });
+}
+
+function cloneBubbleModel(source: Group, opacity: number): BubbleInstance {
+  const root = source.clone(true);
+  const materials: MeshBasicMaterial[] = [];
+
+  root.traverse((object) => {
+    if (!(object instanceof Mesh)) return;
+
+    const sourceMaterials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+    const clonedMaterials = sourceMaterials.map((material) => {
+      const bubbleMaterial = createBubbleMaterial(material, opacity);
+      materials.push(bubbleMaterial);
+      return bubbleMaterial;
+    });
+
+    object.material = Array.isArray(object.material)
+      ? clonedMaterials
+      : clonedMaterials[0]!;
+    object.frustumCulled = false;
+  });
+
+  return { root, materials };
+}
+
+function mountRenderer(element: HTMLElement, sourceModel: Group): () => void {
   const canvas = document.createElement('canvas');
   canvas.className = CANVAS_CLASS;
   canvas.setAttribute('aria-hidden', 'true');
@@ -84,24 +142,19 @@ function mountRenderer(element: HTMLElement, bubbleTexture: Texture): () => void
   const camera = new OrthographicCamera(-1.04, 1.04, 1.04, -1.04, 0.1, 10);
   camera.position.set(0, 0, 3);
 
-  const material = new MeshBasicMaterial({
-    map: bubbleTexture,
-    transparent: true,
-    opacity: priorityOpacity(element),
-    depthWrite: false,
-    depthTest: false,
-    side: DoubleSide,
-  });
-  const shell = new Mesh(geometry(), material);
-  shell.scale.setScalar(0.995);
-  shell.rotation.set(-0.035, 0.055, -0.018);
-  scene.add(shell);
+  const instance = cloneBubbleModel(sourceModel, priorityOpacity(element));
+  scene.add(instance.root);
 
   const render = () => {
     const rect = element.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width));
     const height = Math.max(1, Math.round(rect.height));
-    material.opacity = priorityOpacity(element);
+    const opacity = priorityOpacity(element);
+
+    instance.materials.forEach((material) => {
+      material.opacity = opacity;
+    });
+
     renderer.setSize(width, height, false);
     renderer.render(scene, camera);
   };
@@ -116,8 +169,8 @@ function mountRenderer(element: HTMLElement, bubbleTexture: Texture): () => void
   return () => {
     resizeObserver?.disconnect();
     window.removeEventListener('resize', render);
-    scene.remove(shell);
-    material.dispose();
+    scene.remove(instance.root);
+    instance.materials.forEach((material) => material.dispose());
     renderer.dispose();
     renderer.forceContextLoss();
     canvas.remove();
@@ -130,7 +183,7 @@ async function activate(element: HTMLElement): Promise<void> {
 
   const token = ++controller.loadToken;
   try {
-    const bubbleTexture = await texture();
+    const sourceModel = await model();
     const current = controllers.get(element);
     if (
       !current
@@ -140,9 +193,9 @@ async function activate(element: HTMLElement): Promise<void> {
       || !element.isConnected
     ) return;
 
-    current.disposeRenderer = mountRenderer(element, bubbleTexture);
+    current.disposeRenderer = mountRenderer(element, sourceModel);
   } catch (error) {
-    console.error('[Wishlist] Failed to load the uploaded soap-bubble texture.', error);
+    console.error('[Wishlist] Failed to load assets/soap-bubble.glb.', error);
   }
 }
 
@@ -201,13 +254,11 @@ function startBubbleRuntime(): void {
     for (const mutation of mutations) {
       if (mutation.type === 'attributes') {
         const element = mutation.target as HTMLElement;
-        if (controllers.has(element)) {
-          const controller = controllers.get(element);
-          if (controller?.disposeRenderer) {
-            controller.disposeRenderer();
-            controller.disposeRenderer = null;
-            void activate(element);
-          }
+        const controller = controllers.get(element);
+        if (controller?.disposeRenderer) {
+          controller.disposeRenderer();
+          controller.disposeRenderer = null;
+          void activate(element);
         }
         continue;
       }
