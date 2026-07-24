@@ -1,17 +1,14 @@
 import { publicUrl, supabase } from '@/lib/supabase';
-import { setWishlistProcessedImage } from './wishlistRpc';
+import { completeWishlistImageProcessing } from './wishlistRpc';
 import {
   updateWishlistStoredVisual,
   type WishlistStoredVisual,
 } from './wishlistProcessedImageRegistry';
+import type { WishlistImagePreference } from './wishlistImagePreference';
 
 const BUCKET = 'wishlist-photos';
 const PUBLIC_PATH_MARKER = `/storage/v1/object/public/${BUCKET}/`;
-const pendingByWish = new Map<string, Promise<void>>();
-
-function persistenceKey(wishId: number, sourceUrl: string, revision: number): string {
-  return `${wishId}:${revision}:${sourceUrl}`;
-}
+const pendingBySession = new Map<string, Promise<void>>();
 
 async function dataUrlBlob(src: string): Promise<Blob> {
   const response = await fetch(src);
@@ -33,15 +30,16 @@ function publicStoragePath(value: string | null | undefined): string | null {
   }
 }
 
-async function persistForWish(input: {
+async function persistForSession(input: {
   wishId: number;
   sourceUrl: string;
+  preference: WishlistImagePreference;
   visual: WishlistStoredVisual;
   processingRevision: number;
-  previousProcessedUrl?: string | null | undefined;
+  processorVersion: number;
+  sessionId: string;
 }): Promise<void> {
-  const key = persistenceKey(input.wishId, input.sourceUrl, input.processingRevision);
-  const current = pendingByWish.get(key);
+  const current = pendingBySession.get(input.sessionId);
   if (current) return current;
 
   const task = (async () => {
@@ -58,23 +56,32 @@ async function persistForWish(input: {
           contentType: blob.type,
           cacheControl: '31536000',
         });
-        if (error) throw error;
+        if (error) throw new Error(`storage_upload_failed:${error.message}`);
         processedImageUrl = publicUrl(BUCKET, uploadedPath);
       }
 
-      await setWishlistProcessedImage({
+      const previousProcessedUrl = await completeWishlistImageProcessing({
         wishId: input.wishId,
         sourceImageUrl: input.sourceUrl,
+        imagePreference: input.preference,
+        processingRevision: input.processingRevision,
+        processorVersion: input.processorVersion,
+        sessionId: input.sessionId,
         processedImageUrl,
         imageMode: input.visual.mode,
       });
 
-      updateWishlistStoredVisual(input.sourceUrl, input.wishId, {
-        src: processedImageUrl ?? input.sourceUrl,
-        mode: input.visual.mode,
-      });
+      updateWishlistStoredVisual(
+        input.sourceUrl,
+        input.wishId,
+        {
+          src: processedImageUrl ?? input.sourceUrl,
+          mode: input.visual.mode,
+        },
+        input.processorVersion,
+      );
 
-      const previousPath = publicStoragePath(input.previousProcessedUrl);
+      const previousPath = publicStoragePath(previousProcessedUrl);
       if (previousPath && previousPath !== uploadedPath) {
         await supabase.storage.from(BUCKET).remove([previousPath]).catch(() => undefined);
       }
@@ -85,26 +92,21 @@ async function persistForWish(input: {
       throw error;
     }
   })().finally(() => {
-    pendingByWish.delete(key);
+    pendingBySession.delete(input.sessionId);
   });
 
-  pendingByWish.set(key, task);
+  pendingBySession.set(input.sessionId, task);
   return task;
 }
 
 export async function persistWishlistProcessedVisual(input: {
-  wishId?: number | undefined;
+  wishId: number;
   sourceUrl: string;
+  preference: WishlistImagePreference;
   visual: WishlistStoredVisual;
-  processingRevision?: number | undefined;
-  previousProcessedUrl?: string | null | undefined;
+  processingRevision: number;
+  processorVersion: number;
+  sessionId: string;
 }): Promise<void> {
-  if (input.wishId == null) return;
-  await persistForWish({
-    wishId: input.wishId,
-    sourceUrl: input.sourceUrl,
-    visual: input.visual,
-    processingRevision: input.processingRevision ?? 0,
-    previousProcessedUrl: input.previousProcessedUrl,
-  });
+  await persistForSession(input);
 }
