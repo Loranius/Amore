@@ -6,7 +6,6 @@
 body.wl-cloud-sheet-open {
   overflow: hidden;
   overscroll-behavior: none;
-  touch-action: none;
 }
 
 body.wl-cloud-sheet-open .bottom-nav {
@@ -29,7 +28,7 @@ body.wl-cloud-sheet-open .bottom-nav {
   backdrop-filter: blur(14px) saturate(0.86);
   -webkit-backdrop-filter: blur(14px) saturate(0.86);
   isolation: isolate;
-  touch-action: none;
+  touch-action: pan-y;
 }
 
 .wl-cloud-sheet {
@@ -117,6 +116,7 @@ body.wl-cloud-sheet-open .bottom-nav {
   padding: 8px 18px calc(18px + env(safe-area-inset-bottom, 0px));
   scrollbar-width: thin;
   overscroll-behavior: contain;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
 }
 
