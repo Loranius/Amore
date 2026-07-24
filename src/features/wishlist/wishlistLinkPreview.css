@@ -53,6 +53,39 @@
   color: var(--danger);
 }
 
+/*
+ * The image URL remains part of the form state and save payload, but it is an
+ * implementation detail for most people. Product previews and existing remote
+ * images keep working without exposing a long CDN address in the main form.
+ */
+#wish-image-url {
+  display: none;
+}
+
+/* Give a human-readable confirmation instead of showing the underlying URL. */
+.wm-photo-preview {
+  position: relative;
+}
+
+.wm-photo-preview:has(img)::after {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, var(--ok) 22%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--ok);
+  content: 'Фото готове';
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 @media (max-width: 460px) {
   .wm-link-row {
     grid-template-columns: 1fr;
@@ -60,5 +93,12 @@
 
   .wm-link-preview-button {
     width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wm-photo-preview:has(img)::after {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
