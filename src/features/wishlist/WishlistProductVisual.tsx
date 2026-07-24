@@ -9,6 +9,12 @@ import {
   isWishlistTransparentDisplayMode,
   type WishlistImageDisplayMode,
 } from './wishlistImageModes';
+import {
+  DEFAULT_WISHLIST_IMAGE_PREFERENCE,
+  wishlistImageProcessingSteps,
+  wishlistResultMatchesPreference,
+  type WishlistImagePreference,
+} from './wishlistImagePreference';
 import { resolveWishlistPortrait } from './wishlistPortraitSegmentation';
 import { persistWishlistProcessedVisual } from './wishlistProcessedImagePersistence';
 import { wishlistStoredVisual } from './wishlistProcessedImageRegistry';
@@ -16,25 +22,97 @@ import { wishlistStoredVisual } from './wishlistProcessedImageRegistry';
 interface WishlistProductVisualProps {
   src: string;
   alt: string;
+  wishId?: number;
   className?: string;
   loading?: 'eager' | 'lazy';
-  modeHint?: WishlistImageDisplayMode;
+  processedSrc?: string | null;
+  modeHint?: WishlistImageDisplayMode | null;
+  preference?: WishlistImagePreference;
+  processingRevision?: number;
+  onProcessingChange?: (processing: boolean) => void;
+  onPersisted?: (visual: { src: string; mode: WishlistImageDisplayMode }) => void;
+  onPersistenceError?: () => void;
   onError?: () => void;
 }
 
-function initialVisual(
+interface VisualState {
+  src: string;
+  mode: WishlistImageDisplayMode;
+  processing: boolean;
+}
+
+function persistedVisual(input: {
+  source: string;
+  processedSrc?: string | null;
+  modeHint?: WishlistImageDisplayMode | null;
+  preference: WishlistImagePreference;
+}): Omit<VisualState, 'processing'> | null {
+  const { source, processedSrc, modeHint, preference } = input;
+  if (!modeHint || !wishlistResultMatchesPreference(preference, modeHint)) return null;
+  if (modeHint === 'photo-cover') return { src: source, mode: 'photo-cover' };
+  if (!processedSrc) return null;
+  return { src: processedSrc, mode: modeHint };
+}
+
+function processingSource(src: string, revision: number): string {
+  if (revision <= 0) return src;
+  const withoutFragment = src.split('#', 1)[0] ?? src;
+  return `${withoutFragment}#amore-reprocess-${revision}`;
+}
+
+async function processByPreference(
   src: string,
-  modeHint: WishlistImageDisplayMode | undefined,
-): { src: string; mode: WishlistImageDisplayMode; processing: boolean } {
-  if (modeHint) return { src, mode: modeHint, processing: false };
+  preference: WishlistImagePreference,
+  revision: number,
+): Promise<{ src: string; mode: WishlistImageDisplayMode }> {
+  const steps = wishlistImageProcessingSteps(preference);
+  if (steps.length === 0) return { src, mode: 'photo-cover' };
 
-  const stored = wishlistStoredVisual(src);
-  if (stored) return { ...stored, processing: false };
+  const candidate = processingSource(src, revision);
+  for (const step of steps) {
+    if (step === 'product') {
+      const result = await resolveWishlistImage(candidate);
+      if (result.mode === 'cutout') {
+        return { src: result.src, mode: 'product-cutout' };
+      }
+      continue;
+    }
 
-  const processingMode = wishlistImageMode(src);
+    const result = await resolveWishlistPortrait(candidate);
+    if (result.mode === 'portrait-cutout') return result;
+  }
+
+  return { src, mode: 'photo-cover' };
+}
+
+function initialVisual(input: {
+  src: string;
+  wishId?: number;
+  processedSrc?: string | null;
+  modeHint?: WishlistImageDisplayMode | null;
+  preference: WishlistImagePreference;
+}): VisualState {
+  const persisted = persistedVisual({
+    source: input.src,
+    processedSrc: input.processedSrc,
+    modeHint: input.modeHint,
+    preference: input.preference,
+  });
+  if (persisted) return { ...persisted, processing: false };
+
+  const stored = wishlistStoredVisual(input.wishId, input.src);
+  if (stored && wishlistResultMatchesPreference(input.preference, stored.mode)) {
+    return { ...stored, processing: false };
+  }
+
+  if (input.preference === 'photo-cover') {
+    return { src: input.src, mode: 'photo-cover', processing: false };
+  }
+
+  const processingMode: WishlistImageMode = wishlistImageMode(input.src);
   return {
-    src,
-    mode: inferWishlistImageDisplayMode(src, processingMode),
+    src: input.src,
+    mode: inferWishlistImageDisplayMode(input.src, processingMode),
     processing: processingMode !== 'cutout',
   };
 }
@@ -42,76 +120,95 @@ function initialVisual(
 export function WishlistProductVisual({
   src,
   alt,
+  wishId,
   className = '',
   loading = 'lazy',
-  modeHint,
+  processedSrc = null,
+  modeHint = null,
+  preference = DEFAULT_WISHLIST_IMAGE_PREFERENCE,
+  processingRevision = 0,
+  onProcessingChange,
+  onPersisted,
+  onPersistenceError,
   onError,
 }: WishlistProductVisualProps) {
-  const initial = initialVisual(src, modeHint);
+  const initial = initialVisual({ src, wishId, processedSrc, modeHint, preference });
   const [displaySrc, setDisplaySrc] = useState(initial.src);
   const [mode, setMode] = useState<WishlistImageDisplayMode>(initial.mode);
   const [processing, setProcessing] = useState(initial.processing);
 
   useEffect(() => {
     let active = true;
-    const nextProcessingMode: WishlistImageMode = wishlistImageMode(src);
-    const stored = modeHint === undefined ? wishlistStoredVisual(src) : null;
+    const direct = persistedVisual({ source: src, processedSrc, modeHint, preference });
+    const stored = direct ? null : wishlistStoredVisual(wishId, src);
 
-    if (modeHint !== undefined) {
-      setDisplaySrc(src);
-      setMode(modeHint);
+    if (direct || (stored && wishlistResultMatchesPreference(preference, stored.mode))) {
+      const visual = direct ?? stored!;
+      setDisplaySrc(visual.src);
+      setMode(visual.mode);
       setProcessing(false);
-      return () => {
-        active = false;
-      };
-    }
-
-    if (stored) {
-      setDisplaySrc(stored.src);
-      setMode(stored.mode);
-      setProcessing(false);
+      onProcessingChange?.(false);
       return () => {
         active = false;
       };
     }
 
     setDisplaySrc(src);
-    setMode(inferWishlistImageDisplayMode(src, nextProcessingMode));
-    setProcessing(nextProcessingMode !== 'cutout');
+    setMode(preference === 'photo-cover'
+      ? 'photo-cover'
+      : inferWishlistImageDisplayMode(src, wishlistImageMode(src)));
+    setProcessing(preference !== 'photo-cover');
+    onProcessingChange?.(preference !== 'photo-cover');
 
     void (async () => {
+      const visual = await processByPreference(src, preference, processingRevision);
+      if (!active) return;
+
+      setDisplaySrc(visual.src);
+      setMode(visual.mode);
+
       try {
-        const productResult = await resolveWishlistImage(src);
-        if (!active) return;
-
-        if (productResult.mode === 'cutout') {
-          const visual = { src: productResult.src, mode: 'product-cutout' as const };
-          setDisplaySrc(visual.src);
-          setMode(visual.mode);
-          setProcessing(false);
-          void persistWishlistProcessedVisual(src, visual);
-          return;
-        }
-
-        const portraitResult = await resolveWishlistPortrait(src);
-        if (!active) return;
-        setDisplaySrc(portraitResult.src);
-        setMode(portraitResult.mode);
-        setProcessing(false);
-        void persistWishlistProcessedVisual(src, portraitResult);
+        await persistWishlistProcessedVisual({
+          wishId,
+          sourceUrl: src,
+          visual,
+          processingRevision,
+          previousProcessedUrl: processedSrc,
+        });
+        if (active) onPersisted?.(visual);
       } catch (error) {
-        if (!active) return;
-        console.info('[Wishlist] processed image cache skipped:', error);
-        setDisplaySrc(src);
-        setMode('photo-cover');
-        setProcessing(false);
+        console.info('[Wishlist] processed image persistence skipped:', error);
+        if (active) onPersistenceError?.();
+      } finally {
+        if (active) {
+          setProcessing(false);
+          onProcessingChange?.(false);
+        }
       }
-    })();
+    })().catch((error) => {
+      if (!active) return;
+      console.info('[Wishlist] processed image cache skipped:', error);
+      setDisplaySrc(src);
+      setMode('photo-cover');
+      setProcessing(false);
+      onProcessingChange?.(false);
+      onPersistenceError?.();
+    });
 
     return () => {
       active = false;
     };
-  }, [modeHint, src]);
+  }, [
+    modeHint,
+    onPersisted,
+    onPersistenceError,
+    onProcessingChange,
+    preference,
+    processedSrc,
+    processingRevision,
+    src,
+    wishId,
+  ]);
 
   return (
     <span
