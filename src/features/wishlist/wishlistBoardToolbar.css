@@ -1,22 +1,97 @@
 .wl-board-toolbar {
   margin-block: 16px 20px;
-  padding: 9px 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
   border-radius: 21px;
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--text) 6%, transparent);
+  background: color-mix(in srgb, var(--surface) 91%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--text) 7%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+}
+
+.wl-board-toolbar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 1px 5px 8px;
+}
+
+.wl-board-toolbar-label {
+  color: color-mix(in srgb, var(--text) 88%, var(--muted));
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.wl-board-toolbar-result {
+  color: color-mix(in srgb, var(--muted) 88%, var(--text));
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wl-board-toolbar-result strong {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.wl-board-filter-viewport {
+  position: relative;
+  min-width: 0;
+}
+
+.wl-board-filter-viewport::before,
+.wl-board-filter-viewport::after {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  opacity: 0;
+  content: '';
+  pointer-events: none;
+  transition: opacity 180ms ease;
+}
+
+.wl-board-filter-viewport::before {
+  left: -1px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--surface) 98%, transparent) 12%,
+    transparent
+  );
+}
+
+.wl-board-filter-viewport::after {
+  right: -1px;
+  background: linear-gradient(
+    to left,
+    color-mix(in srgb, var(--surface) 98%, transparent) 12%,
+    transparent
+  );
+}
+
+.wl-board-filter-viewport.has-left-overflow::before,
+.wl-board-filter-viewport.has-right-overflow::after {
+  opacity: 1;
 }
 
 .wl-board-filter-scroll {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
+  padding: 1px 2px 3px;
   overflow-x: auto;
-  overscroll-behavior-inline: contain;
+  scroll-padding-inline: 10px;
+  scroll-snap-type: x proximity;
   scrollbar-width: none;
+  overscroll-behavior-inline: contain;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
 .wl-board-filter-scroll::-webkit-scrollbar {
@@ -25,19 +100,20 @@
 
 .wl-board-filter {
   display: inline-flex;
-  min-height: 38px;
+  min-height: 40px;
   flex: 0 0 auto;
   align-items: center;
-  gap: 6px;
-  padding: 7px 10px;
-  border: 1px solid transparent;
+  gap: 7px;
+  padding: 7px 10px 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
   border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: color-mix(in srgb, var(--muted) 88%, var(--text));
   font: inherit;
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+  scroll-snap-align: start;
   cursor: pointer;
   transition:
     border-color 180ms ease,
@@ -47,28 +123,62 @@
     transform 180ms ease;
 }
 
-.wl-board-filter > span {
-  color: color-mix(in srgb, var(--accent) 66%, var(--muted));
+.wl-board-filter:hover {
+  border-color: color-mix(in srgb, var(--accent) 23%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
 
-.wl-board-filter small {
+.wl-board-filter-icon {
   display: grid;
-  min-width: 21px;
-  height: 21px;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  place-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: color-mix(in srgb, var(--accent) 76%, var(--text));
+  font-size: 12px;
+  line-height: 1;
+}
+
+.wl-board-filter-label {
+  line-height: 1;
+}
+
+.wl-board-filter-count {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
   place-items: center;
   padding-inline: 5px;
   border-radius: 999px;
-  background: color-mix(in srgb, currentColor 9%, transparent);
+  background: color-mix(in srgb, currentColor 11%, transparent);
   color: inherit;
   font-size: 10px;
   font-weight: 900;
+  line-height: 1;
 }
 
 .wl-board-filter.active {
-  border-color: color-mix(in srgb, var(--accent) 16%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  color: var(--accent);
-  box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 84%, var(--text));
+  box-shadow:
+    0 7px 18px color-mix(in srgb, var(--accent) 14%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, white 35%, transparent);
+}
+
+.wl-board-filter.active .wl-board-filter-icon {
+  background: var(--accent);
+  color: #fff;
+}
+
+.wl-board-filter.active .wl-board-filter-count {
+  background: color-mix(in srgb, var(--accent) 17%, var(--surface));
+}
+
+.wl-board-filter[data-priority='high'] .wl-board-filter-icon {
+  font-size: 13px;
 }
 
 .wl-board-filter:active {
@@ -113,11 +223,34 @@
   .wl-board-toolbar {
     margin-inline: -2px;
     padding: 8px;
+    border-radius: 20px;
+  }
+
+  .wl-board-toolbar-head {
+    padding-inline: 4px;
+    padding-bottom: 7px;
+  }
+
+  .wl-board-filter-viewport {
+    margin-inline: -8px;
+  }
+
+  .wl-board-filter-scroll {
+    gap: 6px;
+    padding-inline: 8px 28px;
+    scroll-padding-inline: 8px;
+  }
+
+  .wl-board-filter {
+    min-height: 44px;
+    padding-block: 8px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wl-board-filter {
+  .wl-board-filter,
+  .wl-board-filter-viewport::before,
+  .wl-board-filter-viewport::after {
     transition: none;
   }
 }
