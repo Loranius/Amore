@@ -1,0 +1,266 @@
+.wl-priority-picker-trigger {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease,
+    transform 180ms ease;
+}
+
+.wl-priority-picker-trigger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  background: color-mix(in srgb, var(--surface) 90%, var(--accent) 10%);
+}
+
+.wl-priority-picker-trigger:active:not(:disabled) {
+  transform: scale(0.995);
+}
+
+.wl-priority-picker-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.wl-priority-picker-trigger-value {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  font-weight: 700;
+}
+
+.wl-priority-picker-trigger-value > span:first-child {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  color: var(--accent);
+}
+
+.wl-priority-picker-chevron {
+  color: var(--muted);
+  font-size: 19px;
+  line-height: 1;
+}
+
+.wl-priority-picker-backdrop {
+  position: fixed;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  inset: 0;
+  padding: 16px;
+  background: rgba(40, 27, 35, 0.42);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  animation: wl-priority-backdrop-in 180ms ease both;
+}
+
+.wl-priority-picker-sheet {
+  width: min(100%, 520px);
+  max-height: min(82dvh, 620px);
+  padding: 8px 14px max(18px, env(safe-area-inset-bottom));
+  overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 28px;
+  background: color-mix(in srgb, var(--surface) 98%, transparent);
+  box-shadow: 0 28px 80px rgba(32, 19, 27, 0.3);
+  animation: wl-priority-sheet-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  overscroll-behavior: contain;
+}
+
+.wl-priority-picker-handle {
+  width: 42px;
+  height: 5px;
+  margin: 2px auto 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 24%, transparent);
+}
+
+.wl-priority-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 2px 13px;
+}
+
+.wl-priority-picker-eyebrow {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.wl-priority-picker-header h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.wl-priority-picker-close {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--muted);
+  font: 500 25px/1 system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.wl-priority-picker-options {
+  display: grid;
+  gap: 8px;
+}
+
+.wl-priority-picker-option {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 28px;
+  min-height: 66px;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface) 91%, transparent);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.wl-priority-picker-option:hover,
+.wl-priority-picker-option:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.wl-priority-picker-option:active {
+  transform: scale(0.99);
+}
+
+.wl-priority-picker-option.is-active {
+  border-color: color-mix(in srgb, var(--accent) 38%, transparent);
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  box-shadow: 0 9px 24px color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.wl-priority-picker-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font-size: 18px;
+}
+
+.wl-priority-picker-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.wl-priority-picker-copy strong {
+  font-size: 15px;
+}
+
+.wl-priority-picker-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl-priority-picker-radio {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 2px solid color-mix(in srgb, var(--muted) 34%, transparent);
+  border-radius: 999px;
+  color: white;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.wl-priority-picker-option.is-active .wl-priority-picker-radio {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+@keyframes wl-priority-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes wl-priority-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 560px) {
+  .wl-priority-picker-backdrop {
+    padding: 0;
+  }
+
+  .wl-priority-picker-sheet {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 28px 28px 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-priority-picker-backdrop,
+  .wl-priority-picker-sheet {
+    animation: none;
+  }
+
+  .wl-priority-picker-trigger,
+  .wl-priority-picker-option {
+    transition: none;
+  }
+}
