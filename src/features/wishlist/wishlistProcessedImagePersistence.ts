@@ -2,16 +2,15 @@ import { publicUrl, supabase } from '@/lib/supabase';
 import { setWishlistProcessedImage } from './wishlistRpc';
 import {
   updateWishlistStoredVisual,
-  wishlistIdsForImageSource,
   type WishlistStoredVisual,
 } from './wishlistProcessedImageRegistry';
-import type { WishlistImageDisplayMode } from './wishlistImageModes';
 
 const BUCKET = 'wishlist-photos';
+const PUBLIC_PATH_MARKER = `/storage/v1/object/public/${BUCKET}/`;
 const pendingByWish = new Map<string, Promise<void>>();
 
-function persistenceKey(wishId: number, sourceUrl: string): string {
-  return `${wishId}:${sourceUrl}`;
+function persistenceKey(wishId: number, sourceUrl: string, revision: number): string {
+  return `${wishId}:${revision}:${sourceUrl}`;
 }
 
 async function dataUrlBlob(src: string): Promise<Blob> {
@@ -22,12 +21,26 @@ async function dataUrlBlob(src: string): Promise<Blob> {
   return blob;
 }
 
+function publicStoragePath(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const pathname = new URL(value).pathname;
+    const index = pathname.indexOf(PUBLIC_PATH_MARKER);
+    if (index < 0) return null;
+    return decodeURIComponent(pathname.slice(index + PUBLIC_PATH_MARKER.length));
+  } catch {
+    return null;
+  }
+}
+
 async function persistForWish(input: {
   wishId: number;
   sourceUrl: string;
   visual: WishlistStoredVisual;
+  processingRevision: number;
+  previousProcessedUrl?: string | null;
 }): Promise<void> {
-  const key = persistenceKey(input.wishId, input.sourceUrl);
+  const key = persistenceKey(input.wishId, input.sourceUrl, input.processingRevision);
   const current = pendingByWish.get(key);
   if (current) return current;
 
@@ -39,9 +52,6 @@ async function persistForWish(input: {
       if (input.visual.mode !== 'photo-cover') {
         const blob = await dataUrlBlob(input.visual.src);
         const extension = blob.type.includes('png') ? 'png' : 'webp';
-        // Current bucket policies are shared by authenticated users. A random
-        // object name prevents another session from guessing and overwriting a
-        // processed asset by wish id alone.
         uploadedPath = `processed/${input.wishId}/visual-${crypto.randomUUID()}.${extension}`;
         const { error } = await supabase.storage.from(BUCKET).upload(uploadedPath, blob, {
           upsert: false,
@@ -63,32 +73,38 @@ async function persistForWish(input: {
         src: processedImageUrl ?? input.sourceUrl,
         mode: input.visual.mode,
       });
+
+      const previousPath = publicStoragePath(input.previousProcessedUrl);
+      if (previousPath && previousPath !== uploadedPath) {
+        await supabase.storage.from(BUCKET).remove([previousPath]).catch(() => undefined);
+      }
     } catch (error) {
-      // A stale source means the upload is no longer referenced. Best-effort
-      // cleanup keeps retries safe without turning a visual cache failure into
-      // a user-facing Wishlist error.
       if (uploadedPath) {
         await supabase.storage.from(BUCKET).remove([uploadedPath]).catch(() => undefined);
       }
       throw error;
     }
-  })().catch((error) => {
+  })().finally(() => {
     pendingByWish.delete(key);
-    throw error;
   });
 
   pendingByWish.set(key, task);
   return task;
 }
 
-export async function persistWishlistProcessedVisual(
-  sourceUrl: string,
-  visual: { src: string; mode: WishlistImageDisplayMode },
-): Promise<void> {
-  const wishIds = wishlistIdsForImageSource(sourceUrl);
-  if (wishIds.length === 0) return;
-
-  await Promise.allSettled(
-    wishIds.map((wishId) => persistForWish({ wishId, sourceUrl, visual })),
-  );
+export async function persistWishlistProcessedVisual(input: {
+  wishId?: number;
+  sourceUrl: string;
+  visual: WishlistStoredVisual;
+  processingRevision?: number;
+  previousProcessedUrl?: string | null;
+}): Promise<void> {
+  if (input.wishId == null) return;
+  await persistForWish({
+    wishId: input.wishId,
+    sourceUrl: input.sourceUrl,
+    visual: input.visual,
+    processingRevision: input.processingRevision ?? 0,
+    previousProcessedUrl: input.previousProcessedUrl,
+  });
 }
