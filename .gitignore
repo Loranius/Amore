@@ -9,9 +9,6 @@ dist-ssr
 *.log
 .vite
 
-# Generated from the uploaded Wishlist bubble sources before dev/build.
-public/assets/soap-bubble.glb
-
 # dev-only crystal render harness (never committed)
 crystal-preview.html
 src/crystal-preview.tsx
