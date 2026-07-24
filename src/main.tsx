@@ -21,6 +21,7 @@ import { ConfirmProvider } from '@/providers/ConfirmProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import App from '@/App';
 import '@/index.css';
+import '@/features/wishlist/wishlistMist.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
