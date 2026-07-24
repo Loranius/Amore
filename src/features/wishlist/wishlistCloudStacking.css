@@ -8,12 +8,15 @@
   z-index: 0 !important;
 }
 
+/* Preserve a local stacking context so the negative halo and contact shadow
+   remain behind the sphere instead of disappearing behind the page. */
 .wishlist .wl-cloud-item {
-  z-index: auto !important;
+  z-index: var(--wl-cloud-z, 1) !important;
+  isolation: isolate;
 }
 
 .wishlist .wl-cloud-bubble {
-  z-index: var(--wl-cloud-z, 1);
+  z-index: 1;
 }
 
 .wishlist .wl-cloud-sheet-overlay {
