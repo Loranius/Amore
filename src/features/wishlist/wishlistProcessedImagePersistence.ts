@@ -38,7 +38,7 @@ async function persistForWish(input: {
   sourceUrl: string;
   visual: WishlistStoredVisual;
   processingRevision: number;
-  previousProcessedUrl?: string | null;
+  previousProcessedUrl?: string | null | undefined;
 }): Promise<void> {
   const key = persistenceKey(input.wishId, input.sourceUrl, input.processingRevision);
   const current = pendingByWish.get(key);
@@ -93,11 +93,11 @@ async function persistForWish(input: {
 }
 
 export async function persistWishlistProcessedVisual(input: {
-  wishId?: number;
+  wishId?: number | undefined;
   sourceUrl: string;
   visual: WishlistStoredVisual;
-  processingRevision?: number;
-  previousProcessedUrl?: string | null;
+  processingRevision?: number | undefined;
+  previousProcessedUrl?: string | null | undefined;
 }): Promise<void> {
   if (input.wishId == null) return;
   await persistForWish({
