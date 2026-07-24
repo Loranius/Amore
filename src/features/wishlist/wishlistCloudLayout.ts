@@ -1,5 +1,7 @@
 import './wishlistSoapBubble.css';
 import './wishlistSoapBubbleStatic.css';
+import './wishlistBubbleModel.css';
+import './wishlistBubbleModelRuntime';
 
 export type WishlistCloudPriority = 'high' | 'medium' | 'low';
 
