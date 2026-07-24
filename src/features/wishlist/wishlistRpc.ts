@@ -3,6 +3,8 @@ import { createGiftMemorySignedUrl } from './giftMemory';
 import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
 import { WishlistCreateRequestTracker } from './wishlistCreateIdempotency';
 import { WishlistQuickCompletionTracker } from './wishlistQuickCompletion';
+import { registerWishlistProcessedRows } from './wishlistProcessedImageRegistry';
+import type { WishlistImageDisplayMode } from './wishlistImageModes';
 import type { WishlistItemRow } from '@/types';
 
 export type WishlistStatus =
@@ -18,6 +20,8 @@ export type WishlistCompletionMode = 'gift' | 'shared';
 export type WishlistArchiveScope = 'personal' | 'shared';
 
 export interface WishlistItemV3 extends WishlistItemRow {
+  processed_image_url: string | null;
+  image_mode: WishlistImageDisplayMode | null;
   status: WishlistStatus;
   archived_at: string | null;
   version: number;
@@ -149,7 +153,9 @@ export async function fetchWishlistV3(input: {
     p_include_archived: input.includeArchived ?? false,
   });
   if (error) throw new Error(error.message);
-  return assertRows<WishlistItemV3>(data, 'Wishlist');
+  const rows = assertRows<WishlistItemV3>(data, 'Wishlist');
+  registerWishlistProcessedRows(rows);
+  return rows;
 }
 
 export async function fetchWishlistStatsV3(): Promise<WishlistStatsV3> {
@@ -208,6 +214,20 @@ export async function updateWishlistItem(
     p_wish_id: wishId,
     p_expected_version: expectedVersion,
     ...mutationArgs(payload),
+  });
+}
+
+export async function setWishlistProcessedImage(input: {
+  wishId: number;
+  sourceImageUrl: string;
+  processedImageUrl: string | null;
+  imageMode: WishlistImageDisplayMode;
+}): Promise<void> {
+  await callVoid('set_wishlist_processed_image_v3', {
+    p_wish_id: input.wishId,
+    p_source_image_url: input.sourceImageUrl,
+    p_processed_image_url: input.processedImageUrl,
+    p_image_mode: input.imageMode,
   });
 }
 
