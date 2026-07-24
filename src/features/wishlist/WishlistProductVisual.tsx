@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import {
   resolveWishlistImage,
   wishlistImageMode,
@@ -33,6 +33,7 @@ interface WishlistProductVisualProps {
   preference?: WishlistImagePreference | undefined;
   processingRevision?: number | undefined;
   persistenceEnabled?: boolean | undefined;
+  onActivate?: (() => void) | undefined;
   onProcessingChange?: ((processing: boolean) => void) | undefined;
   onPersisted?: ((visual: { src: string; mode: WishlistImageDisplayMode }) => void) | undefined;
   onPersistenceError?: (() => void) | undefined;
@@ -132,6 +133,7 @@ export function WishlistProductVisual({
   preference,
   processingRevision,
   persistenceEnabled = true,
+  onActivate,
   onProcessingChange,
   onPersisted,
   onPersistenceError,
@@ -238,12 +240,23 @@ export function WishlistProductVisual({
     src,
   ]);
 
+  const handleKeyDown = (event: KeyboardEvent<HTMLSpanElement>) => {
+    if (!onActivate || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    onActivate();
+  };
+
   return (
     <span
       className={`wl-product-visual ${className}`.trim()}
       data-image-mode={mode}
       data-image-transparent={isWishlistTransparentDisplayMode(mode) ? 'true' : 'false'}
       data-processing={processing ? 'true' : 'false'}
+      role={onActivate ? 'button' : undefined}
+      tabIndex={onActivate ? 0 : undefined}
+      aria-label={onActivate ? `Відкрити фото: ${alt}` : undefined}
+      onClick={onActivate}
+      onKeyDown={handleKeyDown}
     >
       <img
         src={displaySrc}
