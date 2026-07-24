@@ -109,11 +109,12 @@ function mountRenderer(element: HTMLElement): () => void {
   const camera = new PerspectiveCamera(36, 1, 0.1, 10);
   camera.position.set(0, 0, 2.05);
 
+  const opacityUniform = { value: priorityOpacity(element) };
   const material = new ShaderMaterial({
     vertexShader,
     fragmentShader,
     uniforms: {
-      uOpacity: { value: priorityOpacity(element) },
+      uOpacity: opacityUniform,
     },
     transparent: true,
     depthWrite: false,
@@ -131,7 +132,7 @@ function mountRenderer(element: HTMLElement): () => void {
     const rect = element.getBoundingClientRect();
     const width = Math.max(1, Math.round(rect.width));
     const height = Math.max(1, Math.round(rect.height));
-    material.uniforms.uOpacity.value = priorityOpacity(element);
+    opacityUniform.value = priorityOpacity(element);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
