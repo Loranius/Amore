@@ -32,6 +32,7 @@ interface WishlistProductVisualProps {
   modeHint?: WishlistImageDisplayMode | null;
   preference?: WishlistImagePreference;
   processingRevision?: number;
+  persistenceEnabled?: boolean;
   onProcessingChange?: (processing: boolean) => void;
   onPersisted?: (visual: { src: string; mode: WishlistImageDisplayMode }) => void;
   onPersistenceError?: () => void;
@@ -130,13 +131,14 @@ export function WishlistProductVisual({
   modeHint,
   preference,
   processingRevision,
+  persistenceEnabled = true,
   onProcessingChange,
   onPersisted,
   onPersistenceError,
   onError,
 }: WishlistProductVisualProps) {
-  const registered = wishlistRegisteredImage(wishId, src);
-  const effectiveWishId = wishId ?? registered?.wishId;
+  const registered = persistenceEnabled ? wishlistRegisteredImage(wishId, src) : null;
+  const effectiveWishId = persistenceEnabled ? (wishId ?? registered?.wishId) : undefined;
   const effectiveProcessedSrc = processedSrc ?? registered?.processedSrc ?? null;
   const effectiveModeHint = modeHint ?? registered?.mode ?? null;
   const effectivePreference = preference
@@ -191,13 +193,15 @@ export function WishlistProductVisual({
       setMode(visual.mode);
 
       try {
-        await persistWishlistProcessedVisual({
-          wishId: effectiveWishId,
-          sourceUrl: src,
-          visual,
-          processingRevision: effectiveRevision,
-          previousProcessedUrl: effectiveProcessedSrc,
-        });
+        if (persistenceEnabled) {
+          await persistWishlistProcessedVisual({
+            wishId: effectiveWishId,
+            sourceUrl: src,
+            visual,
+            processingRevision: effectiveRevision,
+            previousProcessedUrl: effectiveProcessedSrc,
+          });
+        }
         if (active) onPersisted?.(visual);
       } catch (error) {
         console.info('[Wishlist] processed image persistence skipped:', error);
@@ -230,6 +234,7 @@ export function WishlistProductVisual({
     onPersisted,
     onPersistenceError,
     onProcessingChange,
+    persistenceEnabled,
     src,
   ]);
 
