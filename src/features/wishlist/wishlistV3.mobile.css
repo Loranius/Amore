@@ -4,6 +4,7 @@
 @import './wishlistLifecycle.css';
 @import './wishlistGiftMemory.css';
 @import './wishlistGiftMemory.mobile.css';
+@import './wishlistContrast.css';
 
 /* Mobile-only polishing for Wishlist v3. */
 
