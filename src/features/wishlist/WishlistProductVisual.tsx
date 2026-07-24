@@ -1,6 +1,5 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import {
-  resolveWishlistImage,
   wishlistImageMode,
   type WishlistImageMode,
 } from './wishlistImageCutout';
@@ -11,12 +10,16 @@ import {
 } from './wishlistImageModes';
 import {
   DEFAULT_WISHLIST_IMAGE_PREFERENCE,
-  wishlistImageProcessingSteps,
   wishlistResultMatchesPreference,
   type WishlistImagePreference,
 } from './wishlistImagePreference';
-import { resolveWishlistPortrait } from './wishlistPortraitSegmentation';
-import { persistWishlistProcessedVisual } from './wishlistProcessedImagePersistence';
+import {
+  CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION,
+  wishlistImageResultFresh,
+  wishlistImageRetryDelayMs,
+  type WishlistImageProcessingStatus,
+} from './wishlistImageProcessingState';
+import { runWishlistImageProcessing } from './wishlistImageProcessingRunner';
 import {
   wishlistRegisteredImage,
   wishlistStoredVisual,
@@ -59,35 +62,13 @@ function persistedVisual(input: {
   return { src: processedSrc, mode: modeHint };
 }
 
-function processingSource(src: string, revision: number): string {
-  if (revision <= 0) return src;
-  const withoutFragment = src.split('#', 1)[0] ?? src;
-  return `${withoutFragment}#amore-reprocess-${revision}`;
-}
-
-async function processByPreference(
-  src: string,
-  preference: WishlistImagePreference,
-  revision: number,
-): Promise<{ src: string; mode: WishlistImageDisplayMode }> {
-  const steps = wishlistImageProcessingSteps(preference);
-  if (steps.length === 0) return { src, mode: 'photo-cover' };
-
-  const candidate = processingSource(src, revision);
-  for (const step of steps) {
-    if (step === 'product') {
-      const result = await resolveWishlistImage(candidate);
-      if (result.mode === 'cutout') {
-        return { src: result.src, mode: 'product-cutout' };
-      }
-      continue;
-    }
-
-    const result = await resolveWishlistPortrait(candidate);
-    if (result.mode === 'portrait-cutout') return result;
-  }
-
-  return { src, mode: 'photo-cover' };
+function fallbackVisual(src: string, preference: WishlistImagePreference): Omit<VisualState, 'processing'> {
+  if (preference === 'photo-cover') return { src, mode: 'photo-cover' };
+  const processingMode: WishlistImageMode = wishlistImageMode(src);
+  return {
+    src,
+    mode: inferWishlistImageDisplayMode(src, processingMode),
+  };
 }
 
 function initialVisual(input: {
@@ -96,29 +77,37 @@ function initialVisual(input: {
   processedSrc?: string | null | undefined;
   modeHint?: WishlistImageDisplayMode | null | undefined;
   preference: WishlistImagePreference;
+  processingStatus: WishlistImageProcessingStatus;
+  processorVersion: number;
+  persistenceEnabled: boolean;
 }): VisualState {
-  const persisted = persistedVisual({
+  const direct = persistedVisual({
     source: input.src,
     processedSrc: input.processedSrc,
     modeHint: input.modeHint,
     preference: input.preference,
   });
-  if (persisted) return { ...persisted, processing: false };
+  const stored = direct ? null : wishlistStoredVisual(input.wishId, input.src);
+  const usable = direct ?? (
+    stored && wishlistResultMatchesPreference(input.preference, stored.mode)
+      ? stored
+      : null
+  );
 
-  const stored = wishlistStoredVisual(input.wishId, input.src);
-  if (stored && wishlistResultMatchesPreference(input.preference, stored.mode)) {
-    return { ...stored, processing: false };
+  if (usable) {
+    const fresh = input.persistenceEnabled && wishlistImageResultFresh({
+      status: input.processingStatus,
+      processorVersion: input.processorVersion,
+      preference: input.preference,
+      mode: usable.mode,
+      processedSrc: usable.mode === 'photo-cover' ? null : usable.src,
+    });
+    return { ...usable, processing: !fresh };
   }
 
-  if (input.preference === 'photo-cover') {
-    return { src: input.src, mode: 'photo-cover', processing: false };
-  }
-
-  const processingMode: WishlistImageMode = wishlistImageMode(input.src);
   return {
-    src: input.src,
-    mode: inferWishlistImageDisplayMode(input.src, processingMode),
-    processing: processingMode !== 'cutout',
+    ...fallbackVisual(input.src, input.preference),
+    processing: true,
   };
 }
 
@@ -147,6 +136,10 @@ export function WishlistProductVisual({
     ?? registered?.preference
     ?? DEFAULT_WISHLIST_IMAGE_PREFERENCE;
   const effectiveRevision = processingRevision ?? registered?.revision ?? 0;
+  const effectiveStatus = registered?.processingStatus
+    ?? (effectiveModeHint ? 'ready' : 'pending');
+  const effectiveProcessorVersion = registered?.processorVersion
+    ?? (effectiveModeHint ? CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION : 0);
 
   const initial = initialVisual({
     src,
@@ -154,13 +147,18 @@ export function WishlistProductVisual({
     processedSrc: effectiveProcessedSrc,
     modeHint: effectiveModeHint,
     preference: effectivePreference,
+    processingStatus: effectiveStatus,
+    processorVersion: effectiveProcessorVersion,
+    persistenceEnabled,
   });
   const [displaySrc, setDisplaySrc] = useState(initial.src);
   const [mode, setMode] = useState<WishlistImageDisplayMode>(initial.mode);
   const [processing, setProcessing] = useState(initial.processing);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     let active = true;
+    let retryTimer: number | null = null;
     const direct = persistedVisual({
       source: src,
       processedSrc: effectiveProcessedSrc,
@@ -168,11 +166,29 @@ export function WishlistProductVisual({
       preference: effectivePreference,
     });
     const stored = direct ? null : wishlistStoredVisual(effectiveWishId, src);
+    const usable = direct ?? (
+      stored && wishlistResultMatchesPreference(effectivePreference, stored.mode)
+        ? stored
+        : null
+    );
+    const fresh = usable ? wishlistImageResultFresh({
+      status: effectiveStatus,
+      processorVersion: effectiveProcessorVersion,
+      preference: effectivePreference,
+      mode: usable.mode,
+      processedSrc: usable.mode === 'photo-cover' ? null : usable.src,
+    }) : false;
 
-    if (direct || (stored && wishlistResultMatchesPreference(effectivePreference, stored.mode))) {
-      const visual = direct ?? stored!;
-      setDisplaySrc(visual.src);
-      setMode(visual.mode);
+    if (usable) {
+      setDisplaySrc(usable.src);
+      setMode(usable.mode);
+    } else {
+      const fallback = fallbackVisual(src, effectivePreference);
+      setDisplaySrc(fallback.src);
+      setMode(fallback.mode);
+    }
+
+    if (persistenceEnabled && fresh) {
       setProcessing(false);
       onProcessingChange?.(false);
       return () => {
@@ -180,45 +196,43 @@ export function WishlistProductVisual({
       };
     }
 
-    setDisplaySrc(src);
-    setMode(effectivePreference === 'photo-cover'
-      ? 'photo-cover'
-      : inferWishlistImageDisplayMode(src, wishlistImageMode(src)));
-    setProcessing(effectivePreference !== 'photo-cover');
-    onProcessingChange?.(effectivePreference !== 'photo-cover');
+    setProcessing(true);
+    onProcessingChange?.(true);
 
-    void (async () => {
-      const visual = await processByPreference(src, effectivePreference, effectiveRevision);
+    void runWishlistImageProcessing({
+      wishId: effectiveWishId,
+      sourceUrl: src,
+      preference: effectivePreference,
+      processingRevision: effectiveRevision,
+      persistenceEnabled,
+      processorVersion: CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION,
+    }).then((result) => {
       if (!active) return;
 
-      setDisplaySrc(visual.src);
-      setMode(visual.mode);
-
-      try {
-        if (persistenceEnabled) {
-          await persistWishlistProcessedVisual({
-            wishId: effectiveWishId,
-            sourceUrl: src,
-            visual,
-            processingRevision: effectiveRevision,
-            previousProcessedUrl: effectiveProcessedSrc,
-          });
+      if (result.kind === 'deferred') {
+        setProcessing(false);
+        onProcessingChange?.(false);
+        const delay = wishlistImageRetryDelayMs(result.retryAfterMs);
+        if (delay !== null) {
+          retryTimer = window.setTimeout(() => {
+            if (active) setRetryNonce((current) => current + 1);
+          }, delay);
         }
-        if (active) onPersisted?.(visual);
-      } catch (error) {
-        console.info('[Wishlist] processed image persistence skipped:', error);
-        if (active) onPersistenceError?.();
-      } finally {
-        if (active) {
-          setProcessing(false);
-          onProcessingChange?.(false);
-        }
+        return;
       }
-    })().catch((error) => {
+
+      setDisplaySrc(result.visual.src);
+      setMode(result.visual.mode);
+      setProcessing(false);
+      onProcessingChange?.(false);
+      onPersisted?.(result.visual);
+    }).catch((error) => {
       if (!active) return;
-      console.info('[Wishlist] processed image cache skipped:', error);
-      setDisplaySrc(src);
-      setMode('photo-cover');
+      console.info('[Wishlist] image processing failed safely:', error);
+      if (!usable) {
+        setDisplaySrc(src);
+        setMode('photo-cover');
+      }
       setProcessing(false);
       onProcessingChange?.(false);
       onPersistenceError?.();
@@ -226,17 +240,21 @@ export function WishlistProductVisual({
 
     return () => {
       active = false;
+      if (retryTimer !== null) window.clearTimeout(retryTimer);
     };
   }, [
     effectiveModeHint,
     effectivePreference,
     effectiveProcessedSrc,
+    effectiveProcessorVersion,
     effectiveRevision,
+    effectiveStatus,
     effectiveWishId,
     onPersisted,
     onPersistenceError,
     onProcessingChange,
     persistenceEnabled,
+    retryNonce,
     src,
   ]);
 
