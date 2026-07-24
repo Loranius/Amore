@@ -17,7 +17,10 @@ import {
 } from './wishlistImagePreference';
 import { resolveWishlistPortrait } from './wishlistPortraitSegmentation';
 import { persistWishlistProcessedVisual } from './wishlistProcessedImagePersistence';
-import { wishlistStoredVisual } from './wishlistProcessedImageRegistry';
+import {
+  wishlistRegisteredImage,
+  wishlistStoredVisual,
+} from './wishlistProcessedImageRegistry';
 
 interface WishlistProductVisualProps {
   src: string;
@@ -123,26 +126,45 @@ export function WishlistProductVisual({
   wishId,
   className = '',
   loading = 'lazy',
-  processedSrc = null,
-  modeHint = null,
-  preference = DEFAULT_WISHLIST_IMAGE_PREFERENCE,
-  processingRevision = 0,
+  processedSrc,
+  modeHint,
+  preference,
+  processingRevision,
   onProcessingChange,
   onPersisted,
   onPersistenceError,
   onError,
 }: WishlistProductVisualProps) {
-  const initial = initialVisual({ src, wishId, processedSrc, modeHint, preference });
+  const registered = wishlistRegisteredImage(wishId, src);
+  const effectiveProcessedSrc = processedSrc ?? registered?.processedSrc ?? null;
+  const effectiveModeHint = modeHint ?? registered?.mode ?? null;
+  const effectivePreference = preference
+    ?? registered?.preference
+    ?? DEFAULT_WISHLIST_IMAGE_PREFERENCE;
+  const effectiveRevision = processingRevision ?? registered?.revision ?? 0;
+
+  const initial = initialVisual({
+    src,
+    wishId,
+    processedSrc: effectiveProcessedSrc,
+    modeHint: effectiveModeHint,
+    preference: effectivePreference,
+  });
   const [displaySrc, setDisplaySrc] = useState(initial.src);
   const [mode, setMode] = useState<WishlistImageDisplayMode>(initial.mode);
   const [processing, setProcessing] = useState(initial.processing);
 
   useEffect(() => {
     let active = true;
-    const direct = persistedVisual({ source: src, processedSrc, modeHint, preference });
+    const direct = persistedVisual({
+      source: src,
+      processedSrc: effectiveProcessedSrc,
+      modeHint: effectiveModeHint,
+      preference: effectivePreference,
+    });
     const stored = direct ? null : wishlistStoredVisual(wishId, src);
 
-    if (direct || (stored && wishlistResultMatchesPreference(preference, stored.mode))) {
+    if (direct || (stored && wishlistResultMatchesPreference(effectivePreference, stored.mode))) {
       const visual = direct ?? stored!;
       setDisplaySrc(visual.src);
       setMode(visual.mode);
@@ -154,14 +176,14 @@ export function WishlistProductVisual({
     }
 
     setDisplaySrc(src);
-    setMode(preference === 'photo-cover'
+    setMode(effectivePreference === 'photo-cover'
       ? 'photo-cover'
       : inferWishlistImageDisplayMode(src, wishlistImageMode(src)));
-    setProcessing(preference !== 'photo-cover');
-    onProcessingChange?.(preference !== 'photo-cover');
+    setProcessing(effectivePreference !== 'photo-cover');
+    onProcessingChange?.(effectivePreference !== 'photo-cover');
 
     void (async () => {
-      const visual = await processByPreference(src, preference, processingRevision);
+      const visual = await processByPreference(src, effectivePreference, effectiveRevision);
       if (!active) return;
 
       setDisplaySrc(visual.src);
@@ -172,8 +194,8 @@ export function WishlistProductVisual({
           wishId,
           sourceUrl: src,
           visual,
-          processingRevision,
-          previousProcessedUrl: processedSrc,
+          processingRevision: effectiveRevision,
+          previousProcessedUrl: effectiveProcessedSrc,
         });
         if (active) onPersisted?.(visual);
       } catch (error) {
@@ -199,13 +221,13 @@ export function WishlistProductVisual({
       active = false;
     };
   }, [
-    modeHint,
+    effectiveModeHint,
+    effectivePreference,
+    effectiveProcessedSrc,
+    effectiveRevision,
     onPersisted,
     onPersistenceError,
     onProcessingChange,
-    preference,
-    processedSrc,
-    processingRevision,
     src,
     wishId,
   ]);
