@@ -1,0 +1,149 @@
+/* Visual structure for the Wishlist editor.
+ * The underlying fields and save payload stay unchanged; this layer groups the
+ * existing controls into clear, scan-friendly sections.
+ */
+.wishlist .modal-sheet:has(#wish-title) {
+  gap: 10px;
+}
+
+.wishlist .modal-sheet:has(#wish-title) > .modal-title {
+  margin-bottom: 4px;
+  padding-right: 46px;
+}
+
+/* The optional ownership selector is context for a new wish, not part of the
+ * product details. Keep it visually separate from the numbered sections. */
+.wishlist .modal-sheet:has(#wish-title) .form-field:has(.tab-bar) {
+  margin: 2px 0 6px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.wishlist .modal-sheet:has(#wish-title) :is(
+  .form-field:has(#wish-title),
+  .form-field:has(#wish-link),
+  .form-field:has(.wm-photo-picker),
+  .form-field:has(#wish-price),
+  .form-field:has(#wish-priority),
+  .form-field:has(#wish-description)
+) {
+  position: relative;
+  margin: 0;
+  padding: 13px 14px 14px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow:
+    0 7px 20px color-mix(in srgb, var(--text) 5%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 44%, transparent);
+}
+
+/* Section starts. Pseudo headings avoid touching form state or validation. */
+.wishlist .modal-sheet:has(#wish-title) :is(
+  .form-field:has(#wish-title),
+  .form-field:has(.wm-photo-picker),
+  .form-field:has(#wish-price)
+) {
+  margin-top: 15px;
+}
+
+.wishlist .modal-sheet:has(#wish-title) :is(
+  .form-field:has(#wish-title),
+  .form-field:has(.wm-photo-picker),
+  .form-field:has(#wish-price)
+)::before {
+  display: flex;
+  width: fit-content;
+  min-height: 25px;
+  align-items: center;
+  margin: -28px 0 10px -2px;
+  padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.075em;
+  line-height: 1;
+  text-transform: uppercase;
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.wishlist .modal-sheet:has(#wish-title) .form-field:has(#wish-title)::before {
+  content: '1  Основне';
+}
+
+.wishlist .modal-sheet:has(#wish-title) .form-field:has(.wm-photo-picker)::before {
+  content: '2  Фото';
+}
+
+.wishlist .modal-sheet:has(#wish-title) .form-field:has(#wish-price)::before {
+  content: '3  Деталі';
+}
+
+/* Fields from the same section sit closer together, while sections retain a
+ * stronger break. */
+.wishlist .modal-sheet:has(#wish-title) :is(
+  .form-field:has(#wish-link),
+  .form-field:has(#wish-priority),
+  .form-field:has(#wish-description)
+) {
+  margin-top: -3px;
+}
+
+.wishlist .modal-sheet:has(#wish-title) .form-field > span:first-child {
+  margin-bottom: 7px;
+}
+
+.wishlist .modal-sheet:has(#wish-title) .wm-field-hint {
+  margin-bottom: 10px;
+}
+
+.wishlist .modal-sheet:has(#wish-title) .wm-photo-picker {
+  align-items: stretch;
+}
+
+.wishlist .modal-sheet:has(#wish-title) .wm-photo-actions {
+  align-content: center;
+}
+
+.wishlist .modal-sheet:has(#wish-title) .modal-actions {
+  margin-top: 8px;
+}
+
+@media (max-width: 560px) {
+  .wishlist .modal-sheet:has(#wish-title) {
+    gap: 9px;
+  }
+
+  .wishlist .modal-sheet:has(#wish-title) :is(
+    .form-field:has(#wish-title),
+    .form-field:has(#wish-link),
+    .form-field:has(.wm-photo-picker),
+    .form-field:has(#wish-price),
+    .form-field:has(#wish-priority),
+    .form-field:has(#wish-description)
+  ) {
+    padding: 12px;
+    border-radius: 16px;
+  }
+
+  .wishlist .modal-sheet:has(#wish-title) :is(
+    .form-field:has(#wish-title),
+    .form-field:has(.wm-photo-picker),
+    .form-field:has(#wish-price)
+  ) {
+    margin-top: 17px;
+  }
+
+  .wishlist .modal-sheet:has(#wish-title) :is(
+    .form-field:has(#wish-title),
+    .form-field:has(.wm-photo-picker),
+    .form-field:has(#wish-price)
+  )::before {
+    margin-top: -27px;
+  }
+}
