@@ -68,9 +68,10 @@ function cornerAverage(
   let g = 0;
   let b = 0;
   let count = 0;
-  const step = Math.max(1, Math.floor(Math.min(patchWidth, patchHeight) / 12));
+  const safePatchHeight = Math.min(patchHeight, height - startY);
+  const step = Math.max(1, Math.floor(Math.min(patchWidth, safePatchHeight) / 12));
 
-  for (let y = startY; y < startY + patchHeight; y += step) {
+  for (let y = startY; y < startY + safePatchHeight; y += step) {
     for (let x = startX; x < startX + patchWidth; x += step) {
       const offset = (y * width + x) * 4;
       if ((pixels[offset + 3] ?? 0) < 20) continue;
