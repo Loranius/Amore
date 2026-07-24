@@ -1,149 +1,130 @@
-/* Visual structure for the Wishlist editor.
- * The underlying fields and save payload stay unchanged; this layer groups the
- * existing controls into clear, scan-friendly sections.
- */
-.wishlist .modal-sheet:has(#wish-title) {
-  gap: 10px;
+/* Structured, task-oriented layout for the Wishlist editor. */
+.wishlist .wm-form-modal {
+  width: min(94vw, 540px);
+  gap: 14px;
 }
 
-.wishlist .modal-sheet:has(#wish-title) > .modal-title {
-  margin-bottom: 4px;
-  padding-right: 46px;
+.wishlist .wm-form-heading {
+  display: grid;
+  gap: 4px;
+  padding-right: 42px;
 }
 
-/* The optional ownership selector is context for a new wish, not part of the
- * product details. Keep it visually separate from the numbered sections. */
-.wishlist .modal-sheet:has(#wish-title) .form-field:has(.tab-bar) {
-  margin: 2px 0 6px;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
-}
-
-.wishlist .modal-sheet:has(#wish-title) :is(
-  .form-field:has(#wish-title),
-  .form-field:has(#wish-link),
-  .form-field:has(.wm-photo-picker),
-  .form-field:has(#wish-price),
-  .form-field:has(#wish-priority),
-  .form-field:has(#wish-description)
-) {
-  position: relative;
-  margin: 0;
-  padding: 13px 14px 14px;
-  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 17px;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow:
-    0 7px 20px color-mix(in srgb, var(--text) 5%, transparent),
-    inset 0 1px 0 color-mix(in srgb, white 44%, transparent);
-}
-
-/* Section starts. Pseudo headings avoid touching form state or validation. */
-.wishlist .modal-sheet:has(#wish-title) :is(
-  .form-field:has(#wish-title),
-  .form-field:has(.wm-photo-picker),
-  .form-field:has(#wish-price)
-) {
-  margin-top: 15px;
-}
-
-.wishlist .modal-sheet:has(#wish-title) :is(
-  .form-field:has(#wish-title),
-  .form-field:has(.wm-photo-picker),
-  .form-field:has(#wish-price)
-)::before {
-  display: flex;
-  width: fit-content;
-  min-height: 25px;
-  align-items: center;
-  margin: -28px 0 10px -2px;
-  padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
-  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+.wishlist .wm-form-eyebrow {
+  color: var(--accent);
   font-size: 10px;
   font-weight: 900;
-  letter-spacing: 0.075em;
-  line-height: 1;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
-  box-shadow: 0 5px 14px color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
-.wishlist .modal-sheet:has(#wish-title) .form-field:has(#wish-title)::before {
-  content: '1  Основне';
+.wishlist .wm-form-heading > p {
+  margin: 0;
+  color: color-mix(in srgb, var(--muted) 84%, var(--text));
+  font-size: 13px;
+  line-height: 1.45;
 }
 
-.wishlist .modal-sheet:has(#wish-title) .form-field:has(.wm-photo-picker)::before {
-  content: '2  Фото';
+.wishlist .wm-form-section {
+  display: grid;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--text) 5%);
+  border-radius: 21px;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent) 5%, var(--surface)),
+      color-mix(in srgb, var(--surface) 97%, transparent)
+    );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 46%, transparent);
 }
 
-.wishlist .modal-sheet:has(#wish-title) .form-field:has(#wish-price)::before {
-  content: '3  Деталі';
+.wishlist .wm-form-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-bottom: 1px;
 }
 
-/* Fields from the same section sit closer together, while sections retain a
- * stronger break. */
-.wishlist .modal-sheet:has(#wish-title) :is(
-  .form-field:has(#wish-link),
-  .form-field:has(#wish-priority),
-  .form-field:has(#wish-description)
-) {
-  margin-top: -3px;
+.wishlist .wm-form-section-index {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 82%, var(--text));
+  font-size: 12px;
+  font-weight: 900;
 }
 
-.wishlist .modal-sheet:has(#wish-title) .form-field > span:first-child {
-  margin-bottom: 7px;
+.wishlist .wm-form-section-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
-.wishlist .modal-sheet:has(#wish-title) .wm-field-hint {
-  margin-bottom: 10px;
+.wishlist .wm-form-section-head p {
+  margin: 2px 0 0;
+  color: color-mix(in srgb, var(--muted) 84%, var(--text));
+  font-size: 11px;
+  line-height: 1.35;
 }
 
-.wishlist .modal-sheet:has(#wish-title) .wm-photo-picker {
-  align-items: stretch;
+.wishlist .wm-form-section > .form-field,
+.wishlist .wm-form-detail-grid > .form-field {
+  margin: 0;
 }
 
-.wishlist .modal-sheet:has(#wish-title) .wm-photo-actions {
-  align-content: center;
+.wishlist .wm-form-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
 }
 
-.wishlist .modal-sheet:has(#wish-title) .modal-actions {
-  margin-top: 8px;
+.wishlist .wm-form-section textarea {
+  min-height: 96px;
+}
+
+.wishlist .wm-form-section .tab-bar {
+  width: 100%;
 }
 
 @media (max-width: 560px) {
-  .wishlist .modal-sheet:has(#wish-title) {
-    gap: 9px;
+  .wishlist .wm-form-modal {
+    gap: 12px;
   }
 
-  .wishlist .modal-sheet:has(#wish-title) :is(
-    .form-field:has(#wish-title),
-    .form-field:has(#wish-link),
-    .form-field:has(.wm-photo-picker),
-    .form-field:has(#wish-price),
-    .form-field:has(#wish-priority),
-    .form-field:has(#wish-description)
-  ) {
-    padding: 12px;
-    border-radius: 16px;
+  .wishlist .wm-form-heading {
+    padding-inline: 2px 44px;
   }
 
-  .wishlist .modal-sheet:has(#wish-title) :is(
-    .form-field:has(#wish-title),
-    .form-field:has(.wm-photo-picker),
-    .form-field:has(#wish-price)
-  ) {
-    margin-top: 17px;
+  .wishlist .wm-form-section {
+    gap: 12px;
+    padding: 14px;
+    border-radius: 19px;
   }
 
-  .wishlist .modal-sheet:has(#wish-title) :is(
-    .form-field:has(#wish-title),
-    .form-field:has(.wm-photo-picker),
-    .form-field:has(#wish-price)
-  )::before {
-    margin-top: -27px;
+  .wishlist .wm-form-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .wishlist .wm-form-section {
+    padding-inline: 12px;
+  }
+
+  .wishlist .wm-form-section-index {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
   }
 }
