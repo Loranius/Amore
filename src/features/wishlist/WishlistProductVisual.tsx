@@ -25,18 +25,18 @@ import {
 interface WishlistProductVisualProps {
   src: string;
   alt: string;
-  wishId?: number;
-  className?: string;
-  loading?: 'eager' | 'lazy';
-  processedSrc?: string | null;
-  modeHint?: WishlistImageDisplayMode | null;
-  preference?: WishlistImagePreference;
-  processingRevision?: number;
-  persistenceEnabled?: boolean;
-  onProcessingChange?: (processing: boolean) => void;
-  onPersisted?: (visual: { src: string; mode: WishlistImageDisplayMode }) => void;
-  onPersistenceError?: () => void;
-  onError?: () => void;
+  wishId?: number | undefined;
+  className?: string | undefined;
+  loading?: 'eager' | 'lazy' | undefined;
+  processedSrc?: string | null | undefined;
+  modeHint?: WishlistImageDisplayMode | null | undefined;
+  preference?: WishlistImagePreference | undefined;
+  processingRevision?: number | undefined;
+  persistenceEnabled?: boolean | undefined;
+  onProcessingChange?: ((processing: boolean) => void) | undefined;
+  onPersisted?: ((visual: { src: string; mode: WishlistImageDisplayMode }) => void) | undefined;
+  onPersistenceError?: (() => void) | undefined;
+  onError?: (() => void) | undefined;
 }
 
 interface VisualState {
@@ -47,8 +47,8 @@ interface VisualState {
 
 function persistedVisual(input: {
   source: string;
-  processedSrc?: string | null;
-  modeHint?: WishlistImageDisplayMode | null;
+  processedSrc?: string | null | undefined;
+  modeHint?: WishlistImageDisplayMode | null | undefined;
   preference: WishlistImagePreference;
 }): Omit<VisualState, 'processing'> | null {
   const { source, processedSrc, modeHint, preference } = input;
@@ -91,9 +91,9 @@ async function processByPreference(
 
 function initialVisual(input: {
   src: string;
-  wishId?: number;
-  processedSrc?: string | null;
-  modeHint?: WishlistImageDisplayMode | null;
+  wishId?: number | undefined;
+  processedSrc?: string | null | undefined;
+  modeHint?: WishlistImageDisplayMode | null | undefined;
   preference: WishlistImagePreference;
 }): VisualState {
   const persisted = persistedVisual({
