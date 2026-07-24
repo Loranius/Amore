@@ -55,22 +55,22 @@ describe('wishlist processed image registry', () => {
     const source = 'https://shop.example/registry-shared-c.jpg';
     registerWishlistProcessedRows([
       {
+        ...DEFAULTS,
         id: 103,
         image_url: source,
         processed_image_url: null,
         image_mode: 'photo-cover',
         image_preference: 'photo-cover',
         image_processing_revision: 1,
-        ...DEFAULTS,
       },
       {
+        ...DEFAULTS,
         id: 104,
         image_url: source,
         processed_image_url: 'https://project.supabase.co/storage/v1/object/public/wishlist-photos/processed/104/b.webp',
         image_mode: 'portrait-cutout',
         image_preference: 'portrait-cutout',
         image_processing_revision: 2,
-        ...DEFAULTS,
       },
     ]);
 
