@@ -212,6 +212,13 @@ export function WishCard({
   };
 
   const imageAvailable = Boolean(item.image_url) && !imageFailed;
+  const imageVisualProps = {
+    wishId: item.id,
+    processedSrc: item.processed_image_url,
+    modeHint: item.image_mode,
+    preference: item.image_preference,
+    processingRevision: item.image_processing_revision,
+  } as const;
 
   const detailsSheet = detailsOpen && typeof document !== 'undefined'
     ? createPortal(
@@ -255,6 +262,7 @@ export function WishCard({
                         alt={item.title}
                         className="wl-cloud-sheet-photo-visual"
                         loading="eager"
+                        {...imageVisualProps}
                         onError={() => setImageFailed(true)}
                       />
                     </button>
@@ -387,6 +395,7 @@ export function WishCard({
               src={item.image_url ?? ''}
               alt=""
               className="wl-cloud-bubble-media"
+              {...imageVisualProps}
               onError={() => setImageFailed(true)}
             />
           ) : (
