@@ -9,6 +9,7 @@ import {
   isWishlistTransparentDisplayMode,
   type WishlistImageDisplayMode,
 } from './wishlistImageModes';
+import { resolveWishlistPortrait } from './wishlistPortraitSegmentation';
 
 interface WishlistProductVisualProps {
   src: string;
@@ -53,12 +54,23 @@ export function WishlistProductVisual({
     }
 
     setProcessing(nextProcessingMode !== 'cutout');
-    void resolveWishlistImage(src).then((result) => {
+    void (async () => {
+      const productResult = await resolveWishlistImage(src);
       if (!active) return;
-      setDisplaySrc(result.src);
-      setMode(inferWishlistImageDisplayMode(result.src, result.mode));
+
+      if (productResult.mode === 'cutout') {
+        setDisplaySrc(productResult.src);
+        setMode('product-cutout');
+        setProcessing(false);
+        return;
+      }
+
+      const portraitResult = await resolveWishlistPortrait(src);
+      if (!active) return;
+      setDisplaySrc(portraitResult.src);
+      setMode(portraitResult.mode);
       setProcessing(false);
-    });
+    })();
 
     return () => {
       active = false;
