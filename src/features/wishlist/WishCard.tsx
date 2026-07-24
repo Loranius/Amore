@@ -13,6 +13,7 @@ import {
   wishlistCloudPlacement,
   wishlistCloudPriorityPresentation,
 } from './wishlistCloudLayout';
+import { WishlistProductVisual } from './WishlistProductVisual';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistCloud.css';
 import './wishlistCloudModalFix.css';
@@ -249,7 +250,13 @@ export function WishCard({
                       aria-label={`Відкрити фото: ${item.title}`}
                       onClick={() => closeAndRun(() => onPhotoClick(item.image_url ?? ''))}
                     >
-                      <img src={item.image_url ?? ''} alt={item.title} />
+                      <WishlistProductVisual
+                        src={item.image_url ?? ''}
+                        alt={item.title}
+                        className="wl-cloud-sheet-photo-visual"
+                        loading="eager"
+                        onError={() => setImageFailed(true)}
+                      />
                     </button>
                   ) : (
                     <div className="wl-cloud-sheet-photo" aria-label="Мрія без фото">
@@ -376,15 +383,12 @@ export function WishCard({
           onClick={() => setDetailsOpen(true)}
         >
           {imageAvailable ? (
-            <span className="wl-cloud-bubble-media">
-              <img
-                src={item.image_url ?? ''}
-                alt=""
-                loading="lazy"
-                decoding="async"
-                onError={() => setImageFailed(true)}
-              />
-            </span>
+            <WishlistProductVisual
+              src={item.image_url ?? ''}
+              alt=""
+              className="wl-cloud-bubble-media"
+              onError={() => setImageFailed(true)}
+            />
           ) : (
             <span className="wl-cloud-bubble-placeholder" aria-hidden="true">♡</span>
           )}
