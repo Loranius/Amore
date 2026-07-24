@@ -1,4 +1,5 @@
 import {
+  remoteImageFile,
   resolveWishlistImage,
 } from './wishlistImageCutout';
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
@@ -54,6 +55,9 @@ async function processByPreference(
   const candidate = processingSource(src, revision, processorVersion);
   for (const step of steps) {
     if (step === 'product') {
+      if (preference === 'product-cutout') {
+        await remoteImageFile(candidate);
+      }
       const result = await resolveWishlistImage(candidate);
       if (result.mode === 'cutout') {
         return { src: result.src, mode: 'product-cutout' };
