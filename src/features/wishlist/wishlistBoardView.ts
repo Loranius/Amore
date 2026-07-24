@@ -1,6 +1,6 @@
 import type { WishlistItemV3 } from './wishlistRpc';
 
-export type WishlistPriorityFilter = 'all' | 'dream' | 'high' | 'medium' | 'low';
+export type WishlistPriorityFilter = 'all' | 'high' | 'medium' | 'low';
 export type WishlistSort = 'newest' | 'priority' | 'price';
 
 export interface WishlistBoardViewState {
@@ -11,10 +11,9 @@ export interface WishlistBoardViewState {
 }
 
 const PRIORITY_RANK: Record<string, number> = {
-  dream: 0,
-  high: 1,
-  medium: 2,
-  low: 3,
+  high: 0,
+  medium: 1,
+  low: 2,
 };
 
 export const DEFAULT_WISHLIST_BOARD_VIEW: WishlistBoardViewState = {
@@ -23,7 +22,9 @@ export const DEFAULT_WISHLIST_BOARD_VIEW: WishlistBoardViewState = {
 };
 
 function priorityValue(item: WishlistItemV3): string {
-  return String(item.priority ?? '');
+  const value = String(item.priority ?? '');
+  // Compatibility for a cached row during the production data migration.
+  return value === 'dream' ? 'high' : value;
 }
 
 function matchesPriority(item: WishlistItemV3, filter: WishlistPriorityFilter): boolean {
@@ -60,7 +61,6 @@ export function applyWishlistBoardView(
 export function wishlistPriorityFilterCounts(items: WishlistItemV3[]) {
   return {
     all: items.length,
-    dream: items.filter((item) => priorityValue(item) === 'dream').length,
     high: items.filter((item) => priorityValue(item) === 'high').length,
     medium: items.filter((item) => priorityValue(item) === 'medium').length,
     low: items.filter((item) => priorityValue(item) === 'low').length,
