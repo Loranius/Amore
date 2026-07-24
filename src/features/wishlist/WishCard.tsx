@@ -13,14 +13,12 @@ import './wishlistV3.css';
 import './wishlistCardRedesign.css';
 
 const PRIORITY_LABELS: Record<string, string> = {
-  dream: 'Мрія',
   high: 'Дуже хочу',
   medium: 'Хочу',
   low: 'Колись',
 };
 
 const PRIORITY_ICONS: Record<string, string> = {
-  dream: '♥',
   high: '✦',
   medium: '◆',
   low: '○',
@@ -77,6 +75,9 @@ export function WishCard({
     reserved: item.reserved,
     canManageReservation,
   });
+  const displayPriority = item.priority && String(item.priority) === 'dream'
+    ? 'high'
+    : item.priority;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -249,10 +250,10 @@ export function WishCard({
         <div className="wl-card-v3-media-shade" aria-hidden="true" />
 
         <div className="wl-card-v3-topline">
-          {item.priority && (
-            <span className={`wl-priority-v3 wl-priority-v3--${item.priority}`}>
-              <span aria-hidden="true">{PRIORITY_ICONS[item.priority] ?? '•'}</span>
-              {PRIORITY_LABELS[item.priority] ?? item.priority}
+          {displayPriority && (
+            <span className={`wl-priority-v3 wl-priority-v3--${displayPriority}`}>
+              <span aria-hidden="true">{PRIORITY_ICONS[displayPriority] ?? '•'}</span>
+              {PRIORITY_LABELS[displayPriority] ?? displayPriority}
             </span>
           )}
 
