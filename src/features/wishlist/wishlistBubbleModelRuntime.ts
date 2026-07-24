@@ -1,19 +1,16 @@
 import {
-  type BufferGeometry,
   DoubleSide,
   Mesh,
   MeshBasicMaterial,
   OrthographicCamera,
   Scene,
+  SphereGeometry,
   SRGBColorSpace,
   type Texture,
   TextureLoader,
   WebGLRenderer,
 } from 'three';
-import {
-  createWishlistBubbleGeometry,
-  WISHLIST_BUBBLE_TEXTURE_URL,
-} from './wishlistBubbleModelData';
+import { WISHLIST_BUBBLE_TEXTURE_URL } from './wishlistBubbleModelData';
 
 const BUBBLE_SELECTOR = '.wishlist .wl-cloud-bubble';
 const LOCAL_BUBBLE_SELECTOR = '.wl-cloud-bubble';
@@ -27,11 +24,11 @@ interface BubbleController {
 }
 
 const controllers = new Map<HTMLElement, BubbleController>();
-let bubbleGeometry: BufferGeometry | null = null;
+let bubbleGeometry: SphereGeometry | null = null;
 let bubbleTexturePromise: Promise<Texture> | null = null;
 
-function geometry(): BufferGeometry {
-  if (!bubbleGeometry) bubbleGeometry = createWishlistBubbleGeometry();
+function geometry(): SphereGeometry {
+  bubbleGeometry ??= new SphereGeometry(1, 32, 20);
   return bubbleGeometry;
 }
 
