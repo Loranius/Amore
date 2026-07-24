@@ -11,20 +11,22 @@ const INITIAL: WishFormDraftSnapshot = {
   description: 'Чорні',
 };
 
+const SNAPSHOT_KEYS: Array<keyof WishFormDraftSnapshot> = [
+  'scope',
+  'title',
+  'link',
+  'imageUrl',
+  'price',
+  'priority',
+  'description',
+];
+
 describe('hasUnsavedWishChanges', () => {
   it('keeps an untouched form clean', () => {
     expect(hasUnsavedWishChanges(INITIAL, { ...INITIAL }, false)).toBe(false);
   });
 
-  it.each<keyof WishFormDraftSnapshot>([
-    'scope',
-    'title',
-    'link',
-    'imageUrl',
-    'price',
-    'priority',
-    'description',
-  ])('detects a changed %s field', (key) => {
+  it.each(SNAPSHOT_KEYS)('detects a changed %s field', (key) => {
     expect(
       hasUnsavedWishChanges(
         INITIAL,
