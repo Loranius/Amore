@@ -64,30 +64,34 @@ select pg_temp.pi_assert(
 
 select pg_temp.pi_set_actor((select email from pg_temp.processed_image_users where slot = 1));
 
-insert into pg_temp.processed_image_state(wish_id, original_version)
-select created.id, listed.version
-from (
-  select public.create_wishlist_item_idempotent_v3(
-    gen_random_uuid(),
-    'Processed image integration wish',
-    (select id from pg_temp.processed_image_users where slot = 1),
-    false,
-    'Image cache test',
-    null,
-    'https://shop.example/original-a.jpg',
-    1200,
-    'high'
-  ) as id
-) created
-cross join lateral (
-  select w.version
-  from public.get_wishlist_items_v3(
-    (select id from pg_temp.processed_image_users where slot = 1),
-    false,
-    false
-  ) w
-  where w.id = created.id
-) listed;
+insert into pg_temp.processed_image_state(wish_id)
+select public.create_wishlist_item_idempotent_v3(
+  gen_random_uuid(),
+  'Processed image integration wish',
+  (select id from pg_temp.processed_image_users where slot = 1),
+  false,
+  'Image cache test',
+  null,
+  'https://shop.example/original-a.jpg',
+  1200,
+  'high'
+);
+
+-- Function side effects become visible to the next statement, not to a lateral
+-- read in the same statement snapshot.
+update pg_temp.processed_image_state state
+set original_version = listed.version
+from public.get_wishlist_items_v3(
+  (select id from pg_temp.processed_image_users where slot = 1),
+  false,
+  false
+) listed
+where listed.id = state.wish_id;
+
+select pg_temp.pi_assert(
+  'created_wish_is_readable',
+  (select wish_id is not null and original_version = 1 from pg_temp.processed_image_state)
+);
 
 select public.set_wishlist_processed_image_v3(
   (select wish_id from pg_temp.processed_image_state),
