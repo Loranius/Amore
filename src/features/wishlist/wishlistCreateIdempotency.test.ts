@@ -13,6 +13,7 @@ const baseInput: WishlistCreateRequestInput = {
     description: null,
     link: null,
     image_url: null,
+    image_preference: 'auto',
     price: null,
     priority: 'medium',
   },
@@ -49,6 +50,23 @@ describe('Wishlist create idempotency', () => {
     };
 
     expect(wishlistCreateRequestKey(second)).not.toBe(wishlistCreateRequestKey(first));
+  });
+
+  it('keeps the same domain create request when only presentation preference changes', () => {
+    const first = {
+      ...baseInput,
+      payload: {
+        ...baseInput.payload,
+        image_url: 'https://example.com/item.webp',
+        image_preference: 'auto' as const,
+      },
+    };
+    const retry = {
+      ...first,
+      payload: { ...first.payload, image_preference: 'portrait-cutout' as const },
+    };
+
+    expect(wishlistCreateRequestKey(retry)).toBe(wishlistCreateRequestKey(first));
   });
 
   it('reuses a request id until the command settles', () => {
