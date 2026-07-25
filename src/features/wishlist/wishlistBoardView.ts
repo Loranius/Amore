@@ -2,12 +2,14 @@ import type { WishlistItemV3 } from './wishlistRpc';
 
 export type WishlistPriorityFilter = 'all' | 'high' | 'medium' | 'low';
 export type WishlistSort = 'newest' | 'priority' | 'price';
+export type WishlistViewMode = 'bubbles' | 'table' | 'polaroid';
 
 export interface WishlistBoardViewState {
   priority: WishlistPriorityFilter;
   // Sorting is no longer exposed in the UI. Keep the stable default internally
   // for backward-compatible per-tab state without changing WishlistPage orchestration.
   sort: WishlistSort;
+  view: WishlistViewMode;
 }
 
 const PRIORITY_RANK: Record<string, number> = {
@@ -19,6 +21,7 @@ const PRIORITY_RANK: Record<string, number> = {
 export const DEFAULT_WISHLIST_BOARD_VIEW: WishlistBoardViewState = {
   priority: 'all',
   sort: 'newest',
+  view: 'bubbles',
 };
 
 function priorityValue(item: WishlistItemV3): string {
