@@ -361,7 +361,18 @@ export function WishlistPage() {
         />
       )}
 
-      <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
+      <div className="wl-wishlist-controls">
+        <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
+
+        {!archiveOpen && !isPending && !isError && contextItems.length > 0 && (
+          <WishlistBoardToolbar
+            value={activeBoardView}
+            counts={boardFilterCounts}
+            resultCount={visibleItems.length}
+            onChange={changeBoardView}
+          />
+        )}
+      </div>
 
       {archiveOpen && canShowArchive ? (
         <WishArchive
@@ -390,15 +401,6 @@ export function WishlistPage() {
               partnerName={partner.name}
               counts={sharedCounts}
               onChange={setSharedFilter}
-            />
-          )}
-
-          {!isPending && !isError && contextItems.length > 0 && (
-            <WishlistBoardToolbar
-              value={activeBoardView}
-              counts={boardFilterCounts}
-              resultCount={visibleItems.length}
-              onChange={changeBoardView}
             />
           )}
 

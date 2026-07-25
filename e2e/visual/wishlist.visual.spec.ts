@@ -38,10 +38,6 @@ test.describe('Amore mobile visual preview', () => {
     const wishlist = page.locator('.wishlist');
     await expect(wishlist).toBeVisible();
 
-    const grid = page.locator('.wishlist-grid');
-    await expect(grid).toBeVisible();
-    await grid.scrollIntoViewIfNeeded();
-
     // Let images and layout settle while reduced-motion keeps the capture stable.
     await page.waitForTimeout(1_200);
 
@@ -50,8 +46,27 @@ test.describe('Amore mobile visual preview', () => {
       fullPage: true,
     });
 
+    const controls = page.locator('.wl-wishlist-controls');
+    await expect(controls).toBeVisible();
+    await controls.screenshot({
+      path: testInfo.outputPath('03-wishlist-controls-collapsed.png'),
+    });
+
+    const priorityToggle = page.locator('.wl-board-toolbar-toggle');
+    if (await priorityToggle.isVisible()) {
+      await priorityToggle.click();
+      await expect(page.locator('.wl-board-toolbar-panel')).toBeVisible();
+      await controls.screenshot({
+        path: testInfo.outputPath('04-wishlist-controls-expanded.png'),
+      });
+      await priorityToggle.click();
+    }
+
+    const grid = page.locator('.wishlist-grid');
+    await expect(grid).toBeVisible();
+    await grid.scrollIntoViewIfNeeded();
     await grid.screenshot({
-      path: testInfo.outputPath('03-wishlist-bubbles.png'),
+      path: testInfo.outputPath('05-wishlist-bubbles.png'),
     });
   });
 });
