@@ -62,6 +62,16 @@ function stableHash(value: string): number {
   return hash >>> 0;
 }
 
+function freshPolaroidSeed(): number {
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const value = new Uint32Array(1);
+    crypto.getRandomValues(value);
+    return value[0] ?? Date.now();
+  }
+
+  return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
+}
+
 function wishTitle(button: HTMLButtonElement): string {
   const label = button.getAttribute('aria-label') ?? '';
   return label.match(/«(.+?)»/)?.[1] ?? label;
@@ -87,6 +97,7 @@ export function WishlistBoardToolbar({
 }: WishlistBoardToolbarProps) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
+  const [polaroidSeed, setPolaroidSeed] = useState(freshPolaroidSeed);
   const selected = PRIORITY_FILTERS.find((filter) => filter.value === value.priority)
     ?? DEFAULT_PRIORITY_FILTER;
   const selectedView = VIEW_MODES.find((mode) => mode.value === value.view) ?? VIEW_MODES[0]!;
@@ -125,11 +136,17 @@ export function WishlistBoardToolbar({
           return;
         }
 
-        const hash = stableHash(`${title}:${index}`);
-        child.style.setProperty('--wl-polaroid-rotate', hash % 2 === 0 ? '-4deg' : '4deg');
-        child.style.setProperty('--wl-polaroid-x', `${((hash >>> 4) % 9) - 4}px`);
-        child.style.setProperty('--wl-polaroid-y', `${((hash >>> 8) % 15) - 7}px`);
-        child.style.setProperty('--wl-polaroid-tape-rotate', `${((hash >>> 12) % 7) - 3}deg`);
+        const hash = stableHash(`${polaroidSeed}:${title}:${index}`);
+        const direction = (hash & 1) === 0 ? -1 : 1;
+        const horizontalOffset = direction * (10 + ((hash >>> 4) % 19));
+
+        child.style.setProperty(
+          '--wl-polaroid-rotate',
+          ((hash >>> 1) & 1) === 0 ? '-4deg' : '4deg',
+        );
+        child.style.setProperty('--wl-polaroid-x', `${horizontalOffset}px`);
+        child.style.setProperty('--wl-polaroid-y', `${((hash >>> 9) % 17) - 8}px`);
+        child.style.setProperty('--wl-polaroid-tape-rotate', `${((hash >>> 14) % 7) - 3}deg`);
       });
     };
 
@@ -161,13 +178,14 @@ export function WishlistBoardToolbar({
         clearPolaroidVariables(item);
       });
     };
-  }, [value.view]);
+  }, [polaroidSeed, value.view]);
 
   const selectPriority = (priority: WishlistPriorityFilter) => {
     onChange({ ...value, priority });
   };
 
   const selectView = (view: WishlistViewMode) => {
+    if (view === 'polaroid') setPolaroidSeed(freshPolaroidSeed());
     onChange({ ...value, view });
   };
 
