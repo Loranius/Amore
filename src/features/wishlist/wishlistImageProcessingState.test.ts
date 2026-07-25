@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION,
+  isWishlistImageProcessingStaleError,
   wishlistImageProcessingErrorCode,
   wishlistImageResultFresh,
   wishlistImageResultUsable,
@@ -67,6 +68,18 @@ describe('Wishlist image processing state', () => {
     expect(wishlistImageRetryDelayMs(1)).toBe(750);
     expect(wishlistImageRetryDelayMs(2_500)).toBe(2_500);
     expect(wishlistImageRetryDelayMs(999_999)).toBe(120_000);
+  });
+
+  it('treats obsolete image worker generations as terminal', () => {
+    expect(isWishlistImageProcessingStaleError(
+      new Error('image_processing_preference_changed'),
+    )).toBe(true);
+    expect(isWishlistImageProcessingStaleError(
+      new Error('image_processing_revision_changed'),
+    )).toBe(true);
+    expect(isWishlistImageProcessingStaleError(
+      new Error('temporary network failure'),
+    )).toBe(false);
   });
 
   it('maps internal failures to non-sensitive error codes', () => {

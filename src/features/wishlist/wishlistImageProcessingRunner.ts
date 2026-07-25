@@ -9,6 +9,7 @@ import {
 } from './wishlistImagePreference';
 import {
   CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION,
+  isWishlistImageProcessingStaleError,
   wishlistImageProcessingErrorCode,
   type WishlistImageProcessingStatus,
 } from './wishlistImageProcessingState';
@@ -37,6 +38,8 @@ export type WishlistImageProcessingRunResult =
     };
 
 const pendingRuns = new Map<string, Promise<WishlistImageProcessingRunResult>>();
+const staleRuns = new Set<string>();
+const MAX_REMEMBERED_STALE_RUNS = 256;
 
 function processingSource(src: string, revision: number, processorVersion: number): string {
   const withoutFragment = src.split('#', 1)[0] ?? src;
@@ -94,6 +97,14 @@ function environmentDeferred(): WishlistImageProcessingRunResult {
     status: 'pending',
     retryAfterMs: null,
   };
+}
+
+function rememberStaleRun(key: string): void {
+  if (staleRuns.size >= MAX_REMEMBERED_STALE_RUNS) {
+    const oldest = staleRuns.values().next().value as string | undefined;
+    if (oldest) staleRuns.delete(oldest);
+  }
+  staleRuns.add(key);
 }
 
 async function runPersistedProcessing(input: {
@@ -206,6 +217,8 @@ export async function runWishlistImageProcessing(input: {
     processingRevision: input.processingRevision,
     processorVersion,
   });
+  if (staleRuns.has(key)) return environmentDeferred();
+
   const current = pendingRuns.get(key);
   if (current) return current;
 
@@ -219,6 +232,10 @@ export async function runWishlistImageProcessing(input: {
       processingRevision: input.processingRevision,
       processorVersion,
     });
+  }).catch((error) => {
+    if (!isWishlistImageProcessingStaleError(error)) throw error;
+    rememberStaleRun(key);
+    return environmentDeferred();
   }).finally(() => {
     pendingRuns.delete(key);
   });
