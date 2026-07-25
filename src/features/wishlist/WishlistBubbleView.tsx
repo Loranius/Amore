@@ -1,3 +1,4 @@
+import { useMemo, useRef } from 'react';
 import { WishCard } from './WishCard';
 import { WishlistBubbleCard } from './WishlistBubbleCard';
 import { WishlistBubblePhysics } from './WishlistBubblePhysics';
@@ -30,9 +31,19 @@ export function WishlistBubbleView({
   onFulfill,
   onMove,
 }: WishlistBubbleViewProps) {
+  const boardRef = useRef<HTMLDivElement>(null);
+  const contentKey = useMemo(
+    () => items.map((item) => `${item.id}:${item.version}`).join('|'),
+    [items],
+  );
+
   return (
     <>
-      <div className="wishlist-grid wl-bubble-view" aria-label="Бульбашки бажань">
+      <div
+        ref={boardRef}
+        className="wishlist-grid wl-bubble-view"
+        aria-label="Бульбашки бажань"
+      >
         {items.map((item) => (
           <WishCard
             key={item.id}
@@ -58,7 +69,7 @@ export function WishlistBubbleView({
           />
         ))}
       </div>
-      <WishlistBubblePhysics />
+      <WishlistBubblePhysics containerRef={boardRef} contentKey={contentKey} />
     </>
   );
 }
