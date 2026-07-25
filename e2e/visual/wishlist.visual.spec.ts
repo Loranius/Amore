@@ -42,7 +42,7 @@ test.describe('Amore mobile visual preview', () => {
     await expect(grid).toBeVisible();
     await grid.scrollIntoViewIfNeeded();
 
-    // Let images and layout settle while reduced-motion keeps the capture stable.
+    // Keep authenticated visual captures deterministic before taking screenshots.
     await page.waitForTimeout(1_200);
 
     await page.screenshot({
