@@ -1,24 +1,18 @@
-import { useEffect, useId, useState } from 'react';
-import { useCurrentUser } from '@/providers/AuthProvider';
-import { usePartnerQuery } from '@/features/_shared/useUsers';
-import { useSharedWishlistItems, useWishlistItems } from './useWishlist';
-import { wishlistCloudPriorityPresentation } from './wishlistCloudLayout';
-import type { WishlistItemV3 } from './wishlistRpc';
+import { useId, useState } from 'react';
 import type {
   WishlistBoardViewState,
   WishlistPriorityFilter,
   WishlistViewMode,
 } from './wishlistBoardView';
-import type { WishlistTabScope } from './useWishlistViewPreference';
 import './wishlistBoardToolbar.css';
 import './wishlistMobilePolish.css';
 
 interface WishlistBoardToolbarProps {
-  scope: WishlistTabScope;
   value: WishlistBoardViewState;
   counts: Record<WishlistPriorityFilter, number>;
   resultCount: number;
   onChange: (value: WishlistBoardViewState) => void;
+  onPolaroidReshuffle: () => void;
 }
 
 const PRIORITY_FILTERS: Array<{ value: WishlistPriorityFilter; label: string; icon: string }> = [
@@ -45,156 +39,25 @@ const DEFAULT_PRIORITY_FILTER = {
   icon: '✦',
 } satisfies { value: WishlistPriorityFilter; label: string; icon: string };
 
-function stableHash(value: string): number {
-  let hash = 2166136261;
-  for (let index = 0; index < value.length; index += 1) {
-    hash ^= value.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-function freshPolaroidSeed(): number {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const value = new Uint32Array(1);
-    crypto.getRandomValues(value);
-    return value[0] ?? Date.now();
-  }
-  return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
-}
-
-function wishTitle(button: HTMLButtonElement): string {
-  const label = button.getAttribute('aria-label') ?? '';
-  return label.match(/«(.+?)»/)?.[1] ?? label;
-}
-
-function wishMeta(button: HTMLButtonElement): string {
-  const label = button.getAttribute('aria-label') ?? '';
-  return label.match(/»\.\s*(.+)$/)?.[1] ?? 'Відкрити мрію';
-}
-
-function itemQueues(items: WishlistItemV3[]): Map<string, WishlistItemV3[]> {
-  const queues = new Map<string, WishlistItemV3[]>();
-  [...items].sort((a, b) => b.id - a.id).forEach((item) => {
-    const queue = queues.get(item.title) ?? [];
-    queue.push(item);
-    queues.set(item.title, queue);
-  });
-  return queues;
-}
-
-function clearPolaroidVariables(item: HTMLElement): void {
-  item.style.removeProperty('--wl-polaroid-rotate');
-  item.style.removeProperty('--wl-polaroid-x');
-  item.style.removeProperty('--wl-polaroid-y');
-  item.style.removeProperty('--wl-polaroid-tape-rotate');
-}
-
 export function WishlistBoardToolbar({
-  scope,
   value,
   counts,
   resultCount,
   onChange,
+  onPolaroidReshuffle,
 }: WishlistBoardToolbarProps) {
   const panelId = useId();
-  const me = useCurrentUser();
-  const { partner } = usePartnerQuery();
-  const ownItems = useWishlistItems(me.id).data ?? [];
-  const partnerItems = useWishlistItems(partner?.id ?? null).data ?? [];
-  const sharedItems = useSharedWishlistItems().data ?? [];
   const [open, setOpen] = useState(false);
-  const [polaroidSeed, setPolaroidSeed] = useState(freshPolaroidSeed);
   const selected = PRIORITY_FILTERS.find((filter) => filter.value === value.priority)
     ?? DEFAULT_PRIORITY_FILTER;
   const selectedView = VIEW_MODES.find((mode) => mode.value === value.view) ?? VIEW_MODES[0]!;
-
-  useEffect(() => {
-    const root = document.querySelector<HTMLElement>('.wishlist');
-    if (!root) return;
-    root.dataset.wishlistView = value.view;
-
-    // Bubble and feed modes now own their React trees. Only the legacy polaroid
-    // view still needs temporary DOM decoration until its dedicated PR.
-    if (value.view !== 'polaroid') {
-      return () => {
-        root.removeAttribute('data-wishlist-view');
-      };
-    }
-
-    const syncItems = () => {
-      const board = root.querySelector<HTMLElement>('.wishlist-grid');
-      if (!board) return;
-      const activeItems = scope === 'partner' ? partnerItems : scope === 'shared' ? sharedItems : ownItems;
-      const queues = itemQueues(activeItems);
-
-      [...board.children].forEach((child, index) => {
-        if (!(child instanceof HTMLElement)) return;
-        const button = child.querySelector<HTMLButtonElement>('.wl-cloud-bubble');
-        if (!button) return;
-
-        const title = wishTitle(button);
-        const matchedItem = queues.get(title)?.shift();
-        const presentation = matchedItem
-          ? wishlistCloudPriorityPresentation(matchedItem.priority)
-          : null;
-        const priorityLabel = presentation?.label ?? wishMeta(button);
-        const priceLabel = matchedItem?.price != null
-          ? `${matchedItem.price.toLocaleString('uk-UA')} ₴`
-          : 'Ціну не вказано';
-        const description = matchedItem?.description?.trim() || 'Опис не додано';
-
-        button.dataset.wishTitle = title;
-        button.dataset.wishMeta = wishMeta(button);
-        button.dataset.wishPriorityLabel = priorityLabel;
-        button.dataset.wishPrice = priceLabel;
-        button.dataset.wishDescription = description;
-        child.dataset.wishPriorityLabel = priorityLabel;
-        child.dataset.wishPrice = priceLabel;
-        child.dataset.wishDescription = description;
-
-        child.classList.remove('wl-cloud-item');
-        child.classList.add('wl-board-view-item');
-
-        const hash = stableHash(`${polaroidSeed}:${title}:${index}`);
-        const direction = (hash & 1) === 0 ? -1 : 1;
-        const horizontalOffset = direction * (10 + ((hash >>> 4) % 19));
-        child.style.setProperty(
-          '--wl-polaroid-rotate',
-          ((hash >>> 1) & 1) === 0 ? '-4deg' : '4deg',
-        );
-        child.style.setProperty('--wl-polaroid-x', `${horizontalOffset}px`);
-        child.style.setProperty('--wl-polaroid-y', `${((hash >>> 9) % 17) - 8}px`);
-        child.style.setProperty('--wl-polaroid-tape-rotate', `${((hash >>> 14) % 7) - 3}deg`);
-      });
-    };
-
-    syncItems();
-    const observer = new MutationObserver(syncItems);
-    observer.observe(root, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['aria-label'],
-    });
-
-    return () => {
-      observer.disconnect();
-      root.removeAttribute('data-wishlist-view');
-      root.querySelectorAll<HTMLElement>('.wl-board-view-item').forEach((item) => {
-        item.classList.remove('wl-board-view-item');
-        item.classList.add('wl-cloud-item');
-        clearPolaroidVariables(item);
-      });
-    };
-  }, [ownItems, partnerItems, polaroidSeed, scope, sharedItems, value.view]);
 
   const selectPriority = (priority: WishlistPriorityFilter) => {
     onChange({ ...value, priority });
   };
 
   const selectView = (view: WishlistViewMode) => {
-    if (view === 'polaroid') setPolaroidSeed(freshPolaroidSeed());
+    if (view === 'polaroid') onPolaroidReshuffle();
     onChange({ ...value, view });
   };
 

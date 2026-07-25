@@ -1,10 +1,9 @@
 // ============================================================
-// WishCard — shared details state and trigger host
+// WishCard — shared details state and explicit view trigger host
 // ============================================================
 import { useCallback, useState, type ReactNode } from 'react';
 import type { WishCardContext } from './wishCardPresentation';
 import { WishDetailsSheet } from './WishDetailsSheet';
-import { WishlistBubbleCard } from './WishlistBubbleCard';
 import type { WishlistItemV3 } from './wishlistRpc';
 
 export interface WishCardTriggerRenderProps {
@@ -25,7 +24,7 @@ export interface WishCardProps {
   onPurchased: (item: WishlistItemV3) => void;
   onFulfill: (item: WishlistItemV3) => void;
   onMove: (item: WishlistItemV3) => void;
-  renderTrigger?: (props: WishCardTriggerRenderProps) => ReactNode;
+  renderTrigger: (props: WishCardTriggerRenderProps) => ReactNode;
 }
 
 export function WishCard({
@@ -47,20 +46,9 @@ export function WishCard({
   const openDetails = useCallback(() => setDetailsOpen(true), []);
   const closeDetails = useCallback(() => setDetailsOpen(false), []);
 
-  const trigger = renderTrigger
-    ? renderTrigger({ detailsOpen, openDetails })
-    : (
-        <WishlistBubbleCard
-          item={item}
-          busy={busy}
-          detailsOpen={detailsOpen}
-          onOpen={openDetails}
-        />
-      );
-
   return (
     <>
-      {trigger}
+      {renderTrigger({ detailsOpen, openDetails })}
       <WishDetailsSheet
         open={detailsOpen}
         item={item}
