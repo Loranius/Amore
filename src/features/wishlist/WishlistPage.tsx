@@ -10,9 +10,9 @@ import { Lightbox } from '@/components/ui/Lightbox';
 import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
 import { PortalDecor } from '@/features/auth/PortalDecor';
 import { usePartnerQuery } from '@/features/_shared/useUsers';
-import { WishCard } from './WishCard';
 import { WishlistBubbleView } from './WishlistBubbleView';
 import { WishlistFeedView } from './WishlistFeedView';
+import { WishlistPolaroidView } from './WishlistPolaroidView';
 import { WishFormModal } from './WishFormModal';
 import { MoveWishModal } from './MoveWishModal';
 import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
@@ -38,6 +38,7 @@ import {
   wishlistPriorityFilterCounts,
   type WishlistBoardViewState,
 } from './wishlistBoardView';
+import { freshWishlistPolaroidSeed } from './wishlistPolaroidLayout';
 import { partnerGenitive } from './partnerLabel';
 import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import { useWishlistViewPreference } from './useWishlistViewPreference';
@@ -57,6 +58,7 @@ import './wishlistHero.css';
 
 type Tab = 'me' | 'partner' | 'shared';
 type BoardViews = Record<Tab, WishlistBoardViewState>;
+type PolaroidSeeds = Record<Tab, number>;
 
 function requestedTab(value: string | null): Tab {
   return value === 'partner' || value === 'shared' ? value : 'me';
@@ -73,6 +75,14 @@ function initialBoardViews(): BoardViews {
     me: { ...DEFAULT_WISHLIST_BOARD_VIEW },
     partner: { ...DEFAULT_WISHLIST_BOARD_VIEW },
     shared: { ...DEFAULT_WISHLIST_BOARD_VIEW },
+  };
+}
+
+function initialPolaroidSeeds(): PolaroidSeeds {
+  return {
+    me: freshWishlistPolaroidSeed(),
+    partner: freshWishlistPolaroidSeed(),
+    shared: freshWishlistPolaroidSeed(),
   };
 }
 
@@ -142,6 +152,7 @@ export function WishlistPage() {
   const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
   const [sharedFilter, setSharedFilter] = useState<SharedWishFilter>('all');
   const [boardViews, setBoardViews] = useState<BoardViews>(initialBoardViews);
+  const [polaroidSeeds, setPolaroidSeeds] = useState<PolaroidSeeds>(initialPolaroidSeeds);
   const [preferredView, setPreferredView] = useWishlistViewPreference(tab);
   const actionLock = useRef(false);
 
@@ -347,6 +358,27 @@ export function WishlistPage() {
     if (nextView.view !== preferredView) setPreferredView(nextView.view);
   };
 
+  const reshufflePolaroids = () => {
+    setPolaroidSeeds((current) => ({
+      ...current,
+      [tab]: freshWishlistPolaroidSeed(),
+    }));
+  };
+
+  const sharedViewProps = {
+    items: visibleItems,
+    busy: mutationBusy,
+    isItemOwn,
+    canManageReservation,
+    onPhotoClick: setLightbox,
+    onEdit: setEditing,
+    onDelete,
+    onReserve,
+    onPurchased,
+    onFulfill: (wish: WishlistItemV3) => void onFulfill(wish),
+    onMove: setMoving,
+  };
+
   return (
     <section
       className="wishlist pink-page"
@@ -371,11 +403,11 @@ export function WishlistPage() {
 
         {!archiveOpen && !isPending && !isError && contextItems.length > 0 && (
           <WishlistBoardToolbar
-            scope={tab}
             value={activeBoardView}
             counts={boardFilterCounts}
             resultCount={visibleItems.length}
             onChange={changeBoardView}
+            onPolaroidReshuffle={reshufflePolaroids}
           />
         )}
       </div>
@@ -461,52 +493,14 @@ export function WishlistPage() {
                   )}
                 </div>
               ) : activeBoardView.view === 'feed' ? (
-                <WishlistFeedView
-                  items={visibleItems}
-                  busy={mutationBusy}
-                  isItemOwn={isItemOwn}
-                  canManageReservation={canManageReservation}
-                  onPhotoClick={setLightbox}
-                  onEdit={setEditing}
-                  onDelete={onDelete}
-                  onReserve={onReserve}
-                  onPurchased={onPurchased}
-                  onFulfill={(wish) => void onFulfill(wish)}
-                  onMove={setMoving}
-                />
-              ) : activeBoardView.view === 'bubbles' ? (
-                <WishlistBubbleView
-                  items={visibleItems}
-                  busy={mutationBusy}
-                  isItemOwn={isItemOwn}
-                  canManageReservation={canManageReservation}
-                  onPhotoClick={setLightbox}
-                  onEdit={setEditing}
-                  onDelete={onDelete}
-                  onReserve={onReserve}
-                  onPurchased={onPurchased}
-                  onFulfill={(wish) => void onFulfill(wish)}
-                  onMove={setMoving}
+                <WishlistFeedView {...sharedViewProps} />
+              ) : activeBoardView.view === 'polaroid' ? (
+                <WishlistPolaroidView
+                  {...sharedViewProps}
+                  seed={polaroidSeeds[tab]}
                 />
               ) : (
-                <div className="wishlist-grid">
-                  {visibleItems.map((item) => (
-                    <WishCard
-                      key={item.id}
-                      item={item}
-                      isOwn={isItemOwn(item)}
-                      canManageReservation={canManageReservation(item)}
-                      busy={mutationBusy}
-                      onPhotoClick={setLightbox}
-                      onEdit={setEditing}
-                      onDelete={onDelete}
-                      onReserve={onReserve}
-                      onPurchased={onPurchased}
-                      onFulfill={(wish) => void onFulfill(wish)}
-                      onMove={setMoving}
-                    />
-                  ))}
-                </div>
+                <WishlistBubbleView {...sharedViewProps} />
               )}
 
               {canShowArchive && (
