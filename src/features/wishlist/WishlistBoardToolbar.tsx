@@ -34,10 +34,10 @@ const VIEW_MODES: Array<{
     icon: '◯',
   },
   {
-    value: 'table',
-    label: 'Таблиця',
-    description: 'Дві картки в ряд',
-    icon: '▦',
+    value: 'feed',
+    label: 'Стрічка',
+    description: 'Фото й деталі в ряд',
+    icon: '☷',
   },
   {
     value: 'polaroid',
@@ -65,6 +65,18 @@ function stableHash(value: string): number {
 function wishTitle(button: HTMLButtonElement): string {
   const label = button.getAttribute('aria-label') ?? '';
   return label.match(/«(.+?)»/)?.[1] ?? label;
+}
+
+function wishMeta(button: HTMLButtonElement): string {
+  const label = button.getAttribute('aria-label') ?? '';
+  return label.match(/»\.\s*(.+)$/)?.[1] ?? 'Відкрити мрію';
+}
+
+function clearPolaroidVariables(item: HTMLElement): void {
+  item.style.removeProperty('--wl-polaroid-rotate');
+  item.style.removeProperty('--wl-polaroid-x');
+  item.style.removeProperty('--wl-polaroid-y');
+  item.style.removeProperty('--wl-polaroid-tape-rotate');
 }
 
 export function WishlistBoardToolbar({
@@ -96,19 +108,22 @@ export function WishlistBoardToolbar({
 
         const title = wishTitle(button);
         button.dataset.wishTitle = title;
+        button.dataset.wishMeta = wishMeta(button);
 
         if (value.view === 'bubbles') {
           child.classList.add('wl-cloud-item');
           child.classList.remove('wl-board-view-item');
-          child.style.removeProperty('--wl-polaroid-rotate');
-          child.style.removeProperty('--wl-polaroid-x');
-          child.style.removeProperty('--wl-polaroid-y');
-          child.style.removeProperty('--wl-polaroid-tape-rotate');
+          clearPolaroidVariables(child);
           return;
         }
 
         child.classList.remove('wl-cloud-item');
         child.classList.add('wl-board-view-item');
+
+        if (value.view !== 'polaroid') {
+          clearPolaroidVariables(child);
+          return;
+        }
 
         const hash = stableHash(`${title}:${index}`);
         child.style.setProperty('--wl-polaroid-rotate', hash % 2 === 0 ? '-4deg' : '4deg');
@@ -121,7 +136,7 @@ export function WishlistBoardToolbar({
     syncItems();
 
     // Bubble physics discovers items through child-list changes. A temporary
-    // marker refreshes its body map after returning from table or polaroid mode.
+    // marker refreshes its body map after returning from feed or polaroid mode.
     if (value.view === 'bubbles') {
       const board = root.querySelector<HTMLElement>('.wishlist-grid');
       const marker = document.createComment('wishlist-view-sync');
@@ -143,10 +158,7 @@ export function WishlistBoardToolbar({
       root.querySelectorAll<HTMLElement>('.wl-board-view-item').forEach((item) => {
         item.classList.remove('wl-board-view-item');
         item.classList.add('wl-cloud-item');
-        item.style.removeProperty('--wl-polaroid-rotate');
-        item.style.removeProperty('--wl-polaroid-x');
-        item.style.removeProperty('--wl-polaroid-y');
-        item.style.removeProperty('--wl-polaroid-tape-rotate');
+        clearPolaroidVariables(item);
       });
     };
   }, [value.view]);
