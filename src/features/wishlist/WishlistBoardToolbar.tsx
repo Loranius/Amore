@@ -78,11 +78,14 @@ function readStoredViews(): StoredWishlistViews {
     const raw = window.localStorage.getItem(WISHLIST_VIEW_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      me: normalizeStoredView(parsed.me) ?? undefined,
-      partner: normalizeStoredView(parsed.partner) ?? undefined,
-      shared: normalizeStoredView(parsed.shared) ?? undefined,
-    };
+    const stored: StoredWishlistViews = {};
+    const me = normalizeStoredView(parsed.me);
+    const partner = normalizeStoredView(parsed.partner);
+    const shared = normalizeStoredView(parsed.shared);
+    if (me) stored.me = me;
+    if (partner) stored.partner = partner;
+    if (shared) stored.shared = shared;
+    return stored;
   } catch {
     return {};
   }
