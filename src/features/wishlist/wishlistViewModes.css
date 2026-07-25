@@ -1,0 +1,499 @@
+/* Wishlist board presentation selector and non-bubble card layouts. */
+.wl-board-toolbar-section + .wl-board-toolbar-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.wl-board-toolbar-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 3px 8px;
+}
+
+.wl-board-toolbar-section-heading > span {
+  color: color-mix(in srgb, var(--text) 91%, var(--muted));
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.wl-board-toolbar-section-heading > small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.wl-board-view-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.wl-board-view-option {
+  display: grid;
+  min-width: 0;
+  min-height: 62px;
+  grid-template-columns: 34px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 69%, transparent);
+  color: color-mix(in srgb, var(--muted) 86%, var(--text));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.wl-board-view-option:hover,
+.wl-board-view-option:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+
+.wl-board-view-option:active {
+  transform: scale(0.985);
+}
+
+.wl-board-view-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+  font-size: 18px;
+  line-height: 1;
+}
+
+.wl-board-view-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.wl-board-view-copy strong,
+.wl-board-view-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl-board-view-copy strong {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.wl-board-view-copy small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.wl-board-view-check {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: transparent;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.wl-board-view-option.active {
+  border-color: color-mix(in srgb, var(--accent) 31%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 84%, var(--text));
+  box-shadow:
+    0 8px 20px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, white 30%, transparent);
+}
+
+.wl-board-view-option.active .wl-board-view-icon {
+  background: var(--accent);
+  color: #fff;
+}
+
+.wl-board-view-option.active .wl-board-view-check {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Two-column list and pinned-polaroid boards. */
+.wl-wishlist-view-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 14px;
+  padding: 16px 4px 54px;
+}
+
+.wl-wishlist-view-grid > :is(
+  .empty-state,
+  .wl-board-filter-empty,
+  .wl-partner-empty,
+  .wl-shared-empty
+) {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.wl-wishlist-view-grid--polaroid {
+  gap: 25px 16px;
+  padding: 29px 8px 74px;
+}
+
+.wl-view-card {
+  position: relative;
+  min-width: 0;
+}
+
+.wl-view-card--polaroid {
+  z-index: 1;
+  padding: 8px 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 5px;
+  background: #fffdfb;
+  box-shadow:
+    0 17px 31px rgba(72, 45, 58, 0.16),
+    0 4px 9px rgba(72, 45, 58, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+  transform:
+    translate(var(--wl-polaroid-x, 0), var(--wl-polaroid-y, 0))
+    rotate(var(--wl-polaroid-rotate, -4deg));
+  transform-origin: 50% 14%;
+  transition: box-shadow 190ms ease, transform 210ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wl-view-card--polaroid::before {
+  position: absolute;
+  z-index: 5;
+  top: -9px;
+  left: 50%;
+  width: 46px;
+  height: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 3px;
+  background: linear-gradient(
+    100deg,
+    rgba(249, 216, 226, 0.72),
+    rgba(255, 241, 220, 0.78),
+    rgba(236, 218, 244, 0.72)
+  );
+  box-shadow: 0 3px 7px rgba(70, 42, 54, 0.09);
+  content: '';
+  opacity: 0.9;
+  pointer-events: none;
+  transform: translateX(-50%) rotate(var(--wl-polaroid-tape-rotate, 2deg));
+}
+
+.wl-view-card--polaroid:hover,
+.wl-view-card--polaroid:focus-within {
+  z-index: 8;
+  box-shadow:
+    0 23px 42px rgba(72, 45, 58, 0.22),
+    0 7px 15px rgba(72, 45, 58, 0.1);
+  transform:
+    translate(var(--wl-polaroid-x, 0), calc(var(--wl-polaroid-y, 0) - 4px))
+    rotate(var(--wl-polaroid-rotate, -4deg))
+    scale(1.025);
+}
+
+.wl-view-card-shell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.76), transparent 34%),
+    color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+
+.wl-view-card--polaroid .wl-view-card-shell {
+  border-radius: 2px;
+  background: #f5f1f2;
+}
+
+/* Reset the cloud geometry only inside alternative presentation wrappers. */
+.wishlist .wl-view-card-shell .wl-cloud-item {
+  position: absolute;
+  z-index: 1 !important;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  isolation: auto;
+  transform: none;
+  will-change: auto;
+}
+
+.wishlist .wl-view-card-shell .wl-cloud-item::before,
+.wishlist .wl-view-card-shell .wl-cloud-item::after,
+.wishlist .wl-view-card-shell .wl-cloud-bubble::before,
+.wishlist .wl-view-card-shell .wl-cloud-bubble::after {
+  display: none !important;
+  content: none !important;
+  animation: none !important;
+}
+
+.wishlist .wl-view-card-shell .wl-cloud-bubble,
+.wishlist .wl-view-card-shell .wl-cloud-bubble[data-priority='high'],
+.wishlist .wl-view-card-shell .wl-cloud-bubble[data-priority='medium'],
+.wishlist .wl-view-card-shell .wl-cloud-bubble[data-priority='low'] {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  filter: none;
+  transform: none;
+  animation: none;
+  transition: filter 180ms ease, transform 200ms ease;
+}
+
+.wishlist .wl-view-card-shell .wl-cloud-bubble:hover,
+.wishlist .wl-view-card-shell .wl-cloud-bubble:focus-visible,
+.wishlist .wl-view-card-shell .wl-cloud-bubble:active {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  filter: brightness(1.025) saturate(1.025);
+  transform: scale(1.018);
+}
+
+.wishlist .wl-view-card-shell .wl-cloud-bubble:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent);
+  outline-offset: -3px;
+}
+
+.wishlist .wl-view-card-shell .wl-cloud-bubble-media,
+.wishlist .wl-view-card-shell .wl-cloud-bubble-placeholder,
+.wishlist .wl-view-card-shell .wl-product-visual {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+.wishlist .wl-view-card-shell .wl-product-visual::before,
+.wishlist .wl-view-card-shell .wl-product-visual::after {
+  display: none;
+}
+
+.wishlist .wl-view-card-shell .wl-product-visual > img {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: inherit;
+  object-fit: cover;
+  object-position: center;
+  filter: none;
+  mask-image: none;
+  -webkit-mask-image: none;
+  transform: scale(1.01);
+}
+
+.wishlist .wl-view-card-shell .wl-product-visual[data-image-mode='product-cutout'] > img,
+.wishlist .wl-view-card-shell .wl-product-visual[data-image-mode='cutout'] > img,
+.wishlist .wl-view-card-shell .wl-product-visual[data-image-mode='portrait-cutout'] > img {
+  padding: 7%;
+  border-radius: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 9px rgba(48, 27, 38, 0.18));
+  transform: none;
+}
+
+.wl-view-card-caption {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+  padding: 10px 4px 3px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wl-view-card--table {
+  overflow: hidden;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 11%, transparent);
+  border-radius: 21px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--text) 8%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.wl-view-card--table:hover,
+.wl-view-card--table:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 23%, transparent);
+  box-shadow:
+    0 17px 35px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  transform: translateY(-2px);
+}
+
+.wl-view-card-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--text) 94%, var(--muted));
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: clamp(14px, 4vw, 18px);
+  font-weight: 700;
+  line-height: 1.14;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.wl-view-card-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.wl-view-card-priority {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--accent) 76%, var(--text));
+  font-size: 10px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl-view-card-price {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.wl-view-card-caption:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.wl-view-card--polaroid .wl-view-card-caption {
+  min-height: 69px;
+  align-content: start;
+  padding: 11px 5px 1px;
+  color: #40343a;
+}
+
+.wl-view-card--polaroid .wl-view-card-title {
+  color: #40343a;
+  font-size: clamp(14px, 4.2vw, 19px);
+}
+
+.wl-view-card--polaroid .wl-view-card-priority {
+  color: #b76183;
+}
+
+.wl-view-card--polaroid .wl-view-card-price {
+  color: #40343a;
+}
+
+[data-theme='dark'] .wl-view-card--polaroid {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: #e9e3e5;
+  box-shadow:
+    0 20px 38px rgba(0, 0, 0, 0.32),
+    0 5px 11px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 719px) {
+  .wl-board-view-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wl-board-view-option {
+    min-height: 54px;
+  }
+
+  .wl-wishlist-view-grid {
+    gap: 10px;
+    padding-inline: 0;
+  }
+
+  .wl-wishlist-view-grid--polaroid {
+    gap: 23px 12px;
+    padding-inline: 5px;
+  }
+}
+
+@media (max-width: 390px) {
+  .wl-view-card--table {
+    padding: 6px;
+    border-radius: 17px;
+  }
+
+  .wl-view-card-caption {
+    gap: 5px;
+    padding-inline: 2px;
+  }
+
+  .wl-view-card-title {
+    font-size: 13px;
+  }
+
+  .wl-view-card-priority {
+    font-size: 9px;
+  }
+
+  .wl-view-card-price {
+    font-size: 11px;
+  }
+
+  .wl-view-card--polaroid {
+    padding: 6px 6px 10px;
+  }
+
+  .wl-view-card--polaroid::before {
+    width: 39px;
+    height: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-board-view-option,
+  .wl-view-card--table,
+  .wl-view-card--polaroid,
+  .wishlist .wl-view-card-shell .wl-cloud-bubble {
+    transition: none;
+  }
+}
