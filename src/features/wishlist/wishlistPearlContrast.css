@@ -39,9 +39,22 @@
     rgba(255, 150, 202, 0.66);
 }
 
-/* Remove the rotating conic oval behind each bubble; keep the softer ::before mist. */
+/*
+ * Keep the pearlescent sphere itself, but remove every oversized pseudo-layer
+ * behind it. Both old mist layers used elliptical gradients and transforms,
+ * which looked like a rotating oval on real mobile screens.
+ */
+.wishlist .wl-cloud-item::before,
 .wishlist .wl-cloud-item::after {
-  display: none;
-  content: none;
-  animation: none;
+  display: none !important;
+  content: none !important;
+  animation: none !important;
+  transform: none !important;
+}
+
+/* The coloured soap-film rim stays visible, but no longer rotates. */
+.wishlist .wl-cloud-bubble::before {
+  animation: none !important;
+  animation-delay: 0s !important;
+  transform: none !important;
 }
