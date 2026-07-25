@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
-import { wishlistCloudPriorityPresentation } from './wishlistCloudLayout';
+import {
+  normalizeWishlistCloudPriority,
+  wishlistCloudPriorityPresentation,
+} from './wishlistCloudLayout';
 import { WishlistProductVisual } from './WishlistProductVisual';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistFeedView.css';
@@ -26,6 +29,7 @@ export function WishlistFeedCard({
   onOpen,
 }: WishlistFeedCardProps) {
   const [imageFailed, setImageFailed] = useState(false);
+  const priorityKey = normalizeWishlistCloudPriority(item.priority);
   const priority = wishlistCloudPriorityPresentation(item.priority);
   const imageAvailable = Boolean(item.image_url) && !imageFailed;
 
@@ -34,7 +38,7 @@ export function WishlistFeedCard({
   }, [item.image_url]);
 
   return (
-    <article className="wl-feed-card" data-priority={priority.key} aria-busy={busy}>
+    <article className="wl-feed-card" data-priority={priorityKey} aria-busy={busy}>
       <button
         type="button"
         className="wl-feed-card__trigger"
