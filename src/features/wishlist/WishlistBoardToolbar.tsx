@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type {
   WishlistBoardViewState,
   WishlistPriorityFilter,
@@ -53,6 +53,20 @@ const DEFAULT_PRIORITY_FILTER = {
   icon: '✦',
 } satisfies { value: WishlistPriorityFilter; label: string; icon: string };
 
+function stableHash(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function wishTitle(button: HTMLButtonElement): string {
+  const label = button.getAttribute('aria-label') ?? '';
+  return label.match(/«(.+?)»/)?.[1] ?? label;
+}
+
 export function WishlistBoardToolbar({
   value,
   counts,
@@ -64,6 +78,63 @@ export function WishlistBoardToolbar({
   const selected = PRIORITY_FILTERS.find((filter) => filter.value === value.priority)
     ?? DEFAULT_PRIORITY_FILTER;
   const selectedView = VIEW_MODES.find((mode) => mode.value === value.view) ?? VIEW_MODES[0];
+
+  useEffect(() => {
+    const root = document.querySelector<HTMLElement>('.wishlist');
+    if (!root) return;
+
+    root.dataset.wishlistView = value.view;
+
+    const syncItems = () => {
+      const board = root.querySelector<HTMLElement>('.wishlist-grid');
+      if (!board) return;
+
+      [...board.children].forEach((child, index) => {
+        if (!(child instanceof HTMLElement)) return;
+        const button = child.querySelector<HTMLButtonElement>('.wl-cloud-bubble');
+        if (!button) return;
+
+        const title = wishTitle(button);
+        button.dataset.wishTitle = title;
+
+        if (value.view === 'bubbles') {
+          child.classList.add('wl-cloud-item');
+          child.classList.remove('wl-board-view-item');
+          child.style.removeProperty('--wl-polaroid-rotate');
+          child.style.removeProperty('--wl-polaroid-x');
+          child.style.removeProperty('--wl-polaroid-y');
+          child.style.removeProperty('--wl-polaroid-tape-rotate');
+          return;
+        }
+
+        child.classList.remove('wl-cloud-item');
+        child.classList.add('wl-board-view-item');
+
+        const hash = stableHash(`${title}:${index}`);
+        child.style.setProperty('--wl-polaroid-rotate', hash % 2 === 0 ? '-4deg' : '4deg');
+        child.style.setProperty('--wl-polaroid-x', `${((hash >>> 4) % 9) - 4}px`);
+        child.style.setProperty('--wl-polaroid-y', `${((hash >>> 8) % 15) - 7}px`);
+        child.style.setProperty('--wl-polaroid-tape-rotate', `${((hash >>> 12) % 7) - 3}deg`);
+      });
+    };
+
+    syncItems();
+    const observer = new MutationObserver(syncItems);
+    observer.observe(root, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      root.removeAttribute('data-wishlist-view');
+      root.querySelectorAll<HTMLElement>('.wl-board-view-item').forEach((item) => {
+        item.classList.remove('wl-board-view-item');
+        item.classList.add('wl-cloud-item');
+        item.style.removeProperty('--wl-polaroid-rotate');
+        item.style.removeProperty('--wl-polaroid-x');
+        item.style.removeProperty('--wl-polaroid-y');
+        item.style.removeProperty('--wl-polaroid-tape-rotate');
+      });
+    };
+  }, [resultCount, value.view]);
 
   const selectPriority = (priority: WishlistPriorityFilter) => {
     onChange({ ...value, priority });
