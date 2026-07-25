@@ -17,7 +17,7 @@ import './wishlistCloudModalFix.css';
 export interface WishDetailsSheetProps {
   open: boolean;
   item: WishlistItemV3;
-  context?: WishCardContext;
+  context?: WishCardContext | undefined;
   isOwn: boolean;
   canManageReservation: boolean;
   busy: boolean;
