@@ -1,8 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, type RefObject } from 'react';
 
 type BubbleBody = {
   element: HTMLElement;
-  button: HTMLButtonElement;
   x: number;
   y: number;
   vx: number;
@@ -34,6 +33,11 @@ type BoardBounds = {
   bottom: number;
 };
 
+interface WishlistBubblePhysicsProps {
+  containerRef: RefObject<HTMLElement | null>;
+  contentKey: string;
+}
+
 const HOLD_DELAY_MS = 165;
 const DRAG_DISTANCE_PX = 7;
 const FRAME_MS = 1000 / 60;
@@ -59,7 +63,24 @@ function limitVelocity(body: BubbleBody): void {
 }
 
 function mountBubblePhysics(board: HTMLElement): () => void {
-  const bodies = new Map<HTMLElement, BubbleBody>();
+  const bodies = [...board.children]
+    .filter(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement && child.classList.contains('wl-cloud-item'),
+    )
+    .map<BubbleBody>((element) => ({
+      element,
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      baseX: 0,
+      baseY: 0,
+      radius: 0,
+      dragging: false,
+    }));
+  const bodyByElement = new Map(bodies.map((body) => [body.element, body]));
+
   let bounds: BoardBounds = { left: 0, right: 0, top: 0, bottom: 0 };
   let pointer: PointerDrag | null = null;
   let frameId = 0;
@@ -78,9 +99,7 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     );
   };
 
-  const renderAll = () => {
-    bodies.forEach(renderBody);
-  };
+  const renderAll = () => bodies.forEach(renderBody);
 
   const clampBodyToBoard = (body: BubbleBody, bounce: boolean) => {
     const gutter = Math.min(14, body.radius * 0.1);
@@ -89,16 +108,8 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     let minY = bounds.top + body.radius + gutter - body.baseY;
     let maxY = bounds.bottom - body.radius - gutter - body.baseY;
 
-    if (minX > maxX) {
-      const middle = (minX + maxX) / 2;
-      minX = middle;
-      maxX = middle;
-    }
-    if (minY > maxY) {
-      const middle = (minY + maxY) / 2;
-      minY = middle;
-      maxY = middle;
-    }
+    if (minX > maxX) minX = maxX = (minX + maxX) / 2;
+    if (minY > maxY) minY = maxY = (minY + maxY) / 2;
 
     if (body.x < minX) {
       body.x = minX;
@@ -118,15 +129,13 @@ function mountBubblePhysics(board: HTMLElement): () => void {
   };
 
   const resolveCollisions = (passes = 2) => {
-    const list = [...bodies.values()];
-
     for (let pass = 0; pass < passes; pass += 1) {
-      for (let i = 0; i < list.length; i += 1) {
-        const a = list[i];
+      for (let first = 0; first < bodies.length; first += 1) {
+        const a = bodies[first];
         if (!a || a.radius <= 0) continue;
 
-        for (let j = i + 1; j < list.length; j += 1) {
-          const b = list[j];
+        for (let second = first + 1; second < bodies.length; second += 1) {
+          const b = bodies[second];
           if (!b || b.radius <= 0) continue;
 
           const ax = a.baseX + a.x;
@@ -137,11 +146,10 @@ function mountBubblePhysics(board: HTMLElement): () => void {
           let dy = by - ay;
           let distance = Math.hypot(dx, dy);
           const minimumDistance = a.radius + b.radius;
-
           if (distance >= minimumDistance) continue;
 
           if (distance < 0.001) {
-            const angle = ((i + 1) * 1.73 + (j + 1) * 0.91) % (Math.PI * 2);
+            const angle = ((first + 1) * 1.73 + (second + 1) * 0.91) % (Math.PI * 2);
             dx = Math.cos(angle);
             dy = Math.sin(angle);
             distance = 1;
@@ -229,14 +237,9 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     measureFrameId = window.requestAnimationFrame(measureBodies);
   };
 
-  const hasKineticMotion = () => {
-    for (const body of bodies.values()) {
-      if (body.dragging || Math.abs(body.vx) > 0.035 || Math.abs(body.vy) > 0.035) {
-        return true;
-      }
-    }
-    return false;
-  };
+  const hasKineticMotion = () => bodies.some(
+    (body) => body.dragging || Math.abs(body.vx) > 0.035 || Math.abs(body.vy) > 0.035,
+  );
 
   const tick = (now: number) => {
     frameId = 0;
@@ -246,12 +249,10 @@ function mountBubblePhysics(board: HTMLElement): () => void {
 
     bodies.forEach((body) => {
       if (body.dragging) return;
-
       body.x += body.vx * delta;
       body.y += body.vy * delta;
       body.vx *= friction;
       body.vy *= friction;
-
       if (Math.abs(body.vx) < 0.025) body.vx = 0;
       if (Math.abs(body.vy) < 0.025) body.vy = 0;
       clampBodyToBoard(body, true);
@@ -259,10 +260,7 @@ function mountBubblePhysics(board: HTMLElement): () => void {
 
     resolveCollisions(2);
     renderAll();
-
-    if (hasKineticMotion()) {
-      frameId = window.requestAnimationFrame(tick);
-    }
+    if (hasKineticMotion()) frameId = window.requestAnimationFrame(tick);
   };
 
   const ensureAnimation = () => {
@@ -274,7 +272,6 @@ function mountBubblePhysics(board: HTMLElement): () => void {
   const endPointer = (cancelled = false) => {
     const current = pointer;
     if (!current) return;
-
     if (current.holdTimer !== null) window.clearTimeout(current.holdTimer);
     current.body.element.classList.remove('wl-cloud-item--pressed');
 
@@ -284,7 +281,6 @@ function mountBubblePhysics(board: HTMLElement): () => void {
       board.removeAttribute('data-physics-active');
       suppressTarget = current.body.element;
       suppressClickUntil = performance.now() + 420;
-
       if (cancelled || reducedMotion) {
         current.body.vx = 0;
         current.body.vy = 0;
@@ -315,12 +311,10 @@ function mountBubblePhysics(board: HTMLElement): () => void {
   const onPointerDown = (event: PointerEvent) => {
     if (pointer || (event.pointerType === 'mouse' && event.button !== 0)) return;
     if (!(event.target instanceof Element)) return;
-
     const button = event.target.closest<HTMLButtonElement>('.wl-cloud-bubble');
     const item = event.target.closest<HTMLElement>('.wl-cloud-item');
     if (!button || !item || item.parentElement !== board || button.disabled) return;
-
-    const body = bodies.get(item);
+    const body = bodyByElement.get(item);
     if (!body) return;
     measureBodies();
 
@@ -337,7 +331,6 @@ function mountBubblePhysics(board: HTMLElement): () => void {
       active: false,
       holdTimer: null,
     };
-
     item.classList.add('wl-cloud-item--pressed');
     state.holdTimer = window.setTimeout(() => activatePointer(state), HOLD_DELAY_MS);
     pointer = state;
@@ -346,7 +339,6 @@ function mountBubblePhysics(board: HTMLElement): () => void {
   const onPointerMove = (event: PointerEvent) => {
     const state = pointer;
     if (!state || event.pointerId !== state.pointerId) return;
-
     const now = performance.now();
     const previousX = state.lastX;
     const previousY = state.lastY;
@@ -359,7 +351,6 @@ function mountBubblePhysics(board: HTMLElement): () => void {
       const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
       if (distance >= DRAG_DISTANCE_PX) activatePointer(state);
     }
-
     if (!state.active) return;
     event.preventDefault();
 
@@ -368,23 +359,12 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     state.body.vx = state.body.vx * 0.28 + instantVx * 0.72;
     state.body.vy = state.body.vy * 0.28 + instantVy * 0.72;
     limitVelocity(state.body);
-
     state.body.x = event.clientX - state.offsetX - state.body.baseX;
     state.body.y = event.clientY - state.offsetY - state.body.baseY;
     clampBodyToBoard(state.body, false);
     resolveCollisions(3);
     renderAll();
     ensureAnimation();
-  };
-
-  const onPointerUp = (event: PointerEvent) => {
-    if (!pointer || event.pointerId !== pointer.pointerId) return;
-    endPointer(false);
-  };
-
-  const onPointerCancel = (event: PointerEvent) => {
-    if (!pointer || event.pointerId !== pointer.pointerId) return;
-    endPointer(true);
   };
 
   const onClickCapture = (event: MouseEvent) => {
@@ -405,55 +385,18 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     }
   };
 
+  const onPointerUp = (event: PointerEvent) => {
+    if (pointer?.pointerId === event.pointerId) endPointer(false);
+  };
+  const onPointerCancel = (event: PointerEvent) => {
+    if (pointer?.pointerId === event.pointerId) endPointer(true);
+  };
+
   const resizeObserver = typeof ResizeObserver === 'undefined'
     ? null
     : new ResizeObserver(queueMeasure);
-
-  const refreshBodies = () => {
-    const items = [...board.children].filter(
-      (child): child is HTMLElement => child instanceof HTMLElement && child.classList.contains('wl-cloud-item'),
-    );
-    const activeElements = new Set(items);
-
-    bodies.forEach((body, element) => {
-      if (activeElements.has(element)) return;
-      if (pointer?.body === body) endPointer(true);
-      body.element.classList.remove(
-        'wl-cloud-item--pressed',
-        'wl-cloud-item--dragging',
-        'wl-cloud-item--moving',
-      );
-      body.element.style.removeProperty('--wl-physics-x');
-      body.element.style.removeProperty('--wl-physics-y');
-      bodies.delete(element);
-    });
-
-    items.forEach((element) => {
-      if (bodies.has(element)) return;
-      const button = element.querySelector<HTMLButtonElement>('.wl-cloud-bubble');
-      if (!button) return;
-      bodies.set(element, {
-        element,
-        button,
-        x: 0,
-        y: 0,
-        vx: 0,
-        vy: 0,
-        baseX: 0,
-        baseY: 0,
-        radius: 0,
-        dragging: false,
-      });
-    });
-
-    resizeObserver?.disconnect();
-    resizeObserver?.observe(board);
-    bodies.forEach((body) => resizeObserver?.observe(body.element));
-    queueMeasure();
-  };
-
-  const mutationObserver = new MutationObserver(refreshBodies);
-  mutationObserver.observe(board, { childList: true });
+  resizeObserver?.observe(board);
+  bodies.forEach((body) => resizeObserver?.observe(body.element));
 
   const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
   const onMotionPreferenceChange = (event: MediaQueryListEvent) => {
@@ -468,11 +411,10 @@ function mountBubblePhysics(board: HTMLElement): () => void {
   window.addEventListener('pointerup', onPointerUp);
   window.addEventListener('pointercancel', onPointerCancel);
   window.addEventListener('resize', queueMeasure, { passive: true });
-  refreshBodies();
+  queueMeasure();
 
   return () => {
     endPointer(true);
-    mutationObserver.disconnect();
     resizeObserver?.disconnect();
     motionQuery.removeEventListener?.('change', onMotionPreferenceChange);
     board.removeEventListener('pointerdown', onPointerDown);
@@ -497,29 +439,15 @@ function mountBubblePhysics(board: HTMLElement): () => void {
   };
 }
 
-export function WishlistBubblePhysics() {
+export function WishlistBubblePhysics({
+  containerRef,
+  contentKey,
+}: WishlistBubblePhysicsProps) {
   useEffect(() => {
-    let mountedBoard: HTMLElement | null = null;
-    let cleanupBoard: (() => void) | null = null;
-
-    const attachToCurrentBoard = () => {
-      const nextBoard = document.querySelector<HTMLElement>('.wishlist .wishlist-grid');
-      if (nextBoard === mountedBoard) return;
-      cleanupBoard?.();
-      mountedBoard = nextBoard;
-      cleanupBoard = nextBoard ? mountBubblePhysics(nextBoard) : null;
-    };
-
-    attachToCurrentBoard();
-    const wishlistRoot = document.querySelector<HTMLElement>('.wishlist');
-    const observer = new MutationObserver(attachToCurrentBoard);
-    observer.observe(wishlistRoot ?? document.body, { childList: true, subtree: true });
-
-    return () => {
-      observer.disconnect();
-      cleanupBoard?.();
-    };
-  }, []);
+    const board = containerRef.current;
+    if (!board) return;
+    return mountBubblePhysics(board);
+  }, [containerRef, contentKey]);
 
   return null;
 }
