@@ -8,6 +8,8 @@ dist-ssr
 .DS_Store
 *.log
 .vite
+playwright-report
+test-results
 
 # dev-only crystal render harness (never committed)
 crystal-preview.html
