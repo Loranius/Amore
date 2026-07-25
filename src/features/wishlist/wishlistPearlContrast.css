@@ -1,0 +1,40 @@
+/* High-visibility edge for pale product cut-outs and very light portal backgrounds. */
+
+.wishlist .wl-cloud-bubble {
+  padding: clamp(5px, calc(var(--wl-cloud-size) * 0.027), 8px);
+  border: 6px solid;
+  border-color:
+    rgba(255, 91, 166, 0.72)
+    rgba(78, 187, 255, 0.7)
+    rgba(191, 118, 255, 0.62)
+    rgba(255, 130, 193, 0.67);
+  outline: 2px solid rgba(255, 255, 255, 0.72);
+  outline-offset: -1px;
+  background: linear-gradient(145deg, rgba(255, 218, 238, 0.94), rgba(209, 240, 255, 0.94));
+}
+
+.wishlist .wl-cloud-bubble::before {
+  opacity: 0.58;
+  mix-blend-mode: screen;
+}
+
+.wishlist .wl-cloud-bubble-media,
+.wishlist .wl-cloud-bubble-placeholder {
+  border-color: rgba(255, 255, 255, 0.78);
+}
+
+.wishlist .wl-cloud-item:nth-child(3n + 2) .wl-cloud-bubble {
+  border-color:
+    rgba(91, 194, 255, 0.72)
+    rgba(207, 119, 255, 0.64)
+    rgba(255, 104, 174, 0.69)
+    rgba(118, 207, 255, 0.68);
+}
+
+.wishlist .wl-cloud-item:nth-child(3n) .wl-cloud-bubble {
+  border-color:
+    rgba(203, 127, 255, 0.66)
+    rgba(255, 105, 176, 0.7)
+    rgba(91, 195, 255, 0.7)
+    rgba(255, 150, 202, 0.66);
+}
