@@ -1,0 +1,99 @@
+.wl-archive-gift-overlay {
+  z-index: 1400;
+}
+
+.wl-archive-gift-modal {
+  width: min(680px, calc(100vw - 24px));
+  max-height: min(92dvh, 900px);
+  overflow-y: auto;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+.wl-archive-gift-heading {
+  padding-right: 46px;
+}
+
+.wl-archive-gift-from {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin: 16px 0 20px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
+}
+
+.wl-archive-gift-from > span {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  font-size: 21px;
+}
+
+.wl-archive-gift-from > div {
+  display: grid;
+  gap: 2px;
+}
+
+.wl-archive-gift-from small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.wl-archive-gift-from strong {
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 16px;
+}
+
+.wl-archive-gift-photo-picker {
+  align-items: center;
+}
+
+.wl-archive-gift-photo-preview {
+  overflow: hidden;
+}
+
+.wl-archive-gift-photo-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.wl-archive-gift-actions {
+  position: sticky;
+  z-index: 4;
+  bottom: calc(-24px - env(safe-area-inset-bottom, 0px));
+  display: grid;
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.25fr);
+  gap: 10px;
+  margin: 22px -2px -2px;
+  padding: 14px 2px calc(2px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, transparent, var(--surface) 24%);
+}
+
+.wl-archive-gift-actions > button {
+  min-height: 48px;
+}
+
+@media (max-width: 560px) {
+  .wl-archive-gift-modal {
+    width: 100%;
+    max-height: 94dvh;
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .wl-archive-gift-actions {
+    grid-template-columns: 1fr;
+  }
+}
