@@ -145,6 +145,16 @@ test.describe('Amore mobile visual preview', () => {
           descriptionInside: true,
           copyAfterMedia: true,
         });
+
+        await firstFeedCard.locator('.wl-feed-card__trigger').click();
+        const detailsSheet = page.locator('.wl-cloud-sheet');
+        await expect(detailsSheet).toBeVisible();
+        await expect(detailsSheet.locator('.wl-cloud-sheet-title')).not.toBeEmpty();
+        await detailsSheet.screenshot({
+          path: testInfo.outputPath('07-wishlist-details-sheet.png'),
+        });
+        await page.getByRole('button', { name: 'Закрити деталі мрії' }).click();
+        await expect(detailsSheet).toBeHidden();
       }
 
       await feed.screenshot({
