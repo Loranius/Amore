@@ -19,7 +19,12 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'game.html'],
+      includeAssets: [
+        'icons/icon-192.png',
+        'icons/icon-512.png',
+        'game.html',
+        'assets/soap-bubble.glb',
+      ],
       manifest: {
         name: 'Amore',
         short_name: 'Amore',
