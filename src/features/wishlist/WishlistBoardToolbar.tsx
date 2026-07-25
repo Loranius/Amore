@@ -20,6 +20,12 @@ const PRIORITY_FILTERS: Array<{ value: WishlistPriorityFilter; label: string; ic
   { value: 'low', label: 'Приємне', icon: '❀' },
 ];
 
+const DEFAULT_PRIORITY_FILTER = {
+  value: 'all',
+  label: 'Усі',
+  icon: '✦',
+} satisfies { value: WishlistPriorityFilter; label: string; icon: string };
+
 export function WishlistBoardToolbar({
   value,
   counts,
@@ -29,7 +35,7 @@ export function WishlistBoardToolbar({
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const selected = PRIORITY_FILTERS.find((filter) => filter.value === value.priority)
-    ?? PRIORITY_FILTERS[0];
+    ?? DEFAULT_PRIORITY_FILTER;
 
   const selectPriority = (priority: WishlistPriorityFilter) => {
     onChange({ ...value, priority });
