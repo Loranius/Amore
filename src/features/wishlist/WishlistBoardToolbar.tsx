@@ -1,4 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { useCurrentUser } from '@/providers/AuthProvider';
+import { usePartnerQuery } from '@/features/_shared/useUsers';
+import { useSharedWishlistItems, useWishlistItems } from './useWishlist';
+import { wishlistCloudPriorityPresentation } from './wishlistCloudLayout';
+import type { WishlistItemV3 } from './wishlistRpc';
 import type {
   WishlistBoardViewState,
   WishlistPriorityFilter,
@@ -33,24 +38,9 @@ const VIEW_MODES: Array<{
   description: string;
   icon: string;
 }> = [
-  {
-    value: 'bubbles',
-    label: 'Бульбашки',
-    description: 'Жива хмара мрій',
-    icon: '◯',
-  },
-  {
-    value: 'feed',
-    label: 'Стрічка',
-    description: 'Фото й деталі в ряд',
-    icon: '☷',
-  },
-  {
-    value: 'polaroid',
-    label: 'Полароїд',
-    description: 'Закріплені фото',
-    icon: '▱',
-  },
+  { value: 'bubbles', label: 'Бульбашки', description: 'Жива хмара мрій', icon: '◯' },
+  { value: 'feed', label: 'Стрічка', description: 'Фото й деталі в ряд', icon: '☷' },
+  { value: 'polaroid', label: 'Полароїд', description: 'Закріплені фото', icon: '▱' },
 ];
 
 const DEFAULT_PRIORITY_FILTER = {
@@ -74,7 +64,6 @@ function freshPolaroidSeed(): number {
     crypto.getRandomValues(value);
     return value[0] ?? Date.now();
   }
-
   return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
 }
 
@@ -85,7 +74,6 @@ function normalizeStoredView(value: unknown): WishlistViewMode | null {
 
 function readStoredViews(): StoredWishlistViews {
   if (typeof window === 'undefined') return {};
-
   try {
     const raw = window.localStorage.getItem(WISHLIST_VIEW_STORAGE_KEY);
     if (!raw) return {};
@@ -102,12 +90,10 @@ function readStoredViews(): StoredWishlistViews {
 
 function writeStoredView(scope: WishlistTabScope, view: WishlistViewMode): void {
   if (typeof window === 'undefined') return;
-
   try {
-    const current = readStoredViews();
     window.localStorage.setItem(
       WISHLIST_VIEW_STORAGE_KEY,
-      JSON.stringify({ ...current, [scope]: view }),
+      JSON.stringify({ ...readStoredViews(), [scope]: view }),
     );
   } catch {
     // Storage may be unavailable in private mode; the in-memory view still works.
@@ -134,6 +120,16 @@ function wishMeta(button: HTMLButtonElement): string {
   return label.match(/»\.\s*(.+)$/)?.[1] ?? 'Відкрити мрію';
 }
 
+function itemQueues(items: WishlistItemV3[]): Map<string, WishlistItemV3[]> {
+  const queues = new Map<string, WishlistItemV3[]>();
+  [...items].sort((a, b) => b.id - a.id).forEach((item) => {
+    const queue = queues.get(item.title) ?? [];
+    queue.push(item);
+    queues.set(item.title, queue);
+  });
+  return queues;
+}
+
 function clearPolaroidVariables(item: HTMLElement): void {
   item.style.removeProperty('--wl-polaroid-rotate');
   item.style.removeProperty('--wl-polaroid-x');
@@ -148,6 +144,11 @@ export function WishlistBoardToolbar({
   onChange,
 }: WishlistBoardToolbarProps) {
   const panelId = useId();
+  const me = useCurrentUser();
+  const { partner } = usePartnerQuery();
+  const ownItems = useWishlistItems(me.id).data ?? [];
+  const partnerItems = useWishlistItems(partner?.id ?? null).data ?? [];
+  const sharedItems = useSharedWishlistItems().data ?? [];
   const [open, setOpen] = useState(false);
   const [polaroidSeed, setPolaroidSeed] = useState(freshPolaroidSeed);
   const hydratedScopeRef = useRef<WishlistTabScope | null>(null);
@@ -155,11 +156,10 @@ export function WishlistBoardToolbar({
     ?? DEFAULT_PRIORITY_FILTER;
   const selectedView = VIEW_MODES.find((mode) => mode.value === value.view) ?? VIEW_MODES[0]!;
 
-  // The toolbar stays mounted while tabs change, so resolve the active tab from the
-  // tab bar after every render. Each tab keeps its own view across reloads and logins.
+  // The toolbar stays mounted while tabs change. Resolve the selected tab from the
+  // tab bar and persist each tab's presentation independently in localStorage.
   useEffect(() => {
     const scope = activeWishlistScope();
-
     if (hydratedScopeRef.current !== scope) {
       hydratedScopeRef.current = scope;
       const storedView = readStoredViews()[scope];
@@ -168,19 +168,20 @@ export function WishlistBoardToolbar({
         return;
       }
     }
-
     writeStoredView(scope, value.view);
   });
 
   useEffect(() => {
     const root = document.querySelector<HTMLElement>('.wishlist');
     if (!root) return;
-
     root.dataset.wishlistView = value.view;
 
     const syncItems = () => {
       const board = root.querySelector<HTMLElement>('.wishlist-grid');
       if (!board) return;
+      const scope = activeWishlistScope();
+      const activeItems = scope === 'partner' ? partnerItems : scope === 'shared' ? sharedItems : ownItems;
+      const queues = itemQueues(activeItems);
 
       [...board.children].forEach((child, index) => {
         if (!(child instanceof HTMLElement)) return;
@@ -188,8 +189,24 @@ export function WishlistBoardToolbar({
         if (!button) return;
 
         const title = wishTitle(button);
+        const matchedItem = queues.get(title)?.shift();
+        const presentation = matchedItem
+          ? wishlistCloudPriorityPresentation(matchedItem.priority)
+          : null;
+        const priorityLabel = presentation?.label ?? wishMeta(button);
+        const priceLabel = matchedItem?.price != null
+          ? `${matchedItem.price.toLocaleString('uk-UA')} ₴`
+          : 'Ціну не вказано';
+        const description = matchedItem?.description?.trim() || 'Опис не додано';
+
         button.dataset.wishTitle = title;
         button.dataset.wishMeta = wishMeta(button);
+        button.dataset.wishPriorityLabel = priorityLabel;
+        button.dataset.wishPrice = priceLabel;
+        button.dataset.wishDescription = description;
+        child.dataset.wishPriorityLabel = priorityLabel;
+        child.dataset.wishPrice = priceLabel;
+        child.dataset.wishDescription = description;
 
         if (value.view === 'bubbles') {
           child.classList.add('wl-cloud-item');
@@ -209,7 +226,6 @@ export function WishlistBoardToolbar({
         const hash = stableHash(`${polaroidSeed}:${title}:${index}`);
         const direction = (hash & 1) === 0 ? -1 : 1;
         const horizontalOffset = direction * (10 + ((hash >>> 4) % 19));
-
         child.style.setProperty(
           '--wl-polaroid-rotate',
           ((hash >>> 1) & 1) === 0 ? '-4deg' : '4deg',
@@ -221,9 +237,6 @@ export function WishlistBoardToolbar({
     };
 
     syncItems();
-
-    // Bubble physics discovers items through child-list changes. A temporary
-    // marker refreshes its body map after returning from feed or polaroid mode.
     if (value.view === 'bubbles') {
       const board = root.querySelector<HTMLElement>('.wishlist-grid');
       const marker = document.createComment('wishlist-view-sync');
@@ -248,7 +261,7 @@ export function WishlistBoardToolbar({
         clearPolaroidVariables(item);
       });
     };
-  }, [polaroidSeed, value.view]);
+  }, [ownItems, partnerItems, polaroidSeed, sharedItems, value.view]);
 
   const selectPriority = (priority: WishlistPriorityFilter) => {
     onChange({ ...value, priority });
@@ -270,26 +283,17 @@ export function WishlistBoardToolbar({
         onClick={() => setOpen((current) => !current)}
       >
         <span className="wl-board-toolbar-summary">
-          <span className="wl-board-toolbar-summary-icon" aria-hidden="true">
-            {selected.icon}
-          </span>
+          <span className="wl-board-toolbar-summary-icon" aria-hidden="true">{selected.icon}</span>
           <span className="wl-board-toolbar-summary-copy">
             <small>Вага мрії</small>
             <strong>{selected.label}</strong>
           </span>
         </span>
-
         <span className="wl-board-toolbar-meta" role="status" aria-live="polite">
           <span>{selectedView.label}</span>
           <strong>{resultCount}</strong>
         </span>
-
-        <svg
-          className="wl-board-toolbar-chevron"
-          viewBox="0 0 20 20"
-          aria-hidden="true"
-          style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
-        >
+        <svg className="wl-board-toolbar-chevron" viewBox="0 0 20 20" aria-hidden="true" style={{ transformBox: 'fill-box', transformOrigin: 'center' }}>
           <path d="m5.5 7.5 4.5 4.5 4.5-4.5" />
         </svg>
       </button>
@@ -301,12 +305,10 @@ export function WishlistBoardToolbar({
               <span id={`${panelId}-priority-title`}>Пріоритет</span>
               <small>Що показувати</small>
             </div>
-
             <div className="wl-board-filter-grid" role="group" aria-label="Фільтр за вагою мрії">
               {PRIORITY_FILTERS.map((filter) => {
                 const active = value.priority === filter.value;
                 const count = counts[filter.value];
-
                 return (
                   <button
                     key={filter.value}
@@ -331,11 +333,9 @@ export function WishlistBoardToolbar({
               <span id={`${panelId}-view-title`}>Вигляд бажань</span>
               <small>Як розмістити мрії</small>
             </div>
-
             <div className="wl-board-view-grid" role="group" aria-label="Вигляд бажань">
               {VIEW_MODES.map((mode) => {
                 const active = value.view === mode.value;
-
                 return (
                   <button
                     key={mode.value}
