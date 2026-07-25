@@ -77,7 +77,7 @@ export function WishlistBoardToolbar({
   const [open, setOpen] = useState(false);
   const selected = PRIORITY_FILTERS.find((filter) => filter.value === value.priority)
     ?? DEFAULT_PRIORITY_FILTER;
-  const selectedView = VIEW_MODES.find((mode) => mode.value === value.view) ?? VIEW_MODES[0];
+  const selectedView = VIEW_MODES.find((mode) => mode.value === value.view) ?? VIEW_MODES[0]!;
 
   useEffect(() => {
     const root = document.querySelector<HTMLElement>('.wishlist');
