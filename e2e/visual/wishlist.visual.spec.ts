@@ -165,6 +165,38 @@ test.describe('Amore mobile visual preview', () => {
       await feed.screenshot({
         path: testInfo.outputPath('06-wishlist-feed.png'),
       });
+
+      await priorityToggle.click();
+      const polaroidOption = page.locator('.wl-board-view-option[data-view="polaroid"]');
+      await expect(polaroidOption).toBeVisible();
+      await polaroidOption.click();
+      await priorityToggle.click();
+      await expect(page.locator('.wl-board-toolbar-panel')).toBeHidden();
+
+      const polaroidView = page.locator('.wl-polaroid-view');
+      await expect(polaroidView).toBeVisible();
+      await polaroidView.scrollIntoViewIfNeeded();
+
+      const firstPolaroid = polaroidView.locator('.wl-polaroid-card').first();
+      if (await firstPolaroid.count()) {
+        await expect(firstPolaroid.locator('.wl-polaroid-card__title')).not.toBeEmpty();
+        await expect(firstPolaroid.locator('.wl-polaroid-card__priority')).not.toBeEmpty();
+        await expect(firstPolaroid.locator('.wl-cloud-bubble')).toHaveCount(0);
+        await expect(firstPolaroid.locator('[data-wish-title]')).toHaveCount(0);
+
+        const structure = await firstPolaroid.evaluate((card) => ({
+          parentIsPolaroidView: card.parentElement?.classList.contains('wl-polaroid-view') ?? false,
+          hasLegacyBoardClass: card.classList.contains('wl-board-view-item'),
+        }));
+        expect(structure).toEqual({
+          parentIsPolaroidView: true,
+          hasLegacyBoardClass: false,
+        });
+      }
+
+      await polaroidView.screenshot({
+        path: testInfo.outputPath('08-wishlist-polaroids.png'),
+      });
     }
   });
 });
