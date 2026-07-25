@@ -11,6 +11,7 @@ import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
 import { PortalDecor } from '@/features/auth/PortalDecor';
 import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { WishCard } from './WishCard';
+import { WishlistBubbleView } from './WishlistBubbleView';
 import { WishlistFeedView } from './WishlistFeedView';
 import { WishFormModal } from './WishFormModal';
 import { MoveWishModal } from './MoveWishModal';
@@ -461,6 +462,20 @@ export function WishlistPage() {
                 </div>
               ) : activeBoardView.view === 'feed' ? (
                 <WishlistFeedView
+                  items={visibleItems}
+                  busy={mutationBusy}
+                  isItemOwn={isItemOwn}
+                  canManageReservation={canManageReservation}
+                  onPhotoClick={setLightbox}
+                  onEdit={setEditing}
+                  onDelete={onDelete}
+                  onReserve={onReserve}
+                  onPurchased={onPurchased}
+                  onFulfill={(wish) => void onFulfill(wish)}
+                  onMove={setMoving}
+                />
+              ) : activeBoardView.view === 'bubbles' ? (
+                <WishlistBubbleView
                   items={visibleItems}
                   busy={mutationBusy}
                   isItemOwn={isItemOwn}
