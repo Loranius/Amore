@@ -11,9 +11,6 @@ dist-ssr
 playwright-report
 test-results
 
-# Generated from the committed Wishlist bubble source chunks before dev/build.
-public/assets/soap-bubble.glb
-
 # dev-only crystal render harness (never committed)
 crystal-preview.html
 src/crystal-preview.tsx
