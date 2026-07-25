@@ -65,6 +65,35 @@ test.describe('Amore mobile visual preview', () => {
     const grid = page.locator('.wishlist-grid');
     await expect(grid).toBeVisible();
     await grid.scrollIntoViewIfNeeded();
+
+    const firstBubbleItem = page.locator('.wl-cloud-item').first();
+    if (await firstBubbleItem.count()) {
+      const pseudoMotion = await firstBubbleItem.evaluate((item) => {
+        const bubble = item.querySelector<HTMLElement>('.wl-cloud-bubble');
+        if (!bubble) throw new Error('Wishlist bubble was not found.');
+
+        const itemBefore = getComputedStyle(item, '::before');
+        const itemAfter = getComputedStyle(item, '::after');
+        const bubbleBefore = getComputedStyle(bubble, '::before');
+
+        return {
+          itemBeforeDisplay: itemBefore.display,
+          itemBeforeAnimation: itemBefore.animationName,
+          itemAfterDisplay: itemAfter.display,
+          itemAfterAnimation: itemAfter.animationName,
+          bubbleBeforeAnimation: bubbleBefore.animationName,
+        };
+      });
+
+      expect(pseudoMotion).toEqual({
+        itemBeforeDisplay: 'none',
+        itemBeforeAnimation: 'none',
+        itemAfterDisplay: 'none',
+        itemAfterAnimation: 'none',
+        bubbleBeforeAnimation: 'none',
+      });
+    }
+
     await grid.screenshot({
       path: testInfo.outputPath('05-wishlist-bubbles.png'),
     });
