@@ -105,6 +105,8 @@ test.describe('Amore mobile visual preview', () => {
       const feedOption = page.locator('.wl-board-view-option[data-view="feed"]');
       await expect(feedOption).toBeVisible();
       await feedOption.click();
+      await priorityToggle.click();
+      await expect(page.locator('.wl-board-toolbar-panel')).toBeHidden();
 
       const feed = page.locator('.wl-feed-view');
       await expect(feed).toBeVisible();
