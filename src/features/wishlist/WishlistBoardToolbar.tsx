@@ -71,6 +71,7 @@ export function WishlistBoardToolbar({
           className="wl-board-toolbar-chevron"
           viewBox="0 0 20 20"
           aria-hidden="true"
+          style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
         >
           <path d="m5.5 7.5 4.5 4.5 4.5-4.5" />
         </svg>
