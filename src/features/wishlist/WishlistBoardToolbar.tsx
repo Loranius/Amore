@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import type {
   WishlistBoardViewState,
   WishlistPriorityFilter,
@@ -26,111 +26,76 @@ export function WishlistBoardToolbar({
   resultCount,
   onChange,
 }: WishlistBoardToolbarProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const buttonRefs = useRef<Partial<Record<WishlistPriorityFilter, HTMLButtonElement>>>({});
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const panelId = useId();
+  const [open, setOpen] = useState(false);
+  const selected = PRIORITY_FILTERS.find((filter) => filter.value === value.priority)
+    ?? PRIORITY_FILTERS[0];
 
-  const updateScrollHints = useCallback(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-
-    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-    setCanScrollLeft(container.scrollLeft > 4);
-    setCanScrollRight(container.scrollLeft < maxScrollLeft - 4);
-  }, []);
-
-  useEffect(() => {
-    const container = scrollRef.current;
-    if (!container) return;
-
-    const frame = window.requestAnimationFrame(updateScrollHints);
-    const onResize = () => updateScrollHints();
-    let resizeObserver: ResizeObserver | null = null;
-
-    if (typeof ResizeObserver !== 'undefined') {
-      resizeObserver = new ResizeObserver(() => updateScrollHints());
-      resizeObserver.observe(container);
-    } else {
-      window.addEventListener('resize', onResize);
-    }
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      resizeObserver?.disconnect();
-      window.removeEventListener('resize', onResize);
-    };
-  }, [updateScrollHints]);
-
-  useEffect(() => {
-    const container = scrollRef.current;
-    const activeButton = buttonRefs.current[value.priority];
-    if (!container || !activeButton) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-      const centeredLeft = activeButton.offsetLeft - (container.clientWidth - activeButton.offsetWidth) / 2;
-      const nextLeft = Math.max(0, Math.min(maxScrollLeft, centeredLeft));
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-      container.scrollTo({
-        left: nextLeft,
-        behavior: reduceMotion ? 'auto' : 'smooth',
-      });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [updateScrollHints, value.priority]);
-
-  const viewportClassName = [
-    'wl-board-filter-viewport',
-    canScrollLeft ? 'has-left-overflow' : '',
-    canScrollRight ? 'has-right-overflow' : '',
-  ].filter(Boolean).join(' ');
+  const selectPriority = (priority: WishlistPriorityFilter) => {
+    onChange({ ...value, priority });
+    setOpen(false);
+  };
 
   return (
-    <div className="wl-board-toolbar">
-      <div className="wl-board-toolbar-head">
-        <span className="wl-board-toolbar-label">Вага мрії</span>
-        <span className="wl-board-toolbar-result" role="status" aria-live="polite">
-          У хмарі: <strong>{resultCount}</strong>
+    <div className={`wl-board-toolbar${open ? ' is-open' : ''}`}>
+      <button
+        type="button"
+        className="wl-board-toolbar-toggle"
+        aria-expanded={open}
+        aria-controls={panelId}
+        aria-label={`Фільтр за вагою мрії. Обрано: ${selected.label}. Показано: ${resultCount}`}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="wl-board-toolbar-summary">
+          <span className="wl-board-toolbar-summary-icon" aria-hidden="true">
+            {selected.icon}
+          </span>
+          <span className="wl-board-toolbar-summary-copy">
+            <small>Вага мрії</small>
+            <strong>{selected.label}</strong>
+          </span>
         </span>
-      </div>
 
-      <div className={viewportClassName}>
-        <div
-          ref={scrollRef}
-          className="wl-board-filter-scroll"
-          role="group"
-          aria-label="Фільтр хмари за вагою мрії"
-          onScroll={() => updateScrollHints()}
+        <span className="wl-board-toolbar-meta" role="status" aria-live="polite">
+          <span>Показано</span>
+          <strong>{resultCount}</strong>
+        </span>
+
+        <svg
+          className="wl-board-toolbar-chevron"
+          viewBox="0 0 20 20"
+          aria-hidden="true"
         >
-          {PRIORITY_FILTERS.map((filter) => {
-            const active = value.priority === filter.value;
-            const count = counts[filter.value];
+          <path d="m5.5 7.5 4.5 4.5 4.5-4.5" />
+        </svg>
+      </button>
 
-            return (
-              <button
-                key={filter.value}
-                ref={(element) => {
-                  if (element) buttonRefs.current[filter.value] = element;
-                  else delete buttonRefs.current[filter.value];
-                }}
-                type="button"
-                className={`wl-board-filter${active ? ' active' : ''}`}
-                data-priority={filter.value}
-                aria-pressed={active}
-                aria-label={`${filter.label}: ${count}`}
-                onClick={() => onChange({ ...value, priority: filter.value })}
-              >
-                <span className="wl-board-filter-icon" aria-hidden="true">{filter.icon}</span>
-                <span className="wl-board-filter-label">{filter.label}</span>
-                <small className="wl-board-filter-count">{count}</small>
-              </button>
-            );
-          })}
+      {open && (
+        <div id={panelId} className="wl-board-toolbar-panel">
+          <div className="wl-board-filter-grid" role="group" aria-label="Фільтр за вагою мрії">
+            {PRIORITY_FILTERS.map((filter) => {
+              const active = value.priority === filter.value;
+              const count = counts[filter.value];
+
+              return (
+                <button
+                  key={filter.value}
+                  type="button"
+                  className={`wl-board-filter${active ? ' active' : ''}`}
+                  data-priority={filter.value}
+                  aria-pressed={active}
+                  aria-label={`${filter.label}: ${count}`}
+                  onClick={() => selectPriority(filter.value)}
+                >
+                  <span className="wl-board-filter-icon" aria-hidden="true">{filter.icon}</span>
+                  <span className="wl-board-filter-label">{filter.label}</span>
+                  <small className="wl-board-filter-count">{count}</small>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
