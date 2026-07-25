@@ -4,7 +4,6 @@
 .wishlist .wishlist-grid .wl-cloud-bubble[data-priority='medium'],
 .wishlist .wishlist-grid .wl-cloud-bubble[data-priority='low'] {
   --wl-gift-accent: var(--accent);
-  --wl-gift-glow-opacity: 0.58;
   --wl-gift-padding: clamp(4px, calc(var(--wl-cloud-size) * 0.038), 7px);
   box-sizing: border-box;
   overflow: visible;
@@ -22,6 +21,7 @@
   box-shadow:
     0 15px 32px color-mix(in srgb, var(--wl-gift-accent) 15%, transparent),
     0 5px 12px rgba(72, 42, 57, 0.08),
+    0 0 0 3px color-mix(in srgb, var(--wl-gift-accent) 5%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.98),
     inset 0 -1px 0 color-mix(in srgb, var(--wl-gift-accent) 14%, transparent);
   isolation: isolate;
@@ -30,37 +30,22 @@
   filter: none;
 }
 
-.wishlist .wishlist-grid .wl-cloud-bubble[data-priority='high'] {
-  --wl-gift-glow-opacity: 0.72;
-}
-
 .wishlist .wishlist-grid .wl-cloud-bubble[data-priority='medium'] {
   --wl-gift-accent: #c97898;
-  --wl-gift-glow-opacity: 0.56;
 }
 
 .wishlist .wishlist-grid .wl-cloud-bubble[data-priority='low'] {
   --wl-gift-accent: #aa8796;
-  --wl-gift-glow-opacity: 0.42;
 }
 
+/* Keep the historical oval-producing layer permanently disabled. */
 .wishlist .wishlist-grid .wl-cloud-bubble::before {
-  position: absolute;
-  z-index: -1;
-  inset: -10%;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    transparent 57%,
-    color-mix(in srgb, var(--wl-gift-accent) 18%, transparent) 67%,
-    transparent 80%
-  );
-  content: '';
-  opacity: var(--wl-gift-glow-opacity);
-  pointer-events: none;
-  filter: blur(6px);
+  display: none;
+  content: none;
+  animation: none;
 }
 
+/* A narrow circular rim only; no filled layer over the gift photo. */
 .wishlist .wishlist-grid .wl-cloud-bubble::after {
   position: absolute;
   z-index: 2;
@@ -119,6 +104,7 @@
   box-shadow:
     0 18px 38px color-mix(in srgb, var(--wl-gift-accent) 19%, transparent),
     0 7px 16px rgba(72, 42, 57, 0.1),
+    0 0 0 3px color-mix(in srgb, var(--wl-gift-accent) 7%, transparent),
     inset 0 1px 0 white,
     inset 0 -1px 0 color-mix(in srgb, var(--wl-gift-accent) 18%, transparent);
   filter: none;
@@ -142,5 +128,6 @@
   box-shadow:
     0 15px 34px color-mix(in srgb, var(--wl-gift-accent) 17%, transparent),
     0 6px 16px rgba(0, 0, 0, 0.2),
+    0 0 0 3px color-mix(in srgb, var(--wl-gift-accent) 5%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
