@@ -68,7 +68,7 @@ test.describe('Amore mobile visual preview', () => {
 
     const firstBubbleItem = page.locator('.wl-cloud-item').first();
     if (await firstBubbleItem.count()) {
-      const pseudoMotion = await firstBubbleItem.evaluate((item) => {
+      const pseudoLayers = await firstBubbleItem.evaluate((item) => {
         const bubble = item.querySelector<HTMLElement>('.wl-cloud-bubble');
         if (!bubble) throw new Error('Wishlist bubble was not found.');
 
@@ -81,15 +81,17 @@ test.describe('Amore mobile visual preview', () => {
           itemBeforeAnimation: itemBefore.animationName,
           itemAfterDisplay: itemAfter.display,
           itemAfterAnimation: itemAfter.animationName,
+          bubbleBeforeDisplay: bubbleBefore.display,
           bubbleBeforeAnimation: bubbleBefore.animationName,
         };
       });
 
-      expect(pseudoMotion).toEqual({
+      expect(pseudoLayers).toEqual({
         itemBeforeDisplay: 'none',
         itemBeforeAnimation: 'none',
         itemAfterDisplay: 'none',
         itemAfterAnimation: 'none',
+        bubbleBeforeDisplay: 'none',
         bubbleBeforeAnimation: 'none',
       });
     }

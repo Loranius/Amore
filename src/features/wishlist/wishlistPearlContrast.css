@@ -13,11 +13,6 @@
   background: linear-gradient(145deg, rgba(255, 218, 238, 0.94), rgba(209, 240, 255, 0.94));
 }
 
-.wishlist .wl-cloud-bubble::before {
-  opacity: 0.58;
-  mix-blend-mode: screen;
-}
-
 .wishlist .wl-cloud-bubble-media,
 .wishlist .wl-cloud-bubble-placeholder {
   border-color: rgba(255, 255, 255, 0.78);
@@ -39,11 +34,7 @@
     rgba(255, 150, 202, 0.66);
 }
 
-/*
- * Keep the pearlescent sphere itself, but remove every oversized pseudo-layer
- * behind it. Both old mist layers used elliptical gradients and transforms,
- * which looked like a rotating oval on real mobile screens.
- */
+/* Remove every oversized decorative layer behind the Wishlist bubbles. */
 .wishlist .wl-cloud-item::before,
 .wishlist .wl-cloud-item::after {
   display: none !important;
@@ -52,8 +43,12 @@
   transform: none !important;
 }
 
-/* The coloured soap-film rim stays visible, but no longer rotates. */
+/* Remove the oval soap-film shell itself instead of merely stopping its rotation. */
 .wishlist .wl-cloud-bubble::before {
+  display: none !important;
+  content: none !important;
+  opacity: 0 !important;
+  background: none !important;
   animation: none !important;
   animation-delay: 0s !important;
   transform: none !important;
