@@ -66,7 +66,10 @@ test.describe('Amore mobile visual preview', () => {
     await expect(grid).toBeVisible();
     await grid.scrollIntoViewIfNeeded();
 
-    const firstBubbleItem = page.locator('.wl-cloud-item').first();
+    const bubbleView = page.locator('.wl-bubble-view');
+    await expect(bubbleView).toBeVisible();
+
+    const firstBubbleItem = bubbleView.locator('.wl-cloud-item').first();
     if (await firstBubbleItem.count()) {
       const pseudoLayers = await firstBubbleItem.evaluate((item) => {
         const bubble = item.querySelector<HTMLElement>('.wl-cloud-bubble');
@@ -77,6 +80,7 @@ test.describe('Amore mobile visual preview', () => {
         const bubbleBefore = getComputedStyle(bubble, '::before');
 
         return {
+          parentIsBubbleView: item.parentElement?.classList.contains('wl-bubble-view') ?? false,
           itemBeforeDisplay: itemBefore.display,
           itemBeforeAnimation: itemBefore.animationName,
           itemAfterDisplay: itemAfter.display,
@@ -87,6 +91,7 @@ test.describe('Amore mobile visual preview', () => {
       });
 
       expect(pseudoLayers).toEqual({
+        parentIsBubbleView: true,
         itemBeforeDisplay: 'none',
         itemBeforeAnimation: 'none',
         itemAfterDisplay: 'none',
@@ -96,7 +101,7 @@ test.describe('Amore mobile visual preview', () => {
       });
     }
 
-    await grid.screenshot({
+    await bubbleView.screenshot({
       path: testInfo.outputPath('05-wishlist-bubbles.png'),
     });
 

@@ -114,9 +114,9 @@ export function WishlistBoardToolbar({
     if (!root) return;
     root.dataset.wishlistView = value.view;
 
-    // Feed has its own React tree and real text nodes. It must never be transformed
-    // by the legacy bubble/polaroid synchronizer.
-    if (value.view === 'feed') {
+    // Bubble and feed modes now own their React trees. Only the legacy polaroid
+    // view still needs temporary DOM decoration until its dedicated PR.
+    if (value.view !== 'polaroid') {
       return () => {
         root.removeAttribute('data-wishlist-view');
       };
@@ -153,13 +153,6 @@ export function WishlistBoardToolbar({
         child.dataset.wishPrice = priceLabel;
         child.dataset.wishDescription = description;
 
-        if (value.view === 'bubbles') {
-          child.classList.add('wl-cloud-item');
-          child.classList.remove('wl-board-view-item');
-          clearPolaroidVariables(child);
-          return;
-        }
-
         child.classList.remove('wl-cloud-item');
         child.classList.add('wl-board-view-item');
 
@@ -177,13 +170,6 @@ export function WishlistBoardToolbar({
     };
 
     syncItems();
-    if (value.view === 'bubbles') {
-      const board = root.querySelector<HTMLElement>('.wishlist-grid');
-      const marker = document.createComment('wishlist-view-sync');
-      board?.append(marker);
-      marker.remove();
-    }
-
     const observer = new MutationObserver(syncItems);
     observer.observe(root, {
       childList: true,
