@@ -48,10 +48,10 @@ jobs:
       - name: Install Chromium and system dependencies
         run: npx playwright install --with-deps chromium
 
-      - name: Build GitHub Pages bundle
+      - name: Build local visual-preview bundle
         run: npm run build
         env:
-          BASE_PATH: /Amore/
+          BASE_PATH: /
 
       - name: Capture mobile visual preview
         run: npx playwright test
