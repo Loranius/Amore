@@ -99,5 +99,55 @@ test.describe('Amore mobile visual preview', () => {
     await grid.screenshot({
       path: testInfo.outputPath('05-wishlist-bubbles.png'),
     });
+
+    if (await priorityToggle.isVisible()) {
+      await priorityToggle.click();
+      const feedOption = page.locator('.wl-board-view-option[data-view="feed"]');
+      await expect(feedOption).toBeVisible();
+      await feedOption.click();
+
+      const feed = page.locator('.wl-feed-view');
+      await expect(feed).toBeVisible();
+      await feed.scrollIntoViewIfNeeded();
+
+      const firstFeedCard = page.locator('.wl-feed-card').first();
+      if (await firstFeedCard.count()) {
+        await expect(firstFeedCard.locator('.wl-feed-card__title')).not.toBeEmpty();
+        await expect(firstFeedCard.locator('.wl-feed-card__description')).not.toBeEmpty();
+        await expect(firstFeedCard.locator('.wl-feed-card__priority')).not.toBeEmpty();
+        await expect(firstFeedCard.locator('.wl-feed-card__price')).not.toBeEmpty();
+
+        const layout = await firstFeedCard.evaluate((card) => {
+          const trigger = card.querySelector<HTMLElement>('.wl-feed-card__trigger');
+          const media = card.querySelector<HTMLElement>('.wl-feed-card__media');
+          const title = card.querySelector<HTMLElement>('.wl-feed-card__title');
+          const description = card.querySelector<HTMLElement>('.wl-feed-card__description');
+          if (!trigger || !media || !title || !description) {
+            throw new Error('Wishlist feed card structure is incomplete.');
+          }
+
+          const triggerRect = trigger.getBoundingClientRect();
+          const mediaRect = media.getBoundingClientRect();
+          const titleRect = title.getBoundingClientRect();
+          const descriptionRect = description.getBoundingClientRect();
+          return {
+            titleInside: titleRect.left >= triggerRect.left && titleRect.right <= triggerRect.right,
+            descriptionInside:
+              descriptionRect.left >= triggerRect.left && descriptionRect.right <= triggerRect.right,
+            copyAfterMedia: titleRect.left > mediaRect.right,
+          };
+        });
+
+        expect(layout).toEqual({
+          titleInside: true,
+          descriptionInside: true,
+          copyAfterMedia: true,
+        });
+      }
+
+      await feed.screenshot({
+        path: testInfo.outputPath('06-wishlist-feed.png'),
+      });
+    }
   });
 });
