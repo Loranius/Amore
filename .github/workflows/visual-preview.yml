@@ -52,6 +52,10 @@ jobs:
         run: npm run build
         env:
           BASE_PATH: /
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_TMDB_KEY: ${{ secrets.VITE_TMDB_KEY }}
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
 
       - name: Capture mobile visual preview
         run: npx playwright test
