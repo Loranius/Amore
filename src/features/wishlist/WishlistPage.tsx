@@ -11,6 +11,7 @@ import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
 import { PortalDecor } from '@/features/auth/PortalDecor';
 import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { WishCard } from './WishCard';
+import { WishlistFeedView } from './WishlistFeedView';
 import { WishFormModal } from './WishFormModal';
 import { MoveWishModal } from './MoveWishModal';
 import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
@@ -428,9 +429,9 @@ export function WishlistPage() {
             </div>
           ) : (
             <>
-              <div className="wishlist-grid">
-                {visibleItems.length === 0 ? (
-                  contextItems.length > 0 ? (
+              {visibleItems.length === 0 ? (
+                <div className="wishlist-grid">
+                  {contextItems.length > 0 ? (
                     <div className="wl-board-filter-empty">
                       <div>
                         <span aria-hidden="true">✦</span>
@@ -456,9 +457,25 @@ export function WishlistPage() {
                     </div>
                   ) : (
                     <p className="empty-state">Твій список порожній. Час додати нову забаганку.</p>
-                  )
-                ) : (
-                  visibleItems.map((item) => (
+                  )}
+                </div>
+              ) : activeBoardView.view === 'feed' ? (
+                <WishlistFeedView
+                  items={visibleItems}
+                  busy={mutationBusy}
+                  isItemOwn={isItemOwn}
+                  canManageReservation={canManageReservation}
+                  onPhotoClick={setLightbox}
+                  onEdit={setEditing}
+                  onDelete={onDelete}
+                  onReserve={onReserve}
+                  onPurchased={onPurchased}
+                  onFulfill={(wish) => void onFulfill(wish)}
+                  onMove={setMoving}
+                />
+              ) : (
+                <div className="wishlist-grid">
+                  {visibleItems.map((item) => (
                     <WishCard
                       key={item.id}
                       item={item}
@@ -473,9 +490,9 @@ export function WishlistPage() {
                       onFulfill={(wish) => void onFulfill(wish)}
                       onMove={setMoving}
                     />
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
 
               {canShowArchive && (
                 <WishArchive

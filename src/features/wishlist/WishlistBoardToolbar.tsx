@@ -12,7 +12,6 @@ import type {
 import type { WishlistTabScope } from './useWishlistViewPreference';
 import './wishlistBoardToolbar.css';
 import './wishlistMobilePolish.css';
-import './wishlistFeedPolish.css';
 
 interface WishlistBoardToolbarProps {
   scope: WishlistTabScope;
@@ -115,6 +114,14 @@ export function WishlistBoardToolbar({
     if (!root) return;
     root.dataset.wishlistView = value.view;
 
+    // Feed has its own React tree and real text nodes. It must never be transformed
+    // by the legacy bubble/polaroid synchronizer.
+    if (value.view === 'feed') {
+      return () => {
+        root.removeAttribute('data-wishlist-view');
+      };
+    }
+
     const syncItems = () => {
       const board = root.querySelector<HTMLElement>('.wishlist-grid');
       if (!board) return;
@@ -155,11 +162,6 @@ export function WishlistBoardToolbar({
 
         child.classList.remove('wl-cloud-item');
         child.classList.add('wl-board-view-item');
-
-        if (value.view !== 'polaroid') {
-          clearPolaroidVariables(child);
-          return;
-        }
 
         const hash = stableHash(`${polaroidSeed}:${title}:${index}`);
         const direction = (hash & 1) === 0 ? -1 : 1;
