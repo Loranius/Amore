@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveWishDetailsContext,
   wishlistProductHost,
-} from './WishDetailsSheet';
+} from './wishDetailsPresentation';
 import type { WishlistItemV3 } from './wishlistRpc';
 
 function testItem(overrides: Partial<WishlistItemV3> = {}): WishlistItemV3 {
