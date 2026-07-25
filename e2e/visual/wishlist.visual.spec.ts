@@ -1,9 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const visualUserName = process.env.VISUAL_USER_NAME?.trim();
 const visualUserPin = process.env.VISUAL_USER_PIN?.trim();
 
-async function enterPin(page: Parameters<typeof test>[0] extends never ? never : any, pin: string) {
+async function enterPin(page: Page, pin: string) {
   for (const digit of pin) {
     if (!/^\d$/.test(digit)) throw new Error('VISUAL_USER_PIN must contain digits only.');
     await page.getByRole('button', { name: digit, exact: true }).click();
