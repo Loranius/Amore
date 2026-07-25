@@ -34,8 +34,9 @@ type BoardBounds = {
 };
 
 interface WishlistBubblePhysicsProps {
-  containerRef: RefObject<HTMLElement | null>;
-  contentKey: string;
+  containerRef?: RefObject<HTMLElement | null> | undefined;
+  contentKey?: string | undefined;
+  containerSelector?: string | undefined;
 }
 
 const HOLD_DELAY_MS = 165;
@@ -441,13 +442,15 @@ function mountBubblePhysics(board: HTMLElement): () => void {
 
 export function WishlistBubblePhysics({
   containerRef,
-  contentKey,
-}: WishlistBubblePhysicsProps) {
+  contentKey = '',
+  containerSelector = '.wl-archive-cloud-grid',
+}: WishlistBubblePhysicsProps = {}) {
   useEffect(() => {
-    const board = containerRef.current;
+    const board = containerRef?.current
+      ?? document.querySelector<HTMLElement>(containerSelector);
     if (!board) return;
     return mountBubblePhysics(board);
-  }, [containerRef, contentKey]);
+  }, [containerRef, containerSelector, contentKey]);
 
   return null;
 }
