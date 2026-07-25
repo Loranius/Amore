@@ -1,0 +1,202 @@
+/*
+ * Wishlist pearlescent soap-bubble skin.
+ * Loaded after wishlistMist.css so it only strengthens the visual layer;
+ * layout, physics and interaction logic remain untouched.
+ */
+
+.wishlist .wl-cloud-item {
+  --wl-film-angle: 218deg;
+  --wl-glint-x: 30%;
+  --wl-glint-y: 13%;
+  --wl-pearl-pink: rgba(255, 126, 184, 0.78);
+  --wl-pearl-blue: rgba(116, 202, 255, 0.78);
+  --wl-pearl-violet: rgba(202, 147, 255, 0.64);
+  --wl-pearl-warm: rgba(255, 220, 176, 0.58);
+}
+
+.wishlist .wl-cloud-item:nth-child(3n + 2) {
+  --wl-film-angle: 86deg;
+  --wl-glint-x: 68%;
+  --wl-glint-y: 12%;
+}
+
+.wishlist .wl-cloud-item:nth-child(3n) {
+  --wl-film-angle: 304deg;
+  --wl-glint-x: 35%;
+  --wl-glint-y: 17%;
+}
+
+.wishlist .wl-cloud-bubble {
+  box-sizing: border-box;
+  padding: clamp(7px, calc(var(--wl-cloud-size) * 0.04), 11px);
+  border: 1px solid rgba(255, 255, 255, 0.94);
+  background:
+    radial-gradient(ellipse 42% 17% at 29% 8%, rgba(255, 255, 255, 0.96), transparent 72%),
+    conic-gradient(
+      from var(--wl-film-angle),
+      rgba(255, 255, 255, 0.94) 0deg,
+      var(--wl-pearl-pink) 34deg,
+      rgba(255, 192, 225, 0.84) 70deg,
+      var(--wl-pearl-violet) 108deg,
+      var(--wl-pearl-blue) 151deg,
+      rgba(217, 244, 255, 0.9) 193deg,
+      var(--wl-pearl-warm) 233deg,
+      rgba(255, 151, 202, 0.76) 274deg,
+      rgba(171, 222, 255, 0.82) 320deg,
+      rgba(255, 255, 255, 0.94) 360deg
+    );
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.58),
+    -11px -5px 30px rgba(255, 137, 192, 0.32),
+    13px 7px 32px rgba(112, 197, 255, 0.29),
+    0 23px 44px rgba(117, 61, 92, 0.18),
+    inset 0 1px 2px rgba(255, 255, 255, 0.96),
+    inset 0 -2px 6px rgba(97, 50, 82, 0.16);
+}
+
+.wishlist .wl-cloud-bubble-media,
+.wishlist .wl-cloud-bubble-placeholder {
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  background:
+    radial-gradient(circle at 31% 21%, rgba(255, 255, 255, 0.62), transparent 36%),
+    linear-gradient(145deg, rgba(255, 238, 247, 0.9), rgba(232, 246, 255, 0.84));
+  box-shadow:
+    0 0 0 1px rgba(121, 65, 97, 0.08),
+    inset 9px 10px 20px rgba(255, 255, 255, 0.12),
+    inset -11px -14px 24px rgba(107, 61, 93, 0.1);
+}
+
+.wishlist .wl-cloud-bubble-media img {
+  filter: saturate(1.045) contrast(1.025);
+}
+
+.wishlist .wl-cloud-bubble::before {
+  z-index: 5;
+  inset: 1px;
+  background: conic-gradient(
+    from var(--wl-film-angle),
+    rgba(255, 255, 255, 0.98) 0deg 12deg,
+    rgba(255, 117, 182, 0.9) 35deg,
+    rgba(237, 164, 255, 0.84) 79deg,
+    rgba(118, 204, 255, 0.92) 126deg,
+    rgba(230, 250, 255, 0.94) 166deg,
+    rgba(255, 216, 159, 0.8) 209deg,
+    rgba(255, 136, 198, 0.88) 254deg,
+    rgba(171, 151, 255, 0.76) 295deg,
+    rgba(111, 211, 255, 0.88) 334deg,
+    rgba(255, 255, 255, 0.98) 360deg
+  );
+  opacity: 0.96;
+  mix-blend-mode: normal;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 12px), #000 calc(100% - 10px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 12px), #000 calc(100% - 10px));
+  animation: wl-pearl-film-orbit calc(var(--wl-cloud-duration) * 2.4) linear infinite;
+}
+
+.wishlist .wl-cloud-bubble::after {
+  z-index: 6;
+  inset: 0;
+  background:
+    radial-gradient(
+      ellipse 34% 12% at var(--wl-glint-x) var(--wl-glint-y),
+      rgba(255, 255, 255, 0.98) 0 24%,
+      rgba(255, 255, 255, 0.68) 38%,
+      rgba(255, 232, 246, 0.26) 58%,
+      transparent 76%
+    ),
+    radial-gradient(
+      ellipse 9% 5% at calc(var(--wl-glint-x) - 13%) calc(var(--wl-glint-y) + 17%),
+      rgba(255, 255, 255, 0.94),
+      transparent 78%
+    ),
+    radial-gradient(ellipse 29% 15% at 84% 78%, rgba(112, 202, 255, 0.28), transparent 75%),
+    radial-gradient(ellipse 25% 14% at 15% 76%, rgba(255, 126, 184, 0.24), transparent 76%),
+    radial-gradient(circle at 50% 50%, transparent 62%, rgba(255, 255, 255, 0.16) 76%, rgba(89, 44, 73, 0.13) 100%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), transparent 39% 68%, rgba(173, 215, 255, 0.1));
+  opacity: 1;
+}
+
+.wishlist .wl-cloud-item::before {
+  inset: -30%;
+  background:
+    radial-gradient(ellipse 50% 38% at 23% 42%, rgba(255, 142, 190, 0.46), transparent 72%),
+    radial-gradient(ellipse 49% 37% at 78% 57%, rgba(118, 202, 255, 0.36), transparent 74%),
+    radial-gradient(ellipse 38% 28% at 58% 18%, rgba(213, 164, 255, 0.28), transparent 76%),
+    radial-gradient(circle at 49% 52%, rgba(255, 224, 236, 0.48) 0 24%, transparent 58%);
+  opacity: 0.8;
+  filter: blur(clamp(17px, calc(var(--wl-cloud-size) * 0.12), 29px));
+}
+
+.wishlist .wl-cloud-item::after {
+  inset: -23%;
+  background: conic-gradient(
+    from calc(var(--wl-film-angle) * -1),
+    transparent 0 8%,
+    rgba(255, 137, 191, 0.24) 17%,
+    transparent 31%,
+    rgba(119, 203, 255, 0.2) 48%,
+    transparent 63%,
+    rgba(208, 157, 255, 0.19) 78%,
+    transparent 92%
+  );
+  opacity: 0.62;
+  filter: blur(clamp(18px, calc(var(--wl-cloud-size) * 0.13), 31px));
+}
+
+.wishlist .wl-cloud-bubble[data-priority='high'] {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.62),
+    -13px -6px 36px rgba(255, 128, 188, 0.38),
+    15px 8px 38px rgba(105, 198, 255, 0.35),
+    0 26px 52px rgba(117, 61, 92, 0.2),
+    inset 0 1px 2px rgba(255, 255, 255, 0.98),
+    inset 0 -2px 7px rgba(97, 50, 82, 0.17);
+}
+
+.wishlist .wl-cloud-bubble[data-priority='medium'] {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.58),
+    -11px -5px 31px rgba(255, 137, 192, 0.33),
+    13px 7px 33px rgba(112, 197, 255, 0.3),
+    0 23px 45px rgba(117, 61, 92, 0.18),
+    inset 0 1px 2px rgba(255, 255, 255, 0.96),
+    inset 0 -2px 6px rgba(97, 50, 82, 0.16);
+}
+
+.wishlist .wl-cloud-bubble[data-priority='low'] {
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.52),
+    -9px -4px 26px rgba(255, 145, 194, 0.28),
+    11px 6px 28px rgba(124, 201, 247, 0.25),
+    0 20px 39px rgba(117, 61, 92, 0.16),
+    inset 0 1px 2px rgba(255, 255, 255, 0.94),
+    inset 0 -2px 5px rgba(97, 50, 82, 0.14);
+}
+
+.wishlist .wl-cloud-bubble:hover,
+.wishlist .wl-cloud-bubble:focus-visible,
+.wishlist .wl-cloud-item--dragging .wl-cloud-bubble {
+  border-color: rgba(255, 255, 255, 1);
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.64),
+    -15px -7px 42px rgba(255, 121, 184, 0.43),
+    17px 9px 44px rgba(98, 195, 255, 0.4),
+    0 29px 58px rgba(117, 61, 92, 0.22),
+    inset 0 1px 2px rgba(255, 255, 255, 1),
+    inset 0 -2px 8px rgba(97, 50, 82, 0.18);
+}
+
+@keyframes wl-pearl-film-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wishlist .wl-cloud-bubble::before {
+    animation: none;
+    transform: rotate(var(--wl-film-angle));
+  }
+}
