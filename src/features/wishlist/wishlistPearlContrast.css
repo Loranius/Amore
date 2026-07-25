@@ -38,3 +38,10 @@
     rgba(91, 195, 255, 0.7)
     rgba(255, 150, 202, 0.66);
 }
+
+/* Remove the rotating conic oval behind each bubble; keep the softer ::before mist. */
+.wishlist .wl-cloud-item::after {
+  display: none;
+  content: none;
+  animation: none;
+}
