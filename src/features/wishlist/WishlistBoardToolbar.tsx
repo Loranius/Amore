@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { useSharedWishlistItems, useWishlistItems } from './useWishlist';
@@ -9,21 +9,18 @@ import type {
   WishlistPriorityFilter,
   WishlistViewMode,
 } from './wishlistBoardView';
+import type { WishlistTabScope } from './useWishlistViewPreference';
 import './wishlistBoardToolbar.css';
 import './wishlistMobilePolish.css';
 import './wishlistFeedPolish.css';
 
 interface WishlistBoardToolbarProps {
+  scope: WishlistTabScope;
   value: WishlistBoardViewState;
   counts: Record<WishlistPriorityFilter, number>;
   resultCount: number;
   onChange: (value: WishlistBoardViewState) => void;
 }
-
-type WishlistTabScope = 'me' | 'partner' | 'shared';
-type StoredWishlistViews = Partial<Record<WishlistTabScope, WishlistViewMode>>;
-
-const WISHLIST_VIEW_STORAGE_KEY = 'amore:wishlist:view-modes:v1';
 
 const PRIORITY_FILTERS: Array<{ value: WishlistPriorityFilter; label: string; icon: string }> = [
   { value: 'all', label: 'Усі', icon: '✦' },
@@ -67,52 +64,6 @@ function freshPolaroidSeed(): number {
   return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
 }
 
-function normalizeStoredView(value: unknown): WishlistViewMode | null {
-  if (value === 'table') return 'feed';
-  return value === 'bubbles' || value === 'feed' || value === 'polaroid' ? value : null;
-}
-
-function readStoredViews(): StoredWishlistViews {
-  if (typeof window === 'undefined') return {};
-  try {
-    const raw = window.localStorage.getItem(WISHLIST_VIEW_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const stored: StoredWishlistViews = {};
-    const me = normalizeStoredView(parsed.me);
-    const partner = normalizeStoredView(parsed.partner);
-    const shared = normalizeStoredView(parsed.shared);
-    if (me) stored.me = me;
-    if (partner) stored.partner = partner;
-    if (shared) stored.shared = shared;
-    return stored;
-  } catch {
-    return {};
-  }
-}
-
-function writeStoredView(scope: WishlistTabScope, view: WishlistViewMode): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(
-      WISHLIST_VIEW_STORAGE_KEY,
-      JSON.stringify({ ...readStoredViews(), [scope]: view }),
-    );
-  } catch {
-    // Storage may be unavailable in private mode; the in-memory view still works.
-  }
-}
-
-function activeWishlistScope(): WishlistTabScope {
-  const tabs = document.querySelectorAll<HTMLButtonElement>(
-    '.wl-wishlist-controls .tab-bar-btn[role="tab"]',
-  );
-  const activeIndex = [...tabs].findIndex((button) => button.getAttribute('aria-selected') === 'true');
-  if (activeIndex === 1) return 'partner';
-  if (activeIndex === 2) return 'shared';
-  return 'me';
-}
-
 function wishTitle(button: HTMLButtonElement): string {
   const label = button.getAttribute('aria-label') ?? '';
   return label.match(/«(.+?)»/)?.[1] ?? label;
@@ -141,6 +92,7 @@ function clearPolaroidVariables(item: HTMLElement): void {
 }
 
 export function WishlistBoardToolbar({
+  scope,
   value,
   counts,
   resultCount,
@@ -154,25 +106,9 @@ export function WishlistBoardToolbar({
   const sharedItems = useSharedWishlistItems().data ?? [];
   const [open, setOpen] = useState(false);
   const [polaroidSeed, setPolaroidSeed] = useState(freshPolaroidSeed);
-  const hydratedScopeRef = useRef<WishlistTabScope | null>(null);
   const selected = PRIORITY_FILTERS.find((filter) => filter.value === value.priority)
     ?? DEFAULT_PRIORITY_FILTER;
   const selectedView = VIEW_MODES.find((mode) => mode.value === value.view) ?? VIEW_MODES[0]!;
-
-  // The toolbar stays mounted while tabs change. Resolve the selected tab from the
-  // tab bar and persist each tab's presentation independently in localStorage.
-  useEffect(() => {
-    const scope = activeWishlistScope();
-    if (hydratedScopeRef.current !== scope) {
-      hydratedScopeRef.current = scope;
-      const storedView = readStoredViews()[scope];
-      if (storedView && storedView !== value.view) {
-        onChange({ ...value, view: storedView });
-        return;
-      }
-    }
-    writeStoredView(scope, value.view);
-  });
 
   useEffect(() => {
     const root = document.querySelector<HTMLElement>('.wishlist');
@@ -182,7 +118,6 @@ export function WishlistBoardToolbar({
     const syncItems = () => {
       const board = root.querySelector<HTMLElement>('.wishlist-grid');
       if (!board) return;
-      const scope = activeWishlistScope();
       const activeItems = scope === 'partner' ? partnerItems : scope === 'shared' ? sharedItems : ownItems;
       const queues = itemQueues(activeItems);
 
@@ -264,7 +199,7 @@ export function WishlistBoardToolbar({
         clearPolaroidVariables(item);
       });
     };
-  }, [ownItems, partnerItems, polaroidSeed, sharedItems, value.view]);
+  }, [ownItems, partnerItems, polaroidSeed, scope, sharedItems, value.view]);
 
   const selectPriority = (priority: WishlistPriorityFilter) => {
     onChange({ ...value, priority });
