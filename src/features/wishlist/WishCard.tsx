@@ -18,7 +18,12 @@ import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistCloud.css';
 import './wishlistCloudModalFix.css';
 
-interface WishCardProps {
+export interface WishCardTriggerRenderProps {
+  detailsOpen: boolean;
+  openDetails: () => void;
+}
+
+export interface WishCardProps {
   item: WishlistItemV3;
   context?: WishCardContext;
   isOwn: boolean;
@@ -31,6 +36,7 @@ interface WishCardProps {
   onPurchased: (item: WishlistItemV3) => void;
   onFulfill: (item: WishlistItemV3) => void;
   onMove: (item: WishlistItemV3) => void;
+  renderTrigger?: (props: WishCardTriggerRenderProps) => ReactNode;
 }
 
 function productHost(link: string): string {
@@ -54,6 +60,7 @@ export function WishCard({
   onPurchased,
   onFulfill,
   onMove,
+  renderTrigger,
 }: WishCardProps) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
@@ -376,33 +383,42 @@ export function WishCard({
       )
     : null;
 
+  const trigger = renderTrigger
+    ? renderTrigger({
+        detailsOpen,
+        openDetails: () => setDetailsOpen(true),
+      })
+    : (
+        <article className="wl-cloud-item" style={bubbleStyle} aria-busy={busy}>
+          <button
+            type="button"
+            className="wl-cloud-bubble"
+            data-priority={priority}
+            aria-label={`Відкрити мрію «${item.title}». ${priorityPresentation.label}`}
+            aria-haspopup="dialog"
+            aria-expanded={detailsOpen}
+            aria-busy={busy}
+            disabled={busy}
+            onClick={() => setDetailsOpen(true)}
+          >
+            {imageAvailable ? (
+              <WishlistProductVisual
+                src={item.image_url ?? ''}
+                alt=""
+                className="wl-cloud-bubble-media"
+                {...imageVisualProps}
+                onError={() => setImageFailed(true)}
+              />
+            ) : (
+              <span className="wl-cloud-bubble-placeholder" aria-hidden="true">♡</span>
+            )}
+          </button>
+        </article>
+      );
+
   return (
     <>
-      <article className="wl-cloud-item" style={bubbleStyle} aria-busy={busy}>
-        <button
-          type="button"
-          className="wl-cloud-bubble"
-          data-priority={priority}
-          aria-label={`Відкрити мрію «${item.title}». ${priorityPresentation.label}`}
-          aria-haspopup="dialog"
-          aria-expanded={detailsOpen}
-          aria-busy={busy}
-          disabled={busy}
-          onClick={() => setDetailsOpen(true)}
-        >
-          {imageAvailable ? (
-            <WishlistProductVisual
-              src={item.image_url ?? ''}
-              alt=""
-              className="wl-cloud-bubble-media"
-              {...imageVisualProps}
-              onError={() => setImageFailed(true)}
-            />
-          ) : (
-            <span className="wl-cloud-bubble-placeholder" aria-hidden="true">♡</span>
-          )}
-        </button>
-      </article>
+      {trigger}
       {detailsSheet}
     </>
   );
