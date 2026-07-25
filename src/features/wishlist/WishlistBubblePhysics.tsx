@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 
 type BubbleBody = {
   element: HTMLElement;
-  button: HTMLButtonElement;
   x: number;
   y: number;
   vx: number;
@@ -10,7 +9,14 @@ type BubbleBody = {
   baseX: number;
   baseY: number;
   radius: number;
+  mass: number;
   dragging: boolean;
+};
+
+type PointerSample = {
+  x: number;
+  y: number;
+  time: number;
 };
 
 type PointerDrag = {
@@ -25,6 +31,7 @@ type PointerDrag = {
   offsetY: number;
   active: boolean;
   holdTimer: number | null;
+  samples: PointerSample[];
 };
 
 type BoardBounds = {
@@ -37,9 +44,27 @@ type BoardBounds = {
 const HOLD_DELAY_MS = 165;
 const DRAG_DISTANCE_PX = 7;
 const FRAME_MS = 1000 / 60;
-const MAX_SPEED = 26;
-const WALL_RESTITUTION = 0.76;
-const COLLISION_RESTITUTION = 0.82;
+
+const MAX_SPEED = 42;
+const MAX_SUBSTEPS = 5;
+const WALL_RESTITUTION = 0.89;
+const WALL_TANGENT_RETENTION = 0.995;
+const COLLISION_RESTITUTION = 0.94;
+const DRAG_COLLISION_RESTITUTION = 0.08;
+const POSITION_CORRECTION = 0.86;
+const POSITION_SLOP = 0.12;
+
+const AIR_DAMPING_PER_FRAME = 0.996;
+const ROLLING_RESISTANCE_PER_FRAME = 0.018;
+const REDUCED_MOTION_DAMPING_PER_FRAME = 0.86;
+const REDUCED_MOTION_RESISTANCE_PER_FRAME = 0.11;
+const SLEEP_SPEED = 0.035;
+const MOVING_CLASS_SPEED = 0.12;
+
+const THROW_SPEED_MULTIPLIER = 1.16;
+const THROW_SAMPLE_WINDOW_MS = 110;
+const THROW_IDLE_CUTOFF_MS = 145;
+const MAX_POINTER_SAMPLES = 12;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -58,6 +83,49 @@ function limitVelocity(body: BubbleBody): void {
   body.vy *= ratio;
 }
 
+function inverseMass(body: BubbleBody): number {
+  return body.dragging ? 0 : 1 / Math.max(body.mass, 0.0001);
+}
+
+function recordPointerSample(state: PointerDrag, x: number, y: number, time: number): void {
+  state.lastX = x;
+  state.lastY = y;
+  state.lastTime = time;
+  state.samples.push({ x, y, time });
+
+  const oldestAllowed = time - THROW_SAMPLE_WINDOW_MS * 1.5;
+  while (state.samples.length > 2 && state.samples[0]!.time < oldestAllowed) {
+    state.samples.shift();
+  }
+  if (state.samples.length > MAX_POINTER_SAMPLES) {
+    state.samples.splice(0, state.samples.length - MAX_POINTER_SAMPLES);
+  }
+}
+
+function estimateLaunchVelocity(state: PointerDrag, now: number): { vx: number; vy: number } {
+  const recent = state.samples.filter((sample) => now - sample.time <= THROW_SAMPLE_WINDOW_MS);
+  const first = recent[0];
+  const last = recent.at(-1);
+  const idleTime = Math.max(0, now - state.lastTime);
+  const idleFactor = clamp(1 - idleTime / THROW_IDLE_CUTOFF_MS, 0, 1);
+
+  if (!first || !last || last.time - first.time < 8) {
+    return {
+      vx: state.body.vx * idleFactor,
+      vy: state.body.vy * idleFactor,
+    };
+  }
+
+  const elapsed = last.time - first.time;
+  const sampledVx = ((last.x - first.x) / elapsed) * FRAME_MS;
+  const sampledVy = ((last.y - first.y) / elapsed) * FRAME_MS;
+
+  return {
+    vx: (state.body.vx * 0.3 + sampledVx * 0.7) * THROW_SPEED_MULTIPLIER * idleFactor,
+    vy: (state.body.vy * 0.3 + sampledVy * 0.7) * THROW_SPEED_MULTIPLIER * idleFactor,
+  };
+}
+
 function mountBubblePhysics(board: HTMLElement): () => void {
   const bodies = new Map<HTMLElement, BubbleBody>();
   let bounds: BoardBounds = { left: 0, right: 0, top: 0, bottom: 0 };
@@ -74,7 +142,7 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     body.element.style.setProperty('--wl-physics-y', `${body.y.toFixed(2)}px`);
     body.element.classList.toggle(
       'wl-cloud-item--moving',
-      body.dragging || Math.hypot(body.vx, body.vy) > 0.18,
+      body.dragging || Math.hypot(body.vx, body.vy) > MOVING_CLASS_SPEED,
     );
   };
 
@@ -83,7 +151,7 @@ function mountBubblePhysics(board: HTMLElement): () => void {
   };
 
   const clampBodyToBoard = (body: BubbleBody, bounce: boolean) => {
-    const gutter = Math.min(14, body.radius * 0.1);
+    const gutter = Math.min(10, body.radius * 0.075);
     let minX = bounds.left + body.radius + gutter - body.baseX;
     let maxX = bounds.right - body.radius - gutter - body.baseX;
     let minY = bounds.top + body.radius + gutter - body.baseY;
@@ -102,18 +170,30 @@ function mountBubblePhysics(board: HTMLElement): () => void {
 
     if (body.x < minX) {
       body.x = minX;
-      if (bounce && body.vx < 0) body.vx = Math.abs(body.vx) * WALL_RESTITUTION;
+      if (bounce && body.vx < 0) {
+        body.vx = Math.abs(body.vx) * WALL_RESTITUTION;
+        body.vy *= WALL_TANGENT_RETENTION;
+      }
     } else if (body.x > maxX) {
       body.x = maxX;
-      if (bounce && body.vx > 0) body.vx = -Math.abs(body.vx) * WALL_RESTITUTION;
+      if (bounce && body.vx > 0) {
+        body.vx = -Math.abs(body.vx) * WALL_RESTITUTION;
+        body.vy *= WALL_TANGENT_RETENTION;
+      }
     }
 
     if (body.y < minY) {
       body.y = minY;
-      if (bounce && body.vy < 0) body.vy = Math.abs(body.vy) * WALL_RESTITUTION;
+      if (bounce && body.vy < 0) {
+        body.vy = Math.abs(body.vy) * WALL_RESTITUTION;
+        body.vx *= WALL_TANGENT_RETENTION;
+      }
     } else if (body.y > maxY) {
       body.y = maxY;
-      if (bounce && body.vy > 0) body.vy = -Math.abs(body.vy) * WALL_RESTITUTION;
+      if (bounce && body.vy > 0) {
+        body.vy = -Math.abs(body.vy) * WALL_RESTITUTION;
+        body.vx *= WALL_TANGENT_RETENTION;
+      }
     }
   };
 
@@ -150,46 +230,36 @@ function mountBubblePhysics(board: HTMLElement): () => void {
           const nx = dx / distance;
           const ny = dy / distance;
           const overlap = minimumDistance - distance;
+          const inverseMassA = inverseMass(a);
+          const inverseMassB = inverseMass(b);
+          const inverseMassSum = inverseMassA + inverseMassB;
 
-          if (a.dragging && !b.dragging) {
-            b.x += nx * overlap;
-            b.y += ny * overlap;
-            const impact = Math.max(0, a.vx * nx + a.vy * ny);
-            const push = impact * 0.78 + overlap * 0.09 + 0.55;
-            b.vx += nx * push + a.vx * 0.2;
-            b.vy += ny * push + a.vy * 0.2;
-            limitVelocity(b);
-            clampBodyToBoard(b, true);
-            continue;
-          }
+          if (inverseMassSum <= 0) continue;
 
-          if (b.dragging && !a.dragging) {
-            a.x -= nx * overlap;
-            a.y -= ny * overlap;
-            const impact = Math.max(0, -(b.vx * nx + b.vy * ny));
-            const push = impact * 0.78 + overlap * 0.09 + 0.55;
-            a.vx -= nx * push - b.vx * 0.2;
-            a.vy -= ny * push - b.vy * 0.2;
-            limitVelocity(a);
-            clampBodyToBoard(a, true);
-            continue;
-          }
+          const correction = Math.max(overlap - POSITION_SLOP, 0)
+            * POSITION_CORRECTION
+            / inverseMassSum;
+          a.x -= nx * correction * inverseMassA;
+          a.y -= ny * correction * inverseMassA;
+          b.x += nx * correction * inverseMassB;
+          b.y += ny * correction * inverseMassB;
 
-          if (a.dragging && b.dragging) continue;
+          const relativeVx = b.vx - a.vx;
+          const relativeVy = b.vy - a.vy;
+          const velocityAlongNormal = relativeVx * nx + relativeVy * ny;
 
-          const correction = overlap / 2;
-          a.x -= nx * correction;
-          a.y -= ny * correction;
-          b.x += nx * correction;
-          b.y += ny * correction;
+          if (velocityAlongNormal < -0.001) {
+            const restitution = a.dragging || b.dragging
+              ? DRAG_COLLISION_RESTITUTION
+              : COLLISION_RESTITUTION;
+            const impulse = (-(1 + restitution) * velocityAlongNormal) / inverseMassSum;
+            const impulseX = impulse * nx;
+            const impulseY = impulse * ny;
 
-          const relativeVelocity = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
-          if (relativeVelocity < 0) {
-            const impulse = (-(1 + COLLISION_RESTITUTION) * relativeVelocity) / 2;
-            a.vx -= impulse * nx;
-            a.vy -= impulse * ny;
-            b.vx += impulse * nx;
-            b.vy += impulse * ny;
+            a.vx -= impulseX * inverseMassA;
+            a.vy -= impulseY * inverseMassA;
+            b.vx += impulseX * inverseMassB;
+            b.vy += impulseY * inverseMassB;
           }
 
           limitVelocity(a);
@@ -217,10 +287,11 @@ function mountBubblePhysics(board: HTMLElement): () => void {
       body.baseX = rect.left + rect.width / 2 - body.x;
       body.baseY = rect.top + rect.height / 2 - body.y;
       body.radius = Math.min(rect.width, rect.height) * 0.47;
+      body.mass = Math.pow(Math.max(body.radius, 1), 1.35);
       clampBodyToBoard(body, false);
     });
 
-    resolveCollisions(1);
+    resolveCollisions(2);
     renderAll();
   };
 
@@ -231,33 +302,77 @@ function mountBubblePhysics(board: HTMLElement): () => void {
 
   const hasKineticMotion = () => {
     for (const body of bodies.values()) {
-      if (body.dragging || Math.abs(body.vx) > 0.035 || Math.abs(body.vy) > 0.035) {
+      if (body.dragging || Math.hypot(body.vx, body.vy) > SLEEP_SPEED) {
         return true;
       }
     }
     return false;
   };
 
+  const applyRollingResistance = (body: BubbleBody, delta: number) => {
+    if (body.dragging) return;
+
+    const damping = Math.pow(
+      reducedMotion ? REDUCED_MOTION_DAMPING_PER_FRAME : AIR_DAMPING_PER_FRAME,
+      delta,
+    );
+    body.vx *= damping;
+    body.vy *= damping;
+
+    const speed = Math.hypot(body.vx, body.vy);
+    if (speed <= SLEEP_SPEED) {
+      body.vx = 0;
+      body.vy = 0;
+      return;
+    }
+
+    const resistance = (
+      reducedMotion ? REDUCED_MOTION_RESISTANCE_PER_FRAME : ROLLING_RESISTANCE_PER_FRAME
+    ) * delta;
+    const nextSpeed = Math.max(0, speed - resistance);
+
+    if (nextSpeed <= SLEEP_SPEED) {
+      body.vx = 0;
+      body.vy = 0;
+      return;
+    }
+
+    const ratio = nextSpeed / speed;
+    body.vx *= ratio;
+    body.vy *= ratio;
+  };
+
   const tick = (now: number) => {
     frameId = 0;
     const delta = clamp((now - lastFrameTime) / FRAME_MS, 0.35, 2.2);
     lastFrameTime = now;
-    const friction = Math.pow(reducedMotion ? 0.82 : 0.955, delta);
 
+    let maximumSpeed = 0;
+    let smallestRadius = Number.POSITIVE_INFINITY;
     bodies.forEach((body) => {
-      if (body.dragging) return;
-
-      body.x += body.vx * delta;
-      body.y += body.vy * delta;
-      body.vx *= friction;
-      body.vy *= friction;
-
-      if (Math.abs(body.vx) < 0.025) body.vx = 0;
-      if (Math.abs(body.vy) < 0.025) body.vy = 0;
-      clampBodyToBoard(body, true);
+      if (!body.dragging) maximumSpeed = Math.max(maximumSpeed, Math.hypot(body.vx, body.vy));
+      if (body.radius > 0) smallestRadius = Math.min(smallestRadius, body.radius);
     });
 
-    resolveCollisions(2);
+    const safeRadius = Number.isFinite(smallestRadius) ? smallestRadius : 32;
+    const substeps = clamp(
+      Math.ceil((maximumSpeed * delta) / Math.max(10, safeRadius * 0.42)),
+      1,
+      MAX_SUBSTEPS,
+    );
+    const stepDelta = delta / substeps;
+
+    for (let step = 0; step < substeps; step += 1) {
+      bodies.forEach((body) => {
+        if (body.dragging) return;
+        body.x += body.vx * stepDelta;
+        body.y += body.vy * stepDelta;
+        clampBodyToBoard(body, true);
+      });
+      resolveCollisions(2);
+    }
+
+    bodies.forEach((body) => applyRollingResistance(body, delta));
     renderAll();
 
     if (hasKineticMotion()) {
@@ -279,16 +394,20 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     current.body.element.classList.remove('wl-cloud-item--pressed');
 
     if (current.active) {
+      const releaseTime = performance.now();
       current.body.dragging = false;
       current.body.element.classList.remove('wl-cloud-item--dragging');
       board.removeAttribute('data-physics-active');
       suppressTarget = current.body.element;
-      suppressClickUntil = performance.now() + 420;
+      suppressClickUntil = releaseTime + 420;
 
       if (cancelled || reducedMotion) {
         current.body.vx = 0;
         current.body.vy = 0;
       } else {
+        const launch = estimateLaunchVelocity(current, releaseTime);
+        current.body.vx = launch.vx;
+        current.body.vy = launch.vy;
         limitVelocity(current.body);
       }
       ensureAnimation();
@@ -324,6 +443,7 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     if (!body) return;
     measureBodies();
 
+    const now = performance.now();
     const state: PointerDrag = {
       pointerId: event.pointerId,
       body,
@@ -331,11 +451,12 @@ function mountBubblePhysics(board: HTMLElement): () => void {
       startY: event.clientY,
       lastX: event.clientX,
       lastY: event.clientY,
-      lastTime: performance.now(),
+      lastTime: now,
       offsetX: 0,
       offsetY: 0,
       active: false,
       holdTimer: null,
+      samples: [{ x: event.clientX, y: event.clientY, time: now }],
     };
 
     item.classList.add('wl-cloud-item--pressed');
@@ -350,10 +471,9 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     const now = performance.now();
     const previousX = state.lastX;
     const previousY = state.lastY;
-    const elapsed = Math.max(5, now - state.lastTime);
-    state.lastX = event.clientX;
-    state.lastY = event.clientY;
-    state.lastTime = now;
+    const previousTime = state.lastTime;
+    const elapsed = Math.max(5, now - previousTime);
+    recordPointerSample(state, event.clientX, event.clientY, now);
 
     if (!state.active) {
       const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
@@ -365,20 +485,27 @@ function mountBubblePhysics(board: HTMLElement): () => void {
 
     const instantVx = ((event.clientX - previousX) / elapsed) * FRAME_MS;
     const instantVy = ((event.clientY - previousY) / elapsed) * FRAME_MS;
-    state.body.vx = state.body.vx * 0.28 + instantVx * 0.72;
-    state.body.vy = state.body.vy * 0.28 + instantVy * 0.72;
+    state.body.vx = state.body.vx * 0.18 + instantVx * 0.82;
+    state.body.vy = state.body.vy * 0.18 + instantVy * 0.82;
     limitVelocity(state.body);
 
     state.body.x = event.clientX - state.offsetX - state.body.baseX;
     state.body.y = event.clientY - state.offsetY - state.body.baseY;
     clampBodyToBoard(state.body, false);
-    resolveCollisions(3);
+    resolveCollisions(4);
     renderAll();
     ensureAnimation();
   };
 
   const onPointerUp = (event: PointerEvent) => {
     if (!pointer || event.pointerId !== pointer.pointerId) return;
+    const releaseDistance = Math.hypot(
+      event.clientX - pointer.lastX,
+      event.clientY - pointer.lastY,
+    );
+    if (releaseDistance > 0.5) {
+      recordPointerSample(pointer, event.clientX, event.clientY, performance.now());
+    }
     endPointer(false);
   };
 
@@ -434,7 +561,6 @@ function mountBubblePhysics(board: HTMLElement): () => void {
       if (!button) return;
       bodies.set(element, {
         element,
-        button,
         x: 0,
         y: 0,
         vx: 0,
@@ -442,6 +568,7 @@ function mountBubblePhysics(board: HTMLElement): () => void {
         baseX: 0,
         baseY: 0,
         radius: 0,
+        mass: 1,
         dragging: false,
       });
     });
