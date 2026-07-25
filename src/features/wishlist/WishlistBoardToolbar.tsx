@@ -119,8 +119,23 @@ export function WishlistBoardToolbar({
     };
 
     syncItems();
+
+    // Bubble physics discovers items through child-list changes. A temporary
+    // marker refreshes its body map after returning from table or polaroid mode.
+    if (value.view === 'bubbles') {
+      const board = root.querySelector<HTMLElement>('.wishlist-grid');
+      const marker = document.createComment('wishlist-view-sync');
+      board?.append(marker);
+      marker.remove();
+    }
+
     const observer = new MutationObserver(syncItems);
-    observer.observe(root, { childList: true, subtree: true });
+    observer.observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['aria-label'],
+    });
 
     return () => {
       observer.disconnect();
@@ -134,7 +149,7 @@ export function WishlistBoardToolbar({
         item.style.removeProperty('--wl-polaroid-tape-rotate');
       });
     };
-  }, [resultCount, value.view]);
+  }, [value.view]);
 
   const selectPriority = (priority: WishlistPriorityFilter) => {
     onChange({ ...value, priority });
