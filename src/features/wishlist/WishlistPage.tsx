@@ -38,6 +38,7 @@ import {
 } from './wishlistBoardView';
 import { partnerGenitive } from './partnerLabel';
 import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
+import { useWishlistViewPreference } from './useWishlistViewPreference';
 import {
   useWishlistItems,
   useSharedWishlistItems,
@@ -139,6 +140,7 @@ export function WishlistPage() {
   const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
   const [sharedFilter, setSharedFilter] = useState<SharedWishFilter>('all');
   const [boardViews, setBoardViews] = useState<BoardViews>(initialBoardViews);
+  const [preferredView, setPreferredView] = useWishlistViewPreference(tab);
   const actionLock = useRef(false);
 
   useEffect(() => {
@@ -180,7 +182,7 @@ export function WishlistPage() {
     : tab === 'shared' && partner
       ? filterSharedWishes(sharedItems, sharedFilter, me.id, partner.id)
       : items;
-  const activeBoardView = boardViews[tab];
+  const activeBoardView = { ...boardViews[tab], view: preferredView };
   const boardFilterCounts = wishlistPriorityFilterCounts(contextItems);
   const visibleItems = applyWishlistBoardView(contextItems, activeBoardView);
 
@@ -340,6 +342,7 @@ export function WishlistPage() {
 
   const changeBoardView = (nextView: WishlistBoardViewState) => {
     setBoardViews((current) => ({ ...current, [tab]: nextView }));
+    if (nextView.view !== preferredView) setPreferredView(nextView.view);
   };
 
   return (
@@ -366,6 +369,7 @@ export function WishlistPage() {
 
         {!archiveOpen && !isPending && !isError && contextItems.length > 0 && (
           <WishlistBoardToolbar
+            scope={tab}
             value={activeBoardView}
             counts={boardFilterCounts}
             resultCount={visibleItems.length}
