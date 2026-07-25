@@ -16,10 +16,12 @@ function readStoredArchiveViews(): StoredArchiveViews {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw) as Record<string, unknown>;
-    return {
-      personal: normalizeWishlistArchiveView(parsed.personal) ?? undefined,
-      shared: normalizeWishlistArchiveView(parsed.shared) ?? undefined,
-    };
+    const stored: StoredArchiveViews = {};
+    const personal = normalizeWishlistArchiveView(parsed.personal);
+    const shared = normalizeWishlistArchiveView(parsed.shared);
+    if (personal) stored.personal = personal;
+    if (shared) stored.shared = shared;
+    return stored;
   } catch {
     return {};
   }
