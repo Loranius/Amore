@@ -26,6 +26,27 @@ export interface WishlistImageProcessingDecision {
   retryAfterMs: number | null;
 }
 
+const STALE_IMAGE_PROCESSING_MESSAGES = [
+  'image_processing_source_changed',
+  'image_processing_preference_changed',
+  'image_processing_revision_changed',
+  'image_processing_stale',
+] as const;
+
+function errorMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error ?? '')).toLowerCase();
+}
+
+/**
+ * A worker becomes stale when the user edits the image or its display preference
+ * while an older tab/component is still mounted. Retrying the old generation can
+ * never succeed and must be treated as a terminal no-op.
+ */
+export function isWishlistImageProcessingStaleError(error: unknown): boolean {
+  const message = errorMessage(error);
+  return STALE_IMAGE_PROCESSING_MESSAGES.some((code) => message.includes(code));
+}
+
 export function wishlistImageResultUsable(input: {
   preference: WishlistImagePreference;
   mode: WishlistImageDisplayMode | null | undefined;
@@ -56,8 +77,7 @@ export function wishlistImageRetryDelayMs(
 }
 
 export function wishlistImageProcessingErrorCode(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error ?? '');
-  const normalized = message.toLowerCase();
+  const normalized = errorMessage(error);
 
   if (normalized.includes('image_load') || normalized.includes('image_decode')) {
     return 'image_load_failed';
