@@ -16,6 +16,7 @@
 // ============================================================
 import type { DepositedCrystal } from '../artifactTypes';
 import type { CompositionScore } from '../composition/score';
+import type { AttachmentJunction } from '../composition/attachment';
 
 /**
  * Абстрактне «вирощене тіло» — одиниця Growth State. Для виду «кристал»
@@ -31,6 +32,9 @@ export interface GrowthState {
   bodies: readonly GrowthBody[];
   /** Growth Order — ключі тіл у порядку відкладення (детермінований). */
   order: readonly string[];
+  /** Канонічні записи кріплення (`CAI-REQ-004`), відсортовані за junctionId.
+   *  Кореневі тіла (на віртуальному нуклеусі) junction не мають. */
+  junctions: readonly AttachmentJunction[];
   /** Самооцінка композиції (Hierarchy/Flow/Silhouette/…). */
   score: CompositionScore;
   /** Скільки проходів композиції знадобилось (1 або 2). */

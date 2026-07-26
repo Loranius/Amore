@@ -15,12 +15,16 @@ export type {
   DepositedCrystal,
   DepositionEvent,
   DominantSystem,
+  AttachmentContact,
   EvolutionPressures,
   GrowthDomainId,
-  GrowthSite,
   LifeCycleStage,
   NodeKind,
 } from './artifactTypes';
+
+// Attachment Junction (Volume IV, `CAI-REQ-004`).
+export type { AttachmentJunction, JunctionBody, TrimPolicy, SeamPolicy } from './composition/attachment';
+export { buildJunctions, buildJunction, findOrphans, ATTACHMENT_JUNCTION_VERSION } from './composition/attachment';
 export type { Vec3 } from './vec3';
 export type { CompositionScore } from './composition/score';
 export { composeMineralCluster } from './composition/mineralPreset';

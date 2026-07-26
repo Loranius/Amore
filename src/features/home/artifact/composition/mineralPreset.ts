@@ -143,6 +143,14 @@ function synthesizeCrystal(body: ComposedBody, parent: DepositedCrystal, seedNum
     radius: body.radius,
     growthEnergy: body.energy,
     role: body.role === 'micro' ? 'micro' : 'satellite',
+    // `CAI-REQ-004`: «виточене» композицією тіло кріпиться до СВОГО батька,
+    // а не успадковує кріплення батька зі спреду вище.
+    attachment: {
+      hostKey: body.parentKey ?? parent.key,
+      contactPoint: body.anchor,
+      contactNormal: body.direction,
+      hostT: 0,
+    },
     primary: false,
     tier: body.tier,
     archetype: body.archetype as CrystalArchetype,

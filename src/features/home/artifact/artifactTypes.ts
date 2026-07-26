@@ -116,16 +116,21 @@ export interface ArtifactNode {
 }
 
 /**
- * Growth Site — кандидат на місце наступного відкладення: точка на бічній
- * поверхні вже існуючого тіла мінеральної маси + аналітична нормаль.
- * score = Pressure × GrowthPotential × SurfaceStress × LocalDensity × Shadow.
+ * Сирі факти кріплення, які Growth Engine фіксує В МОМЕНТ відкладення
+ * (`CAI-REQ-004`): на якому тілі виросло, де саме та як глибоко сидить.
+ * Раніше host обирався й одразу викидався — через це Geometry Engine не
+ * мав як обробити стик. Канонічний версійований `AttachmentJunction`
+ * публікує вже Composition із ФІНАЛЬНОЇ геометрії (composition/attachment.ts).
  */
-export interface GrowthSite {
-  point: Vec3;
-  normal: Vec3;
-  substrateKey: string;
-  substrateDirection: Vec3;
-  score: number;
+export interface AttachmentContact {
+  /** Ключ тіла-господаря; null — вкорінене у віртуальному ядрі-нуклеусі. */
+  hostKey: string | null;
+  /** Точка на поверхні господаря в момент відкладення. */
+  contactPoint: Vec3;
+  /** Нормаль поверхні господаря в цій точці. */
+  contactNormal: Vec3;
+  /** Частка довжини господаря, де стався контакт (0=основа, 1=вістря). */
+  hostT: number;
 }
 
 /**
@@ -154,6 +159,9 @@ export interface DepositedCrystal {
   growthEnergy: number;
   colonyId: string;
   role: ColonyRole;
+  /** Кріплення до тіла-господаря (`CAI-REQ-004`). Відсутнє лише у
+   *  віртуального нуклеуса, який ніколи не публікується. */
+  attachment?: AttachmentContact;
   /** Монарх друзи (див. ArtifactNode.primary). */
   primary: boolean;
   /** Заповнюються Composition Framework (mineralPreset.ts) після відкладення. */

@@ -86,11 +86,13 @@ import {
 } from '../growthSurface';
 import { growthEnergyAt, makeFieldContext, scoreGrowthSite, type PlacementField } from '../growthField';
 import { composeMineralCluster } from '../composition/mineralPreset';
+import { buildJunctions } from '../composition/attachment';
 import type { CompositionScore } from '../composition/score';
 import { crystalSpecies, type CrystalConstraints } from '../species';
 import type {
   ArtifactInput,
   ArtifactNode,
+  AttachmentContact,
   DepositedCrystal,
   DepositionEvent,
   EvolutionPressures,
@@ -100,6 +102,10 @@ import type { GrowthState } from './growthTypes';
 /** Кандидатів на місце росту за подію — фіксовано (детермінізм draw-порядку).
  *  Це МЕХАНІКА рушія, не біологія виду — тому лишається тут. */
 const SITE_CANDIDATES = 12;
+
+/** Ключ віртуального ядра-нуклеуса. Воно НІКОЛИ не публікується, тож тіла,
+ *  що сидять на ньому, вважаються кореневими (hostKey === null). */
+export const NUCLEUS_KEY = '__nucleus';
 
 // Volume II: усі ВИДОВІ числа (діапазони нуклеації, глибина поховання,
 // вертикаль росту, колонії, монарх, профіль кургану, стрункість) живуть у
@@ -136,7 +142,7 @@ export function makeNucleus(seedNum: number): DepositedCrystal {
   const radius = 0.17 + rng() * 0.05;
   const anchor = v3(0, -0.62, 0);
   return {
-    key: '__nucleus',
+    key: NUCLEUS_KEY,
     kind: 'core',
     domain: null,
     anchor,
@@ -147,7 +153,7 @@ export function makeNucleus(seedNum: number): DepositedCrystal {
     maturity: 1,
     ageDays: Number.MAX_SAFE_INTEGER,
     growthEnergy: 1,
-    colonyId: '__nucleus',
+    colonyId: NUCLEUS_KEY,
     role: 'dominant',
     primary: false,
     breathePhase: 0,
@@ -321,6 +327,18 @@ function depositMineral(
   const maturity = maturityCurve(event.ageDays, event.maturityHalfLife);
   const { anchor, renderedAnchor } = buriedAnchors(hostBody, chosen.t, chosen.angle, radius, maturity, c.burial);
 
+  // `CAI-REQ-004`: host більше НЕ викидається — кріплення стає фактом стану.
+  // Нуклеус віртуальний і не публікується, тож тіла на ньому — кореневі.
+  const contactOf = (t: number, angle: number, body: BodyPair): AttachmentContact => {
+    const sample = sampleSurfacePoint(body.rendered, t, angle);
+    return {
+      hostKey: host.key === NUCLEUS_KEY ? null : host.key,
+      contactPoint: sample.point,
+      contactNormal: sample.normal,
+      hostT: t,
+    };
+  };
+
   const dominant: DepositedCrystal = {
     key: event.key,
     kind: event.kind,
@@ -336,6 +354,7 @@ function depositMineral(
     growthEnergy: energy,
     colonyId: event.key,
     role: 'dominant',
+    attachment: contactOf(chosen.t, chosen.angle, hostBody),
     primary: isMonarch,
     ...(event.emphasized !== undefined ? { emphasized: event.emphasized } : {}),
     breathePhase,
@@ -402,6 +421,7 @@ function depositMineral(
       growthEnergy: energy,
       colonyId: event.key,
       role: 'satellite',
+      attachment: { hostKey: dominant.key, contactPoint: sat.skeletalSample.point, contactNormal: sat.skeletalSample.normal, hostT: st },
       primary: false,
       breathePhase: satPhase,
       breatheSpeed: satSpeed,
@@ -486,7 +506,19 @@ function runDeposition(input: ArtifactInput): DepositedCrystal[] {
 export function runGrowth(input: ArtifactInput): GrowthState {
   const deposited = runDeposition(input);
   const { crystals, score, passes } = composeMineralCluster(deposited, input.seedNum, input.dna.compactnessBias);
-  return { bodies: crystals, order: crystals.map((c) => c.key), score, passes };
+  // Volume IV публікує канонічні кріплення вже з ФІНАЛЬНОЇ геометрії
+  // (`CAI-REQ-004`) — Geometry Engine споживатиме саме їх.
+  const junctions = buildJunctions(
+    crystals.map((c) => ({
+      key: c.key,
+      anchor: c.renderedAnchor,
+      direction: c.direction,
+      length: c.length * MATURITY_HEIGHT_SCALE(c.maturity),
+      radius: c.radius * MATURITY_RADIUS_SCALE(c.maturity),
+      hostKey: c.attachment?.hostKey ?? null,
+    })),
+  );
+  return { bodies: crystals, order: crystals.map((c) => c.key), junctions, score, passes };
 }
 
 /**
