@@ -110,6 +110,10 @@ describe('Species Layer — CrystalSpecies', () => {
   });
 
   it('constrain() кодує природні правила виду числами (§10)', () => {
+    // Тепер це БАЗОВА ЛІНІЯ (crystalConstraints.ts::CRYSTAL_BASELINE) —
+    // правила пари, яка ще нічого не прожила. Перевірки нижче — саме ті
+    // інваріанти виду, що мусять триматись при БУДЬ-ЯКІЙ історії, тож
+    // семантика тесту не змінилась.
     const c = crystalSpecies.constrain();
     // Кристал не росте вниз: напрямок завжди має додатну вертикаль.
     expect(c.minUpwardMain).toBeGreaterThan(0);
@@ -127,7 +131,10 @@ describe('Species Layer — CrystalSpecies', () => {
     expect(inst.streams.length).toBeGreaterThan(0);
     expect(typeof inst.fieldAt).toBe('function');
     expect(inst.hierarchy.monarchKey).toBe('core-0'); // головний кристал друзи
-    expect(inst.constraints.burial).toBeGreaterThan(0);
+    // `constraints` став `constraintsAt(ageDays)`: правила виду історичні
+    // так само, як поле розміщення (див. speciesTypes.ts). Значення на
+    // «сьогодні» — те саме за змістом, що читалось раніше.
+    expect(inst.constraintsAt(0).burial).toBeGreaterThan(0);
     // Ніякого THREE/матеріалів — суто дані. Серіалізується як JSON без функцій-мешів.
     const json = JSON.stringify({
       streams: inst.streams.length,

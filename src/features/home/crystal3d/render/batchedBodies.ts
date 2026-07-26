@@ -22,10 +22,16 @@ import * as THREE from 'three';
 import type { PublishedBody } from '../crystalPublication';
 import { BREATHE_AMPLITUDE, type ClusterMaterial } from '../crystalCluster';
 import { bodyMaterialProps, materialSignature } from '../material/bodyMaterial';
+import { DEFAULT_GFX, type GfxProfile } from './gfxProfile';
+import { applySkyReflection } from './skyReflection';
+import { buildStudioEnvMap } from './envMap';
 
 export interface BodyBatch {
   /** Ключ матеріалу — стабільний, придатний як React-key. */
   signature: string;
+  /** Спільна карта оточення батчів (лише під `?gfx=env`) — тримаємо
+   *  посилання, щоб `disposeBatches` її звільнив. */
+  envMap: THREE.Texture | null;
   mesh: THREE.BatchedMesh;
   /** Тіла батча в порядку їхніх instanceId (id === індекс у масиві). */
   bodies: PublishedBody[];
@@ -48,14 +54,24 @@ const _scale = new THREE.Vector3(1, 1, 1);
 export function buildBodyBatches(
   bodies: readonly PublishedBody[],
   material: ClusterMaterial,
+  gfx: GfxProfile = DEFAULT_GFX,
 ): BodyBatch[] {
   const groups = new Map<string, PublishedBody[]>();
   for (const body of bodies) {
-    const signature = materialSignature(bodyMaterialProps(body.branch, material));
+    const signature = materialSignature(bodyMaterialProps(body.branch, material, gfx));
     const group = groups.get(signature);
     if (group === undefined) groups.set(signature, [body]);
     else group.push(body);
   }
+
+  // ВАЖЛИВО: карта чіпляється на МАТЕРІАЛ, а не на `scene.environment`.
+  // Три.js оновлює уніформу сили відбиття лише під охороною
+  // `if ( material.envMap )` (WebGLMaterials.js:391), тож при
+  // `scene.environment` поле `envMapIntensity` мовчки ігнорується й у
+  // шейдер іде дефолтна одиниця. Виміряно прямо: із `scene.environment`
+  // зміна інтенсивності з 1.0 на 0.32 не змінювала жодного пікселя
+  // (meanDelta 39.82 в обох випадках). Через `material.envMap` — працює.
+  const envMap = gfx.env ? buildStudioEnvMap() : null;
 
   return [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -65,7 +81,7 @@ export function buildBodyBatches(
       const vertexCount = group.reduce((s, b) => s + b.geometry.getAttribute('position').count, 0);
       const indexCount = group.reduce((s, b) => s + (b.geometry.getIndex()?.count ?? 0), 0);
 
-      const props = bodyMaterialProps(group[0]!.branch, material);
+      const props = bodyMaterialProps(group[0]!.branch, material, gfx);
       const batchMaterial = new THREE.MeshPhysicalMaterial({
         vertexColors: true,
         flatShading: true,
@@ -78,6 +94,24 @@ export function buildBodyBatches(
         reflectivity: props.reflectivity,
         emissive: new THREE.Color(props.emissive),
         emissiveIntensity: props.emissiveIntensity,
+        ...(envMap !== null ? { envMap, envMapIntensity: props.envMapIntensity } : {}),
+        // Тонкоплівковий перелив по гранях. Це вбудована можливість
+        // MeshPhysicalMaterial — звичайний шейдерний терм, без окремого
+        // проходу й без текстур, тому вона й потрапила в дефолт, на
+        // відміну від карти оточення (див. render/gfxProfile.ts).
+        iridescence: props.iridescence,
+        iridescenceIOR: props.iridescenceIOR,
+        iridescenceThicknessRange: [100, props.iridescenceThickness],
+      });
+      // Френель + небо поверх фізичної моделі (render/skyReflection.ts).
+      // Викликається рівно раз на батч: батчі перебудовуються цілком при
+      // зміні даних, тож обробники не накопичуються.
+      applySkyReflection(batchMaterial, {
+        rim: props.rimStrength,
+        sky: props.skyStrength,
+        skyColor: new THREE.Color(props.skyColor),
+        groundColor: new THREE.Color(props.groundColor),
+        rimColor: new THREE.Color(props.rimColor),
       });
 
       const mesh = new THREE.BatchedMesh(group.length, vertexCount, indexCount, batchMaterial);
@@ -107,7 +141,7 @@ export function buildBodyBatches(
       mesh.computeBoundingSphere();
       if (mesh.boundingSphere !== null) mesh.boundingSphere.radius *= 1 + BREATHE_AMPLITUDE;
 
-      return { signature, mesh, bodies: group, instanceOf };
+      return { signature, mesh, bodies: group, instanceOf, envMap };
     });
 }
 
@@ -134,8 +168,12 @@ export function breatheBatch(batch: BodyBatch, elapsed: number, amplitude: numbe
 }
 
 export function disposeBatches(batches: readonly BodyBatch[]): void {
+  // Карта оточення спільна для всіх батчів — звільняємо рівно раз.
+  const textures = new Set<THREE.Texture>();
   for (const batch of batches) {
+    if (batch.envMap !== null) textures.add(batch.envMap);
     batch.mesh.dispose();
     (batch.mesh.material as THREE.Material).dispose();
   }
+  for (const texture of textures) texture.dispose();
 }

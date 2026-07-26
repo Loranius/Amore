@@ -71,8 +71,19 @@ function isThisMonth(dateStr: string, now: Date): boolean {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
 }
 
+/** Датоване фото для Evolution Engine: `id` — стабільний порядковий номер
+ *  у пулі (Storage не дає числових ключів), `date` — день завантаження. */
+export interface CrystalPhoto {
+  id: number;
+  date: string;
+}
+
 export function useCrystalDNA(): {
   dna: CrystalDNA;
+  /** Фото з датами — окремо від лічильника `dna.photos`: рушій рахує їх
+   *  історично (скільки їх БУЛО на дату кожного тіла), а лічильник лишається
+   *  для «порожній кристал?» і для дельт. */
+  photos: CrystalPhoto[];
   deltas: CrystalDeltas;
   isPending: boolean;
   isError: boolean;
@@ -149,7 +160,21 @@ export function useCrystalDNA(): {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPending, pins.data, movies.data, series.data, books.data, wishStats.data, dishes.data]);
 
-  return { dna, deltas, isPending, isError };
+  // Порядок пулу — за `created_at` спадно (usePhotoPool), тож сортуємо за
+  // датою зростаюче й нумеруємо: найстарше фото завжди дістає id 1 і не
+  // перенумеровується від нових завантажень (append-only на рівні ключів,
+  // той самий принцип, що в bucketByFixedSize).
+  const photoItems = useMemo<CrystalPhoto[]>(() => {
+    if (isPending) return [];
+    return (photos.data ?? [])
+      .filter((p): p is { url: string; date: string } => p.date !== null)
+      .map((p) => p.date)
+      .sort()
+      .map((date, i) => ({ id: i + 1, date }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPending, photos.data]);
+
+  return { dna, photos: photoItems, deltas, isPending, isError };
 }
 
 export interface MilestoneEvent {

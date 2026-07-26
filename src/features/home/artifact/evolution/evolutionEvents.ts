@@ -87,9 +87,31 @@ export function buildEvolutionTimeline(input: ArtifactInput): EvolutionTimeline 
     });
   }
 
-  // Агрегатні факти «сьогодні»: історія без окремих дат — intensity несе
-  // кількість/суму (100 фото ≠ 100 подій росту, це один великий тиск).
-  if (input.usage.photos > 0) {
+  // Фото. Рівно ОДНА з двох форм, ніколи обидві — інакше historyAt рахував
+  // би їх двічі:
+  //   • є дати (Storage віддав created_at) → по події на фото, кожна зі
+  //     своїм віком. Тільки так рахунок фото стає історичним, а отже може
+  //     впливати на форму, не зрушуючи вже відкладені тіла;
+  //   • дат немає → колишній недатований агрегат: intensity несе кількість
+  //     (100 фото ≠ 100 подій росту, це один великий тиск). Тиски матеріалу
+  //     від цього не змінюються — на віці 0 обидві форми дають те саме
+  //     число, — але історії в такого рахунку немає, і констрейнти його не
+  //     читають (crystalConstraints.ts).
+  // Окремими тілами фото не стають у жодному разі: Growth Engine бере
+  // стріми з growthEvents.ts, а не з таймлайна Evolution.
+  const datedPhotos = input.photos ?? [];
+  if (datedPhotos.length > 0) {
+    for (const p of datedPhotos) {
+      events.push({
+        id: `photos:${p.id}`,
+        timestamp: p.date,
+        ageDays: age(p.date),
+        source: 'photos',
+        category: 'memory',
+        intensity: 1,
+      });
+    }
+  } else if (input.usage.photos > 0) {
     events.push({
       id: 'photos:aggregate',
       timestamp: null,

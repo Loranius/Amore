@@ -24,15 +24,23 @@
  *  • reactions — проєкція еволюційних тисків у словник виду
  *    (споживають і Growth, і рендер-матеріал);
  *  • hierarchy — видові ролі (напр. головний кристал друзи);
- *  • constraints — природні правила виду числами (§10);
+ *  • constraintsAt — природні правила виду числами (§10) СТАНОМ НА ВІК
+ *    події: історія пари змінює не лише «де» тіло сідає, а й закон, за
+ *    яким воно росте;
  *  • speciesState — внутрішній стан виду (§13), описовий.
+ *
+ * `constraintsAt` навмисно має ту саму форму, що й `fieldAt`. Правила, як
+ * і поле розміщення, мусять бути ІСТОРИЧНИМИ: якби рушій читав «правила на
+ * сьогодні», кожен новий запис у БД перераховував би розмір і нахил усіх
+ * уже наявних тіл, і append-only («нові дані не зрушують жоден існуючий
+ * кристал») перестав би виконуватись.
  */
 export interface GrowthInstruction<TStream, TField, TReactions, TConstraints, TState> {
   streams: readonly TStream[];
   fieldAt: (ageDays: number) => TField;
   reactions: TReactions;
   hierarchy: { monarchKey: string | null };
-  constraints: TConstraints;
+  constraintsAt: (ageDays: number) => TConstraints;
   speciesState: TState;
 }
 
@@ -45,7 +53,9 @@ export interface Species<TInput, TStream, TField, TReactions, TConstraints, TSta
   react(input: TInput): TReactions;
   /** Еволюція виду (§12): стадія життєвого циклу конкретного тіла. */
   evolve(maturity: number, energy: number, refinement: number): TStage;
-  /** Природні обмеження (§10) — числа/прапорці, які читає Growth Engine. */
+  /** Базова лінія природних обмежень (§10) — правила виду до будь-якої
+   *  прожитої історії. Growth Engine споживає не її, а `constraintsAt`
+   *  з інструкцій: та сама лінія, зсунута історією пари. */
   constrain(): TConstraints;
   /** Головний вхід: історія + ДНК + seed → Growth Instructions (§7). */
   buildInstructions(input: TInput): GrowthInstruction<TStream, TField, TReactions, TConstraints, TState>;

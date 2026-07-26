@@ -8,109 +8,21 @@
 // читає ЛИШЕ GrowthInstruction — числа й правила звідси; його власна
 // механіка (рулетка, аналітичні поверхні, тіні) від виду не залежить.
 //
-// Значення обмежень — байт-в-байт ті, що жили константами в Growth Engine
-// до Volume II: зміна архітектури не змінює жодного кристала (гарантія —
-// існуючі детермінізм-тести).
+// Обмеження виду живуть окремо (crystalConstraints.ts) і є ФУНКЦІЄЮ
+// історії пари, а не таблицею сталих: `constraintsAt(ageDays)` дзеркалить
+// `fieldAt(ageDays)`, тож і «де тіло сідає», і «за яким законом воно
+// росте» заморожуються на дату події (append-only).
 // ============================================================
-import type { ArtifactInput, EvolutionPressures, LifeCycleStage, NodeKind } from '../artifactTypes';
+import type { ArtifactInput, EvolutionPressures, LifeCycleStage } from '../artifactTypes';
 import type { DepositionStream } from '../growthEvents';
 import { buildDepositionStreams } from '../growthEvents';
 import { makeFieldHistory, placementFieldAt, type PlacementField } from '../growthField';
 import { computeEvolutionPressures } from '../evolutionPressure';
 import { buildEvolutionTimeline, solveForces } from '../evolution';
+import { CRYSTAL_BASELINE, crystalConstraintsAt, type CrystalConstraints } from './crystalConstraints';
 import type { GrowthInstruction, Species } from './speciesTypes';
 
-/** Природні правила кристала (§10) числами — читає Growth Engine. */
-export interface CrystalConstraints {
-  /** Нуклеація лише біля основи субстрату (частка довжини тіла). */
-  siteTMin: number;
-  siteTMax: number;
-  /** Глибина поховання основи у власних радіусах — основи вростають. */
-  burial: number;
-  /** Кристал не росте вниз: мінімальна вертикаль напрямку (± рідкісні діагоналі). */
-  minUpwardMain: number;
-  minUpwardRare: number;
-  diagonalChance: number;
-  /** Колонії нуклеації (морфологія «друза»). */
-  coloniesEnabled: boolean;
-  colonyChance: Readonly<Record<NodeKind, number>>;
-  colonyShareBoost: number;
-  colonyMaxChance: number;
-  /** Головний кристал: рівномірний ріст із днями разом і стеля для решти. */
-  monarch: {
-    baseLength: number;
-    lengthGain: number;
-    growthDays: number;
-    radiusBoost: number;
-    heightCeiling: number;
-  };
-  /** Профіль кургану: висоти спадають від осі. */
-  moundFalloff: (horiz: number) => number;
-  /** «Гравітаційна компакція»: високо нуклейовані тіла стриманіші. */
-  heightDamp: (anchorY: number) => number;
-  /** Правдоподібні кварцові пропорції: стеля стрункості (довжина/радіус). */
-  slenderness: number;
-  monarchSlenderness: number;
-  // ── Attachment-safe placement (`CAI-REQ-001..003`) ──────────────
-  /** Частка радіуса, якою тіло «резервує» об'єм у перевірці зіткнень.
-   *  <1, бо тіло звужується до вістря — повний радіус був би надто суворим. */
-  clearanceScale: number;
-  /** Мін. кут між основами двох дітей ОДНОГО господаря, радіани
-   *  (проти злипання; спека вимагає non-clumping без жорсткої симетрії). */
-  minAngularSeparation: number;
-  /** Коефіцієнт «стискання» дитини, коли жоден кандидат не проходить
-   *  кліренс (спека: reject → redirect → SHRINK → defer). */
-  conflictShrink: number;
-}
-
-const CRYSTAL_CONSTRAINTS: CrystalConstraints = {
-  // Нуклеація вздовж більшої частини тіла (не лише біля основи) — дочірні
-  // кристали чіпляються на різній висоті й розходяться віялом, а не
-  // збиваються в одну колону.
-  siteTMin: 0.04,
-  siteTMax: 0.5,
-  // Менше поховання — тіла НЕ тонуть одне в одному в суцільний ком; видно
-  // окремі шпилі з проміжками (референс — кристали, а не оплавлена брила).
-  burial: 0.4,
-  // Кристал не росте вниз, але друза — це ВІЯЛО спрямованих шпилів під
-  // різними кутами, а не пучок вертикалей: мінімальна вертикаль низька,
-  // діагоналі часті. Саме це дає органічний «сплеск», а не моноліт.
-  minUpwardMain: 0.42,
-  minUpwardRare: 0.2,
-  diagonalChance: 0.28,
-  coloniesEnabled: true,
-  // Менше колоній (було вдвічі більше): супутники збивали композицію в
-  // кущ; кілька окремих шпилів читаються як кристали краще за клуб.
-  colonyChance: {
-    core: 0.08,
-    country: 0.22,
-    city: 0.18,
-    milestone: 0.25,
-    goal: 0.12,
-    anniversary: 0.12,
-    creation: 0.12,
-    memory: 0.12,
-    wish: 0.1,
-  },
-  colonyShareBoost: 0.15,
-  colonyMaxChance: 0.35,
-  // Головний кристал — виразно найбільший, АЛЕ один шпиль серед друзи, а не
-  // моноліт: помірна довжина (≈1.6 у зрілої пари), струнка призма (не колона).
-  monarch: { baseLength: 0.95, lengthGain: 0.75, growthDays: 1200, radiusBoost: 1.05, heightCeiling: 0.82 },
-  // М'який профіль кургану: бічні шпилі лишаються ВИСОКИМИ (друза-віяло, не
-  // конус, що прибиває все навколо центру до землі).
-  moundFalloff: (horiz) => 0.62 + 0.38 / (1 + horiz * 1.4),
-  heightDamp: (anchorY) => 1 / (1 + 0.5 * Math.max(0, anchorY + 0.1)),
-  // Стрункіші тіла — шпилі, не самоцвіти-галька.
-  slenderness: 8,
-  monarchSlenderness: 6.5,
-  // Кристали більше не проростають один крізь одного: тіло резервує об'єм
-  // (капсула) і кут на господарі. 0.8 — компроміс між «конус звужується»
-  // (повний радіус надто суворий) і гарантією, що грані не перетнуться.
-  clearanceScale: 0.8,
-  minAngularSeparation: 0.55,
-  conflictShrink: 0.62,
-};
+export type { CrystalConstraints } from './crystalConstraints';
 
 /** Внутрішній стан виду (§13) — описовий, для UI/телеметрії/майбутніх
  *  рендерерів; Growth Engine його не споживає (жодного візуального впливу). */
@@ -182,19 +94,23 @@ export const crystalSpecies: Species<
 
   evolve: crystalEvolve,
 
-  constrain: () => CRYSTAL_CONSTRAINTS,
+  // Базова лінія виду: правила, істинні для КОЖНОЇ пари ще до першого
+  // прожитого факту. Форму конкретної друзи задає `constraintsAt` в
+  // інструкціях — вона зсуває цю лінію історією.
+  constrain: () => CRYSTAL_BASELINE,
 
   buildInstructions: (input): CrystalInstruction => {
     const streams = buildDepositionStreams(input);
     const history = makeFieldHistory(input);
-    const forces = solveForces(buildEvolutionTimeline(input));
+    const timeline = buildEvolutionTimeline(input);
+    const forces = solveForces(timeline);
     const reactions = computeEvolutionPressures(input);
     return {
       streams,
       fieldAt: (ageDays) => placementFieldAt(history, ageDays),
       reactions,
       hierarchy: { monarchKey: chooseMonarchKey(streams, input.usage.daysTogether) },
-      constraints: CRYSTAL_CONSTRAINTS,
+      constraintsAt: (ageDays) => crystalConstraintsAt(timeline, ageDays),
       // Стан виду (§13) з канонічних сил: напруга від дисбалансу історії,
       // чистота від полірування, щільність/тріщинуватість/енергія — від
       // стабільності і живості пари.

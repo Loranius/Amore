@@ -10,25 +10,37 @@
 // (crystalGeometry.ts) — 2D-контур не потребує переписаної процедурної
 // анатомії.
 // ------------------------------------------------------------
-// Навмисно БЕЗ <Environment>/<Lightformer> (drei) і БЕЗ <EffectComposer>/
-// <Bloom> (@react-three/postprocessing): на реальному пристрої користувача
-// фон .crystal-wrap ставав суцільним білим прямокутником залежно від кута
-// камери (зникав лише коли дивитись знизу, де в кадрі взагалі нема
-// геометрії) — виміряно напряму по пікселях у надісланих скріншотах
-// (справжній колір сторінки ~rgb(255,244,247), «баг» — точний rgb(255,255,255)).
-// Не відтворюється в headless Chromium цієї сесії (ні npm run dev, ні
-// продакшн-білд через vite preview), тож це, найімовірніше, специфічна для
-// мобільного GPU/драйвера поведінка навколо HalfFloat-рендер-таргетів, які
-// використовують і Environment (кубічна карта), і EffectComposer (внутрішні
-// таргети) — обидва одразу прибрані як найбільш підозрілі, оскільки два
-// попередні точкові фікси (скидання clearColor щокадру; повне прибирання
-// material.transmission) НЕ допомогли. «Скляний» вигляд лишається на самих
-// PBR-параметрах (clearcoat/roughness/ior) без глобальної підсвітки ззовні.
+// БІЛИЙ ФОН: що відомо і як улаштована сцена.
+// На реальному пристрої власника фон .crystal-wrap ставав суцільним білим
+// прямокутником залежно від кута камери (зникав, коли в кадрі взагалі не
+// було геометрії) — виміряно по пікселях у надісланих скріншотах:
+// сторінка ~rgb(255,244,247), «баг» — точний rgb(255,255,255). У headless
+// Chromium не відтворюється ні в dev, ні на продакшн-білді.
+//
+// Було три спроби полагодити, і в останній (`ba6ad77`) зі сцени прибрали
+// ОДНИМ коммітом і <Environment>/<Lightformer>, і <EffectComposer>/<Bloom>.
+// Той комміт сам це визнає: «best-supported hypothesis, not a confirmed
+// fix». Тобто жоден із двох підозрюваних не перевірений поодинці.
+//
+// Тепер сцена влаштована так, щоб діагноз нарешті можна було поставити
+// (render/gfxProfile.ts):
+//   • ДЕФОЛТ не містить жодного render target. «Скло» дають френель +
+//     небо просто в шейдері (render/skyReflection.ts) та вбудована
+//     іризація MeshPhysicalMaterial — ні кубмап, ні повноекранних проходів;
+//   • `?gfx=env` вмикає карту оточення ОКРЕМО (render/envMap.ts);
+//   • `?gfx=bloom` вмикає постобробку ОКРЕМО (render/BloomProbe.tsx);
+//   • `?gfx=off` повертає рівно те, що власник уже бачив, — базова лінія
+//     для порівняння.
+//
+// `material.transmission` лишається 0 НАЗАВЖДИ і прапорця не має: там
+// причина доведена по джерелах three.js, а не припущена —
+// WebGLRenderer::renderTransmissionPass жорстко ставить
+// setClearColor(0xffffff, 0.5), щойно clearAlpha < 1.
 // ============================================================
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Sparkles } from '@react-three/drei';
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import {
   useCrystalDNA,
   useMilestoneEvents,
@@ -55,6 +67,11 @@ import { BREATHE_AMPLITUDE, deriveClusterBranch, deriveClusterMaterial, type Clu
 import { breatheBatch, buildBodyBatches, disposeBatches } from './render/batchedBodies';
 import { formatPublicationReport, publishCrystal } from './crystalPublication';
 import { RENDERED_LOD } from './geometry/lod';
+import { describeGfx, gfxProfileFromLocation, isDefaultGfx, type GfxProfile } from './render/gfxProfile';
+
+/** Важкий `postprocessing` лишається окремим чанком: він потрібен лише
+ *  під `?gfx=bloom`, а не кожній парі при кожному відкритті. */
+const BloomProbe = lazy(() => import('./render/BloomProbe'));
 
 /** Центр вертикального «дихання» левітації — немає більше каменя, що заякорює композицію низько. */
 const BOB_CENTER_Y = 0;
@@ -70,10 +87,11 @@ interface ClusterProps {
   branches: ClusterBranch[];
   reduceMotion: boolean;
   grew: boolean;
+  gfx: GfxProfile;
   onOpen: () => void;
 }
 
-function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: ClusterProps) {
+function CrystalCluster({ material, branches, reduceMotion, grew, gfx, onOpen }: ClusterProps) {
   const groupRef = useRef<THREE.Group | null>(null);
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
@@ -82,7 +100,10 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
   // Спокійна «підлога» світіння від Luminosity Pressure — раніше спалах
   // стрибав з нуля, тепер додається поверх завжди трохи теплого ядра
   // (заміна світінню вже видаленої кам'яної основи).
-  const baseIntensity = material.glow * 0.6;
+  // Спогади задають, ЧИ світиться ядро; спільно переглянуті фільми — НАСКІЛЬКИ
+  // яскраво (той самий множник, що в bodyMaterial.ts::coreGlow, щоб внутрішнє
+  // світло й емісія тіла не розходились).
+  const baseIntensity = material.glow * 0.6 * (1 + material.brilliance * 0.8);
 
   // Дотик/тап — короткий теплий спалах (реакція «артефакт відчув доторк»),
   // окремий від довшого/яскравішого спалаху на «виріс новий вузол».
@@ -113,8 +134,8 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
   // стають 6-7 draw calls. Подих кожного тіла лишається власним — його
   // несе матриця екземпляра, а не спільний трансформ.
   const batches = useMemo(
-    () => buildBodyBatches(published.renderable, material),
-    [published, material],
+    () => buildBodyBatches(published.renderable, material, gfx),
+    [published, material, gfx],
   );
 
   // Гейт публікації (`CAI-REQ-012`). У проді не блокує рендер — порожній
@@ -200,7 +221,7 @@ function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
 }
 
 export default function CrystalScene() {
-  const { dna, deltas, isPending: dnaPending } = useCrystalDNA();
+  const { dna, photos, deltas, isPending: dnaPending } = useCrystalDNA();
   const { seed, isPending: seedPending } = useCrystalSeed();
   const { milestones, isPending: milestonesPending } = useMilestoneEvents();
   const { countries, cities, isPending: placesPending } = useCrystalPlaces();
@@ -225,6 +246,15 @@ export default function CrystalScene() {
   // пари (дні/місця/спогади) проявляється в новій композиції друзи, як того
   // хоче рушій. Ефемерно (не чіпає збережений couple-seed): reload повертає
   // справжній кристал.
+  // Профіль графіки читається РІВНО ОДИН РАЗ при монтуванні: він керує
+  // компіляцією шейдерів і складом сцени, тож перечитувати його на кожен
+  // рендер означало б перебудовувати батчі без причини. Щоб змінити
+  // профіль, сторінку треба перезавантажити — для діагностики з телефона
+  // це навіть краще: кожен вимір починається з чистого контексту.
+  const [gfx] = useState(() =>
+    gfxProfileFromLocation(typeof window === 'undefined' ? '' : window.location.search),
+  );
+
   const [seedOverride, setSeedOverride] = useState<string | null>(null);
   const effectiveSeed = seedOverride ?? seed ?? '';
   const regenerate = () => {
@@ -256,6 +286,7 @@ export default function CrystalScene() {
       books,
       memoriesCount,
       memories: memoryItems,
+      photos,
     }),
     [
       seedNum,
@@ -272,6 +303,7 @@ export default function CrystalScene() {
       books,
       memoriesCount,
       memoryItems,
+      photos,
     ],
   );
 
@@ -310,8 +342,16 @@ export default function CrystalScene() {
         onKeyDown={onKeyDownOpen}
       >
         <Canvas dpr={[1, 2]} camera={{ position: [0, 0.2, 5.4], fov: 42 }}>
-          <ambientLight intensity={0.5} />
-          <directionalLight position={[3, 4, 2]} intensity={1.1} />
+          {/* Класичний трипунктовий риг замість «ambient + одне світло +
+              рожевий підсвіт». Головне тут — КОНТРОВЕ світло позаду згори:
+              саме воно окреслює грані яскравою лінією й читається як край
+              скла. Це три звичайні світла, жодного нового механізму, тож
+              воно не бере участі в бісекції білого фону.
+              Ambient знижений: інакше контровий промінь тоне в загальній
+              засвітці й ефект зникає. */}
+          <ambientLight intensity={0.32} />
+          <directionalLight position={[3, 4, 2]} intensity={1.05} />
+          <directionalLight position={[-2.5, 3.5, -3.5]} intensity={0.9} color="#fff1f6" />
           <pointLight position={[-3, -2, -2]} intensity={0.4} color="#e6a0bd" />
           {!isPending &&
             (empty ? (
@@ -322,6 +362,7 @@ export default function CrystalScene() {
                 branches={branches}
                 reduceMotion={reduceMotion}
                 grew={grew}
+                gfx={gfx}
                 onOpen={openModal}
               />
             ))}
@@ -333,6 +374,11 @@ export default function CrystalScene() {
             color="#ffe9f2"
             position={[0, 0.2, 0]}
           />
+          {gfx.bloom && (
+            <Suspense fallback={null}>
+              <BloomProbe />
+            </Suspense>
+          )}
           <OrbitControls
             enablePan={false}
             enableZoom={false}
@@ -341,6 +387,7 @@ export default function CrystalScene() {
             target={[0, 0.2, 0]}
           />
         </Canvas>
+        {!isDefaultGfx(gfx) && <span className="crystal-gfx-badge">{describeGfx(gfx)}</span>}
         <button
           type="button"
           className="crystal-regen"

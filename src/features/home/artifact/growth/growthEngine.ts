@@ -163,6 +163,103 @@ export function makeNucleus(seedNum: number): DepositedCrystal {
   };
 }
 
+/** Ключ основи-матриці — породи, з якої росте друза. */
+export const MATRIX_KEY = '__matrix';
+
+/**
+ * Основа-матриця: приплюснуте тіло під підошвою друзи, у якому тонуть
+ * торці кореневих кристалів.
+ *
+ * Навіщо. Тіла, що нуклеювали на віртуальному нуклеусі, були КОРЕНЕВИМИ
+ * (`hostKey === null`), тож обробка стику не мала куди ховати їхні кришки
+ * основи — і знизу стирчали рівні зрізи труб. Матриця дає їм справжнього
+ * господаря, після чого зріз (`CAI-REQ-005`) прибирає ці кришки САМ,
+ * без жодного нового механізму.
+ *
+ * Чому не «зробити видимим сам нуклеус». Нуклеус — субстрат РОЗМІЩЕННЯ:
+ * усі тіла обрані на його поверхні. Змінити його форму (а вона мусила б
+ * стати низькою й широкою) означало б зрушити геть усі кристали. Матриця
+ * натомість народжується ПІСЛЯ композиції, коли фінальні позиції вже
+ * відомі, і не впливає на розміщення взагалі.
+ *
+ * Розмір виводиться з фактичного розмаху коренів, тож підошва накрита за
+ * будь-яких даних — і в пари з трьома подіями, і з сотнею.
+ */
+function attachMatrix(bodies: readonly DepositedCrystal[], seedNum: number): DepositedCrystal[] {
+  const roots = bodies.filter((b) => (b.attachment?.hostKey ?? null) === null);
+  if (roots.length === 0) return [...bodies];
+
+  const rng = mulberry32(seedNum + hashSeedString('matrix'));
+  let reach = 0;
+  let lowY = Infinity;
+  let highestRootBase = -Infinity;
+  let deepestBurial = 0;
+  for (const b of roots) {
+    const a = b.renderedAnchor;
+    reach = Math.max(reach, Math.hypot(a.x, a.z) + b.radius * MATRIX_RADIUS_MARGIN);
+    lowY = Math.min(lowY, a.y);
+    highestRootBase = Math.max(highestRootBase, a.y);
+    deepestBurial = Math.max(deepestBurial, b.radius * MATRIX_COVER_MARGIN);
+  }
+  for (const b of bodies) lowY = Math.min(lowY, b.renderedAnchor.y);
+
+  // Висота НЕ довільна: матриця мусить накрити основу найвищого кореневого
+  // тіла, інакше його торець лишиться стирчати — а це рівно та скарга, заради
+  // якої матриця й з'явилась. Перша версія брала висоту як частку радіуса й
+  // діставала лише до найнижчого тіла: ховалось 0 із 9 основ.
+  const needTop = highestRootBase + deepestBurial;
+  const length = Math.max(0.12, (needTop - lowY) / (1 - MATRIX_SINK));
+  // Ширина — більша з двох вимог: накрити розмах коренів і лишитись
+  // приплюснутою (інакше купол виростає в п'єдестал).
+  const radius =
+    Math.min(Math.max(0.22, reach, length / MATRIX_FLATNESS), reach * MATRIX_MAX_SPREAD) * (1 + rng() * 0.06);
+  const anchor = v3(0, lowY - length * MATRIX_SINK, 0);
+
+  const matrix: DepositedCrystal = {
+    key: MATRIX_KEY,
+    kind: 'core',
+    domain: null,
+    anchor,
+    renderedAnchor: anchor,
+    direction: v3(0, 1, 0),
+    length,
+    radius,
+    maturity: 1,
+    ageDays: Number.MAX_SAFE_INTEGER,
+    growthEnergy: 1,
+    colonyId: MATRIX_KEY,
+    role: 'dominant',
+    primary: false,
+    tier: 'support',
+    archetype: 'matrix',
+    breathePhase: 0,
+    breatheSpeed: 0,
+    spin: 0,
+  };
+
+  // Кореневі тіла тепер сидять НА матриці — саме це вмикає зріз їхніх кришок.
+  const reparented = bodies.map((b) =>
+    (b.attachment?.hostKey ?? null) === null && b.attachment !== undefined
+      ? { ...b, attachment: { ...b.attachment, hostKey: MATRIX_KEY } }
+      : b,
+  );
+  return [matrix, ...reparented];
+}
+
+/** Наскільки матриця ширша за розмах коренів. */
+const MATRIX_RADIUS_MARGIN = 1.6;
+/** Приплюснутість: радіус ≥ висота / це. Менше — ширший «ґрунт». */
+const MATRIX_FLATNESS = 0.5;
+/** Яка частка висоти матриці ховається нижче підошви друзи. */
+const MATRIX_SINK = 0.38;
+/** На скільки (у радіусах тіла) матриця перекриває основу найвищого кореня.
+ *  Кільце основи лежить РІВНО на висоті бази тіла, тож перекриття треба
+ *  символічне — перша спроба з 1.1 роздула матрицю в тарілку вдвічі ширшу
+ *  за саму друзу. */
+const MATRIX_COVER_MARGIN = 0.25;
+/** Стеля ширини: матриця не має бути ширшою за розмах друзи більш ніж у це. */
+const MATRIX_MAX_SPREAD = 1.45;
+
 /** Випадковий одиничний вектор з 2 draw (детермінований внесок збурення). */
 function perturbVec(rng: () => number): Vec3 {
   const az = rng() * Math.PI * 2;
@@ -583,7 +680,6 @@ function runDeposition(input: ArtifactInput): DepositedCrystal[] {
   const { seedNum, dna } = input;
   const nucleus = makeNucleus(seedNum);
   const instruction = crystalSpecies.buildInstructions(input);
-  const constraints = instruction.constraints;
   const monarch: MonarchState = { key: instruction.hierarchy.monarchKey, length: null };
 
   const bedrock: DepositedCrystal[] = [];
@@ -604,6 +700,11 @@ function runDeposition(input: ArtifactInput): DepositedCrystal[] {
         : [nucleus, ...bedrock.filter((b) => b.ageDays >= event.ageDays), ...streamPrior];
 
       const field = instruction.fieldAt(event.ageDays);
+      // Правила виду — теж ІСТОРИЧНІ (Volume II, crystalConstraints.ts):
+      // тіло росте за законом, який діяв на його дату. Той самий віковий
+      // гейт, що в субстрату й поля, тож дані, додані сьогодні, не можуть
+      // переписати закон жодного вже відкладеного тіла.
+      const constraints = instruction.constraintsAt(event.ageDays);
       // Набір кліренсу (`CAI-REQ-001`): УСЕ вже відкладене, що не молодше за
       // подію — незалежно від стріму. Той самий віковий гейт, що й у
       // субстрату: тіло, додане сьогодні, є наймолодшим, тож жодне існуюче
@@ -631,7 +732,11 @@ function runDeposition(input: ArtifactInput): DepositedCrystal[] {
  */
 export function runGrowth(input: ArtifactInput): GrowthState {
   const deposited = runDeposition(input);
-  const { crystals, score, passes } = composeMineralCluster(deposited, input.seedNum, input.dna.compactnessBias);
+  const composition = composeMineralCluster(deposited, input.seedNum, input.dna.compactnessBias);
+  const { score, passes } = composition;
+  // Основа-матриця додається ПІСЛЯ композиції: її розмір виводиться з
+  // фінальних позицій, і вона стає господарем для кореневих тіл.
+  const crystals = attachMatrix(composition.crystals, input.seedNum);
   // Volume IV публікує канонічні кріплення вже з ФІНАЛЬНОЇ геометрії
   // (`CAI-REQ-004`) — Geometry Engine споживатиме саме їх.
   const junctions = buildJunctions(

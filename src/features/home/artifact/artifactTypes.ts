@@ -45,7 +45,10 @@ export type CrystalArchetype =
   | 'fan'
   | 'split'
   | 'intergrown'
-  | 'etched';
+  | 'etched'
+  /** Основа-матриця: приплюснутий купол-порода під підошвою друзи. Не
+   *  кристал — саме тому має власний профіль, широкий догори, а не шпиль. */
+  | 'matrix';
 
 /**
  * Датований первинний факт із БД — «сировина» для доменних білдерів
@@ -246,9 +249,12 @@ export interface EvolutionPressures {
   stability: number;
   /** Рівномірність використання модулів → Harmony Pressure. */
   harmony: number;
-  /** Фільми — залишається як є, не піднято до named-pressure. */
+  /** Фільми → внутрішні кольорові переливи (відтінок, не яскравість). */
   movieMix: number;
-  /** Книги — залишається як є, не піднято до named-pressure. */
+  /** Фільми → ЯСКРАВІСТЬ: спільно переглянуте розпалює кристал зсередини.
+   *  Окремо від `movieMix`, бо той міняє ТОН, а не силу світла. */
+  brilliance: number;
+  /** Мітки на карті (+ книги) → складність поверхні: кількість граней. */
   surfaceComplexity: number;
   /** Фінанси → щільність/маса (як і в v1). */
   density: number;
@@ -277,4 +283,12 @@ export interface ArtifactInput {
   /** Спогади (photo_calendar) — рахунок для Luminosity Pressure; самі вузли — через bucketByFixedSize. */
   memoriesCount: number;
   memories: readonly DatedItem[];
+  /**
+   * Завантажені фото З ДАТАМИ. Окремі тіла з них НЕ ростуть (сто фото — це
+   * один великий тиск, а не сто подій росту); дати потрібні рівно для того,
+   * щоб рахунок фото став ІСТОРИЧНИМ і міг впливати на форму, не ламаючи
+   * append-only. Порожній список = дат немає: Evolution Engine тоді падає
+   * назад на недатований агрегат `usage.photos` (evolutionEvents.ts).
+   */
+  photos?: readonly DatedItem[];
 }

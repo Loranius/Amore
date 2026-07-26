@@ -84,18 +84,33 @@ export function useCrystalSeed(): { seed: string | null; isPending: boolean } {
 
 /** Пул фото зі Storage (для грані «Фотографії» кристала). */
 const PHOTO_BUCKET = 'family_photos';
+
+/** Фото з ДАТОЮ завантаження. Дата тут не косметика: без неї фото —
+ *  недатований агрегат, і Evolution Engine не має права пускати їх у форму
+ *  кристала (див. artifact/species/crystalConstraints.ts: недатований факт
+ *  зрушив би всю вже відкладену масу й зламав append-only). Storage і так
+ *  віддає `created_at` — раніше воно просто викидалось. */
+export interface PhotoAsset {
+  url: string;
+  /** ISO-дата (YYYY-MM-DD) завантаження; null, якщо Storage її не дав. */
+  date: string | null;
+}
+
 export function usePhotoPool() {
   return useQuery({
     queryKey: qk.photos(),
     staleTime: 10 * 60_000,
-    queryFn: async (): Promise<string[]> => {
+    queryFn: async (): Promise<PhotoAsset[]> => {
       const { data, error } = await supabase.storage
         .from(PHOTO_BUCKET)
         .list('', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
       if (error) throw error;
       return (data ?? [])
         .filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f.name))
-        .map((f) => publicUrl(PHOTO_BUCKET, f.name));
+        .map((f) => ({
+          url: publicUrl(PHOTO_BUCKET, f.name),
+          date: typeof f.created_at === 'string' ? f.created_at.slice(0, 10) : null,
+        }));
     },
   });
 }

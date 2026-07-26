@@ -35,7 +35,14 @@ function isoDaysAgo(days: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-export function makeInput(seed: string): ArtifactInput {
+/** Обсяг прожитого — щоб тести могли питати «а для пари з трьома подіями?».
+ *  Кристал мусить лишатись кристалом на всьому діапазоні, інакше правила
+ *  виду підігнані під один набір даних. */
+export type DataVolume = 'sparse' | 'typical' | 'rich';
+
+export function makeInput(seed: string, volume: DataVolume = 'typical'): ArtifactInput {
+  if (volume === 'sparse') return sparseInput(seed);
+  if (volume === 'rich') return richInput(seed);
   const memories = [480, 410, 350, 290, 220, 160, 45].map((age, i) => ({ id: i + 1, date: isoDaysAgo(age) }));
   return {
     seedNum: hashSeedString(seed),
@@ -84,7 +91,80 @@ export function makeInput(seed: string): ArtifactInput {
     books: [],
     memoriesCount: memories.length,
     memories,
+    // Фото датовані (Storage віддає created_at) — інакше тести структури
+    // сліпі до драйвера `photos` у правилах виду.
+    photos: Array.from({ length: 40 }, (_, i) => ({ id: i + 1, date: isoDaysAgo(470 - i * 11) })),
     ...(seed === SEEDS[3] ? { books: [{ id: 1, date: isoDaysAgo(210) }] } : {}),
+  };
+}
+
+/** Пара, що тільки почала: три записи й пів року разом. */
+function sparseInput(seed: string): ArtifactInput {
+  return {
+    seedNum: hashSeedString(seed),
+    dna: generateArtifactDNA(seed),
+    usage: {
+      daysTogether: 180,
+      photos: 3,
+      places: 1,
+      moviesWatched: 0,
+      booksRead: 0,
+      wishesDone: 0,
+      goalsAchieved: 0,
+      anniversaries: 0,
+      recipesSaved: 0,
+      distinctCountries: 0,
+      milestones: 1,
+      totalSaved: 0,
+    },
+    countries: [],
+    cities: [{ name: 'Kyiv', firstVisit: isoDaysAgo(150) }],
+    milestones: [{ id: 1, title: 'Перше побачення', date: isoDaysAgo(170) }],
+    wishes: [],
+    achievedGoals: [],
+    anniversaries: [],
+    recipes: [],
+    movies: [],
+    books: [],
+    memoriesCount: 1,
+    memories: [{ id: 1, date: isoDaysAgo(60) }],
+    photos: [1, 2, 3].map((id, i) => ({ id, date: isoDaysAgo(140 - i * 50) })),
+  };
+}
+
+/** Пара з десятиліттям спільного життя і сотнею записів. */
+function richInput(seed: string): ArtifactInput {
+  const span = 3600;
+  const spread = (count: number, step: number) => Array.from({ length: count }, (_, i) => span - 60 - i * step);
+  return {
+    seedNum: hashSeedString(seed),
+    dna: generateArtifactDNA(seed),
+    usage: {
+      daysTogether: span,
+      photos: 400,
+      places: 40,
+      moviesWatched: 90,
+      booksRead: 30,
+      wishesDone: 24,
+      goalsAchieved: 12,
+      anniversaries: 9,
+      recipesSaved: 30,
+      distinctCountries: 12,
+      milestones: 14,
+      totalSaved: 90_000,
+    },
+    countries: spread(12, 280).map((age, i) => ({ name: `Country ${i}`, firstVisit: isoDaysAgo(age) })),
+    cities: spread(28, 120).map((age, i) => ({ name: `City ${i}`, firstVisit: isoDaysAgo(age) })),
+    milestones: spread(14, 240).map((age, i) => ({ id: 100 + i, title: `Віха ${i}`, date: isoDaysAgo(age) })),
+    wishes: spread(24, 140).map((age, i) => ({ id: 200 + i, fulfilledAt: isoDaysAgo(age) })),
+    achievedGoals: spread(12, 280).map((age, i) => ({ id: 300 + i, date: isoDaysAgo(age) })),
+    anniversaries: spread(9, 365).map((age, i) => ({ id: 400 + i, date: isoDaysAgo(age) })),
+    recipes: spread(30, 110).map((age, i) => ({ id: 500 + i, date: isoDaysAgo(age) })),
+    movies: spread(90, 38).map((age, i) => ({ id: 600 + i, date: isoDaysAgo(age) })),
+    books: spread(30, 115).map((age, i) => ({ id: 700 + i, date: isoDaysAgo(age) })),
+    memoriesCount: 60,
+    memories: spread(60, 58).map((age, i) => ({ id: 800 + i, date: isoDaysAgo(age) })),
+    photos: spread(400, 8).map((age, i) => ({ id: 900 + i, date: isoDaysAgo(Math.max(1, age)) })),
   };
 }
 
@@ -102,8 +182,11 @@ export interface BuiltMass {
   published: PublishedCrystal;
 }
 
-export function buildBranches(seed: string): { branches: ClusterBranch[]; material: ClusterMaterial } {
-  const input = makeInput(seed);
+export function buildBranches(
+  seed: string,
+  volume: DataVolume = 'typical',
+): { branches: ClusterBranch[]; material: ClusterMaterial } {
+  const input = makeInput(seed, volume);
   const pressures = computeEvolutionPressures(input);
   return {
     branches: buildArtifactNodes(input, pressures).map((n) => deriveClusterBranch(n, input.dna)),
