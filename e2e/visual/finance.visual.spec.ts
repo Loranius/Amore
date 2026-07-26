@@ -18,35 +18,57 @@ async function login(page: import('@playwright/test').Page) {
   await page.waitForURL((url) => !url.hash.includes('/login'), { timeout: 15_000 });
 }
 
+async function expectInsideViewport(
+  page: import('@playwright/test').Page,
+  locator: import('@playwright/test').Locator,
+) {
+  const viewport = page.viewportSize();
+  const box = await locator.boundingBox();
+
+  expect(viewport).not.toBeNull();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(-1);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width + 1);
+}
+
 test('Finance shared goals keep a full-width Pixel 8 Pro layout', async ({ page }, testInfo) => {
   await login(page);
   await page.goto('/#/budget');
 
   await expect(page.getByRole('heading', { name: 'Спільні цілі' })).toBeVisible();
   await expect(page.locator('.finance-goals-hero')).toBeVisible();
+  await expect(page.locator('.finance-goal, .finance-goals-empty').first()).toBeVisible({
+    timeout: 15_000,
+  });
 
-  const contentOverflow = await page.locator('.content').evaluate((element) => (
-    element.scrollWidth > element.clientWidth + 1
-  ));
-  expect(contentOverflow).toBe(false);
+  await page.screenshot({
+    path: testInfo.outputPath('finance-mobile-full.png'),
+    fullPage: true,
+  });
+
+  await expectInsideViewport(page, page.locator('.budget'));
+  await expectInsideViewport(page, page.locator('.finance-goals-hero'));
 
   const goal = page.locator('.finance-goal').first();
   if (await goal.count()) {
-    await expect(goal.locator('.finance-goal-main-card')).toBeVisible();
-    await expect(goal.locator('.goal-progress-card')).toBeVisible();
-    await expect(goal.locator('.goal-forecast-card')).toBeVisible();
+    const mainCard = goal.locator('.finance-goal-main-card');
+    const progressCard = goal.locator('.goal-progress-card');
+    const forecastCard = goal.locator('.goal-forecast-card');
+
+    await expect(mainCard).toBeVisible();
+    await expect(progressCard).toBeVisible();
+    await expect(forecastCard).toBeVisible();
+
+    await expectInsideViewport(page, goal);
+    await expectInsideViewport(page, mainCard);
+    await expectInsideViewport(page, progressCard);
+    await expectInsideViewport(page, forecastCard);
 
     const goalBox = await goal.boundingBox();
-    expect(goalBox).not.toBeNull();
     expect(goalBox!.width).toBeGreaterThan(360);
 
     await goal.screenshot({
       path: testInfo.outputPath('finance-goal-mobile.png'),
     });
   }
-
-  await page.screenshot({
-    path: testInfo.outputPath('finance-mobile-full.png'),
-    fullPage: true,
-  });
 });
