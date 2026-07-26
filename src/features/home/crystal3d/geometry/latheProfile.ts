@@ -67,10 +67,15 @@ export function computeCrystalProfile(
       : branch.role === 'satellite'
         ? 5 + Math.floor(shapeRng() * 2)
         : 6 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+  // Матриця — найширше тіло сцени, і 6-7 граней робили з неї шестигранну
+  // МОНЕТУ з гострим обідком. Порода мусить читатись округлою, тож граней
+  // помітно більше. Draw call вона все одно ділить з рештою (батчинг), а
+  // сама вона одна — ціна нікчемна.
+  const segmentsBeforeLod = branch.archetype === 'matrix' ? baseSegments * 2 + 4 : baseSegments;
   // LOD зрізає граней ПІСЛЯ розіграшу — потік shapeRng не зсувається, тож
   // форма тіла на всіх рівнях та сама, змінюється лише її роздільність
   // (`V5-REQ-009`).
-  const segments = lodSegments(baseSegments, lod);
+  const segments = lodSegments(segmentsBeforeLod, lod);
   const m = branch.maturity;
 
   const h = branch.height * heightScale(m);
@@ -95,7 +100,21 @@ export function computeCrystalProfile(
   const baseR = r * 0.6;
   const bevelR = r * 0.9;
   const side: ProfileRow[] =
-    arch === 'broken'
+    // Основа-матриця — не кристал, а порода: приплюснутий купол, ШИРОКИЙ
+    // догори. Звичайний профіль звужується до вістря, і саме тому перша
+    // версія основи нікого не ховала: біля її верху радіус падав до 0.28r,
+    // а торці кореневих тіл лишались назовні. Тут радіус тримається майже
+    // повним до 0.85 висоти й лише потім заокруглюється.
+    arch === 'matrix'
+      ? [
+          { r: r * 0.72, y: 0 },
+          { r: r * 0.94, y: h * 0.14 },
+          { r, y: h * 0.4 },
+          { r: r * 0.99, y: h * 0.66 },
+          { r: r * 0.92, y: h * 0.87 },
+          { r: r * 0.66, y: h },
+        ]
+      : arch === 'broken'
       ? [
           { r: baseR, y: 0 },
           { r: bevelR, y: h * 0.05 },

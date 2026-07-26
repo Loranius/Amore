@@ -13,6 +13,8 @@
 // ============================================================
 import { describe, expect, it } from 'vitest';
 import { buildMass, SEEDS, toShellEntries } from './fixture';
+import { makeBranch, STRESS_MATERIAL } from './stress';
+import { publishCrystal } from '../crystalPublication';
 import { breatheMargin, isInsideHost } from '../geometry/hostBody';
 import { triangleInside, worldVertices } from '../geometry/junctionTrim';
 import {
@@ -55,32 +57,34 @@ describe('external shell — `CAI-REQ-005` base caps', () => {
     expect(checked).toBeGreaterThan(20);
   });
 
-  it('ЛИШАЄ кришку, коли основу не ховає ЖОДНЕ тіло — інакше повертаються наскрізні діри', () => {
-    // Умова «не похована» тут ширша за `capBuried`: кришку законно знімає і
-    // не-господар, у який тіло випадково заглиблене (`CAI-REQ-007`). Тому
-    // регресію «дір» стереже саме випадок «основу не ховає НІХТО».
-    let checked = 0;
-    for (const seed of SEEDS) {
-      const mass = buildMass(seed);
-      for (const body of mass.bodies) {
-        const world = worldVertices(body.geometry, body.solid);
-        const profileLen = body.solid.profile.points.length;
-        const ringInside = (other: (typeof mass.solids) extends Map<string, infer S> ? S : never): boolean => {
-          const margin = breatheMargin(body.solid, other);
-          for (let v = 0; v < world.length; v++) {
-            if (v % profileLen <= 1 && !isInsideHost(world[v]!, other, margin)) return false;
-          }
-          return true;
-        };
-        const buriedInSomething = [...mass.solids.values()].some(
-          (o) => o.key !== body.solid.key && ringInside(o),
-        );
-        if (buriedInSomething) continue;
-        checked++;
-        expect(capFaceCount(mass, body.branch.key), `${seed}/${body.branch.key}`).toBeGreaterThan(0);
+  it('ЛИШАЄ кришку тілу, під яким нічого немає — інакше повертаються наскрізні діри', () => {
+    // Перевіряється на СИНТЕТИЦІ, і навмисно. Попередня версія цього тесту
+    // брала реальну масу й питала «чи лежить кільце основи всередині
+    // ОДНОГО тіла» — але зріз працює інакше: він знімає ГРАНЬ, якщо та вся
+    // в якомусь тілі. Дві різні умови збігалися доти, доки під друзою не
+    // з'явилась основа-матриця; після неї тест почав хибно падати
+    // (`city-Rome`), хоча оболонка була ціла.
+    //
+    // Тут умова однозначна: самотнє тіло, під яким немає нічого, мусить
+    // зберегти кришку. Саме це й стереже регресію «дір знизу», заради якої
+    // тест писався, і воно не залежить від того, що навколо.
+    const lone = makeBranch({ key: 'lone', pos: [0, 0, 0], dir: [0, 1, 0], height: 1, radius: 0.2 });
+    const p = publishCrystal([lone], STRESS_MATERIAL);
+    const body = p.renderable[0]!;
+    const index = body.geometry.getIndex()!;
+    const profileLen = body.solid.profile.points.length;
+    let capFaces = 0;
+    for (let t = 0; t < index.count / 3; t++) {
+      if (
+        index.getX(t * 3) % profileLen === 0 ||
+        index.getX(t * 3 + 1) % profileLen === 0 ||
+        index.getX(t * 3 + 2) % profileLen === 0
+      ) {
+        capFaces++;
       }
     }
-    expect(checked).toBeGreaterThan(10);
+    expect(capFaces, 'самотнє тіло втратило кришку основи').toBeGreaterThan(0);
+    expect(body.trim.capRemoved).toBe(false);
   });
 });
 
