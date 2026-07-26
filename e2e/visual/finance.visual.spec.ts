@@ -70,5 +70,20 @@ test('Finance shared goals keep a full-width Pixel 8 Pro layout', async ({ page 
     await goal.screenshot({
       path: testInfo.outputPath('finance-goal-mobile.png'),
     });
+
+    await goal.getByRole('button', { name: 'Обговорення' }).click();
+
+    const discussion = page.locator('.goal-comments-modal');
+    await expect(discussion).toBeVisible();
+    await expect(discussion.getByText('Обговорення цілі')).toBeVisible();
+    await expect(discussion.getByLabel('Додати коротку думку')).toBeVisible();
+    await expectInsideViewport(page, discussion);
+
+    await discussion.screenshot({
+      path: testInfo.outputPath('finance-goal-discussion-mobile.png'),
+    });
+
+    await discussion.getByRole('button', { name: 'Закрити обговорення' }).click();
+    await expect(discussion).toBeHidden();
   }
 });
