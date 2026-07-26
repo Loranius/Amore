@@ -52,6 +52,9 @@ import {
   type ArtifactInput,
 } from '../artifact';
 import { deriveClusterBranch, deriveClusterMaterial, buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
+import { buildHostSolids, type HostSolid } from './geometry/hostBody';
+import { trimHiddenFaces } from './geometry/junctionTrim';
+import { formatShellViolations, validateExternalShell } from './geometry/validateShell';
 
 /** Центр вертикального «дихання» левітації — немає більше каменя, що заякорює композицію низько. */
 const BOB_CENTER_Y = 0;
@@ -153,10 +156,32 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
     else meshRefs.current.delete(key);
   };
 
-  const branchMeshes = useMemo(
-    () => branches.map((branch) => ({ branch, geometry: buildBranchGeometry(branch, material) })),
-    [branches, material],
-  );
+  // Volume V — зовнішня оболонка (`CAI-REQ-005..008`). Мешi будуються, а
+  // потім кожен віддає обробці стику ті грані, що сидять усередині сусідів:
+  // заглиблена кришка основи й приховані грані зникають, і маса читається
+  // як ОДНЕ зрощене тіло, а не стос окремих замкнених кристалів. Зріз
+  // робиться один раз тут, а не щокадру — це чиста функція від геометрії.
+  const branchMeshes = useMemo(() => {
+    const solids = buildHostSolids(branches, material);
+    return branches.map((branch) => {
+      const geometry = buildBranchGeometry(branch, material);
+      const solid = solids.get(branch.key);
+      if (solid !== undefined) trimHiddenFaces(geometry, solid, branch.hostKey, solids);
+      return { branch, geometry, solid };
+    });
+  }, [branches, material]);
+
+  // Гейт цілісності оболонки. У проді не блокує рендер (порожній екран
+  // замість кристала — гірше за перетин), але в dev кричить: справжній
+  // гейт стоїть у тестах і `npm run build`. Див. geometry/validateShell.ts.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const entries = branchMeshes
+      .filter((m): m is typeof m & { solid: HostSolid } => m.solid !== undefined)
+      .map(({ branch, geometry, solid }) => ({ solid, hostKey: branch.hostKey, geometry }));
+    const violations = validateExternalShell(entries);
+    if (violations.length > 0) console.error(`[crystal shell]\n${formatShellViolations(violations)}`);
+  }, [branchMeshes]);
 
   useEffect(
     () => () => branchMeshes.forEach(({ geometry }) => geometry.dispose()),

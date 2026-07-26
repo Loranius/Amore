@@ -539,6 +539,7 @@ const toArtifactNode = (c: DepositedCrystal, pressures: EvolutionPressures): Art
   massScale: c.radius * (1 + pressures.stability * 0.15),
   anchor: c.renderedAnchor,
   direction: c.direction,
+  hostKey: c.attachment?.hostKey ?? null,
   spin: c.spin,
   maturity: c.maturity,
   breathePhase: c.breathePhase,

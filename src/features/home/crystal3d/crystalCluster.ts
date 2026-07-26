@@ -23,10 +23,15 @@ import type {
   GrowthDomainId,
   NodeKind,
 } from '../artifact';
+import { computeCrystalProfile } from './geometry/latheProfile';
 
 export interface ClusterBranch {
   key: string;
   kind: NodeKind;
+  /** Ключ тіла-господаря (`CAI-REQ-004`); null — тіло вкорінене в ядрі.
+   *  Потрібен саме рендереру: обробка стику знімає з оболонки грані, що
+   *  сидять усередині господаря (geometry/junctionTrim.ts). */
+  hostKey: string | null;
   domain: GrowthDomainId | null;
   label?: string;
   /** «Доросла» довжина/товщина (до масштабування maturity в buildBranchGeometry). */
@@ -88,6 +93,15 @@ const CREATION_PALETTE: Record<CreationSourceLabel, [string, string]> = {
  */
 const CLUSTER_Y = 0.08;
 
+/**
+ * Амплітуда «дихання» тіла (масштаб по власній осі, CrystalScene::useFrame).
+ * Живе тут, бо на неї спирається не лише анімація: обробка стику
+ * (geometry/hostBody.ts) ерозує тіло-господаря рівно на цю величину, інакше
+ * ледь захована грань виглядала б у крайній фазі дихання. Розійдуться ці
+ * два числа — і в оболонці почнуть блимати дірки.
+ */
+export const BREATHE_AMPLITUDE = 0.018;
+
 const UP = new THREE.Vector3(0, 1, 0);
 
 function basePalette(node: ArtifactNode): [string, string] {
@@ -141,6 +155,7 @@ export function deriveClusterBranch(node: ArtifactNode, dna: ArtifactDNA): Clust
     key: node.key,
     kind: node.kind,
     domain: node.domain,
+    hostKey: node.hostKey,
     ...(node.label !== undefined ? { label: node.label } : {}),
     height: node.growthScale,
     radiusBottom: node.massScale,
@@ -234,76 +249,19 @@ export function buildBranchGeometry(
   branch: ClusterBranch,
   material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix' | 'surfaceComplexity' | 'polish'>,
 ): THREE.BufferGeometry {
-  const shapeRng = mulberry32(hashSeedString(branch.key));
-  // Великі тіла — ВЕЛИКІ чисті грані (референс: кварцовий гексагон, 6-7
-  // граней — кожна читається площиною); середні — 7-9 (+шанс зайвої від
-  // «складності поверхні»/книг); супутники колоній — дрібні й численні,
-  // тому дешевші: 5-6 граней; мікрошар — 4-5 (перф на мобільних GPU).
-  const segments =
-    branch.role === 'micro'
-      ? 4 + Math.floor(shapeRng() * 2)
-      : branch.role === 'satellite'
-        ? 5 + Math.floor(shapeRng() * 2)
-        : 6 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
-  const m = branch.maturity;
+  // Профіль приходить із latheProfile.ts — того самого модуля, яким
+  // користується аналітична модель тіла-господаря (geometry/hostBody.ts).
+  // Це не «винесено для краси»: обробка стику вирізає грані за тим, де,
+  // на її думку, проходить поверхня сусіда, тож дві незалежні копії
+  // профілю рано чи пізно розійшлись би — і оболонка розповзлась би.
+  const { segments, h, points, jitterAmp, scaleX, scaleZ } = computeCrystalProfile(branch, material);
 
-  const h = branch.height * (0.32 + m * 0.68);
-  const r = branch.radiusBottom * (0.4 + m * 0.6);
-  // Архетип (Composition Framework) реалізується тут ЛИШЕ формою профілю —
-  // пропорції вже виставив композитор, матеріали його не обходять.
-  const arch = branch.archetype;
-  const blunt = arch === 'prismatic' || arch === 'tabular' || arch === 'massive';
-  const tipR = blunt ? r * 0.28 : r * (0.14 - m * 0.12); // молоді — тупіші вістря, зрілі — майже гострі
-  const prismEnd = (arch === 'prismatic' ? 0.6 : 0.46) + shapeRng() * 0.08;
-  // pointStart МУСИТЬ бути помітно вище prismEnd (інакше профіль самоперетнеться
-  // при високій maturity, де 0.72-m*0.2 може впасти аж до 0.52) — тому явно
-  // прив'язаний до prismEnd з запасом, а не рахується незалежно.
-  const pointStart = Math.max(prismEnd + 0.14, 0.72 - m * 0.2 + shapeRng() * 0.08);
-
-  // Профіль: ЗАОКРУГЛЕНА ВУЗЬКА основа → призматична ділянка → пірамідальне
-  // вістря. Основа тепер НЕ широка пласка «спідниця» з гострим кутом (яка
-  // читалась як обрубок), а вужча за призму й плавно скруглена вгору
-  // (r·0.6 → біля-повний радіус через м'який bevel) — низ кристала
-  // виглядає обточеним, як у справжнього мінералу, і займає менше місця
-  // (менше налазить на сусідів). 'broken' — зрізана верхівка нижче повної
-  // висоти.
-  const baseR = r * 0.6;
-  const bevelR = r * 0.9;
-  const side =
-    arch === 'broken'
-      ? [
-          new THREE.Vector2(baseR, 0),
-          new THREE.Vector2(bevelR, h * 0.05),
-          new THREE.Vector2(r, h * (0.13 + shapeRng() * 0.03)),
-          new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * Math.min(prismEnd, 0.6)),
-          new THREE.Vector2(r * (0.3 + shapeRng() * 0.08), h * 0.84),
-          new THREE.Vector2(0.06 * r, h * 0.85),
-        ]
-      : [
-          new THREE.Vector2(baseR, 0),
-          new THREE.Vector2(bevelR, h * 0.05),
-          new THREE.Vector2(r, h * (0.13 + shapeRng() * 0.03)),
-          new THREE.Vector2(r * (0.96 + shapeRng() * 0.04), h * prismEnd),
-          new THREE.Vector2(r * (0.9 + shapeRng() * 0.06), h * pointStart),
-          new THREE.Vector2(Math.max(0.001, tipR), h),
-        ];
-
-  // ЗАКРИТІ торці: LatheGeometry — поверхня обертання з ВІДКРИТИМИ кінцями,
-  // тож без кришок видно наскрізь у порожнє нутро — саме ці «діри без
-  // текстури» на вершині й під основою. Додаємо осьову точку (r≈0) перед
-  // основою і після вістря: між нею й кільцем торця лате будує суцільний
-  // диск-кришку. Тепер тіло замкнене з обох боків (низ ховається в
-  // субстраті, верх — грань термінації кристала).
-  const first = side[0]!;
-  const last = side[side.length - 1]!;
-  const profile = [new THREE.Vector2(0.0001, first.y), ...side, new THREE.Vector2(0.0001, last.y)];
-
-  const geo = new THREE.LatheGeometry(profile, segments);
+  const geo = new THREE.LatheGeometry(points, segments);
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
   const colors = new Float32Array(pos.count * 3);
   const { colorA, colorB } = tintBranchColors(branch, material);
   const c = new THREE.Color();
-  const profileLen = profile.length;
+  const profileLen = points.length;
 
   // Легка per-facet варіація тону (справжній мінерал не має ідеально рівного
   // забарвлення грані до грані — тонкі домішки/включення). Тон фіксований на
@@ -345,15 +303,12 @@ export function buildBranchGeometry(
     // щілин по краю кришки).
     if (row > 1 && row < profileLen - 2) {
       const jitterRng = mulberry32(hashSeedString(`${branch.key}:jitter:${facetIdx}:${row}`));
-      // ±8% базово — природна нерівність грані; «Фото → Polishing Pressure»
-      // гамує її глобально, а ієрархія — локально: старі великі тіла чисті
-      // (монарх майже ідеальний), крихітні супутники — грубші. Це і робить
-      // ієрархію читабельною: велике = чисте, дрібне = шорстке.
-      const hierarchy =
-        (branch.primary ? 0.15 : branch.role !== 'dominant' ? 1.25 : 1) * (1 - 0.4 * branch.maturity);
-      // 'etched' — протравлені грані: шорсткість поверх усіх правил.
-      const amp = 0.08 * (1 - material.polish * 0.6) * hierarchy * (branch.archetype === 'etched' ? 1.7 : 1);
-      const j = 1 + (jitterRng() * 2 - 1) * amp;
+      // ±jitterAmp — природна нерівність грані (амплітуду рахує
+      // computeCrystalProfile: полірування × ієрархія × 'etched'). Модель
+      // господаря знає ту саму амплітуду і саме на неї звужує свою нижню
+      // межу радіуса — тому джиттер не може «висунути» грань із зони,
+      // яку обробка стику вважала зануреною.
+      const j = 1 + (jitterRng() * 2 - 1) * jitterAmp;
       pos.setXYZ(i, pos.getX(i) * j, pos.getY(i), pos.getZ(i) * j);
     }
   }
@@ -362,8 +317,7 @@ export function buildBranchGeometry(
   // Пласкі архетипи: blade — лезо (сильний сплюск по X), tabular — таблитчастий
   // (ширший і нижчий, помірний сплюск). Це геометрія, не матеріал — сплюск
   // «запікається» в позиції і обертається разом зі spin-кватерніоном.
-  if (branch.archetype === 'blade') geo.scale(0.45, 1, 1);
-  else if (branch.archetype === 'tabular') geo.scale(1.1, 1, 0.5);
+  if (scaleX !== 1 || scaleZ !== 1) geo.scale(scaleX, 1, scaleZ);
   geo.computeVertexNormals();
   return geo;
 }
