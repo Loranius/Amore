@@ -10,6 +10,7 @@ import { Card } from '@/components/ui/Card';
 import { ProposalCard } from '@/components/ui/ProposalCard';
 import { GoalContributions } from './GoalContributions';
 import { GoalDesiredDateModal, GoalForecastCard } from './GoalForecast';
+import { GoalMilestones } from './GoalMilestones';
 import { useGoalForecastMutations, useGoalForecasts } from './useGoalForecast';
 import {
   CONTRIBUTION_NOTE_MAX,
@@ -101,6 +102,7 @@ export function GoalsList() {
                           <span className="goal-progress-pct">{pct}%</span>
                         </div>
                       </div>
+                      <GoalMilestones savedAmount={saved} targetAmount={target} />
                       <GoalForecastCard
                         forecast={forecastByGoal.get(g.id) ?? null}
                         isLoading={forecastsPending}
