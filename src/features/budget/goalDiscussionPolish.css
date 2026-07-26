@@ -1,0 +1,132 @@
+.goal-comments-overlay {
+  background: color-mix(in srgb, #251d27 58%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.goal-comments-modal {
+  isolation: isolate;
+}
+
+.goal-comments-modal::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 8rem;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 10%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 44%),
+    linear-gradient(180deg, color-mix(in srgb, var(--accent) 5%, transparent), transparent);
+}
+
+.goal-comments-heading {
+  position: relative;
+}
+
+.goal-comments-heading::before {
+  content: '';
+  position: absolute;
+  top: 0.55rem;
+  left: 50%;
+  width: 2.8rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+  transform: translateX(-50%);
+  opacity: 0;
+}
+
+.goal-comments-summary {
+  min-height: 2.15rem;
+}
+
+.goal-comments-list {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--accent) 22%, transparent) transparent;
+}
+
+.goal-comment-bubble {
+  position: relative;
+}
+
+.goal-comment-row.is-partner .goal-comment-bubble::before,
+.goal-comment-row.is-mine .goal-comment-bubble::before {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  width: 0.65rem;
+  height: 0.65rem;
+  background: inherit;
+  border-bottom: inherit;
+}
+
+.goal-comment-row.is-partner .goal-comment-bubble::before {
+  left: -0.22rem;
+  border-left: inherit;
+  border-bottom-left-radius: 0.15rem;
+  transform: skewX(-18deg);
+}
+
+.goal-comment-row.is-mine .goal-comment-bubble::before {
+  right: -0.22rem;
+  border-right: inherit;
+  border-bottom-right-radius: 0.15rem;
+  transform: skewX(18deg);
+}
+
+.goal-comments-composer {
+  position: relative;
+  box-shadow: 0 -12px 32px color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.goal-comments-compose-row textarea {
+  resize: none;
+}
+
+.goal-comment-submit:not(:disabled) {
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+@media (max-width: 600px) {
+  .goal-comments-modal {
+    height: min(91dvh, 820px);
+  }
+
+  .goal-comments-heading {
+    padding-top: 1.35rem;
+  }
+
+  .goal-comments-heading::before {
+    opacity: 1;
+  }
+
+  .goal-comments-list {
+    padding-bottom: 1.35rem;
+  }
+
+  .goal-comments-composer {
+    padding-bottom: max(0.55rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .goal-comments-compose-row textarea {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 370px) {
+  .goal-comments-title-icon {
+    display: none;
+  }
+
+  .goal-comments-title-row {
+    gap: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goal-comments-overlay {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
