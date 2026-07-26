@@ -1,5 +1,5 @@
 // ============================================================
-// BudgetPage — «Фінанси» (порт budget.js UI)
+// BudgetPage — «Фінанси»
 // ============================================================
 import { FreeLimitCard } from './FreeLimitCard';
 import { GoalsList } from './GoalsList';
@@ -11,8 +11,8 @@ export function BudgetPage() {
     <section className="budget pink-page">
       <PortalDecor density="light" parallax={false} />
       <h1 className="budget-title">Фінанси</h1>
-      <FreeLimitCard />
       <GoalsList />
+      <FreeLimitCard />
     </section>
   );
 }
