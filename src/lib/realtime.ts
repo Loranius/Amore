@@ -2,8 +2,8 @@
 // REALTIME — живі оновлення від партнера (порт lib/realtime.js)
 // ------------------------------------------------------------
 // Один канал 'amore-live' на доменні таблиці. При зміні кеші React Query
-// інвалідуються; app_notifications підключена окремо, бо це read-only inbox,
-// а не клієнтська writable-таблиця з Database contract.
+// інвалідуються; app_notifications і savings_goal_contributions підключені
+// окремо, бо не входять до старого клієнтського Database contract.
 // ============================================================
 import { useEffect } from 'react';
 import { supabase } from './supabase';
@@ -53,6 +53,14 @@ function scheduleNotificationInbox(): void {
   }, DEBOUNCE_MS);
 }
 
+function scheduleContributionHistory(): void {
+  clearTimeout(timers.savings_goal_contributions);
+  timers.savings_goal_contributions = setTimeout(() => {
+    void queryClient.invalidateQueries({ queryKey: qk.savingsGoalContributions() });
+    void queryClient.invalidateQueries({ queryKey: qk.savingsGoals() });
+  }, DEBOUNCE_MS);
+}
+
 // ── Життєвий цикл каналу ─────────────────────────────────────
 let channel: ReturnType<typeof supabase.channel> | null = null;
 
@@ -71,6 +79,12 @@ function start(): void {
     'postgres_changes',
     { event: '*', schema: 'public', table: 'app_notifications' },
     scheduleNotificationInbox,
+  );
+
+  ch.on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'savings_goal_contributions' },
+    scheduleContributionHistory,
   );
 
   ch.subscribe((status) => {
