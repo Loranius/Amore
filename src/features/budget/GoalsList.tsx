@@ -1,12 +1,13 @@
 // ============================================================
 // GoalsList — спільні цілі
 // ------------------------------------------------------------
-// pending: очікує голосу партнера. confirmed: прогрес + внесок.
-// Модалки закриваються лише після успішної відповіді сервера.
+// Pending-цілі лишаються у безпечному сценарії голосування.
+// Підтверджені цілі мають власну мобільну композицію: картка дій,
+// окремий прогрес і окремий м’який прогноз.
 // ============================================================
 import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { Card } from '@/components/ui/Card';
+import { useConfirm } from '@/providers/ConfirmProvider';
 import { ProposalCard } from '@/components/ui/ProposalCard';
 import { GoalComments } from './GoalComments';
 import { GoalContributions } from './GoalContributions';
@@ -28,6 +29,7 @@ import {
 
 export function GoalsList() {
   const me = useCurrentUser();
+  const confirmDialog = useConfirm();
   const { data: goals = [], isPending } = useGoals();
   const { data: forecasts = [], isPending: forecastsPending } = useGoalForecasts();
   const {
@@ -59,120 +61,151 @@ export function GoalsList() {
     : null;
   const dateForecast = dateGoalId ? forecastByGoal.get(dateGoalId) ?? null : null;
 
+  const deleteConfirmedGoal = async (goal: BudgetGoalRow) => {
+    const accepted = await confirmDialog(`Видалити ціль «${goal.name}» разом з її історією?`);
+    if (accepted) remove.mutate(goal.id);
+  };
+
   return (
-    <Card className="fin-card">
-      <div className="fin-card-hdr">
-        <span className="fin-card-title">🎯 Спільні цілі</span>
-        <button type="button" className="btn fin-add-goal-btn" onClick={() => setAdding(true)}>
+    <section className="finance-goals" aria-labelledby="finance-goals-title">
+      <header className="finance-goals-hero">
+        <span className="finance-goals-hero-icon" aria-hidden="true">◎</span>
+        <div className="finance-goals-hero-copy">
+          <h2 id="finance-goals-title">Спільні цілі</h2>
+          <p>Крок за кроком до наших мрій</p>
+        </div>
+        <button type="button" className="btn finance-add-goal-btn" onClick={() => setAdding(true)}>
           + Ціль
         </button>
-      </div>
+      </header>
 
       {isPending ? (
-        <p className="empty-state">Завантаження…</p>
+        <div className="finance-goals-state">Завантаження…</div>
       ) : goals.length === 0 ? (
-        <p className="empty-state">Спільних цілей ще немає.</p>
+        <div className="finance-goals-empty">
+          <span aria-hidden="true">✨</span>
+          <strong>Спільних цілей ще немає</strong>
+          <p>Створіть першу мрію, до якої хочеться рухатися разом.</p>
+        </div>
       ) : (
         <div className="goals-list">
-          {goals.map((g) => {
-            const pending = g.status === 'pending';
-            const paused = g.paused_at !== null;
-            const target = Number(g.target_amount ?? 0);
-            const saved = Math.max(0, Number(g.saved_amount ?? 0));
-            const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
-            const pauseBusy = pause.isPending && pause.variables === g.id;
-            const resumeBusy = resume.isPending && resume.variables === g.id;
+          {goals.map((goal) => {
+            const pending = goal.status === 'pending';
+            const paused = goal.paused_at !== null;
+            const target = Math.max(0, Number(goal.target_amount ?? 0));
+            const saved = Math.max(0, Number(goal.saved_amount ?? 0));
+            const pauseBusy = pause.isPending && pause.variables === goal.id;
+            const resumeBusy = resume.isPending && resume.variables === goal.id;
+            const contributionBusy = addContribution.isPending
+              && addContribution.variables?.id === goal.id;
+
+            if (pending) {
+              return (
+                <div className="finance-pending-card" key={goal.id}>
+                  <ProposalCard
+                    pending
+                    proposedBy={goal.proposed_by ?? ''}
+                    meName={me.name}
+                    onConfirm={() => confirm.mutate(goal.id)}
+                    onReject={() => reject.mutate(goal.id)}
+                    onDelete={() => remove.mutate(goal.id)}
+                    info={
+                      <>
+                        <span className="goal-row-name">{goal.name}</span>
+                        {goal.description && <span className="goal-row-desc">{goal.description}</span>}
+                        {goal.url && (
+                          <a className="goal-row-link" href={goal.url} target="_blank" rel="noopener noreferrer">
+                            Відкрити посилання
+                          </a>
+                        )}
+                      </>
+                    }
+                    extraActions={<span className="goal-row-price">{fmtMoney(target)}</span>}
+                  />
+                </div>
+              );
+            }
 
             return (
-              <ProposalCard
-                key={g.id}
-                pending={pending}
-                proposedBy={g.proposed_by ?? ''}
-                meName={me.name}
-                onConfirm={() => confirm.mutate(g.id)}
-                onReject={() => reject.mutate(g.id)}
-                onDelete={() => remove.mutate(g.id)}
-                info={
-                  <>
-                    <span className="goal-row-name">{g.name}</span>
-                    {g.description && <span className="goal-row-desc">{g.description}</span>}
-                    {g.url && (
-                      <a className="goal-row-link" href={g.url} target="_blank" rel="noopener noreferrer">
-                        🔗
-                      </a>
-                    )}
-                  </>
-                }
-                badge={
-                  g.status === 'confirmed' ? (
-                    <>
-                      <span className={`goal-status-badge ${paused ? 'goal-paused' : 'goal-confirmed'}`}>
-                        {paused ? '⏸ На паузі' : '✅ Підтверджено'}
-                      </span>
-                      <div className="goal-progress-wrap">
-                        <div className="goal-progress-bar">
-                          <div className="goal-progress-fill" style={{ width: `${pct}%` }} />
-                        </div>
-                        <div className="goal-progress-meta">
-                          <span>
-                            {fmtMoney(saved)} / {fmtMoney(target)}
-                          </span>
-                          <span className="goal-progress-pct">{pct}%</span>
-                        </div>
-                      </div>
-                      <GoalMilestones savedAmount={saved} targetAmount={target} />
-                      <GoalForecastCard
-                        forecast={forecastByGoal.get(g.id) ?? null}
-                        isLoading={forecastsPending}
-                        paused={paused}
-                        onEdit={() => setDateGoalId(g.id)}
-                      />
-                    </>
-                  ) : undefined
-                }
-                extraActions={
-                  <>
-                    <span className="goal-row-price">{fmtMoney(target)}</span>
-                    {g.status === 'confirmed' && (
-                      <div className="goal-finance-actions">
-                        <button
-                          type="button"
-                          className="btn-secondary goal-history-btn"
-                          onClick={() => setHistoryGoalId(g.id)}
-                        >
-                          Історія
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary goal-comments-btn"
-                          onClick={() => setCommentsGoalId(g.id)}
-                        >
-                          Обговорення
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary goal-pause-btn"
-                          onClick={() => paused ? resume.mutate(g.id) : pause.mutate(g.id)}
-                          disabled={pause.isPending || resume.isPending}
-                        >
-                          {paused
-                            ? (resumeBusy ? 'Відновлюємо…' : 'Відновити')
-                            : (pauseBusy ? 'Зупиняємо…' : 'Пауза')}
-                        </button>
-                        {!paused && (
-                          <button
-                            type="button"
-                            className="btn-secondary goal-add-funds-btn"
-                            onClick={() => setFunding(g)}
-                          >
-                            + Внести
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </>
-                }
-              />
+              <article className={`finance-goal${paused ? ' is-paused' : ''}`} key={goal.id}>
+                <section className="finance-goal-main-card">
+                  <header className="finance-goal-head">
+                    <span className="finance-goal-cover" aria-hidden="true">◎</span>
+                    <div className="finance-goal-heading-copy">
+                      <h3>{goal.name}</h3>
+                      {goal.description && <p>{goal.description}</p>}
+                      {goal.url && (
+                        <a href={goal.url} target="_blank" rel="noopener noreferrer">
+                          Відкрити посилання ↗
+                        </a>
+                      )}
+                    </div>
+                    <strong className="finance-goal-target">{fmtMoney(target)}</strong>
+                  </header>
+
+                  <div className="finance-goal-actions" aria-label="Дії з ціллю">
+                    <button type="button" onClick={() => setHistoryGoalId(goal.id)}>
+                      <span aria-hidden="true">▤</span>
+                      Історія
+                    </button>
+                    <button type="button" onClick={() => setCommentsGoalId(goal.id)}>
+                      <span aria-hidden="true">▱</span>
+                      Обговорення
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => paused ? resume.mutate(goal.id) : pause.mutate(goal.id)}
+                      disabled={pause.isPending || resume.isPending}
+                    >
+                      <span aria-hidden="true">{paused ? '▶' : 'Ⅱ'}</span>
+                      {paused
+                        ? (resumeBusy ? 'Відновлюємо…' : 'Відновити')
+                        : (pauseBusy ? 'Зупиняємо…' : 'Пауза')}
+                    </button>
+                  </div>
+
+                  {paused ? (
+                    <div className="finance-goal-paused-note">
+                      Накопичення призупинено. Прогрес та вся історія збережені.
+                    </div>
+                  ) : (
+                    <QuickContribution
+                      goal={goal}
+                      busy={contributionBusy}
+                      onDetailed={() => setFunding(goal)}
+                      onSubmit={(amount) => addContribution.mutateAsync({
+                        id: goal.id,
+                        amount,
+                        note: null,
+                      })}
+                    />
+                  )}
+
+                  <footer className="finance-goal-status-row">
+                    <span className={paused ? 'is-paused' : 'is-confirmed'}>
+                      <span aria-hidden="true">{paused ? 'Ⅱ' : '✓'}</span>
+                      {paused ? 'На паузі' : 'Підтверджено'}
+                    </span>
+                    <button
+                      type="button"
+                      className="finance-goal-delete"
+                      onClick={() => void deleteConfirmedGoal(goal)}
+                      disabled={remove.isPending}
+                      aria-label={`Видалити ціль ${goal.name}`}
+                    >
+                      ×
+                    </button>
+                  </footer>
+                </section>
+
+                <GoalMilestones savedAmount={saved} targetAmount={target} />
+                <GoalForecastCard
+                  forecast={forecastByGoal.get(goal.id) ?? null}
+                  isLoading={forecastsPending}
+                  paused={paused}
+                  onEdit={() => setDateGoalId(goal.id)}
+                />
+              </article>
             );
           })}
         </div>
@@ -215,7 +248,57 @@ export function GoalsList() {
           }
         />
       )}
-    </Card>
+    </section>
+  );
+}
+
+function QuickContribution({
+  goal,
+  busy,
+  onDetailed,
+  onSubmit,
+}: {
+  goal: BudgetGoalRow;
+  busy: boolean;
+  onDetailed: () => void;
+  onSubmit: (amount: number) => Promise<unknown>;
+}) {
+  const [amount, setAmount] = useState('');
+  const contribution = Number(amount);
+  const valid = isValidContributionAmount(contribution);
+
+  const save = async () => {
+    if (!valid || busy) return;
+    await onSubmit(contribution);
+    setAmount('');
+  };
+
+  return (
+    <div className="finance-quick-contribution">
+      <div className="finance-quick-label">
+        <label htmlFor={`goal-quick-${goal.id}`}>Внести велику суму</label>
+        <button type="button" onClick={onDetailed}>Додати примітку</button>
+      </div>
+      <div className="finance-quick-field">
+        <input
+          id={`goal-quick-${goal.id}`}
+          name={`goal-quick-${goal.id}`}
+          type="number"
+          min={1}
+          step={1}
+          inputMode="numeric"
+          value={amount}
+          onChange={(event) => setAmount(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') void save();
+          }}
+          placeholder="Введіть суму"
+        />
+        <button type="button" onClick={() => void save()} disabled={!valid || busy}>
+          {busy ? 'Вносимо…' : 'Внести'}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -250,7 +333,6 @@ function AddGoalModal({
       });
       onClose();
     } catch {
-      // useGoalMutations уже показує тост; дані форми лишаються на місці.
       setSubmitting(false);
     }
   };
@@ -258,9 +340,9 @@ function AddGoalModal({
   return (
     <div
       className="modal-overlay"
-      onClick={(e) => e.target === e.currentTarget && !submitting && onClose()}
+      onClick={(event) => event.target === event.currentTarget && !submitting && onClose()}
     >
-      <div className="modal-sheet" role="dialog" aria-modal="true">
+      <div className="modal-sheet finance-modal-sheet" role="dialog" aria-modal="true">
         <h2 className="modal-title">Спільна ціль</h2>
         <label className="form-field">
           <span>Назва</span>
@@ -269,7 +351,7 @@ function AddGoalModal({
             name="name"
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(event) => setName(event.target.value)}
             placeholder="Що плануємо?"
             autoFocus
           />
@@ -281,7 +363,7 @@ function AddGoalModal({
             name="description"
             type="text"
             value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            onChange={(event) => setDescription(event.target.value)}
             placeholder="Опис"
           />
         </label>
@@ -294,7 +376,7 @@ function AddGoalModal({
             min={1}
             step={1}
             value={price}
-            onChange={(e) => setPrice(e.target.value)}
+            onChange={(event) => setPrice(event.target.value)}
             placeholder="0"
           />
         </label>
@@ -305,7 +387,7 @@ function AddGoalModal({
             name="url"
             type="url"
             value={url}
-            onChange={(e) => setUrl(e.target.value)}
+            onChange={(event) => setUrl(event.target.value)}
             placeholder="https://…"
           />
         </label>
@@ -327,7 +409,7 @@ function AddGoalModal({
   );
 }
 
-// ── Модалка: внесок ──────────────────────────────────────────
+// ── Модалка: внесок із приміткою ──────────────────────────────
 function AddFundsModal({
   goal,
   onClose,
@@ -355,7 +437,6 @@ function AddFundsModal({
       });
       onClose();
     } catch {
-      // Тост показує mutation; поля не очищаємо, щоб внесок можна було повторити.
       setSubmitting(false);
     }
   };
@@ -363,9 +444,9 @@ function AddFundsModal({
   return (
     <div
       className="modal-overlay"
-      onClick={(e) => e.target === e.currentTarget && !submitting && onClose()}
+      onClick={(event) => event.target === event.currentTarget && !submitting && onClose()}
     >
-      <div className="modal-sheet" role="dialog" aria-modal="true">
+      <div className="modal-sheet finance-modal-sheet" role="dialog" aria-modal="true">
         <h2 className="modal-title">Внесок у ціль</h2>
         <p className="fin-hint">
           «{goal.name}» — накопичено {fmtMoney(saved)} з {fmtMoney(goal.target_amount)}
@@ -379,7 +460,7 @@ function AddFundsModal({
             min={1}
             step={1}
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(event) => setAmount(event.target.value)}
             placeholder="0 ₴"
             autoFocus
           />
@@ -392,7 +473,7 @@ function AddFundsModal({
             rows={3}
             maxLength={CONTRIBUTION_NOTE_MAX}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(event) => setNote(event.target.value)}
             placeholder="Наприклад: ще один крок до подорожі"
           />
           <small className="goal-note-counter">
