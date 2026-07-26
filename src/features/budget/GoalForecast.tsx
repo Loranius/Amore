@@ -12,10 +12,12 @@ import './forecast.css';
 export function GoalForecastCard({
   forecast,
   isLoading,
+  paused,
   onEdit,
 }: {
   forecast: GoalForecast | null;
   isLoading: boolean;
+  paused: boolean;
   onEdit: () => void;
 }) {
   const complete = forecast !== null && forecast.remainingAmount <= 0;
@@ -35,6 +37,24 @@ export function GoalForecastCard({
         <p className="goal-forecast-copy goal-forecast-complete">
           Сума для цієї цілі вже зібрана ✨
         </p>
+      ) : paused ? (
+        <>
+          <p className="goal-forecast-copy goal-forecast-paused">
+            Ціль зараз відпочиває. Прогрес, історія та орієнтир збережені.
+          </p>
+          {forecast?.desiredDate ? (
+            <div className="goal-forecast-target">
+              <span>Бажаний орієнтир збережено — {formatGoalDate(forecast.desiredDate)}</span>
+              <small>
+                Після відновлення прогноз продовжиться без урахування часу паузи.
+              </small>
+            </div>
+          ) : (
+            <small className="goal-forecast-hint">
+              Повернутися до цієї цілі можна будь-коли, коли буде комфортно.
+            </small>
+          )}
+        </>
       ) : (
         <>
           <p className="goal-forecast-copy">
