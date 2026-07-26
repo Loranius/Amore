@@ -109,7 +109,7 @@ const toBody = (c: DepositedCrystal): CompositionBody => ({
 });
 
 /** Ліміт тіл усього зразка (перф мобільних GPU). */
-const TOTAL_BODY_CAP = 120;
+export const TOTAL_BODY_CAP = 120;
 
 function mineralConfig(seedNum: number, compactnessBias: number): CompositionConfig {
   return {

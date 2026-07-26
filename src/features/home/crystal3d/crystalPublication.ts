@@ -32,6 +32,11 @@ import {
   validateExternalShell,
   type ShellViolation,
 } from './geometry/validateShell';
+import {
+  formatTopologyViolations,
+  validateTopology,
+  type TopologyViolation,
+} from './geometry/validateTopology';
 import { bindMaterialRegions, type MaterialRegionStats } from './material/crystalMaterial';
 import {
   formatMaterialViolations,
@@ -63,6 +68,7 @@ export interface PublishedCrystal {
   readonly renderable: readonly PublishedBody[];
   readonly shellViolations: readonly ShellViolation[];
   readonly materialViolations: readonly MaterialViolation[];
+  readonly topologyViolations: readonly TopologyViolation[];
   /** true — стан пройшов валідацію і його дозволено публікувати. */
   readonly ok: boolean;
 }
@@ -131,6 +137,7 @@ export function publishCrystal(
     ...(options.probe === true ? probeExterior(shellEntries, UNDERSIDE_DIRECTIONS) : []),
   ];
   const materialViolations = validateMaterialRegions(bodies, material);
+  const topologyViolations = validateTopology(shellEntries);
 
   // Опублікований стан незмінний (`V6-REQ-010`): сам запис заморожується.
   // Буфери геометрії заморозити не можна — це типізовані масиви GPU, —
@@ -142,7 +149,11 @@ export function publishCrystal(
     renderable: Object.freeze(bodies.filter((b) => (b.geometry.getIndex()?.count ?? 0) > 0)),
     shellViolations: Object.freeze(shellViolations),
     materialViolations: Object.freeze(materialViolations),
-    ok: shellViolations.length === 0 && materialViolations.length === 0,
+    topologyViolations: Object.freeze(topologyViolations),
+    ok:
+      shellViolations.length === 0 &&
+      materialViolations.length === 0 &&
+      topologyViolations.length === 0,
   });
 }
 
@@ -152,6 +163,9 @@ export function formatPublicationReport(published: PublishedCrystal): string {
   if (published.shellViolations.length > 0) lines.push(formatShellViolations(published.shellViolations));
   if (published.materialViolations.length > 0) {
     lines.push(formatMaterialViolations(published.materialViolations));
+  }
+  if (published.topologyViolations.length > 0) {
+    lines.push(formatTopologyViolations(published.topologyViolations));
   }
   if (published.ok) lines.push('гейт публікації: пройдено');
   return lines.join('\n');
