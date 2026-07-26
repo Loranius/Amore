@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { Card } from '@/components/ui/Card';
 import { ProposalCard } from '@/components/ui/ProposalCard';
+import { GoalComments } from './GoalComments';
 import { GoalContributions } from './GoalContributions';
 import { GoalDesiredDateModal, GoalForecastCard } from './GoalForecast';
 import { GoalMilestones } from './GoalMilestones';
@@ -43,11 +44,15 @@ export function GoalsList() {
   const [adding, setAdding] = useState(false);
   const [funding, setFunding] = useState<BudgetGoalRow | null>(null);
   const [historyGoalId, setHistoryGoalId] = useState<string | null>(null);
+  const [commentsGoalId, setCommentsGoalId] = useState<string | null>(null);
   const [dateGoalId, setDateGoalId] = useState<string | null>(null);
 
   const forecastByGoal = new Map(forecasts.map((forecast) => [forecast.goalId, forecast]));
   const historyGoal = historyGoalId
     ? goals.find((goal) => goal.id === historyGoalId) ?? null
+    : null;
+  const commentsGoal = commentsGoalId
+    ? goals.find((goal) => goal.id === commentsGoalId) ?? null
     : null;
   const dateGoal = dateGoalId
     ? goals.find((goal) => goal.id === dateGoalId) ?? null
@@ -139,6 +144,13 @@ export function GoalsList() {
                         </button>
                         <button
                           type="button"
+                          className="btn-secondary goal-comments-btn"
+                          onClick={() => setCommentsGoalId(g.id)}
+                        >
+                          Обговорення
+                        </button>
+                        <button
+                          type="button"
                           className="btn-secondary goal-pause-btn"
                           onClick={() => paused ? resume.mutate(g.id) : pause.mutate(g.id)}
                           disabled={pause.isPending || resume.isPending}
@@ -185,6 +197,12 @@ export function GoalsList() {
         <GoalContributions
           goal={historyGoal}
           onClose={() => setHistoryGoalId(null)}
+        />
+      )}
+      {commentsGoal && (
+        <GoalComments
+          goal={commentsGoal}
+          onClose={() => setCommentsGoalId(null)}
         />
       )}
       {dateGoal && (
