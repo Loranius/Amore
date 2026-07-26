@@ -55,6 +55,7 @@ import { deriveClusterBranch, deriveClusterMaterial, buildBranchGeometry, type C
 import { buildHostSolids, type HostSolid } from './geometry/hostBody';
 import { trimHiddenFaces } from './geometry/junctionTrim';
 import { formatShellViolations, validateExternalShell } from './geometry/validateShell';
+import { bindMaterialRegions } from './material/crystalMaterial';
 
 /** Центр вертикального «дихання» левітації — немає більше каменя, що заякорює композицію низько. */
 const BOB_CENTER_Y = 0;
@@ -163,10 +164,27 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
   // робиться один раз тут, а не щокадру — це чиста функція від геометрії.
   const branchMeshes = useMemo(() => {
     const solids = buildHostSolids(branches, material);
+    const byKey = new Map(branches.map((b) => [b.key, b]));
     return branches.map((branch) => {
       const geometry = buildBranchGeometry(branch, material);
       const solid = solids.get(branch.key);
-      if (solid !== undefined) trimHiddenFaces(geometry, solid, branch.hostKey, solids);
+      if (solid !== undefined) {
+        trimHiddenFaces(geometry, solid, branch.hostKey, solids);
+        // Volume VI — прив'язка матеріалу СТРОГО після зрізу: зрізані грані
+        // не отримують кольору взагалі, а перехід до кольору господаря
+        // живе лише в оголошеній смузі шва (`CAI-REQ-009..010`).
+        const hostSolid = branch.hostKey === null ? undefined : solids.get(branch.hostKey);
+        const hostBranch = branch.hostKey === null ? undefined : byKey.get(branch.hostKey);
+        bindMaterialRegions(
+          geometry,
+          branch,
+          solid,
+          material,
+          hostSolid !== undefined && hostBranch !== undefined
+            ? { solid: hostSolid, branch: hostBranch }
+            : undefined,
+        );
+      }
       return { branch, geometry, solid };
     });
   }, [branches, material]);

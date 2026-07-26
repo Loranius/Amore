@@ -15,6 +15,8 @@ import { hashSeedString } from '../../mulberry32';
 import { buildBranchGeometry, deriveClusterBranch, deriveClusterMaterial, type ClusterBranch, type ClusterMaterial } from '../crystalCluster';
 import { buildHostSolids, type HostSolid } from '../geometry/hostBody';
 import { trimHiddenFaces, type TrimStats } from '../geometry/junctionTrim';
+import { bindMaterialRegions } from '../material/crystalMaterial';
+import type { MaterialEntry } from '../material/validateMaterial';
 import type { ShellEntry } from '../geometry/validateShell';
 import type * as THREE from 'three';
 
@@ -104,10 +106,11 @@ export function buildBranches(seed: string): { branches: ClusterBranch[]; materi
   };
 }
 
-/** Повна маса, як її будує CrystalScene: геометрія + обробка стику. */
+/** Повна маса, як її будує CrystalScene: геометрія → зріз → матеріал. */
 export function buildMass(seed: string, trim = true): BuiltMass {
   const { branches, material } = buildBranches(seed);
   const solids = buildHostSolids(branches, material);
+  const byKey = new Map(branches.map((b) => [b.key, b]));
   const bodies = branches.map((branch) => {
     const geometry = buildBranchGeometry(branch, material);
     const solid = solids.get(branch.key)!;
@@ -122,10 +125,22 @@ export function buildMass(seed: string, trim = true): BuiltMass {
           capRemoved: false,
           occluders: [],
         } satisfies TrimStats);
+    const hostSolid = branch.hostKey === null ? undefined : solids.get(branch.hostKey);
+    const hostBranch = branch.hostKey === null ? undefined : byKey.get(branch.hostKey);
+    bindMaterialRegions(
+      geometry,
+      branch,
+      solid,
+      material,
+      hostSolid !== undefined && hostBranch !== undefined ? { solid: hostSolid, branch: hostBranch } : undefined,
+    );
     return { branch, solid, geometry, stats };
   });
   return { material, solids, bodies };
 }
+
+export const toMaterialEntries = (mass: BuiltMass): MaterialEntry[] =>
+  mass.bodies.map(({ branch, solid, geometry }) => ({ branch, solid, geometry }));
 
 export const toShellEntries = (mass: BuiltMass): ShellEntry[] =>
   mass.bodies.map(({ solid, branch, geometry }) => ({ solid, hostKey: branch.hostKey, geometry }));

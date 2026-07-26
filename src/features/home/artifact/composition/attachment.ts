@@ -22,6 +22,14 @@ import { type Vec3, add, scale, sub, dot, normalize, lengthOf, perpendicularBasi
 /** Версія формату junction — росте при зміні семантики полів. */
 export const ATTACHMENT_JUNCTION_VERSION = '1.0.0';
 
+/**
+ * Ширина смуги матеріального переходу як частка радіуса контакту
+ * (`CAI-REQ-010`). Політика належить Volume IV, а не рендереру: Volume VI
+ * зобов'язаний тримати перехід рівно в цих межах, тож число мусить бути
+ * одне на весь рушій.
+ */
+export const MATERIAL_BLEND_RATIO = 0.35;
+
 /** Політика вирізання геометрії в зоні стику (Vol V). */
 export type TrimPolicy = 'analytic-clip' | 'local-boolean' | 'junction-mesh';
 /** Політика ущільнення шва (Vol V). */
@@ -134,7 +142,7 @@ export function buildJunction(host: JunctionBody, child: JunctionBody): Attachme
     // преференцією самого профілю (§10 Performance Policy).
     trimPolicy: 'analytic-clip',
     seamPolicy: 'weld',
-    materialBlendWidth: contactRadius * 0.35,
+    materialBlendWidth: contactRadius * MATERIAL_BLEND_RATIO,
     version: ATTACHMENT_JUNCTION_VERSION,
   };
 }

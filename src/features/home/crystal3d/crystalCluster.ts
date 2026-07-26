@@ -205,9 +205,6 @@ export interface ClusterMaterial {
   dominance: number;
 }
 
-const WARMTH_COLOR = new THREE.Color('#ff8a3d');
-const MOVIE_COLOR = new THREE.Color('#4fd1e0');
-
 /** Переклад іменованих Evolution Pressures у PBR-параметри матеріалу кристала. */
 export function deriveClusterMaterial(pressures: EvolutionPressures): ClusterMaterial {
   return {
@@ -224,56 +221,33 @@ export function deriveClusterMaterial(pressures: EvolutionPressures): ClusterMat
   };
 }
 
-/** Домішує тон (рецепти/фільми) у колір гілки — застосовується один раз при побудові геометрії. */
-export function tintBranchColors(
-  branch: ClusterBranch,
-  material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix'>,
-): { colorA: THREE.Color; colorB: THREE.Color } {
-  const a = new THREE.Color(branch.colorA);
-  const b = new THREE.Color(branch.colorB);
-  if (material.warmthMix > 0) {
-    a.lerp(WARMTH_COLOR, material.warmthMix * 0.5);
-    b.lerp(WARMTH_COLOR, material.warmthMix * 0.6);
-  }
-  if (material.movieMix > 0) {
-    a.lerp(MOVIE_COLOR, material.movieMix * 0.35);
-    b.lerp(MOVIE_COLOR, material.movieMix * 0.45);
-  }
-  return { colorA: a, colorB: b };
-}
+// `tintBranchColors` переїхав у material/crystalMaterial.ts (Volume VI):
+// домішування тону — матеріальна операція, і тримати її в геометричному
+// адаптері означало б лишити материал у Volume V.
 
 // ── Геометрія гілки: гранована призма → гранена гостра верхівка ──
 // (той самий принцип, що v1, але тепер параметризований maturity:
 // молода гілка — тупіша/тонша/коротша, зріла — гостра/товста/повна).
+//
+// Кольорів тут НЕМАЄ навмисно. Прив'язка матеріалу — Volume VI
+// (material/crystalMaterial.ts), і вона мусить бігти ПІСЛЯ обробки стику:
+// профіль вимагає, щоб зрізані та внутрішні грані взагалі не отримували
+// видимої матеріальної прив'язки (§7), а поки геометрію не зрізано,
+// невідомо, які грані лишаться зовні.
 export function buildBranchGeometry(
   branch: ClusterBranch,
-  material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix' | 'surfaceComplexity' | 'polish'>,
+  material: Pick<ClusterMaterial, 'surfaceComplexity' | 'polish'>,
 ): THREE.BufferGeometry {
   // Профіль приходить із latheProfile.ts — того самого модуля, яким
   // користується аналітична модель тіла-господаря (geometry/hostBody.ts).
   // Це не «винесено для краси»: обробка стику вирізає грані за тим, де,
   // на її думку, проходить поверхня сусіда, тож дві незалежні копії
   // профілю рано чи пізно розійшлись би — і оболонка розповзлась би.
-  const { segments, h, points, jitterAmp, scaleX, scaleZ } = computeCrystalProfile(branch, material);
+  const { segments, points, jitterAmp, scaleX, scaleZ } = computeCrystalProfile(branch, material);
 
   const geo = new THREE.LatheGeometry(points, segments);
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;
-  const colors = new Float32Array(pos.count * 3);
-  const { colorA, colorB } = tintBranchColors(branch, material);
-  const c = new THREE.Color();
   const profileLen = points.length;
-
-  // Легка per-facet варіація тону (справжній мінерал не має ідеально рівного
-  // забарвлення грані до грані — тонкі домішки/включення). Тон фіксований на
-  // всю грань (не на вершину), тому разом із flatShading (Branch у
-  // CrystalScene.tsx) кожна грань читається як окрема, відмінна від сусідньої
-  // — це і прибирає «картонний» ефект гладкого суцільного градієнта.
-  // Монарх — оптично найчистіший: вузький розкид тону граней (майже
-  // однорідний самоцвіт), решта — звичайна мінеральна неоднорідність.
-  const facetTints = Array.from({ length: segments }, (_, idx) => {
-    const tintRng = mulberry32(hashSeedString(`${branch.key}:facet:${idx}`));
-    return branch.primary ? 0.92 + tintRng() * 0.16 : 0.82 + tintRng() * 0.36;
-  });
 
   // THREE.LatheGeometry будує вершини у фіксованому порядку: зовнішній цикл
   // по (segments+1) кутових «колонках» (остання — шов, що дублює колонку 0),
@@ -283,15 +257,7 @@ export function buildBranchGeometry(
   // розклад, без наближення через atan2.
   for (let i = 0; i < pos.count; i++) {
     const row = i % profileLen;
-    const col = Math.floor(i / profileLen);
-    const facetIdx = col % segments;
-
-    const t = h > 0 ? pos.getY(i) / h : 0;
-    c.lerpColors(colorA, colorB, Math.min(1, Math.max(0, t)));
-    const tint = facetTints[facetIdx]!;
-    colors[i * 3] = c.r * tint;
-    colors[i * 3 + 1] = c.g * tint;
-    colors[i * 3 + 2] = c.b * tint;
+    const facetIdx = Math.floor(i / profileLen) % segments;
 
     // Органічний радіальний джиттер — детермінований по (facetIdx, row), тож
     // вершина шва (col===segments) дублює точнісінько той самий джиттер, що
@@ -313,7 +279,6 @@ export function buildBranchGeometry(
     }
   }
 
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   // Пласкі архетипи: blade — лезо (сильний сплюск по X), tabular — таблитчастий
   // (ширший і нижчий, помірний сплюск). Це геометрія, не матеріал — сплюск
   // «запікається» в позиції і обертається разом зі spin-кватерніоном.

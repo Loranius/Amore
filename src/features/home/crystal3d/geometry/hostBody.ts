@@ -115,6 +115,30 @@ export function isInsideHost(worldPoint: THREE.Vector3, host: HostSolid, margin 
 export const breatheMargin = (self: HostSolid, host: HostSolid): number =>
   BREATHE_AMPLITUDE * (self.profile.h + host.profile.h);
 
+/**
+ * Наскільки точка виступає ЗА поверхню тіла (Volume VI, смуга шва).
+ * Від'ємне — точка всередині. Радіальна складова рахується від
+ * номінального профілю (без консервативного звуження): смуга шва — це
+ * питання вигляду, а не безпеки зрізу, і має спиратись на справжню
+ * поверхню, інакше шов «поповз» би на ту саму частку, що й нижня межа.
+ */
+export function distanceOutsideHost(worldPoint: THREE.Vector3, host: HostSolid): number {
+  _local.copy(worldPoint).sub(host.position).applyQuaternion(host.inverseQuaternion);
+  const { profile } = host;
+  const y = Math.max(0, Math.min(profile.h, _local.y));
+  const gap = _local.y < 0 ? -_local.y : _local.y > profile.h ? _local.y - profile.h : 0;
+  const radial = Math.hypot(_local.x / profile.scaleX, _local.z / profile.scaleZ);
+  const radialGap = radial - nominalRadiusAt(profile, y);
+  if (gap === 0) return radialGap;
+  return radialGap <= 0 ? gap : Math.hypot(radialGap, gap);
+}
+
+/** Частка висоти господаря (0=основа, 1=вістря), проти якої стоїть точка. */
+export function projectOnHost(worldPoint: THREE.Vector3, host: HostSolid): number {
+  _local.copy(worldPoint).sub(host.position).applyQuaternion(host.inverseQuaternion);
+  return host.profile.h > 0 ? Math.max(0, Math.min(1, _local.y / host.profile.h)) : 0;
+}
+
 /** Індекс тіл за ключем — вхід для junctionTrim/validateShell. */
 export function buildHostSolids(
   branches: readonly ClusterBranch[],
