@@ -64,9 +64,14 @@ export function sampleSurfacePoint(body: SurfaceBody, t: number, angle: number):
 }
 
 /**
- * Знакова відстань точки до бічної поверхні тіла (<0 — всередині).
+ * Знакова відстань точки до БІЧНОЇ поверхні тіла (<0 — всередині).
  * Використовується тестами інваріанта «кожен кристал нуклеював НА поверхні
  * субстрату» — сам рушій кладе основи через sampleSurfacePoint напряму.
+ *
+ * Увага: проєкція на вісь клемплена, тож для точки ВИЩЕ вістря функція
+ * рахує відстань до вістряного кільця й може повернути від'ємне значення.
+ * Для питання «чи точка взагалі поза тілом» це неправильна відповідь —
+ * для нього є `isOutsideBody`.
  */
 export function distanceToSurface(body: SurfaceBody, p: Vec3): number {
   const rel = sub(p, body.anchor);
@@ -74,4 +79,55 @@ export function distanceToSurface(body: SurfaceBody, p: Vec3): number {
   const axisPoint = add(body.anchor, scale(body.direction, along));
   const radialDist = lengthOf(sub(p, axisPoint));
   return radialDist - radiusAtT(body.radius, body.length > 1e-6 ? along / body.length : 0);
+}
+
+/**
+ * Чи лежить точка ПОЗА об'ємом тіла — з урахуванням торців, а не лише
+ * бічної поверхні (`CAI-REQ-001`). Саме цим питанням перевіряється, що
+ * тіло-дитина зарезервувало власний об'єм, а не потонуло в господарі
+ * цілком: вістря вище вершини господаря — це «зовні», хоча за бічною
+ * поверхнею воно рахувалось би зануреним.
+ */
+export function isOutsideBody(body: SurfaceBody, p: Vec3): boolean {
+  const rel = sub(p, body.anchor);
+  const along = dot(rel, body.direction);
+  if (along < 0 || along > body.length) return true;
+  const axisPoint = add(body.anchor, scale(body.direction, along));
+  const t = body.length > 1e-6 ? along / body.length : 0;
+  return lengthOf(sub(p, axisPoint)) > radiusAtT(body.radius, t);
+}
+
+/**
+ * Чи тіло цілком поховане в масі — жодна точка його осі (крім навмисно
+ * зануреної основи) не виходить назовні (`CAI-REQ-001`).
+ *
+ * Таке тіло — не «маленький кристал», а відсутній: власної поверхні воно
+ * не має, видимим не буде ніколи, зате займає місце в бюджеті тіл і в
+ * кожному обчисленні над масою.
+ *
+ * Перевіряються ВСІ перешкоди, а не лише господар: вимірювання показало,
+ * що тіл, похованих самим господарем, — одиниці, ховають одне одного
+ * переважно СУСІДИ (насамперед супутники колонії, що народжуються майже в
+ * одній точці).
+ *
+ * Чому лише перевірка, а не корекція. Спершу тут була спроба ВИТЯГТИ таке
+ * тіло назовні — нахилити ріст до нормалі, за потреби подовжити. Вона
+ * спрацювала за цифрами (марних тіл удвічі менше, видимих трикутників
+ * +20%), але A/B-рендер показав явну регресію вигляду: витягнуті супутники
+ * перетинали головний шпиль і ламали силует друзи. Тому лишилась відмова:
+ * прибрати невидиме можна безкоштовно, а от домальовувати видиме — ні.
+ */
+export function isFullyBuried(
+  obstacles: readonly SurfaceBody[],
+  anchor: Vec3,
+  direction: Vec3,
+  length: number,
+): boolean {
+  if (obstacles.length === 0) return false;
+  // Основа занурена навмисно (base burial), тож пробуємо від чверті вгору.
+  for (const t of [0.25, 0.5, 0.75, 1]) {
+    const p = add(anchor, scale(direction, length * t));
+    if (obstacles.every((o) => isOutsideBody(o, p))) return false;
+  }
+  return true;
 }

@@ -80,6 +80,7 @@ import { type Vec3, add, scale, normalize, segmentDistance, v3 } from '../vec3';
 import {
   MATURITY_HEIGHT_SCALE,
   MATURITY_RADIUS_SCALE,
+  isFullyBuried,
   radiusAtT,
   sampleSurfacePoint,
   type SurfaceBody,
@@ -496,6 +497,27 @@ function depositMineral(
       add(add(scale(direction, 0.68), scale(v3(0, 1, 0), 0.25)), scale(dirJitter, 0.1)),
     );
     const sat = buriedAnchors(hostBody, st, sAngle, satRadius, maturity, c.burial);
+
+    // `CAI-REQ-001` для колонії. Домінанти проходять `candidateFits` і
+    // резервують об'єм, а супутники досі не перевірялись ЖОДНОГО разу —
+    // їх просто дописували в колонію. Наслідок виміряний: серед похованих
+    // тіл `~s0/~s1/~s2` — найчисленніша група, бо народжуються майже в
+    // одній точці й ховають одне одного.
+    //
+    // Супутник, який цілком тоне в уже відкладеній масі, не відкладається
+    // взагалі: він ніколи не буде видимий, але з'їдає бюджет тіл. Форму
+    // тих, що лишаються, НЕ чіпаємо — спроба витягати їх назовні ламала
+    // силует друзи (див. growthSurface.ts::isFullyBuried).
+    //
+    // `continue` стоїть ПІСЛЯ всіх draw цього супутника, тож потік
+    // випадковості не зсувається (draw-and-discard тримається).
+    const obstacles: SurfaceBody[] = [...colony, ...clearance].map((b) => ({
+      anchor: b.anchor,
+      direction: b.direction,
+      length: b.length,
+      radius: b.radius,
+    }));
+    if (isFullyBuried(obstacles, sat.anchor, satDirection, satLength)) continue;
 
     colony.push({
       key: `${event.key}~s${s}`,
