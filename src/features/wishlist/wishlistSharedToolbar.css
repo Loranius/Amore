@@ -1,0 +1,172 @@
+.wl-shared-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-block: 18px 20px;
+  padding: 16px 18px;
+  border: 1px solid color-mix(in srgb, var(--wl-shared-accent) 16%, transparent);
+  border-radius: 22px;
+  background:
+    radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--wl-shared-accent) 10%, transparent), transparent 36%),
+    color-mix(in srgb, var(--surface) 89%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 7%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.wl-shared-toolbar-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.wl-shared-toolbar-copy strong {
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 15px;
+}
+
+.wl-shared-toolbar-copy span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.wl-shared-filters {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wl-shared-accent) 9%, transparent);
+}
+
+.wl-shared-filter {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.wl-shared-filter small {
+  display: grid;
+  min-width: 21px;
+  height: 21px;
+  place-items: center;
+  padding-inline: 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: inherit;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.wl-shared-filter.active {
+  background: var(--surface);
+  color: color-mix(in srgb, var(--wl-shared-accent) 78%, var(--text));
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--wl-shared-accent) 15%, transparent);
+}
+
+.wl-shared-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  padding: 30px;
+  border: 1px dashed color-mix(in srgb, var(--wl-shared-accent) 28%, transparent);
+  border-radius: 26px;
+  background: color-mix(in srgb, var(--wl-shared-accent) 5%, var(--surface));
+  text-align: center;
+}
+
+.wl-shared-empty > div {
+  max-width: 420px;
+}
+
+.wl-shared-empty span {
+  display: block;
+  margin-bottom: 9px;
+  color: var(--wl-shared-accent);
+  font-size: 38px;
+}
+
+.wl-shared-empty strong {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 19px;
+}
+
+.wl-shared-empty p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.wl-card-v3-attribution {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: -3px;
+  color: color-mix(in srgb, var(--wl-shared-accent) 70%, var(--muted));
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.wl-card-v3-attribution::before {
+  content: '✦';
+  font-size: 9px;
+}
+
+@media (max-width: 820px) {
+  .wl-shared-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wl-shared-filters {
+    width: 100%;
+  }
+
+  .wl-shared-filter {
+    min-width: 0;
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 430px) {
+  .wl-shared-toolbar {
+    padding: 14px;
+  }
+
+  .wl-shared-toolbar-copy span {
+    display: none;
+  }
+
+  .wl-shared-filter {
+    gap: 4px;
+    padding-inline: 7px;
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-shared-filter {
+    transition: none;
+  }
+}

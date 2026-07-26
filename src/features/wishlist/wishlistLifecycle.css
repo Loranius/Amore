@@ -1,0 +1,28 @@
+.wl-card-v3-lifecycle {
+  display: grid;
+  gap: 9px;
+}
+
+.wl-card-v3-stage {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.wl-card-v3-stage--purchased {
+  background: color-mix(in srgb, var(--ok) 11%, transparent);
+  color: var(--ok);
+}
+
+.wl-card-v3-stage--preparing {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  color: var(--accent);
+}

@@ -1,0 +1,136 @@
+/*
+ * Wishlist main tabs mirror the mobile BottomNav interaction:
+ * one shared active surface slides between equal-width slots instead of
+ * repainting three unrelated active buttons. Scope stays on the direct
+ * Wishlist tab bar so modal TabBars and every other module remain untouched.
+ */
+section.wishlist.pink-page > .tab-bar {
+  --wl-tab-inset: 6px;
+  position: sticky;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+section.wishlist.pink-page > .tab-bar::before {
+  position: absolute;
+  z-index: 0;
+  top: var(--wl-tab-inset);
+  bottom: var(--wl-tab-inset);
+  left: var(--wl-tab-inset);
+  width: calc((100% - 12px) / 3);
+  border: 1px solid color-mix(in srgb, var(--accent) 9%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  box-shadow:
+    0 7px 18px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 46%, transparent);
+  content: '';
+  pointer-events: none;
+  transform: translateX(0);
+  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform;
+}
+
+section.wishlist.pink-page > .tab-bar:has(> .tab-bar-btn:nth-child(2).active)::before {
+  transform: translateX(100%);
+}
+
+section.wishlist.pink-page > .tab-bar:has(> .tab-bar-btn:nth-child(3).active)::before {
+  transform: translateX(200%);
+}
+
+section.wishlist.pink-page > .tab-bar .tab-bar-btn {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  box-shadow: none;
+  transition:
+    color 260ms ease,
+    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+section.wishlist.pink-page > .tab-bar .tab-bar-btn.active {
+  background: transparent;
+  box-shadow: none;
+  color: var(--accent);
+  transform: scale(1.025);
+}
+
+section.wishlist.pink-page > .tab-bar .tab-bar-btn:not(.active) {
+  transform: scale(0.985);
+}
+
+section.wishlist.pink-page > .tab-bar .tab-bar-count {
+  transition:
+    color 260ms ease,
+    background-color 260ms ease,
+    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+section.wishlist.pink-page > .tab-bar .tab-bar-btn.active .tab-bar-count {
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+  transform: scale(1.06);
+}
+
+/* A short destination-aware reveal keeps cached boards from snapping while
+   the shared indicator travels. Distinct animation names make the transition
+   replay whenever the selected tab changes, without remounting cards. */
+section.wishlist.pink-page:has(> .tab-bar > .tab-bar-btn:nth-child(1).active)
+  > .tab-bar
+  ~ :not(.modal-overlay):not(.wl-lightbox) {
+  animation: wl-tab-view-me 240ms ease-out both;
+}
+
+section.wishlist.pink-page:has(> .tab-bar > .tab-bar-btn:nth-child(2).active)
+  > .tab-bar
+  ~ :not(.modal-overlay):not(.wl-lightbox) {
+  animation: wl-tab-view-partner 240ms ease-out both;
+}
+
+section.wishlist.pink-page:has(> .tab-bar > .tab-bar-btn:nth-child(3).active)
+  > .tab-bar
+  ~ :not(.modal-overlay):not(.wl-lightbox) {
+  animation: wl-tab-view-shared 240ms ease-out both;
+}
+
+@keyframes wl-tab-view-me {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes wl-tab-view-partner {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes wl-tab-view-shared {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 719px) {
+  section.wishlist.pink-page > .tab-bar {
+    --wl-tab-inset: 5px;
+  }
+
+  section.wishlist.pink-page > .tab-bar::before {
+    width: calc((100% - 10px) / 3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  section.wishlist.pink-page > .tab-bar::before,
+  section.wishlist.pink-page > .tab-bar .tab-bar-btn,
+  section.wishlist.pink-page > .tab-bar .tab-bar-count {
+    transition: none;
+  }
+
+  section.wishlist.pink-page > .tab-bar .tab-bar-btn,
+  section.wishlist.pink-page > .tab-bar .tab-bar-count {
+    transform: none;
+  }
+
+  section.wishlist.pink-page > .tab-bar ~ :not(.modal-overlay):not(.wl-lightbox) {
+    animation: none;
+  }
+}

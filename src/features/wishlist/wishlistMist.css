@@ -1,0 +1,378 @@
+/* Pearlescent portal bubbles, soft haze and interactive physics affordances. */
+
+/* The compact archive launcher now lives beside «Додати мрію». */
+.wishlist .wl-archive-wrap--entry {
+  display: none !important;
+}
+
+.wl-hero-actions--with-completed {
+  min-width: min(334px, 39vw);
+}
+
+.wl-hero-action-row {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.wl-hero-completed {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 15px;
+  border: 1px solid color-mix(in srgb, var(--wl-hero-accent, var(--accent)) 22%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 73%, transparent);
+  color: color-mix(in srgb, var(--wl-hero-accent, var(--accent)) 78%, var(--text));
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--wl-hero-accent, var(--accent)) 12%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.wl-hero-completed > span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--wl-hero-accent, var(--accent)) 13%, transparent);
+  font-size: 12px;
+}
+
+.wl-hero-completed:hover,
+.wl-hero-completed:focus-visible {
+  border-color: color-mix(in srgb, var(--wl-hero-accent, var(--accent)) 36%, transparent);
+  outline: none;
+  background: color-mix(in srgb, var(--wl-hero-accent, var(--accent)) 10%, var(--surface));
+  box-shadow:
+    0 13px 30px color-mix(in srgb, var(--wl-hero-accent, var(--accent)) 18%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.66);
+  transform: translateY(-1px);
+}
+
+.wl-hero-completed:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.wl-hero-completed:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Physics moves the item wrapper; the existing float animation stays on the bubble. */
+.wishlist .wl-cloud-item {
+  --wl-physics-x: 0px;
+  --wl-physics-y: 0px;
+  isolation: isolate;
+  transform: translate3d(var(--wl-physics-x), var(--wl-physics-y), 0);
+  will-change: transform;
+}
+
+.wishlist .wishlist-grid[data-physics-active='true'] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.wishlist .wl-cloud-item--dragging {
+  z-index: 80 !important;
+}
+
+.wishlist .wl-cloud-bubble {
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  background:
+    radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.56), transparent 31%),
+    radial-gradient(circle at 72% 76%, rgba(217, 174, 232, 0.1), transparent 42%),
+    color-mix(in srgb, var(--accent) 5%, var(--surface));
+  box-shadow:
+    0 20px 46px color-mix(in srgb, var(--accent) 17%, transparent),
+    0 7px 19px rgba(82, 46, 65, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.82),
+    inset 0 -13px 24px rgba(74, 39, 60, 0.075);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Thin iridescent soap-film rim. */
+.wishlist .wl-cloud-bubble::before {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 215deg,
+    rgba(255, 255, 255, 0.9),
+    rgba(247, 182, 211, 0.72) 13%,
+    rgba(188, 219, 255, 0.68) 27%,
+    rgba(224, 193, 249, 0.62) 42%,
+    rgba(255, 255, 255, 0.88) 56%,
+    rgba(255, 213, 185, 0.55) 69%,
+    rgba(177, 222, 247, 0.61) 83%,
+    rgba(255, 255, 255, 0.9)
+  );
+  content: '';
+  opacity: 0.78;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 5.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 5.5px));
+  animation: wl-bubble-pearl-shift calc(var(--wl-cloud-duration) * 1.9) linear infinite;
+  animation-delay: var(--wl-cloud-delay);
+}
+
+/* Asymmetric reflections, inner lens and a subtle darker lower edge. */
+.wishlist .wl-cloud-bubble::after {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse 32% 16% at 31% 13%, rgba(255, 255, 255, 0.78), transparent 72%),
+    radial-gradient(ellipse 12% 7% at 19% 28%, rgba(255, 255, 255, 0.62), transparent 74%),
+    radial-gradient(ellipse 20% 10% at 78% 72%, rgba(193, 220, 255, 0.2), transparent 78%),
+    radial-gradient(ellipse 27% 13% at 70% 88%, rgba(245, 174, 207, 0.18), transparent 82%),
+    linear-gradient(to bottom, transparent 55%, rgba(73, 36, 58, 0.085));
+  content: '';
+  pointer-events: none;
+}
+
+.wishlist .wl-cloud-bubble-media,
+.wishlist .wl-cloud-bubble-placeholder {
+  position: relative;
+  z-index: 1;
+}
+
+.wishlist .wl-cloud-bubble-media img {
+  transform: scale(1.025);
+  filter: saturate(1.025) contrast(1.015);
+}
+
+.wishlist .wl-cloud-bubble[data-priority='high'] {
+  box-shadow:
+    0 24px 58px color-mix(in srgb, var(--accent) 25%, transparent),
+    0 8px 22px rgba(82, 46, 65, 0.13),
+    inset 0 1px 1px rgba(255, 255, 255, 0.86),
+    inset 0 -14px 25px rgba(74, 39, 60, 0.075);
+}
+
+.wishlist .wl-cloud-bubble[data-priority='medium'] {
+  box-shadow:
+    0 20px 48px color-mix(in srgb, var(--accent) 20%, transparent),
+    0 7px 20px rgba(82, 46, 65, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.84),
+    inset 0 -13px 24px rgba(74, 39, 60, 0.07);
+}
+
+.wishlist .wl-cloud-bubble[data-priority='low'] {
+  border-color: rgba(255, 255, 255, 0.7);
+  box-shadow:
+    0 17px 40px color-mix(in srgb, var(--accent) 14%, transparent),
+    0 6px 17px rgba(82, 46, 65, 0.1),
+    inset 0 1px 1px rgba(255, 255, 255, 0.78),
+    inset 0 -11px 21px rgba(74, 39, 60, 0.065);
+}
+
+.wishlist .wl-cloud-bubble:hover,
+.wishlist .wl-cloud-bubble:focus-visible {
+  border-color: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    0 27px 66px color-mix(in srgb, var(--accent) 29%, transparent),
+    0 9px 25px rgba(82, 46, 65, 0.14),
+    inset 0 1px 1px rgba(255, 255, 255, 0.9),
+    inset 0 -14px 26px rgba(74, 39, 60, 0.07);
+}
+
+.wishlist .wl-cloud-item--pressed .wl-cloud-bubble {
+  filter: saturate(1.04) brightness(1.025);
+  transform:
+    translate(var(--wl-cloud-x), calc(var(--wl-cloud-y) - 2px))
+    rotate(var(--wl-cloud-rotate))
+    scale(1.025);
+}
+
+.wishlist .wl-cloud-item--dragging .wl-cloud-bubble {
+  animation-play-state: paused;
+  cursor: grabbing;
+  filter: saturate(1.06) brightness(1.035);
+  transform:
+    translate(var(--wl-cloud-x), var(--wl-cloud-y))
+    rotate(var(--wl-cloud-rotate))
+    scale(1.055);
+}
+
+/* Irregular rose mist follows every sphere without becoming a solid halo. */
+.wishlist .wl-cloud-item::before,
+.wishlist .wl-cloud-item::after {
+  position: absolute;
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+}
+
+.wishlist .wl-cloud-item::before {
+  z-index: -1;
+  inset: -23%;
+  background:
+    radial-gradient(circle at 43% 48%, rgba(251, 214, 228, 0.58) 0 24%, transparent 57%),
+    radial-gradient(ellipse 53% 39% at 27% 35%, rgba(246, 184, 200, 0.42), transparent 72%),
+    radial-gradient(ellipse 48% 34% at 78% 69%, rgba(235, 143, 171, 0.27), transparent 76%),
+    radial-gradient(ellipse 34% 25% at 68% 22%, rgba(223, 197, 244, 0.18), transparent 78%);
+  opacity: 0.76;
+  filter: blur(clamp(13px, calc(var(--wl-cloud-size) * 0.095), 22px));
+  transform:
+    translate(var(--wl-cloud-x), var(--wl-cloud-y))
+    rotate(var(--wl-cloud-rotate))
+    scale(0.98);
+  animation: wl-cloud-mist-breathe var(--wl-cloud-duration) ease-in-out infinite;
+  animation-delay: var(--wl-cloud-delay);
+  transition: opacity 220ms ease, filter 220ms ease;
+}
+
+.wishlist .wl-cloud-item::after {
+  z-index: -2;
+  inset: -16%;
+  background: conic-gradient(
+    from 35deg,
+    transparent,
+    rgba(246, 184, 200, 0.2),
+    transparent 32%,
+    rgba(202, 210, 250, 0.13) 49%,
+    transparent 65%,
+    rgba(235, 143, 171, 0.16),
+    transparent
+  );
+  opacity: 0.48;
+  filter: blur(clamp(15px, calc(var(--wl-cloud-size) * 0.11), 25px));
+  transform:
+    translate(var(--wl-cloud-x), var(--wl-cloud-y))
+    rotate(calc(var(--wl-cloud-rotate) * -1));
+  animation: wl-cloud-mist-drift calc(var(--wl-cloud-duration) * 1.35) ease-in-out infinite;
+  animation-delay: calc(var(--wl-cloud-delay) - 0.7s);
+}
+
+.wishlist .wl-cloud-item:hover::before,
+.wishlist .wl-cloud-item:focus-within::before,
+.wishlist .wl-cloud-item--dragging::before {
+  opacity: 0.94;
+  filter: blur(clamp(15px, calc(var(--wl-cloud-size) * 0.11), 25px));
+}
+
+.wishlist .wl-cloud-item--dragging::after {
+  opacity: 0.68;
+}
+
+@keyframes wl-bubble-pearl-shift {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes wl-cloud-mist-breathe {
+  0%, 100% {
+    translate: 0 0;
+    scale: 0.98;
+  }
+  50% {
+    translate: 0 -6px;
+    scale: 1.055;
+  }
+}
+
+@keyframes wl-cloud-mist-drift {
+  0%, 100% {
+    translate: -2px 2px;
+    scale: 0.97;
+  }
+  50% {
+    translate: 5px -4px;
+    scale: 1.06;
+  }
+}
+
+@media (max-width: 719px) {
+  .wishlist .wishlist-grid {
+    min-height: max(64dvh, 560px);
+    padding-bottom: calc(116px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .wl-hero-actions--with-completed {
+    min-width: 0;
+  }
+
+  .wl-hero-action-row {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+    justify-content: flex-start;
+  }
+
+  .wl-hero-action-row .wl-hero-add {
+    min-width: 0;
+    max-width: none;
+    flex: 1 1 150px;
+    padding-inline: 13px;
+  }
+
+  .wl-hero-completed {
+    min-height: 48px;
+    flex: 0 0 auto;
+    padding-inline: 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 390px) {
+  .wl-hero-action-row {
+    gap: 6px;
+  }
+
+  .wl-hero-action-row .wl-hero-add {
+    padding-inline: 9px;
+    font-size: 12px;
+  }
+
+  .wl-hero-completed {
+    padding-inline: 9px;
+    font-size: 11px;
+  }
+
+  .wl-hero-completed > span {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wishlist .wl-cloud-item {
+    will-change: auto;
+  }
+
+  .wishlist .wl-cloud-bubble::before,
+  .wishlist .wl-cloud-item::before,
+  .wishlist .wl-cloud-item::after {
+    animation: none;
+  }
+
+  .wl-hero-completed {
+    transition: none;
+  }
+}

@@ -1,0 +1,199 @@
+.goal-finance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.goal-history-btn,
+.goal-add-funds-btn {
+  white-space: nowrap;
+}
+
+.form-field textarea {
+  width: 100%;
+  min-height: 5.5rem;
+  resize: vertical;
+  font: inherit;
+  color: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0.8rem 0.9rem;
+  outline: none;
+}
+
+.form-field textarea:focus {
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+
+.goal-note-counter {
+  align-self: flex-end;
+  opacity: 0.58;
+}
+
+.goal-history-modal {
+  width: min(560px, calc(100vw - 2rem));
+  max-height: min(760px, calc(100dvh - 2rem));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.goal-history-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.goal-history-kicker {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.58;
+}
+
+.goal-history-close {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.goal-history-close:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.goal-history-list {
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 0.7rem;
+  margin-top: 1rem;
+  padding-right: 0.2rem;
+}
+
+.goal-history-entry {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.goal-history-entry-main {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 0.2rem;
+}
+
+.goal-history-entry-main strong {
+  font-size: 1.08rem;
+}
+
+.goal-history-person,
+.goal-history-entry-meta time {
+  font-size: 0.8rem;
+  opacity: 0.62;
+}
+
+.goal-history-note {
+  margin: 0.35rem 0 0;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.goal-history-entry-meta {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 0.65rem;
+  text-align: right;
+}
+
+.goal-history-cancel {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  opacity: 0.62;
+  cursor: pointer;
+}
+
+.goal-history-cancel:hover {
+  opacity: 1;
+}
+
+.goal-history-cancel:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.goal-history-state,
+.goal-history-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  opacity: 0.76;
+}
+
+.goal-history-empty span {
+  font-size: 1.6rem;
+}
+
+.goal-history-empty p,
+.goal-history-footnote {
+  margin: 0;
+}
+
+.goal-history-footnote {
+  padding-top: 1rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: center;
+  opacity: 0.5;
+}
+
+@media (max-width: 600px) {
+  .goal-finance-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .goal-finance-actions > button {
+    flex: 1;
+  }
+
+  .goal-history-entry {
+    flex-direction: column;
+  }
+
+  .goal-history-entry-meta {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+  }
+}

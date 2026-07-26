@@ -1,10 +1,9 @@
 // ============================================================
-// useWishlist — дані вкладки «Бажання» (порт wishlist.js)
+// useWishlist — дані вкладки «Бажання»
 // ------------------------------------------------------------
-// Активні бажання, архів виконаних, партнер, завантаження фото у
-// Storage і мутації (додати/редагувати/видалити/бронь/виконати).
-// Оптимістика — там, де стара версія малювала «напряму» (бронь,
-// видалення), решта — invalidate. db-notify і конфеті на fulfill.
+// Wishlist v3 читає дані лише через role-safe RPC: власник не отримує
+// reserved_by та не бачить приватні стадії purchased/preparing_surprise.
+// Усі доменні зміни виконуються серверними RPC із перевіркою ролі й стану.
 // ============================================================
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, invokeFn, publicUrl } from '@/lib/supabase';
@@ -14,16 +13,34 @@ import { burstConfetti } from '@/lib/confetti';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useUsers, usePartner } from '@/features/_shared/useUsers';
-import type {
-  WishlistItemRow,
-  FulfilledWishlistItem,
-  InsertRow,
-  UserName,
-} from '@/types';
+import {
+  cancelWishlistReservation,
+  completeWishlistGift,
+  createWishlistItem,
+  fetchFulfilledWishlistV3,
+  fetchWishlistStatsV3,
+  fetchWishlistV3,
+  markWishlistPreparing,
+  markWishlistPurchased,
+  moveWishlistItem,
+  reserveWishlistItem,
+  softDeleteWishlistItem,
+  updateWishlistItem,
+  type GiftMemoryArchiveItem,
+  type WishlistItemV3,
+} from './wishlistRpc';
+import {
+  uploadGiftMemoryAssets,
+  type GiftMemoryFiles,
+} from './giftMemory';
+import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
+import type { WishlistImagePreference } from './wishlistImagePreference';
+import type { WishlistItemRow, UserName } from '@/types';
 
 const BUCKET = 'wishlist-photos';
+const ARCHIVE_SIGNED_URL_REFRESH_MS = 5 * 60 * 60 * 1000;
+const ARCHIVE_STALE_TIME_MS = 4 * 60 * 60 * 1000;
 
-// Присвійна форма імені партнера («Бажання Діми / Лєни»).
 const GENITIVE: Record<UserName, string> = { Діма: 'Діми', Лєна: 'Лєни' };
 export function partnerGenitive(name: string | undefined): string {
   return name && name in GENITIVE ? GENITIVE[name as UserName] : (name ?? 'Партнера');
@@ -32,25 +49,12 @@ export function partnerGenitive(name: string | undefined): string {
 export { usePartner };
 
 // ── Запити ───────────────────────────────────────────────────
-const ACTIVE_COLS =
-  'id,title,description,link,image_url,gift_date,owner,is_shared,reserved,reserved_by,price,priority,fulfilled,fulfilled_by,fulfilled_at';
-
 export function useWishlistItems(ownerId: number | null) {
   return useQuery({
     queryKey: qk.wishlist(ownerId ?? -1),
     enabled: ownerId !== null,
-    queryFn: async (): Promise<WishlistItemRow[]> => {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select(ACTIVE_COLS)
-        .eq('owner', ownerId!)
-        .eq('is_shared', false)
-        .or('fulfilled.is.null,fulfilled.eq.false')
-        .order('id', { ascending: false })
-        .returns<WishlistItemRow[]>();
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async (): Promise<WishlistItemV3[]> =>
+      fetchWishlistV3({ ownerId, shared: false }),
   });
 }
 
@@ -58,48 +62,16 @@ export function useWishlistItems(ownerId: number | null) {
 export function useSharedWishlistItems() {
   return useQuery({
     queryKey: qk.wishlistShared(),
-    queryFn: async (): Promise<WishlistItemRow[]> => {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select(ACTIVE_COLS)
-        .eq('is_shared', true)
-        .or('fulfilled.is.null,fulfilled.eq.false')
-        .order('id', { ascending: false })
-        .returns<WishlistItemRow[]>();
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async (): Promise<WishlistItemV3[]> =>
+      fetchWishlistV3({ ownerId: null, shared: true }),
   });
 }
 
-/** Прогрес пари: скільки бажань (усіх, обох) виконано загалом і цього року. */
+/** Прогрес пари без прямого читання таблиці або приватних полів бронювання. */
 export function useCoupleWishStats() {
   return useQuery({
     queryKey: qk.wishlistStats(),
-    queryFn: async (): Promise<{
-      total: number;
-      done: number;
-      doneThisYear: number;
-      doneThisMonth: number;
-    }> => {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select('fulfilled,fulfilled_at')
-        .returns<{ fulfilled: boolean; fulfilled_at: string | null }[]>();
-      if (error) throw error;
-      const rows = data ?? [];
-      const now = new Date();
-      const done = rows.filter((r) => r.fulfilled).length;
-      const doneThisYear = rows.filter(
-        (r) => r.fulfilled && r.fulfilled_at && new Date(r.fulfilled_at).getFullYear() === now.getFullYear(),
-      ).length;
-      const doneThisMonth = rows.filter((r) => {
-        if (!r.fulfilled || !r.fulfilled_at) return false;
-        const d = new Date(r.fulfilled_at);
-        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
-      }).length;
-      return { total: rows.length, done, doneThisYear, doneThisMonth };
-    },
+    queryFn: fetchWishlistStatsV3,
   });
 }
 
@@ -107,23 +79,23 @@ export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
   return useQuery({
     queryKey: qk.wishlistFulfilled(ownerId ?? -1),
     enabled: enabled && ownerId !== null,
-    queryFn: async (): Promise<FulfilledWishlistItem[]> => {
-      const { data, error } = await supabase
-        .from('wishlist_items')
-        .select('id,title,description,link,image_url,price,priority,fulfilled_at,fulfilled_by')
-        .eq('owner', ownerId!)
-        .eq('fulfilled', true)
-        .order('fulfilled_at', { ascending: false })
-        .returns<FulfilledWishlistItem[]>();
-      if (error) throw error;
-      return data ?? [];
-    },
+    queryFn: async (): Promise<GiftMemoryArchiveItem[]> =>
+      fetchFulfilledWishlistV3(ownerId!),
+    staleTime: ARCHIVE_STALE_TIME_MS,
+    refetchInterval: enabled ? ARCHIVE_SIGNED_URL_REFRESH_MS : false,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
   });
 }
 
-// ── Завантаження фото (HEIC-normalize + compress → Storage) ──
-export async function uploadWishPhoto(file: File, userId: number): Promise<string> {
-  const normalized = await normalize(file); // HEIC → JPEG (може кинути)
+// ── Завантаження фото ────────────────────────────────────────
+export interface UploadedWishPhoto {
+  url: string;
+  path: string;
+}
+
+export async function uploadWishPhoto(file: File, userId: number): Promise<UploadedWishPhoto> {
+  const normalized = await normalize(file);
 
   let blob: Blob = normalized;
   let ext = (normalized.name.split('.').pop() || 'jpg').toLowerCase();
@@ -137,13 +109,20 @@ export async function uploadWishPhoto(file: File, userId: number): Promise<strin
     console.warn('[Wishlist] стиснення не вдалося, вантажимо оригінал:', e);
   }
 
-  const path = `wish-${userId}-${Date.now()}.${ext}`;
+  const path = `${userId}/wish-${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-    upsert: true,
+    upsert: false,
     contentType,
   });
   if (error) throw error;
-  return publicUrl(BUCKET, path);
+  return { path, url: publicUrl(BUCKET, path) };
+}
+
+/** Прибирає лише щойно завантажені, але не прив'язані до бажання файли. */
+export async function removeWishPhotoAssets(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  const { error } = await supabase.storage.from(BUCKET).remove(paths);
+  if (error) console.warn('[Wishlist] не вдалося прибрати незбережене фото:', error);
 }
 
 // ── Мутації ──────────────────────────────────────────────────
@@ -151,9 +130,26 @@ export interface WishFormPayload {
   title: string;
   link: string | null;
   image_url: string | null;
+  image_preference: WishlistImagePreference;
   price: number | null;
   priority: WishlistItemRow['priority'];
   description: string | null;
+}
+
+export interface CompleteGiftInput extends GiftMemoryFiles {
+  item: WishlistItemV3;
+  comment: string;
+  idempotencyKey: string;
+}
+
+function wishMatchesPayload(item: WishlistItemV3, payload: WishFormPayload): boolean {
+  return item.title === payload.title
+    && item.description === payload.description
+    && item.link === payload.link
+    && item.image_url === payload.image_url
+    && item.image_preference === payload.image_preference
+    && item.price === payload.price
+    && item.priority === payload.priority;
 }
 
 export function useWishlistMutations(ownerId: number | null) {
@@ -163,144 +159,213 @@ export function useWishlistMutations(ownerId: number | null) {
   const { data: users } = useUsers();
   const key = ownerId !== null ? qk.wishlist(ownerId) : qk.wishlistShared();
 
-  const snapshot = () => client.getQueryData<WishlistItemRow[]>(key);
-  const rollback = (prev: WishlistItemRow[] | undefined) => {
+  const snapshot = () => client.getQueryData<WishlistItemV3[]>(key);
+  const rollback = (prev: WishlistItemV3[] | undefined) => {
     if (prev) client.setQueryData(key, prev);
   };
   const invalidateBoth = () => {
     void client.invalidateQueries({ queryKey: ['wishlist'] });
   };
 
-  // ДОДАТИ / РЕДАГУВАТИ (фото вантажиться в компоненті до виклику).
-  // owner/isShared — лише для створення (вибір «Моє/Для партнера/Спільне»);
-  // на редагуванні ігноруються, власність не міняється.
   const save = useMutation({
     mutationFn: async (input: {
       id: number | null;
       payload: WishFormPayload;
       owner?: number;
       isShared?: boolean;
+      expectedVersion?: number;
     }) => {
-      if (input.id !== null) {
-        const { error } = await supabase
-          .from('wishlist_items')
-          .update(input.payload)
-          .eq('id', input.id);
-        if (error) throw error;
-      } else {
-        const row: InsertRow<'wishlist_items'> = {
-          ...input.payload,
-          owner: input.owner ?? me.id,
-          is_shared: input.isShared ?? false,
-          reserved: false,
-          reserved_by: null,
-          fulfilled: false,
-        };
-        const { error } = await supabase.from('wishlist_items').insert(row);
-        if (error) throw error;
+      const shared = input.isShared ?? ownerId === null;
+      const targetOwner = input.owner ?? ownerId ?? me.id;
+
+      try {
+        if (input.id !== null) {
+          if (input.expectedVersion == null) throw new Error('wish_version_required');
+          await updateWishlistItem(input.id, input.expectedVersion, input.payload);
+        } else {
+          await createWishlistItem({
+            payload: input.payload,
+            ownerId: targetOwner,
+            shared,
+          });
+        }
+      } catch (error) {
+        if (!isAmbiguousWishlistTransportError(error)) throw error;
+
+        // Update may have committed before the response was lost. Read the
+        // server state before allowing another edit with an obsolete version.
+        try {
+          const serverItems = await fetchWishlistV3({
+            ownerId: shared ? null : targetOwner,
+            shared,
+          });
+          const committed = serverItems.some((item) =>
+            input.id !== null
+              ? item.id === input.id && wishMatchesPayload(item, input.payload)
+              : item.owner === targetOwner
+                && item.is_shared === shared
+                && wishMatchesPayload(item, input.payload),
+          );
+          if (committed) return;
+        } catch {
+          // Не замінюємо первинну transport-помилку помилкою reconciliation.
+        }
+
+        throw error;
       }
     },
-    onSuccess: invalidateBoth,
-    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
+    onError: (e) => {
+      const message = (e as Error).message;
+      toast.show(
+        message.includes('wish_version_conflict')
+          ? 'Партнер щойно змінив цю мрію. Форму оновлено до нової версії.'
+          : message.includes('wishlist_create_retry_safe')
+            ? 'Не вдалося підтвердити створення. Натисни «Зберегти» ще раз — дублікат не з’явиться.'
+            : isAmbiguousWishlistTransportError(e)
+              ? 'З’єднання обірвалося. Перевір список перед повторною спробою.'
+              : message.includes('wish_not_editable')
+                ? 'Цю мрію вже не можна редагувати.'
+                : 'Не вдалося зберегти бажання. Спробуй ще.',
+      );
+    },
+    onSettled: invalidateBoth,
   });
 
-  // ВИДАЛИТИ — оптимістично.
   const remove = useMutation({
-    mutationFn: async (id: number) => {
-      const { error } = await supabase.from('wishlist_items').delete().eq('id', id);
-      if (error) throw error;
-    },
+    mutationFn: softDeleteWishlistItem,
     onMutate: async (id) => {
       await client.cancelQueries({ queryKey: key });
       const prev = snapshot();
-      client.setQueryData<WishlistItemRow[]>(key, (old) =>
+      client.setQueryData<WishlistItemV3[]>(key, (old) =>
         (old ?? []).filter((i) => i.id !== id),
       );
       return { prev };
     },
-    onError: (_e, _v, ctx) => {
+    onError: (e, _v, ctx) => {
       rollback(ctx?.prev);
-      toast.show('Не вдалось видалити бажання. Спробуй ще.');
+      toast.show(
+        (e as Error).message.includes('wish_not_deletable')
+          ? 'Заброньовану або завершену мрію видалити не можна.'
+          : 'Не вдалося видалити бажання. Спробуй ще.',
+      );
     },
     onSettled: invalidateBoth,
   });
 
-  // БРОНЬ / СКАСУВАННЯ БРОНІ — оптимістично.
+  // Без оптимістики: сервер спочатку підтверджує атомарне бронювання.
   const setReserved = useMutation({
     mutationFn: async (v: { id: number; reserved: boolean }) => {
-      const { error } = await supabase
-        .from('wishlist_items')
-        .update({ reserved: v.reserved, reserved_by: v.reserved ? me.id : null })
-        .eq('id', v.id);
-      if (error) throw error;
+      if (v.reserved) await reserveWishlistItem(v.id);
+      else await cancelWishlistReservation(v.id);
     },
-    onMutate: async (v) => {
-      await client.cancelQueries({ queryKey: key });
-      const prev = snapshot();
-      client.setQueryData<WishlistItemRow[]>(key, (old) =>
-        (old ?? []).map((i) =>
-          i.id === v.id
-            ? { ...i, reserved: v.reserved, reserved_by: v.reserved ? me.id : null }
-            : i,
-        ),
+    onError: (e) => {
+      const message = (e as Error).message;
+      toast.show(
+        message.includes('shared_wish_not_reservable')
+          ? 'Спільну мрію не потрібно бронювати — її можна виконати разом.'
+          : message.includes('wish_not_reservable')
+            ? 'Цю мрію вже хтось узяв на себе.'
+            : 'Не вдалося оновити бронювання. Спробуй ще.',
       );
-      return { prev };
-    },
-    onError: (_e, _v, ctx) => {
-      rollback(ctx?.prev);
-      toast.show('Не вдалось оновити бажання. Спробуй ще.');
     },
     onSettled: invalidateBoth,
   });
 
-  // ПЕРЕНЕСТИ (моє / партнеру / спільне) — на вже створеному бажанні,
-  // на відміну від owner/isShared у save (там це лише вибір при СТВОРЕННІ).
+  const markPurchased = useMutation({
+    mutationFn: (id: number) => markWishlistPurchased(id),
+    onError: (e) =>
+      toast.show(
+        (e as Error).message.includes('wish_not_purchasable')
+          ? 'Цей подарунок уже не можна позначити як куплений.'
+          : 'Не вдалося оновити етап покупки. Спробуй ще.',
+      ),
+    onSettled: invalidateBoth,
+  });
+
+  const markPreparing = useMutation({
+    mutationFn: (id: number) => markWishlistPreparing(id),
+    onError: (e) =>
+      toast.show(
+        (e as Error).message.includes('wish_not_preparable')
+          ? 'Спочатку познач подарунок як куплений.'
+          : 'Не вдалося почати підготовку сюрпризу.',
+      ),
+    onSettled: invalidateBoth,
+  });
+
   const changeScope = useMutation({
     mutationFn: async (v: { id: number; owner: number; isShared: boolean }) => {
-      const { error } = await supabase
-        .from('wishlist_items')
-        .update({ owner: v.owner, is_shared: v.isShared })
-        .eq('id', v.id);
-      if (error) throw error;
+      await moveWishlistItem(v.id, v.owner, v.isShared);
     },
-    onSuccess: invalidateBoth,
-    onError: (e) => toast.show('Не вдалось перенести бажання: ' + (e as Error).message),
+    onError: (e) =>
+      toast.show(
+        (e as Error).message.includes('wish_not_movable')
+          ? 'Цю мрію вже не можна переносити.'
+          : 'Не вдалося перенести бажання. Спробуй ще.',
+      ),
+    onSettled: invalidateBoth,
   });
 
-  // ВИКОНАТИ БАЖАННЯ (+ db-notify + конфеті).
   const fulfill = useMutation({
-    mutationFn: async (item: WishlistItemRow) => {
-      const { error } = await supabase
-        .from('wishlist_items')
-        .update({
-          fulfilled: true,
-          fulfilled_by: me.id,
-          fulfilled_at: new Date().toISOString(),
-          reserved: true,
-          reserved_by: me.id,
-        })
-        .eq('id', item.id);
-      if (error) throw error;
+    mutationFn: async ({ item, photo, video, comment, idempotencyKey }: CompleteGiftInput) => {
+      const uploaded = await uploadGiftMemoryAssets({
+        wishId: item.id,
+        userId: me.id,
+        idempotencyKey,
+        files: { photo, video },
+      });
 
-      // Сповіщення в Telegram — не блокує успіх (текст будує Edge Function).
-      const owner = (users ?? []).find((u) => u.id === item.owner);
-      try {
-        await invokeFn('db-notify', {
-          type: 'wish_fulfilled',
-          itemTitle: item.title,
-          ownerId: owner?.id,
-          buyerId: me.id,
-        });
-      } catch (e) {
-        console.warn('[Wishlist] db-notify error:', e);
+      // Не видаляємо повністю завантажені файли після помилки RPC: при
+      // втраченій відповіді сервер міг уже зафіксувати completion. Повторна
+      // спроба використовує той самий idempotency key, а справжні сироти
+      // безпечно прибере wishlist-storage-cleanup після grace period.
+      await completeWishlistGift({
+        wishId: item.id,
+        idempotencyKey,
+        reactionPhotoPath: uploaded.photoPath,
+        reactionVideoPath: uploaded.videoPath,
+        comment: comment.trim() || null,
+      });
+
+      // Shared completion notifications are emitted from wishlist_history in
+      // the next inbox migration. Keep the legacy notification only for gifts.
+      if (!item.is_shared) {
+        const owner = (users ?? []).find((u) => u.id === item.owner);
+        try {
+          await invokeFn('db-notify', {
+            type: 'wish_fulfilled',
+            itemTitle: item.title,
+            ownerId: owner?.id,
+            buyerId: me.id,
+          });
+        } catch (e) {
+          console.warn('[Wishlist] db-notify error:', e);
+        }
       }
     },
-    onSuccess: () => {
-      burstConfetti();
-      invalidateBoth();
+    onSuccess: () => burstConfetti(),
+    onError: (e, input) => {
+      const message = (e as Error).message;
+      toast.show(
+        message.includes('invalid_reaction_')
+          ? 'Не вдалося зберегти медіа. Спробуй обрати файл ще раз.'
+          : message.includes('shared_wish_not_completable')
+            ? 'Цю спільну мрію вже виконав партнер або її стан змінився.'
+            : input.item.is_shared
+              ? 'Не вдалося виконати спільну мрію: ' + message
+              : 'Не вдалося завершити подарунок: ' + message,
+      );
     },
-    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
+    onSettled: invalidateBoth,
   });
 
-  return { save, remove, setReserved, fulfill, changeScope };
+  return {
+    save,
+    remove,
+    setReserved,
+    markPurchased,
+    markPreparing,
+    fulfill,
+    changeScope,
+  };
 }

@@ -8,7 +8,7 @@
 //   3) стан користувача тримаємо тут, а не в DOM.
 //
 // Замість location.reload() при logout — скидаємо стан; RequireAuth
-// (Крок 3) сам зробить редірект на /login.
+// сам зробить редірект на /login.
 // ============================================================
 import {
   createContext,
@@ -50,12 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Захист від подвійного авто-логіну в StrictMode (dev монтує двічі).
   const bootstrapped = useRef(false);
 
+  const clearLocalSession = useCallback(() => {
+    localStorage.removeItem(SESSION_KEY);
+    setUser(null);
+    setStatus('unauthenticated');
+  }, []);
+
   // ── Тиха Supabase-сесія для RLS ─────────────────────────────
-  const signInSilently = useCallback(async (email: string, password: string) => {
+  const signInSilently = useCallback(async (email: string, password: string): Promise<boolean> => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      console.warn('Supabase Auth login failed (RLS буде недоступний):', error.message);
+      console.warn('Supabase Auth login failed (RLS недоступний):', error.message);
+      return false;
     }
+    return true;
   }, []);
 
   // ── Вхід за PIN ─────────────────────────────────────────────
@@ -70,18 +78,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (res.ok) {
-        if (res.email) await signInSilently(res.email, res.password);
-        localStorage.setItem(SESSION_KEY, String(userId));
+        if (!res.email || !(await signInSilently(res.email, res.password))) {
+          clearLocalSession();
+          return { ok: false, reason: 'error' };
+        }
 
         // Ім'я валідуємо guard'ом, а не сліпим кастом.
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from('users')
           .select('id, name')
           .eq('id', userId)
           .single();
-        const appUser = toAppUser(data);
-        if (!appUser) return { ok: false, reason: 'error' };
+        const appUser = error ? null : toAppUser(data);
+        if (!appUser) {
+          await supabase.auth.signOut().catch(() => {});
+          clearLocalSession();
+          return { ok: false, reason: 'error' };
+        }
 
+        localStorage.setItem(SESSION_KEY, String(userId));
         setUser(appUser);
         setStatus('authenticated');
         return { ok: true };
@@ -94,16 +109,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (res.error === 'invalid') return { ok: false, reason: 'invalid' };
       return { ok: false, reason: 'error' };
     },
-    [signInSilently],
+    [clearLocalSession, signInSilently],
   );
 
   // ── Вихід ───────────────────────────────────────────────────
   const logout = useCallback(async () => {
     await supabase.auth.signOut().catch(() => {});
-    localStorage.removeItem(SESSION_KEY);
-    setUser(null);
-    setStatus('unauthenticated');
-  }, []);
+    clearLocalSession();
+  }, [clearLocalSession]);
+
+  // Supabase може завершити сесію асинхронно, наприклад після невдалого
+  // auto-refresh. Без listener UI лишався «залогіненим», а всі RPC падали.
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+        clearLocalSession();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [clearLocalSession]);
 
   // ── Авто-логін за живою Supabase-сесією ─────────────────────
   useEffect(() => {
@@ -122,8 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } = await supabase.auth.getSession();
 
       if (!session) {
-        localStorage.removeItem(SESSION_KEY);
-        setStatus('unauthenticated');
+        clearLocalSession();
         return;
       }
 
@@ -135,8 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const appUser = error ? null : toAppUser(data);
       if (!appUser) {
-        localStorage.removeItem(SESSION_KEY);
-        setStatus('unauthenticated');
+        clearLocalSession();
         return;
       }
 
@@ -147,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Auth: авто-логін впав', err);
       setStatus('unauthenticated');
     });
-  }, []);
+  }, [clearLocalSession]);
 
   const value = useMemo<AuthContextValue>(
     () => ({ user, status, login, logout }),

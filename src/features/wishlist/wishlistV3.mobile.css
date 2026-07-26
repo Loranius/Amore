@@ -1,0 +1,51 @@
+@import './wishlistAlignmentFix.css';
+@import './wishlistTabTransition.css';
+@import './wishlistLinkPreview.css';
+@import './wishlistLifecycle.css';
+@import './wishlistGiftMemory.css';
+@import './wishlistGiftMemory.mobile.css';
+@import './wishlistContrast.css';
+@import './wishlistHeroCompact.css';
+@import './wishlistCardProduct.css';
+@import './wishlistFormSections.css';
+@import './wishlistCloudStacking.css';
+@import './wishlistBubble3d.css';
+@import './wishlistAndroidQa.css';
+@import './wishlistBubbleDepthHotfix.css';
+@import './wishlistBubbleShellFinal.css';
+@import './wishlistViewModes.css';
+
+/* Mobile-only polishing for Wishlist v3. */
+
+.wishlist .is-disabled,
+.wishlist button:disabled,
+.wishlist input:disabled,
+.wishlist textarea:disabled,
+.wishlist select:disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
+.wishlist .is-disabled {
+  pointer-events: none;
+}
+
+@media (max-width: 719px) {
+  .wishlist {
+    padding-bottom: calc(132px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .wl-card-v3-menu-wrap {
+    margin-left: auto;
+  }
+
+  .wl-card-v3-photo img {
+    max-height: 460px;
+  }
+}
+
+@media (max-width: 420px) {
+  .wl-card-v3-reservation-actions {
+    grid-template-columns: 1fr;
+  }
+}

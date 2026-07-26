@@ -1,0 +1,222 @@
+.wishlist {
+  --wl-page-max-width: 1240px;
+  --wl-page-gutter: clamp(2px, 1.2vw, 16px);
+  --wl-section-gap: clamp(18px, 2.4vw, 30px);
+  --wl-card-gap: clamp(18px, 2vw, 24px);
+  --wl-card-radius: 26px;
+  --wl-media-ratio: 4 / 3;
+  --wl-personal-accent: #d98aa8;
+  --wl-partner-accent: #d69a73;
+  --wl-shared-accent: #ad83d5;
+  --wl-memory-accent: #c87998;
+  --wl-hero-gradient: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--accent) 15%, var(--surface)),
+    color-mix(in srgb, var(--surface) 96%, transparent)
+  );
+
+  position: relative;
+  width: min(100%, var(--wl-page-max-width));
+  margin-inline: auto;
+  padding-inline: var(--wl-page-gutter);
+  isolation: isolate;
+}
+
+.wishlist::before {
+  position: absolute;
+  z-index: -1;
+  top: -72px;
+  left: 50%;
+  width: min(920px, 94vw);
+  height: 340px;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--accent) 9%, transparent),
+    transparent 68%
+  );
+  content: '';
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.wishlist > .tab-bar,
+.wishlist > .wl-head,
+.wishlist > .plans-stat-banner,
+.wishlist > .wishlist-grid,
+.wishlist > .empty-state,
+.wishlist > [role='alert'] {
+  position: relative;
+  z-index: 1;
+}
+
+.wishlist-grid {
+  gap: var(--wl-card-gap);
+}
+
+.wl-head {
+  gap: 16px;
+  margin-block: var(--wl-section-gap) 18px;
+}
+
+.wl-title {
+  text-wrap: balance;
+}
+
+/* Stable loading geometry: the real page replaces these blocks without a
+   large height jump, while all decorative motion remains optional. */
+.wl-page-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 70vh;
+}
+
+.wl-skeleton-tabs {
+  width: min(100%, 560px);
+  height: 48px;
+  margin-inline: auto;
+  border-radius: 999px;
+}
+
+.wl-skeleton-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-height: 74px;
+}
+
+.wl-skeleton-heading > div:first-child {
+  display: grid;
+  flex: 1;
+  gap: 10px;
+}
+
+.wl-skeleton-line,
+.wl-skeleton-action,
+.wl-skeleton-cta,
+.wl-skeleton-stat,
+.wl-skeleton-media {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface));
+}
+
+.wl-skeleton-line {
+  height: 13px;
+}
+
+.wl-skeleton-line--eyebrow { width: min(160px, 42vw); height: 10px; }
+.wl-skeleton-line--hero { width: min(360px, 68vw); height: 30px; }
+.wl-skeleton-line--title { width: 76%; height: 20px; }
+.wl-skeleton-line--medium { width: 92%; }
+.wl-skeleton-line--short { width: 58%; }
+
+.wl-skeleton-cta {
+  flex: 0 0 128px;
+  height: 46px;
+}
+
+.wl-skeleton-stat {
+  width: 100%;
+  height: 96px;
+  border-radius: 22px;
+}
+
+.wl-skeleton-grid {
+  align-items: start;
+}
+
+.wl-skeleton-card {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: var(--wl-card-radius);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.wl-skeleton-media {
+  width: 100%;
+  aspect-ratio: var(--wl-media-ratio);
+  border-radius: 0;
+}
+
+.wl-skeleton-card-content {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.wl-skeleton-action {
+  width: 100%;
+  height: 46px;
+  margin-top: 6px;
+  border-radius: 15px;
+}
+
+.wl-skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.wl-skeleton-shimmer::after {
+  position: absolute;
+  inset: 0 auto 0 -55%;
+  width: 46%;
+  background: linear-gradient(
+    100deg,
+    transparent,
+    color-mix(in srgb, white 54%, transparent),
+    transparent
+  );
+  content: '';
+  animation: wl-foundation-shimmer 1.4s ease-in-out infinite;
+  transform: skewX(-12deg);
+}
+
+@keyframes wl-foundation-shimmer {
+  0% { translate: 0; }
+  58%, 100% { translate: 340%; }
+}
+
+@media (max-width: 719px) {
+  .wishlist {
+    --wl-page-gutter: 0px;
+    --wl-section-gap: 18px;
+    --wl-card-gap: 18px;
+  }
+
+  .wishlist::before {
+    top: -44px;
+    height: 260px;
+  }
+
+  .wl-skeleton-heading {
+    align-items: flex-end;
+  }
+
+  .wl-skeleton-cta {
+    flex-basis: 108px;
+  }
+
+  .wl-skeleton-stat {
+    height: 88px;
+  }
+}
+
+@media (max-width: 430px) {
+  .wl-skeleton-heading {
+    display: grid;
+  }
+
+  .wl-skeleton-cta {
+    width: 128px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-skeleton-shimmer::after {
+    display: none;
+    animation: none;
+  }
+}

@@ -1,0 +1,24 @@
+/* Keep the fixed detail sheet in the page-level stacking context. */
+.wishlist .wishlist-grid {
+  isolation: auto !important;
+}
+
+.wishlist .wishlist-grid::before,
+.wishlist .wishlist-grid::after {
+  z-index: 0 !important;
+}
+
+/* Preserve a local stacking context so the negative halo and contact shadow
+   remain behind the sphere instead of disappearing behind the page. */
+.wishlist .wl-cloud-item {
+  z-index: var(--wl-cloud-z, 1) !important;
+  isolation: isolate;
+}
+
+.wishlist .wl-cloud-bubble {
+  z-index: 1;
+}
+
+.wishlist .wl-cloud-sheet-overlay {
+  z-index: 1400;
+}

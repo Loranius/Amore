@@ -1,24 +1,63 @@
 // ============================================================
-// GoalsList — спільні цілі (порт renderGlobalGoals/paintGoals)
+// GoalsList — спільні цілі
 // ------------------------------------------------------------
-// pending: очікує голосу партнера (він бачить ✓/✕). confirmed:
-// прогрес-бар + «Внести». Видалення — своя pending або будь-яка
-// підтверджена.
+// pending: очікує голосу партнера. confirmed: прогрес + внесок.
+// Модалки закриваються лише після успішної відповіді сервера.
 // ============================================================
 import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { Card } from '@/components/ui/Card';
 import { ProposalCard } from '@/components/ui/ProposalCard';
-import { fmtMoney, useGoals, useGoalMutations, type NewGoalInput } from './useBudget';
-import type { SavingsGoalRow } from '@/types';
+import { GoalComments } from './GoalComments';
+import { GoalContributions } from './GoalContributions';
+import { GoalDesiredDateModal, GoalForecastCard } from './GoalForecast';
+import { GoalMilestones } from './GoalMilestones';
+import { useGoalForecastMutations, useGoalForecasts } from './useGoalForecast';
+import {
+  CONTRIBUTION_NOTE_MAX,
+  isValidContributionAmount,
+  normalizeContributionNote,
+} from './contributionModel';
+import {
+  fmtMoney,
+  useGoals,
+  useGoalMutations,
+  type BudgetGoalRow,
+  type NewGoalInput,
+} from './useBudget';
 
 export function GoalsList() {
   const me = useCurrentUser();
   const { data: goals = [], isPending } = useGoals();
-  const { add, confirm, remove, addFunds } = useGoalMutations();
+  const { data: forecasts = [], isPending: forecastsPending } = useGoalForecasts();
+  const {
+    add,
+    confirm,
+    reject,
+    remove,
+    pause,
+    resume,
+    addContribution,
+  } = useGoalMutations();
+  const { setDesiredDate } = useGoalForecastMutations();
 
   const [adding, setAdding] = useState(false);
-  const [funding, setFunding] = useState<SavingsGoalRow | null>(null);
+  const [funding, setFunding] = useState<BudgetGoalRow | null>(null);
+  const [historyGoalId, setHistoryGoalId] = useState<string | null>(null);
+  const [commentsGoalId, setCommentsGoalId] = useState<string | null>(null);
+  const [dateGoalId, setDateGoalId] = useState<string | null>(null);
+
+  const forecastByGoal = new Map(forecasts.map((forecast) => [forecast.goalId, forecast]));
+  const historyGoal = historyGoalId
+    ? goals.find((goal) => goal.id === historyGoalId) ?? null
+    : null;
+  const commentsGoal = commentsGoalId
+    ? goals.find((goal) => goal.id === commentsGoalId) ?? null
+    : null;
+  const dateGoal = dateGoalId
+    ? goals.find((goal) => goal.id === dateGoalId) ?? null
+    : null;
+  const dateForecast = dateGoalId ? forecastByGoal.get(dateGoalId) ?? null : null;
 
   return (
     <Card className="fin-card">
@@ -37,9 +76,12 @@ export function GoalsList() {
         <div className="goals-list">
           {goals.map((g) => {
             const pending = g.status === 'pending';
-            const target = g.target_amount ?? 0;
-            const saved = Math.max(0, g.saved_amount ?? 0);
+            const paused = g.paused_at !== null;
+            const target = Number(g.target_amount ?? 0);
+            const saved = Math.max(0, Number(g.saved_amount ?? 0));
             const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
+            const pauseBusy = pause.isPending && pause.variables === g.id;
+            const resumeBusy = resume.isPending && resume.variables === g.id;
 
             return (
               <ProposalCard
@@ -48,7 +90,7 @@ export function GoalsList() {
                 proposedBy={g.proposed_by ?? ''}
                 meName={me.name}
                 onConfirm={() => confirm.mutate(g.id)}
-                onReject={() => remove.mutate(g.id)}
+                onReject={() => reject.mutate(g.id)}
                 onDelete={() => remove.mutate(g.id)}
                 info={
                   <>
@@ -64,7 +106,9 @@ export function GoalsList() {
                 badge={
                   g.status === 'confirmed' ? (
                     <>
-                      <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
+                      <span className={`goal-status-badge ${paused ? 'goal-paused' : 'goal-confirmed'}`}>
+                        {paused ? '⏸ На паузі' : '✅ Підтверджено'}
+                      </span>
                       <div className="goal-progress-wrap">
                         <div className="goal-progress-bar">
                           <div className="goal-progress-fill" style={{ width: `${pct}%` }} />
@@ -76,6 +120,13 @@ export function GoalsList() {
                           <span className="goal-progress-pct">{pct}%</span>
                         </div>
                       </div>
+                      <GoalMilestones savedAmount={saved} targetAmount={target} />
+                      <GoalForecastCard
+                        forecast={forecastByGoal.get(g.id) ?? null}
+                        isLoading={forecastsPending}
+                        paused={paused}
+                        onEdit={() => setDateGoalId(g.id)}
+                      />
                     </>
                   ) : undefined
                 }
@@ -83,9 +134,41 @@ export function GoalsList() {
                   <>
                     <span className="goal-row-price">{fmtMoney(target)}</span>
                     {g.status === 'confirmed' && (
-                      <button type="button" className="btn-secondary goal-add-funds-btn" onClick={() => setFunding(g)}>
-                        + Внести
-                      </button>
+                      <div className="goal-finance-actions">
+                        <button
+                          type="button"
+                          className="btn-secondary goal-history-btn"
+                          onClick={() => setHistoryGoalId(g.id)}
+                        >
+                          Історія
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary goal-comments-btn"
+                          onClick={() => setCommentsGoalId(g.id)}
+                        >
+                          Обговорення
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary goal-pause-btn"
+                          onClick={() => paused ? resume.mutate(g.id) : pause.mutate(g.id)}
+                          disabled={pause.isPending || resume.isPending}
+                        >
+                          {paused
+                            ? (resumeBusy ? 'Відновлюємо…' : 'Відновити')
+                            : (pauseBusy ? 'Зупиняємо…' : 'Пауза')}
+                        </button>
+                        {!paused && (
+                          <button
+                            type="button"
+                            className="btn-secondary goal-add-funds-btn"
+                            onClick={() => setFunding(g)}
+                          >
+                            + Внести
+                          </button>
+                        )}
+                      </div>
                     )}
                   </>
                 }
@@ -95,13 +178,40 @@ export function GoalsList() {
         </div>
       )}
 
-      {adding && <AddGoalModal onClose={() => setAdding(false)} onSubmit={(v) => add.mutate(v)} />}
+      {adding && (
+        <AddGoalModal
+          onClose={() => setAdding(false)}
+          onSubmit={(value) => add.mutateAsync(value)}
+        />
+      )}
       {funding && (
         <AddFundsModal
           goal={funding}
           onClose={() => setFunding(null)}
-          onSubmit={(amount) =>
-            addFunds.mutate({ id: funding.id, current: Math.max(0, funding.saved_amount ?? 0), amount })
+          onSubmit={({ amount, note }) =>
+            addContribution.mutateAsync({ id: funding.id, amount, note })
+          }
+        />
+      )}
+      {historyGoal && (
+        <GoalContributions
+          goal={historyGoal}
+          onClose={() => setHistoryGoalId(null)}
+        />
+      )}
+      {commentsGoal && (
+        <GoalComments
+          goal={commentsGoal}
+          onClose={() => setCommentsGoalId(null)}
+        />
+      )}
+      {dateGoal && (
+        <GoalDesiredDateModal
+          goalName={dateGoal.name}
+          currentDate={dateForecast?.desiredDate ?? null}
+          onClose={() => setDateGoalId(null)}
+          onSubmit={(desiredDate) =>
+            setDesiredDate.mutateAsync({ goalId: dateGoal.id, desiredDate })
           }
         />
       )}
@@ -115,51 +225,101 @@ function AddGoalModal({
   onSubmit,
 }: {
   onClose: () => void;
-  onSubmit: (v: NewGoalInput) => void;
+  onSubmit: (value: NewGoalInput) => Promise<unknown>;
 }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('');
   const [url, setUrl] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const save = () => {
-    const n = name.trim();
-    if (!n) return;
-    onSubmit({
-      name: n,
-      description: description.trim() || null,
-      target_amount: parseFloat(price) || 0,
-      url: url.trim() || null,
-    });
-    onClose();
+  const targetAmount = Number(price);
+  const validTarget = Number.isFinite(targetAmount) && targetAmount > 0;
+
+  const save = async () => {
+    const normalizedName = name.trim();
+    if (!normalizedName || !validTarget || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        name: normalizedName,
+        description: description.trim() || null,
+        target_amount: targetAmount,
+        url: url.trim() || null,
+      });
+      onClose();
+    } catch {
+      // useGoalMutations уже показує тост; дані форми лишаються на місці.
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && !submitting && onClose()}
+    >
       <div className="modal-sheet" role="dialog" aria-modal="true">
         <h2 className="modal-title">Спільна ціль</h2>
         <label className="form-field">
           <span>Назва</span>
-          <input id="goal-name" name="name" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Що плануємо?" autoFocus />
+          <input
+            id="goal-name"
+            name="name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Що плануємо?"
+            autoFocus
+          />
         </label>
         <label className="form-field">
           <span>Навіщо</span>
-          <input id="goal-description" name="description" type="text" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Опис" />
+          <input
+            id="goal-description"
+            name="description"
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Опис"
+          />
         </label>
         <label className="form-field">
           <span>Вартість, ₴</span>
-          <input id="goal-price" name="price" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} placeholder="0" />
+          <input
+            id="goal-price"
+            name="price"
+            type="number"
+            min={1}
+            step={1}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="0"
+          />
         </label>
         <label className="form-field">
           <span>Посилання</span>
-          <input id="goal-url" name="url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" />
+          <input
+            id="goal-url"
+            name="url"
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://…"
+          />
         </label>
         <div className="modal-actions">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>
             Скасувати
           </button>
-          <button type="button" className="btn" onClick={save} disabled={!name.trim()}>
-            Відправити →
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void save()}
+            disabled={submitting || !name.trim() || !validTarget}
+          >
+            {submitting ? 'Надсилаємо…' : 'Відправити →'}
           </button>
         </div>
       </div>
@@ -173,22 +333,38 @@ function AddFundsModal({
   onClose,
   onSubmit,
 }: {
-  goal: SavingsGoalRow;
+  goal: BudgetGoalRow;
   onClose: () => void;
-  onSubmit: (amount: number) => void;
+  onSubmit: (input: { amount: number; note: string | null }) => Promise<unknown>;
 }) {
   const [amount, setAmount] = useState('');
-  const saved = Math.max(0, goal.saved_amount ?? 0);
+  const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const saved = Math.max(0, Number(goal.saved_amount ?? 0));
+  const contribution = Number(amount);
+  const validContribution = isValidContributionAmount(contribution);
 
-  const save = () => {
-    const v = parseFloat(amount);
-    if (!v || v <= 0) return;
-    onSubmit(v);
-    onClose();
+  const save = async () => {
+    if (!validContribution || submitting) return;
+
+    setSubmitting(true);
+    try {
+      await onSubmit({
+        amount: contribution,
+        note: normalizeContributionNote(note),
+      });
+      onClose();
+    } catch {
+      // Тост показує mutation; поля не очищаємо, щоб внесок можна було повторити.
+      setSubmitting(false);
+    }
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div
+      className="modal-overlay"
+      onClick={(e) => e.target === e.currentTarget && !submitting && onClose()}
+    >
       <div className="modal-sheet" role="dialog" aria-modal="true">
         <h2 className="modal-title">Внесок у ціль</h2>
         <p className="fin-hint">
@@ -200,19 +376,40 @@ function AddFundsModal({
             id="goal-funds-amount"
             name="amount"
             type="number"
-            min={0}
+            min={1}
+            step={1}
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0 ₴"
             autoFocus
           />
         </label>
+        <label className="form-field">
+          <span>Коротка примітка <small>необов’язково</small></span>
+          <textarea
+            id="goal-funds-note"
+            name="note"
+            rows={3}
+            maxLength={CONTRIBUTION_NOTE_MAX}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Наприклад: ще один крок до подорожі"
+          />
+          <small className="goal-note-counter">
+            {note.length}/{CONTRIBUTION_NOTE_MAX}
+          </small>
+        </label>
         <div className="modal-actions">
-          <button type="button" className="btn btn-ghost" onClick={onClose}>
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>
             Скасувати
           </button>
-          <button type="button" className="btn" onClick={save} disabled={!parseFloat(amount)}>
-            Додати
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void save()}
+            disabled={submitting || !validContribution}
+          >
+            {submitting ? 'Додаємо…' : 'Додати внесок'}
           </button>
         </div>
       </div>

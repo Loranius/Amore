@@ -1,0 +1,115 @@
+.goal-milestones {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.goal-milestones-track {
+  position: relative;
+  height: 2.6rem;
+  margin: 0 0.65rem;
+}
+
+.goal-milestones-track::before,
+.goal-milestones-fill {
+  content: '';
+  position: absolute;
+  top: 0.64rem;
+  left: 0;
+  height: 0.18rem;
+  border-radius: 999px;
+}
+
+.goal-milestones-track::before {
+  right: 0;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.goal-milestones-fill {
+  z-index: 1;
+  max-width: 100%;
+  background: currentColor;
+  opacity: 0.42;
+  transition: width 420ms ease;
+}
+
+.goal-milestone-marker {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  display: grid;
+  justify-items: center;
+  gap: 0.28rem;
+  transform: translateX(-50%);
+  color: inherit;
+}
+
+.goal-milestone-dot {
+  width: 1.42rem;
+  height: 1.42rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(25, 20, 35, 0.82);
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0.62;
+  transition: transform 240ms ease, opacity 240ms ease, background 240ms ease;
+}
+
+.goal-milestone-label {
+  font-size: 0.68rem;
+  opacity: 0.48;
+}
+
+.goal-milestone-marker.is-reached .goal-milestone-dot {
+  background: rgba(255, 255, 255, 0.14);
+  opacity: 1;
+}
+
+.goal-milestone-marker.is-reached .goal-milestone-label {
+  opacity: 0.78;
+}
+
+.goal-milestone-marker.is-current .goal-milestone-dot {
+  animation: goal-milestone-arrive 520ms ease-out both;
+}
+
+.goal-milestone-message {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  text-align: center;
+  opacity: 0.78;
+}
+
+@keyframes goal-milestone-arrive {
+  0% {
+    transform: scale(0.82);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.2);
+  }
+  55% {
+    transform: scale(1.08);
+    box-shadow: 0 0 0 0.45rem rgba(255, 255, 255, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goal-milestones-fill,
+  .goal-milestone-dot {
+    transition: none;
+  }
+
+  .goal-milestone-marker.is-current .goal-milestone-dot {
+    animation: none;
+  }
+}

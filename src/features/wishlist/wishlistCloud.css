@@ -1,0 +1,684 @@
+/* Weighted Cloud / Bubble UI for active Wishlist items. */
+.wishlist .wishlist-grid {
+  position: relative;
+  display: flex;
+  min-height: min(68dvh, 760px);
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 8px;
+  padding: 24px 4px 46px;
+  isolation: isolate;
+}
+
+.wishlist .wishlist-grid::before,
+.wishlist .wishlist-grid::after {
+  position: absolute;
+  z-index: -1;
+  border-radius: 50%;
+  content: '';
+  pointer-events: none;
+  filter: blur(2px);
+}
+
+.wishlist .wishlist-grid::before {
+  top: 8%;
+  left: 4%;
+  width: min(58vw, 520px);
+  aspect-ratio: 1;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--accent) 12%, transparent),
+    transparent 67%
+  );
+}
+
+.wishlist .wishlist-grid::after {
+  right: 2%;
+  bottom: 4%;
+  width: min(50vw, 430px);
+  aspect-ratio: 1;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--wl-shared-accent, var(--accent)) 10%, transparent),
+    transparent 68%
+  );
+}
+
+.wishlist .wishlist-grid > :is(
+  .empty-state,
+  .wl-board-filter-empty,
+  .wl-partner-empty,
+  .wl-shared-empty
+) {
+  width: 100%;
+  flex: 1 0 100%;
+}
+
+.wl-cloud-item {
+  position: relative;
+  z-index: var(--wl-cloud-z, 1);
+  width: var(--wl-cloud-size);
+  height: var(--wl-cloud-size);
+  flex: 0 0 var(--wl-cloud-size);
+  margin:
+    var(--wl-cloud-margin-top)
+    var(--wl-cloud-margin-right)
+    var(--wl-cloud-margin-bottom)
+    var(--wl-cloud-margin-left);
+}
+
+.wl-cloud-bubble {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.54);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.46), transparent 34%),
+    color-mix(in srgb, var(--accent) 10%, var(--surface));
+  box-shadow:
+    0 14px 34px color-mix(in srgb, var(--text) 16%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48),
+    inset 0 -7px 18px rgba(84, 42, 62, 0.08);
+  cursor: pointer;
+  isolation: isolate;
+  transform:
+    translate(var(--wl-cloud-x), var(--wl-cloud-y))
+    rotate(var(--wl-cloud-rotate));
+  animation: wl-cloud-float var(--wl-cloud-duration) ease-in-out infinite;
+  animation-delay: var(--wl-cloud-delay);
+  transition:
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    filter 220ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wl-cloud-bubble::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.24), transparent 35%),
+    radial-gradient(circle at 72% 82%, rgba(255, 255, 255, 0.1), transparent 32%);
+  content: '';
+  pointer-events: none;
+}
+
+.wl-cloud-bubble[data-priority='high'] {
+  box-shadow:
+    0 20px 48px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 8px 22px color-mix(in srgb, var(--text) 12%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.56);
+}
+
+.wl-cloud-bubble[data-priority='medium'] {
+  box-shadow:
+    0 16px 38px color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.wl-cloud-bubble[data-priority='low'] {
+  border-color: rgba(255, 255, 255, 0.48);
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--text) 13%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.48);
+}
+
+.wl-cloud-bubble:hover,
+.wl-cloud-bubble:focus-visible {
+  z-index: 10;
+  border-color: rgba(255, 255, 255, 0.82);
+  outline: none;
+  box-shadow:
+    0 24px 58px color-mix(in srgb, var(--accent) 26%, transparent),
+    0 8px 24px color-mix(in srgb, var(--text) 16%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  filter: saturate(1.04) brightness(1.02);
+  transform:
+    translate(var(--wl-cloud-x), calc(var(--wl-cloud-y) - 5px))
+    rotate(var(--wl-cloud-rotate))
+    scale(1.045);
+}
+
+.wl-cloud-bubble:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 4px;
+}
+
+.wl-cloud-bubble:active {
+  transform:
+    translate(var(--wl-cloud-x), var(--wl-cloud-y))
+    rotate(var(--wl-cloud-rotate))
+    scale(0.975);
+}
+
+.wl-cloud-bubble-media,
+.wl-cloud-bubble-media img,
+.wl-cloud-bubble-placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+.wl-cloud-bubble-media {
+  overflow: hidden;
+}
+
+.wl-cloud-bubble-media img {
+  object-fit: cover;
+  object-position: center;
+  transform: scale(1.01);
+}
+
+.wl-cloud-bubble-placeholder {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.5), transparent 31%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent) 18%, var(--surface)),
+      color-mix(in srgb, var(--accent) 6%, var(--surface))
+    );
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+  font-size: clamp(24px, calc(var(--wl-cloud-size) * 0.28), 46px);
+}
+
+.wl-cloud-bubble[aria-busy='true'] {
+  opacity: 0.64;
+  pointer-events: none;
+}
+
+/* Loading state mirrors the final cloud instead of showing e-commerce cards. */
+.wl-cloud-skeleton {
+  position: relative;
+  display: flex;
+  min-height: min(62dvh, 680px);
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 10px;
+  padding: 28px 8px 48px;
+}
+
+.wl-cloud-skeleton-bubble {
+  width: var(--wl-cloud-skeleton-size);
+  height: var(--wl-cloud-skeleton-size);
+  flex: 0 0 var(--wl-cloud-skeleton-size);
+  margin: var(--wl-cloud-skeleton-margin, 0);
+  border: 1px solid color-mix(in srgb, white 42%, transparent);
+  border-radius: 50%;
+  background: linear-gradient(
+    112deg,
+    color-mix(in srgb, var(--accent) 5%, var(--surface)) 18%,
+    color-mix(in srgb, var(--accent) 14%, var(--surface)) 34%,
+    color-mix(in srgb, var(--accent) 5%, var(--surface)) 52%
+  );
+  background-size: 220% 100%;
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--text) 9%, transparent);
+  animation: wl-cloud-shimmer 1.35s linear infinite;
+}
+
+/* Premium detail bottom sheet. */
+.wl-cloud-sheet-overlay {
+  position: fixed;
+  z-index: 1400;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow-y: auto;
+  padding: max(12px, env(safe-area-inset-top)) 0 0;
+  background: color-mix(in srgb, #2c2028 42%, transparent);
+  backdrop-filter: blur(16px) saturate(0.9);
+  -webkit-backdrop-filter: blur(16px) saturate(0.9);
+  animation: wl-cloud-overlay-in 180ms ease both;
+}
+
+.wl-cloud-sheet {
+  --wl-cloud-sheet-accent: var(--accent);
+  position: relative;
+  width: min(100%, 720px);
+  max-height: calc(100dvh - max(12px, env(safe-area-inset-top)));
+  overflow-y: auto;
+  padding: 10px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-bottom: 0;
+  border-radius: 30px 30px 0 0;
+  background:
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--surface) 91%, white 9%),
+      color-mix(in srgb, var(--surface) 82%, transparent)
+    );
+  box-shadow:
+    0 -22px 68px rgba(41, 24, 34, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(28px) saturate(1.08);
+  -webkit-backdrop-filter: blur(28px) saturate(1.08);
+  overscroll-behavior: contain;
+  animation: wl-cloud-sheet-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wl-cloud-sheet[data-priority='high'] { --wl-cloud-sheet-accent: var(--accent); }
+.wl-cloud-sheet[data-priority='medium'] { --wl-cloud-sheet-accent: #c77593; }
+.wl-cloud-sheet[data-priority='low'] { --wl-cloud-sheet-accent: #9a7183; }
+
+.wl-cloud-sheet-handle {
+  width: 44px;
+  height: 5px;
+  margin: 1px auto 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.wl-cloud-sheet-close {
+  position: absolute;
+  z-index: 5;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  color: var(--text);
+  font: 800 18px/1 system-ui, sans-serif;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--text) 12%, transparent);
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.wl-cloud-sheet-hero {
+  display: grid;
+  min-height: 248px;
+  place-items: center;
+  padding: 14px 48px 16px;
+}
+
+.wl-cloud-sheet-photo {
+  display: grid;
+  width: min(62vw, 242px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.62), transparent 58%),
+    color-mix(in srgb, var(--wl-cloud-sheet-accent) 9%, var(--surface));
+  box-shadow:
+    0 22px 48px color-mix(in srgb, var(--wl-cloud-sheet-accent) 20%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  cursor: zoom-in;
+}
+
+.wl-cloud-sheet-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 12px;
+}
+
+.wl-cloud-sheet-photo-placeholder {
+  color: color-mix(in srgb, var(--wl-cloud-sheet-accent) 72%, var(--text));
+  font-size: 58px;
+}
+
+.wl-cloud-sheet-content {
+  display: grid;
+  gap: 13px;
+}
+
+.wl-cloud-sheet-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.wl-cloud-sheet-priority,
+.wl-cloud-sheet-state {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--wl-cloud-sheet-accent) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wl-cloud-sheet-accent) 9%, var(--surface));
+  color: color-mix(in srgb, var(--wl-cloud-sheet-accent) 80%, var(--text));
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.wl-cloud-sheet-state {
+  border-color: color-mix(in srgb, var(--text) 10%, transparent);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: color-mix(in srgb, var(--muted) 78%, var(--text));
+}
+
+.wl-cloud-sheet-attribution {
+  margin: -3px 0 0;
+  color: color-mix(in srgb, var(--muted) 82%, var(--text));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.wl-cloud-sheet-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px 14px;
+}
+
+.wl-cloud-sheet-title {
+  margin: 0;
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: clamp(24px, 7vw, 34px);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+.wl-cloud-sheet-price {
+  align-self: start;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--wl-cloud-sheet-accent) 11%, var(--surface));
+  color: color-mix(in srgb, var(--wl-cloud-sheet-accent) 76%, var(--text));
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.wl-cloud-sheet-description {
+  margin: 0;
+  color: color-mix(in srgb, var(--muted) 78%, var(--text));
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.wl-cloud-sheet-link {
+  display: flex;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 13px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.wl-cloud-sheet-link span:first-child {
+  color: var(--wl-cloud-sheet-accent);
+  font-size: 18px;
+}
+
+.wl-cloud-sheet-link span:nth-child(2) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl-cloud-sheet-link span:last-child {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.wl-cloud-sheet-lifecycle {
+  display: grid;
+  gap: 9px;
+  padding-top: 2px;
+}
+
+.wl-cloud-sheet-hint {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 10px 13px;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--wl-cloud-sheet-accent) 7%, transparent);
+  color: color-mix(in srgb, var(--muted) 78%, var(--text));
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.wl-cloud-sheet-primary,
+.wl-cloud-sheet-secondary {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 16px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.wl-cloud-sheet-primary {
+  border: 0;
+  background: linear-gradient(
+    135deg,
+    var(--wl-cloud-sheet-accent),
+    color-mix(in srgb, var(--wl-cloud-sheet-accent) 72%, #a94f72)
+  );
+  color: #fff;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--wl-cloud-sheet-accent) 24%, transparent);
+}
+
+.wl-cloud-sheet-primary--success {
+  background: linear-gradient(135deg, var(--ok), color-mix(in srgb, var(--ok) 72%, #1d6e4a));
+}
+
+.wl-cloud-sheet-secondary {
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  color: var(--text);
+}
+
+.wl-cloud-sheet-reservation-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(98px, 0.75fr);
+  gap: 9px;
+}
+
+.wl-cloud-sheet-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(86px, 1fr));
+  gap: 10px;
+  margin-top: 3px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.wl-cloud-sheet-action {
+  display: grid;
+  min-height: 82px;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
+  padding: 9px 6px;
+  border: 0;
+  border-radius: 18px;
+  background: transparent;
+  color: color-mix(in srgb, var(--muted) 75%, var(--text));
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.wl-cloud-sheet-action > span {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--text) 11%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  color: var(--wl-cloud-sheet-accent);
+  font-size: 20px;
+  box-shadow: 0 9px 22px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.wl-cloud-sheet-action--danger {
+  color: var(--danger);
+}
+
+.wl-cloud-sheet-action--danger > span {
+  border-color: color-mix(in srgb, var(--danger) 18%, transparent);
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface));
+  color: var(--danger);
+}
+
+.wl-cloud-sheet-action:disabled,
+.wl-cloud-sheet-primary:disabled,
+.wl-cloud-sheet-secondary:disabled {
+  opacity: 0.52;
+  cursor: not-allowed;
+}
+
+@keyframes wl-cloud-float {
+  0%, 100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -6px;
+  }
+}
+
+@keyframes wl-cloud-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes wl-cloud-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(34px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes wl-cloud-shimmer {
+  to { background-position-x: -220%; }
+}
+
+@media (min-width: 720px) {
+  .wishlist .wishlist-grid {
+    min-height: 620px;
+    gap: 16px 14px;
+    padding-inline: 22px;
+  }
+
+  .wl-cloud-sheet-overlay {
+    align-items: center;
+    padding: 24px;
+  }
+
+  .wl-cloud-sheet {
+    display: grid;
+    max-height: min(88dvh, 780px);
+    grid-template-columns: minmax(250px, 0.85fr) minmax(0, 1.15fr);
+    gap: 18px;
+    padding: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.42);
+    border-radius: 30px;
+  }
+
+  .wl-cloud-sheet-handle {
+    display: none;
+  }
+
+  .wl-cloud-sheet-hero {
+    min-height: 100%;
+    padding: 24px;
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.66), transparent 52%),
+      color-mix(in srgb, var(--wl-cloud-sheet-accent) 8%, var(--surface));
+  }
+
+  .wl-cloud-sheet-photo {
+    width: min(29vw, 260px);
+  }
+
+  .wl-cloud-sheet-content {
+    align-content: center;
+    padding: 28px 6px 8px 0;
+  }
+}
+
+@media (max-width: 430px) {
+  .wishlist .wishlist-grid {
+    gap: 7px 4px;
+    padding-inline: 0;
+  }
+
+  .wl-cloud-item {
+    margin-right: calc(var(--wl-cloud-margin-right) * 0.58);
+    margin-left: calc(var(--wl-cloud-margin-left) * 0.58);
+  }
+
+  .wl-cloud-sheet {
+    padding-inline: 15px;
+    border-radius: 27px 27px 0 0;
+  }
+
+  .wl-cloud-sheet-hero {
+    min-height: 226px;
+  }
+
+  .wl-cloud-sheet-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .wl-cloud-sheet-price {
+    justify-self: start;
+  }
+
+  .wl-cloud-sheet-reservation-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-cloud-bubble,
+  .wl-cloud-sheet-overlay,
+  .wl-cloud-sheet,
+  .wl-cloud-skeleton-bubble {
+    animation: none;
+    transition: none;
+  }
+}

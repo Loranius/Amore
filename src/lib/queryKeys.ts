@@ -20,7 +20,12 @@ export const qk = {
     (ownerId === undefined ? (['wishlist'] as const) : (['wishlist', ownerId] as const)),
   wishlistFulfilled: (ownerId: number) => ['wishlist', 'fulfilled', ownerId] as const,
   wishlistShared: () => ['wishlist', 'shared'] as const,
+  wishlistSharedFulfilled: () => ['wishlist', 'shared', 'fulfilled'] as const,
   wishlistStats: () => ['wishlist', 'stats'] as const,
+
+  notifications: () => ['notifications'] as const,
+  notificationsFeed: () => ['notifications', 'feed'] as const,
+  notificationsUnread: () => ['notifications', 'unread'] as const,
 
   media: (type?: MediaType) =>
     (type === undefined ? (['media'] as const) : (['media', type] as const)),
@@ -34,6 +39,10 @@ export const qk = {
 
   freeLimit: () => ['freeLimit'] as const,
   savingsGoals: () => ['savingsGoals'] as const,
+  savingsGoalContributions: (goalId?: string) =>
+    (goalId === undefined
+      ? (['savingsGoalContributions'] as const)
+      : (['savingsGoalContributions', goalId] as const)),
   dates: () => ['dates'] as const,
   sharedDaysOff: () => ['sharedDaysOff'] as const,
 
@@ -65,4 +74,4 @@ export const realtimeInvalidation: Record<
   work_schedule: [['schedule'], qk.sharedDaysOff()],
   map_pins: [qk.mapPins()],
   user_locations: [qk.userLocations()],
-};
+} as const;

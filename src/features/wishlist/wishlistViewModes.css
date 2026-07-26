@@ -1,0 +1,147 @@
+/* Wishlist board presentation selector. Every view now owns its own component CSS. */
+.wl-board-toolbar-section + .wl-board-toolbar-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.wl-board-toolbar-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 3px 8px;
+}
+
+.wl-board-toolbar-section-heading > span {
+  color: color-mix(in srgb, var(--text) 91%, var(--muted));
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.wl-board-toolbar-section-heading > small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.wl-board-view-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.wl-board-view-option {
+  display: grid;
+  min-width: 0;
+  min-height: 62px;
+  grid-template-columns: 34px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 69%, transparent);
+  color: color-mix(in srgb, var(--muted) 86%, var(--text));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.wl-board-view-option:hover,
+.wl-board-view-option:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+
+.wl-board-view-option:active {
+  transform: scale(0.985);
+}
+
+.wl-board-view-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+  font-size: 18px;
+  line-height: 1;
+}
+
+.wl-board-view-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.wl-board-view-copy strong,
+.wl-board-view-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl-board-view-copy strong {
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.wl-board-view-copy small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.wl-board-view-check {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: transparent;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.wl-board-view-option.active {
+  border-color: color-mix(in srgb, var(--accent) 31%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 84%, var(--text));
+  box-shadow:
+    0 8px 20px color-mix(in srgb, var(--accent) 12%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, white 30%, transparent);
+}
+
+.wl-board-view-option.active .wl-board-view-icon,
+.wl-board-view-option.active .wl-board-view-check {
+  background: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 719px) {
+  .wl-board-view-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wl-board-view-option {
+    min-height: 54px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-board-view-option {
+    transition: none;
+  }
+}

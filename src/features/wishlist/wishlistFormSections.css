@@ -1,0 +1,130 @@
+/* Structured, task-oriented layout for the Wishlist editor. */
+.wishlist .wm-form-modal {
+  width: min(94vw, 540px);
+  gap: 14px;
+}
+
+.wishlist .wm-form-heading {
+  display: grid;
+  gap: 4px;
+  padding-right: 42px;
+}
+
+.wishlist .wm-form-eyebrow {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.wishlist .wm-form-heading > p {
+  margin: 0;
+  color: color-mix(in srgb, var(--muted) 84%, var(--text));
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.wishlist .wm-form-section {
+  display: grid;
+  gap: 13px;
+  padding: 15px;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--text) 5%);
+  border-radius: 21px;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent) 5%, var(--surface)),
+      color-mix(in srgb, var(--surface) 97%, transparent)
+    );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 46%, transparent);
+}
+
+.wishlist .wm-form-section-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-bottom: 1px;
+}
+
+.wishlist .wm-form-section-index {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 82%, var(--text));
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.wishlist .wm-form-section-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.wishlist .wm-form-section-head p {
+  margin: 2px 0 0;
+  color: color-mix(in srgb, var(--muted) 84%, var(--text));
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.wishlist .wm-form-section > .form-field,
+.wishlist .wm-form-detail-grid > .form-field {
+  margin: 0;
+}
+
+.wishlist .wm-form-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.wishlist .wm-form-section textarea {
+  min-height: 96px;
+}
+
+.wishlist .wm-form-section .tab-bar {
+  width: 100%;
+}
+
+@media (max-width: 560px) {
+  .wishlist .wm-form-modal {
+    gap: 12px;
+  }
+
+  .wishlist .wm-form-heading {
+    padding-inline: 2px 44px;
+  }
+
+  .wishlist .wm-form-section {
+    gap: 12px;
+    padding: 14px;
+    border-radius: 19px;
+  }
+
+  .wishlist .wm-form-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 390px) {
+  .wishlist .wm-form-section {
+    padding-inline: 12px;
+  }
+
+  .wishlist .wm-form-section-index {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+  }
+}

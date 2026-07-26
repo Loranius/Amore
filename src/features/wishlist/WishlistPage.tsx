@@ -1,166 +1,528 @@
 // ============================================================
-// WishlistPage — вкладка «Бажання» (порт wishlist.js UI)
-// ------------------------------------------------------------
-// Три підвкладки: «Мої бажання» (редаговані, з архівом), «Бажання
-// партнера» (бронь/виконання) і «Спільне» (видимо обом, isOwn — по
-// кожній картці окремо, бо власники змішані). Прогрес-бар і річна
-// статистика — для пари загалом, показуються на всіх вкладках.
+// WishlistPage — вкладка «Бажання»
 // ============================================================
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
+import { useToast } from '@/providers/ToastProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
-import { TabBar } from '@/components/ui/TabBar';
+import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
 import { PortalDecor } from '@/features/auth/PortalDecor';
-import { WishCard } from './WishCard';
+import { usePartnerQuery } from '@/features/_shared/useUsers';
+import { WishlistBubbleView } from './WishlistBubbleView';
+import { WishlistFeedView } from './WishlistFeedView';
+import { WishlistPolaroidView } from './WishlistPolaroidView';
 import { WishFormModal } from './WishFormModal';
 import { MoveWishModal } from './MoveWishModal';
+import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
 import { WishArchive } from './WishArchive';
+import { WishlistGridSkeleton, WishlistPageSkeleton } from './WishlistSkeleton';
+import { WishlistHero } from './WishlistHero';
+import { WishlistPartnerToolbar } from './WishlistPartnerToolbar';
+import { WishlistSharedToolbar } from './WishlistSharedToolbar';
+import { WishlistBoardToolbar } from './WishlistBoardToolbar';
 import {
-  usePartner,
-  partnerGenitive,
+  filterPartnerWishes,
+  partnerWishFilterCounts,
+  type PartnerWishFilter,
+} from './partnerWishFilter';
+import {
+  filterSharedWishes,
+  sharedWishFilterCounts,
+  type SharedWishFilter,
+} from './sharedWishFilter';
+import {
+  applyWishlistBoardView,
+  DEFAULT_WISHLIST_BOARD_VIEW,
+  wishlistPriorityFilterCounts,
+  type WishlistBoardViewState,
+} from './wishlistBoardView';
+import { freshWishlistPolaroidSeed } from './wishlistPolaroidLayout';
+import { partnerGenitive } from './partnerLabel';
+import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
+import { useWishlistViewPreference } from './useWishlistViewPreference';
+import {
   useWishlistItems,
   useSharedWishlistItems,
   useCoupleWishStats,
   useWishlistMutations,
   type WishFormPayload,
 } from './useWishlist';
-import type { WishlistItemRow } from '@/types';
+import type { WishlistItemV3 } from './wishlistRpc';
+import './wishlistV3.mobile.css';
+import './wishlistGiftArchive.css';
+import './wishlistArchiveRedesign.css';
+import './wishlistFoundation.css';
+import './wishlistHero.css';
 
 type Tab = 'me' | 'partner' | 'shared';
+type BoardViews = Record<Tab, WishlistBoardViewState>;
+type PolaroidSeeds = Record<Tab, number>;
+
+function requestedTab(value: string | null): Tab {
+  return value === 'partner' || value === 'shared' ? value : 'me';
+}
+
+function requestedWishId(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function initialBoardViews(): BoardViews {
+  return {
+    me: { ...DEFAULT_WISHLIST_BOARD_VIEW },
+    partner: { ...DEFAULT_WISHLIST_BOARD_VIEW },
+    shared: { ...DEFAULT_WISHLIST_BOARD_VIEW },
+  };
+}
+
+function initialPolaroidSeeds(): PolaroidSeeds {
+  return {
+    me: freshWishlistPolaroidSeed(),
+    partner: freshWishlistPolaroidSeed(),
+    shared: freshWishlistPolaroidSeed(),
+  };
+}
+
+function partnerEmptyState(filter: PartnerWishFilter) {
+  if (filter === 'available') {
+    return {
+      icon: '✓',
+      title: 'Усі активні бажання вже заплановані',
+      description: 'Переглянь «Мої подарунки» або відкрий повний список.',
+    };
+  }
+
+  if (filter === 'mine') {
+    return {
+      icon: '🎁',
+      title: 'Ти ще не запланував жодного подарунка',
+      description: 'У вкладці «Доступні» можна обрати бажання партнера.',
+    };
+  }
+
+  return {
+    icon: '♡',
+    title: 'У партнера поки немає активних бажань',
+    description: 'Нові мрії з’являться тут одразу після додавання.',
+  };
+}
+
+function sharedEmptyState(filter: SharedWishFilter, partnerName: string) {
+  if (filter === 'mine') {
+    return {
+      title: 'Ти ще не додав спільних ідей',
+      description: 'Створи мрію, яку ви зможете редагувати й здійснити разом.',
+    };
+  }
+
+  if (filter === 'partner') {
+    return {
+      title: `Ідей від ${partnerGenitive(partnerName)} поки немає`,
+      description: 'Ідеї партнера з’являться тут одразу після створення.',
+    };
+  }
+
+  return {
+    title: 'Спільних мрій поки немає',
+    description: 'Додайте першу ідею для подорожі, враження або спільної покупки.',
+  };
+}
 
 export function WishlistPage() {
   const me = useCurrentUser();
-  const partner = usePartner();
-  const [tab, setTab] = useState<Tab>('me');
+  const toast = useToast();
+  const {
+    partner,
+    isPending: partnerPending,
+    isError: partnerError,
+    refetch: refetchPartner,
+  } = usePartnerQuery();
+  const [searchParams] = useSearchParams();
+  const tabFromUrl = requestedTab(searchParams.get('tab'));
+  const archiveRequested = searchParams.get('archive') === '1';
+  const notificationRequest = searchParams.get('notification');
+  const archiveFocusWishId = requestedWishId(searchParams.get('wish'));
+  const [tab, setTab] = useState<Tab>(tabFromUrl);
+  const [archiveOpen, setArchiveOpen] = useState(
+    archiveRequested && tabFromUrl !== 'partner',
+  );
+  const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
+  const [sharedFilter, setSharedFilter] = useState<SharedWishFilter>('all');
+  const [boardViews, setBoardViews] = useState<BoardViews>(initialBoardViews);
+  const [polaroidSeeds, setPolaroidSeeds] = useState<PolaroidSeeds>(initialPolaroidSeeds);
+  const [preferredView, setPreferredView] = useWishlistViewPreference(tab);
+  const actionLock = useRef(false);
+
+  useEffect(() => {
+    setTab(tabFromUrl);
+    if (tabFromUrl === 'partner') setArchiveOpen(false);
+  }, [tabFromUrl]);
+
+  useEffect(() => {
+    if (archiveRequested && tabFromUrl !== 'partner') setArchiveOpen(true);
+  }, [archiveRequested, notificationRequest, tabFromUrl]);
 
   const isOwnTab = tab === 'me';
   const ownerId = tab === 'shared' ? null : isOwnTab ? me.id : (partner?.id ?? null);
 
-  const { data: ownItems = [], isPending: ownPending, isError: ownError } =
-    useWishlistItems(ownerId);
-  const { data: sharedItems = [], isPending: sharedPending, isError: sharedError } =
-    useSharedWishlistItems();
+  // All three active scopes load in parallel. This keeps tab counters accurate
+  // and makes switching tabs instant without changing the RPC contract.
+  const ownQuery = useWishlistItems(me.id);
+  const partnerWishlistQuery = useWishlistItems(partner?.id ?? null);
+  const sharedQuery = useSharedWishlistItems();
   const { data: stats } = useCoupleWishStats();
 
-  const items = tab === 'shared' ? sharedItems : ownItems;
-  const isPending = tab === 'shared' ? sharedPending : ownPending;
-  const isError = tab === 'shared' ? sharedError : ownError;
+  const ownItems = ownQuery.data ?? [];
+  const partnerItems = partnerWishlistQuery.data ?? [];
+  const sharedItems = sharedQuery.data ?? [];
+  const activeQuery = tab === 'me'
+    ? ownQuery
+    : tab === 'partner'
+      ? partnerWishlistQuery
+      : sharedQuery;
+  const items = tab === 'me' ? ownItems : tab === 'partner' ? partnerItems : sharedItems;
+  const isPending = activeQuery.isPending;
+  const isFetching = activeQuery.isFetching;
+  const isError = activeQuery.isError;
+  const refetchItems = activeQuery.refetch;
+  const partnerCounts = partnerWishFilterCounts(partnerItems, me.id);
+  const sharedCounts = sharedWishFilterCounts(sharedItems, me.id, partner?.id ?? -1);
+  const contextItems = tab === 'partner'
+    ? filterPartnerWishes(partnerItems, partnerFilter, me.id)
+    : tab === 'shared' && partner
+      ? filterSharedWishes(sharedItems, sharedFilter, me.id, partner.id)
+      : items;
+  const activeBoardView = { ...boardViews[tab], view: preferredView };
+  const boardFilterCounts = wishlistPriorityFilterCounts(contextItems);
+  const visibleItems = applyWishlistBoardView(contextItems, activeBoardView);
 
-  const { save, remove, setReserved, fulfill, changeScope } = useWishlistMutations(ownerId);
+  const {
+    save,
+    remove,
+    setReserved,
+    markPurchased,
+    fulfill,
+    changeScope,
+  } = useWishlistMutations(ownerId);
+  const quickFulfill = useQuickWishlistCompletion();
   const confirmDialog = useConfirm();
 
-  const [editing, setEditing] = useState<WishlistItemRow | null>(null);
+  const [editing, setEditing] = useState<WishlistItemV3 | null>(null);
   const [adding, setAdding] = useState(false);
-  const [moving, setMoving] = useState<WishlistItemRow | null>(null);
+  const [moving, setMoving] = useState<WishlistItemV3 | null>(null);
+  const [completing, setCompleting] = useState<WishlistItemV3 | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
 
-  const submit = (
-    id: number | null,
-    payload: WishFormPayload,
-    scope: { owner: number; isShared: boolean },
-  ) => save.mutate({ id, payload, owner: scope.owner, isShared: scope.isShared });
+  const mutationBusy =
+    save.isPending
+    || remove.isPending
+    || setReserved.isPending
+    || markPurchased.isPending
+    || quickFulfill.isPending
+    || fulfill.isPending
+    || changeScope.isPending;
 
-  const onDelete = async (id: number) => {
-    if (await confirmDialog('Видалити бажання?')) remove.mutate(id);
-  };
-  const onReserve = async (id: number, reserved: boolean) => {
-    if (!reserved && !(await confirmDialog('Скасувати бронювання цього подарунка?'))) return;
-    setReserved.mutate({ id, reserved });
-  };
-  const onFulfill = async (item: WishlistItemRow) => {
-    if (await confirmDialog(`Підтверджуєш, що купив(ла) «${item.title}»? 🎁\n\nОбидва отримають сповіщення ✉️`)) {
-      fulfill.mutate(item);
+  const runAction = async (action: () => Promise<void>) => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    try {
+      await action();
+    } finally {
+      actionLock.current = false;
     }
   };
 
-  const partnerName = partnerGenitive(partner?.name);
-  const isItemOwn = (item: WishlistItemRow) => (tab === 'shared' ? item.owner === me.id : isOwnTab);
+  const submit = async (
+    id: number | null,
+    payload: WishFormPayload,
+    scope: { owner: number; isShared: boolean },
+  ): Promise<void> => {
+    try {
+      await save.mutateAsync({
+        id,
+        payload,
+        owner: scope.owner,
+        isShared: scope.isShared,
+        expectedVersion: editing?.version ?? 0,
+      });
+    } catch (error) {
+      if (id !== null && (error as Error).message.includes('wish_version_conflict')) {
+        const refreshed = await refetchItems();
+        const freshItem = (refreshed.data ?? []).find((item) => item.id === id);
+        if (freshItem) setEditing(freshItem);
+        toast.show('Партнер щойно оновив цю мрію. Ми завантажили актуальну версію.');
+        throw new Error('Перевір оновлені дані та збережи мрію ще раз.');
+      }
+      throw error;
+    }
+  };
 
-  const pct = stats && stats.total ? Math.round((stats.done / stats.total) * 100) : 0;
+  const onDelete = async (id: number) => {
+    await runAction(async () => {
+      if (await confirmDialog('Видалити бажання?')) await remove.mutateAsync(id);
+    });
+  };
+
+  const onReserve = async (id: number, reserved: boolean) => {
+    await runAction(async () => {
+      if (!reserved && !(await confirmDialog('Скасувати планування цього подарунка?'))) return;
+      await setReserved.mutateAsync({ id, reserved });
+    });
+  };
+
+  const onPurchased = async (item: WishlistItemV3) => {
+    await runAction(async () => {
+      if (
+        await confirmDialog(
+          `Позначити «${item.title}» як куплений подарунок?\n\nПісля цього скасувати виконання вже не можна.`,
+        )
+      ) {
+        await markPurchased.mutateAsync(item.id);
+      }
+    });
+  };
+
+  const onFulfill = async (item: WishlistItemV3) => {
+    if (item.completion_mode === 'shared') {
+      setCompleting(item);
+      return;
+    }
+
+    await runAction(async () => {
+      await quickFulfill.mutateAsync(item);
+    });
+  };
+
+  const completeGift = async (draft: GiftCompletionDraft) => {
+    if (!completing) return;
+    await fulfill.mutateAsync({ item: completing, ...draft });
+    setCompleting(null);
+  };
+
+  const isItemOwn = (item: WishlistItemV3) =>
+    tab === 'shared' ? item.owner === me.id : isOwnTab;
+  const canManageReservation = (item: WishlistItemV3) => item.reserved_by === me.id;
+
+  // Не будуємо вкладку партнера до отримання фактичного іншого користувача.
+  // Так у DOM ніколи не з'являється тимчасове «Бажання Партнера».
+  if (partnerPending) return <WishlistPageSkeleton />;
+
+  if (partnerError || !partner) {
+    return (
+      <section className="wishlist pink-page">
+        <PortalDecor density="light" parallax={false} />
+        <div className="empty-state" role="alert">
+          <p>Не вдалося визначити іншого користувача в парі.</p>
+          <button type="button" className="btn btn-secondary" onClick={() => void refetchPartner()}>
+            Спробувати ще
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const tabs: TabBarItem<Tab>[] = [
+    {
+      value: 'me',
+      label: 'Мої',
+      ...(!ownQuery.isPending && !ownQuery.isError ? { count: ownItems.length } : {}),
+    },
+    {
+      value: 'partner',
+      label: partnerGenitive(partner.name),
+      ...(!partnerWishlistQuery.isPending && !partnerWishlistQuery.isError
+        ? { count: partnerItems.length }
+        : {}),
+    },
+    {
+      value: 'shared',
+      label: 'Спільні',
+      ...(!sharedQuery.isPending && !sharedQuery.isError ? { count: sharedItems.length } : {}),
+    },
+  ];
+
+  const partnerEmptyCopy = tab === 'partner' ? partnerEmptyState(partnerFilter) : null;
+  const sharedEmptyCopy = tab === 'shared' ? sharedEmptyState(sharedFilter, partner.name) : null;
+  const canShowArchive = tab === 'me' || tab === 'shared';
+
+  const changeTab = (nextTab: Tab) => {
+    setTab(nextTab);
+    if (nextTab === 'partner') setArchiveOpen(false);
+  };
+
+  const changeBoardView = (nextView: WishlistBoardViewState) => {
+    setBoardViews((current) => ({ ...current, [tab]: nextView }));
+    if (nextView.view !== preferredView) setPreferredView(nextView.view);
+  };
+
+  const reshufflePolaroids = () => {
+    setPolaroidSeeds((current) => ({
+      ...current,
+      [tab]: freshWishlistPolaroidSeed(),
+    }));
+  };
+
+  const sharedViewProps = {
+    items: visibleItems,
+    busy: mutationBusy,
+    isItemOwn,
+    canManageReservation,
+    onPhotoClick: setLightbox,
+    onEdit: setEditing,
+    onDelete,
+    onReserve,
+    onPurchased,
+    onFulfill: (wish: WishlistItemV3) => void onFulfill(wish),
+    onMove: setMoving,
+  };
 
   return (
-    <section className="wishlist pink-page">
+    <section
+      className="wishlist pink-page"
+      aria-busy={(!archiveOpen && isPending) || mutationBusy}
+    >
       <PortalDecor density="light" parallax={false} />
-      <TabBar<Tab>
-        value={tab}
-        onChange={setTab}
-        items={[
-          { value: 'me', label: 'Мої бажання' },
-          { value: 'partner', label: `Бажання ${partnerName}` },
-          { value: 'shared', label: 'Спільне', icon: '🎁' },
-        ]}
-      />
 
-      <div className="wl-head">
-        <h1 className="wl-title">
-          {tab === 'me' ? 'Мої бажання' : tab === 'partner' ? `Бажання ${partnerName}` : '🎁 Спільні бажання'}
-        </h1>
-        <button type="button" className="btn" onClick={() => setAdding(true)}>
-          + Додати
-        </button>
-      </div>
-
-      {stats && stats.total > 0 && (
-        <div className="plans-stat-banner">
-          <div className="plans-stat-row">
-            <div className="plans-stat-info">
-              <span className="plans-stat-num">{stats.done}</span>
-              <span className="plans-stat-sep">/</span>
-              <span className="plans-stat-total">{stats.total}</span>
-              <span className="plans-stat-label">бажань виконано</span>
-            </div>
-            <div className="plans-stat-pct">{pct}%</div>
-          </div>
-          <div className="plans-progress-bar">
-            <div className="plans-progress-fill" style={{ width: `${pct}%` }} />
-          </div>
-          {stats.doneThisYear > 0 && (
-            <p className="wl-year-stat">Ви виконали {stats.doneThisYear} бажань разом цього року ❤️</p>
-          )}
-        </div>
+      {!archiveOpen && (
+        <WishlistHero
+          tab={tab}
+          meName={me.name}
+          partnerName={partner.name}
+          activeCount={isPending || isError ? null : items.length}
+          stats={stats}
+          busy={mutationBusy}
+          onAdd={() => setAdding(true)}
+        />
       )}
 
-      {ownerId === null && tab !== 'shared' ? (
-        <p className="empty-state">Користувача не знайдено.</p>
-      ) : isPending ? (
-        <p className="empty-state">Завантаження…</p>
-      ) : isError ? (
-        <p className="empty-state">Не вдалось завантажити бажання.</p>
+      <div className="wl-wishlist-controls">
+        <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
+
+        {!archiveOpen && !isPending && !isError && contextItems.length > 0 && (
+          <WishlistBoardToolbar
+            value={activeBoardView}
+            counts={boardFilterCounts}
+            resultCount={visibleItems.length}
+            onChange={changeBoardView}
+            onPolaroidReshuffle={reshufflePolaroids}
+          />
+        )}
+      </div>
+
+      {archiveOpen && canShowArchive ? (
+        <WishArchive
+          scope={tab === 'shared' ? 'shared' : 'personal'}
+          ownerId={tab === 'me' ? me.id : null}
+          onPhotoClick={setLightbox}
+          openRequested={archiveRequested}
+          openRequestKey={notificationRequest}
+          focusWishId={archiveFocusWishId}
+          open
+          onOpenChange={setArchiveOpen}
+        />
       ) : (
         <>
-          <div className="wishlist-grid">
-            {items.length === 0 ? (
-              <p className="empty-state">
-                {tab === 'me'
-                  ? 'Твій список порожній. Час додати нову забаганку.'
-                  : tab === 'partner'
-                    ? 'Партнер ще не додав жодного бажання.'
-                    : 'Спільних бажань ще немає. Додайте перше!'}
-              </p>
-            ) : (
-              items.map((item) => (
-                <WishCard
-                  key={item.id}
-                  item={item}
-                  isOwn={isItemOwn(item)}
-                  onPhotoClick={setLightbox}
-                  onEdit={setEditing}
-                  onDelete={onDelete}
-                  onReserve={onReserve}
-                  onFulfill={onFulfill}
-                  onMove={setMoving}
-                />
-              ))
-            )}
-          </div>
+          {tab === 'partner' && !isPending && !isError && (
+            <WishlistPartnerToolbar
+              value={partnerFilter}
+              counts={partnerCounts}
+              onChange={setPartnerFilter}
+            />
+          )}
 
-          {tab === 'me' && <WishArchive ownerId={me.id} />}
+          {tab === 'shared' && !isPending && !isError && (
+            <WishlistSharedToolbar
+              value={sharedFilter}
+              partnerName={partner.name}
+              counts={sharedCounts}
+              onChange={setSharedFilter}
+            />
+          )}
+
+          {ownerId === null && tab !== 'shared' ? (
+            <p className="empty-state">Користувача не знайдено.</p>
+          ) : isPending ? (
+            <div role="status" aria-live="polite" aria-label="Завантаження бажань">
+              <WishlistGridSkeleton />
+            </div>
+          ) : isError ? (
+            <div className="empty-state" role="alert">
+              <p>Не вдалось завантажити бажання. Перевір з’єднання й повтори.</p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                disabled={isFetching}
+                onClick={() => void refetchItems()}
+              >
+                {isFetching ? 'Повторюємо…' : 'Спробувати ще'}
+              </button>
+            </div>
+          ) : (
+            <>
+              {visibleItems.length === 0 ? (
+                <div className="wishlist-grid">
+                  {contextItems.length > 0 ? (
+                    <div className="wl-board-filter-empty">
+                      <div>
+                        <span aria-hidden="true">✦</span>
+                        <strong>За цим фільтром бажань немає</strong>
+                        <p>Обери «Усі» або зміни пріоритет, щоб повернути картки.</p>
+                      </div>
+                    </div>
+                  ) : tab === 'partner' && partnerEmptyCopy ? (
+                    <div className="wl-partner-empty">
+                      <div>
+                        <span aria-hidden="true">{partnerEmptyCopy.icon}</span>
+                        <strong>{partnerEmptyCopy.title}</strong>
+                        <p>{partnerEmptyCopy.description}</p>
+                      </div>
+                    </div>
+                  ) : tab === 'shared' && sharedEmptyCopy ? (
+                    <div className="wl-shared-empty">
+                      <div>
+                        <span aria-hidden="true">✨</span>
+                        <strong>{sharedEmptyCopy.title}</strong>
+                        <p>{sharedEmptyCopy.description}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="empty-state">Твій список порожній. Час додати нову забаганку.</p>
+                  )}
+                </div>
+              ) : activeBoardView.view === 'feed' ? (
+                <WishlistFeedView {...sharedViewProps} />
+              ) : activeBoardView.view === 'polaroid' ? (
+                <WishlistPolaroidView
+                  {...sharedViewProps}
+                  seed={polaroidSeeds[tab]}
+                />
+              ) : (
+                <WishlistBubbleView {...sharedViewProps} />
+              )}
+
+              {canShowArchive && (
+                <WishArchive
+                  scope={tab === 'shared' ? 'shared' : 'personal'}
+                  ownerId={tab === 'me' ? me.id : null}
+                  onPhotoClick={setLightbox}
+                  openRequested={archiveRequested}
+                  openRequestKey={notificationRequest}
+                  focusWishId={archiveFocusWishId}
+                  open={false}
+                  onOpenChange={setArchiveOpen}
+                />
+              )}
+            </>
+          )}
         </>
       )}
 
       {(adding || editing) && (
         <WishFormModal
+          key={editing ? `edit-${editing.id}-${editing.version}` : 'new-wish'}
           item={editing}
           partner={partner}
           defaultScope={tab}
@@ -177,8 +539,24 @@ export function WishlistPage() {
         <MoveWishModal
           item={moving}
           partner={partner}
-          onClose={() => setMoving(null)}
-          onMove={(owner, isShared) => changeScope.mutate({ id: moving.id, owner, isShared })}
+          saving={changeScope.isPending}
+          onClose={() => {
+            if (!changeScope.isPending) setMoving(null);
+          }}
+          onMove={async (owner, isShared) => {
+            await changeScope.mutateAsync({ id: moving.id, owner, isShared });
+          }}
+        />
+      )}
+
+      {completing && (
+        <GiftCompletionModal
+          item={completing}
+          saving={fulfill.isPending}
+          onClose={() => {
+            if (!fulfill.isPending) setCompleting(null);
+          }}
+          onSubmit={completeGift}
         />
       )}
 

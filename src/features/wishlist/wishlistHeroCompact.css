@@ -1,0 +1,110 @@
+/* Mobile density pass for the Wishlist hero.
+ * Keeps the same visual hierarchy while bringing tabs and cards onto the
+ * first viewport sooner. The skeleton mirrors the final geometry to avoid
+ * layout jumps when data resolves.
+ */
+@media (max-width: 719px) {
+  .wishlist .wl-hero,
+  .wishlist .wl-skeleton-hero-card {
+    gap: 12px;
+    margin-top: 12px;
+    margin-bottom: 14px;
+    padding: 18px 16px 16px;
+    border-radius: 24px;
+  }
+
+  .wishlist .wl-hero::before {
+    right: -112px;
+    bottom: -166px;
+    width: 280px;
+    height: 280px;
+  }
+
+  .wishlist .wl-hero::after {
+    right: 42px;
+    bottom: -122px;
+    width: 180px;
+    height: 180px;
+  }
+
+  .wishlist .wl-hero-eyebrow {
+    min-height: 24px;
+    padding: 4px 9px;
+    font-size: 10px;
+  }
+
+  .wishlist .wl-hero-title {
+    margin: 9px 0 5px;
+    font-size: clamp(29px, 9vw, 38px);
+    line-height: 1.04;
+  }
+
+  .wishlist .wl-hero-description {
+    font-size: 13px;
+    line-height: 1.43;
+  }
+
+  .wishlist .wl-hero-metrics,
+  .wishlist .wl-skeleton-metrics {
+    gap: 6px;
+    margin-top: 13px;
+  }
+
+  .wishlist .wl-hero-metric {
+    min-height: 31px;
+    gap: 6px;
+    padding: 5px 9px;
+    font-size: 11px;
+  }
+
+  .wishlist .wl-hero-metric strong {
+    font-size: 14px;
+  }
+
+  .wishlist .wl-skeleton-hero-copy {
+    gap: 9px;
+  }
+
+  .wishlist .wl-skeleton-metric {
+    width: 132px;
+    height: 31px;
+  }
+
+  .wishlist .wl-hero-actions,
+  .wishlist .wl-skeleton-hero-actions {
+    gap: 9px;
+  }
+
+  .wishlist .wl-hero-symbol,
+  .wishlist .wl-skeleton-symbol {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+  }
+
+  .wishlist .wl-hero-symbol {
+    font-size: 23px;
+  }
+
+  .wishlist .wl-hero-add {
+    min-height: 44px;
+    max-width: 200px;
+    padding-inline: 15px;
+  }
+}
+
+@media (max-width: 390px) {
+  .wishlist .wl-hero,
+  .wishlist .wl-skeleton-hero-card {
+    padding-inline: 15px;
+  }
+
+  .wishlist .wl-hero-title {
+    font-size: clamp(28px, 9vw, 35px);
+  }
+
+  .wishlist .wl-hero-add {
+    max-width: 188px;
+    font-size: 13px;
+  }
+}

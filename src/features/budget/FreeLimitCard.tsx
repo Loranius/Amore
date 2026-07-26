@@ -1,8 +1,8 @@
 // ============================================================
-// FreeLimitCard — вільний ліміт (порт renderFreeLimit/paintFreeLimit)
+// FreeLimitCard — вільний ліміт
 // ------------------------------------------------------------
-// Слайдер пропонує суму; партнер бачить панель підтвердження. Позиція
-// слайдера не «стрибає» під пальцем при realtime-оновленні (draggingRef).
+// 0 ₴ є валідним лімітом. Підтвердження/відхилення надсилає на сервер
+// точний snapshot пропозиції, тому застарілий екран не затре нову суму.
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -18,26 +18,33 @@ export function FreeLimitCard() {
   const { data: fl } = useFreeLimit();
   const { propose, confirm, reject } = useFreeLimitMutations();
 
-  const limit = fl?.limit_value ?? 0;
-  const proposalValue = fl?.proposal_value ?? null;
+  const limit = Number(fl?.limit_value ?? 0);
+  const proposalValue = fl?.proposal_value === null || fl?.proposal_value === undefined
+    ? null
+    : Number(fl.proposal_value);
   const proposedBy = fl?.proposed_by ?? null;
 
-  const [sliderVal, setSliderVal] = useState(limit || 2000);
+  const [sliderVal, setSliderVal] = useState(limit);
   const dragging = useRef(false);
 
   // Синхронізуємо слайдер з лімітом — але не поки користувач його тягне.
   useEffect(() => {
-    if (!dragging.current) setSliderVal(limit || 2000);
+    if (!dragging.current) setSliderVal(limit);
   }, [limit]);
 
-  // Пропозиція від ПАРТНЕРА (не від мене) → показуємо панель.
-  const incoming = proposalValue !== null && proposedBy !== me.name ? proposalValue : null;
+  const incoming = proposalValue !== null && proposedBy && proposedBy !== me.name
+    ? { value: proposalValue, proposedBy }
+    : null;
+
+  const stopDragging = () => {
+    dragging.current = false;
+  };
 
   return (
     <Card className="fin-card">
       <div className="fin-card-hdr">
         <span className="fin-card-title">💳 Вільний ліміт</span>
-        <span className="fin-limit-current">{limit > 0 ? fmtMoney(limit) : 'не встановлено'}</span>
+        <span className="fin-limit-current">{fmtMoney(limit)}</span>
       </div>
       <p className="fin-hint">Сума, яку кожен може витратити без узгодження.</p>
 
@@ -52,7 +59,9 @@ export function FreeLimitCard() {
         step={SLIDER_STEP}
         value={sliderVal}
         onPointerDown={() => (dragging.current = true)}
-        onPointerUp={() => (dragging.current = false)}
+        onPointerUp={stopDragging}
+        onPointerCancel={stopDragging}
+        onBlur={stopDragging}
         onChange={(e) => setSliderVal(Number(e.target.value))}
       />
       <button
@@ -61,23 +70,33 @@ export function FreeLimitCard() {
         onClick={() => propose.mutate(sliderVal)}
         disabled={propose.isPending}
       >
-        Запропонувати {fmtMoney(sliderVal)}
+        {propose.isPending ? 'Надсилаємо…' : `Запропонувати ${fmtMoney(sliderVal)}`}
       </button>
 
       {proposalValue !== null && proposedBy === me.name && (
         <p className="fin-hint fin-await">⏳ Очікуємо відповідь партнера на {fmtMoney(proposalValue)}</p>
       )}
 
-      {incoming !== null && (
+      {incoming && (
         <div className="fin-proposal-panel visible">
           <p className="fin-proposal-text">
-            {proposedBy} пропонує: {fmtMoney(incoming)}
+            {incoming.proposedBy} пропонує: {fmtMoney(incoming.value)}
           </p>
           <div className="fin-proposal-actions">
-            <button type="button" className="btn" onClick={() => confirm.mutate(incoming)}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => confirm.mutate(incoming)}
+              disabled={confirm.isPending || reject.isPending}
+            >
               ✓ Погодитись
             </button>
-            <button type="button" className="btn-secondary" onClick={() => reject.mutate()}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => reject.mutate(incoming)}
+              disabled={confirm.isPending || reject.isPending}
+            >
               ✕ Відхилити
             </button>
           </div>

@@ -1,0 +1,142 @@
+/*
+ * Wishlist contrast layer.
+ *
+ * Keep the soft Pink Portal palette, but strengthen the hierarchy between
+ * primary copy, supporting text, controls and disabled states. All values are
+ * derived from the active theme tokens, so light and dark themes stay aligned.
+ */
+.wishlist {
+  --wl-text-secondary: color-mix(in srgb, var(--muted) 68%, var(--text) 32%);
+  --wl-text-tertiary: color-mix(in srgb, var(--muted) 82%, var(--text) 18%);
+  --wl-control-border: color-mix(in srgb, var(--text) 18%, transparent);
+  --wl-control-border-hover: color-mix(in srgb, var(--accent) 46%, var(--text) 8%);
+  --wl-control-bg: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
+  --wl-control-bg-muted: color-mix(in srgb, var(--surface) 96%, var(--text) 4%);
+}
+
+/* Field labels must remain clearly distinct from hints and entered values. */
+.wishlist .form-field > span,
+.wishlist .form-field > label,
+.wishlist .modal-title {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.wishlist :is(input, textarea, select) {
+  border-color: var(--wl-control-border);
+  background: var(--wl-control-bg-muted);
+  color: var(--text);
+  caret-color: var(--accent);
+  transition:
+    border-color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.wishlist :is(input, textarea, select)::placeholder {
+  color: var(--wl-text-tertiary);
+  opacity: 1;
+}
+
+.wishlist :is(input, textarea, select):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--wl-control-border));
+  background: var(--wl-control-bg);
+}
+
+.wishlist :is(input, textarea, select):focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  outline: none;
+}
+
+/* Supporting text stays softer than body copy, but no longer fades into the
+   pink background on mobile displays with lower brightness. */
+.wishlist :is(
+  .wm-field-hint,
+  .modal-sub,
+  .modal-note,
+  .wl-card-v3-description,
+  .wl-card-v3-hint,
+  .wl-board-filter-empty p,
+  .wl-priority-picker-copy small,
+  .wl-priority-picker-chevron
+) {
+  color: var(--wl-text-secondary);
+}
+
+.wishlist .wl-card-v3-status:not(.wl-card-v3-status--owner) {
+  color: var(--wl-text-secondary);
+}
+
+/* Filters and tabs should still read as interactive when they are inactive. */
+.wishlist .wl-board-toolbar {
+  border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+.wishlist .wl-board-filter:not(.active),
+.wishlist .tab-bar-btn:not(.active) {
+  color: var(--wl-text-secondary);
+}
+
+.wishlist .wl-board-filter:not(.active) {
+  border-color: color-mix(in srgb, var(--text) 7%, transparent);
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+}
+
+.wishlist .wl-board-filter:not(.active):hover {
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: var(--text);
+}
+
+.wishlist .tab-bar-btn:not(.active) .tab-bar-count,
+.wishlist .wl-board-filter:not(.active) small {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--wl-text-secondary);
+}
+
+/* Secondary actions need a visible boundary without competing with the pink
+   primary action. */
+.wishlist :is(.btn-secondary, .btn-ghost, .wl-card-v3-secondary) {
+  border-color: var(--wl-control-border);
+  background: var(--wl-control-bg-muted);
+  color: var(--wl-text-secondary);
+}
+
+.wishlist :is(.btn-secondary, .btn-ghost, .wl-card-v3-secondary):hover:not(:disabled) {
+  border-color: var(--wl-control-border-hover);
+  background: var(--wl-control-bg);
+  color: var(--text);
+}
+
+.wishlist .wl-card-v3 {
+  border-color: color-mix(in srgb, var(--accent) 18%, transparent);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--text) 13%, transparent);
+}
+
+.wishlist .wl-priority-picker-trigger {
+  border-color: var(--wl-control-border);
+  background: var(--wl-control-bg);
+}
+
+.wishlist .wl-priority-picker-option {
+  border-color: color-mix(in srgb, var(--text) 13%, transparent);
+}
+
+/* Disabled controls stay recognisably unavailable without becoming illegible. */
+.wishlist .is-disabled,
+.wishlist button:disabled,
+.wishlist input:disabled,
+.wishlist textarea:disabled,
+.wishlist select:disabled {
+  opacity: 0.68;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wishlist :is(input, textarea, select) {
+    transition: none;
+  }
+}
