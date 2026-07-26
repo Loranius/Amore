@@ -35,6 +35,18 @@ function isStaleFinanceError(error: unknown): boolean {
 
 function financeErrorText(error: unknown): string {
   const message = error instanceof Error ? error.message : '';
+  if (message.includes('finance_goal_paused')) {
+    return 'Ціль зараз на паузі. Спочатку віднови її.';
+  }
+  if (message.includes('finance_goal_already_paused')) {
+    return 'Ціль уже на паузі. Дані оновлено.';
+  }
+  if (message.includes('finance_goal_not_paused')) {
+    return 'Ціль уже активна. Дані оновлено.';
+  }
+  if (message.includes('finance_goal_pause_state_invalid')) {
+    return 'Не вдалося відновити ціль. Спробуй ще.';
+  }
   if (message.includes('finance_contribution_delete_not_allowed')) {
     return 'Можна скасувати лише власний внесок.';
   }
@@ -48,14 +60,40 @@ function financeErrorText(error: unknown): string {
 }
 
 /** Реальний PK savings_goals у Supabase — UUID, не number. */
-export type BudgetGoalRow = Omit<SavingsGoalRow, 'id'> & { id: string };
+export type BudgetGoalRow = Omit<SavingsGoalRow, 'id'> & {
+  id: string;
+  paused_at: string | null;
+};
 
-function normalizeGoalRow(row: SavingsGoalRow): BudgetGoalRow {
-  const id = (row as unknown as { id?: unknown }).id;
-  if (typeof id !== 'string' || id.length === 0) {
-    throw new Error('savings_goals повернув некоректний UUID');
+interface GoalSelectChain {
+  order(
+    column: string,
+    options: { ascending: boolean },
+  ): Promise<{ data: unknown[] | null; error: RpcError | null }>;
+}
+
+interface GoalTableReader {
+  select(columns: string): GoalSelectChain;
+}
+
+function normalizeGoalRow(value: unknown): BudgetGoalRow {
+  if (!value || typeof value !== 'object') {
+    throw new Error('savings_goals повернув некоректний рядок');
   }
-  return row as unknown as BudgetGoalRow;
+
+  const row = value as Record<string, unknown>;
+  const id = row.id;
+  const pausedAt = row.paused_at;
+
+  if (
+    typeof id !== 'string'
+    || id.length === 0
+    || (pausedAt !== null && typeof pausedAt !== 'string')
+  ) {
+    throw new Error('savings_goals повернув некоректний UUID або стан паузи');
+  }
+
+  return value as BudgetGoalRow;
 }
 
 export interface GoalContribution {
@@ -175,11 +213,12 @@ export function useGoals() {
   return useQuery({
     queryKey: qk.savingsGoals(),
     queryFn: async (): Promise<BudgetGoalRow[]> => {
-      const { data, error } = await supabase
-        .from('savings_goals')
-        .select('id,name,target_amount,url,description,status,proposed_by,saved_amount')
+      // paused_at щойно доданий міграцією і ще не входить до згенерованих типів.
+      const table = supabase.from('savings_goals') as unknown as GoalTableReader;
+      const { data, error } = await table
+        .select('id,name,target_amount,url,description,status,proposed_by,saved_amount,paused_at')
         .order('created_at', { ascending: false });
-      if (error) throw error;
+      if (error) throw new Error(error.message);
       return (data ?? []).map(normalizeGoalRow);
     },
   });
@@ -226,6 +265,7 @@ export function useGoalMutations() {
 
   const invalidateGoal = (goalId?: string) => {
     void client.invalidateQueries({ queryKey: qk.savingsGoals() });
+    void client.invalidateQueries({ queryKey: ['savingsGoalForecasts'] });
     if (goalId) {
       void client.invalidateQueries({ queryKey: qk.savingsGoalContributions(goalId) });
     }
@@ -273,6 +313,24 @@ export function useGoalMutations() {
     onSettled: (_data, _error, id) => invalidateGoal(id),
   });
 
+  const pause = useMutation({
+    mutationFn: async (id: string) => {
+      await callFinanceRpc('finance_pause_savings_goal_v1', { p_goal_id: id });
+    },
+    onSuccess: () => toast.show('Ціль поставлено на паузу. Усе збережено.'),
+    onError,
+    onSettled: (_data, _error, id) => invalidateGoal(id),
+  });
+
+  const resume = useMutation({
+    mutationFn: async (id: string) => {
+      await callFinanceRpc('finance_resume_savings_goal_v1', { p_goal_id: id });
+    },
+    onSuccess: () => toast.show('Ціль знову активна.'),
+    onError,
+    onSettled: (_data, _error, id) => invalidateGoal(id),
+  });
+
   const addContribution = useMutation({
     mutationFn: async ({ id, amount, note }: AddContributionInput) => {
       await callFinanceRpc('finance_add_savings_goal_contribution_v1', {
@@ -312,6 +370,8 @@ export function useGoalMutations() {
     confirm,
     reject,
     remove,
+    pause,
+    resume,
     addContribution,
     deleteContribution,
     addFunds,

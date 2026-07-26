@@ -29,7 +29,15 @@ export function GoalsList() {
   const me = useCurrentUser();
   const { data: goals = [], isPending } = useGoals();
   const { data: forecasts = [], isPending: forecastsPending } = useGoalForecasts();
-  const { add, confirm, reject, remove, addContribution } = useGoalMutations();
+  const {
+    add,
+    confirm,
+    reject,
+    remove,
+    pause,
+    resume,
+    addContribution,
+  } = useGoalMutations();
   const { setDesiredDate } = useGoalForecastMutations();
 
   const [adding, setAdding] = useState(false);
@@ -63,9 +71,12 @@ export function GoalsList() {
         <div className="goals-list">
           {goals.map((g) => {
             const pending = g.status === 'pending';
+            const paused = g.paused_at !== null;
             const target = Number(g.target_amount ?? 0);
             const saved = Math.max(0, Number(g.saved_amount ?? 0));
             const pct = target > 0 ? Math.min(100, Math.round((saved / target) * 100)) : 0;
+            const pauseBusy = pause.isPending && pause.variables === g.id;
+            const resumeBusy = resume.isPending && resume.variables === g.id;
 
             return (
               <ProposalCard
@@ -90,7 +101,9 @@ export function GoalsList() {
                 badge={
                   g.status === 'confirmed' ? (
                     <>
-                      <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
+                      <span className={`goal-status-badge ${paused ? 'goal-paused' : 'goal-confirmed'}`}>
+                        {paused ? '⏸ На паузі' : '✅ Підтверджено'}
+                      </span>
                       <div className="goal-progress-wrap">
                         <div className="goal-progress-bar">
                           <div className="goal-progress-fill" style={{ width: `${pct}%` }} />
@@ -106,6 +119,7 @@ export function GoalsList() {
                       <GoalForecastCard
                         forecast={forecastByGoal.get(g.id) ?? null}
                         isLoading={forecastsPending}
+                        paused={paused}
                         onEdit={() => setDateGoalId(g.id)}
                       />
                     </>
@@ -125,11 +139,23 @@ export function GoalsList() {
                         </button>
                         <button
                           type="button"
-                          className="btn-secondary goal-add-funds-btn"
-                          onClick={() => setFunding(g)}
+                          className="btn-secondary goal-pause-btn"
+                          onClick={() => paused ? resume.mutate(g.id) : pause.mutate(g.id)}
+                          disabled={pause.isPending || resume.isPending}
                         >
-                          + Внести
+                          {paused
+                            ? (resumeBusy ? 'Відновлюємо…' : 'Відновити')
+                            : (pauseBusy ? 'Зупиняємо…' : 'Пауза')}
                         </button>
+                        {!paused && (
+                          <button
+                            type="button"
+                            className="btn-secondary goal-add-funds-btn"
+                            onClick={() => setFunding(g)}
+                          >
+                            + Внести
+                          </button>
+                        )}
                       </div>
                     )}
                   </>
