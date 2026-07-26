@@ -6,6 +6,7 @@ import { GoalsList } from './GoalsList';
 import { PortalDecor } from '@/features/auth/PortalDecor';
 import './budget.css';
 import './financeLayoutFix.css';
+import './goalDiscussionPolish.css';
 
 export function BudgetPage() {
   return (
