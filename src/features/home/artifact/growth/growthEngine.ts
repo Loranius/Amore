@@ -76,7 +76,7 @@
 // ============================================================
 import { mulberry32, hashSeedString } from '../../mulberry32';
 import { maturityCurve } from '../maturity';
-import { type Vec3, add, scale, normalize, v3 } from '../vec3';
+import { type Vec3, add, scale, normalize, segmentDistance, v3 } from '../vec3';
 import {
   MATURITY_HEIGHT_SCALE,
   MATURITY_RADIUS_SCALE,
@@ -228,6 +228,61 @@ function buriedAnchors(body: BodyPair, t: number, angle: number, radius: number,
   };
 }
 
+/**
+ * Декоративні тіла можна відкинути при нестачі місця; тіла, що несуть
+ * реальні дані пари (країна, місто, віха, ціль, річниця, спогад, бажання,
+ * творчість), — ніколи. Краще щільніше, ніж «зник спогад».
+ */
+function isDecorativeKind(event: DepositionEvent): boolean {
+  return event.key.startsWith('baseline-');
+}
+
+/**
+ * Чи вміщується тіло дитини в цьому кандидаті (`CAI-REQ-001`, `CAI-REQ-003`).
+ *
+ * Дві перевірки:
+ *  1) КУТ — між основами дітей ОДНОГО господаря має бути мін. сепарація
+ *     (non-clumping без жорсткої симетрії);
+ *  2) ОБ'ЄМ — капсула дитини (вісь+радіус) не перетинає капсулу жодного
+ *     стороннього тіла. Господар виключений: перекриття з ним — це і є
+ *     дозволена зона стику (junction), решта — заборонена.
+ */
+function candidateFits(
+  cand: { idx: number; t: number; angle: number },
+  bodies: readonly BodyPair[],
+  substrate: readonly DepositedCrystal[],
+  clearance: readonly DepositedCrystal[],
+  length: number,
+  radius: number,
+  c: CrystalConstraints,
+): boolean {
+  const host = substrate[cand.idx]!;
+  const hostBody = bodies[cand.idx]!;
+
+  // 1. Кутова сепарація від братів на тому самому господарі.
+  for (const other of clearance) {
+    const att = other.attachment;
+    if (att === undefined || att.hostKey !== host.key) continue;
+    let d = Math.abs(att.hostAngle - cand.angle) % (Math.PI * 2);
+    if (d > Math.PI) d = Math.PI * 2 - d;
+    if (d < c.minAngularSeparation) return false;
+  }
+
+  // 2. Об'ємна резервація: капсула проти капсул сторонніх тіл.
+  const probe = sampleSurfacePoint(hostBody.skeletal, cand.t, cand.angle);
+  const base = probe.point;
+  const dir = normalize(add(probe.normal, v3(0, 0.6, 0)));
+  const tip = add(base, scale(dir, length));
+  const rSelf = radius * c.clearanceScale;
+  for (const other of clearance) {
+    if (other.key === host.key) continue; // зона стику — дозволена
+    const oTip = add(other.anchor, scale(other.direction, other.length));
+    const gap = segmentDistance(base, tip, other.anchor, oTip);
+    if (gap < rSelf + other.radius * c.clearanceScale) return false;
+  }
+  return true;
+}
+
 /** Стан монарха друзи: ключ обирається до симуляції, довжина фіксується
  *  в момент його відкладення і стає стелею висоти для решти тіл. */
 interface MonarchState {
@@ -245,6 +300,10 @@ interface MonarchState {
 function depositMineral(
   event: DepositionEvent,
   substrate: readonly DepositedCrystal[],
+  /** Тіла, від яких треба тримати дистанцію (`CAI-REQ-001`): усе вже
+   *  відкладене, що НЕ молодше за подію — той самий віковий гейт, що й у
+   *  субстрату, тож append-only не ламається. */
+  clearance: readonly DepositedCrystal[],
   seedNum: number,
   dna: ArtifactInput['dna'],
   field: PlacementField,
@@ -283,21 +342,52 @@ function depositMineral(
   for (let i = 0; i < SITE_CANDIDATES; i++) {
     const idx = Math.min(substrate.length - 1, Math.floor(rng() * substrate.length));
     const t = c.siteTMin + rng() * (c.siteTMax - c.siteTMin);
-    const angle = rng() * Math.PI * 2;
+    // СТРАТИФІКОВАНИЙ азимут (`CAI-REQ-002`): кандидат i живе у своєму
+    // секторі кола, jitter лише всередині сектора. Чистий rng()*2π давав
+    // злипання кандидатів в одному боці — саме звідти бралися «кущі».
+    const angle = ((i + rng()) / SITE_CANDIDATES) * Math.PI * 2;
     const { point, normal } = sampleSurfacePoint(bodies[idx]!.skeletal, t, angle);
     candidates.push({ idx, t, angle, score: 1e-6 + scoreGrowthSite(ctx, event, point, normal, t) });
   }
 
-  // Рулетка ймовірнісного поля (1 draw).
-  const total = candidates.reduce((acc, s) => acc + s.score, 0);
+  // Об'ємна резервація (`CAI-REQ-001`, `CAI-REQ-003`): кандидат дійсний,
+  // лише якщо тіло дитини НЕ перетинає стороннє тіло поза власною зоною
+  // стику і не тулиться впритул до брата по господарю. Перевірка йде по
+  // ТОМУ САМОМУ віковому гейту, що й субстрат, — тож дані, додані сьогодні,
+  // не можуть зрушити жоден існуючий кристал (append-only).
+  const valid = candidates.map((cand) =>
+    isMonarch ? true : candidateFits(cand, bodies, substrate, clearance, rawLength, rawRadius, c),
+  );
+  const anyValid = valid.some(Boolean);
+
+  // Рулетка ймовірнісного поля (1 draw) — СЕРЕД ДІЙСНИХ кандидатів
+  // («redirect» зі спеки). Кількість draw незмінна: валідність нічого не
+  // тягне з rng.
+  const total = candidates.reduce((acc, s, i) => acc + (anyValid && !valid[i] ? 0 : s.score), 0);
   let pick = rng() * total;
   let chosen = candidates[candidates.length - 1]!;
-  for (const cand of candidates) {
-    pick -= cand.score;
+  for (let i = 0; i < candidates.length; i++) {
+    if (anyValid && !valid[i]) continue;
+    pick -= candidates[i]!.score;
     if (pick <= 0) {
-      chosen = cand;
+      chosen = candidates[i]!;
       break;
     }
+  }
+  // Жоден кандидат не вмістився → «shrink» зі спеки: тіло стискається і
+  // сідає на найкраще з наявних місць. Декоративні тіла, що навіть після
+  // стискання не влазять, відкидаються (`defer`) — дата-backed НІКОЛИ:
+  // реальний спогад пари не має зникати через тісноту.
+  let conflictShrink = 1;
+  if (!anyValid && !isMonarch) {
+    conflictShrink = c.conflictShrink;
+    let best = candidates[0]!;
+    for (const cand of candidates) if (cand.score > best.score) best = cand;
+    chosen = best;
+    const shrunkFits = candidateFits(
+      chosen, bodies, substrate, clearance, rawLength * conflictShrink, rawRadius * conflictShrink, c,
+    );
+    if (!shrunkFits && isDecorativeKind(event)) return [];
   }
   // Монарх ігнорує рулетку МІСЦЯ (draw однаково витрачені — форма потоку
   // фіксована): він сидить точно ПО ЦЕНТРУ, на осі ядра-нуклеуса — головний
@@ -311,9 +401,9 @@ function depositMineral(
   const probe = sampleSurfacePoint(hostBody.skeletal, chosen.t, chosen.angle);
   const energy = growthEnergyAt(probe.point, substrate);
   const falloff = isMonarch ? 1 : c.moundFalloff(Math.hypot(probe.point.x, probe.point.z));
-  let length = rawLength * (0.55 + 0.45 * energy) * c.heightDamp(probe.point.y) * falloff;
+  let length = rawLength * conflictShrink * (0.55 + 0.45 * energy) * c.heightDamp(probe.point.y) * falloff;
   if (isMonarch) length = rawLength; // рівномірний ріст без випадкових модуляцій
-  let radius = rawRadius * (0.7 + 0.3 * energy);
+  let radius = rawRadius * conflictShrink * (0.7 + 0.3 * energy);
   // Правдоподібні кварцові пропорції (референс): довге тіло не буває
   // голкою-волосиною — стрункість обмежена, король особливо кремезний.
   if (length > 0.6) radius = Math.max(radius, length / (isMonarch ? c.monarchSlenderness : c.slenderness));
@@ -336,6 +426,7 @@ function depositMineral(
       contactPoint: sample.point,
       contactNormal: sample.normal,
       hostT: t,
+      hostAngle: angle,
     };
   };
 
@@ -421,7 +512,13 @@ function depositMineral(
       growthEnergy: energy,
       colonyId: event.key,
       role: 'satellite',
-      attachment: { hostKey: dominant.key, contactPoint: sat.skeletalSample.point, contactNormal: sat.skeletalSample.normal, hostT: st },
+      attachment: {
+        hostKey: dominant.key,
+        contactPoint: sat.skeletalSample.point,
+        contactNormal: sat.skeletalSample.normal,
+        hostT: st,
+        hostAngle: sAngle,
+      },
       primary: false,
       breathePhase: satPhase,
       breatheSpeed: satSpeed,
@@ -484,7 +581,13 @@ function runDeposition(input: ArtifactInput): DepositedCrystal[] {
         : [nucleus, ...bedrock.filter((b) => b.ageDays >= event.ageDays), ...streamPrior];
 
       const field = instruction.fieldAt(event.ageDays);
-      const colony = depositMineral(event, substrate, seedNum, dna, field, monarch, constraints);
+      // Набір кліренсу (`CAI-REQ-001`): УСЕ вже відкладене, що не молодше за
+      // подію — незалежно від стріму. Той самий віковий гейт, що й у
+      // субстрату: тіло, додане сьогодні, є наймолодшим, тож жодне існуюче
+      // його «не бачить» і не зрушується (append-only тримається).
+      const clearance = deposited.filter((b) => b.ageDays >= event.ageDays);
+      const colony = depositMineral(event, substrate, clearance, seedNum, dna, field, monarch, constraints);
+      if (colony.length === 0) continue; // декоративне тіло не знайшло місця
       const dominant = colony[0]!;
       if (dominant.primary) monarch.length = dominant.length;
 

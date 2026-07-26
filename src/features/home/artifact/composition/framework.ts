@@ -75,6 +75,10 @@ export interface CompositionBody {
   shielded: boolean;
   colonyId: string;
   role: CompositionRole;
+  /** Ключ тіла, на якому це тіло тримається (null — коріння). Композиція
+   *  НЕ МАЄ ПРАВА видалити тіло, яке комусь служить господарем: це
+   *  осиротило б junction (`CAI-REQ-004`). */
+  hostKey?: string | null;
 }
 
 export interface ComposedBody extends CompositionBody {
@@ -282,6 +286,7 @@ function archetypePass(bodies: ComposedBody[], original: Map<string, Composition
           ...b,
           key: `${b.key}~${spec.suffix}${i}`,
           parentKey: b.key,
+          hostKey: b.key,
           anchor: add(add(b.anchor, scale(side, b.radius * 0.55)), scale(b.direction, b.length * 0.06)),
           direction: bendToward(b.direction, side, tiltAmt),
           length: b.length * spec.lengthMul * (0.85 + crng() * 0.3),
@@ -400,9 +405,16 @@ function densityPass(bodies: ComposedBody[], seedNum: number, config: Compositio
     return Math.min(count - 1, Math.floor((az / (Math.PI * 2)) * count));
   };
   const removed = new Set<string>();
+  // Тіло, на якому хтось тримається, недоторканне: інакше його діти
+  // лишаться без господаря (`CAI-REQ-004` — рівно один валідний junction).
+  const loadBearing = new Set<string>();
+  for (const b of bodies) {
+    if (b.hostKey != null) loadBearing.add(b.hostKey);
+    if (b.parentKey !== undefined) loadBearing.add(b.parentKey);
+  }
   const perSector = new Map<number, ComposedBody[]>();
   for (const b of bodies) {
-    if (!b.decorative || b.shielded) continue;
+    if (!b.decorative || b.shielded || loadBearing.has(b.key)) continue;
     const s = sectorOf(b);
     if (!perSector.has(s)) perSector.set(s, []);
     perSector.get(s)!.push(b);
@@ -486,6 +498,7 @@ function microPass(bodies: ComposedBody[], seedNum: number, config: CompositionC
       micro.push({
         key: `${parent.key}~m${i}`,
         parentKey: parent.key,
+        hostKey: parent.key,
         anchor: add(surface, scale(side, -radius * 0.6)),
         direction: microDir,
         length,
