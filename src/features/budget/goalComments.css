@@ -1,0 +1,181 @@
+.goal-comments-modal {
+  width: min(560px, calc(100vw - 2rem));
+  max-height: min(780px, calc(100dvh - 2rem));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.goal-comments-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.goal-comments-kicker {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.58;
+}
+
+.goal-comments-close {
+  flex: 0 0 auto;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.goal-comments-close:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.goal-comments-list {
+  min-height: 7rem;
+  overflow-y: auto;
+  display: grid;
+  align-content: start;
+  gap: 0.65rem;
+  margin-top: 1rem;
+  padding-right: 0.2rem;
+}
+
+.goal-comment-entry {
+  max-width: 88%;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 18px 18px 18px 7px;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.goal-comment-mine {
+  justify-self: end;
+  border-radius: 18px 18px 7px 18px;
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.goal-comment-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.78rem;
+}
+
+.goal-comment-meta time {
+  flex: 0 0 auto;
+  opacity: 0.55;
+}
+
+.goal-comment-entry p {
+  margin: 0;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.goal-comment-delete {
+  justify-self: end;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.goal-comment-delete:hover {
+  opacity: 1;
+}
+
+.goal-comment-delete:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.goal-comments-state,
+.goal-comments-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+  text-align: center;
+  opacity: 0.76;
+}
+
+.goal-comments-empty span {
+  font-size: 1.6rem;
+}
+
+.goal-comments-empty p {
+  margin: 0;
+}
+
+.goal-comments-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.goal-comments-composer .form-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.goal-comments-composer textarea {
+  min-height: 4.5rem;
+}
+
+.goal-comment-counter {
+  align-self: flex-end;
+  opacity: 0.58;
+}
+
+.goal-comment-submit {
+  flex: 0 0 auto;
+  margin-bottom: 1.35rem;
+}
+
+.goal-comments-footnote {
+  margin: 0.75rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-align: center;
+  opacity: 0.5;
+}
+
+@media (max-width: 600px) {
+  .goal-comment-entry {
+    max-width: 94%;
+  }
+
+  .goal-comments-composer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .goal-comment-submit {
+    width: 100%;
+    margin-bottom: 0;
+  }
+}
