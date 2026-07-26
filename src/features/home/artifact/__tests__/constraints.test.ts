@@ -97,7 +97,7 @@ function makeInput(seed: string, o: Partial<ArtifactInput> = {}): ArtifactInput 
 
 const build = (input: ArtifactInput): ArtifactNode[] => buildArtifactNodes(input, computeEvolutionPressures(input));
 
-const ZERO: CrystalShapeDrivers = { travel: 0, bond: 0, memory: 0, balance: 0, wishes: 0, events: 0 };
+const ZERO: CrystalShapeDrivers = { travel: 0, bond: 0, memory: 0, balance: 0, wishes: 0, events: 0, photos: 0 };
 const DRIVER_NAMES = Object.keys(ZERO) as (keyof CrystalShapeDrivers)[];
 const only = (name: keyof CrystalShapeDrivers, value: number): CrystalShapeDrivers => ({ ...ZERO, [name]: value });
 
@@ -117,7 +117,7 @@ describe('правила виду — інваріанти на всьому п�
   });
 
   it('жодна комбінація історії не порушує геологію кристала', () => {
-    // 2^6 кутів простору драйверів + середина: якби формула могла дати
+    // Усі кути простору драйверів + середина: якби формула могла дати
     // від'ємну вертикаль, стелю нижче підлоги чи шанс колонії >1, це
     // вилізло б саме на кутах.
     const corners: CrystalShapeDrivers[] = [];
@@ -128,7 +128,7 @@ describe('правила виду — інваріанти на всьому п�
       });
       corners.push(d);
     }
-    corners.push({ travel: 0.5, bond: 0.5, memory: 0.5, balance: 0.5, wishes: 0.5, events: 0.5 });
+    corners.push({ travel: 0.5, bond: 0.5, memory: 0.5, balance: 0.5, wishes: 0.5, events: 0.5, photos: 0.5 });
 
     for (const d of corners) {
       const c = crystalConstraintsFrom(d);
@@ -176,8 +176,6 @@ describe('правила виду — кожен драйвер зсуває с�
     ['bond', 'основи глибше вростають', (c) => c.burial, 'up'],
     ['bond', 'маса випрямляється вгору', (c) => c.minUpwardMain, 'up'],
     ['bond', 'менше діагоналей', (c) => c.diagonalChance, 'down'],
-    ['bond', 'король товщає', (c) => c.monarch.radiusBoost, 'up'],
-    ['bond', 'король росте швидше', (c) => c.monarch.lengthGain, 'up'],
     ['bond', 'король сильніше домінує', (c) => c.monarch.heightCeiling, 'down'],
     ['memory', 'шпилі стрункішають', (c) => c.slenderness, 'up'],
     ['balance', 'курган пологішає', (c) => c.moundFalloff(1), 'up'],
@@ -185,7 +183,26 @@ describe('правила виду — кожен драйвер зсуває с�
     ['wishes', 'стеля колоній вища', (c) => c.colonyMaxChance, 'up'],
     ['wishes', 'спідниця тісніша', (c) => c.minAngularSeparation, 'down'],
     ['events', 'більше дочірніх кристалів', (c) => c.colonyChance.milestone, 'up'],
+    ['photos', 'бічні шпилі тягнуться вище', (c) => c.moundFalloff(1), 'up'],
+    ['photos', 'стеля висоти дітей піднімається', (c) => c.monarch.heightCeiling, 'up'],
   ];
+
+  it('розміри самого короля НЕ залежать від драйверів — і це навмисно', () => {
+    // `baseLength`/`lengthGain`/`radiusBoost` читає лише гілка монарха, а
+    // монарх — найстаріша подія маси, тож його історія завжди порожня
+    // (`historyAt(timeline, daysTogether)` → bond = 0). Прив'язати їх до
+    // драйверів означало б написати формулу, яка ніколи не спрацьовує.
+    // Король росте від ВЛАСНОГО віку (event.ageDays), і саме це перевіряє
+    // наскрізний тест «довший спільний шлях → вищий і товщий король».
+    const base = crystalConstraintsFrom(ZERO);
+    for (const d of DRIVER_NAMES) {
+      const c = crystalConstraintsFrom(only(d, 1));
+      expect(c.monarch.baseLength, d).toBe(base.monarch.baseLength);
+      expect(c.monarch.lengthGain, d).toBe(base.monarch.lengthGain);
+      expect(c.monarch.radiusBoost, d).toBe(base.monarch.radiusBoost);
+      expect(c.monarch.growthDays, d).toBe(base.monarch.growthDays);
+    }
+  });
 
   for (const [driver, effect, read, direction] of cases) {
     it(`${driver} → ${effect}`, () => {
@@ -208,7 +225,7 @@ describe('правила виду — кожен драйвер зсуває с�
     const base = crystalConstraintsFrom(ZERO);
     const travel = crystalConstraintsFrom(only('travel', 1));
     expect(travel.burial).toBe(base.burial);
-    expect(travel.monarch.radiusBoost).toBe(base.monarch.radiusBoost);
+    expect(travel.monarch.heightCeiling).toBe(base.monarch.heightCeiling);
     expect(travel.colonyChance.wish).toBe(base.colonyChance.wish);
     const wishes = crystalConstraintsFrom(only('wishes', 1));
     expect(wishes.burial).toBe(base.burial);
@@ -303,6 +320,90 @@ describe('форма реагує на життя пари (наскрізно)'
         }),
       );
       expect(rich.length, `${seed}: спідниця не наросла`).toBeGreaterThan(base.length);
+    }
+  });
+});
+
+describe('фото з датами — умова, за якої вони взагалі мають право на форму', () => {
+  const datedPhotos = (count: number, oldestAge: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      id: i + 1,
+      date: isoDaysAgo(Math.max(1, oldestAge - Math.floor((i * oldestAge) / Math.max(1, count)))),
+    }));
+
+  it('без дат драйвер форми = 0, хоч агрегат і видно', () => {
+    // Це головна захисна умова: недатований агрегат `historyAt` віддає на
+    // БУДЬ-ЯКИЙ вік, тож якби правила його читали, одне завантажене фото
+    // зрушило б усю вже відкладену масу.
+    const timeline = buildEvolutionTimeline(makeInput(SEEDS[0])); // usage.photos = 40, дат немає
+    for (const age of [500, 300, 0]) {
+      const counts = historyAt(timeline, age);
+      expect(counts.photos, `вік ${age}`).toBe(40);
+      expect(counts.photosDated, `вік ${age}: недатовані фото полізли у форму`).toBe(0);
+      expect(crystalShapeDrivers(counts).photos, `вік ${age}`).toBe(0);
+    }
+  });
+
+  it('з датами рахунок стає історичним', () => {
+    const timeline = buildEvolutionTimeline(
+      makeInput(SEEDS[0], { photos: datedPhotos(60, 480), usage: { ...makeInput(SEEDS[0]).usage, photos: 60 } }),
+    );
+    const old = historyAt(timeline, 400);
+    const today = historyAt(timeline, 0);
+    expect(old.photosDated).toBeGreaterThan(0);
+    expect(today.photosDated).toBe(60);
+    expect(old.photosDated, 'на старий вік видно менше фото, ніж сьогодні').toBeLessThan(today.photosDated);
+    expect(crystalShapeDrivers(today).photos).toBeGreaterThan(crystalShapeDrivers(old).photos);
+  });
+
+  it('матеріал не змінюється від того, датовані фото чи ні', () => {
+    // Обидві форми на віці 0 дають той самий рахунок, тож Refinement
+    // Pressure (полірування, прозорість, джиттер граней) лишається тою
+    // самою — датування додає ІСТОРІЮ, а не новий факт.
+    const base = makeInput(SEEDS[0]);
+    const withDates = makeInput(SEEDS[0], { photos: datedPhotos(40, 480) });
+    expect(computeEvolutionPressures(withDates).refinement).toBe(computeEvolutionPressures(base).refinement);
+  });
+
+  it('фото, завантажене СЬОГОДНІ, не зрушує жодне вже відкладене тіло', () => {
+    // Той самий інваріант, що в deposition.test.ts, але для нового зв'язку
+    // «фото → форма»: без цієї перевірки датування фото було б рівно тим
+    // порушенням append-only, від якого ми його й захищали.
+    const before = makeInput(SEEDS[0], {
+      photos: datedPhotos(40, 480),
+      usage: { ...makeInput(SEEDS[0]).usage, photos: 40 },
+    });
+    const after = makeInput(SEEDS[0], {
+      photos: [...datedPhotos(40, 480), { id: 999, date: isoDaysAgo(0) }],
+      usage: { ...makeInput(SEEDS[0]).usage, photos: 41 },
+    });
+    const byKey = new Map(build(after).map((n) => [n.key, n]));
+    for (const node of build(before)) {
+      const grown = byKey.get(node.key);
+      if (grown === undefined) continue; // декоративні тіла композитор може ховати
+      expect(grown.growthScale, `${node.key} змінив висоту від нового фото`).toBe(node.growthScale);
+      expect(grown.anchor, `${node.key} зрушив від нового фото`).toEqual(node.anchor);
+    }
+    // …і водночас нове фото видно «сьогодні» — інакше перевірка вакуумна.
+    const tl = buildEvolutionTimeline(after);
+    expect(historyAt(tl, 0).photosDated).toBe(41);
+  });
+
+  it('більше фото → вищі бічні шпилі', () => {
+    for (const seed of SEEDS) {
+      const few = makeInput(seed, { photos: datedPhotos(5, 480), usage: { ...makeInput(seed).usage, photos: 5 } });
+      const many = makeInput(seed, { photos: datedPhotos(400, 480), usage: { ...makeInput(seed).usage, photos: 400 } });
+      const meanChild = (nodes: ArtifactNode[]) => {
+        const kids = nodes.filter((n) => !n.primary && n.role === 'dominant');
+        return kids.reduce((a, n) => a + n.growthScale, 0) / kids.length;
+      };
+      const tallest = (nodes: ArtifactNode[]) =>
+        Math.max(...nodes.filter((n) => !n.primary).map((n) => n.growthScale));
+      expect(meanChild(build(many)), `${seed}: середній шпиль не виріс`).toBeGreaterThan(meanChild(build(few)));
+      expect(tallest(build(many)), `${seed}: найвищий шпиль не виріс`).toBeGreaterThan(tallest(build(few)));
+      // Але король усе одно домінує — стеля піднімається, а не зникає.
+      const king = build(many).find((n) => n.primary)!;
+      expect(tallest(build(many))).toBeLessThan(king.growthScale * 0.6);
     }
   });
 });

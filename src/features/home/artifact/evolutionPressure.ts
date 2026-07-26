@@ -37,9 +37,21 @@ export function computeEvolutionPressures(input: ArtifactInput): EvolutionPressu
   // Рецепти → Warmth (теплий відтінок).
   const warmth = Math.min(0.6, c.recipes * 0.05);
 
-  // Фільми/книги — лишаються як є, не підняті до named-pressure словника.
+  // Фільми — внутрішні кольорові переливи (не підняті до named-pressure).
   const movieMix = Math.min(0.7, c.movies * 0.01);
-  const surfaceComplexity = Math.min(1, c.books * 0.08);
+  // …і окремо ЯСКРАВІСТЬ. `movieMix` міняє лише тон (домішує колір у
+  // палітру), тож «чим більше фільмів, тим яскравіший кристал» через нього
+  // не виражається взагалі. Шкала швидша за movieMix навмисно: 30 фільмів
+  // — це вже помітно тепліше світло всередині, а не ледь-ледь.
+  const brilliance = Math.min(1, c.movies / 60);
+
+  // Мітки на карті → СКЛАДНІСТЬ ПОВЕРХНІ (кількість граней). Раніше це
+  // тримали самі книги, і зв'язок був майже невидимий: у пари з двома
+  // книгами surfaceComplexity = 0.16, тобто «іноді на одну грань більше».
+  // Кожне нове місце — це новий кут, під яким пара побачила світ, тож
+  // саме подорожі задають гранованість; книги лишаються другим доданком.
+  // Країна важить удвічі за місто (та сама ієрархія, що в Expansion).
+  const surfaceComplexity = Math.min(1, (c.countries * 2 + c.cities) * 0.05 + c.books * 0.03);
 
   // Цілі/річниці/тривалість стосунків → Stability (steadier + thicker), відмінна від фінансової density.
   const stability = clamp01(
@@ -77,6 +89,7 @@ export function computeEvolutionPressures(input: ArtifactInput): EvolutionPressu
     stability,
     harmony,
     movieMix,
+    brilliance,
     surfaceComplexity,
     density,
     dominant,

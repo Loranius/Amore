@@ -194,11 +194,13 @@ export interface ClusterMaterial {
   polish: number;
   /** Рецепти → теплий відтінок (Warmth Pressure). */
   warmthMix: number;
-  /** Фільми → внутрішні кольорові переливи. */
+  /** Фільми → внутрішні кольорові переливи (тон). */
   movieMix: number;
+  /** Фільми → яскравість світіння зсередини (сила, не тон). */
+  brilliance: number;
   /** Спогади → внутрішнє світіння (Luminosity Pressure). */
   glow: number;
-  /** Книги → складність поверхні (більше/менш регулярні грані). */
+  /** Мітки на карті (+ книги) → складність поверхні: кількість граней. */
   surfaceComplexity: number;
   /** Фінанси → щільність/маса. */
   density: number;
@@ -214,6 +216,7 @@ export function deriveClusterMaterial(pressures: EvolutionPressures): ClusterMat
     polish: pressures.refinement,
     warmthMix: pressures.warmth,
     movieMix: pressures.movieMix,
+    brilliance: pressures.brilliance,
     glow: pressures.luminosity,
     surfaceComplexity: pressures.surfaceComplexity,
     density: pressures.density,

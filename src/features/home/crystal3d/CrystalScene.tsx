@@ -82,7 +82,10 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
   // Спокійна «підлога» світіння від Luminosity Pressure — раніше спалах
   // стрибав з нуля, тепер додається поверх завжди трохи теплого ядра
   // (заміна світінню вже видаленої кам'яної основи).
-  const baseIntensity = material.glow * 0.6;
+  // Спогади задають, ЧИ світиться ядро; спільно переглянуті фільми — НАСКІЛЬКИ
+  // яскраво (той самий множник, що в bodyMaterial.ts::coreGlow, щоб внутрішнє
+  // світло й емісія тіла не розходились).
+  const baseIntensity = material.glow * 0.6 * (1 + material.brilliance * 0.8);
 
   // Дотик/тап — короткий теплий спалах (реакція «артефакт відчув доторк»),
   // окремий від довшого/яскравішого спалаху на «виріс новий вузол».
@@ -200,7 +203,7 @@ function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
 }
 
 export default function CrystalScene() {
-  const { dna, deltas, isPending: dnaPending } = useCrystalDNA();
+  const { dna, photos, deltas, isPending: dnaPending } = useCrystalDNA();
   const { seed, isPending: seedPending } = useCrystalSeed();
   const { milestones, isPending: milestonesPending } = useMilestoneEvents();
   const { countries, cities, isPending: placesPending } = useCrystalPlaces();
@@ -256,6 +259,7 @@ export default function CrystalScene() {
       books,
       memoriesCount,
       memories: memoryItems,
+      photos,
     }),
     [
       seedNum,
@@ -272,6 +276,7 @@ export default function CrystalScene() {
       books,
       memoriesCount,
       memoryItems,
+      photos,
     ],
   );
 

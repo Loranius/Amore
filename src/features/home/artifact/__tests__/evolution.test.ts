@@ -159,6 +159,13 @@ describe('Evolution Engine', () => {
   it('ХАРАКТЕРИЗАЦІЯ: species-проєкція тисків байт-в-байт як до рефакторингу', () => {
     // Значення зняті з computeEvolutionPressures ДО переходу на Evolution
     // Engine — зміна архітектури не сміє змінити жодного тиску.
+    //
+    // ЄДИНЕ оновлене очікування — `surfaceComplexity`, і це не рефакторинг,
+    // а свідома зміна семантики (Phase 10): складність поверхні тепер
+    // тримають МІТКИ НА КАРТІ (країна важить удвічі за місто), а книги
+    // лишились другим доданком. Раніше її тримали самі книги, і в цієї
+    // пари їх нуль — звідси старе 0. Формула:
+    //   min(1, (країни·2 + міста)·0.05 + книги·0.03) = (2·2 + 2)·0.05 = 0.3
     const p = computeEvolutionPressures(makeInput());
     expect(p.expansion).toBe(0.2857142857142857);
     expect(p.refinement).toBe(0.3333333333333333);
@@ -167,7 +174,7 @@ describe('Evolution Engine', () => {
     expect(p.stability).toBe(0.23750000000000002);
     expect(p.harmony).toBe(0.9038609667715);
     expect(p.movieMix).toBe(0.02);
-    expect(p.surfaceComplexity).toBe(0);
+    expect(p.surfaceComplexity).toBeCloseTo(0.3, 12);
     expect(p.density).toBe(1.1385794353331309);
     expect(p.dominant).toBe('connection');
     expect(p.dominance).toBe(0.3888888888888889);
@@ -178,5 +185,39 @@ describe('Evolution Engine', () => {
       creation: 0.1388888888888889,
       future: 0.05555555555555555,
     });
+  });
+
+  it('мітки на карті → складність поверхні (граней більше)', () => {
+    const few = computeEvolutionPressures(makeInput());
+    const many = computeEvolutionPressures(
+      makeInput({
+        countries: Array.from({ length: 8 }, (_, i) => ({ name: `C${i}`, firstVisit: isoDaysAgo(400 - i * 20) })),
+        cities: Array.from({ length: 14 }, (_, i) => ({ name: `T${i}`, firstVisit: isoDaysAgo(430 - i * 20) })),
+      }),
+    );
+    expect(many.surfaceComplexity).toBeGreaterThan(few.surfaceComplexity);
+    // Країна важить удвічі за місто — та сама ієрархія, що в Expansion.
+    const oneCountry = computeEvolutionPressures(
+      makeInput({ countries: [{ name: 'X', firstVisit: isoDaysAgo(300) }], cities: [] }),
+    );
+    const oneCity = computeEvolutionPressures(
+      makeInput({ countries: [], cities: [{ name: 'Y', firstVisit: isoDaysAgo(300) }] }),
+    );
+    expect(oneCountry.surfaceComplexity).toBeCloseTo(oneCity.surfaceComplexity * 2, 12);
+  });
+
+  it('фільми → яскравість, окремо від тону', () => {
+    // `movieMix` домішує КОЛІР, `brilliance` додає СИЛИ світлу. До Phase 10
+    // існував лише перший, тож прохання «більше фільмів → яскравіший
+    // кристал» не виконувалось узагалі.
+    const few = computeEvolutionPressures(makeInput());
+    const many = computeEvolutionPressures(
+      makeInput({ movies: Array.from({ length: 45 }, (_, i) => ({ id: i + 1, date: isoDaysAgo(300 - i * 6) })) }),
+    );
+    expect(many.brilliance).toBeGreaterThan(few.brilliance);
+    expect(many.brilliance).toBeLessThanOrEqual(1);
+    // Зростає монотонно й не стрибає в насичення з перших же фільмів.
+    expect(few.brilliance).toBeGreaterThan(0);
+    expect(few.brilliance).toBeLessThan(0.1);
   });
 });

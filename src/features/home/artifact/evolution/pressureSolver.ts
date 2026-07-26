@@ -36,12 +36,23 @@ export function historyAt(timeline: EvolutionTimeline, ageDays: number): Evoluti
     wishes: 0,
     daysTogetherThen: 0,
     photos: 0,
+    photosDated: 0,
     totalSaved: 0,
   };
   for (const e of timeline.events) {
-    // Агрегати «сьогодні» доступні завжди (вони не мають власної історії).
+    // Фото бувають у двох формах (evolutionEvents.ts), і рівно одна з них
+    // потрапляє в таймлайн. Недатований агрегат (timestamp === null) — це
+    // «скільки їх сьогодні»: власної історії він не має, тож видимий на
+    // будь-який вік. Датовані фото проходять звичайний віковий гейт нижче
+    // й дають рахунок СТАНОМ НА вік — саме він і має право впливати на
+    // форму, не ламаючи append-only.
     if (e.source === 'photos') {
-      counts.photos = e.intensity;
+      if (e.timestamp === null) {
+        counts.photos = e.intensity;
+      } else if (e.ageDays >= ageDays) {
+        counts.photos += 1;
+        counts.photosDated += 1;
+      }
       continue;
     }
     if (e.source === 'finances') {

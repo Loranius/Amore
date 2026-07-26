@@ -35,7 +35,12 @@ export interface BodyMaterialProps {
  * milestone — золоте світіння вехи, мікрошар — матовіший «пил».
  */
 export function bodyMaterialProps(branch: ClusterBranch, material: ClusterMaterial): BodyMaterialProps {
-  const coreGlow = branch.kind === 'core' ? material.glow * 0.5 : 0;
+  // «Чим більше фільмів, тим яскравіший кристал». Світіння ядра росло лише
+  // від спогадів (Luminosity), а фільми міняли самий ТОН (`movieMix`) —
+  // тобто прохання власника не виконувалось узагалі. Тепер спільно
+  // переглянуте додає СИЛИ тому самому світлу: множник, а не новий колір,
+  // щоб дві грані матеріалу не сперечались за одне й те саме.
+  const coreGlow = branch.kind === 'core' ? material.glow * 0.5 * (1 + material.brilliance * 0.8) : 0;
   // Монарх друзи: скляна чистота без transmission (заборонений — див. вище)
   // і без opacity (перетинні мешi без сортування артефачать).
   const primary = branch.primary && !branch.emissive;

@@ -71,6 +71,7 @@ export const STRESS_MATERIAL: ClusterMaterial = {
   polish: 0.5,
   warmthMix: 0,
   movieMix: 0,
+  brilliance: 0,
   glow: 0,
   surfaceComplexity: 0.5,
   density: 0.5,

@@ -91,6 +91,9 @@ export function makeInput(seed: string, volume: DataVolume = 'typical'): Artifac
     books: [],
     memoriesCount: memories.length,
     memories,
+    // Фото датовані (Storage віддає created_at) — інакше тести структури
+    // сліпі до драйвера `photos` у правилах виду.
+    photos: Array.from({ length: 40 }, (_, i) => ({ id: i + 1, date: isoDaysAgo(470 - i * 11) })),
     ...(seed === SEEDS[3] ? { books: [{ id: 1, date: isoDaysAgo(210) }] } : {}),
   };
 }
@@ -125,6 +128,7 @@ function sparseInput(seed: string): ArtifactInput {
     books: [],
     memoriesCount: 1,
     memories: [{ id: 1, date: isoDaysAgo(60) }],
+    photos: [1, 2, 3].map((id, i) => ({ id, date: isoDaysAgo(140 - i * 50) })),
   };
 }
 
@@ -160,6 +164,7 @@ function richInput(seed: string): ArtifactInput {
     books: spread(30, 115).map((age, i) => ({ id: 700 + i, date: isoDaysAgo(age) })),
     memoriesCount: 60,
     memories: spread(60, 58).map((age, i) => ({ id: 800 + i, date: isoDaysAgo(age) })),
+    photos: spread(400, 8).map((age, i) => ({ id: 900 + i, date: isoDaysAgo(Math.max(1, age)) })),
   };
 }
 

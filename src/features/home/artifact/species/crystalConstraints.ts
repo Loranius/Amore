@@ -32,13 +32,17 @@
 // нього шари — той самий задокументований компроміс, що й у полі розміщення.
 //
 // ── ЧОГО ТУТ НЕМАЄ І ЧОМУ ───────────────────────────────────────
-// Драйвери беруться ЛИШЕ з датованих фактів. `photos` і `totalSaved` в
-// `EvolutionHistoryCounts` — недатовані агрегати: `historyAt` віддає їхнє
-// сьогоднішнє значення на будь-який вік. Пустити їх у констрейнти означало
-// б зламати append-only (одне завантажене фото зрушило б усю масу), тож
-// вони лишаються там, де були: у матеріалі й джиттері граней. Щоб фото
-// впливали на СТРУКТУРУ, їм спершу потрібні власні дати — це окрема зміна
-// вхідного контракту, не косметика тут.
+// Драйвери беруться ЛИШЕ з датованих фактів. `totalSaved` —недатований
+// агрегат: `historyAt` віддає його сьогоднішнє значення на будь-який вік.
+// Пустити такий факт у констрейнти означало б зламати append-only (один
+// новий запис зрушив би всю масу), тож фінанси лишаються там, де були: у
+// матеріалі (щільність/маса).
+//
+// Фото пройшли цей шлях до кінця: Supabase Storage і так віддає
+// `created_at`, тож вони тепер датовані (`useHome.ts::usePhotoPool` →
+// `ArtifactInput.photos`). Але правила читають не `counts.photos`, а
+// `counts.photosDated` — рівно те, чий вік справді відомий. У пари, чиї
+// фото прийшли без дат, драйвер лишається 0, і форма не поїде.
 // ============================================================
 import type { NodeKind } from '../artifactTypes';
 import {
@@ -111,6 +115,8 @@ export interface CrystalShapeDrivers {
   wishes: number;
   /** Віхи — «великі події народжують великі гілки». */
   events: number;
+  /** Завантажені фото (ЛИШЕ датовані) — «шпилі тягнуться вище». */
+  photos: number;
 }
 
 const clamp01 = (n: number): number => Math.max(0, Math.min(1, n));
@@ -133,6 +139,9 @@ export function crystalShapeDrivers(c: EvolutionHistoryCounts): CrystalShapeDriv
     balance: evenness([shares.exploration, shares.memory, shares.connection, shares.creation, shares.future]),
     wishes: clamp01(c.wishes / 10),
     events: clamp01(c.milestones / 8),
+    // Та сама шкала 120, що в Refinement Pressure — один факт не може
+    // означати «багато фото» для матеріалу і «мало» для форми.
+    photos: clamp01(c.photosDated / 120),
   };
 }
 
@@ -170,19 +179,27 @@ function colonyChanceFor(d: CrystalShapeDrivers): Record<NodeKind, number> {
  * | драйвер   | що змінює                              | видимий наслідок              |
  * |-----------|----------------------------------------|-------------------------------|
  * | travel    | siteTMax                               | друза підіймається по королю  |
- * | bond      | burial, minUpward, monarch.*           | вищий, товщий, прямішій король|
+ * | bond      | burial, minUpward, heightCeiling        | пряміша маса, виразніший король|
  * | memory    | slenderness                            | тонші, голчастіші шпилі       |
  * | balance   | moundFalloff                           | пологіший курган, менше «шпиля-самітника» |
  * | wishes    | colonyChance(дрібні), minAngularSep    | густіша спідниця з друзок     |
  * | events    | colonyChance(великі)                   | більше дочірніх кристалів     |
+ * | photos    | heightCeiling, підлога moundFalloff     | вищі бічні шпилі              |
  *
  * При НУЛЬОВІЙ історії функція повертає рівно `CRYSTAL_BASELINE` — форму
  * друзи, з якої починає кожна пара.
  */
 export function crystalConstraintsFrom(d: CrystalShapeDrivers): CrystalConstraints {
-  // Пологість кургану: рівномірно прожите життя дає ширший, рівніший
-  // курган; перекошене — різкий спад і один шпиль над рештою.
-  const falloffFloor = shift(0.3, 0.1, d.balance);
+  // Пологість кургану — те, що вирішує ВИСОТУ бічних шпилів: множник
+  // падає з відстанню від осі, і саме він робив дітей куксами.
+  //   • balance: рівномірно прожите життя дає ширший, рівніший курган;
+  //     перекошене — різкий спад і один шпиль над рештою;
+  //   • photos: підлога множника росте, тобто далекі від осі шпилі
+  //     перестають так різко коротшати — «чим більше фото, тим вищі шпилі».
+  //     Діє на ПІДЛОГУ, а не на стелю ієрархії (`monarch.heightCeiling`):
+  //     та стереже друзу від «качана кукурудзи», і чіпати її означало б
+  //     дозволити дітям наздогнати короля.
+  const falloffFloor = shift(0.3, 0.1, d.balance) + 0.12 * clamp01(d.photos);
   const falloffRate = shift(4.0, -1.2, d.balance);
   return {
     // Нуклеація ТІЛЬКИ біля підошви. Найважливіше число виду: заміри
@@ -203,17 +220,32 @@ export function crystalConstraintsFrom(d: CrystalShapeDrivers): CrystalConstrain
     colonyChance: colonyChanceFor(d),
     colonyShareBoost: 0.15,
     colonyMaxChance: shift(0.35, 0.15, d.wishes),
-    // Головний кристал росте рівномірно з віком стосунків (це робить
-    // `event.ageDays` у growthEngine). Зв'язок додає ще два ефекти:
-    // король стає товщим і сильніше домінує над рештою.
-    // УВАГА до `heightCeiling`: це стеля для ДІТЕЙ відносно короля, а не
-    // висота самого короля.
+    // Головний кристал росте рівномірно з віком стосунків — це робить
+    // `event.ageDays` у growthEngine, не ці числа.
+    //
+    // `baseLength`, `lengthGain` і `radiusBoost` читаються ЛИШЕ в гілці
+    // монарха, а монарх — найстаріша подія в масі, тож його історія завжди
+    // порожня (`historyAt(timeline, daysTogether)` дає bond = 0). Робити їх
+    // залежними від драйверів було б самообманом: формула виглядала б
+    // чутливою, а на екрані не змінювалось би нічого. Тому вони сталі.
+    //
+    // `heightCeiling` — інша річ: це стеля для ДІТЕЙ відносно короля
+    // (`length = min(length, monarch.length × ceiling)`), і читається вона з
+    // констрейнтів ДИТИНИ, тобто драйвери тут живі:
+    //   • bond опускає стелю — що довший спільний шлях, то виразніше
+    //     король домінує над рештою;
+    //   • photos піднімають — «чим більше фото, тим вищі шпилі». Це єдиний
+    //     важіль, який справді робить бічні шпилі вищими: підлога кургану
+    //     сама по собі дає лише +2% (виміряно), бо високі тіла все одно
+    //     впираються в цю стелю.
+    // Обидва зсуви малі навмисно: стеля — те, що стереже друзу від «качана
+    // кукурудзи» (structure.test.ts: король ≥ 2:1).
     monarch: {
       baseLength: 1.35,
-      lengthGain: shift(1.05, 0.25, d.bond),
+      lengthGain: 1.05,
       growthDays: 1200,
-      radiusBoost: shift(0.86, 0.1, d.bond),
-      heightCeiling: shift(0.4, -0.06, d.bond),
+      radiusBoost: 0.86,
+      heightCeiling: shift(0.4, -0.06, d.bond) + 0.12 * clamp01(d.photos),
     },
     moundFalloff: (horiz) => falloffFloor + (1 - falloffFloor) / (1 + horiz * falloffRate),
     heightDamp: (anchorY) => 1 / (1 + 0.5 * Math.max(0, anchorY + 0.1)),
@@ -236,6 +268,7 @@ const NO_HISTORY: CrystalShapeDrivers = {
   balance: 0,
   wishes: 0,
   events: 0,
+  photos: 0,
 };
 
 /**

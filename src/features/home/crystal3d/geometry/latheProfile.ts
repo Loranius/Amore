@@ -61,12 +61,26 @@ export function computeCrystalProfile(
   // граней — кожна читається площиною); середні — 7-9 (+шанс зайвої від
   // «складності поверхні»/книг); супутники колоній — дрібні й численні,
   // тому дешевші: 5-6 граней; мікрошар — 4-5 (перф на мобільних GPU).
-  const baseSegments =
+  const roleBase =
     branch.role === 'micro'
       ? 4 + Math.floor(shapeRng() * 2)
       : branch.role === 'satellite'
         ? 5 + Math.floor(shapeRng() * 2)
-        : 6 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+        : 6 + Math.floor(shapeRng() * 3);
+  // «Мітки на карті → більше граней»: складність поверхні тепер додає до
+  // ТРЬОХ граней, а не рівно одну — інакше зв'язок був невидимий (уся його
+  // амплітуда дорівнювала одній грані). Один розіграш обслуговує і цілу
+  // частину бюджету, і дробову (stochastic rounding), тож ПОРЯДОК і
+  // КІЛЬКІСТЬ звертань до shapeRng лишились ті самі, що були
+  // (DETERMINISM_STANDARD §3): draw для бонусу як був після 3-стороннього,
+  // так і лишився, і в micro/satellite його як не було, так і немає.
+  const facetBudget = material.surfaceComplexity * 3;
+  const baseSegments =
+    branch.role === 'micro' || branch.role === 'satellite'
+      ? roleBase
+      : roleBase +
+        Math.floor(facetBudget) +
+        (shapeRng() < facetBudget - Math.floor(facetBudget) ? 1 : 0);
   // Матриця — найширше тіло сцени, і 6-7 граней робили з неї шестигранну
   // МОНЕТУ з гострим обідком. Порода мусить читатись округлою, тож граней
   // помітно більше. Draw call вона все одно ділить з рештою (батчинг), а
