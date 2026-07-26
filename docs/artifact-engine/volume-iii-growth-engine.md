@@ -1,3 +1,7 @@
+> **ІСТОРИЧНИЙ ДОКУМЕНТ.** Написаний до злиття нормативного паку SAS v2.1.
+> Канонічне джерело істини — `docs/02_VOLUMES/` та `docs/01_CONTRACTS/`.
+> Лишається як опис того, як шари лягли на код Amore.
+
 # Artifact Engine Documentation — Volume III: Growth Engine
 
 ## Purpose
