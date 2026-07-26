@@ -51,6 +51,16 @@ export interface CrystalConstraints {
   /** Правдоподібні кварцові пропорції: стеля стрункості (довжина/радіус). */
   slenderness: number;
   monarchSlenderness: number;
+  // ── Attachment-safe placement (`CAI-REQ-001..003`) ──────────────
+  /** Частка радіуса, якою тіло «резервує» об'єм у перевірці зіткнень.
+   *  <1, бо тіло звужується до вістря — повний радіус був би надто суворим. */
+  clearanceScale: number;
+  /** Мін. кут між основами двох дітей ОДНОГО господаря, радіани
+   *  (проти злипання; спека вимагає non-clumping без жорсткої симетрії). */
+  minAngularSeparation: number;
+  /** Коефіцієнт «стискання» дитини, коли жоден кандидат не проходить
+   *  кліренс (спека: reject → redirect → SHRINK → defer). */
+  conflictShrink: number;
 }
 
 const CRYSTAL_CONSTRAINTS: CrystalConstraints = {
@@ -94,6 +104,12 @@ const CRYSTAL_CONSTRAINTS: CrystalConstraints = {
   // Стрункіші тіла — шпилі, не самоцвіти-галька.
   slenderness: 8,
   monarchSlenderness: 6.5,
+  // Кристали більше не проростають один крізь одного: тіло резервує об'єм
+  // (капсула) і кут на господарі. 0.8 — компроміс між «конус звужується»
+  // (повний радіус надто суворий) і гарантією, що грані не перетнуться.
+  clearanceScale: 0.8,
+  minAngularSeparation: 0.55,
+  conflictShrink: 0.62,
 };
 
 /** Внутрішній стан виду (§13) — описовий, для UI/телеметрії/майбутніх

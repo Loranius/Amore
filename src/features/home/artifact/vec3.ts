@@ -40,6 +40,51 @@ export const lerpVec = (a: Vec3, b: Vec3, t: number): Vec3 =>
   v3(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t);
 
 /**
+ * Найкоротша відстань між двома відрізками [p1,q1] і [p2,q2].
+ * Основа об'ємної резервації (`CAI-REQ-001`): тіло кристала апроксимується
+ * капсулою (відрізок осі + радіус), тож перетин двох тіл — це
+ * segmentDistance < r1 + r2. Класичний розв'язок Ericson, повністю
+ * детермінований (жодних ітерацій/епсилон-залежних гілок понад вироджені).
+ */
+export function segmentDistance(p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3): number {
+  const EPS = 1e-9;
+  const d1 = sub(q1, p1);
+  const d2 = sub(q2, p2);
+  const r = sub(p1, p2);
+  const a = dot(d1, d1);
+  const e = dot(d2, d2);
+  const f = dot(d2, r);
+  const clamp01v = (n: number): number => Math.max(0, Math.min(1, n));
+
+  let s: number;
+  let t: number;
+  if (a <= EPS && e <= EPS) return lengthOf(r);
+  if (a <= EPS) {
+    s = 0;
+    t = clamp01v(f / e);
+  } else {
+    const c = dot(d1, r);
+    if (e <= EPS) {
+      t = 0;
+      s = clamp01v(-c / a);
+    } else {
+      const b = dot(d1, d2);
+      const denom = a * e - b * b;
+      s = denom > EPS ? clamp01v((b * f - c * e) / denom) : 0;
+      t = (b * s + f) / e;
+      if (t < 0) {
+        t = 0;
+        s = clamp01v(-c / a);
+      } else if (t > 1) {
+        t = 1;
+        s = clamp01v((b - c) / a);
+      }
+    }
+  }
+  return lengthOf(sub(add(p1, scale(d1, s)), add(p2, scale(d2, t))));
+}
+
+/**
  * Два ортогональні одиничні вектори, перпендикулярні dir — локальна рамка
  * бічної поверхні кристала (кут angle обертається саме в цій рамці).
  * Вибір опорної осі детермінований (залежить лише від dir), тож та сама

@@ -51,7 +51,9 @@ import {
   isArtifactEmpty,
   type ArtifactInput,
 } from '../artifact';
-import { deriveClusterBranch, deriveClusterMaterial, buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
+import { deriveClusterBranch, deriveClusterMaterial, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
+import { formatPublicationReport, publishCrystal } from './crystalPublication';
+import { RENDERED_LOD } from './geometry/lod';
 
 /** Центр вертикального «дихання» левітації — немає більше каменя, що заякорює композицію низько. */
 const BOB_CENTER_Y = 0;
@@ -153,10 +155,30 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
     else meshRefs.current.delete(key);
   };
 
-  const branchMeshes = useMemo(
-    () => branches.map((branch) => ({ branch, geometry: buildBranchGeometry(branch, material) })),
+  // Volume V — зовнішня оболонка (`CAI-REQ-005..008`). Мешi будуються, а
+  // потім кожен віддає обробці стику ті грані, що сидять усередині сусідів:
+  // заглиблена кришка основи й приховані грані зникають, і маса читається
+  // як ОДНЕ зрощене тіло, а не стос окремих замкнених кристалів. Зріз
+  // робиться один раз тут, а не щокадру — це чиста функція від геометрії.
+  // Порядок «форма → зріз стику → матеріал → валідація» живе в
+  // publishCrystal — одне місце на сцену, тести й dev-харнес.
+  // Про вибір рівня деталізації див. RENDERED_LOD: автозниження якості
+  // виміряно шкідливе (воно збільшує draw calls).
+  const published = useMemo(
+    () => publishCrystal(branches, material, { lod: RENDERED_LOD }),
     [branches, material],
   );
+  // Малюємо лише те, що має що малювати: тіла, повністю поховані в сусідах,
+  // після зрізу порожні, а порожній меш усе одно коштує draw call.
+  const branchMeshes = published.renderable;
+
+  // Гейт публікації (`CAI-REQ-012`). У проді не блокує рендер — порожній
+  // екран замість кристала гірший за перетин, — але в dev кричить.
+  // Справжній гейт стоїть у тестах і `npm run build`.
+  useEffect(() => {
+    if (!import.meta.env.DEV || published.ok) return;
+    console.error(`[crystal publication]\n${formatPublicationReport(published)}`);
+  }, [published]);
 
   useEffect(
     () => () => branchMeshes.forEach(({ geometry }) => geometry.dispose()),

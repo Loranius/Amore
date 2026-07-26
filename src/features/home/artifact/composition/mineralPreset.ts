@@ -105,6 +105,7 @@ const toBody = (c: DepositedCrystal): CompositionBody => ({
   shielded: c.emphasized === true, // золоті віхи — недоторканні
   colonyId: c.colonyId,
   role: c.role,
+  hostKey: c.attachment?.hostKey ?? null,
 });
 
 /** Ліміт тіл усього зразка (перф мобільних GPU). */
@@ -143,6 +144,17 @@ function synthesizeCrystal(body: ComposedBody, parent: DepositedCrystal, seedNum
     radius: body.radius,
     growthEnergy: body.energy,
     role: body.role === 'micro' ? 'micro' : 'satellite',
+    // `CAI-REQ-004`: «виточене» композицією тіло кріпиться до СВОГО батька,
+    // а не успадковує кріплення батька зі спреду вище.
+    attachment: {
+      hostKey: body.parentKey ?? parent.key,
+      contactPoint: body.anchor,
+      contactNormal: body.direction,
+      hostT: 0,
+      // Азимут «виточеного» тіла в рамці батька — детермінований із його
+      // ключа: композиційні спавни не проходять рулетку розміщення.
+      hostAngle: (hashSeedString(body.key) % 3600) / 3600 * Math.PI * 2,
+    },
     primary: false,
     tier: body.tier,
     archetype: body.archetype as CrystalArchetype,
@@ -190,10 +202,13 @@ export function composeMineralCluster(
     const sorted = [...composed].sort(
       (a, b) => a.radius * a.radius * a.length - b.radius * b.radius * b.length || a.key.localeCompare(b.key),
     );
+    const loadBearing = new Set(
+      composed.map((c) => c.attachment?.hostKey).filter((k): k is string => typeof k === 'string'),
+    );
     const toDrop = new Set<string>();
     for (const c of sorted) {
       if (composed.length - toDrop.size <= TOTAL_BODY_CAP) break;
-      if (isDecorative(c) && c.emphasized !== true) toDrop.add(c.key);
+      if (isDecorative(c) && c.emphasized !== true && !loadBearing.has(c.key)) toDrop.add(c.key);
     }
     let cascaded = true;
     while (cascaded) {
