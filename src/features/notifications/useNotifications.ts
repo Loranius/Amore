@@ -17,13 +17,15 @@ import {
   markAppNotificationRead,
 } from './notificationsRpc';
 
-export interface PendingNotification {
-  kind: 'date' | 'goal';
-  id: number;
+interface PendingNotificationBase {
   title: string;
   detail: string;
   proposedBy: string;
 }
+
+export type PendingNotification =
+  | (PendingNotificationBase & { kind: 'date'; id: number })
+  | (PendingNotificationBase & { kind: 'goal'; id: string });
 
 export function useNotifications() {
   const me = useCurrentUser();

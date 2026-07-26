@@ -2,7 +2,10 @@
 // NotificationsPanel — actionable proposals + event inbox
 // ============================================================
 import { useNavigate } from 'react-router-dom';
-import { useNotifications } from '@/features/notifications/useNotifications';
+import {
+  useNotifications,
+  type PendingNotification,
+} from '@/features/notifications/useNotifications';
 import { useDateMutations } from '@/features/schedule/useDates';
 import { useGoalMutations } from '@/features/budget/useBudget';
 import { ProposalCard } from '@/components/ui/ProposalCard';
@@ -55,14 +58,14 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
 
   if (!open) return null;
 
-  const confirmItem = (kind: string, id: number) => {
-    if (kind === 'date') dateMutations.confirm.mutate(id);
-    else goalMutations.confirm.mutate(id);
+  const confirmItem = (item: PendingNotification) => {
+    if (item.kind === 'date') dateMutations.confirm.mutate(item.id);
+    else goalMutations.confirm.mutate(item.id);
   };
 
-  const rejectItem = (kind: string, id: number) => {
-    if (kind === 'date') dateMutations.remove.mutate(id);
-    else goalMutations.remove.mutate(id);
+  const rejectItem = (item: PendingNotification) => {
+    if (item.kind === 'date') dateMutations.remove.mutate(item.id);
+    else goalMutations.reject.mutate(item.id);
   };
 
   const openEvent = (
@@ -109,8 +112,8 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
                   pending
                   proposedBy={item.proposedBy}
                   meName={me.name}
-                  onConfirm={() => confirmItem(item.kind, item.id)}
-                  onReject={() => rejectItem(item.kind, item.id)}
+                  onConfirm={() => confirmItem(item)}
+                  onReject={() => rejectItem(item)}
                   badge={<span className="goal-status-badge">від {item.proposedBy}</span>}
                   info={
                     <>
