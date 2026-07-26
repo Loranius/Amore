@@ -680,7 +680,6 @@ function runDeposition(input: ArtifactInput): DepositedCrystal[] {
   const { seedNum, dna } = input;
   const nucleus = makeNucleus(seedNum);
   const instruction = crystalSpecies.buildInstructions(input);
-  const constraints = instruction.constraints;
   const monarch: MonarchState = { key: instruction.hierarchy.monarchKey, length: null };
 
   const bedrock: DepositedCrystal[] = [];
@@ -701,6 +700,11 @@ function runDeposition(input: ArtifactInput): DepositedCrystal[] {
         : [nucleus, ...bedrock.filter((b) => b.ageDays >= event.ageDays), ...streamPrior];
 
       const field = instruction.fieldAt(event.ageDays);
+      // Правила виду — теж ІСТОРИЧНІ (Volume II, crystalConstraints.ts):
+      // тіло росте за законом, який діяв на його дату. Той самий віковий
+      // гейт, що в субстрату й поля, тож дані, додані сьогодні, не можуть
+      // переписати закон жодного вже відкладеного тіла.
+      const constraints = instruction.constraintsAt(event.ageDays);
       // Набір кліренсу (`CAI-REQ-001`): УСЕ вже відкладене, що не молодше за
       // подію — незалежно від стріму. Той самий віковий гейт, що й у
       // субстрату: тіло, додане сьогодні, є наймолодшим, тож жодне існуюче
