@@ -43,6 +43,21 @@
   font-weight: 600;
 }
 
+.goal-forecast-paused {
+  opacity: 0.86;
+}
+
+.goal-paused {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+}
+
+.goal-pause-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 .goal-forecast-target {
   display: grid;
   gap: 0.25rem;
