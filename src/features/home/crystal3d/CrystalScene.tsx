@@ -51,76 +51,19 @@ import {
   isArtifactEmpty,
   type ArtifactInput,
 } from '../artifact';
-import { deriveClusterBranch, deriveClusterMaterial, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
+import { BREATHE_AMPLITUDE, deriveClusterBranch, deriveClusterMaterial, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
+import { breatheBatch, buildBodyBatches, disposeBatches } from './render/batchedBodies';
 import { formatPublicationReport, publishCrystal } from './crystalPublication';
 import { RENDERED_LOD } from './geometry/lod';
 
 /** Центр вертикального «дихання» левітації — немає більше каменя, що заякорює композицію низько. */
 const BOB_CENTER_Y = 0;
 
-interface BranchProps {
-  branch: ClusterBranch;
-  geometry: THREE.BufferGeometry;
-  material: ClusterMaterial;
-  registerMesh: (key: string, mesh: THREE.Mesh | null) => void;
-  onOpen: () => void;
-}
-
-/**
- * Одне тіло мінеральної маси. Дихання анімує ЄДИНИЙ useFrame у
- * CrystalCluster (кожне тіло — своєю фазою/швидкістю через registerMesh);
- * раніше кожен меш тримав власний RAF-колбек — з колоніями супутників це
- * було б ~сотня зайвих підписок щокадру. Розтяг лише по Y (геометрія має
- * основу в y=0) — виглядає як «підростання», не роздування.
- * Milestone-тіла (emissive) — золоте світіння замість фото-полірування,
- * щоб читались як веха, а не черговий приріст. 'core'-тіла отримують
- * додатковий, слабший luminosity-підсвіт (§4 левітації — світіння ядра
- * замінює світіння вже видаленої кам'яної основи).
- *
- * Позиція+кватерніон приходять готовими з deriveClusterBranch: основа
- * сидить трохи ПІД поверхнею свого субстрату (base burial), тож мешi
- * навмисно перетинаються — око бачить одну зрощену мінеральну масу.
- *
- * `transmission` НАВМИСНО завжди 0 (реального заломлення в сцені немає —
- * див. заголовок файлу). «Скляний» вигляд — лише через високий clearcoat/
- * низький roughness (пряме+ambient світло, без environment map).
- */
-function Branch({ branch, geometry, material, registerMesh, onOpen }: BranchProps) {
-  const coreGlow = branch.kind === 'core' ? material.glow * 0.5 : 0;
-  // Монарх друзи: скляна чистота без transmission (заборонений — mobile-баг,
-  // див. заголовок) і без opacity (перетинні мешi без сортування артефачать)
-  // — лише найглибший clearcoat/найнижчий roughness у сцені + легке власне
-  // світіння серця.
-  const primary = branch.primary && !branch.emissive;
-  // Ярусне полірування композиції: support ледь глибший блиск, мікрошар —
-  // матовіший «пил» (ієрархія читається і в оптиці, не лише в розмірах).
-  const micro = branch.tier === 'micro';
-  const support = branch.tier === 'support' && !branch.emissive;
-
-  return (
-    <mesh
-      ref={(mesh: THREE.Mesh | null) => registerMesh(branch.key, mesh)}
-      geometry={geometry}
-      position={[branch.posX, branch.posY, branch.posZ]}
-      quaternion={[branch.quatX, branch.quatY, branch.quatZ, branch.quatW]}
-      onClick={onOpen}
-    >
-      <meshPhysicalMaterial
-        vertexColors
-        flatShading
-        roughness={branch.emissive ? 0.06 : primary ? 0.03 : micro ? Math.min(0.5, material.roughness * 1.6) : Math.max(0.04, material.roughness * 0.5)}
-        metalness={branch.emissive ? 0.1 : 0}
-        transmission={0}
-        clearcoat={branch.emissive ? 0.95 : primary ? 1 : support ? Math.min(1, material.clearcoat + 0.35) : micro ? material.clearcoat * 0.4 : Math.min(1, material.clearcoat + 0.25)}
-        clearcoatRoughness={primary ? 0.02 : 0.04}
-        ior={1.6}
-        reflectivity={branch.emissive ? 0.8 : primary ? 0.9 : 0.7}
-        emissive={branch.emissive ? '#e8b23d' : '#ff9d5c'}
-        emissiveIntensity={branch.emissive ? 0.4 : primary ? Math.max(coreGlow, 0.12) : coreGlow}
-      />
-    </mesh>
-  );
-}
+// Тіло більше не має власного React-компонента й власного матеріалу: усі
+// тіла зведені в кілька BatchedMesh за матеріалом (render/batchedBodies.ts),
+// а самі PBR-параметри переїхали в material/bodyMaterial.ts (Volume VI —
+// це матеріальні властивості, а не деталь рендер-компонента). Подих кожного
+// тіла лишився власним: його несе матриця екземпляра.
 
 interface ClusterProps {
   material: ClusterMaterial;
@@ -132,7 +75,6 @@ interface ClusterProps {
 
 function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: ClusterProps) {
   const groupRef = useRef<THREE.Group | null>(null);
-  const meshRefs = useRef(new Map<string, THREE.Mesh>());
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
   const flashDuration = useRef(1300);
@@ -150,11 +92,6 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
     flashPeak.current = 1.1;
   };
 
-  const registerMesh = (key: string, mesh: THREE.Mesh | null) => {
-    if (mesh) meshRefs.current.set(key, mesh);
-    else meshRefs.current.delete(key);
-  };
-
   // Volume V — зовнішня оболонка (`CAI-REQ-005..008`). Мешi будуються, а
   // потім кожен віддає обробці стику ті грані, що сидять усередині сусідів:
   // заглиблена кришка основи й приховані грані зникають, і маса читається
@@ -170,7 +107,15 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
   );
   // Малюємо лише те, що має що малювати: тіла, повністю поховані в сусідах,
   // після зрізу порожні, а порожній меш усе одно коштує draw call.
-  const branchMeshes = published.renderable;
+  //
+  // Далі тіла зводяться в батчі за матеріалом (render/batchedBodies.ts):
+  // різних наборів PBR-параметрів усього 6-7, тож 27-42 окремі мешi
+  // стають 6-7 draw calls. Подих кожного тіла лишається власним — його
+  // несе матриця екземпляра, а не спільний трансформ.
+  const batches = useMemo(
+    () => buildBodyBatches(published.renderable, material),
+    [published, material],
+  );
 
   // Гейт публікації (`CAI-REQ-012`). У проді не блокує рендер — порожній
   // екран замість кристала гірший за перетин, — але в dev кричить.
@@ -180,10 +125,15 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
     console.error(`[crystal publication]\n${formatPublicationReport(published)}`);
   }, [published]);
 
-  useEffect(
-    () => () => branchMeshes.forEach(({ geometry }) => geometry.dispose()),
-    [branchMeshes],
-  );
+  // Батчі копіюють геометрію у власні буфери, тож звільняти треба і їх, і
+  // вихідні геометрії публікації.
+  useEffect(() => {
+    const bodies = published.bodies;
+    return () => {
+      disposeBatches(batches);
+      bodies.forEach(({ geometry }) => geometry.dispose());
+    };
+  }, [batches, published]);
 
   useFrame((state, delta) => {
     const group = groupRef.current;
@@ -200,14 +150,11 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
       // Левітація: артефакт повільно гойдається вгору-вниз, без жодної
       // видимої опори (§4 — «no visible foundation»).
       group.position.y = BOB_CENTER_Y + Math.sin(state.clock.elapsedTime * 0.18) * 0.12;
-      // Мікро-дихання кожного тіла (власна фаза/швидкість) — один спільний
-      // цикл замість useFrame-підписки на кожен меш (див. Branch).
+      // Мікро-дихання кожного тіла (власна фаза/швидкість). Тепер це
+      // матриця екземпляра в батчі, а не scale окремого меша — рух той
+      // самий, викликів рендера менше.
       const t = state.clock.elapsedTime;
-      for (const { branch } of branchMeshes) {
-        const mesh = meshRefs.current.get(branch.key);
-        if (!mesh) continue;
-        mesh.scale.set(1, 1 + Math.sin(t * branch.breatheSpeed + branch.breathePhase) * 0.018, 1);
-      }
+      for (const batch of batches) breatheBatch(batch, t, BREATHE_AMPLITUDE);
     }
     const light = flashLightRef.current;
     if (light) {
@@ -221,15 +168,8 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
   return (
     <group ref={groupRef} onPointerDown={onTouch}>
       <pointLight ref={flashLightRef} position={[0, 0.5, 0]} color="#fff2cf" intensity={baseIntensity} distance={4} />
-      {branchMeshes.map(({ branch, geometry }) => (
-        <Branch
-          key={branch.key}
-          branch={branch}
-          geometry={geometry}
-          material={material}
-          registerMesh={registerMesh}
-          onOpen={onOpen}
-        />
+      {batches.map((batch) => (
+        <primitive key={batch.signature} object={batch.mesh} onClick={onOpen} />
       ))}
     </group>
   );
