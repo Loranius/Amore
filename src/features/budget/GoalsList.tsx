@@ -8,6 +8,12 @@ import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { Card } from '@/components/ui/Card';
 import { ProposalCard } from '@/components/ui/ProposalCard';
+import { GoalContributions } from './GoalContributions';
+import {
+  CONTRIBUTION_NOTE_MAX,
+  isValidContributionAmount,
+  normalizeContributionNote,
+} from './contributionModel';
 import {
   fmtMoney,
   useGoals,
@@ -19,10 +25,15 @@ import {
 export function GoalsList() {
   const me = useCurrentUser();
   const { data: goals = [], isPending } = useGoals();
-  const { add, confirm, reject, remove, addFunds } = useGoalMutations();
+  const { add, confirm, reject, remove, addContribution } = useGoalMutations();
 
   const [adding, setAdding] = useState(false);
   const [funding, setFunding] = useState<BudgetGoalRow | null>(null);
+  const [historyGoalId, setHistoryGoalId] = useState<string | null>(null);
+
+  const historyGoal = historyGoalId
+    ? goals.find((goal) => goal.id === historyGoalId) ?? null
+    : null;
 
   return (
     <Card className="fin-card">
@@ -87,13 +98,22 @@ export function GoalsList() {
                   <>
                     <span className="goal-row-price">{fmtMoney(target)}</span>
                     {g.status === 'confirmed' && (
-                      <button
-                        type="button"
-                        className="btn-secondary goal-add-funds-btn"
-                        onClick={() => setFunding(g)}
-                      >
-                        + Внести
-                      </button>
+                      <div className="goal-finance-actions">
+                        <button
+                          type="button"
+                          className="btn-secondary goal-history-btn"
+                          onClick={() => setHistoryGoalId(g.id)}
+                        >
+                          Історія
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary goal-add-funds-btn"
+                          onClick={() => setFunding(g)}
+                        >
+                          + Внести
+                        </button>
+                      </div>
                     )}
                   </>
                 }
@@ -113,7 +133,15 @@ export function GoalsList() {
         <AddFundsModal
           goal={funding}
           onClose={() => setFunding(null)}
-          onSubmit={(amount) => addFunds.mutateAsync({ id: funding.id, amount })}
+          onSubmit={({ amount, note }) =>
+            addContribution.mutateAsync({ id: funding.id, amount, note })
+          }
+        />
+      )}
+      {historyGoal && (
+        <GoalContributions
+          goal={historyGoal}
+          onClose={() => setHistoryGoalId(null)}
         />
       )}
     </Card>
@@ -236,23 +264,27 @@ function AddFundsModal({
 }: {
   goal: BudgetGoalRow;
   onClose: () => void;
-  onSubmit: (amount: number) => Promise<unknown>;
+  onSubmit: (input: { amount: number; note: string | null }) => Promise<unknown>;
 }) {
   const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const saved = Math.max(0, Number(goal.saved_amount ?? 0));
   const contribution = Number(amount);
-  const validContribution = Number.isFinite(contribution) && contribution > 0;
+  const validContribution = isValidContributionAmount(contribution);
 
   const save = async () => {
     if (!validContribution || submitting) return;
 
     setSubmitting(true);
     try {
-      await onSubmit(contribution);
+      await onSubmit({
+        amount: contribution,
+        note: normalizeContributionNote(note),
+      });
       onClose();
     } catch {
-      // Тост показує mutation; поле не очищаємо, щоб суму можна було повторити.
+      // Тост показує mutation; поля не очищаємо, щоб внесок можна було повторити.
       setSubmitting(false);
     }
   };
@@ -281,6 +313,21 @@ function AddFundsModal({
             autoFocus
           />
         </label>
+        <label className="form-field">
+          <span>Коротка примітка <small>необов’язково</small></span>
+          <textarea
+            id="goal-funds-note"
+            name="note"
+            rows={3}
+            maxLength={CONTRIBUTION_NOTE_MAX}
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Наприклад: ще один крок до подорожі"
+          />
+          <small className="goal-note-counter">
+            {note.length}/{CONTRIBUTION_NOTE_MAX}
+          </small>
+        </label>
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose} disabled={submitting}>
             Скасувати
@@ -291,7 +338,7 @@ function AddFundsModal({
             onClick={() => void save()}
             disabled={submitting || !validContribution}
           >
-            {submitting ? 'Додаємо…' : 'Додати'}
+            {submitting ? 'Додаємо…' : 'Додати внесок'}
           </button>
         </div>
       </div>
