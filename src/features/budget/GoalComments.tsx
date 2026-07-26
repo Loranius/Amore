@@ -147,7 +147,7 @@ export function GoalComments({
             <span aria-hidden="true">{paused ? 'Ⅱ' : '●'}</span>
             {paused ? 'Ціль на паузі' : 'Активна ціль'}
           </span>
-          <span>{commentCountLabel(comments.length)}</span>
+          <span>{isPending ? 'Завантаження…' : commentCountLabel(comments.length)}</span>
         </div>
 
         {isPending ? (
