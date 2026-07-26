@@ -44,6 +44,54 @@ export interface ShellEntry {
   geometry: THREE.BufferGeometry;
 }
 
+/**
+ * Чи бачить промінь ВИВОРІТ оболонки першим — із захистом від виродженого
+ * влучання.
+ *
+ * Навіщо захист. Лате ставить вершину колонки 0 рівно на вісь Z (x=0), а
+ * канонічні напрямки проб містять точні осі — тож промінь може піти точно
+ * вздовж ребра меша. У цьому випадку обидва суміжні трикутники не
+ * зараховують влучання (класичне ребро в ray-triangle), промінь «проходить
+ * крізь» передню стінку і першим бачить задню. Це артефакт проби, а не
+ * дірка: перевірка кількості перетинів показує 1 замість 2.
+ *
+ * Захист — підтвердження двома ледь зсунутими променями: артефакт ребра
+ * зникає від найменшого зсуву (сусідній промінь нормально влучає в передню
+ * стінку), а справжня дірка лишається видимою з усіх трьох.
+ *
+ * Спершу я додав був ще й перевірку парності перетинів (замкнене тіло
+ * перетинається парну кількість разів). Її довелось прибрати: відкрита
+ * оболонка дає непарну кількість ЗАКОНОМІРНО — і це рівно той дефект, який
+ * проба має ловити. Правило відсіювало саме знахідки, заради яких існує.
+ */
+function seesInterior(
+  raycaster: THREE.Raycaster,
+  meshes: readonly THREE.Mesh[],
+  origin: THREE.Vector3,
+  direction: THREE.Vector3,
+): THREE.Intersection | null {
+  const cast = (o: THREE.Vector3): THREE.Intersection | null => {
+    raycaster.set(o, direction);
+    const hits = raycaster.intersectObjects(meshes as THREE.Mesh[], false);
+    const first = hits[0];
+    if (first === undefined || first.face == null) return null;
+    const normal = first.face.normal.clone().applyQuaternion(first.object.quaternion);
+    return normal.dot(direction) > 1e-6 ? first : null;
+  };
+
+  const primary = cast(origin);
+  if (primary === null) return null;
+
+  // Підтвердження: зсув на частку розміру тіла в двох незалежних напрямках.
+  const [u, w] = orthoBasis(direction);
+  const eps = 1e-4;
+  let confirmed = 0;
+  for (const shift of [u.clone().multiplyScalar(eps), w.clone().multiplyScalar(eps)]) {
+    if (cast(origin.clone().add(shift)) !== null) confirmed++;
+  }
+  return confirmed === 2 ? primary : null;
+}
+
 const RANK: Record<ShellViolationKind, number> = {
   'orphan-host': 0,
   'visible-base-cap': 1,
@@ -198,13 +246,8 @@ export function probeExterior(
           .addScaledVector(direction, -span)
           .addScaledVector(u, Math.cos(angle) * radius)
           .addScaledVector(w, Math.sin(angle) * radius);
-        raycaster.set(origin, direction);
-        const hit = raycaster.intersectObjects(meshes, false)[0];
-        if (hit === undefined || hit.face == null) continue;
-        // Нормаль грані у світі; додатний скаляр із напрямком променя
-        // означає, що ми дивимось граню в спину — це виворіт оболонки.
-        const normal = hit.face.normal.clone().applyQuaternion(hit.object.quaternion);
-        if (normal.dot(direction) <= 1e-6) continue;
+        const hit = seesInterior(raycaster, meshes, origin, direction);
+        if (hit === null) continue;
         const key = String(hit.object.userData.key);
         if (seen.has(key)) continue;
         seen.add(key);
@@ -221,7 +264,7 @@ export function probeExterior(
   return violations;
 }
 
-/** Напрямки проб за замовчуванням: строго знизу + чотири низькі діагоналі. */
+/** Напрямки проб знизу: строго знизу + чотири низькі діагоналі. */
 export const UNDERSIDE_DIRECTIONS: THREE.Vector3[] = [
   new THREE.Vector3(0, 1, 0),
   new THREE.Vector3(0.6, 1, 0),
@@ -229,6 +272,122 @@ export const UNDERSIDE_DIRECTIONS: THREE.Vector3[] = [
   new THREE.Vector3(0, 1, 0.6),
   new THREE.Vector3(0, 1, -0.6),
 ];
+
+/** Повний оберт навколо колонії — 16 горизонтальних напрямків (§8). */
+export const ORBIT_DIRECTIONS: THREE.Vector3[] = Array.from({ length: 16 }, (_, i) => {
+  const a = (i / 16) * Math.PI * 2;
+  return new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+});
+
+/** Строго згори (§8). */
+export const TOP_DIRECTION = new THREE.Vector3(0, -1, 0);
+
+/** Похилі згори — між орбітою й видом згори лишалась би сліпа зона. */
+const UPPER_OBLIQUE: THREE.Vector3[] = [
+  new THREE.Vector3(0.7, -1, 0),
+  new THREE.Vector3(-0.7, -1, 0),
+  new THREE.Vector3(0, -1, 0.7),
+  new THREE.Vector3(0, -1, -0.7),
+];
+
+/**
+ * Уся матриця видів §8 одним набором: оберт + верх + похилі згори + низ.
+ * Тримається тут, а не в тестах, щоб «повний набір видів» мав одне
+ * визначення — інакше кожен тест перевіряв би свою частину й ніхто не
+ * відповідав би за покриття цілком.
+ */
+export const VALIDATION_VIEWS: THREE.Vector3[] = [
+  ...ORBIT_DIRECTIONS,
+  TOP_DIRECTION,
+  ...UPPER_OBLIQUE,
+  ...UNDERSIDE_DIRECTIONS,
+];
+
+/**
+ * `CAI-REQ-008`, близькі види стиків (§8: «close-up views of every high-risk
+ * junction» + «side views at junction height»).
+ *
+ * Навіщо окремо від `probeExterior`. Глобальна проба стріляє сіткою по
+ * силуету всієї маси — на 58 тіл це десятки променів на весь кристал, і
+ * дефект розміром з один стик вона може просто не зачепити. Тут навпаки:
+ * для КОЖНОЇ пари господар↔дитина промені йдуть щільною сферою прямо в
+ * точку виходу дитини з господаря. Саме там і живуть ризики: зрізана
+ * кришка, шов, майже дотичні поверхні.
+ *
+ * Перше влучання не має бути виворотом грані — критерій той самий, що в
+ * `probeExterior`, бо питання те саме: чи не видно нутро оболонки.
+ */
+export function probeJunctions(
+  entries: readonly ShellEntry[],
+  ringCount = 8,
+): ShellViolation[] {
+  const probeMaterial = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide });
+  const meshes = entries.map((e) => {
+    const mesh = new THREE.Mesh(e.geometry, probeMaterial);
+    mesh.position.copy(e.solid.position);
+    mesh.quaternion.copy(e.solid.inverseQuaternion).invert();
+    mesh.updateMatrixWorld(true);
+    mesh.userData.key = e.solid.key;
+    return mesh;
+  });
+  const byKey = new Map(entries.map((e) => [e.solid.key, e]));
+  const raycaster = new THREE.Raycaster();
+  const violations: ShellViolation[] = [];
+  const seen = new Set<string>();
+
+  // Габарит УСІЄЇ маси. Стартувати промінь на фіксованій невеликій відстані
+  // від стику не можна: стик лежить на поверхні господаря, тож для напрямків
+  // «усередину» такий старт опинявся б у тілі господаря, і проба звітувала б
+  // про виворіт там, де насправді просто дивиться зсередини назовні. Тому
+  // промені завжди починаються ЗА межами маси, лише прицілені в стик.
+  const center = new THREE.Vector3();
+  for (const e of entries) center.add(e.solid.boundsCenter);
+  if (entries.length > 0) center.multiplyScalar(1 / entries.length);
+  let massRadius = 0;
+  for (const e of entries) {
+    massRadius = Math.max(massRadius, center.distanceTo(e.solid.boundsCenter) + e.solid.boundsRadius);
+  }
+
+  for (const entry of entries) {
+    const { hostKey, solid } = entry;
+    if (hostKey === null) continue;
+    const host = byKey.get(hostKey)?.solid;
+    if (host === undefined) continue;
+
+    // Ціль — основа дитини, тобто точка її виходу з господаря.
+    const target = solid.position.clone();
+    const start = massRadius + center.distanceTo(target) + Math.max(solid.profile.h, host.profile.h);
+
+    for (let ring = 0; ring < ringCount; ring++) {
+      const phi = ((ring + 0.5) / ringCount) * Math.PI; // полярний кут
+      const slices = Math.max(4, Math.round(Math.sin(phi) * ringCount * 2));
+      for (let s = 0; s < slices; s++) {
+        const theta = (s / slices) * Math.PI * 2;
+        const dir = new THREE.Vector3(
+          Math.sin(phi) * Math.cos(theta),
+          Math.cos(phi),
+          Math.sin(phi) * Math.sin(theta),
+        );
+        // Старт поза масою, напрямок — точно в стик.
+        const inward = dir.clone().negate();
+        const hit = seesInterior(raycaster, meshes, target.clone().addScaledVector(dir, start), inward);
+        if (hit === null) continue;
+        const key = String(hit.object.userData.key);
+        const id = `${solid.key}@${key}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        violations.push({
+          kind: 'interior-visible-from-outside',
+          key,
+          hostKey: byKey.get(key)?.hostKey ?? null,
+          detail: `виворіт оболонки видно зблизька біля стику ${hostKey}→${solid.key}`,
+        });
+      }
+    }
+  }
+  violations.sort((a, b) => a.key.localeCompare(b.key) || a.detail.localeCompare(b.detail));
+  return violations;
+}
 
 function orthoBasis(n: THREE.Vector3): [THREE.Vector3, THREE.Vector3] {
   const seed = Math.abs(n.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
