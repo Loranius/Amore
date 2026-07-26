@@ -109,7 +109,7 @@ describe('external shell — `CAI-REQ-007` hidden faces', () => {
 
   it('зріз реально працює: сира маса порушення МАЄ, зрізана — ні', () => {
     for (const seed of SEEDS) {
-      const raw = validateExternalShell(toShellEntries(buildMass(seed, false)));
+      const raw = validateExternalShell(toShellEntries(buildMass(seed, { skipTrim: true })));
       const trimmed = validateExternalShell(toShellEntries(buildMass(seed)));
       expect(raw.length, `${seed}: валідатор нічого не ловить на сирій масі`).toBeGreaterThan(0);
       expect(formatShellViolations(trimmed)).toBe('external shell: 0 порушень');

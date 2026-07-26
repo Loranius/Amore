@@ -1,9 +1,13 @@
 // ============================================================
-// Фікстура геометричних тестів Volume V: реальна маса з реального рушія.
+// Фікстура геометричних і матеріальних тестів: реальна маса з рушія.
 // ------------------------------------------------------------
 // Навмисно НЕ синтетичні «два циліндри»: перевіряти обробку стику треба на
 // тій самій композиції, що йде на екран пари, — інакше тест зелений на
 // іграшці й сліпий до справжнього кристала.
+//
+// Конвеєр не дублюється: `buildMass` викликає той самий `publishCrystal`,
+// що й сцена. Якби фікстура складала кроки самотужки, тести перевіряли б
+// свою власну послідовність, а не ту, що йде користувачеві.
 // ============================================================
 import {
   buildArtifactNodes,
@@ -12,10 +16,10 @@ import {
   type ArtifactInput,
 } from '../../artifact';
 import { hashSeedString } from '../../mulberry32';
-import { buildBranchGeometry, deriveClusterBranch, deriveClusterMaterial, type ClusterBranch, type ClusterMaterial } from '../crystalCluster';
-import { buildHostSolids, type HostSolid } from '../geometry/hostBody';
-import { trimHiddenFaces, type TrimStats } from '../geometry/junctionTrim';
-import { bindMaterialRegions } from '../material/crystalMaterial';
+import { deriveClusterBranch, deriveClusterMaterial, type ClusterBranch, type ClusterMaterial } from '../crystalCluster';
+import { publishCrystal, type PublishedBody, type PublishedCrystal, type PublishOptions } from '../crystalPublication';
+import type { HostSolid } from '../geometry/hostBody';
+import type { TrimStats } from '../geometry/junctionTrim';
 import type { MaterialEntry } from '../material/validateMaterial';
 import type { ShellEntry } from '../geometry/validateShell';
 import type * as THREE from 'three';
@@ -95,6 +99,7 @@ export interface BuiltMass {
   material: ClusterMaterial;
   solids: Map<string, HostSolid>;
   bodies: BuiltBody[];
+  published: PublishedCrystal;
 }
 
 export function buildBranches(seed: string): { branches: ClusterBranch[]; material: ClusterMaterial } {
@@ -106,41 +111,27 @@ export function buildBranches(seed: string): { branches: ClusterBranch[]; materi
   };
 }
 
-/** Повна маса, як її будує CrystalScene: геометрія → зріз → матеріал. */
-export function buildMass(seed: string, trim = true): BuiltMass {
-  const { branches, material } = buildBranches(seed);
-  const solids = buildHostSolids(branches, material);
-  const byKey = new Map(branches.map((b) => [b.key, b]));
-  const bodies = branches.map((branch) => {
-    const geometry = buildBranchGeometry(branch, material);
-    const solid = solids.get(branch.key)!;
-    const stats = trim
-      ? trimHiddenFaces(geometry, solid, branch.hostKey, solids)
-      : ({
-          key: branch.key,
-          hostKey: branch.hostKey,
-          trianglesTotal: (geometry.getIndex()?.count ?? 0) / 3,
-          trianglesRemoved: 0,
-          capBuried: false,
-          capRemoved: false,
-          occluders: [],
-        } satisfies TrimStats);
-    const hostSolid = branch.hostKey === null ? undefined : solids.get(branch.hostKey);
-    const hostBranch = branch.hostKey === null ? undefined : byKey.get(branch.hostKey);
-    bindMaterialRegions(
-      geometry,
-      branch,
-      solid,
-      material,
-      hostSolid !== undefined && hostBranch !== undefined ? { solid: hostSolid, branch: hostBranch } : undefined,
-    );
-    return { branch, solid, geometry, stats };
-  });
-  return { material, solids, bodies };
-}
+const toBuiltBody = (b: PublishedBody): BuiltBody => ({
+  branch: b.branch,
+  solid: b.solid,
+  geometry: b.geometry,
+  stats: b.trim,
+});
 
-export const toMaterialEntries = (mass: BuiltMass): MaterialEntry[] =>
-  mass.bodies.map(({ branch, solid, geometry }) => ({ branch, solid, geometry }));
+/** Повна маса — рівно тим конвеєром, що й у сцені. */
+export function buildMass(seed: string, options: PublishOptions = {}): BuiltMass {
+  const { branches, material } = buildBranches(seed);
+  const published = publishCrystal(branches, material, options);
+  return {
+    material,
+    solids: new Map(published.bodies.map((b) => [b.branch.key, b.solid])),
+    bodies: published.bodies.map(toBuiltBody),
+    published,
+  };
+}
 
 export const toShellEntries = (mass: BuiltMass): ShellEntry[] =>
   mass.bodies.map(({ solid, branch, geometry }) => ({ solid, hostKey: branch.hostKey, geometry }));
+
+export const toMaterialEntries = (mass: BuiltMass): MaterialEntry[] =>
+  mass.bodies.map(({ branch, solid, geometry }) => ({ branch, solid, geometry }));

@@ -21,6 +21,7 @@
 import * as THREE from 'three';
 import { BREATHE_AMPLITUDE, type ClusterBranch, type ClusterMaterial } from '../crystalCluster';
 import { computeCrystalProfile, nominalRadiusAt, type CrystalProfile } from './latheProfile';
+import type { LodLevel } from './lod';
 
 /** Тіло, проти якого перевіряють занурення: профіль + світовий трансформ. */
 export interface HostSolid {
@@ -40,8 +41,13 @@ export interface HostSolid {
 export function buildHostSolid(
   branch: ClusterBranch,
   material: Pick<ClusterMaterial, 'surfaceComplexity' | 'polish'>,
+  lod: LodLevel = 'high',
 ): HostSolid {
-  const profile = computeCrystalProfile(branch, material);
+  // Модель господаря МУСИТЬ будуватись на тому самому рівні деталізації, що
+  // й меш: нижня межа радіуса залежить від кількості граней (cos(π/n)), тож
+  // модель з іншим LOD вважала б господаря товщим, ніж він намальований, і
+  // зріз проїв би дірку (`CAI-REQ-011`).
+  const profile = computeCrystalProfile(branch, material, lod);
   const inradius = Math.cos(Math.PI / profile.segments);
   const position = new THREE.Vector3(branch.posX, branch.posY, branch.posZ);
   const quaternion = new THREE.Quaternion(branch.quatX, branch.quatY, branch.quatZ, branch.quatW);
@@ -143,6 +149,7 @@ export function projectOnHost(worldPoint: THREE.Vector3, host: HostSolid): numbe
 export function buildHostSolids(
   branches: readonly ClusterBranch[],
   material: Pick<ClusterMaterial, 'surfaceComplexity' | 'polish'>,
+  lod: LodLevel = 'high',
 ): Map<string, HostSolid> {
-  return new Map(branches.map((b) => [b.key, buildHostSolid(b, material)]));
+  return new Map(branches.map((b) => [b.key, buildHostSolid(b, material, lod)]));
 }

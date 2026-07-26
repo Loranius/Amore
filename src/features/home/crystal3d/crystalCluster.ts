@@ -24,6 +24,7 @@ import type {
   NodeKind,
 } from '../artifact';
 import { computeCrystalProfile } from './geometry/latheProfile';
+import type { LodLevel } from './geometry/lod';
 
 export interface ClusterBranch {
   key: string;
@@ -237,13 +238,14 @@ export function deriveClusterMaterial(pressures: EvolutionPressures): ClusterMat
 export function buildBranchGeometry(
   branch: ClusterBranch,
   material: Pick<ClusterMaterial, 'surfaceComplexity' | 'polish'>,
+  lod: LodLevel = 'high',
 ): THREE.BufferGeometry {
   // Профіль приходить із latheProfile.ts — того самого модуля, яким
   // користується аналітична модель тіла-господаря (geometry/hostBody.ts).
   // Це не «винесено для краси»: обробка стику вирізає грані за тим, де,
   // на її думку, проходить поверхня сусіда, тож дві незалежні копії
   // профілю рано чи пізно розійшлись би — і оболонка розповзлась би.
-  const { segments, points, jitterAmp, scaleX, scaleZ } = computeCrystalProfile(branch, material);
+  const { segments, points, jitterAmp, scaleX, scaleZ } = computeCrystalProfile(branch, material, lod);
 
   const geo = new THREE.LatheGeometry(points, segments);
   const pos = geo.getAttribute('position') as THREE.BufferAttribute;

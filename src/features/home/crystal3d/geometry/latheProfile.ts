@@ -17,6 +17,7 @@
 import * as THREE from 'three';
 import { mulberry32, hashSeedString } from '../../mulberry32';
 import type { ClusterBranch, ClusterMaterial } from '../crystalCluster';
+import { lodSegments, type LodLevel } from './lod';
 
 /** Рядок профілю обертання: радіус на висоті y (локальний простір тіла). */
 export interface ProfileRow {
@@ -53,18 +54,23 @@ const radiusScale = (m: number): number => 0.4 + m * 0.6;
 export function computeCrystalProfile(
   branch: ClusterBranch,
   material: Pick<ClusterMaterial, 'surfaceComplexity' | 'polish'>,
+  lod: LodLevel = 'high',
 ): CrystalProfile {
   const shapeRng = mulberry32(hashSeedString(branch.key));
   // Великі тіла — ВЕЛИКІ чисті грані (референс: кварцовий гексагон, 6-7
   // граней — кожна читається площиною); середні — 7-9 (+шанс зайвої від
   // «складності поверхні»/книг); супутники колоній — дрібні й численні,
   // тому дешевші: 5-6 граней; мікрошар — 4-5 (перф на мобільних GPU).
-  const segments =
+  const baseSegments =
     branch.role === 'micro'
       ? 4 + Math.floor(shapeRng() * 2)
       : branch.role === 'satellite'
         ? 5 + Math.floor(shapeRng() * 2)
         : 6 + Math.floor(shapeRng() * 3) + (shapeRng() < material.surfaceComplexity ? 1 : 0);
+  // LOD зрізає граней ПІСЛЯ розіграшу — потік shapeRng не зсувається, тож
+  // форма тіла на всіх рівнях та сама, змінюється лише її роздільність
+  // (`V5-REQ-009`).
+  const segments = lodSegments(baseSegments, lod);
   const m = branch.maturity;
 
   const h = branch.height * heightScale(m);

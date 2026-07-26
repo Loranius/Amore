@@ -51,11 +51,9 @@ import {
   isArtifactEmpty,
   type ArtifactInput,
 } from '../artifact';
-import { deriveClusterBranch, deriveClusterMaterial, buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
-import { buildHostSolids, type HostSolid } from './geometry/hostBody';
-import { trimHiddenFaces } from './geometry/junctionTrim';
-import { formatShellViolations, validateExternalShell } from './geometry/validateShell';
-import { bindMaterialRegions } from './material/crystalMaterial';
+import { deriveClusterBranch, deriveClusterMaterial, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
+import { formatPublicationReport, publishCrystal } from './crystalPublication';
+import { RENDERED_LOD } from './geometry/lod';
 
 /** Центр вертикального «дихання» левітації — немає більше каменя, що заякорює композицію низько. */
 const BOB_CENTER_Y = 0;
@@ -162,44 +160,25 @@ function CrystalCluster({ material, branches, reduceMotion, grew, onOpen }: Clus
   // заглиблена кришка основи й приховані грані зникають, і маса читається
   // як ОДНЕ зрощене тіло, а не стос окремих замкнених кристалів. Зріз
   // робиться один раз тут, а не щокадру — це чиста функція від геометрії.
-  const branchMeshes = useMemo(() => {
-    const solids = buildHostSolids(branches, material);
-    const byKey = new Map(branches.map((b) => [b.key, b]));
-    return branches.map((branch) => {
-      const geometry = buildBranchGeometry(branch, material);
-      const solid = solids.get(branch.key);
-      if (solid !== undefined) {
-        trimHiddenFaces(geometry, solid, branch.hostKey, solids);
-        // Volume VI — прив'язка матеріалу СТРОГО після зрізу: зрізані грані
-        // не отримують кольору взагалі, а перехід до кольору господаря
-        // живе лише в оголошеній смузі шва (`CAI-REQ-009..010`).
-        const hostSolid = branch.hostKey === null ? undefined : solids.get(branch.hostKey);
-        const hostBranch = branch.hostKey === null ? undefined : byKey.get(branch.hostKey);
-        bindMaterialRegions(
-          geometry,
-          branch,
-          solid,
-          material,
-          hostSolid !== undefined && hostBranch !== undefined
-            ? { solid: hostSolid, branch: hostBranch }
-            : undefined,
-        );
-      }
-      return { branch, geometry, solid };
-    });
-  }, [branches, material]);
+  // Порядок «форма → зріз стику → матеріал → валідація» живе в
+  // publishCrystal — одне місце на сцену, тести й dev-харнес.
+  // Про вибір рівня деталізації див. RENDERED_LOD: автозниження якості
+  // виміряно шкідливе (воно збільшує draw calls).
+  const published = useMemo(
+    () => publishCrystal(branches, material, { lod: RENDERED_LOD }),
+    [branches, material],
+  );
+  // Малюємо лише те, що має що малювати: тіла, повністю поховані в сусідах,
+  // після зрізу порожні, а порожній меш усе одно коштує draw call.
+  const branchMeshes = published.renderable;
 
-  // Гейт цілісності оболонки. У проді не блокує рендер (порожній екран
-  // замість кристала — гірше за перетин), але в dev кричить: справжній
-  // гейт стоїть у тестах і `npm run build`. Див. geometry/validateShell.ts.
+  // Гейт публікації (`CAI-REQ-012`). У проді не блокує рендер — порожній
+  // екран замість кристала гірший за перетин, — але в dev кричить.
+  // Справжній гейт стоїть у тестах і `npm run build`.
   useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    const entries = branchMeshes
-      .filter((m): m is typeof m & { solid: HostSolid } => m.solid !== undefined)
-      .map(({ branch, geometry, solid }) => ({ solid, hostKey: branch.hostKey, geometry }));
-    const violations = validateExternalShell(entries);
-    if (violations.length > 0) console.error(`[crystal shell]\n${formatShellViolations(violations)}`);
-  }, [branchMeshes]);
+    if (!import.meta.env.DEV || published.ok) return;
+    console.error(`[crystal publication]\n${formatPublicationReport(published)}`);
+  }, [published]);
 
   useEffect(
     () => () => branchMeshes.forEach(({ geometry }) => geometry.dispose()),
