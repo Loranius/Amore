@@ -31,7 +31,9 @@ export function getGoalMilestoneState(
 ): GoalMilestoneState {
   const progress = calculateGoalProgress(savedAmount, targetAmount);
   const reached = GOAL_MILESTONES.filter((level) => progress >= level);
-  const current = reached.length > 0 ? reached[reached.length - 1] : null;
+  const current: GoalMilestoneLevel | null = reached.length > 0
+    ? reached[reached.length - 1]!
+    : null;
 
   return {
     progress,
