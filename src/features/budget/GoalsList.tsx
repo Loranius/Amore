@@ -9,6 +9,8 @@ import { useCurrentUser } from '@/providers/AuthProvider';
 import { Card } from '@/components/ui/Card';
 import { ProposalCard } from '@/components/ui/ProposalCard';
 import { GoalContributions } from './GoalContributions';
+import { GoalDesiredDateModal, GoalForecastCard } from './GoalForecast';
+import { useGoalForecastMutations, useGoalForecasts } from './useGoalForecast';
 import {
   CONTRIBUTION_NOTE_MAX,
   isValidContributionAmount,
@@ -25,15 +27,23 @@ import {
 export function GoalsList() {
   const me = useCurrentUser();
   const { data: goals = [], isPending } = useGoals();
+  const { data: forecasts = [], isPending: forecastsPending } = useGoalForecasts();
   const { add, confirm, reject, remove, addContribution } = useGoalMutations();
+  const { setDesiredDate } = useGoalForecastMutations();
 
   const [adding, setAdding] = useState(false);
   const [funding, setFunding] = useState<BudgetGoalRow | null>(null);
   const [historyGoalId, setHistoryGoalId] = useState<string | null>(null);
+  const [dateGoalId, setDateGoalId] = useState<string | null>(null);
 
+  const forecastByGoal = new Map(forecasts.map((forecast) => [forecast.goalId, forecast]));
   const historyGoal = historyGoalId
     ? goals.find((goal) => goal.id === historyGoalId) ?? null
     : null;
+  const dateGoal = dateGoalId
+    ? goals.find((goal) => goal.id === dateGoalId) ?? null
+    : null;
+  const dateForecast = dateGoalId ? forecastByGoal.get(dateGoalId) ?? null : null;
 
   return (
     <Card className="fin-card">
@@ -91,6 +101,11 @@ export function GoalsList() {
                           <span className="goal-progress-pct">{pct}%</span>
                         </div>
                       </div>
+                      <GoalForecastCard
+                        forecast={forecastByGoal.get(g.id) ?? null}
+                        isLoading={forecastsPending}
+                        onEdit={() => setDateGoalId(g.id)}
+                      />
                     </>
                   ) : undefined
                 }
@@ -142,6 +157,16 @@ export function GoalsList() {
         <GoalContributions
           goal={historyGoal}
           onClose={() => setHistoryGoalId(null)}
+        />
+      )}
+      {dateGoal && (
+        <GoalDesiredDateModal
+          goalName={dateGoal.name}
+          currentDate={dateForecast?.desiredDate ?? null}
+          onClose={() => setDateGoalId(null)}
+          onSubmit={(desiredDate) =>
+            setDesiredDate.mutateAsync({ goalId: dateGoal.id, desiredDate })
+          }
         />
       )}
     </Card>

@@ -1,0 +1,85 @@
+.goal-forecast-card {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.goal-forecast-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  opacity: 0.76;
+}
+
+.goal-forecast-edit {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.goal-forecast-edit:hover {
+  opacity: 1;
+}
+
+.goal-forecast-copy {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.goal-forecast-complete {
+  font-weight: 600;
+}
+
+.goal-forecast-target {
+  display: grid;
+  gap: 0.25rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  line-height: 1.4;
+}
+
+.goal-forecast-target small,
+.goal-forecast-hint {
+  opacity: 0.62;
+  line-height: 1.4;
+}
+
+.goal-date-modal {
+  width: min(500px, calc(100vw - 2rem));
+}
+
+.goal-date-actions {
+  flex-wrap: wrap;
+}
+
+.goal-date-remove {
+  margin-right: auto;
+}
+
+@media (max-width: 600px) {
+  .goal-forecast-head {
+    align-items: flex-start;
+  }
+
+  .goal-date-actions > button {
+    flex: 1 1 45%;
+  }
+
+  .goal-date-remove {
+    flex-basis: 100% !important;
+    margin-right: 0;
+  }
+}
