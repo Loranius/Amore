@@ -26,3 +26,13 @@
     margin-left: auto;
   }
 }
+
+/* Помилка завантаження вільного ліміту: підказка й кнопка повтору поруч,
+   не розтягуючи картку. Див. FreeLimitCard — картка більше не показує
+   «0 ₴» замість невідомої суми. */
+.fin-limit-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}

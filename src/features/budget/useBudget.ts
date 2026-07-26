@@ -155,11 +155,16 @@ export function useFreeLimit() {
   return useQuery({
     queryKey: qk.freeLimit(),
     queryFn: async (): Promise<FreeLimit> => {
+      // `maybeSingle`, а не `single`: `single` кидає помилку, коли рядка
+      // немає, тож запасне значення нижче було недосяжним, а порожня
+      // таблиця перетворювалась на вічну помилку замість «ліміт ще не
+      // задано». Пара з чистою базою бачила б збій на головному екрані
+      // фінансів.
       const { data, error } = await supabase
         .from('free_limit')
         .select('limit_value,proposal_value,proposed_by')
         .eq('id', 1)
-        .single();
+        .maybeSingle();
       if (error) throw error;
       return data ?? { limit_value: 0, proposal_value: null, proposed_by: null };
     },

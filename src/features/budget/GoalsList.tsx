@@ -30,7 +30,7 @@ import {
 export function GoalsList() {
   const me = useCurrentUser();
   const confirmDialog = useConfirm();
-  const { data: goals = [], isPending } = useGoals();
+  const { data: goals = [], isPending, isError, refetch } = useGoals();
   const { data: forecasts = [], isPending: forecastsPending } = useGoalForecasts();
   const {
     add,
@@ -81,6 +81,18 @@ export function GoalsList() {
 
       {isPending ? (
         <div className="finance-goals-state">Завантаження…</div>
+      ) : isError ? (
+        /* Без цієї гілки провал запиту виглядав як «цілей ще немає»:
+           `goals` порожній, isPending уже false — і екран впевнено
+           повідомляв, що спільних цілей не існує. Помилку треба називати
+           помилкою й давати кнопку повтору, як це вже роблять історія
+           внесків, обговорення та архів бажань. */
+        <div className="finance-goals-state" role="alert">
+          <span>Не вдалося завантажити цілі.</span>
+          <button type="button" className="btn-secondary" onClick={() => void refetch()}>
+            Спробувати ще
+          </button>
+        </div>
       ) : goals.length === 0 ? (
         <div className="finance-goals-empty">
           <span aria-hidden="true">✨</span>

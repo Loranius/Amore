@@ -1,4 +1,10 @@
 import { supabase } from '@/lib/supabase';
+import {
+  nextWishlistImageFrame,
+  wishlistImageAbortSignal,
+  withWishlistImageTimeout,
+  WISHLIST_IMAGE_FETCH_TIMEOUT_MS,
+} from './wishlistImageTimeouts';
 
 export type WishlistImageMode = 'cover' | 'cutout';
 
@@ -349,8 +355,17 @@ async function fetchImageBlob(src: string): Promise<Blob> {
     return response.blob();
   }
 
+  // Обидва мережеві шляхи ОБМЕЖЕНІ в часі. Без цього з'єднання до CDN
+  // магазину, яке прийняли й не відповіли, тримає проміс безкінечно, а
+  // послідовна черга обробки замирає для ВСІХ інших картинок до
+  // перезавантаження сторінки (див. wishlistImageTimeouts.ts).
+  const signal = wishlistImageAbortSignal();
   try {
-    const direct = await fetch(src, { credentials: 'omit', mode: 'cors' });
+    const direct = await fetch(src, {
+      credentials: 'omit',
+      mode: 'cors',
+      ...(signal !== undefined ? { signal } : {}),
+    });
     if (direct.ok && direct.headers.get('content-type')?.toLowerCase().startsWith('image/')) {
       return await direct.blob();
     }
@@ -358,9 +373,10 @@ async function fetchImageBlob(src: string): Promise<Blob> {
     // Many shop CDNs omit CORS; the authenticated Edge proxy is the fallback.
   }
 
-  const { data, error } = await supabase.functions.invoke<Blob | ArrayBuffer>(
-    'wishlist-image-proxy',
-    { body: { url: src } },
+  const { data, error } = await withWishlistImageTimeout(
+    supabase.functions.invoke<Blob | ArrayBuffer>('wishlist-image-proxy', { body: { url: src } }),
+    WISHLIST_IMAGE_FETCH_TIMEOUT_MS,
+    'image_proxy_timeout',
   );
   if (error) throw error;
   if (data instanceof Blob) return data;
@@ -380,7 +396,11 @@ async function processImage(src: string): Promise<WishlistCutoutResult> {
   if (isWishlistCutoutUrl(src)) return { src, mode: 'cutout' };
 
   try {
-    await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+    // Пауза на кадр, щоб важка обробка не почалась просто в кадрі
+    // взаємодії. НЕ «чекати кадр» — саме «не довше за кадр»: rAF не
+    // спрацьовує у прихованій вкладці, і безумовне очікування замикало б
+    // усю чергу обробки назавжди.
+    await nextWishlistImageFrame();
     const blob = await fetchImageBlob(src);
     if (!blob.type.toLowerCase().startsWith('image/')) return { src, mode: 'cover' };
     const cutout = await createCutout(blob);

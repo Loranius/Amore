@@ -83,6 +83,14 @@
   text-align: center;
 }
 
+/* Стан помилки: текст + кнопка повтору в один стовпчик по центру, як в
+   інших екранах із retry (історія внесків, обговорення, архів). */
+.finance-goals-state[role='alert'] {
+  display: grid;
+  justify-items: center;
+  gap: 0.75rem;
+}
+
 .finance-goals-empty {
   display: grid;
   justify-items: center;

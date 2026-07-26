@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
+import { nextWishlistImageFrame } from './wishlistImageTimeouts';
 import './progressivePhoto.css';
 
 type ProgressivePhotoState = 'loading' | 'ready' | 'error';
@@ -54,9 +55,15 @@ export function ProgressivePhoto({
 
     if (generationRef.current !== generation || image.naturalWidth === 0) return;
 
-    window.requestAnimationFrame(() => {
-      if (generationRef.current === generation) setState('ready');
-    });
+    // Кадр чекаємо, але НЕ безумовно. `requestAnimationFrame` не
+    // викликається у прихованій вкладці, а картинка може дозавантажитись
+    // саме тоді. Зі старим `window.requestAnimationFrame(...)` стан
+    // назавжди лишався 'loading': фото вже є, але воно під шимером
+    // (`.wl-progressive-photo img { opacity: 0 }`), а кнопка —
+    // `aria-disabled`, тож відкрити його неможливо навіть після
+    // повернення у вкладку. Саме так виглядало «фото вічно вантажаться».
+    await nextWishlistImageFrame();
+    if (generationRef.current === generation) setState('ready');
   }, []);
 
   useEffect(() => {

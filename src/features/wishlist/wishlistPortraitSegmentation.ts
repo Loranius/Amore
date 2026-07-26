@@ -1,6 +1,10 @@
 import { remoteImageFile } from './wishlistImageCutout';
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
 import { portraitMaskLooksUsable } from './wishlistPortraitMask';
+import {
+  withWishlistImageTimeout,
+  WISHLIST_IMAGE_MODEL_TIMEOUT_MS,
+} from './wishlistImageTimeouts';
 
 const MEDIAPIPE_VERSION = '0.10.31';
 const TASKS_VISION_URL = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MEDIAPIPE_VERSION}`;
@@ -73,7 +77,13 @@ function portraitProcessingError(error: unknown): Error {
 }
 
 async function importTasksVision(): Promise<TasksVisionModule> {
-  return import(/* @vite-ignore */ `${TASKS_VISION_URL}/+esm`) as Promise<TasksVisionModule>;
+  // Модель тягнеться з CDN: без стелі часу зависла мережа замкнула б усю
+  // послідовну чергу обробки картинок (wishlistImageTimeouts.ts).
+  return withWishlistImageTimeout(
+    import(/* @vite-ignore */ `${TASKS_VISION_URL}/+esm`) as Promise<TasksVisionModule>,
+    WISHLIST_IMAGE_MODEL_TIMEOUT_MS,
+    'portrait_model_timeout',
+  );
 }
 
 async function getSegmenter(): Promise<ImageSegmenter> {

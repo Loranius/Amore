@@ -15,7 +15,7 @@ const SLIDER_STEP = 100;
 
 export function FreeLimitCard() {
   const me = useCurrentUser();
-  const { data: fl } = useFreeLimit();
+  const { data: fl, isPending, isError, refetch } = useFreeLimit();
   const { propose, confirm, reject } = useFreeLimitMutations();
 
   const limit = Number(fl?.limit_value ?? 0);
@@ -44,9 +44,24 @@ export function FreeLimitCard() {
     <Card className="fin-card">
       <div className="fin-card-hdr">
         <span className="fin-card-title">💳 Вільний ліміт</span>
-        <span className="fin-limit-current">{fmtMoney(limit)}</span>
+        {/* Поки ліміт не завантажено, НЕ показуємо «0 ₴». Раніше картка
+            малювала нуль і під час завантаження, і після помилки — тобто
+            впевнено повідомляла неправдиву суму грошей. Краще чесне
+            «—» і кнопка «Спробувати ще». */}
+        <span className="fin-limit-current">
+          {isPending ? '…' : isError ? '—' : fmtMoney(limit)}
+        </span>
       </div>
       <p className="fin-hint">Сума, яку кожен може витратити без узгодження.</p>
+
+      {isError && (
+        <div className="fin-hint fin-limit-error" role="alert">
+          <span>Не вдалося завантажити ліміт.</span>
+          <button type="button" className="btn-secondary" onClick={() => void refetch()}>
+            Спробувати ще
+          </button>
+        </div>
+      )}
 
       <div className="fin-slider-display">{fmtMoney(sliderVal)}</div>
       <input
@@ -63,12 +78,13 @@ export function FreeLimitCard() {
         onPointerCancel={stopDragging}
         onBlur={stopDragging}
         onChange={(e) => setSliderVal(Number(e.target.value))}
+        disabled={isPending || isError}
       />
       <button
         type="button"
         className="btn fin-propose-btn"
         onClick={() => propose.mutate(sliderVal)}
-        disabled={propose.isPending}
+        disabled={propose.isPending || isPending || isError}
       >
         {propose.isPending ? 'Надсилаємо…' : `Запропонувати ${fmtMoney(sliderVal)}`}
       </button>
