@@ -39,6 +39,10 @@ export const qk = {
 
   freeLimit: () => ['freeLimit'] as const,
   savingsGoals: () => ['savingsGoals'] as const,
+  savingsGoalContributions: (goalId?: string) =>
+    (goalId === undefined
+      ? (['savingsGoalContributions'] as const)
+      : (['savingsGoalContributions', goalId] as const)),
   dates: () => ['dates'] as const,
   sharedDaysOff: () => ['sharedDaysOff'] as const,
 

@@ -4,6 +4,7 @@
 import { FreeLimitCard } from './FreeLimitCard';
 import { GoalsList } from './GoalsList';
 import { PortalDecor } from '@/features/auth/PortalDecor';
+import './budget.css';
 
 export function BudgetPage() {
   return (

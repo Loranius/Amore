@@ -33,6 +33,20 @@ function isStaleFinanceError(error: unknown): boolean {
   return error instanceof Error && error.message.includes('finance_stale');
 }
 
+function financeErrorText(error: unknown): string {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('finance_contribution_delete_not_allowed')) {
+    return 'Можна скасувати лише власний внесок.';
+  }
+  if (message.includes('finance_stale_contribution')) {
+    return 'Цей внесок уже змінено. Історію оновлено.';
+  }
+  if (isStaleFinanceError(error)) {
+    return 'Дані вже змінилися. Сторінку оновлено.';
+  }
+  return 'Помилка. Спробуй ще.';
+}
+
 /** Реальний PK savings_goals у Supabase — UUID, не number. */
 export type BudgetGoalRow = Omit<SavingsGoalRow, 'id'> & { id: string };
 
@@ -42,6 +56,53 @@ function normalizeGoalRow(row: SavingsGoalRow): BudgetGoalRow {
     throw new Error('savings_goals повернув некоректний UUID');
   }
   return row as unknown as BudgetGoalRow;
+}
+
+export interface GoalContribution {
+  id: string;
+  goalId: string;
+  amount: number;
+  note: string | null;
+  contributedBy: number;
+  contributorName: string;
+  createdAt: string;
+}
+
+function normalizeContribution(value: unknown): GoalContribution {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Finance contribution RPC returned an invalid row');
+  }
+
+  const row = value as Record<string, unknown>;
+  const id = row.id;
+  const goalId = row.goal_id;
+  const amount = Number(row.amount);
+  const contributedBy = Number(row.contributed_by);
+  const contributorName = row.contributor_name;
+  const createdAt = row.created_at;
+  const note = row.note;
+
+  if (
+    typeof id !== 'string'
+    || typeof goalId !== 'string'
+    || !Number.isFinite(amount)
+    || !Number.isSafeInteger(contributedBy)
+    || typeof contributorName !== 'string'
+    || typeof createdAt !== 'string'
+    || (note !== null && typeof note !== 'string')
+  ) {
+    throw new Error('Finance contribution RPC returned an invalid payload');
+  }
+
+  return {
+    id,
+    goalId,
+    amount,
+    note: note as string | null,
+    contributedBy,
+    contributorName,
+    createdAt,
+  };
 }
 
 // ── Вільний ліміт ────────────────────────────────────────────
@@ -124,6 +185,23 @@ export function useGoals() {
   });
 }
 
+export function useGoalContributions(goalId: string | null) {
+  return useQuery({
+    queryKey: qk.savingsGoalContributions(goalId ?? undefined),
+    enabled: goalId !== null,
+    queryFn: async (): Promise<GoalContribution[]> => {
+      if (!goalId) return [];
+      const data = await callFinanceRpc('finance_get_savings_goal_contributions_v1', {
+        p_goal_id: goalId,
+      });
+      if (!Array.isArray(data)) {
+        throw new Error('Finance contribution history returned an invalid payload');
+      }
+      return data.map(normalizeContribution);
+    },
+  });
+}
+
 export interface NewGoalInput {
   name: string;
   description: string | null;
@@ -131,13 +209,31 @@ export interface NewGoalInput {
   url: string | null;
 }
 
+export interface AddContributionInput {
+  id: string;
+  amount: number;
+  note: string | null;
+}
+
+export interface DeleteContributionInput {
+  contributionId: string;
+  goalId: string;
+}
+
 export function useGoalMutations() {
   const client = useQueryClient();
   const toast = useToast();
-  const invalidate = () => void client.invalidateQueries({ queryKey: qk.savingsGoals() });
+
+  const invalidateGoal = (goalId?: string) => {
+    void client.invalidateQueries({ queryKey: qk.savingsGoals() });
+    if (goalId) {
+      void client.invalidateQueries({ queryKey: qk.savingsGoalContributions(goalId) });
+    }
+  };
+
   const onError = (error: unknown) => {
     console.error('Finance goal mutation failed:', error);
-    toast.show(isStaleFinanceError(error) ? 'Ціль уже змінилася. Дані оновлено.' : 'Помилка. Спробуй ще.');
+    toast.show(financeErrorText(error));
   };
 
   const add = useMutation({
@@ -150,7 +246,7 @@ export function useGoalMutations() {
       });
     },
     onError,
-    onSettled: invalidate,
+    onSettled: () => invalidateGoal(),
   });
 
   const confirm = useMutation({
@@ -158,7 +254,7 @@ export function useGoalMutations() {
       await callFinanceRpc('finance_confirm_savings_goal_v1', { p_goal_id: id });
     },
     onError,
-    onSettled: invalidate,
+    onSettled: (_data, _error, id) => invalidateGoal(id),
   });
 
   const reject = useMutation({
@@ -166,7 +262,7 @@ export function useGoalMutations() {
       await callFinanceRpc('finance_reject_savings_goal_v1', { p_goal_id: id });
     },
     onError,
-    onSettled: invalidate,
+    onSettled: (_data, _error, id) => invalidateGoal(id),
   });
 
   const remove = useMutation({
@@ -174,9 +270,32 @@ export function useGoalMutations() {
       await callFinanceRpc('finance_delete_savings_goal_v1', { p_goal_id: id });
     },
     onError,
-    onSettled: invalidate,
+    onSettled: (_data, _error, id) => invalidateGoal(id),
   });
 
+  const addContribution = useMutation({
+    mutationFn: async ({ id, amount, note }: AddContributionInput) => {
+      await callFinanceRpc('finance_add_savings_goal_contribution_v1', {
+        p_goal_id: id,
+        p_amount: amount,
+        p_note: note,
+      });
+    },
+    onError,
+    onSettled: (_data, _error, input) => invalidateGoal(input.id),
+  });
+
+  const deleteContribution = useMutation({
+    mutationFn: async ({ contributionId }: DeleteContributionInput) => {
+      await callFinanceRpc('finance_delete_savings_goal_contribution_v1', {
+        p_contribution_id: contributionId,
+      });
+    },
+    onError,
+    onSettled: (_data, _error, input) => invalidateGoal(input.goalId),
+  });
+
+  // Залишаємо старий mutation-контракт для місць, які ще не передають примітку.
   const addFunds = useMutation({
     mutationFn: async ({ id, amount }: { id: string; amount: number }) => {
       await callFinanceRpc('finance_add_savings_goal_funds_v1', {
@@ -185,8 +304,16 @@ export function useGoalMutations() {
       });
     },
     onError,
-    onSettled: invalidate,
+    onSettled: (_data, _error, input) => invalidateGoal(input.id),
   });
 
-  return { add, confirm, reject, remove, addFunds };
+  return {
+    add,
+    confirm,
+    reject,
+    remove,
+    addContribution,
+    deleteContribution,
+    addFunds,
+  };
 }
