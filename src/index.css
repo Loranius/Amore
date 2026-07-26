@@ -1902,6 +1902,25 @@ a.wl-card-title { color: var(--accent); }
   cursor: pointer;
 }
 /* Кнопка перегенерації — поруч із кристалом (нижній правий кут сцени). */
+/* Значок діагностичного профілю графіки (`?gfx=`). Показується ТІЛЬКИ
+   коли профіль не дефолтний: без нього помилка набору в адресному рядку
+   телефона («blomo» замість «bloom») тихо дала б порожній профіль, і
+   висновок про причину білого фону вийшов би хибним.
+   Див. crystal3d/render/gfxProfile.ts. */
+.crystal-gfx-badge {
+  position: absolute;
+  left: 4px;
+  bottom: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(58, 37, 48, 0.72);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
 .crystal-regen {
   position: absolute;
   right: 4px;
