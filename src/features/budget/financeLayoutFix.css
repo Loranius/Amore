@@ -1,0 +1,18 @@
+.budget.pink-page {
+  box-sizing: border-box;
+  width: min(calc(100% + 32px), 792px);
+  max-width: none;
+  margin: -16px auto calc(-1 * (env(safe-area-inset-bottom, 0) + 88px));
+  overflow-x: clip;
+}
+
+.finance-goals,
+.finance-goal,
+.finance-goal-main-card,
+.goal-progress-card,
+.goal-forecast-card,
+.fin-card {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
