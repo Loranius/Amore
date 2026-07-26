@@ -1,6 +1,6 @@
--- Critical safety boundary for the Finance module.
--- All client writes go through guarded security-definer RPCs; tables remain
--- readable in realtime but are no longer directly writable by authenticated users.
+-- Phase 1: add guarded Finance RPCs without removing legacy direct writes yet.
+-- This is backward-compatible with the currently deployed client and lets the
+-- new client ship before the stricter table permissions are enabled.
 
 create or replace function public.finance_current_user_name_v1()
 returns text
@@ -270,33 +270,6 @@ begin
   return v_saved;
 end;
 $$;
-
--- Direct writes would bypass the checks above, so authenticated clients receive
--- read-only table access. service_role keeps bypassing RLS for trusted bots/jobs.
-drop policy if exists auth_only on public.free_limit;
-drop policy if exists auth_only on public.savings_goals;
-drop policy if exists finance_read_authenticated on public.free_limit;
-drop policy if exists finance_read_authenticated on public.savings_goals;
-
-alter table public.free_limit enable row level security;
-alter table public.savings_goals enable row level security;
-
-create policy finance_read_authenticated
-on public.free_limit
-for select
-to authenticated
-using (true);
-
-create policy finance_read_authenticated
-on public.savings_goals
-for select
-to authenticated
-using (true);
-
-revoke insert, update, delete on public.free_limit from anon, authenticated;
-revoke insert, update, delete on public.savings_goals from anon, authenticated;
-grant select on public.free_limit to authenticated;
-grant select on public.savings_goals to authenticated;
 
 revoke all on function public.finance_current_user_name_v1() from public, anon, authenticated;
 revoke all on function public.finance_propose_free_limit_v1(numeric) from public, anon;
