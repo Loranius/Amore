@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { daysInMonth, stepMonth } from '@/features/_shared/month';
 import type { AppUser } from '@/types';
 import {
@@ -28,12 +28,14 @@ export function ScheduleEditor({
   mo,
   marks,
   today,
+  onPendingSelectionChange,
 }: {
   user: AppUser;
   yr: number;
   mo: number;
   marks: MarksMap;
   today: string;
+  onPendingSelectionChange: (pending: boolean) => void;
 }) {
   const [selectedMark, setSelectedMark] = useState<ScheduleMark>('Х');
   const [bulkMode, setBulkMode] = useState(false);
@@ -50,6 +52,22 @@ export function ScheduleEditor({
     () => Object.values(userMarks).filter((mark) => mark === 'Р' || mark === 'Х').length,
     [userMarks],
   );
+
+  useEffect(() => {
+    const hasPendingSelection = selectedDates.size > 0;
+    onPendingSelectionChange(hasPendingSelection);
+    if (!hasPendingSelection) return;
+
+    const protectFromReload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', protectFromReload);
+    return () => {
+      window.removeEventListener('beforeunload', protectFromReload);
+      onPendingSelectionChange(false);
+    };
+  }, [onPendingSelectionChange, selectedDates.size]);
 
   const applyChanges = (changes: ScheduleChange[], successMessage: string) => {
     if (changes.length === 0 || isPending) return;
@@ -71,14 +89,21 @@ export function ScheduleEditor({
   };
 
   const toggleBulkMode = () => {
+    if (bulkMode && selectedDates.size > 0) {
+      const discard = window.confirm('Скасувати вибір позначених днів без застосування?');
+      if (!discard) return;
+    }
     setBulkMode((current) => !current);
     setSelectedDates(new Set());
   };
 
   const applySelected = () => {
     const changes = [...selectedDates].map((date) => ({ userId: user.id, date, mark: selectedMark }));
-    applyChanges(changes, `${markLabel(selectedMark)}: оновлено ${changes.length} дн.`);
-    setSelectedDates(new Set());
+    if (changes.length === 0 || isPending) return;
+    batchMutation.mutate(
+      { changes, successMessage: `${markLabel(selectedMark)}: оновлено ${changes.length} дн.` },
+      { onSuccess: () => setSelectedDates(new Set()) },
+    );
   };
 
   const applyTemplate = (kind: TemplateKind) => {
