@@ -21,6 +21,7 @@ const EVENT_ICON: Record<AppNotificationKind, string> = {
   wishlist_gift_completed: '✨',
   wishlist_gift_memory: '📸',
   wishlist_shared_completed: '🌟',
+  schedule_fill_reminder: '📅',
 };
 
 function eventTime(value: string): string {
