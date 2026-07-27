@@ -18,6 +18,7 @@ import { countdownLabel, dayStatus, fmtLongDate, type DayStatus } from './schedu
 import type { DateRow } from '@/types';
 import './schedule.css';
 import './scheduleCompleteness.css';
+import './scheduleEditToggle.css';
 
 function yearMonthFromParam(value: string | null): { yr: number; mo: number } | null {
   if (!value || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return null;
@@ -190,7 +191,6 @@ export function SchedulePage() {
     <section className="sched">
       <header className="sched-hero">
         <div><span className="sched-kicker">Календар пари</span><h1 className="sched-title">Графік</h1><p className="sched-subtitle">Побачте, коли ви обоє вільні, та заплануйте час разом.</p></div>
-        <button type="button" className={`sched-edit-toggle${editMode ? ' is-active' : ''}`} onClick={toggleEditMode}>{editMode ? 'Завершити' : 'Редагувати'}</button>
       </header>
 
       <section className={`sched-next-card${nextSharedDate ? '' : ' sched-next-card--empty'}`} aria-label="Наступний спільний вихідний">
@@ -203,7 +203,20 @@ export function SchedulePage() {
         {nextSharedDate && <button type="button" className="sched-next-action" onClick={() => openPlanModal(nextSharedDate)}>Запланувати</button>}
       </section>
 
-      <ScheduleMonthNav yr={yr} mo={mo} onChange={changeMonth} />
+      <div className="sched-month-toolbar">
+        <ScheduleMonthNav yr={yr} mo={mo} onChange={changeMonth} />
+        <div className="sched-edit-row">
+          <button
+            type="button"
+            className={`sched-edit-compact${editMode ? ' is-active' : ''}`}
+            onClick={toggleEditMode}
+            aria-pressed={editMode}
+          >
+            {editMode ? 'Завершити' : 'Редагувати'}
+          </button>
+        </div>
+      </div>
+
       <ScheduleCompletionStatus
         users={users}
         marks={marks}
