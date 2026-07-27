@@ -23,7 +23,7 @@ export function ScheduleMonthNav({
           onClick={() => onChange(current)}
           disabled={isCurrentMonth}
         >
-          {isCurrentMonth ? 'Поточний місяць' : 'Повернутися до сьогодні'}
+          {isCurrentMonth ? 'Поточний місяць' : 'Сьогодні'}
         </button>
       </div>
       <button type="button" className="sched-nav-btn" onClick={() => onChange(stepMonth(yr, mo, 1))} aria-label="Наступний місяць">›</button>
