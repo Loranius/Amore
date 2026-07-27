@@ -386,7 +386,7 @@ function DayDetailsSheet({
   onClose: () => void;
   onPlan: () => void;
 }) {
-  const canPlan = status === 'both-off';
+  const canPlan = status === 'both-off' && date >= todayLocal();
 
   return (
     <div
