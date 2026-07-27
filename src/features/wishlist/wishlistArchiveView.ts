@@ -1,50 +1,35 @@
+// Вибір вигляду архіву. Логіка читання/запису — у спільному
+// `_shared/viewPreference`; тут лишається лише конфігурація архіву.
+import {
+  normalizeView,
+  readViewPreference,
+  writeViewPreference,
+  type ViewPreferenceConfig,
+} from '@/features/_shared/viewPreference';
+
 export type WishlistArchiveViewMode = 'bubbles' | 'feed' | 'polaroid';
+export type WishlistArchiveScope = 'personal' | 'shared';
 
-const STORAGE_KEY = 'amore:wishlist:archive-view-modes:v1';
-
-type StoredArchiveViews = Partial<Record<'personal' | 'shared', WishlistArchiveViewMode>>;
+const CONFIG: ViewPreferenceConfig<WishlistArchiveViewMode> = {
+  storageKey: 'amore:wishlist:archive-view-modes:v1',
+  modes: ['bubbles', 'feed', 'polaroid'],
+  fallback: 'bubbles',
+  aliases: { table: 'feed' },
+};
 
 export function normalizeWishlistArchiveView(value: unknown): WishlistArchiveViewMode | null {
-  if (value === 'table') return 'feed';
-  return value === 'bubbles' || value === 'feed' || value === 'polaroid' ? value : null;
+  return normalizeView(CONFIG, value);
 }
 
-function readStoredArchiveViews(): StoredArchiveViews {
-  if (typeof window === 'undefined') return {};
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const stored: StoredArchiveViews = {};
-    const personal = normalizeWishlistArchiveView(parsed.personal);
-    const shared = normalizeWishlistArchiveView(parsed.shared);
-    if (personal) stored.personal = personal;
-    if (shared) stored.shared = shared;
-    return stored;
-  } catch {
-    return {};
-  }
-}
-
-export function readWishlistArchiveView(scope: 'personal' | 'shared'): WishlistArchiveViewMode {
-  return readStoredArchiveViews()[scope] ?? 'bubbles';
+export function readWishlistArchiveView(scope: WishlistArchiveScope): WishlistArchiveViewMode {
+  return readViewPreference<WishlistArchiveViewMode, WishlistArchiveScope>(CONFIG, scope);
 }
 
 export function writeWishlistArchiveView(
-  scope: 'personal' | 'shared',
+  scope: WishlistArchiveScope,
   view: WishlistArchiveViewMode,
 ): void {
-  if (typeof window === 'undefined') return;
-
-  try {
-    window.localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({ ...readStoredArchiveViews(), [scope]: view }),
-    );
-  } catch {
-    // The selected view still works for this session when storage is unavailable.
-  }
+  writeViewPreference<WishlistArchiveViewMode, WishlistArchiveScope>(CONFIG, scope, view);
 }
 
 export function freshArchivePolaroidSeed(): number {
