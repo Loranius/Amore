@@ -1,0 +1,57 @@
+.sched-month-toolbar {
+  margin-bottom: 10px;
+}
+
+.sched-month-toolbar .sched-nav {
+  margin-bottom: 0;
+}
+
+.sched-edit-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: 6px 4px 0;
+}
+
+.sched .sched-edit-compact {
+  min-height: 32px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 8%, transparent);
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.sched .sched-edit-compact:active {
+  transform: scale(0.96);
+}
+
+.sched .sched-edit-compact.is-active {
+  border-color: transparent;
+  background: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 520px) {
+  .sched-edit-row {
+    margin-top: 5px;
+  }
+
+  .sched .sched-edit-compact {
+    min-height: 30px;
+    padding-inline: 11px;
+    font-size: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched .sched-edit-compact {
+    transition: none;
+  }
+}
