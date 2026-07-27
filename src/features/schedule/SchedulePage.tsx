@@ -6,6 +6,7 @@ import { useSchedule } from './useSchedule';
 import { useDateMutations, useDatePlans, useSharedDaysOff } from './useDates';
 import { PlanDateModal } from './PlanDateModal';
 import { ScheduleEditor } from './ScheduleEditor';
+import { ScheduleMonthNav } from './ScheduleMonthNav';
 import { ScheduleMonthOverview } from './ScheduleMonthOverview';
 import { ScheduleUpcoming } from './ScheduleUpcoming';
 import { ScheduleDayDetails } from './ScheduleDayDetails';
@@ -98,6 +99,8 @@ export function SchedulePage() {
         {nextSharedDate && <button type="button" className="sched-next-action" onClick={() => openPlanModal(nextSharedDate)}>Запланувати</button>}
       </section>
 
+      <ScheduleMonthNav yr={yr} mo={mo} onChange={setYm} />
+
       {editMode ? (
         <div className="sched-edit-panel">
           <div className="sched-person-switcher" role="tablist" aria-label="Чий графік редагувати">
@@ -107,7 +110,7 @@ export function SchedulePage() {
         </div>
       ) : (
         <>
-          <ScheduleMonthOverview yr={yr} mo={mo} today={today} usersCount={users.length} statusCounts={statusCounts} statusOf={statusOf} plansByDate={plansByDate} onMonthChange={setYm} onSelectDate={setSelectedDate} />
+          <ScheduleMonthOverview yr={yr} mo={mo} today={today} usersCount={users.length} statusCounts={statusCounts} statusOf={statusOf} plansByDate={plansByDate} onSelectDate={setSelectedDate} />
           <ScheduleUpcoming sharedDates={sharedDates} plansByDate={plansByDate} onSelectDate={setSelectedDate} onPlan={() => openPlanModal()} />
           <ScheduleDatePlans plans={datePlans} meName={me.name} onConfirm={(id) => dateMutations.confirm.mutate(id)} onRemove={(id) => dateMutations.remove.mutate(id)} />
         </>
