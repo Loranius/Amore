@@ -27,6 +27,9 @@ import { syncPinMarkers, type MarkerStore } from './mapMarkers';
 import { useMapPins, useMapPinMutations, useCityBackfill } from './useMapPins';
 import { useUserLocations, useCheckin } from './useLocations';
 import { CatFilterBar, PinCards } from './MapPanels';
+import { MapViewPicker } from './MapViewPicker';
+import { MapCities, MapTimeline, TravelSummaryBar } from './MapViews';
+import { useMapView } from './mapView';
 import { PinModal } from './PinModal';
 import { AddPinModal } from './AddPinModal';
 import { LocationHistoryModal } from './LocationHistoryModal';
@@ -55,6 +58,7 @@ export function MapPage() {
   const confirmDialog = useConfirm();
   useCityBackfill(pins);
 
+  const [view, setView] = useMapView();
   const [filter, setFilter] = useState<'all' | PinCategory>('all');
   const [search, setSearch] = useState('');
   const [geoResults, setGeoResults] = useState<MapboxFeature[]>([]);
@@ -251,7 +255,10 @@ export function MapPage() {
         )}
       </div>
 
-      <div className={`map-stage${expanded ? ' map-stage--full' : ''}`}>
+      <div
+        className={`map-stage${expanded ? ' map-stage--full' : ''}`}
+        hidden={view !== 'map'}
+      >
         <div ref={containerRef} className="map-container" />
         <button
           type="button"
@@ -281,7 +288,9 @@ export function MapPage() {
         )}
       </div>
 
-      <div className="map-actions-row">
+      <MapViewPicker value={view} onChange={setView} />
+
+      <div className="map-actions-row" hidden={view !== 'map'}>
         <button type="button" className="btn" onClick={() => checkin.mutate(undefined, {
           onSuccess: (c) => flyTo(c.lng, c.lat, 14),
         })} disabled={checkin.isPending}>
@@ -292,14 +301,27 @@ export function MapPage() {
         </button>
       </div>
 
-      <CatFilterBar pins={pins} active={filter} onChange={setFilter} />
-      <PinCards
-        allPins={pins}
-        visiblePins={visiblePins}
-        search={search}
-        focusedId={focusedId}
-        onCardClick={onCardClick}
-      />
+      {view === 'map' ? (
+        <>
+          <CatFilterBar pins={pins} active={filter} onChange={setFilter} />
+          <PinCards
+            allPins={pins}
+            visiblePins={visiblePins}
+            search={search}
+            focusedId={focusedId}
+            onCardClick={onCardClick}
+          />
+        </>
+      ) : (
+        <>
+          <TravelSummaryBar pins={pins} />
+          {view === 'timeline' ? (
+            <MapTimeline pins={pins} focusedId={focusedId} onCardClick={onCardClick} />
+          ) : (
+            <MapCities pins={pins} focusedId={focusedId} onCardClick={onCardClick} />
+          )}
+        </>
+      )}
 
       {addAt && (
         <AddPinModal

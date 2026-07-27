@@ -2136,6 +2136,21 @@ a.wl-card-title { color: var(--accent); }
 .fin-del-btn { border: 0; background: transparent; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; }
 .fin-del-btn:hover { color: var(--danger); }
 
+/* ── Перемикач вигляду розділу (Спогади, Карта) ────────────── */
+.view-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+.view-option {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: 1px solid var(--hair, color-mix(in srgb, var(--text) 12%, transparent));
+  background: var(--surface); color: var(--text);
+  border-radius: 12px; padding: 9px 6px; font: inherit; cursor: pointer;
+  transition: border-color .18s, background .18s;
+}
+.view-option.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.view-icon { font-size: 16px; line-height: 1; }
+.view-copy { display: flex; flex-direction: column; align-items: center; }
+.view-copy strong { font-size: 12.5px; }
+.view-copy small { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.25; }
+
 /* ============================================================
    НАША КАРТА (map) — mapbox + піни + геолокація
    ============================================================ */
@@ -2278,6 +2293,31 @@ a.wl-card-title { color: var(--accent); }
 
 .map-actions-row { display: flex; gap: 8px; }
 .map-actions-row .btn, .map-actions-row .btn-secondary { flex: 1; }
+/* Явне правило обов'язкове: авторський display перебиває [hidden] з
+   таблиці браузера, і .map-actions-row із display:flex просто не
+   ховався б. Карту ховаємо, а не розмонтовуємо, — інакше кожне
+   перемикання вигляду знищувало б інстанс mapbox разом із камерою. */
+.map-stage[hidden], .map-actions-row[hidden] { display: none; }
+
+/* ── Підсумок подорожей ────────────────────────────────────── */
+.map-summary {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+}
+.map-sum-cell {
+  flex: 1 1 62px; display: flex; flex-direction: column; align-items: center;
+  gap: 1px; padding: 9px 6px; border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+.map-sum-cell--wide { flex: 1 1 96px; }
+.map-sum-cell b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.map-sum-cell span { font-size: 10.5px; color: var(--muted); text-align: center; }
+
+/* ── Вигляд «Міста» ────────────────────────────────────────── */
+.map-cities { display: grid; gap: 16px; }
+.map-city-hd { display: flex; flex-direction: column; gap: 1px; padding: 0 2px 7px; }
+.map-city-hd b { font-size: 16px; }
+.map-city-hd span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 
 .pin-list { display: flex; flex-direction: column; gap: 10px; }

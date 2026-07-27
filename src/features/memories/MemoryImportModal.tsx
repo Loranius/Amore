@@ -7,7 +7,7 @@
 // тридцять окремих правок.
 // ============================================================
 import { useState } from 'react';
-import { todayISO } from '@/lib/utils';
+import { pluralUA, todayISO } from '@/lib/utils';
 import { formatMemoryDate, normalizeMemoryDate } from './memoriesDate';
 import { readExifTakenAt } from '@/lib/exif';
 import {
@@ -106,7 +106,7 @@ export function MemoryImportModal({ busy, progress, onClose, onSubmit }: MemoryI
         ) : (
           <>
             <p className="mem-import-sum">
-              {summary.total} фото · {summary.days} {summary.days === 1 ? 'день' : 'днів'}
+              {summary.total} фото · {summary.days} {pluralUA(summary.days, ['день', 'дні', 'днів'])}
               {summary.undated > 0 && <> · <b>{summary.undated} без дати</b></>}
             </p>
 

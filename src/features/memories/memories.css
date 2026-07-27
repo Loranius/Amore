@@ -12,21 +12,6 @@
 .mem-head h1 { margin: 0; font-size: 25px; }
 .mem-sub { margin: 2px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-/* ── Перемикач вигляду ─────────────────────────────────────── */
-.mem-view-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
-.mem-view-option {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  border: 1px solid var(--hair, color-mix(in srgb, var(--text) 12%, transparent));
-  background: var(--surface); color: var(--text);
-  border-radius: 12px; padding: 9px 6px; font: inherit; cursor: pointer;
-  transition: border-color .18s, background .18s;
-}
-.mem-view-option.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
-.mem-view-icon { font-size: 16px; line-height: 1; }
-.mem-view-copy { display: flex; flex-direction: column; align-items: center; }
-.mem-view-copy strong { font-size: 12.5px; }
-.mem-view-copy small { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.25; }
-
 /* ── Плитка знімка ─────────────────────────────────────────── */
 .mem-photo {
   position: relative; overflow: hidden; border: 0; padding: 0; width: 100%;

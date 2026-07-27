@@ -6,11 +6,10 @@ import type { PinCategory, MapPinRow } from '@/types';
 export const CATEGORIES: Record<PinCategory, { label: string; emoji: string; color: string }> = {
   visited: { label: 'Були', emoji: '📍', color: '#E8829C' },
   restaurant: { label: 'Ресторан', emoji: '🍽', color: '#FF6B9D' },
-  plan: { label: 'Плануємо', emoji: '✈️', color: '#C45B79' },
   favorite: { label: 'Улюблене', emoji: '⭐', color: '#F6B9CC' },
 };
 
-export const CATEGORY_ORDER: PinCategory[] = ['visited', 'restaurant', 'plan', 'favorite'];
+export const CATEGORY_ORDER: PinCategory[] = ['visited', 'restaurant', 'favorite'];
 
 // Перший user за алфавітом — Діма 💙, другий — Лєна 💗.
 export const USER_LOCATION_STYLES = [

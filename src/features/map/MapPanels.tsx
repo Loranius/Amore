@@ -43,12 +43,16 @@ export function PinCards({
   search,
   focusedId,
   onCardClick,
+  flat = false,
 }: {
   allPins: MapPinRow[];
   visiblePins: MapPinRow[];
   search: string;
   focusedId: number | null;
   onCardClick: (pin: MapPinRow) => void;
+  /** Без групування за містом — коли групує вже той, хто викликає
+      (хронологія по місяцях, список міст). */
+  flat?: boolean;
 }) {
   const query = search.toLowerCase().trim();
   const filtered = query
@@ -71,7 +75,7 @@ export function PinCards({
   }
 
   // Без пошуку — групуємо за містом; при пошуку — пласким списком.
-  if (query) {
+  if (query || flat) {
     return (
       <div className="pin-list">
         {filtered.map((pin) => (
