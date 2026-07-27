@@ -12,6 +12,7 @@ import { currentYearMonth, stepMonth } from '@/features/_shared/month';
 import { MemoriesViewPicker } from './MemoriesViewPicker';
 import { MemoriesAlbum, MemoriesFeed, MemoriesMosaicMonth } from './MemoriesOverviews';
 import { MemoryDayView } from './MemoryDayView';
+import { MemoryImportModal } from './MemoryImportModal';
 import { MemoryUploadModal } from './MemoryUploadModal';
 import { MemoryViewer } from './MemoryViewer';
 import { groupMemoriesByDate } from './memoriesDate';
@@ -23,11 +24,13 @@ import type { MemoryRow } from '@/types';
 export function MemoriesPage() {
   const me = useCurrentUser();
   const { data, isPending, isError, refetch, isFetching } = useMemories();
-  const { upload, unlink, remove } = useMemoriesMutations();
+  const { upload, uploadMany, saveOrder, unlink, remove } = useMemoriesMutations();
   const [view, setView] = useMemoriesView();
   const [openDate, setOpenDate] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<MemoryRow | null>(null);
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
 
   const groups = useMemo(() => groupMemoriesByDate(data?.photos ?? []), [data?.photos]);
@@ -67,8 +70,10 @@ export function MemoriesPage() {
           photos={dayGroup.photos}
           links={links}
           description={days[dayGroup.date] ?? null}
+          savingOrder={saveOrder.isPending}
           onBack={() => setOpenDate(null)}
           onOpen={setLightbox}
+          onSaveOrder={(patch) => saveOrder.mutate(patch)}
         />
       {lightbox && (
         <MemoryViewer
@@ -98,7 +103,13 @@ export function MemoriesPage() {
               : `${totalPhotos} фото · від ${earliest?.slice(0, 4) ?? ''}`}
           </p>
         </div>
-        <button type="button" className="btn" onClick={() => setAdding(true)}>+ Додати</button>
+        {/* Два входи, а не один із перемикачем усередині: додати один
+            знімок — це підпис і точність дати, а завантажити сотню — це
+            зовсім інший екран, із розкладкою по днях. */}
+        <div className="mem-add">
+          <button type="button" className="btn btn-ghost" onClick={() => setImporting(true)}>Багато</button>
+          <button type="button" className="btn" onClick={() => setAdding(true)}>+ Додати</button>
+        </div>
       </header>
 
       <MemoriesViewPicker value={view} onChange={setView} />
@@ -130,6 +141,25 @@ export function MemoriesPage() {
           busy={upload.isPending}
           onClose={() => setAdding(false)}
           onSubmit={(input) => upload.mutate(input, { onSuccess: () => setAdding(false) })}
+        />
+      )}
+
+      {importing && (
+        <MemoryImportModal
+          busy={uploadMany.isPending}
+          progress={progress}
+          onClose={() => { setImporting(false); setProgress(null); }}
+          onSubmit={(items) => {
+            setProgress({ done: 0, total: items.length });
+            uploadMany.mutate(
+              {
+                items,
+                userId: me.id,
+                onProgress: (done, total) => setProgress({ done, total }),
+              },
+              { onSettled: () => { setImporting(false); setProgress(null); } },
+            );
+          }}
         />
       )}
 

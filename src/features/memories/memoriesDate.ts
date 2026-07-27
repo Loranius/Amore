@@ -60,22 +60,33 @@ export const TIME_BUCKET_LABEL: Record<TimeBucket, string> = {
 /**
  * Частина доби за часом зйомки. `null`, коли часу немає — такі знімки
  * йдуть окремою групою, а не вигадують собі ранок.
+ *
+ * UTC-геттери НАВМИСНО. `taken_at` зберігає настінний час камери,
+ * записаний так, ніби він UTC (див. exif.ts): «06:12» означає, що на
+ * годиннику було 06:12 ТАМ, де знімали. Локальні геттери перевели б це в
+ * зону глядача, і фото, зняте на світанку в Одесі, потрапляло б у «День»
+ * при перегляді з іншого поясу.
  */
 export function timeBucketOf(takenAt: string | null): TimeBucket | null {
-  if (!takenAt) return null;
-  const h = new Date(takenAt).getHours();
-  if (Number.isNaN(h)) return null;
+  const h = wallHours(takenAt);
+  if (h === null) return null;
   if (h < 12) return 'morning';
   if (h < 17) return 'afternoon';
   return 'evening';
 }
 
-/** 'HH:MM' часу зйомки або null. */
+function wallHours(takenAt: string | null): number | null {
+  if (!takenAt) return null;
+  const d = new Date(takenAt);
+  return Number.isNaN(d.getTime()) ? null : d.getUTCHours();
+}
+
+/** 'HH:MM' настінного часу зйомки або null. */
 export function memoryTime(takenAt: string | null): string | null {
   if (!takenAt) return null;
   const d = new Date(takenAt);
   if (Number.isNaN(d.getTime())) return null;
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 }
 
 export interface MemoryDayGroup {

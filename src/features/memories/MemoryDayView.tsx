@@ -7,7 +7,8 @@
 // ============================================================
 import { useMemo, useState } from 'react';
 import { MemoryMosaic, SOURCE_META } from './MemoryPhoto';
-import { formatMemoryDate, splitByTimeOfDay, TIME_BUCKET_LABEL } from './memoriesDate';
+import { formatMemoryDate, memoryTime, splitByTimeOfDay, TIME_BUCKET_LABEL } from './memoriesDate';
+import { moveMemory, orderChanged, orderPatch } from './memoriesOrder';
 import type { MemoryLinksById } from './useMemories';
 import type { MemoryRow, MemorySource } from '@/types';
 
@@ -18,14 +19,18 @@ interface MemoryDayViewProps {
   photos: MemoryRow[];
   links: MemoryLinksById;
   description: string | null;
+  savingOrder: boolean;
   onBack: () => void;
   onOpen: (photo: MemoryRow) => void;
+  onSaveOrder: (patch: Array<{ id: number; sort_order: number }>) => void;
 }
 
 export function MemoryDayView({
-  date, photos, links, description, onBack, onOpen,
+  date, photos, links, description, savingOrder, onBack, onOpen, onSaveOrder,
 }: MemoryDayViewProps) {
   const [filter, setFilter] = useState<Filter>('all');
+  // null — звичайний перегляд; масив — чернетка порядку, ще не збережена.
+  const [draft, setDraft] = useState<MemoryRow[] | null>(null);
 
   const counts = useMemo(() => {
     const c: Partial<Record<Filter, number>> = { all: photos.length, manual: 0 };
@@ -62,11 +67,33 @@ export function MemoryDayView({
       <header className="mem-day-hd">
         <button type="button" className="mem-back" onClick={onBack}>‹ Назад</button>
         <h2>{formatMemoryDate(date, photos[0]?.date_precision ?? 'day')}</h2>
-        <p className="mem-day-meta">{photos.length} фото</p>
+        <div className="mem-day-row">
+          <p className="mem-day-meta">{photos.length} фото</p>
+          {/* Переставляти є сенс лише коли знімків більше одного. */}
+          {photos.length > 1 && draft === null && (
+            <button type="button" className="mem-order-toggle" onClick={() => { setFilter('all'); setDraft(photos); }}>
+              Порядок
+            </button>
+          )}
+        </div>
       </header>
 
-      {description && <p className="mem-day-desc">{description}</p>}
+      {description && draft === null && <p className="mem-day-desc">{description}</p>}
 
+      {draft !== null ? (
+        <MemoryReorder
+          photos={draft}
+          busy={savingOrder}
+          onMove={(index, delta) => setDraft((d) => (d ? moveMemory(d, index, delta) : d))}
+          onCancel={() => setDraft(null)}
+          onSave={() => {
+            if (!orderChanged(photos, draft)) { setDraft(null); return; }
+            onSaveOrder(orderPatch(draft));
+            setDraft(null);
+          }}
+        />
+      ) : (
+      <>
       {visibleChips.length > 2 && (
         <div className="mem-filters">
           {visibleChips.map(([key, label]) => (
@@ -97,6 +124,66 @@ export function MemoryDayView({
       ) : (
         <MemoryMosaic photos={shown} links={links} onOpen={onOpen} />
       )}
+      </>
+      )}
     </section>
+  );
+}
+
+/**
+ * Режим перестановки: список замість мозаїки.
+ *
+ * Стрілки, а не перетягування. Перетягування по сітці 3×3 на телефоні
+ * промахується пальцем і не має жодного шляху з клавіатури; список із
+ * «вгору/вниз» працює і там, і там, і не вимагає власного шару жестів.
+ *
+ * Порядок — чернетка до натискання «Зберегти»: помилкове торкання не
+ * має одразу писати в базу й смикати весь архів перезавантаженням.
+ */
+function MemoryReorder({
+  photos, busy, onMove, onCancel, onSave,
+}: {
+  photos: readonly MemoryRow[];
+  busy: boolean;
+  onMove: (index: number, delta: number) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="mem-order">
+      <p className="mem-order-hint">
+        Перетягування замінили стрілки — так само працює і пальцем, і з клавіатури.
+        Порядок збережеться лише після «Готово».
+      </p>
+      <ol className="mem-order-list">
+        {photos.map((photo, i) => (
+          <li key={photo.id} className="mem-order-row">
+            <span className="mem-order-n">{i + 1}</span>
+            <img src={photo.photo_url} alt="" loading="lazy" decoding="async" />
+            <span className="mem-order-cap">
+              {photo.caption ?? memoryTime(photo.taken_at) ?? 'Без підпису'}
+            </span>
+            <span className="mem-order-btns">
+              <button
+                type="button" className="mem-order-btn"
+                onClick={() => onMove(i, -1)} disabled={i === 0 || busy}
+                aria-label={`Пересунути вище, зараз ${i + 1}`}
+              >↑</button>
+              <button
+                type="button" className="mem-order-btn"
+                onClick={() => onMove(i, 1)} disabled={i === photos.length - 1 || busy}
+                aria-label={`Пересунути нижче, зараз ${i + 1}`}
+              >↓</button>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <div className="mem-order-actions">
+        <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={busy}>Скасувати</button>
+        <button type="button" className="btn" onClick={onSave} disabled={busy}>
+          {busy ? 'Зберігаю…' : 'Готово'}
+        </button>
+      </div>
+    </div>
   );
 }
