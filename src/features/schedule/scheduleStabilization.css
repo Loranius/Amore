@@ -1,0 +1,97 @@
+/* Schedule 2.1 — статус заповнення та мобільна стабілізація. */
+.sched-completion {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sched-completion-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  min-width: 0;
+  padding: 11px 11px 13px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.sched-completion-card.is-complete {
+  border-color: color-mix(in srgb, var(--ok) 28%, transparent);
+  background: color-mix(in srgb, var(--ok) 7%, var(--surface));
+}
+
+.sched-completion-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sched-completion-copy strong,
+.sched-completion-copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sched-completion-copy strong {
+  font-size: 13px;
+}
+
+.sched-completion-copy span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.sched-completion-value {
+  align-self: center;
+  color: var(--accent);
+  font-family: 'Fredoka', sans-serif;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.sched-completion-card.is-complete .sched-completion-value {
+  color: var(--ok);
+}
+
+.sched-completion-track {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.sched-completion-track span {
+  display: block;
+  height: 100%;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--accent);
+  transition: width 0.24s ease;
+}
+
+.sched-completion-card.is-complete .sched-completion-track span {
+  background: var(--ok);
+}
+
+@media (max-width: 380px) {
+  .sched-completion {
+    grid-template-columns: 1fr;
+  }
+
+  .sched-completion-card {
+    padding-block: 10px 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-completion-track span {
+    transition: none;
+  }
+}
