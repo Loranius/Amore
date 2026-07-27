@@ -7,6 +7,7 @@ import { useDateMutations, useDatePlans, useSharedDaysOff } from './useDates';
 import { PlanDateModal } from './PlanDateModal';
 import { ScheduleEditor } from './ScheduleEditor';
 import { ScheduleMonthNav } from './ScheduleMonthNav';
+import { ScheduleCompletionStatus } from './ScheduleCompletionStatus';
 import { ScheduleMonthOverview } from './ScheduleMonthOverview';
 import { ScheduleUpcoming } from './ScheduleUpcoming';
 import { ScheduleDayDetails } from './ScheduleDayDetails';
@@ -21,6 +22,7 @@ export function SchedulePage() {
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
   const [editMode, setEditMode] = useState(false);
   const [editUserId, setEditUserId] = useState<number | null>(null);
+  const [hasPendingBulkSelection, setHasPendingBulkSelection] = useState(false);
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [initialPlanDate, setInitialPlanDate] = useState<string | undefined>();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -68,10 +70,30 @@ export function SchedulePage() {
     ? sharedDates.includes(selectedDate) ? 'both-off' : statusOf.get(selectedDate) ?? 'none'
     : 'none';
 
+  const canDiscardPendingSelection = () => {
+    if (!hasPendingBulkSelection) return true;
+    return window.confirm('Є вибрані дні, до яких зміни ще не застосовано. Скасувати цей вибір?');
+  };
+
   const toggleEditMode = () => {
+    if (editMode && !canDiscardPendingSelection()) return;
     if (!editMode && editUserId === null) setEditUserId(users.find((user) => user.name === me.name)?.id ?? users[0]?.id ?? null);
+    setHasPendingBulkSelection(false);
     setEditMode((current) => !current);
     setSelectedDate(null);
+  };
+
+  const changeMonth = (next: { yr: number; mo: number }) => {
+    if (!canDiscardPendingSelection()) return;
+    setHasPendingBulkSelection(false);
+    setYm(next);
+  };
+
+  const changeEditUser = (userId: number) => {
+    if (userId === activeEditUser?.id) return;
+    if (!canDiscardPendingSelection()) return;
+    setHasPendingBulkSelection(false);
+    setEditUserId(userId);
   };
 
   const openPlanModal = (date?: string) => {
@@ -99,14 +121,25 @@ export function SchedulePage() {
         {nextSharedDate && <button type="button" className="sched-next-action" onClick={() => openPlanModal(nextSharedDate)}>Запланувати</button>}
       </section>
 
-      <ScheduleMonthNav yr={yr} mo={mo} onChange={setYm} />
+      <ScheduleMonthNav yr={yr} mo={mo} onChange={changeMonth} />
+      <ScheduleCompletionStatus users={users} marks={marks} total={total} />
 
       {editMode ? (
         <div className="sched-edit-panel">
           <div className="sched-person-switcher" role="tablist" aria-label="Чий графік редагувати">
-            {users.map((user) => <button key={user.id} type="button" role="tab" aria-selected={activeEditUser?.id === user.id} className={activeEditUser?.id === user.id ? 'is-active' : ''} onClick={() => setEditUserId(user.id)}>{user.name}</button>)}
+            {users.map((user) => <button key={user.id} type="button" role="tab" aria-selected={activeEditUser?.id === user.id} className={activeEditUser?.id === user.id ? 'is-active' : ''} onClick={() => changeEditUser(user.id)}>{user.name}</button>)}
           </div>
-          {activeEditUser && <ScheduleEditor user={activeEditUser} yr={yr} mo={mo} marks={marks} today={today} />}
+          {activeEditUser && (
+            <ScheduleEditor
+              key={`${activeEditUser.id}-${yr}-${mo}`}
+              user={activeEditUser}
+              yr={yr}
+              mo={mo}
+              marks={marks}
+              today={today}
+              onPendingSelectionChange={setHasPendingBulkSelection}
+            />
+          )}
         </div>
       ) : (
         <>
