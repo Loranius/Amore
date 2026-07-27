@@ -1273,7 +1273,41 @@ a.wl-card-title { color: var(--accent); }
   cursor: pointer;
 }
 .cal-del-btn:hover { color: var(--danger); }
+.cal-edit-btn {
+  flex: 0 0 auto;
+  border: 0;
+  background: transparent;
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px;
+  cursor: pointer;
+  opacity: 0.62;
+}
+.cal-edit-btn:hover, .cal-edit-btn:focus-visible { opacity: 1; }
 .cal-yearly-toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+
+/* Помилка завантаження: повідомлення без кнопки повтору — це глухий кут,
+   особливо в PWA, яку відкривають у метро. */
+.cal-error { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+/* Скелет списку подій — щоб висота не стрибала, коли дані приїхали. */
+.cal-skeleton { display: flex; flex-direction: column; gap: 6px; }
+.cal-skeleton-row {
+  height: 62px;
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    var(--surface) 0%,
+    color-mix(in srgb, var(--text) 7%, var(--surface)) 50%,
+    var(--surface) 100%
+  );
+  background-size: 220% 100%;
+  animation: cal-skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes cal-skeleton-shimmer { to { background-position-x: -220%; } }
+@media (prefers-reduced-motion: reduce) {
+  .cal-skeleton-row { animation: none; }
+}
 
 /* Плани */
 .plans-tab-bar { display: flex; gap: 6px; margin-bottom: 12px; }
@@ -1336,6 +1370,10 @@ a.wl-card-title { color: var(--accent); }
 .plans-card-note { font-size: 13px; color: var(--muted); }
 .plans-card-footer { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
 .plans-card-countdown, .plans-card-done-time { font-weight: 600; }
+/* Прострочений активний план. Раніше така картка не показувала взагалі
+   нічого замість відліку — дедлайн минув, і дата зникала з очей. */
+.plans-card--overdue { box-shadow: inset 3px 0 0 var(--danger); }
+.plans-card-overdue { font-weight: 600; color: var(--danger); }
 .plans-card-actions { display: flex; gap: 6px; padding: 0 12px 12px; }
 .plans-action-btn {
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);

@@ -5,13 +5,15 @@
 // дати плану до done_at.
 // ============================================================
 import { useEffect } from 'react';
-import { PLAN_CATS, planMetadataOf, formatUaDate, MONTHS } from './calendarUtils';
+import { planMetadataOf } from '@/features/_shared/events';
+import { localDateFromISO } from '@/lib/utils';
+import { PLAN_CATS, formatUaDate, MONTHS } from './calendarUtils';
 import type { EventRow } from '@/types';
 
 function durationLabel(fromISO: string, toISO: string): string {
   const diffDay = Math.max(
     0,
-    Math.round((new Date(toISO).getTime() - new Date(fromISO).getTime()) / 86_400_000),
+    Math.round((localDateFromISO(toISO).getTime() - localDateFromISO(fromISO).getTime()) / 86_400_000),
   );
   if (diffDay === 0) return 'Виконано в той самий день';
   if (diffDay === 1) return 'Виконано за 1 день';
@@ -32,8 +34,11 @@ export function PlanArchiveModal({ ev, onClose }: { ev: EventRow; onClose: () =>
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const doneStr = meta.done_at
-    ? `${new Date(meta.done_at).getDate()} ${MONTHS[new Date(meta.done_at).getMonth()]} ${new Date(meta.done_at).getFullYear()} р.`
+  // done_at — це timestamp із зоною (не календарна дата), тож він читається
+  // штатним конструктором; локальний день із нього і треба показати.
+  const doneAt = meta.done_at ? new Date(meta.done_at) : null;
+  const doneStr = doneAt
+    ? `${doneAt.getDate()} ${MONTHS[doneAt.getMonth()]} ${doneAt.getFullYear()} р.`
     : '—';
 
   return (

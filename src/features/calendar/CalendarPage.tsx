@@ -10,12 +10,13 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { TabBar } from '@/components/ui/TabBar';
+import { planMetadataOf } from '@/features/_shared/events';
 import { useEvents, useCalendarMutations } from './useCalendar';
 import { enrichEvent, sortEnriched } from './calendarUtils';
 import { EventList } from './EventList';
 import { PlansBoard } from './PlansBoard';
 import { AddEventModal, AddPlanModal } from './AddEventModal';
-import type { EventType } from '@/types';
+import type { EnrichedEvent, EventType } from '@/types';
 
 const TAB_DEFS: { type: EventType; label: string }[] = [
   { type: 'anniversary', label: '💕 Наші свята' },
@@ -24,13 +25,26 @@ const TAB_DEFS: { type: EventType; label: string }[] = [
   { type: 'other', label: '🗺️ Плани' },
 ];
 
+/**
+ * Стан модалки несе і вид форми, і рядок, який редагується. Одне поле, а
+ * не два незалежні: «яку форму показати» й «що саме правимо» не можуть
+ * розійтись, і неможливо відкрити модалку події з планом усередині.
+ * `row === null` означає створення — той самий патерн, що у вішлисті.
+ */
+type ModalState =
+  | { kind: 'event'; row: EnrichedEvent | null }
+  | { kind: 'plan'; row: EnrichedEvent | null }
+  | null;
+
 export function CalendarPage() {
-  const { data: events = [], isPending, isError } = useEvents();
-  const { addEvent, addPlan, setPlanStatus, deleteEvent } = useCalendarMutations();
+  const { data: events = [], isPending, isError, refetch, isFetching } = useEvents();
+  const {
+    addEvent, addPlan, updateEvent, updatePlan, setPlanStatus, deleteEvent,
+  } = useCalendarMutations();
   const confirmDialog = useConfirm();
 
   const [filter, setFilter] = useState<EventType>('anniversary');
-  const [modal, setModal] = useState<'event' | 'plan' | null>(null);
+  const [modal, setModal] = useState<ModalState>(null);
 
   const enriched = useMemo(
     () => events.map(enrichEvent).sort(sortEnriched),
@@ -55,7 +69,7 @@ export function CalendarPage() {
         <button
           type="button"
           className="btn"
-          onClick={() => setModal(filter === 'other' ? 'plan' : 'event')}
+          onClick={() => setModal({ kind: filter === 'other' ? 'plan' : 'event', row: null })}
         >
           + Додати
         </button>
@@ -69,27 +83,67 @@ export function CalendarPage() {
       />
 
       {isPending ? (
-        <p className="empty-state">Завантаження…</p>
+        <CalendarSkeleton />
       ) : isError ? (
-        <p className="empty-state">Не вдалось завантажити події.</p>
+        <div className="empty-state cal-error">
+          <p>Не вдалось завантажити події.</p>
+          <button type="button" className="btn" onClick={() => void refetch()} disabled={isFetching}>
+            {isFetching ? 'Пробую…' : 'Спробувати ще раз'}
+          </button>
+        </div>
       ) : events.length === 0 ? (
         <p className="empty-state">Подій ще немає. Додай першу!</p>
       ) : filter === 'other' ? (
         <PlansBoard
           plans={filtered}
           onSetStatus={(id, metadata) => setPlanStatus.mutate({ id, metadata })}
+          onEdit={(plan) => setModal({ kind: 'plan', row: plan })}
           onDelete={onDelete}
         />
       ) : (
-        <EventList events={filtered} onDelete={onDelete} />
+        <EventList
+          events={filtered}
+          onEdit={(ev) => setModal({ kind: 'event', row: ev })}
+          onDelete={onDelete}
+        />
       )}
 
-      {modal === 'event' && (
-        <AddEventModal onClose={() => setModal(null)} onSubmit={(i) => addEvent.mutate(i)} />
+      {modal?.kind === 'event' && (
+        <AddEventModal
+          event={modal.row}
+          onClose={() => setModal(null)}
+          onSubmit={(input) => {
+            const row = modal.row;
+            if (row) updateEvent.mutate({ id: row.id, input });
+            else addEvent.mutate(input);
+          }}
+        />
       )}
-      {modal === 'plan' && (
-        <AddPlanModal onClose={() => setModal(null)} onSubmit={(i) => addPlan.mutate(i)} />
+      {modal?.kind === 'plan' && (
+        <AddPlanModal
+          plan={modal.row}
+          onClose={() => setModal(null)}
+          onSubmit={(input) => {
+            const row = modal.row;
+            // metadata береться з поточного рядка: правка назви не має
+            // повертати виконаний план у «Планується».
+            if (row) updatePlan.mutate({ id: row.id, input, current: planMetadataOf(row) });
+            else addPlan.mutate(input);
+          }}
+        />
       )}
     </section>
+  );
+}
+
+/** Скелет замість рядка «Завантаження…»: висота списку не стрибає, коли
+ *  дані приїхали. Локальний — потрібен лише тут. */
+function CalendarSkeleton() {
+  return (
+    <div className="cal-skeleton" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="cal-skeleton-row" />
+      ))}
+    </div>
   );
 }

@@ -47,6 +47,30 @@ function fmtDateUA(dateStr: string): string {
   return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
 }
 
+/**
+ * 'MM-DD' щорічної події, як вона випадає в конкретному році.
+ *
+ * Навіщо: звірка сирих 'MM-DD' означала, що подія 29 лютого не збігається
+ * ні з чим три роки з чотирьох — нагадування про неї просто НЕ приходило.
+ * Конвенція та сама, що в застосунку: останній день того самого місяця,
+ * тобто 28 лютого. Правило продубльоване в
+ * `src/features/calendar/calendarUtils.ts::sameDayInYear`; edge-функція не
+ * імпортує з `src/`, тож міняти конвенцію треба в обох місцях.
+ */
+function yearlyMD(evMD: string, year: number): string {
+  const [month, day] = evMD.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return `${String(month).padStart(2, "0")}-${String(Math.min(day, daysInMonth)).padStart(2, "0")}`;
+}
+
+/** Виконаний план не має нагадувати про себе. Статус лежить у metadata
+ *  (`PlanMetadata`), яку пише дошка планів. */
+function isDonePlan(ev: { type?: string | null; metadata?: unknown }): boolean {
+  if (ev.type !== "other") return false;
+  const meta = ev.metadata as { status?: unknown } | null;
+  return !!meta && meta.status === "done";
+}
+
 // ── Telegram ──────────────────────────────────────────────────
 async function sendTelegram(chatId: string | number, text: string): Promise<void> {
   const token = Deno.env.get("TG_BOT_TOKEN");
@@ -101,10 +125,10 @@ serve(async (req) => {
     // ── Завантажуємо ВСІ події ────────────────────────────────
     const { data: events, error: evErr } = await sb
       .from("events")
-      .select("id,title,description,date,yearly,type");
+      .select("id,title,description,date,yearly,type,metadata");
 
     if (evErr) throw evErr;
-    const toCheck = events || [];
+    const toCheck = (events || []).filter((ev: any) => !isDonePlan(ev));
 
     // ── Отримуємо отримувачів ─────────────────────────────────
     const { data: users } = await sb
@@ -131,10 +155,13 @@ serve(async (req) => {
       let displayDate = "";
 
       if (isYearly) {
-        // Щорічна подія: порівнюємо тільки місяць і день
-        if      (evMD === todayMD) { kind = "today";   displayDate = fmtDateUA(todayStr); }
-        else if (evMD === plus1MD) { kind = "tomorrow"; displayDate = fmtDateUA(plus1Str); }
-        else if (evMD === plus3MD) { kind = "in3days";  displayDate = fmtDateUA(plus3Str); }
+        // Щорічна подія: порівнюємо тільки місяць і день, але дату події
+        // спершу проєктуємо на ЦІЛЬОВИЙ рік — інакше 29 лютого не
+        // збігається ні з чим (див. yearlyMD).
+        const inYear = (s: string) => yearlyMD(evMD, Number(s.slice(0, 4)));
+        if      (inYear(todayStr) === todayMD) { kind = "today";   displayDate = fmtDateUA(todayStr); }
+        else if (inYear(plus1Str) === plus1MD) { kind = "tomorrow"; displayDate = fmtDateUA(plus1Str); }
+        else if (inYear(plus3Str) === plus3MD) { kind = "in3days";  displayDate = fmtDateUA(plus3Str); }
       } else {
         // Разова подія: точна дата
         if      (evDate === todayStr) { kind = "today";   displayDate = fmtDateUA(evDate); }

@@ -8,10 +8,11 @@ import type { EnrichedEvent } from '@/types';
 
 interface EventListProps {
   events: EnrichedEvent[]; // вже відфільтровані за типом і відсортовані
+  onEdit: (ev: EnrichedEvent) => void;
   onDelete: (id: number) => void;
 }
 
-export function EventList({ events, onDelete }: EventListProps) {
+export function EventList({ events, onEdit, onDelete }: EventListProps) {
   if (events.length === 0) {
     return <p className="empty-state">У цій категорії поки нічого немає.</p>;
   }
@@ -24,9 +25,16 @@ export function EventList({ events, onDelete }: EventListProps) {
     <div>
       {nextUp && <NextBanner ev={nextUp} />}
       {upcoming.length > 0 && (
-        <Section events={upcoming} onDelete={onDelete} hideBadgeForId={nextUp?.id ?? null} />
+        <Section
+          events={upcoming}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          hideBadgeForId={nextUp?.id ?? null}
+        />
       )}
-      {past.length > 0 && <Section title="✓ Минулі" events={past} onDelete={onDelete} muted />}
+      {past.length > 0 && (
+        <Section title="✓ Минулі" events={past} onEdit={onEdit} onDelete={onDelete} muted />
+      )}
     </div>
   );
 }
@@ -52,10 +60,13 @@ interface SectionProps {
   events: EnrichedEvent[];
   muted?: boolean;
   hideBadgeForId?: number | null;
+  onEdit: (ev: EnrichedEvent) => void;
   onDelete: (id: number) => void;
 }
 
-function Section({ title, events, muted = false, hideBadgeForId = null, onDelete }: SectionProps) {
+function Section({
+  title, events, muted = false, hideBadgeForId = null, onEdit, onDelete,
+}: SectionProps) {
   return (
     <div className="cal-section">
       {title && <div className={`cal-section-title${muted ? ' cal-muted' : ''}`}>{title}</div>}
@@ -80,9 +91,18 @@ function Section({ title, events, muted = false, hideBadgeForId = null, onDelete
             </div>
             <button
               type="button"
+              className="cal-edit-btn"
+              onClick={() => onEdit(ev)}
+              aria-label={`Редагувати «${ev.title}»`}
+              title="Редагувати"
+            >
+              ✏️
+            </button>
+            <button
+              type="button"
               className="cal-del-btn"
               onClick={() => onDelete(ev.id)}
-              aria-label="Видалити"
+              aria-label={`Видалити «${ev.title}»`}
             >
               ×
             </button>

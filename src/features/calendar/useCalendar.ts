@@ -77,6 +77,54 @@ export function useCalendarMutations() {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
+  // Редагування. Донедавна модуль умів лише створити й видалити: одруківка
+  // в назві лікувалась видаленням і повторним створенням — а разом із
+  // рядком зникали й `metadata.done_at`, і зв'язок із кристалом (він
+  // рахує події за `is_milestone` та `type`).
+  const updateEvent = useMutation({
+    mutationFn: async (v: { id: number; input: NewEventInput }) => {
+      const { error } = await supabase
+        .from('events')
+        .update({
+          title: v.input.title,
+          date: v.input.date,
+          description: v.input.description,
+          type: v.input.type,
+          yearly: v.input.yearly,
+          is_milestone: v.input.is_milestone,
+        })
+        .eq('id', v.id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
+  });
+
+  // План редагується разом зі своєю metadata, але `status`/`done_at`
+  // беруться з ПОТОЧНОГО стану, а не з форми: інакше правка назви
+  // виконаного плану тихо повертала б його в «Планується».
+  const updatePlan = useMutation({
+    mutationFn: async (v: { id: number; input: NewPlanInput; current: PlanMetadata }) => {
+      const metadata: PlanMetadata = {
+        cat: v.input.cat,
+        status: v.current.status,
+        done_at: v.current.done_at,
+      };
+      const { error } = await supabase
+        .from('events')
+        .update({
+          title: v.input.title,
+          date: v.input.date,
+          description: v.input.note,
+          metadata,
+        })
+        .eq('id', v.id);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
+  });
+
   // Зміна статусу плану — пишемо ЦІЛУ metadata (типізовано), без тегів.
   const setPlanStatus = useMutation({
     mutationFn: async (v: { id: number; metadata: PlanMetadata }) => {
@@ -99,5 +147,5 @@ export function useCalendarMutations() {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
-  return { addEvent, addPlan, setPlanStatus, deleteEvent };
+  return { addEvent, addPlan, updateEvent, updatePlan, setPlanStatus, deleteEvent };
 }
