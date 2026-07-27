@@ -15,6 +15,7 @@ import { ScheduleDatePlans } from './ScheduleDatePlans';
 import { countdownLabel, dayStatus, fmtLongDate, type DayStatus } from './scheduleViewModel';
 import type { DateRow } from '@/types';
 import './schedule.css';
+import './scheduleCompleteness.css';
 
 export function SchedulePage() {
   const { data: users = [] } = useUsers();
@@ -96,6 +97,15 @@ export function SchedulePage() {
     setEditUserId(userId);
   };
 
+  const openEditorForUser = (userId: number) => {
+    if (editMode && userId === activeEditUser?.id) return;
+    if (!canDiscardPendingSelection()) return;
+    setHasPendingBulkSelection(false);
+    setEditUserId(userId);
+    setEditMode(true);
+    setSelectedDate(null);
+  };
+
   const openPlanModal = (date?: string) => {
     setInitialPlanDate(date);
     setSelectedDate(null);
@@ -122,7 +132,7 @@ export function SchedulePage() {
       </section>
 
       <ScheduleMonthNav yr={yr} mo={mo} onChange={changeMonth} />
-      <ScheduleCompletionStatus users={users} marks={marks} total={total} />
+      <ScheduleCompletionStatus users={users} marks={marks} total={total} onEditUser={openEditorForUser} />
 
       {editMode ? (
         <div className="sched-edit-panel">
