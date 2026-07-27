@@ -42,7 +42,7 @@ export function ScheduleEditor({
   const total = daysInMonth(yr, mo);
   const userMarks = marks[user.id] ?? {};
   const previousMonth = stepMonth(yr, mo, -1);
-  const { data: previousMarks = {} } = useSchedule(previousMonth.yr, previousMonth.mo);
+  const { data: previousMarks = {}, isPending: previousMonthPending } = useSchedule(previousMonth.yr, previousMonth.mo);
   const singleMutation = useScheduleMutation(yr, mo);
   const batchMutation = useScheduleBatchMutation(yr, mo);
   const isPending = singleMutation.isPending || batchMutation.isPending;
@@ -90,6 +90,7 @@ export function ScheduleEditor({
   };
 
   const copyPreviousMonth = () => {
+    if (previousMonthPending) return;
     if (!window.confirm('Поточний місяць буде замінено графіком попереднього. Продовжити?')) return;
     applyChanges(
       buildCopyChanges({
@@ -139,6 +140,7 @@ export function ScheduleEditor({
         onTemplate={applyTemplate}
         onCopyPrevious={copyPreviousMonth}
         onClear={clearMonth}
+        copyDisabled={isPending || previousMonthPending}
       />
     </div>
   );
