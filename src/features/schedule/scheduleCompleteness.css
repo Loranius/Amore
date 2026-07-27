@@ -1,4 +1,4 @@
-/* Schedule stage 3 — навігація до поточного місяця та швидке закриття пропусків. */
+/* Schedule stage 3–4 — повнота графіка, швидкі дії та нагадування партнеру. */
 .sched .sched-nav {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) 42px;
@@ -35,22 +35,52 @@
   opacity: 0.72;
 }
 
-.sched-completion-action {
+.sched-completion-actions {
   grid-column: 1 / -1;
-  justify-self: stretch;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+}
+
+.sched-completion-action,
+.sched-completion-remind {
+  min-width: 0;
   border: 0;
   border-radius: 10px;
   padding: 7px 9px;
-  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
-  color: var(--accent);
   font: inherit;
   font-size: 10px;
   font-weight: 800;
   cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease;
 }
 
-.sched-completion-action:active {
+.sched-completion-action {
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  color: var(--accent);
+}
+
+.sched-completion-remind {
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  background: var(--surface);
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.sched-completion-remind.is-sent {
+  border-color: color-mix(in srgb, var(--ok) 28%, transparent);
+  background: color-mix(in srgb, var(--ok) 8%, var(--surface));
+  color: var(--ok);
+}
+
+.sched-completion-action:active,
+.sched-completion-remind:active {
   transform: scale(0.98);
+}
+
+.sched-completion-remind:disabled {
+  cursor: default;
+  opacity: 0.72;
 }
 
 .sched-editor-missing {
@@ -84,6 +114,16 @@
   padding: 11px 12px;
 }
 
+@media (max-width: 440px) {
+  .sched-completion-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .sched-completion-remind {
+    width: 100%;
+  }
+}
+
 @media (max-width: 380px) {
   .sched .sched-nav {
     grid-template-columns: 38px minmax(0, 1fr) 38px;
@@ -107,6 +147,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sched-completion-action,
+  .sched-completion-remind,
   .sched-editor-missing {
     transition: none;
   }
