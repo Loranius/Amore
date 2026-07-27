@@ -2,6 +2,7 @@
 // AddPinModal — нове місце (порт openAddModal)
 // ============================================================
 import { useState } from 'react';
+import { todayISO } from '@/lib/utils';
 import { normalize } from '@/lib/images';
 import { CATEGORIES, CATEGORY_ORDER } from './mapConstants';
 import { useToast } from '@/providers/ToastProvider';
@@ -13,7 +14,10 @@ interface AddPinModalProps {
   lng: number;
   initialTitle?: string | undefined;
   onClose: () => void;
-  onSubmit: (payload: { title: string; category: PinCategory; note: string | null; file: File | null }) => void;
+  onSubmit: (payload: {
+    title: string; category: PinCategory; note: string | null;
+    file: File | null; visitedAt: string;
+  }) => void;
 }
 
 export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: AddPinModalProps) {
@@ -22,6 +26,10 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
   const [category, setCategory] = useState<PinCategory>('visited');
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  // За замовчуванням сьогодні, але змінюване: мітку часто ставлять уже
+  // після поїздки, і саме ця дата вирішує, в який день архіву
+  // «Спогадів» стане фото місця.
+  const [visitedAt, setVisitedAt] = useState(todayISO());
   const [preview, setPreview] = useState<string | null>(null);
 
   const pickFile = async (f: File) => {
@@ -39,7 +47,7 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
   const save = () => {
     const t = title.trim();
     if (!t) return;
-    onSubmit({ title: t, category, note: note.trim() || null, file });
+    onSubmit({ title: t, category, note: note.trim() || null, file, visitedAt });
     onClose();
   };
 
@@ -87,6 +95,17 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
           </FilePickerButton>
           {preview && <img className="pin-add-preview" src={preview} alt="" />}
         </div>
+
+        <label className="form-field">
+          <span>Коли були</span>
+          <input
+            id="pin-visited"
+            name="visited_at"
+            type="date"
+            value={visitedAt}
+            onChange={(e) => setVisitedAt(e.target.value)}
+          />
+        </label>
 
         <label className="form-field">
           <span>Нотатка</span>

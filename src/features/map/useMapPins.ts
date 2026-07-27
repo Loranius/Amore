@@ -20,7 +20,7 @@ const BUCKET = 'map-photos';
 async function fetchPins(): Promise<MapPinRow[]> {
   const { data, error } = await supabase
     .from('map_pins')
-    .select('id,title,note,category,lat,lng,photo_url,rating,review,city,country,created_by,created_at')
+    .select('id,title,note,category,lat,lng,photo_url,rating,review,city,country,created_by,created_at,visited_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
@@ -64,6 +64,10 @@ export interface PinUpdate {
   review: string | null;
   rating: number | null;
   photo_url?: string;
+  /** Коли ви там були. Керує тим, у який день фото мітки стане в архів
+   *  «Спогадів» — до появи цієї колонки бралася дата створення мітки,
+   *  і мітка про давню подорож падала в сьогоднішній день. */
+  visited_at?: string;
 }
 
 export function useMapPinMutations() {
@@ -81,6 +85,7 @@ export function useMapPinMutations() {
       title: string;
       note: string | null;
       file: File | null;
+      visitedAt: string;
     }): Promise<MapPinRow | null> => {
       const geo = await reverseGeocode(v.lat, v.lng);
       const row: InsertRow<'map_pins'> = {
@@ -92,6 +97,7 @@ export function useMapPinMutations() {
         city: geo.city || null,
         country: geo.country || null,
         created_by: user.id,
+        visited_at: v.visitedAt,
       };
       const { data, error } = await supabase.from('map_pins').insert(row).select('id').single();
       if (error || !data) throw error ?? new Error('insert failed');
@@ -102,7 +108,7 @@ export function useMapPinMutations() {
       }
       const { data: fresh } = await supabase
         .from('map_pins')
-        .select('id,title,note,category,lat,lng,photo_url,rating,review,city,country,created_by,created_at')
+        .select('id,title,note,category,lat,lng,photo_url,rating,review,city,country,created_by,created_at,visited_at')
         .eq('id', data.id)
         .single();
       return fresh ?? null;

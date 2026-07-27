@@ -306,6 +306,8 @@ export interface DateRow {
 }
 
 export interface MapPinRow {
+  /** 'YYYY-MM-DD' — коли пара там була. Керує датою фото в «Спогадах». */
+  visited_at: string | null;
   id: number;
   title: string;
   note: string | null;

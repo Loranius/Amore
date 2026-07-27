@@ -155,6 +155,26 @@ export function useMemoriesMutations() {
   });
 
   /**
+   * Відв'язати спогад від модуля (§16), не видаляючи його.
+   *
+   * Фото лишається в архіві й стає «доданим вручну» — просто зникає
+   * зв'язок. Це половина вибору, який архів зобов'язаний давати замість
+   * мовчазного видалення.
+   */
+  const unlink = useMutation({
+    mutationFn: async (v: { memoryId: number; source: MemorySource }) => {
+      const { error } = await supabase
+        .from('memory_links')
+        .delete()
+        .eq('memory_id', v.memoryId)
+        .eq('source_type', v.source);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e) => toast.show('Не вдалось відв\'язати: ' + (e as Error).message),
+  });
+
+  /**
    * Видалення спогаду з архіву.
    *
    * Файл зі сховища прибирається ЛИШЕ якщо архів ним володіє
@@ -176,5 +196,5 @@ export function useMemoriesMutations() {
     onError: (e) => toast.show('Не вдалось видалити: ' + (e as Error).message),
   });
 
-  return { upload, saveCaption, saveDayDescription, remove };
+  return { upload, saveCaption, saveDayDescription, unlink, remove };
 }

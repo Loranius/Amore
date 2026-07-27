@@ -8,12 +8,12 @@
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { Lightbox } from '@/components/ui/Lightbox';
 import { currentYearMonth, stepMonth } from '@/features/_shared/month';
 import { MemoriesViewPicker } from './MemoriesViewPicker';
 import { MemoriesAlbum, MemoriesFeed, MemoriesMosaicMonth } from './MemoriesOverviews';
 import { MemoryDayView } from './MemoryDayView';
 import { MemoryUploadModal } from './MemoryUploadModal';
+import { MemoryViewer } from './MemoryViewer';
 import { groupMemoriesByDate } from './memoriesDate';
 import { useMemoriesView } from './memoriesView';
 import { useMemories, useMemoriesMutations } from './useMemories';
@@ -23,7 +23,7 @@ import type { MemoryRow } from '@/types';
 export function MemoriesPage() {
   const me = useCurrentUser();
   const { data, isPending, isError, refetch, isFetching } = useMemories();
-  const { upload } = useMemoriesMutations();
+  const { upload, unlink, remove } = useMemoriesMutations();
   const [view, setView] = useMemoriesView();
   const [openDate, setOpenDate] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<MemoryRow | null>(null);
@@ -70,7 +70,16 @@ export function MemoriesPage() {
           onBack={() => setOpenDate(null)}
           onOpen={setLightbox}
         />
-        <Lightbox src={lightbox?.photo_url ?? null} onClose={() => setLightbox(null)} />
+      {lightbox && (
+        <MemoryViewer
+          photo={lightbox}
+          sources={links[lightbox.id] ?? []}
+          busy={unlink.isPending || remove.isPending}
+          onClose={() => setLightbox(null)}
+          onUnlink={(source) => unlink.mutate({ memoryId: lightbox.id, source })}
+          onDelete={() => remove.mutate(lightbox, { onSuccess: () => setLightbox(null) })}
+        />
+      )}
       </section>
     );
   }
@@ -124,7 +133,16 @@ export function MemoriesPage() {
         />
       )}
 
-      <Lightbox src={lightbox?.photo_url ?? null} onClose={() => setLightbox(null)} />
+      {lightbox && (
+        <MemoryViewer
+          photo={lightbox}
+          sources={links[lightbox.id] ?? []}
+          busy={unlink.isPending || remove.isPending}
+          onClose={() => setLightbox(null)}
+          onUnlink={(source) => unlink.mutate({ memoryId: lightbox.id, source })}
+          onDelete={() => remove.mutate(lightbox, { onSuccess: () => setLightbox(null) })}
+        />
+      )}
     </section>
   );
 }
