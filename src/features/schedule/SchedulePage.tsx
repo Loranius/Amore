@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useUsers } from '@/features/_shared/useUsers';
 import { currentYearMonth, daysInMonth, monthKeyOf, todayLocal, ymd } from '@/features/_shared/month';
@@ -19,16 +19,17 @@ import type { DateRow } from '@/types';
 import './schedule.css';
 import './scheduleCompleteness.css';
 
+function yearMonthFromParam(value: string | null): { yr: number; mo: number } | null {
+  if (!value || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return null;
+  return { yr: Number(value.slice(0, 4)), mo: Number(value.slice(5, 7)) };
+}
+
 function initialYearMonth(params: URLSearchParams): { yr: number; mo: number } {
-  const value = params.get('month');
-  if (value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)) {
-    return { yr: Number(value.slice(0, 4)), mo: Number(value.slice(5, 7)) };
-  }
-  return currentYearMonth();
+  return yearMonthFromParam(params.get('month')) ?? currentYearMonth();
 }
 
 export function SchedulePage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { data: users = [] } = useUsers();
   const me = useCurrentUser();
   const [{ yr, mo }, setYm] = useState(() => initialYearMonth(searchParams));
@@ -60,6 +61,40 @@ export function SchedulePage() {
   const remindingUserId = scheduleReminder.isPending
     ? scheduleReminder.variables?.recipientId ?? null
     : null;
+
+  const requestedMonth = searchParams.get('month');
+  const requestedEdit = searchParams.get('edit') === '1';
+
+  useEffect(() => {
+    const nextMonth = yearMonthFromParam(requestedMonth);
+    if (!nextMonth && !requestedEdit) return;
+
+    if (hasPendingBulkSelection) {
+      const discard = window.confirm(
+        'Є вибрані дні, до яких зміни ще не застосовано. Скасувати цей вибір і відкрити нагадування?',
+      );
+      if (!discard) {
+        const cleaned = new URLSearchParams(searchParams);
+        cleaned.delete('month');
+        cleaned.delete('edit');
+        setSearchParams(cleaned, { replace: true });
+        return;
+      }
+    }
+
+    setHasPendingBulkSelection(false);
+    if (nextMonth) setYm(nextMonth);
+    if (requestedEdit) {
+      setEditUserId(null);
+      setEditMode(true);
+      setSelectedDate(null);
+    }
+
+    const cleaned = new URLSearchParams(searchParams);
+    cleaned.delete('month');
+    cleaned.delete('edit');
+    setSearchParams(cleaned, { replace: true });
+  }, [hasPendingBulkSelection, requestedEdit, requestedMonth, searchParams, setSearchParams]);
 
   const statusOf = useMemo(() => {
     const map = new Map<string, DayStatus>();
