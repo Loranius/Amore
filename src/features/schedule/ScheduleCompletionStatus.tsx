@@ -1,5 +1,6 @@
 import type { AppUser } from '@/types';
 import type { MarksMap } from './useSchedule';
+import './scheduleStabilization.css';
 
 function countFilled(userId: number, marks: MarksMap): number {
   return Object.values(marks[userId] ?? {}).filter((mark) => mark === 'Р' || mark === 'Х').length;
