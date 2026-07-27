@@ -1,9 +1,8 @@
 // ============================================================
 // PlanDateModal — «Запланувати побачення»
 // ------------------------------------------------------------
-// Дата — лише з переданого списку майбутніх спільних вихідних
-// (sharedDates, з useSharedDaysOff). Той самий ModalShell-патерн,
-// що в calendar/AddEventModal.tsx.
+// Дата — лише з переданого списку майбутніх спільних вихідних.
+// initialDate дозволяє відкрити форму прямо з вибраної клітинки.
 // ============================================================
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -32,20 +31,22 @@ function ModalShell({ title, children, onClose }: {
 /** 'YYYY-MM-DD' → «26 липня, нд». */
 function fmtSharedDate(d: string): string {
   const dt = new Date(d + 'T00:00:00');
-  const label = dt.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', weekday: 'short' });
-  return label;
+  return dt.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', weekday: 'short' });
 }
 
 export function PlanDateModal({
   sharedDates,
+  initialDate,
   onClose,
   onSubmit,
 }: {
   sharedDates: string[];
+  initialDate?: string;
   onClose: () => void;
   onSubmit: (input: NewDateInput) => void;
 }) {
-  const [date, setDate] = useState(sharedDates[0] ?? '');
+  const firstDate = initialDate && sharedDates.includes(initialDate) ? initialDate : sharedDates[0] ?? '';
+  const [date, setDate] = useState(firstDate);
   const [title, setTitle] = useState('');
   const [place, setPlace] = useState('');
   const [time, setTime] = useState('');
