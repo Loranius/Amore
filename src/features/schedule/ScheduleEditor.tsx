@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { daysInMonth, stepMonth } from '@/features/_shared/month';
+import { daysInMonth, stepMonth, ymd } from '@/features/_shared/month';
 import type { AppUser } from '@/types';
 import {
   useSchedule,
@@ -14,6 +14,7 @@ import {
   buildCopyChanges,
   buildTemplateChanges,
   markLabel,
+  normalizeMark,
   templateLabel,
   type TemplateKind,
 } from './scheduleEditorModel';
@@ -51,6 +52,11 @@ export function ScheduleEditor({
   const markedCount = useMemo(
     () => Object.values(userMarks).filter((mark) => mark === 'Р' || mark === 'Х').length,
     [userMarks],
+  );
+  const missingDates = useMemo(
+    () => Array.from({ length: total }, (_, index) => ymd(yr, mo, index + 1))
+      .filter((date) => normalizeMark(userMarks[date]) === ''),
+    [mo, total, userMarks, yr],
   );
 
   useEffect(() => {
@@ -95,6 +101,12 @@ export function ScheduleEditor({
     }
     setBulkMode((current) => !current);
     setSelectedDates(new Set());
+  };
+
+  const selectMissingDates = () => {
+    if (missingDates.length === 0 || isPending) return;
+    setBulkMode(true);
+    setSelectedDates((current) => new Set([...current, ...missingDates]));
   };
 
   const applySelected = () => {
@@ -142,7 +154,9 @@ export function ScheduleEditor({
         onMarkChange={setSelectedMark}
         bulkMode={bulkMode}
         selectedCount={selectedDates.size}
+        missingCount={missingDates.length}
         onToggleBulk={toggleBulkMode}
+        onSelectMissing={selectMissingDates}
         onApplySelected={applySelected}
         markedCount={markedCount}
         total={total}
