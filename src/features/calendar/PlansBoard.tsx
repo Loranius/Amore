@@ -5,11 +5,12 @@
 // статус читаються з metadata (planMetadataOf), без парсингу тегів.
 // ============================================================
 import { useMemo, useState } from 'react';
+import { planMetadataOf } from '@/features/_shared/events';
+import { localDateFromISO } from '@/lib/utils';
 import {
   PLAN_CATS,
   PLAN_STATUS,
   PLAN_CAT_ORDER,
-  planMetadataOf,
   daysLabel,
   formatUaDate,
 } from './calendarUtils';
@@ -21,10 +22,11 @@ type PlansTab = 'active' | 'archive';
 interface PlansBoardProps {
   plans: EnrichedEvent[]; // events типу 'other'
   onSetStatus: (id: number, metadata: PlanMetadata) => void;
+  onEdit: (plan: EnrichedEvent) => void;
   onDelete: (id: number) => void;
 }
 
-export function PlansBoard({ plans, onSetStatus, onDelete }: PlansBoardProps) {
+export function PlansBoard({ plans, onSetStatus, onEdit, onDelete }: PlansBoardProps) {
   const [tab, setTab] = useState<PlansTab>('active');
   const [viewing, setViewing] = useState<EnrichedEvent | null>(null);
 
@@ -45,6 +47,10 @@ export function PlansBoard({ plans, onSetStatus, onDelete }: PlansBoardProps) {
   };
   const undo = (ev: EnrichedEvent, meta: PlanMetadata) =>
     onSetStatus(ev.id, { ...meta, status: 'planned', done_at: null });
+  // «В процесі» досі можна було поставити ЛИШЕ при створенні плану — на
+  // картці кнопки не було, тож статус був наполовину мертвий.
+  const toggleActive = (ev: EnrichedEvent, meta: PlanMetadata) =>
+    onSetStatus(ev.id, { ...meta, status: meta.status === 'active' ? 'planned' : 'active' });
 
   const shown = tab === 'archive' ? archive : active;
 
@@ -117,6 +123,8 @@ export function PlansBoard({ plans, onSetStatus, onDelete }: PlansBoardProps) {
                     isArchive={tab === 'archive'}
                     onMarkDone={() => markDone(ev, meta)}
                     onUndo={() => undo(ev, meta)}
+                    onToggleActive={() => toggleActive(ev, meta)}
+                    onEdit={() => onEdit(ev)}
                     onDelete={() => onDelete(ev.id)}
                     onView={() => setViewing(ev)}
                   />
@@ -140,11 +148,15 @@ interface PlanCardProps {
   isArchive: boolean;
   onMarkDone: () => void;
   onUndo: () => void;
+  onToggleActive: () => void;
+  onEdit: () => void;
   onDelete: () => void;
   onView: () => void;
 }
 
-function PlanCard({ ev, meta, isArchive, onMarkDone, onUndo, onDelete, onView }: PlanCardProps) {
+function PlanCard({
+  ev, meta, isArchive, onMarkDone, onUndo, onToggleActive, onEdit, onDelete, onView,
+}: PlanCardProps) {
   const cat = PLAN_CATS[meta.cat];
   const st = PLAN_STATUS[meta.status];
 
@@ -153,13 +165,21 @@ function PlanCard({ ev, meta, isArchive, onMarkDone, onUndo, onDelete, onView }:
     const doneDate = new Date(meta.done_at);
     const diffDay = Math.max(
       0,
-      Math.round((doneDate.getTime() - new Date(ev.date).getTime()) / 86_400_000),
+      Math.round((doneDate.getTime() - localDateFromISO(ev.date).getTime()) / 86_400_000),
     );
     doneInfo = `✅ ${formatUaDate(meta.done_at)} · ${diffDay} дн.`;
   }
 
+  // Прострочений активний план раніше не показував НІЧОГО: умова була
+  // «якщо днів ≥ 0 — відлік, інакше інформація про виконання», а для
+  // невиконаного плану другої гілки не існує. На дошці власника так стояв
+  // план із дедлайном тиждень тому — без єдиної позначки дати.
+  const overdueDays = !isArchive && ev.days < 0 ? Math.abs(ev.days) : 0;
+
   return (
-    <div className={`plans-card${isArchive ? ' plans-card--done' : ''}`}>
+    <div
+      className={`plans-card${isArchive ? ' plans-card--done' : ''}${overdueDays ? ' plans-card--overdue' : ''}`}
+    >
       <div className="plans-card-top" style={{ background: cat.gradient }}>
         <span className="plans-card-cat-icon">{cat.icon}</span>
         <span className={`plans-card-status ${st.cls}`}>
@@ -171,7 +191,11 @@ function PlanCard({ ev, meta, isArchive, onMarkDone, onUndo, onDelete, onView }:
         {ev.description && <div className="plans-card-note">{ev.description}</div>}
         <div className="plans-card-footer">
           <span className="plans-card-date">📅 {formatUaDate(ev.date)}</span>
-          {!isArchive && ev.days >= 0 ? (
+          {overdueDays > 0 ? (
+            <span className="plans-card-overdue">
+              ⚠️ прострочено на {overdueDays} дн.
+            </span>
+          ) : !isArchive ? (
             <span className="plans-card-countdown" style={{ color: cat.color }}>
               {daysLabel(ev.days)}
             </span>
@@ -191,15 +215,29 @@ function PlanCard({ ev, meta, isArchive, onMarkDone, onUndo, onDelete, onView }:
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            className="plans-action-btn plans-done-big"
-            onClick={onMarkDone}
-          >
-            ✅ Позначити виконано
-          </button>
+          <>
+            <button
+              type="button"
+              className="plans-action-btn plans-done-big"
+              onClick={onMarkDone}
+            >
+              ✅ Позначити виконано
+            </button>
+            <button
+              type="button"
+              className="plans-action-btn"
+              onClick={onToggleActive}
+              title={meta.status === 'active' ? 'Повернути в «Планується»' : 'Позначити «В процесі»'}
+              aria-label={meta.status === 'active' ? 'Повернути в «Планується»' : 'Позначити «В процесі»'}
+            >
+              {meta.status === 'active' ? '⏳' : '🔥'}
+            </button>
+          </>
         )}
-        <button type="button" className="plans-action-btn" onClick={onDelete} title="Видалити">
+        <button type="button" className="plans-action-btn" onClick={onEdit} title="Редагувати" aria-label="Редагувати">
+          ✏️
+        </button>
+        <button type="button" className="plans-action-btn" onClick={onDelete} title="Видалити" aria-label="Видалити">
           🗑
         </button>
       </div>

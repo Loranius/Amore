@@ -1,19 +1,26 @@
 // ============================================================
-// AddEventModal / AddPlanModal — створення події та плану
+// AddEventModal / AddPlanModal — створення й редагування події та плану
 // ------------------------------------------------------------
 // План зберігається з типізованою metadata (без тегів у description).
+// Одна модалка на обидва режими — патерн вішлиста (`WishFormModal`):
+// `event`/`plan` === null означає створення.
 // ============================================================
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { planMetadataOf } from '@/features/_shared/events';
 import { PLAN_CATS, PLAN_CAT_ORDER } from './calendarUtils';
 import type { NewEventInput, NewPlanInput } from './useCalendar';
-import type { EventType, PlanCategory } from '@/types';
+import type { EnrichedEvent, EventRow, EventType, PlanCategory } from '@/types';
 
+// Тип `other` тут НАВМИСНО відсутній. Він писав рядок без `metadata`, а
+// дошка планів підставляє дефолт для будь-якого `type='other'` — тож
+// «Інша подія» мовчки з'являлась серед планів як запланований пункт
+// категорії «Інше» і псувала лічильник «N / M планів виконано».
+// Плани створюються своєю модалкою, події — цією.
 const EVENT_TYPES: { type: EventType; label: string }[] = [
   { type: 'birthday', label: '🎂 День народження' },
   { type: 'anniversary', label: '💕 Річниця' },
   { type: 'holiday', label: '🎉 Свято' },
-  { type: 'other', label: '📅 Інше' },
 ];
 
 function ModalShell({ title, children, onClose }: {
@@ -37,19 +44,29 @@ function ModalShell({ title, children, onClose }: {
 }
 
 // ── Подія ────────────────────────────────────────────────────
+/** Тип події з БД може бути null або 'other' (легасі) — у формі показуємо
+ *  найближчий валідний варіант, а не порожній вибір. */
+function editableEventType(value: EventType | null): EventType {
+  return value === 'anniversary' || value === 'holiday' ? value : 'birthday';
+}
+
 export function AddEventModal({
+  event,
   onClose,
   onSubmit,
 }: {
+  event: EventRow | null;
   onClose: () => void;
   onSubmit: (input: NewEventInput) => void;
 }) {
-  const [type, setType] = useState<EventType>('birthday');
-  const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
-  const [description, setDescription] = useState('');
-  const [yearly, setYearly] = useState(true);
-  const [isMilestone, setIsMilestone] = useState(false);
+  const [type, setType] = useState<EventType>(
+    event ? editableEventType(event.type) : 'birthday',
+  );
+  const [title, setTitle] = useState(event?.title ?? '');
+  const [date, setDate] = useState(event?.date ?? '');
+  const [description, setDescription] = useState(event?.description ?? '');
+  const [yearly, setYearly] = useState(event ? Boolean(event.yearly) : true);
+  const [isMilestone, setIsMilestone] = useState(event?.is_milestone ?? false);
 
   const save = () => {
     if (!title.trim() || !date) return;
@@ -65,7 +82,7 @@ export function AddEventModal({
   };
 
   return (
-    <ModalShell title="Нова подія" onClose={onClose}>
+    <ModalShell title={event ? 'Редагувати подію' : 'Нова подія'} onClose={onClose}>
       <div className="form-field">
         <span>Тип</span>
         <div className="chips">
@@ -130,16 +147,22 @@ export function AddEventModal({
 
 // ── План ─────────────────────────────────────────────────────
 export function AddPlanModal({
+  plan,
   onClose,
   onSubmit,
 }: {
+  plan: EnrichedEvent | null;
   onClose: () => void;
   onSubmit: (input: NewPlanInput) => void;
 }) {
-  const [cat, setCat] = useState<PlanCategory>('date');
-  const [title, setTitle] = useState('');
-  const [date, setDate] = useState('');
-  const [note, setNote] = useState('');
+  const existing = plan ? planMetadataOf(plan) : null;
+  const [cat, setCat] = useState<PlanCategory>(existing?.cat ?? 'date');
+  const [title, setTitle] = useState(plan?.title ?? '');
+  const [date, setDate] = useState(plan?.date ?? '');
+  const [note, setNote] = useState(plan?.description ?? '');
+  // Статус редагується не тут, а кнопками на картці: виконаний план не
+  // має повертатись у «Планується» лише тому, що виправили назву. Тому
+  // при редагуванні вибір статусу в формі не показується взагалі.
   const [status, setStatus] = useState<'planned' | 'active'>('planned');
 
   const save = () => {
@@ -149,7 +172,7 @@ export function AddPlanModal({
   };
 
   return (
-    <ModalShell title="Новий план 🗺️" onClose={onClose}>
+    <ModalShell title={plan ? 'Редагувати план 🗺️' : 'Новий план 🗺️'} onClose={onClose}>
       <div className="form-field">
         <span>Категорія</span>
         <div className="chips">
@@ -199,25 +222,27 @@ export function AddPlanModal({
         />
       </label>
 
-      <div className="form-field">
-        <span>Статус</span>
-        <div className="chips">
-          <button
-            type="button"
-            className={`chip${status === 'planned' ? ' active' : ''}`}
-            onClick={() => setStatus('planned')}
-          >
-            ⏳ Планується
-          </button>
-          <button
-            type="button"
-            className={`chip${status === 'active' ? ' active' : ''}`}
-            onClick={() => setStatus('active')}
-          >
-            🔥 В процесі
-          </button>
+      {plan === null && (
+        <div className="form-field">
+          <span>Статус</span>
+          <div className="chips">
+            <button
+              type="button"
+              className={`chip${status === 'planned' ? ' active' : ''}`}
+              onClick={() => setStatus('planned')}
+            >
+              ⏳ Планується
+            </button>
+            <button
+              type="button"
+              className={`chip${status === 'active' ? ' active' : ''}`}
+              onClick={() => setStatus('active')}
+            >
+              🔥 В процесі
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={onClose}>

@@ -1,0 +1,213 @@
+/* ============================================================
+   «Спогади» — фотоархів. Токени беруться з :root застосунку, власної
+   палітри модуль не заводить.
+   ============================================================ */
+
+.memories { padding-bottom: 40px; }
+
+.mem-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px; margin-bottom: 12px;
+}
+.mem-head h1 { margin: 0; font-size: 25px; }
+.mem-sub { margin: 2px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ── Перемикач вигляду ─────────────────────────────────────── */
+.mem-view-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+.mem-view-option {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: 1px solid var(--hair, color-mix(in srgb, var(--text) 12%, transparent));
+  background: var(--surface); color: var(--text);
+  border-radius: 12px; padding: 9px 6px; font: inherit; cursor: pointer;
+  transition: border-color .18s, background .18s;
+}
+.mem-view-option.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.mem-view-icon { font-size: 16px; line-height: 1; }
+.mem-view-copy { display: flex; flex-direction: column; align-items: center; }
+.mem-view-copy strong { font-size: 12.5px; }
+.mem-view-copy small { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.25; }
+
+/* ── Плитка знімка ─────────────────────────────────────────── */
+.mem-photo {
+  position: relative; overflow: hidden; border: 0; padding: 0; width: 100%;
+  border-radius: 4px; background: color-mix(in srgb, var(--text) 8%, transparent);
+  cursor: pointer; display: block;
+}
+.mem-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mem-src {
+  position: absolute; right: 5px; top: 5px; width: 18px; height: 18px;
+  border-radius: 999px; display: grid; place-items: center;
+  font-size: 9.5px; color: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .3);
+}
+.mem-src--place { background: #5ba3d9; }
+.mem-src--wish { background: #9b6ea8; }
+.mem-src--goal { background: #e8829c; }
+.mem-src--event { background: #d9a441; }
+.mem-capdot {
+  position: absolute; left: 5px; bottom: 5px; width: 6px; height: 6px;
+  border-radius: 999px; background: #fff; box-shadow: 0 0 0 2px rgb(0 0 0 / .28);
+}
+
+/* Три колонки з квадратними клітинками. Великий кадр — рівно 2×2, тож
+   поруч із ним у третій стовпець стають два квадрати й рядок сходиться.
+   Саме це замощення прибрало дірки, які дала перша спроба на шести
+   колонках із різними пропорціями. */
+.mem-mosaic {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 3px;
+  margin-bottom: 16px;
+}
+.mem-mosaic > .mem-photo { aspect-ratio: 1; }
+.mem-photo--big { grid-column: span 2; grid-row: span 2; aspect-ratio: 1; }
+
+/* ── A. Стрічка ────────────────────────────────────────────── */
+.mem-daybar {
+  position: sticky; top: 0; z-index: 5; width: 100%;
+  display: flex; align-items: baseline; gap: 8px; text-align: left;
+  border: 0; background: linear-gradient(var(--bg) 74%, transparent);
+  color: var(--text); font: inherit; padding: 10px 2px 7px; cursor: pointer;
+}
+/* Дата й лічильник не стискаються, опис забирає решту й обрізається.
+   Без flex-shrink:0 «14 липня» ламалось на два рядки, а «18 фото» — на
+   «18» і «фото». */
+.mem-daybar b { font-size: 15.5px; flex: 0 0 auto; white-space: nowrap; }
+.mem-daybar span {
+  font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums;
+  flex: 0 0 auto; white-space: nowrap;
+}
+.mem-daybar em {
+  font-style: italic; font-size: 12px; color: var(--muted);
+  flex: 1 1 auto; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ── B. Альбом ─────────────────────────────────────────────── */
+.mem-album { display: grid; gap: 14px; }
+.mem-spread {
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 12px; padding: 14px 13px 16px;
+}
+.mem-spread-hd { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.mem-spread-hd b { font-size: 16px; }
+.mem-spread-hd span {
+  font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.mem-spread-note {
+  margin: 0 0 10px; font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic; font-size: 13px; color: var(--muted); line-height: 1.45;
+}
+.mem-paperwall { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+/* Паспарту бере тон із --surface, а не чистий білий: у темній темі білий
+   прямокутник під фото світиться, як лампа. */
+.mem-mount {
+  position: relative; padding: 6px 6px 0; background: var(--surface);
+  border-radius: 2px; box-shadow: 0 4px 14px rgb(0 0 0 / .14);
+}
+.mem-mount-photo { display: block; width: 100%; border: 0; padding: 0; background: none; cursor: pointer; }
+.mem-mount-photo img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
+.mem-mount-cap {
+  display: block; padding: 5px 2px 7px; min-height: 1.2em;
+  font-family: Georgia, 'Times New Roman', serif; font-style: italic;
+  font-size: 11.5px; color: var(--muted); line-height: 1.3;
+}
+.mem-corner { position: absolute; width: 13px; height: 13px; z-index: 3; }
+.mem-corner--tl { top: 2px; left: 2px; background: linear-gradient(135deg, rgb(58 37 48 / .34) 0 46%, transparent 47%); }
+.mem-corner--br { bottom: 2px; right: 2px; background: linear-gradient(315deg, rgb(58 37 48 / .34) 0 46%, transparent 47%); }
+.tilt-a { rotate: -1.1deg; }
+.tilt-b { rotate: .9deg; }
+.mem-more {
+  margin-top: 12px; width: 100%; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: var(--surface); color: var(--text); border-radius: 10px;
+  padding: 8px 12px; font: inherit; font-size: 12.5px; cursor: pointer;
+}
+
+/* ── C. Мозаїка ────────────────────────────────────────────── */
+.mem-cal-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-bottom: 10px; font-weight: 600;
+}
+.mem-nav-btn {
+  width: 34px; height: 34px; border-radius: 10px; font-size: 17px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: var(--surface); color: var(--text);
+}
+.mem-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 5px; }
+.mem-dow span {
+  text-align: center; font-size: 10px; letter-spacing: .06em;
+  color: var(--muted); font-weight: 700;
+}
+/* align-items: start — обов'язково. За замовчуванням клітинка розтягується
+   на висоту рядка, і це перебиває aspect-ratio: у рядках БЕЗ фото висоту
+   задавав самий лише номер дня, тож порожні дні виходили пласкими
+   смужками замість квадратів. */
+.mem-cgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; align-items: start; }
+.mem-cell {
+  aspect-ratio: 1; border: 0; padding: 0; border-radius: 9px; position: relative;
+  overflow: hidden; cursor: pointer; font: inherit; color: var(--text);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.mem-cell--empty { cursor: default; }
+.mem-cell:disabled { cursor: default; }
+.mem-cell img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mem-cell-veil {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(180deg, rgb(0 0 0 / .22), transparent 42%, rgb(0 0 0 / .3));
+}
+.mem-cell-n { position: absolute; left: 5px; top: 3px; z-index: 2; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.mem-cell--has .mem-cell-n { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / .55); }
+.mem-cell-cnt {
+  position: absolute; right: 4px; bottom: 3px; z-index: 2; font-size: 10px;
+  font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / .6);
+  font-variant-numeric: tabular-nums;
+}
+.mem-cell--today { box-shadow: inset 0 0 0 2px var(--accent); }
+
+/* ── Екран дня ─────────────────────────────────────────────── */
+.mem-day-hd { margin-bottom: 8px; }
+.mem-back { border: 0; background: none; color: var(--accent); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; padding: 0 0 6px; }
+.mem-day-hd h2 { margin: 0; font-size: 22px; }
+.mem-day-meta { margin: 3px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mem-day-desc {
+  margin: 8px 0 0; font-family: Georgia, 'Times New Roman', serif; font-style: italic;
+  font-size: 13.5px; color: var(--muted); line-height: 1.5;
+}
+.mem-filters { display: flex; gap: 6px; overflow-x: auto; padding: 12px 0 10px; scrollbar-width: none; }
+.mem-filters::-webkit-scrollbar { display: none; }
+.mem-chip {
+  flex: 0 0 auto; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: var(--surface); color: var(--text);
+}
+.mem-chip[aria-pressed='true'] { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 700; }
+.mem-part {
+  margin: 12px 0 6px; font-size: 10.5px; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--muted); font-weight: 800;
+}
+
+/* ── Завантаження й помилка ────────────────────────────────── */
+.mem-skeleton { display: grid; gap: 10px; }
+.mem-skeleton-block {
+  height: 120px; border-radius: 12px;
+  background: linear-gradient(90deg,
+    var(--surface) 0%,
+    color-mix(in srgb, var(--text) 7%, var(--surface)) 50%,
+    var(--surface) 100%);
+  background-size: 220% 100%;
+  animation: mem-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes mem-shimmer { to { background-position-x: -220%; } }
+.mem-error { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+.mem-upload-preview {
+  width: 100%; max-height: 220px; object-fit: cover;
+  border-radius: 12px; margin-bottom: 4px;
+}
+.mem-upload-hint { margin: -2px 0 10px; font-size: 12.5px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .mem-skeleton-block { animation: none; }
+}

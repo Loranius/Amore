@@ -48,6 +48,7 @@ export const MORE_GROUPS: NavGroup[] = [
   {
     label: 'Часто',
     items: [
+      { to: '/memories', icon: '📸', label: 'Спогади' },
       { to: '/calendar', icon: '📅', label: 'Календар' },
       { to: '/media', icon: '🎬', label: 'Вотчліст' },
     ],
@@ -79,5 +80,4 @@ export const MORE_PREFIXES: string[] = MORE_ITEMS.map((i) => i.to);
 export const CALENDAR_TABS: NavItem[] = [
   { to: '/calendar', icon: '📅', label: 'Події', end: true },
   { to: '/calendar/schedule', icon: '🗓️', label: 'Графік' },
-  { to: '/calendar/photos', icon: '📸', label: 'Фото' },
 ];

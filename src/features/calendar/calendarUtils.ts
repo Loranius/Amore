@@ -2,9 +2,14 @@
 // Календар — константи та чисті утиліти дат (порт із calendar.js)
 // ------------------------------------------------------------
 // Жодного парсингу тегів: план читає ev.metadata (PlanMetadata).
-// planMetadataOf() дає безпечний дефолт для подій без metadata
-// (легасі до бекфілу або не-плани).
+//
+// Файл навмисно БЕЗ рантайм-залежностей, окрім `localDateFromISO`: тут
+// живе вся арифметика дат модуля, і вона мусить тестуватись без клієнта
+// бази. Раніше звідси реекспортувався `planMetadataOf`, через що імпорт
+// цих чистих функцій тягнув за собою `@/lib/supabase`. Споживачі беруть
+// його прямо з `_shared/events` — рівно як це вже робить `home/Hero.tsx`.
 // ============================================================
+import { localDateFromISO } from '@/lib/utils';
 import type {
   EventRow,
   EnrichedEvent,
@@ -13,13 +18,13 @@ import type {
   PlanStatus,
 } from '@/types';
 
-// planMetadataOf живе у _shared (спільний із головною). Реекспорт для календаря.
-export { planMetadataOf } from '@/features/_shared/events';
-
-export const MONTHS = [
-  'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
-  'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня',
-] as const;
+// Список місяців живе у _shared/month.ts — календар мав власну копію,
+// поки «Спогадам» не знадобився той самий. Псевдонім лишається, щоб
+// наявні імпорти MONTHS не мінялись. Імпорт саме локальний, а не
+// `export … from`: реекспорт не вводить імені в область файлу, і
+// formatUaDate нижче його не побачив би.
+import { MONTHS_UA_GENITIVE as MONTHS } from '@/features/_shared/month';
+export { MONTHS };
 
 export const TYPES: Record<EventType, { icon: string; label: string; color: string }> = {
   birthday: { icon: '🎂', label: 'День народження', color: '#FF6B9D' },
@@ -48,18 +53,37 @@ export const PLAN_STATUS: Record<PlanStatus, { label: string; icon: string; cls:
 export const PLAN_CAT_ORDER: PlanCategory[] = ['date', 'dream', 'trip', 'goal', 'other'];
 
 // ── Дати ─────────────────────────────────────────────────────
+/**
+ * Та сама дата в іншому році, із затисканням до кінця місяця.
+ *
+ * `new Date(2027, 1, 29)` — це НЕ 29 лютого, а 1 березня: переповнення
+ * дня в Date мовчки переливається в наступний місяць. Через це щорічна
+ * подія 29 лютого показувалась 1 березня, а крон-нагадування, що звіряє
+ * 'MM-DD', не спрацьовувало взагалі три роки з чотирьох.
+ *
+ * Конвенція — останній день ТОГО САМОГО місяця (28 лютого), а не перший
+ * день наступного. Те саме правило продубльоване в
+ * `supabase/functions/event-reminders/index.ts`; edge-функція не імпортує
+ * з `src/`, тож при зміні конвенції правити треба обидва місця.
+ */
+function sameDayInYear(year: number, month: number, day: number): Date {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  return new Date(year, month, Math.min(day, daysInMonth));
+}
+
 /** Наступне настання події (щорічні перераховуються на цей/наступний рік). */
 export function nextOccurrence(ev: EventRow): { date: Date; passed: boolean } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const orig = new Date(ev.date);
+  const orig = localDateFromISO(ev.date);
 
   if (!ev.yearly) {
     const d = new Date(orig.getFullYear(), orig.getMonth(), orig.getDate());
     return { date: d, passed: d < today };
   }
-  let next = new Date(today.getFullYear(), orig.getMonth(), orig.getDate());
-  if (next < today) next = new Date(today.getFullYear() + 1, orig.getMonth(), orig.getDate());
+  const [month, day] = [orig.getMonth(), orig.getDate()];
+  let next = sameDayInYear(today.getFullYear(), month, day);
+  if (next < today) next = sameDayInYear(today.getFullYear() + 1, month, day);
   return { date: next, passed: false };
 }
 
@@ -81,7 +105,7 @@ export function daysLabel(n: number): string {
 
 /** 'YYYY-MM-DD' → «5 січня 2026 р.». */
 export function formatUaDate(iso: string): string {
-  const d = new Date(iso);
+  const d = localDateFromISO(iso);
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} р.`;
 }
 
