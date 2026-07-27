@@ -1,0 +1,268 @@
+/* ============================================================
+ * Об'ємна оболонка бульбашки — фінальний шар поверхні.
+ * ------------------------------------------------------------
+ * ЩО ТУТ БУЛО ДО ЦЬОГО. Поверхню малювали три файли, які сперечались
+ * між собою:
+ *   • wishlistGiftPortrait.css — вигравав за специфічністю (0,3,0) і
+ *     давав `linear-gradient(145deg, …)`. Лінійний градієнт — це ПЛОСКА
+ *     площина: він однаково світлий уздовж усієї лінії, тож коло з ним
+ *     читається як наліпка, а не як куля. Саме це власник і побачив.
+ *   • wishlistPearlRim.css — 6px конічний обідок через `border-box`;
+ *   • wishlistPearlContrast.css — існував майже виключно щоб той обідок
+ *     прибрати назад (`border: 6px solid` з іншими кольорами, `outline`
+ *     і `display: none !important` на ореолах).
+ * Два останні видалено: разом вони давали 152 рядки, чистий підсумок
+ * яких — 1px кольорова рамка й 2px біла обводка.
+ *
+ * ЩО ДАЄ ОБ'ЄМ (у порядку внеску):
+ *   1. Радіальне затемнення до дальнього краю — базова тінь кулі.
+ *   2. Внутрішні тіні по діагоналі: світло згори-зліва, темрява
+ *      знизу-справа. Це товщина оболонки.
+ *   3. Підсвітка знизу: світло, що пройшло крізь бульбашку наскрізь.
+ *      Без неї нижній край виглядає як дірка.
+ *   4. Два відблиски: дрібний різкий + широкий м'який. Один — завжди
+ *      пластик.
+ *   5. Іризуючий обідок лише по самому краю (тонкоплівкові кольори).
+ *
+ * ВАРТІСТЬ: нуль кадрів. Тут немає жодної анімації, жодного
+ * `backdrop-filter` і жодного `filter` — тільки градієнти й тіні, які
+ * браузер розтеризує один раз і кешує в шар.
+ *
+ * СПЕЦИФІЧНІСТЬ. Селектори навмисно на один клас довші за
+ * `wishlistGiftPortrait.css` (`.wl-cloud-item` посередині): шар має
+ * вигравати незалежно від того, в якому порядку збірник склеїть CSS.
+ * ============================================================ */
+
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble {
+  --wl-glass-tint: var(--wl-gift-accent, var(--accent));
+  /* Плівка, а не рамка. Товста подушка (було до 7px) робила з бульбашки
+     два диски: світле кільце й окрема тарілка фото всередині. */
+  --wl-glass-shell: clamp(2px, calc(var(--wl-cloud-size) * 0.022), 4px);
+
+  box-sizing: border-box;
+  overflow: visible;
+  padding: var(--wl-glass-shell);
+  border: 0;
+  border-radius: 50%;
+  outline: none;
+  /* `ellipse 100% 100%`, а не `circle`. У `circle` радіус за замовчуванням
+     — `farthest-corner`, тобто до КУТА квадратної рамки: останні ~30%
+     градієнта лежать поза видимим колом і темний термінатор просто
+     ніколи не з'являється. Перший рендер це й показав — біла таблетка. */
+  background:
+    /* 3 — світло наскрізь по нижньому краю */
+    radial-gradient(ellipse 58% 32% at 60% 94%, rgba(255, 255, 255, 0.72), transparent 70%),
+    /* 1 — сфера: яскраво в точці освітлення, темно на термінаторі.
+       Тон навмисно НЕ блідий. На майже білій кулі білий відблиск видно
+       лише по його краю — і він читається як вм'ятина, а не як світло;
+       перший рендер дав саме таку «ложку». Світлу потрібен тон, на
+       якому він може бути світлом. */
+    radial-gradient(
+      ellipse 100% 100% at 33% 27%,
+      color-mix(in srgb, var(--wl-glass-tint) 5%, white) 0%,
+      color-mix(in srgb, var(--wl-glass-tint) 17%, white) 32%,
+      color-mix(in srgb, var(--wl-glass-tint) 38%, white) 64%,
+      color-mix(in srgb, var(--wl-glass-tint) 60%, #7c4f63) 90%,
+      color-mix(in srgb, var(--wl-glass-tint) 70%, #5d3446) 100%
+    );
+  box-shadow:
+    /* контактна тінь — бульбашка стоїть над сторінкою, а не в ній */
+    0 14px 24px -12px rgba(72, 42, 57, 0.34),
+    0 28px 46px -20px color-mix(in srgb, var(--wl-glass-tint) 32%, transparent),
+    /* мокрий край плівки */
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  filter: none;
+  isolation: isolate;
+}
+
+/* 2 + 4 — ОБ'ЄМ І ВІДБЛИСКИ, одним шаром поверх усього.
+ *
+ * Чому разом і чому саме тут. Спершу товщину малювали внутрішні тіні
+ * лінзи (фото/плейсхолдера). Рендер показав шов: оболонка в 2–4px
+ * навколо лінзи лишалась світлою там, де сама лінза вже затемнена, і
+ * знизу-зліва з'являвся яскравий серп. Тінь, що описує кулю, не може
+ * закінчуватись на межі внутрішнього елемента.
+ *
+ * Цей шар накриває ВЕСЬ диск — і плівку, і лінзу, — тож розриву немає
+ * за побудовою. Він же несе відблиски: справжня бульбашка відбиває
+ * світло перед предметом, а не за ним.
+ *
+ * Затемнення притиснуте до дальнього краю (до 62% воно прозоре), тому
+ * фото товару лишається читабельним — тьмяніє лише обідок. */
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble::before {
+  position: absolute;
+  z-index: 4;
+  display: block;
+  inset: 0;
+  /* `width`/`height` ОБОВ'ЯЗКОВІ, і це не перестраховка.
+     wishlistBubbleShellFinal.css ставить цьому псевдоелементу
+     `width: 52%; height: 27%`. Для абсолютно позиційованого блока
+     задана ширина перебиває `right`, а задана висота — `bottom`: `inset: 0`
+     мовчки ігнорується, і всі відблиски малюються в маленький прямокутник
+     угорі зліва. Саме він виглядав як біла «ложка», видовбана в кулі. */
+  width: auto;
+  height: auto;
+  border-radius: 50%;
+  background:
+    /* дрібний різкий відблиск. Один, а не два: другий, зсунутий по
+       діагоналі, зливався з першим у кому з чіткою нижньою межею —
+       рендер показав «ложку», видовбану в кулі. */
+    radial-gradient(
+      ellipse 11% 7.5% at 31% 20%,
+      rgba(255, 255, 255, 0.98) 0 34%,
+      rgba(255, 255, 255, 0.42) 66%,
+      transparent 100%
+    ),
+    /* Широка м'яка засвітка навколо нього. Її еліпс мусить ПОМІЩАТИСЬ
+       у коло: коли він виходив за верхній край (40%×30% at 33%/24%),
+       `border-radius` різав його по дузі — і зверху з'являвся білий
+       «козирок» із чіткою межею. Обрізаний градієнт завжди має край. */
+    radial-gradient(ellipse 33% 25% at 37% 32%, rgba(255, 255, 255, 0.3), transparent 82%),
+    /* рефлекс знизу — світло, що обійшло кулю */
+    radial-gradient(ellipse 34% 12% at 63% 92%, rgba(255, 255, 255, 0.44), transparent 74%),
+    /* товщина: темрява на дальньому краї, чисто прозоро в центрі */
+    radial-gradient(
+      ellipse 100% 100% at 33% 27%,
+      transparent 0 62%,
+      color-mix(in srgb, var(--wl-glass-tint) 34%, rgba(58, 31, 43, 0.24)) 84%,
+      color-mix(in srgb, var(--wl-glass-tint) 46%, rgba(46, 23, 34, 0.5)) 100%
+    );
+  content: '';
+  opacity: 1;
+  animation: none;
+  pointer-events: none;
+}
+
+/* 5 — тонкоплівкові кольори лише на самому краю. Кут береться з
+   `--wl-film-angle` (його вже роздає wishlistPearlBubbles.css по
+   `nth-child`), тож сусідні бульбашки переливаються по-різному. */
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  /* Та сама пастка, що й у `::before` вище. */
+  width: auto;
+  height: auto;
+  border: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from var(--wl-film-angle, 218deg),
+    rgba(255, 148, 199, 0.9),
+    rgba(255, 255, 255, 0.14) 13%,
+    rgba(138, 206, 255, 0.85) 29%,
+    rgba(255, 255, 255, 0.12) 45%,
+    rgba(199, 148, 255, 0.74) 61%,
+    rgba(255, 224, 158, 0.62) 79%,
+    rgba(255, 148, 199, 0.9)
+  );
+  box-shadow: none;
+  content: '';
+  /* Звичайне змішування, а не `screen`. Поверхня бульбашки світла, а
+     `screen` зі світлим тлом — майже тотожна операція: у попередньому
+     рендері обідка просто не було видно. */
+  opacity: 0.45;
+  pointer-events: none;
+  /* Ширина обідка — від розміру бульбашки. Сталі 5px на маленькій (78px)
+     з'їдали 13% радіуса, на великій (174px) — 5.7%: різні бульбашки
+     виглядали як різні матеріали. */
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--wl-cloud-size) * 0.05),
+    #000 calc(100% - var(--wl-cloud-size) * 0.018)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--wl-cloud-size) * 0.05),
+    #000 calc(100% - var(--wl-cloud-size) * 0.018)
+  );
+}
+
+/* Ореоли позаду бульбашок лишаються вимкненими. Це рішення прийняте
+   раніше (wishlistPearlContrast.css: «Remove every oversized decorative
+   layer») і не скасовується — просто переїхало сюди без `!important`,
+   бо тепер вистачає специфічності. */
+.wishlist .wishlist-grid .wl-cloud-item::before,
+.wishlist .wishlist-grid .wl-cloud-item::after {
+  display: none;
+  content: none;
+}
+
+/* Лінза не має власного світлотіньового малюнка: увесь об'єм малює
+   шар вище, суцільно по диску. Тут лишається тільки те, що робить її
+   лінзою — кругла форма без рамки. */
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble-media,
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble-placeholder {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+/* Плейсхолдер — не окремий диск, а та сама сфера, що й оболонка. */
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble-placeholder {
+  background: radial-gradient(
+    ellipse 100% 100% at 33% 27%,
+    color-mix(in srgb, var(--wl-glass-tint) 5%, white) 0%,
+    color-mix(in srgb, var(--wl-glass-tint) 17%, white) 32%,
+    color-mix(in srgb, var(--wl-glass-tint) 38%, white) 64%,
+    color-mix(in srgb, var(--wl-glass-tint) 58%, #7c4f63) 92%,
+    color-mix(in srgb, var(--wl-glass-tint) 68%, #5d3446) 100%
+  );
+}
+
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble:hover,
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble:focus-visible,
+.wishlist .wishlist-grid .wl-cloud-item--dragging .wl-cloud-bubble {
+  box-shadow:
+    0 18px 30px -12px rgba(72, 42, 57, 0.38),
+    0 34px 56px -20px color-mix(in srgb, var(--wl-glass-tint) 40%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.86);
+}
+
+.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--wl-glass-tint) 42%, transparent);
+  outline-offset: 4px;
+}
+
+/* Темна тема: джерело світла те саме, але оболонка не може бути білою —
+   інакше бульбашка світиться, як лампа. Тінь глибша, відблиски слабші. */
+[data-theme='dark'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble {
+  background:
+    radial-gradient(ellipse 56% 30% at 62% 93%, rgba(255, 255, 255, 0.16), transparent 72%),
+    radial-gradient(
+      circle at 33% 27%,
+      color-mix(in srgb, var(--surface) 72%, white) 0%,
+      color-mix(in srgb, var(--wl-glass-tint) 16%, var(--surface)) 48%,
+      color-mix(in srgb, var(--surface) 92%, black) 82%,
+      color-mix(in srgb, var(--surface) 74%, black) 100%
+    );
+  box-shadow:
+    0 14px 26px -12px rgba(0, 0, 0, 0.55),
+    0 28px 48px -20px color-mix(in srgb, var(--wl-glass-tint) 26%, transparent),
+    inset 6px 8px 15px -6px rgba(255, 255, 255, 0.3),
+    inset -8px -11px 20px -7px rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.24);
+}
+
+/* Плейсхолдер теж, інакше темна тема не діє: він накриває ~96% диска,
+   і світла сфера на ньому лишає бульбашку білою на чорному тлі. */
+[data-theme='dark'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble-placeholder {
+  background: radial-gradient(
+    ellipse 100% 100% at 33% 27%,
+    color-mix(in srgb, var(--surface) 68%, white) 0%,
+    color-mix(in srgb, var(--wl-glass-tint) 20%, var(--surface)) 46%,
+    color-mix(in srgb, var(--surface) 88%, black) 84%,
+    color-mix(in srgb, var(--surface) 70%, black) 100%
+  );
+}
+
+[data-theme='dark'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble::before {
+  opacity: 0.62;
+}
+
+[data-theme='dark'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble::after {
+  opacity: 0.5;
+}

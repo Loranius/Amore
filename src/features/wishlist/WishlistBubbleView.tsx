@@ -1,7 +1,8 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { WishCard } from './WishCard';
 import { WishlistBubbleCard } from './WishlistBubbleCard';
 import { WishlistBubblePhysics } from './WishlistBubblePhysics';
+import { freshWishlistCloudSeed } from './wishlistCloudLayout';
 import type { WishlistItemV3 } from './wishlistRpc';
 
 interface WishlistBubbleViewProps {
@@ -32,6 +33,10 @@ export function WishlistBubbleView({
   onMove,
 }: WishlistBubbleViewProps) {
   const boardRef = useRef<HTMLDivElement>(null);
+  // Свіжий seed на монтування вигляду: дошка щоразу складається інакше, але
+  // поки користувач у ній — нічого не стрибає. Ініціалізатор `useState`
+  // виконується один раз, тож це нуль роботи в кадрі.
+  const [seed] = useState(freshWishlistCloudSeed);
   const contentKey = useMemo(
     () => items.map((item) => `${item.id}:${item.version}`).join('|'),
     [items],
@@ -61,6 +66,7 @@ export function WishlistBubbleView({
             renderTrigger={({ openDetails, detailsOpen }) => (
               <WishlistBubbleCard
                 item={item}
+                seed={seed}
                 busy={busy}
                 detailsOpen={detailsOpen}
                 onOpen={openDetails}

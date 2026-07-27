@@ -23,8 +23,10 @@ import App from '@/App';
 import '@/index.css';
 import '@/features/wishlist/wishlistMist.css';
 import '@/features/wishlist/wishlistPearlBubbles.css';
-import '@/features/wishlist/wishlistPearlRim.css';
-import '@/features/wishlist/wishlistPearlContrast.css';
+// Останній шар поверхні бульбашок. Замінив wishlistPearlRim.css і
+// wishlistPearlContrast.css: перший малював 6px обідок, другий існував
+// щоб той обідок прибрати — разом вони давали 1px рамку за 152 рядки.
+import '@/features/wishlist/wishlistBubbleGlass.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');

@@ -17,6 +17,7 @@ import { ProgressivePhoto } from './ProgressivePhoto';
 import { WishlistArchiveViewPicker } from './WishlistArchiveViewPicker';
 import { WishlistBubblePhysics } from './WishlistBubblePhysics';
 import {
+  freshWishlistCloudSeed,
   normalizeWishlistCloudPriority,
   wishlistCloudPlacement,
   wishlistCloudPriorityPresentation,
@@ -74,9 +75,11 @@ interface ArchiveItemProps {
   onOpen: (item: GiftMemoryArchiveItem) => void;
 }
 
-interface ArchivePolaroidProps extends ArchiveItemProps {
+interface ArchiveSeededProps extends ArchiveItemProps {
   seed: number;
 }
+
+type ArchivePolaroidProps = ArchiveSeededProps;
 
 function momentValue(item: GiftMemoryArchiveItem): string | null {
   return item.completed_at ?? item.fulfilled_at;
@@ -140,12 +143,12 @@ export function archiveCountText(count: number, shared: boolean): string {
   return `${count} ${many}`;
 }
 
-function ArchiveBubble({ item, index, isFocused, onOpen }: ArchiveItemProps) {
+function ArchiveBubble({ item, seed, index, isFocused, onOpen }: ArchiveSeededProps) {
   const priority = normalizeWishlistCloudPriority(item.priority);
   const priorityPresentation = wishlistCloudPriorityPresentation(item.priority);
   const placement = useMemo(
-    () => wishlistCloudPlacement(`archive-${item.id}`, index),
-    [index, item.id],
+    () => wishlistCloudPlacement(seed, `archive-${item.id}`, index),
+    [seed, index, item.id],
   );
   const image = archiveBubbleImage(item);
   const dateLabel = formatMoment(momentValue(item));
@@ -161,6 +164,8 @@ function ArchiveBubble({ item, index, isFocused, onOpen }: ArchiveItemProps) {
     '--wl-cloud-delay': `${placement.delay}s`,
     '--wl-cloud-duration': `${placement.duration}s`,
     '--wl-cloud-z': placement.zIndex,
+    '--wl-cloud-drift-x': `${placement.driftX}px`,
+    '--wl-cloud-drift-y': `${placement.driftY}px`,
   } as CSSProperties;
 
   return (
@@ -471,6 +476,9 @@ export function WishArchive({
     readWishlistArchiveView(scope)
   );
   const [polaroidSeed, setPolaroidSeed] = useState(freshArchivePolaroidSeed);
+  // Бульбашки архіву — та сама логіка, що й на дошці бажань: розкладка
+  // нова на кожне відкриття архіву, стала поки він відкритий.
+  const [bubbleSeed] = useState(freshWishlistCloudSeed);
   const open = controlledOpen ?? internalOpen;
   const wrapRef = useRef<HTMLDivElement>(null);
   const { data: items = [], isPending, isError, refetch } =
@@ -677,6 +685,7 @@ export function WishArchive({
                     <ArchiveBubble
                       key={item.id}
                       item={item}
+                      seed={bubbleSeed}
                       index={index}
                       actorName={actorNameFor(item, usersMap)}
                       isFocused={focusWishId === item.id}
