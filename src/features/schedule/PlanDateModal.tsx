@@ -41,7 +41,7 @@ export function PlanDateModal({
   onSubmit,
 }: {
   sharedDates: string[];
-  initialDate?: string;
+  initialDate?: string | undefined;
   onClose: () => void;
   onSubmit: (input: NewDateInput) => void;
 }) {
