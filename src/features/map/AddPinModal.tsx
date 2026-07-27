@@ -2,7 +2,10 @@
 // AddPinModal — нове місце (порт openAddModal)
 // ============================================================
 import { useState } from 'react';
+import { todayISO } from '@/lib/utils';
 import { normalize } from '@/lib/images';
+import { exifDay, readExifTakenAt } from '@/lib/exif';
+import { formatDateUA } from '@/features/_shared/month';
 import { CATEGORIES, CATEGORY_ORDER } from './mapConstants';
 import { useToast } from '@/providers/ToastProvider';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
@@ -13,7 +16,10 @@ interface AddPinModalProps {
   lng: number;
   initialTitle?: string | undefined;
   onClose: () => void;
-  onSubmit: (payload: { title: string; category: PinCategory; note: string | null; file: File | null }) => void;
+  onSubmit: (payload: {
+    title: string; category: PinCategory; note: string | null;
+    file: File | null; visitedAt: string;
+  }) => void;
 }
 
 export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: AddPinModalProps) {
@@ -22,7 +28,13 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
   const [category, setCategory] = useState<PinCategory>('visited');
   const [note, setNote] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  // За замовчуванням сьогодні, але змінюване: мітку часто ставлять уже
+  // після поїздки, і саме ця дата вирішує, в який день архіву
+  // «Спогадів» стане фото місця.
+  const [visitedAt, setVisitedAt] = useState(todayISO());
   const [preview, setPreview] = useState<string | null>(null);
+  /** День зйомки з метаданих — пропозиція, а не мовчазна підстановка. */
+  const [shotOn, setShotOn] = useState<string | null>(null);
 
   const pickFile = async (f: File) => {
     let normalized = f;
@@ -34,12 +46,22 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
     }
     setFile(normalized);
     setPreview(URL.createObjectURL(normalized));
+
+    // Дату зйомки читаємо з ОРИГІНАЛУ: normalize перекодовує HEIC у JPEG
+    // і метадані при цьому не переживають перетворення. Перші 128 КБ —
+    // EXIF лежить на початку файлу.
+    try {
+      const day = exifDay(readExifTakenAt(await f.slice(0, 128 * 1024).arrayBuffer()));
+      setShotOn(day);
+    } catch {
+      setShotOn(null);
+    }
   };
 
   const save = () => {
     const t = title.trim();
     if (!t) return;
-    onSubmit({ title: t, category, note: note.trim() || null, file });
+    onSubmit({ title: t, category, note: note.trim() || null, file, visitedAt });
     onClose();
   };
 
@@ -89,8 +111,31 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
         </div>
 
         <label className="form-field">
+          <span>Коли були</span>
+          <input
+            id="pin-visited"
+            name="visited_at"
+            type="date"
+            value={visitedAt}
+            onChange={(e) => setVisitedAt(e.target.value)}
+          />
+        </label>
+
+        {/* Пропозиція, а не автопідстановка: фото могло бути зняте не там
+            і не тоді, і мовчки посунути дату — це те саме, чого ми
+            уникаємо в масовому імпорті «Спогадів». */}
+        {shotOn && shotOn !== visitedAt && (
+          <button type="button" className="pin-exif-hint" onClick={() => setVisitedAt(shotOn)}>
+            Фото знято {formatDateUA(shotOn)} — поставити цю дату?
+          </button>
+        )}
+
+        <label className="form-field">
           <span>Нотатка</span>
-          <textarea id="pin-note" name="note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Враження, деталі…" />
+          {/* Не «враження»: враження — окреме поле в модалці перегляду, і
+              коли обидва плейсхолдери обіцяли одне й те саме, текст
+              розтікався по двох колонках, з яких показувалась одна. */}
+          <textarea id="pin-note" name="note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Деталь, яку не хочеться забути…" />
         </label>
 
         <p className="pin-coords">📌 {lat.toFixed(4)}, {lng.toFixed(4)}</p>

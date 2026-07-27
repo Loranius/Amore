@@ -2136,6 +2136,21 @@ a.wl-card-title { color: var(--accent); }
 .fin-del-btn { border: 0; background: transparent; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; }
 .fin-del-btn:hover { color: var(--danger); }
 
+/* ── Перемикач вигляду розділу (Спогади, Карта) ────────────── */
+.view-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
+.view-option {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: 1px solid var(--hair, color-mix(in srgb, var(--text) 12%, transparent));
+  background: var(--surface); color: var(--text);
+  border-radius: 12px; padding: 9px 6px; font: inherit; cursor: pointer;
+  transition: border-color .18s, background .18s;
+}
+.view-option.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.view-icon { font-size: 16px; line-height: 1; }
+.view-copy { display: flex; flex-direction: column; align-items: center; }
+.view-copy strong { font-size: 12.5px; }
+.view-copy small { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.25; }
+
 /* ============================================================
    НАША КАРТА (map) — mapbox + піни + геолокація
    ============================================================ */
@@ -2177,7 +2192,37 @@ a.wl-card-title { color: var(--accent); }
 }
 .map-geo-sub { color: var(--muted); font-size: 12px; }
 
+.map-stage { position: relative; }
 .map-container { width: 100%; height: 340px; border-radius: 16px; overflow: hidden; }
+/* Розгорнута карта — накладка на весь екран, а не системний fullscreen:
+   Safari на iOS не вміє повноекранного режиму для довільних елементів,
+   тож нативний FullscreenControl там просто не працює. */
+.map-stage--full {
+  position: fixed; inset: 0; z-index: 90;
+  background: var(--bg);
+  padding: max(8px, env(safe-area-inset-top)) 8px calc(8px + env(safe-area-inset-bottom));
+}
+.map-stage--full .map-container { height: 100%; border-radius: 12px; }
+.map-expand {
+  position: absolute; left: 12px; top: 12px; z-index: 3;
+  width: 34px; height: 34px; border-radius: 10px; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: var(--surface); color: var(--text); font-size: 14px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / .18);
+}
+.map-stage--full .map-expand { left: 18px; top: max(18px, calc(env(safe-area-inset-top) + 10px)); }
+
+/* Скупчення злиплих міток. Кругле й без емодзі — щоб його не сплутати з
+   однією міткою: крапля означає «одне місце», коло з числом — «тут їх
+   кілька, наблизь». */
+.map-cluster {
+  min-width: 34px; height: 34px; padding: 0 8px;
+  border-radius: 999px; display: grid; place-items: center;
+  background: var(--accent); color: #fff;
+  font-weight: 800; font-size: 13px; font-variant-numeric: tabular-nums;
+  border: 2px solid #fff; box-shadow: 0 2px 10px rgb(0 0 0 / .35);
+  cursor: pointer;
+}
 .map-marker {
   width: 32px; height: 32px;
   border-radius: 50% 50% 50% 0;
@@ -2189,7 +2234,54 @@ a.wl-card-title { color: var(--accent); }
   cursor: pointer;
   border: 2px solid #fff;
 }
-.map-marker { }
+/* Зворотний поворот вмісту: краплю нахиляє сам маркер, і без цього
+   емодзі всередині стояло перекошеним на 45°. */
+.map-marker-icon { display: block; transform: rotate(45deg); }
+
+/* ── Постановка нового місця прицілом ──────────────────────── */
+.map-fab {
+  position: absolute; right: 12px; bottom: 12px; z-index: 3;
+  border: 0; border-radius: 999px; padding: 10px 16px;
+  background: var(--accent); color: #fff; font: inherit; font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28); cursor: pointer;
+}
+/* pointer-events: none — обов'язково: приціл лежить поверх карти, і без
+   цього він з'їдав би панорамування, заради якого й існує. */
+.map-crosshair {
+  position: absolute; left: 50%; top: 50%; z-index: 3;
+  width: 34px; height: 34px; margin: -34px 0 0 -17px;
+  pointer-events: none;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: color-mix(in srgb, var(--accent) 88%, transparent);
+  border: 3px solid #fff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+}
+/* Точка під вістрям: сама крапля показує, ЯК виглядатиме мітка, а
+   крапка — КУДИ саме вона стане. Без неї на масштабі вулиці не видно,
+   у який бік будинку ти цілишся. */
+.map-crosshair::after {
+  content: ''; position: absolute; right: -9px; bottom: -9px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 2px rgb(0 0 0 / .35);
+}
+.map-place-bar {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 4;
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 14px;
+  background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  font-size: 12.5px;
+}
+.map-place-bar > span { flex: 1; min-width: 0; color: var(--muted); }
+.map-place-cancel, .map-place-ok {
+  flex: 0 0 auto; border-radius: 999px; padding: 7px 14px;
+  font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.map-place-cancel {
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: transparent; color: var(--text);
+}
+.map-place-ok { border: 0; background: var(--accent); color: #fff; }
 .map-location-marker {
   width: 30px; height: 30px;
   border-radius: 50%;
@@ -2201,6 +2293,31 @@ a.wl-card-title { color: var(--accent); }
 
 .map-actions-row { display: flex; gap: 8px; }
 .map-actions-row .btn, .map-actions-row .btn-secondary { flex: 1; }
+/* Явне правило обов'язкове: авторський display перебиває [hidden] з
+   таблиці браузера, і .map-actions-row із display:flex просто не
+   ховався б. Карту ховаємо, а не розмонтовуємо, — інакше кожне
+   перемикання вигляду знищувало б інстанс mapbox разом із камерою. */
+.map-stage[hidden], .map-actions-row[hidden] { display: none; }
+
+/* ── Підсумок подорожей ────────────────────────────────────── */
+.map-summary {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;
+}
+.map-sum-cell {
+  flex: 1 1 62px; display: flex; flex-direction: column; align-items: center;
+  gap: 1px; padding: 9px 6px; border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+.map-sum-cell--wide { flex: 1 1 96px; }
+.map-sum-cell b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.map-sum-cell span { font-size: 10.5px; color: var(--muted); text-align: center; }
+
+/* ── Вигляд «Міста» ────────────────────────────────────────── */
+.map-cities { display: grid; gap: 16px; }
+.map-city-hd { display: flex; flex-direction: column; gap: 1px; padding: 0 2px 7px; }
+.map-city-hd b { font-size: 16px; }
+.map-city-hd span { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 
 .pin-list { display: flex; flex-direction: column; gap: 10px; }
@@ -2208,26 +2325,40 @@ a.wl-card-title { color: var(--accent); }
 .pin-city-name { font-weight: 600; }
 .pin-city-count { color: var(--muted); font-size: 13px; }
 .pin-card {
+  position: relative;
   display: flex;
   gap: 12px;
   background: var(--surface);
   border-radius: 14px;
   overflow: hidden;
-  cursor: pointer;
   border: 2px solid transparent;
 }
 .pin-card--active { border-color: var(--accent); }
+/* Кнопка-накладка на всю картку: дає фокус і Enter, не змінюючи
+   розкладки. «Маршрут» стоїть шаром вище й лишається клікабельним. */
+.pin-card-open {
+  position: absolute; inset: 0; z-index: 1;
+  border: 0; background: none; padding: 0; cursor: pointer;
+}
+.pin-card:has(.pin-card-open:focus-visible) { border-color: var(--accent); }
+.pin-card-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 .pin-card-photo, .pin-card-photo-placeholder { width: 96px; height: 96px; object-fit: cover; flex: 0 0 auto; }
 .pin-card-photo-placeholder { display: grid; place-items: center; font-size: 32px; background: color-mix(in srgb, var(--text) 6%, transparent); }
 .pin-card-body { flex: 1; min-width: 0; padding: 10px 12px 10px 0; display: flex; flex-direction: column; gap: 4px; }
 .pin-card-header { display: flex; justify-content: space-between; gap: 8px; }
 .pin-card-title { font-weight: 600; margin: 0; }
 .pin-card-cat { font-size: 12px; color: var(--muted); flex: 0 0 auto; }
-.pin-card-rating { color: #f5b301; font-size: 13px; }
+.pin-card-rating { color: #f5b301; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.pin-card-date { color: var(--muted); font-size: 12px; }
 .map-star { color: color-mix(in srgb, var(--text) 25%, transparent); background: none; border: 0; cursor: pointer; font-size: 20px; padding: 0 2px; }
 .map-star.filled { color: #f5b301; }
 .pin-card-review { font-size: 13px; color: var(--muted); margin: 0; }
-.pin-route-btn { font-size: 13px; color: var(--accent); text-decoration: none; width: fit-content; }
+.pin-card-more { font-size: 11px; color: var(--muted); opacity: .75; }
+/* z-index: 2 — щоб посилання лишалось над кнопкою-накладкою картки. */
+.pin-route-btn {
+  position: relative; z-index: 2;
+  font-size: 13px; color: var(--accent); text-decoration: none; width: fit-content;
+}
 
 /* Модалка перегляду піна — фото зверху фіксоване (overflow:hidden
    заради заокруглених країв), а .pin-view-body скролиться окремо,
@@ -2247,6 +2378,7 @@ a.wl-card-title { color: var(--accent); }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+.pin-view-meta { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
 .pin-rating-row { display: flex; gap: 2px; }
 .pin-view-actions { flex-wrap: wrap; }
 .pin-delete-action { color: var(--danger); }
@@ -2256,6 +2388,12 @@ a.wl-card-title { color: var(--accent); }
 .pin-cat-btn { border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); background: transparent; color: var(--text); border-radius: 10px; padding: 10px; font: inherit; cursor: pointer; }
 .pin-cat-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
 .pin-add-preview { width: 100%; max-height: 160px; object-fit: cover; border-radius: 10px; margin-top: 8px; }
+.pin-exif-hint {
+  width: 100%; text-align: left; cursor: pointer; font: inherit; font-size: 12.5px;
+  border-radius: 12px; padding: 10px 12px; margin: -4px 0 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--text);
+}
 .pin-coords { color: var(--muted); font-size: 13px; text-align: center; }
 
 /* Архів геолокацій */

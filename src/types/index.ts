@@ -47,7 +47,9 @@ export type ShoppingCategory =
 
 export type WishPriority = 'high' | 'medium' | 'low';
 
-export type PinCategory = 'visited' | 'restaurant' | 'plan' | 'favorite';
+// «plan» прибрано: категорія прожила весь час модуля з нулем міток —
+// планування живе в календарі, де в події є дата, нагадування й статус.
+export type PinCategory = 'visited' | 'restaurant' | 'favorite';
 
 export type EventType = 'birthday' | 'anniversary' | 'holiday' | 'other';
 
@@ -306,6 +308,8 @@ export interface DateRow {
 }
 
 export interface MapPinRow {
+  /** 'YYYY-MM-DD' — коли пара там була. Керує датою фото в «Спогадах». */
+  visited_at: string | null;
   id: number;
   title: string;
   note: string | null;

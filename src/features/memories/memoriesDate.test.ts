@@ -90,9 +90,9 @@ describe('formatMemoryDate', () => {
 
 describe('час зйомки', () => {
   it('розкладає години по частинах доби', () => {
-    expect(timeBucketOf('2026-07-14T06:12:00')).toBe('morning');
-    expect(timeBucketOf('2026-07-14T13:30:00')).toBe('afternoon');
-    expect(timeBucketOf('2026-07-14T20:41:00')).toBe('evening');
+    expect(timeBucketOf('2026-07-14T06:12:00Z')).toBe('morning');
+    expect(timeBucketOf('2026-07-14T13:30:00Z')).toBe('afternoon');
+    expect(timeBucketOf('2026-07-14T20:41:00Z')).toBe('evening');
   });
 
   it('без часу — жодної частини доби, а не вигаданий ранок', () => {
@@ -102,10 +102,10 @@ describe('час зйомки', () => {
   });
 
   it('межі 12:00 і 17:00 належать наступній частині', () => {
-    expect(timeBucketOf('2026-07-14T11:59:00')).toBe('morning');
-    expect(timeBucketOf('2026-07-14T12:00:00')).toBe('afternoon');
-    expect(timeBucketOf('2026-07-14T16:59:00')).toBe('afternoon');
-    expect(timeBucketOf('2026-07-14T17:00:00')).toBe('evening');
+    expect(timeBucketOf('2026-07-14T11:59:00Z')).toBe('morning');
+    expect(timeBucketOf('2026-07-14T12:00:00Z')).toBe('afternoon');
+    expect(timeBucketOf('2026-07-14T16:59:00Z')).toBe('afternoon');
+    expect(timeBucketOf('2026-07-14T17:00:00Z')).toBe('evening');
   });
 });
 
@@ -124,16 +124,16 @@ describe('groupMemoriesByDate', () => {
     // Інакше перестановка знімків користувачем нічого б не давала:
     // EXIF повертав би їх на місце при кожному перемальовуванні.
     const groups = groupMemoriesByDate([
-      photo({ id: 1, sort_order: 2, taken_at: '2026-07-14T06:00:00' }),
-      photo({ id: 2, sort_order: 1, taken_at: '2026-07-14T20:00:00' }),
+      photo({ id: 1, sort_order: 2, taken_at: '2026-07-14T06:00:00Z' }),
+      photo({ id: 2, sort_order: 1, taken_at: '2026-07-14T20:00:00Z' }),
     ]);
     expect(groups[0]!.photos.map((p) => p.id)).toEqual([2, 1]);
   });
 
   it('за рівного порядку вирішує час зйомки, потім id', () => {
     const groups = groupMemoriesByDate([
-      photo({ id: 9, taken_at: '2026-07-14T20:00:00' }),
-      photo({ id: 3, taken_at: '2026-07-14T06:00:00' }),
+      photo({ id: 9, taken_at: '2026-07-14T20:00:00Z' }),
+      photo({ id: 3, taken_at: '2026-07-14T06:00:00Z' }),
       photo({ id: 5, taken_at: null }),
     ]);
     expect(groups[0]!.photos.map((p) => p.id)).toEqual([5, 3, 9]);
@@ -147,8 +147,8 @@ describe('groupMemoriesByDate', () => {
 describe('splitByTimeOfDay', () => {
   it('повертає лише непорожні частини, у порядку доби', () => {
     const groups = splitByTimeOfDay([
-      photo({ id: 1, taken_at: '2026-07-14T20:41:00' }),
-      photo({ id: 2, taken_at: '2026-07-14T06:12:00' }),
+      photo({ id: 1, taken_at: '2026-07-14T20:41:00Z' }),
+      photo({ id: 2, taken_at: '2026-07-14T06:12:00Z' }),
       photo({ id: 3, taken_at: null }),
     ]);
     expect(groups.map((g) => g.bucket)).toEqual(['morning', 'evening', null]);
@@ -156,9 +156,9 @@ describe('splitByTimeOfDay', () => {
 
   it('усі знімки лишаються рівно в одній частині', () => {
     const photos = [
-      photo({ id: 1, taken_at: '2026-07-14T06:00:00' }),
-      photo({ id: 2, taken_at: '2026-07-14T13:00:00' }),
-      photo({ id: 3, taken_at: '2026-07-14T21:00:00' }),
+      photo({ id: 1, taken_at: '2026-07-14T06:00:00Z' }),
+      photo({ id: 2, taken_at: '2026-07-14T13:00:00Z' }),
+      photo({ id: 3, taken_at: '2026-07-14T21:00:00Z' }),
       photo({ id: 4, taken_at: null }),
     ];
     const total = splitByTimeOfDay(photos).reduce((n, g) => n + g.photos.length, 0);

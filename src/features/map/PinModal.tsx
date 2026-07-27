@@ -1,5 +1,14 @@
 // ============================================================
-// PinModal — перегляд/редагування місця (порт openPinModal)
+// PinModal — перегляд/редагування місця.
+// ------------------------------------------------------------
+// Тут живе весь текст мітки, і це важливо: `note` писався при створенні,
+// але не показувався ніде — ані в картці, ані тут. Тепер обидва тексти
+// видимі й редаговані, кожен зі своєю роллю: нотатка це факт про місце
+// («столик біля вікна»), враження — те, що лишилось після.
+//
+// Дата відвідання теж редагується: саме вона вирішує, у який день архіву
+// «Спогадів» стане фото цієї мітки, і помилку в ній треба мати змогу
+// виправити пізніше.
 // ============================================================
 import { useState } from 'react';
 import { Lightbox } from '@/components/ui/Lightbox';
@@ -8,6 +17,8 @@ import { CATEGORIES } from './mapConstants';
 import { directionsUrl } from '@/lib/mapbox';
 import { uploadPinPhoto, type PinUpdate } from './useMapPins';
 import { useToast } from '@/providers/ToastProvider';
+import { useUsersMap } from '@/features/_shared/useUsers';
+import { formatDateUA } from '@/features/_shared/month';
 import type { MapPinRow } from '@/types';
 
 interface PinModalProps {
@@ -19,20 +30,33 @@ interface PinModalProps {
 
 export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
   const toast = useToast();
+  const users = useUsersMap();
   const cat = CATEGORIES[pin.category];
 
   const [title, setTitle] = useState(pin.title);
   const [rating, setRating] = useState(pin.rating ?? 0);
   const [review, setReview] = useState(pin.review ?? '');
+  const [note, setNote] = useState(pin.note ?? '');
+  const [visitedAt, setVisitedAt] = useState(pin.visited_at ?? '');
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [lightbox, setLightbox] = useState<string | null>(null);
+
+  const author = pin.created_by ? users[pin.created_by] : undefined;
 
   const save = async () => {
     const t = title.trim();
     if (!t) return;
     setSaving(true);
-    const patch: PinUpdate = { title: t, review: review.trim() || null, rating: rating || null };
+    const patch: PinUpdate = {
+      title: t,
+      review: review.trim() || null,
+      note: note.trim() || null,
+      rating: rating || null,
+    };
+    // Порожню дату не пишемо: краще лишити стару, ніж стерти той єдиний
+    // орієнтир, за яким фото місця стоїть у своєму дні в «Спогадах».
+    if (visitedAt) patch.visited_at = visitedAt;
     if (file) {
       const url = await uploadPinPhoto(file, pin.id);
       if (url) patch.photo_url = url;
@@ -60,6 +84,16 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
         )}
 
         <div className="pin-view-body">
+          {/* Хто поставив мітку й коли там були — досі це знала лише база. */}
+          <p className="pin-view-meta">
+            {cat.emoji} {cat.label}
+            {pin.city && <> · {pin.city}</>}
+            {pin.visited_at && <> · були {formatDateUA(pin.visited_at)}</>}
+            {/* «від Х», а не «додав/додала Х»: рід із імені не вгадується,
+                а помилятись у ньому щоразу — гірше за нейтральний підпис. */}
+            {author && <> · від {author}</>}
+          </p>
+
           <label className="form-field">
             <span>Назва</span>
             <input id="pin-edit-title" name="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -92,6 +126,30 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
               onChange={(e) => setReview(e.target.value)}
               placeholder="Що сподобалось…"
               style={{ resize: 'vertical' }}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Нотатка</span>
+            <textarea
+              id="pin-edit-note"
+              name="note"
+              rows={2}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Деталь, яку не хочеться забути…"
+              style={{ resize: 'vertical' }}
+            />
+          </label>
+
+          <label className="form-field">
+            <span>Коли були</span>
+            <input
+              id="pin-edit-visited"
+              name="visited_at"
+              type="date"
+              value={visitedAt}
+              onChange={(e) => setVisitedAt(e.target.value)}
             />
           </label>
 

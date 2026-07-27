@@ -17,6 +17,25 @@ export function todayISO(d: Date = new Date()): string {
   return `${y}-${m}-${day}`;
 }
 
+/**
+ * Українська форма числівника: [1, 2–4, 5+].
+ *
+ * `pluralUA(3, ['місто', 'міста', 'міст'])` → 'міста'.
+ *
+ * Наївне `n === 1 ? 'місто' : 'міст'` дає «3 міст» і «2 днів» — тобто
+ * зламану мову там, де пара читає власні дані. Правило: закінчення 11–14
+ * завжди беруть третю форму, інакше вирішує остання цифра.
+ */
+export function pluralUA(n: number, forms: readonly [string, string, string]): string {
+  const abs = Math.abs(Math.trunc(n));
+  const lastTwo = abs % 100;
+  if (lastTwo >= 11 && lastTwo <= 14) return forms[2];
+  const last = abs % 10;
+  if (last === 1) return forms[0];
+  if (last >= 2 && last <= 4) return forms[1];
+  return forms[2];
+}
+
 /** 'YYYY-MM' поточного місяця — ключ для schedule / photoCalendar. */
 export function monthKey(d: Date = new Date()): string {
   return todayISO(d).slice(0, 7);
