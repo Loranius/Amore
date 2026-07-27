@@ -59,6 +59,10 @@
 .wl-cloud-item {
   position: relative;
   z-index: var(--wl-cloud-z, 1);
+  /* Запасні амплітуди дихання: бульбашки з інших екранів, які ще не
+     передають розкладку, лишаються рухомими, а не завмирають. */
+  --wl-cloud-drift-x: 0px;
+  --wl-cloud-drift-y: -6px;
   width: var(--wl-cloud-size);
   height: var(--wl-cloud-size);
   flex: 0 0 var(--wl-cloud-size);
@@ -566,12 +570,27 @@
   cursor: not-allowed;
 }
 
+/* Дихання по ОБОХ осях. Раніше було `0 -6px` — однакова вертикальна
+   гойдалка для всіх бульбашок, через що дошка читалась як застигла.
+   Тепер амплітуди беруться з розкладки (свої на кожну бульбашку), а
+   чотири опорні кадри дають повільну петлю замість «вгору-вниз».
+
+   Це властивість `translate`, а не `transform`: вона композиториться
+   окремо й не конфліктує з `transform` на тому самому елементі
+   (там живуть зсув розкладки, поворот і масштаб при натисканні).
+   Кадри малює браузер на GPU — JS не бере в цьому участі. */
 @keyframes wl-cloud-float {
   0%, 100% {
     translate: 0 0;
   }
+  25% {
+    translate: var(--wl-cloud-drift-x) calc(var(--wl-cloud-drift-y) * 0.55);
+  }
   50% {
-    translate: 0 -6px;
+    translate: 0 var(--wl-cloud-drift-y);
+  }
+  75% {
+    translate: calc(var(--wl-cloud-drift-x) * -1) calc(var(--wl-cloud-drift-y) * 0.4);
   }
 }
 

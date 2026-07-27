@@ -36,6 +36,7 @@ describe('WishlistBubbleCard', () => {
     const html = renderToStaticMarkup(
       <WishlistBubbleCard
         item={testItem()}
+        seed={0x5eed_1234}
         busy={false}
         detailsOpen={false}
         onOpen={() => undefined}

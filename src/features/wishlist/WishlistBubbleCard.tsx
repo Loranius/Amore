@@ -10,6 +10,8 @@ import './wishlistCloud.css';
 
 export interface WishlistBubbleCardProps {
   item: WishlistItemV3;
+  /** Seed розкладки дошки: свіжий на кожне відкриття вигляду, сталий у межах сесії. */
+  seed: number;
   busy: boolean;
   detailsOpen: boolean;
   onOpen: () => void;
@@ -17,6 +19,7 @@ export interface WishlistBubbleCardProps {
 
 export function WishlistBubbleCard({
   item,
+  seed,
   busy,
   detailsOpen,
   onOpen,
@@ -25,8 +28,8 @@ export function WishlistBubbleCard({
   const priority = normalizeWishlistCloudPriority(item.priority);
   const priorityPresentation = wishlistCloudPriorityPresentation(item.priority);
   const placement = useMemo(
-    () => wishlistCloudPlacement(item.id, item.id % 19),
-    [item.id],
+    () => wishlistCloudPlacement(seed, item.id, item.id % 19),
+    [seed, item.id],
   );
 
   const bubbleStyle = {
@@ -41,6 +44,8 @@ export function WishlistBubbleCard({
     '--wl-cloud-delay': `${placement.delay}s`,
     '--wl-cloud-duration': `${placement.duration}s`,
     '--wl-cloud-z': placement.zIndex,
+    '--wl-cloud-drift-x': `${placement.driftX}px`,
+    '--wl-cloud-drift-y': `${placement.driftY}px`,
   } as CSSProperties;
 
   useEffect(() => {

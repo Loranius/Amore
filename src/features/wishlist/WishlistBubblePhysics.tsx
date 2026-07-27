@@ -10,6 +10,9 @@ type BubbleBody = {
   baseY: number;
   radius: number;
   dragging: boolean;
+  /** Куди тягне палець. Тіло доганяє цю точку, а не стрибає в неї. */
+  targetX: number;
+  targetY: number;
 };
 
 type PointerDrag = {
@@ -43,11 +46,55 @@ const HOLD_DELAY_MS = 165;
 const DRAG_DISTANCE_PX = 7;
 const FRAME_MS = 1000 / 60;
 const MAX_SPEED = 26;
-const WALL_RESTITUTION = 0.76;
+
+/**
+ * Стінка цілує, а не відбиває: 0.76 повертало більшу частину кидка назад
+ * у дошку, і бульбашка металась між краями. 0.6 гасить кожен дотик до
+ * краю на 40%, тож кидок доїжджає й зупиняється.
+ */
+const WALL_RESTITUTION = 0.6;
 const COLLISION_RESTITUTION = 0.82;
+
+/**
+ * Тертя за кадр. Пройдений шлях після кидка = v0 / (1 − friction):
+ * 0.955 давало 22·v0 (типовий змах ≈ ширина дошки — кидок гальмував
+ * майже одразу), 0.985 дало б 67·v0 (більярд). 0.978 → 45·v0: бульбашка
+ * помітно котиться, встигає торкнутись краю раз-два й стає.
+ */
+const FRICTION_PER_FRAME = 0.978;
+const REDUCED_FRICTION_PER_FRAME = 0.82;
+
+/** Нижче цієї швидкості рух непомітний — обнуляємо, щоб цикл заснув. */
+const REST_SPEED = 0.02;
+
+/**
+ * Частка відстані до пальця, яку тіло проходить за кадр. Раніше позиція
+ * жорстко дорівнювала пальцю (`x = clientX − offset`) — бульбашка була
+ * приклеєна й не мала ваги. Відставання і читається як «котиться».
+ */
+const DRAG_FOLLOW = 0.32;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Множник згасання швидкості за `delta` кадрів (1 = 60 Гц).
+ *
+ * Показник, а не множення на константу щокадру: на 120-Гц екрані кадрів
+ * удвічі більше, і «×0.978 за кадр» гальмувало б бульбашку вдвічі
+ * швидше, ніж на 60 Гц. Інерція має бути властивістю кидка, а не
+ * частоти оновлення екрана.
+ */
+export function bubbleFriction(delta: number, reducedMotion = false): number {
+  return Math.pow(reducedMotion ? REDUCED_FRICTION_PER_FRAME : FRICTION_PER_FRAME, delta);
+}
+
+/** Частка відстані до пальця, пройдена за `delta` кадрів. Та сама вимога
+ *  незалежності від частоти кадрів, що й у `bubbleFriction`. */
+export function bubbleFollow(delta: number, reducedMotion = false): number {
+  if (reducedMotion) return 1;
+  return 1 - Math.pow(1 - DRAG_FOLLOW, delta);
 }
 
 function parsePixels(value: string): number {
@@ -79,6 +126,8 @@ function mountBubblePhysics(board: HTMLElement): () => void {
       baseY: 0,
       radius: 0,
       dragging: false,
+      targetX: 0,
+      targetY: 0,
     }));
   const bodyByElement = new Map(bodies.map((body) => [body.element, body]));
 
@@ -238,24 +287,35 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     measureFrameId = window.requestAnimationFrame(measureBodies);
   };
 
+  // Поріг той самий, що й у `tick`: цикл засинає рівно тоді, коли всі
+  // швидкості вже обнулені. Раніше поріг сну (0.035) був ВИЩИЙ за поріг
+  // обнулення (0.025), тож rAF міг спинитись із замороженою швидкістю.
   const hasKineticMotion = () => bodies.some(
-    (body) => body.dragging || Math.abs(body.vx) > 0.035 || Math.abs(body.vy) > 0.035,
+    (body) => body.dragging
+      || Math.abs(body.vx) >= REST_SPEED
+      || Math.abs(body.vy) >= REST_SPEED,
   );
 
   const tick = (now: number) => {
     frameId = 0;
     const delta = clamp((now - lastFrameTime) / FRAME_MS, 0.35, 2.2);
     lastFrameTime = now;
-    const friction = Math.pow(reducedMotion ? 0.82 : 0.955, delta);
+    const friction = bubbleFriction(delta, reducedMotion);
+    const follow = bubbleFollow(delta, reducedMotion);
 
     bodies.forEach((body) => {
-      if (body.dragging) return;
+      if (body.dragging) {
+        body.x += (body.targetX - body.x) * follow;
+        body.y += (body.targetY - body.y) * follow;
+        clampBodyToBoard(body, false);
+        return;
+      }
       body.x += body.vx * delta;
       body.y += body.vy * delta;
       body.vx *= friction;
       body.vy *= friction;
-      if (Math.abs(body.vx) < 0.025) body.vx = 0;
-      if (Math.abs(body.vy) < 0.025) body.vy = 0;
+      if (Math.abs(body.vx) < REST_SPEED) body.vx = 0;
+      if (Math.abs(body.vy) < REST_SPEED) body.vy = 0;
       clampBodyToBoard(body, true);
     });
 
@@ -301,6 +361,9 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     state.body.dragging = true;
     state.body.vx = 0;
     state.body.vy = 0;
+    // Ціль = поточна позиція, інакше перший кадр доганяння смикне тіло.
+    state.body.targetX = state.body.x;
+    state.body.targetY = state.body.y;
     state.offsetX = state.lastX - (state.body.baseX + state.body.x);
     state.offsetY = state.lastY - (state.body.baseY + state.body.y);
     state.body.element.classList.remove('wl-cloud-item--pressed');
@@ -360,11 +423,11 @@ function mountBubblePhysics(board: HTMLElement): () => void {
     state.body.vx = state.body.vx * 0.28 + instantVx * 0.72;
     state.body.vy = state.body.vy * 0.28 + instantVy * 0.72;
     limitVelocity(state.body);
-    state.body.x = event.clientX - state.offsetX - state.body.baseX;
-    state.body.y = event.clientY - state.offsetY - state.body.baseY;
-    clampBodyToBoard(state.body, false);
-    resolveCollisions(3);
-    renderAll();
+    // Тільки ціль. Саме переміщення, зіткнення й малювання робить `tick`
+    // — один раз на кадр, а не на кожну подію вказівника (їх на 120-Гц
+    // екрані буває більше, ніж кадрів).
+    state.body.targetX = event.clientX - state.offsetX - state.body.baseX;
+    state.body.targetY = event.clientY - state.offsetY - state.body.baseY;
     ensureAnimation();
   };
 
