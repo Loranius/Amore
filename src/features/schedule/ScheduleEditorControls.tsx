@@ -6,7 +6,9 @@ export function ScheduleEditorControls({
   onMarkChange,
   bulkMode,
   selectedCount,
+  missingCount,
   onToggleBulk,
+  onSelectMissing,
   onApplySelected,
   markedCount,
   total,
@@ -16,7 +18,9 @@ export function ScheduleEditorControls({
   onMarkChange: (mark: ScheduleMark) => void;
   bulkMode: boolean;
   selectedCount: number;
+  missingCount: number;
   onToggleBulk: () => void;
+  onSelectMissing: () => void;
   onApplySelected: () => void;
   markedCount: number;
   total: number;
@@ -53,17 +57,26 @@ export function ScheduleEditorControls({
         >
           {bulkMode ? 'Завершити вибір' : 'Обрати кілька днів'}
         </button>
-        {bulkMode && (
-          <button
-            type="button"
-            className="sched-editor-apply"
-            onClick={onApplySelected}
-            disabled={selectedCount === 0 || isPending}
-          >
-            Застосувати до {selectedCount}
-          </button>
-        )}
+        <button
+          type="button"
+          className="sched-editor-missing"
+          onClick={onSelectMissing}
+          disabled={missingCount === 0 || isPending}
+        >
+          {missingCount === 0 ? 'Пропусків немає' : `Обрати пропуски · ${missingCount}`}
+        </button>
       </div>
+
+      {bulkMode && (
+        <button
+          type="button"
+          className="sched-editor-apply sched-editor-apply-wide"
+          onClick={onApplySelected}
+          disabled={selectedCount === 0 || isPending}
+        >
+          Застосувати до {selectedCount}
+        </button>
+      )}
 
       <div className="sched-editor-progress">
         <div className="sched-editor-progress-copy">
