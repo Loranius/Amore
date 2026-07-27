@@ -11,6 +11,11 @@ dist-ssr
 playwright-report
 test-results
 
+# Кеш інкрементальної збірки TypeScript. Його переписує кожен запуск
+# typecheck, тож у git він давав конфлікт при злитті кожної гілки —
+# і жодної користі: локально файл усе одно згенерується заново.
+*.tsbuildinfo
+
 # dev-only crystal render harness (never committed)
 crystal-preview.html
 src/crystal-preview.tsx
