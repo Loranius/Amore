@@ -1,11 +1,18 @@
 // ============================================================
-// MapPage — карта спогадів і планів (порт map.js UI/оркестрація)
+// MapPage — карта спогадів і планів.
 // ------------------------------------------------------------
-// mapbox-gl керується імперативно через refs; піни/маркери синкаються
-// в ефектах під стан React. Клік по карті → додати місце. Клік по
-// картці чи маркеру — одразу летимо туди й відкриваємо модалку
-// (раніше перший тап лише летів, другий відкривав — неочевидно;
-// focusedPinId лишився тільки для підсвітки картки на списку).
+// mapbox-gl керується імперативно через refs; маркери синкаються під
+// стан React. Три правила, кожне з них — виправлення реального болю:
+//
+// 1. Камера рухається лише тоді, коли її про це просять: перше
+//    завантаження, зміна фільтра, перехід за карткою. Раніше fitBounds
+//    висів на `visiblePins`, а будь-яка мутація робить invalidate — тож
+//    після кожного збереження оцінки карту відкидало на загальний план.
+// 2. Маркери оновлюються різницею (planMarkerSync), а не «знищити все й
+//    створити наново».
+// 3. Нове місце ставиться ЯВНО — режимом прицілу. Раніше будь-який тап
+//    по карті відкривав модалку створення, і промах пальцем під час
+//    панорамування коштував модалки.
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
@@ -17,6 +24,7 @@ import {
   DEFAULT_CENTER,
   USER_LOCATION_STYLES,
 } from './mapConstants';
+import { markerSignature, planMarkerSync } from './mapPinView';
 import { useMapPins, useMapPinMutations, useCityBackfill } from './useMapPins';
 import { useUserLocations, useCheckin } from './useLocations';
 import { CatFilterBar, PinCards } from './MapPanels';
@@ -30,8 +38,10 @@ import type { MapPinRow, PinCategory, MapboxFeature } from '@/types';
 export function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const pinMarkers = useRef<mapboxgl.Marker[]>([]);
+  const pinMarkers = useRef(new Map<number, { marker: mapboxgl.Marker; sig: string }>());
   const locMarkers = useRef<mapboxgl.Marker[]>([]);
+  /** Фільтр, під який камеру вже зводили. Стереже від повторних стрибків. */
+  const fittedFor = useRef<string | null>(null);
 
   const { data: pins = [] } = useMapPins();
   const { data: users = [] } = useUsers();
@@ -45,9 +55,18 @@ export function MapPage() {
   const [search, setSearch] = useState('');
   const [geoResults, setGeoResults] = useState<MapboxFeature[]>([]);
   const [addAt, setAddAt] = useState<{ lat: number; lng: number; title?: string } | null>(null);
-  const [viewPin, setViewPin] = useState<MapPinRow | null>(null);
+  const [placing, setPlacing] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const focusedPinId = useRef<number | null>(null);
+  const [focusedId, setFocusedId] = useState<number | null>(null);
+
+  // Модалка тримає id, а не знімок рядка: маркер живе довше за одне
+  // перемальовування, і колишній `setViewPin(pin)` показував би дані,
+  // застиглі на момент створення маркера.
+  const [viewPinId, setViewPinId] = useState<number | null>(null);
+  const [justAdded, setJustAdded] = useState<MapPinRow | null>(null);
+  const viewPin =
+    pins.find((p) => p.id === viewPinId) ??
+    (justAdded && justAdded.id === viewPinId ? justAdded : null);
 
   const visiblePins = useMemo(
     () => (filter === 'all' ? pins : pins.filter((p) => p.category === filter)),
@@ -70,47 +89,69 @@ export function MapPage() {
       showUserLocation: true,
     });
     map.addControl(geo, 'top-right');
-    map.on('click', (e) => setAddAt({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
     mapRef.current = map;
 
     return () => {
       map.remove();
       mapRef.current = null;
+      pinMarkers.current.clear();
     };
   }, []);
 
-  // ── Синк маркерів пінів ────────────────────────────────────
+  // ── Синк маркерів пінів (різницею) ─────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    pinMarkers.current.forEach((m) => m.remove());
-    pinMarkers.current = [];
 
-    for (const pin of visiblePins) {
+    const drawn = new Map([...pinMarkers.current].map(([id, m]) => [id, m.sig]));
+    const plan = planMarkerSync(drawn, visiblePins);
+    if (!plan.add.length && !plan.remove.length) return;
+
+    for (const id of plan.remove) {
+      pinMarkers.current.get(id)?.marker.remove();
+      pinMarkers.current.delete(id);
+    }
+
+    const byId = new Map(visiblePins.map((p) => [p.id, p]));
+    for (const id of plan.add) {
+      const pin = byId.get(id);
+      if (!pin) continue;
       const cat = CATEGORIES[pin.category];
       const elMarker = document.createElement('div');
       elMarker.className = 'map-marker';
       elMarker.style.background = cat.color;
-      elMarker.textContent = cat.emoji;
+      // Емодзі в окремому елементі: сама крапля повернута на -45°, і без
+      // зворотного повороту всередині іконка стояла перекошеною.
+      const elIcon = document.createElement('span');
+      elIcon.className = 'map-marker-icon';
+      elIcon.textContent = cat.emoji;
+      elMarker.appendChild(elIcon);
       elMarker.addEventListener('click', (e) => {
         e.stopPropagation();
-        focusedPinId.current = pin.id;
-        setViewPin(pin);
+        setFocusedId(pin.id);
+        setViewPinId(pin.id);
       });
       const marker = new mapboxgl.Marker(elMarker).setLngLat([pin.lng, pin.lat]).addTo(map);
-      pinMarkers.current.push(marker);
+      pinMarkers.current.set(pin.id, { marker, sig: markerSignature(pin) });
     }
+  }, [visiblePins]);
 
-    // Автозум під наявні піни.
+  // ── Камера: лише перше зведення на кожен фільтр ────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || visiblePins.length === 0) return;
+    if (fittedFor.current === filter) return;
+    fittedFor.current = filter;
+
     if (visiblePins.length === 1) {
       const p = visiblePins[0]!;
       map.flyTo({ center: [p.lng, p.lat], zoom: 12 });
-    } else if (visiblePins.length > 1) {
-      const bounds = new mapboxgl.LngLatBounds();
-      visiblePins.forEach((p) => bounds.extend([p.lng, p.lat]));
-      map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 600 });
+      return;
     }
-  }, [visiblePins]);
+    const bounds = new mapboxgl.LngLatBounds();
+    visiblePins.forEach((p) => bounds.extend([p.lng, p.lat]));
+    map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 600 });
+  }, [filter, visiblePins]);
 
   // ── Синк маркерів геолокації партнерів ─────────────────────
   useEffect(() => {
@@ -147,9 +188,9 @@ export function MapPage() {
     mapRef.current?.flyTo({ center: [lng, lat], zoom });
 
   const onCardClick = (pin: MapPinRow) => {
-    focusedPinId.current = pin.id;
+    setFocusedId(pin.id);
     flyTo(pin.lng, pin.lat);
-    setViewPin(pin);
+    setViewPinId(pin.id);
   };
 
   const pickGeoResult = (f: MapboxFeature) => {
@@ -158,6 +199,13 @@ export function MapPage() {
     setSearch('');
     flyTo(lng, lat, 14);
     setAddAt({ lat, lng, title: f.text ?? f.place_name ?? '' });
+  };
+
+  /** Підтвердити місце під прицілом — координати беремо з центра карти. */
+  const confirmPlacement = () => {
+    const c = mapRef.current?.getCenter();
+    setPlacing(false);
+    if (c) setAddAt({ lat: c.lat, lng: c.lng });
   };
 
   return (
@@ -185,7 +233,27 @@ export function MapPage() {
         )}
       </div>
 
-      <div ref={containerRef} className="map-container" />
+      <div className="map-stage">
+        <div ref={containerRef} className="map-container" />
+        {placing ? (
+          <>
+            <div className="map-crosshair" aria-hidden="true" />
+            <div className="map-place-bar">
+              <span>Наведіть карту на місце</span>
+              <button type="button" className="map-place-cancel" onClick={() => setPlacing(false)}>
+                Скасувати
+              </button>
+              <button type="button" className="map-place-ok" onClick={confirmPlacement}>
+                Тут
+              </button>
+            </div>
+          </>
+        ) : (
+          <button type="button" className="map-fab" onClick={() => setPlacing(true)}>
+            + Місце
+          </button>
+        )}
+      </div>
 
       <div className="map-actions-row">
         <button type="button" className="btn" onClick={() => checkin.mutate(undefined, {
@@ -203,7 +271,7 @@ export function MapPage() {
         allPins={pins}
         visiblePins={visiblePins}
         search={search}
-        focusedId={focusedPinId.current}
+        focusedId={focusedId}
         onCardClick={onCardClick}
       />
 
@@ -216,7 +284,16 @@ export function MapPage() {
           onSubmit={(payload) =>
             add.mutate(
               { ...payload, lat: addAt.lat, lng: addAt.lng },
-              { onSuccess: (fresh) => fresh && setViewPin(fresh) },
+              {
+                onSuccess: (fresh) => {
+                  if (!fresh) return;
+                  // Свіжий рядок тримаємо окремо: invalidate ще не встиг
+                  // повернути список, а модалка має відкритись одразу.
+                  setJustAdded(fresh);
+                  setViewPinId(fresh.id);
+                  setFocusedId(fresh.id);
+                },
+              },
             )
           }
         />
@@ -224,12 +301,13 @@ export function MapPage() {
       {viewPin && (
         <PinModal
           pin={viewPin}
-          onClose={() => setViewPin(null)}
+          onClose={() => { setViewPinId(null); setFocusedId(null); }}
           onSave={(patch) => update.mutate({ id: viewPin.id, patch })}
           onDelete={async () => {
             if (await confirmDialog('Видалити це місце?')) {
               remove.mutate(viewPin.id);
-              setViewPin(null);
+              setViewPinId(null);
+              setFocusedId(null);
             }
           }}
         />

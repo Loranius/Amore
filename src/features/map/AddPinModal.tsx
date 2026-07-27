@@ -109,7 +109,10 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
 
         <label className="form-field">
           <span>Нотатка</span>
-          <textarea id="pin-note" name="note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Враження, деталі…" />
+          {/* Не «враження»: враження — окреме поле в модалці перегляду, і
+              коли обидва плейсхолдери обіцяли одне й те саме, текст
+              розтікався по двох колонках, з яких показувалась одна. */}
+          <textarea id="pin-note" name="note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Деталь, яку не хочеться забути…" />
         </label>
 
         <p className="pin-coords">📌 {lat.toFixed(4)}, {lng.toFixed(4)}</p>

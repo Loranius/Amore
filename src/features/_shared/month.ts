@@ -20,6 +20,27 @@ export const MONTHS_UA_GENITIVE = [
 
 export const DAYS_UA = ['ПН', 'ВТ', 'СР', 'ЧТ', 'ПТ', 'СБ', 'НД'] as const;
 
+/**
+ * 'YYYY-MM-DD' → «14 липня 2026». Без року — «14 липня».
+ *
+ * Розбір ЛОКАЛЬНИЙ (див. localDateFromISO): дата тут календарний факт,
+ * а не мить у часі, і `new Date('2026-07-14').getDate()` у від'ємних
+ * зонах віддав би 13.
+ *
+ * Порожній чи несправний рядок дає порожній підпис, а не «Invalid Date»
+ * посеред картки місця.
+ */
+export function formatDateUA(iso: string, opts: { year?: boolean } = {}): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!match) return '';
+  const [, y, m, d] = match;
+  const month = MONTHS_UA_GENITIVE[Number(m) - 1];
+  if (!month) return '';
+  const day = Number(d);
+  if (day < 1 || day > daysInMonth(Number(y), Number(m))) return '';
+  return opts.year === false ? `${day} ${month}` : `${day} ${month} ${y}`;
+}
+
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /** 'YYYY-MM-DD' з (рік, місяць 1–12, день). */

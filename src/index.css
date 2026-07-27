@@ -2177,6 +2177,7 @@ a.wl-card-title { color: var(--accent); }
 }
 .map-geo-sub { color: var(--muted); font-size: 12px; }
 
+.map-stage { position: relative; }
 .map-container { width: 100%; height: 340px; border-radius: 16px; overflow: hidden; }
 .map-marker {
   width: 32px; height: 32px;
@@ -2189,7 +2190,54 @@ a.wl-card-title { color: var(--accent); }
   cursor: pointer;
   border: 2px solid #fff;
 }
-.map-marker { }
+/* Зворотний поворот вмісту: краплю нахиляє сам маркер, і без цього
+   емодзі всередині стояло перекошеним на 45°. */
+.map-marker-icon { display: block; transform: rotate(45deg); }
+
+/* ── Постановка нового місця прицілом ──────────────────────── */
+.map-fab {
+  position: absolute; right: 12px; bottom: 12px; z-index: 3;
+  border: 0; border-radius: 999px; padding: 10px 16px;
+  background: var(--accent); color: #fff; font: inherit; font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28); cursor: pointer;
+}
+/* pointer-events: none — обов'язково: приціл лежить поверх карти, і без
+   цього він з'їдав би панорамування, заради якого й існує. */
+.map-crosshair {
+  position: absolute; left: 50%; top: 50%; z-index: 3;
+  width: 34px; height: 34px; margin: -34px 0 0 -17px;
+  pointer-events: none;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: color-mix(in srgb, var(--accent) 88%, transparent);
+  border: 3px solid #fff;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+}
+/* Точка під вістрям: сама крапля показує, ЯК виглядатиме мітка, а
+   крапка — КУДИ саме вона стане. Без неї на масштабі вулиці не видно,
+   у який бік будинку ти цілишся. */
+.map-crosshair::after {
+  content: ''; position: absolute; right: -9px; bottom: -9px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 0 2px rgb(0 0 0 / .35);
+}
+.map-place-bar {
+  position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 4;
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 14px;
+  background: var(--surface); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  font-size: 12.5px;
+}
+.map-place-bar > span { flex: 1; min-width: 0; color: var(--muted); }
+.map-place-cancel, .map-place-ok {
+  flex: 0 0 auto; border-radius: 999px; padding: 7px 14px;
+  font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+}
+.map-place-cancel {
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: transparent; color: var(--text);
+}
+.map-place-ok { border: 0; background: var(--accent); color: #fff; }
 .map-location-marker {
   width: 30px; height: 30px;
   border-radius: 50%;
@@ -2208,26 +2256,40 @@ a.wl-card-title { color: var(--accent); }
 .pin-city-name { font-weight: 600; }
 .pin-city-count { color: var(--muted); font-size: 13px; }
 .pin-card {
+  position: relative;
   display: flex;
   gap: 12px;
   background: var(--surface);
   border-radius: 14px;
   overflow: hidden;
-  cursor: pointer;
   border: 2px solid transparent;
 }
 .pin-card--active { border-color: var(--accent); }
+/* Кнопка-накладка на всю картку: дає фокус і Enter, не змінюючи
+   розкладки. «Маршрут» стоїть шаром вище й лишається клікабельним. */
+.pin-card-open {
+  position: absolute; inset: 0; z-index: 1;
+  border: 0; background: none; padding: 0; cursor: pointer;
+}
+.pin-card:has(.pin-card-open:focus-visible) { border-color: var(--accent); }
+.pin-card-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 .pin-card-photo, .pin-card-photo-placeholder { width: 96px; height: 96px; object-fit: cover; flex: 0 0 auto; }
 .pin-card-photo-placeholder { display: grid; place-items: center; font-size: 32px; background: color-mix(in srgb, var(--text) 6%, transparent); }
 .pin-card-body { flex: 1; min-width: 0; padding: 10px 12px 10px 0; display: flex; flex-direction: column; gap: 4px; }
 .pin-card-header { display: flex; justify-content: space-between; gap: 8px; }
 .pin-card-title { font-weight: 600; margin: 0; }
 .pin-card-cat { font-size: 12px; color: var(--muted); flex: 0 0 auto; }
-.pin-card-rating { color: #f5b301; font-size: 13px; }
+.pin-card-rating { color: #f5b301; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.pin-card-date { color: var(--muted); font-size: 12px; }
 .map-star { color: color-mix(in srgb, var(--text) 25%, transparent); background: none; border: 0; cursor: pointer; font-size: 20px; padding: 0 2px; }
 .map-star.filled { color: #f5b301; }
 .pin-card-review { font-size: 13px; color: var(--muted); margin: 0; }
-.pin-route-btn { font-size: 13px; color: var(--accent); text-decoration: none; width: fit-content; }
+.pin-card-more { font-size: 11px; color: var(--muted); opacity: .75; }
+/* z-index: 2 — щоб посилання лишалось над кнопкою-накладкою картки. */
+.pin-route-btn {
+  position: relative; z-index: 2;
+  font-size: 13px; color: var(--accent); text-decoration: none; width: fit-content;
+}
 
 /* Модалка перегляду піна — фото зверху фіксоване (overflow:hidden
    заради заокруглених країв), а .pin-view-body скролиться окремо,
@@ -2247,6 +2309,7 @@ a.wl-card-title { color: var(--accent); }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+.pin-view-meta { margin: 0 0 4px; font-size: 12px; color: var(--muted); }
 .pin-rating-row { display: flex; gap: 2px; }
 .pin-view-actions { flex-wrap: wrap; }
 .pin-delete-action { color: var(--danger); }

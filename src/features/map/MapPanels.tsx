@@ -2,7 +2,9 @@
 // MapPanels — панель фільтрів + картки пінів (порт renderCatFilterBar/renderPinCards)
 // ============================================================
 import { CATEGORIES, CATEGORY_ORDER, groupPinsByCity } from './mapConstants';
+import { pinHasSecondText, pinPrimaryText } from './mapPinView';
 import { directionsUrl } from '@/lib/mapbox';
+import { formatDateUA } from '@/features/_shared/month';
 import { TabBar } from '@/components/ui/TabBar';
 import type { MapPinRow, PinCategory } from '@/types';
 
@@ -59,7 +61,7 @@ export function PinCards({
     : visiblePins;
 
   if (!allPins.length) {
-    return <p className="empty-state">Натисни на карту, щоб додати місце 📍</p>;
+    return <p className="empty-state">Натисни «+ Місце» на карті, щоб додати перше 📍</p>;
   }
   if (!visiblePins.length) {
     return <p className="empty-state">У цій категорії поки немає місць 🔍</p>;
@@ -96,6 +98,19 @@ export function PinCards({
   );
 }
 
+/**
+ * Картка місця.
+ *
+ * Відкриття — це `<button>`, а не `div` з `onClick`: раніше картку не
+ * можна було ні сфокусувати, ні натиснути з клавіатури, і читалка не
+ * знала, що вона взагалі клікабельна.
+ *
+ * Кнопка лежить накладкою на всю картку, а не обгортає вміст. Обгортка
+ * була б простішою, але «Маршрут» — це `<a>`, а посилання всередині
+ * кнопки недійсне; винесення ж його окремим рядком під фото додавало
+ * картці цілий порожній ряд. Накладка лишає розкладку компактною, а
+ * посилання просто стоїть шаром вище.
+ */
 function PinCard({
   pin,
   focused,
@@ -106,10 +121,19 @@ function PinCard({
   onClick: (pin: MapPinRow) => void;
 }) {
   const cat = CATEGORIES[pin.category];
+  const text = pinPrimaryText(pin);
+  const visited = pin.visited_at ? formatDateUA(pin.visited_at, { year: false }) : '';
+
   return (
-    <div className={`pin-card${focused ? ' pin-card--active' : ''}`} onClick={() => onClick(pin)}>
+    <div className={`pin-card${focused ? ' pin-card--active' : ''}`}>
+      <button
+        type="button"
+        className="pin-card-open"
+        onClick={() => onClick(pin)}
+        aria-label={`Відкрити «${pin.title}»`}
+      />
       {pin.photo_url ? (
-        <img className="pin-card-photo" loading="lazy" src={pin.photo_url} alt={pin.title} />
+        <img className="pin-card-photo" loading="lazy" src={pin.photo_url} alt="" />
       ) : (
         <div className="pin-card-photo-placeholder">{cat.emoji}</div>
       )}
@@ -120,22 +144,27 @@ function PinCard({
             {cat.emoji} {cat.label}
           </span>
         </div>
-        {pin.rating ? (
+        {(pin.rating || visited) && (
           <div className="pin-card-rating">
-            {Array.from({ length: 5 }, (_, i) => (
-              <span key={i} className={i < pin.rating! ? 'map-star filled' : 'map-star'}>
-                ★
-              </span>
-            ))}
+            {pin.rating
+              ? Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} className={i < pin.rating! ? 'map-star filled' : 'map-star'}>
+                    ★
+                  </span>
+                ))
+              : null}
+            {visited && <span className="pin-card-date">{visited}</span>}
           </div>
-        ) : null}
-        {pin.review && <p className="pin-card-review">{pin.review}</p>}
+        )}
+        {text && <p className="pin-card-review">{text}</p>}
+        {/* Другий текст не влазить у картку, але мовчати про нього не
+            можна — саме так нотатки й ставали невидимими. */}
+        {pinHasSecondText(pin) && <span className="pin-card-more">+ нотатка</span>}
         <a
           className="pin-route-btn"
           href={directionsUrl(pin.lat, pin.lng)}
           target="_blank"
           rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
         >
           🧭 Маршрут
         </a>

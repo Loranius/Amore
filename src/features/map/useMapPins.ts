@@ -62,6 +62,9 @@ export async function uploadPinPhoto(file: File, pinId: number): Promise<string 
 export interface PinUpdate {
   title: string;
   review: string | null;
+  /** Нотатка, яку писали при створенні мітки. Донедавна її не можна було
+   *  ні побачити, ні змінити — вона лише мовчки лежала в базі. */
+  note: string | null;
   rating: number | null;
   photo_url?: string;
   /** Коли ви там були. Керує тим, у який день фото мітки стане в архів
