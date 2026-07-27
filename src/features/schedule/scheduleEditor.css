@@ -1,0 +1,128 @@
+/* Schedule editor V2 — явні стани, масове редагування та шаблони. */
+.sched-editor { display: flex; flex-direction: column; gap: 14px; }
+
+.sched-editor-toolbar,
+.sched-editor-templates {
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+
+.sched-editor-state-row { display: flex; flex-direction: column; gap: 8px; }
+.sched-editor-label { font-size: 12px; font-weight: 700; color: var(--muted); }
+.sched-editor-state-switch {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.sched-editor-state-switch button,
+.sched-editor-bulk-toggle,
+.sched-editor-apply,
+.sched-editor-template-grid button {
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.sched-editor-state-switch button {
+  min-width: 0;
+  padding: 9px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sched-editor-state-switch button span { font-size: 17px; }
+.sched-editor-state-switch button.is-active {
+  border-color: color-mix(in srgb, var(--accent) 70%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
+}
+.sched-editor-state-switch button:active,
+.sched-editor-bulk-toggle:active,
+.sched-editor-apply:active,
+.sched-editor-template-grid button:active { transform: scale(0.98); }
+
+.sched-editor-bulk-row { display: flex; gap: 8px; margin-top: 10px; }
+.sched-editor-bulk-toggle,
+.sched-editor-apply { flex: 1; padding: 10px 12px; font-size: 13px; font-weight: 700; }
+.sched-editor-bulk-toggle.is-active { color: var(--accent); border-color: var(--accent); }
+.sched-editor-apply { border-color: transparent; background: var(--accent); color: #fff; }
+
+.sched-editor-progress { margin-top: 12px; }
+.sched-editor-progress-copy { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--muted); }
+.sched-editor-progress-copy strong { color: var(--text); }
+.sched-editor-progress-track {
+  height: 7px;
+  margin-top: 6px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.sched-editor-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.25s ease;
+}
+
+.sched-editor-hint { margin: -4px 0 10px; color: var(--muted); font-size: 12px; }
+.sched-editor-cell { cursor: pointer; overflow: hidden; }
+.sched-editor-cell.is-work { background: color-mix(in srgb, #4a86e8 18%, var(--surface)); }
+.sched-editor-cell.is-off { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); }
+.sched-editor-cell.is-work .sched-cell-letter { color: #4a86e8; }
+.sched-editor-cell.is-off .sched-cell-letter { color: var(--accent); }
+.sched-editor-cell.is-selected {
+  outline: 3px solid color-mix(in srgb, var(--accent) 78%, transparent);
+  outline-offset: -2px;
+}
+.sched-editor-cell:disabled { cursor: wait; opacity: 0.72; }
+.sched-editor-check {
+  position: absolute;
+  right: 4px;
+  bottom: 3px;
+  width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.sched-editor-template-head { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.sched-editor-template-head div { display: flex; flex-direction: column; gap: 2px; }
+.sched-editor-template-head span,
+.sched-editor-template-head small { color: var(--muted); font-size: 11px; }
+.sched-editor-template-head strong { font-size: 15px; }
+.sched-editor-template-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sched-editor-template-grid button { min-height: 42px; padding: 9px 10px; font-size: 12px; font-weight: 700; }
+.sched-editor-template-grid button.is-danger { color: var(--danger); }
+.sched-editor-template-grid button:disabled,
+.sched-editor-state-switch button:disabled,
+.sched-editor-bulk-toggle:disabled,
+.sched-editor-apply:disabled { cursor: not-allowed; opacity: 0.48; }
+
+@media (min-width: 560px) {
+  .sched-editor-state-row { flex-direction: row; align-items: center; justify-content: space-between; }
+  .sched-editor-state-switch { width: min(100%, 360px); }
+  .sched-editor-template-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-editor-state-switch button,
+  .sched-editor-bulk-toggle,
+  .sched-editor-apply,
+  .sched-editor-template-grid button,
+  .sched-editor-progress-track span { transition: none; }
+}
