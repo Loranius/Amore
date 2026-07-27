@@ -24,15 +24,34 @@ const COLUMNS = 'id,photo_url,storage_bucket,storage_path,memory_date,date_preci
 /** Зв'язки, згруповані по спогаду — щоб позначку джерела малювати без другого запиту. */
 export type MemoryLinksById = Record<number, MemorySource[]>;
 
+/**
+ * Спогад → джерело → id сутності. Окремо від `links`, бо позначку
+ * малюють десятки місць, а сам id потрібен рівно одному — переходу за
+ * позначкою. Зміна форми `links` зачепила б усі ті місця даремно.
+ */
+export type MemoryLinkIds = Record<number, Partial<Record<MemorySource, number>>>;
+
 export interface MemoriesArchive {
   photos: MemoryRow[];
   links: MemoryLinksById;
+  linkIds: MemoryLinkIds;
   days: Record<string, string>;
 }
 
 function groupLinks(rows: readonly MemoryLinkRow[]): MemoryLinksById {
   const out: MemoryLinksById = {};
   for (const row of rows) (out[row.memory_id] ??= []).push(row.source_type);
+  return out;
+}
+
+function groupLinkIds(rows: readonly MemoryLinkRow[]): MemoryLinkIds {
+  const out: MemoryLinkIds = {};
+  // Якщо фото прив'язане до двох сутностей одного типу, перемагає перша:
+  // позначка все одно одна, і вести їй треба кудись певно.
+  for (const row of rows) {
+    const entry = (out[row.memory_id] ??= {});
+    entry[row.source_type] ??= row.source_id;
+  }
   return out;
 }
 
@@ -61,9 +80,11 @@ export function useMemories() {
       for (const d of (days.data ?? []) as MemoryDayRow[]) {
         if (d.description) descriptions[d.memory_date] = d.description;
       }
+      const linkRows = (links.data ?? []) as MemoryLinkRow[];
       return {
         photos: (photos.data ?? []) as MemoryRow[],
-        links: groupLinks((links.data ?? []) as MemoryLinkRow[]),
+        links: groupLinks(linkRows),
+        linkIds: groupLinkIds(linkRows),
         days: descriptions,
       };
     },

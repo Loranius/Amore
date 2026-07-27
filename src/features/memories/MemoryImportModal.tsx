@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import { todayISO } from '@/lib/utils';
 import { formatMemoryDate, normalizeMemoryDate } from './memoriesDate';
-import { readExifTakenAt } from './exif';
+import { readExifTakenAt } from '@/lib/exif';
 import {
   groupFilesByDay, importSummary, isImportReady, mergeGroupsByDate,
   type ImportGroup, type ScannedFile,

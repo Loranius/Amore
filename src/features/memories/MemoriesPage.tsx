@@ -35,6 +35,7 @@ export function MemoriesPage() {
 
   const groups = useMemo(() => groupMemoriesByDate(data?.photos ?? []), [data?.photos]);
   const links = data?.links ?? {};
+  const linkIds = data?.linkIds ?? {};
   const days = data?.days ?? {};
 
   const dayGroup = openDate ? groups.find((g) => g.date === openDate) : undefined;
@@ -79,6 +80,7 @@ export function MemoriesPage() {
         <MemoryViewer
           photo={lightbox}
           sources={links[lightbox.id] ?? []}
+          sourceIds={linkIds[lightbox.id] ?? {}}
           busy={unlink.isPending || remove.isPending}
           onClose={() => setLightbox(null)}
           onUnlink={(source) => unlink.mutate({ memoryId: lightbox.id, source })}
@@ -167,6 +169,7 @@ export function MemoriesPage() {
         <MemoryViewer
           photo={lightbox}
           sources={links[lightbox.id] ?? []}
+          sourceIds={linkIds[lightbox.id] ?? {}}
           busy={unlink.isPending || remove.isPending}
           onClose={() => setLightbox(null)}
           onUnlink={(source) => unlink.mutate({ memoryId: lightbox.id, source })}

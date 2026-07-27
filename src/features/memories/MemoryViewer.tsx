@@ -16,6 +16,8 @@ import type { MemoryRow, MemorySource } from '@/types';
 interface MemoryViewerProps {
   photo: MemoryRow;
   sources: MemorySource[];
+  /** id сутності на тому кінці зв'язку — для переходу за позначкою. */
+  sourceIds: Partial<Record<MemorySource, number>>;
   busy: boolean;
   onClose: () => void;
   onUnlink: (source: MemorySource) => void;
@@ -23,7 +25,7 @@ interface MemoryViewerProps {
 }
 
 export function MemoryViewer({
-  photo, sources, busy, onClose, onUnlink, onDelete,
+  photo, sources, sourceIds, busy, onClose, onUnlink, onDelete,
 }: MemoryViewerProps) {
   const navigate = useNavigate();
   const usersMap = useUsersMap();
@@ -35,11 +37,12 @@ export function MemoryViewer({
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // Вішлист уміє відкриватись на конкретному бажанні; карта глибоких
-  // посилань не має, тож туди ведемо просто на екран.
-  const openSource = (source: MemorySource, id?: number) => {
+  // Обидва модулі вміють відкриватись на конкретній сутності, тож
+  // позначка веде до самого бажання чи самої мітки, а не просто на екран.
+  const openSource = (source: MemorySource) => {
+    const id = sourceIds[source];
     if (source === 'wish' && id) navigate(`/wishlist?archive=1&wish=${id}`);
-    else if (source === 'place') navigate('/map');
+    else if (source === 'place') navigate(id ? `/map?pin=${id}` : '/map');
   };
 
   const author = photo.uploaded_by ? usersMap[photo.uploaded_by] : null;

@@ -4,6 +4,8 @@
 import { useState } from 'react';
 import { todayISO } from '@/lib/utils';
 import { normalize } from '@/lib/images';
+import { exifDay, readExifTakenAt } from '@/lib/exif';
+import { formatDateUA } from '@/features/_shared/month';
 import { CATEGORIES, CATEGORY_ORDER } from './mapConstants';
 import { useToast } from '@/providers/ToastProvider';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
@@ -31,6 +33,8 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
   // «Спогадів» стане фото місця.
   const [visitedAt, setVisitedAt] = useState(todayISO());
   const [preview, setPreview] = useState<string | null>(null);
+  /** День зйомки з метаданих — пропозиція, а не мовчазна підстановка. */
+  const [shotOn, setShotOn] = useState<string | null>(null);
 
   const pickFile = async (f: File) => {
     let normalized = f;
@@ -42,6 +46,16 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
     }
     setFile(normalized);
     setPreview(URL.createObjectURL(normalized));
+
+    // Дату зйомки читаємо з ОРИГІНАЛУ: normalize перекодовує HEIC у JPEG
+    // і метадані при цьому не переживають перетворення. Перші 128 КБ —
+    // EXIF лежить на початку файлу.
+    try {
+      const day = exifDay(readExifTakenAt(await f.slice(0, 128 * 1024).arrayBuffer()));
+      setShotOn(day);
+    } catch {
+      setShotOn(null);
+    }
   };
 
   const save = () => {
@@ -106,6 +120,15 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
             onChange={(e) => setVisitedAt(e.target.value)}
           />
         </label>
+
+        {/* Пропозиція, а не автопідстановка: фото могло бути зняте не там
+            і не тоді, і мовчки посунути дату — це те саме, чого ми
+            уникаємо в масовому імпорті «Спогадів». */}
+        {shotOn && shotOn !== visitedAt && (
+          <button type="button" className="pin-exif-hint" onClick={() => setVisitedAt(shotOn)}>
+            Фото знято {formatDateUA(shotOn)} — поставити цю дату?
+          </button>
+        )}
 
         <label className="form-field">
           <span>Нотатка</span>

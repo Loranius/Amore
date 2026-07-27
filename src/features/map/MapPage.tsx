@@ -8,23 +8,22 @@
 //    завантаження, зміна фільтра, перехід за карткою. Раніше fitBounds
 //    висів на `visiblePins`, а будь-яка мутація робить invalidate — тож
 //    після кожного збереження оцінки карту відкидало на загальний план.
-// 2. Маркери оновлюються різницею (planMarkerSync), а не «знищити все й
-//    створити наново».
+// 2. Маркери оновлюються різницею (syncPinMarkers), а не «знищити все й
+//    створити наново». Злиплі мітки зводяться в скупчення, тож масштаб
+//    країни більше не показує пляму з двадцяти шести крапель.
 // 3. Нове місце ставиться ЯВНО — режимом прицілу. Раніше будь-який тап
 //    по карті відкривав модалку створення, і промах пальцем під час
 //    панорамування коштував модалки.
 // ============================================================
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MAPBOX_TOKEN, geocodePlaces } from '@/lib/mapbox';
 import { useUsers } from '@/features/_shared/useUsers';
-import {
-  CATEGORIES,
-  DEFAULT_CENTER,
-  USER_LOCATION_STYLES,
-} from './mapConstants';
-import { markerSignature, planMarkerSync } from './mapPinView';
+import { useTheme } from '@/providers/ThemeProvider';
+import { DEFAULT_CENTER, MAP_STYLE, USER_LOCATION_STYLES } from './mapConstants';
+import { syncPinMarkers, type MarkerStore } from './mapMarkers';
 import { useMapPins, useMapPinMutations, useCityBackfill } from './useMapPins';
 import { useUserLocations, useCheckin } from './useLocations';
 import { CatFilterBar, PinCards } from './MapPanels';
@@ -38,12 +37,17 @@ import type { MapPinRow, PinCategory, MapboxFeature } from '@/types';
 export function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const pinMarkers = useRef(new Map<number, { marker: mapboxgl.Marker; sig: string }>());
+  const pinMarkers = useRef<MarkerStore>(new Map());
   const locMarkers = useRef<mapboxgl.Marker[]>([]);
   /** Фільтр, під який камеру вже зводили. Стереже від повторних стрибків. */
   const fittedFor = useRef<string | null>(null);
 
-  const { data: pins = [] } = useMapPins();
+  const { theme } = useTheme();
+  // Тема на момент створення карти. Тримати її в deps ефекту ініціалізації
+  // не можна — перемикач теми перестворював би карту цілком.
+  const themeRef = useRef(theme);
+  const [params, setParams] = useSearchParams();
+  const { data: pins = [], isSuccess } = useMapPins();
   const { data: users = [] } = useUsers();
   const { data: locations = [] } = useUserLocations();
   const { add, update, remove } = useMapPinMutations();
@@ -56,8 +60,11 @@ export function MapPage() {
   const [geoResults, setGeoResults] = useState<MapboxFeature[]>([]);
   const [addAt, setAddAt] = useState<{ lat: number; lng: number; title?: string } | null>(null);
   const [placing, setPlacing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [focusedId, setFocusedId] = useState<number | null>(null);
+  /** Лічильник рухів карти: скупчення залежать від масштабу й рамки. */
+  const [viewTick, setViewTick] = useState(0);
 
   // Модалка тримає id, а не знімок рядка: маркер живе довше за одне
   // перемальовування, і колишній `setViewPin(pin)` показував би дані,
@@ -79,7 +86,7 @@ export function MapPage() {
     mapboxgl.accessToken = MAPBOX_TOKEN;
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: MAP_STYLE[themeRef.current],
       center: DEFAULT_CENTER,
       zoom: 5,
     });
@@ -89,6 +96,9 @@ export function MapPage() {
       showUserLocation: true,
     });
     map.addControl(geo, 'top-right');
+    // Скупчення рахуються в екранних пікселях, тож після кожного руху
+    // камери склад маркерів треба перерахувати заново.
+    map.on('moveend', () => setViewTick((t) => t + 1));
     mapRef.current = map;
 
     return () => {
@@ -98,43 +108,32 @@ export function MapPage() {
     };
   }, []);
 
-  // ── Синк маркерів пінів (різницею) ─────────────────────────
+  // ── Стиль під тему ─────────────────────────────────────────
+  // DOM-маркери переживають setStyle: вони живуть поверх полотна, а не
+  // в шарах стилю, тож перемальовувати їх тут не треба.
+  useEffect(() => {
+    mapRef.current?.setStyle(MAP_STYLE[theme]);
+  }, [theme]);
+
+  // Розгортання міняє розмір контейнера, а mapbox сам про це не дізнається.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
+    const t = setTimeout(() => map.resize(), 60);
+    return () => clearTimeout(t);
+  }, [expanded]);
 
-    const drawn = new Map([...pinMarkers.current].map(([id, m]) => [id, m.sig]));
-    const plan = planMarkerSync(drawn, visiblePins);
-    if (!plan.add.length && !plan.remove.length) return;
-
-    for (const id of plan.remove) {
-      pinMarkers.current.get(id)?.marker.remove();
-      pinMarkers.current.delete(id);
-    }
-
-    const byId = new Map(visiblePins.map((p) => [p.id, p]));
-    for (const id of plan.add) {
-      const pin = byId.get(id);
-      if (!pin) continue;
-      const cat = CATEGORIES[pin.category];
-      const elMarker = document.createElement('div');
-      elMarker.className = 'map-marker';
-      elMarker.style.background = cat.color;
-      // Емодзі в окремому елементі: сама крапля повернута на -45°, і без
-      // зворотного повороту всередині іконка стояла перекошеною.
-      const elIcon = document.createElement('span');
-      elIcon.className = 'map-marker-icon';
-      elIcon.textContent = cat.emoji;
-      elMarker.appendChild(elIcon);
-      elMarker.addEventListener('click', (e) => {
-        e.stopPropagation();
-        setFocusedId(pin.id);
-        setViewPinId(pin.id);
-      });
-      const marker = new mapboxgl.Marker(elMarker).setLngLat([pin.lng, pin.lat]).addTo(map);
-      pinMarkers.current.set(pin.id, { marker, sig: markerSignature(pin) });
-    }
-  }, [visiblePins]);
+  // ── Синк маркерів пінів ────────────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    syncPinMarkers({
+      map,
+      pins: visiblePins,
+      store: pinMarkers.current,
+      onOpenPin: (pin) => { setFocusedId(pin.id); setViewPinId(pin.id); },
+    });
+  }, [visiblePins, viewTick]);
 
   // ── Камера: лише перше зведення на кожен фільтр ────────────
   useEffect(() => {
@@ -172,6 +171,25 @@ export function MapPage() {
       locMarkers.current.push(marker);
     }
   }, [locations, users]);
+
+  // ── Глибоке посилання /map?pin=42 ──────────────────────────
+  // Звідси приходять зі «Спогадів»: у фото місця є позначка джерела, і
+  // вона мусить вести до самої мітки, а не просто на екран карти.
+  useEffect(() => {
+    const raw = params.get('pin');
+    if (!raw || !isSuccess) return;
+    const target = pins.find((p) => p.id === Number(raw));
+    if (target) {
+      setFocusedId(target.id);
+      setViewPinId(target.id);
+      mapRef.current?.flyTo({ center: [target.lng, target.lat], zoom: 15 });
+    }
+    // Прибираємо параметр у будь-якому разі: якщо мітку вже видалили,
+    // він інакше зависав би в адресі й спрацьовував на кожен рендер.
+    const next = new URLSearchParams(params);
+    next.delete('pin');
+    setParams(next, { replace: true });
+  }, [params, pins, isSuccess, setParams]);
 
   // ── Пошук місць (debounce) ─────────────────────────────────
   useEffect(() => {
@@ -233,8 +251,16 @@ export function MapPage() {
         )}
       </div>
 
-      <div className="map-stage">
+      <div className={`map-stage${expanded ? ' map-stage--full' : ''}`}>
         <div ref={containerRef} className="map-container" />
+        <button
+          type="button"
+          className="map-expand"
+          onClick={() => setExpanded((v) => !v)}
+          aria-label={expanded ? 'Згорнути карту' : 'Розгорнути карту'}
+        >
+          {expanded ? '✕' : '⤢'}
+        </button>
         {placing ? (
           <>
             <div className="map-crosshair" aria-hidden="true" />
