@@ -231,6 +231,42 @@ export interface PhotoCalendarRow {
   comment: string | null;
 }
 
+// ── «Спогади» — центральний фотоархів ────────────────────────
+/** Що саме відомо про дату спогаду. Див. features/memories/memoriesDate.ts. */
+export type MemoryPrecision = 'day' | 'month' | 'year' | 'approx';
+
+/** Модуль, який приніс фото в архів. Спогад без жодного зв'язку — доданий вручну. */
+export type MemorySource = 'wish' | 'place' | 'goal' | 'event';
+
+export interface MemoryRow {
+  id: number;
+  photo_url: string;
+  /** Заповнені лише для файлів, завантажених самим архівом; для чужих — null. */
+  storage_bucket: string | null;
+  storage_path: string | null;
+  /** Завжди початок періоду відповідно до date_precision. */
+  memory_date: string;
+  date_precision: MemoryPrecision;
+  /** Час зйомки з метаданих, якщо відомий. */
+  taken_at: string | null;
+  caption: string | null;
+  uploaded_by: number | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface MemoryLinkRow {
+  memory_id: number;
+  source_type: MemorySource;
+  source_id: number;
+}
+
+export interface MemoryDayRow {
+  memory_date: string;
+  description: string | null;
+  updated_by: number | null;
+}
+
 /** Єдиний рядок (id = 1) — ліміт «вільних» витрат + поточна пропозиція. */
 export interface FreeLimitRow {
   id: number;
@@ -361,6 +397,9 @@ export interface Database {
       user_sizes:         TableDef<UserSizesRow, 'user_id'>;
       work_schedule:      TableDef<WorkScheduleRow, 'date' | 'user_id' | 'mark'>;
       photo_calendar:     TableDef<PhotoCalendarRow, 'date' | 'user_id' | 'photo_url'>;
+      memories:           TableDef<MemoryRow, 'photo_url' | 'memory_date'>;
+      memory_days:        TableDef<MemoryDayRow, 'memory_date'>;
+      memory_links:       TableDef<MemoryLinkRow, 'memory_id' | 'source_type' | 'source_id'>;
       free_limit:         TableDef<FreeLimitRow, 'id'>;
       savings_goals:      TableDef<SavingsGoalRow, 'name'>;
       map_pins:           TableDef<MapPinRow, 'title' | 'category' | 'lat' | 'lng'>;
@@ -538,7 +577,8 @@ export type RealtimeTable =
   | 'events' | 'free_limit' | 'savings_goals' | 'dates'
   | 'media_items' | 'dishes' | 'wishlist_items'
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
-  | 'map_pins' | 'user_locations';
+  | 'map_pins' | 'user_locations'
+  | 'memories' | 'memory_links' | 'memory_days';
 
 export type RealtimeEventType = 'INSERT' | 'UPDATE' | 'DELETE';
 

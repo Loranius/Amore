@@ -51,7 +51,7 @@ import {
   useCreationSources,
 } from '../useCrystal';
 import { useCrystalSeed } from '../useHome';
-import { useMemories } from '../useMemories';
+import { useMemories } from '@/features/memories/useMemories';
 import { useClusterGrowthFlash } from '../useCrystalSeen';
 import { hashSeedString } from '../mulberry32';
 import { CrystalStats } from '../CrystalStats';
@@ -226,7 +226,7 @@ export default function CrystalScene() {
   const { milestones, isPending: milestonesPending } = useMilestoneEvents();
   const { countries, cities, isPending: placesPending } = useCrystalPlaces();
   const { wishes, isPending: wishesPending } = useCrystalWishes();
-  const { data: memories, isPending: memoriesPending } = useMemories();
+  const { data: archive, isPending: memoriesPending } = useMemories();
   const { achievedGoals, isPending: goalsPending } = useAchievedGoals();
   const { anniversaries, isPending: anniversariesPending } = useAnniversaryEvents();
   const { recipes, movies, books, isPending: creationPending } = useCreationSources();
@@ -264,11 +264,19 @@ export default function CrystalScene() {
 
   const seedNum = useMemo(() => hashSeedString(effectiveSeed), [effectiveSeed]);
   const artifactDNA = useMemo(() => generateArtifactDNA(effectiveSeed), [effectiveSeed]);
-  const memoriesCount = memories?.length ?? 0;
-  const memoryItems = useMemo(
-    () => (memories ?? []).map((m) => ({ id: m.id, date: m.date })),
-    [memories],
-  );
+  // ЛИШЕ вручну додані знімки архіву — ті, що не прийшли з іншого модуля.
+  // Архів тепер вбирає фото міток карти й виконаних бажань, а вони вже
+  // входять у кристал власними драйверами (places, wishes). Годувати їх
+  // сюди означало б порахувати одну подію двічі й роздути форму на
+  // порожньому місці. Спогад без зв'язків — найближчий відповідник того
+  // «фото дня», яким цей драйвер був до заміни моделі.
+  const memoryItems = useMemo(() => {
+    const links = archive?.links ?? {};
+    return (archive?.photos ?? [])
+      .filter((m) => (links[m.id] ?? []).length === 0)
+      .map((m) => ({ id: m.id, date: m.memory_date }));
+  }, [archive]);
+  const memoriesCount = memoryItems.length;
 
   const input: ArtifactInput = useMemo(
     () => ({

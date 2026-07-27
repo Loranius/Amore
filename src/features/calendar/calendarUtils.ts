@@ -18,10 +18,13 @@ import type {
   PlanStatus,
 } from '@/types';
 
-export const MONTHS = [
-  'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
-  'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня',
-] as const;
+// Список місяців живе у _shared/month.ts — календар мав власну копію,
+// поки «Спогадам» не знадобився той самий. Псевдонім лишається, щоб
+// наявні імпорти MONTHS не мінялись. Імпорт саме локальний, а не
+// `export … from`: реекспорт не вводить імені в область файлу, і
+// formatUaDate нижче його не побачив би.
+import { MONTHS_UA_GENITIVE as MONTHS } from '@/features/_shared/month';
+export { MONTHS };
 
 export const TYPES: Record<EventType, { icon: string; label: string; color: string }> = {
   birthday: { icon: '🎂', label: 'День народження', color: '#FF6B9D' },

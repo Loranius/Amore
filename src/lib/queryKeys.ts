@@ -37,6 +37,12 @@ export const qk = {
   photoCalendarAll: () => ['photoCalendar', 'all'] as const,
   photos: () => ['photos'] as const,
 
+  // «Спогади». Стрічка гортає всю хронологію одним запитом, місяць —
+  // окремим: календарю не потрібні тисячі рядків, щоб намалювати сітку.
+  memories: () => ['memories'] as const,
+  memoriesMonth: (month: string) => ['memories', 'month', month] as const,
+  memoriesDay: (date: string) => ['memories', 'day', date] as const,
+
   freeLimit: () => ['freeLimit'] as const,
   savingsGoals: () => ['savingsGoals'] as const,
   savingsGoalContributions: (goalId?: string) =>
@@ -71,6 +77,9 @@ export const realtimeInvalidation: Record<
   wishlist_items: [['wishlist']],
   shopping_items: [qk.shopping()],
   photo_calendar: [['photoCalendar']],
+  memories: [['memories']],
+  memory_links: [['memories']],
+  memory_days: [['memories']],
   work_schedule: [['schedule'], qk.sharedDaysOff()],
   map_pins: [qk.mapPins()],
   user_locations: [qk.userLocations()],

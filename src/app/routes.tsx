@@ -19,7 +19,7 @@ import { ShoppingPage } from '@/features/shopping/ShoppingPage';
 import { WishlistPage } from '@/features/wishlist/WishlistPage';
 import { CalendarPage } from '@/features/calendar/CalendarPage';
 import { SchedulePage } from '@/features/schedule/SchedulePage';
-import { PhotoCalendarPage } from '@/features/photo-calendar/PhotoCalendarPage';
+import { MemoriesPage } from '@/features/memories/MemoriesPage';
 import { MediaPage } from '@/features/media/MediaPage';
 import { CulinaryPage } from '@/features/culinary/CulinaryPage';
 import { HomePage } from '@/features/home/HomePage';
@@ -49,17 +49,20 @@ export const router = createHashRouter([
           { path: 'budget', element: <BudgetPage /> },
           { path: 'shopping', element: <ShoppingPage /> },
 
-          // Хаб «Календар»: /calendar (Події) · /schedule · /photos
+          // Хаб «Календар»: /calendar (Події) · /schedule
           {
             path: 'calendar',
             element: <CalendarHub />,
             children: [
               { index: true, element: <CalendarPage /> },
               { path: 'schedule', element: <SchedulePage /> },
-              { path: 'photos', element: <PhotoCalendarPage /> },
+              // «Фото» став окремим розділом /memories. Редирект лишається,
+              // щоб збережені посилання й закладки не ламались.
+              { path: 'photos', element: <Navigate to="/memories" replace /> },
             ],
           },
 
+          { path: 'memories', element: <MemoriesPage /> },
           { path: 'media', element: <MediaPage /> },
           { path: 'whereto', element: <WhereToPage /> },
           { path: 'map', element: <MapPage /> },
