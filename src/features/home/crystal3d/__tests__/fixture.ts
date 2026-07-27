@@ -38,11 +38,12 @@ function isoDaysAgo(days: number): string {
 /** Обсяг прожитого — щоб тести могли питати «а для пари з трьома подіями?».
  *  Кристал мусить лишатись кристалом на всьому діапазоні, інакше правила
  *  виду підігнані під один набір даних. */
-export type DataVolume = 'sparse' | 'typical' | 'rich';
+export type DataVolume = 'sparse' | 'typical' | 'rich' | 'backfilled';
 
 export function makeInput(seed: string, volume: DataVolume = 'typical'): ArtifactInput {
   if (volume === 'sparse') return sparseInput(seed);
   if (volume === 'rich') return richInput(seed);
+  if (volume === 'backfilled') return backfilledInput(seed);
   const memories = [480, 410, 350, 290, 220, 160, 45].map((age, i) => ({ id: i + 1, date: isoDaysAgo(age) }));
   return {
     seedNum: hashSeedString(seed),
@@ -129,6 +130,53 @@ function sparseInput(seed: string): ArtifactInput {
     memoriesCount: 1,
     memories: [{ id: 1, date: isoDaysAgo(60) }],
     photos: [1, 2, 3].map((id, i) => ({ id, date: isoDaysAgo(140 - i * 50) })),
+  };
+}
+
+/**
+ * НАЙВАЖЛИВІША форма даних, якої тут бракувало: стосункам роки, а всі
+ * записи внесені за останній місяць. Саме так виглядає реальна пара, яка
+ * щойно почала користуватись застосунком — і саме на ній кристал ламався.
+ *
+ * Числа зняті з бази власника (2026-07-26): 1308 днів разом, уся історія
+ * створена 16.06–26.07. Наслідок був структурний: король росте від ВІКУ
+ * СТОСУНКІВ (2.4 завдовжки), а кожне дата-тіло — від власного, свіжого
+ * запису, тож 14 із 48 тіл після зрізу виявлялись порожні, а половина
+ * видимих була коротша за радіус короля. На екрані — моноліт і крихти.
+ */
+function backfilledInput(seed: string): ArtifactInput {
+  const spread = (count: number, from: number, to: number) =>
+    Array.from({ length: count }, (_, i) => from - Math.round(((from - to) * i) / Math.max(1, count - 1)));
+  return {
+    seedNum: hashSeedString(seed),
+    dna: generateArtifactDNA(seed),
+    usage: {
+      daysTogether: 1308,
+      photos: 50,
+      places: 26,
+      moviesWatched: 112,
+      booksRead: 0,
+      wishesDone: 3,
+      goalsAchieved: 0,
+      anniversaries: 4,
+      recipesSaved: 3,
+      distinctCountries: 1,
+      milestones: 1,
+      totalSaved: 0,
+    },
+    countries: [{ name: 'Ukraine', firstVisit: isoDaysAgo(39) }],
+    cities: spread(26, 39, 4).map((age, i) => ({ name: `City ${i}`, firstVisit: isoDaysAgo(age) })),
+    milestones: [{ id: 1, title: 'Віха', date: isoDaysAgo(13) }],
+    wishes: spread(3, 21, 2).map((age, i) => ({ id: 200 + i, fulfilledAt: isoDaysAgo(age) })),
+    achievedGoals: [],
+    // Річниці — єдине, що справді старе: вони рахуються від дат стосунків.
+    anniversaries: [1526, 1391, 1308, 13].map((age, i) => ({ id: 400 + i, date: isoDaysAgo(age) })),
+    recipes: spread(3, 6, 4).map((age, i) => ({ id: 500 + i, date: isoDaysAgo(age) })),
+    movies: spread(112, 40, 8).map((age, i) => ({ id: 600 + i, date: isoDaysAgo(age) })),
+    books: [],
+    memoriesCount: 23,
+    memories: spread(23, 36, 6).map((age, i) => ({ id: 800 + i, date: isoDaysAgo(age) })),
+    photos: spread(50, 39, 1).map((age, i) => ({ id: 900 + i, date: isoDaysAgo(age) })),
   };
 }
 

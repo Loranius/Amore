@@ -104,6 +104,24 @@ import type { GrowthState } from './growthTypes';
  *  Це МЕХАНІКА рушія, не біологія виду — тому лишається тут. */
 const SITE_CANDIDATES = 12;
 
+/** На скільки РЕНДЕРНА довжина тіла мусить перевищити радіус господаря в
+ *  точці кріплення, щоб тіло справді показалось назовні, а не потонуло в
+ *  ньому. Див. `escapeHostPass`. */
+const ESCAPE_MARGIN = 1.3;
+
+/** Орієнтир, до якого підтягуються надто дрібні дата-тіла — частка
+ *  довжини короля. Не жорсткий мінімум: див. SHORT_BODY_LIFT. */
+const MIN_CHILD_OF_KING = 0.22;
+
+/** Наскільки близько до орієнтира підтягується НАЙдрібніше тіло (решта —
+ *  пропорційно ближче). Заміряно на 4 сідах × 3 обсягах + реальних даних:
+ *  при 1.0 (жорсткий поріг) медіана сідає рівно на орієнтир — друза стає
+ *  «король плюс N однакових дітей»; при 0.62 повертається половина
+ *  невидимих тіл. 0.8 — точка, де видимість майже як у жорсткого порога
+ *  (крихт 3 замість 17), а медіана лишається нижчою за орієнтир
+ *  (0.203–0.210 проти 0.22), тобто розмір і далі щось означає. */
+const SHORT_BODY_LIFT = 0.8;
+
 /** Ключ віртуального ядра-нуклеуса. Воно НІКОЛИ не публікується, тож тіла,
  *  що сидять на ньому, вважаються кореневими (hostKey === null). */
 export const NUCLEUS_KEY = '__nucleus';
@@ -161,6 +179,77 @@ export function makeNucleus(seedNum: number): DepositedCrystal {
     breatheSpeed: 0,
     spin: 0,
   };
+}
+
+/**
+ * Прохід «дитина мусить вилізти з господаря» — ПІСЛЯ композиції.
+ *
+ * ЧОМУ ПІСЛЯ. Відкладення рахує розміри по геометрії, якої на екрані вже
+ * немає: композиція (Volume IV) потім змінює тіла — архетип `massive`
+ * множить радіус короля на 1.35, старіння додає ще 15%, Geological Mass
+ * підбирає решту. Тобто тіло, яке при відкладенні вилазило з господаря,
+ * після композиції може опинитись цілком усередині нього. Зріз Volume V
+ * прибере його як невидиме — і подія пари мовчки зникне з кристала.
+ *
+ * Це не гіпотеза, а замір на РЕАЛЬНИХ даних власника (1308 днів разом, уся
+ * історія внесена за 40 днів): 48 відкладених тіл → 14 порожніх після
+ * зрізу (29%), і ще 17 із 34 видимих коротші за радіус короля, тобто
+ * читаються як крихти. На екрані лишався моноліт і жменька уламків.
+ *
+ * Що робить прохід: подовжує дитину рівно настільки, щоб її РЕНДЕРНА
+ * довжина перевищила фінальний радіус господаря в точці кріплення. Нічого
+ * не рухає (Phase 7 показала рендером, що розштовхування псує картину) і
+ * нікого не потовщує — лише дає довжину, якої бракує, щоб подія була
+ * видима.
+ *
+ * Межі, які прохід НЕ порушує:
+ *  • король не чіпається взагалі;
+ *  • дитина не переростає стелю ієрархії (`monarch.heightCeiling`), тож
+ *    друза не перетворюється на «качан кукурудзи»;
+ *  • тіло, якому стеля не дає вилізти, лишається як було — його й далі
+ *    відсіє `isFullyBuried`, і це чесніше, ніж огризок назовні.
+ */
+function escapeHostPass(
+  bodies: readonly DepositedCrystal[],
+  ceiling: number,
+): DepositedCrystal[] {
+  const byKey = new Map(bodies.map((b) => [b.key, b]));
+  const monarch = bodies.find((b) => b.primary);
+  const maxLength = monarch ? monarch.length * ceiling : Infinity;
+
+  return bodies.map((body) => {
+    // ЛИШЕ домінанти. Супутники колонії й мікрошар — навмисно дрібні:
+    // вони декорують свого батька, а не представляють окрему подію. Перша
+    // версія проходу підтягувала й їх, і тести одразу впіймали наслідок:
+    // супутник ставав довшим за власного батька (0.393 проти 0.132), а
+    // «пил» переставав бути пилом. Це той рівень, який не має бути видимим
+    // окремо, тож він лишається як був.
+    if (body.role !== 'dominant' || body.primary) return body;
+    const hostKey = body.attachment?.hostKey ?? null;
+    if (hostKey === null) return body;
+    const host = byKey.get(hostKey);
+    if (host === undefined) return body;
+
+    const hostRendered = host.radius * MATURITY_RADIUS_SCALE(host.maturity);
+    const hostRadiusHere = radiusAtT(hostRendered, body.attachment?.hostT ?? 0);
+    const rendered = body.length * MATURITY_HEIGHT_SCALE(body.maturity);
+    const needed = Math.max(
+      hostRadiusHere * ESCAPE_MARGIN,
+      (monarch?.length ?? 0) * MIN_CHILD_OF_KING,
+    );
+    if (rendered >= needed) return body;
+
+    // М'ЯКО, а не клампом. Жорсткий поріг збирав більшість тіл рівно на
+    // ньому: медіана дорівнювала мінімуму (0.220 від короля на 7 із 12
+    // заміряних випадків), і друза втрачала розмаїття розмірів — король
+    // плюс N однакових дітей. Тому короткі тіла ПІДТЯГУЮТЬСЯ до порога
+    // пропорційно тому, які вони були: порядок і різниця між ними
+    // зберігаються, зникає лише невидимість.
+    const ratio = rendered / needed;
+    const lifted = needed * (SHORT_BODY_LIFT + (1 - SHORT_BODY_LIFT) * ratio);
+    const grown = Math.min(lifted / MATURITY_HEIGHT_SCALE(body.maturity), maxLength);
+    return grown > body.length ? { ...body, length: grown } : body;
+  });
 }
 
 /** Ключ основи-матриці — породи, з якої росте друза. */
@@ -505,14 +594,15 @@ function depositMineral(
   // Правдоподібні кварцові пропорції (референс): довге тіло не буває
   // голкою-волосиною — стрункість обмежена, король особливо кремезний.
   if (length > 0.6) radius = Math.max(radius, length / (isMonarch ? c.monarchSlenderness : c.slenderness));
+
+  const maturity = maturityCurve(event.ageDays, event.maturityHalfLife);
+
   // Ієрархія: ніхто не переростає монарха (той відкладається найпершим).
   if (!isMonarch && monarch.length !== null) length = Math.min(length, monarch.length * c.monarch.heightCeiling);
 
   // Успадкування напрямку (3 draw); монарх — ідеально вертикальний стрижень.
   let direction = inheritDirection(probe.normal, host.direction, probe.point, rng, c);
   if (isMonarch) direction = normalize(add(scale(direction, 0.06), scale(v3(0, 1, 0), 0.94)));
-
-  const maturity = maturityCurve(event.ageDays, event.maturityHalfLife);
   const { anchor, renderedAnchor } = buriedAnchors(hostBody, chosen.t, chosen.angle, radius, maturity, c.burial);
 
   // `CAI-REQ-004`: host більше НЕ викидається — кріплення стає фактом стану.
@@ -736,7 +826,13 @@ export function runGrowth(input: ArtifactInput): GrowthState {
   const { score, passes } = composition;
   // Основа-матриця додається ПІСЛЯ композиції: її розмір виводиться з
   // фінальних позицій, і вона стає господарем для кореневих тіл.
-  const crystals = attachMatrix(composition.crystals, input.seedNum);
+  // Дитина мусить бути видима після композиції, а не лише в момент
+  // відкладення — інакше подія пари тихо зникає (див. escapeHostPass).
+  const escaped = escapeHostPass(
+    composition.crystals,
+    crystalSpecies.constrain().monarch.heightCeiling,
+  );
+  const crystals = attachMatrix(escaped, input.seedNum);
   // Volume IV публікує канонічні кріплення вже з ФІНАЛЬНОЇ геометрії
   // (`CAI-REQ-004`) — Geometry Engine споживатиме саме їх.
   const junctions = buildJunctions(
