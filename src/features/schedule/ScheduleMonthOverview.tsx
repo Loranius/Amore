@@ -1,4 +1,4 @@
-import { DAYS_UA, MONTHS_UA, daysInMonth, firstMondayOffset, stepMonth, ymd } from '@/features/_shared/month';
+import { DAYS_UA, daysInMonth, firstMondayOffset, ymd } from '@/features/_shared/month';
 import type { DateRow } from '@/types';
 import type { DayStatus } from './scheduleViewModel';
 import { fmtLongDate, statusText } from './scheduleViewModel';
@@ -11,7 +11,6 @@ export function ScheduleMonthOverview({
   statusCounts,
   statusOf,
   plansByDate,
-  onMonthChange,
   onSelectDate,
 }: {
   yr: number;
@@ -21,7 +20,6 @@ export function ScheduleMonthOverview({
   statusCounts: { both: number; lena: number; dima: number };
   statusOf: Map<string, DayStatus>;
   plansByDate: Map<string, DateRow[]>;
-  onMonthChange: (next: { yr: number; mo: number }) => void;
   onSelectDate: (date: string) => void;
 }) {
   const total = daysInMonth(yr, mo);
@@ -29,12 +27,6 @@ export function ScheduleMonthOverview({
 
   return (
     <>
-      <div className="sched-nav">
-        <button type="button" className="sched-nav-btn" onClick={() => onMonthChange(stepMonth(yr, mo, -1))} aria-label="Попередній місяць">‹</button>
-        <span className="sched-month-label">{MONTHS_UA[mo - 1]} {yr}</span>
-        <button type="button" className="sched-nav-btn" onClick={() => onMonthChange(stepMonth(yr, mo, 1))} aria-label="Наступний місяць">›</button>
-      </div>
-
       {usersCount >= 2 && (
         <div className="sched-stats" aria-label="Статистика вихідних цього місяця">
           <div className="sched-stat sched-stat--shared"><strong>{statusCounts.both}</strong><span>спільні</span></div>
