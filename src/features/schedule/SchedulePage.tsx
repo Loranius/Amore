@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useUsers } from '@/features/_shared/useUsers';
-import { currentYearMonth, daysInMonth, todayLocal, ymd } from '@/features/_shared/month';
+import { currentYearMonth, daysInMonth, monthKeyOf, todayLocal, ymd } from '@/features/_shared/month';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useSchedule } from './useSchedule';
+import { useScheduleReminder } from './useScheduleReminder';
 import { useDateMutations, useDatePlans, useSharedDaysOff } from './useDates';
 import { PlanDateModal } from './PlanDateModal';
 import { ScheduleEditor } from './ScheduleEditor';
@@ -17,26 +19,47 @@ import type { DateRow } from '@/types';
 import './schedule.css';
 import './scheduleCompleteness.css';
 
+function initialYearMonth(params: URLSearchParams): { yr: number; mo: number } {
+  const value = params.get('month');
+  if (value && /^\d{4}-(0[1-9]|1[0-2])$/.test(value)) {
+    return { yr: Number(value.slice(0, 4)), mo: Number(value.slice(5, 7)) };
+  }
+  return currentYearMonth();
+}
+
 export function SchedulePage() {
+  const [searchParams] = useSearchParams();
   const { data: users = [] } = useUsers();
   const me = useCurrentUser();
-  const [{ yr, mo }, setYm] = useState(currentYearMonth);
-  const [editMode, setEditMode] = useState(false);
+  const [{ yr, mo }, setYm] = useState(() => initialYearMonth(searchParams));
+  const [editMode, setEditMode] = useState(() => searchParams.get('edit') === '1');
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [hasPendingBulkSelection, setHasPendingBulkSelection] = useState(false);
   const [planModalOpen, setPlanModalOpen] = useState(false);
   const [initialPlanDate, setInitialPlanDate] = useState<string | undefined>();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [remindedKeys, setRemindedKeys] = useState<Set<string>>(() => new Set());
 
   const { data: marks = {} } = useSchedule(yr, mo);
   const { data: sharedDates = [] } = useSharedDaysOff();
   const { data: datePlans = [] } = useDatePlans();
   const dateMutations = useDateMutations();
+  const scheduleReminder = useScheduleReminder();
   const total = daysInMonth(yr, mo);
   const today = todayLocal();
+  const month = monthKeyOf(yr, mo);
+  const currentMonth = currentYearMonth();
+  const canRemindForMonth = month >= monthKeyOf(currentMonth.yr, currentMonth.mo);
+  const currentUser = users.find((user) => user.name === me.name);
   const lena = users.find((user) => user.name === 'Лєна');
   const dima = users.find((user) => user.name === 'Діма');
-  const activeEditUser = users.find((user) => user.id === editUserId) ?? users.find((user) => user.name === me.name) ?? users[0];
+  const activeEditUser = users.find((user) => user.id === editUserId) ?? currentUser ?? users[0];
+  const remindedUserIds = new Set(
+    users.filter((user) => remindedKeys.has(`${month}:${user.id}`)).map((user) => user.id),
+  );
+  const remindingUserId = scheduleReminder.isPending
+    ? scheduleReminder.variables?.recipientId ?? null
+    : null;
 
   const statusOf = useMemo(() => {
     const map = new Map<string, DayStatus>();
@@ -78,7 +101,7 @@ export function SchedulePage() {
 
   const toggleEditMode = () => {
     if (editMode && !canDiscardPendingSelection()) return;
-    if (!editMode && editUserId === null) setEditUserId(users.find((user) => user.name === me.name)?.id ?? users[0]?.id ?? null);
+    if (!editMode && editUserId === null) setEditUserId(currentUser?.id ?? users[0]?.id ?? null);
     setHasPendingBulkSelection(false);
     setEditMode((current) => !current);
     setSelectedDate(null);
@@ -104,6 +127,20 @@ export function SchedulePage() {
     setEditUserId(userId);
     setEditMode(true);
     setSelectedDate(null);
+  };
+
+  const remindUser = (userId: number) => {
+    if (!canRemindForMonth || userId === currentUser?.id) return;
+    const key = `${month}:${userId}`;
+    scheduleReminder.mutate(
+      { recipientId: userId, month },
+      {
+        onSuccess: (result) => {
+          if (result === 'already_complete') return;
+          setRemindedKeys((current) => new Set(current).add(key));
+        },
+      },
+    );
   };
 
   const openPlanModal = (date?: string) => {
@@ -132,7 +169,17 @@ export function SchedulePage() {
       </section>
 
       <ScheduleMonthNav yr={yr} mo={mo} onChange={changeMonth} />
-      <ScheduleCompletionStatus users={users} marks={marks} total={total} onEditUser={openEditorForUser} />
+      <ScheduleCompletionStatus
+        users={users}
+        marks={marks}
+        total={total}
+        currentUserId={currentUser?.id ?? null}
+        canRemind={canRemindForMonth}
+        remindingUserId={remindingUserId}
+        remindedUserIds={remindedUserIds}
+        onEditUser={openEditorForUser}
+        onRemindUser={remindUser}
+      />
 
       {editMode ? (
         <div className="sched-edit-panel">
