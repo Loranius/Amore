@@ -1,12 +1,8 @@
 // ============================================================
-// SchedulePage — «Графік» (порт schedule.js UI)
+// SchedulePage — «Графік»
 // ------------------------------------------------------------
-// За замовчуванням (перегляд) — ОДИН спільний графік: клітинка дня
-// пофарбована за тим, хто вільний («Х») — обоє (темно-рожевий),
-// лише Лєна, лише Діма; де обоє працюють — колір не міняється.
-// У режимі редагування — окремі дошки на кожного (тап циклічно
-// міняє позначку саме тій людині; спільний вигляд для цього не
-// підходить — треба однозначно знати, чию мітку міняєш).
+// Спільний огляд зайнятості пари, найближчі спільні вихідні,
+// побачення та окремий режим редагування графіка кожного партнера.
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
@@ -26,6 +22,7 @@ import { useSharedDaysOff, useDatePlans, useDateMutations } from './useDates';
 import { PlanDateModal } from './PlanDateModal';
 import { ProposalCard } from '@/components/ui/ProposalCard';
 import type { AppUser, DateRow } from '@/types';
+import './schedule.css';
 
 type DayStatus = 'both-off' | 'lena-off' | 'dima-off' | 'none';
 
@@ -38,12 +35,39 @@ function dayStatus(lena: AppUser | undefined, dima: AppUser | undefined, marks: 
   return 'none';
 }
 
+function fmtLongDate(d: string): string {
+  return new Date(`${d}T12:00:00`).toLocaleDateString('uk-UA', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+}
+
+function countdownLabel(date: string, today: string): string {
+  const target = new Date(`${date}T12:00:00`).getTime();
+  const current = new Date(`${today}T12:00:00`).getTime();
+  const days = Math.max(0, Math.round((target - current) / 86_400_000));
+  if (days === 0) return 'Сьогодні';
+  if (days === 1) return 'Завтра';
+  return `Через ${days} дн.`;
+}
+
+function statusText(status: DayStatus): string {
+  if (status === 'both-off') return 'Ви обоє вільні';
+  if (status === 'lena-off') return 'Лєна вільна, Діма працює';
+  if (status === 'dima-off') return 'Діма вільний, Лєна працює';
+  return 'Спільного вихідного немає';
+}
+
 export function SchedulePage() {
   const { data: users = [] } = useUsers();
   const me = useCurrentUser();
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
   const [editMode, setEditMode] = useState(false);
+  const [editUserId, setEditUserId] = useState<number | null>(null);
   const [planModalOpen, setPlanModalOpen] = useState(false);
+  const [initialPlanDate, setInitialPlanDate] = useState<string | undefined>();
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const { data: marks = {} } = useSchedule(yr, mo);
   const mutation = useScheduleMutation(yr, mo);
@@ -58,6 +82,8 @@ export function SchedulePage() {
 
   const lena = users.find((u) => u.name === 'Лєна');
   const dima = users.find((u) => u.name === 'Діма');
+  const activeEditUser =
+    users.find((u) => u.id === editUserId) ?? users.find((u) => u.name === me.name) ?? users[0];
 
   const statusOf = useMemo(() => {
     const map = new Map<string, DayStatus>();
@@ -68,19 +94,93 @@ export function SchedulePage() {
     return map;
   }, [lena, dima, marks, yr, mo, total]);
 
-  const bothOffCount = useMemo(() => {
-    let n = 0;
-    for (const s of statusOf.values()) if (s === 'both-off') n++;
-    return n;
+  const statusCounts = useMemo(() => {
+    const counts = { both: 0, lena: 0, dima: 0 };
+    for (const status of statusOf.values()) {
+      if (status === 'both-off') counts.both++;
+      if (status === 'lena-off' || status === 'both-off') counts.lena++;
+      if (status === 'dima-off' || status === 'both-off') counts.dima++;
+    }
+    return counts;
   }, [statusOf]);
+
+  const plansByDate = useMemo(() => {
+    const map = new Map<string, DateRow[]>();
+    for (const plan of datePlans) {
+      const list = map.get(plan.date) ?? [];
+      list.push(plan);
+      map.set(plan.date, list);
+    }
+    return map;
+  }, [datePlans]);
+
+  const nextSharedDate = sharedDates[0];
+  const selectedStatus = selectedDate
+    ? sharedDates.includes(selectedDate)
+      ? 'both-off'
+      : statusOf.get(selectedDate) ?? 'none'
+    : 'none';
+  const selectedPlans = selectedDate ? plansByDate.get(selectedDate) ?? [] : [];
 
   const onCell = (userId: number, date: string, current: string) => {
     if (!editMode || mutation.isPending) return;
     mutation.mutate({ userId, date, mark: MARK_CYCLE[current] ?? 'Р' });
   };
 
+  const toggleEditMode = () => {
+    if (!editMode && editUserId === null) {
+      setEditUserId(users.find((u) => u.name === me.name)?.id ?? users[0]?.id ?? null);
+    }
+    setEditMode((value) => !value);
+    setSelectedDate(null);
+  };
+
+  const openPlanModal = (date?: string) => {
+    setInitialPlanDate(date);
+    setSelectedDate(null);
+    setPlanModalOpen(true);
+  };
+
   return (
     <section className="sched">
+      <header className="sched-hero">
+        <div>
+          <span className="sched-kicker">Календар пари</span>
+          <h1 className="sched-title">Графік</h1>
+          <p className="sched-subtitle">Побачте, коли ви обоє вільні, та заплануйте час разом.</p>
+        </div>
+        <button
+          type="button"
+          className={`sched-edit-toggle${editMode ? ' is-active' : ''}`}
+          onClick={toggleEditMode}
+        >
+          {editMode ? 'Завершити' : 'Редагувати'}
+        </button>
+      </header>
+
+      {nextSharedDate ? (
+        <section className="sched-next-card" aria-label="Наступний спільний вихідний">
+          <div className="sched-next-icon" aria-hidden="true">♥</div>
+          <div className="sched-next-copy">
+            <span>Наступний спільний вихідний</span>
+            <strong>{fmtLongDate(nextSharedDate)}</strong>
+            <small>{countdownLabel(nextSharedDate, today)}</small>
+          </div>
+          <button type="button" className="sched-next-action" onClick={() => openPlanModal(nextSharedDate)}>
+            Запланувати
+          </button>
+        </section>
+      ) : (
+        <section className="sched-next-card sched-next-card--empty">
+          <div className="sched-next-icon" aria-hidden="true">♡</div>
+          <div className="sched-next-copy">
+            <span>Спільний вихідний ще не знайдено</span>
+            <strong>Заповніть графік на найближчі дні</strong>
+            <small>Ми автоматично покажемо першу вільну дату.</small>
+          </div>
+        </section>
+      )}
+
       <div className="sched-nav">
         <button
           type="button"
@@ -103,32 +203,43 @@ export function SchedulePage() {
         </button>
       </div>
 
-      {users.length >= 2 && bothOffCount > 0 && (
-        <p className="heat-summary">
-          💗 {bothOffCount} {bothOffCount === 1 ? 'спільний вихідний' : 'спільних вихідних'} цього місяця
-        </p>
+      {users.length >= 2 && (
+        <div className="sched-stats" aria-label="Статистика вихідних цього місяця">
+          <div className="sched-stat sched-stat--shared">
+            <strong>{statusCounts.both}</strong>
+            <span>спільні</span>
+          </div>
+          <div className="sched-stat">
+            <strong>{statusCounts.dima}</strong>
+            <span>Діма вільний</span>
+          </div>
+          <div className="sched-stat">
+            <strong>{statusCounts.lena}</strong>
+            <span>Лєна вільна</span>
+          </div>
+        </div>
       )}
-
-      {sharedDates.length > 0 && (
-        <button type="button" className="btn date-plan-cta" onClick={() => setPlanModalOpen(true)}>
-          💗 Запланувати побачення
-        </button>
-      )}
-
-      <button
-        type="button"
-        className={`sched-edit-toggle${editMode ? ' is-active' : ''}`}
-        onClick={() => setEditMode((v) => !v)}
-      >
-        {editMode ? '✅ Завершити редагування' : '✏️ Редагувати графік'}
-      </button>
 
       {editMode ? (
-        <div className="sched-boards sched-boards--editing">
-          {users.map((u) => (
+        <div className="sched-edit-panel">
+          <div className="sched-person-switcher" role="tablist" aria-label="Чий графік редагувати">
+            {users.map((user) => (
+              <button
+                key={user.id}
+                type="button"
+                role="tab"
+                aria-selected={activeEditUser?.id === user.id}
+                className={activeEditUser?.id === user.id ? 'is-active' : ''}
+                onClick={() => setEditUserId(user.id)}
+              >
+                {user.name}
+              </button>
+            ))}
+          </div>
+          <p className="sched-edit-hint">Торкайся дня: порожньо → робота → вихідний.</p>
+          {activeEditUser && (
             <Board
-              key={u.id}
-              user={u}
+              user={activeEditUser}
               yr={yr}
               mo={mo}
               marks={marks}
@@ -136,10 +247,10 @@ export function SchedulePage() {
               statusOf={statusOf}
               onCell={onCell}
             />
-          ))}
+          )}
         </div>
       ) : (
-        <div className="card sched-board">
+        <div className="card sched-board sched-board--overview">
           <div className="sched-grid">
             {DAYS_UA.map((d) => (
               <div key={d} className="pcal-dow">
@@ -154,22 +265,31 @@ export function SchedulePage() {
               const ds = ymd(yr, mo, day);
               const isToday = ds === today;
               const status = statusOf.get(ds) ?? 'none';
+              const dayPlans = plansByDate.get(ds) ?? [];
+              const hasConfirmedPlan = dayPlans.some((plan) => plan.status === 'confirmed');
               return (
-                <div
+                <button
                   key={ds}
+                  type="button"
                   className={
-                    'sched-cell' +
+                    'sched-cell sched-cell--interactive' +
                     ` sched-cell--${status}` +
                     (isToday ? ' sched-cell--today' : '')
                   }
+                  onClick={() => setSelectedDate(ds)}
+                  aria-label={`${fmtLongDate(ds)}. ${statusText(status)}${dayPlans.length ? '. Є заплановане побачення' : ''}`}
                 >
-                  <span className="sched-cell-num">
-                    {day}
-                    {status === 'both-off' && <span className="sched-cell-heart">♥</span>}
-                    {status === 'lena-off' && <span className="sched-cell-who">Л</span>}
-                    {status === 'dima-off' && <span className="sched-cell-who">Д</span>}
+                  <span className="sched-cell-num">{day}</span>
+                  <span className="sched-cell-symbol" aria-hidden="true">
+                    {status === 'both-off' ? '♥' : status === 'lena-off' ? 'Л' : status === 'dima-off' ? 'Д' : ''}
                   </span>
-                </div>
+                  {dayPlans.length > 0 && (
+                    <span
+                      className={`sched-cell-plan-dot${hasConfirmedPlan ? ' is-confirmed' : ''}`}
+                      title={hasConfirmedPlan ? 'Підтверджене побачення' : 'Запропоноване побачення'}
+                    />
+                  )}
+                </button>
               );
             })}
           </div>
@@ -181,12 +301,43 @@ export function SchedulePage() {
           <span><i className="heat-swatch heat-swatch--both-off" /> обоє вільні</span>
           <span><i className="heat-swatch heat-swatch--lena-off" /> Лєна вільна</span>
           <span><i className="heat-swatch heat-swatch--dima-off" /> Діма вільний</span>
+          <span><i className="heat-swatch heat-swatch--plan" /> є план</span>
         </div>
+      )}
+
+      {!editMode && sharedDates.length > 0 && (
+        <section className="sched-upcoming">
+          <div className="sched-section-head">
+            <div>
+              <span className="sched-section-kicker">Попереду</span>
+              <h2>Найближчі спільні дні</h2>
+            </div>
+            <button type="button" onClick={() => openPlanModal()}>+ Побачення</button>
+          </div>
+          <div className="sched-upcoming-list">
+            {sharedDates.slice(0, 3).map((date) => {
+              const plan = plansByDate.get(date)?.[0];
+              return (
+                <button key={date} type="button" className="sched-upcoming-row" onClick={() => setSelectedDate(date)}>
+                  <span className="sched-upcoming-date">
+                    <strong>{new Date(`${date}T12:00:00`).toLocaleDateString('uk-UA', { day: 'numeric' })}</strong>
+                    <small>{new Date(`${date}T12:00:00`).toLocaleDateString('uk-UA', { month: 'short' })}</small>
+                  </span>
+                  <span className="sched-upcoming-copy">
+                    <strong>{fmtLongDate(date)}</strong>
+                    <small>{plan ? plan.title : 'Планів поки немає'}</small>
+                  </span>
+                  <span className="sched-upcoming-arrow" aria-hidden="true">›</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       )}
 
       {datePlans.length > 0 && (
         <div className="date-plans">
-          <h2 className="date-plans-title">💗 Заплановані побачення</h2>
+          <h2 className="date-plans-title">Заплановані побачення</h2>
           {datePlans.map((d) => (
             <DatePlanCard
               key={d.id}
@@ -199,14 +350,85 @@ export function SchedulePage() {
         </div>
       )}
 
+      {selectedDate && (
+        <DayDetailsSheet
+          date={selectedDate}
+          status={selectedStatus}
+          plans={selectedPlans}
+          onClose={() => setSelectedDate(null)}
+          onPlan={() => openPlanModal(selectedDate)}
+        />
+      )}
+
       {planModalOpen && (
         <PlanDateModal
+          key={initialPlanDate ?? 'default-date'}
           sharedDates={sharedDates}
+          initialDate={initialPlanDate}
           onClose={() => setPlanModalOpen(false)}
           onSubmit={(input) => dateMutations.propose.mutate(input)}
         />
       )}
     </section>
+  );
+}
+
+function DayDetailsSheet({
+  date,
+  status,
+  plans,
+  onClose,
+  onPlan,
+}: {
+  date: string;
+  status: DayStatus;
+  plans: DateRow[];
+  onClose: () => void;
+  onPlan: () => void;
+}) {
+  const canPlan = status === 'both-off';
+
+  return (
+    <div
+      className="sched-day-overlay"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section className="sched-day-sheet" role="dialog" aria-modal="true" aria-label={`Деталі за ${fmtLongDate(date)}`}>
+        <div className="sched-day-handle" />
+        <div className="sched-day-head">
+          <div>
+            <span>{fmtLongDate(date)}</span>
+            <h2>{statusText(status)}</h2>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Закрити">×</button>
+        </div>
+
+        {plans.length > 0 ? (
+          <div className="sched-day-plans">
+            {plans.map((plan) => (
+              <article key={plan.id} className="sched-day-plan">
+                <span className={`sched-day-plan-status ${plan.status}`}>{plan.status === 'confirmed' ? 'Підтверджено' : 'Очікує'}</span>
+                <strong>{plan.title}</strong>
+                <small>
+                  {plan.time ? plan.time.slice(0, 5) : 'Час не вказано'}
+                  {plan.place ? ` · ${plan.place}` : ''}
+                </small>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="sched-day-empty">На цей день спільних планів ще немає.</p>
+        )}
+
+        {canPlan && (
+          <button type="button" className="btn sched-day-plan-btn" onClick={onPlan}>
+            Запланувати побачення
+          </button>
+        )}
+      </section>
+    </div>
   );
 }
 
@@ -270,8 +492,8 @@ function Board({ user, yr, mo, marks, today, statusOf, onCell }: BoardProps) {
   const userMarks = marks[user.id] ?? {};
 
   return (
-    <div className="card sched-board">
-      <h3 className="sched-board-title">{user.name}</h3>
+    <div className="card sched-board sched-board--editing">
+      <h3 className="sched-board-title">Графік: {user.name}</h3>
       <div className="sched-grid">
         {DAYS_UA.map((d) => (
           <div key={d} className="pcal-dow">
@@ -297,11 +519,9 @@ function Board({ user, yr, mo, marks, today, statusOf, onCell }: BoardProps) {
                 (isToday ? ' sched-cell--today' : '')
               }
               onClick={() => onCell(user.id, ds, mark)}
+              aria-label={`${fmtLongDate(ds)}. ${mark === 'Р' ? 'Робочий день' : mark === 'Х' ? 'Вихідний' : 'Не вказано'}`}
             >
-              <span className="sched-cell-num">
-                {day}
-                {status === 'both-off' && <span className="sched-cell-heart">♥</span>}
-              </span>
+              <span className="sched-cell-num">{day}</span>
               <span
                 className={
                   'sched-cell-letter' +
