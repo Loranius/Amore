@@ -43,7 +43,9 @@ export interface CrystalDeltas {
   recipesSavedThisMonth: number;
 }
 
-const EMPTY_DNA: CrystalDNA = {
+/** Нулі для стану «дані ще не прийшли». Експортується, бо той самий
+ *  порожній знімок потрібен і заглушці кристала, поки вантажиться 3D. */
+export const EMPTY_DNA: CrystalDNA = {
   daysTogether: 0,
   photos: 0,
   places: 0,
@@ -58,7 +60,7 @@ const EMPTY_DNA: CrystalDNA = {
   totalSaved: 0,
 };
 
-const EMPTY_DELTAS: CrystalDeltas = {
+export const EMPTY_DELTAS: CrystalDeltas = {
   wishesDoneThisMonth: 0,
   placesThisMonth: 0,
   moviesWatchedThisMonth: 0,

@@ -2229,6 +2229,30 @@ a.wl-card-title { color: var(--accent); }
   line-height: 1;
 }
 .crystal-svg { width: 100%; height: 100%; overflow: visible; }
+
+/* ── Заглушка, поки вантажиться 3D-сцена ───────────────────── */
+/* Не кристал і не форма: м'яке світло в тій самій рамці. Будь-який
+   контур тут читався б як «ось так виглядає кристал» — і брехав би,
+   бо за секунду на цьому місці стане зовсім інший артефакт. */
+.crystal-wrap--loading { cursor: default; display: grid; place-items: center; }
+.crystal-loading-glow {
+  width: 58%; aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(
+    circle at 42% 38%,
+    color-mix(in srgb, var(--accent) 22%, transparent),
+    transparent 68%
+  );
+  animation: crystal-loading-breathe 2.4s ease-in-out infinite;
+}
+@keyframes crystal-loading-breathe {
+  0%, 100% { opacity: .55; transform: scale(.94); }
+  50%      { opacity: 1;   transform: scale(1.06); }
+}
+/* Пульсація — це «зачекай», а не оздоба: кому рух заважає, той бачить
+   рівне світло, і зміст лишається той самий. */
+@media (prefers-reduced-motion: reduce) {
+  .crystal-loading-glow { animation: none; opacity: .8; }
+}
 .crystal-spin { transform-origin: 100px 100px; animation: crystal-spin 140s linear infinite; }
 .crystal-breathe { transform-origin: 100px 100px; animation: crystal-breathe 7s ease-in-out infinite; }
 .crystal-facet {
