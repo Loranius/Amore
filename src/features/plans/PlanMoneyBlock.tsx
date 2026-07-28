@@ -21,7 +21,12 @@ import { goalsOfPlan, planMoney } from './planMoney';
 import { usePlanMutations } from './usePlans';
 import type { PlanRow } from '@/types';
 
-export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string }) {
+export function PlanMoneyBlock({ plan, accent, embedded = false }: {
+  plan: PlanRow;
+  accent: string;
+  /** Усередині disclosure заголовок секції вже намальований зовні. */
+  embedded?: boolean;
+}) {
   const { data: goals = [], isPending } = useGoals();
   const { add, setGoalPlan } = useGoalMutations();
   const { updatePlan } = usePlanMutations();
@@ -29,6 +34,7 @@ export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string
 
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState('');
+  const [connecting, setConnecting] = useState(false);
   const [creating, setCreating] = useState(false);
   const [linking, setLinking] = useState(false);
 
@@ -36,7 +42,7 @@ export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string
   const mine = goalsOfPlan(plan, goals);
   // Прив'язати можна лише вільну ціль: перевішувати чужу означало б
   // мовчки забрати гроші в іншого плану.
-  const free = goals.filter((g) => g.plan_id === null);
+  const free = goals.filter((goal) => goal.plan_id === null);
 
   const saveBudget = () => {
     const raw = budgetDraft.trim().replace(/\s/g, '').replace(',', '.');
@@ -53,9 +59,9 @@ export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string
   };
 
   return (
-    <section className="plan-money">
+    <section className={`plan-money${embedded ? ' plan-money--embedded' : ''}`}>
       <header className="plan-money-head">
-        <h3>Гроші</h3>
+        {!embedded && <h3>Гроші</h3>}
         {!editingBudget && (
           <button
             type="button"
@@ -65,7 +71,7 @@ export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string
               setEditingBudget(true);
             }}
           >
-            {plan.budget === null ? 'Додати бюджет' : `Бюджет ${fmtMoney(plan.budget)}`}
+            {plan.budget === null ? 'Додати бюджет' : `Змінити бюджет · ${fmtMoney(plan.budget)}`}
           </button>
         )}
       </header>
@@ -83,8 +89,8 @@ export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string
               inputMode="numeric"
               value={budgetDraft}
               placeholder="Порожньо — грошей не потребує"
-              onChange={(e) => setBudgetDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') saveBudget(); }}
+              onChange={(event) => setBudgetDraft(event.target.value)}
+              onKeyDown={(event) => { if (event.key === 'Enter') saveBudget(); }}
             />
           </label>
           <div className="plan-money-editor-actions">
@@ -112,9 +118,7 @@ export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string
       {isPending ? (
         <p className="plan-money-empty">Завантаження…</p>
       ) : mine.length === 0 ? (
-        <p className="plan-money-empty">
-          Цілей у скарбничці під цей план ще немає.
-        </p>
+        <p className="plan-money-empty">Скарбничка до цього плану ще не підключена.</p>
       ) : (
         <ul className="plan-goal-list">
           {mine.map((goal) => (
@@ -134,9 +138,6 @@ export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string
                 aria-label={`Відв'язати «${goal.name}» від плану`}
                 onClick={() => void unlink(goal)}
               >
-                {/* Хрестик, а не кошик: кнопка знімає ЗВ'ЯЗОК, а не
-                    видаляє ціль. Кошик поруч із грошима читався б як
-                    «стерти накопичення» — і колись хтось на це натиснув би. */}
                 <CloseIcon size={14} />
               </button>
             </li>
@@ -145,15 +146,52 @@ export function PlanMoneyBlock({ plan, accent }: { plan: PlanRow; accent: string
       )}
 
       <div className="plan-money-actions">
-        <button type="button" className="plan-money-action" onClick={() => setCreating(true)}>
-          <PlusIcon size={14} /> Збирати в скарбничці
+        <button
+          type="button"
+          className={`plan-money-action${connecting ? ' active' : ''}`}
+          onClick={() => {
+            setConnecting((value) => !value);
+            setCreating(false);
+            setLinking(false);
+          }}
+        >
+          <PiggyBankIcon size={15} />
+          {mine.length === 0 ? 'Підключити скарбничку' : 'Додати ще одну ціль'}
         </button>
-        {free.length > 0 && (
-          <button type="button" className="plan-money-action" onClick={() => setLinking((v) => !v)}>
-            <SwapIcon size={14} /> Прив'язати наявну
-          </button>
-        )}
       </div>
+
+      {connecting && (
+        <div className="plan-money-connect-choice" role="group" aria-label="Як підключити скарбничку">
+          <button
+            type="button"
+            onClick={() => {
+              setConnecting(false);
+              setCreating(true);
+            }}
+          >
+            <PlusIcon size={16} />
+            <span>
+              <b>Створити нову ціль</b>
+              <small>Назва й сума вже підставляться з плану</small>
+            </span>
+          </button>
+          {free.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setConnecting(false);
+                setLinking(true);
+              }}
+            >
+              <SwapIcon size={16} />
+              <span>
+                <b>Обрати наявну</b>
+                <small>{free.length} вільних цілей у скарбничці</small>
+              </span>
+            </button>
+          )}
+        </div>
+      )}
 
       {linking && free.length > 0 && (
         <ul className="plan-goal-picker">
@@ -220,7 +258,7 @@ function NewGoalForPlan({ plan, busy, onClose, onSubmit }: {
           name="goal_name"
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(event) => setName(event.target.value)}
         />
       </label>
       <label className="form-field">
@@ -233,7 +271,7 @@ function NewGoalForPlan({ plan, busy, onClose, onSubmit }: {
           step="100"
           inputMode="numeric"
           value={target}
-          onChange={(e) => setTarget(e.target.value)}
+          onChange={(event) => setTarget(event.target.value)}
         />
       </label>
       <p className="plan-money-hint">

@@ -16,8 +16,6 @@ import { Link } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { usePartner } from '@/features/_shared/useUsers';
 import { CloseIcon, GiftIcon, PlusIcon } from '@/components/icons/UiIcon';
-// Ті самі значки, що в нижній панелі й меню «Ще»: розділ мусить
-// упізнаватись тим, чим він уже позначений в іншому місці застосунку.
 import { CameraIcon, CartIcon } from '@/components/icons/NavIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
 import { useSharedWishlistItems, useWishlistItems } from '@/features/wishlist/useWishlist';
@@ -31,18 +29,38 @@ import type { PlanLinkTarget, PlanRow } from '@/types';
 
 const TARGET_META: Record<PlanLinkTarget, {
   label: string;
+  description: string;
   /** Куди веде тап: у планів немає власних сторінок бажання чи мітки. */
   to: string;
   Icon: typeof MapPinIcon;
 }> = {
-  wish: { label: 'Бажання', to: '/wishlist', Icon: GiftIcon },
-  place: { label: 'Місце', to: '/map', Icon: MapPinIcon },
-  memory: { label: 'Спогад', to: '/memories', Icon: CameraIcon },
+  wish: {
+    label: 'Бажання',
+    description: 'Пов’язати зі спільною або особистою мрією',
+    to: '/wishlist',
+    Icon: GiftIcon,
+  },
+  place: {
+    label: 'Місце',
+    description: 'Додати точку з вашої карти',
+    to: '/map',
+    Icon: MapPinIcon,
+  },
+  memory: {
+    label: 'Спогад',
+    description: 'Прикріпити фото або вже прожитий момент',
+    to: '/memories',
+    Icon: CameraIcon,
+  },
 };
 
 const TABS: PlanLinkTarget[] = ['wish', 'place', 'memory'];
 
-export function PlanLinksBlock({ plan }: { plan: PlanRow }) {
+export function PlanLinksBlock({ plan, embedded = false }: {
+  plan: PlanRow;
+  /** Усередині disclosure заголовок секції вже намальований зовні. */
+  embedded?: boolean;
+}) {
   const me = useCurrentUser();
   const partner = usePartner();
   const { data: links = [] } = usePlanLinks();
@@ -54,6 +72,7 @@ export function PlanLinksBlock({ plan }: { plan: PlanRow }) {
   const { data: pins = [] } = useMapPins();
   const { data: archive } = useMemories();
 
+  const [choosing, setChoosing] = useState(false);
   const [picking, setPicking] = useState<PlanLinkTarget | null>(null);
   const [shopping, setShopping] = useState(false);
 
@@ -61,13 +80,13 @@ export function PlanLinksBlock({ plan }: { plan: PlanRow }) {
   // лише дозволене, тож чужого сюди не потрапить (див. resolveLinks).
   const catalog = useMemo<LinkCatalog>(() => ({
     wish: new Map(
-      [...myWishes, ...partnerWishes, ...sharedWishes].map((w) => [w.id, { title: w.title }]),
+      [...myWishes, ...partnerWishes, ...sharedWishes].map((wish) => [wish.id, { title: wish.title }]),
     ),
-    place: new Map(pins.map((p) => [p.id, { title: p.title, subtitle: p.city }])),
+    place: new Map(pins.map((pin) => [pin.id, { title: pin.title, subtitle: pin.city }])),
     memory: new Map(
-      (archive?.photos ?? []).map((m) => [
-        m.id,
-        { title: m.caption || formatMemoryDate(m.memory_date, m.date_precision) },
+      (archive?.photos ?? []).map((memory) => [
+        memory.id,
+        { title: memory.caption || formatMemoryDate(memory.memory_date, memory.date_precision) },
       ]),
     ),
   }), [myWishes, partnerWishes, sharedWishes, pins, archive]);
@@ -86,17 +105,22 @@ export function PlanLinksBlock({ plan }: { plan: PlanRow }) {
       .map(([id, info]) => ({ id, ...info }));
   }, [picking, catalog, plan, links]);
 
+  const startPicking = (type: PlanLinkTarget) => {
+    setChoosing(false);
+    setShopping(false);
+    setPicking(type);
+  };
+
   return (
-    <section className="plan-links">
-      <header className="plan-links-head">
-        <h3>Пов'язане</h3>
-      </header>
+    <section className={`plan-links${embedded ? ' plan-links--embedded' : ''}`}>
+      {!embedded && (
+        <header className="plan-links-head">
+          <h3>Пов'язане</h3>
+        </header>
+      )}
 
       {resolved.length === 0 ? (
-        <p className="plan-links-empty">
-          Прив'яжи бажання, місце на карті або спогад — і план перестане бути
-          самотнім рядком.
-        </p>
+        <p className="plan-links-empty">Тут можна зібрати все, що стосується цього плану.</p>
       ) : (
         <ul className="plan-link-list">
           {resolved.map((item) => {
@@ -115,7 +139,9 @@ export function PlanLinksBlock({ plan }: { plan: PlanRow }) {
                   className="plan-link-unlink"
                   aria-label={`Відв'язати «${item.title}»`}
                   onClick={() => unlink.mutate({
-                    planId: plan.id, targetType: item.type, targetId: item.id,
+                    planId: plan.id,
+                    targetType: item.type,
+                    targetId: item.id,
                   })}
                 >
                   <CloseIcon size={14} />
@@ -127,47 +153,71 @@ export function PlanLinksBlock({ plan }: { plan: PlanRow }) {
       )}
 
       <div className="plan-links-actions">
-        {TABS.map((type) => (
-          <button
-            key={type}
-            type="button"
-            className={`plan-links-action${picking === type ? ' active' : ''}`}
-            onClick={() => { setPicking(picking === type ? null : type); setShopping(false); }}
-          >
-            {(() => { const I = TARGET_META[type].Icon; return <I size={14} />; })()}
-            {TARGET_META[type].label}
-          </button>
-        ))}
         <button
           type="button"
-          className={`plan-links-action${shopping ? ' active' : ''}`}
-          onClick={() => { setShopping((v) => !v); setPicking(null); }}
+          className={`plan-links-action plan-links-action--primary${choosing ? ' active' : ''}`}
+          onClick={() => {
+            setChoosing((value) => !value);
+            setPicking(null);
+            setShopping(false);
+          }}
         >
-          <CartIcon size={14} /> У покупки
+          <PlusIcon size={15} /> Додати пов’язане
         </button>
       </div>
+
+      {choosing && (
+        <div className="plan-link-kind-picker" role="group" aria-label="Що додати до плану">
+          {TABS.map((type) => {
+            const meta = TARGET_META[type];
+            return (
+              <button key={type} type="button" onClick={() => startPicking(type)}>
+                <meta.Icon size={18} />
+                <span>
+                  <b>{meta.label}</b>
+                  <small>{meta.description}</small>
+                </span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => {
+              setChoosing(false);
+              setPicking(null);
+              setShopping(true);
+            }}
+          >
+            <CartIcon size={18} />
+            <span>
+              <b>У покупки</b>
+              <small>Додати потрібні речі до спільного списку</small>
+            </span>
+          </button>
+        </div>
+      )}
 
       {picking !== null && (
         options.length === 0 ? (
           <p className="plan-links-empty">
             {catalog[picking]?.size
-              ? 'Усе з цього розділу вже прив\'язане.'
+              ? 'Усе з цього розділу вже пов’язане.'
               : 'У цьому розділі поки порожньо.'}
           </p>
         ) : (
           <ul className="plan-link-picker">
-            {options.map((opt) => (
-              <li key={opt.id}>
+            {options.map((option) => (
+              <li key={option.id}>
                 <button
                   type="button"
                   onClick={() => {
-                    link.mutate({ planId: plan.id, targetType: picking, targetId: opt.id });
+                    link.mutate({ planId: plan.id, targetType: picking, targetId: option.id });
                     setPicking(null);
                   }}
                 >
                   <PlusIcon size={14} />
-                  <span>{opt.title}</span>
-                  {opt.subtitle && <small>{opt.subtitle}</small>}
+                  <span>{option.title}</span>
+                  {option.subtitle && <small>{option.subtitle}</small>}
                 </button>
               </li>
             ))}
@@ -193,7 +243,7 @@ function ShoppingComposer({ plan, onDone }: { plan: PlanRow; onDone: () => void 
 
   const lines = text
     .split(/[,\n]/)
-    .map((s) => s.trim())
+    .map((line) => line.trim())
     .filter(Boolean);
 
   return (
@@ -206,7 +256,7 @@ function ShoppingComposer({ plan, onDone }: { plan: PlanRow; onDone: () => void 
           rows={3}
           value={text}
           placeholder="Термос, батарейки, сир"
-          onChange={(e) => setText(e.target.value)}
+          onChange={(event) => setText(event.target.value)}
         />
       </label>
       <p className="plan-shopping-hint">

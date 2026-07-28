@@ -1,0 +1,668 @@
+/* ============================================================
+   «Плани» — сторінка однієї точки маршруту.
+   ------------------------------------------------------------
+   Герой показує лише суть плану. Робочі можливості відкриваються
+   поступово, тому сторінка не виглядає панеллю керування.
+   ============================================================ */
+
+.plan-detail-page {
+  --plan-detail-accent: var(--accent);
+  max-width: 760px;
+  margin: 0 auto;
+  padding-bottom: 48px;
+}
+
+.plan-detail-back {
+  margin-bottom: 12px;
+  color: color-mix(in srgb, var(--plan-detail-accent) 78%, var(--text));
+}
+
+/* ── Обкладинка ─────────────────────────────────────────────── */
+.plan-detail-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  gap: 18px;
+  padding: 22px 18px 18px;
+  border: 1px solid color-mix(in srgb, var(--plan-detail-accent) 24%, transparent);
+  border-radius: clamp(22px, 6vw, 30px);
+  background:
+    radial-gradient(circle at 86% 10%, color-mix(in srgb, var(--plan-detail-accent) 24%, transparent), transparent 36%),
+    radial-gradient(circle at 8% 96%, color-mix(in srgb, var(--plan-detail-accent) 12%, transparent), transparent 38%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--plan-detail-accent) 9%, var(--surface)),
+      color-mix(in srgb, var(--plan-detail-accent) 2%, var(--surface))
+    );
+  box-shadow:
+    0 22px 54px color-mix(in srgb, var(--text) 9%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 48%, transparent);
+}
+
+.plan-detail-hero--closed {
+  filter: saturate(.72);
+}
+
+.plan-detail-orbit {
+  position: absolute;
+  z-index: -1;
+  border: 1px solid color-mix(in srgb, var(--plan-detail-accent) 24%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.plan-detail-orbit--one {
+  top: -84px;
+  right: -62px;
+  width: 210px;
+  height: 210px;
+}
+
+.plan-detail-orbit--two {
+  right: 22px;
+  bottom: -112px;
+  width: 176px;
+  height: 176px;
+}
+
+.plan-detail-identity {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.plan-detail-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border: 1px solid color-mix(in srgb, var(--plan-detail-accent) 28%, transparent);
+  border-radius: 20px;
+  color: var(--plan-detail-accent);
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255,255,255,.72), transparent 36%),
+    color-mix(in srgb, var(--plan-detail-accent) 13%, var(--surface));
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--plan-detail-accent) 17%, transparent),
+    inset 0 1px 0 rgba(255,255,255,.52);
+}
+
+.plan-detail-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.plan-detail-category {
+  color: color-mix(in srgb, var(--plan-detail-accent) 82%, var(--text));
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .085em;
+  text-transform: uppercase;
+}
+
+.plan-detail-copy h1 {
+  margin: 0;
+  font-size: clamp(24px, 7vw, 34px);
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+
+.plan-detail-copy p {
+  margin: 3px 0 0;
+  max-width: 48ch;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.plan-detail-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plan-detail-fact {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 15px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: border-color 180ms ease, transform 180ms ease, background 180ms ease;
+}
+
+.plan-detail-fact:hover,
+.plan-detail-fact:focus-visible {
+  border-color: color-mix(in srgb, var(--plan-detail-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--plan-detail-accent) 7%, var(--surface));
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.plan-detail-fact > svg {
+  flex: 0 0 auto;
+  color: var(--plan-detail-accent);
+}
+
+.plan-detail-fact > span {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.plan-detail-fact small {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.plan-detail-fact b {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-detail-fact em {
+  flex: 0 0 auto;
+  color: color-mix(in srgb, var(--plan-detail-accent) 84%, var(--text));
+  font-size: 10.5px;
+  font-style: normal;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.plan-detail-fact--static {
+  cursor: default;
+}
+
+.plan-detail-primary {
+  width: 100%;
+  min-height: 46px;
+  padding: 11px 18px;
+  border: 0;
+  border-radius: 15px;
+  color: white;
+  background: color-mix(in srgb, var(--plan-detail-accent) 86%, #4c3340);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--plan-detail-accent) 24%, transparent);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease, filter 180ms ease;
+}
+
+.plan-detail-primary:hover,
+.plan-detail-primary:focus-visible {
+  outline: none;
+  filter: brightness(1.035) saturate(1.05);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px color-mix(in srgb, var(--plan-detail-accent) 30%, transparent);
+}
+
+.plan-detail-primary:active {
+  transform: scale(.985);
+}
+
+/* ── Progressive disclosure ────────────────────────────────── */
+.plan-detail-sections {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.plan-disclosure {
+  scroll-margin-top: 14px;
+  overflow: clip;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 9px 24px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.plan-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 68px;
+  padding: 11px 13px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.plan-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.plan-disclosure > summary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--plan-detail-accent) 48%, transparent);
+  outline-offset: -2px;
+}
+
+.plan-disclosure-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  color: color-mix(in srgb, var(--plan-detail-accent) 80%, var(--text));
+  background: color-mix(in srgb, var(--plan-detail-accent) 10%, var(--surface));
+}
+
+.plan-disclosure-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.plan-disclosure-copy b {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.plan-disclosure-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-disclosure-chevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 220ms ease;
+}
+
+.plan-disclosure[open] .plan-disclosure-chevron {
+  transform: rotate(180deg);
+}
+
+.plan-disclosure-body {
+  padding: 13px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--plan-detail-accent) 3%, var(--surface)),
+      var(--surface) 44%
+    );
+}
+
+.plan-disclosure-body :is(.plan-tasks, .plan-money, .plan-links) {
+  margin-top: 0;
+}
+
+/* ── Підготовка ────────────────────────────────────────────── */
+.plan-tasks--embedded {
+  gap: 10px;
+}
+
+.plan-tasks--embedded .plan-tasks-head {
+  justify-content: flex-end;
+}
+
+.plan-tasks-complete {
+  margin: 0;
+  padding: 11px 12px;
+  border-radius: 13px;
+  color: color-mix(in srgb, var(--plan-detail-accent) 78%, var(--text));
+  background: color-mix(in srgb, var(--plan-detail-accent) 9%, var(--surface));
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.plan-tasks-done-toggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plan-tasks-done-toggle > svg:last-child {
+  transition: transform 180ms ease;
+}
+
+.plan-tasks-done-toggle.active > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.plan-tasks-done-toggle:hover,
+.plan-tasks-done-toggle:focus-visible {
+  color: var(--text);
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  outline: none;
+}
+
+/* ── Бюджет ────────────────────────────────────────────────── */
+.plan-money--embedded .plan-money-head {
+  justify-content: flex-end;
+}
+
+.plan-money--embedded .plan-money-budget-btn {
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--plan-detail-accent) 28%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--plan-detail-accent) 6%, var(--surface));
+}
+
+.plan-money-action.active {
+  border-style: solid;
+  background: color-mix(in srgb, var(--plan-detail-accent) 9%, var(--surface));
+}
+
+.plan-money-connect-choice,
+.plan-link-kind-picker {
+  display: grid;
+  gap: 7px;
+}
+
+.plan-money-connect-choice > button,
+.plan-link-kind-picker > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 13px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-money-connect-choice > button:hover,
+.plan-money-connect-choice > button:focus-visible,
+.plan-link-kind-picker > button:hover,
+.plan-link-kind-picker > button:focus-visible {
+  border-color: color-mix(in srgb, var(--plan-detail-accent) 36%, transparent);
+  background: color-mix(in srgb, var(--plan-detail-accent) 5%, var(--surface));
+  outline: none;
+}
+
+.plan-money-connect-choice > button > svg,
+.plan-link-kind-picker > button > svg {
+  flex: 0 0 auto;
+  color: var(--plan-detail-accent);
+}
+
+.plan-money-connect-choice > button > span,
+.plan-link-kind-picker > button > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.plan-money-connect-choice b,
+.plan-link-kind-picker b {
+  font-size: 12.5px;
+}
+
+.plan-money-connect-choice small,
+.plan-link-kind-picker small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* ── Пов'язане ─────────────────────────────────────────────── */
+.plan-links-action--primary {
+  border-style: solid;
+}
+
+/* ── Небезпечна дія ────────────────────────────────────────── */
+.plan-detail-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 20px 4px 0;
+  padding: 7px 4px;
+  border: 0;
+  color: color-mix(in srgb, var(--danger) 74%, var(--muted));
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.plan-detail-delete:hover,
+.plan-detail-delete:focus-visible {
+  color: var(--danger);
+  outline: none;
+}
+
+/* ── Bottom sheets: дата і статус ──────────────────────────── */
+.plan-detail-overlay {
+  z-index: 1450;
+  align-items: flex-end;
+  padding: max(12px, env(safe-area-inset-top)) 0 0;
+  background: color-mix(in srgb, #2c2028 42%, transparent);
+  backdrop-filter: blur(16px) saturate(.9);
+  -webkit-backdrop-filter: blur(16px) saturate(.9);
+}
+
+.plan-detail-sheet {
+  width: min(100%, 620px);
+  max-height: calc(100dvh - max(12px, env(safe-area-inset-top)));
+  overflow-y: auto;
+  display: grid;
+  gap: 12px;
+  padding: 9px 18px calc(22px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid color-mix(in srgb, white 38%, transparent);
+  border-bottom: 0;
+  border-radius: 26px 26px 0 0;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 -24px 70px rgba(29, 18, 24, .22);
+}
+
+.plan-detail-sheet-handle {
+  justify-self: center;
+  width: 42px;
+  height: 4px;
+  margin-bottom: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+.plan-detail-sheet .modal-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.plan-detail-sheet-copy {
+  margin: -6px 0 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.plan-detail-sheet-done {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 2px;
+}
+
+.plan-status-sheet-list {
+  display: grid;
+  gap: 6px;
+}
+
+.plan-status-sheet-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 11px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-status-sheet-option:hover,
+.plan-status-sheet-option:focus-visible,
+.plan-status-sheet-option.active {
+  border-color: color-mix(in srgb, var(--plan-detail-accent) 28%, transparent);
+  background: color-mix(in srgb, var(--plan-detail-accent) 8%, var(--surface));
+  outline: none;
+}
+
+.plan-status-sheet-option:disabled {
+  opacity: .6;
+  cursor: progress;
+}
+
+.plan-status-sheet-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  color: var(--plan-detail-accent);
+  background: color-mix(in srgb, var(--plan-detail-accent) 9%, var(--surface));
+}
+
+.plan-status-sheet-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.plan-status-sheet-copy b {
+  font-size: 13px;
+}
+
+.plan-status-sheet-copy small {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.plan-status-sheet-option > svg {
+  flex: 0 0 auto;
+  color: var(--plan-detail-accent);
+}
+
+.plan-status-sheet-divider {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.plan-status-sheet-divider::before,
+.plan-status-sheet-divider::after {
+  flex: 1 1 auto;
+  height: 1px;
+  content: '';
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.plan-status-sheet-list--closed .plan-status-sheet-icon {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--text) 5%, var(--surface));
+}
+
+/* ── Mobile ────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .plan-detail-hero {
+    gap: 15px;
+    padding: 18px 14px 14px;
+    border-radius: 24px;
+  }
+
+  .plan-detail-identity {
+    gap: 11px;
+  }
+
+  .plan-detail-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 17px;
+  }
+
+  .plan-detail-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-detail-fact {
+    min-height: 52px;
+  }
+
+  .plan-disclosure > summary {
+    min-height: 64px;
+    padding: 10px 11px;
+  }
+
+  .plan-disclosure-body {
+    padding: 11px;
+  }
+
+  .plan-detail-sheet {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+}
+
+@media (max-width: 360px) {
+  .plan-detail-copy h1 {
+    font-size: 23px;
+  }
+
+  .plan-detail-icon {
+    width: 46px;
+    height: 46px;
+  }
+
+  .plan-disclosure-copy small {
+    max-width: 210px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-detail-fact,
+  .plan-detail-primary,
+  .plan-disclosure-chevron,
+  .plan-tasks-done-toggle > svg:last-child {
+    transition: none;
+  }
+}

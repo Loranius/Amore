@@ -1,0 +1,199 @@
+/* ============================================================
+   Фото виконаного плану: окремий емоційний шар між картою та архівом.
+   ============================================================ */
+
+.plan-memories {
+  display: grid;
+  gap: 14px;
+}
+
+.plan-memories-empty {
+  display: grid;
+  justify-items: center;
+  padding: 25px 18px;
+  border: 1px dashed color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 28%, transparent);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 11%, transparent), transparent 52%),
+    color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 3%, var(--surface));
+  text-align: center;
+}
+
+.plan-memories-empty-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  margin-bottom: 9px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 12%, var(--surface));
+  color: var(--plan-detail-accent, var(--accent));
+}
+
+.plan-memories-empty strong {
+  font-size: 15px;
+}
+
+.plan-memories-empty p {
+  max-width: 330px;
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.plan-memories-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.plan-memory-card {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.plan-memory-card img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.plan-memory-open {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+.plan-memory-open:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 46%, transparent);
+  outline-offset: -3px;
+}
+
+.plan-memory-caption {
+  display: grid;
+  gap: 2px;
+  padding: 10px 11px 11px;
+}
+
+.plan-memory-caption strong {
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-memory-caption small {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.plan-memory-unlink {
+  position: absolute;
+  z-index: 3;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .38);
+  border-radius: 50%;
+  background: rgba(20, 20, 24, .52);
+  color: white;
+  backdrop-filter: blur(9px);
+  cursor: pointer;
+}
+
+.plan-memories-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.plan-memories-actions > a {
+  color: var(--plan-detail-accent, var(--accent));
+  font-size: 11.5px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.plan-memories-add {
+  min-height: 38px;
+}
+
+.plan-memories-skeleton {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plan-memories-skeleton span {
+  aspect-ratio: 4 / 3;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  animation: plan-memory-skeleton 1.4s ease-in-out infinite alternate;
+}
+
+.mem-upload-context {
+  margin: -7px 0 15px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Виконана точка на карті отримує фото, але лишається частиною стежки. */
+.plan-journey-stop--completed .plan-journey-card {
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--plan-journey-accent) 34%, transparent);
+}
+
+.plan-journey-completed-photo {
+  width: calc(100% + 30px);
+  max-height: 142px;
+  margin: -14px -15px 8px;
+  object-fit: cover;
+}
+
+.plan-journey-stop--completed .plan-journey-marker {
+  background: color-mix(in srgb, var(--plan-journey-accent) 14%, var(--surface));
+  box-shadow:
+    0 12px 28px color-mix(in srgb, var(--plan-journey-accent) 27%, transparent),
+    0 0 0 7px color-mix(in srgb, var(--plan-journey-accent) 8%, transparent);
+}
+
+.plan-journey-memory-count {
+  color: color-mix(in srgb, var(--plan-journey-accent) 76%, var(--text));
+  font-size: 10.5px;
+  font-weight: 800;
+}
+
+@keyframes plan-memory-skeleton {
+  from { opacity: .46; }
+  to { opacity: .9; }
+}
+
+@media (max-width: 370px) {
+  .plan-memories-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-memories-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-memories-skeleton span {
+    animation: none;
+  }
+}
