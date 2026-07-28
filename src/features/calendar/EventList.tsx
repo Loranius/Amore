@@ -10,6 +10,7 @@
 // ============================================================
 import { useUsersMap } from '@/features/_shared/useUsers';
 import { EventIcon } from '@/components/icons/EventIcon';
+import { CloseIcon, RepeatIcon } from '@/components/icons/UiIcon';
 import { formatDateUA } from '@/features/_shared/month';
 import {
   TYPES, daysLabel, occurrenceISO, occurrenceLabel,
@@ -149,7 +150,7 @@ function EventRow({
           {years && <span>{years}</span>}
           {/* «↻ щороку» лише коли роковин немає: підпис роковин буває
               виключно в щорічної події, тож поруч вони дублювали одне одного. */}
-          {ev.yearly && !years && <span>↻ щороку</span>}
+          {ev.yearly && !years && <span><RepeatIcon size={12} /> щороку</span>}
         </div>
       </div>
       <button
@@ -158,7 +159,7 @@ function EventRow({
         onClick={() => onDelete(ev.id)}
         aria-label={`Видалити «${ev.title}»`}
       >
-        ×
+        <CloseIcon size={15} />
       </button>
     </div>
   );

@@ -64,6 +64,31 @@ export interface MonthSummary {
   types: string[];
 }
 
+export interface MonthHeat extends MonthSummary {
+  /** 0 — порожній місяць; далі 0.35…1 відносно найгустішого. */
+  heat: number;
+}
+
+/**
+ * Насиченість місяців відносно найгустішого в році.
+ *
+ * Річний огляд досі був двійковим: «є події» або «немає». Місяць із
+ * п'ятьма подіями виглядав так само, як із однією, і питання «де в нас
+ * густо» — заради якого цей вигляд і відкривають — лишалось без
+ * відповіді.
+ *
+ * Порожній місяць — рівно 0, а не «трошки»: інакше в році, де максимум
+ * дві події, різниця між нулем і одиницею зникає. Ненульові починаються
+ * з 0.35, бо нижче плитка вже не відрізняється від порожньої.
+ */
+export function yearHeat(months: readonly MonthSummary[]): MonthHeat[] {
+  const max = months.reduce((n, m) => Math.max(n, m.count), 0);
+  return months.map((m) => ({
+    ...m,
+    heat: m.count === 0 || max === 0 ? 0 : 0.35 + 0.65 * (m.count / max),
+  }));
+}
+
 /** Скільки подій у кожному місяці року — для річного огляду. */
 export function yearSummary(events: readonly EventRow[], yr: number): MonthSummary[] {
   return Array.from({ length: 12 }, (_, i) => {

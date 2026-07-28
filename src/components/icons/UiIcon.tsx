@@ -184,6 +184,35 @@ export function ChevronDownIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
+/** Шеврони вбік — попередній / наступний місяць. */
+export function ChevronLeftIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M14.6 6.6 9.4 12l5.2 5.4" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="m9.4 6.6 5.2 5.4-5.2 5.4" />
+    </svg>
+  );
+}
+
+/** Дві стрілки по колу — подія повторюється щороку. */
+export function RepeatIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M4.4 9.4h12.4a2.8 2.8 0 0 1 2.8 2.8v.4" />
+      <path d="m7.6 6.2-3.2 3.2 3.2 3.2" />
+      <path d="M19.6 14.6H7.2a2.8 2.8 0 0 1-2.8-2.8v-.4" />
+      <path d="m16.4 17.8 3.2-3.2-3.2-3.2" />
+    </svg>
+  );
+}
+
 /** Кругова стрілка — обробити ще раз. */
 export function RefreshIcon({ size = 24, className = '' }: IconProps) {
   return (

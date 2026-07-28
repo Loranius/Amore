@@ -1375,9 +1375,19 @@ a.wl-card-title { color: var(--accent); }
   gap: 10px; margin-bottom: 10px; font-size: 16px;
 }
 .cal-nav-btn {
-  width: 36px; height: 36px; border-radius: 10px; font-size: 18px; cursor: pointer;
+  width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
+  display: grid; place-items: center;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
   background: var(--surface); color: var(--text);
+}
+/* «Сьогодні» стоїть між назвою місяця й стрілкою вперед, а не окремим
+   рядком: рядок навігації і так по центру, а зайвий ряд відсунув би
+   сітку вниз рівно на висоту кнопки. */
+.cal-today-btn {
+  flex: 0 0 auto; margin-left: auto; padding: 6px 12px; border-radius: 999px;
+  font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent);
 }
 .cal-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 5px; }
 .cal-dow span {
@@ -1395,14 +1405,43 @@ a.wl-card-title { color: var(--accent); }
   position: relative; aspect-ratio: 1; border-radius: 9px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   background: color-mix(in srgb, var(--text) 4%, transparent);
+  border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer;
+  transition: background .15s, box-shadow .15s;
 }
-.cal-cell--pad { background: none; }
+.cal-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Заглушка перед першим числом — не кнопка й не ціль дотику. */
+.cal-cell--pad { background: none; cursor: default; pointer-events: none; }
 .cal-cell--has { background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .cal-cell--today { box-shadow: inset 0 0 0 2px var(--accent); }
+/* Вибраний день — заливка, а не рамка: рамкою вже позначене «сьогодні»,
+   і два кільця поруч не відрізнити. Коли вибраний день І Є сьогоднішнім,
+   видно обидва стани одразу. */
+.cal-cell--sel { background: var(--accent); color: #fff; }
+.cal-cell--sel .cal-cell-n { font-weight: 800; }
 .cal-cell-n { font-size: 12px; font-variant-numeric: tabular-nums; }
 .cal-cell--has .cal-cell-n { font-weight: 700; }
 .cal-cell-dots { display: flex; gap: 2px; }
 .cal-cell-dots i { width: 5px; height: 5px; border-radius: 50%; display: block; }
+
+/* ── Панель вибраного дня ──────────────────────────────────── */
+.cal-day-panel {
+  display: grid; gap: 8px; padding: 12px; border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.cal-day-panel-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cal-day-panel-hd b { font-size: 15px; }
+.cal-day-panel-all {
+  flex: 0 0 auto; border: 0; background: none; color: var(--accent);
+  font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; padding: 2px;
+}
+.cal-day-panel-empty { margin: 0; font-size: 13px; color: var(--muted); }
+.cal-day-panel-add {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 12px; border-radius: var(--radius-md); font: inherit; font-weight: 700;
+  cursor: pointer; border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  background: transparent; color: var(--accent);
+}
 
 .cal-month-list { display: grid; gap: 10px; }
 .cal-day-block { display: grid; gap: 4px; }
@@ -1427,7 +1466,13 @@ a.wl-card-title { color: var(--accent); }
 }
 .cal-year-cell b { font-size: 13px; }
 .cal-year-cell small { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.cal-year-cell--has { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+/* Насиченість пропорційна кількості подій: --cal-heat приходить із
+   компонента (0.35…1 відносно найгустішого місяця). Стеля 26% — вище
+   назва місяця вже втрачає контраст із заливкою. */
+.cal-year-cell--has {
+  background: color-mix(in srgb, var(--accent) calc(var(--cal-heat, 1) * 26%), var(--surface));
+}
+.cal-year-cell--now { box-shadow: inset 0 0 0 2px var(--accent), var(--shadow-sm); }
 /* min-height — щоб місяці без подій не були нижчими за сусідів і сітка
    не «ходила сходинками». */
 .cal-year-dots { display: flex; gap: 3px; min-height: 6px; }

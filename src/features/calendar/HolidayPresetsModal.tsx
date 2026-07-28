@@ -11,8 +11,8 @@
 import { useState } from 'react';
 import { pluralUA } from '@/lib/utils';
 import { formatDateUA } from '@/features/_shared/month';
-import { SparkIcon } from '@/components/icons/EventIcon';
 import { presetDate, type HolidayPreset } from './holidayPresets';
+import { SparkIcon } from '@/components/icons/EventIcon';
 
 interface HolidayPresetsModalProps {
   presets: HolidayPreset[];
@@ -51,7 +51,9 @@ export function HolidayPresetsModal({
         <h2 className="modal-title">Типові свята</h2>
 
         {presets.length === 0 ? (
-          <p className="empty-state">Усі ці дні у вас уже є 🎉</p>
+          <p className="empty-state empty-state--icon">
+        <SparkIcon size={26} /> Усі ці дні у вас уже є
+      </p>
         ) : (
           <>
             <p className="cal-field-hint" style={{ margin: '0 0 10px' }}>
