@@ -1,0 +1,354 @@
+/* ============================================================
+   «Плани» — швидке створення нової точки.
+   ------------------------------------------------------------
+   Форма не схожа на анкету: велика думка, кілька легких підказок і
+   необов'язковий другий рівень. Після збереження — один простий вибір.
+   ============================================================ */
+
+.plan-create-overlay {
+  z-index: 80;
+  align-items: flex-end;
+  padding: 18px 12px max(18px, env(safe-area-inset-bottom));
+}
+
+.plan-create-sheet {
+  --plan-create-accent: var(--accent);
+  width: min(100%, 560px);
+  max-height: min(90dvh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--plan-create-accent) 18%, transparent);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--plan-create-accent) 14%, transparent), transparent 34%),
+    var(--surface);
+  box-shadow: 0 24px 70px color-mix(in srgb, #000 30%, transparent);
+}
+
+.plan-create-form,
+.plan-create-success {
+  display: grid;
+  gap: 20px;
+  padding: 24px 20px 20px;
+}
+
+.plan-create-head {
+  display: grid;
+  gap: 7px;
+}
+
+.plan-create-eyebrow {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--plan-create-accent) 78%, var(--text));
+}
+
+.plan-create-head h2,
+.plan-create-success h2 {
+  margin: 0;
+  font-size: clamp(22px, 6vw, 29px);
+  line-height: 1.12;
+  letter-spacing: -.035em;
+}
+
+.plan-create-head p,
+.plan-create-success p {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.plan-create-title-field {
+  position: relative;
+  display: block;
+}
+
+.plan-create-title-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 108px;
+  resize: none;
+  padding: 18px 18px 30px;
+  border: 1px solid color-mix(in srgb, var(--plan-create-accent) 34%, transparent);
+  border-radius: 21px;
+  outline: none;
+  background: color-mix(in srgb, var(--plan-create-accent) 5%, var(--bg));
+  color: var(--text);
+  font: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.35;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.plan-create-title-field textarea::placeholder {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+}
+
+.plan-create-title-field textarea:focus {
+  border-color: color-mix(in srgb, var(--plan-create-accent) 72%, transparent);
+  background: color-mix(in srgb, var(--plan-create-accent) 8%, var(--bg));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--plan-create-accent) 10%, transparent);
+}
+
+.plan-create-title-field small {
+  position: absolute;
+  right: 15px;
+  bottom: 11px;
+  font-size: 10.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-create-kind {
+  display: grid;
+  gap: 10px;
+}
+
+.plan-create-kind-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plan-create-kind-head > span {
+  font-size: 12.5px;
+  font-weight: 750;
+}
+
+.plan-create-kind-head small {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.plan-create-quick-categories {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plan-create-category {
+  display: grid;
+  place-items: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 78px;
+  padding: 10px 5px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, color .16s ease;
+}
+
+.plan-create-category span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.plan-create-category:hover {
+  transform: translateY(-1px);
+}
+
+.plan-create-category.active {
+  border-color: color-mix(in srgb, var(--plan-create-accent) 48%, transparent);
+  background: color-mix(in srgb, var(--plan-create-accent) 12%, var(--surface));
+  color: color-mix(in srgb, var(--plan-create-accent) 82%, var(--text));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--plan-create-accent) 10%, transparent);
+}
+
+.plan-create-more-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plan-create-more-toggle svg {
+  transition: transform .2s ease;
+}
+
+.plan-create-more-toggle.open svg {
+  transform: rotate(180deg);
+}
+
+.plan-create-more {
+  display: grid;
+  gap: 15px;
+  margin-top: -8px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg) 62%, var(--surface));
+  animation: plan-create-reveal .2s ease both;
+}
+
+.plan-create-extra-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.plan-create-extra-category {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.plan-create-extra-category.active {
+  border-color: color-mix(in srgb, var(--plan-create-accent) 44%, transparent);
+  background: color-mix(in srgb, var(--plan-create-accent) 11%, var(--surface));
+  color: color-mix(in srgb, var(--plan-create-accent) 78%, var(--text));
+  font-weight: 700;
+}
+
+.plan-create-note {
+  margin: 0;
+}
+
+.plan-create-note textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.plan-create-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.plan-create-cancel,
+.plan-create-done {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plan-create-save,
+.plan-create-continue {
+  min-height: 44px;
+  padding-inline: 18px;
+  border-radius: 999px;
+  background: var(--plan-create-accent);
+}
+
+.plan-create-success {
+  justify-items: center;
+  min-height: 390px;
+  align-content: center;
+  text-align: center;
+}
+
+.plan-create-success-mark {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  margin-bottom: 3px;
+  border-radius: 26px;
+  background: color-mix(in srgb, var(--plan-create-accent) 14%, var(--surface));
+  color: var(--plan-create-accent);
+  box-shadow: 0 16px 42px color-mix(in srgb, var(--plan-create-accent) 16%, transparent);
+  animation: plan-create-mark .42s cubic-bezier(.2, .9, .2, 1.2) both;
+}
+
+.plan-create-success h2 {
+  max-width: 14ch;
+  overflow-wrap: anywhere;
+}
+
+.plan-create-success-actions {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 310px);
+  margin-top: 6px;
+}
+
+.plan-create-continue {
+  width: 100%;
+}
+
+.plan-create-done {
+  min-height: 40px;
+}
+
+@keyframes plan-create-reveal {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes plan-create-mark {
+  from { opacity: 0; transform: scale(.78) rotate(-8deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@media (min-width: 640px) {
+  .plan-create-overlay {
+    align-items: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .plan-create-sheet {
+    border-radius: 23px;
+  }
+
+  .plan-create-form,
+  .plan-create-success {
+    padding-inline: 15px;
+  }
+
+  .plan-create-quick-categories {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .plan-create-category {
+    min-height: 67px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-create-category,
+  .plan-create-more-toggle svg,
+  .plan-create-more,
+  .plan-create-success-mark {
+    animation: none;
+    transition: none;
+  }
+}
