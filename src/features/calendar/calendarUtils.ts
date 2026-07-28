@@ -37,31 +37,29 @@ export { MONTHS };
  * теми потребують РІЗНИХ міток: глибока вина річниці на темному тлі
  * зникає, а світлий корал на білому — навпаки.
  */
-export const TYPES: Record<
-  EventType,
-  { icon: string; label: string; mark: string; ink: string }
-> = {
-  birthday: { icon: '🎂', label: 'День народження', mark: 'var(--ev-birthday)', ink: 'var(--ev-birthday-ink)' },
-  anniversary: { icon: '💕', label: 'Річниця', mark: 'var(--ev-anniversary)', ink: 'var(--ev-anniversary-ink)' },
-  holiday: { icon: '🎉', label: 'Свято', mark: 'var(--ev-holiday)', ink: 'var(--ev-holiday-ink)' },
-  other: { icon: '🗺️', label: 'Плани', mark: 'var(--ev-other)', ink: 'var(--ev-other-ink)' },
+export const TYPES: Record<EventType, { label: string; mark: string; ink: string }> = {
+  birthday: { label: 'День народження', mark: 'var(--ev-birthday)', ink: 'var(--ev-birthday-ink)' },
+  anniversary: { label: 'Річниця', mark: 'var(--ev-anniversary)', ink: 'var(--ev-anniversary-ink)' },
+  holiday: { label: 'Свято', mark: 'var(--ev-holiday)', ink: 'var(--ev-holiday-ink)' },
+  other: { label: 'Плани', mark: 'var(--ev-other)', ink: 'var(--ev-other-ink)' },
 };
 
 export const PLAN_CATS: Record<
   PlanCategory,
-  { icon: string; label: string; color: string; gradient: string }
+  { label: string; color: string; gradient: string }
 > = {
-  date: { icon: '💑', label: 'Побачення', color: '#FF6B9D', gradient: 'linear-gradient(135deg,#FF6B9D,#E8829C)' },
-  dream: { icon: '✨', label: 'Мрії', color: '#9B6EA8', gradient: 'linear-gradient(135deg,#9B6EA8,#C084D4)' },
-  trip: { icon: '✈️', label: 'Подорожі', color: '#5BA3D9', gradient: 'linear-gradient(135deg,#5BA3D9,#7EC8E3)' },
-  goal: { icon: '🎯', label: 'Цілі', color: '#E8829C', gradient: 'linear-gradient(135deg,#E8829C,#F4A6BE)' },
-  other: { icon: '🗺️', label: 'Інше', color: '#B98A9A', gradient: 'linear-gradient(135deg,#B98A9A,#D4B0BC)' },
+  date: { label: 'Побачення', color: '#FF6B9D', gradient: 'linear-gradient(135deg,#FF6B9D,#E8829C)' },
+  dream: { label: 'Мрії', color: '#9B6EA8', gradient: 'linear-gradient(135deg,#9B6EA8,#C084D4)' },
+  trip: { label: 'Подорожі', color: '#5BA3D9', gradient: 'linear-gradient(135deg,#5BA3D9,#7EC8E3)' },
+  goal: { label: 'Цілі', color: '#E8829C', gradient: 'linear-gradient(135deg,#E8829C,#F4A6BE)' },
+  other: { label: 'Інше', color: '#B98A9A', gradient: 'linear-gradient(135deg,#B98A9A,#D4B0BC)' },
 };
 
-export const PLAN_STATUS: Record<PlanStatus, { label: string; icon: string; cls: string }> = {
-  planned: { label: 'Планується', icon: '⏳', cls: 'plan-status-planned' },
-  active: { label: 'В процесі', icon: '🔥', cls: 'plan-status-active' },
-  done: { label: 'Виконано!', icon: '✅', cls: 'plan-status-done' },
+// Значки живуть у components/icons/PlanIcon — тут лишились підпис і клас.
+export const PLAN_STATUS: Record<PlanStatus, { label: string; cls: string }> = {
+  planned: { label: 'Планується', cls: 'plan-status-planned' },
+  active: { label: 'В процесі', cls: 'plan-status-active' },
+  done: { label: 'Виконано!', cls: 'plan-status-done' },
 };
 
 export const PLAN_CAT_ORDER: PlanCategory[] = ['date', 'dream', 'trip', 'goal', 'other'];
@@ -108,7 +106,7 @@ export function daysUntil(dateObj: Date): number {
 }
 
 export function daysLabel(n: number): string {
-  if (n === 0) return '🎊 Сьогодні!';
+  if (n === 0) return 'Сьогодні!';
   if (n === 1) return 'завтра';
   if (n < 0) return `${Math.abs(n)} дн. тому`;
   if (n < 7) return `через ${n} дн.`;

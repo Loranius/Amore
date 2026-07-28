@@ -4,6 +4,8 @@
 // Читає metadata напряму (без регулярок). Тривалість рахується від
 // дати плану до done_at.
 // ============================================================
+import { CheckCircleIcon, PlanCatIcon } from '@/components/icons/PlanIcon';
+import { CalendarIcon, CheckIcon } from '@/components/icons/UiIcon';
 import { useEffect } from 'react';
 import { planMetadataOf } from '@/features/_shared/events';
 import { localDateFromISO } from '@/lib/utils';
@@ -50,23 +52,23 @@ export function PlanArchiveModal({ ev, onClose }: { ev: EventRow; onClose: () =>
     >
       <div className="modal-sheet plan-archive-modal" role="dialog" aria-modal="true">
         <div className="plan-archive-header" style={{ background: cat.gradient }}>
-          <span className="plan-archive-cat-icon">{cat.icon}</span>
+          <span className="plan-archive-cat-icon"><PlanCatIcon cat={meta.cat} size={22} /></span>
           <div>
             <div className="plan-archive-cat-label">{cat.label}</div>
             <div className="plan-archive-title">{ev.title}</div>
           </div>
-          <span className="plan-archive-done-badge">✅ Виконано</span>
+          <span className="plan-archive-done-badge"><CheckIcon size={13} /> Виконано</span>
         </div>
 
         <div className="plan-archive-body">
           {ev.description && <div className="plan-archive-note">{ev.description}</div>}
           <div className="plan-archive-meta-row">
             <div className="plan-archive-meta-item">
-              <div className="plan-archive-meta-label">📅 Дата плану</div>
+              <div className="plan-archive-meta-label"><CalendarIcon size={13} /> Дата плану</div>
               <div className="plan-archive-meta-val">{formatUaDate(ev.date)}</div>
             </div>
             <div className="plan-archive-meta-item">
-              <div className="plan-archive-meta-label">🏁 Виконано</div>
+              <div className="plan-archive-meta-label"><CheckCircleIcon size={13} /> Виконано</div>
               <div className="plan-archive-meta-val">{doneStr}</div>
             </div>
           </div>

@@ -42,7 +42,7 @@ export function EventList({ events, onEdit, onDelete }: EventListProps) {
         <Section events={upcoming} onEdit={onEdit} onDelete={onDelete} />
       )}
       {past.length > 0 && (
-        <Section title="✓ Минулі" events={past} onEdit={onEdit} onDelete={onDelete} muted />
+        <Section title="Минулі" events={past} onEdit={onEdit} onDelete={onDelete} muted />
       )}
     </div>
   );

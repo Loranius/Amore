@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { pluralUA } from '@/lib/utils';
 import { formatDateUA } from '@/features/_shared/month';
+import { SparkIcon } from '@/components/icons/EventIcon';
 import { presetDate, type HolidayPreset } from './holidayPresets';
 
 interface HolidayPresetsModalProps {
@@ -64,7 +65,7 @@ export function HolidayPresetsModal({
                 return (
                   <label key={p.md} className={`cal-preset-row${on ? ' cal-preset-row--on' : ''}`}>
                     <input type="checkbox" checked={on} onChange={() => toggle(p.md)} disabled={busy} />
-                    <span className="cal-preset-icon" aria-hidden="true">{p.icon}</span>
+                    <span className="cal-preset-icon"><SparkIcon size={16} /></span>
                     <span className="cal-preset-name">{p.title}</span>
                     <span className="cal-preset-date">{formatDateUA(presetDate(p.md), { year: false })}</span>
                   </label>

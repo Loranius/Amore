@@ -10,7 +10,7 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { TabBar } from '@/components/ui/TabBar';
-import { EventIcon } from '@/components/icons/EventIcon';
+import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
 import { planMetadataOf } from '@/features/_shared/events';
 import { useEvents, useCalendarMutations } from './useCalendar';
 import { enrichEvent, sortEnriched } from './calendarUtils';
@@ -139,7 +139,7 @@ export function CalendarPage() {
       ) : filter === 'holiday' && presets.length > 0 ? (
         <>
           <button type="button" className="cal-preset-cta" onClick={() => setPresetsOpen(true)}>
-            🎉 Додати типові свята
+            <span className="cal-preset-cta-hd"><SparkIcon size={17} /> Додати типові свята</span>
             <small>Новий рік, Незалежність, Різдво та інші — з перевіркою дат</small>
           </button>
           {filtered.length > 0 && (

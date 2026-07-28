@@ -10,6 +10,8 @@ import type { ReactNode } from 'react';
 import { planMetadataOf } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
 import { EventIcon } from '@/components/icons/EventIcon';
+import { FlameIcon, HourglassIcon, PlanCatIcon } from '@/components/icons/PlanIcon';
+import { BellIcon } from '@/components/icons/UiIcon';
 import { PLAN_CATS, PLAN_CAT_ORDER } from './calendarUtils';
 import type { NewEventInput, NewPlanInput } from './useCalendar';
 import type { EnrichedEvent, EventRow, EventType, PlanCategory } from '@/types';
@@ -168,7 +170,7 @@ export function AddEventModal({
           checked={isMilestone}
           onChange={(e) => setIsMilestone(e.target.checked)}
         />
-        <span>💍 Велика подія (заручини, весілля, важлива віха)</span>
+        <span>Велика подія — заручини, весілля, важлива віха</span>
       </label>
       {/* Галочка не косметична: `is_milestone` читає useCrystal і вирощує
           з неї вузол на головній. Досі про цей наслідок не було сказано
@@ -179,7 +181,7 @@ export function AddEventModal({
           за день і в сам день. Працює давно — і досі про це не було
           сказано ніде, тож людина не знала, чи взагалі щось прийде. */}
       <p className="cal-reminder-note">
-        🔔 Нагадаємо в Telegram за 3 дні, за день і зранку в сам день.
+        <BellIcon size={15} /> Нагадаємо в Telegram за 3 дні, за день і зранку в сам день.
       </p>
 
       <div className="modal-actions">
@@ -221,7 +223,7 @@ export function AddPlanModal({
   };
 
   return (
-    <ModalShell title={plan ? 'Редагувати план 🗺️' : 'Новий план 🗺️'} onClose={onClose}>
+    <ModalShell title={plan ? 'Редагувати план' : 'Новий план'} onClose={onClose}>
       <div className="form-field">
         <span>Категорія</span>
         <div className="chips">
@@ -236,7 +238,7 @@ export function AddPlanModal({
                 style={active ? { background: c.gradient, color: '#fff' } : undefined}
                 onClick={() => setCat(key)}
               >
-                {c.icon} {c.label}
+                <PlanCatIcon cat={key} size={15} /> {c.label}
               </button>
             );
           })}
@@ -280,14 +282,14 @@ export function AddPlanModal({
               className={`chip${status === 'planned' ? ' active' : ''}`}
               onClick={() => setStatus('planned')}
             >
-              ⏳ Планується
+              <HourglassIcon size={15} /> Планується
             </button>
             <button
               type="button"
               className={`chip${status === 'active' ? ' active' : ''}`}
               onClick={() => setStatus('active')}
             >
-              🔥 В процесі
+              <FlameIcon size={15} /> В процесі
             </button>
           </div>
         </div>

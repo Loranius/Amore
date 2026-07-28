@@ -14,6 +14,11 @@ import {
   daysLabel,
   formatUaDate,
 } from './calendarUtils';
+import { PlanCatIcon, PlanStatusIcon } from '@/components/icons/PlanIcon';
+import {
+  BoxIcon, CalendarIcon, CheckIcon, EyeIcon, PencilIcon, TrashIcon, UndoIcon, WarningIcon,
+} from '@/components/icons/UiIcon';
+import { FlagIcon } from '@/components/icons/EventIcon';
 import { PlanArchiveModal } from './PlanArchiveModal';
 import type { EnrichedEvent, PlanMetadata } from '@/types';
 
@@ -62,14 +67,14 @@ export function PlansBoard({ plans, onSetStatus, onEdit, onDelete }: PlansBoardP
           className={`plans-tab-btn${tab === 'active' ? ' active' : ''}`}
           onClick={() => setTab('active')}
         >
-          🗺️ Активні <span className="plans-tab-count">{active.length}</span>
+          <FlagIcon size={15} /> Активні <span className="plans-tab-count">{active.length}</span>
         </button>
         <button
           type="button"
           className={`plans-tab-btn${tab === 'archive' ? ' active' : ''}`}
           onClick={() => setTab('archive')}
         >
-          ✅ Архів <span className="plans-tab-count">{archive.length}</span>
+          <CheckIcon size={15} /> Архів <span className="plans-tab-count">{archive.length}</span>
         </button>
       </div>
 
@@ -90,7 +95,9 @@ export function PlansBoard({ plans, onSetStatus, onEdit, onDelete }: PlansBoardP
 
       {shown.length === 0 ? (
         <div className="plans-empty">
-          <div className="plans-empty-icon">{tab === 'archive' ? '📦' : '🗺️'}</div>
+          <div className="plans-empty-icon">
+            {tab === 'archive' ? <BoxIcon size={44} /> : <FlagIcon size={44} />}
+          </div>
           <p className="plans-empty-title">
             {tab === 'archive' ? 'Архів порожній' : 'Тут живуть ваші плани'}
           </p>
@@ -109,7 +116,7 @@ export function PlansBoard({ plans, onSetStatus, onEdit, onDelete }: PlansBoardP
             <div key={catKey} className="plans-section">
               <div className="plans-section-hdr">
                 <span className="plans-section-icon" style={{ background: cat.gradient }}>
-                  {cat.icon}
+                  <PlanCatIcon cat={catKey} size={17} />
                 </span>
                 <span className="plans-section-title">{cat.label}</span>
                 <span className="plans-section-count">{items.length}</span>
@@ -167,7 +174,7 @@ function PlanCard({
       0,
       Math.round((doneDate.getTime() - localDateFromISO(ev.date).getTime()) / 86_400_000),
     );
-    doneInfo = `✅ ${formatUaDate(meta.done_at)} · ${diffDay} дн.`;
+    doneInfo = `${formatUaDate(meta.done_at)} · ${diffDay} дн.`;
   }
 
   // Прострочений активний план раніше не показував НІЧОГО: умова була
@@ -181,37 +188,39 @@ function PlanCard({
       className={`plans-card${isArchive ? ' plans-card--done' : ''}${overdueDays ? ' plans-card--overdue' : ''}`}
     >
       <div className="plans-card-top" style={{ background: cat.gradient }}>
-        <span className="plans-card-cat-icon">{cat.icon}</span>
+        <span className="plans-card-cat-icon"><PlanCatIcon cat={meta.cat} size={19} /></span>
         <span className={`plans-card-status ${st.cls}`}>
-          {st.icon} {st.label}
+          <PlanStatusIcon status={meta.status} size={13} /> {st.label}
         </span>
       </div>
       <div className="plans-card-body">
         <div className="plans-card-title">{ev.title}</div>
         {ev.description && <div className="plans-card-note">{ev.description}</div>}
         <div className="plans-card-footer">
-          <span className="plans-card-date">📅 {formatUaDate(ev.date)}</span>
+          <span className="plans-card-date"><CalendarIcon size={13} /> {formatUaDate(ev.date)}</span>
           {overdueDays > 0 ? (
             <span className="plans-card-overdue">
-              ⚠️ прострочено на {overdueDays} дн.
+              <WarningIcon size={13} /> прострочено на {overdueDays} дн.
             </span>
           ) : !isArchive ? (
             <span className="plans-card-countdown" style={{ color: cat.color }}>
               {daysLabel(ev.days)}
             </span>
           ) : (
-            doneInfo && <span className="plans-card-done-time">{doneInfo}</span>
+            doneInfo && (
+              <span className="plans-card-done-time"><CheckIcon size={13} /> {doneInfo}</span>
+            )
           )}
         </div>
       </div>
       <div className="plans-card-actions">
         {isArchive ? (
           <>
-            <button type="button" className="plans-action-btn" onClick={onView} title="Переглянути">
-              👁
+            <button type="button" className="plans-action-btn" onClick={onView} title="Переглянути" aria-label="Переглянути">
+              <EyeIcon size={17} />
             </button>
-            <button type="button" className="plans-action-btn" onClick={onUndo} title="Повернути">
-              ↩️
+            <button type="button" className="plans-action-btn" onClick={onUndo} title="Повернути" aria-label="Повернути">
+              <UndoIcon size={17} />
             </button>
           </>
         ) : (
@@ -221,7 +230,7 @@ function PlanCard({
               className="plans-action-btn plans-done-big"
               onClick={onMarkDone}
             >
-              ✅ Позначити виконано
+              <CheckIcon size={16} /> Позначити виконано
             </button>
             <button
               type="button"
@@ -230,15 +239,15 @@ function PlanCard({
               title={meta.status === 'active' ? 'Повернути в «Планується»' : 'Позначити «В процесі»'}
               aria-label={meta.status === 'active' ? 'Повернути в «Планується»' : 'Позначити «В процесі»'}
             >
-              {meta.status === 'active' ? '⏳' : '🔥'}
+              <PlanStatusIcon status={meta.status === 'active' ? 'planned' : 'active'} size={17} />
             </button>
           </>
         )}
         <button type="button" className="plans-action-btn" onClick={onEdit} title="Редагувати" aria-label="Редагувати">
-          ✏️
+          <PencilIcon size={17} />
         </button>
         <button type="button" className="plans-action-btn" onClick={onDelete} title="Видалити" aria-label="Видалити">
-          🗑
+          <TrashIcon size={17} />
         </button>
       </div>
     </div>
