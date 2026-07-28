@@ -93,6 +93,8 @@ export interface PlanRow {
   location_name: string | null;
   /** map_pins.id, без зовнішнього ключа: мітку можна видалити. */
   place_id: number | null;
+  /** Скільки план коштуватиме. null — грошей не потребує або ще не рахували. */
+  budget: number | null;
   /** Заповнений лише коли план запропонував один партнер другому. */
   proposed_by: number | null;
   confirmed: boolean;
@@ -351,6 +353,8 @@ export interface SavingsGoalRow {
   /** Ім'я того, хто запропонував (історично текст, не FK). */
   proposed_by: string | null;
   saved_amount: number | null;
+  /** plans.id, коли ціль збирають під конкретний план. */
+  plan_id: number | null;
 }
 
 /** Побачення на спільний вихідний (pending/confirmed, той самий патерн, що savings_goals). */

@@ -20,7 +20,7 @@ import type { PlanCategory, PlanDatePrecision, PlanRow, PlanStatus, PlanTaskRow 
 // Один рядок-літерал, а не конкатенація: supabase-js виводить форму
 // відповіді з ТЕКСТУ select'а, і склеєний рядок для нього — просто
 // `string`, після чого data стає GenericStringError[].
-const PLAN_COLUMNS = 'id,title,description,category,status,cover_url,url,start_date,end_date,start_time,date_precision,location_name,place_id,proposed_by,confirmed,created_by,created_at,updated_at,completed_at';
+const PLAN_COLUMNS = 'id,title,description,category,status,cover_url,url,start_date,end_date,start_time,date_precision,location_name,place_id,budget,proposed_by,confirmed,created_by,created_at,updated_at,completed_at';
 
 const TASK_COLUMNS = 'id,plan_id,title,assigned_to,due_date,done,done_at,sort_order,created_at';
 
@@ -43,6 +43,7 @@ export interface PlanPatch {
   date_precision?: PlanDatePrecision;
   location_name?: string | null;
   place_id?: number | null;
+  budget?: number | null;
 }
 
 export function usePlans() {

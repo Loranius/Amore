@@ -50,7 +50,7 @@ amore-react/
         ├── auth/                 # LoginPage, UserSelect, PinPad
         ├── home/                 # HomePage, Counter, PhotosCloud, WeekWidget, HomeWidgets, Greeting
         ├── wishlist/             # WishlistPage, useWishlist.ts, WishCard, WishFormModal
-        ├── plans/                # PlansPage, PlanDetailsPage, usePlans.ts, planModel.ts
+        ├── plans/                # PlansPage, PlanDetailsPage, planModel.ts, planMoney.ts
         ├── piggybank/            # PiggyBankPage («Скарбничка»), useBudget.ts, FreeLimitCard
         ├── calendar/             # CalendarPage, useCalendar.ts, EventList, calendarPlans.ts
         ├── schedule/             # SchedulePage, useWorkSchedule.ts

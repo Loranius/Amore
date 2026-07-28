@@ -421,7 +421,12 @@
   white-space: nowrap;
 }
 
+/* inline-flex + flex:0 0 auto — значок у бейджі інакше стискається
+   flex-контейнером і форма тихо спотворюється. */
 .goal-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   width: fit-content;
   margin-top: 0.3rem;
   padding: 0.32rem 0.55rem;
@@ -441,6 +446,8 @@
   width: 38px;
   height: 38px;
   padding: 0;
+  display: grid;
+  place-items: center;
 }
 
 .fin-del-btn {
@@ -449,7 +456,7 @@
   color: var(--muted);
   padding: 0.25rem;
   font: inherit;
-  font-size: 1.25rem;
+  display: flex;
   cursor: pointer;
 }
 
@@ -899,3 +906,11 @@
     padding-block: 0.75rem;
   }
 }
+
+/* Плашка плану на картці цілі: зв'язок читається з обох боків. */
+.finance-goal-plan {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 2px;
+  font-size: 11.5px; font-weight: 700; color: var(--accent); text-decoration: none;
+}
+
+.goal-status-badge > svg { flex: 0 0 auto; }

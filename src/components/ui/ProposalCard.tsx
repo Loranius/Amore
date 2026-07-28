@@ -1,5 +1,5 @@
 // ============================================================
-// ProposalCard — «пропозиція → партнер голосує ✓/✕»
+// ProposalCard — «пропозиція → партнер голосує так/ні»
 // ------------------------------------------------------------
 // Розвиток TintedRow під конкретний повторюваний патерн (спільні
 // цілі, побачення, дзвіночок сповіщень): pending/confirmed бейдж +
@@ -10,11 +10,13 @@
 import type { ReactNode } from 'react';
 import { TintedRow } from './TintedRow';
 import { useConfirm } from '@/providers/ConfirmProvider';
+import { CheckCircleIcon, HourglassIcon } from '@/components/icons/PlanIcon';
+import { CheckIcon, CloseIcon } from '@/components/icons/UiIcon';
 
 export interface ProposalCardProps {
   pending: boolean;
   info: ReactNode;
-  /** Якщо не задано — дефолтний бейдж «⏳ Очікує {партнер}» / «✅ Підтверджено». */
+  /** Якщо не задано — дефолтний бейдж «Очікує {партнер}» / «Підтверджено». */
   badge?: ReactNode;
   proposedBy: string;
   meName: string;
@@ -54,9 +56,13 @@ export function ProposalCard({
           {info}
           {badge ?? (
             pending ? (
-              <span className="goal-status-badge">⏳ Очікує {partnerGen}</span>
+              <span className="goal-status-badge">
+                <HourglassIcon size={12} /> Очікує {partnerGen}
+              </span>
             ) : (
-              <span className="goal-status-badge goal-confirmed">✅ Підтверджено</span>
+              <span className="goal-status-badge goal-confirmed">
+                <CheckCircleIcon size={12} /> Підтверджено
+              </span>
             )
           )}
         </>
@@ -66,15 +72,21 @@ export function ProposalCard({
           {extraActions}
           {canVote && (
             <div className="goal-vote-btns">
-              <button type="button" className="btn goal-vote-yes" onClick={onConfirm}>
-                ✓
+              <button
+                type="button"
+                className="btn goal-vote-yes"
+                aria-label="Підтвердити"
+                onClick={onConfirm}
+              >
+                <CheckIcon size={16} />
               </button>
               <button
                 type="button"
                 className="btn-secondary goal-vote-no"
+                aria-label="Відхилити"
                 onClick={async () => (await confirmDialog(rejectConfirmMessage)) && onReject()}
               >
-                ✕
+                <CloseIcon size={16} />
               </button>
             </div>
           )}
@@ -85,7 +97,7 @@ export function ProposalCard({
               onClick={async () => (await confirmDialog(deleteConfirmMessage)) && onDelete!()}
               aria-label="Видалити"
             >
-              ×
+              <CloseIcon size={15} />
             </button>
           )}
         </>

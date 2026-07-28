@@ -2,9 +2,10 @@
 // Сторінка одного плану.
 // ------------------------------------------------------------
 // Тут план перестає бути рядком у списку: дата з потрібною точністю,
-// місце, статус і завдання підготовки. Бюджет і зв'язки з бажаннями,
-// мапою та спогадами — наступні етапи; сторінка навмисно лишає їм
-// місце внизу, а не вбудовує заглушки.
+// місце, статус, завдання підготовки й гроші — бюджет разом із цілями
+// скарбнички, які під нього збирають. Зв'язки з бажаннями, мапою та
+// спогадами — наступний етап; сторінка навмисно лишає їм місце внизу,
+// а не вбудовує заглушки.
 // ============================================================
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -15,6 +16,7 @@ import { PLAN_CATEGORIES, PLAN_PRECISION_LABEL, PLAN_STATUSES, PLAN_STATUS_ORDER
 import { daysUntilStart, hasPreciseDate, isClosed, planDateLabel } from './planModel';
 import { usePlanMutations, usePlans } from './usePlans';
 import { PlanTasks } from './PlanTasks';
+import { PlanMoneyBlock } from './PlanMoneyBlock';
 import './plans.css';
 import type { PlanDatePrecision } from '@/types';
 
@@ -159,6 +161,8 @@ export function PlanDetailsPage() {
       </div>
 
       <PlanTasks planId={plan.id} accent={cat.color} />
+
+      <PlanMoneyBlock plan={plan} accent={cat.color} />
 
       <button type="button" className="plan-delete" onClick={() => void remove()}>
         <TrashIcon size={15} /> Видалити план

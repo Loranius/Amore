@@ -17,7 +17,7 @@ const TODAY = new Date(2026, 6, 28); // 28 липня 2026, локальна п�
 const plan = (over: Partial<PlanRow> = {}): PlanRow => ({
   id: 1, title: 'План', description: null, category: 'other', status: 'planning',
   cover_url: null, url: null, start_date: null, end_date: null, start_time: null,
-  date_precision: 'none', location_name: null, place_id: null, proposed_by: null,
+  date_precision: 'none', location_name: null, place_id: null, budget: null, proposed_by: null,
   confirmed: true, created_by: 1, created_at: '2026-07-01T10:00:00Z',
   updated_at: '2026-07-01T10:00:00Z', completed_at: null,
   ...over,

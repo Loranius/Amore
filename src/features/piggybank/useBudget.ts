@@ -84,6 +84,7 @@ function normalizeGoalRow(value: unknown): BudgetGoalRow {
   const row = value as Record<string, unknown>;
   const id = row.id;
   const pausedAt = row.paused_at;
+  const planId = row.plan_id;
 
   if (
     typeof id !== 'string'
@@ -93,7 +94,13 @@ function normalizeGoalRow(value: unknown): BudgetGoalRow {
     throw new Error('savings_goals повернув некоректний UUID або стан паузи');
   }
 
-  return value as BudgetGoalRow;
+  // plan_id приходить із PostgREST як number або null. Мовчки лишити тут
+  // рядок означало б, що порівняння `goal.plan_id === plan.id` тихо не
+  // спрацює й ціль не знайде свій план.
+  return {
+    ...(value as BudgetGoalRow),
+    plan_id: planId === null || planId === undefined ? null : Number(planId),
+  };
 }
 
 export interface GoalContribution {
@@ -221,7 +228,7 @@ export function useGoals() {
       // paused_at щойно доданий міграцією і ще не входить до згенерованих типів.
       const table = supabase.from('savings_goals') as unknown as GoalTableReader;
       const { data, error } = await table
-        .select('id,name,target_amount,url,description,status,proposed_by,saved_amount,paused_at')
+        .select('id,name,target_amount,url,description,status,proposed_by,saved_amount,paused_at,plan_id')
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       return (data ?? []).map(normalizeGoalRow);
@@ -251,6 +258,8 @@ export interface NewGoalInput {
   description: string | null;
   target_amount: number;
   url: string | null;
+  /** Коли ціль заводять зі сторінки плану — вона одразу його. */
+  plan_id?: number | null;
 }
 
 export interface AddContributionInput {
@@ -283,6 +292,21 @@ export function useGoalMutations() {
 
   const add = useMutation({
     mutationFn: async (input: NewGoalInput) => {
+      // v3 замість v1 лише коли ціль заводять під план: створити, а
+      // потім прив'язати окремим викликом означало б вікно, у якому
+      // ціль уже видно обом, але вона ще нічия — на грошах із
+      // підтвердженням партнера це зайве питання «а це на що?».
+      if (input.plan_id != null) {
+        await callFinanceRpc('finance_create_savings_goal_v3', {
+          p_name: input.name,
+          p_description: input.description,
+          p_target_amount: input.target_amount,
+          p_url: input.url,
+          p_desired_date: null,
+          p_plan_id: input.plan_id,
+        });
+        return;
+      }
       await callFinanceRpc('finance_create_savings_goal_v1', {
         p_name: input.name,
         p_description: input.description,
@@ -292,6 +316,18 @@ export function useGoalMutations() {
     },
     onError,
     onSettled: () => invalidateGoal(),
+  });
+
+  /** Прив'язати ціль до плану або відв'язати (planId === null). */
+  const setGoalPlan = useMutation({
+    mutationFn: async ({ goalId, planId }: { goalId: string; planId: number | null }) => {
+      await callFinanceRpc('finance_set_savings_goal_plan_v1', {
+        p_goal_id: goalId,
+        p_plan_id: planId,
+      });
+    },
+    onError,
+    onSettled: (_data, _error, vars) => invalidateGoal(vars.goalId),
   });
 
   const confirm = useMutation({
@@ -380,5 +416,6 @@ export function useGoalMutations() {
     addContribution,
     deleteContribution,
     addFunds,
+    setGoalPlan,
   };
 }

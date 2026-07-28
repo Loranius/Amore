@@ -6,6 +6,7 @@
 // окремий прогрес і окремий м’який прогноз.
 // ============================================================
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { ProposalCard } from '@/components/ui/ProposalCard';
@@ -15,6 +16,8 @@ import { GoalDesiredDateModal, GoalForecastCard } from './GoalForecast';
 import { GoalMilestones } from './GoalMilestones';
 import { useGoalForecastMutations, useGoalForecasts } from './useGoalForecast';
 import { SparkIcon } from '@/components/icons/EventIcon';
+import { PlansIcon } from '@/components/icons/NavIcon';
+import { usePlans } from '@/features/plans/usePlans';
 import { TargetIcon } from '@/components/icons/PlanIcon';
 import { CheckIcon, CommentIcon, ExternalLinkIcon, ListIcon, PauseIcon, PlayIcon } from '@/components/icons/UiIcon';
 import {
@@ -45,6 +48,10 @@ export function GoalsList() {
     addContribution,
   } = useGoalMutations();
   const { setDesiredDate } = useGoalForecastMutations();
+  // Лише назви: сама сторінка плану лишається за посиланням, а тягнути
+  // сюди весь модуль планів заради одного рядка не треба.
+  const { data: plans = [] } = usePlans();
+  const planTitles = new Map(plans.map((p) => [p.id, p.title]));
 
   const [adding, setAdding] = useState(false);
   const [funding, setFunding] = useState<BudgetGoalRow | null>(null);
@@ -127,6 +134,14 @@ export function GoalsList() {
                     info={
                       <>
                         <span className="goal-row-name">{goal.name}</span>
+                        {/* Саме тут план потрібен найбільше: партнер бачить
+                            пропозицію першим і мусить розуміти, на що
+                            голосує, не відкриваючи інший розділ. */}
+                        {goal.plan_id !== null && planTitles.has(goal.plan_id) && (
+                          <Link className="finance-goal-plan" to={`/plans/${goal.plan_id}`}>
+                            <PlansIcon size={12} /> {planTitles.get(goal.plan_id)}
+                          </Link>
+                        )}
                         {goal.description && <span className="goal-row-desc">{goal.description}</span>}
                         {goal.url && (
                           <a className="goal-row-link" href={goal.url} target="_blank" rel="noopener noreferrer">
@@ -148,6 +163,15 @@ export function GoalsList() {
                     <span className="finance-goal-cover" aria-hidden="true"><TargetIcon size={22} /></span>
                     <div className="finance-goal-heading-copy">
                       <h3>{goal.name}</h3>
+                      {/* Зв'язок мусить читатись з обох боків: зі сторінки
+                          плану видно ціль, а тут — заради чого збираємо.
+                          Інакше «Карпати» у скарбничці лишались би просто
+                          сумою без причини. */}
+                      {goal.plan_id !== null && planTitles.has(goal.plan_id) && (
+                        <Link className="finance-goal-plan" to={`/plans/${goal.plan_id}`}>
+                          <PlansIcon size={12} /> {planTitles.get(goal.plan_id)}
+                        </Link>
+                      )}
                       {goal.description && <p>{goal.description}</p>}
                       {goal.url && (
                         <a href={goal.url} target="_blank" rel="noopener noreferrer">
