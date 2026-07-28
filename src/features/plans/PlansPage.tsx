@@ -1,9 +1,9 @@
 // ============================================================
 // «Плани» — карта спільного шляху.
 // ------------------------------------------------------------
-// Календарні річниці й великі події показують уже пройдений шлях,
-// «Ви тут» відділяє минуле від майбутнього, а датовані плани та майбутні
-// віхи продовжують ту саму стежку. Дані не дублюються між модулями.
+// Календарні річниці, великі події та виконані плани показують уже
+// пройдений шлях. «Ви тут» відділяє його від майбутніх планів і віх.
+// Фото виконаного плану береться з центрального архіву без копіювання.
 // ============================================================
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -14,7 +14,9 @@ import { pluralUA } from '@/lib/utils';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useCalendarMutations, useEvents } from '@/features/calendar/useCalendar';
 import type { NewEventInput } from '@/features/calendar/useCalendar';
+import { useMemories } from '@/features/memories/useMemories';
 import { usePlanMutations, usePlans } from './usePlans';
+import { usePlanLinks } from './usePlanLinks';
 import { isClosed, nextPlan, planDateLabel, sortPlans } from './planModel';
 import { PLAN_CATEGORIES, PLAN_STATUSES } from './planConstants';
 import { AddPlanModal } from './AddPlanModal';
@@ -22,7 +24,8 @@ import { AddMilestoneModal } from './AddMilestoneModal';
 import './plans.css';
 import './plansJourney.css';
 import './plansMilestones.css';
-import type { EventRow, PlanRow } from '@/types';
+import './plansMemories.css';
+import type { EventRow, MemoryRow, PlanRow } from '@/types';
 
 const ROUTE_ROW_HEIGHT = 166;
 const IDEAS_PREVIEW_LIMIT = 6;
@@ -33,6 +36,10 @@ interface JourneyPath {
   height: number;
   d: string;
 }
+
+type PastJourneyItem =
+  | { kind: 'milestone'; date: string; event: EventRow }
+  | { kind: 'completed-plan'; date: string; plan: PlanRow; memories: MemoryRow[] };
 
 type FutureJourneyItem =
   | { kind: 'milestone'; date: string; event: EventRow }
@@ -54,6 +61,12 @@ function milestoneDateLabel(date: string): string {
 
 function relationshipMoment(event: EventRow): boolean {
   return event.type === 'anniversary' || event.is_milestone;
+}
+
+function completedPlanDate(plan: PlanRow): string {
+  return plan.completed_at?.slice(0, 10)
+    ?? plan.start_date
+    ?? plan.created_at.slice(0, 10);
 }
 
 function routeNodeX(index: number): number {
@@ -148,6 +161,49 @@ function JourneyPlanStop({
             Підтвердити
           </button>
         )}
+      </article>
+    </div>
+  );
+}
+
+function JourneyCompletedPlan({
+  plan,
+  memories,
+  index,
+}: {
+  plan: PlanRow;
+  memories: MemoryRow[];
+  index: number;
+}) {
+  const category = PLAN_CATEGORIES[plan.category];
+  const side = index % 2 === 0 ? 'left' : 'right';
+  const style = { '--plan-journey-accent': category.color } as CSSProperties;
+  const cover = memories[0] ?? null;
+
+  return (
+    <div
+      className={`plan-journey-stop plan-journey-stop--${side} plan-journey-stop--completed`}
+      style={style}
+    >
+      <span className="plan-journey-marker" aria-hidden="true"><category.Icon size={18} /></span>
+      <article className="plan-journey-card">
+        <Link
+          className="plan-journey-card-open"
+          to={`/plans/${plan.id}`}
+          aria-label={`Відкрити пройдений момент «${plan.title}»`}
+        />
+        {cover && <img className="plan-journey-completed-photo" src={cover.photo_url} alt="" loading="lazy" />}
+        <span className="plan-journey-card-kicker">Пройдений момент</span>
+        <strong>{plan.title}</strong>
+        <span className="plan-journey-card-meta">
+          <span>{milestoneDateLabel(completedPlanDate(plan))}</span>
+          {plan.location_name && <span>{plan.location_name}</span>}
+        </span>
+        <span className="plan-journey-memory-count">
+          {memories.length > 0
+            ? `${memories.length} ${memories.length === 1 ? 'фото' : 'фото'} у спогадах`
+            : 'Додати фото до моменту'}
+        </span>
       </article>
     </div>
   );
@@ -250,6 +306,8 @@ export function PlansPage() {
     refetch: refetchEvents,
     isFetching: eventsFetching,
   } = useEvents();
+  const { data: planLinks = [] } = usePlanLinks();
+  const { data: memoryArchive } = useMemories();
   const { addPlan, confirmPlan } = usePlanMutations();
   const { addEvent, updateEvent, deleteEvent } = useCalendarMutations();
 
@@ -268,7 +326,28 @@ export function PlansPage() {
     () => sorted.filter((plan) => !isClosed(plan) && plan.start_date === null),
     [sorted],
   );
-  const closed = useMemo(() => sorted.filter((plan) => isClosed(plan)), [sorted]);
+  const donePlans = useMemo(() => sorted.filter((plan) => plan.status === 'done'), [sorted]);
+  const archived = useMemo(
+    () => sorted.filter((plan) => plan.status === 'postponed' || plan.status === 'cancelled'),
+    [sorted],
+  );
+
+  const memoriesByPlan = useMemo(() => {
+    const byId = new Map((memoryArchive?.photos ?? []).map((memory) => [memory.id, memory]));
+    const result = new Map<number, MemoryRow[]>();
+    for (const link of planLinks) {
+      if (link.target_type !== 'memory') continue;
+      const memory = byId.get(link.target_id);
+      if (!memory) continue;
+      const list = result.get(link.plan_id) ?? [];
+      list.push(memory);
+      result.set(link.plan_id, list);
+    }
+    for (const list of result.values()) {
+      list.sort((left, right) => left.memory_date.localeCompare(right.memory_date) || left.id - right.id);
+    }
+    return result;
+  }, [memoryArchive?.photos, planLinks]);
 
   const today = localDateKey();
   const moments = useMemo(
@@ -283,11 +362,30 @@ export function PlansPage() {
     [moments, today],
   );
   const origin = pastMoments[0] ?? null;
-  const history = origin ? pastMoments.slice(1) : pastMoments;
   const futureMoments = useMemo(
     () => moments.filter((event) => event.date > today),
     [moments, today],
   );
+
+  const historyItems = useMemo<PastJourneyItem[]>(() => {
+    const items: PastJourneyItem[] = [
+      ...(origin ? pastMoments.slice(1) : pastMoments).map((event) => ({
+        kind: 'milestone' as const,
+        date: event.date,
+        event,
+      })),
+      ...donePlans.map((plan) => ({
+        kind: 'completed-plan' as const,
+        date: completedPlanDate(plan),
+        plan,
+        memories: memoriesByPlan.get(plan.id) ?? [],
+      })),
+    ];
+    return items
+      .filter((item) => origin === null || item.date >= origin.date)
+      .sort((left, right) => left.date.localeCompare(right.date) || left.kind.localeCompare(right.kind));
+  }, [donePlans, memoriesByPlan, origin, pastMoments]);
+
   const futureItems = useMemo<FutureJourneyItem[]>(() => {
     const items: FutureJourneyItem[] = [
       ...futureMoments.map((event) => ({ kind: 'milestone' as const, date: event.date, event })),
@@ -297,15 +395,16 @@ export function PlansPage() {
   }, [dated, futureMoments]);
 
   const routeXs = useMemo(() => {
-    const xs = history.map((_event, index) => routeNodeX(index));
+    const xs = historyItems.map((_item, index) => routeNodeX(index));
     xs.push(50);
-    futureItems.forEach((_item, offset) => xs.push(routeNodeX(history.length + 1 + offset)));
+    futureItems.forEach((_item, offset) => xs.push(routeNodeX(historyItems.length + 1 + offset)));
     return xs;
-  }, [futureItems, history]);
+  }, [futureItems, historyItems]);
   const route = useMemo(() => journeyPath(routeXs), [routeXs]);
 
   const visibleIdeas = showAllIdeas ? ideas : ideas.slice(0, IDEAS_PREVIEW_LIMIT);
   const activeCount = dated.length + ideas.length;
+  const historyCount = moments.length + donePlans.length;
   const journeyPending = plansPending || eventsPending;
   const journeyError = plansError || eventsError;
   const journeyFetching = plansFetching || eventsFetching;
@@ -377,7 +476,7 @@ export function PlansPage() {
           {!journeyPending && !journeyError && (
             <div className="plan-journey-counts">
               <span className="plan-journey-count plan-journey-count--history">
-                {moments.length} {pluralUA(moments.length, ['віха на карті', 'віхи на карті', 'віх на карті'])}
+                {historyCount} {pluralUA(historyCount, ['момент на карті', 'моменти на карті', 'моментів на карті'])}
               </span>
               <span className="plan-journey-count">
                 {activeCount} {pluralUA(activeCount, ['план попереду', 'плани попереду', 'планів попереду'])}
@@ -454,20 +553,27 @@ export function PlansPage() {
               </svg>
 
               <div className="plan-journey-stops">
-                {history.map((event, index) => (
+                {historyItems.map((item, index) => item.kind === 'milestone' ? (
                   <JourneyMilestone
-                    key={`milestone-${event.id}`}
-                    event={event}
+                    key={`milestone-${item.event.id}`}
+                    event={item.event}
                     index={index}
                     future={false}
                     onOpen={openMilestone}
+                  />
+                ) : (
+                  <JourneyCompletedPlan
+                    key={`completed-plan-${item.plan.id}`}
+                    plan={item.plan}
+                    memories={item.memories}
+                    index={index}
                   />
                 ))}
 
                 <JourneyNow />
 
                 {futureItems.map((item, offset) => {
-                  const index = history.length + 1 + offset;
+                  const index = historyItems.length + 1 + offset;
                   return item.kind === 'milestone' ? (
                     <JourneyMilestone
                       key={`milestone-${item.event.id}`}
@@ -527,18 +633,18 @@ export function PlansPage() {
             </section>
           )}
 
-          {closed.length > 0 && (
+          {archived.length > 0 && (
             <details className="plan-journey-archive">
               <summary>
                 <span className="plan-journey-archive-title">
-                  <small>Позаду</small>
-                  <strong>Пройдений шлях</strong>
+                  <small>Поза стежкою</small>
+                  <strong>Відкладене й скасоване</strong>
                 </span>
-                <span className="plan-journey-archive-count">{closed.length}</span>
+                <span className="plan-journey-archive-count">{archived.length}</span>
               </summary>
 
               <div className="plan-journey-archive-list">
-                {closed.map((plan) => {
+                {archived.map((plan) => {
                   const category = PLAN_CATEGORIES[plan.category];
                   const status = PLAN_STATUSES[plan.status];
                   const date = planDateLabel(plan);
