@@ -18,6 +18,10 @@ import { PlansBoard } from './PlansBoard';
 import { AddEventModal, AddPlanModal } from './AddEventModal';
 import { HolidayPresetsModal } from './HolidayPresetsModal';
 import { missingPresets } from './holidayPresets';
+import { CalendarViewPicker } from './CalendarViewPicker';
+import { CalendarMonthView, CalendarYearView } from './CalendarViews';
+import { useCalendarView } from './calendarView';
+import { currentYearMonth, stepMonth } from '@/features/_shared/month';
 import type { EnrichedEvent, EventType } from '@/types';
 
 const TAB_DEFS: { type: EventType; label: string }[] = [
@@ -48,6 +52,8 @@ export function CalendarPage() {
   const [filter, setFilter] = useState<EventType>('anniversary');
   const [modal, setModal] = useState<ModalState>(null);
   const [presetsOpen, setPresetsOpen] = useState(false);
+  const [view, setView] = useCalendarView();
+  const [{ yr, mo }, setYm] = useState(currentYearMonth);
 
   // Заготовки рахуємо по ВСІХ подіях, а не лише по вкладці свят: 24
   // серпня, заведене колись як «Інша подія», однаково займає той день.
@@ -82,12 +88,18 @@ export function CalendarPage() {
         </button>
       </div>
 
-      <TabBar<EventType>
-        variant="scroll"
-        value={filter}
-        onChange={setFilter}
-        items={TAB_DEFS.map((def) => ({ value: def.type, label: def.label, count: counts[def.type] }))}
-      />
+      <CalendarViewPicker value={view} onChange={setView} />
+
+      {/* Вкладки типів мають сенс лише у списку: сітка й рік показують усі
+          типи одразу — заради того їх і відкривають. */}
+      {view === 'list' && (
+        <TabBar<EventType>
+          variant="scroll"
+          value={filter}
+          onChange={setFilter}
+          items={TAB_DEFS.map((def) => ({ value: def.type, label: def.label, count: counts[def.type] }))}
+        />
+      )}
 
       {isPending ? (
         <CalendarSkeleton />
@@ -98,6 +110,24 @@ export function CalendarPage() {
             {isFetching ? 'Пробую…' : 'Спробувати ще раз'}
           </button>
         </div>
+      ) : view === 'month' ? (
+        <CalendarMonthView
+          events={events}
+          yr={yr}
+          mo={mo}
+          onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
+          onOpenEvent={(ev) => setModal({
+            kind: (ev.type ?? 'other') === 'other' ? 'plan' : 'event',
+            row: enriched.find((e) => e.id === ev.id) ?? null,
+          })}
+        />
+      ) : view === 'year' ? (
+        <CalendarYearView
+          events={events}
+          yr={yr}
+          onStepYear={(delta) => setYm({ yr: yr + delta, mo })}
+          onOpenMonth={(month) => { setYm({ yr, mo: month }); setView('month'); }}
+        />
       ) : filter === 'holiday' && presets.length > 0 ? (
         <>
           <button type="button" className="cal-preset-cta" onClick={() => setPresetsOpen(true)}>

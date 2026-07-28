@@ -66,7 +66,7 @@ export const PLAN_CAT_ORDER: PlanCategory[] = ['date', 'dream', 'trip', 'goal', 
  * `supabase/functions/event-reminders/index.ts`; edge-функція не імпортує
  * з `src/`, тож при зміні конвенції правити треба обидва місця.
  */
-function sameDayInYear(year: number, month: number, day: number): Date {
+export function sameDayInYear(year: number, month: number, day: number): Date {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   return new Date(year, month, Math.min(day, daysInMonth));
 }
