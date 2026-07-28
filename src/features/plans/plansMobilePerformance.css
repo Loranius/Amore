@@ -1,0 +1,176 @@
+/* ============================================================
+   Мобільний performance budget для «Планів».
+   ------------------------------------------------------------
+   Основна карта зберігає атмосферу, але не змушує touch-пристрої
+   безперервно перемальовувати довгий SVG, шість хмар і десятки тіней.
+   ============================================================ */
+
+/* Off-screen вузли не фарбуються, але зберігають стабільну висоту. */
+.plan-journey-stop {
+  min-height: 154px;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 154px;
+}
+
+.plan-idea-cove,
+.plan-journey-archive {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
+}
+
+.plan-journey-route-svg {
+  contain: paint;
+}
+
+/* За замовчуванням жодних нескінченних анімацій. */
+.plan-journey-path-dash,
+.plan-journey-stop--current .plan-journey-marker::before,
+.plan-journey-cloud {
+  animation: none;
+}
+
+.plan-journey-load-more {
+  position: relative;
+  z-index: 8;
+  display: block;
+  min-height: 38px;
+  margin: 2px auto 8px;
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.plan-journey-load-more--history {
+  margin-top: 2px;
+  margin-bottom: 0;
+}
+
+.plan-journey-load-more--future {
+  margin-top: -72px;
+  margin-bottom: 86px;
+}
+
+/* Повний рух доступний лише пристроям із точною мишею. */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .plan-journey-path-dash {
+    animation: plan-journey-path-drift 20s linear infinite;
+  }
+
+  .plan-journey-stop--current .plan-journey-marker::before {
+    animation: plan-journey-current-pulse 2.8s ease-out infinite;
+  }
+
+  .plan-journey-cloud {
+    animation: plan-journey-cloud-drift var(--plan-cloud-duration, 22s) ease-in-out infinite alternate;
+  }
+}
+
+@media (max-width: 768px), (hover: none), (pointer: coarse) {
+  .plan-journey-hero,
+  .plan-journey-shell,
+  .plan-idea-cove {
+    box-shadow: none;
+  }
+
+  .plan-journey-hero::after {
+    filter: none;
+  }
+
+  .plan-journey-shell {
+    contain: paint;
+    background:
+      linear-gradient(160deg,
+        color-mix(in srgb, #e8c985 4%, var(--surface)),
+        var(--surface) 58%,
+        color-mix(in srgb, var(--accent) 4%, var(--surface)));
+  }
+
+  .plan-journey-shell::before {
+    display: none;
+  }
+
+  .plan-journey-route {
+    padding-inline: 10px;
+  }
+
+  .plan-journey-fog {
+    filter: none;
+  }
+
+  .plan-journey-cloud {
+    border-color: color-mix(in srgb, white 14%, transparent);
+    background: color-mix(in srgb, var(--surface) 90%, transparent);
+    box-shadow: none;
+    opacity: .74;
+  }
+
+  .plan-journey-cloud::before,
+  .plan-journey-cloud::after {
+    box-shadow: none;
+  }
+
+  .plan-journey-marker,
+  .plan-journey-origin-mark {
+    box-shadow: 0 3px 10px color-mix(in srgb, var(--plan-journey-accent, var(--accent)) 15%, transparent);
+  }
+
+  .plan-journey-card,
+  .plan-journey-stop--current .plan-journey-card {
+    background: color-mix(in srgb, var(--plan-journey-accent) 4%, var(--surface));
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--text) 7%, transparent);
+    transform: none;
+  }
+
+  .plan-journey-card-description {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .plan-journey-completed-photo {
+    contain: paint;
+  }
+
+  .plan-idea-note {
+    border-radius: 16px;
+    box-shadow: none;
+    clip-path: none;
+    transform: none;
+  }
+
+  .plan-idea-note::after {
+    display: none;
+  }
+
+  .plan-detail-orbit {
+    display: none;
+  }
+
+  .plan-detail-hero,
+  .plan-disclosure {
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .plan-journey-load-more--future {
+    margin-top: -66px;
+    margin-bottom: 82px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-journey-path-dash,
+  .plan-journey-stop--current .plan-journey-marker::before,
+  .plan-journey-cloud {
+    animation: none !important;
+  }
+}
