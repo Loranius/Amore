@@ -9,6 +9,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { planMetadataOf } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
+import { EventIcon } from '@/components/icons/EventIcon';
 import { PLAN_CATS, PLAN_CAT_ORDER } from './calendarUtils';
 import type { NewEventInput, NewPlanInput } from './useCalendar';
 import type { EnrichedEvent, EventRow, EventType, PlanCategory } from '@/types';
@@ -19,9 +20,9 @@ import type { EnrichedEvent, EventRow, EventType, PlanCategory } from '@/types';
 // категорії «Інше» і псувала лічильник «N / M планів виконано».
 // Плани створюються своєю модалкою, події — цією.
 const EVENT_TYPES: { type: EventType; label: string }[] = [
-  { type: 'birthday', label: '🎂 День народження' },
-  { type: 'anniversary', label: '💕 Річниця' },
-  { type: 'holiday', label: '🎉 Свято' },
+  { type: 'birthday', label: 'День народження' },
+  { type: 'anniversary', label: 'Річниця' },
+  { type: 'holiday', label: 'Свято' },
 ];
 
 function ModalShell({ title, children, onClose }: {
@@ -99,6 +100,7 @@ export function AddEventModal({
               className={`chip${type === t.type ? ' active' : ''}`}
               onClick={() => setType(t.type)}
             >
+              <EventIcon type={t.type} size={15} />
               {t.label}
             </button>
           ))}

@@ -9,6 +9,7 @@
 // цей час випливали з даних і ніде не показувались.
 // ============================================================
 import { useUsersMap } from '@/features/_shared/useUsers';
+import { EventIcon } from '@/components/icons/EventIcon';
 import { formatDateUA } from '@/features/_shared/month';
 import {
   TYPES, daysLabel, occurrenceISO, occurrenceLabel,
@@ -57,7 +58,9 @@ function NextBanner({ ev, onEdit }: { ev: EnrichedEvent; onEdit: (ev: EnrichedEv
       style={{ borderColor: t.mark }}
       onClick={() => onEdit(ev)}
     >
-      <div className="cal-next-icon">{t.icon}</div>
+      <div className="cal-next-icon" style={{ color: t.mark }}>
+        <EventIcon type={ev.type} size={34} />
+      </div>
       <div className="cal-next-info">
         <div className="cal-next-label">Найближча</div>
         <div className="cal-next-title">{ev.title}</div>
@@ -124,7 +127,9 @@ function EventRow({
         aria-label={`Редагувати «${ev.title}»`}
       />
       <div className="cal-event-type-bar" style={{ background: t.mark }} />
-      <div className="cal-event-icon">{t.icon}</div>
+      <div className="cal-event-icon" style={{ color: t.mark }}>
+        <EventIcon type={ev.type} size={21} />
+      </div>
       <div className="cal-event-info">
         <div className="cal-event-title">
           {ev.title}

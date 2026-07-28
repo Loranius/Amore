@@ -11,12 +11,14 @@
 // variant="scroll" — контент-ширина + горизонтальний скрол (багато
 //                    пунктів: категорії, фільтри).
 // ============================================================
+import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface TabBarItem<T extends string = string> {
   value: T;
   label: string;
-  icon?: string;
+  /** Емодзі-рядок (решта модулів) або мальований значок. */
+  icon?: ReactNode;
   count?: number;
   disabled?: boolean;
 }
@@ -44,7 +46,7 @@ export function TabBar<T extends string>({
           disabled={it.disabled}
           onClick={() => onChange(it.value)}
         >
-          {it.icon && <span aria-hidden="true">{it.icon} </span>}
+          {it.icon && <span className="tab-icon" aria-hidden="true">{it.icon}</span>}
           {it.label}
           {it.count !== undefined && <span className="tab-bar-count">{it.count}</span>}
         </button>

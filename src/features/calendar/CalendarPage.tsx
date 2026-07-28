@@ -10,6 +10,7 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { TabBar } from '@/components/ui/TabBar';
+import { EventIcon } from '@/components/icons/EventIcon';
 import { planMetadataOf } from '@/features/_shared/events';
 import { useEvents, useCalendarMutations } from './useCalendar';
 import { enrichEvent, sortEnriched } from './calendarUtils';
@@ -24,11 +25,13 @@ import { useCalendarView } from './calendarView';
 import { currentYearMonth, stepMonth } from '@/features/_shared/month';
 import type { EnrichedEvent, EventType } from '@/types';
 
+// Значок окремо від підпису: TabBar приймає ReactNode, тож малюємо
+// той самий набір, що й у списку, а не системне емодзі.
 const TAB_DEFS: { type: EventType; label: string }[] = [
-  { type: 'anniversary', label: '💕 Наші свята' },
-  { type: 'birthday', label: '🎂 Дні народження' },
-  { type: 'holiday', label: '🎉 Свята' },
-  { type: 'other', label: '🗺️ Плани' },
+  { type: 'anniversary', label: 'Наші свята' },
+  { type: 'birthday', label: 'Дні народження' },
+  { type: 'holiday', label: 'Свята' },
+  { type: 'other', label: 'Плани' },
 ];
 
 /**
@@ -97,7 +100,12 @@ export function CalendarPage() {
           variant="scroll"
           value={filter}
           onChange={setFilter}
-          items={TAB_DEFS.map((def) => ({ value: def.type, label: def.label, count: counts[def.type] }))}
+          items={TAB_DEFS.map((def) => ({
+            value: def.type,
+            label: def.label,
+            icon: <EventIcon type={def.type} size={15} />,
+            count: counts[def.type],
+          }))}
         />
       )}
 

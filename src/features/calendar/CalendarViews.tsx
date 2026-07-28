@@ -11,6 +11,7 @@
 // ============================================================
 import { DAYS_UA, MONTHS_UA, daysInMonth, firstMondayOffset, formatDateUA, todayLocal, ymd } from '@/features/_shared/month';
 import { pluralUA } from '@/lib/utils';
+import { EventIcon } from '@/components/icons/EventIcon';
 import { TYPES } from './calendarUtils';
 import { eventsByDay, yearSummary } from './calendarMonth';
 import type { EventRow } from '@/types';
@@ -90,7 +91,9 @@ export function CalendarMonthView({
               <div className="cal-day-num">{formatDateUA(ymd(yr, mo, day), { year: false })}</div>
               {list.map((ev) => (
                 <button key={ev.id} type="button" className="cal-day-event" onClick={() => onOpenEvent(ev)}>
-                  <span aria-hidden="true">{TYPES[ev.type ?? 'other'].icon}</span>
+                  <span style={{ color: TYPES[ev.type ?? 'other'].mark, display: 'flex' }}>
+                    <EventIcon type={ev.type} size={19} />
+                  </span>
                   <span className="cal-day-event-title">{ev.title}</span>
                 </button>
               ))}
