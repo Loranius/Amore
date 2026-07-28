@@ -7,7 +7,7 @@
 // конкретного плану.
 // ============================================================
 import { useMemo, useState, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 import { pluralUA } from '@/lib/utils';
@@ -149,9 +149,11 @@ function IdeaNote({ plan, onConfirm }: { plan: PlanRow; onConfirm: (id: number) 
 }
 
 export function PlansPage() {
+  const navigate = useNavigate();
   const { data: plans = [], isPending, isError, refetch, isFetching } = usePlans();
   const { addPlan, confirmPlan } = usePlanMutations();
   const [adding, setAdding] = useState(false);
+  const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
   const [showAllIdeas, setShowAllIdeas] = useState(false);
 
   const sorted = useMemo(() => sortPlans(plans), [plans]);
@@ -171,6 +173,18 @@ export function PlansPage() {
 
   const confirm = (id: number) => confirmPlan.mutate(id);
 
+  const openAdd = () => {
+    addPlan.reset();
+    setCreatedPlanId(null);
+    setAdding(true);
+  };
+
+  const closeAdd = () => {
+    if (addPlan.isPending) return;
+    setAdding(false);
+    setCreatedPlanId(null);
+  };
+
   return (
     <section className="plans">
       <header className="plan-journey-hero">
@@ -185,7 +199,7 @@ export function PlansPage() {
           )}
         </div>
 
-        <button type="button" className="btn plan-journey-add" onClick={() => setAdding(true)}>
+        <button type="button" className="btn plan-journey-add" onClick={openAdd}>
           <PlusIcon size={15} /> План
         </button>
       </header>
@@ -248,7 +262,7 @@ export function PlansPage() {
             <footer className="plan-journey-future">
               <strong>Далі шлях ховається в тумані</strong>
               <p>Майбутнє ще не нанесене на карту — нова пригода може початися з однієї ідеї.</p>
-              <button type="button" className="btn" onClick={() => setAdding(true)}>
+              <button type="button" className="btn" onClick={openAdd}>
                 <PlusIcon size={14} /> Відкрити нову точку
               </button>
             </footer>
@@ -325,8 +339,16 @@ export function PlansPage() {
       {adding && (
         <AddPlanModal
           busy={addPlan.isPending}
-          onClose={() => setAdding(false)}
-          onSubmit={(input) => addPlan.mutate(input)}
+          createdPlanId={createdPlanId}
+          onClose={closeAdd}
+          onSubmit={(input) => addPlan.mutate(input, {
+            onSuccess: (plan) => setCreatedPlanId(plan.id),
+          })}
+          onContinue={(id) => {
+            setAdding(false);
+            setCreatedPlanId(null);
+            navigate(`/plans/${id}?setup=1`);
+          }}
         />
       )}
     </section>
