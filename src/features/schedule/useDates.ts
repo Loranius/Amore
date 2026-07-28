@@ -2,7 +2,7 @@
 // useDates — «Побачення» на спільний вихідний
 // ------------------------------------------------------------
 // Той самий патерн pending/confirmed + proposed_by, що спільні цілі
-// (useGoalMutations у features/budget/useBudget.ts): пропозиція йде
+// (useGoalMutations у features/piggybank/useBudget.ts): пропозиція йде
 // в Telegram партнеру з кнопками ✅/❌ (тригер БД → db-notify), а
 // підтвердити/відхилити можна і звідти, і з сайту (дзвіночок або
 // список на цій сторінці).

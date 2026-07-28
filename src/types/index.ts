@@ -53,8 +53,66 @@ export type PinCategory = 'visited' | 'restaurant' | 'favorite';
 
 export type EventType = 'birthday' | 'anniversary' | 'holiday' | 'other';
 
-export type PlanCategory = 'date' | 'dream' | 'trip' | 'goal' | 'other';
-export type PlanStatus = 'planned' | 'active' | 'done';
+/**
+ * Категорії й статуси модуля «Плани».
+ *
+ * Старий набір (`date|dream|trip|goal|other` × `planned|active|done`) жив
+ * у JSONB `events.metadata`, поки плани були вкладкою календаря. Він
+ * змішував різні речі: «Мрії» — це бажання без дії, «Цілі» — це
+ * накопичення, і жодне з двох не описує, ЩО пара збирається зробити.
+ */
+export type PlanCategory =
+  | 'date' | 'trip' | 'ride' | 'place' | 'event' | 'activity'
+  | 'rest' | 'holiday' | 'learning' | 'home' | 'other';
+
+export type PlanStatus =
+  | 'idea' | 'planning' | 'preparing' | 'ready' | 'done' | 'postponed' | 'cancelled';
+
+/**
+ * Наскільки визначена дата плану.
+ *
+ * Та сама конвенція, що в «Спогадах»: `start_date` завжди зберігає
+ * ПОЧАТОК періоду, а точність каже, як його показати. Завдяки цьому одне
+ * сортування працює і для «12 серпня», і для «осінь 2026».
+ */
+export type PlanDatePrecision = 'day' | 'range' | 'month' | 'season' | 'year' | 'none';
+
+export interface PlanRow {
+  id: number;
+  title: string;
+  description: string | null;
+  category: PlanCategory;
+  status: PlanStatus;
+  cover_url: string | null;
+  url: string | null;
+  /** Завжди ПОЧАТОК періоду; як показати — каже date_precision. */
+  start_date: string | null;
+  end_date: string | null;
+  start_time: string | null;
+  date_precision: PlanDatePrecision;
+  location_name: string | null;
+  /** map_pins.id, без зовнішнього ключа: мітку можна видалити. */
+  place_id: number | null;
+  /** Заповнений лише коли план запропонував один партнер другому. */
+  proposed_by: number | null;
+  confirmed: boolean;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface PlanTaskRow {
+  id: number;
+  plan_id: number;
+  title: string;
+  assigned_to: number | null;
+  due_date: string | null;
+  done: boolean;
+  done_at: string | null;
+  sort_order: number;
+  created_at: string;
+}
 
 export type MediaType = 'movie' | 'series' | 'book';
 export type MediaStatus = 'want' | 'watching' | 'done' | 'dropped';
@@ -100,8 +158,10 @@ export interface Recipe {
  * Після бекфілу description містить лише чистий текст нотатки.
  */
 export interface PlanMetadata {
-  cat: PlanCategory;
-  status: PlanStatus;
+  /** Стара категорія: 'date'|'dream'|'trip'|'goal'|'other'. */
+  cat: string;
+  /** Старий статус: 'planned'|'active'|'done'. */
+  status: string;
   /** ISO-дата виконання; null поки статус ≠ 'done'. */
   done_at: string | null;
 }
@@ -407,6 +467,8 @@ export interface Database {
       memories:           TableDef<MemoryRow, 'photo_url' | 'memory_date'>;
       memory_days:        TableDef<MemoryDayRow, 'memory_date'>;
       memory_links:       TableDef<MemoryLinkRow, 'memory_id' | 'source_type' | 'source_id'>;
+      plans:              TableDef<PlanRow, 'title'>;
+      plan_tasks:         TableDef<PlanTaskRow, 'plan_id' | 'title'>;
       free_limit:         TableDef<FreeLimitRow, 'id'>;
       savings_goals:      TableDef<SavingsGoalRow, 'name'>;
       map_pins:           TableDef<MapPinRow, 'title' | 'category' | 'lat' | 'lng'>;
@@ -585,7 +647,8 @@ export type RealtimeTable =
   | 'media_items' | 'dishes' | 'wishlist_items'
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
   | 'map_pins' | 'user_locations'
-  | 'memories' | 'memory_links' | 'memory_days';
+  | 'memories' | 'memory_links' | 'memory_days'
+  | 'plans' | 'plan_tasks';
 
 export type RealtimeEventType = 'INSERT' | 'UPDATE' | 'DELETE';
 

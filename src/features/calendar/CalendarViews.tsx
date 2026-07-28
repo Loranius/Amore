@@ -13,6 +13,11 @@
 // із ним зробити було неможливо — а це головний жест будь-якого
 // календаря. Тепер день це кнопка, вибраний день відкриває свою панель
 // замість списку місяця, і з неї ж додається подія САМЕ на цю дату.
+//
+// Плани приходять ОКРЕМИМ пропом із власної таблиці: у календарі вони
+// гості, а не події. Тому в них свій значок-позначка (смужка проти
+// круглої крапки), свій колір категорії й тап веде не в модалку події,
+// а на сторінку плану.
 // ============================================================
 import { useState } from 'react';
 import {
@@ -22,9 +27,14 @@ import {
 import { pluralUA } from '@/lib/utils';
 import { EventIcon } from '@/components/icons/EventIcon';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/icons/UiIcon';
+import { PLAN_CATEGORIES } from '@/features/plans/planConstants';
 import { TYPES } from './calendarUtils';
 import { eventsByDay, yearHeat, yearSummary } from './calendarMonth';
-import type { EventRow } from '@/types';
+import { planMuted, planYearTotal, plansByDay, plansByMonth } from './calendarPlans';
+import type { EventRow, PlanRow } from '@/types';
+
+/** Скільки позначок вміщується в клітинку дня, перш ніж вони зіллються. */
+const MAX_DOTS = 3;
 
 /**
  * Повернення до поточного місяця/року.
@@ -44,19 +54,23 @@ function TodayButton({ show, onClick }: { show: boolean; onClick: () => void }) 
 
 // ── Місяць ───────────────────────────────────────────────────
 export function CalendarMonthView({
-  events, yr, mo, onStepMonth, onGoToday, onOpenEvent, onAddOn,
+  events, plans, yr, mo, onStepMonth, onGoToday, onOpenEvent, onOpenPlan, onAddOn,
 }: {
   events: EventRow[];
+  plans: PlanRow[];
   yr: number;
   mo: number;
   onStepMonth: (delta: number) => void;
   onGoToday: () => void;
   onOpenEvent: (ev: EventRow) => void;
+  /** Відкрити сторінку плану — календар його лише показує, не редагує. */
+  onOpenPlan: (id: number) => void;
   /** Створити подію на конкретну дату ('YYYY-MM-DD'). */
   onAddOn: (iso: string) => void;
 }) {
   const monthName = MONTHS_UA[mo - 1] ?? '';
   const byDay = eventsByDay(events, yr, mo);
+  const planDays = plansByDay(plans, yr, mo);
   const total = daysInMonth(yr, mo);
   const offset = firstMondayOffset(yr, mo);
   const today = todayLocal();
@@ -77,7 +91,31 @@ export function CalendarMonthView({
     ...Array.from({ length: total }, (_, i) => i + 1),
   ];
 
-  const chosen = [...byDay.entries()].sort((a, b) => a[0] - b[0]);
+  // Список під сіткою — об'єднання днів із подіями і днів із планами:
+  // день, у якому є лише план, мусить у ньому бути, інакше сітка знову
+  // стане німою рівно для планів.
+  const chosen = [...new Set([...byDay.keys(), ...planDays.keys()])].sort((a, b) => a - b);
+
+  // Багатоденний план стоїть у списку РАЗ — під своїм першим днем у цьому
+  // місяці, з підписом «3 дні». У сітці й у панелі дня він займає кожен
+  // свій день (там питання «що 22-го»), але списком три однакові рядки
+  // поспіль нічого не додавали б.
+  const listPlans = new Map<number, Array<{ plan: PlanRow; span: number }>>();
+  const spans = new Map<number, number>();
+  for (const list of planDays.values()) {
+    for (const p of list) spans.set(p.id, (spans.get(p.id) ?? 0) + 1);
+  }
+  const listed = new Set<number>();
+  for (const day of chosen) {
+    for (const p of planDays.get(day) ?? []) {
+      if (listed.has(p.id)) continue;
+      listed.add(p.id);
+      const bucket = listPlans.get(day);
+      const entry = { plan: p, span: spans.get(p.id) ?? 1 };
+      if (bucket) bucket.push(entry);
+      else listPlans.set(day, [entry]);
+    }
+  }
 
   return (
     <div className="cal-month">
@@ -103,9 +141,14 @@ export function CalendarMonthView({
         {cells.map((day, i) => {
           if (day === null) return <span key={`pad-${i}`} className="cal-cell cal-cell--pad" />;
           const list = byDay.get(day) ?? [];
+          const dayPlans = planDays.get(day) ?? [];
           const iso = ymd(yr, mo, day);
           const isToday = iso === today;
           const isSel = selected === day;
+          // Не більше трьох позначок разом: далі вони зливаються в пляму
+          // й перестають щось означати. Події йдуть першими — план
+          // однаково видно смужкою в списку під сіткою.
+          const dots = [...list.slice(0, MAX_DOTS), ...dayPlans].slice(0, MAX_DOTS);
           return (
             <button
               key={day}
@@ -115,19 +158,25 @@ export function CalendarMonthView({
               // не потрібна.
               onClick={() => setSelected(isSel ? null : day)}
               aria-pressed={isSel}
-              aria-label={`${day} ${MONTHS_UA[mo - 1]}${list.length ? `, ${list.length} ${pluralUA(list.length, ['подія', 'події', 'подій'])}` : ''}`}
+              aria-label={cellLabel(day, mo, list.length, dayPlans.length)}
               className={
-                `cal-cell${list.length ? ' cal-cell--has' : ''}`
+                `cal-cell${list.length || dayPlans.length ? ' cal-cell--has' : ''}`
                 + `${isToday ? ' cal-cell--today' : ''}${isSel ? ' cal-cell--sel' : ''}`
               }
             >
               <span className="cal-cell-n">{day}</span>
-              {list.length > 0 && (
+              {dots.length > 0 && (
                 <span className="cal-cell-dots">
-                  {/* Не більше трьох крапок: далі вони зливаються в пляму
-                      й перестають щось означати. */}
-                  {list.slice(0, 3).map((ev) => (
-                    <i key={ev.id} style={{ background: TYPES[ev.type ?? 'other'].mark }} />
+                  {dots.map((row) => (
+                    'category' in row
+                      ? (
+                        <i
+                          key={`p${row.id}`}
+                          className="cal-dot-plan"
+                          style={{ background: PLAN_CATEGORIES[row.category].color }}
+                        />
+                      )
+                      : <i key={`e${row.id}`} style={{ background: TYPES[row.type ?? 'other'].mark }} />
                   ))}
                 </span>
               )}
@@ -140,28 +189,50 @@ export function CalendarMonthView({
         <DayPanel
           iso={ymd(yr, mo, selected)}
           list={byDay.get(selected) ?? []}
+          plans={planDays.get(selected) ?? []}
           onOpenEvent={onOpenEvent}
+          onOpenPlan={onOpenPlan}
           onAddOn={onAddOn}
           onClear={() => setSelected(null)}
         />
       ) : chosen.length === 0 ? (
-        /* Під сіткою — самі події місяця. Крапка каже «щось є», але не
-           каже що; без цього списку сітка була б красивою й німою. */
-        <p className="empty-state">Цього місяця подій немає.</p>
+        /* Під сіткою — самі події й плани місяця. Крапка каже «щось є»,
+           але не каже що; без цього списку сітка була б красивою й німою. */
+        <p className="empty-state">Цього місяця нічого немає.</p>
       ) : (
         <div className="cal-month-list">
-          {chosen.map(([day, list]) => (
-            <div key={day} className="cal-day-block">
-              <div className="cal-day-num">{formatDateUA(ymd(yr, mo, day), { year: false })}</div>
-              {list.map((ev) => (
-                <EventLine key={ev.id} ev={ev} onOpen={onOpenEvent} />
-              ))}
-            </div>
-          ))}
+          {chosen.map((day) => {
+            const dayEvents = byDay.get(day) ?? [];
+            const dayPlans = listPlans.get(day) ?? [];
+            // День, у якому лишились самі «продовження» багатоденного
+            // плану, у списку не потрібен: заголовок дати без жодного
+            // рядка під ним.
+            if (dayEvents.length === 0 && dayPlans.length === 0) return null;
+            return (
+              <div key={day} className="cal-day-block">
+                <div className="cal-day-num">{formatDateUA(ymd(yr, mo, day), { year: false })}</div>
+                {dayEvents.map((ev) => (
+                  <EventLine key={`e${ev.id}`} ev={ev} onOpen={onOpenEvent} />
+                ))}
+                {dayPlans.map(({ plan, span }) => (
+                  <PlanLine key={`p${plan.id}`} plan={plan} span={span} onOpen={onOpenPlan} />
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
   );
+}
+
+/** Підпис клітинки для читалки: події й плани рахуються окремо, бо це
+ *  різні речі, і «3 події» на дні з одним планом було б неправдою. */
+function cellLabel(day: number, mo: number, events: number, plans: number): string {
+  const parts: string[] = [];
+  if (events) parts.push(`${events} ${pluralUA(events, ['подія', 'події', 'подій'])}`);
+  if (plans) parts.push(`${plans} ${pluralUA(plans, ['план', 'плани', 'планів'])}`);
+  return `${day} ${MONTHS_UA[mo - 1]}${parts.length ? `, ${parts.join(', ')}` : ''}`;
 }
 
 function EventLine({ ev, onOpen }: { ev: EventRow; onOpen: (ev: EventRow) => void }) {
@@ -171,6 +242,38 @@ function EventLine({ ev, onOpen }: { ev: EventRow; onOpen: (ev: EventRow) => voi
         <EventIcon type={ev.type} size={19} />
       </span>
       <span className="cal-day-event-title">{ev.title}</span>
+    </button>
+  );
+}
+
+/**
+ * Рядок плану в календарі.
+ *
+ * Виглядає як рядок події, але веде на сторінку плану, а не в модалку
+ * редагування: календар плани лише показує. Підпис «План» потрібен саме
+ * тому — без нього тап відкривав би зовсім не те, чого чекаєш.
+ */
+function PlanLine({ plan, span = 1, onOpen }: {
+  plan: PlanRow;
+  /** Скільки днів цього місяця займає план — підпис для багатоденних. */
+  span?: number;
+  onOpen: (id: number) => void;
+}) {
+  const cat = PLAN_CATEGORIES[plan.category];
+  return (
+    <button
+      type="button"
+      className={`cal-day-event cal-day-plan${planMuted(plan) ? ' cal-muted' : ''}`}
+      onClick={() => onOpen(plan.id)}
+    >
+      <span style={{ color: cat.color, display: 'flex' }}>
+        <cat.Icon size={19} />
+      </span>
+      <span className="cal-day-event-title">{plan.title}</span>
+      {span > 1 && (
+        <span className="cal-day-plan-span">{span} {pluralUA(span, ['день', 'дні', 'днів'])}</span>
+      )}
+      <span className="cal-day-plan-tag">План</span>
     </button>
   );
 }
@@ -187,11 +290,13 @@ function EventLine({ ev, onOpen }: { ev: EventRow; onOpen: (ev: EventRow) => voi
  * так само часто, як заради перегляду.
  */
 function DayPanel({
-  iso, list, onOpenEvent, onAddOn, onClear,
+  iso, list, plans, onOpenEvent, onOpenPlan, onAddOn, onClear,
 }: {
   iso: string;
   list: EventRow[];
+  plans: PlanRow[];
   onOpenEvent: (ev: EventRow) => void;
+  onOpenPlan: (id: number) => void;
   onAddOn: (iso: string) => void;
   onClear: () => void;
 }) {
@@ -203,10 +308,13 @@ function DayPanel({
           Весь місяць
         </button>
       </div>
-      {list.length === 0 ? (
+      {list.length === 0 && plans.length === 0 ? (
         <p className="cal-day-panel-empty">Цього дня нічого не заплановано.</p>
       ) : (
-        list.map((ev) => <EventLine key={ev.id} ev={ev} onOpen={onOpenEvent} />)
+        <>
+          {list.map((ev) => <EventLine key={`e${ev.id}`} ev={ev} onOpen={onOpenEvent} />)}
+          {plans.map((p) => <PlanLine key={`p${p.id}`} plan={p} onOpen={onOpenPlan} />)}
+        </>
       )}
       <button type="button" className="cal-day-panel-add" onClick={() => onAddOn(iso)}>
         <PlusIcon size={15} /> Додати на {formatDateUA(iso, { year: false })}
@@ -217,16 +325,27 @@ function DayPanel({
 
 // ── Рік ──────────────────────────────────────────────────────
 export function CalendarYearView({
-  events, yr, onStepYear, onGoToday, onOpenMonth,
+  events, plans, yr, onStepYear, onGoToday, onOpenMonth,
 }: {
   events: EventRow[];
+  plans: PlanRow[];
   yr: number;
   onStepYear: (delta: number) => void;
   onGoToday: () => void;
   onOpenMonth: (month: number) => void;
 }) {
-  const months = yearHeat(yearSummary(events, yr));
-  const total = months.reduce((n, m) => n + m.count, 0);
+  const planCounts = plansByMonth(plans, yr);
+  const eventMonths = yearSummary(events, yr);
+  // Плани входять у кількість ДО розрахунку насиченості: інакше місяць
+  // із тижневим походом і без подій лишився б блідим, а питання
+  // річного огляду — «де в нас густо», а не «де густо на події».
+  const months = yearHeat(
+    eventMonths.map((m) => ({ ...m, count: m.count + (planCounts[m.month - 1] ?? 0) })),
+  );
+  const eventTotal = eventMonths.reduce((n, m) => n + m.count, 0);
+  // Рахуємо РІЗНІ плани, а не суму по місяцях: похід через межу року
+  // інакше став би двома.
+  const planTotal = planYearTotal(plans, yr);
   const now = currentYearMonth();
 
   return (
@@ -242,8 +361,11 @@ export function CalendarYearView({
         </button>
       </div>
 
+      {/* Події й плани рахуються окремо: злити їх в одне число означало б
+          назвати похід подією, а це вже інший модуль. */}
       <p className="cal-year-total">
-        {total} {pluralUA(total, ['подія', 'події', 'подій'])} за рік
+        {eventTotal} {pluralUA(eventTotal, ['подія', 'події', 'подій'])} за рік
+        {planTotal > 0 && <> · {planTotal} {pluralUA(planTotal, ['план', 'плани', 'планів'])}</>}
       </p>
 
       <div className="cal-year-grid">
@@ -262,6 +384,9 @@ export function CalendarYearView({
               {m.types.map((t) => (
                 <i key={t} style={{ background: TYPES[t as keyof typeof TYPES].mark }} />
               ))}
+              {/* Одна смужка на весь місяць, а не по одній на план:
+                  крапки тут відповідають на «що саме», а не «скільки». */}
+              {(planCounts[m.month - 1] ?? 0) > 0 && <i className="cal-dot-plan" />}
             </span>
             <small>{m.count || '—'}</small>
           </button>

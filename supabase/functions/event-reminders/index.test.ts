@@ -4,7 +4,10 @@
 // Запуск: `deno test supabase/functions/event-reminders/`.
 // ============================================================
 import { assertEquals } from "https://deno.land/std@0.224.0/assert/mod.ts";
-import { buildText, reminderTargets, type Recipient } from "./reminderRules.ts";
+import {
+  buildText, planReminderKind, reminderTargets,
+  type PlanRemindable, type Recipient,
+} from "./reminderRules.ts";
 
 const DIMA: Recipient = { id: 1, name: "Діма", chat_id: "111" };
 const LENA: Recipient = { id: 2, name: "Лєна", chat_id: "222" };
@@ -76,4 +79,63 @@ Deno.test("опис події додається останнім рядком 
     buildText(ev, "13 липня", "tomorrow", null),
     "⚠️ <b>Завтра (13 липня) — «Річниця»</b>\n🎯 Підготуйся заздалегідь\n💬 столик о 19:00",
   );
+});
+
+// ── Плани ────────────────────────────────────────────────────
+const DATES = { today: "2026-07-28", plus1: "2026-07-29", plus3: "2026-07-31" };
+
+const plan = (over: Partial<PlanRemindable> = {}): PlanRemindable => ({
+  title: "Вікенд у Карпатах", description: null, start_date: "2026-07-31",
+  date_precision: "day", status: "preparing", confirmed: true, ...over,
+});
+
+Deno.test("план нагадує про себе за три дні, за день і в день початку", () => {
+  assertEquals(planReminderKind(plan({ start_date: DATES.today }), DATES), "today");
+  assertEquals(planReminderKind(plan({ start_date: DATES.plus1 }), DATES), "tomorrow");
+  assertEquals(planReminderKind(plan({ start_date: DATES.plus3 }), DATES), "in3days");
+});
+
+Deno.test("будь-яка інша дата мовчить — нагадування рівно три", () => {
+  assertEquals(planReminderKind(plan({ start_date: "2026-07-30" }), DATES), null);
+  assertEquals(planReminderKind(plan({ start_date: "2026-08-15" }), DATES), null);
+  assertEquals(planReminderKind(plan({ start_date: null }), DATES), null);
+});
+
+Deno.test("період нагадує про ПОЧАТОК: кінець нікого не застає зненацька", () => {
+  assertEquals(
+    planReminderKind(plan({ date_precision: "range", start_date: DATES.plus1 }), DATES),
+    "tomorrow",
+  );
+});
+
+Deno.test("неточна дата не нагадує: «через 3 дні» під «осінь 2026» — неправда", () => {
+  for (const precision of ["month", "season", "year", "none"]) {
+    assertEquals(planReminderKind(plan({ date_precision: precision }), DATES), null);
+  }
+});
+
+Deno.test("закритий план мовчить — виконаний, відкладений і скасований", () => {
+  // Те саме правило, що колись робив isDonePlan по JSONB metadata,
+  // лише тепер у явному полі status.
+  for (const status of ["done", "postponed", "cancelled"]) {
+    assertEquals(planReminderKind(plan({ status }), DATES), null);
+  }
+});
+
+Deno.test("план у роботі нагадує при будь-якому відкритому статусі", () => {
+  for (const status of ["idea", "planning", "preparing", "ready"]) {
+    assertEquals(planReminderKind(plan({ status }), DATES), "in3days");
+  }
+});
+
+Deno.test("непідтверджена пропозиція не нагадує: це ще питання, а не план", () => {
+  assertEquals(planReminderKind(plan({ confirmed: false }), DATES), null);
+});
+
+Deno.test("план іде обом і завжди із загальною підказкою", () => {
+  // У плану немає person_user_id, тож правило «не нагадуй їй про її ж
+  // день народження» його не стосується — нагадування спільне.
+  const targets = reminderTargets({}, PAIR);
+  assertEquals(targets.map((t) => t.recipient.id), [1, 2]);
+  assertEquals(targets.map((t) => t.personName), [null, null]);
 });

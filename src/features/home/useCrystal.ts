@@ -14,7 +14,7 @@ import { daysBetween } from './homeUtils';
 import { useMapPins } from '@/features/map/useMapPins';
 import { useMediaItems } from '@/features/media/useMedia';
 import { useCoupleWishStats } from '@/features/wishlist/useWishlist';
-import { useGoals } from '@/features/budget/useBudget';
+import { useGoals } from '@/features/piggybank/useBudget';
 import { useEvents } from '@/features/_shared/events';
 import { useDishes } from '@/features/culinary/useDishes';
 

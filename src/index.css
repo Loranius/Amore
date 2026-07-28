@@ -1420,8 +1420,15 @@ a.wl-card-title { color: var(--accent); }
 .cal-cell--sel .cal-cell-n { font-weight: 800; }
 .cal-cell-n { font-size: 12px; font-variant-numeric: tabular-nums; }
 .cal-cell--has .cal-cell-n { font-weight: 700; }
-.cal-cell-dots { display: flex; gap: 2px; }
+.cal-cell-dots { display: flex; align-items: center; gap: 2px; }
 .cal-cell-dots i { width: 5px; height: 5px; border-radius: 50%; display: block; }
+/* Позначка плану — смужка, а не крапка. Кольору тут мало: категорії
+   планів і типи подій уже ділять ту саму палітру, тож на п'яти пікселях
+   вони б не розрізнялись. Форма розрізняє. */
+.cal-cell-dots i.cal-dot-plan { width: 8px; height: 3px; border-radius: 2px; }
+.cal-year-dots i.cal-dot-plan {
+  width: 11px; height: 4px; border-radius: 2px; background: var(--accent);
+}
 
 /* ── Панель вибраного дня ──────────────────────────────────── */
 .cal-day-panel {
@@ -1454,6 +1461,19 @@ a.wl-card-title { color: var(--accent); }
 }
 /* min-width: 0 — довга назва події інакше розпирає кнопку за межі екрана. */
 .cal-day-event-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Рядок плану веде на іншу сторінку, а не в модалку редагування, — і
+   мусить це показувати ще до тапу. Пунктирна рамка й підпис «План»
+   роблять рядок явно чужим у списку подій. */
+.cal-day-plan { border-style: dashed; }
+.cal-day-plan-tag {
+  flex: 0 0 auto; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 2px 6px; border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.cal-day-plan-span { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cal-day-plan.cal-muted { opacity: 0.55; }
 
 /* ── Огляд року ────────────────────────────────────────────── */
 .cal-year-total { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -2168,6 +2188,22 @@ a.wl-card-title { color: var(--accent); }
 }
 .home-hero-next-event { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
 
+/* ── Віджет «Плани» під кристалом ──────────────────────────── */
+/* width: 100% обов'язковий — .home це flex-колонка з align-items:
+   center, і без нього секція стиснулась би до ширини свого тексту. */
+.home-plans { width: 100%; margin-top: 4px; }
+.home-plans-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.home-plans-hd h2 {
+  margin: 0; font-family: 'Fredoka', sans-serif; font-size: 17px; font-weight: 600; color: var(--text);
+}
+.home-plans-all { flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: var(--accent); text-decoration: none; }
+.home-plans-empty {
+  display: block; padding: 12px 14px; border-radius: var(--radius-md);
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  color: var(--muted); font-size: 13px; text-decoration: none;
+}
+
 /* Кристал — SVG, анімація чисто CSS (без per-frame JS-рендеру). */
 .crystal-wrap {
   position: relative;
@@ -2340,7 +2376,7 @@ a.wl-card-title { color: var(--accent); }
 .budget { display: flex; flex-direction: column; gap: 16px; }
 .budget-title { margin: 0; }
 
-/* Фон/радіус — з .card (BudgetPage: className="card fin-card"); тут лише паддінг. */
+/* Фон/радіус — з .card (PiggyBankPage: className="card fin-card"); тут лише паддінг. */
 .fin-card { padding: 16px; }
 .fin-card-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .fin-card-title { font-weight: 700; }

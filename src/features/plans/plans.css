@@ -1,0 +1,211 @@
+/* ============================================================
+   Модуль «Плани».
+   ------------------------------------------------------------
+   Кольори категорій приходять інлайном із planConstants — вони
+   належать даним, а не темі. Усе інше бере токени порталу, щоб модуль
+   не мав власної палітри й лишався своїм у світлій і темній темі.
+   ============================================================ */
+
+.plans { padding-bottom: 32px; }
+
+.plans-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 12px; margin-bottom: 14px;
+}
+.plans-head h1 { margin: 0; font-size: 25px; }
+.plans-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.plans-error { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+/* ── Акцентна картка найближчого ───────────────────────────── */
+.plan-next {
+  display: grid; gap: 10px; padding: 14px 16px; margin-bottom: 14px;
+  border: 2px solid; border-radius: var(--radius-lg);
+  background: var(--surface); color: var(--text);
+  text-decoration: none; box-shadow: var(--shadow-sm);
+}
+.plan-next-kicker {
+  font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--muted);
+}
+.plan-next-head { display: flex; align-items: center; gap: 12px; }
+/* display:flex — інакше svg сідає на базову лінію тексту. */
+.plan-next-icon { display: flex; flex: 0 0 auto; }
+/* min-width: 0 — довга назва інакше розпирає картку за межі екрана. */
+.plan-next-copy { display: grid; gap: 2px; min-width: 0; }
+.plan-next-title { font-size: 18px; line-height: 1.25; }
+.plan-next-when { font-size: 16px; font-weight: 800; letter-spacing: -.01em; }
+.plan-next-meta { font-size: 12px; color: var(--muted); }
+
+.plan-next-progress { display: grid; gap: 5px; }
+.plan-next-progress small { font-size: 11.5px; color: var(--muted); }
+.plan-next-bar {
+  display: block; height: 6px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.plan-next-bar > span { display: block; height: 100%; border-radius: 999px; }
+.plan-next-task { font-size: 12.5px; color: var(--muted); }
+
+/* ── Список ────────────────────────────────────────────────── */
+.plan-list { display: grid; gap: 10px; margin-top: 12px; }
+
+.plan-card {
+  position: relative; display: flex; gap: 0; overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: var(--radius-md); background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.plan-card--closed { opacity: .62; }
+.plan-card-bar { flex: 0 0 4px; }
+
+/* Накладка на всю картку: сама картка не може бути посиланням, бо
+   всередині є кнопка «Підтвердити», а кнопка в посиланні недійсна.
+   Той самий прийом, що в картці місця на карті. */
+.plan-card-open {
+  position: absolute; inset: 0; z-index: 1;
+  border: 0; background: none; cursor: pointer;
+}
+.plan-card-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+
+.plan-card-body { flex: 1 1 auto; min-width: 0; display: grid; gap: 5px; padding: 11px 13px; }
+.plan-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.plan-card-cat,
+.plan-card-status {
+  display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+  font-size: 11.5px; font-weight: 700;
+}
+.plan-card-status { color: var(--muted); }
+.plan-card-title {
+  margin: 0; font-size: 15px; font-weight: 700; line-height: 1.3;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.plan-card-desc {
+  margin: 0; font-size: 12.5px; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.plan-card-meta {
+  display: flex; flex-wrap: wrap; gap: 4px 10px;
+  font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.plan-card-when { font-weight: 700; }
+.plan-card-overdue { font-weight: 700; color: var(--danger); }
+/* z-index — кнопка мусить лежати НАД накладкою, інакше тап по ній
+   відкривав би план замість підтвердження. */
+.plan-card-confirm {
+  position: relative; z-index: 2; justify-self: start; margin-top: 3px;
+  padding: 6px 13px; border-radius: 999px; font: inherit; font-size: 12px;
+  font-weight: 700; cursor: pointer; border: 0;
+  background: var(--accent); color: #fff;
+}
+
+/* ── Форма створення ───────────────────────────────────────── */
+/* minmax(0, 1fr) — обов'язково: у grid елемент за замовчуванням не
+   вужчий за свій вміст, і довгий підпис категорії розпирав би колонку. */
+.plan-cat-grid {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
+}
+.plan-cat-btn {
+  display: inline-flex; align-items: center; gap: 7px; min-width: 0;
+  padding: 9px 11px; border-radius: 12px; font: inherit; font-size: 13px;
+  cursor: pointer; text-align: left;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: var(--surface); color: var(--text);
+}
+.plan-cat-btn.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent); font-weight: 700;
+}
+.plan-cat-btn > svg { flex: 0 0 auto; }
+.plan-add-hint { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
+
+/* ── Сторінка плану ────────────────────────────────────────── */
+.plan-page { padding-bottom: 32px; }
+.plan-back {
+  display: inline-flex; align-items: center; gap: 4px; margin-bottom: 10px;
+  font-size: 13px; font-weight: 700; color: var(--accent); text-decoration: none;
+}
+
+.plan-page-head {
+  display: flex; align-items: flex-start; gap: 13px; padding: 14px 16px;
+  border: 2px solid; border-radius: var(--radius-lg);
+  background: var(--surface); box-shadow: var(--shadow-sm);
+}
+.plan-page-icon { display: flex; flex: 0 0 auto; }
+.plan-page-copy { min-width: 0; display: grid; gap: 3px; }
+.plan-page-cat { font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.plan-page-copy h1 { margin: 0; font-size: 21px; line-height: 1.2; }
+.plan-page-copy p { margin: 0; font-size: 13px; color: var(--muted); }
+
+.plan-page-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.plan-fact {
+  display: grid; gap: 2px; padding: 10px 12px; text-align: left; min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  border-radius: var(--radius-md); background: var(--surface);
+  font: inherit; color: var(--text); cursor: pointer;
+}
+.plan-fact--static { cursor: default; }
+.plan-fact small { font-size: 11px; color: var(--muted); }
+.plan-fact b { font-size: 13.5px; }
+.plan-fact span { font-size: 12px; font-weight: 700; }
+
+.plan-date-editor {
+  display: grid; gap: 10px; margin-top: 10px; padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.plan-status-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.plan-status-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 12px; border-radius: 999px; font: inherit; font-size: 12.5px;
+  cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  background: var(--surface); color: var(--muted);
+}
+.plan-status-btn.active {
+  border-color: var(--accent); color: var(--accent); font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+/* ── Завдання ──────────────────────────────────────────────── */
+.plan-tasks { margin-top: 18px; display: grid; gap: 9px; }
+.plan-tasks-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.plan-tasks-head h3 { margin: 0; font-size: 15px; }
+.plan-tasks-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.plan-tasks-bar {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+}
+.plan-tasks-bar > span { display: block; height: 100%; border-radius: 999px; }
+.plan-tasks-empty { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+.plan-task-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.plan-task {
+  display: flex; align-items: center; gap: 10px; padding: 9px 11px;
+  border-radius: var(--radius-md); background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+.plan-task--done .plan-task-title { text-decoration: line-through; color: var(--muted); }
+.plan-task-check {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 7px;
+  display: grid; place-items: center; cursor: pointer; color: #fff;
+  border: 1.5px solid color-mix(in srgb, var(--text) 22%, transparent);
+  background: transparent;
+}
+.plan-task-title { flex: 1 1 auto; min-width: 0; font-size: 13.5px; }
+.plan-task-del {
+  flex: 0 0 auto; border: 0; background: none; color: var(--muted);
+  cursor: pointer; padding: 3px; display: flex;
+}
+.plan-task-del:hover { color: var(--danger); }
+
+.plan-task-add { display: flex; gap: 7px; }
+.plan-task-add input { flex: 1 1 auto; min-width: 0; }
+.plan-task-add .btn { flex: 0 0 auto; display: grid; place-items: center; padding: 0 14px; }
+
+.plan-delete {
+  display: inline-flex; align-items: center; gap: 7px; margin-top: 22px;
+  padding: 9px 14px; border-radius: var(--radius-md); font: inherit; font-size: 13px;
+  cursor: pointer; border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent);
+  background: transparent; color: var(--danger);
+}

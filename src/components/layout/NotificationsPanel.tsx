@@ -7,7 +7,7 @@ import {
   type PendingNotification,
 } from '@/features/notifications/useNotifications';
 import { useDateMutations } from '@/features/schedule/useDates';
-import { useGoalMutations } from '@/features/budget/useBudget';
+import { useGoalMutations } from '@/features/piggybank/useBudget';
 import { ProposalCard } from '@/components/ui/ProposalCard';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { AppNotificationKind } from '@/features/notifications/notificationsRpc';

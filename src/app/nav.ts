@@ -15,7 +15,8 @@ import type { ReactNode } from 'react';
 import type { IconProps } from '@/components/icons/iconBase';
 import {
   CalendarHeartIcon, CameraIcon, CartIcon, ClockIcon,
-  FilmIcon, GamepadIcon, HeartIcon, MoreIcon, PotIcon, SettingsIcon, TicketIcon, WalletIcon,
+  FilmIcon, GamepadIcon, HeartIcon, MoreIcon, PiggyBankIcon, PlansIcon,
+  PotIcon, SettingsIcon, TicketIcon,
 } from '@/components/icons/NavIcon';
 import { CalendarIcon, GiftIcon } from '@/components/icons/UiIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
@@ -45,7 +46,10 @@ export const BOTTOM_LEFT: NavItem[] = [
   // слоту тієї самої панелі. Той самий значок і в «Спогадах», де ним
   // позначене виконане бажання.
   { to: '/wishlist', Icon: GiftIcon, label: 'Вішлист' },
-  { to: '/budget', Icon: WalletIcon, label: 'Фінанси' },
+  // «Плани» замість «Фінансів»: спільні задуми відкривають щодня, а
+  // накопичення — раз на кілька тижнів. Одна з п'яти позицій нижньої
+  // панелі має належати першому.
+  { to: '/plans', Icon: PlansIcon, label: 'Плани' },
 ];
 
 /** Центральна кнопка — головна. */
@@ -85,6 +89,7 @@ export const MORE_GROUPS: NavGroup[] = [
   {
     label: 'Інше',
     items: [
+      { to: '/piggybank', Icon: PiggyBankIcon, label: 'Скарбничка' },
       { to: '/map', Icon: MapPinIcon, label: 'Наша карта' },
       { to: '/game', Icon: GamepadIcon, label: 'Гра' },
     ],

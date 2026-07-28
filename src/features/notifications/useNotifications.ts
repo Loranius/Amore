@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useDatePlans } from '@/features/schedule/useDates';
-import { useGoals, fmtMoney } from '@/features/budget/useBudget';
+import { useGoals, fmtMoney } from '@/features/piggybank/useBudget';
 import { qk } from '@/lib/queryKeys';
 import {
   fetchAppNotifications,
