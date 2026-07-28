@@ -24,14 +24,29 @@ interface MemoryUploadModalProps {
   busy: boolean;
   onClose: () => void;
   onSubmit: (input: UploadMemoryInput) => void;
+  initialDate?: string | undefined;
+  initialCaption?: string | undefined;
+  title?: string | undefined;
+  description?: string | undefined;
+  submitLabel?: string | undefined;
 }
 
-export function MemoryUploadModal({ userId, busy, onClose, onSubmit }: MemoryUploadModalProps) {
+export function MemoryUploadModal({
+  userId,
+  busy,
+  onClose,
+  onSubmit,
+  initialDate,
+  initialCaption,
+  title = 'Новий спогад',
+  description,
+  submitLabel = 'Зберегти',
+}: MemoryUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [date, setDate] = useState(todayISO());
+  const [date, setDate] = useState(initialDate ?? todayISO());
   const [precision, setPrecision] = useState<MemoryPrecision>('day');
-  const [caption, setCaption] = useState('');
+  const [caption, setCaption] = useState(initialCaption ?? '');
 
   const pick = (picked: File | null) => {
     setFile(picked);
@@ -58,9 +73,10 @@ export function MemoryUploadModal({ userId, busy, onClose, onSubmit }: MemoryUpl
   };
 
   return (
-    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
+    <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget && !busy) close(); }}>
       <div className="modal-sheet" role="dialog" aria-modal="true">
-        <h2 className="modal-title">Новий спогад</h2>
+        <h2 className="modal-title">{title}</h2>
+        {description && <p className="mem-upload-context">{description}</p>}
 
         <label className="form-field">
           <span>Фотографія</span>
@@ -68,6 +84,7 @@ export function MemoryUploadModal({ userId, busy, onClose, onSubmit }: MemoryUpl
             type="file"
             accept="image/*"
             onChange={(e) => pick(e.target.files?.[0] ?? null)}
+            disabled={busy}
           />
         </label>
 
@@ -82,6 +99,7 @@ export function MemoryUploadModal({ userId, busy, onClose, onSubmit }: MemoryUpl
                 type="button"
                 className={`chip${precision === p.value ? ' active' : ''}`}
                 onClick={() => setPrecision(p.value)}
+                disabled={busy}
               >
                 {p.label}
               </button>
@@ -91,7 +109,7 @@ export function MemoryUploadModal({ userId, busy, onClose, onSubmit }: MemoryUpl
 
         <label className="form-field">
           <span>Дата</span>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={busy} />
         </label>
 
         {/* Показуємо, як спогад справді підпишеться: при точності «місяць»
@@ -108,13 +126,14 @@ export function MemoryUploadModal({ userId, busy, onClose, onSubmit }: MemoryUpl
             maxLength={500}
             onChange={(e) => setCaption(e.target.value)}
             style={{ resize: 'vertical' }}
+            disabled={busy}
           />
         </label>
 
         <div className="modal-actions">
-          <button type="button" className="btn btn-ghost" onClick={close}>Скасувати</button>
+          <button type="button" className="btn btn-ghost" onClick={close} disabled={busy}>Скасувати</button>
           <button type="button" className="btn" onClick={save} disabled={!file || busy}>
-            {busy ? 'Додаю…' : 'Зберегти'}
+            {busy ? 'Додаю…' : submitLabel}
           </button>
         </div>
       </div>
