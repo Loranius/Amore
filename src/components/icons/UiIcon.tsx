@@ -165,6 +165,133 @@ export function ExpandIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
+/** Стрілка з рамки — зовнішнє посилання. */
+export function ExternalLinkIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M13.4 4.4h6.2v6.2M19.6 4.4 11 13" />
+      <path d="M18 14.4v4.2a1.8 1.8 0 0 1-1.8 1.8H5.4a1.8 1.8 0 0 1-1.8-1.8V7.8A1.8 1.8 0 0 1 5.4 6h4.2" />
+    </svg>
+  );
+}
+
+/** Шеврон униз — розкрити список. */
+export function ChevronDownIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="m6.6 9.4 5.4 5.2 5.4-5.2" />
+    </svg>
+  );
+}
+
+/** Кругова стрілка — обробити ще раз. */
+export function RefreshIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M20.2 11.4a8.2 8.2 0 1 0-.7 5" />
+      <path d="M20.4 4.8v6.6h-6.6" />
+    </svg>
+  );
+}
+
+/** Трикутник — відтворити відео. */
+export function PlayIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M8.6 5.6 18.8 12 8.6 18.4V5.6Z" />
+    </svg>
+  );
+}
+
+/** Камера з об'єктивом збоку — відеореакція. */
+export function VideoIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <rect x="2.8" y="6.4" width="12.6" height="11.2" rx="2.2" />
+      <path d="m15.4 10.6 5.8-3v8.8l-5.8-3v-2.8Z" />
+    </svg>
+  );
+}
+
+/** Замок — таємниця всередині пари. */
+export function LockIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <rect x="4.6" y="10.4" width="14.8" height="9.8" rx="2.2" />
+      <path d="M8.2 10.4V7.8a3.8 3.8 0 0 1 7.6 0v2.6" />
+    </svg>
+  );
+}
+
+/** Торба — сторінка магазину. */
+export function BagIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M5.4 7.6h13.2l1.1 11.4a1.6 1.6 0 0 1-1.6 1.8H5.9a1.6 1.6 0 0 1-1.6-1.8L5.4 7.6Z" />
+      <path d="M8.8 10V6.8a3.2 3.2 0 0 1 6.4 0V10" />
+    </svg>
+  );
+}
+
+/** Лоток зі стрілкою — «мені». */
+export function InboxIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M3.6 13.4h4l1.4 2.4h6l1.4-2.4h4" />
+      <path d="M6.6 4.6h10.8l3 8.8v4.2a2 2 0 0 1-2 2H5.6a2 2 0 0 1-2-2v-4.2l3-8.8Z" />
+    </svg>
+  );
+}
+
+/** Силует — конкретна людина. */
+export function UserIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <circle cx="12" cy="8" r="3.8" />
+      <path d="M4.8 20.4a7.2 7.2 0 0 1 14.4 0" />
+    </svg>
+  );
+}
+
+/** Дві стрілки — перенести між списками. */
+export function SwapIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M4 9.2h16M16.4 5.6 20 9.2l-3.6 3.6" />
+      <path d="M20 15.8H4M7.6 12.2 4 15.8l3.6 3.6" />
+    </svg>
+  );
+}
+
+/** Плюс — додати. */
+export function PlusIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+/** Риска — «не вказано». Не текстове тире: у списку, де решта пунктів
+    мають мальовані значки, символ із шрифту стоїть на іншій висоті. */
+export function MinusIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M6.4 12h11.2" />
+    </svg>
+  );
+}
+
+/** Стос — «усі» в фільтрі, коли жоден окремий значок не підходить. */
+export function LayersIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="m12 3.6 8.4 4.4-8.4 4.4L3.6 8l8.4-4.4Z" />
+      <path d="m3.6 12.4 8.4 4.4 8.4-4.4M3.6 16.8l8.4 4.4 8.4-4.4" />
+    </svg>
+  );
+}
+
 /** Дзвіночок — нагадування. */
 export function BellIcon({ size = 24, className = '' }: IconProps) {
   return (

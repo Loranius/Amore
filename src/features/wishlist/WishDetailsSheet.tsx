@@ -17,6 +17,9 @@ import { WishlistProductVisual } from './WishlistProductVisual';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistCloud.css';
 import './wishlistCloudModalFix.css';
+import { SparkIcon } from '@/components/icons/EventIcon';
+import { BagIcon, CheckIcon, ExternalLinkIcon, GiftIcon, PencilIcon, TrashIcon } from '@/components/icons/UiIcon';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 export interface WishDetailsSheetProps {
   open: boolean;
@@ -117,7 +120,7 @@ export function WishDetailsSheet({
           disabled={busy}
           onClick={() => closeAndRun(() => onFulfill(item))}
         >
-          <span aria-hidden="true">✨</span>
+          <SparkIcon size={15} />
           Виконати разом
         </button>
       ) : (
@@ -135,7 +138,7 @@ export function WishDetailsSheet({
               disabled={busy}
               onClick={() => closeAndRun(() => onPurchased(item))}
             >
-              <span aria-hidden="true">✓</span>
+              <CheckIcon size={15} />
               Подарунок куплено
             </button>
             <button
@@ -158,7 +161,7 @@ export function WishDetailsSheet({
             disabled={busy}
             onClick={() => closeAndRun(() => onFulfill(item))}
           >
-            <span aria-hidden="true">🎁</span>
+            <GiftIcon size={15} />
             Подарунок вручено
           </button>
         );
@@ -188,7 +191,7 @@ export function WishDetailsSheet({
         disabled={busy}
         onClick={() => closeAndRun(() => onReserve(item.id, true))}
       >
-        <span aria-hidden="true">🎁</span>
+        <GiftIcon size={15} />
         Здійснити бажання
       </button>
     );
@@ -243,7 +246,7 @@ export function WishDetailsSheet({
                 </button>
               ) : (
                 <div className="wl-cloud-sheet-photo" aria-label="Мрія без фото">
-                  <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true">♡</span>
+                  <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true"><HeartIcon size={34} /></span>
                 </div>
               )}
             </div>
@@ -251,12 +254,12 @@ export function WishDetailsSheet({
             <div className="wl-cloud-sheet-summary">
               <div className="wl-cloud-sheet-meta">
                 <span className="wl-cloud-sheet-priority">
-                  <span aria-hidden="true">{priorityPresentation.icon}</span>
+                  <priorityPresentation.Icon size={13} />
                   {priorityPresentation.label}
                 </span>
                 {statusChip && (
                   <span className="wl-cloud-sheet-state" data-tone={statusChip.tone}>
-                    <span aria-hidden="true">{statusChip.icon}</span>
+                    <statusChip.Icon size={13} />
                     {statusChip.label}
                   </span>
                 )}
@@ -287,7 +290,7 @@ export function WishDetailsSheet({
               target="_blank"
               rel="noopener noreferrer"
             >
-              <span aria-hidden="true">↗</span>
+              <ExternalLinkIcon size={15} />
               <span>{wishlistProductHost(item.link)}</span>
               <span aria-hidden="true">›</span>
             </a>
@@ -303,7 +306,7 @@ export function WishDetailsSheet({
                 disabled={busy}
                 onClick={() => closeAndRun(() => onEdit(item))}
               >
-                <span aria-hidden="true">✎</span>
+                <PencilIcon size={15} />
                 Редагувати
               </button>
             )}
@@ -327,7 +330,7 @@ export function WishDetailsSheet({
                 disabled={busy}
                 onClick={() => closeAndRun(() => onDelete(item.id))}
               >
-                <span aria-hidden="true">⌫</span>
+                <TrashIcon size={15} />
                 Видалити
               </button>
             )}
@@ -339,7 +342,7 @@ export function WishDetailsSheet({
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                <span aria-hidden="true">🛍</span>
+                <BagIcon size={15} />
                 Купити
               </a>
             )}

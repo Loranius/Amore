@@ -10,6 +10,8 @@ import {
 import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
 import type { ManualArchiveGiftPayload } from './wishlistArchiveMutations';
 import './wishlistArchiveManualGift.css';
+import { CloseIcon, GiftIcon, ImageIcon } from '@/components/icons/UiIcon';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 interface ArchiveGiftFormModalProps {
   partnerName: string;
@@ -187,7 +189,7 @@ export function ArchiveGiftFormModal({
         </div>
 
         <div className="wl-archive-gift-from">
-          <span aria-hidden="true">🎁</span>
+          <GiftIcon size={15} />
           <div>
             <small>Подарунок для тебе</small>
             <strong>Від {partnerName}</strong>
@@ -242,7 +244,7 @@ export function ArchiveGiftFormModal({
               {previewSrc ? (
                 <img src={previewSrc} alt={`Попередній перегляд: ${title || 'подарунок'}`} />
               ) : (
-                <span className="wm-photo-placeholder" aria-hidden="true">♡</span>
+                <span className="wm-photo-placeholder" aria-hidden="true"><HeartIcon size={34} /></span>
               )}
             </div>
             <div className="wm-photo-actions">
@@ -251,11 +253,11 @@ export function ArchiveGiftFormModal({
                 disabled={saving}
                 onPick={(file) => void pickFile(file)}
               >
-                🖼 Обрати з пристрою
+                <ImageIcon size={15} /> Обрати з пристрою
               </FilePickerButton>
               {previewSrc && (
                 <button type="button" className="btn-secondary" disabled={saving} onClick={clearPhoto}>
-                  ✕ Прибрати
+                  <CloseIcon size={14} /> Прибрати
                 </button>
               )}
             </div>

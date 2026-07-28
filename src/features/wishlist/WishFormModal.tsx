@@ -39,6 +39,9 @@ import type { WishlistImageDisplayMode } from './wishlistImageModes';
 import type { AppUser } from '@/types';
 import './wishlistFormSections.css';
 import './wishlistUnsavedChanges.css';
+import { TogetherIcon } from '@/components/icons/WishIcon';
+import { CloseIcon, ImageIcon, UserIcon } from '@/components/icons/UiIcon';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 type Scope = 'me' | 'partner' | 'shared';
 type WishlistPriorityV3 = 'high' | 'medium' | 'low';
@@ -520,9 +523,14 @@ export function WishFormModal({
                   if (!saving) setScope(value);
                 }}
                 items={[
-                  { value: 'me', label: 'Моє' },
-                  { value: 'partner', label: `Для ${partner?.name ?? 'партнера'}`, disabled: !partner },
-                  { value: 'shared', label: 'Спільне', icon: '🎁' },
+                  { value: 'me', label: 'Моє', icon: <HeartIcon size={14} /> },
+                  {
+                    value: 'partner',
+                    label: `Для ${partner?.name ?? 'партнера'}`,
+                    icon: <UserIcon size={14} />,
+                    disabled: !partner,
+                  },
+                  { value: 'shared', label: 'Спільне', icon: <TogetherIcon size={14} /> },
                 ]}
               />
             </div>
@@ -627,7 +635,7 @@ export function WishFormModal({
                     }}
                   />
                 ) : (
-                  <span className="wm-photo-placeholder" aria-hidden="true">♡</span>
+                  <span className="wm-photo-placeholder" aria-hidden="true"><HeartIcon size={34} /></span>
                 )}
               </div>
               <div className="wm-photo-actions">
@@ -636,11 +644,11 @@ export function WishFormModal({
                   disabled={saving}
                   onPick={(file) => void pickFile(file)}
                 >
-                  🖼 Обрати з пристрою
+                  <ImageIcon size={15} /> Обрати з пристрою
                 </FilePickerButton>
                 {previewSrc && (
                   <button type="button" className="btn-secondary" onClick={clearPhoto} disabled={saving}>
-                    ✕ Прибрати
+                    <CloseIcon size={14} /> Прибрати
                   </button>
                 )}
               </div>

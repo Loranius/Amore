@@ -6,6 +6,8 @@ import type {
 } from './wishlistBoardView';
 import './wishlistBoardToolbar.css';
 import './wishlistMobilePolish.css';
+import { WISH_ALL_ICON, WISH_PRIORITY_ICON, WISH_VIEW_ICON, type WishIconComponent } from '@/components/icons/WishIcon';
+import { CheckIcon } from '@/components/icons/UiIcon';
 
 interface WishlistBoardToolbarProps {
   value: WishlistBoardViewState;
@@ -15,29 +17,31 @@ interface WishlistBoardToolbarProps {
   onPolaroidReshuffle: () => void;
 }
 
-const PRIORITY_FILTERS: Array<{ value: WishlistPriorityFilter; label: string; icon: string }> = [
-  { value: 'all', label: 'Усі', icon: '✦' },
-  { value: 'high', label: 'Жадане', icon: '✦' },
-  { value: 'medium', label: 'Бажане', icon: '♡' },
-  { value: 'low', label: 'Приємне', icon: '❀' },
+const PRIORITY_FILTERS: Array<{
+  value: WishlistPriorityFilter;
+  label: string;
+  Icon: WishIconComponent;
+}> = [
+  // «Усі» мало той самий ✦, що й «Жадане» — два сусідні чипи одного
+  // ряду з однаковою позначкою.
+  { value: 'all', label: 'Усі', Icon: WISH_ALL_ICON },
+  { value: 'high', label: 'Жадане', Icon: WISH_PRIORITY_ICON.high },
+  { value: 'medium', label: 'Бажане', Icon: WISH_PRIORITY_ICON.medium },
+  { value: 'low', label: 'Приємне', Icon: WISH_PRIORITY_ICON.low },
 ];
 
 const VIEW_MODES: Array<{
   value: WishlistViewMode;
   label: string;
   description: string;
-  icon: string;
+  Icon: WishIconComponent;
 }> = [
-  { value: 'bubbles', label: 'Бульбашки', description: 'Жива хмара мрій', icon: '◯' },
-  { value: 'feed', label: 'Стрічка', description: 'Фото й деталі в ряд', icon: '☷' },
-  { value: 'polaroid', label: 'Полароїд', description: 'Закріплені фото', icon: '▱' },
+  { value: 'bubbles', label: 'Бульбашки', description: 'Жива хмара мрій', Icon: WISH_VIEW_ICON.bubbles },
+  { value: 'feed', label: 'Стрічка', description: 'Фото й деталі в ряд', Icon: WISH_VIEW_ICON.feed },
+  { value: 'polaroid', label: 'Полароїд', description: 'Закріплені фото', Icon: WISH_VIEW_ICON.polaroid },
 ];
 
-const DEFAULT_PRIORITY_FILTER = {
-  value: 'all',
-  label: 'Усі',
-  icon: '✦',
-} satisfies { value: WishlistPriorityFilter; label: string; icon: string };
+const DEFAULT_PRIORITY_FILTER = PRIORITY_FILTERS[0]!;
 
 export function WishlistBoardToolbar({
   value,
@@ -72,7 +76,7 @@ export function WishlistBoardToolbar({
         onClick={() => setOpen((current) => !current)}
       >
         <span className="wl-board-toolbar-summary">
-          <span className="wl-board-toolbar-summary-icon" aria-hidden="true">{selected.icon}</span>
+          <span className="wl-board-toolbar-summary-icon" aria-hidden="true"><selected.Icon size={20} /></span>
           <span className="wl-board-toolbar-summary-copy">
             <small>Вага мрії</small>
             <strong>{selected.label}</strong>
@@ -108,7 +112,7 @@ export function WishlistBoardToolbar({
                     aria-label={`${filter.label}: ${count}`}
                     onClick={() => selectPriority(filter.value)}
                   >
-                    <span className="wl-board-filter-icon" aria-hidden="true">{filter.icon}</span>
+                    <span className="wl-board-filter-icon" aria-hidden="true"><filter.Icon size={18} /></span>
                     <span className="wl-board-filter-label">{filter.label}</span>
                     <small className="wl-board-filter-count">{count}</small>
                   </button>
@@ -134,12 +138,12 @@ export function WishlistBoardToolbar({
                     aria-pressed={active}
                     onClick={() => selectView(mode.value)}
                   >
-                    <span className="wl-board-view-icon" aria-hidden="true">{mode.icon}</span>
+                    <span className="wl-board-view-icon" aria-hidden="true"><mode.Icon size={20} /></span>
                     <span className="wl-board-view-copy">
                       <strong>{mode.label}</strong>
                       <small>{mode.description}</small>
                     </span>
-                    <span className="wl-board-view-check" aria-hidden="true">✓</span>
+                    <span className="wl-board-view-check" aria-hidden="true"><CheckIcon size={14} /></span>
                   </button>
                 );
               })}

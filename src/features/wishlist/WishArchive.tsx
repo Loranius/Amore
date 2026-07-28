@@ -39,6 +39,10 @@ import type {
 } from './wishlistRpc';
 import './wishlistArchiveBubbles.css';
 import './wishlistArchiveViews.css';
+import { SparkIcon } from '@/components/icons/EventIcon';
+import { TogetherIcon } from '@/components/icons/WishIcon';
+import { ExternalLinkIcon, GiftIcon, PlayIcon, PlusIcon } from '@/components/icons/UiIcon';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 type ArchiveGroup = {
   key: string;
@@ -188,7 +192,7 @@ function ArchiveBubble({ item, seed, index, isFocused, onOpen }: ArchiveSeededPr
           </span>
         ) : (
           <span className="wl-cloud-bubble-placeholder wl-archive-cloud-bubble-placeholder" aria-hidden="true">
-            {item.reaction_video_url ? '▶' : '♡'}
+            {item.reaction_video_url ? <PlayIcon size={30} /> : <HeartIcon size={30} />}
           </span>
         )}
       </button>
@@ -221,7 +225,7 @@ function ArchiveFeedCard({
           {image ? (
             <img src={image} alt="" loading="lazy" decoding="async" />
           ) : (
-            <span aria-hidden="true">{item.reaction_video_url ? '▶' : '♡'}</span>
+            <span aria-hidden="true">{item.reaction_video_url ? <PlayIcon size={30} /> : <HeartIcon size={30} />}</span>
           )}
         </span>
 
@@ -279,7 +283,7 @@ function ArchivePolaroidCard({
           {image ? (
             <img src={image} alt="" loading="lazy" decoding="async" />
           ) : (
-            <span aria-hidden="true">{item.reaction_video_url ? '▶' : '♡'}</span>
+            <span aria-hidden="true">{item.reaction_video_url ? <PlayIcon size={30} /> : <HeartIcon size={30} />}</span>
           )}
         </span>
         <span className="wl-archive-polaroid-caption">
@@ -371,7 +375,7 @@ function ArchiveMemorySheet({
                     onPhotoClick(src);
                   }}
                   fallback={(
-                    <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true">♡</span>
+                    <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true"><HeartIcon size={34} /></span>
                   )}
                 />
               ) : item.reaction_video_url ? (
@@ -385,7 +389,7 @@ function ArchiveMemorySheet({
                 />
               ) : (
                 <div className="wl-cloud-sheet-photo wl-archive-cloud-sheet-photo" aria-label="Спогад без фото">
-                  <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true">♡</span>
+                  <span className="wl-cloud-sheet-photo-placeholder" aria-hidden="true"><HeartIcon size={34} /></span>
                 </div>
               )}
             </div>
@@ -393,7 +397,7 @@ function ArchiveMemorySheet({
             <div className="wl-cloud-sheet-summary">
               <div className="wl-cloud-sheet-meta">
                 <span className="wl-cloud-sheet-priority">
-                  <span aria-hidden="true">{isShared ? '✨' : '🎁'}</span>
+                  {isShared ? <TogetherIcon size={13} /> : <GiftIcon size={13} />}
                   {isShared ? 'Спільний момент' : 'Подарована мрія'}
                 </span>
                 <time className="wl-cloud-sheet-state" dateTime={momentDate ?? undefined}>
@@ -444,7 +448,7 @@ function ArchiveMemorySheet({
               target="_blank"
               rel="noopener noreferrer"
             >
-              <span aria-hidden="true">↗</span>
+              <ExternalLinkIcon size={15} />
               <span>Відкрити подарунок</span>
               <span aria-hidden="true">›</span>
             </a>
@@ -548,7 +552,7 @@ export function WishArchive({
           aria-label={`Відкрити: ${title}`}
         >
           <span className="wl-archive-entry-icon" aria-hidden="true">
-            {isShared ? '✨' : '🎁'}
+            {isShared ? <TogetherIcon size={22} /> : <GiftIcon size={22} />}
           </span>
           <span className="wl-archive-entry-copy">
             <strong>{title}</strong>
@@ -602,12 +606,12 @@ export function WishArchive({
                 className="wl-archive-add-gift"
                 onClick={() => setAddingGift(true)}
               >
-                <span aria-hidden="true">＋</span>
+                <PlusIcon size={15} />
                 Давній подарунок
               </button>
             )}
             <span className="wl-archive-page-symbol" aria-hidden="true">
-              {isShared ? '✨' : '🎁'}
+              {isShared ? <TogetherIcon size={22} /> : <GiftIcon size={22} />}
             </span>
           </div>
         </header>
@@ -615,12 +619,12 @@ export function WishArchive({
         <div className="wl-archive-body">
           {isPending ? (
             <div className="wl-archive-state" role="status">
-              <span className="wl-archive-state-icon" aria-hidden="true">✦</span>
+              <span className="wl-archive-state-icon" aria-hidden="true"><SparkIcon size={26} /></span>
               <strong>Відкриваємо ваші спогади…</strong>
             </div>
           ) : isError ? (
             <div className="wl-archive-state">
-              <span className="wl-archive-state-icon" aria-hidden="true">♡</span>
+              <span className="wl-archive-state-icon" aria-hidden="true"><HeartIcon size={26} /></span>
               <strong>Не вдалося відкрити архів</strong>
               <p>Спогади на місці — спробуй завантажити їх ще раз.</p>
               <button type="button" className="btn-secondary" onClick={() => void refetch()}>
@@ -630,7 +634,7 @@ export function WishArchive({
           ) : items.length === 0 ? (
             <div className="wl-archive-state wl-archive-state--empty">
               <span className="wl-archive-state-icon" aria-hidden="true">
-                {isShared ? '✨' : '🎀'}
+                {isShared ? <TogetherIcon size={26} /> : <GiftIcon size={26} />}
               </span>
               <strong>
                 {isShared
@@ -644,14 +648,14 @@ export function WishArchive({
               </p>
               {!isShared && (
                 <button type="button" className="btn-primary" onClick={() => setAddingGift(true)}>
-                  ＋ Додати давній подарунок
+                  <PlusIcon size={15} /> Додати давній подарунок
                 </button>
               )}
             </div>
           ) : (
             <>
               <div className="wl-archive-summary">
-                <span className="wl-archive-summary-icon" aria-hidden="true">✦</span>
+                <span className="wl-archive-summary-icon" aria-hidden="true"><SparkIcon size={20} /></span>
                 <span className="wl-archive-summary-copy">
                   <strong>{archiveCountText(items.length, isShared)}</strong>
                   <small>
