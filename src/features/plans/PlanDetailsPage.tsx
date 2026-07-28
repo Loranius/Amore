@@ -60,7 +60,8 @@ const STATUS_HELP: Record<PlanStatus, string> = {
 
 export function PlanDetailsPage() {
   const { id } = useParams();
-  const planId = Number(id);
+  const parsedPlanId = Number(id);
+  const planId = Number.isSafeInteger(parsedPlanId) && parsedPlanId > 0 ? parsedPlanId : -1;
   const navigate = useNavigate();
   const confirmDialog = useConfirm();
   const { data: plans = [], isPending } = usePlans();
