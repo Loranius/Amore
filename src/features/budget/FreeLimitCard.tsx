@@ -8,6 +8,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { Card } from '@/components/ui/Card';
 import { fmtMoney, useFreeLimit, useFreeLimitMutations } from './useBudget';
+import { HourglassIcon } from '@/components/icons/PlanIcon';
+import { CheckIcon, CloseIcon, CreditCardIcon } from '@/components/icons/UiIcon';
 
 const SLIDER_MIN = 0;
 const SLIDER_MAX = 20000;
@@ -43,7 +45,7 @@ export function FreeLimitCard() {
   return (
     <Card className="fin-card">
       <div className="fin-card-hdr">
-        <span className="fin-card-title">💳 Вільний ліміт</span>
+        <span className="fin-card-title"><CreditCardIcon size={17} /> Вільний ліміт</span>
         {/* Поки ліміт не завантажено, НЕ показуємо «0 ₴». Раніше картка
             малювала нуль і під час завантаження, і після помилки — тобто
             впевнено повідомляла неправдиву суму грошей. Краще чесне
@@ -90,7 +92,9 @@ export function FreeLimitCard() {
       </button>
 
       {proposalValue !== null && proposedBy === me.name && (
-        <p className="fin-hint fin-await">⏳ Очікуємо відповідь партнера на {fmtMoney(proposalValue)}</p>
+        <p className="fin-hint fin-await">
+          <HourglassIcon size={14} /> Очікуємо відповідь партнера на {fmtMoney(proposalValue)}
+        </p>
       )}
 
       {incoming && (
@@ -105,7 +109,7 @@ export function FreeLimitCard() {
               onClick={() => confirm.mutate(incoming)}
               disabled={confirm.isPending || reject.isPending}
             >
-              ✓ Погодитись
+              <CheckIcon size={15} /> Погодитись
             </button>
             <button
               type="button"
@@ -113,7 +117,7 @@ export function FreeLimitCard() {
               onClick={() => reject.mutate(incoming)}
               disabled={confirm.isPending || reject.isPending}
             >
-              ✕ Відхилити
+              <CloseIcon size={15} /> Відхилити
             </button>
           </div>
         </div>

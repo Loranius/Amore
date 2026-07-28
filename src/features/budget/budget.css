@@ -97,8 +97,8 @@
   gap: 0.45rem;
 }
 
-.finance-goals-empty > span {
-  font-size: 2rem;
+.finance-goals-empty > svg {
+  color: var(--accent);
 }
 
 .finance-goals-empty strong {
@@ -726,8 +726,8 @@
   text-align: center;
 }
 
-.goal-history-empty span {
-  font-size: 1.6rem;
+.goal-history-empty > svg {
+  color: var(--accent);
 }
 
 .goal-history-empty p,

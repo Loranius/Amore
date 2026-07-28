@@ -14,6 +14,9 @@ import { GoalContributions } from './GoalContributions';
 import { GoalDesiredDateModal, GoalForecastCard } from './GoalForecast';
 import { GoalMilestones } from './GoalMilestones';
 import { useGoalForecastMutations, useGoalForecasts } from './useGoalForecast';
+import { SparkIcon } from '@/components/icons/EventIcon';
+import { TargetIcon } from '@/components/icons/PlanIcon';
+import { CheckIcon, CommentIcon, ExternalLinkIcon, ListIcon, PauseIcon, PlayIcon } from '@/components/icons/UiIcon';
 import {
   CONTRIBUTION_NOTE_MAX,
   isValidContributionAmount,
@@ -69,7 +72,7 @@ export function GoalsList() {
   return (
     <section className="finance-goals" aria-labelledby="finance-goals-title">
       <header className="finance-goals-hero">
-        <span className="finance-goals-hero-icon" aria-hidden="true">◎</span>
+        <span className="finance-goals-hero-icon" aria-hidden="true"><TargetIcon size={26} /></span>
         <div className="finance-goals-hero-copy">
           <h2 id="finance-goals-title">Спільні цілі</h2>
           <p>Крок за кроком до наших мрій</p>
@@ -95,7 +98,7 @@ export function GoalsList() {
         </div>
       ) : goals.length === 0 ? (
         <div className="finance-goals-empty">
-          <span aria-hidden="true">✨</span>
+          <SparkIcon size={26} />
           <strong>Спільних цілей ще немає</strong>
           <p>Створіть першу мрію, до якої хочеться рухатися разом.</p>
         </div>
@@ -142,13 +145,13 @@ export function GoalsList() {
               <article className={`finance-goal${paused ? ' is-paused' : ''}`} key={goal.id}>
                 <section className="finance-goal-main-card">
                   <header className="finance-goal-head">
-                    <span className="finance-goal-cover" aria-hidden="true">◎</span>
+                    <span className="finance-goal-cover" aria-hidden="true"><TargetIcon size={22} /></span>
                     <div className="finance-goal-heading-copy">
                       <h3>{goal.name}</h3>
                       {goal.description && <p>{goal.description}</p>}
                       {goal.url && (
                         <a href={goal.url} target="_blank" rel="noopener noreferrer">
-                          Відкрити посилання ↗
+                          Відкрити посилання <ExternalLinkIcon size={13} />
                         </a>
                       )}
                     </div>
@@ -157,11 +160,11 @@ export function GoalsList() {
 
                   <div className="finance-goal-actions" aria-label="Дії з ціллю">
                     <button type="button" onClick={() => setHistoryGoalId(goal.id)}>
-                      <span aria-hidden="true">▤</span>
+                      <ListIcon size={16} />
                       Історія
                     </button>
                     <button type="button" onClick={() => setCommentsGoalId(goal.id)}>
-                      <span aria-hidden="true">▱</span>
+                      <CommentIcon size={16} />
                       Обговорення
                     </button>
                     <button
@@ -169,7 +172,7 @@ export function GoalsList() {
                       onClick={() => paused ? resume.mutate(goal.id) : pause.mutate(goal.id)}
                       disabled={pause.isPending || resume.isPending}
                     >
-                      <span aria-hidden="true">{paused ? '▶' : 'Ⅱ'}</span>
+                      {paused ? <PlayIcon size={15} /> : <PauseIcon size={15} />}
                       {paused
                         ? (resumeBusy ? 'Відновлюємо…' : 'Відновити')
                         : (pauseBusy ? 'Зупиняємо…' : 'Пауза')}
@@ -195,7 +198,7 @@ export function GoalsList() {
 
                   <footer className="finance-goal-status-row">
                     <span className={paused ? 'is-paused' : 'is-confirmed'}>
-                      <span aria-hidden="true">{paused ? 'Ⅱ' : '✓'}</span>
+                      {paused ? <PauseIcon size={14} /> : <CheckIcon size={14} />}
                       {paused ? 'На паузі' : 'Підтверджено'}
                     </span>
                     <button
