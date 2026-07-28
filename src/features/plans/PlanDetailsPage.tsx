@@ -4,8 +4,9 @@
 // Перший рівень відповідає лише на три питання: що це, коли це і що
 // робити далі. Технічні можливості не зникли, але відкриваються
 // поступово — підготовка, бюджет і зв'язки живуть у disclosure-блоках.
+// Виконаний план змінює акцент із підготовки на збереження спогадів.
 // ============================================================
-import { useMemo, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import {
@@ -16,7 +17,7 @@ import {
   GiftIcon,
   TrashIcon,
 } from '@/components/icons/UiIcon';
-import { PiggyBankIcon } from '@/components/icons/NavIcon';
+import { CameraIcon, PiggyBankIcon } from '@/components/icons/NavIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
 import { daysLabel } from '@/features/calendar/calendarUtils';
 import { fmtMoney, useGoals } from '@/features/piggybank/useBudget';
@@ -40,8 +41,10 @@ import { usePlanMutations, usePlans, usePlanTasks } from './usePlans';
 import { PlanTasks } from './PlanTasks';
 import { PlanMoneyBlock } from './PlanMoneyBlock';
 import { PlanLinksBlock } from './PlanLinksBlock';
+import { PlanMemoriesBlock } from './PlanMemoriesBlock';
 import './plans.css';
 import './plansDetail.css';
+import './plansMemories.css';
 import type { PlanDatePrecision, PlanStatus } from '@/types';
 
 const PRECISIONS: PlanDatePrecision[] = ['none', 'day', 'range', 'month', 'season', 'year'];
@@ -72,12 +75,19 @@ export function PlanDetailsPage() {
   const [editingDate, setEditingDate] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(true);
+  const [memoriesOpen, setMemoriesOpen] = useState(false);
+  const [addingMemory, setAddingMemory] = useState(false);
   const tasksRef = useRef<HTMLDetailsElement>(null);
+  const memoriesRef = useRef<HTMLDetailsElement>(null);
 
   const plan = useMemo(
     () => (planId === null ? null : plans.find((item) => item.id === planId) ?? null),
     [plans, planId],
   );
+
+  useEffect(() => {
+    if (plan?.status === 'done') setMemoriesOpen(true);
+  }, [plan?.id, plan?.status]);
 
   if (isPending) return <p className="empty-state">Завантаження…</p>;
   if (!plan) {
@@ -96,7 +106,9 @@ export function PlanDetailsPage() {
   const closed = isClosed(plan);
   const ready = readiness(tasks);
   const money = planMoney(plan, goals);
-  const linkedCount = linksOfPlan(plan, allLinks).length;
+  const planLinks = linksOfPlan(plan, allLinks);
+  const linkedCount = planLinks.length;
+  const memoryCount = planLinks.filter((link) => link.target_type === 'memory').length;
 
   const preparationSummary = ready.total > 0
     ? `${ready.done} з ${ready.total} готово`
@@ -109,6 +121,9 @@ export function PlanDetailsPage() {
   const linksSummary = linkedCount > 0
     ? `${linkedCount} пов’язаних елементів`
     : 'Бажання, місця, спогади й покупки';
+  const memoriesSummary = memoryCount > 0
+    ? `${memoryCount} ${memoryCount === 1 ? 'фото' : memoryCount < 5 ? 'фото' : 'фото'} прикріплено`
+    : 'Фото й підписи цього моменту';
 
   const remove = async () => {
     if (await confirmDialog(`Видалити план «${plan.title}» разом із завданнями?`)) {
@@ -116,19 +131,34 @@ export function PlanDetailsPage() {
     }
   };
 
-  const openPreparation = () => {
-    setTasksOpen(true);
+  const scrollTo = (ref: React.RefObject<HTMLDetailsElement | null>) => {
     window.requestAnimationFrame(() => {
       const behavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-      tasksRef.current?.scrollIntoView({ behavior, block: 'start' });
+      ref.current?.scrollIntoView({ behavior, block: 'start' });
     });
   };
 
-  const primaryAction = date === null
-    ? { label: 'Обрати дату', action: () => setEditingDate(true) }
-    : closed
-      ? { label: 'Змінити стан', action: () => setStatusOpen(true) }
-      : { label: 'Продовжити підготовку', action: openPreparation };
+  const openPreparation = () => {
+    setTasksOpen(true);
+    scrollTo(tasksRef);
+  };
+
+  const openMemories = (startAdding = false) => {
+    setMemoriesOpen(true);
+    scrollTo(memoriesRef);
+    if (startAdding) window.requestAnimationFrame(() => setAddingMemory(true));
+  };
+
+  const primaryAction = plan.status === 'done'
+    ? {
+        label: memoryCount > 0 ? 'Додати ще фото' : 'Додати спогад',
+        action: () => openMemories(true),
+      }
+    : date === null
+      ? { label: 'Обрати дату', action: () => setEditingDate(true) }
+      : closed
+        ? { label: 'Змінити стан', action: () => setStatusOpen(true) }
+        : { label: 'Продовжити підготовку', action: openPreparation };
 
   const detailStyle = { '--plan-detail-accent': cat.color } as CSSProperties;
 
@@ -187,6 +217,31 @@ export function PlanDetailsPage() {
       </header>
 
       <div className="plan-detail-sections">
+        {(plan.status === 'done' || memoryCount > 0) && (
+          <details
+            ref={memoriesRef}
+            className="plan-disclosure plan-disclosure--memories"
+            open={memoriesOpen}
+            onToggle={(event) => setMemoriesOpen(event.currentTarget.open)}
+          >
+            <summary>
+              <span className="plan-disclosure-icon"><CameraIcon size={18} /></span>
+              <span className="plan-disclosure-copy">
+                <b>Спогади про цей момент</b>
+                <small>{memoriesSummary}</small>
+              </span>
+              <ChevronDownIcon className="plan-disclosure-chevron" size={18} />
+            </summary>
+            <div className="plan-disclosure-body">
+              <PlanMemoriesBlock
+                plan={plan}
+                adding={addingMemory}
+                onAddingChange={setAddingMemory}
+              />
+            </div>
+          </details>
+        )}
+
         <details
           ref={tasksRef}
           className="plan-disclosure"
@@ -339,7 +394,10 @@ export function PlanDetailsPage() {
                   current={plan.status}
                   disabled={setStatus.isPending}
                   onChoose={() => {
-                    setStatus.mutate({ id: plan.id, status: key });
+                    setStatus.mutate(
+                      { id: plan.id, status: key },
+                      { onSuccess: () => { if (key === 'done') openMemories(false); } },
+                    );
                     setStatusOpen(false);
                   }}
                 />
