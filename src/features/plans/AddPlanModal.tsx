@@ -75,10 +75,10 @@ export function AddPlanModal({
             </header>
 
             <label className="plan-create-title-field">
-              <span className="sr-only">Назва плану</span>
               <textarea
                 id="plan-title"
                 name="title"
+                aria-label="Назва плану"
                 rows={2}
                 maxLength={120}
                 value={title}
