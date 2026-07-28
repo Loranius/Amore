@@ -33,8 +33,8 @@ const TAB_DEFS: { type: EventType; label: string }[] = [
 type ModalState = {
   kind: 'event';
   row: EventRow | null;
-  date?: string;
-  type?: EventType;
+  date?: string | undefined;
+  type?: EventType | undefined;
 } | null;
 
 export function CalendarPage() {
