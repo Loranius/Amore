@@ -9,8 +9,9 @@
 // цей час випливали з даних і ніде не показувались.
 // ============================================================
 import { useUsersMap } from '@/features/_shared/useUsers';
+import { formatDateUA } from '@/features/_shared/month';
 import {
-  TYPES, daysLabel, formatOccurrence, occurrenceLabel,
+  TYPES, daysLabel, occurrenceISO, occurrenceLabel,
 } from './calendarUtils';
 import type { EnrichedEvent } from '@/types';
 
@@ -53,17 +54,20 @@ function NextBanner({ ev, onEdit }: { ev: EnrichedEvent; onEdit: (ev: EnrichedEv
     <button
       type="button"
       className="cal-next-banner"
-      style={{ borderColor: t.color }}
+      style={{ borderColor: t.mark }}
       onClick={() => onEdit(ev)}
     >
       <div className="cal-next-icon">{t.icon}</div>
       <div className="cal-next-info">
         <div className="cal-next-label">Найближча</div>
         <div className="cal-next-title">{ev.title}</div>
-        <div className="cal-next-when" style={{ color: t.color }}>
-          {daysLabel(ev.days)} · {formatOccurrence(ev)}
+        <div className="cal-next-when" style={{ color: t.ink }}>
+          {daysLabel(ev.days)}
         </div>
-        {years && <div className="cal-next-years">{years}</div>}
+        <div className="cal-next-years">
+          {formatDateUA(occurrenceISO(ev))}
+          {years && <> · {years}</>}
+        </div>
       </div>
     </button>
   );
@@ -119,7 +123,7 @@ function EventRow({
         onClick={() => onEdit(ev)}
         aria-label={`Редагувати «${ev.title}»`}
       />
-      <div className="cal-event-type-bar" style={{ background: t.color }} />
+      <div className="cal-event-type-bar" style={{ background: t.mark }} />
       <div className="cal-event-icon">{t.icon}</div>
       <div className="cal-event-info">
         <div className="cal-event-title">
@@ -127,20 +131,20 @@ function EventRow({
           {person && <span className="cal-person-chip">{person}</span>}
         </div>
         {ev.description && <div className="cal-event-desc">{ev.description}</div>}
+        {/* Одне головне число й один тихий підрядок замість п'яти
+            рівновагових шматочків, які регулярно ламались на два рядки.
+            Око шукає «коли» — воно й найпомітніше. */}
+        {!muted && (
+          <div className="cal-event-when" style={{ color: t.ink }}>
+            {daysLabel(ev.days)}
+          </div>
+        )}
         <div className="cal-event-meta">
-          <span>{formatOccurrence(ev)}</span>
-          {years && <span className="cal-years-badge">{years}</span>}
-          {/* «↻ щороку» лише коли роковин немає. Підпис роковин з'являється
-              виключно в щорічної події (у разової настання збігається з
-              датою, тож років нуль), тож поруч із «5 років разом» позначка
-              повторюваності повідомляла те саме вдруге й розганяла рядок
-              меты на два. */}
-          {ev.yearly && !years && <span className="cal-yearly-badge">↻ щороку</span>}
-          {!muted && (
-            <span className="cal-days-badge" style={{ color: t.color }}>
-              {daysLabel(ev.days)}
-            </span>
-          )}
+          <span>{formatDateUA(occurrenceISO(ev))}</span>
+          {years && <span>{years}</span>}
+          {/* «↻ щороку» лише коли роковин немає: підпис роковин буває
+              виключно в щорічної події, тож поруч вони дублювали одне одного. */}
+          {ev.yearly && !years && <span>↻ щороку</span>}
         </div>
       </div>
       <button

@@ -26,11 +26,25 @@ import type {
 import { MONTHS_UA_GENITIVE as MONTHS } from '@/features/_shared/month';
 export { MONTHS };
 
-export const TYPES: Record<EventType, { icon: string; label: string; color: string }> = {
-  birthday: { icon: '🎂', label: 'День народження', color: '#FF6B9D' },
-  anniversary: { icon: '💕', label: 'Річниця', color: '#E8829C' },
-  holiday: { icon: '🎉', label: 'Свято', color: '#F4A6BE' },
-  other: { icon: '🗺️', label: 'Плани', color: '#9B6EA8' },
+/**
+ * Тип події → значок і дві фарби.
+ *
+ * `mark` малює смужку й крапку, `ink` — текст. Одним кольором обидві
+ * ролі не закриваються: те, що добре видно крапкою, як 12-піксельний
+ * текст на білому давало 1.9–2.7:1.
+ *
+ * Самі значення живуть у CSS-змінних (index.css), бо світла й темна
+ * теми потребують РІЗНИХ міток: глибока вина річниці на темному тлі
+ * зникає, а світлий корал на білому — навпаки.
+ */
+export const TYPES: Record<
+  EventType,
+  { icon: string; label: string; mark: string; ink: string }
+> = {
+  birthday: { icon: '🎂', label: 'День народження', mark: 'var(--ev-birthday)', ink: 'var(--ev-birthday-ink)' },
+  anniversary: { icon: '💕', label: 'Річниця', mark: 'var(--ev-anniversary)', ink: 'var(--ev-anniversary-ink)' },
+  holiday: { icon: '🎉', label: 'Свято', mark: 'var(--ev-holiday)', ink: 'var(--ev-holiday-ink)' },
+  other: { icon: '🗺️', label: 'Плани', mark: 'var(--ev-other)', ink: 'var(--ev-other-ink)' },
 };
 
 export const PLAN_CATS: Record<
@@ -122,6 +136,12 @@ export function formatUaDate(iso: string): string {
 export function formatOccurrence(ev: EnrichedEvent): string {
   const d = ev.nextDate;
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} р.`;
+}
+
+/** Дата настання у 'YYYY-MM-DD' — для підписів через formatDateUA. */
+export function occurrenceISO(ev: EnrichedEvent): string {
+  const d = ev.nextDate;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /**

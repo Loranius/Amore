@@ -70,7 +70,7 @@ export function CalendarMonthView({
                   {/* Не більше трьох крапок: далі вони зливаються в пляму
                       й перестають щось означати. */}
                   {list.slice(0, 3).map((ev) => (
-                    <i key={ev.id} style={{ background: TYPES[ev.type ?? 'other'].color }} />
+                    <i key={ev.id} style={{ background: TYPES[ev.type ?? 'other'].mark }} />
                   ))}
                 </span>
               )}
@@ -137,7 +137,7 @@ export function CalendarYearView({
             <b>{MONTHS_UA[m.month - 1]}</b>
             <span className="cal-year-dots">
               {m.types.map((t) => (
-                <i key={t} style={{ background: TYPES[t as keyof typeof TYPES].color }} />
+                <i key={t} style={{ background: TYPES[t as keyof typeof TYPES].mark }} />
               ))}
             </span>
             <small>{m.count || '—'}</small>
