@@ -1228,20 +1228,29 @@ a.wl-card-title { color: var(--accent); }
 .cal-head .btn { flex: 0 0 auto; padding: 8px 16px; }
 
 
+/* Банер — кнопка: найближчу подію відкривають частіше за будь-яку іншу,
+   і мати для неї єдиний шлях через дрібний рядок нижче не мало сенсу. */
 .cal-next-banner {
   display: flex;
   gap: 12px;
   align-items: center;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
   background: var(--surface);
   border: 2px solid;
   border-radius: 16px;
   padding: 14px 16px;
   margin-bottom: 14px;
+  cursor: pointer;
 }
+.cal-next-banner:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .cal-next-icon { font-size: 32px; }
 .cal-next-label { font-size: 12px; color: var(--muted); text-transform: uppercase; }
 .cal-next-title { font-size: 18px; font-weight: 600; }
 .cal-next-when { font-weight: 600; }
+.cal-next-years { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
 
 .cal-section { margin-bottom: 14px; }
 .cal-section-title { font-size: 13px; color: var(--muted); margin: 8px 2px; }
@@ -1257,6 +1266,15 @@ a.wl-card-title { color: var(--accent); }
   position: relative;
   overflow: hidden;
 }
+/* Накладка на весь рядок замість олівця впритул до хрестика: велика
+   ціль для пальця й фокус із клавіатури. Хрестик стоїть шаром вище. */
+.cal-event-open {
+  position: absolute; inset: 0; z-index: 1;
+  border: 0; background: none; padding: 0; cursor: pointer;
+}
+.cal-event-item:has(.cal-event-open:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
 .cal-event-type-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
 .cal-event-icon { font-size: 22px; padding-left: 6px; }
 .cal-event-info { flex: 1; min-width: 0; }
@@ -1264,27 +1282,27 @@ a.wl-card-title { color: var(--accent); }
 .cal-event-desc { font-size: 13px; color: var(--muted); }
 .cal-event-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--muted); margin-top: 2px; }
 .cal-yearly-badge, .cal-days-badge { font-size: 12px; }
+/* Роковини — головне, що людина шукає очима в рядку дня народження,
+   тож єдиний елемент меты, який не приглушений. */
+.cal-years-badge { font-size: 12px; font-weight: 700; color: var(--text); }
 .cal-del-btn {
+  position: relative; z-index: 2;
   flex: 0 0 auto;
   border: 0;
   background: transparent;
   color: var(--muted);
   font-size: 20px;
+  /* Власна зона дотику 36×36 і відступ від тексту: раніше хрестик стояв
+     упритул до олівця, і промах пальцем відкривав діалог видалення. */
+  width: 36px; height: 36px;
+  margin-left: 4px;
+  border-radius: 10px;
   cursor: pointer;
 }
+.cal-del-btn:focus-visible { outline: 2px solid var(--danger); outline-offset: -2px; }
 .cal-del-btn:hover { color: var(--danger); }
-.cal-edit-btn {
-  flex: 0 0 auto;
-  border: 0;
-  background: transparent;
-  font-size: 15px;
-  line-height: 1;
-  padding: 4px;
-  cursor: pointer;
-  opacity: 0.62;
-}
-.cal-edit-btn:hover, .cal-edit-btn:focus-visible { opacity: 1; }
 .cal-yearly-toggle { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.cal-field-hint { margin: -2px 0 8px 26px; font-size: 12px; color: var(--muted); line-height: 1.4; }
 
 /* Помилка завантаження: повідомлення без кнопки повтору — це глухий кут,
    особливо в PWA, яку відкривають у метро. */

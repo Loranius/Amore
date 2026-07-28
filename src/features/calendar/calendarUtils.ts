@@ -9,7 +9,7 @@
 // цих чистих функцій тягнув за собою `@/lib/supabase`. Споживачі беруть
 // його прямо з `_shared/events` — рівно як це вже робить `home/Hero.tsx`.
 // ============================================================
-import { localDateFromISO } from '@/lib/utils';
+import { localDateFromISO, pluralUA } from '@/lib/utils';
 import type {
   EventRow,
   EnrichedEvent,
@@ -107,6 +107,51 @@ export function daysLabel(n: number): string {
 export function formatUaDate(iso: string): string {
   const d = localDateFromISO(iso);
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} р.`;
+}
+
+/**
+ * Дата НАЙБЛИЖЧОГО настання події.
+ *
+ * Список показував `ev.date` — вихідну дату. Для щорічної події це
+ * означало «5 липня 1963 р.» під заголовком дня народження: екран друкував
+ * рік народження людини й лишав читачеві самому здогадатись, що подія
+ * буде 5 липня 2027. Найближче настання весь цей час обчислювалось
+ * (`enrichEvent`), використовувалось для «через скільки днів» — і не
+ * показувалось.
+ */
+export function formatOccurrence(ev: EnrichedEvent): string {
+  const d = ev.nextDate;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} р.`;
+}
+
+/**
+ * Котрі роковини настануть цього разу.
+ *
+ * Рік народження й рік початку стосунків уже лежать у `date` — з них
+ * прямо випливає і вік, і «скільки років разом». Досі з цієї арифметики
+ * не виводилось нічого.
+ *
+ * Нуль означає «це та сама подія, що й оригінал» (перше настання) — тоді
+ * показувати нема чого, і підпис не малюється.
+ */
+export function occurrenceYears(ev: EnrichedEvent): number {
+  return ev.nextDate.getFullYear() - localDateFromISO(ev.date).getFullYear();
+}
+
+/**
+ * Підпис роковин під тип події, або null коли він не має сенсу.
+ *
+ * Для свята рік походження нічого не означає: «Новий рік, 26 років» —
+ * нісенітниця. Для дня народження це вік, для річниці — скільки років
+ * разом.
+ */
+export function occurrenceLabel(ev: EnrichedEvent): string | null {
+  const years = occurrenceYears(ev);
+  if (years <= 0) return null;
+  const word = pluralUA(years, ['рік', 'роки', 'років']);
+  if (ev.type === 'birthday') return `виповниться ${years} ${word}`;
+  if (ev.type === 'anniversary') return `${years} ${word} разом`;
+  return null;
 }
 
 export function enrichEvent(ev: EventRow): EnrichedEvent {

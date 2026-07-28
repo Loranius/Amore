@@ -132,6 +132,10 @@ export function AddEventModal({
         />
         <span>💍 Велика подія (заручини, весілля, важлива віха)</span>
       </label>
+      {/* Галочка не косметична: `is_milestone` читає useCrystal і вирощує
+          з неї вузол на головній. Досі про цей наслідок не було сказано
+          ніде, і позначку ставили (чи не ставили) наосліп. */}
+      <p className="cal-field-hint">Велика подія проростає окремою гранню кристала на головній.</p>
 
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={onClose}>

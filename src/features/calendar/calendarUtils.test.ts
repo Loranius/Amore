@@ -12,8 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   daysLabel,
   daysUntil,
+  enrichEvent,
+  formatOccurrence,
   formatUaDate,
   nextOccurrence,
+  occurrenceLabel,
+  occurrenceYears,
   sortEnriched,
 } from './calendarUtils';
 import type { EnrichedEvent, EventRow } from '@/types';
@@ -36,6 +40,11 @@ function event(date: string, yearly: boolean): EventRow {
     metadata: null,
     is_milestone: false,
   } as EventRow;
+}
+
+/** Подія з типом — роковини підписуються по-різному для дня народження й річниці. */
+function typed(date: string, yearly: boolean, type: EventRow['type']): EventRow {
+  return { ...event(date, yearly), type };
 }
 
 /** 'YYYY-MM-DD' локальної дати — щоб не порівнювати Date з Date. */
@@ -158,5 +167,78 @@ describe('sortEnriched', () => {
       .sort(sortEnriched)
       .map((e) => e.id);
     expect(order).toEqual([3, 2, 1, 4]);
+  });
+});
+
+// ============================================================
+// Роковини та дата настання.
+// ------------------------------------------------------------
+// Інваріант: усе, що вже лежить у `date`, мусить дійти до екрана. Рік
+// народження й рік початку стосунків зберігались роками, а вік і
+// «скільки років разом» не показувались ніде — при тому, що це головне,
+// що хочуть знати про день народження й річницю.
+//
+// Другий інваріант: показується НАЙБЛИЖЧЕ настання, а не вихідна дата.
+// Список друкував «5 липня 1963 р.» для дня народження, що буде 2027-го.
+// ============================================================
+describe('formatOccurrence', () => {
+  it('показує найближче настання, а не рік народження', () => {
+    const ev = enrichEvent(typed('1963-07-05', true, 'birthday'));
+    expect(formatOccurrence(ev)).toBe('5 липня 2027 р.');
+    // Регресія: саме тут раніше друкувався 1963-й.
+    expect(formatUaDate(ev.date)).toBe('5 липня 1963 р.');
+  });
+
+  it('для разової події настання збігається з самою датою', () => {
+    const ev = enrichEvent(typed('2026-12-31', false, 'holiday'));
+    expect(formatOccurrence(ev)).toBe('31 грудня 2026 р.');
+  });
+});
+
+describe('occurrenceYears', () => {
+  it('рахує роковини від вихідного року', () => {
+    expect(occurrenceYears(enrichEvent(typed('1963-07-05', true, 'birthday')))).toBe(64);
+    expect(occurrenceYears(enrichEvent(typed('2022-05-22', true, 'anniversary')))).toBe(5);
+  });
+
+  it('перше настання — нуль роковин', () => {
+    // Подія, заведена на цей рік і ще не настала: «0 років» показувати нема чого.
+    expect(occurrenceYears(enrichEvent(typed('2026-12-26', true, 'anniversary')))).toBe(0);
+  });
+
+  it('29 лютого не збиває лік років при затисканні до 28-го', () => {
+    // 2027-й не високосний, настання затиснеться на 28 лютого — але це
+    // все одно роковини 2024 року, а не на рік менше.
+    const ev = enrichEvent(typed('2024-02-29', true, 'birthday'));
+    expect(occurrenceYears(ev)).toBe(3);
+    expect(formatOccurrence(ev)).toBe('28 лютого 2027 р.');
+  });
+});
+
+describe('occurrenceLabel', () => {
+  it('день народження — це вік, річниця — роки разом', () => {
+    expect(occurrenceLabel(enrichEvent(typed('1963-07-05', true, 'birthday'))))
+      .toBe('виповниться 64 роки');
+    expect(occurrenceLabel(enrichEvent(typed('2022-05-22', true, 'anniversary'))))
+      .toBe('5 років разом');
+  });
+
+  it('числівник узгоджується, а не приклеюється', () => {
+    // 61 рік / 62 роки / 65 років — і 11–14 завжди третьою формою.
+    expect(occurrenceLabel(enrichEvent(typed('1966-07-05', true, 'birthday'))))
+      .toBe('виповниться 61 рік');
+    expect(occurrenceLabel(enrichEvent(typed('2016-07-05', true, 'birthday'))))
+      .toBe('виповниться 11 років');
+    expect(occurrenceLabel(enrichEvent(typed('2022-12-26', true, 'anniversary'))))
+      .toBe('4 роки разом');
+  });
+
+  it('для свята рік походження нічого не означає', () => {
+    // «Новий рік, 26 років» — нісенітниця, тож підпису немає.
+    expect(occurrenceLabel(enrichEvent(typed('2000-01-01', true, 'holiday')))).toBeNull();
+  });
+
+  it('перше настання підпису не має', () => {
+    expect(occurrenceLabel(enrichEvent(typed('2026-12-26', true, 'anniversary')))).toBeNull();
   });
 });
