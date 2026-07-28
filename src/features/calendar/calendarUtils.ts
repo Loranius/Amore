@@ -9,7 +9,7 @@
 // цих чистих функцій тягнув за собою `@/lib/supabase`. Споживачі беруть
 // його прямо з `_shared/events` — рівно як це вже робить `home/Hero.tsx`.
 // ============================================================
-import { localDateFromISO } from '@/lib/utils';
+import { localDateFromISO, pluralUA } from '@/lib/utils';
 import type {
   EventRow,
   EnrichedEvent,
@@ -26,28 +26,40 @@ import type {
 import { MONTHS_UA_GENITIVE as MONTHS } from '@/features/_shared/month';
 export { MONTHS };
 
-export const TYPES: Record<EventType, { icon: string; label: string; color: string }> = {
-  birthday: { icon: '🎂', label: 'День народження', color: '#FF6B9D' },
-  anniversary: { icon: '💕', label: 'Річниця', color: '#E8829C' },
-  holiday: { icon: '🎉', label: 'Свято', color: '#F4A6BE' },
-  other: { icon: '🗺️', label: 'Плани', color: '#9B6EA8' },
+/**
+ * Тип події → значок і дві фарби.
+ *
+ * `mark` малює смужку й крапку, `ink` — текст. Одним кольором обидві
+ * ролі не закриваються: те, що добре видно крапкою, як 12-піксельний
+ * текст на білому давало 1.9–2.7:1.
+ *
+ * Самі значення живуть у CSS-змінних (index.css), бо світла й темна
+ * теми потребують РІЗНИХ міток: глибока вина річниці на темному тлі
+ * зникає, а світлий корал на білому — навпаки.
+ */
+export const TYPES: Record<EventType, { label: string; mark: string; ink: string }> = {
+  birthday: { label: 'День народження', mark: 'var(--ev-birthday)', ink: 'var(--ev-birthday-ink)' },
+  anniversary: { label: 'Річниця', mark: 'var(--ev-anniversary)', ink: 'var(--ev-anniversary-ink)' },
+  holiday: { label: 'Свято', mark: 'var(--ev-holiday)', ink: 'var(--ev-holiday-ink)' },
+  other: { label: 'Плани', mark: 'var(--ev-other)', ink: 'var(--ev-other-ink)' },
 };
 
 export const PLAN_CATS: Record<
   PlanCategory,
-  { icon: string; label: string; color: string; gradient: string }
+  { label: string; color: string; gradient: string }
 > = {
-  date: { icon: '💑', label: 'Побачення', color: '#FF6B9D', gradient: 'linear-gradient(135deg,#FF6B9D,#E8829C)' },
-  dream: { icon: '✨', label: 'Мрії', color: '#9B6EA8', gradient: 'linear-gradient(135deg,#9B6EA8,#C084D4)' },
-  trip: { icon: '✈️', label: 'Подорожі', color: '#5BA3D9', gradient: 'linear-gradient(135deg,#5BA3D9,#7EC8E3)' },
-  goal: { icon: '🎯', label: 'Цілі', color: '#E8829C', gradient: 'linear-gradient(135deg,#E8829C,#F4A6BE)' },
-  other: { icon: '🗺️', label: 'Інше', color: '#B98A9A', gradient: 'linear-gradient(135deg,#B98A9A,#D4B0BC)' },
+  date: { label: 'Побачення', color: '#FF6B9D', gradient: 'linear-gradient(135deg,#FF6B9D,#E8829C)' },
+  dream: { label: 'Мрії', color: '#9B6EA8', gradient: 'linear-gradient(135deg,#9B6EA8,#C084D4)' },
+  trip: { label: 'Подорожі', color: '#5BA3D9', gradient: 'linear-gradient(135deg,#5BA3D9,#7EC8E3)' },
+  goal: { label: 'Цілі', color: '#E8829C', gradient: 'linear-gradient(135deg,#E8829C,#F4A6BE)' },
+  other: { label: 'Інше', color: '#B98A9A', gradient: 'linear-gradient(135deg,#B98A9A,#D4B0BC)' },
 };
 
-export const PLAN_STATUS: Record<PlanStatus, { label: string; icon: string; cls: string }> = {
-  planned: { label: 'Планується', icon: '⏳', cls: 'plan-status-planned' },
-  active: { label: 'В процесі', icon: '🔥', cls: 'plan-status-active' },
-  done: { label: 'Виконано!', icon: '✅', cls: 'plan-status-done' },
+// Значки живуть у components/icons/PlanIcon — тут лишились підпис і клас.
+export const PLAN_STATUS: Record<PlanStatus, { label: string; cls: string }> = {
+  planned: { label: 'Планується', cls: 'plan-status-planned' },
+  active: { label: 'В процесі', cls: 'plan-status-active' },
+  done: { label: 'Виконано!', cls: 'plan-status-done' },
 };
 
 export const PLAN_CAT_ORDER: PlanCategory[] = ['date', 'dream', 'trip', 'goal', 'other'];
@@ -66,7 +78,7 @@ export const PLAN_CAT_ORDER: PlanCategory[] = ['date', 'dream', 'trip', 'goal', 
  * `supabase/functions/event-reminders/index.ts`; edge-функція не імпортує
  * з `src/`, тож при зміні конвенції правити треба обидва місця.
  */
-function sameDayInYear(year: number, month: number, day: number): Date {
+export function sameDayInYear(year: number, month: number, day: number): Date {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   return new Date(year, month, Math.min(day, daysInMonth));
 }
@@ -94,7 +106,7 @@ export function daysUntil(dateObj: Date): number {
 }
 
 export function daysLabel(n: number): string {
-  if (n === 0) return '🎊 Сьогодні!';
+  if (n === 0) return 'Сьогодні!';
   if (n === 1) return 'завтра';
   if (n < 0) return `${Math.abs(n)} дн. тому`;
   if (n < 7) return `через ${n} дн.`;
@@ -107,6 +119,57 @@ export function daysLabel(n: number): string {
 export function formatUaDate(iso: string): string {
   const d = localDateFromISO(iso);
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} р.`;
+}
+
+/**
+ * Дата НАЙБЛИЖЧОГО настання події.
+ *
+ * Список показував `ev.date` — вихідну дату. Для щорічної події це
+ * означало «5 липня 1963 р.» під заголовком дня народження: екран друкував
+ * рік народження людини й лишав читачеві самому здогадатись, що подія
+ * буде 5 липня 2027. Найближче настання весь цей час обчислювалось
+ * (`enrichEvent`), використовувалось для «через скільки днів» — і не
+ * показувалось.
+ */
+export function formatOccurrence(ev: EnrichedEvent): string {
+  const d = ev.nextDate;
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} р.`;
+}
+
+/** Дата настання у 'YYYY-MM-DD' — для підписів через formatDateUA. */
+export function occurrenceISO(ev: EnrichedEvent): string {
+  const d = ev.nextDate;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * Котрі роковини настануть цього разу.
+ *
+ * Рік народження й рік початку стосунків уже лежать у `date` — з них
+ * прямо випливає і вік, і «скільки років разом». Досі з цієї арифметики
+ * не виводилось нічого.
+ *
+ * Нуль означає «це та сама подія, що й оригінал» (перше настання) — тоді
+ * показувати нема чого, і підпис не малюється.
+ */
+export function occurrenceYears(ev: EnrichedEvent): number {
+  return ev.nextDate.getFullYear() - localDateFromISO(ev.date).getFullYear();
+}
+
+/**
+ * Підпис роковин під тип події, або null коли він не має сенсу.
+ *
+ * Для свята рік походження нічого не означає: «Новий рік, 26 років» —
+ * нісенітниця. Для дня народження це вік, для річниці — скільки років
+ * разом.
+ */
+export function occurrenceLabel(ev: EnrichedEvent): string | null {
+  const years = occurrenceYears(ev);
+  if (years <= 0) return null;
+  const word = pluralUA(years, ['рік', 'роки', 'років']);
+  if (ev.type === 'birthday') return `виповниться ${years} ${word}`;
+  if (ev.type === 'anniversary') return `${years} ${word} разом`;
+  return null;
 }
 
 export function enrichEvent(ev: EventRow): EnrichedEvent {

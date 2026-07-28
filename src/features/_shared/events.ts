@@ -14,7 +14,7 @@ import type { EventRow, PlanMetadata } from '@/types';
 export async function loadEvents(): Promise<EventRow[]> {
   const { data, error } = await supabase
     .from('events')
-    .select('id,title,description,date,created_by,type,yearly,metadata,is_milestone')
+    .select('id,title,description,date,created_by,type,yearly,metadata,is_milestone,person_user_id')
     .order('date', { ascending: true });
   if (error) throw error;
   return data ?? [];

@@ -82,21 +82,31 @@ test.describe('Amore mobile visual preview', () => {
         return {
           parentIsBubbleView: item.parentElement?.classList.contains('wl-bubble-view') ?? false,
           itemBeforeDisplay: itemBefore.display,
-          itemBeforeAnimation: itemBefore.animationName,
           itemAfterDisplay: itemAfter.display,
-          itemAfterAnimation: itemAfter.animationName,
           bubbleBeforeDisplay: bubbleBefore.display,
           bubbleBeforeAnimation: bubbleBefore.animationName,
         };
       });
 
+      // Інваріант той самий, що й був: за бульбашкою не стоять
+      // декоративні шари туману. Стереже його `display: none` —
+      // псевдоелемент без боксу не малюється й не анімується взагалі,
+      // тож окремо перевіряти його animationName нема сенсу: це назва
+      // правила, яке однаково нікуди не застосовується. Ці дві
+      // перевірки прибрані як такі, що ловили не те.
+      //
+      // Змінилось по суті одне: `.wl-cloud-bubble::before` більше не
+      // туман, а САМА бульбашка. У перловому вигляді цей шар був
+      // овальною «мильною плівкою» позаду лінзи, і його вимикали. В
+      // об'ємному склі (wishlistBubbleGlass.css) він накриває весь диск
+      // і несе світлотінь та відблиски — без нього бульбашка перестає
+      // бути бульбашкою. Тому `display: block` тут тепер вимога, а не
+      // регресія. Його анімація лишається вимкненою: об'єм не крутиться.
       expect(pseudoLayers).toEqual({
         parentIsBubbleView: true,
         itemBeforeDisplay: 'none',
-        itemBeforeAnimation: 'none',
         itemAfterDisplay: 'none',
-        itemAfterAnimation: 'none',
-        bubbleBeforeDisplay: 'none',
+        bubbleBeforeDisplay: 'block',
         bubbleBeforeAnimation: 'none',
       });
     }

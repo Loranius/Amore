@@ -133,6 +133,9 @@ export interface EventRow {
   metadata: PlanMetadata | null;
   /** Заручини/весілля/народження дитини тощо — окремо від metadata (та зайнята під плани). */
   is_milestone: boolean;
+  /** Кого стосується подія, якщо це користувач застосунку. null — людина
+   *  поза застосунком (батьки, друзі) або подія взагалі не про людину. */
+  person_user_id: number | null;
 }
 
 export interface MediaItemRow {

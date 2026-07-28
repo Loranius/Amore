@@ -24,6 +24,8 @@ export interface NewEventInput {
   type: EventRow['type'];
   yearly: boolean;
   is_milestone: boolean;
+  /** Чий це день народження, якщо людина є в застосунку. */
+  person_user_id: number | null;
 }
 
 export interface NewPlanInput {
@@ -49,6 +51,7 @@ export function useCalendarMutations() {
         type: input.type,
         yearly: input.yearly,
         is_milestone: input.is_milestone,
+        person_user_id: input.person_user_id,
         created_by: user.id,
       };
       const { error } = await supabase.from('events').insert(row);
@@ -92,6 +95,7 @@ export function useCalendarMutations() {
           type: v.input.type,
           yearly: v.input.yearly,
           is_milestone: v.input.is_milestone,
+          person_user_id: v.input.person_user_id,
         })
         .eq('id', v.id);
       if (error) throw error;
@@ -138,6 +142,32 @@ export function useCalendarMutations() {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
+  /**
+   * Заготовки свят — одним запитом.
+   *
+   * Десять окремих insert'ів на телефоні в метро це десять шансів
+   * обірватись посередині й лишити половину списку.
+   */
+  const addHolidays = useMutation({
+    mutationFn: async (items: Array<{ title: string; date: string }>) => {
+      if (items.length === 0) return;
+      const rows: InsertRow<'events'>[] = items.map((h) => ({
+        title: h.title,
+        date: h.date,
+        description: null,
+        type: 'holiday',
+        yearly: true,
+        is_milestone: false,
+        person_user_id: null,
+        created_by: user.id,
+      }));
+      const { error } = await supabase.from('events').insert(rows);
+      if (error) throw error;
+    },
+    onSuccess: invalidate,
+    onError: (e) => toast.show('Не вдалось додати свята: ' + (e as Error).message),
+  });
+
   const deleteEvent = useMutation({
     mutationFn: async (id: number) => {
       const { error } = await supabase.from('events').delete().eq('id', id);
@@ -147,5 +177,5 @@ export function useCalendarMutations() {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
-  return { addEvent, addPlan, updateEvent, updatePlan, setPlanStatus, deleteEvent };
+  return { addEvent, addPlan, addHolidays, updateEvent, updatePlan, setPlanStatus, deleteEvent };
 }
