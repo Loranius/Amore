@@ -1,9 +1,9 @@
 // ============================================================
 // Спогади виконаного плану.
 // ------------------------------------------------------------
-// Фото фізично живуть у центральному архіві `memories`, а план тримає
-// лише зв'язок у `plan_links`. Відв'язування не видаляє знімок — момент
-// залишається у «Спогадах», навіть якщо його більше не показують у плані.
+// Фото фізично живуть у центральному архіві `memories`, але цей блок
+// завантажує лише ID, URL, дату й підпис фотографій поточного плану.
+// Відв'язування не видаляє знімок із загального архіву.
 // ============================================================
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -12,8 +12,12 @@ import { CloseIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { MemoryUploadModal } from '@/features/memories/MemoryUploadModal';
 import { formatMemoryDate } from '@/features/memories/memoriesDate';
-import { useMemories, useMemoriesMutations } from '@/features/memories/useMemories';
-import { usePlanLinkMutations, usePlanLinks } from './usePlanLinks';
+import { useMemoriesMutations } from '@/features/memories/useMemories';
+import {
+  usePlanLinkedMemories,
+  usePlanLinkMutations,
+  usePlanLinks,
+} from './usePlanLinks';
 import type { PlanRow } from '@/types';
 
 function memoryDateForPlan(plan: PlanRow): string {
@@ -32,30 +36,32 @@ export function PlanMemoriesBlock({
   onAddingChange: (value: boolean) => void;
 }) {
   const me = useCurrentUser();
-  const { data: archive, isPending: memoriesPending } = useMemories();
   const { data: links = [], isPending: linksPending } = usePlanLinks();
+  const memoryIds = useMemo(
+    () => links
+      .filter((link) => link.plan_id === plan.id && link.target_type === 'memory')
+      .map((link) => link.target_id),
+    [links, plan.id],
+  );
+  const {
+    data: linkedMemories = [],
+    isPending: linkedMemoriesPending,
+  } = usePlanLinkedMemories(memoryIds);
   const { uploadForPlan } = useMemoriesMutations();
   const { unlink } = usePlanLinkMutations();
 
-  const memories = useMemo(() => {
-    const ids = new Set(
-      links
-        .filter((link) => link.plan_id === plan.id && link.target_type === 'memory')
-        .map((link) => link.target_id),
-    );
-    return (archive?.photos ?? [])
-      .filter((memory) => ids.has(memory.id))
-      .sort((left, right) => left.memory_date.localeCompare(right.memory_date) || left.id - right.id);
-  }, [archive?.photos, links, plan.id]);
-
-  const pending = memoriesPending || linksPending;
+  const memories = useMemo(
+    () => linkedMemories
+      .slice()
+      .sort((left, right) => left.memory_date.localeCompare(right.memory_date) || left.id - right.id),
+    [linkedMemories],
+  );
+  const pending = linksPending || (memoryIds.length > 0 && linkedMemoriesPending);
 
   return (
     <section className="plan-memories" aria-label="Спогади про виконаний план">
       {pending ? (
-        <div className="plan-memories-skeleton" aria-hidden="true">
-          <span /><span /><span />
-        </div>
+        <div className="plan-memories-skeleton" aria-hidden="true"><span /><span /><span /></div>
       ) : memories.length === 0 ? (
         <div className="plan-memories-empty">
           <span className="plan-memories-empty-icon" aria-hidden="true"><CameraIcon size={24} /></span>
@@ -67,7 +73,13 @@ export function PlanMemoriesBlock({
           {memories.map((memory) => (
             <article key={memory.id} className="plan-memory-card">
               <Link className="plan-memory-open" to="/memories" aria-label="Відкрити архів спогадів" />
-              <img src={memory.photo_url} alt={memory.caption ?? ''} loading="lazy" />
+              <img
+                src={memory.photo_url}
+                alt={memory.caption ?? ''}
+                loading="lazy"
+                decoding="async"
+                fetchPriority="low"
+              />
               <div className="plan-memory-caption">
                 <strong>{memory.caption || 'Наш момент'}</strong>
                 <small>{formatMemoryDate(memory.memory_date, memory.date_precision)}</small>
@@ -91,11 +103,7 @@ export function PlanMemoriesBlock({
       )}
 
       <div className="plan-memories-actions">
-        <button
-          type="button"
-          className="btn plan-memories-add"
-          onClick={() => onAddingChange(true)}
-        >
+        <button type="button" className="btn plan-memories-add" onClick={() => onAddingChange(true)}>
           <PlusIcon size={15} /> {memories.length > 0 ? 'Додати ще фото' : 'Додати спогад'}
         </button>
         {memories.length > 0 && <Link to="/memories">Усі спогади</Link>}
