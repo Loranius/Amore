@@ -1,49 +1,76 @@
 // ============================================================
 // «Плани» — карта спільного шляху.
 // ------------------------------------------------------------
-// Головний екран не намагається бути таблицею керування. Датовані плани
-// стають точками маршруту, ідеї без дати лежать окремо, а завершене
-// ховається у «пройдений шлях». Уся складна робота лишається всередині
-// конкретного плану.
+// Календарні річниці й великі події показують уже пройдений шлях,
+// «Ви тут» відділяє минуле від майбутнього, а датовані плани та майбутні
+// віхи продовжують ту саму стежку. Дані не дублюються між модулями.
 // ============================================================
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { EventIcon } from '@/components/icons/EventIcon';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 import { pluralUA } from '@/lib/utils';
+import { useConfirm } from '@/providers/ConfirmProvider';
+import { useCalendarMutations, useEvents } from '@/features/calendar/useCalendar';
 import { usePlanMutations, usePlans } from './usePlans';
 import { isClosed, nextPlan, planDateLabel, sortPlans } from './planModel';
 import { PLAN_CATEGORIES, PLAN_STATUSES } from './planConstants';
 import { AddPlanModal } from './AddPlanModal';
+import { AddMilestoneModal } from './AddMilestoneModal';
 import './plans.css';
 import './plansJourney.css';
-import type { PlanRow } from '@/types';
+import './plansMilestones.css';
+import type { EventRow, NewEventInput, PlanRow } from '@/types';
 
 const ROUTE_ROW_HEIGHT = 166;
 const IDEAS_PREVIEW_LIMIT = 6;
+const MILESTONE_ACCENT = '#c77a98';
+const IMPORTANT_MILESTONE_ACCENT = '#bd5f84';
 
 interface JourneyPath {
   height: number;
   d: string;
 }
 
+type FutureJourneyItem =
+  | { kind: 'milestone'; date: string; event: EventRow }
+  | { kind: 'plan'; date: string; plan: PlanRow };
+
+function localDateKey(): string {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
+function milestoneDateLabel(date: string): string {
+  return new Date(`${date}T00:00:00`).toLocaleDateString('uk-UA', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function relationshipMoment(event: EventRow): boolean {
+  return event.type === 'anniversary' || event.is_milestone;
+}
+
+function routeNodeX(index: number): number {
+  return index % 2 === 0 ? 72 : 28;
+}
+
 /**
- * SVG тягнеться разом із картою, а точки чергуються між правою і лівою
- * частиною екрана. Шлях генерується від кількості планів, тому не має
- * обмеження на довжину й не потребує окремої розкладки для кожного набору.
+ * Точки можуть бути ліворуч, праворуч або по центру («Ви тут»), тому
+ * шлях будується з готового масиву X-координат, а не лише з кількості.
  */
-function journeyPath(count: number): JourneyPath {
-  const rows = Math.max(count, 1);
+function journeyPath(nodeXs: number[]): JourneyPath {
+  const rows = Math.max(nodeXs.length, 1);
   const height = rows * ROUTE_ROW_HEIGHT + 110;
   const points = [{ x: 50, y: 0 }];
 
-  for (let index = 0; index < count; index += 1) {
-    points.push({
-      x: index % 2 === 0 ? 72 : 28,
-      y: ROUTE_ROW_HEIGHT / 2 + index * ROUTE_ROW_HEIGHT,
-    });
-  }
-
+  nodeXs.forEach((x, index) => {
+    points.push({ x, y: ROUTE_ROW_HEIGHT / 2 + index * ROUTE_ROW_HEIGHT });
+  });
   points.push({ x: 50, y: height });
 
   let d = `M ${points[0]!.x} ${points[0]!.y}`;
@@ -67,7 +94,7 @@ function JourneyFog({ edge }: { edge: 'top' | 'bottom' }) {
   );
 }
 
-function JourneyStop({
+function JourneyPlanStop({
   plan,
   index,
   current,
@@ -125,6 +152,63 @@ function JourneyStop({
   );
 }
 
+function JourneyMilestone({
+  event,
+  index,
+  future,
+  onOpen,
+}: {
+  event: EventRow;
+  index: number;
+  future: boolean;
+  onOpen: (event: EventRow) => void;
+}) {
+  const side = index % 2 === 0 ? 'left' : 'right';
+  const accent = event.is_milestone ? IMPORTANT_MILESTONE_ACCENT : MILESTONE_ACCENT;
+  const style = { '--plan-journey-accent': accent } as CSSProperties;
+
+  return (
+    <div
+      className={`plan-journey-stop plan-journey-stop--${side} plan-journey-stop--milestone${event.is_milestone ? ' plan-journey-stop--milestone-important' : ''}`}
+      style={style}
+    >
+      <span className="plan-journey-marker" aria-hidden="true">
+        <EventIcon type={event.type ?? 'anniversary'} size={18} />
+      </span>
+
+      <article className="plan-journey-card">
+        <button
+          type="button"
+          className="plan-journey-card-open plan-journey-card-open--button"
+          onClick={() => onOpen(event)}
+          aria-label={`Відкрити віху «${event.title}»`}
+        />
+        <span className="plan-journey-card-kicker">
+          {future ? 'Попереду' : event.is_milestone ? 'Велика віха' : 'Наша історія'}
+        </span>
+        <strong>{event.title}</strong>
+        <span className="plan-journey-card-meta">
+          <span>{milestoneDateLabel(event.date)}</span>
+          {event.yearly && <span>щороку</span>}
+        </span>
+        {event.description && <span className="plan-journey-card-description">{event.description}</span>}
+      </article>
+    </div>
+  );
+}
+
+function JourneyNow() {
+  return (
+    <div className="plan-journey-now" aria-label="Поточна точка маршруту">
+      <span className="plan-journey-marker" aria-hidden="true"><HeartIcon size={20} /></span>
+      <span className="plan-journey-now-copy">
+        <small>Сьогодні</small>
+        <strong>Ви тут</strong>
+      </span>
+    </div>
+  );
+}
+
 function IdeaNote({ plan, onConfirm }: { plan: PlanRow; onConfirm: (id: number) => void }) {
   const category = PLAN_CATEGORIES[plan.category];
   const style = { '--plan-note-accent': category.color } as CSSProperties;
@@ -150,11 +234,28 @@ function IdeaNote({ plan, onConfirm }: { plan: PlanRow; onConfirm: (id: number) 
 
 export function PlansPage() {
   const navigate = useNavigate();
-  const { data: plans = [], isPending, isError, refetch, isFetching } = usePlans();
+  const confirmDialog = useConfirm();
+  const {
+    data: plans = [],
+    isPending: plansPending,
+    isError: plansError,
+    refetch: refetchPlans,
+    isFetching: plansFetching,
+  } = usePlans();
+  const {
+    data: events = [],
+    isPending: eventsPending,
+    isError: eventsError,
+    refetch: refetchEvents,
+    isFetching: eventsFetching,
+  } = useEvents();
   const { addPlan, confirmPlan } = usePlanMutations();
+  const { addEvent, updateEvent, deleteEvent } = useCalendarMutations();
+
   const [adding, setAdding] = useState(false);
   const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
   const [showAllIdeas, setShowAllIdeas] = useState(false);
+  const [milestoneEditor, setMilestoneEditor] = useState<EventRow | 'new' | null>(null);
 
   const sorted = useMemo(() => sortPlans(plans), [plans]);
   const soonest = useMemo(() => nextPlan(plans), [plans]);
@@ -167,9 +268,46 @@ export function PlansPage() {
     [sorted],
   );
   const closed = useMemo(() => sorted.filter((plan) => isClosed(plan)), [sorted]);
-  const route = useMemo(() => journeyPath(dated.length), [dated.length]);
+
+  const today = localDateKey();
+  const moments = useMemo(
+    () => events
+      .filter(relationshipMoment)
+      .slice()
+      .sort((left, right) => left.date.localeCompare(right.date) || left.id - right.id),
+    [events],
+  );
+  const pastMoments = useMemo(
+    () => moments.filter((event) => event.date <= today),
+    [moments, today],
+  );
+  const origin = pastMoments[0] ?? null;
+  const history = origin ? pastMoments.slice(1) : pastMoments;
+  const futureMoments = useMemo(
+    () => moments.filter((event) => event.date > today),
+    [moments, today],
+  );
+  const futureItems = useMemo<FutureJourneyItem[]>(() => {
+    const items: FutureJourneyItem[] = [
+      ...futureMoments.map((event) => ({ kind: 'milestone' as const, date: event.date, event })),
+      ...dated.map((plan) => ({ kind: 'plan' as const, date: plan.start_date!, plan })),
+    ];
+    return items.sort((left, right) => left.date.localeCompare(right.date) || left.kind.localeCompare(right.kind));
+  }, [dated, futureMoments]);
+
+  const routeXs = useMemo(() => {
+    const xs = history.map((_event, index) => routeNodeX(index));
+    xs.push(50);
+    futureItems.forEach((_item, offset) => xs.push(routeNodeX(history.length + 1 + offset)));
+    return xs;
+  }, [futureItems, history]);
+  const route = useMemo(() => journeyPath(routeXs), [routeXs]);
+
   const visibleIdeas = showAllIdeas ? ideas : ideas.slice(0, IDEAS_PREVIEW_LIMIT);
   const activeCount = dated.length + ideas.length;
+  const journeyPending = plansPending || eventsPending;
+  const journeyError = plansError || eventsError;
+  const journeyFetching = plansFetching || eventsFetching;
 
   const confirm = (id: number) => confirmPlan.mutate(id);
 
@@ -185,47 +323,123 @@ export function PlansPage() {
     setCreatedPlanId(null);
   };
 
+  const openNewMilestone = () => {
+    addEvent.reset();
+    updateEvent.reset();
+    deleteEvent.reset();
+    setMilestoneEditor('new');
+  };
+
+  const openMilestone = (event: EventRow) => {
+    addEvent.reset();
+    updateEvent.reset();
+    deleteEvent.reset();
+    setMilestoneEditor(event);
+  };
+
+  const milestoneBusy = addEvent.isPending || updateEvent.isPending;
+  const milestoneDeleting = deleteEvent.isPending;
+  const currentMilestone = milestoneEditor === 'new' ? null : milestoneEditor;
+
+  const closeMilestone = () => {
+    if (milestoneBusy || milestoneDeleting) return;
+    setMilestoneEditor(null);
+  };
+
+  const saveMilestone = (input: NewEventInput) => {
+    if (milestoneEditor === 'new') {
+      addEvent.mutate(input, { onSuccess: () => setMilestoneEditor(null) });
+      return;
+    }
+    if (milestoneEditor) {
+      updateEvent.mutate(
+        { id: milestoneEditor.id, input },
+        { onSuccess: () => setMilestoneEditor(null) },
+      );
+    }
+  };
+
+  const removeMilestone = async () => {
+    if (!currentMilestone) return;
+    if (await confirmDialog(`Видалити віху «${currentMilestone.title}» із календаря та карти?`)) {
+      deleteEvent.mutate(currentMilestone.id, { onSuccess: () => setMilestoneEditor(null) });
+    }
+  };
+
   return (
     <section className="plans">
       <header className="plan-journey-hero">
         <div className="plan-journey-hero-copy">
-          <span className="plan-journey-eyebrow">Карта спільного шляху</span>
-          <h1>Наші плани</h1>
-          <p>Те, що вже стало частиною вашої історії, і пригоди, які ще попереду.</p>
-          {!isPending && !isError && (
-            <span className="plan-journey-count">
-              {activeCount} {pluralUA(activeCount, ['план попереду', 'плани попереду', 'планів попереду'])}
-            </span>
+          <span className="plan-journey-eyebrow">Карта стосунків</span>
+          <h1>Наш шлях</h1>
+          <p>Важливі моменти, точка, де ви зараз, і пригоди, які ще попереду.</p>
+          {!journeyPending && !journeyError && (
+            <div className="plan-journey-counts">
+              <span className="plan-journey-count plan-journey-count--history">
+                {moments.length} {pluralUA(moments.length, ['віха на карті', 'віхи на карті', 'віх на карті'])}
+              </span>
+              <span className="plan-journey-count">
+                {activeCount} {pluralUA(activeCount, ['план попереду', 'плани попереду', 'планів попереду'])}
+              </span>
+            </div>
           )}
         </div>
 
-        <button type="button" className="btn plan-journey-add" onClick={openAdd}>
-          <PlusIcon size={15} /> План
-        </button>
+        <div className="plan-journey-actions">
+          <button type="button" className="plan-journey-add-milestone" onClick={openNewMilestone}>
+            <HeartIcon size={14} /> Віха
+          </button>
+          <button type="button" className="btn plan-journey-add" onClick={openAdd}>
+            <PlusIcon size={15} /> План
+          </button>
+        </div>
       </header>
 
-      {isPending ? (
+      {journeyPending ? (
         <p className="empty-state">Завантаження маршруту…</p>
-      ) : isError ? (
+      ) : journeyError ? (
         <div className="empty-state plans-error" role="alert">
-          <p>Не вдалося завантажити карту планів.</p>
-          <button type="button" className="btn" onClick={() => void refetch()} disabled={isFetching}>
-            {isFetching ? 'Пробую…' : 'Спробувати ще'}
+          <p>Не вдалося завантажити спільний шлях.</p>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void Promise.all([refetchPlans(), refetchEvents()])}
+            disabled={journeyFetching}
+          >
+            {journeyFetching ? 'Пробую…' : 'Спробувати ще'}
           </button>
         </div>
       ) : (
         <>
-          <section className="plan-journey-shell" aria-label="Маршрут майбутніх планів">
+          <section className="plan-journey-shell" aria-label="Карта спільного шляху">
             <JourneyFog edge="top" />
 
-            <header className="plan-journey-origin">
-              <span className="plan-journey-origin-mark" aria-hidden="true">
-                <HeartIcon size={24} />
-              </span>
-              <small>Початок маршруту</small>
-              <strong>Все почалося тут</strong>
-              <p>Перша точка вашої спільної історії, з якої дорога веде далі.</p>
-            </header>
+            {origin ? (
+              <button
+                type="button"
+                className="plan-journey-origin plan-journey-origin--interactive"
+                onClick={() => openMilestone(origin)}
+                aria-label={`Відкрити початкову віху «${origin.title}»`}
+              >
+                <span className="plan-journey-origin-mark" aria-hidden="true">
+                  <HeartIcon size={24} />
+                </span>
+                <small>Початок маршруту</small>
+                <strong>{origin.title}</strong>
+                <span className="plan-journey-origin-date">{milestoneDateLabel(origin.date)}</span>
+                {origin.description && <p>{origin.description}</p>}
+                <span className="plan-journey-origin-edit">Торкнися, щоб відкрити</span>
+              </button>
+            ) : (
+              <header className="plan-journey-origin">
+                <span className="plan-journey-origin-mark" aria-hidden="true">
+                  <HeartIcon size={24} />
+                </span>
+                <small>Початок маршруту</small>
+                <strong>Все почалося тут</strong>
+                <p>Додайте першу важливу дату — і карта отримає справжній початок.</p>
+              </header>
+            )}
 
             <div className="plan-journey-route">
               <svg
@@ -238,24 +452,40 @@ export function PlansPage() {
                 <path className="plan-journey-path-dash" d={route.d} />
               </svg>
 
-              {dated.length === 0 ? (
-                <div className="plan-journey-empty">
-                  <strong>Перша зупинка ще не нанесена</strong>
-                  <p>Додайте план із датою — і стежка відкриє наступну точку маршруту.</p>
-                </div>
-              ) : (
-                <div className="plan-journey-stops">
-                  {dated.map((plan, index) => (
-                    <JourneyStop
-                      key={plan.id}
-                      plan={plan}
+              <div className="plan-journey-stops">
+                {history.map((event, index) => (
+                  <JourneyMilestone
+                    key={`milestone-${event.id}`}
+                    event={event}
+                    index={index}
+                    future={false}
+                    onOpen={openMilestone}
+                  />
+                ))}
+
+                <JourneyNow />
+
+                {futureItems.map((item, offset) => {
+                  const index = history.length + 1 + offset;
+                  return item.kind === 'milestone' ? (
+                    <JourneyMilestone
+                      key={`milestone-${item.event.id}`}
+                      event={item.event}
                       index={index}
-                      current={plan.id === soonest?.id}
+                      future
+                      onOpen={openMilestone}
+                    />
+                  ) : (
+                    <JourneyPlanStop
+                      key={`plan-${item.plan.id}`}
+                      plan={item.plan}
+                      index={index}
+                      current={item.plan.id === soonest?.id}
                       onConfirm={confirm}
                     />
-                  ))}
-                </div>
-              )}
+                  );
+                })}
+              </div>
             </div>
 
             <JourneyFog edge="bottom" />
@@ -349,6 +579,18 @@ export function PlansPage() {
             setCreatedPlanId(null);
             navigate(`/plans/${id}`);
           }}
+        />
+      )}
+
+      {milestoneEditor && (
+        <AddMilestoneModal
+          key={milestoneEditor === 'new' ? 'new' : milestoneEditor.id}
+          event={currentMilestone}
+          busy={milestoneBusy}
+          deleting={milestoneDeleting}
+          onClose={closeMilestone}
+          onSubmit={saveMilestone}
+          onDelete={currentMilestone ? () => void removeMilestone() : undefined}
         />
       )}
     </section>
