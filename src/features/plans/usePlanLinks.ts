@@ -1,9 +1,9 @@
 // ============================================================
 // Зв'язки плану з бажаннями, мітками карти й спогадами.
 // ------------------------------------------------------------
-// Усі зв'язки читаються одним невеликим запитом. Для карти окремий хук
-// завантажує лише мініатюрні поля реально прив'язаних спогадів замість
-// усього фотоархіву, описів днів і джерел.
+// Усі зв'язки читаються одним невеликим запитом. Для карти й сторінки
+// виконаного плану окремий хук завантажує лише реально прив'язані фото
+// замість усього архіву, описів днів і джерел.
 // ============================================================
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -12,7 +12,10 @@ import { qk } from '@/lib/queryKeys';
 import { useToast } from '@/providers/ToastProvider';
 import type { MemoryRow, PlanLinkRow, PlanLinkTarget } from '@/types';
 
-export type PlanMemoryPreview = Pick<MemoryRow, 'id' | 'photo_url' | 'memory_date'>;
+export type PlanMemoryPreview = Pick<
+  MemoryRow,
+  'id' | 'photo_url' | 'memory_date' | 'date_precision' | 'caption'
+>;
 
 export function usePlanLinks() {
   return useQuery({
@@ -28,11 +31,11 @@ export function usePlanLinks() {
 }
 
 /**
- * Легкий запит для оглядової карти.
+ * Легкий запит для карти й виконаного плану.
  *
  * `useMemories()` навмисно повертає весь архів, усі memory_links і
- * memory_days — це правильно для модуля «Спогади», але занадто дорого для
- * карти планів, якій потрібна лише одна обкладинка виконаної точки.
+ * memory_days — це правильно для модуля «Спогади», але занадто дорого
+ * для плану, якому потрібні лише власні фотографії.
  */
 export function usePlanLinkedMemories(memoryIds: readonly number[]) {
   const ids = useMemo(
@@ -47,7 +50,7 @@ export function usePlanLinkedMemories(memoryIds: readonly number[]) {
     queryFn: async (): Promise<PlanMemoryPreview[]> => {
       const { data, error } = await supabase
         .from('memories')
-        .select('id,photo_url,memory_date')
+        .select('id,photo_url,memory_date,date_precision,caption')
         .in('id', ids)
         .order('memory_date', { ascending: true });
       if (error) throw new Error(error.message);
