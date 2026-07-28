@@ -3,7 +3,7 @@
 // ------------------------------------------------------------
 // Перший екран просить тільки назву. Категорія й нотатка допомагають,
 // але не блокують думку на півдорозі. Після збереження людина вирішує:
-// залишити задум у затоці ідей або одразу додати дату й кроки.
+// залишити задум у затоці ідей або одразу продовжити його планування.
 // ============================================================
 import { useState, type CSSProperties } from 'react';
 import { CheckIcon, ChevronDownIcon } from '@/components/icons/UiIcon';
@@ -180,11 +180,11 @@ export function AddPlanModal({
             </span>
             <span className="plan-create-eyebrow">Точку додано</span>
             <h2 id="plan-create-title">{title.trim()}</h2>
-            <p>Поки що вона чекає без дати серед ідей. Можна залишити її так або одразу продовжити планування.</p>
+            <p>Поки що вона чекає без дати серед ідей. Можна залишити її так або перейти до дати, кроків і бюджету.</p>
 
             <div className="plan-create-success-actions">
               <button type="button" className="btn plan-create-continue" onClick={() => onContinue(createdPlanId)}>
-                Додати дату й кроки
+                Продовжити планування
               </button>
               <button type="button" className="plan-create-done" onClick={onClose}>
                 Залишити як ідею
