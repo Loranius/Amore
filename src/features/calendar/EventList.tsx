@@ -8,6 +8,7 @@
 // голові. Поруч — роковини («виповниться 64», «5 років разом»), які весь
 // цей час випливали з даних і ніде не показувались.
 // ============================================================
+import { useUsersMap } from '@/features/_shared/useUsers';
 import {
   TYPES, daysLabel, formatOccurrence, occurrenceLabel,
 } from './calendarUtils';
@@ -105,6 +106,10 @@ function EventRow({
 }) {
   const t = TYPES[ev.type ?? 'other'];
   const years = occurrenceLabel(ev);
+  const users = useUsersMap();
+  // Ім'я показуємо лише коли подія прив'язана до людини з застосунку:
+  // для батьків і друзів прив'язки немає й бути не мусить.
+  const person = ev.person_user_id ? users[ev.person_user_id] : null;
 
   return (
     <div className={`cal-event-item${muted ? ' cal-muted' : ''}`}>
@@ -117,7 +122,10 @@ function EventRow({
       <div className="cal-event-type-bar" style={{ background: t.color }} />
       <div className="cal-event-icon">{t.icon}</div>
       <div className="cal-event-info">
-        <div className="cal-event-title">{ev.title}</div>
+        <div className="cal-event-title">
+          {ev.title}
+          {person && <span className="cal-person-chip">{person}</span>}
+        </div>
         {ev.description && <div className="cal-event-desc">{ev.description}</div>}
         <div className="cal-event-meta">
           <span>{formatOccurrence(ev)}</span>

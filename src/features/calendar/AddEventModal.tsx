@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { planMetadataOf } from '@/features/_shared/events';
+import { useUsers } from '@/features/_shared/useUsers';
 import { PLAN_CATS, PLAN_CAT_ORDER } from './calendarUtils';
 import type { NewEventInput, NewPlanInput } from './useCalendar';
 import type { EnrichedEvent, EventRow, EventType, PlanCategory } from '@/types';
@@ -67,6 +68,8 @@ export function AddEventModal({
   const [description, setDescription] = useState(event?.description ?? '');
   const [yearly, setYearly] = useState(event ? Boolean(event.yearly) : true);
   const [isMilestone, setIsMilestone] = useState(event?.is_milestone ?? false);
+  const [personId, setPersonId] = useState<number | null>(event?.person_user_id ?? null);
+  const { data: users = [] } = useUsers();
 
   const save = () => {
     if (!title.trim() || !date) return;
@@ -77,6 +80,9 @@ export function AddEventModal({
       type,
       yearly,
       is_milestone: isMilestone,
+      // Прив'язка має сенс лише для дня народження: річниця й свято — не
+      // про одну людину. Зміна типу не тягне за собою чужий id.
+      person_user_id: type === 'birthday' ? personId : null,
     });
     onClose();
   };
@@ -98,6 +104,36 @@ export function AddEventModal({
           ))}
         </div>
       </div>
+
+      {type === 'birthday' && users.length > 0 && (
+        <div className="form-field">
+          <span>Чий день народження</span>
+          <div className="chips">
+            {users.map((u) => (
+              <button
+                key={u.id}
+                type="button"
+                className={`chip${personId === u.id ? ' active' : ''}`}
+                onClick={() => setPersonId(personId === u.id ? null : u.id)}
+              >
+                {u.name}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={`chip${personId === null ? ' active' : ''}`}
+              onClick={() => setPersonId(null)}
+            >
+              Хтось інший
+            </button>
+          </div>
+          {/* «Хтось інший» — не відмовка, а звичайний випадок: батьки,
+              діти й друзі в застосунку не заведені. */}
+          <p className="cal-field-hint">
+            Потрібно лише для вас двох — щоб застосунок не нагадував людині про її ж день народження.
+          </p>
+        </div>
+      )}
 
       <label className="form-field">
         <span>Назва</span>
@@ -136,6 +172,13 @@ export function AddEventModal({
           з неї вузол на головній. Досі про цей наслідок не було сказано
           ніде, і позначку ставили (чи не ставили) наосліп. */}
       <p className="cal-field-hint">Велика подія проростає окремою гранню кристала на головній.</p>
+
+      {/* Нагадування шле крон event-reminders о 8:00 за Києвом за 3 дні,
+          за день і в сам день. Працює давно — і досі про це не було
+          сказано ніде, тож людина не знала, чи взагалі щось прийде. */}
+      <p className="cal-reminder-note">
+        🔔 Нагадаємо в Telegram за 3 дні, за день і зранку в сам день.
+      </p>
 
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={onClose}>

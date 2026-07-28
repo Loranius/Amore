@@ -16,6 +16,8 @@ import { enrichEvent, sortEnriched } from './calendarUtils';
 import { EventList } from './EventList';
 import { PlansBoard } from './PlansBoard';
 import { AddEventModal, AddPlanModal } from './AddEventModal';
+import { HolidayPresetsModal } from './HolidayPresetsModal';
+import { missingPresets } from './holidayPresets';
 import type { EnrichedEvent, EventType } from '@/types';
 
 const TAB_DEFS: { type: EventType; label: string }[] = [
@@ -39,12 +41,17 @@ type ModalState =
 export function CalendarPage() {
   const { data: events = [], isPending, isError, refetch, isFetching } = useEvents();
   const {
-    addEvent, addPlan, updateEvent, updatePlan, setPlanStatus, deleteEvent,
+    addEvent, addPlan, addHolidays, updateEvent, updatePlan, setPlanStatus, deleteEvent,
   } = useCalendarMutations();
   const confirmDialog = useConfirm();
 
   const [filter, setFilter] = useState<EventType>('anniversary');
   const [modal, setModal] = useState<ModalState>(null);
+  const [presetsOpen, setPresetsOpen] = useState(false);
+
+  // Заготовки рахуємо по ВСІХ подіях, а не лише по вкладці свят: 24
+  // серпня, заведене колись як «Інша подія», однаково займає той день.
+  const presets = useMemo(() => missingPresets(events), [events]);
 
   const enriched = useMemo(
     () => events.map(enrichEvent).sort(sortEnriched),
@@ -91,6 +98,20 @@ export function CalendarPage() {
             {isFetching ? 'Пробую…' : 'Спробувати ще раз'}
           </button>
         </div>
+      ) : filter === 'holiday' && presets.length > 0 ? (
+        <>
+          <button type="button" className="cal-preset-cta" onClick={() => setPresetsOpen(true)}>
+            🎉 Додати типові свята
+            <small>Новий рік, Незалежність, Різдво та інші — з перевіркою дат</small>
+          </button>
+          {filtered.length > 0 && (
+            <EventList
+              events={filtered}
+              onEdit={(ev) => setModal({ kind: 'event', row: ev })}
+              onDelete={onDelete}
+            />
+          )}
+        </>
       ) : events.length === 0 ? (
         <p className="empty-state">Подій ще немає. Додай першу!</p>
       ) : filter === 'other' ? (
@@ -130,6 +151,16 @@ export function CalendarPage() {
             if (row) updatePlan.mutate({ id: row.id, input, current: planMetadataOf(row) });
             else addPlan.mutate(input);
           }}
+        />
+      )}
+      {presetsOpen && (
+        <HolidayPresetsModal
+          presets={presets}
+          busy={addHolidays.isPending}
+          onClose={() => setPresetsOpen(false)}
+          onSubmit={(items) =>
+            addHolidays.mutate(items, { onSuccess: () => setPresetsOpen(false) })
+          }
         />
       )}
     </section>
