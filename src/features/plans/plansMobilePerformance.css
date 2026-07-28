@@ -2,7 +2,7 @@
    Мобільний performance budget для «Планів».
    ------------------------------------------------------------
    Основна карта зберігає атмосферу, але не змушує touch-пристрої
-   безперервно перемальовувати довгий SVG, шість хмар і десятки тіней.
+   безперервно перемальовувати довгий SVG, хмари й десятки тіней.
    ============================================================ */
 
 /* Off-screen вузли не фарбуються, але зберігають стабільну висоту. */
@@ -55,6 +55,26 @@
 .plan-journey-load-more--future {
   margin-top: -72px;
   margin-bottom: 86px;
+}
+
+/* Легкий placeholder, доки закритий блок «Пов’язане» не видимий. */
+.plan-links-deferred {
+  display: grid;
+  gap: 8px;
+  min-height: 62px;
+  align-content: center;
+}
+
+.plan-links-deferred span {
+  display: block;
+  width: 100%;
+  height: 13px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 5%, var(--surface));
+}
+
+.plan-links-deferred span:last-child {
+  width: 62%;
 }
 
 /* Повний рух доступний лише пристроям із точною мишею. */
