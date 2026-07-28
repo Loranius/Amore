@@ -102,12 +102,23 @@ export interface UploadMemoryInput {
   takenAt?: string | null;
 }
 
+/** Прибирає створений архівом рядок і його файл під час складного відкату. */
+async function rollbackUploadedMemory(memory: MemoryRow): Promise<void> {
+  await supabase.from('memories').delete().eq('id', memory.id);
+  if (memory.storage_bucket && memory.storage_path) {
+    await supabase.storage
+      .from(memory.storage_bucket)
+      .remove([memory.storage_path])
+      .catch(() => undefined);
+  }
+}
+
 /**
  * Один знімок: стиснути → у сховище → рядок в архіві.
  * Винесено з хука, бо цим шляхом ідуть і поодинокі додавання, і кожен
  * файл масового імпорту — дві копії розійшлися б.
  */
-async function uploadOne(input: UploadMemoryInput): Promise<void> {
+async function uploadOne(input: UploadMemoryInput): Promise<MemoryRow> {
   let blob: Blob = input.file;
   let ext = 'jpg';
   let contentType = 'image/jpeg';
@@ -132,33 +143,68 @@ async function uploadOne(input: UploadMemoryInput): Promise<void> {
     .upload(path, blob, { upsert: false, contentType });
   if (upErr) throw upErr;
 
-  const { error } = await supabase.from('memories').insert({
-    photo_url: publicUrl(MEMORIES_BUCKET, path),
-    storage_bucket: MEMORIES_BUCKET,
-    storage_path: path,
-    memory_date: memoryDate,
-    date_precision: input.precision,
-    caption: input.caption,
-    uploaded_by: input.userId,
-    taken_at: input.takenAt ?? null,
-  });
+  const { data, error } = await supabase
+    .from('memories')
+    .insert({
+      photo_url: publicUrl(MEMORIES_BUCKET, path),
+      storage_bucket: MEMORIES_BUCKET,
+      storage_path: path,
+      memory_date: memoryDate,
+      date_precision: input.precision,
+      caption: input.caption,
+      uploaded_by: input.userId,
+      taken_at: input.takenAt ?? null,
+    })
+    .select(COLUMNS)
+    .single();
+
   if (error) {
     // Рядок не створився — файл у сховищі став сиротою. Прибираємо,
     // інакше кожна невдала спроба лишає сміття, за яке платить власник.
     await supabase.storage.from(MEMORIES_BUCKET).remove([path]).catch(() => undefined);
     throw error;
   }
+
+  return data as MemoryRow;
 }
 
 export function useMemoriesMutations() {
   const client = useQueryClient();
   const toast = useToast();
   const invalidate = () => void client.invalidateQueries({ queryKey: qk.memories() });
+  const invalidatePlanLinks = () => void client.invalidateQueries({ queryKey: qk.planLinks() });
 
   const upload = useMutation({
     mutationFn: uploadOne,
     onSuccess: invalidate,
     onError: (e) => toast.show('Не вдалось додати спогад: ' + (e as Error).message),
+  });
+
+  /**
+   * Фото, додане з виконаного плану, одразу стає звичайним спогадом і
+   * отримує рядок `plan_links`. Якщо другий крок падає, перший відкочується:
+   * у стрічці не лишається фото, яке користувач вважав прикріпленим до плану.
+   */
+  const uploadForPlan = useMutation({
+    mutationFn: async (v: { planId: number; input: UploadMemoryInput }): Promise<MemoryRow> => {
+      const memory = await uploadOne(v.input);
+      const { error } = await supabase
+        .from('plan_links')
+        .upsert(
+          { plan_id: v.planId, target_type: 'memory', target_id: memory.id },
+          { onConflict: 'plan_id,target_type,target_id', ignoreDuplicates: true },
+        );
+      if (error) {
+        await rollbackUploadedMemory(memory);
+        throw error;
+      }
+      return memory;
+    },
+    onSuccess: () => {
+      invalidate();
+      invalidatePlanLinks();
+    },
+    onError: (e) => toast.show('Не вдалось прикріпити спогад: ' + (e as Error).message),
   });
 
   /**
@@ -283,5 +329,14 @@ export function useMemoriesMutations() {
     onError: (e) => toast.show('Не вдалось видалити: ' + (e as Error).message),
   });
 
-  return { upload, uploadMany, saveOrder, saveCaption, saveDayDescription, unlink, remove };
+  return {
+    upload,
+    uploadForPlan,
+    uploadMany,
+    saveOrder,
+    saveCaption,
+    saveDayDescription,
+    unlink,
+    remove,
+  };
 }
