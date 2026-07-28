@@ -1,9 +1,8 @@
 // ============================================================
-// AddEventModal — створення й редагування події календаря
+// AddEventModal — створення й редагування події календаря.
 // ------------------------------------------------------------
-// План зберігається з типізованою metadata (без тегів у description).
-// Одна модалка на обидва режими — патерн вішлиста (`WishFormModal`):
-// `event`/`plan` === null означає створення.
+// Активна вкладка передає початковий тип: у «Наших святах» форма одразу
+// відкриває річницю, у днях народження — день народження, у святах — свято.
 // ============================================================
 import { useState } from 'react';
 import type { ReactNode } from 'react';
@@ -13,11 +12,6 @@ import { BellIcon } from '@/components/icons/UiIcon';
 import type { NewEventInput } from './useCalendar';
 import type { EventRow, EventType } from '@/types';
 
-// Тип `other` тут НАВМИСНО відсутній. Він писав рядок без `metadata`, а
-// дошка планів підставляє дефолт для будь-якого `type='other'` — тож
-// «Інша подія» мовчки з'являлась серед планів як запланований пункт
-// категорії «Інше» і псувала лічильник «N / M планів виконано».
-// Плани створюються своєю модалкою, події — цією.
 const EVENT_TYPES: { type: EventType; label: string }[] = [
   { type: 'birthday', label: 'День народження' },
   { type: 'anniversary', label: 'Річниця' },
@@ -32,8 +26,8 @@ function ModalShell({ title, children, onClose }: {
   return (
     <div
       className="modal-overlay"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
       }}
     >
       <div className="modal-sheet" role="dialog" aria-modal="true">
@@ -44,27 +38,26 @@ function ModalShell({ title, children, onClose }: {
   );
 }
 
-// ── Подія ────────────────────────────────────────────────────
-/** Тип події з БД може бути null або 'other' (легасі) — у формі показуємо
- *  найближчий валідний варіант, а не порожній вибір. */
-function editableEventType(value: EventType | null): EventType {
-  return value === 'anniversary' || value === 'holiday' ? value : 'birthday';
+function editableEventType(value: EventType | null | undefined): EventType {
+  if (value === 'anniversary' || value === 'holiday' || value === 'birthday') return value;
+  return 'birthday';
 }
 
 export function AddEventModal({
   event,
   initialDate,
+  initialType,
   onClose,
   onSubmit,
 }: {
   event: EventRow | null;
-  /** Дата, вибрана в сітці місяця: форма відкривається вже на ній. */
   initialDate?: string | undefined;
+  initialType?: EventType | undefined;
   onClose: () => void;
   onSubmit: (input: NewEventInput) => void;
 }) {
   const [type, setType] = useState<EventType>(
-    event ? editableEventType(event.type) : 'birthday',
+    event ? editableEventType(event.type) : editableEventType(initialType),
   );
   const [title, setTitle] = useState(event?.title ?? '');
   const [date, setDate] = useState(event?.date ?? initialDate ?? '');
@@ -83,8 +76,6 @@ export function AddEventModal({
       type,
       yearly,
       is_milestone: isMilestone,
-      // Прив'язка має сенс лише для дня народження: річниця й свято — не
-      // про одну людину. Зміна типу не тягне за собою чужий id.
       person_user_id: type === 'birthday' ? personId : null,
     });
     onClose();
@@ -95,15 +86,15 @@ export function AddEventModal({
       <div className="form-field">
         <span>Тип</span>
         <div className="chips">
-          {EVENT_TYPES.map((t) => (
+          {EVENT_TYPES.map((item) => (
             <button
-              key={t.type}
+              key={item.type}
               type="button"
-              className={`chip${type === t.type ? ' active' : ''}`}
-              onClick={() => setType(t.type)}
+              className={`chip${type === item.type ? ' active' : ''}`}
+              onClick={() => setType(item.type)}
             >
-              <EventIcon type={t.type} size={15} />
-              {t.label}
+              <EventIcon type={item.type} size={15} />
+              {item.label}
             </button>
           ))}
         </div>
@@ -113,14 +104,14 @@ export function AddEventModal({
         <div className="form-field">
           <span>Чий день народження</span>
           <div className="chips">
-            {users.map((u) => (
+            {users.map((user) => (
               <button
-                key={u.id}
+                key={user.id}
                 type="button"
-                className={`chip${personId === u.id ? ' active' : ''}`}
-                onClick={() => setPersonId(personId === u.id ? null : u.id)}
+                className={`chip${personId === user.id ? ' active' : ''}`}
+                onClick={() => setPersonId(personId === user.id ? null : user.id)}
               >
-                {u.name}
+                {user.name}
               </button>
             ))}
             <button
@@ -131,8 +122,6 @@ export function AddEventModal({
               Хтось інший
             </button>
           </div>
-          {/* «Хтось інший» — не відмовка, а звичайний випадок: батьки,
-              діти й друзі в застосунку не заведені. */}
           <p className="cal-field-hint">
             Потрібно лише для вас двох — щоб застосунок не нагадував людині про її ж день народження.
           </p>
@@ -141,25 +130,25 @@ export function AddEventModal({
 
       <label className="form-field">
         <span>Назва</span>
-        <input id="event-title" name="title" type="text" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+        <input id="event-title" name="title" type="text" value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
       </label>
       <label className="form-field">
         <span>Дата</span>
-        <input id="event-date" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        <input id="event-date" name="date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
       </label>
       <label className="form-field">
-        <span>Опис (необов'язково)</span>
+        <span>Опис (необов’язково)</span>
         <textarea
           id="event-description"
           name="description"
           rows={2}
           value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          onChange={(event) => setDescription(event.target.value)}
           style={{ resize: 'vertical' }}
         />
       </label>
       <label className="cal-yearly-toggle">
-        <input id="event-yearly" name="yearly" type="checkbox" checked={yearly} onChange={(e) => setYearly(e.target.checked)} />
+        <input id="event-yearly" name="yearly" type="checkbox" checked={yearly} onChange={(event) => setYearly(event.target.checked)} />
         <span>Повторюється щороку</span>
       </label>
       <label className="cal-yearly-toggle">
@@ -168,30 +157,20 @@ export function AddEventModal({
           name="is_milestone"
           type="checkbox"
           checked={isMilestone}
-          onChange={(e) => setIsMilestone(e.target.checked)}
+          onChange={(event) => setIsMilestone(event.target.checked)}
         />
         <span>Велика подія — заручини, весілля, важлива віха</span>
       </label>
-      {/* Річниці автоматично стають вузлами карти. is_milestone додає
-          сильніший акцент і лишається сигналом для кристала. */}
       <p className="cal-field-hint">
-        Річниці з’являються на карті «Наш шлях» автоматично. Велика подія отримує сильніший акцент і окрему грань кристала.
+        Річниці автоматично з’являються у «Нашому шляху». Позначка великої події додає сильніший акцент.
       </p>
-
-      {/* Нагадування шле крон event-reminders о 8:00 за Києвом за 3 дні,
-          за день і в сам день. Працює давно — і досі про це не було
-          сказано ніде, тож людина не знала, чи взагалі щось прийде. */}
       <p className="cal-reminder-note">
         <BellIcon size={15} /> Нагадаємо в Telegram за 3 дні, за день і зранку в сам день.
       </p>
 
       <div className="modal-actions">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
-          Скасувати
-        </button>
-        <button type="button" className="btn" onClick={save} disabled={!title.trim() || !date}>
-          Зберегти
-        </button>
+        <button type="button" className="btn btn-ghost" onClick={onClose}>Скасувати</button>
+        <button type="button" className="btn" onClick={save} disabled={!title.trim() || !date}>Зберегти</button>
       </div>
     </ModalShell>
   );
