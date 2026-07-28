@@ -347,7 +347,7 @@ export function PlansPage() {
           onContinue={(id) => {
             setAdding(false);
             setCreatedPlanId(null);
-            navigate(`/plans/${id}?setup=1`);
+            navigate(`/plans/${id}`);
           }}
         />
       )}
