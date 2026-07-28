@@ -6,22 +6,36 @@ import {
   useNotifications,
   type PendingNotification,
 } from '@/features/notifications/useNotifications';
-import { useDateMutations } from '@/features/schedule/useDates';
+import { usePlanMutations } from '@/features/plans/usePlans';
 import { useGoalMutations } from '@/features/piggybank/useBudget';
 import { ProposalCard } from '@/components/ui/ProposalCard';
 import { useCurrentUser } from '@/providers/AuthProvider';
+import { CalendarIcon, GiftIcon } from '@/components/icons/UiIcon';
+import { CameraIcon, HeartIcon, PlansIcon } from '@/components/icons/NavIcon';
+import { CheckCircleIcon, TargetIcon } from '@/components/icons/PlanIcon';
+import { TogetherIcon } from '@/components/icons/WishIcon';
+import type { IconProps } from '@/components/icons/iconBase';
 import type { AppNotificationKind } from '@/features/notifications/notificationsRpc';
+import type { ReactNode } from 'react';
 import '@/features/notifications/notifications.css';
 
-const KIND_ICON: Record<string, string> = { date: '💗', goal: '🎯' };
+type NotifIcon = (props: IconProps) => ReactNode;
 
-const EVENT_ICON: Record<AppNotificationKind, string> = {
-  wishlist_new_wish: '♡',
-  wishlist_shared_wish: '🎁',
-  wishlist_gift_completed: '✨',
-  wishlist_gift_memory: '📸',
-  wishlist_shared_completed: '🌟',
-  schedule_fill_reminder: '📅',
+// Значки замість емодзі — того самого набору, що й у розділах, куди
+// сповіщення ведуть: план у сповіщенні позначений тим самим, чим
+// «Плани» в нижній панелі.
+const KIND_ICON: Record<string, NotifIcon> = { plan: PlansIcon, goal: TargetIcon };
+
+const EVENT_ICON: Record<AppNotificationKind, NotifIcon> = {
+  wishlist_new_wish: HeartIcon,
+  // «Спільне» бажання — ті самі два кільця, що у вкладці вішлиста.
+  wishlist_shared_wish: TogetherIcon,
+  wishlist_gift_completed: GiftIcon,
+  wishlist_gift_memory: CameraIcon,
+  // Здійснене СПІЛЬНЕ бажання — окремий значок: інакше воно нічим не
+  // відрізнялося б від звичайного подарунка в тому самому списку.
+  wishlist_shared_completed: CheckCircleIcon,
+  schedule_fill_reminder: CalendarIcon,
 };
 
 function eventTime(value: string): string {
@@ -54,18 +68,21 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
     markRead,
     markAllRead,
   } = useNotifications();
-  const dateMutations = useDateMutations();
+  const planMutations = usePlanMutations();
   const goalMutations = useGoalMutations();
 
   if (!open) return null;
 
   const confirmItem = (item: PendingNotification) => {
-    if (item.kind === 'date') dateMutations.confirm.mutate(item.id);
+    if (item.kind === 'plan') planMutations.confirmPlan.mutate(item.id);
     else goalMutations.confirm.mutate(item.id);
   };
 
+  // Відхилити пропозицію = видалити її. Той самий вибір, що у цілей
+  // накопичення: «відхилений план» — це стан, який нікому не потрібен
+  // і який довелося б звідусіль відсіювати.
   const rejectItem = (item: PendingNotification) => {
-    if (item.kind === 'date') dateMutations.remove.mutate(item.id);
+    if (item.kind === 'plan') planMutations.removePlan.mutate(item.id);
     else goalMutations.reject.mutate(item.id);
   };
 
@@ -119,7 +136,8 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
                   info={
                     <>
                       <span className="notif-item-title">
-                        {KIND_ICON[item.kind]} {item.title}
+                        {(() => { const I = KIND_ICON[item.kind]; return I ? <I size={15} /> : null; })()}
+                        {item.title}
                       </span>
                       <span className="notif-item-detail">{item.detail}</span>
                     </>
@@ -147,7 +165,7 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
               </button>
             </div>
           ) : events.length === 0 ? (
-            <div className="notifications-state">Нових подій Wishlist поки немає ✨</div>
+            <div className="notifications-state">Нових подій Wishlist поки немає</div>
           ) : (
             <div className="notification-event-list">
               {events.map((event) => {
@@ -160,7 +178,7 @@ export function NotificationsPanel({ open, onClose }: { open: boolean; onClose: 
                     onClick={() => openEvent(event.id, event.href, event.entity_id, unread)}
                   >
                     <span className="notification-event-icon" aria-hidden="true">
-                      {EVENT_ICON[event.kind]}
+                      {(() => { const I = EVENT_ICON[event.kind]; return I ? <I size={17} /> : null; })()}
                     </span>
                     <span className="notification-event-content">
                       <strong>{event.title}</strong>

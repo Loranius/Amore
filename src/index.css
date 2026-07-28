@@ -1874,7 +1874,10 @@ a.wl-card-title { color: var(--accent); }
 
 /* ── Панель сповіщень (дзвіночок) — вміст усередині .tinted-row ─── */
 .notif-list { display: flex; flex-direction: column; gap: 10px; }
-.notif-item-title { font-weight: 600; }
+/* inline-flex — значок стоїть у рядку з назвою, а не над нею; flex:0 0
+   auto на svg, бо в flex-контейнері він інакше стискається. */
+.notif-item-title { font-weight: 600; display: inline-flex; align-items: center; gap: 7px; }
+.notif-item-title > svg { flex: 0 0 auto; color: var(--accent); }
 .notif-item-detail { font-size: 13px; color: var(--muted); }
 
 /* Фото-календар */

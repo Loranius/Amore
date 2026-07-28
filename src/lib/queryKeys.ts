@@ -54,7 +54,6 @@ export const qk = {
     (goalId === undefined
       ? (['savingsGoalContributions'] as const)
       : (['savingsGoalContributions', goalId] as const)),
-  dates: () => ['dates'] as const,
   sharedDaysOff: () => ['sharedDaysOff'] as const,
 
   mapPins: () => ['mapPins'] as const,
@@ -76,7 +75,6 @@ export const realtimeInvalidation: Record<
   events: [qk.events()],
   free_limit: [qk.freeLimit()],
   savings_goals: [qk.savingsGoals()],
-  dates: [qk.dates()],
   media_items: [qk.media()],
   dishes: [qk.dishes()],
   wishlist_items: [['wishlist']],

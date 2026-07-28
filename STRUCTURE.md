@@ -53,7 +53,7 @@ amore-react/
         ├── plans/                # PlansPage, PlanDetailsPage, planModel.ts, planMoney.ts
         ├── piggybank/            # PiggyBankPage («Скарбничка»), useBudget.ts, FreeLimitCard
         ├── calendar/             # CalendarPage, useCalendar.ts, EventList, calendarPlans.ts
-        ├── schedule/             # SchedulePage, useWorkSchedule.ts
+        ├── schedule/             # SchedulePage, useSchedule.ts, useSharedDaysOff.ts
         ├── photo-calendar/       # PhotoCalendarPage, usePhotoCalendar.ts
         ├── question/             # QuestionPage, useDailyQuestion.ts
         ├── capsule/              # CapsulePage, useCapsules.ts
@@ -100,6 +100,7 @@ amore-react/
 | `users`                | `['users']`                          |
 | `events`               | `['events']`                         |
 | —                      | `['plans']`, `['planTasks', id]`, `['planLinks']` |
+| `dates` (прибрано)     | побачення живуть у `['plans']`       |
 | `shopping:items`       | `['shopping']`                       |
 | `wishlist:<owner>`     | `['wishlist', ownerId]`              |
 | `media:<type>:<status>`| `['media', { type, status }]`        |

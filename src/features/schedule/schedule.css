@@ -513,6 +513,9 @@
   margin: 16px 0;
 }
 
+/* Рядок став посиланням на сторінку плану (раніше це був німий
+   <article>), тож колір і підкреслення треба знімати явно: інакше
+   браузер малює синій підкреслений текст поверх усієї картки. */
 .sched-day-plan {
   display: flex;
   flex-direction: column;
@@ -520,7 +523,10 @@
   padding: 12px;
   border-radius: 14px;
   background: color-mix(in srgb, var(--accent) 8%, transparent);
+  color: var(--text);
+  text-decoration: none;
 }
+.sched-day-plan strong { font-size: 14px; }
 
 .sched-day-plan-status {
   align-self: flex-start;

@@ -104,7 +104,8 @@
   place-items: center;
   border-radius: 14px;
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  font-size: 20px;
+  /* Значок, а не емодзі: колір задаємо ми, розмір приходить пропом. */
+  color: var(--accent);
 }
 
 .notification-event-content {
@@ -178,6 +179,5 @@
     width: 38px;
     height: 38px;
     border-radius: 13px;
-    font-size: 18px;
   }
 }

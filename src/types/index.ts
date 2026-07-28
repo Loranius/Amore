@@ -369,22 +369,6 @@ export interface SavingsGoalRow {
   plan_id: number | null;
 }
 
-/** Побачення на спільний вихідний (pending/confirmed, той самий патерн, що savings_goals). */
-export interface DateRow {
-  id: number;
-  title: string;
-  place: string | null;
-  /** 'YYYY-MM-DD', обов'язково спільний вихідний (перевіряється на клієнті). */
-  date: string;
-  /** 'HH:MM:SS' або null. */
-  time: string | null;
-  description: string | null;
-  url: string | null;
-  status: GoalStatus;
-  /** Ім'я того, хто запропонував. */
-  proposed_by: string;
-  created_at: string;
-}
 
 export interface MapPinRow {
   /** 'YYYY-MM-DD' — коли пара там була. Керує датою фото в «Спогадах». */
@@ -493,7 +477,6 @@ export interface Database {
       user_locations:     TableDef<UserLocationRow, 'user_id' | 'lat' | 'lng'>;
       wishlist_items:     TableDef<WishlistItemRow, 'title' | 'owner'>;
       dishes:             TableDef<DishRow, 'title' | 'category'>;
-      dates:              TableDef<DateRow, 'title' | 'date' | 'proposed_by'>;
       // pin_attempts і закриті колонки users — лише service_role
       // (Edge Function auth-pin); у клієнтському контракті їх немає.
     };
@@ -660,7 +643,7 @@ export type EdgeFunctionName = keyof EdgeFunctions;
 
 /** Таблиці, на які підписується клієнт (публікація supabase_realtime). */
 export type RealtimeTable =
-  | 'events' | 'free_limit' | 'savings_goals' | 'dates'
+  | 'events' | 'free_limit' | 'savings_goals'
   | 'media_items' | 'dishes' | 'wishlist_items'
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
   | 'map_pins' | 'user_locations'
@@ -792,17 +775,6 @@ export interface CulinaryPersistedState {
  * автоматично.
  */
 export type Optimistic<T> = T & { readonly __optimistic?: true };
-
-/**
- * Імена вкладок старого роутера. Потрібні перехідно: realtime-конфіг
- * і збережений sessionStorage `portal:lastView` оперують ними;
- * мапа view → URL живе в src/app/routes.ts.
- */
-export type ViewName =
-  | 'home' | 'wishlist' | 'budget'
-  | 'calendar' | 'schedule' | 'photo-calendar'
-  | 'media' | 'whereto' | 'map' | 'shopping'
-  | 'random' | 'game';
 
 // ────────────────────────────────────────────────────────────
 // 11. БРАУЗЕРНІ ДОПОВНЕННЯ

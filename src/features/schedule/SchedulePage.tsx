@@ -1,21 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUsers } from '@/features/_shared/useUsers';
 import { currentYearMonth, daysInMonth, monthKeyOf, todayLocal, ymd } from '@/features/_shared/month';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useSchedule } from './useSchedule';
 import { useScheduleReminder } from './useScheduleReminder';
-import { useDateMutations, useDatePlans, useSharedDaysOff } from './useDates';
-import { PlanDateModal } from './PlanDateModal';
+import { useSharedDaysOff } from './useSharedDaysOff';
+import { usePlans } from '@/features/plans/usePlans';
+import { showsInCalendar } from '@/features/plans/planModel';
 import { ScheduleEditor } from './ScheduleEditor';
 import { ScheduleMonthNav } from './ScheduleMonthNav';
 import { ScheduleCompletionStatus } from './ScheduleCompletionStatus';
 import { ScheduleMonthOverview } from './ScheduleMonthOverview';
 import { ScheduleUpcoming } from './ScheduleUpcoming';
 import { ScheduleDayDetails } from './ScheduleDayDetails';
-import { ScheduleDatePlans } from './ScheduleDatePlans';
 import { countdownLabel, dayStatus, fmtLongDate, type DayStatus } from './scheduleViewModel';
-import type { DateRow } from '@/types';
+import type { PlanRow } from '@/types';
 import './schedule.css';
 import './scheduleCompleteness.css';
 import './scheduleEditToggle.css';
@@ -37,15 +37,13 @@ export function SchedulePage() {
   const [editMode, setEditMode] = useState(() => searchParams.get('edit') === '1');
   const [editUserId, setEditUserId] = useState<number | null>(null);
   const [hasPendingBulkSelection, setHasPendingBulkSelection] = useState(false);
-  const [planModalOpen, setPlanModalOpen] = useState(false);
-  const [initialPlanDate, setInitialPlanDate] = useState<string | undefined>();
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [remindedKeys, setRemindedKeys] = useState<Set<string>>(() => new Set());
 
   const { data: marks = {} } = useSchedule(yr, mo);
   const { data: sharedDates = [] } = useSharedDaysOff();
-  const { data: datePlans = [] } = useDatePlans();
-  const dateMutations = useDateMutations();
+  const { data: allPlans = [] } = usePlans();
+  const navigate = useNavigate();
   const scheduleReminder = useScheduleReminder();
   const total = daysInMonth(yr, mo);
   const today = todayLocal();
@@ -116,15 +114,18 @@ export function SchedulePage() {
     return counts;
   }, [statusOf]);
 
+  // Лише плани з точною датою: «осінь 2026» не має де стояти в дні
+  // графіка — те саме правило, що в календарній сітці.
   const plansByDate = useMemo(() => {
-    const map = new Map<string, DateRow[]>();
-    for (const plan of datePlans) {
-      const plans = map.get(plan.date) ?? [];
-      plans.push(plan);
-      map.set(plan.date, plans);
+    const map = new Map<string, PlanRow[]>();
+    for (const plan of allPlans) {
+      if (!showsInCalendar(plan) || !plan.start_date) continue;
+      const list = map.get(plan.start_date) ?? [];
+      list.push(plan);
+      map.set(plan.start_date, list);
     }
     return map;
-  }, [datePlans]);
+  }, [allPlans]);
 
   const selectedStatus: DayStatus = selectedDate
     ? sharedDates.includes(selectedDate) ? 'both-off' : statusOf.get(selectedDate) ?? 'none'
@@ -179,10 +180,11 @@ export function SchedulePage() {
     );
   };
 
-  const openPlanModal = (date?: string) => {
-    setInitialPlanDate(date);
+  // Заводити план у двох місцях не треба: графік лише показує, що вже
+  // заплановано на спільний вихідний, а створення живе в «Планах».
+  const openPlans = () => {
     setSelectedDate(null);
-    setPlanModalOpen(true);
+    navigate('/plans');
   };
 
   const nextSharedDate = sharedDates[0];
@@ -200,7 +202,7 @@ export function SchedulePage() {
           <strong>{nextSharedDate ? fmtLongDate(nextSharedDate) : 'Заповніть графік на найближчі дні'}</strong>
           <small>{nextSharedDate ? countdownLabel(nextSharedDate, today) : 'Ми автоматично покажемо першу вільну дату.'}</small>
         </div>
-        {nextSharedDate && <button type="button" className="sched-next-action" onClick={() => openPlanModal(nextSharedDate)}>Запланувати</button>}
+        {nextSharedDate && <button type="button" className="sched-next-action" onClick={openPlans}>Запланувати</button>}
       </section>
 
       <div className="sched-month-toolbar">
@@ -249,13 +251,11 @@ export function SchedulePage() {
       ) : (
         <>
           <ScheduleMonthOverview yr={yr} mo={mo} today={today} usersCount={users.length} statusCounts={statusCounts} statusOf={statusOf} plansByDate={plansByDate} onSelectDate={setSelectedDate} />
-          <ScheduleUpcoming sharedDates={sharedDates} plansByDate={plansByDate} onSelectDate={setSelectedDate} onPlan={() => openPlanModal()} />
-          <ScheduleDatePlans plans={datePlans} meName={me.name} onConfirm={(id) => dateMutations.confirm.mutate(id)} onRemove={(id) => dateMutations.remove.mutate(id)} />
+          <ScheduleUpcoming sharedDates={sharedDates} plansByDate={plansByDate} onSelectDate={setSelectedDate} onPlan={openPlans} />
         </>
       )}
 
-      {selectedDate && <ScheduleDayDetails date={selectedDate} status={selectedStatus} plans={plansByDate.get(selectedDate) ?? []} onClose={() => setSelectedDate(null)} onPlan={() => openPlanModal(selectedDate)} />}
-      {planModalOpen && <PlanDateModal key={initialPlanDate ?? 'default-date'} sharedDates={sharedDates} initialDate={initialPlanDate} onClose={() => setPlanModalOpen(false)} onSubmit={(input) => dateMutations.propose.mutate(input)} />}
+      {selectedDate && <ScheduleDayDetails date={selectedDate} status={selectedStatus} plans={plansByDate.get(selectedDate) ?? []} onClose={() => setSelectedDate(null)} onPlan={openPlans} />}
     </section>
   );
 }
