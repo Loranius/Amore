@@ -1,14 +1,21 @@
 // ============================================================
 // useNotifications — actionable proposals + persistent event inbox
 // ------------------------------------------------------------
-// Pending dates/goals remain computed from their domain state. Wishlist events
-// are persisted server-side, deduplicated and read through privacy-safe RPCs.
+// Пропозиції, що чекають відповіді, рахуються зі стану самих модулів;
+// події вішлиста живуть на сервері й читаються через privacy-safe RPC.
+//
+// Побачення переїхали в «Плани» разом із власною механікою пропозиції
+// (`proposed_by` + `confirmed`), тож звідси читається `plans`, а не
+// таблиця `dates`. Її екран прибрано, і лишити тут старе джерело
+// означало б показувати кнопки, які ведуть у розділ, якого немає.
 // ============================================================
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { useDatePlans } from '@/features/schedule/useDates';
-import { useGoals, fmtMoney } from '@/features/budget/useBudget';
+import { useUsersMap } from '@/features/_shared/useUsers';
+import { usePlans } from '@/features/plans/usePlans';
+import { planDateLabel } from '@/features/plans/planModel';
+import { useGoals, fmtMoney } from '@/features/piggybank/useBudget';
 import { qk } from '@/lib/queryKeys';
 import {
   fetchAppNotifications,
@@ -24,25 +31,32 @@ interface PendingNotificationBase {
 }
 
 export type PendingNotification =
-  | (PendingNotificationBase & { kind: 'date'; id: number })
+  | (PendingNotificationBase & { kind: 'plan'; id: number })
   | (PendingNotificationBase & { kind: 'goal'; id: string });
 
 export function useNotifications() {
   const me = useCurrentUser();
   const client = useQueryClient();
-  const { data: dates = [] } = useDatePlans();
+  const users = useUsersMap();
+  const { data: plans = [] } = usePlans();
   const { data: goals = [] } = useGoals();
 
   const items = useMemo<PendingNotification[]>(() => {
-    const pendingDates: PendingNotification[] = dates
-      .filter((date) => date.status === 'pending' && date.proposed_by !== me.name)
-      .map((date) => ({
-        kind: 'date',
-        id: date.id,
-        title: date.title,
-        detail: `📅 ${date.date}${date.place ? ' · ' + date.place : ''}`,
-        proposedBy: date.proposed_by,
-      }));
+    const pendingPlans: PendingNotification[] = plans
+      // Пропозиція — це план, який ХТОСЬ запропонував і який ще не
+      // підтверджено. План без `proposed_by` створений спільно й
+      // нікого ні про що не питає, тому сюди не потрапляє.
+      .filter((plan) => !plan.confirmed && plan.proposed_by !== null && plan.proposed_by !== me.id)
+      .map((plan) => {
+        const date = planDateLabel(plan);
+        return {
+          kind: 'plan' as const,
+          id: plan.id,
+          title: plan.title,
+          detail: [date, plan.location_name].filter(Boolean).join(' · ') || 'Без дати',
+          proposedBy: users[plan.proposed_by!] ?? '',
+        };
+      });
 
     const pendingGoals: PendingNotification[] = goals
       .filter((goal) => goal.status === 'pending' && goal.proposed_by !== me.name)
@@ -50,12 +64,12 @@ export function useNotifications() {
         kind: 'goal',
         id: goal.id,
         title: goal.name,
-        detail: goal.target_amount ? `🎯 ${fmtMoney(goal.target_amount)}` : '🎯 Спільна ціль',
+        detail: goal.target_amount ? fmtMoney(goal.target_amount) : 'Спільна ціль',
         proposedBy: goal.proposed_by ?? '',
       }));
 
-    return [...pendingDates, ...pendingGoals];
-  }, [dates, goals, me.name]);
+    return [...pendingPlans, ...pendingGoals];
+  }, [plans, goals, users, me.id, me.name]);
 
   const feedQuery = useQuery({
     queryKey: qk.notificationsFeed(),

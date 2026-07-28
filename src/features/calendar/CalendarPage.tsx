@@ -8,21 +8,21 @@
 // прибрано, кольорове оформлення перенесене на вкладку «Графік».)
 // ============================================================
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { TabBar } from '@/components/ui/TabBar';
 import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
-import { planMetadataOf } from '@/features/_shared/events';
 import { useEvents, useCalendarMutations } from './useCalendar';
 import { enrichEvent, sortEnriched } from './calendarUtils';
 import { EventList } from './EventList';
-import { PlansBoard } from './PlansBoard';
-import { AddEventModal, AddPlanModal } from './AddEventModal';
+import { AddEventModal } from './AddEventModal';
 import { HolidayPresetsModal } from './HolidayPresetsModal';
 import { missingPresets } from './holidayPresets';
 import { CalendarViewPicker } from './CalendarViewPicker';
 import { CalendarMonthView, CalendarYearView } from './CalendarViews';
 import { useCalendarView } from './calendarView';
 import { currentYearMonth, stepMonth } from '@/features/_shared/month';
+import { usePlans } from '@/features/plans/usePlans';
 import type { EnrichedEvent, EventType } from '@/types';
 
 // Значок окремо від підпису: TabBar приймає ReactNode, тож малюємо
@@ -31,7 +31,6 @@ const TAB_DEFS: { type: EventType; label: string }[] = [
   { type: 'anniversary', label: 'Наші свята' },
   { type: 'birthday', label: 'Дні народження' },
   { type: 'holiday', label: 'Свята' },
-  { type: 'other', label: 'Плани' },
 ];
 
 /**
@@ -40,17 +39,19 @@ const TAB_DEFS: { type: EventType; label: string }[] = [
  * розійтись, і неможливо відкрити модалку події з планом усередині.
  * `row === null` означає створення — той самий патерн, що у вішлисті.
  */
-type ModalState =
-  | { kind: 'event'; row: EnrichedEvent | null; date?: string }
-  | { kind: 'plan'; row: EnrichedEvent | null; date?: string }
-  | null;
+type ModalState = { kind: 'event'; row: EnrichedEvent | null; date?: string } | null;
 
 export function CalendarPage() {
   const { data: events = [], isPending, isError, refetch, isFetching } = useEvents();
+  // Плани — окреме джерело, а не події з `type='other'`, як було досі.
+  // Сітка і рік їх показують; список за типами — ні: у планів є власний
+  // модуль, і вкладка тут повернула б рівно те дублювання, яке прибрали.
+  const { data: plans = [] } = usePlans();
   const {
-    addEvent, addPlan, addHolidays, updateEvent, updatePlan, setPlanStatus, deleteEvent,
+    addEvent, addHolidays, updateEvent, deleteEvent,
   } = useCalendarMutations();
   const confirmDialog = useConfirm();
+  const navigate = useNavigate();
 
   const [filter, setFilter] = useState<EventType>('anniversary');
   const [modal, setModal] = useState<ModalState>(null);
@@ -85,7 +86,7 @@ export function CalendarPage() {
         <button
           type="button"
           className="btn"
-          onClick={() => setModal({ kind: filter === 'other' ? 'plan' : 'event', row: null })}
+          onClick={() => setModal({ kind: 'event', row: null })}
         >
           + Додати
         </button>
@@ -121,24 +122,22 @@ export function CalendarPage() {
       ) : view === 'month' ? (
         <CalendarMonthView
           events={events}
+          plans={plans}
           yr={yr}
           mo={mo}
           onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
           onGoToday={() => setYm(currentYearMonth())}
-          // Тип нової події визначає активна вкладка списку: у сітці
-          // вкладок немає, а «Плани» — окрема форма. Поза вкладкою
-          // «Плани» день заводить звичайну подію.
-          onAddOn={(date) => setModal({
-            kind: filter === 'other' ? 'plan' : 'event', row: null, date,
-          })}
+          onAddOn={(date) => setModal({ kind: 'event', row: null, date })}
           onOpenEvent={(ev) => setModal({
-            kind: (ev.type ?? 'other') === 'other' ? 'plan' : 'event',
+            kind: 'event',
             row: enriched.find((e) => e.id === ev.id) ?? null,
           })}
+          onOpenPlan={(id) => navigate(`/plans/${id}`)}
         />
       ) : view === 'year' ? (
         <CalendarYearView
           events={events}
+          plans={plans}
           yr={yr}
           onStepYear={(delta) => setYm({ yr: yr + delta, mo })}
           onGoToday={() => setYm(currentYearMonth())}
@@ -160,13 +159,6 @@ export function CalendarPage() {
         </>
       ) : events.length === 0 ? (
         <p className="empty-state">Подій ще немає. Додай першу!</p>
-      ) : filter === 'other' ? (
-        <PlansBoard
-          plans={filtered}
-          onSetStatus={(id, metadata) => setPlanStatus.mutate({ id, metadata })}
-          onEdit={(plan) => setModal({ kind: 'plan', row: plan })}
-          onDelete={onDelete}
-        />
       ) : (
         <EventList
           events={filtered}
@@ -184,20 +176,6 @@ export function CalendarPage() {
             const row = modal.row;
             if (row) updateEvent.mutate({ id: row.id, input });
             else addEvent.mutate(input);
-          }}
-        />
-      )}
-      {modal?.kind === 'plan' && (
-        <AddPlanModal
-          plan={modal.row}
-          initialDate={modal.date}
-          onClose={() => setModal(null)}
-          onSubmit={(input) => {
-            const row = modal.row;
-            // metadata береться з поточного рядка: правка назви не має
-            // повертати виконаний план у «Планується».
-            if (row) updatePlan.mutate({ id: row.id, input, current: planMetadataOf(row) });
-            else addPlan.mutate(input);
           }}
         />
       )}

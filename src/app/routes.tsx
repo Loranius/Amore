@@ -23,7 +23,9 @@ import { MemoriesPage } from '@/features/memories/MemoriesPage';
 import { MediaPage } from '@/features/media/MediaPage';
 import { CulinaryPage } from '@/features/culinary/CulinaryPage';
 import { HomePage } from '@/features/home/HomePage';
-import { BudgetPage } from '@/features/budget/BudgetPage';
+import { PiggyBankPage } from '@/features/piggybank/PiggyBankPage';
+import { PlansPage } from '@/features/plans/PlansPage';
+import { PlanDetailsPage } from '@/features/plans/PlanDetailsPage';
 import { MapPage } from '@/features/map/MapPage';
 import { WhereToPage } from '@/features/whereto/WhereToPage';
 import { GamePage } from '@/features/game/GamePage';
@@ -46,7 +48,12 @@ export const router = createHashRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: 'wishlist', element: <WishlistPage /> },
-          { path: 'budget', element: <BudgetPage /> },
+          { path: 'plans', element: <PlansPage /> },
+          { path: 'plans/:id', element: <PlanDetailsPage /> },
+          { path: 'piggybank', element: <PiggyBankPage /> },
+          // Стара адреса «Фінансів»: закладки й посилання в Telegram
+          // не мусять ламатись через перейменування модуля.
+          { path: 'budget', element: <Navigate to="/piggybank" replace /> },
           { path: 'shopping', element: <ShoppingPage /> },
 
           // Хаб «Календар»: /calendar (Події) · /schedule

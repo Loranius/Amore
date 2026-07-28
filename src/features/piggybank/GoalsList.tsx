@@ -6,6 +6,7 @@
 // окремий прогрес і окремий м’який прогноз.
 // ============================================================
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { ProposalCard } from '@/components/ui/ProposalCard';
@@ -14,6 +15,11 @@ import { GoalContributions } from './GoalContributions';
 import { GoalDesiredDateModal, GoalForecastCard } from './GoalForecast';
 import { GoalMilestones } from './GoalMilestones';
 import { useGoalForecastMutations, useGoalForecasts } from './useGoalForecast';
+import { SparkIcon } from '@/components/icons/EventIcon';
+import { PlansIcon } from '@/components/icons/NavIcon';
+import { usePlans } from '@/features/plans/usePlans';
+import { TargetIcon } from '@/components/icons/PlanIcon';
+import { CheckIcon, CommentIcon, ExternalLinkIcon, ListIcon, PauseIcon, PlayIcon } from '@/components/icons/UiIcon';
 import {
   CONTRIBUTION_NOTE_MAX,
   isValidContributionAmount,
@@ -42,6 +48,10 @@ export function GoalsList() {
     addContribution,
   } = useGoalMutations();
   const { setDesiredDate } = useGoalForecastMutations();
+  // Лише назви: сама сторінка плану лишається за посиланням, а тягнути
+  // сюди весь модуль планів заради одного рядка не треба.
+  const { data: plans = [] } = usePlans();
+  const planTitles = new Map(plans.map((p) => [p.id, p.title]));
 
   const [adding, setAdding] = useState(false);
   const [funding, setFunding] = useState<BudgetGoalRow | null>(null);
@@ -69,7 +79,7 @@ export function GoalsList() {
   return (
     <section className="finance-goals" aria-labelledby="finance-goals-title">
       <header className="finance-goals-hero">
-        <span className="finance-goals-hero-icon" aria-hidden="true">◎</span>
+        <span className="finance-goals-hero-icon" aria-hidden="true"><TargetIcon size={26} /></span>
         <div className="finance-goals-hero-copy">
           <h2 id="finance-goals-title">Спільні цілі</h2>
           <p>Крок за кроком до наших мрій</p>
@@ -95,7 +105,7 @@ export function GoalsList() {
         </div>
       ) : goals.length === 0 ? (
         <div className="finance-goals-empty">
-          <span aria-hidden="true">✨</span>
+          <SparkIcon size={26} />
           <strong>Спільних цілей ще немає</strong>
           <p>Створіть першу мрію, до якої хочеться рухатися разом.</p>
         </div>
@@ -124,6 +134,14 @@ export function GoalsList() {
                     info={
                       <>
                         <span className="goal-row-name">{goal.name}</span>
+                        {/* Саме тут план потрібен найбільше: партнер бачить
+                            пропозицію першим і мусить розуміти, на що
+                            голосує, не відкриваючи інший розділ. */}
+                        {goal.plan_id !== null && planTitles.has(goal.plan_id) && (
+                          <Link className="finance-goal-plan" to={`/plans/${goal.plan_id}`}>
+                            <PlansIcon size={12} /> {planTitles.get(goal.plan_id)}
+                          </Link>
+                        )}
                         {goal.description && <span className="goal-row-desc">{goal.description}</span>}
                         {goal.url && (
                           <a className="goal-row-link" href={goal.url} target="_blank" rel="noopener noreferrer">
@@ -142,13 +160,22 @@ export function GoalsList() {
               <article className={`finance-goal${paused ? ' is-paused' : ''}`} key={goal.id}>
                 <section className="finance-goal-main-card">
                   <header className="finance-goal-head">
-                    <span className="finance-goal-cover" aria-hidden="true">◎</span>
+                    <span className="finance-goal-cover" aria-hidden="true"><TargetIcon size={22} /></span>
                     <div className="finance-goal-heading-copy">
                       <h3>{goal.name}</h3>
+                      {/* Зв'язок мусить читатись з обох боків: зі сторінки
+                          плану видно ціль, а тут — заради чого збираємо.
+                          Інакше «Карпати» у скарбничці лишались би просто
+                          сумою без причини. */}
+                      {goal.plan_id !== null && planTitles.has(goal.plan_id) && (
+                        <Link className="finance-goal-plan" to={`/plans/${goal.plan_id}`}>
+                          <PlansIcon size={12} /> {planTitles.get(goal.plan_id)}
+                        </Link>
+                      )}
                       {goal.description && <p>{goal.description}</p>}
                       {goal.url && (
                         <a href={goal.url} target="_blank" rel="noopener noreferrer">
-                          Відкрити посилання ↗
+                          Відкрити посилання <ExternalLinkIcon size={13} />
                         </a>
                       )}
                     </div>
@@ -157,11 +184,11 @@ export function GoalsList() {
 
                   <div className="finance-goal-actions" aria-label="Дії з ціллю">
                     <button type="button" onClick={() => setHistoryGoalId(goal.id)}>
-                      <span aria-hidden="true">▤</span>
+                      <ListIcon size={16} />
                       Історія
                     </button>
                     <button type="button" onClick={() => setCommentsGoalId(goal.id)}>
-                      <span aria-hidden="true">▱</span>
+                      <CommentIcon size={16} />
                       Обговорення
                     </button>
                     <button
@@ -169,7 +196,7 @@ export function GoalsList() {
                       onClick={() => paused ? resume.mutate(goal.id) : pause.mutate(goal.id)}
                       disabled={pause.isPending || resume.isPending}
                     >
-                      <span aria-hidden="true">{paused ? '▶' : 'Ⅱ'}</span>
+                      {paused ? <PlayIcon size={15} /> : <PauseIcon size={15} />}
                       {paused
                         ? (resumeBusy ? 'Відновлюємо…' : 'Відновити')
                         : (pauseBusy ? 'Зупиняємо…' : 'Пауза')}
@@ -195,7 +222,7 @@ export function GoalsList() {
 
                   <footer className="finance-goal-status-row">
                     <span className={paused ? 'is-paused' : 'is-confirmed'}>
-                      <span aria-hidden="true">{paused ? 'Ⅱ' : '✓'}</span>
+                      {paused ? <PauseIcon size={14} /> : <CheckIcon size={14} />}
                       {paused ? 'На паузі' : 'Підтверджено'}
                     </span>
                     <button

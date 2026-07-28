@@ -9,8 +9,6 @@ import type {
   UserName,
   AppUser,
   PlanMetadata,
-  PlanCategory,
-  PlanStatus,
   CulinaryDish,
   ShoppingCategory,
 } from '@/types';
@@ -27,8 +25,8 @@ export function toAppUser(row: { id: number; name: string } | null | undefined):
   return { id: row.id, name: row.name };
 }
 
-const PLAN_CATS: readonly PlanCategory[] = ['date', 'dream', 'trip', 'goal', 'other'];
-const PLAN_STATUSES: readonly PlanStatus[] = ['planned', 'active', 'done'];
+const PLAN_CATS: readonly string[] = ['date', 'dream', 'trip', 'goal', 'other'];
+const PLAN_STATUSES: readonly string[] = ['planned', 'active', 'done'];
 
 /**
  * Перевіряє форму jsonb events.metadata. Плани, бекфілені з тегів
@@ -39,9 +37,9 @@ export function isPlanMetadata(v: unknown): v is PlanMetadata {
   const m = v as Record<string, unknown>;
   return (
     typeof m.cat === 'string' &&
-    (PLAN_CATS as readonly string[]).includes(m.cat) &&
+    PLAN_CATS.includes(m.cat) &&
     typeof m.status === 'string' &&
-    (PLAN_STATUSES as readonly string[]).includes(m.status) &&
+    PLAN_STATUSES.includes(m.status) &&
     (m.done_at === null || typeof m.done_at === 'string')
   );
 }

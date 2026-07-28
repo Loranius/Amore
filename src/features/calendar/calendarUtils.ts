@@ -10,13 +10,7 @@
 // його прямо з `_shared/events` — рівно як це вже робить `home/Hero.tsx`.
 // ============================================================
 import { localDateFromISO, pluralUA } from '@/lib/utils';
-import type {
-  EventRow,
-  EnrichedEvent,
-  EventType,
-  PlanCategory,
-  PlanStatus,
-} from '@/types';
+import type { EventRow, EnrichedEvent, EventType } from '@/types';
 
 // Список місяців живе у _shared/month.ts — календар мав власну копію,
 // поки «Спогадам» не знадобився той самий. Псевдонім лишається, щоб
@@ -43,26 +37,6 @@ export const TYPES: Record<EventType, { label: string; mark: string; ink: string
   holiday: { label: 'Свято', mark: 'var(--ev-holiday)', ink: 'var(--ev-holiday-ink)' },
   other: { label: 'Плани', mark: 'var(--ev-other)', ink: 'var(--ev-other-ink)' },
 };
-
-export const PLAN_CATS: Record<
-  PlanCategory,
-  { label: string; color: string; gradient: string }
-> = {
-  date: { label: 'Побачення', color: '#FF6B9D', gradient: 'linear-gradient(135deg,#FF6B9D,#E8829C)' },
-  dream: { label: 'Мрії', color: '#9B6EA8', gradient: 'linear-gradient(135deg,#9B6EA8,#C084D4)' },
-  trip: { label: 'Подорожі', color: '#5BA3D9', gradient: 'linear-gradient(135deg,#5BA3D9,#7EC8E3)' },
-  goal: { label: 'Цілі', color: '#E8829C', gradient: 'linear-gradient(135deg,#E8829C,#F4A6BE)' },
-  other: { label: 'Інше', color: '#B98A9A', gradient: 'linear-gradient(135deg,#B98A9A,#D4B0BC)' },
-};
-
-// Значки живуть у components/icons/PlanIcon — тут лишились підпис і клас.
-export const PLAN_STATUS: Record<PlanStatus, { label: string; cls: string }> = {
-  planned: { label: 'Планується', cls: 'plan-status-planned' },
-  active: { label: 'В процесі', cls: 'plan-status-active' },
-  done: { label: 'Виконано!', cls: 'plan-status-done' },
-};
-
-export const PLAN_CAT_ORDER: PlanCategory[] = ['date', 'dream', 'trip', 'goal', 'other'];
 
 // ── Дати ─────────────────────────────────────────────────────
 /**

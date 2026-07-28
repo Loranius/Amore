@@ -13,6 +13,11 @@ export const qk = {
 
   events: () => ['events'] as const,
   plans: () => ['plans'] as const,
+  planTasks: (planId?: number) =>
+    (planId === undefined ? (['planTasks'] as const) : (['planTasks', planId] as const)),
+  // Зв'язки читаються однією таблицею на всі плани: рядків одиниці, а
+  // окремий запит на кожен план означав би N запитів на списку.
+  planLinks: () => ['planLinks'] as const,
 
   shopping: () => ['shopping'] as const,
 
@@ -49,7 +54,6 @@ export const qk = {
     (goalId === undefined
       ? (['savingsGoalContributions'] as const)
       : (['savingsGoalContributions', goalId] as const)),
-  dates: () => ['dates'] as const,
   sharedDaysOff: () => ['sharedDaysOff'] as const,
 
   mapPins: () => ['mapPins'] as const,
@@ -68,10 +72,9 @@ export const realtimeInvalidation: Record<
   import('@/types').RealtimeTable,
   ReadonlyArray<readonly unknown[]>
 > = {
-  events: [qk.events(), qk.plans()],
+  events: [qk.events()],
   free_limit: [qk.freeLimit()],
   savings_goals: [qk.savingsGoals()],
-  dates: [qk.dates()],
   media_items: [qk.media()],
   dishes: [qk.dishes()],
   wishlist_items: [['wishlist']],
@@ -80,6 +83,9 @@ export const realtimeInvalidation: Record<
   memories: [['memories']],
   memory_links: [['memories']],
   memory_days: [['memories']],
+  plans: [qk.plans()],
+  plan_tasks: [qk.planTasks()],
+  plan_links: [qk.planLinks()],
   work_schedule: [['schedule'], qk.sharedDaysOff()],
   map_pins: [qk.mapPins()],
   user_locations: [qk.userLocations()],

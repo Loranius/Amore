@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { fmtMoney } from './useBudget';
 import { GOAL_MILESTONES, getGoalMilestoneState } from './milestoneModel';
 import './milestones.css';
+import { FlagIcon } from '@/components/icons/EventIcon';
 
 export function GoalMilestones({
   savedAmount,
@@ -57,7 +58,7 @@ export function GoalMilestones({
       </div>
 
       <div className="goal-progress-message" aria-live="polite">
-        <span className="goal-progress-message-icon" aria-hidden="true">♧</span>
+        <span className="goal-progress-message-icon" aria-hidden="true"><FlagIcon size={20} /></span>
         <div>
           <strong>{state.message}</strong>
           <p>

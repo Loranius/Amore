@@ -7,6 +7,7 @@ import {
   type BudgetGoalRow,
 } from './useBudget';
 import { canCancelContribution } from './contributionModel';
+import { SparkIcon } from '@/components/icons/EventIcon';
 
 function contributionMoment(value: string): string {
   const date = new Date(value);
@@ -84,7 +85,7 @@ export function GoalContributions({
           </div>
         ) : contributions.length === 0 ? (
           <div className="goal-history-empty">
-            <span aria-hidden="true">✨</span>
+            <SparkIcon size={26} />
             <p>Перший внесок стане початком історії цієї цілі.</p>
           </div>
         ) : (

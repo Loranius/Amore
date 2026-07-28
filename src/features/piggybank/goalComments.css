@@ -378,11 +378,12 @@
   font-weight: 800;
 }
 
-.goal-comment-submit > span:last-child {
+.goal-comment-submit > svg {
+  flex: 0 0 auto;
   width: 1.45rem;
   height: 1.45rem;
-  display: grid;
-  place-items: center;
+  padding: 0.22rem;
+  box-sizing: border-box;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.18);
 }
@@ -510,7 +511,11 @@
     display: none;
   }
 
-  .goal-comment-submit > span:last-child {
+  /* На вузькому екрані кнопка стає лише значком (підпис вище сховано),
+     тож значок більшає. Селектор дивиться на svg: раніше тут був
+     <span> зі стрілкою, і після заміни правило мовчки цілилось у
+     підпис, який і так display:none. */
+  .goal-comment-submit > svg {
     width: 1.7rem;
     height: 1.7rem;
   }

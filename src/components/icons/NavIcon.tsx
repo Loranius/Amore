@@ -27,17 +27,6 @@ export function HeartIcon({ size = 24, className = '', filled = false }: IconPro
   );
 }
 
-/** Гаманець — фінанси. */
-export function WalletIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M3.6 8.4a2 2 0 0 1 2-2h11.2a2 2 0 0 1 2 2v.8" />
-      <rect x="3.6" y="8.4" width="16.8" height="11.2" rx="2" />
-      <path d="M20.4 12.6h-3.6a1.9 1.9 0 0 0 0 3.8h3.6" />
-    </svg>
-  );
-}
-
 /** Візок — покупки. */
 export function CartIcon({ size = 24, className = '' }: IconProps) {
   return (
@@ -152,6 +141,42 @@ export function GamepadIcon({ size = 24, className = '' }: IconProps) {
       <path d="M7.2 11v2.4M6 12.2h2.4" />
       <circle cx="16.2" cy="11.6" r=".95" fill="currentColor" stroke="none" />
       <circle cx="18" cy="13.6" r=".95" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/**
+ * Список із галочкою — «Плани».
+ *
+ * Не прапорець і не календар: прапорець уже позначає віху у фінансах, а
+ * календар — сусідній розділ. Плани це про підготовку, тож перелік
+ * кроків, у якому перший уже зроблений.
+ */
+export function PlansIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M9.6 6.4h10.8M9.6 12h10.8M9.6 17.6h7.2" />
+      <path d="m3.2 6.2 1.6 1.6 2.6-2.8" />
+      <path d="M3.6 11.2h2.8M3.6 16.8h2.8" />
+    </svg>
+  );
+}
+
+/**
+ * Скарбничка.
+ *
+ * Не гаманець: гаманець позначав увесь розділ «Фінанси», поки той стояв
+ * у нижній панелі, і після переїзду в «Ще» лишився б підписом до іншої
+ * речі. Тут прорізь угорі й ніжки — те, що робить свинку свинкою навіть
+ * на 20 пікселях.
+ */
+export function PiggyBankIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M3.4 12.6c0-3.4 3.4-5.8 7.6-5.8 3 0 5.6 1.2 6.9 3.1l2.7.7v3.6l-2 .6a6.4 6.4 0 0 1-2.2 2.4v2.2h-3v-1.2a11 11 0 0 1-4.8 0v1.2h-3v-2.4c-1.4-1-2.2-2.5-2.2-4.4Z" />
+      <path d="M9.2 6.9c-.5-1.5.4-3 1.9-3.3" />
+      <circle cx="7.4" cy="12.4" r=".95" fill="currentColor" stroke="none" />
+      <path d="M11.6 9.8h3.2" />
     </svg>
   );
 }

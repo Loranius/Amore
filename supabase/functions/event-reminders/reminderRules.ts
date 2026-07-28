@@ -47,6 +47,60 @@ export function buildText(
  */
 export const ACCUSATIVE: Record<string, string> = { "Лєна": "Лєну", "Діма": "Діму" };
 
+// ── Плани ────────────────────────────────────────────────────
+/**
+ * Плани переїхали з `events` (`type='other'` + JSONB metadata) у власну
+ * таблицю `plans`. Крон мусить читати їх звідти — інакше нагадування про
+ * них просто перестали б надходити, і помітили б це аж тоді, коли
+ * пропустили б виїзд.
+ */
+export interface PlanRemindable {
+  title: string;
+  description: string | null;
+  start_date: string | null;
+  /** 'day' | 'range' | 'month' | 'season' | 'year' | 'none' */
+  date_precision: string;
+  /** 'idea' | 'planning' | 'preparing' | 'ready' | 'done' | 'postponed' | 'cancelled' */
+  status: string;
+  confirmed: boolean;
+}
+
+/** Статуси, за яких план більше не в роботі. Дзеркало `PLAN_STATUSES[].closed`
+ *  у `src/features/plans/planConstants.ts` — edge-функція не імпортує з `src/`,
+ *  тож міняти набір треба в обох місцях. */
+const CLOSED_STATUSES = ["done", "postponed", "cancelled"];
+
+/**
+ * Чи нагадувати про цей план сьогодні, і як саме.
+ *
+ * Три відсіювання, кожне зі своєї причини:
+ *
+ * • неточна дата — «через 3 дні» під планом «осінь 2026» обіцяло б
+ *   знання, якого немає: 1 вересня там стоїть лише як початок періоду;
+ * • закритий статус — виконаний, відкладений чи скасований план не має
+ *   нагадувати про себе (це те саме правило, що колись робив `isDonePlan`
+ *   по JSONB, лише тепер у явному полі);
+ * • непідтверджена пропозиція — це ще питання до партнера, а не спільний
+ *   план. «Завтра — Львів» про те, на що ще не погодились, було б
+ *   неправдою.
+ *
+ * Нагадуємо про ПОЧАТОК: кінець періоду нікого не застає зненацька.
+ */
+export function planReminderKind(
+  plan: PlanRemindable,
+  dates: { today: string; plus1: string; plus3: string },
+): "today" | "tomorrow" | "in3days" | null {
+  if (!plan.start_date) return null;
+  if (plan.date_precision !== "day" && plan.date_precision !== "range") return null;
+  if (CLOSED_STATUSES.includes(plan.status)) return null;
+  if (!plan.confirmed) return null;
+
+  if (plan.start_date === dates.today) return "today";
+  if (plan.start_date === dates.plus1) return "tomorrow";
+  if (plan.start_date === dates.plus3) return "in3days";
+  return null;
+}
+
 export interface Recipient { id: number; name: string; chat_id: string | number }
 
 /**

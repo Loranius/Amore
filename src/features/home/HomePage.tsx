@@ -16,6 +16,7 @@ import { lazy, Suspense } from 'react';
 import { Hero } from './Hero';
 import { Crystal } from './Crystal';
 import { CrystalPlaceholder } from './CrystalPlaceholder';
+import { HomePlansCard } from './HomePlansCard';
 import { CrystalErrorBoundary } from './crystal3d/CrystalErrorBoundary';
 import { useWebglSupport } from './crystal3d/useWebglSupport';
 import { PortalDecor } from '@/features/auth/PortalDecor';
@@ -39,6 +40,9 @@ export function HomePage() {
       ) : (
         <Crystal />
       )}
+      {/* Під кристалом, а не над: кристал — те, заради чого головну
+          відкривають, і посувати його заради віджета не варто. */}
+      <HomePlansCard />
     </section>
   );
 }

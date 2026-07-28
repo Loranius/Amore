@@ -7,21 +7,15 @@
 // ============================================================
 import { useMemo } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { useEvents, planMetadataOf } from '@/features/_shared/events';
+import { useEvents } from '@/features/_shared/events';
 import { useStartDate } from './useHome';
 import { daysBetween, formatSinceDate, nextAnniversaryLabel } from './homeUtils';
-import type { EventRow } from '@/types';
 
 const COMMON = ['Хай, бубос 💛', 'Привіт, пупс 🌸', 'Шо ти там, крошка? 😏'];
 const PERSONAL: Record<string, string[]> = {
   Лєна: ['Привіт, Лєнок 🌷', 'Привіт, Лєнусік 💕', 'Привіт, Лєнчик ✨'],
   Діма: ['Як справи, Дімасік? 😎', 'Привіт, Дімонич 🤙'],
 };
-
-function isArchivedPlan(ev: EventRow): boolean {
-  if ((ev.type ?? 'other') !== 'other') return false;
-  return planMetadataOf(ev).status === 'done';
-}
 
 function useNextEventLabel(): string | null {
   const { data: events = [] } = useEvents();
@@ -30,7 +24,7 @@ function useNextEventLabel(): string | null {
     today.setHours(0, 0, 0, 0);
     const ev = events.find((e) => {
       const d = new Date(e.date + 'T00:00:00');
-      return d >= today && !isArchivedPlan(e);
+      return d >= today;
     });
     if (!ev) return null;
 

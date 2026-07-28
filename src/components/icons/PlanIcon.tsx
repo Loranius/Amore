@@ -1,12 +1,15 @@
 // ============================================================
 // Значки категорій і статусів планів.
 // ------------------------------------------------------------
-// Той самий набір і та сама основа, що в EventIcon: дошка планів живе
-// на одному екрані зі списком подій, і мішати там мальоване з
-// системними емодзі означало б лишити роботу зробленою наполовину.
+// Той самий набір і та сама основа, що в EventIcon.
+//
+// Тут лежать САМІ значки, без таблиць «категорія → значок»: категорії
+// й статуси належать модулю «Плани» (features/plans/planConstants.ts),
+// і тримати їхній перелік ще й тут означало б двічі правити при кожній
+// зміні. Рівно так уже розійшлись були PLAN_CATS у calendarUtils і в
+// lib/guards.
 // ============================================================
 import { iconAttrs, type IconProps } from './iconBase';
-import type { PlanCategory, PlanStatus } from '@/types';
 
 /**
  * Два келихи, зсунуті чашами — побачення.
@@ -106,30 +109,70 @@ export function CheckCircleIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
-const BY_CAT = {
-  date: GlassesIcon,
-  dream: DreamIcon,
-  trip: PlaneIcon,
-  goal: TargetIcon,
-  other: DotsIcon,
-} as const;
-
-const BY_STATUS = {
-  planned: HourglassIcon,
-  active: FlameIcon,
-  done: CheckCircleIcon,
-} as const;
-
-export function PlanCatIcon({
-  cat, size = 24, className = '',
-}: IconProps & { cat: PlanCategory }) {
-  const Icon = BY_CAT[cat];
-  return <Icon size={size} className={className} />;
+/**
+ * Лампочка — «Ідея».
+ *
+ * Спершу тут стояв місяць із зіркою (DreamIcon). На 14px у чипі
+ * статусу півмісяць читався незамкненим колом, тобто круговою
+ * стрілкою «оновити» — рендер показав це одразу на сторінці плану.
+ */
+export function BulbIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M12 3.2a6.2 6.2 0 0 0-3.6 11.25V17h7.2v-2.55A6.2 6.2 0 0 0 12 3.2Z" />
+      <path d="M9.6 19.4h4.8M10.4 21.4h3.2" />
+    </svg>
+  );
 }
 
-export function PlanStatusIcon({
-  status, size = 24, className = '',
-}: IconProps & { status: PlanStatus }) {
-  const Icon = BY_STATUS[status];
-  return <Icon size={size} className={className} />;
+/** Авто — поїздка (коротша за подорож, без літака). */
+export function CarIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M3.4 15.4v-2.2l1.8-4.4a2 2 0 0 1 1.85-1.2h9.9a2 2 0 0 1 1.85 1.2l1.8 4.4v2.2" />
+      <path d="M3.4 13.2h17.2" />
+      <path d="M4.6 15.4h14.8v2.6a1 1 0 0 1-1 1h-1.4a1 1 0 0 1-1-1v-.8H8v.8a1 1 0 0 1-1 1H5.6a1 1 0 0 1-1-1v-2.6Z" />
+    </svg>
+  );
+}
+
+/** Пульс — спільна активність. */
+export function ActivityIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M2.8 12h3.6l2.2-6 3.6 12 2.4-7.4 1.6 3.4h4.9" />
+    </svg>
+  );
+}
+
+/** Чашка — відпочинок. */
+export function MugIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M4.4 8.6h11.2v7a4 4 0 0 1-4 4H8.4a4 4 0 0 1-4-4v-7Z" />
+      <path d="M15.6 10.6h1.8a2.6 2.6 0 0 1 0 5.2h-1.8" />
+      <path d="M7.6 3.4v2.4M11.4 3.4v2.4" />
+    </svg>
+  );
+}
+
+/** Книга — навчання. */
+export function BookIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M5 4.4h10.6a2.4 2.4 0 0 1 2.4 2.4v12.8H7.4a2.4 2.4 0 0 1-2.4-2.4V4.4Z" />
+      <path d="M5 17.2a2.4 2.4 0 0 1 2.4-2.4H18" />
+      <path d="M9 8.4h5" />
+    </svg>
+  );
+}
+
+/** Будинок — для дому. */
+export function HouseIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M3.6 10.4 12 3.8l8.4 6.6v8.2a1.6 1.6 0 0 1-1.6 1.6H5.2a1.6 1.6 0 0 1-1.6-1.6v-8.2Z" />
+      <path d="M9.4 20.2v-6h5.2v6" />
+    </svg>
+  );
 }

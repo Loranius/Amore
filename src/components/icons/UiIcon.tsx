@@ -321,6 +321,70 @@ export function LayersIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
+/** Картка — вільний ліміт. Не гаманець: гаманець уже позначає весь
+    розділ «Фінанси» в навігації, і всередині нього він нічого не
+    розрізняє. */
+export function CreditCardIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <rect x="2.8" y="5.6" width="18.4" height="12.8" rx="2.4" />
+      <path d="M2.8 10h18.4" />
+      <path d="M6.4 14.6h3.4" />
+    </svg>
+  );
+}
+
+/** Хмарка — обговорення цілі. */
+export function CommentIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M20.4 12.6a7.4 7.4 0 0 1-8 7.36l-5.2 1.44 1.44-4.1A7.4 7.4 0 1 1 20.4 12.6Z" />
+      <path d="M8.8 11.6h6.4M8.8 14.8h4" />
+    </svg>
+  );
+}
+
+/** Крапка — «живе зараз». Стан, а не дія: тому просте коло, а не знак
+    відтворення, який читався б кнопкою. */
+export function DotIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Дві риски — пауза. */
+export function PauseIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M9.4 5.6v12.8M14.6 5.6v12.8" />
+    </svg>
+  );
+}
+
+/** Літак — надіслати. Стрілка вгору тут читалась «нагору сторінки», а
+    не «відправити». */
+export function SendIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M20.6 3.4 10.4 13.6" />
+      <path d="M20.6 3.4 14.2 20.6l-3.8-7-7-3.8L20.6 3.4Z" />
+    </svg>
+  );
+}
+
+/** Лінія вгору — орієнтовний шлях до суми. */
+export function TrendIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="m3.4 16.4 5-5 3.6 3.6 6.2-6.6" />
+      <path d="M14.6 8.4h4.6V13" />
+      <path d="M3.4 20.4h17.2" />
+    </svg>
+  );
+}
+
 /** Дзвіночок — нагадування. */
 export function BellIcon({ size = 24, className = '' }: IconProps) {
   return (

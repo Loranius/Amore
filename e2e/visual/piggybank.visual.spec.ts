@@ -31,9 +31,9 @@ async function expectInsideViewport(
   expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width + 1);
 }
 
-test('Finance shared goals keep a full-width Pixel 8 Pro layout', async ({ page }, testInfo) => {
+test('Скарбничка: спільні цілі тримають повну ширину Pixel 8 Pro', async ({ page }, testInfo) => {
   await login(page);
-  await page.goto('/#/budget');
+  await page.goto('/#/piggybank');
 
   await expect(page.getByRole('heading', { name: 'Спільні цілі' })).toBeVisible();
   await expect(page.locator('.finance-goals-hero')).toBeVisible();

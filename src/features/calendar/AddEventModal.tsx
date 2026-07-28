@@ -1,5 +1,5 @@
 // ============================================================
-// AddEventModal / AddPlanModal — створення й редагування події та плану
+// AddEventModal — створення й редагування події календаря
 // ------------------------------------------------------------
 // План зберігається з типізованою metadata (без тегів у description).
 // Одна модалка на обидва режими — патерн вішлиста (`WishFormModal`):
@@ -7,14 +7,11 @@
 // ============================================================
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { planMetadataOf } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
 import { EventIcon } from '@/components/icons/EventIcon';
-import { FlameIcon, HourglassIcon, PlanCatIcon } from '@/components/icons/PlanIcon';
 import { BellIcon } from '@/components/icons/UiIcon';
-import { PLAN_CATS, PLAN_CAT_ORDER } from './calendarUtils';
-import type { NewEventInput, NewPlanInput } from './useCalendar';
-import type { EnrichedEvent, EventRow, EventType, PlanCategory } from '@/types';
+import type { NewEventInput } from './useCalendar';
+import type { EventRow, EventType } from '@/types';
 
 // Тип `other` тут НАВМИСНО відсутній. Він писав рядок без `metadata`, а
 // дошка планів підставляє дефолт для будь-якого `type='other'` — тож
@@ -186,120 +183,6 @@ export function AddEventModal({
       <p className="cal-reminder-note">
         <BellIcon size={15} /> Нагадаємо в Telegram за 3 дні, за день і зранку в сам день.
       </p>
-
-      <div className="modal-actions">
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
-          Скасувати
-        </button>
-        <button type="button" className="btn" onClick={save} disabled={!title.trim() || !date}>
-          Зберегти
-        </button>
-      </div>
-    </ModalShell>
-  );
-}
-
-// ── План ─────────────────────────────────────────────────────
-export function AddPlanModal({
-  plan,
-  initialDate,
-  onClose,
-  onSubmit,
-}: {
-  plan: EnrichedEvent | null;
-  /** Дата, вибрана в сітці місяця: форма відкривається вже на ній. */
-  initialDate?: string | undefined;
-  onClose: () => void;
-  onSubmit: (input: NewPlanInput) => void;
-}) {
-  const existing = plan ? planMetadataOf(plan) : null;
-  const [cat, setCat] = useState<PlanCategory>(existing?.cat ?? 'date');
-  const [title, setTitle] = useState(plan?.title ?? '');
-  const [date, setDate] = useState(plan?.date ?? initialDate ?? '');
-  const [note, setNote] = useState(plan?.description ?? '');
-  // Статус редагується не тут, а кнопками на картці: виконаний план не
-  // має повертатись у «Планується» лише тому, що виправили назву. Тому
-  // при редагуванні вибір статусу в формі не показується взагалі.
-  const [status, setStatus] = useState<'planned' | 'active'>('planned');
-
-  const save = () => {
-    if (!title.trim() || !date) return;
-    onSubmit({ title: title.trim(), date, note: note.trim() || null, cat, status });
-    onClose();
-  };
-
-  return (
-    <ModalShell title={plan ? 'Редагувати план' : 'Новий план'} onClose={onClose}>
-      <div className="form-field">
-        <span>Категорія</span>
-        <div className="chips">
-          {PLAN_CAT_ORDER.map((key) => {
-            const c = PLAN_CATS[key];
-            const active = cat === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                className={`chip${active ? ' active' : ''}`}
-                style={active ? { background: c.gradient, color: '#fff' } : undefined}
-                onClick={() => setCat(key)}
-              >
-                <PlanCatIcon cat={key} size={15} /> {c.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <label className="form-field">
-        <span>Назва</span>
-        <input
-          id="plan-title"
-          name="title"
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Наприклад, поїхати на море разом"
-          autoFocus
-        />
-      </label>
-      <label className="form-field">
-        <span>Дата / дедлайн</span>
-        <input id="plan-date" name="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      </label>
-      <label className="form-field">
-        <span>Нотатка (необов'язково)</span>
-        <textarea
-          id="plan-note"
-          name="note"
-          rows={2}
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          style={{ resize: 'vertical' }}
-        />
-      </label>
-
-      {plan === null && (
-        <div className="form-field">
-          <span>Статус</span>
-          <div className="chips">
-            <button
-              type="button"
-              className={`chip${status === 'planned' ? ' active' : ''}`}
-              onClick={() => setStatus('planned')}
-            >
-              <HourglassIcon size={15} /> Планується
-            </button>
-            <button
-              type="button"
-              className={`chip${status === 'active' ? ' active' : ''}`}
-              onClick={() => setStatus('active')}
-            >
-              <FlameIcon size={15} /> В процесі
-            </button>
-          </div>
-        </div>
-      )}
 
       <div className="modal-actions">
         <button type="button" className="btn btn-ghost" onClick={onClose}>

@@ -1,4 +1,12 @@
-import type { DateRow } from '@/types';
+// ============================================================
+// Найближчі спільні вихідні — і що на них уже заплановано.
+// ------------------------------------------------------------
+// Раніше сюди дивилась таблиця `dates` із власним екраном побачень.
+// Побачення переїхали в «Плани» разом із датою й підтвердженням, тож
+// рядок читає плани, а кнопка веде туди ж: два місця, де заводять те
+// саме, розходились би на першому ж тижні.
+// ============================================================
+import type { PlanRow } from '@/types';
 import { fmtLongDate } from './scheduleViewModel';
 
 export function ScheduleUpcoming({
@@ -8,8 +16,9 @@ export function ScheduleUpcoming({
   onPlan,
 }: {
   sharedDates: string[];
-  plansByDate: Map<string, DateRow[]>;
+  plansByDate: Map<string, PlanRow[]>;
   onSelectDate: (date: string) => void;
+  /** Веде в «Плани»: заводити план у двох місцях не треба. */
   onPlan: () => void;
 }) {
   if (sharedDates.length === 0) return null;
@@ -18,7 +27,7 @@ export function ScheduleUpcoming({
     <section className="sched-upcoming">
       <div className="sched-section-head">
         <div><span className="sched-section-kicker">Попереду</span><h2>Найближчі спільні дні</h2></div>
-        <button type="button" onClick={onPlan}>+ Побачення</button>
+        <button type="button" onClick={onPlan}>+ План</button>
       </div>
       <div className="sched-upcoming-list">
         {sharedDates.slice(0, 3).map((date) => {

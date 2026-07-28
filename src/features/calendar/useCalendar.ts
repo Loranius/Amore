@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import type { EventRow, InsertRow, PlanCategory, PlanStatus, PlanMetadata } from '@/types';
+import type { EventRow, InsertRow } from '@/types';
 
 // Запит подій живе у _shared (спільний із головною). Реекспорт — щоб
 // наявні імпорти календаря не мінялися.
@@ -28,13 +28,6 @@ export interface NewEventInput {
   person_user_id: number | null;
 }
 
-export interface NewPlanInput {
-  title: string;
-  date: string;
-  note: string | null;
-  cat: PlanCategory;
-  status: Extract<PlanStatus, 'planned' | 'active'>;
-}
 
 export function useCalendarMutations() {
   const client = useQueryClient();
@@ -61,24 +54,6 @@ export function useCalendarMutations() {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
-  const addPlan = useMutation({
-    mutationFn: async (input: NewPlanInput) => {
-      const metadata: PlanMetadata = { cat: input.cat, status: input.status, done_at: null };
-      const row: InsertRow<'events'> = {
-        title: input.title,
-        date: input.date,
-        description: input.note,
-        type: 'other',
-        yearly: false,
-        created_by: user.id,
-        metadata,
-      };
-      const { error } = await supabase.from('events').insert(row);
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
-    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
-  });
 
   // Редагування. Донедавна модуль умів лише створити й видалити: одруківка
   // в назві лікувалась видаленням і повторним створенням — а разом із
@@ -107,40 +82,8 @@ export function useCalendarMutations() {
   // План редагується разом зі своєю metadata, але `status`/`done_at`
   // беруться з ПОТОЧНОГО стану, а не з форми: інакше правка назви
   // виконаного плану тихо повертала б його в «Планується».
-  const updatePlan = useMutation({
-    mutationFn: async (v: { id: number; input: NewPlanInput; current: PlanMetadata }) => {
-      const metadata: PlanMetadata = {
-        cat: v.input.cat,
-        status: v.current.status,
-        done_at: v.current.done_at,
-      };
-      const { error } = await supabase
-        .from('events')
-        .update({
-          title: v.input.title,
-          date: v.input.date,
-          description: v.input.note,
-          metadata,
-        })
-        .eq('id', v.id);
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
-    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
-  });
 
   // Зміна статусу плану — пишемо ЦІЛУ metadata (типізовано), без тегів.
-  const setPlanStatus = useMutation({
-    mutationFn: async (v: { id: number; metadata: PlanMetadata }) => {
-      const { error } = await supabase
-        .from('events')
-        .update({ metadata: v.metadata })
-        .eq('id', v.id);
-      if (error) throw error;
-    },
-    onSuccess: invalidate,
-    onError: (e) => toast.show('Помилка: ' + (e as Error).message),
-  });
 
   /**
    * Заготовки свят — одним запитом.
@@ -177,5 +120,5 @@ export function useCalendarMutations() {
     onError: (e) => toast.show('Помилка: ' + (e as Error).message),
   });
 
-  return { addEvent, addPlan, addHolidays, updateEvent, updatePlan, setPlanStatus, deleteEvent };
+  return { addEvent, addHolidays, updateEvent, deleteEvent };
 }

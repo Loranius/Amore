@@ -18,11 +18,16 @@
 // з іменем, а сама іменинниця/іменинник — нічого. Без прив'язки (дні
 // народження батьків, друзів, усі річниці) обоє отримують те саме, що
 // й раніше.
+//
+// Крім подій перевіряються ПЛАНИ з таблиці `plans`. Раніше вони жили в
+// `events` як `type='other'`; після переїзду цей крон мовчки перестав би
+// про них нагадувати — найтихіша з можливих поломок, бо помітна лише
+// тоді, коли вже пропустив виїзд.
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { buildText, reminderTargets } from "./reminderRules.ts";
+import { buildText, planReminderKind, reminderTargets } from "./reminderRules.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -70,14 +75,6 @@ function yearlyMD(evMD: string, year: number): string {
   return `${String(month).padStart(2, "0")}-${String(Math.min(day, daysInMonth)).padStart(2, "0")}`;
 }
 
-/** Виконаний план не має нагадувати про себе. Статус лежить у metadata
- *  (`PlanMetadata`), яку пише дошка планів. */
-function isDonePlan(ev: { type?: string | null; metadata?: unknown }): boolean {
-  if (ev.type !== "other") return false;
-  const meta = ev.metadata as { status?: unknown } | null;
-  return !!meta && meta.status === "done";
-}
-
 // ── Telegram ──────────────────────────────────────────────────
 async function sendTelegram(chatId: string | number, text: string): Promise<void> {
   const token = Deno.env.get("TG_BOT_TOKEN");
@@ -110,13 +107,27 @@ serve(async (req) => {
     const plus1MD = plus1Str.slice(5);
     const plus3MD = plus3Str.slice(5);
 
-    // ── Завантажуємо ВСІ події ────────────────────────────────
+    // ── Завантажуємо події ────────────────────────────────────
+    // `type='other'` НЕ беремо: такі рядки були планами, і тепер плани
+    // читаються з власної таблиці нижче. Без цього фільтра нагадування
+    // про перенесений план приходило б двічі — те саме дублювання, через
+    // яке колись видалили крон daily-reminder.
     const { data: events, error: evErr } = await sb
       .from("events")
-      .select("id,title,description,date,yearly,type,metadata,person_user_id");
+      .select("id,title,description,date,yearly,type,person_user_id")
+      .neq("type", "other");
 
     if (evErr) throw evErr;
-    const toCheck = (events || []).filter((ev: any) => !isDonePlan(ev));
+    const toCheck = events || [];
+
+    // ── Завантажуємо плани ────────────────────────────────────
+    // Порожній список планів — не привід мовчати про події, тому помилку
+    // тут лише логуємо: половина нагадувань краща за жодного.
+    const { data: plansData, error: planErr } = await sb
+      .from("plans")
+      .select("id,title,description,start_date,date_precision,status,confirmed");
+    if (planErr) console.error("plans read failed:", planErr);
+    const plans = plansData || [];
 
     // ── Отримуємо отримувачів ─────────────────────────────────
     const { data: users } = await sb
@@ -126,7 +137,11 @@ serve(async (req) => {
 
     if (!recipients.length) {
       return new Response(
-        JSON.stringify({ skipped: "no_recipients", events_found: toCheck.length }),
+        JSON.stringify({
+          skipped: "no_recipients",
+          events_found: toCheck.length,
+          plans_found: plans.length,
+        }),
         { headers: { ...CORS, "Content-Type": "application/json" } },
       );
     }
@@ -174,6 +189,23 @@ serve(async (req) => {
       results.push(`${kind}:${ev.title}`);
     }
 
+    // ── Перевіряємо кожен план ────────────────────────────────
+    // Плани не бувають щорічними й не прив'язані до людини, тож усе
+    // правило — в одній чистій функції, а тут лишається сама розсилка.
+    for (const plan of plans) {
+      const kind = planReminderKind(plan as any, {
+        today: todayStr, plus1: plus1Str, plus3: plus3Str,
+      });
+      if (!kind) continue;
+
+      const displayDate = fmtDateUA(plan.start_date as string);
+      for (const t of reminderTargets({}, recipients)) {
+        await sendTelegram(t.recipient.chat_id, buildText(plan as any, displayDate, kind, null));
+        messages += 1;
+      }
+      results.push(`${kind}:план ${plan.title}`);
+    }
+
     console.log("event-reminders done:", results);
 
     return new Response(
@@ -183,6 +215,7 @@ serve(async (req) => {
         skipped_self: skippedSelf,
         reminders: results,
         events_checked: toCheck.length,
+        plans_checked: plans.length,
         recipients: recipients.length,
       }),
       { headers: { ...CORS, "Content-Type": "application/json" } },

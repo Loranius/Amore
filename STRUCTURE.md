@@ -50,9 +50,10 @@ amore-react/
         ├── auth/                 # LoginPage, UserSelect, PinPad
         ├── home/                 # HomePage, Counter, PhotosCloud, WeekWidget, HomeWidgets, Greeting
         ├── wishlist/             # WishlistPage, useWishlist.ts, WishCard, WishFormModal
-        ├── budget/               # BudgetPage, useFreeLimit.ts, useSavingsGoals.ts
-        ├── calendar/             # CalendarPage, useEvents.ts, usePlans.ts, EventList, PlanBoard
-        ├── schedule/             # SchedulePage, useWorkSchedule.ts
+        ├── plans/                # PlansPage, PlanDetailsPage, planModel.ts, planMoney.ts
+        ├── piggybank/            # PiggyBankPage («Скарбничка»), useBudget.ts, FreeLimitCard
+        ├── calendar/             # CalendarPage, useCalendar.ts, EventList, calendarPlans.ts
+        ├── schedule/             # SchedulePage, useSchedule.ts, useSharedDaysOff.ts
         ├── photo-calendar/       # PhotoCalendarPage, usePhotoCalendar.ts
         ├── question/             # QuestionPage, useDailyQuestion.ts
         ├── capsule/              # CapsulePage, useCapsules.ts
@@ -73,7 +74,10 @@ amore-react/
 | `/login`             | auth/LoginPage          | auth-screen      |
 | `/`                  | home/HomePage           | home             |
 | `/wishlist`          | wishlist/WishlistPage   | wishlist         |
-| `/budget`            | budget/BudgetPage       | budget           |
+| `/plans`             | plans/PlansPage         | —  (новий)       |
+| `/plans/:id`         | plans/PlanDetailsPage   | —  (новий)       |
+| `/piggybank`         | piggybank/PiggyBankPage | budget           |
+| `/budget`            | → редирект на `/piggybank` | budget        |
 | `/calendar`          | calendar/CalendarPage   | calendar (хаб)   |
 | `/calendar/schedule` | schedule/SchedulePage   | schedule         |
 | `/calendar/photos`   | photo-calendar/…Page    | photo-calendar   |
@@ -95,6 +99,8 @@ amore-react/
 |------------------------|--------------------------------------|
 | `users`                | `['users']`                          |
 | `events`               | `['events']`                         |
+| —                      | `['plans']`, `['planTasks', id]`, `['planLinks']` |
+| `dates` (прибрано)     | побачення живуть у `['plans']`       |
 | `shopping:items`       | `['shopping']`                       |
 | `wishlist:<owner>`     | `['wishlist', ownerId]`              |
 | `media:<type>:<status>`| `['media', { type, status }]`        |

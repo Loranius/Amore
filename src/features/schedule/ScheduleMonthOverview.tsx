@@ -1,5 +1,5 @@
 import { DAYS_UA, daysInMonth, firstMondayOffset, ymd } from '@/features/_shared/month';
-import type { DateRow } from '@/types';
+import type { PlanRow } from '@/types';
 import type { DayStatus } from './scheduleViewModel';
 import { fmtLongDate, statusText } from './scheduleViewModel';
 
@@ -19,7 +19,7 @@ export function ScheduleMonthOverview({
   usersCount: number;
   statusCounts: { both: number; lena: number; dima: number };
   statusOf: Map<string, DayStatus>;
-  plansByDate: Map<string, DateRow[]>;
+  plansByDate: Map<string, PlanRow[]>;
   onSelectDate: (date: string) => void;
 }) {
   const total = daysInMonth(yr, mo);
@@ -44,18 +44,20 @@ export function ScheduleMonthOverview({
             const date = ymd(yr, mo, day);
             const status = statusOf.get(date) ?? 'none';
             const plans = plansByDate.get(date) ?? [];
-            const confirmed = plans.some((plan) => plan.status === 'confirmed');
+            // Крапка «підтверджено» — про згоду партнера, а не про статус
+            // підготовки: саме це питання ставлять, дивлячись на графік.
+            const confirmed = plans.some((plan) => plan.confirmed);
             return (
               <button
                 key={date}
                 type="button"
                 className={`sched-cell sched-cell--interactive sched-cell--${status}${date === today ? ' sched-cell--today' : ''}`}
                 onClick={() => onSelectDate(date)}
-                aria-label={`${fmtLongDate(date)}. ${statusText(status)}${plans.length ? '. Є заплановане побачення' : ''}`}
+                aria-label={`${fmtLongDate(date)}. ${statusText(status)}${plans.length ? '. Є план на цей день' : ''}`}
               >
                 <span className="sched-cell-num">{day}</span>
                 <span className="sched-cell-symbol" aria-hidden="true">{status === 'both-off' ? '♥' : status === 'lena-off' ? 'Л' : status === 'dima-off' ? 'Д' : ''}</span>
-                {plans.length > 0 && <span className={`sched-cell-plan-dot${confirmed ? ' is-confirmed' : ''}`} title={confirmed ? 'Підтверджене побачення' : 'Запропоноване побачення'} />}
+                {plans.length > 0 && <span className={`sched-cell-plan-dot${confirmed ? ' is-confirmed' : ''}`} title={confirmed ? 'Підтверджений план' : 'Запропонований план'} />}
               </button>
             );
           })}

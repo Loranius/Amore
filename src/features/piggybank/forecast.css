@@ -21,26 +21,32 @@
   gap: 0.85rem;
 }
 
+/* flex-wrap — щоб заголовок лишався одним рядком: «Орієнтовний шлях»
+   + «Змінити орієнтир» не влазять у 448px разом, і без цього ламався
+   САМЕ заголовок, а не кнопка. */
 .goal-forecast-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  flex-wrap: wrap;
+  gap: 0.75rem 0.5rem;
 }
 
 .goal-forecast-head > span {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
+  white-space: nowrap;
   color: var(--text);
   font-size: 1rem;
   font-weight: 800;
 }
 
-.goal-forecast-head > span > span {
+/* flex: 0 0 auto — обов'язково: у flex-контейнері svg стискається за
+   замовчуванням, і значок 15px рендерився 11-піксельним. */
+.goal-forecast-head > span > svg {
+  flex: 0 0 auto;
   color: var(--accent);
-  font-size: 1.45rem;
-  line-height: 1;
 }
 
 .goal-forecast-edit {

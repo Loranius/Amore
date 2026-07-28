@@ -10,6 +10,7 @@ import {
 import { useGoalCommentMutations, useGoalComments } from './useGoalComments';
 import type { BudgetGoalRow } from './useBudget';
 import './goalComments.css';
+import { CloseIcon, CommentIcon, DotIcon, PauseIcon, SendIcon } from '@/components/icons/UiIcon';
 
 function commentMoment(value: string): string {
   const date = new Date(value);
@@ -124,7 +125,7 @@ export function GoalComments({
       >
         <header className="goal-comments-heading">
           <div className="goal-comments-title-row">
-            <span className="goal-comments-title-icon" aria-hidden="true">▱</span>
+            <span className="goal-comments-title-icon" aria-hidden="true"><CommentIcon size={22} /></span>
             <div>
               <span className="goal-comments-kicker">Обговорення цілі</span>
               <h2 id="goal-comments-title" className="modal-title">{goal.name}</h2>
@@ -138,13 +139,13 @@ export function GoalComments({
             disabled={busy}
             aria-label="Закрити обговорення"
           >
-            ×
+            <CloseIcon size={17} />
           </button>
         </header>
 
         <div className="goal-comments-summary" aria-label="Стан обговорення">
           <span className={paused ? 'is-paused' : 'is-active'}>
-            <span aria-hidden="true">{paused ? 'Ⅱ' : '●'}</span>
+            {paused ? <PauseIcon size={13} /> : <DotIcon size={13} />}
             {paused ? 'Ціль на паузі' : 'Активна ціль'}
           </span>
           <span>{isPending ? 'Завантаження…' : commentCountLabel(comments.length)}</span>
@@ -161,7 +162,7 @@ export function GoalComments({
           </div>
         ) : comments.length === 0 ? (
           <div className="goal-comments-empty">
-            <span className="goal-comments-empty-icon" aria-hidden="true">▱</span>
+            <span className="goal-comments-empty-icon" aria-hidden="true"><CommentIcon size={26} /></span>
             <strong>Тут поки тихо</strong>
             <p>Залиште першу коротку думку або домовленість про цю ціль.</p>
           </div>
@@ -231,7 +232,7 @@ export function GoalComments({
               aria-label="Надіслати коментар"
             >
               <span>{addComment.isPending ? 'Додаємо…' : 'Надіслати'}</span>
-              <span aria-hidden="true">↑</span>
+              <SendIcon size={15} />
             </button>
           </div>
           <div className="goal-comments-composer-meta">

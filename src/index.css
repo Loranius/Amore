@@ -23,6 +23,11 @@
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
 :root {
+  /* Каже браузеру, в якій темі малювати те, що НЕ наше: календарик у
+     input[type=date], стрілку select, смуги прокрутки, підсвітку
+     автозаповнення. Без цього в темній темі вони лишались світлими —
+     чорний календарик на темному полі. */
+  color-scheme: light;
   --bg: #fff7f9;
   --surface: #ffffff;
   --text: #3a2530;
@@ -66,6 +71,7 @@
 }
 
 [data-theme='dark'] {
+  color-scheme: dark;
   --bg: #201720;
   --surface: #34252c;
   --text: #f5e6ea;
@@ -107,6 +113,45 @@ select,
 textarea {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+}
+
+/* ── Базові кольори полів вводу ────────────────────────────────
+   Досі кольори мали лише поля всередині .form-field. Будь-яке поле поза
+   ним — а таких по порталу десятки: пошук у вішлисті, «Що треба
+   зробити?» у планах, суми у скарбничці — лишалось із типовими
+   стилями браузера, тобто БІЛИМ прямокутником із чорним текстом. У
+   світлій темі це майже не видно, у темній — біла пляма посеред
+   екрана, і саме тому баг прожив так довго.
+
+   Увесь селектор загорнутий у :where() — і це не косметика. :where()
+   має НУЛЬОВУ вагу, тож будь-яке наявне правило (навіть `input` без
+   класу) перебиває цю добавку: вона лише закриває дірку там, де не було
+   нічого, і нічого не переоформлює.
+
+   Перший підхід був `input:not([type=checkbox]):not([type=radio])…` —
+   і це виявилось пасткою: кожен :not() додає вагу свого аргументу, тож
+   вісім таких дали (0,8,1) і правило почало перебивати модульні стилі.
+   Помітно це стало на полі внеску у скарбничці: воно має border:0 і
+   прозорий фон, а «найслабше» правило домальовувало йому рамку.
+
+   Перемикачі, повзунки, вибір файлу й кольору виключені: у них фон і
+   рамка означають зовсім інше, і задавати їх тут — псувати. */
+:where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='submit'], [type='button'], [type='reset'], [type='image']), select, textarea) {
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  /* НЕ менше 16px: iOS Safari зумить сторінку при фокусі на полі з
+     меншим font-size. Те саме правило, що вже стоїть у .form-field. */
+  font-size: 16px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 1; /* Firefox інакше додає власну прозорість поверх кольору. */
 }
 
 /* ── Тости (порт .eb-toast зі старого components.css) ────────── */
@@ -1420,8 +1465,15 @@ a.wl-card-title { color: var(--accent); }
 .cal-cell--sel .cal-cell-n { font-weight: 800; }
 .cal-cell-n { font-size: 12px; font-variant-numeric: tabular-nums; }
 .cal-cell--has .cal-cell-n { font-weight: 700; }
-.cal-cell-dots { display: flex; gap: 2px; }
+.cal-cell-dots { display: flex; align-items: center; gap: 2px; }
 .cal-cell-dots i { width: 5px; height: 5px; border-radius: 50%; display: block; }
+/* Позначка плану — смужка, а не крапка. Кольору тут мало: категорії
+   планів і типи подій уже ділять ту саму палітру, тож на п'яти пікселях
+   вони б не розрізнялись. Форма розрізняє. */
+.cal-cell-dots i.cal-dot-plan { width: 8px; height: 3px; border-radius: 2px; }
+.cal-year-dots i.cal-dot-plan {
+  width: 11px; height: 4px; border-radius: 2px; background: var(--accent);
+}
 
 /* ── Панель вибраного дня ──────────────────────────────────── */
 .cal-day-panel {
@@ -1454,6 +1506,19 @@ a.wl-card-title { color: var(--accent); }
 }
 /* min-width: 0 — довга назва події інакше розпирає кнопку за межі екрана. */
 .cal-day-event-title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Рядок плану веде на іншу сторінку, а не в модалку редагування, — і
+   мусить це показувати ще до тапу. Пунктирна рамка й підпис «План»
+   роблять рядок явно чужим у списку подій. */
+.cal-day-plan { border-style: dashed; }
+.cal-day-plan-tag {
+  flex: 0 0 auto; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--muted);
+  padding: 2px 6px; border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 7%, transparent);
+}
+.cal-day-plan-span { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cal-day-plan.cal-muted { opacity: 0.55; }
 
 /* ── Огляд року ────────────────────────────────────────────── */
 .cal-year-total { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -1809,7 +1874,10 @@ a.wl-card-title { color: var(--accent); }
 
 /* ── Панель сповіщень (дзвіночок) — вміст усередині .tinted-row ─── */
 .notif-list { display: flex; flex-direction: column; gap: 10px; }
-.notif-item-title { font-weight: 600; }
+/* inline-flex — значок стоїть у рядку з назвою, а не над нею; flex:0 0
+   auto на svg, бо в flex-контейнері він інакше стискається. */
+.notif-item-title { font-weight: 600; display: inline-flex; align-items: center; gap: 7px; }
+.notif-item-title > svg { flex: 0 0 auto; color: var(--accent); }
 .notif-item-detail { font-size: 13px; color: var(--muted); }
 
 /* Фото-календар */
@@ -2168,6 +2236,22 @@ a.wl-card-title { color: var(--accent); }
 }
 .home-hero-next-event { margin: 6px 0 0; font-size: 12px; color: var(--muted); }
 
+/* ── Віджет «Плани» під кристалом ──────────────────────────── */
+/* width: 100% обов'язковий — .home це flex-колонка з align-items:
+   center, і без нього секція стиснулась би до ширини свого тексту. */
+.home-plans { width: 100%; margin-top: 4px; }
+.home-plans-hd { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.home-plans-hd h2 {
+  margin: 0; font-family: 'Fredoka', sans-serif; font-size: 17px; font-weight: 600; color: var(--text);
+}
+.home-plans-all { flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: var(--accent); text-decoration: none; }
+.home-plans-empty {
+  display: block; padding: 12px 14px; border-radius: var(--radius-md);
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  color: var(--muted); font-size: 13px; text-decoration: none;
+}
+
 /* Кристал — SVG, анімація чисто CSS (без per-frame JS-рендеру). */
 .crystal-wrap {
   position: relative;
@@ -2340,7 +2424,7 @@ a.wl-card-title { color: var(--accent); }
 .budget { display: flex; flex-direction: column; gap: 16px; }
 .budget-title { margin: 0; }
 
-/* Фон/радіус — з .card (BudgetPage: className="card fin-card"); тут лише паддінг. */
+/* Фон/радіус — з .card (PiggyBankPage: className="card fin-card"); тут лише паддінг. */
 .fin-card { padding: 16px; }
 .fin-card-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
 .fin-card-title { font-weight: 700; }

@@ -8,6 +8,7 @@ import {
   localTodayIso,
 } from './forecastModel';
 import './forecast.css';
+import { PencilIcon, TrendIcon } from '@/components/icons/UiIcon';
 
 export function GoalForecastCard({
   forecast,
@@ -26,9 +27,9 @@ export function GoalForecastCard({
     <section className="goal-forecast-card" aria-label="Орієнтовний прогноз цілі">
       <div className="goal-forecast-body">
         <div className="goal-forecast-head">
-          <span><span aria-hidden="true">◔</span> Орієнтовний шлях</span>
+          <span><TrendIcon size={15} /> Орієнтовний шлях</span>
           <button type="button" className="goal-forecast-edit" onClick={onEdit}>
-            Змінити орієнтир <span aria-hidden="true">✎</span>
+            Змінити орієнтир <PencilIcon size={13} />
           </button>
         </div>
 
@@ -36,7 +37,7 @@ export function GoalForecastCard({
           <p className="goal-forecast-copy">Формуємо прогноз…</p>
         ) : complete ? (
           <p className="goal-forecast-copy goal-forecast-complete">
-            Сума для цієї цілі вже зібрана ✨
+            Сума для цієї цілі вже зібрана
           </p>
         ) : paused ? (
           <>
