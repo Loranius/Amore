@@ -7,6 +7,7 @@
 // ============================================================
 import { useMemo, useState } from 'react';
 import { MemoryMosaic, SOURCE_META } from './MemoryPhoto';
+import { ArrowDownIcon, ArrowUpIcon } from '@/components/icons/UiIcon';
 import { formatMemoryDate, memoryTime, splitByTimeOfDay, TIME_BUCKET_LABEL } from './memoriesDate';
 import { moveMemory, orderChanged, orderPatch } from './memoriesOrder';
 import type { MemoryLinksById } from './useMemories';
@@ -168,12 +169,12 @@ function MemoryReorder({
                 type="button" className="mem-order-btn"
                 onClick={() => onMove(i, -1)} disabled={i === 0 || busy}
                 aria-label={`Пересунути вище, зараз ${i + 1}`}
-              >↑</button>
+              ><ArrowUpIcon size={16} /></button>
               <button
                 type="button" className="mem-order-btn"
                 onClick={() => onMove(i, 1)} disabled={i === photos.length - 1 || busy}
                 aria-label={`Пересунути нижче, зараз ${i + 1}`}
-              >↓</button>
+              ><ArrowDownIcon size={16} /></button>
             </span>
           </li>
         ))}

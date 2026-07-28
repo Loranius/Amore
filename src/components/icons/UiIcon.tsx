@@ -75,6 +75,96 @@ export function WarningIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
+/** Зірка. `filled` — для шкали оцінки, де порожня й повна мусять
+ *  відрізнятись формою, а не лише кольором. */
+export function StarIcon({ size = 24, className = '', filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <svg {...iconAttrs(size, className)} fill={filled ? 'currentColor' : 'none'}>
+      <path d="m12 3.6 2.62 5.5 5.88.82-4.28 4.3 1.04 6.02L12 17.3l-5.26 2.94 1.04-6.02L3.5 9.92l5.88-.82L12 3.6Z" />
+    </svg>
+  );
+}
+
+/** Лупа — пошук і порожній результат. */
+export function SearchIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <circle cx="10.6" cy="10.6" r="6.6" />
+      <path d="m15.4 15.4 4.6 4.6" />
+    </svg>
+  );
+}
+
+/** Хрестик — закрити. */
+export function CloseIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="m6.4 6.4 11.2 11.2M17.6 6.4 6.4 17.6" />
+    </svg>
+  );
+}
+
+/** Картинка — вибір фото. */
+export function ImageIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <rect x="3.4" y="4.6" width="17.2" height="14.8" rx="2.4" />
+      <circle cx="8.6" cy="9.6" r="1.6" />
+      <path d="m3.9 16.6 4.5-4.2a2 2 0 0 1 2.7 0l5.2 4.8M14.6 14.2l1.5-1.4a2 2 0 0 1 2.7 0l1.6 1.5" />
+    </svg>
+  );
+}
+
+/** Список — архів геолокацій. */
+export function ListIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M9 6.4h11M9 12h11M9 17.6h11" />
+      <circle cx="4.8" cy="6.4" r=".95" fill="currentColor" stroke="none" />
+      <circle cx="4.8" cy="12" r=".95" fill="currentColor" stroke="none" />
+      <circle cx="4.8" cy="17.6" r=".95" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+/** Подарунок — виконане бажання. */
+export function GiftIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <rect x="3.6" y="9.4" width="16.8" height="10.8" rx="1.8" />
+      <path d="M2.8 9.4h18.4M12 9.4v10.8" />
+      <path d="M12 9.4S10.6 4 8.2 4a2.2 2.2 0 0 0 0 5.4M12 9.4S13.4 4 15.8 4a2.2 2.2 0 0 1 0 5.4" />
+    </svg>
+  );
+}
+
+/** Стрілки перестановки — ручний порядок у «Спогадах». */
+export function ArrowUpIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M12 19.4V5.2M5.8 11.4 12 5.2l6.2 6.2" />
+    </svg>
+  );
+}
+
+export function ArrowDownIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M12 4.6v14.2M5.8 12.6 12 18.8l6.2-6.2" />
+    </svg>
+  );
+}
+
+/** Стрілки врізнобіч — розгорнути карту на весь екран. */
+export function ExpandIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M14.6 4.6h4.8v4.8M19.4 4.6l-6 6" />
+      <path d="M9.4 19.4H4.6v-4.8M4.6 19.4l6-6" />
+    </svg>
+  );
+}
+
 /** Дзвіночок — нагадування. */
 export function BellIcon({ size = 24, className = '' }: IconProps) {
   return (

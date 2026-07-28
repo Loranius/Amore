@@ -728,6 +728,12 @@ textarea {
 }
 
 .empty-state { color: var(--muted); }
+/* Значок над текстом, а не в його рядку: у порожньому стані він працює
+   картинкою, і в рядку тексту губився б. */
+.empty-state--icon {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-align: center;
+}
 
 /* ── Auth-екран: декоративний фон (серця/квіти/торти/хвильки) ─
    Позиції/кольори — data-масиви в PortalDecor.tsx, тут лише форми. */
@@ -2332,7 +2338,9 @@ a.wl-card-title { color: var(--accent); }
   transition: border-color .18s, background .18s;
 }
 .view-option.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
-.view-icon { font-size: 16px; line-height: 1; }
+/* display:flex — значок не сидить на базовій лінії й не з'їжджає
+   відносно підпису під ним. */
+.view-icon { display: flex; align-items: center; }
 .view-copy { display: flex; flex-direction: column; align-items: center; }
 .view-copy strong { font-size: 12.5px; }
 .view-copy small { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.25; }
@@ -2529,11 +2537,12 @@ a.wl-card-title { color: var(--accent); }
 .pin-card:has(.pin-card-open:focus-visible) { border-color: var(--accent); }
 .pin-card-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 .pin-card-photo, .pin-card-photo-placeholder { width: 96px; height: 96px; object-fit: cover; flex: 0 0 auto; }
-.pin-card-photo-placeholder { display: grid; place-items: center; font-size: 32px; background: color-mix(in srgb, var(--text) 6%, transparent); }
+.pin-card-photo-placeholder { display: grid; place-items: center; background: color-mix(in srgb, var(--text) 6%, transparent); }
 .pin-card-body { flex: 1; min-width: 0; padding: 10px 12px 10px 0; display: flex; flex-direction: column; gap: 4px; }
 .pin-card-header { display: flex; justify-content: space-between; gap: 8px; }
 .pin-card-title { font-weight: 600; margin: 0; }
 .pin-card-cat { font-size: 12px; color: var(--muted); flex: 0 0 auto; }
+.pin-card-cat > svg, .pin-view-meta > svg, .pin-city-name > svg, .map-city-hd span > svg { vertical-align: -2px; }
 .pin-card-rating { color: #f5b301; font-size: 13px; display: flex; align-items: center; gap: 8px; }
 .pin-card-date { color: var(--muted); font-size: 12px; }
 .map-star { color: color-mix(in srgb, var(--text) 25%, transparent); background: none; border: 0; cursor: pointer; font-size: 20px; padding: 0 2px; }
@@ -2553,7 +2562,7 @@ a.wl-card-title { color: var(--accent); }
 .pin-view-photo-wrap { position: relative; }
 .pin-view-photo { width: 100%; max-height: 260px; object-fit: cover; cursor: zoom-in; display: block; }
 .pin-view-photo-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 10px 14px; background: linear-gradient(transparent, rgba(0,0,0,0.7)); color: #fff; font-weight: 600; }
-.pin-view-photo-placeholder { height: 120px; display: grid; place-items: center; font-size: 40px; background: color-mix(in srgb, var(--text) 8%, transparent); }
+.pin-view-photo-placeholder { height: 120px; display: grid; place-items: center; background: color-mix(in srgb, var(--text) 8%, transparent); }
 .pin-view-body {
   padding: 16px;
   display: flex;

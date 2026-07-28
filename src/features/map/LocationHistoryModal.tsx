@@ -4,6 +4,7 @@
 import { useMemo } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
 import { useLocationHistory } from './useLocations';
+import { HeartsIcon } from '@/components/icons/EventIcon';
 import { USER_LOCATION_STYLES } from './mapConstants';
 
 export function LocationHistoryModal({ onClose }: { onClose: () => void }) {
@@ -18,13 +19,13 @@ export function LocationHistoryModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet" role="dialog" aria-modal="true">
-        <h2 className="modal-title">📋 Архів за 24 год</h2>
+        <h2 className="modal-title">Архів за 24 год</h2>
 
         <div className="loc-hist-list">
           {isPending ? (
             <p className="empty-state">Завантаження…</p>
           ) : history.length === 0 ? (
-            <p className="loc-hist-empty">Ще немає записів за останні 24 години 🗺️</p>
+            <p className="loc-hist-empty">Ще немає записів за останні 24 години</p>
           ) : (
             history.map((rec, i) => {
               const idx = sortedUsers.findIndex((u) => u.id === rec.user_id);
@@ -38,7 +39,9 @@ export function LocationHistoryModal({ onClose }: { onClose: () => void }) {
 
               return (
                 <div key={i} className="loc-hist-row">
-                  <span className="loc-hist-emoji">{style.emoji}</span>
+                  <span className="loc-hist-emoji" style={{ color: style.color }}>
+                    <HeartsIcon size={18} />
+                  </span>
                   <div className="loc-hist-info">
                     <span className="loc-hist-name">{userName}</span>
                     <a className="loc-hist-place" href={mapsUrl} target="_blank" rel="noopener noreferrer">

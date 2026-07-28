@@ -23,6 +23,8 @@ import { MAPBOX_TOKEN, geocodePlaces } from '@/lib/mapbox';
 import { useUsers } from '@/features/_shared/useUsers';
 import { useTheme } from '@/providers/ThemeProvider';
 import { DEFAULT_CENTER, MAP_STYLE, USER_LOCATION_STYLES } from './mapConstants';
+import { CrosshairIcon, heartNode } from '@/components/icons/MapIcon';
+import { CloseIcon, ExpandIcon, ListIcon } from '@/components/icons/UiIcon';
 import { syncPinMarkers, type MarkerStore } from './mapMarkers';
 import { useMapPins, useMapPinMutations, useCityBackfill } from './useMapPins';
 import { useUserLocations, useCheckin } from './useLocations';
@@ -170,7 +172,7 @@ export function MapPage() {
       const elMarker = document.createElement('div');
       elMarker.className = 'map-location-marker';
       elMarker.style.background = style.color;
-      elMarker.textContent = style.emoji;
+      elMarker.appendChild(heartNode(15));
       const marker = new mapboxgl.Marker(elMarker).setLngLat([loc.lng, loc.lat]).addTo(map);
       locMarkers.current.push(marker);
     }
@@ -266,7 +268,7 @@ export function MapPage() {
           onClick={() => setExpanded((v) => !v)}
           aria-label={expanded ? 'Згорнути карту' : 'Розгорнути карту'}
         >
-          {expanded ? '✕' : '⤢'}
+          {expanded ? <CloseIcon size={16} /> : <ExpandIcon size={16} />}
         </button>
         {placing ? (
           <>
@@ -294,10 +296,10 @@ export function MapPage() {
         <button type="button" className="btn" onClick={() => checkin.mutate(undefined, {
           onSuccess: (c) => flyTo(c.lng, c.lat, 14),
         })} disabled={checkin.isPending}>
-          {checkin.isPending ? '⏳' : '📍 Я тут'}
+          {checkin.isPending ? 'Зачекайте…' : <><CrosshairIcon size={16} /> Я тут</>}
         </button>
         <button type="button" className="btn-secondary" onClick={() => setHistoryOpen(true)}>
-          📋 Архів 24 год
+          <ListIcon size={16} /> Архів 24 год
         </button>
       </div>
 

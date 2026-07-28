@@ -19,6 +19,8 @@ import { uploadPinPhoto, type PinUpdate } from './useMapPins';
 import { useToast } from '@/providers/ToastProvider';
 import { useUsersMap } from '@/features/_shared/useUsers';
 import { formatDateUA } from '@/features/_shared/month';
+import { CompassIcon, PinCategoryIcon } from '@/components/icons/MapIcon';
+import { ImageIcon, StarIcon } from '@/components/icons/UiIcon';
 import type { MapPinRow } from '@/types';
 
 interface PinModalProps {
@@ -80,13 +82,15 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
             <div className="pin-view-photo-caption">{pin.title}</div>
           </div>
         ) : (
-          <div className="pin-view-photo-placeholder">{cat.emoji}</div>
+          <div className="pin-view-photo-placeholder" style={{ color: cat.color }}>
+            <PinCategoryIcon cat={pin.category} size={44} />
+          </div>
         )}
 
         <div className="pin-view-body">
           {/* Хто поставив мітку й коли там були — досі це знала лише база. */}
           <p className="pin-view-meta">
-            {cat.emoji} {cat.label}
+            <PinCategoryIcon cat={pin.category} size={13} /> {cat.label}
             {pin.city && <> · {pin.city}</>}
             {pin.visited_at && <> · були {formatDateUA(pin.visited_at)}</>}
             {/* «від Х», а не «додав/додала Х»: рід із імені не вгадується,
@@ -106,11 +110,11 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
                 <button
                   key={n}
                   type="button"
-                  className={`map-star${n <= rating ? ' filled' : ''}`}
+                  className={`map-star map-star-btn${n <= rating ? ' filled' : ''}`}
                   onClick={() => setRating(n === rating ? 0 : n)}
                   aria-label={`${n} зірок`}
                 >
-                  ★
+                  <StarIcon size={22} filled={n <= rating} />
                 </button>
               ))}
             </div>
@@ -156,7 +160,7 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
           <div className="form-field">
             <span>Замінити фото</span>
             <FilePickerButton id="pin-edit-photo-file" onPick={setFile}>
-              🖼 Обрати з пристрою
+              <ImageIcon size={15} /> Обрати з пристрою
             </FilePickerButton>
           </div>
 
@@ -168,7 +172,7 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
               rel="noopener noreferrer"
               style={{ textDecoration: 'none', textAlign: 'center' }}
             >
-              🧭 Маршрут
+              <CompassIcon size={15} /> Маршрут
             </a>
             <button type="button" className="btn-secondary pin-delete-action" onClick={onDelete}>
               Видалити
