@@ -324,6 +324,34 @@
   }
 }
 
+@media (max-height: 700px) {
+  .plan-create-overlay {
+    padding-top: 8px;
+  }
+
+  .plan-create-sheet {
+    max-height: calc(100dvh - 16px - env(safe-area-inset-bottom));
+    border-radius: 23px 23px 18px 18px;
+  }
+
+  .plan-create-form {
+    gap: 14px;
+    padding-top: 18px;
+  }
+
+  .plan-create-head p {
+    display: none;
+  }
+
+  .plan-create-title-field textarea {
+    min-height: 86px;
+  }
+
+  .plan-create-category {
+    min-height: 64px;
+  }
+}
+
 @media (max-width: 380px) {
   .plan-create-sheet {
     border-radius: 23px;
