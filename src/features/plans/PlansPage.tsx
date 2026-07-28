@@ -13,6 +13,7 @@ import { HeartIcon } from '@/components/icons/NavIcon';
 import { pluralUA } from '@/lib/utils';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useCalendarMutations, useEvents } from '@/features/calendar/useCalendar';
+import type { NewEventInput } from '@/features/calendar/useCalendar';
 import { usePlanMutations, usePlans } from './usePlans';
 import { isClosed, nextPlan, planDateLabel, sortPlans } from './planModel';
 import { PLAN_CATEGORIES, PLAN_STATUSES } from './planConstants';
@@ -21,7 +22,7 @@ import { AddMilestoneModal } from './AddMilestoneModal';
 import './plans.css';
 import './plansJourney.css';
 import './plansMilestones.css';
-import type { EventRow, NewEventInput, PlanRow } from '@/types';
+import type { EventRow, PlanRow } from '@/types';
 
 const ROUTE_ROW_HEIGHT = 166;
 const IDEAS_PREVIEW_LIMIT = 6;
