@@ -35,7 +35,7 @@ import {
 } from './planModel';
 import { planMoney } from './planMoney';
 import { linksOfPlan } from './planLinkModel';
-import { usePlanLinkMutations, usePlanLinks } from './usePlanLinks';
+import { usePlanLinks } from './usePlanLinks';
 import { usePlanMutations, usePlans, usePlanTasks } from './usePlans';
 import { PlanTasks } from './PlanTasks';
 import { PlanMoneyBlock } from './PlanMoneyBlock';
@@ -67,17 +67,11 @@ export function PlanDetailsPage() {
   const { data: tasks = [] } = usePlanTasks(planId);
   const { data: goals = [] } = useGoals();
   const { data: allLinks = [] } = usePlanLinks();
-  const { unlink } = usePlanLinkMutations();
   const { updatePlan, setStatus, removePlan } = usePlanMutations();
   const [editingDate, setEditingDate] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [tasksOpen, setTasksOpen] = useState(true);
   const tasksRef = useRef<HTMLDetailsElement>(null);
-
-  // `unlink` підіймає query client для тієї само кеш-області, що й блок
-  // зв'язків. Посилання нижче не викликає мутацію, але тримає hook на
-  // сторінці під тим самим провайдером під час переходів між планами.
-  void unlink;
 
   const plan = useMemo(() => plans.find((item) => item.id === planId) ?? null, [plans, planId]);
 
