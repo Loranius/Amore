@@ -122,7 +122,7 @@ export function PlanDetailsPage() {
     ? `${linkedCount} пов’язаних елементів`
     : 'Бажання, місця, спогади й покупки';
   const memoriesSummary = memoryCount > 0
-    ? `${memoryCount} ${memoryCount === 1 ? 'фото' : memoryCount < 5 ? 'фото' : 'фото'} прикріплено`
+    ? `${memoryCount} фото прикріплено`
     : 'Фото й підписи цього моменту';
 
   const remove = async () => {
