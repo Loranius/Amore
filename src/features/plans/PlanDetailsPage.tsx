@@ -61,7 +61,7 @@ const STATUS_HELP: Record<PlanStatus, string> = {
 export function PlanDetailsPage() {
   const { id } = useParams();
   const parsedPlanId = Number(id);
-  const planId = Number.isSafeInteger(parsedPlanId) && parsedPlanId > 0 ? parsedPlanId : -1;
+  const planId = Number.isSafeInteger(parsedPlanId) && parsedPlanId > 0 ? parsedPlanId : null;
   const navigate = useNavigate();
   const confirmDialog = useConfirm();
   const { data: plans = [], isPending } = usePlans();
@@ -74,7 +74,10 @@ export function PlanDetailsPage() {
   const [tasksOpen, setTasksOpen] = useState(true);
   const tasksRef = useRef<HTMLDetailsElement>(null);
 
-  const plan = useMemo(() => plans.find((item) => item.id === planId) ?? null, [plans, planId]);
+  const plan = useMemo(
+    () => (planId === null ? null : plans.find((item) => item.id === planId) ?? null),
+    [plans, planId],
+  );
 
   if (isPending) return <p className="empty-state">Завантаження…</p>;
   if (!plan) {
