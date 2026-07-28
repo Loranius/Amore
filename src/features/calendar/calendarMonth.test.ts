@@ -12,7 +12,7 @@
 // одну подію в різні дні.
 // ============================================================
 import { describe, expect, it } from 'vitest';
-import { dayInMonth, eventsByDay, yearSummary } from './calendarMonth';
+import { dayInMonth, eventsByDay, yearHeat, yearSummary } from './calendarMonth';
 import type { EventRow } from '@/types';
 
 let nextId = 1;
@@ -114,5 +114,39 @@ describe('yearSummary', () => {
     const events = [event('2020-05-10', true), event('2026-05-11', false)];
     expect(yearSummary(events, 2026)[4]!.count).toBe(2);
     expect(yearSummary(events, 2027)[4]!.count).toBe(1);
+  });
+});
+
+describe('yearHeat', () => {
+  const months = (...counts: number[]) =>
+    counts.map((count, i) => ({ month: i + 1, count, types: [] }));
+
+  it('порожній місяць має рівно нуль, а не «трохи»', () => {
+    const heat = yearHeat(months(0, 3));
+    expect(heat[0]!.heat).toBe(0);
+    expect(heat[1]!.heat).toBeGreaterThan(0);
+  });
+
+  it('рік без подій не ділить на нуль', () => {
+    expect(yearHeat(months(0, 0, 0)).every((m) => m.heat === 0)).toBe(true);
+  });
+
+  it('найгустіший місяць — одиниця, решта пропорційно', () => {
+    const heat = yearHeat(months(0, 1, 2, 4));
+    expect(heat[3]!.heat).toBeCloseTo(1);
+    expect(heat[2]!.heat).toBeCloseTo(0.35 + 0.65 * 0.5);
+    expect(heat[1]!.heat).toBeCloseTo(0.35 + 0.65 * 0.25);
+  });
+
+  it('ненульова насиченість не опускається нижче 0.35 — інакше місяць з '
+    + 'однією подією не відрізнити від порожнього', () => {
+    // Рік, де є місяць із двадцятьма подіями й місяць з однією.
+    const heat = yearHeat(months(20, 1));
+    expect(heat[1]!.heat).toBeGreaterThanOrEqual(0.35);
+  });
+
+  it('не змінює вихідні поля місяця', () => {
+    const src = [{ month: 7, count: 2, types: ['birthday'] }];
+    expect(yearHeat(src)[0]).toMatchObject({ month: 7, count: 2, types: ['birthday'] });
   });
 });

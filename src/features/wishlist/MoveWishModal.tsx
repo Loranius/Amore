@@ -6,6 +6,8 @@
 import { useEffect, useRef } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { AppUser, WishlistItemRow } from '@/types';
+import { TogetherIcon } from '@/components/icons/WishIcon';
+import { CloseIcon, InboxIcon, SwapIcon, UserIcon } from '@/components/icons/UiIcon';
 
 interface MoveWishModalProps {
   item: WishlistItemRow;
@@ -36,16 +38,16 @@ export function MoveWishModal({ item, partner, saving, onClose, onMove }: MoveWi
   }, [onClose, saving]);
 
   const allOptions = [
-    { key: 'me', label: 'Мені', icon: '📥', owner: me.id, isShared: false, possible: true },
+    { key: 'me', label: 'Мені', Icon: InboxIcon, owner: me.id, isShared: false, possible: true },
     {
       key: 'partner',
       label: `Для ${partner?.name ?? 'партнера'}`,
-      icon: '👤',
+      Icon: UserIcon,
       owner: partner?.id ?? me.id,
       isShared: false,
       possible: !!partner,
     },
-    { key: 'shared', label: 'Спільне', icon: '🎁', owner: item.owner, isShared: true, possible: true },
+    { key: 'shared', label: 'Спільне', Icon: TogetherIcon, owner: item.owner, isShared: true, possible: true },
   ] as const;
 
   const isCurrent = (opt: (typeof allOptions)[number]) =>
@@ -86,10 +88,10 @@ export function MoveWishModal({ item, partner, saving, onClose, onMove }: MoveWi
           disabled={saving}
           onClick={onClose}
         >
-          ×
+          <CloseIcon size={17} />
         </button>
         <h2 id="move-wish-title" className="modal-title wl-move-title">
-          ↔️ Перенести «{item.title}»
+          <SwapIcon size={18} /> Перенести «{item.title}»
         </h2>
         <p className="wl-move-sub">Куди перенести:</p>
         <div className="wl-move-options">
@@ -101,7 +103,7 @@ export function MoveWishModal({ item, partner, saving, onClose, onMove }: MoveWi
               disabled={saving}
               onClick={() => void move(opt.owner, opt.isShared)}
             >
-              <span className="wl-move-option-icon" aria-hidden="true">{opt.icon}</span>
+              <span className="wl-move-option-icon" aria-hidden="true"><opt.Icon size={20} /></span>
               {opt.label}
             </button>
           ))}

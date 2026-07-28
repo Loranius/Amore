@@ -7,6 +7,7 @@ import { wishlistPolaroidLayout } from './wishlistPolaroidLayout';
 import { WishlistProductVisual } from './WishlistProductVisual';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistPolaroidView.css';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 interface WishlistPolaroidCardProps {
   item: WishlistItemV3;
@@ -74,14 +75,14 @@ export function WishlistPolaroidCard({
               onError={() => setImageFailed(true)}
             />
           ) : (
-            <span className="wl-polaroid-card__placeholder" aria-hidden="true">♡</span>
+            <span className="wl-polaroid-card__placeholder" aria-hidden="true"><HeartIcon size={34} /></span>
           )}
         </span>
 
         <span className="wl-polaroid-card__caption">
           <strong className="wl-polaroid-card__title">{item.title}</strong>
           <span className="wl-polaroid-card__priority">
-            <span aria-hidden="true">{priority.icon}</span>
+            <priority.Icon size={12} />
             {priority.label}
           </span>
         </span>

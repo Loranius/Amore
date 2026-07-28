@@ -1,5 +1,8 @@
 import type { WishlistImagePreference } from './wishlistImagePreference';
 import './wishlistImageModePicker.css';
+import type { WishIconComponent } from '@/components/icons/WishIcon';
+import { SparkIcon } from '@/components/icons/EventIcon';
+import { BoxIcon, CheckIcon, ImageIcon, RefreshIcon, UserIcon } from '@/components/icons/UiIcon';
 
 interface WishlistImageModePickerProps {
   value: WishlistImagePreference;
@@ -14,31 +17,31 @@ interface WishlistImageModePickerProps {
 
 const OPTIONS: ReadonlyArray<{
   value: WishlistImagePreference;
-  icon: string;
+  Icon: WishIconComponent;
   label: string;
   description: string;
 }> = [
   {
     value: 'auto',
-    icon: '✨',
+    Icon: SparkIcon,
     label: 'Автоматично',
     description: 'Портал сам вибере найкращий спосіб.',
   },
   {
     value: 'product-cutout',
-    icon: '📦',
+    Icon: BoxIcon,
     label: 'Товар без фону',
     description: 'Для одягу, техніки та предметів.',
   },
   {
     value: 'portrait-cutout',
-    icon: '🧍',
+    Icon: UserIcon,
     label: 'Людина без фону',
     description: 'AI-сегментація портретного фото.',
   },
   {
     value: 'photo-cover',
-    icon: '🖼',
+    Icon: ImageIcon,
     label: 'Оригінальне фото',
     description: 'Показувати кадр без вирізання.',
   },
@@ -79,12 +82,12 @@ export function WishlistImageModePicker({
               disabled={disabled || processing}
               onClick={() => onChange(option.value)}
             >
-              <span className="wm-image-mode-icon" aria-hidden="true">{option.icon}</span>
+              <span className="wm-image-mode-icon" aria-hidden="true"><option.Icon size={20} /></span>
               <span className="wm-image-mode-copy">
                 <strong>{option.label}</strong>
                 <small>{option.description}</small>
               </span>
-              <span className="wm-image-mode-check" aria-hidden="true">✓</span>
+              <span className="wm-image-mode-check" aria-hidden="true"><CheckIcon size={14} /></span>
             </button>
           );
         })}
@@ -97,7 +100,7 @@ export function WishlistImageModePicker({
           disabled={reprocessDisabled}
           onClick={onReprocess}
         >
-          <span aria-hidden="true">↻</span>
+          <RefreshIcon size={15} />
           {processing ? 'Обробляємо…' : 'Застосувати й обробити ще раз'}
         </button>
 

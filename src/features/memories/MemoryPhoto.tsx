@@ -1,15 +1,28 @@
 // Плитка знімка — спільна для всіх трьох виглядів.
 // Позначка джерела й крапка «є підпис» живуть тут, щоб три оглядові
 // екрани не малювали їх кожен по-своєму.
+import type { ReactNode } from 'react';
+import type { IconProps } from '@/components/icons/iconBase';
+import { MapPinIcon } from '@/components/icons/MapIcon';
+import { TargetIcon } from '@/components/icons/PlanIcon';
+import { CalendarIcon, GiftIcon } from '@/components/icons/UiIcon';
 import type { MemoryRow, MemorySource } from '@/types';
 
 // `label` — повна назва для підказки й повного екрана; `short` — для
 // чипів фільтра, де довгий підпис виїжджає за екран телефона.
-export const SOURCE_META: Record<MemorySource, { icon: string; label: string; short: string; cls: string }> = {
-  place: { icon: '◎', label: 'Відвідане місце', short: 'Місця', cls: 'mem-src--place' },
-  wish: { icon: '✦', label: 'Виконане бажання', short: 'Бажання', cls: 'mem-src--wish' },
-  goal: { icon: '◆', label: 'Спільна ціль', short: 'Цілі', cls: 'mem-src--goal' },
-  event: { icon: '❖', label: 'Подія', short: 'Події', cls: 'mem-src--event' },
+//
+// `Icon` — сам компонент, а не готовий вузол: позначка джерела стоїть і
+// на плитці розміром з ніготь, і в підписі під повним екраном, тож
+// розмір мусить задавати місце виклику. Раніше тут були геометричні
+// гліфи ◎ ✦ ◆ ❖ — на плитці 11px вони всі читались однаковою цяткою.
+export const SOURCE_META: Record<
+  MemorySource,
+  { Icon: (props: IconProps) => ReactNode; label: string; short: string; cls: string }
+> = {
+  place: { Icon: MapPinIcon, label: 'Відвідане місце', short: 'Місця', cls: 'mem-src--place' },
+  wish: { Icon: GiftIcon, label: 'Виконане бажання', short: 'Бажання', cls: 'mem-src--wish' },
+  goal: { Icon: TargetIcon, label: 'Спільна ціль', short: 'Цілі', cls: 'mem-src--goal' },
+  event: { Icon: CalendarIcon, label: 'Подія', short: 'Події', cls: 'mem-src--event' },
 };
 
 interface MemoryPhotoProps {
@@ -33,7 +46,7 @@ export function MemoryPhoto({ photo, sources, featured, onOpen }: MemoryPhotoPro
       <img src={photo.photo_url} alt="" loading="lazy" decoding="async" draggable={false} />
       {meta && (
         <span className={`mem-src ${meta.cls}`} title={meta.label} aria-hidden="true">
-          {meta.icon}
+          <meta.Icon size={12} />
         </span>
       )}
       {photo.caption && <span className="mem-capdot" aria-hidden="true" />}

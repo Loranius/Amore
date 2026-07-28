@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUsersMap } from '@/features/_shared/useUsers';
 import { SOURCE_META } from './MemoryPhoto';
+import { CloseIcon } from '@/components/icons/UiIcon';
 import { formatMemoryDate, memoryTime } from './memoriesDate';
 import type { MemoryRow, MemorySource } from '@/types';
 
@@ -50,7 +51,9 @@ export function MemoryViewer({
 
   return (
     <div className="mem-viewer" role="dialog" aria-modal="true" aria-label="Спогад">
-      <button type="button" className="mem-viewer-x" onClick={onClose} aria-label="Закрити">✕</button>
+      <button type="button" className="mem-viewer-x" onClick={onClose} aria-label="Закрити">
+        <CloseIcon size={18} />
+      </button>
 
       <div className="mem-viewer-stage">
         <img src={photo.photo_url} alt={photo.caption ?? ''} />
@@ -67,16 +70,19 @@ export function MemoryViewer({
 
         {sources.length > 0 && (
           <div className="mem-viewer-sources">
-            {sources.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`mem-viewer-badge ${SOURCE_META[s].cls}`}
-                onClick={() => openSource(s)}
-              >
-                {SOURCE_META[s].icon} {SOURCE_META[s].label} ›
-              </button>
-            ))}
+            {sources.map((s) => {
+              const { Icon, cls, label } = SOURCE_META[s];
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  className={`mem-viewer-badge ${cls}`}
+                  onClick={() => openSource(s)}
+                >
+                  <Icon size={14} /> {label} ›
+                </button>
+              );
+            })}
           </div>
         )}
 

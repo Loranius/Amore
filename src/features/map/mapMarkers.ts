@@ -10,6 +10,7 @@
 // вузлами й самою картою.
 // ============================================================
 import mapboxgl from 'mapbox-gl';
+import { pinCategoryNode } from '@/components/icons/MapIcon';
 import { CATEGORIES, CLUSTER_RADIUS_PX, PIN_TIP_OFFSET } from './mapConstants';
 import { clusterPins, clusterSignature, planSync } from './mapPinView';
 import type { MapPinRow } from '@/types';
@@ -58,11 +59,11 @@ export function syncPinMarkers({ map, pins, store, onOpenPin }: SyncOptions): vo
       const cat = CATEGORIES[single.category];
       el.className = 'map-marker';
       el.style.background = cat.color;
-      // Емодзі в окремому елементі: сама крапля повернута на -45°, і без
+      // Значок в окремому елементі: сама крапля повернута на -45°, і без
       // зворотного повороту всередині іконка стояла перекошеною.
       const icon = document.createElement('span');
       icon.className = 'map-marker-icon';
-      icon.textContent = cat.emoji;
+      icon.appendChild(pinCategoryNode(single.category, 15));
       el.appendChild(icon);
       el.setAttribute('aria-label', single.title);
       el.addEventListener('click', (e) => {

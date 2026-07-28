@@ -7,6 +7,7 @@ import {
 import { WishlistProductVisual } from './WishlistProductVisual';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistCloud.css';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 export interface WishlistBubbleCardProps {
   item: WishlistItemV3;
@@ -83,7 +84,7 @@ export function WishlistBubbleCard({
             onError={() => setImageFailed(true)}
           />
         ) : (
-          <span className="wl-cloud-bubble-placeholder" aria-hidden="true">♡</span>
+          <span className="wl-cloud-bubble-placeholder" aria-hidden="true"><HeartIcon size={34} /></span>
         )}
       </button>
     </article>

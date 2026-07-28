@@ -12,10 +12,17 @@
 //   • в день    — «🔴 СЬОГОДНІ: …»
 //
 // Підтримує yearly-події (щорічні): порівнює лише MM-DD.
+//
+// Якщо подія прив'язана до людини з застосунку (events.person_user_id),
+// текст різний для двох читачів: партнер отримує підказку про подарунок
+// з іменем, а сама іменинниця/іменинник — нічого. Без прив'язки (дні
+// народження батьків, друзів, усі річниці) обоє отримують те саме, що
+// й раніше.
 // ============================================================
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { buildText, reminderTargets } from "./reminderRules.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -83,25 +90,6 @@ async function sendTelegram(chatId: string | number, text: string): Promise<void
   if (!res.ok) console.error("Telegram error:", await res.text());
 }
 
-// ── Текст нагадування залежно від відстані ───────────────────
-function buildText(
-  ev: { title: string; description: string | null },
-  displayDate: string,
-  kind: "today" | "tomorrow" | "in3days",
-): string {
-  const desc = ev.description ? `\n💬 ${ev.description}` : "";
-  const title = ev.title || "Подія";
-
-  switch (kind) {
-    case "today":
-      return `🔴 <b>СЬОГОДНІ — «${title}»</b>\n📌 Не пропусти!` + desc;
-    case "tomorrow":
-      return `⚠️ <b>Завтра (${displayDate}) — «${title}»</b>\n🎯 Підготуйся заздалегідь` + desc;
-    case "in3days":
-      return `⏰ <b>Через 3 дні (${displayDate}) — «${title}»</b>\n📋 Плануй заздалегідь` + desc;
-  }
-}
-
 // ── Головний обробник ─────────────────────────────────────────
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -125,7 +113,7 @@ serve(async (req) => {
     // ── Завантажуємо ВСІ події ────────────────────────────────
     const { data: events, error: evErr } = await sb
       .from("events")
-      .select("id,title,description,date,yearly,type,metadata");
+      .select("id,title,description,date,yearly,type,metadata,person_user_id");
 
     if (evErr) throw evErr;
     const toCheck = (events || []).filter((ev: any) => !isDonePlan(ev));
@@ -145,6 +133,10 @@ serve(async (req) => {
 
     // ── Перевіряємо кожну подію ───────────────────────────────
     const results: string[] = [];
+    // Лічимо ПОВІДОМЛЕННЯ окремо від подій: з появою персоналізації
+    // подія більше не означає рівно два повідомлення.
+    let messages = 0;
+    let skippedSelf = 0;
 
     for (const ev of toCheck) {
       const evDate: string = ev.date;       // "YYYY-MM-DD"
@@ -171,10 +163,12 @@ serve(async (req) => {
 
       if (!kind) continue; // ця подія сьогодні не нагадується
 
-      const text = buildText(ev, displayDate, kind);
+      const targets = reminderTargets(ev, recipients);
+      skippedSelf += recipients.length - targets.length;
 
-      for (const r of recipients) {
-        await sendTelegram(r.chat_id, text);
+      for (const t of targets) {
+        await sendTelegram(t.recipient.chat_id, buildText(ev, displayDate, kind, t.personName));
+        messages += 1;
       }
 
       results.push(`${kind}:${ev.title}`);
@@ -185,6 +179,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         sent: results.length,
+        messages,
+        skipped_self: skippedSelf,
         reminders: results,
         events_checked: toCheck.length,
         recipients: recipients.length,

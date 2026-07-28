@@ -33,7 +33,7 @@ export function useQuickWishlistCompletion() {
     },
     onSuccess: () => {
       burstConfetti();
-      toast.show('Подарунок вручено — бажання перенесено у спогади ♡');
+      toast.show('Подарунок вручено — бажання перенесено у спогади');
     },
     onError: (error) => {
       const message = (error as Error).message;

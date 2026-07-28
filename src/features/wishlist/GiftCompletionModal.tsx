@@ -3,6 +3,9 @@ import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { normalizeToPreview } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
 import type { WishlistItemV3 } from './wishlistRpc';
+import { TogetherIcon } from '@/components/icons/WishIcon';
+import { CloseIcon, GiftIcon, LockIcon, VideoIcon } from '@/components/icons/UiIcon';
+import { CameraIcon, HeartIcon } from '@/components/icons/NavIcon';
 import {
   validateGiftMemoryPhoto,
   validateGiftMemoryVideo,
@@ -149,11 +152,13 @@ export function GiftCompletionModal({
           disabled={saving}
           onClick={onClose}
         >
-          ×
+          <CloseIcon size={17} />
         </button>
 
         <div className="gift-memory-heading">
-          <div className="gift-memory-icon" aria-hidden="true">{isShared ? '✨' : '🎁'}</div>
+          <div className="gift-memory-icon" aria-hidden="true">
+            {isShared ? <TogetherIcon size={26} /> : <GiftIcon size={26} />}
+          </div>
           <div>
             <h2 id="gift-memory-title" className="modal-title">
               {isShared ? 'Спільну мрію виконано' : 'Подарунок вручено'}
@@ -167,7 +172,7 @@ export function GiftCompletionModal({
         </div>
 
         <div className="gift-memory-wish">
-          {item.image_url ? <img src={item.image_url} alt="" /> : <span aria-hidden="true">♡</span>}
+          {item.image_url ? <img src={item.image_url} alt="" /> : <span aria-hidden="true"><HeartIcon size={26} /></span>}
           <div>
             <strong>{item.title}</strong>
             <small>Фото, відео й коментар необов’язкові.</small>
@@ -184,7 +189,7 @@ export function GiftCompletionModal({
               {photoPreview ? (
                 <img src={photoPreview} alt="Попередній перегляд моменту" />
               ) : (
-                <span aria-hidden="true">📸</span>
+                <span aria-hidden="true"><CameraIcon size={28} /></span>
               )}
             </div>
             <div className="gift-memory-file-actions">
@@ -218,7 +223,7 @@ export function GiftCompletionModal({
               {videoPreview ? (
                 <video src={videoPreview} controls playsInline preload="metadata" />
               ) : (
-                <span aria-hidden="true">🎬</span>
+                <span aria-hidden="true"><VideoIcon size={28} /></span>
               )}
             </div>
             <div className="gift-memory-file-actions">
@@ -248,15 +253,15 @@ export function GiftCompletionModal({
             value={comment}
             disabled={saving}
             placeholder={isShared
-              ? 'Наприклад: ми так довго про це мріяли ❤️'
-              : 'Наприклад: вона зовсім не очікувала і дуже зраділа ❤️'}
+              ? 'Наприклад: ми так довго про це мріяли'
+              : 'Наприклад: вона зовсім не очікувала і дуже зраділа'}
             onChange={(event) => setComment(event.target.value)}
           />
           <small>{comment.length}/1000</small>
         </label>
 
         <div className="gift-memory-note">
-          <span aria-hidden="true">🔒</span>
+          <LockIcon size={15} />
           Медіа зберігаються у приватному bucket, а в архіві відкриваються через тимчасові посилання.
         </div>
 

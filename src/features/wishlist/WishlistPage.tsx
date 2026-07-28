@@ -55,6 +55,9 @@ import './wishlistGiftArchive.css';
 import './wishlistArchiveRedesign.css';
 import './wishlistFoundation.css';
 import './wishlistHero.css';
+import { TogetherIcon } from '@/components/icons/WishIcon';
+import { CheckIcon, GiftIcon, LayersIcon } from '@/components/icons/UiIcon';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 type Tab = 'me' | 'partner' | 'shared';
 type BoardViews = Record<Tab, WishlistBoardViewState>;
@@ -89,7 +92,7 @@ function initialPolaroidSeeds(): PolaroidSeeds {
 function partnerEmptyState(filter: PartnerWishFilter) {
   if (filter === 'available') {
     return {
-      icon: '✓',
+      Icon: CheckIcon,
       title: 'Усі активні бажання вже заплановані',
       description: 'Переглянь «Мої подарунки» або відкрий повний список.',
     };
@@ -97,14 +100,14 @@ function partnerEmptyState(filter: PartnerWishFilter) {
 
   if (filter === 'mine') {
     return {
-      icon: '🎁',
+      Icon: GiftIcon,
       title: 'Ти ще не запланував жодного подарунка',
       description: 'У вкладці «Доступні» можна обрати бажання партнера.',
     };
   }
 
   return {
-    icon: '♡',
+    Icon: HeartIcon,
     title: 'У партнера поки немає активних бажань',
     description: 'Нові мрії з’являться тут одразу після додавання.',
   };
@@ -467,7 +470,7 @@ export function WishlistPage() {
                   {contextItems.length > 0 ? (
                     <div className="wl-board-filter-empty">
                       <div>
-                        <span aria-hidden="true">✦</span>
+                        <LayersIcon size={26} />
                         <strong>За цим фільтром бажань немає</strong>
                         <p>Обери «Усі» або зміни пріоритет, щоб повернути картки.</p>
                       </div>
@@ -475,7 +478,7 @@ export function WishlistPage() {
                   ) : tab === 'partner' && partnerEmptyCopy ? (
                     <div className="wl-partner-empty">
                       <div>
-                        <span aria-hidden="true">{partnerEmptyCopy.icon}</span>
+                        <partnerEmptyCopy.Icon size={26} />
                         <strong>{partnerEmptyCopy.title}</strong>
                         <p>{partnerEmptyCopy.description}</p>
                       </div>
@@ -483,7 +486,7 @@ export function WishlistPage() {
                   ) : tab === 'shared' && sharedEmptyCopy ? (
                     <div className="wl-shared-empty">
                       <div>
-                        <span aria-hidden="true">✨</span>
+                        <TogetherIcon size={26} />
                         <strong>{sharedEmptyCopy.title}</strong>
                         <p>{sharedEmptyCopy.description}</p>
                       </div>

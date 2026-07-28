@@ -5,7 +5,7 @@
 // Містить головну + всі розділи + кнопку налаштувань (модалка).
 // ============================================================
 import { NavLink } from 'react-router-dom';
-import { BOTTOM_LEFT, BOTTOM_RIGHT, HOME_ITEM, MORE_ITEMS } from '@/app/nav';
+import { BOTTOM_LEFT, BOTTOM_RIGHT, HOME_ITEM, MORE_ITEMS, SETTINGS_ICON } from '@/app/nav';
 import type { NavItem } from '@/app/nav';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +25,7 @@ export function Sidebar({ onOpenSettings }: { onOpenSettings: () => void }) {
             className={({ isActive }) => cn('sidebar-item', isActive && 'active')}
           >
             <span className="sidebar-icon" aria-hidden="true">
-              {i.icon}
+              <i.Icon size={20} />
             </span>
             <span className="sidebar-label">{i.label}</span>
           </NavLink>
@@ -34,7 +34,7 @@ export function Sidebar({ onOpenSettings }: { onOpenSettings: () => void }) {
 
       <button type="button" className="sidebar-item sidebar-settings" onClick={onOpenSettings}>
         <span className="sidebar-icon" aria-hidden="true">
-          ⚙️
+          <SETTINGS_ICON size={20} />
         </span>
         <span className="sidebar-label">Налаштування</span>
       </button>

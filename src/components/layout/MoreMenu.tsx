@@ -9,7 +9,7 @@
 // ============================================================
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { MORE_GROUPS } from '@/app/nav';
+import { MORE_GROUPS, SETTINGS_ICON } from '@/app/nav';
 import { cn } from '@/lib/utils';
 
 interface MoreMenuProps {
@@ -54,7 +54,7 @@ export function MoreMenu({ open, onClose, onOpenSettings }: MoreMenuProps) {
                   onClick={onClose}
                 >
                   <span className="more-menu-icon" aria-hidden="true">
-                    {i.icon}
+                    <i.Icon size={26} />
                   </span>
                   <span className="more-menu-label">{i.label}</span>
                 </NavLink>
@@ -72,7 +72,7 @@ export function MoreMenu({ open, onClose, onOpenSettings }: MoreMenuProps) {
           }}
         >
           <span className="more-menu-icon" aria-hidden="true">
-            ⚙️
+            <SETTINGS_ICON size={26} />
           </span>
           <span className="more-menu-label">Налаштування</span>
         </button>

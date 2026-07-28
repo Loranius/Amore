@@ -1,6 +1,10 @@
 import { WishlistBubblePhysics } from './WishlistBubblePhysics';
 import { partnerGenitive } from './partnerLabel';
 import type { WishlistStatsV3 } from './wishlistRpc';
+import type { WishIconComponent } from '@/components/icons/WishIcon';
+import { TogetherIcon } from '@/components/icons/WishIcon';
+import { CheckIcon, GiftIcon, PlusIcon } from '@/components/icons/UiIcon';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 type WishlistHeroTab = 'me' | 'partner' | 'shared';
 
@@ -18,7 +22,7 @@ interface HeroCopy {
   eyebrow: string;
   title: string;
   description: string;
-  symbol: string;
+  Symbol: WishIconComponent;
 }
 
 function heroCopy(tab: WishlistHeroTab, meName: string, partnerName: string): HeroCopy {
@@ -27,7 +31,7 @@ function heroCopy(tab: WishlistHeroTab, meName: string, partnerName: string): He
       eyebrow: `Бажання ${partnerGenitive(partnerName)}`,
       title: `Мрії ${partnerGenitive(partnerName)}`,
       description: 'Можливо, саме тут заховався наступний приємний сюрприз.',
-      symbol: '🎁',
+      Symbol: GiftIcon,
     };
   }
 
@@ -36,7 +40,7 @@ function heroCopy(tab: WishlistHeroTab, meName: string, partnerName: string): He
       eyebrow: `${meName} + ${partnerName}`,
       title: 'Наші спільні мрії',
       description: 'Те, що ви хочете побачити, спробувати або здійснити разом.',
-      symbol: '✨',
+      Symbol: TogetherIcon,
     };
   }
 
@@ -44,7 +48,7 @@ function heroCopy(tab: WishlistHeroTab, meName: string, partnerName: string): He
     eyebrow: 'Особистий список',
     title: 'Мої мрії',
     description: 'Зберігай усе, що одного дня хочеться здійснити.',
-    symbol: '♡',
+    Symbol: HeartIcon,
   };
 }
 
@@ -99,10 +103,10 @@ export function WishlistHero({
         </div>
 
         <div className={`wl-hero-actions${canOpenCompleted ? ' wl-hero-actions--with-completed' : ''}`}>
-          <span className="wl-hero-symbol" aria-hidden="true">{copy.symbol}</span>
+          <span className="wl-hero-symbol" aria-hidden="true"><copy.Symbol size={26} /></span>
           <div className="wl-hero-action-row">
             <button type="button" className="btn wl-hero-add" disabled={busy} onClick={onAdd}>
-              <span aria-hidden="true">＋</span>
+              <PlusIcon size={16} />
               Додати мрію
             </button>
             {canOpenCompleted && (
@@ -113,7 +117,7 @@ export function WishlistHero({
                 onClick={openCompleted}
                 aria-label="Відкрити здійснені мрії та подаровані спогади"
               >
-                <span aria-hidden="true">✓</span>
+                <CheckIcon size={15} />
                 Здійснене
               </button>
             )}

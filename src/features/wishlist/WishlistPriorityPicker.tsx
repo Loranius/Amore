@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import './wishlistPriorityPicker.css';
+import { WISH_PRIORITY_ICON, type WishIconComponent } from '@/components/icons/WishIcon';
+import { CheckIcon, ChevronDownIcon, MinusIcon } from '@/components/icons/UiIcon';
 
 type WishlistPriority = 'high' | 'medium' | 'low';
 
@@ -11,31 +13,33 @@ interface WishlistPriorityPickerProps {
 
 const OPTIONS: Array<{
   value: WishlistPriority | '';
-  icon: string;
+  Icon: WishIconComponent;
   label: string;
   description: string;
 }> = [
   {
     value: '',
-    icon: '—',
+    // Мальована риска, а не тире зі шрифту: серед трьох значків
+    // текстовий символ стояв на власній висоті й вибивався з ряду.
+    Icon: MinusIcon,
     label: 'Не вказано',
     description: 'Бульбашка середнього розміру',
   },
   {
     value: 'high',
-    icon: '✦',
+    Icon: WISH_PRIORITY_ICON.high,
     label: 'Жадане',
     description: 'Найбільша фокусна бульбашка',
   },
   {
     value: 'medium',
-    icon: '♡',
+    Icon: WISH_PRIORITY_ICON.medium,
     label: 'Бажане',
     description: 'Середня бульбашка у хмарі',
   },
   {
     value: 'low',
-    icon: '❀',
+    Icon: WISH_PRIORITY_ICON.low,
     label: 'Приємне',
     description: 'Маленька легка бульбашка',
   },
@@ -119,10 +123,10 @@ export function WishlistPriorityPicker({
         onClick={() => setOpen(true)}
       >
         <span className="wl-priority-picker-trigger-value">
-          <span aria-hidden="true">{selected.icon}</span>
+          <selected.Icon size={18} />
           {selected.label}
         </span>
-        <span className="wl-priority-picker-chevron" aria-hidden="true">⌄</span>
+        <span className="wl-priority-picker-chevron" aria-hidden="true"><ChevronDownIcon size={16} /></span>
       </button>
 
       {open && (
@@ -173,14 +177,14 @@ export function WishlistPriorityPicker({
                     }}
                   >
                     <span className="wl-priority-picker-icon" aria-hidden="true">
-                      {option.icon}
+                      <option.Icon size={18} />
                     </span>
                     <span className="wl-priority-picker-copy">
                       <strong>{option.label}</strong>
                       <small>{option.description}</small>
                     </span>
                     <span className="wl-priority-picker-radio" aria-hidden="true">
-                      {active ? '✓' : ''}
+                      {active ? <CheckIcon size={15} /> : null}
                     </span>
                   </button>
                 );

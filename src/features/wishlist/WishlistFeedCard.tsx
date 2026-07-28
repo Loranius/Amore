@@ -6,6 +6,7 @@ import {
 import { WishlistProductVisual } from './WishlistProductVisual';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistFeedView.css';
+import { HeartIcon } from '@/components/icons/NavIcon';
 
 interface WishlistFeedCardProps {
   item: WishlistItemV3;
@@ -62,7 +63,7 @@ export function WishlistFeedCard({
               onError={() => setImageFailed(true)}
             />
           ) : (
-            <span className="wl-feed-card__placeholder" aria-hidden="true">♡</span>
+            <span className="wl-feed-card__placeholder" aria-hidden="true"><HeartIcon size={30} /></span>
           )}
         </span>
 
@@ -76,7 +77,7 @@ export function WishlistFeedCard({
 
           <span className="wl-feed-card__meta">
             <span className="wl-feed-card__priority">
-              <span aria-hidden="true">{priority.icon}</span>
+              <priority.Icon size={12} />
               {priority.label}
             </span>
             <span className="wl-feed-card__price">{formatWishlistFeedPrice(item.price)}</span>

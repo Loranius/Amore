@@ -7,6 +7,8 @@ import { normalize } from '@/lib/images';
 import { exifDay, readExifTakenAt } from '@/lib/exif';
 import { formatDateUA } from '@/features/_shared/month';
 import { CATEGORIES, CATEGORY_ORDER } from './mapConstants';
+import { PinCategoryIcon } from '@/components/icons/MapIcon';
+import { ImageIcon } from '@/components/icons/UiIcon';
 import { useToast } from '@/providers/ToastProvider';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import type { PinCategory } from '@/types';
@@ -95,7 +97,7 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
                   className={`pin-cat-btn${category === key ? ' active' : ''}`}
                   onClick={() => setCategory(key)}
                 >
-                  {cat.emoji} {cat.label}
+                  <PinCategoryIcon cat={key} size={15} /> {cat.label}
                 </button>
               );
             })}
@@ -105,7 +107,7 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
         <div className="form-field">
           <span>Фото місця</span>
           <FilePickerButton id="pin-photo-file" onPick={(f) => void pickFile(f)}>
-            🖼 Обрати з пристрою
+            <ImageIcon size={15} /> Обрати з пристрою
           </FilePickerButton>
           {preview && <img className="pin-add-preview" src={preview} alt="" />}
         </div>
@@ -138,7 +140,7 @@ export function AddPinModal({ lat, lng, initialTitle = '', onClose, onSubmit }: 
           <textarea id="pin-note" name="note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Деталь, яку не хочеться забути…" />
         </label>
 
-        <p className="pin-coords">📌 {lat.toFixed(4)}, {lng.toFixed(4)}</p>
+        <p className="pin-coords">{lat.toFixed(4)}, {lng.toFixed(4)}</p>
 
         <div className="modal-actions">
           <button type="button" className="btn btn-ghost" onClick={onClose}>

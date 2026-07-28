@@ -33,7 +33,7 @@ export function HubTabs({ items }: { items: NavItem[] }) {
             role="tab"
             className={({ isActive }) => cn('hub-tab', isActive && 'active')}
           >
-            <span aria-hidden="true">{t.icon}</span> {t.label}
+            <t.Icon size={15} /> {t.label}
           </NavLink>
         ))}
       </div>

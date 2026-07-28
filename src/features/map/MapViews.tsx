@@ -13,6 +13,8 @@ import { PinCards } from './MapPanels';
 import { cityStats, groupPinsByMonth, travelSummary } from './mapStats';
 import { formatDateUA } from '@/features/_shared/month';
 import { pluralUA } from '@/lib/utils';
+import { MapPinIcon } from '@/components/icons/MapIcon';
+import { StarIcon } from '@/components/icons/UiIcon';
 import type { MapPinRow } from '@/types';
 
 interface ViewProps {
@@ -60,7 +62,9 @@ export function TravelSummaryBar({ pins }: { pins: MapPinRow[] }) {
 export function MapTimeline({ pins, focusedId, onCardClick }: ViewProps) {
   const groups = groupPinsByMonth(pins);
   if (groups.length === 0) {
-    return <p className="empty-state">Місць ще немає — постав перше на карті 📍</p>;
+    return <p className="empty-state empty-state--icon">
+        <MapPinIcon size={26} /> Місць ще немає — постав перше на карті
+      </p>;
   }
 
   return (
@@ -89,7 +93,9 @@ export function MapTimeline({ pins, focusedId, onCardClick }: ViewProps) {
 export function MapCities({ pins, focusedId, onCardClick }: ViewProps) {
   const stats = cityStats(pins);
   if (stats.length === 0) {
-    return <p className="empty-state">Міст ще немає — постав перше місце на карті 📍</p>;
+    return <p className="empty-state empty-state--icon">
+        <MapPinIcon size={26} /> Міст ще немає — постав перше місце на карті
+      </p>;
   }
 
   return (
@@ -100,7 +106,9 @@ export function MapCities({ pins, focusedId, onCardClick }: ViewProps) {
             <b>{city.city}</b>
             <span>
               {city.pins.length} {pluralUA(city.pins.length, ['місце', 'місця', 'місць'])}
-              {city.avgRating !== null && <> · ★ {city.avgRating.toFixed(1)}</>}
+              {city.avgRating !== null && (
+                <> · <StarIcon size={12} filled className="map-star" /> {city.avgRating.toFixed(1)}</>
+              )}
               {city.lastVisit && <> · {formatDateUA(city.lastVisit)}</>}
             </span>
           </header>

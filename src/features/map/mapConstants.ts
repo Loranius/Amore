@@ -3,18 +3,21 @@
 // ============================================================
 import type { PinCategory, MapPinRow } from '@/types';
 
-export const CATEGORIES: Record<PinCategory, { label: string; emoji: string; color: string }> = {
-  visited: { label: 'Були', emoji: '📍', color: '#E8829C' },
-  restaurant: { label: 'Ресторан', emoji: '🍽', color: '#FF6B9D' },
-  favorite: { label: 'Улюблене', emoji: '⭐', color: '#F6B9CC' },
+// Значки живуть у components/icons/MapIcon: маркер mapbox — вузол DOM,
+// тож той самий шлях потрібен і React-компоненту, і імперативному коду.
+export const CATEGORIES: Record<PinCategory, { label: string; color: string }> = {
+  visited: { label: 'Були', color: '#E8829C' },
+  restaurant: { label: 'Ресторан', color: '#FF6B9D' },
+  favorite: { label: 'Улюблене', color: '#F6B9CC' },
 };
 
 export const CATEGORY_ORDER: PinCategory[] = ['visited', 'restaurant', 'favorite'];
 
-// Перший user за алфавітом — Діма 💙, другий — Лєна 💗.
+// Перший user за алфавітом, потім другий. Обидва — серце; людей
+// розрізняє колір, а не форма, тож форма лишається однією.
 export const USER_LOCATION_STYLES = [
-  { emoji: '💙', color: '#4A90D9', label: 'Дімусік' },
-  { emoji: '💗', color: '#E8829C', label: 'Лєнусік' },
+  { color: '#4A90D9', label: 'Дімусік' },
+  { color: '#E8829C', label: 'Лєнусік' },
 ] as const;
 
 export const DEFAULT_CENTER: [number, number] = [30.5234, 50.4501]; // Київ

@@ -41,8 +41,8 @@ const TAB_DEFS: { type: EventType; label: string }[] = [
  * `row === null` означає створення — той самий патерн, що у вішлисті.
  */
 type ModalState =
-  | { kind: 'event'; row: EnrichedEvent | null }
-  | { kind: 'plan'; row: EnrichedEvent | null }
+  | { kind: 'event'; row: EnrichedEvent | null; date?: string }
+  | { kind: 'plan'; row: EnrichedEvent | null; date?: string }
   | null;
 
 export function CalendarPage() {
@@ -124,6 +124,13 @@ export function CalendarPage() {
           yr={yr}
           mo={mo}
           onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
+          onGoToday={() => setYm(currentYearMonth())}
+          // Тип нової події визначає активна вкладка списку: у сітці
+          // вкладок немає, а «Плани» — окрема форма. Поза вкладкою
+          // «Плани» день заводить звичайну подію.
+          onAddOn={(date) => setModal({
+            kind: filter === 'other' ? 'plan' : 'event', row: null, date,
+          })}
           onOpenEvent={(ev) => setModal({
             kind: (ev.type ?? 'other') === 'other' ? 'plan' : 'event',
             row: enriched.find((e) => e.id === ev.id) ?? null,
@@ -134,6 +141,7 @@ export function CalendarPage() {
           events={events}
           yr={yr}
           onStepYear={(delta) => setYm({ yr: yr + delta, mo })}
+          onGoToday={() => setYm(currentYearMonth())}
           onOpenMonth={(month) => { setYm({ yr, mo: month }); setView('month'); }}
         />
       ) : filter === 'holiday' && presets.length > 0 ? (
@@ -170,6 +178,7 @@ export function CalendarPage() {
       {modal?.kind === 'event' && (
         <AddEventModal
           event={modal.row}
+          initialDate={modal.date}
           onClose={() => setModal(null)}
           onSubmit={(input) => {
             const row = modal.row;
@@ -181,6 +190,7 @@ export function CalendarPage() {
       {modal?.kind === 'plan' && (
         <AddPlanModal
           plan={modal.row}
+          initialDate={modal.date}
           onClose={() => setModal(null)}
           onSubmit={(input) => {
             const row = modal.row;

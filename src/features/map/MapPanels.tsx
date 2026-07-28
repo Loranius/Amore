@@ -6,6 +6,8 @@ import { pinHasSecondText, pinPrimaryText } from './mapPinView';
 import { directionsUrl } from '@/lib/mapbox';
 import { formatDateUA } from '@/features/_shared/month';
 import { TabBar } from '@/components/ui/TabBar';
+import { CompassIcon, MapPinIcon, PinCategoryIcon } from '@/components/icons/MapIcon';
+import { SearchIcon, StarIcon } from '@/components/icons/UiIcon';
 import type { MapPinRow, PinCategory } from '@/types';
 
 // ── Фільтр за категорією ─────────────────────────────────────
@@ -24,11 +26,11 @@ export function CatFilterBar({
       value={active}
       onChange={onChange}
       items={[
-        { value: 'all', label: 'Всі', icon: '🗺️', count: pins.length },
+        { value: 'all', label: 'Всі', count: pins.length },
         ...CATEGORY_ORDER.map((key) => ({
           value: key as 'all' | PinCategory,
           label: CATEGORIES[key].label,
-          icon: CATEGORIES[key].emoji,
+          icon: <PinCategoryIcon cat={key} size={14} />,
           count: pins.filter((p) => p.category === key).length,
         })),
       ]}
@@ -65,13 +67,17 @@ export function PinCards({
     : visiblePins;
 
   if (!allPins.length) {
-    return <p className="empty-state">Натисни «+ Місце» на карті, щоб додати перше 📍</p>;
+    return <p className="empty-state">Натисни «+ Місце» на карті, щоб додати перше</p>;
   }
   if (!visiblePins.length) {
-    return <p className="empty-state">У цій категорії поки немає місць 🔍</p>;
+    return <p className="empty-state">У цій категорії поки немає місць</p>;
   }
   if (query && !filtered.length) {
-    return <p className="empty-state">Нічого не знайдено 🔍</p>;
+    return (
+      <p className="empty-state empty-state--icon">
+        <SearchIcon size={26} /> Нічого не знайдено
+      </p>
+    );
   }
 
   // Без пошуку — групуємо за містом; при пошуку — пласким списком.
@@ -90,7 +96,7 @@ export function PinCards({
       {groupPinsByCity(filtered).map((group) => (
         <div key={group.city}>
           <div className="pin-city-header">
-            <span className="pin-city-name">📍 {group.city}</span>
+            <span className="pin-city-name"><MapPinIcon size={14} /> {group.city}</span>
             <span className="pin-city-count">{group.pins.length}</span>
           </div>
           {group.pins.map((pin) => (
@@ -139,22 +145,22 @@ function PinCard({
       {pin.photo_url ? (
         <img className="pin-card-photo" loading="lazy" src={pin.photo_url} alt="" />
       ) : (
-        <div className="pin-card-photo-placeholder">{cat.emoji}</div>
+        <div className="pin-card-photo-placeholder" style={{ color: cat.color }}>
+          <PinCategoryIcon cat={pin.category} size={30} />
+        </div>
       )}
       <div className="pin-card-body">
         <div className="pin-card-header">
           <p className="pin-card-title">{pin.title}</p>
           <span className="pin-card-cat">
-            {cat.emoji} {cat.label}
+            <PinCategoryIcon cat={pin.category} size={13} /> {cat.label}
           </span>
         </div>
         {(pin.rating || visited) && (
           <div className="pin-card-rating">
             {pin.rating
               ? Array.from({ length: 5 }, (_, i) => (
-                  <span key={i} className={i < pin.rating! ? 'map-star filled' : 'map-star'}>
-                    ★
-                  </span>
+                  <StarIcon key={i} size={14} filled={i < pin.rating!} className="map-star" />
                 ))
               : null}
             {visited && <span className="pin-card-date">{visited}</span>}
@@ -170,7 +176,7 @@ function PinCard({
           target="_blank"
           rel="noopener noreferrer"
         >
-          🧭 Маршрут
+          <CompassIcon size={14} /> Маршрут
         </a>
       </div>
     </div>

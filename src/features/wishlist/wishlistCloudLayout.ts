@@ -1,10 +1,11 @@
+import { WISH_PRIORITY_ICON, type WishIconComponent } from '@/components/icons/WishIcon';
 import './wishlistGiftPortrait.css';
 
 export type WishlistCloudPriority = 'high' | 'medium' | 'low';
 
 export interface WishlistCloudPriorityPresentation {
   label: 'Жадане' | 'Бажане' | 'Приємне';
-  icon: string;
+  Icon: WishIconComponent;
   size: number;
 }
 
@@ -26,9 +27,9 @@ export interface WishlistCloudPlacement {
 }
 
 const PRIORITY_PRESENTATION: Record<WishlistCloudPriority, WishlistCloudPriorityPresentation> = {
-  high: { label: 'Жадане', icon: '✦', size: 174 },
-  medium: { label: 'Бажане', icon: '♡', size: 116 },
-  low: { label: 'Приємне', icon: '❀', size: 78 },
+  high: { label: 'Жадане', Icon: WISH_PRIORITY_ICON.high, size: 174 },
+  medium: { label: 'Бажане', Icon: WISH_PRIORITY_ICON.medium, size: 116 },
+  low: { label: 'Приємне', Icon: WISH_PRIORITY_ICON.low, size: 78 },
 };
 
 function stableHash(value: string): number {

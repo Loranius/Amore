@@ -56,10 +56,13 @@ function editableEventType(value: EventType | null): EventType {
 
 export function AddEventModal({
   event,
+  initialDate,
   onClose,
   onSubmit,
 }: {
   event: EventRow | null;
+  /** Дата, вибрана в сітці місяця: форма відкривається вже на ній. */
+  initialDate?: string | undefined;
   onClose: () => void;
   onSubmit: (input: NewEventInput) => void;
 }) {
@@ -67,7 +70,7 @@ export function AddEventModal({
     event ? editableEventType(event.type) : 'birthday',
   );
   const [title, setTitle] = useState(event?.title ?? '');
-  const [date, setDate] = useState(event?.date ?? '');
+  const [date, setDate] = useState(event?.date ?? initialDate ?? '');
   const [description, setDescription] = useState(event?.description ?? '');
   const [yearly, setYearly] = useState(event ? Boolean(event.yearly) : true);
   const [isMilestone, setIsMilestone] = useState(event?.is_milestone ?? false);
@@ -199,17 +202,20 @@ export function AddEventModal({
 // ── План ─────────────────────────────────────────────────────
 export function AddPlanModal({
   plan,
+  initialDate,
   onClose,
   onSubmit,
 }: {
   plan: EnrichedEvent | null;
+  /** Дата, вибрана в сітці місяця: форма відкривається вже на ній. */
+  initialDate?: string | undefined;
   onClose: () => void;
   onSubmit: (input: NewPlanInput) => void;
 }) {
   const existing = plan ? planMetadataOf(plan) : null;
   const [cat, setCat] = useState<PlanCategory>(existing?.cat ?? 'date');
   const [title, setTitle] = useState(plan?.title ?? '');
-  const [date, setDate] = useState(plan?.date ?? '');
+  const [date, setDate] = useState(plan?.date ?? initialDate ?? '');
   const [note, setNote] = useState(plan?.description ?? '');
   // Статус редагується не тут, а кнопками на картці: виконаний план не
   // має повертатись у «Планується» лише тому, що виправили назву. Тому

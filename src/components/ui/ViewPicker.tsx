@@ -8,11 +8,15 @@
 // Вішлист має власний варіант із галочкою і сюди поки не зведений: це
 // інша розмітка, і зводити її треба окремо, а не мимохідь.
 // ============================================================
+import type { ReactNode } from 'react';
+
 export interface ViewOption<T extends string> {
   value: T;
   label: string;
   description: string;
-  icon: string;
+  /** Мальований значок, а не гліф: запасу «☰ ▤ ▦» не вистачало на
+      дев'ять виглядів трьох модулів, і форми починали повторюватись. */
+  icon: ReactNode;
 }
 
 export function ViewPicker<T extends string>({
