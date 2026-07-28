@@ -1,17 +1,11 @@
 // ============================================================
 // Зв'язки плану: бажання, місця карти, спогади — і покупки.
 // ------------------------------------------------------------
-// «Вікенд у Карпатах» майже ніколи не сам по собі: під нього є
-// бажання, мітка на карті й — після поїздки — фото в архіві. Досі
-// перейти з плану до потрібного бажання можна було лише пошуком у
-// чужому модулі.
-//
-// Покупки стоять поруч, але вони НЕ зв'язок: рядки йдуть у спільний
-// список і живуть далі своїм життям. Тому й кнопка каже «Додати», а не
-// «Прив'язати», і після додавання тут нічого не лишається — інакше ми
-// б обіцяли двосторонність, якої в покупок немає.
+// Важкі каталоги не завантажуються, доки згорнута секція не з'явиться у
+// viewport. Це прибирає запити до вішлиста, карти й архіву при звичайному
+// відкритті сторінки плану.
 // ============================================================
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { usePartner } from '@/features/_shared/useUsers';
@@ -30,7 +24,6 @@ import type { PlanLinkTarget, PlanRow } from '@/types';
 const TARGET_META: Record<PlanLinkTarget, {
   label: string;
   description: string;
-  /** Куди веде тап: у планів немає власних сторінок бажання чи мітки. */
   to: string;
   Icon: typeof MapPinIcon;
 }> = {
@@ -58,9 +51,49 @@ const TABS: PlanLinkTarget[] = ['wish', 'place', 'memory'];
 
 export function PlanLinksBlock({ plan, embedded = false }: {
   plan: PlanRow;
-  /** Усередині disclosure заголовок секції вже намальований зовні. */
   embedded?: boolean;
 }) {
+  const rootRef = useRef<HTMLElement>(null);
+  const [active, setActive] = useState(!embedded);
+
+  useEffect(() => {
+    if (active || !embedded) return;
+    const node = rootRef.current;
+    if (!node) return;
+
+    if (!('IntersectionObserver' in window)) {
+      setActive(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setActive(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '160px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [active, embedded]);
+
+  return (
+    <section ref={rootRef} className={`plan-links${embedded ? ' plan-links--embedded' : ''}`}>
+      {active ? (
+        <PlanLinksContent plan={plan} embedded={embedded} />
+      ) : (
+        <div className="plan-links-deferred" aria-hidden="true">
+          <span />
+          <span />
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PlanLinksContent({ plan, embedded }: { plan: PlanRow; embedded: boolean }) {
   const me = useCurrentUser();
   const partner = usePartner();
   const { data: links = [] } = usePlanLinks();
@@ -76,8 +109,6 @@ export function PlanLinksBlock({ plan, embedded = false }: {
   const [picking, setPicking] = useState<PlanLinkTarget | null>(null);
   const [shopping, setShopping] = useState(false);
 
-  // Довідник збирається з того, що читач і так бачить: вішлист віддає
-  // лише дозволене, тож чужого сюди не потрапить (див. resolveLinks).
   const catalog = useMemo<LinkCatalog>(() => ({
     wish: new Map(
       [...myWishes, ...partnerWishes, ...sharedWishes].map((wish) => [wish.id, { title: wish.title }]),
@@ -94,8 +125,6 @@ export function PlanLinksBlock({ plan, embedded = false }: {
   const mine = linksOfPlan(plan, links);
   const resolved = resolveLinks(mine, catalog);
 
-  // Вибір показує лише те, що ще не прив'язане: повторний рядок у
-  // списку нічого не додає, а тап по ньому виглядав би як помилка.
   const options = useMemo(() => {
     if (picking === null) return [];
     const all = catalog[picking];
@@ -112,11 +141,9 @@ export function PlanLinksBlock({ plan, embedded = false }: {
   };
 
   return (
-    <section className={`plan-links${embedded ? ' plan-links--embedded' : ''}`}>
+    <>
       {!embedded && (
-        <header className="plan-links-head">
-          <h3>Пов'язане</h3>
-        </header>
+        <header className="plan-links-head"><h3>Пов'язане</h3></header>
       )}
 
       {resolved.length === 0 ? (
@@ -173,10 +200,7 @@ export function PlanLinksBlock({ plan, embedded = false }: {
             return (
               <button key={type} type="button" onClick={() => startPicking(type)}>
                 <meta.Icon size={18} />
-                <span>
-                  <b>{meta.label}</b>
-                  <small>{meta.description}</small>
-                </span>
+                <span><b>{meta.label}</b><small>{meta.description}</small></span>
               </button>
             );
           })}
@@ -189,10 +213,7 @@ export function PlanLinksBlock({ plan, embedded = false }: {
             }}
           >
             <CartIcon size={18} />
-            <span>
-              <b>У покупки</b>
-              <small>Додати потрібні речі до спільного списку</small>
-            </span>
+            <span><b>У покупки</b><small>Додати потрібні речі до спільного списку</small></span>
           </button>
         </div>
       )}
@@ -200,9 +221,7 @@ export function PlanLinksBlock({ plan, embedded = false }: {
       {picking !== null && (
         options.length === 0 ? (
           <p className="plan-links-empty">
-            {catalog[picking]?.size
-              ? 'Усе з цього розділу вже пов’язане.'
-              : 'У цьому розділі поки порожньо.'}
+            {catalog[picking]?.size ? 'Усе з цього розділу вже пов’язане.' : 'У цьому розділі поки порожньо.'}
           </p>
         ) : (
           <ul className="plan-link-picker">
@@ -226,25 +245,14 @@ export function PlanLinksBlock({ plan, embedded = false }: {
       )}
 
       {shopping && <ShoppingComposer plan={plan} onDone={() => setShopping(false)} />}
-    </section>
+    </>
   );
 }
 
-/**
- * Що купити під план.
- *
- * Свідомо однобічна дія: рядки йдуть у спільний список покупок і
- * назад не звітують. Тому текст прямо це й каже — інакше з плану
- * очікували б побачити, що вже куплено, а такого зв'язку немає.
- */
 function ShoppingComposer({ plan, onDone }: { plan: PlanRow; onDone: () => void }) {
   const { add } = useShoppingMutations();
   const [text, setText] = useState('');
-
-  const lines = text
-    .split(/[,\n]/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const lines = text.split(/[,\n]/).map((line) => line.trim()).filter(Boolean);
 
   return (
     <div className="plan-shopping">
@@ -259,9 +267,7 @@ function ShoppingComposer({ plan, onDone }: { plan: PlanRow; onDone: () => void 
           onChange={(event) => setText(event.target.value)}
         />
       </label>
-      <p className="plan-shopping-hint">
-        Рядки підуть у спільний список покупок і житимуть там окремо від плану.
-      </p>
+      <p className="plan-shopping-hint">Рядки підуть у спільний список покупок і житимуть там окремо від плану.</p>
       <div className="plan-shopping-actions">
         <button
           type="button"
