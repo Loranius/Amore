@@ -104,6 +104,18 @@ export interface PlanRow {
   completed_at: string | null;
 }
 
+/** Тип сутності, з якою пов'язаний план. Ті самі слова, що в
+ *  memory_links.source_type — щоб «місце» означало одне й те саме скрізь. */
+export type PlanLinkTarget = 'wish' | 'place' | 'memory';
+
+export interface PlanLinkRow {
+  plan_id: number;
+  target_type: PlanLinkTarget;
+  /** Без зовнішнього ключа: ціль можна видалити, план від цього не зникає. */
+  target_id: number;
+  created_at: string;
+}
+
 export interface PlanTaskRow {
   id: number;
   plan_id: number;
@@ -473,6 +485,7 @@ export interface Database {
       memory_links:       TableDef<MemoryLinkRow, 'memory_id' | 'source_type' | 'source_id'>;
       plans:              TableDef<PlanRow, 'title'>;
       plan_tasks:         TableDef<PlanTaskRow, 'plan_id' | 'title'>;
+      plan_links:         TableDef<PlanLinkRow, 'plan_id' | 'target_type' | 'target_id'>;
       free_limit:         TableDef<FreeLimitRow, 'id'>;
       savings_goals:      TableDef<SavingsGoalRow, 'name'>;
       map_pins:           TableDef<MapPinRow, 'title' | 'category' | 'lat' | 'lng'>;
@@ -652,7 +665,7 @@ export type RealtimeTable =
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
   | 'map_pins' | 'user_locations'
   | 'memories' | 'memory_links' | 'memory_days'
-  | 'plans' | 'plan_tasks';
+  | 'plans' | 'plan_tasks' | 'plan_links';
 
 export type RealtimeEventType = 'INSERT' | 'UPDATE' | 'DELETE';
 

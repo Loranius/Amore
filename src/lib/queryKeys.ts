@@ -15,6 +15,9 @@ export const qk = {
   plans: () => ['plans'] as const,
   planTasks: (planId?: number) =>
     (planId === undefined ? (['planTasks'] as const) : (['planTasks', planId] as const)),
+  // Зв'язки читаються однією таблицею на всі плани: рядків одиниці, а
+  // окремий запит на кожен план означав би N запитів на списку.
+  planLinks: () => ['planLinks'] as const,
 
   shopping: () => ['shopping'] as const,
 
@@ -84,6 +87,7 @@ export const realtimeInvalidation: Record<
   memory_days: [['memories']],
   plans: [qk.plans()],
   plan_tasks: [qk.planTasks()],
+  plan_links: [qk.planLinks()],
   work_schedule: [['schedule'], qk.sharedDaysOff()],
   map_pins: [qk.mapPins()],
   user_locations: [qk.userLocations()],

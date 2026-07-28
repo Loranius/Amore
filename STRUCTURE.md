@@ -99,7 +99,7 @@ amore-react/
 |------------------------|--------------------------------------|
 | `users`                | `['users']`                          |
 | `events`               | `['events']`                         |
-| —                      | `['plans']`, `['planTasks', id]`     |
+| —                      | `['plans']`, `['planTasks', id]`, `['planLinks']` |
 | `shopping:items`       | `['shopping']`                       |
 | `wishlist:<owner>`     | `['wishlist', ownerId]`              |
 | `media:<type>:<status>`| `['media', { type, status }]`        |

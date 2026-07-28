@@ -289,3 +289,61 @@
 .plan-goal-picker button > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-goal-picker button > small { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .plan-goal-picker button > svg { flex: 0 0 auto; }
+
+/* ── Зв'язки плану ─────────────────────────────────────────── */
+.plan-links { margin-top: 18px; display: grid; gap: 9px; }
+.plan-links-head h3 { margin: 0; font-size: 15px; }
+.plan-links-empty { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+.plan-link-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.plan-link {
+  display: flex; align-items: center; gap: 8px; padding: 9px 11px;
+  border-radius: var(--radius-md); background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+/* min-width: 0 — довга назва бажання інакше розпирає рядок за екран. */
+.plan-link-open {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 9px;
+  color: var(--text); text-decoration: none;
+}
+.plan-link-icon { flex: 0 0 auto; display: flex; color: var(--accent); }
+.plan-link-copy { display: grid; gap: 1px; min-width: 0; }
+.plan-link-copy b { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-link-copy small { font-size: 11.5px; color: var(--muted); }
+.plan-link-unlink {
+  flex: 0 0 auto; border: 0; background: none; color: var(--muted);
+  cursor: pointer; padding: 3px; display: flex;
+}
+.plan-link-unlink:hover { color: var(--danger); }
+
+.plan-links-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-links-action {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px;
+  border-radius: var(--radius-md); font: inherit; font-size: 12.5px; cursor: pointer;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  background: transparent; color: var(--accent);
+}
+.plan-links-action.active {
+  border-style: solid; font-weight: 700;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+.plan-links-action > svg { flex: 0 0 auto; }
+
+.plan-link-picker { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.plan-link-picker button {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 9px 11px; border-radius: var(--radius-md); font: inherit; font-size: 13px;
+  cursor: pointer; border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface)); color: var(--text);
+}
+.plan-link-picker button > svg { flex: 0 0 auto; color: var(--accent); }
+.plan-link-picker button > span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-link-picker button > small { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); }
+
+.plan-shopping {
+  display: grid; gap: 10px; padding: 12px; border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+.plan-shopping-hint { margin: 0; font-size: 12px; color: var(--muted); }
+.plan-shopping-actions { display: flex; align-items: center; gap: 10px; }
