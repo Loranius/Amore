@@ -7,7 +7,7 @@
 // будь-який із MORE_PREFIXES-роутів.
 // ============================================================
 import { NavLink, useLocation } from 'react-router-dom';
-import { BOTTOM_LEFT, BOTTOM_RIGHT, HOME_ITEM, MORE_PREFIXES, isNavItemActive } from '@/app/nav';
+import { BOTTOM_LEFT, BOTTOM_RIGHT, HOME_ITEM, MORE_ICON, MORE_PREFIXES, isNavItemActive } from '@/app/nav';
 import type { NavItem } from '@/app/nav';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +19,7 @@ function NavButton({ item }: { item: NavItem }) {
       className={({ isActive }) => cn('nav-btn', isActive && 'active')}
     >
       <span className="nav-icon" aria-hidden="true">
-        {item.icon}
+        <item.Icon size={22} />
       </span>
       <span className="nav-label">{item.label}</span>
     </NavLink>
@@ -67,7 +67,7 @@ export function BottomNav({ onOpenMore }: { onOpenMore: () => void }) {
           aria-label="Головна"
         >
           <span className="nav-icon-home" aria-hidden="true">
-            {HOME_ITEM.icon}
+            <HOME_ITEM.Icon size={26} />
           </span>
         </NavLink>
 
@@ -82,7 +82,7 @@ export function BottomNav({ onOpenMore }: { onOpenMore: () => void }) {
           aria-haspopup="dialog"
         >
           <span className="nav-icon" aria-hidden="true">
-            ⋯
+            <MORE_ICON size={22} />
           </span>
           <span className="nav-label">Ще</span>
         </button>

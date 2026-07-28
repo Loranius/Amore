@@ -255,12 +255,15 @@ textarea {
   text-decoration: none;
 }
 .nav-btn.active { color: var(--accent); }
-.nav-icon { font-size: 20px; }
+/* display:flex — інакше svg сідає на базову лінію тексту й з'їжджає
+   вниз відносно підпису під ним. */
+.nav-icon { display: flex; align-items: center; }
 .nav-label { font-size: 11px; }
-.nav-btn-home .nav-icon-home {
-  font-size: 26px;
-  color: var(--accent);
-}
+.nav-btn-home .nav-icon-home { display: flex; color: var(--accent); }
+/* Серце «Головної» — заповнене: це підпис застосунку, а не ще один
+   пункт. Заливка тут, а не пропом, бо NavItem віддає значок як є, і
+   правило в CSS перебиває презентаційний атрибут fill="none". */
+.nav-btn-home .nav-icon-home svg { fill: currentColor; }
 
 /* ── Сайдбар (десктоп) ──────────────────────────────────────── */
 .sidebar { display: none; }
@@ -287,7 +290,7 @@ textarea {
 }
 .sidebar-item.active { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
 .sidebar-settings { margin-top: auto; }
-.sidebar-icon { width: 22px; text-align: center; }
+.sidebar-icon { width: 22px; display: flex; justify-content: center; }
 
 /* ── Дзвіночок сповіщень (плаваюча кнопка, правий верхній кут) ──
    Топ-бару в застосунку немає — тому fixed, поверх усього контенту,
@@ -399,6 +402,7 @@ textarea {
   transition: color 0.3s ease;
 }
 .hub-tab.active { color: #fff; }
+.hub-tab > svg { vertical-align: -2px; margin-right: 3px; }
 .hub-tabs-indicator {
   position: absolute;
   inset: 0;
@@ -460,7 +464,7 @@ textarea {
   cursor: pointer;
   text-decoration: none;
 }
-.more-menu-icon { font-size: 24px; }
+.more-menu-icon { display: flex; align-items: center; }
 .more-menu-label { font-size: 12px; text-align: center; }
 .more-menu-settings-btn { grid-column: span 4; flex-direction: row; justify-content: center; }
 .more-menu-close {
