@@ -1,0 +1,196 @@
+/* ============================================================
+   Людяний огляд модуля «Плани».
+   ============================================================ */
+
+.plans-overview-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  padding: 19px;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 24px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 7%, var(--surface)), var(--surface));
+}
+
+.plans-overview-hero > div { min-width: 0; }
+.plans-overview-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--accent);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+.plans-overview-hero h1 { margin: 0; font-size: 28px; letter-spacing: -.035em; }
+.plans-overview-hero p {
+  max-width: 48ch;
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.48;
+}
+.plans-overview-add { flex: 0 0 auto; white-space: nowrap; }
+
+.plans-overview-nearest,
+.plans-overview-section {
+  margin-top: 18px;
+}
+
+.plans-overview-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.plans-overview-section-head h2 {
+  margin: 0;
+  font-size: 17px;
+  letter-spacing: -.02em;
+}
+.plans-overview-section-head p {
+  max-width: 46ch;
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.plans-overview-section-head > span {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 750;
+}
+.plans-overview-section-head--quiet { margin-bottom: 8px; }
+.plans-overview-section-head--quiet span {
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+
+.plans-overview .plan-next {
+  margin-bottom: 0;
+  border-width: 1px;
+  border-radius: 22px;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.plans-overview .plan-card {
+  border-radius: 18px;
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--text) 5%, transparent);
+}
+.plans-overview .plan-card-bar { flex-basis: 3px; }
+.plans-overview .plan-card-body { padding: 13px 14px; }
+.plans-overview .plan-card-status {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 4%, var(--surface));
+  font-size: 10.5px;
+  font-weight: 650;
+}
+
+.plans-overview-more {
+  display: block;
+  min-height: 38px;
+  margin: 10px auto 0;
+  padding: 7px 13px;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.plans-overview-closed {
+  margin-top: 18px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 20px;
+  background: var(--surface);
+}
+.plans-overview-closed summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.plans-overview-closed summary::-webkit-details-marker { display: none; }
+.plans-overview-closed summary > span { display: grid; gap: 2px; }
+.plans-overview-closed summary small { color: var(--muted); font-size: 10.5px; }
+.plans-overview-closed summary strong { font-size: 13.5px; }
+.plans-overview-closed summary b {
+  display: grid;
+  min-width: 29px;
+  height: 29px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  color: var(--muted);
+  font-size: 11px;
+}
+.plans-overview-closed-list { margin: 0; padding: 0 10px 10px; }
+
+.plans-overview-empty {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  padding: 42px 22px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  text-align: center;
+}
+.plans-overview-empty > span { color: var(--accent); font-size: 30px; }
+.plans-overview-empty h2 { margin: 0; font-size: 19px; }
+.plans-overview-empty p {
+  max-width: 36ch;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.plans-overview-skeleton { display: grid; gap: 10px; }
+.plans-overview-skeleton span {
+  display: block;
+  height: 112px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  animation: plans-overview-pulse 1.5s ease-in-out infinite alternate;
+}
+@keyframes plans-overview-pulse { to { opacity: .55; } }
+
+@media (max-width: 560px) {
+  .plans-overview-hero {
+    align-items: flex-start;
+    padding: 17px;
+  }
+  .plans-overview-hero p { max-width: 34ch; }
+  .plans-overview-add { padding-inline: 12px; }
+  .plans-overview .plan-next,
+  .plans-overview .plan-card { box-shadow: none; }
+}
+
+@media (max-width: 360px) {
+  .plans-overview-hero { display: grid; }
+  .plans-overview-add { width: fit-content; }
+  .plans-overview-section-head { align-items: flex-start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans-overview-skeleton span { animation: none; }
+}
