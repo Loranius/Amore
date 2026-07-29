@@ -78,6 +78,7 @@ function TreeLabRenderedScene({
     `${Math.round(build.composition.score.total * 100)}% comp`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
+    `${build.life.leaves.length} live`,
     `${build.materials.diagnostics.uniqueMaterialCount} mat`,
     `${build.mesh.diagnostics.branchCount} гілок`,
     `${formatCount(totalTriangles)} △`,
@@ -131,6 +132,14 @@ function TreeLabRenderedScene({
       data-tree-lab-material-quantization={build.materials.diagnostics.quantizationSteps}
       data-tree-lab-bark-material={barkMaterial?.signature ?? ''}
       data-tree-lab-foliage-material={foliageMaterial?.signature ?? ''}
+      data-tree-lab-life-profiles={build.life.diagnostics.emittedLeafProfileCount}
+      data-tree-lab-life-truncated={build.life.diagnostics.truncatedLeafInstanceIds.length}
+      data-tree-lab-life-motion-scale={build.life.motionScale}
+      data-tree-lab-life-sway-x={build.life.branch.swayXAmplitudeRad}
+      data-tree-lab-life-sway-z={build.life.branch.swayZAmplitudeRad}
+      data-tree-lab-life-matrix-updates={build.life.diagnostics.estimatedMatrixUpdatesPerFrame}
+      data-tree-lab-life-extra-draw-calls={build.life.diagnostics.estimatedAdditionalDrawCalls}
+      data-tree-lab-life-reduced-motion={String(reduceMotion)}
       data-tree-lab-branches={build.mesh.diagnostics.branchCount}
       data-tree-lab-junctions={build.mesh.diagnostics.junctionCount}
       data-tree-lab-branch-vertices={build.mesh.diagnostics.vertexCount}
@@ -152,6 +161,8 @@ function TreeLabRenderedScene({
           mesh={build.mesh}
           leaves={build.leaves}
           materials={build.materials}
+          life={build.life}
+          reducedMotion={reduceMotion}
         />
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} warmupFrames={18} />
         <OrbitControls
