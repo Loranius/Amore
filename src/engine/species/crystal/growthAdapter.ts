@@ -65,6 +65,20 @@ function attachmentDepth(instruction: CrystalGrowthInstruction): number {
 }
 
 /**
+ * Inner-radius fraction safe for the faceted mesh at every current LOD.
+ * Values include room for per-facet jitter and anisotropic archetype scales.
+ */
+function surfaceRadiusScale(instruction: CrystalGrowthInstruction): number {
+  if (instruction.kind === 'mother') return 0.76;
+  if (instruction.archetype === 'blade') return 0.34;
+  if (instruction.archetype === 'tabular') return 0.43;
+  if (instruction.archetype === 'needle') return 0.51;
+  if (instruction.archetype === 'fan') return 0.54;
+  if (instruction.archetype === 'massive') return 0.64;
+  return 0.64;
+}
+
+/**
  * Species directions retain their seeded ordering, while the Crystal adapter
  * compresses the attachment band toward the lower body and shoulder. Event
  * spires start above the mother's lower termination so their entire base ring
@@ -126,6 +140,7 @@ function adaptInstruction(
     maturity: instruction.maturity,
     axialScale: size.axialScale,
     radialScale: size.radialScale,
+    surfaceRadiusScale: surfaceRadiusScale(instruction),
     preferredAzimuthRad: instruction.azimuthRad,
     preferredElevation: instruction.elevation,
     radialBias: placementBias(instruction),
