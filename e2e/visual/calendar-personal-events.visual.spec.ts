@@ -30,9 +30,9 @@ test('Календар: лише наші події та дні народже�
   const viewPicker = page.getByRole('group', { name: 'Вигляд календаря' });
   await viewPicker.getByRole('button', { name: /Список/ }).click();
 
-  await expect(page.getByRole('button', { name: /Наші свята/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Дні народження/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Свята', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: /Наші свята/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: /Дні народження/ })).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Свята', exact: true })).toHaveCount(0);
   await expect(page.locator('.relationship-journey')).toBeVisible();
   await expectInsideViewport(page, '.calendar');
   await expectInsideViewport(page, '.relationship-journey');
@@ -51,7 +51,7 @@ test('Календар: лише наші події та дні народже�
   await expect(relationshipForm.getByRole('button', { name: /Велика подія Пропозиція/ })).toHaveAttribute('aria-pressed', 'true');
   await relationshipForm.getByRole('button', { name: 'Скасувати' }).click();
 
-  await page.getByRole('button', { name: /Дні народження/ }).click();
+  await page.getByRole('tab', { name: /Дні народження/ }).click();
   await page.getByRole('button', { name: /Додати/, exact: false }).first().click();
   const birthdayForm = page.locator('.cal-entry-sheet');
   await expect(birthdayForm).toBeVisible();
