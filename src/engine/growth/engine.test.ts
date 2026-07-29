@@ -101,6 +101,37 @@ describe('Universal Growth Engine', () => {
     }
   });
 
+  it('keeps the Crystal Species compact, upward and rooted around one focal mother', () => {
+    const state = buildGrowthState({
+      blueprint: growthBlueprint(BASE_EVENTS),
+      config: DEFAULT_GROWTH_ENGINE_CONFIG,
+    });
+    const mother = state.bodies[0]!;
+
+    expect(mother.kind).toBe('crystal:mother');
+    expect(mother.direction.y).toBeGreaterThanOrEqual(0.9);
+    expect(mother.skeletonLength).toBeGreaterThan(
+      Math.max(...state.bodies.slice(1).map((body) => body.skeletonLength)),
+    );
+
+    for (const body of state.bodies.slice(1)) {
+      if (body.kind === 'crystal:event-spire') {
+        expect(body.hostBodyId).toBe(mother.id);
+        expect(body.generation).toBe(1);
+        expect(body.direction.y).toBeGreaterThanOrEqual(0.62);
+        expect(body.skeletonLength).toBeLessThanOrEqual(1.3);
+      } else if (body.kind === 'crystal:satellite') {
+        expect(body.generation).toBeLessThanOrEqual(2);
+        expect(body.direction.y).toBeGreaterThanOrEqual(0.42);
+        expect(body.skeletonLength).toBeLessThanOrEqual(0.84);
+      } else if (body.kind === 'crystal:inclusion') {
+        expect(body.generation).toBeLessThanOrEqual(3);
+        expect(body.direction.y).toBeGreaterThanOrEqual(0.3);
+        expect(body.skeletonLength).toBeLessThanOrEqual(0.42);
+      }
+    }
+  });
+
   it('keeps every historical body byte-stable when a later event is appended', () => {
     const earlier = buildGrowthState({
       blueprint: growthBlueprint(BASE_EVENTS),

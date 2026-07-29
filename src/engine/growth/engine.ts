@@ -53,6 +53,13 @@ function validateBlueprint(blueprint: UniversalGrowthBlueprint): void {
     if (!Number.isFinite(instruction.radialScale) || instruction.radialScale <= 0) {
       throw new Error(`Growth instruction "${instruction.id}" requires positive radialScale.`);
     }
+    if (
+      !Number.isFinite(instruction.surfaceRadiusScale)
+      || instruction.surfaceRadiusScale <= 0
+      || instruction.surfaceRadiusScale > 1
+    ) {
+      throw new Error(`Growth instruction "${instruction.id}" requires surfaceRadiusScale in (0, 1].`);
+    }
   }
 }
 
@@ -90,6 +97,7 @@ function rootBody(blueprint: UniversalGrowthBlueprint): GrowthBody {
     )),
     skeletonLength: round6(instruction.axialScale),
     skeletonRadius: round6(instruction.radialScale),
+    surfaceRadiusScale: round6(instruction.surfaceRadiusScale),
     renderedLength: round6(instruction.axialScale * render.length),
     renderedRadius: round6(instruction.radialScale * render.radius),
     maturity: round6(clamp01(instruction.maturity)),
@@ -222,6 +230,7 @@ function depositInstruction(
     direction: evaluation.site.direction,
     skeletonLength: round6(skeletonLength),
     skeletonRadius: round6(skeletonRadius),
+    surfaceRadiusScale: round6(instruction.surfaceRadiusScale),
     renderedLength: round6(skeletonLength * render.length),
     renderedRadius: round6(skeletonRadius * render.radius),
     maturity: round6(clamp01(instruction.maturity)),
