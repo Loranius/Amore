@@ -1,9 +1,3 @@
-// ============================================================
-// Тести грошей плану.
-//
-// Кожен тест називає інваріант, який перевіряє (.claude/rules/tests.md).
-// Дата тут не потрібна: жодна з функцій не питає «сьогодні».
-// ============================================================
 import { describe, expect, it } from 'vitest';
 import { goalsOfPlan, hasMoney, planMoney, type LinkedGoal } from './planMoney';
 import type { PlanRow } from '@/types';
@@ -21,87 +15,55 @@ const goal = (over: Partial<LinkedGoal> = {}): LinkedGoal => ({
   plan_id: 1, target_amount: 10_000, saved_amount: 2_500, ...over,
 });
 
-describe('goalsOfPlan', () => {
-  it('бере лише свої цілі — чужий план у підрахунок не потрапляє', () => {
+describe('goalsOfPlan legacy helper', () => {
+  it('усе ще може прочитати старі зв’язки під час міграції', () => {
     const mine = goal();
     const theirs = goal({ plan_id: 2 });
     const loose = goal({ plan_id: null });
     expect(goalsOfPlan(plan(), [mine, theirs, loose])).toEqual([mine]);
   });
-
-  it('за статусом не фільтруємо: відхилена ціль у таблиці не лишається', () => {
-    // finance_reject_savings_goal_v1 ВИДАЛЯЄ рядок, тож стану
-    // «відхилена» не існує. Живі статуси — pending і confirmed, і
-    // запропонована ціль так само чекає на гроші, як підтверджена.
-    const mine = goal();
-    expect(goalsOfPlan(plan(), [mine])).toEqual([mine]);
-  });
 });
 
 describe('planMoney', () => {
-  it('без бюджету й без цілей — нулі, а не сто відсотків', () => {
-    // Те саме правило, що в readiness: порожньо означає «не починали».
+  it('без бюджету повертає порожній стан', () => {
     expect(planMoney(plan(), [])).toEqual({
       budget: null, target: 0, saved: 0, gap: null, percent: 0, goals: 0,
     });
   });
 
-  it('відсоток рахується від бюджету — саме він відповідає «чи вистачає»', () => {
-    // Ціль на 20 000 зібрана наполовину, але план коштує 40 000:
-    // готовність — 25%, а не 50%.
+  it('зберігає лише очікувану вартість плану', () => {
+    expect(planMoney(plan({ budget: 40_000 }), [])).toEqual({
+      budget: 40_000, target: 0, saved: 0, gap: 40_000, percent: 0, goals: 0,
+    });
+  });
+
+  it('ігнорує старі savings goals у новій моделі', () => {
     const money = planMoney(plan({ budget: 40_000 }), [
       goal({ target_amount: 20_000, saved_amount: 10_000 }),
     ]);
-    expect(money.percent).toBe(25);
-    expect(money.gap).toBe(30_000);
+    expect(money).toEqual({
+      budget: 40_000, target: 0, saved: 0, gap: 40_000, percent: 0, goals: 0,
+    });
   });
 
-  it('без бюджету мірка — сума цілей, іншої не лишається', () => {
-    const money = planMoney(plan(), [goal({ target_amount: 10_000, saved_amount: 5_000 })]);
-    expect(money.percent).toBe(50);
-    expect(money.gap).toBeNull();
+  it('нульовий бюджет лишається легальним', () => {
+    expect(planMoney(plan({ budget: 0 }), [])).toEqual({
+      budget: 0, target: 0, saved: 0, gap: 0, percent: 0, goals: 0,
+    });
   });
 
-  it('кілька цілей додаються, а не заміщують одна одну', () => {
-    const money = planMoney(plan({ budget: 30_000 }), [
-      goal({ target_amount: 10_000, saved_amount: 4_000 }),
-      goal({ target_amount: 20_000, saved_amount: 5_000 }),
-    ]);
-    expect(money).toMatchObject({ target: 30_000, saved: 9_000, goals: 2, percent: 30 });
-  });
-
-  it('зібрано більше за бюджет: сто відсотків і нульова нестача, без мінусів', () => {
-    const money = planMoney(plan({ budget: 5_000 }), [
-      goal({ target_amount: 10_000, saved_amount: 8_000 }),
-    ]);
-    expect(money.percent).toBe(100);
-    expect(money.gap).toBe(0);
-  });
-
-  it('нульовий бюджет не ділить на нуль', () => {
-    // «Безкоштовний» план — легальний стан: пікнік коштує нуль.
-    const money = planMoney(plan({ budget: 0 }), []);
-    expect(money.percent).toBe(0);
-    expect(money.gap).toBe(0);
-  });
-
-  it('порожні суми в базі читаються як нуль, а не як NaN', () => {
-    const money = planMoney(plan({ budget: 1_000 }), [
-      goal({ target_amount: null, saved_amount: null }),
-    ]);
-    expect(money.target).toBe(0);
-    expect(money.saved).toBe(0);
-    expect(money.percent).toBe(0);
+  it('некоректна сума не перетворює UI на NaN', () => {
+    const invalid = plan({ budget: Number.NaN });
+    expect(planMoney(invalid, []).budget).toBe(0);
   });
 });
 
 describe('hasMoney', () => {
-  it('блок показується коли є бюджет АБО хоч одна ціль', () => {
+  it('блок показується, коли в плані визначено бюджет', () => {
     expect(hasMoney(planMoney(plan({ budget: 100 }), []))).toBe(true);
-    expect(hasMoney(planMoney(plan(), [goal()]))).toBe(true);
   });
 
-  it('порожньому плану блок грошей не потрібен', () => {
-    expect(hasMoney(planMoney(plan(), []))).toBe(false);
+  it('старі цілі самі по собі більше не вмикають блок', () => {
+    expect(hasMoney(planMoney(plan(), [goal()]))).toBe(false);
   });
 });
