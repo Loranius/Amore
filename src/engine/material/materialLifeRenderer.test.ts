@@ -135,8 +135,9 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(Object.values(touched.bodyGlowMultiplier).some((value) => value > 1)).toBe(true);
   });
 
-  it('batches different geometries by optical signature', () => {
+  it('batches different geometries and fits them without mutating domain coordinates', () => {
     const { geometry, material, life } = pipeline();
+    const geometryBefore = JSON.stringify(geometry);
     const bundle = createThreeCrystalRenderBundle(geometry, material);
     const frame = sampleCrystalLife({ life, elapsedSeconds: 12.5, interactionPulse: 0.4 });
     applyCrystalLifeFrame(bundle, frame);
@@ -146,9 +147,19 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(bundle.drawCallCount).toBe(material.diagnostics.uniqueMaterialCount);
     expect(bundle.drawCallCount).toBe(bundle.batches.length);
     expect(bundle.drawCallCount).toBeLessThan(geometry.meshes.length);
-    expect(bundle.group.children).toHaveLength(bundle.drawCallCount);
+    expect(bundle.group.children).toEqual([bundle.content]);
+    expect(bundle.content.children).toHaveLength(bundle.drawCallCount);
     expect(bundle.group.rotation.y).toBeCloseTo(frame.rotationY, 6);
     expect(bundle.group.position.y).toBeCloseTo(frame.positionY, 6);
+
+    expect(bundle.fit.sourceSize.x).toBeGreaterThan(0);
+    expect(bundle.fit.sourceSize.y).toBeGreaterThan(0);
+    expect(bundle.fit.sourceSize.z).toBeGreaterThan(0);
+    expect(bundle.fit.scale).toBeGreaterThan(0);
+    expect(bundle.fit.sourceSize.y * bundle.fit.scale).toBeLessThanOrEqual(bundle.fit.targetHeight + 1e-6);
+    expect(Math.max(bundle.fit.sourceSize.x, bundle.fit.sourceSize.z) * bundle.fit.scale)
+      .toBeLessThanOrEqual(bundle.fit.targetWidth + 1e-6);
+    expect(JSON.stringify(geometry)).toBe(geometryBefore);
 
     const uniqueMeshes = new Set(bundle.meshes.values());
     const uniqueMaterials = new Set(bundle.materials.values());
