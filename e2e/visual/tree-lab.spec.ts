@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
@@ -16,6 +16,26 @@ function numericAttribute(value: string | null, name: string): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) throw new Error(`${name} must be finite, received ${String(value)}`);
   return parsed;
+}
+
+async function expectCompositionMetrics(preview: Locator) {
+  await expect(preview).toHaveAttribute(
+    'data-tree-lab-silhouette',
+    /^(columnar|oval|umbrella|windswept)$/,
+  );
+  for (const attribute of [
+    'data-tree-lab-composition-score',
+    'data-tree-lab-negative-space',
+    'data-tree-lab-crown-density',
+  ]) {
+    const value = numericAttribute(await preview.getAttribute(attribute), attribute);
+    expect(value).toBeGreaterThanOrEqual(0);
+    expect(value).toBeLessThanOrEqual(1);
+  }
+  expect(numericAttribute(
+    await preview.getAttribute('data-tree-lab-empty-cells'),
+    'emptyCells',
+  )).toBeGreaterThanOrEqual(0);
 }
 
 test.describe('Tree Species Pixel 8 Pro preview', () => {
@@ -38,6 +58,7 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
       timeout: 20_000,
     });
     await expect(preview).toHaveAttribute('data-tree-lab-violations', '');
+    await expectCompositionMetrics(preview);
 
     await page.screenshot({
       path: 'test-results/tree-species-fixture-pixel-8-pro.png',
@@ -57,6 +78,7 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
     await expect(preview).toHaveAttribute('data-tree-lab-acceptance', 'pass', {
       timeout: 20_000,
     });
+    await expectCompositionMetrics(preview);
 
     const normalizedEvents = numericAttribute(
       await preview.getAttribute('data-tree-lab-normalized-events'),

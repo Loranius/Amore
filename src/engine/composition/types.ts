@@ -1,4 +1,9 @@
 import type { GrowthState, GrowthTier, GrowthVec3 } from '../growth';
+import type {
+  OrganicCurveFrameState,
+  OrganicSkeletonState,
+} from '../labs/organic';
+import type { TreeSpeciesBlueprint } from '../species/tree';
 
 export type CrystalSilhouette = 'cathedral' | 'fan' | 'druse';
 export type CrystalCompositionRole = 'focal' | 'support' | 'family' | 'companion' | 'micro';
@@ -62,4 +67,87 @@ export interface CrystalCompositionState {
 export interface BuildCrystalCompositionInput {
   growth: GrowthState;
   config: CrystalCompositionConfig;
+}
+
+export type TreeSilhouette = 'columnar' | 'oval' | 'umbrella' | 'windswept';
+export type TreeCompositionRole = 'trunk' | 'primary' | 'secondary' | 'twig';
+
+export interface TreeCompositionConfig {
+  /** Bump whenever tree scoring or silhouette rules change. */
+  rulesVersion: string;
+  azimuthSectorCount: number;
+  verticalLayerCount: number;
+  targetEmptySectorShare: number;
+  targetCrownFill: number;
+}
+
+export interface TreeCompositionBounds {
+  min: GrowthVec3;
+  max: GrowthVec3;
+  center: GrowthVec3;
+  radius: number;
+  height: number;
+}
+
+/** Stable branch-local analysis. It never mutates the source skeleton or frames. */
+export interface TreeCompositionBranch {
+  branchId: string;
+  generation: number;
+  role: TreeCompositionRole;
+  parentBranchId: string | null;
+  sourceNodeCount: number;
+  sampleCount: number;
+  length: number;
+  meanRadius: number;
+  estimatedVolume: number;
+  radialReach: number;
+  minHeight: number;
+  maxHeight: number;
+  azimuthSectorIndex: number;
+  verticalLayerIndices: number[];
+  terminalDirection: GrowthVec3;
+}
+
+export interface TreeCompositionScore {
+  hierarchy: number;
+  flow: number;
+  silhouette: number;
+  crownDensity: number;
+  balance: number;
+  rhythm: number;
+  negativeSpace: number;
+  junctionRealism: number;
+  total: number;
+}
+
+export interface TreeCompositionDiagnostics {
+  missingCurveBranchIds: string[];
+  orphanCurveBranchIds: string[];
+  emptySectorIndices: number[];
+  crowdedSectorIndices: number[];
+  occupiedCellCount: number;
+  emptyCellCount: number;
+  generationCounts: number[];
+}
+
+export interface TreeCompositionState {
+  treeCompositionVersion: 1;
+  rulesVersion: string;
+  sourceSpeciesRulesVersion: string;
+  sourceSkeletonVersion: OrganicSkeletonState['organicSkeletonVersion'];
+  sourceFrameVersion: OrganicCurveFrameState['organicCurveFrameVersion'];
+  artifactSeed: number;
+  silhouette: TreeSilhouette;
+  axis: GrowthVec3;
+  bounds: TreeCompositionBounds;
+  branches: TreeCompositionBranch[];
+  score: TreeCompositionScore;
+  diagnostics: TreeCompositionDiagnostics;
+}
+
+export interface BuildTreeCompositionInput {
+  species: TreeSpeciesBlueprint;
+  skeleton: OrganicSkeletonState;
+  frames: OrganicCurveFrameState;
+  config: TreeCompositionConfig;
 }
