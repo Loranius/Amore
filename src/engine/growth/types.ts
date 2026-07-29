@@ -30,6 +30,12 @@ export interface UniversalGrowthInstruction {
   maturity: number;
   axialScale: number;
   radialScale: number;
+  /**
+   * Conservative fraction of analytical radius safe for future attachments.
+   * Faceted or concave species use < 1 so Growth Sites cannot land outside the
+   * eventual mesh even when the analytical envelope is circular.
+   */
+  surfaceRadiusScale: number;
   preferredAzimuthRad: number;
   preferredElevation: number;
   radialBias: number;
@@ -104,6 +110,7 @@ export interface GrowthBody {
   direction: GrowthVec3;
   skeletonLength: number;
   skeletonRadius: number;
+  surfaceRadiusScale: number;
   renderedLength: number;
   renderedRadius: number;
   maturity: number;

@@ -1,0 +1,144 @@
+import {
+  add,
+  distance,
+  dot,
+  orthonormalBasis,
+  scale,
+  subtract,
+} from '../growth/math';
+import type { GrowthVec3 } from '../growth';
+import { rebuildCrystalMeshNormals } from './mesh';
+import type {
+  CrystalGeometryConfig,
+  CrystalMeshData,
+  CrystalSolid,
+} from './types';
+
+function vertexAt(positions: readonly number[], index: number): GrowthVec3 {
+  return {
+    x: positions[index * 3] ?? 0,
+    y: positions[index * 3 + 1] ?? 0,
+    z: positions[index * 3 + 2] ?? 0,
+  };
+}
+
+function midpoint(left: GrowthVec3, right: GrowthVec3): GrowthVec3 {
+  return scale(add(left, right), 0.5);
+}
+
+function centroid(a: GrowthVec3, b: GrowthVec3, c: GrowthVec3): GrowthVec3 {
+  return scale(add(add(a, b), c), 1 / 3);
+}
+
+function boundsOverlap(left: CrystalSolid, right: CrystalSolid, epsilon: number): boolean {
+  return distance(left.bounds.center, right.bounds.center)
+    <= left.bounds.radius + right.bounds.radius + epsilon;
+}
+
+function radiusAt(solid: CrystalSolid, y: number): number {
+  const rows = solid.profile.rows;
+  if (y <= (rows[0]?.y ?? 0)) return rows[0]?.radius ?? 0;
+  for (let index = 0; index < rows.length - 1; index += 1) {
+    const left = rows[index]!;
+    const right = rows[index + 1]!;
+    if (y <= right.y) {
+      const span = Math.max(1e-9, right.y - left.y);
+      const t = (y - left.y) / span;
+      return left.radius * (1 - t) + right.radius * t;
+    }
+  }
+  return rows[rows.length - 1]?.radius ?? 0;
+}
+
+export function pointInsideCrystalSolid(
+  point: GrowthVec3,
+  solid: CrystalSolid,
+  epsilon: number,
+): boolean {
+  const relative = subtract(point, solid.profile.geometryAnchor);
+  const y = dot(relative, solid.body.direction);
+  const lastY = solid.profile.rows[solid.profile.rows.length - 1]?.y ?? 0;
+  if (y < -epsilon || y > lastY + epsilon) return false;
+
+  const axisPoint = add(solid.profile.geometryAnchor, scale(solid.body.direction, y));
+  const radial = subtract(point, axisPoint);
+  const { tangent, bitangent } = orthonormalBasis(solid.body.direction);
+  const radius = Math.max(1e-9, radiusAt(solid, y));
+  const x = dot(radial, tangent) / Math.max(1e-9, radius * solid.profile.scaleX);
+  const z = dot(radial, bitangent) / Math.max(1e-9, radius * solid.profile.scaleZ);
+  const allowance = 1 + epsilon / radius;
+  return x * x + z * z <= allowance * allowance;
+}
+
+function triangleInsideSolid(
+  a: GrowthVec3,
+  b: GrowthVec3,
+  c: GrowthVec3,
+  solid: CrystalSolid,
+  epsilon: number,
+): boolean {
+  return pointInsideCrystalSolid(a, solid, epsilon)
+    && pointInsideCrystalSolid(b, solid, epsilon)
+    && pointInsideCrystalSolid(c, solid, epsilon)
+    && pointInsideCrystalSolid(centroid(a, b, c), solid, epsilon)
+    && pointInsideCrystalSolid(midpoint(a, b), solid, epsilon)
+    && pointInsideCrystalSolid(midpoint(b, c), solid, epsilon)
+    && pointInsideCrystalSolid(midpoint(c, a), solid, epsilon);
+}
+
+/**
+ * Bounded local shell trim. Vertex buffers stay stable; only the visible index
+ * list changes. Attached base caps are never part of the external shell.
+ */
+export function trimCrystalMesh(
+  mesh: CrystalMeshData,
+  self: CrystalSolid,
+  solids: readonly CrystalSolid[],
+  config: CrystalGeometryConfig,
+): CrystalMeshData {
+  const candidates = solids
+    .filter((solid) => solid.body.id !== self.body.id && boundsOverlap(self, solid, config.hiddenFaceEpsilon))
+    .sort((left, right) => left.body.id.localeCompare(right.body.id));
+  const kept: number[] = [];
+  const occluders = new Set<string>();
+  let baseCapRemoved = false;
+
+  for (let triangle = 0; triangle < mesh.sourceTriangleCount; triangle += 1) {
+    const offset = triangle * 3;
+    const ia = mesh.indices[offset] ?? 0;
+    const ib = mesh.indices[offset + 1] ?? 0;
+    const ic = mesh.indices[offset + 2] ?? 0;
+
+    if (mesh.hostBodyId !== null && triangle < mesh.baseCapTriangleCount) {
+      baseCapRemoved = true;
+      if (mesh.hostBodyId) occluders.add(mesh.hostBodyId);
+      continue;
+    }
+
+    const a = vertexAt(mesh.positions, ia);
+    const b = vertexAt(mesh.positions, ib);
+    const c = vertexAt(mesh.positions, ic);
+    const hiddenBy = candidates.find((candidate) => triangleInsideSolid(
+      a,
+      b,
+      c,
+      candidate,
+      config.hiddenFaceEpsilon,
+    ));
+    if (hiddenBy) {
+      occluders.add(hiddenBy.body.id);
+      continue;
+    }
+    kept.push(ia, ib, ic);
+  }
+
+  const visibleTriangleCount = kept.length / 3;
+  return rebuildCrystalMeshNormals({
+    ...mesh,
+    indices: kept,
+    visibleTriangleCount,
+    removedTriangleCount: mesh.sourceTriangleCount - visibleTriangleCount,
+    baseCapRemoved,
+    occluderBodyIds: [...occluders].sort(),
+  });
+}

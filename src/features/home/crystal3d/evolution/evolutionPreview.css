@@ -1,0 +1,64 @@
+.evolution-preview-wrap {
+  position: relative;
+}
+
+.evolution-preview-badge,
+.evolution-preview-diagnostics {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px solid rgb(255 255 255 / 72%);
+  border-radius: 999px;
+  background: rgb(87 35 57 / 72%);
+  box-shadow: 0 6px 18px rgb(75 28 49 / 18%);
+  color: #fff8fb;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(10px);
+}
+
+.evolution-preview-badge {
+  right: 12px;
+  bottom: 12px;
+  max-width: calc(100% - 24px);
+  padding: 7px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.evolution-preview-diagnostics {
+  left: 12px;
+  bottom: 12px;
+  padding: 7px 9px;
+}
+
+.evolution-preview-badge--error {
+  right: 12px;
+  top: 12px;
+  bottom: auto;
+  background: rgb(125 42 53 / 80%);
+}
+
+.evolution-preview-fallback {
+  position: relative;
+}
+
+@media (max-width: 430px) {
+  .evolution-preview-badge {
+    right: 8px;
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+
+  .evolution-preview-diagnostics {
+    left: 8px;
+    bottom: 8px;
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+}
