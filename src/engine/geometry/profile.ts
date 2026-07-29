@@ -60,10 +60,10 @@ function appendRow(rows: CrystalProfileRow[], y: number, radius: number): void {
 
 function buildMotherRows(length: number, radius: number): CrystalProfileRow[] {
   const rows: CrystalProfileRow[] = [];
-  // A narrow buried-looking foot, a long straight prism and a proper
-  // termination. This avoids the old inflated oval silhouette.
-  appendRow(rows, 0, radius * 0.76);
-  appendRow(rows, length * 0.055, radius * 0.94);
+  // A double-terminated floating prism: the lower point avoids a visible flat
+  // cut, while the long central shaft remains the unique composition focus.
+  appendRow(rows, 0, radius * 0.16);
+  appendRow(rows, length * 0.055, radius * 0.72);
   appendRow(rows, length * 0.13, radius);
   appendRow(rows, length * 0.66, radius * 0.98);
   appendRow(rows, length * 0.73, radius * 0.92);
