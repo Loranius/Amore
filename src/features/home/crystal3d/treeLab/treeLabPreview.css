@@ -11,6 +11,7 @@
 }
 
 .tree-lab-preview-badge,
+.tree-lab-preview-species,
 .tree-lab-preview-status {
   position: absolute;
   z-index: 4;
@@ -33,6 +34,18 @@
   overflow: hidden;
   background: rgb(74 55 43 / 78%);
   color: #fffaf6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-lab-preview-species {
+  right: 12px;
+  top: 12px;
+  max-width: calc(100% - 168px);
+  padding: 7px 10px;
+  overflow: hidden;
+  background: rgb(245 238 226 / 82%);
+  color: #4e382b;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -69,6 +82,14 @@
     right: 8px;
     bottom: 8px;
     max-width: calc(100% - 16px);
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+
+  .tree-lab-preview-species {
+    right: 8px;
+    top: 8px;
+    max-width: calc(100% - 145px);
     padding: 6px 8px;
     font-size: 9px;
   }

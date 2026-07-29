@@ -3,15 +3,32 @@ import { createThreeOrganicSweepGeometry } from '@/engine/renderer/three';
 import { TREE_LAB_MOBILE_BUDGET } from './acceptance';
 import { buildTreeLabPreview } from './buildTreeLabPreview';
 
+function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'buildMs'> {
+  const { buildMs: _buildMs, ...stable } = value;
+  return stable;
+}
+
 describe('Tree Lab preview pipeline', () => {
-  it('keeps deterministic geometry across repeated builds', () => {
+  it('keeps the full Evolution -> Species -> Growth -> Geometry result deterministic', () => {
     const first = buildTreeLabPreview('medium');
     const second = buildTreeLabPreview('medium');
 
+    expect(withoutBuildTime(second)).toEqual(withoutBuildTime(first));
     expect(second.seed).toBe(first.seed);
-    expect(second.skeleton).toEqual(first.skeleton);
-    expect(second.frames).toEqual(first.frames);
-    expect(second.mesh).toEqual(first.mesh);
+  });
+
+  it('uses Tree Species output instead of a free-standing random attractor field', () => {
+    const build = buildTreeLabPreview('medium');
+
+    expect(build.species.species).toBe('tree');
+    expect(build.species.coupleId).toBe('amore:tree-species-preview');
+    expect(build.species.state.stage).toBe('young');
+    expect(build.species.diagnostics.annualInstructionCount).toBe(2);
+    expect(build.species.diagnostics.eventInstructionCount).toBe(8);
+    expect(build.field.diagnostics.attractorCount).toBe(15);
+    expect(build.field.diagnostics.truncatedInstructionIds).toEqual([]);
+    expect(build.skeleton.seed).toBe(build.field.seed);
+    expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
   });
 
   it('keeps the medium mobile topology inside the published limits', () => {

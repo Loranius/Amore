@@ -41,7 +41,7 @@ export default function TreeLabPreviewScene() {
       ? `budget fail: ${acceptance.violations.join(', ')}`
       : 'runtime warming…';
   const badge = [
-    'Tree Lab',
+    'Tree Species',
     lod,
     `${build.mesh.diagnostics.branchCount} гілок`,
     `${build.mesh.diagnostics.junctionCount} стиків`,
@@ -50,14 +50,26 @@ export default function TreeLabPreviewScene() {
     runtime ? `${runtime.drawCalls} DC` : 'DC…',
     `${build.buildMs.toFixed(1)} ms`,
   ].join(' · ');
+  const speciesBadge = [
+    build.species.state.stage,
+    `${build.species.diagnostics.annualInstructionCount} річн.`,
+    `${build.species.diagnostics.eventInstructionCount} подій`,
+    `${build.field.diagnostics.attractorCount} цілей`,
+  ].join(' · ');
 
   return (
     <div
       className="crystal-wrap tree-lab-preview-wrap"
       data-tree-lab-preview="ready"
+      data-tree-lab-source="tree-species"
       data-tree-lab-lod={lod}
       data-tree-lab-acceptance={acceptance.status}
       data-tree-lab-violations={acceptance.violations.join(',')}
+      data-tree-lab-stage={build.species.state.stage}
+      data-tree-lab-annual-instructions={build.species.diagnostics.annualInstructionCount}
+      data-tree-lab-event-instructions={build.species.diagnostics.eventInstructionCount}
+      data-tree-lab-attractors={build.field.diagnostics.attractorCount}
+      data-tree-lab-truncated={build.field.diagnostics.truncatedInstructionIds.length}
       data-tree-lab-branches={build.mesh.diagnostics.branchCount}
       data-tree-lab-junctions={build.mesh.diagnostics.junctionCount}
       data-tree-lab-vertices={build.mesh.diagnostics.vertexCount}
@@ -85,6 +97,9 @@ export default function TreeLabPreviewScene() {
           target={[0, 2.55, 0]}
         />
       </Canvas>
+      <span className="tree-lab-preview-species" aria-label="Дані Tree Species preview">
+        {speciesBadge}
+      </span>
       <span className="tree-lab-preview-badge" aria-label="Метрики Tree Lab preview">
         {badge}
       </span>
