@@ -40,44 +40,41 @@ function directionInheritance(instruction: CrystalGrowthInstruction): number {
   return 0.5;
 }
 
+/**
+ * Full adult dimensions depend only on the stable instruction itself.
+ * Global current pressures are intentionally excluded: a future event may add
+ * a new body, but it must never resize historical skeletons.
+ */
 function dimensions(
-  blueprint: CrystalSpeciesBlueprint,
   instruction: CrystalGrowthInstruction,
 ): { axialScale: number; radialScale: number } {
-  const density = blueprint.pressures.density;
-  const stability = blueprint.pressures.stability;
-
   if (instruction.kind === 'mother') {
-    return {
-      axialScale: round6(1.5 + stability * 0.36 + density * 0.18),
-      radialScale: round6(0.29 + density * 0.11 + stability * 0.055),
-    };
+    return { axialScale: 1.72, radialScale: 0.36 };
   }
   if (instruction.kind === 'event-spire') {
     return {
-      axialScale: round6(0.95 + instruction.weight * 0.82 + stability * 0.12),
-      radialScale: round6(0.13 + instruction.weight * 0.075 + density * 0.035),
+      axialScale: round6(0.98 + instruction.weight * 0.82),
+      radialScale: round6(0.14 + instruction.weight * 0.07),
     };
   }
   if (instruction.kind === 'satellite') {
     return {
-      axialScale: round6(0.56 + instruction.weight * 0.61 + blueprint.pressures.expansion * 0.12),
-      radialScale: round6(0.09 + instruction.weight * 0.052 + density * 0.022),
+      axialScale: round6(0.58 + instruction.weight * 0.6),
+      radialScale: round6(0.095 + instruction.weight * 0.05),
     };
   }
   return {
-    axialScale: round6(0.24 + instruction.weight * 0.34 + blueprint.pressures.surfaceComplexity * 0.07),
-    radialScale: round6(0.068 + instruction.weight * 0.036 + density * 0.018),
+    axialScale: round6(0.25 + instruction.weight * 0.34),
+    radialScale: round6(0.07 + instruction.weight * 0.035),
   };
 }
 
 function adaptInstruction(
-  blueprint: CrystalSpeciesBlueprint,
   instruction: CrystalGrowthInstruction,
   sequence: number,
   colonyId: string | null,
 ): UniversalGrowthInstruction {
-  const size = dimensions(blueprint, instruction);
+  const size = dimensions(instruction);
   return {
     id: instruction.id,
     sourceId: instruction.sourceEventId,
@@ -124,9 +121,8 @@ export function crystalToGrowthBlueprint(
     engineVersion: blueprint.engineVersion,
     speciesRulesVersion: blueprint.rulesVersion,
     artifactSeed: blueprint.artifactSeed,
-    root: adaptInstruction(blueprint, blueprint.mother, -1, null),
+    root: adaptInstruction(blueprint.mother, -1, null),
     instructions: blueprint.formations.map((instruction, index) => adaptInstruction(
-      blueprint,
       instruction,
       index,
       membership.get(instruction.id) ?? null,
