@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isTreeLabPreviewEnabled, resolveTreeLabLod } from './featureFlag';
+import {
+  isTreeLabPreviewEnabled,
+  resolveTreeLabLod,
+  resolveTreeLabSource,
+} from './featureFlag';
 
 describe('Tree Lab preview flags', () => {
   it('requires an explicit tree-lab renderer value', () => {
@@ -14,5 +18,13 @@ describe('Tree Lab preview flags', () => {
     expect(resolveTreeLabLod('?treeLod=low')).toBe('low');
     expect(resolveTreeLabLod('?treeLod=ultra')).toBe('medium');
     expect(resolveTreeLabLod('', 'low')).toBe('low');
+  });
+
+  it('keeps the fixture baseline unless portal history is explicitly requested', () => {
+    expect(resolveTreeLabSource('')).toBe('fixture');
+    expect(resolveTreeLabSource('?treeSource=fixture')).toBe('fixture');
+    expect(resolveTreeLabSource('?treeSource=portal')).toBe('portal');
+    expect(resolveTreeLabSource('?treeSource=unknown')).toBe('fixture');
+    expect(resolveTreeLabSource('', 'portal')).toBe('portal');
   });
 });
