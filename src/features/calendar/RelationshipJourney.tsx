@@ -10,6 +10,7 @@ import { HeartIcon } from '@/components/icons/NavIcon';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import type { EventRow } from '@/types';
 import './relationshipJourney.css';
+import './relationshipJourneyImportance.css';
 
 const ROW_HEIGHT = 142;
 const HISTORY_BATCH = 8;
