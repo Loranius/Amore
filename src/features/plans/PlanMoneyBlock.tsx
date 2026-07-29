@@ -5,12 +5,13 @@
 // зберігає, скільки може коштувати, та показує поточну спільну заначку
 // для орієнтиру.
 // ============================================================
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { PiggyBankIcon } from '@/components/icons/NavIcon';
 import { fmtMoney } from '@/features/piggybank/useBudget';
 import { usePiggyBank } from '@/features/piggybank/usePiggyBank';
 import { usePlanMutations } from './usePlans';
+import './planMoneyBalance.css';
 import type { PlanRow } from '@/types';
 
 export function PlanMoneyBlock({ plan, accent, embedded = false }: {
@@ -27,6 +28,7 @@ export function PlanMoneyBlock({ plan, accent, embedded = false }: {
   const saved = Math.max(0, Number(piggyBank?.balance ?? 0));
   const gap = budget === null ? null : Math.max(0, budget - saved);
   const enough = budget !== null && saved >= budget;
+  const comparisonStyle = { '--plan-money-accent': accent } as CSSProperties;
 
   const saveBudget = () => {
     const raw = budgetDraft.trim().replace(/\s/g, '').replace(',', '.');
@@ -82,7 +84,7 @@ export function PlanMoneyBlock({ plan, accent, embedded = false }: {
         </div>
       )}
 
-      <Link className="plan-money-piggy" to="/piggybank" style={{ '--plan-money-accent': accent } as React.CSSProperties}>
+      <Link className="plan-money-piggy" to="/piggybank" style={comparisonStyle}>
         <span className="plan-money-piggy-icon" aria-hidden="true"><PiggyBankIcon size={20} /></span>
         <span>
           <small>Зараз у скарбничці</small>
