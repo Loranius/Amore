@@ -16,26 +16,22 @@ const ALLOWED_MEMORY_SOURCES = new Set(['wish', 'place', 'goal', 'event']);
 
 export function archiveToWishlistSource(
   item: WishlistEvolutionArchiveItem,
-  isShared: boolean,
 ): WishlistSource {
   return {
     id: item.id,
     fulfilled: true,
     fulfilledAt: item.fulfilled_at ?? item.completed_at,
     giftDate: item.completed_at,
-    isShared,
+    isShared: item.is_shared,
     priority: item.priority,
   };
 }
 
-export function dedupeEvolutionWishlist(
-  personal: readonly WishlistEvolutionArchiveItem[],
-  shared: readonly WishlistEvolutionArchiveItem[],
+export function evolutionWishlistFromPairArchive(
+  rows: readonly WishlistEvolutionArchiveItem[],
 ): WishlistSource[] {
   const byId = new Map<number, WishlistSource>();
-  for (const item of personal) byId.set(item.id, archiveToWishlistSource(item, false));
-  // Shared wins if a backend scope ever returns the same row in both archives.
-  for (const item of shared) byId.set(item.id, archiveToWishlistSource(item, true));
+  for (const item of rows) byId.set(item.id, archiveToWishlistSource(item));
   return [...byId.values()].sort((left, right) => left.id - right.id);
 }
 
