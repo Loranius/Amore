@@ -19,6 +19,8 @@ import {
   TREE_SPECIES_PREVIEW_AS_OF,
 } from './treeSpeciesFixture';
 
+const TREE_FIXTURE_RULES_VERSION = 'tree-species-preview-v1.0.0';
+
 export interface TreeLabPreviewBuild {
   seed: number;
   lod: OrganicMeshLod;
@@ -31,23 +33,31 @@ export interface TreeLabPreviewBuild {
   buildMs: number;
 }
 
+export interface BuildTreeLabPreviewFromArtifactInput {
+  artifact: ArtifactBlueprint;
+  asOf: string;
+  lod: OrganicMeshLod;
+  rulesVersion: string;
+}
+
 function now(): number {
   return typeof performance === 'undefined' ? Date.now() : performance.now();
 }
 
 /**
- * End-to-end laboratory path:
- * Evolution fixture -> Tree Species -> Organic Growth -> Geometry.
+ * Pure artifact-to-mesh path. It accepts either the fixed regression fixture or
+ * a read-only ArtifactBlueprint assembled from normalized portal events.
  */
-export function buildTreeLabPreview(lod: OrganicMeshLod): TreeLabPreviewBuild {
+export function buildTreeLabPreviewFromArtifact({
+  artifact,
+  asOf,
+  lod,
+  rulesVersion,
+}: BuildTreeLabPreviewFromArtifactInput): TreeLabPreviewBuild {
   const startedAt = now();
-  const artifact = buildTreeSpeciesPreviewArtifact();
   const species = buildTreeSpeciesBlueprint({
     artifact,
-    config: {
-      asOf: TREE_SPECIES_PREVIEW_AS_OF,
-      rulesVersion: 'tree-species-preview-v1.0.0',
-    },
+    config: { asOf, rulesVersion },
   });
   const field = treeToOrganicField(species);
   const skeleton = buildOrganicSkeleton({
@@ -69,4 +79,14 @@ export function buildTreeLabPreview(lod: OrganicMeshLod): TreeLabPreviewBuild {
     mesh,
     buildMs: now() - startedAt,
   };
+}
+
+/** Fixed fixture retained as the deterministic regression baseline. */
+export function buildTreeLabPreview(lod: OrganicMeshLod): TreeLabPreviewBuild {
+  return buildTreeLabPreviewFromArtifact({
+    artifact: buildTreeSpeciesPreviewArtifact(),
+    asOf: TREE_SPECIES_PREVIEW_AS_OF,
+    lod,
+    rulesVersion: TREE_FIXTURE_RULES_VERSION,
+  });
 }
