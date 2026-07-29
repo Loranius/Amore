@@ -69,6 +69,8 @@ function TreeLabRenderedScene({
     : source === 'fixture-fallback'
       ? 'Fixture fallback'
       : 'Fixture baseline';
+  const barkMaterial = build.materials.materials.find((material) => material.role === 'bark');
+  const foliageMaterial = build.materials.materials.find((material) => material.role === 'foliage');
   const badge = [
     sourceLabel,
     build.lod,
@@ -76,6 +78,7 @@ function TreeLabRenderedScene({
     `${Math.round(build.composition.score.total * 100)}% comp`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
+    `${build.materials.diagnostics.uniqueMaterialCount} mat`,
     `${build.mesh.diagnostics.branchCount} гілок`,
     `${formatCount(totalTriangles)} △`,
     runtime ? `${runtime.drawCalls} DC` : 'DC…',
@@ -122,6 +125,12 @@ function TreeLabRenderedScene({
       data-tree-lab-leaf-rendered-triangles={build.leaves.diagnostics.renderedTriangleCount}
       data-tree-lab-leaf-truncated={build.leaves.diagnostics.truncatedInstanceIds.length}
       data-tree-lab-leaf-draw-calls={build.leaves.diagnostics.estimatedDrawCalls}
+      data-tree-lab-material-count={build.materials.diagnostics.uniqueMaterialCount}
+      data-tree-lab-material-budget={build.materials.diagnostics.materialBudget}
+      data-tree-lab-material-budget-exceeded={String(build.materials.diagnostics.materialBudgetExceeded)}
+      data-tree-lab-material-quantization={build.materials.diagnostics.quantizationSteps}
+      data-tree-lab-bark-material={barkMaterial?.signature ?? ''}
+      data-tree-lab-foliage-material={foliageMaterial?.signature ?? ''}
       data-tree-lab-branches={build.mesh.diagnostics.branchCount}
       data-tree-lab-junctions={build.mesh.diagnostics.junctionCount}
       data-tree-lab-branch-vertices={build.mesh.diagnostics.vertexCount}
@@ -139,7 +148,11 @@ function TreeLabRenderedScene({
         <ambientLight intensity={0.72} />
         <directionalLight position={[4, 7, 5]} intensity={1.25} />
         <directionalLight position={[-4, 3, -2]} intensity={0.45} />
-        <TreeLabObject mesh={build.mesh} leaves={build.leaves} />
+        <TreeLabObject
+          mesh={build.mesh}
+          leaves={build.leaves}
+          materials={build.materials}
+        />
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} warmupFrames={18} />
         <OrbitControls
           enablePan={false}
