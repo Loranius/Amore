@@ -35,6 +35,7 @@ export function createThreeTreeLifeBinding(
     matrix.decompose(position, quaternion, scale);
     baseLeafTransforms.push({ position, quaternion, scale });
   }
+  leafMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
   root.userData['treeLife'] = {
     leafInstances: leafMesh.count,
