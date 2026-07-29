@@ -64,6 +64,18 @@ function attachmentDepth(instruction: CrystalGrowthInstruction): number {
 }
 
 /**
+ * Species directions retain their seeded ordering, while the Crystal adapter
+ * compresses the attachment band toward the lower body and shoulder. The
+ * universal Growth Engine still chooses the final analytical surface site.
+ */
+function placementBias(instruction: CrystalGrowthInstruction): number {
+  if (instruction.kind === 'event-spire') return round6(0.05 + instruction.radialBias * 0.28);
+  if (instruction.kind === 'satellite') return round6(0.08 + instruction.radialBias * 0.35);
+  if (instruction.kind === 'inclusion') return round6(0.04 + instruction.radialBias * 0.28);
+  return 0;
+}
+
+/**
  * Full adult dimensions depend only on the stable instruction itself.
  * Global current pressures are intentionally excluded: a future event may add
  * a new body, but it must never resize historical skeletons.
@@ -72,7 +84,7 @@ function dimensions(
   instruction: CrystalGrowthInstruction,
 ): { axialScale: number; radialScale: number } {
   if (instruction.kind === 'mother') {
-    return { axialScale: 1.62, radialScale: 0.39 };
+    return { axialScale: 1.64, radialScale: 0.34 };
   }
   if (instruction.kind === 'event-spire') {
     return {
@@ -114,7 +126,7 @@ function adaptInstruction(
     radialScale: size.radialScale,
     preferredAzimuthRad: instruction.azimuthRad,
     preferredElevation: instruction.elevation,
-    radialBias: instruction.radialBias,
+    radialBias: placementBias(instruction),
     attachmentDepth: attachmentDepth(instruction),
     hostPreference: hostPreference(instruction),
     maxGeneration: maxGeneration(instruction),
