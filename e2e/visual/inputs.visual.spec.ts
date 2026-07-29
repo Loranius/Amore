@@ -42,6 +42,20 @@ async function login(page: import('@playwright/test').Page) {
   await page.waitForURL((url) => !url.hash.includes('/login'), { timeout: 15_000 });
 }
 
+/**
+ * У preview-збірці `#root` може тимчасово мати службову visibility:hidden,
+ * поки провайдери завершують bootstrap. Для цього тесту важливо не те, чи
+ * сам контейнер уже намальований, а те, що React-дерево справді змонтоване:
+ * інакше перевірка полів пройшла б порожньою.
+ */
+async function waitForAppTree(page: import('@playwright/test').Page) {
+  await expect(page.locator('#root')).toBeAttached();
+  await page.waitForFunction(() => {
+    const root = document.querySelector('#root');
+    return root instanceof HTMLElement && root.childElementCount > 0;
+  }, undefined, { timeout: 10_000 });
+}
+
 test('Темна тема: жодне поле вводу не лишається світлим', async ({ page }) => {
   // Тему читає ThemeProvider із localStorage до першого рендеру, тож
   // ставимо її ДО завантаження застосунку — інакше перший кадр був би
@@ -53,7 +67,7 @@ test('Темна тема: жодне поле вводу не лишаєтьс�
 
   for (const route of ROUTES) {
     await page.goto(route);
-    await expect(page.locator('#root')).toBeVisible();
+    await waitForAppTree(page);
     // Дані приїжджають асинхронно, а форми часто під ними.
     await page.waitForTimeout(1500);
 
