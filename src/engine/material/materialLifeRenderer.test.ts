@@ -26,14 +26,14 @@ const EVENTS: EvolutionEventInput[] = [
     channels: { exploration: 0.92, remembrance: 0.36 },
     portalActivity: 0.3,
   },
-  {
-    id: 'photo-day',
-    occurredAt: '2024-09-04T12:00:00Z',
+  ...Array.from({ length: 7 }, (_, index): EvolutionEventInput => ({
+    id: `photo-day-${index + 1}`,
+    occurredAt: `2025-0${(index % 7) + 1}-04T12:00:00Z`,
     source: 'memories@1',
     evidence: 'verified',
     channels: { remembrance: 0.64, culture: 0.22 },
     portalActivity: 0.16,
-  },
+  })),
 ];
 
 function pipeline(options?: { reducedMotion?: boolean; quality?: 'high' | 'balanced' | 'low' | 'fallback' }) {
@@ -93,6 +93,7 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(second.life).toEqual(first.life);
     expect(first.material.diagnostics.transmissionForcedOff).toBe(true);
     expect(first.material.bodies).toHaveLength(first.geometry.meshes.length);
+    expect(first.material.diagnostics.uniqueMaterialCount).toBeLessThan(first.material.bodies.length);
     for (const body of first.material.bodies) {
       expect(body.transmission).toBe(0);
       expect(body.opacity).toBe(1);
@@ -130,11 +131,11 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(first.groupScale).toBe(1);
     expect(touched.rotationY).toBe(0);
     expect(touched.positionY).toBe(0);
-    expect(touched.groupScale).toBeGreaterThanOrEqual(1);
+    expect(touched.groupScale).toBe(1);
     expect(Object.values(touched.bodyGlowMultiplier).some((value) => value > 1)).toBe(true);
   });
 
-  it('creates valid Three.js objects without making renderer decisions', () => {
+  it('batches different geometries by optical signature', () => {
     const { geometry, material, life } = pipeline();
     const bundle = createThreeCrystalRenderBundle(geometry, material);
     const frame = sampleCrystalLife({ life, elapsedSeconds: 12.5, interactionPulse: 0.4 });
@@ -142,18 +143,23 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
 
     expect(bundle.meshes.size).toBe(geometry.meshes.length);
     expect(bundle.materials.size).toBe(material.bodies.length);
-    expect(bundle.group.children).toHaveLength(geometry.meshes.length);
+    expect(bundle.drawCallCount).toBe(material.diagnostics.uniqueMaterialCount);
+    expect(bundle.drawCallCount).toBe(bundle.batches.length);
+    expect(bundle.drawCallCount).toBeLessThan(geometry.meshes.length);
+    expect(bundle.group.children).toHaveLength(bundle.drawCallCount);
     expect(bundle.group.rotation.y).toBeCloseTo(frame.rotationY, 6);
     expect(bundle.group.position.y).toBeCloseTo(frame.positionY, 6);
 
-    for (const [bodyId, mesh] of bundle.meshes) {
-      const source = geometry.meshes.find((candidate) => candidate.bodyId === bodyId);
-      expect(source).toBeDefined();
-      expect(mesh.geometry.getAttribute('position').count).toBe(source!.positions.length / 3);
-      expect(mesh.geometry.getAttribute('normal').count).toBe(source!.normals.length / 3);
-      expect(mesh.geometry.getIndex()?.count).toBe(source!.indices.length);
-      expect(mesh.material.transmission).toBe(0);
-      expect(mesh.material.transparent).toBe(false);
+    const uniqueMeshes = new Set(bundle.meshes.values());
+    const uniqueMaterials = new Set(bundle.materials.values());
+    expect(uniqueMeshes.size).toBe(bundle.drawCallCount);
+    expect(uniqueMaterials.size).toBe(bundle.drawCallCount);
+
+    for (const batch of bundle.batches) {
+      expect(batch.bodyIds.length).toBeGreaterThan(0);
+      expect(batch.material.transmission).toBe(0);
+      expect(batch.material.transparent).toBe(false);
+      expect(batch.mesh.userData['evolutionBodyIds']).toEqual(batch.bodyIds);
     }
 
     bundle.dispose();
