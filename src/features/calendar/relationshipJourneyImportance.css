@@ -1,0 +1,60 @@
+/* ============================================================
+   Візуальна вага звичайних і великих подій на «Нашому шляху».
+   Підключається після базової карти, тому змінює лише рівень акценту.
+   ============================================================ */
+.relationship-journey-node--regular .relationship-journey-marker {
+  width: 36px;
+  height: 36px;
+  border-width: 1.5px;
+}
+
+.relationship-journey-node--regular .relationship-journey-card {
+  border-color: color-mix(in srgb, var(--relationship-journey-accent) 15%, transparent);
+  background: color-mix(in srgb, var(--relationship-journey-accent) 3%, var(--surface));
+}
+
+.relationship-journey-node--major .relationship-journey-marker {
+  width: 48px;
+  height: 48px;
+  border-width: 3px;
+  background:
+    radial-gradient(circle at 32% 26%, color-mix(in srgb, white 52%, transparent), transparent 35%),
+    color-mix(in srgb, var(--relationship-journey-accent) 13%, var(--surface));
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--relationship-journey-accent) 20%, transparent);
+}
+
+.relationship-journey-node--major .relationship-journey-card {
+  padding: 14px;
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--relationship-journey-accent) 42%, transparent);
+  background:
+    radial-gradient(circle at 100% 0, color-mix(in srgb, var(--relationship-journey-accent) 10%, transparent), transparent 44%),
+    color-mix(in srgb, var(--relationship-journey-accent) 7%, var(--surface));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--relationship-journey-accent) 10%, transparent);
+}
+
+.relationship-journey-node--major .relationship-journey-card strong {
+  font-size: 15px;
+}
+
+.relationship-journey-node--major .relationship-journey-card small {
+  letter-spacing: .065em;
+}
+
+@media (max-width: 390px) {
+  .relationship-journey-node--major .relationship-journey-marker {
+    width: 44px;
+    height: 44px;
+  }
+
+  .relationship-journey-node--major .relationship-journey-card {
+    padding: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .relationship-journey-node--major .relationship-journey-marker,
+  .relationship-journey-node--major .relationship-journey-card {
+    box-shadow: none;
+  }
+}

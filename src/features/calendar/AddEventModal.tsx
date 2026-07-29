@@ -1,22 +1,20 @@
 // ============================================================
-// AddEventModal — створення й редагування події календаря.
+// AddEventModal — контекстна форма особистого календаря.
 // ------------------------------------------------------------
-// Активна вкладка передає початковий тип: у «Наших святах» форма одразу
-// відкриває річницю, у днях народження — день народження, у святах — свято.
+// Розділ уже визначає призначення запису. У «Наших святах» користувач
+// обирає лише вагу моменту: звичайна подія або велика подія. У «Днях
+// народження» форма одразу працює як день народження без зайвого вибору.
 // ============================================================
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
-import { EventIcon } from '@/components/icons/EventIcon';
+import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
 import { BellIcon } from '@/components/icons/UiIcon';
 import type { NewEventInput } from './useCalendar';
 import type { EventRow, EventType } from '@/types';
+import './calendarEventForm.css';
 
-const EVENT_TYPES: { type: EventType; label: string }[] = [
-  { type: 'birthday', label: 'День народження' },
-  { type: 'anniversary', label: 'Річниця' },
-  { type: 'holiday', label: 'Свято' },
-];
+type CalendarEntryType = Extract<EventType, 'anniversary' | 'birthday'>;
 
 function ModalShell({ title, children, onClose }: {
   title: string;
@@ -30,7 +28,7 @@ function ModalShell({ title, children, onClose }: {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="modal-sheet" role="dialog" aria-modal="true">
+      <div className="modal-sheet cal-entry-sheet" role="dialog" aria-modal="true">
         <h2 className="modal-title">{title}</h2>
         {children}
       </div>
@@ -38,31 +36,30 @@ function ModalShell({ title, children, onClose }: {
   );
 }
 
-function editableEventType(value: EventType | null | undefined): EventType {
-  if (value === 'anniversary' || value === 'holiday' || value === 'birthday') return value;
-  return 'birthday';
+function entryType(event: EventRow | null, initialType: CalendarEntryType): CalendarEntryType {
+  if (event?.type === 'birthday') return 'birthday';
+  return initialType;
 }
 
 export function AddEventModal({
   event,
   initialDate,
-  initialType,
+  initialType = 'anniversary',
   onClose,
   onSubmit,
 }: {
   event: EventRow | null;
   initialDate?: string | undefined;
-  initialType?: EventType | undefined;
+  initialType?: CalendarEntryType | undefined;
   onClose: () => void;
   onSubmit: (input: NewEventInput) => void;
 }) {
-  const [type, setType] = useState<EventType>(
-    event ? editableEventType(event.type) : editableEventType(initialType),
-  );
+  const type = entryType(event, initialType);
+  const relationshipEvent = type === 'anniversary';
   const [title, setTitle] = useState(event?.title ?? '');
   const [date, setDate] = useState(event?.date ?? initialDate ?? '');
   const [description, setDescription] = useState(event?.description ?? '');
-  const [yearly, setYearly] = useState(event ? Boolean(event.yearly) : true);
+  const [yearly, setYearly] = useState(event ? Boolean(event.yearly) : type === 'birthday');
   const [isMilestone, setIsMilestone] = useState(event?.is_milestone ?? false);
   const [personId, setPersonId] = useState<number | null>(event?.person_user_id ?? null);
   const { data: users = [] } = useUsers();
@@ -75,30 +72,61 @@ export function AddEventModal({
       description: description.trim() || null,
       type,
       yearly,
-      is_milestone: isMilestone,
+      is_milestone: relationshipEvent ? isMilestone : false,
       person_user_id: type === 'birthday' ? personId : null,
     });
     onClose();
   };
 
+  const modalTitle = event
+    ? relationshipEvent ? 'Редагувати подію нашого шляху' : 'Редагувати день народження'
+    : relationshipEvent ? 'Нова подія нашого шляху' : 'Новий день народження';
+
   return (
-    <ModalShell title={event ? 'Редагувати подію' : 'Нова подія'} onClose={onClose}>
-      <div className="form-field">
-        <span>Тип</span>
-        <div className="chips">
-          {EVENT_TYPES.map((item) => (
-            <button
-              key={item.type}
-              type="button"
-              className={`chip${type === item.type ? ' active' : ''}`}
-              onClick={() => setType(item.type)}
-            >
-              <EventIcon type={item.type} size={15} />
-              {item.label}
-            </button>
-          ))}
+    <ModalShell title={modalTitle} onClose={onClose}>
+      <div className="cal-entry-context" aria-hidden="true">
+        <span><EventIcon type={type} size={19} /></span>
+        <div>
+          <strong>{relationshipEvent ? 'Наші свята' : 'Дні народження'}</strong>
+          <small>
+            {relationshipEvent
+              ? 'Запис одразу з’явиться на дорожній карті стосунків.'
+              : 'Запис залишиться у списку днів народження.'}
+          </small>
         </div>
       </div>
+
+      {relationshipEvent && (
+        <fieldset className="cal-significance">
+          <legend>Яка це подія?</legend>
+          <div className="cal-significance-grid">
+            <button
+              type="button"
+              className={`cal-significance-option${!isMilestone ? ' active' : ''}`}
+              aria-pressed={!isMilestone}
+              onClick={() => setIsMilestone(false)}
+            >
+              <span className="cal-significance-icon"><EventIcon type="anniversary" size={20} /></span>
+              <span>
+                <strong>Подія</strong>
+                <small>Новий важливий момент, який хочеться залишити у вашій історії.</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={`cal-significance-option cal-significance-option--major${isMilestone ? ' active' : ''}`}
+              aria-pressed={isMilestone}
+              onClick={() => setIsMilestone(true)}
+            >
+              <span className="cal-significance-icon"><SparkIcon size={20} /></span>
+              <span>
+                <strong>Велика подія</strong>
+                <small>Пропозиція, весілля або інша ключова віха ваших стосунків.</small>
+              </span>
+            </button>
+          </div>
+        </fieldset>
+      )}
 
       {type === 'birthday' && users.length > 0 && (
         <div className="form-field">
@@ -119,51 +147,60 @@ export function AddEventModal({
               className={`chip${personId === null ? ' active' : ''}`}
               onClick={() => setPersonId(null)}
             >
-              Хтось інший
+              Родич або близька людина
             </button>
           </div>
           <p className="cal-field-hint">
-            Потрібно лише для вас двох — щоб застосунок не нагадував людині про її ж день народження.
+            Вибір потрібен лише для вас двох. Для родичів і друзів залиште останній варіант.
           </p>
         </div>
       )}
 
       <label className="form-field">
-        <span>Назва</span>
-        <input id="event-title" name="title" type="text" value={title} onChange={(event) => setTitle(event.target.value)} autoFocus />
+        <span>{relationshipEvent ? 'Що сталося?' : 'Ім’я або назва'}</span>
+        <input
+          id="event-title"
+          name="title"
+          type="text"
+          value={title}
+          onChange={(inputEvent) => setTitle(inputEvent.target.value)}
+          placeholder={relationshipEvent ? 'Наприклад, уперше поїхали разом у подорож' : 'Наприклад, день народження мами'}
+          autoFocus
+        />
       </label>
       <label className="form-field">
         <span>Дата</span>
-        <input id="event-date" name="date" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+        <input
+          id="event-date"
+          name="date"
+          type="date"
+          value={date}
+          onChange={(inputEvent) => setDate(inputEvent.target.value)}
+        />
       </label>
       <label className="form-field">
-        <span>Опис (необов’язково)</span>
+        <span>Короткий опис <small>необов’язково</small></span>
         <textarea
           id="event-description"
           name="description"
           rows={2}
           value={description}
-          onChange={(event) => setDescription(event.target.value)}
+          onChange={(inputEvent) => setDescription(inputEvent.target.value)}
+          placeholder={relationshipEvent ? 'Чому цей момент важливий для вас?' : 'Додаткова примітка'}
           style={{ resize: 'vertical' }}
         />
       </label>
       <label className="cal-yearly-toggle">
-        <input id="event-yearly" name="yearly" type="checkbox" checked={yearly} onChange={(event) => setYearly(event.target.checked)} />
-        <span>Повторюється щороку</span>
-      </label>
-      <label className="cal-yearly-toggle">
         <input
-          id="event-milestone"
-          name="is_milestone"
+          id="event-yearly"
+          name="yearly"
           type="checkbox"
-          checked={isMilestone}
-          onChange={(event) => setIsMilestone(event.target.checked)}
+          checked={yearly}
+          onChange={(inputEvent) => setYearly(inputEvent.target.checked)}
         />
-        <span>Велика подія — заручини, весілля, важлива віха</span>
+        <span>{relationshipEvent ? 'Відзначати цю дату щороку' : 'Нагадувати щороку'}</span>
       </label>
-      <p className="cal-field-hint">
-        Річниці автоматично з’являються у «Нашому шляху». Позначка великої події додає сильніший акцент.
-      </p>
+
       <p className="cal-reminder-note">
         <BellIcon size={15} /> Нагадаємо в Telegram за 3 дні, за день і зранку в сам день.
       </p>
