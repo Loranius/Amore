@@ -5,6 +5,11 @@ import {
 } from '@/engine/composition';
 import type { ArtifactBlueprint } from '@/engine/evolution';
 import {
+  DEFAULT_TREE_FOLIAGE_CONFIG,
+  buildTreeFoliage,
+  type TreeFoliageState,
+} from '@/engine/foliage';
+import {
   buildOrganicCurveFrames,
   buildOrganicSkeleton,
   buildOrganicSweepMesh,
@@ -35,6 +40,7 @@ export interface TreeLabPreviewBuild {
   skeleton: OrganicSkeletonState;
   frames: OrganicCurveFrameState;
   composition: TreeCompositionState;
+  foliage: TreeFoliageState;
   mesh: OrganicSweepMesh;
   buildMs: number;
 }
@@ -78,6 +84,12 @@ export function buildTreeLabPreviewFromArtifact({
     frames,
     config: DEFAULT_TREE_COMPOSITION_CONFIG,
   });
+  const foliage = buildTreeFoliage({
+    species,
+    frames,
+    composition,
+    config: DEFAULT_TREE_FOLIAGE_CONFIG,
+  });
   const mesh = buildOrganicSweepMesh(frames, lod);
 
   return {
@@ -89,6 +101,7 @@ export function buildTreeLabPreviewFromArtifact({
     skeleton,
     frames,
     composition,
+    foliage,
     mesh,
     buildMs: now() - startedAt,
   };
