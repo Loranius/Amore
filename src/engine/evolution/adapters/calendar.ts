@@ -1,5 +1,4 @@
 import { parseCalendarDate } from '../calendar';
-import type { EvolutionEventInput } from '../types';
 import {
   CALENDAR_MILESTONE_PRESSURE,
   CALENDAR_RECURRENCE_PRESSURE,
