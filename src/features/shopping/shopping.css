@@ -1,0 +1,769 @@
+/* ============================================================
+   «Покупки» — легкий щоденний список.
+   ------------------------------------------------------------
+   Жодних важких ефектів: ієрархія створюється відступами, кольором,
+   тонкими рамками й короткими transform/opacity реакціями.
+   ============================================================ */
+
+.shopping-page {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: 0;
+  padding-bottom: 30px;
+}
+
+/* ── Компактна шапка ────────────────────────────────────────── */
+.shopping-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 118px;
+  margin-bottom: 16px;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 17%, transparent);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 31%),
+    linear-gradient(138deg, color-mix(in srgb, var(--accent) 7%, var(--surface)), var(--surface));
+}
+
+.shopping-hero::after {
+  content: '';
+  position: absolute;
+  right: -24px;
+  bottom: -40px;
+  width: 122px;
+  height: 122px;
+  border: 22px solid color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.shopping-hero-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 21%, transparent);
+  border-radius: 21px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--accent);
+}
+
+.shopping-hero-copy {
+  min-width: 0;
+}
+
+.shopping-eyebrow {
+  display: block;
+  margin-bottom: 4px;
+  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.shopping-hero h1 {
+  margin: 0;
+  font-size: clamp(27px, 7vw, 36px);
+  font-weight: 760;
+  line-height: 1.05;
+  letter-spacing: -.04em;
+}
+
+.shopping-hero p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.shopping-hero-count {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 82%, var(--text));
+  font-size: 14px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Швидке додавання ───────────────────────────────────────── */
+.shopping-composer {
+  position: relative;
+  display: grid;
+  gap: 13px;
+  margin-bottom: 24px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.shopping-composer-copy h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  letter-spacing: -.02em;
+}
+
+.shopping-composer-copy p {
+  max-width: 48ch;
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.shopping-composer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  gap: 9px;
+  align-items: stretch;
+}
+
+.shopping-input {
+  width: 100%;
+  min-height: 70px;
+  padding: 13px 14px;
+  resize: none;
+  border: 1px solid color-mix(in srgb, var(--text) 11%, transparent);
+  border-radius: 18px;
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 2.5%, var(--bg));
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.4;
+  transition: border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
+}
+
+.shopping-input:focus {
+  border-color: color-mix(in srgb, var(--accent) 58%, transparent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.shopping-input:disabled {
+  opacity: .65;
+}
+
+.shopping-add-button {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  min-height: 70px;
+  padding: 9px;
+  border: 0;
+  border-radius: 18px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 83%, white), var(--accent));
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 18%, transparent);
+  transition: transform .14s ease, opacity .14s ease;
+}
+
+.shopping-add-button > span {
+  min-height: 22px;
+  font-size: 25px;
+  font-weight: 400;
+  line-height: .85;
+}
+
+.shopping-add-button strong {
+  font-size: 11.5px;
+  font-weight: 780;
+}
+
+.shopping-add-button:active:not(:disabled) {
+  transform: scale(.975);
+}
+
+.shopping-add-button:disabled {
+  opacity: .48;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* ── Категорії ──────────────────────────────────────────────── */
+.shopping-groups {
+  display: grid;
+  gap: 13px;
+}
+
+.shopping-group {
+  --shopping-category: var(--accent);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 170px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--shopping-category) 15%, color-mix(in srgb, var(--text) 6%, transparent));
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 5px 17px color-mix(in srgb, var(--text) 3.5%, transparent);
+  animation: shopping-section-in .22s ease both;
+}
+
+.shopping-group-head {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px 9px;
+  border-bottom: 1px solid color-mix(in srgb, var(--shopping-category) 10%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--shopping-category) 6%, var(--surface)), var(--surface) 66%);
+}
+
+.shopping-group-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--shopping-category) 12%, var(--surface));
+  font-size: 18px;
+}
+
+.shopping-group-head h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 770;
+  letter-spacing: -.01em;
+}
+
+.shopping-group-count {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--shopping-category) 10%, var(--surface));
+  color: color-mix(in srgb, var(--shopping-category) 76%, var(--text));
+  font-size: 10.5px;
+  font-weight: 820;
+  font-variant-numeric: tabular-nums;
+}
+
+.shopping-group-list {
+  display: grid;
+  padding: 3px 10px 8px;
+}
+
+/* ── Один товар ─────────────────────────────────────────────── */
+.shopping-item {
+  display: grid;
+  grid-template-columns: 31px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 8px 2px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 6%, transparent);
+  transition: opacity .16s ease, transform .16s ease, background-color .16s ease;
+}
+
+.shopping-item:last-child {
+  border-bottom: 0;
+}
+
+.shopping-item:active {
+  transform: scale(.995);
+}
+
+.shopping-check {
+  display: grid;
+  width: 29px;
+  height: 29px;
+  place-items: center;
+  padding: 0;
+  border: 1.8px solid color-mix(in srgb, var(--shopping-category, var(--accent)) 52%, color-mix(in srgb, var(--text) 22%, transparent));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--shopping-category, var(--accent)) 3%, transparent);
+  color: #fff;
+  cursor: pointer;
+  transition: transform .14s ease, background-color .16s ease, border-color .16s ease;
+}
+
+.shopping-check:active {
+  transform: scale(.88);
+}
+
+.shopping-check--on {
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.shopping-item-info {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.shopping-item-main {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+}
+
+.shopping-item-main strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13.5px;
+  font-weight: 680;
+  line-height: 1.28;
+}
+
+.shopping-item-main > span {
+  flex: 0 0 auto;
+  max-width: 100%;
+  padding: 3px 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--shopping-category, var(--accent)) 8%, var(--bg));
+  color: var(--muted);
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shopping-item-info small {
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.25;
+}
+
+.shopping-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: .58;
+  transition: opacity .16s ease;
+}
+
+.shopping-item:hover .shopping-item-actions,
+.shopping-item:focus-within .shopping-item-actions {
+  opacity: 1;
+}
+
+.shopping-item-actions button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color .14s ease, color .14s ease, transform .14s ease;
+}
+
+.shopping-item-actions button:active {
+  transform: scale(.9);
+}
+
+.shopping-item-actions button:hover,
+.shopping-item-actions button:focus-visible {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--accent);
+  outline: none;
+}
+
+.shopping-item-actions .shopping-delete:hover,
+.shopping-item-actions .shopping-delete:focus-visible {
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface));
+  color: var(--danger);
+}
+
+.shopping-item--bought {
+  opacity: .66;
+}
+
+.shopping-item--bought .shopping-item-main strong {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+/* ── Порожні, помилкові та loading стани ───────────────────── */
+.shopping-state {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  margin: 3px 0 8px;
+  padding: 34px 20px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 25%, transparent);
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--accent) 3%, var(--surface));
+  text-align: center;
+}
+
+.shopping-state > span {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  place-items: center;
+  margin-bottom: 2px;
+  border-radius: 19px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--accent);
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.shopping-state h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.shopping-state p {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.shopping-state .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+}
+
+.shopping-state--error > span {
+  background: color-mix(in srgb, var(--danger) 10%, var(--surface));
+  color: var(--danger);
+}
+
+.shopping-skeleton {
+  display: grid;
+  gap: 8px;
+}
+
+.shopping-skeleton span {
+  display: block;
+  height: 58px;
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  animation: shopping-skeleton-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.shopping-skeleton .shopping-skeleton-heading {
+  width: 46%;
+  height: 30px;
+  margin-top: 5px;
+}
+
+/* ── Куплене ────────────────────────────────────────────────── */
+.shopping-archive {
+  margin-top: 20px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 22px;
+  background: var(--surface);
+}
+
+.shopping-archive summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 66px;
+  padding: 12px 15px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.shopping-archive summary::-webkit-details-marker {
+  display: none;
+}
+
+.shopping-archive-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.shopping-archive-copy small {
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.shopping-archive-copy strong {
+  font-size: 13.5px;
+  font-weight: 720;
+}
+
+.shopping-archive-tail {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.shopping-archive-tail b {
+  display: grid;
+  min-width: 31px;
+  height: 31px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.shopping-archive-tail svg {
+  transition: transform .18s ease;
+}
+
+.shopping-archive[open] .shopping-archive-tail svg {
+  transform: rotate(180deg);
+}
+
+.shopping-archive-list {
+  display: grid;
+  padding: 0 10px 8px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 6%, transparent);
+  animation: shopping-archive-in .18s ease both;
+}
+
+.shopping-archive-empty {
+  margin: 0;
+  padding: 18px 8px;
+  color: var(--muted);
+  font-size: 11.5px;
+  text-align: center;
+}
+
+/* ── Редагування ────────────────────────────────────────────── */
+.shopping-edit-overlay {
+  align-items: flex-end;
+  padding: 16px 12px max(16px, env(safe-area-inset-bottom));
+}
+
+.shopping-edit-sheet {
+  width: min(100%, 520px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 27px;
+}
+
+.shopping-edit-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 20px 15px;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.shopping-edit-head small {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--accent);
+  font-size: 9.5px;
+  font-weight: 820;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.shopping-edit-head h2 {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -.025em;
+}
+
+.shopping-edit-close {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  color: var(--text);
+  cursor: pointer;
+}
+
+.shopping-edit-form {
+  display: grid;
+  gap: 14px;
+  padding: 17px 20px 20px;
+}
+
+.shopping-edit-form .form-field {
+  gap: 6px;
+}
+
+.shopping-edit-form .form-field > span {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.shopping-edit-form .form-field input,
+.shopping-edit-form .form-field select {
+  min-height: 47px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 2%, var(--bg));
+}
+
+.shopping-edit-actions {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  margin-top: 3px;
+}
+
+.shopping-edit-actions .btn {
+  min-height: 46px;
+  margin: 0;
+  border-radius: 14px;
+}
+
+@keyframes shopping-section-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shopping-archive-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shopping-skeleton-pulse {
+  to { opacity: .52; }
+}
+
+/* ── Телефони ───────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .shopping-hero {
+    grid-template-columns: 52px minmax(0, 1fr) auto;
+    min-height: 108px;
+    padding: 17px;
+    border-radius: 25px;
+  }
+
+  .shopping-hero-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 18px;
+  }
+
+  .shopping-composer {
+    padding: 15px;
+    border-radius: 22px;
+    box-shadow: none;
+  }
+
+  .shopping-group {
+    box-shadow: none;
+  }
+
+  .shopping-item-actions {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 380px) {
+  .shopping-hero {
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 15px;
+  }
+
+  .shopping-hero-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+  }
+
+  .shopping-hero-count {
+    min-width: 36px;
+    height: 36px;
+    font-size: 12px;
+  }
+
+  .shopping-composer-row {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    gap: 7px;
+  }
+
+  .shopping-add-button strong {
+    font-size: 10.5px;
+  }
+
+  .shopping-group-head {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    padding-inline: 10px;
+  }
+
+  .shopping-group-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 12px;
+    font-size: 16px;
+  }
+
+  .shopping-group-list {
+    padding-inline: 8px;
+  }
+
+  .shopping-item {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+    gap: 7px;
+  }
+
+  .shopping-check {
+    width: 27px;
+    height: 27px;
+  }
+
+  .shopping-item-actions button {
+    width: 29px;
+    height: 29px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .shopping-add-button,
+  .shopping-check,
+  .shopping-item,
+  .shopping-item-actions button {
+    transition-duration: .1s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shopping-group,
+  .shopping-archive-list,
+  .shopping-skeleton span {
+    animation: none;
+  }
+
+  .shopping-input,
+  .shopping-add-button,
+  .shopping-check,
+  .shopping-item,
+  .shopping-item-actions,
+  .shopping-item-actions button,
+  .shopping-archive-tail svg {
+    transition: none;
+  }
+}
