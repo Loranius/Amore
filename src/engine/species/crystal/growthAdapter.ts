@@ -58,6 +58,10 @@ function minUpwardComponent(instruction: CrystalGrowthInstruction): number {
 }
 
 function attachmentDepth(instruction: CrystalGrowthInstruction): number {
+  // Event spires sit in the lower shoulder band where the mother's rendered
+  // profile tapers. A deeper root guarantees every base-ring vertex remains
+  // inside the host solid rather than merely hiding the centre point.
+  if (instruction.kind === 'event-spire') return Math.max(0.52, instruction.attachmentDepth * 2.1);
   if (instruction.kind === 'inclusion') return Math.max(0.48, instruction.attachmentDepth * 2.4);
   if (instruction.kind === 'satellite') return Math.max(0.24, instruction.attachmentDepth * 1.35);
   return instruction.attachmentDepth;
