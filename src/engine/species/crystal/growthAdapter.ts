@@ -58,10 +58,7 @@ function minUpwardComponent(instruction: CrystalGrowthInstruction): number {
 }
 
 function attachmentDepth(instruction: CrystalGrowthInstruction): number {
-  // Event spires sit in the lower shoulder band where the mother's rendered
-  // profile tapers. A deeper root guarantees every base-ring vertex remains
-  // inside the host solid rather than merely hiding the centre point.
-  if (instruction.kind === 'event-spire') return Math.max(0.52, instruction.attachmentDepth * 2.1);
+  if (instruction.kind === 'event-spire') return Math.max(0.32, instruction.attachmentDepth * 1.35);
   if (instruction.kind === 'inclusion') return Math.max(0.48, instruction.attachmentDepth * 2.4);
   if (instruction.kind === 'satellite') return Math.max(0.24, instruction.attachmentDepth * 1.35);
   return instruction.attachmentDepth;
@@ -69,11 +66,12 @@ function attachmentDepth(instruction: CrystalGrowthInstruction): number {
 
 /**
  * Species directions retain their seeded ordering, while the Crystal adapter
- * compresses the attachment band toward the lower body and shoulder. The
- * universal Growth Engine still chooses the final analytical surface site.
+ * compresses the attachment band toward the lower body and shoulder. Event
+ * spires start above the mother's lower termination so their entire base ring
+ * can be sealed inside a stable prismatic cross-section.
  */
 function placementBias(instruction: CrystalGrowthInstruction): number {
-  if (instruction.kind === 'event-spire') return round6(0.05 + instruction.radialBias * 0.28);
+  if (instruction.kind === 'event-spire') return round6(0.22 + instruction.radialBias * 0.16);
   if (instruction.kind === 'satellite') return round6(0.08 + instruction.radialBias * 0.35);
   if (instruction.kind === 'inclusion') return round6(0.04 + instruction.radialBias * 0.28);
   return 0;
