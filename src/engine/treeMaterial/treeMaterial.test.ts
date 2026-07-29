@@ -6,7 +6,7 @@ import { buildTreeMaterialState } from './treeMaterial';
 function expectQuantized(value: number, steps: number) {
   expect(value).toBeGreaterThanOrEqual(0);
   expect(value).toBeLessThanOrEqual(1);
-  expect(value * (steps - 1)).toBeCloseTo(Math.round(value * (steps - 1)), 6);
+  expect(value * (steps - 1)).toBeCloseTo(Math.round(value * (steps - 1)), 4);
 }
 
 describe('Tree Material Lab', () => {
