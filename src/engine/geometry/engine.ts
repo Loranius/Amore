@@ -112,7 +112,6 @@ export function buildCrystalGeometry(
   };
   const rawMeshes = chooseMeshes(input, diagnostics);
   const bodyById = new Map(input.growth.bodies.map((body) => [body.id, body] as const));
-  const rawMeshById = new Map(rawMeshes.map((mesh) => [mesh.bodyId, mesh] as const));
   const solids: CrystalSolid[] = rawMeshes.flatMap((mesh) => {
     const body = bodyById.get(mesh.bodyId);
     return body ? [{ body, profile: mesh.profile, bounds: mesh.bounds }] : [];
