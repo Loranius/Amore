@@ -3,7 +3,7 @@ import { buildArtifactBlueprint, type EvolutionEventInput } from '../evolution';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../species/crystal';
 import { DEFAULT_GROWTH_ENGINE_CONFIG } from './config';
 import { buildGrowthState } from './engine';
-import type { GrowthBody, UniversalGrowthBlueprint } from './types';
+import type { UniversalGrowthBlueprint } from './types';
 
 const AS_OF = '2026-07-29T09:00:00Z';
 
@@ -60,11 +60,6 @@ function growthBlueprint(events: readonly EvolutionEventInput[]): UniversalGrowt
   return crystalToGrowthBlueprint(crystal);
 }
 
-function stableBody(body: GrowthBody): Omit<GrowthBody, 'renderedLength' | 'renderedRadius' | 'maturity'> {
-  const { renderedLength: _renderedLength, renderedRadius: _renderedRadius, maturity: _maturity, ...stable } = body;
-  return stable;
-}
-
 describe('Universal Growth Engine', () => {
   it('is deterministic and independent of instruction array order', () => {
     const blueprint = growthBlueprint(BASE_EVENTS);
@@ -106,10 +101,9 @@ describe('Universal Growth Engine', () => {
     }
   });
 
-  it('keeps historical placement and adult dimensions unchanged when a later event is appended', () => {
-    const earlierBlueprint = growthBlueprint(BASE_EVENTS);
+  it('keeps every historical body byte-stable when a later event is appended', () => {
     const earlier = buildGrowthState({
-      blueprint: earlierBlueprint,
+      blueprint: growthBlueprint(BASE_EVENTS),
       config: DEFAULT_GROWTH_ENGINE_CONFIG,
     });
     const later = buildGrowthState({
@@ -129,9 +123,7 @@ describe('Universal Growth Engine', () => {
 
     expect(later.bodies).toHaveLength(earlier.bodies.length + 1);
     for (const oldBody of earlier.bodies) {
-      const nextBody = later.bodies.find((body) => body.id === oldBody.id);
-      expect(nextBody).toBeDefined();
-      expect(stableBody(nextBody!)).toEqual(stableBody(oldBody));
+      expect(later.bodies.find((body) => body.id === oldBody.id)).toEqual(oldBody);
     }
   });
 
