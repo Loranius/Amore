@@ -7,6 +7,8 @@ const MAX_FOLIAGE_LEAVES = 900;
 const MAX_MEDIUM_LEAF_INSTANCES = 520;
 const MAX_TREE_TRIANGLES = 16_000;
 const MAX_TREE_DRAW_CALLS = 2;
+const TREE_MATERIAL_COUNT = 2;
+const TREE_MATERIAL_QUANTIZATION = 16;
 
 async function login(page: Page, url: string) {
   await page.goto(url);
@@ -114,6 +116,24 @@ async function expectLeafGeometryMetrics(preview: Locator, requireInstances: boo
   expect(estimatedDrawCalls).toBe(1);
 }
 
+async function expectMaterialMetrics(preview: Locator) {
+  expect(numericAttribute(
+    await preview.getAttribute('data-tree-lab-material-count'),
+    'treeMaterialCount',
+  )).toBe(TREE_MATERIAL_COUNT);
+  expect(numericAttribute(
+    await preview.getAttribute('data-tree-lab-material-budget'),
+    'treeMaterialBudget',
+  )).toBe(TREE_MATERIAL_COUNT);
+  expect(numericAttribute(
+    await preview.getAttribute('data-tree-lab-material-quantization'),
+    'treeMaterialQuantization',
+  )).toBe(TREE_MATERIAL_QUANTIZATION);
+  await expect(preview).toHaveAttribute('data-tree-lab-material-budget-exceeded', 'false');
+  await expect(preview).toHaveAttribute('data-tree-lab-bark-material', /tree-material-v1\.0\.0\|bark\|/);
+  await expect(preview).toHaveAttribute('data-tree-lab-foliage-material', /tree-material-v1\.0\.0\|foliage\|/);
+}
+
 async function expectRuntimeBudget(preview: Locator) {
   const triangles = numericAttribute(
     await preview.getAttribute('data-tree-lab-triangles'),
@@ -153,6 +173,7 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
     await expectCompositionMetrics(preview);
     await expectFoliageMetrics(preview, true);
     await expectLeafGeometryMetrics(preview, true);
+    await expectMaterialMetrics(preview);
     await expectRuntimeBudget(preview);
 
     await page.screenshot({
@@ -176,6 +197,7 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
     await expectCompositionMetrics(preview);
     await expectFoliageMetrics(preview, false);
     await expectLeafGeometryMetrics(preview, false);
+    await expectMaterialMetrics(preview);
     await expectRuntimeBudget(preview);
 
     const normalizedEvents = numericAttribute(

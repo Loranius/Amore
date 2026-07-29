@@ -30,6 +30,11 @@ import {
   type TreeSpeciesBlueprint,
 } from '@/engine/species/tree';
 import {
+  DEFAULT_TREE_MATERIAL_CONFIG,
+  buildTreeMaterialState,
+  type TreeMaterialState,
+} from '@/engine/treeMaterial';
+import {
   buildTreeSpeciesPreviewArtifact,
   TREE_SPECIES_PREVIEW_AS_OF,
 } from './treeSpeciesFixture';
@@ -47,6 +52,7 @@ export interface TreeLabPreviewBuild {
   composition: TreeCompositionState;
   foliage: TreeFoliageState;
   leaves: TreeLeafGeometryState;
+  materials: TreeMaterialState;
   mesh: OrganicSweepMesh;
   buildMs: number;
 }
@@ -101,6 +107,13 @@ export function buildTreeLabPreviewFromArtifact({
     lod,
     config: DEFAULT_TREE_LEAF_GEOMETRY_CONFIG,
   });
+  const materials = buildTreeMaterialState({
+    species,
+    composition,
+    foliage,
+    leaves,
+    config: DEFAULT_TREE_MATERIAL_CONFIG,
+  });
   const mesh = buildOrganicSweepMesh(frames, lod);
 
   return {
@@ -114,6 +127,7 @@ export function buildTreeLabPreviewFromArtifact({
     composition,
     foliage,
     leaves,
+    materials,
     mesh,
     buildMs: now() - startedAt,
   };
