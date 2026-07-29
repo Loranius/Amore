@@ -1,3 +1,8 @@
+import {
+  DEFAULT_TREE_COMPOSITION_CONFIG,
+  buildTreeComposition,
+  type TreeCompositionState,
+} from '@/engine/composition';
 import type { ArtifactBlueprint } from '@/engine/evolution';
 import {
   buildOrganicCurveFrames,
@@ -29,6 +34,7 @@ export interface TreeLabPreviewBuild {
   field: TreeOrganicField;
   skeleton: OrganicSkeletonState;
   frames: OrganicCurveFrameState;
+  composition: TreeCompositionState;
   mesh: OrganicSweepMesh;
   buildMs: number;
 }
@@ -66,6 +72,12 @@ export function buildTreeLabPreviewFromArtifact({
     config: field.skeletonConfig,
   });
   const frames = buildOrganicCurveFrames(skeleton);
+  const composition = buildTreeComposition({
+    species,
+    skeleton,
+    frames,
+    config: DEFAULT_TREE_COMPOSITION_CONFIG,
+  });
   const mesh = buildOrganicSweepMesh(frames, lod);
 
   return {
@@ -76,6 +88,7 @@ export function buildTreeLabPreviewFromArtifact({
     field,
     skeleton,
     frames,
+    composition,
     mesh,
     buildMs: now() - startedAt,
   };
