@@ -1,0 +1,345 @@
+/* ============================================================
+   «Плани» — фото-плитки пов'язаних елементів.
+   ------------------------------------------------------------
+   Окремий файл навмисно не переписує старий plans.css: нова візуальна
+   мова локальна до PlanLinksBlock і не зачіпає завдання, бюджет чи
+   головний екран планів.
+   ============================================================ */
+
+.plan-links--embedded {
+  gap: 12px;
+}
+
+.plan-link-grid,
+.plan-links .plan-link-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-link-card,
+.plan-links .plan-link-picker > li {
+  min-width: 0;
+}
+
+.plan-link-card {
+  position: relative;
+  overflow: hidden;
+  min-height: 172px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 8%, transparent);
+  isolation: isolate;
+}
+
+.plan-links .plan-link-open,
+.plan-links .plan-link-picker button {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 172px;
+  overflow: hidden;
+  border: 0;
+  border-radius: inherit;
+  color: #fff;
+  background: transparent;
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+  isolation: isolate;
+}
+
+.plan-links .plan-link-open:focus-visible,
+.plan-links .plan-link-picker button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 58%, white);
+  outline-offset: -3px;
+}
+
+.plan-link-media {
+  position: absolute;
+  inset: 0;
+  z-index: -3;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 20% 18%, rgba(255,255,255,.48), transparent 34%),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 24%, var(--surface)),
+      color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 7%, var(--surface))
+    );
+}
+
+.plan-link-media-fallback {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border: 1px solid color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 28%, transparent);
+  border-radius: 22px;
+  color: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 78%, var(--text));
+  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 9%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.plan-link-media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 220ms ease, filter 220ms ease;
+}
+
+.plan-links .plan-link-open:hover .plan-link-media img,
+.plan-links .plan-link-open:focus-visible .plan-link-media img,
+.plan-links .plan-link-picker button:hover .plan-link-media img,
+.plan-links .plan-link-picker button:focus-visible .plan-link-media img {
+  transform: scale(1.035);
+  filter: saturate(1.04);
+}
+
+.plan-link-shade,
+.plan-link-picker-shade {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background:
+    linear-gradient(180deg, rgba(31,18,27,.05) 22%, rgba(31,18,27,.34) 58%, rgba(31,18,27,.88) 100%),
+    linear-gradient(90deg, rgba(31,18,27,.2), transparent 62%);
+  pointer-events: none;
+}
+
+.plan-link-type {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: calc(100% - 56px);
+  padding: 5px 8px;
+  border: 1px solid rgba(255,255,255,.32);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(39,24,34,.46);
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.plan-links .plan-link-copy,
+.plan-links .plan-link-picker-copy {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.plan-links .plan-link-copy b,
+.plan-links .plan-link-picker-copy b {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.22;
+  text-shadow: 0 1px 8px rgba(0,0,0,.32);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.plan-links .plan-link-copy small,
+.plan-links .plan-link-picker-copy small {
+  overflow: hidden;
+  color: rgba(255,255,255,.78);
+  font-size: 10.5px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 7px rgba(0,0,0,.34);
+}
+
+.plan-links .plan-link-unlink {
+  position: absolute;
+  z-index: 3;
+  top: 9px;
+  right: 9px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 11px;
+  color: #fff;
+  background: rgba(39,24,34,.48);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.plan-links .plan-link-unlink:hover,
+.plan-links .plan-link-unlink:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--danger) 72%, rgba(39,24,34,.58));
+  transform: scale(1.04);
+}
+
+.plan-links .plan-link-picker button {
+  min-height: 156px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 17px;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.plan-link-picker-add {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  border: 1px solid rgba(255,255,255,.34);
+  border-radius: 11px;
+  color: #fff;
+  background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 72%, rgba(39,24,34,.46));
+  box-shadow: 0 8px 18px rgba(0,0,0,.14);
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+}
+
+.plan-links .plan-link-kind-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plan-links .plan-link-kind-picker > button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 15px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 4%, var(--surface));
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+
+.plan-links .plan-link-kind-picker > button:hover,
+.plan-links .plan-link-kind-picker > button:focus-visible {
+  outline: none;
+  border-color: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 34%, transparent);
+  background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 9%, var(--surface));
+  transform: translateY(-1px);
+}
+
+.plan-link-kind-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 13px;
+  color: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 80%, var(--text));
+  background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 11%, var(--surface));
+}
+
+.plan-links .plan-link-kind-picker > button > span:last-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-links .plan-link-kind-picker b {
+  overflow: hidden;
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-links .plan-link-kind-picker small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.plan-links-deferred {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.plan-links-deferred > span {
+  min-height: 156px;
+  border-radius: 17px;
+  background:
+    linear-gradient(100deg, transparent 18%, color-mix(in srgb, white 32%, transparent) 46%, transparent 72%),
+    color-mix(in srgb, var(--text) 6%, var(--surface));
+  background-size: 220% 100%, auto;
+  animation: plan-link-shimmer 1.15s linear infinite;
+}
+
+@keyframes plan-link-shimmer {
+  to { background-position: -120% 0, 0 0; }
+}
+
+@media (max-width: 359px) {
+  .plan-link-grid,
+  .plan-links .plan-link-picker,
+  .plan-links .plan-link-kind-picker,
+  .plan-links-deferred {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .plan-link-card,
+  .plan-links .plan-link-open {
+    min-height: 184px;
+  }
+}
+
+@media (pointer: coarse) {
+  .plan-links .plan-link-open:hover .plan-link-media img,
+  .plan-links .plan-link-picker button:hover .plan-link-media img {
+    transform: none;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-link-media img,
+  .plan-links .plan-link-unlink,
+  .plan-links .plan-link-kind-picker > button {
+    transition: none;
+  }
+
+  .plan-links-deferred > span {
+    animation: none;
+  }
+}
