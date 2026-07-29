@@ -1,6 +1,7 @@
 import {
   add,
   cross,
+  distance,
   dot,
   normalize,
   orthonormalBasis,
@@ -15,6 +16,7 @@ import type {
   OrganicBranchCurve,
   OrganicCurveFrameSample,
   OrganicCurveFrameState,
+  OrganicJunctionAnchor,
   OrganicSurfaceConfig,
 } from './surfaceTypes';
 import type { OrganicSkeletonNode, OrganicSkeletonState } from './types';
@@ -182,7 +184,89 @@ function buildBranchCurve(
     generation: first.generation,
     parentNodeId: first.branchId === 'organic:trunk' ? null : first.parentId,
     terminalNodeId: terminal.id,
+    junction: null,
     samples,
+  };
+}
+
+function closestSample(
+  curve: OrganicBranchCurve,
+  position: GrowthVec3,
+): OrganicCurveFrameSample | null {
+  return curve.samples.reduce<OrganicCurveFrameSample | null>((best, sample) => {
+    if (!best) return sample;
+    return distance(sample.position, position) < distance(best.position, position) ? sample : best;
+  }, null);
+}
+
+function junctionForCurve(
+  curve: OrganicBranchCurve,
+  curvesByBranchId: ReadonlyMap<string, OrganicBranchCurve>,
+  nodesById: ReadonlyMap<string, OrganicSkeletonNode>,
+  config: OrganicSurfaceConfig,
+): OrganicJunctionAnchor | null {
+  if (!curve.parentNodeId) return null;
+  const parentNode = nodesById.get(curve.parentNodeId);
+  if (!parentNode) return null;
+  const parentCurve = curvesByBranchId.get(parentNode.branchId);
+  if (!parentCurve) return null;
+  const parentSample = closestSample(parentCurve, parentNode.position);
+  const rootSample = curve.samples[0];
+  const nextSample = curve.samples.find(
+    (sample, index) => index > 0 && distance(sample.position, parentSample?.position ?? parentNode.position) > 1e-6,
+  );
+  if (!parentSample || !rootSample || !nextSample) return null;
+
+  const childDirection = normalize(
+    subtract(nextSample.position, parentSample.position),
+    rootSample.tangent,
+  );
+  const projectedRadial = subtract(
+    childDirection,
+    scale(parentSample.tangent, dot(childDirection, parentSample.tangent)),
+  );
+  const radialDirection = normalize(projectedRadial, parentSample.normal);
+  const surfacePosition = add(
+    parentSample.position,
+    scale(radialDirection, parentSample.radius * config.junctionSurfaceRatio),
+  );
+  const insetPosition = add(
+    parentSample.position,
+    scale(radialDirection, parentSample.radius * config.junctionInsetRatio),
+  );
+  const minimumJoinDistance = Math.max(
+    parentSample.radius * config.junctionSurfaceRatio,
+    rootSample.radius * 1.25,
+  );
+  const joinSampleIndex = Math.max(
+    1,
+    curve.samples.findIndex(
+      (sample, index) => index > 0 && distance(sample.position, parentSample.position) >= minimumJoinDistance,
+    ),
+  );
+  const resolvedJoinSampleIndex = Math.min(
+    curve.samples.length - 1,
+    joinSampleIndex < 1 ? 1 : joinSampleIndex,
+  );
+  const joinSample = curve.samples[resolvedJoinSampleIndex]!;
+  const collarRadius = Math.min(
+    parentSample.radius * 0.72,
+    Math.max(joinSample.radius, rootSample.radius * config.junctionFlare),
+  );
+
+  return {
+    childBranchId: curve.branchId,
+    parentBranchId: parentCurve.branchId,
+    parentNodeId: parentNode.id,
+    parentPosition: parentSample.position,
+    parentRadius: parentSample.radius,
+    parentTangent: parentSample.tangent,
+    radialDirection: roundVec(radialDirection),
+    surfacePosition: roundVec(surfacePosition),
+    insetPosition: roundVec(insetPosition),
+    childDirection: roundVec(childDirection),
+    collarRadius: round6(Math.max(config.minimumRadius, collarRadius)),
+    joinSampleIndex: resolvedJoinSampleIndex,
   };
 }
 
@@ -191,14 +275,23 @@ export function buildOrganicCurveFrames(
   config: OrganicSurfaceConfig = DEFAULT_ORGANIC_SURFACE_CONFIG,
 ): OrganicCurveFrameState {
   const nodesById = new Map(skeleton.nodes.map((node) => [node.id, node]));
-  const curves: OrganicBranchCurve[] = [];
+  const rawCurves: OrganicBranchCurve[] = [];
   const skippedBranchIds: string[] = [];
 
   for (const branch of collectBranches(skeleton)) {
     const curve = buildBranchCurve(branch, nodesById, config);
-    if (curve) curves.push(curve);
+    if (curve) rawCurves.push(curve);
     else if (branch[0]) skippedBranchIds.push(branch[0].branchId);
   }
+
+  const curvesByBranchId = new Map(rawCurves.map((curve) => [curve.branchId, curve]));
+  const unresolvedJunctionBranchIds: string[] = [];
+  const curves = rawCurves.map((curve) => {
+    if (!curve.parentNodeId) return curve;
+    const junction = junctionForCurve(curve, curvesByBranchId, nodesById, config);
+    if (!junction) unresolvedJunctionBranchIds.push(curve.branchId);
+    return { ...curve, junction };
+  });
 
   return {
     organicCurveFrameVersion: 1,
@@ -208,7 +301,9 @@ export function buildOrganicCurveFrames(
     diagnostics: {
       branchCount: curves.length,
       sampleCount: curves.reduce((total, curve) => total + curve.samples.length, 0),
+      junctionCount: curves.filter((curve) => curve.junction !== null).length,
       skippedBranchIds,
+      unresolvedJunctionBranchIds,
     },
   };
 }
