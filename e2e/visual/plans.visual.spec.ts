@@ -32,6 +32,13 @@ test.describe('Plans mobile visual preview', () => {
     await expect(overview).toBeVisible();
     await page.waitForTimeout(1_200);
 
+    const addButton = page.locator('.plans-overview-add');
+    await expect(addButton).toBeVisible();
+    const addBox = await addButton.boundingBox();
+    expect(addBox).not.toBeNull();
+    expect(addBox!.width).toBeLessThanOrEqual(56);
+    expect(addBox!.height).toBeLessThanOrEqual(56);
+
     await page.screenshot({
       path: testInfo.outputPath('plans-mobile-full.png'),
       fullPage: true,
@@ -51,6 +58,15 @@ test.describe('Plans mobile visual preview', () => {
     if (await ideas.count()) {
       await ideas.screenshot({ path: testInfo.outputPath('plans-undated-ideas.png') });
     }
+
+    await addButton.click();
+    const createSheet = page.locator('.plan-create-sheet');
+    await expect(createSheet).toBeVisible();
+    await createSheet.getByRole('button', { name: /Обкладинка плану/ }).click();
+    await expect(createSheet.locator('.plan-create-photo-picker')).toBeVisible();
+    await createSheet.screenshot({ path: testInfo.outputPath('plan-create-photo-picker.png') });
+    await createSheet.getByRole('button', { name: 'Скасувати' }).click();
+    await expect(createSheet).toBeHidden();
 
     if (await featured.count()) {
       await featured.first().click();

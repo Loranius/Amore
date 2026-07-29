@@ -1,15 +1,16 @@
 // ============================================================
 // Швидке створення спільного плану.
 // ------------------------------------------------------------
-// Перший рівень просить лише назву. Тип і нотатка відкриваються окремо,
-// тому форма не перетворюється на анкету. Календарна категорія «Свято»
-// навмисно відсутня: річниці та свята створюються в календарі.
+// Перший рівень просить лише назву. Тип, фото й нотатка відкриваються
+// окремо, тому форма не перетворюється на анкету.
 // ============================================================
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
-import { CheckIcon, ChevronDownIcon } from '@/components/icons/UiIcon';
+import { CheckIcon, ChevronDownIcon, CloseIcon } from '@/components/icons/UiIcon';
+import { CameraIcon } from '@/components/icons/NavIcon';
 import { PLAN_CATEGORIES, PLAN_CATEGORY_ORDER } from './planConstants';
 import './plansCreate.css';
 import './plansCreateAccordion.css';
+import './plansCreatePhoto.css';
 import type { NewPlanInput } from './usePlans';
 import type { PlanCategory } from '@/types';
 
@@ -32,7 +33,10 @@ export function AddPlanModal({
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<PlanCategory>('other');
   const [description, setDescription] = useState('');
+  const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [typeOpen, setTypeOpen] = useState(false);
+  const [photoOpen, setPhotoOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const closeTimer = useRef<number | null>(null);
@@ -43,6 +47,16 @@ export function AddPlanModal({
   useEffect(() => () => {
     if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
   }, []);
+
+  useEffect(() => {
+    if (!coverFile) {
+      setCoverPreview(null);
+      return;
+    }
+    const url = URL.createObjectURL(coverFile);
+    setCoverPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [coverFile]);
 
   const finishWithMotion = (action: () => void) => {
     if (busy || closing) return;
@@ -60,6 +74,7 @@ export function AddPlanModal({
       title: cleanTitle,
       category,
       description: description.trim() || null,
+      coverFile,
     });
   };
 
@@ -146,6 +161,56 @@ export function AddPlanModal({
                       </button>
                     );
                   })}
+                </div>
+              )}
+            </section>
+
+            <section className="plan-create-accordion">
+              <button
+                type="button"
+                className={`plan-create-accordion-toggle${photoOpen ? ' open' : ''}`}
+                aria-expanded={photoOpen}
+                onClick={() => setPhotoOpen((value) => !value)}
+                disabled={busy || closing}
+              >
+                <span className="plan-create-accordion-icon" aria-hidden="true"><CameraIcon size={18} /></span>
+                <span className="plan-create-accordion-copy">
+                  <small>Обкладинка плану</small>
+                  <strong>{coverFile ? 'Фото вибрано' : 'Додати фото'}</strong>
+                </span>
+                <span className="plan-create-accordion-optional">необов’язково</span>
+                <ChevronDownIcon size={17} />
+              </button>
+
+              {photoOpen && (
+                <div className="plan-create-photo">
+                  {coverPreview ? (
+                    <div className="plan-create-photo-preview">
+                      <img src={coverPreview} alt="Попередній перегляд обкладинки плану" />
+                      <button
+                        type="button"
+                        aria-label="Прибрати фото"
+                        onClick={() => setCoverFile(null)}
+                        disabled={busy || closing}
+                      >
+                        <CloseIcon size={15} />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="plan-create-photo-picker">
+                      <CameraIcon size={24} />
+                      <span>
+                        <strong>Вибрати фото</strong>
+                        <small>Воно стане обкладинкою плану</small>
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
+                        onChange={(event) => setCoverFile(event.target.files?.[0] ?? null)}
+                        disabled={busy || closing}
+                      />
+                    </label>
+                  )}
                 </div>
               )}
             </section>

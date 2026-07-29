@@ -1,0 +1,135 @@
+/* ============================================================
+   План — необов'язкова обкладинка під час швидкого створення.
+   ============================================================ */
+
+.plan-create-photo {
+  padding: 10px 11px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.plan-create-photo-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 11px;
+  min-height: 74px;
+  padding: 13px;
+  border: 1px dashed color-mix(in srgb, var(--plan-create-accent, var(--accent)) 34%, transparent);
+  border-radius: 18px;
+  color: color-mix(in srgb, var(--plan-create-accent, var(--accent)) 78%, var(--text));
+  background: color-mix(in srgb, var(--plan-create-accent, var(--accent)) 5%, var(--surface));
+  cursor: pointer;
+}
+
+.plan-create-photo-picker > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.plan-create-photo-picker strong {
+  font-size: 13px;
+}
+
+.plan-create-photo-picker small {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.plan-create-photo-picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.plan-create-photo-preview {
+  position: relative;
+  min-height: 150px;
+  overflow: hidden;
+  border-radius: 19px;
+  background: color-mix(in srgb, var(--plan-create-accent, var(--accent)) 8%, var(--surface));
+}
+
+.plan-create-photo-preview img {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+}
+
+.plan-create-photo-preview button {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 12px;
+  color: #fff;
+  background: rgba(35,24,32,.54);
+  cursor: pointer;
+  backdrop-filter: blur(9px);
+  -webkit-backdrop-filter: blur(9px);
+}
+
+/* Вища специфічність навмисна: plansOverview.css має стару мобільну
+   корекцію на 82×86 px нижче по каскаду. Компактний плюс має перемогти
+   її незалежно від порядку CSS-чанків. */
+.plans-overview .plans-overview-add {
+  width: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: 16px;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.plans-overview .plans-overview-add span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.plans-overview .plans-overview-add svg {
+  width: 22px;
+  height: 22px;
+}
+
+@media (max-width: 560px) {
+  .plans-overview .plans-overview-add {
+    width: 48px;
+    min-height: 48px;
+    height: 48px;
+    border-radius: 16px;
+    box-shadow: none;
+  }
+}
+
+@media (max-height: 690px) {
+  .plan-create-photo-preview,
+  .plan-create-photo-preview img {
+    height: 118px;
+    min-height: 118px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-create-photo-preview button {
+    transition: none;
+  }
+}

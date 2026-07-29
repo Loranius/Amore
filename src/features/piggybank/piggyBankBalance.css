@@ -1,0 +1,161 @@
+/* ============================================================
+   Скарбничка — одна спільна сума без фінансових цілей.
+   ============================================================ */
+
+.piggy-balance {
+  position: relative;
+  display: grid;
+  gap: 13px;
+  padding: 21px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 27px;
+  background:
+    radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 30%),
+    linear-gradient(145deg, color-mix(in srgb, var(--accent) 6%, var(--surface)), var(--surface));
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 6%, transparent);
+}
+
+.piggy-balance-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.piggy-balance-head > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.piggy-balance-icon,
+.piggy-balance-modal-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 auto;
+  border-radius: 19px;
+  color: color-mix(in srgb, var(--accent) 80%, var(--text));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.piggy-balance-eyebrow {
+  color: color-mix(in srgb, var(--accent) 78%, var(--text));
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.piggy-balance h2 {
+  margin: 0;
+  font-size: 21px;
+  letter-spacing: -.025em;
+}
+
+.piggy-balance-amount {
+  display: block;
+  margin-top: 2px;
+  font-size: clamp(34px, 9vw, 48px);
+  font-weight: 780;
+  line-height: 1;
+  letter-spacing: -.045em;
+  font-variant-numeric: tabular-nums;
+}
+
+.piggy-balance-copy {
+  max-width: 43ch;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.52;
+}
+
+.piggy-balance-updated {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.piggy-balance-edit {
+  justify-self: start;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  border-radius: 14px;
+  color: color-mix(in srgb, var(--accent) 84%, var(--text));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  font: inherit;
+  font-size: 12px;
+  font-weight: 780;
+  cursor: pointer;
+  transition: transform 150ms ease, background 150ms ease;
+}
+
+.piggy-balance-edit:active {
+  transform: scale(.97);
+}
+
+.piggy-balance-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 70px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.piggy-balance-state button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.piggy-balance-overlay {
+  align-items: flex-end;
+  padding: 14px 12px max(14px, env(safe-area-inset-bottom));
+}
+
+.piggy-balance-sheet {
+  display: grid;
+  gap: 14px;
+  width: min(100%, 520px);
+  padding-top: 18px;
+  border-radius: 26px;
+}
+
+.piggy-balance-sheet > p {
+  margin: -5px 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.piggy-balance-modal-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 17px;
+}
+
+@media (max-width: 359px) {
+  .piggy-balance {
+    padding: 18px;
+    border-radius: 23px;
+  }
+
+  .piggy-balance-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piggy-balance-edit {
+    transition: none;
+  }
+}
