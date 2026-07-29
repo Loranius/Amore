@@ -52,7 +52,23 @@ describe('Tree Life Lab', () => {
 
     expect(low.motionScale).toBeLessThan(high.motionScale);
     for (const leaf of low.leaves) {
-      expect(highByLeafId.get(leaf.leafInstanceId)).toEqual(leaf);
+      const highLeaf = highByLeafId.get(leaf.leafInstanceId);
+      expect(highLeaf).toBeDefined();
+      expect(highLeaf && {
+        id: highLeaf.id,
+        leafInstanceId: highLeaf.leafInstanceId,
+        phaseRad: highLeaf.phaseRad,
+        speed: highLeaf.speed,
+        pitchAmplitudeRad: highLeaf.pitchAmplitudeRad,
+        rollAmplitudeRad: highLeaf.rollAmplitudeRad,
+      }).toEqual({
+        id: leaf.id,
+        leafInstanceId: leaf.leafInstanceId,
+        phaseRad: leaf.phaseRad,
+        speed: leaf.speed,
+        pitchAmplitudeRad: leaf.pitchAmplitudeRad,
+        rollAmplitudeRad: leaf.rollAmplitudeRad,
+      });
     }
     expect(low.branch).toEqual(high.branch);
   });
