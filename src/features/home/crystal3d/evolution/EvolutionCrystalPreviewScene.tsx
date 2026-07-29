@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useCallback, useState, type KeyboardEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
@@ -7,6 +7,10 @@ import { MemoryModal } from '../../MemoryModal';
 import { useCrystalDNA } from '../../useCrystal';
 import LegacyCrystalScene from '../CrystalScene';
 import { EvolutionCrystalObject } from './EvolutionCrystalObject';
+import {
+  EvolutionRuntimeProbe,
+  type EvolutionRuntimeMetrics,
+} from './EvolutionRuntimeProbe';
 import { useEvolutionCrystalPipeline } from './useEvolutionCrystalPipeline';
 import './evolutionPreview.css';
 
@@ -22,6 +26,10 @@ export default function EvolutionCrystalPreviewScene() {
   const { pipeline, isPending, error } = useEvolutionCrystalPipeline(reduceMotion);
   const { dna, deltas, isPending: statsPending } = useCrystalDNA();
   const [open, setOpen] = useState(false);
+  const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
+  const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => {
+    setRuntime(next);
+  }, []);
 
   if (error) {
     console.error('[Evolution crystal preview] fallback to legacy renderer:', error);
@@ -50,6 +58,7 @@ export default function EvolutionCrystalPreviewScene() {
     metrics.quality,
     `${metrics.meshCount} тіл`,
     `${formatTopology(metrics.usedTriangles)} △`,
+    runtime ? `${runtime.drawCalls} DC` : 'метрики…',
     `${metrics.buildMs.toFixed(1)} ms`,
   ].join(' · ');
 
@@ -65,9 +74,13 @@ export default function EvolutionCrystalPreviewScene() {
         data-evolution-quality={metrics.quality}
         data-evolution-bodies={metrics.bodyCount}
         data-evolution-meshes={metrics.meshCount}
+        data-evolution-materials={metrics.materialCount}
         data-evolution-vertices={metrics.usedVertices}
         data-evolution-triangles={metrics.usedTriangles}
         data-evolution-build-ms={metrics.buildMs}
+        data-evolution-runtime={runtime ? 'ready' : 'warming'}
+        data-evolution-draw-calls={runtime?.drawCalls ?? ''}
+        data-evolution-rendered-triangles={runtime?.triangles ?? ''}
       >
         <Canvas
           dpr={metrics.quality === 'high' ? [1, 2] : metrics.quality === 'balanced' ? [1, 1.75] : [1, 1.35]}
@@ -84,6 +97,7 @@ export default function EvolutionCrystalPreviewScene() {
             life={pipeline.life}
             onOpen={openModal}
           />
+          <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
           <OrbitControls
             enablePan={false}
             enableZoom={false}
