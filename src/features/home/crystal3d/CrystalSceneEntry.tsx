@@ -1,18 +1,30 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
+import { CrystalPlaceholder } from '../CrystalPlaceholder';
 import LegacyCrystalScene from './CrystalScene';
 import EvolutionCrystalPreviewScene from './evolution/EvolutionCrystalPreviewScene';
 import { isEvolutionRendererPreviewEnabled } from './evolution/featureFlag';
+import { isTreeLabPreviewEnabled } from './treeLab/featureFlag';
+
+const TreeLabPreviewScene = lazy(() => import('./treeLab/TreeLabPreviewScene'));
 
 /**
- * The production path stays legacy by default. New queries and the Phase 1-6
- * pipeline are mounted only for the explicit `?engine=evolution` preview.
+ * Production stays on the legacy renderer. Evolution and Tree Lab are isolated,
+ * explicit previews and never replace Home without a query flag.
  */
 export default function CrystalSceneEntry() {
-  const [evolutionPreview] = useState(() =>
-    isEvolutionRendererPreviewEnabled(
-      typeof window === 'undefined' ? '' : window.location.search,
-    ),
+  const [search] = useState(
+    () => typeof window === 'undefined' ? '' : window.location.search,
   );
 
-  return evolutionPreview ? <EvolutionCrystalPreviewScene /> : <LegacyCrystalScene />;
+  if (isTreeLabPreviewEnabled(search)) {
+    return (
+      <Suspense fallback={<CrystalPlaceholder />}>
+        <TreeLabPreviewScene />
+      </Suspense>
+    );
+  }
+
+  return isEvolutionRendererPreviewEnabled(search)
+    ? <EvolutionCrystalPreviewScene />
+    : <LegacyCrystalScene />;
 }
