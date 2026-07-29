@@ -5,7 +5,7 @@
 // тому форма не перетворюється на анкету. Календарна категорія «Свято»
 // навмисно відсутня: річниці та свята створюються в календарі.
 // ============================================================
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { CheckIcon, ChevronDownIcon } from '@/components/icons/UiIcon';
 import { PLAN_CATEGORIES, PLAN_CATEGORY_ORDER } from './planConstants';
 import './plansCreate.css';
@@ -14,6 +14,7 @@ import type { NewPlanInput } from './usePlans';
 import type { PlanCategory } from '@/types';
 
 const PLAN_TYPES = PLAN_CATEGORY_ORDER.filter((key) => key !== 'holiday');
+const CLOSE_MOTION_MS = 150;
 
 export function AddPlanModal({
   busy,
@@ -33,9 +34,24 @@ export function AddPlanModal({
   const [description, setDescription] = useState('');
   const [typeOpen, setTypeOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const closeTimer = useRef<number | null>(null);
 
   const selected = PLAN_CATEGORIES[category];
   const style = { '--plan-create-accent': selected.color } as CSSProperties;
+
+  useEffect(() => () => {
+    if (closeTimer.current !== null) window.clearTimeout(closeTimer.current);
+  }, []);
+
+  const finishWithMotion = (action: () => void) => {
+    if (busy || closing) return;
+    setClosing(true);
+    closeTimer.current = window.setTimeout(action, CLOSE_MOTION_MS);
+  };
+
+  const requestClose = () => finishWithMotion(onClose);
+  const requestContinue = (id: number) => finishWithMotion(() => onContinue(id));
 
   const save = () => {
     const cleanTitle = title.trim();
@@ -49,13 +65,13 @@ export function AddPlanModal({
 
   return (
     <div
-      className="modal-overlay plan-create-overlay"
+      className={`modal-overlay plan-create-overlay${closing ? ' is-closing' : ''}`}
       onClick={(event) => {
-        if (!busy && event.target === event.currentTarget) onClose();
+        if (!busy && event.target === event.currentTarget) requestClose();
       }}
     >
       <div
-        className="modal-sheet plan-create-sheet"
+        className={`modal-sheet plan-create-sheet${closing ? ' is-closing' : ''}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="plan-create-title"
@@ -86,7 +102,7 @@ export function AddPlanModal({
                 onChange={(event) => setTitle(event.target.value)}
                 placeholder="Наприклад, поїхати разом у Карпати"
                 autoFocus
-                disabled={busy}
+                disabled={busy || closing}
               />
               <small>{title.trim().length}/120</small>
             </label>
@@ -97,7 +113,7 @@ export function AddPlanModal({
                 className={`plan-create-accordion-toggle${typeOpen ? ' open' : ''}`}
                 aria-expanded={typeOpen}
                 onClick={() => setTypeOpen((value) => !value)}
-                disabled={busy}
+                disabled={busy || closing}
               >
                 <span className="plan-create-accordion-icon" aria-hidden="true"><selected.Icon size={18} /></span>
                 <span className="plan-create-accordion-copy">
@@ -123,7 +139,7 @@ export function AddPlanModal({
                           setCategory(key);
                           setTypeOpen(false);
                         }}
-                        disabled={busy}
+                        disabled={busy || closing}
                       >
                         <item.Icon size={17} />
                         <span>{key === 'other' ? 'Без типу' : item.label}</span>
@@ -140,7 +156,7 @@ export function AddPlanModal({
                 className={`plan-create-accordion-toggle plan-create-accordion-toggle--note${noteOpen ? ' open' : ''}`}
                 aria-expanded={noteOpen}
                 onClick={() => setNoteOpen((value) => !value)}
-                disabled={busy}
+                disabled={busy || closing}
               >
                 <span className="plan-create-accordion-copy">
                   <small>Додаткова деталь</small>
@@ -159,17 +175,17 @@ export function AddPlanModal({
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     placeholder="Наприклад, поїхати власною машиною та взяти фотоапарат"
-                    disabled={busy}
+                    disabled={busy || closing}
                   />
                 </label>
               )}
             </section>
 
             <div className="plan-create-actions">
-              <button type="button" className="plan-create-cancel" onClick={onClose} disabled={busy}>
+              <button type="button" className="plan-create-cancel" onClick={requestClose} disabled={busy || closing}>
                 Скасувати
               </button>
-              <button type="submit" className="btn plan-create-save" disabled={busy || !title.trim()}>
+              <button type="submit" className="btn plan-create-save" disabled={busy || closing || !title.trim()}>
                 {busy ? 'Зберігаю…' : 'Зберегти ідею'}
               </button>
             </div>
@@ -182,10 +198,15 @@ export function AddPlanModal({
             <p>Він збережений серед ідей. Можна залишити його так або одразу додати дату, кроки й бюджет.</p>
 
             <div className="plan-create-success-actions">
-              <button type="button" className="btn plan-create-continue" onClick={() => onContinue(createdPlanId)}>
+              <button
+                type="button"
+                className="btn plan-create-continue"
+                onClick={() => requestContinue(createdPlanId)}
+                disabled={closing}
+              >
                 Продовжити планування
               </button>
-              <button type="button" className="plan-create-done" onClick={onClose}>
+              <button type="button" className="plan-create-done" onClick={requestClose} disabled={closing}>
                 Залишити як ідею
               </button>
             </div>
