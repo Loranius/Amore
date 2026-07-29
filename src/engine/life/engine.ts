@@ -117,7 +117,9 @@ export function sampleCrystalLife(input: SampleCrystalLifeInput): CrystalLifeFra
     tiltX: round6(moving ? Math.sin(elapsed * 0.16) * life.tiltXAmplitude : 0),
     tiltZ: round6(moving ? Math.sin(elapsed * 0.12 + 1.7) * life.tiltZAmplitude : 0),
     positionY: round6(moving ? Math.sin(elapsed * life.levitationSpeed) * life.levitationAmplitude : 0),
-    groupScale: round6(1 + (moving ? Math.sin(elapsed * life.breatheSpeed) * life.breatheAmplitude : 0) + pulse * 0.006),
+    groupScale: round6(1 + (moving
+      ? Math.sin(elapsed * life.breatheSpeed) * life.breatheAmplitude + pulse * 0.006
+      : 0)),
     sparklePhase: round6(moving ? (elapsed * life.sparkleSpeed) % 1 : 0),
     bodyGlowMultiplier,
   };
