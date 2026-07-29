@@ -31,63 +31,32 @@ async function expectInsideViewport(
   expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.width + 1);
 }
 
-test('Скарбничка: спільні цілі тримають повну ширину Pixel 8 Pro', async ({ page }, testInfo) => {
+test('Скарбничка: одна спільна сума й вільний ліміт на Pixel 8 Pro', async ({ page }, testInfo) => {
   await login(page);
   await page.goto('/#/piggybank');
 
-  await expect(page.getByRole('heading', { name: 'Спільні цілі' })).toBeVisible();
-  await expect(page.locator('.finance-goals-hero')).toBeVisible();
-  await expect(page.locator('.finance-goal, .finance-goals-empty').first()).toBeVisible({
-    timeout: 15_000,
-  });
+  const balance = page.locator('.piggy-balance');
+  await expect(balance).toBeVisible({ timeout: 15_000 });
+  await expect(balance.getByRole('heading', { name: 'Скарбничка' })).toBeVisible();
+  await expect(balance.getByText('Спільні відкладені гроші')).toBeVisible();
+  await expect(page.getByText('Вільний ліміт', { exact: true })).toBeVisible();
+  await expect(page.getByText('Спільні цілі', { exact: true })).toHaveCount(0);
 
   await page.screenshot({
-    path: testInfo.outputPath('finance-mobile-full.png'),
+    path: testInfo.outputPath('piggybank-mobile-full.png'),
     fullPage: true,
   });
 
   await expectInsideViewport(page, page.locator('.budget'));
-  await expectInsideViewport(page, page.locator('.finance-goals-hero'));
+  await expectInsideViewport(page, balance);
+  await balance.screenshot({ path: testInfo.outputPath('piggybank-balance-card.png') });
 
-  const goal = page.locator('.finance-goal').first();
-  if (await goal.count()) {
-    const mainCard = goal.locator('.finance-goal-main-card');
-    const progressCard = goal.locator('.goal-progress-card');
-    const forecastCard = goal.locator('.goal-forecast-card');
-
-    await expect(mainCard).toBeVisible();
-    await expect(progressCard).toBeVisible();
-    await expect(forecastCard).toBeVisible();
-
-    await expectInsideViewport(page, goal);
-    await expectInsideViewport(page, mainCard);
-    await expectInsideViewport(page, progressCard);
-    await expectInsideViewport(page, forecastCard);
-
-    const goalBox = await goal.boundingBox();
-    expect(goalBox!.width).toBeGreaterThan(360);
-
-    await goal.screenshot({
-      path: testInfo.outputPath('finance-goal-mobile.png'),
-    });
-
-    await goal.getByRole('button', { name: 'Обговорення' }).click();
-
-    const discussion = page.locator('.goal-comments-modal');
-    await expect(discussion).toBeVisible();
-    await expect(discussion.getByText('Обговорення цілі')).toBeVisible();
-    await expect(discussion.getByLabel('Додати коротку думку')).toBeVisible();
-    await expect(discussion.locator('.goal-comments-state')).toBeHidden({ timeout: 15_000 });
-    await expect(
-      discussion.locator('.goal-comments-list, .goal-comments-empty').first(),
-    ).toBeVisible();
-    await expectInsideViewport(page, discussion);
-
-    await discussion.screenshot({
-      path: testInfo.outputPath('finance-goal-discussion-mobile.png'),
-    });
-
-    await discussion.getByRole('button', { name: 'Закрити обговорення' }).click();
-    await expect(discussion).toBeHidden();
-  }
+  await balance.getByRole('button', { name: 'Змінити суму' }).click();
+  const sheet = page.locator('.piggy-balance-sheet');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByLabel('Загальна сума, ₴')).toBeVisible();
+  await expectInsideViewport(page, sheet);
+  await sheet.screenshot({ path: testInfo.outputPath('piggybank-balance-editor.png') });
+  await sheet.getByRole('button', { name: 'Скасувати' }).click();
+  await expect(sheet).toBeHidden();
 });
