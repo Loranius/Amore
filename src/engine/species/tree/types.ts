@@ -81,6 +81,8 @@ export interface TreeGrowthInstruction {
   sourceEventId: string | null;
   sourceEpisodeId: string | null;
   epochIndex: number;
+  /** Stable chronological key used by append-only Growth adapters. */
+  sequence: number;
   channel: EvolutionChannel | null;
   kind: TreeBranchKind;
   tier: TreeBranchTier;
