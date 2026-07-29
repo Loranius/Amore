@@ -114,7 +114,7 @@ describe('Evolution real-data snapshot mapping', () => {
         id: 7,
         title: 'Львів',
         note: null,
-        category: 'travel',
+        category: 'visited',
         lat: 49.8,
         lng: 24.0,
         photo_url: null,
