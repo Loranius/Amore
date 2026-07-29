@@ -20,6 +20,7 @@ import { useShoppingMutations } from '@/features/shopping/useShoppingItems';
 import { isLinked, linksOfPlan, resolveLinks, type LinkCatalog } from './planLinkModel';
 import { usePlanLinkMutations, usePlanLinks } from './usePlanLinks';
 import type { PlanLinkTarget, PlanRow } from '@/types';
+import './planLinksTiles.css';
 
 const TARGET_META: Record<PlanLinkTarget, {
   label: string;
@@ -111,14 +112,35 @@ function PlanLinksContent({ plan, embedded }: { plan: PlanRow; embedded: boolean
 
   const catalog = useMemo<LinkCatalog>(() => ({
     wish: new Map(
-      [...myWishes, ...partnerWishes, ...sharedWishes].map((wish) => [wish.id, { title: wish.title }]),
-    ),
-    place: new Map(pins.map((pin) => [pin.id, { title: pin.title, subtitle: pin.city }])),
-    memory: new Map(
-      (archive?.photos ?? []).map((memory) => [
-        memory.id,
-        { title: memory.caption || formatMemoryDate(memory.memory_date, memory.date_precision) },
+      [...myWishes, ...partnerWishes, ...sharedWishes].map((wish) => [
+        wish.id,
+        {
+          title: wish.title,
+          subtitle: wish.description,
+          imageUrl: wish.image_url,
+        },
       ]),
+    ),
+    place: new Map(pins.map((pin) => [
+      pin.id,
+      {
+        title: pin.title,
+        subtitle: [pin.city, pin.country].filter(Boolean).join(' · ') || null,
+        imageUrl: pin.photo_url,
+      },
+    ])),
+    memory: new Map(
+      (archive?.photos ?? []).map((memory) => {
+        const date = formatMemoryDate(memory.memory_date, memory.date_precision);
+        return [
+          memory.id,
+          {
+            title: memory.caption || date,
+            subtitle: memory.caption ? date : null,
+            imageUrl: memory.photo_url,
+          },
+        ];
+      }),
     ),
   }), [myWishes, partnerWishes, sharedWishes, pins, archive]);
 
@@ -149,16 +171,22 @@ function PlanLinksContent({ plan, embedded }: { plan: PlanRow; embedded: boolean
       {resolved.length === 0 ? (
         <p className="plan-links-empty">Тут можна зібрати все, що стосується цього плану.</p>
       ) : (
-        <ul className="plan-link-list">
+        <ul className="plan-link-grid">
           {resolved.map((item) => {
             const meta = TARGET_META[item.type];
             return (
-              <li key={`${item.type}-${item.id}`} className="plan-link">
-                <Link className="plan-link-open" to={meta.to}>
-                  <span className="plan-link-icon"><meta.Icon size={17} /></span>
+              <li key={`${item.type}-${item.id}`} className="plan-link-card">
+                <Link
+                  className="plan-link-open"
+                  to={meta.to}
+                  aria-label={`Відкрити ${meta.label.toLowerCase()} «${item.title}»`}
+                >
+                  <LinkPreviewMedia imageUrl={item.imageUrl} Icon={meta.Icon} />
+                  <span className="plan-link-shade" aria-hidden="true" />
+                  <span className="plan-link-type"><meta.Icon size={13} /> {meta.label}</span>
                   <span className="plan-link-copy">
                     <b>{item.title}</b>
-                    <small>{item.subtitle ? `${meta.label} · ${item.subtitle}` : meta.label}</small>
+                    {item.subtitle && <small>{item.subtitle}</small>}
                   </span>
                 </Link>
                 <button
@@ -199,7 +227,7 @@ function PlanLinksContent({ plan, embedded }: { plan: PlanRow; embedded: boolean
             const meta = TARGET_META[type];
             return (
               <button key={type} type="button" onClick={() => startPicking(type)}>
-                <meta.Icon size={18} />
+                <span className="plan-link-kind-icon"><meta.Icon size={20} /></span>
                 <span><b>{meta.label}</b><small>{meta.description}</small></span>
               </button>
             );
@@ -212,7 +240,7 @@ function PlanLinksContent({ plan, embedded }: { plan: PlanRow; embedded: boolean
               setShopping(true);
             }}
           >
-            <CartIcon size={18} />
+            <span className="plan-link-kind-icon"><CartIcon size={20} /></span>
             <span><b>У покупки</b><small>Додати потрібні речі до спільного списку</small></span>
           </button>
         </div>
@@ -225,27 +253,55 @@ function PlanLinksContent({ plan, embedded }: { plan: PlanRow; embedded: boolean
           </p>
         ) : (
           <ul className="plan-link-picker">
-            {options.map((option) => (
-              <li key={option.id}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    link.mutate({ planId: plan.id, targetType: picking, targetId: option.id });
-                    setPicking(null);
-                  }}
-                >
-                  <PlusIcon size={14} />
-                  <span>{option.title}</span>
-                  {option.subtitle && <small>{option.subtitle}</small>}
-                </button>
-              </li>
-            ))}
+            {options.map((option) => {
+              const meta = TARGET_META[picking];
+              return (
+                <li key={option.id}>
+                  <button
+                    type="button"
+                    aria-label={`Додати «${option.title}»`}
+                    onClick={() => {
+                      link.mutate({ planId: plan.id, targetType: picking, targetId: option.id });
+                      setPicking(null);
+                    }}
+                  >
+                    <LinkPreviewMedia imageUrl={option.imageUrl} Icon={meta.Icon} />
+                    <span className="plan-link-picker-shade" aria-hidden="true" />
+                    <span className="plan-link-picker-add"><PlusIcon size={14} /></span>
+                    <span className="plan-link-picker-copy">
+                      <b>{option.title}</b>
+                      {option.subtitle && <small>{option.subtitle}</small>}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )
       )}
 
       {shopping && <ShoppingComposer plan={plan} onDone={() => setShopping(false)} />}
     </>
+  );
+}
+
+function LinkPreviewMedia({ imageUrl, Icon }: {
+  imageUrl?: string | null;
+  Icon: typeof MapPinIcon;
+}) {
+  return (
+    <span className="plan-link-media" aria-hidden="true">
+      <span className="plan-link-media-fallback"><Icon size={30} /></span>
+      {imageUrl && (
+        <img
+          src={imageUrl}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          onError={(event) => { event.currentTarget.hidden = true; }}
+        />
+      )}
+    </span>
   );
 }
 
