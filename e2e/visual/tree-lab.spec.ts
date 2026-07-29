@@ -4,6 +4,9 @@ const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
 const MAX_FOLIAGE_CLUSTERS = 64;
 const MAX_FOLIAGE_LEAVES = 900;
+const MAX_MEDIUM_LEAF_INSTANCES = 520;
+const MAX_TREE_TRIANGLES = 16_000;
+const MAX_TREE_DRAW_CALLS = 2;
 
 async function login(page: Page, url: string) {
   await page.goto(url);
@@ -71,6 +74,62 @@ async function expectFoliageMetrics(preview: Locator, requireClusters: boolean) 
   expect(truncated).toBeGreaterThanOrEqual(0);
 }
 
+async function expectLeafGeometryMetrics(preview: Locator, requireInstances: boolean) {
+  const candidates = numericAttribute(
+    await preview.getAttribute('data-tree-lab-leaf-candidates'),
+    'leafCandidates',
+  );
+  const instances = numericAttribute(
+    await preview.getAttribute('data-tree-lab-leaf-instances'),
+    'leafInstances',
+  );
+  const sharedVertices = numericAttribute(
+    await preview.getAttribute('data-tree-lab-leaf-shared-vertices'),
+    'leafSharedVertices',
+  );
+  const sharedTriangles = numericAttribute(
+    await preview.getAttribute('data-tree-lab-leaf-shared-triangles'),
+    'leafSharedTriangles',
+  );
+  const renderedTriangles = numericAttribute(
+    await preview.getAttribute('data-tree-lab-leaf-rendered-triangles'),
+    'leafRenderedTriangles',
+  );
+  const truncated = numericAttribute(
+    await preview.getAttribute('data-tree-lab-leaf-truncated'),
+    'leafTruncated',
+  );
+  const estimatedDrawCalls = numericAttribute(
+    await preview.getAttribute('data-tree-lab-leaf-draw-calls'),
+    'leafDrawCalls',
+  );
+
+  expect(candidates).toBeGreaterThanOrEqual(instances);
+  expect(instances).toBeGreaterThanOrEqual(requireInstances ? 1 : 0);
+  expect(instances).toBeLessThanOrEqual(MAX_MEDIUM_LEAF_INSTANCES);
+  expect(sharedVertices).toBeGreaterThan(0);
+  expect(sharedTriangles).toBeGreaterThan(0);
+  expect(renderedTriangles).toBe(instances * sharedTriangles);
+  expect(truncated).toBeGreaterThanOrEqual(0);
+  expect(estimatedDrawCalls).toBe(1);
+}
+
+async function expectRuntimeBudget(preview: Locator) {
+  const triangles = numericAttribute(
+    await preview.getAttribute('data-tree-lab-triangles'),
+    'treeTriangles',
+  );
+  const drawCalls = numericAttribute(
+    await preview.getAttribute('data-tree-lab-draw-calls'),
+    'treeDrawCalls',
+  );
+
+  expect(triangles).toBeGreaterThan(0);
+  expect(triangles).toBeLessThanOrEqual(MAX_TREE_TRIANGLES);
+  expect(drawCalls).toBeGreaterThan(0);
+  expect(drawCalls).toBeLessThanOrEqual(MAX_TREE_DRAW_CALLS);
+}
+
 test.describe('Tree Species Pixel 8 Pro preview', () => {
   test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
 
@@ -93,6 +152,8 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
     await expect(preview).toHaveAttribute('data-tree-lab-violations', '');
     await expectCompositionMetrics(preview);
     await expectFoliageMetrics(preview, true);
+    await expectLeafGeometryMetrics(preview, true);
+    await expectRuntimeBudget(preview);
 
     await page.screenshot({
       path: 'test-results/tree-species-fixture-pixel-8-pro.png',
@@ -114,6 +175,8 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
     });
     await expectCompositionMetrics(preview);
     await expectFoliageMetrics(preview, false);
+    await expectLeafGeometryMetrics(preview, false);
+    await expectRuntimeBudget(preview);
 
     const normalizedEvents = numericAttribute(
       await preview.getAttribute('data-tree-lab-normalized-events'),

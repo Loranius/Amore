@@ -10,6 +10,11 @@ import {
   type TreeFoliageState,
 } from '@/engine/foliage';
 import {
+  DEFAULT_TREE_LEAF_GEOMETRY_CONFIG,
+  buildTreeLeafGeometry,
+  type TreeLeafGeometryState,
+} from '@/engine/leafGeometry';
+import {
   buildOrganicCurveFrames,
   buildOrganicSkeleton,
   buildOrganicSweepMesh,
@@ -41,6 +46,7 @@ export interface TreeLabPreviewBuild {
   frames: OrganicCurveFrameState;
   composition: TreeCompositionState;
   foliage: TreeFoliageState;
+  leaves: TreeLeafGeometryState;
   mesh: OrganicSweepMesh;
   buildMs: number;
 }
@@ -90,6 +96,11 @@ export function buildTreeLabPreviewFromArtifact({
     composition,
     config: DEFAULT_TREE_FOLIAGE_CONFIG,
   });
+  const leaves = buildTreeLeafGeometry({
+    foliage,
+    lod,
+    config: DEFAULT_TREE_LEAF_GEOMETRY_CONFIG,
+  });
   const mesh = buildOrganicSweepMesh(frames, lod);
 
   return {
@@ -102,6 +113,7 @@ export function buildTreeLabPreviewFromArtifact({
     frames,
     composition,
     foliage,
+    leaves,
     mesh,
     buildMs: now() - startedAt,
   };

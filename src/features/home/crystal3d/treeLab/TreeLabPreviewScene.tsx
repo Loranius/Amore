@@ -48,9 +48,13 @@ function TreeLabRenderedScene({
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => {
     setRuntime(next);
   }, []);
+  const totalVertices = build.mesh.diagnostics.vertexCount
+    + build.leaves.diagnostics.sharedVertexCount;
+  const totalTriangles = build.mesh.diagnostics.triangleCount
+    + build.leaves.diagnostics.renderedTriangleCount;
   const acceptance = evaluateTreeLabAcceptance({
-    vertices: build.mesh.diagnostics.vertexCount,
-    triangles: build.mesh.diagnostics.triangleCount,
+    vertices: totalVertices,
+    triangles: totalTriangles,
     buildMs: build.buildMs,
     drawCalls: runtime?.drawCalls ?? null,
   });
@@ -70,12 +74,10 @@ function TreeLabRenderedScene({
     build.lod,
     build.composition.silhouette,
     `${Math.round(build.composition.score.total * 100)}% comp`,
-    `${build.foliage.diagnostics.emittedClusterCount} foliage`,
-    `${build.foliage.diagnostics.totalLeafCount} leaves`,
+    `${build.foliage.diagnostics.emittedClusterCount} clusters`,
+    `${build.leaves.instances.length} cards`,
     `${build.mesh.diagnostics.branchCount} гілок`,
-    `${build.mesh.diagnostics.junctionCount} стиків`,
-    `${formatCount(build.mesh.diagnostics.vertexCount)} vtx`,
-    `${formatCount(build.mesh.diagnostics.triangleCount)} △`,
+    `${formatCount(totalTriangles)} △`,
     runtime ? `${runtime.drawCalls} DC` : 'DC…',
     `${build.buildMs.toFixed(1)} ms`,
   ].join(' · ');
@@ -113,10 +115,19 @@ function TreeLabRenderedScene({
       data-tree-lab-foliage-leaves={build.foliage.diagnostics.totalLeafCount}
       data-tree-lab-foliage-cells={build.foliage.diagnostics.occupiedCellIds.length}
       data-tree-lab-foliage-truncated={build.foliage.diagnostics.truncatedClusterIds.length}
+      data-tree-lab-leaf-candidates={build.leaves.diagnostics.candidateInstanceCount}
+      data-tree-lab-leaf-instances={build.leaves.diagnostics.renderedInstanceCount}
+      data-tree-lab-leaf-shared-vertices={build.leaves.diagnostics.sharedVertexCount}
+      data-tree-lab-leaf-shared-triangles={build.leaves.diagnostics.sharedTriangleCount}
+      data-tree-lab-leaf-rendered-triangles={build.leaves.diagnostics.renderedTriangleCount}
+      data-tree-lab-leaf-truncated={build.leaves.diagnostics.truncatedInstanceIds.length}
+      data-tree-lab-leaf-draw-calls={build.leaves.diagnostics.estimatedDrawCalls}
       data-tree-lab-branches={build.mesh.diagnostics.branchCount}
       data-tree-lab-junctions={build.mesh.diagnostics.junctionCount}
-      data-tree-lab-vertices={build.mesh.diagnostics.vertexCount}
-      data-tree-lab-triangles={build.mesh.diagnostics.triangleCount}
+      data-tree-lab-branch-vertices={build.mesh.diagnostics.vertexCount}
+      data-tree-lab-branch-triangles={build.mesh.diagnostics.triangleCount}
+      data-tree-lab-vertices={totalVertices}
+      data-tree-lab-triangles={totalTriangles}
       data-tree-lab-build-ms={build.buildMs.toFixed(3)}
       data-tree-lab-draw-calls={runtime?.drawCalls ?? ''}
     >
@@ -128,7 +139,7 @@ function TreeLabRenderedScene({
         <ambientLight intensity={0.72} />
         <directionalLight position={[4, 7, 5]} intensity={1.25} />
         <directionalLight position={[-4, 3, -2]} intensity={0.45} />
-        <TreeLabObject mesh={build.mesh} />
+        <TreeLabObject mesh={build.mesh} leaves={build.leaves} />
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} warmupFrames={18} />
         <OrbitControls
           enablePan={false}

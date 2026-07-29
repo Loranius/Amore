@@ -16,7 +16,7 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
 }
 
 describe('Tree Lab preview pipeline', () => {
-  it('keeps the full Evolution -> Species -> Growth -> Geometry result deterministic', () => {
+  it('keeps the full Evolution -> Species -> Growth -> Composition -> Foliage -> Geometry result deterministic', () => {
     const first = buildTreeLabPreview('medium');
     const second = buildTreeLabPreview('medium');
 
@@ -50,19 +50,22 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
   });
 
-  it('keeps the medium mobile topology inside the published limits', () => {
+  it('keeps branch and instanced leaf workload inside the published mobile limits', () => {
     const build = buildTreeLabPreview('medium');
+    const totalVertices = build.mesh.diagnostics.vertexCount
+      + build.leaves.diagnostics.sharedVertexCount;
+    const totalTriangles = build.mesh.diagnostics.triangleCount
+      + build.leaves.diagnostics.renderedTriangleCount;
 
-    expect(build.mesh.diagnostics.vertexCount).toBeLessThanOrEqual(
-      TREE_LAB_MOBILE_BUDGET.maxVertices,
-    );
-    expect(build.mesh.diagnostics.triangleCount).toBeLessThanOrEqual(
-      TREE_LAB_MOBILE_BUDGET.maxTriangles,
+    expect(totalVertices).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxVertices);
+    expect(totalTriangles).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxTriangles);
+    expect(build.leaves.diagnostics.estimatedDrawCalls + 1).toBeLessThanOrEqual(
+      TREE_LAB_MOBILE_BUDGET.maxDrawCalls,
     );
     expect(build.mesh.diagnostics.junctionCount).toBe(build.frames.diagnostics.junctionCount);
   });
 
-  it('adapts the pure mesh to one indexed Three.js geometry', () => {
+  it('adapts the pure branch mesh to one indexed Three.js geometry', () => {
     const build = buildTreeLabPreview('low');
     const geometry = createThreeOrganicSweepGeometry(build.mesh);
 
