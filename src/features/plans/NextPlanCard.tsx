@@ -5,7 +5,7 @@
 // ілюстрація, короткий зміст і зрозумілий час до події. Детальна підготовка
 // лишається всередині плану, щоб віджет не перетворювався на звіт.
 // ============================================================
-import type { CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarIcon, ChevronRightIcon } from '@/components/icons/UiIcon';
 import { daysLabel } from '@/features/calendar/calendarUtils';
@@ -15,17 +15,37 @@ import { PLAN_CATEGORIES } from './planConstants';
 import { daysUntilStart, planDateLabel, readiness } from './planModel';
 import type { PlanRow } from '@/types';
 
-export function NextPlanCard({ plan }: { plan: PlanRow }) {
+export function NextPlanCard({
+  plan,
+  highlighted = false,
+}: {
+  plan: PlanRow;
+  highlighted?: boolean;
+}) {
   const category = PLAN_CATEGORIES[plan.category];
   const { data: tasks = [] } = usePlanTasks(plan.id);
   const ready = readiness(tasks);
   const days = daysUntilStart(plan);
   const date = planDateLabel(plan);
   const description = plan.description?.trim() || null;
+  const [freshCountdown, setFreshCountdown] = useState(false);
+
+  useEffect(() => {
+    if (days === null) return;
+    const key = `amore:plans-countdown:${plan.id}:${plan.start_date ?? ''}`;
+    try {
+      if (window.sessionStorage.getItem(key) === 'shown') return;
+      window.sessionStorage.setItem(key, 'shown');
+    } catch {
+      // У приватному режимі sessionStorage може бути недоступним. Тоді
+      // просто показуємо одноразовий акцент для поточного монтування.
+    }
+    setFreshCountdown(true);
+  }, [days, plan.id, plan.start_date]);
 
   return (
     <Link
-      className={`plans-featured-card${plan.cover_url ? ' plans-featured-card--photo' : ''}`}
+      className={`plans-featured-card${plan.cover_url ? ' plans-featured-card--photo' : ''}${highlighted ? ' is-new' : ''}`}
       to={`/plans/${plan.id}`}
       style={{ '--plan-accent': category.color } as CSSProperties}
     >
@@ -54,7 +74,11 @@ export function NextPlanCard({ plan }: { plan: PlanRow }) {
         {description && <span className="plans-featured-description">{description}</span>}
 
         <span className="plans-featured-meta">
-          {days !== null && <b>{daysLabel(days)}</b>}
+          {days !== null && (
+            <b className={`plans-featured-countdown${freshCountdown ? ' is-fresh' : ''}`}>
+              {daysLabel(days)}
+            </b>
+          )}
           {date && (
             <span>
               <CalendarIcon size={15} />
