@@ -91,6 +91,7 @@ export interface CrystalGeometryDiagnostics {
   meshesWithoutVisibleTriangles: string[];
   nonFiniteBodyIds: string[];
   downgradedBodyIds: string[];
+  budgetOmittedBodyIds: string[];
 }
 
 export interface CrystalGeometryState {
