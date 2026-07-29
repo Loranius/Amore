@@ -1,4 +1,5 @@
 export { adaptEvolutionSnapshot, buildArtifactFromSnapshot } from './assemble';
+export { toEvolutionSourceSnapshot, type AmoreEvolutionRows } from './amoreSnapshot';
 export { adaptCalendarEvents } from './calendar';
 export { adaptMapPlaces } from './map';
 export { adaptMemories } from './memories';
