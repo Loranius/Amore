@@ -224,6 +224,8 @@ Reuse the same universal pipeline. Add reef-specific translation, surface occupa
 
 ## Current implementation status
 
-Phase 1 is being implemented in `src/engine/evolution`.
+Phases 1–4 are implemented in stacked branches.
 
-The current Home page and Crystal scene are intentionally untouched in this phase.
+Phase 5 now provides immutable crystal composition analysis, deterministic indexed geometry, junction integrity, hidden-face removal and append-only mobile topology budgeting.
+
+The current Home page and production Crystal scene are intentionally untouched until the renderer bridge is separately validated.
