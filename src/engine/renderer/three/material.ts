@@ -1,8 +1,26 @@
 import * as THREE from 'three';
-import type { CrystalBodyMaterial, CrystalRgb } from '../../material';
+import type { CrystalBodyMaterial, CrystalRgb, CrystalShaderRecipe } from '../../material';
 
 function toColor(color: CrystalRgb): THREE.Color {
   return new THREE.Color().setRGB(color.r, color.g, color.b);
+}
+
+function rgbKey(color: CrystalRgb): string {
+  return `${color.r.toFixed(6)},${color.g.toFixed(6)},${color.b.toFixed(6)}`;
+}
+
+function shaderKey(recipe: CrystalShaderRecipe): string {
+  return [
+    recipe.shaderVersion,
+    recipe.rimStrength.toFixed(6),
+    recipe.skyStrength.toFixed(6),
+    rgbKey(recipe.skyColor),
+    rgbKey(recipe.groundColor),
+    rgbKey(recipe.rimColor),
+    recipe.inclusionDensity.toFixed(6),
+    recipe.inclusionScale.toFixed(6),
+    recipe.inclusionContrast.toFixed(6),
+  ].join('|');
 }
 
 const FRAGMENT_PARS = /* glsl */ `
@@ -30,11 +48,13 @@ const FRAGMENT_BODY = /* glsl */ `
     dot( vViewPosition, vec3(0.83, 1.17, 0.61) ) * uEvolutionInclusionScale
     + dot( normal, vec3(2.1, 1.3, 1.7) )
   );
-  float evolutionInclusion = smoothstep(1.0 - uEvolutionInclusionDensity, 1.0, evolutionBand * 0.5 + 0.5);
+  float evolutionInclusion = uEvolutionInclusionDensity > 0.0001
+    ? smoothstep(1.0 - uEvolutionInclusionDensity, 1.0, evolutionBand * 0.5 + 0.5)
+    : 0.0;
   outgoingLight *= 1.0 - evolutionInclusion * uEvolutionInclusionContrast;
 `;
 
-function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: CrystalBodyMaterial['shader'], key: string): void {
+function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: CrystalBodyMaterial['shader']): void {
   if (
     recipe.rimStrength <= 0
     && recipe.skyStrength <= 0
@@ -54,7 +74,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
       .replace('void main() {', `${FRAGMENT_PARS}\nvoid main() {`)
       .replace('#include <opaque_fragment>', `${FRAGMENT_BODY}\n#include <opaque_fragment>`);
   };
-  material.customProgramCacheKey = () => `evolution-crystal:${key}`;
+  material.customProgramCacheKey = () => `evolution-crystal:${shaderKey(recipe)}`;
   material.needsUpdate = true;
 }
 
@@ -85,6 +105,6 @@ export function createThreeCrystalMaterial(source: CrystalBodyMaterial): THREE.M
   material.userData['evolutionBodyId'] = source.bodyId;
   material.userData['evolutionSignature'] = source.signature;
   material.userData['evolutionBaseEmissiveIntensity'] = source.emissiveIntensity;
-  applyEvolutionShader(material, source.shader, source.signature);
+  applyEvolutionShader(material, source.shader);
   return material;
 }
