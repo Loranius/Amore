@@ -26,18 +26,35 @@ function hostPreference(instruction: CrystalGrowthInstruction): GrowthHostPrefer
   return 'balanced';
 }
 
+/**
+ * Crystals read as one druse only while the hierarchy stays shallow.
+ * Event spires are guaranteed root children through maxGeneration=1.
+ */
 function maxGeneration(instruction: CrystalGrowthInstruction): number {
-  if (instruction.kind === 'event-spire') return 2;
-  if (instruction.kind === 'satellite') return 3;
-  if (instruction.kind === 'inclusion') return 4;
+  if (instruction.kind === 'event-spire') return 1;
+  if (instruction.kind === 'satellite') return 2;
+  if (instruction.kind === 'inclusion') return 3;
   return 1;
 }
 
+/**
+ * The analytical surface normal is mostly lateral. Crystal bodies must retain
+ * more of their own seeded morphology than tree branches or coral polyps do,
+ * otherwise a tall mother crystal turns into a trunk covered in horizontal
+ * spikes.
+ */
 function directionInheritance(instruction: CrystalGrowthInstruction): number {
-  if (instruction.kind === 'event-spire') return 0.56;
-  if (instruction.kind === 'satellite') return 0.67;
-  if (instruction.kind === 'inclusion') return 0.78;
+  if (instruction.kind === 'event-spire') return 0.24;
+  if (instruction.kind === 'satellite') return 0.36;
+  if (instruction.kind === 'inclusion') return 0.48;
   return 0.5;
+}
+
+function minUpwardComponent(instruction: CrystalGrowthInstruction): number {
+  if (instruction.kind === 'event-spire') return 0.62;
+  if (instruction.kind === 'satellite') return 0.42;
+  if (instruction.kind === 'inclusion') return 0.3;
+  return 0.9;
 }
 
 /**
@@ -49,23 +66,23 @@ function dimensions(
   instruction: CrystalGrowthInstruction,
 ): { axialScale: number; radialScale: number } {
   if (instruction.kind === 'mother') {
-    return { axialScale: 1.72, radialScale: 0.36 };
+    return { axialScale: 1.62, radialScale: 0.39 };
   }
   if (instruction.kind === 'event-spire') {
     return {
-      axialScale: round6(0.98 + instruction.weight * 0.82),
-      radialScale: round6(0.14 + instruction.weight * 0.07),
+      axialScale: round6(0.76 + instruction.weight * 0.54),
+      radialScale: round6(0.15 + instruction.weight * 0.065),
     };
   }
   if (instruction.kind === 'satellite') {
     return {
-      axialScale: round6(0.58 + instruction.weight * 0.6),
-      radialScale: round6(0.095 + instruction.weight * 0.05),
+      axialScale: round6(0.42 + instruction.weight * 0.42),
+      radialScale: round6(0.1 + instruction.weight * 0.045),
     };
   }
   return {
-    axialScale: round6(0.25 + instruction.weight * 0.34),
-    radialScale: round6(0.07 + instruction.weight * 0.035),
+    axialScale: round6(0.18 + instruction.weight * 0.24),
+    radialScale: round6(0.075 + instruction.weight * 0.03),
   };
 }
 
@@ -96,7 +113,7 @@ function adaptInstruction(
     hostPreference: hostPreference(instruction),
     maxGeneration: maxGeneration(instruction),
     directionInheritance: directionInheritance(instruction),
-    minUpwardComponent: 0.16,
+    minUpwardComponent: minUpwardComponent(instruction),
     attributes: {
       formationKind: instruction.kind,
       archetype: instruction.archetype,
