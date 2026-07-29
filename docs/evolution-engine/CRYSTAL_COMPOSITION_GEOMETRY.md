@@ -92,6 +92,19 @@ Default mobile budget:
 - 18,000 vertices;
 - 30,000 visible triangles.
 
+## Acceptance criteria
+
+Phase 5 is accepted only when:
+
+- composition is deterministic and leaves `GrowthState` byte-for-byte unchanged;
+- exactly one focal body is published;
+- every emitted index references an existing finite vertex;
+- attached bodies have no external base cap;
+- every included attached body has one versioned junction;
+- profile signatures and world vertices of old bodies remain stable after appending a later event;
+- topology budgeting never downgrades an already emitted historical body because of a later event;
+- the complete TypeScript, unit-test, production-build, PWA and Pixel 8 Pro workflows are green.
+
 ## Not included
 
 - Three.js `BufferGeometry` adapter;
