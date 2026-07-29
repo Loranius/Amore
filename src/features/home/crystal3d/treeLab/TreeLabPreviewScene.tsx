@@ -70,6 +70,8 @@ function TreeLabRenderedScene({
     build.lod,
     build.composition.silhouette,
     `${Math.round(build.composition.score.total * 100)}% comp`,
+    `${build.foliage.diagnostics.emittedClusterCount} foliage`,
+    `${build.foliage.diagnostics.totalLeafCount} leaves`,
     `${build.mesh.diagnostics.branchCount} гілок`,
     `${build.mesh.diagnostics.junctionCount} стиків`,
     `${formatCount(build.mesh.diagnostics.vertexCount)} vtx`,
@@ -106,6 +108,11 @@ function TreeLabRenderedScene({
       data-tree-lab-negative-space={build.composition.score.negativeSpace}
       data-tree-lab-crown-density={build.composition.score.crownDensity}
       data-tree-lab-empty-cells={build.composition.diagnostics.emptyCellCount}
+      data-tree-lab-foliage-candidates={build.foliage.diagnostics.candidateClusterCount}
+      data-tree-lab-foliage-clusters={build.foliage.diagnostics.emittedClusterCount}
+      data-tree-lab-foliage-leaves={build.foliage.diagnostics.totalLeafCount}
+      data-tree-lab-foliage-cells={build.foliage.diagnostics.occupiedCellIds.length}
+      data-tree-lab-foliage-truncated={build.foliage.diagnostics.truncatedClusterIds.length}
       data-tree-lab-branches={build.mesh.diagnostics.branchCount}
       data-tree-lab-junctions={build.mesh.diagnostics.junctionCount}
       data-tree-lab-vertices={build.mesh.diagnostics.vertexCount}
