@@ -47,7 +47,11 @@ export function buildEvolutionMemoryLinks(
     const memoryId = Number(memoryIdText);
     if (!Number.isSafeInteger(memoryId)) continue;
     for (const [sourceType, sourceId] of Object.entries(sources)) {
-      if (!ALLOWED_MEMORY_SOURCES.has(sourceType) || !Number.isSafeInteger(sourceId)) continue;
+      if (
+        !ALLOWED_MEMORY_SOURCES.has(sourceType)
+        || typeof sourceId !== 'number'
+        || !Number.isSafeInteger(sourceId)
+      ) continue;
       links.push({
         memoryId,
         sourceType: sourceType as MemoryLinkSource['sourceType'],
