@@ -1,15 +1,12 @@
 import { useMemo, useState } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useEvents } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
 import { useMapPins } from '@/features/map/useMapPins';
 import { useMemories } from '@/features/memories/useMemories';
 import { usePlans } from '@/features/plans/usePlans';
 import { useShoppingItems } from '@/features/shopping/useShoppingItems';
-import {
-  fetchPersonalWishlistEvolutionArchive,
-  fetchSharedWishlistEvolutionArchive,
-} from '@/features/wishlist/wishlistEvolutionArchive';
+import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
 import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
 import {
@@ -50,7 +47,7 @@ import {
 import { resolveCrystalRendererQuality } from '@/engine/renderer';
 import {
   buildEvolutionSourceSnapshot,
-  dedupeEvolutionWishlist,
+  evolutionWishlistFromPairArchive,
   stableEvolutionCoupleId,
 } from './sourceSnapshot';
 
@@ -139,6 +136,11 @@ export function useEvolutionCrystalPipeline(
   const pins = useMapPins();
   const archive = useMemories();
   const shopping = useShoppingItems();
+  const wishlistArchive = useQuery({
+    queryKey: ['wishlist', 'evolution-archive', 'pair'],
+    queryFn: fetchPairWishlistEvolutionArchive,
+    staleTime: 5 * 60_000,
+  });
   const [asOf] = useState(() => new Date().toISOString());
   const [quality] = useState(readQuality);
 
@@ -146,21 +148,11 @@ export function useEvolutionCrystalPipeline(
     () => (users.data ?? []).map((user) => user.id).sort((left, right) => left - right),
     [users.data],
   );
-  const personalArchives = useQueries({
-    queries: userIds.map((ownerId) => ({
-      queryKey: ['wishlist', 'evolution-archive', ownerId],
-      queryFn: () => fetchPersonalWishlistEvolutionArchive(ownerId),
-      staleTime: 5 * 60_000,
-    })),
-  });
-  const sharedArchive = useQuery({
-    queryKey: ['wishlist', 'evolution-archive', 'shared'],
-    queryFn: fetchSharedWishlistEvolutionArchive,
-    staleTime: 5 * 60_000,
-  });
+  const wishlist = useMemo(
+    () => evolutionWishlistFromPairArchive(wishlistArchive.data ?? []),
+    [wishlistArchive.data],
+  );
 
-  const personalPending = personalArchives.some((query) => query.isPending);
-  const personalError = personalArchives.find((query) => query.error)?.error;
   const isPending = startDateQuery.isPending
     || users.isPending
     || events.isPending
@@ -168,8 +160,7 @@ export function useEvolutionCrystalPipeline(
     || pins.isPending
     || archive.isPending
     || shopping.isPending
-    || personalPending
-    || sharedArchive.isPending;
+    || wishlistArchive.isPending;
 
   const queryError = startDateQuery.error
     ?? users.error
@@ -178,17 +169,7 @@ export function useEvolutionCrystalPipeline(
     ?? pins.error
     ?? archive.error
     ?? shopping.error
-    ?? personalError
-    ?? sharedArchive.error;
-
-  const personalItems = useMemo(
-    () => personalArchives.flatMap((query) => query.data ?? []),
-    [personalArchives],
-  );
-  const wishlist = useMemo(
-    () => dedupeEvolutionWishlist(personalItems, sharedArchive.data ?? []),
-    [personalItems, sharedArchive.data],
-  );
+    ?? wishlistArchive.error;
 
   return useMemo<UseEvolutionCrystalPipelineResult>(() => {
     if (queryError) {
