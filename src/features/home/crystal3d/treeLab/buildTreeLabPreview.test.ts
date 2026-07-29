@@ -16,7 +16,7 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
 }
 
 describe('Tree Lab preview pipeline', () => {
-  it('keeps the full Evolution -> Species -> Growth -> Composition -> Foliage -> Geometry result deterministic', () => {
+  it('keeps the full Evolution -> Species -> Growth -> Composition -> Foliage -> Geometry -> Material -> Life result deterministic', () => {
     const first = buildTreeLabPreview('medium');
     const second = buildTreeLabPreview('medium');
 
@@ -50,7 +50,7 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
   });
 
-  it('keeps branch and instanced leaf workload inside the published mobile limits', () => {
+  it('keeps branch, instanced leaves and life updates inside published mobile limits', () => {
     const build = buildTreeLabPreview('medium');
     const totalVertices = build.mesh.diagnostics.vertexCount
       + build.leaves.diagnostics.sharedVertexCount;
@@ -62,6 +62,11 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.leaves.diagnostics.estimatedDrawCalls + 1).toBeLessThanOrEqual(
       TREE_LAB_MOBILE_BUDGET.maxDrawCalls,
     );
+    expect(build.life.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
+    expect(build.life.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(
+      build.life.leaves.length,
+    );
+    expect(build.life.leaves.length).toBeLessThanOrEqual(build.leaves.instances.length);
     expect(build.mesh.diagnostics.junctionCount).toBe(build.frames.diagnostics.junctionCount);
   });
 
