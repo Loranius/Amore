@@ -13,13 +13,25 @@ export interface ThreeCrystalBatch {
   baseEmissiveIntensity: number;
 }
 
+export interface ThreeCrystalFit {
+  sourceCenter: THREE.Vector3;
+  sourceSize: THREE.Vector3;
+  scale: number;
+  targetHeight: number;
+  targetWidth: number;
+}
+
 export interface ThreeCrystalRenderBundle {
+  /** Life transforms are applied only to this root. */
   group: THREE.Group;
+  /** Static renderer-only centering/fit transform. */
+  content: THREE.Group;
   batches: readonly ThreeCrystalBatch[];
   /** Body lookup remains available for diagnostics and interaction tests. */
   meshes: ReadonlyMap<string, THREE.BatchedMesh>;
   materials: ReadonlyMap<string, THREE.MeshPhysicalMaterial>;
   drawCallCount: number;
+  fit: ThreeCrystalFit;
   dispose: () => void;
 }
 
@@ -91,6 +103,41 @@ function buildBatch(source: BatchSource): ThreeCrystalBatch {
   };
 }
 
+function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalBatch[]): ThreeCrystalFit {
+  const bounds = new THREE.Box3();
+  let hasBounds = false;
+  for (const batch of batches) {
+    const batchBounds = batch.mesh.boundingBox;
+    if (batchBounds === null || batchBounds.isEmpty()) continue;
+    bounds.union(batchBounds);
+    hasBounds = true;
+  }
+
+  const sourceCenter = hasBounds ? bounds.getCenter(new THREE.Vector3()) : new THREE.Vector3();
+  const sourceSize = hasBounds ? bounds.getSize(new THREE.Vector3()) : new THREE.Vector3(1, 1, 1);
+  const targetHeight = 3.25;
+  const targetWidth = 3.45;
+  const safeHeight = Math.max(0.001, sourceSize.y);
+  const safeHorizontal = Math.max(0.001, sourceSize.x, sourceSize.z);
+  const scale = Math.min(targetHeight / safeHeight, targetWidth / safeHorizontal);
+
+  content.scale.setScalar(scale);
+  content.position.set(
+    -sourceCenter.x * scale,
+    -sourceCenter.y * scale + 0.06,
+    -sourceCenter.z * scale,
+  );
+  content.userData['evolutionFit'] = {
+    sourceCenter: sourceCenter.toArray(),
+    sourceSize: sourceSize.toArray(),
+    scale,
+    targetHeight,
+    targetWidth,
+  };
+
+  return { sourceCenter, sourceSize, scale, targetHeight, targetWidth };
+}
+
 export function createThreeCrystalRenderBundle(
   geometryState: CrystalGeometryState,
   materialState: CrystalMaterialState,
@@ -102,30 +149,38 @@ export function createThreeCrystalRenderBundle(
   const group = new THREE.Group();
   group.name = 'Amore Evolution Crystal';
   group.userData['evolutionArtifactSeed'] = geometryState.artifactSeed;
+  const content = new THREE.Group();
+  content.name = 'Amore Evolution Crystal fitted content';
+  group.add(content);
+
   const batches = groupByMaterial(geometryState, materialState).map(buildBatch);
   const meshes = new Map<string, THREE.BatchedMesh>();
   const materials = new Map<string, THREE.MeshPhysicalMaterial>();
 
   for (const batch of batches) {
-    group.add(batch.mesh);
+    content.add(batch.mesh);
     for (const bodyId of batch.bodyIds) {
       meshes.set(bodyId, batch.mesh);
       materials.set(bodyId, batch.material);
     }
   }
+  const fit = fitCrystalContent(content, batches);
   group.userData['evolutionDrawCallCount'] = batches.length;
 
   return {
     group,
+    content,
     batches,
     meshes,
     materials,
     drawCallCount: batches.length,
+    fit,
     dispose: () => {
       for (const batch of batches) {
         batch.mesh.dispose();
         batch.material.dispose();
       }
+      content.clear();
       group.clear();
     },
   };
