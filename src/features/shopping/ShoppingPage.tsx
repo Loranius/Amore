@@ -5,7 +5,7 @@
 // категорії, активне групується, куплене ховається в компактний архів.
 // Цей компонент відповідає лише за людяну мобільну подачу.
 // ============================================================
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { SHOPPING_CATEGORIES } from '@/app/constants';
 import {
   BagIcon,
@@ -24,6 +24,7 @@ import {
 } from './useShoppingItems';
 import { EditItemModal } from './EditItemModal';
 import './shopping.css';
+import './shoppingCompact.css';
 import type { ShoppingItemRow, ShoppingCategory } from '@/types';
 
 const CATEGORY_VISUALS: Record<string, { icon: string; color: string }> = {
@@ -40,6 +41,8 @@ const CATEGORY_VISUALS: Record<string, { icon: string; color: string }> = {
   Спорт: { icon: '🏃', color: '#7394b0' },
   Інше: { icon: '🛍️', color: '#9a7d8a' },
 };
+
+const COMPLETE_ANIMATION_MS = 430;
 
 function categoryVisual(category: string) {
   return CATEGORY_VISUALS[category] ?? CATEGORY_VISUALS['Інше']!;
@@ -61,6 +64,13 @@ export function ShoppingPage() {
   const [adding, setAdding] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [editing, setEditing] = useState<ShoppingItemRow | null>(null);
+  const [completingIds, setCompletingIds] = useState<Set<number>>(() => new Set());
+  const completionTimers = useRef(new Map<number, number>());
+
+  useEffect(() => () => {
+    completionTimers.current.forEach((timer) => window.clearTimeout(timer));
+    completionTimers.current.clear();
+  }, []);
 
   const active = useMemo(() => items.filter((item) => !item.bought), [items]);
   const bought = useMemo(
@@ -104,6 +114,33 @@ export function ShoppingPage() {
     } finally {
       setAdding(false);
     }
+  };
+
+  const toggleItem = (item: ShoppingItemRow) => {
+    if (item.bought) {
+      toggleBought.mutate(item);
+      return;
+    }
+    if (completionTimers.current.has(item.id)) return;
+
+    setCompletingIds((current) => {
+      const next = new Set(current);
+      next.add(item.id);
+      return next;
+    });
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timer = window.setTimeout(() => {
+      completionTimers.current.delete(item.id);
+      setCompletingIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
+      toggleBought.mutate(item);
+    }, reduceMotion ? 40 : COMPLETE_ANIMATION_MS);
+
+    completionTimers.current.set(item.id, timer);
   };
 
   const statusText = active.length === 0
@@ -195,8 +232,9 @@ export function ShoppingPage() {
                     <ItemRow
                       key={item.id}
                       item={item}
+                      completing={completingIds.has(item.id)}
                       authorName={authorName}
-                      onToggle={() => toggleBought.mutate(item)}
+                      onToggle={() => toggleItem(item)}
                       onDelete={() => remove.mutate(item.id)}
                       onEdit={() => setEditing(item)}
                     />
@@ -235,7 +273,7 @@ export function ShoppingPage() {
                   item={item}
                   bought
                   authorName={authorName}
-                  onToggle={() => toggleBought.mutate(item)}
+                  onToggle={() => toggleItem(item)}
                   onDelete={() => remove.mutate(item.id)}
                 />
               ))
@@ -258,22 +296,36 @@ export function ShoppingPage() {
 interface ItemRowProps {
   item: ShoppingItemRow;
   bought?: boolean;
+  completing?: boolean;
   authorName: (id: number | null) => string;
   onToggle: () => void;
   onDelete: () => void;
   onEdit?: () => void;
 }
 
-function ItemRow({ item, bought = false, authorName, onToggle, onDelete, onEdit }: ItemRowProps) {
+function ItemRow({
+  item,
+  bought = false,
+  completing = false,
+  authorName,
+  onToggle,
+  onDelete,
+  onEdit,
+}: ItemRowProps) {
+  const locked = completing;
   return (
-    <article className={`shopping-item${bought ? ' shopping-item--bought' : ''}`}>
+    <article
+      className={`shopping-item${bought ? ' shopping-item--bought' : ''}${completing ? ' shopping-item--completing' : ''}`}
+      aria-busy={completing || undefined}
+    >
       <button
         type="button"
-        className={`shopping-check${bought ? ' shopping-check--on' : ''}`}
+        className={`shopping-check${bought || completing ? ' shopping-check--on' : ''}${completing ? ' shopping-check--pending' : ''}`}
         onClick={onToggle}
-        aria-label={bought ? 'Повернути в список' : 'Позначити купленим'}
+        disabled={locked}
+        aria-label={bought ? 'Повернути в список' : completing ? 'Переношу в куплене' : 'Позначити купленим'}
       >
-        {bought && <CheckIcon size={17} />}
+        {(bought || completing) && <CheckIcon size={16} />}
       </button>
 
       <div className="shopping-item-info">
@@ -281,21 +333,23 @@ function ItemRow({ item, bought = false, authorName, onToggle, onDelete, onEdit 
           <strong>{item.title}</strong>
           {item.qty && <span>{item.qty}</span>}
         </div>
-        <small>
-          {bought
-            ? `Купив(ла) ${authorName(item.bought_by)}`
-            : `Додав(ла) ${authorName(item.created_by)}`}
-        </small>
+        {bought && <small>Купив(ла) {authorName(item.bought_by)}</small>}
       </div>
 
       <div className="shopping-item-actions">
         {onEdit && (
-          <button type="button" onClick={onEdit} aria-label={`Редагувати «${item.title}»`}>
-            <PencilIcon size={17} />
+          <button type="button" onClick={onEdit} disabled={locked} aria-label={`Редагувати «${item.title}»`}>
+            <PencilIcon size={15} />
           </button>
         )}
-        <button type="button" className="shopping-delete" onClick={onDelete} aria-label={`Видалити «${item.title}»`}>
-          <TrashIcon size={17} />
+        <button
+          type="button"
+          className="shopping-delete"
+          onClick={onDelete}
+          disabled={locked}
+          aria-label={`Видалити «${item.title}»`}
+        >
+          <TrashIcon size={15} />
         </button>
       </div>
     </article>
