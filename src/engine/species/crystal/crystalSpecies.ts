@@ -1,4 +1,5 @@
 import { parseEvolutionInstant } from '../../evolution/calendar';
+import { buildPressureLedger } from '../../evolution/ledger';
 import { buildColonies, buildEventFormations, buildMotherInstruction, relationshipAgeDays } from './formations';
 import { buildCrystalPressures, buildCrystalState } from './pressures';
 import type {
@@ -22,12 +23,24 @@ export function buildCrystalSpeciesBlueprint(
   if (asOfEpoch === null) throw new Error(`Invalid Crystal Species asOf: "${input.config.asOf}".`);
   const asOf = new Date(asOfEpoch).toISOString();
 
-  const pressures = buildCrystalPressures(input.artifact);
-  const ageDays = relationshipAgeDays(input.artifact, asOf);
-  const state = buildCrystalState(input.artifact, ageDays, pressures);
-  const mother = buildMotherInstruction(input.artifact, asOf);
+  // Adapters normally exclude future facts already, but Species remains safe
+  // when called with a hand-built or imported blueprint. Future records may be
+  // diagnosed, never allowed to affect today's material or structural state.
+  const currentEvents = input.artifact.events.filter((event) => event.occurredAtEpochMs <= asOfEpoch);
+  const currentArtifact = currentEvents.length === input.artifact.events.length
+    ? input.artifact
+    : {
+        ...input.artifact,
+        events: currentEvents,
+        pressureLedger: buildPressureLedger(currentEvents),
+      };
+
+  const pressures = buildCrystalPressures(currentArtifact);
+  const ageDays = relationshipAgeDays(currentArtifact, asOf);
+  const state = buildCrystalState(currentArtifact, ageDays, pressures);
+  const mother = buildMotherInstruction(currentArtifact, asOf);
   const { formations, diagnostics } = buildEventFormations(input.artifact, asOf);
-  const colonies = buildColonies(input.artifact.deterministicSeed, formations);
+  const colonies = buildColonies(currentArtifact.deterministicSeed, formations);
 
   return {
     speciesBlueprintVersion: 1,
