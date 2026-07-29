@@ -1,21 +1,19 @@
 // ============================================================
-// CalendarPage — події, свята й «Наш шлях».
+// CalendarPage — особисті дати пари.
 // ------------------------------------------------------------
-// «Наш шлях» належить вкладці «Наші свята» і читає лише календарні
-// річниці та важливі віхи. Плани лишаються окремим модулем, але місячна
-// й річна сітки й далі можуть показувати їх поруч з календарними датами.
+// Календар має два змістовні розділи: «Наші свята» з дорожньою картою
+// стосунків та «Дні народження». Загальні державні й типові свята не
+// показуються ні у вкладках, ні в місячній та річній сітках.
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { TabBar } from '@/components/ui/TabBar';
-import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
+import { EventIcon } from '@/components/icons/EventIcon';
 import { useEvents, useCalendarMutations } from './useCalendar';
 import { enrichEvent, sortEnriched } from './calendarUtils';
 import { EventList } from './EventList';
 import { AddEventModal } from './AddEventModal';
-import { HolidayPresetsModal } from './HolidayPresetsModal';
-import { missingPresets } from './holidayPresets';
 import { CalendarViewPicker } from './CalendarViewPicker';
 import { CalendarMonthView, CalendarYearView } from './CalendarViews';
 import { useCalendarView } from './calendarView';
@@ -24,44 +22,58 @@ import { currentYearMonth, stepMonth } from '@/features/_shared/month';
 import { usePlans } from '@/features/plans/usePlans';
 import type { EventRow, EventType } from '@/types';
 
-const TAB_DEFS: { type: EventType; label: string }[] = [
+type CalendarSection = Extract<EventType, 'anniversary' | 'birthday'>;
+
+const TAB_DEFS: { type: CalendarSection; label: string }[] = [
   { type: 'anniversary', label: 'Наші свята' },
   { type: 'birthday', label: 'Дні народження' },
-  { type: 'holiday', label: 'Свята' },
 ];
 
 type ModalState = {
-  kind: 'event';
   row: EventRow | null;
   date?: string | undefined;
-  type?: EventType | undefined;
+  type: CalendarSection;
 } | null;
 
 export function CalendarPage() {
   const { data: events = [], isPending, isError, refetch, isFetching } = useEvents();
   const { data: plans = [] } = usePlans();
-  const { addEvent, addHolidays, updateEvent, deleteEvent } = useCalendarMutations();
+  const { addEvent, updateEvent, deleteEvent } = useCalendarMutations();
   const confirmDialog = useConfirm();
   const navigate = useNavigate();
 
-  const [filter, setFilter] = useState<EventType>('anniversary');
+  const [filter, setFilter] = useState<CalendarSection>('anniversary');
   const [modal, setModal] = useState<ModalState>(null);
-  const [presetsOpen, setPresetsOpen] = useState(false);
   const [view, setView] = useCalendarView();
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
 
-  const presets = useMemo(() => missingPresets(events), [events]);
-  const enriched = useMemo(() => events.map(enrichEvent).sort(sortEnriched), [events]);
+  // Старі holiday-рядки не видаляємо з бази, але вони більше не є частиною
+  // особистого календаря пари й не повинні просочуватись у жоден його вигляд.
+  const visibleEvents = useMemo(
+    () => events.filter((event) => event.type === 'anniversary' || event.type === 'birthday'),
+    [events],
+  );
+  const enriched = useMemo(
+    () => visibleEvents.map(enrichEvent).sort(sortEnriched),
+    [visibleEvents],
+  );
   const counts = useMemo(() => {
-    const result: Record<EventType, number> = { anniversary: 0, birthday: 0, holiday: 0, other: 0 };
-    for (const event of enriched) result[event.type ?? 'other']++;
+    const result: Record<CalendarSection, number> = { anniversary: 0, birthday: 0 };
+    for (const event of enriched) {
+      if (event.type === 'anniversary' || event.type === 'birthday') result[event.type] += 1;
+    }
     return result;
   }, [enriched]);
 
-  const filtered = enriched.filter((event) => (event.type ?? 'other') === filter);
+  const filtered = enriched.filter((event) => event.type === filter);
 
-  const openNewEvent = (type: EventType = filter, date?: string) => {
-    setModal({ kind: 'event', row: null, type, date });
+  const openNewEvent = (type: CalendarSection = filter, date?: string) => {
+    setModal({ row: null, type, date });
+  };
+
+  const openExistingEvent = (event: EventRow) => {
+    const type: CalendarSection = event.type === 'birthday' ? 'birthday' : 'anniversary';
+    setModal({ row: event, type });
   };
 
   const onDelete = async (id: number) => {
@@ -80,15 +92,15 @@ export function CalendarPage() {
       <CalendarViewPicker value={view} onChange={setView} />
 
       {view === 'list' && (
-        <TabBar<EventType>
+        <TabBar<CalendarSection>
           variant="scroll"
           value={filter}
           onChange={setFilter}
-          items={TAB_DEFS.map((def) => ({
-            value: def.type,
-            label: def.label,
-            icon: <EventIcon type={def.type} size={15} />,
-            count: counts[def.type],
+          items={TAB_DEFS.map((definition) => ({
+            value: definition.type,
+            label: definition.label,
+            icon: <EventIcon type={definition.type} size={15} />,
+            count: counts[definition.type],
           }))}
         />
       )}
@@ -104,22 +116,21 @@ export function CalendarPage() {
         </div>
       ) : view === 'month' ? (
         <CalendarMonthView
-          events={events}
+          events={visibleEvents}
           plans={plans}
           yr={yr}
           mo={mo}
           onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
           onGoToday={() => setYm(currentYearMonth())}
           onAddOn={(date) => openNewEvent(filter, date)}
-          onOpenEvent={(event) => setModal({
-            kind: 'event',
-            row: enriched.find((item) => item.id === event.id) ?? event,
-          })}
+          onOpenEvent={(event) => openExistingEvent(
+            enriched.find((item) => item.id === event.id) ?? event,
+          )}
           onOpenPlan={(id) => navigate(`/plans/${id}`)}
         />
       ) : view === 'year' ? (
         <CalendarYearView
-          events={events}
+          events={visibleEvents}
           plans={plans}
           yr={yr}
           onStepYear={(delta) => setYm({ yr: yr + delta, mo })}
@@ -129,64 +140,32 @@ export function CalendarPage() {
       ) : filter === 'anniversary' ? (
         <>
           <RelationshipJourney
-            events={events}
-            onOpen={(event) => setModal({ kind: 'event', row: event })}
+            events={visibleEvents}
+            onOpen={openExistingEvent}
             onAdd={() => openNewEvent('anniversary')}
           />
           {filtered.length > 0 ? (
-            <EventList
-              events={filtered}
-              onEdit={(event) => setModal({ kind: 'event', row: event })}
-              onDelete={onDelete}
-            />
+            <EventList events={filtered} onEdit={openExistingEvent} onDelete={onDelete} />
           ) : (
-            <p className="empty-state">Наших свят ще немає. Додайте першу важливу дату.</p>
-          )}
-        </>
-      ) : filter === 'holiday' && presets.length > 0 ? (
-        <>
-          <button type="button" className="cal-preset-cta" onClick={() => setPresetsOpen(true)}>
-            <span className="cal-preset-cta-hd"><SparkIcon size={17} /> Додати типові свята</span>
-            <small>Новий рік, Незалежність, Різдво та інші — з перевіркою дат</small>
-          </button>
-          {filtered.length > 0 && (
-            <EventList
-              events={filtered}
-              onEdit={(event) => setModal({ kind: 'event', row: event })}
-              onDelete={onDelete}
-            />
+            <p className="empty-state">Наших подій ще немає. Додайте перший момент вашої історії.</p>
           )}
         </>
       ) : filtered.length === 0 ? (
-        <p className="empty-state">Подій у цій вкладці ще немає.</p>
+        <p className="empty-state">Днів народження ще немає.</p>
       ) : (
-        <EventList
-          events={filtered}
-          onEdit={(event) => setModal({ kind: 'event', row: event })}
-          onDelete={onDelete}
-        />
+        <EventList events={filtered} onEdit={openExistingEvent} onDelete={onDelete} />
       )}
 
-      {modal?.kind === 'event' && (
+      {modal && (
         <AddEventModal
           event={modal.row}
           initialDate={modal.date}
           initialType={modal.type}
           onClose={() => setModal(null)}
           onSubmit={(input) => {
-            const row = modal.row;
-            if (row) updateEvent.mutate({ id: row.id, input });
+            if (modal.row) updateEvent.mutate({ id: modal.row.id, input });
             else addEvent.mutate(input);
           }}
-        />
-      )}
-
-      {presetsOpen && (
-        <HolidayPresetsModal
-          presets={presets}
-          busy={addHolidays.isPending}
-          onClose={() => setPresetsOpen(false)}
-          onSubmit={(items) => addHolidays.mutate(items, { onSuccess: () => setPresetsOpen(false) })}
         />
       )}
     </section>
