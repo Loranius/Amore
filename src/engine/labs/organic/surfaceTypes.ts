@@ -6,6 +6,10 @@ export type OrganicMeshLod = 'high' | 'medium' | 'low';
 export interface OrganicSurfaceConfig {
   curveSamplesPerSegment: number;
   minimumRadius: number;
+  junctionInsetRatio: number;
+  junctionSurfaceRatio: number;
+  junctionFlare: number;
+  junctionSegmentsByLod: Readonly<Record<OrganicMeshLod, number>>;
   radialSegmentsByLod: Readonly<Record<OrganicMeshLod, number>>;
   axialStrideByLod: Readonly<Record<OrganicMeshLod, number>>;
 }
@@ -23,11 +27,27 @@ export interface OrganicCurveFrameSample {
   radius: number;
 }
 
+export interface OrganicJunctionAnchor {
+  childBranchId: string;
+  parentBranchId: string;
+  parentNodeId: string;
+  parentPosition: GrowthVec3;
+  parentRadius: number;
+  parentTangent: GrowthVec3;
+  radialDirection: GrowthVec3;
+  surfacePosition: GrowthVec3;
+  insetPosition: GrowthVec3;
+  childDirection: GrowthVec3;
+  collarRadius: number;
+  joinSampleIndex: number;
+}
+
 export interface OrganicBranchCurve {
   branchId: string;
   generation: number;
   parentNodeId: string | null;
   terminalNodeId: string;
+  junction: OrganicJunctionAnchor | null;
   samples: OrganicCurveFrameSample[];
 }
 
@@ -39,7 +59,9 @@ export interface OrganicCurveFrameState {
   diagnostics: {
     branchCount: number;
     sampleCount: number;
+    junctionCount: number;
     skippedBranchIds: string[];
+    unresolvedJunctionBranchIds: string[];
   };
 }
 
@@ -50,6 +72,7 @@ export interface OrganicSweepBranchRange {
   firstIndex: number;
   indexCount: number;
   ringCount: number;
+  junctionRingCount: number;
   radialSegments: number;
 }
 
@@ -64,7 +87,9 @@ export interface OrganicSweepMesh {
   branches: OrganicSweepBranchRange[];
   diagnostics: {
     branchCount: number;
+    junctionCount: number;
     ringCount: number;
+    junctionRingCount: number;
     vertexCount: number;
     triangleCount: number;
   };
