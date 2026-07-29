@@ -68,6 +68,8 @@ function TreeLabRenderedScene({
   const badge = [
     sourceLabel,
     build.lod,
+    build.composition.silhouette,
+    `${Math.round(build.composition.score.total * 100)}% comp`,
     `${build.mesh.diagnostics.branchCount} гілок`,
     `${build.mesh.diagnostics.junctionCount} стиків`,
     `${formatCount(build.mesh.diagnostics.vertexCount)} vtx`,
@@ -99,6 +101,11 @@ function TreeLabRenderedScene({
       data-tree-lab-event-instructions={build.species.diagnostics.eventInstructionCount}
       data-tree-lab-attractors={build.field.diagnostics.attractorCount}
       data-tree-lab-truncated={build.field.diagnostics.truncatedInstructionIds.length}
+      data-tree-lab-silhouette={build.composition.silhouette}
+      data-tree-lab-composition-score={build.composition.score.total}
+      data-tree-lab-negative-space={build.composition.score.negativeSpace}
+      data-tree-lab-crown-density={build.composition.score.crownDensity}
+      data-tree-lab-empty-cells={build.composition.diagnostics.emptyCellCount}
       data-tree-lab-branches={build.mesh.diagnostics.branchCount}
       data-tree-lab-junctions={build.mesh.diagnostics.junctionCount}
       data-tree-lab-vertices={build.mesh.diagnostics.vertexCount}
