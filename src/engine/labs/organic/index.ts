@@ -8,6 +8,7 @@ export type {
   OrganicBranchCurve,
   OrganicCurveFrameSample,
   OrganicCurveFrameState,
+  OrganicJunctionAnchor,
   OrganicMeshLod,
   OrganicSurfaceConfig,
   OrganicSweepBranchRange,
