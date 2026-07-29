@@ -12,6 +12,11 @@ import type {
   TreeLifeState,
 } from './types';
 
+function motionRound(value: number): number {
+  const rounded = round6(value);
+  return Object.is(rounded, -0) ? 0 : rounded;
+}
+
 function validateInput(input: BuildTreeLifeInput): void {
   const { species, composition, leaves, materials, config } = input;
   if (!config.rulesVersion.trim()) {
@@ -141,11 +146,11 @@ export function sampleTreeLifeFrame(input: SampleTreeLifeInput): TreeLifeFrame {
 
   return {
     elapsedSeconds: round6(elapsed),
-    branchRotationX: round6(Math.sin(primaryWave) * branch.swayXAmplitudeRad * scale),
-    branchRotationY: round6(
+    branchRotationX: motionRound(Math.sin(primaryWave) * branch.swayXAmplitudeRad * scale),
+    branchRotationY: motionRound(
       Math.sin(primaryWave * 0.63 + 0.91) * branch.twistAmplitudeRad * scale,
     ),
-    branchRotationZ: round6(
+    branchRotationZ: motionRound(
       Math.sin(primaryWave * 0.81 + 1.37) * branch.swayZAmplitudeRad * scale,
     ),
     leaves: input.life.leaves.map((leaf) => {
@@ -153,8 +158,10 @@ export function sampleTreeLifeFrame(input: SampleTreeLifeInput): TreeLifeFrame {
       return {
         leafInstanceId: leaf.leafInstanceId,
         sequence: leaf.sequence,
-        pitchRad: round6(Math.sin(phase * 0.73 + 0.48) * leaf.pitchAmplitudeRad * scale),
-        rollRad: round6(Math.sin(phase) * leaf.rollAmplitudeRad * scale),
+        pitchRad: motionRound(
+          Math.sin(phase * 0.73 + 0.48) * leaf.pitchAmplitudeRad * scale,
+        ),
+        rollRad: motionRound(Math.sin(phase) * leaf.rollAmplitudeRad * scale),
       };
     }),
   };
