@@ -94,6 +94,7 @@ export function createThreeCrystalMaterial(source: CrystalBodyMaterial): THREE.M
     opacity: 1,
     transparent: false,
     depthWrite: true,
+    flatShading: true,
     envMapIntensity: source.envMapIntensity,
   });
   material.iridescence = source.iridescence;
