@@ -57,6 +57,12 @@ function minUpwardComponent(instruction: CrystalGrowthInstruction): number {
   return 0.9;
 }
 
+function attachmentDepth(instruction: CrystalGrowthInstruction): number {
+  if (instruction.kind === 'inclusion') return Math.max(0.48, instruction.attachmentDepth * 2.4);
+  if (instruction.kind === 'satellite') return Math.max(0.24, instruction.attachmentDepth * 1.35);
+  return instruction.attachmentDepth;
+}
+
 /**
  * Full adult dimensions depend only on the stable instruction itself.
  * Global current pressures are intentionally excluded: a future event may add
@@ -81,8 +87,8 @@ function dimensions(
     };
   }
   return {
-    axialScale: round6(0.18 + instruction.weight * 0.24),
-    radialScale: round6(0.075 + instruction.weight * 0.03),
+    axialScale: round6(0.12 + instruction.weight * 0.16),
+    radialScale: round6(0.055 + instruction.weight * 0.02),
   };
 }
 
@@ -109,7 +115,7 @@ function adaptInstruction(
     preferredAzimuthRad: instruction.azimuthRad,
     preferredElevation: instruction.elevation,
     radialBias: instruction.radialBias,
-    attachmentDepth: instruction.attachmentDepth,
+    attachmentDepth: attachmentDepth(instruction),
     hostPreference: hostPreference(instruction),
     maxGeneration: maxGeneration(instruction),
     directionInheritance: directionInheritance(instruction),
