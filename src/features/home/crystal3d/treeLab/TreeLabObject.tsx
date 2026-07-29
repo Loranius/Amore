@@ -11,6 +11,9 @@ export function TreeLabObject({ mesh }: { mesh: OrganicSweepMesh }) {
       roughness: 0.92,
       metalness: 0,
       flatShading: false,
+      // OrbitControls may expose the reverse side of terminal/base caps.
+      // DoubleSide keeps the laboratory sweep visibly closed from every angle.
+      side: THREE.DoubleSide,
     }),
     [],
   );
