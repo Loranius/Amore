@@ -1,14 +1,23 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import {
   EvolutionRuntimeProbe,
   type EvolutionRuntimeMetrics,
 } from '../evolution/EvolutionRuntimeProbe';
 import { evaluateTreeLabAcceptance } from './acceptance';
-import { buildTreeLabPreview } from './buildTreeLabPreview';
-import { resolveTreeLabLod } from './featureFlag';
+import {
+  buildTreeLabPreview,
+  type TreeLabPreviewBuild,
+} from './buildTreeLabPreview';
+import {
+  resolveTreeLabLod,
+  resolveTreeLabSource,
+  type TreeLabSource,
+} from './featureFlag';
 import { TreeLabObject } from './TreeLabObject';
+import { useTreeLabPortalPreview } from './useTreeLabPortalPreview';
 import './treeLabPreview.css';
 
 function formatCount(value: number): string {
@@ -16,15 +25,25 @@ function formatCount(value: number): string {
   return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
 }
 
-export default function TreeLabPreviewScene() {
-  const [lod] = useState(() => resolveTreeLabLod(
-    typeof window === 'undefined' ? '' : window.location.search,
-  ));
+type RenderedTreeLabSource = TreeLabSource | 'fixture-fallback';
+
+interface TreeLabRenderedSceneProps {
+  build: TreeLabPreviewBuild;
+  source: RenderedTreeLabSource;
+  adapterDiagnosticCount: number;
+  errorMessage?: string | undefined;
+}
+
+function TreeLabRenderedScene({
+  build,
+  source,
+  adapterDiagnosticCount,
+  errorMessage,
+}: TreeLabRenderedSceneProps) {
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
-  const build = useMemo(() => buildTreeLabPreview(lod), [lod]);
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => {
     setRuntime(next);
@@ -35,14 +54,20 @@ export default function TreeLabPreviewScene() {
     buildMs: build.buildMs,
     drawCalls: runtime?.drawCalls ?? null,
   });
-  const statusLabel = acceptance.status === 'pass'
+  const budgetLabel = acceptance.status === 'pass'
     ? 'mobile budget OK'
     : acceptance.status === 'fail'
       ? `budget fail: ${acceptance.violations.join(', ')}`
       : 'runtime warming…';
+  const statusLabel = errorMessage ? `portal fallback · ${budgetLabel}` : budgetLabel;
+  const sourceLabel = source === 'portal'
+    ? 'Portal history'
+    : source === 'fixture-fallback'
+      ? 'Fixture fallback'
+      : 'Fixture baseline';
   const badge = [
-    'Tree Species',
-    lod,
+    sourceLabel,
+    build.lod,
     `${build.mesh.diagnostics.branchCount} гілок`,
     `${build.mesh.diagnostics.junctionCount} стиків`,
     `${formatCount(build.mesh.diagnostics.vertexCount)} vtx`,
@@ -61,8 +86,12 @@ export default function TreeLabPreviewScene() {
     <div
       className="crystal-wrap tree-lab-preview-wrap"
       data-tree-lab-preview="ready"
-      data-tree-lab-source="tree-species"
-      data-tree-lab-lod={lod}
+      data-tree-lab-source={source}
+      data-tree-lab-couple-id={build.artifact.coupleId}
+      data-tree-lab-normalized-events={build.artifact.events.length}
+      data-tree-lab-adapter-diagnostics={adapterDiagnosticCount}
+      data-tree-lab-error={errorMessage ?? ''}
+      data-tree-lab-lod={build.lod}
       data-tree-lab-acceptance={acceptance.status}
       data-tree-lab-violations={acceptance.violations.join(',')}
       data-tree-lab-stage={build.species.state.stage}
@@ -78,9 +107,9 @@ export default function TreeLabPreviewScene() {
       data-tree-lab-draw-calls={runtime?.drawCalls ?? ''}
     >
       <Canvas
-        dpr={lod === 'high' ? [1, 1.75] : lod === 'medium' ? [1, 1.5] : [1, 1.25]}
+        dpr={build.lod === 'high' ? [1, 1.75] : build.lod === 'medium' ? [1, 1.5] : [1, 1.25]}
         camera={{ position: [6.2, 3.7, 8.4], fov: 40 }}
-        gl={{ alpha: true, antialias: lod !== 'low' }}
+        gl={{ alpha: true, antialias: build.lod !== 'low' }}
       >
         <ambientLight intensity={0.72} />
         <directionalLight position={[4, 7, 5]} intensity={1.25} />
@@ -106,9 +135,67 @@ export default function TreeLabPreviewScene() {
       <span
         className={`tree-lab-preview-status tree-lab-preview-status--${acceptance.status}`}
         aria-label="Перевірка мобільного бюджету Tree Lab"
+        title={errorMessage}
       >
         {statusLabel}
       </span>
     </div>
   );
+}
+
+interface TreeLabFixtureSceneProps {
+  lod: TreeLabPreviewBuild['lod'];
+  source?: 'fixture' | 'fixture-fallback';
+  errorMessage?: string | undefined;
+}
+
+function TreeLabFixtureScene({
+  lod,
+  source = 'fixture',
+  errorMessage,
+}: TreeLabFixtureSceneProps) {
+  const build = useMemo(() => buildTreeLabPreview(lod), [lod]);
+  return (
+    <TreeLabRenderedScene
+      build={build}
+      source={source}
+      adapterDiagnosticCount={0}
+      errorMessage={errorMessage}
+    />
+  );
+}
+
+function TreeLabPortalScene({ lod }: { lod: TreeLabPreviewBuild['lod'] }) {
+  const { preview, isPending, error } = useTreeLabPortalPreview(lod);
+
+  if (isPending) return <CrystalPlaceholder />;
+  if (error || !preview) {
+    return (
+      <TreeLabFixtureScene
+        lod={lod}
+        source="fixture-fallback"
+        errorMessage={error?.message ?? 'Portal tree preview failed.'}
+      />
+    );
+  }
+
+  return (
+    <TreeLabRenderedScene
+      build={preview.build}
+      source="portal"
+      adapterDiagnosticCount={preview.diagnostics.length}
+    />
+  );
+}
+
+export default function TreeLabPreviewScene() {
+  const [search] = useState(
+    () => typeof window === 'undefined' ? '' : window.location.search,
+  );
+  const [lod] = useState(() => resolveTreeLabLod(search));
+  const [source] = useState(() => resolveTreeLabSource(search));
+
+  return source === 'portal'
+    ? <TreeLabPortalScene lod={lod} />
+    : <TreeLabFixtureScene lod={lod} />;
 }
