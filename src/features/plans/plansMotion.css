@@ -1,0 +1,357 @@
+/* ============================================================
+   Легкий motion-layer для огляду «Планів».
+   ------------------------------------------------------------
+   Тільки короткі реакції на появу й дію користувача. Жодного постійного
+   руху, blur-анімацій або великих repaint-зон.
+   ============================================================ */
+
+.plans-overview--motion {
+  --plans-enter-y: 10px;
+  --plans-enter-duration: 230ms;
+  --plans-stagger: 42ms;
+}
+
+.plans-overview--motion > .plans-overview-hero,
+.plans-overview--motion > .plans-overview-nearest,
+.plans-overview--motion > .plans-overview-section,
+.plans-overview--motion > .plans-overview-closed,
+.plans-overview--motion > .plans-overview-empty {
+  animation: plans-overview-enter var(--plans-enter-duration) cubic-bezier(.22, .72, .24, 1) both;
+  animation-delay: calc(var(--plans-enter-order, 0) * var(--plans-stagger));
+}
+
+.plans-upcoming-tile,
+.plans-idea-rail > .plans-idea-chip {
+  animation: plans-item-enter 190ms cubic-bezier(.22, .72, .24, 1) both;
+  animation-delay: calc(110ms + var(--plans-item-order, 0) * 38ms);
+}
+
+.plans-featured-card,
+.plans-upcoming-tile,
+.plans-idea-chip,
+.plans-overview-add,
+.plans-widget-all,
+.plans-overview-sheet > header button {
+  transition:
+    transform 145ms cubic-bezier(.22, .72, .24, 1),
+    border-color 145ms ease,
+    background-color 145ms ease;
+}
+
+.plans-featured-media img,
+.plans-upcoming-media img {
+  transition: transform 180ms cubic-bezier(.22, .72, .24, 1);
+}
+
+.plans-featured-card:active {
+  transform: scale(.992);
+}
+
+.plans-featured-card:active .plans-featured-media img {
+  transform: scale(1.022);
+}
+
+.plans-upcoming-tile:has(.plans-upcoming-tile-open:active) {
+  transform: scale(.982);
+}
+
+.plans-upcoming-tile:has(.plans-upcoming-tile-open:active) .plans-upcoming-media img {
+  transform: scale(1.018);
+}
+
+.plans-idea-chip:active {
+  transform: translateY(-2px) scale(.988);
+}
+
+.plans-overview-add:active,
+.plans-widget-all:active,
+.plans-overview-sheet > header button:active {
+  transform: scale(.96);
+}
+
+.plans-overview-add svg,
+.plans-idea-chip--add > svg {
+  transition: transform 170ms cubic-bezier(.22, .72, .24, 1);
+}
+
+.plans-overview-add:active svg,
+.plans-idea-chip--add:active > svg {
+  transform: rotate(38deg) scale(.92);
+}
+
+.plans-featured-progress i {
+  transform-origin: left center;
+  animation: plans-progress-fill 430ms cubic-bezier(.22, .72, .24, 1) 150ms both;
+}
+
+.plans-featured-countdown {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 7px;
+}
+
+.plans-featured-countdown.is-fresh {
+  animation: plans-countdown-emphasis 620ms ease-out both;
+}
+
+.plans-featured-card,
+.plans-upcoming-tile,
+.plans-idea-chip {
+  position: relative;
+}
+
+.plans-featured-card.is-new,
+.plans-upcoming-tile.is-new,
+.plans-idea-chip.is-new {
+  animation: plans-new-item-pop 520ms cubic-bezier(.2, .88, .22, 1.18) both;
+}
+
+.plans-featured-card.is-new::after,
+.plans-upcoming-tile.is-new::after,
+.plans-idea-chip.is-new::after {
+  content: '';
+  position: absolute;
+  z-index: 4;
+  inset: -1px;
+  border: 2px solid color-mix(in srgb, var(--plan-accent, var(--accent)) 58%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  animation: plans-new-item-ring 760ms ease-out both;
+}
+
+.plans-overview-closed-list {
+  animation: plans-archive-reveal 180ms cubic-bezier(.22, .72, .24, 1) both;
+  transform-origin: top center;
+}
+
+.plans-overview-count-pop {
+  animation: plans-count-change 260ms cubic-bezier(.22, .72, .24, 1) both;
+}
+
+.plans-overview-sheet-overlay {
+  animation: plans-sheet-backdrop-in 150ms ease-out both;
+}
+
+.plans-overview-sheet {
+  animation: plans-sheet-in 230ms cubic-bezier(.18, .82, .22, 1.05) both;
+}
+
+.plan-create-overlay:not(.is-closing) {
+  animation: plans-sheet-backdrop-in 145ms ease-out both;
+}
+
+.plan-create-sheet:not(.is-closing) {
+  animation: plans-create-sheet-in 215ms cubic-bezier(.18, .82, .22, 1.04) both;
+}
+
+.plan-create-overlay.is-closing {
+  pointer-events: none;
+  animation: plans-sheet-backdrop-out 150ms ease-in both;
+}
+
+.plan-create-sheet.is-closing {
+  animation: plans-create-sheet-out 150ms cubic-bezier(.4, 0, 1, 1) both;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plans-featured-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .plans-featured-card:hover .plans-featured-media img {
+    transform: scale(1.015);
+  }
+
+  .plans-upcoming-tile:has(.plans-upcoming-tile-open:hover),
+  .plans-idea-chip:hover {
+    transform: translateY(-2px);
+  }
+}
+
+@media (pointer: coarse) {
+  .plans-overview--motion {
+    --plans-enter-y: 7px;
+    --plans-enter-duration: 190ms;
+    --plans-stagger: 34ms;
+  }
+
+  .plans-featured-card,
+  .plans-upcoming-tile,
+  .plans-idea-chip,
+  .plans-overview-add,
+  .plans-widget-all,
+  .plans-overview-sheet > header button {
+    transition-duration: 115ms;
+  }
+
+  .plans-featured-card:active {
+    transform: scale(.995);
+  }
+
+  .plans-featured-card:active .plans-featured-media img,
+  .plans-upcoming-tile:has(.plans-upcoming-tile-open:active) .plans-upcoming-media img {
+    transform: scale(1.012);
+  }
+
+  .plans-upcoming-tile:has(.plans-upcoming-tile-open:active),
+  .plans-idea-chip:active {
+    transform: scale(.99);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans-overview--motion > .plans-overview-hero,
+  .plans-overview--motion > .plans-overview-nearest,
+  .plans-overview--motion > .plans-overview-section,
+  .plans-overview--motion > .plans-overview-closed,
+  .plans-overview--motion > .plans-overview-empty,
+  .plans-upcoming-tile,
+  .plans-idea-rail > .plans-idea-chip,
+  .plans-featured-progress i,
+  .plans-featured-countdown.is-fresh,
+  .plans-featured-card.is-new,
+  .plans-upcoming-tile.is-new,
+  .plans-idea-chip.is-new,
+  .plans-featured-card.is-new::after,
+  .plans-upcoming-tile.is-new::after,
+  .plans-idea-chip.is-new::after,
+  .plans-overview-closed-list,
+  .plans-overview-count-pop,
+  .plans-overview-sheet-overlay,
+  .plans-overview-sheet,
+  .plan-create-overlay,
+  .plan-create-sheet {
+    animation: none !important;
+  }
+
+  .plans-featured-card,
+  .plans-upcoming-tile,
+  .plans-idea-chip,
+  .plans-overview-add,
+  .plans-widget-all,
+  .plans-overview-sheet > header button,
+  .plans-featured-media img,
+  .plans-upcoming-media img,
+  .plans-overview-add svg,
+  .plans-idea-chip--add > svg {
+    transition: none !important;
+  }
+}
+
+@keyframes plans-overview-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--plans-enter-y));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes plans-item-enter {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes plans-progress-fill {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes plans-countdown-emphasis {
+  0%, 100% {
+    background: transparent;
+    transform: scale(1);
+  }
+  42% {
+    background: color-mix(in srgb, var(--plan-accent) 12%, transparent);
+    transform: scale(1.035);
+  }
+}
+
+@keyframes plans-new-item-pop {
+  0% { scale: .94; }
+  62% { scale: 1.018; }
+  100% { scale: 1; }
+}
+
+@keyframes plans-new-item-ring {
+  0% {
+    opacity: 0;
+    transform: scale(.96);
+  }
+  30% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: scale(1.025);
+  }
+}
+
+@keyframes plans-archive-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes plans-count-change {
+  0% { transform: scale(.78); opacity: .45; }
+  65% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes plans-sheet-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes plans-sheet-backdrop-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes plans-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes plans-create-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes plans-create-sheet-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(20px) scale(.99);
+  }
+}
