@@ -79,10 +79,12 @@
   -webkit-backdrop-filter: blur(9px);
 }
 
-/* Головна дія в hero — лише компактний плюс. Текст лишається доступним
-   скрінрідеру, але не займає місце у візуальній композиції. */
-.plans-overview-add {
+/* Вища специфічність навмисна: plansOverview.css має стару мобільну
+   корекцію на 82×86 px нижче по каскаду. Компактний плюс має перемогти
+   її незалежно від порядку CSS-чанків. */
+.plans-overview .plans-overview-add {
   width: 48px;
+  min-width: 48px;
   min-height: 48px;
   height: 48px;
   padding: 0;
@@ -90,7 +92,7 @@
   box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 16%, transparent);
 }
 
-.plans-overview-add span {
+.plans-overview .plans-overview-add span {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -103,9 +105,19 @@
   border: 0;
 }
 
-.plans-overview-add svg {
+.plans-overview .plans-overview-add svg {
   width: 22px;
   height: 22px;
+}
+
+@media (max-width: 560px) {
+  .plans-overview .plans-overview-add {
+    width: 48px;
+    min-height: 48px;
+    height: 48px;
+    border-radius: 16px;
+    box-shadow: none;
+  }
 }
 
 @media (max-height: 690px) {
