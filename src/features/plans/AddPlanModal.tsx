@@ -1,19 +1,19 @@
 // ============================================================
-// Швидке створення нової точки маршруту.
+// Швидке створення спільного плану.
 // ------------------------------------------------------------
-// Перший екран просить тільки назву. Категорія й нотатка допомагають,
-// але не блокують думку на півдорозі. Після збереження людина вирішує:
-// залишити задум у затоці ідей або одразу продовжити його планування.
+// Перший рівень просить лише назву. Тип і нотатка відкриваються окремо,
+// тому форма не перетворюється на анкету. Календарна категорія «Свято»
+// навмисно відсутня: річниці та свята створюються в календарі.
 // ============================================================
 import { useState, type CSSProperties } from 'react';
 import { CheckIcon, ChevronDownIcon } from '@/components/icons/UiIcon';
 import { PLAN_CATEGORIES, PLAN_CATEGORY_ORDER } from './planConstants';
 import './plansCreate.css';
+import './plansCreateAccordion.css';
 import type { NewPlanInput } from './usePlans';
 import type { PlanCategory } from '@/types';
 
-const QUICK_CATEGORIES: PlanCategory[] = ['date', 'trip', 'place', 'activity'];
-const EXTRA_CATEGORIES = PLAN_CATEGORY_ORDER.filter((key) => !QUICK_CATEGORIES.includes(key));
+const PLAN_TYPES = PLAN_CATEGORY_ORDER.filter((key) => key !== 'holiday');
 
 export function AddPlanModal({
   busy,
@@ -31,7 +31,8 @@ export function AddPlanModal({
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<PlanCategory>('other');
   const [description, setDescription] = useState('');
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [typeOpen, setTypeOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
 
   const selected = PLAN_CATEGORIES[category];
   const style = { '--plan-create-accent': selected.color } as CSSProperties;
@@ -69,9 +70,9 @@ export function AddPlanModal({
             }}
           >
             <header className="plan-create-head">
-              <span className="plan-create-eyebrow">Нова точка маршруту</span>
-              <h2 id="plan-create-title">Що хочете пережити разом?</h2>
-              <p>Достатньо короткої ідеї. Дату, місце та підготовку додасте тоді, коли будете готові.</p>
+              <span className="plan-create-eyebrow">Новий спільний план</span>
+              <h2 id="plan-create-title">Що хочете зробити разом?</h2>
+              <p>Запишіть задум одним реченням. Дату, місце, бюджет і підготовку можна додати пізніше.</p>
             </header>
 
             <label className="plan-create-title-field">
@@ -83,104 +84,102 @@ export function AddPlanModal({
                 maxLength={120}
                 value={title}
                 onChange={(event) => setTitle(event.target.value)}
-                placeholder="Наприклад, зустріти світанок у горах"
+                placeholder="Наприклад, поїхати разом у Карпати"
                 autoFocus
                 disabled={busy}
               />
               <small>{title.trim().length}/120</small>
             </label>
 
-            <section className="plan-create-kind" aria-labelledby="plan-create-kind-title">
-              <div className="plan-create-kind-head">
-                <span id="plan-create-kind-title">Що це приблизно?</span>
-                <small>Не обов’язково</small>
-              </div>
+            <section className="plan-create-accordion" aria-labelledby="plan-type-title">
+              <button
+                type="button"
+                className={`plan-create-accordion-toggle${typeOpen ? ' open' : ''}`}
+                aria-expanded={typeOpen}
+                onClick={() => setTypeOpen((value) => !value)}
+                disabled={busy}
+              >
+                <span className="plan-create-accordion-icon" aria-hidden="true"><selected.Icon size={18} /></span>
+                <span className="plan-create-accordion-copy">
+                  <small id="plan-type-title">Тип плану</small>
+                  <strong>{category === 'other' ? 'Не вибрано' : selected.label}</strong>
+                </span>
+                <span className="plan-create-accordion-optional">необов’язково</span>
+                <ChevronDownIcon size={17} />
+              </button>
 
-              <div className="plan-create-quick-categories">
-                {QUICK_CATEGORIES.map((key) => {
-                  const item = PLAN_CATEGORIES[key];
-                  const active = category === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className={`plan-create-category${active ? ' active' : ''}`}
-                      aria-pressed={active}
-                      onClick={() => setCategory(active ? 'other' : key)}
-                      disabled={busy}
-                    >
-                      <item.Icon size={19} />
-                      <span>{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <button
-              type="button"
-              className={`plan-create-more-toggle${moreOpen ? ' open' : ''}`}
-              aria-expanded={moreOpen}
-              onClick={() => setMoreOpen((current) => !current)}
-              disabled={busy}
-            >
-              <span>{moreOpen ? 'Сховати додаткове' : 'Додати нотатку або інший тип'}</span>
-              <ChevronDownIcon size={17} />
-            </button>
-
-            {moreOpen && (
-              <div className="plan-create-more">
-                <div className="plan-create-extra-categories" aria-label="Інші типи плану">
-                  {EXTRA_CATEGORIES.map((key) => {
+              {typeOpen && (
+                <div className="plan-create-type-grid" aria-label="Типи спільних планів">
+                  {PLAN_TYPES.map((key) => {
                     const item = PLAN_CATEGORIES[key];
                     const active = category === key;
                     return (
                       <button
                         key={key}
                         type="button"
-                        className={`plan-create-extra-category${active ? ' active' : ''}`}
+                        className={`plan-create-type-option${active ? ' active' : ''}`}
                         aria-pressed={active}
-                        onClick={() => setCategory(key)}
+                        onClick={() => {
+                          setCategory(key);
+                          setTypeOpen(false);
+                        }}
                         disabled={busy}
                       >
-                        <item.Icon size={15} /> {key === 'other' ? 'Без типу' : item.label}
+                        <item.Icon size={17} />
+                        <span>{key === 'other' ? 'Без типу' : item.label}</span>
                       </button>
                     );
                   })}
                 </div>
+              )}
+            </section>
 
-                <label className="form-field plan-create-note">
-                  <span>Нотатка</span>
+            <section className="plan-create-accordion">
+              <button
+                type="button"
+                className={`plan-create-accordion-toggle plan-create-accordion-toggle--note${noteOpen ? ' open' : ''}`}
+                aria-expanded={noteOpen}
+                onClick={() => setNoteOpen((value) => !value)}
+                disabled={busy}
+              >
+                <span className="plan-create-accordion-copy">
+                  <small>Додаткова деталь</small>
+                  <strong>{description.trim() ? 'Нотатку додано' : 'Додати нотатку'}</strong>
+                </span>
+                <ChevronDownIcon size={17} />
+              </button>
+
+              {noteOpen && (
+                <label className="form-field plan-create-note plan-create-note--accordion">
+                  <span>Що важливо не забути?</span>
                   <textarea
                     id="plan-description"
                     name="description"
-                    rows={2}
+                    rows={3}
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
-                    placeholder="Деталь, яку не хочеться забути…"
+                    placeholder="Наприклад, поїхати власною машиною та взяти фотоапарат"
                     disabled={busy}
                   />
                 </label>
-              </div>
-            )}
+              )}
+            </section>
 
             <div className="plan-create-actions">
               <button type="button" className="plan-create-cancel" onClick={onClose} disabled={busy}>
                 Скасувати
               </button>
               <button type="submit" className="btn plan-create-save" disabled={busy || !title.trim()}>
-                {busy ? 'Наношу на карту…' : 'Зберегти ідею'}
+                {busy ? 'Зберігаю…' : 'Зберегти ідею'}
               </button>
             </div>
           </form>
         ) : (
           <section className="plan-create-success" aria-labelledby="plan-create-title">
-            <span className="plan-create-success-mark" aria-hidden="true">
-              <CheckIcon size={28} />
-            </span>
-            <span className="plan-create-eyebrow">Точку додано</span>
+            <span className="plan-create-success-mark" aria-hidden="true"><CheckIcon size={28} /></span>
+            <span className="plan-create-eyebrow">План додано</span>
             <h2 id="plan-create-title">{title.trim()}</h2>
-            <p>Поки що вона чекає без дати серед ідей. Можна залишити її так або перейти до дати, кроків і бюджету.</p>
+            <p>Він збережений серед ідей. Можна залишити його так або одразу додати дату, кроки й бюджет.</p>
 
             <div className="plan-create-success-actions">
               <button type="button" className="btn plan-create-continue" onClick={() => onContinue(createdPlanId)}>

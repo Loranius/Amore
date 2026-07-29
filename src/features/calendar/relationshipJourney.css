@@ -1,0 +1,231 @@
+/* ============================================================
+   «Наш шлях» у вкладці календаря «Наші свята».
+   ============================================================ */
+.relationship-journey {
+  margin: 14px 0 18px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 24px;
+  background: var(--surface);
+}
+.relationship-journey > summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 13px 15px;
+  cursor: pointer;
+  list-style: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.relationship-journey > summary::-webkit-details-marker { display: none; }
+.relationship-journey-summary-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+}
+.relationship-journey-summary-copy { display: grid; min-width: 0; flex: 1 1 auto; gap: 1px; }
+.relationship-journey-summary-copy small { color: var(--muted); font-size: 10.5px; }
+.relationship-journey-summary-copy strong { font-size: 15px; }
+.relationship-journey-summary-count {
+  display: grid;
+  min-width: 29px;
+  height: 29px;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+}
+.relationship-journey-shell {
+  position: relative;
+  overflow: hidden;
+  border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, #e8c985 4%, var(--surface)), var(--surface) 55%, color-mix(in srgb, var(--accent) 4%, var(--surface)));
+  contain: paint;
+}
+.relationship-journey-origin {
+  position: relative;
+  z-index: 4;
+  display: grid;
+  justify-items: center;
+  width: 100%;
+  padding: 70px 18px 20px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+.relationship-journey-origin > span {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  place-items: center;
+  border: 2px solid color-mix(in srgb, var(--accent) 55%, white);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+}
+.relationship-journey-origin small { margin-top: 11px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.relationship-journey-origin strong { margin-top: 3px; font-size: 17px; }
+.relationship-journey-origin em { margin-top: 2px; color: var(--muted); font-size: 11px; font-style: normal; }
+.relationship-journey-route { position: relative; z-index: 2; min-height: 210px; padding: 4px 10px 78px; }
+.relationship-journey-route > svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  contain: paint;
+}
+.relationship-journey-path-base,
+.relationship-journey-path-dash {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.relationship-journey-path-base { stroke: color-mix(in srgb, var(--text) 10%, transparent); stroke-width: 8; }
+.relationship-journey-path-dash { stroke: color-mix(in srgb, var(--accent) 52%, var(--text)); stroke-width: 2; stroke-dasharray: 4 10; }
+.relationship-journey-nodes { position: relative; z-index: 2; }
+.relationship-journey-node {
+  --relationship-journey-node-x: 72%;
+  --relationship-journey-accent: var(--accent);
+  position: relative;
+  display: flex;
+  min-height: 142px;
+  align-items: center;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 142px;
+}
+.relationship-journey-node--left { justify-content: flex-start; padding-right: 25%; }
+.relationship-journey-node--right { --relationship-journey-node-x: 28%; justify-content: flex-end; padding-left: 25%; }
+.relationship-journey-marker {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: var(--relationship-journey-node-x, 50%);
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 2px solid color-mix(in srgb, var(--relationship-journey-accent, var(--accent)) 68%, white);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--relationship-journey-accent, var(--accent));
+  transform: translate(-50%, -50%);
+}
+.relationship-journey-card {
+  position: relative;
+  display: grid;
+  width: min(70%, 300px);
+  min-width: 0;
+  gap: 4px;
+  padding: 12px 13px;
+  border: 1px solid color-mix(in srgb, var(--relationship-journey-accent) 18%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--relationship-journey-accent) 4%, var(--surface));
+}
+.relationship-journey-open { position: absolute; z-index: 1; inset: 0; border: 0; border-radius: inherit; background: transparent; cursor: pointer; }
+.relationship-journey-open:focus-visible { outline: 3px solid color-mix(in srgb, var(--relationship-journey-accent) 45%, transparent); outline-offset: 2px; }
+.relationship-journey-card small { color: color-mix(in srgb, var(--relationship-journey-accent) 76%, var(--text)); font-size: 9.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.relationship-journey-card strong { overflow: hidden; font-size: 14px; line-height: 1.28; text-overflow: ellipsis; }
+.relationship-journey-card > span { color: var(--muted); font-size: 10.5px; }
+.relationship-journey-card p { display: -webkit-box; overflow: hidden; margin: 1px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.relationship-journey-now {
+  position: relative;
+  display: grid;
+  min-height: 126px;
+  place-items: center;
+}
+.relationship-journey-now .relationship-journey-marker { --relationship-journey-node-x: 50%; --relationship-journey-accent: var(--accent); }
+.relationship-journey-now > span:last-child { display: grid; justify-items: center; margin-top: 72px; }
+.relationship-journey-now small { color: var(--muted); font-size: 9.5px; text-transform: uppercase; }
+.relationship-journey-now strong { font-size: 14px; }
+.relationship-journey-more {
+  position: relative;
+  z-index: 6;
+  display: block;
+  min-height: 36px;
+  margin: 0 auto 4px;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  color: var(--accent);
+  font: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.relationship-journey-more--future { margin-top: -58px; margin-bottom: 72px; }
+.relationship-journey-future {
+  position: relative;
+  z-index: 6;
+  display: grid;
+  justify-items: center;
+  margin-top: -72px;
+  padding: 82px 18px 22px;
+  text-align: center;
+}
+.relationship-journey-future strong { font-size: 14px; }
+.relationship-journey-future p { max-width: 280px; margin: 4px 0 11px; color: var(--muted); font-size: 11px; line-height: 1.4; }
+.relationship-journey-future .btn { min-height: 38px; }
+.relationship-journey-fog {
+  position: absolute;
+  z-index: 4;
+  right: -14%;
+  left: -14%;
+  height: 126px;
+  pointer-events: none;
+}
+.relationship-journey-fog--top { top: -40px; }
+.relationship-journey-fog--bottom { z-index: 5; bottom: -20px; height: 160px; }
+.relationship-journey-fog > span {
+  position: absolute;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  opacity: .78;
+}
+.relationship-journey-fog > span:first-child { top: 26px; left: -2%; width: 58%; height: 62px; }
+.relationship-journey-fog > span:last-child { top: 4px; right: -4%; width: 62%; height: 72px; }
+.relationship-journey-fog--bottom > span:first-child { top: 64px; height: 82px; }
+.relationship-journey-fog--bottom > span:last-child { top: 38px; height: 92px; }
+.relationship-journey-empty {
+  position: relative;
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 74px 22px 32px;
+  text-align: center;
+}
+.relationship-journey-empty > span { color: var(--accent); }
+.relationship-journey-empty strong { font-size: 16px; }
+.relationship-journey-empty p { max-width: 34ch; margin: 0 0 8px; color: var(--muted); font-size: 11.5px; line-height: 1.42; }
+
+@media (max-width: 430px), (hover: none), (pointer: coarse) {
+  .relationship-journey-card { width: 72%; }
+  .relationship-journey-node--left { padding-right: 22%; }
+  .relationship-journey-node--right { padding-left: 22%; }
+}
+
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .relationship-journey-path-dash { animation: relationship-journey-drift 22s linear infinite; }
+  .relationship-journey-fog > span { animation: relationship-journey-cloud 18s ease-in-out infinite alternate; }
+  .relationship-journey-fog > span:last-child { animation-delay: -7s; }
+}
+@keyframes relationship-journey-drift { to { stroke-dashoffset: -140; } }
+@keyframes relationship-journey-cloud { from { transform: translate3d(-8px, 0, 0); } to { transform: translate3d(11px, -3px, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .relationship-journey-path-dash,
+  .relationship-journey-fog > span { animation: none !important; }
+}

@@ -1,0 +1,115 @@
+/* Акордеони необов'язкових полів у швидкому створенні плану. */
+.plan-create-accordion {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg) 55%, var(--surface));
+}
+
+.plan-create-accordion-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 13px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.plan-create-accordion-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--plan-create-accent) 12%, var(--surface));
+  color: var(--plan-create-accent);
+}
+
+.plan-create-accordion-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 1px;
+}
+.plan-create-accordion-copy small { color: var(--muted); font-size: 10.5px; }
+.plan-create-accordion-copy strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-create-accordion-optional {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 10px;
+}
+.plan-create-accordion-toggle > svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform .18s ease;
+}
+.plan-create-accordion-toggle.open > svg { transform: rotate(180deg); }
+.plan-create-accordion-toggle--note { min-height: 54px; }
+
+.plan-create-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding: 0 10px 10px;
+  animation: plan-create-reveal .18s ease both;
+}
+.plan-create-type-option {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.plan-create-type-option svg { flex: 0 0 auto; }
+.plan-create-type-option span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-create-type-option.active {
+  border-color: color-mix(in srgb, var(--plan-create-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--plan-create-accent) 10%, var(--surface));
+  color: color-mix(in srgb, var(--plan-create-accent) 78%, var(--text));
+  font-weight: 750;
+}
+
+.plan-create-note--accordion {
+  margin: 0;
+  padding: 0 11px 11px;
+  animation: plan-create-reveal .18s ease both;
+}
+.plan-create-note--accordion > span { margin-bottom: 5px; }
+
+@media (max-width: 380px) {
+  .plan-create-accordion-optional { display: none; }
+  .plan-create-type-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-create-accordion-toggle > svg,
+  .plan-create-type-grid,
+  .plan-create-note--accordion {
+    animation: none;
+    transition: none;
+  }
+}
