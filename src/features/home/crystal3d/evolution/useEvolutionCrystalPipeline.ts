@@ -7,10 +7,10 @@ import { useMemories } from '@/features/memories/useMemories';
 import { usePlans } from '@/features/plans/usePlans';
 import { useShoppingItems } from '@/features/shopping/useShoppingItems';
 import {
-  fetchFulfilledWishlistV3,
-  fetchSharedWishlistArchiveV3,
-  type GiftMemoryArchiveItem,
-} from '@/features/wishlist/wishlistRpc';
+  fetchPersonalWishlistEvolutionArchive,
+  fetchSharedWishlistEvolutionArchive,
+  type WishlistEvolutionArchiveItem,
+} from '@/features/wishlist/wishlistEvolutionArchive';
 import { useStartDate } from '@/features/home/useHome';
 import {
   buildArtifactFromSnapshot,
@@ -19,27 +19,38 @@ import {
   type MemoryLinkSource,
   type WishlistSource,
 } from '@/engine/evolution/adapters';
-import { buildCrystalSpeciesBlueprint } from '@/engine/species/crystal';
-import { crystalToGrowthBlueprint } from '@/engine/species/crystal';
-import { DEFAULT_GROWTH_ENGINE_CONFIG, buildGrowthState } from '@/engine/growth';
+import {
+  buildCrystalSpeciesBlueprint,
+  crystalToGrowthBlueprint,
+  type CrystalSpeciesBlueprint,
+} from '@/engine/species/crystal';
+import {
+  DEFAULT_GROWTH_ENGINE_CONFIG,
+  buildGrowthState,
+  type GrowthState,
+} from '@/engine/growth';
 import {
   DEFAULT_CRYSTAL_COMPOSITION_CONFIG,
   buildCrystalComposition,
+  type CrystalCompositionState,
 } from '@/engine/composition';
-import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG, buildCrystalGeometry } from '@/engine/geometry';
+import {
+  DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
+  buildCrystalGeometry,
+  type CrystalGeometryState,
+} from '@/engine/geometry';
 import {
   DEFAULT_CRYSTAL_MATERIAL_CONFIG,
   buildCrystalMaterialState,
   type CrystalMaterialQuality,
+  type CrystalMaterialState,
 } from '@/engine/material';
-import { DEFAULT_CRYSTAL_LIFE_CONFIG, buildCrystalLifeState } from '@/engine/life';
+import {
+  DEFAULT_CRYSTAL_LIFE_CONFIG,
+  buildCrystalLifeState,
+  type CrystalLifeState,
+} from '@/engine/life';
 import { resolveCrystalRendererQuality } from '@/engine/renderer';
-import type { CrystalSpeciesBlueprint } from '@/engine/species/crystal';
-import type { GrowthState } from '@/engine/growth';
-import type { CrystalCompositionState } from '@/engine/composition';
-import type { CrystalGeometryState } from '@/engine/geometry';
-import type { CrystalMaterialState } from '@/engine/material';
-import type { CrystalLifeState } from '@/engine/life';
 
 const ENGINE_VERSION = '1.0.0';
 const SPECIES_RULES_VERSION = '1.0.0';
@@ -79,7 +90,7 @@ function readQuality(): CrystalMaterialQuality {
   const extendedNavigator = navigator as Navigator & { deviceMemory?: number };
   return resolveCrystalRendererQuality({
     webgl: true,
-    webgl2: typeof window.WebGL2RenderingContext !== 'undefined',
+    webgl2: typeof WebGL2RenderingContext !== 'undefined',
     deviceMemoryGb: typeof extendedNavigator.deviceMemory === 'number'
       ? extendedNavigator.deviceMemory
       : null,
@@ -90,8 +101,8 @@ function readQuality(): CrystalMaterialQuality {
   });
 }
 
-function archiveToWishlistSource(
-  item: GiftMemoryArchiveItem,
+export function archiveToWishlistSource(
+  item: WishlistEvolutionArchiveItem,
   isShared: boolean,
 ): WishlistSource {
   return {
@@ -104,9 +115,9 @@ function archiveToWishlistSource(
   };
 }
 
-function dedupeWishlist(
-  personal: readonly GiftMemoryArchiveItem[],
-  shared: readonly GiftMemoryArchiveItem[],
+export function dedupeEvolutionWishlist(
+  personal: readonly WishlistEvolutionArchiveItem[],
+  shared: readonly WishlistEvolutionArchiveItem[],
 ): WishlistSource[] {
   const byId = new Map<number, WishlistSource>();
   for (const item of personal) byId.set(item.id, archiveToWishlistSource(item, false));
@@ -115,7 +126,7 @@ function dedupeWishlist(
   return [...byId.values()].sort((left, right) => left.id - right.id);
 }
 
-function memoryLinksFromArchive(
+export function buildEvolutionMemoryLinks(
   linkIds: Record<number, Partial<Record<string, number>>>,
 ): MemoryLinkSource[] {
   const links: MemoryLinkSource[] = [];
@@ -138,7 +149,7 @@ function memoryLinksFromArchive(
   );
 }
 
-function buildSnapshot(input: {
+export function buildEvolutionSourceSnapshot(input: {
   events: NonNullable<ReturnType<typeof useEvents>['data']>;
   plans: NonNullable<ReturnType<typeof usePlans>['data']>;
   wishlist: WishlistSource[];
@@ -180,7 +191,9 @@ function buildSnapshot(input: {
       takenAt: memory.taken_at,
       createdAt: memory.created_at,
     })),
-    memoryLinks: memoryLinksFromArchive(input.archive.linkIds as Record<number, Partial<Record<string, number>>>),
+    memoryLinks: buildEvolutionMemoryLinks(
+      input.archive.linkIds as Record<number, Partial<Record<string, number>>>,
+    ),
     shoppingItems: input.shopping.map((item) => ({
       id: item.id,
       bought: item.bought,
@@ -188,6 +201,13 @@ function buildSnapshot(input: {
       createdAt: item.created_at,
     })),
   };
+}
+
+function growthBodyLimit(quality: CrystalMaterialQuality): number {
+  if (quality === 'high') return 96;
+  if (quality === 'balanced') return 64;
+  if (quality === 'low') return 36;
+  return 18;
 }
 
 /**
@@ -214,13 +234,13 @@ export function useEvolutionCrystalPipeline(
   const personalArchives = useQueries({
     queries: userIds.map((ownerId) => ({
       queryKey: ['wishlist', 'evolution-archive', ownerId],
-      queryFn: () => fetchFulfilledWishlistV3(ownerId),
+      queryFn: () => fetchPersonalWishlistEvolutionArchive(ownerId),
       staleTime: 5 * 60_000,
     })),
   });
   const sharedArchive = useQuery({
     queryKey: ['wishlist', 'evolution-archive', 'shared'],
-    queryFn: fetchSharedWishlistArchiveV3,
+    queryFn: fetchSharedWishlistEvolutionArchive,
     staleTime: 5 * 60_000,
   });
 
@@ -250,11 +270,11 @@ export function useEvolutionCrystalPipeline(
     [personalArchives],
   );
   const wishlist = useMemo(
-    () => dedupeWishlist(personalItems, sharedArchive.data ?? []),
+    () => dedupeEvolutionWishlist(personalItems, sharedArchive.data ?? []),
     [personalItems, sharedArchive.data],
   );
 
-  const result = useMemo<UseEvolutionCrystalPipelineResult>(() => {
+  return useMemo<UseEvolutionCrystalPipelineResult>(() => {
     if (queryError) {
       return {
         pipeline: null,
@@ -269,7 +289,7 @@ export function useEvolutionCrystalPipeline(
     try {
       const started = performance.now();
       const coupleId = `amore-couple:${userIds.join('-')}`;
-      const snapshot = buildSnapshot({
+      const snapshot = buildEvolutionSourceSnapshot({
         events: events.data ?? [],
         plans: plans.data ?? [],
         wishlist,
@@ -294,7 +314,10 @@ export function useEvolutionCrystalPipeline(
       });
       const growth = buildGrowthState({
         blueprint: crystalToGrowthBlueprint(species),
-        config: DEFAULT_GROWTH_ENGINE_CONFIG,
+        config: {
+          ...DEFAULT_GROWTH_ENGINE_CONFIG,
+          maxBodies: growthBodyLimit(quality),
+        },
       });
       const composition = buildCrystalComposition({
         growth,
@@ -368,6 +391,4 @@ export function useEvolutionCrystalPipeline(
     userIds,
     wishlist,
   ]);
-
-  return result;
 }
