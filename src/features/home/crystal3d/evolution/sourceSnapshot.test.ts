@@ -5,7 +5,7 @@ import type { EventRow, MapPinRow, PlanRow, ShoppingItemRow } from '@/types';
 import {
   buildEvolutionMemoryLinks,
   buildEvolutionSourceSnapshot,
-  dedupeEvolutionWishlist,
+  evolutionWishlistFromPairArchive,
   stableEvolutionCoupleId,
 } from './sourceSnapshot';
 
@@ -18,16 +18,22 @@ function archiveItem(
     priority: 'medium',
     fulfilled_at: '2026-01-02T10:00:00Z',
     completed_at: '2026-01-02T10:00:00Z',
+    is_shared: false,
     ...overrides,
   };
 }
 
 describe('Evolution real-data snapshot mapping', () => {
-  it('deduplicates wishlist archives deterministically and lets shared scope win', () => {
-    const result = dedupeEvolutionWishlist(
-      [archiveItem(4), archiveItem(2, { priority: 'low' })],
-      [archiveItem(2, { priority: 'high', fulfilled_at: '2026-02-03T09:00:00Z' })],
-    );
+  it('maps pair-wide wishlist rows deterministically and preserves shared scope', () => {
+    const result = evolutionWishlistFromPairArchive([
+      archiveItem(4),
+      archiveItem(2, { priority: 'low' }),
+      archiveItem(2, {
+        priority: 'high',
+        fulfilled_at: '2026-02-03T09:00:00Z',
+        is_shared: true,
+      }),
+    ]);
 
     expect(result.map((item) => item.id)).toEqual([2, 4]);
     expect(result[0]).toMatchObject({
@@ -109,7 +115,7 @@ describe('Evolution real-data snapshot mapping', () => {
         updated_at: '2025-03-04T18:00:00Z',
         completed_at: '2025-03-04T18:00:00Z',
       } as PlanRow],
-      wishlist: dedupeEvolutionWishlist([archiveItem(6)], []),
+      wishlist: evolutionWishlistFromPairArchive([archiveItem(6)]),
       pins: [{
         id: 7,
         title: 'Львів',
