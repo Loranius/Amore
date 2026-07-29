@@ -1,11 +1,11 @@
 // ============================================================
 // «Наш шлях» усередині календарної вкладки «Наші свята».
 // ------------------------------------------------------------
-// Карта показує тільки календарні річниці та важливі віхи. Плани сюди
-// не потрапляють: подорожі, побачення й активності мають власний модуль.
+// Карта читає лише особисті події пари (`type='anniversary'`). Звичайні
+// моменти та великі віхи йдуть одним шляхом, але мають різну візуальну вагу.
 // ============================================================
 import { memo, useMemo, useState, type CSSProperties } from 'react';
-import { EventIcon } from '@/components/icons/EventIcon';
+import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import type { EventRow } from '@/types';
@@ -29,8 +29,7 @@ function localDateKey(): string {
 }
 
 function isJourneyEvent(event: EventRow): boolean {
-  if (event.type === 'birthday') return false;
-  return event.type === 'anniversary' || Boolean(event.is_milestone);
+  return event.type === 'anniversary';
 }
 
 function dateLabel(date: string): string {
@@ -73,14 +72,18 @@ const JourneyNode = memo(function JourneyNode({
   future: boolean;
   onOpen: (event: EventRow) => void;
 }) {
-  const accent = event.is_milestone ? IMPORTANT_ACCENT : REGULAR_ACCENT;
+  const major = Boolean(event.is_milestone);
+  const accent = major ? IMPORTANT_ACCENT : REGULAR_ACCENT;
   const side = index % 2 === 0 ? 'left' : 'right';
   const style = { '--relationship-journey-accent': accent } as CSSProperties;
 
   return (
-    <div className={`relationship-journey-node relationship-journey-node--${side}`} style={style}>
+    <div
+      className={`relationship-journey-node relationship-journey-node--${side} relationship-journey-node--${major ? 'major' : 'regular'}`}
+      style={style}
+    >
       <span className="relationship-journey-marker" aria-hidden="true">
-        <EventIcon type={event.type ?? 'anniversary'} size={17} />
+        {major ? <SparkIcon size={19} /> : <EventIcon type="anniversary" size={16} />}
       </span>
       <article className="relationship-journey-card">
         <button
@@ -89,7 +92,7 @@ const JourneyNode = memo(function JourneyNode({
           aria-label={`Відкрити подію «${event.title}»`}
           onClick={() => onOpen(event)}
         />
-        <small>{future ? 'Попереду' : event.is_milestone ? 'Важлива віха' : 'Наша дата'}</small>
+        <small>{major ? 'Велика подія' : 'Подія'}{future ? ' · попереду' : ''}</small>
         <strong>{event.title}</strong>
         <span>{dateLabel(event.date)}{event.yearly ? ' · щороку' : ''}</span>
         {event.description && <p>{event.description}</p>}
@@ -151,7 +154,7 @@ export function RelationshipJourney({
       <summary>
         <span className="relationship-journey-summary-icon" aria-hidden="true"><HeartIcon size={19} /></span>
         <span className="relationship-journey-summary-copy">
-          <small>Карта важливих дат</small>
+          <small>Карта подій стосунків</small>
           <strong>Наш шлях</strong>
         </span>
         <span className="relationship-journey-summary-count">{moments.length}</span>
@@ -164,9 +167,9 @@ export function RelationshipJourney({
           {moments.length === 0 ? (
             <section className="relationship-journey-empty">
               <span aria-hidden="true"><HeartIcon size={25} /></span>
-              <strong>Додайте першу важливу дату</strong>
-              <p>Початок стосунків, перше знайомство, заручини або інша спільна віха з’явиться тут.</p>
-              <button type="button" className="btn" onClick={onAdd}><PlusIcon size={14} /> Додати дату</button>
+              <strong>Додайте першу подію</strong>
+              <p>Початок стосунків, перша спільна поїздка, пропозиція або інший важливий момент з’явиться тут.</p>
+              <button type="button" className="btn" onClick={onAdd}><PlusIcon size={14} /> Додати подію</button>
             </section>
           ) : (
             <>
@@ -240,8 +243,8 @@ export function RelationshipJourney({
               <JourneyFog edge="bottom" />
               <footer className="relationship-journey-future">
                 <strong>Історія триває</strong>
-                <p>Нові річниці та важливі події продовжуватимуть цей шлях.</p>
-                <button type="button" className="btn" onClick={onAdd}><PlusIcon size={14} /> Додати важливу дату</button>
+                <p>Нові звичайні та великі події продовжуватимуть цей шлях.</p>
+                <button type="button" className="btn" onClick={onAdd}><PlusIcon size={14} /> Додати подію</button>
               </footer>
             </>
           )}
