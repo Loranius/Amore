@@ -14,6 +14,10 @@ const PRIORITY_SIGNIFICANCE: Readonly<Record<string, number>> = {
   low: 0.08,
 };
 
+function roundPressure(value: number): number {
+  return Math.round(value * 1_000) / 1_000;
+}
+
 export function adaptWishlist(
   rows: readonly WishlistSource[],
   context: EvolutionAdapterContext,
@@ -58,7 +62,10 @@ export function adaptWishlist(
       evidence: row.fulfilledAt ? 'verified' : 'historical-estimate',
       channels: withPressure({
         ...WISHLIST_BASE_PRESSURE,
-        significance: Math.min(1, WISHLIST_BASE_PRESSURE.significance + priorityBoost),
+        significance: roundPressure(Math.min(
+          1,
+          WISHLIST_BASE_PRESSURE.significance + priorityBoost,
+        )),
         stability: sharedBoost,
       }),
       portalActivity: 0.24,
