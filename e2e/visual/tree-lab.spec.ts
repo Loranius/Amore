@@ -2,6 +2,8 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
+const MAX_FOLIAGE_CLUSTERS = 64;
+const MAX_FOLIAGE_LEAVES = 900;
 
 async function login(page: Page, url: string) {
   await page.goto(url);
@@ -38,6 +40,37 @@ async function expectCompositionMetrics(preview: Locator) {
   )).toBeGreaterThanOrEqual(0);
 }
 
+async function expectFoliageMetrics(preview: Locator, requireClusters: boolean) {
+  const candidates = numericAttribute(
+    await preview.getAttribute('data-tree-lab-foliage-candidates'),
+    'foliageCandidates',
+  );
+  const clusters = numericAttribute(
+    await preview.getAttribute('data-tree-lab-foliage-clusters'),
+    'foliageClusters',
+  );
+  const leaves = numericAttribute(
+    await preview.getAttribute('data-tree-lab-foliage-leaves'),
+    'foliageLeaves',
+  );
+  const cells = numericAttribute(
+    await preview.getAttribute('data-tree-lab-foliage-cells'),
+    'foliageCells',
+  );
+  const truncated = numericAttribute(
+    await preview.getAttribute('data-tree-lab-foliage-truncated'),
+    'foliageTruncated',
+  );
+
+  expect(candidates).toBeGreaterThanOrEqual(clusters);
+  expect(clusters).toBeGreaterThanOrEqual(requireClusters ? 1 : 0);
+  expect(clusters).toBeLessThanOrEqual(MAX_FOLIAGE_CLUSTERS);
+  expect(leaves).toBeGreaterThanOrEqual(0);
+  expect(leaves).toBeLessThanOrEqual(MAX_FOLIAGE_LEAVES);
+  expect(cells).toBeGreaterThanOrEqual(0);
+  expect(truncated).toBeGreaterThanOrEqual(0);
+}
+
 test.describe('Tree Species Pixel 8 Pro preview', () => {
   test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
 
@@ -59,6 +92,7 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
     });
     await expect(preview).toHaveAttribute('data-tree-lab-violations', '');
     await expectCompositionMetrics(preview);
+    await expectFoliageMetrics(preview, true);
 
     await page.screenshot({
       path: 'test-results/tree-species-fixture-pixel-8-pro.png',
@@ -79,6 +113,7 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
       timeout: 20_000,
     });
     await expectCompositionMetrics(preview);
+    await expectFoliageMetrics(preview, false);
 
     const normalizedEvents = numericAttribute(
       await preview.getAttribute('data-tree-lab-normalized-events'),
