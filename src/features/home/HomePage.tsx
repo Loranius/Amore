@@ -2,10 +2,11 @@
 // HomePage — головна: Hero + Кристал Amore
 // ------------------------------------------------------------
 // 3D-рендер (crystal3d/CrystalSceneEntry.tsx) — основний entry point.
-// За замовчуванням він лишає чинний CrystalScene; лише явний
-// `?engine=evolution` монтує новий Phase 1-6 pipeline. SVG-версія
-// (Crystal.tsx) — гарантований фолбек, якщо WebGL недоступний або будь-яка
-// 3D-сцена впала при ініціалізації (CrystalErrorBoundary).
+// За замовчуванням він лишає чинний CrystalScene. Явні query flags монтують
+// ізольовані лабораторії: `?engine=evolution` — Phase 1-6 Crystal pipeline,
+// `?engine=tree-lab` — органічне дерево. SVG-версія (Crystal.tsx) —
+// гарантований фолбек, якщо WebGL недоступний або будь-яка 3D-сцена впала
+// при ініціалізації (CrystalErrorBoundary).
 //
 // На час ЗАВАНТАЖЕННЯ чанка сцени показується CrystalPlaceholder, а не
 // Crystal: підставляти туди кристал першої версії означало показувати
