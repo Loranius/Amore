@@ -1,48 +1,32 @@
 // ============================================================
-// Гроші плану: бюджет і цілі скарбнички під нього.
+// Гроші плану: очікувана вартість + загальна скарбничка.
 // ------------------------------------------------------------
-// Досі «скільки це коштуватиме» і «скільки ми зібрали» жили в різних
-// кінцях застосунку й не знали одне про одного. Тут вони поруч, і
-// питання «чи вистачає нам на Карпати» має одну відповідь замість двох
-// напіввідповідей.
-//
-// Ціль створюється ЗАПРОПОНОВАНОЮ (це правило скарбнички, не наше):
-// партнер підтверджує її там само, де й будь-яку іншу. Тому тут прямо
-// сказано, що ціль піде на підтвердження — інакше вона виглядала б
-// створеною, а в скарбничці чекала б голосу.
+// План більше не створює фінансову «ціль» і не резервує гроші. Він лише
+// зберігає, скільки може коштувати, та показує поточну спільну заначку
+// для орієнтиру.
 // ============================================================
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useConfirm } from '@/providers/ConfirmProvider';
-import { CloseIcon, PlusIcon, SwapIcon } from '@/components/icons/UiIcon';
 import { PiggyBankIcon } from '@/components/icons/NavIcon';
-import { fmtMoney, useGoalMutations, useGoals, type BudgetGoalRow } from '@/features/piggybank/useBudget';
-import { goalsOfPlan, planMoney } from './planMoney';
+import { fmtMoney } from '@/features/piggybank/useBudget';
+import { usePiggyBank } from '@/features/piggybank/usePiggyBank';
 import { usePlanMutations } from './usePlans';
 import type { PlanRow } from '@/types';
 
 export function PlanMoneyBlock({ plan, accent, embedded = false }: {
   plan: PlanRow;
   accent: string;
-  /** Усередині disclosure заголовок секції вже намальований зовні. */
   embedded?: boolean;
 }) {
-  const { data: goals = [], isPending } = useGoals();
-  const { add, setGoalPlan } = useGoalMutations();
+  const { data: piggyBank, isPending: piggyPending } = usePiggyBank();
   const { updatePlan } = usePlanMutations();
-  const confirmDialog = useConfirm();
-
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState('');
-  const [connecting, setConnecting] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [linking, setLinking] = useState(false);
 
-  const money = planMoney(plan, goals);
-  const mine = goalsOfPlan(plan, goals);
-  // Прив'язати можна лише вільну ціль: перевішувати чужу означало б
-  // мовчки забрати гроші в іншого плану.
-  const free = goals.filter((goal) => goal.plan_id === null);
+  const budget = plan.budget === null ? null : Math.max(0, Number(plan.budget));
+  const saved = Math.max(0, Number(piggyBank?.balance ?? 0));
+  const gap = budget === null ? null : Math.max(0, budget - saved);
+  const enough = budget !== null && saved >= budget;
 
   const saveBudget = () => {
     const raw = budgetDraft.trim().replace(/\s/g, '').replace(',', '.');
@@ -50,12 +34,6 @@ export function PlanMoneyBlock({ plan, accent, embedded = false }: {
     if (value !== null && (!Number.isFinite(value) || value < 0)) return;
     updatePlan.mutate({ id: plan.id, patch: { budget: value } });
     setEditingBudget(false);
-  };
-
-  const unlink = async (goal: BudgetGoalRow) => {
-    if (await confirmDialog(`Відв'язати ціль «${goal.name}» від плану? Гроші лишаться у скарбничці.`)) {
-      setGoalPlan.mutate({ goalId: goal.id, planId: null });
-    }
   };
 
   return (
@@ -79,7 +57,7 @@ export function PlanMoneyBlock({ plan, accent, embedded = false }: {
       {editingBudget && (
         <div className="plan-money-editor">
           <label className="form-field">
-            <span>Скільки це коштуватиме</span>
+            <span>Скільки це може коштувати</span>
             <input
               id={`plan-budget-${plan.id}`}
               name="budget"
@@ -88,13 +66,15 @@ export function PlanMoneyBlock({ plan, accent, embedded = false }: {
               step="100"
               inputMode="numeric"
               value={budgetDraft}
-              placeholder="Порожньо — грошей не потребує"
+              placeholder="Порожньо — ще не рахували"
               onChange={(event) => setBudgetDraft(event.target.value)}
               onKeyDown={(event) => { if (event.key === 'Enter') saveBudget(); }}
             />
           </label>
           <div className="plan-money-editor-actions">
-            <button type="button" className="btn" onClick={saveBudget}>Зберегти</button>
+            <button type="button" className="btn" onClick={saveBudget} disabled={updatePlan.isPending}>
+              {updatePlan.isPending ? 'Зберігаю…' : 'Зберегти'}
+            </button>
             <button type="button" className="plan-money-cancel" onClick={() => setEditingBudget(false)}>
               Скасувати
             </button>
@@ -102,192 +82,31 @@ export function PlanMoneyBlock({ plan, accent, embedded = false }: {
         </div>
       )}
 
-      {(money.saved > 0 || money.goals > 0) && (
-        <>
+      <Link className="plan-money-piggy" to="/piggybank" style={{ '--plan-money-accent': accent } as React.CSSProperties}>
+        <span className="plan-money-piggy-icon" aria-hidden="true"><PiggyBankIcon size={20} /></span>
+        <span>
+          <small>Зараз у скарбничці</small>
+          <strong>{piggyPending ? 'Завантаження…' : fmtMoney(saved)}</strong>
+        </span>
+      </Link>
+
+      {budget === null ? (
+        <p className="plan-money-empty">Вкажи приблизну вартість плану, коли вона стане зрозумілою.</p>
+      ) : (
+        <div className={`plan-money-comparison${enough ? ' is-enough' : ''}`}>
           <div className="plan-money-bar" aria-hidden="true">
-            <span style={{ width: `${money.percent}%`, background: accent }} />
+            <span style={{ width: `${Math.min(100, budget > 0 ? (saved / budget) * 100 : 100)}%`, background: accent }} />
           </div>
           <p className="plan-money-sum">
-            Зібрано <b>{fmtMoney(money.saved)}</b>
-            {money.gap !== null && money.gap > 0 && <> · лишилось {fmtMoney(money.gap)}</>}
-            {money.gap === 0 && plan.budget !== null && <> · бюджет закритий</>}
+            План: <b>{fmtMoney(budget)}</b>
+            {enough ? <> · у скарбничці достатньо</> : gap !== null ? <> · не вистачає {fmtMoney(gap)}</> : null}
           </p>
-        </>
-      )}
-
-      {isPending ? (
-        <p className="plan-money-empty">Завантаження…</p>
-      ) : mine.length === 0 ? (
-        <p className="plan-money-empty">Скарбничка до цього плану ще не підключена.</p>
-      ) : (
-        <ul className="plan-goal-list">
-          {mine.map((goal) => (
-            <li key={goal.id} className="plan-goal">
-              <Link className="plan-goal-open" to="/piggybank">
-                <span className="plan-goal-name">
-                  {goal.name}
-                  {goal.status === 'pending' && <em className="plan-goal-pending">на підтвердженні</em>}
-                </span>
-                <small>
-                  {fmtMoney(goal.saved_amount)} з {fmtMoney(goal.target_amount)}
-                </small>
-              </Link>
-              <button
-                type="button"
-                className="plan-goal-unlink"
-                aria-label={`Відв'язати «${goal.name}» від плану`}
-                onClick={() => void unlink(goal)}
-              >
-                <CloseIcon size={14} />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="plan-money-actions">
-        <button
-          type="button"
-          className={`plan-money-action${connecting ? ' active' : ''}`}
-          onClick={() => {
-            setConnecting((value) => !value);
-            setCreating(false);
-            setLinking(false);
-          }}
-        >
-          <PiggyBankIcon size={15} />
-          {mine.length === 0 ? 'Підключити скарбничку' : 'Додати ще одну ціль'}
-        </button>
-      </div>
-
-      {connecting && (
-        <div className="plan-money-connect-choice" role="group" aria-label="Як підключити скарбничку">
-          <button
-            type="button"
-            onClick={() => {
-              setConnecting(false);
-              setCreating(true);
-            }}
-          >
-            <PlusIcon size={16} />
-            <span>
-              <b>Створити нову ціль</b>
-              <small>Назва й сума вже підставляться з плану</small>
-            </span>
-          </button>
-          {free.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                setConnecting(false);
-                setLinking(true);
-              }}
-            >
-              <SwapIcon size={16} />
-              <span>
-                <b>Обрати наявну</b>
-                <small>{free.length} вільних цілей у скарбничці</small>
-              </span>
-            </button>
-          )}
         </div>
       )}
 
-      {linking && free.length > 0 && (
-        <ul className="plan-goal-picker">
-          {free.map((goal) => (
-            <li key={goal.id}>
-              <button
-                type="button"
-                onClick={() => {
-                  setGoalPlan.mutate({ goalId: goal.id, planId: plan.id });
-                  setLinking(false);
-                }}
-              >
-                <PiggyBankIcon size={16} />
-                <span>{goal.name}</span>
-                <small>{fmtMoney(goal.saved_amount)} з {fmtMoney(goal.target_amount)}</small>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {creating && (
-        <NewGoalForPlan
-          plan={plan}
-          busy={add.isPending}
-          onClose={() => setCreating(false)}
-          onSubmit={(name, target) => {
-            add.mutate(
-              { name, description: null, target_amount: target, url: null, plan_id: plan.id },
-              { onSuccess: () => setCreating(false) },
-            );
-          }}
-        />
-      )}
-    </section>
-  );
-}
-
-/**
- * Форма нової цілі під план.
- *
- * Назва й сума підставляються з плану: у дев'яти випадках із десяти
- * ціль зветься так само, як план, і дорівнює його бюджету. Лишити поля
- * порожніми означало б змусити двічі набирати те, що вже відоме.
- */
-function NewGoalForPlan({ plan, busy, onClose, onSubmit }: {
-  plan: PlanRow;
-  busy: boolean;
-  onClose: () => void;
-  onSubmit: (name: string, target: number) => void;
-}) {
-  const [name, setName] = useState(plan.title);
-  const [target, setTarget] = useState(plan.budget === null ? '' : String(plan.budget));
-
-  const amount = Number(target.trim().replace(/\s/g, '').replace(',', '.'));
-  const valid = name.trim().length > 0 && Number.isFinite(amount) && amount > 0;
-
-  return (
-    <div className="plan-money-editor">
-      <label className="form-field">
-        <span>Назва цілі</span>
-        <input
-          id={`plan-goal-name-${plan.id}`}
-          name="goal_name"
-          type="text"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-        />
-      </label>
-      <label className="form-field">
-        <span>Скільки зібрати</span>
-        <input
-          id={`plan-goal-target-${plan.id}`}
-          name="goal_target"
-          type="number"
-          min="1"
-          step="100"
-          inputMode="numeric"
-          value={target}
-          onChange={(event) => setTarget(event.target.value)}
-        />
-      </label>
       <p className="plan-money-hint">
-        Ціль з'явиться у скарбничці як пропозиція — партнер її підтвердить.
+        Сума зі скарбнички показана лише для орієнтиру й не резервується під цей план автоматично.
       </p>
-      <div className="plan-money-editor-actions">
-        <button
-          type="button"
-          className="btn"
-          disabled={!valid || busy}
-          onClick={() => onSubmit(name.trim(), amount)}
-        >
-          {busy ? 'Створюю…' : 'Створити ціль'}
-        </button>
-        <button type="button" className="plan-money-cancel" onClick={onClose}>Скасувати</button>
-      </div>
-    </div>
+    </section>
   );
 }
