@@ -1,4 +1,5 @@
 export { buildCrystalSpeciesBlueprint } from './crystalSpecies';
+export { crystalToGrowthBlueprint } from './growthAdapter';
 export { projectCrystalToLegacyPressures } from './legacyBridge';
 export {
   CRYSTAL_LIFE_STAGES,
