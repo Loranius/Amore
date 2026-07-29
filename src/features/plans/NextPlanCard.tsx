@@ -5,6 +5,7 @@
 // ілюстрація, короткий зміст і зрозумілий час до події. Детальна підготовка
 // лишається всередині плану, щоб віджет не перетворювався на звіт.
 // ============================================================
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarIcon, ChevronRightIcon } from '@/components/icons/UiIcon';
 import { daysLabel } from '@/features/calendar/calendarUtils';
@@ -26,7 +27,7 @@ export function NextPlanCard({ plan }: { plan: PlanRow }) {
     <Link
       className={`plans-featured-card${plan.cover_url ? ' plans-featured-card--photo' : ''}`}
       to={`/plans/${plan.id}`}
-      style={{ '--plan-accent': category.color } as React.CSSProperties}
+      style={{ '--plan-accent': category.color } as CSSProperties}
     >
       <span className="plans-featured-media" aria-hidden={!plan.cover_url}>
         {plan.cover_url ? (
