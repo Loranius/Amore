@@ -51,5 +51,24 @@ test.describe('Plans mobile visual preview', () => {
     if (await ideas.count()) {
       await ideas.screenshot({ path: testInfo.outputPath('plans-undated-ideas.png') });
     }
+
+    if (await featured.count()) {
+      await featured.first().click();
+      await expect(page.locator('.plan-detail-page')).toBeVisible();
+
+      const related = page.locator('details.plan-disclosure').filter({ hasText: 'Пов’язане' }).first();
+      if (await related.count()) {
+        if ((await related.getAttribute('open')) === null) {
+          await related.locator('summary').click();
+        }
+
+        const tiles = related.locator('.plan-link-grid');
+        if (await tiles.count()) {
+          await expect(tiles).toBeVisible();
+          await page.waitForTimeout(900);
+          await related.screenshot({ path: testInfo.outputPath('plan-related-photo-tiles.png') });
+        }
+      }
+    }
   });
 });
