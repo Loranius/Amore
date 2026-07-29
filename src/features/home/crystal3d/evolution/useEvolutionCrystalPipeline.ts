@@ -9,15 +9,12 @@ import { useShoppingItems } from '@/features/shopping/useShoppingItems';
 import {
   fetchPersonalWishlistEvolutionArchive,
   fetchSharedWishlistEvolutionArchive,
-  type WishlistEvolutionArchiveItem,
 } from '@/features/wishlist/wishlistEvolutionArchive';
-import { useStartDate } from '@/features/home/useHome';
+import { qk } from '@/lib/queryKeys';
+import { supabase } from '@/lib/supabase';
 import {
   buildArtifactFromSnapshot,
   type AdapterDiagnostic,
-  type EvolutionSourceSnapshot,
-  type MemoryLinkSource,
-  type WishlistSource,
 } from '@/engine/evolution/adapters';
 import {
   buildCrystalSpeciesBlueprint,
@@ -51,11 +48,15 @@ import {
   type CrystalLifeState,
 } from '@/engine/life';
 import { resolveCrystalRendererQuality } from '@/engine/renderer';
+import {
+  buildEvolutionSourceSnapshot,
+  dedupeEvolutionWishlist,
+  stableEvolutionCoupleId,
+} from './sourceSnapshot';
 
 const ENGINE_VERSION = '1.0.0';
 const SPECIES_RULES_VERSION = '1.0.0';
 const COUPLE_TIME_ZONE = 'Europe/Kyiv';
-const ALLOWED_MEMORY_SOURCES = new Set(['wish', 'place', 'goal', 'event']);
 
 export interface EvolutionCrystalMetrics {
   buildMs: number;
@@ -101,113 +102,27 @@ function readQuality(): CrystalMaterialQuality {
   });
 }
 
-export function archiveToWishlistSource(
-  item: WishlistEvolutionArchiveItem,
-  isShared: boolean,
-): WishlistSource {
-  return {
-    id: item.id,
-    fulfilled: true,
-    fulfilledAt: item.fulfilled_at ?? item.completed_at,
-    giftDate: item.completed_at,
-    isShared,
-    priority: item.priority,
-  };
-}
-
-export function dedupeEvolutionWishlist(
-  personal: readonly WishlistEvolutionArchiveItem[],
-  shared: readonly WishlistEvolutionArchiveItem[],
-): WishlistSource[] {
-  const byId = new Map<number, WishlistSource>();
-  for (const item of personal) byId.set(item.id, archiveToWishlistSource(item, false));
-  // Shared wins if a backend scope ever returns the same row in both archives.
-  for (const item of shared) byId.set(item.id, archiveToWishlistSource(item, true));
-  return [...byId.values()].sort((left, right) => left.id - right.id);
-}
-
-export function buildEvolutionMemoryLinks(
-  linkIds: Record<number, Partial<Record<string, number>>>,
-): MemoryLinkSource[] {
-  const links: MemoryLinkSource[] = [];
-  for (const [memoryIdText, sources] of Object.entries(linkIds)) {
-    const memoryId = Number(memoryIdText);
-    if (!Number.isSafeInteger(memoryId)) continue;
-    for (const [sourceType, sourceId] of Object.entries(sources)) {
-      if (!ALLOWED_MEMORY_SOURCES.has(sourceType) || !Number.isSafeInteger(sourceId)) continue;
-      links.push({
-        memoryId,
-        sourceType: sourceType as MemoryLinkSource['sourceType'],
-        sourceId,
-      });
-    }
-  }
-  return links.sort((left, right) =>
-    left.memoryId - right.memoryId
-      || left.sourceType.localeCompare(right.sourceType)
-      || left.sourceId - right.sourceId,
-  );
-}
-
-export function buildEvolutionSourceSnapshot(input: {
-  events: NonNullable<ReturnType<typeof useEvents>['data']>;
-  plans: NonNullable<ReturnType<typeof usePlans>['data']>;
-  wishlist: WishlistSource[];
-  pins: NonNullable<ReturnType<typeof useMapPins>['data']>;
-  archive: NonNullable<ReturnType<typeof useMemories>['data']>;
-  shopping: NonNullable<ReturnType<typeof useShoppingItems>['data']>;
-}): EvolutionSourceSnapshot {
-  return {
-    calendarEvents: input.events.map((event) => ({
-      id: event.id,
-      date: event.date,
-      type: event.type,
-      yearly: event.yearly,
-      isMilestone: event.is_milestone,
-    })),
-    plans: input.plans.map((plan) => ({
-      id: plan.id,
-      category: plan.category,
-      status: plan.status,
-      startDate: plan.start_date,
-      endDate: plan.end_date,
-      completedAt: plan.completed_at,
-      createdAt: plan.created_at,
-    })),
-    wishlistItems: input.wishlist,
-    mapPlaces: input.pins.map((pin) => ({
-      id: pin.id,
-      category: pin.category,
-      visitedAt: pin.visited_at,
-      createdAt: pin.created_at,
-      rating: pin.rating,
-      city: pin.city,
-      country: pin.country,
-    })),
-    memories: input.archive.photos.map((memory) => ({
-      id: memory.id,
-      memoryDate: memory.memory_date,
-      datePrecision: memory.date_precision,
-      takenAt: memory.taken_at,
-      createdAt: memory.created_at,
-    })),
-    memoryLinks: buildEvolutionMemoryLinks(
-      input.archive.linkIds as Record<number, Partial<Record<string, number>>>,
-    ),
-    shoppingItems: input.shopping.map((item) => ({
-      id: item.id,
-      bought: item.bought,
-      boughtAt: item.bought_at,
-      createdAt: item.created_at,
-    })),
-  };
-}
-
 function growthBodyLimit(quality: CrystalMaterialQuality): number {
   if (quality === 'high') return 96;
   if (quality === 'balanced') return 64;
   if (quality === 'low') return 36;
   return 18;
+}
+
+function useEvolutionStartDate() {
+  return useQuery({
+    queryKey: [...qk.settings(), 'relationship_start_date'],
+    staleTime: 60 * 60_000,
+    queryFn: async (): Promise<string | null> => {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'relationship_start_date')
+        .maybeSingle();
+      if (error) throw error;
+      return typeof data?.value === 'string' && data.value.trim() ? data.value : null;
+    },
+  });
 }
 
 /**
@@ -217,7 +132,7 @@ function growthBodyLimit(quality: CrystalMaterialQuality): number {
 export function useEvolutionCrystalPipeline(
   reducedMotion: boolean,
 ): UseEvolutionCrystalPipelineResult {
-  const startDate = useStartDate();
+  const startDateQuery = useEvolutionStartDate();
   const users = useUsers();
   const events = useEvents();
   const plans = usePlans();
@@ -246,17 +161,18 @@ export function useEvolutionCrystalPipeline(
 
   const personalPending = personalArchives.some((query) => query.isPending);
   const personalError = personalArchives.find((query) => query.error)?.error;
-  const isPending = users.isPending
+  const isPending = startDateQuery.isPending
+    || users.isPending
     || events.isPending
     || plans.isPending
     || pins.isPending
     || archive.isPending
     || shopping.isPending
     || personalPending
-    || sharedArchive.isPending
-    || !startDate;
+    || sharedArchive.isPending;
 
-  const queryError = users.error
+  const queryError = startDateQuery.error
+    ?? users.error
     ?? events.error
     ?? plans.error
     ?? pins.error
@@ -282,19 +198,31 @@ export function useEvolutionCrystalPipeline(
         error: queryError instanceof Error ? queryError : new Error(String(queryError)),
       };
     }
-    if (isPending || !startDate || userIds.length === 0) {
-      return { pipeline: null, isPending: true, error: null };
+    if (isPending) return { pipeline: null, isPending: true, error: null };
+    if (!startDateQuery.data) {
+      return {
+        pipeline: null,
+        isPending: false,
+        error: new Error('Evolution preview requires relationship_start_date.'),
+      };
+    }
+    if (userIds.length === 0 || !archive.data) {
+      return {
+        pipeline: null,
+        isPending: false,
+        error: new Error('Evolution preview could not assemble the couple snapshot.'),
+      };
     }
 
     try {
       const started = performance.now();
-      const coupleId = `amore-couple:${userIds.join('-')}`;
+      const coupleId = stableEvolutionCoupleId(userIds);
       const snapshot = buildEvolutionSourceSnapshot({
         events: events.data ?? [],
         plans: plans.data ?? [],
         wishlist,
         pins: pins.data ?? [],
-        archive: archive.data!,
+        archive: archive.data,
         shopping: shopping.data ?? [],
       });
       const artifactResult = buildArtifactFromSnapshot({
@@ -303,7 +231,7 @@ export function useEvolutionCrystalPipeline(
         snapshot,
         engineConfig: {
           engineVersion: ENGINE_VERSION,
-          relationshipStartedAt: startDate,
+          relationshipStartedAt: startDateQuery.data,
           timeZone: COUPLE_TIME_ZONE,
           leapDayPolicy: 'feb-28',
         },
@@ -387,7 +315,7 @@ export function useEvolutionCrystalPipeline(
     queryError,
     reducedMotion,
     shopping.data,
-    startDate,
+    startDateQuery.data,
     userIds,
     wishlist,
   ]);
