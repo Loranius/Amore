@@ -5,7 +5,7 @@
 // плани йдуть далі та які ідеї ще не мають дати. Повні списки відкриваються
 // окремим bottom sheet і не перевантажують мобільний екран.
 // ============================================================
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   CalendarIcon,
@@ -23,12 +23,18 @@ import { usePlanMutations, usePlans } from './usePlans';
 import { isClosed, nextPlan, planDateLabel, sortPlans } from './planModel';
 import './plans.css';
 import './plansOverview.css';
+import './plansMotion.css';
 import type { PlanRow } from '@/types';
 
 const UPCOMING_PREVIEW = 3;
 const IDEAS_PREVIEW = 3;
+const NEW_ITEM_HIGHLIGHT_MS = 900;
 
 type OverviewSheet = 'upcoming' | 'ideas' | null;
+
+function enterStyle(order: number): CSSProperties {
+  return { '--plans-enter-order': order } as CSSProperties;
+}
 
 export function PlansPage() {
   const navigate = useNavigate();
@@ -43,6 +49,7 @@ export function PlansPage() {
 
   const [adding, setAdding] = useState(false);
   const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
+  const [highlightedPlanId, setHighlightedPlanId] = useState<number | null>(null);
   const [closedOpen, setClosedOpen] = useState(false);
   const [sheet, setSheet] = useState<OverviewSheet>(null);
 
@@ -62,6 +69,12 @@ export function PlansPage() {
   const visibleUpcoming = upcoming.slice(0, UPCOMING_PREVIEW);
   const visibleIdeas = ideas.slice(0, IDEAS_PREVIEW);
 
+  useEffect(() => {
+    if (highlightedPlanId === null) return;
+    const timer = window.setTimeout(() => setHighlightedPlanId(null), NEW_ITEM_HIGHLIGHT_MS);
+    return () => window.clearTimeout(timer);
+  }, [highlightedPlanId]);
+
   const openAdd = () => {
     addPlan.reset();
     setCreatedPlanId(null);
@@ -70,13 +83,14 @@ export function PlansPage() {
 
   const closeAdd = () => {
     if (addPlan.isPending) return;
+    if (createdPlanId !== null) setHighlightedPlanId(createdPlanId);
     setAdding(false);
     setCreatedPlanId(null);
   };
 
   return (
-    <section className="plans plans-overview">
-      <header className="plans-overview-hero">
+    <section className="plans plans-overview plans-overview--motion">
+      <header className="plans-overview-hero" style={enterStyle(0)}>
         <div className="plans-overview-hero-copy">
           <span className="plans-overview-eyebrow">Разом попереду</span>
           <h1>Плани</h1>
@@ -98,7 +112,7 @@ export function PlansPage() {
           </button>
         </div>
       ) : plans.length === 0 ? (
-        <section className="plans-overview-empty">
+        <section className="plans-overview-empty" style={enterStyle(1)}>
           <span aria-hidden="true">✦</span>
           <h2>Що зробимо разом?</h2>
           <p>Почніть із короткої ідеї. Дату, місце, бюджет і кроки можна додати пізніше.</p>
@@ -107,16 +121,24 @@ export function PlansPage() {
       ) : (
         <>
           {nearest && (
-            <section className="plans-overview-nearest" aria-labelledby="plans-nearest-title">
+            <section
+              className="plans-overview-nearest"
+              aria-labelledby="plans-nearest-title"
+              style={enterStyle(1)}
+            >
               <header className="plans-widget-heading plans-widget-heading--nearest">
                 <h2 id="plans-nearest-title">Найближче</h2>
               </header>
-              <NextPlanCard plan={nearest} />
+              <NextPlanCard plan={nearest} highlighted={nearest.id === highlightedPlanId} />
             </section>
           )}
 
           {upcoming.length > 0 && (
-            <section className="plans-overview-section" aria-labelledby="plans-upcoming-title">
+            <section
+              className="plans-overview-section"
+              aria-labelledby="plans-upcoming-title"
+              style={enterStyle(2)}
+            >
               <header className="plans-widget-heading">
                 <div>
                   <h2 id="plans-upcoming-title">Попереду</h2>
@@ -134,12 +156,23 @@ export function PlansPage() {
               </header>
 
               <div className="plans-upcoming-grid">
-                {visibleUpcoming.map((plan) => <UpcomingPlanTile key={plan.id} plan={plan} />)}
+                {visibleUpcoming.map((plan, index) => (
+                  <UpcomingPlanTile
+                    key={plan.id}
+                    plan={plan}
+                    order={index}
+                    highlighted={plan.id === highlightedPlanId}
+                  />
+                ))}
               </div>
             </section>
           )}
 
-          <section className="plans-overview-section plans-overview-ideas" aria-labelledby="plans-ideas-title">
+          <section
+            className="plans-overview-section plans-overview-ideas"
+            aria-labelledby="plans-ideas-title"
+            style={enterStyle(3)}
+          >
             <header className="plans-widget-heading plans-widget-heading--ideas">
               <div>
                 <h2 id="plans-ideas-title">Ідеї без дати</h2>
@@ -153,7 +186,14 @@ export function PlansPage() {
             </header>
 
             <div className="plans-idea-rail">
-              {visibleIdeas.map((plan) => <IdeaChip key={plan.id} plan={plan} />)}
+              {visibleIdeas.map((plan, index) => (
+                <IdeaChip
+                  key={plan.id}
+                  plan={plan}
+                  order={index}
+                  highlighted={plan.id === highlightedPlanId}
+                />
+              ))}
               <button type="button" className="plans-idea-chip plans-idea-chip--add" onClick={openAdd}>
                 <PlusIcon size={19} />
                 <span>Додати ідею</span>
@@ -166,6 +206,7 @@ export function PlansPage() {
               className="plans-overview-closed"
               open={closedOpen}
               onToggle={(event) => setClosedOpen(event.currentTarget.open)}
+              style={enterStyle(4)}
             >
               <summary>
                 <span>
@@ -173,7 +214,7 @@ export function PlansPage() {
                   <strong>Виконані, відкладені й скасовані</strong>
                 </span>
                 <span className="plans-overview-closed-tail">
-                  <b>{closed.length}</b>
+                  <b key={closed.length} className="plans-overview-count-pop">{closed.length}</b>
                   <ChevronDownIcon size={18} />
                 </span>
               </summary>
@@ -198,6 +239,7 @@ export function PlansPage() {
           onContinue={(id) => {
             setAdding(false);
             setCreatedPlanId(null);
+            setHighlightedPlanId(null);
             navigate(`/plans/${id}`);
           }}
         />
@@ -215,13 +257,24 @@ export function PlansPage() {
   );
 }
 
-function UpcomingPlanTile({ plan }: { plan: PlanRow }) {
+function UpcomingPlanTile({
+  plan,
+  order,
+  highlighted,
+}: {
+  plan: PlanRow;
+  order: number;
+  highlighted: boolean;
+}) {
   const category = PLAN_CATEGORIES[plan.category];
   const date = planDateLabel(plan);
-  const style = { '--plan-accent': category.color } as CSSProperties;
+  const style = {
+    '--plan-accent': category.color,
+    '--plans-item-order': order,
+  } as CSSProperties;
 
   return (
-    <article className="plans-upcoming-tile" style={style}>
+    <article className={`plans-upcoming-tile${highlighted ? ' is-new' : ''}`} style={style}>
       <Link className="plans-upcoming-tile-open" to={`/plans/${plan.id}`} aria-label={`Відкрити план «${plan.title}»`} />
       <span className={`plans-upcoming-media${plan.cover_url ? ' plans-upcoming-media--photo' : ''}`} aria-hidden={!plan.cover_url}>
         {plan.cover_url ? (
@@ -245,12 +298,27 @@ function UpcomingPlanTile({ plan }: { plan: PlanRow }) {
   );
 }
 
-function IdeaChip({ plan }: { plan: PlanRow }) {
+function IdeaChip({
+  plan,
+  order,
+  highlighted,
+}: {
+  plan: PlanRow;
+  order: number;
+  highlighted: boolean;
+}) {
   const category = PLAN_CATEGORIES[plan.category];
-  const style = { '--plan-accent': category.color } as CSSProperties;
+  const style = {
+    '--plan-accent': category.color,
+    '--plans-item-order': order,
+  } as CSSProperties;
 
   return (
-    <Link className="plans-idea-chip" style={style} to={`/plans/${plan.id}`}>
+    <Link
+      className={`plans-idea-chip${highlighted ? ' is-new' : ''}`}
+      style={style}
+      to={`/plans/${plan.id}`}
+    >
       <span aria-hidden="true"><category.Icon size={20} /></span>
       <strong>{plan.title}</strong>
     </Link>
