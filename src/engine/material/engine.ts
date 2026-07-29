@@ -1,4 +1,3 @@
-import { stableHash32 } from '../evolution';
 import { CRYSTAL_MATERIAL_QUALITY_PRESETS } from './config';
 import {
   clamp01,
@@ -29,10 +28,6 @@ function validateInput(input: BuildCrystalMaterialInput): void {
   }
 }
 
-function seededUnit(seed: number, salt: string): number {
-  return stableHash32(`${seed}\u001f${salt}`) / 0xffffffff;
-}
-
 function palette(input: BuildCrystalMaterialInput): CrystalMaterialPalette {
   const pressures = input.species.pressures;
   const state = input.species.state;
@@ -47,9 +42,12 @@ function palette(input: BuildCrystalMaterialInput): CrystalMaterialPalette {
   return { primary, secondary, highlight, core };
 }
 
+/**
+ * Signature describes optical identity only. bodyId is intentionally excluded,
+ * so bodies with the same composition role can share one BatchedMesh material.
+ */
 function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string {
   return [
-    body.bodyId,
     rgbSignature(body.baseColor),
     rgbSignature(body.emissiveColor),
     body.roughness,
@@ -83,12 +81,18 @@ function bodyColor(
   base: CrystalMaterialPalette,
   role: string,
   emphasized: boolean,
-  seed: number,
 ): CrystalRgb {
-  const jitter = (seededUnit(seed, 'material:hue') - 0.5) * 0.12;
-  const roleMix = role === 'focal' ? 0.08 : role === 'support' ? 0.18 : role === 'micro' ? 0.42 : 0.28;
+  const roleMix = role === 'focal'
+    ? 0.06
+    : role === 'support'
+      ? 0.18
+      : role === 'family'
+        ? 0.25
+        : role === 'companion'
+          ? 0.32
+          : 0.44;
   const target = emphasized ? rgb(1, 0.72, 0.28) : base.secondary;
-  return scaleRgb(mixRgb(base.primary, target, clamp01(roleMix + jitter)), role === 'micro' ? 0.84 : 1);
+  return scaleRgb(mixRgb(base.primary, target, roleMix), role === 'micro' ? 0.84 : 1);
 }
 
 function shaderRecipe(
@@ -143,8 +147,7 @@ function buildBodyMaterial(
   const role = compositionBody.role;
   const micro = role === 'micro';
   const focal = role === 'focal';
-  const seed = instruction?.seed ?? stableHash32(bodyId);
-  const baseColor = bodyColor(materialPalette, role, emphasized, seed);
+  const baseColor = bodyColor(materialPalette, role, emphasized);
   const emissiveColor = emphasized ? rgb(1, 0.66, 0.22) : materialPalette.core;
 
   const rawRoughness = (0.3 - pressures.refinement * 0.2 + state.fracture * 0.08)
