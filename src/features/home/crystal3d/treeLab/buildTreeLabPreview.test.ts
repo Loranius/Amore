@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { createThreeOrganicSweepGeometry } from '@/engine/renderer/three';
 import { TREE_LAB_MOBILE_BUDGET } from './acceptance';
-import { buildTreeLabPreview } from './buildTreeLabPreview';
+import {
+  buildTreeLabPreview,
+  buildTreeLabPreviewFromArtifact,
+} from './buildTreeLabPreview';
+import {
+  buildTreeSpeciesPreviewArtifact,
+  TREE_SPECIES_PREVIEW_AS_OF,
+} from './treeSpeciesFixture';
 
 function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'buildMs'> {
   const { buildMs: _buildMs, ...stable } = value;
@@ -15,6 +22,18 @@ describe('Tree Lab preview pipeline', () => {
 
     expect(withoutBuildTime(second)).toEqual(withoutBuildTime(first));
     expect(second.seed).toBe(first.seed);
+  });
+
+  it('preserves the fixed fixture as a wrapper around the generic artifact path', () => {
+    const fixture = buildTreeLabPreview('medium');
+    const generic = buildTreeLabPreviewFromArtifact({
+      artifact: buildTreeSpeciesPreviewArtifact(),
+      asOf: TREE_SPECIES_PREVIEW_AS_OF,
+      lod: 'medium',
+      rulesVersion: 'tree-species-preview-v1.0.0',
+    });
+
+    expect(withoutBuildTime(generic)).toEqual(withoutBuildTime(fixture));
   });
 
   it('uses Tree Species output instead of a free-standing random attractor field', () => {
