@@ -31,7 +31,7 @@ interface TreeLabRenderedSceneProps {
   build: TreeLabPreviewBuild;
   source: RenderedTreeLabSource;
   adapterDiagnosticCount: number;
-  errorMessage?: string;
+  errorMessage?: string | undefined;
 }
 
 function TreeLabRenderedScene({
@@ -146,7 +146,7 @@ function TreeLabRenderedScene({
 interface TreeLabFixtureSceneProps {
   lod: TreeLabPreviewBuild['lod'];
   source?: 'fixture' | 'fixture-fallback';
-  errorMessage?: string;
+  errorMessage?: string | undefined;
 }
 
 function TreeLabFixtureScene({
