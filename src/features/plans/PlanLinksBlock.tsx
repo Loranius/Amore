@@ -286,7 +286,7 @@ function PlanLinksContent({ plan, embedded }: { plan: PlanRow; embedded: boolean
 }
 
 function LinkPreviewMedia({ imageUrl, Icon }: {
-  imageUrl?: string | null;
+  imageUrl: string | null | undefined;
   Icon: typeof MapPinIcon;
 }) {
   return (
