@@ -31,7 +31,9 @@ export interface GrowthSiteCandidate {
 }
 
 function radiusAt(host: GrowthBody, hostT: number): number {
-  return host.skeletonRadius * (1 - clamp(hostT, 0, 1) * 0.62);
+  return host.skeletonRadius
+    * host.surfaceRadiusScale
+    * (1 - clamp(hostT, 0, 1) * 0.62);
 }
 
 export function bodyEnd(body: Pick<GrowthBody, 'anchor' | 'direction' | 'skeletonLength'>): GrowthVec3 {
