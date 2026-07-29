@@ -27,6 +27,9 @@ test('Календар: лише наші події та дні народже�
   await login(page);
   await page.goto('./#/calendar', { waitUntil: 'networkidle' });
 
+  const viewPicker = page.getByRole('group', { name: 'Вигляд календаря' });
+  await viewPicker.getByRole('button', { name: /Список/ }).click();
+
   await expect(page.getByRole('button', { name: /Наші свята/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Дні народження/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Свята', exact: true })).toHaveCount(0);
