@@ -1,23 +1,29 @@
 import type { TreeLeafOrientationConfig } from './types';
 
 export const DEFAULT_TREE_LEAF_ORIENTATION_CONFIG: TreeLeafOrientationConfig = {
-  rulesVersion: 'tree-leaf-orientation-v1.0.0',
+  rulesVersion: 'tree-leaf-orientation-v1.1.0',
   orientationByLayer: {
     inner: {
-      maximumTiltRad: 0.08,
-      maximumFanRad: 0.1,
-      maximumTwistRad: 0.12,
+      maximumTiltRad: 0.12,
+      maximumFanRad: 0.14,
+      maximumTwistRad: 0.16,
     },
     middle: {
-      maximumTiltRad: 0.11,
-      maximumFanRad: 0.15,
-      maximumTwistRad: 0.17,
+      maximumTiltRad: 0.15,
+      maximumFanRad: 0.2,
+      maximumTwistRad: 0.22,
     },
     outer: {
-      maximumTiltRad: 0.15,
-      maximumFanRad: 0.21,
-      maximumTwistRad: 0.23,
+      maximumTiltRad: 0.18,
+      maximumFanRad: 0.25,
+      maximumTwistRad: 0.28,
     },
   },
+  frontFacingStrengthByLayer: {
+    inner: 0.74,
+    middle: 0.64,
+    outer: 0.52,
+  },
+  minimumFrontFacingDot: 0.28,
   quantizationBands: 17,
 };
