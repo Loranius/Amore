@@ -3,11 +3,16 @@ import {
   clamp,
   clamp01,
   directionFromAzimuthElevation,
+  dot,
   round6,
   roundVec,
   seededUnit,
 } from './math';
-import { attachmentFromSite, sampleGrowthSite } from './surface';
+import {
+  buildGrowthSurfaceAtlasFromMass,
+  type GrowthSurfaceRegion,
+} from './surfaceAtlas';
+import { attachmentFromSite, sampleGrowthRegionSite } from './surface';
 import type {
   BuildGrowthStateInput,
   GrowthBody,
@@ -19,6 +24,10 @@ import type {
   UniversalGrowthBlueprint,
   UniversalGrowthInstruction,
 } from './types';
+
+function compareIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
 
 function validateConfig(config: GrowthEngineConfig): void {
   if (!config.rulesVersion.trim()) throw new Error('Growth Engine requires a non-empty rulesVersion.');
@@ -107,68 +116,113 @@ function rootBody(blueprint: UniversalGrowthBlueprint): GrowthBody {
   };
 }
 
-function hostWeight(host: GrowthBody, instruction: UniversalGrowthInstruction): number {
+function regionHostAffinity(
+  host: GrowthBody,
+  instruction: UniversalGrowthInstruction,
+): number {
   const root = host.generation === 0;
   const sameColony = instruction.colonyId !== null && host.colonyId === instruction.colonyId;
-  let weight = 1 / (1 + host.generation * 0.45);
 
-  if (instruction.hostPreference === 'root') weight *= root ? 4.4 : 0.16;
-  else if (instruction.hostPreference === 'same-colony') weight *= sameColony ? 4.1 : root ? 1.25 : 0.42;
-  else if (instruction.hostPreference === 'surface') weight *= root ? 0.72 : sameColony ? 2.6 : 1.55;
-  else weight *= sameColony ? 2.3 : root ? 1.35 : 1;
-
-  if (host.tier === 'king') weight *= 1.18;
-  if (host.tier === 'micro') weight *= 0.42;
-  return Math.max(0.001, weight);
+  if (instruction.hostPreference === 'root') return root ? 1 : 0.08;
+  if (instruction.hostPreference === 'same-colony') {
+    if (sameColony) return 1;
+    return root ? 0.6 : 0.22;
+  }
+  if (instruction.hostPreference === 'surface') {
+    if (sameColony) return 0.96;
+    return root ? 0.42 : 0.88;
+  }
+  if (sameColony) return 0.94;
+  return root ? 0.72 : 0.68;
 }
 
-function weightedHost(
-  hosts: readonly GrowthBody[],
+function regionPriority(
+  region: GrowthSurfaceRegion,
+  host: GrowthBody,
   instruction: UniversalGrowthInstruction,
-  candidateIndex: number,
-): GrowthBody {
-  const root = hosts[0]!;
-  if (candidateIndex === 0) return root;
-
-  const sameColony = hosts.filter(
-    (host) => instruction.colonyId !== null && host.colonyId === instruction.colonyId,
+): number {
+  const preferred = directionFromAzimuthElevation(
+    instruction.preferredAzimuthRad,
+    instruction.preferredElevation,
   );
-  if (candidateIndex === 1 && sameColony.length > 0) return sameColony[sameColony.length - 1]!;
+  const alignment = clamp01((dot(region.surfaceNormal, preferred) + 1) * 0.5);
+  const upwardExposure = clamp01((region.surfaceNormal.y + 1) * 0.5);
+  const deterministicVariation = seededUnit(
+    instruction.seed,
+    `surface-region:${region.id}`,
+  );
 
-  const weights = hosts.map((host) => hostWeight(host, instruction));
-  const total = weights.reduce((sum, weight) => sum + weight, 0);
-  let cursor = seededUnit(instruction.seed, `host:${candidateIndex}`) * total;
-  for (let index = 0; index < hosts.length; index += 1) {
-    cursor -= weights[index] ?? 0;
-    if (cursor <= 0) return hosts[index] ?? root;
-  }
-  return hosts[hosts.length - 1] ?? root;
+  return round6(
+    region.growthPotential * 2.25
+      + regionHostAffinity(host, instruction) * 2.1
+      + alignment * 0.7
+      + (1 - region.surfaceStress) * 0.32
+      + (1 - region.localDensity) * 0.24
+      + upwardExposure * 0.12
+      + deterministicVariation * 0.1,
+  );
+}
+
+interface RankedSurfaceRegion {
+  readonly region: GrowthSurfaceRegion;
+  readonly host: GrowthBody;
+  readonly priority: number;
 }
 
 function chooseCandidate(
+  species: string,
   instruction: UniversalGrowthInstruction,
   bodies: readonly GrowthBody[],
   occupiedSites: readonly GrowthSurfaceOccupancy[],
   config: GrowthEngineConfig,
 ): { evaluation: CandidateEvaluation; usedFallback: boolean; rejectedCount: number } {
-  const eligibleHosts = bodies.filter((body) => body.generation < Math.max(1, instruction.maxGeneration));
-  const hosts = eligibleHosts.length > 0 ? eligibleHosts : [bodies[0]!];
-  const evaluations: CandidateEvaluation[] = [];
+  const bodyById = new Map(bodies.map((body) => [body.id, body] as const));
+  const atlas = buildGrowthSurfaceAtlasFromMass({ species, bodies, occupiedSites });
+  const maximumGeneration = Math.max(1, instruction.maxGeneration);
+  const eligible = atlas.regions.filter((region) => {
+    const host = bodyById.get(region.sourceBodyId);
+    return host !== undefined && host.generation < maximumGeneration;
+  });
+  const active = eligible.filter((region) => region.growthPotential > 0);
+  const exposed = eligible.filter((region) => region.exposed);
+  const pool = active.length > 0 ? active : exposed.length > 0 ? exposed : eligible;
+  const ranked: RankedSurfaceRegion[] = pool.map((region) => {
+    const host = bodyById.get(region.sourceBodyId);
+    if (!host) throw new Error(`Surface Atlas references missing body "${region.sourceBodyId}".`);
+    return {
+      region,
+      host,
+      priority: regionPriority(region, host, instruction),
+    };
+  });
 
-  for (let candidateIndex = 0; candidateIndex < config.candidateCount; candidateIndex += 1) {
-    const host = weightedHost(hosts, instruction, candidateIndex);
-    const site = sampleGrowthSite(host, instruction, candidateIndex);
-    evaluations.push(evaluateGrowthSite(site, instruction, bodies, occupiedSites, config));
-  }
+  ranked.sort((left, right) => (
+    right.priority - left.priority
+    || compareIds(left.region.id, right.region.id)
+  ));
 
-  evaluations.sort((left, right) => right.score - left.score || left.site.candidateIndex - right.site.candidateIndex);
+  const evaluations = ranked
+    .slice(0, config.candidateCount)
+    .map((entry, candidateIndex) => evaluateGrowthSite(
+      sampleGrowthRegionSite(entry.host, entry.region, instruction, candidateIndex),
+      instruction,
+      bodies,
+      occupiedSites,
+      config,
+    ));
+
+  evaluations.sort((left, right) => (
+    right.score - left.score
+    || compareIds(left.site.surfaceRegionId ?? '', right.site.surfaceRegionId ?? '')
+    || left.site.candidateIndex - right.site.candidateIndex
+  ));
   const accepted = evaluations.find((evaluation) => !evaluation.rejected);
   const selected = accepted ?? evaluations[0];
-  if (!selected) throw new Error(`Growth Engine produced no site candidates for "${instruction.id}".`);
+  if (!selected) throw new Error(`Growth Engine produced no Surface Atlas candidates for "${instruction.id}".`);
 
   return {
     evaluation: selected,
-    usedFallback: accepted === undefined,
+    usedFallback: active.length === 0 || accepted === undefined,
     rejectedCount: evaluations.filter((evaluation) => evaluation.rejected).length,
   };
 }
@@ -186,6 +240,7 @@ function depositInstruction(
   );
 
   const { evaluation, usedFallback, rejectedCount } = chooseCandidate(
+    blueprint.species,
     instruction,
     bodies,
     occupiedSites,
@@ -243,6 +298,9 @@ function depositInstruction(
   occupiedSites.push({
     siteKey: evaluation.site.siteKey,
     bodyId: body.id,
+    ...(evaluation.site.surfaceRegionId === null
+      ? {}
+      : { surfaceRegionId: evaluation.site.surfaceRegionId }),
     hostBodyId: host.id,
     hostT: evaluation.site.hostT,
     hostAngleRad: evaluation.site.hostAngleRad,
@@ -264,7 +322,7 @@ function buildColonies(
   return blueprint.colonies.map((colony) => {
     const members = bodies.filter((body) => body.colonyId === colony.id);
     const rootBody = [...members].sort(
-      (left, right) => left.generation - right.generation || left.sequence - right.sequence || left.id.localeCompare(right.id),
+      (left, right) => left.generation - right.generation || left.sequence - right.sequence || compareIds(left.id, right.id),
     )[0];
     return {
       id: colony.id,
@@ -291,7 +349,7 @@ export function buildGrowthState(input: BuildGrowthStateInput): GrowthState {
 
   const blueprint = input.blueprint;
   const ordered = [...blueprint.instructions].sort(
-    (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
+    (left, right) => left.sequence - right.sequence || compareIds(left.id, right.id),
   );
   const capacity = Math.max(0, input.config.maxBodies - 1);
   const accepted = ordered.slice(0, capacity);
