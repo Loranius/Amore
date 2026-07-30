@@ -52,6 +52,12 @@ export interface GrowthSurfaceAtlas {
   readonly regions: readonly GrowthSurfaceRegion[];
 }
 
+export interface BuildGrowthSurfaceAtlasFromMassInput {
+  readonly species: string;
+  readonly bodies: readonly GrowthBody[];
+  readonly occupiedSites: readonly GrowthSurfaceOccupancy[];
+}
+
 interface AxisProjection {
   readonly t: number;
   readonly rawT: number;
@@ -118,6 +124,7 @@ function densityAt(
 }
 
 function isOccupied(
+  regionId: string,
   bodyId: string,
   hostT: number,
   azimuthRad: number,
@@ -125,9 +132,12 @@ function isOccupied(
 ): boolean {
   const angularWindow = (TAU / SURFACE_SECTOR_COUNT) * 0.72;
   return occupiedSites.some((site) => (
-    site.hostBodyId === bodyId
-    && Math.abs(site.hostT - hostT) <= 0.11
-    && angularDistance(site.hostAngleRad, azimuthRad) <= angularWindow
+    site.surfaceRegionId === regionId
+    || (
+      site.hostBodyId === bodyId
+      && Math.abs(site.hostT - hostT) <= 0.11
+      && angularDistance(site.hostAngleRad, azimuthRad) <= angularWindow
+    )
   ));
 }
 
@@ -146,6 +156,7 @@ function buildBodyRegions(
     const center = add(body.anchor, scale(body.direction, body.skeletonLength * hostT));
 
     for (let sectorIndex = 0; sectorIndex < SURFACE_SECTOR_COUNT; sectorIndex += 1) {
+      const regionId = `${body.id}:region:${bandIndex}:${sectorIndex}`;
       const azimuthRad = round6(
         phase
         + sectorIndex * (TAU / SURFACE_SECTOR_COUNT)
@@ -161,7 +172,7 @@ function buildBodyRegions(
         scale(body.direction, 0.08),
       )));
       const exposed = !isCoveredByAnotherBody(body.id, surfacePosition, bodies);
-      const occupied = isOccupied(body.id, hostT, azimuthRad, occupiedSites);
+      const occupied = isOccupied(regionId, body.id, hostT, azimuthRad, occupiedSites);
       const localDensity = densityAt(body.id, surfacePosition, sourceRadius, bodies);
       const crowding = clamp01(body.crowding / 4);
       const surfaceStress = round6(clamp01(
@@ -181,7 +192,7 @@ function buildBodyRegions(
         ));
 
       regions.push({
-        id: `${body.id}:region:${bandIndex}:${sectorIndex}`,
+        id: regionId,
         sourceBodyId: body.id,
         bandIndex,
         sectorIndex,
@@ -203,30 +214,44 @@ function buildBodyRegions(
 }
 
 /**
- * Builds a deterministic species-neutral atlas over the aggregate analytical
- * surface. Region identity and coordinates depend only on the source body;
- * density, stress and exposure are current-field values derived from the full
- * mineral mass.
+ * Builds the atlas directly from the current aggregate analytical mass.
+ * This keeps candidate selection independent from a completed GrowthState.
  */
-export function buildGrowthSurfaceAtlas(state: GrowthState): GrowthSurfaceAtlas {
-  const bodies = [...state.bodies].sort(
+export function buildGrowthSurfaceAtlasFromMass(
+  input: BuildGrowthSurfaceAtlasFromMassInput,
+): GrowthSurfaceAtlas {
+  const bodies = [...input.bodies].sort(
     (left, right) => left.sequence - right.sequence || compareIds(left.id, right.id),
   );
   const regions = bodies.flatMap((body) => buildBodyRegions(
     body,
     bodies,
-    state.surfaceMap.occupiedSites,
+    input.occupiedSites,
   ));
   const exposedRegionCount = regions.filter((region) => region.exposed).length;
   const activeRegionCount = regions.filter((region) => region.growthPotential > 0).length;
 
   return {
     surfaceAtlasVersion: 1,
-    species: state.species,
+    species: input.species,
     bodyCount: bodies.length,
     regionCount: regions.length,
     exposedRegionCount,
     activeRegionCount,
     regions,
   };
+}
+
+/**
+ * Builds a deterministic species-neutral atlas over the aggregate analytical
+ * surface. Region identity and coordinates depend only on the source body;
+ * density, stress and exposure are current-field values derived from the full
+ * mineral mass.
+ */
+export function buildGrowthSurfaceAtlas(state: GrowthState): GrowthSurfaceAtlas {
+  return buildGrowthSurfaceAtlasFromMass({
+    species: state.species,
+    bodies: state.bodies,
+    occupiedSites: state.surfaceMap.occupiedSites,
+  });
 }
