@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TreeBarkSurfaceState } from '@/engine/barkSurface';
 import type { TreeCanopyDepthState } from '@/engine/canopyDepth';
+import type { TreeCanopyLightState } from '@/engine/canopyLight';
 import type { TreeGroundDetailState } from '@/engine/groundDetail';
 import type { TreeLeafGeometryState } from '@/engine/leafGeometry';
 import type { OrganicSweepMesh } from '@/engine/labs/organic';
@@ -30,6 +31,7 @@ interface TreeLabObjectProps {
   soilSurface: TreeSoilSurfaceState;
   barkSurface: TreeBarkSurfaceState;
   canopyDepth: TreeCanopyDepthState;
+  canopyLight: TreeCanopyLightState;
   groundDetails: TreeGroundDetailState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
@@ -43,6 +45,7 @@ export function TreeLabObject({
   soilSurface,
   barkSurface,
   canopyDepth,
+  canopyLight,
   groundDetails,
   leaves,
   materials,
@@ -64,8 +67,13 @@ export function TreeLabObject({
     [materials, barkSurface],
   );
   const leafMesh = useMemo(
-    () => createThreeTreeLeafInstancedMesh(leaves, materialPair.foliage, canopyDepth),
-    [leaves, materialPair, canopyDepth],
+    () => createThreeTreeLeafInstancedMesh(
+      leaves,
+      materialPair.foliage,
+      canopyDepth,
+      canopyLight,
+    ),
+    [leaves, materialPair, canopyDepth, canopyLight],
   );
   const groundDetailMesh = useMemo(
     () => createThreeTreeGroundDetailInstancedMesh(groundDetails),
