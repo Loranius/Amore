@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
@@ -17,7 +17,7 @@ function numeric(value: string | null, name: string): number {
   return parsed;
 }
 
-async function expectAcceptedContract(preview: ReturnType<Page['locator']>) {
+async function expectAcceptedContract(preview: Locator) {
   await expect(preview).toBeVisible({ timeout: 25_000 });
   await expect(preview).toHaveAttribute('data-tree-production-acceptance', 'true');
   await expect(preview).toHaveAttribute(
