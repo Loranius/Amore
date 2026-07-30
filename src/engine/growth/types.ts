@@ -6,6 +6,7 @@ export interface GrowthVec3 {
 
 export type GrowthTier = 'king' | 'support' | 'family' | 'companion' | 'micro';
 export type GrowthHostPreference = 'root' | 'same-colony' | 'balanced' | 'surface';
+export type GrowthCenterRole = 'dominant' | 'satellite' | 'micro';
 
 export type GrowthAttributeValue = string | number | boolean | null;
 export type GrowthAttributes = Readonly<Record<string, GrowthAttributeValue>>;
@@ -45,10 +46,27 @@ export interface UniversalGrowthInstruction {
   directionInheritance: number;
   minUpwardComponent: number;
   attributes: GrowthAttributes;
+  /** Stable local geological center. Optional for non-crystal species and v1 snapshots. */
+  growthCenterId?: string | null;
+  /** Member role inside a local geological center. */
+  growthCenterRole?: GrowthCenterRole | null;
 }
 
 export interface UniversalGrowthColony {
   id: string;
+  seed: number;
+  epochIndex: number;
+  kind: string;
+  preferredAzimuthRad: number;
+  preferredElevation: number;
+  weight: number;
+  instructionIds: string[];
+}
+
+export interface UniversalGrowthCenter {
+  id: string;
+  sourceInstructionId: string;
+  sourceId: string | null;
   seed: number;
   epochIndex: number;
   kind: string;
@@ -68,6 +86,8 @@ export interface UniversalGrowthBlueprint {
   root: UniversalGrowthInstruction;
   instructions: UniversalGrowthInstruction[];
   colonies: UniversalGrowthColony[];
+  /** Optional for non-crystal adapters and backward-compatible imported blueprints. */
+  growthCenters?: UniversalGrowthCenter[];
 }
 
 export interface GrowthEngineConfig {
@@ -120,6 +140,10 @@ export interface GrowthBody {
   growthEnergy: number;
   competition: number;
   crowding: number;
+  /** Optional for backward-compatible reads of Growth State v1 snapshots. */
+  growthCenterId?: string | null;
+  /** Optional for backward-compatible reads of Growth State v1 snapshots. */
+  growthCenterRole?: GrowthCenterRole | null;
 }
 
 export interface GrowthSurfaceOccupancy {
@@ -148,6 +172,20 @@ export interface GrowthColonyState {
   maxGeneration: number;
 }
 
+export interface GrowthCenterState {
+  id: string;
+  sourceInstructionId: string;
+  sourceId: string | null;
+  kind: string;
+  epochIndex: number;
+  seed: number;
+  bodyIds: string[];
+  dominantBodyId: string | null;
+  surfaceRegionId: string | null;
+  totalWeight: number;
+  maxGeneration: number;
+}
+
 export interface GrowthDiagnostics {
   truncatedInstructionIds: string[];
   fallbackInstructionIds: string[];
@@ -168,6 +206,8 @@ export interface GrowthState {
   bodies: GrowthBody[];
   surfaceMap: GrowthSurfaceMap;
   colonies: GrowthColonyState[];
+  /** Optional for backward-compatible reads of Growth State v1 snapshots. */
+  growthCenters?: GrowthCenterState[];
   diagnostics: GrowthDiagnostics;
 }
 
