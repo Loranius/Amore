@@ -86,6 +86,7 @@ function TreeLabRenderedScene({
     `${Math.round(build.groundContact.diagnostics.visiblePathFraction * 100)}% visible`,
     `${formatCount(build.terrain.diagnostics.triangleCount)} terrain △`,
     `${build.soilSurface.diagnostics.uniqueTintCount} soil tints`,
+    `${build.barkSurface.diagnostics.uniqueTintCount} bark tints`,
     `${build.groundDetails.instances.length} ground details`,
     `${formatCount(build.rootGeometry.diagnostics.triangleCount)} static △`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
@@ -198,6 +199,34 @@ function TreeLabRenderedScene({
       data-tree-lab-soil-material-count={build.soilSurface.diagnostics.materialCount}
       data-tree-lab-soil-extra-draw-calls={build.soilSurface.diagnostics.estimatedAdditionalDrawCalls}
       data-tree-lab-soil-extra-materials={build.soilSurface.diagnostics.estimatedAdditionalMaterials}
+      data-tree-lab-bark-surface="true"
+      data-tree-lab-bark-surface-id={build.barkSurface.descriptor.id}
+      data-tree-lab-bark-tint-attribute={build.barkSurface.descriptor.tintAttributeId}
+      data-tree-lab-bark-roughness-attribute={build.barkSurface.descriptor.roughnessAttributeId}
+      data-tree-lab-bark-signature={build.barkSurface.signature}
+      data-tree-lab-bark-branch-vertices={build.barkSurface.diagnostics.branchVertexCount}
+      data-tree-lab-bark-static-vertices={build.barkSurface.diagnostics.staticVertexCount}
+      data-tree-lab-bark-static-bark-vertices={build.barkSurface.diagnostics.staticBarkVertexCount}
+      data-tree-lab-bark-terrain-vertices={build.barkSurface.diagnostics.preservedTerrainVertexCount}
+      data-tree-lab-bark-tinted-branch-vertices={build.barkSurface.diagnostics.tintedBranchVertexCount}
+      data-tree-lab-bark-tinted-static-vertices={build.barkSurface.diagnostics.tintedStaticBarkVertexCount}
+      data-tree-lab-bark-ranges={build.barkSurface.diagnostics.branchRangeCount}
+      data-tree-lab-bark-trunk-vertices={build.barkSurface.diagnostics.trunkVertexCount}
+      data-tree-lab-bark-generated-vertices={build.barkSurface.diagnostics.generatedBranchVertexCount}
+      data-tree-lab-bark-max-generation={build.barkSurface.diagnostics.maximumGeneration}
+      data-tree-lab-bark-unique-tints={build.barkSurface.diagnostics.uniqueTintCount}
+      data-tree-lab-bark-tint-budget={build.barkSurface.diagnostics.tintBudget}
+      data-tree-lab-bark-tint-budget-exceeded={String(build.barkSurface.diagnostics.tintBudgetExceeded)}
+      data-tree-lab-bark-quantization={build.barkSurface.diagnostics.quantizationSteps}
+      data-tree-lab-bark-tone-bands={build.barkSurface.diagnostics.toneBands}
+      data-tree-lab-bark-roughness-bands={build.barkSurface.diagnostics.roughnessBands}
+      data-tree-lab-bark-roughness-min={build.barkSurface.diagnostics.minimumRoughnessCharacter}
+      data-tree-lab-bark-roughness-max={build.barkSurface.diagnostics.maximumRoughnessCharacter}
+      data-tree-lab-bark-geometry-preserved={String(build.barkSurface.diagnostics.geometryPreserved)}
+      data-tree-lab-bark-ranges-preserved={String(build.barkSurface.diagnostics.branchRangesPreserved)}
+      data-tree-lab-bark-soil-preserved={String(build.barkSurface.diagnostics.soilTerrainTintPreserved)}
+      data-tree-lab-bark-extra-draw-calls={build.barkSurface.diagnostics.estimatedAdditionalDrawCalls}
+      data-tree-lab-bark-extra-materials={build.barkSurface.diagnostics.estimatedAdditionalMaterials}
       data-tree-lab-ground-detail="true"
       data-tree-lab-ground-detail-id={build.groundDetails.descriptor.id}
       data-tree-lab-ground-detail-template-id={build.groundDetails.descriptor.templateId}
@@ -285,6 +314,7 @@ function TreeLabRenderedScene({
           mesh={build.mesh}
           rootGeometry={build.rootGeometry}
           soilSurface={build.soilSurface}
+          barkSurface={build.barkSurface}
           groundDetails={build.groundDetails}
           leaves={build.leaves}
           materials={build.materials}
