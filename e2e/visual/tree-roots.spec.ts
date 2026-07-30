@@ -17,10 +17,10 @@ function numeric(value: string | null, name: string): number {
   return parsed;
 }
 
-test.describe('Tree Root Architecture Pixel 8 Pro acceptance', () => {
+test.describe('Tree Root Geometry Pixel 8 Pro acceptance', () => {
   test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
 
-  test('publishes a bounded append-only root prefix without extra draw calls', async ({ page }) => {
+  test('renders a bounded anchored root sweep outside Tree Life deformation', async ({ page }) => {
     await login(page, '?engine=tree-lab&treeSource=fixture&treeLod=medium#/login');
 
     const preview = page.locator('[data-tree-lab-preview="ready"]');
@@ -41,6 +41,30 @@ test.describe('Tree Root Architecture Pixel 8 Pro acceptance', () => {
       await preview.getAttribute('data-tree-lab-root-sample-budget'),
       'rootSampleBudget',
     );
+    const renderedRoots = numeric(
+      await preview.getAttribute('data-tree-lab-root-geometry-roots'),
+      'renderedRoots',
+    );
+    const rootVertices = numeric(
+      await preview.getAttribute('data-tree-lab-root-geometry-vertices'),
+      'rootVertices',
+    );
+    const rootTriangles = numeric(
+      await preview.getAttribute('data-tree-lab-root-geometry-triangles'),
+      'rootTriangles',
+    );
+    const rootDrawCalls = numeric(
+      await preview.getAttribute('data-tree-lab-root-geometry-draw-calls'),
+      'rootDrawCalls',
+    );
+    const vertexBudget = numeric(
+      await preview.getAttribute('data-tree-lab-root-geometry-vertex-budget'),
+      'rootVertexBudget',
+    );
+    const triangleBudget = numeric(
+      await preview.getAttribute('data-tree-lab-root-geometry-triangle-budget'),
+      'rootTriangleBudget',
+    );
     const drawCalls = numeric(await preview.getAttribute('data-tree-lab-draw-calls'), 'drawCalls');
 
     expect(candidates).toBeGreaterThanOrEqual(roots);
@@ -52,6 +76,20 @@ test.describe('Tree Root Architecture Pixel 8 Pro acceptance', () => {
     expect(truncated).toBeGreaterThanOrEqual(0);
     expect(rootBudget).toBe(9);
     expect(sampleBudget).toBe(63);
-    expect(drawCalls).toBeLessThanOrEqual(2);
+    expect(renderedRoots).toBe(roots);
+    expect(rootVertices).toBeGreaterThan(0);
+    expect(rootVertices).toBeLessThanOrEqual(vertexBudget);
+    expect(rootTriangles).toBeGreaterThan(0);
+    expect(rootTriangles).toBeLessThanOrEqual(triangleBudget);
+    expect(rootDrawCalls).toBe(1);
+    await expect(preview).toHaveAttribute('data-tree-lab-root-geometry-anchored', 'true');
+    await expect(preview).toHaveAttribute('data-tree-lab-root-geometry-vertex-budget-exceeded', 'false');
+    await expect(preview).toHaveAttribute('data-tree-lab-root-geometry-triangle-budget-exceeded', 'false');
+    expect(drawCalls).toBeLessThanOrEqual(3);
+
+    await page.screenshot({
+      path: 'test-results/tree-root-geometry-fixture-pixel-8-pro.png',
+      fullPage: true,
+    });
   });
 });
