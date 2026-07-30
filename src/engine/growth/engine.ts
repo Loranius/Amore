@@ -3,6 +3,7 @@ import {
   clamp,
   clamp01,
   directionFromAzimuthElevation,
+  distance,
   dot,
   round6,
   roundVec,
@@ -20,6 +21,7 @@ import {
 import type {
   BuildGrowthStateInput,
   GrowthBody,
+  GrowthCenterState,
   GrowthColonyState,
   GrowthDiagnostics,
   GrowthEngineConfig,
@@ -56,10 +58,12 @@ function validateBlueprint(blueprint: UniversalGrowthBlueprint): void {
   }
 
   const ids = new Set<string>();
+  const instructionById = new Map<string, UniversalGrowthInstruction>();
   for (const instruction of [blueprint.root, ...blueprint.instructions]) {
     if (!instruction.id.trim()) throw new Error('Growth instruction requires a non-empty id.');
     if (ids.has(instruction.id)) throw new Error(`Duplicate growth instruction id: "${instruction.id}".`);
     ids.add(instruction.id);
+    instructionById.set(instruction.id, instruction);
     if (!Number.isFinite(instruction.axialScale) || instruction.axialScale <= 0) {
       throw new Error(`Growth instruction "${instruction.id}" requires positive axialScale.`);
     }
@@ -72,6 +76,39 @@ function validateBlueprint(blueprint: UniversalGrowthBlueprint): void {
       || instruction.surfaceRadiusScale > 1
     ) {
       throw new Error(`Growth instruction "${instruction.id}" requires surfaceRadiusScale in (0, 1].`);
+    }
+  }
+
+  if (blueprint.growthCenters === undefined) return;
+  const centerIds = new Set<string>();
+  for (const center of blueprint.growthCenters) {
+    if (!center.id.trim()) throw new Error('Growth Center requires a non-empty id.');
+    if (centerIds.has(center.id)) throw new Error(`Duplicate Growth Center id: "${center.id}".`);
+    centerIds.add(center.id);
+    const source = instructionById.get(center.sourceInstructionId);
+    if (!source) {
+      throw new Error(`Growth Center "${center.id}" references missing source instruction "${center.sourceInstructionId}".`);
+    }
+    const memberIds = new Set(center.instructionIds);
+    if (memberIds.size !== center.instructionIds.length) {
+      throw new Error(`Growth Center "${center.id}" contains duplicate instruction ids.`);
+    }
+    let dominantCount = 0;
+    for (const instructionId of center.instructionIds) {
+      const member = instructionById.get(instructionId);
+      if (!member) {
+        throw new Error(`Growth Center "${center.id}" references missing instruction "${instructionId}".`);
+      }
+      if ((member.growthCenterId ?? null) !== center.id) {
+        throw new Error(`Growth instruction "${instructionId}" does not belong to Growth Center "${center.id}".`);
+      }
+      if ((member.growthCenterRole ?? null) === 'dominant') dominantCount += 1;
+    }
+    if (dominantCount !== 1) {
+      throw new Error(`Growth Center "${center.id}" requires exactly one dominant instruction.`);
+    }
+    if ((source.growthCenterRole ?? null) !== 'dominant') {
+      throw new Error(`Growth Center "${center.id}" source instruction must be dominant.`);
     }
   }
 }
@@ -117,6 +154,8 @@ function rootBody(blueprint: UniversalGrowthBlueprint): GrowthBody {
     growthEnergy: 1,
     competition: 0,
     crowding: 0,
+    growthCenterId: instruction.growthCenterId ?? null,
+    growthCenterRole: instruction.growthCenterRole ?? null,
   };
 }
 
@@ -178,10 +217,52 @@ function regionHostAffinity(
   return root ? 0.72 : 0.68;
 }
 
+interface GrowthCenterPlacementContext {
+  readonly id: string;
+  readonly dominant: GrowthBody;
+  readonly influenceRadius: number;
+}
+
+function growthCenterPlacementContext(
+  instruction: UniversalGrowthInstruction,
+  bodies: readonly GrowthBody[],
+): GrowthCenterPlacementContext | null {
+  const id = instruction.growthCenterId ?? null;
+  const role = instruction.growthCenterRole ?? null;
+  if (id === null || role === null || role === 'dominant') return null;
+  const members = bodies.filter((body) => (body.growthCenterId ?? null) === id);
+  const dominant = members.find((body) => body.growthCenterRole === 'dominant') ?? members[0];
+  if (!dominant) return null;
+  return {
+    id,
+    dominant,
+    influenceRadius: round6(
+      dominant.skeletonLength * 0.58
+      + dominant.skeletonRadius * 3.4
+      + instruction.axialScale * 0.72,
+    ),
+  };
+}
+
+function centerRegionBias(
+  region: GrowthSurfaceRegion,
+  host: GrowthBody,
+  context: GrowthCenterPlacementContext | null,
+): number {
+  if (context === null) return 0;
+  const proximity = clamp01(
+    1 - distance(region.surfacePosition, context.dominant.anchor) / Math.max(context.influenceRadius, 1e-6),
+  );
+  const sameCenter = (host.growthCenterId ?? null) === context.id ? 1 : 0;
+  const dominantHost = host.id === context.dominant.id ? 1 : 0;
+  return sameCenter * 1.55 + dominantHost * 0.55 + proximity * 1.35;
+}
+
 function regionPriority(
   region: GrowthSurfaceRegion,
   host: GrowthBody,
   instruction: UniversalGrowthInstruction,
+  centerContext: GrowthCenterPlacementContext | null,
 ): number {
   const preferred = directionFromAzimuthElevation(
     instruction.preferredAzimuthRad,
@@ -197,6 +278,7 @@ function regionPriority(
   return round6(
     region.growthPotential * 2.25
       + regionHostAffinity(host, instruction) * 2.1
+      + centerRegionBias(region, host, centerContext)
       + alignment * 0.7
       + (1 - region.surfaceStress) * 0.32
       + (1 - region.localDensity) * 0.24
@@ -221,20 +303,52 @@ function chooseAtlasCandidate(
   const bodyById = new Map(bodies.map((body) => [body.id, body] as const));
   const atlas = buildGrowthSurfaceAtlasFromMass({ species, bodies, occupiedSites });
   const maximumGeneration = Math.max(1, instruction.maxGeneration);
+  const centerContext = growthCenterPlacementContext(instruction, bodies);
   const eligible = atlas.regions.filter((region) => {
     const host = bodyById.get(region.sourceBodyId);
-    return host !== undefined && host.generation < maximumGeneration;
+    if (host === undefined) return false;
+    if (centerContext !== null && (host.growthCenterId ?? null) === centerContext.id) {
+      return host.generation < centerContext.dominant.generation + maximumGeneration;
+    }
+    return host.generation < maximumGeneration;
   });
-  const active = eligible.filter((region) => region.growthPotential > 0);
-  const exposed = eligible.filter((region) => region.exposed);
-  const pool = active.length > 0 ? active : exposed.length > 0 ? exposed : eligible;
+  const centerOwned = centerContext === null
+    ? []
+    : eligible.filter((region) => {
+      const host = bodyById.get(region.sourceBodyId);
+      return host !== undefined && (host.growthCenterId ?? null) === centerContext.id;
+    });
+  const centerOwnedAvailable = centerOwned.filter((region) => (
+    region.growthPotential > 0 || (region.exposed && !region.occupied)
+  ));
+  const localEligible = centerContext === null
+    ? eligible
+    : eligible.filter((region) => {
+      const host = bodyById.get(region.sourceBodyId);
+      if (!host) return false;
+      if ((host.growthCenterId ?? null) === centerContext.id) return true;
+      return distance(region.surfacePosition, centerContext.dominant.anchor) <= centerContext.influenceRadius;
+    });
+  const usedGlobalCenterFallback = centerContext !== null
+    && centerOwnedAvailable.length === 0
+    && localEligible.length === 0;
+  const candidateDomain = centerContext === null
+    ? eligible
+    : centerOwnedAvailable.length > 0
+      ? centerOwned
+      : localEligible.length > 0
+        ? localEligible
+        : eligible;
+  const active = candidateDomain.filter((region) => region.growthPotential > 0);
+  const exposed = candidateDomain.filter((region) => region.exposed);
+  const pool = active.length > 0 ? active : exposed.length > 0 ? exposed : candidateDomain;
   const ranked: RankedSurfaceRegion[] = pool.map((region) => {
     const host = bodyById.get(region.sourceBodyId);
     if (!host) throw new Error(`Surface Atlas references missing body "${region.sourceBodyId}".`);
     return {
       region,
       host,
-      priority: regionPriority(region, host, instruction),
+      priority: regionPriority(region, host, instruction, centerContext),
     };
   });
 
@@ -264,7 +378,7 @@ function chooseAtlasCandidate(
 
   return {
     evaluation: selected,
-    usedFallback: active.length === 0 || accepted === undefined,
+    usedFallback: usedGlobalCenterFallback || active.length === 0 || accepted === undefined,
     rejectedCount: evaluations.filter((evaluation) => evaluation.rejected).length,
   };
 }
@@ -317,9 +431,13 @@ function depositInstruction(
   config: GrowthEngineConfig,
   diagnostics: GrowthDiagnostics,
 ): void {
-  const blockedSameColony = instruction.colonyId !== null && bodies.some(
-    (body) => body.colonyId === instruction.colonyId && body.generation >= instruction.maxGeneration,
-  );
+  const localCenterMember = (instruction.growthCenterRole ?? null) !== null
+    && instruction.growthCenterRole !== 'dominant';
+  const blockedSameColony = !localCenterMember
+    && instruction.colonyId !== null
+    && bodies.some(
+      (body) => body.colonyId === instruction.colonyId && body.generation >= instruction.maxGeneration,
+    );
 
   const { evaluation, usedFallback, rejectedCount } = chooseCandidate(
     blueprint.species,
@@ -332,7 +450,14 @@ function depositInstruction(
   if (usedFallback) diagnostics.fallbackInstructionIds.push(instruction.id);
 
   const host = evaluation.site.host;
-  const generation = Math.min(host.generation + 1, Math.max(1, instruction.maxGeneration));
+  const centerDominant = localCenterMember && instruction.growthCenterId !== undefined
+    ? bodies.find((body) => (body.growthCenterId ?? null) === instruction.growthCenterId
+      && body.growthCenterRole === 'dominant')
+    : undefined;
+  const generationLimit = centerDominant === undefined
+    ? Math.max(1, instruction.maxGeneration)
+    : centerDominant.generation + Math.max(1, instruction.maxGeneration);
+  const generation = Math.min(host.generation + 1, generationLimit);
   if (blockedSameColony && host.colonyId !== instruction.colonyId) {
     diagnostics.generationClampedInstructionIds.push(instruction.id);
   }
@@ -374,6 +499,8 @@ function depositInstruction(
     growthEnergy: round6(growthEnergy),
     competition: evaluation.competition,
     crowding: evaluation.crowding,
+    growthCenterId: instruction.growthCenterId ?? null,
+    growthCenterRole: instruction.growthCenterRole ?? null,
   };
 
   bodies.push(body);
@@ -403,7 +530,7 @@ function buildColonies(
   );
   return blueprint.colonies.map((colony) => {
     const members = bodies.filter((body) => body.colonyId === colony.id);
-    const rootBody = [...members].sort(
+    const root = [...members].sort(
       (left, right) => left.generation - right.generation || left.sequence - right.sequence || compareIds(left.id, right.id),
     )[0];
     return {
@@ -412,7 +539,36 @@ function buildColonies(
       epochIndex: colony.epochIndex,
       seed: colony.seed,
       bodyIds: members.map((body) => body.id),
-      rootBodyId: rootBody?.id ?? null,
+      rootBodyId: root?.id ?? null,
+      totalWeight: round6(members.reduce((sum, body) => sum + (instructionWeight.get(body.id) ?? 0), 0)),
+      maxGeneration: members.reduce((max, body) => Math.max(max, body.generation), 0),
+    };
+  });
+}
+
+function buildGrowthCenters(
+  blueprint: UniversalGrowthBlueprint,
+  bodies: readonly GrowthBody[],
+): GrowthCenterState[] {
+  const centers = blueprint.growthCenters ?? [];
+  const instructionWeight = new Map(
+    blueprint.instructions.map((instruction) => [instruction.id, instruction.weight] as const),
+  );
+  return centers.map((center) => {
+    const members = bodies
+      .filter((body) => (body.growthCenterId ?? null) === center.id)
+      .sort((left, right) => left.sequence - right.sequence || compareIds(left.id, right.id));
+    const dominant = members.find((body) => body.growthCenterRole === 'dominant') ?? null;
+    return {
+      id: center.id,
+      sourceInstructionId: center.sourceInstructionId,
+      sourceId: center.sourceId,
+      kind: center.kind,
+      epochIndex: center.epochIndex,
+      seed: center.seed,
+      bodyIds: members.map((body) => body.id),
+      dominantBodyId: dominant?.id ?? null,
+      surfaceRegionId: dominant?.attachment?.surfaceRegionId ?? null,
       totalWeight: round6(members.reduce((sum, body) => sum + (instructionWeight.get(body.id) ?? 0), 0)),
       maxGeneration: members.reduce((max, body) => Math.max(max, body.generation), 0),
     };
@@ -471,6 +627,9 @@ export function buildGrowthState(input: BuildGrowthStateInput): GrowthState {
       occupiedSites,
     },
     colonies: buildColonies(blueprint, bodies),
+    ...(blueprint.growthCenters === undefined
+      ? {}
+      : { growthCenters: buildGrowthCenters(blueprint, bodies) }),
     diagnostics,
   };
 }
