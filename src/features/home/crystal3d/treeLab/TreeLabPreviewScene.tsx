@@ -49,8 +49,10 @@ function TreeLabRenderedScene({
     setRuntime(next);
   }, []);
   const totalVertices = build.mesh.diagnostics.vertexCount
+    + build.rootGeometry.diagnostics.vertexCount
     + build.leaves.diagnostics.sharedVertexCount;
   const totalTriangles = build.mesh.diagnostics.triangleCount
+    + build.rootGeometry.diagnostics.triangleCount
     + build.leaves.diagnostics.renderedTriangleCount;
   const acceptance = evaluateTreeLabAcceptance({
     vertices: totalVertices,
@@ -77,6 +79,7 @@ function TreeLabRenderedScene({
     build.composition.silhouette,
     `${Math.round(build.composition.score.total * 100)}% comp`,
     `${build.roots.diagnostics.emittedRootCount} roots`,
+    `${formatCount(build.rootGeometry.diagnostics.triangleCount)} root △`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
     `${build.life.leaves.length} live`,
@@ -123,6 +126,15 @@ function TreeLabRenderedScene({
       data-tree-lab-root-truncated={build.roots.diagnostics.truncatedRootIds.length}
       data-tree-lab-root-budget={build.roots.diagnostics.rootBudget}
       data-tree-lab-root-sample-budget={build.roots.diagnostics.sampleBudget}
+      data-tree-lab-root-geometry-roots={build.rootGeometry.diagnostics.renderedRootCount}
+      data-tree-lab-root-geometry-vertices={build.rootGeometry.diagnostics.vertexCount}
+      data-tree-lab-root-geometry-triangles={build.rootGeometry.diagnostics.triangleCount}
+      data-tree-lab-root-geometry-draw-calls={build.rootGeometry.diagnostics.estimatedDrawCalls}
+      data-tree-lab-root-geometry-anchored={String(build.rootGeometry.diagnostics.anchoredToGround)}
+      data-tree-lab-root-geometry-vertex-budget={build.rootGeometry.diagnostics.vertexBudget}
+      data-tree-lab-root-geometry-triangle-budget={build.rootGeometry.diagnostics.triangleBudget}
+      data-tree-lab-root-geometry-vertex-budget-exceeded={String(build.rootGeometry.diagnostics.vertexBudgetExceeded)}
+      data-tree-lab-root-geometry-triangle-budget-exceeded={String(build.rootGeometry.diagnostics.triangleBudgetExceeded)}
       data-tree-lab-foliage-candidates={build.foliage.diagnostics.candidateClusterCount}
       data-tree-lab-foliage-clusters={build.foliage.diagnostics.emittedClusterCount}
       data-tree-lab-foliage-leaves={build.foliage.diagnostics.totalLeafCount}
@@ -168,6 +180,7 @@ function TreeLabRenderedScene({
         <directionalLight position={[-4, 3, -2]} intensity={0.45} />
         <TreeLabObject
           mesh={build.mesh}
+          rootGeometry={build.rootGeometry}
           leaves={build.leaves}
           materials={build.materials}
           life={build.life}
