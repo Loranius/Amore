@@ -14,6 +14,11 @@ export interface TreeCrownSilhouetteConfig {
   maximumRadialOffsetRatio: number;
   maximumScaleDelta: number;
   envelopeResponse: number;
+  middleLayerResponse: number;
+  frontClosureScaleDelta: number;
+  viewDirectionCount: number;
+  minimumReadableFacingDot: number;
+  minimumReadableLeafFraction: number;
 }
 
 export interface TreeCrownSilhouetteProfile {
@@ -35,10 +40,20 @@ export interface TreeCrownSilhouetteProfile {
   targetEnvelopeRatio: number;
   radialOffset: number;
   radialOffsetRatio: number;
+  frontClosureScaleDelta: number;
   scaleMultiplier: number;
   envelopeErrorBefore: number;
   envelopeErrorAfter: number;
   adjusted: boolean;
+}
+
+export interface TreeCrownViewReadability {
+  viewIndex: number;
+  direction: GrowthVec3;
+  frontLeafCount: number;
+  readableFrontLeafCount: number;
+  readableFrontLeafFraction: number;
+  accepted: boolean;
 }
 
 export interface TreeCrownSilhouetteState {
@@ -76,6 +91,8 @@ export interface TreeCrownSilhouetteState {
     emittedProfileCount: number;
     adjustedLeafCount: number;
     adjustedOuterLeafCount: number;
+    adjustedMiddleLeafCount: number;
+    frontClosureLeafCount: number;
     untouchedInnerLeafCount: number;
     untouchedMiddleLeafCount: number;
     occupiedOuterSectorIndices: number[];
@@ -87,6 +104,9 @@ export interface TreeCrownSilhouetteState {
     maximumScaleDelta: number;
     averageEnvelopeErrorBefore: number;
     averageEnvelopeErrorAfter: number;
+    viewReadability: TreeCrownViewReadability[];
+    minimumReadableFrontLeafFraction: number;
+    viewReadabilityAccepted: true;
     stableLeafOrderPreserved: true;
     instanceCountPreserved: true;
     crownCellProvenancePreserved: true;
