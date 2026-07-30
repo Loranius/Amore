@@ -7,7 +7,7 @@ export const DEFAULT_ORGANIC_SURFACE_CONFIG: OrganicSurfaceConfig = {
   junctionSurfaceRatio: 0.98,
   junctionFlare: 1.56,
   junctionSegmentsByLod: {
-    high: 5,
+    high: 4,
     medium: 5,
     low: 3,
   },
