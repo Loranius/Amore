@@ -76,6 +76,7 @@ function TreeLabRenderedScene({
     build.lod,
     build.composition.silhouette,
     `${Math.round(build.composition.score.total * 100)}% comp`,
+    `${build.roots.diagnostics.emittedRootCount} roots`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
     `${build.life.leaves.length} live`,
@@ -114,6 +115,14 @@ function TreeLabRenderedScene({
       data-tree-lab-negative-space={build.composition.score.negativeSpace}
       data-tree-lab-crown-density={build.composition.score.crownDensity}
       data-tree-lab-empty-cells={build.composition.diagnostics.emptyCellCount}
+      data-tree-lab-root-candidates={build.roots.diagnostics.candidateRootCount}
+      data-tree-lab-root-count={build.roots.diagnostics.emittedRootCount}
+      data-tree-lab-root-surface={build.roots.diagnostics.surfaceRootCount}
+      data-tree-lab-root-near-surface={build.roots.diagnostics.nearSurfaceRootCount}
+      data-tree-lab-root-samples={build.roots.diagnostics.sampleCount}
+      data-tree-lab-root-truncated={build.roots.diagnostics.truncatedRootIds.length}
+      data-tree-lab-root-budget={build.roots.diagnostics.rootBudget}
+      data-tree-lab-root-sample-budget={build.roots.diagnostics.sampleBudget}
       data-tree-lab-foliage-candidates={build.foliage.diagnostics.candidateClusterCount}
       data-tree-lab-foliage-clusters={build.foliage.diagnostics.emittedClusterCount}
       data-tree-lab-foliage-leaves={build.foliage.diagnostics.totalLeafCount}
