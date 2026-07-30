@@ -103,8 +103,8 @@ export interface CrystalGeometryState {
   engineVersion: string;
   speciesRulesVersion: string;
   artifactSeed: number;
-  /** Derived burial and center-maturation metadata for Geometry/Fusion consumers. */
-  geology: CrystalGeologyState;
+  /** New builds include this; optional keeps persisted Geometry State v1 snapshots readable. */
+  geology?: CrystalGeologyState;
   meshes: CrystalMeshData[];
   junctions: CrystalAttachmentJunction[];
   budget: CrystalGeometryBudget;
