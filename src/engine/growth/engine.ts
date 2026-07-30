@@ -12,7 +12,11 @@ import {
   buildGrowthSurfaceAtlasFromMass,
   type GrowthSurfaceRegion,
 } from './surfaceAtlas';
-import { attachmentFromSite, sampleGrowthRegionSite } from './surface';
+import {
+  attachmentFromSite,
+  sampleGrowthRegionSite,
+  sampleGrowthSite,
+} from './surface';
 import type {
   BuildGrowthStateInput,
   GrowthBody,
@@ -116,6 +120,44 @@ function rootBody(blueprint: UniversalGrowthBlueprint): GrowthBody {
   };
 }
 
+function hostWeight(host: GrowthBody, instruction: UniversalGrowthInstruction): number {
+  const root = host.generation === 0;
+  const sameColony = instruction.colonyId !== null && host.colonyId === instruction.colonyId;
+  let weight = 1 / (1 + host.generation * 0.45);
+
+  if (instruction.hostPreference === 'root') weight *= root ? 4.4 : 0.16;
+  else if (instruction.hostPreference === 'same-colony') weight *= sameColony ? 4.1 : root ? 1.25 : 0.42;
+  else if (instruction.hostPreference === 'surface') weight *= root ? 0.72 : sameColony ? 2.6 : 1.55;
+  else weight *= sameColony ? 2.3 : root ? 1.35 : 1;
+
+  if (host.tier === 'king') weight *= 1.18;
+  if (host.tier === 'micro') weight *= 0.42;
+  return Math.max(0.001, weight);
+}
+
+function weightedHost(
+  hosts: readonly GrowthBody[],
+  instruction: UniversalGrowthInstruction,
+  candidateIndex: number,
+): GrowthBody {
+  const root = hosts[0]!;
+  if (candidateIndex === 0) return root;
+
+  const sameColony = hosts.filter(
+    (host) => instruction.colonyId !== null && host.colonyId === instruction.colonyId,
+  );
+  if (candidateIndex === 1 && sameColony.length > 0) return sameColony[sameColony.length - 1]!;
+
+  const weights = hosts.map((host) => hostWeight(host, instruction));
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  let cursor = seededUnit(instruction.seed, `host:${candidateIndex}`) * total;
+  for (let index = 0; index < hosts.length; index += 1) {
+    cursor -= weights[index] ?? 0;
+    if (cursor <= 0) return hosts[index] ?? root;
+  }
+  return hosts[hosts.length - 1] ?? root;
+}
+
 function regionHostAffinity(
   host: GrowthBody,
   instruction: UniversalGrowthInstruction,
@@ -169,7 +211,7 @@ interface RankedSurfaceRegion {
   readonly priority: number;
 }
 
-function chooseCandidate(
+function chooseAtlasCandidate(
   species: string,
   instruction: UniversalGrowthInstruction,
   bodies: readonly GrowthBody[],
@@ -225,6 +267,46 @@ function chooseCandidate(
     usedFallback: active.length === 0 || accepted === undefined,
     rejectedCount: evaluations.filter((evaluation) => evaluation.rejected).length,
   };
+}
+
+function chooseLegacyCandidate(
+  instruction: UniversalGrowthInstruction,
+  bodies: readonly GrowthBody[],
+  occupiedSites: readonly GrowthSurfaceOccupancy[],
+  config: GrowthEngineConfig,
+): { evaluation: CandidateEvaluation; usedFallback: boolean; rejectedCount: number } {
+  const eligibleHosts = bodies.filter((body) => body.generation < Math.max(1, instruction.maxGeneration));
+  const hosts = eligibleHosts.length > 0 ? eligibleHosts : [bodies[0]!];
+  const evaluations: CandidateEvaluation[] = [];
+
+  for (let candidateIndex = 0; candidateIndex < config.candidateCount; candidateIndex += 1) {
+    const host = weightedHost(hosts, instruction, candidateIndex);
+    const site = sampleGrowthSite(host, instruction, candidateIndex);
+    evaluations.push(evaluateGrowthSite(site, instruction, bodies, occupiedSites, config));
+  }
+
+  evaluations.sort((left, right) => right.score - left.score || left.site.candidateIndex - right.site.candidateIndex);
+  const accepted = evaluations.find((evaluation) => !evaluation.rejected);
+  const selected = accepted ?? evaluations[0];
+  if (!selected) throw new Error(`Growth Engine produced no site candidates for "${instruction.id}".`);
+
+  return {
+    evaluation: selected,
+    usedFallback: accepted === undefined,
+    rejectedCount: evaluations.filter((evaluation) => evaluation.rejected).length,
+  };
+}
+
+function chooseCandidate(
+  species: string,
+  instruction: UniversalGrowthInstruction,
+  bodies: readonly GrowthBody[],
+  occupiedSites: readonly GrowthSurfaceOccupancy[],
+  config: GrowthEngineConfig,
+): { evaluation: CandidateEvaluation; usedFallback: boolean; rejectedCount: number } {
+  return species === 'crystal'
+    ? chooseAtlasCandidate(species, instruction, bodies, occupiedSites, config)
+    : chooseLegacyCandidate(instruction, bodies, occupiedSites, config);
 }
 
 function depositInstruction(
