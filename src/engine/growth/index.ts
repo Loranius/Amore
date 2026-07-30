@@ -1,7 +1,11 @@
 export { DEFAULT_GROWTH_ENGINE_CONFIG } from './config';
 export { buildGrowthState } from './engine';
-export { buildGrowthSurfaceAtlas } from './surfaceAtlas';
+export {
+  buildGrowthSurfaceAtlas,
+  buildGrowthSurfaceAtlasFromMass,
+} from './surfaceAtlas';
 export type {
+  BuildGrowthSurfaceAtlasFromMassInput,
   GrowthSurfaceAtlas,
   GrowthSurfaceRegion,
 } from './surfaceAtlas';
