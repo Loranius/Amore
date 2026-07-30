@@ -16,6 +16,10 @@ describe('Three.js Tree Material adapter', () => {
     expect(pair.foliage.side).toBe(THREE.DoubleSide);
     expect(pair.bark.transparent).toBe(false);
     expect(pair.foliage.transparent).toBe(false);
+    expect(pair.bark.vertexColors).toBe(true);
+    expect(pair.foliage.vertexColors).toBe(false);
+    expect(pair.bark.userData['treeVertexTintEnabled']).toBe(true);
+    expect(pair.foliage.userData['treeVertexTintEnabled']).toBe(false);
 
     pair.bark.dispose();
     pair.foliage.dispose();
