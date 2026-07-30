@@ -29,7 +29,9 @@ function matrixForInstance(
   silhouetteProfile?: TreeCrownSilhouetteProfile,
 ): THREE.Matrix4 {
   const yAxis = vector(instance.direction).normalize();
-  const sourceNormal = vector(instance.normal);
+  const sourceNormal = vector(
+    orientationProfile?.presentationNormal ?? instance.normal,
+  );
   const projectedNormal = sourceNormal.sub(
     yAxis.clone().multiplyScalar(sourceNormal.dot(yAxis)),
   );
@@ -258,6 +260,9 @@ export function createThreeTreeLeafInstancedMesh(
       inner: canopy.diagnostics.innerLeafCount,
       middle: canopy.diagnostics.middleLeafCount,
       outer: canopy.diagnostics.outerLeafCount,
+      sourceFrontLeaves: canopy.diagnostics.sourceFrontLeafCount,
+      renderedFrontLeaves: canopy.diagnostics.renderedFrontLeafCount,
+      presentationShiftedLeaves: canopy.diagnostics.presentationShiftedLeafCount,
       uniqueTints: canopy.diagnostics.uniqueTintCount,
       additionalDrawCalls: canopy.diagnostics.estimatedAdditionalDrawCalls,
       additionalMaterials: canopy.diagnostics.estimatedAdditionalMaterials,
@@ -303,6 +308,9 @@ export function createThreeTreeLeafInstancedMesh(
       signature: orientation.signature,
       profiles: orientation.profiles.length,
       nonZeroProfiles: orientation.diagnostics.nonZeroProfileCount,
+      frontFacingAdjustedLeaves: orientation.diagnostics.frontFacingAdjustedLeafCount,
+      averageSourceFacingDot: orientation.diagnostics.averageSourceFacingDot,
+      averageRenderFacingDot: orientation.diagnostics.averageRenderFacingDot,
       maximumRotationRad: orientation.diagnostics.maximumRotationRad,
       additionalDrawCalls: orientation.diagnostics.estimatedAdditionalDrawCalls,
       additionalMaterials: orientation.diagnostics.estimatedAdditionalMaterials,

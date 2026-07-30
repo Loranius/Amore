@@ -1,5 +1,6 @@
 import type { TreeCanopyDepthLayer, TreeCanopyDepthState } from '../canopyDepth';
 import type { TreeCanopyLightState } from '../canopyLight';
+import type { GrowthVec3 } from '../growth';
 import type { TreeLeafGeometryLod, TreeLeafGeometryState } from '../leafGeometry';
 import type { TreePhenologyState } from '../phenology';
 
@@ -13,6 +14,8 @@ export interface TreeLeafOrientationConfig {
   /** Bump whenever orientation sampling or bounds change. */
   rulesVersion: string;
   orientationByLayer: Readonly<Record<TreeCanopyDepthLayer, TreeLeafOrientationLayerConfig>>;
+  frontFacingStrengthByLayer: Readonly<Record<TreeCanopyDepthLayer, number>>;
+  minimumFrontFacingDot: number;
   quantizationBands: number;
 }
 
@@ -24,6 +27,10 @@ export interface TreeLeafOrientationProfile {
   phenologyProfileId: string;
   sequence: number;
   layer: TreeCanopyDepthLayer;
+  presentationNormal: GrowthVec3;
+  sourceFacingDot: number;
+  renderFacingDot: number;
+  frontFacingAdjusted: boolean;
   tiltRad: number;
   fanRad: number;
   twistRad: number;
@@ -61,6 +68,13 @@ export interface TreeLeafOrientationState {
     middleLeafCount: number;
     outerLeafCount: number;
     nonZeroProfileCount: number;
+    frontFacingAdjustedLeafCount: number;
+    frontFacingCandidateCount: number;
+    minimumSourceFacingDot: number;
+    minimumRenderFacingDot: number;
+    averageSourceFacingDot: number;
+    averageRenderFacingDot: number;
+    frontFacingNotReduced: true;
     minimumRotationRad: number;
     maximumRotationRad: number;
     averageRotationRad: number;

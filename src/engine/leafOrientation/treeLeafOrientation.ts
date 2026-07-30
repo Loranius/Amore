@@ -1,4 +1,16 @@
-import { round6, seededUnit } from '../growth/math';
+import {
+  add,
+  dot,
+  normalize,
+  round6,
+  roundVec,
+  scale,
+  seededUnit,
+  subtract,
+} from '../growth/math';
+import type { GrowthVec3 } from '../growth';
+import type { TreeLeafInstance } from '../leafGeometry';
+import type { TreeCanopyDepthProfile } from '../canopyDepth';
 import type {
   BuildTreeLeafOrientationInput,
   TreeLeafOrientationProfile,
@@ -16,12 +28,21 @@ function validateInput(input: BuildTreeLeafOrientationInput): void {
     || config.quantizationBands % 2 === 0) {
     throw new Error('Tree Leaf Orientation quantizationBands must be an odd integer between 3 and 65.');
   }
+  if (!Number.isFinite(config.minimumFrontFacingDot)
+    || config.minimumFrontFacingDot < 0
+    || config.minimumFrontFacingDot > 1) {
+    throw new Error('Tree Leaf Orientation minimumFrontFacingDot must be in [0, 1].');
+  }
   for (const layer of ['inner', 'middle', 'outer'] as const) {
     const bounds = config.orientationByLayer[layer];
     for (const [name, value] of Object.entries(bounds)) {
       if (!Number.isFinite(value) || value < 0 || value > 0.35) {
         throw new Error(`Tree Leaf Orientation ${layer}.${name} must be in [0, 0.35].`);
       }
+    }
+    const facingStrength = config.frontFacingStrengthByLayer[layer];
+    if (!Number.isFinite(facingStrength) || facingStrength < 0 || facingStrength > 1) {
+      throw new Error(`Tree Leaf Orientation frontFacingStrengthByLayer.${layer} must be in [0, 1].`);
     }
   }
   if (leaves.artifactSeed !== canopyDepth.artifactSeed
@@ -65,6 +86,72 @@ function quantizedSigned(
   return round6(normalized * maximum);
 }
 
+interface PresentationNormalResult {
+  presentationNormal: GrowthVec3;
+  sourceFacingDot: number;
+  renderFacingDot: number;
+  frontFacingAdjusted: boolean;
+  candidate: boolean;
+}
+
+function buildPresentationNormal(
+  leaf: TreeLeafInstance,
+  depth: TreeCanopyDepthProfile,
+  input: BuildTreeLeafOrientationInput,
+): PresentationNormalResult {
+  const frontDirection = normalize(
+    input.canopyDepth.diagnostics.presentationFrontDirection,
+    { x: 0, y: 0, z: 1 },
+  );
+  const leafDirection = normalize(leaf.direction, { x: 0, y: 1, z: 0 });
+  const projectedFront = normalize(
+    subtract(frontDirection, scale(leafDirection, dot(frontDirection, leafDirection))),
+    leaf.normal,
+  );
+  const sourceNormal = normalize(leaf.normal, projectedFront);
+  const alignedSource = dot(sourceNormal, projectedFront) < 0
+    ? scale(sourceNormal, -1)
+    : sourceNormal;
+  const candidate = depth.renderFrontDepth >= 0 || depth.presentationShifted;
+  const sourceFacingDot = round6(Math.abs(dot(sourceNormal, projectedFront)));
+
+  if (!candidate) {
+    return {
+      presentationNormal: roundVec(sourceNormal),
+      sourceFacingDot,
+      renderFacingDot: sourceFacingDot,
+      frontFacingAdjusted: false,
+      candidate: false,
+    };
+  }
+
+  const baseStrength = input.config.frontFacingStrengthByLayer[depth.layer];
+  const variation = 0.92 + seededUnit(
+    input.leaves.artifactSeed,
+    `${leaf.id}:front-facing-strength`,
+  ) * 0.16;
+  const strength = Math.min(1, Math.max(
+    input.config.minimumFrontFacingDot,
+    baseStrength * variation,
+  ));
+  const presentationNormal = normalize(
+    add(
+      scale(alignedSource, 1 - strength),
+      scale(projectedFront, strength),
+    ),
+    projectedFront,
+  );
+  const renderFacingDot = round6(Math.abs(dot(presentationNormal, projectedFront)));
+
+  return {
+    presentationNormal: roundVec(presentationNormal),
+    sourceFacingDot,
+    renderFacingDot,
+    frontFacingAdjusted: renderFacingDot > sourceFacingDot + 1e-6,
+    candidate: true,
+  };
+}
+
 function signatureFor(state: Omit<TreeLeafOrientationState, 'signature'>): string {
   return [
     state.rulesVersion,
@@ -75,14 +162,16 @@ function signatureFor(state: Omit<TreeLeafOrientationState, 'signature'>): strin
     state.diagnostics.innerLeafCount,
     state.diagnostics.middleLeafCount,
     state.diagnostics.outerLeafCount,
+    state.diagnostics.frontFacingAdjustedLeafCount,
+    state.diagnostics.averageRenderFacingDot.toFixed(6),
     state.diagnostics.maximumRotationRad.toFixed(6),
     state.diagnostics.averageRotationRad.toFixed(6),
   ].join('|');
 }
 
 /**
- * Publishes small deterministic local rotations for accepted leaves. Positions,
- * colors, IDs, crown cells and Tree Life state remain untouched.
+ * Publishes deterministic local rotations and stable presentation normals for
+ * accepted leaves. Positions, colors, IDs, crown cells and Tree Life state stay untouched.
  */
 export function buildTreeLeafOrientation(
   input: BuildTreeLeafOrientationInput,
@@ -93,6 +182,12 @@ export function buildTreeLeafOrientation(
   let middleLeafCount = 0;
   let outerLeafCount = 0;
   let nonZeroProfileCount = 0;
+  let frontFacingAdjustedLeafCount = 0;
+  let frontFacingCandidateCount = 0;
+  let sourceFacingSum = 0;
+  let renderFacingSum = 0;
+  const sourceFacingValues: number[] = [];
+  const renderFacingValues: number[] = [];
 
   for (let index = 0; index < input.leaves.instances.length; index += 1) {
     const leaf = input.leaves.instances[index]!;
@@ -107,6 +202,7 @@ export function buildTreeLeafOrientation(
       throw new Error(`Tree Leaf Orientation cannot resolve upstream profiles for "${leaf.id}".`);
     }
 
+    const facing = buildPresentationNormal(leaf, depth, input);
     const bounds = input.config.orientationByLayer[depth.layer];
     const tiltRad = quantizedSigned(
       input.leaves.artifactSeed,
@@ -132,6 +228,14 @@ export function buildTreeLeafOrientation(
     else if (depth.layer === 'middle') middleLeafCount += 1;
     else outerLeafCount += 1;
     if (totalRotationRad > 1e-9) nonZeroProfileCount += 1;
+    if (facing.candidate) {
+      frontFacingCandidateCount += 1;
+      sourceFacingSum += facing.sourceFacingDot;
+      renderFacingSum += facing.renderFacingDot;
+      sourceFacingValues.push(facing.sourceFacingDot);
+      renderFacingValues.push(facing.renderFacingDot);
+    }
+    if (facing.frontFacingAdjusted) frontFacingAdjustedLeafCount += 1;
 
     profiles.push({
       id: `tree:leaf-orientation:${leaf.id}`,
@@ -141,6 +245,10 @@ export function buildTreeLeafOrientation(
       phenologyProfileId: phenology.id,
       sequence: leaf.sequence,
       layer: depth.layer,
+      presentationNormal: facing.presentationNormal,
+      sourceFacingDot: facing.sourceFacingDot,
+      renderFacingDot: facing.renderFacingDot,
+      frontFacingAdjusted: facing.frontFacingAdjusted,
       tiltRad,
       fanRad,
       twistRad,
@@ -154,6 +262,15 @@ export function buildTreeLeafOrientation(
   const averageRotationRad = rotations.length > 0
     ? rotations.reduce((sum, value) => sum + value, 0) / rotations.length
     : 0;
+  const averageSourceFacingDot = frontFacingCandidateCount > 0
+    ? sourceFacingSum / frontFacingCandidateCount
+    : 0;
+  const averageRenderFacingDot = frontFacingCandidateCount > 0
+    ? renderFacingSum / frontFacingCandidateCount
+    : 0;
+  if (averageRenderFacingDot + 1e-6 < averageSourceFacingDot) {
+    throw new Error('Tree Leaf Orientation front-facing projection must not reduce front readability.');
+  }
   const stableLeafOrderPreserved = profiles.every((profile, index) => (
     profile.sequence === input.leaves.instances[index]?.sequence
     && profile.leafInstanceId === input.leaves.instances[index]?.id
@@ -192,6 +309,13 @@ export function buildTreeLeafOrientation(
       middleLeafCount,
       outerLeafCount,
       nonZeroProfileCount,
+      frontFacingAdjustedLeafCount,
+      frontFacingCandidateCount,
+      minimumSourceFacingDot: round6(sourceFacingValues.length > 0 ? Math.min(...sourceFacingValues) : 0),
+      minimumRenderFacingDot: round6(renderFacingValues.length > 0 ? Math.min(...renderFacingValues) : 0),
+      averageSourceFacingDot: round6(averageSourceFacingDot),
+      averageRenderFacingDot: round6(averageRenderFacingDot),
+      frontFacingNotReduced: true,
       minimumRotationRad: round6(minimumRotationRad),
       maximumRotationRad: round6(maximumRotationRad),
       averageRotationRad: round6(averageRotationRad),

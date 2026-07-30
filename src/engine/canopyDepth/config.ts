@@ -1,14 +1,18 @@
 import type { TreeCanopyDepthConfig } from './types';
 
 export const DEFAULT_TREE_CANOPY_DEPTH_CONFIG: TreeCanopyDepthConfig = {
-  rulesVersion: 'tree-canopy-depth-v1.0.0',
+  rulesVersion: 'tree-canopy-depth-v1.3.0',
   innerDepthMaximum: 0.38,
   outerDepthMinimum: 0.7,
-  maximumOffsetRatio: 0.12,
+  maximumOffsetRatio: 0.22,
+  presentationFrontDirection: { x: 0.6, y: 0, z: 0.8 },
+  frontFillFraction: 0.82,
+  frontBiasRatio: 0.88,
+  frontFillDepthRatio: 0.14,
   scaleByLayer: {
-    inner: 0.9,
-    middle: 1,
-    outer: 1.08,
+    inner: 1.42,
+    middle: 1.38,
+    outer: 1.24,
   },
   tintByLayer: {
     inner: { r: 0.8, g: 0.86, b: 0.78 },

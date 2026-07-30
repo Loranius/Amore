@@ -66,6 +66,25 @@ describe('Tree Canopy Depth', () => {
     }
   });
 
+  it('recovers a stable front crown layer without collapsing the rear volume', () => {
+    const { canopy } = rebuild();
+    const shifted = canopy.profiles.filter((profile) => profile.presentationShifted);
+    const retainedRear = canopy.profiles.filter((profile) => profile.renderFrontDepth < 0);
+
+    expect(canopy.diagnostics.presentationFrontDirection).toEqual({ x: 0.6, y: 0, z: 0.8 });
+    expect(canopy.diagnostics.frontHemisphereNotReduced).toBe(true);
+    expect(canopy.diagnostics.renderedFrontLeafCount).toBeGreaterThanOrEqual(
+      canopy.diagnostics.sourceFrontLeafCount,
+    );
+    expect(canopy.diagnostics.renderedFrontLeafFraction).toBeGreaterThanOrEqual(
+      canopy.diagnostics.sourceFrontLeafFraction,
+    );
+    expect(canopy.diagnostics.frontLayersCovered).toBeGreaterThan(1);
+    expect(shifted.length).toBeGreaterThan(0);
+    expect(retainedRear.length).toBeGreaterThan(0);
+    expect(shifted.every((profile) => profile.renderFrontDepth > profile.sourceFrontDepth)).toBe(true);
+  });
+
   it('keeps offsets, scales and tints inside explicit mobile bounds', () => {
     const { build, canopy } = rebuild();
     const clusters = new Map(build.foliage.clusters.map((cluster) => [cluster.id, cluster] as const));
