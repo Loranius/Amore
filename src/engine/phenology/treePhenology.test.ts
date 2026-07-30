@@ -43,12 +43,15 @@ describe('Tree Phenology', () => {
     }
   });
 
-  it('preserves accepted leaf identity and order across LODs', () => {
-    const low = buildTreeLabPreview('low').phenology.profiles.map((profile) => profile.leafInstanceId);
-    const medium = buildTreeLabPreview('medium').phenology.profiles.map((profile) => profile.leafInstanceId);
-    const high = buildTreeLabPreview('high').phenology.profiles.map((profile) => profile.leafInstanceId);
-
-    expect(medium.slice(0, low.length)).toEqual(low);
-    expect(high.slice(0, medium.length)).toEqual(medium);
+  it('preserves accepted leaf identity and order inside every LOD', () => {
+    for (const lod of ['low', 'medium', 'high'] as const) {
+      const build = buildTreeLabPreview(lod);
+      expect(build.phenology.profiles.map((profile) => profile.leafInstanceId)).toEqual(
+        build.leaves.instances.map((leaf) => leaf.id),
+      );
+      expect(build.phenology.profiles.map((profile) => profile.sequence)).toEqual(
+        build.leaves.instances.map((leaf) => leaf.sequence),
+      );
+    }
   });
 });
