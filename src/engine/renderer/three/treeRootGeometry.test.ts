@@ -25,7 +25,27 @@ describe('Three Tree Root Geometry adapter', () => {
     expect(geometry.userData['treeRootGeometry']).toMatchObject({
       roots: state.diagnostics.renderedRootCount,
       anchoredToGround: true,
+      contactApplied: false,
       lod: 'medium',
+    });
+
+    geometry.dispose();
+  });
+
+  it('publishes Ground Contact and merged collar diagnostics without another mesh', () => {
+    const state = buildTreeLabPreview('medium').rootGeometry;
+    const geometry = createThreeTreeRootGeometry(state);
+
+    expect(state.diagnostics.contactApplied).toBe(true);
+    expect(state.diagnostics.collarVertexCount).toBeGreaterThan(0);
+    expect(state.diagnostics.collarTriangleCount).toBeGreaterThan(0);
+    expect(geometry.getAttribute('position').count).toBe(state.diagnostics.vertexCount);
+    expect(geometry.userData['treeRootGeometry']).toMatchObject({
+      contactApplied: true,
+      groundLevelY: state.diagnostics.groundLevelY,
+      visiblePathFraction: state.diagnostics.visiblePathFraction,
+      collarVertices: state.diagnostics.collarVertexCount,
+      collarTriangles: state.diagnostics.collarTriangleCount,
     });
 
     geometry.dispose();

@@ -79,6 +79,7 @@ function TreeLabRenderedScene({
     build.composition.silhouette,
     `${Math.round(build.composition.score.total * 100)}% comp`,
     `${build.roots.diagnostics.emittedRootCount} roots`,
+    `${Math.round(build.groundContact.diagnostics.visiblePathFraction * 100)}% visible`,
     `${formatCount(build.rootGeometry.diagnostics.triangleCount)} root △`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
@@ -126,11 +127,29 @@ function TreeLabRenderedScene({
       data-tree-lab-root-truncated={build.roots.diagnostics.truncatedRootIds.length}
       data-tree-lab-root-budget={build.roots.diagnostics.rootBudget}
       data-tree-lab-root-sample-budget={build.roots.diagnostics.sampleBudget}
+      data-tree-lab-ground-contact="true"
+      data-tree-lab-ground-level={build.groundContact.ground.levelY}
+      data-tree-lab-ground-burial-depth={build.groundContact.burialDepth}
+      data-tree-lab-ground-visible-path-fraction={build.groundContact.diagnostics.visiblePathFraction}
+      data-tree-lab-ground-visible-roots={build.groundContact.diagnostics.visibleRootCount}
+      data-tree-lab-ground-visible-samples={build.groundContact.diagnostics.visibleSampleCount}
+      data-tree-lab-ground-buried-samples={build.groundContact.diagnostics.buriedSampleCount}
+      data-tree-lab-ground-prefix-preserved={String(build.groundContact.diagnostics.appendOnlyPrefixPreserved)}
+      data-tree-lab-ground-terrain-binding={build.groundContact.ground.terrainBindingId}
+      data-tree-lab-ground-collar-bottom-y={build.groundContact.collar.bottomY}
+      data-tree-lab-ground-collar-top-y={build.groundContact.collar.topY}
+      data-tree-lab-ground-collar-bottom-radius={build.groundContact.collar.bottomRadius}
+      data-tree-lab-ground-collar-top-radius={build.groundContact.collar.topRadius}
+      data-tree-lab-ground-extra-draw-calls={build.groundContact.diagnostics.estimatedAdditionalDrawCalls}
+      data-tree-lab-ground-extra-materials={build.groundContact.diagnostics.estimatedAdditionalMaterials}
       data-tree-lab-root-geometry-roots={build.rootGeometry.diagnostics.renderedRootCount}
       data-tree-lab-root-geometry-vertices={build.rootGeometry.diagnostics.vertexCount}
       data-tree-lab-root-geometry-triangles={build.rootGeometry.diagnostics.triangleCount}
       data-tree-lab-root-geometry-draw-calls={build.rootGeometry.diagnostics.estimatedDrawCalls}
       data-tree-lab-root-geometry-anchored={String(build.rootGeometry.diagnostics.anchoredToGround)}
+      data-tree-lab-root-geometry-contact-applied={String(build.rootGeometry.diagnostics.contactApplied)}
+      data-tree-lab-root-geometry-collar-vertices={build.rootGeometry.diagnostics.collarVertexCount}
+      data-tree-lab-root-geometry-collar-triangles={build.rootGeometry.diagnostics.collarTriangleCount}
       data-tree-lab-root-geometry-vertex-budget={build.rootGeometry.diagnostics.vertexBudget}
       data-tree-lab-root-geometry-triangle-budget={build.rootGeometry.diagnostics.triangleBudget}
       data-tree-lab-root-geometry-vertex-budget-exceeded={String(build.rootGeometry.diagnostics.vertexBudgetExceeded)}

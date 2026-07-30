@@ -1,3 +1,4 @@
+import type { TreeGroundContactState } from '../groundContact';
 import type {
   OrganicMeshLod,
   OrganicSurfaceConfig,
@@ -20,6 +21,11 @@ export interface TreeRootGeometryDiagnostics {
   triangleCount: number;
   estimatedDrawCalls: number;
   anchoredToGround: true;
+  contactApplied: boolean;
+  groundLevelY: number | null;
+  visiblePathFraction: number | null;
+  collarVertexCount: number;
+  collarTriangleCount: number;
   vertexBudget: number;
   triangleBudget: number;
   vertexBudgetExceeded: boolean;
@@ -33,6 +39,8 @@ export interface TreeRootGeometryState {
   rulesVersion: string;
   sourceRootArchitectureVersion: TreeRootArchitectureState['treeRootArchitectureVersion'];
   sourceRootRulesVersion: string;
+  sourceGroundContactVersion: TreeGroundContactState['treeGroundContactVersion'] | null;
+  sourceGroundContactRulesVersion: string | null;
   artifactSeed: number;
   lod: OrganicMeshLod;
   mesh: OrganicSweepMesh;
@@ -41,6 +49,7 @@ export interface TreeRootGeometryState {
 
 export interface BuildTreeRootGeometryInput {
   roots: TreeRootArchitectureState;
+  contact?: TreeGroundContactState;
   lod: OrganicMeshLod;
   config: TreeRootGeometryConfig;
 }

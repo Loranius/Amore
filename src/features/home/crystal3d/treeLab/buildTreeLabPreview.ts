@@ -10,6 +10,11 @@ import {
   type TreeFoliageState,
 } from '@/engine/foliage';
 import {
+  DEFAULT_TREE_GROUND_CONTACT_CONFIG,
+  buildTreeGroundContact,
+  type TreeGroundContactState,
+} from '@/engine/groundContact';
+import {
   DEFAULT_TREE_LEAF_GEOMETRY_CONFIG,
   buildTreeLeafGeometry,
   type TreeLeafGeometryState,
@@ -66,6 +71,7 @@ export interface TreeLabPreviewBuild {
   frames: OrganicCurveFrameState;
   composition: TreeCompositionState;
   roots: TreeRootArchitectureState;
+  groundContact: TreeGroundContactState;
   rootGeometry: TreeRootGeometryState;
   foliage: TreeFoliageState;
   leaves: TreeLeafGeometryState;
@@ -120,8 +126,14 @@ export function buildTreeLabPreviewFromArtifact({
     frames,
     config: DEFAULT_TREE_ROOT_ARCHITECTURE_CONFIG,
   });
+  const groundContact = buildTreeGroundContact({
+    species,
+    roots,
+    config: DEFAULT_TREE_GROUND_CONTACT_CONFIG,
+  });
   const rootGeometry = buildTreeRootGeometry({
     roots,
+    contact: groundContact,
     lod,
     config: DEFAULT_TREE_ROOT_GEOMETRY_CONFIG,
   });
@@ -162,6 +174,7 @@ export function buildTreeLabPreviewFromArtifact({
     frames,
     composition,
     roots,
+    groundContact,
     rootGeometry,
     foliage,
     leaves,
