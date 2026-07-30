@@ -2,6 +2,7 @@ export { buildReefSpeciesBlueprint } from './reefSpecies';
 export * from './layout';
 export * from './foundation';
 export * from './skeletons';
+export * from './meshes';
 export {
   REEF_COLONY_MORPHOTYPES,
   REEF_LIFE_STAGES,
