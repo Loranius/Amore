@@ -40,6 +40,11 @@ import {
   type TreeLeafGeometryState,
 } from '@/engine/leafGeometry';
 import {
+  DEFAULT_TREE_LEAF_ORIENTATION_CONFIG,
+  buildTreeLeafOrientation,
+  type TreeLeafOrientationState,
+} from '@/engine/leafOrientation';
+import {
   buildOrganicCurveFrames,
   buildOrganicSkeleton,
   buildOrganicSweepMesh,
@@ -115,6 +120,7 @@ export interface TreeLabPreviewBuild {
   canopyDepth: TreeCanopyDepthState;
   canopyLight: TreeCanopyLightState;
   phenology: TreePhenologyState;
+  leafOrientation: TreeLeafOrientationState;
   soilSurface: TreeSoilSurfaceState;
   barkSurface: TreeBarkSurfaceState;
   groundDetails: TreeGroundDetailState;
@@ -163,7 +169,14 @@ export function buildTreeLabPreviewFromArtifact({
     asOf,
     config: DEFAULT_TREE_PHENOLOGY_CONFIG,
   });
-  const canopyLight = Object.assign({}, canopyLightBase, { phenology });
+  const leafOrientation = buildTreeLeafOrientation({
+    leaves,
+    canopyDepth,
+    canopyLight: canopyLightBase,
+    phenology,
+    config: DEFAULT_TREE_LEAF_ORIENTATION_CONFIG,
+  });
+  const canopyLight = Object.assign({}, canopyLightBase, { phenology, leafOrientation });
   const soilSurface = buildTreeSoilSurface({ species, terrain, rootGeometry, materials, config: DEFAULT_TREE_SOIL_SURFACE_CONFIG });
   const mesh = buildOrganicSweepMesh(frames, lod);
   const barkSurface = buildTreeBarkSurface({
@@ -197,6 +210,7 @@ export function buildTreeLabPreviewFromArtifact({
     canopyDepth,
     canopyLight,
     phenology,
+    leafOrientation,
     soilSurface,
     barkSurface,
     groundDetails,

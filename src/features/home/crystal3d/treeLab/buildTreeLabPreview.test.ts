@@ -16,7 +16,7 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
 }
 
 describe('Tree Lab preview pipeline', () => {
-  it('keeps the full Evolution -> Species -> Growth -> Canopy Depth -> Light Response -> Bark Surface -> Ground Detail -> Life result deterministic', () => {
+  it('keeps the full Evolution -> Species -> Growth -> Canopy -> Phenology -> Leaf Orientation -> Surface -> Life result deterministic', () => {
     const first = buildTreeLabPreview('medium');
     const second = buildTreeLabPreview('medium');
 
@@ -50,7 +50,7 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
   });
 
-  it('keeps crown light, depth, surface character, static geometry, instances and life inside published mobile limits', () => {
+  it('keeps canopy, leaf orientation, surface character, static geometry, instances and life inside published mobile limits', () => {
     const build = buildTreeLabPreview('medium');
     const totalVertices = build.mesh.diagnostics.vertexCount
       + build.rootGeometry.diagnostics.vertexCount
@@ -85,6 +85,13 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.canopyLight.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
     expect(build.canopyLight.diagnostics.estimatedAdditionalMaterials).toBe(0);
     expect(build.canopyLight.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
+    expect(build.phenology.profiles).toHaveLength(build.leaves.instances.length);
+    expect(build.leafOrientation.profiles).toHaveLength(build.leaves.instances.length);
+    expect(build.leafOrientation.diagnostics.nonZeroProfileCount).toBeGreaterThan(0);
+    expect(build.leafOrientation.diagnostics.stableLeafOrderPreserved).toBe(true);
+    expect(build.leafOrientation.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
+    expect(build.leafOrientation.diagnostics.estimatedAdditionalMaterials).toBe(0);
+    expect(build.leafOrientation.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
     expect(build.barkSurface.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
     expect(build.barkSurface.diagnostics.estimatedAdditionalMaterials).toBe(0);
     expect(build.barkSurface.diagnostics.materialCount).toBe(2);
