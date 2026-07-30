@@ -82,6 +82,9 @@ export interface GrowthEngineConfig {
 
 export interface GrowthAttachment {
   siteKey: string;
+  /** Stable aggregate Surface Atlas region chosen for this attachment. */
+  surfaceRegionId?: string;
+  /** Compatibility/provenance body used by Geometry and Fusion. */
   hostBodyId: string;
   hostT: number;
   hostAngleRad: number;
@@ -122,6 +125,8 @@ export interface GrowthBody {
 export interface GrowthSurfaceOccupancy {
   siteKey: string;
   bodyId: string;
+  /** Optional for backward-compatible reads of Growth State v1 snapshots. */
+  surfaceRegionId?: string;
   hostBodyId: string;
   hostT: number;
   hostAngleRad: number;
