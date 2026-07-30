@@ -29,6 +29,11 @@ import {
   type TreeRootArchitectureState,
 } from '@/engine/rootArchitecture';
 import {
+  DEFAULT_TREE_ROOT_GEOMETRY_CONFIG,
+  buildTreeRootGeometry,
+  type TreeRootGeometryState,
+} from '@/engine/rootGeometry';
+import {
   buildTreeSpeciesBlueprint,
   treeToOrganicField,
   type TreeOrganicField,
@@ -61,6 +66,7 @@ export interface TreeLabPreviewBuild {
   frames: OrganicCurveFrameState;
   composition: TreeCompositionState;
   roots: TreeRootArchitectureState;
+  rootGeometry: TreeRootGeometryState;
   foliage: TreeFoliageState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
@@ -114,6 +120,11 @@ export function buildTreeLabPreviewFromArtifact({
     frames,
     config: DEFAULT_TREE_ROOT_ARCHITECTURE_CONFIG,
   });
+  const rootGeometry = buildTreeRootGeometry({
+    roots,
+    lod,
+    config: DEFAULT_TREE_ROOT_GEOMETRY_CONFIG,
+  });
   const foliage = buildTreeFoliage({
     species,
     frames,
@@ -151,6 +162,7 @@ export function buildTreeLabPreviewFromArtifact({
     frames,
     composition,
     roots,
+    rootGeometry,
     foliage,
     leaves,
     materials,
