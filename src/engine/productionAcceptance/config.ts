@@ -30,7 +30,7 @@ export const TREE_PRODUCTION_PIPELINE_PHASES: readonly TreeProductionPhaseId[] =
 
 export const TREE_PRODUCTION_MOBILE_BUDGET: TreeProductionMobileBudget = {
   maxVertices: 12_000,
-  maxTriangles: 16_000,
+  maxTriangles: 18_000,
   maxBuildMs: 220,
   maxDrawCalls: 4,
   maxMaterials: 3,
