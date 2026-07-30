@@ -85,7 +85,7 @@ test.describe('Tree Root Geometry Pixel 8 Pro acceptance', () => {
     await expect(preview).toHaveAttribute('data-tree-lab-root-geometry-anchored', 'true');
     await expect(preview).toHaveAttribute('data-tree-lab-root-geometry-vertex-budget-exceeded', 'false');
     await expect(preview).toHaveAttribute('data-tree-lab-root-geometry-triangle-budget-exceeded', 'false');
-    expect(drawCalls).toBeLessThanOrEqual(3);
+    expect(drawCalls).toBeLessThanOrEqual(4);
 
     await page.screenshot({
       path: 'test-results/tree-root-geometry-fixture-pixel-8-pro.png',

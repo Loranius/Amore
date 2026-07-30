@@ -15,6 +15,11 @@ import {
   type TreeGroundContactState,
 } from '@/engine/groundContact';
 import {
+  DEFAULT_TREE_GROUND_DETAIL_CONFIG,
+  buildTreeGroundDetail,
+  type TreeGroundDetailState,
+} from '@/engine/groundDetail';
+import {
   DEFAULT_TREE_LEAF_GEOMETRY_CONFIG,
   buildTreeLeafGeometry,
   type TreeLeafGeometryState,
@@ -88,6 +93,7 @@ export interface TreeLabPreviewBuild {
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
   soilSurface: TreeSoilSurfaceState;
+  groundDetails: TreeGroundDetailState;
   life: TreeLifeState;
   mesh: OrganicSweepMesh;
   buildMs: number;
@@ -181,6 +187,12 @@ export function buildTreeLabPreviewFromArtifact({
     materials,
     config: DEFAULT_TREE_SOIL_SURFACE_CONFIG,
   });
+  const groundDetails = buildTreeGroundDetail({
+    species,
+    terrain,
+    soil: soilSurface,
+    config: DEFAULT_TREE_GROUND_DETAIL_CONFIG,
+  });
   const life = buildTreeLifeState({
     species,
     composition,
@@ -207,6 +219,7 @@ export function buildTreeLabPreviewFromArtifact({
     leaves,
     materials,
     soilSurface,
+    groundDetails,
     life,
     mesh,
     buildMs: now() - startedAt,

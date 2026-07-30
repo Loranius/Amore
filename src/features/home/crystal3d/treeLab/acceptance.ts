@@ -21,7 +21,7 @@ export const TREE_LAB_MOBILE_BUDGET: TreeLabAcceptanceBudget = {
   maxVertices: 12_000,
   maxTriangles: 16_000,
   maxBuildMs: 80,
-  maxDrawCalls: 3,
+  maxDrawCalls: 4,
 };
 
 export function evaluateTreeLabAcceptance(

@@ -106,7 +106,7 @@ test.describe('Tree Soil Surface Pixel 8 Pro acceptance', () => {
     expect(extraDrawCalls).toBe(0);
     expect(extraMaterials).toBe(0);
     expect(materialCount).toBe(2);
-    expect(drawCalls).toBeLessThanOrEqual(3);
+    expect(drawCalls).toBeLessThanOrEqual(4);
     expect(signature?.length ?? 0).toBeGreaterThan(0);
 
     await page.screenshot({
