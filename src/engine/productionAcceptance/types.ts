@@ -33,7 +33,7 @@ export interface TreeProductionPhaseCheckpointInput {
 
 export interface TreeProductionPhaseCheckpoint extends TreeProductionPhaseCheckpointInput {
   sequence: number;
-  status: 'pass';
+  status: 'pass' | 'fail';
 }
 
 export interface TreeProductionLeafIdentityInput {
