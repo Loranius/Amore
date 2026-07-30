@@ -5,6 +5,10 @@ import type {
 } from '../../canopyDepth';
 import type { TreeCanopyLightState } from '../../canopyLight';
 import type {
+  TreeCrownSilhouetteProfile,
+  TreeCrownSilhouetteState,
+} from '../../crownSilhouette';
+import type {
   TreeLeafGeometryState,
   TreeLeafInstance,
 } from '../../leafGeometry';
@@ -22,6 +26,7 @@ function matrixForInstance(
   instance: TreeLeafInstance,
   canopyProfile?: TreeCanopyDepthProfile,
   orientationProfile?: TreeLeafOrientationProfile,
+  silhouetteProfile?: TreeCrownSilhouetteProfile,
 ): THREE.Matrix4 {
   const yAxis = vector(instance.direction).normalize();
   const sourceNormal = vector(instance.normal);
@@ -51,7 +56,8 @@ function matrixForInstance(
       'YXZ',
     ))
     : new THREE.Matrix4();
-  const scaleMultiplier = canopyProfile?.scaleMultiplier ?? 1;
+  const scaleMultiplier = (canopyProfile?.scaleMultiplier ?? 1)
+    * (silhouetteProfile?.scaleMultiplier ?? 1);
   const size = new THREE.Matrix4().makeScale(
     instance.width * scaleMultiplier,
     instance.length * scaleMultiplier,
@@ -60,7 +66,11 @@ function matrixForInstance(
   const matrix = new THREE.Matrix4()
     .multiplyMatrices(basis, localOrientation)
     .multiply(size);
-  matrix.setPosition(vector(canopyProfile?.renderPosition ?? instance.position));
+  matrix.setPosition(vector(
+    silhouetteProfile?.renderPosition
+      ?? canopyProfile?.renderPosition
+      ?? instance.position,
+  ));
   return matrix;
 }
 
@@ -134,6 +144,30 @@ function validateOrientation(
   }
 }
 
+function validateCrownSilhouette(
+  leaves: TreeLeafGeometryState,
+  canopy: TreeCanopyDepthState | undefined,
+  light: TreeCanopyLightState | undefined,
+  phenology: TreePhenologyState | undefined,
+  orientation: TreeLeafOrientationState | undefined,
+  silhouette: TreeCrownSilhouetteState,
+): void {
+  if (!canopy || !light || !phenology || !orientation) {
+    throw new Error('Three Tree Leaf Geometry requires all crown layers before Crown Silhouette.');
+  }
+  if (silhouette.artifactSeed !== leaves.artifactSeed
+    || silhouette.lod !== leaves.lod
+    || silhouette.sourceLeafGeometryVersion !== leaves.treeLeafGeometryVersion
+    || silhouette.sourceLeafGeometryRulesVersion !== leaves.rulesVersion
+    || silhouette.sourceCanopyDepthSignature !== canopy.signature
+    || silhouette.sourceCanopyLightSignature !== light.signature
+    || silhouette.sourcePhenologySignature !== phenology.signature
+    || silhouette.sourceLeafOrientationSignature !== orientation.signature
+    || silhouette.profiles.length !== leaves.instances.length) {
+    throw new Error('Three Tree Leaf Geometry received incompatible Crown Silhouette.');
+  }
+}
+
 export function createThreeTreeLeafCardGeometry(state: TreeLeafGeometryState): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(state.template.positions, 3));
@@ -158,11 +192,20 @@ export function createThreeTreeLeafInstancedMesh(
   light?: TreeCanopyLightState,
   phenology?: TreePhenologyState,
   orientation?: TreeLeafOrientationState,
+  silhouette?: TreeCrownSilhouetteState,
 ): THREE.InstancedMesh {
   if (canopy) validateCanopyDepth(state, canopy);
   if (light) validateCanopyLight(state, canopy, light);
   if (phenology) validatePhenology(state, light, phenology);
   if (orientation) validateOrientation(state, canopy, light, phenology, orientation);
+  if (silhouette) validateCrownSilhouette(
+    state,
+    canopy,
+    light,
+    phenology,
+    orientation,
+    silhouette,
+  );
   const geometry = createThreeTreeLeafCardGeometry(state);
   const mesh = new THREE.InstancedMesh(geometry, material, state.instances.length);
   mesh.name = 'TreeLeafInstances';
@@ -175,9 +218,15 @@ export function createThreeTreeLeafInstancedMesh(
     const lightProfile = light?.profiles[instance.sequence];
     const phenologyProfile = phenology?.profiles[instance.sequence];
     const orientationProfile = orientation?.profiles[instance.sequence];
+    const silhouetteProfile = silhouette?.profiles[instance.sequence];
     mesh.setMatrixAt(
       instance.sequence,
-      matrixForInstance(instance, canopyProfile, orientationProfile),
+      matrixForInstance(
+        instance,
+        canopyProfile,
+        orientationProfile,
+        silhouetteProfile,
+      ),
     );
     const tint = phenologyProfile?.combinedTintMultiplier
       ?? lightProfile?.combinedTintMultiplier
@@ -195,6 +244,7 @@ export function createThreeTreeLeafInstancedMesh(
     canopyLightApplied: light !== undefined,
     phenologyApplied: phenology !== undefined,
     leafOrientationApplied: orientation !== undefined,
+    crownSilhouetteApplied: silhouette !== undefined,
   };
   if (canopy) {
     mesh.userData['treeCanopyDepth'] = {
@@ -256,6 +306,25 @@ export function createThreeTreeLeafInstancedMesh(
       maximumRotationRad: orientation.diagnostics.maximumRotationRad,
       additionalDrawCalls: orientation.diagnostics.estimatedAdditionalDrawCalls,
       additionalMaterials: orientation.diagnostics.estimatedAdditionalMaterials,
+    };
+  }
+  if (silhouette) {
+    mesh.userData['treeCrownSilhouette'] = {
+      version: silhouette.treeCrownSilhouetteVersion,
+      rulesVersion: silhouette.rulesVersion,
+      id: silhouette.descriptor.id,
+      profileId: silhouette.descriptor.profileId,
+      matrixAttributeId: silhouette.descriptor.matrixAttributeId,
+      negativeSpaceId: silhouette.descriptor.negativeSpaceId,
+      signature: silhouette.signature,
+      profiles: silhouette.profiles.length,
+      adjustedLeaves: silhouette.diagnostics.adjustedLeafCount,
+      emptyOuterSectors: silhouette.diagnostics.emptyOuterSectorCount,
+      averageEnvelopeErrorBefore: silhouette.diagnostics.averageEnvelopeErrorBefore,
+      averageEnvelopeErrorAfter: silhouette.diagnostics.averageEnvelopeErrorAfter,
+      negativeSpaceAccepted: silhouette.diagnostics.negativeSpaceAccepted,
+      additionalDrawCalls: silhouette.diagnostics.estimatedAdditionalDrawCalls,
+      additionalMaterials: silhouette.diagnostics.estimatedAdditionalMaterials,
     };
   }
   return mesh;
