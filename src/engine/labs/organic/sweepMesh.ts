@@ -317,12 +317,43 @@ function addCap(
   }
 }
 
+function maximumFrameRadius(frameState: OrganicCurveFrameState): number {
+  return Math.max(
+    1e-6,
+    ...frameState.curves.flatMap((curve) => curve.samples.map((sample) => sample.radius)),
+  );
+}
+
+function radialSegmentsForCurve(
+  curve: OrganicBranchCurve,
+  lod: OrganicMeshLod,
+  config: OrganicSurfaceConfig,
+  maximumRadius: number,
+): number {
+  const baseSegments = Math.max(3, Math.floor(config.radialSegmentsByLod[lod]));
+  if (lod === 'low') return baseSegments;
+
+  const curveRadius = Math.max(
+    curve.junction?.collarRadius ?? 0,
+    ...curve.samples.map((sample) => sample.radius),
+  );
+  const radiusRatio = curveRadius / Math.max(1e-6, maximumRadius);
+
+  if (curve.branchId === 'organic:trunk' || curve.generation === 0 || radiusRatio >= 0.5) {
+    return baseSegments;
+  }
+  if (curve.generation <= 1 || radiusRatio >= 0.22) {
+    return Math.max(7, baseSegments - 2);
+  }
+  return Math.max(6, baseSegments - 4);
+}
+
 export function buildOrganicSweepMesh(
   frameState: OrganicCurveFrameState,
   lod: OrganicMeshLod,
   config: OrganicSurfaceConfig = DEFAULT_ORGANIC_SURFACE_CONFIG,
 ): OrganicSweepMesh {
-  const radialSegments = Math.max(3, Math.floor(config.radialSegmentsByLod[lod]));
+  const maximumRadius = maximumFrameRadius(frameState);
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
@@ -333,6 +364,7 @@ export function buildOrganicSweepMesh(
   let junctionRingCount = 0;
 
   for (const curve of frameState.curves) {
+    const radialSegments = radialSegmentsForCurve(curve, lod, config, maximumRadius);
     const prepared = prepareCurveForLod(curve, lod, config);
     const samples = prepared.samples;
     if (samples.length < 2) continue;
