@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildGrowthSurfaceAtlas } from './surfaceAtlas';
+import {
+  buildGrowthSurfaceAtlas,
+  buildGrowthSurfaceAtlasFromMass,
+} from './surfaceAtlas';
 import type {
   GrowthBody,
   GrowthState,
@@ -115,6 +118,16 @@ describe('Growth Surface Atlas', () => {
     expect(reversed).toEqual(forward);
   });
 
+  it('builds the same atlas from an in-progress aggregate mass', () => {
+    const state = growthState();
+
+    expect(buildGrowthSurfaceAtlasFromMass({
+      species: state.species,
+      bodies: state.bodies,
+      occupiedSites: state.surfaceMap.occupiedSites,
+    })).toEqual(buildGrowthSurfaceAtlas(state));
+  });
+
   it('publishes finite normalized regions over the whole aggregate surface', () => {
     const atlas = buildGrowthSurfaceAtlas(growthState());
     const ids = new Set(atlas.regions.map((region) => region.id));
@@ -174,7 +187,7 @@ describe('Growth Surface Atlas', () => {
     }
   });
 
-  it('removes occupied surface regions from future growth potential', () => {
+  it('removes an explicitly reserved atlas region from future growth potential', () => {
     const initial = buildGrowthSurfaceAtlas(growthState());
     const target = initial.regions.find((region) => (
       region.sourceBodyId === MOTHER.id && region.exposed
@@ -186,9 +199,10 @@ describe('Growth Surface Atlas', () => {
       [{
         siteKey: 'occupied-test-site',
         bodyId: SUPPORT.id,
+        surfaceRegionId: target!.id,
         hostBodyId: MOTHER.id,
-        hostT: target!.hostT,
-        hostAngleRad: target!.azimuthRad,
+        hostT: 0,
+        hostAngleRad: target!.azimuthRad + Math.PI,
       }],
     ));
     const updated = occupied.regions.find((region) => region.id === target!.id);
