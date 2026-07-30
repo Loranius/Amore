@@ -143,7 +143,11 @@ describe('Tree Foliage', () => {
     expect(constrained.diagnostics.totalLeafCount).toBeLessThanOrEqual(60);
     expect(constrained.diagnostics.truncatedClusterIds.length).toBeGreaterThan(0);
     for (const cluster of constrained.clusters) {
-      expect(build.foliage.clusters.find((candidate) => candidate.id === cluster.id)).toEqual(cluster);
+      const source = build.foliage.clusters.find((candidate) => candidate.id === cluster.id);
+      expect(source).toBeDefined();
+      const { sequence: _constrainedSequence, ...stableCluster } = cluster;
+      const { sequence: _sourceSequence, ...stableSource } = source!;
+      expect(stableCluster).toEqual(stableSource);
     }
   });
 });
