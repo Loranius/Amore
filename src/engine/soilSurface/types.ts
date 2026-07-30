@@ -10,6 +10,8 @@ export interface TreeSoilSurfaceConfig {
   /** Number of published values available per RGB multiplier channel. */
   quantizationSteps: number;
   maximumUniqueTints: number;
+  radialTintBands: number;
+  variationTintBands: number;
   plateauTint: TreeRgb;
   reliefTint: TreeRgb;
   edgeTint: TreeRgb;
@@ -41,6 +43,8 @@ export interface TreeSoilSurfaceDiagnostics {
   tintBudget: number;
   tintBudgetExceeded: false;
   quantizationSteps: number;
+  radialTintBands: number;
+  variationTintBands: number;
   prefixWhitePreserved: true;
   terrainRangePreserved: true;
   materialRole: 'bark';
