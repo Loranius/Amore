@@ -15,6 +15,8 @@ export type {
   GrowthAttributeValue,
   GrowthAttributes,
   GrowthBody,
+  GrowthCenterRole,
+  GrowthCenterState,
   GrowthColonyState,
   GrowthDiagnostics,
   GrowthEngineConfig,
@@ -25,6 +27,7 @@ export type {
   GrowthTier,
   GrowthVec3,
   UniversalGrowthBlueprint,
+  UniversalGrowthCenter,
   UniversalGrowthColony,
   UniversalGrowthInstruction,
 } from './types';
