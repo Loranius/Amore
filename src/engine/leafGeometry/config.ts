@@ -1,21 +1,21 @@
 import type { TreeLeafGeometryConfig } from './types';
 
 export const DEFAULT_TREE_LEAF_GEOMETRY_CONFIG: TreeLeafGeometryConfig = {
-  rulesVersion: '1.0.0',
+  rulesVersion: 'tree-leaf-geometry-v1.1.0',
   renderFractionByLod: {
     high: 1,
-    medium: 0.58,
-    low: 0.3,
+    medium: 0.76,
+    low: 0.34,
   },
   maxInstancesByLod: {
     high: 900,
-    medium: 520,
-    low: 260,
+    medium: 720,
+    low: 360,
   },
-  minimumLength: 0.12,
-  maximumLength: 0.3,
-  minimumWidthRatio: 0.38,
-  maximumWidthRatio: 0.58,
+  minimumLength: 0.14,
+  maximumLength: 0.32,
+  minimumWidthRatio: 0.42,
+  maximumWidthRatio: 0.62,
   radialSpread: 0.76,
-  axialSpread: 0.52,
+  axialSpread: 0.58,
 };
