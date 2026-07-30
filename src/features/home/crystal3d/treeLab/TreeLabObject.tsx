@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import type { TreeGroundDetailState } from '@/engine/groundDetail';
 import type { TreeLeafGeometryState } from '@/engine/leafGeometry';
 import type { OrganicSweepMesh } from '@/engine/labs/organic';
 import type { TreeRootGeometryState } from '@/engine/rootGeometry';
@@ -13,6 +14,7 @@ import type { TreeMaterialState } from '@/engine/treeMaterial';
 import {
   applyThreeTreeLifeFrame,
   createThreeOrganicSweepGeometry,
+  createThreeTreeGroundDetailInstancedMesh,
   createThreeTreeLeafInstancedMesh,
   createThreeTreeLifeBinding,
   createThreeTreeMaterialPair,
@@ -24,6 +26,7 @@ interface TreeLabObjectProps {
   mesh: OrganicSweepMesh;
   rootGeometry: TreeRootGeometryState;
   soilSurface: TreeSoilSurfaceState;
+  groundDetails: TreeGroundDetailState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
   life: TreeLifeState;
@@ -34,6 +37,7 @@ export function TreeLabObject({
   mesh,
   rootGeometry,
   soilSurface,
+  groundDetails,
   leaves,
   materials,
   life,
@@ -53,6 +57,10 @@ export function TreeLabObject({
   const leafMesh = useMemo(
     () => createThreeTreeLeafInstancedMesh(leaves, materialPair.foliage),
     [leaves, materialPair],
+  );
+  const groundDetailMesh = useMemo(
+    () => createThreeTreeGroundDetailInstancedMesh(groundDetails),
+    [groundDetails],
   );
 
   useEffect(() => {
@@ -79,9 +87,15 @@ export function TreeLabObject({
     branchGeometry.dispose();
     rootsGeometry.dispose();
     leafMesh.geometry.dispose();
+    groundDetailMesh.geometry.dispose();
+    if (Array.isArray(groundDetailMesh.material)) {
+      for (const material of groundDetailMesh.material) material.dispose();
+    } else {
+      groundDetailMesh.material.dispose();
+    }
     materialPair.bark.dispose();
     materialPair.foliage.dispose();
-  }, [branchGeometry, rootsGeometry, leafMesh, materialPair]);
+  }, [branchGeometry, rootsGeometry, leafMesh, groundDetailMesh, materialPair]);
 
   return (
     <group>
@@ -98,6 +112,7 @@ export function TreeLabObject({
           }}
         />
       )}
+      {groundDetails.instances.length > 0 && <primitive object={groundDetailMesh} />}
       <group ref={motionRoot}>
         <mesh
           geometry={branchGeometry}
