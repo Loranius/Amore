@@ -15,6 +15,9 @@ export interface TreeCrownSilhouetteConfig {
   maximumScaleDelta: number;
   envelopeResponse: number;
   middleLayerResponse: number;
+  frontClosureSelectionFraction: number;
+  frontClosureTargetRadialRatio: number;
+  frontClosureMaximumInwardOffsetRatio: number;
   frontClosureScaleDelta: number;
   viewDirectionCount: number;
   minimumReadableFacingDot: number;
@@ -40,6 +43,8 @@ export interface TreeCrownSilhouetteProfile {
   targetEnvelopeRatio: number;
   radialOffset: number;
   radialOffsetRatio: number;
+  frontClosureSelected: boolean;
+  frontClosureInwardOffsetRatio: number;
   frontClosureScaleDelta: number;
   scaleMultiplier: number;
   envelopeErrorBefore: number;
@@ -93,6 +98,7 @@ export interface TreeCrownSilhouetteState {
     adjustedOuterLeafCount: number;
     adjustedMiddleLeafCount: number;
     frontClosureLeafCount: number;
+    frontClosureInwardLeafCount: number;
     untouchedInnerLeafCount: number;
     untouchedMiddleLeafCount: number;
     occupiedOuterSectorIndices: number[];
@@ -101,6 +107,7 @@ export interface TreeCrownSilhouetteState {
     emptyOuterSectorCount: number;
     maximumRadialOffset: number;
     maximumRadialOffsetRatio: number;
+    maximumFrontClosureInwardOffsetRatio: number;
     maximumScaleDelta: number;
     averageEnvelopeErrorBefore: number;
     averageEnvelopeErrorAfter: number;
