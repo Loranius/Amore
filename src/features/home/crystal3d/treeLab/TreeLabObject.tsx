@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import type { TreeBarkSurfaceState } from '@/engine/barkSurface';
 import type { TreeGroundDetailState } from '@/engine/groundDetail';
 import type { TreeLeafGeometryState } from '@/engine/leafGeometry';
 import type { OrganicSweepMesh } from '@/engine/labs/organic';
@@ -26,6 +27,7 @@ interface TreeLabObjectProps {
   mesh: OrganicSweepMesh;
   rootGeometry: TreeRootGeometryState;
   soilSurface: TreeSoilSurfaceState;
+  barkSurface: TreeBarkSurfaceState;
   groundDetails: TreeGroundDetailState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
@@ -37,6 +39,7 @@ export function TreeLabObject({
   mesh,
   rootGeometry,
   soilSurface,
+  barkSurface,
   groundDetails,
   leaves,
   materials,
@@ -45,14 +48,17 @@ export function TreeLabObject({
 }: TreeLabObjectProps) {
   const motionRoot = useRef<THREE.Group>(null);
   const lifeBinding = useRef<ThreeTreeLifeBinding | null>(null);
-  const branchGeometry = useMemo(() => createThreeOrganicSweepGeometry(mesh), [mesh]);
+  const branchGeometry = useMemo(
+    () => createThreeOrganicSweepGeometry(mesh, barkSurface),
+    [mesh, barkSurface],
+  );
   const rootsGeometry = useMemo(
-    () => createThreeTreeRootGeometry(rootGeometry, soilSurface),
-    [rootGeometry, soilSurface],
+    () => createThreeTreeRootGeometry(rootGeometry, soilSurface, barkSurface),
+    [rootGeometry, soilSurface, barkSurface],
   );
   const materialPair = useMemo(
-    () => createThreeTreeMaterialPair(materials),
-    [materials],
+    () => createThreeTreeMaterialPair(materials, barkSurface),
+    [materials, barkSurface],
   );
   const leafMesh = useMemo(
     () => createThreeTreeLeafInstancedMesh(leaves, materialPair.foliage),
@@ -109,6 +115,7 @@ export function TreeLabObject({
             treeRootAnchored: true,
             treeTerrainMerged: rootGeometry.diagnostics.terrainMergedIntoStaticMesh,
             treeSoilTintApplied: true,
+            treeBarkSurfaceApplied: true,
           }}
         />
       )}
@@ -119,6 +126,7 @@ export function TreeLabObject({
           material={materialPair.bark}
           castShadow={false}
           receiveShadow={false}
+          userData={{ treeBarkSurfaceApplied: true }}
         />
         {leaves.instances.length > 0 && <primitive object={leafMesh} />}
       </group>
