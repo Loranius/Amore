@@ -49,25 +49,30 @@ function removeVertexSlice(
   return [...values.slice(0, first), ...values.slice(last)];
 }
 
-function trimChildCollar(
+function shiftAfterRemoval(
   mesh: OrganicSweepMesh,
-  branchId: string,
+  input: {
+    branchId: string;
+    firstRemovedVertex: number;
+    removedVertices: number;
+    firstRemovedIndex: number;
+    removedIndices: number;
+    removedRings: number;
+    junctionRingCount?: number;
+    junctionRingDelta?: number;
+  },
 ): OrganicSweepMesh {
-  const target = mesh.branches.find((branch) => branch.branchId === branchId);
-  if (!target || target.junctionRingCount <= 1) return mesh;
-
-  const removedRings = target.junctionRingCount;
-  const removedVertices = removedRings * target.radialSegments;
-  const removedIndices = removedRings * target.radialSegments * 6;
-  if (target.ringCount - removedRings < 2
-    || removedVertices >= target.vertexCount
-    || removedIndices >= target.indexCount) {
-    return mesh;
-  }
-
-  const firstRemovedVertex = target.firstVertex;
+  const {
+    branchId,
+    firstRemovedVertex,
+    removedVertices,
+    firstRemovedIndex,
+    removedIndices,
+    removedRings,
+    junctionRingCount,
+    junctionRingDelta = 0,
+  } = input;
   const lastRemovedVertex = firstRemovedVertex + removedVertices;
-  const firstRemovedIndex = target.firstIndex;
   const lastRemovedIndex = firstRemovedIndex + removedIndices;
   const positions = removeVertexSlice(
     mesh.positions,
@@ -102,8 +107,7 @@ function trimChildCollar(
         vertexCount: branch.vertexCount - removedVertices,
         indexCount: branch.indexCount - removedIndices,
         ringCount: branch.ringCount - removedRings,
-        // One logical shared-shell transition replaces all explicit collar rings.
-        junctionRingCount: 1,
+        junctionRingCount: junctionRingCount ?? branch.junctionRingCount,
       };
     }
     return {
@@ -127,32 +131,143 @@ function trimChildCollar(
     diagnostics: {
       ...mesh.diagnostics,
       ringCount: mesh.diagnostics.ringCount - removedRings,
-      junctionRingCount: mesh.diagnostics.junctionRingCount - removedRings + 1,
+      junctionRingCount: mesh.diagnostics.junctionRingCount + junctionRingDelta,
       vertexCount: mesh.diagnostics.vertexCount - removedVertices,
       triangleCount: mesh.diagnostics.triangleCount - removedIndices / 3,
     },
   };
 }
 
-function removeSharedForkCollars(
+function sampledCurveIndices(
+  curve: OrganicBranchCurve,
+  stride: number,
+): number[] {
+  return curve.samples
+    .map((_sample, index) => index)
+    .filter((index) => (
+      index === 0
+      || index === curve.samples.length - 1
+      || index % stride === 0
+    ));
+}
+
+function parentRingsCoveredByShell(
+  parent: OrganicBranchCurve,
+  lod: OrganicMeshLod,
+  config: OrganicSurfaceConfig,
+): number {
+  const terminal = parent.samples[parent.samples.length - 1];
+  if (!terminal) return 0;
+  const minimumBlendLength = terminal.radius * 1.05;
+  let lowerIndex = Math.max(0, parent.samples.length - 2);
+  for (let index = parent.samples.length - 2; index >= 0; index -= 1) {
+    const candidate = parent.samples[index];
+    if (!candidate) continue;
+    lowerIndex = index;
+    if (distance(candidate.position, terminal.position) >= minimumBlendLength) break;
+  }
+
+  const stride = Math.max(1, Math.floor(config.axialStrideByLod[lod]));
+  const sampled = sampledCurveIndices(parent, stride);
+  const firstCovered = sampled.findIndex((index) => index >= lowerIndex);
+  if (firstCovered < 0) return 0;
+  return sampled.length - firstCovered;
+}
+
+function trimParentForkTube(
   mesh: OrganicSweepMesh,
   fork: SharedFork,
+  lod: OrganicMeshLod,
+  config: OrganicSurfaceConfig,
 ): OrganicSweepMesh {
+  const target = mesh.branches.find(
+    (branch) => branch.branchId === fork.parent.branchId,
+  );
+  if (!target) return mesh;
+  const coveredRings = parentRingsCoveredByShell(fork.parent, lod, config);
+  const removedRings = Math.min(
+    Math.max(0, coveredRings),
+    Math.max(0, target.ringCount - 2),
+  );
+  if (removedRings <= 0) return mesh;
+
+  const retainedRings = target.ringCount - removedRings;
+  const removedVertices = removedRings * target.radialSegments;
+  const removedIndices = removedRings * target.radialSegments * 6;
+  const firstRemovedVertex = target.firstVertex
+    + retainedRings * target.radialSegments;
+  const firstRemovedIndex = target.firstIndex
+    + (retainedRings - 1) * target.radialSegments * 6;
+  if (removedVertices >= target.vertexCount
+    || removedIndices >= target.indexCount) {
+    return mesh;
+  }
+
+  return shiftAfterRemoval(mesh, {
+    branchId: target.branchId,
+    firstRemovedVertex,
+    removedVertices,
+    firstRemovedIndex,
+    removedIndices,
+    removedRings,
+  });
+}
+
+function trimChildCollar(
+  mesh: OrganicSweepMesh,
+  branchId: string,
+): OrganicSweepMesh {
+  const target = mesh.branches.find((branch) => branch.branchId === branchId);
+  if (!target || target.junctionRingCount <= 1) return mesh;
+
+  const removedRings = target.junctionRingCount;
+  const removedVertices = removedRings * target.radialSegments;
+  const removedIndices = removedRings * target.radialSegments * 6;
+  if (target.ringCount - removedRings < 2
+    || removedVertices >= target.vertexCount
+    || removedIndices >= target.indexCount) {
+    return mesh;
+  }
+
+  return shiftAfterRemoval(mesh, {
+    branchId,
+    firstRemovedVertex: target.firstVertex,
+    removedVertices,
+    firstRemovedIndex: target.firstIndex,
+    removedIndices,
+    removedRings,
+    // One logical shared-shell transition replaces all explicit collar rings.
+    junctionRingCount: 1,
+    junctionRingDelta: -removedRings + 1,
+  });
+}
+
+function removeSharedForkOverlaps(
+  mesh: OrganicSweepMesh,
+  fork: SharedFork,
+  lod: OrganicMeshLod,
+  config: OrganicSurfaceConfig,
+): OrganicSweepMesh {
+  const parentTrimmed = trimParentForkTube(mesh, fork, lod, config);
   const orderedChildren = [...fork.children].sort((left, right) => {
-    const leftRange = mesh.branches.find((branch) => branch.branchId === left.branchId);
-    const rightRange = mesh.branches.find((branch) => branch.branchId === right.branchId);
+    const leftRange = parentTrimmed.branches.find(
+      (branch) => branch.branchId === left.branchId,
+    );
+    const rightRange = parentTrimmed.branches.find(
+      (branch) => branch.branchId === right.branchId,
+    );
     return (rightRange?.firstVertex ?? 0) - (leftRange?.firstVertex ?? 0);
   });
   return orderedChildren.reduce(
     (current, child) => trimChildCollar(current, child.branchId),
-    mesh,
+    parentTrimmed,
   );
 }
 
 /**
- * Production tree sweep: build the shared implicit Y-shell, then remove the
- * explicit child collar rings hidden underneath it so only one bark surface
- * remains visible at the main fork.
+ * Production tree sweep: build the shared implicit Y-shell, then remove every
+ * parent/child ring hidden underneath it so one continuous bark surface owns
+ * the complete main fork.
  */
 export function buildOrganicSweepMesh(
   frameState: OrganicCurveFrameState,
@@ -161,5 +276,7 @@ export function buildOrganicSweepMesh(
 ): OrganicSweepMesh {
   const seamless = buildSeamlessOrganicSweepMesh(frameState, lod, config);
   const fork = findSharedFork(frameState);
-  return fork ? removeSharedForkCollars(seamless, fork) : seamless;
+  return fork
+    ? removeSharedForkOverlaps(seamless, fork, lod, config)
+    : seamless;
 }
