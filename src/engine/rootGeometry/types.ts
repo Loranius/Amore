@@ -5,6 +5,7 @@ import type {
   OrganicSweepMesh,
 } from '../labs/organic';
 import type { TreeRootArchitectureState } from '../rootArchitecture';
+import type { TreeTerrainBindingState } from '../terrainBinding';
 
 export interface TreeRootGeometryConfig {
   /** Bump whenever root meshing, LOD or geometry budgets change. */
@@ -26,6 +27,10 @@ export interface TreeRootGeometryDiagnostics {
   visiblePathFraction: number | null;
   collarVertexCount: number;
   collarTriangleCount: number;
+  terrainApplied: boolean;
+  terrainVertexCount: number;
+  terrainTriangleCount: number;
+  terrainMergedIntoStaticMesh: boolean;
   vertexBudget: number;
   triangleBudget: number;
   vertexBudgetExceeded: boolean;
@@ -41,6 +46,8 @@ export interface TreeRootGeometryState {
   sourceRootRulesVersion: string;
   sourceGroundContactVersion: TreeGroundContactState['treeGroundContactVersion'] | null;
   sourceGroundContactRulesVersion: string | null;
+  sourceTerrainBindingVersion: TreeTerrainBindingState['treeTerrainBindingVersion'] | null;
+  sourceTerrainBindingRulesVersion: string | null;
   artifactSeed: number;
   lod: OrganicMeshLod;
   mesh: OrganicSweepMesh;
@@ -50,6 +57,7 @@ export interface TreeRootGeometryState {
 export interface BuildTreeRootGeometryInput {
   roots: TreeRootArchitectureState;
   contact?: TreeGroundContactState;
+  terrain?: TreeTerrainBindingState;
   lod: OrganicMeshLod;
   config: TreeRootGeometryConfig;
 }
