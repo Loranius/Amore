@@ -1,4 +1,9 @@
 import {
+  DEFAULT_TREE_BARK_SURFACE_CONFIG,
+  buildTreeBarkSurface,
+  type TreeBarkSurfaceState,
+} from '@/engine/barkSurface';
+import {
   DEFAULT_TREE_COMPOSITION_CONFIG,
   buildTreeComposition,
   type TreeCompositionState,
@@ -93,6 +98,7 @@ export interface TreeLabPreviewBuild {
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
   soilSurface: TreeSoilSurfaceState;
+  barkSurface: TreeBarkSurfaceState;
   groundDetails: TreeGroundDetailState;
   life: TreeLifeState;
   mesh: OrganicSweepMesh;
@@ -187,6 +193,16 @@ export function buildTreeLabPreviewFromArtifact({
     materials,
     config: DEFAULT_TREE_SOIL_SURFACE_CONFIG,
   });
+  const mesh = buildOrganicSweepMesh(frames, lod);
+  const barkSurface = buildTreeBarkSurface({
+    species,
+    frames,
+    mesh,
+    rootGeometry,
+    soil: soilSurface,
+    materials,
+    config: DEFAULT_TREE_BARK_SURFACE_CONFIG,
+  });
   const groundDetails = buildTreeGroundDetail({
     species,
     terrain,
@@ -200,7 +216,6 @@ export function buildTreeLabPreviewFromArtifact({
     materials,
     config: DEFAULT_TREE_LIFE_CONFIG,
   });
-  const mesh = buildOrganicSweepMesh(frames, lod);
 
   return {
     seed: field.seed,
@@ -219,6 +234,7 @@ export function buildTreeLabPreviewFromArtifact({
     leaves,
     materials,
     soilSurface,
+    barkSurface,
     groundDetails,
     life,
     mesh,
