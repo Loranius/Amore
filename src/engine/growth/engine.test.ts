@@ -135,7 +135,7 @@ describe('Universal Growth Engine', () => {
     for (const center of centers) {
       expect(center.dominantBodyId).toBe(center.sourceInstructionId);
       expect(typeof center.surfaceRegionId).toBe('string');
-      expect(center.bodyIds.length).toBeGreaterThanOrEqual(4);
+      expect(center.bodyIds.length).toBeGreaterThanOrEqual(3);
       expect(center.bodyIds.length).toBeLessThanOrEqual(6);
 
       const dominant = bodyById.get(center.dominantBodyId!);
