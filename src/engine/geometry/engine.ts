@@ -1,4 +1,5 @@
 import type { GrowthBody } from '../growth';
+import { buildCrystalGeologyState } from '../species/crystal/geology';
 import { buildCrystalJunction } from './junction';
 import { buildCrystalMesh } from './mesh';
 import { trimCrystalMesh } from './trim';
@@ -102,6 +103,7 @@ export function buildCrystalGeometry(
   input: BuildCrystalGeometryInput,
 ): CrystalGeometryState {
   validateInput(input);
+  const geology = buildCrystalGeologyState(input.growth);
   const diagnostics: CrystalGeometryDiagnostics = {
     missingHostBodyIds: [],
     unsealedJunctionIds: [],
@@ -159,6 +161,7 @@ export function buildCrystalGeometry(
     engineVersion: input.growth.engineVersion,
     speciesRulesVersion: input.growth.speciesRulesVersion,
     artifactSeed: input.growth.artifactSeed,
+    geology,
     meshes,
     junctions,
     budget: {
