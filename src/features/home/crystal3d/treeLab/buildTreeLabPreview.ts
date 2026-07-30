@@ -24,6 +24,11 @@ import {
   type OrganicSweepMesh,
 } from '@/engine/labs/organic';
 import {
+  DEFAULT_TREE_ROOT_ARCHITECTURE_CONFIG,
+  buildTreeRootArchitecture,
+  type TreeRootArchitectureState,
+} from '@/engine/rootArchitecture';
+import {
   buildTreeSpeciesBlueprint,
   treeToOrganicField,
   type TreeOrganicField,
@@ -55,6 +60,7 @@ export interface TreeLabPreviewBuild {
   skeleton: OrganicSkeletonState;
   frames: OrganicCurveFrameState;
   composition: TreeCompositionState;
+  roots: TreeRootArchitectureState;
   foliage: TreeFoliageState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
@@ -102,6 +108,12 @@ export function buildTreeLabPreviewFromArtifact({
     frames,
     config: DEFAULT_TREE_COMPOSITION_CONFIG,
   });
+  const roots = buildTreeRootArchitecture({
+    species,
+    composition,
+    frames,
+    config: DEFAULT_TREE_ROOT_ARCHITECTURE_CONFIG,
+  });
   const foliage = buildTreeFoliage({
     species,
     frames,
@@ -138,6 +150,7 @@ export function buildTreeLabPreviewFromArtifact({
     skeleton,
     frames,
     composition,
+    roots,
     foliage,
     leaves,
     materials,
