@@ -109,7 +109,7 @@ export function buildTreeLeafOrientation(
 
     const bounds = input.config.orientationByLayer[depth.layer];
     const tiltRad = quantizedSigned(
-      input.artifactSeed ?? input.leaves.artifactSeed,
+      input.leaves.artifactSeed,
       `${leaf.id}:leaf-orientation:tilt`,
       bounds.maximumTiltRad,
       input.config.quantizationBands,
