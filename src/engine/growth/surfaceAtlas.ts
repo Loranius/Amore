@@ -39,6 +39,10 @@ export interface GrowthSurfaceRegion {
   readonly surfaceStress: number;
   readonly growthPotential: number;
   readonly localDensity: number;
+  /** Light/resource suppression produced by nearby mature crystal bodies. */
+  readonly growthShadow: number;
+  /** Extra local pressure produced by bodies in the same Growth Center. */
+  readonly competitionPressure: number;
   readonly maturity: number;
 }
 
@@ -63,6 +67,11 @@ interface AxisProjection {
   readonly rawT: number;
   readonly axisPoint: GrowthVec3;
   readonly axisDistance: number;
+}
+
+interface GrowthShadowField {
+  readonly growthShadow: number;
+  readonly competitionPressure: number;
 }
 
 function compareIds(left: string, right: string): number {
@@ -123,6 +132,80 @@ function densityAt(
   return round6(clamp01(accumulated / 3));
 }
 
+function bodyShadowStrength(body: GrowthBody): number {
+  const size = clamp01(
+    (body.skeletonLength * 0.48 + body.skeletonRadius * 3.2) / 1.5,
+  );
+  const maturity = 0.2 + clamp01(body.maturity) * 0.8;
+  const role = body.growthCenterRole === 'dominant'
+    ? 1
+    : body.tier === 'king'
+      ? 0.95
+      : body.growthCenterRole === 'satellite'
+        ? 0.72
+        : body.tier === 'support' || body.tier === 'family'
+          ? 0.64
+          : body.tier === 'companion'
+            ? 0.5
+            : 0.32;
+  const energy = 0.5 + clamp01(body.growthEnergy) * 0.5;
+  return clamp01(size * maturity * role * energy);
+}
+
+function shadowFieldAt(
+  species: string,
+  sourceBody: GrowthBody,
+  point: GrowthVec3,
+  surfaceNormal: GrowthVec3,
+  bodies: readonly GrowthBody[],
+): GrowthShadowField {
+  if (species !== 'crystal') {
+    return { growthShadow: 0, competitionPressure: 0 };
+  }
+
+  let transmission = 1;
+  let sameCenterPressure = 0;
+  const sourceCenterId = sourceBody.growthCenterId ?? null;
+
+  for (const body of bodies) {
+    if (body.id === sourceBody.id) continue;
+    const projection = projectToAxis(body, point);
+    if (projection.rawT < -0.25 || projection.rawT > 1.25) continue;
+
+    const otherRadius = radiusAt(body, projection.t);
+    const clearance = Math.max(0, projection.axisDistance - otherRadius);
+    const influenceRadius = Math.max(
+      0.000001,
+      0.08 + otherRadius * 4.6 + body.skeletonLength * 0.34,
+    );
+    const proximity = clamp01(1 - clearance / influenceRadius);
+    if (proximity <= 0) continue;
+
+    const towardAxis = normalize(
+      subtract(projection.axisPoint, point),
+      scale(surfaceNormal, -1),
+    );
+    const facing = clamp01((dot(surfaceNormal, towardAxis) + 1) * 0.5);
+    const axialShelter = clamp01(1 - Math.abs(projection.rawT - 0.5) / 0.85);
+    const sameCenter = sourceCenterId !== null
+      && (body.growthCenterId ?? null) === sourceCenterId;
+    const strength = clamp01(
+      bodyShadowStrength(body)
+      * proximity
+      * (0.48 + facing * 0.32 + axialShelter * 0.2)
+      * (sameCenter ? 1.18 : 1),
+    );
+
+    transmission *= 1 - strength * 0.8;
+    if (sameCenter) sameCenterPressure += strength;
+  }
+
+  return {
+    growthShadow: round6(clamp01(1 - transmission)),
+    competitionPressure: round6(clamp01(sameCenterPressure / 1.25)),
+  };
+}
+
 function isOccupied(
   regionId: string,
   bodyId: string,
@@ -142,6 +225,7 @@ function isOccupied(
 }
 
 function buildBodyRegions(
+  species: string,
   body: GrowthBody,
   bodies: readonly GrowthBody[],
   occupiedSites: readonly GrowthSurfaceOccupancy[],
@@ -174,21 +258,28 @@ function buildBodyRegions(
       const exposed = !isCoveredByAnotherBody(body.id, surfacePosition, bodies);
       const occupied = isOccupied(regionId, body.id, hostT, azimuthRad, occupiedSites);
       const localDensity = densityAt(body.id, surfacePosition, sourceRadius, bodies);
+      const shadow = shadowFieldAt(species, body, surfacePosition, surfaceNormal, bodies);
       const crowding = clamp01(body.crowding / 4);
       const surfaceStress = round6(clamp01(
-        body.competition * 0.45
-        + crowding * 0.2
-        + localDensity * 0.35
+        body.competition * 0.32
+        + crowding * 0.14
+        + localDensity * 0.22
+        + shadow.growthShadow * 0.22
+        + shadow.competitionPressure * 0.1
         + (occupied ? 0.15 : 0),
       ));
       const upwardExposure = clamp01((surfaceNormal.y + 1) * 0.5);
+      const basePotential = (1 - surfaceStress) * 0.44
+        + (1 - localDensity) * 0.18
+        + upwardExposure * 0.13
+        + (1 - body.maturity) * 0.05
+        + (1 - shadow.growthShadow) * 0.2;
       const growthPotential = !exposed || occupied
         ? 0
         : round6(clamp01(
-          (1 - surfaceStress) * 0.55
-          + (1 - localDensity) * 0.25
-          + upwardExposure * 0.15
-          + (1 - body.maturity) * 0.05,
+          basePotential
+          * (1 - shadow.growthShadow * 0.72)
+          * (1 - shadow.competitionPressure * 0.45),
         ));
 
       regions.push({
@@ -205,6 +296,8 @@ function buildBodyRegions(
         surfaceStress,
         growthPotential,
         localDensity,
+        growthShadow: shadow.growthShadow,
+        competitionPressure: shadow.competitionPressure,
         maturity: round6(clamp01(body.maturity)),
       });
     }
@@ -224,6 +317,7 @@ export function buildGrowthSurfaceAtlasFromMass(
     (left, right) => left.sequence - right.sequence || compareIds(left.id, right.id),
   );
   const regions = bodies.flatMap((body) => buildBodyRegions(
+    input.species,
     body,
     bodies,
     input.occupiedSites,
@@ -245,8 +339,8 @@ export function buildGrowthSurfaceAtlasFromMass(
 /**
  * Builds a deterministic species-neutral atlas over the aggregate analytical
  * surface. Region identity and coordinates depend only on the source body;
- * density, stress and exposure are current-field values derived from the full
- * mineral mass.
+ * density, stress, shadow and exposure are current-field values derived from
+ * the full mineral mass.
  */
 export function buildGrowthSurfaceAtlas(state: GrowthState): GrowthSurfaceAtlas {
   return buildGrowthSurfaceAtlasFromMass({
