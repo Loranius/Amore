@@ -3,7 +3,7 @@ export { DEFAULT_ORGANIC_SKELETON_CONFIG } from './config';
 export { buildOrganicCurveFrames } from './curveFrames';
 export { buildOrganicSkeleton } from './spaceColonization';
 export { DEFAULT_ORGANIC_SURFACE_CONFIG } from './surfaceConfig';
-export { buildOrganicSweepMesh } from './sweepMesh';
+export { buildOrganicSweepMesh } from './productionSweepMesh';
 export type {
   OrganicBranchCurve,
   OrganicCurveFrameSample,

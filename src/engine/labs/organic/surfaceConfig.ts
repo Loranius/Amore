@@ -3,22 +3,22 @@ import type { OrganicSurfaceConfig } from './surfaceTypes';
 export const DEFAULT_ORGANIC_SURFACE_CONFIG: OrganicSurfaceConfig = {
   curveSamplesPerSegment: 3,
   minimumRadius: 0.004,
-  junctionInsetRatio: 0.28,
-  junctionSurfaceRatio: 0.96,
-  junctionFlare: 1.48,
+  junctionInsetRatio: 0.24,
+  junctionSurfaceRatio: 0.98,
+  junctionFlare: 1.56,
   junctionSegmentsByLod: {
-    high: 5,
+    high: 4,
     medium: 4,
-    low: 2,
+    low: 3,
   },
   radialSegmentsByLod: {
-    high: 10,
-    medium: 7,
-    low: 5,
+    high: 9,
+    medium: 8,
+    low: 6,
   },
   axialStrideByLod: {
     high: 1,
-    medium: 2,
-    low: 4,
+    medium: 1,
+    low: 3,
   },
 };
