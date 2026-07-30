@@ -52,6 +52,8 @@ describe('Tree Canopy Depth', () => {
 
     const sourceCells = new Set(build.foliage.clusters.map((cluster) => cluster.crownCellId));
     for (const profile of canopy.profiles) {
+      expect(profile.depth).toBeGreaterThanOrEqual(0);
+      expect(profile.depth).toBeLessThanOrEqual(1);
       expect(sourceCells.has(profile.crownCellId)).toBe(true);
       if (profile.layer === 'inner') {
         expect(profile.depth).toBeLessThanOrEqual(DEFAULT_TREE_CANOPY_DEPTH_CONFIG.innerDepthMaximum);
@@ -98,13 +100,23 @@ describe('Tree Canopy Depth', () => {
     expect(canopy.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
   });
 
-  it('preserves strict leaf ID prefixes across LODs', () => {
-    const low = rebuild('low').canopy.profiles.map((profile) => profile.leafInstanceId);
-    const medium = rebuild('medium').canopy.profiles.map((profile) => profile.leafInstanceId);
-    const high = rebuild('high').canopy.profiles.map((profile) => profile.leafInstanceId);
+  it('keeps lower LOD profiles stable in higher LODs', () => {
+    const low = rebuild('low').canopy.profiles;
+    const medium = rebuild('medium').canopy.profiles;
+    const high = rebuild('high').canopy.profiles;
+    const mediumById = new Map(medium.map((profile) => [profile.leafInstanceId, profile] as const));
+    const highById = new Map(high.map((profile) => [profile.leafInstanceId, profile] as const));
 
-    expect(medium.slice(0, low.length)).toEqual(low);
-    expect(high.slice(0, medium.length)).toEqual(medium);
+    for (const profile of low) {
+      expect(mediumById.get(profile.leafInstanceId)).toEqual({
+        ...profile,
+        sequence: mediumById.get(profile.leafInstanceId)?.sequence,
+      });
+      expect(highById.get(profile.leafInstanceId)).toEqual({
+        ...profile,
+        sequence: highById.get(profile.leafInstanceId)?.sequence,
+      });
+    }
   });
 
   it('does not mutate composition, foliage, leaves or materials', () => {
