@@ -13,6 +13,18 @@ import type {
   CrystalProfileRow,
 } from './types';
 
+interface BaseProfileRow {
+  y: number;
+  radius: number;
+}
+
+interface ProfileShapeTuning {
+  asymmetry: number;
+  twist: number;
+  lean: number;
+  phase: number;
+}
+
 function stringAttribute(value: GrowthAttributeValue | undefined, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback;
 }
@@ -47,7 +59,22 @@ function profileScales(archetype: string): { scaleX: number; scaleZ: number } {
   return { scaleX: 1, scaleZ: 1 };
 }
 
-function appendRow(rows: CrystalProfileRow[], y: number, radius: number): void {
+function shapeTuning(archetype: string, mother: boolean): ProfileShapeTuning {
+  if (mother) return { asymmetry: 0.035, twist: 0.045, lean: 0.035, phase: 0.018 };
+  if (archetype === 'blade') return { asymmetry: 0.18, twist: 0.14, lean: 0.18, phase: 0.09 };
+  if (archetype === 'tabular') return { asymmetry: 0.14, twist: 0.1, lean: 0.12, phase: 0.07 };
+  if (archetype === 'needle') return { asymmetry: 0.06, twist: 0.16, lean: 0.14, phase: 0.055 };
+  if (archetype === 'massive') return { asymmetry: 0.12, twist: 0.075, lean: 0.08, phase: 0.05 };
+  if (archetype === 'fan') return { asymmetry: 0.17, twist: 0.18, lean: 0.2, phase: 0.095 };
+  if (archetype === 'etched') return { asymmetry: 0.16, twist: 0.17, lean: 0.15, phase: 0.11 };
+  return { asymmetry: 0.09, twist: 0.11, lean: 0.1, phase: 0.055 };
+}
+
+function signedUnit(seed: number, label: string): number {
+  return seededUnit(seed, label) * 2 - 1;
+}
+
+function appendBaseRow(rows: BaseProfileRow[], y: number, radius: number): void {
   const safeY = round6(Math.max(0, y));
   const safeRadius = round6(Math.max(0.0001, radius));
   const previous = rows[rows.length - 1];
@@ -58,18 +85,85 @@ function appendRow(rows: CrystalProfileRow[], y: number, radius: number): void {
   rows.push({ y: safeY, radius: safeRadius });
 }
 
-function buildMotherRows(length: number, radius: number): CrystalProfileRow[] {
-  const rows: CrystalProfileRow[] = [];
+function buildMotherRows(length: number, radius: number): BaseProfileRow[] {
+  const rows: BaseProfileRow[] = [];
   // A double-terminated floating prism: the lower point avoids a visible flat
   // cut, while the long central shaft remains the unique composition focus.
-  appendRow(rows, 0, radius * 0.16);
-  appendRow(rows, length * 0.055, radius * 0.72);
-  appendRow(rows, length * 0.13, radius);
-  appendRow(rows, length * 0.66, radius * 0.98);
-  appendRow(rows, length * 0.73, radius * 0.92);
-  appendRow(rows, length * 0.84, radius * 0.62);
-  appendRow(rows, length, radius * 0.018);
+  appendBaseRow(rows, 0, radius * 0.16);
+  appendBaseRow(rows, length * 0.055, radius * 0.72);
+  appendBaseRow(rows, length * 0.13, radius);
+  appendBaseRow(rows, length * 0.66, radius * 0.98);
+  appendBaseRow(rows, length * 0.73, radius * 0.92);
+  appendBaseRow(rows, length * 0.84, radius * 0.62);
+  appendBaseRow(rows, length, radius * 0.018);
   return rows;
+}
+
+function smoothStep(value: number): number {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+}
+
+function decorateRows(
+  rows: readonly BaseProfileRow[],
+  body: GrowthBody,
+  scales: { scaleX: number; scaleZ: number },
+  tuning: ProfileShapeTuning,
+  twistTotal: number,
+  axisLeanX: number,
+  axisLeanZ: number,
+  burialStartY: number,
+  burialCompression: number,
+): CrystalProfileRow[] {
+  const lastY = Math.max(1e-9, rows[rows.length - 1]?.y ?? 0);
+  const phaseBias = signedUnit(body.seed, 'geometry:profile-phase-bias') * tuning.phase * 0.35;
+  const bowX = signedUnit(body.seed, 'geometry:axis-bow-x') * Math.abs(axisLeanX + axisLeanZ) * 0.35;
+  const bowZ = signedUnit(body.seed, 'geometry:axis-bow-z') * Math.abs(axisLeanX + axisLeanZ) * 0.35;
+  const minimumScale = Math.max(0.0001, Math.min(scales.scaleX, scales.scaleZ));
+
+  return rows.map((row, rowIndex) => {
+    const t = Math.max(0, Math.min(1, row.y / lastY));
+    const bend = Math.sin(Math.PI * t);
+    const centerOffsetX = axisLeanX * smoothStep(t) + bowX * bend;
+    const centerOffsetZ = axisLeanZ * smoothStep(t) + bowZ * bend;
+    const rotation = twistTotal * smoothStep(t);
+    const facetPhase = phaseBias
+      + signedUnit(body.seed, `geometry:facet-phase:${rowIndex}`) * tuning.phase * bend;
+    const burialT = burialStartY > 1e-9
+      ? Math.max(0, Math.min(1, row.y / burialStartY))
+      : 1;
+    const compression = burialStartY > 0 && row.y < burialStartY
+      ? burialCompression + (1 - burialCompression) * smoothStep(burialT)
+      : 1;
+    const pulse = Math.sin((t * Math.PI * 2) + phaseBias * 7) * tuning.asymmetry * 0.22;
+    const rowNoiseX = signedUnit(body.seed, `geometry:radius-x:${rowIndex}`) * tuning.asymmetry * 0.38;
+    const rowNoiseZ = signedUnit(body.seed, `geometry:radius-z:${rowIndex}`) * tuning.asymmetry * 0.38;
+    const radiusX = Math.max(
+      0.0001,
+      row.radius * scales.scaleX * compression * (1 + pulse + rowNoiseX),
+    );
+    const radiusZ = Math.max(
+      0.0001,
+      row.radius * scales.scaleZ * compression * (1 - pulse + rowNoiseZ),
+    );
+    const offsetEnvelope = Math.hypot(centerOffsetX, centerOffsetZ) / minimumScale;
+    const conservativeRadius = Math.max(
+      row.radius,
+      radiusX / Math.max(0.0001, scales.scaleX),
+      radiusZ / Math.max(0.0001, scales.scaleZ),
+    ) + offsetEnvelope;
+
+    return {
+      y: row.y,
+      radius: round6(conservativeRadius),
+      radiusX: round6(radiusX),
+      radiusZ: round6(radiusZ),
+      centerOffsetX: round6(centerOffsetX),
+      centerOffsetZ: round6(centerOffsetZ),
+      rotation: round6(rotation),
+      facetPhase: round6(facetPhase),
+    };
+  });
 }
 
 /**
@@ -96,7 +190,7 @@ export function buildCrystalProfile(
     : body.anchor;
   const radius = Math.max(0.0001, body.renderedRadius);
   const bodyStart = extraSink;
-  const rows: CrystalProfileRow[] = mother
+  const baseRows: BaseProfileRow[] = mother
     ? buildMotherRows(body.renderedLength, radius)
     : [];
 
@@ -120,25 +214,51 @@ export function buildCrystalProfile(
 
     if (attached) {
       const buriedBase = Math.min(radius * 0.18, Math.max(radius * 0.055, extraSink * 0.28));
-      appendRow(rows, 0, buriedBase);
-      appendRow(rows, extraSink * 0.5, radius * 0.42);
-      appendRow(rows, extraSink, radius * 0.82);
+      appendBaseRow(baseRows, 0, buriedBase);
+      appendBaseRow(baseRows, extraSink * 0.5, radius * 0.42);
+      appendBaseRow(baseRows, extraSink, radius * 0.82);
     } else {
-      appendRow(rows, 0, radius * 0.7);
+      appendBaseRow(baseRows, 0, radius * 0.7);
     }
 
-    appendRow(rows, bodyStart + body.renderedLength * 0.05, radius * 0.9);
-    appendRow(rows, bodyStart + body.renderedLength * 0.14, radius);
-    appendRow(
-      rows,
+    appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.05, radius * 0.9);
+    appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.14, radius);
+    appendBaseRow(
+      baseRows,
       prismEnd,
       radius * (0.95 + seededUnit(body.seed, 'geometry:prism-radius') * 0.04),
     );
-    appendRow(rows, pointStart, radius * (broken ? 0.58 : 0.86));
-    appendRow(rows, bodyStart + body.renderedLength * (broken ? 0.86 : 1), tipRadius);
+    appendBaseRow(baseRows, pointStart, radius * (broken ? 0.58 : 0.86));
+    appendBaseRow(baseRows, bodyStart + body.renderedLength * (broken ? 0.86 : 1), tipRadius);
   }
 
   const scales = mother ? { scaleX: 0.92, scaleZ: 1 } : profileScales(archetype);
+  const tuning = shapeTuning(archetype, mother);
+  const twistSign = signedUnit(body.seed, 'geometry:twist-sign') < 0 ? -1 : 1;
+  const twistTotal = round6(
+    twistSign * tuning.twist * (0.55 + seededUnit(body.seed, 'geometry:twist-strength') * 0.45),
+  );
+  const leanAngle = seededUnit(body.seed, 'geometry:lean-angle') * Math.PI * 2;
+  const leanMagnitude = radius * tuning.lean * (
+    0.5 + seededUnit(body.seed, 'geometry:lean-strength') * 0.5
+  );
+  const axisLeanX = round6(Math.cos(leanAngle) * leanMagnitude);
+  const axisLeanZ = round6(Math.sin(leanAngle) * leanMagnitude);
+  const burialStartY = attached ? round6(extraSink) : 0;
+  const burialCompression = attached
+    ? round6(0.62 + seededUnit(body.seed, 'geometry:burial-compression') * 0.14)
+    : 1;
+  const rows = decorateRows(
+    baseRows,
+    body,
+    scales,
+    tuning,
+    twistTotal,
+    axisLeanX,
+    axisLeanZ,
+    burialStartY,
+    burialCompression,
+  );
   const segments = mother ? motherSegments(lod) : crystalSegments(body.tier, lod);
   const signaturePayload = JSON.stringify({
     bodyId: body.id,
@@ -152,6 +272,11 @@ export function buildCrystalProfile(
     geometryLength: round6(geometryLength),
     rows,
     scales,
+    twistTotal,
+    axisLeanX,
+    axisLeanZ,
+    burialStartY,
+    burialCompression,
   });
 
   return {
@@ -165,6 +290,11 @@ export function buildCrystalProfile(
     geometryAnchor: roundVec(geometryAnchor),
     scaleX: scales.scaleX,
     scaleZ: scales.scaleZ,
+    twistTotal,
+    axisLeanX,
+    axisLeanZ,
+    burialStartY,
+    burialCompression,
     rows,
     signature: stableHash32(signaturePayload).toString(16).padStart(8, '0'),
   };

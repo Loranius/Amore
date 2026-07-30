@@ -15,6 +15,7 @@ import type {
   CrystalLodLevel,
   CrystalMeshBounds,
   CrystalMeshData,
+  CrystalProfileRow,
 } from './types';
 
 function vertexAt(positions: readonly number[], index: number): GrowthVec3 {
@@ -101,6 +102,22 @@ function computeBounds(positions: readonly number[]): CrystalMeshBounds {
   };
 }
 
+function rowCenter(
+  anchor: GrowthVec3,
+  direction: GrowthVec3,
+  tangent: GrowthVec3,
+  bitangent: GrowthVec3,
+  row: CrystalProfileRow,
+): GrowthVec3 {
+  return add(
+    add(
+      add(anchor, scale(direction, row.y)),
+      scale(tangent, row.centerOffsetX),
+    ),
+    scale(bitangent, row.centerOffsetZ),
+  );
+}
+
 export function rebuildCrystalMeshNormals(mesh: CrystalMeshData): CrystalMeshData {
   return { ...mesh, normals: computeNormals(mesh.positions, mesh.indices) };
 }
@@ -115,26 +132,35 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
 
   for (let rowIndex = 0; rowIndex < profile.rows.length; rowIndex += 1) {
     const row = profile.rows[rowIndex]!;
+    const center = rowCenter(
+      profile.geometryAnchor,
+      body.direction,
+      tangent,
+      bitangent,
+      row,
+    );
     for (let segment = 0; segment < segments; segment += 1) {
-      const angle = (segment / segments) * Math.PI * 2;
-      const jitter = 1 + (seededUnit(body.seed, `geometry:facet:${segment}`) - 0.5) * 0.07;
+      const angle = (segment / segments) * Math.PI * 2 + row.rotation + row.facetPhase;
+      const facetJitter = seededUnit(body.seed, `geometry:facet:${segment}`) - 0.5;
+      const rowJitter = seededUnit(body.seed, `geometry:facet-row:${rowIndex}:${segment}`) - 0.5;
+      const jitter = 1 + facetJitter * 0.07 + rowJitter * 0.026;
       const radial = add(
-        scale(tangent, Math.cos(angle) * profile.scaleX),
-        scale(bitangent, Math.sin(angle) * profile.scaleZ),
+        scale(tangent, Math.cos(angle) * row.radiusX * jitter),
+        scale(bitangent, Math.sin(angle) * row.radiusZ * jitter),
       );
-      const point = add(
-        add(profile.geometryAnchor, scale(body.direction, row.y)),
-        scale(radial, row.radius * jitter),
-      );
-      pushVertex(positions, point);
+      pushVertex(positions, add(center, radial));
     }
   }
 
-  const baseCenter = pushVertex(positions, profile.geometryAnchor);
+  const firstRow = profile.rows[0]!;
+  const baseCenter = pushVertex(
+    positions,
+    rowCenter(profile.geometryAnchor, body.direction, tangent, bitangent, firstRow),
+  );
   const lastRow = profile.rows[profile.rows.length - 1]!;
   const topCenter = pushVertex(
     positions,
-    add(profile.geometryAnchor, scale(body.direction, lastRow.y)),
+    rowCenter(profile.geometryAnchor, body.direction, tangent, bitangent, lastRow),
   );
 
   for (let segment = 0; segment < segments; segment += 1) {

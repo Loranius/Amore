@@ -14,7 +14,14 @@ export interface CrystalGeometryConfig {
 
 export interface CrystalProfileRow {
   y: number;
+  /** Conservative radius retained for trim/solid compatibility. */
   radius: number;
+  radiusX: number;
+  radiusZ: number;
+  centerOffsetX: number;
+  centerOffsetZ: number;
+  rotation: number;
+  facetPhase: number;
 }
 
 export interface CrystalBodyProfile {
@@ -28,6 +35,11 @@ export interface CrystalBodyProfile {
   geometryAnchor: GrowthVec3;
   scaleX: number;
   scaleZ: number;
+  twistTotal: number;
+  axisLeanX: number;
+  axisLeanZ: number;
+  burialStartY: number;
+  burialCompression: number;
   rows: CrystalProfileRow[];
   signature: string;
 }
