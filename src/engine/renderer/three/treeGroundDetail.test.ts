@@ -31,7 +31,7 @@ describe('Three Tree Ground Detail adapter', () => {
       estimatedDrawCalls: 1,
       anchoredToTerrain: true,
     });
-    expect(mesh.material).not.toBeInstanceOf(Array);
+    expect(Array.isArray(mesh.material)).toBe(false);
     expect(mesh.frustumCulled).toBe(false);
 
     dispose(mesh);
