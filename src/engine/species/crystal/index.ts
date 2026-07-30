@@ -1,6 +1,13 @@
 export { buildCrystalSpeciesBlueprint } from './crystalSpecies';
 export { crystalToGrowthBlueprint } from './growthAdapter';
 export { projectCrystalToLegacyPressures } from './legacyBridge';
+export { buildCrystalGeologyState } from './geology';
+export type {
+  CrystalBodyBurialState,
+  CrystalBurialClass,
+  CrystalCenterMaturationState,
+  CrystalGeologyState,
+} from './geology';
 export {
   CRYSTAL_LIFE_STAGES,
   type BuildCrystalSpeciesBlueprintInput,
