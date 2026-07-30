@@ -2,6 +2,7 @@ import {
   add,
   clamp01,
   distance,
+  dot,
   normalize,
   round6,
   roundVec,
@@ -9,6 +10,9 @@ import {
   seededUnit,
   subtract,
 } from '../growth/math';
+import type { GrowthVec3 } from '../growth';
+import type { TreeFoliageCluster } from '../foliage';
+import type { TreeLeafInstance } from '../leafGeometry';
 import type { TreeRgb } from '../treeMaterial';
 import type {
   BuildTreeCanopyDepthInput,
@@ -19,6 +23,10 @@ import type {
 
 const LAYERS: readonly TreeCanopyDepthLayer[] = ['inner', 'middle', 'outer'];
 const TINT_VARIATION_BANDS = 8;
+
+function vectorLength(value: GrowthVec3): number {
+  return Math.hypot(value.x, value.y, value.z);
+}
 
 function validateInput(input: BuildTreeCanopyDepthInput): void {
   const { composition, foliage, leaves, materials, config } = input;
@@ -36,6 +44,23 @@ function validateInput(input: BuildTreeCanopyDepthInput): void {
   }
   if (!Number.isFinite(config.maximumOffsetRatio) || config.maximumOffsetRatio < 0 || config.maximumOffsetRatio > 0.25) {
     throw new Error('Tree Canopy Depth maximumOffsetRatio must be in [0, 0.25].');
+  }
+  if (
+    !Number.isFinite(config.presentationFrontDirection.x)
+    || !Number.isFinite(config.presentationFrontDirection.y)
+    || !Number.isFinite(config.presentationFrontDirection.z)
+    || Math.hypot(config.presentationFrontDirection.x, config.presentationFrontDirection.z) <= 1e-6
+  ) {
+    throw new Error('Tree Canopy Depth presentationFrontDirection requires a finite horizontal direction.');
+  }
+  for (const [name, value] of [
+    ['frontFillFraction', config.frontFillFraction],
+    ['frontBiasRatio', config.frontBiasRatio],
+    ['frontFillDepthRatio', config.frontFillDepthRatio],
+  ] as const) {
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      throw new Error(`Tree Canopy Depth ${name} must be in [0, 1].`);
+    }
   }
   if (!Number.isInteger(config.quantizationSteps) || config.quantizationSteps < 2 || config.quantizationSteps > 256) {
     throw new Error('Tree Canopy Depth quantizationSteps must be an integer between 2 and 256.');
@@ -142,9 +167,76 @@ function offsetRatioForLayer(
   maximum: number,
 ): number {
   const variation = seededUnit(seed, `${leafId}:depth-offset`);
-  if (layer === 'inner') return 0;
-  if (layer === 'middle') return maximum * (0.14 + variation * 0.2);
-  return maximum * (0.55 + variation * 0.45);
+  if (layer === 'inner') return maximum * (0.02 + variation * 0.04);
+  if (layer === 'middle') return maximum * (0.1 + variation * 0.14);
+  return maximum * (0.28 + variation * 0.24);
+}
+
+function clampOffset(value: GrowthVec3, maximumMagnitude: number): GrowthVec3 {
+  const magnitude = vectorLength(value);
+  if (magnitude <= maximumMagnitude || magnitude <= 1e-9) return value;
+  return scale(value, maximumMagnitude / magnitude);
+}
+
+function buildPositionOffset(
+  leaf: TreeLeafInstance,
+  cluster: TreeFoliageCluster,
+  layer: TreeCanopyDepthLayer,
+  frontDirection: GrowthVec3,
+  input: BuildTreeCanopyDepthInput,
+): GrowthVec3 {
+  const relativeToCrown = subtract(leaf.position, input.composition.bounds.center);
+  const sourceFrontDepth = dot(relativeToCrown, frontDirection);
+  const outward = normalize(relativeToCrown, cluster.normal);
+  const maximumMagnitude = cluster.radius * input.config.maximumOffsetRatio;
+
+  const radialRatio = offsetRatioForLayer(
+    layer,
+    leaf.seed,
+    leaf.id,
+    input.config.maximumOffsetRatio,
+  );
+  const backDamping = sourceFrontDepth < 0 ? 0.18 : 1;
+  const radialOffset = scale(outward, cluster.radius * radialRatio * backDamping);
+
+  const selectedForFrontFill = seededUnit(
+    input.leaves.artifactSeed,
+    `${leaf.id}:presentation-front-fill`,
+  ) < input.config.frontFillFraction;
+  const targetVariation = 0.45 + seededUnit(
+    input.leaves.artifactSeed,
+    `${leaf.id}:presentation-front-depth`,
+  ) * 0.55;
+  const targetFrontDepth = cluster.radius
+    * input.config.frontFillDepthRatio
+    * targetVariation;
+  const requiredForwardDistance = Math.max(0, targetFrontDepth - sourceFrontDepth);
+  const layerWeight = layer === 'inner' ? 0.62 : layer === 'middle' ? 0.86 : 1;
+  const maximumForwardDistance = maximumMagnitude
+    * input.config.frontBiasRatio
+    * layerWeight;
+  const forwardDistance = selectedForFrontFill
+    ? Math.min(requiredForwardDistance, maximumForwardDistance)
+    : 0;
+  const forwardOffset = scale(frontDirection, forwardDistance);
+
+  const sideDirection = normalize(
+    { x: -frontDirection.z, y: 0, z: frontDirection.x },
+    { x: 1, y: 0, z: 0 },
+  );
+  const sideVariation = seededUnit(
+    input.leaves.artifactSeed,
+    `${leaf.id}:presentation-side-stagger`,
+  ) * 2 - 1;
+  const sideDistance = forwardDistance > 0
+    ? maximumMagnitude * 0.1 * input.config.frontBiasRatio * sideVariation
+    : 0;
+  const sideOffset = scale(sideDirection, sideDistance);
+
+  return roundVec(clampOffset(
+    add(radialOffset, add(forwardOffset, sideOffset)),
+    maximumMagnitude,
+  ));
 }
 
 function profileSignature(state: Omit<TreeCanopyDepthState, 'signature'>): string {
@@ -156,6 +248,8 @@ function profileSignature(state: Omit<TreeCanopyDepthState, 'signature'>): strin
     state.diagnostics.innerLeafCount,
     state.diagnostics.middleLeafCount,
     state.diagnostics.outerLeafCount,
+    state.diagnostics.renderedFrontLeafCount,
+    state.diagnostics.presentationShiftedLeafCount,
     state.diagnostics.uniqueTintCount,
     state.diagnostics.maximumPositionOffset.toFixed(6),
   ].join('|');
@@ -172,9 +266,17 @@ export function buildTreeCanopyDepth(
   const clustersById = new Map(input.foliage.clusters.map((cluster) => [cluster.id, cluster] as const));
   const profiles: TreeCanopyDepthProfile[] = [];
   const tintKeys = new Set<string>();
+  const frontLayers = new Set<TreeCanopyDepthLayer>();
+  const frontDirection = roundVec(normalize(
+    input.config.presentationFrontDirection,
+    { x: 0, y: 0, z: 1 },
+  ));
   let innerLeafCount = 0;
   let middleLeafCount = 0;
   let outerLeafCount = 0;
+  let sourceFrontLeafCount = 0;
+  let renderedFrontLeafCount = 0;
+  let presentationShiftedLeafCount = 0;
   let maximumPositionOffset = 0;
 
   for (const leaf of input.leaves.instances) {
@@ -189,19 +291,23 @@ export function buildTreeCanopyDepth(
     );
     const seededDepth = seededUnit(leaf.seed, `${leaf.id}:depth`);
     const depth = depthForLayer(layer, actualRadialDepth, seededDepth, input);
-    const outward = normalize(
-      subtract(leaf.position, input.composition.bounds.center),
-      cluster.normal,
-    );
-    const offsetRatio = offsetRatioForLayer(
+    const positionOffset = buildPositionOffset(
+      leaf,
+      cluster,
       layer,
-      leaf.seed,
-      leaf.id,
-      input.config.maximumOffsetRatio,
+      frontDirection,
+      input,
     );
-    const offsetMagnitude = cluster.radius * offsetRatio;
-    const positionOffset = roundVec(scale(outward, offsetMagnitude));
     const renderPosition = roundVec(add(leaf.position, positionOffset));
+    const sourceFrontDepth = round6(dot(
+      subtract(leaf.position, input.composition.bounds.center),
+      frontDirection,
+    ));
+    const renderFrontDepth = round6(dot(
+      subtract(renderPosition, input.composition.bounds.center),
+      frontDirection,
+    ));
+    const presentationShifted = dot(positionOffset, frontDirection) > 1e-6;
     const scaleVariation = 0.98 + seededUnit(leaf.seed, `${leaf.id}:depth-scale`) * 0.04;
     const scaleMultiplier = round6(input.config.scaleByLayer[layer] * scaleVariation);
     const variationBand = Math.min(
@@ -217,7 +323,13 @@ export function buildTreeCanopyDepth(
     if (layer === 'inner') innerLeafCount += 1;
     else if (layer === 'middle') middleLeafCount += 1;
     else outerLeafCount += 1;
-    maximumPositionOffset = Math.max(maximumPositionOffset, offsetMagnitude);
+    if (sourceFrontDepth >= 0) sourceFrontLeafCount += 1;
+    if (renderFrontDepth >= 0) {
+      renderedFrontLeafCount += 1;
+      frontLayers.add(layer);
+    }
+    if (presentationShifted) presentationShiftedLeafCount += 1;
+    maximumPositionOffset = Math.max(maximumPositionOffset, vectorLength(positionOffset));
     tintKeys.add(tintKey(tintMultiplier));
     profiles.push({
       id: `tree:canopy-depth:${leaf.id}`,
@@ -231,6 +343,9 @@ export function buildTreeCanopyDepth(
       sourcePosition: { ...leaf.position },
       positionOffset,
       renderPosition,
+      sourceFrontDepth,
+      renderFrontDepth,
+      presentationShifted,
       scaleMultiplier,
       tintMultiplier,
     });
@@ -250,8 +365,12 @@ export function buildTreeCanopyDepth(
   if (!stableLeafOrderPreserved || !instanceCountPreserved) {
     throw new Error('Tree Canopy Depth must preserve accepted leaf order and instance count.');
   }
+  if (renderedFrontLeafCount < sourceFrontLeafCount) {
+    throw new Error('Tree Canopy Depth front-volume recovery must not reduce front hemisphere coverage.');
+  }
 
   const scales = profiles.map((profile) => profile.scaleMultiplier);
+  const leafCount = input.leaves.instances.length;
   const stateWithoutSignature: Omit<TreeCanopyDepthState, 'signature'> = {
     treeCanopyDepthVersion: 1,
     rulesVersion: input.config.rulesVersion.trim(),
@@ -274,7 +393,7 @@ export function buildTreeCanopyDepth(
     },
     profiles,
     diagnostics: {
-      sourceLeafCount: input.leaves.instances.length,
+      sourceLeafCount: leafCount,
       emittedProfileCount: profiles.length,
       innerLeafCount,
       middleLeafCount,
@@ -284,6 +403,14 @@ export function buildTreeCanopyDepth(
       filledPreviouslyEmptyCells: false,
       stableLeafOrderPreserved: true,
       instanceCountPreserved: true,
+      presentationFrontDirection: frontDirection,
+      sourceFrontLeafCount,
+      renderedFrontLeafCount,
+      sourceFrontLeafFraction: round6(leafCount > 0 ? sourceFrontLeafCount / leafCount : 0),
+      renderedFrontLeafFraction: round6(leafCount > 0 ? renderedFrontLeafCount / leafCount : 0),
+      presentationShiftedLeafCount,
+      frontLayersCovered: frontLayers.size,
+      frontHemisphereNotReduced: true,
       minimumScaleMultiplier: round6(scales.length > 0 ? Math.min(...scales) : 1),
       maximumScaleMultiplier: round6(scales.length > 0 ? Math.max(...scales) : 1),
       maximumPositionOffset: round6(maximumPositionOffset),
