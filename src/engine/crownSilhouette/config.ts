@@ -1,14 +1,17 @@
 import type { TreeCrownSilhouetteConfig } from './types';
 
 export const DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG: TreeCrownSilhouetteConfig = {
-  rulesVersion: 'tree-crown-silhouette-v1.1.0',
+  rulesVersion: 'tree-crown-silhouette-v1.2.0',
   azimuthSectorCount: 16,
   verticalBandCount: 5,
   maximumRadialOffsetRatio: 0.055,
-  maximumScaleDelta: 0.07,
+  maximumScaleDelta: 0.34,
   envelopeResponse: 0.7,
-  middleLayerResponse: 0.38,
-  frontClosureScaleDelta: 0.05,
+  middleLayerResponse: 0.18,
+  frontClosureSelectionFraction: 0.82,
+  frontClosureTargetRadialRatio: 0.46,
+  frontClosureMaximumInwardOffsetRatio: 0.13,
+  frontClosureScaleDelta: 0.28,
   viewDirectionCount: 8,
   minimumReadableFacingDot: 0.16,
   minimumReadableLeafFraction: 0.1,
