@@ -1,19 +1,19 @@
 import type { OrganicSurfaceConfig } from './surfaceTypes';
 
 export const DEFAULT_ORGANIC_SURFACE_CONFIG: OrganicSurfaceConfig = {
-  curveSamplesPerSegment: 4,
+  curveSamplesPerSegment: 3,
   minimumRadius: 0.004,
   junctionInsetRatio: 0.24,
   junctionSurfaceRatio: 0.98,
   junctionFlare: 1.56,
   junctionSegmentsByLod: {
-    high: 7,
-    medium: 6,
+    high: 5,
+    medium: 5,
     low: 3,
   },
   radialSegmentsByLod: {
-    high: 12,
-    medium: 10,
+    high: 10,
+    medium: 9,
     low: 6,
   },
   axialStrideByLod: {
