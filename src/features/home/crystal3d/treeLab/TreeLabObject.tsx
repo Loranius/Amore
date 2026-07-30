@@ -7,6 +7,7 @@ import type { TreeCanopyLightState } from '@/engine/canopyLight';
 import type { TreeGroundDetailState } from '@/engine/groundDetail';
 import type { TreeLeafGeometryState } from '@/engine/leafGeometry';
 import type { OrganicSweepMesh } from '@/engine/labs/organic';
+import type { TreePhenologyState } from '@/engine/phenology';
 import type { TreeRootGeometryState } from '@/engine/rootGeometry';
 import type { TreeSoilSurfaceState } from '@/engine/soilSurface';
 import {
@@ -32,6 +33,7 @@ interface TreeLabObjectProps {
   barkSurface: TreeBarkSurfaceState;
   canopyDepth: TreeCanopyDepthState;
   canopyLight: TreeCanopyLightState;
+  phenology: TreePhenologyState;
   groundDetails: TreeGroundDetailState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
@@ -46,6 +48,7 @@ export function TreeLabObject({
   barkSurface,
   canopyDepth,
   canopyLight,
+  phenology,
   groundDetails,
   leaves,
   materials,
@@ -72,8 +75,9 @@ export function TreeLabObject({
       materialPair.foliage,
       canopyDepth,
       canopyLight,
+      phenology,
     ),
-    [leaves, materialPair, canopyDepth, canopyLight],
+    [leaves, materialPair, canopyDepth, canopyLight, phenology],
   );
   const groundDetailMesh = useMemo(
     () => createThreeTreeGroundDetailInstancedMesh(groundDetails),
