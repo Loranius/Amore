@@ -53,11 +53,10 @@ describe('Tree production preview pipeline', () => {
   });
 
   it('publishes a passing production contract for low, medium and high LOD', () => {
-    const builds = [
-      buildTreeLabPreview('low'),
-      buildTreeLabPreview('medium'),
-      buildTreeLabPreview('high'),
-    ];
+    const low = buildTreeLabPreview('low');
+    const medium = buildTreeLabPreview('medium');
+    const high = buildTreeLabPreview('high');
+    const builds = [low, medium, high] as const;
 
     for (const build of builds) {
       const contract = build.productionAcceptance;
@@ -88,9 +87,9 @@ describe('Tree production preview pipeline', () => {
       );
     }
 
-    const lowIds = builds[0].leaves.instances.map((leaf) => leaf.id);
-    const mediumIds = builds[1].leaves.instances.map((leaf) => leaf.id);
-    const highIds = builds[2].leaves.instances.map((leaf) => leaf.id);
+    const lowIds = low.leaves.instances.map((leaf) => leaf.id);
+    const mediumIds = medium.leaves.instances.map((leaf) => leaf.id);
+    const highIds = high.leaves.instances.map((leaf) => leaf.id);
     expect(mediumIds.slice(0, lowIds.length)).toEqual(lowIds);
     expect(highIds.slice(0, mediumIds.length)).toEqual(mediumIds);
   });
