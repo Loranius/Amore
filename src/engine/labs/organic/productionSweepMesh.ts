@@ -186,7 +186,7 @@ function trimParentForkTube(
   if (!target) return mesh;
   const coveredRings = parentRingsCoveredByShell(fork.parent, lod, config);
   const removedRings = Math.min(
-    Math.max(0, coveredRings),
+    Math.max(0, coveredRings - 1),
     Math.max(0, target.ringCount - 2),
   );
   if (removedRings <= 0) return mesh;
@@ -266,8 +266,8 @@ function removeSharedForkOverlaps(
 
 /**
  * Production tree sweep: build the shared implicit Y-shell, then remove every
- * parent/child ring hidden underneath it so one continuous bark surface owns
- * the complete main fork.
+ * parent/child ring hidden underneath it while retaining the shared boundary
+ * ring that seals the trunk to the new fork surface.
  */
 export function buildOrganicSweepMesh(
   frameState: OrganicCurveFrameState,
