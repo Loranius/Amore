@@ -93,6 +93,26 @@ describe('Crystal Geometry', () => {
     );
   });
 
+  it('resolves host dependencies independently of serialized body array order', () => {
+    const canonical = pipeline(BASE_EVENTS);
+    const reorderedGrowth = {
+      ...canonical.growth,
+      bodies: [...canonical.growth.bodies].reverse(),
+    };
+    const reordered = buildCrystalGeometry({
+      growth: reorderedGrowth,
+      composition: canonical.composition,
+      config: DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
+    });
+
+    expect(reordered.diagnostics.missingHostBodyIds).toEqual([]);
+    expect(reordered.diagnostics.budgetOmittedBodyIds).toEqual([]);
+    expect(reordered.meshes.map((mesh) => mesh.bodyId)).toEqual(
+      canonical.geometry.meshes.map((mesh) => mesh.bodyId),
+    );
+    expect(reordered.junctions).toHaveLength(reorderedGrowth.bodies.length - 1);
+  });
+
   it('publishes normalized geological burial and center maturation metadata', () => {
     const { geometry } = pipeline(BASE_EVENTS);
     const geology = geometry.geology;
