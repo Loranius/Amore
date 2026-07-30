@@ -4,6 +4,11 @@ export {
   createThreeTreeLeafCardGeometry,
   createThreeTreeLeafInstancedMesh,
 } from './leafInstances';
+export {
+  createThreeTreeGroundDetailGeometry,
+  createThreeTreeGroundDetailInstancedMesh,
+  createThreeTreeGroundDetailMaterial,
+} from './treeGroundDetail';
 export { createThreeTreeRootGeometry } from './treeRootGeometry';
 export {
   createThreeTreeMaterial,
