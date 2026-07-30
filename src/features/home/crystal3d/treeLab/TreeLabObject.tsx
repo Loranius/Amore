@@ -82,13 +82,16 @@ export function TreeLabObject({
 
   return (
     <group>
-      {rootGeometry.diagnostics.renderedRootCount > 0 && (
+      {rootGeometry.diagnostics.vertexCount > 0 && (
         <mesh
           geometry={rootsGeometry}
           material={materialPair.bark}
           castShadow={false}
           receiveShadow={false}
-          userData={{ treeRootAnchored: true }}
+          userData={{
+            treeRootAnchored: true,
+            treeTerrainMerged: rootGeometry.diagnostics.terrainMergedIntoStaticMesh,
+          }}
         />
       )}
       <group ref={motionRoot}>
