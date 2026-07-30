@@ -6,7 +6,6 @@ import {
   lerp,
   normalize,
   round6,
-  scale,
   subtract,
 } from '../../growth/math';
 import type { GrowthVec3 } from '../../growth/types';
