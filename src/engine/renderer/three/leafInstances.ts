@@ -70,10 +70,14 @@ function validateCanopyLight(
   if (light.artifactSeed !== leaves.artifactSeed
     || light.lod !== leaves.lod
     || light.sourceLeafGeometryVersion !== leaves.treeLeafGeometryVersion
-    || light.sourceLeafGeometryRulesVersion !== leaves.rulesVersion
-    || light.sourceCanopyDepthSignature !== canopy.signature
-    || light.profiles.length !== leaves.instances.length) {
-    throw new Error('Three Tree Leaf Geometry received incompatible Canopy Light.');
+    || light.sourceLeafGeometryRulesVersion !== leaves.rulesVersion) {
+    throw new Error('Three Tree Leaf Geometry received Canopy Light from another leaf state.');
+  }
+  if (light.sourceCanopyDepthSignature !== canopy.signature) {
+    throw new Error('Three Tree Leaf Geometry received Canopy Light from another Canopy Depth state.');
+  }
+  if (light.profiles.length !== leaves.instances.length) {
+    throw new Error('Three Tree Leaf Geometry Canopy Light profile count does not match leaves.');
   }
 }
 
@@ -148,6 +152,40 @@ export function createThreeTreeLeafInstancedMesh(
     canopyLightApplied: light !== undefined,
     phenologyApplied: phenology !== undefined,
   };
+  if (canopy) {
+    mesh.userData['treeCanopyDepth'] = {
+      version: canopy.treeCanopyDepthVersion,
+      rulesVersion: canopy.rulesVersion,
+      id: canopy.descriptor.id,
+      profileId: canopy.descriptor.profileId,
+      tintAttributeId: canopy.descriptor.tintAttributeId,
+      signature: canopy.signature,
+      profiles: canopy.profiles.length,
+      inner: canopy.diagnostics.innerLeafCount,
+      middle: canopy.diagnostics.middleLeafCount,
+      outer: canopy.diagnostics.outerLeafCount,
+      uniqueTints: canopy.diagnostics.uniqueTintCount,
+      additionalDrawCalls: canopy.diagnostics.estimatedAdditionalDrawCalls,
+      additionalMaterials: canopy.diagnostics.estimatedAdditionalMaterials,
+    };
+  }
+  if (light) {
+    mesh.userData['treeCanopyLight'] = {
+      version: light.treeCanopyLightVersion,
+      rulesVersion: light.rulesVersion,
+      id: light.descriptor.id,
+      profileId: light.descriptor.profileId,
+      tintAttributeId: light.descriptor.tintAttributeId,
+      signature: light.signature,
+      profiles: light.profiles.length,
+      shade: light.diagnostics.shadeLeafCount,
+      transition: light.diagnostics.transitionLeafCount,
+      sunlit: light.diagnostics.sunlitLeafCount,
+      uniqueCombinedTints: light.diagnostics.uniqueCombinedTintCount,
+      additionalDrawCalls: light.diagnostics.estimatedAdditionalDrawCalls,
+      additionalMaterials: light.diagnostics.estimatedAdditionalMaterials,
+    };
+  }
   if (phenology) {
     mesh.userData['treePhenology'] = {
       version: phenology.treePhenologyVersion,
