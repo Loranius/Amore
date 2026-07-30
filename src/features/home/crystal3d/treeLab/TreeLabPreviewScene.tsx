@@ -80,7 +80,8 @@ function TreeLabRenderedScene({
     `${Math.round(build.composition.score.total * 100)}% comp`,
     `${build.roots.diagnostics.emittedRootCount} roots`,
     `${Math.round(build.groundContact.diagnostics.visiblePathFraction * 100)}% visible`,
-    `${formatCount(build.rootGeometry.diagnostics.triangleCount)} root △`,
+    `${formatCount(build.terrain.diagnostics.triangleCount)} terrain △`,
+    `${formatCount(build.rootGeometry.diagnostics.triangleCount)} static △`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
     `${build.life.leaves.length} live`,
@@ -142,6 +143,32 @@ function TreeLabRenderedScene({
       data-tree-lab-ground-collar-top-radius={build.groundContact.collar.topRadius}
       data-tree-lab-ground-extra-draw-calls={build.groundContact.diagnostics.estimatedAdditionalDrawCalls}
       data-tree-lab-ground-extra-materials={build.groundContact.diagnostics.estimatedAdditionalMaterials}
+      data-tree-lab-terrain-binding="true"
+      data-tree-lab-terrain-binding-id={build.terrain.binding.id}
+      data-tree-lab-terrain-source-binding={build.terrain.binding.sourceBindingId}
+      data-tree-lab-terrain-surface-id={build.terrain.binding.surfaceId}
+      data-tree-lab-terrain-heightfield-id={build.terrain.binding.heightfieldId}
+      data-tree-lab-terrain-ground-plane-id={build.terrain.binding.groundPlaneId}
+      data-tree-lab-terrain-ground-level={build.terrain.groundLevelY}
+      data-tree-lab-terrain-surface-radius={build.terrain.surfaceRadius}
+      data-tree-lab-terrain-plateau-radius={build.terrain.plateauRadius}
+      data-tree-lab-terrain-root-coverage-radius={build.terrain.diagnostics.rootCoverageRadius}
+      data-tree-lab-terrain-radial-segments={build.terrain.diagnostics.radialSegments}
+      data-tree-lab-terrain-rings={build.terrain.diagnostics.ringCount}
+      data-tree-lab-terrain-vertices={build.terrain.diagnostics.vertexCount}
+      data-tree-lab-terrain-triangles={build.terrain.diagnostics.triangleCount}
+      data-tree-lab-terrain-min-y={build.terrain.diagnostics.minimumY}
+      data-tree-lab-terrain-max-y={build.terrain.diagnostics.maximumY}
+      data-tree-lab-terrain-max-height-delta={build.terrain.diagnostics.maximumHeightDelta}
+      data-tree-lab-terrain-vertex-budget={build.terrain.diagnostics.vertexBudget}
+      data-tree-lab-terrain-triangle-budget={build.terrain.diagnostics.triangleBudget}
+      data-tree-lab-terrain-vertex-budget-exceeded={String(build.terrain.diagnostics.vertexBudgetExceeded)}
+      data-tree-lab-terrain-triangle-budget-exceeded={String(build.terrain.diagnostics.triangleBudgetExceeded)}
+      data-tree-lab-terrain-ground-preserved={String(build.terrain.diagnostics.groundPlanePreserved)}
+      data-tree-lab-terrain-root-coverage-preserved={String(build.terrain.diagnostics.rootCoveragePreserved)}
+      data-tree-lab-terrain-merged={String(build.terrain.diagnostics.mergedIntoRootGeometry)}
+      data-tree-lab-terrain-extra-draw-calls={build.terrain.diagnostics.estimatedAdditionalDrawCalls}
+      data-tree-lab-terrain-extra-materials={build.terrain.diagnostics.estimatedAdditionalMaterials}
       data-tree-lab-root-geometry-roots={build.rootGeometry.diagnostics.renderedRootCount}
       data-tree-lab-root-geometry-vertices={build.rootGeometry.diagnostics.vertexCount}
       data-tree-lab-root-geometry-triangles={build.rootGeometry.diagnostics.triangleCount}
@@ -150,6 +177,10 @@ function TreeLabRenderedScene({
       data-tree-lab-root-geometry-contact-applied={String(build.rootGeometry.diagnostics.contactApplied)}
       data-tree-lab-root-geometry-collar-vertices={build.rootGeometry.diagnostics.collarVertexCount}
       data-tree-lab-root-geometry-collar-triangles={build.rootGeometry.diagnostics.collarTriangleCount}
+      data-tree-lab-root-geometry-terrain-applied={String(build.rootGeometry.diagnostics.terrainApplied)}
+      data-tree-lab-root-geometry-terrain-vertices={build.rootGeometry.diagnostics.terrainVertexCount}
+      data-tree-lab-root-geometry-terrain-triangles={build.rootGeometry.diagnostics.terrainTriangleCount}
+      data-tree-lab-root-geometry-terrain-merged={String(build.rootGeometry.diagnostics.terrainMergedIntoStaticMesh)}
       data-tree-lab-root-geometry-vertex-budget={build.rootGeometry.diagnostics.vertexBudget}
       data-tree-lab-root-geometry-triangle-budget={build.rootGeometry.diagnostics.triangleBudget}
       data-tree-lab-root-geometry-vertex-budget-exceeded={String(build.rootGeometry.diagnostics.vertexBudgetExceeded)}
