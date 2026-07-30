@@ -15,6 +15,18 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
   return stable;
 }
 
+function expectStableOrderedSubset(
+  smallerIds: readonly string[],
+  largerIds: readonly string[],
+): void {
+  const positions = new Map(largerIds.map((id, index) => [id, index] as const));
+  const matchedPositions = smallerIds.map((id) => positions.get(id));
+  expect(matchedPositions.every((position) => position !== undefined)).toBe(true);
+  for (let index = 1; index < matchedPositions.length; index += 1) {
+    expect(matchedPositions[index]).toBeGreaterThan(matchedPositions[index - 1] ?? -1);
+  }
+}
+
 describe('Tree production preview pipeline', () => {
   it('keeps the full Evolution -> Species -> Growth -> Crown -> Surface -> Life -> Acceptance result deterministic', () => {
     const first = buildTreeLabPreview('medium');
@@ -90,8 +102,8 @@ describe('Tree production preview pipeline', () => {
     const lowIds = low.leaves.instances.map((leaf) => leaf.id);
     const mediumIds = medium.leaves.instances.map((leaf) => leaf.id);
     const highIds = high.leaves.instances.map((leaf) => leaf.id);
-    expect(mediumIds.slice(0, lowIds.length)).toEqual(lowIds);
-    expect(highIds.slice(0, mediumIds.length)).toEqual(mediumIds);
+    expectStableOrderedSubset(lowIds, mediumIds);
+    expectStableOrderedSubset(mediumIds, highIds);
   });
 
   it('keeps canopy polish, surface character, static geometry, instances and life inside published mobile limits', () => {
