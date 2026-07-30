@@ -29,6 +29,7 @@ describe('Tree Crown Silhouette', () => {
     expect(first.diagnostics.adjustedOuterLeafCount).toBeGreaterThan(0);
     expect(first.diagnostics.adjustedMiddleLeafCount).toBeGreaterThan(0);
     expect(first.diagnostics.frontClosureLeafCount).toBeGreaterThan(0);
+    expect(first.diagnostics.frontClosureInwardLeafCount).toBeGreaterThan(0);
     expect(first.diagnostics.adjustedLeafCount).toBe(
       first.diagnostics.adjustedOuterLeafCount + first.diagnostics.adjustedMiddleLeafCount,
     );
@@ -46,6 +47,9 @@ describe('Tree Crown Silhouette', () => {
     expect(first.diagnostics.maximumRadialOffsetRatio).toBeLessThanOrEqual(
       DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.maximumRadialOffsetRatio + 1e-6,
     );
+    expect(first.diagnostics.maximumFrontClosureInwardOffsetRatio).toBeLessThanOrEqual(
+      DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.frontClosureMaximumInwardOffsetRatio + 1e-6,
+    );
     expect(first.diagnostics.maximumScaleDelta).toBeLessThanOrEqual(
       DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.maximumScaleDelta + 1e-6,
     );
@@ -53,19 +57,35 @@ describe('Tree Crown Silhouette', () => {
     expect(first.diagnostics.estimatedAdditionalMaterials).toBe(0);
     expect(first.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
 
+    const inwardProfiles = first.profiles.filter(
+      (profile) => profile.frontClosureInwardOffsetRatio < 0,
+    );
+    expect(inwardProfiles.length).toBe(first.diagnostics.frontClosureInwardLeafCount);
+
     for (const profile of first.profiles) {
       expect(profile.sourceSectorIndex).toBe(profile.renderSectorIndex);
-      expect(profile.envelopeErrorAfter).toBeLessThanOrEqual(profile.envelopeErrorBefore + 1e-6);
-      expect(Math.abs(profile.radialOffsetRatio)).toBeLessThanOrEqual(
-        DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.maximumRadialOffsetRatio + 1e-6,
-      );
       expect(Math.abs(profile.scaleMultiplier - 1)).toBeLessThanOrEqual(
         DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.maximumScaleDelta + 1e-6,
       );
+      if (profile.layer === 'outer') {
+        expect(profile.envelopeErrorAfter).toBeLessThanOrEqual(profile.envelopeErrorBefore + 1e-6);
+        expect(Math.abs(profile.radialOffsetRatio)).toBeLessThanOrEqual(
+          DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.maximumRadialOffsetRatio + 1e-6,
+        );
+      }
+      if (profile.frontClosureSelected) {
+        expect(profile.layer).toBe('middle');
+        expect(profile.frontClosureInwardOffsetRatio).toBeLessThanOrEqual(0);
+        expect(Math.abs(profile.frontClosureInwardOffsetRatio)).toBeLessThanOrEqual(
+          DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.frontClosureMaximumInwardOffsetRatio + 1e-6,
+        );
+      }
       if (profile.layer === 'inner') {
         expect(profile.adjusted).toBe(false);
         expect(profile.scaleMultiplier).toBe(1);
         expect(profile.renderPosition).toEqual(profile.sourcePosition);
+        expect(profile.frontClosureSelected).toBe(false);
+        expect(profile.frontClosureInwardOffsetRatio).toBe(0);
         expect(profile.frontClosureScaleDelta).toBe(0);
       }
     }
@@ -107,6 +127,8 @@ describe('Tree Crown Silhouette', () => {
         crownCellId: profile.crownCellId,
         renderPosition: profile.renderPosition,
         radialOffsetRatio: profile.radialOffsetRatio,
+        frontClosureSelected: profile.frontClosureSelected,
+        frontClosureInwardOffsetRatio: profile.frontClosureInwardOffsetRatio,
         frontClosureScaleDelta: profile.frontClosureScaleDelta,
         scaleMultiplier: profile.scaleMultiplier,
       });
@@ -116,6 +138,8 @@ describe('Tree Crown Silhouette', () => {
         crownCellId: profile.crownCellId,
         renderPosition: profile.renderPosition,
         radialOffsetRatio: profile.radialOffsetRatio,
+        frontClosureSelected: profile.frontClosureSelected,
+        frontClosureInwardOffsetRatio: profile.frontClosureInwardOffsetRatio,
         frontClosureScaleDelta: profile.frontClosureScaleDelta,
         scaleMultiplier: profile.scaleMultiplier,
       });
