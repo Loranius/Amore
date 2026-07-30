@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { TreeBarkSurfaceState } from '@/engine/barkSurface';
 import type { TreeCanopyDepthState } from '@/engine/canopyDepth';
 import type { TreeCanopyLightState } from '@/engine/canopyLight';
+import type { TreeCrownSilhouetteState } from '@/engine/crownSilhouette';
 import type { TreeGroundDetailState } from '@/engine/groundDetail';
 import type { TreeLeafGeometryState } from '@/engine/leafGeometry';
 import type { TreeLeafOrientationState } from '@/engine/leafOrientation';
@@ -30,6 +31,7 @@ import {
 type CanopyLightRuntimeState = TreeCanopyLightState & {
   phenology?: TreePhenologyState;
   leafOrientation?: TreeLeafOrientationState;
+  crownSilhouette?: TreeCrownSilhouetteState;
 };
 
 interface TreeLabObjectProps {
@@ -81,6 +83,7 @@ export function TreeLabObject({
       canopyLight,
       canopyLight.phenology,
       canopyLight.leafOrientation,
+      canopyLight.crownSilhouette,
     ),
     [leaves, materialPair, canopyDepth, canopyLight],
   );
