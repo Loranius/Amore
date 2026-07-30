@@ -36,9 +36,9 @@ interface ForkPatch {
 }
 
 const GRID_BY_LOD: Readonly<Record<OrganicMeshLod, number>> = {
-  high: 11,
-  medium: 9,
-  low: 7,
+  high: 9,
+  medium: 8,
+  low: 6,
 };
 
 const CUBE_CORNERS: readonly GrowthVec3[] = [
