@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { TREE_PRODUCTION_MOBILE_BUDGET } from '@/engine/productionAcceptance';
+import {
+  TREE_PRODUCTION_HIGH_DETAIL_BUDGET,
+  TREE_PRODUCTION_MOBILE_BUDGET,
+} from '@/engine/productionAcceptance';
 import { createThreeOrganicSweepGeometry } from '@/engine/renderer/three';
 import {
   buildTreeLabPreview,
@@ -60,6 +63,9 @@ describe('Tree production preview pipeline', () => {
 
     for (const build of builds) {
       const contract = build.productionAcceptance;
+      const budget = build.lod === 'high'
+        ? TREE_PRODUCTION_HIGH_DETAIL_BUDGET
+        : TREE_PRODUCTION_MOBILE_BUDGET;
       expect({ lod: build.lod, violations: contract.violations }).toEqual({
         lod: build.lod,
         violations: [],
@@ -76,18 +82,10 @@ describe('Tree production preview pipeline', () => {
       expect(contract.diagnostics.barkGeometryPreserved).toBe(true);
       expect(contract.diagnostics.groundDetailsAnchored).toBe(true);
       expect(contract.diagnostics.groundDetailPrefixPreserved).toBe(true);
-      expect(contract.diagnostics.vertices).toBeLessThanOrEqual(
-        TREE_PRODUCTION_MOBILE_BUDGET.maxVertices,
-      );
-      expect(contract.diagnostics.triangles).toBeLessThanOrEqual(
-        TREE_PRODUCTION_MOBILE_BUDGET.maxTriangles,
-      );
-      expect(contract.diagnostics.estimatedDrawCalls).toBeLessThanOrEqual(
-        TREE_PRODUCTION_MOBILE_BUDGET.maxDrawCalls,
-      );
-      expect(contract.diagnostics.materials).toBeLessThanOrEqual(
-        TREE_PRODUCTION_MOBILE_BUDGET.maxMaterials,
-      );
+      expect(contract.diagnostics.vertices).toBeLessThanOrEqual(budget.maxVertices);
+      expect(contract.diagnostics.triangles).toBeLessThanOrEqual(budget.maxTriangles);
+      expect(contract.diagnostics.estimatedDrawCalls).toBeLessThanOrEqual(budget.maxDrawCalls);
+      expect(contract.diagnostics.materials).toBeLessThanOrEqual(budget.maxMaterials);
     }
 
     const lowIds = low.leaves.instances.map((leaf) => leaf.id);

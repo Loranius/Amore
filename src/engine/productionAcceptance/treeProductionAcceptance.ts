@@ -1,6 +1,7 @@
 import { stableHash32 } from '../evolution';
 import {
   TREE_PRODUCTION_ACCEPTANCE_RULES_VERSION,
+  TREE_PRODUCTION_HIGH_DETAIL_BUDGET,
   TREE_PRODUCTION_MOBILE_BUDGET,
   TREE_PRODUCTION_PIPELINE_PHASES,
 } from './config';
@@ -51,7 +52,10 @@ export function buildTreeProductionAcceptance(
     throw new Error('Tree Production acceptance requires a valid asOf timestamp.');
   }
 
-  const budget = { ...(input.budget ?? TREE_PRODUCTION_MOBILE_BUDGET) };
+  const defaultBudget = input.lod === 'high'
+    ? TREE_PRODUCTION_HIGH_DETAIL_BUDGET
+    : TREE_PRODUCTION_MOBILE_BUDGET;
+  const budget = { ...(input.budget ?? defaultBudget) };
   validateBudget(budget);
 
   const phaseOrderPreserved = input.phases.length === TREE_PRODUCTION_PIPELINE_PHASES.length
