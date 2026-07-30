@@ -92,6 +92,7 @@ function TreeLabRenderedScene({
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
     `${build.canopyDepth.diagnostics.innerLeafCount}/${build.canopyDepth.diagnostics.middleLeafCount}/${build.canopyDepth.diagnostics.outerLeafCount} depth`,
+    `${build.canopyLight.diagnostics.shadeLeafCount}/${build.canopyLight.diagnostics.transitionLeafCount}/${build.canopyLight.diagnostics.sunlitLeafCount} light`,
     `${build.life.leaves.length} live`,
     `${totalMaterials} mat`,
     `${build.mesh.diagnostics.branchCount} гілок`,
@@ -305,6 +306,33 @@ function TreeLabRenderedScene({
       data-tree-lab-canopy-extra-draw-calls={build.canopyDepth.diagnostics.estimatedAdditionalDrawCalls}
       data-tree-lab-canopy-extra-materials={build.canopyDepth.diagnostics.estimatedAdditionalMaterials}
       data-tree-lab-canopy-extra-matrix-updates={build.canopyDepth.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame}
+      data-tree-lab-canopy-light="true"
+      data-tree-lab-canopy-light-id={build.canopyLight.descriptor.id}
+      data-tree-lab-canopy-light-profile-id={build.canopyLight.descriptor.profileId}
+      data-tree-lab-canopy-light-tint-attribute={build.canopyLight.descriptor.tintAttributeId}
+      data-tree-lab-canopy-light-signature={build.canopyLight.signature}
+      data-tree-lab-canopy-light-direction-x={build.canopyLight.lightDirection.x}
+      data-tree-lab-canopy-light-direction-y={build.canopyLight.lightDirection.y}
+      data-tree-lab-canopy-light-direction-z={build.canopyLight.lightDirection.z}
+      data-tree-lab-canopy-light-profiles={build.canopyLight.diagnostics.emittedProfileCount}
+      data-tree-lab-canopy-light-shade={build.canopyLight.diagnostics.shadeLeafCount}
+      data-tree-lab-canopy-light-transition={build.canopyLight.diagnostics.transitionLeafCount}
+      data-tree-lab-canopy-light-sunlit={build.canopyLight.diagnostics.sunlitLeafCount}
+      data-tree-lab-canopy-light-exposure-min={build.canopyLight.diagnostics.minimumExposure}
+      data-tree-lab-canopy-light-exposure-max={build.canopyLight.diagnostics.maximumExposure}
+      data-tree-lab-canopy-light-exposure-average={build.canopyLight.diagnostics.averageExposure}
+      data-tree-lab-canopy-light-exposure-bands={build.canopyLight.diagnostics.exposureBands}
+      data-tree-lab-canopy-light-unique-tints={build.canopyLight.diagnostics.uniqueCombinedTintCount}
+      data-tree-lab-canopy-light-tint-budget={build.canopyLight.diagnostics.combinedTintBudget}
+      data-tree-lab-canopy-light-tint-budget-exceeded={String(build.canopyLight.diagnostics.combinedTintBudgetExceeded)}
+      data-tree-lab-canopy-light-quantization={build.canopyLight.diagnostics.quantizationSteps}
+      data-tree-lab-canopy-light-direction-normalized={String(build.canopyLight.diagnostics.lightDirectionNormalized)}
+      data-tree-lab-canopy-light-order-preserved={String(build.canopyLight.diagnostics.canopyProfileOrderPreserved)}
+      data-tree-lab-canopy-light-instances-preserved={String(build.canopyLight.diagnostics.instanceCountPreserved)}
+      data-tree-lab-canopy-light-cells-preserved={String(build.canopyLight.diagnostics.crownCellProvenancePreserved)}
+      data-tree-lab-canopy-light-extra-draw-calls={build.canopyLight.diagnostics.estimatedAdditionalDrawCalls}
+      data-tree-lab-canopy-light-extra-materials={build.canopyLight.diagnostics.estimatedAdditionalMaterials}
+      data-tree-lab-canopy-light-extra-matrix-updates={build.canopyLight.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame}
       data-tree-lab-material-count={build.materials.diagnostics.uniqueMaterialCount}
       data-tree-lab-material-budget={build.materials.diagnostics.materialBudget}
       data-tree-lab-material-budget-exceeded={String(build.materials.diagnostics.materialBudgetExceeded)}
@@ -334,7 +362,14 @@ function TreeLabRenderedScene({
         gl={{ alpha: true, antialias: build.lod !== 'low' }}
       >
         <ambientLight intensity={0.72} />
-        <directionalLight position={[4, 7, 5]} intensity={1.25} />
+        <directionalLight
+          position={[
+            build.canopyLight.lightDirection.x * 8,
+            build.canopyLight.lightDirection.y * 8,
+            build.canopyLight.lightDirection.z * 8,
+          ]}
+          intensity={1.25}
+        />
         <directionalLight position={[-4, 3, -2]} intensity={0.45} />
         <TreeLabObject
           mesh={build.mesh}
@@ -342,6 +377,7 @@ function TreeLabRenderedScene({
           soilSurface={build.soilSurface}
           barkSurface={build.barkSurface}
           canopyDepth={build.canopyDepth}
+          canopyLight={build.canopyLight}
           groundDetails={build.groundDetails}
           leaves={build.leaves}
           materials={build.materials}
