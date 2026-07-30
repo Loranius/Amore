@@ -1,5 +1,6 @@
 import type { CrystalCompositionState } from '../composition/types';
 import type { GrowthBody, GrowthState, GrowthVec3 } from '../growth';
+import type { CrystalGeologyState } from '../species/crystal/geology';
 
 export type CrystalLodLevel = 'high' | 'medium' | 'low';
 
@@ -102,6 +103,8 @@ export interface CrystalGeometryState {
   engineVersion: string;
   speciesRulesVersion: string;
   artifactSeed: number;
+  /** Derived burial and center-maturation metadata for Geometry/Fusion consumers. */
+  geology: CrystalGeologyState;
   meshes: CrystalMeshData[];
   junctions: CrystalAttachmentJunction[];
   budget: CrystalGeometryBudget;
