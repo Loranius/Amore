@@ -4,7 +4,6 @@ import './homeArtifactSwitcher.css';
 export function ReefPreviewPlaceholder() {
   return (
     <div
-      id="home-artifact-preview"
       className="reef-preview-placeholder"
       data-home-artifact-preview="reef"
       data-reef-preview="pending"
@@ -30,7 +29,6 @@ export function ReefPreviewPlaceholder() {
 export function HomeArtifactWebglFallback({ artifact }: { artifact: Exclude<HomeArtifact, 'reef'> }) {
   return (
     <div
-      id="home-artifact-preview"
       className="home-artifact-preview-fallback"
       data-home-artifact-preview={artifact}
       data-home-artifact-webgl="unavailable"
