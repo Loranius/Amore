@@ -16,7 +16,7 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
 }
 
 describe('Tree Lab preview pipeline', () => {
-  it('keeps the full Evolution -> Species -> Growth -> Canopy -> Phenology -> Leaf Orientation -> Surface -> Life result deterministic', () => {
+  it('keeps the full Evolution -> Species -> Growth -> Canopy -> Phenology -> Orientation -> Silhouette -> Surface -> Life result deterministic', () => {
     const first = buildTreeLabPreview('medium');
     const second = buildTreeLabPreview('medium');
 
@@ -50,7 +50,7 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
   });
 
-  it('keeps canopy, leaf orientation, surface character, static geometry, instances and life inside published mobile limits', () => {
+  it('keeps canopy polish, surface character, static geometry, instances and life inside published mobile limits', () => {
     const build = buildTreeLabPreview('medium');
     const totalVertices = build.mesh.diagnostics.vertexCount
       + build.rootGeometry.diagnostics.vertexCount
@@ -92,6 +92,16 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.leafOrientation.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
     expect(build.leafOrientation.diagnostics.estimatedAdditionalMaterials).toBe(0);
     expect(build.leafOrientation.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
+    expect(build.crownSilhouette.profiles).toHaveLength(build.leaves.instances.length);
+    expect(build.crownSilhouette.diagnostics.adjustedOuterLeafCount).toBeGreaterThan(0);
+    expect(build.crownSilhouette.diagnostics.preservedEmptySectorIndices).toBe(true);
+    expect(build.crownSilhouette.diagnostics.filledPreviouslyEmptySectors).toBe(false);
+    expect(build.crownSilhouette.diagnostics.preservedVerticalBands).toBe(true);
+    expect(build.crownSilhouette.diagnostics.silhouetteErrorNotIncreased).toBe(true);
+    expect(build.crownSilhouette.diagnostics.negativeSpaceAccepted).toBe(true);
+    expect(build.crownSilhouette.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
+    expect(build.crownSilhouette.diagnostics.estimatedAdditionalMaterials).toBe(0);
+    expect(build.crownSilhouette.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
     expect(build.barkSurface.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
     expect(build.barkSurface.diagnostics.estimatedAdditionalMaterials).toBe(0);
     expect(build.barkSurface.diagnostics.materialCount).toBe(2);
