@@ -47,6 +47,31 @@ describe('Tree Root Geometry Integration Lab', () => {
     expect(medium.diagnostics.triangleCount).toBeGreaterThanOrEqual(low.diagnostics.triangleCount);
   });
 
+  it('merges Ground Contact and Terrain Binding without changing accepted states', () => {
+    const preview = buildTreeLabPreview('medium');
+    const rootsBefore = JSON.stringify(preview.roots);
+    const contactBefore = JSON.stringify(preview.groundContact);
+    const terrainBefore = JSON.stringify(preview.terrain);
+
+    const state = buildTreeRootGeometry({
+      roots: preview.roots,
+      contact: preview.groundContact,
+      terrain: preview.terrain,
+      lod: 'medium',
+      config: DEFAULT_TREE_ROOT_GEOMETRY_CONFIG,
+    });
+
+    expect(state.diagnostics.contactApplied).toBe(true);
+    expect(state.diagnostics.terrainApplied).toBe(true);
+    expect(state.diagnostics.terrainVertexCount).toBe(preview.terrain.diagnostics.vertexCount);
+    expect(state.diagnostics.terrainTriangleCount).toBe(preview.terrain.diagnostics.triangleCount);
+    expect(state.diagnostics.terrainMergedIntoStaticMesh).toBe(true);
+    expect(state.diagnostics.estimatedDrawCalls).toBe(1);
+    expect(JSON.stringify(preview.roots)).toBe(rootsBefore);
+    expect(JSON.stringify(preview.groundContact)).toBe(contactBefore);
+    expect(JSON.stringify(preview.terrain)).toBe(terrainBefore);
+  });
+
   it('does not mutate accepted root architecture', () => {
     const preview = buildTreeLabPreview('medium');
     const before = JSON.stringify(preview.roots);
