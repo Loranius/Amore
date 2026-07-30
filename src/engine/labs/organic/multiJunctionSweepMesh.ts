@@ -331,6 +331,32 @@ function buildJunctionPatch(
   const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
+  const vertexByKey = new Map<string, number>();
+
+  const vertexIndex = (vertex: GrowthVec3, normal: GrowthVec3): number => {
+    const relative = subtract(vertex, group.anchor.position);
+    const angle = Math.atan2(
+      dot(relative, group.anchor.binormal),
+      dot(relative, group.anchor.normal),
+    );
+    const u = round6(clamp01(
+      0.5 + dot(relative, group.anchor.tangent) / Math.max(1e-6, group.parentRadius * 5),
+    ));
+    const v = round6((angle / (Math.PI * 2) + 1) % 1);
+    const key = [
+      round6(vertex.x), round6(vertex.y), round6(vertex.z),
+      round6(normal.x), round6(normal.y), round6(normal.z),
+      u, v,
+    ].join(':');
+    const existing = vertexByKey.get(key);
+    if (existing !== undefined) return existing;
+    const index = positions.length / 3;
+    pushVec(positions, vertex);
+    pushVec(normals, normal);
+    uvs.push(u, v);
+    vertexByKey.set(key, index);
+    return index;
+  };
 
   const emitTriangle = (first: GrowthVec3, second: GrowthVec3, third: GrowthVec3) => {
     const face = cross(subtract(second, first), subtract(third, first));
@@ -342,21 +368,11 @@ function buildJunctionPatch(
       [triangle[1], triangle[2]] = [triangle[2]!, triangle[1]!];
       [triangleNormals[1], triangleNormals[2]] = [triangleNormals[2]!, triangleNormals[1]!];
     }
-    const firstVertex = positions.length / 3;
-    triangle.forEach((vertex, index) => {
-      const relative = subtract(vertex, group.anchor.position);
-      const angle = Math.atan2(
-        dot(relative, group.anchor.binormal),
-        dot(relative, group.anchor.normal),
-      );
-      pushVec(positions, vertex);
-      pushVec(normals, triangleNormals[index]!);
-      uvs.push(
-        round6(clamp01(0.5 + dot(relative, group.anchor.tangent) / Math.max(1e-6, group.parentRadius * 5))),
-        round6((angle / (Math.PI * 2) + 1) % 1),
-      );
-    });
-    indices.push(firstVertex, firstVertex + 1, firstVertex + 2);
+    indices.push(
+      vertexIndex(triangle[0]!, triangleNormals[0]!),
+      vertexIndex(triangle[1]!, triangleNormals[1]!),
+      vertexIndex(triangle[2]!, triangleNormals[2]!),
+    );
   };
 
   for (let xIndex = 0; xIndex < grid; xIndex += 1) {
