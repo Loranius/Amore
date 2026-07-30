@@ -1,5 +1,10 @@
 export { DEFAULT_GROWTH_ENGINE_CONFIG } from './config';
 export { buildGrowthState } from './engine';
+export { buildGrowthSurfaceAtlas } from './surfaceAtlas';
+export type {
+  GrowthSurfaceAtlas,
+  GrowthSurfaceRegion,
+} from './surfaceAtlas';
 export type {
   BuildGrowthStateInput,
   GrowthAttachment,
