@@ -36,7 +36,31 @@ describe('Tree Leaf Orientation', () => {
       expect(Math.abs(profile.tiltRad)).toBeLessThanOrEqual(bounds.maximumTiltRad + 1e-6);
       expect(Math.abs(profile.fanRad)).toBeLessThanOrEqual(bounds.maximumFanRad + 1e-6);
       expect(Math.abs(profile.twistRad)).toBeLessThanOrEqual(bounds.maximumTwistRad + 1e-6);
+      expect(Math.hypot(
+        profile.presentationNormal.x,
+        profile.presentationNormal.y,
+        profile.presentationNormal.z,
+      )).toBeCloseTo(1, 5);
     }
+  });
+
+  it('improves stable front readability without changing the accepted leaf set', () => {
+    const { orientation } = rebuild();
+    const adjusted = orientation.profiles.filter((profile) => profile.frontFacingAdjusted);
+    const candidates = orientation.profiles.filter((profile) => (
+      profile.renderFacingDot !== profile.sourceFacingDot || profile.frontFacingAdjusted
+    ));
+
+    expect(orientation.diagnostics.frontFacingCandidateCount).toBeGreaterThan(0);
+    expect(orientation.diagnostics.frontFacingAdjustedLeafCount).toBeGreaterThan(0);
+    expect(orientation.diagnostics.frontFacingNotReduced).toBe(true);
+    expect(orientation.diagnostics.averageRenderFacingDot).toBeGreaterThanOrEqual(
+      orientation.diagnostics.averageSourceFacingDot,
+    );
+    expect(orientation.diagnostics.minimumRenderFacingDot).toBeGreaterThanOrEqual(0);
+    expect(adjusted.length).toBe(orientation.diagnostics.frontFacingAdjustedLeafCount);
+    expect(candidates.length).toBeGreaterThan(0);
+    expect(adjusted.every((profile) => profile.renderFacingDot > profile.sourceFacingDot)).toBe(true);
   });
 
   it('keeps accepted leaf identity and orientation values stable across LODs', () => {
@@ -50,6 +74,10 @@ describe('Tree Leaf Orientation', () => {
       expect(mediumByLeafId.get(profile.leafInstanceId)).toMatchObject({
         leafInstanceId: profile.leafInstanceId,
         layer: profile.layer,
+        presentationNormal: profile.presentationNormal,
+        sourceFacingDot: profile.sourceFacingDot,
+        renderFacingDot: profile.renderFacingDot,
+        frontFacingAdjusted: profile.frontFacingAdjusted,
         tiltRad: profile.tiltRad,
         fanRad: profile.fanRad,
         twistRad: profile.twistRad,
@@ -57,6 +85,10 @@ describe('Tree Leaf Orientation', () => {
       expect(highByLeafId.get(profile.leafInstanceId)).toMatchObject({
         leafInstanceId: profile.leafInstanceId,
         layer: profile.layer,
+        presentationNormal: profile.presentationNormal,
+        sourceFacingDot: profile.sourceFacingDot,
+        renderFacingDot: profile.renderFacingDot,
+        frontFacingAdjusted: profile.frontFacingAdjusted,
         tiltRad: profile.tiltRad,
         fanRad: profile.fanRad,
         twistRad: profile.twistRad,
