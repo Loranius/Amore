@@ -310,7 +310,7 @@ Automated coverage verifies:
 - Tree Life prefix identity;
 - all preservation conditions;
 - all three LODs pass the static production contract;
-- low IDs remain a prefix of medium and medium remain a prefix of high;
+- low leaf IDs remain an ordered subset of medium and medium remain an ordered subset of high;
 - fixture wrapper and generic build remain equal;
 - couple-day `asOf` is stable across reloads;
 - runtime warming/pass/fail behavior;
