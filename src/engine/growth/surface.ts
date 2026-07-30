@@ -30,6 +30,8 @@ export interface GrowthSiteCandidate {
   surfacePotential: number;
   surfaceStress: number;
   localDensity: number;
+  growthShadow: number;
+  competitionPressure: number;
   anchor: GrowthVec3;
   direction: GrowthVec3;
   burialDepth: number;
@@ -104,6 +106,8 @@ export function sampleGrowthSite(
     surfacePotential: 0.5,
     surfaceStress: 0,
     localDensity: 0,
+    growthShadow: 0,
+    competitionPressure: 0,
     anchor: roundVec(anchor),
     direction: roundVec(direction),
     burialDepth,
@@ -134,6 +138,8 @@ export function sampleGrowthRegionSite(
     surfacePotential: region.growthPotential,
     surfaceStress: region.surfaceStress,
     localDensity: region.localDensity,
+    growthShadow: region.growthShadow,
+    competitionPressure: region.competitionPressure,
     anchor: roundVec(anchor),
     direction: roundVec(direction),
     burialDepth,
@@ -150,5 +156,11 @@ export function attachmentFromSite(site: GrowthSiteCandidate): GrowthAttachment 
     point: site.surfacePoint,
     normal: site.surfaceNormal,
     burialDepth: site.burialDepth,
+    ...(site.surfaceRegionId === null
+      ? {}
+      : {
+          growthShadow: round6(site.growthShadow),
+          competitionPressure: round6(site.competitionPressure),
+        }),
   };
 }
