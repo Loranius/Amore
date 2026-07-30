@@ -1,7 +1,7 @@
 import type { TreeRootGeometryConfig } from './types';
 
 export const DEFAULT_TREE_ROOT_GEOMETRY_CONFIG: TreeRootGeometryConfig = {
-  rulesVersion: 'tree-root-geometry-v1.0.0',
+  rulesVersion: 'tree-root-geometry-v1.1.0',
   surface: {
     curveSamplesPerSegment: 1,
     minimumRadius: 0.008,
@@ -25,13 +25,13 @@ export const DEFAULT_TREE_ROOT_GEOMETRY_CONFIG: TreeRootGeometryConfig = {
     },
   },
   maximumVerticesByLod: {
-    high: 800,
-    medium: 650,
-    low: 400,
+    high: 1_100,
+    medium: 850,
+    low: 520,
   },
   maximumTrianglesByLod: {
-    high: 1_200,
-    medium: 950,
-    low: 600,
+    high: 1_700,
+    medium: 1_300,
+    low: 780,
   },
 };
