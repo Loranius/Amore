@@ -1,6 +1,7 @@
 import {
   add,
   cross,
+  distance,
   dot,
   lerp,
   normalize,
@@ -16,6 +17,7 @@ import type {
   OrganicBranchCurve,
   OrganicCurveFrameSample,
   OrganicCurveFrameState,
+  OrganicJunctionAnchor,
   OrganicMeshLod,
   OrganicSurfaceConfig,
   OrganicSweepMesh,
@@ -26,8 +28,18 @@ interface PreparedCurveSamples {
   junctionRingCount: number;
 }
 
+interface ParentJunctionInfluence {
+  junction: OrganicJunctionAnchor;
+  reachesTerminal: boolean;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
 function smoothstep(value: number): number {
-  return value * value * (3 - 2 * value);
+  const clamped = clamp01(value);
+  return clamped * clamped * (3 - 2 * clamped);
 }
 
 function sampleByStride(
@@ -58,7 +70,7 @@ function junctionCenters(
     const t = (index - 1) / (ringCount - 1);
     const eased = smoothstep(t);
     const guided = lerp(junction.surfacePosition, joinSample.position, eased);
-    const arcLift = Math.sin(Math.PI * t) * junction.parentRadius * 0.08;
+    const arcLift = Math.sin(Math.PI * t) * junction.parentRadius * 0.16;
     centers.push(add(guided, scale(junction.parentTangent, arcLift)));
   }
   return centers;
@@ -150,6 +162,72 @@ function prepareCurveForLod(
   };
 }
 
+function collectParentJunctionInfluences(
+  frameState: OrganicCurveFrameState,
+): ReadonlyMap<string, ParentJunctionInfluence[]> {
+  const curvesById = new Map(frameState.curves.map((curve) => [curve.branchId, curve]));
+  const influencesByParent = new Map<string, ParentJunctionInfluence[]>();
+
+  for (const childCurve of frameState.curves) {
+    const junction = childCurve.junction;
+    if (!junction) continue;
+    const parentCurve = curvesById.get(junction.parentBranchId);
+    const terminalSample = parentCurve?.samples[parentCurve.samples.length - 1];
+    if (!parentCurve || !terminalSample) continue;
+
+    const terminalDistance = distance(junction.parentPosition, terminalSample.position);
+    const terminalThreshold = Math.max(
+      junction.parentRadius * 1.35,
+      terminalSample.radius * 1.75,
+    );
+    const influence: ParentJunctionInfluence = {
+      junction,
+      reachesTerminal: junction.parentNodeId === parentCurve.terminalNodeId
+        || terminalDistance <= terminalThreshold,
+    };
+    const existing = influencesByParent.get(junction.parentBranchId);
+    if (existing) existing.push(influence);
+    else influencesByParent.set(junction.parentBranchId, [influence]);
+  }
+
+  return influencesByParent;
+}
+
+function junctionBulge(
+  sample: OrganicCurveFrameSample,
+  radialNormal: GrowthVec3,
+  influences: readonly ParentJunctionInfluence[],
+): number {
+  let directionalBulge = 0;
+  let terminalFlare = 0;
+
+  for (const influence of influences) {
+    const { junction } = influence;
+    const blendLength = Math.max(
+      junction.parentRadius * 2.1,
+      junction.collarRadius * 2.6,
+      1e-4,
+    );
+    const proximity = 1 - distance(sample.position, junction.parentPosition) / blendLength;
+    if (proximity <= 0) continue;
+
+    const axialWeight = smoothstep(proximity);
+    const facing = clamp01((dot(radialNormal, junction.radialDirection) + 0.12) / 1.12);
+    const angularWeight = smoothstep(facing);
+    const maximumButtress = Math.min(
+      junction.parentRadius * 0.34,
+      junction.collarRadius * 0.52,
+    );
+    directionalBulge += maximumButtress * axialWeight * angularWeight;
+
+    if (influence.reachesTerminal) {
+      terminalFlare = Math.max(terminalFlare, sample.radius * 0.12 * axialWeight);
+    }
+  }
+
+  return terminalFlare + Math.min(sample.radius * 0.48, directionalBulge);
+}
+
 function pushVec(target: number[], vector: GrowthVec3): void {
   target.push(round6(vector.x), round6(vector.y), round6(vector.z));
 }
@@ -162,6 +240,7 @@ function addRing(
   ringIndex: number,
   ringCount: number,
   radialSegments: number,
+  parentJunctions: readonly ParentJunctionInfluence[],
 ): void {
   for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
     const angle = radialIndex / radialSegments * Math.PI * 2;
@@ -169,7 +248,8 @@ function addRing(
       scale(sample.normal, Math.cos(angle)),
       scale(sample.binormal, Math.sin(angle)),
     ));
-    pushVec(positions, add(sample.position, scale(radialNormal, sample.radius)));
+    const resolvedRadius = sample.radius + junctionBulge(sample, radialNormal, parentJunctions);
+    pushVec(positions, add(sample.position, scale(radialNormal, resolvedRadius)));
     pushVec(normals, radialNormal);
     uvs.push(
       ringCount <= 1 ? 0 : round6(ringIndex / (ringCount - 1)),
@@ -248,6 +328,7 @@ export function buildOrganicSweepMesh(
   const uvs: number[] = [];
   const indices: number[] = [];
   const branches: OrganicSweepMesh['branches'] = [];
+  const junctionsByParent = collectParentJunctionInfluences(frameState);
   let ringCount = 0;
   let junctionRingCount = 0;
 
@@ -257,9 +338,19 @@ export function buildOrganicSweepMesh(
     if (samples.length < 2) continue;
     const firstVertex = positions.length / 3;
     const firstIndex = indices.length;
+    const parentJunctions = junctionsByParent.get(curve.branchId) ?? [];
 
     samples.forEach((sample, index) => {
-      addRing(positions, normals, uvs, sample, index, samples.length, radialSegments);
+      addRing(
+        positions,
+        normals,
+        uvs,
+        sample,
+        index,
+        samples.length,
+        radialSegments,
+        parentJunctions,
+      );
     });
     addTubeIndices(indices, firstVertex, samples.length, radialSegments);
 
@@ -275,16 +366,20 @@ export function buildOrganicSweepMesh(
         true,
       );
     }
-    addCap(
-      positions,
-      normals,
-      uvs,
-      indices,
-      samples[samples.length - 1]!,
-      radialSegments,
-      samples[samples.length - 1]!.tangent,
-      false,
-    );
+
+    const opensIntoChildBranches = parentJunctions.some((influence) => influence.reachesTerminal);
+    if (!opensIntoChildBranches) {
+      addCap(
+        positions,
+        normals,
+        uvs,
+        indices,
+        samples[samples.length - 1]!,
+        radialSegments,
+        samples[samples.length - 1]!.tangent,
+        false,
+      );
+    }
 
     ringCount += samples.length;
     junctionRingCount += prepared.junctionRingCount;
