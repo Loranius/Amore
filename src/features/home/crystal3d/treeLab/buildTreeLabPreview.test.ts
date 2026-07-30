@@ -16,7 +16,7 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
 }
 
 describe('Tree Lab preview pipeline', () => {
-  it('keeps the full Evolution -> Species -> Growth -> Composition -> Ground Detail -> Life result deterministic', () => {
+  it('keeps the full Evolution -> Species -> Growth -> Bark Surface -> Ground Detail -> Life result deterministic', () => {
     const first = buildTreeLabPreview('medium');
     const second = buildTreeLabPreview('medium');
 
@@ -50,7 +50,7 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
   });
 
-  it('keeps static geometry, instanced leaves, ground details and life inside published mobile limits', () => {
+  it('keeps surface character, static geometry, instances and life inside published mobile limits', () => {
     const build = buildTreeLabPreview('medium');
     const totalVertices = build.mesh.diagnostics.vertexCount
       + build.rootGeometry.diagnostics.vertexCount
@@ -68,6 +68,9 @@ describe('Tree Lab preview pipeline', () => {
     expect(totalVertices).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxVertices);
     expect(totalTriangles).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxTriangles);
     expect(estimatedDrawCalls).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxDrawCalls);
+    expect(build.barkSurface.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
+    expect(build.barkSurface.diagnostics.estimatedAdditionalMaterials).toBe(0);
+    expect(build.barkSurface.diagnostics.materialCount).toBe(2);
     expect(build.groundDetails.instances).toHaveLength(72);
     expect(build.groundDetails.diagnostics.totalMaterialCount).toBe(3);
     expect(build.life.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
@@ -78,18 +81,21 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.mesh.diagnostics.junctionCount).toBe(build.frames.diagnostics.junctionCount);
   });
 
-  it('adapts the pure branch mesh to one indexed Three.js geometry', () => {
+  it('adapts the pure branch mesh and Bark Surface to one indexed Three.js geometry', () => {
     const build = buildTreeLabPreview('low');
-    const geometry = createThreeOrganicSweepGeometry(build.mesh);
+    const geometry = createThreeOrganicSweepGeometry(build.mesh, build.barkSurface);
 
     expect(geometry.getAttribute('position').count).toBe(build.mesh.diagnostics.vertexCount);
     expect(geometry.getAttribute('normal').count).toBe(build.mesh.diagnostics.vertexCount);
     expect(geometry.getAttribute('uv').count).toBe(build.mesh.diagnostics.vertexCount);
+    expect(geometry.getAttribute('color').count).toBe(build.mesh.diagnostics.vertexCount);
+    expect(geometry.getAttribute('barkCharacter').count).toBe(build.mesh.diagnostics.vertexCount);
     expect(geometry.getIndex()?.count).toBe(build.mesh.indices.length);
     expect(geometry.userData['treeLab']).toMatchObject({
       lod: 'low',
       branches: build.mesh.diagnostics.branchCount,
       junctions: build.mesh.diagnostics.junctionCount,
+      barkSurfaceApplied: true,
     });
 
     geometry.dispose();
