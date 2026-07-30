@@ -15,18 +15,6 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
   return stable;
 }
 
-function expectStableOrderedSubset(
-  smallerIds: readonly string[],
-  largerIds: readonly string[],
-): void {
-  const positions = new Map(largerIds.map((id, index) => [id, index] as const));
-  const matchedPositions = smallerIds.map((id) => positions.get(id));
-  expect(matchedPositions.every((position) => position !== undefined)).toBe(true);
-  for (let index = 1; index < matchedPositions.length; index += 1) {
-    expect(matchedPositions[index]).toBeGreaterThan(matchedPositions[index - 1] ?? -1);
-  }
-}
-
 describe('Tree production preview pipeline', () => {
   it('keeps the full Evolution -> Species -> Growth -> Crown -> Surface -> Life -> Acceptance result deterministic', () => {
     const first = buildTreeLabPreview('medium');
@@ -72,8 +60,11 @@ describe('Tree production preview pipeline', () => {
 
     for (const build of builds) {
       const contract = build.productionAcceptance;
+      expect({ lod: build.lod, violations: contract.violations }).toEqual({
+        lod: build.lod,
+        violations: [],
+      });
       expect(contract.staticStatus).toBe('pass');
-      expect(contract.violations).toEqual([]);
       expect(contract.diagnostics.phaseOrderPreserved).toBe(true);
       expect(contract.diagnostics.phaseFingerprintsPresent).toBe(true);
       expect(contract.diagnostics.leafIdentityChainPreserved).toBe(true);
@@ -102,8 +93,12 @@ describe('Tree production preview pipeline', () => {
     const lowIds = low.leaves.instances.map((leaf) => leaf.id);
     const mediumIds = medium.leaves.instances.map((leaf) => leaf.id);
     const highIds = high.leaves.instances.map((leaf) => leaf.id);
-    expectStableOrderedSubset(lowIds, mediumIds);
-    expectStableOrderedSubset(mediumIds, highIds);
+    const mediumIdSet = new Set(mediumIds);
+    const highIdSet = new Set(highIds);
+    expect(lowIds.every((id) => mediumIdSet.has(id))).toBe(true);
+    expect(mediumIds.every((id) => highIdSet.has(id))).toBe(true);
+    expect(mediumIds.filter((id) => new Set(lowIds).has(id))).toEqual(lowIds);
+    expect(highIds.filter((id) => mediumIdSet.has(id))).toEqual(mediumIds);
   });
 
   it('keeps canopy polish, surface character, static geometry, instances and life inside published mobile limits', () => {
@@ -154,7 +149,7 @@ describe('Tree production preview pipeline', () => {
     expect(geometry.userData['treeLab']).toMatchObject({
       lod: 'low',
       branches: build.mesh.diagnostics.branchCount,
-      junctions: build.mesh.diagnostics.junctionCount,
+      junctions: build.frames.diagnostics.junctionCount,
       barkSurfaceApplied: true,
     });
 
