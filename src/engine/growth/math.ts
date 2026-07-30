@@ -84,8 +84,22 @@ export function directionFromAzimuthElevation(
 
 export function ensureUpward(vector: GrowthVec3, minUpwardComponent: number): GrowthVec3 {
   const normalized = normalize(vector);
-  if (normalized.y >= minUpwardComponent) return normalized;
-  return normalize({ ...normalized, y: minUpwardComponent });
+  const minimum = clamp(minUpwardComponent, -1, 1);
+  if (normalized.y >= minimum) return normalized;
+  if (minimum >= 1 - 1e-9) return { ...GROWTH_UP };
+
+  const horizontalMagnitude = Math.hypot(normalized.x, normalized.z);
+  const targetHorizontalMagnitude = Math.sqrt(Math.max(0, 1 - minimum * minimum));
+  if (horizontalMagnitude <= 1e-9) {
+    return { x: targetHorizontalMagnitude, y: minimum, z: 0 };
+  }
+
+  const horizontalScale = targetHorizontalMagnitude / horizontalMagnitude;
+  return {
+    x: normalized.x * horizontalScale,
+    y: minimum,
+    z: normalized.z * horizontalScale,
+  };
 }
 
 export function orthonormalBasis(direction: GrowthVec3): { tangent: GrowthVec3; bitangent: GrowthVec3 } {
