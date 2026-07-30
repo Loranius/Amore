@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import type {
+  TreeCanopyDepthProfile,
+  TreeCanopyDepthState,
+} from '../../canopyDepth';
+import type {
   TreeLeafGeometryState,
   TreeLeafInstance,
 } from '../../leafGeometry';
@@ -8,7 +12,10 @@ function vector(value: TreeLeafInstance['position']): THREE.Vector3 {
   return new THREE.Vector3(value.x, value.y, value.z);
 }
 
-function matrixForInstance(instance: TreeLeafInstance): THREE.Matrix4 {
+function matrixForInstance(
+  instance: TreeLeafInstance,
+  canopyProfile?: TreeCanopyDepthProfile,
+): THREE.Matrix4 {
   const yAxis = vector(instance.direction).normalize();
   const sourceNormal = vector(instance.normal);
   const projectedNormal = sourceNormal.sub(
@@ -29,10 +36,37 @@ function matrixForInstance(instance: TreeLeafInstance): THREE.Matrix4 {
   const rolledX = xAxis.clone().multiplyScalar(cosine).addScaledVector(zAxis, sine);
   const rolledZ = zAxis.clone().multiplyScalar(cosine).addScaledVector(xAxis, -sine);
   const basis = new THREE.Matrix4().makeBasis(rolledX, yAxis, rolledZ);
-  const size = new THREE.Matrix4().makeScale(instance.width, instance.length, instance.width);
+  const scaleMultiplier = canopyProfile?.scaleMultiplier ?? 1;
+  const size = new THREE.Matrix4().makeScale(
+    instance.width * scaleMultiplier,
+    instance.length * scaleMultiplier,
+    instance.width * scaleMultiplier,
+  );
   const matrix = new THREE.Matrix4().multiplyMatrices(basis, size);
-  matrix.setPosition(vector(instance.position));
+  matrix.setPosition(vector(canopyProfile?.renderPosition ?? instance.position));
   return matrix;
+}
+
+function validateCanopyDepth(
+  leaves: TreeLeafGeometryState,
+  canopy: TreeCanopyDepthState,
+): void {
+  if (canopy.artifactSeed !== leaves.artifactSeed
+    || canopy.lod !== leaves.lod
+    || canopy.sourceLeafGeometryVersion !== leaves.treeLeafGeometryVersion
+    || canopy.sourceLeafGeometryRulesVersion !== leaves.rulesVersion) {
+    throw new Error('Three Tree Leaf Geometry received Canopy Depth from another leaf state.');
+  }
+  if (canopy.profiles.length !== leaves.instances.length) {
+    throw new Error('Three Tree Leaf Geometry Canopy Depth profile count does not match leaves.');
+  }
+  for (let index = 0; index < leaves.instances.length; index += 1) {
+    const leaf = leaves.instances[index];
+    const profile = canopy.profiles[index];
+    if (!leaf || !profile || profile.sequence !== index || profile.leafInstanceId !== leaf.id) {
+      throw new Error('Three Tree Leaf Geometry Canopy Depth order does not match leaves.');
+    }
+  }
 }
 
 export function createThreeTreeLeafCardGeometry(
@@ -63,7 +97,9 @@ export function createThreeTreeLeafCardGeometry(
 export function createThreeTreeLeafInstancedMesh(
   state: TreeLeafGeometryState,
   material: THREE.Material,
+  canopy?: TreeCanopyDepthState,
 ): THREE.InstancedMesh {
+  if (canopy) validateCanopyDepth(state, canopy);
   const geometry = createThreeTreeLeafCardGeometry(state);
   const mesh = new THREE.InstancedMesh(geometry, material, state.instances.length);
   mesh.name = 'TreeLeafInstances';
@@ -72,14 +108,44 @@ export function createThreeTreeLeafInstancedMesh(
   mesh.frustumCulled = false;
 
   for (const instance of state.instances) {
-    mesh.setMatrixAt(instance.sequence, matrixForInstance(instance));
+    const profile = canopy?.profiles[instance.sequence];
+    mesh.setMatrixAt(instance.sequence, matrixForInstance(instance, profile));
+    if (profile) {
+      mesh.setColorAt(
+        instance.sequence,
+        new THREE.Color(
+          profile.tintMultiplier.r,
+          profile.tintMultiplier.g,
+          profile.tintMultiplier.b,
+        ),
+      );
+    }
   }
   mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   mesh.userData['treeLeafGeometry'] = {
     lod: state.lod,
     instances: state.instances.length,
     renderedTriangles: state.diagnostics.renderedTriangleCount,
     estimatedDrawCalls: state.diagnostics.estimatedDrawCalls,
+    canopyDepthApplied: canopy !== undefined,
   };
+  if (canopy) {
+    mesh.userData['treeCanopyDepth'] = {
+      version: canopy.treeCanopyDepthVersion,
+      rulesVersion: canopy.rulesVersion,
+      id: canopy.descriptor.id,
+      profileId: canopy.descriptor.profileId,
+      tintAttributeId: canopy.descriptor.tintAttributeId,
+      signature: canopy.signature,
+      profiles: canopy.profiles.length,
+      inner: canopy.diagnostics.innerLeafCount,
+      middle: canopy.diagnostics.middleLeafCount,
+      outer: canopy.diagnostics.outerLeafCount,
+      uniqueTints: canopy.diagnostics.uniqueTintCount,
+      additionalDrawCalls: canopy.diagnostics.estimatedAdditionalDrawCalls,
+      additionalMaterials: canopy.diagnostics.estimatedAdditionalMaterials,
+    };
+  }
   return mesh;
 }
