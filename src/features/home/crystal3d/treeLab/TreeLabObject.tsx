@@ -7,6 +7,7 @@ import type { TreeCanopyLightState } from '@/engine/canopyLight';
 import type { TreeGroundDetailState } from '@/engine/groundDetail';
 import type { TreeLeafGeometryState } from '@/engine/leafGeometry';
 import type { OrganicSweepMesh } from '@/engine/labs/organic';
+import type { TreePhenologyState } from '@/engine/phenology';
 import type { TreeRootGeometryState } from '@/engine/rootGeometry';
 import type { TreeSoilSurfaceState } from '@/engine/soilSurface';
 import {
@@ -25,13 +26,15 @@ import {
   type ThreeTreeLifeBinding,
 } from '@/engine/renderer/three';
 
+type CanopyLightWithPhenology = TreeCanopyLightState & { phenology?: TreePhenologyState };
+
 interface TreeLabObjectProps {
   mesh: OrganicSweepMesh;
   rootGeometry: TreeRootGeometryState;
   soilSurface: TreeSoilSurfaceState;
   barkSurface: TreeBarkSurfaceState;
   canopyDepth: TreeCanopyDepthState;
-  canopyLight: TreeCanopyLightState;
+  canopyLight: CanopyLightWithPhenology;
   groundDetails: TreeGroundDetailState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
@@ -72,6 +75,7 @@ export function TreeLabObject({
       materialPair.foliage,
       canopyDepth,
       canopyLight,
+      canopyLight.phenology,
     ),
     [leaves, materialPair, canopyDepth, canopyLight],
   );

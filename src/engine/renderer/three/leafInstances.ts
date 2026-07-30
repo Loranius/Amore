@@ -8,6 +8,7 @@ import type {
   TreeLeafGeometryState,
   TreeLeafInstance,
 } from '../../leafGeometry';
+import type { TreePhenologyState } from '../../phenology';
 
 function vector(value: TreeLeafInstance['position']): THREE.Vector3 {
   return new THREE.Vector3(value.x, value.y, value.z);
@@ -48,10 +49,7 @@ function matrixForInstance(
   return matrix;
 }
 
-function validateCanopyDepth(
-  leaves: TreeLeafGeometryState,
-  canopy: TreeCanopyDepthState,
-): void {
+function validateCanopyDepth(leaves: TreeLeafGeometryState, canopy: TreeCanopyDepthState): void {
   if (canopy.artifactSeed !== leaves.artifactSeed
     || canopy.lod !== leaves.lod
     || canopy.sourceLeafGeometryVersion !== leaves.treeLeafGeometryVersion
@@ -61,13 +59,6 @@ function validateCanopyDepth(
   if (canopy.profiles.length !== leaves.instances.length) {
     throw new Error('Three Tree Leaf Geometry Canopy Depth profile count does not match leaves.');
   }
-  for (let index = 0; index < leaves.instances.length; index += 1) {
-    const leaf = leaves.instances[index];
-    const profile = canopy.profiles[index];
-    if (!leaf || !profile || profile.sequence !== index || profile.leafInstanceId !== leaf.id) {
-      throw new Error('Three Tree Leaf Geometry Canopy Depth order does not match leaves.');
-    }
-  }
 }
 
 function validateCanopyLight(
@@ -75,48 +66,41 @@ function validateCanopyLight(
   canopy: TreeCanopyDepthState | undefined,
   light: TreeCanopyLightState,
 ): void {
-  if (!canopy) {
-    throw new Error('Three Tree Leaf Geometry requires Canopy Depth before Canopy Light.');
-  }
+  if (!canopy) throw new Error('Three Tree Leaf Geometry requires Canopy Depth before Canopy Light.');
   if (light.artifactSeed !== leaves.artifactSeed
     || light.lod !== leaves.lod
     || light.sourceLeafGeometryVersion !== leaves.treeLeafGeometryVersion
     || light.sourceLeafGeometryRulesVersion !== leaves.rulesVersion) {
     throw new Error('Three Tree Leaf Geometry received Canopy Light from another leaf state.');
   }
-  if (light.sourceCanopyDepthVersion !== canopy.treeCanopyDepthVersion
-    || light.sourceCanopyDepthRulesVersion !== canopy.rulesVersion
-    || light.sourceCanopyDepthSignature !== canopy.signature) {
+  if (light.sourceCanopyDepthSignature !== canopy.signature) {
     throw new Error('Three Tree Leaf Geometry received Canopy Light from another Canopy Depth state.');
   }
   if (light.profiles.length !== leaves.instances.length) {
     throw new Error('Three Tree Leaf Geometry Canopy Light profile count does not match leaves.');
   }
-  for (let index = 0; index < leaves.instances.length; index += 1) {
-    const leaf = leaves.instances[index];
-    const canopyProfile = canopy.profiles[index];
-    const lightProfile = light.profiles[index];
-    if (!leaf || !canopyProfile || !lightProfile
-      || lightProfile.sequence !== index
-      || lightProfile.leafInstanceId !== leaf.id
-      || lightProfile.canopyProfileId !== canopyProfile.id) {
-      throw new Error('Three Tree Leaf Geometry Canopy Light order does not match leaves.');
-    }
+}
+
+function validatePhenology(
+  leaves: TreeLeafGeometryState,
+  light: TreeCanopyLightState | undefined,
+  phenology: TreePhenologyState,
+): void {
+  if (!light) throw new Error('Three Tree Leaf Geometry requires Canopy Light before Phenology.');
+  if (phenology.artifactSeed !== leaves.artifactSeed
+    || phenology.lod !== leaves.lod
+    || phenology.sourceLeafGeometryVersion !== leaves.treeLeafGeometryVersion
+    || phenology.sourceLeafGeometryRulesVersion !== leaves.rulesVersion
+    || phenology.sourceCanopyLightSignature !== light.signature
+    || phenology.profiles.length !== leaves.instances.length) {
+    throw new Error('Three Tree Leaf Geometry received incompatible Phenology.');
   }
 }
 
-export function createThreeTreeLeafCardGeometry(
-  state: TreeLeafGeometryState,
-): THREE.BufferGeometry {
+export function createThreeTreeLeafCardGeometry(state: TreeLeafGeometryState): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute(
-    'position',
-    new THREE.Float32BufferAttribute(state.template.positions, 3),
-  );
-  geometry.setAttribute(
-    'uv',
-    new THREE.Float32BufferAttribute(state.template.uvs, 2),
-  );
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(state.template.positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(state.template.uvs, 2));
   geometry.setIndex(state.template.indices);
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
@@ -135,9 +119,11 @@ export function createThreeTreeLeafInstancedMesh(
   material: THREE.Material,
   canopy?: TreeCanopyDepthState,
   light?: TreeCanopyLightState,
+  phenology?: TreePhenologyState,
 ): THREE.InstancedMesh {
   if (canopy) validateCanopyDepth(state, canopy);
   if (light) validateCanopyLight(state, canopy, light);
+  if (phenology) validatePhenology(state, light, phenology);
   const geometry = createThreeTreeLeafCardGeometry(state);
   const mesh = new THREE.InstancedMesh(geometry, material, state.instances.length);
   mesh.name = 'TreeLeafInstances';
@@ -148,14 +134,12 @@ export function createThreeTreeLeafInstancedMesh(
   for (const instance of state.instances) {
     const canopyProfile = canopy?.profiles[instance.sequence];
     const lightProfile = light?.profiles[instance.sequence];
+    const phenologyProfile = phenology?.profiles[instance.sequence];
     mesh.setMatrixAt(instance.sequence, matrixForInstance(instance, canopyProfile));
-    const tint = lightProfile?.combinedTintMultiplier ?? canopyProfile?.tintMultiplier;
-    if (tint) {
-      mesh.setColorAt(
-        instance.sequence,
-        new THREE.Color(tint.r, tint.g, tint.b),
-      );
-    }
+    const tint = phenologyProfile?.combinedTintMultiplier
+      ?? lightProfile?.combinedTintMultiplier
+      ?? canopyProfile?.tintMultiplier;
+    if (tint) mesh.setColorAt(instance.sequence, new THREE.Color(tint.r, tint.g, tint.b));
   }
   mesh.instanceMatrix.needsUpdate = true;
   if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -166,6 +150,7 @@ export function createThreeTreeLeafInstancedMesh(
     estimatedDrawCalls: state.diagnostics.estimatedDrawCalls,
     canopyDepthApplied: canopy !== undefined,
     canopyLightApplied: light !== undefined,
+    phenologyApplied: phenology !== undefined,
   };
   if (canopy) {
     mesh.userData['treeCanopyDepth'] = {
@@ -199,6 +184,19 @@ export function createThreeTreeLeafInstancedMesh(
       uniqueCombinedTints: light.diagnostics.uniqueCombinedTintCount,
       additionalDrawCalls: light.diagnostics.estimatedAdditionalDrawCalls,
       additionalMaterials: light.diagnostics.estimatedAdditionalMaterials,
+    };
+  }
+  if (phenology) {
+    mesh.userData['treePhenology'] = {
+      version: phenology.treePhenologyVersion,
+      rulesVersion: phenology.rulesVersion,
+      id: phenology.descriptor.id,
+      phase: phenology.phase,
+      signature: phenology.signature,
+      profiles: phenology.profiles.length,
+      accents: phenology.diagnostics.accentLeafCount,
+      additionalDrawCalls: phenology.diagnostics.estimatedAdditionalDrawCalls,
+      additionalMaterials: phenology.diagnostics.estimatedAdditionalMaterials,
     };
   }
   return mesh;
