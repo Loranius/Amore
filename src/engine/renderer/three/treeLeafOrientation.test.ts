@@ -43,16 +43,20 @@ describe('Three Tree Leaf Orientation adapter', () => {
       additionalMaterials: 0,
     });
 
+    const variedIndex = build.leafOrientation.profiles.findIndex(
+      (profile) => profile.totalRotationRad > 1e-9,
+    );
+    expect(variedIndex).toBeGreaterThanOrEqual(0);
     const plainMatrix = new THREE.Matrix4();
     const orientedMatrix = new THREE.Matrix4();
-    plain.getMatrixAt(0, plainMatrix);
-    oriented.getMatrixAt(0, orientedMatrix);
+    plain.getMatrixAt(variedIndex, plainMatrix);
+    oriented.getMatrixAt(variedIndex, orientedMatrix);
     expect(orientedMatrix.elements).not.toEqual(plainMatrix.elements);
 
     const plainColor = new THREE.Color();
     const orientedColor = new THREE.Color();
-    plain.getColorAt(0, plainColor);
-    oriented.getColorAt(0, orientedColor);
+    plain.getColorAt(variedIndex, plainColor);
+    oriented.getColorAt(variedIndex, orientedColor);
     expect(orientedColor.r).toBeCloseTo(plainColor.r, 6);
     expect(orientedColor.g).toBeCloseTo(plainColor.g, 6);
     expect(orientedColor.b).toBeCloseTo(plainColor.b, 6);
