@@ -101,6 +101,26 @@ function orderBodiesForGeometry(bodies: readonly GrowthBody[]): GeometryBodyOrde
   };
 }
 
+interface PreparedGeometryBody {
+  readonly body: GrowthBody;
+  readonly candidates: readonly CrystalMeshData[];
+  readonly minimumVertices: number;
+  readonly minimumTriangles: number;
+}
+
+function prepareGeometryBodies(bodies: readonly GrowthBody[]): PreparedGeometryBody[] {
+  return bodies.map((body) => {
+    const candidates = lodCandidates(body).map((lod) => buildCrystalMesh(body, lod));
+    const minimum = candidates[candidates.length - 1]!;
+    return {
+      body,
+      candidates,
+      minimumVertices: minimum.positions.length / 3,
+      minimumTriangles: minimum.sourceTriangleCount,
+    };
+  });
+}
+
 function chooseMeshes(
   input: BuildCrystalGeometryInput,
   diagnostics: CrystalGeometryDiagnostics,
@@ -110,10 +130,24 @@ function chooseMeshes(
   const bodyOrder = orderBodiesForGeometry(input.growth.bodies);
   diagnostics.missingHostBodyIds.push(...bodyOrder.unresolvedBodyIds);
   diagnostics.budgetOmittedBodyIds.push(...bodyOrder.unresolvedBodyIds);
+
+  const prepared = prepareGeometryBodies(bodyOrder.ordered);
+  const suffixMinimumVertices = Array<number>(prepared.length + 1).fill(0);
+  const suffixMinimumTriangles = Array<number>(prepared.length + 1).fill(0);
+  for (let index = prepared.length - 1; index >= 0; index -= 1) {
+    const entry = prepared[index]!;
+    suffixMinimumVertices[index] = entry.minimumVertices + (suffixMinimumVertices[index + 1] ?? 0);
+    suffixMinimumTriangles[index] = entry.minimumTriangles + (suffixMinimumTriangles[index + 1] ?? 0);
+  }
+
+  const allMinimumMeshesFit = (suffixMinimumVertices[0] ?? 0) <= input.config.maxVertices
+    && (suffixMinimumTriangles[0] ?? 0) <= input.config.maxTriangles;
   let usedVertices = 0;
   let usedTriangles = 0;
 
-  for (const body of bodyOrder.ordered) {
+  for (let index = 0; index < prepared.length; index += 1) {
+    const entry = prepared[index]!;
+    const body = entry.body;
     if (body.hostBodyId !== null && !includedBodyIds.has(body.hostBodyId)) {
       // The host exists but was omitted by the geometry budget. Descendants must
       // also be omitted, but this is not a missing-host data error.
@@ -121,24 +155,25 @@ function chooseMeshes(
       continue;
     }
 
-    const candidates = lodCandidates(body);
+    const reservedVertices = allMinimumMeshesFit ? suffixMinimumVertices[index + 1] ?? 0 : 0;
+    const reservedTriangles = allMinimumMeshesFit ? suffixMinimumTriangles[index + 1] ?? 0 : 0;
     let selected: CrystalMeshData | null = null;
-    for (const lod of candidates) {
-      const candidate = buildCrystalMesh(body, lod);
+    for (let candidateIndex = 0; candidateIndex < entry.candidates.length; candidateIndex += 1) {
+      const candidate = entry.candidates[candidateIndex]!;
       const vertices = candidate.positions.length / 3;
       const triangles = candidate.sourceTriangleCount;
       if (
-        usedVertices + vertices <= input.config.maxVertices
-        && usedTriangles + triangles <= input.config.maxTriangles
+        usedVertices + vertices + reservedVertices <= input.config.maxVertices
+        && usedTriangles + triangles + reservedTriangles <= input.config.maxTriangles
       ) {
         selected = candidate;
-        if (lod !== candidates[0]) diagnostics.downgradedBodyIds.push(body.id);
+        if (candidateIndex > 0) diagnostics.downgradedBodyIds.push(body.id);
         break;
       }
     }
 
     if (selected === null && body.generation === 0) {
-      selected = buildCrystalMesh(body, 'low');
+      selected = entry.candidates[entry.candidates.length - 1]!;
       diagnostics.downgradedBodyIds.push(body.id);
     }
     if (selected === null) {
