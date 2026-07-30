@@ -86,26 +86,29 @@ describe('Crystal Geometry', () => {
     expect(repeated).toEqual(firstPipeline.geometry);
     expect(JSON.stringify(firstPipeline.growth)).toBe(growthBefore);
     expect(JSON.stringify(firstPipeline.composition)).toBe(compositionBefore);
-    expect(firstPipeline.geometry.geology.bodyCount).toBe(firstPipeline.growth.bodies.length);
-    expect(firstPipeline.geometry.geology.centers).toHaveLength(
+    expect(firstPipeline.geometry.geology).toBeDefined();
+    expect(firstPipeline.geometry.geology?.bodyCount).toBe(firstPipeline.growth.bodies.length);
+    expect(firstPipeline.geometry.geology?.centers).toHaveLength(
       firstPipeline.growth.growthCenters?.length ?? 0,
     );
   });
 
   it('publishes normalized geological burial and center maturation metadata', () => {
     const { geometry } = pipeline(BASE_EVENTS);
+    const geology = geometry.geology;
 
-    expect(geometry.geology.geologyStateVersion).toBe(1);
-    expect(geometry.geology.maxBurialRatio).toBeGreaterThanOrEqual(0);
-    expect(geometry.geology.maxBurialRatio).toBeLessThanOrEqual(0.82);
-    for (const body of geometry.geology.bodies) {
+    expect(geology).toBeDefined();
+    expect(geology?.geologyStateVersion).toBe(1);
+    expect(geology?.maxBurialRatio).toBeGreaterThanOrEqual(0);
+    expect(geology?.maxBurialRatio).toBeLessThanOrEqual(0.82);
+    for (const body of geology?.bodies ?? []) {
       expect(body.burialRatio).toBeGreaterThanOrEqual(0);
       expect(body.burialRatio).toBeLessThanOrEqual(0.82);
       expect(body.exposedTipRatio).toBeGreaterThan(0);
       expect(body.exposedTipRatio).toBeLessThanOrEqual(1);
       expect(body.buriedLength + body.exposedLength).toBeGreaterThan(0);
     }
-    for (const center of geometry.geology.centers) {
+    for (const center of geology?.centers ?? []) {
       expect(center.maturity).toBeGreaterThanOrEqual(0);
       expect(center.maturity).toBeLessThanOrEqual(1);
       expect(center.cohesion).toBeGreaterThanOrEqual(0);
@@ -166,8 +169,10 @@ describe('Crystal Geometry', () => {
       },
     ]).geometry;
 
-    expect(later.geology.bodyCount).toBeGreaterThan(earlier.geology.bodyCount);
-    expect(later.meshes).toHaveLength(later.geology.bodyCount);
+    expect(earlier.geology).toBeDefined();
+    expect(later.geology).toBeDefined();
+    expect(later.geology?.bodyCount ?? 0).toBeGreaterThan(earlier.geology?.bodyCount ?? 0);
+    expect(later.meshes).toHaveLength(later.geology?.bodyCount ?? 0);
     for (const oldMesh of earlier.meshes) {
       const nextMesh = later.meshes.find((mesh) => mesh.bodyId === oldMesh.bodyId);
       expect(nextMesh).toBeDefined();
