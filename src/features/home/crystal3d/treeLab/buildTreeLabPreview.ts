@@ -18,6 +18,11 @@ import {
   buildTreeComposition,
   type TreeCompositionState,
 } from '@/engine/composition';
+import {
+  DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG,
+  buildTreeCrownSilhouette,
+  type TreeCrownSilhouetteState,
+} from '@/engine/crownSilhouette';
 import type { ArtifactBlueprint } from '@/engine/evolution';
 import {
   DEFAULT_TREE_FOLIAGE_CONFIG,
@@ -121,6 +126,7 @@ export interface TreeLabPreviewBuild {
   canopyLight: TreeCanopyLightState;
   phenology: TreePhenologyState;
   leafOrientation: TreeLeafOrientationState;
+  crownSilhouette: TreeCrownSilhouetteState;
   soilSurface: TreeSoilSurfaceState;
   barkSurface: TreeBarkSurfaceState;
   groundDetails: TreeGroundDetailState;
@@ -176,7 +182,20 @@ export function buildTreeLabPreviewFromArtifact({
     phenology,
     config: DEFAULT_TREE_LEAF_ORIENTATION_CONFIG,
   });
-  const canopyLight = Object.assign({}, canopyLightBase, { phenology, leafOrientation });
+  const crownSilhouette = buildTreeCrownSilhouette({
+    composition,
+    leaves,
+    canopyDepth,
+    canopyLight: canopyLightBase,
+    phenology,
+    leafOrientation,
+    config: DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG,
+  });
+  const canopyLight = Object.assign({}, canopyLightBase, {
+    phenology,
+    leafOrientation,
+    crownSilhouette,
+  });
   const soilSurface = buildTreeSoilSurface({ species, terrain, rootGeometry, materials, config: DEFAULT_TREE_SOIL_SURFACE_CONFIG });
   const mesh = buildOrganicSweepMesh(frames, lod);
   const barkSurface = buildTreeBarkSurface({
@@ -211,6 +230,7 @@ export function buildTreeLabPreviewFromArtifact({
     canopyLight,
     phenology,
     leafOrientation,
+    crownSilhouette,
     soilSurface,
     barkSurface,
     groundDetails,
