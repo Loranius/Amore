@@ -45,6 +45,11 @@ import {
   type TreeSpeciesBlueprint,
 } from '@/engine/species/tree';
 import {
+  DEFAULT_TREE_TERRAIN_BINDING_CONFIG,
+  buildTreeTerrainBinding,
+  type TreeTerrainBindingState,
+} from '@/engine/terrainBinding';
+import {
   DEFAULT_TREE_LIFE_CONFIG,
   buildTreeLifeState,
   type TreeLifeState,
@@ -72,6 +77,7 @@ export interface TreeLabPreviewBuild {
   composition: TreeCompositionState;
   roots: TreeRootArchitectureState;
   groundContact: TreeGroundContactState;
+  terrain: TreeTerrainBindingState;
   rootGeometry: TreeRootGeometryState;
   foliage: TreeFoliageState;
   leaves: TreeLeafGeometryState;
@@ -131,9 +137,16 @@ export function buildTreeLabPreviewFromArtifact({
     roots,
     config: DEFAULT_TREE_GROUND_CONTACT_CONFIG,
   });
+  const terrain = buildTreeTerrainBinding({
+    species,
+    contact: groundContact,
+    lod,
+    config: DEFAULT_TREE_TERRAIN_BINDING_CONFIG,
+  });
   const rootGeometry = buildTreeRootGeometry({
     roots,
     contact: groundContact,
+    terrain,
     lod,
     config: DEFAULT_TREE_ROOT_GEOMETRY_CONFIG,
   });
@@ -175,6 +188,7 @@ export function buildTreeLabPreviewFromArtifact({
     composition,
     roots,
     groundContact,
+    terrain,
     rootGeometry,
     foliage,
     leaves,
