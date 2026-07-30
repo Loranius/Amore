@@ -12,6 +12,14 @@ export interface TreeCanopyDepthConfig {
   innerDepthMaximum: number;
   outerDepthMinimum: number;
   maximumOffsetRatio: number;
+  /** Stable portal presentation axis. It is never read from the live camera. */
+  presentationFrontDirection: GrowthVec3;
+  /** Fraction of back/central leaves eligible for deterministic front-volume recovery. */
+  frontFillFraction: number;
+  /** Share of the total offset budget reserved for front-volume recovery. */
+  frontBiasRatio: number;
+  /** Target front depth expressed as a fraction of the source cluster radius. */
+  frontFillDepthRatio: number;
   scaleByLayer: Readonly<Record<TreeCanopyDepthLayer, number>>;
   tintByLayer: Readonly<Record<TreeCanopyDepthLayer, TreeRgb>>;
   quantizationSteps: number;
@@ -39,6 +47,9 @@ export interface TreeCanopyDepthProfile {
   sourcePosition: GrowthVec3;
   positionOffset: GrowthVec3;
   renderPosition: GrowthVec3;
+  sourceFrontDepth: number;
+  renderFrontDepth: number;
+  presentationShifted: boolean;
   scaleMultiplier: number;
   tintMultiplier: TreeRgb;
 }
@@ -54,6 +65,14 @@ export interface TreeCanopyDepthDiagnostics {
   filledPreviouslyEmptyCells: false;
   stableLeafOrderPreserved: true;
   instanceCountPreserved: true;
+  presentationFrontDirection: GrowthVec3;
+  sourceFrontLeafCount: number;
+  renderedFrontLeafCount: number;
+  sourceFrontLeafFraction: number;
+  renderedFrontLeafFraction: number;
+  presentationShiftedLeafCount: number;
+  frontLayersCovered: number;
+  frontHemisphereNotReduced: true;
   minimumScaleMultiplier: number;
   maximumScaleMultiplier: number;
   maximumPositionOffset: number;
