@@ -12,6 +12,10 @@ import type {
   CrystalSolid,
 } from './types';
 
+function compareIds(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function validateInput(input: BuildCrystalGeometryInput): void {
   if (!input.config.rulesVersion.trim()) {
     throw new Error('Crystal Geometry requires a non-empty rulesVersion.');
@@ -45,18 +49,74 @@ function finiteMesh(mesh: CrystalMeshData): boolean {
     && mesh.indices.every(Number.isInteger);
 }
 
+interface GeometryBodyOrder {
+  readonly ordered: GrowthBody[];
+  readonly unresolvedBodyIds: string[];
+}
+
+/**
+ * Geometry consumes imported Growth State v1 snapshots as well as fresh engine
+ * output. Resolve host dependencies explicitly instead of trusting array order.
+ */
+function orderBodiesForGeometry(bodies: readonly GrowthBody[]): GeometryBodyOrder {
+  const pending = [...bodies].sort(
+    (left, right) => left.sequence - right.sequence || compareIds(left.id, right.id),
+  );
+  const knownBodyIds = new Set(pending.map((body) => body.id));
+  const resolvedBodyIds = new Set<string>();
+  const ordered: GrowthBody[] = [];
+  const unresolvedBodyIds: string[] = [];
+
+  while (pending.length > 0) {
+    let progressed = false;
+
+    for (let index = 0; index < pending.length;) {
+      const body = pending[index]!;
+      const hostBodyId = body.hostBodyId;
+      if (hostBodyId === null || resolvedBodyIds.has(hostBodyId)) {
+        ordered.push(body);
+        resolvedBodyIds.add(body.id);
+        pending.splice(index, 1);
+        progressed = true;
+        continue;
+      }
+      if (!knownBodyIds.has(hostBodyId)) {
+        unresolvedBodyIds.push(body.id);
+        pending.splice(index, 1);
+        progressed = true;
+        continue;
+      }
+      index += 1;
+    }
+
+    if (!progressed) {
+      unresolvedBodyIds.push(...pending.map((body) => body.id));
+      break;
+    }
+  }
+
+  return {
+    ordered,
+    unresolvedBodyIds: [...new Set(unresolvedBodyIds)].sort(compareIds),
+  };
+}
+
 function chooseMeshes(
   input: BuildCrystalGeometryInput,
   diagnostics: CrystalGeometryDiagnostics,
 ): CrystalMeshData[] {
   const meshes: CrystalMeshData[] = [];
   const includedBodyIds = new Set<string>();
+  const bodyOrder = orderBodiesForGeometry(input.growth.bodies);
+  diagnostics.missingHostBodyIds.push(...bodyOrder.unresolvedBodyIds);
+  diagnostics.budgetOmittedBodyIds.push(...bodyOrder.unresolvedBodyIds);
   let usedVertices = 0;
   let usedTriangles = 0;
 
-  for (const body of input.growth.bodies) {
+  for (const body of bodyOrder.ordered) {
     if (body.hostBodyId !== null && !includedBodyIds.has(body.hostBodyId)) {
-      diagnostics.missingHostBodyIds.push(body.id);
+      // The host exists but was omitted by the geometry budget. Descendants must
+      // also be omitted, but this is not a missing-host data error.
       diagnostics.budgetOmittedBodyIds.push(body.id);
       continue;
     }
@@ -151,7 +211,10 @@ export function buildCrystalGeometry(
     diagnostics.nonFiniteBodyIds,
     diagnostics.downgradedBodyIds,
     diagnostics.budgetOmittedBodyIds,
-  ]) values.sort();
+  ]) {
+    const unique = [...new Set(values)].sort(compareIds);
+    values.splice(0, values.length, ...unique);
+  }
 
   return {
     geometryStateVersion: 1,
