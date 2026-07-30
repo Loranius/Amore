@@ -2,6 +2,7 @@ import {
   clamp,
   round6,
   roundVec,
+  seededUnit,
 } from '../growth/math';
 import type { TreeSilhouette } from '../composition';
 import type {
@@ -50,12 +51,19 @@ function validateInput(input: BuildTreeCrownSilhouetteInput): void {
   }
   if (!Number.isFinite(config.maximumScaleDelta)
     || config.maximumScaleDelta < 0
-    || config.maximumScaleDelta > 0.12) {
-    throw new Error('Tree Crown Silhouette maximumScaleDelta must stay in [0, 0.12].');
+    || config.maximumScaleDelta > 0.5) {
+    throw new Error('Tree Crown Silhouette maximumScaleDelta must stay in [0, 0.5].');
+  }
+  if (!Number.isFinite(config.frontClosureMaximumInwardOffsetRatio)
+    || config.frontClosureMaximumInwardOffsetRatio < 0
+    || config.frontClosureMaximumInwardOffsetRatio > 0.25) {
+    throw new Error('Tree Crown Silhouette frontClosureMaximumInwardOffsetRatio must stay in [0, 0.25].');
   }
   for (const [name, value] of [
     ['envelopeResponse', config.envelopeResponse],
     ['middleLayerResponse', config.middleLayerResponse],
+    ['frontClosureSelectionFraction', config.frontClosureSelectionFraction],
+    ['frontClosureTargetRadialRatio', config.frontClosureTargetRadialRatio],
     ['frontClosureScaleDelta', config.frontClosureScaleDelta],
     ['minimumReadableFacingDot', config.minimumReadableFacingDot],
     ['minimumReadableLeafFraction', config.minimumReadableLeafFraction],
@@ -225,8 +233,10 @@ function signatureFor(state: Omit<TreeCrownSilhouetteState, 'signature'>): strin
     state.profiles.length,
     state.diagnostics.adjustedLeafCount,
     state.diagnostics.frontClosureLeafCount,
+    state.diagnostics.frontClosureInwardLeafCount,
     state.diagnostics.emptyOuterSectorIndices.join(','),
     state.diagnostics.maximumRadialOffsetRatio.toFixed(6),
+    state.diagnostics.maximumFrontClosureInwardOffsetRatio.toFixed(6),
     state.diagnostics.maximumScaleDelta.toFixed(6),
     state.diagnostics.averageEnvelopeErrorAfter.toFixed(6),
     state.diagnostics.minimumReadableFrontLeafFraction.toFixed(6),
@@ -235,7 +245,8 @@ function signatureFor(state: Omit<TreeCrownSilhouetteState, 'signature'>): strin
 
 /**
  * Refines accepted outer and middle leaf matrices toward the published crown
- * envelope, adds bounded front closure and validates readability from eight views.
+ * envelope, pulls a deterministic middle-layer subset into the front interior,
+ * and validates readability from eight views.
  */
 export function buildTreeCrownSilhouette(
   input: BuildTreeCrownSilhouetteInput,
@@ -251,10 +262,12 @@ export function buildTreeCrownSilhouette(
   let adjustedOuterLeafCount = 0;
   let adjustedMiddleLeafCount = 0;
   let frontClosureLeafCount = 0;
+  let frontClosureInwardLeafCount = 0;
   let untouchedInnerLeafCount = 0;
   let untouchedMiddleLeafCount = 0;
   let maximumRadialOffset = 0;
   let maximumRadialOffsetRatio = 0;
+  let maximumFrontClosureInwardOffsetRatio = 0;
   let maximumScaleDelta = 0;
 
   for (let index = 0; index < input.leaves.instances.length; index += 1) {
@@ -296,13 +309,35 @@ export function buildTreeCrownSilhouette(
     );
 
     const response = layerResponse(depth.layer, input);
+    const frontCandidate = depth.layer !== 'inner'
+      && (depth.renderFrontDepth >= 0 || depth.presentationShifted);
+    const frontClosureSelected = depth.layer === 'middle'
+      && frontCandidate
+      && normalizedHeight >= 0.24
+      && seededUnit(
+        input.leaves.artifactSeed,
+        `${leaf.id}:crown-silhouette:front-closure`,
+      ) < input.config.frontClosureSelectionFraction;
+
     let radialOffsetRatio = 0;
+    let frontClosureInwardOffsetRatio = 0;
     let radialOffset = 0;
     let renderPosition = { ...sourcePosition };
     const errorBefore = Math.abs(targetRatio - sourceRadialRatio);
     const signedError = targetRatio - sourceRadialRatio;
 
-    if (response > 0 && horizontalDistance > EPSILON) {
+    if (frontClosureSelected && horizontalDistance > EPSILON) {
+      const maximumInward = Math.min(
+        input.config.frontClosureMaximumInwardOffsetRatio,
+        sourceRadialRatio * 0.45,
+      );
+      frontClosureInwardOffsetRatio = round6(clamp(
+        (input.config.frontClosureTargetRadialRatio - sourceRadialRatio) * 0.82,
+        -maximumInward,
+        0,
+      ));
+      radialOffsetRatio = frontClosureInwardOffsetRatio;
+    } else if (response > 0 && horizontalDistance > EPSILON) {
       const centerSafeMaximum = Math.min(
         input.config.maximumRadialOffsetRatio * response,
         sourceRadialRatio * 0.45,
@@ -312,6 +347,9 @@ export function buildTreeCrownSilhouette(
         -centerSafeMaximum,
         centerSafeMaximum,
       ));
+    }
+
+    if (Math.abs(radialOffsetRatio) > EPSILON && horizontalDistance > EPSILON) {
       radialOffset = round6(radialOffsetRatio * input.composition.bounds.radius);
       const inverseDistance = 1 / horizontalDistance;
       renderPosition = roundVec({
@@ -321,25 +359,30 @@ export function buildTreeCrownSilhouette(
       });
     }
 
-    const envelopeScaleDelta = signedError
-      * input.config.envelopeResponse
-      * 0.45
-      * response;
+    const envelopeScaleDelta = frontClosureSelected
+      ? 0
+      : signedError * input.config.envelopeResponse * 0.45 * response;
     const normalizedFrontDepth = clamp(
       depth.renderFrontDepth / input.composition.bounds.radius,
       -1,
       1,
     );
-    const frontCandidate = depth.layer !== 'inner'
-      && (depth.renderFrontDepth >= 0 || depth.presentationShifted);
     const frontWeight = frontCandidate
-      ? clamp((normalizedFrontDepth + 0.08) / 0.58, 0.25, 1)
+      ? clamp((normalizedFrontDepth + 0.08) / 0.58, 0.3, 1)
       : 0;
-    const frontClosureScaleDelta = frontCandidate
-      ? input.config.frontClosureScaleDelta
-        * frontWeight
-        * (0.72 + orientation.renderFacingDot * 0.28)
+    const heightWeight = frontCandidate
+      ? clamp((normalizedHeight - 0.18) / 0.56, 0.35, 1)
       : 0;
+    const closureLayerWeight = frontClosureSelected
+      ? 1
+      : depth.layer === 'outer' && frontCandidate
+        ? 0.34
+        : 0;
+    const frontClosureScaleDelta = input.config.frontClosureScaleDelta
+      * closureLayerWeight
+      * frontWeight
+      * heightWeight
+      * (0.72 + orientation.renderFacingDot * 0.28);
     const totalScaleDelta = depth.layer === 'inner'
       ? 0
       : clamp(
@@ -380,9 +423,17 @@ export function buildTreeCrownSilhouette(
       if (adjusted) adjustedOuterLeafCount += 1;
     }
     if (frontClosureScaleDelta > EPSILON) frontClosureLeafCount += 1;
+    if (frontClosureInwardOffsetRatio < -EPSILON) frontClosureInwardLeafCount += 1;
     if (adjusted) adjustedLeafCount += 1;
     maximumRadialOffset = Math.max(maximumRadialOffset, Math.abs(radialOffset));
-    maximumRadialOffsetRatio = Math.max(maximumRadialOffsetRatio, Math.abs(radialOffsetRatio));
+    maximumRadialOffsetRatio = Math.max(
+      maximumRadialOffsetRatio,
+      frontClosureSelected ? 0 : Math.abs(radialOffsetRatio),
+    );
+    maximumFrontClosureInwardOffsetRatio = Math.max(
+      maximumFrontClosureInwardOffsetRatio,
+      Math.abs(frontClosureInwardOffsetRatio),
+    );
     maximumScaleDelta = Math.max(maximumScaleDelta, Math.abs(scaleMultiplier - 1));
 
     profiles.push({
@@ -404,6 +455,8 @@ export function buildTreeCrownSilhouette(
       targetEnvelopeRatio: targetRatio,
       radialOffset,
       radialOffsetRatio,
+      frontClosureSelected,
+      frontClosureInwardOffsetRatio,
       frontClosureScaleDelta: round6(frontClosureScaleDelta),
       scaleMultiplier,
       envelopeErrorBefore: round6(errorBefore),
@@ -413,6 +466,9 @@ export function buildTreeCrownSilhouette(
 
     if (sourceVerticalBandIndex !== renderVerticalBandIndex) {
       throw new Error('Tree Crown Silhouette must preserve vertical bands.');
+    }
+    if (sourceSectorIndex !== renderSectorIndex) {
+      throw new Error('Tree Crown Silhouette must preserve azimuth sectors.');
     }
   }
 
@@ -498,6 +554,7 @@ export function buildTreeCrownSilhouette(
       adjustedOuterLeafCount,
       adjustedMiddleLeafCount,
       frontClosureLeafCount,
+      frontClosureInwardLeafCount,
       untouchedInnerLeafCount,
       untouchedMiddleLeafCount,
       occupiedOuterSectorIndices,
@@ -506,6 +563,7 @@ export function buildTreeCrownSilhouette(
       emptyOuterSectorCount: emptyOuterSectorIndices.length,
       maximumRadialOffset: round6(maximumRadialOffset),
       maximumRadialOffsetRatio: round6(maximumRadialOffsetRatio),
+      maximumFrontClosureInwardOffsetRatio: round6(maximumFrontClosureInwardOffsetRatio),
       maximumScaleDelta: round6(maximumScaleDelta),
       averageEnvelopeErrorBefore: round6(averageEnvelopeErrorBefore),
       averageEnvelopeErrorAfter: round6(averageEnvelopeErrorAfter),
