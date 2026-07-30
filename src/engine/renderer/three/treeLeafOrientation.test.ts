@@ -10,7 +10,7 @@ function dispose(mesh: THREE.InstancedMesh, material: THREE.Material): void {
 }
 
 describe('Three Tree Leaf Orientation adapter', () => {
-  it('changes only accepted instance matrices inside the existing leaf draw call', () => {
+  it('applies accepted front-facing normals inside the existing leaf draw call', () => {
     const build = buildTreeLabPreview('medium');
     const plainMaterials = createThreeTreeMaterialPair(build.materials, build.barkSurface);
     const orientedMaterials = createThreeTreeMaterialPair(build.materials, build.barkSurface);
@@ -39,12 +39,18 @@ describe('Three Tree Leaf Orientation adapter', () => {
       id: 'tree:leaf-orientation:micro-variation',
       profileId: 'tree:leaf-orientation:instance-profile',
       profiles: build.leaves.instances.length,
+      frontFacingAdjustedLeaves: build.leafOrientation.diagnostics.frontFacingAdjustedLeafCount,
       additionalDrawCalls: 0,
       additionalMaterials: 0,
     });
+    expect(
+      oriented.userData['treeLeafOrientation'].averageRenderFacingDot,
+    ).toBeGreaterThanOrEqual(
+      oriented.userData['treeLeafOrientation'].averageSourceFacingDot,
+    );
 
     const variedIndex = build.leafOrientation.profiles.findIndex(
-      (profile) => profile.totalRotationRad > 1e-9,
+      (profile) => profile.frontFacingAdjusted && profile.totalRotationRad > 1e-9,
     );
     expect(variedIndex).toBeGreaterThanOrEqual(0);
     const plainMatrix = new THREE.Matrix4();
@@ -60,6 +66,8 @@ describe('Three Tree Leaf Orientation adapter', () => {
     expect(orientedColor.r).toBeCloseTo(plainColor.r, 6);
     expect(orientedColor.g).toBeCloseTo(plainColor.g, 6);
     expect(orientedColor.b).toBeCloseTo(plainColor.b, 6);
+
+    expect((oriented.material as THREE.MeshStandardMaterial).side).toBe(THREE.DoubleSide);
 
     dispose(plain, plainMaterials.foliage);
     plainMaterials.bark.dispose();
