@@ -1,4 +1,5 @@
 export { buildReefSpeciesBlueprint } from './reefSpecies';
+export * from './layout';
 export {
   REEF_COLONY_MORPHOTYPES,
   REEF_LIFE_STAGES,
