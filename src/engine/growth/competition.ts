@@ -98,6 +98,9 @@ export function evaluateGrowthSite(
   const alignment = clamp01((dot(site.direction, preferred) + 1) * 0.5);
   const generationScore = clamp01(1 - site.host.generation / Math.max(1, instruction.maxGeneration + 1));
   const affinity = hostAffinity(site.host, instruction);
+  const geologicalScore = site.surfacePotential * 1.45
+    + (1 - site.surfaceStress) * 0.3
+    + (1 - site.localDensity) * 0.25;
 
   const score = round6(
     clearanceScore * 2.5
@@ -105,6 +108,7 @@ export function evaluateGrowthSite(
       + affinity * 1.05
       + alignment * 0.65
       + generationScore * 0.35
+      + geologicalScore
       - competition * 2.8
       - Math.min(1, crowding / 4) * 0.45,
   );
@@ -116,6 +120,8 @@ export function evaluateGrowthSite(
     crowding: round6(crowding),
     minClearance: round6(minClearance),
     angularSeparation: round6(angularSeparation),
-    rejected: maxOverlap > 0.88 || angularSeparation < config.minAngularSeparationRad * 0.24,
+    rejected: maxOverlap > 0.88
+      || angularSeparation < config.minAngularSeparationRad * 0.24
+      || (site.surfaceRegionId !== null && site.surfacePotential <= 0),
   };
 }
