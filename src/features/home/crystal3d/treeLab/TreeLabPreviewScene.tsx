@@ -50,10 +50,12 @@ function TreeLabRenderedScene({
   }, []);
   const totalVertices = build.mesh.diagnostics.vertexCount
     + build.rootGeometry.diagnostics.vertexCount
-    + build.leaves.diagnostics.sharedVertexCount;
+    + build.leaves.diagnostics.sharedVertexCount
+    + build.groundDetails.diagnostics.sharedVertexCount;
   const totalTriangles = build.mesh.diagnostics.triangleCount
     + build.rootGeometry.diagnostics.triangleCount
-    + build.leaves.diagnostics.renderedTriangleCount;
+    + build.leaves.diagnostics.renderedTriangleCount
+    + build.groundDetails.diagnostics.renderedTriangleCount;
   const acceptance = evaluateTreeLabAcceptance({
     vertices: totalVertices,
     triangles: totalTriangles,
@@ -73,6 +75,8 @@ function TreeLabRenderedScene({
       : 'Fixture baseline';
   const barkMaterial = build.materials.materials.find((material) => material.role === 'bark');
   const foliageMaterial = build.materials.materials.find((material) => material.role === 'foliage');
+  const totalMaterials = build.materials.diagnostics.uniqueMaterialCount
+    + build.groundDetails.diagnostics.estimatedAdditionalMaterials;
   const badge = [
     sourceLabel,
     build.lod,
@@ -82,11 +86,12 @@ function TreeLabRenderedScene({
     `${Math.round(build.groundContact.diagnostics.visiblePathFraction * 100)}% visible`,
     `${formatCount(build.terrain.diagnostics.triangleCount)} terrain △`,
     `${build.soilSurface.diagnostics.uniqueTintCount} soil tints`,
+    `${build.groundDetails.instances.length} ground details`,
     `${formatCount(build.rootGeometry.diagnostics.triangleCount)} static △`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
     `${build.life.leaves.length} live`,
-    `${build.materials.diagnostics.uniqueMaterialCount} mat`,
+    `${totalMaterials} mat`,
     `${build.mesh.diagnostics.branchCount} гілок`,
     `${formatCount(totalTriangles)} △`,
     runtime ? `${runtime.drawCalls} DC` : 'DC…',
@@ -193,6 +198,30 @@ function TreeLabRenderedScene({
       data-tree-lab-soil-material-count={build.soilSurface.diagnostics.materialCount}
       data-tree-lab-soil-extra-draw-calls={build.soilSurface.diagnostics.estimatedAdditionalDrawCalls}
       data-tree-lab-soil-extra-materials={build.soilSurface.diagnostics.estimatedAdditionalMaterials}
+      data-tree-lab-ground-detail="true"
+      data-tree-lab-ground-detail-id={build.groundDetails.descriptor.id}
+      data-tree-lab-ground-detail-template-id={build.groundDetails.descriptor.templateId}
+      data-tree-lab-ground-detail-material-id={build.groundDetails.descriptor.materialId}
+      data-tree-lab-ground-detail-signature={build.groundDetails.signature}
+      data-tree-lab-ground-detail-candidates={build.groundDetails.diagnostics.candidateInstanceCount}
+      data-tree-lab-ground-detail-instances={build.groundDetails.diagnostics.emittedInstanceCount}
+      data-tree-lab-ground-detail-stones={build.groundDetails.diagnostics.stoneCount}
+      data-tree-lab-ground-detail-fallen-leaves={build.groundDetails.diagnostics.fallenLeafCount}
+      data-tree-lab-ground-detail-moss={build.groundDetails.diagnostics.mossCount}
+      data-tree-lab-ground-detail-budget={build.groundDetails.diagnostics.instanceBudget}
+      data-tree-lab-ground-detail-stone-budget={build.groundDetails.diagnostics.stoneBudget}
+      data-tree-lab-ground-detail-leaf-budget={build.groundDetails.diagnostics.fallenLeafBudget}
+      data-tree-lab-ground-detail-moss-budget={build.groundDetails.diagnostics.mossBudget}
+      data-tree-lab-ground-detail-budget-exceeded={String(build.groundDetails.diagnostics.instanceBudgetExceeded)}
+      data-tree-lab-ground-detail-truncated={build.groundDetails.diagnostics.truncatedInstanceIds.length}
+      data-tree-lab-ground-detail-shared-vertices={build.groundDetails.diagnostics.sharedVertexCount}
+      data-tree-lab-ground-detail-shared-triangles={build.groundDetails.diagnostics.sharedTriangleCount}
+      data-tree-lab-ground-detail-rendered-triangles={build.groundDetails.diagnostics.renderedTriangleCount}
+      data-tree-lab-ground-detail-draw-calls={build.groundDetails.diagnostics.estimatedDrawCalls}
+      data-tree-lab-ground-detail-extra-materials={build.groundDetails.diagnostics.estimatedAdditionalMaterials}
+      data-tree-lab-ground-detail-total-materials={build.groundDetails.diagnostics.totalMaterialCount}
+      data-tree-lab-ground-detail-anchored={String(build.groundDetails.diagnostics.anchoredToTerrain)}
+      data-tree-lab-ground-detail-prefix={String(build.groundDetails.diagnostics.stablePrefixPreserved)}
       data-tree-lab-root-geometry-roots={build.rootGeometry.diagnostics.renderedRootCount}
       data-tree-lab-root-geometry-vertices={build.rootGeometry.diagnostics.vertexCount}
       data-tree-lab-root-geometry-triangles={build.rootGeometry.diagnostics.triangleCount}
@@ -256,6 +285,7 @@ function TreeLabRenderedScene({
           mesh={build.mesh}
           rootGeometry={build.rootGeometry}
           soilSurface={build.soilSurface}
+          groundDetails={build.groundDetails}
           leaves={build.leaves}
           materials={build.materials}
           life={build.life}
