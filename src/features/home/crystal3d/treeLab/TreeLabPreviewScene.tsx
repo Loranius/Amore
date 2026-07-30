@@ -81,6 +81,7 @@ function TreeLabRenderedScene({
     `${build.roots.diagnostics.emittedRootCount} roots`,
     `${Math.round(build.groundContact.diagnostics.visiblePathFraction * 100)}% visible`,
     `${formatCount(build.terrain.diagnostics.triangleCount)} terrain △`,
+    `${build.soilSurface.diagnostics.uniqueTintCount} soil tints`,
     `${formatCount(build.rootGeometry.diagnostics.triangleCount)} static △`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
@@ -169,6 +170,29 @@ function TreeLabRenderedScene({
       data-tree-lab-terrain-merged={String(build.terrain.diagnostics.mergedIntoRootGeometry)}
       data-tree-lab-terrain-extra-draw-calls={build.terrain.diagnostics.estimatedAdditionalDrawCalls}
       data-tree-lab-terrain-extra-materials={build.terrain.diagnostics.estimatedAdditionalMaterials}
+      data-tree-lab-soil-surface="true"
+      data-tree-lab-soil-id={build.soilSurface.descriptor.id}
+      data-tree-lab-soil-palette-id={build.soilSurface.descriptor.paletteId}
+      data-tree-lab-soil-tint-attribute={build.soilSurface.descriptor.tintAttributeId}
+      data-tree-lab-soil-terrain-surface-id={build.soilSurface.descriptor.terrainSurfaceId}
+      data-tree-lab-soil-material-role={build.soilSurface.descriptor.materialRole}
+      data-tree-lab-soil-signature={build.soilSurface.signature}
+      data-tree-lab-soil-root-geometry-vertices={build.soilSurface.diagnostics.rootGeometryVertexCount}
+      data-tree-lab-soil-prefix-vertices={build.soilSurface.diagnostics.preservedBarkVertexCount}
+      data-tree-lab-soil-terrain-offset={build.soilSurface.diagnostics.terrainVertexOffset}
+      data-tree-lab-soil-terrain-vertices={build.soilSurface.diagnostics.terrainVertexCount}
+      data-tree-lab-soil-tinted-vertices={build.soilSurface.diagnostics.tintedTerrainVertexCount}
+      data-tree-lab-soil-unique-tints={build.soilSurface.diagnostics.uniqueTintCount}
+      data-tree-lab-soil-tint-budget={build.soilSurface.diagnostics.tintBudget}
+      data-tree-lab-soil-tint-budget-exceeded={String(build.soilSurface.diagnostics.tintBudgetExceeded)}
+      data-tree-lab-soil-quantization={build.soilSurface.diagnostics.quantizationSteps}
+      data-tree-lab-soil-radial-bands={build.soilSurface.diagnostics.radialTintBands}
+      data-tree-lab-soil-variation-bands={build.soilSurface.diagnostics.variationTintBands}
+      data-tree-lab-soil-prefix-preserved={String(build.soilSurface.diagnostics.prefixWhitePreserved)}
+      data-tree-lab-soil-terrain-range-preserved={String(build.soilSurface.diagnostics.terrainRangePreserved)}
+      data-tree-lab-soil-material-count={build.soilSurface.diagnostics.materialCount}
+      data-tree-lab-soil-extra-draw-calls={build.soilSurface.diagnostics.estimatedAdditionalDrawCalls}
+      data-tree-lab-soil-extra-materials={build.soilSurface.diagnostics.estimatedAdditionalMaterials}
       data-tree-lab-root-geometry-roots={build.rootGeometry.diagnostics.renderedRootCount}
       data-tree-lab-root-geometry-vertices={build.rootGeometry.diagnostics.vertexCount}
       data-tree-lab-root-geometry-triangles={build.rootGeometry.diagnostics.triangleCount}
@@ -231,6 +255,7 @@ function TreeLabRenderedScene({
         <TreeLabObject
           mesh={build.mesh}
           rootGeometry={build.rootGeometry}
+          soilSurface={build.soilSurface}
           leaves={build.leaves}
           materials={build.materials}
           life={build.life}
