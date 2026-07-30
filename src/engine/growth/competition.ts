@@ -71,7 +71,7 @@ export function evaluateGrowthSite(
 
   let minClearance = Number.POSITIVE_INFINITY;
   let maxOverlap = 0;
-  let crowding = 0;
+  let geometricCrowding = 0;
 
   for (const body of bodies) {
     if (body.id === site.host.id) continue;
@@ -82,12 +82,22 @@ export function evaluateGrowthSite(
     if (clearance < 0) maxOverlap = Math.max(maxOverlap, -clearance / Math.max(combinedRadius, 1e-6));
 
     const influenceRadius = combinedRadius * 3.2;
-    if (distance < influenceRadius) crowding += 1 - distance / influenceRadius;
+    if (distance < influenceRadius) geometricCrowding += 1 - distance / influenceRadius;
   }
 
   if (!Number.isFinite(minClearance)) minClearance = 1;
 
-  const competition = clamp01(maxOverlap * 0.76 + Math.min(1, crowding / 5) * 0.24);
+  const geometricCompetition = clamp01(
+    maxOverlap * 0.76 + Math.min(1, geometricCrowding / 5) * 0.24,
+  );
+  const competition = clamp01(
+    geometricCompetition
+    + site.competitionPressure * 0.22
+    + site.growthShadow * 0.12,
+  );
+  const crowding = geometricCrowding
+    + site.competitionPressure * 1.8
+    + site.growthShadow * 0.7;
   const angularSeparation = nearestSiteAngle(site, occupiedSites);
   const angularScore = clamp01(angularSeparation / config.minAngularSeparationRad);
   const clearanceScore = clamp01((minClearance + instruction.radialScale * 0.75) / 0.9);
@@ -100,7 +110,9 @@ export function evaluateGrowthSite(
   const affinity = hostAffinity(site.host, instruction);
   const geologicalScore = site.surfacePotential * 1.45
     + (1 - site.surfaceStress) * 0.3
-    + (1 - site.localDensity) * 0.25;
+    + (1 - site.localDensity) * 0.25
+    + (1 - site.growthShadow) * 0.4
+    + (1 - site.competitionPressure) * 0.3;
 
   const score = round6(
     clearanceScore * 2.5
@@ -110,7 +122,9 @@ export function evaluateGrowthSite(
       + generationScore * 0.35
       + geologicalScore
       - competition * 2.8
-      - Math.min(1, crowding / 4) * 0.45,
+      - Math.min(1, crowding / 4) * 0.45
+      - site.growthShadow * 0.35
+      - site.competitionPressure * 0.55,
   );
 
   return {
