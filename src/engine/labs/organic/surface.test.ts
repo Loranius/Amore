@@ -6,6 +6,10 @@ import { buildOrganicCurveFrames } from './curveFrames';
 import { buildOrganicSkeleton } from './spaceColonization';
 import { DEFAULT_ORGANIC_SURFACE_CONFIG } from './surfaceConfig';
 import { buildOrganicSweepMesh } from './sweepMesh';
+import type {
+  OrganicCurveFrameSample,
+  OrganicCurveFrameState,
+} from './surfaceTypes';
 
 const SEED = 41_992;
 const ATTRACTORS = generateEllipsoidAttractors({
@@ -22,6 +26,172 @@ function buildSkeleton(count = ATTRACTORS.length) {
     attractors: ATTRACTORS.slice(0, count),
     config: DEFAULT_ORGANIC_SKELETON_CONFIG,
   });
+}
+
+function sample(
+  id: string,
+  branchId: string,
+  position: { x: number; y: number; z: number },
+  radius: number,
+  normalizedDistance: number,
+  tangent = { x: 0, y: 1, z: 0 },
+  normal = { x: 1, y: 0, z: 0 },
+  binormal = { x: 0, y: 0, z: -1 },
+): OrganicCurveFrameSample {
+  return {
+    id,
+    sourceNodeId: id,
+    branchId,
+    generation: branchId === 'organic:trunk' ? 0 : 1,
+    normalizedDistance,
+    position,
+    tangent,
+    normal,
+    binormal,
+    radius,
+  };
+}
+
+function buildSyntheticForkFrames(): OrganicCurveFrameState {
+  const trunkSamples = [
+    sample('trunk:0', 'organic:trunk', { x: 0, y: 0, z: 0 }, 0.31, 0),
+    sample('trunk:1', 'organic:trunk', { x: 0, y: 0.25, z: 0 }, 0.3, 0.25),
+    sample('trunk:2', 'organic:trunk', { x: 0, y: 0.5, z: 0 }, 0.29, 0.5),
+    sample('trunk:3', 'organic:trunk', { x: 0, y: 0.75, z: 0 }, 0.27, 0.75),
+    sample('trunk:end', 'organic:trunk', { x: 0, y: 1, z: 0 }, 0.25, 1),
+  ];
+  const leftTangent = { x: -0.6, y: 0.8, z: 0 };
+  const rightTangent = { x: 0.6, y: 0.8, z: 0 };
+  const childNormal = { x: 0, y: 0, z: 1 };
+  const leftBinormal = { x: 0.8, y: 0.6, z: 0 };
+  const rightBinormal = { x: 0.8, y: -0.6, z: 0 };
+
+  return {
+    organicCurveFrameVersion: 1,
+    sourceSkeletonVersion: 1,
+    sourceRulesVersion: 'synthetic-fork-v1',
+    curves: [
+      {
+        branchId: 'organic:trunk',
+        generation: 0,
+        parentNodeId: null,
+        terminalNodeId: 'trunk:end',
+        junction: null,
+        samples: trunkSamples,
+      },
+      {
+        branchId: 'branch:left',
+        generation: 1,
+        parentNodeId: 'trunk:end',
+        terminalNodeId: 'left:end',
+        junction: {
+          childBranchId: 'branch:left',
+          parentBranchId: 'organic:trunk',
+          parentNodeId: 'trunk:end',
+          parentPosition: { x: 0, y: 1, z: 0 },
+          parentRadius: 0.25,
+          parentTangent: { x: 0, y: 1, z: 0 },
+          radialDirection: { x: -1, y: 0, z: 0 },
+          surfacePosition: { x: -0.24, y: 1, z: 0 },
+          insetPosition: { x: -0.07, y: 1, z: 0 },
+          childDirection: leftTangent,
+          collarRadius: 0.2,
+          joinSampleIndex: 1,
+        },
+        samples: [
+          sample(
+            'left:0',
+            'branch:left',
+            { x: 0, y: 1, z: 0 },
+            0.18,
+            0,
+            leftTangent,
+            childNormal,
+            leftBinormal,
+          ),
+          sample(
+            'left:1',
+            'branch:left',
+            { x: -0.32, y: 1.36, z: 0 },
+            0.15,
+            0.5,
+            leftTangent,
+            childNormal,
+            leftBinormal,
+          ),
+          sample(
+            'left:end',
+            'branch:left',
+            { x: -0.62, y: 1.72, z: 0 },
+            0.11,
+            1,
+            leftTangent,
+            childNormal,
+            leftBinormal,
+          ),
+        ],
+      },
+      {
+        branchId: 'branch:right',
+        generation: 1,
+        parentNodeId: 'trunk:end',
+        terminalNodeId: 'right:end',
+        junction: {
+          childBranchId: 'branch:right',
+          parentBranchId: 'organic:trunk',
+          parentNodeId: 'trunk:end',
+          parentPosition: { x: 0, y: 1, z: 0 },
+          parentRadius: 0.25,
+          parentTangent: { x: 0, y: 1, z: 0 },
+          radialDirection: { x: 1, y: 0, z: 0 },
+          surfacePosition: { x: 0.24, y: 1, z: 0 },
+          insetPosition: { x: 0.07, y: 1, z: 0 },
+          childDirection: rightTangent,
+          collarRadius: 0.2,
+          joinSampleIndex: 1,
+        },
+        samples: [
+          sample(
+            'right:0',
+            'branch:right',
+            { x: 0, y: 1, z: 0 },
+            0.18,
+            0,
+            rightTangent,
+            childNormal,
+            rightBinormal,
+          ),
+          sample(
+            'right:1',
+            'branch:right',
+            { x: 0.32, y: 1.36, z: 0 },
+            0.15,
+            0.5,
+            rightTangent,
+            childNormal,
+            rightBinormal,
+          ),
+          sample(
+            'right:end',
+            'branch:right',
+            { x: 0.62, y: 1.72, z: 0 },
+            0.11,
+            1,
+            rightTangent,
+            childNormal,
+            rightBinormal,
+          ),
+        ],
+      },
+    ],
+    diagnostics: {
+      branchCount: 3,
+      sampleCount: 11,
+      junctionCount: 2,
+      skippedBranchIds: [],
+      unresolvedJunctionBranchIds: [],
+    },
+  };
 }
 
 describe('Tree Lab organic surface', () => {
@@ -45,13 +215,13 @@ describe('Tree Lab organic surface', () => {
 
     for (const curve of frames.curves) {
       expect(curve.samples.length).toBeGreaterThanOrEqual(2);
-      for (const sample of curve.samples) {
-        expect(length(sample.tangent)).toBeCloseTo(1, 5);
-        expect(length(sample.normal)).toBeCloseTo(1, 5);
-        expect(length(sample.binormal)).toBeCloseTo(1, 5);
-        expect(Math.abs(dot(sample.tangent, sample.normal))).toBeLessThan(2e-5);
-        expect(Math.abs(dot(sample.tangent, sample.binormal))).toBeLessThan(2e-5);
-        expect(Math.abs(dot(sample.normal, sample.binormal))).toBeLessThan(2e-5);
+      for (const frameSample of curve.samples) {
+        expect(length(frameSample.tangent)).toBeCloseTo(1, 5);
+        expect(length(frameSample.normal)).toBeCloseTo(1, 5);
+        expect(length(frameSample.binormal)).toBeCloseTo(1, 5);
+        expect(Math.abs(dot(frameSample.tangent, frameSample.normal))).toBeLessThan(2e-5);
+        expect(Math.abs(dot(frameSample.tangent, frameSample.binormal))).toBeLessThan(2e-5);
+        expect(Math.abs(dot(frameSample.normal, frameSample.binormal))).toBeLessThan(2e-5);
       }
     }
   });
@@ -76,6 +246,42 @@ describe('Tree Lab organic surface', () => {
         DEFAULT_ORGANIC_SURFACE_CONFIG.minimumRadius,
       );
     }
+  });
+
+  it('opens terminal forks and grows parent-side buttresses instead of leaving a glued cap', () => {
+    const frames = buildSyntheticForkFrames();
+    const mesh = buildOrganicSweepMesh(frames, 'medium');
+    const trunk = mesh.branches.find((branch) => branch.branchId === 'organic:trunk');
+    const left = mesh.branches.find((branch) => branch.branchId === 'branch:left');
+    const right = mesh.branches.find((branch) => branch.branchId === 'branch:right');
+
+    expect(trunk).toBeDefined();
+    expect(left?.junctionRingCount).toBe(
+      DEFAULT_ORGANIC_SURFACE_CONFIG.junctionSegmentsByLod.medium,
+    );
+    expect(right?.junctionRingCount).toBe(
+      DEFAULT_ORGANIC_SURFACE_CONFIG.junctionSegmentsByLod.medium,
+    );
+
+    const expectedTubeIndices = (trunk!.ringCount - 1) * trunk!.radialSegments * 6;
+    const expectedBaseCapIndices = trunk!.radialSegments * 3;
+    expect(trunk!.indexCount).toBe(expectedTubeIndices + expectedBaseCapIndices);
+
+    const terminalRingStart = trunk!.firstVertex
+      + (trunk!.ringCount - 1) * trunk!.radialSegments;
+    const terminalPosition = { x: 0, y: 1, z: 0 };
+    const radialExtent = (directionX: number) => {
+      let maximum = Number.NEGATIVE_INFINITY;
+      for (let index = 0; index < trunk!.radialSegments; index += 1) {
+        const vertex = terminalRingStart + index;
+        const x = mesh.positions[vertex * 3]! - terminalPosition.x;
+        maximum = Math.max(maximum, x * directionX);
+      }
+      return maximum;
+    };
+
+    expect(radialExtent(-1)).toBeGreaterThan(0.25 * 1.15);
+    expect(radialExtent(1)).toBeGreaterThan(0.25 * 1.15);
   });
 
   it('keeps historical branch curves byte-stable when later attractors are appended', () => {
