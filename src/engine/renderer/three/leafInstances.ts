@@ -8,6 +8,10 @@ import type {
   TreeLeafGeometryState,
   TreeLeafInstance,
 } from '../../leafGeometry';
+import type {
+  TreeLeafOrientationProfile,
+  TreeLeafOrientationState,
+} from '../../leafOrientation';
 import type { TreePhenologyState } from '../../phenology';
 
 function vector(value: TreeLeafInstance['position']): THREE.Vector3 {
@@ -17,6 +21,7 @@ function vector(value: TreeLeafInstance['position']): THREE.Vector3 {
 function matrixForInstance(
   instance: TreeLeafInstance,
   canopyProfile?: TreeCanopyDepthProfile,
+  orientationProfile?: TreeLeafOrientationProfile,
 ): THREE.Matrix4 {
   const yAxis = vector(instance.direction).normalize();
   const sourceNormal = vector(instance.normal);
@@ -38,13 +43,23 @@ function matrixForInstance(
   const rolledX = xAxis.clone().multiplyScalar(cosine).addScaledVector(zAxis, sine);
   const rolledZ = zAxis.clone().multiplyScalar(cosine).addScaledVector(xAxis, -sine);
   const basis = new THREE.Matrix4().makeBasis(rolledX, yAxis, rolledZ);
+  const localOrientation = orientationProfile
+    ? new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(
+      orientationProfile.tiltRad,
+      orientationProfile.twistRad,
+      orientationProfile.fanRad,
+      'YXZ',
+    ))
+    : new THREE.Matrix4();
   const scaleMultiplier = canopyProfile?.scaleMultiplier ?? 1;
   const size = new THREE.Matrix4().makeScale(
     instance.width * scaleMultiplier,
     instance.length * scaleMultiplier,
     instance.width * scaleMultiplier,
   );
-  const matrix = new THREE.Matrix4().multiplyMatrices(basis, size);
+  const matrix = new THREE.Matrix4()
+    .multiplyMatrices(basis, localOrientation)
+    .multiply(size);
   matrix.setPosition(vector(canopyProfile?.renderPosition ?? instance.position));
   return matrix;
 }
@@ -97,6 +112,28 @@ function validatePhenology(
   }
 }
 
+function validateOrientation(
+  leaves: TreeLeafGeometryState,
+  canopy: TreeCanopyDepthState | undefined,
+  light: TreeCanopyLightState | undefined,
+  phenology: TreePhenologyState | undefined,
+  orientation: TreeLeafOrientationState,
+): void {
+  if (!canopy || !light || !phenology) {
+    throw new Error('Three Tree Leaf Geometry requires Canopy Depth, Canopy Light and Phenology before Leaf Orientation.');
+  }
+  if (orientation.artifactSeed !== leaves.artifactSeed
+    || orientation.lod !== leaves.lod
+    || orientation.sourceLeafGeometryVersion !== leaves.treeLeafGeometryVersion
+    || orientation.sourceLeafGeometryRulesVersion !== leaves.rulesVersion
+    || orientation.sourceCanopyDepthSignature !== canopy.signature
+    || orientation.sourceCanopyLightSignature !== light.signature
+    || orientation.sourcePhenologySignature !== phenology.signature
+    || orientation.profiles.length !== leaves.instances.length) {
+    throw new Error('Three Tree Leaf Geometry received incompatible Leaf Orientation.');
+  }
+}
+
 export function createThreeTreeLeafCardGeometry(state: TreeLeafGeometryState): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(state.template.positions, 3));
@@ -120,10 +157,12 @@ export function createThreeTreeLeafInstancedMesh(
   canopy?: TreeCanopyDepthState,
   light?: TreeCanopyLightState,
   phenology?: TreePhenologyState,
+  orientation?: TreeLeafOrientationState,
 ): THREE.InstancedMesh {
   if (canopy) validateCanopyDepth(state, canopy);
   if (light) validateCanopyLight(state, canopy, light);
   if (phenology) validatePhenology(state, light, phenology);
+  if (orientation) validateOrientation(state, canopy, light, phenology, orientation);
   const geometry = createThreeTreeLeafCardGeometry(state);
   const mesh = new THREE.InstancedMesh(geometry, material, state.instances.length);
   mesh.name = 'TreeLeafInstances';
@@ -135,7 +174,11 @@ export function createThreeTreeLeafInstancedMesh(
     const canopyProfile = canopy?.profiles[instance.sequence];
     const lightProfile = light?.profiles[instance.sequence];
     const phenologyProfile = phenology?.profiles[instance.sequence];
-    mesh.setMatrixAt(instance.sequence, matrixForInstance(instance, canopyProfile));
+    const orientationProfile = orientation?.profiles[instance.sequence];
+    mesh.setMatrixAt(
+      instance.sequence,
+      matrixForInstance(instance, canopyProfile, orientationProfile),
+    );
     const tint = phenologyProfile?.combinedTintMultiplier
       ?? lightProfile?.combinedTintMultiplier
       ?? canopyProfile?.tintMultiplier;
@@ -151,6 +194,7 @@ export function createThreeTreeLeafInstancedMesh(
     canopyDepthApplied: canopy !== undefined,
     canopyLightApplied: light !== undefined,
     phenologyApplied: phenology !== undefined,
+    leafOrientationApplied: orientation !== undefined,
   };
   if (canopy) {
     mesh.userData['treeCanopyDepth'] = {
@@ -197,6 +241,21 @@ export function createThreeTreeLeafInstancedMesh(
       accents: phenology.diagnostics.accentLeafCount,
       additionalDrawCalls: phenology.diagnostics.estimatedAdditionalDrawCalls,
       additionalMaterials: phenology.diagnostics.estimatedAdditionalMaterials,
+    };
+  }
+  if (orientation) {
+    mesh.userData['treeLeafOrientation'] = {
+      version: orientation.treeLeafOrientationVersion,
+      rulesVersion: orientation.rulesVersion,
+      id: orientation.descriptor.id,
+      profileId: orientation.descriptor.profileId,
+      matrixAttributeId: orientation.descriptor.matrixAttributeId,
+      signature: orientation.signature,
+      profiles: orientation.profiles.length,
+      nonZeroProfiles: orientation.diagnostics.nonZeroProfileCount,
+      maximumRotationRad: orientation.diagnostics.maximumRotationRad,
+      additionalDrawCalls: orientation.diagnostics.estimatedAdditionalDrawCalls,
+      additionalMaterials: orientation.diagnostics.estimatedAdditionalMaterials,
     };
   }
   return mesh;
