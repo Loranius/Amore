@@ -226,14 +226,14 @@ Automated coverage verifies:
 
 - deterministic Canopy Light state;
 - one light profile per accepted leaf;
-- exact leaf, Canopy Depth and crown-cell order;
+- exact leaf, Canopy Depth and crown-cell order within each accepted LOD;
 - normalized primary direction;
 - bounded crown-side, facing, height and layer exposure;
 - bounded final exposure;
 - shade, transition and sunlit accounting;
 - final RGB bounds;
 - combined-tint budget enforcement;
-- lower-LOD identity prefix preservation;
+- lower-LOD leaf identity preservation in higher LODs;
 - upstream state immutability;
 - provenance rejection;
 - unchanged Canopy Depth matrices;
