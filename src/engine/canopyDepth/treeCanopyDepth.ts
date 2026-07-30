@@ -121,11 +121,11 @@ function depthForLayer(
     ));
   }
   if (layer === 'outer') {
-    return round6(Math.max(
+    return round6(clamp01(Math.max(
       outerDepthMinimum,
       outerDepthMinimum + (1 - outerDepthMinimum) * (0.2 + seededDepth * 0.8) * 0.76
         + actualRadialDepth * 0.24,
-    ));
+    )));
   }
   const middleSpan = outerDepthMinimum - innerDepthMaximum;
   const middle = innerDepthMaximum + middleSpan * (0.2 + seededDepth * 0.6);
@@ -242,6 +242,15 @@ export function buildTreeCanopyDepth(
     );
   }
 
+  const stableLeafOrderPreserved = profiles.every((profile, index) => (
+    profile.sequence === index
+    && profile.leafInstanceId === input.leaves.instances[index]?.id
+  ));
+  const instanceCountPreserved = profiles.length === input.leaves.instances.length;
+  if (!stableLeafOrderPreserved || !instanceCountPreserved) {
+    throw new Error('Tree Canopy Depth must preserve accepted leaf order and instance count.');
+  }
+
   const scales = profiles.map((profile) => profile.scaleMultiplier);
   const stateWithoutSignature: Omit<TreeCanopyDepthState, 'signature'> = {
     treeCanopyDepthVersion: 1,
@@ -273,11 +282,8 @@ export function buildTreeCanopyDepth(
       occupiedCellCount: new Set(profiles.map((profile) => profile.crownCellId)).size,
       preservedOccupiedCellIds: true,
       filledPreviouslyEmptyCells: false,
-      stableLeafOrderPreserved: profiles.every((profile, index) => (
-        profile.sequence === index
-        && profile.leafInstanceId === input.leaves.instances[index]?.id
-      )),
-      instanceCountPreserved: profiles.length === input.leaves.instances.length,
+      stableLeafOrderPreserved: true,
+      instanceCountPreserved: true,
       minimumScaleMultiplier: round6(scales.length > 0 ? Math.min(...scales) : 1),
       maximumScaleMultiplier: round6(scales.length > 0 ? Math.max(...scales) : 1),
       maximumPositionOffset: round6(maximumPositionOffset),
