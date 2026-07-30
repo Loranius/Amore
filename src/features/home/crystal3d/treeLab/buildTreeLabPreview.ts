@@ -4,6 +4,11 @@ import {
   type TreeBarkSurfaceState,
 } from '@/engine/barkSurface';
 import {
+  DEFAULT_TREE_CANOPY_DEPTH_CONFIG,
+  buildTreeCanopyDepth,
+  type TreeCanopyDepthState,
+} from '@/engine/canopyDepth';
+import {
   DEFAULT_TREE_COMPOSITION_CONFIG,
   buildTreeComposition,
   type TreeCompositionState,
@@ -97,6 +102,7 @@ export interface TreeLabPreviewBuild {
   foliage: TreeFoliageState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
+  canopyDepth: TreeCanopyDepthState;
   soilSurface: TreeSoilSurfaceState;
   barkSurface: TreeBarkSurfaceState;
   groundDetails: TreeGroundDetailState;
@@ -186,6 +192,13 @@ export function buildTreeLabPreviewFromArtifact({
     leaves,
     config: DEFAULT_TREE_MATERIAL_CONFIG,
   });
+  const canopyDepth = buildTreeCanopyDepth({
+    composition,
+    foliage,
+    leaves,
+    materials,
+    config: DEFAULT_TREE_CANOPY_DEPTH_CONFIG,
+  });
   const soilSurface = buildTreeSoilSurface({
     species,
     terrain,
@@ -233,6 +246,7 @@ export function buildTreeLabPreviewFromArtifact({
     foliage,
     leaves,
     materials,
+    canopyDepth,
     soilSurface,
     barkSurface,
     groundDetails,

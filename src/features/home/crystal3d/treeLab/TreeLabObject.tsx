@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { TreeBarkSurfaceState } from '@/engine/barkSurface';
+import type { TreeCanopyDepthState } from '@/engine/canopyDepth';
 import type { TreeGroundDetailState } from '@/engine/groundDetail';
 import type { TreeLeafGeometryState } from '@/engine/leafGeometry';
 import type { OrganicSweepMesh } from '@/engine/labs/organic';
@@ -28,6 +29,7 @@ interface TreeLabObjectProps {
   rootGeometry: TreeRootGeometryState;
   soilSurface: TreeSoilSurfaceState;
   barkSurface: TreeBarkSurfaceState;
+  canopyDepth: TreeCanopyDepthState;
   groundDetails: TreeGroundDetailState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
@@ -40,6 +42,7 @@ export function TreeLabObject({
   rootGeometry,
   soilSurface,
   barkSurface,
+  canopyDepth,
   groundDetails,
   leaves,
   materials,
@@ -61,8 +64,8 @@ export function TreeLabObject({
     [materials, barkSurface],
   );
   const leafMesh = useMemo(
-    () => createThreeTreeLeafInstancedMesh(leaves, materialPair.foliage),
-    [leaves, materialPair],
+    () => createThreeTreeLeafInstancedMesh(leaves, materialPair.foliage, canopyDepth),
+    [leaves, materialPair, canopyDepth],
   );
   const groundDetailMesh = useMemo(
     () => createThreeTreeGroundDetailInstancedMesh(groundDetails),

@@ -16,7 +16,7 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
 }
 
 describe('Tree Lab preview pipeline', () => {
-  it('keeps the full Evolution -> Species -> Growth -> Bark Surface -> Ground Detail -> Life result deterministic', () => {
+  it('keeps the full Evolution -> Species -> Growth -> Canopy Depth -> Bark Surface -> Ground Detail -> Life result deterministic', () => {
     const first = buildTreeLabPreview('medium');
     const second = buildTreeLabPreview('medium');
 
@@ -50,7 +50,7 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
   });
 
-  it('keeps surface character, static geometry, instances and life inside published mobile limits', () => {
+  it('keeps crown depth, surface character, static geometry, instances and life inside published mobile limits', () => {
     const build = buildTreeLabPreview('medium');
     const totalVertices = build.mesh.diagnostics.vertexCount
       + build.rootGeometry.diagnostics.vertexCount
@@ -68,6 +68,13 @@ describe('Tree Lab preview pipeline', () => {
     expect(totalVertices).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxVertices);
     expect(totalTriangles).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxTriangles);
     expect(estimatedDrawCalls).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxDrawCalls);
+    expect(build.canopyDepth.profiles).toHaveLength(build.leaves.instances.length);
+    expect(build.canopyDepth.diagnostics.innerLeafCount).toBeGreaterThan(0);
+    expect(build.canopyDepth.diagnostics.middleLeafCount).toBeGreaterThan(0);
+    expect(build.canopyDepth.diagnostics.outerLeafCount).toBeGreaterThan(0);
+    expect(build.canopyDepth.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
+    expect(build.canopyDepth.diagnostics.estimatedAdditionalMaterials).toBe(0);
+    expect(build.canopyDepth.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
     expect(build.barkSurface.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
     expect(build.barkSurface.diagnostics.estimatedAdditionalMaterials).toBe(0);
     expect(build.barkSurface.diagnostics.materialCount).toBe(2);

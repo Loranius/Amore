@@ -91,6 +91,7 @@ function TreeLabRenderedScene({
     `${formatCount(build.rootGeometry.diagnostics.triangleCount)} static △`,
     `${build.foliage.diagnostics.emittedClusterCount} clusters`,
     `${build.leaves.instances.length} cards`,
+    `${build.canopyDepth.diagnostics.innerLeafCount}/${build.canopyDepth.diagnostics.middleLeafCount}/${build.canopyDepth.diagnostics.outerLeafCount} depth`,
     `${build.life.leaves.length} live`,
     `${totalMaterials} mat`,
     `${build.mesh.diagnostics.branchCount} гілок`,
@@ -279,6 +280,31 @@ function TreeLabRenderedScene({
       data-tree-lab-leaf-rendered-triangles={build.leaves.diagnostics.renderedTriangleCount}
       data-tree-lab-leaf-truncated={build.leaves.diagnostics.truncatedInstanceIds.length}
       data-tree-lab-leaf-draw-calls={build.leaves.diagnostics.estimatedDrawCalls}
+      data-tree-lab-canopy-depth="true"
+      data-tree-lab-canopy-depth-id={build.canopyDepth.descriptor.id}
+      data-tree-lab-canopy-profile-id={build.canopyDepth.descriptor.profileId}
+      data-tree-lab-canopy-tint-attribute={build.canopyDepth.descriptor.tintAttributeId}
+      data-tree-lab-canopy-signature={build.canopyDepth.signature}
+      data-tree-lab-canopy-profiles={build.canopyDepth.diagnostics.emittedProfileCount}
+      data-tree-lab-canopy-inner={build.canopyDepth.diagnostics.innerLeafCount}
+      data-tree-lab-canopy-middle={build.canopyDepth.diagnostics.middleLeafCount}
+      data-tree-lab-canopy-outer={build.canopyDepth.diagnostics.outerLeafCount}
+      data-tree-lab-canopy-cells={build.canopyDepth.diagnostics.occupiedCellCount}
+      data-tree-lab-canopy-cells-preserved={String(build.canopyDepth.diagnostics.preservedOccupiedCellIds)}
+      data-tree-lab-canopy-empty-cells-filled={String(build.canopyDepth.diagnostics.filledPreviouslyEmptyCells)}
+      data-tree-lab-canopy-order-preserved={String(build.canopyDepth.diagnostics.stableLeafOrderPreserved)}
+      data-tree-lab-canopy-instances-preserved={String(build.canopyDepth.diagnostics.instanceCountPreserved)}
+      data-tree-lab-canopy-scale-min={build.canopyDepth.diagnostics.minimumScaleMultiplier}
+      data-tree-lab-canopy-scale-max={build.canopyDepth.diagnostics.maximumScaleMultiplier}
+      data-tree-lab-canopy-max-offset={build.canopyDepth.diagnostics.maximumPositionOffset}
+      data-tree-lab-canopy-max-offset-ratio={build.canopyDepth.diagnostics.maximumPositionOffsetRatio}
+      data-tree-lab-canopy-unique-tints={build.canopyDepth.diagnostics.uniqueTintCount}
+      data-tree-lab-canopy-tint-budget={build.canopyDepth.diagnostics.tintBudget}
+      data-tree-lab-canopy-tint-budget-exceeded={String(build.canopyDepth.diagnostics.tintBudgetExceeded)}
+      data-tree-lab-canopy-quantization={build.canopyDepth.diagnostics.quantizationSteps}
+      data-tree-lab-canopy-extra-draw-calls={build.canopyDepth.diagnostics.estimatedAdditionalDrawCalls}
+      data-tree-lab-canopy-extra-materials={build.canopyDepth.diagnostics.estimatedAdditionalMaterials}
+      data-tree-lab-canopy-extra-matrix-updates={build.canopyDepth.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame}
       data-tree-lab-material-count={build.materials.diagnostics.uniqueMaterialCount}
       data-tree-lab-material-budget={build.materials.diagnostics.materialBudget}
       data-tree-lab-material-budget-exceeded={String(build.materials.diagnostics.materialBudgetExceeded)}
@@ -315,6 +341,7 @@ function TreeLabRenderedScene({
           rootGeometry={build.rootGeometry}
           soilSurface={build.soilSurface}
           barkSurface={build.barkSurface}
+          canopyDepth={build.canopyDepth}
           groundDetails={build.groundDetails}
           leaves={build.leaves}
           materials={build.materials}
