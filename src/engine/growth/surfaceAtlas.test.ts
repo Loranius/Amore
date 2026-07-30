@@ -5,8 +5,10 @@ import {
 } from './surfaceAtlas';
 import type {
   GrowthBody,
+  GrowthCenterRole,
   GrowthState,
   GrowthSurfaceOccupancy,
+  GrowthTier,
   GrowthVec3,
 } from './types';
 
@@ -19,6 +21,9 @@ function growthBody(input: {
   length: number;
   generation?: number;
   maturity?: number;
+  tier?: GrowthTier;
+  growthCenterId?: string;
+  growthCenterRole?: GrowthCenterRole;
 }): GrowthBody {
   const generation = input.generation ?? 0;
   return {
@@ -27,10 +32,10 @@ function growthBody(input: {
     sourceId: input.id,
     species: 'crystal',
     kind: generation === 0 ? 'crystal:mother' : 'crystal:event-spire',
-    tier: generation === 0 ? 'king' : 'support',
+    tier: input.tier ?? (generation === 0 ? 'king' : 'support'),
     attributes: {},
     sequence: input.sequence,
-    colonyId: null,
+    colonyId: input.growthCenterId ?? null,
     epochIndex: 0,
     seed: input.seed,
     emphasized: false,
@@ -48,6 +53,12 @@ function growthBody(input: {
     growthEnergy: 1,
     competition: generation === 0 ? 0 : 0.18,
     crowding: generation === 0 ? 0 : 0.45,
+    ...(input.growthCenterId === undefined
+      ? {}
+      : { growthCenterId: input.growthCenterId }),
+    ...(input.growthCenterRole === undefined
+      ? {}
+      : { growthCenterRole: input.growthCenterRole }),
   };
 }
 
@@ -110,6 +121,10 @@ function growthState(
   };
 }
 
+function mean(values: readonly number[]): number {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 describe('Growth Surface Atlas', () => {
   it('is deterministic and independent of body array order', () => {
     const forward = buildGrowthSurfaceAtlas(growthState([MOTHER, SUPPORT]));
@@ -154,8 +169,100 @@ describe('Growth Surface Atlas', () => {
       expect(region.growthPotential).toBeLessThanOrEqual(1);
       expect(region.localDensity).toBeGreaterThanOrEqual(0);
       expect(region.localDensity).toBeLessThanOrEqual(1);
+      expect(region.growthShadow).toBeGreaterThanOrEqual(0);
+      expect(region.growthShadow).toBeLessThanOrEqual(1);
+      expect(region.competitionPressure).toBeGreaterThanOrEqual(0);
+      expect(region.competitionPressure).toBeLessThanOrEqual(1);
       if (!region.exposed) expect(region.growthPotential).toBe(0);
     }
+  });
+
+  it('lets large mature crystals cast stronger shadows than small immature bodies', () => {
+    const large = growthBody({
+      id: 'large-shadow',
+      sequence: 0,
+      seed: 404,
+      anchor: { x: 0.42, y: 0.28, z: 0.02 },
+      radius: 0.22,
+      length: 1.15,
+      generation: 1,
+      maturity: 0.95,
+      tier: 'support',
+      growthCenterId: 'center-shadow',
+      growthCenterRole: 'dominant',
+    });
+    const small = growthBody({
+      id: 'small-shadow',
+      sequence: 0,
+      seed: 404,
+      anchor: { x: 0.42, y: 0.28, z: 0.02 },
+      radius: 0.07,
+      length: 0.28,
+      generation: 1,
+      maturity: 0.1,
+      tier: 'micro',
+      growthCenterId: 'center-shadow',
+      growthCenterRole: 'micro',
+    });
+    const largeAtlas = buildGrowthSurfaceAtlas(growthState([MOTHER, large]));
+    const smallAtlas = buildGrowthSurfaceAtlas(growthState([MOTHER, small]));
+    const smallById = new Map(smallAtlas.regions.map((region) => [region.id, region] as const));
+    const paired = largeAtlas.regions.filter((region) => (
+      region.sourceBodyId === MOTHER.id
+      && region.exposed
+      && smallById.get(region.id)?.exposed === true
+    ));
+
+    expect(paired.length).toBeGreaterThan(0);
+    expect(Math.max(...paired.map((region) => region.growthShadow))).toBeGreaterThan(
+      Math.max(...paired.map((region) => smallById.get(region.id)!.growthShadow)) + 0.2,
+    );
+    expect(mean(paired.map((region) => region.growthPotential))).toBeLessThan(
+      mean(paired.map((region) => smallById.get(region.id)!.growthPotential)),
+    );
+  });
+
+  it('adds extra competition only between bodies of the same Growth Center', () => {
+    const dominant = growthBody({
+      id: 'center-dominant',
+      sequence: 0,
+      seed: 505,
+      anchor: { x: 0, y: 0, z: 0 },
+      radius: 0.25,
+      length: 1,
+      generation: 1,
+      maturity: 0.9,
+      tier: 'support',
+      growthCenterId: 'center-a',
+      growthCenterRole: 'dominant',
+    });
+    const sameCenter = growthBody({
+      id: 'center-satellite',
+      sequence: 1,
+      seed: 606,
+      anchor: { x: 0.25, y: 0.2, z: 0 },
+      radius: 0.1,
+      length: 0.4,
+      generation: 2,
+      maturity: 0.8,
+      tier: 'companion',
+      growthCenterId: 'center-a',
+      growthCenterRole: 'satellite',
+    });
+    const otherCenter = {
+      ...sameCenter,
+      id: 'other-center-satellite',
+      instructionId: 'other-center-satellite',
+      growthCenterId: 'center-b',
+      colonyId: 'center-b',
+    } satisfies GrowthBody;
+    const sameAtlas = buildGrowthSurfaceAtlas(growthState([dominant, sameCenter]));
+    const otherAtlas = buildGrowthSurfaceAtlas(growthState([dominant, otherCenter]));
+    const sameRegions = sameAtlas.regions.filter((region) => region.sourceBodyId === dominant.id);
+    const otherRegions = otherAtlas.regions.filter((region) => region.sourceBodyId === dominant.id);
+
+    expect(Math.max(...sameRegions.map((region) => region.competitionPressure))).toBeGreaterThan(0);
+    expect(Math.max(...otherRegions.map((region) => region.competitionPressure))).toBe(0);
   });
 
   it('keeps historical region identity and coordinates stable after later growth', () => {
