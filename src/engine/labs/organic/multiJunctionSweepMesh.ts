@@ -45,15 +45,15 @@ interface JunctionPatch {
 }
 
 const GRID_BY_LOD: Readonly<Record<OrganicMeshLod, number>> = {
-  high: 8,
-  medium: 7,
+  high: 7,
+  medium: 6,
   low: 5,
 };
 
 const MAX_PATCHES_BY_LOD: Readonly<Record<OrganicMeshLod, number>> = {
-  high: 12,
-  medium: 8,
-  low: 4,
+  high: 6,
+  medium: 4,
+  low: 2,
 };
 
 const CUBE_CORNERS: readonly GrowthVec3[] = [
@@ -182,7 +182,7 @@ function visibleJunctionGroups(
     ...(trunk?.samples.map((sample) => sample.radius) ?? []),
     ...groups.map((group) => group.parentRadius),
   );
-  const minimumRatio = lod === 'low' ? 0.2 : lod === 'medium' ? 0.105 : 0.075;
+  const minimumRatio = lod === 'low' ? 0.24 : lod === 'medium' ? 0.14 : 0.1;
 
   return groups
     .filter((group) => group.key !== primaryKey)
