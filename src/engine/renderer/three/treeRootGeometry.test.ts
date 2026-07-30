@@ -26,19 +26,24 @@ describe('Three Tree Root Geometry adapter', () => {
       roots: state.diagnostics.renderedRootCount,
       anchoredToGround: true,
       contactApplied: false,
+      terrainApplied: false,
       lod: 'medium',
     });
 
     geometry.dispose();
   });
 
-  it('publishes Ground Contact and merged collar diagnostics without another mesh', () => {
+  it('publishes Ground Contact, collar and terrain as one static geometry', () => {
     const state = buildTreeLabPreview('medium').rootGeometry;
     const geometry = createThreeTreeRootGeometry(state);
 
     expect(state.diagnostics.contactApplied).toBe(true);
     expect(state.diagnostics.collarVertexCount).toBeGreaterThan(0);
     expect(state.diagnostics.collarTriangleCount).toBeGreaterThan(0);
+    expect(state.diagnostics.terrainApplied).toBe(true);
+    expect(state.diagnostics.terrainVertexCount).toBeGreaterThan(0);
+    expect(state.diagnostics.terrainTriangleCount).toBeGreaterThan(0);
+    expect(state.diagnostics.terrainMergedIntoStaticMesh).toBe(true);
     expect(geometry.getAttribute('position').count).toBe(state.diagnostics.vertexCount);
     expect(geometry.userData['treeRootGeometry']).toMatchObject({
       contactApplied: true,
@@ -46,6 +51,10 @@ describe('Three Tree Root Geometry adapter', () => {
       visiblePathFraction: state.diagnostics.visiblePathFraction,
       collarVertices: state.diagnostics.collarVertexCount,
       collarTriangles: state.diagnostics.collarTriangleCount,
+      terrainApplied: true,
+      terrainVertices: state.diagnostics.terrainVertexCount,
+      terrainTriangles: state.diagnostics.terrainTriangleCount,
+      terrainMergedIntoStaticMesh: true,
     });
 
     geometry.dispose();
