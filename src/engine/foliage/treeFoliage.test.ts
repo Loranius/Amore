@@ -46,6 +46,30 @@ describe('Tree Foliage', () => {
     }
   });
 
+  it('fills interior branch spans instead of publishing only terminal-tip foliage', () => {
+    const build = buildTreeLabPreview('medium');
+    const samplesById = new Map(
+      build.frames.curves.flatMap((curve) => (
+        curve.samples.map((sample) => [sample.id, sample] as const)
+      )),
+    );
+    const normalizedDistances = build.foliage.clusters
+      .map((cluster) => samplesById.get(cluster.sourceSampleId)?.normalizedDistance)
+      .filter((value): value is number => value !== undefined);
+    const interiorClusters = normalizedDistances.filter((distance) => distance < 0.58);
+
+    expect(normalizedDistances).toHaveLength(build.foliage.clusters.length);
+    expect(Math.min(...normalizedDistances)).toBeLessThan(0.5);
+    expect(interiorClusters.length).toBeGreaterThanOrEqual(
+      Math.ceil(build.foliage.clusters.length * 0.2),
+    );
+    expect(build.foliage.diagnostics.occupiedCellIds.length).toBeGreaterThanOrEqual(4);
+    expect(build.leaves.diagnostics.clusterIdsWithoutInstances).toEqual([]);
+    expect(build.leaves.instances.length).toBeGreaterThanOrEqual(
+      Math.floor(build.foliage.diagnostics.totalLeafCount * 0.68),
+    );
+  });
+
   it('does not mutate species, frames or composition', () => {
     const build = buildTreeLabPreview('medium');
     const speciesBefore = JSON.stringify(build.species);
