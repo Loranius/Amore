@@ -1,6 +1,8 @@
+type ProductionDatePart = 'year' | 'month' | 'day';
+
 function datePart(
   parts: Intl.DateTimeFormatPart[],
-  type: Intl.DateTimeFormatPartTypes,
+  type: ProductionDatePart,
 ): string {
   const value = parts.find((part) => part.type === type)?.value;
   if (!value) throw new Error(`Tree Production asOf could not resolve ${type}.`);
