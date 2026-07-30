@@ -250,6 +250,7 @@ export function buildTreeBarkSurface(
   const staticVertexColors: number[] = [];
   const staticRoughnessCharacters: number[] = [];
   const staticBarkVertices = soil.diagnostics.preservedBarkVertexCount;
+  const groundLevelY = rootGeometry.diagnostics.groundLevelY ?? 0;
   for (let vertex = 0; vertex < rootGeometry.diagnostics.vertexCount; vertex += 1) {
     const base = rgbAt(soil.vertexColors, vertex);
     if (vertex >= staticBarkVertices) {
@@ -273,7 +274,7 @@ export function buildTreeBarkSurface(
       z,
       nx,
       nz,
-      axial: clamp01((y - rootGeometry.diagnostics.groundLevelY)
+      axial: clamp01((y - groundLevelY)
         / Math.max(EPSILON, species.structure.baseRadius * 2.5)),
       config,
     });
