@@ -38,5 +38,5 @@ export const TREE_PRODUCTION_MOBILE_BUDGET: TreeProductionMobileBudget = {
 
 export const TREE_PRODUCTION_HIGH_DETAIL_BUDGET: TreeProductionMobileBudget = {
   ...TREE_PRODUCTION_MOBILE_BUDGET,
-  maxTriangles: 18_000,
+  maxTriangles: 24_000,
 };
