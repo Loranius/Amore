@@ -44,11 +44,13 @@ export function HomeArtifactSwitcher({ value, onChange }: HomeArtifactSwitcherPr
     >
       {ARTIFACTS.map((artifact) => {
         const selected = artifact === value;
+        const label = HOME_ARTIFACT_LABELS[artifact];
         return (
           <button
             key={artifact}
             type="button"
             role="tab"
+            aria-label={artifact === 'reef' ? `${label} — ще в розробці` : label}
             aria-selected={selected}
             aria-controls="home-artifact-preview"
             className={`home-artifact-option${selected ? ' home-artifact-option--active' : ''}`}
@@ -59,8 +61,8 @@ export function HomeArtifactSwitcher({ value, onChange }: HomeArtifactSwitcherPr
             <span className="home-artifact-option-icon">
               <ArtifactIcon artifact={artifact} />
             </span>
-            <span>{HOME_ARTIFACT_LABELS[artifact]}</span>
-            {artifact === 'reef' && <span className="home-artifact-option-dot" aria-label="Ще в розробці" />}
+            <span>{label}</span>
+            {artifact === 'reef' && <span className="home-artifact-option-dot" aria-hidden="true" />}
           </button>
         );
       })}
