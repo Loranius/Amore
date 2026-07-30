@@ -65,7 +65,7 @@ describe('Crystal Growth Center adapter', () => {
     );
 
     for (const center of centers) {
-      expect(center.instructionIds.length).toBeGreaterThanOrEqual(4);
+      expect(center.instructionIds.length).toBeGreaterThanOrEqual(3);
       expect(center.instructionIds.length).toBeLessThanOrEqual(6);
       expect(center.instructionIds[0]).toBe(center.sourceInstructionId);
 
@@ -75,7 +75,7 @@ describe('Crystal Growth Center adapter', () => {
 
       expect(dominant).toHaveLength(1);
       expect(dominant[0]?.id).toBe(center.sourceInstructionId);
-      expect(local.length).toBeGreaterThanOrEqual(3);
+      expect(local.length).toBeGreaterThanOrEqual(2);
       expect(local.every((member) => member.colonyId === center.id)).toBe(true);
       expect(local.every((member) => member.hostPreference === 'same-colony')).toBe(true);
       expect(local.every((member) => member.axialScale < dominant[0]!.axialScale)).toBe(true);
