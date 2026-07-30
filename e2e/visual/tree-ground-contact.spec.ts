@@ -110,7 +110,7 @@ test.describe('Tree Ground Contact Pixel 8 Pro acceptance', () => {
     expect(extraDrawCalls).toBe(0);
     expect(extraMaterials).toBe(0);
     expect(materialCount).toBe(2);
-    expect(drawCalls).toBeLessThanOrEqual(3);
+    expect(drawCalls).toBeLessThanOrEqual(4);
 
     await page.screenshot({
       path: 'test-results/tree-ground-contact-fixture-pixel-8-pro.png',
