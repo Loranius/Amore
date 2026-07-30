@@ -1,10 +1,8 @@
 import {
-  add,
   normalize,
   orthonormalBasis,
   round6,
   roundVec,
-  scale,
   seededUnit,
   subtract,
 } from '../growth/math';
@@ -21,6 +19,7 @@ import type {
 } from './types';
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const TAU = Math.PI * 2;
 
 function validateInput(input: BuildTreeRootArchitectureInput): void {
   const { config, species, composition, frames } = input;
@@ -89,7 +88,7 @@ function createRoot(
   const id = `tree:root:${sequence}`;
   const kind = rootKind(species.artifactSeed, sequence);
   const azimuthJitter = (seededUnit(species.artifactSeed, `${id}:azimuth`) - 0.5) * 0.42;
-  const azimuthRad = round6((sequence * GOLDEN_ANGLE + azimuthJitter) % (Math.PI * 2));
+  const azimuthRad = round6(((sequence * GOLDEN_ANGLE + azimuthJitter) % TAU + TAU) % TAU);
   const bendRad = round6((seededUnit(species.artifactSeed, `${id}:bend`) - 0.5) * 0.72);
   const length = round6(species.structure.crownRadius * (
     0.42 + seededUnit(species.artifactSeed, `${id}:length`) * 0.34
@@ -97,7 +96,10 @@ function createRoot(
   const depthScale = kind === 'surface'
     ? 0.07 + seededUnit(species.artifactSeed, `${id}:depth`) * 0.08
     : 0.18 + seededUnit(species.artifactSeed, `${id}:depth`) * 0.16;
-  const maximumDepth = round6(Math.max(0.025, depthScale * Math.max(0.6, species.structure.baseRadius * 2.4)));
+  const maximumDepth = round6(Math.max(
+    0.025,
+    depthScale * Math.max(0.6, species.structure.baseRadius * 2.4),
+  ));
   const startRadius = round6(Math.max(
     0.035,
     species.structure.baseRadius * (0.4 - (sequence % 4) * 0.035),
@@ -196,6 +198,7 @@ export function buildTreeRootArchitecture(
     { length: Math.max(0, candidateRootCount - emittedRootCount) },
     (_value, index) => `tree:root:${emittedRootCount + index}`,
   );
+  const sampleCount = curves.reduce((sum, curve) => sum + curve.samples.length, 0);
 
   return {
     treeRootArchitectureVersion: 1,
@@ -212,7 +215,7 @@ export function buildTreeRootArchitecture(
       curves,
       diagnostics: {
         branchCount: curves.length,
-        sampleCount: curves.reduce((sum, curve) => sum + curve.samples.length, 0),
+        sampleCount,
         junctionCount: 0,
         skippedBranchIds: [],
         unresolvedJunctionBranchIds: [],
@@ -224,7 +227,7 @@ export function buildTreeRootArchitecture(
       emittedRootCount: roots.length,
       surfaceRootCount: roots.filter((root) => root.kind === 'surface').length,
       nearSurfaceRootCount: roots.filter((root) => root.kind === 'near-surface').length,
-      sampleCount: curves.reduce((sum, curve) => sum + curve.samples.length, 0),
+      sampleCount,
       rootBudget: config.maximumRoots,
       sampleBudget: config.maximumSamples,
       truncatedRootIds,
