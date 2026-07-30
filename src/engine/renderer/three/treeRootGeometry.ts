@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { TreeRootGeometryState } from '../../rootGeometry';
 import { createThreeOrganicSweepGeometry } from './organicSweep';
 
-/** Thin renderer adapter for the accepted static root sweep and merged collar. */
+/** Thin renderer adapter for accepted roots, collar and merged terrain. */
 export function createThreeTreeRootGeometry(
   state: TreeRootGeometryState,
 ): THREE.BufferGeometry {
@@ -21,6 +21,10 @@ export function createThreeTreeRootGeometry(
     visiblePathFraction: state.diagnostics.visiblePathFraction,
     collarVertices: state.diagnostics.collarVertexCount,
     collarTriangles: state.diagnostics.collarTriangleCount,
+    terrainApplied: state.diagnostics.terrainApplied,
+    terrainVertices: state.diagnostics.terrainVertexCount,
+    terrainTriangles: state.diagnostics.terrainTriangleCount,
+    terrainMergedIntoStaticMesh: state.diagnostics.terrainMergedIntoStaticMesh,
   };
   return geometry;
 }
