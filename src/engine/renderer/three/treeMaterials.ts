@@ -12,6 +12,7 @@ function color(value: TreeRgb): THREE.Color {
 export function createThreeTreeMaterial(
   recipe: TreeMaterialRecipe,
 ): THREE.MeshStandardMaterial {
+  const vertexColors = recipe.role === 'bark';
   const material = new THREE.MeshStandardMaterial({
     color: color(recipe.color),
     emissive: color(recipe.emissiveColor),
@@ -23,10 +24,12 @@ export function createThreeTreeMaterial(
     depthWrite: recipe.depthWrite,
     flatShading: recipe.flatShading,
     side: recipe.side === 'double' ? THREE.DoubleSide : THREE.FrontSide,
+    vertexColors,
   });
   material.name = recipe.id;
   material.userData['treeMaterialRole'] = recipe.role;
   material.userData['treeMaterialSignature'] = recipe.signature;
+  material.userData['treeVertexTintEnabled'] = vertexColors;
   return material;
 }
 
