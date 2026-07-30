@@ -111,6 +111,10 @@ export interface GrowthAttachment {
   point: GrowthVec3;
   normal: GrowthVec3;
   burialDepth: number;
+  /** Growth Shadow measured when this body nucleated. */
+  growthShadow?: number;
+  /** Same-center competition measured when this body nucleated. */
+  competitionPressure?: number;
 }
 
 export interface GrowthBody {
