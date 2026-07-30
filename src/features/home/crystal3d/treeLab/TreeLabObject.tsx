@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import type { TreeLeafGeometryState } from '@/engine/leafGeometry';
 import type { OrganicSweepMesh } from '@/engine/labs/organic';
 import type { TreeRootGeometryState } from '@/engine/rootGeometry';
+import type { TreeSoilSurfaceState } from '@/engine/soilSurface';
 import {
   sampleTreeLifeFrame,
   type TreeLifeState,
@@ -22,6 +23,7 @@ import {
 interface TreeLabObjectProps {
   mesh: OrganicSweepMesh;
   rootGeometry: TreeRootGeometryState;
+  soilSurface: TreeSoilSurfaceState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
   life: TreeLifeState;
@@ -31,6 +33,7 @@ interface TreeLabObjectProps {
 export function TreeLabObject({
   mesh,
   rootGeometry,
+  soilSurface,
   leaves,
   materials,
   life,
@@ -40,8 +43,8 @@ export function TreeLabObject({
   const lifeBinding = useRef<ThreeTreeLifeBinding | null>(null);
   const branchGeometry = useMemo(() => createThreeOrganicSweepGeometry(mesh), [mesh]);
   const rootsGeometry = useMemo(
-    () => createThreeTreeRootGeometry(rootGeometry),
-    [rootGeometry],
+    () => createThreeTreeRootGeometry(rootGeometry, soilSurface),
+    [rootGeometry, soilSurface],
   );
   const materialPair = useMemo(
     () => createThreeTreeMaterialPair(materials),
@@ -91,6 +94,7 @@ export function TreeLabObject({
           userData={{
             treeRootAnchored: true,
             treeTerrainMerged: rootGeometry.diagnostics.terrainMergedIntoStaticMesh,
+            treeSoilTintApplied: true,
           }}
         />
       )}

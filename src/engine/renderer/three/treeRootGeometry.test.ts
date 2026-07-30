@@ -27,15 +27,19 @@ describe('Three Tree Root Geometry adapter', () => {
       anchoredToGround: true,
       contactApplied: false,
       terrainApplied: false,
+      soilTintApplied: false,
       lod: 'medium',
     });
 
     geometry.dispose();
   });
 
-  it('publishes Ground Contact, collar and terrain as one static geometry', () => {
-    const state = buildTreeLabPreview('medium').rootGeometry;
-    const geometry = createThreeTreeRootGeometry(state);
+  it('publishes roots, collar, terrain and soil tint as one static geometry', () => {
+    const preview = buildTreeLabPreview('medium');
+    const state = preview.rootGeometry;
+    const soil = preview.soilSurface;
+    const geometry = createThreeTreeRootGeometry(state, soil);
+    const colors = geometry.getAttribute('color');
 
     expect(state.diagnostics.contactApplied).toBe(true);
     expect(state.diagnostics.collarVertexCount).toBeGreaterThan(0);
@@ -45,6 +49,11 @@ describe('Three Tree Root Geometry adapter', () => {
     expect(state.diagnostics.terrainTriangleCount).toBeGreaterThan(0);
     expect(state.diagnostics.terrainMergedIntoStaticMesh).toBe(true);
     expect(geometry.getAttribute('position').count).toBe(state.diagnostics.vertexCount);
+    expect(colors.count).toBe(state.diagnostics.vertexCount);
+    expect(colors.getX(0)).toBeCloseTo(1, 6);
+    expect(colors.getY(0)).toBeCloseTo(1, 6);
+    expect(colors.getZ(0)).toBeCloseTo(1, 6);
+    expect(colors.getX(soil.diagnostics.terrainVertexOffset)).toBeLessThan(1);
     expect(geometry.userData['treeRootGeometry']).toMatchObject({
       contactApplied: true,
       groundLevelY: state.diagnostics.groundLevelY,
@@ -55,6 +64,15 @@ describe('Three Tree Root Geometry adapter', () => {
       terrainVertices: state.diagnostics.terrainVertexCount,
       terrainTriangles: state.diagnostics.terrainTriangleCount,
       terrainMergedIntoStaticMesh: true,
+      soilTintApplied: true,
+    });
+    expect(geometry.userData['treeSoilSurface']).toMatchObject({
+      id: 'tree:soil:surface',
+      paletteId: 'tree:soil:palette',
+      tintAttributeId: 'tree:soil:vertex-tint',
+      terrainVertexOffset: soil.diagnostics.terrainVertexOffset,
+      terrainVertices: soil.diagnostics.terrainVertexCount,
+      materialRole: 'bark',
     });
 
     geometry.dispose();

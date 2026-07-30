@@ -45,6 +45,11 @@ import {
   type TreeSpeciesBlueprint,
 } from '@/engine/species/tree';
 import {
+  DEFAULT_TREE_SOIL_SURFACE_CONFIG,
+  buildTreeSoilSurface,
+  type TreeSoilSurfaceState,
+} from '@/engine/soilSurface';
+import {
   DEFAULT_TREE_TERRAIN_BINDING_CONFIG,
   buildTreeTerrainBinding,
   type TreeTerrainBindingState,
@@ -82,6 +87,7 @@ export interface TreeLabPreviewBuild {
   foliage: TreeFoliageState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
+  soilSurface: TreeSoilSurfaceState;
   life: TreeLifeState;
   mesh: OrganicSweepMesh;
   buildMs: number;
@@ -168,6 +174,13 @@ export function buildTreeLabPreviewFromArtifact({
     leaves,
     config: DEFAULT_TREE_MATERIAL_CONFIG,
   });
+  const soilSurface = buildTreeSoilSurface({
+    species,
+    terrain,
+    rootGeometry,
+    materials,
+    config: DEFAULT_TREE_SOIL_SURFACE_CONFIG,
+  });
   const life = buildTreeLifeState({
     species,
     composition,
@@ -193,6 +206,7 @@ export function buildTreeLabPreviewFromArtifact({
     foliage,
     leaves,
     materials,
+    soilSurface,
     life,
     mesh,
     buildMs: now() - startedAt,
