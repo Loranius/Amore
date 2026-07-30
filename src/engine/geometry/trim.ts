@@ -86,6 +86,37 @@ function triangleInsideSolid(
     && pointInsideCrystalSolid(midpoint(c, a), solid, epsilon);
 }
 
+function minimumExposedTipRatio(solid: CrystalSolid): number {
+  const body = solid.body;
+  const role = body.growthCenterRole ?? null;
+  if (body.generation === 0 || body.tier === 'king') return 0.66;
+  if (role === 'dominant') return 0.52;
+  if (role === 'satellite') return 0.32;
+  if (role === 'micro' || body.tier === 'micro') return 0.18;
+  return 0.28;
+}
+
+/**
+ * Growth Centers deliberately intergrow, so analytical solids can overlap more
+ * than their final visible shells should. Preserve a role-sensitive upper tip
+ * band and only trim the lower/intersection portion of a body.
+ */
+function triangleTouchesProtectedTip(
+  a: GrowthVec3,
+  b: GrowthVec3,
+  c: GrowthVec3,
+  solid: CrystalSolid,
+  epsilon: number,
+): boolean {
+  const lastY = solid.profile.rows[solid.profile.rows.length - 1]?.y ?? 0;
+  const bodyStart = Math.min(lastY, Math.max(0, solid.profile.extraSink));
+  const visibleSpan = Math.max(0, lastY - bodyStart);
+  const protectedStartY = bodyStart + visibleSpan * (1 - minimumExposedTipRatio(solid));
+  const center = centroid(a, b, c);
+  const centerY = dot(subtract(center, solid.profile.geometryAnchor), solid.body.direction);
+  return centerY >= protectedStartY - epsilon;
+}
+
 /**
  * Bounded local shell trim. Vertex buffers stay stable; only the visible index
  * list changes. Attached base caps are never part of the external shell.
@@ -118,13 +149,22 @@ export function trimCrystalMesh(
     const a = vertexAt(mesh.positions, ia);
     const b = vertexAt(mesh.positions, ib);
     const c = vertexAt(mesh.positions, ic);
-    const hiddenBy = candidates.find((candidate) => triangleInsideSolid(
+    const protectedTip = triangleTouchesProtectedTip(
       a,
       b,
       c,
-      candidate,
+      self,
       config.hiddenFaceEpsilon,
-    ));
+    );
+    const hiddenBy = protectedTip
+      ? undefined
+      : candidates.find((candidate) => triangleInsideSolid(
+        a,
+        b,
+        c,
+        candidate,
+        config.hiddenFaceEpsilon,
+      ));
     if (hiddenBy) {
       occluders.add(hiddenBy.body.id);
       continue;
