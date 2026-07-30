@@ -7,13 +7,13 @@ export const DEFAULT_ORGANIC_SURFACE_CONFIG: OrganicSurfaceConfig = {
   junctionSurfaceRatio: 0.98,
   junctionFlare: 1.56,
   junctionSegmentsByLod: {
-    high: 6,
+    high: 5,
     medium: 5,
     low: 3,
   },
   radialSegmentsByLod: {
-    high: 13,
-    medium: 11,
+    high: 12,
+    medium: 10,
     low: 6,
   },
   axialStrideByLod: {
