@@ -49,6 +49,11 @@ import {
   type OrganicSweepMesh,
 } from '@/engine/labs/organic';
 import {
+  DEFAULT_TREE_PHENOLOGY_CONFIG,
+  buildTreePhenology,
+  type TreePhenologyState,
+} from '@/engine/phenology';
+import {
   DEFAULT_TREE_ROOT_ARCHITECTURE_CONFIG,
   buildTreeRootArchitecture,
   type TreeRootArchitectureState,
@@ -109,6 +114,7 @@ export interface TreeLabPreviewBuild {
   materials: TreeMaterialState;
   canopyDepth: TreeCanopyDepthState;
   canopyLight: TreeCanopyLightState;
+  phenology: TreePhenologyState;
   soilSurface: TreeSoilSurfaceState;
   barkSurface: TreeBarkSurfaceState;
   groundDetails: TreeGroundDetailState;
@@ -128,10 +134,6 @@ function now(): number {
   return typeof performance === 'undefined' ? Date.now() : performance.now();
 }
 
-/**
- * Pure artifact-to-mesh path. It accepts either the fixed regression fixture or
- * a read-only ArtifactBlueprint assembled from normalized portal events.
- */
 export function buildTreeLabPreviewFromArtifact({
   artifact,
   asOf,
@@ -139,10 +141,7 @@ export function buildTreeLabPreviewFromArtifact({
   rulesVersion,
 }: BuildTreeLabPreviewFromArtifactInput): TreeLabPreviewBuild {
   const startedAt = now();
-  const species = buildTreeSpeciesBlueprint({
-    artifact,
-    config: { asOf, rulesVersion },
-  });
+  const species = buildTreeSpeciesBlueprint({ artifact, config: { asOf, rulesVersion } });
   const field = treeToOrganicField(species);
   const skeleton = buildOrganicSkeleton({
     seed: field.seed,
@@ -212,6 +211,14 @@ export function buildTreeLabPreviewFromArtifact({
     materials,
     config: DEFAULT_TREE_CANOPY_LIGHT_CONFIG,
   });
+  const phenology = buildTreePhenology({
+    species,
+    leaves,
+    canopyLight,
+    materials,
+    asOf,
+    config: DEFAULT_TREE_PHENOLOGY_CONFIG,
+  });
   const soilSurface = buildTreeSoilSurface({
     species,
     terrain,
@@ -261,6 +268,7 @@ export function buildTreeLabPreviewFromArtifact({
     materials,
     canopyDepth,
     canopyLight,
+    phenology,
     soilSurface,
     barkSurface,
     groundDetails,
@@ -270,7 +278,6 @@ export function buildTreeLabPreviewFromArtifact({
   };
 }
 
-/** Fixed fixture retained as the deterministic regression baseline. */
 export function buildTreeLabPreview(lod: OrganicMeshLod): TreeLabPreviewBuild {
   return buildTreeLabPreviewFromArtifact({
     artifact: buildTreeSpeciesPreviewArtifact(),
