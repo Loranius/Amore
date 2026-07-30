@@ -3,6 +3,7 @@ import type {
   TreeCanopyDepthProfile,
   TreeCanopyDepthState,
 } from '../../canopyDepth';
+import type { TreeCanopyLightState } from '../../canopyLight';
 import type {
   TreeLeafGeometryState,
   TreeLeafInstance,
@@ -69,6 +70,41 @@ function validateCanopyDepth(
   }
 }
 
+function validateCanopyLight(
+  leaves: TreeLeafGeometryState,
+  canopy: TreeCanopyDepthState | undefined,
+  light: TreeCanopyLightState,
+): void {
+  if (!canopy) {
+    throw new Error('Three Tree Leaf Geometry requires Canopy Depth before Canopy Light.');
+  }
+  if (light.artifactSeed !== leaves.artifactSeed
+    || light.lod !== leaves.lod
+    || light.sourceLeafGeometryVersion !== leaves.treeLeafGeometryVersion
+    || light.sourceLeafGeometryRulesVersion !== leaves.rulesVersion) {
+    throw new Error('Three Tree Leaf Geometry received Canopy Light from another leaf state.');
+  }
+  if (light.sourceCanopyDepthVersion !== canopy.treeCanopyDepthVersion
+    || light.sourceCanopyDepthRulesVersion !== canopy.rulesVersion
+    || light.sourceCanopyDepthSignature !== canopy.signature) {
+    throw new Error('Three Tree Leaf Geometry received Canopy Light from another Canopy Depth state.');
+  }
+  if (light.profiles.length !== leaves.instances.length) {
+    throw new Error('Three Tree Leaf Geometry Canopy Light profile count does not match leaves.');
+  }
+  for (let index = 0; index < leaves.instances.length; index += 1) {
+    const leaf = leaves.instances[index];
+    const canopyProfile = canopy.profiles[index];
+    const lightProfile = light.profiles[index];
+    if (!leaf || !canopyProfile || !lightProfile
+      || lightProfile.sequence !== index
+      || lightProfile.leafInstanceId !== leaf.id
+      || lightProfile.canopyProfileId !== canopyProfile.id) {
+      throw new Error('Three Tree Leaf Geometry Canopy Light order does not match leaves.');
+    }
+  }
+}
+
 export function createThreeTreeLeafCardGeometry(
   state: TreeLeafGeometryState,
 ): THREE.BufferGeometry {
@@ -98,8 +134,10 @@ export function createThreeTreeLeafInstancedMesh(
   state: TreeLeafGeometryState,
   material: THREE.Material,
   canopy?: TreeCanopyDepthState,
+  light?: TreeCanopyLightState,
 ): THREE.InstancedMesh {
   if (canopy) validateCanopyDepth(state, canopy);
+  if (light) validateCanopyLight(state, canopy, light);
   const geometry = createThreeTreeLeafCardGeometry(state);
   const mesh = new THREE.InstancedMesh(geometry, material, state.instances.length);
   mesh.name = 'TreeLeafInstances';
@@ -108,16 +146,14 @@ export function createThreeTreeLeafInstancedMesh(
   mesh.frustumCulled = false;
 
   for (const instance of state.instances) {
-    const profile = canopy?.profiles[instance.sequence];
-    mesh.setMatrixAt(instance.sequence, matrixForInstance(instance, profile));
-    if (profile) {
+    const canopyProfile = canopy?.profiles[instance.sequence];
+    const lightProfile = light?.profiles[instance.sequence];
+    mesh.setMatrixAt(instance.sequence, matrixForInstance(instance, canopyProfile));
+    const tint = lightProfile?.combinedTintMultiplier ?? canopyProfile?.tintMultiplier;
+    if (tint) {
       mesh.setColorAt(
         instance.sequence,
-        new THREE.Color(
-          profile.tintMultiplier.r,
-          profile.tintMultiplier.g,
-          profile.tintMultiplier.b,
-        ),
+        new THREE.Color(tint.r, tint.g, tint.b),
       );
     }
   }
@@ -129,6 +165,7 @@ export function createThreeTreeLeafInstancedMesh(
     renderedTriangles: state.diagnostics.renderedTriangleCount,
     estimatedDrawCalls: state.diagnostics.estimatedDrawCalls,
     canopyDepthApplied: canopy !== undefined,
+    canopyLightApplied: light !== undefined,
   };
   if (canopy) {
     mesh.userData['treeCanopyDepth'] = {
@@ -145,6 +182,23 @@ export function createThreeTreeLeafInstancedMesh(
       uniqueTints: canopy.diagnostics.uniqueTintCount,
       additionalDrawCalls: canopy.diagnostics.estimatedAdditionalDrawCalls,
       additionalMaterials: canopy.diagnostics.estimatedAdditionalMaterials,
+    };
+  }
+  if (light) {
+    mesh.userData['treeCanopyLight'] = {
+      version: light.treeCanopyLightVersion,
+      rulesVersion: light.rulesVersion,
+      id: light.descriptor.id,
+      profileId: light.descriptor.profileId,
+      tintAttributeId: light.descriptor.tintAttributeId,
+      signature: light.signature,
+      profiles: light.profiles.length,
+      shade: light.diagnostics.shadeLeafCount,
+      transition: light.diagnostics.transitionLeafCount,
+      sunlit: light.diagnostics.sunlitLeafCount,
+      uniqueCombinedTints: light.diagnostics.uniqueCombinedTintCount,
+      additionalDrawCalls: light.diagnostics.estimatedAdditionalDrawCalls,
+      additionalMaterials: light.diagnostics.estimatedAdditionalMaterials,
     };
   }
   return mesh;
