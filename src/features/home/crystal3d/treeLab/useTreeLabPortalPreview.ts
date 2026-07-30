@@ -14,6 +14,7 @@ import {
   type AdapterDiagnostic,
 } from '@/engine/evolution/adapters';
 import type { OrganicMeshLod } from '@/engine/labs/organic';
+import { resolveTreeProductionAsOf } from '@/engine/productionAcceptance';
 import {
   buildEvolutionSourceSnapshot,
   evolutionWishlistFromPairArchive,
@@ -57,8 +58,10 @@ function useRelationshipStartDate() {
 }
 
 /**
- * Read-only portal adapter for the isolated Tree Lab. Module rows are normalized
- * through the existing Evolution adapters before Tree Species sees them.
+ * Read-only portal adapter for the production Tree pipeline. Module rows are
+ * normalized through the existing Evolution adapters before Tree Species sees
+ * them. `asOf` is pinned to the current relationship-local day so identical
+ * history produces the same contract after a reload.
  */
 export function useTreeLabPortalPreview(
   lod: OrganicMeshLod,
@@ -75,7 +78,7 @@ export function useTreeLabPortalPreview(
     queryFn: fetchPairWishlistEvolutionArchive,
     staleTime: 5 * 60_000,
   });
-  const [asOf] = useState(() => new Date().toISOString());
+  const [asOf] = useState(() => resolveTreeProductionAsOf(new Date(), COUPLE_TIME_ZONE));
 
   const userIds = useMemo(
     () => (users.data ?? []).map((user) => user.id).sort((left, right) => left - right),
@@ -153,6 +156,7 @@ export function useTreeLabPortalPreview(
         asOf,
         lod,
         rulesVersion: TREE_PORTAL_RULES_VERSION,
+        asOfPolicy: 'couple-day',
       });
 
       return {

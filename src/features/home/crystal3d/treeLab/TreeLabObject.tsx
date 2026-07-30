@@ -28,19 +28,16 @@ import {
   type ThreeTreeLifeBinding,
 } from '@/engine/renderer/three';
 
-type CanopyLightRuntimeState = TreeCanopyLightState & {
-  phenology?: TreePhenologyState;
-  leafOrientation?: TreeLeafOrientationState;
-  crownSilhouette?: TreeCrownSilhouetteState;
-};
-
 interface TreeLabObjectProps {
   mesh: OrganicSweepMesh;
   rootGeometry: TreeRootGeometryState;
   soilSurface: TreeSoilSurfaceState;
   barkSurface: TreeBarkSurfaceState;
   canopyDepth: TreeCanopyDepthState;
-  canopyLight: CanopyLightRuntimeState;
+  canopyLight: TreeCanopyLightState;
+  phenology: TreePhenologyState;
+  leafOrientation: TreeLeafOrientationState;
+  crownSilhouette: TreeCrownSilhouetteState;
   groundDetails: TreeGroundDetailState;
   leaves: TreeLeafGeometryState;
   materials: TreeMaterialState;
@@ -55,6 +52,9 @@ export function TreeLabObject({
   barkSurface,
   canopyDepth,
   canopyLight,
+  phenology,
+  leafOrientation,
+  crownSilhouette,
   groundDetails,
   leaves,
   materials,
@@ -81,11 +81,19 @@ export function TreeLabObject({
       materialPair.foliage,
       canopyDepth,
       canopyLight,
-      canopyLight.phenology,
-      canopyLight.leafOrientation,
-      canopyLight.crownSilhouette,
+      phenology,
+      leafOrientation,
+      crownSilhouette,
     ),
-    [leaves, materialPair, canopyDepth, canopyLight],
+    [
+      leaves,
+      materialPair,
+      canopyDepth,
+      canopyLight,
+      phenology,
+      leafOrientation,
+      crownSilhouette,
+    ],
   );
   const groundDetailMesh = useMemo(
     () => createThreeTreeGroundDetailInstancedMesh(groundDetails),

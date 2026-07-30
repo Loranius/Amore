@@ -1,9 +1,12 @@
-export interface TreeLabAcceptanceBudget {
-  maxVertices: number;
-  maxTriangles: number;
-  maxBuildMs: number;
-  maxDrawCalls: number;
-}
+import {
+  TREE_PRODUCTION_MOBILE_BUDGET,
+  type TreeProductionMobileBudget,
+} from '@/engine/productionAcceptance';
+
+export type TreeLabAcceptanceBudget = Pick<
+  TreeProductionMobileBudget,
+  'maxVertices' | 'maxTriangles' | 'maxBuildMs' | 'maxDrawCalls'
+>;
 
 export interface TreeLabAcceptanceInput {
   vertices: number;
@@ -17,13 +20,13 @@ export interface TreeLabAcceptanceResult {
   violations: string[];
 }
 
-export const TREE_LAB_MOBILE_BUDGET: TreeLabAcceptanceBudget = {
-  maxVertices: 12_000,
-  maxTriangles: 16_000,
-  maxBuildMs: 80,
-  maxDrawCalls: 4,
-};
+/** @deprecated Production code uses TREE_PRODUCTION_MOBILE_BUDGET. */
+export const TREE_LAB_MOBILE_BUDGET: TreeLabAcceptanceBudget = TREE_PRODUCTION_MOBILE_BUDGET;
 
+/**
+ * Compatibility wrapper for older phase tests. Production rendering now uses
+ * evaluateTreeProductionRuntimeAcceptance with the published static contract.
+ */
 export function evaluateTreeLabAcceptance(
   input: TreeLabAcceptanceInput,
   budget: TreeLabAcceptanceBudget = TREE_LAB_MOBILE_BUDGET,

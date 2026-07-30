@@ -1,12 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import { evaluateTreeProductionRuntimeAcceptance } from '@/engine/productionAcceptance';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import {
   EvolutionRuntimeProbe,
   type EvolutionRuntimeMetrics,
 } from '../evolution/EvolutionRuntimeProbe';
-import { evaluateTreeLabAcceptance } from './acceptance';
 import {
   buildTreeLabPreview,
   type TreeLabPreviewBuild,
@@ -48,24 +48,17 @@ function TreeLabRenderedScene({
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => {
     setRuntime(next);
   }, []);
-  const totalVertices = build.mesh.diagnostics.vertexCount
-    + build.rootGeometry.diagnostics.vertexCount
-    + build.leaves.diagnostics.sharedVertexCount
-    + build.groundDetails.diagnostics.sharedVertexCount;
-  const totalTriangles = build.mesh.diagnostics.triangleCount
-    + build.rootGeometry.diagnostics.triangleCount
-    + build.leaves.diagnostics.renderedTriangleCount
-    + build.groundDetails.diagnostics.renderedTriangleCount;
-  const acceptance = evaluateTreeLabAcceptance({
-    vertices: totalVertices,
-    triangles: totalTriangles,
+  const totalVertices = build.productionAcceptance.diagnostics.vertices;
+  const totalTriangles = build.productionAcceptance.diagnostics.triangles;
+  const acceptance = evaluateTreeProductionRuntimeAcceptance({
+    contract: build.productionAcceptance,
     buildMs: build.buildMs,
     drawCalls: runtime?.drawCalls ?? null,
   });
   const budgetLabel = acceptance.status === 'pass'
-    ? 'mobile budget OK'
+    ? 'production accepted'
     : acceptance.status === 'fail'
-      ? `budget fail: ${acceptance.violations.join(', ')}`
+      ? `acceptance fail: ${acceptance.violations.join(', ')}`
       : 'runtime warming…';
   const statusLabel = errorMessage ? `portal fallback · ${budgetLabel}` : budgetLabel;
   const sourceLabel = source === 'portal'
@@ -93,6 +86,7 @@ function TreeLabRenderedScene({
     `${build.leaves.instances.length} cards`,
     `${build.canopyDepth.diagnostics.innerLeafCount}/${build.canopyDepth.diagnostics.middleLeafCount}/${build.canopyDepth.diagnostics.outerLeafCount} depth`,
     `${build.canopyLight.diagnostics.shadeLeafCount}/${build.canopyLight.diagnostics.transitionLeafCount}/${build.canopyLight.diagnostics.sunlitLeafCount} light`,
+    `${build.productionAcceptance.phaseCheckpoints.length} prod phases`,
     `${build.life.leaves.length} live`,
     `${totalMaterials} mat`,
     `${build.mesh.diagnostics.branchCount} гілок`,
@@ -119,6 +113,31 @@ function TreeLabRenderedScene({
       data-tree-lab-lod={build.lod}
       data-tree-lab-acceptance={acceptance.status}
       data-tree-lab-violations={acceptance.violations.join(',')}
+      data-tree-production-acceptance="true"
+      data-tree-production-contract-id={build.productionAcceptance.descriptor.id}
+      data-tree-production-pipeline-id={build.productionAcceptance.descriptor.pipelineId}
+      data-tree-production-runtime-id={build.productionAcceptance.descriptor.runtimeId}
+      data-tree-production-identity-id={build.productionAcceptance.descriptor.identityId}
+      data-tree-production-static-status={build.productionAcceptance.staticStatus}
+      data-tree-production-runtime-status={acceptance.status}
+      data-tree-production-signature={build.productionAcceptance.signature}
+      data-tree-production-identity-signature={build.productionAcceptance.identitySignature}
+      data-tree-production-as-of={build.productionAcceptance.asOf}
+      data-tree-production-as-of-policy={build.productionAcceptance.asOfPolicy}
+      data-tree-production-phase-count={build.productionAcceptance.diagnostics.emittedPhaseCount}
+      data-tree-production-phase-expected={build.productionAcceptance.diagnostics.expectedPhaseCount}
+      data-tree-production-phase-order={String(build.productionAcceptance.diagnostics.phaseOrderPreserved)}
+      data-tree-production-phase-fingerprints={String(build.productionAcceptance.diagnostics.phaseFingerprintsPresent)}
+      data-tree-production-leaf-chain={String(build.productionAcceptance.diagnostics.leafIdentityChainPreserved)}
+      data-tree-production-life-prefix={String(build.productionAcceptance.diagnostics.lifeLeafPrefixPreserved)}
+      data-tree-production-negative-space={String(build.productionAcceptance.diagnostics.negativeSpaceAccepted)}
+      data-tree-production-ground-anchored={String(build.productionAcceptance.diagnostics.groundAnchored)}
+      data-tree-production-terrain-merged={String(build.productionAcceptance.diagnostics.terrainMergedIntoStaticGeometry)}
+      data-tree-production-soil-preserved={String(build.productionAcceptance.diagnostics.soilTerrainTintPreserved)}
+      data-tree-production-bark-preserved={String(build.productionAcceptance.diagnostics.barkGeometryPreserved)}
+      data-tree-production-ground-detail-anchored={String(build.productionAcceptance.diagnostics.groundDetailsAnchored)}
+      data-tree-production-ground-detail-prefix={String(build.productionAcceptance.diagnostics.groundDetailPrefixPreserved)}
+      data-tree-production-violations={build.productionAcceptance.violations.join(',')}
       data-tree-lab-stage={build.species.state.stage}
       data-tree-lab-annual-instructions={build.species.diagnostics.annualInstructionCount}
       data-tree-lab-event-instructions={build.species.diagnostics.eventInstructionCount}
@@ -378,6 +397,9 @@ function TreeLabRenderedScene({
           barkSurface={build.barkSurface}
           canopyDepth={build.canopyDepth}
           canopyLight={build.canopyLight}
+          phenology={build.phenology}
+          leafOrientation={build.leafOrientation}
+          crownSilhouette={build.crownSilhouette}
           groundDetails={build.groundDetails}
           leaves={build.leaves}
           materials={build.materials}
@@ -403,7 +425,7 @@ function TreeLabRenderedScene({
       </span>
       <span
         className={`tree-lab-preview-status tree-lab-preview-status--${acceptance.status}`}
-        aria-label="Перевірка мобільного бюджету Tree Lab"
+        aria-label="Production acceptance дерева"
         title={errorMessage}
       >
         {statusLabel}

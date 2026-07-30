@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { TREE_PRODUCTION_MOBILE_BUDGET } from '@/engine/productionAcceptance';
 import { createThreeOrganicSweepGeometry } from '@/engine/renderer/three';
-import { TREE_LAB_MOBILE_BUDGET } from './acceptance';
 import {
   buildTreeLabPreview,
   buildTreeLabPreviewFromArtifact,
@@ -15,13 +15,26 @@ function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'bui
   return stable;
 }
 
-describe('Tree Lab preview pipeline', () => {
-  it('keeps the full Evolution -> Species -> Growth -> Canopy -> Phenology -> Orientation -> Silhouette -> Surface -> Life result deterministic', () => {
+function expectStableOrderedSubset(
+  smallerIds: readonly string[],
+  largerIds: readonly string[],
+): void {
+  const positions = new Map(largerIds.map((id, index) => [id, index] as const));
+  const matchedPositions = smallerIds.map((id) => positions.get(id));
+  expect(matchedPositions.every((position) => position !== undefined)).toBe(true);
+  for (let index = 1; index < matchedPositions.length; index += 1) {
+    expect(matchedPositions[index]).toBeGreaterThan(matchedPositions[index - 1] ?? -1);
+  }
+}
+
+describe('Tree production preview pipeline', () => {
+  it('keeps the full Evolution -> Species -> Growth -> Crown -> Surface -> Life -> Acceptance result deterministic', () => {
     const first = buildTreeLabPreview('medium');
     const second = buildTreeLabPreview('medium');
 
     expect(withoutBuildTime(second)).toEqual(withoutBuildTime(first));
     expect(second.seed).toBe(first.seed);
+    expect(second.productionAcceptance.signature).toBe(first.productionAcceptance.signature);
   });
 
   it('preserves the fixed fixture as a wrapper around the generic artifact path', () => {
@@ -31,6 +44,7 @@ describe('Tree Lab preview pipeline', () => {
       asOf: TREE_SPECIES_PREVIEW_AS_OF,
       lod: 'medium',
       rulesVersion: 'tree-species-preview-v1.0.0',
+      asOfPolicy: 'fixed-fixture',
     });
 
     expect(withoutBuildTime(generic)).toEqual(withoutBuildTime(fixture));
@@ -50,24 +64,52 @@ describe('Tree Lab preview pipeline', () => {
     expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
   });
 
+  it('publishes a passing production contract for low, medium and high LOD', () => {
+    const low = buildTreeLabPreview('low');
+    const medium = buildTreeLabPreview('medium');
+    const high = buildTreeLabPreview('high');
+    const builds = [low, medium, high] as const;
+
+    for (const build of builds) {
+      const contract = build.productionAcceptance;
+      expect(contract.staticStatus).toBe('pass');
+      expect(contract.violations).toEqual([]);
+      expect(contract.diagnostics.phaseOrderPreserved).toBe(true);
+      expect(contract.diagnostics.phaseFingerprintsPresent).toBe(true);
+      expect(contract.diagnostics.leafIdentityChainPreserved).toBe(true);
+      expect(contract.diagnostics.lifeLeafPrefixPreserved).toBe(true);
+      expect(contract.diagnostics.negativeSpaceAccepted).toBe(true);
+      expect(contract.diagnostics.groundAnchored).toBe(true);
+      expect(contract.diagnostics.terrainMergedIntoStaticGeometry).toBe(true);
+      expect(contract.diagnostics.soilTerrainTintPreserved).toBe(true);
+      expect(contract.diagnostics.barkGeometryPreserved).toBe(true);
+      expect(contract.diagnostics.groundDetailsAnchored).toBe(true);
+      expect(contract.diagnostics.groundDetailPrefixPreserved).toBe(true);
+      expect(contract.diagnostics.vertices).toBeLessThanOrEqual(
+        TREE_PRODUCTION_MOBILE_BUDGET.maxVertices,
+      );
+      expect(contract.diagnostics.triangles).toBeLessThanOrEqual(
+        TREE_PRODUCTION_MOBILE_BUDGET.maxTriangles,
+      );
+      expect(contract.diagnostics.estimatedDrawCalls).toBeLessThanOrEqual(
+        TREE_PRODUCTION_MOBILE_BUDGET.maxDrawCalls,
+      );
+      expect(contract.diagnostics.materials).toBeLessThanOrEqual(
+        TREE_PRODUCTION_MOBILE_BUDGET.maxMaterials,
+      );
+    }
+
+    const lowIds = low.leaves.instances.map((leaf) => leaf.id);
+    const mediumIds = medium.leaves.instances.map((leaf) => leaf.id);
+    const highIds = high.leaves.instances.map((leaf) => leaf.id);
+    expectStableOrderedSubset(lowIds, mediumIds);
+    expectStableOrderedSubset(mediumIds, highIds);
+  });
+
   it('keeps canopy polish, surface character, static geometry, instances and life inside published mobile limits', () => {
     const build = buildTreeLabPreview('medium');
-    const totalVertices = build.mesh.diagnostics.vertexCount
-      + build.rootGeometry.diagnostics.vertexCount
-      + build.leaves.diagnostics.sharedVertexCount
-      + build.groundDetails.diagnostics.sharedVertexCount;
-    const totalTriangles = build.mesh.diagnostics.triangleCount
-      + build.rootGeometry.diagnostics.triangleCount
-      + build.leaves.diagnostics.renderedTriangleCount
-      + build.groundDetails.diagnostics.renderedTriangleCount;
-    const estimatedDrawCalls = 1
-      + build.rootGeometry.diagnostics.estimatedDrawCalls
-      + build.leaves.diagnostics.estimatedDrawCalls
-      + build.groundDetails.diagnostics.estimatedDrawCalls;
+    const contract = build.productionAcceptance;
 
-    expect(totalVertices).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxVertices);
-    expect(totalTriangles).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxTriangles);
-    expect(estimatedDrawCalls).toBeLessThanOrEqual(TREE_LAB_MOBILE_BUDGET.maxDrawCalls);
     expect(build.canopyDepth.profiles).toHaveLength(build.leaves.instances.length);
     expect(build.canopyDepth.diagnostics.innerLeafCount).toBeGreaterThan(0);
     expect(build.canopyDepth.diagnostics.middleLeafCount).toBeGreaterThan(0);
@@ -82,36 +124,20 @@ describe('Tree Lab preview pipeline', () => {
         + build.canopyLight.diagnostics.sunlitLeafCount,
     ).toBe(build.leaves.instances.length);
     expect(build.canopyLight.diagnostics.uniqueCombinedTintCount).toBeGreaterThan(1);
-    expect(build.canopyLight.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
-    expect(build.canopyLight.diagnostics.estimatedAdditionalMaterials).toBe(0);
-    expect(build.canopyLight.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
     expect(build.phenology.profiles).toHaveLength(build.leaves.instances.length);
     expect(build.leafOrientation.profiles).toHaveLength(build.leaves.instances.length);
     expect(build.leafOrientation.diagnostics.nonZeroProfileCount).toBeGreaterThan(0);
-    expect(build.leafOrientation.diagnostics.stableLeafOrderPreserved).toBe(true);
-    expect(build.leafOrientation.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
-    expect(build.leafOrientation.diagnostics.estimatedAdditionalMaterials).toBe(0);
-    expect(build.leafOrientation.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
     expect(build.crownSilhouette.profiles).toHaveLength(build.leaves.instances.length);
     expect(build.crownSilhouette.diagnostics.adjustedOuterLeafCount).toBeGreaterThan(0);
-    expect(build.crownSilhouette.diagnostics.preservedEmptySectorIndices).toBe(true);
-    expect(build.crownSilhouette.diagnostics.filledPreviouslyEmptySectors).toBe(false);
-    expect(build.crownSilhouette.diagnostics.preservedVerticalBands).toBe(true);
-    expect(build.crownSilhouette.diagnostics.silhouetteErrorNotIncreased).toBe(true);
     expect(build.crownSilhouette.diagnostics.negativeSpaceAccepted).toBe(true);
-    expect(build.crownSilhouette.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
-    expect(build.crownSilhouette.diagnostics.estimatedAdditionalMaterials).toBe(0);
-    expect(build.crownSilhouette.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
-    expect(build.barkSurface.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
-    expect(build.barkSurface.diagnostics.estimatedAdditionalMaterials).toBe(0);
     expect(build.barkSurface.diagnostics.materialCount).toBe(2);
     expect(build.groundDetails.instances).toHaveLength(72);
     expect(build.groundDetails.diagnostics.totalMaterialCount).toBe(3);
-    expect(build.life.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
     expect(build.life.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(
       build.life.leaves.length,
     );
     expect(build.life.leaves.length).toBeLessThanOrEqual(build.leaves.instances.length);
+    expect(contract.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(build.life.leaves.length);
     expect(build.mesh.diagnostics.junctionCount).toBe(build.frames.diagnostics.junctionCount);
   });
 
