@@ -12,7 +12,7 @@ export const DEFAULT_ORGANIC_SURFACE_CONFIG: OrganicSurfaceConfig = {
     low: 3,
   },
   radialSegmentsByLod: {
-    high: 8,
+    high: 9,
     medium: 8,
     low: 6,
   },
