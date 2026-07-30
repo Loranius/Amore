@@ -193,7 +193,7 @@ function addTubeIndices(
       const b = nextRing + radialIndex;
       const c = nextRing + nextRadial;
       const d = currentRing + nextRadial;
-      indices.push(a, b, d, b, c, d);
+      indices.push(a, d, b, b, d, c);
     }
   }
 }
