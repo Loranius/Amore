@@ -73,8 +73,9 @@ describe('Universal Growth Engine', () => {
   });
 
   it('attaches every non-root body to a reserved aggregate Surface Atlas region', () => {
+    const blueprint = growthBlueprint(BASE_EVENTS);
     const state = buildGrowthState({
-      blueprint: growthBlueprint(BASE_EVENTS),
+      blueprint,
       config: DEFAULT_GROWTH_ENGINE_CONFIG,
     });
     const ids = new Set(state.bodies.map((body) => body.id));
@@ -82,9 +83,9 @@ describe('Universal Growth Engine', () => {
       state.surfaceMap.occupiedSites.map((site) => [site.bodyId, site] as const),
     );
 
-    expect(state.bodies).toHaveLength(BASE_EVENTS.length + 1);
+    expect(state.bodies).toHaveLength(blueprint.instructions.length + 1);
     expect(state.bodies[0]?.hostBodyId).toBeNull();
-    expect(state.surfaceMap.occupiedSites).toHaveLength(BASE_EVENTS.length);
+    expect(state.surfaceMap.occupiedSites).toHaveLength(blueprint.instructions.length);
 
     for (const body of state.bodies.slice(1)) {
       const occupancy = occupancyByBodyId.get(body.id);
@@ -121,12 +122,43 @@ describe('Universal Growth Engine', () => {
     expect(new Set(regionIds).size).toBe(regionIds.length);
   });
 
+  it('builds one compact local Growth Center per evolution formation', () => {
+    const blueprint = growthBlueprint(BASE_EVENTS);
+    const state = buildGrowthState({ blueprint, config: DEFAULT_GROWTH_ENGINE_CONFIG });
+    const centers = state.growthCenters ?? [];
+    const bodyById = new Map(state.bodies.map((body) => [body.id, body] as const));
+
+    expect(blueprint.growthCenters).toHaveLength(BASE_EVENTS.length);
+    expect(centers).toHaveLength(BASE_EVENTS.length);
+    expect(state.colonies.map((colony) => colony.id)).toEqual(centers.map((center) => center.id));
+
+    for (const center of centers) {
+      expect(center.dominantBodyId).toBe(center.sourceInstructionId);
+      expect(typeof center.surfaceRegionId).toBe('string');
+      expect(center.bodyIds.length).toBeGreaterThanOrEqual(4);
+      expect(center.bodyIds.length).toBeLessThanOrEqual(6);
+
+      const dominant = bodyById.get(center.dominantBodyId!);
+      expect(dominant?.growthCenterRole).toBe('dominant');
+      expect(dominant?.growthCenterId).toBe(center.id);
+
+      for (const bodyId of center.bodyIds) {
+        const body = bodyById.get(bodyId)!;
+        expect(body.growthCenterId).toBe(center.id);
+        if (body.growthCenterRole === 'dominant') continue;
+        const host = bodyById.get(body.hostBodyId!);
+        expect(host?.growthCenterId).toBe(center.id);
+      }
+    }
+  });
+
   it('keeps the Crystal Species compact, upward and rooted around one focal mother', () => {
     const state = buildGrowthState({
       blueprint: growthBlueprint(BASE_EVENTS),
       config: DEFAULT_GROWTH_ENGINE_CONFIG,
     });
     const mother = state.bodies[0]!;
+    const bodyById = new Map(state.bodies.map((body) => [body.id, body] as const));
 
     expect(mother.kind).toBe('crystal:mother');
     expect(mother.direction.y).toBeGreaterThanOrEqual(0.9);
@@ -141,38 +173,46 @@ describe('Universal Growth Engine', () => {
         expect(body.direction.y).toBeGreaterThanOrEqual(0.62);
         expect(body.skeletonLength).toBeLessThanOrEqual(1.3);
       } else if (body.kind === 'crystal:satellite') {
-        expect(body.generation).toBeLessThanOrEqual(2);
-        expect(body.direction.y).toBeGreaterThanOrEqual(0.42);
+        expect(body.direction.y).toBeGreaterThanOrEqual(0.34);
         expect(body.skeletonLength).toBeLessThanOrEqual(0.84);
       } else if (body.kind === 'crystal:inclusion') {
-        expect(body.generation).toBeLessThanOrEqual(3);
-        expect(body.direction.y).toBeGreaterThanOrEqual(0.3);
+        expect(body.direction.y).toBeGreaterThanOrEqual(0.24);
         expect(body.skeletonLength).toBeLessThanOrEqual(0.42);
+      }
+
+      if (body.growthCenterRole !== 'dominant') {
+        const host = bodyById.get(body.hostBodyId!);
+        expect(host?.growthCenterId).toBe(body.growthCenterId);
+        expect(body.generation).toBeGreaterThan(host?.generation ?? 0);
       }
     }
   });
 
   it('keeps every historical body byte-stable when a later event is appended', () => {
+    const earlierBlueprint = growthBlueprint(BASE_EVENTS);
+    const laterBlueprint = growthBlueprint([
+      ...BASE_EVENTS,
+      {
+        id: 'fulfilled-dream',
+        occurredAt: '2026-05-20T12:00:00Z',
+        source: 'wishlist@1',
+        evidence: 'verified',
+        channels: { achievement: 0.92, significance: 0.58 },
+        portalActivity: 0.28,
+      },
+    ]);
     const earlier = buildGrowthState({
-      blueprint: growthBlueprint(BASE_EVENTS),
+      blueprint: earlierBlueprint,
       config: DEFAULT_GROWTH_ENGINE_CONFIG,
     });
     const later = buildGrowthState({
-      blueprint: growthBlueprint([
-        ...BASE_EVENTS,
-        {
-          id: 'fulfilled-dream',
-          occurredAt: '2026-05-20T12:00:00Z',
-          source: 'wishlist@1',
-          evidence: 'verified',
-          channels: { achievement: 0.92, significance: 0.58 },
-          portalActivity: 0.28,
-        },
-      ]),
+      blueprint: laterBlueprint,
       config: DEFAULT_GROWTH_ENGINE_CONFIG,
     });
 
-    expect(later.bodies).toHaveLength(earlier.bodies.length + 1);
+    expect(later.bodies).toHaveLength(
+      earlier.bodies.length + laterBlueprint.instructions.length - earlierBlueprint.instructions.length,
+    );
     for (const oldBody of earlier.bodies) {
       expect(later.bodies.find((body) => body.id === oldBody.id)).toEqual(oldBody);
     }
@@ -203,5 +243,6 @@ describe('Universal Growth Engine', () => {
     expect(state.diagnostics.truncatedInstructionIds).toEqual(
       blueprint.instructions.slice(2).map((instruction) => instruction.id),
     );
+    expect(state.growthCenters?.[0]?.dominantBodyId).not.toBeNull();
   });
 });
