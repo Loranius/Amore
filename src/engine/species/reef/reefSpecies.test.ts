@@ -42,7 +42,7 @@ const BASE_EVENTS: EvolutionEventInput[] = [
     occurredAt: '2024-10-12',
     source: 'calendar@1',
     evidence: 'verified',
-    channels: { culture: 0.9, significance: 0.6 },
+    channels: { culture: 0.9, significance: 0.8 },
     portalActivity: 0.25,
   },
   {
@@ -68,10 +68,7 @@ function buildArtifact(events: readonly EvolutionEventInput[] = BASE_EVENTS) {
   });
 }
 
-function buildReef(
-  events: readonly EvolutionEventInput[] = BASE_EVENTS,
-  asOf = '2026-07-01',
-) {
+function buildReef(events: readonly EvolutionEventInput[] = BASE_EVENTS, asOf = '2026-07-01') {
   return buildReefSpeciesBlueprint({
     artifact: buildArtifact(events),
     config: { asOf, rulesVersion: 'reef-species-v1.0.0' },
@@ -104,12 +101,7 @@ describe('Reef Species Phase 1', () => {
       maximumAcceptedColonies: 144,
     });
     expect(reef.grammar.morphotypeOrder).toEqual([
-      'encrusting',
-      'massive',
-      'branching',
-      'plating',
-      'soft-coral',
-      'sea-fan',
+      'encrusting', 'massive', 'branching', 'plating', 'soft-coral', 'sea-fan',
     ]);
     expect(eventMorphotypes).toEqual([
       'calendar:proposal:massive:landmark',
@@ -165,19 +157,12 @@ describe('Reef Species Phase 1', () => {
     const reef = buildReef([
       ...BASE_EVENTS,
       {
-        id: 'future:trip',
-        occurredAt: '2027-01-01',
-        source: 'plans@1',
-        evidence: 'verified',
+        id: 'future:trip', occurredAt: '2027-01-01', source: 'plans@1', evidence: 'verified',
         channels: { exploration: 1 },
       },
       {
-        id: 'activity-only',
-        occurredAt: '2025-02-01',
-        source: 'legacy@1',
-        evidence: 'historical-estimate',
-        channels: {},
-        portalActivity: 0.2,
+        id: 'activity-only', occurredAt: '2025-02-01', source: 'legacy@1',
+        evidence: 'historical-estimate', channels: {}, portalActivity: 0.2,
       },
     ]);
 
@@ -228,7 +213,7 @@ describe('Reef Species Phase 1', () => {
     expect(artifact).toEqual(before);
   });
 
-  it('rejects implicit clocks and empty rules versions', () => {
+  it('rejects invalid clocks and empty rules versions', () => {
     const artifact = buildArtifact();
     expect(() => buildReefSpeciesBlueprint({
       artifact,
