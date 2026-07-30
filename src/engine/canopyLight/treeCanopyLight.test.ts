@@ -113,13 +113,33 @@ describe('Tree Canopy Light Response', () => {
     expect(light.diagnostics.estimatedAdditionalMatrixUpdatesPerFrame).toBe(0);
   });
 
-  it('preserves accepted light-profile prefixes across LODs', () => {
-    const low = rebuild('low').light.profiles.map((profile) => profile.leafInstanceId);
-    const medium = rebuild('medium').light.profiles.map((profile) => profile.leafInstanceId);
-    const high = rebuild('high').light.profiles.map((profile) => profile.leafInstanceId);
+  it('preserves accepted light-profile identities across LODs', () => {
+    const low = rebuild('low').light.profiles;
+    const medium = rebuild('medium').light.profiles;
+    const high = rebuild('high').light.profiles;
+    const mediumByLeafId = new Map(
+      medium.map((profile) => [profile.leafInstanceId, profile] as const),
+    );
+    const highByLeafId = new Map(
+      high.map((profile) => [profile.leafInstanceId, profile] as const),
+    );
 
-    expect(medium.slice(0, low.length)).toEqual(low);
-    expect(high.slice(0, medium.length)).toEqual(medium);
+    for (const profile of low) {
+      expect(mediumByLeafId.get(profile.leafInstanceId)).toMatchObject({
+        leafInstanceId: profile.leafInstanceId,
+        canopyProfileId: profile.canopyProfileId,
+        crownCellId: profile.crownCellId,
+        band: profile.band,
+        exposure: profile.exposure,
+      });
+      expect(highByLeafId.get(profile.leafInstanceId)).toMatchObject({
+        leafInstanceId: profile.leafInstanceId,
+        canopyProfileId: profile.canopyProfileId,
+        crownCellId: profile.crownCellId,
+        band: profile.band,
+        exposure: profile.exposure,
+      });
+    }
   });
 
   it('does not mutate composition, leaves, Canopy Depth or materials', () => {
