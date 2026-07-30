@@ -72,21 +72,30 @@ describe('Universal Growth Engine', () => {
     expect(reversed).toEqual(forward);
   });
 
-  it('attaches every non-root body to an existing analytical surface', () => {
+  it('attaches every non-root body to a reserved aggregate Surface Atlas region', () => {
     const state = buildGrowthState({
       blueprint: growthBlueprint(BASE_EVENTS),
       config: DEFAULT_GROWTH_ENGINE_CONFIG,
     });
     const ids = new Set(state.bodies.map((body) => body.id));
+    const occupancyByBodyId = new Map(
+      state.surfaceMap.occupiedSites.map((site) => [site.bodyId, site] as const),
+    );
 
     expect(state.bodies).toHaveLength(BASE_EVENTS.length + 1);
     expect(state.bodies[0]?.hostBodyId).toBeNull();
     expect(state.surfaceMap.occupiedSites).toHaveLength(BASE_EVENTS.length);
 
     for (const body of state.bodies.slice(1)) {
+      const occupancy = occupancyByBodyId.get(body.id);
+      const surfaceRegionId = body.attachment?.surfaceRegionId;
+
       expect(body.hostBodyId).not.toBeNull();
       expect(ids.has(body.hostBodyId!)).toBe(true);
       expect(body.attachment?.hostBodyId).toBe(body.hostBodyId);
+      expect(surfaceRegionId).toBe(`${body.hostBodyId}:${surfaceRegionId?.split(':').slice(-3).join(':')}`);
+      expect(occupancy?.surfaceRegionId).toBe(surfaceRegionId);
+      expect(occupancy?.hostBodyId).toBe(body.hostBodyId);
       expect(body.attachment?.burialDepth).toBeGreaterThan(0);
       expect(body.generation).toBeGreaterThan(0);
       expect(body.competition).toBeGreaterThanOrEqual(0);
@@ -99,6 +108,17 @@ describe('Universal Growth Engine', () => {
       expect(magnitude).toBeCloseTo(1, 5);
       expect(body.direction.y).toBeGreaterThan(0);
     }
+  });
+
+  it('never deposits two bodies into the same Surface Atlas region', () => {
+    const state = buildGrowthState({
+      blueprint: growthBlueprint(BASE_EVENTS),
+      config: DEFAULT_GROWTH_ENGINE_CONFIG,
+    });
+    const regionIds = state.surfaceMap.occupiedSites.map((site) => site.surfaceRegionId);
+
+    expect(regionIds.every((regionId) => typeof regionId === 'string')).toBe(true);
+    expect(new Set(regionIds).size).toBe(regionIds.length);
   });
 
   it('keeps the Crystal Species compact, upward and rooted around one focal mother', () => {
