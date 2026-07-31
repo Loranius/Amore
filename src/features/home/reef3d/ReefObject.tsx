@@ -63,7 +63,7 @@ export function ReefObject({
   return (
     <group
       rotation={[-0.08, -0.18, 0]}
-      position={[0, -0.18, 0]}
+      position={[0, 0.52, 0]}
       scale={1.05}
     >
       <mesh
