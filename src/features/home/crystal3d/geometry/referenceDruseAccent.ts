@@ -3,7 +3,7 @@
 // ------------------------------------------------------------
 // У sparse-історії після приховування micro може не лишитися жодного
 // кристала нижче 20% висоти монарха. Один найменший не-hero dominant
-// стабільно стає 16%-м переднім шпилем на зовнішньому краї матриці.
+// стабільно стає 16%-м переднім шпилем на зовнішньому краї монарха.
 // Growth State і стабільний ключ не змінюються.
 // ============================================================
 import * as THREE from 'three';
@@ -34,11 +34,8 @@ function chooseHero(branches: readonly ClusterBranch[]): string | null {
 export function ensureVisibleReferenceAccent(
   branches: readonly ClusterBranch[],
 ): ClusterBranch[] {
-  const matrix = branches.find((branch) => branch.archetype === 'matrix');
   const monarch = branches.find((branch) => branch.primary);
-  if (matrix === undefined || monarch === undefined) {
-    return branches.map((branch) => ({ ...branch }));
-  }
+  if (monarch === undefined) return branches.map((branch) => ({ ...branch }));
 
   const heroKey = chooseHero(branches);
   const accent = branches
@@ -60,6 +57,7 @@ export function ensureVisibleReferenceAccent(
     Math.max(accent.radiusBottom, height / 4.6),
     monarch.radiusBottom * 0.32,
   );
+  const monarchPosition = new THREE.Vector3(monarch.posX, monarch.posY, monarch.posZ);
   const monarchQuaternion = new THREE.Quaternion(
     monarch.quatX,
     monarch.quatY,
@@ -67,16 +65,8 @@ export function ensureVisibleReferenceAccent(
     monarch.quatW,
   ).normalize();
   const monarchAxis = UP.clone().applyQuaternion(monarchQuaternion).normalize();
-  const matrixPosition = new THREE.Vector3(matrix.posX, matrix.posY, matrix.posZ);
-  const matrixQuaternion = new THREE.Quaternion(
-    matrix.quatX,
-    matrix.quatY,
-    matrix.quatZ,
-    matrix.quatW,
-  ).normalize();
-  const matrixAxis = UP.clone().applyQuaternion(matrixQuaternion).normalize();
-  const matrixHeight = matrix.height * heightScale(matrix.maturity);
-  const matrixRadius = matrix.radiusBottom * radiusScale(matrix.maturity);
+  const monarchHeight = monarch.height * heightScale(monarch.maturity);
+  const monarchRadius = monarch.radiusBottom * radiusScale(monarch.maturity);
 
   const reference = Math.abs(monarchAxis.x) < 0.9
     ? new THREE.Vector3(1, 0, 0)
@@ -87,19 +77,18 @@ export function ensureVisibleReferenceAccent(
   const radial = u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize();
   const tangent = new THREE.Vector3().crossVectors(radial, monarchAxis).normalize();
 
-  // Центр основи стоїть одразу за аналітичним радіусом матриці. Це робить
-  // короткий шпиль гарантовано видимим у sparse-друзі, але візуально він
-  // торкається зовнішнього краю юбки й лишається її частиною.
-  const radialDistance = matrixRadius + accentRadius * 0.08;
-  const position = matrixPosition
-    .addScaledVector(matrixAxis, matrixHeight * 0.16)
-    .addScaledVector(radial, radialDistance)
-    .addScaledVector(tangent, matrixRadius * 0.04);
-  const direction = matrixAxis
+  // Основа торкається зовнішньої межі монарха, але її центр уже за його
+  // аналітичним радіусом. Отже trim не може поглинути весь короткий шпиль,
+  // а він візуально лишається частиною базальної юбки.
+  const position = monarchPosition
+    .addScaledVector(monarchAxis, monarchHeight * 0.02)
+    .addScaledVector(radial, monarchRadius + accentRadius * 0.06)
+    .addScaledVector(tangent, monarchRadius * 0.05);
+  const direction = monarchAxis
     .clone()
-    .multiplyScalar(0.98)
-    .addScaledVector(UP, 0.2)
-    .addScaledVector(radial, 0.38)
+    .multiplyScalar(0.86)
+    .addScaledVector(UP, 0.18)
+    .addScaledVector(radial, 0.52)
     .addScaledVector(tangent, 0.06)
     .normalize();
   const quaternion = quaternionFor(direction, accent.key);
@@ -107,7 +96,7 @@ export function ensureVisibleReferenceAccent(
   return branches.map((branch) => branch.key === accent.key
     ? {
         ...branch,
-        hostKey: matrix.key,
+        hostKey: monarch.key,
         height,
         radiusBottom: accentRadius,
         posX: position.x,
