@@ -99,11 +99,12 @@ function placeAccent(
   };
 }
 
-export function ensureVisibleReferenceAccent(
+/** Стабільна множина тіл, які мають лишитися видимою короткою фракцією. */
+export function selectReferenceAccentKeys(
   branches: readonly ClusterBranch[],
-): ClusterBranch[] {
+): ReadonlySet<string> {
   const monarch = branches.find((branch) => branch.primary);
-  if (monarch === undefined) return branches.map((branch) => ({ ...branch }));
+  if (monarch === undefined) return new Set();
 
   const heroKey = chooseHero(branches);
   const loadBearing = new Set(
@@ -118,17 +119,30 @@ export function ensureVisibleReferenceAccent(
     && branch.role !== 'micro'
   ));
   const targetCount = Math.max(2, Math.ceil(population.length * 0.14));
-  const accents = population
-    .filter((branch) => !loadBearing.has(branch.key))
-    .sort((left, right) => {
-      const lv = left.height * left.radiusBottom * left.radiusBottom;
-      const rv = right.height * right.radiusBottom * right.radiusBottom;
-      return lv - rv || left.key.localeCompare(right.key);
-    })
-    .slice(0, targetCount);
-  if (accents.length === 0) return branches.map((branch) => ({ ...branch }));
+  return new Set(
+    population
+      .filter((branch) => !loadBearing.has(branch.key))
+      .sort((left, right) => {
+        const lv = left.height * left.radiusBottom * left.radiusBottom;
+        const rv = right.height * right.radiusBottom * right.radiusBottom;
+        return lv - rv || left.key.localeCompare(right.key);
+      })
+      .slice(0, targetCount)
+      .map((branch) => branch.key),
+  );
+}
 
-  const accentIndex = new Map(accents.map((branch, index) => [branch.key, index] as const));
+export function ensureVisibleReferenceAccent(
+  branches: readonly ClusterBranch[],
+): ClusterBranch[] {
+  const monarch = branches.find((branch) => branch.primary);
+  if (monarch === undefined) return branches.map((branch) => ({ ...branch }));
+
+  const accentKeys = selectReferenceAccentKeys(branches);
+  if (accentKeys.size === 0) return branches.map((branch) => ({ ...branch }));
+  const accentIndex = new Map(
+    [...accentKeys].map((key, index) => [key, index] as const),
+  );
   return branches.map((branch) => {
     const index = accentIndex.get(branch.key);
     return index === undefined ? { ...branch } : placeAccent(branch, monarch, index);
