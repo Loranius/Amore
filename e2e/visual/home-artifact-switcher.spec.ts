@@ -45,6 +45,7 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reef = page.locator('[data-reef-preview="ready"]');
     await expect(reef).toBeVisible({ timeout: 25_000 });
     await expect(reef).toHaveAttribute('data-reef-source', 'portal');
+    await expect(reef).toHaveAttribute('data-reef-presentation', 'reef-visual-v1');
     await expect(reef).toHaveAttribute('data-reef-static-acceptance', 'pass');
     await expect(reef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(reef).toHaveAttribute('data-reef-phase-count', '8');
@@ -54,6 +55,15 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reef).toHaveAttribute('data-reef-range-binding-chain', 'true');
     const productionSignature = await reef.getAttribute('data-reef-production-signature');
     expect(productionSignature).toMatch(/^[0-9a-f]{8}$/);
+
+    const reefBox = await reef.boundingBox();
+    const canvasBox = await reef.locator('canvas').boundingBox();
+    expect(reefBox).not.toBeNull();
+    expect(canvasBox).not.toBeNull();
+    if (reefBox && canvasBox) {
+      expect(Math.abs(canvasBox.y - reefBox.y)).toBeLessThanOrEqual(2);
+      expect(canvasBox.height).toBeGreaterThanOrEqual(reefBox.height - 2);
+    }
 
     const reefDrawCalls = Number(await reef.getAttribute('data-reef-runtime-draw-calls'));
     const reefVertices = Number(await reef.getAttribute('data-reef-vertices'));
@@ -71,6 +81,7 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(home).toHaveAttribute('data-home-artifact', 'reef');
     const reloadedReef = page.locator('[data-reef-preview="ready"]');
     await expect(reloadedReef).toBeVisible({ timeout: 25_000 });
+    await expect(reloadedReef).toHaveAttribute('data-reef-presentation', 'reef-visual-v1');
     await expect(reloadedReef).toHaveAttribute('data-reef-production-signature', productionSignature ?? '');
     await expect(reloadedReef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(page.getByRole('tab', { name: /Риф/ })).toHaveAttribute('aria-selected', 'true');
