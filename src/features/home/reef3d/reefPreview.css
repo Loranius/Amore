@@ -1,7 +1,6 @@
 .reef-production-wrap,
 .reef-production-error {
   position: relative;
-  min-height: 520px;
   overflow: hidden;
   border: 1px solid rgb(85 188 202 / 24%);
   border-radius: 24px;
@@ -12,6 +11,13 @@
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 72%),
     0 18px 44px rgb(26 87 100 / 16%);
+}
+
+.reef-production-wrap {
+  width: 100%;
+  height: clamp(420px, 62vw, 520px);
+  min-height: 0;
+  isolation: isolate;
 }
 
 .reef-production-wrap::before {
@@ -25,9 +31,18 @@
   pointer-events: none;
 }
 
-.reef-production-wrap canvas {
-  position: relative;
+.reef-production-wrap > div:first-child {
+  position: absolute !important;
   z-index: 1;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.reef-production-wrap canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
   touch-action: none;
 }
 
@@ -123,8 +138,11 @@
 @media (max-width: 430px) {
   .reef-production-wrap,
   .reef-production-error {
-    min-height: 500px;
     border-radius: 20px;
+  }
+
+  .reef-production-wrap {
+    height: 420px;
   }
 
   .reef-production-badge {
