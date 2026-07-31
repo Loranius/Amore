@@ -35,10 +35,22 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Godot Web emits large .wasm/.pck files. They must not enter the
+        // Workbox precache manifest or exceed its build-time size ceiling.
+        globIgnores: ['**/godot/evolution-engine/**'],
         // game.html — окремий документ в iframe; хай кешується як навігація.
         maximumFileSizeToCacheInBytes: 5000000,
-        navigateFallbackDenylist: [/game\.html/, /\.mp4$/],
+        navigateFallbackDenylist: [/game\.html/, /\.mp4$/, /\/godot\/evolution-engine\//],
         runtimeCaching: [
+          {
+            urlPattern: /\/godot\/evolution-engine\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'godot-evolution-engine',
+              cacheableResponse: { statuses: [0, 200] },
+              expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
           {
             // Публічні фото зі Storage — cache-first, вони незмінні за URL.
             urlPattern: /\/storage\/v1\/object\/public\//,
