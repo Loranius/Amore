@@ -111,7 +111,7 @@ export function buildReefPreviewFromArtifact({
   const acceptance = buildReefProductionAcceptance({
     coupleId: species.coupleId,
     artifactSeed: species.artifactSeed,
-    asOf,
+    asOf: species.asOf,
     species,
     layout,
     foundation,
