@@ -2,6 +2,7 @@ extends SceneTree
 
 const Model = preload("res://scripts/core/evolution_model.gd")
 const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
+const CrystalSpecies = preload("res://scripts/species/crystal_species.gd")
 
 
 func _init() -> void:
@@ -53,13 +54,41 @@ func _run() -> void:
 		_fail("Determinism failure: input ordering changed canonical state.")
 		return
 
-	if first_state.instructions.size() != payloads.size() + 1:
-		_fail("Growth history failure: expected genesis plus one instruction per event.")
+	var genesis_count := 1 + CrystalSpecies.BASAL_CROWN_COUNT
+	if first_state.instructions.size() != payloads.size() + genesis_count:
+		_fail("Growth history failure: expected genesis druse plus one instruction per event.")
 		return
 
 	if first_state.history.size() != first_state.instructions.size():
 		_fail("Append-only history failure: history and instruction counts differ.")
 		return
+
+	var mother = first_state.instructions[0]
+	if mother.id != CrystalSpecies.MOTHER_ID or mother.generation != 0 or not mother.parent_id.is_empty():
+		_fail("Genesis failure: mother crystal identity is invalid.")
+		return
+
+	for index in range(1, genesis_count):
+		var basal = first_state.instructions[index]
+		if basal.parent_id != mother.id or basal.generation != 1:
+			_fail("Genesis failure: basal crown lineage is invalid.")
+			return
+		if String(basal.metadata.get("role", "")) != "basal-crown":
+			_fail("Genesis failure: basal crown role is missing.")
+			return
+		if float(basal.metadata.get("merge_depth_ratio", 0.0)) < 0.5:
+			_fail("Attachment failure: basal crown is not embedded deeply enough.")
+			return
+
+	for index in range(genesis_count, first_state.instructions.size()):
+		var event_growth = first_state.instructions[index]
+		if first_state.get_instruction(event_growth.parent_id) == null:
+			_fail("Lineage failure: event growth parent is missing.")
+			return
+		var merge_depth := float(event_growth.metadata.get("merge_depth_ratio", 0.0))
+		if merge_depth < 0.45 or merge_depth > 0.7:
+			_fail("Attachment failure: event growth merge depth is outside bounds.")
+			return
 
 	print("PASS: deterministic crystal rebuild; instructions=%d" % first_state.instructions.size())
 	quit(0)
