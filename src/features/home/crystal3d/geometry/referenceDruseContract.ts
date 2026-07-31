@@ -2,10 +2,10 @@
 // referenceDruseContract — останній renderer-only санітарний контракт.
 // ------------------------------------------------------------
 // Layout формує силует. Цей pass фіксує три інваріанти:
-//   • hero-spire помітний, але монарх лишається >2× вищим;
+//   • hero-spire великий, але монарх лишається головним;
 //   • micro та два найменші synthetic satellites стають внутрішніми
 //     включеннями, а не хаотичним пилом на поверхні;
-//   • родина hero має невеликий тангенційний рознос без z-fighting.
+//   • родина hero сидить біля його кореня, а не стирчить збоку вгорі.
 // ============================================================
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
@@ -77,17 +77,17 @@ function hiddenInclusion(
   const hostRadius = host.radiusBottom * radiusScale(host.maturity);
   const { radial } = radialBasis(hostAxis, branch.key);
   const position = hostPosition
-    .addScaledVector(hostAxis, hostHeight * 0.025)
-    .addScaledVector(radial, hostRadius * 0.045);
+    .addScaledVector(hostAxis, hostHeight * 0.02)
+    .addScaledVector(radial, hostRadius * 0.035);
   const direction = hostAxis
     .clone()
-    .multiplyScalar(0.96)
-    .addScaledVector(radial, 0.08)
+    .multiplyScalar(0.97)
+    .addScaledVector(radial, 0.07)
     .normalize();
   const height = Math.min(
     branch.height,
-    monarch.height * (satellite ? 0.105 : 0.075),
-    host.height * (satellite ? 0.24 : 0.22),
+    monarch.height * (satellite ? 0.095 : 0.065),
+    host.height * (satellite ? 0.21 : 0.19),
   );
   const adjusted = withDirection(branch, direction);
   return {
@@ -95,7 +95,7 @@ function hiddenInclusion(
     height,
     radiusBottom: Math.min(
       branch.radiusBottom,
-      host.radiusBottom * (satellite ? 0.15 : 0.13),
+      host.radiusBottom * (satellite ? 0.14 : 0.12),
     ),
     posX: position.x,
     posY: position.y,
@@ -104,18 +104,43 @@ function hiddenInclusion(
   };
 }
 
-function separateHeroChild(branch: ClusterBranch, host: ClusterBranch): ClusterBranch {
+/**
+ * Супутник hero лишається його дитиною, але переїжджає до нижніх 3–6%
+ * шпиля. Це прибирає довгий горизонтальний «ріг» за монархом і формує
+ * локальну групу біля спільної основи.
+ */
+function settleHeroChild(
+  branch: ClusterBranch,
+  host: ClusterBranch,
+  monarch: ClusterBranch,
+): ClusterBranch {
   const hostAxis = axisOf(host);
+  const hostPosition = positionOf(host);
+  const hostHeight = host.height * heightScale(host.maturity);
   const hostRadius = host.radiusBottom * radiusScale(host.maturity);
-  const { tangent } = radialBasis(hostAxis, branch.key);
-  const position = positionOf(branch).addScaledVector(tangent, hostRadius * 0.24);
-  const direction = axisOf(branch).addScaledVector(tangent, 0.2).normalize();
+  const { radial, tangent } = radialBasis(hostAxis, branch.key);
+  const position = hostPosition
+    .addScaledVector(hostAxis, hostHeight * (0.025 + unitFromKey(branch.key, 'hero-child-y') * 0.025))
+    .addScaledVector(radial, hostRadius * 0.48)
+    .addScaledVector(tangent, hostRadius * (unitFromKey(branch.key, 'hero-child-t') - 0.5) * 0.2);
+  const direction = UP.clone()
+    .multiplyScalar(0.82)
+    .addScaledVector(hostAxis, 0.28)
+    .addScaledVector(radial, 0.42)
+    .normalize();
+  const height = Math.min(branch.height, monarch.height * 0.22, host.height * 0.34);
   const adjusted = withDirection(branch, direction);
   return {
     ...adjusted,
+    height,
+    radiusBottom: Math.min(
+      Math.max(branch.radiusBottom, height / 4.6),
+      host.radiusBottom * 0.3,
+    ),
     posX: position.x,
     posY: position.y,
     posZ: position.z,
+    archetype: branch.archetype === 'etched' ? 'etched' : 'prismatic',
   };
 }
 
@@ -132,16 +157,17 @@ export function enforceReferenceDruseContract(
   const heroKey = hero?.key ?? null;
   const heroHeight = hero === null
     ? null
-    : clamp(hero.height, monarch.height * 0.46, monarch.height * 0.495);
+    : clamp(hero.height, monarch.height * 0.68, monarch.height * 0.76);
   const adjustedHero = hero === null || heroHeight === null
     ? null
     : {
         ...hero,
         height: heroHeight,
         radiusBottom: Math.min(
-          Math.max(hero.radiusBottom, heroHeight / 5.8),
-          monarch.radiusBottom * 0.58,
+          Math.max(hero.radiusBottom, heroHeight / 4.45),
+          monarch.radiusBottom * 0.68,
         ),
+        archetype: 'prismatic' as const,
       };
 
   const byKey = new Map(branches.map((branch) => [branch.key, branch] as const));
@@ -166,7 +192,7 @@ export function enforceReferenceDruseContract(
       return hiddenInclusion(branch, host, monarch, branch.role === 'satellite');
     }
     if (branch.role === 'satellite' && branch.hostKey === heroKey) {
-      return separateHeroChild(branch, host);
+      return settleHeroChild(branch, host, monarch);
     }
     return { ...branch };
   });
