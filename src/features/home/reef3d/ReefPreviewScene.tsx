@@ -9,6 +9,10 @@ import {
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { ReefObject } from './ReefObject';
 import {
+  REEF_FOUNDATION_PASS,
+  REEF_FOUNDATION_PRESENTATION_VERSION,
+} from './reefFoundationPresentation';
+import {
   REEF_MATERIAL_PASS,
   REEF_MATERIAL_PRESENTATION_VERSION,
 } from './reefMaterialPresentation';
@@ -100,6 +104,8 @@ export default function ReefPreviewScene() {
       data-reef-shape-pass={REEF_COLONY_SHAPE_PASS}
       data-reef-material-presentation={REEF_MATERIAL_PRESENTATION_VERSION}
       data-reef-material-pass={REEF_MATERIAL_PASS}
+      data-reef-foundation-presentation={REEF_FOUNDATION_PRESENTATION_VERSION}
+      data-reef-foundation-pass={REEF_FOUNDATION_PASS}
       data-reef-acceptance={status}
       data-reef-static-acceptance={build.acceptance.staticStatus}
       data-reef-violations={runtimeViolations.join(',')}
@@ -161,7 +167,7 @@ export default function ReefPreviewScene() {
         {status === 'pass' ? 'production accepted' : status === 'fail' ? 'acceptance fail' : 'runtime warming…'}
       </span>
       <span className="reef-production-species">
-        Reef Species · Phase 11 · {reducedMotion ? 'material language · static' : 'material language · ambient current'}
+        Reef Species · Phase 12 · {reducedMotion ? 'natural foundation · static' : 'natural foundation · ambient current'}
       </span>
       <span className="reef-production-badge" title={badge}>{badge}</span>
     </div>
