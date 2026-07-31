@@ -57,7 +57,11 @@ export function ReefObject({
   });
 
   return (
-    <group rotation={[-0.08, -0.16, 0]} position={[0, -0.55, 0]}>
+    <group
+      rotation={[-0.1, -0.18, 0]}
+      position={[0, -0.25, 0]}
+      scale={1.15}
+    >
       <mesh
         geometry={scene.foundation.geometry}
         material={scene.foundation.material}
