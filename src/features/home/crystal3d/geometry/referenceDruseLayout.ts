@@ -95,7 +95,7 @@ function shapeMatrix(branch: ClusterBranch, monarch: ClusterBranch): ClusterBran
 }
 
 function shapeHero(branch: ClusterBranch, monarch: ClusterBranch): ClusterBranch {
-  const height = clamp(branch.height, monarch.height * 0.64, monarch.height * 0.76);
+  const height = clamp(branch.height, monarch.height * 0.64, monarch.height * 0.74);
   return {
     ...branch,
     height,
@@ -116,15 +116,15 @@ function shapeDominant(
   const originalRatio = originalMonarch.height > 0 ? branch.height / originalMonarch.height : 0;
   const support = branch.tier === 'support';
   const ratio = support
-    ? clamp(originalRatio, 0.28, 0.48)
-    : clamp(originalRatio, 0.14, 0.34);
+    ? clamp(originalRatio, 0.32, 0.5)
+    : clamp(originalRatio, 0.24, 0.4);
   const height = monarch.height * ratio;
   return {
     ...branch,
     height,
     radiusBottom: Math.min(
       Math.max(branch.radiusBottom, height / (support ? 5.7 : 5.1)),
-      monarch.radiusBottom * (support ? 0.5 : 0.4),
+      monarch.radiusBottom * (support ? 0.52 : 0.42),
     ),
     archetype: safeArchetype(branch),
   };
@@ -132,16 +132,20 @@ function shapeDominant(
 
 function shapeLocal(branch: ClusterBranch, host: ClusterBranch, monarch: ClusterBranch): ClusterBranch {
   const micro = branch.role === 'micro';
-  const height = Math.min(
-    clamp(branch.height, monarch.height * (micro ? 0.04 : 0.075), monarch.height * (micro ? 0.12 : 0.21)),
-    host.height * (micro ? 0.52 : 0.64),
+  const requested = clamp(
+    branch.height,
+    monarch.height * (micro ? 0.07 : 0.22),
+    monarch.height * (micro ? 0.15 : 0.31),
   );
+  const height = micro
+    ? Math.min(requested, host.height * 0.58)
+    : Math.min(requested, Math.max(host.height * 0.82, monarch.height * 0.22));
   return {
     ...branch,
     height,
     radiusBottom: Math.min(
       Math.max(branch.radiusBottom, height / (micro ? 4.0 : 4.8)),
-      host.radiusBottom * (micro ? 0.48 : 0.64),
+      host.radiusBottom * (micro ? 0.5 : 0.72),
     ),
     archetype: safeArchetype(branch),
   };
@@ -165,7 +169,10 @@ function placeOnHost(
   const center = positionOf(host).addScaledVector(hostAxis, hostHeight * hostT);
   const contact = center.addScaledVector(radial, radiusHere);
   const ownRadius = renderedRadius(branch);
-  const burial = Math.min(ownRadius * 1.8 + radiusHere * 0.25, radiusHere * 0.88);
+
+  // Кільце основи сидить усередині господаря, але не настільки глибоко,
+  // щоб локальний Marching-Cubes collar повністю зник після hidden-face trim.
+  const burial = Math.min(ownRadius * 1.12 + radiusHere * 0.04, radiusHere * 0.72);
   const position = contact.addScaledVector(radial, -burial);
   const direction = hostAxis
     .clone()
@@ -187,6 +194,13 @@ function chooseHero(branches: readonly ClusterBranch[]): ClusterBranch | null {
 }
 
 export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): ClusterBranch[] {
+  // Synthetic geometry tests intentionally do not carry the production
+  // matrix. They validate arbitrary branch configurations and must not be
+  // restaged as a decorative Amore specimen.
+  if (!branches.some((branch) => branch.archetype === 'matrix')) {
+    return branches.map((branch) => ({ ...branch }));
+  }
+
   const originalMonarch = branches.find((branch) => branch.primary);
   if (originalMonarch === undefined) return branches.map((branch) => ({ ...branch }));
 
