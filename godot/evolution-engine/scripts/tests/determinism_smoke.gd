@@ -156,6 +156,32 @@ func _validate_morphology(instructions: Array) -> String:
 		if bounds.size.x < instruction.radius * 1.35 or bounds.size.z < instruction.radius * 1.35:
 			return "Geometry failure: crystal morphology collapsed laterally."
 
+		var arrays: Array = mesh.surface_get_arrays(0)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+		if vertices.is_empty() or vertices.size() != normals.size():
+			return "Geometry failure: vertex and normal buffers are inconsistent."
+		var directional_samples := 0
+		var outward_samples := 0
+		for vertex_index in range(vertices.size()):
+			var normal: Vector3 = normals[vertex_index]
+			if normal.length() < 0.98 or normal.length() > 1.02:
+				return "Geometry failure: facet normal is not normalized."
+			var vertex: Vector3 = vertices[vertex_index]
+			var radial := Vector3(vertex.x, 0.0, vertex.z)
+			if radial.length_squared() < instruction.radius * instruction.radius * 0.1:
+				continue
+			if absf(normal.y) > 0.97:
+				continue
+			directional_samples += 1
+			if normal.dot(radial.normalized()) > 0.0:
+				outward_samples += 1
+		if directional_samples == 0:
+			return "Geometry failure: no directional normal samples were found."
+		var outward_ratio: float = float(outward_samples) / float(directional_samples)
+		if outward_ratio < 0.72:
+			return "Geometry failure: facet normals are not predominantly outward."
+
 		var material := mesh.surface_get_material(0) as StandardMaterial3D
 		if material == null:
 			return "Material failure: optical material is missing."
