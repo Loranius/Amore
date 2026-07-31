@@ -9,6 +9,7 @@ import { useShoppingItems } from '@/features/shopping/useShoppingItems';
 import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
 import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
+import type { ArtifactBlueprint } from '@/engine/evolution';
 import {
   buildArtifactFromSnapshot,
   type AdapterDiagnostic,
@@ -67,6 +68,7 @@ export interface EvolutionCrystalMetrics {
 }
 
 export interface EvolutionCrystalPipeline {
+  artifact: ArtifactBlueprint;
   species: CrystalSpeciesBlueprint;
   growth: GrowthState;
   composition: CrystalCompositionState;
@@ -259,6 +261,7 @@ export function useEvolutionCrystalPipeline(
         isPending: false,
         error: null,
         pipeline: {
+          artifact: artifactResult.blueprint,
           species,
           growth,
           composition,
