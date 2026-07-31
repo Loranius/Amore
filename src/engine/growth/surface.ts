@@ -66,6 +66,60 @@ function growthDirection(
   );
 }
 
+function dominantCrystalBasalHostT(
+  host: GrowthBody,
+  instruction: UniversalGrowthInstruction,
+  region: GrowthSurfaceRegion,
+): number | null {
+  const dominantCrystal = host.species === 'crystal'
+    && host.generation === 0
+    && instruction.growthCenterRole === 'dominant';
+  if (!dominantCrystal) return null;
+
+  // Phase 3B-1: large daughter crystals must nucleate around the monarch foot,
+  // never on its middle or upper shaft. Keep a bounded 15-33% basal ring while
+  // preserving deterministic variation between sectors and stable instructions.
+  const basalDraw = seededUnit(
+    instruction.seed,
+    `crystal:basal-host-t:${region.sectorIndex}`,
+  );
+  return round6(0.15 + basalDraw * 0.18);
+}
+
+function remappedRegionSurface(
+  host: GrowthBody,
+  instruction: UniversalGrowthInstruction,
+  region: GrowthSurfaceRegion,
+): {
+  hostT: number;
+  surfacePoint: GrowthVec3;
+  surfaceNormal: GrowthVec3;
+} {
+  const basalHostT = dominantCrystalBasalHostT(host, instruction, region);
+  if (basalHostT === null) {
+    return {
+      hostT: region.hostT,
+      surfacePoint: region.surfacePosition,
+      surfaceNormal: region.surfaceNormal,
+    };
+  }
+
+  const { tangent, bitangent } = orthonormalBasis(host.direction);
+  const radialNormal = normalize(add(
+    scale(tangent, Math.cos(region.azimuthRad)),
+    scale(bitangent, Math.sin(region.azimuthRad)),
+  ));
+  const center = add(host.anchor, scale(host.direction, host.skeletonLength * basalHostT));
+  return {
+    hostT: basalHostT,
+    surfacePoint: roundVec(add(center, scale(radialNormal, radiusAt(host, basalHostT)))),
+    surfaceNormal: roundVec(normalize(add(
+      scale(radialNormal, 0.92),
+      scale(host.direction, 0.08),
+    ))),
+  };
+}
+
 /** Compatibility sampler retained for non-atlas callers. */
 export function sampleGrowthSite(
   host: GrowthBody,
@@ -121,20 +175,21 @@ export function sampleGrowthRegionSite(
   instruction: UniversalGrowthInstruction,
   candidateIndex: number,
 ): GrowthSiteCandidate {
-  const surfaceNormal = normalize(region.surfaceNormal);
+  const remapped = remappedRegionSurface(host, instruction, region);
+  const surfaceNormal = normalize(remapped.surfaceNormal);
   const direction = growthDirection(host, surfaceNormal, instruction);
   const burialDepth = round6(instruction.radialScale * instruction.attachmentDepth);
-  const anchor = add(region.surfacePosition, scale(direction, -burialDepth));
+  const anchor = add(remapped.surfacePoint, scale(direction, -burialDepth));
 
   return {
     siteKey: `${region.id}:site:${instruction.id}`,
     surfaceRegionId: region.id,
     candidateIndex,
     host,
-    hostT: region.hostT,
+    hostT: remapped.hostT,
     hostAngleRad: region.azimuthRad,
-    surfacePoint: region.surfacePosition,
-    surfaceNormal: region.surfaceNormal,
+    surfacePoint: remapped.surfacePoint,
+    surfaceNormal: remapped.surfaceNormal,
     surfacePotential: region.growthPotential,
     surfaceStress: region.surfaceStress,
     localDensity: region.localDensity,

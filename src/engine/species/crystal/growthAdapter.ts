@@ -25,17 +25,13 @@ function sectorMembership(blueprint: CrystalSpeciesBlueprint): Map<string, strin
   return membership;
 }
 
-function dominantHostPreference(instruction: CrystalGrowthInstruction): GrowthHostPreference {
-  if (instruction.kind === 'event-spire') return 'root';
-  if (instruction.kind === 'satellite') return 'surface';
-  if (instruction.kind === 'inclusion') return 'balanced';
+function dominantHostPreference(_instruction: CrystalGrowthInstruction): GrowthHostPreference {
+  // Phase 3B-1: each Growth Center begins at the monarch foot. Supporting
+  // members may then grow from their local dominant through same-colony rules.
   return 'root';
 }
 
-function dominantMaxGeneration(instruction: CrystalGrowthInstruction): number {
-  if (instruction.kind === 'event-spire') return 1;
-  if (instruction.kind === 'satellite') return 2;
-  if (instruction.kind === 'inclusion') return 2;
+function dominantMaxGeneration(_instruction: CrystalGrowthInstruction): number {
   return 1;
 }
 
@@ -422,7 +418,7 @@ export function crystalToGrowthBlueprint(
   return {
     growthBlueprintVersion: 1,
     species: 'crystal',
-    sourceBlueprintVersion: `crystal:${blueprint.speciesBlueprintVersion}:growth-centers@1`,
+    sourceBlueprintVersion: `crystal:${blueprint.speciesBlueprintVersion}:growth-centers@2`,
     engineVersion: blueprint.engineVersion,
     speciesRulesVersion: blueprint.rulesVersion,
     artifactSeed: blueprint.artifactSeed,
