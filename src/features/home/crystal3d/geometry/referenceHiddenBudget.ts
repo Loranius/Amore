@@ -3,8 +3,9 @@
 // ------------------------------------------------------------
 // Reference accent навмисно робить частину листових тіл видимою юбкою.
 // Щоб це не повертало зайві порожні draw calls, кілька інших найменших
-// satellites (які НЕ входять до accent і не несуть дітей) занурюються в
-// основу свого справжнього батька. Growth State, hostKey та ключі незмінні.
+// satellites (які НЕ входять до accent і не несуть дітей) переносяться
+// всередину монарха лише в publication-layout. Growth State і стабільні
+// ключі не змінюються.
 // ============================================================
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
@@ -48,22 +49,27 @@ function isAlreadyInternal(branch: ClusterBranch, host: ClusterBranch): boolean 
   return radialDistanceFromHostAxis(branch, host) <= hostRadius * 0.18;
 }
 
-function hideInsideHost(
+/**
+ * Малі батьківські шпилі не завжди можуть повністю поглинути satellite.
+ * Тому бюджетні невидимі включення кладемо в гарантовано широкий монарх.
+ * Це renderer-only branch copy: upstream Growth State і attachment-граф
+ * залишаються недоторканними.
+ */
+function hideInsideMonarch(
   branch: ClusterBranch,
-  host: ClusterBranch,
   monarch: ClusterBranch,
 ): ClusterBranch {
-  const hostAxis = axisOf(host);
-  const hostHeight = host.height * heightScale(host.maturity);
-  const hostRadius = host.radiusBottom * radiusScale(host.maturity);
-  const radial = radialDirection(hostAxis, branch.key);
-  const position = positionOf(host)
-    .addScaledVector(hostAxis, hostHeight * 0.028)
-    .addScaledVector(radial, hostRadius * 0.025);
-  const direction = hostAxis
+  const monarchAxis = axisOf(monarch);
+  const monarchHeight = monarch.height * heightScale(monarch.maturity);
+  const monarchRadius = monarch.radiusBottom * radiusScale(monarch.maturity);
+  const radial = radialDirection(monarchAxis, branch.key);
+  const position = positionOf(monarch)
+    .addScaledVector(monarchAxis, monarchHeight * 0.018)
+    .addScaledVector(radial, monarchRadius * 0.012);
+  const direction = monarchAxis
     .clone()
-    .multiplyScalar(0.98)
-    .addScaledVector(radial, 0.055)
+    .multiplyScalar(0.995)
+    .addScaledVector(radial, 0.025)
     .normalize();
   const quaternion = new THREE.Quaternion().setFromUnitVectors(UP, direction);
   quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(
@@ -74,8 +80,9 @@ function hideInsideHost(
 
   return {
     ...branch,
-    height: Math.min(branch.height, monarch.height * 0.075, host.height * 0.2),
-    radiusBottom: Math.min(branch.radiusBottom, host.radiusBottom * 0.115),
+    hostKey: monarch.key,
+    height: Math.min(branch.height, monarch.height * 0.045),
+    radiusBottom: Math.min(branch.radiusBottom, monarch.radiusBottom * 0.065),
     posX: position.x,
     posY: position.y,
     posZ: position.z,
@@ -127,9 +134,7 @@ export function enforceReferenceHiddenBudget(
     .slice(0, ADDITIONAL_HIDDEN_TARGET);
 
   const hiddenKeys = new Set(candidates.map((branch) => branch.key));
-  return branches.map((branch) => {
-    if (!hiddenKeys.has(branch.key) || branch.hostKey === null) return { ...branch };
-    const host = byKey.get(branch.hostKey);
-    return host === undefined ? { ...branch } : hideInsideHost(branch, host, monarch);
-  });
+  return branches.map((branch) => (
+    hiddenKeys.has(branch.key) ? hideInsideMonarch(branch, monarch) : { ...branch }
+  ));
 }
