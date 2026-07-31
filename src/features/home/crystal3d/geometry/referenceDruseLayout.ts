@@ -207,7 +207,13 @@ function placeOnHost(
   const { radial, tangent } = radialFrame(hostAxis, angle);
   const hostHeight = renderedHeight(host);
   const hostRadius = renderedRadius(host);
-  const radiusHere = hostRadius * (1 - clamp(hostT, 0, 1) * 0.62);
+  // Матриця не звужується як кристал: у canonical profile вона тримає
+  // 94–100% радіуса до 66% висоти. Старе універсальне taper-рівняння
+  // давало тут лише 70–78%, через що вся корона народжувалась глибоко в
+  // породі й trim залишав на екрані випадкові уламки.
+  const radiusHere = host.archetype === 'matrix'
+    ? hostRadius * (0.985 - clamp(hostT, 0, 1) * 0.035)
+    : hostRadius * (1 - clamp(hostT, 0, 1) * 0.62);
   const center = positionOf(host).addScaledVector(hostAxis, hostHeight * hostT);
   const contact = center.addScaledVector(radial, radiusHere);
   const ownRadius = renderedRadius(branch);
@@ -299,9 +305,6 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
       result = monarch;
     } else if (source.role === 'dominant') {
       if (source.key === heroKey) {
-        // Великий золотий шпиль росте зі спільної породи, а не приклеєний
-        // до середини монарха. Back-left дає референсне перекриття, але
-        // збільшений радіус і мала burial лишають його об’єм читабельним.
         result = placeOnHost(
           shapeHero(source, monarch),
           matrix,
@@ -311,8 +314,8 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
           0.22,
           0,
           matrix.key,
-          0.44,
-          -0.08,
+          0.36,
+          0.22,
         );
       } else {
         const index = dominantIndex.get(source.key) ?? 0;
@@ -327,8 +330,8 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
           support ? 0.56 : 0.76,
           (unitFromKey(source.key, 'reference-druse-tangent') - 0.5) * 0.12,
           matrix.key,
-          0.62,
-          0.05 + (index % 2) * 0.08,
+          0.42,
+          0.2 + (index % 2) * 0.06,
         );
       }
     } else {
@@ -354,8 +357,8 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
         micro ? 0.92 : 0.7,
         (unitFromKey(source.key, 'reference-druse-local-tangent') - 0.5) * 0.14,
         host.key,
-        micro ? 0.48 : 0.62,
-        hostIsMatrix ? 0.12 : 0,
+        micro ? 0.48 : hostIsMatrix ? 0.4 : 0.62,
+        hostIsMatrix ? 0.22 : 0,
       );
     }
 
