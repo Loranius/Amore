@@ -4,8 +4,8 @@
 // Нормативно: Volume V §12 (публікація), Volume VI §11,
 // `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
 //
-// Порядок незмінний: renderer-layout → renderer-contract → accent → hidden
-// budget → форма → зріз стику → локальне implicit-зрощення → матеріал →
+// Порядок: renderer-layout → renderer-contract → accent → форма → зріз
+// стику → hidden budget → локальне implicit-зрощення → матеріал →
 // валідація. Reference-pass живуть тут, а не в Growth State: історія й
 // append-only лишаються чистими.
 // ============================================================
@@ -14,7 +14,10 @@ import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from '.
 import { buildHostSolids, type HostSolid } from './geometry/hostBody';
 import { trimHiddenFaces, type TrimStats } from './geometry/junctionTrim';
 import { LOD_LEVELS, type LodLevel } from './geometry/lod';
-import { ensureVisibleReferenceAccent } from './geometry/referenceDruseAccent';
+import {
+  ensureVisibleReferenceAccent,
+  selectReferenceAccentKeys,
+} from './geometry/referenceDruseAccent';
 import {
   buildReferenceJunctionBodies,
   type ImplicitJunctionStats,
@@ -90,13 +93,15 @@ export function publishCrystal(
   options: PublishOptions = {},
 ): PublishedCrystal {
   const lod = options.lod ?? 'high';
-  const laidOut = options.skipReferenceLayout
+  const referenceBase = options.skipReferenceLayout
+    ? null
+    : enforceReferenceDruseContract(applyReferenceDruseLayout(branches));
+  const accentKeys = referenceBase === null
+    ? new Set<string>()
+    : selectReferenceAccentKeys(referenceBase);
+  const laidOut = referenceBase === null
     ? branches.map((branch) => ({ ...branch }))
-    : enforceReferenceHiddenBudget(
-        ensureVisibleReferenceAccent(
-          enforceReferenceDruseContract(applyReferenceDruseLayout(branches)),
-        ),
-      );
+    : ensureVisibleReferenceAccent(referenceBase);
   const solids = buildHostSolids(laidOut, material, lod);
   const byKey = new Map(laidOut.map((branch) => [branch.key, branch] as const));
 
@@ -126,6 +131,10 @@ export function publishCrystal(
 
     return { branch, solid, geometry, trim, material: materialStats };
   });
+
+  if (referenceBase !== null) {
+    enforceReferenceHiddenBudget(bodies, accentKeys);
+  }
 
   const implicit = options.skipFusion
     ? []
