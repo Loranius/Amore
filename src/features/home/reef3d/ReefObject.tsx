@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ReefPreviewBuild } from './buildReefPreview';
+import { applyReefPresentation } from './reefPresentation';
 import {
   createReefThreeScene,
   disposeReefThreeScene,
@@ -17,7 +18,10 @@ export function ReefObject({
   reducedMotion: boolean;
   onSceneReady?: (scene: ReefThreeSceneState) => void;
 }) {
-  const scene = useMemo(() => createReefThreeScene(build), [build]);
+  const scene = useMemo(
+    () => applyReefPresentation(createReefThreeScene(build)),
+    [build],
+  );
 
   useEffect(() => {
     onSceneReady?.(scene);
@@ -58,9 +62,9 @@ export function ReefObject({
 
   return (
     <group
-      rotation={[-0.1, -0.18, 0]}
-      position={[0, -0.25, 0]}
-      scale={1.15}
+      rotation={[-0.08, -0.18, 0]}
+      position={[0, 0.52, 0]}
+      scale={1.05}
     >
       <mesh
         geometry={scene.foundation.geometry}
