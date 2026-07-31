@@ -60,7 +60,9 @@ function profileScales(archetype: string): { scaleX: number; scaleZ: number } {
 }
 
 function shapeTuning(archetype: string, mother: boolean): ProfileShapeTuning {
-  if (mother) return { asymmetry: 0.035, twist: 0.045, lean: 0.035, phase: 0.018 };
+  // The mother crystal is the dominant mobile silhouette. Phase 3A must remain
+  // clearly readable even at low LOD instead of being limited to sub-pixel noise.
+  if (mother) return { asymmetry: 0.18, twist: 0.2, lean: 0.26, phase: 0.08 };
   if (archetype === 'blade') return { asymmetry: 0.18, twist: 0.14, lean: 0.18, phase: 0.09 };
   if (archetype === 'tabular') return { asymmetry: 0.14, twist: 0.1, lean: 0.12, phase: 0.07 };
   if (archetype === 'needle') return { asymmetry: 0.06, twist: 0.16, lean: 0.14, phase: 0.055 };
@@ -232,7 +234,7 @@ export function buildCrystalProfile(
     appendBaseRow(baseRows, bodyStart + body.renderedLength * (broken ? 0.86 : 1), tipRadius);
   }
 
-  const scales = mother ? { scaleX: 0.92, scaleZ: 1 } : profileScales(archetype);
+  const scales = mother ? { scaleX: 0.78, scaleZ: 1.12 } : profileScales(archetype);
   const tuning = shapeTuning(archetype, mother);
   const twistSign = signedUnit(body.seed, 'geometry:twist-sign') < 0 ? -1 : 1;
   const twistTotal = round6(
