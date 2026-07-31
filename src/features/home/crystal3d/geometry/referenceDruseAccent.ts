@@ -3,8 +3,8 @@
 // ------------------------------------------------------------
 // У sparse-історії після приховування micro може не лишитися жодного
 // кристала нижче 20% висоти монарха. Один найменший не-hero dominant
-// стабільно стає 17.5%-м переднім шпилем і виходить із верхньо-бічного
-// плеча матриці. Growth State і стабільний ключ не змінюються.
+// стабільно стає 16%-м переднім шпилем на зовнішньому краї матриці.
+// Growth State і стабільний ключ не змінюються.
 // ============================================================
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
@@ -55,10 +55,10 @@ export function ensureVisibleReferenceAccent(
     })[0];
   if (accent === undefined) return branches.map((branch) => ({ ...branch }));
 
-  const height = monarch.height * 0.175;
+  const height = monarch.height * 0.16;
   const accentRadius = Math.min(
     Math.max(accent.radiusBottom, height / 4.6),
-    monarch.radiusBottom * 0.34,
+    monarch.radiusBottom * 0.32,
   );
   const monarchQuaternion = new THREE.Quaternion(
     monarch.quatX,
@@ -87,21 +87,20 @@ export function ensureVisibleReferenceAccent(
   const radial = u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize();
   const tangent = new THREE.Vector3().crossVectors(radial, monarchAxis).normalize();
 
-  // Точка народження стоїть у верхньо-бічній чверті матриці. Локальний
-  // радіус там уже менший за базовий, тому шпиль швидко виходить назовні,
-  // але нижня кришка ще сидить у мінеральній основі.
-  const matrixT = 0.62;
-  const radiusAtT = matrixRadius * (1 - matrixT * 0.62);
+  // Центр основи стоїть одразу за аналітичним радіусом матриці. Це робить
+  // короткий шпиль гарантовано видимим у sparse-друзі, але візуально він
+  // торкається зовнішнього краю юбки й лишається її частиною.
+  const radialDistance = matrixRadius + accentRadius * 0.08;
   const position = matrixPosition
-    .addScaledVector(matrixAxis, matrixHeight * matrixT)
-    .addScaledVector(radial, radiusAtT - accentRadius * 0.32)
-    .addScaledVector(tangent, matrixRadius * 0.08);
+    .addScaledVector(matrixAxis, matrixHeight * 0.16)
+    .addScaledVector(radial, radialDistance)
+    .addScaledVector(tangent, matrixRadius * 0.04);
   const direction = matrixAxis
     .clone()
-    .multiplyScalar(0.94)
-    .addScaledVector(UP, 0.22)
-    .addScaledVector(radial, 0.62)
-    .addScaledVector(tangent, 0.08)
+    .multiplyScalar(0.98)
+    .addScaledVector(UP, 0.2)
+    .addScaledVector(radial, 0.38)
+    .addScaledVector(tangent, 0.06)
     .normalize();
   const quaternion = quaternionFor(direction, accent.key);
 
