@@ -9,14 +9,15 @@ export const REEF_FOUNDATION_PASS = 'phase-12-foundation-seafloor';
 export const REEF_FOUNDATION_PROFILE = Object.freeze({
   primaryEdgeLobes: 3,
   secondaryEdgeLobes: 7,
-  primaryEdgeAmplitude: 0.078,
-  secondaryEdgeAmplitude: 0.034,
-  asymmetricEdgeAmplitude: 0.026,
-  bottomTaper: 0.9,
-  topReliefRatio: 0.012,
-  edgeShelfRatio: 0.009,
-  bottomDepthVariationRatio: 0.012,
-  colonyBedLiftRatio: 0.008,
+  primaryEdgeAmplitude: 0.105,
+  secondaryEdgeAmplitude: 0.046,
+  asymmetricEdgeAmplitude: 0.038,
+  bottomTaper: 0.95,
+  topReliefRatio: 0.016,
+  edgeShelfRatio: 0.014,
+  edgeErosionRatio: 0.018,
+  bottomDepthVariationRatio: 0.018,
+  colonyBedLiftRatio: 0.009,
   colonyBedRadiusMultiplier: 1.65,
 });
 
@@ -78,7 +79,7 @@ function colonyBedLift(
     const influence = normalized * normalized * (3 - 2 * normalized);
     const targetLift = Math.min(
       maximumFoundationRadius * REEF_FOUNDATION_PROFILE.colonyBedLiftRatio,
-      0.008 + attachment.targetHeight * 0.009,
+      0.009 + attachment.targetHeight * 0.009,
     );
     lift = Math.max(lift, targetLift * influence);
   }
@@ -91,7 +92,7 @@ function radialSilhouetteScale(
   phase: number,
   surface: ReefFoundationSurface,
 ): number {
-  const edge = smoothstep(0.68, 1, radiusT);
+  const edge = smoothstep(0.58, 1, radiusT);
   const primary = Math.sin(
     angle * REEF_FOUNDATION_PROFILE.primaryEdgeLobes + phase,
   ) * REEF_FOUNDATION_PROFILE.primaryEdgeAmplitude;
@@ -123,8 +124,12 @@ function topRelief(
   const edgeShelf = Math.sin(angle * 5 + phase * 1.17)
     * maximumFoundationRadius
     * REEF_FOUNDATION_PROFILE.edgeShelfRatio
-    * smoothstep(0.62, 1, radiusT);
-  return shelf + crossCurrent + edgeShelf;
+    * smoothstep(0.6, 1, radiusT);
+  const edgeErosion = -maximumFoundationRadius
+    * REEF_FOUNDATION_PROFILE.edgeErosionRatio
+    * smoothstep(0.76, 1, radiusT)
+    * (0.72 + Math.sin(angle * 3 - phase * 0.91) * 0.28);
+  return shelf + crossCurrent + edgeShelf + edgeErosion;
 }
 
 /**
@@ -179,7 +184,7 @@ export function applyReefFoundationPresentation(
       const depthVariation = Math.sin(angle * 4 - phase * 0.82)
         * radius
         * REEF_FOUNDATION_PROFILE.bottomDepthVariationRatio;
-      positions[offset + 1] = sourceY - Math.abs(depthVariation) * 0.62 + depthVariation * 0.38;
+      positions[offset + 1] = sourceY - Math.abs(depthVariation) * 0.45 + depthVariation * 0.55;
     }
   });
 
