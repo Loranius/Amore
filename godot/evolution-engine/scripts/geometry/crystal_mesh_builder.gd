@@ -231,9 +231,10 @@ func _add_quad_clockwise(
 	d: Vector3,
 	color: Color,
 ) -> void:
-	# Godot uses clockwise front-face winding. Normals are calculated from
-	# the outward CCW order, while vertices are submitted in reverse order.
-	var outward := (b - a).cross(d - a).normalized()
+	# Vertices are submitted clockwise for Godot front faces. The stored
+	# lighting normal follows the opposite geometric cross order so it points
+	# away from the crystal axis instead of into the solid volume.
+	var outward := (d - a).cross(b - a).normalized()
 	_add_triangle_with_normal(surface, a, c, b, outward, color)
 	_add_triangle_with_normal(surface, a, d, c, outward, color)
 
@@ -245,7 +246,7 @@ func _add_triangle_clockwise(
 	c: Vector3,
 	color: Color,
 ) -> void:
-	var outward := (b - a).cross(c - a).normalized()
+	var outward := (c - a).cross(b - a).normalized()
 	_add_triangle_with_normal(surface, a, c, b, outward, color)
 
 
