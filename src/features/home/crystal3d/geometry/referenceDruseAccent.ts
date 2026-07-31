@@ -3,9 +3,8 @@
 // ------------------------------------------------------------
 // У sparse-історії після приховування micro може не лишитися жодного
 // кристала нижче 20% висоти монарха. Один найменший не-hero dominant
-// стабільно стає 17.5%-м переднім шпилем і вкорінюється в матрицю поруч із
-// монархом: кришка ховається в породі, але тіло вже не може бути повністю
-// поглинуте оболонкою центрального кристала. Growth State і ключ незмінні.
+// стабільно стає 17.5%-м переднім шпилем і виходить із верхньо-бічного
+// плеча матриці. Growth State і стабільний ключ не змінюються.
 // ============================================================
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
@@ -77,6 +76,7 @@ export function ensureVisibleReferenceAccent(
   ).normalize();
   const matrixAxis = UP.clone().applyQuaternion(matrixQuaternion).normalize();
   const matrixHeight = matrix.height * heightScale(matrix.maturity);
+  const matrixRadius = matrix.radiusBottom * radiusScale(matrix.maturity);
 
   const reference = Math.abs(monarchAxis.x) < 0.9
     ? new THREE.Vector3(1, 0, 0)
@@ -86,20 +86,22 @@ export function ensureVisibleReferenceAccent(
   const angle = unitFromKey(accent.key) * TAU;
   const radial = u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize();
   const tangent = new THREE.Vector3().crossVectors(radial, monarchAxis).normalize();
-  const monarchRadius = monarch.radiusBottom * radiusScale(monarch.maturity);
 
-  // Основа лежить усередині приплюснутої матриці, а її XZ-позиція вже за
-  // оболонкою монарха. Тому trim прибирає нижню кришку, але не весь шпиль.
+  // Точка народження стоїть у верхньо-бічній чверті матриці. Локальний
+  // радіус там уже менший за базовий, тому шпиль швидко виходить назовні,
+  // але нижня кришка ще сидить у мінеральній основі.
+  const matrixT = 0.62;
+  const radiusAtT = matrixRadius * (1 - matrixT * 0.62);
   const position = matrixPosition
-    .addScaledVector(matrixAxis, matrixHeight * 0.42)
-    .addScaledVector(radial, monarchRadius + accentRadius * 0.28)
-    .addScaledVector(tangent, monarchRadius * 0.14);
-  const direction = monarchAxis
+    .addScaledVector(matrixAxis, matrixHeight * matrixT)
+    .addScaledVector(radial, radiusAtT - accentRadius * 0.32)
+    .addScaledVector(tangent, matrixRadius * 0.08);
+  const direction = matrixAxis
     .clone()
-    .multiplyScalar(0.4)
-    .addScaledVector(UP, 0.18)
-    .addScaledVector(radial, 1.02)
-    .addScaledVector(tangent, 0.12)
+    .multiplyScalar(0.94)
+    .addScaledVector(UP, 0.22)
+    .addScaledVector(radial, 0.62)
+    .addScaledVector(tangent, 0.08)
     .normalize();
   const quaternion = quaternionFor(direction, accent.key);
 
