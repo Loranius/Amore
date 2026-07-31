@@ -92,13 +92,9 @@ function placeAccent(
   const radial = presentationRadial(foundationAxis, accentAngle(accentIndex));
   const tangent = new THREE.Vector3().crossVectors(radial, foundationAxis).normalize();
 
-  // Matrix profile тримає майже повний радіус на цьому рівні. Центр
-  // короткого шпиля ставимо приблизно на 95,5% реального ободу: його кришка
-  // лишається в породі, а призматичне тіло виходить назовні й читається у
-  // фронтальному Pixel 8 Pro кадрі. Старі 82% ховали майже весь accent.
   const ring = Math.floor(accentIndex / FRONT_ACCENT_SLOTS.length);
-  const radialDistance = foundationRadius * (0.955 + ring * 0.16)
-    + accentRadius * (0.1 + ring * 0.55);
+  const radialDistance = foundationRadius * (0.82 + ring * 0.14)
+    + accentRadius * (0.2 + ring * 0.55);
   const position = foundationPosition
     .addScaledVector(foundationAxis, foundationHeight * (0.42 + (accentIndex % 3) * 0.025))
     .addScaledVector(radial, radialDistance)
@@ -128,7 +124,6 @@ function placeAccent(
   };
 }
 
-/** Стабільна множина тіл, які мають лишитися видимою короткою фракцією. */
 export function selectReferenceAccentKeys(
   branches: readonly ClusterBranch[],
 ): ReadonlySet<string> {
@@ -161,12 +156,6 @@ export function selectReferenceAccentKeys(
   );
 }
 
-/**
- * Accent-шпилі є контрольованою короткою фракцією. УСІ інші не-micro
- * кристали корони повинні бути вищими за радіус монарха, інакше багата
- * історія перетворюється на десятки нечитабельних камінців. Піднімаємо
- * тільки дорослу висоту renderer-copy; позиція, hostKey і ключ не міняються.
- */
 function promoteReadableCrownSpires(
   branches: readonly ClusterBranch[],
   monarch: ClusterBranch,
