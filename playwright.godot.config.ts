@@ -27,7 +27,7 @@ export default defineConfig({
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: 'off',
     browserName: 'chromium',
     viewport: { width: 448, height: 998 },
     screen: { width: 448, height: 998 },
