@@ -1,52 +1,29 @@
 // ============================================================
 // referenceDruseLayout — renderer-only анатомія референсної друзи.
-// ------------------------------------------------------------
-// Growth State лишається незмінним: жодна історична позиція, довжина або
-// attachment не переписується. Цей модуль працює лише з ClusterBranch перед
-// Geometry Engine і формує видиму музейну композицію:
-//   • об’ємний призматичний монарх;
-//   • один високий бічний hero-spire;
-//   • решта домінантів — у нижніх кільцях навколо монарха;
-//   • satellites/micro тримаються свого справжнього батька, але біля його
-//     основи, тому вся локальна колонія теж потрапляє в базальну «юбку».
+// Growth State не змінюється: цей pass працює лише перед Geometry Engine.
 // ============================================================
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
-import type { CrystalArchetype } from '../../artifact';
 import type { ClusterBranch } from '../crystalCluster';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
-
 const unitFromKey = (key: string, channel: string): number =>
   (hashSeedString(`${channel}:${key}`) >>> 0) / 0x1_0000_0000;
-
 const heightScale = (maturity: number): number => 0.32 + maturity * 0.68;
 const radiusScale = (maturity: number): number => 0.4 + maturity * 0.6;
 
-function positionOf(branch: ClusterBranch): THREE.Vector3 {
-  return new THREE.Vector3(branch.posX, branch.posY, branch.posZ);
-}
-
-function quaternionOf(branch: ClusterBranch): THREE.Quaternion {
-  return new THREE.Quaternion(branch.quatX, branch.quatY, branch.quatZ, branch.quatW).normalize();
-}
-
-function axisOf(branch: ClusterBranch): THREE.Vector3 {
-  return UP.clone().applyQuaternion(quaternionOf(branch)).normalize();
-}
-
-function renderedHeight(branch: ClusterBranch): number {
-  return branch.height * heightScale(branch.maturity);
-}
-
-function renderedRadius(branch: ClusterBranch): number {
-  return branch.radiusBottom * radiusScale(branch.maturity);
-}
+const positionOf = (branch: ClusterBranch): THREE.Vector3 =>
+  new THREE.Vector3(branch.posX, branch.posY, branch.posZ);
+const quaternionOf = (branch: ClusterBranch): THREE.Quaternion =>
+  new THREE.Quaternion(branch.quatX, branch.quatY, branch.quatZ, branch.quatW).normalize();
+const axisOf = (branch: ClusterBranch): THREE.Vector3 =>
+  UP.clone().applyQuaternion(quaternionOf(branch)).normalize();
+const renderedHeight = (branch: ClusterBranch): number => branch.height * heightScale(branch.maturity);
+const renderedRadius = (branch: ClusterBranch): number => branch.radiusBottom * radiusScale(branch.maturity);
 
 function radialFrame(axis: THREE.Vector3, angle: number): { radial: THREE.Vector3; tangent: THREE.Vector3 } {
   const ref = Math.abs(axis.x) < 0.88
@@ -55,14 +32,17 @@ function radialFrame(axis: THREE.Vector3, angle: number): { radial: THREE.Vector
   const u = ref.addScaledVector(axis, -ref.dot(axis)).normalize();
   const w = new THREE.Vector3().crossVectors(u, axis).normalize();
   return {
-    radial: u.multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize(),
-    tangent: u.set(-Math.sin(angle), 0, 0).addScaledVector(w, Math.cos(angle)).normalize(),
+    radial: u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize(),
+    tangent: u.clone().multiplyScalar(-Math.sin(angle)).addScaledVector(w, Math.cos(angle)).normalize(),
   };
 }
 
 function quaternionFor(direction: THREE.Vector3, key: string): THREE.Quaternion {
   const aligned = new THREE.Quaternion().setFromUnitVectors(UP, direction.clone().normalize());
-  const spin = new THREE.Quaternion().setFromAxisAngle(UP, unitFromKey(key, 'reference-druse-spin') * TAU);
+  const spin = new THREE.Quaternion().setFromAxisAngle(
+    UP,
+    unitFromKey(key, 'reference-druse-spin') * TAU,
+  );
   return aligned.multiply(spin).normalize();
 }
 
@@ -86,7 +66,7 @@ function withPose(
   };
 }
 
-function safeArchetype(branch: ClusterBranch): CrystalArchetype {
+function safeArchetype(branch: ClusterBranch): ClusterBranch['archetype'] {
   if (branch.archetype === 'blade' || branch.archetype === 'tabular' || branch.archetype === 'matrix') {
     return branch.role === 'micro' ? 'spear' : 'prismatic';
   }
@@ -97,9 +77,8 @@ function shapeMonarch(branch: ClusterBranch): ClusterBranch {
   const height = Math.min(branch.height, 2.15);
   const radiusBottom = Math.max(branch.radiusBottom, height / 4.7);
   const direction = axisOf(branch).multiplyScalar(0.12).addScaledVector(UP, 0.88).normalize();
-  const positioned = withPose(branch, positionOf(branch), direction, branch.hostKey);
   return {
-    ...positioned,
+    ...withPose(branch, positionOf(branch), direction, branch.hostKey),
     height,
     radiusBottom,
     tier: 'king',
@@ -129,7 +108,11 @@ function shapeHero(branch: ClusterBranch, monarch: ClusterBranch): ClusterBranch
   };
 }
 
-function shapeDominant(branch: ClusterBranch, monarch: ClusterBranch, originalMonarch: ClusterBranch): ClusterBranch {
+function shapeDominant(
+  branch: ClusterBranch,
+  monarch: ClusterBranch,
+  originalMonarch: ClusterBranch,
+): ClusterBranch {
   const originalRatio = originalMonarch.height > 0 ? branch.height / originalMonarch.height : 0;
   const support = branch.tier === 'support';
   const ratio = support
@@ -149,10 +132,8 @@ function shapeDominant(branch: ClusterBranch, monarch: ClusterBranch, originalMo
 
 function shapeLocal(branch: ClusterBranch, host: ClusterBranch, monarch: ClusterBranch): ClusterBranch {
   const micro = branch.role === 'micro';
-  const minRatio = micro ? 0.04 : 0.075;
-  const maxRatio = micro ? 0.12 : 0.21;
   const height = Math.min(
-    clamp(branch.height, monarch.height * minRatio, monarch.height * maxRatio),
+    clamp(branch.height, monarch.height * (micro ? 0.04 : 0.075), monarch.height * (micro ? 0.12 : 0.21)),
     host.height * (micro ? 0.52 : 0.64),
   );
   return {
@@ -184,14 +165,7 @@ function placeOnHost(
   const center = positionOf(host).addScaledVector(hostAxis, hostHeight * hostT);
   const contact = center.addScaledVector(radial, radiusHere);
   const ownRadius = renderedRadius(branch);
-
-  // Кільце основи мусить опинитися ГАРАНТОВАНО всередині господаря, а не
-  // лише торкатися його поверхні: тоді junctionTrim прибирає кришку й
-  // MarchingCubes має справжню зону перекриття для локального комірця.
-  const burial = Math.min(
-    ownRadius * 1.8 + radiusHere * 0.25,
-    radiusHere * 0.88,
-  );
+  const burial = Math.min(ownRadius * 1.8 + radiusHere * 0.25, radiusHere * 0.88);
   const position = contact.addScaledVector(radial, -burial);
   const direction = hostAxis
     .clone()
@@ -200,7 +174,6 @@ function placeOnHost(
     .addScaledVector(radial, outwardWeight)
     .addScaledVector(tangent, tangentWeight)
     .normalize();
-
   return withPose(branch, position, direction, hostKey);
 }
 
@@ -213,21 +186,14 @@ function chooseHero(branches: readonly ClusterBranch[]): ClusterBranch | null {
   );
 }
 
-/**
- * Pure renderer layout. Повертає нові записи у тому самому порядку і з
- * тією самою множиною ключів; вхідні branches не мутуються.
- */
 export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): ClusterBranch[] {
   const originalMonarch = branches.find((branch) => branch.primary);
   if (originalMonarch === undefined) return branches.map((branch) => ({ ...branch }));
 
   const monarch = shapeMonarch(originalMonarch);
-  const hero = chooseHero(branches);
-  const heroKey = hero?.key ?? null;
+  const heroKey = chooseHero(branches)?.key ?? null;
   const originalByKey = new Map(branches.map((branch) => [branch.key, branch] as const));
-  const output = new Map<string, ClusterBranch>();
-  output.set(monarch.key, monarch);
-
+  const output = new Map<string, ClusterBranch>([[monarch.key, monarch]]);
   const originalYaw = new THREE.Euler().setFromQuaternion(quaternionOf(originalMonarch), 'YXZ').y;
   const baseAngle = originalYaw + 0.35;
 
@@ -235,13 +201,9 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
   let nextDominant = 0;
   for (const branch of branches) {
     if (
-      branch.primary ||
-      branch.key === heroKey ||
-      branch.role !== 'dominant' ||
-      branch.archetype === 'matrix'
+      branch.primary || branch.key === heroKey || branch.role !== 'dominant' || branch.archetype === 'matrix'
     ) continue;
-    dominantIndex.set(branch.key, nextDominant);
-    nextDominant += 1;
+    dominantIndex.set(branch.key, nextDominant++);
   }
 
   const siblingIndex = new Map<string, number>();
@@ -259,8 +221,7 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
     const cached = output.get(key);
     if (cached !== undefined) return cached;
     const source = originalByKey.get(key);
-    if (source === undefined) return monarch;
-    if (visiting.has(key)) return monarch;
+    if (source === undefined || visiting.has(key)) return monarch;
     visiting.add(key);
 
     let result: ClusterBranch;
@@ -270,16 +231,9 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
       result = monarch;
     } else if (source.role === 'dominant') {
       if (source.key === heroKey) {
-        const shaped = shapeHero(source, monarch);
         result = placeOnHost(
-          shaped,
-          monarch,
-          baseAngle + Math.PI * 1.18,
-          0.055,
-          1,
-          0.26,
-          0.03,
-          monarch.key,
+          shapeHero(source, monarch), monarch, baseAngle + Math.PI * 1.18,
+          0.055, 1, 0.26, 0.03, monarch.key,
         );
       } else {
         const index = dominantIndex.get(source.key) ?? 0;
