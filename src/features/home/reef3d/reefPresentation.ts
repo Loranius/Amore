@@ -1,5 +1,6 @@
 import type { BufferAttribute } from 'three';
 import type {
+  ReefColonyMorphotype,
   ReefColonyMotionBinding,
   ReefLayoutVec3,
 } from '@/engine/species/reef';
@@ -9,7 +10,8 @@ import type {
   ReefThreeSceneState,
 } from './reefThreeAdapter';
 
-export const REEF_PRESENTATION_VERSION = 'reef-visual-v1';
+export const REEF_PRESENTATION_VERSION = 'reef-visual-v2';
+export const REEF_COLONY_SHAPE_PASS = 'phase-10-colony-shapes';
 
 export const REEF_PRESENTATION_PROFILE = Object.freeze({
   foundationVerticalScale: 0.42,
@@ -18,7 +20,118 @@ export const REEF_PRESENTATION_PROFILE = Object.freeze({
   colonyRootLift: 0.025,
 });
 
+export interface ReefColonyShapeProfile {
+  readonly axialScale: number;
+  readonly radialRootScale: number;
+  readonly radialTipScale: number;
+  readonly midBulge: number;
+  readonly edgeExpansion: number;
+  readonly lobeCount: number;
+  readonly lobeAmplitude: number;
+  readonly twist: number;
+  readonly bend: number;
+  readonly rimLift: number;
+  readonly depthScale: number;
+}
+
+/**
+ * Phase 10 keeps the accepted topology and stable ranges intact, but gives
+ * every existing morphotype its own readable production silhouette.
+ */
+export const REEF_COLONY_SHAPE_PROFILES: Readonly<
+  Record<ReefColonyMorphotype, ReefColonyShapeProfile>
+> = Object.freeze({
+  branching: {
+    axialScale: 1.08,
+    radialRootScale: 0.72,
+    radialTipScale: 0.96,
+    midBulge: 0.08,
+    edgeExpansion: 0.03,
+    lobeCount: 3,
+    lobeAmplitude: 0.035,
+    twist: 0.9,
+    bend: 0.14,
+    rimLift: 0,
+    depthScale: 1,
+  },
+  massive: {
+    axialScale: 0.78,
+    radialRootScale: 0.82,
+    radialTipScale: 0.34,
+    midBulge: 0.52,
+    edgeExpansion: 0.16,
+    lobeCount: 6,
+    lobeAmplitude: 0.06,
+    twist: 0.35,
+    bend: 0.025,
+    rimLift: 0.02,
+    depthScale: 1,
+  },
+  plating: {
+    axialScale: 0.52,
+    radialRootScale: 0.52,
+    radialTipScale: 0.72,
+    midBulge: 0.12,
+    edgeExpansion: 0.48,
+    lobeCount: 7,
+    lobeAmplitude: 0.09,
+    twist: 0.45,
+    bend: 0.03,
+    rimLift: 0.18,
+    depthScale: 1,
+  },
+  encrusting: {
+    axialScale: 0.28,
+    radialRootScale: 1.04,
+    radialTipScale: 1.02,
+    midBulge: 0.05,
+    edgeExpansion: 0.18,
+    lobeCount: 8,
+    lobeAmplitude: 0.07,
+    twist: 0.3,
+    bend: 0.01,
+    rimLift: 0.025,
+    depthScale: 1,
+  },
+  'soft-coral': {
+    axialScale: 1.12,
+    radialRootScale: 0.66,
+    radialTipScale: 1.18,
+    midBulge: 0.22,
+    edgeExpansion: 0.08,
+    lobeCount: 5,
+    lobeAmplitude: 0.11,
+    twist: 1.15,
+    bend: 0.18,
+    rimLift: 0.04,
+    depthScale: 0.94,
+  },
+  'sea-fan': {
+    axialScale: 1.18,
+    radialRootScale: 0.58,
+    radialTipScale: 1.25,
+    midBulge: 0.08,
+    edgeExpansion: 0.16,
+    lobeCount: 4,
+    lobeAmplitude: 0.045,
+    twist: 0.18,
+    bend: 0.12,
+    rimLift: 0.02,
+    depthScale: 0.58,
+  },
+});
+
 const EPSILON = 1e-6;
+const TAU = Math.PI * 2;
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function smoothstep(edge0: number, edge1: number, value: number): number {
+  const t = clamp01((value - edge0) / Math.max(EPSILON, edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
 
 function mutableArray(attribute: BufferAttribute): Float32Array {
   return attribute.array as Float32Array;
@@ -35,6 +148,10 @@ function normalize(
     y: value.y / length,
     z: value.z / length,
   };
+}
+
+function dot(left: ReefLayoutVec3, right: ReefLayoutVec3): number {
+  return left.x * right.x + left.y * right.y + left.z * right.z;
 }
 
 function cross(left: ReefLayoutVec3, right: ReefLayoutVec3): ReefLayoutVec3 {
@@ -96,6 +213,23 @@ function presentMotion(motion: ReefColonyMotionBinding): ReefColonyMotionBinding
   };
 }
 
+function stableHash(value: string): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+function rangePhase(id: string): number {
+  return (stableHash(id) / 0xffffffff) * TAU;
+}
+
+function rangeSign(id: string): number {
+  return (stableHash(`${id}:bend`) & 1) === 0 ? -1 : 1;
+}
+
 function transformFoundation(scene: ReefThreeSceneState): void {
   const geometry = scene.foundation.geometry;
   const positionAttribute = geometry.getAttribute('position') as BufferAttribute;
@@ -124,28 +258,138 @@ function transformFoundation(scene: ReefThreeSceneState): void {
   geometry.userData.reefFoundationVerticalScale = verticalScale;
 }
 
+interface RangeMetrics {
+  readonly maximumAxialDistance: number;
+  readonly maximumRadialDistance: number;
+}
+
+function measureRange(
+  positions: Float32Array,
+  runtime: ReefBatchRuntimeRange,
+): RangeMetrics {
+  const { range, motion } = runtime;
+  let maximumAxialDistance = EPSILON;
+  let maximumRadialDistance = EPSILON;
+
+  for (let index = range.vertexStart; index < range.vertexStart + range.vertexCount; index += 1) {
+    const offset = index * 3;
+    const relative = {
+      x: (positions[offset] ?? 0) - motion.pivot.x,
+      y: (positions[offset + 1] ?? 0) - motion.pivot.y,
+      z: (positions[offset + 2] ?? 0) - motion.pivot.z,
+    };
+    const axial = dot(relative, motion.axis);
+    const radial = {
+      x: relative.x - motion.axis.x * axial,
+      y: relative.y - motion.axis.y * axial,
+      z: relative.z - motion.axis.z * axial,
+    };
+    maximumAxialDistance = Math.max(maximumAxialDistance, Math.max(0, axial));
+    maximumRadialDistance = Math.max(
+      maximumRadialDistance,
+      Math.hypot(radial.x, radial.y, radial.z),
+    );
+  }
+
+  return { maximumAxialDistance, maximumRadialDistance };
+}
+
+function shapeBasis(motion: ReefColonyMotionBinding): {
+  side: ReefLayoutVec3;
+  depth: ReefLayoutVec3;
+} {
+  let side = cross(motion.axis, motion.responseDirection);
+  if (Math.hypot(side.x, side.y, side.z) <= EPSILON) {
+    side = cross(motion.axis, { x: 0, y: 0, z: 1 });
+  }
+  if (Math.hypot(side.x, side.y, side.z) <= EPSILON) {
+    side = cross(motion.axis, { x: 1, y: 0, z: 0 });
+  }
+  side = normalize(side, { x: 1, y: 0, z: 0 });
+  return {
+    side,
+    depth: normalize(cross(side, motion.axis), { x: 0, y: 0, z: 1 }),
+  };
+}
+
+function shapeRange(batch: ReefRenderableBatch, runtime: ReefBatchRuntimeRange): void {
+  const profile = REEF_COLONY_SHAPE_PROFILES[runtime.range.morphotype];
+  const metrics = measureRange(batch.basePositions, runtime);
+  const { side, depth } = shapeBasis(runtime.motion);
+  const phase = rangePhase(runtime.range.id);
+  const bendSign = rangeSign(runtime.range.id);
+
+  for (
+    let index = runtime.range.vertexStart;
+    index < runtime.range.vertexStart + runtime.range.vertexCount;
+    index += 1
+  ) {
+    const offset = index * 3;
+    const relative = {
+      x: (batch.basePositions[offset] ?? 0) - runtime.motion.pivot.x,
+      y: (batch.basePositions[offset + 1] ?? 0) - runtime.motion.pivot.y,
+      z: (batch.basePositions[offset + 2] ?? 0) - runtime.motion.pivot.z,
+    };
+    const axial = dot(relative, runtime.motion.axis);
+    const radial = {
+      x: relative.x - runtime.motion.axis.x * axial,
+      y: relative.y - runtime.motion.axis.y * axial,
+      z: relative.z - runtime.motion.axis.z * axial,
+    };
+    const sideDistance = dot(radial, side);
+    const depthDistance = dot(radial, depth);
+    const radialDistance = Math.hypot(sideDistance, depthDistance);
+    const axialT = clamp01(axial / metrics.maximumAxialDistance);
+    const radialT = clamp01(radialDistance / metrics.maximumRadialDistance);
+    const edge = smoothstep(0.56, 0.98, radialT);
+    const angle = Math.atan2(depthDistance, sideDistance);
+    const lobe = Math.sin(
+      angle * profile.lobeCount + phase + axialT * profile.twist,
+    );
+    const middle = Math.sin(Math.PI * axialT);
+    const baseRadialScale = profile.radialRootScale
+      + (profile.radialTipScale - profile.radialRootScale) * axialT;
+    const radialScale = Math.max(
+      0.12,
+      baseRadialScale
+        + profile.midBulge * middle
+        + profile.edgeExpansion * edge * (0.35 + axialT * 0.65)
+        + profile.lobeAmplitude * lobe * (0.3 + middle * 0.7),
+    );
+    const bend = metrics.maximumRadialDistance
+      * profile.bend
+      * axialT
+      * axialT
+      * bendSign;
+    const rimLift = metrics.maximumAxialDistance
+      * profile.rimLift
+      * edge
+      * edge
+      * (0.3 + axialT * 0.7);
+    const shapedAxial = axial * profile.axialScale + rimLift;
+    const shapedSide = sideDistance * radialScale + bend;
+    const shapedDepth = depthDistance * radialScale * profile.depthScale;
+
+    batch.basePositions[offset] = runtime.motion.pivot.x
+      + runtime.motion.axis.x * shapedAxial
+      + side.x * shapedSide
+      + depth.x * shapedDepth;
+    batch.basePositions[offset + 1] = runtime.motion.pivot.y
+      + runtime.motion.axis.y * shapedAxial
+      + side.y * shapedSide
+      + depth.y * shapedDepth;
+    batch.basePositions[offset + 2] = runtime.motion.pivot.z
+      + runtime.motion.axis.z * shapedAxial
+      + side.z * shapedSide
+      + depth.z * shapedDepth;
+  }
+}
+
 function maximumAxialDistance(
   positions: Float32Array,
   runtime: ReefBatchRuntimeRange,
 ): number {
-  const { range, motion } = runtime;
-  let maximum = EPSILON;
-  for (let index = range.vertexStart; index < range.vertexStart + range.vertexCount; index += 1) {
-    const offset = index * 3;
-    const relativeX = (positions[offset] ?? 0) - motion.pivot.x;
-    const relativeY = (positions[offset + 1] ?? 0) - motion.pivot.y;
-    const relativeZ = (positions[offset + 2] ?? 0) - motion.pivot.z;
-    maximum = Math.max(
-      maximum,
-      Math.max(
-        0,
-        relativeX * motion.axis.x
-          + relativeY * motion.axis.y
-          + relativeZ * motion.axis.z,
-      ),
-    );
-  }
-  return maximum;
+  return measureRange(positions, runtime).maximumAxialDistance;
 }
 
 function transformBatch(batch: ReefRenderableBatch): void {
@@ -156,7 +400,7 @@ function transformBatch(batch: ReefRenderableBatch): void {
 
   for (const runtime of batch.runtimeRanges) {
     const sourceMotion = runtime.motion;
-    const pivot = sourceMotion.pivot;
+    const sourcePivot = sourceMotion.pivot;
 
     for (
       let index = runtime.range.vertexStart;
@@ -164,26 +408,18 @@ function transformBatch(batch: ReefRenderableBatch): void {
       index += 1
     ) {
       const offset = index * 3;
-      const sourceX = batch.basePositions[offset] ?? pivot.x;
-      const sourceY = batch.basePositions[offset + 1] ?? pivot.y;
-      const sourceZ = batch.basePositions[offset + 2] ?? pivot.z;
-      batch.basePositions[offset] = pivot.x + (sourceX - pivot.x) * horizontal;
-      batch.basePositions[offset + 1] = pivot.y * foundationVertical
-        + (sourceY - pivot.y) * vertical
+      const sourceX = batch.basePositions[offset] ?? sourcePivot.x;
+      const sourceY = batch.basePositions[offset + 1] ?? sourcePivot.y;
+      const sourceZ = batch.basePositions[offset + 2] ?? sourcePivot.z;
+      batch.basePositions[offset] = sourcePivot.x + (sourceX - sourcePivot.x) * horizontal;
+      batch.basePositions[offset + 1] = sourcePivot.y * foundationVertical
+        + (sourceY - sourcePivot.y) * vertical
         + rootLift;
-      batch.basePositions[offset + 2] = pivot.z + (sourceZ - pivot.z) * horizontal;
-
-      const transformedNormal = transformNormal({
-        x: batch.baseNormals[offset] ?? 0,
-        y: batch.baseNormals[offset + 1] ?? 1,
-        z: batch.baseNormals[offset + 2] ?? 0,
-      }, horizontal, vertical, horizontal);
-      batch.baseNormals[offset] = transformedNormal.x;
-      batch.baseNormals[offset + 1] = transformedNormal.y;
-      batch.baseNormals[offset + 2] = transformedNormal.z;
+      batch.basePositions[offset + 2] = sourcePivot.z + (sourceZ - sourcePivot.z) * horizontal;
     }
 
     runtime.motion = presentMotion(sourceMotion);
+    shapeRange(batch, runtime);
     runtime.rotationAxis = normalize(
       cross(runtime.motion.axis, runtime.motion.responseDirection),
       { x: 1, y: 0, z: 0 },
@@ -192,21 +428,28 @@ function transformBatch(batch: ReefRenderableBatch): void {
   }
 
   const positionAttribute = batch.geometry.getAttribute('position') as BufferAttribute;
-  const normalAttribute = batch.geometry.getAttribute('normal') as BufferAttribute;
   mutableArray(positionAttribute).set(batch.basePositions);
-  mutableArray(normalAttribute).set(batch.baseNormals);
   positionAttribute.needsUpdate = true;
+
+  // The shape pass is non-linear, therefore normals are regenerated from the
+  // unchanged index topology and then captured as the exact Phase 7 base.
+  batch.geometry.computeVertexNormals();
+  const normalAttribute = batch.geometry.getAttribute('normal') as BufferAttribute;
+  batch.baseNormals.set(mutableArray(normalAttribute));
   normalAttribute.needsUpdate = true;
+
   batch.geometry.computeBoundingBox();
   batch.geometry.computeBoundingSphere();
   batch.geometry.userData.reefPresentationVersion = REEF_PRESENTATION_VERSION;
+  batch.geometry.userData.reefShapePass = REEF_COLONY_SHAPE_PASS;
   batch.geometry.userData.reefColonyHorizontalScale = horizontal;
   batch.geometry.userData.reefColonyVerticalScale = vertical;
 }
 
 /**
- * Applies a renderer-only composition pass without changing colony identity,
- * geometry counts, draw calls, materials or accepted engine state.
+ * Applies Phase 10 as a renderer-only composition pass. Colony IDs, ranges,
+ * indices, triangle/vertex counts, materials, draw calls and accepted engine
+ * state remain unchanged.
  */
 export function applyReefPresentation(scene: ReefThreeSceneState): ReefThreeSceneState {
   if (scene.foundation.geometry.userData.reefPresentationVersion === REEF_PRESENTATION_VERSION) {
