@@ -43,13 +43,12 @@ function requiredSpeckCull(visibleCount: number, speckCount: number): number {
 /**
  * Гарантує renderer-budget без нових перетинів геометрії.
  * Кандидати вже мають побудовану/обрізану оболонку, тому ми відбираємо лише
- * реально видимі тіла. Монарх, matrix, hero/dominant та господарі ВИДИМИХ
- * дітей ніколи не відсікаються.
+ * реально видимі тіла. Монарх, matrix, hero/dominant, усі accent-шпилі та
+ * господарі ВИДИМИХ дітей ніколи не відсікаються.
  *
- * Спочатку прибираємо фактичні «крихти» — тіла, нижчі за радіус монарха.
- * Короткий accent захищений лише доки він читається як шпиль; sub-radius
- * accent уже є пилом і може бути відсіяний. Середні кристали юбки при цьому
- * лишаються захищеними.
+ * Якщо після promotion лишаються неакцентні крихти, саме вони отримують
+ * найвищий пріоритет. Середні кристали юбки й короткий структурний дециль
+ * при цьому залишаються видимими.
  */
 export function enforceReferenceHiddenBudget(
   bodies: readonly ReferenceBudgetBody[],
@@ -64,7 +63,9 @@ export function enforceReferenceHiddenBudget(
   const visible = bodies.filter((body) => triangleCount(body) > 0);
   const alreadyHidden = bodies.length - visible.length;
   const visibleSpecks = visible.filter((body) => (
-    !body.branch.primary && body.solid.profile.h < monarchRadius
+    !body.branch.primary
+    && body.branch.archetype !== 'matrix'
+    && body.solid.profile.h < monarchRadius
   ));
 
   const hiddenMissing = Math.max(0, MINIMUM_HIDDEN_BODIES - alreadyHidden);
@@ -79,17 +80,13 @@ export function enforceReferenceHiddenBudget(
   );
 
   const candidates = visible
-    .filter((body) => {
-      if (
-        body.branch.primary
-        || body.branch.archetype === 'matrix'
-        || body.branch.role === 'dominant'
-        || visibleLoadBearing.has(body.branch.key)
-      ) return false;
-
-      const isSpeck = body.solid.profile.h < monarchRadius;
-      return !accentKeys.has(body.branch.key) || isSpeck;
-    })
+    .filter((body) => (
+      !body.branch.primary
+      && body.branch.archetype !== 'matrix'
+      && body.branch.role !== 'dominant'
+      && !accentKeys.has(body.branch.key)
+      && !visibleLoadBearing.has(body.branch.key)
+    ))
     .sort((left, right) => {
       const leftSpeck = left.solid.profile.h < monarchRadius ? 0 : 1;
       const rightSpeck = right.solid.profile.h < monarchRadius ? 0 : 1;
