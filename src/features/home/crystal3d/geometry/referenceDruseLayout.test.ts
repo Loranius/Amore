@@ -98,8 +98,9 @@ function positionOf(value: ClusterBranch): THREE.Vector3 {
 }
 
 describe('renderer-only reference druse layout', () => {
-  it('creates a volumetric monarch, one hero and a basal crown', () => {
+  it('creates a volumetric monarch, rear hero and basal crown on shared matrix', () => {
     const result = applyReferenceDruseLayout(FIXTURE);
+    const matrix = result.find((value) => value.archetype === 'matrix')!;
     const monarch = result.find((value) => value.primary)!;
     const hero = result.find((value) => value.key === 'milestone-1')!;
     const family = result.find((value) => value.key === 'memory-1')!;
@@ -107,25 +108,28 @@ describe('renderer-only reference druse layout', () => {
 
     expect(monarch.archetype).toBe('prismatic');
     expect(monarch.height).toBeLessThanOrEqual(2.15);
-    expect(monarch.height / monarch.radiusBottom).toBeLessThanOrEqual(4.7);
+    expect(monarch.height / monarch.radiusBottom).toBeLessThanOrEqual(4.35);
 
-    expect(hero.hostKey).toBe(monarch.key);
-    expect(hero.height / monarch.height).toBeGreaterThanOrEqual(0.64);
+    expect(hero.hostKey).toBe(matrix.key);
+    expect(hero.height / monarch.height).toBeGreaterThanOrEqual(0.68);
     expect(hero.height / monarch.height).toBeLessThanOrEqual(0.76);
+    expect(hero.archetype).toBe('prismatic');
+    expect(hero.posX).toBeLessThan(monarch.posX);
+    expect(hero.posZ).toBeLessThan(monarch.posZ);
 
     const monarchAxis = axisOf(monarch);
     const monarchHeight = monarch.height;
     for (const value of result) {
       if (value.primary || value.archetype === 'matrix' || value.role !== 'dominant') continue;
       const axial = positionOf(value).sub(positionOf(monarch)).dot(monarchAxis);
-      expect(axial / monarchHeight, value.key).toBeLessThanOrEqual(0.12);
-      expect(value.hostKey).toBe(monarch.key);
+      expect(axial / monarchHeight, value.key).toBeLessThanOrEqual(0.18);
+      expect(value.hostKey).toBe(matrix.key);
       expect(value.archetype).not.toBe('blade');
       expect(value.archetype).not.toBe('tabular');
     }
 
     expect(satellite.hostKey).toBe(family.key);
-    expect(positionOf(satellite).distanceTo(positionOf(family))).toBeLessThan(family.radiusBottom * 1.4);
+    expect(positionOf(satellite).distanceTo(positionOf(family))).toBeLessThan(family.radiusBottom * 1.8);
     expect(axisOf(satellite).y).toBeGreaterThan(0);
   });
 
