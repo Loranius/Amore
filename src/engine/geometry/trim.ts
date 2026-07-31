@@ -35,19 +35,49 @@ function boundsOverlap(left: CrystalSolid, right: CrystalSolid, epsilon: number)
     <= left.bounds.radius + right.bounds.radius + epsilon;
 }
 
-function radiusAt(solid: CrystalSolid, y: number): number {
+interface CrystalProfileSlice {
+  centerOffsetX: number;
+  centerOffsetZ: number;
+  radiusX: number;
+  radiusZ: number;
+}
+
+function sliceFromRow(row: CrystalSolid['profile']['rows'][number] | undefined): CrystalProfileSlice {
+  return {
+    centerOffsetX: row?.centerOffsetX ?? 0,
+    centerOffsetZ: row?.centerOffsetZ ?? 0,
+    radiusX: row?.radiusX ?? 0,
+    radiusZ: row?.radiusZ ?? 0,
+  };
+}
+
+function interpolateSlice(
+  left: CrystalProfileSlice,
+  right: CrystalProfileSlice,
+  t: number,
+): CrystalProfileSlice {
+  const mix = (a: number, b: number): number => a * (1 - t) + b * t;
+  return {
+    centerOffsetX: mix(left.centerOffsetX, right.centerOffsetX),
+    centerOffsetZ: mix(left.centerOffsetZ, right.centerOffsetZ),
+    radiusX: mix(left.radiusX, right.radiusX),
+    radiusZ: mix(left.radiusZ, right.radiusZ),
+  };
+}
+
+/** Samples the same bent elliptical shell used by buildCrystalMesh. */
+function profileSliceAt(solid: CrystalSolid, y: number): CrystalProfileSlice {
   const rows = solid.profile.rows;
-  if (y <= (rows[0]?.y ?? 0)) return rows[0]?.radius ?? 0;
+  if (y <= (rows[0]?.y ?? 0)) return sliceFromRow(rows[0]);
   for (let index = 0; index < rows.length - 1; index += 1) {
     const left = rows[index]!;
     const right = rows[index + 1]!;
     if (y <= right.y) {
       const span = Math.max(1e-9, right.y - left.y);
-      const t = (y - left.y) / span;
-      return left.radius * (1 - t) + right.radius * t;
+      return interpolateSlice(sliceFromRow(left), sliceFromRow(right), (y - left.y) / span);
     }
   }
-  return rows[rows.length - 1]?.radius ?? 0;
+  return sliceFromRow(rows[rows.length - 1]);
 }
 
 export function pointInsideCrystalSolid(
@@ -60,13 +90,21 @@ export function pointInsideCrystalSolid(
   const lastY = solid.profile.rows[solid.profile.rows.length - 1]?.y ?? 0;
   if (y < -epsilon || y > lastY + epsilon) return false;
 
-  const axisPoint = add(solid.profile.geometryAnchor, scale(solid.body.direction, y));
-  const radial = subtract(point, axisPoint);
   const { tangent, bitangent } = orthonormalBasis(solid.body.direction);
-  const radius = Math.max(1e-9, radiusAt(solid, y));
-  const x = dot(radial, tangent) / Math.max(1e-9, radius * solid.profile.scaleX);
-  const z = dot(radial, bitangent) / Math.max(1e-9, radius * solid.profile.scaleZ);
-  const allowance = 1 + epsilon / radius;
+  const slice = profileSliceAt(solid, y);
+  const axisPoint = add(
+    add(
+      add(solid.profile.geometryAnchor, scale(solid.body.direction, y)),
+      scale(tangent, slice.centerOffsetX),
+    ),
+    scale(bitangent, slice.centerOffsetZ),
+  );
+  const radial = subtract(point, axisPoint);
+  const radiusX = Math.max(1e-9, slice.radiusX);
+  const radiusZ = Math.max(1e-9, slice.radiusZ);
+  const x = dot(radial, tangent) / radiusX;
+  const z = dot(radial, bitangent) / radiusZ;
+  const allowance = 1 + epsilon / Math.min(radiusX, radiusZ);
   return x * x + z * z <= allowance * allowance;
 }
 
