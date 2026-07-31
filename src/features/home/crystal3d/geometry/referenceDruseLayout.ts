@@ -113,8 +113,6 @@ function safeArchetype(branch: ClusterBranch): ClusterBranch['archetype'] {
 
 function shapeMonarch(branch: ClusterBranch): ClusterBranch {
   const height = Math.min(branch.height, 2.15);
-  // Товстий кварцовий шпиль: переріз майже круглий, висота/діаметр не
-  // перетворює його ні на лезо, ні на прямокутний стовп.
   const radiusBottom = Math.max(branch.radiusBottom, height / 4.35);
   const direction = axisOf(branch).multiplyScalar(0.08).addScaledVector(UP, 0.92).normalize();
   return {
@@ -207,20 +205,10 @@ function placeOnHost(
   const { radial, tangent } = radialFrame(hostAxis, angle);
   const hostHeight = renderedHeight(host);
   const hostRadius = renderedRadius(host);
-  // Матриця не звужується як кристал: у canonical profile вона тримає
-  // 94–100% радіуса до 66% висоти. Старе універсальне taper-рівняння
-  // давало тут лише 70–78%, через що вся корона народжувалась глибоко в
-  // породі й trim залишав на екрані випадкові уламки.
-  const radiusHere = host.archetype === 'matrix'
-    ? hostRadius * (0.985 - clamp(hostT, 0, 1) * 0.035)
-    : hostRadius * (1 - clamp(hostT, 0, 1) * 0.62);
+  const radiusHere = hostRadius * (1 - clamp(hostT, 0, 1) * 0.62);
   const center = positionOf(host).addScaledVector(hostAxis, hostHeight * hostT);
   const contact = center.addScaledVector(radial, radiusHere);
   const ownRadius = renderedRadius(branch);
-
-  // Основа лишається всередині господаря, але не настільки глибоко, щоб
-  // весь шпиль зникав за монархом. radialGap використовується тільки на
-  // матриці: вона широка й схована, тож може винести юбку за силует.
   const burial = branch.role === 'micro'
     ? Math.min(ownRadius * 0.5 + radiusHere * 0.015, radiusHere * 0.32)
     : Math.min(ownRadius * burialFactor + radiusHere * 0.025, radiusHere * 0.58);
@@ -247,8 +235,6 @@ function chooseHero(branches: readonly ClusterBranch[]): ClusterBranch | null {
 
 function dominantSlot(index: number): number {
   if (index < FRONT_CROWN_SLOTS.length) return FRONT_CROWN_SLOTS[index]!;
-  // Після читабельного переднього вінця добудовуємо повне кільце. Старі
-  // слоти не рухаються, коли пізніше додаються нові події.
   return FRONT_CROWN_SLOTS[index % FRONT_CROWN_SLOTS.length]!
     + (Math.floor(index / FRONT_CROWN_SLOTS.length) + 1) * GOLDEN_ANGLE;
 }
@@ -314,8 +300,8 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
           0.22,
           0,
           matrix.key,
-          0.36,
-          0.22,
+          0.44,
+          -0.08,
         );
       } else {
         const index = dominantIndex.get(source.key) ?? 0;
@@ -330,8 +316,8 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
           support ? 0.56 : 0.76,
           (unitFromKey(source.key, 'reference-druse-tangent') - 0.5) * 0.12,
           matrix.key,
-          0.42,
-          0.2 + (index % 2) * 0.06,
+          0.62,
+          0.05 + (index % 2) * 0.08,
         );
       }
     } else {
@@ -357,8 +343,8 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
         micro ? 0.92 : 0.7,
         (unitFromKey(source.key, 'reference-druse-local-tangent') - 0.5) * 0.14,
         host.key,
-        micro ? 0.48 : hostIsMatrix ? 0.4 : 0.62,
-        hostIsMatrix ? 0.22 : 0,
+        micro ? 0.48 : 0.62,
+        hostIsMatrix ? 0.12 : 0,
       );
     }
 
