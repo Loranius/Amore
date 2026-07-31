@@ -3,7 +3,7 @@
 // ------------------------------------------------------------
 // Базальна корона навмисно робить дрібні шпилі видимими. Для стабільного
 // мобільного бюджету залишаємо логічні тіла у PublishedCrystal.bodies, але
-// не публікуємо меші кількох найменших неакцентних листових супутників.
+// не публікуємо меші кількох найменших неакцентних листових тіл.
 // Growth State, hostKey, стабільні ключі та attachment-граф не змінюються.
 // ============================================================
 import type * as THREE from 'three';
@@ -29,10 +29,6 @@ const triangleCount = (body: ReferenceBudgetBody): number =>
 const bodyVolume = (body: ReferenceBudgetBody): number =>
   body.branch.height * body.branch.radiusBottom * body.branch.radiusBottom;
 
-/**
- * Повертає мінімальну кількість крихт, які треба відсікти, щоб після
- * видалення і чисельник, і знаменник вкладались у MAX_VISIBLE_SPECK_SHARE.
- */
 function requiredSpeckCull(visibleCount: number, speckCount: number): number {
   if (visibleCount <= 0) return 0;
   const excess = speckCount - MAX_VISIBLE_SPECK_SHARE * visibleCount;
@@ -42,13 +38,11 @@ function requiredSpeckCull(visibleCount: number, speckCount: number): number {
 
 /**
  * Гарантує renderer-budget без нових перетинів геометрії.
- * Кандидати вже мають побудовану/обрізану оболонку, тому ми відбираємо лише
- * реально видимі тіла. Монарх, matrix, hero/dominant, усі accent-шпилі та
- * господарі ВИДИМИХ дітей ніколи не відсікаються.
- *
- * Якщо після promotion лишаються неакцентні крихти, саме вони отримують
- * найвищий пріоритет. Середні кристали юбки й короткий структурний дециль
- * при цьому залишаються видимими.
+ * Монарх, matrix, hero/support, усі accent-шпилі та господарі ВИДИМИХ
+ * дітей ніколи не відсікаються. Звичайний family-dominant без дітей — це
+ * такий самий leaf-body, як satellite: якщо він найменший і не входить у
+ * композиційний accent, його можна не публікувати в renderer, лишивши у
+ * логічному стані.
  */
 export function enforceReferenceHiddenBudget(
   bodies: readonly ReferenceBudgetBody[],
@@ -80,13 +74,17 @@ export function enforceReferenceHiddenBudget(
   );
 
   const candidates = visible
-    .filter((body) => (
-      !body.branch.primary
-      && body.branch.archetype !== 'matrix'
-      && body.branch.role !== 'dominant'
-      && !accentKeys.has(body.branch.key)
-      && !visibleLoadBearing.has(body.branch.key)
-    ))
+    .filter((body) => {
+      const protectedDominant = body.branch.role === 'dominant'
+        && (body.branch.tier === 'support' || body.branch.emissive === true);
+      return (
+        !body.branch.primary
+        && body.branch.archetype !== 'matrix'
+        && !protectedDominant
+        && !accentKeys.has(body.branch.key)
+        && !visibleLoadBearing.has(body.branch.key)
+      );
+    })
     .sort((left, right) => {
       const leftSpeck = left.solid.profile.h < monarchRadius ? 0 : 1;
       const rightSpeck = right.solid.profile.h < monarchRadius ? 0 : 1;
@@ -99,8 +97,6 @@ export function enforceReferenceHiddenBudget(
     .slice(0, targetCount);
 
   for (const body of candidates) {
-    // Empty indexed geometry remains a valid logical PublishedBody, but it
-    // cannot produce triangles, draw calls, shell violations or ray hits.
     body.geometry.setIndex([]);
   }
 }
