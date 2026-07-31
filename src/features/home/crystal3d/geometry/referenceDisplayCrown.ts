@@ -25,7 +25,7 @@ const HERO_RATIO = 0.48;
 const MEDIUM_ANGLES = [-1.25, 1.25, -0.78, 0.78, -0.36, 0.36] as const;
 const SHORT_ANGLES = [-1.5, 1.5, -1.12, 1.12, -0.76, 0.76, -0.42, 0.42, 0] as const;
 const MEDIUM_RATIOS = [0.38, 0.34, 0.31, 0.28, 0.25, 0.23] as const;
-const SHORT_RATIOS = [0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1] as const;
+const SHORT_RATIOS = [0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1, 0.09] as const;
 
 const heightScale = (maturity: number): number => 0.32 + maturity * 0.68;
 const radiusScale = (maturity: number): number => 0.4 + maturity * 0.6;
@@ -280,7 +280,7 @@ export function buildReferenceDisplayCrown(
   selection.shortKeys.forEach((key, index) => {
     const source = byKey.get(key);
     if (source === undefined) return;
-    const ratio = SHORT_RATIOS[index] ?? 0.1;
+    const ratio = SHORT_RATIOS[index] ?? 0.09;
     const radial = radialAt(front, right, SHORT_ANGLES[index] ?? index * 0.5);
     const ownRadius = renderedHeight(monarch) * ratio / 3.95;
     const branch = displayBranch(
