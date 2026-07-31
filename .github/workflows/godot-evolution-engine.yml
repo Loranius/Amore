@@ -38,10 +38,25 @@ jobs:
           godot --version
 
       - name: Import and parse project
-        run: godot --headless --path godot/evolution-engine --editor --quit
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot/evolution-engine --editor --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-import.log; then
+            echo 'Godot reported script parser or loader errors.'
+            exit 1
+          fi
 
       - name: Run deterministic growth smoke test
-        run: >-
-          timeout 60s godot --headless
-          --path godot/evolution-engine
-          --script res://scripts/tests/determinism_smoke.gd
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60s godot --headless \
+            --path godot/evolution-engine \
+            --script res://scripts/tests/determinism_smoke.gd \
+            2>&1 | tee /tmp/godot-smoke.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-smoke.log; then
+            echo 'Godot reported script parser or loader errors during the smoke test.'
+            exit 1
+          fi
+          grep -q 'PASS: deterministic crystal rebuild' /tmp/godot-smoke.log
