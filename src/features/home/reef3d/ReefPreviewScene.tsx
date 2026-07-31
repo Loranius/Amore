@@ -8,7 +8,10 @@ import {
   type EvolutionRuntimeMetrics,
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { ReefObject } from './ReefObject';
-import { REEF_PRESENTATION_VERSION } from './reefPresentation';
+import {
+  REEF_COLONY_SHAPE_PASS,
+  REEF_PRESENTATION_VERSION,
+} from './reefPresentation';
 import type { ReefThreeSceneState } from './reefThreeAdapter';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefPreview.css';
@@ -90,6 +93,7 @@ export default function ReefPreviewScene() {
       data-reef-preview="ready"
       data-reef-source="portal"
       data-reef-presentation={REEF_PRESENTATION_VERSION}
+      data-reef-shape-pass={REEF_COLONY_SHAPE_PASS}
       data-reef-acceptance={status}
       data-reef-static-acceptance={build.acceptance.staticStatus}
       data-reef-violations={runtimeViolations.join(',')}
@@ -151,7 +155,7 @@ export default function ReefPreviewScene() {
         {status === 'pass' ? 'production accepted' : status === 'fail' ? 'acceptance fail' : 'runtime warming…'}
       </span>
       <span className="reef-production-species">
-        Reef Species · Phase 9 · {reducedMotion ? 'static' : 'ambient current'}
+        Reef Species · Phase 10 · {reducedMotion ? 'colony forms · static' : 'colony forms · ambient current'}
       </span>
       <span className="reef-production-badge" title={badge}>{badge}</span>
     </div>
