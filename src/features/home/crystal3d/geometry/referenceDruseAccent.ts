@@ -92,13 +92,13 @@ function placeAccent(
   const radial = presentationRadial(foundationAxis, accentAngle(accentIndex));
   const tangent = new THREE.Vector3().crossVectors(radial, foundationAxis).normalize();
 
-  // Низькі шпилі стоять на верхньому плечі прихованої матриці. Перші
-  // дев'ять утворюють фронтальну дугу, решта добудовують друге повне кільце.
-  // Основа занурена, але центр винесений майже до краю породи — юбка не
-  // ховається за товстим монархом у стартовому Pixel 8 Pro кадрі.
+  // Matrix profile тримає майже повний радіус на цьому рівні. Центр
+  // короткого шпиля ставимо приблизно на 95,5% реального ободу: його кришка
+  // лишається в породі, а призматичне тіло виходить назовні й читається у
+  // фронтальному Pixel 8 Pro кадрі. Старі 82% ховали майже весь accent.
   const ring = Math.floor(accentIndex / FRONT_ACCENT_SLOTS.length);
-  const radialDistance = foundationRadius * (0.82 + ring * 0.14)
-    + accentRadius * (0.2 + ring * 0.55);
+  const radialDistance = foundationRadius * (0.955 + ring * 0.16)
+    + accentRadius * (0.1 + ring * 0.55);
   const position = foundationPosition
     .addScaledVector(foundationAxis, foundationHeight * (0.42 + (accentIndex % 3) * 0.025))
     .addScaledVector(radial, radialDistance)
