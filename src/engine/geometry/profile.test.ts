@@ -127,7 +127,7 @@ describe('Crystal organic profile phase 3a', () => {
     ]);
   });
 
-  it('keeps an unburied mother crystal only mildly organic', () => {
+  it('allows the mother crystal to receive visible organic deformation', () => {
     const mother = crystalBody({
       id: 'mother',
       kind: 'crystal:mother',
@@ -143,7 +143,8 @@ describe('Crystal organic profile phase 3a', () => {
     expect(profile.archetype).toBe('prismatic');
     expect(profile.burialStartY).toBe(0);
     expect(profile.burialCompression).toBe(1);
-    expect(Math.abs(profile.twistTotal)).toBeLessThanOrEqual(0.045);
+    expect(Math.abs(profile.twistTotal)).toBeGreaterThan(0);
+    expect(Math.hypot(profile.axisLeanX, profile.axisLeanZ)).toBeGreaterThan(0);
     expect(profile.rows).toHaveLength(7);
   });
 });
