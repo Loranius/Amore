@@ -26,6 +26,12 @@ func create_genesis_instructions(dna) -> Array:
 			+ Vector3.UP * rng.range_float(0.75, 0.96)
 		).normalized()
 		var energy: float = rng.range_float(0.42, 0.68)
+		var metadata: Dictionary = _morphology_metadata(rng, "basal-crown", energy)
+		metadata["hue_shift"] = rng.range_float(-0.045, 0.075)
+		metadata["cap_base"] = false
+		metadata["attachment_ratio"] = 0.03
+		metadata["merge_depth_ratio"] = 0.58
+		metadata["surface_offset_ratio"] = 0.76
 		instructions.append(Model.GrowthInstruction.new(
 			"crystal:genesis:basal:%02d" % index,
 			MOTHER_ID,
@@ -37,14 +43,7 @@ func create_genesis_instructions(dna) -> Array:
 			rng.range_int(5, 7),
 			energy,
 			"genesis",
-			{
-				"role": "basal-crown",
-				"hue_shift": rng.range_float(-0.045, 0.075),
-				"cap_base": false,
-				"attachment_ratio": 0.03,
-				"merge_depth_ratio": 0.58,
-				"surface_offset_ratio": 0.76,
-			},
+			metadata,
 		))
 
 	return instructions
@@ -52,6 +51,10 @@ func create_genesis_instructions(dna) -> Array:
 
 func create_mother(dna) -> RefCounted:
 	var rng = DeterministicRNG.new(dna.seed)
+	var metadata: Dictionary = _morphology_metadata(rng, "mother", 1.0)
+	metadata["hue_shift"] = rng.range_float(-0.035, 0.035)
+	metadata["cap_base"] = true
+	metadata["merge_depth_ratio"] = 0.0
 	return Model.GrowthInstruction.new(
 		MOTHER_ID,
 		"",
@@ -63,12 +66,7 @@ func create_mother(dna) -> RefCounted:
 		rng.range_int(6, 8),
 		1.0,
 		"genesis",
-		{
-			"role": "mother",
-			"hue_shift": rng.range_float(-0.035, 0.035),
-			"cap_base": true,
-			"merge_depth_ratio": 0.0,
-		},
+		metadata,
 	)
 
 
@@ -134,6 +132,13 @@ func translate_event(dna, event, event_index: int, state) -> RefCounted:
 	var radius: float = lerpf(0.16, 0.31, total_pressure) * generation_scale
 	var length: float = lerpf(0.82, 1.82, total_pressure) * generation_scale
 	var sides: int = rng.range_int(5, 8)
+	var metadata: Dictionary = _morphology_metadata(rng, "event-growth", total_pressure)
+	metadata["source"] = event.source
+	metadata["hue_shift"] = rng.range_float(-0.065, 0.09) + culture * 0.035
+	metadata["cap_base"] = false
+	metadata["attachment_ratio"] = along_ratio
+	metadata["merge_depth_ratio"] = merge_depth_ratio
+	metadata["surface_offset_ratio"] = surface_offset_ratio
 
 	return Model.GrowthInstruction.new(
 		"crystal:%s" % event.id,
@@ -146,15 +151,7 @@ func translate_event(dna, event, event_index: int, state) -> RefCounted:
 		sides,
 		total_pressure,
 		event.id,
-		{
-			"source": event.source,
-			"role": "event-growth",
-			"hue_shift": rng.range_float(-0.065, 0.09) + culture * 0.035,
-			"cap_base": false,
-			"attachment_ratio": along_ratio,
-			"merge_depth_ratio": merge_depth_ratio,
-			"surface_offset_ratio": surface_offset_ratio,
-		},
+		metadata,
 	)
 
 
@@ -175,6 +172,67 @@ func _select_parent(event, event_index: int, state, rng) -> RefCounted:
 	var available_event_parents: int = state.instructions.size() - event_parent_start
 	var selected_event_offset: int = rng.range_int(0, maxi(0, available_event_parents - 1))
 	return state.instructions[event_parent_start + selected_event_offset]
+
+
+func _morphology_metadata(rng, role: String, energy: float) -> Dictionary:
+	var body_taper_min := 0.78
+	var body_taper_max := 0.92
+	var waist_min := 0.9
+	var waist_max := 1.04
+	var shoulder_min := 0.64
+	var shoulder_max := 0.78
+	var termination_min := 0.18
+	var termination_max := 0.29
+	var tip_offset_max := 0.2
+	var ridge_min := 0.035
+	var ridge_max := 0.09
+	var twist_max := 0.075
+	var center_drift_max := 0.09
+
+	if role == "mother":
+		body_taper_min = 0.84
+		body_taper_max = 0.94
+		waist_min = 0.95
+		waist_max = 1.045
+		shoulder_min = 0.69
+		shoulder_max = 0.79
+		termination_min = 0.17
+		termination_max = 0.23
+		tip_offset_max = 0.13
+		ridge_min = 0.025
+		ridge_max = 0.065
+		twist_max = 0.045
+		center_drift_max = 0.055
+	elif role == "basal-crown":
+		body_taper_min = 0.76
+		body_taper_max = 0.9
+		waist_min = 0.88
+		waist_max = 1.055
+		shoulder_min = 0.61
+		shoulder_max = 0.76
+		termination_min = 0.2
+		termination_max = 0.31
+		tip_offset_max = 0.24
+		ridge_min = 0.04
+		ridge_max = 0.1
+		twist_max = 0.095
+		center_drift_max = 0.12
+
+	var bounded_energy: float = clampf(energy, 0.0, 1.0)
+	return {
+		"role": role,
+		"body_taper": rng.range_float(body_taper_min, body_taper_max),
+		"waist_ratio": rng.range_float(waist_min, waist_max),
+		"shoulder_height_ratio": rng.range_float(shoulder_min, shoulder_max),
+		"termination_depth_ratio": rng.range_float(termination_min, termination_max),
+		"facet_phase": rng.range_float(-0.22, 0.22),
+		"ring_twist": rng.range_float(-twist_max, twist_max),
+		"ridge_strength": rng.range_float(ridge_min, ridge_max) * lerpf(0.85, 1.12, bounded_energy),
+		"center_drift_x": rng.range_float(-center_drift_max, center_drift_max),
+		"center_drift_z": rng.range_float(-center_drift_max, center_drift_max),
+		"tip_offset_x": rng.range_float(-tip_offset_max, tip_offset_max),
+		"tip_offset_z": rng.range_float(-tip_offset_max, tip_offset_max),
+	}
 
 
 func _channel(event, name: String) -> float:
