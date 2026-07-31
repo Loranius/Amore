@@ -10,7 +10,8 @@ const SAMPLE_STEPS := [0.32, 0.58, 0.82, 1.0]
 func rebuild(dna, source_events: Array):
 	var state := Model.EvolutionState.new(dna)
 	var species := CrystalSpecies.new()
-	state.append_instruction(species.create_mother(dna))
+	for genesis_instruction in species.create_genesis_instructions(dna):
+		state.append_instruction(genesis_instruction)
 
 	var events := source_events.duplicate()
 	events.sort_custom(func(left, right): return left.sort_key() < right.sort_key())
