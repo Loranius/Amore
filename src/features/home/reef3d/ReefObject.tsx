@@ -24,6 +24,24 @@ export function ReefObject({
     return () => disposeReefThreeScene(scene);
   }, [onSceneReady, scene]);
 
+  useEffect(() => {
+    if (!reducedMotion) return;
+    for (const batch of scene.batches) {
+      sampleReefBatchFrame(
+        batch,
+        0,
+        true,
+        build.life.current.cycleSeconds,
+        build.life.current.phaseRadians,
+      );
+    }
+  }, [
+    build.life.current.cycleSeconds,
+    build.life.current.phaseRadians,
+    reducedMotion,
+    scene,
+  ]);
+
   useFrame(({ clock }) => {
     if (reducedMotion) return;
     const elapsedSeconds = clock.getElapsedTime();
