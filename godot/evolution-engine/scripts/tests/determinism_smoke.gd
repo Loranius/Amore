@@ -156,6 +156,22 @@ func _validate_morphology(instructions: Array) -> String:
 		if bounds.size.x < instruction.radius * 1.35 or bounds.size.z < instruction.radius * 1.35:
 			return "Geometry failure: crystal morphology collapsed laterally."
 
+		var material := mesh.surface_get_material(0) as StandardMaterial3D
+		if material == null:
+			return "Material failure: optical material is missing."
+		if not material.rim_enabled or material.rim < 0.1 or material.rim > 0.34:
+			return "Material failure: bounded rim contract is invalid."
+		if not material.clearcoat_enabled or material.clearcoat < 0.3 or material.clearcoat > 0.72:
+			return "Material failure: bounded clearcoat contract is invalid."
+		if material.clearcoat_roughness < 0.07 or material.clearcoat_roughness > 0.25:
+			return "Material failure: clearcoat roughness is outside bounds."
+		if not material.backlight_enabled:
+			return "Material failure: internal backlight cue is disabled."
+		if material.roughness < 0.15 or material.roughness > 0.31:
+			return "Material failure: surface roughness is outside bounds."
+		if material.emission_energy_multiplier > 0.065:
+			return "Material failure: internal emission exceeds the mobile bound."
+
 	return ""
 
 
