@@ -1,4 +1,4 @@
-import { useCallback, useState, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
@@ -6,6 +6,10 @@ import { CrystalStats } from '../../CrystalStats';
 import { MemoryModal } from '../../MemoryModal';
 import { useCrystalDNA } from '../../useCrystal';
 import LegacyCrystalScene from '../CrystalScene';
+import GodotEvolutionPreview from '../../godot3d/GodotEvolutionPreview';
+import { GODOT_EVOLUTION_ENABLED } from '../../godot3d/godotFeatureFlag';
+import { godotPayloadFromArtifact } from '../../godot3d/godotPayloadFromArtifact';
+import type { GodotBridgeInboundMessage } from '../../godot3d/godotBridgeProtocol';
 import { EvolutionCrystalObject } from './EvolutionCrystalObject';
 import {
   EvolutionRuntimeProbe,
@@ -19,6 +23,8 @@ function formatTopology(value: number): string {
   return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
 }
 
+type GodotStateMessage = Extract<GodotBridgeInboundMessage, { type: 'amore:godot:state' }>;
+
 export default function EvolutionCrystalPreviewScene() {
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -27,8 +33,16 @@ export default function EvolutionCrystalPreviewScene() {
   const { dna, deltas, isPending: statsPending } = useCrystalDNA();
   const [open, setOpen] = useState(false);
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
+  const [godotState, setGodotState] = useState<GodotStateMessage | null>(null);
+  const godotPayload = useMemo(
+    () => pipeline ? godotPayloadFromArtifact(pipeline.artifact) : null,
+    [pipeline],
+  );
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => {
     setRuntime(next);
+  }, []);
+  const onGodotMessage = useCallback((message: GodotBridgeInboundMessage) => {
+    if (message.type === 'amore:godot:state') setGodotState(message);
   }, []);
 
   if (error) {
@@ -53,14 +67,21 @@ export default function EvolutionCrystalPreviewScene() {
     }
   };
   const metrics = pipeline.metrics;
-  const badge = [
-    'Evolution',
-    metrics.quality,
-    `${metrics.meshCount} тіл`,
-    `${formatTopology(metrics.usedTriangles)} △`,
-    runtime ? `${runtime.drawCalls} DC` : 'метрики…',
-    `${metrics.buildMs.toFixed(1)} ms`,
-  ].join(' · ');
+  const badge = GODOT_EVOLUTION_ENABLED
+    ? [
+        'Godot 4.7.1',
+        godotState ? `${godotState.instructions} тіл` : 'runtime…',
+        godotState ? `${godotState.history} подій` : 'bridge…',
+        godotState?.signature ?? 'signature…',
+      ].join(' · ')
+    : [
+        'Evolution',
+        metrics.quality,
+        `${metrics.meshCount} тіл`,
+        `${formatTopology(metrics.usedTriangles)} △`,
+        runtime ? `${runtime.drawCalls} DC` : 'метрики…',
+        `${metrics.buildMs.toFixed(1)} ms`,
+      ].join(' · ');
 
   return (
     <>
@@ -71,41 +92,55 @@ export default function EvolutionCrystalPreviewScene() {
         aria-label="Кристал Amore Evolution — показати випадковий спогад"
         onKeyDown={onKeyDownOpen}
         data-evolution-preview="ready"
+        data-evolution-renderer={GODOT_EVOLUTION_ENABLED ? 'godot-4.7.1' : 'three'}
         data-evolution-quality={metrics.quality}
-        data-evolution-bodies={metrics.bodyCount}
-        data-evolution-meshes={metrics.meshCount}
-        data-evolution-materials={metrics.materialCount}
-        data-evolution-vertices={metrics.usedVertices}
-        data-evolution-triangles={metrics.usedTriangles}
+        data-evolution-bodies={GODOT_EVOLUTION_ENABLED
+          ? godotState?.instructions ?? ''
+          : metrics.bodyCount}
+        data-evolution-meshes={GODOT_EVOLUTION_ENABLED ? '' : metrics.meshCount}
+        data-evolution-materials={GODOT_EVOLUTION_ENABLED ? '' : metrics.materialCount}
+        data-evolution-vertices={GODOT_EVOLUTION_ENABLED ? '' : metrics.usedVertices}
+        data-evolution-triangles={GODOT_EVOLUTION_ENABLED ? '' : metrics.usedTriangles}
         data-evolution-build-ms={metrics.buildMs}
-        data-evolution-runtime={runtime ? 'ready' : 'warming'}
-        data-evolution-draw-calls={runtime?.drawCalls ?? ''}
-        data-evolution-rendered-triangles={runtime?.triangles ?? ''}
+        data-evolution-runtime={GODOT_EVOLUTION_ENABLED
+          ? godotState ? 'ready' : 'warming'
+          : runtime ? 'ready' : 'warming'}
+        data-evolution-draw-calls={GODOT_EVOLUTION_ENABLED ? '' : runtime?.drawCalls ?? ''}
+        data-evolution-rendered-triangles={GODOT_EVOLUTION_ENABLED ? '' : runtime?.triangles ?? ''}
+        data-evolution-state-signature={godotState?.signature ?? ''}
       >
-        <Canvas
-          dpr={metrics.quality === 'high' ? [1, 2] : metrics.quality === 'balanced' ? [1, 1.75] : [1, 1.35]}
-          camera={{ position: [0, 0.2, 5.4], fov: 42 }}
-          gl={{ alpha: true, antialias: metrics.quality !== 'fallback' }}
-        >
-          <ambientLight intensity={0.3} />
-          <directionalLight position={[3, 4, 2]} intensity={1.08} />
-          <directionalLight position={[-2.5, 3.5, -3.5]} intensity={0.82} color="#fff1f6" />
-          <pointLight position={[-3, -2, -2]} intensity={0.34} color="#e6a0bd" />
-          <EvolutionCrystalObject
-            geometry={pipeline.geometry}
-            material={pipeline.material}
-            life={pipeline.life}
-            onOpen={openModal}
+        {GODOT_EVOLUTION_ENABLED && godotPayload ? (
+          <GodotEvolutionPreview
+            payload={godotPayload}
+            enabled
+            onMessage={onGodotMessage}
           />
-          <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
-          <OrbitControls
-            enablePan={false}
-            enableZoom={false}
-            enableDamping={!reduceMotion}
-            dampingFactor={0.08}
-            target={[0, 0.2, 0]}
-          />
-        </Canvas>
+        ) : (
+          <Canvas
+            dpr={metrics.quality === 'high' ? [1, 2] : metrics.quality === 'balanced' ? [1, 1.75] : [1, 1.35]}
+            camera={{ position: [0, 0.2, 5.4], fov: 42 }}
+            gl={{ alpha: true, antialias: metrics.quality !== 'fallback' }}
+          >
+            <ambientLight intensity={0.3} />
+            <directionalLight position={[3, 4, 2]} intensity={1.08} />
+            <directionalLight position={[-2.5, 3.5, -3.5]} intensity={0.82} color="#fff1f6" />
+            <pointLight position={[-3, -2, -2]} intensity={0.34} color="#e6a0bd" />
+            <EvolutionCrystalObject
+              geometry={pipeline.geometry}
+              material={pipeline.material}
+              life={pipeline.life}
+              onOpen={openModal}
+            />
+            <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
+            <OrbitControls
+              enablePan={false}
+              enableZoom={false}
+              enableDamping={!reduceMotion}
+              dampingFactor={0.08}
+              target={[0, 0.2, 0]}
+            />
+          </Canvas>
+        )}
         <span className="evolution-preview-badge" aria-label="Метрики Evolution preview">
           {badge}
         </span>
