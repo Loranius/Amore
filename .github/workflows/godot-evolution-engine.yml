@@ -7,13 +7,23 @@ on:
     paths:
       - 'godot/evolution-engine/**'
       - 'src/features/home/godot3d/**'
+      - 'src/features/home/crystal3d/evolution/**'
+      - 'e2e/godot/**'
+      - 'playwright.godot.config.ts'
       - 'vite.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/godot-evolution-engine.yml'
   pull_request:
     paths:
       - 'godot/evolution-engine/**'
       - 'src/features/home/godot3d/**'
+      - 'src/features/home/crystal3d/evolution/**'
+      - 'e2e/godot/**'
+      - 'playwright.godot.config.ts'
       - 'vite.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/godot-evolution-engine.yml'
   workflow_dispatch:
 
@@ -23,7 +33,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -113,4 +123,39 @@ jobs:
           name: amore-godot-web-${{ github.sha }}
           path: /tmp/amore-godot-web
           if-no-files-found: error
+          retention-days: 14
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install React and Playwright dependencies
+        run: |
+          npm ci
+          npm install --no-save --no-package-lock @playwright/test@1.61.1
+          npx playwright install --with-deps chromium
+
+      - name: Stage Godot runtime for same-origin Vite serving
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf public/godot/evolution-engine
+          mkdir -p public/godot/evolution-engine
+          cp -R /tmp/amore-godot-web/. public/godot/evolution-engine/
+          test -s public/godot/evolution-engine/index.wasm
+
+      - name: Run React to Godot Pixel 8 Pro bridge test
+        run: npx playwright test --config=playwright.godot.config.ts
+
+      - name: Upload browser proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amore-godot-browser-proof-${{ github.sha }}
+          path: |
+            test-results/
+            playwright-report-godot/
+          if-no-files-found: warn
           retention-days: 14
