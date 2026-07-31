@@ -14,18 +14,18 @@ func create_genesis_instructions(dna) -> Array:
 	var phase_offset: float = rng.range_float(-0.18, 0.18)
 
 	for index in range(BASAL_CROWN_COUNT):
-		var spin := TAU * float(index) / float(BASAL_CROWN_COUNT) + phase_offset
-		var radial := Vector3(cos(spin), 0.0, sin(spin)).normalized()
-		var attach_position := (
+		var spin: float = TAU * float(index) / float(BASAL_CROWN_COUNT) + phase_offset
+		var radial: Vector3 = Vector3(cos(spin), 0.0, sin(spin)).normalized()
+		var attach_position: Vector3 = (
 			mother.attach_position
 			+ Vector3.UP * rng.range_float(0.04, 0.15)
 			+ radial * mother.radius * rng.range_float(0.34, 0.48)
 		)
-		var direction := (
+		var direction: Vector3 = (
 			radial * rng.range_float(0.48, 0.72)
 			+ Vector3.UP * rng.range_float(0.72, 0.94)
 		).normalized()
-		var energy := rng.range_float(0.42, 0.7)
+		var energy: float = rng.range_float(0.42, 0.7)
 		instructions.append(Model.GrowthInstruction.new(
 			"crystal:genesis:basal:%02d" % index,
 			MOTHER_ID,
@@ -90,7 +90,7 @@ func translate_event(dna, event, event_index: int, state) -> RefCounted:
 	var radial: Vector3 = (tangent_a * cos(spin) + tangent_b * sin(spin)).normalized()
 	var along_ratio: float = rng.range_float(0.16, 0.78)
 	var parent_radius_at_attachment: float = parent.radius * lerpf(1.08, 0.7, along_ratio)
-	var merge_depth_ratio := rng.range_float(0.48, 0.66)
+	var merge_depth_ratio: float = rng.range_float(0.48, 0.66)
 	var attach_position: Vector3 = (
 		parent.attach_position
 		+ parent_direction * parent.length * along_ratio
@@ -166,11 +166,11 @@ func _select_parent(event, event_index: int, state, rng) -> RefCounted:
 
 	# Event growth may use the mother or previously accepted event structures,
 	# but the DNA-defined basal crown is not selected as an event parent yet.
-	var event_parent_start := 1 + BASAL_CROWN_COUNT
+	var event_parent_start: int = 1 + BASAL_CROWN_COUNT
 	if state.instructions.size() <= event_parent_start:
 		return state.instructions[0]
-	var available_event_parents := state.instructions.size() - event_parent_start
-	var selected_event_offset := rng.range_int(0, maxi(0, available_event_parents - 1))
+	var available_event_parents: int = state.instructions.size() - event_parent_start
+	var selected_event_offset: int = rng.range_int(0, maxi(0, available_event_parents - 1))
 	return state.instructions[event_parent_start + selected_event_offset]
 
 
