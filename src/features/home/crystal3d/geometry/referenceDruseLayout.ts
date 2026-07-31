@@ -116,8 +116,8 @@ function shapeDominant(
   const originalRatio = originalMonarch.height > 0 ? branch.height / originalMonarch.height : 0;
   const support = branch.tier === 'support';
   const ratio = support
-    ? clamp(originalRatio, 0.32, 0.5)
-    : clamp(originalRatio, 0.24, 0.4);
+    ? clamp(originalRatio, 0.34, 0.5)
+    : clamp(originalRatio, 0.27, 0.4);
   const height = monarch.height * ratio;
   return {
     ...branch,
@@ -134,18 +134,18 @@ function shapeLocal(branch: ClusterBranch, host: ClusterBranch, monarch: Cluster
   const micro = branch.role === 'micro';
   const requested = clamp(
     branch.height,
-    monarch.height * (micro ? 0.07 : 0.22),
-    monarch.height * (micro ? 0.15 : 0.31),
+    monarch.height * (micro ? 0.055 : 0.26),
+    monarch.height * (micro ? 0.14 : 0.34),
   );
   const height = micro
     ? Math.min(requested, host.height * 0.58)
-    : Math.min(requested, Math.max(host.height * 0.82, monarch.height * 0.22));
+    : Math.min(requested, Math.max(host.height * 0.88, monarch.height * 0.26));
   return {
     ...branch,
     height,
     radiusBottom: Math.min(
       Math.max(branch.radiusBottom, height / (micro ? 4.0 : 4.8)),
-      host.radiusBottom * (micro ? 0.5 : 0.72),
+      host.radiusBottom * (micro ? 0.5 : 0.78),
     ),
     archetype: safeArchetype(branch),
   };
@@ -170,9 +170,12 @@ function placeOnHost(
   const contact = center.addScaledVector(radial, radiusHere);
   const ownRadius = renderedRadius(branch);
 
-  // Кільце основи сидить усередині господаря, але не настільки глибоко,
-  // щоб локальний Marching-Cubes collar повністю зник після hidden-face trim.
-  const burial = Math.min(ownRadius * 1.12 + radiusHere * 0.04, radiusHere * 0.72);
+  // Великі й середні шпилі мають гарантовано поховане кільце основи.
+  // Micro навмисно сидять мілкіше: кілька дрібних граней повинні читатися
+  // на фронті юбки, а не повністю зникати всередині батьківського кристала.
+  const burial = branch.role === 'micro'
+    ? Math.min(ownRadius * 0.76 + radiusHere * 0.02, radiusHere * 0.42)
+    : Math.min(ownRadius * 1.42 + radiusHere * 0.08, radiusHere * 0.82);
   const position = contact.addScaledVector(radial, -burial);
   const direction = hostAxis
     .clone()
@@ -194,9 +197,6 @@ function chooseHero(branches: readonly ClusterBranch[]): ClusterBranch | null {
 }
 
 export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): ClusterBranch[] {
-  // Synthetic geometry tests intentionally do not carry the production
-  // matrix. They validate arbitrary branch configurations and must not be
-  // restaged as a decorative Amore specimen.
   if (!branches.some((branch) => branch.archetype === 'matrix')) {
     return branches.map((branch) => ({ ...branch }));
   }
@@ -279,9 +279,9 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
         shaped,
         host,
         baseAngle + unitFromKey(host.key, 'reference-druse-family') * TAU + index * GOLDEN_ANGLE,
-        (micro ? 0.018 : 0.028) + ring * (micro ? 0.018 : 0.026),
+        (micro ? 0.012 : 0.024) + ring * (micro ? 0.016 : 0.024),
         micro ? 0.48 : 0.58,
-        micro ? 1.02 : 0.86,
+        micro ? 1.04 : 0.84,
         (unitFromKey(source.key, 'reference-druse-local-tangent') - 0.5) * 0.2,
         host.key,
       );
