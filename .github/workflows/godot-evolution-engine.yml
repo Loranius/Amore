@@ -131,11 +131,25 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install React and Playwright dependencies
+      - name: Install React and Playwright test package
         run: |
           npm ci
           npm install --no-save --no-package-lock @playwright/test@1.61.1
-          npx playwright install --with-deps chromium
+
+      - name: Select preinstalled Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          browser_path=''
+          for candidate in chromium google-chrome google-chrome-stable; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+              browser_path="$(command -v "$candidate")"
+              break
+            fi
+          done
+          test -n "$browser_path"
+          "$browser_path" --version
+          echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$browser_path" >> "$GITHUB_ENV"
 
       - name: Stage Godot runtime for same-origin Vite serving
         shell: bash
