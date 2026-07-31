@@ -15,7 +15,6 @@ const UP = new THREE.Vector3(0, 1, 0);
 const CAMERA_FRONT = new THREE.Vector3(0, 0, 1);
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const NEAR_SPECK_PROMOTION_COUNT = 2;
 const FRONT_ACCENT_SLOTS = [
   -0.96,
   0.96,
@@ -163,54 +162,40 @@ export function selectReferenceAccentKeys(
 }
 
 /**
- * У щільній backfilled-друзі частина звичайних family-dominants може бути
- * буквально на кілька відсотків нижчою за радіус об’ємного монарха й
- * читатися пилом. Accent-шпилі не чіпаємо — вони потрібні короткому децилю.
- * Натомість два найближчі до порога неакцентні листові кристали піднімаємо
- * до 103,5% радіуса монарха, але не вище 24% його висоти.
+ * Accent-шпилі є контрольованою короткою фракцією. УСІ інші не-micro
+ * кристали корони повинні бути вищими за радіус монарха, інакше багата
+ * історія перетворюється на десятки нечитабельних камінців. Піднімаємо
+ * тільки дорослу висоту renderer-copy; позиція, hostKey і ключ не міняються.
  */
-function promoteNearSpeckFamilySpires(
+function promoteReadableCrownSpires(
   branches: readonly ClusterBranch[],
   monarch: ClusterBranch,
   accentKeys: ReadonlySet<string>,
 ): ClusterBranch[] {
   const monarchHeight = monarch.height * heightScale(monarch.maturity);
   const monarchRadius = monarch.radiusBottom * radiusScale(monarch.maturity);
-  const readableHeight = Math.min(monarchHeight * 0.24, monarchRadius * 1.035);
+  const readableHeight = Math.min(monarchHeight * 0.31, monarchRadius * 1.075);
   if (readableHeight <= monarchRadius) return branches.map((branch) => ({ ...branch }));
 
-  const loadBearing = new Set(
-    branches
-      .map((branch) => branch.hostKey)
-      .filter((key): key is string => key !== null),
-  );
-  const promoted = new Set(
-    branches
-      .filter((branch) => {
-        if (
-          branch.primary
-          || branch.archetype === 'matrix'
-          || branch.role !== 'dominant'
-          || accentKeys.has(branch.key)
-          || loadBearing.has(branch.key)
-        ) return false;
-        const effectiveHeight = branch.height * heightScale(branch.maturity);
-        return effectiveHeight < monarchRadius && effectiveHeight >= monarchRadius * 0.72;
-      })
-      .sort((left, right) => {
-        const leftHeight = left.height * heightScale(left.maturity);
-        const rightHeight = right.height * heightScale(right.maturity);
-        return rightHeight - leftHeight || left.key.localeCompare(right.key);
-      })
-      .slice(0, NEAR_SPECK_PROMOTION_COUNT)
-      .map((branch) => branch.key),
-  );
+  return branches.map((branch) => {
+    if (
+      branch.primary
+      || branch.archetype === 'matrix'
+      || branch.role === 'micro'
+      || accentKeys.has(branch.key)
+    ) return { ...branch };
 
-  return branches.map((branch) => (
-    promoted.has(branch.key)
-      ? { ...branch, height: readableHeight / heightScale(branch.maturity) }
-      : { ...branch }
-  ));
+    const effectiveHeight = branch.height * heightScale(branch.maturity);
+    if (effectiveHeight >= monarchRadius * 1.025) return { ...branch };
+    return {
+      ...branch,
+      height: readableHeight / heightScale(branch.maturity),
+      radiusBottom: Math.max(
+        branch.radiusBottom,
+        readableHeight / heightScale(branch.maturity) / 4.8,
+      ),
+    };
+  });
 }
 
 export function ensureVisibleReferenceAccent(
@@ -231,5 +216,5 @@ export function ensureVisibleReferenceAccent(
       ? { ...branch }
       : placeAccent(branch, monarch, foundation, index);
   });
-  return promoteNearSpeckFamilySpires(accented, monarch, accentKeys);
+  return promoteReadableCrownSpires(accented, monarch, accentKeys);
 }
