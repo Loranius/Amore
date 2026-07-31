@@ -3,6 +3,7 @@ extends SceneTree
 const Model = preload("res://scripts/core/evolution_model.gd")
 const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
 const CrystalSpecies = preload("res://scripts/species/crystal_species.gd")
+const CrystalMeshBuilder = preload("res://scripts/geometry/crystal_mesh_builder.gd")
 
 
 func _init() -> void:
@@ -110,8 +111,52 @@ func _run() -> void:
 			_fail("Attachment failure: event growth root is not near the parent surface.")
 			return
 
+	var morphology_error := _validate_morphology(first_state.instructions)
+	if not morphology_error.is_empty():
+		_fail(morphology_error)
+		return
+
 	print("PASS: deterministic crystal rebuild; instructions=%d" % first_state.instructions.size())
 	quit(0)
+
+
+func _validate_morphology(instructions: Array) -> String:
+	var builder = CrystalMeshBuilder.new()
+	for instruction in instructions:
+		var body_taper: float = float(instruction.metadata.get("body_taper", -1.0))
+		var waist_ratio: float = float(instruction.metadata.get("waist_ratio", -1.0))
+		var shoulder_height: float = float(instruction.metadata.get("shoulder_height_ratio", -1.0))
+		var termination_depth: float = float(instruction.metadata.get("termination_depth_ratio", -1.0))
+		var ridge_strength: float = float(instruction.metadata.get("ridge_strength", -1.0))
+		var tip_offset := Vector2(
+			float(instruction.metadata.get("tip_offset_x", 0.0)),
+			float(instruction.metadata.get("tip_offset_z", 0.0)),
+		)
+
+		if body_taper < 0.68 or body_taper > 1.0:
+			return "Morphology failure: body taper is outside bounds."
+		if waist_ratio < 0.8 or waist_ratio > 1.12:
+			return "Morphology failure: waist ratio is outside bounds."
+		if shoulder_height < 0.55 or shoulder_height > 0.84:
+			return "Morphology failure: shoulder height is outside bounds."
+		if termination_depth < 0.12 or termination_depth > 0.36:
+			return "Morphology failure: termination depth is outside bounds."
+		if ridge_strength < 0.0 or ridge_strength > 0.14:
+			return "Morphology failure: ridge strength is outside bounds."
+		if tip_offset.length() > 0.36:
+			return "Morphology failure: tip offset is outside bounds."
+
+		var instance: MeshInstance3D = builder.create_mesh_instance(instruction)
+		var mesh := instance.mesh as ArrayMesh
+		if mesh == null or mesh.get_surface_count() != 1:
+			return "Geometry failure: crystal mesh surface is missing."
+		var bounds: AABB = mesh.get_aabb()
+		if bounds.size.y < instruction.length * 0.95:
+			return "Geometry failure: crystal morphology lost vertical extent."
+		if bounds.size.x < instruction.radius * 1.35 or bounds.size.z < instruction.radius * 1.35:
+			return "Geometry failure: crystal morphology collapsed laterally."
+
+	return ""
 
 
 func _fail(message: String) -> void:
