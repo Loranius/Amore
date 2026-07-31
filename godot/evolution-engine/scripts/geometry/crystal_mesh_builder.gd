@@ -145,16 +145,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 			)
 
 	var mesh := surface.commit()
-	var material := StandardMaterial3D.new()
-	material.vertex_color_use_as_albedo = true
-	material.roughness = 0.32
-	material.metallic = 0.025
-	material.cull_mode = BaseMaterial3D.CULL_BACK
-	material.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
-	material.emission_enabled = true
-	material.emission = color.darkened(0.34)
-	material.emission_energy_multiplier = 0.035 + instruction.energy * 0.06
-	mesh.surface_set_material(0, material)
+	mesh.surface_set_material(0, _build_optical_material(instruction, color))
 	return mesh
 
 
@@ -197,6 +188,39 @@ func _connect_rings(
 			upper[side],
 			facet_color,
 		)
+
+
+func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
+	var energy: float = clampf(instruction.energy, 0.0, 1.0)
+	var material := StandardMaterial3D.new()
+	material.vertex_color_use_as_albedo = true
+	material.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
+	material.cull_mode = BaseMaterial3D.CULL_BACK
+	material.roughness = lerpf(0.29, 0.17, energy)
+	material.metallic = 0.015
+	material.metallic_specular = lerpf(0.58, 0.76, energy)
+
+	material.rim_enabled = true
+	material.rim = lerpf(0.14, 0.3, energy)
+	material.rim_tint = 0.64
+
+	material.clearcoat_enabled = true
+	material.clearcoat = lerpf(0.34, 0.68, energy)
+	material.clearcoat_roughness = lerpf(0.23, 0.09, energy)
+
+	material.backlight_enabled = true
+	var backlight_strength: float = lerpf(0.09, 0.16, energy)
+	material.backlight = Color(
+		color.r * backlight_strength,
+		color.g * backlight_strength,
+		color.b * backlight_strength,
+		1.0,
+	)
+
+	material.emission_enabled = true
+	material.emission = color.darkened(0.38)
+	material.emission_energy_multiplier = 0.018 + energy * 0.042
+	return material
 
 
 func _add_quad_clockwise(
