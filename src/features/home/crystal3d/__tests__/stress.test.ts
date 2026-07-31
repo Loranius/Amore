@@ -115,15 +115,19 @@ describe('топологія — Testing Strategy «Geometry Integrity»', () =>
   });
 
   it('перевірка вміє впасти: відкрита межа назовні ловиться', () => {
-    // Вирізаємо в КОРЕНЕВОГО тіла (яке нікуди не заглиблене) шматок стінки —
-    // дірка опиняється просто неба, і це саме те, що має ловити `CAI-REQ-006`.
+    // У спільній матриці верхня кришка значною мірою закрита короною, тому
+    // видалення останніх індексів більше не гарантує зовнішню діру. Вирізаємо
+    // чотири трикутники з середини lathe-буфера — це бічна стінка породи,
+    // яка за визначенням дивиться назовні й мусить дати open boundary.
     const { branches, material } = buildBranches(SEEDS[0]);
     const p = publishCrystal(branches, material);
     const victim = p.bodies.find(
       (b) => b.branch.hostKey === null && (b.geometry.getIndex()?.count ?? 0) > 30,
     )!;
     const index = victim.geometry.getIndex()!;
-    const kept = Array.from(index.array).slice(0, index.count - 12);
+    const all = Array.from(index.array);
+    const cutStart = Math.floor((index.count * 0.45) / 3) * 3;
+    const kept = [...all.slice(0, cutStart), ...all.slice(cutStart + 12)];
     victim.geometry.setIndex(kept);
     const violations = validateTopology(shellEntries(p));
     expect(violations.some((v) => v.kind === 'open-boundary-outside' && v.key === victim.branch.key)).toBe(

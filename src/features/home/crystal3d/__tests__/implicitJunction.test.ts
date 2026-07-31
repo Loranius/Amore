@@ -13,9 +13,37 @@ describe('Phase 3B-2 — bounded implicit junction fusion', () => {
       expect(published.bodies.map((body) => body.branch.key)).toEqual(
         branches.map((branch) => branch.key),
       );
-      expect(published.drawables.length).toBe(
+
+      const renderableKeys = new Set(
+        published.renderable.map((body) => body.branch.key),
+      );
+      const junctionKeys = new Set(
+        published.junctions.map((body) => body.branch.key),
+      );
+
+      // `renderable` is the semantic one-body-per-logical-key set. The scene
+      // may intentionally draw a smaller canonical subset when the controlled
+      // reference crown is active, while still adding the surviving collars.
+      expect(published.drawables.length).toBeLessThanOrEqual(
         published.renderable.length + published.junctions.length,
       );
+      for (const drawable of published.drawables) {
+        expect(
+          renderableKeys.has(drawable.branch.key)
+          || junctionKeys.has(drawable.branch.key),
+        ).toBe(true);
+      }
+
+      // Every display replacement must be present exactly once in the real
+      // scene; its canonical source with the same logical key must not leak in.
+      for (const display of published.displayBodies) {
+        expect(
+          published.drawables.filter(
+            (body) => body.branch.key === display.branch.key,
+          ),
+        ).toEqual([display]);
+      }
+
       expect(published.junctions.length).toBeLessThanOrEqual(4);
 
       for (const junction of published.junctions) {
@@ -40,6 +68,9 @@ describe('Phase 3B-2 — bounded implicit junction fusion', () => {
     expect(repeated.junctions.map((body) => body.branch.key)).toEqual(
       first.junctions.map((body) => body.branch.key),
     );
+    expect(repeated.drawables.map((body) => body.branch.key)).toEqual(
+      first.drawables.map((body) => body.branch.key),
+    );
     first.junctions.forEach((body, index) => {
       const again = repeated.junctions[index]!;
       expect(Array.from(again.geometry.getAttribute('position').array)).toEqual(
@@ -51,6 +82,11 @@ describe('Phase 3B-2 — bounded implicit junction fusion', () => {
     });
 
     expect(disabled.junctions).toHaveLength(0);
-    expect(disabled.drawables).toEqual(disabled.renderable);
+    expect(
+      disabled.drawables.every((body) => disabled.renderable.includes(body)),
+    ).toBe(true);
+    for (const display of disabled.displayBodies) {
+      expect(disabled.drawables).toContain(display);
+    }
   });
 });

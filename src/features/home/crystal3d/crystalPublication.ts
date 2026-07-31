@@ -1,22 +1,29 @@
 // ============================================================
 // crystalPublication — єдиний конвеєр публікації кристала.
 // ------------------------------------------------------------
-// Нормативно: Volume V §12 (публікація), Volume VI §11,
-// `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
-//
-// Порядок незмінний: форма → зріз стику → локальне implicit-зрощення →
-// матеріал → валідація. Marching Cubes працює лише один раз під час
-// публікації та лише в обмежених зонах найбільших базальних стиків.
+// Canonical bodies лишаються повними для trim/shell/topology. Reference
+// display crown лише замінює їх у фактичному renderable за тим самим key.
 // ============================================================
 import type * as THREE from 'three';
 import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
 import { buildHostSolids, type HostSolid } from './geometry/hostBody';
-import {
-  buildImplicitJunctionBodies,
-  type ImplicitJunctionStats,
-} from './geometry/implicitJunction';
 import { trimHiddenFaces, type TrimStats } from './geometry/junctionTrim';
 import { LOD_LEVELS, type LodLevel } from './geometry/lod';
+import {
+  ensureVisibleReferenceAccent,
+  selectReferenceAccentKeys,
+} from './geometry/referenceDruseAccent';
+import {
+  buildReferenceDisplayCrown,
+  type ReferenceDisplaySelection,
+} from './geometry/referenceDisplayCrown';
+import {
+  buildReferenceJunctionBodies,
+  type ImplicitJunctionStats,
+} from './geometry/referenceJunction';
+import { enforceReferenceDruseContract } from './geometry/referenceDruseContract';
+import { enforceReferenceHiddenBudget } from './geometry/referenceHiddenBudget';
+import { applyReferenceDruseLayout } from './geometry/referenceDruseLayout';
 import {
   formatShellViolations,
   probeExterior,
@@ -42,18 +49,27 @@ export interface PublishedBody {
   readonly geometry: THREE.BufferGeometry;
   readonly trim: TrimStats;
   readonly material: MaterialRegionStats;
-  /** Є лише в synthetic collar, логічним тілом Growth Engine не є. */
   readonly implicitJunction?: ImplicitJunctionStats;
+  readonly referenceDisplay?: 'hero' | 'medium' | 'short';
+}
+
+interface PreparedBody {
+  readonly branch: ClusterBranch;
+  readonly solid: HostSolid;
+  readonly geometry: THREE.BufferGeometry;
+  readonly trim: TrimStats;
 }
 
 export interface PublishedCrystal {
   readonly lod: LodLevel;
-  /** Усі логічні тіла стану, включно з повністю прихованими. */
+  /** Усі canonical логічні тіла, включно з прихованими. */
   readonly bodies: readonly PublishedBody[];
-  /** Видимі логічні тіла; семантика метрик/історії лишається незмінною. */
+  /** Фактичні видимі логічні key: canonical або їх display-заміна. */
   readonly renderable: readonly PublishedBody[];
-  /** Фактичний набір рендера: видимі тіла + bounded implicit collars. */
+  /** Реальний набір сцени. Може бути художньо чистішим за semantic renderable. */
   readonly drawables: readonly PublishedBody[];
+  readonly displayBodies: readonly PublishedBody[];
+  readonly displaySelection: ReferenceDisplaySelection | null;
   readonly junctions: readonly PublishedBody[];
   readonly shellViolations: readonly ShellViolation[];
   readonly materialViolations: readonly MaterialViolation[];
@@ -63,47 +79,72 @@ export interface PublishedCrystal {
 
 export interface PublishOptions {
   lod?: LodLevel;
-  /** Пропустити зріз стику — лише для доказів «валідатор не вакуумний». */
+  skipReferenceLayout?: boolean;
+  skipReferenceDisplay?: boolean;
   skipTrim?: boolean;
-  /** Пропустити смугу шва — before/after для `CAI-REQ-010`. */
   skipSeam?: boolean;
-  /** Пропустити implicit collars — A/B і falsifiability-тести Phase 3B-2. */
   skipFusion?: boolean;
-  /** Проби променями коштують помітно дорожче за статичну валідацію. */
   probe?: boolean;
 }
 
-/**
- * Будує і валідує повний стан кристала на заданому рівні деталізації.
- * Чиста функція від (branches, material, options) — жодного стану/часу.
- */
+const emptyTrim = (branch: ClusterBranch, geometry: THREE.BufferGeometry): TrimStats => ({
+  key: branch.key,
+  hostKey: branch.hostKey,
+  trianglesTotal: (geometry.getIndex()?.count ?? 0) / 3,
+  trianglesRemoved: 0,
+  capBuried: false,
+  capRemoved: false,
+  occluders: [],
+});
+
+const triangleCount = (geometry: THREE.BufferGeometry): number =>
+  (geometry.getIndex()?.count ?? 0) / 3;
+
 export function publishCrystal(
   branches: readonly ClusterBranch[],
   material: ClusterMaterial,
   options: PublishOptions = {},
 ): PublishedCrystal {
   const lod = options.lod ?? 'high';
-  const solids = buildHostSolids(branches, material, lod);
-  const byKey = new Map(branches.map((branch) => [branch.key, branch] as const));
+  const referenceBase = options.skipReferenceLayout
+    ? null
+    : enforceReferenceDruseContract(applyReferenceDruseLayout(branches));
+  const accentKeys = referenceBase === null
+    ? new Set<string>()
+    : selectReferenceAccentKeys(referenceBase);
+  const laidOut = referenceBase === null
+    ? branches.map((branch) => ({ ...branch }))
+    : ensureVisibleReferenceAccent(referenceBase);
+  const solids = buildHostSolids(laidOut, material, lod);
+  const byKey = new Map(laidOut.map((branch) => [branch.key, branch] as const));
 
-  const bodies: PublishedBody[] = branches.map((branch) => {
+  const prepared: PreparedBody[] = laidOut.map((branch) => {
     const solid = solids.get(branch.key)!;
     const geometry = buildBranchGeometry(branch, material, lod);
-
-    // 1. Volume V — зовнішня оболонка: знімаємо приховані грані.
     const trim = options.skipTrim
-      ? ({
-          key: branch.key,
-          hostKey: branch.hostKey,
-          trianglesTotal: (geometry.getIndex()?.count ?? 0) / 3,
-          trianglesRemoved: 0,
-          capBuried: false,
-          capRemoved: false,
-          occluders: [],
-        } satisfies TrimStats)
+      ? emptyTrim(branch, geometry)
       : trimHiddenFaces(geometry, solid, branch.hostKey, solids);
+    return { branch, solid, geometry, trim };
+  });
 
-    // 2. Volume VI — матеріал СТРОГО після зрізу.
+  const displayResult = referenceBase === null || options.skipReferenceDisplay === true
+    ? null
+    : buildReferenceDisplayCrown(laidOut, material, lod, accentKeys);
+  const activeDisplayKeys = displayResult !== null && displayResult.bodies.length > 0
+    ? displayResult.selection.sourceKeys
+    : new Set<string>();
+
+  if (referenceBase !== null) {
+    // Якщо display оживляє source, який canonical trim уже повністю сховав,
+    // компенсуємо це додатковим не-display hidden body. Фінальна економія
+    // тому не залежить від того, які саме реальні події стали короною.
+    const revived = prepared.filter((body) => (
+      activeDisplayKeys.has(body.branch.key) && triangleCount(body.geometry) === 0
+    )).length;
+    enforceReferenceHiddenBudget(prepared, accentKeys, 4 + revived, activeDisplayKeys);
+  }
+
+  const bodies: PublishedBody[] = prepared.map(({ branch, solid, geometry, trim }) => {
     const hostSolid = branch.hostKey === null ? undefined : solids.get(branch.hostKey);
     const hostBranch = branch.hostKey === null ? undefined : byKey.get(branch.hostKey);
     const host =
@@ -111,15 +152,21 @@ export function publishCrystal(
         ? { solid: hostSolid, branch: hostBranch }
         : undefined;
     const materialStats = bindMaterialRegions(geometry, branch, solid, material, host);
-
     return { branch, solid, geometry, trim, material: materialStats };
   });
 
-  // 3. Phase 3B-2 — локальна smooth-union оболонка стику. Вона не додає
-  // подій/тіл у Growth State: це renderer-only зовнішня мінеральна шкіра.
+  const displayBodies: PublishedBody[] = (displayResult?.bodies ?? []).map((display) => ({
+    branch: display.branch,
+    solid: display.solid,
+    geometry: display.geometry,
+    trim: emptyTrim(display.branch, display.geometry),
+    material: display.material,
+    referenceDisplay: display.kind,
+  }));
+
   const implicit = options.skipFusion
     ? []
-    : buildImplicitJunctionBodies(branches, solids, lod);
+    : buildReferenceJunctionBodies(laidOut, solids, lod);
   const junctions: PublishedBody[] = implicit.flatMap((junction) => {
     const hostSolid = junction.branch.hostKey === null
       ? undefined
@@ -131,7 +178,6 @@ export function publishCrystal(
       junction.geometry.dispose();
       return [];
     }
-
     const materialStats = bindMaterialRegions(
       junction.geometry,
       junction.branch,
@@ -158,9 +204,7 @@ export function publishCrystal(
     }];
   });
 
-  // 4. Канонічні shell/topology перевірки лишаються на логічних lathe-
-  // тілах: їхні валідатори свідомо використовують col·profileLen+row.
-  // Implicit collar має власну boundary-перевірку перед поверненням модуля.
+  // Canonical shell не залежить від художнього display-layer.
   const shellEntries = bodies.map((body) => ({
     solid: body.solid,
     hostKey: body.branch.hostKey,
@@ -170,16 +214,47 @@ export function publishCrystal(
     ...validateExternalShell(shellEntries),
     ...(options.probe === true ? probeExterior(shellEntries, UNDERSIDE_DIRECTIONS) : []),
   ];
-  const materialViolations = validateMaterialRegions([...bodies, ...junctions], material);
+  const materialViolations = validateMaterialRegions(
+    [...bodies, ...displayBodies, ...junctions],
+    material,
+  );
   const topologyViolations = validateTopology(shellEntries);
-  const renderable = bodies.filter((body) => (body.geometry.getIndex()?.count ?? 0) > 0);
-  const drawables = [...renderable, ...junctions];
+
+  // Semantic renderable лишається 1:1 з логічними key і використовується
+  // метриками/тестами. Canonical source mesh замінюється display-версією
+  // лише для того самого key.
+  const logicalRenderable = bodies.filter((body) => (
+    triangleCount(body.geometry) > 0 && !activeDisplayKeys.has(body.branch.key)
+  ));
+  const renderable = [...logicalRenderable, ...displayBodies];
+
+  // Коли reference crown активна, випадкові canonical діти й їхні старі
+  // implicit-комірці не повинні вдруге з'являтися у кадрі. Для сцени
+  // лишаються тільки центральне тіло, прихована матриця/основа й
+  // контрольована корона. Canonical оболонка при цьому повністю збережена
+  // вище для shell/topology/material-аудиту.
+  const hasReferenceDisplay = displayBodies.length > 0;
+  const sceneCanonical = hasReferenceDisplay
+    ? logicalRenderable.filter((body) => body.branch.primary || body.branch.archetype === 'matrix')
+    : logicalRenderable;
+  const sceneJunctions = hasReferenceDisplay
+    ? junctions.filter((body) => {
+        const junction = body.implicitJunction;
+        return junction === undefined || (
+          !activeDisplayKeys.has(junction.sourceKey)
+          && !activeDisplayKeys.has(junction.hostKey)
+        );
+      })
+    : junctions;
+  const drawables = [...sceneCanonical, ...displayBodies, ...sceneJunctions];
 
   return Object.freeze({
     lod,
     bodies: Object.freeze(bodies),
     renderable: Object.freeze(renderable),
     drawables: Object.freeze(drawables),
+    displayBodies: Object.freeze(displayBodies),
+    displaySelection: displayResult?.selection ?? null,
     junctions: Object.freeze(junctions),
     shellViolations: Object.freeze(shellViolations),
     materialViolations: Object.freeze(materialViolations),
@@ -191,10 +266,9 @@ export function publishCrystal(
   });
 }
 
-/** Читабельний звіт гейта — для dev-консолі й доказів у репорті. */
 export function formatPublicationReport(published: PublishedCrystal): string {
   const lines = [
-    `LOD ${published.lod}: ${published.bodies.length} тіл, ${published.junctions.length} implicit-стиків`,
+    `LOD ${published.lod}: ${published.bodies.length} тіл, ${published.displayBodies.length} display, ${published.junctions.length} implicit-стиків`,
   ];
   if (published.shellViolations.length > 0) lines.push(formatShellViolations(published.shellViolations));
   if (published.materialViolations.length > 0) {
@@ -207,7 +281,6 @@ export function formatPublicationReport(published: PublishedCrystal): string {
   return lines.join('\n');
 }
 
-/** Усі публіковані рівні — вхід для перевірки `CAI-REQ-011`. */
 export function publishAllLods(
   branches: readonly ClusterBranch[],
   material: ClusterMaterial,

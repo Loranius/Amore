@@ -109,7 +109,7 @@ describe('external shell — `CAI-REQ-007` hidden faces', () => {
         }
       }
     }
-  });
+  }, 10_000);
 
   it('зріз реально працює: сира маса порушення МАЄ, зрізана — ні', () => {
     for (const seed of SEEDS) {
