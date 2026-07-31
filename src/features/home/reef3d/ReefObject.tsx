@@ -1,6 +1,8 @@
 import { useEffect, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { ReefPreviewBuild } from './buildReefPreview';
+import { applyReefMaterialColorSpace } from './reefMaterialColorSpace';
+import { applyReefMaterialPresentation } from './reefMaterialPresentation';
 import { applyReefPresentation } from './reefPresentation';
 import {
   createReefThreeScene,
@@ -19,7 +21,11 @@ export function ReefObject({
   onSceneReady?: (scene: ReefThreeSceneState) => void;
 }) {
   const scene = useMemo(
-    () => applyReefPresentation(createReefThreeScene(build)),
+    () => applyReefMaterialColorSpace(
+      applyReefMaterialPresentation(
+        applyReefPresentation(createReefThreeScene(build)),
+      ),
+    ),
     [build],
   );
 

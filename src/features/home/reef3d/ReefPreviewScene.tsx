@@ -9,6 +9,10 @@ import {
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { ReefObject } from './ReefObject';
 import {
+  REEF_MATERIAL_PASS,
+  REEF_MATERIAL_PRESENTATION_VERSION,
+} from './reefMaterialPresentation';
+import {
   REEF_COLONY_SHAPE_PASS,
   REEF_PRESENTATION_VERSION,
 } from './reefPresentation';
@@ -94,6 +98,8 @@ export default function ReefPreviewScene() {
       data-reef-source="portal"
       data-reef-presentation={REEF_PRESENTATION_VERSION}
       data-reef-shape-pass={REEF_COLONY_SHAPE_PASS}
+      data-reef-material-presentation={REEF_MATERIAL_PRESENTATION_VERSION}
+      data-reef-material-pass={REEF_MATERIAL_PASS}
       data-reef-acceptance={status}
       data-reef-static-acceptance={build.acceptance.staticStatus}
       data-reef-violations={runtimeViolations.join(',')}
@@ -129,10 +135,10 @@ export default function ReefPreviewScene() {
         camera={{ position: [0, 2.75, 7.8], fov: 40, near: 0.1, far: 40 }}
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       >
-        <ambientLight intensity={0.66} />
-        <hemisphereLight args={['#d9f7ff', '#183848', 1.2]} />
-        <directionalLight position={[4, 7, 5]} intensity={2.05} color="#fff4df" />
-        <directionalLight position={[-4, 2, -3]} intensity={0.85} color="#62c5df" />
+        <ambientLight intensity={0.46} />
+        <hemisphereLight args={['#d8f8ff', '#244654', 1.05]} />
+        <directionalLight position={[4, 7, 5]} intensity={2.2} color="#fff1da" />
+        <directionalLight position={[-4, 2, -3]} intensity={0.72} color="#6bbbd3" />
         <ReefObject
           build={build}
           reducedMotion={reducedMotion}
@@ -155,7 +161,7 @@ export default function ReefPreviewScene() {
         {status === 'pass' ? 'production accepted' : status === 'fail' ? 'acceptance fail' : 'runtime warming…'}
       </span>
       <span className="reef-production-species">
-        Reef Species · Phase 10 · {reducedMotion ? 'colony forms · static' : 'colony forms · ambient current'}
+        Reef Species · Phase 11 · {reducedMotion ? 'material language · static' : 'material language · ambient current'}
       </span>
       <span className="reef-production-badge" title={badge}>{badge}</span>
     </div>

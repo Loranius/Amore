@@ -47,6 +47,8 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reef).toHaveAttribute('data-reef-source', 'portal');
     await expect(reef).toHaveAttribute('data-reef-presentation', 'reef-visual-v2');
     await expect(reef).toHaveAttribute('data-reef-shape-pass', 'phase-10-colony-shapes');
+    await expect(reef).toHaveAttribute('data-reef-material-presentation', 'reef-material-v1');
+    await expect(reef).toHaveAttribute('data-reef-material-pass', 'phase-11-material-pass');
     await expect(reef).toHaveAttribute('data-reef-static-acceptance', 'pass');
     await expect(reef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(reef).toHaveAttribute('data-reef-phase-count', '8');
@@ -84,6 +86,8 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reloadedReef).toBeVisible({ timeout: 25_000 });
     await expect(reloadedReef).toHaveAttribute('data-reef-presentation', 'reef-visual-v2');
     await expect(reloadedReef).toHaveAttribute('data-reef-shape-pass', 'phase-10-colony-shapes');
+    await expect(reloadedReef).toHaveAttribute('data-reef-material-presentation', 'reef-material-v1');
+    await expect(reloadedReef).toHaveAttribute('data-reef-material-pass', 'phase-11-material-pass');
     await expect(reloadedReef).toHaveAttribute('data-reef-production-signature', productionSignature ?? '');
     await expect(reloadedReef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(page.getByRole('tab', { name: /Риф/ })).toHaveAttribute('aria-selected', 'true');
