@@ -9,7 +9,7 @@
 import type * as THREE from 'three';
 import type { ClusterBranch } from '../crystalCluster';
 
-const MINIMUM_HIDDEN_BODIES = 3;
+const MINIMUM_HIDDEN_BODIES = 4;
 
 export interface ReferenceBudgetBody {
   readonly branch: ClusterBranch;
@@ -25,8 +25,8 @@ const bodyVolume = (body: ReferenceBudgetBody): number =>
 /**
  * Гарантує мінімальний renderer-budget без нових перетинів геометрії.
  * Кандидати вже мають побудовану/обрізану оболонку, тому ми відбираємо лише
- * реально видимі листові тіла. Акцентна юбка, монарх, hero/dominant і тіла,
- * на яких тримаються діти, ніколи не відсікаються.
+ * реально видимі неакцентні тіла. Монарх, matrix, hero/dominant, базальна
+ * акцентна фракція та господарі ВИДИМИХ дітей ніколи не відсікаються.
  */
 export function enforceReferenceHiddenBudget(
   bodies: readonly ReferenceBudgetBody[],
@@ -38,8 +38,9 @@ export function enforceReferenceHiddenBudget(
   const missing = Math.max(0, MINIMUM_HIDDEN_BODIES - alreadyHidden);
   if (missing === 0) return;
 
-  const loadBearing = new Set(
+  const visibleLoadBearing = new Set(
     bodies
+      .filter((body) => triangleCount(body) > 0)
       .map((body) => body.branch.hostKey)
       .filter((key): key is string => key !== null),
   );
@@ -51,7 +52,7 @@ export function enforceReferenceHiddenBudget(
       && body.branch.archetype !== 'matrix'
       && body.branch.role !== 'dominant'
       && !accentKeys.has(body.branch.key)
-      && !loadBearing.has(body.branch.key)
+      && !visibleLoadBearing.has(body.branch.key)
     ))
     .sort((left, right) => (
       bodyVolume(left) - bodyVolume(right)
