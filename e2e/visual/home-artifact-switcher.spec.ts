@@ -14,7 +14,7 @@ async function login(page: Page, url: string) {
 test.describe('Home artifact switcher Pixel 8 Pro', () => {
   test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
 
-  test('switches between the live Crystal, live Tree and honest Reef slot', async ({ page }) => {
+  test('switches between the accepted Crystal, Tree and Reef renderers', async ({ page }) => {
     await login(page, '?artifact=crystal#/login');
 
     const home = page.locator('.home');
@@ -42,8 +42,18 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await page.getByRole('tab', { name: /Риф/ }).click();
     await expect(home).toHaveAttribute('data-home-artifact', 'reef');
     await expect(page.getByRole('heading', { name: 'Риф Amore' })).toBeVisible();
-    await expect(page.locator('[data-reef-preview="pending"]')).toBeVisible();
-    await expect(page.getByText('Риф ще не підключено')).toBeVisible();
+    const reef = page.locator('[data-reef-preview="ready"]');
+    await expect(reef).toBeVisible({ timeout: 25_000 });
+    await expect(reef).toHaveAttribute('data-reef-source', 'portal');
+    await expect(reef).toHaveAttribute('data-reef-static-acceptance', 'pass');
+    await expect(reef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
+    const reefDrawCalls = Number(await reef.getAttribute('data-reef-runtime-draw-calls'));
+    const reefVertices = Number(await reef.getAttribute('data-reef-vertices'));
+    const reefTriangles = Number(await reef.getAttribute('data-reef-triangles'));
+    expect(reefDrawCalls).toBeGreaterThan(0);
+    expect(reefDrawCalls).toBeLessThanOrEqual(7);
+    expect(reefVertices).toBeLessThanOrEqual(24_256);
+    expect(reefTriangles).toBeLessThanOrEqual(36_512);
     await page.screenshot({
       path: 'test-results/home-artifact-reef-pixel-8-pro.png',
       fullPage: true,
@@ -51,7 +61,7 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
 
     await page.reload();
     await expect(home).toHaveAttribute('data-home-artifact', 'reef');
-    await expect(page.locator('[data-reef-preview="pending"]')).toBeVisible();
+    await expect(page.locator('[data-reef-preview="ready"]')).toBeVisible({ timeout: 25_000 });
     await expect(page.getByRole('tab', { name: /Риф/ })).toHaveAttribute('aria-selected', 'true');
   });
 });
