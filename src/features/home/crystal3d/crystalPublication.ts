@@ -5,9 +5,8 @@
 // `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
 //
 // Порядок: renderer-layout → renderer-contract → accent → форма → зріз
-// стику → hidden budget → матеріал → локальне implicit-зрощення →
-// валідація. Reference-pass живуть тут, а не в Growth State: історія й
-// append-only лишаються чистими.
+// стику → reference display crown → hidden budget → матеріал → локальне
+// implicit-зрощення → валідація. Growth State лишається незмінним.
 // ============================================================
 import type * as THREE from 'three';
 import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
@@ -18,6 +17,10 @@ import {
   ensureVisibleReferenceAccent,
   selectReferenceAccentKeys,
 } from './geometry/referenceDruseAccent';
+import {
+  buildReferenceDisplayCrown,
+  type ReferenceDisplaySelection,
+} from './geometry/referenceDisplayCrown';
 import {
   buildReferenceJunctionBodies,
   type ImplicitJunctionStats,
@@ -52,6 +55,8 @@ export interface PublishedBody {
   readonly material: MaterialRegionStats;
   /** Є лише в synthetic collar, логічним тілом Growth Engine не є. */
   readonly implicitJunction?: ImplicitJunctionStats;
+  /** Renderer-only display-представлення логічного тіла з тим самим key. */
+  readonly referenceDisplay?: 'hero' | 'medium' | 'short';
 }
 
 interface PreparedBody {
@@ -65,10 +70,13 @@ export interface PublishedCrystal {
   readonly lod: LodLevel;
   /** Усі логічні тіла стану, включно з повністю прихованими. */
   readonly bodies: readonly PublishedBody[];
-  /** Видимі логічні тіла; семантика метрик/історії лишається незмінною. */
+  /** Видимі логічні тіла, включно з renderer-only представленнями тих самих key. */
   readonly renderable: readonly PublishedBody[];
-  /** Фактичний набір рендера: видимі тіла + bounded implicit collars. */
+  /** Фактичний набір рендера: renderable + bounded implicit collars. */
   readonly drawables: readonly PublishedBody[];
+  /** Контрольовані renderer-only hero та базальна корона. */
+  readonly displayBodies: readonly PublishedBody[];
+  readonly displaySelection: ReferenceDisplaySelection | null;
   readonly junctions: readonly PublishedBody[];
   readonly shellViolations: readonly ShellViolation[];
   readonly materialViolations: readonly MaterialViolation[];
@@ -80,6 +88,8 @@ export interface PublishOptions {
   lod?: LodLevel;
   /** Пропустити renderer-layout — лише для A/B та доказу межі шарів. */
   skipReferenceLayout?: boolean;
+  /** Пропустити контрольований display crown — A/B візуальної композиції. */
+  skipReferenceDisplay?: boolean;
   /** Пропустити зріз стику — лише для доказів «валідатор не вакуумний». */
   skipTrim?: boolean;
   /** Пропустити смугу шва — before/after для `CAI-REQ-010`. */
@@ -89,6 +99,16 @@ export interface PublishOptions {
   /** Проби променями коштують помітно дорожче за статичну валідацію. */
   probe?: boolean;
 }
+
+const emptyTrim = (branch: ClusterBranch, geometry: THREE.BufferGeometry): TrimStats => ({
+  key: branch.key,
+  hostKey: branch.hostKey,
+  trianglesTotal: (geometry.getIndex()?.count ?? 0) / 3,
+  trianglesRemoved: 0,
+  capBuried: false,
+  capRemoved: false,
+  occluders: [],
+});
 
 /**
  * Будує і валідує повний стан кристала на заданому рівні деталізації.
@@ -117,19 +137,25 @@ export function publishCrystal(
     const geometry = buildBranchGeometry(branch, material, lod);
 
     const trim = options.skipTrim
-      ? ({
-          key: branch.key,
-          hostKey: branch.hostKey,
-          trianglesTotal: (geometry.getIndex()?.count ?? 0) / 3,
-          trianglesRemoved: 0,
-          capBuried: false,
-          capRemoved: false,
-          occluders: [],
-        } satisfies TrimStats)
+      ? emptyTrim(branch, geometry)
       : trimHiddenFaces(geometry, solid, branch.hostKey, solids);
 
     return { branch, solid, geometry, trim };
   });
+
+  const displayResult = referenceBase === null || options.skipReferenceDisplay === true
+    ? null
+    : buildReferenceDisplayCrown(laidOut, material, lod, accentKeys);
+  if (displayResult !== null) {
+    // Старий mesh події лишається в `bodies`, але не потрапляє в renderer.
+    // Display-body нижче має той самий key, тому tap/модалка/метрики бачать
+    // ту саму логічну подію, а не новий synthetic ID.
+    for (const body of prepared) {
+      if (displayResult.selection.sourceKeys.has(body.branch.key)) {
+        body.geometry.setIndex([]);
+      }
+    }
+  }
 
   if (referenceBase !== null) {
     enforceReferenceHiddenBudget(prepared, accentKeys);
@@ -145,6 +171,15 @@ export function publishCrystal(
     const materialStats = bindMaterialRegions(geometry, branch, solid, material, host);
     return { branch, solid, geometry, trim, material: materialStats };
   });
+
+  const displayBodies: PublishedBody[] = (displayResult?.bodies ?? []).map((display) => ({
+    branch: display.branch,
+    solid: display.solid,
+    geometry: display.geometry,
+    trim: emptyTrim(display.branch, display.geometry),
+    material: display.material,
+    referenceDisplay: display.kind,
+  }));
 
   const implicit = options.skipFusion
     ? []
@@ -187,6 +222,9 @@ export function publishCrystal(
     }];
   });
 
+  // Shell/topology перевіряють канонічні логічні тіла. Display crown є
+  // заміною renderer-представлення вже перевірених ключів і не бере участі
+  // у trim/host-математиці, аналогічно bounded implicit collars.
   const shellEntries = bodies.map((body) => ({
     solid: body.solid,
     hostKey: body.branch.hostKey,
@@ -196,9 +234,13 @@ export function publishCrystal(
     ...validateExternalShell(shellEntries),
     ...(options.probe === true ? probeExterior(shellEntries, UNDERSIDE_DIRECTIONS) : []),
   ];
-  const materialViolations = validateMaterialRegions([...bodies, ...junctions], material);
+  const materialViolations = validateMaterialRegions(
+    [...bodies, ...displayBodies, ...junctions],
+    material,
+  );
   const topologyViolations = validateTopology(shellEntries);
-  const renderable = bodies.filter((body) => (body.geometry.getIndex()?.count ?? 0) > 0);
+  const logicalRenderable = bodies.filter((body) => (body.geometry.getIndex()?.count ?? 0) > 0);
+  const renderable = [...logicalRenderable, ...displayBodies];
   const drawables = [...renderable, ...junctions];
 
   return Object.freeze({
@@ -206,6 +248,8 @@ export function publishCrystal(
     bodies: Object.freeze(bodies),
     renderable: Object.freeze(renderable),
     drawables: Object.freeze(drawables),
+    displayBodies: Object.freeze(displayBodies),
+    displaySelection: displayResult?.selection ?? null,
     junctions: Object.freeze(junctions),
     shellViolations: Object.freeze(shellViolations),
     materialViolations: Object.freeze(materialViolations),
@@ -219,7 +263,7 @@ export function publishCrystal(
 
 export function formatPublicationReport(published: PublishedCrystal): string {
   const lines = [
-    `LOD ${published.lod}: ${published.bodies.length} тіл, ${published.junctions.length} implicit-стиків`,
+    `LOD ${published.lod}: ${published.bodies.length} тіл, ${published.displayBodies.length} display, ${published.junctions.length} implicit-стиків`,
   ];
   if (published.shellViolations.length > 0) lines.push(formatShellViolations(published.shellViolations));
   if (published.materialViolations.length > 0) {
