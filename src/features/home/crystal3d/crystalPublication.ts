@@ -4,9 +4,9 @@
 // Нормативно: Volume V §12 (публікація), Volume VI §11,
 // `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
 //
-// Порядок незмінний: renderer-layout → renderer-contract → форма → зріз
-// стику → локальне implicit-зрощення → матеріал → валідація. Обидва
-// reference-pass живуть тут, а не в Growth State: історія й append-only
+// Порядок незмінний: renderer-layout → renderer-contract → accent → форма
+// → зріз стику → локальне implicit-зрощення → матеріал → валідація.
+// Reference-pass живуть тут, а не в Growth State: історія й append-only
 // лишаються чистими.
 // ============================================================
 import type * as THREE from 'three';
@@ -14,6 +14,7 @@ import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from '.
 import { buildHostSolids, type HostSolid } from './geometry/hostBody';
 import { trimHiddenFaces, type TrimStats } from './geometry/junctionTrim';
 import { LOD_LEVELS, type LodLevel } from './geometry/lod';
+import { ensureVisibleReferenceAccent } from './geometry/referenceDruseAccent';
 import {
   buildReferenceJunctionBodies,
   type ImplicitJunctionStats,
@@ -90,7 +91,9 @@ export function publishCrystal(
   const lod = options.lod ?? 'high';
   const laidOut = options.skipReferenceLayout
     ? branches.map((branch) => ({ ...branch }))
-    : enforceReferenceDruseContract(applyReferenceDruseLayout(branches));
+    : ensureVisibleReferenceAccent(
+        enforceReferenceDruseContract(applyReferenceDruseLayout(branches)),
+      );
   const solids = buildHostSolids(laidOut, material, lod);
   const byKey = new Map(laidOut.map((branch) => [branch.key, branch] as const));
 
