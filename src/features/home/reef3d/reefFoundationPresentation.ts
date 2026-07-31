@@ -12,7 +12,7 @@ export const REEF_FOUNDATION_PROFILE = Object.freeze({
   primaryEdgeAmplitude: 0.105,
   secondaryEdgeAmplitude: 0.046,
   asymmetricEdgeAmplitude: 0.038,
-  bottomTaper: 0.95,
+  bottomTaper: 0.94,
   topReliefRatio: 0.016,
   edgeShelfRatio: 0.014,
   edgeErosionRatio: 0.018,
