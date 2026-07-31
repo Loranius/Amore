@@ -1,10 +1,10 @@
 // ============================================================
 // referenceDruseContract — останній renderer-only санітарний контракт.
 // ------------------------------------------------------------
-// Layout формує силует. Цей pass фіксує чотири інваріанти:
+// Layout формує силует. Цей pass фіксує три інваріанти:
 //   • hero-spire помітний, але монарх лишається >2× вищим;
-//   • micro та один найменший satellite стають внутрішніми включеннями;
-//   • один малий satellite лишається видимою короткою фракцією юбки;
+//   • micro та два найменші synthetic satellites стають внутрішніми
+//     включеннями, а не хаотичним пилом на поверхні;
 //   • родина hero має невеликий тангенційний рознос без z-fighting.
 // ============================================================
 import * as THREE from 'three';
@@ -78,16 +78,16 @@ function hiddenInclusion(
   const { radial } = radialBasis(hostAxis, branch.key);
   const position = hostPosition
     .addScaledVector(hostAxis, hostHeight * 0.025)
-    .addScaledVector(radial, hostRadius * 0.06);
+    .addScaledVector(radial, hostRadius * 0.045);
   const direction = hostAxis
     .clone()
-    .multiplyScalar(0.94)
-    .addScaledVector(radial, 0.1)
+    .multiplyScalar(0.96)
+    .addScaledVector(radial, 0.08)
     .normalize();
   const height = Math.min(
     branch.height,
-    monarch.height * (satellite ? 0.12 : 0.08),
-    host.height * (satellite ? 0.28 : 0.26),
+    monarch.height * (satellite ? 0.105 : 0.075),
+    host.height * (satellite ? 0.24 : 0.22),
   );
   const adjusted = withDirection(branch, direction);
   return {
@@ -95,49 +95,12 @@ function hiddenInclusion(
     height,
     radiusBottom: Math.min(
       branch.radiusBottom,
-      host.radiusBottom * (satellite ? 0.18 : 0.15),
+      host.radiusBottom * (satellite ? 0.15 : 0.13),
     ),
     posX: position.x,
     posY: position.y,
     posZ: position.z,
     archetype: branch.archetype === 'etched' ? 'etched' : 'spear',
-  };
-}
-
-function visibleSmallSatellite(
-  branch: ClusterBranch,
-  host: ClusterBranch,
-  monarch: ClusterBranch,
-): ClusterBranch {
-  const hostAxis = axisOf(host);
-  const hostPosition = positionOf(host);
-  const hostHeight = host.height * heightScale(host.maturity);
-  const hostRadius = host.radiusBottom * radiusScale(host.maturity);
-  const { radial, tangent } = radialBasis(hostAxis, branch.key);
-  const position = hostPosition
-    .addScaledVector(hostAxis, hostHeight * 0.035)
-    .addScaledVector(radial, hostRadius * 0.68)
-    .addScaledVector(tangent, hostRadius * 0.08);
-  const direction = hostAxis
-    .clone()
-    .multiplyScalar(0.58)
-    .addScaledVector(UP, 0.18)
-    .addScaledVector(radial, 0.82)
-    .addScaledVector(tangent, 0.12)
-    .normalize();
-  const height = monarch.height * 0.18;
-  const adjusted = withDirection(branch, direction);
-  return {
-    ...adjusted,
-    height,
-    radiusBottom: Math.min(
-      Math.max(branch.radiusBottom, height / 4.8),
-      host.radiusBottom * 0.56,
-    ),
-    posX: position.x,
-    posY: position.y,
-    posZ: position.z,
-    archetype: 'prismatic',
   };
 }
 
@@ -191,8 +154,7 @@ export function enforceReferenceDruseContract(
       const rv = right.height * right.radiusBottom * right.radiusBottom;
       return lv - rv || left.key.localeCompare(right.key);
     });
-  const innerSatelliteKey = satellites[0]?.key ?? null;
-  const visibleSmallKey = satellites[1]?.key ?? null;
+  const innerSatelliteKeys = new Set(satellites.slice(0, 2).map((branch) => branch.key));
 
   return branches.map((branch) => {
     if (branch.key === heroKey && adjustedHero !== null) return adjustedHero;
@@ -200,11 +162,8 @@ export function enforceReferenceDruseContract(
     const host = byKey.get(branch.hostKey);
     if (host === undefined) return { ...branch };
 
-    if (branch.role === 'micro' || branch.key === innerSatelliteKey) {
+    if (branch.role === 'micro' || innerSatelliteKeys.has(branch.key)) {
       return hiddenInclusion(branch, host, monarch, branch.role === 'satellite');
-    }
-    if (branch.key === visibleSmallKey) {
-      return visibleSmallSatellite(branch, host, monarch);
     }
     if (branch.role === 'satellite' && branch.hostKey === heroKey) {
       return separateHeroChild(branch, host);
