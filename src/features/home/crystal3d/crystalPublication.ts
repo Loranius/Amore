@@ -66,6 +66,7 @@ export interface PublishedCrystal {
   readonly bodies: readonly PublishedBody[];
   /** Фактичні видимі логічні key: canonical або їх display-заміна. */
   readonly renderable: readonly PublishedBody[];
+  /** Реальний набір сцени. Може бути художньо чистішим за semantic renderable. */
   readonly drawables: readonly PublishedBody[];
   readonly displayBodies: readonly PublishedBody[];
   readonly displaySelection: ReferenceDisplaySelection | null;
@@ -219,13 +220,33 @@ export function publishCrystal(
   );
   const topologyViolations = validateTopology(shellEntries);
 
-  // Canonical source mesh не малюється, коли для того самого key існує
-  // display-представлення. Сам body при цьому лишається повним і валідним.
+  // Semantic renderable лишається 1:1 з логічними key і використовується
+  // метриками/тестами. Canonical source mesh замінюється display-версією
+  // лише для того самого key.
   const logicalRenderable = bodies.filter((body) => (
     triangleCount(body.geometry) > 0 && !activeDisplayKeys.has(body.branch.key)
   ));
   const renderable = [...logicalRenderable, ...displayBodies];
-  const drawables = [...renderable, ...junctions];
+
+  // Коли reference crown активна, випадкові canonical діти й їхні старі
+  // implicit-комірці не повинні вдруге з'являтися у кадрі. Для сцени
+  // лишаються тільки центральне тіло, прихована матриця/основа й
+  // контрольована корона. Canonical оболонка при цьому повністю збережена
+  // вище для shell/topology/material-аудиту.
+  const hasReferenceDisplay = displayBodies.length > 0;
+  const sceneCanonical = hasReferenceDisplay
+    ? logicalRenderable.filter((body) => body.branch.primary || body.branch.archetype === 'matrix')
+    : logicalRenderable;
+  const sceneJunctions = hasReferenceDisplay
+    ? junctions.filter((body) => {
+        const junction = body.implicitJunction;
+        return junction === undefined || (
+          !activeDisplayKeys.has(junction.sourceKey)
+          && !activeDisplayKeys.has(junction.hostKey)
+        );
+      })
+    : junctions;
+  const drawables = [...sceneCanonical, ...displayBodies, ...sceneJunctions];
 
   return Object.freeze({
     lod,
