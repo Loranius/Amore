@@ -14,6 +14,12 @@ const MINIMUM_HIDDEN_BODIES = 4;
 export interface ReferenceBudgetBody {
   readonly branch: ClusterBranch;
   readonly geometry: THREE.BufferGeometry;
+  readonly solid: {
+    readonly profile: {
+      readonly h: number;
+      readonly r: number;
+    };
+  };
 }
 
 const triangleCount = (body: ReferenceBudgetBody): number =>
@@ -27,12 +33,20 @@ const bodyVolume = (body: ReferenceBudgetBody): number =>
  * Кандидати вже мають побудовану/обрізану оболонку, тому ми відбираємо лише
  * реально видимі неакцентні тіла. Монарх, matrix, hero/dominant, базальна
  * акцентна фракція та господарі ВИДИМИХ дітей ніколи не відсікаються.
+ *
+ * Першими йдуть фактичні «крихти» — тіла, нижчі за радіус монарха. Так
+ * culling не зменшує знаменник, залишаючи пил на екрані, а прибирає саме
+ * надлишкову дрібну фракцію backfilled-композицій.
  */
 export function enforceReferenceHiddenBudget(
   bodies: readonly ReferenceBudgetBody[],
   accentKeys: ReadonlySet<string>,
 ): void {
   if (!bodies.some((body) => body.branch.archetype === 'matrix')) return;
+
+  const monarch = bodies.find((body) => body.branch.primary);
+  if (monarch === undefined) return;
+  const monarchRadius = monarch.solid.profile.r;
 
   const alreadyHidden = bodies.filter((body) => triangleCount(body) === 0).length;
   const missing = Math.max(0, MINIMUM_HIDDEN_BODIES - alreadyHidden);
@@ -54,10 +68,15 @@ export function enforceReferenceHiddenBudget(
       && !accentKeys.has(body.branch.key)
       && !visibleLoadBearing.has(body.branch.key)
     ))
-    .sort((left, right) => (
-      bodyVolume(left) - bodyVolume(right)
-      || left.branch.key.localeCompare(right.branch.key)
-    ))
+    .sort((left, right) => {
+      const leftSpeck = left.solid.profile.h < monarchRadius ? 0 : 1;
+      const rightSpeck = right.solid.profile.h < monarchRadius ? 0 : 1;
+      return (
+        leftSpeck - rightSpeck
+        || bodyVolume(left) - bodyVolume(right)
+        || left.branch.key.localeCompare(right.branch.key)
+      );
+    })
     .slice(0, missing);
 
   for (const body of candidates) {
