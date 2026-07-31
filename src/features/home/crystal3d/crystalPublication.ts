@@ -4,9 +4,9 @@
 // Нормативно: Volume V §12 (публікація), Volume VI §11,
 // `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
 //
-// Порядок незмінний: форма → зріз стику → локальне implicit-зрощення →
-// матеріал → валідація. Marching Cubes працює лише один раз під час
-// публікації та лише в обмежених зонах найбільших базальних стиків.
+// Порядок незмінний: renderer-layout → форма → зріз стику → локальне
+// implicit-зрощення → матеріал → валідація. Reference layout навмисно
+// живе тут, а не в Growth State: історія й append-only лишаються чистими.
 // ============================================================
 import type * as THREE from 'three';
 import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
@@ -17,6 +17,7 @@ import {
 } from './geometry/implicitJunction';
 import { trimHiddenFaces, type TrimStats } from './geometry/junctionTrim';
 import { LOD_LEVELS, type LodLevel } from './geometry/lod';
+import { applyReferenceDruseLayout } from './geometry/referenceDruseLayout';
 import {
   formatShellViolations,
   probeExterior,
@@ -63,6 +64,8 @@ export interface PublishedCrystal {
 
 export interface PublishOptions {
   lod?: LodLevel;
+  /** Пропустити renderer-layout — лише для A/B та доказу межі шарів. */
+  skipReferenceLayout?: boolean;
   /** Пропустити зріз стику — лише для доказів «валідатор не вакуумний». */
   skipTrim?: boolean;
   /** Пропустити смугу шва — before/after для `CAI-REQ-010`. */
@@ -83,14 +86,16 @@ export function publishCrystal(
   options: PublishOptions = {},
 ): PublishedCrystal {
   const lod = options.lod ?? 'high';
-  const solids = buildHostSolids(branches, material, lod);
-  const byKey = new Map(branches.map((branch) => [branch.key, branch] as const));
+  const laidOut = options.skipReferenceLayout
+    ? branches.map((branch) => ({ ...branch }))
+    : applyReferenceDruseLayout(branches);
+  const solids = buildHostSolids(laidOut, material, lod);
+  const byKey = new Map(laidOut.map((branch) => [branch.key, branch] as const));
 
-  const bodies: PublishedBody[] = branches.map((branch) => {
+  const bodies: PublishedBody[] = laidOut.map((branch) => {
     const solid = solids.get(branch.key)!;
     const geometry = buildBranchGeometry(branch, material, lod);
 
-    // 1. Volume V — зовнішня оболонка: знімаємо приховані грані.
     const trim = options.skipTrim
       ? ({
           key: branch.key,
@@ -103,7 +108,6 @@ export function publishCrystal(
         } satisfies TrimStats)
       : trimHiddenFaces(geometry, solid, branch.hostKey, solids);
 
-    // 2. Volume VI — матеріал СТРОГО після зрізу.
     const hostSolid = branch.hostKey === null ? undefined : solids.get(branch.hostKey);
     const hostBranch = branch.hostKey === null ? undefined : byKey.get(branch.hostKey);
     const host =
@@ -115,11 +119,9 @@ export function publishCrystal(
     return { branch, solid, geometry, trim, material: materialStats };
   });
 
-  // 3. Phase 3B-2 — локальна smooth-union оболонка стику. Вона не додає
-  // подій/тіл у Growth State: це renderer-only зовнішня мінеральна шкіра.
   const implicit = options.skipFusion
     ? []
-    : buildImplicitJunctionBodies(branches, solids, lod);
+    : buildImplicitJunctionBodies(laidOut, solids, lod);
   const junctions: PublishedBody[] = implicit.flatMap((junction) => {
     const hostSolid = junction.branch.hostKey === null
       ? undefined
@@ -158,9 +160,6 @@ export function publishCrystal(
     }];
   });
 
-  // 4. Канонічні shell/topology перевірки лишаються на логічних lathe-
-  // тілах: їхні валідатори свідомо використовують col·profileLen+row.
-  // Implicit collar має власну boundary-перевірку перед поверненням модуля.
   const shellEntries = bodies.map((body) => ({
     solid: body.solid,
     hostKey: body.branch.hostKey,
@@ -191,7 +190,6 @@ export function publishCrystal(
   });
 }
 
-/** Читабельний звіт гейта — для dev-консолі й доказів у репорті. */
 export function formatPublicationReport(published: PublishedCrystal): string {
   const lines = [
     `LOD ${published.lod}: ${published.bodies.length} тіл, ${published.junctions.length} implicit-стиків`,
@@ -207,7 +205,6 @@ export function formatPublicationReport(published: PublishedCrystal): string {
   return lines.join('\n');
 }
 
-/** Усі публіковані рівні — вхід для перевірки `CAI-REQ-011`. */
 export function publishAllLods(
   branches: readonly ClusterBranch[],
   material: ClusterMaterial,
