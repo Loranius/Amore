@@ -54,7 +54,7 @@ func _run() -> void:
 		_fail("Determinism failure: input ordering changed canonical state.")
 		return
 
-	var genesis_count := 1 + CrystalSpecies.BASAL_CROWN_COUNT
+	var genesis_count: int = 1 + CrystalSpecies.BASAL_CROWN_COUNT
 	if first_state.instructions.size() != payloads.size() + genesis_count:
 		_fail("Growth history failure: expected genesis druse plus one instruction per event.")
 		return
@@ -79,15 +79,35 @@ func _run() -> void:
 		if float(basal.metadata.get("merge_depth_ratio", 0.0)) < 0.5:
 			_fail("Attachment failure: basal crown is not embedded deeply enough.")
 			return
+		var radial_distance: float = Vector2(
+			basal.attach_position.x - mother.attach_position.x,
+			basal.attach_position.z - mother.attach_position.z,
+		).length()
+		var radial_ratio: float = radial_distance / mother.radius
+		if radial_ratio < 0.65 or radial_ratio > 0.88:
+			_fail("Attachment failure: basal crown root is not near the mother surface.")
+			return
+
+		for other_index in range(index + 1, genesis_count):
+			var other = first_state.instructions[other_index]
+			var root_distance: float = basal.attach_position.distance_to(other.attach_position)
+			var minimum_root_distance: float = (basal.radius + other.radius) * 0.95
+			if root_distance < minimum_root_distance:
+				_fail("Competition failure: basal crown roots overlap too strongly.")
+				return
 
 	for index in range(genesis_count, first_state.instructions.size()):
 		var event_growth = first_state.instructions[index]
 		if first_state.get_instruction(event_growth.parent_id) == null:
 			_fail("Lineage failure: event growth parent is missing.")
 			return
-		var merge_depth := float(event_growth.metadata.get("merge_depth_ratio", 0.0))
+		var merge_depth: float = float(event_growth.metadata.get("merge_depth_ratio", 0.0))
 		if merge_depth < 0.45 or merge_depth > 0.7:
 			_fail("Attachment failure: event growth merge depth is outside bounds.")
+			return
+		var surface_offset: float = float(event_growth.metadata.get("surface_offset_ratio", 0.0))
+		if surface_offset < 0.7 or surface_offset > 0.9:
+			_fail("Attachment failure: event growth root is not near the parent surface.")
 			return
 
 	print("PASS: deterministic crystal rebuild; instructions=%d" % first_state.instructions.size())
