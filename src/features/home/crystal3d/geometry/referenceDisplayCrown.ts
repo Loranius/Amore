@@ -194,7 +194,7 @@ function displayBranch(
 ): ClusterBranch {
   const monarchHeight = renderedHeight(monarch);
   const height = monarchHeight * heightRatio;
-  const radiusBottom = height / (kind === 'hero' ? 3.85 : kind === 'medium' ? 4.25 : 3.95);
+  const radiusBottom = height / (kind === 'hero' ? 3.05 : kind === 'medium' ? 3.9 : 3.55);
   const position = base.clone().addScaledVector(radial, radiusDistance);
   const direction = UP
     .clone()
@@ -266,7 +266,7 @@ export function buildReferenceDisplayCrown(
   const monarchRadius = renderedRadius(monarch);
   const matrixHeight = renderedHeight(matrix);
   const foundation = new THREE.Vector3(matrix.posX, matrix.posY, matrix.posZ)
-    .addScaledVector(axis, matrixHeight * 0.42);
+    .addScaledVector(axis, matrixHeight * 0.56);
   const bodies: ReferenceDisplayBody[] = [];
 
   if (selection.heroKey !== null) {
@@ -276,11 +276,11 @@ export function buildReferenceDisplayCrown(
       const branch = displayBranch(
         source,
         monarch,
-        foundation.clone().addScaledVector(axis, matrixHeight * 0.03),
+        foundation.clone().addScaledVector(axis, matrixHeight * 0.04),
         radial,
         HERO_RATIO,
-        monarchRadius * 1.02,
-        0.1,
+        monarchRadius * 1.18,
+        0.18,
         0.08,
         'hero',
       );
@@ -293,15 +293,15 @@ export function buildReferenceDisplayCrown(
     if (source === undefined) return;
     const ratio = MEDIUM_RATIOS[index] ?? 0.23;
     const radial = radialAt(front, right, MEDIUM_ANGLES[index] ?? index * 0.6);
-    const ownRadius = renderedHeight(monarch) * ratio / 4.25;
+    const ownRadius = renderedHeight(monarch) * ratio / 3.9;
     const branch = displayBranch(
       source,
       monarch,
-      foundation.clone().addScaledVector(axis, matrixHeight * (0.02 + (index % 2) * 0.025)),
+      foundation.clone().addScaledVector(axis, matrixHeight * (0.07 + (index % 2) * 0.03)),
       radial,
       ratio,
-      monarchRadius * 0.9 + ownRadius * 0.3,
-      0.42 + (index % 3) * 0.04,
+      monarchRadius * 1.06 + ownRadius * 0.58,
+      0.48 + (index % 3) * 0.04,
       index * 0.37,
       'medium',
     );
@@ -314,16 +314,16 @@ export function buildReferenceDisplayCrown(
     if (source === undefined) return;
     const ratio = shortRatio(index, shortCount);
     const radial = radialAt(front, right, shortAngle(index));
-    const ownRadius = renderedHeight(monarch) * ratio / 3.95;
+    const ownRadius = renderedHeight(monarch) * ratio / 3.55;
     const ring = Math.floor(index / 9);
     const branch = displayBranch(
       source,
       monarch,
-      foundation.clone().addScaledVector(axis, matrixHeight * (0.035 + (index % 3) * 0.016)),
+      foundation.clone().addScaledVector(axis, matrixHeight * (0.08 + (index % 3) * 0.02)),
       radial,
       ratio,
-      monarchRadius * (0.98 + ring * 0.08) + ownRadius * 0.42,
-      0.56 + (index % 3) * 0.05,
+      monarchRadius * (1.12 + ring * 0.18) + ownRadius * 0.68,
+      0.64 + (index % 3) * 0.05,
       index * 0.51,
       'short',
     );
