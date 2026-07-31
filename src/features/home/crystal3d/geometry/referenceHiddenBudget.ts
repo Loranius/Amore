@@ -21,6 +21,10 @@ export interface ReferenceBudgetBody {
       readonly r: number;
     };
   };
+  readonly trim?: {
+    /** Тіла, які реально закривали внутрішні грані цього mesh. */
+    readonly occluders: readonly string[];
+  };
 }
 
 const triangleCount = (body: ReferenceBudgetBody): number =>
@@ -74,6 +78,14 @@ export function enforceReferenceHiddenBudget(
       .filter((key): key is string => key !== null),
   );
 
+  // Trim уже довів, які сусіди реально закривали внутрішні грані. Якщо
+  // прибрати такий occluder після trim, у сусіда відкриється виворіт, хоча
+  // його власна геометрія не змінювалась. Такі тіла бюджет не чіпає.
+  const visibleOccluders = new Set<string>();
+  for (const body of visible) {
+    for (const key of body.trim?.occluders ?? []) visibleOccluders.add(key);
+  }
+
   const candidates = visible
     .filter((body) => {
       const protectedDominant = body.branch.role === 'dominant'
@@ -85,6 +97,7 @@ export function enforceReferenceHiddenBudget(
         && !accentKeys.has(body.branch.key)
         && !protectedKeys.has(body.branch.key)
         && !visibleLoadBearing.has(body.branch.key)
+        && !visibleOccluders.has(body.branch.key)
       );
     })
     .sort((left, right) => {
