@@ -81,18 +81,19 @@ export function selectReferenceDisplaySources(
   }
   const hasChildren = (key: string): boolean => (children.get(key)?.length ?? 0) > 0;
 
-  const eligible = branches.filter((branch) => (
+  // Коротка юбка може використовувати й leaf-micro: саме вони є природною
+  // дрібною фракцією. Для середньої корони micro нижче відсіюються окремо.
+  const leafEligible = branches.filter((branch) => (
     !branch.primary
     && branch.archetype !== 'matrix'
     && branch.key !== heroKey
-    && branch.role !== 'micro'
     && !hasChildren(branch.key)
   ));
 
-  const accentCandidates = eligible
+  const accentCandidates = leafEligible
     .filter((branch) => accentKeys.has(branch.key))
     .sort((left, right) => left.key.localeCompare(right.key));
-  const smallestExtras = eligible
+  const smallestExtras = leafEligible
     .filter((branch) => !accentKeys.has(branch.key))
     .sort((left, right) => volume(left) - volume(right) || left.key.localeCompare(right.key));
   const shortSources = [...accentCandidates];
@@ -102,8 +103,8 @@ export function selectReferenceDisplaySources(
   }
 
   const shortSet = new Set(shortSources.map((branch) => branch.key));
-  const mediumSources = eligible
-    .filter((branch) => !shortSet.has(branch.key))
+  const mediumSources = leafEligible
+    .filter((branch) => branch.role !== 'micro' && !shortSet.has(branch.key))
     .sort((left, right) => volume(right) - volume(left) || left.key.localeCompare(right.key))
     .slice(0, MEDIUM_ANGLES.length);
 
