@@ -67,10 +67,10 @@ function ellipsoidSdf(
 }
 
 function implicitField(x: number, y: number, z: number, hostX: number, hostZ: number): number {
-  const base = ellipsoidSdf(x, y, z, 0, -0.08, 0, 0.82, 0.54, 0.82);
-  const neck = ellipsoidSdf(x, y, z, 0, 0.38, 0, 0.56, 0.72, 0.56);
-  const host = ellipsoidSdf(x, y, z, hostX, -0.34, hostZ, 0.76, 0.46, 0.76);
-  return -smoothMin(smoothMin(base, neck, 0.22), host, 0.25);
+  const base = ellipsoidSdf(x, y, z, 0, -0.04, 0, 0.86, 0.62, 0.86);
+  const neck = ellipsoidSdf(x, y, z, 0, 0.42, 0, 0.62, 0.82, 0.62);
+  const host = ellipsoidSdf(x, y, z, hostX, -0.22, hostZ, 0.9, 0.58, 0.9);
+  return -smoothMin(smoothMin(base, neck, 0.28), host, 0.32);
 }
 
 function extractMarchingGeometry(
@@ -105,9 +105,12 @@ function extractMarchingGeometry(
     return null;
   }
 
-  const radialScale = radius * 1.3;
-  const axialScale = radius * 0.92;
-  const axialOffset = radius * 0.08;
+  // Deeply seated roots need the bridge to rise above the source cap before
+  // hidden-face trimming. The field remains local: even the largest retry is
+  // shorter than one source radius beyond the declared junction band.
+  const radialScale = radius * 1.85;
+  const axialScale = radius * 1.35;
+  const axialOffset = radius * 0.52;
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i += 1) {
     positions[i * 3] = source.getX(i) * radialScale;
@@ -157,8 +160,11 @@ function trimInsideBodies(
   const world = worldVertices(geometry, self);
   const generated = index.count / 3;
   const kept: number[] = [];
-  const selfMargin = Math.min(breatheMargin(self, self) * 0.35, self.profile.r * 0.12);
-  const hostMargin = Math.min(breatheMargin(self, host) * 0.35, self.profile.r * 0.16);
+  // Trim against eroded solids so every open edge is still safely buried in
+  // the real bodies. The larger margin also prevents the whole collar from
+  // disappearing when a reference-layout root is deeply seated.
+  const selfMargin = Math.min(breatheMargin(self, self) * 0.68, self.profile.r * 0.2);
+  const hostMargin = Math.min(breatheMargin(self, host) * 0.68, self.profile.r * 0.24);
 
   for (let triangle = 0; triangle < generated; triangle += 1) {
     const a = index.getX(triangle * 3);
@@ -256,43 +262,51 @@ export function buildImplicitJunctionBody(
   const horizontal = Math.hypot(towardHost.x, towardHost.z);
   const hostX = horizontal > 1e-8 ? clamp((towardHost.x / horizontal) * 0.28, -0.28, 0.28) : 0;
   const hostZ = horizontal > 1e-8 ? clamp((towardHost.z / horizontal) * 0.28, -0.28, 0.28) : 0;
-  const radius = Math.max(budget.minRadius, self.profile.r);
-  const geometry = extractMarchingGeometry(
-    budget.resolution,
-    budget.maxPolyCount,
-    radius,
-    hostX,
-    hostZ,
-  );
-  if (geometry === null) return null;
+  const baseRadius = Math.max(budget.minRadius, self.profile.r);
 
-  const trim = trimInsideBodies(geometry, self, host);
-  const exposed = exposedBoundaryEdges(geometry, self, host);
-  if (trim.kept === 0 || exposed > 0) {
-    geometry.dispose();
-    return null;
+  // One deterministic bounded retry is cheaper than letting a valid major
+  // junction disappear merely because its seed/profile sits at the edge of
+  // the low-resolution field.
+  for (const multiplier of [1, 1.18, 1.36] as const) {
+    const radius = baseRadius * multiplier;
+    const geometry = extractMarchingGeometry(
+      budget.resolution,
+      budget.maxPolyCount,
+      radius,
+      hostX,
+      hostZ,
+    );
+    if (geometry === null) continue;
+
+    const trim = trimInsideBodies(geometry, self, host);
+    const exposed = exposedBoundaryEdges(geometry, self, host);
+    if (trim.kept === 0 || exposed > 0) {
+      geometry.dispose();
+      continue;
+    }
+
+    const branch = syntheticBranch(source);
+    const solid = syntheticSolid(self, branch.key);
+    geometry.userData.implicitJunction = true;
+    geometry.userData.sourceKey = source.key;
+    geometry.userData.hostKey = source.hostKey;
+
+    return {
+      branch,
+      solid,
+      geometry,
+      stats: {
+        key: branch.key,
+        sourceKey: source.key,
+        hostKey: source.hostKey!,
+        resolution: budget.resolution,
+        trianglesGenerated: trim.generated,
+        trianglesKept: trim.kept,
+        exposedBoundaryEdges: exposed,
+      },
+    };
   }
-
-  const branch = syntheticBranch(source);
-  const solid = syntheticSolid(self, branch.key);
-  geometry.userData.implicitJunction = true;
-  geometry.userData.sourceKey = source.key;
-  geometry.userData.hostKey = source.hostKey;
-
-  return {
-    branch,
-    solid,
-    geometry,
-    stats: {
-      key: branch.key,
-      sourceKey: source.key,
-      hostKey: source.hostKey!,
-      resolution: budget.resolution,
-      trianglesGenerated: trim.generated,
-      trianglesKept: trim.kept,
-      exposedBoundaryEdges: exposed,
-    },
-  };
+  return null;
 }
 
 export function buildImplicitJunctionBodies(
