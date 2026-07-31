@@ -6,10 +6,14 @@ on:
       - feat/godot-evolution-engine-bootstrap
     paths:
       - 'godot/evolution-engine/**'
+      - 'src/features/home/godot3d/**'
+      - 'vite.config.ts'
       - '.github/workflows/godot-evolution-engine.yml'
   pull_request:
     paths:
       - 'godot/evolution-engine/**'
+      - 'src/features/home/godot3d/**'
+      - 'vite.config.ts'
       - '.github/workflows/godot-evolution-engine.yml'
   workflow_dispatch:
 
@@ -19,23 +23,40 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Godot 4.7.1
+      - name: Install Godot 4.7.1 and Web templates
         shell: bash
         run: |
           set -euo pipefail
           curl --fail --location --retry 3 \
             --output /tmp/godot.zip \
             https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          curl --fail --location --retry 3 \
+            --output /tmp/godot-templates.tpz \
+            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+
           unzip -q /tmp/godot.zip -d /tmp/godot
           chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
           sudo ln -s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 /usr/local/bin/godot
+
+          rm -rf /tmp/godot-export-templates
+          mkdir -p /tmp/godot-export-templates
+          unzip -q /tmp/godot-templates.tpz -d /tmp/godot-export-templates
+          template_source=/tmp/godot-export-templates
+          if [[ -d /tmp/godot-export-templates/templates ]]; then
+            template_source=/tmp/godot-export-templates/templates
+          fi
+          template_target="$HOME/.local/share/godot/export_templates/4.7.1.stable"
+          mkdir -p "$template_target"
+          cp -R "$template_source"/. "$template_target"/
+
           godot --version
+          test -f "$template_target/web_release.zip"
 
       - name: Import and parse project
         shell: bash
@@ -60,3 +81,36 @@ jobs:
             exit 1
           fi
           grep -q 'PASS: deterministic crystal rebuild' /tmp/godot-smoke.log
+
+      - name: Export Web runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/amore-godot-web
+          mkdir -p /tmp/amore-godot-web
+          godot --headless \
+            --path godot/evolution-engine \
+            --export-release Web \
+            /tmp/amore-godot-web/index.html \
+            2>&1 | tee /tmp/godot-export.log
+
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script|ERROR: Cannot export' /tmp/godot-export.log; then
+            echo 'Godot reported a Web export failure.'
+            exit 1
+          fi
+
+          test -s /tmp/amore-godot-web/index.html
+          test -s /tmp/amore-godot-web/index.js
+          test -s /tmp/amore-godot-web/index.wasm
+          test -s /tmp/amore-godot-web/index.pck
+          grep -q 'AmoreGodotBridge' /tmp/amore-godot-web/index.html
+          grep -q 'amore:godot:booting' /tmp/amore-godot-web/index.html
+          find /tmp/amore-godot-web -maxdepth 1 -type f -printf '%f %s bytes\n' | sort | tee /tmp/amore-godot-web/build-manifest.txt
+
+      - name: Upload Web runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: amore-godot-web-${{ github.sha }}
+          path: /tmp/amore-godot-web
+          if-no-files-found: error
+          retention-days: 14
