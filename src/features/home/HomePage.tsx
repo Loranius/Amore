@@ -1,10 +1,9 @@
 // ============================================================
 // HomePage — головна: Hero + вибраний Evolution-об’єкт
 // ------------------------------------------------------------
-// Кристал і Дерево показують нові accepted renderer pipelines. Риф має
-// чесний зарезервований preview-slot до появи Reef Species/Geometry.
-// Вибір живе в URL + localStorage, тому його можна порівнювати без переходів
-// між технічними query-preview сторінками.
+// Кристал, Дерево і Риф показують accepted renderer pipelines.
+// Вибір живе в URL + localStorage, тому об’єкти можна порівнювати без
+// переходів між технічними query-preview сторінками.
 // ============================================================
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { Hero } from './Hero';
@@ -12,10 +11,7 @@ import { Crystal } from './Crystal';
 import { CrystalPlaceholder } from './CrystalPlaceholder';
 import { HomePlansCard } from './HomePlansCard';
 import { HomeArtifactSwitcher } from './HomeArtifactSwitcher';
-import {
-  HomeArtifactWebglFallback,
-  ReefPreviewPlaceholder,
-} from './HomeArtifactPreviewFallback';
+import { HomeArtifactWebglFallback } from './HomeArtifactPreviewFallback';
 import {
   HOME_ARTIFACT_LABELS,
   HOME_ARTIFACT_STORAGE_KEY,
@@ -28,6 +24,7 @@ import { useWebglSupport } from './crystal3d/useWebglSupport';
 import { PortalDecor } from '@/features/auth/PortalDecor';
 
 const CrystalScene = lazy(() => import('./crystal3d/CrystalSceneEntry'));
+const ReefScene = lazy(() => import('./reef3d/ReefPreviewScene'));
 
 function storedArtifact(): string | null {
   if (typeof window === 'undefined') return null;
@@ -69,7 +66,7 @@ export function HomePage() {
 
   const rendererFallback = artifact === 'crystal'
     ? <Crystal />
-    : <HomeArtifactWebglFallback artifact="tree" />;
+    : <HomeArtifactWebglFallback artifact={artifact} />;
 
   return (
     <section className="home" data-home-artifact={artifact}>
@@ -78,12 +75,12 @@ export function HomePage() {
       <HomeArtifactSwitcher value={artifact} onChange={selectArtifact} />
       <h1 className="home-title">{HOME_ARTIFACT_LABELS[artifact]} Amore</h1>
       <div id="home-artifact-preview" style={{ width: '100%' }}>
-        {artifact === 'reef' ? (
-          <ReefPreviewPlaceholder />
-        ) : webglSupported ? (
+        {webglSupported ? (
           <CrystalErrorBoundary key={artifact} fallback={rendererFallback}>
             <Suspense fallback={<CrystalPlaceholder />}>
-              <CrystalScene key={artifact} artifact={artifact} />
+              {artifact === 'reef'
+                ? <ReefScene />
+                : <CrystalScene key={artifact} artifact={artifact} />}
             </Suspense>
           </CrystalErrorBoundary>
         ) : rendererFallback}
