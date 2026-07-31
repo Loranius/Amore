@@ -7,13 +7,17 @@ extends RefCounted
 func create_mesh_instance(instruction) -> MeshInstance3D:
 	var instance := MeshInstance3D.new()
 	instance.name = _safe_node_name(instruction.id)
-	instance.mesh = _build_mesh(instruction)
+	instance.mesh = create_mesh(instruction)
 	instance.position = instruction.attach_position
 	instance.basis = _basis_from_y(instruction.direction)
 	instance.set_meta("growth_id", instruction.id)
 	instance.set_meta("parent_id", instruction.parent_id)
 	instance.set_meta("generation", instruction.generation)
 	return instance
+
+
+func create_mesh(instruction) -> ArrayMesh:
+	return _build_mesh(instruction)
 
 
 func _build_mesh(instruction) -> ArrayMesh:
@@ -116,10 +120,10 @@ func _build_mesh(instruction) -> ArrayMesh:
 		center_drift + tip_offset * 0.34,
 	)
 
-	_connect_rings(surface, base_ring, lower_ring, color.darkened(0.13))
-	_connect_rings(surface, lower_ring, mid_ring, color.darkened(0.035))
-	_connect_rings(surface, mid_ring, shoulder_ring, color.lightened(0.018))
-	_connect_rings(surface, shoulder_ring, termination_ring, color.lightened(0.04))
+	_connect_rings(surface, base_ring, lower_ring, color.darkened(0.16))
+	_connect_rings(surface, lower_ring, mid_ring, color.darkened(0.06))
+	_connect_rings(surface, mid_ring, shoulder_ring, color.lightened(0.012))
+	_connect_rings(surface, shoulder_ring, termination_ring, color.lightened(0.035))
 
 	for side in range(sides):
 		var next := (side + 1) % sides
@@ -128,7 +132,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 			termination_ring[side],
 			termination_ring[next],
 			tip,
-			color.lightened(0.08 + float(side % 2) * 0.018),
+			color.lightened(0.065 + float(side % 2) * 0.016),
 		)
 
 	if bool(instruction.metadata.get("cap_base", false)):
@@ -141,7 +145,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 				base_ring[next],
 				base_ring[side],
 				Vector3.DOWN,
-				color.darkened(0.2),
+				color.darkened(0.22),
 			)
 
 	var mesh := surface.commit()
@@ -179,7 +183,7 @@ func _connect_rings(
 	var sides: int = mini(lower.size(), upper.size())
 	for side in range(sides):
 		var next: int = (side + 1) % sides
-		var facet_color := color.lightened(float(side % 3) * 0.018)
+		var facet_color := color.lightened(float(side % 3) * 0.014)
 		_add_quad_clockwise(
 			surface,
 			lower[side],
@@ -196,20 +200,20 @@ func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 	material.vertex_color_use_as_albedo = true
 	material.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	material.cull_mode = BaseMaterial3D.CULL_BACK
-	material.roughness = lerpf(0.29, 0.17, energy)
-	material.metallic = 0.015
-	material.metallic_specular = lerpf(0.58, 0.76, energy)
+	material.roughness = lerpf(0.34, 0.22, energy)
+	material.metallic = 0.01
+	material.metallic_specular = lerpf(0.48, 0.68, energy)
 
 	material.rim_enabled = true
-	material.rim = lerpf(0.14, 0.3, energy)
-	material.rim_tint = 0.64
+	material.rim = lerpf(0.07, 0.17, energy)
+	material.rim_tint = 0.48
 
 	material.clearcoat_enabled = true
-	material.clearcoat = lerpf(0.34, 0.68, energy)
-	material.clearcoat_roughness = lerpf(0.23, 0.09, energy)
+	material.clearcoat = lerpf(0.28, 0.62, energy)
+	material.clearcoat_roughness = lerpf(0.28, 0.12, energy)
 
 	material.backlight_enabled = true
-	var backlight_strength: float = lerpf(0.09, 0.16, energy)
+	var backlight_strength: float = lerpf(0.025, 0.055, energy)
 	material.backlight = Color(
 		color.r * backlight_strength,
 		color.g * backlight_strength,
@@ -218,8 +222,8 @@ func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 	)
 
 	material.emission_enabled = true
-	material.emission = color.darkened(0.38)
-	material.emission_energy_multiplier = 0.018 + energy * 0.042
+	material.emission = color.darkened(0.46)
+	material.emission_energy_multiplier = 0.006 + energy * 0.018
 	return material
 
 
@@ -277,8 +281,8 @@ func _basis_from_y(direction: Vector3) -> Basis:
 func _crystal_color(instruction) -> Color:
 	var hue_shift := float(instruction.metadata.get("hue_shift", 0.0))
 	var hue := fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
-	var saturation := clampf(0.44 + instruction.energy * 0.13, 0.0, 1.0)
-	var value := clampf(0.68 + instruction.energy * 0.15, 0.0, 1.0)
+	var saturation := clampf(0.34 + instruction.energy * 0.11, 0.0, 1.0)
+	var value := clampf(0.64 + instruction.energy * 0.13, 0.0, 1.0)
 	return Color.from_hsv(hue, saturation, value, 1.0)
 
 
