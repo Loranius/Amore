@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import { evaluateReefProductionRuntimeAcceptance } from '@/engine/productionAcceptance';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
 import {
   EvolutionRuntimeProbe,
   type EvolutionRuntimeMetrics,
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
-import { REEF_PRODUCTION_BUDGET } from './buildReefPreview';
 import { ReefObject } from './ReefObject';
 import type { ReefThreeSceneState } from './reefThreeAdapter';
 import { useReefPortalPreview } from './useReefPortalPreview';
@@ -59,21 +59,18 @@ export default function ReefPreviewScene() {
   }
 
   const { build, diagnostics } = portal.preview;
-  const runtimeViolations = [...build.diagnostics.violations];
-  const reportedDrawCalls = runtime?.drawCalls ?? sceneState?.diagnostics.drawCalls ?? null;
-  const reportedTriangles = runtime?.triangles ?? sceneState?.diagnostics.triangles ?? null;
-  if (reportedDrawCalls !== null && reportedDrawCalls > REEF_PRODUCTION_BUDGET.maximumDrawCalls) {
-    runtimeViolations.push('runtime-draw-call-budget');
-  }
-  if (reportedTriangles !== null && reportedTriangles > REEF_PRODUCTION_BUDGET.maximumTriangles) {
-    runtimeViolations.push('runtime-triangle-budget');
-  }
-  const runtimeReady = runtime !== null || (reducedMotion && sceneState !== null);
-  const status = runtimeViolations.length > 0
-    ? 'fail'
-    : runtimeReady
-      ? 'pass'
-      : 'warming';
+  const reportedDrawCalls = runtime?.drawCalls
+    ?? (reducedMotion ? sceneState?.diagnostics.drawCalls ?? null : null);
+  const reportedTriangles = runtime?.triangles
+    ?? (reducedMotion ? sceneState?.diagnostics.triangles ?? null : null);
+  const runtimeAcceptance = evaluateReefProductionRuntimeAcceptance({
+    contract: build.acceptance,
+    buildMs: build.buildMs,
+    drawCalls: reportedDrawCalls,
+    triangles: reportedTriangles,
+  });
+  const status = runtimeAcceptance.status;
+  const runtimeViolations = runtimeAcceptance.violations;
   const badge = [
     build.species.state.stage,
     `${build.diagnostics.colonyCount} colonies`,
@@ -92,8 +89,15 @@ export default function ReefPreviewScene() {
       data-reef-preview="ready"
       data-reef-source="portal"
       data-reef-acceptance={status}
-      data-reef-static-acceptance={build.diagnostics.staticStatus}
+      data-reef-static-acceptance={build.acceptance.staticStatus}
       data-reef-violations={runtimeViolations.join(',')}
+      data-reef-production-signature={build.acceptance.signature}
+      data-reef-identity-signature={build.acceptance.identitySignature}
+      data-reef-phase-count={build.acceptance.phaseCheckpoints.length}
+      data-reef-phase-order={String(build.acceptance.diagnostics.phaseOrderPreserved)}
+      data-reef-phase-provenance={String(build.acceptance.diagnostics.phaseProvenancePreserved)}
+      data-reef-colony-identity={String(build.acceptance.diagnostics.colonyIdentityChainPreserved)}
+      data-reef-range-binding-chain={String(build.acceptance.diagnostics.rangeBindingChainPreserved)}
       data-reef-reduced-motion={String(reducedMotion)}
       data-reef-couple-id={build.artifact.coupleId}
       data-reef-as-of={build.life.asOf}
@@ -145,7 +149,7 @@ export default function ReefPreviewScene() {
         {status === 'pass' ? 'production accepted' : status === 'fail' ? 'acceptance fail' : 'runtime warming…'}
       </span>
       <span className="reef-production-species">
-        Reef Species · Phase 8 · {reducedMotion ? 'static' : 'ambient current'}
+        Reef Species · Phase 9 · {reducedMotion ? 'static' : 'ambient current'}
       </span>
       <span className="reef-production-badge" title={badge}>{badge}</span>
     </div>
