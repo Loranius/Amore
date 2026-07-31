@@ -70,7 +70,7 @@ function buildInput(): BuildReefProductionAcceptanceInput {
   return {
     coupleId: species.coupleId,
     artifactSeed: species.artifactSeed,
-    asOf,
+    asOf: species.asOf,
     species,
     layout,
     foundation,
