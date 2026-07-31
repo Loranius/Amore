@@ -4,10 +4,10 @@
 // Нормативно: Volume V §12 (публікація), Volume VI §11,
 // `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
 //
-// Порядок незмінний: renderer-layout → renderer-contract → accent → форма
-// → зріз стику → локальне implicit-зрощення → матеріал → валідація.
-// Reference-pass живуть тут, а не в Growth State: історія й append-only
-// лишаються чистими.
+// Порядок незмінний: renderer-layout → renderer-contract → accent → hidden
+// budget → форма → зріз стику → локальне implicit-зрощення → матеріал →
+// валідація. Reference-pass живуть тут, а не в Growth State: історія й
+// append-only лишаються чистими.
 // ============================================================
 import type * as THREE from 'three';
 import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
@@ -20,6 +20,7 @@ import {
   type ImplicitJunctionStats,
 } from './geometry/referenceJunction';
 import { enforceReferenceDruseContract } from './geometry/referenceDruseContract';
+import { enforceReferenceHiddenBudget } from './geometry/referenceHiddenBudget';
 import { applyReferenceDruseLayout } from './geometry/referenceDruseLayout';
 import {
   formatShellViolations,
@@ -91,8 +92,10 @@ export function publishCrystal(
   const lod = options.lod ?? 'high';
   const laidOut = options.skipReferenceLayout
     ? branches.map((branch) => ({ ...branch }))
-    : ensureVisibleReferenceAccent(
-        enforceReferenceDruseContract(applyReferenceDruseLayout(branches)),
+    : enforceReferenceHiddenBudget(
+        ensureVisibleReferenceAccent(
+          enforceReferenceDruseContract(applyReferenceDruseLayout(branches)),
+        ),
       );
   const solids = buildHostSolids(laidOut, material, lod);
   const byKey = new Map(laidOut.map((branch) => [branch.key, branch] as const));
