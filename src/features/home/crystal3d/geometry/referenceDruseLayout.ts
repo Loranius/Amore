@@ -7,8 +7,24 @@ import { hashSeedString } from '../../mulberry32';
 import type { ClusterBranch } from '../crystalCluster';
 
 const UP = new THREE.Vector3(0, 1, 0);
+/** Камера CrystalScene стоїть на +Z. Початковий кадр має читатися одразу,
+ *  але повне кільце зберігає правильний силует і після OrbitControls/оберту. */
+const CAMERA_FRONT = new THREE.Vector3(0, 0, 1);
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const HERO_ANGLE = -2.12; // позаду-ліворуч від монарха у стартовому кадрі
+const FRONT_CROWN_SLOTS = [
+  -1.12,
+  1.12,
+  -0.72,
+  0.72,
+  -0.36,
+  0.36,
+  0,
+  -1.48,
+  1.48,
+] as const;
+
 const clamp = (value: number, min: number, max: number): number =>
   Math.max(min, Math.min(max, value));
 const unitFromKey = (key: string, channel: string): number =>
@@ -25,23 +41,44 @@ const axisOf = (branch: ClusterBranch): THREE.Vector3 =>
 const renderedHeight = (branch: ClusterBranch): number => branch.height * heightScale(branch.maturity);
 const renderedRadius = (branch: ClusterBranch): number => branch.radiusBottom * radiusScale(branch.maturity);
 
-function radialFrame(axis: THREE.Vector3, angle: number): { radial: THREE.Vector3; tangent: THREE.Vector3 } {
-  const ref = Math.abs(axis.x) < 0.88
-    ? new THREE.Vector3(1, 0, 0)
-    : new THREE.Vector3(0, 0, 1);
-  const u = ref.addScaledVector(axis, -ref.dot(axis)).normalize();
-  const w = new THREE.Vector3().crossVectors(u, axis).normalize();
+/**
+ * angle=0 дивиться до камери (+Z), додатний кут іде вправо (+X).
+ * На похиленому монарху front/right проєктуються на площину його основи.
+ */
+function presentationFrame(
+  axis: THREE.Vector3,
+  angle: number,
+): { radial: THREE.Vector3; tangent: THREE.Vector3 } {
+  let front = CAMERA_FRONT.clone().addScaledVector(axis, -CAMERA_FRONT.dot(axis));
+  if (front.lengthSq() < 1e-6) {
+    front = new THREE.Vector3(0, 1, 0).addScaledVector(axis, -axis.y);
+  }
+  front.normalize();
+  const right = new THREE.Vector3().crossVectors(axis, front).normalize();
+  const radial = front
+    .clone()
+    .multiplyScalar(Math.cos(angle))
+    .addScaledVector(right, Math.sin(angle))
+    .normalize();
   return {
-    radial: u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize(),
-    tangent: u.clone().multiplyScalar(-Math.sin(angle)).addScaledVector(w, Math.cos(angle)).normalize(),
+    radial,
+    tangent: new THREE.Vector3().crossVectors(radial, axis).normalize(),
   };
 }
 
-function quaternionFor(direction: THREE.Vector3, key: string): THREE.Quaternion {
+function radialFrame(axis: THREE.Vector3, angle: number): { radial: THREE.Vector3; tangent: THREE.Vector3 } {
+  return presentationFrame(axis, angle);
+}
+
+function quaternionFor(
+  direction: THREE.Vector3,
+  key: string,
+  spinOverride?: number,
+): THREE.Quaternion {
   const aligned = new THREE.Quaternion().setFromUnitVectors(UP, direction.clone().normalize());
   const spin = new THREE.Quaternion().setFromAxisAngle(
     UP,
-    unitFromKey(key, 'reference-druse-spin') * TAU,
+    spinOverride ?? unitFromKey(key, 'reference-druse-spin') * TAU,
   );
   return aligned.multiply(spin).normalize();
 }
@@ -51,8 +88,9 @@ function withPose(
   position: THREE.Vector3,
   direction: THREE.Vector3,
   hostKey: string | null,
+  spinOverride?: number,
 ): ClusterBranch {
-  const quat = quaternionFor(direction, branch.key);
+  const quat = quaternionFor(direction, branch.key, spinOverride);
   return {
     ...branch,
     hostKey,
@@ -75,10 +113,12 @@ function safeArchetype(branch: ClusterBranch): ClusterBranch['archetype'] {
 
 function shapeMonarch(branch: ClusterBranch): ClusterBranch {
   const height = Math.min(branch.height, 2.15);
-  const radiusBottom = Math.max(branch.radiusBottom, height / 4.7);
-  const direction = axisOf(branch).multiplyScalar(0.12).addScaledVector(UP, 0.88).normalize();
+  // Товстий кварцовий шпиль: переріз майже круглий, висота/діаметр не
+  // перетворює його ні на лезо, ні на прямокутний стовп.
+  const radiusBottom = Math.max(branch.radiusBottom, height / 4.35);
+  const direction = axisOf(branch).multiplyScalar(0.08).addScaledVector(UP, 0.92).normalize();
   return {
-    ...withPose(branch, positionOf(branch), direction, branch.hostKey),
+    ...withPose(branch, positionOf(branch), direction, branch.hostKey, 0),
     height,
     radiusBottom,
     tier: 'king',
@@ -89,19 +129,19 @@ function shapeMonarch(branch: ClusterBranch): ClusterBranch {
 function shapeMatrix(branch: ClusterBranch, monarch: ClusterBranch): ClusterBranch {
   return {
     ...branch,
-    radiusBottom: Math.max(branch.radiusBottom, monarch.radiusBottom * 1.32),
-    height: Math.max(branch.height, monarch.radiusBottom * 0.62),
+    radiusBottom: Math.max(branch.radiusBottom, monarch.radiusBottom * 1.62),
+    height: Math.max(branch.height, monarch.radiusBottom * 0.68),
   };
 }
 
 function shapeHero(branch: ClusterBranch, monarch: ClusterBranch): ClusterBranch {
-  const height = clamp(branch.height, monarch.height * 0.64, monarch.height * 0.74);
+  const height = clamp(branch.height, monarch.height * 0.68, monarch.height * 0.76);
   return {
     ...branch,
     height,
     radiusBottom: Math.min(
-      Math.max(branch.radiusBottom, height / 5.8),
-      monarch.radiusBottom * 0.62,
+      Math.max(branch.radiusBottom, height / 4.45),
+      monarch.radiusBottom * 0.68,
     ),
     tier: 'support',
     archetype: 'prismatic',
@@ -116,15 +156,15 @@ function shapeDominant(
   const originalRatio = originalMonarch.height > 0 ? branch.height / originalMonarch.height : 0;
   const support = branch.tier === 'support';
   const ratio = support
-    ? clamp(originalRatio, 0.34, 0.5)
-    : clamp(originalRatio, 0.27, 0.4);
+    ? clamp(originalRatio, 0.32, 0.46)
+    : clamp(originalRatio, 0.22, 0.36);
   const height = monarch.height * ratio;
   return {
     ...branch,
     height,
     radiusBottom: Math.min(
-      Math.max(branch.radiusBottom, height / (support ? 5.7 : 5.1)),
-      monarch.radiusBottom * (support ? 0.52 : 0.42),
+      Math.max(branch.radiusBottom, height / (support ? 4.8 : 4.5)),
+      monarch.radiusBottom * (support ? 0.52 : 0.44),
     ),
     archetype: safeArchetype(branch),
   };
@@ -134,18 +174,18 @@ function shapeLocal(branch: ClusterBranch, host: ClusterBranch, monarch: Cluster
   const micro = branch.role === 'micro';
   const requested = clamp(
     branch.height,
-    monarch.height * (micro ? 0.055 : 0.26),
-    monarch.height * (micro ? 0.14 : 0.34),
+    monarch.height * (micro ? 0.05 : 0.18),
+    monarch.height * (micro ? 0.12 : 0.29),
   );
   const height = micro
-    ? Math.min(requested, host.height * 0.58)
-    : Math.min(requested, Math.max(host.height * 0.88, monarch.height * 0.26));
+    ? Math.min(requested, host.height * 0.46)
+    : Math.min(requested, Math.max(host.height * 0.72, monarch.height * 0.18));
   return {
     ...branch,
     height,
     radiusBottom: Math.min(
-      Math.max(branch.radiusBottom, height / (micro ? 4.0 : 4.8)),
-      host.radiusBottom * (micro ? 0.5 : 0.78),
+      Math.max(branch.radiusBottom, height / (micro ? 4.1 : 4.5)),
+      host.radiusBottom * (micro ? 0.42 : 0.66),
     ),
     archetype: safeArchetype(branch),
   };
@@ -160,6 +200,8 @@ function placeOnHost(
   outwardWeight: number,
   tangentWeight: number,
   hostKey: string,
+  burialFactor = 0.78,
+  radialGapFactor = 0,
 ): ClusterBranch {
   const hostAxis = axisOf(host);
   const { radial, tangent } = radialFrame(hostAxis, angle);
@@ -170,17 +212,18 @@ function placeOnHost(
   const contact = center.addScaledVector(radial, radiusHere);
   const ownRadius = renderedRadius(branch);
 
-  // Великі й середні шпилі мають гарантовано поховане кільце основи.
-  // Micro навмисно сидять мілкіше: кілька дрібних граней повинні читатися
-  // на фронті юбки, а не повністю зникати всередині батьківського кристала.
+  // Основа лишається всередині господаря, але не настільки глибоко, щоб
+  // весь шпиль зникав за монархом. radialGap використовується тільки на
+  // матриці: вона широка й схована, тож може винести юбку за силует.
   const burial = branch.role === 'micro'
-    ? Math.min(ownRadius * 0.76 + radiusHere * 0.02, radiusHere * 0.42)
-    : Math.min(ownRadius * 1.42 + radiusHere * 0.08, radiusHere * 0.82);
-  const position = contact.addScaledVector(radial, -burial);
+    ? Math.min(ownRadius * 0.5 + radiusHere * 0.015, radiusHere * 0.32)
+    : Math.min(ownRadius * burialFactor + radiusHere * 0.025, radiusHere * 0.58);
+  const position = contact
+    .addScaledVector(radial, ownRadius * radialGapFactor - burial);
   const direction = hostAxis
     .clone()
     .multiplyScalar(upWeight)
-    .addScaledVector(UP, 0.24)
+    .addScaledVector(UP, 0.28)
     .addScaledVector(radial, outwardWeight)
     .addScaledVector(tangent, tangentWeight)
     .normalize();
@@ -196,8 +239,17 @@ function chooseHero(branches: readonly ClusterBranch[]): ClusterBranch | null {
   );
 }
 
+function dominantSlot(index: number): number {
+  if (index < FRONT_CROWN_SLOTS.length) return FRONT_CROWN_SLOTS[index]!;
+  // Після читабельного переднього вінця добудовуємо повне кільце. Старі
+  // слоти не рухаються, коли пізніше додаються нові події.
+  return FRONT_CROWN_SLOTS[index % FRONT_CROWN_SLOTS.length]!
+    + (Math.floor(index / FRONT_CROWN_SLOTS.length) + 1) * GOLDEN_ANGLE;
+}
+
 export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): ClusterBranch[] {
-  if (!branches.some((branch) => branch.archetype === 'matrix')) {
+  const matrixSource = branches.find((branch) => branch.archetype === 'matrix');
+  if (matrixSource === undefined) {
     return branches.map((branch) => ({ ...branch }));
   }
 
@@ -205,11 +257,13 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
   if (originalMonarch === undefined) return branches.map((branch) => ({ ...branch }));
 
   const monarch = shapeMonarch(originalMonarch);
+  const matrix = shapeMatrix(matrixSource, monarch);
   const heroKey = chooseHero(branches)?.key ?? null;
   const originalByKey = new Map(branches.map((branch) => [branch.key, branch] as const));
-  const output = new Map<string, ClusterBranch>([[monarch.key, monarch]]);
-  const originalYaw = new THREE.Euler().setFromQuaternion(quaternionOf(originalMonarch), 'YXZ').y;
-  const baseAngle = originalYaw + 0.35;
+  const output = new Map<string, ClusterBranch>([
+    [matrix.key, matrix],
+    [monarch.key, monarch],
+  ]);
 
   const dominantIndex = new Map<string, number>();
   let nextDominant = 0;
@@ -240,50 +294,68 @@ export function applyReferenceDruseLayout(branches: readonly ClusterBranch[]): C
 
     let result: ClusterBranch;
     if (source.archetype === 'matrix') {
-      result = shapeMatrix(source, monarch);
+      result = matrix;
     } else if (source.primary) {
       result = monarch;
     } else if (source.role === 'dominant') {
       if (source.key === heroKey) {
+        // Великий золотий шпиль росте зі спільної породи, а не приклеєний
+        // до середини монарха. Back-left дає референсне перекриття, але
+        // збільшений радіус і мала burial лишають його об’єм читабельним.
         result = placeOnHost(
-          shapeHero(source, monarch), monarch, baseAngle + Math.PI * 1.18,
-          0.055, 1, 0.26, 0.03, monarch.key,
+          shapeHero(source, monarch),
+          matrix,
+          HERO_ANGLE,
+          0.46,
+          1.06,
+          0.22,
+          0,
+          matrix.key,
+          0.44,
+          -0.08,
         );
       } else {
         const index = dominantIndex.get(source.key) ?? 0;
-        const ring = index % 3;
-        const around = Math.floor(index / 3);
         const shaped = shapeDominant(source, monarch, originalMonarch);
         const support = shaped.tier === 'support';
         result = placeOnHost(
           shaped,
-          monarch,
-          baseAngle + ring * 0.34 + around * GOLDEN_ANGLE,
-          0.025 + ring * 0.034,
-          support ? 0.82 : 0.62,
-          support ? 0.62 : 0.92,
-          (unitFromKey(source.key, 'reference-druse-tangent') - 0.5) * 0.16,
-          monarch.key,
+          matrix,
+          dominantSlot(index),
+          0.38 + (index % 3) * 0.045,
+          support ? 0.86 : 0.7,
+          support ? 0.56 : 0.76,
+          (unitFromKey(source.key, 'reference-druse-tangent') - 0.5) * 0.12,
+          matrix.key,
+          0.62,
+          0.05 + (index % 2) * 0.08,
         );
       }
     } else {
       const sourceHost = source.hostKey === null ? undefined : originalByKey.get(source.hostKey);
       const host = sourceHost === undefined || sourceHost.archetype === 'matrix'
-        ? monarch
+        ? matrix
         : layout(sourceHost.key);
       const index = siblingIndex.get(source.key) ?? 0;
       const ring = index % 3;
       const shaped = shapeLocal(source, host, monarch);
       const micro = shaped.role === 'micro';
+      const hostIsMatrix = host.archetype === 'matrix';
       result = placeOnHost(
         shaped,
         host,
-        baseAngle + unitFromKey(host.key, 'reference-druse-family') * TAU + index * GOLDEN_ANGLE,
-        (micro ? 0.012 : 0.024) + ring * (micro ? 0.016 : 0.024),
-        micro ? 0.48 : 0.58,
-        micro ? 1.04 : 0.84,
-        (unitFromKey(source.key, 'reference-druse-local-tangent') - 0.5) * 0.2,
+        hostIsMatrix
+          ? dominantSlot(index + nextDominant)
+          : unitFromKey(host.key, 'reference-druse-family') * TAU + index * GOLDEN_ANGLE,
+        hostIsMatrix
+          ? 0.34 + ring * 0.04
+          : (micro ? 0.008 : 0.018) + ring * (micro ? 0.012 : 0.018),
+        micro ? 0.56 : 0.72,
+        micro ? 0.92 : 0.7,
+        (unitFromKey(source.key, 'reference-druse-local-tangent') - 0.5) * 0.14,
         host.key,
+        micro ? 0.48 : 0.62,
+        hostIsMatrix ? 0.12 : 0,
       );
     }
 
