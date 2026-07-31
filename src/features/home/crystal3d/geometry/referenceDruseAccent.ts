@@ -3,9 +3,9 @@
 // ------------------------------------------------------------
 // У sparse-історії після приховування micro може не лишитися жодного
 // кристала нижче 20% висоти монарха. Один найменший не-hero dominant
-// стабільно стає 17.5%-м переднім шпилем: його основа частково занурена,
-// але більша частина перерізу гарантовано виходить за оболонку монарха.
-// Growth State та стабільний ключ не змінюються.
+// стабільно стає 17.5%-м переднім шпилем і вкорінюється в матрицю поруч із
+// монархом: кришка ховається в породі, але тіло вже не може бути повністю
+// поглинуте оболонкою центрального кристала. Growth State і ключ незмінні.
 // ============================================================
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
@@ -15,6 +15,7 @@ const UP = new THREE.Vector3(0, 1, 0);
 const TAU = Math.PI * 2;
 const unitFromKey = (key: string): number =>
   (hashSeedString(`reference-accent:${key}`) >>> 0) / 0x1_0000_0000;
+const heightScale = (maturity: number): number => 0.32 + maturity * 0.68;
 const radiusScale = (maturity: number): number => 0.4 + maturity * 0.6;
 
 function quaternionFor(direction: THREE.Vector3, key: string): THREE.Quaternion {
@@ -34,11 +35,12 @@ function chooseHero(branches: readonly ClusterBranch[]): string | null {
 export function ensureVisibleReferenceAccent(
   branches: readonly ClusterBranch[],
 ): ClusterBranch[] {
-  if (!branches.some((branch) => branch.archetype === 'matrix')) {
+  const matrix = branches.find((branch) => branch.archetype === 'matrix');
+  const monarch = branches.find((branch) => branch.primary);
+  if (matrix === undefined || monarch === undefined) {
     return branches.map((branch) => ({ ...branch }));
   }
-  const monarch = branches.find((branch) => branch.primary);
-  if (monarch === undefined) return branches.map((branch) => ({ ...branch }));
+
   const heroKey = chooseHero(branches);
   const accent = branches
     .filter((branch) => (
@@ -59,7 +61,6 @@ export function ensureVisibleReferenceAccent(
     Math.max(accent.radiusBottom, height / 4.6),
     monarch.radiusBottom * 0.34,
   );
-  const monarchPosition = new THREE.Vector3(monarch.posX, monarch.posY, monarch.posZ);
   const monarchQuaternion = new THREE.Quaternion(
     monarch.quatX,
     monarch.quatY,
@@ -67,6 +68,16 @@ export function ensureVisibleReferenceAccent(
     monarch.quatW,
   ).normalize();
   const monarchAxis = UP.clone().applyQuaternion(monarchQuaternion).normalize();
+  const matrixPosition = new THREE.Vector3(matrix.posX, matrix.posY, matrix.posZ);
+  const matrixQuaternion = new THREE.Quaternion(
+    matrix.quatX,
+    matrix.quatY,
+    matrix.quatZ,
+    matrix.quatW,
+  ).normalize();
+  const matrixAxis = UP.clone().applyQuaternion(matrixQuaternion).normalize();
+  const matrixHeight = matrix.height * heightScale(matrix.maturity);
+
   const reference = Math.abs(monarchAxis.x) < 0.9
     ? new THREE.Vector3(1, 0, 0)
     : new THREE.Vector3(0, 0, 1);
@@ -75,20 +86,18 @@ export function ensureVisibleReferenceAccent(
   const angle = unitFromKey(accent.key) * TAU;
   const radial = u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize();
   const tangent = new THREE.Vector3().crossVectors(radial, monarchAxis).normalize();
-  const hostRadius = monarch.radiusBottom * radiusScale(monarch.maturity);
+  const monarchRadius = monarch.radiusBottom * radiusScale(monarch.maturity);
 
-  // Центр основи стоїть лише на 48% власного радіуса всередині поверхні:
-  // цього досить для мінерального контакту, але не досить, щоб trim повністю
-  // поглинув короткий передній шпиль, як було при старих 70% hostRadius.
-  const radialDistance = hostRadius - accentRadius * 0.48;
-  const position = monarchPosition
-    .addScaledVector(monarchAxis, monarch.height * 0.014)
-    .addScaledVector(radial, radialDistance)
-    .addScaledVector(tangent, hostRadius * 0.12);
+  // Основа лежить усередині приплюснутої матриці, а її XZ-позиція вже за
+  // оболонкою монарха. Тому trim прибирає нижню кришку, але не весь шпиль.
+  const position = matrixPosition
+    .addScaledVector(matrixAxis, matrixHeight * 0.42)
+    .addScaledVector(radial, monarchRadius + accentRadius * 0.28)
+    .addScaledVector(tangent, monarchRadius * 0.14);
   const direction = monarchAxis
     .clone()
-    .multiplyScalar(0.42)
-    .addScaledVector(UP, 0.14)
+    .multiplyScalar(0.4)
+    .addScaledVector(UP, 0.18)
     .addScaledVector(radial, 1.02)
     .addScaledVector(tangent, 0.12)
     .normalize();
@@ -97,7 +106,7 @@ export function ensureVisibleReferenceAccent(
   return branches.map((branch) => branch.key === accent.key
     ? {
         ...branch,
-        hostKey: monarch.key,
+        hostKey: matrix.key,
         height,
         radiusBottom: accentRadius,
         posX: position.x,
