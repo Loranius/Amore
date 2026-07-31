@@ -2,9 +2,8 @@
 // referenceDisplayCrown — контрольований renderer-only силует друзи.
 // ------------------------------------------------------------
 // Growth/Artifact State лишається джерелом кількості, ключів і кольору hero.
-// Однак випадкова геометрія окремої події не повинна визначати художній
-// силует. Обрані логічні тіла отримують display-mesh з ТИМ САМИМ ключем,
-// тоді як їхній старий mesh приховується у crystalPublication.
+// Обрані логічні тіла отримують display-mesh з ТИМ САМИМ ключем; canonical
+// mesh лишається валідним для shell-аудиту, але не входить у renderable.
 // ============================================================
 import * as THREE from 'three';
 import {
@@ -22,10 +21,11 @@ import {
 const UP = new THREE.Vector3(0, 1, 0);
 const CAMERA_FRONT = new THREE.Vector3(0, 0, 1);
 const HERO_ANGLE = -1.72;
+const HERO_RATIO = 0.48;
 const MEDIUM_ANGLES = [-1.25, 1.25, -0.78, 0.78, -0.36, 0.36] as const;
 const SHORT_ANGLES = [-1.5, 1.5, -1.12, 1.12, -0.76, 0.76, -0.42, 0.42, 0] as const;
-const MEDIUM_RATIOS = [0.42, 0.38, 0.35, 0.32, 0.29, 0.27] as const;
-const SHORT_RATIOS = [0.22, 0.21, 0.2, 0.19, 0.18, 0.17, 0.16, 0.15, 0.14] as const;
+const MEDIUM_RATIOS = [0.38, 0.34, 0.31, 0.28, 0.25, 0.23] as const;
+const SHORT_RATIOS = [0.18, 0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1] as const;
 
 const heightScale = (maturity: number): number => 0.32 + maturity * 0.68;
 const radiusScale = (maturity: number): number => 0.4 + maturity * 0.6;
@@ -58,15 +58,18 @@ function chooseHero(branches: readonly ClusterBranch[]): ClusterBranch | null {
   );
 }
 
-/**
- * Відбирає тільки leaf-тіла: прихований старий mesh не залишає видиму
- * дитину в повітрі. Hero може мати нащадків — їхні старі mesh теж входять
- * до sourceKeys, але самі нащадки не дублюються display-геометрією.
- */
+/** Leaf-тіла можна замінити display-mesh без видимої сироти. Hero може
+ * мати нащадків — їхні canonical mesh також не входять у renderable. */
 export function selectReferenceDisplaySources(
   branches: readonly ClusterBranch[],
   accentKeys: ReadonlySet<string>,
 ): ReferenceDisplaySelection {
+  const matrix = branches.find((branch) => branch.archetype === 'matrix');
+  const monarch = branches.find((branch) => branch.primary);
+  if (matrix === undefined || monarch === undefined) {
+    return { heroKey: null, mediumKeys: [], shortKeys: [], sourceKeys: new Set() };
+  }
+
   const hero = chooseHero(branches);
   const heroKey = hero?.key ?? null;
   const children = new Map<string, string[]>();
@@ -160,11 +163,11 @@ function displayBranch(
 ): ClusterBranch {
   const monarchHeight = renderedHeight(monarch);
   const height = monarchHeight * heightRatio;
-  const radiusBottom = height / (kind === 'hero' ? 4.15 : kind === 'medium' ? 4.35 : 4.05);
+  const radiusBottom = height / (kind === 'hero' ? 3.85 : kind === 'medium' ? 4.25 : 3.95);
   const position = base.clone().addScaledVector(radial, radiusDistance);
   const direction = UP
     .clone()
-    .multiplyScalar(kind === 'hero' ? 0.97 : kind === 'medium' ? 0.88 : 0.78)
+    .multiplyScalar(kind === 'hero' ? 0.99 : kind === 'medium' ? 0.88 : 0.78)
     .addScaledVector(radial, outward)
     .normalize();
   const quaternion = quaternionFor(direction, spin);
@@ -244,9 +247,9 @@ export function buildReferenceDisplayCrown(
         monarch,
         foundation.clone().addScaledVector(axis, matrixHeight * 0.03),
         radial,
-        0.64,
-        monarchRadius * 0.98,
-        0.16,
+        HERO_RATIO,
+        monarchRadius * 1.02,
+        0.1,
         0.08,
         'hero',
       );
@@ -257,16 +260,16 @@ export function buildReferenceDisplayCrown(
   selection.mediumKeys.forEach((key, index) => {
     const source = byKey.get(key);
     if (source === undefined) return;
-    const ratio = MEDIUM_RATIOS[index] ?? 0.27;
+    const ratio = MEDIUM_RATIOS[index] ?? 0.23;
     const radial = radialAt(front, right, MEDIUM_ANGLES[index] ?? index * 0.6);
-    const ownRadius = renderedHeight(monarch) * ratio / 4.35;
+    const ownRadius = renderedHeight(monarch) * ratio / 4.25;
     const branch = displayBranch(
       source,
       monarch,
       foundation.clone().addScaledVector(axis, matrixHeight * (0.02 + (index % 2) * 0.025)),
       radial,
       ratio,
-      monarchRadius * 0.88 + ownRadius * 0.28,
+      monarchRadius * 0.9 + ownRadius * 0.3,
       0.42 + (index % 3) * 0.04,
       index * 0.37,
       'medium',
@@ -277,16 +280,16 @@ export function buildReferenceDisplayCrown(
   selection.shortKeys.forEach((key, index) => {
     const source = byKey.get(key);
     if (source === undefined) return;
-    const ratio = SHORT_RATIOS[index] ?? 0.14;
+    const ratio = SHORT_RATIOS[index] ?? 0.1;
     const radial = radialAt(front, right, SHORT_ANGLES[index] ?? index * 0.5);
-    const ownRadius = renderedHeight(monarch) * ratio / 4.05;
+    const ownRadius = renderedHeight(monarch) * ratio / 3.95;
     const branch = displayBranch(
       source,
       monarch,
       foundation.clone().addScaledVector(axis, matrixHeight * (0.04 + (index % 3) * 0.018)),
       radial,
       ratio,
-      monarchRadius * 0.96 + ownRadius * 0.4,
+      monarchRadius * 0.98 + ownRadius * 0.42,
       0.56 + (index % 3) * 0.05,
       index * 0.51,
       'short',
