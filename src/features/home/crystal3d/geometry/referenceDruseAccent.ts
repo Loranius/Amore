@@ -2,8 +2,8 @@
 // referenceDruseAccent — гарантована коротка видима фракція юбки.
 // ------------------------------------------------------------
 // У sparse-історії після приховування micro може не лишитися жодного
-// кристала нижче 20% висоти монарха. Один найменший не-hero dominant
-// стабільно стає 16%-м переднім шпилем на зовнішньому краї монарха.
+// кристала нижче 20% видимої висоти друзи. Один найменший не-hero dominant
+// стабільно стає 13%-м переднім шпилем на зовнішньому краї монарха.
 // Growth State і стабільний ключ не змінюються.
 // ============================================================
 import * as THREE from 'three';
@@ -52,7 +52,7 @@ export function ensureVisibleReferenceAccent(
     })[0];
   if (accent === undefined) return branches.map((branch) => ({ ...branch }));
 
-  const height = monarch.height * 0.16;
+  const height = monarch.height * 0.13;
   const accentRadius = Math.min(
     Math.max(accent.radiusBottom, height / 4.6),
     monarch.radiusBottom * 0.32,
