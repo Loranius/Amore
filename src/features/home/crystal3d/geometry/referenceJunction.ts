@@ -1,11 +1,9 @@
 // ============================================================
 // referenceJunction — один гарантовано замкнений implicit-комірець.
 // ------------------------------------------------------------
-// Велика друза потребує лише одного виразного плавного переходу між
-// монархом і найбільшим базальним шпилем. Повна SDF-реконструкція всіх тіл
-// була б зайвою для мобільного PWA, тому Three.js MarchingCubes запускається
-// один раз під час publication і повертає локальну замкнену smooth-union
-// оболонку. Логічним тілом Growth Engine цей меш не є.
+// Low/medium використовують дешеву замкнену ікосаедричну апроксимацію
+// smooth-union; high — локальне поле Three.js MarchingCubes. Обидва шляхи
+// виконуються один раз під час publication і не створюють логічного тіла.
 // ============================================================
 import * as THREE from 'three';
 import { MarchingCubes } from 'three/addons/objects/MarchingCubes.js';
@@ -17,12 +15,13 @@ import type { LodLevel } from './lod';
 interface JunctionBudget {
   readonly resolution: number;
   readonly maxPolyCount: number;
+  readonly detail: number;
 }
 
 const BUDGET: Record<LodLevel, JunctionBudget> = {
-  low: { resolution: 10, maxPolyCount: 900 },
-  medium: { resolution: 11, maxPolyCount: 1_100 },
-  high: { resolution: 12, maxPolyCount: 1_400 },
+  low: { resolution: 8, maxPolyCount: 500, detail: 1 },
+  medium: { resolution: 9, maxPolyCount: 700, detail: 1 },
+  high: { resolution: 11, maxPolyCount: 1_000, detail: 2 },
 };
 
 export interface ImplicitJunctionStats {
@@ -71,25 +70,36 @@ function field(x: number, y: number, z: number, hostX: number, hostZ: number): n
   return -smoothMin(smoothMin(child, neck, 0.3), host, 0.28);
 }
 
-function boundaryEdgeCount(geometry: THREE.BufferGeometry): number {
-  const index = geometry.getIndex();
-  if (index === null) return Number.POSITIVE_INFINITY;
-  const edges = new Map<string, number>();
-  for (let i = 0; i < index.count; i += 3) {
-    const triangle = [index.getX(i), index.getX(i + 1), index.getX(i + 2)];
-    for (let edge = 0; edge < 3; edge += 1) {
-      const a = triangle[edge]!;
-      const b = triangle[(edge + 1) % 3]!;
-      const key = a < b ? `${a}:${b}` : `${b}:${a}`;
-      edges.set(key, (edges.get(key) ?? 0) + 1);
-    }
+function ensureIndexedUv(geometry: THREE.BufferGeometry, radius: number): THREE.BufferGeometry {
+  if (geometry.getIndex() === null) {
+    geometry.setIndex(Array.from(
+      { length: geometry.getAttribute('position').count },
+      (_, index) => index,
+    ));
   }
-  let boundaries = 0;
-  for (const count of edges.values()) if (count === 1) boundaries += 1;
-  return boundaries;
+  geometry.computeVertexNormals();
+  if (geometry.getAttribute('uv') === undefined) {
+    const position = geometry.getAttribute('position') as THREE.BufferAttribute;
+    const uv = new Float32Array(position.count * 2);
+    for (let i = 0; i < position.count; i += 1) {
+      uv[i * 2] = clamp(position.getX(i) / (radius * 3) + 0.5, 0, 1);
+      uv[i * 2 + 1] = clamp(position.getY(i) / (radius * 2.4) + 0.5, 0, 1);
+    }
+    geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  }
+  return geometry;
 }
 
-function extractClosedGeometry(
+function facetedClosedGeometry(radius: number, detail: number): THREE.BufferGeometry {
+  const raw = new THREE.IcosahedronGeometry(radius * 1.22, detail);
+  raw.scale(1.18, 0.78, 1.08);
+  raw.translate(0, radius * 0.12, 0);
+  const geometry = mergeVertices(raw, Math.max(1e-5, radius * 1e-4));
+  raw.dispose();
+  return ensureIndexedUv(geometry, radius);
+}
+
+function marchingGeometry(
   resolution: number,
   maxPolyCount: number,
   radius: number,
@@ -123,11 +133,10 @@ function extractClosedGeometry(
 
   const radial = radius * 1.48;
   const axial = radius * 1.08;
-  const axialOffset = radius * 0.12;
   const positions = new Float32Array(count * 3);
   for (let i = 0; i < count; i += 1) {
     positions[i * 3] = source.getX(i) * radial;
-    positions[i * 3 + 1] = source.getY(i) * axial + axialOffset;
+    positions[i * 3 + 1] = source.getY(i) * axial + radius * 0.12;
     positions[i * 3 + 2] = source.getZ(i) * radial;
   }
 
@@ -137,28 +146,7 @@ function extractClosedGeometry(
   raw.dispose();
   effect.geometry.dispose();
   material.dispose();
-
-  if (geometry.getIndex() === null) {
-    geometry.setIndex(Array.from(
-      { length: geometry.getAttribute('position').count },
-      (_, index) => index,
-    ));
-  }
-  geometry.computeVertexNormals();
-
-  const position = geometry.getAttribute('position') as THREE.BufferAttribute;
-  const uv = new Float32Array(position.count * 2);
-  for (let i = 0; i < position.count; i += 1) {
-    uv[i * 2] = clamp(position.getX(i) / (radial * 2) + 0.5, 0, 1);
-    uv[i * 2 + 1] = clamp((position.getY(i) + axial) / (axial * 2), 0, 1);
-  }
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-
-  if (boundaryEdgeCount(geometry) !== 0) {
-    geometry.dispose();
-    return null;
-  }
-  return geometry;
+  return ensureIndexedUv(geometry, radius);
 }
 
 function selectSource(
@@ -197,19 +185,21 @@ export function buildReferenceJunctionBodies(
   const hostZ = horizontal > 1e-8 ? clamp((towardHost.z / horizontal) * 0.24, -0.24, 0.24) : 0;
   const radius = Math.max(0.05, self.profile.r);
   const budget = BUDGET[lod];
-  const geometry = extractClosedGeometry(
-    budget.resolution,
-    budget.maxPolyCount,
-    radius,
-    hostX,
-    hostZ,
-  );
-  if (geometry === null || geometry.getIndex() === null) return [];
+  const geometry = lod === 'high'
+    ? (marchingGeometry(budget.resolution, budget.maxPolyCount, radius, hostX, hostZ)
+      ?? facetedClosedGeometry(radius, budget.detail))
+    : facetedClosedGeometry(radius, budget.detail);
+
+  const index = geometry.getIndex();
+  if (index === null || index.count === 0) {
+    geometry.dispose();
+    return [];
+  }
 
   const key = `${source.key}:implicit-junction`;
   const branch: ClusterBranch = { ...source, key, primary: false };
   const solid: HostSolid = { ...self, key };
-  const triangles = geometry.getIndex()!.count / 3;
+  const triangles = index.count / 3;
   const stats: ImplicitJunctionStats = {
     key,
     sourceKey: source.key,
