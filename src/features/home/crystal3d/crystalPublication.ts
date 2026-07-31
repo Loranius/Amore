@@ -1,12 +1,8 @@
 // ============================================================
 // crystalPublication — єдиний конвеєр публікації кристала.
 // ------------------------------------------------------------
-// Нормативно: Volume V §12 (публікація), Volume VI §11,
-// `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
-//
-// Порядок: renderer-layout → renderer-contract → accent → форма → зріз
-// стику → reference display crown → hidden budget → матеріал → локальне
-// implicit-зрощення → валідація. Growth State лишається незмінним.
+// Canonical bodies лишаються повними для trim/shell/topology. Reference
+// display crown лише замінює їх у фактичному renderable за тим самим key.
 // ============================================================
 import type * as THREE from 'three';
 import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
@@ -53,9 +49,7 @@ export interface PublishedBody {
   readonly geometry: THREE.BufferGeometry;
   readonly trim: TrimStats;
   readonly material: MaterialRegionStats;
-  /** Є лише в synthetic collar, логічним тілом Growth Engine не є. */
   readonly implicitJunction?: ImplicitJunctionStats;
-  /** Renderer-only display-представлення логічного тіла з тим самим key. */
   readonly referenceDisplay?: 'hero' | 'medium' | 'short';
 }
 
@@ -68,13 +62,11 @@ interface PreparedBody {
 
 export interface PublishedCrystal {
   readonly lod: LodLevel;
-  /** Усі логічні тіла стану, включно з повністю прихованими. */
+  /** Усі canonical логічні тіла, включно з прихованими. */
   readonly bodies: readonly PublishedBody[];
-  /** Видимі логічні тіла, включно з renderer-only представленнями тих самих key. */
+  /** Фактичні видимі логічні key: canonical або їх display-заміна. */
   readonly renderable: readonly PublishedBody[];
-  /** Фактичний набір рендера: renderable + bounded implicit collars. */
   readonly drawables: readonly PublishedBody[];
-  /** Контрольовані renderer-only hero та базальна корона. */
   readonly displayBodies: readonly PublishedBody[];
   readonly displaySelection: ReferenceDisplaySelection | null;
   readonly junctions: readonly PublishedBody[];
@@ -86,17 +78,11 @@ export interface PublishedCrystal {
 
 export interface PublishOptions {
   lod?: LodLevel;
-  /** Пропустити renderer-layout — лише для A/B та доказу межі шарів. */
   skipReferenceLayout?: boolean;
-  /** Пропустити контрольований display crown — A/B візуальної композиції. */
   skipReferenceDisplay?: boolean;
-  /** Пропустити зріз стику — лише для доказів «валідатор не вакуумний». */
   skipTrim?: boolean;
-  /** Пропустити смугу шва — before/after для `CAI-REQ-010`. */
   skipSeam?: boolean;
-  /** Пропустити implicit collars — A/B і falsifiability-тести Phase 3B-2. */
   skipFusion?: boolean;
-  /** Проби променями коштують помітно дорожче за статичну валідацію. */
   probe?: boolean;
 }
 
@@ -110,10 +96,9 @@ const emptyTrim = (branch: ClusterBranch, geometry: THREE.BufferGeometry): TrimS
   occluders: [],
 });
 
-/**
- * Будує і валідує повний стан кристала на заданому рівні деталізації.
- * Чиста функція від (branches, material, options) — жодного стану/часу.
- */
+const triangleCount = (geometry: THREE.BufferGeometry): number =>
+  (geometry.getIndex()?.count ?? 0) / 3;
+
 export function publishCrystal(
   branches: readonly ClusterBranch[],
   material: ClusterMaterial,
@@ -135,30 +120,27 @@ export function publishCrystal(
   const prepared: PreparedBody[] = laidOut.map((branch) => {
     const solid = solids.get(branch.key)!;
     const geometry = buildBranchGeometry(branch, material, lod);
-
     const trim = options.skipTrim
       ? emptyTrim(branch, geometry)
       : trimHiddenFaces(geometry, solid, branch.hostKey, solids);
-
     return { branch, solid, geometry, trim };
   });
 
   const displayResult = referenceBase === null || options.skipReferenceDisplay === true
     ? null
     : buildReferenceDisplayCrown(laidOut, material, lod, accentKeys);
-  if (displayResult !== null) {
-    // Старий mesh події лишається в `bodies`, але не потрапляє в renderer.
-    // Display-body нижче має той самий key, тому tap/модалка/метрики бачать
-    // ту саму логічну подію, а не новий synthetic ID.
-    for (const body of prepared) {
-      if (displayResult.selection.sourceKeys.has(body.branch.key)) {
-        body.geometry.setIndex([]);
-      }
-    }
-  }
+  const activeDisplayKeys = displayResult !== null && displayResult.bodies.length > 0
+    ? displayResult.selection.sourceKeys
+    : new Set<string>();
 
   if (referenceBase !== null) {
-    enforceReferenceHiddenBudget(prepared, accentKeys);
+    // Якщо display оживляє source, який canonical trim уже повністю сховав,
+    // компенсуємо це додатковим не-display hidden body. Фінальна економія
+    // тому не залежить від того, які саме реальні події стали короною.
+    const revived = prepared.filter((body) => (
+      activeDisplayKeys.has(body.branch.key) && triangleCount(body.geometry) === 0
+    )).length;
+    enforceReferenceHiddenBudget(prepared, accentKeys, 4 + revived, activeDisplayKeys);
   }
 
   const bodies: PublishedBody[] = prepared.map(({ branch, solid, geometry, trim }) => {
@@ -195,7 +177,6 @@ export function publishCrystal(
       junction.geometry.dispose();
       return [];
     }
-
     const materialStats = bindMaterialRegions(
       junction.geometry,
       junction.branch,
@@ -222,9 +203,7 @@ export function publishCrystal(
     }];
   });
 
-  // Shell/topology перевіряють канонічні логічні тіла. Display crown є
-  // заміною renderer-представлення вже перевірених ключів і не бере участі
-  // у trim/host-математиці, аналогічно bounded implicit collars.
+  // Canonical shell не залежить від художнього display-layer.
   const shellEntries = bodies.map((body) => ({
     solid: body.solid,
     hostKey: body.branch.hostKey,
@@ -239,7 +218,12 @@ export function publishCrystal(
     material,
   );
   const topologyViolations = validateTopology(shellEntries);
-  const logicalRenderable = bodies.filter((body) => (body.geometry.getIndex()?.count ?? 0) > 0);
+
+  // Canonical source mesh не малюється, коли для того самого key існує
+  // display-представлення. Сам body при цьому лишається повним і валідним.
+  const logicalRenderable = bodies.filter((body) => (
+    triangleCount(body.geometry) > 0 && !activeDisplayKeys.has(body.branch.key)
+  ));
   const renderable = [...logicalRenderable, ...displayBodies];
   const drawables = [...renderable, ...junctions];
 
