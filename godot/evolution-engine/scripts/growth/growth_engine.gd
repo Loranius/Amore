@@ -1,0 +1,68 @@
+extends RefCounted
+
+const Model = preload("res://scripts/core/evolution_model.gd")
+const CrystalSpecies = preload("res://scripts/species/crystal_species.gd")
+
+const COLLISION_ATTEMPTS := 12
+const SAMPLE_STEPS := [0.32, 0.58, 0.82, 1.0]
+
+
+func rebuild(dna, source_events: Array):
+	var state := Model.EvolutionState.new(dna)
+	var species := CrystalSpecies.new()
+	state.append_instruction(species.create_mother(dna))
+
+	var events := source_events.duplicate()
+	events.sort_custom(func(left, right): return left.sort_key() < right.sort_key())
+
+	for event_index in range(events.size()):
+		var event = events[event_index]
+		var candidate = species.translate_event(dna, event, event_index, state)
+		candidate = _resolve_competition(candidate, state)
+		state.append_instruction(candidate, event)
+
+	return state
+
+
+func _resolve_competition(candidate, state):
+	var original_direction: Vector3 = candidate.direction
+	var parent = state.get_instruction(candidate.parent_id)
+	var rotation_axis := parent.direction if parent != null else Vector3.UP
+
+	for attempt in range(COLLISION_ATTEMPTS):
+		if _is_clear(candidate, state):
+			candidate.metadata["collision_attempt"] = attempt
+			candidate.metadata["growth_shadow"] = float(attempt) / float(COLLISION_ATTEMPTS)
+			return candidate
+
+		var alternating_sign := -1.0 if attempt % 2 == 0 else 1.0
+		var angular_step := deg_to_rad(13.0 + float(attempt) * 4.5) * alternating_sign
+		candidate.direction = original_direction.rotated(rotation_axis, angular_step).normalized()
+		candidate.direction = (candidate.direction + Vector3.UP * float(attempt) * 0.012).normalized()
+
+	# Bounded fallback: preserve the event and identity while reducing occupied volume.
+	candidate.radius *= 0.72
+	candidate.length *= 0.82
+	candidate.direction = (candidate.direction + Vector3.UP * 0.16).normalized()
+	candidate.metadata["collision_attempt"] = COLLISION_ATTEMPTS
+	candidate.metadata["growth_shadow"] = 1.0
+	candidate.metadata["competition_fallback"] = true
+	return candidate
+
+
+func _is_clear(candidate, state) -> bool:
+	for existing in state.instructions:
+		# A child is intentionally allowed to overlap its parent close to the base;
+		# the geometry layer later turns that overlap into an organic merge.
+		if existing.id == candidate.parent_id:
+			continue
+
+		var required_clearance: float = (candidate.radius + existing.radius) * 1.12
+		for candidate_step in SAMPLE_STEPS:
+			var candidate_point: Vector3 = candidate.sample_point(candidate_step)
+			for existing_step in SAMPLE_STEPS:
+				var existing_point: Vector3 = existing.sample_point(existing_step)
+				if candidate_point.distance_to(existing_point) < required_clearance:
+					return false
+
+	return true
