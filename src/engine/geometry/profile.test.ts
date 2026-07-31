@@ -9,6 +9,7 @@ import {
 } from '../growth/math';
 import { buildCrystalMesh } from './mesh';
 import { buildCrystalProfile } from './profile';
+import { pointInsideCrystalSolid } from './trim';
 
 function crystalBody(overrides: Partial<GrowthBody> = {}): GrowthBody {
   return {
@@ -54,6 +55,19 @@ function crystalBody(overrides: Partial<GrowthBody> = {}): GrowthBody {
     growthCenterRole: 'dominant',
     ...overrides,
   };
+}
+
+function motherBody(): GrowthBody {
+  return crystalBody({
+    id: 'mother',
+    kind: 'crystal:mother',
+    tier: 'king',
+    attributes: { formationKind: 'mother', archetype: 'massive' },
+    generation: 0,
+    hostBodyId: null,
+    attachment: null,
+    growthCenterRole: 'dominant',
+  });
 }
 
 describe('Crystal organic profile phase 3a', () => {
@@ -127,24 +141,40 @@ describe('Crystal organic profile phase 3a', () => {
     ]);
   });
 
-  it('allows the mother crystal to receive visible organic deformation', () => {
-    const mother = crystalBody({
-      id: 'mother',
-      kind: 'crystal:mother',
-      tier: 'king',
-      attributes: { formationKind: 'mother', archetype: 'massive' },
-      generation: 0,
-      hostBodyId: null,
-      attachment: null,
-      growthCenterRole: 'dominant',
-    });
-    const profile = buildCrystalProfile(mother, 'high');
+  it('keeps the mother silhouette visibly organic even at low LOD', () => {
+    const mother = motherBody();
+    const profile = buildCrystalProfile(mother, 'low');
+    const leanMagnitude = Math.hypot(profile.axisLeanX, profile.axisLeanZ);
 
     expect(profile.archetype).toBe('prismatic');
     expect(profile.burialStartY).toBe(0);
     expect(profile.burialCompression).toBe(1);
-    expect(Math.abs(profile.twistTotal)).toBeGreaterThan(0);
-    expect(Math.hypot(profile.axisLeanX, profile.axisLeanZ)).toBeGreaterThan(0);
+    expect(Math.abs(profile.twistTotal)).toBeGreaterThanOrEqual(0.11);
+    expect(leanMagnitude).toBeGreaterThanOrEqual(mother.renderedRadius * 0.129);
+    expect(profile.scaleX).toBe(0.78);
+    expect(profile.scaleZ).toBe(1.12);
+    expect(profile.segments).toBe(6);
     expect(profile.rows).toHaveLength(7);
+  });
+
+  it('tests trim occupancy against the bent elliptical shell, not a straight radius envelope', () => {
+    const mother = motherBody();
+    const mesh = buildCrystalMesh(mother, 'low');
+    const row = mesh.profile.rows[3]!;
+    const { tangent, bitangent } = orthonormalBasis(mother.direction);
+    const center = add(
+      add(
+        add(mesh.profile.geometryAnchor, scale(mother.direction, row.y)),
+        scale(tangent, row.centerOffsetX),
+      ),
+      scale(bitangent, row.centerOffsetZ),
+    );
+    const solid = { body: mother, profile: mesh.profile, bounds: mesh.bounds };
+    const inside = add(center, scale(tangent, row.radiusX * 0.95));
+    const outside = add(center, scale(tangent, row.radiusX * 1.05));
+
+    expect(pointInsideCrystalSolid(center, solid, 0)).toBe(true);
+    expect(pointInsideCrystalSolid(inside, solid, 0)).toBe(true);
+    expect(pointInsideCrystalSolid(outside, solid, 0)).toBe(false);
   });
 });
