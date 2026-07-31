@@ -53,6 +53,10 @@ export interface ReefThreeSceneState {
   };
 }
 
+function typedValue(array: Float32Array, index: number): number {
+  return array[index] ?? 0;
+}
+
 function colorArray(color: ReefMaterialColor): [number, number, number] {
   return [color.r, color.g, color.b];
 }
@@ -166,9 +170,9 @@ function maximumAxialDistance(
   for (let index = range.vertexStart; index < range.vertexStart + range.vertexCount; index += 1) {
     const offset = index * 3;
     const relative = {
-      x: positions[offset] - motion.pivot.x,
-      y: positions[offset + 1] - motion.pivot.y,
-      z: positions[offset + 2] - motion.pivot.z,
+      x: typedValue(positions, offset) - motion.pivot.x,
+      y: typedValue(positions, offset + 1) - motion.pivot.y,
+      z: typedValue(positions, offset + 2) - motion.pivot.z,
     };
     maximum = Math.max(maximum, Math.max(0, dot(relative, motion.axis)));
   }
@@ -336,9 +340,9 @@ export function sampleReefBatchFrame(
 
       for (let index = range.vertexStart; index < range.vertexStart + range.vertexCount; index += 1) {
         const offset = index * 3;
-        const relativeX = batch.basePositions[offset] - motion.pivot.x;
-        const relativeY = batch.basePositions[offset + 1] - motion.pivot.y;
-        const relativeZ = batch.basePositions[offset + 2] - motion.pivot.z;
+        const relativeX = typedValue(batch.basePositions, offset) - motion.pivot.x;
+        const relativeY = typedValue(batch.basePositions, offset + 1) - motion.pivot.y;
+        const relativeZ = typedValue(batch.basePositions, offset + 2) - motion.pivot.z;
         const axialDistance = Math.max(
           0,
           relativeX * motion.axis.x + relativeY * motion.axis.y + relativeZ * motion.axis.z,
@@ -356,9 +360,9 @@ export function sampleReefBatchFrame(
           angle,
         );
         const rotatedNormal = rotateAroundAxis(
-          batch.baseNormals[offset],
-          batch.baseNormals[offset + 1],
-          batch.baseNormals[offset + 2],
+          typedValue(batch.baseNormals, offset),
+          typedValue(batch.baseNormals, offset + 1),
+          typedValue(batch.baseNormals, offset + 2),
           rotationAxis,
           angle,
         );
@@ -368,9 +372,9 @@ export function sampleReefBatchFrame(
         normals[offset] = rotatedNormal[0];
         normals[offset + 1] = rotatedNormal[1];
         normals[offset + 2] = rotatedNormal[2];
-        colors[offset] = Math.min(1, batch.baseColors[offset] * pulse);
-        colors[offset + 1] = Math.min(1, batch.baseColors[offset + 1] * pulse);
-        colors[offset + 2] = Math.min(1, batch.baseColors[offset + 2] * pulse);
+        colors[offset] = Math.min(1, typedValue(batch.baseColors, offset) * pulse);
+        colors[offset + 1] = Math.min(1, typedValue(batch.baseColors, offset + 1) * pulse);
+        colors[offset + 2] = Math.min(1, typedValue(batch.baseColors, offset + 2) * pulse);
       }
     }
   }
