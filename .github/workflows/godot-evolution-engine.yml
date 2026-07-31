@@ -1,0 +1,47 @@
+name: Godot Evolution Engine
+
+on:
+  push:
+    branches:
+      - feat/godot-evolution-engine-bootstrap
+    paths:
+      - 'godot/evolution-engine/**'
+      - '.github/workflows/godot-evolution-engine.yml'
+  pull_request:
+    paths:
+      - 'godot/evolution-engine/**'
+      - '.github/workflows/godot-evolution-engine.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 \
+            --output /tmp/godot.zip \
+            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          sudo ln -s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 /usr/local/bin/godot
+          godot --version
+
+      - name: Import and parse project
+        run: godot --headless --path godot/evolution-engine --editor --quit
+
+      - name: Run deterministic growth smoke test
+        run: >-
+          godot --headless
+          --path godot/evolution-engine
+          --script res://scripts/tests/determinism_smoke.gd
