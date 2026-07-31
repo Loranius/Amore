@@ -1,11 +1,11 @@
 // ============================================================
 // referenceDruseAccent — коротка видима фракція базальної юбки.
 // ------------------------------------------------------------
-// Структурний контракт вимірює 10-й перцентиль. У typical/full-друзі це
-// вже третє-четверте найкоротше тіло, тому одного чи двох акцентів мало.
-// Шість найменших non-hero dominants утворюють стабільну передню фракцію
-// 12–13.5% висоти монарха, рознесену золотим кутом. Growth State і ключі
-// не змінюються — це суто renderer-layout перед Geometry Engine.
+// Структурний контракт вимірює 10-й перцентиль, тому фіксовані 2/6 шпилів
+// не масштабуються від sparse до rich. Приблизно 14% неслужбових тіл стають
+// короткою фракцією 10–11.8% висоти монарха. Беремо лише листові тіла без
+// власних дітей: renderer-layout не розриває локальні колонії та Growth
+// State/стабільні ключі лишаються недоторканними.
 // ============================================================
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
@@ -38,11 +38,11 @@ function placeAccent(
   monarch: ClusterBranch,
   accentIndex: number,
 ): ClusterBranch {
-  const heightRatio = 0.12 + accentIndex * 0.003;
+  const heightRatio = 0.1 + (accentIndex % 4) * 0.006;
   const height = monarch.height * heightRatio;
   const accentRadius = Math.min(
-    Math.max(height / 4.6, monarch.radiusBottom * 0.05),
-    monarch.radiusBottom * 0.26,
+    Math.max(height / 4.4, monarch.radiusBottom * 0.045),
+    monarch.radiusBottom * 0.24,
   );
   const monarchPosition = new THREE.Vector3(monarch.posX, monarch.posY, monarch.posZ);
   const monarchQuaternion = new THREE.Quaternion(
@@ -64,19 +64,22 @@ function placeAccent(
   const radial = u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize();
   const tangent = new THREE.Vector3().crossVectors(radial, monarchAxis).normalize();
 
-  // Центр основи стоїть трохи за аналітичним радіусом монарха. Короткі
-  // шпилі гарантовано лишаються видимими, але торкаються його базальної
-  // оболонки й читаються єдиною юбкою, а не окремими уламками в повітрі.
+  // Після восьми тіл починається друге низьке кільце: щільна rich-юбка не
+  // складає всі шпилі в одну окружність і не створює z-fighting.
+  const ring = Math.floor(accentIndex / 8);
+  const radialDistance = monarchRadius
+    + accentRadius * (0.08 + ring * 1.15)
+    + monarchRadius * ring * 0.06;
   const position = monarchPosition
-    .addScaledVector(monarchAxis, monarchHeight * (0.012 + (accentIndex % 3) * 0.008))
-    .addScaledVector(radial, monarchRadius + accentRadius * 0.06)
-    .addScaledVector(tangent, monarchRadius * ((accentIndex % 2 === 0 ? 1 : -1) * 0.04));
+    .addScaledVector(monarchAxis, monarchHeight * (0.01 + (accentIndex % 4) * 0.007))
+    .addScaledVector(radial, radialDistance)
+    .addScaledVector(tangent, monarchRadius * ((accentIndex % 2 === 0 ? 1 : -1) * 0.035));
   const direction = monarchAxis
     .clone()
-    .multiplyScalar(0.82 + (accentIndex % 2) * 0.06)
+    .multiplyScalar(0.78 + (accentIndex % 3) * 0.05)
     .addScaledVector(UP, 0.16)
-    .addScaledVector(radial, 0.54 + (accentIndex % 3) * 0.05)
-    .addScaledVector(tangent, accentIndex % 2 === 0 ? 0.05 : -0.05)
+    .addScaledVector(radial, 0.58 + (accentIndex % 4) * 0.04)
+    .addScaledVector(tangent, accentIndex % 2 === 0 ? 0.045 : -0.045)
     .normalize();
   const quaternion = quaternionFor(direction, branch.key);
 
@@ -103,19 +106,26 @@ export function ensureVisibleReferenceAccent(
   if (monarch === undefined) return branches.map((branch) => ({ ...branch }));
 
   const heroKey = chooseHero(branches);
-  const accents = branches
-    .filter((branch) => (
-      !branch.primary
-      && branch.role === 'dominant'
-      && branch.archetype !== 'matrix'
-      && branch.key !== heroKey
-    ))
+  const loadBearing = new Set(
+    branches
+      .map((branch) => branch.hostKey)
+      .filter((key): key is string => key !== null),
+  );
+  const population = branches.filter((branch) => (
+    !branch.primary
+    && branch.archetype !== 'matrix'
+    && branch.key !== heroKey
+    && branch.role !== 'micro'
+  ));
+  const targetCount = Math.max(2, Math.ceil(population.length * 0.14));
+  const accents = population
+    .filter((branch) => !loadBearing.has(branch.key))
     .sort((left, right) => {
       const lv = left.height * left.radiusBottom * left.radiusBottom;
       const rv = right.height * right.radiusBottom * right.radiusBottom;
       return lv - rv || left.key.localeCompare(right.key);
     })
-    .slice(0, 6);
+    .slice(0, targetCount);
   if (accents.length === 0) return branches.map((branch) => ({ ...branch }));
 
   const accentIndex = new Map(accents.map((branch, index) => [branch.key, index] as const));
