@@ -2,7 +2,7 @@
 // referenceDruseContract — останній renderer-only санітарний контракт.
 // ------------------------------------------------------------
 // Layout формує силует. Цей pass фіксує три інваріанти:
-//   • hero-spire великий, але монарх лишається головним;
+//   • hero-spire добре відкритий збоку, але монарх лишається >2× вищим;
 //   • micro та два найменші synthetic satellites стають внутрішніми
 //     включеннями, а не хаотичним пилом на поверхні;
 //   • родина hero сидить біля його кореня, а не стирчить збоку вгорі.
@@ -128,7 +128,7 @@ function settleHeroChild(
     .addScaledVector(hostAxis, 0.28)
     .addScaledVector(radial, 0.42)
     .normalize();
-  const height = Math.min(branch.height, monarch.height * 0.22, host.height * 0.34);
+  const height = Math.min(branch.height, monarch.height * 0.2, host.height * 0.34);
   const adjusted = withDirection(branch, direction);
   return {
     ...adjusted,
@@ -157,15 +157,15 @@ export function enforceReferenceDruseContract(
   const heroKey = hero?.key ?? null;
   const heroHeight = hero === null
     ? null
-    : clamp(hero.height, monarch.height * 0.68, monarch.height * 0.76);
+    : clamp(hero.height, monarch.height * 0.47, monarch.height * 0.495);
   const adjustedHero = hero === null || heroHeight === null
     ? null
     : {
         ...hero,
         height: heroHeight,
         radiusBottom: Math.min(
-          Math.max(hero.radiusBottom, heroHeight / 4.45),
-          monarch.radiusBottom * 0.68,
+          Math.max(hero.radiusBottom, heroHeight / 4.2),
+          monarch.radiusBottom * 0.62,
         ),
         archetype: 'prismatic' as const,
       };
