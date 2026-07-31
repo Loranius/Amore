@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
 const baseURL = 'http://127.0.0.1:4174/';
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?.trim() || undefined;
 
 export default defineConfig({
   testDir: './e2e/godot',
@@ -34,6 +35,7 @@ export default defineConfig({
     isMobile: true,
     hasTouch: true,
     launchOptions: {
+      ...(executablePath ? { executablePath } : {}),
       args: [
         '--enable-webgl',
         '--ignore-gpu-blocklist',
