@@ -116,6 +116,11 @@ func _run() -> void:
 		_fail(morphology_error)
 		return
 
+	var environment_error := _validate_environment()
+	if not environment_error.is_empty():
+		_fail(environment_error)
+		return
+
 	print("PASS: deterministic crystal rebuild; instructions=%d" % first_state.instructions.size())
 	quit(0)
 
@@ -146,8 +151,7 @@ func _validate_morphology(instructions: Array) -> String:
 		if tip_offset.length() > 0.36:
 			return "Morphology failure: tip offset is outside bounds."
 
-		var instance: MeshInstance3D = builder.create_mesh_instance(instruction)
-		var mesh := instance.mesh as ArrayMesh
+		var mesh: ArrayMesh = builder.create_mesh(instruction)
 		if mesh == null or mesh.get_surface_count() != 1:
 			return "Geometry failure: crystal mesh surface is missing."
 		var bounds: AABB = mesh.get_aabb()
@@ -185,19 +189,48 @@ func _validate_morphology(instructions: Array) -> String:
 		var material := mesh.surface_get_material(0) as StandardMaterial3D
 		if material == null:
 			return "Material failure: optical material is missing."
-		if not material.rim_enabled or material.rim < 0.1 or material.rim > 0.34:
+		if not material.rim_enabled or material.rim < 0.05 or material.rim > 0.19:
 			return "Material failure: bounded rim contract is invalid."
-		if not material.clearcoat_enabled or material.clearcoat < 0.3 or material.clearcoat > 0.72:
+		if not material.clearcoat_enabled or material.clearcoat < 0.25 or material.clearcoat > 0.65:
 			return "Material failure: bounded clearcoat contract is invalid."
-		if material.clearcoat_roughness < 0.07 or material.clearcoat_roughness > 0.25:
+		if material.clearcoat_roughness < 0.1 or material.clearcoat_roughness > 0.3:
 			return "Material failure: clearcoat roughness is outside bounds."
 		if not material.backlight_enabled:
 			return "Material failure: internal backlight cue is disabled."
-		if material.roughness < 0.15 or material.roughness > 0.31:
+		if material.roughness < 0.2 or material.roughness > 0.35:
 			return "Material failure: surface roughness is outside bounds."
-		if material.emission_energy_multiplier > 0.065:
+		if material.emission_energy_multiplier > 0.03:
 			return "Material failure: internal emission exceeds the mobile bound."
 
+	return ""
+
+
+func _validate_environment() -> String:
+	var packed_scene := load("res://scenes/evolution_engine.tscn") as PackedScene
+	if packed_scene == null:
+		return "Environment failure: main scene could not be loaded."
+	var root := packed_scene.instantiate()
+	var world_environment := root.get_node_or_null("WorldEnvironment") as WorldEnvironment
+	if world_environment == null or world_environment.environment == null:
+		root.free()
+		return "Environment failure: WorldEnvironment is missing."
+	var environment := world_environment.environment
+	if environment.background_mode != Environment.BG_SKY:
+		root.free()
+		return "Environment failure: background is not Sky-based."
+	if environment.ambient_light_source != Environment.AMBIENT_SOURCE_SKY:
+		root.free()
+		return "Environment failure: ambient light is not Sky-based."
+	if environment.reflected_light_source != Environment.REFLECTION_SOURCE_SKY:
+		root.free()
+		return "Environment failure: reflected light is not Sky-based."
+	if environment.sky == null or environment.sky.sky_material == null:
+		root.free()
+		return "Environment failure: procedural radiance Sky is missing."
+	if environment.sky.radiance_size > Sky.RADIANCE_SIZE_64:
+		root.free()
+		return "Environment failure: radiance map exceeds the mobile budget."
+	root.free()
 	return ""
 
 
