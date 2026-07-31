@@ -42,12 +42,17 @@ interface CrystalProfileSlice {
   radiusZ: number;
 }
 
-function sliceFromRow(row: CrystalSolid['profile']['rows'][number] | undefined): CrystalProfileSlice {
+function sliceFromRow(
+  row: CrystalSolid['profile']['rows'][number] | undefined,
+  scaleX: number,
+  scaleZ: number,
+): CrystalProfileSlice {
+  const legacyRadius = row?.radius ?? 0;
   return {
     centerOffsetX: row?.centerOffsetX ?? 0,
     centerOffsetZ: row?.centerOffsetZ ?? 0,
-    radiusX: row?.radiusX ?? 0,
-    radiusZ: row?.radiusZ ?? 0,
+    radiusX: row?.radiusX ?? legacyRadius * scaleX,
+    radiusZ: row?.radiusZ ?? legacyRadius * scaleZ,
   };
 }
 
@@ -68,16 +73,19 @@ function interpolateSlice(
 /** Samples the same bent elliptical shell used by buildCrystalMesh. */
 function profileSliceAt(solid: CrystalSolid, y: number): CrystalProfileSlice {
   const rows = solid.profile.rows;
-  if (y <= (rows[0]?.y ?? 0)) return sliceFromRow(rows[0]);
+  const fromRow = (row: CrystalSolid['profile']['rows'][number] | undefined): CrystalProfileSlice => (
+    sliceFromRow(row, solid.profile.scaleX, solid.profile.scaleZ)
+  );
+  if (y <= (rows[0]?.y ?? 0)) return fromRow(rows[0]);
   for (let index = 0; index < rows.length - 1; index += 1) {
     const left = rows[index]!;
     const right = rows[index + 1]!;
     if (y <= right.y) {
       const span = Math.max(1e-9, right.y - left.y);
-      return interpolateSlice(sliceFromRow(left), sliceFromRow(right), (y - left.y) / span);
+      return interpolateSlice(fromRow(left), fromRow(right), (y - left.y) / span);
     }
   }
-  return sliceFromRow(rows[rows.length - 1]);
+  return fromRow(rows[rows.length - 1]);
 }
 
 export function pointInsideCrystalSolid(
