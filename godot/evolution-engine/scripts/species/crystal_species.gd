@@ -4,7 +4,7 @@ const Model = preload("res://scripts/core/evolution_model.gd")
 const DeterministicRNG = preload("res://scripts/core/deterministic_rng.gd")
 
 const MOTHER_ID := "crystal:mother"
-const BASAL_CROWN_COUNT := 6
+const BASAL_CROWN_COUNT := 5
 
 
 func create_genesis_instructions(dna) -> Array:
@@ -18,22 +18,22 @@ func create_genesis_instructions(dna) -> Array:
 		var radial: Vector3 = Vector3(cos(spin), 0.0, sin(spin)).normalized()
 		var attach_position: Vector3 = (
 			mother.attach_position
-			+ Vector3.UP * rng.range_float(0.04, 0.15)
-			+ radial * mother.radius * rng.range_float(0.34, 0.48)
+			+ Vector3.UP * rng.range_float(0.03, 0.12)
+			+ radial * mother.radius * rng.range_float(0.7, 0.82)
 		)
 		var direction: Vector3 = (
-			radial * rng.range_float(0.48, 0.72)
-			+ Vector3.UP * rng.range_float(0.72, 0.94)
+			radial * rng.range_float(0.54, 0.72)
+			+ Vector3.UP * rng.range_float(0.75, 0.96)
 		).normalized()
-		var energy: float = rng.range_float(0.42, 0.7)
+		var energy: float = rng.range_float(0.42, 0.68)
 		instructions.append(Model.GrowthInstruction.new(
 			"crystal:genesis:basal:%02d" % index,
 			MOTHER_ID,
 			1,
 			attach_position,
 			direction,
-			rng.range_float(0.16, 0.25),
-			rng.range_float(0.74, 1.28),
+			rng.range_float(0.15, 0.22),
+			rng.range_float(0.68, 1.12),
 			rng.range_int(5, 7),
 			energy,
 			"genesis",
@@ -43,6 +43,7 @@ func create_genesis_instructions(dna) -> Array:
 				"cap_base": false,
 				"attachment_ratio": 0.03,
 				"merge_depth_ratio": 0.58,
+				"surface_offset_ratio": 0.76,
 			},
 		))
 
@@ -91,10 +92,11 @@ func translate_event(dna, event, event_index: int, state) -> RefCounted:
 	var along_ratio: float = rng.range_float(0.16, 0.78)
 	var parent_radius_at_attachment: float = parent.radius * lerpf(1.08, 0.7, along_ratio)
 	var merge_depth_ratio: float = rng.range_float(0.48, 0.66)
+	var surface_offset_ratio: float = rng.range_float(0.74, 0.86)
 	var attach_position: Vector3 = (
 		parent.attach_position
 		+ parent_direction * parent.length * along_ratio
-		+ radial * parent_radius_at_attachment * (1.0 - merge_depth_ratio)
+		+ radial * parent_radius_at_attachment * surface_offset_ratio
 	)
 
 	var significance: float = _channel(event, "significance")
@@ -151,6 +153,7 @@ func translate_event(dna, event, event_index: int, state) -> RefCounted:
 			"cap_base": false,
 			"attachment_ratio": along_ratio,
 			"merge_depth_ratio": merge_depth_ratio,
+			"surface_offset_ratio": surface_offset_ratio,
 		},
 	)
 
