@@ -27,7 +27,7 @@ func rebuild(dna, source_events: Array):
 func _resolve_competition(candidate, state):
 	var original_direction: Vector3 = candidate.direction
 	var parent = state.get_instruction(candidate.parent_id)
-	var rotation_axis := parent.direction if parent != null else Vector3.UP
+	var rotation_axis: Vector3 = parent.direction if parent != null else Vector3.UP
 
 	for attempt in range(COLLISION_ATTEMPTS):
 		if _is_clear(candidate, state):
