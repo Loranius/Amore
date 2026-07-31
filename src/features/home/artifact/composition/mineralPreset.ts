@@ -21,6 +21,7 @@ import {
   type ComposedBody,
   type SilhouettePreset,
 } from './framework';
+import { applyReferenceDruseComposition } from './referenceDruse';
 import type { CompositionScore } from './score';
 
 // ── Силуети (Stage 3): читабельні навіть як чорна тінь ───────────
@@ -69,7 +70,7 @@ const SILHOUETTES: SilhouettePreset[] = [
 const ramp = (v: number, from: number, to: number): number => Math.max(0, Math.min(1, (v - from) / (to - from)));
 
 const ARCHETYPES: ArchetypeDef[] = [
-  { id: 'spear', weight: () => 0.32 }, // базовий — перемагає, лише коли ніщо інше не виражене
+  { id: 'spear', weight: () => 0.32 },
   { id: 'massive', weight: (f) => ramp(f.volume, 0.02, 0.12) * ramp(f.age, 0.5, 1) * 0.9, lengthMul: 0.78, radiusMul: 1.35 },
   { id: 'prismatic', weight: (f) => ramp(f.age, 0.6, 1) * ramp(f.energy, 0.6, 1) * 0.75, lengthMul: 0.95, radiusMul: 1.1 },
   { id: 'needle', weight: (f) => (1 - ramp(f.volume, 0.002, 0.02)) * (1 - ramp(f.energy, 0.4, 0.9)) * 0.7, lengthMul: 1.3, radiusMul: 0.6 },
@@ -84,11 +85,6 @@ const ARCHETYPES: ArchetypeDef[] = [
   { id: 'etched', weight: (f) => ramp(f.age, 0.75, 1) * ramp(f.stress, 1.0, 1.5) * 0.4 },
 ];
 
-// ── Мапінг предметних полів у генеричні прапорці ─────────────────
-
-/** Декоративні тіла (можна ховати/видаляти): супутники колоній, амбіентний
- *  baseline-трикл і все «виточене» композитором. Тіла, що представляють
- *  реальні дані пари (країни/віхи/бажання/...), — ніколи. */
 const isDecorative = (c: DepositedCrystal): boolean =>
   c.role !== 'dominant' || c.key.startsWith('baseline-') || c.key.includes('~');
 
@@ -102,13 +98,12 @@ const toBody = (c: DepositedCrystal): CompositionBody => ({
   energy: c.growthEnergy,
   primary: c.primary,
   decorative: isDecorative(c),
-  shielded: c.emphasized === true, // золоті віхи — недоторканні
+  shielded: c.emphasized === true,
   colonyId: c.colonyId,
   role: c.role,
   hostKey: c.attachment?.hostKey ?? null,
 });
 
-/** Ліміт тіл усього зразка (перф мобільних GPU). */
 export const TOTAL_BODY_CAP = 120;
 
 function mineralConfig(seedNum: number, compactnessBias: number): CompositionConfig {
@@ -130,8 +125,6 @@ export interface MineralComposition {
   passes: number;
 }
 
-/** Синтез DepositedCrystal для тіл, «виточених» композитором (компаньйони,
- *  мікрошар): предметні поля успадковуються від батька, дихання — keyed. */
 function synthesizeCrystal(body: ComposedBody, parent: DepositedCrystal, seedNum: number): DepositedCrystal {
   const rng = mulberry32(seedNum + hashSeedString(`composed:${body.key}`));
   return {
@@ -144,15 +137,11 @@ function synthesizeCrystal(body: ComposedBody, parent: DepositedCrystal, seedNum
     radius: body.radius,
     growthEnergy: body.energy,
     role: body.role === 'micro' ? 'micro' : 'satellite',
-    // `CAI-REQ-004`: «виточене» композицією тіло кріпиться до СВОГО батька,
-    // а не успадковує кріплення батька зі спреду вище.
     attachment: {
       hostKey: body.parentKey ?? parent.key,
       contactPoint: body.anchor,
       contactNormal: body.direction,
       hostT: 0,
-      // Азимут «виточеного» тіла в рамці батька — детермінований із його
-      // ключа: композиційні спавни не проходять рулетку розміщення.
       hostAngle: (hashSeedString(body.key) % 3600) / 3600 * Math.PI * 2,
     },
     primary: false,
@@ -164,10 +153,6 @@ function synthesizeCrystal(body: ComposedBody, parent: DepositedCrystal, seedNum
   };
 }
 
-/**
- * Головний вхід предметного шару: компонує вже відкладену мінеральну масу.
- * Growth Engine недоторканний — це суто пост-обробка його результату.
- */
 export function composeMineralCluster(
   crystals: readonly DepositedCrystal[],
   seedNum: number,
@@ -196,8 +181,6 @@ export function composeMineralCluster(
     return synthesizeCrystal(body, parent, seedNum);
   });
 
-  // Перф-стеля: зайве зрізається з найдрібніших декоративних (детерміновано);
-  // каскадом ховаються й «виточені» з викинутого тіла (`X~...` від X).
   if (composed.length > TOTAL_BODY_CAP) {
     const sorted = [...composed].sort(
       (a, b) => a.radius * a.radius * a.length - b.radius * b.radius * b.length || a.key.localeCompare(b.key),
@@ -224,5 +207,6 @@ export function composeMineralCluster(
     composed = composed.filter((c) => !toDrop.has(c.key));
   }
 
+  composed = applyReferenceDruseComposition(composed, seedNum);
   return { crystals: composed, score, passes };
 }
