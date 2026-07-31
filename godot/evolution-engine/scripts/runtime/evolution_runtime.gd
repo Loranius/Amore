@@ -3,26 +3,32 @@ extends Node3D
 const Model = preload("res://scripts/core/evolution_model.gd")
 const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
 const CrystalMeshBuilder = preload("res://scripts/geometry/crystal_mesh_builder.gd")
+const WebPortalBridge = preload("res://scripts/runtime/web_portal_bridge.gd")
 
 @onready var artifact_root: Node3D = $ArtifactRoot
 @onready var status_label: Label = $UI/SafeArea/StatusPanel/StatusMargin/StatusLabel
 
 var current_state = null
+var web_bridge = null
 
 
 func _ready() -> void:
-	rebuild_from_payload(_demo_payload())
+	web_bridge = WebPortalBridge.new()
+	web_bridge.name = "WebPortalBridge"
+	web_bridge.payload_received.connect(_on_web_payload_received)
+	add_child(web_bridge)
+	rebuild_from_payload(_demo_payload(), "demo")
 
 
 func rebuild_from_json(payload_json: String) -> bool:
 	var parsed = JSON.parse_string(payload_json)
 	if typeof(parsed) != TYPE_DICTIONARY:
-		push_error("Evolution payload must be a JSON object.")
+		_report_error("Evolution payload must be a JSON object.")
 		return false
-	return rebuild_from_payload(parsed)
+	return rebuild_from_payload(parsed, "portal")
 
 
-func rebuild_from_payload(payload: Dictionary) -> bool:
+func rebuild_from_payload(payload: Dictionary, source: String = "runtime") -> bool:
 	var dna_payload: Dictionary = payload.get("dna", {})
 	var dna := Model.ArtifactDNA.new(
 		int(dna_payload.get("seed", 1)),
@@ -32,7 +38,7 @@ func rebuild_from_payload(payload: Dictionary) -> bool:
 	)
 
 	if dna.species != &"crystal":
-		push_error("Bootstrap runtime currently supports Crystal only.")
+		_report_error("Bootstrap runtime currently supports Crystal only.")
 		return false
 
 	var events: Array = []
@@ -42,7 +48,8 @@ func rebuild_from_payload(payload: Dictionary) -> bool:
 
 	current_state = GrowthEngine.new().rebuild(dna, events)
 	_render_state()
-	_update_status()
+	_update_status(source)
+	_post_runtime_state(source)
 	print("AMORE_EVOLUTION_SNAPSHOT=" + canonical_snapshot_json())
 	return true
 
@@ -62,12 +69,42 @@ func _render_state() -> void:
 		artifact_root.add_child(builder.create_mesh_instance(instruction))
 
 
-func _update_status() -> void:
+func _update_status(source: String) -> void:
 	status_label.text = (
 		"Godot 4.7.1 · Crystal bootstrap\n"
 		+ "%d accepted growth instructions\n" % current_state.instructions.size()
-		+ "seed %d · deterministic rebuild" % current_state.dna.seed
+		+ "seed %d · %s rebuild" % [current_state.dna.seed, source]
 	)
+
+
+func _post_runtime_state(source: String) -> void:
+	if web_bridge == null or current_state == null:
+		return
+
+	var snapshot_json := canonical_snapshot_json()
+	web_bridge.post_message({
+		"type": "amore:godot:state",
+		"version": "4.7.1",
+		"source": source,
+		"species": String(current_state.dna.species),
+		"seed": current_state.dna.seed,
+		"instructions": current_state.instructions.size(),
+		"history": current_state.history.size(),
+		"signature": snapshot_json.sha256_text().substr(0, 16),
+	})
+
+
+func _on_web_payload_received(payload_json: String) -> void:
+	rebuild_from_json(payload_json)
+
+
+func _report_error(message: String) -> void:
+	push_error(message)
+	if web_bridge != null:
+		web_bridge.post_message({
+			"type": "amore:godot:error",
+			"message": message,
+		})
 
 
 func _demo_payload() -> Dictionary:
