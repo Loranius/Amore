@@ -135,10 +135,10 @@ export function selectReferenceAccentKeys(
 
 /**
  * У щільній backfilled-друзі частина звичайних family-dominants може бути
- * буквально на кілька відсотків нижчою за радіус монарха й читатися пилом.
- * Accent-шпилі не чіпаємо — вони потрібні короткому децилю. Натомість два
- * найближчі до порога неакцентні листові кристали трохи подовжуються, але
- * лишаються нижчими за 19% висоти монарха.
+ * буквально на кілька відсотків нижчою за радіус об’ємного монарха й
+ * читатися пилом. Accent-шпилі не чіпаємо — вони потрібні короткому децилю.
+ * Натомість два найближчі до порога неакцентні листові кристали піднімаємо
+ * до 103,5% радіуса монарха, але не вище 24% його висоти.
  */
 function promoteNearSpeckFamilySpires(
   branches: readonly ClusterBranch[],
@@ -147,7 +147,7 @@ function promoteNearSpeckFamilySpires(
 ): ClusterBranch[] {
   const monarchHeight = monarch.height * heightScale(monarch.maturity);
   const monarchRadius = monarch.radiusBottom * radiusScale(monarch.maturity);
-  const readableHeight = Math.min(monarchHeight * 0.19, monarchRadius * 1.035);
+  const readableHeight = Math.min(monarchHeight * 0.24, monarchRadius * 1.035);
   if (readableHeight <= monarchRadius) return branches.map((branch) => ({ ...branch }));
 
   const loadBearing = new Set(
