@@ -5,7 +5,7 @@
 // `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
 //
 // Порядок: renderer-layout → renderer-contract → accent → форма → зріз
-// стику → hidden budget → локальне implicit-зрощення → матеріал →
+// стику → hidden budget → матеріал → локальне implicit-зрощення →
 // валідація. Reference-pass живуть тут, а не в Growth State: історія й
 // append-only лишаються чистими.
 // ============================================================
@@ -52,6 +52,13 @@ export interface PublishedBody {
   readonly material: MaterialRegionStats;
   /** Є лише в synthetic collar, логічним тілом Growth Engine не є. */
   readonly implicitJunction?: ImplicitJunctionStats;
+}
+
+interface PreparedBody {
+  readonly branch: ClusterBranch;
+  readonly solid: HostSolid;
+  readonly geometry: THREE.BufferGeometry;
+  readonly trim: TrimStats;
 }
 
 export interface PublishedCrystal {
@@ -105,7 +112,7 @@ export function publishCrystal(
   const solids = buildHostSolids(laidOut, material, lod);
   const byKey = new Map(laidOut.map((branch) => [branch.key, branch] as const));
 
-  const bodies: PublishedBody[] = laidOut.map((branch) => {
+  const prepared: PreparedBody[] = laidOut.map((branch) => {
     const solid = solids.get(branch.key)!;
     const geometry = buildBranchGeometry(branch, material, lod);
 
@@ -121,6 +128,14 @@ export function publishCrystal(
         } satisfies TrimStats)
       : trimHiddenFaces(geometry, solid, branch.hostKey, solids);
 
+    return { branch, solid, geometry, trim };
+  });
+
+  if (referenceBase !== null) {
+    enforceReferenceHiddenBudget(prepared, accentKeys);
+  }
+
+  const bodies: PublishedBody[] = prepared.map(({ branch, solid, geometry, trim }) => {
     const hostSolid = branch.hostKey === null ? undefined : solids.get(branch.hostKey);
     const hostBranch = branch.hostKey === null ? undefined : byKey.get(branch.hostKey);
     const host =
@@ -128,13 +143,8 @@ export function publishCrystal(
         ? { solid: hostSolid, branch: hostBranch }
         : undefined;
     const materialStats = bindMaterialRegions(geometry, branch, solid, material, host);
-
     return { branch, solid, geometry, trim, material: materialStats };
   });
-
-  if (referenceBase !== null) {
-    enforceReferenceHiddenBudget(bodies, accentKeys);
-  }
 
   const implicit = options.skipFusion
     ? []
