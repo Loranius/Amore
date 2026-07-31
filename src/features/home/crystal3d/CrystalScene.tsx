@@ -118,23 +118,17 @@ function CrystalCluster({ material, branches, reduceMotion, grew, gfx, onOpen }:
   // заглиблена кришка основи й приховані грані зникають, і маса читається
   // як ОДНЕ зрощене тіло, а не стос окремих замкнених кристалів. Зріз
   // робиться один раз тут, а не щокадру — це чиста функція від геометрії.
-  // Порядок «форма → зріз стику → матеріал → валідація» живе в
-  // publishCrystal — одне місце на сцену, тести й dev-харнес.
-  // Про вибір рівня деталізації див. RENDERED_LOD: автозниження якості
-  // виміряно шкідливе (воно збільшує draw calls).
+  // Порядок «форма → зріз стику → implicit-зрощення → матеріал → валідація»
+  // живе в publishCrystal — одне місце на сцену, тести й dev-харнес.
   const published = useMemo(
     () => publishCrystal(branches, material, { lod: RENDERED_LOD }),
     [branches, material],
   );
-  // Малюємо лише те, що має що малювати: тіла, повністю поховані в сусідах,
-  // після зрізу порожні, а порожній меш усе одно коштує draw call.
-  //
-  // Далі тіла зводяться в батчі за матеріалом (render/batchedBodies.ts):
-  // різних наборів PBR-параметрів усього 6-7, тож 27-42 окремі мешi
-  // стають 6-7 draw calls. Подих кожного тіла лишається власним — його
-  // несе матриця екземпляра, а не спільний трансформ.
+  // Фактичний набір рендера — видимі логічні тіла плюс bounded implicit
+  // collars. Вони мають ті самі матеріальні сигнатури й входять у наявні
+  // BatchedMesh, тому не створюють окремого draw call на кожен стик.
   const batches = useMemo(
-    () => buildBodyBatches(published.renderable, material, gfx),
+    () => buildBodyBatches(published.drawables, material, gfx),
     [published, material, gfx],
   );
 
@@ -146,13 +140,15 @@ function CrystalCluster({ material, branches, reduceMotion, grew, gfx, onOpen }:
     console.error(`[crystal publication]\n${formatPublicationReport(published)}`);
   }, [published]);
 
-  // Батчі копіюють геометрію у власні буфери, тож звільняти треба і їх, і
-  // вихідні геометрії публікації.
+  // Батчі копіюють геометрію у власні буфери. Junctions не входять у
+  // `bodies`, тому звільняємо унікальне об'єднання обох наборів.
   useEffect(() => {
-    const bodies = published.bodies;
+    const geometries = new Set(
+      [...published.bodies, ...published.junctions].map(({ geometry }) => geometry),
+    );
     return () => {
       disposeBatches(batches);
-      bodies.forEach(({ geometry }) => geometry.dispose());
+      geometries.forEach((geometry) => geometry.dispose());
     };
   }, [batches, published]);
 
