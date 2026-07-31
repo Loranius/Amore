@@ -9,7 +9,7 @@
 import type * as THREE from 'three';
 import type { ClusterBranch } from '../crystalCluster';
 
-const MINIMUM_HIDDEN_BODIES = 4;
+const DEFAULT_MINIMUM_HIDDEN_BODIES = 4;
 const MAX_VISIBLE_SPECK_SHARE = 0.25;
 
 export interface ReferenceBudgetBody {
@@ -38,15 +38,16 @@ function requiredSpeckCull(visibleCount: number, speckCount: number): number {
 
 /**
  * Гарантує renderer-budget без нових перетинів геометрії.
- * Монарх, matrix, hero/support, усі accent-шпилі та господарі ВИДИМИХ
- * дітей ніколи не відсікаються. Звичайний family-dominant без дітей — це
- * такий самий leaf-body, як satellite: якщо він найменший і не входить у
- * композиційний accent, його можна не публікувати в renderer, лишивши у
- * логічному стані.
+ * `minimumHiddenBodies` може враховувати display-представлення, які
+ * оживляють логічно прихований source key. `protectedKeys` не відсікаються:
+ * їхній canonical mesh потрібен для shell/probe, навіть коли сам renderer
+ * покаже контрольовану display-геометрію.
  */
 export function enforceReferenceHiddenBudget(
   bodies: readonly ReferenceBudgetBody[],
   accentKeys: ReadonlySet<string>,
+  minimumHiddenBodies = DEFAULT_MINIMUM_HIDDEN_BODIES,
+  protectedKeys: ReadonlySet<string> = new Set(),
 ): void {
   if (!bodies.some((body) => body.branch.archetype === 'matrix')) return;
 
@@ -62,7 +63,7 @@ export function enforceReferenceHiddenBudget(
     && body.solid.profile.h < monarchRadius
   ));
 
-  const hiddenMissing = Math.max(0, MINIMUM_HIDDEN_BODIES - alreadyHidden);
+  const hiddenMissing = Math.max(0, minimumHiddenBodies - alreadyHidden);
   const speckCull = requiredSpeckCull(visible.length, visibleSpecks.length);
   const targetCount = Math.max(hiddenMissing, speckCull);
   if (targetCount === 0) return;
@@ -82,6 +83,7 @@ export function enforceReferenceHiddenBudget(
         && body.branch.archetype !== 'matrix'
         && !protectedDominant
         && !accentKeys.has(body.branch.key)
+        && !protectedKeys.has(body.branch.key)
         && !visibleLoadBearing.has(body.branch.key)
       );
     })
