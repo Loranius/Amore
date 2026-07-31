@@ -61,15 +61,17 @@ export default function ReefPreviewScene() {
   const { build, diagnostics } = portal.preview;
   const runtimeViolations = [...build.diagnostics.violations];
   const reportedDrawCalls = runtime?.drawCalls ?? sceneState?.diagnostics.drawCalls ?? null;
+  const reportedTriangles = runtime?.triangles ?? sceneState?.diagnostics.triangles ?? null;
   if (reportedDrawCalls !== null && reportedDrawCalls > REEF_PRODUCTION_BUDGET.maximumDrawCalls) {
     runtimeViolations.push('runtime-draw-call-budget');
   }
-  if (runtime && runtime.triangles > REEF_PRODUCTION_BUDGET.maximumTriangles) {
+  if (reportedTriangles !== null && reportedTriangles > REEF_PRODUCTION_BUDGET.maximumTriangles) {
     runtimeViolations.push('runtime-triangle-budget');
   }
+  const runtimeReady = runtime !== null || (reducedMotion && sceneState !== null);
   const status = runtimeViolations.length > 0
     ? 'fail'
-    : runtime
+    : runtimeReady
       ? 'pass'
       : 'warming';
   const badge = [
@@ -106,15 +108,15 @@ export default function ReefPreviewScene() {
       data-reef-materials={build.diagnostics.materialCount}
       data-reef-motion-bindings={build.diagnostics.motionBindingCount}
       data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}
-      data-reef-runtime-draw-calls={runtime?.drawCalls ?? ''}
-      data-reef-runtime-triangles={runtime?.triangles ?? ''}
+      data-reef-runtime-draw-calls={reportedDrawCalls ?? ''}
+      data-reef-runtime-triangles={reportedTriangles ?? ''}
       data-reef-build-ms={build.buildMs}
       data-reef-current-cycle={build.life.current.cycleSeconds}
     >
       <Canvas
         dpr={[1, 1.5]}
         frameloop={reducedMotion ? 'demand' : 'always'}
-        camera={{ position: [0, 2.8, 6.8], fov: 42, near: 0.1, far: 40 }}
+        camera={{ position: [0, 3.2, 6.4], fov: 38, near: 0.1, far: 40 }}
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       >
         <ambientLight intensity={0.58} />
@@ -135,7 +137,7 @@ export default function ReefPreviewScene() {
           maxDistance={9.5}
           minPolarAngle={0.58}
           maxPolarAngle={1.48}
-          target={[0, 0.25, 0]}
+          target={[0, 1.05, 0]}
         />
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} warmupFrames={18} />
       </Canvas>
