@@ -11,12 +11,12 @@
 import type * as THREE from 'three';
 import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
 import { buildHostSolids, type HostSolid } from './geometry/hostBody';
-import {
-  buildImplicitJunctionBodies,
-  type ImplicitJunctionStats,
-} from './geometry/implicitJunction';
 import { trimHiddenFaces, type TrimStats } from './geometry/junctionTrim';
 import { LOD_LEVELS, type LodLevel } from './geometry/lod';
+import {
+  buildReferenceJunctionBodies,
+  type ImplicitJunctionStats,
+} from './geometry/referenceJunction';
 import { applyReferenceDruseLayout } from './geometry/referenceDruseLayout';
 import {
   formatShellViolations,
@@ -121,7 +121,7 @@ export function publishCrystal(
 
   const implicit = options.skipFusion
     ? []
-    : buildImplicitJunctionBodies(laidOut, solids, lod);
+    : buildReferenceJunctionBodies(laidOut, solids, lod);
   const junctions: PublishedBody[] = implicit.flatMap((junction) => {
     const hostSolid = junction.branch.hostKey === null
       ? undefined
