@@ -4,9 +4,10 @@
 // Нормативно: Volume V §12 (публікація), Volume VI §11,
 // `CAI-REQ-011..012`, `V5-REQ-009/016`, `V6-REQ-010/015`.
 //
-// Порядок незмінний: renderer-layout → форма → зріз стику → локальне
-// implicit-зрощення → матеріал → валідація. Reference layout навмисно
-// живе тут, а не в Growth State: історія й append-only лишаються чистими.
+// Порядок незмінний: renderer-layout → renderer-contract → форма → зріз
+// стику → локальне implicit-зрощення → матеріал → валідація. Обидва
+// reference-pass живуть тут, а не в Growth State: історія й append-only
+// лишаються чистими.
 // ============================================================
 import type * as THREE from 'three';
 import { buildBranchGeometry, type ClusterBranch, type ClusterMaterial } from './crystalCluster';
@@ -17,6 +18,7 @@ import {
   buildReferenceJunctionBodies,
   type ImplicitJunctionStats,
 } from './geometry/referenceJunction';
+import { enforceReferenceDruseContract } from './geometry/referenceDruseContract';
 import { applyReferenceDruseLayout } from './geometry/referenceDruseLayout';
 import {
   formatShellViolations,
@@ -88,7 +90,7 @@ export function publishCrystal(
   const lod = options.lod ?? 'high';
   const laidOut = options.skipReferenceLayout
     ? branches.map((branch) => ({ ...branch }))
-    : applyReferenceDruseLayout(branches);
+    : enforceReferenceDruseContract(applyReferenceDruseLayout(branches));
   const solids = buildHostSolids(laidOut, material, lod);
   const byKey = new Map(laidOut.map((branch) => [branch.key, branch] as const));
 
