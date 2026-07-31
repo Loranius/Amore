@@ -21,8 +21,8 @@ func _build_mesh(instruction) -> ArrayMesh:
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	var sides: int = instruction.sides
-	var merge_depth_ratio := float(instruction.metadata.get("merge_depth_ratio", 0.0))
-	var attached := instruction.generation > 0
+	var merge_depth_ratio: float = float(instruction.metadata.get("merge_depth_ratio", 0.0))
+	var attached: bool = instruction.generation > 0
 	var base_radius: float = instruction.radius * (1.34 if attached else 1.08)
 	var lower_radius: float = instruction.radius * (1.03 if attached else 1.0)
 	var shoulder_radius: float = instruction.radius * 0.76
