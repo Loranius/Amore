@@ -3,6 +3,7 @@ export * from './layout';
 export * from './foundation';
 export * from './skeletons';
 export * from './meshes';
+export * from './materials';
 export {
   REEF_COLONY_MORPHOTYPES,
   REEF_LIFE_STAGES,
