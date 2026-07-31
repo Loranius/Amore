@@ -21,19 +21,10 @@ import {
   type ComposedBody,
   type SilhouettePreset,
 } from './framework';
-import { applyReferenceDruseComposition } from './referenceDruse';
 import type { CompositionScore } from './score';
-
-// ── Силуети (Stage 3): читабельні навіть як чорна тінь ───────────
-// envelope(alignment 0..1, horiz, y) → цільовий множник довжини ~0.7..1.1.
-// Уся бібліотека — родина «центрального кургану» (референс: вертикальна
-// друза з головним кристалом по центру і дочірніми, що спадають висотою
-// назовні); пресети різняться лише крутизною/фланками, не типом композиції.
 
 const SILHOUETTES: SilhouettePreset[] = [
   {
-    // Віяло: центральний шпиль і кілька бічних, що явно розходяться —
-    // органічний «сплеск» кристалів (референс: золоті шпилі веером).
     id: 'fan',
     supportAxes: [
       { azimuthOffset: -0.7, tilt: 0.7 },
@@ -43,7 +34,6 @@ const SILHOUETTES: SilhouettePreset[] = [
     envelope: (a, horiz) => 0.82 + a * 0.28 - Math.min(0.12, horiz * 0.12),
   },
   {
-    // Собор: центральний шпиль і два високі фланкуючі під помірним кутом.
     id: 'cathedral',
     supportAxes: [
       { azimuthOffset: -1.15, tilt: 0.5 },
@@ -52,7 +42,6 @@ const SILHOUETTES: SilhouettePreset[] = [
     envelope: (a, horiz) => 0.8 + a * 0.3 - Math.min(0.1, horiz * 0.1),
   },
   {
-    // Друза: широкий розкидистий кущ шпилів на всі боки.
     id: 'druse',
     supportAxes: [
       { azimuthOffset: 0, tilt: 0.65 },
@@ -64,8 +53,6 @@ const SILHOUETTES: SilhouettePreset[] = [
     envelope: (a, horiz) => 0.78 + a * 0.24 - Math.min(0.08, horiz * 0.08),
   },
 ];
-
-// ── Архетипи (Stage 4): вік/розмір/енергія/напруга/seed — ніколи випадково ──
 
 const ramp = (v: number, from: number, to: number): number => Math.max(0, Math.min(1, (v - from) / (to - from)));
 
@@ -207,6 +194,5 @@ export function composeMineralCluster(
     composed = composed.filter((c) => !toDrop.has(c.key));
   }
 
-  composed = applyReferenceDruseComposition(composed, seedNum);
   return { crystals: composed, score, passes };
 }
