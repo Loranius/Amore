@@ -20,12 +20,16 @@ import {
 
 const UP = new THREE.Vector3(0, 1, 0);
 const CAMERA_FRONT = new THREE.Vector3(0, 0, 1);
+const TAU = Math.PI * 2;
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const HERO_ANGLE = -1.72;
 const HERO_RATIO = 0.48;
 const MEDIUM_ANGLES = [-1.25, 1.25, -0.78, 0.78, -0.36, 0.36] as const;
 const SHORT_ANGLES = [-1.5, 1.5, -1.12, 1.12, -0.76, 0.76, -0.42, 0.42, 0] as const;
 const MEDIUM_RATIOS = [0.38, 0.34, 0.31, 0.28, 0.25, 0.23] as const;
-const SHORT_RATIOS = [0.17, 0.16, 0.15, 0.14, 0.13, 0.12, 0.11, 0.1, 0.09] as const;
+const MIN_SHORT_DISPLAY = 4;
+const MAX_SHORT_DISPLAY = 18;
+const SHORT_DISPLAY_SHARE = 0.18;
 
 const heightScale = (maturity: number): number => 0.32 + maturity * 0.68;
 const radiusScale = (maturity: number): number => 0.4 + maturity * 0.6;
@@ -33,6 +37,19 @@ const renderedHeight = (branch: ClusterBranch): number => branch.height * height
 const renderedRadius = (branch: ClusterBranch): number => branch.radiusBottom * radiusScale(branch.maturity);
 const volume = (branch: ClusterBranch): number =>
   renderedHeight(branch) * renderedRadius(branch) * renderedRadius(branch);
+
+const shortRatio = (index: number, count: number): number => {
+  if (count <= 1) return 0.12;
+  const t = index / (count - 1);
+  return 0.17 - t * 0.08;
+};
+
+const shortAngle = (index: number): number => {
+  const fixed = SHORT_ANGLES[index];
+  if (fixed !== undefined) return fixed;
+  const angle = index * GOLDEN_ANGLE + 0.31;
+  return ((angle + Math.PI) % TAU) - Math.PI;
+};
 
 export interface ReferenceDisplayBody {
   readonly branch: ClusterBranch;
@@ -83,12 +100,12 @@ export function selectReferenceDisplaySources(
 
   // Коротка юбка може використовувати й leaf-micro: саме вони є природною
   // дрібною фракцією. Для середньої корони micro нижче відсіюються окремо.
-  const leafEligible = branches.filter((branch) => (
+  const population = branches.filter((branch) => (
     !branch.primary
     && branch.archetype !== 'matrix'
     && branch.key !== heroKey
-    && !hasChildren(branch.key)
   ));
+  const leafEligible = population.filter((branch) => !hasChildren(branch.key));
 
   const accentCandidates = leafEligible
     .filter((branch) => accentKeys.has(branch.key))
@@ -96,9 +113,21 @@ export function selectReferenceDisplaySources(
   const smallestExtras = leafEligible
     .filter((branch) => !accentKeys.has(branch.key))
     .sort((left, right) => volume(left) - volume(right) || left.key.localeCompare(right.key));
+
+  // Дециль — популяційна метрика. Фіксовані дев’ять шпилів достатні для
+  // sparse/typical, але не для rich. Юбка тому масштабується разом з історією.
+  const targetShortCount = Math.min(
+    MAX_SHORT_DISPLAY,
+    leafEligible.length,
+    Math.max(
+      MIN_SHORT_DISPLAY,
+      accentCandidates.length,
+      Math.ceil(population.length * SHORT_DISPLAY_SHARE),
+    ),
+  );
   const shortSources = [...accentCandidates];
   for (const candidate of smallestExtras) {
-    if (shortSources.length >= SHORT_ANGLES.length) break;
+    if (shortSources.length >= targetShortCount) break;
     shortSources.push(candidate);
   }
 
@@ -108,8 +137,9 @@ export function selectReferenceDisplaySources(
     .sort((left, right) => volume(right) - volume(left) || left.key.localeCompare(right.key))
     .slice(0, MEDIUM_ANGLES.length);
 
+  const selectedShort = shortSources.slice(0, targetShortCount);
   const sourceKeys = new Set<string>([
-    ...shortSources.map((branch) => branch.key),
+    ...selectedShort.map((branch) => branch.key),
     ...mediumSources.map((branch) => branch.key),
   ]);
   if (heroKey !== null) {
@@ -125,7 +155,7 @@ export function selectReferenceDisplaySources(
   return {
     heroKey,
     mediumKeys: Object.freeze(mediumSources.map((branch) => branch.key)),
-    shortKeys: Object.freeze(shortSources.slice(0, SHORT_ANGLES.length).map((branch) => branch.key)),
+    shortKeys: Object.freeze(selectedShort.map((branch) => branch.key)),
     sourceKeys,
   };
 }
@@ -278,19 +308,21 @@ export function buildReferenceDisplayCrown(
     bodies.push(makeBody(branch, source.key, 'medium', material, lod));
   });
 
+  const shortCount = selection.shortKeys.length;
   selection.shortKeys.forEach((key, index) => {
     const source = byKey.get(key);
     if (source === undefined) return;
-    const ratio = SHORT_RATIOS[index] ?? 0.09;
-    const radial = radialAt(front, right, SHORT_ANGLES[index] ?? index * 0.5);
+    const ratio = shortRatio(index, shortCount);
+    const radial = radialAt(front, right, shortAngle(index));
     const ownRadius = renderedHeight(monarch) * ratio / 3.95;
+    const ring = Math.floor(index / 9);
     const branch = displayBranch(
       source,
       monarch,
-      foundation.clone().addScaledVector(axis, matrixHeight * (0.04 + (index % 3) * 0.018)),
+      foundation.clone().addScaledVector(axis, matrixHeight * (0.035 + (index % 3) * 0.016)),
       radial,
       ratio,
-      monarchRadius * 0.98 + ownRadius * 0.42,
+      monarchRadius * (0.98 + ring * 0.08) + ownRadius * 0.42,
       0.56 + (index % 3) * 0.05,
       index * 0.51,
       'short',
