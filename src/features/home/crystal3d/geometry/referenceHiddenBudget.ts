@@ -10,6 +10,7 @@ import type * as THREE from 'three';
 import type { ClusterBranch } from '../crystalCluster';
 
 const MINIMUM_HIDDEN_BODIES = 4;
+const MAX_VISIBLE_SPECK_SHARE = 0.25;
 
 export interface ReferenceBudgetBody {
   readonly branch: ClusterBranch;
@@ -29,14 +30,26 @@ const bodyVolume = (body: ReferenceBudgetBody): number =>
   body.branch.height * body.branch.radiusBottom * body.branch.radiusBottom;
 
 /**
- * Гарантує мінімальний renderer-budget без нових перетинів геометрії.
+ * Повертає мінімальну кількість крихт, які треба відсікти, щоб після
+ * видалення і чисельник, і знаменник вкладались у MAX_VISIBLE_SPECK_SHARE.
+ */
+function requiredSpeckCull(visibleCount: number, speckCount: number): number {
+  if (visibleCount <= 0) return 0;
+  const excess = speckCount - MAX_VISIBLE_SPECK_SHARE * visibleCount;
+  if (excess <= 0) return 0;
+  return Math.ceil(excess / (1 - MAX_VISIBLE_SPECK_SHARE) - 1e-9);
+}
+
+/**
+ * Гарантує renderer-budget без нових перетинів геометрії.
  * Кандидати вже мають побудовану/обрізану оболонку, тому ми відбираємо лише
- * реально видимі неакцентні тіла. Монарх, matrix, hero/dominant, базальна
- * акцентна фракція та господарі ВИДИМИХ дітей ніколи не відсікаються.
+ * реально видимі тіла. Монарх, matrix, hero/dominant та господарі ВИДИМИХ
+ * дітей ніколи не відсікаються.
  *
- * Першими йдуть фактичні «крихти» — тіла, нижчі за радіус монарха. Так
- * culling не зменшує знаменник, залишаючи пил на екрані, а прибирає саме
- * надлишкову дрібну фракцію backfilled-композицій.
+ * Спочатку прибираємо фактичні «крихти» — тіла, нижчі за радіус монарха.
+ * Короткий accent захищений лише доки він читається як шпиль; sub-radius
+ * accent уже є пилом і може бути відсіяний. Середні кристали юбки при цьому
+ * лишаються захищеними.
  */
 export function enforceReferenceHiddenBudget(
   bodies: readonly ReferenceBudgetBody[],
@@ -48,26 +61,35 @@ export function enforceReferenceHiddenBudget(
   if (monarch === undefined) return;
   const monarchRadius = monarch.solid.profile.r;
 
-  const alreadyHidden = bodies.filter((body) => triangleCount(body) === 0).length;
-  const missing = Math.max(0, MINIMUM_HIDDEN_BODIES - alreadyHidden);
-  if (missing === 0) return;
+  const visible = bodies.filter((body) => triangleCount(body) > 0);
+  const alreadyHidden = bodies.length - visible.length;
+  const visibleSpecks = visible.filter((body) => (
+    !body.branch.primary && body.solid.profile.h < monarchRadius
+  ));
+
+  const hiddenMissing = Math.max(0, MINIMUM_HIDDEN_BODIES - alreadyHidden);
+  const speckCull = requiredSpeckCull(visible.length, visibleSpecks.length);
+  const targetCount = Math.max(hiddenMissing, speckCull);
+  if (targetCount === 0) return;
 
   const visibleLoadBearing = new Set(
-    bodies
-      .filter((body) => triangleCount(body) > 0)
+    visible
       .map((body) => body.branch.hostKey)
       .filter((key): key is string => key !== null),
   );
 
-  const candidates = bodies
-    .filter((body) => (
-      triangleCount(body) > 0
-      && !body.branch.primary
-      && body.branch.archetype !== 'matrix'
-      && body.branch.role !== 'dominant'
-      && !accentKeys.has(body.branch.key)
-      && !visibleLoadBearing.has(body.branch.key)
-    ))
+  const candidates = visible
+    .filter((body) => {
+      if (
+        body.branch.primary
+        || body.branch.archetype === 'matrix'
+        || body.branch.role === 'dominant'
+        || visibleLoadBearing.has(body.branch.key)
+      ) return false;
+
+      const isSpeck = body.solid.profile.h < monarchRadius;
+      return !accentKeys.has(body.branch.key) || isSpeck;
+    })
     .sort((left, right) => {
       const leftSpeck = left.solid.profile.h < monarchRadius ? 0 : 1;
       const rightSpeck = right.solid.profile.h < monarchRadius ? 0 : 1;
@@ -77,7 +99,7 @@ export function enforceReferenceHiddenBudget(
         || left.branch.key.localeCompare(right.branch.key)
       );
     })
-    .slice(0, missing);
+    .slice(0, targetCount);
 
   for (const body of candidates) {
     // Empty indexed geometry remains a valid logical PublishedBody, but it
