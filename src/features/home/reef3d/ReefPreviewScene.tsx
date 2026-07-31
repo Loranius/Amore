@@ -8,6 +8,7 @@ import {
   type EvolutionRuntimeMetrics,
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { ReefObject } from './ReefObject';
+import { REEF_PRESENTATION_VERSION } from './reefPresentation';
 import type { ReefThreeSceneState } from './reefThreeAdapter';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefPreview.css';
@@ -88,6 +89,7 @@ export default function ReefPreviewScene() {
       data-home-artifact-preview="reef"
       data-reef-preview="ready"
       data-reef-source="portal"
+      data-reef-presentation={REEF_PRESENTATION_VERSION}
       data-reef-acceptance={status}
       data-reef-static-acceptance={build.acceptance.staticStatus}
       data-reef-violations={runtimeViolations.join(',')}
@@ -120,13 +122,13 @@ export default function ReefPreviewScene() {
       <Canvas
         dpr={[1, 1.5]}
         frameloop={reducedMotion ? 'demand' : 'always'}
-        camera={{ position: [0, 3.2, 6.4], fov: 38, near: 0.1, far: 40 }}
+        camera={{ position: [0, 2.75, 7.8], fov: 40, near: 0.1, far: 40 }}
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
       >
-        <ambientLight intensity={0.58} />
-        <hemisphereLight args={['#d9f7ff', '#183848', 1.1]} />
-        <directionalLight position={[4, 7, 5]} intensity={2.2} color="#fff4df" />
-        <directionalLight position={[-4, 2, -3]} intensity={0.75} color="#62c5df" />
+        <ambientLight intensity={0.66} />
+        <hemisphereLight args={['#d9f7ff', '#183848', 1.2]} />
+        <directionalLight position={[4, 7, 5]} intensity={2.05} color="#fff4df" />
+        <directionalLight position={[-4, 2, -3]} intensity={0.85} color="#62c5df" />
         <ReefObject
           build={build}
           reducedMotion={reducedMotion}
@@ -137,11 +139,11 @@ export default function ReefPreviewScene() {
           enablePan={false}
           enableDamping={!reducedMotion}
           dampingFactor={0.06}
-          minDistance={4.6}
-          maxDistance={9.5}
-          minPolarAngle={0.58}
-          maxPolarAngle={1.48}
-          target={[0, 1.05, 0]}
+          minDistance={6}
+          maxDistance={10.5}
+          minPolarAngle={0.62}
+          maxPolarAngle={1.45}
+          target={[0, 0.82, 0]}
         />
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} warmupFrames={18} />
       </Canvas>
