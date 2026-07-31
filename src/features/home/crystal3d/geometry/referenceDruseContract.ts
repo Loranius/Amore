@@ -1,10 +1,11 @@
 // ============================================================
 // referenceDruseContract — останній renderer-only санітарний контракт.
 // ------------------------------------------------------------
-// Layout формує силует. Цей вузький pass лише фіксує дві інваріанти:
-//   • hero-spire помітний, але монарх лишається щонайменше удвічі вищим;
-//   • micro — внутрішні зародки біля осі свого господаря, а видиму юбку
-//     утворюють середні satellites/dominants, не хаотичний «пил».
+// Layout формує силует. Цей pass фіксує чотири інваріанти:
+//   • hero-spire помітний, але монарх лишається >2× вищим;
+//   • micro та один найменший satellite стають внутрішніми включеннями;
+//   • один малий satellite лишається видимою короткою фракцією юбки;
+//   • родина hero має невеликий тангенційний рознос без z-fighting.
 // ============================================================
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
@@ -51,6 +52,110 @@ function chooseHero(branches: readonly ClusterBranch[]): ClusterBranch | null {
   );
 }
 
+function radialBasis(axis: THREE.Vector3, key: string): { radial: THREE.Vector3; tangent: THREE.Vector3 } {
+  const angle = unitFromKey(key, 'reference-contract-angle') * TAU;
+  const reference = Math.abs(axis.x) < 0.9
+    ? new THREE.Vector3(1, 0, 0)
+    : new THREE.Vector3(0, 0, 1);
+  const u = reference.addScaledVector(axis, -reference.dot(axis)).normalize();
+  const w = new THREE.Vector3().crossVectors(u, axis).normalize();
+  return {
+    radial: u.clone().multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize(),
+    tangent: u.clone().multiplyScalar(-Math.sin(angle)).addScaledVector(w, Math.cos(angle)).normalize(),
+  };
+}
+
+function hiddenInclusion(
+  branch: ClusterBranch,
+  host: ClusterBranch,
+  monarch: ClusterBranch,
+  satellite: boolean,
+): ClusterBranch {
+  const hostAxis = axisOf(host);
+  const hostPosition = positionOf(host);
+  const hostHeight = host.height * heightScale(host.maturity);
+  const hostRadius = host.radiusBottom * radiusScale(host.maturity);
+  const { radial } = radialBasis(hostAxis, branch.key);
+  const position = hostPosition
+    .addScaledVector(hostAxis, hostHeight * 0.025)
+    .addScaledVector(radial, hostRadius * 0.06);
+  const direction = hostAxis
+    .clone()
+    .multiplyScalar(0.94)
+    .addScaledVector(radial, 0.1)
+    .normalize();
+  const height = Math.min(
+    branch.height,
+    monarch.height * (satellite ? 0.12 : 0.08),
+    host.height * (satellite ? 0.28 : 0.26),
+  );
+  const adjusted = withDirection(branch, direction);
+  return {
+    ...adjusted,
+    height,
+    radiusBottom: Math.min(
+      branch.radiusBottom,
+      host.radiusBottom * (satellite ? 0.18 : 0.15),
+    ),
+    posX: position.x,
+    posY: position.y,
+    posZ: position.z,
+    archetype: branch.archetype === 'etched' ? 'etched' : 'spear',
+  };
+}
+
+function visibleSmallSatellite(
+  branch: ClusterBranch,
+  host: ClusterBranch,
+  monarch: ClusterBranch,
+): ClusterBranch {
+  const hostAxis = axisOf(host);
+  const hostPosition = positionOf(host);
+  const hostHeight = host.height * heightScale(host.maturity);
+  const hostRadius = host.radiusBottom * radiusScale(host.maturity);
+  const { radial, tangent } = radialBasis(hostAxis, branch.key);
+  const position = hostPosition
+    .addScaledVector(hostAxis, hostHeight * 0.035)
+    .addScaledVector(radial, hostRadius * 0.68)
+    .addScaledVector(tangent, hostRadius * 0.08);
+  const direction = hostAxis
+    .clone()
+    .multiplyScalar(0.58)
+    .addScaledVector(UP, 0.18)
+    .addScaledVector(radial, 0.82)
+    .addScaledVector(tangent, 0.12)
+    .normalize();
+  const height = monarch.height * 0.18;
+  const adjusted = withDirection(branch, direction);
+  return {
+    ...adjusted,
+    height,
+    radiusBottom: Math.min(
+      Math.max(branch.radiusBottom, height / 4.8),
+      host.radiusBottom * 0.56,
+    ),
+    posX: position.x,
+    posY: position.y,
+    posZ: position.z,
+    archetype: 'prismatic',
+  };
+}
+
+function separateHeroChild(branch: ClusterBranch, host: ClusterBranch): ClusterBranch {
+  const hostAxis = axisOf(host);
+  const hostRadius = host.radiusBottom * radiusScale(host.maturity);
+  const { tangent } = radialBasis(hostAxis, branch.key);
+  const position = positionOf(branch).addScaledVector(tangent, hostRadius * 0.24);
+  const direction = axisOf(branch).addScaledVector(tangent, 0.2).normalize();
+  const adjusted = withDirection(branch, direction);
+  return {
+    ...adjusted,
+    posX: position.x,
+    posY: position.y,
+    posZ: position.z,
+  };
+}
+
 export function enforceReferenceDruseContract(
   branches: readonly ClusterBranch[],
 ): ClusterBranch[] {
@@ -60,63 +165,50 @@ export function enforceReferenceDruseContract(
   const monarch = branches.find((branch) => branch.primary);
   if (monarch === undefined) return branches.map((branch) => ({ ...branch }));
 
-  const heroKey = chooseHero(branches)?.key ?? null;
-  const byKey = new Map(branches.map((branch) => [branch.key, branch] as const));
-
-  return branches.map((branch) => {
-    if (branch.key === heroKey) {
-      const height = clamp(branch.height, monarch.height * 0.46, monarch.height * 0.5);
-      return {
-        ...branch,
-        height,
+  const hero = chooseHero(branches);
+  const heroKey = hero?.key ?? null;
+  const heroHeight = hero === null
+    ? null
+    : clamp(hero.height, monarch.height * 0.46, monarch.height * 0.495);
+  const adjustedHero = hero === null || heroHeight === null
+    ? null
+    : {
+        ...hero,
+        height: heroHeight,
         radiusBottom: Math.min(
-          Math.max(branch.radiusBottom, height / 5.8),
+          Math.max(hero.radiusBottom, heroHeight / 5.8),
           monarch.radiusBottom * 0.58,
         ),
       };
-    }
 
-    if (branch.role !== 'micro' || branch.hostKey === null) return { ...branch };
+  const byKey = new Map(branches.map((branch) => [branch.key, branch] as const));
+  if (adjustedHero !== null) byKey.set(adjustedHero.key, adjustedHero);
+
+  const satellites = branches
+    .filter((branch) => branch.role === 'satellite' && branch.hostKey !== null)
+    .sort((left, right) => {
+      const lv = left.height * left.radiusBottom * left.radiusBottom;
+      const rv = right.height * right.radiusBottom * right.radiusBottom;
+      return lv - rv || left.key.localeCompare(right.key);
+    });
+  const innerSatelliteKey = satellites[0]?.key ?? null;
+  const visibleSmallKey = satellites[1]?.key ?? null;
+
+  return branches.map((branch) => {
+    if (branch.key === heroKey && adjustedHero !== null) return adjustedHero;
+    if (branch.hostKey === null) return { ...branch };
     const host = byKey.get(branch.hostKey);
     if (host === undefined) return { ...branch };
 
-    const hostAxis = axisOf(host);
-    const hostPosition = positionOf(host);
-    const hostHeight = host.height * heightScale(host.maturity);
-    const hostRadius = host.radiusBottom * radiusScale(host.maturity);
-    const angle = unitFromKey(branch.key, 'reference-contract-micro-angle') * TAU;
-
-    const reference = Math.abs(hostAxis.x) < 0.9
-      ? new THREE.Vector3(1, 0, 0)
-      : new THREE.Vector3(0, 0, 1);
-    const u = reference.addScaledVector(hostAxis, -reference.dot(hostAxis)).normalize();
-    const w = new THREE.Vector3().crossVectors(u, hostAxis).normalize();
-    const radial = u.multiplyScalar(Math.cos(angle)).addScaledVector(w, Math.sin(angle)).normalize();
-
-    // Майже на осі й низько: оболонка господаря повністю приховує micro,
-    // але attachment-граф і стабільний ключ лишаються незмінними.
-    const position = hostPosition
-      .addScaledVector(hostAxis, hostHeight * 0.025)
-      .addScaledVector(radial, hostRadius * 0.08);
-    const direction = hostAxis
-      .clone()
-      .multiplyScalar(0.9)
-      .addScaledVector(radial, 0.16)
-      .normalize();
-    const height = Math.min(
-      branch.height,
-      monarch.height * 0.1,
-      host.height * 0.34,
-    );
-    const adjusted = withDirection(branch, direction);
-    return {
-      ...adjusted,
-      height,
-      radiusBottom: Math.min(branch.radiusBottom, host.radiusBottom * 0.22),
-      posX: position.x,
-      posY: position.y,
-      posZ: position.z,
-      archetype: branch.archetype === 'etched' ? 'etched' : 'spear',
-    };
+    if (branch.role === 'micro' || branch.key === innerSatelliteKey) {
+      return hiddenInclusion(branch, host, monarch, branch.role === 'satellite');
+    }
+    if (branch.key === visibleSmallKey) {
+      return visibleSmallSatellite(branch, host, monarch);
+    }
+    if (branch.role === 'satellite' && branch.hostKey === heroKey) {
+      return separateHeroChild(branch, host);
+    }
+    return { ...branch };
   });
 }
