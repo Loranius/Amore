@@ -21,11 +21,16 @@ func _build_mesh(instruction) -> ArrayMesh:
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 
 	var sides: int = instruction.sides
-	var base_radius: float = instruction.radius * (1.16 if instruction.generation > 0 else 1.04)
-	var lower_radius: float = instruction.radius
+	var merge_depth_ratio := float(instruction.metadata.get("merge_depth_ratio", 0.0))
+	var attached := instruction.generation > 0
+	var base_radius: float = instruction.radius * (1.34 if attached else 1.08)
+	var lower_radius: float = instruction.radius * (1.03 if attached else 1.0)
 	var shoulder_radius: float = instruction.radius * 0.76
-	var base_y := 0.0
-	var lower_y: float = instruction.length * 0.10
+	var base_y: float = -minf(
+		instruction.length * 0.1,
+		instruction.radius * merge_depth_ratio * 0.72,
+	) if attached else 0.0
+	var lower_y: float = instruction.length * 0.12
 	var shoulder_y: float = instruction.length * 0.78
 	var tip := Vector3(0.0, instruction.length, 0.0)
 	var color := _crystal_color(instruction)
@@ -49,7 +54,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 			base_ring[next],
 			lower_ring[next],
 			lower_ring[side],
-			color.darkened(0.06),
+			color.darkened(0.12),
 		)
 		_add_quad_clockwise(
 			surface,
@@ -57,18 +62,18 @@ func _build_mesh(instruction) -> ArrayMesh:
 			lower_ring[next],
 			shoulder_ring[next],
 			shoulder_ring[side],
-			color.lightened(float(side % 3) * 0.035),
+			color.lightened(float(side % 3) * 0.025),
 		)
 		_add_triangle_clockwise(
 			surface,
 			shoulder_ring[side],
 			shoulder_ring[next],
 			tip,
-			color.lightened(0.10),
+			color.lightened(0.075),
 		)
 
 	if bool(instruction.metadata.get("cap_base", false)):
-		var center := Vector3.ZERO
+		var center := Vector3(0.0, base_y, 0.0)
 		for side in range(sides):
 			var next := (side + 1) % sides
 			_add_triangle_with_normal(
@@ -77,19 +82,19 @@ func _build_mesh(instruction) -> ArrayMesh:
 				base_ring[next],
 				base_ring[side],
 				Vector3.DOWN,
-				color.darkened(0.18),
+				color.darkened(0.2),
 			)
 
 	var mesh := surface.commit()
 	var material := StandardMaterial3D.new()
 	material.vertex_color_use_as_albedo = true
-	material.roughness = 0.23
-	material.metallic = 0.08
+	material.roughness = 0.32
+	material.metallic = 0.025
 	material.cull_mode = BaseMaterial3D.CULL_BACK
 	material.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	material.emission_enabled = true
-	material.emission = color.darkened(0.28)
-	material.emission_energy_multiplier = 0.16 + instruction.energy * 0.18
+	material.emission = color.darkened(0.34)
+	material.emission_energy_multiplier = 0.035 + instruction.energy * 0.06
 	mesh.surface_set_material(0, material)
 	return mesh
 
@@ -146,9 +151,9 @@ func _basis_from_y(direction: Vector3) -> Basis:
 
 func _crystal_color(instruction) -> Color:
 	var hue_shift := float(instruction.metadata.get("hue_shift", 0.0))
-	var hue := fposmod(0.78 + hue_shift + float(instruction.generation) * 0.018, 1.0)
-	var saturation := clampf(0.54 + instruction.energy * 0.18, 0.0, 1.0)
-	var value := clampf(0.72 + instruction.energy * 0.18, 0.0, 1.0)
+	var hue := fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
+	var saturation := clampf(0.44 + instruction.energy * 0.13, 0.0, 1.0)
+	var value := clampf(0.68 + instruction.energy * 0.15, 0.0, 1.0)
 	return Color.from_hsv(hue, saturation, value, 1.0)
 
 
