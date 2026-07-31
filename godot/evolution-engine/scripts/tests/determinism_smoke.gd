@@ -5,6 +5,10 @@ const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
 
 
 func _init() -> void:
+	call_deferred("_run")
+
+
+func _run() -> void:
 	var dna := Model.ArtifactDNA.new(
 		582013,
 		&"crystal",
@@ -46,22 +50,24 @@ func _init() -> void:
 	var second_snapshot := JSON.stringify(second_state.canonical_snapshot())
 
 	if first_snapshot != second_snapshot:
-		push_error("Determinism failure: input ordering changed canonical state.")
-		quit(1)
+		_fail("Determinism failure: input ordering changed canonical state.")
 		return
 
 	if first_state.instructions.size() != payloads.size() + 1:
-		push_error("Growth history failure: expected genesis plus one instruction per event.")
-		quit(1)
+		_fail("Growth history failure: expected genesis plus one instruction per event.")
 		return
 
 	if first_state.history.size() != first_state.instructions.size():
-		push_error("Append-only history failure: history and instruction counts differ.")
-		quit(1)
+		_fail("Append-only history failure: history and instruction counts differ.")
 		return
 
 	print("PASS: deterministic crystal rebuild; instructions=%d" % first_state.instructions.size())
 	quit(0)
+
+
+func _fail(message: String) -> void:
+	push_error(message)
+	quit(1)
 
 
 func _events_from_payloads(payloads: Array) -> Array:
