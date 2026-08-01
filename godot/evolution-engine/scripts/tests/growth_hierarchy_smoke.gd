@@ -83,9 +83,12 @@ func _run() -> void:
 			_fail("Hierarchy failure: child radius is not subordinate to its parent.")
 			return
 
-		event_child_counts[instruction.parent_id] = int(
-			event_child_counts.get(instruction.parent_id, 0),
-		) + 1
+		# Aggregate deposits belong to a colony seed for canonical lineage but do
+		# not create a separate visible child and therefore consume no branch slot.
+		if String(instruction.metadata.get("render_mode", "visible")) != "aggregate-only":
+			event_child_counts[instruction.parent_id] = int(
+				event_child_counts.get(instruction.parent_id, 0),
+			) + 1
 
 	for parent_id in event_child_counts:
 		var parent = first_state.get_instruction(String(parent_id))
