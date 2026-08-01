@@ -1,5 +1,7 @@
 name: Godot Phase 15 Canary Preview
 
+# Consumes the approved physical release controls from Vercel Preview variables.
+
 on:
   push:
     branches:
