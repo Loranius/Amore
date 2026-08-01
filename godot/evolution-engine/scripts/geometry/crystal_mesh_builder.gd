@@ -227,24 +227,45 @@ func _connect_rings(
 
 func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 	var energy: float = clampf(instruction.energy, 0.0, 1.0)
+	var semantic_pressure: Dictionary = Dictionary(
+		instruction.metadata.get("semantic_pressure", {}),
+	)
+	var polishing: float = clampf(
+		float(semantic_pressure.get("polishing", instruction.metadata.get("semantic_polish_factor", 0.0))),
+		0.0,
+		1.0,
+	)
+	var luminosity: float = clampf(
+		float(semantic_pressure.get("luminosity", instruction.metadata.get("semantic_luminosity", 0.0))),
+		0.0,
+		1.0,
+	)
 	var material := StandardMaterial3D.new()
 	material.vertex_color_use_as_albedo = true
 	material.albedo_color = Color(1.0, 1.0, 1.0, 1.0)
 	material.cull_mode = BaseMaterial3D.CULL_BACK
-	material.roughness = lerpf(0.34, 0.22, energy)
+	material.roughness = clampf(lerpf(0.34, 0.22, energy) - polishing * 0.035, 0.2, 0.35)
 	material.metallic = 0.01
-	material.metallic_specular = lerpf(0.48, 0.68, energy)
+	material.metallic_specular = clampf(lerpf(0.48, 0.68, energy) + polishing * 0.04, 0.45, 0.72)
 
 	material.rim_enabled = true
-	material.rim = lerpf(0.07, 0.17, energy)
+	material.rim = clampf(lerpf(0.07, 0.17, energy) + luminosity * 0.018, 0.05, 0.19)
 	material.rim_tint = 0.48
 
 	material.clearcoat_enabled = true
-	material.clearcoat = lerpf(0.28, 0.62, energy)
-	material.clearcoat_roughness = lerpf(0.28, 0.12, energy)
+	material.clearcoat = clampf(lerpf(0.28, 0.62, energy) + polishing * 0.045, 0.25, 0.65)
+	material.clearcoat_roughness = clampf(
+		lerpf(0.28, 0.12, energy) - polishing * 0.025,
+		0.1,
+		0.3,
+	)
 
 	material.backlight_enabled = true
-	var backlight_strength: float = lerpf(0.025, 0.055, energy)
+	var backlight_strength: float = clampf(
+		lerpf(0.025, 0.055, energy) + luminosity * 0.012,
+		0.02,
+		0.07,
+	)
 	material.backlight = Color(
 		color.r * backlight_strength,
 		color.g * backlight_strength,
@@ -254,7 +275,11 @@ func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 
 	material.emission_enabled = true
 	material.emission = color.darkened(0.46)
-	material.emission_energy_multiplier = 0.006 + energy * 0.018
+	material.emission_energy_multiplier = clampf(
+		0.006 + energy * 0.014 + luminosity * 0.009,
+		0.006,
+		0.03,
+	)
 	return material
 
 
@@ -310,10 +335,27 @@ func _basis_from_y(direction: Vector3) -> Basis:
 
 
 func _crystal_color(instruction) -> Color:
+	var semantic_pressure: Dictionary = Dictionary(
+		instruction.metadata.get("semantic_pressure", {}),
+	)
+	var polishing: float = clampf(float(semantic_pressure.get("polishing", 0.0)), 0.0, 1.0)
+	var luminosity: float = clampf(
+		float(semantic_pressure.get("luminosity", instruction.metadata.get("semantic_luminosity", 0.0))),
+		0.0,
+		1.0,
+	)
 	var hue_shift: float = float(instruction.metadata.get("hue_shift", 0.0))
 	var hue: float = fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
-	var saturation: float = clampf(0.34 + instruction.energy * 0.11, 0.0, 1.0)
-	var value: float = clampf(0.64 + instruction.energy * 0.13, 0.0, 1.0)
+	var saturation: float = clampf(
+		0.34 + instruction.energy * 0.11 - polishing * 0.025,
+		0.0,
+		1.0,
+	)
+	var value: float = clampf(
+		0.64 + instruction.energy * 0.13 + luminosity * 0.045,
+		0.0,
+		1.0,
+	)
 	return Color.from_hsv(hue, saturation, value, 1.0)
 
 
