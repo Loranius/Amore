@@ -2,6 +2,7 @@ extends RefCounted
 
 const Model = preload("res://scripts/core/evolution_model.gd")
 const CrystalSpecies = preload("res://scripts/species/crystal_species.gd")
+const CrystalGrowthHierarchy = preload("res://scripts/growth/crystal_growth_hierarchy.gd")
 
 const COLLISION_ATTEMPTS := 12
 const SAMPLE_STEPS := [0.32, 0.58, 0.82, 1.0]
@@ -10,6 +11,7 @@ const SAMPLE_STEPS := [0.32, 0.58, 0.82, 1.0]
 func rebuild(dna, source_events: Array):
 	var state := Model.EvolutionState.new(dna)
 	var species := CrystalSpecies.new()
+	var hierarchy := CrystalGrowthHierarchy.new()
 	for genesis_instruction in species.create_genesis_instructions(dna):
 		state.append_instruction(genesis_instruction)
 
@@ -19,6 +21,7 @@ func rebuild(dna, source_events: Array):
 	for event_index in range(events.size()):
 		var event = events[event_index]
 		var candidate = species.translate_event(dna, event, event_index, state)
+		candidate = hierarchy.apply(dna, candidate, event, event_index, state)
 		candidate = _resolve_competition(candidate, state)
 		state.append_instruction(candidate, event)
 
