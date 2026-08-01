@@ -93,6 +93,7 @@ export function isGodotBridgeInboundMessage(value: unknown): value is GodotBridg
     case 'amore:godot:state':
       return isVersionedMessage(value)
         && typeof value.source === 'string'
+        && value.source.length > 0
         && ['crystal', 'tree', 'reef'].includes(String(value.species))
         && isFiniteNumber(value.seed)
         && isNonNegativeInteger(value.instructions)
@@ -117,6 +118,7 @@ export function isGodotRuntimeStateAccepted(
   message: GodotStateMessage,
   payload: GodotEvolutionPayload,
 ): boolean {
+  if (message.source !== 'portal') return false;
   if (message.species !== payload.dna.species) return false;
   if (message.seed !== payload.dna.seed) return false;
   if (message.input_events !== payload.events.length) return false;
