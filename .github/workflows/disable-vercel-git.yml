@@ -53,7 +53,7 @@ jobs:
               "$VERCEL_ORG_ID" "$project_id" \
               > "$project_dir/.vercel/project.json"
 
-            vercel git disconnect github \
+            vercel project disconnect \
               --yes \
               --cwd "$project_dir" \
               --token="$VERCEL_TOKEN"
