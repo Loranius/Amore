@@ -4,6 +4,7 @@ const Model = preload("res://scripts/core/evolution_model.gd")
 const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
 const CrystalMeshBuilder = preload("res://scripts/geometry/crystal_mesh_builder.gd")
 const CrystalFusionBuilder = preload("res://scripts/geometry/crystal_fusion_builder.gd")
+const CrystalColonyProjection = preload("res://scripts/geometry/crystal_colony_projection.gd")
 const WebPortalBridge = preload("res://scripts/runtime/web_portal_bridge.gd")
 
 @onready var artifact_root: Node3D = $ArtifactRoot
@@ -11,6 +12,7 @@ const WebPortalBridge = preload("res://scripts/runtime/web_portal_bridge.gd")
 
 var current_state = null
 var web_bridge = null
+var current_projected_count := 0
 
 
 func _ready() -> void:
@@ -67,15 +69,17 @@ func _render_state() -> void:
 
 	var crystal_builder := CrystalMeshBuilder.new()
 	var fusion_builder := CrystalFusionBuilder.new()
-	if not current_state.instructions.is_empty():
+	var projected: Array = CrystalColonyProjection.new().build(current_state)
+	current_projected_count = projected.size()
+	if not projected.is_empty():
 		artifact_root.add_child(
-			fusion_builder.create_foundation_instance(current_state.instructions[0]),
+			fusion_builder.create_foundation_instance(projected[0]),
 		)
 
-	# Every attached Crystal now carries its buried root and surface flare in
-	# the same ArrayMesh. Rendering a second collar here would recreate the
-	# visible bracelet seam Phase 5 is intended to remove.
-	for instruction in current_state.instructions:
+	# Aggregate-only event instructions are canonical evidence, not separate
+	# meshes. The colony projection folds their bounded gains into the visible
+	# seed so accumulated history reads as one mineral body.
+	for instruction in projected:
 		var crystal_instance: MeshInstance3D = crystal_builder.create_mesh_instance(instruction)
 		_apply_crystal_shadow_policy(crystal_instance)
 		artifact_root.add_child(crystal_instance)
@@ -96,8 +100,11 @@ func _apply_crystal_shadow_policy(instance: MeshInstance3D) -> void:
 
 func _update_status(source: String) -> void:
 	status_label.text = (
-		"Godot 4.7.1 · Crystal Phase 5\n"
-		+ "%d accepted growth instructions\n" % current_state.instructions.size()
+		"Godot 4.7.1 · Crystal Phase 8\n"
+		+ "%d canonical · %d rendered bodies\n" % [
+			current_state.instructions.size(),
+			current_projected_count,
+		]
 		+ "seed %d · %s rebuild" % [current_state.dna.seed, source]
 	)
 
@@ -114,6 +121,7 @@ func _post_runtime_state(source: String) -> void:
 		"species": String(current_state.dna.species),
 		"seed": current_state.dna.seed,
 		"instructions": current_state.instructions.size(),
+		"rendered_instructions": current_projected_count,
 		"history": current_state.history.size(),
 		"signature": snapshot_json.sha256_text().substr(0, 16),
 	})
