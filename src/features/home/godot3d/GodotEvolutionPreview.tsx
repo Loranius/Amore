@@ -83,7 +83,7 @@ export function GodotEvolutionPreview({
 
   const sendPayload = useCallback(() => {
     const target = iframeRef.current?.contentWindow;
-    if (!target) return;
+    if (!target || fatalReportedRef.current) return;
     target.postMessage(createGodotPayloadMessage(runtimePayload), window.location.origin);
   }, [runtimePayload]);
 
@@ -124,7 +124,9 @@ export function GodotEvolutionPreview({
     setMotion('unknown');
 
     const timeoutId = window.setTimeout(() => {
-      if (!acceptedRef.current) reportFatal('startup-timeout');
+      if (!acceptedRef.current && !fatalReportedRef.current) {
+        reportFatal('startup-timeout');
+      }
     }, Math.max(1_000, startupTimeoutMs));
 
     return () => window.clearTimeout(timeoutId);
@@ -149,19 +151,22 @@ export function GodotEvolutionPreview({
 
       switch (message.type) {
         case 'amore:godot:booting':
-          setStatus('booting');
+          if (!acceptedRef.current && !fatalReportedRef.current) setStatus('booting');
           break;
         case 'amore:godot:progress':
-          setProgress(message.ratio);
+          if (!fatalReportedRef.current) setProgress(message.ratio);
           break;
         case 'amore:godot:engine-started':
-          setStatus('started');
+          if (!acceptedRef.current && !fatalReportedRef.current) setStatus('started');
           break;
         case 'amore:godot:ready':
-          setStatus('ready');
-          sendPayload();
+          if (!acceptedRef.current && !fatalReportedRef.current) {
+            setStatus('ready');
+            sendPayload();
+          }
           break;
         case 'amore:godot:state':
+          if (fatalReportedRef.current) break;
           if (!isGodotRuntimeStateAccepted(message, runtimePayload)) {
             reportFatal('state-mismatch');
             break;
