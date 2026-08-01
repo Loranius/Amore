@@ -50,23 +50,25 @@ test('React receives Phase 13 runtime telemetry from Godot 4.7.1', async ({ page
   page.on('pageerror', error => browserErrors.push(error.message));
 
   await page.goto('/e2e/godot/');
-  const { preview } = await expectAcceptedRuntime(page);
+  const { harness, preview } = await expectAcceptedRuntime(page);
   await expect(preview).toHaveAttribute('data-godot-motion', 'full');
   await expect(preview).toHaveAttribute('data-godot-suspended', 'false');
-  await expect(preview).toHaveAttribute('data-godot-health-fallback', 'false');
+  await expect(harness).toHaveAttribute('data-godot-fatal-failure', '');
+  await expect(preview).toHaveAttribute('data-godot-status', 'accepted');
   expect(browserErrors).toEqual([]);
 
   await page.screenshot({
-    path: 'test-results/phase13-runtime-health-pixel-8-pro.png',
+    path: 'test-results/phase13-runtime-health-automation.png',
     fullPage: true,
   });
 });
 
-test('Phase 13 physical-device console reaches PASS with orbit, restore and 30 samples', async ({ page }) => {
+test('Phase 13 automation proves orbit, restore and 30-sample workflow', async ({ page }) => {
   await page.goto('/e2e/godot/?godotDiagnostics=1');
   const { harness, preview } = await expectAcceptedRuntime(page);
   const panel = page.locator('[data-godot-device-acceptance="phase-13"]');
   await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute('data-godot-assessment', 'automation');
   await panel.evaluate(element => {
     (element as HTMLElement).style.pointerEvents = 'none';
   });
@@ -90,24 +92,30 @@ test('Phase 13 physical-device console reaches PASS with orbit, restore and 30 s
     async () => Number(await panel.getAttribute('data-godot-health-samples')),
     { timeout: 90_000 },
   ).toBeGreaterThanOrEqual(30);
-  await expect(panel).toHaveAttribute('data-godot-health-status', 'healthy');
-  await expect(panel).toHaveAttribute('data-godot-acceptance-passed', 'true');
-  await expect(preview).toHaveAttribute('data-godot-acceptance-passed', 'true');
+  await expect(panel).toHaveAttribute('data-godot-workflow-passed', 'true');
+  await expect(panel).toHaveAttribute('data-godot-acceptance-passed', 'false');
+  await expect(preview).toHaveAttribute('data-godot-workflow-passed', 'true');
+  await expect(preview).toHaveAttribute('data-godot-acceptance-passed', 'false');
+  await expect(preview).toHaveAttribute('data-godot-status', 'accepted');
 
   const reportText = await page.locator('[data-godot-acceptance-report]').textContent();
   const report = JSON.parse(reportText ?? '{}') as {
+    assessment?: string;
+    workflowPassed?: boolean;
     passed?: boolean;
     privacy?: string;
     criteria?: { orbitCompleted?: boolean; backgroundRestoreCompleted?: boolean };
   };
-  expect(report.passed).toBe(true);
+  expect(report.assessment).toBe('automation');
+  expect(report.workflowPassed).toBe(true);
+  expect(report.passed).toBe(false);
   expect(report.criteria?.orbitCompleted).toBe(true);
   expect(report.criteria?.backgroundRestoreCompleted).toBe(true);
   expect(report.privacy).toContain('No Artifact DNA');
   expect(reportText).not.toContain('event:a');
 
   await page.screenshot({
-    path: 'test-results/phase13-device-acceptance-pass-pixel-8-pro.png',
+    path: 'test-results/phase13-automation-workflow-pass.png',
     fullPage: true,
   });
 });
@@ -123,7 +131,7 @@ test('Godot canvas tap activates the React portal action', async ({ page }) => {
 });
 
 test('sustained critical telemetry triggers the production health fallback', async ({ page }) => {
-  await page.goto('/e2e/godot/');
+  await page.goto('/e2e/godot/?healthFallback=1');
   const { harness, preview } = await expectAcceptedRuntime(page);
   const frame = godotContentFrame(page);
 
@@ -162,7 +170,7 @@ test('Godot Life Engine respects browser reduced motion', async ({ page }) => {
   expect(browserErrors).toEqual([]);
 
   await page.screenshot({
-    path: 'test-results/phase13-reduced-motion-pixel-8-pro.png',
+    path: 'test-results/phase13-reduced-motion-automation.png',
     fullPage: true,
   });
 });
