@@ -3,6 +3,7 @@ extends SceneTree
 const Model = preload("res://scripts/core/evolution_model.gd")
 const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
 const CrystalMeshBuilder = preload("res://scripts/geometry/crystal_mesh_builder.gd")
+const CrystalColonyProjection = preload("res://scripts/geometry/crystal_colony_projection.gd")
 
 
 func _init() -> void:
@@ -33,10 +34,11 @@ func _run() -> void:
 		}),
 	]
 	var state = GrowthEngine.new().rebuild(dna, events)
+	var projected: Array = CrystalColonyProjection.new().build(state)
 	var builder = CrystalMeshBuilder.new()
 	var attached_count := 0
 
-	for instruction in state.instructions:
+	for instruction in projected:
 		if instruction.generation <= 0:
 			continue
 		attached_count += 1
@@ -88,9 +90,8 @@ func _run() -> void:
 				% [flare_radius, body_radius],
 			)
 			return
-		# The lower ring has a nominal 1.035R radius. Accepted Phase 3 ridge
-		# modulation and center drift raise its theoretical sampled maximum to
-		# roughly 1.16R, so the continuity band must include that morphology.
+		# The lower ring has a nominal 1.035R radius. Accepted morphology and
+		# bounded colony projection remain inside the same local continuity band.
 		if body_radius < instruction.radius * 0.93 or body_radius > instruction.radius * 1.18:
 			_fail(
 				"Integrated fusion failure: body %.4f is outside 0.93–1.18 × R %.4f."
