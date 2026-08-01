@@ -58,10 +58,10 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 	var radius: float = mother.radius * radius_ratio
 	var height: float = mother.radius * height_ratio
 	var bottom_y: float = mother.attach_position.y - mother.radius * 0.075
-	var skirt_y: float = mother.attach_position.y + height * 0.16
-	var shoulder_y: float = mother.attach_position.y + height * 0.58
-	var crown_y: float = mother.attach_position.y + height * 0.84
-	var top: Vector3 = center + Vector3.UP * (mother.attach_position.y + height)
+	var skirt_y: float = mother.attach_position.y + height * 0.14
+	var shoulder_y: float = mother.attach_position.y + height * 0.5
+	var crown_y: float = mother.attach_position.y + height * 0.74
+	var top: Vector3 = center + Vector3.UP * (mother.attach_position.y + height * 0.82)
 	var color: Color = _crystal_color(mother).darkened(0.1)
 
 	var bottom_ring: Array[Vector3] = _build_foundation_ring(
@@ -80,25 +80,25 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 		phase + 0.035,
 		irregularity,
 		center,
-		height * 0.055,
+		height * 0.05,
 	)
 	var shoulder_ring: Array[Vector3] = _build_foundation_ring(
 		sides,
 		radius * 0.72,
 		shoulder_y,
 		phase + 0.07,
-		irregularity * 0.86,
+		irregularity * 0.82,
 		center,
-		height * 0.04,
+		height * 0.035,
 	)
 	var crown_ring: Array[Vector3] = _build_foundation_ring(
 		sides,
-		radius * 0.38,
+		radius * 0.42,
 		crown_y,
 		phase + 0.11,
-		irregularity * 0.58,
+		irregularity * 0.52,
 		center,
-		height * 0.022,
+		height * 0.018,
 	)
 
 	_connect_rings(surface, bottom_ring, skirt_ring, color.darkened(0.11))
@@ -112,7 +112,7 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 			crown_ring[side],
 			crown_ring[next],
 			top,
-			color.lightened(0.035 + float(side % 2) * 0.012),
+			color.lightened(0.03 + float(side % 2) * 0.01),
 		)
 
 	var bottom_center: Vector3 = center + Vector3.UP * bottom_y
@@ -147,25 +147,28 @@ func create_junction_mesh(instruction) -> ArrayMesh:
 		0.64,
 		0.88,
 	)
+	# Canonical metadata may request a wider biological flare, but the visible
+	# Web sleeve is deliberately clamped to a subtle bevel. The buried section
+	# still carries the full merge depth and hides the parent/child seam.
 	var flare_ratio: float = clampf(
-		float(instruction.metadata.get("junction_flare_ratio", 1.46)),
-		1.32,
-		1.62,
+		float(instruction.metadata.get("junction_flare_ratio", 1.24)),
+		1.16,
+		1.28,
 	)
 	var sleeve_ratio: float = clampf(
-		float(instruction.metadata.get("junction_sleeve_ratio", 1.08)),
-		1.02,
-		1.18,
+		float(instruction.metadata.get("junction_sleeve_ratio", 1.035)),
+		1.01,
+		1.055,
 	)
 	var junction_height_ratio: float = clampf(
 		float(instruction.metadata.get("junction_height_ratio", 0.035)),
-		0.012,
-		0.065,
+		0.018,
+		0.05,
 	)
 	var sleeve_height_ratio: float = clampf(
-		float(instruction.metadata.get("junction_sleeve_height_ratio", 0.14)),
-		0.1,
-		0.2,
+		float(instruction.metadata.get("junction_sleeve_height_ratio", 0.1)),
+		0.075,
+		0.11,
 	)
 	var phase: float = float(instruction.metadata.get("facet_phase", 0.0))
 	var twist: float = float(instruction.metadata.get("ring_twist", 0.0))
@@ -175,40 +178,43 @@ func create_junction_mesh(instruction) -> ArrayMesh:
 		0.14,
 	)
 	var root_y: float = -minf(
-		instruction.length * 0.14,
-		instruction.radius * merge_depth * 0.94,
+		instruction.length * 0.16,
+		instruction.radius * merge_depth * 0.98,
 	)
-	var flare_y: float = instruction.length * junction_height_ratio
+	var flare_y: float = minf(
+		instruction.length * 0.006,
+		instruction.radius * junction_height_ratio * 0.5,
+	)
 	var sleeve_y: float = maxf(
 		instruction.length * sleeve_height_ratio,
-		flare_y + instruction.radius * 0.48,
+		flare_y + instruction.radius * 0.32,
 	)
-	var color: Color = _crystal_color(instruction).darkened(0.035)
+	var color: Color = _crystal_color(instruction)
 
 	var root_ring: Array[Vector3] = _build_ring(
 		sides,
 		instruction.radius * root_core_ratio,
 		root_y,
 		phase,
-		ridge * 0.35,
+		ridge * 0.28,
 	)
 	var flare_ring: Array[Vector3] = _build_ring(
 		sides,
 		instruction.radius * flare_ratio,
 		flare_y,
-		phase + twist * 0.08,
-		ridge * 0.7,
+		phase + twist * 0.05,
+		ridge * 0.48,
 	)
 	var sleeve_ring: Array[Vector3] = _build_ring(
 		sides,
 		instruction.radius * sleeve_ratio,
 		sleeve_y,
-		phase + twist * 0.2,
-		ridge * 0.52,
+		phase + twist * 0.14,
+		ridge * 0.38,
 	)
 
-	_connect_rings(surface, root_ring, flare_ring, color.darkened(0.055))
-	_connect_rings(surface, flare_ring, sleeve_ring, color.lightened(0.012))
+	_connect_rings(surface, root_ring, flare_ring, color.darkened(0.025))
+	_connect_rings(surface, flare_ring, sleeve_ring, color.lightened(0.008))
 
 	var mesh: ArrayMesh = surface.commit()
 	mesh.surface_set_material(0, _build_junction_material(instruction, color))
@@ -304,18 +310,18 @@ func _build_junction_material(instruction, color: Color) -> StandardMaterial3D:
 	material.vertex_color_use_as_albedo = true
 	material.albedo_color = Color.WHITE
 	material.cull_mode = BaseMaterial3D.CULL_BACK
-	material.roughness = lerpf(0.4, 0.29, energy)
+	material.roughness = lerpf(0.38, 0.29, energy)
 	material.metallic = 0.008
-	material.metallic_specular = lerpf(0.44, 0.58, energy)
+	material.metallic_specular = lerpf(0.46, 0.62, energy)
 	material.rim_enabled = true
 	material.rim = lerpf(0.045, 0.095, energy)
 	material.rim_tint = 0.42
 	material.clearcoat_enabled = true
-	material.clearcoat = lerpf(0.18, 0.36, energy)
-	material.clearcoat_roughness = lerpf(0.32, 0.22, energy)
+	material.clearcoat = lerpf(0.24, 0.46, energy)
+	material.clearcoat_roughness = lerpf(0.3, 0.2, energy)
 	material.emission_enabled = true
-	material.emission = color.darkened(0.5)
-	material.emission_energy_multiplier = 0.003 + energy * 0.008
+	material.emission = color.darkened(0.48)
+	material.emission_energy_multiplier = 0.003 + energy * 0.009
 	return material
 
 
