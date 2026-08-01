@@ -1,16 +1,16 @@
 extends Node3D
 
 @export var rotation_speed := 0.006
-@export var zoom_step := 0.65
-@export var minimum_distance := 5.5
-@export var maximum_distance := 13.0
-@export var target_height := 1.8
+@export var zoom_step := 0.6
+@export var minimum_distance := 5.2
+@export var maximum_distance := 12.0
+@export var target_height := 1.62
 
 @onready var camera: Camera3D = $Camera3D
 
-var distance := 9.2
-var pitch := deg_to_rad(-8.0)
-var yaw := deg_to_rad(18.0)
+var distance := 8.35
+var pitch := deg_to_rad(-5.0)
+var yaw := deg_to_rad(26.0)
 
 
 func _ready() -> void:
@@ -20,11 +20,11 @@ func _ready() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		yaw -= event.relative.x * rotation_speed
-		pitch = clampf(pitch - event.relative.y * rotation_speed, deg_to_rad(-42.0), deg_to_rad(22.0))
+		pitch = clampf(pitch - event.relative.y * rotation_speed, deg_to_rad(-38.0), deg_to_rad(20.0))
 		_apply_camera_transform()
 	elif event is InputEventScreenDrag:
 		yaw -= event.relative.x * rotation_speed
-		pitch = clampf(pitch - event.relative.y * rotation_speed, deg_to_rad(-42.0), deg_to_rad(22.0))
+		pitch = clampf(pitch - event.relative.y * rotation_speed, deg_to_rad(-38.0), deg_to_rad(20.0))
 		_apply_camera_transform()
 	elif event is InputEventMouseButton and event.pressed:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
