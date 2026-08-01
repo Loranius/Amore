@@ -17,12 +17,16 @@ The runnable Crystal slice generates a deterministic colony from:
 
 1. immutable Artifact DNA;
 2. a sorted append-only Evolution Event history;
-3. Species translation into initial Growth Instructions;
+3. species-neutral channels translated into bounded Crystal geological pressure;
 4. deterministic primary, secondary and accent hierarchy assignment;
 5. bounded parent capacity, generation depth and silhouette control;
-6. deterministic collision resolution that preserves the hierarchy floor;
-7. procedural ArrayMesh construction and integrated junction geometry;
-8. a mobile-friendly Godot Compatibility renderer scene.
+6. compatible events accumulated as colony extension, thickening or refinement;
+7. deterministic collision resolution for visible colony seeds;
+8. a renderer projection that folds aggregate deposits into unified mineral bodies;
+9. procedural ArrayMesh construction and integrated junction geometry;
+10. a mobile-friendly Godot Compatibility renderer scene.
+
+Every event remains present in canonical state and history. Aggregate events are not deleted or merged in storage; they are projected into an existing visible colony only at the renderer boundary.
 
 Tree and Reef will reuse the same canonical event/state pipeline after the Crystal slice passes its remaining visual and physical-device acceptance gates.
 
@@ -43,6 +47,14 @@ godot --headless \
 
 godot --headless \
   --path godot/evolution-engine \
+  --script res://scripts/tests/semantic_pressure_smoke.gd
+
+godot --headless \
+  --path godot/evolution-engine \
+  --script res://scripts/tests/colony_accumulation_smoke.gd
+
+godot --headless \
+  --path godot/evolution-engine \
   --script res://scripts/tests/integrated_fusion_smoke.gd
 ```
 
@@ -55,9 +67,11 @@ React / Vite / Supabase
         v
 Godot Evolution Runtime
         |
-        +-- Species translation
+        +-- Species semantic translation
         +-- Growth hierarchy
+        +-- Colony accumulation
         +-- Collision competition
+        +-- Renderer projection
         +-- Geometry builders
         +-- Materials / Life / Camera
         |
