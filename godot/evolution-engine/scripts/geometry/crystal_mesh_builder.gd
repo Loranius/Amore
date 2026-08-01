@@ -82,12 +82,14 @@ func _build_mesh(instruction) -> ArrayMesh:
 	var mid_radius: float = instruction.radius * waist_ratio
 	var shoulder_radius: float = instruction.radius * body_taper
 	if is_mother:
-		# Renderer-only taper removes the manufactured tower read while the
-		# canonical attachment radius, length and lineage remain unchanged.
-		mid_radius *= 0.90
-		shoulder_radius *= 0.82
-	var upper_mid_radius: float = lerpf(mid_radius, shoulder_radius, 0.52) * 0.96
-	var termination_radius: float = shoulder_radius * lerpf(0.54, 0.70, instruction.energy)
+		# The mother keeps its accepted base and full length but begins narrowing
+		# much earlier, replacing the former pillar silhouette with a mineral
+		# spire while preserving enough overlap for canonical child roots.
+		lower_radius *= 0.96
+		mid_radius *= 0.84
+		shoulder_radius *= 0.74
+	var upper_mid_radius: float = lerpf(mid_radius, shoulder_radius, 0.56) * 0.95
+	var termination_radius: float = shoulder_radius * lerpf(0.52, 0.68, instruction.energy)
 	var base_y: float = -minf(
 		instruction.length * 0.16,
 		instruction.radius * merge_depth_ratio * 0.98,
@@ -96,9 +98,9 @@ func _build_mesh(instruction) -> ArrayMesh:
 		instruction.length * 0.008,
 		instruction.radius * 0.028,
 	) if attached else 0.0
-	var lower_y: float = instruction.length * (0.145 if attached else 0.115)
-	var mid_y: float = instruction.length * 0.395
-	var upper_mid_y: float = instruction.length * 0.575
+	var lower_y: float = instruction.length * (0.145 if attached else 0.11)
+	var mid_y: float = instruction.length * (0.34 if is_mother else 0.395)
+	var upper_mid_y: float = instruction.length * (0.54 if is_mother else 0.575)
 	var shoulder_y: float = instruction.length * shoulder_height_ratio
 	var termination_y: float = instruction.length * (1.0 - termination_depth_ratio)
 	termination_y = maxf(shoulder_y + instruction.length * 0.055, termination_y)
@@ -174,10 +176,10 @@ func _build_mesh(instruction) -> ArrayMesh:
 		_connect_rings_gradient(surface, base_ring, fusion_ring, instruction, 0.0, 0.05)
 		_connect_rings_gradient(surface, fusion_ring, lower_ring, instruction, 0.05, 0.145)
 	else:
-		_connect_rings_gradient(surface, base_ring, lower_ring, instruction, 0.0, 0.115)
-	_connect_rings_gradient(surface, lower_ring, mid_ring, instruction, 0.145, 0.395)
-	_connect_rings_gradient(surface, mid_ring, upper_mid_ring, instruction, 0.395, 0.575)
-	_connect_rings_gradient(surface, upper_mid_ring, shoulder_ring, instruction, 0.575, shoulder_height_ratio)
+		_connect_rings_gradient(surface, base_ring, lower_ring, instruction, 0.0, 0.11)
+	_connect_rings_gradient(surface, lower_ring, mid_ring, instruction, 0.145, 0.34 if is_mother else 0.395)
+	_connect_rings_gradient(surface, mid_ring, upper_mid_ring, instruction, 0.34 if is_mother else 0.395, 0.54 if is_mother else 0.575)
+	_connect_rings_gradient(surface, upper_mid_ring, shoulder_ring, instruction, 0.54 if is_mother else 0.575, shoulder_height_ratio)
 	_connect_rings_gradient(surface, shoulder_ring, termination_ring, instruction, shoulder_height_ratio, 0.86)
 
 	for side in range(sides):
