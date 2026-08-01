@@ -45,7 +45,12 @@ export default defineConfig({
         globIgnores: ['**/godot/evolution-engine/**'],
         // game.html — окремий документ в iframe; хай кешується як навігація.
         maximumFileSizeToCacheInBytes: 5000000,
-        navigateFallbackDenylist: [/game\.html/, /\.mp4$/, /\/godot\/evolution-engine\//],
+        navigateFallbackDenylist: [
+          /game\.html/,
+          /\.mp4$/,
+          /\/godot\/evolution-engine\//,
+          /\/e2e\/godot\//,
+        ],
         runtimeCaching: [
           {
             urlPattern: /\/godot\/evolution-engine\//,
