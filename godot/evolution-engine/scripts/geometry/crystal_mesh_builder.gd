@@ -54,11 +54,12 @@ func _build_mesh(instruction) -> ArrayMesh:
 		0.0,
 		0.14,
 	)
+	var visual_bias: Vector3 = _visual_profile.body_bias(instruction) * instruction.radius
 	var center_drift: Vector3 = Vector3(
 		float(instruction.metadata.get("center_drift_x", 0.0)) * instruction.radius,
 		0.0,
 		float(instruction.metadata.get("center_drift_z", 0.0)) * instruction.radius,
-	)
+	) + visual_bias
 	var tip_offset: Vector3 = Vector3(
 		float(instruction.metadata.get("tip_offset_x", 0.0)) * instruction.radius,
 		0.0,
@@ -75,18 +76,18 @@ func _build_mesh(instruction) -> ArrayMesh:
 		1.16,
 		1.28,
 	)
-	var base_radius: float = instruction.radius * (root_core_ratio if attached else 1.06)
+	var base_radius: float = instruction.radius * (root_core_ratio if attached else 1.04)
 	var fusion_radius: float = instruction.radius * integrated_flare_ratio
-	var lower_radius: float = instruction.radius * (1.035 if attached else 1.0)
+	var lower_radius: float = instruction.radius * (1.035 if attached else 0.985)
 	var mid_radius: float = instruction.radius * waist_ratio
 	var shoulder_radius: float = instruction.radius * body_taper
 	if is_mother:
-		# Phase 10 removes the monolithic cylinder read while preserving the
-		# canonical radius and full vertical extent.
-		mid_radius *= 0.965
-		shoulder_radius *= 0.92
-	var upper_mid_radius: float = lerpf(mid_radius, shoulder_radius, 0.48) * 0.975
-	var termination_radius: float = shoulder_radius * lerpf(0.58, 0.74, instruction.energy)
+		# Renderer-only taper removes the manufactured tower read while the
+		# canonical attachment radius, length and lineage remain unchanged.
+		mid_radius *= 0.90
+		shoulder_radius *= 0.82
+	var upper_mid_radius: float = lerpf(mid_radius, shoulder_radius, 0.52) * 0.96
+	var termination_radius: float = shoulder_radius * lerpf(0.54, 0.70, instruction.energy)
 	var base_y: float = -minf(
 		instruction.length * 0.16,
 		instruction.radius * merge_depth_ratio * 0.98,
@@ -95,9 +96,9 @@ func _build_mesh(instruction) -> ArrayMesh:
 		instruction.length * 0.008,
 		instruction.radius * 0.028,
 	) if attached else 0.0
-	var lower_y: float = instruction.length * (0.145 if attached else 0.12)
-	var mid_y: float = instruction.length * 0.43
-	var upper_mid_y: float = instruction.length * 0.61
+	var lower_y: float = instruction.length * (0.145 if attached else 0.115)
+	var mid_y: float = instruction.length * 0.395
+	var upper_mid_y: float = instruction.length * 0.575
 	var shoulder_y: float = instruction.length * shoulder_height_ratio
 	var termination_y: float = instruction.length * (1.0 - termination_depth_ratio)
 	termination_y = maxf(shoulder_y + instruction.length * 0.055, termination_y)
@@ -133,7 +134,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 		lower_y,
 		facet_phase + ring_twist * 0.22,
 		ridge_strength * 0.7,
-		center_drift * 0.18,
+		center_drift * 0.14,
 	)
 	var mid_ring: Array[Vector3] = _build_ring(
 		sides,
@@ -141,7 +142,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 		mid_y,
 		facet_phase + ring_twist * 0.5,
 		ridge_strength,
-		center_drift * 0.56,
+		center_drift * 0.5,
 	)
 	var upper_mid_ring: Array[Vector3] = _build_ring(
 		sides,
@@ -149,7 +150,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 		upper_mid_y,
 		facet_phase + ring_twist * 0.76,
 		ridge_strength * 0.92,
-		center_drift * 0.82,
+		center_drift * 0.78,
 	)
 	var shoulder_ring: Array[Vector3] = _build_ring(
 		sides,
@@ -166,16 +167,17 @@ func _build_mesh(instruction) -> ArrayMesh:
 		facet_phase + ring_twist * 1.22,
 		ridge_strength * 0.58,
 		center_drift + tip_offset * 0.34,
+		instruction.radius * (0.09 if is_mother else 0.045),
 	)
 
 	if attached:
 		_connect_rings_gradient(surface, base_ring, fusion_ring, instruction, 0.0, 0.05)
 		_connect_rings_gradient(surface, fusion_ring, lower_ring, instruction, 0.05, 0.145)
 	else:
-		_connect_rings_gradient(surface, base_ring, lower_ring, instruction, 0.0, 0.12)
-	_connect_rings_gradient(surface, lower_ring, mid_ring, instruction, 0.145, 0.43)
-	_connect_rings_gradient(surface, mid_ring, upper_mid_ring, instruction, 0.43, 0.61)
-	_connect_rings_gradient(surface, upper_mid_ring, shoulder_ring, instruction, 0.61, shoulder_height_ratio)
+		_connect_rings_gradient(surface, base_ring, lower_ring, instruction, 0.0, 0.115)
+	_connect_rings_gradient(surface, lower_ring, mid_ring, instruction, 0.145, 0.395)
+	_connect_rings_gradient(surface, mid_ring, upper_mid_ring, instruction, 0.395, 0.575)
+	_connect_rings_gradient(surface, upper_mid_ring, shoulder_ring, instruction, 0.575, shoulder_height_ratio)
 	_connect_rings_gradient(surface, shoulder_ring, termination_ring, instruction, shoulder_height_ratio, 0.86)
 
 	for side in range(sides):
@@ -215,6 +217,7 @@ func _build_ring(
 	phase: float,
 	ridge_strength: float,
 	center: Vector3,
+	vertical_wave: float = 0.0,
 ) -> Array[Vector3]:
 	var ring: Array[Vector3] = []
 	for side in range(sides):
@@ -224,8 +227,9 @@ func _build_ring(
 			+ cos(angle * 3.0 - phase * 1.7) * 0.38
 		)
 		var local_radius: float = radius * (1.0 + harmonic * ridge_strength)
+		var local_y: float = y + sin(angle * 2.0 + phase * 1.4) * vertical_wave
 		var radial: Vector3 = Vector3(cos(angle), 0.0, sin(angle))
-		ring.append(center + radial * local_radius + Vector3.UP * y)
+		ring.append(center + radial * local_radius + Vector3.UP * local_y)
 	return ring
 
 
@@ -277,11 +281,11 @@ func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 	material.metallic_specular = clampf(lerpf(0.5, 0.69, energy) + polishing * 0.025, 0.45, 0.72)
 
 	material.rim_enabled = true
-	material.rim = clampf(lerpf(0.07, 0.17, energy) + luminosity * 0.018, 0.05, 0.19)
-	material.rim_tint = 0.42
+	material.rim = clampf(lerpf(0.07, 0.16, energy) + luminosity * 0.012, 0.05, 0.18)
+	material.rim_tint = 0.4
 
 	material.clearcoat_enabled = true
-	material.clearcoat = clampf(lerpf(0.28, 0.62, energy) + polishing * 0.025, 0.25, 0.65)
+	material.clearcoat = clampf(lerpf(0.28, 0.6, energy) + polishing * 0.025, 0.25, 0.63)
 	material.clearcoat_roughness = clampf(
 		lerpf(0.28, 0.12, energy) - polishing * 0.02,
 		0.1,
@@ -290,9 +294,9 @@ func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 
 	material.backlight_enabled = true
 	var backlight_strength: float = clampf(
-		lerpf(0.03, 0.06, energy) + luminosity * 0.008,
+		lerpf(0.026, 0.052, energy) + luminosity * 0.006,
 		0.02,
-		0.07,
+		0.06,
 	)
 	material.backlight = Color(
 		color.r * backlight_strength,
@@ -302,11 +306,11 @@ func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 	)
 
 	material.emission_enabled = true
-	material.emission = color.darkened(0.5)
+	material.emission = color.darkened(0.56)
 	material.emission_energy_multiplier = clampf(
-		0.005 + energy * 0.012 + luminosity * 0.007,
-		0.005,
-		0.026,
+		0.003 + energy * 0.007 + luminosity * 0.004,
+		0.003,
+		0.016,
 	)
 	return material
 
