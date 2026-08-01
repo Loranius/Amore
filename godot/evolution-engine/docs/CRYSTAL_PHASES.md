@@ -143,3 +143,50 @@ Phase 6 passes:
 6. preserved mother dominance;
 7. silhouette-floor preservation during collision search;
 8. Godot parser/import, integrated fusion, Web export and React bridge validation.
+
+## Phase 7 — Module semantics as geological pressure
+
+Phase 7 prevents portal modules from creating renderer-specific geometry directly. Every Evolution Event remains species-neutral. Crystal Species translates the event into a bounded geological pressure vector:
+
+- `expansion` — outward exploration and colony reach;
+- `internal_density` — accumulated remembrance and compact mass;
+- `polishing` — cleaner facets, reduced drift and increased facet resolution;
+- `structural` — stronger inherited direction, thicker support and vertical authority;
+- `luminosity` — bounded colour and optical emphasis.
+
+### Current module interpretation
+
+- Map and travel primarily raise expansion;
+- Memories primarily raise internal density;
+- Photos primarily raise polishing;
+- completed Plans and Goals primarily raise structural pressure;
+- fulfilled Wishlist events primarily raise luminosity;
+- Shopping and Calendar contribute smaller structural and density pressure.
+
+Module identity is only one input. The normalized event channels, portal activity and evidence quality remain part of every pressure calculation. Historical estimates are attenuated without being removed from append-only history.
+
+### Projection boundary
+
+```text
+Evolution Event
+  → Crystal semantic pressure
+  → bounded Crystal morphology projection
+  → hierarchy and collision competition
+  → accepted Growth Instruction
+  → mesh and material presentation
+```
+
+The complete pressure vector, normalized source family, dominant pressure, semantic version and projection version are serialized with each event Growth Instruction. Tree and Reef may translate the same neutral event into entirely different biological or colonial outcomes.
+
+### Acceptance gates
+
+Phase 7 requires:
+
+1. deterministic pressure reconstruction;
+2. exactly five bounded pressure values in the range 0–1;
+3. stable source-family normalization;
+4. accepted dominant pressure for Map, Memories, Photos, Plans and Wishlist fixtures;
+5. semantic metadata preserved through hierarchy and competition;
+6. bounded length, radius, direction and morphology projection;
+7. unchanged append-only history and identity;
+8. parser/import, determinism, hierarchy, fusion, Web export and React bridge validation.
