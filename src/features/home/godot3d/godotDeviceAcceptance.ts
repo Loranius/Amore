@@ -26,6 +26,7 @@ export interface GodotDeviceEnvironment {
   screenWidth: number;
   screenHeight: number;
   devicePixelRatio: number;
+  automated: boolean;
 }
 
 export interface GodotDeviceAcceptanceCriteria {
@@ -39,8 +40,9 @@ export interface GodotDeviceAcceptanceCriteria {
 }
 
 export interface GodotDeviceAcceptanceReport {
-  version: 'godot-device-acceptance-v1';
+  version: 'godot-device-acceptance-v2';
   generatedAt: string;
+  assessment: 'automation' | 'physical';
   environment: GodotDeviceEnvironment;
   runtime: {
     version: string;
@@ -57,6 +59,7 @@ export interface GodotDeviceAcceptanceReport {
   lifecycle: GodotLifecycleMessage | null;
   interactions: GodotInteractionCounts;
   criteria: GodotDeviceAcceptanceCriteria;
+  workflowPassed: boolean;
   passed: boolean;
   privacy: 'No Artifact DNA, Evolution Events, Supabase data or relationship content included.';
 }
@@ -83,6 +86,7 @@ export function readGodotDeviceEnvironment(): GodotDeviceEnvironment {
       screenWidth: 0,
       screenHeight: 0,
       devicePixelRatio: 1,
+      automated: true,
     };
   }
   return {
@@ -93,6 +97,7 @@ export function readGodotDeviceEnvironment(): GodotDeviceEnvironment {
     screenWidth: window.screen.width,
     screenHeight: window.screen.height,
     devicePixelRatio: window.devicePixelRatio || 1,
+    automated: navigator.webdriver === true,
   };
 }
 
@@ -114,10 +119,17 @@ export function createGodotDeviceAcceptanceReport(input: {
     deterministicSignaturePresent: Boolean(input.state?.signature),
     motionProfileCaptured: input.state?.motion === 'full' || input.state?.motion === 'reduced',
   };
+  const workflowPassed = criteria.runtimeAccepted
+    && criteria.stableThirtySecondWindow
+    && criteria.orbitCompleted
+    && criteria.backgroundRestoreCompleted
+    && criteria.deterministicSignaturePresent
+    && criteria.motionProfileCaptured;
 
   return {
-    version: 'godot-device-acceptance-v1',
+    version: 'godot-device-acceptance-v2',
     generatedAt: input.generatedAt ?? new Date().toISOString(),
+    assessment: input.environment.automated ? 'automation' : 'physical',
     environment: input.environment,
     runtime: {
       version: input.state?.version ?? input.telemetry?.version ?? 'unknown',
@@ -134,7 +146,8 @@ export function createGodotDeviceAcceptanceReport(input: {
     lifecycle: input.lifecycle,
     interactions: input.interactions,
     criteria,
-    passed: Object.values(criteria).every(Boolean),
+    workflowPassed,
+    passed: workflowPassed && criteria.healthyRuntime && !input.environment.automated,
     privacy: 'No Artifact DNA, Evolution Events, Supabase data or relationship content included.',
   };
 }
