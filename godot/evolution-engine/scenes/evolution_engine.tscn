@@ -22,17 +22,18 @@ radiance_size = 1
 sky_material = SubResource("ProceduralSkyMaterial_crystal")
 
 [sub_resource type="Environment" id="Environment_main"]
-background_mode = 2
+background_mode = 1
+background_color = Color(0.022, 0.026, 0.048, 1)
+background_energy_multiplier = 1.0
 sky = SubResource("Sky_crystal")
-background_energy_multiplier = 0.88
 ambient_light_source = 3
 ambient_light_color = Color(0.19, 0.22, 0.34, 1)
-ambient_light_energy = 0.42
+ambient_light_energy = 0.48
 ambient_light_sky_contribution = 0.86
 reflected_light_source = 2
 tonemap_mode = 2
 glow_enabled = true
-glow_intensity = 0.16
+glow_intensity = 0.13
 
 [sub_resource type="StyleBoxFlat" id="Style_status"]
 bg_color = Color(0.018, 0.024, 0.052, 0.7)
@@ -53,24 +54,24 @@ script = ExtResource("1_runtime")
 environment = SubResource("Environment_main")
 
 [node name="KeyLight" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-42, -38, 0)
-light_color = Color(0.78, 0.88, 1, 1)
-light_energy = 1.05
+rotation_degrees = Vector3(-38, -32, 0)
+light_color = Color(0.82, 0.9, 1, 1)
+light_energy = 1.0
 shadow_enabled = true
-shadow_blur = 3.2
+shadow_blur = 3.4
 
 [node name="RimLight" type="OmniLight3D" parent="."]
-position = Vector3(-3.2, 4.8, -2.2)
-light_color = Color(0.48, 0.52, 0.96, 1)
-light_energy = 1.15
-omni_range = 9.0
+position = Vector3(-3.8, 4.6, -3.2)
+light_color = Color(0.48, 0.56, 0.9, 1)
+light_energy = 0.9
+omni_range = 9.5
 shadow_enabled = false
 
 [node name="WarmFill" type="OmniLight3D" parent="."]
-position = Vector3(3.6, 2.3, 4.2)
-light_color = Color(1, 0.68, 0.52, 1)
-light_energy = 0.65
-omni_range = 8.0
+position = Vector3(3.8, 2.1, 4.4)
+light_color = Color(1, 0.72, 0.58, 1)
+light_energy = 0.58
+omni_range = 8.5
 shadow_enabled = false
 
 [node name="ArtifactRoot" type="Node3D" parent="."]
@@ -81,7 +82,7 @@ script = ExtResource("2_camera")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 current = true
-fov = 38.0
+fov = 39.0
 near = 0.05
 far = 80.0
 
