@@ -34,7 +34,10 @@ export type GodotBridgeInboundMessage =
       species: string;
       seed: number;
       instructions: number;
+      rendered_instructions?: number;
       history: number;
+      motion?: 'full' | 'reduced';
+      life_version?: string;
       signature: string;
     }
   | { type: 'amore:godot:error'; message: string };
