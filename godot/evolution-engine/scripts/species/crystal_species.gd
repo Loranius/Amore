@@ -1,0 +1,377 @@
+extends RefCounted
+
+const Model = preload("res://scripts/core/evolution_model.gd")
+const DeterministicRNG = preload("res://scripts/core/deterministic_rng.gd")
+const CrystalSemanticPressure = preload("res://scripts/species/crystal_semantic_pressure.gd")
+
+const MOTHER_ID := "crystal:mother"
+const BASAL_CROWN_COUNT := 5
+const SEMANTIC_PROJECTION_VERSION := "crystal-semantic-projection-v1"
+
+
+func create_genesis_instructions(dna) -> Array:
+	var mother = create_mother(dna)
+	var instructions: Array = [mother]
+	var rng = DeterministicRNG.new(DeterministicRNG.seed_from_text("genesis:basal-crown", dna.seed))
+	var phase_offset: float = rng.range_float(-0.18, 0.18)
+
+	for index in range(BASAL_CROWN_COUNT):
+		var spin: float = TAU * float(index) / float(BASAL_CROWN_COUNT) + phase_offset
+		var radial: Vector3 = Vector3(cos(spin), 0.0, sin(spin)).normalized()
+		var attach_position: Vector3 = (
+			mother.attach_position
+			+ Vector3.UP * rng.range_float(0.03, 0.12)
+			+ radial * mother.radius * rng.range_float(0.7, 0.82)
+		)
+		var direction: Vector3 = (
+			radial * rng.range_float(0.54, 0.72)
+			+ Vector3.UP * rng.range_float(0.75, 0.96)
+		).normalized()
+		var energy: float = rng.range_float(0.42, 0.68)
+		var metadata: Dictionary = _morphology_metadata(rng, "basal-crown", energy)
+		metadata["hue_shift"] = rng.range_float(-0.045, 0.075)
+		metadata["cap_base"] = false
+		metadata["attachment_ratio"] = 0.03
+		metadata["merge_depth_ratio"] = 0.58
+		metadata["surface_offset_ratio"] = 0.76
+		instructions.append(Model.GrowthInstruction.new(
+			"crystal:genesis:basal:%02d" % index,
+			MOTHER_ID,
+			1,
+			attach_position,
+			direction,
+			rng.range_float(0.15, 0.22),
+			rng.range_float(0.68, 1.12),
+			rng.range_int(5, 7),
+			energy,
+			"genesis",
+			metadata,
+		))
+
+	return instructions
+
+
+func create_mother(dna) -> RefCounted:
+	var rng = DeterministicRNG.new(dna.seed)
+	var metadata: Dictionary = _morphology_metadata(rng, "mother", 1.0)
+	metadata["hue_shift"] = rng.range_float(-0.035, 0.035)
+	metadata["cap_base"] = true
+	metadata["merge_depth_ratio"] = 0.0
+	metadata["foundation_radius_ratio"] = rng.range_float(1.48, 1.64)
+	metadata["foundation_height_ratio"] = rng.range_float(0.64, 0.8)
+	metadata["foundation_irregularity"] = rng.range_float(0.06, 0.115)
+	metadata["foundation_phase"] = rng.range_float(-0.24, 0.24)
+	metadata["foundation_sides"] = rng.range_int(10, 12)
+	metadata["foundation_offset_x"] = rng.range_float(-0.075, 0.075)
+	metadata["foundation_offset_z"] = rng.range_float(-0.075, 0.075)
+	return Model.GrowthInstruction.new(
+		MOTHER_ID,
+		"",
+		0,
+		Vector3(0.0, -0.18, 0.0),
+		Vector3.UP,
+		rng.range_float(0.58, 0.72),
+		rng.range_float(3.35, 3.95),
+		rng.range_int(6, 8),
+		1.0,
+		"genesis",
+		metadata,
+	)
+
+
+func translate_event(dna, event, event_index: int, state) -> RefCounted:
+	var decision_seed: int = DeterministicRNG.seed_from_text(
+		"%s|%s|%d" % [event.sort_key(), String(dna.species), event_index],
+		dna.seed,
+	)
+	var rng = DeterministicRNG.new(decision_seed)
+	var semantic: Dictionary = CrystalSemanticPressure.new().evaluate(event)
+	var pressure: Dictionary = Dictionary(semantic.get("pressure", {}))
+	var expansion: float = float(pressure.get("expansion", 0.0))
+	var internal_density: float = float(pressure.get("internal_density", 0.0))
+	var polishing: float = float(pressure.get("polishing", 0.0))
+	var structural: float = float(pressure.get("structural", 0.0))
+	var luminosity: float = float(pressure.get("luminosity", 0.0))
+	var parent = _select_parent(event, event_index, state, rng)
+	var parent_direction: Vector3 = parent.direction
+
+	var tangent_a: Vector3 = parent_direction.cross(Vector3.UP)
+	if tangent_a.length_squared() < 0.000001:
+		tangent_a = parent_direction.cross(Vector3.RIGHT)
+	tangent_a = tangent_a.normalized()
+	var tangent_b: Vector3 = parent_direction.cross(tangent_a).normalized()
+
+	var spin: float = rng.range_float(0.0, TAU)
+	var radial: Vector3 = (tangent_a * cos(spin) + tangent_b * sin(spin)).normalized()
+	var along_ratio: float = rng.range_float(0.16, 0.78)
+	var parent_radius_at_attachment: float = parent.radius * lerpf(1.08, 0.7, along_ratio)
+	var merge_depth_ratio: float = rng.range_float(0.48, 0.66)
+	var surface_offset_ratio: float = rng.range_float(0.74, 0.86)
+	var attach_position: Vector3 = (
+		parent.attach_position
+		+ parent_direction * parent.length * along_ratio
+		+ radial * parent_radius_at_attachment * surface_offset_ratio
+	)
+
+	var significance: float = _channel(event, "significance")
+	var remembrance: float = _channel(event, "remembrance")
+	var exploration: float = _channel(event, "exploration")
+	var achievement: float = _channel(event, "achievement")
+	var stability: float = _channel(event, "stability")
+	var culture: float = _channel(event, "culture")
+	var total_pressure: float = clampf(
+		0.16
+		+ event.portal_activity * 0.18
+		+ significance * 0.14
+		+ remembrance * 0.1
+		+ achievement * 0.1
+		+ exploration * 0.06
+		+ stability * 0.06
+		+ culture * 0.03
+		+ structural * 0.08
+		+ internal_density * 0.07
+		+ expansion * 0.05
+		+ luminosity * 0.03,
+		0.0,
+		1.0,
+	)
+
+	var outward_force: float = 0.6 + exploration * 0.12 + expansion * 0.2
+	var inherited_force: float = (
+		0.4
+		+ stability * 0.14
+		+ remembrance * 0.06
+		+ structural * 0.16
+		+ internal_density * 0.06
+	)
+	var upward_force: float = 0.04 + achievement * 0.05 + structural * 0.1
+	var mutation_angle: float = 18.0 + culture * 10.0 - polishing * 3.0
+	var mutation: Vector3 = rng.direction_in_cone(radial, deg_to_rad(maxf(10.0, mutation_angle)))
+	var direction: Vector3 = (
+		radial * outward_force
+		+ parent_direction * inherited_force
+		+ Vector3.UP * upward_force
+		+ mutation * (0.07 + culture * 0.07)
+	).normalized()
+	if direction.y < 0.1:
+		direction = (direction + Vector3.UP * (0.18 - direction.y)).normalized()
+
+	var generation: int = parent.generation + 1
+	var generation_scale: float = pow(0.82, float(maxi(0, generation - 1)))
+	var semantic_radius_scale: float = (
+		lerpf(0.96, 1.14, internal_density)
+		* lerpf(0.98, 1.08, structural)
+	)
+	var semantic_length_scale: float = (
+		lerpf(0.96, 1.14, expansion)
+		* lerpf(0.98, 1.08, structural)
+	)
+	var radius: float = (
+		lerpf(0.16, 0.31, total_pressure)
+		* generation_scale
+		* semantic_radius_scale
+	)
+	var length: float = (
+		lerpf(0.82, 1.82, total_pressure)
+		* generation_scale
+		* semantic_length_scale
+	)
+	var sides: int = clampi(rng.range_int(5, 8) + int(roundf(polishing * 2.0)), 5, 10)
+	var metadata: Dictionary = _morphology_metadata(rng, "event-growth", total_pressure)
+	_apply_semantic_morphology(metadata, pressure)
+	metadata["source"] = event.source
+	metadata["hue_shift"] = (
+		rng.range_float(-0.065, 0.09)
+		+ culture * 0.035
+		+ luminosity * 0.018
+		- polishing * 0.008
+	)
+	metadata["cap_base"] = false
+	metadata["attachment_ratio"] = along_ratio
+	metadata["merge_depth_ratio"] = merge_depth_ratio
+	metadata["surface_offset_ratio"] = surface_offset_ratio
+	metadata["semantic_pressure"] = pressure.duplicate(true)
+	metadata["semantic_source_family"] = String(semantic.get("source_family", "unknown"))
+	metadata["semantic_dominant"] = String(semantic.get("dominant", "structural"))
+	metadata["semantic_intensity"] = float(semantic.get("intensity", 0.0))
+	metadata["semantic_version"] = String(semantic.get("version", "unknown"))
+	metadata["semantic_projection_version"] = SEMANTIC_PROJECTION_VERSION
+	metadata["semantic_length_scale"] = semantic_length_scale
+	metadata["semantic_radius_scale"] = semantic_radius_scale
+	metadata["semantic_polish_factor"] = polishing
+	metadata["semantic_luminosity"] = luminosity
+
+	return Model.GrowthInstruction.new(
+		"crystal:%s" % event.id,
+		parent.id,
+		generation,
+		attach_position,
+		direction,
+		radius,
+		length,
+		sides,
+		total_pressure,
+		event.id,
+		metadata,
+	)
+
+
+func _select_parent(event, event_index: int, state, rng) -> RefCounted:
+	if event_index < 3:
+		return state.instructions[0]
+
+	var remembrance: float = _channel(event, "remembrance")
+	var stability: float = _channel(event, "stability")
+	if remembrance + stability > 1.2:
+		return state.instructions[0]
+
+	# Event growth may use the mother or previously accepted event structures,
+	# but the DNA-defined basal crown is not selected as an event parent yet.
+	var event_parent_start: int = 1 + BASAL_CROWN_COUNT
+	if state.instructions.size() <= event_parent_start:
+		return state.instructions[0]
+	var available_event_parents: int = state.instructions.size() - event_parent_start
+	var selected_event_offset: int = rng.range_int(0, maxi(0, available_event_parents - 1))
+	return state.instructions[event_parent_start + selected_event_offset]
+
+
+func _apply_semantic_morphology(metadata: Dictionary, pressure: Dictionary) -> void:
+	var expansion: float = float(pressure.get("expansion", 0.0))
+	var internal_density: float = float(pressure.get("internal_density", 0.0))
+	var polishing: float = float(pressure.get("polishing", 0.0))
+	var structural: float = float(pressure.get("structural", 0.0))
+
+	metadata["body_taper"] = clampf(
+		float(metadata.get("body_taper", 0.86))
+		+ structural * 0.035
+		+ internal_density * 0.025
+		- expansion * 0.02,
+		0.68,
+		1.0,
+	)
+	metadata["waist_ratio"] = clampf(
+		float(metadata.get("waist_ratio", 0.98)) + internal_density * 0.04,
+		0.8,
+		1.12,
+	)
+	metadata["shoulder_height_ratio"] = clampf(
+		float(metadata.get("shoulder_height_ratio", 0.72)) + structural * 0.025,
+		0.55,
+		0.84,
+	)
+	metadata["termination_depth_ratio"] = clampf(
+		float(metadata.get("termination_depth_ratio", 0.22)) - polishing * 0.025,
+		0.12,
+		0.36,
+	)
+	metadata["ridge_strength"] = clampf(
+		float(metadata.get("ridge_strength", 0.055)) * lerpf(1.0, 0.68, polishing),
+		0.0,
+		0.14,
+	)
+	metadata["ring_twist"] = clampf(
+		float(metadata.get("ring_twist", 0.0)) * lerpf(1.0, 0.76, polishing),
+		-0.11,
+		0.11,
+	)
+	metadata["center_drift_x"] = (
+		float(metadata.get("center_drift_x", 0.0)) * lerpf(1.0, 0.82, polishing)
+	)
+	metadata["center_drift_z"] = (
+		float(metadata.get("center_drift_z", 0.0)) * lerpf(1.0, 0.82, polishing)
+	)
+
+
+func _morphology_metadata(rng, role: String, energy: float) -> Dictionary:
+	var body_taper_min := 0.78
+	var body_taper_max := 0.92
+	var waist_min := 0.9
+	var waist_max := 1.04
+	var shoulder_min := 0.64
+	var shoulder_max := 0.78
+	var termination_min := 0.18
+	var termination_max := 0.29
+	var tip_offset_max := 0.2
+	var ridge_min := 0.035
+	var ridge_max := 0.09
+	var twist_max := 0.075
+	var center_drift_max := 0.09
+	var root_core_min := 0.7
+	var root_core_max := 0.82
+	var flare_min := 1.4
+	var flare_max := 1.53
+	var sleeve_min := 1.045
+	var sleeve_max := 1.12
+	var junction_height_min := 0.02
+	var junction_height_max := 0.05
+	var sleeve_height_min := 0.12
+	var sleeve_height_max := 0.17
+
+	if role == "mother":
+		body_taper_min = 0.84
+		body_taper_max = 0.94
+		waist_min = 0.95
+		waist_max = 1.045
+		shoulder_min = 0.69
+		shoulder_max = 0.79
+		termination_min = 0.17
+		termination_max = 0.23
+		tip_offset_max = 0.13
+		ridge_min = 0.025
+		ridge_max = 0.065
+		twist_max = 0.045
+		center_drift_max = 0.055
+	elif role == "basal-crown":
+		body_taper_min = 0.76
+		body_taper_max = 0.9
+		waist_min = 0.88
+		waist_max = 1.055
+		shoulder_min = 0.61
+		shoulder_max = 0.76
+		termination_min = 0.2
+		termination_max = 0.31
+		tip_offset_max = 0.24
+		ridge_min = 0.04
+		ridge_max = 0.1
+		twist_max = 0.095
+		center_drift_max = 0.12
+		root_core_min = 0.68
+		root_core_max = 0.79
+		flare_min = 1.46
+		flare_max = 1.58
+		sleeve_min = 1.06
+		sleeve_max = 1.14
+		junction_height_min = 0.018
+		junction_height_max = 0.042
+		sleeve_height_min = 0.13
+		sleeve_height_max = 0.18
+
+	var bounded_energy: float = clampf(energy, 0.0, 1.0)
+	var metadata := {
+		"role": role,
+		"body_taper": rng.range_float(body_taper_min, body_taper_max),
+		"waist_ratio": rng.range_float(waist_min, waist_max),
+		"shoulder_height_ratio": rng.range_float(shoulder_min, shoulder_max),
+		"termination_depth_ratio": rng.range_float(termination_min, termination_max),
+		"facet_phase": rng.range_float(-0.22, 0.22),
+		"ring_twist": rng.range_float(-twist_max, twist_max),
+		"ridge_strength": rng.range_float(ridge_min, ridge_max) * lerpf(0.85, 1.12, bounded_energy),
+		"center_drift_x": rng.range_float(-center_drift_max, center_drift_max),
+		"center_drift_z": rng.range_float(-center_drift_max, center_drift_max),
+		"tip_offset_x": rng.range_float(-tip_offset_max, tip_offset_max),
+		"tip_offset_z": rng.range_float(-tip_offset_max, tip_offset_max),
+	}
+	if role != "mother":
+		metadata["root_core_ratio"] = rng.range_float(root_core_min, root_core_max)
+		metadata["junction_flare_ratio"] = rng.range_float(flare_min, flare_max)
+		metadata["junction_sleeve_ratio"] = rng.range_float(sleeve_min, sleeve_max)
+		metadata["junction_height_ratio"] = rng.range_float(junction_height_min, junction_height_max)
+		metadata["junction_sleeve_height_ratio"] = rng.range_float(
+			sleeve_height_min,
+			sleeve_height_max,
+		)
+	return metadata
+
+
+func _channel(event, name: String) -> float:
+	return clampf(float(event.channels.get(name, 0.0)), 0.0, 1.0)

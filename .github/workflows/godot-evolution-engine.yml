@@ -1,0 +1,270 @@
+name: Godot Evolution Engine
+
+on:
+  push:
+    branches:
+      - feat/godot-evolution-engine-bootstrap
+      - feat/godot-crystal-phase-11-production-cutover
+      - feat/godot-crystal-phase-12-mobile-hardening
+      - feat/godot-crystal-phase-13-device-acceptance
+      - feat/godot-crystal-phase-14-release-control
+      - feat/godot-crystal-phase-15-release-candidate
+    paths:
+      - 'godot/evolution-engine/**'
+      - 'src/features/home/godot3d/**'
+      - 'src/features/home/crystal3d/evolution/**'
+      - 'e2e/godot/**'
+      - 'scripts/generate-godot-release-candidate.mjs'
+      - 'playwright.godot.config.ts'
+      - 'vite.config.ts'
+      - 'vercel.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.env.local.example'
+      - '.github/workflows/godot-evolution-engine.yml'
+  pull_request:
+    paths:
+      - 'godot/evolution-engine/**'
+      - 'src/features/home/godot3d/**'
+      - 'src/features/home/crystal3d/evolution/**'
+      - 'e2e/godot/**'
+      - 'scripts/generate-godot-release-candidate.mjs'
+      - 'playwright.godot.config.ts'
+      - 'vite.config.ts'
+      - 'vercel.json'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.env.local.example'
+      - '.github/workflows/godot-evolution-engine.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Godot 4.7.1 and Web templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 30 --continue-at - \
+            --output /tmp/godot.zip \
+            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 30 --continue-at - \
+            --output /tmp/godot-templates.tpz \
+            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          sudo ln -s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 /usr/local/bin/godot
+
+          rm -rf /tmp/godot-export-templates
+          mkdir -p /tmp/godot-export-templates
+          unzip -q /tmp/godot-templates.tpz -d /tmp/godot-export-templates
+          template_source=/tmp/godot-export-templates
+          if [[ -d /tmp/godot-export-templates/templates ]]; then
+            template_source=/tmp/godot-export-templates/templates
+          fi
+          template_target="$HOME/.local/share/godot/export_templates/4.7.1.stable"
+          mkdir -p "$template_target"
+          cp -R "$template_source"/. "$template_target"/
+
+          godot --version
+          test -f "$template_target/web_release.zip"
+
+      - name: Import and parse project
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot/evolution-engine --editor --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-import.log; then
+            exit 1
+          fi
+
+      - name: Run Crystal Phase 1–13 runtime smoke suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_smoke() {
+            local script="$1"
+            local expected="$2"
+            local log="/tmp/${script%.gd}.log"
+            timeout 60s godot --headless \
+              --path godot/evolution-engine \
+              --script "res://scripts/tests/$script" \
+              2>&1 | tee "$log"
+            if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' "$log"; then
+              exit 1
+            fi
+            grep -Fq "$expected" "$log"
+          }
+
+          run_smoke determinism_smoke.gd 'PASS: deterministic crystal rebuild'
+          run_smoke growth_hierarchy_smoke.gd 'PASS: crystal growth hierarchy'
+          run_smoke semantic_pressure_smoke.gd 'PASS: crystal semantic pressure'
+          run_smoke colony_accumulation_smoke.gd 'PASS: crystal colony accumulation'
+          run_smoke life_engine_smoke.gd 'PASS: crystal life engine'
+          run_smoke visual_polish_smoke.gd 'PASS: crystal visual polish'
+          run_smoke integrated_fusion_smoke.gd 'PASS: integrated crystal fusion'
+          run_smoke portal_cutover_smoke.gd 'PASS: Godot portal production cutover; Phase 13 interaction evidence'
+          run_smoke mobile_runtime_smoke.gd 'PASS: Phase 12 mobile runtime hardening'
+
+      - name: Export Web runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/amore-godot-web
+          mkdir -p /tmp/amore-godot-web
+          godot --headless \
+            --path godot/evolution-engine \
+            --export-release Web \
+            /tmp/amore-godot-web/index.html \
+            2>&1 | tee /tmp/godot-export.log
+
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script|ERROR: Cannot export' /tmp/godot-export.log; then
+            exit 1
+          fi
+          for file in index.html index.js index.wasm index.pck; do
+            test -s "/tmp/amore-godot-web/$file"
+          done
+          grep -q 'AmoreGodotBridge' /tmp/amore-godot-web/index.html
+          grep -q 'capabilitiesJson' /tmp/amore-godot-web/index.html
+          grep -q 'takeLifecycle' /tmp/amore-godot-web/index.html
+          find /tmp/amore-godot-web -maxdepth 1 -type f -printf '%f %s bytes\n' \
+            | sort | tee /tmp/amore-godot-web/build-manifest.txt
+
+      - name: Upload raw Web runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: amore-godot-web-${{ github.sha }}
+          path: /tmp/amore-godot-web
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install React and Playwright test package
+        run: |
+          npm ci
+          npm install --no-save --no-package-lock @playwright/test@1.61.1
+
+      - name: Select preinstalled Chromium
+        shell: bash
+        run: |
+          set -euo pipefail
+          browser_path=''
+          for candidate in chromium google-chrome google-chrome-stable; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+              browser_path="$(command -v "$candidate")"
+              break
+            fi
+          done
+          test -n "$browser_path"
+          "$browser_path" --version
+          echo "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=$browser_path" >> "$GITHUB_ENV"
+
+      - name: Stage Godot runtime and Phase 15 manifest for Vite
+        env:
+          GODOT_RC_ROOT: public/godot/evolution-engine
+          GODOT_RC_RELEASE_ID: ci-phase15-automation
+          GODOT_RC_ACCEPTANCE_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          GODOT_RC_BUILD_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf public/godot/evolution-engine
+          mkdir -p public/godot/evolution-engine
+          cp -R /tmp/amore-godot-web/. public/godot/evolution-engine/
+          node scripts/generate-godot-release-candidate.mjs
+          test -s public/godot/evolution-engine/release-manifest.json
+          test "$(jq -r '.releaseId' public/godot/evolution-engine/release-manifest.json)" = 'ci-phase15-automation'
+          test "$(jq -r '.assets | length' public/godot/evolution-engine/release-manifest.json)" = '4'
+
+      - name: Run React, TypeScript and Phase 15 release-candidate tests
+        run: npm test
+
+      - name: Build Phase 15 approved-fixture bundle
+        env:
+          VITE_EVOLUTION_GODOT: production
+          VITE_EVOLUTION_GODOT_ROLLOUT: 100
+          VITE_EVOLUTION_GODOT_RELEASE_STAGE: released-100
+          VITE_EVOLUTION_GODOT_RELEASE_ID: ci-phase15-automation
+          VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          VITE_EVOLUTION_GODOT_KILL_SWITCH: off
+          GODOT_RC_ROOT: dist/godot/evolution-engine
+          GODOT_RC_RELEASE_ID: ci-phase15-automation
+          GODOT_RC_ACCEPTANCE_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          GODOT_RC_BUILD_SHA: ${{ github.sha }}
+        run: |
+          npm run build
+          node scripts/generate-godot-release-candidate.mjs
+          test -s dist/godot/evolution-engine/index.html
+          test -s dist/godot/evolution-engine/index.wasm
+          test -s dist/godot/evolution-engine/index.pck
+          test -s dist/godot/evolution-engine/release-manifest.json
+          test "$(jq -r '.acceptanceDigest' dist/godot/evolution-engine/release-manifest.json)" = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+
+      - name: Run Phase 15 browser release and rollback proof
+        env:
+          VITE_EVOLUTION_GODOT: production
+          VITE_EVOLUTION_GODOT_ROLLOUT: 100
+          VITE_EVOLUTION_GODOT_RELEASE_STAGE: released-100
+          VITE_EVOLUTION_GODOT_RELEASE_ID: ci-phase15-automation
+          VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          VITE_EVOLUTION_GODOT_KILL_SWITCH: off
+        run: npx playwright test --config=playwright.godot.config.ts
+
+      - name: Build Phase 15 automation report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          preflight='test-results/phase15-release-candidate-preflight.png'
+          rollback='test-results/phase15-rollback-drill.png'
+          workflow='test-results/phase13-automation-workflow-pass.png'
+          if [[ -s "$preflight" && -s "$rollback" && -s "$workflow" ]]; then
+            cat > test-results/phase15-release-candidate-proof.html <<'HTML'
+          <!doctype html>
+          <html lang="uk"><head><meta charset="utf-8"><title>Crystal Phase 15 release candidate proof</title>
+          <style>body{font-family:system-ui;background:#111;color:#fff;margin:24px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}img{width:100%;border-radius:18px;border:1px solid #555}h2{font-size:18px}@media(max-width:900px){.grid{grid-template-columns:1fr}}</style></head>
+          <body><h1>Crystal Phase 15 — release candidate automation proof</h1><div class="grid">
+          <section><h2>Manifest preflight</h2><img src="phase15-release-candidate-preflight.png"></section>
+          <section><h2>Rollback drill</h2><img src="phase15-rollback-drill.png"></section>
+          <section><h2>30-sample workflow</h2><img src="phase13-automation-workflow-pass.png"></section>
+          </div><p>The manifest binds the exact Godot assets to one release ID, build SHA and physical-report digest. CI uses a synthetic digest and does not claim physical acceptance.</p></body></html>
+          HTML
+          fi
+
+      - name: Upload Phase 15 release-candidate proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: amore-godot-phase15-release-candidate-proof-${{ github.sha }}
+          path: |
+            test-results/
+            playwright-report-godot/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload deployable Phase 15 release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: amore-godot-phase15-release-candidate-${{ github.sha }}
+          path: |
+            dist/
+            vercel.json
+          if-no-files-found: error
+          retention-days: 14

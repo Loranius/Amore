@@ -1,0 +1,31 @@
+; Engine configuration file.
+; Amore Evolution Engine — Godot 4.7.1
+config_version=5
+
+[application]
+
+config/name="Amore Evolution Engine"
+config/description="Deterministic procedural Crystal, Tree and Reef runtime for Amore"
+run/main_scene="res://scenes/evolution_engine.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+
+[display]
+
+window/size/viewport_width=1080
+window/size/viewport_height=1920
+window/size/window_width_override=540
+window/size/window_height_override=960
+window/stretch/mode="canvas_items"
+window/handheld/orientation=1
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method.web="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+environment/defaults/default_clear_color=Color(0.012, 0.016, 0.035, 1)
+
+[physics]
+
+common/enable_pause_aware_picking=true

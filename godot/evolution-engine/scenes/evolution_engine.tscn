@@ -1,0 +1,114 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/runtime/evolution_runtime.gd" id="1_runtime"]
+[ext_resource type="Script" path="res://scripts/runtime/orbit_camera.gd" id="2_camera"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_crystal"]
+sky_top_color = Color(0.022, 0.03, 0.066, 1)
+sky_horizon_color = Color(0.052, 0.058, 0.11, 1)
+sky_curve = 0.58
+sky_energy_multiplier = 0.84
+ground_bottom_color = Color(0.024, 0.029, 0.058, 1)
+ground_horizon_color = Color(0.052, 0.058, 0.11, 1)
+ground_curve = 0.56
+ground_energy_multiplier = 0.72
+sun_angle_max = 6.0
+sun_curve = 0.1
+energy_multiplier = 1.0
+use_debanding = true
+
+[sub_resource type="Sky" id="Sky_crystal"]
+radiance_size = 1
+sky_material = SubResource("ProceduralSkyMaterial_crystal")
+
+[sub_resource type="Environment" id="Environment_main"]
+background_mode = 2
+background_energy_multiplier = 1.0
+sky = SubResource("Sky_crystal")
+ambient_light_source = 3
+ambient_light_color = Color(0.19, 0.22, 0.34, 1)
+ambient_light_energy = 0.48
+ambient_light_sky_contribution = 0.86
+reflected_light_source = 2
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.13
+
+[sub_resource type="StyleBoxFlat" id="Style_status"]
+bg_color = Color(0.018, 0.024, 0.052, 0.7)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.42, 0.5, 0.78, 0.28)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[node name="EvolutionEngine" type="Node3D"]
+script = ExtResource("1_runtime")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_main")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-38, -32, 0)
+light_color = Color(0.82, 0.9, 1, 1)
+light_energy = 1.0
+shadow_enabled = true
+shadow_blur = 3.4
+
+[node name="RimLight" type="OmniLight3D" parent="."]
+position = Vector3(-3.8, 4.6, -3.2)
+light_color = Color(0.48, 0.56, 0.9, 1)
+light_energy = 0.9
+omni_range = 9.5
+shadow_enabled = false
+
+[node name="WarmFill" type="OmniLight3D" parent="."]
+position = Vector3(3.8, 2.1, 4.4)
+light_color = Color(1, 0.72, 0.58, 1)
+light_energy = 0.58
+omni_range = 8.5
+shadow_enabled = false
+
+[node name="ArtifactRoot" type="Node3D" parent="."]
+position = Vector3(0, 0.16, 0)
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("2_camera")
+
+[node name="Camera3D" type="Camera3D" parent="CameraRig"]
+current = true
+fov = 39.0
+near = 0.05
+far = 80.0
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="SafeArea" type="MarginContainer" parent="UI"]
+offset_left = 18.0
+offset_top = 18.0
+offset_right = 438.0
+offset_bottom = 142.0
+
+[node name="StatusPanel" type="PanelContainer" parent="UI/SafeArea"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("Style_status")
+
+[node name="StatusMargin" type="MarginContainer" parent="UI/SafeArea/StatusPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
+
+[node name="StatusLabel" type="Label" parent="UI/SafeArea/StatusPanel/StatusMargin"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.89, 0.92, 1, 0.88)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.45)
+theme_override_constants/shadow_offset_x = 1
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 13
+text = "Godot 4.7.1 · loading Evolution Engine…"
