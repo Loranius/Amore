@@ -55,7 +55,7 @@ React host
             └─ JavaScriptBridge polling
                  └─ deterministic Godot rebuild
                       └─ amore:godot:state
-                           ├─ valid identity/history → accepted Godot renderer
+                           ├─ valid identity/events/history bounds → accepted Godot renderer
                            └─ mismatch/error/timeout → Three.js fallback
 ```
 
@@ -88,7 +88,9 @@ The runtime emits:
 - `amore:godot:activate`;
 - `amore:godot:error`.
 
-The accepted state message includes species, seed, canonical instruction count, rendered instruction count, history count, motion mode, phase and deterministic snapshot signature.
+The accepted state message includes species, seed, canonical instruction count, rendered instruction count, input-event count, canonical history count, motion mode, phase and deterministic snapshot signature.
+
+`input_events` counts only the portal Evolution Events received in the current payload. `history` is the complete append-only canonical history and may additionally include genesis records, so it must be equal to or greater than `input_events`.
 
 `amore:godot:activate` restores the portal action inside the iframe. A short tap or Enter/Space emits one activation; orbit drags and zoom gestures emit none.
 
@@ -98,10 +100,13 @@ React does not trust a message solely because its `type` is known. Phase 11 vali
 
 - species equals payload species;
 - seed equals payload seed;
-- history count equals payload event count;
+- input-event count equals payload event count;
+- canonical history count is no smaller than input-event count;
 - canonical instruction count is positive;
 - rendered instruction count cannot exceed canonical instruction count;
 - signature is present and bounded to the expected deterministic format.
+
+Lifecycle status is monotonic. A late `booting` or `engine-started` message cannot downgrade an already accepted runtime or overwrite a fatal fallback state.
 
 ## Controlled fallback
 
@@ -110,7 +115,7 @@ The host resolves to `three-fallback` after:
 1. iframe load failure;
 2. explicit Godot runtime error;
 3. startup timeout before accepted state;
-4. state identity or history mismatch.
+4. state identity, input-event or history-bound mismatch.
 
 This fallback changes only the renderer. It does not mutate Artifact DNA, Evolution Events, append-only history or Supabase state.
 
