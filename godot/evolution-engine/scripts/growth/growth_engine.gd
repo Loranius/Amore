@@ -3,6 +3,7 @@ extends RefCounted
 const Model = preload("res://scripts/core/evolution_model.gd")
 const CrystalSpecies = preload("res://scripts/species/crystal_species.gd")
 const CrystalGrowthHierarchy = preload("res://scripts/growth/crystal_growth_hierarchy.gd")
+const CrystalColonyAccumulator = preload("res://scripts/growth/crystal_colony_accumulator.gd")
 
 const COLLISION_ATTEMPTS := 12
 const SAMPLE_STEPS := [0.32, 0.58, 0.82, 1.0]
@@ -12,6 +13,7 @@ func rebuild(dna, source_events: Array):
 	var state := Model.EvolutionState.new(dna)
 	var species := CrystalSpecies.new()
 	var hierarchy := CrystalGrowthHierarchy.new()
+	var colonies := CrystalColonyAccumulator.new()
 	for genesis_instruction in species.create_genesis_instructions(dna):
 		state.append_instruction(genesis_instruction)
 
@@ -22,10 +24,22 @@ func rebuild(dna, source_events: Array):
 		var event = events[event_index]
 		var candidate = species.translate_event(dna, event, event_index, state)
 		candidate = hierarchy.apply(dna, candidate, event, event_index, state)
-		candidate = _resolve_competition(candidate, state)
+		candidate = colonies.apply(dna, candidate, event, event_index, state)
+		if colonies.is_aggregate(candidate):
+			candidate = _accept_aggregate(candidate)
+		else:
+			candidate = _resolve_competition(candidate, state)
 		state.append_instruction(candidate, event)
 
 	return state
+
+
+func _accept_aggregate(candidate):
+	candidate.metadata["collision_attempt"] = 0
+	candidate.metadata["growth_shadow"] = 0.0
+	candidate.metadata["competition_mode"] = "colony-aggregate"
+	candidate.metadata["competition_fallback"] = false
+	return candidate
 
 
 func _resolve_competition(candidate, state):
@@ -38,6 +52,7 @@ func _resolve_competition(candidate, state):
 		if _is_clear(candidate, state):
 			candidate.metadata["collision_attempt"] = attempt
 			candidate.metadata["growth_shadow"] = float(attempt) / float(COLLISION_ATTEMPTS)
+			candidate.metadata["competition_mode"] = "visible-column"
 			return candidate
 
 		var alternating_sign := -1.0 if attempt % 2 == 0 else 1.0
@@ -53,6 +68,7 @@ func _resolve_competition(candidate, state):
 	_apply_silhouette_floor(candidate)
 	candidate.metadata["collision_attempt"] = COLLISION_ATTEMPTS
 	candidate.metadata["growth_shadow"] = 1.0
+	candidate.metadata["competition_mode"] = "visible-column"
 	candidate.metadata["competition_fallback"] = true
 	return candidate
 
@@ -77,6 +93,10 @@ func _apply_silhouette_floor(candidate) -> void:
 
 func _is_clear(candidate, state) -> bool:
 	for existing in state.instructions:
+		if String(existing.metadata.get("render_mode", "visible")) == (
+			CrystalColonyAccumulator.RENDER_AGGREGATE
+		):
+			continue
 		# A child is intentionally allowed to overlap its parent close to the base;
 		# the geometry layer later turns that overlap into an organic merge.
 		if existing.id == candidate.parent_id:
