@@ -5,6 +5,7 @@ const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
 const CrystalMeshBuilder = preload("res://scripts/geometry/crystal_mesh_builder.gd")
 const CrystalFusionBuilder = preload("res://scripts/geometry/crystal_fusion_builder.gd")
 const CrystalColonyProjection = preload("res://scripts/geometry/crystal_colony_projection.gd")
+const CrystalLifeEngine = preload("res://scripts/life/crystal_life_engine.gd")
 const WebPortalBridge = preload("res://scripts/runtime/web_portal_bridge.gd")
 
 @onready var artifact_root: Node3D = $ArtifactRoot
@@ -12,10 +13,16 @@ const WebPortalBridge = preload("res://scripts/runtime/web_portal_bridge.gd")
 
 var current_state = null
 var web_bridge = null
+var life_engine = null
 var current_projected_count := 0
+var current_reduced_motion := false
 
 
 func _ready() -> void:
+	life_engine = CrystalLifeEngine.new()
+	life_engine.name = "CrystalLifeEngine"
+	add_child(life_engine)
+
 	web_bridge = WebPortalBridge.new()
 	web_bridge.name = "WebPortalBridge"
 	web_bridge.payload_received.connect(_on_web_payload_received)
@@ -49,8 +56,19 @@ func rebuild_from_payload(payload: Dictionary, source: String = "runtime") -> bo
 		if typeof(event_payload) == TYPE_DICTIONARY:
 			events.append(Model.EvolutionEvent.from_dictionary(event_payload))
 
-	current_state = GrowthEngine.new().rebuild(dna, events)
-	_render_state()
+	var previous_ids: Dictionary = _instruction_id_set(current_state)
+	var next_state = GrowthEngine.new().rebuild(dna, events)
+	var cues: Dictionary = _new_growth_cues(previous_ids, next_state, source)
+	current_state = next_state
+	current_reduced_motion = bool(dna.traits.get("reduced_motion", false))
+	if web_bridge != null:
+		current_reduced_motion = (
+			current_reduced_motion or web_bridge.prefers_reduced_motion()
+		)
+	_render_state(
+		Dictionary(cues.get("reveal", {})),
+		Dictionary(cues.get("impact", {})),
+	)
 	_update_status(source)
 	_post_runtime_state(source)
 	print("AMORE_EVOLUTION_SNAPSHOT=" + canonical_snapshot_json())
@@ -63,7 +81,9 @@ func canonical_snapshot_json() -> String:
 	return JSON.stringify(current_state.canonical_snapshot())
 
 
-func _render_state() -> void:
+func _render_state(reveal_ids: Dictionary, impact_ids: Dictionary) -> void:
+	if life_engine != null:
+		life_engine.clear_entries()
 	for child in artifact_root.get_children():
 		child.free()
 
@@ -71,6 +91,8 @@ func _render_state() -> void:
 	var fusion_builder := CrystalFusionBuilder.new()
 	var projected: Array = CrystalColonyProjection.new().build(current_state)
 	current_projected_count = projected.size()
+	if life_engine != null:
+		life_engine.configure(current_state.dna.seed, current_reduced_motion)
 	if not projected.is_empty():
 		artifact_root.add_child(
 			fusion_builder.create_foundation_instance(projected[0]),
@@ -83,6 +105,45 @@ func _render_state() -> void:
 		var crystal_instance: MeshInstance3D = crystal_builder.create_mesh_instance(instruction)
 		_apply_crystal_shadow_policy(crystal_instance)
 		artifact_root.add_child(crystal_instance)
+		if life_engine != null:
+			life_engine.register_instance(
+				crystal_instance,
+				instruction,
+				reveal_ids.has(instruction.id),
+				impact_ids.has(instruction.id),
+			)
+
+
+func _new_growth_cues(previous_ids: Dictionary, next_state, source: String) -> Dictionary:
+	var reveal: Dictionary = {}
+	var impact: Dictionary = {}
+	if source == "demo":
+		return {"reveal": reveal, "impact": impact}
+
+	for instruction in next_state.instructions:
+		if previous_ids.has(instruction.id):
+			continue
+		if String(instruction.metadata.get("role", "")) != "event-growth":
+			continue
+		if String(instruction.metadata.get("render_mode", "visible")) == "aggregate-only":
+			var target_id: String = String(
+				instruction.metadata.get("colony_target_id", ""),
+			)
+			if not target_id.is_empty():
+				impact[target_id] = true
+		else:
+			reveal[instruction.id] = true
+			impact[instruction.id] = true
+	return {"reveal": reveal, "impact": impact}
+
+
+func _instruction_id_set(state) -> Dictionary:
+	var ids: Dictionary = {}
+	if state == null:
+		return ids
+	for instruction in state.instructions:
+		ids[instruction.id] = true
+	return ids
 
 
 func _apply_crystal_shadow_policy(instance: MeshInstance3D) -> void:
@@ -99,13 +160,14 @@ func _apply_crystal_shadow_policy(instance: MeshInstance3D) -> void:
 
 
 func _update_status(source: String) -> void:
+	var motion_label := "reduced motion" if current_reduced_motion else "life active"
 	status_label.text = (
-		"Godot 4.7.1 · Crystal Phase 8\n"
+		"Godot 4.7.1 · Crystal Phase 9\n"
 		+ "%d canonical · %d rendered bodies\n" % [
 			current_state.instructions.size(),
 			current_projected_count,
 		]
-		+ "seed %d · %s rebuild" % [current_state.dna.seed, source]
+		+ "seed %d · %s · %s" % [current_state.dna.seed, source, motion_label]
 	)
 
 
@@ -123,6 +185,8 @@ func _post_runtime_state(source: String) -> void:
 		"instructions": current_state.instructions.size(),
 		"rendered_instructions": current_projected_count,
 		"history": current_state.history.size(),
+		"motion": "reduced" if current_reduced_motion else "full",
+		"life_version": CrystalLifeEngine.VERSION,
 		"signature": snapshot_json.sha256_text().substr(0, 16),
 	})
 
