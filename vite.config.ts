@@ -12,6 +12,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 // підставляє CI через BASE_PATH (див. .github/workflows/deploy.yml). Локально
 // й на кореневому домені лишається '/'.
 const base = process.env.BASE_PATH ?? '/';
+const godotReleaseCacheKey = (
+  process.env.VITE_EVOLUTION_GODOT_RELEASE_ID
+  || 'preview'
+).replace(/[^a-z0-9._-]/gi, '-').slice(0, 64);
 
 export default defineConfig({
   plugins: [
@@ -44,9 +48,10 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: /\/godot\/evolution-engine\//,
-            handler: 'CacheFirst',
+            handler: 'NetworkFirst',
             options: {
-              cacheName: 'godot-evolution-engine',
+              cacheName: `godot-evolution-engine-${godotReleaseCacheKey}`,
+              networkTimeoutSeconds: 10,
               cacheableResponse: { statuses: [0, 200] },
               expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 30 },
             },
