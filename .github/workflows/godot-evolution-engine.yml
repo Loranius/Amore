@@ -136,6 +136,20 @@ jobs:
           fi
           grep -q 'PASS: crystal colony accumulation' /tmp/godot-colony-smoke.log
 
+      - name: Run Crystal life engine smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60s godot --headless \
+            --path godot/evolution-engine \
+            --script res://scripts/tests/life_engine_smoke.gd \
+            2>&1 | tee /tmp/godot-life-smoke.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-life-smoke.log; then
+            echo 'Godot reported script parser or loader errors during the life test.'
+            exit 1
+          fi
+          grep -q 'PASS: crystal life engine' /tmp/godot-life-smoke.log
+
       - name: Run integrated Crystal fusion smoke test
         shell: bash
         run: |
