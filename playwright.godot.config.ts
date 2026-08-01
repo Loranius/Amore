@@ -23,7 +23,7 @@ export default defineConfig({
     baseURL,
     locale: 'uk-UA',
     colorScheme: 'dark',
-    reducedMotion: 'reduce',
+    reducedMotion: 'no-preference',
     serviceWorkers: 'block',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
