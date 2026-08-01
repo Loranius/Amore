@@ -101,9 +101,7 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
       </div>
 
       <small>{report.privacy}</small>
-      <script type="application/json" data-godot-acceptance-report>
-        {reportJson}
-      </script>
+      <output hidden data-godot-acceptance-report>{reportJson}</output>
     </aside>
   );
 }
