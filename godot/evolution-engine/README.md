@@ -9,7 +9,7 @@ The accepted Three.js implementation is preserved at:
 - branch: `archive/threejs-evolution-engine-2026-07-31`
 - source commit: `0b9fda4187aa2d1e9bf80f4b0c56c296ea0e5480`
 
-Nothing in the existing React, Supabase or Three.js runtime is deleted by this bootstrap.
+Nothing in the existing React, Supabase or Three.js runtime is deleted by this migration. Phase 11 also keeps a live automatic Three.js fallback inside the Crystal route.
 
 ## Current vertical slice
 
@@ -27,13 +27,26 @@ The runnable Crystal slice generates a deterministic colony from:
 10. runtime-only Life Engine cues for idle light, new seed growth and colony impacts;
 11. browser `prefers-reduced-motion` support;
 12. a deterministic Phase 10 visual profile for mineral families, cloudy bases, pale terminations and oblique framing;
-13. a floor-free, dark-slate mobile Godot Compatibility renderer scene.
+13. a floor-free, dark-slate mobile Godot Compatibility renderer scene;
+14. a strict same-origin production handshake validated against species, seed and event history;
+15. automatic Three.js fallback for iframe, runtime, timeout or state-mismatch failure;
+16. tap and keyboard activation routed from the Godot canvas back to the existing React Memory modal.
 
-Every event remains present in canonical state and history. Aggregate events are not deleted or merged in storage; they are projected into an existing visible colony only at the renderer boundary. Life animation and Phase 10 presentation own only duplicated materials, vertex colours and local renderer transforms, never canonical geometry or history.
+Every event remains present in canonical state and history. Aggregate events are not deleted or merged in storage; they are projected into an existing visible colony only at the renderer boundary. Life animation and presentation own only duplicated materials, vertex colours and local renderer transforms, never canonical geometry or history.
 
-The current Web profile remains opaque for stable overlapping Crystal sorting. Phase 10 does not claim physical transmission or refraction; real optical expansion remains later work.
+The current Web profile remains opaque for stable overlapping Crystal sorting. It does not claim physical transmission or refraction; real optical expansion remains later work.
 
-Tree and Reef will reuse the same canonical event/state pipeline after the Crystal slice passes its remaining physical-device acceptance gates.
+Tree and Reef will reuse the same canonical event/state pipeline after the Crystal production cutover passes its remaining physical-device acceptance gates.
+
+## Runtime mode
+
+Set `VITE_EVOLUTION_GODOT` in the React environment:
+
+```text
+disabled   → Three.js
+preview    → opt-in Godot preview
+production → Godot production route with automatic Three.js fallback
+```
 
 ## Run locally
 
@@ -69,6 +82,17 @@ godot --headless \
 godot --headless \
   --path godot/evolution-engine \
   --script res://scripts/tests/integrated_fusion_smoke.gd
+
+godot --headless \
+  --path godot/evolution-engine \
+  --script res://scripts/tests/portal_cutover_smoke.gd
+```
+
+Production React verification requires an accepted Godot Web export staged under `public/godot/evolution-engine/`:
+
+```bash
+VITE_EVOLUTION_GODOT=production npm test
+VITE_EVOLUTION_GODOT=production npm run build
 ```
 
 ## Architectural boundary
@@ -88,10 +112,13 @@ Godot Evolution Runtime
         +-- Geometry builders
         +-- Deterministic visual profile
         +-- Runtime-only Life Engine
-        +-- Materials / Camera
+        +-- Materials / Camera / interaction bridge
         |
         v
-Web canvas embedded in Amore
+Same-origin Web canvas embedded in Amore
+        |
+        +-- accepted state → keep Godot
+        +-- fatal cutover failure → Three.js fallback
 ```
 
 Godot must not invent relationship history, mutate Supabase data, or own portal navigation.
