@@ -24,6 +24,10 @@ func configure(dna_seed: int, reduced_motion: bool) -> void:
 		_reset_to_static()
 
 
+func clear_entries() -> void:
+	_entries.clear()
+
+
 func register_instance(
 	instance: MeshInstance3D,
 	instruction,
