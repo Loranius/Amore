@@ -44,6 +44,12 @@ const payload: GodotEvolutionPayload = {
   ],
 };
 
+function queryFlag(name: string): boolean {
+  return ['1', 'true', 'on'].includes(
+    (new URLSearchParams(window.location.search).get(name) ?? '').toLowerCase(),
+  );
+}
+
 function GodotBridgeHarness() {
   const [activationCount, setActivationCount] = useState(0);
   const [interactionCount, setInteractionCount] = useState(0);
@@ -74,7 +80,7 @@ function GodotBridgeHarness() {
       <GodotEvolutionPreview
         payload={payload}
         enabled
-        healthFallbackEnabled
+        healthFallbackEnabled={queryFlag('healthFallback')}
         onMessage={onMessage}
         onFatalError={setFatalFailure}
       />
