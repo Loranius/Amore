@@ -76,7 +76,7 @@ func _render_state() -> void:
 		artifact_root.add_child(crystal_builder.create_mesh_instance(instruction))
 
 	for instruction in current_state.instructions:
-		if instruction.generation > 0:
+		if String(instruction.metadata.get("role", "")) == "event-growth":
 			artifact_root.add_child(fusion_builder.create_junction_instance(instruction))
 
 
