@@ -6,9 +6,11 @@ const CrystalMeshBuilder = preload("res://scripts/geometry/crystal_mesh_builder.
 const CrystalFusionBuilder = preload("res://scripts/geometry/crystal_fusion_builder.gd")
 const CrystalColonyProjection = preload("res://scripts/geometry/crystal_colony_projection.gd")
 const CrystalLifeEngine = preload("res://scripts/life/crystal_life_engine.gd")
+const CrystalVisualProfile = preload("res://scripts/presentation/crystal_visual_profile.gd")
 const WebPortalBridge = preload("res://scripts/runtime/web_portal_bridge.gd")
 
 @onready var artifact_root: Node3D = $ArtifactRoot
+@onready var status_panel: PanelContainer = $UI/SafeArea/StatusPanel
 @onready var status_label: Label = $UI/SafeArea/StatusPanel/StatusMargin/StatusLabel
 
 var current_state = null
@@ -87,6 +89,13 @@ func _render_state(reveal_ids: Dictionary, impact_ids: Dictionary) -> void:
 	for child in artifact_root.get_children():
 		child.free()
 
+	var visual_profile := CrystalVisualProfile.new()
+	artifact_root.rotation = Vector3(
+		deg_to_rad(visual_profile.default_tilt_degrees(current_state.dna.seed)),
+		deg_to_rad(visual_profile.default_yaw_degrees(current_state.dna.seed)),
+		0.0,
+	)
+
 	var crystal_builder := CrystalMeshBuilder.new()
 	var fusion_builder := CrystalFusionBuilder.new()
 	var projected: Array = CrystalColonyProjection.new().build(current_state)
@@ -147,22 +156,22 @@ func _instruction_id_set(state) -> Dictionary:
 
 
 func _apply_crystal_shadow_policy(instance: MeshInstance3D) -> void:
-	# Opaque Web rendering is retained for stable sorting, but a child Crystal
-	# must not paint a black contact shadow onto its parent inside the intentional
-	# fusion overlap. Direct lighting, facet normals, Sky reflections and cast
-	# shadows on the environment remain active.
+	# The mother may receive the softened key shadow for depth. Attached bodies
+	# retain the Phase 5 seam policy so intentional overlap never becomes a
+	# black contact band.
 	var array_mesh := instance.mesh as ArrayMesh
 	if array_mesh == null or array_mesh.get_surface_count() == 0:
 		return
 	var material := array_mesh.surface_get_material(0) as StandardMaterial3D
 	if material != null:
-		material.disable_receive_shadows = true
+		material.disable_receive_shadows = int(instance.get_meta("generation", 0)) > 0
 
 
 func _update_status(source: String) -> void:
 	var motion_label := "reduced motion" if current_reduced_motion else "life active"
+	status_panel.visible = source != "portal"
 	status_label.text = (
-		"Godot 4.7.1 · Crystal Phase 9\n"
+		"Godot 4.7.1 · Crystal Phase 10\n"
 		+ "%d canonical · %d rendered bodies\n" % [
 			current_state.instructions.size(),
 			current_projected_count,
@@ -187,6 +196,8 @@ func _post_runtime_state(source: String) -> void:
 		"history": current_state.history.size(),
 		"motion": "reduced" if current_reduced_motion else "full",
 		"life_version": CrystalLifeEngine.VERSION,
+		"visual_version": CrystalVisualProfile.VERSION,
+		"phase": 10,
 		"signature": snapshot_json.sha256_text().substr(0, 16),
 	})
 
