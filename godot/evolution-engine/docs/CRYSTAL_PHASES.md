@@ -249,3 +249,62 @@ Phase 8 requires:
 8. bounded projected gains;
 9. later events cannot rewrite any earlier canonical instruction or history row;
 10. parser/import, prior smoke tests, Web export and React bridge validation.
+
+## Phase 9 — Runtime-only Crystal Life Engine
+
+Phase 9 adds restrained life cues after canonical reconstruction and colony projection. The Life Engine may animate duplicated materials and local node transforms, but it may not modify Artifact DNA, Evolution Events, Growth Instructions, lineage, canonical geometry values or history.
+
+### Presentation cues
+
+- every visible Crystal receives a slow, seed-derived idle light phase;
+- a new visible colony seed reveals from its attachment plane over 1.05 seconds;
+- an aggregate deposit triggers a short impact pulse on its existing colony seed;
+- luminosity, polishing and energy influence bounded presentation amplitude;
+- idle phase and period are stable for the same DNA seed and instruction ID;
+- runtime elapsed time is deliberately excluded from canonical snapshots.
+
+The reveal uses local radial and axial scale only. It settles at `Vector3.ONE`, so the accepted renderer projection remains the final visible geometry after the cue completes.
+
+### Mobile bounds
+
+- idle emission factor: 0.94–1.18 × the accepted material baseline;
+- idle rim factor: 0.97–1.09 × baseline;
+- transient emission energy: maximum 0.045;
+- transient rim strength: maximum 0.22;
+- initial axial reveal scale: 0.12;
+- initial radial reveal scale: 0.72;
+- no animated transparency, particles, additional lights or per-frame mesh rebuilds.
+
+### Reduced motion
+
+The Web runtime reads `prefers-reduced-motion: reduce` through JavaScriptBridge. A canonical DNA trait named `reduced_motion` may also force the static path. In reduced-motion mode:
+
+- reveal scale resolves immediately to one;
+- impact flashes are disabled;
+- idle material modulation is disabled;
+- duplicated materials return to their accepted baseline values;
+- canonical and renderer output remain otherwise identical.
+
+### Rebuild cue routing
+
+```text
+new canonical instruction
+  ├─ visible colony seed → reveal + impact cue on its own body
+  └─ aggregate-only deposit → impact cue on colony_target_id
+```
+
+Repeating the same payload creates no new cue because instruction identity is already present in the previous accepted runtime state.
+
+### Acceptance gates
+
+Phase 9 requires:
+
+1. deterministic presentation sampling for equal seed, instruction and runtime time;
+2. all material and scale values inside explicit mobile bounds;
+3. reveal settles exactly at static presentation scale;
+4. aggregate deposits target an existing rendered colony rather than a new body;
+5. reduced motion produces a fully static sample;
+6. animation cannot mutate canonical snapshot JSON;
+7. one duplicated material per animated visible Crystal;
+8. no particles, transparency or per-frame mesh generation;
+9. parser/import, all prior smoke tests, Web export and React bridge validation.
