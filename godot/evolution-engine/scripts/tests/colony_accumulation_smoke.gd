@@ -109,12 +109,10 @@ func _run() -> void:
 		_fail("Colony failure: renderer still exposes every canonical event.")
 		return
 
-	var projected_by_id: Dictionary = {}
 	var enlarged_radius := false
 	var enlarged_length := false
 	var refined_surface := false
 	for instruction in projected:
-		projected_by_id[instruction.id] = instruction
 		var base_radius: float = float(instruction.metadata.get("colony_base_radius", instruction.radius))
 		var base_length: float = float(instruction.metadata.get("colony_base_length", instruction.length))
 		var radius_gain: float = float(instruction.metadata.get("colony_radius_gain_total", 0.0))
@@ -199,7 +197,8 @@ func _event(
 	channels: Dictionary,
 	activity: float,
 ):
-	var year: int = 2023 + index / 12
+	var year_offset: int = floori(float(index) / 12.0)
+	var year: int = 2023 + year_offset
 	var month: int = index % 12 + 1
 	return Model.EvolutionEvent.new(
 		id,
