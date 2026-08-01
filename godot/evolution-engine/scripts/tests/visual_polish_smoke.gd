@@ -71,8 +71,8 @@ func _run() -> void:
 		return
 	var yaw_a: float = profile.default_yaw_degrees(dna.seed)
 	var yaw_b: float = profile.default_yaw_degrees(dna.seed)
-	if not is_equal_approx(yaw_a, yaw_b) or absf(yaw_a) > 13.01:
-		_fail("Visual failure: default presentation angle is not deterministic or bounded.")
+	if not is_equal_approx(yaw_a, yaw_b) or yaw_a < 24.0 or yaw_a > 34.0:
+		_fail("Visual failure: default presentation angle is not deterministic or oblique.")
 		return
 
 	var palette_buckets: Dictionary = {}
@@ -92,6 +92,12 @@ func _run() -> void:
 		return
 
 	var mother = state.instructions[0]
+	var bias_a: Vector3 = profile.body_bias(mother)
+	var bias_b: Vector3 = profile.body_bias(mother)
+	if not bias_a.is_equal_approx(bias_b) or bias_a.length() > 0.08:
+		_fail("Visual failure: body bias is not deterministic or bounded.")
+		return
+
 	var mesh: ArrayMesh = CrystalMeshBuilder.new().create_mesh(mother)
 	if mesh == null or mesh.get_surface_count() != 1:
 		_fail("Visual failure: polished mother mesh is missing.")
@@ -158,6 +164,14 @@ func _run() -> void:
 		return
 	var world := scene.get_node("WorldEnvironment") as WorldEnvironment
 	var environment := world.environment
+	if environment.background_mode != Environment.BG_COLOR:
+		scene.free()
+		_fail("Visual failure: Phase 10 background must use explicit slate colour.")
+		return
+	if environment.background_color.get_luminance() < 0.015:
+		scene.free()
+		_fail("Visual failure: presentation background collapsed back to pure black.")
+		return
 	if environment.background_energy_multiplier < 0.75 or environment.background_energy_multiplier > 1.0:
 		scene.free()
 		_fail("Visual failure: background exposure is outside the accepted dark-slate range.")
