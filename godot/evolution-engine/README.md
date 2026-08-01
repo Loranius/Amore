@@ -30,21 +30,42 @@ The runtime provides:
 13. Phase 13 orbit/zoom/tap/keyboard interaction evidence;
 14. 30-sample device acceptance reports;
 15. sustained-performance Three.js fallback;
-16. stable percentage-based production cohorts.
+16. stable percentage-based production cohorts;
+17. Phase 14 blocked-by-default production release approval;
+18. SHA-256 binding to an exact frozen physical PASS report;
+19. fixed 5/25/50/100 rollout ceilings and an emergency kill switch.
 
-Every event remains present in canonical state and history. Renderer quality and health policies never alter growth instructions, colony membership or the deterministic snapshot signature.
+Every event remains present in canonical state and history. Renderer quality, health and release policies never alter growth instructions, colony membership or the deterministic snapshot signature.
 
-## Runtime and rollout mode
+## Runtime and release mode
 
 ```text
 VITE_EVOLUTION_GODOT=disabled   → Three.js
 VITE_EVOLUTION_GODOT=preview    → explicit Godot preview
-VITE_EVOLUTION_GODOT=production → Godot production route with fallback
-
-VITE_EVOLUTION_GODOT_ROLLOUT=0..100
+VITE_EVOLUTION_GODOT=production → Phase 14 release gate + cohort + fallback
 ```
 
-Production browsers receive a persistent anonymous cohort bucket, so a user does not randomly switch renderer between sessions.
+Production requires:
+
+```bash
+VITE_EVOLUTION_GODOT_RELEASE_STAGE=canary-5
+VITE_EVOLUTION_GODOT_RELEASE_ID=crystal-phase14-20260801
+VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256=<SHA-256 of exact frozen PHYSICAL PASS JSON>
+VITE_EVOLUTION_GODOT_KILL_SWITCH=off
+VITE_EVOLUTION_GODOT_ROLLOUT=5
+```
+
+Allowed stage ceilings:
+
+| Stage | Maximum effective rollout |
+| --- | ---: |
+| `blocked` | 0% |
+| `canary-5` | 5% |
+| `ramp-25` | 25% |
+| `ramp-50` | 50% |
+| `released-100` | 100% |
+
+The lower value between the requested rollout and the stage ceiling wins. A persistent anonymous cohort bucket prevents random renderer switching between sessions. `VITE_EVOLUTION_GODOT_KILL_SWITCH=on` always forces Three.js.
 
 An optional runtime-only DNA trait may request a presentation tier:
 
@@ -62,7 +83,7 @@ An optional runtime-only DNA trait may request a presentation tier:
 | balanced | 0.86 | 30 Hz | on | on |
 | economy | 0.72 | 20 Hz | off | off |
 
-## Device diagnostics
+## Device diagnostics and release candidate
 
 Open a deployed preview with:
 
@@ -77,7 +98,7 @@ The report distinguishes:
 - `WORKFLOW PASS` — automated bridge/lifecycle/interaction proof;
 - `PHYSICAL PASS` — healthy telemetry from a non-automated real device.
 
-CI software rendering can never claim physical acceptance.
+CI software rendering can never claim physical acceptance. After a real `PHYSICAL PASS`, the `Зафіксувати release candidate` action freezes the exact report bytes, calculates SHA-256 and generates the initial 5% canary environment block.
 
 ## Run locally
 
@@ -100,19 +121,25 @@ godot --headless --path godot/evolution-engine --script res://scripts/tests/mobi
 React/Web verification:
 
 ```bash
-VITE_EVOLUTION_GODOT=production VITE_EVOLUTION_GODOT_ROLLOUT=100 npm test
-VITE_EVOLUTION_GODOT=production VITE_EVOLUTION_GODOT_ROLLOUT=100 npm run build
+npm test
+npm run build
 npx playwright test --config=playwright.godot.config.ts
 ```
+
+A production build without a valid Phase 14 release environment intentionally renders Three.js.
 
 ## Architectural boundary
 
 ```text
 React / Vite / Supabase
         |
-        | serialized Artifact DNA + Evolution Events
+        | physical report digest + release stage + stable cohort
         v
-Godot Evolution Runtime
+Phase 14 release control
+        |
+        | accepted Artifact DNA + Evolution Events
+        v
+Godot Evolution Runtime (accepted Phase 13 runtime)
         |
         +-- deterministic growth and geometry
         +-- visual profile and Life Engine
@@ -121,8 +148,8 @@ Godot Evolution Runtime
         v
 Same-origin Web canvas
         |
-        +-- accepted and healthy → keep Godot
-        +-- non-rollout cohort → Three.js
+        +-- approved, accepted and healthy → keep Godot
+        +-- closed gate / non-cohort → Three.js
         +-- sustained critical health → Three.js fallback
         +-- fatal bridge failure → Three.js fallback
 ```
@@ -131,5 +158,6 @@ See:
 
 - `docs/CRYSTAL_PHASE_11.md` — production portal cutover;
 - `docs/CRYSTAL_PHASE_12.md` — mobile runtime hardening;
-- `docs/CRYSTAL_PHASE_13.md` — physical acceptance and progressive rollout;
+- `docs/CRYSTAL_PHASE_13.md` — physical acceptance and workflow proof;
+- `docs/CRYSTAL_PHASE_14.md` — auditable release control and staged promotion;
 - `docs/WEB_RUNTIME_BRIDGE.md` — same-origin bridge contract.
