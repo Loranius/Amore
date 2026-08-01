@@ -147,6 +147,9 @@ export function GodotEvolutionPreview({
       }
 
       const message = event.data;
+      if (message.type === 'amore:godot:state' && message.source !== 'portal') {
+        return;
+      }
       onMessage?.(message);
 
       switch (message.type) {
