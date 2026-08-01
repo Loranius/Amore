@@ -14,6 +14,7 @@ import {
 import {
   GODOT_EVOLUTION_ENABLED,
   GODOT_EVOLUTION_MODE,
+  GODOT_EVOLUTION_RELEASE_CONTROL,
   GODOT_EVOLUTION_ROLLOUT_ELIGIBLE,
   GODOT_EVOLUTION_ROLLOUT_PERCENT,
 } from '../../godot3d/godotFeatureFlag';
@@ -94,6 +95,7 @@ export default function EvolutionCrystalPreviewScene() {
   const badge = renderer === 'godot'
     ? [
         GODOT_EVOLUTION_MODE === 'production' ? 'Godot production' : 'Godot preview',
+        GODOT_EVOLUTION_RELEASE_CONTROL.stage,
         `rollout ${GODOT_EVOLUTION_ROLLOUT_PERCENT}%`,
         godotState ? `${godotState.instructions} канон.` : 'runtime…',
         godotState?.rendered_instructions !== undefined
@@ -109,9 +111,11 @@ export default function EvolutionCrystalPreviewScene() {
           `${formatTopology(metrics.usedTriangles)} △`,
         ].join(' · ')
       : [
-          GODOT_EVOLUTION_MODE === 'production' && !GODOT_EVOLUTION_ROLLOUT_ELIGIBLE
-            ? 'Three rollout cohort'
-            : 'Evolution',
+          GODOT_EVOLUTION_MODE === 'production' && !GODOT_EVOLUTION_RELEASE_CONTROL.gateOpen
+            ? `Three release gate · ${GODOT_EVOLUTION_RELEASE_CONTROL.reason}`
+            : GODOT_EVOLUTION_MODE === 'production' && !GODOT_EVOLUTION_ROLLOUT_ELIGIBLE
+              ? 'Three rollout cohort'
+              : 'Evolution',
           metrics.quality,
           `${metrics.meshCount} тіл`,
           `${formatTopology(metrics.usedTriangles)} △`,
@@ -147,6 +151,11 @@ export default function EvolutionCrystalPreviewScene() {
         data-evolution-godot-failure={godotFailure ?? ''}
         data-evolution-godot-rollout={GODOT_EVOLUTION_ROLLOUT_PERCENT}
         data-evolution-godot-cohort={String(GODOT_EVOLUTION_ROLLOUT_ELIGIBLE)}
+        data-evolution-godot-release-stage={GODOT_EVOLUTION_RELEASE_CONTROL.stage}
+        data-evolution-godot-release-gate={String(GODOT_EVOLUTION_RELEASE_CONTROL.gateOpen)}
+        data-evolution-godot-release-reason={GODOT_EVOLUTION_RELEASE_CONTROL.reason}
+        data-evolution-godot-release-id={GODOT_EVOLUTION_RELEASE_CONTROL.releaseId}
+        data-evolution-godot-kill-switch={String(GODOT_EVOLUTION_RELEASE_CONTROL.killSwitch)}
       >
         {useGodot && godotPayload ? (
           <GodotEvolutionPreview
@@ -201,3 +210,5 @@ export default function EvolutionCrystalPreviewScene() {
     </>
   );
 }
+
+export default EvolutionCrystalPreviewScene;
