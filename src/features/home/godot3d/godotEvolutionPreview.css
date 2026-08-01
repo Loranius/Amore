@@ -39,10 +39,153 @@
   backdrop-filter: blur(10px);
 }
 
+.godot-device-acceptance {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  left: 12px;
+  z-index: 3;
+  display: grid;
+  gap: 10px;
+  max-height: calc(100% - 24px);
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid rgba(168, 142, 255, 0.28);
+  border-radius: 20px;
+  background: rgba(7, 9, 20, 0.91);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.38);
+  color: rgba(244, 241, 255, 0.92);
+  font-size: 12px;
+  backdrop-filter: blur(18px);
+}
+
+.godot-device-acceptance__heading,
+.godot-device-acceptance__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.godot-device-acceptance__heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.godot-device-acceptance__eyebrow {
+  color: rgba(193, 178, 255, 0.72);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.godot-device-acceptance__verdict {
+  padding: 5px 8px;
+  border: 1px solid rgba(245, 194, 105, 0.28);
+  border-radius: 999px;
+  background: rgba(245, 194, 105, 0.1);
+  color: rgba(255, 223, 164, 0.95);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.godot-device-acceptance__verdict[data-status="passed"],
+.godot-device-acceptance__verdict[data-status="healthy"] {
+  border-color: rgba(107, 224, 161, 0.3);
+  background: rgba(107, 224, 161, 0.1);
+  color: rgba(156, 245, 196, 0.96);
+}
+
+.godot-device-acceptance__verdict[data-status="critical"] {
+  border-color: rgba(255, 111, 135, 0.34);
+  background: rgba(255, 111, 135, 0.11);
+  color: rgba(255, 174, 188, 0.96);
+}
+
+.godot-device-acceptance__metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.godot-device-acceptance__metrics span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  padding: 7px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+  color: rgba(218, 213, 239, 0.68);
+  font-size: 9px;
+  text-align: center;
+}
+
+.godot-device-acceptance__metrics b {
+  overflow: hidden;
+  color: rgba(247, 244, 255, 0.95);
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+
+.godot-device-acceptance__criteria {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+}
+
+.godot-device-acceptance__criteria span {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: rgba(214, 208, 234, 0.66);
+  font-size: 10px;
+}
+
+.godot-device-acceptance__criteria span[data-passed="true"] {
+  color: rgba(183, 239, 207, 0.88);
+}
+
+.godot-device-acceptance__criteria i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  font-style: normal;
+  line-height: 14px;
+  text-align: center;
+}
+
+.godot-device-acceptance__actions button {
+  flex: 1;
+  min-height: 32px;
+  border: 1px solid rgba(181, 162, 255, 0.22);
+  border-radius: 10px;
+  background: rgba(139, 111, 231, 0.12);
+  color: rgba(242, 238, 255, 0.9);
+  font: inherit;
+  font-weight: 650;
+}
+
+.godot-device-acceptance small {
+  color: rgba(204, 198, 225, 0.48);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
 @media (max-width: 640px) {
   .godot-evolution-preview {
     min-height: 480px;
     border-radius: 24px;
+  }
+
+  .godot-device-acceptance__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .godot-device-acceptance__criteria {
+    grid-template-columns: 1fr;
   }
 }
 
