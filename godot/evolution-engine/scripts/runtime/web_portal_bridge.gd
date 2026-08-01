@@ -33,6 +33,16 @@ func _process(delta: float) -> void:
 		payload_received.emit(String(queued_payload))
 
 
+func prefers_reduced_motion() -> bool:
+	if not _active:
+		return false
+	var preference = JavaScriptBridge.eval(
+		"Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)",
+		true,
+	)
+	return bool(preference) if typeof(preference) == TYPE_BOOL else false
+
+
 func post_message(message: Dictionary) -> void:
 	if not _active:
 		return
