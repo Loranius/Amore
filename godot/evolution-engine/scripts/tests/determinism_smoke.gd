@@ -4,6 +4,7 @@ const Model = preload("res://scripts/core/evolution_model.gd")
 const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
 const CrystalSpecies = preload("res://scripts/species/crystal_species.gd")
 const CrystalMeshBuilder = preload("res://scripts/geometry/crystal_mesh_builder.gd")
+const CrystalFusionBuilder = preload("res://scripts/geometry/crystal_fusion_builder.gd")
 
 
 func _init() -> void:
@@ -116,6 +117,11 @@ func _run() -> void:
 		_fail(morphology_error)
 		return
 
+	var fusion_error := _validate_fusion(first_state.instructions)
+	if not fusion_error.is_empty():
+		_fail(fusion_error)
+		return
+
 	var environment_error := _validate_environment()
 	if not environment_error.is_empty():
 		_fail(environment_error)
@@ -160,31 +166,9 @@ func _validate_morphology(instructions: Array) -> String:
 		if bounds.size.x < instruction.radius * 1.35 or bounds.size.z < instruction.radius * 1.35:
 			return "Geometry failure: crystal morphology collapsed laterally."
 
-		var arrays: Array = mesh.surface_get_arrays(0)
-		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-		var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-		if vertices.is_empty() or vertices.size() != normals.size():
-			return "Geometry failure: vertex and normal buffers are inconsistent."
-		var directional_samples := 0
-		var outward_samples := 0
-		for vertex_index in range(vertices.size()):
-			var normal: Vector3 = normals[vertex_index]
-			if normal.length() < 0.98 or normal.length() > 1.02:
-				return "Geometry failure: facet normal is not normalized."
-			var vertex: Vector3 = vertices[vertex_index]
-			var radial := Vector3(vertex.x, 0.0, vertex.z)
-			if radial.length_squared() < instruction.radius * instruction.radius * 0.1:
-				continue
-			if absf(normal.y) > 0.97:
-				continue
-			directional_samples += 1
-			if normal.dot(radial.normalized()) > 0.0:
-				outward_samples += 1
-		if directional_samples == 0:
-			return "Geometry failure: no directional normal samples were found."
-		var outward_ratio: float = float(outward_samples) / float(directional_samples)
-		if outward_ratio < 0.72:
-			return "Geometry failure: facet normals are not predominantly outward."
+		var normal_error := _validate_outward_normals(mesh, Vector3.ZERO, instruction.radius)
+		if not normal_error.is_empty():
+			return normal_error
 
 		var material := mesh.surface_get_material(0) as StandardMaterial3D
 		if material == null:
@@ -202,6 +186,165 @@ func _validate_morphology(instructions: Array) -> String:
 		if material.emission_energy_multiplier > 0.03:
 			return "Material failure: internal emission exceeds the mobile bound."
 
+	return ""
+
+
+func _validate_fusion(instructions: Array) -> String:
+	if instructions.is_empty():
+		return "Fusion failure: no mother instruction is available."
+	var builder = CrystalFusionBuilder.new()
+	var mother = instructions[0]
+	var foundation_radius: float = float(mother.metadata.get("foundation_radius_ratio", -1.0))
+	var foundation_height: float = float(mother.metadata.get("foundation_height_ratio", -1.0))
+	var foundation_irregularity: float = float(
+		mother.metadata.get("foundation_irregularity", -1.0),
+	)
+	var foundation_sides: int = int(mother.metadata.get("foundation_sides", 0))
+	if foundation_radius < 1.42 or foundation_radius > 1.72:
+		return "Fusion failure: foundation radius ratio is outside bounds."
+	if foundation_height < 0.58 or foundation_height > 0.86:
+		return "Fusion failure: foundation height ratio is outside bounds."
+	if foundation_irregularity < 0.035 or foundation_irregularity > 0.14:
+		return "Fusion failure: foundation irregularity is outside bounds."
+	if foundation_sides < 9 or foundation_sides > 14:
+		return "Fusion failure: foundation side count is outside bounds."
+
+	var foundation_mesh: ArrayMesh = builder.create_foundation_mesh(mother)
+	if foundation_mesh == null or foundation_mesh.get_surface_count() != 1:
+		return "Fusion failure: foundation mesh surface is missing."
+	var foundation_bounds: AABB = foundation_mesh.get_aabb()
+	if foundation_bounds.size.x < mother.radius * 2.35:
+		return "Fusion failure: foundation does not cover enough lateral width."
+	if foundation_bounds.size.z < mother.radius * 2.35:
+		return "Fusion failure: foundation does not cover enough depth."
+	if foundation_bounds.size.y < mother.radius * 0.58:
+		return "Fusion failure: foundation is too flat to hide basal roots."
+	var foundation_center := Vector3(
+		mother.attach_position.x
+			+ float(mother.metadata.get("foundation_offset_x", 0.0)) * mother.radius,
+		0.0,
+		mother.attach_position.z
+			+ float(mother.metadata.get("foundation_offset_z", 0.0)) * mother.radius,
+	)
+	var foundation_normal_error := _validate_outward_normals(
+		foundation_mesh,
+		foundation_center,
+		mother.radius,
+	)
+	if not foundation_normal_error.is_empty():
+		return "Fusion foundation: " + foundation_normal_error
+	var foundation_material := foundation_mesh.surface_get_material(0) as StandardMaterial3D
+	if foundation_material == null:
+		return "Fusion failure: foundation material is missing."
+	if foundation_material.roughness < 0.42 or foundation_material.roughness > 0.5:
+		return "Fusion failure: foundation roughness is outside bounds."
+	if not foundation_material.clearcoat_enabled:
+		return "Fusion failure: foundation clearcoat is disabled."
+	if foundation_material.clearcoat < 0.18 or foundation_material.clearcoat > 0.26:
+		return "Fusion failure: foundation clearcoat is outside bounds."
+	if foundation_material.emission_energy_multiplier > 0.008:
+		return "Fusion failure: foundation emission exceeds the mobile bound."
+
+	for instruction in instructions:
+		if instruction.generation <= 0:
+			continue
+		var root_core: float = float(instruction.metadata.get("root_core_ratio", -1.0))
+		var flare: float = float(instruction.metadata.get("junction_flare_ratio", -1.0))
+		var sleeve: float = float(instruction.metadata.get("junction_sleeve_ratio", -1.0))
+		var junction_height: float = float(
+			instruction.metadata.get("junction_height_ratio", -1.0),
+		)
+		var sleeve_height: float = float(
+			instruction.metadata.get("junction_sleeve_height_ratio", -1.0),
+		)
+		if root_core < 0.64 or root_core > 0.88:
+			return "Fusion failure: buried root core ratio is outside bounds."
+		if flare < 1.32 or flare > 1.62:
+			return "Fusion failure: junction flare ratio is outside bounds."
+		if sleeve < 1.02 or sleeve > 1.18:
+			return "Fusion failure: junction sleeve ratio is outside bounds."
+		if junction_height < 0.012 or junction_height > 0.065:
+			return "Fusion failure: junction flare height is outside bounds."
+		if sleeve_height < 0.1 or sleeve_height > 0.2:
+			return "Fusion failure: junction sleeve height is outside bounds."
+		if flare <= root_core * 1.55:
+			return "Fusion failure: junction does not widen enough above its buried root."
+
+		var junction_mesh: ArrayMesh = builder.create_junction_mesh(instruction)
+		if junction_mesh == null or junction_mesh.get_surface_count() != 1:
+			return "Fusion failure: junction mesh surface is missing."
+		var junction_bounds: AABB = junction_mesh.get_aabb()
+		if junction_bounds.position.y >= -instruction.radius * 0.2:
+			return "Fusion failure: junction root is not buried below the attachment plane."
+		if junction_bounds.size.x < instruction.radius * 2.3:
+			return "Fusion failure: junction flare collapsed laterally."
+		if junction_bounds.size.z < instruction.radius * 2.3:
+			return "Fusion failure: junction flare collapsed in depth."
+
+		var arrays: Array = junction_mesh.surface_get_arrays(0)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var minimum_y: float = 1.0e20
+		for vertex in vertices:
+			minimum_y = minf(minimum_y, vertex.y)
+		var root_radius := 0.0
+		var flare_radius := 0.0
+		for vertex in vertices:
+			var radial_radius: float = Vector2(vertex.x, vertex.z).length()
+			if absf(vertex.y - minimum_y) < 0.0001:
+				root_radius = maxf(root_radius, radial_radius)
+			elif vertex.y > 0.0 and vertex.y < instruction.length * 0.08:
+				flare_radius = maxf(flare_radius, radial_radius)
+		if root_radius <= 0.0 or flare_radius <= root_radius * 1.45:
+			return "Fusion failure: generated flare does not cover the buried root seam."
+
+		var junction_normal_error := _validate_outward_normals(
+			junction_mesh,
+			Vector3.ZERO,
+			instruction.radius,
+		)
+		if not junction_normal_error.is_empty():
+			return "Fusion junction: " + junction_normal_error
+		var junction_material := junction_mesh.surface_get_material(0) as StandardMaterial3D
+		if junction_material == null:
+			return "Fusion failure: junction material is missing."
+		if junction_material.roughness < 0.27 or junction_material.roughness > 0.42:
+			return "Fusion failure: junction roughness is outside bounds."
+		if junction_material.emission_energy_multiplier > 0.014:
+			return "Fusion failure: junction emission exceeds the mobile bound."
+
+	return ""
+
+
+func _validate_outward_normals(mesh: ArrayMesh, radial_center: Vector3, scale: float) -> String:
+	var arrays: Array = mesh.surface_get_arrays(0)
+	var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	if vertices.is_empty() or vertices.size() != normals.size():
+		return "Geometry failure: vertex and normal buffers are inconsistent."
+	var directional_samples := 0
+	var outward_samples := 0
+	for vertex_index in range(vertices.size()):
+		var normal: Vector3 = normals[vertex_index]
+		if normal.length() < 0.98 or normal.length() > 1.02:
+			return "Geometry failure: facet normal is not normalized."
+		var vertex: Vector3 = vertices[vertex_index]
+		var radial := Vector3(
+			vertex.x - radial_center.x,
+			0.0,
+			vertex.z - radial_center.z,
+		)
+		if radial.length_squared() < scale * scale * 0.1:
+			continue
+		if absf(normal.y) > 0.97:
+			continue
+		directional_samples += 1
+		if normal.dot(radial.normalized()) > 0.0:
+			outward_samples += 1
+	if directional_samples == 0:
+		return "Geometry failure: no directional normal samples were found."
+	var outward_ratio: float = float(outward_samples) / float(directional_samples)
+	if outward_ratio < 0.72:
+		return "Geometry failure: facet normals are not predominantly outward."
 	return ""
 
 
