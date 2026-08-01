@@ -7,6 +7,7 @@ on:
       - feat/godot-crystal-phase-11-production-cutover
       - feat/godot-crystal-phase-12-mobile-hardening
       - feat/godot-crystal-phase-13-device-acceptance
+      - feat/godot-crystal-phase-14-release-control
     paths:
       - 'godot/evolution-engine/**'
       - 'src/features/home/godot3d/**'
@@ -84,7 +85,7 @@ jobs:
             exit 1
           fi
 
-      - name: Run Crystal Phase 1–13 smoke suite
+      - name: Run Crystal Phase 1–13 runtime smoke suite
         shell: bash
         run: |
           set -euo pipefail
@@ -179,26 +180,34 @@ jobs:
           cp -R /tmp/amore-godot-web/. public/godot/evolution-engine/
           test -s public/godot/evolution-engine/index.wasm
 
-      - name: Run React and TypeScript tests
+      - name: Run React, TypeScript and Phase 14 release-policy tests
         run: npm test
 
-      - name: Build Phase 13 rollout bundle
+      - name: Build Phase 14 approved-fixture bundle
         env:
           VITE_EVOLUTION_GODOT: production
           VITE_EVOLUTION_GODOT_ROLLOUT: 100
+          VITE_EVOLUTION_GODOT_RELEASE_STAGE: released-100
+          VITE_EVOLUTION_GODOT_RELEASE_ID: ci-phase14-automation
+          VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          VITE_EVOLUTION_GODOT_KILL_SWITCH: off
         run: |
           npm run build
           test -s dist/godot/evolution-engine/index.html
           test -s dist/godot/evolution-engine/index.wasm
           test -s dist/godot/evolution-engine/index.pck
 
-      - name: Run Phase 13 browser workflow proof
+      - name: Run Phase 14 browser workflow proof
         env:
           VITE_EVOLUTION_GODOT: production
           VITE_EVOLUTION_GODOT_ROLLOUT: 100
+          VITE_EVOLUTION_GODOT_RELEASE_STAGE: released-100
+          VITE_EVOLUTION_GODOT_RELEASE_ID: ci-phase14-automation
+          VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+          VITE_EVOLUTION_GODOT_KILL_SWITCH: off
         run: npx playwright test --config=playwright.godot.config.ts
 
-      - name: Build Phase 13 automation report
+      - name: Build Phase 14 automation report
         if: always()
         shell: bash
         run: |
@@ -206,22 +215,22 @@ jobs:
           health='test-results/phase13-runtime-health-automation.png'
           workflow='test-results/phase13-automation-workflow-pass.png'
           if [[ -s "$health" && -s "$workflow" ]]; then
-            cat > test-results/phase13-automation-proof.html <<'HTML'
+            cat > test-results/phase14-release-control-proof.html <<'HTML'
           <!doctype html>
-          <html lang="uk"><head><meta charset="utf-8"><title>Crystal Phase 13 automation proof</title>
+          <html lang="uk"><head><meta charset="utf-8"><title>Crystal Phase 14 release control proof</title>
           <style>body{font-family:system-ui;background:#111;color:#fff;margin:24px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}img{width:100%;border-radius:18px;border:1px solid #555}h2{font-size:18px}</style></head>
-          <body><h1>Crystal Phase 13 — automated workflow proof</h1><div class="grid">
-          <section><h2>Software-renderer telemetry</h2><img src="phase13-runtime-health-automation.png"></section>
-          <section><h2>30-sample WORKFLOW PASS</h2><img src="phase13-automation-workflow-pass.png"></section>
-          </div><p>This artifact proves bridge, orbit, restore, signature and fallback behavior. It does not claim physical Pixel 8 Pro health.</p></body></html>
+          <body><h1>Crystal Phase 14 — release control automation proof</h1><div class="grid">
+          <section><h2>Phase 13 runtime telemetry</h2><img src="phase13-runtime-health-automation.png"></section>
+          <section><h2>30-sample workflow proof</h2><img src="phase13-automation-workflow-pass.png"></section>
+          </div><p>Unit tests verify blocked-by-default production, SHA-256 physical report validation, fixed 5/25/50/100 rollout ceilings and emergency kill switch. The CI digest is an automation fixture, not physical approval.</p></body></html>
           HTML
           fi
 
-      - name: Upload Phase 13 browser proof
+      - name: Upload Phase 14 release-control proof
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: amore-godot-phase13-automation-proof-${{ github.sha }}
+          name: amore-godot-phase14-release-control-proof-${{ github.sha }}
           path: |
             test-results/
             playwright-report-godot/
