@@ -288,6 +288,7 @@ export function GodotEvolutionPreview({
       data-godot-health-fallback={String(health.snapshot.shouldFallback)}
       data-godot-orbit-count={interactions.orbit}
       data-godot-zoom-count={interactions.zoom}
+      data-godot-workflow-passed={String(acceptanceReport.workflowPassed)}
       data-godot-acceptance-passed={String(acceptanceReport.passed)}
     >
       <iframe
