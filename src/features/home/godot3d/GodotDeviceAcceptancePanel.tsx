@@ -118,7 +118,8 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
   return (
     <aside
       className="godot-device-acceptance"
-      data-godot-device-acceptance="phase-14"
+      data-godot-device-acceptance="phase-13"
+      data-godot-release-control="phase-14"
       data-godot-assessment={report.assessment}
       data-godot-workflow-passed={String(report.workflowPassed)}
       data-godot-acceptance-passed={String(report.passed)}
