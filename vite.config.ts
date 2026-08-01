@@ -16,6 +16,7 @@ const godotReleaseCacheKey = (
   process.env.VITE_EVOLUTION_GODOT_RELEASE_ID
   || 'preview'
 ).replace(/[^a-z0-9._-]/gi, '-').slice(0, 64);
+const buildGodotHarness = process.env.BUILD_GODOT_HARNESS === '1';
 
 export default defineConfig({
   plugins: [
@@ -72,5 +73,17 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  ...(buildGodotHarness
+    ? {
+        build: {
+          rollupOptions: {
+            input: {
+              app: fileURLToPath(new URL('./index.html', import.meta.url)),
+              godotHarness: fileURLToPath(new URL('./e2e/godot/index.html', import.meta.url)),
+            },
+          },
+        },
+      }
+    : {}),
   base,
 });
