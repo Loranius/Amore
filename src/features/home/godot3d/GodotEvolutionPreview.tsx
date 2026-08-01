@@ -32,6 +32,14 @@ interface GodotEvolutionPreviewProps {
   onMessage?: (message: GodotBridgeInboundMessage) => void;
 }
 
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+
+function initialReducedMotionPreference(): boolean {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
 export function GodotEvolutionPreview({
   payload,
   enabled = GODOT_EVOLUTION_ENABLED,
@@ -46,13 +54,35 @@ export function GodotEvolutionPreview({
   const [progress, setProgress] = useState(0);
   const [stateSignature, setStateSignature] = useState('');
   const [motion, setMotion] = useState<'unknown' | 'full' | 'reduced'>('unknown');
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(
+    initialReducedMotionPreference,
+  );
   const source = useMemo(() => resolveGodotWebUrl(import.meta.env.BASE_URL), []);
+  const runtimePayload = useMemo<GodotEvolutionPayload>(() => ({
+    ...payload,
+    dna: {
+      ...payload.dna,
+      traits: {
+        ...(payload.dna.traits ?? {}),
+        reduced_motion: prefersReducedMotion,
+      },
+    },
+  }), [payload, prefersReducedMotion]);
 
   const sendPayload = useCallback(() => {
     const target = iframeRef.current?.contentWindow;
     if (!target) return;
-    target.postMessage(createGodotPayloadMessage(payload), window.location.origin);
-  }, [payload]);
+    target.postMessage(createGodotPayloadMessage(runtimePayload), window.location.origin);
+  }, [runtimePayload]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined;
+    const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
+    const updatePreference = () => setPrefersReducedMotion(mediaQuery.matches);
+    updatePreference();
+    mediaQuery.addEventListener('change', updatePreference);
+    return () => mediaQuery.removeEventListener('change', updatePreference);
+  }, []);
 
   useEffect(() => {
     if (!enabled) {
