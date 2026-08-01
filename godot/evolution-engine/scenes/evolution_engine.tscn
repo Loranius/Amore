@@ -1,20 +1,20 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/runtime/evolution_runtime.gd" id="1_runtime"]
 [ext_resource type="Script" path="res://scripts/runtime/orbit_camera.gd" id="2_camera"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_crystal"]
-sky_top_color = Color(0.004, 0.006, 0.026, 1)
-sky_horizon_color = Color(0.092, 0.065, 0.16, 1)
-sky_curve = 0.22
-sky_energy_multiplier = 0.42
-ground_bottom_color = Color(0.008, 0.009, 0.022, 1)
-ground_horizon_color = Color(0.12, 0.075, 0.13, 1)
-ground_curve = 0.18
-ground_energy_multiplier = 0.24
-sun_angle_max = 8.0
-sun_curve = 0.08
-energy_multiplier = 0.72
+sky_top_color = Color(0.008, 0.012, 0.032, 1)
+sky_horizon_color = Color(0.07, 0.064, 0.11, 1)
+sky_curve = 0.3
+sky_energy_multiplier = 0.58
+ground_bottom_color = Color(0.012, 0.014, 0.026, 1)
+ground_horizon_color = Color(0.085, 0.06, 0.095, 1)
+ground_curve = 0.24
+ground_energy_multiplier = 0.34
+sun_angle_max = 6.0
+sun_curve = 0.1
+energy_multiplier = 0.88
 use_debanding = true
 
 [sub_resource type="Sky" id="Sky_crystal"]
@@ -24,38 +24,27 @@ sky_material = SubResource("ProceduralSkyMaterial_crystal")
 [sub_resource type="Environment" id="Environment_main"]
 background_mode = 2
 sky = SubResource("Sky_crystal")
-background_energy_multiplier = 0.62
+background_energy_multiplier = 0.88
 ambient_light_source = 3
-ambient_light_color = Color(0.16, 0.18, 0.3, 1)
-ambient_light_energy = 0.3
-ambient_light_sky_contribution = 0.78
+ambient_light_color = Color(0.19, 0.22, 0.34, 1)
+ambient_light_energy = 0.42
+ambient_light_sky_contribution = 0.86
 reflected_light_source = 2
 tonemap_mode = 2
 glow_enabled = true
-glow_intensity = 0.2
-
-[sub_resource type="StandardMaterial3D" id="Material_floor"]
-albedo_color = Color(0.026, 0.029, 0.055, 1)
-metallic = 0.02
-roughness = 0.92
-
-[sub_resource type="PlaneMesh" id="Plane_floor"]
-material = SubResource("Material_floor")
-size = Vector2(18, 18)
-subdivide_width = 1
-subdivide_depth = 1
+glow_intensity = 0.16
 
 [sub_resource type="StyleBoxFlat" id="Style_status"]
-bg_color = Color(0.025, 0.035, 0.075, 0.82)
+bg_color = Color(0.018, 0.024, 0.052, 0.7)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
 border_width_bottom = 1
-border_color = Color(0.46, 0.39, 0.82, 0.45)
-corner_radius_top_left = 18
-corner_radius_top_right = 18
-corner_radius_bottom_right = 18
-corner_radius_bottom_left = 18
+border_color = Color(0.42, 0.5, 0.78, 0.28)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
 
 [node name="EvolutionEngine" type="Node3D"]
 script = ExtResource("1_runtime")
@@ -64,48 +53,45 @@ script = ExtResource("1_runtime")
 environment = SubResource("Environment_main")
 
 [node name="KeyLight" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-48, -58, 0)
-light_color = Color(0.76, 0.84, 1, 1)
-light_energy = 0.9
+rotation_degrees = Vector3(-42, -38, 0)
+light_color = Color(0.78, 0.88, 1, 1)
+light_energy = 1.05
 shadow_enabled = true
-shadow_blur = 2.4
+shadow_blur = 3.2
 
 [node name="RimLight" type="OmniLight3D" parent="."]
-position = Vector3(-3.8, 4.4, -2.8)
-light_color = Color(0.48, 0.4, 0.86, 1)
-light_energy = 1.65
-omni_range = 8.5
+position = Vector3(-3.2, 4.8, -2.2)
+light_color = Color(0.48, 0.52, 0.96, 1)
+light_energy = 1.15
+omni_range = 9.0
 shadow_enabled = false
 
 [node name="WarmFill" type="OmniLight3D" parent="."]
-position = Vector3(3.4, 1.8, 3.1)
-light_color = Color(0.9, 0.56, 0.68, 1)
-light_energy = 0.48
-omni_range = 6.5
+position = Vector3(3.6, 2.3, 4.2)
+light_color = Color(1, 0.68, 0.52, 1)
+light_energy = 0.65
+omni_range = 8.0
 shadow_enabled = false
 
-[node name="Floor" type="MeshInstance3D" parent="."]
-position = Vector3(0, -0.08, 0)
-mesh = SubResource("Plane_floor")
-
 [node name="ArtifactRoot" type="Node3D" parent="."]
+position = Vector3(0, 0.16, 0)
 
 [node name="CameraRig" type="Node3D" parent="."]
 script = ExtResource("2_camera")
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 current = true
-fov = 42.0
+fov = 38.0
 near = 0.05
 far = 80.0
 
 [node name="UI" type="CanvasLayer" parent="."]
 
 [node name="SafeArea" type="MarginContainer" parent="UI"]
-offset_left = 24.0
-offset_top = 24.0
-offset_right = 516.0
-offset_bottom = 196.0
+offset_left = 18.0
+offset_top = 18.0
+offset_right = 438.0
+offset_bottom = 142.0
 
 [node name="StatusPanel" type="PanelContainer" parent="UI/SafeArea"]
 layout_mode = 2
@@ -113,16 +99,16 @@ theme_override_styles/panel = SubResource("Style_status")
 
 [node name="StatusMargin" type="MarginContainer" parent="UI/SafeArea/StatusPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 18
-theme_override_constants/margin_top = 14
-theme_override_constants/margin_right = 18
-theme_override_constants/margin_bottom = 14
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
 
 [node name="StatusLabel" type="Label" parent="UI/SafeArea/StatusPanel/StatusMargin"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.91, 0.92, 1, 1)
-theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.55)
+theme_override_colors/font_color = Color(0.89, 0.92, 1, 0.88)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.45)
 theme_override_constants/shadow_offset_x = 1
-theme_override_constants/shadow_offset_y = 2
-theme_override_font_sizes/font_size = 17
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 13
 text = "Godot 4.7.1 · loading Evolution Engine…"
