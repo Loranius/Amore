@@ -1,7 +1,10 @@
-import { StrictMode } from 'react';
+import { StrictMode, useCallback, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import GodotEvolutionPreview from '@/features/home/godot3d/GodotEvolutionPreview';
-import type { GodotEvolutionPayload } from '@/features/home/godot3d/godotBridgeProtocol';
+import type {
+  GodotBridgeInboundMessage,
+  GodotEvolutionPayload,
+} from '@/features/home/godot3d/godotBridgeProtocol';
 
 const payload: GodotEvolutionPayload = {
   dna: {
@@ -41,13 +44,20 @@ const payload: GodotEvolutionPayload = {
   ],
 };
 
-const root = document.getElementById('root');
-if (!root) throw new Error('Godot bridge harness root is missing.');
+function GodotBridgeHarness() {
+  const [activationCount, setActivationCount] = useState(0);
+  const [fatalFailure, setFatalFailure] = useState('');
+  const onMessage = useCallback((message: GodotBridgeInboundMessage) => {
+    if (message.type === 'amore:godot:activate') {
+      setActivationCount(count => count + 1);
+    }
+  }, []);
 
-createRoot(root).render(
-  <StrictMode>
+  return (
     <main
       data-godot-harness="react"
+      data-godot-activation-count={activationCount}
+      data-godot-fatal-failure={fatalFailure}
       style={{
         width: '100%',
         maxWidth: 520,
@@ -56,7 +66,21 @@ createRoot(root).render(
         boxSizing: 'border-box',
       }}
     >
-      <GodotEvolutionPreview payload={payload} enabled />
+      <GodotEvolutionPreview
+        payload={payload}
+        enabled
+        onMessage={onMessage}
+        onFatalError={setFatalFailure}
+      />
     </main>
+  );
+}
+
+const root = document.getElementById('root');
+if (!root) throw new Error('Godot bridge harness root is missing.');
+
+createRoot(root).render(
+  <StrictMode>
+    <GodotBridgeHarness />
   </StrictMode>,
 );
