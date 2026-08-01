@@ -5,6 +5,10 @@ extends RefCounted
 ## Attached crystals contain their own buried root and fusion flare so parent
 ## junctions stay continuous without a second overlay mesh.
 
+const CrystalVisualProfile = preload("res://scripts/presentation/crystal_visual_profile.gd")
+
+var _visual_profile = CrystalVisualProfile.new()
+
 
 func create_mesh_instance(instruction) -> MeshInstance3D:
 	var instance := MeshInstance3D.new()
@@ -29,6 +33,8 @@ func _build_mesh(instruction) -> ArrayMesh:
 	var sides: int = instruction.sides
 	var merge_depth_ratio: float = float(instruction.metadata.get("merge_depth_ratio", 0.0))
 	var attached: bool = instruction.generation > 0
+	var role: String = String(instruction.metadata.get("role", ""))
+	var is_mother: bool = String(instruction.id) == "crystal:mother" or role == "mother"
 	var body_taper: float = clampf(float(instruction.metadata.get("body_taper", 0.86)), 0.68, 1.0)
 	var waist_ratio: float = clampf(float(instruction.metadata.get("waist_ratio", 0.98)), 0.8, 1.12)
 	var shoulder_height_ratio: float = clampf(
@@ -69,12 +75,18 @@ func _build_mesh(instruction) -> ArrayMesh:
 		1.16,
 		1.28,
 	)
-	var base_radius: float = instruction.radius * (root_core_ratio if attached else 1.08)
+	var base_radius: float = instruction.radius * (root_core_ratio if attached else 1.06)
 	var fusion_radius: float = instruction.radius * integrated_flare_ratio
 	var lower_radius: float = instruction.radius * (1.035 if attached else 1.0)
 	var mid_radius: float = instruction.radius * waist_ratio
 	var shoulder_radius: float = instruction.radius * body_taper
-	var termination_radius: float = shoulder_radius * lerpf(0.62, 0.78, instruction.energy)
+	if is_mother:
+		# Phase 10 removes the monolithic cylinder read while preserving the
+		# canonical radius and full vertical extent.
+		mid_radius *= 0.965
+		shoulder_radius *= 0.92
+	var upper_mid_radius: float = lerpf(mid_radius, shoulder_radius, 0.48) * 0.975
+	var termination_radius: float = shoulder_radius * lerpf(0.58, 0.74, instruction.energy)
 	var base_y: float = -minf(
 		instruction.length * 0.16,
 		instruction.radius * merge_depth_ratio * 0.98,
@@ -84,7 +96,8 @@ func _build_mesh(instruction) -> ArrayMesh:
 		instruction.radius * 0.028,
 	) if attached else 0.0
 	var lower_y: float = instruction.length * (0.145 if attached else 0.12)
-	var mid_y: float = instruction.length * 0.46
+	var mid_y: float = instruction.length * 0.43
+	var upper_mid_y: float = instruction.length * 0.61
 	var shoulder_y: float = instruction.length * shoulder_height_ratio
 	var termination_y: float = instruction.length * (1.0 - termination_depth_ratio)
 	termination_y = maxf(shoulder_y + instruction.length * 0.055, termination_y)
@@ -126,9 +139,17 @@ func _build_mesh(instruction) -> ArrayMesh:
 		sides,
 		mid_radius,
 		mid_y,
-		facet_phase + ring_twist * 0.55,
+		facet_phase + ring_twist * 0.5,
 		ridge_strength,
-		center_drift * 0.62,
+		center_drift * 0.56,
+	)
+	var upper_mid_ring: Array[Vector3] = _build_ring(
+		sides,
+		upper_mid_radius,
+		upper_mid_y,
+		facet_phase + ring_twist * 0.76,
+		ridge_strength * 0.92,
+		center_drift * 0.82,
 	)
 	var shoulder_ring: Array[Vector3] = _build_ring(
 		sides,
@@ -148,22 +169,25 @@ func _build_mesh(instruction) -> ArrayMesh:
 	)
 
 	if attached:
-		_connect_rings(surface, base_ring, fusion_ring, color.darkened(0.095))
-		_connect_rings(surface, fusion_ring, lower_ring, color.darkened(0.07))
+		_connect_rings_gradient(surface, base_ring, fusion_ring, instruction, 0.0, 0.05)
+		_connect_rings_gradient(surface, fusion_ring, lower_ring, instruction, 0.05, 0.145)
 	else:
-		_connect_rings(surface, base_ring, lower_ring, color.darkened(0.16))
-	_connect_rings(surface, lower_ring, mid_ring, color.darkened(0.06))
-	_connect_rings(surface, mid_ring, shoulder_ring, color.lightened(0.012))
-	_connect_rings(surface, shoulder_ring, termination_ring, color.lightened(0.035))
+		_connect_rings_gradient(surface, base_ring, lower_ring, instruction, 0.0, 0.12)
+	_connect_rings_gradient(surface, lower_ring, mid_ring, instruction, 0.145, 0.43)
+	_connect_rings_gradient(surface, mid_ring, upper_mid_ring, instruction, 0.43, 0.61)
+	_connect_rings_gradient(surface, upper_mid_ring, shoulder_ring, instruction, 0.61, shoulder_height_ratio)
+	_connect_rings_gradient(surface, shoulder_ring, termination_ring, instruction, shoulder_height_ratio, 0.86)
 
 	for side in range(sides):
 		var next: int = (side + 1) % sides
-		_add_triangle_clockwise(
+		_add_triangle_clockwise_gradient(
 			surface,
 			termination_ring[side],
 			termination_ring[next],
 			tip,
-			color.lightened(0.065 + float(side % 2) * 0.016),
+			_visual_profile.facet_color(instruction, 0.86, side),
+			_visual_profile.facet_color(instruction, 0.86, next),
+			_visual_profile.facet_color(instruction, 1.0, side),
 		)
 
 	if bool(instruction.metadata.get("cap_base", false)):
@@ -176,7 +200,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 				base_ring[next],
 				base_ring[side],
 				Vector3.DOWN,
-				color.darkened(0.22),
+				_visual_profile.facet_color(instruction, 0.0, side).darkened(0.15),
 			)
 
 	var mesh: ArrayMesh = surface.commit()
@@ -205,23 +229,27 @@ func _build_ring(
 	return ring
 
 
-func _connect_rings(
+func _connect_rings_gradient(
 	surface: SurfaceTool,
 	lower: Array[Vector3],
 	upper: Array[Vector3],
-	color: Color,
+	instruction,
+	lower_height: float,
+	upper_height: float,
 ) -> void:
 	var sides: int = mini(lower.size(), upper.size())
 	for side in range(sides):
 		var next: int = (side + 1) % sides
-		var facet_color: Color = color.lightened(float(side % 3) * 0.014)
-		_add_quad_clockwise(
+		_add_quad_clockwise_gradient(
 			surface,
 			lower[side],
 			lower[next],
 			upper[next],
 			upper[side],
-			facet_color,
+			_visual_profile.facet_color(instruction, lower_height, side),
+			_visual_profile.facet_color(instruction, lower_height, next),
+			_visual_profile.facet_color(instruction, upper_height, next),
+			_visual_profile.facet_color(instruction, upper_height, side),
 		)
 
 
@@ -246,23 +274,23 @@ func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 	material.cull_mode = BaseMaterial3D.CULL_BACK
 	material.roughness = clampf(lerpf(0.34, 0.22, energy) - polishing * 0.035, 0.2, 0.35)
 	material.metallic = 0.01
-	material.metallic_specular = clampf(lerpf(0.48, 0.68, energy) + polishing * 0.04, 0.45, 0.72)
+	material.metallic_specular = clampf(lerpf(0.5, 0.69, energy) + polishing * 0.025, 0.45, 0.72)
 
 	material.rim_enabled = true
 	material.rim = clampf(lerpf(0.07, 0.17, energy) + luminosity * 0.018, 0.05, 0.19)
-	material.rim_tint = 0.48
+	material.rim_tint = 0.42
 
 	material.clearcoat_enabled = true
-	material.clearcoat = clampf(lerpf(0.28, 0.62, energy) + polishing * 0.045, 0.25, 0.65)
+	material.clearcoat = clampf(lerpf(0.28, 0.62, energy) + polishing * 0.025, 0.25, 0.65)
 	material.clearcoat_roughness = clampf(
-		lerpf(0.28, 0.12, energy) - polishing * 0.025,
+		lerpf(0.28, 0.12, energy) - polishing * 0.02,
 		0.1,
 		0.3,
 	)
 
 	material.backlight_enabled = true
 	var backlight_strength: float = clampf(
-		lerpf(0.025, 0.055, energy) + luminosity * 0.012,
+		lerpf(0.03, 0.06, energy) + luminosity * 0.008,
 		0.02,
 		0.07,
 	)
@@ -274,40 +302,63 @@ func _build_optical_material(instruction, color: Color) -> StandardMaterial3D:
 	)
 
 	material.emission_enabled = true
-	material.emission = color.darkened(0.46)
+	material.emission = color.darkened(0.5)
 	material.emission_energy_multiplier = clampf(
-		0.006 + energy * 0.014 + luminosity * 0.009,
-		0.006,
-		0.03,
+		0.005 + energy * 0.012 + luminosity * 0.007,
+		0.005,
+		0.026,
 	)
 	return material
 
 
-func _add_quad_clockwise(
+func _add_quad_clockwise_gradient(
 	surface: SurfaceTool,
 	a: Vector3,
 	b: Vector3,
 	c: Vector3,
 	d: Vector3,
-	color: Color,
+	color_a: Color,
+	color_b: Color,
+	color_c: Color,
+	color_d: Color,
 ) -> void:
 	# Vertices are submitted clockwise for Godot front faces. The stored
 	# lighting normal follows the opposite geometric cross order so it points
 	# away from the crystal axis instead of into the solid volume.
 	var outward: Vector3 = (d - a).cross(b - a).normalized()
-	_add_triangle_with_normal(surface, a, c, b, outward, color)
-	_add_triangle_with_normal(surface, a, d, c, outward, color)
+	_add_triangle_with_colors(surface, a, c, b, outward, color_a, color_c, color_b)
+	_add_triangle_with_colors(surface, a, d, c, outward, color_a, color_d, color_c)
 
 
-func _add_triangle_clockwise(
+func _add_triangle_clockwise_gradient(
 	surface: SurfaceTool,
 	a: Vector3,
 	b: Vector3,
 	c: Vector3,
-	color: Color,
+	color_a: Color,
+	color_b: Color,
+	color_c: Color,
 ) -> void:
 	var outward: Vector3 = (c - a).cross(b - a).normalized()
-	_add_triangle_with_normal(surface, a, c, b, outward, color)
+	_add_triangle_with_colors(surface, a, c, b, outward, color_a, color_c, color_b)
+
+
+func _add_triangle_with_colors(
+	surface: SurfaceTool,
+	a: Vector3,
+	b: Vector3,
+	c: Vector3,
+	normal: Vector3,
+	color_a: Color,
+	color_b: Color,
+	color_c: Color,
+) -> void:
+	var vertices := [a, b, c]
+	var colors := [color_a, color_b, color_c]
+	for index in range(3):
+		surface.set_normal(normal)
+		surface.set_color(colors[index])
+		surface.add_vertex(vertices[index])
 
 
 func _add_triangle_with_normal(
@@ -335,28 +386,7 @@ func _basis_from_y(direction: Vector3) -> Basis:
 
 
 func _crystal_color(instruction) -> Color:
-	var semantic_pressure: Dictionary = Dictionary(
-		instruction.metadata.get("semantic_pressure", {}),
-	)
-	var polishing: float = clampf(float(semantic_pressure.get("polishing", 0.0)), 0.0, 1.0)
-	var luminosity: float = clampf(
-		float(semantic_pressure.get("luminosity", instruction.metadata.get("semantic_luminosity", 0.0))),
-		0.0,
-		1.0,
-	)
-	var hue_shift: float = float(instruction.metadata.get("hue_shift", 0.0))
-	var hue: float = fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
-	var saturation: float = clampf(
-		0.34 + instruction.energy * 0.11 - polishing * 0.025,
-		0.0,
-		1.0,
-	)
-	var value: float = clampf(
-		0.64 + instruction.energy * 0.13 + luminosity * 0.045,
-		0.0,
-		1.0,
-	)
-	return Color.from_hsv(hue, saturation, value, 1.0)
+	return _visual_profile.base_color(instruction)
 
 
 func _safe_node_name(value: String) -> String:
