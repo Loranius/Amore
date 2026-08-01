@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { parseGodotEvolutionFlag } from './godotFeatureFlag';
+import {
+  parseGodotEvolutionFlag,
+  parseGodotEvolutionMode,
+} from './godotFeatureFlag';
 import {
   createGodotPayloadMessage,
   isGodotBridgeInboundMessage,
+  isGodotRuntimeStateAccepted,
   resolveGodotWebUrl,
   type GodotEvolutionPayload,
+  type GodotStateMessage,
 } from './godotBridgeProtocol';
 
 const payload: GodotEvolutionPayload = {
@@ -13,16 +18,43 @@ const payload: GodotEvolutionPayload = {
     species: 'crystal',
     engine_version: 'godot-0.1.0',
   },
-  events: [],
+  events: [
+    {
+      id: 'memory:first-place',
+      occurred_at: '2024-02-12',
+      source: 'map@1',
+    },
+  ],
+};
+
+const acceptedState: GodotStateMessage = {
+  type: 'amore:godot:state',
+  version: '4.7.1',
+  source: 'portal',
+  species: 'crystal',
+  seed: 582013,
+  instructions: 4,
+  rendered_instructions: 3,
+  history: 1,
+  motion: 'full',
+  phase: 11,
+  signature: '0123456789abcdef',
 };
 
 describe('Godot Evolution feature flag', () => {
-  it.each(['1', 'true', 'TRUE', 'on', 'enabled'])('accepts %s', value => {
+  it.each(['1', 'true', 'TRUE', 'on', 'enabled', 'preview'])('accepts %s as preview', value => {
     expect(parseGodotEvolutionFlag(value)).toBe(true);
+    expect(parseGodotEvolutionMode(value)).toBe('preview');
+  });
+
+  it.each(['production', 'prod', 'cutover'])('accepts %s as production', value => {
+    expect(parseGodotEvolutionFlag(value)).toBe(true);
+    expect(parseGodotEvolutionMode(value)).toBe('production');
   });
 
   it.each([undefined, null, '', '0', 'false', 'off', 'random'])('rejects %s', value => {
     expect(parseGodotEvolutionFlag(value)).toBe(false);
+    expect(parseGodotEvolutionMode(value)).toBe('disabled');
   });
 });
 
@@ -33,11 +65,39 @@ describe('Godot portal bridge protocol', () => {
     expect(message.payload).toBe(payload);
   });
 
-  it('accepts only known inbound message types', () => {
-    expect(isGodotBridgeInboundMessage({ type: 'amore:godot:ready', version: '4.7.1' })).toBe(true);
-    expect(isGodotBridgeInboundMessage({ type: 'amore:godot:state', signature: 'abc' })).toBe(true);
+  it('accepts complete known inbound messages', () => {
+    expect(isGodotBridgeInboundMessage({
+      type: 'amore:godot:ready',
+      version: '4.7.1',
+      runtime: 'godot',
+    })).toBe(true);
+    expect(isGodotBridgeInboundMessage(acceptedState)).toBe(true);
+    expect(isGodotBridgeInboundMessage({
+      type: 'amore:godot:activate',
+      source: 'tap',
+    })).toBe(true);
+  });
+
+  it('rejects partial, malformed and unknown inbound messages', () => {
+    expect(isGodotBridgeInboundMessage({ type: 'amore:godot:state', signature: 'abc' })).toBe(false);
+    expect(isGodotBridgeInboundMessage({
+      type: 'amore:godot:progress',
+      current: 1,
+      total: 0,
+      ratio: 2,
+    })).toBe(false);
     expect(isGodotBridgeInboundMessage({ type: 'amore:portal:payload' })).toBe(false);
     expect(isGodotBridgeInboundMessage(null)).toBe(false);
+  });
+
+  it('accepts only runtime state matching the canonical payload identity and history', () => {
+    expect(isGodotRuntimeStateAccepted(acceptedState, payload)).toBe(true);
+    expect(isGodotRuntimeStateAccepted({ ...acceptedState, seed: 1 }, payload)).toBe(false);
+    expect(isGodotRuntimeStateAccepted({ ...acceptedState, history: 0 }, payload)).toBe(false);
+    expect(isGodotRuntimeStateAccepted({
+      ...acceptedState,
+      rendered_instructions: 5,
+    }, payload)).toBe(false);
   });
 
   it('resolves root and GitHub Pages base paths', () => {
