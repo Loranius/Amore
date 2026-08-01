@@ -1,8 +1,20 @@
 import { useMemo, useState } from 'react';
 import type { GodotDeviceAcceptanceReport } from './godotDeviceAcceptance';
+import {
+  createGodotReleaseEnvSnippet,
+  sha256Hex,
+  validateGodotPhysicalAcceptanceReport,
+} from './godotPhysicalAcceptanceImport';
 
 interface GodotDeviceAcceptancePanelProps {
   report: GodotDeviceAcceptanceReport;
+}
+
+interface FrozenReleaseCandidate {
+  reportJson: string;
+  digest: string;
+  envSnippet: string;
+  releaseId: string;
 }
 
 const CRITERIA_LABELS: Record<keyof GodotDeviceAcceptanceReport['criteria'], string> = {
@@ -15,8 +27,22 @@ const CRITERIA_LABELS: Record<keyof GodotDeviceAcceptanceReport['criteria'], str
   motionProfileCaptured: 'Motion profile captured',
 };
 
+function saveTextFile(content: string, filename: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePanelProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [candidateStatus, setCandidateStatus] = useState<'idle' | 'working' | 'invalid' | 'ready'>('idle');
+  const [candidate, setCandidate] = useState<FrozenReleaseCandidate | null>(null);
   const reportJson = useMemo(() => JSON.stringify(report, null, 2), [report]);
   const verdict = report.passed
     ? 'PHYSICAL PASS'
@@ -39,21 +65,61 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
   };
 
   const saveReport = () => {
-    const blob = new Blob([reportJson], { type: 'application/json;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `amore-godot-device-${report.generatedAt.replaceAll(':', '-')}.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    saveTextFile(
+      reportJson,
+      `amore-godot-device-${report.generatedAt.replaceAll(':', '-')}.json`,
+      'application/json;charset=utf-8',
+    );
+  };
+
+  const freezeReleaseCandidate = async () => {
+    setCandidateStatus('working');
+    const validation = validateGodotPhysicalAcceptanceReport(report);
+    if (!validation.valid) {
+      setCandidate(null);
+      setCandidateStatus('invalid');
+      return;
+    }
+    const frozenJson = JSON.stringify(report, null, 2);
+    const digest = await sha256Hex(frozenJson);
+    const releaseDate = report.generatedAt.slice(0, 10).replaceAll('-', '');
+    const releaseId = `crystal-phase14-${releaseDate}`;
+    setCandidate({
+      reportJson: frozenJson,
+      digest,
+      releaseId,
+      envSnippet: createGodotReleaseEnvSnippet({
+        releaseId,
+        acceptanceDigest: digest,
+      }),
+    });
+    setCandidateStatus('ready');
+  };
+
+  const saveCandidate = () => {
+    if (!candidate) return;
+    saveTextFile(
+      candidate.reportJson,
+      `${candidate.releaseId}-physical-pass.json`,
+      'application/json;charset=utf-8',
+    );
+  };
+
+  const copyReleaseEnv = async () => {
+    if (!candidate) return;
+    try {
+      await navigator.clipboard.writeText(candidate.envSnippet);
+      setCopyStatus('copied');
+    } catch {
+      setCopyStatus('failed');
+    }
   };
 
   return (
     <aside
       className="godot-device-acceptance"
       data-godot-device-acceptance="phase-13"
+      data-godot-release-control="phase-14"
       data-godot-assessment={report.assessment}
       data-godot-workflow-passed={String(report.workflowPassed)}
       data-godot-acceptance-passed={String(report.passed)}
@@ -66,14 +132,16 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
       data-godot-health-max-memory-mb={report.health.maxStaticMemoryMb.toFixed(2)}
       data-godot-acceptance-orbits={report.interactions.orbit}
       data-godot-acceptance-restores={report.health.restores}
-      aria-label="Godot physical device acceptance console"
+      data-godot-release-candidate={candidateStatus}
+      data-godot-release-digest={candidate?.digest ?? ''}
+      aria-label="Godot physical device acceptance and release console"
     >
       <div className="godot-device-acceptance__heading">
         <div>
           <span className="godot-device-acceptance__eyebrow">
-            Crystal Phase 13 · {report.assessment}
+            Crystal Phase 14 · {report.assessment}
           </span>
-          <strong>Physical device acceptance</strong>
+          <strong>Physical acceptance & release control</strong>
         </div>
         <span
           className="godot-device-acceptance__verdict"
@@ -106,13 +174,38 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
       <div className="godot-device-acceptance__actions">
         <button type="button" onClick={copyReport}>
           {copyStatus === 'copied'
-            ? 'Звіт скопійовано'
+            ? 'Скопійовано'
             : copyStatus === 'failed'
               ? 'Копіювання недоступне'
               : 'Копіювати JSON'}
         </button>
         <button type="button" onClick={saveReport}>Зберегти JSON</button>
+        <button
+          type="button"
+          disabled={!report.passed || candidateStatus === 'working'}
+          onClick={freezeReleaseCandidate}
+        >
+          {candidateStatus === 'working' ? 'Фіксую…' : 'Зафіксувати release candidate'}
+        </button>
       </div>
+
+      {candidateStatus === 'invalid' && (
+        <p className="godot-device-acceptance__release-error">
+          Release candidate відхилено: потрібен повний PHYSICAL PASS.
+        </p>
+      )}
+
+      {candidate && (
+        <section className="godot-device-acceptance__release" aria-label="Frozen Godot release candidate">
+          <strong>{candidate.releaseId}</strong>
+          <code>{candidate.digest}</code>
+          <pre>{candidate.envSnippet}</pre>
+          <div className="godot-device-acceptance__actions">
+            <button type="button" onClick={copyReleaseEnv}>Копіювати release env</button>
+            <button type="button" onClick={saveCandidate}>Зберегти frozen report</button>
+          </div>
+        </section>
+      )}
 
       <small>
         {report.assessment === 'automation'
@@ -121,6 +214,7 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
         {report.privacy}
       </small>
       <output hidden data-godot-acceptance-report>{reportJson}</output>
+      <output hidden data-godot-release-env>{candidate?.envSnippet ?? ''}</output>
     </aside>
   );
 }

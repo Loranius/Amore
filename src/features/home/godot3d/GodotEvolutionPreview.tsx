@@ -7,7 +7,10 @@ import {
   useState,
 } from 'react';
 import type { GodotCutoverFailure } from './godotCutoverPolicy';
-import { GODOT_EVOLUTION_ENABLED } from './godotFeatureFlag';
+import {
+  GODOT_EVOLUTION_ENABLED,
+  GODOT_EVOLUTION_RELEASE_CONTROL,
+} from './godotFeatureFlag';
 import {
   createGodotPayloadMessage,
   isGodotBridgeInboundMessage,
@@ -28,6 +31,14 @@ import {
 } from './godotDeviceAcceptance';
 import GodotDeviceAcceptancePanel from './GodotDeviceAcceptancePanel';
 import {
+  isGodotReleaseOperationsEnabled,
+  isGodotRollbackDrillEnabled,
+  loadGodotReleaseCandidateManifest,
+  resolveGodotReleaseManifestUrl,
+  type GodotReleasePreflightSnapshot,
+} from './godotReleaseCandidate';
+import GodotReleaseCandidatePanel from './GodotReleaseCandidatePanel';
+import {
   INITIAL_GODOT_RUNTIME_HEALTH,
   reduceGodotRuntimeHealth,
   type GodotRuntimeHealthSnapshot,
@@ -36,6 +47,7 @@ import './godotEvolutionPreview.css';
 
 export type GodotEvolutionStatus =
   | 'disabled'
+  | 'preflight'
   | 'booting'
   | 'started'
   | 'ready'
@@ -51,6 +63,9 @@ interface GodotEvolutionPreviewProps {
   startupTimeoutMs?: number;
   healthFallbackEnabled?: boolean;
   diagnosticsEnabled?: boolean;
+  releasePreflightEnabled?: boolean;
+  releaseOperationsEnabled?: boolean;
+  rollbackDrill?: boolean;
   onMessage?: (message: GodotBridgeInboundMessage) => void;
   onStatusChange?: (status: GodotEvolutionStatus) => void;
   onHealthChange?: (health: GodotRuntimeHealthSnapshot) => void;
@@ -59,6 +74,11 @@ interface GodotEvolutionPreviewProps {
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
+const BYPASSED_PREFLIGHT: GodotReleasePreflightSnapshot = {
+  status: 'bypassed',
+  reason: 'preview-or-test-mode',
+  manifest: null,
+};
 
 function initialReducedMotionPreference(): boolean {
   return typeof window !== 'undefined'
@@ -71,6 +91,16 @@ function initialDiagnosticsPreference(): boolean {
     && isGodotDiagnosticsEnabled(window.location.search);
 }
 
+function initialReleaseOperationsPreference(): boolean {
+  return typeof window !== 'undefined'
+    && isGodotReleaseOperationsEnabled(window.location.search);
+}
+
+function initialRollbackDrillPreference(): boolean {
+  return typeof window !== 'undefined'
+    && isGodotRollbackDrillEnabled(window.location.search);
+}
+
 export function GodotEvolutionPreview({
   payload,
   enabled = GODOT_EVOLUTION_ENABLED,
@@ -79,6 +109,9 @@ export function GodotEvolutionPreview({
   startupTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
   healthFallbackEnabled = false,
   diagnosticsEnabled = initialDiagnosticsPreference(),
+  releasePreflightEnabled = false,
+  releaseOperationsEnabled = initialReleaseOperationsPreference(),
+  rollbackDrill = initialRollbackDrillPreference(),
   onMessage,
   onStatusChange,
   onHealthChange,
@@ -87,8 +120,9 @@ export function GodotEvolutionPreview({
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const acceptedRef = useRef(false);
   const fatalReportedRef = useRef(false);
+  const candidateEnabled = enabled && !rollbackDrill;
   const [status, setStatus] = useState<GodotEvolutionStatus>(
-    enabled ? 'booting' : 'disabled',
+    candidateEnabled ? (releasePreflightEnabled ? 'preflight' : 'booting') : 'disabled',
   );
   const [progress, setProgress] = useState(0);
   const [state, setState] = useState<GodotStateMessage | null>(null);
@@ -96,10 +130,18 @@ export function GodotEvolutionPreview({
   const [lifecycle, setLifecycle] = useState<GodotLifecycleMessage | null>(null);
   const [health, setHealth] = useState(INITIAL_GODOT_RUNTIME_HEALTH);
   const [interactions, setInteractions] = useState(INITIAL_GODOT_INTERACTIONS);
+  const [preflight, setPreflight] = useState<GodotReleasePreflightSnapshot>(
+    releasePreflightEnabled
+      ? { status: 'checking', reason: 'loading-release-manifest', manifest: null }
+      : BYPASSED_PREFLIGHT,
+  );
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(
     initialReducedMotionPreference,
   );
   const source = useMemo(() => resolveGodotWebUrl(import.meta.env.BASE_URL), []);
+  const manifestUrl = useMemo(() => resolveGodotReleaseManifestUrl(source), [source]);
+  const runtimeEnabled = candidateEnabled
+    && (!releasePreflightEnabled || preflight.status === 'ready');
   const environment = useMemo(readGodotDeviceEnvironment, []);
   const runtimePayload = useMemo<GodotEvolutionPayload>(() => ({
     ...payload,
@@ -122,9 +164,9 @@ export function GodotEvolutionPreview({
 
   const sendPayload = useCallback(() => {
     const target = iframeRef.current?.contentWindow;
-    if (!target || fatalReportedRef.current) return;
+    if (!target || fatalReportedRef.current || !runtimeEnabled) return;
     target.postMessage(createGodotPayloadMessage(runtimePayload), window.location.origin);
-  }, [runtimePayload]);
+  }, [runtimeEnabled, runtimePayload]);
 
   const reportFatal = useCallback((failure: GodotCutoverFailure) => {
     if (fatalReportedRef.current) return;
@@ -155,10 +197,41 @@ export function GodotEvolutionPreview({
   }, []);
 
   useEffect(() => {
-    if (!enabled) {
+    let cancelled = false;
+    if (!candidateEnabled || !releasePreflightEnabled) {
+      setPreflight(BYPASSED_PREFLIGHT);
+      return () => { cancelled = true; };
+    }
+
+    fatalReportedRef.current = false;
+    setStatus('preflight');
+    setPreflight({ status: 'checking', reason: 'loading-release-manifest', manifest: null });
+    void loadGodotReleaseCandidateManifest({
+      url: manifestUrl,
+      expected: {
+        releaseId: GODOT_EVOLUTION_RELEASE_CONTROL.releaseId,
+        acceptanceDigest: GODOT_EVOLUTION_RELEASE_CONTROL.acceptanceDigest,
+      },
+    }).then(manifest => {
+      if (cancelled) return;
+      setPreflight({ status: 'ready', reason: 'manifest-verified', manifest });
+    }).catch(error => {
+      if (cancelled) return;
+      const reason = error instanceof Error ? error.message : 'Unknown release manifest failure.';
+      setPreflight({ status: 'failed', reason, manifest: null });
+      reportFatal('release-preflight');
+    });
+
+    return () => { cancelled = true; };
+  }, [candidateEnabled, manifestUrl, releasePreflightEnabled, reportFatal]);
+
+  useEffect(() => {
+    if (!runtimeEnabled) {
       acceptedRef.current = false;
-      fatalReportedRef.current = false;
-      setStatus('disabled');
+      if (!candidateEnabled) {
+        fatalReportedRef.current = false;
+        setStatus('disabled');
+      }
       return undefined;
     }
 
@@ -179,10 +252,10 @@ export function GodotEvolutionPreview({
     }, Math.max(1_000, startupTimeoutMs));
 
     return () => window.clearTimeout(timeoutId);
-  }, [enabled, reportFatal, startupTimeoutMs]);
+  }, [candidateEnabled, reportFatal, runtimeEnabled, startupTimeoutMs]);
 
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (!runtimeEnabled) return undefined;
 
     const handleMessage = (event: MessageEvent<unknown>) => {
       const frameWindow = iframeRef.current?.contentWindow;
@@ -247,15 +320,15 @@ export function GodotEvolutionPreview({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [enabled, onMessage, reportFatal, runtimePayload, sendPayload]);
+  }, [onMessage, reportFatal, runtimeEnabled, runtimePayload, sendPayload]);
 
   useEffect(() => {
-    if (enabled && (status === 'ready' || status === 'accepted')) {
+    if (runtimeEnabled && (status === 'ready' || status === 'accepted')) {
       sendPayload();
     }
-  }, [enabled, sendPayload, status]);
+  }, [runtimeEnabled, sendPayload, status]);
 
-  if (!enabled) return fallback;
+  if (!candidateEnabled) return fallback;
 
   const quality = telemetry?.quality ?? state?.quality ?? 'unknown';
   const renderScale = telemetry?.render_scale ?? state?.render_scale;
@@ -290,28 +363,40 @@ export function GodotEvolutionPreview({
       data-godot-zoom-count={interactions.zoom}
       data-godot-workflow-passed={String(acceptanceReport.workflowPassed)}
       data-godot-acceptance-passed={String(acceptanceReport.passed)}
+      data-godot-release-preflight={preflight.status}
+      data-godot-release-preflight-reason={preflight.reason}
+      data-godot-release-id={preflight.manifest?.releaseId ?? ''}
+      data-godot-release-build-sha={preflight.manifest?.buildSha ?? ''}
+      data-godot-release-total-bytes={preflight.manifest?.totalBytes ?? ''}
     >
-      <iframe
-        ref={iframeRef}
-        className="godot-evolution-preview__frame"
-        src={source}
-        title="Amore Evolution Engine — Godot 4.7.1"
-        loading="eager"
-        allow="fullscreen"
-        sandbox="allow-scripts allow-same-origin"
-        referrerPolicy="same-origin"
-        onError={() => reportFatal('frame-load')}
-      />
+      {runtimeEnabled && (
+        <iframe
+          ref={iframeRef}
+          className="godot-evolution-preview__frame"
+          src={source}
+          title="Amore Evolution Engine — Godot 4.7.1"
+          loading="eager"
+          allow="fullscreen"
+          sandbox="allow-scripts allow-same-origin"
+          referrerPolicy="same-origin"
+          onError={() => reportFatal('frame-load')}
+        />
+      )}
       <span className="godot-evolution-preview__status" aria-live="polite">
         {status === 'accepted'
           ? `Godot ${quality} · ${health.snapshot.status}${telemetry ? ` · ${Math.round(telemetry.fps)} FPS` : ''}`
-          : status === 'timeout'
-            ? 'Godot runtime timeout'
-            : status === 'error'
-              ? 'Godot runtime error'
-              : `Godot runtime · ${Math.round(progress * 100)}%`}
+          : status === 'preflight'
+            ? 'Godot release preflight…'
+            : status === 'timeout'
+              ? 'Godot runtime timeout'
+              : status === 'error'
+                ? 'Godot runtime error'
+                : `Godot runtime · ${Math.round(progress * 100)}%`}
       </span>
       {diagnosticsEnabled && <GodotDeviceAcceptancePanel report={acceptanceReport} />}
+      {releaseOperationsEnabled && (
+        <GodotReleaseCandidatePanel preflight={preflight} rollbackDrill={rollbackDrill} />
+      )}
     </div>
   );
 }

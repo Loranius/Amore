@@ -3,6 +3,11 @@ import {
   parseGodotRolloutPercent,
   resolveGodotRolloutEligibility,
 } from './godotRolloutPolicy';
+import {
+  parseGodotKillSwitch,
+  parseGodotReleaseStage,
+  resolveGodotReleaseControl,
+} from './godotReleaseControl';
 
 export type GodotEvolutionMode = 'disabled' | 'preview' | 'production';
 
@@ -36,9 +41,19 @@ function browserCohortKey(): string {
 export const GODOT_EVOLUTION_MODE = parseGodotEvolutionMode(
   import.meta.env.VITE_EVOLUTION_GODOT,
 );
-export const GODOT_EVOLUTION_ROLLOUT_PERCENT = parseGodotRolloutPercent(
+export const GODOT_EVOLUTION_REQUESTED_ROLLOUT_PERCENT = parseGodotRolloutPercent(
   import.meta.env.VITE_EVOLUTION_GODOT_ROLLOUT,
 );
+export const GODOT_EVOLUTION_RELEASE_CONTROL = resolveGodotReleaseControl({
+  mode: GODOT_EVOLUTION_MODE,
+  requestedRolloutPercent: GODOT_EVOLUTION_REQUESTED_ROLLOUT_PERCENT,
+  stage: parseGodotReleaseStage(import.meta.env.VITE_EVOLUTION_GODOT_RELEASE_STAGE),
+  releaseId: String(import.meta.env.VITE_EVOLUTION_GODOT_RELEASE_ID ?? ''),
+  acceptanceDigest: String(import.meta.env.VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256 ?? ''),
+  killSwitch: parseGodotKillSwitch(import.meta.env.VITE_EVOLUTION_GODOT_KILL_SWITCH),
+});
+export const GODOT_EVOLUTION_ROLLOUT_PERCENT =
+  GODOT_EVOLUTION_RELEASE_CONTROL.effectiveRolloutPercent;
 export const GODOT_EVOLUTION_COHORT_KEY = browserCohortKey();
 export const GODOT_EVOLUTION_ROLLOUT_ELIGIBLE = resolveGodotRolloutEligibility({
   mode: GODOT_EVOLUTION_MODE,
@@ -46,6 +61,7 @@ export const GODOT_EVOLUTION_ROLLOUT_ELIGIBLE = resolveGodotRolloutEligibility({
   cohortKey: GODOT_EVOLUTION_COHORT_KEY,
 });
 
-export const GODOT_EVOLUTION_ENABLED = GODOT_EVOLUTION_MODE !== 'disabled'
+export const GODOT_EVOLUTION_ENABLED = GODOT_EVOLUTION_RELEASE_CONTROL.gateOpen
+  && GODOT_EVOLUTION_MODE !== 'disabled'
   && GODOT_EVOLUTION_ROLLOUT_ELIGIBLE;
 export const GODOT_EVOLUTION_PRODUCTION = GODOT_EVOLUTION_MODE === 'production';

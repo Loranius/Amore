@@ -14,9 +14,11 @@ import {
 import {
   GODOT_EVOLUTION_ENABLED,
   GODOT_EVOLUTION_MODE,
+  GODOT_EVOLUTION_RELEASE_CONTROL,
   GODOT_EVOLUTION_ROLLOUT_ELIGIBLE,
   GODOT_EVOLUTION_ROLLOUT_PERCENT,
 } from '../../godot3d/godotFeatureFlag';
+import { isGodotRollbackDrillEnabled } from '../../godot3d/godotReleaseCandidate';
 import { godotPayloadFromArtifact } from '../../godot3d/godotPayloadFromArtifact';
 import type {
   GodotBridgeInboundMessage,
@@ -35,10 +37,16 @@ function formatTopology(value: number): string {
   return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
 }
 
+function initialRollbackDrill(): boolean {
+  return typeof window !== 'undefined'
+    && isGodotRollbackDrillEnabled(window.location.search);
+}
+
 export default function EvolutionCrystalPreviewScene() {
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
+  const [rollbackDrill] = useState(initialRollbackDrill);
   const { pipeline, isPending, error } = useEvolutionCrystalPipeline(reduceMotion);
   const { dna, deltas, isPending: statsPending } = useCrystalDNA();
   const [open, setOpen] = useState(false);
@@ -49,8 +57,9 @@ export default function EvolutionCrystalPreviewScene() {
     () => pipeline ? godotPayloadFromArtifact(pipeline.artifact) : null,
     [pipeline],
   );
+  const godotCandidateEnabled = GODOT_EVOLUTION_ENABLED && !rollbackDrill;
   const renderer = resolveEvolutionRenderer({
-    enabled: GODOT_EVOLUTION_ENABLED,
+    enabled: godotCandidateEnabled,
     payloadReady: Boolean(godotPayload),
     failure: godotFailure,
   });
@@ -93,9 +102,10 @@ export default function EvolutionCrystalPreviewScene() {
   const metrics = pipeline.metrics;
   const badge = renderer === 'godot'
     ? [
-        GODOT_EVOLUTION_MODE === 'production' ? 'Godot production' : 'Godot preview',
+        GODOT_EVOLUTION_MODE === 'production' ? 'Godot production RC' : 'Godot preview',
+        GODOT_EVOLUTION_RELEASE_CONTROL.stage,
         `rollout ${GODOT_EVOLUTION_ROLLOUT_PERCENT}%`,
-        godotState ? `${godotState.instructions} канон.` : 'runtime…',
+        godotState ? `${godotState.instructions} канон.` : 'preflight/runtime…',
         godotState?.rendered_instructions !== undefined
           ? `${godotState.rendered_instructions} тіл`
           : 'bridge…',
@@ -109,9 +119,13 @@ export default function EvolutionCrystalPreviewScene() {
           `${formatTopology(metrics.usedTriangles)} △`,
         ].join(' · ')
       : [
-          GODOT_EVOLUTION_MODE === 'production' && !GODOT_EVOLUTION_ROLLOUT_ELIGIBLE
-            ? 'Three rollout cohort'
-            : 'Evolution',
+          rollbackDrill
+            ? 'Three rollback drill'
+            : GODOT_EVOLUTION_MODE === 'production' && !GODOT_EVOLUTION_RELEASE_CONTROL.gateOpen
+              ? `Three release gate · ${GODOT_EVOLUTION_RELEASE_CONTROL.reason}`
+              : GODOT_EVOLUTION_MODE === 'production' && !GODOT_EVOLUTION_ROLLOUT_ELIGIBLE
+                ? 'Three rollout cohort'
+                : 'Evolution',
           metrics.quality,
           `${metrics.meshCount} тіл`,
           `${formatTopology(metrics.usedTriangles)} △`,
@@ -147,6 +161,12 @@ export default function EvolutionCrystalPreviewScene() {
         data-evolution-godot-failure={godotFailure ?? ''}
         data-evolution-godot-rollout={GODOT_EVOLUTION_ROLLOUT_PERCENT}
         data-evolution-godot-cohort={String(GODOT_EVOLUTION_ROLLOUT_ELIGIBLE)}
+        data-evolution-godot-release-stage={GODOT_EVOLUTION_RELEASE_CONTROL.stage}
+        data-evolution-godot-release-gate={String(GODOT_EVOLUTION_RELEASE_CONTROL.gateOpen)}
+        data-evolution-godot-release-reason={GODOT_EVOLUTION_RELEASE_CONTROL.reason}
+        data-evolution-godot-release-id={GODOT_EVOLUTION_RELEASE_CONTROL.releaseId}
+        data-evolution-godot-kill-switch={String(GODOT_EVOLUTION_RELEASE_CONTROL.killSwitch)}
+        data-evolution-godot-rollback-drill={String(rollbackDrill)}
       >
         {useGodot && godotPayload ? (
           <GodotEvolutionPreview
@@ -154,6 +174,7 @@ export default function EvolutionCrystalPreviewScene() {
             enabled
             startupTimeoutMs={60_000}
             healthFallbackEnabled={GODOT_EVOLUTION_MODE === 'production'}
+            releasePreflightEnabled={GODOT_EVOLUTION_MODE === 'production'}
             onMessage={onGodotMessage}
             onFatalError={onGodotFatalError}
           />
