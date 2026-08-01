@@ -4,14 +4,14 @@
 [ext_resource type="Script" path="res://scripts/runtime/orbit_camera.gd" id="2_camera"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_crystal"]
-sky_top_color = Color(0.026, 0.034, 0.074, 1)
-sky_horizon_color = Color(0.082, 0.086, 0.15, 1)
-sky_curve = 0.38
-sky_energy_multiplier = 0.82
-ground_bottom_color = Color(0.018, 0.022, 0.044, 1)
-ground_horizon_color = Color(0.074, 0.066, 0.12, 1)
-ground_curve = 0.3
-ground_energy_multiplier = 0.46
+sky_top_color = Color(0.022, 0.03, 0.066, 1)
+sky_horizon_color = Color(0.052, 0.058, 0.11, 1)
+sky_curve = 0.58
+sky_energy_multiplier = 0.84
+ground_bottom_color = Color(0.024, 0.029, 0.058, 1)
+ground_horizon_color = Color(0.052, 0.058, 0.11, 1)
+ground_curve = 0.56
+ground_energy_multiplier = 0.72
 sun_angle_max = 6.0
 sun_curve = 0.1
 energy_multiplier = 1.0
