@@ -2,7 +2,7 @@
 
 ## Status
 
-Phase 11 establishes the guarded production cutover. Phase 12 adds capability detection, lifecycle suspension and telemetry. Phase 13 adds validated interaction evidence, runtime-health fallback, device reports and progressive rollout without expanding Godot's data authority.
+Phase 11 establishes the guarded production cutover. Phase 12 adds capability detection, lifecycle suspension and telemetry. Phase 13 adds validated interaction evidence, runtime-health fallback and honest device reports. Phase 14 adds an auditable release-control boundary before the bridge can enter production.
 
 ## Runtime selection
 
@@ -14,9 +14,31 @@ VITE_EVOLUTION_GODOT_ROLLOUT=0..100
 ```
 
 - disabled always selects Three.js;
-- preview explicitly selects Godot;
-- production selects Godot only for an eligible persistent browser cohort;
-- any fatal cutover failure selects the existing Three.js fallback.
+- preview explicitly selects Godot without production approval;
+- production requires an open Phase 14 release gate and an eligible persistent browser cohort;
+- any fatal or sustained-critical cutover failure selects the existing Three.js fallback.
+
+## Phase 14 release boundary
+
+Production additionally reads:
+
+```text
+VITE_EVOLUTION_GODOT_RELEASE_STAGE
+VITE_EVOLUTION_GODOT_RELEASE_ID
+VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256
+VITE_EVOLUTION_GODOT_KILL_SWITCH
+```
+
+The gate opens only when:
+
+- stage is one of `canary-5`, `ramp-25`, `ramp-50`, `released-100`;
+- release ID matches the bounded identifier format;
+- acceptance digest is exactly 64 hexadecimal SHA-256 characters;
+- kill switch is inactive.
+
+Stage ceilings are fixed at 5%, 25%, 50% and 100%. The requested rollout cannot exceed the current stage. `blocked` or an active kill switch produces an effective rollout of 0%.
+
+This control runs before iframe creation. A closed gate is a normal Three.js selection, not a runtime failure. The physical report digest is public audit metadata, not a secret or credential.
 
 ## Build output
 
@@ -39,7 +61,8 @@ The React host and Godot iframe are same-origin.
 - the shell accepts payloads only from `window.parent` and current origin;
 - Godot receives canonical serialized input, never Supabase credentials or access tokens;
 - Godot cannot write history or own portal navigation;
-- device reports exclude DNA, events and relationship content.
+- device reports exclude DNA, events and relationship content;
+- release approval changes renderer selection only and cannot mutate canonical data.
 
 ## Host → Godot
 
@@ -97,7 +120,7 @@ The runtime emits:
 
 Only `source: portal` can be accepted. React verifies species, seed, input-event count, canonical history bounds, instruction counts and deterministic signature.
 
-The Phase 13 state additionally reports the quality tier, render scale, Life Engine rate and phase number. Quality remains presentation-only.
+The accepted Phase 13 runtime additionally reports the quality tier, render scale, Life Engine rate and phase number. Phase 14 does not modify this runtime state or signature.
 
 ### Telemetry
 
@@ -161,7 +184,7 @@ Production fallback requires eight consecutive critical samples. A single slow f
 
 Health thresholds and the complete acceptance procedure are defined in `CRYSTAL_PHASE_13.md`.
 
-## Device acceptance report
+## Device acceptance and frozen candidate
 
 The query-gated panel is enabled through:
 
@@ -178,6 +201,8 @@ It exposes two separate results:
 
 `navigator.webdriver === true` marks the assessment as automation. Automated CI can never claim physical acceptance.
 
+After `PHYSICAL PASS`, Phase 14 validates the report again and freezes exact JSON bytes. SHA-256 is calculated from those bytes, so editing or reformatting the saved report invalidates its digest.
+
 ## Controlled fallback
 
 The host resolves to `three-fallback` after:
@@ -188,22 +213,18 @@ The host resolves to `three-fallback` after:
 4. canonical state mismatch;
 5. sustained critical performance health.
 
-Background suspension alone is not fatal.
+Background suspension alone is not fatal. Closed release gates and non-selected cohorts use ordinary `three`, not `three-fallback`.
 
-## Phase 13 verification
+## Phase 14 verification
 
-The bridge requires:
+The release path requires:
 
-1. Godot parser and all prior smoke tests;
-2. interaction smoke proof;
-3. strict state, telemetry, lifecycle and interaction validation;
-4. deterministic health, rollout and report tests;
-5. release Web export;
-6. production Vite build;
-7. automated 30-sample workflow proof;
-8. orbit and background restore proof;
-9. unchanged signature after restore;
-10. dedicated critical-health fallback proof;
-11. tap and reduced-motion regressions;
-12. browser artifact upload;
-13. a real Pixel 8 Pro report before broad production rollout.
+1. all Phase 1–13 runtime and browser checks;
+2. production blocked by default;
+3. strict physical-report import validation;
+4. exact SHA-256 generation tests;
+5. fixed stage-ceiling tests;
+6. emergency kill-switch precedence;
+7. production bundle with an explicitly synthetic CI approval fixture;
+8. browser workflow, restore, signature and fallback regression proof;
+9. a real frozen Pixel 8 Pro report before any actual canary deployment.
