@@ -3,6 +3,7 @@ extends Node3D
 const Model = preload("res://scripts/core/evolution_model.gd")
 const GrowthEngine = preload("res://scripts/growth/growth_engine.gd")
 const CrystalMeshBuilder = preload("res://scripts/geometry/crystal_mesh_builder.gd")
+const CrystalFusionBuilder = preload("res://scripts/geometry/crystal_fusion_builder.gd")
 const WebPortalBridge = preload("res://scripts/runtime/web_portal_bridge.gd")
 
 @onready var artifact_root: Node3D = $ArtifactRoot
@@ -62,16 +63,26 @@ func canonical_snapshot_json() -> String:
 
 func _render_state() -> void:
 	for child in artifact_root.get_children():
-		child.queue_free()
+		child.free()
 
-	var builder := CrystalMeshBuilder.new()
+	var crystal_builder := CrystalMeshBuilder.new()
+	var fusion_builder := CrystalFusionBuilder.new()
+	if not current_state.instructions.is_empty():
+		artifact_root.add_child(
+			fusion_builder.create_foundation_instance(current_state.instructions[0]),
+		)
+
 	for instruction in current_state.instructions:
-		artifact_root.add_child(builder.create_mesh_instance(instruction))
+		artifact_root.add_child(crystal_builder.create_mesh_instance(instruction))
+
+	for instruction in current_state.instructions:
+		if instruction.generation > 0:
+			artifact_root.add_child(fusion_builder.create_junction_instance(instruction))
 
 
 func _update_status(source: String) -> void:
 	status_label.text = (
-		"Godot 4.7.1 · Crystal bootstrap\n"
+		"Godot 4.7.1 · Crystal Phase 5\n"
 		+ "%d accepted growth instructions\n" % current_state.instructions.size()
 		+ "seed %d · %s rebuild" % [current_state.dna.seed, source]
 	)
