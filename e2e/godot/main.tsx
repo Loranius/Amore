@@ -75,7 +75,6 @@ function GodotBridgeHarness() {
         payload={payload}
         enabled
         healthFallbackEnabled
-        diagnosticsEnabled
         onMessage={onMessage}
         onFatalError={setFatalFailure}
       />
