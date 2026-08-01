@@ -22,6 +22,8 @@ export interface GodotEvolutionPayload {
   events: GodotEvolutionEventPayload[];
 }
 
+export type GodotActivationSource = 'tap' | 'keyboard';
+
 export type GodotBridgeInboundMessage =
   | { type: 'amore:godot:booting'; version: string }
   | { type: 'amore:godot:progress'; current: number; total: number; ratio: number }
@@ -31,35 +33,98 @@ export type GodotBridgeInboundMessage =
       type: 'amore:godot:state';
       version: string;
       source: string;
-      species: string;
+      species: 'crystal' | 'tree' | 'reef';
       seed: number;
       instructions: number;
       rendered_instructions?: number;
       history: number;
       motion?: 'full' | 'reduced';
       life_version?: string;
+      visual_version?: string;
+      phase?: number;
       signature: string;
     }
+  | { type: 'amore:godot:activate'; source: GodotActivationSource }
   | { type: 'amore:godot:error'; message: string };
+
+export type GodotStateMessage = Extract<
+  GodotBridgeInboundMessage,
+  { type: 'amore:godot:state' }
+>;
 
 export interface GodotBridgePayloadMessage {
   type: 'amore:godot:payload';
   payload: GodotEvolutionPayload;
 }
 
-const INBOUND_TYPES = new Set([
-  'amore:godot:booting',
-  'amore:godot:progress',
-  'amore:godot:engine-started',
-  'amore:godot:ready',
-  'amore:godot:state',
-  'amore:godot:error',
-]);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isNonNegativeInteger(value: unknown): value is number {
+  return isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
+function isVersionedMessage(value: Record<string, unknown>): boolean {
+  return typeof value.version === 'string' && value.version.length > 0;
+}
 
 export function isGodotBridgeInboundMessage(value: unknown): value is GodotBridgeInboundMessage {
-  if (!value || typeof value !== 'object') return false;
-  const type = Reflect.get(value, 'type');
-  return typeof type === 'string' && INBOUND_TYPES.has(type);
+  if (!isRecord(value) || typeof value.type !== 'string') return false;
+
+  switch (value.type) {
+    case 'amore:godot:booting':
+    case 'amore:godot:engine-started':
+      return isVersionedMessage(value);
+    case 'amore:godot:progress':
+      return isNonNegativeInteger(value.current)
+        && isNonNegativeInteger(value.total)
+        && value.total > 0
+        && isFiniteNumber(value.ratio)
+        && value.ratio >= 0
+        && value.ratio <= 1;
+    case 'amore:godot:ready':
+      return isVersionedMessage(value) && value.runtime === 'godot';
+    case 'amore:godot:state':
+      return isVersionedMessage(value)
+        && typeof value.source === 'string'
+        && ['crystal', 'tree', 'reef'].includes(String(value.species))
+        && isFiniteNumber(value.seed)
+        && isNonNegativeInteger(value.instructions)
+        && (value.rendered_instructions === undefined
+          || isNonNegativeInteger(value.rendered_instructions))
+        && isNonNegativeInteger(value.history)
+        && (value.motion === undefined || value.motion === 'full' || value.motion === 'reduced')
+        && typeof value.signature === 'string'
+        && value.signature.length >= 8;
+    case 'amore:godot:activate':
+      return value.source === 'tap' || value.source === 'keyboard';
+    case 'amore:godot:error':
+      return typeof value.message === 'string' && value.message.length > 0;
+    default:
+      return false;
+  }
+}
+
+export function isGodotRuntimeStateAccepted(
+  message: GodotStateMessage,
+  payload: GodotEvolutionPayload,
+): boolean {
+  if (message.species !== payload.dna.species) return false;
+  if (message.seed !== payload.dna.seed) return false;
+  if (message.history !== payload.events.length) return false;
+  if (message.instructions < 1) return false;
+  if (
+    message.rendered_instructions !== undefined
+    && message.rendered_instructions > message.instructions
+  ) {
+    return false;
+  }
+  return true;
 }
 
 export function createGodotPayloadMessage(
