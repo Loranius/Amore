@@ -43,10 +43,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl --fail --location --retry 3 \
+          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 30 --continue-at - \
             --output /tmp/godot.zip \
             https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
-          curl --fail --location --retry 3 \
+          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 30 --continue-at - \
             --output /tmp/godot-templates.tpz \
             https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
 
@@ -91,6 +93,20 @@ jobs:
             exit 1
           fi
           grep -q 'PASS: deterministic crystal rebuild' /tmp/godot-smoke.log
+
+      - name: Run integrated Crystal fusion smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60s godot --headless \
+            --path godot/evolution-engine \
+            --script res://scripts/tests/integrated_fusion_smoke.gd \
+            2>&1 | tee /tmp/godot-fusion-smoke.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-fusion-smoke.log; then
+            echo 'Godot reported script parser or loader errors during the integrated fusion test.'
+            exit 1
+          fi
+          grep -q 'PASS: integrated crystal fusion' /tmp/godot-fusion-smoke.log
 
       - name: Export Web runtime
         shell: bash
