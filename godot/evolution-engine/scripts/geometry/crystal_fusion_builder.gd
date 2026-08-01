@@ -48,7 +48,7 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 		0.14,
 	)
 	var phase: float = float(mother.metadata.get("foundation_phase", 0.0))
-	var center := Vector3(
+	var center: Vector3 = Vector3(
 		mother.attach_position.x
 			+ float(mother.metadata.get("foundation_offset_x", 0.0)) * mother.radius,
 		0.0,
@@ -61,8 +61,8 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 	var skirt_y: float = mother.attach_position.y + height * 0.16
 	var shoulder_y: float = mother.attach_position.y + height * 0.58
 	var crown_y: float = mother.attach_position.y + height * 0.84
-	var top := center + Vector3.UP * (mother.attach_position.y + height)
-	var color := _crystal_color(mother).darkened(0.1)
+	var top: Vector3 = center + Vector3.UP * (mother.attach_position.y + height)
+	var color: Color = _crystal_color(mother).darkened(0.1)
 
 	var bottom_ring: Array[Vector3] = _build_foundation_ring(
 		sides,
@@ -115,7 +115,7 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 			color.lightened(0.035 + float(side % 2) * 0.012),
 		)
 
-	var bottom_center := center + Vector3.UP * bottom_y
+	var bottom_center: Vector3 = center + Vector3.UP * bottom_y
 	for side in range(sides):
 		var next: int = (side + 1) % sides
 		_add_triangle_with_normal(
@@ -127,7 +127,7 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 			color.darkened(0.18),
 		)
 
-	var mesh := surface.commit()
+	var mesh: ArrayMesh = surface.commit()
 	mesh.surface_set_material(0, _build_foundation_material(color))
 	return mesh
 
@@ -183,7 +183,7 @@ func create_junction_mesh(instruction) -> ArrayMesh:
 		instruction.length * sleeve_height_ratio,
 		flare_y + instruction.radius * 0.48,
 	)
-	var color := _crystal_color(instruction).darkened(0.035)
+	var color: Color = _crystal_color(instruction).darkened(0.035)
 
 	var root_ring: Array[Vector3] = _build_ring(
 		sides,
@@ -210,7 +210,7 @@ func create_junction_mesh(instruction) -> ArrayMesh:
 	_connect_rings(surface, root_ring, flare_ring, color.darkened(0.055))
 	_connect_rings(surface, flare_ring, sleeve_ring, color.lightened(0.012))
 
-	var mesh := surface.commit()
+	var mesh: ArrayMesh = surface.commit()
 	mesh.surface_set_material(0, _build_junction_material(instruction, color))
 	return mesh
 
@@ -233,7 +233,7 @@ func _build_foundation_ring(
 		)
 		var local_radius: float = radius * (1.0 + harmonic * irregularity)
 		var local_y: float = y + sin(angle * 3.0 + phase) * vertical_wave
-		var radial := Vector3(cos(angle), 0.0, sin(angle))
+		var radial: Vector3 = Vector3(cos(angle), 0.0, sin(angle))
 		ring.append(center + radial * local_radius + Vector3.UP * local_y)
 	return ring
 
@@ -253,7 +253,7 @@ func _build_ring(
 			+ cos(angle * 3.0 - phase * 1.7) * 0.38
 		)
 		var local_radius: float = radius * (1.0 + harmonic * ridge_strength)
-		var radial := Vector3(cos(angle), 0.0, sin(angle))
+		var radial: Vector3 = Vector3(cos(angle), 0.0, sin(angle))
 		ring.append(radial * local_radius + Vector3.UP * y)
 	return ring
 
@@ -267,7 +267,7 @@ func _connect_rings(
 	var sides: int = mini(lower.size(), upper.size())
 	for side in range(sides):
 		var next: int = (side + 1) % sides
-		var facet_color := color.lightened(float(side % 3) * 0.012)
+		var facet_color: Color = color.lightened(float(side % 3) * 0.012)
 		_add_quad_clockwise(
 			surface,
 			lower[side],
@@ -327,7 +327,7 @@ func _add_quad_clockwise(
 	d: Vector3,
 	color: Color,
 ) -> void:
-	var outward := (d - a).cross(b - a).normalized()
+	var outward: Vector3 = (d - a).cross(b - a).normalized()
 	_add_triangle_with_normal(surface, a, c, b, outward, color)
 	_add_triangle_with_normal(surface, a, d, c, outward, color)
 
@@ -339,7 +339,7 @@ func _add_triangle_clockwise(
 	c: Vector3,
 	color: Color,
 ) -> void:
-	var outward := (c - a).cross(b - a).normalized()
+	var outward: Vector3 = (c - a).cross(b - a).normalized()
 	_add_triangle_with_normal(surface, a, c, b, outward, color)
 
 
@@ -358,20 +358,20 @@ func _add_triangle_with_normal(
 
 
 func _basis_from_y(direction: Vector3) -> Basis:
-	var y_axis := direction.normalized()
-	var x_axis := Vector3.FORWARD.cross(y_axis)
+	var y_axis: Vector3 = direction.normalized()
+	var x_axis: Vector3 = Vector3.FORWARD.cross(y_axis)
 	if x_axis.length_squared() < 0.000001:
 		x_axis = Vector3.RIGHT
 	x_axis = x_axis.normalized()
-	var z_axis := x_axis.cross(y_axis).normalized()
+	var z_axis: Vector3 = x_axis.cross(y_axis).normalized()
 	return Basis(x_axis, y_axis, z_axis)
 
 
 func _crystal_color(instruction) -> Color:
-	var hue_shift := float(instruction.metadata.get("hue_shift", 0.0))
-	var hue := fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
-	var saturation := clampf(0.34 + instruction.energy * 0.11, 0.0, 1.0)
-	var value := clampf(0.64 + instruction.energy * 0.13, 0.0, 1.0)
+	var hue_shift: float = float(instruction.metadata.get("hue_shift", 0.0))
+	var hue: float = fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
+	var saturation: float = clampf(0.34 + instruction.energy * 0.11, 0.0, 1.0)
+	var value: float = clampf(0.64 + instruction.energy * 0.13, 0.0, 1.0)
 	return Color.from_hsv(hue, saturation, value, 1.0)
 
 
