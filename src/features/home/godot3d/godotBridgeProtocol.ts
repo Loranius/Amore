@@ -37,6 +37,7 @@ export type GodotBridgeInboundMessage =
       seed: number;
       instructions: number;
       rendered_instructions?: number;
+      input_events: number;
       history: number;
       motion?: 'full' | 'reduced';
       life_version?: string;
@@ -97,7 +98,9 @@ export function isGodotBridgeInboundMessage(value: unknown): value is GodotBridg
         && isNonNegativeInteger(value.instructions)
         && (value.rendered_instructions === undefined
           || isNonNegativeInteger(value.rendered_instructions))
+        && isNonNegativeInteger(value.input_events)
         && isNonNegativeInteger(value.history)
+        && value.history >= value.input_events
         && (value.motion === undefined || value.motion === 'full' || value.motion === 'reduced')
         && typeof value.signature === 'string'
         && value.signature.length >= 8;
@@ -116,7 +119,8 @@ export function isGodotRuntimeStateAccepted(
 ): boolean {
   if (message.species !== payload.dna.species) return false;
   if (message.seed !== payload.dna.seed) return false;
-  if (message.history !== payload.events.length) return false;
+  if (message.input_events !== payload.events.length) return false;
+  if (message.history < message.input_events) return false;
   if (message.instructions < 1) return false;
   if (
     message.rendered_instructions !== undefined
