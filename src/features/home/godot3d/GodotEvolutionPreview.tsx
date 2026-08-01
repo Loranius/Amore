@@ -39,7 +39,7 @@ interface GodotEvolutionPreviewProps {
 }
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
-const DEFAULT_STARTUP_TIMEOUT_MS = 20_000;
+const DEFAULT_STARTUP_TIMEOUT_MS = 60_000;
 
 function initialReducedMotionPreference(): boolean {
   return typeof window !== 'undefined'
