@@ -8,7 +8,7 @@ interface GodotDeviceAcceptancePanelProps {
 const CRITERIA_LABELS: Record<keyof GodotDeviceAcceptanceReport['criteria'], string> = {
   runtimeAccepted: 'Portal runtime accepted',
   stableThirtySecondWindow: '30 telemetry samples',
-  healthyRuntime: 'Runtime health stable',
+  healthyRuntime: 'Physical runtime health stable',
   orbitCompleted: 'Orbit gesture completed',
   backgroundRestoreCompleted: 'Background restore completed',
   deterministicSignaturePresent: 'Deterministic signature present',
@@ -18,6 +18,16 @@ const CRITERIA_LABELS: Record<keyof GodotDeviceAcceptanceReport['criteria'], str
 export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePanelProps) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   const reportJson = useMemo(() => JSON.stringify(report, null, 2), [report]);
+  const verdict = report.passed
+    ? 'PHYSICAL PASS'
+    : report.workflowPassed
+      ? 'WORKFLOW PASS'
+      : report.health.status.toUpperCase();
+  const verdictStatus = report.passed
+    ? 'passed'
+    : report.workflowPassed
+      ? 'workflow'
+      : report.health.status;
 
   const copyReport = async () => {
     try {
@@ -44,6 +54,8 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
     <aside
       className="godot-device-acceptance"
       data-godot-device-acceptance="phase-13"
+      data-godot-assessment={report.assessment}
+      data-godot-workflow-passed={String(report.workflowPassed)}
       data-godot-acceptance-passed={String(report.passed)}
       data-godot-health-status={report.health.status}
       data-godot-health-reason={report.health.reason}
@@ -58,14 +70,16 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
     >
       <div className="godot-device-acceptance__heading">
         <div>
-          <span className="godot-device-acceptance__eyebrow">Crystal Phase 13</span>
+          <span className="godot-device-acceptance__eyebrow">
+            Crystal Phase 13 · {report.assessment}
+          </span>
           <strong>Physical device acceptance</strong>
         </div>
         <span
           className="godot-device-acceptance__verdict"
-          data-status={report.passed ? 'passed' : report.health.status}
+          data-status={verdictStatus}
         >
-          {report.passed ? 'PASS' : report.health.status.toUpperCase()}
+          {verdict}
         </span>
       </div>
 
@@ -100,7 +114,12 @@ export function GodotDeviceAcceptancePanel({ report }: GodotDeviceAcceptancePane
         <button type="button" onClick={saveReport}>Зберегти JSON</button>
       </div>
 
-      <small>{report.privacy}</small>
+      <small>
+        {report.assessment === 'automation'
+          ? 'Automation validates the workflow only; hardware health remains a physical-device gate. '
+          : ''}
+        {report.privacy}
+      </small>
       <output hidden data-godot-acceptance-report>{reportJson}</output>
     </aside>
   );
