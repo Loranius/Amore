@@ -13,27 +13,37 @@ Nothing in the existing React, Supabase or Three.js runtime is deleted by this b
 
 ## Current vertical slice
 
-The first runnable slice generates a deterministic crystal colony from:
+The runnable Crystal slice generates a deterministic colony from:
 
 1. immutable Artifact DNA;
 2. a sorted append-only Evolution Event history;
-3. species translation into Growth Instructions;
-4. deterministic collision resolution;
-5. procedural ArrayMesh construction;
-6. a mobile-friendly Godot Compatibility renderer scene.
+3. Species translation into initial Growth Instructions;
+4. deterministic primary, secondary and accent hierarchy assignment;
+5. bounded parent capacity, generation depth and silhouette control;
+6. deterministic collision resolution that preserves the hierarchy floor;
+7. procedural ArrayMesh construction and integrated junction geometry;
+8. a mobile-friendly Godot Compatibility renderer scene.
 
-Tree and Reef will reuse the same canonical event/state pipeline after the crystal slice passes web and Pixel 8 Pro validation.
+Tree and Reef will reuse the same canonical event/state pipeline after the Crystal slice passes its remaining visual and physical-device acceptance gates.
 
 ## Run locally
 
 Open `godot/evolution-engine/project.godot` in Godot 4.7.1 and run the main scene.
 
-Headless determinism smoke test:
+Headless acceptance tests:
 
 ```bash
 godot --headless \
   --path godot/evolution-engine \
   --script res://scripts/tests/determinism_smoke.gd
+
+godot --headless \
+  --path godot/evolution-engine \
+  --script res://scripts/tests/growth_hierarchy_smoke.gd
+
+godot --headless \
+  --path godot/evolution-engine \
+  --script res://scripts/tests/integrated_fusion_smoke.gd
 ```
 
 ## Architectural boundary
@@ -46,7 +56,8 @@ React / Vite / Supabase
 Godot Evolution Runtime
         |
         +-- Species translation
-        +-- Growth Engine
+        +-- Growth hierarchy
+        +-- Collision competition
         +-- Geometry builders
         +-- Materials / Life / Camera
         |
