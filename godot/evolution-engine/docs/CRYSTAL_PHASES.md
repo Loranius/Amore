@@ -34,7 +34,7 @@ The accepted Pixel 8 Pro browser proof shows a readable druse base without the e
 
 ### Canonical morphology parameters
 
-Every accepted crystal instruction now owns deterministic values for:
+Every accepted crystal instruction owns deterministic values for:
 
 - body taper;
 - waist ratio;
@@ -50,7 +50,7 @@ These values belong to Species translation and are serialized with Growth Instru
 
 ### Geometry projection
 
-The Godot mesh builder projects each crystal through five profile rings:
+The Godot mesh builder projects each crystal through bounded profile rings:
 
 ```text
 embedded base
@@ -63,14 +63,82 @@ embedded base
 
 Rings may twist and drift within bounded values while preserving the accepted root, direction, radius, length and lineage.
 
+## Phase 4 — Optical material foundation
+
+Phase 4 established a mobile-bounded optical language without relying on expensive transparency:
+
+- corrected outward facet normals while preserving Godot clockwise front faces;
+- bounded roughness, clearcoat, rim, backlight and emission;
+- procedural low-resolution Sky radiance for PBR reflections;
+- explicit vertex and normal validation;
+- no GDExtension, thread or SharedArrayBuffer dependency for Web export.
+
+The result prioritizes readable planes and silhouette over neon emission.
+
+## Phase 5 — Foundation and integrated junction cleanup
+
+Phase 5 removed separate collar-like junction overlays and moved the attachment transition into each child mesh:
+
+```text
+buried root
+  → integrated flare
+  → lower recovery ring
+  → crystal body
+```
+
+Accepted contracts include:
+
+- one low-profile faceted foundation around the mother Crystal;
+- deterministic foundation width, height, irregularity, phase and offset;
+- basal roots hidden inside the shared foundation;
+- one continuous ArrayMesh per attached Crystal;
+- bounded flare-to-root and flare-to-body ratios;
+- no visible bracelet or hexagonal collar geometry.
+
+## Phase 6 — Growth hierarchy and silhouette control
+
+Phase 6 introduces a renderer-independent hierarchy pass between Species translation and collision competition.
+
+### Canonical event tiers
+
+Each accepted event growth receives exactly one deterministic silhouette tier:
+
+- `primary` — high-significance or high-achievement growth that may become a major branch;
+- `secondary` — supporting growth that fills the composition without competing with the mother;
+- `accent` — shorter, thinner and more lateral growth driven by exploration, culture or low prominence.
+
+The tier, prominence score and hierarchy version are serialized into Growth Instruction metadata.
+
+### Parent and generation contracts
+
+- the mother accepts at most four event children in addition to the DNA basal crown;
+- primary event parents may accept at most two event children;
+- secondary and accent event parents accept at most one event child;
+- DNA basal crown crystals are not event parents;
+- event growth is capped at generation three;
+- primary growth may not start below the accepted upward silhouette floor;
+- every child remains subordinate to its parent in both length and radius.
+
+### Pipeline order
+
+```text
+Species translation
+  → deterministic hierarchy and reattachment
+  → bounded collision competition
+  → append-only canonical state
+  → procedural geometry
+```
+
+Collision fallback may reduce occupied volume, but it may not change identity, tier, parent lineage or append-only history.
+
 ### Acceptance gates
 
-Phase 3 must pass:
+Phase 6 must pass:
 
-1. deterministic state reconstruction;
-2. morphology parameter bounds;
-3. single-surface ArrayMesh generation;
-4. minimum vertical and lateral mesh extent;
-5. release Web export;
-6. React → Godot WebAssembly bridge proof;
-7. manual Pixel 8 Pro silhouette and facet review.
+1. input-order-independent canonical reconstruction;
+2. valid `primary`, `secondary` and `accent` coverage;
+3. bounded parent capacities;
+4. maximum generation three;
+5. child-to-parent length and radius subordination;
+6. preserved mother dominance;
+7. Godot parser/import, Web export and React bridge validation.
