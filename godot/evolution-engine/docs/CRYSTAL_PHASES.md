@@ -129,11 +129,11 @@ Species translation
   → procedural geometry
 ```
 
-Collision fallback may reduce occupied volume, but it may not change identity, tier, parent lineage or append-only history.
+Collision fallback may reduce occupied volume, but it may not change identity, tier, parent lineage or append-only history. Collision rotation is also required to reapply the tier-specific upward floor before a candidate can be accepted.
 
 ### Acceptance gates
 
-Phase 6 must pass:
+Phase 6 passes:
 
 1. input-order-independent canonical reconstruction;
 2. valid `primary`, `secondary` and `accent` coverage;
@@ -141,4 +141,5 @@ Phase 6 must pass:
 4. maximum generation three;
 5. child-to-parent length and radius subordination;
 6. preserved mother dominance;
-7. Godot parser/import, Web export and React bridge validation.
+7. silhouette-floor preservation during collision search;
+8. Godot parser/import, integrated fusion, Web export and React bridge validation.
