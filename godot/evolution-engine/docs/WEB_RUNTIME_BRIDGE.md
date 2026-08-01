@@ -2,21 +2,47 @@
 
 ## Status
 
-Phase 11 promotes the bridge from an isolated vertical slice to a production-capable Crystal cutover with automatic Three.js fallback. Phase 12 adds mobile capability detection, page lifecycle handling and runtime telemetry without expanding Godot's data authority.
+Phase 11 establishes the guarded production cutover. Phase 12 adds capability detection, lifecycle suspension and telemetry. Phase 13 adds validated interaction evidence, runtime-health fallback and honest device reports. Phase 14 adds an auditable release-control boundary before the bridge can enter production.
 
-Activation is controlled through:
+## Runtime selection
 
-```bash
+```text
 VITE_EVOLUTION_GODOT=disabled
 VITE_EVOLUTION_GODOT=preview
 VITE_EVOLUTION_GODOT=production
+VITE_EVOLUTION_GODOT_ROLLOUT=0..100
 ```
 
-`disabled` keeps Three.js. `preview` enables the Godot path without declaring a production cutover. `production` selects Godot only after a valid accepted state; fatal failures immediately render the existing Three.js Evolution scene.
+- disabled always selects Three.js;
+- preview explicitly selects Godot without production approval;
+- production requires an open Phase 14 release gate and an eligible persistent browser cohort;
+- any fatal or sustained-critical cutover failure selects the existing Three.js fallback.
+
+## Phase 14 release boundary
+
+Production additionally reads:
+
+```text
+VITE_EVOLUTION_GODOT_RELEASE_STAGE
+VITE_EVOLUTION_GODOT_RELEASE_ID
+VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256
+VITE_EVOLUTION_GODOT_KILL_SWITCH
+```
+
+The gate opens only when:
+
+- stage is one of `canary-5`, `ramp-25`, `ramp-50`, `released-100`;
+- release ID matches the bounded identifier format;
+- acceptance digest is exactly 64 hexadecimal SHA-256 characters;
+- kill switch is inactive.
+
+Stage ceilings are fixed at 5%, 25%, 50% and 100%. The requested rollout cannot exceed the current stage. `blocked` or an active kill switch produces an effective rollout of 0%.
+
+This control runs before iframe creation. A closed gate is a normal Three.js selection, not a runtime failure. The physical report digest is public audit metadata, not a secret or credential.
 
 ## Build output
 
-The `Web` export preset produces:
+The Web export contains:
 
 ```text
 index.html
@@ -25,39 +51,18 @@ index.wasm
 index.pck
 ```
 
-CI stages these files at `public/godot/evolution-engine/` before the Vite production build. The build is rejected unless all four files are present and non-empty under `dist/godot/evolution-engine/`.
+CI stages the files under `public/godot/evolution-engine/` and rejects a production build when any required output is missing.
 
-The `.wasm` and `.pck` files are excluded from Workbox precache and use a separate CacheFirst runtime cache.
+## Security and ownership boundary
 
-## Security boundary
+The React host and Godot iframe are same-origin.
 
-The React host and Godot iframe must be same-origin.
-
-- React accepts messages only when `event.origin === window.location.origin` and `event.source` is the expected iframe window;
-- the custom shell accepts payloads only from `window.parent` with the current origin;
-- payloads contain canonical data only, never Supabase credentials or access tokens;
-- capability data contains browser runtime characteristics only;
-- Godot cannot write relationship history, call Supabase or own portal navigation.
-
-## Message flow
-
-```text
-React host
-  └─ amore:godot:payload
-       └─ custom HTML payload queue
-            └─ JavaScriptBridge polling
-                 └─ deterministic Godot rebuild
-                      └─ amore:godot:state source=portal
-                           ├─ valid identity/events/history → accepted
-                           └─ mismatch/error/timeout → Three.js fallback
-
-Browser lifecycle
-  └─ custom HTML lifecycle queue
-       └─ JavaScriptBridge polling
-            └─ suspend/resume presentation only
-                 ├─ amore:godot:lifecycle
-                 └─ amore:godot:telemetry
-```
+- React accepts messages only from the expected iframe window and current origin;
+- the shell accepts payloads only from `window.parent` and current origin;
+- Godot receives canonical serialized input, never Supabase credentials or access tokens;
+- Godot cannot write history or own portal navigation;
+- device reports exclude DNA, events and relationship content;
+- release approval changes renderer selection only and cannot mutate canonical data.
 
 ## Host → Godot
 
@@ -78,11 +83,7 @@ Browser lifecycle
 }
 ```
 
-The optional `runtime_quality` trait accepts `auto`, `high`, `balanced` or `economy`. It controls presentation cost only.
-
 ## Custom shell API
-
-The same-origin shell exposes a frozen `window.AmoreGodotBridge` object:
 
 ```text
 takePayload()
@@ -91,16 +92,14 @@ capabilitiesJson()
 postBase64(encodedMessage)
 ```
 
-`capabilitiesJson()` reports:
+Capabilities include available memory, CPU concurrency, device-pixel ratio, viewport, visibility and reduced-motion preference.
 
-- device memory when the browser exposes it;
-- hardware concurrency;
-- device pixel ratio;
-- iframe viewport dimensions;
-- visibility state;
-- reduced-motion preference.
+Lifecycle states are queued with a bounded queue:
 
-The lifecycle queue is capped to prevent unbounded growth while Godot is starting.
+```text
+hidden, visible, pagehide, pageshow,
+freeze, resume, context-lost, context-restored
+```
 
 ## Godot → host messages
 
@@ -113,25 +112,15 @@ The runtime emits:
 - `amore:godot:state`;
 - `amore:godot:telemetry`;
 - `amore:godot:lifecycle`;
+- `amore:godot:interaction`;
 - `amore:godot:activate`;
 - `amore:godot:error`.
 
 ### Accepted state
 
-Only `source: portal` may enter production acceptance. A temporary local demo state is ignored.
+Only `source: portal` can be accepted. React verifies species, seed, input-event count, canonical history bounds, instruction counts and deterministic signature.
 
-The accepted state includes:
-
-- species and seed;
-- canonical and rendered instruction counts;
-- portal input-event count;
-- complete canonical history count;
-- motion mode;
-- quality governor version and selected tier;
-- render scale and Life Engine update rate;
-- phase and deterministic signature.
-
-`input_events` counts only portal Evolution Events. `history` may also contain genesis records, so it must be greater than or equal to `input_events`.
+The accepted Phase 13 runtime additionally reports the quality tier, render scale, Life Engine rate and phase number. Phase 14 does not modify this runtime state or signature.
 
 ### Telemetry
 
@@ -152,7 +141,7 @@ The accepted state includes:
 }
 ```
 
-Telemetry is emitted only after a portal payload is active. React validates every number and range before exposing it to diagnostics.
+Suspended telemetry is excluded from health evaluation.
 
 ### Lifecycle acknowledgement
 
@@ -166,72 +155,76 @@ Telemetry is emitted only after a portal payload is active. React validates ever
 }
 ```
 
-Supported states are:
+Suspension pauses Life Engine, disables orbit input and blocks activation. Restore reapplies the active tier without rebuilding canonical state.
 
-```text
-hidden, visible, pagehide, pageshow,
-freeze, resume, context-lost, context-restored
+### Interaction evidence
+
+```ts
+{
+  type: 'amore:godot:interaction',
+  kind: 'orbit',
+  sequence: 1,
+}
 ```
 
-Suspension pauses Life Engine, disables orbit input and blocks activation while preserving canonical state and generated meshes. Restore reapplies the active quality tier and increments the restore counter.
+Valid kinds are `orbit`, `zoom`, `tap` and `keyboard`.
 
-### Activation
+The interaction message is distinct from activation:
 
-A short tap or Enter/Space emits `amore:godot:activate`. Orbit drags and zoom gestures emit none. Activation is blocked while the runtime is suspended.
+- tap/keyboard can activate the portal action;
+- orbit/zoom never activate it;
+- completed interactions are counted in the device report;
+- malformed kinds or non-positive sequence values are rejected.
 
-## React validation
+## Runtime health
 
-React does not trust a message solely because its `type` is known.
+React classifies active telemetry as warming, healthy, degraded or critical.
 
-State validation requires:
+Production fallback requires eight consecutive critical samples. A single slow frame or short startup drop does not trigger fallback.
 
-- `source === 'portal'`;
-- species and seed equal the payload;
-- input-event count equal the payload event count;
-- history count no smaller than input-event count;
-- positive canonical instruction count;
-- rendered instruction count no greater than canonical count;
-- bounded optional quality settings;
-- deterministic signature.
+Health thresholds and the complete acceptance procedure are defined in `CRYSTAL_PHASE_13.md`.
 
-Telemetry validation requires:
+## Device acceptance and frozen candidate
 
-- a known quality tier;
-- finite non-negative FPS, frame time and memory;
-- integer non-negative draw calls, primitives and restore count;
-- render scale between `0.5` and `1.0`;
-- Life Engine rate between `10` and `60 Hz`;
-- a boolean suspended state.
+The query-gated panel is enabled through:
 
-Lifecycle validation requires a known state, non-negative integer sequence/restore counts and a boolean suspended state.
+```text
+?godotDiagnostics=1
+```
 
-Lifecycle status remains monotonic: late boot messages cannot downgrade an accepted or failed runtime.
+The report contains runtime versions, deterministic signature, anonymous environment data, health aggregates, latest telemetry, lifecycle evidence and interaction counts.
+
+It exposes two separate results:
+
+- `workflowPassed` — bridge, telemetry window, orbit, restore, signature and motion proof;
+- `passed` — workflow proof plus healthy telemetry from a non-automated browser.
+
+`navigator.webdriver === true` marks the assessment as automation. Automated CI can never claim physical acceptance.
+
+After `PHYSICAL PASS`, Phase 14 validates the report again and freezes exact JSON bytes. SHA-256 is calculated from those bytes, so editing or reformatting the saved report invalidates its digest.
 
 ## Controlled fallback
 
 The host resolves to `three-fallback` after:
 
 1. iframe load failure;
-2. explicit Godot runtime error;
-3. startup timeout before accepted state;
-4. portal-state identity, input-event or history-bound mismatch.
+2. explicit runtime error;
+3. startup timeout;
+4. canonical state mismatch;
+5. sustained critical performance health.
 
-Background suspension is not a fatal error. A WebGL context loss enters suspension and waits for `context-restored`; a separate runtime error still triggers the established fallback.
+Background suspension alone is not fatal. Closed release gates and non-selected cohorts use ordinary `three`, not `three-fallback`.
 
-## Phase 12 verification
+## Phase 14 verification
 
-The bridge is accepted only after:
+The release path requires:
 
-1. Godot parser and all Phase 1–12 smoke tests;
-2. release Web export containing capability and lifecycle shell methods;
-3. strict TypeScript tests for state, telemetry and lifecycle;
-4. production Vite build containing HTML, JavaScript, WASM and PCK;
-5. Pixel 8 Pro viewport telemetry proof;
-6. pagehide/pageshow suspend and restore proof;
-7. unchanged canonical signature after restore;
-8. full-motion and reduced-motion screenshots;
-9. before/after visual comparison report;
-10. canvas activation proof;
-11. live Three.js fallback and archive branch preserved.
-
-CI device emulation is not a substitute for physical GPU, thermal and battery measurements. The actual Pixel 8 Pro telemetry capture remains the external release gate described in `CRYSTAL_PHASE_12.md`.
+1. all Phase 1–13 runtime and browser checks;
+2. production blocked by default;
+3. strict physical-report import validation;
+4. exact SHA-256 generation tests;
+5. fixed stage-ceiling tests;
+6. emergency kill-switch precedence;
+7. production bundle with an explicitly synthetic CI approval fixture;
+8. browser workflow, restore, signature and fallback regression proof;
+9. a real frozen Pixel 8 Pro report before any actual canary deployment.

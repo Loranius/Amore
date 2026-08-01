@@ -33,6 +33,7 @@ var current_source := "demo"
 var runtime_suspended := false
 var restore_count := 0
 var telemetry_elapsed := 0.0
+var interaction_sequence := 0
 
 
 func _ready() -> void:
@@ -57,6 +58,8 @@ func _ready() -> void:
 
 	if camera_rig.has_signal("portal_activate"):
 		camera_rig.connect("portal_activate", _on_portal_activate)
+	if camera_rig.has_signal("portal_interaction"):
+		camera_rig.connect("portal_interaction", _on_portal_interaction)
 	rebuild_from_payload(_demo_payload(), "demo")
 
 
@@ -160,9 +163,6 @@ func _render_state(reveal_ids: Dictionary, impact_ids: Dictionary) -> void:
 			fusion_builder.create_foundation_instance(projected[0]),
 		)
 
-	# Aggregate-only event instructions are canonical evidence, not separate
-	# meshes. The colony projection folds their bounded gains into the visible
-	# seed so accumulated history reads as one mineral body.
 	for instruction in projected:
 		var crystal_instance: MeshInstance3D = crystal_builder.create_mesh_instance(instruction)
 		_apply_crystal_shadow_policy(crystal_instance)
@@ -209,9 +209,6 @@ func _instruction_id_set(state) -> Dictionary:
 
 
 func _apply_crystal_shadow_policy(instance: MeshInstance3D) -> void:
-	# The mother may receive the softened key shadow for depth. Attached bodies
-	# retain the Phase 5 seam policy so intentional overlap never becomes a
-	# black contact band.
 	var array_mesh := instance.mesh as ArrayMesh
 	if array_mesh == null or array_mesh.get_surface_count() == 0:
 		return
@@ -238,7 +235,7 @@ func _update_status(source: String) -> void:
 	var motion_label := "reduced motion" if current_reduced_motion else "life active"
 	status_panel.visible = source != "portal"
 	status_label.text = (
-		"Godot 4.7.1 · Crystal Phase 12\n"
+		"Godot 4.7.1 · Crystal Phase 13\n"
 		+ "%d canonical · %d rendered bodies\n" % [
 			current_state.instructions.size(),
 			current_projected_count,
@@ -274,7 +271,7 @@ func _post_runtime_state(source: String) -> void:
 		"quality": String(current_quality_settings.get("quality", "balanced")),
 		"render_scale": float(current_quality_settings.get("render_scale", 0.86)),
 		"life_hz": float(current_quality_settings.get("life_hz", 30.0)),
-		"phase": 12,
+		"phase": 13,
 		"signature": snapshot_json.sha256_text().substr(0, 16),
 	})
 
@@ -338,6 +335,17 @@ func _on_portal_activate(source: String) -> void:
 	web_bridge.post_message({
 		"type": "amore:godot:activate",
 		"source": source,
+	})
+
+
+func _on_portal_interaction(kind: String) -> void:
+	if web_bridge == null or runtime_suspended:
+		return
+	interaction_sequence += 1
+	web_bridge.post_message({
+		"type": "amore:godot:interaction",
+		"kind": kind,
+		"sequence": interaction_sequence,
 	})
 
 

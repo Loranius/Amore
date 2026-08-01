@@ -42,7 +42,7 @@ const acceptedState: GodotStateMessage = {
   quality: 'balanced',
   render_scale: 0.86,
   life_hz: 30,
-  phase: 12,
+  phase: 13,
   signature: '0123456789abcdef',
 };
 
@@ -70,7 +70,7 @@ describe('Godot portal bridge protocol', () => {
     expect(message.payload).toBe(payload);
   });
 
-  it('accepts complete state, telemetry, lifecycle and activation messages', () => {
+  it('accepts complete state, telemetry, lifecycle, interaction and activation messages', () => {
     expect(isGodotBridgeInboundMessage({
       type: 'amore:godot:ready',
       version: '4.7.1',
@@ -99,12 +99,17 @@ describe('Godot portal bridge protocol', () => {
       restores: 1,
     })).toBe(true);
     expect(isGodotBridgeInboundMessage({
+      type: 'amore:godot:interaction',
+      kind: 'orbit',
+      sequence: 1,
+    })).toBe(true);
+    expect(isGodotBridgeInboundMessage({
       type: 'amore:godot:activate',
       source: 'tap',
     })).toBe(true);
   });
 
-  it('rejects malformed runtime settings and telemetry', () => {
+  it('rejects malformed runtime settings, telemetry and interaction evidence', () => {
     expect(isGodotBridgeInboundMessage({ type: 'amore:godot:state', signature: 'abc' })).toBe(false);
     expect(isGodotBridgeInboundMessage({
       ...acceptedState,
@@ -135,6 +140,11 @@ describe('Godot portal bridge protocol', () => {
       sequence: 1,
       suspended: false,
       restores: 0,
+    })).toBe(false);
+    expect(isGodotBridgeInboundMessage({
+      type: 'amore:godot:interaction',
+      kind: 'swipe',
+      sequence: 0,
     })).toBe(false);
     expect(isGodotBridgeInboundMessage({
       type: 'amore:godot:progress',
