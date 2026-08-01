@@ -94,6 +94,20 @@ jobs:
           fi
           grep -q 'PASS: deterministic crystal rebuild' /tmp/godot-smoke.log
 
+      - name: Run Crystal growth hierarchy smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60s godot --headless \
+            --path godot/evolution-engine \
+            --script res://scripts/tests/growth_hierarchy_smoke.gd \
+            2>&1 | tee /tmp/godot-hierarchy-smoke.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-hierarchy-smoke.log; then
+            echo 'Godot reported script parser or loader errors during the hierarchy test.'
+            exit 1
+          fi
+          grep -q 'PASS: crystal growth hierarchy' /tmp/godot-hierarchy-smoke.log
+
       - name: Run integrated Crystal fusion smoke test
         shell: bash
         run: |
