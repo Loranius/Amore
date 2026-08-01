@@ -15,6 +15,9 @@ import {
   resolveGodotWebUrl,
   type GodotBridgeInboundMessage,
   type GodotEvolutionPayload,
+  type GodotLifecycleMessage,
+  type GodotStateMessage,
+  type GodotTelemetryMessage,
 } from './godotBridgeProtocol';
 import './godotEvolutionPreview.css';
 
@@ -64,8 +67,9 @@ export function GodotEvolutionPreview({
     enabled ? 'booting' : 'disabled',
   );
   const [progress, setProgress] = useState(0);
-  const [stateSignature, setStateSignature] = useState('');
-  const [motion, setMotion] = useState<'unknown' | 'full' | 'reduced'>('unknown');
+  const [state, setState] = useState<GodotStateMessage | null>(null);
+  const [telemetry, setTelemetry] = useState<GodotTelemetryMessage | null>(null);
+  const [lifecycle, setLifecycle] = useState<GodotLifecycleMessage | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(
     initialReducedMotionPreference,
   );
@@ -120,8 +124,9 @@ export function GodotEvolutionPreview({
     fatalReportedRef.current = false;
     setStatus('booting');
     setProgress(0);
-    setStateSignature('');
-    setMotion('unknown');
+    setState(null);
+    setTelemetry(null);
+    setLifecycle(null);
 
     const timeoutId = window.setTimeout(() => {
       if (!acceptedRef.current && !fatalReportedRef.current) {
@@ -175,9 +180,14 @@ export function GodotEvolutionPreview({
             break;
           }
           acceptedRef.current = true;
-          setStateSignature(message.signature);
-          setMotion(message.motion ?? 'unknown');
+          setState(message);
           setStatus('accepted');
+          break;
+        case 'amore:godot:telemetry':
+          setTelemetry(message);
+          break;
+        case 'amore:godot:lifecycle':
+          setLifecycle(message);
           break;
         case 'amore:godot:activate':
           break;
@@ -199,14 +209,31 @@ export function GodotEvolutionPreview({
 
   if (!enabled) return fallback;
 
+  const quality = telemetry?.quality ?? state?.quality ?? 'unknown';
+  const renderScale = telemetry?.render_scale ?? state?.render_scale;
+  const lifeHz = telemetry?.life_hz ?? state?.life_hz;
+  const suspended = telemetry?.suspended ?? lifecycle?.suspended ?? false;
+  const restores = telemetry?.restores ?? lifecycle?.restores ?? 0;
+
   return (
     <div
       className={`godot-evolution-preview ${className}`.trim()}
-      data-godot-evolution="production-cutover"
+      data-godot-evolution="mobile-hardened"
       data-godot-status={status}
       data-godot-progress={progress.toFixed(3)}
-      data-godot-state-signature={stateSignature}
-      data-godot-motion={motion}
+      data-godot-state-signature={state?.signature ?? ''}
+      data-godot-motion={state?.motion ?? 'unknown'}
+      data-godot-quality={quality}
+      data-godot-fps={telemetry?.fps.toFixed(2) ?? ''}
+      data-godot-frame-ms={telemetry?.frame_ms.toFixed(2) ?? ''}
+      data-godot-draw-calls={telemetry?.draw_calls ?? ''}
+      data-godot-primitives={telemetry?.primitives ?? ''}
+      data-godot-static-memory-mb={telemetry?.static_memory_mb.toFixed(2) ?? ''}
+      data-godot-render-scale={renderScale?.toFixed(2) ?? ''}
+      data-godot-life-hz={lifeHz?.toFixed(0) ?? ''}
+      data-godot-suspended={String(suspended)}
+      data-godot-restores={String(restores)}
+      data-godot-lifecycle={lifecycle?.state ?? ''}
     >
       <iframe
         ref={iframeRef}
@@ -221,7 +248,7 @@ export function GodotEvolutionPreview({
       />
       <span className="godot-evolution-preview__status" aria-live="polite">
         {status === 'accepted'
-          ? 'Godot runtime accepted'
+          ? `Godot ${quality}${telemetry ? ` · ${Math.round(telemetry.fps)} FPS` : ''}`
           : status === 'timeout'
             ? 'Godot runtime timeout'
             : status === 'error'
