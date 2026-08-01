@@ -145,7 +145,7 @@ export default function EvolutionCrystalPreviewScene() {
           <GodotEvolutionPreview
             payload={godotPayload}
             enabled
-            startupTimeoutMs={20_000}
+            startupTimeoutMs={60_000}
             onMessage={onGodotMessage}
             onFatalError={onGodotFatalError}
           />
