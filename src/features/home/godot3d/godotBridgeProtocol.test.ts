@@ -96,8 +96,9 @@ describe('Godot portal bridge protocol', () => {
     expect(isGodotBridgeInboundMessage(null)).toBe(false);
   });
 
-  it('accepts only runtime state matching the canonical payload identity and source event count', () => {
+  it('accepts only portal state matching the canonical payload identity and source event count', () => {
     expect(isGodotRuntimeStateAccepted(acceptedState, payload)).toBe(true);
+    expect(isGodotRuntimeStateAccepted({ ...acceptedState, source: 'demo' }, payload)).toBe(false);
     expect(isGodotRuntimeStateAccepted({ ...acceptedState, seed: 1 }, payload)).toBe(false);
     expect(isGodotRuntimeStateAccepted({ ...acceptedState, input_events: 0 }, payload)).toBe(false);
     expect(isGodotRuntimeStateAccepted({
