@@ -164,15 +164,20 @@ func _run() -> void:
 		return
 	var world := scene.get_node("WorldEnvironment") as WorldEnvironment
 	var environment := world.environment
-	if environment.background_mode != Environment.BG_COLOR:
+	if environment.background_mode != Environment.BG_SKY:
 		scene.free()
-		_fail("Visual failure: Phase 10 background must use explicit slate colour.")
+		_fail("Visual failure: Phase 10 must preserve the procedural Sky background.")
 		return
-	if environment.background_color.get_luminance() < 0.015:
+	if environment.sky == null or not (environment.sky.sky_material is ProceduralSkyMaterial):
 		scene.free()
-		_fail("Visual failure: presentation background collapsed back to pure black.")
+		_fail("Visual failure: readable procedural slate Sky is missing.")
 		return
-	if environment.background_energy_multiplier < 0.75 or environment.background_energy_multiplier > 1.0:
+	var sky_material := environment.sky.sky_material as ProceduralSkyMaterial
+	if sky_material.sky_top_color.get_luminance() < 0.025:
+		scene.free()
+		_fail("Visual failure: presentation Sky collapsed back to near-black.")
+		return
+	if environment.background_energy_multiplier < 0.75 or environment.background_energy_multiplier > 1.05:
 		scene.free()
 		_fail("Visual failure: background exposure is outside the accepted dark-slate range.")
 		return
