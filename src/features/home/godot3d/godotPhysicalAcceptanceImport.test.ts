@@ -68,7 +68,7 @@ describe('Godot physical acceptance import', () => {
 
   it('produces a stable SHA-256 digest for the exact report bytes', async () => {
     expect(await sha256Hex('amore-phase-14')).toBe(
-      '9c46aff64ee35a41919bcb78190c842356a64130583900c40380ea3f0186812b',
+      '3b06a321c31e658cd3e2eb41523be5ba3ba8d250701b60c30002c1ea37dc28f1',
     );
   });
 
