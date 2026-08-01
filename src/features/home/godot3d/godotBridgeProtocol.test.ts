@@ -35,7 +35,8 @@ const acceptedState: GodotStateMessage = {
   seed: 582013,
   instructions: 4,
   rendered_instructions: 3,
-  history: 1,
+  input_events: 1,
+  history: 7,
   motion: 'full',
   phase: 11,
   signature: '0123456789abcdef',
@@ -81,6 +82,11 @@ describe('Godot portal bridge protocol', () => {
   it('rejects partial, malformed and unknown inbound messages', () => {
     expect(isGodotBridgeInboundMessage({ type: 'amore:godot:state', signature: 'abc' })).toBe(false);
     expect(isGodotBridgeInboundMessage({
+      ...acceptedState,
+      input_events: 3,
+      history: 2,
+    })).toBe(false);
+    expect(isGodotBridgeInboundMessage({
       type: 'amore:godot:progress',
       current: 1,
       total: 0,
@@ -90,10 +96,15 @@ describe('Godot portal bridge protocol', () => {
     expect(isGodotBridgeInboundMessage(null)).toBe(false);
   });
 
-  it('accepts only runtime state matching the canonical payload identity and history', () => {
+  it('accepts only runtime state matching the canonical payload identity and source event count', () => {
     expect(isGodotRuntimeStateAccepted(acceptedState, payload)).toBe(true);
     expect(isGodotRuntimeStateAccepted({ ...acceptedState, seed: 1 }, payload)).toBe(false);
-    expect(isGodotRuntimeStateAccepted({ ...acceptedState, history: 0 }, payload)).toBe(false);
+    expect(isGodotRuntimeStateAccepted({ ...acceptedState, input_events: 0 }, payload)).toBe(false);
+    expect(isGodotRuntimeStateAccepted({
+      ...acceptedState,
+      input_events: 8,
+      history: 7,
+    }, payload)).toBe(false);
     expect(isGodotRuntimeStateAccepted({
       ...acceptedState,
       rendered_instructions: 5,
