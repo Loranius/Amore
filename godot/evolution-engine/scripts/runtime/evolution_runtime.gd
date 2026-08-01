@@ -10,6 +10,7 @@ const CrystalVisualProfile = preload("res://scripts/presentation/crystal_visual_
 const WebPortalBridge = preload("res://scripts/runtime/web_portal_bridge.gd")
 
 @onready var artifact_root: Node3D = $ArtifactRoot
+@onready var camera_rig: Node3D = $CameraRig
 @onready var status_panel: PanelContainer = $UI/SafeArea/StatusPanel
 @onready var status_label: Label = $UI/SafeArea/StatusPanel/StatusMargin/StatusLabel
 
@@ -29,6 +30,8 @@ func _ready() -> void:
 	web_bridge.name = "WebPortalBridge"
 	web_bridge.payload_received.connect(_on_web_payload_received)
 	add_child(web_bridge)
+	if camera_rig.has_signal("portal_activate"):
+		camera_rig.connect("portal_activate", _on_portal_activate)
 	rebuild_from_payload(_demo_payload(), "demo")
 
 
@@ -171,7 +174,7 @@ func _update_status(source: String) -> void:
 	var motion_label := "reduced motion" if current_reduced_motion else "life active"
 	status_panel.visible = source != "portal"
 	status_label.text = (
-		"Godot 4.7.1 · Crystal Phase 10\n"
+		"Godot 4.7.1 · Crystal Phase 11\n"
 		+ "%d canonical · %d rendered bodies\n" % [
 			current_state.instructions.size(),
 			current_projected_count,
@@ -197,13 +200,22 @@ func _post_runtime_state(source: String) -> void:
 		"motion": "reduced" if current_reduced_motion else "full",
 		"life_version": CrystalLifeEngine.VERSION,
 		"visual_version": CrystalVisualProfile.VERSION,
-		"phase": 10,
+		"phase": 11,
 		"signature": snapshot_json.sha256_text().substr(0, 16),
 	})
 
 
 func _on_web_payload_received(payload_json: String) -> void:
 	rebuild_from_json(payload_json)
+
+
+func _on_portal_activate(source: String) -> void:
+	if web_bridge == null:
+		return
+	web_bridge.post_message({
+		"type": "amore:godot:activate",
+		"source": source,
+	})
 
 
 func _report_error(message: String) -> void:
