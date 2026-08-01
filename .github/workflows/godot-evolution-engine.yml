@@ -150,6 +150,20 @@ jobs:
           fi
           grep -q 'PASS: crystal life engine' /tmp/godot-life-smoke.log
 
+      - name: Run Crystal visual polish smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60s godot --headless \
+            --path godot/evolution-engine \
+            --script res://scripts/tests/visual_polish_smoke.gd \
+            2>&1 | tee /tmp/godot-visual-smoke.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-visual-smoke.log; then
+            echo 'Godot reported script parser or loader errors during the visual polish test.'
+            exit 1
+          fi
+          grep -q 'PASS: crystal visual polish' /tmp/godot-visual-smoke.log
+
       - name: Run integrated Crystal fusion smoke test
         shell: bash
         run: |
