@@ -29,6 +29,7 @@ func rebuild(dna, source_events: Array):
 
 
 func _resolve_competition(candidate, state):
+	_apply_silhouette_floor(candidate)
 	var original_direction: Vector3 = candidate.direction
 	var parent = state.get_instruction(candidate.parent_id)
 	var rotation_axis: Vector3 = parent.direction if parent != null else Vector3.UP
@@ -43,15 +44,35 @@ func _resolve_competition(candidate, state):
 		var angular_step := deg_to_rad(13.0 + float(attempt) * 4.5) * alternating_sign
 		candidate.direction = original_direction.rotated(rotation_axis, angular_step).normalized()
 		candidate.direction = (candidate.direction + Vector3.UP * float(attempt) * 0.012).normalized()
+		_apply_silhouette_floor(candidate)
 
 	# Bounded fallback: preserve the event and identity while reducing occupied volume.
 	candidate.radius *= 0.72
 	candidate.length *= 0.82
 	candidate.direction = (candidate.direction + Vector3.UP * 0.16).normalized()
+	_apply_silhouette_floor(candidate)
 	candidate.metadata["collision_attempt"] = COLLISION_ATTEMPTS
 	candidate.metadata["growth_shadow"] = 1.0
 	candidate.metadata["competition_fallback"] = true
 	return candidate
+
+
+func _apply_silhouette_floor(candidate) -> void:
+	var tier: String = String(candidate.metadata.get("silhouette_tier", ""))
+	if tier.is_empty():
+		return
+	var minimum_y := 0.24 if tier == CrystalGrowthHierarchy.TIER_PRIMARY else (
+		0.14 if tier == CrystalGrowthHierarchy.TIER_SECONDARY else 0.07
+	)
+	if candidate.direction.y >= minimum_y:
+		return
+	var lateral := Vector3(candidate.direction.x, 0.0, candidate.direction.z)
+	if lateral.length_squared() < 0.000001:
+		candidate.direction = Vector3.UP
+		return
+	var lateral_weight: float = sqrt(maxf(0.0, 1.0 - minimum_y * minimum_y))
+	candidate.direction = lateral.normalized() * lateral_weight + Vector3.UP * minimum_y
+	candidate.direction = candidate.direction.normalized()
 
 
 func _is_clear(candidate, state) -> bool:
