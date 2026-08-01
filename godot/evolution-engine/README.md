@@ -1,56 +1,50 @@
 # Amore Evolution Engine — Godot 4.7.1
 
-This directory is the new 3D runtime for Amore artifacts. React/Vite remains the portal shell; Godot owns only procedural 3D generation, presentation and interaction for Crystal, Tree and Reef.
+This directory is the 3D runtime for Amore artifacts. React/Vite remains the portal shell; Godot owns only procedural 3D generation, presentation and interaction for Crystal, Tree and Reef.
 
 ## Migration safety
 
 The accepted Three.js implementation is preserved at:
 
-- branch: `archive/threejs-evolution-engine-2026-07-31`
-- source commit: `0b9fda4187aa2d1e9bf80f4b0c56c296ea0e5480`
+- branch: `archive/threejs-evolution-engine-2026-07-31`;
+- source commit: `0b9fda4187aa2d1e9bf80f4b0c56c296ea0e5480`.
 
-Nothing in the existing React, Supabase or Three.js runtime is deleted by this migration. Phase 11 keeps a live automatic Three.js fallback inside the Crystal route, and Phase 12 does not modify that rollback path.
+The live Crystal route still contains automatic Three.js fallback. Godot has no Supabase credentials, write path or portal-navigation authority.
 
-## Current vertical slice
+## Current Crystal vertical slice
 
-The runnable Crystal slice generates a deterministic colony from:
+The runtime provides:
 
-1. immutable Artifact DNA;
-2. a sorted append-only Evolution Event history;
-3. species-neutral channels translated into bounded Crystal geological pressure;
-4. deterministic primary, secondary and accent hierarchy assignment;
-5. bounded parent capacity, generation depth and silhouette control;
-6. compatible events accumulated as colony extension, thickening or refinement;
-7. deterministic collision resolution for visible colony seeds;
-8. a renderer projection that folds aggregate deposits into unified mineral bodies;
-9. procedural ArrayMesh construction and integrated junction geometry;
-10. runtime-only Life Engine cues for idle light, new seed growth and colony impacts;
-11. browser `prefers-reduced-motion` support;
-12. a deterministic Phase 10 visual profile for mineral families, cloudy bases, pale terminations and oblique framing;
-13. a floor-free, dark-slate mobile Godot Compatibility renderer scene;
-14. a strict same-origin production handshake validated against species, seed and event history;
-15. automatic Three.js fallback for iframe, runtime, timeout or state-mismatch failure;
-16. tap and keyboard activation routed from the Godot canvas back to the existing React Memory modal;
-17. runtime-only `high`, `balanced` and `economy` quality tiers;
-18. bounded render scale, shadow, glow and Life Engine frequency adaptation;
-19. background suspension and restore without canonical rebuild;
-20. Godot-to-React FPS, frame-time, draw-call, primitive and memory telemetry.
+1. immutable Artifact DNA and sorted append-only Evolution Events;
+2. deterministic semantic pressure, hierarchy and collision resolution;
+3. aggregate colony projection without deleting canonical evidence;
+4. procedural integrated Crystal geometry;
+5. deterministic Phase 10 mineral presentation;
+6. runtime-only Life Engine animation and reduced-motion support;
+7. strict same-origin React ↔ Godot bridge validation;
+8. production fallback for load, runtime, timeout and state mismatch failures;
+9. tap/keyboard activation without orbit-drag activation;
+10. `high`, `balanced` and `economy` mobile presentation tiers;
+11. background suspension and restore without canonical rebuild;
+12. FPS, frame-time, draw-call, primitive and memory telemetry;
+13. Phase 13 orbit/zoom/tap/keyboard interaction evidence;
+14. 30-sample device acceptance reports;
+15. sustained-performance Three.js fallback;
+16. stable percentage-based production cohorts.
 
-Every event remains present in canonical state and history. Aggregate events are not deleted or merged in storage; they are projected into an existing visible colony only at the renderer boundary. Life animation and presentation own only duplicated materials, vertex colours and local renderer transforms, never canonical geometry or history.
+Every event remains present in canonical state and history. Renderer quality and health policies never alter growth instructions, colony membership or the deterministic snapshot signature.
 
-The current Web profile remains opaque for stable overlapping Crystal sorting. It does not claim physical transmission or refraction; real optical expansion remains later work.
-
-Tree and Reef will reuse the same canonical event/state pipeline after the Crystal runtime passes its physical Pixel 8 Pro release gate.
-
-## Runtime mode
-
-Set `VITE_EVOLUTION_GODOT` in the React environment:
+## Runtime and rollout mode
 
 ```text
-disabled   → Three.js
-preview    → opt-in Godot preview
-production → Godot production route with automatic Three.js fallback
+VITE_EVOLUTION_GODOT=disabled   → Three.js
+VITE_EVOLUTION_GODOT=preview    → explicit Godot preview
+VITE_EVOLUTION_GODOT=production → Godot production route with fallback
+
+VITE_EVOLUTION_GODOT_ROLLOUT=0..100
 ```
+
+Production browsers receive a persistent anonymous cohort bucket, so a user does not randomly switch renderer between sessions.
 
 An optional runtime-only DNA trait may request a presentation tier:
 
@@ -60,8 +54,6 @@ An optional runtime-only DNA trait may request a presentation tier:
 }
 ```
 
-`auto` is the default. Quality never changes canonical growth or history.
-
 ## Mobile quality bounds
 
 | Tier | 3D scale | Life Engine | Shadow | Glow |
@@ -70,13 +62,28 @@ An optional runtime-only DNA trait may request a presentation tier:
 | balanced | 0.86 | 30 Hz | on | on |
 | economy | 0.72 | 20 Hz | off | off |
 
-The governor downgrades only after sustained low FPS and recovers conservatively to protect mobile battery and thermal stability.
+## Device diagnostics
+
+Open a deployed preview with:
+
+```text
+?godotDiagnostics=1
+```
+
+The panel collects 30 active samples, orbit evidence and background restore evidence, then creates a privacy-safe JSON report.
+
+The report distinguishes:
+
+- `WORKFLOW PASS` — automated bridge/lifecycle/interaction proof;
+- `PHYSICAL PASS` — healthy telemetry from a non-automated real device.
+
+CI software rendering can never claim physical acceptance.
 
 ## Run locally
 
-Open `godot/evolution-engine/project.godot` in Godot 4.7.1 and run the main scene.
+Open `godot/evolution-engine/project.godot` in Godot 4.7.1.
 
-Headless acceptance tests:
+Headless tests:
 
 ```bash
 godot --headless --path godot/evolution-engine --script res://scripts/tests/determinism_smoke.gd
@@ -90,11 +97,11 @@ godot --headless --path godot/evolution-engine --script res://scripts/tests/port
 godot --headless --path godot/evolution-engine --script res://scripts/tests/mobile_runtime_smoke.gd
 ```
 
-Production React verification requires an accepted Godot Web export staged under `public/godot/evolution-engine/`:
+React/Web verification:
 
 ```bash
-VITE_EVOLUTION_GODOT=production npm test
-VITE_EVOLUTION_GODOT=production npm run build
+VITE_EVOLUTION_GODOT=production VITE_EVOLUTION_GODOT_ROLLOUT=100 npm test
+VITE_EVOLUTION_GODOT=production VITE_EVOLUTION_GODOT_ROLLOUT=100 npm run build
 npx playwright test --config=playwright.godot.config.ts
 ```
 
@@ -107,31 +114,22 @@ React / Vite / Supabase
         v
 Godot Evolution Runtime
         |
-        +-- Species semantic translation
-        +-- Growth hierarchy
-        +-- Colony accumulation
-        +-- Collision competition
-        +-- Renderer projection
-        +-- Geometry builders
-        +-- Deterministic visual profile
-        +-- Runtime-only Life Engine
-        +-- Runtime quality governor
-        +-- Lifecycle / telemetry bridge
-        +-- Materials / Camera / interaction bridge
-        |
+        +-- deterministic growth and geometry
+        +-- visual profile and Life Engine
+        +-- quality governor
+        +-- lifecycle / telemetry / interaction bridge
         v
-Same-origin Web canvas embedded in Amore
+Same-origin Web canvas
         |
-        +-- accepted state → keep Godot
-        +-- mobile telemetry → React diagnostics
-        +-- background → suspend presentation only
-        +-- fatal cutover failure → Three.js fallback
+        +-- accepted and healthy → keep Godot
+        +-- non-rollout cohort → Three.js
+        +-- sustained critical health → Three.js fallback
+        +-- fatal bridge failure → Three.js fallback
 ```
-
-Godot must not invent relationship history, mutate Supabase data, or own portal navigation.
 
 See:
 
 - `docs/CRYSTAL_PHASE_11.md` — production portal cutover;
-- `docs/CRYSTAL_PHASE_12.md` — mobile runtime hardening and physical-device gate;
-- `docs/WEB_RUNTIME_BRIDGE.md` — same-origin message contract.
+- `docs/CRYSTAL_PHASE_12.md` — mobile runtime hardening;
+- `docs/CRYSTAL_PHASE_13.md` — physical acceptance and progressive rollout;
+- `docs/WEB_RUNTIME_BRIDGE.md` — same-origin bridge contract.
