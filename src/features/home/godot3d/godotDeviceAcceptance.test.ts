@@ -57,6 +57,17 @@ const lifecycle: GodotLifecycleMessage = {
   restores: 1,
 };
 
+const physicalEnvironment = {
+  userAgent: 'Pixel 8 Pro test',
+  platform: 'Linux armv8l',
+  viewportWidth: 412,
+  viewportHeight: 915,
+  screenWidth: 412,
+  screenHeight: 915,
+  devicePixelRatio: 2.625,
+  automated: false,
+};
+
 describe('Godot device acceptance report', () => {
   it('recognizes the explicit diagnostics query only', () => {
     expect(isGodotDiagnosticsEnabled('?godotDiagnostics=1')).toBe(true);
@@ -71,7 +82,7 @@ describe('Godot device acceptance report', () => {
     expect(INITIAL_GODOT_INTERACTIONS.orbit).toBe(0);
   });
 
-  it('passes only after stable telemetry, orbit and background restore evidence', () => {
+  it('physically passes only after healthy telemetry, orbit and background restore evidence', () => {
     let health = INITIAL_GODOT_RUNTIME_HEALTH;
     for (let index = 0; index < GODOT_HEALTH_ACCEPTANCE_SAMPLES; index += 1) {
       health = reduceGodotRuntimeHealth(health, telemetry);
@@ -79,15 +90,7 @@ describe('Godot device acceptance report', () => {
     const interactions = incrementGodotInteraction(INITIAL_GODOT_INTERACTIONS, 'orbit');
     const report = createGodotDeviceAcceptanceReport({
       generatedAt: '2026-08-01T10:00:00.000Z',
-      environment: {
-        userAgent: 'Pixel 8 Pro test',
-        platform: 'Linux armv8l',
-        viewportWidth: 412,
-        viewportHeight: 915,
-        screenWidth: 412,
-        screenHeight: 915,
-        devicePixelRatio: 2.625,
-      },
+      environment: physicalEnvironment,
       state,
       health: health.snapshot,
       telemetry,
@@ -95,11 +98,42 @@ describe('Godot device acceptance report', () => {
       interactions,
     });
 
+    expect(report.assessment).toBe('physical');
+    expect(report.workflowPassed).toBe(true);
     expect(report.passed).toBe(true);
     expect(report.criteria.backgroundRestoreCompleted).toBe(true);
     expect(report.runtime.phase).toBe(13);
     expect(JSON.stringify(report)).not.toContain('memory:first-place');
     expect(report.privacy).toContain('No Artifact DNA');
+  });
+
+  it('allows automation to prove the workflow without claiming hardware health', () => {
+    const criticalTelemetry: GodotTelemetryMessage = {
+      ...telemetry,
+      fps: 8,
+      frame_ms: 125,
+      quality: 'economy',
+      render_scale: 0.72,
+      life_hz: 20,
+    };
+    let health = INITIAL_GODOT_RUNTIME_HEALTH;
+    for (let index = 0; index < GODOT_HEALTH_ACCEPTANCE_SAMPLES; index += 1) {
+      health = reduceGodotRuntimeHealth(health, criticalTelemetry);
+    }
+    const interactions = incrementGodotInteraction(INITIAL_GODOT_INTERACTIONS, 'orbit');
+    const report = createGodotDeviceAcceptanceReport({
+      environment: { ...physicalEnvironment, automated: true },
+      state,
+      health: health.snapshot,
+      telemetry: criticalTelemetry,
+      lifecycle,
+      interactions,
+    });
+
+    expect(report.assessment).toBe('automation');
+    expect(report.workflowPassed).toBe(true);
+    expect(report.criteria.healthyRuntime).toBe(false);
+    expect(report.passed).toBe(false);
   });
 
   it('does not pass a healthy session without orbit evidence', () => {
@@ -108,15 +142,7 @@ describe('Godot device acceptance report', () => {
       health = reduceGodotRuntimeHealth(health, telemetry);
     }
     const report = createGodotDeviceAcceptanceReport({
-      environment: {
-        userAgent: 'test',
-        platform: 'test',
-        viewportWidth: 412,
-        viewportHeight: 915,
-        screenWidth: 412,
-        screenHeight: 915,
-        devicePixelRatio: 2.625,
-      },
+      environment: physicalEnvironment,
       state,
       health: health.snapshot,
       telemetry,
@@ -124,6 +150,7 @@ describe('Godot device acceptance report', () => {
       interactions: INITIAL_GODOT_INTERACTIONS,
     });
 
+    expect(report.workflowPassed).toBe(false);
     expect(report.passed).toBe(false);
     expect(report.criteria.orbitCompleted).toBe(false);
   });
