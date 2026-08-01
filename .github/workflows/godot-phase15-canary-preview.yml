@@ -1,7 +1,5 @@
 name: Godot Phase 15 Canary Preview
 
-# Consumes the approved physical release controls from Vercel Preview variables.
-
 on:
   push:
     branches:
@@ -189,7 +187,7 @@ jobs:
           import { parse } from 'dotenv';
 
           const pulled = parse(readFileSync('.env.vercel-preview.local', 'utf8'));
-          const buildEnv = { ...process.env, ...pulled };
+          const buildEnv = { ...process.env, ...pulled, BUILD_GODOT_HARNESS: '1' };
           const build = spawnSync('npm', ['run', 'build'], {
             env: buildEnv,
             stdio: 'inherit',
@@ -208,6 +206,9 @@ jobs:
           });
           process.exit(manifest.status ?? 1);
           NODE
+          test -s dist/index.html
+          test -s dist/e2e/godot/index.html
+          test -s dist/godot/evolution-engine/release-manifest.json
 
       - name: Verify manifest and exact asset hashes
         shell: bash
@@ -390,12 +391,14 @@ jobs:
           const page = await context.newPage();
           const pageErrors = [];
           page.on('pageerror', error => pageErrors.push(error.message));
-          await page.goto(`${url}/e2e/godot/?godotReleaseOps=1`, {
+          await page.goto(`${url}/e2e/godot/?releasePreflight=1&godotReleaseOps=1`, {
             waitUntil: 'domcontentloaded',
             timeout: 60_000,
           });
           await page.locator('#root > *').first().waitFor({ state: 'visible', timeout: 60_000 });
           const preview = page.locator('[data-godot-evolution="device-acceptance"]');
+          await expect(preview).toHaveAttribute('data-godot-release-preflight', 'ready', { timeout: 120_000 });
+          await expect(preview).toHaveAttribute('data-godot-release-preflight-reason', 'manifest-verified');
           await expect(preview).toHaveAttribute('data-godot-status', 'accepted', { timeout: 120_000 });
           await expect(page.locator('iframe[title="Amore Evolution Engine — Godot 4.7.1"]')).toBeVisible();
           await expect(page.locator('body')).toContainText(releaseId);
