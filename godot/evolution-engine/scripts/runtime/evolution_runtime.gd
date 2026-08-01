@@ -76,7 +76,22 @@ func _render_state() -> void:
 	# the same ArrayMesh. Rendering a second collar here would recreate the
 	# visible bracelet seam Phase 5 is intended to remove.
 	for instruction in current_state.instructions:
-		artifact_root.add_child(crystal_builder.create_mesh_instance(instruction))
+		var crystal_instance: MeshInstance3D = crystal_builder.create_mesh_instance(instruction)
+		_apply_crystal_shadow_policy(crystal_instance)
+		artifact_root.add_child(crystal_instance)
+
+
+func _apply_crystal_shadow_policy(instance: MeshInstance3D) -> void:
+	# Opaque Web rendering is retained for stable sorting, but a child Crystal
+	# must not paint a black contact shadow onto its parent inside the intentional
+	# fusion overlap. Direct lighting, facet normals, Sky reflections and cast
+	# shadows on the environment remain active.
+	var array_mesh := instance.mesh as ArrayMesh
+	if array_mesh == null or array_mesh.get_surface_count() == 0:
+		return
+	var material := array_mesh.surface_get_material(0) as StandardMaterial3D
+	if material != null:
+		material.disable_receive_shadows = true
 
 
 func _update_status(source: String) -> void:
