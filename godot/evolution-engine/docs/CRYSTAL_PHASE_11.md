@@ -24,12 +24,15 @@ The accepted state must contain:
 2. runtime source;
 3. supported species;
 4. the exact canonical DNA seed sent by React;
-5. non-negative canonical instruction and history counts;
-6. history count equal to the payload event count;
-7. rendered instruction count no greater than canonical instruction count;
-8. a deterministic snapshot signature of at least eight characters.
+5. non-negative canonical instruction, input-event and history counts;
+6. input-event count equal to the payload event count;
+7. canonical history count no smaller than the input-event count because genesis history is retained;
+8. rendered instruction count no greater than canonical instruction count;
+9. a deterministic snapshot signature of at least eight characters.
 
 A partial, malformed or mismatched state can never mark the renderer as accepted.
+
+Handshake status is monotonic. Late shell messages such as `amore:godot:engine-started` cannot downgrade an already accepted or failed runtime.
 
 ## Controlled fallback
 
@@ -38,7 +41,7 @@ The host switches to the existing Three.js Evolution renderer when any fatal cut
 - iframe load failure;
 - Godot runtime error;
 - startup acceptance timeout;
-- accepted-state identity or history mismatch.
+- accepted-state identity, input-event or history-bound mismatch.
 
 Fallback is local to presentation. It does not rewrite portal data, canonical history or renderer-independent state.
 
@@ -97,12 +100,13 @@ Phase 11 requires all of the following:
 3. orbit drag emits no activation;
 4. Enter emits one keyboard activation;
 5. React bridge validators reject malformed messages;
-6. state identity, seed and history mismatches are rejected;
-7. every fatal cutover reason resolves to `three-fallback`;
-8. full production TypeScript and Vite build succeeds with `VITE_EVOLUTION_GODOT=production`;
-9. built output contains the Godot HTML, JavaScript, WASM and PCK files;
-10. Pixel 8 Pro Playwright proof reaches accepted full-motion state;
-11. reduced-motion browser proof remains accepted and static;
-12. a real canvas click reaches the React activation handler;
-13. no Supabase credential or write capability enters the iframe payload;
-14. the Three.js archive and runtime fallback remain intact.
+6. state identity, seed, input-event and history-bound mismatches are rejected;
+7. late lifecycle messages cannot downgrade accepted or failed status;
+8. every fatal cutover reason resolves to `three-fallback`;
+9. full production TypeScript and Vite build succeeds with `VITE_EVOLUTION_GODOT=production`;
+10. built output contains the Godot HTML, JavaScript, WASM and PCK files;
+11. Pixel 8 Pro Playwright proof reaches accepted full-motion state;
+12. reduced-motion browser proof remains accepted and static;
+13. a real canvas click reaches the React activation handler;
+14. no Supabase credential or write capability enters the iframe payload;
+15. the Three.js archive and runtime fallback remain intact.
