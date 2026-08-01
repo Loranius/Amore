@@ -7,9 +7,19 @@ import { MemoryModal } from '../../MemoryModal';
 import { useCrystalDNA } from '../../useCrystal';
 import LegacyCrystalScene from '../CrystalScene';
 import GodotEvolutionPreview from '../../godot3d/GodotEvolutionPreview';
-import { GODOT_EVOLUTION_ENABLED } from '../../godot3d/godotFeatureFlag';
+import {
+  resolveEvolutionRenderer,
+  type GodotCutoverFailure,
+} from '../../godot3d/godotCutoverPolicy';
+import {
+  GODOT_EVOLUTION_ENABLED,
+  GODOT_EVOLUTION_MODE,
+} from '../../godot3d/godotFeatureFlag';
 import { godotPayloadFromArtifact } from '../../godot3d/godotPayloadFromArtifact';
-import type { GodotBridgeInboundMessage } from '../../godot3d/godotBridgeProtocol';
+import type {
+  GodotBridgeInboundMessage,
+  GodotStateMessage,
+} from '../../godot3d/godotBridgeProtocol';
 import { EvolutionCrystalObject } from './EvolutionCrystalObject';
 import {
   EvolutionRuntimeProbe,
@@ -23,8 +33,6 @@ function formatTopology(value: number): string {
   return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
 }
 
-type GodotStateMessage = Extract<GodotBridgeInboundMessage, { type: 'amore:godot:state' }>;
-
 export default function EvolutionCrystalPreviewScene() {
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -34,15 +42,30 @@ export default function EvolutionCrystalPreviewScene() {
   const [open, setOpen] = useState(false);
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const [godotState, setGodotState] = useState<GodotStateMessage | null>(null);
+  const [godotFailure, setGodotFailure] = useState<GodotCutoverFailure | null>(null);
   const godotPayload = useMemo(
     () => pipeline ? godotPayloadFromArtifact(pipeline.artifact) : null,
     [pipeline],
   );
+  const renderer = resolveEvolutionRenderer({
+    enabled: GODOT_EVOLUTION_ENABLED,
+    payloadReady: Boolean(godotPayload),
+    failure: godotFailure,
+  });
+  const useGodot = renderer === 'godot';
+
+  const openModal = useCallback(() => setOpen(true), []);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => {
     setRuntime(next);
   }, []);
   const onGodotMessage = useCallback((message: GodotBridgeInboundMessage) => {
     if (message.type === 'amore:godot:state') setGodotState(message);
+    if (message.type === 'amore:godot:activate') openModal();
+  }, [openModal]);
+  const onGodotFatalError = useCallback((failure: GodotCutoverFailure) => {
+    console.error(`[Godot production cutover] ${failure}; falling back to Three.js.`);
+    setGodotState(null);
+    setGodotFailure(failure);
   }, []);
 
   if (error) {
@@ -59,7 +82,6 @@ export default function EvolutionCrystalPreviewScene() {
 
   if (isPending || !pipeline) return <CrystalPlaceholder />;
 
-  const openModal = () => setOpen(true);
   const onKeyDownOpen = (event: KeyboardEvent) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
@@ -67,21 +89,30 @@ export default function EvolutionCrystalPreviewScene() {
     }
   };
   const metrics = pipeline.metrics;
-  const badge = GODOT_EVOLUTION_ENABLED
+  const badge = renderer === 'godot'
     ? [
-        'Godot 4.7.1',
-        godotState ? `${godotState.instructions} тіл` : 'runtime…',
-        godotState ? `${godotState.history} подій` : 'bridge…',
+        GODOT_EVOLUTION_MODE === 'production' ? 'Godot production' : 'Godot preview',
+        godotState ? `${godotState.instructions} канон.` : 'runtime…',
+        godotState?.rendered_instructions !== undefined
+          ? `${godotState.rendered_instructions} тіл`
+          : 'bridge…',
         godotState?.signature ?? 'signature…',
       ].join(' · ')
-    : [
-        'Evolution',
-        metrics.quality,
-        `${metrics.meshCount} тіл`,
-        `${formatTopology(metrics.usedTriangles)} △`,
-        runtime ? `${runtime.drawCalls} DC` : 'метрики…',
-        `${metrics.buildMs.toFixed(1)} ms`,
-      ].join(' · ');
+    : renderer === 'three-fallback'
+      ? [
+          'Three fallback',
+          godotFailure,
+          `${metrics.meshCount} тіл`,
+          `${formatTopology(metrics.usedTriangles)} △`,
+        ].join(' · ')
+      : [
+          'Evolution',
+          metrics.quality,
+          `${metrics.meshCount} тіл`,
+          `${formatTopology(metrics.usedTriangles)} △`,
+          runtime ? `${runtime.drawCalls} DC` : 'метрики…',
+          `${metrics.buildMs.toFixed(1)} ms`,
+        ].join(' · ');
 
   return (
     <>
@@ -92,28 +123,31 @@ export default function EvolutionCrystalPreviewScene() {
         aria-label="Кристал Amore Evolution — показати випадковий спогад"
         onKeyDown={onKeyDownOpen}
         data-evolution-preview="ready"
-        data-evolution-renderer={GODOT_EVOLUTION_ENABLED ? 'godot-4.7.1' : 'three'}
+        data-evolution-renderer={renderer === 'godot' ? 'godot-4.7.1' : renderer}
         data-evolution-quality={metrics.quality}
-        data-evolution-bodies={GODOT_EVOLUTION_ENABLED
+        data-evolution-bodies={renderer === 'godot'
           ? godotState?.instructions ?? ''
           : metrics.bodyCount}
-        data-evolution-meshes={GODOT_EVOLUTION_ENABLED ? '' : metrics.meshCount}
-        data-evolution-materials={GODOT_EVOLUTION_ENABLED ? '' : metrics.materialCount}
-        data-evolution-vertices={GODOT_EVOLUTION_ENABLED ? '' : metrics.usedVertices}
-        data-evolution-triangles={GODOT_EVOLUTION_ENABLED ? '' : metrics.usedTriangles}
+        data-evolution-meshes={renderer === 'godot' ? '' : metrics.meshCount}
+        data-evolution-materials={renderer === 'godot' ? '' : metrics.materialCount}
+        data-evolution-vertices={renderer === 'godot' ? '' : metrics.usedVertices}
+        data-evolution-triangles={renderer === 'godot' ? '' : metrics.usedTriangles}
         data-evolution-build-ms={metrics.buildMs}
-        data-evolution-runtime={GODOT_EVOLUTION_ENABLED
+        data-evolution-runtime={renderer === 'godot'
           ? godotState ? 'ready' : 'warming'
           : runtime ? 'ready' : 'warming'}
-        data-evolution-draw-calls={GODOT_EVOLUTION_ENABLED ? '' : runtime?.drawCalls ?? ''}
-        data-evolution-rendered-triangles={GODOT_EVOLUTION_ENABLED ? '' : runtime?.triangles ?? ''}
+        data-evolution-draw-calls={renderer === 'godot' ? '' : runtime?.drawCalls ?? ''}
+        data-evolution-rendered-triangles={renderer === 'godot' ? '' : runtime?.triangles ?? ''}
         data-evolution-state-signature={godotState?.signature ?? ''}
+        data-evolution-godot-failure={godotFailure ?? ''}
       >
-        {GODOT_EVOLUTION_ENABLED && godotPayload ? (
+        {useGodot && godotPayload ? (
           <GodotEvolutionPreview
             payload={godotPayload}
             enabled
+            startupTimeoutMs={20_000}
             onMessage={onGodotMessage}
+            onFatalError={onGodotFatalError}
           />
         ) : (
           <Canvas
