@@ -210,5 +210,3 @@ export default function EvolutionCrystalPreviewScene() {
     </>
   );
 }
-
-export default EvolutionCrystalPreviewScene;
