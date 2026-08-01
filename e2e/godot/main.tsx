@@ -46,10 +46,14 @@ const payload: GodotEvolutionPayload = {
 
 function GodotBridgeHarness() {
   const [activationCount, setActivationCount] = useState(0);
+  const [interactionCount, setInteractionCount] = useState(0);
   const [fatalFailure, setFatalFailure] = useState('');
   const onMessage = useCallback((message: GodotBridgeInboundMessage) => {
     if (message.type === 'amore:godot:activate') {
       setActivationCount(count => count + 1);
+    }
+    if (message.type === 'amore:godot:interaction') {
+      setInteractionCount(count => count + 1);
     }
   }, []);
 
@@ -57,6 +61,7 @@ function GodotBridgeHarness() {
     <main
       data-godot-harness="react"
       data-godot-activation-count={activationCount}
+      data-godot-interaction-count={interactionCount}
       data-godot-fatal-failure={fatalFailure}
       style={{
         width: '100%',
@@ -69,6 +74,8 @@ function GodotBridgeHarness() {
       <GodotEvolutionPreview
         payload={payload}
         enabled
+        healthFallbackEnabled
+        diagnosticsEnabled
         onMessage={onMessage}
         onFatalError={setFatalFailure}
       />
