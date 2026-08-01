@@ -4,17 +4,17 @@
 [ext_resource type="Script" path="res://scripts/runtime/orbit_camera.gd" id="2_camera"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_crystal"]
-sky_top_color = Color(0.008, 0.012, 0.032, 1)
-sky_horizon_color = Color(0.07, 0.064, 0.11, 1)
-sky_curve = 0.3
-sky_energy_multiplier = 0.58
-ground_bottom_color = Color(0.012, 0.014, 0.026, 1)
-ground_horizon_color = Color(0.085, 0.06, 0.095, 1)
-ground_curve = 0.24
-ground_energy_multiplier = 0.34
+sky_top_color = Color(0.026, 0.034, 0.074, 1)
+sky_horizon_color = Color(0.082, 0.086, 0.15, 1)
+sky_curve = 0.38
+sky_energy_multiplier = 0.82
+ground_bottom_color = Color(0.018, 0.022, 0.044, 1)
+ground_horizon_color = Color(0.074, 0.066, 0.12, 1)
+ground_curve = 0.3
+ground_energy_multiplier = 0.46
 sun_angle_max = 6.0
 sun_curve = 0.1
-energy_multiplier = 0.88
+energy_multiplier = 1.0
 use_debanding = true
 
 [sub_resource type="Sky" id="Sky_crystal"]
@@ -22,8 +22,7 @@ radiance_size = 1
 sky_material = SubResource("ProceduralSkyMaterial_crystal")
 
 [sub_resource type="Environment" id="Environment_main"]
-background_mode = 1
-background_color = Color(0.022, 0.026, 0.048, 1)
+background_mode = 2
 background_energy_multiplier = 1.0
 sky = SubResource("Sky_crystal")
 ambient_light_source = 3
