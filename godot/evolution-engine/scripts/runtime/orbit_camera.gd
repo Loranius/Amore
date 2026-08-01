@@ -4,13 +4,13 @@ extends Node3D
 @export var zoom_step := 0.6
 @export var minimum_distance := 5.2
 @export var maximum_distance := 12.0
-@export var target_height := 1.62
+@export var target_height := 1.58
 
 @onready var camera: Camera3D = $Camera3D
 
-var distance := 8.35
-var pitch := deg_to_rad(-5.0)
-var yaw := deg_to_rad(26.0)
+var distance := 8.9
+var pitch := deg_to_rad(-3.0)
+var yaw := deg_to_rad(18.0)
 
 
 func _ready() -> void:
