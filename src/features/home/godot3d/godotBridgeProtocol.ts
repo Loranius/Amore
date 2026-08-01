@@ -23,6 +23,16 @@ export interface GodotEvolutionPayload {
 }
 
 export type GodotActivationSource = 'tap' | 'keyboard';
+export type GodotRuntimeQuality = 'high' | 'balanced' | 'economy';
+export type GodotLifecycleState =
+  | 'hidden'
+  | 'visible'
+  | 'pagehide'
+  | 'pageshow'
+  | 'freeze'
+  | 'resume'
+  | 'context-lost'
+  | 'context-restored';
 
 export type GodotBridgeInboundMessage =
   | { type: 'amore:godot:booting'; version: string }
@@ -42,8 +52,33 @@ export type GodotBridgeInboundMessage =
       motion?: 'full' | 'reduced';
       life_version?: string;
       visual_version?: string;
+      quality_version?: string;
+      quality?: GodotRuntimeQuality;
+      render_scale?: number;
+      life_hz?: number;
       phase?: number;
       signature: string;
+    }
+  | {
+      type: 'amore:godot:telemetry';
+      version: string;
+      quality: GodotRuntimeQuality;
+      fps: number;
+      frame_ms: number;
+      draw_calls: number;
+      primitives: number;
+      static_memory_mb: number;
+      render_scale: number;
+      life_hz: number;
+      suspended: boolean;
+      restores: number;
+    }
+  | {
+      type: 'amore:godot:lifecycle';
+      state: GodotLifecycleState;
+      sequence: number;
+      suspended: boolean;
+      restores: number;
     }
   | { type: 'amore:godot:activate'; source: GodotActivationSource }
   | { type: 'amore:godot:error'; message: string };
@@ -53,10 +88,32 @@ export type GodotStateMessage = Extract<
   { type: 'amore:godot:state' }
 >;
 
+export type GodotTelemetryMessage = Extract<
+  GodotBridgeInboundMessage,
+  { type: 'amore:godot:telemetry' }
+>;
+
+export type GodotLifecycleMessage = Extract<
+  GodotBridgeInboundMessage,
+  { type: 'amore:godot:lifecycle' }
+>;
+
 export interface GodotBridgePayloadMessage {
   type: 'amore:godot:payload';
   payload: GodotEvolutionPayload;
 }
+
+const RUNTIME_QUALITIES: GodotRuntimeQuality[] = ['high', 'balanced', 'economy'];
+const LIFECYCLE_STATES: GodotLifecycleState[] = [
+  'hidden',
+  'visible',
+  'pagehide',
+  'pageshow',
+  'freeze',
+  'resume',
+  'context-lost',
+  'context-restored',
+];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
@@ -66,12 +123,34 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+function isNonNegativeNumber(value: unknown): value is number {
+  return isFiniteNumber(value) && value >= 0;
+}
+
 function isNonNegativeInteger(value: unknown): value is number {
   return isFiniteNumber(value) && Number.isInteger(value) && value >= 0;
 }
 
 function isVersionedMessage(value: Record<string, unknown>): boolean {
   return typeof value.version === 'string' && value.version.length > 0;
+}
+
+function isRuntimeQuality(value: unknown): value is GodotRuntimeQuality {
+  return typeof value === 'string'
+    && RUNTIME_QUALITIES.includes(value as GodotRuntimeQuality);
+}
+
+function isLifecycleState(value: unknown): value is GodotLifecycleState {
+  return typeof value === 'string'
+    && LIFECYCLE_STATES.includes(value as GodotLifecycleState);
+}
+
+function isOptionalRuntimeSettings(value: Record<string, unknown>): boolean {
+  return (value.quality === undefined || isRuntimeQuality(value.quality))
+    && (value.render_scale === undefined
+      || (isFiniteNumber(value.render_scale) && value.render_scale >= 0.5 && value.render_scale <= 1))
+    && (value.life_hz === undefined
+      || (isFiniteNumber(value.life_hz) && value.life_hz >= 10 && value.life_hz <= 60));
 }
 
 export function isGodotBridgeInboundMessage(value: unknown): value is GodotBridgeInboundMessage {
@@ -103,8 +182,30 @@ export function isGodotBridgeInboundMessage(value: unknown): value is GodotBridg
         && isNonNegativeInteger(value.history)
         && value.history >= value.input_events
         && (value.motion === undefined || value.motion === 'full' || value.motion === 'reduced')
+        && isOptionalRuntimeSettings(value)
         && typeof value.signature === 'string'
         && value.signature.length >= 8;
+    case 'amore:godot:telemetry':
+      return isVersionedMessage(value)
+        && isRuntimeQuality(value.quality)
+        && isNonNegativeNumber(value.fps)
+        && isNonNegativeNumber(value.frame_ms)
+        && isNonNegativeInteger(value.draw_calls)
+        && isNonNegativeInteger(value.primitives)
+        && isNonNegativeNumber(value.static_memory_mb)
+        && isFiniteNumber(value.render_scale)
+        && value.render_scale >= 0.5
+        && value.render_scale <= 1
+        && isFiniteNumber(value.life_hz)
+        && value.life_hz >= 10
+        && value.life_hz <= 60
+        && typeof value.suspended === 'boolean'
+        && isNonNegativeInteger(value.restores);
+    case 'amore:godot:lifecycle':
+      return isLifecycleState(value.state)
+        && isNonNegativeInteger(value.sequence)
+        && typeof value.suspended === 'boolean'
+        && isNonNegativeInteger(value.restores);
     case 'amore:godot:activate':
       return value.source === 'tap' || value.source === 'keyboard';
     case 'amore:godot:error':
