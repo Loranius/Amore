@@ -93,8 +93,11 @@
       'use strict';
 
       const payloadQueue = [];
+      const lifecycleQueue = [];
       const boot = document.getElementById('boot');
       const progress = document.getElementById('boot-progress');
+      const canvas = document.getElementById('canvas');
+      let lifecycleSequence = 0;
 
       function post(message) {
         if (window.parent === window) return;
@@ -106,9 +109,36 @@
         return new TextDecoder().decode(bytes);
       }
 
+      function queueLifecycle(state) {
+        lifecycleSequence += 1;
+        lifecycleQueue.push(JSON.stringify({ state, sequence: lifecycleSequence }));
+        if (lifecycleQueue.length > 16) lifecycleQueue.shift();
+      }
+
+      function capabilities() {
+        return {
+          device_memory_gb: Number(navigator.deviceMemory || 0),
+          hardware_concurrency: Number(navigator.hardwareConcurrency || 0),
+          device_pixel_ratio: Number(window.devicePixelRatio || 1),
+          viewport_width: Number(window.innerWidth || canvas.clientWidth || 1),
+          viewport_height: Number(window.innerHeight || canvas.clientHeight || 1),
+          visibility: document.visibilityState === 'hidden' ? 'hidden' : 'visible',
+          reduced_motion: Boolean(
+            window.matchMedia
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ),
+        };
+      }
+
       window.AmoreGodotBridge = Object.freeze({
         takePayload() {
           return payloadQueue.shift() ?? '';
+        },
+        takeLifecycle() {
+          return lifecycleQueue.shift() ?? '';
+        },
+        capabilitiesJson() {
+          return JSON.stringify(capabilities());
         },
         postBase64(encoded) {
           try {
@@ -125,11 +155,25 @@
         payloadQueue.push(JSON.stringify(event.data.payload));
       });
 
+      document.addEventListener('visibilitychange', () => {
+        queueLifecycle(document.visibilityState === 'hidden' ? 'hidden' : 'visible');
+      });
+      window.addEventListener('pagehide', () => queueLifecycle('pagehide'));
+      window.addEventListener('pageshow', () => queueLifecycle('pageshow'));
+      window.addEventListener('freeze', () => queueLifecycle('freeze'));
+      window.addEventListener('resume', () => queueLifecycle('resume'));
+      canvas.addEventListener('webglcontextlost', event => {
+        event.preventDefault();
+        queueLifecycle('context-lost');
+      });
+      canvas.addEventListener('webglcontextrestored', () => queueLifecycle('context-restored'));
+      queueLifecycle(document.visibilityState === 'hidden' ? 'hidden' : 'visible');
+
       post({ type: 'amore:godot:booting', version: '4.7.1' });
 
       const engine = new Engine($GODOT_CONFIG);
       engine.startGame({
-        canvas: document.getElementById('canvas'),
+        canvas,
         canvasResizePolicy: 2,
         onProgress(current, total) {
           const ratio = total > 0 ? Math.min(1, current / total) : 0;

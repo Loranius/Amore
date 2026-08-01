@@ -5,23 +5,39 @@ extends Node
 
 const CrystalLifeProfile = preload("res://scripts/life/crystal_life_profile.gd")
 
-const VERSION := "crystal-life-engine-v1"
+const VERSION := "crystal-life-engine-v2"
 const MAX_EMISSION_ENERGY := 0.045
 const MAX_RIM_STRENGTH := 0.22
+const MIN_UPDATE_HZ := 10.0
+const MAX_UPDATE_HZ := 60.0
 
 var _profile = CrystalLifeProfile.new()
 var _dna_seed := 1
 var _elapsed := 0.0
 var _reduced_motion := false
+var _runtime_paused := false
+var _update_hz := 60.0
+var _update_accumulator := 0.0
 var _entries: Dictionary = {}
 
 
 func configure(dna_seed: int, reduced_motion: bool) -> void:
 	_dna_seed = dna_seed
 	_reduced_motion = reduced_motion
-	set_process(not _reduced_motion)
+	_update_process_state()
 	if _reduced_motion:
 		_reset_to_static()
+
+
+func set_update_hz(value: float) -> void:
+	_update_hz = clampf(value, MIN_UPDATE_HZ, MAX_UPDATE_HZ)
+	_update_accumulator = 0.0
+
+
+func set_runtime_paused(paused: bool) -> void:
+	_runtime_paused = paused
+	_update_accumulator = 0.0
+	_update_process_state()
 
 
 func clear_entries() -> void:
@@ -59,7 +75,7 @@ func register_instance(
 
 
 func advance(delta: float) -> void:
-	if _reduced_motion:
+	if _reduced_motion or _runtime_paused:
 		return
 	_elapsed += maxf(delta, 0.0)
 	var expired_ids: Array[String] = []
@@ -82,6 +98,14 @@ func is_reduced_motion() -> bool:
 	return _reduced_motion
 
 
+func is_runtime_paused() -> bool:
+	return _runtime_paused
+
+
+func update_hz() -> float:
+	return _update_hz
+
+
 func life_snapshot() -> Dictionary:
 	return {
 		"version": VERSION,
@@ -89,11 +113,25 @@ func life_snapshot() -> Dictionary:
 		"entries": _entries.size(),
 		"elapsed": _elapsed,
 		"reduced_motion": _reduced_motion,
+		"runtime_paused": _runtime_paused,
+		"update_hz": _update_hz,
 	}
 
 
 func _process(delta: float) -> void:
-	advance(delta)
+	if _reduced_motion or _runtime_paused:
+		return
+	_update_accumulator += maxf(delta, 0.0)
+	var interval := 1.0 / _update_hz
+	if _update_accumulator < interval:
+		return
+	var accumulated := _update_accumulator
+	_update_accumulator = 0.0
+	advance(accumulated)
+
+
+func _update_process_state() -> void:
+	set_process(not _reduced_motion and not _runtime_paused)
 
 
 func _apply_entry(entry: Dictionary) -> void:

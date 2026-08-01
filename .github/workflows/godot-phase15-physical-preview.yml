@@ -1,0 +1,327 @@
+name: Godot Phase 15 Physical Preview
+
+on:
+  push:
+    branches:
+      - feat/godot-crystal-phase-15-release-candidate
+    paths:
+      - '.github/workflows/godot-phase15-physical-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: godot-phase15-physical-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'Loranius/Amore'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    steps:
+      - name: Checkout Phase 15 branch
+        uses: actions/checkout@v4
+
+      - name: Verify Vercel deployment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_ORG_ID"
+          test -n "$VERCEL_PROJECT_ID"
+          test -n "$VERCEL_TOKEN"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install application and deployment tooling
+        run: |
+          npm ci
+          npm install --no-save --no-package-lock @playwright/test@1.61.1 dotenv@16.4.7
+          npm install --global vercel@latest
+
+      - name: Link Vercel project and pull Preview variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .vercel
+          mkdir -p .vercel
+          cat > .vercel/project.json <<JSON
+          {
+            "orgId": "${VERCEL_ORG_ID}",
+            "projectId": "${VERCEL_PROJECT_ID}"
+          }
+          JSON
+          vercel env pull .env.vercel-preview.local \
+            --environment=preview \
+            --yes \
+            --token="$VERCEL_TOKEN"
+          test -s .env.vercel-preview.local
+
+      - name: Verify required Preview variables without exposing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { parse } from 'dotenv';
+
+          const env = parse(readFileSync('.env.vercel-preview.local', 'utf8'));
+          const required = [
+            'VITE_SUPABASE_URL',
+            'VITE_SUPABASE_ANON_KEY',
+            'VITE_TMDB_KEY',
+            'VITE_MAPBOX_TOKEN',
+          ];
+          const missing = required.filter(key => !String(env[key] ?? '').trim());
+          if (missing.length > 0) {
+            console.error(`Missing Vercel Preview variables: ${missing.join(', ')}`);
+            process.exit(1);
+          }
+          if (!String(env.VITE_SUPABASE_URL).startsWith('https://')) {
+            console.error('VITE_SUPABASE_URL must start with https://');
+            process.exit(1);
+          }
+          if (!String(env.VITE_MAPBOX_TOKEN).startsWith('pk.')) {
+            console.error('VITE_MAPBOX_TOKEN must be a public pk.* token.');
+            process.exit(1);
+          }
+          console.log(`Verified ${required.length} required Vercel Preview variables.`);
+          NODE
+
+      - name: Install Godot 4.7.1 and Web templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 30 \
+            --output /tmp/godot.zip \
+            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 30 \
+            --output /tmp/godot-templates.tpz \
+            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          sudo ln -s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 /usr/local/bin/godot
+
+          rm -rf /tmp/godot-export-templates
+          mkdir -p /tmp/godot-export-templates
+          unzip -q /tmp/godot-templates.tpz -d /tmp/godot-export-templates
+          template_source=/tmp/godot-export-templates
+          if [[ -d /tmp/godot-export-templates/templates ]]; then
+            template_source=/tmp/godot-export-templates/templates
+          fi
+          template_target="$HOME/.local/share/godot/export_templates/4.7.1.stable"
+          mkdir -p "$template_target"
+          cp -R "$template_source"/. "$template_target"/
+          godot --version
+          test -f "$template_target/web_release.zip"
+
+      - name: Export Godot Web runtime for the physical preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot/evolution-engine --editor --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-import.log; then
+            exit 1
+          fi
+
+          rm -rf public/godot/evolution-engine /tmp/amore-godot-web
+          mkdir -p public/godot/evolution-engine /tmp/amore-godot-web
+          godot --headless \
+            --path godot/evolution-engine \
+            --export-release Web \
+            /tmp/amore-godot-web/index.html \
+            2>&1 | tee /tmp/godot-export.log
+
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script|ERROR: Cannot export' /tmp/godot-export.log; then
+            exit 1
+          fi
+          for file in index.html index.js index.wasm index.pck; do
+            test -s "/tmp/amore-godot-web/$file"
+          done
+          cp -R /tmp/amore-godot-web/. public/godot/evolution-engine/
+
+      - name: Build full Amore physical-preview bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { spawnSync } from 'node:child_process';
+          import { parse } from 'dotenv';
+
+          const pulled = parse(readFileSync('.env.vercel-preview.local', 'utf8'));
+          const buildEnv = {
+            ...process.env,
+            ...pulled,
+            VITE_EVOLUTION_GODOT: 'preview',
+            VITE_EVOLUTION_GODOT_ROLLOUT: '100',
+            VITE_EVOLUTION_GODOT_RELEASE_STAGE: 'blocked',
+            VITE_EVOLUTION_GODOT_RELEASE_ID: '',
+            VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256: '',
+            VITE_EVOLUTION_GODOT_KILL_SWITCH: 'off',
+          };
+          const result = spawnSync('npm', ['run', 'build'], {
+            env: buildEnv,
+            stdio: 'inherit',
+          });
+          process.exit(result.status ?? 1);
+          NODE
+
+          test -s dist/index.html
+          test -s dist/godot/evolution-engine/index.html
+          test -s dist/godot/evolution-engine/index.js
+          test -s dist/godot/evolution-engine/index.wasm
+          test -s dist/godot/evolution-engine/index.pck
+
+      - name: Prepare Vercel Build Output API bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .vercel/output
+          mkdir -p .vercel/output/static
+          cp -R dist/. .vercel/output/static/
+
+          cat > .vercel/output/config.json <<'JSON'
+          {
+            "version": 3,
+            "routes": [
+              {
+                "src": "/godot/evolution-engine/index\\.html",
+                "headers": {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Cross-Origin-Resource-Policy": "same-origin"
+                },
+                "continue": true
+              },
+              {
+                "src": "/godot/evolution-engine/index\\.wasm",
+                "headers": {
+                  "Cache-Control": "public, max-age=0, must-revalidate",
+                  "Content-Type": "application/wasm",
+                  "Cross-Origin-Resource-Policy": "same-origin"
+                },
+                "continue": true
+              },
+              {
+                "src": "/godot/evolution-engine/index\\.pck",
+                "headers": {
+                  "Cache-Control": "public, max-age=0, must-revalidate",
+                  "Content-Type": "application/octet-stream",
+                  "Cross-Origin-Resource-Policy": "same-origin"
+                },
+                "continue": true
+              },
+              {
+                "src": "/godot/evolution-engine/index\\.js",
+                "headers": {
+                  "Cache-Control": "public, max-age=0, must-revalidate",
+                  "Cross-Origin-Resource-Policy": "same-origin"
+                },
+                "continue": true
+              },
+              { "handle": "filesystem" },
+              { "src": "/(.*)", "dest": "/index.html" }
+            ]
+          }
+          JSON
+          node -e "JSON.parse(require('fs').readFileSync('.vercel/output/config.json', 'utf8'))"
+
+      - name: Disable authentication on the dedicated preview project
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(
+            curl --fail --silent --show-error \
+              --request PATCH \
+              --url "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}?teamId=${VERCEL_ORG_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+              --header 'Content-Type: application/json' \
+              --data '{"ssoProtection":null}'
+          )"
+          node -e "const p=JSON.parse(process.argv[1]); if (p.ssoProtection != null) process.exit(1)" "$response"
+
+      - name: Deploy physical preview to Vercel
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          preview_url="$(vercel deploy --prebuilt --yes --archive=tgz --token="$VERCEL_TOKEN")"
+          test -n "$preview_url"
+          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$preview_url" > preview-url.txt
+          vercel inspect "$preview_url" --wait --timeout 5m --token="$VERCEL_TOKEN"
+
+      - name: Verify the deployed portal renders instead of a white screen
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          browser_path=''
+          for candidate in chromium google-chrome google-chrome-stable; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+              browser_path="$(command -v "$candidate")"
+              break
+            fi
+          done
+          test -n "$browser_path"
+          export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$browser_path"
+
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+
+          const url = process.env.PREVIEW_URL;
+          const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+          const browser = await chromium.launch({ executablePath, headless: true });
+          const page = await browser.newPage({ viewport: { width: 412, height: 915 } });
+          const pageErrors = [];
+          page.on('pageerror', error => pageErrors.push(error.message));
+          await page.goto(`${url}/?godotDiagnostics=1&godotReleaseOps=1`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 60_000,
+          });
+          await page.locator('#root > *').first().waitFor({ state: 'visible', timeout: 60_000 });
+          const fatalEnvironmentError = pageErrors.find(message =>
+            message.includes('VITE_SUPABASE_URL') || message.includes('VITE_SUPABASE_ANON_KEY')
+          );
+          if (fatalEnvironmentError) throw new Error(fatalEnvironmentError);
+          await page.screenshot({ path: 'phase15-physical-preview-smoke.png', fullPage: true });
+          await browser.close();
+          NODE
+
+      - name: Publish preview evidence
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          {
+            echo '## Godot Phase 15 Physical Preview'
+            echo
+            echo "Preview URL: ${PREVIEW_URL}/?godotDiagnostics=1&godotReleaseOps=1"
+            echo
+            echo 'This is a preview-mode physical acceptance build. It does not claim PHYSICAL PASS or authorize canary rollout.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload preview URL and browser smoke evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: amore-godot-phase15-physical-preview-${{ github.sha }}
+          path: |
+            preview-url.txt
+            phase15-physical-preview-smoke.png
+          if-no-files-found: error
+          retention-days: 14

@@ -1,7 +1,10 @@
-import { StrictMode } from 'react';
+import { StrictMode, useCallback, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import GodotEvolutionPreview from '@/features/home/godot3d/GodotEvolutionPreview';
-import type { GodotEvolutionPayload } from '@/features/home/godot3d/godotBridgeProtocol';
+import type {
+  GodotBridgeInboundMessage,
+  GodotEvolutionPayload,
+} from '@/features/home/godot3d/godotBridgeProtocol';
 
 const payload: GodotEvolutionPayload = {
   dna: {
@@ -41,13 +44,33 @@ const payload: GodotEvolutionPayload = {
   ],
 };
 
-const root = document.getElementById('root');
-if (!root) throw new Error('Godot bridge harness root is missing.');
+function queryFlag(name: string): boolean {
+  return ['1', 'true', 'on'].includes(
+    (new URLSearchParams(window.location.search).get(name) ?? '').toLowerCase(),
+  );
+}
 
-createRoot(root).render(
-  <StrictMode>
+function GodotBridgeHarness() {
+  const [activationCount, setActivationCount] = useState(0);
+  const [interactionCount, setInteractionCount] = useState(0);
+  const [fatalFailure, setFatalFailure] = useState('');
+  const rollbackDrill = queryFlag('godotRollbackDrill');
+  const onMessage = useCallback((message: GodotBridgeInboundMessage) => {
+    if (message.type === 'amore:godot:activate') {
+      setActivationCount(count => count + 1);
+    }
+    if (message.type === 'amore:godot:interaction') {
+      setInteractionCount(count => count + 1);
+    }
+  }, []);
+
+  return (
     <main
       data-godot-harness="react"
+      data-godot-activation-count={activationCount}
+      data-godot-interaction-count={interactionCount}
+      data-godot-fatal-failure={fatalFailure}
+      data-godot-rollback-drill={String(rollbackDrill)}
       style={{
         width: '100%',
         maxWidth: 520,
@@ -56,7 +79,26 @@ createRoot(root).render(
         boxSizing: 'border-box',
       }}
     >
-      <GodotEvolutionPreview payload={payload} enabled />
+      <GodotEvolutionPreview
+        payload={payload}
+        enabled={!rollbackDrill}
+        fallback={<div data-godot-three-fallback="rollback-drill">Three.js rollback drill</div>}
+        healthFallbackEnabled={queryFlag('healthFallback')}
+        releasePreflightEnabled={queryFlag('releasePreflight')}
+        releaseOperationsEnabled={queryFlag('godotReleaseOps')}
+        rollbackDrill={rollbackDrill}
+        onMessage={onMessage}
+        onFatalError={setFatalFailure}
+      />
     </main>
+  );
+}
+
+const root = document.getElementById('root');
+if (!root) throw new Error('Godot bridge harness root is missing.');
+
+createRoot(root).render(
+  <StrictMode>
+    <GodotBridgeHarness />
   </StrictMode>,
 );
