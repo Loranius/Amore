@@ -6,6 +6,7 @@ on:
       - feat/godot-evolution-engine-bootstrap
       - feat/godot-crystal-phase-11-production-cutover
       - feat/godot-crystal-phase-12-mobile-hardening
+      - feat/godot-crystal-phase-13-device-acceptance
     paths:
       - 'godot/evolution-engine/**'
       - 'src/features/home/godot3d/**'
@@ -15,6 +16,7 @@ on:
       - 'vite.config.ts'
       - 'package.json'
       - 'package-lock.json'
+      - '.env.local.example'
       - '.github/workflows/godot-evolution-engine.yml'
   pull_request:
     paths:
@@ -26,6 +28,7 @@ on:
       - 'vite.config.ts'
       - 'package.json'
       - 'package-lock.json'
+      - '.env.local.example'
       - '.github/workflows/godot-evolution-engine.yml'
   workflow_dispatch:
 
@@ -35,7 +38,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -90,9 +93,7 @@ jobs:
             --path godot/evolution-engine \
             --script res://scripts/tests/determinism_smoke.gd \
             2>&1 | tee /tmp/godot-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-smoke.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-smoke.log; then exit 1; fi
           grep -q 'PASS: deterministic crystal rebuild' /tmp/godot-smoke.log
 
       - name: Run Crystal growth hierarchy smoke test
@@ -102,9 +103,7 @@ jobs:
           timeout 60s godot --headless --path godot/evolution-engine \
             --script res://scripts/tests/growth_hierarchy_smoke.gd \
             2>&1 | tee /tmp/godot-hierarchy-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-hierarchy-smoke.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-hierarchy-smoke.log; then exit 1; fi
           grep -q 'PASS: crystal growth hierarchy' /tmp/godot-hierarchy-smoke.log
 
       - name: Run Crystal semantic pressure smoke test
@@ -114,9 +113,7 @@ jobs:
           timeout 60s godot --headless --path godot/evolution-engine \
             --script res://scripts/tests/semantic_pressure_smoke.gd \
             2>&1 | tee /tmp/godot-semantic-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-semantic-smoke.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-semantic-smoke.log; then exit 1; fi
           grep -q 'PASS: crystal semantic pressure' /tmp/godot-semantic-smoke.log
 
       - name: Run Crystal colony accumulation smoke test
@@ -126,9 +123,7 @@ jobs:
           timeout 60s godot --headless --path godot/evolution-engine \
             --script res://scripts/tests/colony_accumulation_smoke.gd \
             2>&1 | tee /tmp/godot-colony-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-colony-smoke.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-colony-smoke.log; then exit 1; fi
           grep -q 'PASS: crystal colony accumulation' /tmp/godot-colony-smoke.log
 
       - name: Run Crystal life engine smoke test
@@ -138,9 +133,7 @@ jobs:
           timeout 60s godot --headless --path godot/evolution-engine \
             --script res://scripts/tests/life_engine_smoke.gd \
             2>&1 | tee /tmp/godot-life-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-life-smoke.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-life-smoke.log; then exit 1; fi
           grep -q 'PASS: crystal life engine' /tmp/godot-life-smoke.log
 
       - name: Run Crystal visual polish smoke test
@@ -150,9 +143,7 @@ jobs:
           timeout 60s godot --headless --path godot/evolution-engine \
             --script res://scripts/tests/visual_polish_smoke.gd \
             2>&1 | tee /tmp/godot-visual-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-visual-smoke.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-visual-smoke.log; then exit 1; fi
           grep -q 'PASS: crystal visual polish' /tmp/godot-visual-smoke.log
 
       - name: Run integrated Crystal fusion smoke test
@@ -162,22 +153,18 @@ jobs:
           timeout 60s godot --headless --path godot/evolution-engine \
             --script res://scripts/tests/integrated_fusion_smoke.gd \
             2>&1 | tee /tmp/godot-fusion-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-fusion-smoke.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-fusion-smoke.log; then exit 1; fi
           grep -q 'PASS: integrated crystal fusion' /tmp/godot-fusion-smoke.log
 
-      - name: Run Godot portal production cutover smoke test
+      - name: Run Godot portal and interaction smoke test
         shell: bash
         run: |
           set -euo pipefail
           timeout 60s godot --headless --path godot/evolution-engine \
             --script res://scripts/tests/portal_cutover_smoke.gd \
             2>&1 | tee /tmp/godot-cutover-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-cutover-smoke.log; then
-            exit 1
-          fi
-          grep -q 'PASS: Godot portal production cutover' /tmp/godot-cutover-smoke.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-cutover-smoke.log; then exit 1; fi
+          grep -q 'PASS: Godot portal production cutover; Phase 13 interaction evidence' /tmp/godot-cutover-smoke.log
 
       - name: Run Phase 12 mobile runtime smoke test
         shell: bash
@@ -186,9 +173,7 @@ jobs:
           timeout 60s godot --headless --path godot/evolution-engine \
             --script res://scripts/tests/mobile_runtime_smoke.gd \
             2>&1 | tee /tmp/godot-mobile-runtime-smoke.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-mobile-runtime-smoke.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-mobile-runtime-smoke.log; then exit 1; fi
           grep -q 'PASS: Phase 12 mobile runtime hardening' /tmp/godot-mobile-runtime-smoke.log
 
       - name: Export Web runtime
@@ -203,9 +188,7 @@ jobs:
             /tmp/amore-godot-web/index.html \
             2>&1 | tee /tmp/godot-export.log
 
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script|ERROR: Cannot export' /tmp/godot-export.log; then
-            exit 1
-          fi
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script|ERROR: Cannot export' /tmp/godot-export.log; then exit 1; fi
 
           test -s /tmp/amore-godot-web/index.html
           test -s /tmp/amore-godot-web/index.js
@@ -262,44 +245,46 @@ jobs:
       - name: Run React and TypeScript tests
         run: npm test
 
-      - name: Build Phase 12 mobile-hardened bundle
+      - name: Build Phase 13 rollout bundle
         env:
           VITE_EVOLUTION_GODOT: production
+          VITE_EVOLUTION_GODOT_ROLLOUT: 100
         run: |
           npm run build
           test -s dist/godot/evolution-engine/index.html
           test -s dist/godot/evolution-engine/index.wasm
           test -s dist/godot/evolution-engine/index.pck
 
-      - name: Run React to Godot Pixel 8 Pro bridge tests
+      - name: Run Phase 13 Pixel 8 Pro acceptance tests
         env:
           VITE_EVOLUTION_GODOT: production
+          VITE_EVOLUTION_GODOT_ROLLOUT: 100
         run: npx playwright test --config=playwright.godot.config.ts
 
-      - name: Build Phase 12 visual comparison report
+      - name: Build Phase 13 acceptance report
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          before='test-results/phase12-before-background-restore-pixel-8-pro.png'
-          after='test-results/phase12-after-background-restore-pixel-8-pro.png'
-          if [[ -s "$before" && -s "$after" ]]; then
-            cat > test-results/phase12-visual-comparison.html <<'HTML'
+          health='test-results/phase13-runtime-health-pixel-8-pro.png'
+          acceptance='test-results/phase13-device-acceptance-pass-pixel-8-pro.png'
+          if [[ -s "$health" && -s "$acceptance" ]]; then
+            cat > test-results/phase13-device-acceptance.html <<'HTML'
           <!doctype html>
-          <html lang="uk"><head><meta charset="utf-8"><title>Crystal Phase 12 visual comparison</title>
+          <html lang="uk"><head><meta charset="utf-8"><title>Crystal Phase 13 device acceptance</title>
           <style>body{font-family:system-ui;background:#111;color:#fff;margin:24px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}img{width:100%;border-radius:18px;border:1px solid #555}h2{font-size:18px}</style></head>
-          <body><h1>Crystal Phase 12 — background/restore visual comparison</h1><div class="grid">
-          <section><h2>Before background suspension</h2><img src="phase12-before-background-restore-pixel-8-pro.png"></section>
-          <section><h2>After restore</h2><img src="phase12-after-background-restore-pixel-8-pro.png"></section>
-          </div><p>Acceptance also verifies that the canonical state signature is identical before and after restore.</p></body></html>
+          <body><h1>Crystal Phase 13 — device acceptance proof</h1><div class="grid">
+          <section><h2>Runtime health</h2><img src="phase13-runtime-health-pixel-8-pro.png"></section>
+          <section><h2>30-sample acceptance PASS</h2><img src="phase13-device-acceptance-pass-pixel-8-pro.png"></section>
+          </div><p>The browser suite also verifies orbit evidence, background restore, stable signature and sustained-critical fallback.</p></body></html>
           HTML
           fi
 
-      - name: Upload Phase 12 browser proof
+      - name: Upload Phase 13 browser proof
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: amore-godot-phase12-browser-proof-${{ github.sha }}
+          name: amore-godot-phase13-device-proof-${{ github.sha }}
           path: |
             test-results/
             playwright-report-godot/
