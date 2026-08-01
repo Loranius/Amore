@@ -72,12 +72,11 @@ func _render_state() -> void:
 			fusion_builder.create_foundation_instance(current_state.instructions[0]),
 		)
 
+	# Every attached Crystal now carries its buried root and surface flare in
+	# the same ArrayMesh. Rendering a second collar here would recreate the
+	# visible bracelet seam Phase 5 is intended to remove.
 	for instruction in current_state.instructions:
 		artifact_root.add_child(crystal_builder.create_mesh_instance(instruction))
-
-	for instruction in current_state.instructions:
-		if String(instruction.metadata.get("role", "")) == "event-growth":
-			artifact_root.add_child(fusion_builder.create_junction_instance(instruction))
 
 
 func _update_status(source: String) -> void:
