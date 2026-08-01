@@ -18,6 +18,7 @@ var current_state = null
 var web_bridge = null
 var life_engine = null
 var current_projected_count := 0
+var current_input_event_count := 0
 var current_reduced_motion := false
 
 
@@ -60,6 +61,7 @@ func rebuild_from_payload(payload: Dictionary, source: String = "runtime") -> bo
 	for event_payload in payload.get("events", []):
 		if typeof(event_payload) == TYPE_DICTIONARY:
 			events.append(Model.EvolutionEvent.from_dictionary(event_payload))
+	current_input_event_count = events.size()
 
 	var previous_ids: Dictionary = _instruction_id_set(current_state)
 	var next_state = GrowthEngine.new().rebuild(dna, events)
@@ -196,6 +198,7 @@ func _post_runtime_state(source: String) -> void:
 		"seed": current_state.dna.seed,
 		"instructions": current_state.instructions.size(),
 		"rendered_instructions": current_projected_count,
+		"input_events": current_input_event_count,
 		"history": current_state.history.size(),
 		"motion": "reduced" if current_reduced_motion else "full",
 		"life_version": CrystalLifeEngine.VERSION,
