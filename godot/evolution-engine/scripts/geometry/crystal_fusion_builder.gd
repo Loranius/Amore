@@ -4,6 +4,10 @@ extends RefCounted
 ## parent/child intersection seams without transparency or runtime booleans.
 ## All geometry is derived from canonical GrowthInstruction metadata.
 
+const CrystalVisualProfile = preload("res://scripts/presentation/crystal_visual_profile.gd")
+
+var _visual_profile = CrystalVisualProfile.new()
+
 
 func create_foundation_instance(mother) -> MeshInstance3D:
 	var instance := MeshInstance3D.new()
@@ -62,7 +66,7 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 	var shoulder_y: float = mother.attach_position.y + height * 0.5
 	var crown_y: float = mother.attach_position.y + height * 0.74
 	var top: Vector3 = center + Vector3.UP * (mother.attach_position.y + height * 0.82)
-	var color: Color = _crystal_color(mother).darkened(0.1)
+	var color: Color = _visual_profile.foundation_color(mother)
 
 	var bottom_ring: Array[Vector3] = _build_foundation_ring(
 		sides,
@@ -101,9 +105,9 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 		height * 0.018,
 	)
 
-	_connect_rings(surface, bottom_ring, skirt_ring, color.darkened(0.11))
-	_connect_rings(surface, skirt_ring, shoulder_ring, color.darkened(0.045))
-	_connect_rings(surface, shoulder_ring, crown_ring, color.lightened(0.018))
+	_connect_rings(surface, bottom_ring, skirt_ring, color.darkened(0.22))
+	_connect_rings(surface, skirt_ring, shoulder_ring, color.darkened(0.1))
+	_connect_rings(surface, shoulder_ring, crown_ring, color.lightened(0.035))
 
 	for side in range(sides):
 		var next: int = (side + 1) % sides
@@ -112,7 +116,7 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 			crown_ring[side],
 			crown_ring[next],
 			top,
-			color.lightened(0.03 + float(side % 2) * 0.01),
+			color.lightened(0.07 + float(side % 2) * 0.012),
 		)
 
 	var bottom_center: Vector3 = center + Vector3.UP * bottom_y
@@ -124,7 +128,7 @@ func create_foundation_mesh(mother) -> ArrayMesh:
 			bottom_ring[next],
 			bottom_ring[side],
 			Vector3.DOWN,
-			color.darkened(0.18),
+			color.darkened(0.28),
 		)
 
 	var mesh: ArrayMesh = surface.commit()
@@ -147,9 +151,6 @@ func create_junction_mesh(instruction) -> ArrayMesh:
 		0.64,
 		0.88,
 	)
-	# Canonical metadata may request a wider biological flare, but the visible
-	# Web sleeve is deliberately clamped to a subtle bevel. The buried section
-	# still carries the full merge depth and hides the parent/child seam.
 	var flare_ratio: float = clampf(
 		float(instruction.metadata.get("junction_flare_ratio", 1.24)),
 		1.16,
@@ -189,7 +190,7 @@ func create_junction_mesh(instruction) -> ArrayMesh:
 		instruction.length * sleeve_height_ratio,
 		flare_y + instruction.radius * 0.32,
 	)
-	var color: Color = _crystal_color(instruction)
+	var color: Color = _visual_profile.base_color(instruction)
 
 	var root_ring: Array[Vector3] = _build_ring(
 		sides,
@@ -213,8 +214,8 @@ func create_junction_mesh(instruction) -> ArrayMesh:
 		ridge * 0.38,
 	)
 
-	_connect_rings(surface, root_ring, flare_ring, color.darkened(0.025))
-	_connect_rings(surface, flare_ring, sleeve_ring, color.lightened(0.008))
+	_connect_rings(surface, root_ring, flare_ring, color.darkened(0.12))
+	_connect_rings(surface, flare_ring, sleeve_ring, color.darkened(0.015))
 
 	var mesh: ArrayMesh = surface.commit()
 	mesh.surface_set_material(0, _build_junction_material(instruction, color))
@@ -289,18 +290,18 @@ func _build_foundation_material(color: Color) -> StandardMaterial3D:
 	material.vertex_color_use_as_albedo = true
 	material.albedo_color = Color.WHITE
 	material.cull_mode = BaseMaterial3D.CULL_BACK
-	material.roughness = 0.46
-	material.metallic = 0.008
-	material.metallic_specular = 0.46
+	material.roughness = 0.49
+	material.metallic = 0.012
+	material.metallic_specular = 0.5
 	material.rim_enabled = true
-	material.rim = 0.045
-	material.rim_tint = 0.38
+	material.rim = 0.04
+	material.rim_tint = 0.32
 	material.clearcoat_enabled = true
-	material.clearcoat = 0.22
-	material.clearcoat_roughness = 0.34
+	material.clearcoat = 0.18
+	material.clearcoat_roughness = 0.36
 	material.emission_enabled = true
-	material.emission = color.darkened(0.52)
-	material.emission_energy_multiplier = 0.004
+	material.emission = color.darkened(0.58)
+	material.emission_energy_multiplier = 0.002
 	return material
 
 
@@ -320,8 +321,8 @@ func _build_junction_material(instruction, color: Color) -> StandardMaterial3D:
 	material.clearcoat = lerpf(0.24, 0.46, energy)
 	material.clearcoat_roughness = lerpf(0.3, 0.2, energy)
 	material.emission_enabled = true
-	material.emission = color.darkened(0.48)
-	material.emission_energy_multiplier = 0.003 + energy * 0.009
+	material.emission = color.darkened(0.5)
+	material.emission_energy_multiplier = 0.003 + energy * 0.008
 	return material
 
 
@@ -371,14 +372,6 @@ func _basis_from_y(direction: Vector3) -> Basis:
 	x_axis = x_axis.normalized()
 	var z_axis: Vector3 = x_axis.cross(y_axis).normalized()
 	return Basis(x_axis, y_axis, z_axis)
-
-
-func _crystal_color(instruction) -> Color:
-	var hue_shift: float = float(instruction.metadata.get("hue_shift", 0.0))
-	var hue: float = fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
-	var saturation: float = clampf(0.34 + instruction.energy * 0.11, 0.0, 1.0)
-	var value: float = clampf(0.64 + instruction.energy * 0.13, 0.0, 1.0)
-	return Color.from_hsv(hue, saturation, value, 1.0)
 
 
 func _safe_node_name(value: String) -> String:
