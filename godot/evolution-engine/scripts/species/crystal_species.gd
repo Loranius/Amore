@@ -55,6 +55,13 @@ func create_mother(dna) -> RefCounted:
 	metadata["hue_shift"] = rng.range_float(-0.035, 0.035)
 	metadata["cap_base"] = true
 	metadata["merge_depth_ratio"] = 0.0
+	metadata["foundation_radius_ratio"] = rng.range_float(1.48, 1.64)
+	metadata["foundation_height_ratio"] = rng.range_float(0.64, 0.8)
+	metadata["foundation_irregularity"] = rng.range_float(0.06, 0.115)
+	metadata["foundation_phase"] = rng.range_float(-0.24, 0.24)
+	metadata["foundation_sides"] = rng.range_int(10, 12)
+	metadata["foundation_offset_x"] = rng.range_float(-0.075, 0.075)
+	metadata["foundation_offset_z"] = rng.range_float(-0.075, 0.075)
 	return Model.GrowthInstruction.new(
 		MOTHER_ID,
 		"",
@@ -188,6 +195,16 @@ func _morphology_metadata(rng, role: String, energy: float) -> Dictionary:
 	var ridge_max := 0.09
 	var twist_max := 0.075
 	var center_drift_max := 0.09
+	var root_core_min := 0.7
+	var root_core_max := 0.82
+	var flare_min := 1.4
+	var flare_max := 1.53
+	var sleeve_min := 1.045
+	var sleeve_max := 1.12
+	var junction_height_min := 0.02
+	var junction_height_max := 0.05
+	var sleeve_height_min := 0.12
+	var sleeve_height_max := 0.17
 
 	if role == "mother":
 		body_taper_min = 0.84
@@ -217,9 +234,19 @@ func _morphology_metadata(rng, role: String, energy: float) -> Dictionary:
 		ridge_max = 0.1
 		twist_max = 0.095
 		center_drift_max = 0.12
+		root_core_min = 0.68
+		root_core_max = 0.79
+		flare_min = 1.46
+		flare_max = 1.58
+		sleeve_min = 1.06
+		sleeve_max = 1.14
+		junction_height_min = 0.018
+		junction_height_max = 0.042
+		sleeve_height_min = 0.13
+		sleeve_height_max = 0.18
 
 	var bounded_energy: float = clampf(energy, 0.0, 1.0)
-	return {
+	var metadata := {
 		"role": role,
 		"body_taper": rng.range_float(body_taper_min, body_taper_max),
 		"waist_ratio": rng.range_float(waist_min, waist_max),
@@ -233,6 +260,16 @@ func _morphology_metadata(rng, role: String, energy: float) -> Dictionary:
 		"tip_offset_x": rng.range_float(-tip_offset_max, tip_offset_max),
 		"tip_offset_z": rng.range_float(-tip_offset_max, tip_offset_max),
 	}
+	if role != "mother":
+		metadata["root_core_ratio"] = rng.range_float(root_core_min, root_core_max)
+		metadata["junction_flare_ratio"] = rng.range_float(flare_min, flare_max)
+		metadata["junction_sleeve_ratio"] = rng.range_float(sleeve_min, sleeve_max)
+		metadata["junction_height_ratio"] = rng.range_float(junction_height_min, junction_height_max)
+		metadata["junction_sleeve_height_ratio"] = rng.range_float(
+			sleeve_height_min,
+			sleeve_height_max,
+		)
+	return metadata
 
 
 func _channel(event, name: String) -> float:
