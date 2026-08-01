@@ -26,11 +26,14 @@ The runnable Crystal slice generates a deterministic colony from:
 9. procedural ArrayMesh construction and integrated junction geometry;
 10. runtime-only Life Engine cues for idle light, new seed growth and colony impacts;
 11. browser `prefers-reduced-motion` support;
-12. a mobile-friendly Godot Compatibility renderer scene.
+12. a deterministic Phase 10 visual profile for mineral families, cloudy bases, pale terminations and oblique framing;
+13. a floor-free, dark-slate mobile Godot Compatibility renderer scene.
 
-Every event remains present in canonical state and history. Aggregate events are not deleted or merged in storage; they are projected into an existing visible colony only at the renderer boundary. Life animation owns only duplicated materials and local node transforms, never canonical geometry or history.
+Every event remains present in canonical state and history. Aggregate events are not deleted or merged in storage; they are projected into an existing visible colony only at the renderer boundary. Life animation and Phase 10 presentation own only duplicated materials, vertex colours and local renderer transforms, never canonical geometry or history.
 
-Tree and Reef will reuse the same canonical event/state pipeline after the Crystal slice passes its remaining visual and physical-device acceptance gates.
+The current Web profile remains opaque for stable overlapping Crystal sorting. Phase 10 does not claim physical transmission or refraction; real optical expansion remains later work.
+
+Tree and Reef will reuse the same canonical event/state pipeline after the Crystal slice passes its remaining physical-device acceptance gates.
 
 ## Run locally
 
@@ -61,6 +64,10 @@ godot --headless \
 
 godot --headless \
   --path godot/evolution-engine \
+  --script res://scripts/tests/visual_polish_smoke.gd
+
+godot --headless \
+  --path godot/evolution-engine \
   --script res://scripts/tests/integrated_fusion_smoke.gd
 ```
 
@@ -79,6 +86,7 @@ Godot Evolution Runtime
         +-- Collision competition
         +-- Renderer projection
         +-- Geometry builders
+        +-- Deterministic visual profile
         +-- Runtime-only Life Engine
         +-- Materials / Camera
         |
