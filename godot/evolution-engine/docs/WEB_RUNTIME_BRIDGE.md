@@ -54,7 +54,7 @@ React host
        └─ custom HTML shell queue
             └─ JavaScriptBridge polling
                  └─ deterministic Godot rebuild
-                      └─ amore:godot:state
+                      └─ amore:godot:state source=portal
                            ├─ valid identity/events/history bounds → accepted Godot renderer
                            └─ mismatch/error/timeout → Three.js fallback
 ```
@@ -90,6 +90,8 @@ The runtime emits:
 
 The accepted state message includes species, seed, canonical instruction count, rendered instruction count, input-event count, canonical history count, motion mode, phase and deterministic snapshot signature.
 
+Only a state with `source: portal` can enter production acceptance. The locally generated demo state may exist briefly before the JavaScript queue delivers the portal payload; the React host ignores that state without accepting it and without triggering fallback.
+
 `input_events` counts only the portal Evolution Events received in the current payload. `history` is the complete append-only canonical history and may additionally include genesis records, so it must be equal to or greater than `input_events`.
 
 `amore:godot:activate` restores the portal action inside the iframe. A short tap or Enter/Space emits one activation; orbit drags and zoom gestures emit none.
@@ -98,6 +100,7 @@ The accepted state message includes species, seed, canonical instruction count, 
 
 React does not trust a message solely because its `type` is known. Phase 11 validates the complete message shape and then verifies the runtime state against the payload:
 
+- source equals `portal`;
 - species equals payload species;
 - seed equals payload seed;
 - input-event count equals payload event count;
@@ -115,7 +118,7 @@ The host resolves to `three-fallback` after:
 1. iframe load failure;
 2. explicit Godot runtime error;
 3. startup timeout before accepted state;
-4. state identity, input-event or history-bound mismatch.
+4. portal-state identity, input-event or history-bound mismatch.
 
 This fallback changes only the renderer. It does not mutate Artifact DNA, Evolution Events, append-only history or Supabase state.
 
@@ -139,7 +142,7 @@ The Godot renderer may remain selected in the production Crystal route only afte
 1. Godot parser and every Phase 1–11 smoke test;
 2. release Web export;
 3. same-origin bridge test;
-4. strict accepted-state validation;
+4. strict portal-only accepted-state validation;
 5. production Vite build containing HTML, JavaScript, WASM and PCK files;
 6. Pixel 8 Pro load/FPS/memory review;
 7. full-motion and reduced-motion visual acceptance;
