@@ -23,6 +23,7 @@ export interface GodotEvolutionPayload {
 }
 
 export type GodotActivationSource = 'tap' | 'keyboard';
+export type GodotInteractionKind = 'orbit' | 'zoom' | 'tap' | 'keyboard';
 export type GodotRuntimeQuality = 'high' | 'balanced' | 'economy';
 export type GodotLifecycleState =
   | 'hidden'
@@ -80,6 +81,11 @@ export type GodotBridgeInboundMessage =
       suspended: boolean;
       restores: number;
     }
+  | {
+      type: 'amore:godot:interaction';
+      kind: GodotInteractionKind;
+      sequence: number;
+    }
   | { type: 'amore:godot:activate'; source: GodotActivationSource }
   | { type: 'amore:godot:error'; message: string };
 
@@ -98,12 +104,18 @@ export type GodotLifecycleMessage = Extract<
   { type: 'amore:godot:lifecycle' }
 >;
 
+export type GodotInteractionMessage = Extract<
+  GodotBridgeInboundMessage,
+  { type: 'amore:godot:interaction' }
+>;
+
 export interface GodotBridgePayloadMessage {
   type: 'amore:godot:payload';
   payload: GodotEvolutionPayload;
 }
 
 const RUNTIME_QUALITIES: GodotRuntimeQuality[] = ['high', 'balanced', 'economy'];
+const INTERACTION_KINDS: GodotInteractionKind[] = ['orbit', 'zoom', 'tap', 'keyboard'];
 const LIFECYCLE_STATES: GodotLifecycleState[] = [
   'hidden',
   'visible',
@@ -138,6 +150,11 @@ function isVersionedMessage(value: Record<string, unknown>): boolean {
 function isRuntimeQuality(value: unknown): value is GodotRuntimeQuality {
   return typeof value === 'string'
     && RUNTIME_QUALITIES.includes(value as GodotRuntimeQuality);
+}
+
+function isInteractionKind(value: unknown): value is GodotInteractionKind {
+  return typeof value === 'string'
+    && INTERACTION_KINDS.includes(value as GodotInteractionKind);
 }
 
 function isLifecycleState(value: unknown): value is GodotLifecycleState {
@@ -206,6 +223,10 @@ export function isGodotBridgeInboundMessage(value: unknown): value is GodotBridg
         && isNonNegativeInteger(value.sequence)
         && typeof value.suspended === 'boolean'
         && isNonNegativeInteger(value.restores);
+    case 'amore:godot:interaction':
+      return isInteractionKind(value.kind)
+        && isNonNegativeInteger(value.sequence)
+        && value.sequence > 0;
     case 'amore:godot:activate':
       return value.source === 'tap' || value.source === 'keyboard';
     case 'amore:godot:error':
