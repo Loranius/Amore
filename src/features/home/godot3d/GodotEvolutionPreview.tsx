@@ -19,6 +19,19 @@ import {
   type GodotStateMessage,
   type GodotTelemetryMessage,
 } from './godotBridgeProtocol';
+import {
+  INITIAL_GODOT_INTERACTIONS,
+  createGodotDeviceAcceptanceReport,
+  incrementGodotInteraction,
+  isGodotDiagnosticsEnabled,
+  readGodotDeviceEnvironment,
+} from './godotDeviceAcceptance';
+import GodotDeviceAcceptancePanel from './GodotDeviceAcceptancePanel';
+import {
+  INITIAL_GODOT_RUNTIME_HEALTH,
+  reduceGodotRuntimeHealth,
+  type GodotRuntimeHealthSnapshot,
+} from './godotRuntimeHealthPolicy';
 import './godotEvolutionPreview.css';
 
 export type GodotEvolutionStatus =
@@ -36,8 +49,11 @@ interface GodotEvolutionPreviewProps {
   className?: string;
   fallback?: ReactNode;
   startupTimeoutMs?: number;
+  healthFallbackEnabled?: boolean;
+  diagnosticsEnabled?: boolean;
   onMessage?: (message: GodotBridgeInboundMessage) => void;
   onStatusChange?: (status: GodotEvolutionStatus) => void;
+  onHealthChange?: (health: GodotRuntimeHealthSnapshot) => void;
   onFatalError?: (failure: GodotCutoverFailure) => void;
 }
 
@@ -50,14 +66,22 @@ function initialReducedMotionPreference(): boolean {
     && window.matchMedia(REDUCED_MOTION_QUERY).matches;
 }
 
+function initialDiagnosticsPreference(): boolean {
+  return typeof window !== 'undefined'
+    && isGodotDiagnosticsEnabled(window.location.search);
+}
+
 export function GodotEvolutionPreview({
   payload,
   enabled = GODOT_EVOLUTION_ENABLED,
   className = '',
   fallback = null,
   startupTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
+  healthFallbackEnabled = false,
+  diagnosticsEnabled = initialDiagnosticsPreference(),
   onMessage,
   onStatusChange,
+  onHealthChange,
   onFatalError,
 }: GodotEvolutionPreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -70,10 +94,13 @@ export function GodotEvolutionPreview({
   const [state, setState] = useState<GodotStateMessage | null>(null);
   const [telemetry, setTelemetry] = useState<GodotTelemetryMessage | null>(null);
   const [lifecycle, setLifecycle] = useState<GodotLifecycleMessage | null>(null);
+  const [health, setHealth] = useState(INITIAL_GODOT_RUNTIME_HEALTH);
+  const [interactions, setInteractions] = useState(INITIAL_GODOT_INTERACTIONS);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(
     initialReducedMotionPreference,
   );
   const source = useMemo(() => resolveGodotWebUrl(import.meta.env.BASE_URL), []);
+  const environment = useMemo(readGodotDeviceEnvironment, []);
   const runtimePayload = useMemo<GodotEvolutionPayload>(() => ({
     ...payload,
     dna: {
@@ -84,6 +111,14 @@ export function GodotEvolutionPreview({
       },
     },
   }), [payload, prefersReducedMotion]);
+  const acceptanceReport = useMemo(() => createGodotDeviceAcceptanceReport({
+    environment,
+    state,
+    health: health.snapshot,
+    telemetry,
+    lifecycle,
+    interactions,
+  }), [environment, health.snapshot, interactions, lifecycle, state, telemetry]);
 
   const sendPayload = useCallback(() => {
     const target = iframeRef.current?.contentWindow;
@@ -102,6 +137,13 @@ export function GodotEvolutionPreview({
   useEffect(() => {
     onStatusChange?.(status);
   }, [onStatusChange, status]);
+
+  useEffect(() => {
+    onHealthChange?.(health.snapshot);
+    if (healthFallbackEnabled && health.snapshot.shouldFallback) {
+      reportFatal('performance-health');
+    }
+  }, [health.snapshot, healthFallbackEnabled, onHealthChange, reportFatal]);
 
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return undefined;
@@ -127,6 +169,8 @@ export function GodotEvolutionPreview({
     setState(null);
     setTelemetry(null);
     setLifecycle(null);
+    setHealth(INITIAL_GODOT_RUNTIME_HEALTH);
+    setInteractions(INITIAL_GODOT_INTERACTIONS);
 
     const timeoutId = window.setTimeout(() => {
       if (!acceptedRef.current && !fatalReportedRef.current) {
@@ -185,9 +229,13 @@ export function GodotEvolutionPreview({
           break;
         case 'amore:godot:telemetry':
           setTelemetry(message);
+          setHealth(current => reduceGodotRuntimeHealth(current, message));
           break;
         case 'amore:godot:lifecycle':
           setLifecycle(message);
+          break;
+        case 'amore:godot:interaction':
+          setInteractions(current => incrementGodotInteraction(current, message.kind));
           break;
         case 'amore:godot:activate':
           break;
@@ -218,7 +266,7 @@ export function GodotEvolutionPreview({
   return (
     <div
       className={`godot-evolution-preview ${className}`.trim()}
-      data-godot-evolution="mobile-hardened"
+      data-godot-evolution="device-acceptance"
       data-godot-status={status}
       data-godot-progress={progress.toFixed(3)}
       data-godot-state-signature={state?.signature ?? ''}
@@ -234,6 +282,13 @@ export function GodotEvolutionPreview({
       data-godot-suspended={String(suspended)}
       data-godot-restores={String(restores)}
       data-godot-lifecycle={lifecycle?.state ?? ''}
+      data-godot-health={health.snapshot.status}
+      data-godot-health-reason={health.snapshot.reason}
+      data-godot-health-samples={health.snapshot.sampleCount}
+      data-godot-health-fallback={String(health.snapshot.shouldFallback)}
+      data-godot-orbit-count={interactions.orbit}
+      data-godot-zoom-count={interactions.zoom}
+      data-godot-acceptance-passed={String(acceptanceReport.passed)}
     >
       <iframe
         ref={iframeRef}
@@ -248,13 +303,14 @@ export function GodotEvolutionPreview({
       />
       <span className="godot-evolution-preview__status" aria-live="polite">
         {status === 'accepted'
-          ? `Godot ${quality}${telemetry ? ` · ${Math.round(telemetry.fps)} FPS` : ''}`
+          ? `Godot ${quality} · ${health.snapshot.status}${telemetry ? ` · ${Math.round(telemetry.fps)} FPS` : ''}`
           : status === 'timeout'
             ? 'Godot runtime timeout'
             : status === 'error'
               ? 'Godot runtime error'
               : `Godot runtime · ${Math.round(progress * 100)}%`}
       </span>
+      {diagnosticsEnabled && <GodotDeviceAcceptancePanel report={acceptanceReport} />}
     </div>
   );
 }
