@@ -190,3 +190,62 @@ Phase 7 requires:
 6. bounded length, radius, direction and morphology projection;
 7. unchanged append-only history and identity;
 8. parser/import, determinism, hierarchy, fusion, Web export and React bridge validation.
+
+## Phase 8 — Append-only colony accumulation
+
+Phase 8 separates canonical evidence from visible body count. Every Evolution Event still produces exactly one immutable Growth Instruction and history row, but compatible events may join an existing mineral colony instead of creating a separate visible Crystal.
+
+### Colony roles
+
+- `seed` — starts a visible colony and enters normal hierarchy and collision competition;
+- `extension` — contributes bounded length to the seed projection;
+- `thickening` — contributes bounded radius and structural mass;
+- `refinement` — contributes polish, facet resolution, optical energy and luminosity.
+
+A colony accepts at most seven canonical members before a later compatible event starts another seed. This reduces body proliferation without imposing a permanent final form.
+
+### Compatibility and lineage
+
+Compatibility is deterministic and depends on:
+
+- similarity of the five Phase 7 geological pressures;
+- matching dominant pressure;
+- matching normalized module family;
+- current colony saturation.
+
+Aggregate instructions preserve their own event ID, semantic metadata, hierarchy tier and canonical history. Their parent and colony target point to the visible seed, but aggregate-only deposits do not consume visible branch capacity and do not enter separate collision searches.
+
+### Renderer projection
+
+```text
+append-only Growth Instructions
+  → visible colony seeds + aggregate deposits
+  → bounded colony projection
+  → one enlarged/refined instruction per visible colony
+  → ArrayMesh generation
+```
+
+The projection clones canonical instructions before applying gains. Canonical radius, length, energy, sides and metadata are never mutated. Later events may intentionally change the rendered projection of a colony while all earlier canonical instructions remain byte-stable.
+
+Current projection caps per colony are:
+
+- radius gain: 34%;
+- length gain: 30%;
+- energy gain: 16%;
+- polish gain: 24%;
+- luminosity gain: 20%.
+
+### Acceptance gates
+
+Phase 8 requires:
+
+1. input-order-independent colony reconstruction;
+2. one canonical instruction and history row per event;
+3. deterministic seed, extension, thickening and refinement assignment;
+4. no more than seven canonical members per colony;
+5. aggregate targets must exist and must be visible seeds;
+6. aggregate deposits excluded from visible collision and parent-capacity accounting;
+7. renderer count equal to genesis plus visible colony seeds;
+8. bounded projected gains;
+9. later events cannot rewrite any earlier canonical instruction or history row;
+10. parser/import, prior smoke tests, Web export and React bridge validation.
