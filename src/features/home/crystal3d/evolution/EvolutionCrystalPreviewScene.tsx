@@ -14,6 +14,8 @@ import {
 import {
   GODOT_EVOLUTION_ENABLED,
   GODOT_EVOLUTION_MODE,
+  GODOT_EVOLUTION_ROLLOUT_ELIGIBLE,
+  GODOT_EVOLUTION_ROLLOUT_PERCENT,
 } from '../../godot3d/godotFeatureFlag';
 import { godotPayloadFromArtifact } from '../../godot3d/godotPayloadFromArtifact';
 import type {
@@ -92,6 +94,7 @@ export default function EvolutionCrystalPreviewScene() {
   const badge = renderer === 'godot'
     ? [
         GODOT_EVOLUTION_MODE === 'production' ? 'Godot production' : 'Godot preview',
+        `rollout ${GODOT_EVOLUTION_ROLLOUT_PERCENT}%`,
         godotState ? `${godotState.instructions} канон.` : 'runtime…',
         godotState?.rendered_instructions !== undefined
           ? `${godotState.rendered_instructions} тіл`
@@ -106,7 +109,9 @@ export default function EvolutionCrystalPreviewScene() {
           `${formatTopology(metrics.usedTriangles)} △`,
         ].join(' · ')
       : [
-          'Evolution',
+          GODOT_EVOLUTION_MODE === 'production' && !GODOT_EVOLUTION_ROLLOUT_ELIGIBLE
+            ? 'Three rollout cohort'
+            : 'Evolution',
           metrics.quality,
           `${metrics.meshCount} тіл`,
           `${formatTopology(metrics.usedTriangles)} △`,
@@ -140,12 +145,15 @@ export default function EvolutionCrystalPreviewScene() {
         data-evolution-rendered-triangles={renderer === 'godot' ? '' : runtime?.triangles ?? ''}
         data-evolution-state-signature={godotState?.signature ?? ''}
         data-evolution-godot-failure={godotFailure ?? ''}
+        data-evolution-godot-rollout={GODOT_EVOLUTION_ROLLOUT_PERCENT}
+        data-evolution-godot-cohort={String(GODOT_EVOLUTION_ROLLOUT_ELIGIBLE)}
       >
         {useGodot && godotPayload ? (
           <GodotEvolutionPreview
             payload={godotPayload}
             enabled
             startupTimeoutMs={60_000}
+            healthFallbackEnabled={GODOT_EVOLUTION_MODE === 'production'}
             onMessage={onGodotMessage}
             onFatalError={onGodotFatalError}
           />
