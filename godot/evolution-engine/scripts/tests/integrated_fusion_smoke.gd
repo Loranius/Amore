@@ -77,13 +77,25 @@ func _run() -> void:
 			_fail("Integrated fusion failure: root, flare or body ring was not found.")
 			return
 		if flare_radius < root_radius * 1.32:
-			_fail("Integrated fusion failure: surface flare does not cover the buried root seam.")
+			_fail(
+				"Integrated fusion failure: flare %.4f does not cover root %.4f."
+				% [flare_radius, root_radius],
+			)
 			return
 		if flare_radius > body_radius * 1.3:
-			_fail("Integrated fusion failure: surface flare is wide enough to read as a bracelet.")
+			_fail(
+				"Integrated fusion failure: flare %.4f reads as a bracelet over body %.4f."
+				% [flare_radius, body_radius],
+			)
 			return
-		if body_radius < instruction.radius * 0.96 or body_radius > instruction.radius * 1.1:
-			_fail("Integrated fusion failure: lower body radius is outside the continuity band.")
+		# The lower ring has a nominal 1.035R radius. Accepted Phase 3 ridge
+		# modulation and center drift raise its theoretical sampled maximum to
+		# roughly 1.16R, so the continuity band must include that morphology.
+		if body_radius < instruction.radius * 0.93 or body_radius > instruction.radius * 1.18:
+			_fail(
+				"Integrated fusion failure: body %.4f is outside 0.93–1.18 × R %.4f."
+				% [body_radius, instruction.radius],
+			)
 			return
 
 		var material := mesh.surface_get_material(0) as StandardMaterial3D
