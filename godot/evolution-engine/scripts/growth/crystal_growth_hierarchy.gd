@@ -4,6 +4,7 @@ const DeterministicRNG = preload("res://scripts/core/deterministic_rng.gd")
 
 const MOTHER_ID := "crystal:mother"
 const ROLE_EVENT := "event-growth"
+const RENDER_AGGREGATE := "aggregate-only"
 const TIER_PRIMARY := "primary"
 const TIER_SECONDARY := "secondary"
 const TIER_ACCENT := "accent"
@@ -97,6 +98,8 @@ func _choose_parent(
 
 
 func _is_parent_eligible(parent, tier: String, state) -> bool:
+	if String(parent.metadata.get("render_mode", "visible")) == RENDER_AGGREGATE:
+		return false
 	var role: String = String(parent.metadata.get("role", ""))
 	if parent.id != MOTHER_ID and role != ROLE_EVENT:
 		return false
@@ -251,6 +254,8 @@ func _count_event_children(parent_id: String, state) -> int:
 	var count := 0
 	for instruction in state.instructions:
 		if instruction.parent_id != parent_id:
+			continue
+		if String(instruction.metadata.get("render_mode", "visible")) == RENDER_AGGREGATE:
 			continue
 		if String(instruction.metadata.get("role", "")) == ROLE_EVENT:
 			count += 1
