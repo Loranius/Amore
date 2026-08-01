@@ -3,7 +3,8 @@ export type GodotCutoverFailure =
   | 'runtime-error'
   | 'startup-timeout'
   | 'state-mismatch'
-  | 'performance-health';
+  | 'performance-health'
+  | 'release-preflight';
 
 export type EvolutionRenderer = 'godot' | 'three' | 'three-fallback';
 

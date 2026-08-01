@@ -1,0 +1,445 @@
+name: Godot Phase 15 Canary Preview
+
+on:
+  push:
+    branches:
+      - feat/godot-crystal-phase-15-release-candidate
+    paths:
+      - '.github/workflows/godot-phase15-canary-preview.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: godot-phase15-canary-preview
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'Loranius/Amore'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+
+    steps:
+      - name: Checkout Phase 15 branch
+        uses: actions/checkout@v4
+
+      - name: Verify Vercel deployment secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_ORG_ID"
+          test -n "$VERCEL_PROJECT_ID"
+          test -n "$VERCEL_TOKEN"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install application and deployment tooling
+        run: |
+          npm ci
+          npm install --no-save --no-package-lock @playwright/test@1.61.1 dotenv@16.4.7
+          npm install --global vercel@latest
+
+      - name: Link Vercel project and pull Preview variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .vercel
+          mkdir -p .vercel
+          cat > .vercel/project.json <<JSON
+          {
+            "orgId": "${VERCEL_ORG_ID}",
+            "projectId": "${VERCEL_PROJECT_ID}"
+          }
+          JSON
+          vercel env pull .env.vercel-preview.local \
+            --environment=preview \
+            --yes \
+            --token="$VERCEL_TOKEN"
+          test -s .env.vercel-preview.local
+
+      - name: Validate real canary-5 release variables without exposing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { parse } from 'dotenv';
+
+          const env = parse(readFileSync('.env.vercel-preview.local', 'utf8'));
+          const required = [
+            'VITE_SUPABASE_URL',
+            'VITE_SUPABASE_ANON_KEY',
+            'VITE_TMDB_KEY',
+            'VITE_MAPBOX_TOKEN',
+            'VITE_EVOLUTION_GODOT',
+            'VITE_EVOLUTION_GODOT_ROLLOUT',
+            'VITE_EVOLUTION_GODOT_RELEASE_STAGE',
+            'VITE_EVOLUTION_GODOT_RELEASE_ID',
+            'VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256',
+            'VITE_EVOLUTION_GODOT_KILL_SWITCH',
+          ];
+          const missing = required.filter(key => !String(env[key] ?? '').trim());
+          if (missing.length > 0) {
+            throw new Error(`Missing Vercel Preview variables: ${missing.join(', ')}`);
+          }
+
+          if (!String(env.VITE_SUPABASE_URL).startsWith('https://')) {
+            throw new Error('VITE_SUPABASE_URL must start with https://.');
+          }
+          if (!String(env.VITE_MAPBOX_TOKEN).startsWith('pk.')) {
+            throw new Error('VITE_MAPBOX_TOKEN must be a public pk.* token.');
+          }
+
+          const mode = String(env.VITE_EVOLUTION_GODOT).trim().toLowerCase();
+          const stage = String(env.VITE_EVOLUTION_GODOT_RELEASE_STAGE).trim().toLowerCase();
+          const releaseId = String(env.VITE_EVOLUTION_GODOT_RELEASE_ID).trim();
+          const digest = String(env.VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256).trim().toLowerCase();
+          const killSwitch = String(env.VITE_EVOLUTION_GODOT_KILL_SWITCH).trim().toLowerCase();
+          const rollout = Number(String(env.VITE_EVOLUTION_GODOT_ROLLOUT).trim());
+
+          if (mode !== 'production') throw new Error('Godot mode must be production.');
+          if (stage !== 'canary-5') throw new Error('Godot release stage must be canary-5.');
+          if (rollout !== 5) throw new Error('Godot rollout must be exactly 5.');
+          if (killSwitch !== 'off') throw new Error('Godot kill switch must be off.');
+          if (!/^[a-z0-9][a-z0-9._-]{2,63}$/i.test(releaseId)) {
+            throw new Error('Godot release ID is invalid.');
+          }
+          if (!/^[0-9a-f]{64}$/.test(digest)) {
+            throw new Error('Godot physical acceptance SHA-256 is invalid.');
+          }
+
+          console.log('Verified required portal variables and strict canary-5 release controls.');
+          NODE
+
+      - name: Install Godot 4.7.1 and Web templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 30 \
+            --output /tmp/godot.zip \
+            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
+            --connect-timeout 30 \
+            --output /tmp/godot-templates.tpz \
+            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
+
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
+          sudo ln -s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 /usr/local/bin/godot
+
+          rm -rf /tmp/godot-export-templates
+          mkdir -p /tmp/godot-export-templates
+          unzip -q /tmp/godot-templates.tpz -d /tmp/godot-export-templates
+          template_source=/tmp/godot-export-templates
+          if [[ -d /tmp/godot-export-templates/templates ]]; then
+            template_source=/tmp/godot-export-templates/templates
+          fi
+          template_target="$HOME/.local/share/godot/export_templates/4.7.1.stable"
+          mkdir -p "$template_target"
+          cp -R "$template_source"/. "$template_target"/
+          godot --version
+          test -f "$template_target/web_release.zip"
+
+      - name: Export exact Godot Web runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --path godot/evolution-engine --editor --quit 2>&1 | tee /tmp/godot-import.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-import.log; then
+            exit 1
+          fi
+
+          rm -rf public/godot/evolution-engine /tmp/amore-godot-web
+          mkdir -p public/godot/evolution-engine /tmp/amore-godot-web
+          godot --headless \
+            --path godot/evolution-engine \
+            --export-release Web \
+            /tmp/amore-godot-web/index.html \
+            2>&1 | tee /tmp/godot-export.log
+
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script|ERROR: Cannot export' /tmp/godot-export.log; then
+            exit 1
+          fi
+          for file in index.html index.js index.wasm index.pck; do
+            test -s "/tmp/amore-godot-web/$file"
+          done
+          cp -R /tmp/amore-godot-web/. public/godot/evolution-engine/
+
+      - name: Build and bind the real Phase 15 release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { spawnSync } from 'node:child_process';
+          import { parse } from 'dotenv';
+
+          const pulled = parse(readFileSync('.env.vercel-preview.local', 'utf8'));
+          const buildEnv = { ...process.env, ...pulled, BUILD_GODOT_HARNESS: '1' };
+          const build = spawnSync('npm', ['run', 'build'], {
+            env: buildEnv,
+            stdio: 'inherit',
+          });
+          if (build.status !== 0) process.exit(build.status ?? 1);
+
+          const manifest = spawnSync(process.execPath, ['scripts/generate-godot-release-candidate.mjs'], {
+            env: {
+              ...buildEnv,
+              GODOT_RC_ROOT: 'dist/godot/evolution-engine',
+              GODOT_RC_RELEASE_ID: String(pulled.VITE_EVOLUTION_GODOT_RELEASE_ID).trim(),
+              GODOT_RC_ACCEPTANCE_SHA256: String(pulled.VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256).trim(),
+              GODOT_RC_BUILD_SHA: String(process.env.GITHUB_SHA ?? '').trim(),
+            },
+            stdio: 'inherit',
+          });
+          process.exit(manifest.status ?? 1);
+          NODE
+          test -s dist/index.html
+          test -s dist/e2e/godot/index.html
+          test -s dist/godot/evolution-engine/release-manifest.json
+
+      - name: Verify manifest and exact asset hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { readFileSync, statSync } from 'node:fs';
+          import { parse } from 'dotenv';
+
+          const env = parse(readFileSync('.env.vercel-preview.local', 'utf8'));
+          const root = 'dist/godot/evolution-engine';
+          const manifest = JSON.parse(readFileSync(`${root}/release-manifest.json`, 'utf8'));
+          const required = ['index.html', 'index.js', 'index.wasm', 'index.pck'];
+
+          if (manifest.version !== 'godot-release-candidate-v1') throw new Error('Invalid manifest version.');
+          if (manifest.phase !== 15) throw new Error('Invalid manifest phase.');
+          if (manifest.runtimeVersion !== '4.7.1') throw new Error('Invalid runtime version.');
+          if (manifest.releaseId !== String(env.VITE_EVOLUTION_GODOT_RELEASE_ID).trim()) {
+            throw new Error('Manifest release ID mismatch.');
+          }
+          if (manifest.acceptanceDigest !== String(env.VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256).trim().toLowerCase()) {
+            throw new Error('Manifest acceptance digest mismatch.');
+          }
+          if (manifest.buildSha !== String(process.env.GITHUB_SHA).toLowerCase()) {
+            throw new Error('Manifest build SHA mismatch.');
+          }
+          if (!Array.isArray(manifest.assets) || manifest.assets.length !== required.length) {
+            throw new Error('Manifest must contain exactly four required assets.');
+          }
+
+          let totalBytes = 0;
+          for (const file of required) {
+            const entry = manifest.assets.find(candidate => candidate.file === file);
+            if (!entry) throw new Error(`Manifest is missing ${file}.`);
+            const path = `${root}/${file}`;
+            const bytes = readFileSync(path);
+            const sha256 = createHash('sha256').update(bytes).digest('hex');
+            if (entry.bytes !== statSync(path).size || entry.sha256 !== sha256) {
+              throw new Error(`Manifest integrity mismatch for ${file}.`);
+            }
+            totalBytes += entry.bytes;
+          }
+          if (manifest.totalBytes !== totalBytes) throw new Error('Manifest aggregate byte count mismatch.');
+          console.log('Verified Phase 15 manifest and exact Godot asset hashes.');
+          NODE
+
+      - name: Prepare Vercel Build Output API bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .vercel/output
+          mkdir -p .vercel/output/static
+          cp -R dist/. .vercel/output/static/
+
+          cat > .vercel/output/config.json <<'JSON'
+          {
+            "version": 3,
+            "routes": [
+              {
+                "src": "/godot/evolution-engine/release-manifest\\.json",
+                "headers": {
+                  "Cache-Control": "no-store, max-age=0",
+                  "Content-Type": "application/json; charset=utf-8"
+                },
+                "continue": true
+              },
+              {
+                "src": "/godot/evolution-engine/index\\.html",
+                "headers": {
+                  "Cache-Control": "no-cache, no-store, must-revalidate",
+                  "Cross-Origin-Resource-Policy": "same-origin"
+                },
+                "continue": true
+              },
+              {
+                "src": "/godot/evolution-engine/index\\.wasm",
+                "headers": {
+                  "Cache-Control": "public, max-age=0, must-revalidate",
+                  "Content-Type": "application/wasm",
+                  "Cross-Origin-Resource-Policy": "same-origin"
+                },
+                "continue": true
+              },
+              {
+                "src": "/godot/evolution-engine/index\\.pck",
+                "headers": {
+                  "Cache-Control": "public, max-age=0, must-revalidate",
+                  "Content-Type": "application/octet-stream",
+                  "Cross-Origin-Resource-Policy": "same-origin"
+                },
+                "continue": true
+              },
+              {
+                "src": "/godot/evolution-engine/index\\.js",
+                "headers": {
+                  "Cache-Control": "public, max-age=0, must-revalidate",
+                  "Cross-Origin-Resource-Policy": "same-origin"
+                },
+                "continue": true
+              },
+              { "handle": "filesystem" },
+              { "src": "/(.*)", "dest": "/index.html" }
+            ]
+          }
+          JSON
+          node -e "JSON.parse(require('fs').readFileSync('.vercel/output/config.json', 'utf8'))"
+
+      - name: Keep the dedicated preview project publicly testable
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(
+            curl --fail --silent --show-error \
+              --request PATCH \
+              --url "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}?teamId=${VERCEL_ORG_ID}" \
+              --header "Authorization: Bearer ${VERCEL_TOKEN}" \
+              --header 'Content-Type: application/json' \
+              --data '{"ssoProtection":null}'
+          )"
+          node -e "const p=JSON.parse(process.argv[1]); if (p.ssoProtection != null) process.exit(1)" "$response"
+
+      - name: Deploy canary-5 preview to Vercel
+        id: deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          preview_url="$(vercel deploy --prebuilt --yes --archive=tgz --token="$VERCEL_TOKEN")"
+          test -n "$preview_url"
+          echo "url=$preview_url" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$preview_url" > canary-preview-url.txt
+          vercel inspect "$preview_url" --wait --timeout 5m --token="$VERCEL_TOKEN"
+
+      - name: Verify deployed manifest and canary runtime
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          browser_path=''
+          for candidate in chromium google-chrome google-chrome-stable; do
+            if command -v "$candidate" >/dev/null 2>&1; then
+              browser_path="$(command -v "$candidate")"
+              break
+            fi
+          done
+          test -n "$browser_path"
+          export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$browser_path"
+
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { chromium, expect } from '@playwright/test';
+          import { parse } from 'dotenv';
+
+          const url = process.env.PREVIEW_URL;
+          const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
+          const env = parse(readFileSync('.env.vercel-preview.local', 'utf8'));
+          const releaseId = String(env.VITE_EVOLUTION_GODOT_RELEASE_ID).trim();
+          const digest = String(env.VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256).trim().toLowerCase();
+
+          const response = await fetch(`${url}/godot/evolution-engine/release-manifest.json`, {
+            headers: { Accept: 'application/json' },
+            cache: 'no-store',
+          });
+          if (!response.ok) throw new Error(`Deployed manifest returned HTTP ${response.status}.`);
+          const manifest = await response.json();
+          if (manifest.releaseId !== releaseId || manifest.acceptanceDigest !== digest) {
+            throw new Error('Deployed manifest does not match the approved physical release.');
+          }
+          if (manifest.buildSha !== String(process.env.GITHUB_SHA).toLowerCase()) {
+            throw new Error('Deployed manifest build SHA mismatch.');
+          }
+
+          const browser = await chromium.launch({ executablePath, headless: true });
+          const context = await browser.newContext({ viewport: { width: 412, height: 915 } });
+          await context.addInitScript(() => {
+            localStorage.setItem('amore:godot-rollout-cohort-v1', 'phase15-canary-10');
+          });
+
+          const page = await context.newPage();
+          const pageErrors = [];
+          page.on('pageerror', error => pageErrors.push(error.message));
+          await page.goto(`${url}/e2e/godot/?releasePreflight=1&godotReleaseOps=1`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 60_000,
+          });
+          await page.locator('#root > *').first().waitFor({ state: 'visible', timeout: 60_000 });
+          const preview = page.locator('[data-godot-evolution="device-acceptance"]');
+          await expect(preview).toHaveAttribute('data-godot-release-preflight', 'ready', { timeout: 120_000 });
+          await expect(preview).toHaveAttribute('data-godot-release-preflight-reason', 'manifest-verified');
+          await expect(preview).toHaveAttribute('data-godot-status', 'accepted', { timeout: 120_000 });
+          await expect(page.locator('iframe[title="Amore Evolution Engine — Godot 4.7.1"]')).toBeVisible();
+          await expect(page.locator('body')).toContainText(releaseId);
+          if (pageErrors.length > 0) throw new Error(`Browser errors: ${pageErrors.join(' | ')}`);
+          await page.screenshot({ path: 'phase15-canary-runtime.png', fullPage: true });
+
+          const rollback = await context.newPage();
+          await rollback.goto(`${url}/e2e/godot/?godotRollbackDrill=1&godotReleaseOps=1`, {
+            waitUntil: 'domcontentloaded',
+            timeout: 60_000,
+          });
+          await rollback.locator('#root > *').first().waitFor({ state: 'visible', timeout: 60_000 });
+          await expect(rollback.locator('iframe[title="Amore Evolution Engine — Godot 4.7.1"]')).toHaveCount(0);
+          await rollback.screenshot({ path: 'phase15-canary-rollback.png', fullPage: true });
+          await browser.close();
+          NODE
+
+      - name: Publish canary preview evidence
+        env:
+          PREVIEW_URL: ${{ steps.deploy.outputs.url }}
+        shell: bash
+        run: |
+          release_id="$(node --input-type=module -e "import{readFileSync}from'node:fs';import{parse}from'dotenv';process.stdout.write(String(parse(readFileSync('.env.vercel-preview.local','utf8')).VITE_EVOLUTION_GODOT_RELEASE_ID).trim())")"
+          {
+            echo '## Godot Phase 15 Canary-5 Preview'
+            echo
+            echo "Preview URL: ${PREVIEW_URL}/?godotReleaseOps=1"
+            echo
+            echo "Release ID: ${release_id}"
+            echo
+            echo 'Deployment is limited to the canary-5 stage. The kill switch remains available through Vercel Preview variables.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload canary URL, manifest and browser evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: amore-godot-phase15-canary-preview-${{ github.sha }}
+          path: |
+            canary-preview-url.txt
+            dist/godot/evolution-engine/release-manifest.json
+            phase15-canary-runtime.png
+            phase15-canary-rollback.png
+          if-no-files-found: error
+          retention-days: 14

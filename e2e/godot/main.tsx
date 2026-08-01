@@ -54,6 +54,7 @@ function GodotBridgeHarness() {
   const [activationCount, setActivationCount] = useState(0);
   const [interactionCount, setInteractionCount] = useState(0);
   const [fatalFailure, setFatalFailure] = useState('');
+  const rollbackDrill = queryFlag('godotRollbackDrill');
   const onMessage = useCallback((message: GodotBridgeInboundMessage) => {
     if (message.type === 'amore:godot:activate') {
       setActivationCount(count => count + 1);
@@ -69,6 +70,7 @@ function GodotBridgeHarness() {
       data-godot-activation-count={activationCount}
       data-godot-interaction-count={interactionCount}
       data-godot-fatal-failure={fatalFailure}
+      data-godot-rollback-drill={String(rollbackDrill)}
       style={{
         width: '100%',
         maxWidth: 520,
@@ -79,8 +81,12 @@ function GodotBridgeHarness() {
     >
       <GodotEvolutionPreview
         payload={payload}
-        enabled
+        enabled={!rollbackDrill}
+        fallback={<div data-godot-three-fallback="rollback-drill">Three.js rollback drill</div>}
         healthFallbackEnabled={queryFlag('healthFallback')}
+        releasePreflightEnabled={queryFlag('releasePreflight')}
+        releaseOperationsEnabled={queryFlag('godotReleaseOps')}
+        rollbackDrill={rollbackDrill}
         onMessage={onMessage}
         onFatalError={setFatalFailure}
       />
