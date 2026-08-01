@@ -6,10 +6,12 @@ import {
   useRef,
   useState,
 } from 'react';
+import type { GodotCutoverFailure } from './godotCutoverPolicy';
 import { GODOT_EVOLUTION_ENABLED } from './godotFeatureFlag';
 import {
   createGodotPayloadMessage,
   isGodotBridgeInboundMessage,
+  isGodotRuntimeStateAccepted,
   resolveGodotWebUrl,
   type GodotBridgeInboundMessage,
   type GodotEvolutionPayload,
@@ -22,6 +24,7 @@ export type GodotEvolutionStatus =
   | 'started'
   | 'ready'
   | 'accepted'
+  | 'timeout'
   | 'error';
 
 interface GodotEvolutionPreviewProps {
@@ -29,10 +32,14 @@ interface GodotEvolutionPreviewProps {
   enabled?: boolean;
   className?: string;
   fallback?: ReactNode;
+  startupTimeoutMs?: number;
   onMessage?: (message: GodotBridgeInboundMessage) => void;
+  onStatusChange?: (status: GodotEvolutionStatus) => void;
+  onFatalError?: (failure: GodotCutoverFailure) => void;
 }
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+const DEFAULT_STARTUP_TIMEOUT_MS = 20_000;
 
 function initialReducedMotionPreference(): boolean {
   return typeof window !== 'undefined'
@@ -45,9 +52,14 @@ export function GodotEvolutionPreview({
   enabled = GODOT_EVOLUTION_ENABLED,
   className = '',
   fallback = null,
+  startupTimeoutMs = DEFAULT_STARTUP_TIMEOUT_MS,
   onMessage,
+  onStatusChange,
+  onFatalError,
 }: GodotEvolutionPreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const acceptedRef = useRef(false);
+  const fatalReportedRef = useRef(false);
   const [status, setStatus] = useState<GodotEvolutionStatus>(
     enabled ? 'booting' : 'disabled',
   );
@@ -75,6 +87,18 @@ export function GodotEvolutionPreview({
     target.postMessage(createGodotPayloadMessage(runtimePayload), window.location.origin);
   }, [runtimePayload]);
 
+  const reportFatal = useCallback((failure: GodotCutoverFailure) => {
+    if (fatalReportedRef.current) return;
+    fatalReportedRef.current = true;
+    acceptedRef.current = false;
+    setStatus(failure === 'startup-timeout' ? 'timeout' : 'error');
+    onFatalError?.(failure);
+  }, [onFatalError]);
+
+  useEffect(() => {
+    onStatusChange?.(status);
+  }, [onStatusChange, status]);
+
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return undefined;
     const mediaQuery = window.matchMedia(REDUCED_MOTION_QUERY);
@@ -86,9 +110,28 @@ export function GodotEvolutionPreview({
 
   useEffect(() => {
     if (!enabled) {
+      acceptedRef.current = false;
+      fatalReportedRef.current = false;
       setStatus('disabled');
       return undefined;
     }
+
+    acceptedRef.current = false;
+    fatalReportedRef.current = false;
+    setStatus('booting');
+    setProgress(0);
+    setStateSignature('');
+    setMotion('unknown');
+
+    const timeoutId = window.setTimeout(() => {
+      if (!acceptedRef.current) reportFatal('startup-timeout');
+    }, Math.max(1_000, startupTimeoutMs));
+
+    return () => window.clearTimeout(timeoutId);
+  }, [enabled, reportFatal, startupTimeoutMs]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
 
     const handleMessage = (event: MessageEvent<unknown>) => {
       const frameWindow = iframeRef.current?.contentWindow;
@@ -109,7 +152,7 @@ export function GodotEvolutionPreview({
           setStatus('booting');
           break;
         case 'amore:godot:progress':
-          setProgress(Number.isFinite(message.ratio) ? message.ratio : 0);
+          setProgress(message.ratio);
           break;
         case 'amore:godot:engine-started':
           setStatus('started');
@@ -119,19 +162,26 @@ export function GodotEvolutionPreview({
           sendPayload();
           break;
         case 'amore:godot:state':
+          if (!isGodotRuntimeStateAccepted(message, runtimePayload)) {
+            reportFatal('state-mismatch');
+            break;
+          }
+          acceptedRef.current = true;
           setStateSignature(message.signature);
           setMotion(message.motion ?? 'unknown');
           setStatus('accepted');
           break;
+        case 'amore:godot:activate':
+          break;
         case 'amore:godot:error':
-          setStatus('error');
+          reportFatal('runtime-error');
           break;
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [enabled, onMessage, sendPayload]);
+  }, [enabled, onMessage, reportFatal, runtimePayload, sendPayload]);
 
   useEffect(() => {
     if (enabled && (status === 'ready' || status === 'accepted')) {
@@ -144,7 +194,7 @@ export function GodotEvolutionPreview({
   return (
     <div
       className={`godot-evolution-preview ${className}`.trim()}
-      data-godot-evolution="isolated"
+      data-godot-evolution="production-cutover"
       data-godot-status={status}
       data-godot-progress={progress.toFixed(3)}
       data-godot-state-signature={stateSignature}
@@ -159,13 +209,16 @@ export function GodotEvolutionPreview({
         allow="fullscreen"
         sandbox="allow-scripts allow-same-origin"
         referrerPolicy="same-origin"
+        onError={() => reportFatal('frame-load')}
       />
       <span className="godot-evolution-preview__status" aria-live="polite">
         {status === 'accepted'
           ? 'Godot runtime accepted'
-          : status === 'error'
-            ? 'Godot runtime error'
-            : `Godot runtime · ${Math.round(progress * 100)}%`}
+          : status === 'timeout'
+            ? 'Godot runtime timeout'
+            : status === 'error'
+              ? 'Godot runtime error'
+              : `Godot runtime · ${Math.round(progress * 100)}%`}
       </span>
     </div>
   );
