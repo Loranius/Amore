@@ -1,4 +1,5 @@
 import type { GodotReleasePreflightSnapshot } from './godotReleaseCandidate';
+import './godotReleaseCandidate.css';
 
 interface GodotReleaseCandidatePanelProps {
   preflight: GodotReleasePreflightSnapshot;
