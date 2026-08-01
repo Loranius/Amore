@@ -157,8 +157,12 @@
   text-align: center;
 }
 
+.godot-device-acceptance__actions {
+  flex-wrap: wrap;
+}
+
 .godot-device-acceptance__actions button {
-  flex: 1;
+  flex: 1 1 130px;
   min-height: 32px;
   border: 1px solid rgba(181, 162, 255, 0.22);
   border-radius: 10px;
@@ -166,6 +170,48 @@
   color: rgba(242, 238, 255, 0.9);
   font: inherit;
   font-weight: 650;
+}
+
+.godot-device-acceptance__actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+.godot-device-acceptance__release {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(107, 224, 161, 0.22);
+  border-radius: 14px;
+  background: rgba(107, 224, 161, 0.055);
+}
+
+.godot-device-acceptance__release code,
+.godot-device-acceptance__release pre {
+  margin: 0;
+  overflow: auto;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.26);
+  color: rgba(222, 249, 234, 0.9);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 9px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.godot-device-acceptance__release code {
+  padding: 7px;
+}
+
+.godot-device-acceptance__release pre {
+  padding: 9px;
+}
+
+.godot-device-acceptance__release-error {
+  margin: 0;
+  color: rgba(255, 174, 188, 0.96);
+  font-size: 10px;
 }
 
 .godot-device-acceptance small {
