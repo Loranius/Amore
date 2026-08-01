@@ -1,6 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-async function expectAcceptedRuntime(page: Parameters<typeof test>[0] extends never ? never : any) {
+async function expectAcceptedRuntime(page: Page) {
   const harness = page.locator('[data-godot-harness="react"]');
   const preview = page.locator('[data-godot-evolution="isolated"]');
   await expect(harness).toBeVisible();
