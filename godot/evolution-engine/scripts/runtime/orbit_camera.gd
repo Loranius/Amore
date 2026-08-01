@@ -1,6 +1,7 @@
 extends Node3D
 
 signal portal_activate(source: String)
+signal portal_interaction(kind: String)
 
 @export var rotation_speed := 0.006
 @export var zoom_step := 0.6
@@ -54,15 +55,19 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 			distance = maxf(minimum_distance, distance - zoom_step)
 			_apply_camera_transform()
+			portal_interaction.emit("zoom")
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			distance = minf(maximum_distance, distance + zoom_step)
 			_apply_camera_transform()
+			portal_interaction.emit("zoom")
 	elif event is InputEventMagnifyGesture:
 		distance = clampf(distance / maxf(0.2, event.factor), minimum_distance, maximum_distance)
 		_apply_camera_transform()
+		portal_interaction.emit("zoom")
 	elif event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ENTER or event.keycode == KEY_SPACE:
 			portal_activate.emit("keyboard")
+			portal_interaction.emit("keyboard")
 
 
 func _begin_pointer() -> void:
@@ -79,10 +84,14 @@ func _finish_pointer(source: String) -> void:
 		elapsed_seconds <= tap_max_duration_seconds
 		and _pointer_distance <= tap_max_distance
 	)
+	var completed_distance := _pointer_distance
 	_pointer_active = false
 	_pointer_distance = 0.0
 	if is_tap:
 		portal_activate.emit(source)
+		portal_interaction.emit("tap")
+	elif completed_distance > tap_max_distance:
+		portal_interaction.emit("orbit")
 
 
 func _apply_camera_transform() -> void:

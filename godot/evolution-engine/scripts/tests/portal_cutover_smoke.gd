@@ -4,6 +4,7 @@ const OrbitCamera = preload("res://scripts/runtime/orbit_camera.gd")
 
 var failures: Array[String] = []
 var activations: Array[String] = []
+var interactions: Array[String] = []
 
 
 func _initialize() -> void:
@@ -21,6 +22,7 @@ func _run() -> void:
 	await process_frame
 
 	rig.connect("portal_activate", _on_portal_activate)
+	rig.connect("portal_interaction", _on_portal_interaction)
 
 	var tap_down := InputEventScreenTouch.new()
 	tap_down.index = 0
@@ -34,6 +36,7 @@ func _run() -> void:
 	tap_up.pressed = false
 	rig.call("_unhandled_input", tap_up)
 	_expect(activations == ["tap"], "short touch must activate the portal exactly once")
+	_expect(interactions == ["tap"], "short touch must produce one tap interaction")
 
 	var drag_down := InputEventScreenTouch.new()
 	drag_down.index = 0
@@ -53,6 +56,13 @@ func _run() -> void:
 	drag_up.pressed = false
 	rig.call("_unhandled_input", drag_up)
 	_expect(activations == ["tap"], "orbit drag must not activate the portal")
+	_expect(interactions == ["tap", "orbit"], "completed orbit drag must produce evidence")
+
+	var wheel := InputEventMouseButton.new()
+	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
+	wheel.pressed = true
+	rig.call("_unhandled_input", wheel)
+	_expect(interactions == ["tap", "orbit", "zoom"], "zoom must produce interaction evidence")
 
 	var keyboard := InputEventKey.new()
 	keyboard.keycode = KEY_ENTER
@@ -62,12 +72,16 @@ func _run() -> void:
 		activations == ["tap", "keyboard"],
 		"keyboard activation must remain available for accessibility",
 	)
+	_expect(
+		interactions == ["tap", "orbit", "zoom", "keyboard"],
+		"keyboard activation must be represented in device evidence",
+	)
 
 	rig.queue_free()
 	await process_frame
 
 	if failures.is_empty():
-		print("PASS: Godot portal production cutover")
+		print("PASS: Godot portal production cutover; Phase 13 interaction evidence")
 		quit(0)
 		return
 
@@ -78,6 +92,10 @@ func _run() -> void:
 
 func _on_portal_activate(source: String) -> void:
 	activations.append(source)
+
+
+func _on_portal_interaction(kind: String) -> void:
+	interactions.append(kind)
 
 
 func _expect(condition: bool, message: String) -> void:
