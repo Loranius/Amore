@@ -2,15 +2,17 @@
 
 ## Status
 
-This bridge is an isolated vertical slice. It is not routed into the production Crystal/Tree/Reef switcher yet.
+Phase 11 promotes the bridge from an isolated vertical slice to a production-capable Crystal cutover with an automatic Three.js fallback.
 
-Activation is opt-in through:
+Activation is controlled through:
 
 ```bash
-VITE_EVOLUTION_GODOT=1
+VITE_EVOLUTION_GODOT=disabled
+VITE_EVOLUTION_GODOT=preview
+VITE_EVOLUTION_GODOT=production
 ```
 
-The feature flag defaults to disabled, so missing Web export files cannot break the current Three.js production renderer.
+`disabled` keeps the accepted Three.js renderer. `preview` enables the Godot path without declaring a production cutover. `production` selects Godot only while the iframe reaches a valid accepted state; fatal failures immediately render the existing Three.js Evolution scene.
 
 ## Build output
 
@@ -23,11 +25,13 @@ index.wasm
 index.pck
 ```
 
-CI uploads these files as a temporary workflow artifact. A later cutover phase will copy an accepted build to:
+CI stages these files at:
 
 ```text
 public/godot/evolution-engine/
 ```
+
+before the Vite production build. The build is rejected unless all four files are present and non-empty under `dist/godot/evolution-engine/`.
 
 Vite/Workbox deliberately excludes this directory from precache because the `.wasm` and `.pck` files are large. The files use a separate CacheFirst runtime cache.
 
@@ -51,7 +55,8 @@ React host
             └─ JavaScriptBridge polling
                  └─ deterministic Godot rebuild
                       └─ amore:godot:state
-                           └─ React acceptance state
+                           ├─ valid identity/history → accepted Godot renderer
+                           └─ mismatch/error/timeout → Three.js fallback
 ```
 
 ### Host → Godot
@@ -80,13 +85,38 @@ The runtime emits:
 - `amore:godot:engine-started`;
 - `amore:godot:ready`;
 - `amore:godot:state`;
+- `amore:godot:activate`;
 - `amore:godot:error`.
 
-The accepted state message includes species, seed, instruction/history counts and a deterministic snapshot signature.
+The accepted state message includes species, seed, canonical instruction count, rendered instruction count, history count, motion mode, phase and deterministic snapshot signature.
+
+`amore:godot:activate` restores the portal action inside the iframe. A short tap or Enter/Space emits one activation; orbit drags and zoom gestures emit none.
+
+## Acceptance validation
+
+React does not trust a message solely because its `type` is known. Phase 11 validates the complete message shape and then verifies the runtime state against the payload:
+
+- species equals payload species;
+- seed equals payload seed;
+- history count equals payload event count;
+- canonical instruction count is positive;
+- rendered instruction count cannot exceed canonical instruction count;
+- signature is present and bounded to the expected deterministic format.
+
+## Controlled fallback
+
+The host resolves to `three-fallback` after:
+
+1. iframe load failure;
+2. explicit Godot runtime error;
+3. startup timeout before accepted state;
+4. state identity or history mismatch.
+
+This fallback changes only the renderer. It does not mutate Artifact DNA, Evolution Events, append-only history or Supabase state.
 
 ## Web compatibility choices
 
-The first Web preset uses:
+The Web preset uses:
 
 - Compatibility renderer;
 - GDScript;
@@ -95,15 +125,18 @@ The first Web preset uses:
 - adaptive canvas sizing;
 - both desktop and mobile texture compression variants.
 
-Keeping threads and extensions disabled avoids requiring SharedArrayBuffer and cross-origin isolation during the first GitHub Pages and mobile validation pass.
+Keeping threads and extensions disabled avoids requiring SharedArrayBuffer and cross-origin isolation during the first production mobile pass.
 
 ## Cutover gate
 
-The Godot renderer may replace the current Three.js Crystal route only after all of these pass:
+The Godot renderer may remain selected in the production Crystal route only after all of these pass:
 
-1. Godot parser and deterministic smoke tests;
+1. Godot parser and every Phase 1–11 smoke test;
 2. release Web export;
 3. same-origin bridge test;
-4. Pixel 8 Pro load/FPS/memory review;
-5. fixed-camera visual acceptance;
-6. rollback path through the Three.js archive branch.
+4. strict accepted-state validation;
+5. production Vite build containing HTML, JavaScript, WASM and PCK files;
+6. Pixel 8 Pro load/FPS/memory review;
+7. full-motion and reduced-motion visual acceptance;
+8. canvas-tap activation proof;
+9. rollback path through both live Three.js fallback and the archive branch.
