@@ -1,11 +1,11 @@
-name: Deploy to GitHub Pages - Godot Canary-5
-
-# Permanent production deployment for the physically approved Phase 15 canary.
+name: Deploy to GitHub Pages
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    paths-ignore:
+      - '.github/workflows/deploy.yml'
+      - '.github/workflows/godot-phase15-production-canary.yml'
   workflow_dispatch:
 
 permissions:
@@ -19,290 +19,42 @@ concurrency:
 
 jobs:
   build:
-    if: github.repository == 'Loranius/Amore'
     runs-on: ubuntu-latest
-    timeout-minutes: 50
-
-    env:
-      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-      VITE_TMDB_KEY: ${{ secrets.VITE_TMDB_KEY }}
-      VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
-      VITE_EVOLUTION_GODOT: production
-      VITE_EVOLUTION_GODOT_RELEASE_STAGE: canary-5
-      VITE_EVOLUTION_GODOT_RELEASE_ID: crystal-phase14-20260801
-      VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256: b4bc9ed5a11efff70c89037ccaf09c2bb639a541e4fc95eea6f77765a5172d8e
-      VITE_EVOLUTION_GODOT_KILL_SWITCH: 'off'
-      VITE_EVOLUTION_GODOT_ROLLOUT: '5'
-      BASE_PATH: /Amore/
-      BUILD_GODOT_HARNESS: '1'
-
     steps:
-      - name: Checkout approved Phase 15 candidate
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Install application and browser tooling
+      - name: Compute base path
+        id: base
         run: |
-          npm ci
-          npm install --no-save --no-package-lock @playwright/test@1.61.1
-
-      - name: Validate strict production canary-5 controls
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --input-type=module <<'NODE'
-          const required = [
-            'VITE_SUPABASE_URL',
-            'VITE_SUPABASE_ANON_KEY',
-            'VITE_TMDB_KEY',
-            'VITE_MAPBOX_TOKEN',
-            'VITE_EVOLUTION_GODOT',
-            'VITE_EVOLUTION_GODOT_ROLLOUT',
-            'VITE_EVOLUTION_GODOT_RELEASE_STAGE',
-            'VITE_EVOLUTION_GODOT_RELEASE_ID',
-            'VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256',
-            'VITE_EVOLUTION_GODOT_KILL_SWITCH',
-          ];
-          const missing = required.filter(key => !String(process.env[key] ?? '').trim());
-          if (missing.length > 0) {
-            throw new Error(`Missing production variables: ${missing.join(', ')}`);
-          }
-          if (!String(process.env.VITE_SUPABASE_URL).startsWith('https://')) {
-            throw new Error('VITE_SUPABASE_URL must start with https://.');
-          }
-          if (!String(process.env.VITE_MAPBOX_TOKEN).startsWith('pk.')) {
-            throw new Error('VITE_MAPBOX_TOKEN must be a public pk.* token.');
-          }
-
-          const expected = {
-            mode: 'production',
-            stage: 'canary-5',
-            releaseId: 'crystal-phase14-20260801',
-            digest: 'b4bc9ed5a11efff70c89037ccaf09c2bb639a541e4fc95eea6f77765a5172d8e',
-            killSwitch: 'off',
-            rollout: 5,
-          };
-          const actual = {
-            mode: String(process.env.VITE_EVOLUTION_GODOT).trim().toLowerCase(),
-            stage: String(process.env.VITE_EVOLUTION_GODOT_RELEASE_STAGE).trim().toLowerCase(),
-            releaseId: String(process.env.VITE_EVOLUTION_GODOT_RELEASE_ID).trim(),
-            digest: String(process.env.VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256).trim().toLowerCase(),
-            killSwitch: String(process.env.VITE_EVOLUTION_GODOT_KILL_SWITCH).trim().toLowerCase(),
-            rollout: Number(String(process.env.VITE_EVOLUTION_GODOT_ROLLOUT).trim()),
-          };
-
-          for (const [key, value] of Object.entries(expected)) {
-            if (actual[key] !== value) throw new Error(`Strict production canary mismatch: ${key}.`);
-          }
-          console.log('Verified strict production canary-5 controls.');
-          NODE
-
-      - name: Install Godot 4.7.1 and Web templates
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
-            --connect-timeout 30 \
-            --output /tmp/godot.zip \
-            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
-          curl --http1.1 --fail --location --retry 5 --retry-all-errors --retry-delay 2 \
-            --connect-timeout 30 \
-            --output /tmp/godot-templates.tpz \
-            https://godot-releases.nbg1.your-objectstorage.com/4.7.1-stable/Godot_v4.7.1-stable_export_templates.tpz
-
-          unzip -q /tmp/godot.zip -d /tmp/godot
-          chmod +x /tmp/godot/Godot_v4.7.1-stable_linux.x86_64
-          sudo ln -s /tmp/godot/Godot_v4.7.1-stable_linux.x86_64 /usr/local/bin/godot
-
-          rm -rf /tmp/godot-export-templates
-          mkdir -p /tmp/godot-export-templates
-          unzip -q /tmp/godot-templates.tpz -d /tmp/godot-export-templates
-          template_source=/tmp/godot-export-templates
-          if [[ -d /tmp/godot-export-templates/templates ]]; then
-            template_source=/tmp/godot-export-templates/templates
-          fi
-          template_target="$HOME/.local/share/godot/export_templates/4.7.1.stable"
-          mkdir -p "$template_target"
-          cp -R "$template_source"/. "$template_target"/
-          godot --version
-          test -f "$template_target/web_release.zip"
-
-      - name: Export exact Godot Web runtime
-        shell: bash
-        run: |
-          set -euo pipefail
-          godot --headless --path godot/evolution-engine --editor --quit 2>&1 | tee /tmp/godot-import.log
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-import.log; then
-            exit 1
+          if [[ "${{ github.event.repository.name }}" == *.github.io ]]; then
+            echo "base=/" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=/${{ github.event.repository.name }}/" >> "$GITHUB_OUTPUT"
           fi
 
-          rm -rf public/godot/evolution-engine /tmp/amore-godot-web
-          mkdir -p public/godot/evolution-engine /tmp/amore-godot-web
-          godot --headless \
-            --path godot/evolution-engine \
-            --export-release Web \
-            /tmp/amore-godot-web/index.html \
-            2>&1 | tee /tmp/godot-export.log
+      - name: Install dependencies
+        run: npm ci
 
-          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script|ERROR: Cannot export' /tmp/godot-export.log; then
-            exit 1
-          fi
-          for file in index.html index.js index.wasm index.pck; do
-            test -s "/tmp/amore-godot-web/$file"
-          done
-          cp -R /tmp/amore-godot-web/. public/godot/evolution-engine/
+      - name: Build
+        run: npm run build
+        env:
+          BASE_PATH: ${{ steps.base.outputs.base }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_TMDB_KEY: ${{ secrets.VITE_TMDB_KEY }}
+          VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
 
-      - name: Build and bind the production Phase 15 release candidate
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run build
-          GODOT_RC_ROOT=dist/godot/evolution-engine \
-          GODOT_RC_RELEASE_ID="$VITE_EVOLUTION_GODOT_RELEASE_ID" \
-          GODOT_RC_ACCEPTANCE_SHA256="$VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256" \
-          GODOT_RC_BUILD_SHA="$GITHUB_SHA" \
-            node scripts/generate-godot-release-candidate.mjs
+      - name: Verify PWA and base-path output
+        run: npm run verify:pages-build -- --base="${{ steps.base.outputs.base }}"
 
-          test -s dist/index.html
-          test -s dist/e2e/godot/index.html
-          test -s dist/godot/evolution-engine/release-manifest.json
-
-      - name: Verify manifest and exact production asset hashes
-        shell: bash
-        run: |
-          set -euo pipefail
-          node --input-type=module <<'NODE'
-          import { createHash } from 'node:crypto';
-          import { readFileSync, statSync } from 'node:fs';
-
-          const root = 'dist/godot/evolution-engine';
-          const manifest = JSON.parse(readFileSync(`${root}/release-manifest.json`, 'utf8'));
-          const required = ['index.html', 'index.js', 'index.wasm', 'index.pck'];
-
-          if (manifest.version !== 'godot-release-candidate-v1') throw new Error('Invalid manifest version.');
-          if (manifest.phase !== 15) throw new Error('Invalid manifest phase.');
-          if (manifest.runtimeVersion !== '4.7.1') throw new Error('Invalid runtime version.');
-          if (manifest.releaseId !== process.env.VITE_EVOLUTION_GODOT_RELEASE_ID) {
-            throw new Error('Manifest release ID mismatch.');
-          }
-          if (manifest.acceptanceDigest !== process.env.VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256) {
-            throw new Error('Manifest acceptance digest mismatch.');
-          }
-          if (manifest.buildSha !== String(process.env.GITHUB_SHA).toLowerCase()) {
-            throw new Error('Manifest build SHA mismatch.');
-          }
-          if (!Array.isArray(manifest.assets) || manifest.assets.length !== required.length) {
-            throw new Error('Manifest must contain exactly four required assets.');
-          }
-
-          let totalBytes = 0;
-          for (const file of required) {
-            const entry = manifest.assets.find(candidate => candidate.file === file);
-            if (!entry) throw new Error(`Manifest is missing ${file}.`);
-            const path = `${root}/${file}`;
-            const bytes = readFileSync(path);
-            const sha256 = createHash('sha256').update(bytes).digest('hex');
-            if (entry.bytes !== statSync(path).size || entry.sha256 !== sha256) {
-              throw new Error(`Manifest integrity mismatch for ${file}.`);
-            }
-            totalBytes += entry.bytes;
-          }
-          if (manifest.totalBytes !== totalBytes) throw new Error('Manifest aggregate byte count mismatch.');
-          console.log('Verified the production Phase 15 manifest and exact Godot asset hashes.');
-          NODE
-
-      - name: Verify GitHub Pages and base-path output
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run verify:pages-build -- --base="$BASE_PATH"
-          grep -q 'id="root"' dist/index.html
-          grep -q 'id="root"' dist/e2e/godot/index.html
-
-      - name: Prove canary and rollback locally before deployment
-        shell: bash
-        run: |
-          set -euo pipefail
-          browser_path=''
-          for candidate in chromium google-chrome google-chrome-stable; do
-            if command -v "$candidate" >/dev/null 2>&1; then
-              browser_path="$(command -v "$candidate")"
-              break
-            fi
-          done
-          test -n "$browser_path"
-          export PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH="$browser_path"
-
-          npm run preview -- --host 127.0.0.1 --port 4173 > /tmp/amore-production-preview.log 2>&1 &
-          preview_pid=$!
-          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
-
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent "http://127.0.0.1:4173${BASE_PATH}" >/dev/null; then
-              break
-            fi
-            if [[ "$attempt" == 30 ]]; then
-              sed -n '1,200p' /tmp/amore-production-preview.log
-              exit 1
-            fi
-            sleep 1
-          done
-
-          node --input-type=module <<'NODE'
-          import { chromium, expect } from '@playwright/test';
-
-          const base = `http://127.0.0.1:4173${process.env.BASE_PATH}`;
-          const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
-          const browser = await chromium.launch({ executablePath, headless: true });
-          const context = await browser.newContext({ viewport: { width: 412, height: 915 } });
-          await context.addInitScript(() => {
-            localStorage.setItem('amore:godot-rollout-cohort-v1', 'phase15-canary-10');
-          });
-
-          const page = await context.newPage();
-          const pageErrors = [];
-          page.on('pageerror', error => pageErrors.push(error.message));
-          await page.goto(`${base}e2e/godot/?releasePreflight=1&godotReleaseOps=1`, {
-            waitUntil: 'domcontentloaded',
-            timeout: 60_000,
-          });
-          const preview = page.locator('[data-godot-evolution="device-acceptance"]');
-          await expect(preview).toHaveAttribute('data-godot-release-preflight', 'ready', { timeout: 120_000 });
-          await expect(preview).toHaveAttribute('data-godot-release-preflight-reason', 'manifest-verified');
-          await expect(preview).toHaveAttribute('data-godot-status', 'accepted', { timeout: 120_000 });
-          await expect(page.locator('iframe[title="Amore Evolution Engine — Godot 4.7.1"]')).toBeVisible();
-          if (pageErrors.length > 0) throw new Error(`Browser errors: ${pageErrors.join(' | ')}`);
-          await page.screenshot({ path: 'phase15-production-canary-local.png', fullPage: true });
-
-          const rollback = await context.newPage();
-          await rollback.goto(`${base}e2e/godot/?godotRollbackDrill=1&godotReleaseOps=1`, {
-            waitUntil: 'domcontentloaded',
-            timeout: 60_000,
-          });
-          await expect(rollback.locator('[data-godot-three-fallback="rollback-drill"]')).toBeVisible();
-          await expect(rollback.locator('iframe[title="Amore Evolution Engine — Godot 4.7.1"]')).toHaveCount(0);
-          await rollback.screenshot({ path: 'phase15-production-rollback-local.png', fullPage: true });
-          await browser.close();
-          NODE
-
-      - name: Upload pre-deploy production evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: amore-godot-phase15-production-predeploy-${{ github.sha }}
-          path: |
-            dist/godot/evolution-engine/release-manifest.json
-            phase15-production-canary-local.png
-            phase15-production-rollback-local.png
-          if-no-files-found: error
-          retention-days: 30
-
-      - name: Upload production Pages artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -310,104 +62,21 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy production canary-5 to GitHub Pages
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
-      - name: Verify the live production manifest and exact assets
+      - name: Smoke test deployed PWA
         env:
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-          RELEASE_ID: crystal-phase14-20260801
-          ACCEPTANCE_SHA256: b4bc9ed5a11efff70c89037ccaf09c2bb639a541e4fc95eea6f77765a5172d8e
-          BUILD_SHA: ${{ github.sha }}
-        shell: bash
         run: |
           set -euo pipefail
           root="${PAGE_URL%/}/"
-          export ROOT_URL="$root"
-
-          curl --fail --location --retry 12 --retry-delay 5 --retry-all-errors \
-            "$root" --output /tmp/amore-production-index.html
-          grep -q 'id="root"' /tmp/amore-production-index.html
-
-          node --input-type=module <<'NODE'
-          import { createHash } from 'node:crypto';
-
-          const root = process.env.ROOT_URL;
-          const expectedRelease = process.env.RELEASE_ID;
-          const expectedDigest = process.env.ACCEPTANCE_SHA256;
-          const expectedBuild = String(process.env.BUILD_SHA).toLowerCase();
-
-          async function fetchWithRetry(url, attempts = 12) {
-            let lastError;
-            for (let attempt = 1; attempt <= attempts; attempt += 1) {
-              try {
-                const response = await fetch(url, { cache: 'no-store' });
-                if (response.ok) return response;
-                lastError = new Error(`HTTP ${response.status} for ${url}`);
-              } catch (error) {
-                lastError = error;
-              }
-              await new Promise(resolve => setTimeout(resolve, 5000));
-            }
-            throw lastError;
-          }
-
-          const manifestResponse = await fetchWithRetry(`${root}godot/evolution-engine/release-manifest.json`);
-          const manifest = await manifestResponse.json();
-          if (manifest.releaseId !== expectedRelease) throw new Error('Live release ID mismatch.');
-          if (manifest.acceptanceDigest !== expectedDigest) throw new Error('Live acceptance digest mismatch.');
-          if (manifest.buildSha !== expectedBuild) throw new Error('Live build SHA mismatch.');
-
-          for (const asset of manifest.assets) {
-            const response = await fetchWithRetry(`${root}godot/evolution-engine/${asset.file}`);
-            const bytes = new Uint8Array(await response.arrayBuffer());
-            const sha256 = createHash('sha256').update(bytes).digest('hex');
-            if (bytes.byteLength !== asset.bytes || sha256 !== asset.sha256) {
-              throw new Error(`Live asset mismatch: ${asset.file}.`);
-            }
-          }
-
-          const harness = await fetchWithRetry(`${root}e2e/godot/`);
-          if (!(await harness.text()).includes('id="root"')) {
-            throw new Error('Live production harness is missing.');
-          }
-          console.log('Verified live production manifest and exact Godot assets.');
-          NODE
-
-          printf '%s\n' "$root" > production-canary-url.txt
-          curl --fail --location --retry 6 --retry-delay 3 --retry-all-errors \
-            "${root}godot/evolution-engine/release-manifest.json" \
-            --output production-release-manifest.json
-
-      - name: Publish production canary evidence
-        env:
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-        shell: bash
-        run: |
-          {
-            echo '## Godot Phase 15 Production Canary-5'
-            echo
-            echo "Production URL: ${PAGE_URL%/}/"
-            echo
-            echo 'Release ID: crystal-phase14-20260801'
-            echo
-            echo 'Effective rollout ceiling: 5%'
-            echo
-            echo 'Three.js remains active for non-canary cohorts and all Godot runtime failures.'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload live production evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: amore-godot-phase15-production-live-${{ github.sha }}
-          path: |
-            production-canary-url.txt
-            production-release-manifest.json
-          if-no-files-found: error
-          retention-days: 30
+          curl --fail --location --retry 10 --retry-delay 5 --retry-all-errors "$root" --output /tmp/amore-index.html
+          grep -q 'id="root"' /tmp/amore-index.html
+          curl --fail --location --retry 10 --retry-delay 5 --retry-all-errors "${root}manifest.webmanifest" --output /tmp/amore-manifest.webmanifest
+          curl --fail --location --retry 10 --retry-delay 5 --retry-all-errors "${root}sw.js" --output /tmp/amore-sw.js
