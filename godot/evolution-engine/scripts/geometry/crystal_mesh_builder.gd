@@ -2,6 +2,8 @@ extends RefCounted
 
 ## Builds one faceted crystal column from an accepted GrowthInstruction.
 ## Meshes are local +Y columns and are oriented by the runtime transform.
+## Attached crystals contain their own buried root and fusion flare so parent
+## junctions stay continuous without a second overlay mesh.
 
 
 func create_mesh_instance(instruction) -> MeshInstance3D:
@@ -46,47 +48,72 @@ func _build_mesh(instruction) -> ArrayMesh:
 		0.0,
 		0.14,
 	)
-	var center_drift := Vector3(
+	var center_drift: Vector3 = Vector3(
 		float(instruction.metadata.get("center_drift_x", 0.0)) * instruction.radius,
 		0.0,
 		float(instruction.metadata.get("center_drift_z", 0.0)) * instruction.radius,
 	)
-	var tip_offset := Vector3(
+	var tip_offset: Vector3 = Vector3(
 		float(instruction.metadata.get("tip_offset_x", 0.0)) * instruction.radius,
 		0.0,
 		float(instruction.metadata.get("tip_offset_z", 0.0)) * instruction.radius,
 	)
 
-	var base_radius: float = instruction.radius * (1.34 if attached else 1.08)
-	var lower_radius: float = instruction.radius * (1.03 if attached else 1.0)
+	var root_core_ratio: float = clampf(
+		float(instruction.metadata.get("root_core_ratio", 0.76)),
+		0.64,
+		0.88,
+	)
+	var integrated_flare_ratio: float = clampf(
+		float(instruction.metadata.get("junction_flare_ratio", 1.22)),
+		1.16,
+		1.28,
+	)
+	var base_radius: float = instruction.radius * (root_core_ratio if attached else 1.08)
+	var fusion_radius: float = instruction.radius * integrated_flare_ratio
+	var lower_radius: float = instruction.radius * (1.035 if attached else 1.0)
 	var mid_radius: float = instruction.radius * waist_ratio
 	var shoulder_radius: float = instruction.radius * body_taper
 	var termination_radius: float = shoulder_radius * lerpf(0.62, 0.78, instruction.energy)
 	var base_y: float = -minf(
-		instruction.length * 0.1,
-		instruction.radius * merge_depth_ratio * 0.72,
+		instruction.length * 0.16,
+		instruction.radius * merge_depth_ratio * 0.98,
 	) if attached else 0.0
-	var lower_y: float = instruction.length * 0.12
+	var fusion_y: float = minf(
+		instruction.length * 0.008,
+		instruction.radius * 0.028,
+	) if attached else 0.0
+	var lower_y: float = instruction.length * (0.145 if attached else 0.12)
 	var mid_y: float = instruction.length * 0.46
 	var shoulder_y: float = instruction.length * shoulder_height_ratio
 	var termination_y: float = instruction.length * (1.0 - termination_depth_ratio)
 	termination_y = maxf(shoulder_y + instruction.length * 0.055, termination_y)
 	termination_y = minf(instruction.length * 0.9, termination_y)
-	var tip := Vector3(
+	var tip: Vector3 = Vector3(
 		center_drift.x + tip_offset.x,
 		instruction.length,
 		center_drift.z + tip_offset.z,
 	)
-	var color := _crystal_color(instruction)
+	var color: Color = _crystal_color(instruction)
 
 	var base_ring: Array[Vector3] = _build_ring(
 		sides,
 		base_radius,
 		base_y,
 		facet_phase,
-		ridge_strength * 0.42,
+		ridge_strength * (0.3 if attached else 0.42),
 		Vector3.ZERO,
 	)
+	var fusion_ring: Array[Vector3] = []
+	if attached:
+		fusion_ring = _build_ring(
+			sides,
+			fusion_radius,
+			fusion_y,
+			facet_phase + ring_twist * 0.05,
+			ridge_strength * 0.48,
+			Vector3.ZERO,
+		)
 	var lower_ring: Array[Vector3] = _build_ring(
 		sides,
 		lower_radius,
@@ -120,13 +147,17 @@ func _build_mesh(instruction) -> ArrayMesh:
 		center_drift + tip_offset * 0.34,
 	)
 
-	_connect_rings(surface, base_ring, lower_ring, color.darkened(0.16))
+	if attached:
+		_connect_rings(surface, base_ring, fusion_ring, color.darkened(0.095))
+		_connect_rings(surface, fusion_ring, lower_ring, color.darkened(0.07))
+	else:
+		_connect_rings(surface, base_ring, lower_ring, color.darkened(0.16))
 	_connect_rings(surface, lower_ring, mid_ring, color.darkened(0.06))
 	_connect_rings(surface, mid_ring, shoulder_ring, color.lightened(0.012))
 	_connect_rings(surface, shoulder_ring, termination_ring, color.lightened(0.035))
 
 	for side in range(sides):
-		var next := (side + 1) % sides
+		var next: int = (side + 1) % sides
 		_add_triangle_clockwise(
 			surface,
 			termination_ring[side],
@@ -138,7 +169,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 	if bool(instruction.metadata.get("cap_base", false)):
 		var center := Vector3(0.0, base_y, 0.0)
 		for side in range(sides):
-			var next := (side + 1) % sides
+			var next: int = (side + 1) % sides
 			_add_triangle_with_normal(
 				surface,
 				center,
@@ -148,7 +179,7 @@ func _build_mesh(instruction) -> ArrayMesh:
 				color.darkened(0.22),
 			)
 
-	var mesh := surface.commit()
+	var mesh: ArrayMesh = surface.commit()
 	mesh.surface_set_material(0, _build_optical_material(instruction, color))
 	return mesh
 
@@ -169,7 +200,7 @@ func _build_ring(
 			+ cos(angle * 3.0 - phase * 1.7) * 0.38
 		)
 		var local_radius: float = radius * (1.0 + harmonic * ridge_strength)
-		var radial := Vector3(cos(angle), 0.0, sin(angle))
+		var radial: Vector3 = Vector3(cos(angle), 0.0, sin(angle))
 		ring.append(center + radial * local_radius + Vector3.UP * y)
 	return ring
 
@@ -183,7 +214,7 @@ func _connect_rings(
 	var sides: int = mini(lower.size(), upper.size())
 	for side in range(sides):
 		var next: int = (side + 1) % sides
-		var facet_color := color.lightened(float(side % 3) * 0.014)
+		var facet_color: Color = color.lightened(float(side % 3) * 0.014)
 		_add_quad_clockwise(
 			surface,
 			lower[side],
@@ -238,7 +269,7 @@ func _add_quad_clockwise(
 	# Vertices are submitted clockwise for Godot front faces. The stored
 	# lighting normal follows the opposite geometric cross order so it points
 	# away from the crystal axis instead of into the solid volume.
-	var outward := (d - a).cross(b - a).normalized()
+	var outward: Vector3 = (d - a).cross(b - a).normalized()
 	_add_triangle_with_normal(surface, a, c, b, outward, color)
 	_add_triangle_with_normal(surface, a, d, c, outward, color)
 
@@ -250,7 +281,7 @@ func _add_triangle_clockwise(
 	c: Vector3,
 	color: Color,
 ) -> void:
-	var outward := (c - a).cross(b - a).normalized()
+	var outward: Vector3 = (c - a).cross(b - a).normalized()
 	_add_triangle_with_normal(surface, a, c, b, outward, color)
 
 
@@ -269,20 +300,20 @@ func _add_triangle_with_normal(
 
 
 func _basis_from_y(direction: Vector3) -> Basis:
-	var y_axis := direction.normalized()
-	var x_axis := Vector3.FORWARD.cross(y_axis)
+	var y_axis: Vector3 = direction.normalized()
+	var x_axis: Vector3 = Vector3.FORWARD.cross(y_axis)
 	if x_axis.length_squared() < 0.000001:
 		x_axis = Vector3.RIGHT
 	x_axis = x_axis.normalized()
-	var z_axis := x_axis.cross(y_axis).normalized()
+	var z_axis: Vector3 = x_axis.cross(y_axis).normalized()
 	return Basis(x_axis, y_axis, z_axis)
 
 
 func _crystal_color(instruction) -> Color:
-	var hue_shift := float(instruction.metadata.get("hue_shift", 0.0))
-	var hue := fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
-	var saturation := clampf(0.34 + instruction.energy * 0.11, 0.0, 1.0)
-	var value := clampf(0.64 + instruction.energy * 0.13, 0.0, 1.0)
+	var hue_shift: float = float(instruction.metadata.get("hue_shift", 0.0))
+	var hue: float = fposmod(0.765 + hue_shift + float(instruction.generation) * 0.014, 1.0)
+	var saturation: float = clampf(0.34 + instruction.energy * 0.11, 0.0, 1.0)
+	var value: float = clampf(0.64 + instruction.energy * 0.13, 0.0, 1.0)
 	return Color.from_hsv(hue, saturation, value, 1.0)
 
 
