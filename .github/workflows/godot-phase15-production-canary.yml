@@ -1,5 +1,7 @@
 name: Godot Phase 15 Production Canary-5
 
+# PWA navigation fallback must preserve the Godot validation harness.
+
 on:
   push:
     branches:
