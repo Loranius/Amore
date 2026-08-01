@@ -2,9 +2,11 @@ extends RefCounted
 
 const Model = preload("res://scripts/core/evolution_model.gd")
 const DeterministicRNG = preload("res://scripts/core/deterministic_rng.gd")
+const CrystalSemanticPressure = preload("res://scripts/species/crystal_semantic_pressure.gd")
 
 const MOTHER_ID := "crystal:mother"
 const BASAL_CROWN_COUNT := 5
+const SEMANTIC_PROJECTION_VERSION := "crystal-semantic-projection-v1"
 
 
 func create_genesis_instructions(dna) -> Array:
@@ -83,6 +85,13 @@ func translate_event(dna, event, event_index: int, state) -> RefCounted:
 		dna.seed,
 	)
 	var rng = DeterministicRNG.new(decision_seed)
+	var semantic: Dictionary = CrystalSemanticPressure.new().evaluate(event)
+	var pressure: Dictionary = Dictionary(semantic.get("pressure", {}))
+	var expansion: float = float(pressure.get("expansion", 0.0))
+	var internal_density: float = float(pressure.get("internal_density", 0.0))
+	var polishing: float = float(pressure.get("polishing", 0.0))
+	var structural: float = float(pressure.get("structural", 0.0))
+	var luminosity: float = float(pressure.get("luminosity", 0.0))
 	var parent = _select_parent(event, event_index, state, rng)
 	var parent_direction: Vector3 = parent.direction
 
@@ -111,41 +120,86 @@ func translate_event(dna, event, event_index: int, state) -> RefCounted:
 	var stability: float = _channel(event, "stability")
 	var culture: float = _channel(event, "culture")
 	var total_pressure: float = clampf(
-		0.18
-		+ event.portal_activity * 0.24
-		+ significance * 0.18
-		+ remembrance * 0.14
-		+ achievement * 0.14
-		+ exploration * 0.08
-		+ stability * 0.08
-		+ culture * 0.04,
+		0.16
+		+ event.portal_activity * 0.18
+		+ significance * 0.14
+		+ remembrance * 0.1
+		+ achievement * 0.1
+		+ exploration * 0.06
+		+ stability * 0.06
+		+ culture * 0.03
+		+ structural * 0.08
+		+ internal_density * 0.07
+		+ expansion * 0.05
+		+ luminosity * 0.03,
 		0.0,
 		1.0,
 	)
 
-	var outward_force: float = 0.64 + exploration * 0.16 + achievement * 0.08
-	var inherited_force: float = 0.44 + stability * 0.22 + remembrance * 0.08
-	var mutation: Vector3 = rng.direction_in_cone(radial, deg_to_rad(18.0 + culture * 10.0))
+	var outward_force: float = 0.6 + exploration * 0.12 + expansion * 0.2
+	var inherited_force: float = (
+		0.4
+		+ stability * 0.14
+		+ remembrance * 0.06
+		+ structural * 0.16
+		+ internal_density * 0.06
+	)
+	var upward_force: float = 0.04 + achievement * 0.05 + structural * 0.1
+	var mutation_angle: float = 18.0 + culture * 10.0 - polishing * 3.0
+	var mutation: Vector3 = rng.direction_in_cone(radial, deg_to_rad(maxf(10.0, mutation_angle)))
 	var direction: Vector3 = (
 		radial * outward_force
 		+ parent_direction * inherited_force
-		+ mutation * (0.08 + culture * 0.08)
+		+ Vector3.UP * upward_force
+		+ mutation * (0.07 + culture * 0.07)
 	).normalized()
 	if direction.y < 0.1:
 		direction = (direction + Vector3.UP * (0.18 - direction.y)).normalized()
 
 	var generation: int = parent.generation + 1
 	var generation_scale: float = pow(0.82, float(maxi(0, generation - 1)))
-	var radius: float = lerpf(0.16, 0.31, total_pressure) * generation_scale
-	var length: float = lerpf(0.82, 1.82, total_pressure) * generation_scale
-	var sides: int = rng.range_int(5, 8)
+	var semantic_radius_scale: float = (
+		lerpf(0.96, 1.14, internal_density)
+		* lerpf(0.98, 1.08, structural)
+	)
+	var semantic_length_scale: float = (
+		lerpf(0.96, 1.14, expansion)
+		* lerpf(0.98, 1.08, structural)
+	)
+	var radius: float = (
+		lerpf(0.16, 0.31, total_pressure)
+		* generation_scale
+		* semantic_radius_scale
+	)
+	var length: float = (
+		lerpf(0.82, 1.82, total_pressure)
+		* generation_scale
+		* semantic_length_scale
+	)
+	var sides: int = clampi(rng.range_int(5, 8) + int(roundf(polishing * 2.0)), 5, 10)
 	var metadata: Dictionary = _morphology_metadata(rng, "event-growth", total_pressure)
+	_apply_semantic_morphology(metadata, pressure)
 	metadata["source"] = event.source
-	metadata["hue_shift"] = rng.range_float(-0.065, 0.09) + culture * 0.035
+	metadata["hue_shift"] = (
+		rng.range_float(-0.065, 0.09)
+		+ culture * 0.035
+		+ luminosity * 0.018
+		- polishing * 0.008
+	)
 	metadata["cap_base"] = false
 	metadata["attachment_ratio"] = along_ratio
 	metadata["merge_depth_ratio"] = merge_depth_ratio
 	metadata["surface_offset_ratio"] = surface_offset_ratio
+	metadata["semantic_pressure"] = pressure.duplicate(true)
+	metadata["semantic_source_family"] = String(semantic.get("source_family", "unknown"))
+	metadata["semantic_dominant"] = String(semantic.get("dominant", "structural"))
+	metadata["semantic_intensity"] = float(semantic.get("intensity", 0.0))
+	metadata["semantic_version"] = String(semantic.get("version", "unknown"))
+	metadata["semantic_projection_version"] = SEMANTIC_PROJECTION_VERSION
+	metadata["semantic_length_scale"] = semantic_length_scale
+	metadata["semantic_radius_scale"] = semantic_radius_scale
+	metadata["semantic_polish_factor"] = polishing
+	metadata["semantic_luminosity"] = luminosity
 
 	return Model.GrowthInstruction.new(
 		"crystal:%s" % event.id,
@@ -179,6 +233,53 @@ func _select_parent(event, event_index: int, state, rng) -> RefCounted:
 	var available_event_parents: int = state.instructions.size() - event_parent_start
 	var selected_event_offset: int = rng.range_int(0, maxi(0, available_event_parents - 1))
 	return state.instructions[event_parent_start + selected_event_offset]
+
+
+func _apply_semantic_morphology(metadata: Dictionary, pressure: Dictionary) -> void:
+	var expansion: float = float(pressure.get("expansion", 0.0))
+	var internal_density: float = float(pressure.get("internal_density", 0.0))
+	var polishing: float = float(pressure.get("polishing", 0.0))
+	var structural: float = float(pressure.get("structural", 0.0))
+
+	metadata["body_taper"] = clampf(
+		float(metadata.get("body_taper", 0.86))
+		+ structural * 0.035
+		+ internal_density * 0.025
+		- expansion * 0.02,
+		0.68,
+		1.0,
+	)
+	metadata["waist_ratio"] = clampf(
+		float(metadata.get("waist_ratio", 0.98)) + internal_density * 0.04,
+		0.8,
+		1.12,
+	)
+	metadata["shoulder_height_ratio"] = clampf(
+		float(metadata.get("shoulder_height_ratio", 0.72)) + structural * 0.025,
+		0.55,
+		0.84,
+	)
+	metadata["termination_depth_ratio"] = clampf(
+		float(metadata.get("termination_depth_ratio", 0.22)) - polishing * 0.025,
+		0.12,
+		0.36,
+	)
+	metadata["ridge_strength"] = clampf(
+		float(metadata.get("ridge_strength", 0.055)) * lerpf(1.0, 0.68, polishing),
+		0.0,
+		0.14,
+	)
+	metadata["ring_twist"] = clampf(
+		float(metadata.get("ring_twist", 0.0)) * lerpf(1.0, 0.76, polishing),
+		-0.11,
+		0.11,
+	)
+	metadata["center_drift_x"] = (
+		float(metadata.get("center_drift_x", 0.0)) * lerpf(1.0, 0.82, polishing)
+	)
+	metadata["center_drift_z"] = (
+		float(metadata.get("center_drift_z", 0.0)) * lerpf(1.0, 0.82, polishing)
+	)
 
 
 func _morphology_metadata(rng, role: String, energy: float) -> Dictionary:
