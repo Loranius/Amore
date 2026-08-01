@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feat/godot-evolution-engine-bootstrap
+      - feat/godot-crystal-phase-11-production-cutover
     paths:
       - 'godot/evolution-engine/**'
       - 'src/features/home/godot3d/**'
@@ -33,7 +34,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -178,6 +179,20 @@ jobs:
           fi
           grep -q 'PASS: integrated crystal fusion' /tmp/godot-fusion-smoke.log
 
+      - name: Run Godot portal production cutover smoke test
+        shell: bash
+        run: |
+          set -euo pipefail
+          timeout 60s godot --headless \
+            --path godot/evolution-engine \
+            --script res://scripts/tests/portal_cutover_smoke.gd \
+            2>&1 | tee /tmp/godot-cutover-smoke.log
+          if grep -Eq 'SCRIPT ERROR:|ERROR: Failed to load script' /tmp/godot-cutover-smoke.log; then
+            echo 'Godot reported script parser or loader errors during the cutover test.'
+            exit 1
+          fi
+          grep -q 'PASS: Godot portal production cutover' /tmp/godot-cutover-smoke.log
+
       - name: Export Web runtime
         shell: bash
         run: |
@@ -246,7 +261,21 @@ jobs:
           cp -R /tmp/amore-godot-web/. public/godot/evolution-engine/
           test -s public/godot/evolution-engine/index.wasm
 
+      - name: Run React and TypeScript tests
+        run: npm test -- --runInBand
+
+      - name: Build production cutover bundle
+        env:
+          VITE_EVOLUTION_GODOT: production
+        run: |
+          npm run build
+          test -s dist/godot/evolution-engine/index.html
+          test -s dist/godot/evolution-engine/index.wasm
+          test -s dist/godot/evolution-engine/index.pck
+
       - name: Run React to Godot Pixel 8 Pro bridge test
+        env:
+          VITE_EVOLUTION_GODOT: production
         run: npx playwright test --config=playwright.godot.config.ts
 
       - name: Upload browser proof
