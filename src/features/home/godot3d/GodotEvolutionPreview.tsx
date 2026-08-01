@@ -45,6 +45,7 @@ export function GodotEvolutionPreview({
   );
   const [progress, setProgress] = useState(0);
   const [stateSignature, setStateSignature] = useState('');
+  const [motion, setMotion] = useState<'unknown' | 'full' | 'reduced'>('unknown');
   const source = useMemo(() => resolveGodotWebUrl(import.meta.env.BASE_URL), []);
 
   const sendPayload = useCallback(() => {
@@ -89,6 +90,7 @@ export function GodotEvolutionPreview({
           break;
         case 'amore:godot:state':
           setStateSignature(message.signature);
+          setMotion(message.motion ?? 'unknown');
           setStatus('accepted');
           break;
         case 'amore:godot:error':
@@ -116,6 +118,7 @@ export function GodotEvolutionPreview({
       data-godot-status={status}
       data-godot-progress={progress.toFixed(3)}
       data-godot-state-signature={stateSignature}
+      data-godot-motion={motion}
     >
       <iframe
         ref={iframeRef}
