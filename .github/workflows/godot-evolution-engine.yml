@@ -262,7 +262,7 @@ jobs:
           test -s public/godot/evolution-engine/index.wasm
 
       - name: Run React and TypeScript tests
-        run: npm test -- --runInBand
+        run: npm test
 
       - name: Build production cutover bundle
         env:
