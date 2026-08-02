@@ -10,6 +10,7 @@ import {
   clamp01,
   daysBetweenExplicit,
   maturityAt,
+  relationshipMaturityAt,
   round6,
   saturate,
   seededUnit,
@@ -143,7 +144,8 @@ export function buildMotherInstruction(
     archetype: motherArchetypes[archetypeIndex] ?? 'prismatic',
     emphasized: false,
     weight: 1,
-    maturity: maturityAt(artifact.relationshipStartedAt, asOf, 180),
+    // Relationship duration, not event decay — see relationshipMaturityAt().
+    maturity: relationshipMaturityAt(artifact.relationshipStartedAt, asOf),
     azimuthRad: round6(seededUnit(seed, 'azimuth') * Math.PI * 2),
     elevation: 1,
     radialBias: 0,

@@ -208,10 +208,53 @@ describe('Crystal organic profile phase 3a', () => {
     expect(profile.burialCompression).toBe(1);
     expect(Math.abs(profile.twistTotal)).toBeGreaterThanOrEqual(0.11);
     expect(leanMagnitude).toBeGreaterThanOrEqual(mother.renderedRadius * 0.129);
-    expect(profile.scaleX).toBe(0.78);
-    expect(profile.scaleZ).toBe(1.12);
+    // Cross-section rounded from 1.44:1 to 1.18:1 and the taper extended into
+    // one extra row (2026-08-02 monarch reshape) — the monarch was reading as
+    // a flat slab with a capped cylinder silhouette. Asymmetry is retained
+    // deliberately; it just no longer dominates the shape.
+    expect(profile.scaleX).toBe(0.9);
+    expect(profile.scaleZ).toBe(1.06);
     expect(profile.segments).toBe(6);
-    expect(profile.rows).toHaveLength(7);
+    expect(profile.rows).toHaveLength(8);
+  });
+
+  it('tapers the monarch continuously instead of holding a cylinder', () => {
+    // The monarch is the composition's focal point, so its silhouette carries
+    // the most weight. Holding near-full radius up the shaft and then cutting
+    // to a point reads as a capped column rather than a spire.
+    //
+    // Measured on radiusX, the actual rendered ellipse radius. `row.radius` is
+    // the conservative trim envelope — it folds in the axis-lean offset, which
+    // grows up the body, so it is not a silhouette measurement and can peak
+    // above the true shoulder.
+    const profile = buildCrystalProfile(motherBody(), 'high');
+    const rows = profile.rows;
+    const top = rows[rows.length - 1]!.y;
+    const widestIndex = rows.reduce(
+      (best, row, index) => (row.radiusX > rows[best]!.radiusX ? index : best),
+      0,
+    );
+    const widest = rows[widestIndex]!.radiusX;
+
+    // The shoulder sits low on the body, not halfway up it.
+    expect(rows[widestIndex]!.y).toBeLessThan(top * 0.3);
+
+    // Sample the silhouette rather than asserting strict row-to-row descent:
+    // the profile carries deliberate per-row asymmetry noise, and demanding
+    // monotonicity would be asserting that noise away.
+    const radiusNear = (fraction: number): number => {
+      const targetY = top * fraction;
+      return rows.reduce(
+        (best, row) => (
+          Math.abs(row.y - targetY) < Math.abs(best.y - targetY) ? row : best
+        ),
+        rows[0]!,
+      ).radiusX;
+    };
+
+    expect(radiusNear(0.6)).toBeLessThan(widest * 0.9);
+    expect(radiusNear(0.8)).toBeLessThan(widest * 0.7);
+    expect(radiusNear(1)).toBeLessThan(widest * 0.1);
   });
 
   it('tests trim occupancy against the bent elliptical shell, not a straight radius envelope', () => {

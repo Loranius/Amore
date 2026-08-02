@@ -82,23 +82,48 @@ function dominantPlacementBias(instruction: CrystalGrowthInstruction): number {
 function dominantDimensions(
   instruction: CrystalGrowthInstruction,
 ): { axialScale: number; radialScale: number } {
+  // Monarch proportions (visual QA, 2026-08-02). The old 1.64/0.34 rendered
+  // at roughly 2.5:1 height-to-width — a squat block rather than the slender
+  // spire the reference art calls for. Raising axial and cutting radial takes
+  // it to roughly 4.5-5:1, and the taller axial also compensates for the new,
+  // much slower relationship maturity curve so a long relationship still ends
+  // up with a large crystal.
   if (instruction.kind === 'mother') {
-    return { axialScale: 1.64, radialScale: 0.34 };
+    return { axialScale: 1.75, radialScale: 0.19 };
   }
+  // Event bodies are deliberately well under the monarch now. Previously an
+  // event-spire could render ~70% of the monarch's height, so the cluster read
+  // as several competing crystals with no clear centre; the monarch has to
+  // stay unmistakably dominant.
+  // Event bodies are shortened so the monarch stays the unmistakable centre —
+  // an event-spire used to render ~80% of the monarch's height and sit right
+  // over her lower shaft, which is what made the whole cluster read as one
+  // massive blob rather than a crystal with companions.
+  //
+  // Only the lengths move. Radii are left exactly as they were on purpose:
+  // a child's base ring is sunk into its host by a depth derived from its own
+  // radius, and whether that ring stays enclosed turns out to be brittle under
+  // radius changes — a sweep of uniform radius scales found 0.65x sealing
+  // while both 0.75x and 0.55x left a junction unsealed. That non-monotonic
+  // response means any radius value here would be fitted to one fixture and
+  // would likely expose a base cap on some other couple's data. Slimming the
+  // children needs the attachment model to become robust first, or needs them
+  // off the monarch's body entirely (the planned ground-nucleation change),
+  // not a lucky constant.
   if (instruction.kind === 'event-spire') {
     return {
-      axialScale: round6(0.76 + instruction.weight * 0.54),
+      axialScale: round6(0.46 + instruction.weight * 0.32),
       radialScale: round6(0.15 + instruction.weight * 0.065),
     };
   }
   if (instruction.kind === 'satellite') {
     return {
-      axialScale: round6(0.42 + instruction.weight * 0.42),
+      axialScale: round6(0.26 + instruction.weight * 0.26),
       radialScale: round6(0.1 + instruction.weight * 0.045),
     };
   }
   return {
-    axialScale: round6(0.12 + instruction.weight * 0.16),
+    axialScale: round6(0.085 + instruction.weight * 0.11),
     radialScale: round6(0.055 + instruction.weight * 0.02),
   };
 }

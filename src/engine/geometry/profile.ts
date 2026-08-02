@@ -89,14 +89,20 @@ function appendBaseRow(rows: BaseProfileRow[], y: number, radius: number): void 
 
 function buildMotherRows(length: number, radius: number): BaseProfileRow[] {
   const rows: BaseProfileRow[] = [];
-  // A double-terminated floating prism: the lower point avoids a visible flat
-  // cut, while the long central shaft remains the unique composition focus.
+  // A double-terminated prism that reads as a spire rather than a column.
+  // The previous profile held ~98% of full radius all the way to 66% of its
+  // height and then dropped to a point over the last third, which silhouettes
+  // as a fat cylinder with a cap stuck on top — the "too flat, too massive"
+  // note from visual QA (2026-08-02). Natural quartz terminations taper
+  // continuously, so the widest point now sits low and every row above it
+  // steps inward, giving one uninterrupted line from shoulder to tip.
   appendBaseRow(rows, 0, radius * 0.16);
-  appendBaseRow(rows, length * 0.055, radius * 0.72);
-  appendBaseRow(rows, length * 0.13, radius);
-  appendBaseRow(rows, length * 0.66, radius * 0.98);
-  appendBaseRow(rows, length * 0.73, radius * 0.92);
-  appendBaseRow(rows, length * 0.84, radius * 0.62);
+  appendBaseRow(rows, length * 0.05, radius * 0.74);
+  appendBaseRow(rows, length * 0.12, radius);
+  appendBaseRow(rows, length * 0.4, radius * 0.93);
+  appendBaseRow(rows, length * 0.62, radius * 0.78);
+  appendBaseRow(rows, length * 0.8, radius * 0.54);
+  appendBaseRow(rows, length * 0.92, radius * 0.27);
   appendBaseRow(rows, length, radius * 0.018);
   return rows;
 }
@@ -234,7 +240,11 @@ export function buildCrystalProfile(
     appendBaseRow(baseRows, bodyStart + body.renderedLength * (broken ? 0.86 : 1), tipRadius);
   }
 
-  const scales = mother ? { scaleX: 0.78, scaleZ: 1.12 } : profileScales(archetype);
+  // The monarch keeps a slight elliptical cross-section so it never reads as a
+  // machined cylinder, but 0.78/1.12 was a 1.44:1 slab that looked flat from
+  // the front and thin from the side. 1.18:1 keeps the organic asymmetry while
+  // presenting a consistent silhouette as the camera orbits.
+  const scales = mother ? { scaleX: 0.9, scaleZ: 1.06 } : profileScales(archetype);
   const tuning = shapeTuning(archetype, mother);
   const twistSign = signedUnit(body.seed, 'geometry:twist-sign') < 0 ? -1 : 1;
   const twistTotal = round6(
