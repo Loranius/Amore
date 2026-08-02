@@ -144,10 +144,12 @@ describe('Crystal Geometry', () => {
     const { growth, geometry } = pipeline(BASE_EVENTS);
 
     expect(geometry.meshes).toHaveLength(growth.bodies.length);
-    expect(geometry.junctions).toHaveLength(
-      growth.bodies.filter((body) => body.hostBodyId !== null).length,
-    );
-    expect(geometry.junctions.length).toBeGreaterThan(0);
+    // One junction per attached body. Crystal bodies all stand in the ground
+    // now (ADR-0003), so this count is legitimately zero for this species —
+    // the rule still has to hold, and the count still has to match.
+    const attachedCount = growth.bodies.filter((body) => body.hostBodyId !== null).length;
+    expect(geometry.junctions).toHaveLength(attachedCount);
+    expect(attachedCount).toBe(0);
     expect(geometry.diagnostics.budgetOmittedBodyIds).toEqual([]);
     expect(geometry.diagnostics.nonFiniteBodyIds).toEqual([]);
     expect(geometry.diagnostics.meshesWithoutVisibleTriangles).toEqual([]);
@@ -214,8 +216,11 @@ describe('Crystal Geometry', () => {
     const unrestricted = pipeline(BASE_EVENTS).geometry;
     const constrained = pipeline(BASE_EVENTS, {
       ...DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
+      // Lowered with ADR-0003: a couple's crystal is ~5 bodies instead of ~38,
+      // so the old ceiling no longer forced any omission and the test stopped
+      // exercising the budget at all.
       maxVertices: 120,
-      maxTriangles: 180,
+      maxTriangles: 220,
     }).geometry;
 
     expect(constrained.meshes.length).toBeGreaterThan(0);

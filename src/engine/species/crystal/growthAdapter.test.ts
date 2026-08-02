@@ -30,7 +30,11 @@ function blueprint(events: readonly EvolutionEventInput[]) {
 }
 
 describe('Crystal Growth Center adapter', () => {
-  it('keeps every large center dominant on the monarch and local members on their center', () => {
+  it('gives each event exactly one crystal and nothing growing on it', () => {
+    // ADR-0003: a centre used to publish 3-5 local members attached to its
+    // dominant, which put growths on the sides of crystals and pushed a
+    // typical couple to ~38 bodies. Each event is now one free-standing
+    // crystal.
     const growth = blueprint([BASE_EVENT]);
     const centers = growth.growthCenters ?? [];
     const byId = new Map(growth.instructions.map((item) => [item.id, item] as const));
@@ -40,16 +44,18 @@ describe('Crystal Growth Center adapter', () => {
 
     for (const center of centers) {
       const members = center.instructionIds.map((id) => byId.get(id)!);
-      const dominant = members.find((member) => member.growthCenterRole === 'dominant')!;
-      const local = members.filter((member) => member.growthCenterRole !== 'dominant');
+      expect(members).toHaveLength(1);
 
+      const dominant = members[0]!;
+      expect(dominant.growthCenterRole).toBe('dominant');
       expect(dominant.id).toBe(center.sourceInstructionId);
       expect(dominant.hostPreference).toBe('root');
       expect(dominant.maxGeneration).toBe(1);
-      expect(local.length).toBeGreaterThanOrEqual(2);
-      expect(local.every((member) => member.hostPreference === 'same-colony')).toBe(true);
-      expect(local.every((member) => member.axialScale < dominant.axialScale)).toBe(true);
     }
+
+    // One crystal per event, plus the monarch as the blueprint root.
+    expect(growth.instructions).toHaveLength(1);
+    expect(growth.root.growthCenterRole ?? null).toBeNull();
   });
 
   it('does not change old center instructions when a later event is appended', () => {

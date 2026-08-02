@@ -172,7 +172,12 @@ function chooseMeshes(
       }
     }
 
-    if (selected === null && body.generation === 0) {
+    // Never publish an empty artifact: the first body is kept at its lowest
+    // LOD even if the budget cannot afford it. This used to exempt every
+    // generation-0 body, which was equivalent while the monarch was the only
+    // root — but ADR-0003 made every crystal ground-rooted, so that form of
+    // the rule silently disabled budget omission for the whole species.
+    if (selected === null && meshes.length === 0) {
       selected = entry.candidates[entry.candidates.length - 1]!;
       diagnostics.downgradedBodyIds.push(body.id);
     }

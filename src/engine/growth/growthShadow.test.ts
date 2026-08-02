@@ -53,14 +53,17 @@ function buildState() {
 }
 
 describe('Crystal Growth Shadow', () => {
-  it('stores normalized shadow and local competition on every atlas attachment', () => {
+  it('normalizes shadow and local competition on any atlas attachment', () => {
     const state = buildState();
     const attachments = state.bodies
       .slice(1)
       .map((body) => body.attachment)
       .filter((attachment) => attachment !== null);
 
-    expect(attachments.length).toBeGreaterThan(EVENTS.length);
+    // Crystals all stand in the substrate now (ADR-0003), so this species
+    // produces no atlas attachments at all. The normalization contract still
+    // has to hold for whatever does attach, so assert it over whatever is
+    // there rather than requiring a population that no longer exists.
     for (const attachment of attachments) {
       expect(attachment.surfaceRegionId).toBeDefined();
       expect(attachment.growthShadow).toBeGreaterThanOrEqual(0);
@@ -68,7 +71,22 @@ describe('Crystal Growth Shadow', () => {
       expect(attachment.competitionPressure).toBeGreaterThanOrEqual(0);
       expect(attachment.competitionPressure).toBeLessThanOrEqual(1);
     }
-    expect(attachments.some((attachment) => (attachment.growthShadow ?? 0) > 0)).toBe(true);
+  });
+
+  it('still records competition pressure between ground-rooted crystals', () => {
+    // The shadow/competition model is what stops companions from landing on
+    // top of each other. Ground-rooted bodies carry it on the body rather than
+    // on an attachment, so it must not silently go to zero for everyone.
+    const state = buildState();
+    const companions = state.bodies.slice(1);
+
+    expect(companions.length).toBeGreaterThan(0);
+    for (const body of companions) {
+      expect(body.competition).toBeGreaterThanOrEqual(0);
+      expect(body.competition).toBeLessThanOrEqual(1);
+      expect(body.crowding).toBeGreaterThanOrEqual(0);
+    }
+    expect(companions.some((body) => body.crowding > 0)).toBe(true);
   });
 
   it('remains deterministic with shadow-aware candidate scoring', () => {

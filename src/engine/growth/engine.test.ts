@@ -132,14 +132,14 @@ describe('Universal Growth Engine', () => {
       blueprint: growthBlueprint(BASE_EVENTS),
       config: DEFAULT_GROWTH_ENGINE_CONFIG,
     });
-    // Ground-rooted companions occupy substrate sites, which carry no atlas
-    // region; the uniqueness rule still has to hold for everything that does
-    // reserve one.
+    // Every crystal stands in the substrate (ADR-0003), so none of them
+    // reserves an atlas region. The uniqueness rule still has to hold for any
+    // that do — it just has nothing to constrain for this species today.
     const regionIds = state.surfaceMap.occupiedSites
       .map((site) => site.surfaceRegionId)
       .filter((regionId): regionId is string => regionId !== undefined);
 
-    expect(regionIds.length).toBeGreaterThan(0);
+    expect(regionIds).toEqual([]);
     expect(new Set(regionIds).size).toBe(regionIds.length);
   });
 
@@ -158,8 +158,9 @@ describe('Universal Growth Engine', () => {
       // The centre's dominant now nucleates in the substrate, so the centre
       // reserves no atlas region of its own.
       expect(center.surfaceRegionId).toBeNull();
-      expect(center.bodyIds.length).toBeGreaterThanOrEqual(3);
-      expect(center.bodyIds.length).toBeLessThanOrEqual(6);
+      // One crystal per event and nothing grows on it (ADR-0003), so a centre
+      // is exactly its dominant.
+      expect(center.bodyIds).toEqual([center.dominantBodyId]);
 
       const dominant = bodyById.get(center.dominantBodyId!);
       expect(dominant?.growthCenterRole).toBe('dominant');

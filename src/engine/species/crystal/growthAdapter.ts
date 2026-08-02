@@ -1,13 +1,12 @@
 import type {
   GrowthCenterRole,
   GrowthHostPreference,
-  GrowthTier,
   UniversalGrowthBlueprint,
   UniversalGrowthCenter,
   UniversalGrowthColony,
   UniversalGrowthInstruction,
 } from '../../growth';
-import { round6, seededUnit, stableSeed } from './math';
+import { round6, stableSeed } from './math';
 import type {
   CrystalArchetype,
   CrystalGrowthInstruction,
@@ -15,7 +14,6 @@ import type {
 } from './types';
 
 const CENTER_SEQUENCE_STRIDE = 8;
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 function sectorMembership(blueprint: CrystalSpeciesBlueprint): Map<string, string> {
   const membership = new Map<string, string>();
@@ -91,142 +89,34 @@ function dominantDimensions(
   if (instruction.kind === 'mother') {
     return { axialScale: 1.75, radialScale: 0.19 };
   }
-  // Event bodies are deliberately well under the monarch now. Previously an
-  // event-spire could render ~70% of the monarch's height, so the cluster read
-  // as several competing crystals with no clear centre; the monarch has to
-  // stay unmistakably dominant.
-  // Event bodies are shortened so the monarch stays the unmistakable centre —
-  // an event-spire used to render ~80% of the monarch's height and sit right
-  // over her lower shaft, which is what made the whole cluster read as one
-  // massive blob rather than a crystal with companions.
-  //
-  // Only the lengths move. Radii are left exactly as they were on purpose:
-  // a child's base ring is sunk into its host by a depth derived from its own
-  // radius, and whether that ring stays enclosed turns out to be brittle under
-  // radius changes — a sweep of uniform radius scales found 0.65x sealing
-  // while both 0.75x and 0.55x left a junction unsealed. That non-monotonic
-  // response means any radius value here would be fitted to one fixture and
-  // would likely expose a base cap on some other couple's data. Slimming the
-  // children needs the attachment model to become robust first, or needs them
-  // off the monarch's body entirely (the planned ground-nucleation change),
-  // not a lucky constant.
+  // Companions must read as crystals, not pebbles. They used to render at
+  // roughly 1.8:1 height-to-width (the largest was a squat cream block sitting
+  // in front of the monarch), because their radii were pinned: while they were
+  // attached to a host, slimming them changed how their base ring buried and
+  // could leave a junction unsealed. ADR-0003 removed those attachments
+  // entirely, so radius is now free and set for silhouette alone — roughly
+  // 3.5-4.5:1, slender enough to be crystals while staying well under the
+  // monarch's ~5:1 so she keeps the eye.
   if (instruction.kind === 'event-spire') {
     return {
-      axialScale: round6(0.46 + instruction.weight * 0.32),
-      radialScale: round6(0.15 + instruction.weight * 0.065),
+      axialScale: round6(0.5 + instruction.weight * 0.34),
+      radialScale: round6(0.062 + instruction.weight * 0.038),
     };
   }
   if (instruction.kind === 'satellite') {
     return {
-      axialScale: round6(0.26 + instruction.weight * 0.26),
-      radialScale: round6(0.1 + instruction.weight * 0.045),
+      axialScale: round6(0.28 + instruction.weight * 0.28),
+      radialScale: round6(0.042 + instruction.weight * 0.024),
     };
   }
   return {
-    axialScale: round6(0.085 + instruction.weight * 0.11),
-    radialScale: round6(0.055 + instruction.weight * 0.02),
+    axialScale: round6(0.14 + instruction.weight * 0.14),
+    radialScale: round6(0.02 + instruction.weight * 0.009),
   };
 }
 
 function centerId(instruction: CrystalGrowthInstruction): string {
   return `${instruction.id}:center`;
-}
-
-function centerMemberCounts(instruction: CrystalGrowthInstruction): {
-  satelliteCount: number;
-  microCount: number;
-} {
-  const satelliteDraw = seededUnit(instruction.seed, 'growth-center:satellite-count');
-  const microDraw = seededUnit(instruction.seed, 'growth-center:micro-count');
-
-  if (instruction.kind === 'event-spire') {
-    return {
-      satelliteCount: 2 + Math.floor(satelliteDraw * 2),
-      microCount: 2,
-    };
-  }
-  if (instruction.kind === 'satellite') {
-    return {
-      satelliteCount: 1 + Math.floor(satelliteDraw * 2),
-      microCount: 1 + Math.floor(microDraw * 2),
-    };
-  }
-  return {
-    satelliteCount: 1,
-    microCount: 2 + Math.floor(microDraw * 2),
-  };
-}
-
-function memberArchetype(
-  source: CrystalGrowthInstruction,
-  role: Exclude<GrowthCenterRole, 'dominant'>,
-  memberSeed: number,
-): CrystalArchetype {
-  const candidates: readonly CrystalArchetype[] = role === 'satellite'
-    ? [source.archetype, 'prismatic', 'needle', 'twin']
-    : ['needle', 'etched', 'blade'];
-  const index = Math.min(
-    candidates.length - 1,
-    Math.floor(seededUnit(memberSeed, 'archetype') * candidates.length),
-  );
-  return candidates[index] ?? candidates[0]!;
-}
-
-function memberTier(
-  source: CrystalGrowthInstruction,
-  role: Exclude<GrowthCenterRole, 'dominant'>,
-): GrowthTier {
-  if (role === 'micro') return 'micro';
-  return source.weight >= 0.65 ? 'family' : 'companion';
-}
-
-function memberDimensions(
-  source: CrystalGrowthInstruction,
-  role: Exclude<GrowthCenterRole, 'dominant'>,
-  memberSeed: number,
-): { axialScale: number; radialScale: number } {
-  const base = dominantDimensions(source);
-  if (role === 'satellite') {
-    const axialFactor = 0.34 + seededUnit(memberSeed, 'axial') * 0.18;
-    const radialFactor = 0.42 + seededUnit(memberSeed, 'radial') * 0.16;
-    return {
-      axialScale: round6(Math.max(0.1, base.axialScale * axialFactor)),
-      radialScale: round6(Math.max(0.04, base.radialScale * radialFactor)),
-    };
-  }
-  const axialFactor = 0.14 + seededUnit(memberSeed, 'axial') * 0.11;
-  const radialFactor = 0.22 + seededUnit(memberSeed, 'radial') * 0.12;
-  return {
-    axialScale: round6(Math.max(0.075, base.axialScale * axialFactor)),
-    radialScale: round6(Math.max(0.03, base.radialScale * radialFactor)),
-  };
-}
-
-function memberDirection(
-  source: CrystalGrowthInstruction,
-  role: Exclude<GrowthCenterRole, 'dominant'>,
-  localIndex: number,
-  memberSeed: number,
-): { preferredAzimuthRad: number; preferredElevation: number; radialBias: number } {
-  const azimuthJitter = (seededUnit(memberSeed, 'azimuth-jitter') - 0.5) * 0.58;
-  const preferredAzimuthRad = round6(
-    source.azimuthRad + (localIndex + 1) * GOLDEN_ANGLE + azimuthJitter,
-  );
-  if (role === 'satellite') {
-    return {
-      preferredAzimuthRad,
-      preferredElevation: round6(Math.max(
-        0.34,
-        source.elevation * 0.78 + seededUnit(memberSeed, 'elevation') * 0.14,
-      )),
-      radialBias: round6(0.2 + seededUnit(memberSeed, 'radial-bias') * 0.48),
-    };
-  }
-  return {
-    preferredAzimuthRad,
-    preferredElevation: round6(0.28 + seededUnit(memberSeed, 'elevation') * 0.24),
-    radialBias: round6(0.16 + seededUnit(memberSeed, 'radial-bias') * 0.38),
-  };
 }
 
 function commonAttributes(
@@ -315,53 +205,6 @@ function adaptDominant(
   };
 }
 
-function adaptMember(
-  source: CrystalGrowthInstruction,
-  role: Exclude<GrowthCenterRole, 'dominant'>,
-  memberIndex: number,
-  localIndex: number,
-  sequence: number,
-  growthCenterId: string,
-  sectorColonyId: string | null,
-): UniversalGrowthInstruction {
-  const id = `${source.id}:${role}:${memberIndex}`;
-  const seed = stableSeed(source.seed, id);
-  const size = memberDimensions(source, role, seed);
-  const direction = memberDirection(source, role, localIndex, seed);
-  const archetype = memberArchetype(source, role, seed);
-  const kind = role === 'satellite' ? 'crystal:satellite' : 'crystal:inclusion';
-
-  return {
-    id,
-    sourceId: source.sourceEventId,
-    sequence,
-    colonyId: growthCenterId,
-    epochIndex: source.epochIndex,
-    kind,
-    tier: memberTier(source, role),
-    seed,
-    emphasized: false,
-    weight: round6(source.weight * (role === 'satellite' ? 0.38 : 0.16)),
-    maturity: source.maturity,
-    axialScale: size.axialScale,
-    radialScale: size.radialScale,
-    surfaceRadiusScale: surfaceRadiusScaleFor(archetype, role),
-    preferredAzimuthRad: direction.preferredAzimuthRad,
-    preferredElevation: direction.preferredElevation,
-    radialBias: direction.radialBias,
-    attachmentDepth: role === 'satellite'
-      ? round6(0.3 + seededUnit(seed, 'burial') * 0.14)
-      : round6(0.48 + seededUnit(seed, 'burial') * 0.18),
-    hostPreference: 'same-colony',
-    maxGeneration: role === 'satellite' ? 2 : 3,
-    directionInheritance: role === 'satellite' ? 0.5 : 0.58,
-    minUpwardComponent: role === 'satellite' ? 0.34 : 0.24,
-    attributes: commonAttributes(source, growthCenterId, role, sectorColonyId, archetype),
-    growthCenterId,
-    growthCenterRole: role,
-  };
-}
-
 function adaptCenter(
   source: CrystalGrowthInstruction,
   centerIndex: number,
@@ -371,38 +214,15 @@ function adaptCenter(
   colony: UniversalGrowthColony;
   instructions: UniversalGrowthInstruction[];
 } {
+  // One crystal per event, and nothing grows on it. A centre used to also
+  // publish 3-5 local members attached to its dominant, which is what put
+  // growths on the sides of crystals and pushed a typical couple to 38 bodies.
+  // See docs/05_ADR/ADR-0003-crystal-free-standing-druse.md.
   const id = centerId(source);
   const sequenceBase = centerIndex * CENTER_SEQUENCE_STRIDE;
   const instructions: UniversalGrowthInstruction[] = [
     adaptDominant(source, sequenceBase, id, sectorColonyId),
   ];
-  const counts = centerMemberCounts(source);
-  let localIndex = 1;
-
-  for (let index = 0; index < counts.satelliteCount; index += 1) {
-    instructions.push(adaptMember(
-      source,
-      'satellite',
-      index,
-      localIndex,
-      sequenceBase + localIndex,
-      id,
-      sectorColonyId,
-    ));
-    localIndex += 1;
-  }
-  for (let index = 0; index < counts.microCount; index += 1) {
-    instructions.push(adaptMember(
-      source,
-      'micro',
-      index,
-      localIndex,
-      sequenceBase + localIndex,
-      id,
-      sectorColonyId,
-    ));
-    localIndex += 1;
-  }
 
   const instructionIds = instructions.map((instruction) => instruction.id);
   const seed = stableSeed(source.seed, id);
