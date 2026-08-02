@@ -44,10 +44,31 @@ export function crystalSegments(tier: GrowthTier, lod: CrystalLodLevel): number 
   return Math.max(4, Math.ceil(high * 0.6));
 }
 
-function motherSegments(lod: CrystalLodLevel): number {
-  if (lod === 'high') return 8;
-  if (lod === 'medium') return 7;
-  return 6;
+/** Smallest and largest ring a lathe may have and still close cleanly. */
+const MIN_SEGMENTS = 4;
+const MAX_SEGMENTS = 24;
+
+/**
+ * Facet count of a body.
+ *
+ * Since ADR-0004 the species publishes this as data — the monarch earns her
+ * facets with the couple's photos — so it is deliberately **not** reduced by
+ * level of detail. A weaker phone must not show the same couple a differently
+ * shaped crystal; LOD reduces profile rows and drops small bodies instead.
+ *
+ * Bodies from species that publish no facet count keep the old tier-and-LOD
+ * behaviour.
+ */
+function segmentsFor(
+  body: GrowthBody,
+  mother: boolean,
+  lod: CrystalLodLevel,
+): number {
+  const published = body.attributes['facetCount'];
+  if (typeof published === 'number' && Number.isFinite(published)) {
+    return Math.max(MIN_SEGMENTS, Math.min(MAX_SEGMENTS, Math.round(published)));
+  }
+  return mother ? 8 : crystalSegments(body.tier, lod);
 }
 
 function profileScales(archetype: string): { scaleX: number; scaleZ: number } {
@@ -271,7 +292,7 @@ export function buildCrystalProfile(
     burialStartY,
     burialCompression,
   );
-  const segments = mother ? motherSegments(lod) : crystalSegments(body.tier, lod);
+  const segments = segmentsFor(body, mother, lod);
   const signaturePayload = JSON.stringify({
     bodyId: body.id,
     seed: body.seed,

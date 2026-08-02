@@ -14,11 +14,20 @@ export const CRYSTAL_LIFE_STAGES = [
 
 export type CrystalLifeStage = (typeof CRYSTAL_LIFE_STAGES)[number];
 
+/**
+ * What a crystal body stands for.
+ *
+ * Since ADR-0004 there are exactly three. A body used to stand for a single
+ * portal row, which made the count grow without a ceiling; now it stands for
+ * the couple as a whole, for one of their years, or for one thing they
+ * finished together.
+ */
 export type CrystalFormationKind =
   | 'mother'
-  | 'event-spire'
-  | 'satellite'
-  | 'inclusion';
+  /** One relationship year, frozen at its anniversary. */
+  | 'annual'
+  /** A completed plan, in the ring of small crystals around the monarch. */
+  | 'skirt';
 
 export type CrystalFormationTier =
   | 'king'
@@ -101,10 +110,43 @@ export interface CrystalGrowthInstruction {
   emphasized: boolean;
   weight: number;
   maturity: number;
+  /**
+   * Final height and radius of the body, in engine units.
+   *
+   * These used to be derived inside the growth adapter from `weight` and
+   * `kind`. Since ADR-0004 the size of every body follows a different rule
+   * per kind — days together for the monarch, the year's own history for an
+   * annual crystal — so the decision belongs to the species that knows those
+   * rules, and the adapter is left doing only translation.
+   */
+  axialScale: number;
+  radialScale: number;
+  /**
+   * Sides the lathe revolves. Data, not detail: since ADR-0004 the monarch's
+   * facet count is earned with photos, so it must not vary with the device's
+   * level of detail.
+   */
+  facetCount: number;
   azimuthRad: number;
   elevation: number;
   radialBias: number;
   attachmentDepth: number;
+  /**
+   * Distance from the monarch's axis, in engine units.
+   *
+   * Explicit since ADR-0004. The growth engine used to derive it from the
+   * monarch's own radius, which coupled two unrelated things: thickening the
+   * monarch shifted every crystal standing around her, so a new photo nudged
+   * the whole druse. Null keeps the engine's own placement for species that
+   * have no opinion.
+   */
+  ringDistance: number | null;
+  /**
+   * Linear RGB the body is tinted, and how strongly its facets refract.
+   * White with no iridescence is the state every crystal is born in.
+   */
+  tintRgb: readonly [number, number, number];
+  iridescence: number;
   seed: number;
 }
 

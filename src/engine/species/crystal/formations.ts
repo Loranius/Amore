@@ -1,27 +1,32 @@
 import {
-  EVOLUTION_CHANNELS,
   type ArtifactBlueprint,
   type EvolutionChannel,
-  type EvolutionPressureVector,
   type NormalizedEvolutionEvent,
 } from '../../evolution';
 import { parseEvolutionInstant } from '../../evolution/calendar';
 import {
   clamp01,
   daysBetweenExplicit,
-  maturityAt,
   relationshipMaturityAt,
   round6,
   saturate,
   seededUnit,
   stableSeed,
-  vectorTotal,
 } from './math';
+import {
+  childAzimuthRad,
+  childDimensions,
+  childDistance,
+  childGrowthProgress,
+  childRingIndex,
+  monarchAxialScale,
+  monarchFacetCount,
+  monarchRadialScale,
+  relationshipYears,
+} from './growthModel';
 import type {
   CrystalArchetype,
   CrystalColonyBlueprint,
-  CrystalFormationKind,
-  CrystalFormationTier,
   CrystalGrowthInstruction,
   CrystalSpeciesDiagnostics,
 } from './types';
@@ -34,18 +39,6 @@ const ARCHETYPES: Readonly<Record<EvolutionChannel, readonly CrystalArchetype[]>
   stability: ['massive', 'tabular', 'intergrown'],
   significance: ['prismatic', 'split', 'twin'],
 };
-
-function eventDominantChannel(vector: EvolutionPressureVector): EvolutionChannel | null {
-  let channel: EvolutionChannel | null = null;
-  let value = 0;
-  for (const candidate of EVOLUTION_CHANNELS) {
-    if (vector[candidate] > value) {
-      channel = candidate;
-      value = vector[candidate];
-    }
-  }
-  return channel;
-}
 
 function chooseArchetype(
   channel: EvolutionChannel,
@@ -60,66 +53,33 @@ function chooseArchetype(
   return candidates[index] ?? candidates[0]!;
 }
 
-function formationKind(
-  channel: EvolutionChannel,
-  emphasized: boolean,
-): CrystalFormationKind {
-  if (emphasized) return 'event-spire';
-  if (channel === 'achievement' || channel === 'exploration' || channel === 'significance') {
-    return 'satellite';
-  }
-  return 'inclusion';
+/** Which portal module an event came from, e.g. `memories@1.0.0` -> `memories`. */
+export function eventModule(source: string): string {
+  const at = source.indexOf('@');
+  return at === -1 ? source : source.slice(0, at);
 }
 
-function formationTier(weight: number, emphasized: boolean): CrystalFormationTier {
-  if (emphasized) return 'support';
-  if (weight >= 0.65) return 'family';
-  if (weight >= 0.35) return 'companion';
-  return 'micro';
+/**
+ * Completed relationship years at each photo's date.
+ *
+ * `epochIndex` is already exactly that — the Evolution volume computes it as
+ * the number of anniversaries passed when the event occurred — so the facet
+ * accumulator needs no date arithmetic of its own.
+ */
+function photoYearsOf(events: readonly NormalizedEvolutionEvent[]): number[] {
+  return events
+    .filter((event) => eventModule(event.source) === 'memories')
+    .map((event) => event.epochIndex);
 }
 
-function halfLifeFor(kind: CrystalFormationKind): number {
-  if (kind === 'event-spire') return 120;
-  if (kind === 'satellite') return 75;
-  if (kind === 'inclusion') return 50;
-  return 180;
-}
-
-function directionFor(
-  seed: number,
-  id: string,
-  kind: CrystalFormationKind,
-): Pick<CrystalGrowthInstruction, 'azimuthRad' | 'elevation' | 'radialBias'> {
-  const azimuthRad = round6(seededUnit(seed, `${id}:azimuth`) * Math.PI * 2);
-  const elevationUnit = seededUnit(seed, `${id}:elevation`);
-  const radialUnit = seededUnit(seed, `${id}:radial`);
-
-  if (kind === 'event-spire') {
-    // Cluster-composition fix (visual QA, 2026-08-02): 0.72-0.96 read as
-    // "grows almost straight up," which visually nests an event-spire
-    // against the mother's own shaft instead of letting it read as its
-    // own crystal. Real geode satellites lean out at a real diagonal.
-    // See dominantDirectionInheritance() -- this only sets the *preferred*
-    // direction; the actual outward lean also depends on how much weight
-    // the true host surface normal gets in growthDirection().
-    return {
-      azimuthRad,
-      elevation: round6(0.46 + elevationUnit * 0.3),
-      radialBias: round6(0.18 + radialUnit * 0.37),
-    };
-  }
-  if (kind === 'satellite') {
-    return {
-      azimuthRad,
-      elevation: round6(0.48 + elevationUnit * 0.38),
-      radialBias: round6(0.34 + radialUnit * 0.5),
-    };
-  }
-  return {
-    azimuthRad,
-    elevation: round6(0.34 + elevationUnit * 0.31),
-    radialBias: round6(0.12 + radialUnit * 0.27),
-  };
+/** Facts that had already happened at `at`. A later record may not reach back. */
+function occurredEvents(
+  artifact: ArtifactBlueprint,
+  at: string,
+): NormalizedEvolutionEvent[] {
+  const epoch = parseEvolutionInstant(at);
+  if (epoch === null) return [];
+  return artifact.events.filter((event) => event.occurredAtEpochMs <= epoch);
 }
 
 export function buildMotherInstruction(
@@ -133,6 +93,15 @@ export function buildMotherInstruction(
     Math.floor(seededUnit(seed, 'archetype') * motherArchetypes.length),
   );
 
+  // Three dimensions, three independent sources (ADR-0004). Height answers
+  // "how long have we been together", girth "how much have we put in", facets
+  // "how much have we kept". No single module can run away with the monarch
+  // because no single module drives more than one of them.
+  const daysTogether = daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0;
+  const occurred = occurredEvents(artifact, asOf);
+  const axialScale = monarchAxialScale(daysTogether);
+  const radialScale = monarchRadialScale(axialScale, occurred.length);
+
   return {
     id: 'crystal:mother',
     sourceEventId: null,
@@ -144,90 +113,227 @@ export function buildMotherInstruction(
     archetype: motherArchetypes[archetypeIndex] ?? 'prismatic',
     emphasized: false,
     weight: 1,
-    // Relationship duration, not event decay — see relationshipMaturityAt().
+    // Size now comes from the curves above, so maturity no longer scales the
+    // monarch. It stays published because downstream volumes read it for
+    // optical and life decisions.
     maturity: relationshipMaturityAt(artifact.relationshipStartedAt, asOf),
+    axialScale,
+    radialScale,
+    facetCount: monarchFacetCount(photoYearsOf(occurred)),
     azimuthRad: round6(seededUnit(seed, 'azimuth') * Math.PI * 2),
     elevation: 1,
     radialBias: 0,
     attachmentDepth: 0.34,
+    // The monarch stands on the axis; nothing to offset her by.
+    ringDistance: 0,
+    tintRgb: [1, 1, 1] as const,
+    iridescence: 0,
     seed,
   };
 }
 
-function buildEventInstruction(
-  artifactSeed: number,
-  event: NormalizedEvolutionEvent,
+/**
+ * Events that count as important enough to pull a year's crystal closer to
+ * the monarch, and to feed its size.
+ *
+ * Anniversaries and milestones only, by the owner's choice. Note this is a
+ * deliberately sparse signal — a real couple logged six such records across
+ * three and a half years — which is why one event is worth a quarter of the
+ * distance rather than a nudge.
+ */
+function isImportantEvent(event: NormalizedEvolutionEvent): boolean {
+  return eventModule(event.source) === 'calendar';
+}
+
+/**
+ * Every event inside `[startsAt, endsAt)` that has actually happened.
+ *
+ * The `asOf` bound is not redundant with the year window: the year in
+ * progress ends in the future, so without it a plan dated next month would
+ * already be feeding this year's crystal. A fact may only ever affect the
+ * artifact once it has occurred.
+ */
+function eventsWithin(
+  artifact: ArtifactBlueprint,
+  startsAt: string,
+  endsAt: string,
+  asOfEpoch: number,
+): NormalizedEvolutionEvent[] {
+  const from = parseEvolutionInstant(startsAt);
+  const to = parseEvolutionInstant(endsAt);
+  if (from === null || to === null) return [];
+  return artifact.events.filter(
+    (event) => event.occurredAtEpochMs >= from
+      && event.occurredAtEpochMs < to
+      && event.occurredAtEpochMs <= asOfEpoch,
+  );
+}
+
+/**
+ * One crystal per relationship year (ADR-0004).
+ *
+ * Born on the anniversary, grown in twelve monthly steps, frozen at the next
+ * anniversary. Because a frozen year keeps half of the monarch *as she was
+ * then*, and she keeps growing afterwards, the finished ring reads as a
+ * growth history on its own.
+ */
+export function buildAnnualFormations(
+  artifact: ArtifactBlueprint,
   asOf: string,
-): CrystalGrowthInstruction | null {
-  const channel = eventDominantChannel(event.channels);
-  if (channel === null) return null;
+): CrystalGrowthInstruction[] {
+  const asOfEpoch = parseEvolutionInstant(asOf);
+  if (asOfEpoch === null) return [];
+  const monarchAxial = (at: string): number =>
+    monarchAxialScale(daysBetweenExplicit(artifact.relationshipStartedAt, at) ?? 0);
 
-  const totalPressure = vectorTotal(event.channels);
-  const weight = saturate(totalPressure + event.portalActivity * 0.16, 1.15);
-  const emphasized = event.channels.significance >= 0.75
-    || (event.channels.significance >= 0.55 && Math.max(...EVOLUTION_CHANNELS.map((key) => event.channels[key])) >= 0.85);
-  const kind = formationKind(channel, emphasized);
-  const id = `crystal:event:${event.id}`;
-  const seed = stableSeed(artifactSeed, id);
-  const direction = directionFor(seed, id, kind);
+  return relationshipYears(artifact.relationshipStartedAt, asOf, artifact.leapDayPolicy)
+    .map((year) => {
+      const id = `crystal:year:${year.index + 1}`;
+      const seed = stableSeed(artifact.deterministicSeed, id);
+      const yearEvents = eventsWithin(artifact, year.startsAt, year.endsAt, asOfEpoch);
+      const importantEventCount = yearEvents.filter(isImportantEvent).length;
+      // How full the year was, across every module — not just the important
+      // events, so a busy year without a logged anniversary is still a big
+      // crystal.
+      const yearActivity = saturate(yearEvents.length, 12);
 
-  return {
-    id,
-    sourceEventId: event.id,
-    sourceEpisodeId: event.episodeId,
-    epochIndex: event.epochIndex,
-    channel,
-    kind,
-    tier: formationTier(weight, emphasized),
-    archetype: chooseArchetype(channel, seed, id),
-    emphasized,
-    weight,
-    maturity: maturityAt(event.occurredAt, asOf, halfLifeFor(kind)),
-    ...direction,
-    attachmentDepth: round6(clamp01(
-      0.1 + event.channels.stability * 0.13 + event.channels.significance * 0.07,
-    )),
-    seed,
-  };
+      // A frozen year keeps the proportion it had when it closed; the year in
+      // progress measures against the monarch as she is today.
+      //
+      // "As she was then" has to mean her girth too, not only her height:
+      // sizing a closed year against today's activity would un-freeze it,
+      // because every new photo anywhere would move the whole finished ring.
+      const measuredAt = year.complete ? year.endsAt : asOf;
+      const monarchAtClose = monarchAxial(measuredAt);
+      const monarchRadialAtClose = monarchRadialScale(
+        monarchAtClose,
+        occurredEvents(artifact, measuredAt).length,
+      );
+      const progress = childGrowthProgress(year, asOf);
+      const size = childDimensions(monarchAtClose, progress, yearActivity);
+      const ringIndex = childRingIndex(year.index);
+
+      return {
+        id,
+        sourceEventId: null,
+        sourceEpisodeId: null,
+        epochIndex: year.index,
+        channel: null,
+        kind: 'annual' as const,
+        tier: year.complete ? ('support' as const) : ('family' as const),
+        archetype: chooseArchetype('remembrance', seed, id),
+        emphasized: year.complete,
+        weight: round6(clamp01(progress * (0.6 + 0.4 * yearActivity))),
+        maturity: progress,
+        axialScale: size.axialScale,
+        radialScale: size.radialScale,
+        // Years carry more facets the fuller they were, within the same range
+        // the monarch uses so the ring never out-detail the centre.
+        facetCount: 6 + Math.round(yearActivity * 2),
+        azimuthRad: childAzimuthRad(year.index),
+        elevation: 1,
+        radialBias: 0,
+        attachmentDepth: 0.2,
+        ringDistance: childDistance({
+          monarchRadialScale: monarchRadialAtClose,
+          childRadialScale: size.radialScale,
+          ringIndex,
+          importantEventCount,
+        }),
+        // White until the wishlist can tell the engine who granted what; see
+        // ADR-0004. White is the correct birth state, not a placeholder.
+        tintRgb: [1, 1, 1] as const,
+        iridescence: 0,
+        seed,
+      };
+    });
 }
 
-export function buildEventFormations(
+/** Distance from the axis for the skirt: just clear of the substrate mound. */
+const SKIRT_RING_DISTANCE = 0.34;
+/** Beyond this the skirt reads as gravel; further plans thicken it instead. */
+const SKIRT_MAX_BODIES = 24;
+
+/**
+ * A small crystal for every completed plan (ADR-0004).
+ *
+ * These do not grow. A plan is something the couple finished, so its crystal
+ * is a mark rather than an organism — it appears beside the monarch, never
+ * attached to her, and stays the size it arrived at.
+ */
+export function buildSkirtFormations(
+  artifact: ArtifactBlueprint,
+  asOf: string,
+): CrystalGrowthInstruction[] {
+  const asOfEpoch = parseEvolutionInstant(asOf);
+  if (asOfEpoch === null) return [];
+
+  const completed = artifact.events
+    .filter((event) => eventModule(event.source) === 'plans')
+    .filter((event) => event.occurredAtEpochMs <= asOfEpoch)
+    .slice(0, SKIRT_MAX_BODIES);
+
+  return completed.map((event, index) => {
+    const id = `crystal:plan:${event.id}`;
+    const seed = stableSeed(artifact.deterministicSeed, id);
+    // Enough size spread that the ring reads as pebbles of a real place
+    // rather than a row of identical pins.
+    const scale = 0.09 + seededUnit(seed, 'size') * 0.05;
+
+    return {
+      id,
+      sourceEventId: event.id,
+      sourceEpisodeId: event.episodeId,
+      epochIndex: event.epochIndex,
+      channel: null,
+      kind: 'skirt' as const,
+      tier: 'micro' as const,
+      archetype: 'prismatic' as const,
+      emphasized: false,
+      weight: 0.2,
+      maturity: 1,
+      axialScale: round6(scale),
+      radialScale: round6(scale * 0.3),
+      facetCount: 5,
+      azimuthRad: childAzimuthRad(index + 3),
+      elevation: 1,
+      radialBias: 0,
+      attachmentDepth: 0.12,
+      ringDistance: round6(SKIRT_RING_DISTANCE + seededUnit(seed, 'ring') * 0.07),
+      tintRgb: [1, 1, 1] as const,
+      iridescence: 0,
+      seed,
+    };
+  });
+}
+
+/**
+ * Everything the crystal grows besides the monarch, in a stable order:
+ * years first, then the skirt.
+ */
+export function buildCrystalFormations(
   artifact: ArtifactBlueprint,
   asOf: string,
 ): { formations: CrystalGrowthInstruction[]; diagnostics: CrystalSpeciesDiagnostics } {
   const asOfEpoch = parseEvolutionInstant(asOf);
   if (asOfEpoch === null) throw new Error(`Invalid Crystal Species asOf: "${asOf}".`);
 
-  const formations: CrystalGrowthInstruction[] = [];
-  const zeroPressureEventIds: string[] = [];
-  const futureEventIds: string[] = [];
-
-  for (const event of artifact.events) {
-    if (event.occurredAtEpochMs > asOfEpoch) {
-      futureEventIds.push(event.id);
-      continue;
-    }
-    const instruction = buildEventInstruction(artifact.deterministicSeed, event, asOf);
-    if (instruction === null) {
-      zeroPressureEventIds.push(event.id);
-      continue;
-    }
-    formations.push(instruction);
-  }
-
-  formations.sort((left, right) => {
-    const leftEvent = artifact.events.find((event) => event.id === left.sourceEventId);
-    const rightEvent = artifact.events.find((event) => event.id === right.sourceEventId);
-    return (leftEvent?.occurredAtEpochMs ?? 0) - (rightEvent?.occurredAtEpochMs ?? 0)
-      || left.id.localeCompare(right.id);
-  });
+  const formations = [
+    ...buildAnnualFormations(artifact, asOf),
+    ...buildSkirtFormations(artifact, asOf),
+  ];
 
   return {
     formations,
     diagnostics: {
+      // A couple always has the year they are living in, so an empty history
+      // now means the relationship start date itself is unusable.
       emptyHistory: formations.length === 0,
-      zeroPressureEventIds: zeroPressureEventIds.sort(),
-      futureEventIds: futureEventIds.sort(),
+      zeroPressureEventIds: [],
+      futureEventIds: artifact.events
+        .filter((event) => event.occurredAtEpochMs > asOfEpoch)
+        .map((event) => event.id)
+        .sort(),
     },
   };
 }

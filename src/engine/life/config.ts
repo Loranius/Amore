@@ -5,4 +5,5 @@ export const DEFAULT_CRYSTAL_LIFE_CONFIG: CrystalLifeConfig = {
   reducedMotion: false,
   quality: 'balanced',
   maxSparkles: 42,
+  mediaFinishedCount: 0,
 };

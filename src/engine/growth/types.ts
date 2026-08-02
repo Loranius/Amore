@@ -45,6 +45,23 @@ export interface UniversalGrowthInstruction {
   maxGeneration: number;
   directionInheritance: number;
   minUpwardComponent: number;
+  /**
+   * Distance from the artifact's axis, in engine units, when the species has
+   * an opinion. Optional for backward-compatible reads of Growth State v1
+   * snapshots and for species that leave placement to the engine.
+   */
+  ringDistance?: number | null;
+  /**
+   * True when `axialScale` and `radialScale` are already the body's finished
+   * size and the engine must publish them untouched.
+   *
+   * The engine otherwise scales a body by its maturity and by how crowded its
+   * host is. For a species that computes size itself that is double counting:
+   * the crystal monarch's height is a curve over days together, and
+   * multiplying it by a second, saturating maturity curve flattened exactly
+   * the growth the first curve exists to express.
+   */
+  sizeIsFinal?: boolean;
   attributes: GrowthAttributes;
   /** Stable local geological center. Optional for non-crystal species and v1 snapshots. */
   growthCenterId?: string | null;

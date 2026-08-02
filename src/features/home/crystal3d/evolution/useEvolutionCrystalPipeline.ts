@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useEvents } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
 import { useMapPins } from '@/features/map/useMapPins';
+import { useFinishedMediaCount } from '@/features/media/useMedia';
 import { useMemories } from '@/features/memories/useMemories';
 import { usePlans } from '@/features/plans/usePlans';
 import { useShoppingItems } from '@/features/shopping/useShoppingItems';
@@ -101,12 +102,23 @@ function readQuality(): CrystalMaterialQuality {
   });
 }
 
-function growthBodyLimit(quality: CrystalMaterialQuality): number {
-  if (quality === 'high') return 96;
-  if (quality === 'balanced') return 64;
-  if (quality === 'low') return 36;
-  return 18;
-}
+/**
+ * Hard ceiling on published bodies, identical on every device.
+ *
+ * This used to be a function of the quality profile (96/64/36/18), which made
+ * the performance budget quietly do the product's job: the same couple got a
+ * different artifact on a different phone, and because the growth engine keeps
+ * the *oldest* instructions when it truncates, everything recent simply
+ * vanished — a real couple had 69 of their 104 events dropped, including every
+ * plan and every fulfilled wish.
+ *
+ * Since ADR-0004 the body count follows the couple's years, so it is bounded
+ * by construction: roughly one per year plus the skirt. This is now only a
+ * safety valve against absurd input, never a design lever. Quality still
+ * governs level of detail, sparkles and optical features — things that may
+ * differ between devices without changing what the couple's crystal *is*.
+ */
+const MAX_PUBLISHED_BODIES = 128;
 
 function useEvolutionStartDate() {
   return useQuery({
@@ -138,6 +150,7 @@ export function useEvolutionCrystalPipeline(
   const pins = useMapPins();
   const archive = useMemories();
   const shopping = useShoppingItems();
+  const finishedMedia = useFinishedMediaCount();
   const wishlistArchive = useQuery({
     queryKey: ['wishlist', 'evolution-archive', 'pair'],
     queryFn: fetchPairWishlistEvolutionArchive,
@@ -162,6 +175,7 @@ export function useEvolutionCrystalPipeline(
     || pins.isPending
     || archive.isPending
     || shopping.isPending
+    || finishedMedia.isPending
     || wishlistArchive.isPending;
 
   const queryError = startDateQuery.error
@@ -171,6 +185,7 @@ export function useEvolutionCrystalPipeline(
     ?? pins.error
     ?? archive.error
     ?? shopping.error
+    ?? finishedMedia.error
     ?? wishlistArchive.error;
 
   return useMemo<UseEvolutionCrystalPipelineResult>(() => {
@@ -227,7 +242,7 @@ export function useEvolutionCrystalPipeline(
         blueprint: crystalToGrowthBlueprint(species),
         config: {
           ...DEFAULT_GROWTH_ENGINE_CONFIG,
-          maxBodies: growthBodyLimit(quality),
+          maxBodies: MAX_PUBLISHED_BODIES,
         },
       });
       const composition = buildCrystalComposition({
@@ -253,6 +268,7 @@ export function useEvolutionCrystalPipeline(
           ...DEFAULT_CRYSTAL_LIFE_CONFIG,
           quality,
           reducedMotion,
+          mediaFinishedCount: finishedMedia.data ?? 0,
         },
       });
       const finished = performance.now();
@@ -292,6 +308,7 @@ export function useEvolutionCrystalPipeline(
     archive.data,
     asOf,
     events.data,
+    finishedMedia.data,
     isPending,
     pins.data,
     plans.data,

@@ -188,7 +188,14 @@ describe('Crystal Geometry', () => {
     }
   });
 
-  it('keeps old profile signatures and vertex positions stable after append', () => {
+  it('keeps closed years byte-stable when a later event is appended', () => {
+    // The year in progress is identified by being last: years are emitted in
+    // calendar order, so the newest is the one still growing.
+    const CURRENT_YEAR_BODY_ID = pipeline(BASE_EVENTS).geometry.meshes
+      .map((mesh) => mesh.bodyId)
+      .filter((bodyId) => bodyId.startsWith('crystal:year:'))
+      .at(-1)!;
+
     const earlier = pipeline(BASE_EVENTS).geometry;
     const later = pipeline([
       ...BASE_EVENTS,
@@ -204,11 +211,18 @@ describe('Crystal Geometry', () => {
 
     expect(earlier.geology).toBeDefined();
     expect(later.geology).toBeDefined();
-    expect(later.geology?.bodyCount ?? 0).toBeGreaterThan(earlier.geology?.bodyCount ?? 0);
+    // Since ADR-0004 a new event does not add a body: the count follows the
+    // couple's years. That is the point — it is what stops a photo album from
+    // growing the druse without a ceiling.
+    expect(later.geology?.bodyCount ?? 0).toBe(earlier.geology?.bodyCount ?? 0);
     // geology counts growth bodies; meshes additionally carry the substrate.
     expect(later.meshes).toHaveLength((later.geology?.bodyCount ?? 0) + 1);
     for (const oldMesh of earlier.meshes) {
       if (oldMesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
+      // The monarch and the year in progress both answer to new activity by
+      // design; every closed year keeps its exact mesh.
+      if (oldMesh.bodyId === 'crystal:mother') continue;
+      if (oldMesh.bodyId === CURRENT_YEAR_BODY_ID) continue;
       const nextMesh = later.meshes.find((mesh) => mesh.bodyId === oldMesh.bodyId);
       expect(nextMesh).toBeDefined();
       expect(nextMesh?.profile.signature).toBe(oldMesh.profile.signature);

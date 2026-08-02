@@ -6,7 +6,7 @@ import type {
   UniversalGrowthColony,
   UniversalGrowthInstruction,
 } from '../../growth';
-import { round6, stableSeed } from './math';
+import { stableSeed } from './math';
 import type {
   CrystalArchetype,
   CrystalGrowthInstruction,
@@ -33,30 +33,23 @@ function dominantMaxGeneration(_instruction: CrystalGrowthInstruction): number {
   return 1;
 }
 
+/**
+ * How much a body's growth direction follows the surface it stands on versus
+ * its own seeded preference. Every crystal stands in the ground now
+ * (ADR-0003), so the surface normal is straight up and this mostly decides
+ * how upright the body is.
+ */
 function dominantDirectionInheritance(instruction: CrystalGrowthInstruction): number {
-  // Cluster-composition fix (visual QA, 2026-08-02): event-spires are the
-  // most visually prominent per-event bodies, so they most need to read as
-  // distinct fingers radiating from the mother rather than hugging its own
-  // axis -- raise their weight on the true host surface normal above even
-  // satellite/inclusion so the outward lean actually correlates with where
-  // each one is anchored, instead of a mostly-random preferred direction.
-  if (instruction.kind === 'event-spire') return 0.56;
-  if (instruction.kind === 'satellite') return 0.36;
-  if (instruction.kind === 'inclusion') return 0.48;
-  return 0.5;
+  // The skirt hugs the ground and may lean freely; a year's crystal stands
+  // like a smaller monarch.
+  return instruction.kind === 'skirt' ? 0.34 : 0.5;
 }
 
 function dominantMinUpwardComponent(instruction: CrystalGrowthInstruction): number {
-  if (instruction.kind === 'event-spire') return 0.62;
-  if (instruction.kind === 'satellite') return 0.42;
-  if (instruction.kind === 'inclusion') return 0.3;
-  return 0.9;
+  return instruction.kind === 'skirt' ? 0.46 : 0.86;
 }
 
 function dominantAttachmentDepth(instruction: CrystalGrowthInstruction): number {
-  if (instruction.kind === 'event-spire') return Math.max(0.32, instruction.attachmentDepth * 1.35);
-  if (instruction.kind === 'inclusion') return Math.max(0.48, instruction.attachmentDepth * 2.4);
-  if (instruction.kind === 'satellite') return Math.max(0.24, instruction.attachmentDepth * 1.35);
   return instruction.attachmentDepth;
 }
 
@@ -66,53 +59,24 @@ function surfaceRadiusScaleFor(archetype: CrystalArchetype, kind: string): numbe
   if (archetype === 'tabular') return 0.43;
   if (archetype === 'needle') return 0.51;
   if (archetype === 'fan') return 0.54;
-  if (archetype === 'massive') return 0.64;
   return 0.64;
 }
 
 function dominantPlacementBias(instruction: CrystalGrowthInstruction): number {
-  if (instruction.kind === 'event-spire') return round6(0.22 + instruction.radialBias * 0.16);
-  if (instruction.kind === 'satellite') return round6(0.08 + instruction.radialBias * 0.35);
-  if (instruction.kind === 'inclusion') return round6(0.04 + instruction.radialBias * 0.28);
-  return 0;
+  return instruction.radialBias;
 }
 
-function dominantDimensions(
+/**
+ * Since ADR-0004 the species itself decides every body's height and radius,
+ * because the rule differs per kind — days together for the monarch, the
+ * year's own history for an annual crystal. This adapter translates; it no
+ * longer designs. The formulas that used to live here moved to
+ * `formations.ts` unchanged.
+ */
+function dimensionsOf(
   instruction: CrystalGrowthInstruction,
 ): { axialScale: number; radialScale: number } {
-  // Monarch proportions (visual QA, 2026-08-02). The old 1.64/0.34 rendered
-  // at roughly 2.5:1 height-to-width — a squat block rather than the slender
-  // spire the reference art calls for. Raising axial and cutting radial takes
-  // it to roughly 4.5-5:1, and the taller axial also compensates for the new,
-  // much slower relationship maturity curve so a long relationship still ends
-  // up with a large crystal.
-  if (instruction.kind === 'mother') {
-    return { axialScale: 1.75, radialScale: 0.19 };
-  }
-  // Companions must read as crystals, not pebbles. They used to render at
-  // roughly 1.8:1 height-to-width (the largest was a squat cream block sitting
-  // in front of the monarch), because their radii were pinned: while they were
-  // attached to a host, slimming them changed how their base ring buried and
-  // could leave a junction unsealed. ADR-0003 removed those attachments
-  // entirely, so radius is now free and set for silhouette alone — roughly
-  // 3.5-4.5:1, slender enough to be crystals while staying well under the
-  // monarch's ~5:1 so she keeps the eye.
-  if (instruction.kind === 'event-spire') {
-    return {
-      axialScale: round6(0.5 + instruction.weight * 0.34),
-      radialScale: round6(0.062 + instruction.weight * 0.038),
-    };
-  }
-  if (instruction.kind === 'satellite') {
-    return {
-      axialScale: round6(0.28 + instruction.weight * 0.28),
-      radialScale: round6(0.042 + instruction.weight * 0.024),
-    };
-  }
-  return {
-    axialScale: round6(0.14 + instruction.weight * 0.14),
-    radialScale: round6(0.02 + instruction.weight * 0.009),
-  };
+  return { axialScale: instruction.axialScale, radialScale: instruction.radialScale };
 }
 
 function centerId(instruction: CrystalGrowthInstruction): string {
@@ -135,11 +99,19 @@ function commonAttributes(
     growthCenterRole,
     centerSourceInstructionId: growthCenterId === null ? null : source.id,
     sectorColonyId,
+    // Facets, tint and ring distance are species data since ADR-0004.
+    // Attributes carry them because they are an open map: no published state
+    // shape changes, and older snapshots keep reading.
+    facetCount: source.facetCount,
+    tintR: source.tintRgb[0],
+    tintG: source.tintRgb[1],
+    tintB: source.tintRgb[2],
+    iridescence: source.iridescence,
   };
 }
 
 function adaptMother(instruction: CrystalGrowthInstruction): UniversalGrowthInstruction {
-  const size = dominantDimensions(instruction);
+  const size = dimensionsOf(instruction);
   return {
     id: instruction.id,
     sourceId: instruction.sourceEventId,
@@ -163,6 +135,8 @@ function adaptMother(instruction: CrystalGrowthInstruction): UniversalGrowthInst
     maxGeneration: 1,
     directionInheritance: 0.5,
     minUpwardComponent: 0.9,
+    ringDistance: instruction.ringDistance,
+    sizeIsFinal: true,
     attributes: commonAttributes(instruction, null, null, null, instruction.archetype),
     growthCenterId: null,
     growthCenterRole: null,
@@ -175,7 +149,7 @@ function adaptDominant(
   growthCenterId: string,
   sectorColonyId: string | null,
 ): UniversalGrowthInstruction {
-  const size = dominantDimensions(source);
+  const size = dimensionsOf(source);
   return {
     id: source.id,
     sourceId: source.sourceEventId,
@@ -195,6 +169,9 @@ function adaptDominant(
     preferredElevation: source.elevation,
     radialBias: dominantPlacementBias(source),
     attachmentDepth: dominantAttachmentDepth(source),
+    ringDistance: source.ringDistance,
+    // Since ADR-0004 the crystal species computes every final size itself.
+    sizeIsFinal: true,
     hostPreference: dominantHostPreference(source),
     maxGeneration: dominantMaxGeneration(source),
     directionInheritance: dominantDirectionInheritance(source),

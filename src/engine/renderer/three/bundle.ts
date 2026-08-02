@@ -109,13 +109,18 @@ function buildBatch(source: BatchSource): ThreeCrystalBatch {
 
 /**
  * Engine-unit size of a fully grown crystal — the one that should just about
- * fill the frame. The monarch tops out a little under 1.75 units long once
- * relationship maturity saturates, plus the substrate burial below y=0; the
- * width allows for a wide spread of companions around her. These are reference
- * points for scaling, not limits: anything larger is still clamped to fit.
+ * fill the frame. These are reference points for scaling, not limits: anything
+ * larger is still clamped to fit.
+ *
+ * Re-anchored for ADR-0004. The druse is no longer a monarch with a scatter of
+ * event bodies; it is a monarch inside rings of annual crystals, and the ring
+ * widens as the couple accumulates years. Measured across ages, a ten-year
+ * couple comes out about 2.6 wide and 1.9 tall, and a twenty-year one 3.5 by
+ * 2.4 — so the old 1.7 width would have clamped almost everybody, which
+ * quietly cancels the growth the engine just computed.
  */
 const REFERENCE_HEIGHT = 2;
-const REFERENCE_WIDTH = 1.7;
+const REFERENCE_WIDTH = 2.2;
 
 const TARGET_HEIGHT = 3.25;
 const TARGET_WIDTH = 3.45;

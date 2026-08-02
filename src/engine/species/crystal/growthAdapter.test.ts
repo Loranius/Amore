@@ -30,17 +30,21 @@ function blueprint(events: readonly EvolutionEventInput[]) {
 }
 
 describe('Crystal Growth Center adapter', () => {
-  it('gives each event exactly one crystal and nothing growing on it', () => {
+  it('gives each formation exactly one crystal and nothing growing on it', () => {
     // ADR-0003: a centre used to publish 3-5 local members attached to its
     // dominant, which put growths on the sides of crystals and pushed a
-    // typical couple to ~38 bodies. Each event is now one free-standing
-    // crystal.
+    // typical couple to ~38 bodies. A formation is now one free-standing
+    // crystal — and since ADR-0004 a formation is a year or a finished plan,
+    // not a portal row.
     const growth = blueprint([BASE_EVENT]);
     const centers = growth.growthCenters ?? [];
     const byId = new Map(growth.instructions.map((item) => [item.id, item] as const));
 
     expect(growth.sourceBlueprintVersion).toBe('crystal:1:growth-centers@2');
-    expect(centers).toHaveLength(1);
+    // Three relationship years between 2024-02-14 and the 2026-07-29 clock,
+    // and one crystal for each of them — the count follows the calendar, not
+    // the single event this fixture logs (ADR-0004).
+    expect(centers).toHaveLength(3);
 
     for (const center of centers) {
       const members = center.instructionIds.map((id) => byId.get(id)!);
@@ -53,12 +57,12 @@ describe('Crystal Growth Center adapter', () => {
       expect(dominant.maxGeneration).toBe(1);
     }
 
-    // One crystal per event, plus the monarch as the blueprint root.
-    expect(growth.instructions).toHaveLength(1);
+    // One crystal per formation, plus the monarch as the blueprint root.
+    expect(growth.instructions).toHaveLength(3);
     expect(growth.root.growthCenterRole ?? null).toBeNull();
   });
 
-  it('does not change old center instructions when a later event is appended', () => {
+  it('does not change a closed year when a later event is appended', () => {
     const earlier = blueprint([BASE_EVENT]);
     const later = blueprint([
       BASE_EVENT,
@@ -69,20 +73,22 @@ describe('Crystal Growth Center adapter', () => {
       },
     ]);
 
-    for (const oldInstruction of earlier.instructions) {
+    // A year that has already closed is a record of that year (ADR-0004), so
+    // nothing logged afterwards may move it. The year in progress is
+    // deliberately excluded: growing with new activity is its whole job.
+    const closed = earlier.instructions.filter((item) => item.maturity === 1);
+    expect(closed.length).toBeGreaterThan(0);
+    for (const oldInstruction of closed) {
       expect(later.instructions.find((item) => item.id === oldInstruction.id)).toEqual(oldInstruction);
     }
   });
 
-  it('gives event-spires a real outward lean instead of growing parallel to the mother', () => {
-    // Cluster-composition fix (visual QA, 2026-08-02): a dominant instruction
-    // that is almost fully vertical (elevation close to 1) and barely
-    // inherits the host surface normal (low directionInheritance) ends up
-    // visually hugging the mother's own shaft instead of reading as its own
-    // radiating crystal. Both levers must move together for the fix to
-    // actually manifest -- see growthDirection() in growth/surface.ts, which
-    // blends preferredElevation and directionInheritance before clamping to
-    // minUpwardComponent.
+  it('stands each year at the distance its own history earned', () => {
+    // Replaces a test about event-spires leaning away from the mother. That
+    // lean existed because companions grew out of her shaft; since ADR-0003
+    // they stand in the ground, and since ADR-0004 their distance is stated
+    // outright rather than derived from the monarch's girth — which used to
+    // mean thickening her shifted the whole druse.
     const growth = blueprint([BASE_EVENT]);
     const dominants = growth.instructions.filter(
       (item) => item.growthCenterRole === 'dominant',
@@ -90,13 +96,13 @@ describe('Crystal Growth Center adapter', () => {
     expect(dominants.length).toBeGreaterThan(0);
 
     for (const dominant of dominants) {
-      // elevation=1 is fully vertical; staying well under 1 leaves real
-      // room for the surface normal to pull the direction outward.
-      expect(dominant.preferredElevation).toBeLessThan(0.8);
-      // Below ~0.4 the preferred direction (which ignores the anchor's
-      // actual position on the host) would dominate over the true outward
-      // surface normal, undoing the fix.
-      expect(dominant.directionInheritance).toBeGreaterThanOrEqual(0.4);
+      // A stated distance, not an inherited one.
+      expect(dominant.ringDistance).not.toBeNull();
+      expect(dominant.ringDistance!).toBeGreaterThan(0);
+      // Clear of the monarch's own footprint by more than her radius.
+      expect(dominant.ringDistance!).toBeGreaterThan(growth.root.radialScale);
+      // Standing in the ground, so it grows upward rather than out of a host.
+      expect(dominant.minUpwardComponent).toBeGreaterThan(0.5);
     }
   });
 });

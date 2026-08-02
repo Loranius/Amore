@@ -1,4 +1,5 @@
 import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
+import { mediaSparkleCount } from '../species/crystal/growthModel';
 import { stableHash32 } from '../evolution';
 import type { CrystalMaterialQuality } from '../material';
 import type {
@@ -83,11 +84,12 @@ export function buildCrystalLifeState(input: BuildCrystalLifeInput): CrystalLife
   validateInput(input);
   const motion = input.config.reducedMotion ? 0 : qualityMotionScale(input.config.quality);
   const sparkleCap = Math.min(input.config.maxSparkles, qualitySparkleCap(input.config.quality));
-  const bodyCount = input.material.bodies.length;
-  const requestedSparkles = Math.round(
-    8 + bodyCount * 0.72 + input.species.pressures.brilliance * 18 + input.species.pressures.luminosity * 10,
-  );
-  const sparkleCount = input.config.reducedMotion ? 0 : Math.max(0, Math.min(sparkleCap, requestedSparkles));
+  // Crystal dust now counts what the couple watched and read (ADR-0004)
+  // instead of how many bodies the druse happens to have — the body count
+  // stopped being a measure of anything once it followed the calendar.
+  const sparkleCount = input.config.reducedMotion
+    ? 0
+    : mediaSparkleCount(input.config.mediaFinishedCount, sparkleCap);
 
   return {
     lifeStateVersion: 1,

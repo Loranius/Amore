@@ -126,7 +126,11 @@ function renderedScale(maturity: number): { length: number; radius: number } {
 
 function rootBody(blueprint: UniversalGrowthBlueprint): GrowthBody {
   const instruction = blueprint.root;
-  const render = renderedScale(instruction.maturity);
+  // See `sizeIsFinal`: a species that sized the root itself has already folded
+  // time into that size, and the engine's maturity curve would count it twice.
+  const render = instruction.sizeIsFinal === true
+    ? { length: 1, radius: 1 }
+    : renderedScale(instruction.maturity);
   return {
     id: instruction.id,
     instructionId: instruction.id,
@@ -430,8 +434,17 @@ function chooseGroundCandidate(
   config: GrowthEngineConfig,
 ): { evaluation: CandidateEvaluation; usedFallback: boolean; rejectedCount: number } {
   const root = bodies[0]!;
+  // A stated distance means the species assigned this body a slot of its own,
+  // so there is nothing to choose between: sampling alternatives would let a
+  // neighbour's arrival hand it a different bearing, which is exactly what
+  // ADR-0004 forbids for a year that has already closed.
+  const stated = instruction.ringDistance ?? null;
+  const candidateCount = stated !== null && Number.isFinite(stated) && stated > 0
+    ? 1
+    : config.candidateCount;
+
   const evaluations: CandidateEvaluation[] = [];
-  for (let candidateIndex = 0; candidateIndex < config.candidateCount; candidateIndex += 1) {
+  for (let candidateIndex = 0; candidateIndex < candidateCount; candidateIndex += 1) {
     const site = sampleGroundSite(root, instruction, candidateIndex);
     evaluations.push(evaluateGrowthSite(site, instruction, bodies, occupiedSites, config));
   }
@@ -551,10 +564,21 @@ function depositInstruction(
     energyFloor,
     1,
   );
-  const skeletonLength = instruction.axialScale * (0.72 + growthEnergy * 0.28);
-  const render = renderedScale(instruction.maturity);
+  // Growth energy is competition for a host's surface: siblings crowding the
+  // same body get less of it. A ground-rooted body competes for nothing — it
+  // stands in the substrate on its own — so scaling it here would only leak
+  // its neighbours' state into its size. That leak was visible: thickening
+  // the monarch shrank a finished year's crystal by a hair, which broke the
+  // promise (ADR-0004) that a closed year never changes again.
+  const sizeIsFinal = instruction.sizeIsFinal === true;
+  const energyLength = groundRooted || sizeIsFinal ? 1 : 0.72 + growthEnergy * 0.28;
+  const energyRadius = groundRooted || sizeIsFinal ? 1 : 0.8 + growthEnergy * 0.2;
+  const skeletonLength = instruction.axialScale * energyLength;
+  // A species that already sized the body has folded maturity in; applying the
+  // engine's curve on top would count time twice.
+  const render = sizeIsFinal ? { length: 1, radius: 1 } : renderedScale(instruction.maturity);
   const skeletonRadius = fitRadiusToHost(
-    instruction.radialScale * (0.8 + growthEnergy * 0.2),
+    instruction.radialScale * energyRadius,
     render.radius,
     groundRooted ? null : evaluation.site,
   );

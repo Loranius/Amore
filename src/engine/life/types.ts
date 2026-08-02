@@ -8,6 +8,17 @@ export interface CrystalLifeConfig {
   reducedMotion: boolean;
   quality: CrystalMaterialQuality;
   maxSparkles: number;
+  /**
+   * Films, series and books the couple has finished (ADR-0004).
+   *
+   * It arrives here rather than through the Evolution adapters on purpose:
+   * `media_items` records no completion date, only a status, so a media event
+   * could not be honestly placed on the couple's timeline. Ambience is the one
+   * thing that needs no date — it is a count, not a moment — so media drives
+   * the dust around the artifact and nothing else. If the table ever gains a
+   * finished-at timestamp, media can graduate to a real adapter.
+   */
+  mediaFinishedCount: number;
 }
 
 export interface CrystalBodyLife {

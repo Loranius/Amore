@@ -214,8 +214,27 @@ describe('Crystal organic profile phase 3a', () => {
     // deliberately; it just no longer dominates the shape.
     expect(profile.scaleX).toBe(0.9);
     expect(profile.scaleZ).toBe(1.06);
-    expect(profile.segments).toBe(6);
     expect(profile.rows).toHaveLength(8);
+  });
+
+  it('keeps the facet count off the level-of-detail knob', () => {
+    // ADR-0004 made facets data: the monarch earns them with the couple's
+    // photos. Reducing them on a weaker phone would show the same couple a
+    // differently shaped crystal, which is the same defect the device body
+    // cap had. LOD reduces rows and drops small bodies instead.
+    const body = { ...motherBody(), attributes: { ...motherBody().attributes, facetCount: 13 } };
+
+    for (const lod of ['high', 'medium', 'low'] as const) {
+      expect(buildCrystalProfile(body, lod).segments).toBe(13);
+    }
+  });
+
+  it('refuses a facet count that would not close into a solid', () => {
+    const tooFew = { ...motherBody(), attributes: { ...motherBody().attributes, facetCount: 1 } };
+    const tooMany = { ...motherBody(), attributes: { ...motherBody().attributes, facetCount: 500 } };
+
+    expect(buildCrystalProfile(tooFew, 'high').segments).toBeGreaterThanOrEqual(4);
+    expect(buildCrystalProfile(tooMany, 'high').segments).toBeLessThanOrEqual(24);
   });
 
   it('tapers the monarch continuously instead of holding a cylinder', () => {

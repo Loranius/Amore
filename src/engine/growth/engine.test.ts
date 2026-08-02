@@ -3,7 +3,10 @@ import { buildArtifactBlueprint, type EvolutionEventInput } from '../evolution';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../species/crystal';
 import { DEFAULT_GROWTH_ENGINE_CONFIG } from './config';
 import { buildGrowthState } from './engine';
-import type { UniversalGrowthBlueprint } from './types';
+import type { GrowthBody, UniversalGrowthBlueprint } from './types';
+
+/** The monarch's id, as published by the crystal species adapter. */
+const MONARCH_BODY_ID = 'crystal:mother';
 
 const AS_OF = '2026-07-29T09:00:00Z';
 
@@ -240,9 +243,42 @@ describe('Universal Growth Engine', () => {
     expect(later.bodies).toHaveLength(
       earlier.bodies.length + laterBlueprint.instructions.length - earlierBlueprint.instructions.length,
     );
-    for (const oldBody of earlier.bodies) {
-      expect(later.bodies.find((body) => body.id === oldBody.id)).toEqual(oldBody);
+    // ADR-0004 draws the line at the anniversary. Two bodies are *supposed*
+    // to answer to a new event: the monarch, who answers to everything, and
+    // the year currently in progress. Every closed year is a record of that
+    // year and must not move again — which is the property this test exists
+    // for, since the whole druse used to reshuffle on any new row.
+    //
+    // `competition`, `crowding` and `growthEnergy` are excluded because they
+    // are readings of the neighbourhood rather than properties of the body:
+    // the ring genuinely does get busier, and since ground-rooted bodies are
+    // no longer scaled by growth energy, these three decide nothing.
+    const NEIGHBOURHOOD_READINGS = ['competition', 'crowding', 'growthEnergy'] as const;
+    const authoritative = (body: GrowthBody): Record<string, unknown> => {
+      const copy: Record<string, unknown> = { ...body };
+      for (const key of NEIGHBOURHOOD_READINGS) delete copy[key];
+      return copy;
+    };
+    const isClosedYear = (body: { id: string; maturity?: number }): boolean =>
+      body.id.startsWith('crystal:year:') && body.maturity === 1;
+
+    const closedYears = earlier.bodies.filter(isClosedYear);
+    expect(closedYears.length).toBeGreaterThan(0);
+    for (const oldBody of closedYears) {
+      const nextBody = later.bodies.find((body) => body.id === oldBody.id);
+      expect(nextBody).toBeDefined();
+      expect(authoritative(nextBody!)).toEqual(authoritative(oldBody));
     }
+
+    // And the carve-out is not a licence for nothing to happen: assert both
+    // exceptions actually did respond, so they cannot hide a regression.
+    const byId = (bodies: typeof earlier.bodies, id: string) => bodies.find((b) => b.id === id)!;
+    expect(byId(later.bodies, MONARCH_BODY_ID).renderedRadius)
+      .toBeGreaterThan(byId(earlier.bodies, MONARCH_BODY_ID).renderedRadius);
+
+    const currentYearId = earlier.bodies.filter((body) => body.id.startsWith('crystal:year:')).at(-1)!.id;
+    expect(byId(later.bodies, currentYearId).renderedLength)
+      .toBeGreaterThan(byId(earlier.bodies, currentYearId).renderedLength);
   });
 
   it('builds colony state without creating orphan members', () => {

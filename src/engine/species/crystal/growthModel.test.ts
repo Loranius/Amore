@@ -1,0 +1,366 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CHILD_GROWTH_STEPS,
+  CHILD_MIN_CLEARANCE,
+  CHILD_MONARCH_SHARE,
+  CHILD_RING_CAPACITY,
+  MONARCH_MAX_FACETS,
+  MONARCH_MIN_FACETS,
+  WISH_CHANNEL_CAP,
+  anniversaryOn,
+  childAzimuthRad,
+  childDimensions,
+  childDistance,
+  childGrowthProgress,
+  childRingIndex,
+  facetThresholdForYears,
+  mediaSparkleCount,
+  monarchAxialScale,
+  monarchFacetCount,
+  monarchRadialScale,
+  relationshipYears,
+  wishTint,
+} from './growthModel';
+
+const YEAR = 365;
+
+describe('monarch height (ADR-0004)', () => {
+  it('never stops growing, unlike the curve it replaces', () => {
+    // The exponential it replaces saturated near five years: a twenty-year
+    // couple and a ten-year couple rendered the same crystal. Every decade
+    // must still be visibly taller than the one before it.
+    const decades = [10, 20, 30, 40].map((y) => monarchAxialScale(y * YEAR));
+    for (let index = 1; index < decades.length; index += 1) {
+      expect(decades[index]!).toBeGreaterThan(decades[index - 1]!);
+    }
+  });
+
+  it('decelerates hard so the monarch never becomes huge', () => {
+    const ten = monarchAxialScale(10 * YEAR);
+    const forty = monarchAxialScale(40 * YEAR);
+    // Four times the relationship must not be anywhere near four times the
+    // crystal — that was the owner's whole complaint about the old monarch.
+    expect(forty / ten).toBeLessThan(1.5);
+    expect(forty / ten).toBeGreaterThan(1.2);
+  });
+
+  it('keeps the ten-year size the owner already accepted', () => {
+    // The previous model rendered a ten-year monarch at ~1.67 engine units
+    // and that was signed off. Landing anywhere far from it would be a
+    // silent redesign of a decision already made.
+    expect(monarchAxialScale(10 * YEAR)).toBeGreaterThan(1.6);
+    expect(monarchAxialScale(10 * YEAR)).toBeLessThan(1.8);
+  });
+
+  it('separates a young relationship from an old one', () => {
+    expect(monarchAxialScale(YEAR)).toBeLessThan(monarchAxialScale(5 * YEAR));
+    expect(monarchAxialScale(5 * YEAR)).toBeLessThan(monarchAxialScale(10 * YEAR));
+  });
+
+  it('survives a nonsense age', () => {
+    for (const days of [0, -400, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(Number.isFinite(monarchAxialScale(days))).toBe(true);
+      expect(monarchAxialScale(days)).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('monarch girth', () => {
+  it('thickens with portal activity but only within the silhouette', () => {
+    const axial = monarchAxialScale(3.6 * YEAR);
+    const quiet = monarchRadialScale(axial, 0);
+    const busy = monarchRadialScale(axial, 104);
+    const extreme = monarchRadialScale(axial, 100_000);
+
+    expect(busy).toBeGreaterThan(quiet);
+    expect(extreme).toBeGreaterThan(busy);
+    // Activity must never turn the spire into a block, nor a quiet couple's
+    // crystal into a needle.
+    // Tolerance covers the round6 quantisation of the published radius.
+    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(3.8 - 1e-4);
+    expect(axial / (2 * quiet)).toBeLessThanOrEqual(6.2 + 1e-4);
+  });
+
+  it('lands a typical couple near the silhouette the owner already accepted', () => {
+    // The shipped monarch was about 4.6:1 and signed off at that shape.
+    const axial = monarchAxialScale(3.6 * YEAR);
+    const aspect = axial / (2 * monarchRadialScale(axial, 104));
+    expect(aspect).toBeGreaterThan(4.2);
+    expect(aspect).toBeLessThan(5.4);
+  });
+
+  it('lets a longer relationship carry more girth at the same activity', () => {
+    const young = monarchAxialScale(YEAR);
+    const old = monarchAxialScale(20 * YEAR);
+    expect(monarchRadialScale(old, 5_000)).toBeGreaterThan(monarchRadialScale(young, 5_000));
+  });
+});
+
+describe('facets from photos', () => {
+  it('charges each photo the threshold in force when it was taken', () => {
+    expect(facetThresholdForYears(0)).toBe(5);
+    expect(facetThresholdForYears(1)).toBe(10);
+    expect(facetThresholdForYears(4)).toBe(10);
+    expect(facetThresholdForYears(5)).toBe(15);
+    expect(facetThresholdForYears(10)).toBe(20);
+    expect(facetThresholdForYears(40)).toBe(20);
+  });
+
+  it('never loses a facet when the couple crosses a threshold', () => {
+    // The regression this whole accumulator exists for. Dividing the current
+    // photo count by the current threshold would take a couple with 100
+    // photos from 20 facets to 10 the day they pass their first anniversary.
+    const before = monarchFacetCount(new Array<number>(100).fill(0));
+    const afterOneMorePhoto = monarchFacetCount([...new Array<number>(100).fill(0), 1]);
+
+    expect(afterOneMorePhoto).toBeGreaterThanOrEqual(before);
+  });
+
+  it('is monotonic across any history', () => {
+    const history = [0, 0, 0, 1, 1, 4, 5, 5, 9, 10, 12, 30];
+    let previous = 0;
+    for (let taken = 0; taken <= history.length; taken += 1) {
+      const facets = monarchFacetCount(history.slice(0, taken));
+      expect(facets).toBeGreaterThanOrEqual(previous);
+      previous = facets;
+    }
+  });
+
+  it('stays inside the range where the shape still reads as a crystal', () => {
+    expect(monarchFacetCount([])).toBe(MONARCH_MIN_FACETS);
+    expect(monarchFacetCount(new Array<number>(10_000).fill(0))).toBe(MONARCH_MAX_FACETS);
+  });
+
+  it('matches the owner-stated cost per tier', () => {
+    // Five photos in year one buy exactly one facet; four do not.
+    expect(monarchFacetCount(new Array<number>(4).fill(0))).toBe(MONARCH_MIN_FACETS);
+    expect(monarchFacetCount(new Array<number>(5).fill(0))).toBe(MONARCH_MIN_FACETS + 1);
+    // Ten photos in year three buy one; in year six they do not.
+    expect(monarchFacetCount(new Array<number>(10).fill(3))).toBe(MONARCH_MIN_FACETS + 1);
+    expect(monarchFacetCount(new Array<number>(10).fill(6))).toBe(MONARCH_MIN_FACETS);
+  });
+});
+
+describe('relationship years', () => {
+  it('gives one year per anniversary plus the one in progress', () => {
+    // The real couple: started 2022-12-26, asked on 2026-08-02.
+    const years = relationshipYears('2022-12-26', '2026-08-02', 'feb-28');
+    expect(years).toHaveLength(4);
+    expect(years[0]!.startsAt).toBe('2022-12-26');
+    expect(years[3]!.startsAt).toBe('2025-12-26');
+    expect(years.filter((year) => year.complete)).toHaveLength(3);
+    expect(years[3]!.complete).toBe(false);
+  });
+
+  it('opens the next year exactly on the anniversary', () => {
+    const before = relationshipYears('2022-12-26', '2025-12-25', 'feb-28');
+    const on = relationshipYears('2022-12-26', '2025-12-26', 'feb-28');
+    expect(before).toHaveLength(3);
+    expect(on).toHaveLength(4);
+    expect(on[2]!.complete).toBe(true);
+  });
+
+  it('always gives the couple at least the year they are living', () => {
+    expect(relationshipYears('2026-08-01', '2026-08-02', 'feb-28')).toHaveLength(1);
+    expect(relationshipYears('2026-08-02', '2026-08-02', 'feb-28')).toHaveLength(1);
+  });
+
+  it('honours the leap-day policy the rest of the engine uses', () => {
+    expect(anniversaryOn('2020-02-29', 2023, 'feb-28')).toBe('2023-02-28');
+    expect(anniversaryOn('2020-02-29', 2023, 'mar-1')).toBe('2023-03-01');
+    expect(anniversaryOn('2020-02-29', 2024, 'feb-28')).toBe('2024-02-29');
+  });
+
+  it('returns nothing for an unusable start date instead of guessing', () => {
+    expect(relationshipYears('not-a-date', '2026-08-02', 'feb-28')).toEqual([]);
+  });
+});
+
+describe('child growth steps', () => {
+  const year = { index: 3, startsAt: '2025-12-26', endsAt: '2026-12-26', complete: false };
+
+  it('is born at one twelfth rather than at nothing', () => {
+    expect(childGrowthProgress(year, '2025-12-26')).toBeCloseTo(1 / CHILD_GROWTH_STEPS, 6);
+  });
+
+  it('advances once a month, on the day of the month it was born', () => {
+    expect(childGrowthProgress(year, '2026-01-25')).toBeCloseTo(1 / 12, 6);
+    expect(childGrowthProgress(year, '2026-01-26')).toBeCloseTo(2 / 12, 6);
+    expect(childGrowthProgress(year, '2026-08-02')).toBeCloseTo(8 / 12, 6);
+  });
+
+  it('is exactly full once the year has closed', () => {
+    expect(childGrowthProgress({ ...year, complete: true }, '2026-12-26')).toBe(1);
+  });
+
+  it('never runs past full even on a late clock', () => {
+    expect(childGrowthProgress(year, '2027-06-01')).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('child crystals', () => {
+  it('never exceeds half the monarch it stands beside', () => {
+    const monarch = monarchAxialScale(4 * YEAR);
+    const child = childDimensions(monarch, 1, 1);
+    // Tolerance is one round6 step: every published number is quantised to
+    // six decimals, so an exact-equality bound would fail on the rounding.
+    expect(child.axialScale).toBeLessThanOrEqual(monarch * CHILD_MONARCH_SHARE + 1e-6);
+    expect(child.axialScale).toBeLessThan(monarch);
+    expect(child.radialScale * 2).toBeLessThan(monarch);
+  });
+
+  it('grows with its months and with the year that fed it', () => {
+    const monarch = monarchAxialScale(4 * YEAR);
+    expect(childDimensions(monarch, 0.5, 1).axialScale)
+      .toBeGreaterThan(childDimensions(monarch, 0.25, 1).axialScale);
+    expect(childDimensions(monarch, 1, 1).axialScale)
+      .toBeGreaterThan(childDimensions(monarch, 1, 0).axialScale);
+  });
+
+  it('shows the monarch growing between frozen years', () => {
+    // A year frozen early keeps half of the monarch as she was then, and she
+    // has grown since — so the ring is a growth history for free.
+    const firstYear = childDimensions(monarchAxialScale(YEAR), 1, 1);
+    const tenthYear = childDimensions(monarchAxialScale(10 * YEAR), 1, 1);
+    expect(tenthYear.axialScale).toBeGreaterThan(firstYear.axialScale);
+  });
+
+  it('can never touch the monarch, whatever the year held', () => {
+    const monarchRadial = monarchRadialScale(monarchAxialScale(10 * YEAR), 10_000);
+    for (const events of [0, 1, 4, 40, 10_000]) {
+      for (const ringIndex of [0, 1, 2]) {
+        const child = childDimensions(monarchAxialScale(10 * YEAR), 1, 1);
+        const distance = childDistance({
+          monarchRadialScale: monarchRadial,
+          childRadialScale: child.radialScale,
+          ringIndex,
+          importantEventCount: events,
+        });
+        const gap = distance - monarchRadial - child.radialScale;
+        expect(gap).toBeGreaterThanOrEqual(CHILD_MIN_CLEARANCE);
+      }
+    }
+  });
+
+  it('draws closer with each important event', () => {
+    const base = {
+      monarchRadialScale: 0.15,
+      childRadialScale: 0.08,
+      ringIndex: 0,
+    };
+    const quiet = childDistance({ ...base, importantEventCount: 0 });
+    const one = childDistance({ ...base, importantEventCount: 1 });
+    const many = childDistance({ ...base, importantEventCount: 4 });
+
+    expect(one).toBeLessThan(quiet);
+    expect(many).toBeLessThan(one);
+    // One event has to be worth seeing: the couple in question logs only
+    // one or two calendar milestones a year, so a subtle step would read as
+    // no step at all.
+    expect(quiet - one).toBeGreaterThan(0.05);
+  });
+
+  it('opens a new ring every eight years so no year is crowded out', () => {
+    expect(childRingIndex(0)).toBe(0);
+    expect(childRingIndex(CHILD_RING_CAPACITY - 1)).toBe(0);
+    expect(childRingIndex(CHILD_RING_CAPACITY)).toBe(1);
+    expect(childRingIndex(CHILD_RING_CAPACITY * 2)).toBe(2);
+
+    const inner = childDistance({
+      monarchRadialScale: 0.15, childRadialScale: 0.08, ringIndex: 0, importantEventCount: 2,
+    });
+    const outer = childDistance({
+      monarchRadialScale: 0.15, childRadialScale: 0.08, ringIndex: 1, importantEventCount: 2,
+    });
+    expect(outer).toBeGreaterThan(inner);
+  });
+
+  it('never puts two years at the same bearing', () => {
+    const seen = new Set<number>();
+    for (let index = 0; index < 40; index += 1) {
+      const azimuth = childAzimuthRad(index);
+      expect(azimuth).toBeGreaterThanOrEqual(0);
+      expect(azimuth).toBeLessThan(Math.PI * 2);
+      seen.add(azimuth);
+    }
+    expect(seen.size).toBe(40);
+  });
+});
+
+describe('colour from fulfilled wishes', () => {
+  it('leaves a year with no gifts as the white crystal it was born', () => {
+    const tint = wishTint({ forFirst: 0, shared: 0, forSecond: 0 });
+    expect(tint.rgb).toEqual([1, 1, 1]);
+    expect(tint.iridescence).toBe(0);
+  });
+
+  it('rewards a perfectly balanced year with rainbow, not grey', () => {
+    // The reason this is not a literal RGB triple. Ten, ten and ten is the
+    // best year a couple can have; mapped straight onto channels it would
+    // render grey — the dullest crystal on the platform.
+    const tint = wishTint({ forFirst: 10, shared: 10, forSecond: 10 });
+    expect(tint.rgb[0]).toBeCloseTo(1, 6);
+    expect(tint.rgb[1]).toBeCloseTo(1, 6);
+    expect(tint.rgb[2]).toBeCloseTo(1, 6);
+    expect(tint.iridescence).toBeCloseTo(1, 6);
+  });
+
+  it('tints toward the partner who was given to', () => {
+    const red = wishTint({ forFirst: 10, shared: 0, forSecond: 0 });
+    expect(red.rgb[0]).toBeGreaterThan(red.rgb[1]);
+    expect(red.rgb[0]).toBeGreaterThan(red.rgb[2]);
+    expect(red.iridescence).toBe(0);
+
+    const blue = wishTint({ forFirst: 0, shared: 0, forSecond: 10 });
+    expect(blue.rgb[2]).toBeGreaterThan(blue.rgb[0]);
+
+    const green = wishTint({ forFirst: 0, shared: 10, forSecond: 0 });
+    expect(green.rgb[1]).toBeGreaterThan(green.rgb[0]);
+  });
+
+  it('deepens with the count and then stops at the cap', () => {
+    const few = wishTint({ forFirst: 2, shared: 0, forSecond: 0 });
+    const many = wishTint({ forFirst: 9, shared: 0, forSecond: 0 });
+    const capped = wishTint({ forFirst: WISH_CHANNEL_CAP, shared: 0, forSecond: 0 });
+    const beyond = wishTint({ forFirst: 400, shared: 0, forSecond: 0 });
+
+    expect(many.rgb[1]).toBeLessThan(few.rgb[1]);
+    expect(beyond).toEqual(capped);
+  });
+
+  it('stays a translucent stone rather than stained glass', () => {
+    // Even the most one-sided year keeps enough light in the other channels
+    // to read as crystal.
+    const extreme = wishTint({ forFirst: 10, shared: 0, forSecond: 0 });
+    expect(Math.min(...extreme.rgb)).toBeGreaterThan(0.2);
+  });
+
+  it('produces finite colours for nonsense counts', () => {
+    const tint = wishTint({ forFirst: Number.NaN, shared: -5, forSecond: Number.POSITIVE_INFINITY });
+    expect(tint.rgb.every(Number.isFinite)).toBe(true);
+    expect(Number.isFinite(tint.iridescence)).toBe(true);
+  });
+});
+
+describe('sparkles from media', () => {
+  it('always leaves some life around the artifact', () => {
+    expect(mediaSparkleCount(0, 42)).toBe(6);
+  });
+
+  it('grows with what the couple finished, with diminishing returns', () => {
+    expect(mediaSparkleCount(25, 128)).toBeLessThan(mediaSparkleCount(169, 128));
+    expect(mediaSparkleCount(169, 128)).toBeLessThan(mediaSparkleCount(400, 128));
+
+    // Diminishing returns means the same *number* of extra titles buys less
+    // dust the more you already have — not that a larger multiple buys less,
+    // which is a different (and false) claim.
+    const earlyHundred = mediaSparkleCount(200, 128) - mediaSparkleCount(100, 128);
+    const lateHundred = mediaSparkleCount(600, 128) - mediaSparkleCount(500, 128);
+    expect(lateHundred).toBeLessThan(earlyHundred);
+  });
+
+  it('respects the device cap it is given', () => {
+    expect(mediaSparkleCount(10_000, 18)).toBe(18);
+    expect(mediaSparkleCount(10_000, 0)).toBe(0);
+  });
+});

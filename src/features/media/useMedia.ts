@@ -30,6 +30,29 @@ export function useMediaItems(type: MediaType) {
   return useQuery({ queryKey: qk.media(type), queryFn: () => loadItems(type) });
 }
 
+/**
+ * How many films, series and books the couple has finished.
+ *
+ * Only the count, and only `status = 'done'` — the crystal uses it for the
+ * dust drifting around the artifact (ADR-0004) and needs nothing else. A
+ * head-count query rather than a row fetch because the watchlist can run to
+ * hundreds of rows and the artifact would throw all of them away.
+ */
+export function useFinishedMediaCount() {
+  return useQuery({
+    queryKey: [...qk.media(), 'finished-count'],
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<number> => {
+      const { count, error } = await supabase
+        .from('media_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'done');
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+}
+
 /** Постер: HEIC → JPEG → compress → Storage. Повертає public URL або null. */
 export async function uploadPoster(file: File, type: MediaType, itemId: number): Promise<string | null> {
   let normalized: File;

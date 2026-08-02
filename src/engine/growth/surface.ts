@@ -168,19 +168,37 @@ export function sampleGroundSite(
   instruction: UniversalGrowthInstruction,
   candidateIndex: number,
 ): GrowthSiteCandidate {
+  // An instruction that states its own distance owns its placement outright:
+  // the species has already assigned it a slot, so neither the candidate
+  // sweep nor jitter may move it.
+  //
+  // Both halves of that mattered. Deriving the radius from the root's own
+  // radius — the only option before ADR-0004 — meant thickening the monarch
+  // shifted every body standing around her. And letting competition pick
+  // among twelve sampled bearings meant a single new event could hand a
+  // finished year a completely different bearing. Either way a new photo
+  // reshuffled the whole druse, and a "frozen" year was not frozen.
+  const stated = instruction.ringDistance ?? null;
+  const placed = stated !== null && Number.isFinite(stated) && stated > 0;
+
   const goldenAngle = Math.PI * (3 - Math.sqrt(5));
   const angleJitter = (seededUnit(instruction.seed, `ground:${candidateIndex}:angle`) - 0.5) * 0.85;
   const azimuth = round6(
-    instruction.preferredAzimuthRad + candidateIndex * goldenAngle + angleJitter,
+    placed
+      ? instruction.preferredAzimuthRad
+      : instruction.preferredAzimuthRad + candidateIndex * goldenAngle + angleJitter,
   );
   const outward = { x: Math.cos(azimuth), y: 0, z: Math.sin(azimuth) };
 
-  // Stand clear of the monarch's own footprint, with deterministic spread so
-  // the companions do not land on a perfect circle.
-  const radiusJitter = 0.82 + seededUnit(instruction.seed, `ground:${candidateIndex}:radius`) * 0.5;
-  const ringRadius = round6(
-    (root.skeletonRadius * 0.95 + instruction.radialScale * 0.95) * radiusJitter,
-  );
+  // Without a stated distance the engine falls back to standing the body just
+  // clear of the root's footprint, with deterministic spread so bodies do not
+  // land on a perfect circle.
+  const ringRadius = placed
+    ? round6(stated)
+    : round6(
+        (root.skeletonRadius * 0.95 + instruction.radialScale * 0.95)
+        * (0.82 + seededUnit(instruction.seed, `ground:${candidateIndex}:radius`) * 0.5),
+      );
   const surfacePoint = {
     x: round6(outward.x * ringRadius),
     y: 0,

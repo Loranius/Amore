@@ -82,14 +82,17 @@ describe('crystal render fit', () => {
 
   it('scales by a fixed reference so size reflects the crystal, not the frame', () => {
     const young = fitFor('2023-06-14', 2023);
-    const old = fitFor('2016-06-14', 2016);
+    const older = fitFor('2021-06-14', 2021);
 
     // Neither is large enough to need clamping, so both take the same scale
     // factor — the on-screen difference comes from the geometry itself.
+    // (A much older couple does get clamped: since ADR-0004 the ring of
+    // annual crystals genuinely outgrows the frame eventually, which the
+    // overflow test below covers.)
     expect(young.fit.clamped).toBe(false);
-    expect(old.fit.clamped).toBe(false);
+    expect(older.fit.clamped).toBe(false);
     expect(young.fit.scale).toBeCloseTo(young.fit.referenceScale, 6);
-    expect(old.fit.scale).toBeCloseTo(young.fit.scale, 6);
+    expect(older.fit.scale).toBeCloseTo(young.fit.scale, 6);
   });
 
   it('never lets a crystal overflow the frame', () => {

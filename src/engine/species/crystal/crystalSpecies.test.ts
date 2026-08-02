@@ -63,11 +63,6 @@ function buildCrystal(
   });
 }
 
-function withoutMaturity<T extends { maturity: number }>(value: T): Omit<T, 'maturity'> {
-  const { maturity: _maturity, ...stable } = value;
-  return stable;
-}
-
 describe('Crystal Species', () => {
   it('is deterministic regardless of source event order', () => {
     const forward = buildCrystal();
@@ -75,35 +70,23 @@ describe('Crystal Species', () => {
     expect(reversed).toEqual(forward);
   });
 
-  it('locks the mother, event hierarchy and stable colonies', () => {
+  it('grows one crystal per relationship year, not per portal row', () => {
+    // ADR-0004. The four events below used to produce four bodies; the shape
+    // of the druse now follows the calendar instead, so the same history
+    // yields the two years the couple has lived plus the one finished plan.
     const crystal = buildCrystal();
 
     expect({
       species: `${crystal.species}@${crystal.speciesBlueprintVersion}`,
       mother: `${crystal.mother.id}:${crystal.mother.kind}:${crystal.mother.tier}`,
-      formationKinds: crystal.formations.map(
-        (formation) => `${formation.sourceEventId}:${formation.kind}:${formation.tier}`,
+      formations: crystal.formations.map(
+        (formation) => `${formation.id}:${formation.kind}:${formation.tier}`,
       ),
-      emphasized: crystal.formations
-        .filter((formation) => formation.emphasized)
-        .map((formation) => formation.id),
-      colonies: crystal.colonies.map((colony) => colony.id),
     }).toMatchInlineSnapshot(`
       {
-        "colonies": [
-          "crystal:colony:0:exploration",
-          "crystal:colony:0:significance",
-          "crystal:colony:1:achievement",
-          "crystal:colony:1:stability",
-        ],
-        "emphasized": [
-          "crystal:event:calendar:proposal",
-        ],
-        "formationKinds": [
-          "calendar:proposal:event-spire:support",
-          "place:lviv:satellite:companion",
-          "wish:camera:satellite:companion",
-          "shopping:2025-01-06:inclusion:micro",
+        "formations": [
+          "crystal:year:1:annual:support",
+          "crystal:year:2:annual:family",
         ],
         "mother": "crystal:mother:mother:king",
         "species": "crystal@1",
@@ -111,7 +94,9 @@ describe('Crystal Species', () => {
     `);
   });
 
-  it('keeps existing formation identities and directions when a later event is appended', () => {
+  it('adds a body only when a year turns, however much the couple logs', () => {
+    // The failure this replaces: every new row grew another crystal, so a
+    // photo album alone could push the druse past thirty bodies.
     const base = buildCrystal(BASE_EVENTS.slice(0, 3));
     const extended = buildCrystal([
       ...BASE_EVENTS.slice(0, 3),
@@ -125,23 +110,49 @@ describe('Crystal Species', () => {
       },
     ]);
 
-    const existingIds = new Set(base.formations.map((formation) => formation.id));
-    const extendedExisting = extended.formations.filter((formation) => existingIds.has(formation.id));
-    expect(extendedExisting).toEqual(base.formations);
+    expect(extended.formations).toHaveLength(base.formations.length);
+    expect(extended.formations.map((formation) => formation.id))
+      .toEqual(base.formations.map((formation) => formation.id));
+  });
+
+  it('freezes a finished year and keeps growing the current one', () => {
+    const early = buildCrystal(BASE_EVENTS, '2025-07-01');
+    const later = buildCrystal(BASE_EVENTS, '2025-11-01');
+
+    const frozenId = 'crystal:year:1';
+    const frozenEarly = early.formations.find((formation) => formation.id === frozenId)!;
+    const frozenLater = later.formations.find((formation) => formation.id === frozenId)!;
+    expect(frozenLater.axialScale).toBe(frozenEarly.axialScale);
+    expect(frozenLater.maturity).toBe(1);
+
+    const growingId = 'crystal:year:2';
+    const growingEarly = early.formations.find((formation) => formation.id === growingId)!;
+    const growingLater = later.formations.find((formation) => formation.id === growingId)!;
+    expect(growingLater.axialScale).toBeGreaterThan(growingEarly.axialScale);
+    expect(growingLater.maturity).toBeGreaterThan(growingEarly.maturity);
   });
 
   it('lets time mature formations without changing their seeded morphology', () => {
     const earlier = buildCrystal(BASE_EVENTS, '2025-07-01');
     const later = buildCrystal(BASE_EVENTS, '2026-07-01');
 
-    expect(withoutMaturity(later.mother)).toEqual(withoutMaturity(earlier.mother));
+    // ADR-0004 changed what "unchanged" means for the monarch. Her height now
+    // answers "how long have we been together", so a year passing *must* move
+    // it — that is the feature. What still may not drift is her seeded
+    // morphology: the same couple keeps the same crystal identity forever.
+    expect(later.mother.seed).toBe(earlier.mother.seed);
+    expect(later.mother.archetype).toBe(earlier.mother.archetype);
+    expect(later.mother.azimuthRad).toBe(earlier.mother.azimuthRad);
+    expect(later.mother.facetCount).toBe(earlier.mother.facetCount);
+    expect(later.mother.axialScale).toBeGreaterThan(earlier.mother.axialScale);
     expect(later.mother.maturity).toBeGreaterThan(earlier.mother.maturity);
 
-    for (let index = 0; index < earlier.formations.length; index += 1) {
-      const before = earlier.formations[index]!;
-      const after = later.formations[index]!;
-      expect(withoutMaturity(after)).toEqual(withoutMaturity(before));
-      expect(after.maturity).toBeGreaterThanOrEqual(before.maturity);
+    // A year that has closed is a record: nothing about it may move again.
+    const frozen = (crystal: ReturnType<typeof buildCrystal>) =>
+      crystal.formations.filter((formation) => formation.maturity === 1 && formation.emphasized);
+    for (const before of frozen(earlier)) {
+      const after = later.formations.find((formation) => formation.id === before.id);
+      expect(after).toEqual(before);
     }
   });
 
@@ -166,9 +177,10 @@ describe('Crystal Species', () => {
     ]);
 
     expect(crystal.diagnostics.futureEventIds).toEqual(['future:trip']);
-    expect(crystal.diagnostics.zeroPressureEventIds).toEqual(['activity-only']);
+    // Since ADR-0004 no event grows its own body, so a pressureless event can
+    // no longer be reported as one that failed to grow. What still must hold
+    // is that a future fact touches nothing today.
     expect(crystal.formations.some((formation) => formation.sourceEventId === 'future:trip')).toBe(false);
-    expect(crystal.formations.some((formation) => formation.sourceEventId === 'activity-only')).toBe(false);
     expect(crystal.state.eventCount).toBe(BASE_EVENTS.length + 1);
   });
 
