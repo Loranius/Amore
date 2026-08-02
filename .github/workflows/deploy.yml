@@ -399,7 +399,7 @@ jobs:
             echo
             echo 'Effective rollout ceiling: 25%'
             echo
-            echo 'Three.js remains active for non-canary cohorts and all Godot runtime failures.'
+            echo 'Three.js remains active for cohorts outside the rollout and all Godot runtime failures.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload live production evidence
