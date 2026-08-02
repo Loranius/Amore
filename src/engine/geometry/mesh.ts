@@ -139,8 +139,14 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
       bitangent,
       row,
     );
+    const angleStep = (Math.PI * 2) / segments;
     for (let segment = 0; segment < segments; segment += 1) {
-      const angle = (segment / segments) * Math.PI * 2 + row.rotation + row.facetPhase;
+      const facetAngleJitter = (seededUnit(body.seed, `geometry:facet-angle:${segment}`) - 0.5)
+        * angleStep * 0.28;
+      const rowAngleJitter = (seededUnit(body.seed, `geometry:facet-angle-row:${rowIndex}:${segment}`) - 0.5)
+        * angleStep * 0.07;
+      const angle = segment * angleStep + facetAngleJitter + rowAngleJitter
+        + row.rotation + row.facetPhase;
       const facetJitter = seededUnit(body.seed, `geometry:facet:${segment}`) - 0.5;
       const rowJitter = seededUnit(body.seed, `geometry:facet-row:${rowIndex}:${segment}`) - 0.5;
       const jitter = 1 + facetJitter * 0.07 + rowJitter * 0.026;

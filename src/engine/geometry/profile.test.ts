@@ -121,7 +121,11 @@ describe('Crystal organic profile phase 3a', () => {
       ),
       scale(bitangent, row.centerOffsetZ),
     );
-    const angle = row.rotation + row.facetPhase;
+    const angleStep = (Math.PI * 2) / mesh.profile.segments;
+    const facetAngleJitter = (seededUnit(body.seed, 'geometry:facet-angle:0') - 0.5) * angleStep * 0.28;
+    const rowAngleJitter = (seededUnit(body.seed, `geometry:facet-angle-row:${rowIndex}:0`) - 0.5)
+      * angleStep * 0.07;
+    const angle = facetAngleJitter + rowAngleJitter + row.rotation + row.facetPhase;
     const facetJitter = seededUnit(body.seed, 'geometry:facet:0') - 0.5;
     const rowJitter = seededUnit(body.seed, `geometry:facet-row:${rowIndex}:0`) - 0.5;
     const jitter = 1 + facetJitter * 0.07 + rowJitter * 0.026;
@@ -139,6 +143,59 @@ describe('Crystal organic profile phase 3a', () => {
       round6(expected.y),
       round6(expected.z),
     ]);
+  });
+
+  it('gives ring facets irregular widths instead of a perfectly even polygon', () => {
+    // A hand-cut gem reads as organic because its facets vary in width; a
+    // perfectly even polygon reads as a machined/plastic prism (visual QA
+    // finding on the Amore crystal preview, 2026-08-02).
+    const body = crystalBody();
+    const mesh = buildCrystalMesh(body, 'high');
+    const segments = mesh.profile.segments;
+    const rowIndex = Math.min(2, mesh.profile.rows.length - 1);
+    const { tangent, bitangent } = orthonormalBasis(body.direction);
+    const row = mesh.profile.rows[rowIndex]!;
+    const center = add(
+      add(
+        add(mesh.profile.geometryAnchor, scale(body.direction, row.y)),
+        scale(tangent, row.centerOffsetX),
+      ),
+      scale(bitangent, row.centerOffsetZ),
+    );
+
+    const rowStart = rowIndex * segments;
+    const angles: number[] = [];
+    for (let segment = 0; segment < segments; segment += 1) {
+      const offset = (rowStart + segment) * 3;
+      const vertex = {
+        x: mesh.positions[offset]!,
+        y: mesh.positions[offset + 1]!,
+        z: mesh.positions[offset + 2]!,
+      };
+      const local = {
+        x: (vertex.x - center.x) * tangent.x + (vertex.y - center.y) * tangent.y + (vertex.z - center.z) * tangent.z,
+        z: (vertex.x - center.x) * bitangent.x + (vertex.y - center.y) * bitangent.y + (vertex.z - center.z) * bitangent.z,
+      };
+      angles.push(Math.atan2(local.z, local.x));
+    }
+
+    const gaps: number[] = [];
+    for (let segment = 0; segment < segments; segment += 1) {
+      const next = (segment + 1) % segments;
+      let gap = angles[next]! - angles[segment]!;
+      while (gap <= 0) gap += Math.PI * 2;
+      gaps.push(gap);
+    }
+
+    // Non-degenerate: winding stays monotonic, no facet collapses or crosses
+    // its neighbour.
+    expect(gaps.every((gap) => gap > 0.001)).toBe(true);
+    expect(gaps.reduce((sum, gap) => sum + gap, 0)).toBeCloseTo(Math.PI * 2, 5);
+
+    // Irregular: facet widths are not all equal, unlike a plain even polygon.
+    const maxGap = Math.max(...gaps);
+    const minGap = Math.min(...gaps);
+    expect(maxGap - minGap).toBeGreaterThan(0.01);
   });
 
   it('keeps the mother silhouette visibly organic even at low LOD', () => {
