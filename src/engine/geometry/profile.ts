@@ -117,10 +117,18 @@ function buildMotherRows(length: number, radius: number): BaseProfileRow[] {
   // note from visual QA (2026-08-02). Natural quartz terminations taper
   // continuously, so the widest point now sits low and every row above it
   // steps inward, giving one uninterrupted line from shoulder to tip.
+  //
+  // Ten slices rather than eight. The two extra sit in the long gaps of the
+  // shaft (0.12→0.40 and 0.40→0.62), which is where the old profile ran
+  // hundreds of pixels without a single horizontal edge — the stretch that
+  // read as a smooth ball. Each slice turns and drifts on its own, so a slice
+  // is not detail for its own sake: it is another place the surface can break.
   appendBaseRow(rows, 0, radius * 0.16);
   appendBaseRow(rows, length * 0.05, radius * 0.74);
   appendBaseRow(rows, length * 0.12, radius);
+  appendBaseRow(rows, length * 0.26, radius * 0.975);
   appendBaseRow(rows, length * 0.4, radius * 0.93);
+  appendBaseRow(rows, length * 0.51, radius * 0.865);
   appendBaseRow(rows, length * 0.62, radius * 0.78);
   appendBaseRow(rows, length * 0.8, radius * 0.54);
   appendBaseRow(rows, length * 0.92, radius * 0.27);
@@ -133,6 +141,81 @@ function smoothStep(value: number): number {
   return t * t * (3 - 2 * t);
 }
 
+/**
+ * How far each slice turns relative to the one below it.
+ *
+ * A lathe whose rings all share one orientation is a prism, and a prism read as
+ * "a smooth ball sticking out of the ground" in review: every quad between two
+ * rings is a long vertical strip, all strips meet the light at the same angle,
+ * and nothing on the surface tells you where one face ends and the next begins.
+ * Turning each slice breaks those strips into ribbons that catch the light
+ * separately — the single biggest difference between a lathe and a crystal.
+ *
+ * The whole body used to twist by about 11° in total. This is 6–12° **per
+ * slice**, so an eight-row monarch turns through roughly 70°.
+ */
+const SLICE_TURN_MIN_RAD = 6 * (Math.PI / 180);
+const SLICE_TURN_MAX_RAD = 12 * (Math.PI / 180);
+
+/**
+ * Ceiling on the turn, as a fraction of one facet's angular width.
+ *
+ * Without it a 24-facet monarch (the couple with the most photos) would turn
+ * each slice by most of a facet, shearing every quad into a sliver. The visual
+ * effect of a turn is relative to facet width, not absolute, so a crystal with
+ * many narrow facets needs a proportionally smaller step.
+ */
+const SLICE_TURN_MAX_STEP_FRACTION = 0.4;
+
+/** How far a slice may wander off the axis, as a fraction of its own radius. */
+const SLICE_DRIFT = 0.05;
+/** The tip wanders further — a terminated crystal is never centred over its base. */
+const SLICE_TIP_DRIFT = 0.14;
+
+/** Per-slice radius swing, 5–10% of the profile radius. */
+const SLICE_RADIUS_SWING_MIN = 0.05;
+const SLICE_RADIUS_SWING_MAX = 0.1;
+
+function sliceRadiusSwing(seed: number, rowIndex: number, axis: 'x' | 'z'): number {
+  const unit = seededUnit(seed, `geometry:slice-radius-swing:${axis}:${rowIndex}`);
+  return SLICE_RADIUS_SWING_MIN + unit * (SLICE_RADIUS_SWING_MAX - SLICE_RADIUS_SWING_MIN);
+}
+
+/**
+ * Per-slice turn, accumulated from the base upward.
+ *
+ * Accumulated rather than interpolated: the point is that adjacent slices
+ * differ, and any curve that eases in and out flattens exactly the slices where
+ * the crystal is widest and most visible.
+ */
+function sliceTurns(
+  seed: number,
+  rowCount: number,
+  segments: number,
+  twistTotal: number,
+): number[] {
+  const step = (Math.PI * 2) / Math.max(1, segments);
+  const ceiling = step * SLICE_TURN_MAX_STEP_FRACTION;
+  // One handedness for the whole body. Seeding this independently let a crystal
+  // twist one way at body scale and the other slice by slice, which cancels
+  // into a shape that reads as a mistake rather than as growth.
+  const direction = twistTotal < 0 ? -1 : 1;
+  const turns: number[] = [];
+  let accumulated = 0;
+  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+    if (rowIndex > 0) {
+      const unit = seededUnit(seed, `geometry:slice-turn:${rowIndex}`);
+      const magnitude = Math.min(
+        ceiling,
+        SLICE_TURN_MIN_RAD + unit * (SLICE_TURN_MAX_RAD - SLICE_TURN_MIN_RAD),
+      );
+      accumulated += direction * magnitude;
+    }
+    turns.push(round6(accumulated));
+  }
+  return turns;
+}
+
 function decorateRows(
   rows: readonly BaseProfileRow[],
   body: GrowthBody,
@@ -143,8 +226,10 @@ function decorateRows(
   axisLeanZ: number,
   burialStartY: number,
   burialCompression: number,
+  segments: number,
 ): CrystalProfileRow[] {
   const lastY = Math.max(1e-9, rows[rows.length - 1]?.y ?? 0);
+  const turns = sliceTurns(body.seed, rows.length, segments, twistTotal);
   const phaseBias = signedUnit(body.seed, 'geometry:profile-phase-bias') * tuning.phase * 0.35;
   const bowX = signedUnit(body.seed, 'geometry:axis-bow-x') * Math.abs(axisLeanX + axisLeanZ) * 0.35;
   const bowZ = signedUnit(body.seed, 'geometry:axis-bow-z') * Math.abs(axisLeanX + axisLeanZ) * 0.35;
@@ -153,9 +238,18 @@ function decorateRows(
   return rows.map((row, rowIndex) => {
     const t = Math.max(0, Math.min(1, row.y / lastY));
     const bend = Math.sin(Math.PI * t);
-    const centerOffsetX = axisLeanX * smoothStep(t) + bowX * bend;
-    const centerOffsetZ = axisLeanZ * smoothStep(t) + bowZ * bend;
-    const rotation = twistTotal * smoothStep(t);
+    // Each slice also steps sideways on its own. The lean and the bow are
+    // smooth curves — they move the whole silhouette without ever making two
+    // neighbouring slices disagree, which is what actually produces an edge.
+    // The last slice gets the largest step, so the tip finishes off the axis
+    // rather than centred over the base like a spun cone.
+    const tipward = rowIndex === rows.length - 1 ? SLICE_TIP_DRIFT : SLICE_DRIFT;
+    const driftScale = row.radius * tipward;
+    const driftX = signedUnit(body.seed, `geometry:slice-drift-x:${rowIndex}`) * driftScale;
+    const driftZ = signedUnit(body.seed, `geometry:slice-drift-z:${rowIndex}`) * driftScale;
+    const centerOffsetX = axisLeanX * smoothStep(t) + bowX * bend + driftX;
+    const centerOffsetZ = axisLeanZ * smoothStep(t) + bowZ * bend + driftZ;
+    const rotation = twistTotal * smoothStep(t) + (turns[rowIndex] ?? 0);
     const facetPhase = phaseBias
       + signedUnit(body.seed, `geometry:facet-phase:${rowIndex}`) * tuning.phase * bend;
     const burialT = burialStartY > 1e-9
@@ -165,8 +259,11 @@ function decorateRows(
       ? burialCompression + (1 - burialCompression) * smoothStep(burialT)
       : 1;
     const pulse = Math.sin((t * Math.PI * 2) + phaseBias * 7) * tuning.asymmetry * 0.22;
-    const rowNoiseX = signedUnit(body.seed, `geometry:radius-x:${rowIndex}`) * tuning.asymmetry * 0.38;
-    const rowNoiseZ = signedUnit(body.seed, `geometry:radius-z:${rowIndex}`) * tuning.asymmetry * 0.38;
+    // 5–10% per slice, stated rather than incidental: enough that the taper
+    // reads as a stack of distinct sections, small enough that the silhouette
+    // stays a crystal and not a stack of coins.
+    const rowNoiseX = signedUnit(body.seed, `geometry:radius-x:${rowIndex}`) * sliceRadiusSwing(body.seed, rowIndex, 'x');
+    const rowNoiseZ = signedUnit(body.seed, `geometry:radius-z:${rowIndex}`) * sliceRadiusSwing(body.seed, rowIndex, 'z');
     const radiusX = Math.max(
       0.0001,
       row.radius * scales.scaleX * compression * (1 + pulse + rowNoiseX),
@@ -252,6 +349,10 @@ export function buildCrystalProfile(
 
     appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.05, radius * 0.9);
     appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.14, radius);
+    // Same reason as the monarch: the shaft used to run from 0.14 to ~0.6 with
+    // no horizontal edge in it at all.
+    appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.3, radius * 0.985);
+    appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.44, radius * 0.97);
     appendBaseRow(
       baseRows,
       prismEnd,
@@ -281,6 +382,9 @@ export function buildCrystalProfile(
   const burialCompression = attached
     ? round6(0.62 + seededUnit(body.seed, 'geometry:burial-compression') * 0.14)
     : 1;
+  // Facet count first: the per-slice turn is measured against one facet's
+  // angular width, so the rows cannot be laid out until the ring is known.
+  const segments = segmentsFor(body, mother, lod);
   const rows = decorateRows(
     baseRows,
     body,
@@ -291,8 +395,8 @@ export function buildCrystalProfile(
     axisLeanZ,
     burialStartY,
     burialCompression,
+    segments,
   );
-  const segments = segmentsFor(body, mother, lod);
   const signaturePayload = JSON.stringify({
     bodyId: body.id,
     seed: body.seed,

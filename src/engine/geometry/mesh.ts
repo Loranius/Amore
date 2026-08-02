@@ -184,7 +184,23 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
       const b = currentStart + next;
       const c = nextStart + segment;
       const d = nextStart + next;
-      indices.push(a, b, c, b, d, c);
+      // Alternating the diagonal is what turns a lathe into something faceted.
+      // Splitting every quad the same way gave every triangle in the body the
+      // same pair of edge directions, so the whole surface caught the light at
+      // one angle and the crystal read as a smooth spun shape. A checkerboard
+      // makes neighbouring triangles lean opposite ways, and once each face
+      // carries its own normal (see the flat-shading pass below) that is what
+      // the eye reads as facets.
+      //
+      // An odd segment count would put two same-parity quads next to each other
+      // at the seam. That is a mild defect in the pattern, not in the mesh —
+      // both splits are valid triangulations of the same quad and wind the same
+      // way, so the shell stays closed and consistently oriented either way.
+      if ((row + segment) % 2 === 0) {
+        indices.push(a, b, c, b, d, c);
+      } else {
+        indices.push(a, b, d, a, d, c);
+      }
     }
   }
 
