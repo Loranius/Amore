@@ -12,11 +12,6 @@ import { VitePWA } from 'vite-plugin-pwa';
 // підставляє CI через BASE_PATH (див. .github/workflows/deploy.yml). Локально
 // й на кореневому домені лишається '/'.
 const base = process.env.BASE_PATH ?? '/';
-const godotReleaseCacheKey = (
-  process.env.VITE_EVOLUTION_GODOT_RELEASE_ID
-  || 'preview'
-).replace(/[^a-z0-9._-]/gi, '-').slice(0, 64);
-const buildGodotHarness = process.env.BUILD_GODOT_HARNESS === '1';
 
 export default defineConfig({
   plugins: [
@@ -40,28 +35,13 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Godot Web emits large .wasm/.pck files. They must not enter the
-        // Workbox precache manifest or exceed its build-time size ceiling.
-        globIgnores: ['**/godot/evolution-engine/**'],
         // game.html — окремий документ в iframe; хай кешується як навігація.
         maximumFileSizeToCacheInBytes: 5000000,
         navigateFallbackDenylist: [
           /game\.html/,
           /\.mp4$/,
-          /\/godot\/evolution-engine\//,
-          /\/e2e\/godot\//,
         ],
         runtimeCaching: [
-          {
-            urlPattern: /\/godot\/evolution-engine\//,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: `godot-evolution-engine-${godotReleaseCacheKey}`,
-              networkTimeoutSeconds: 10,
-              cacheableResponse: { statuses: [0, 200] },
-              expiration: { maxEntries: 12, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
           {
             // Публічні фото зі Storage — cache-first, вони незмінні за URL.
             urlPattern: /\/storage\/v1\/object\/public\//,
@@ -78,17 +58,5 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
-  ...(buildGodotHarness
-    ? {
-        build: {
-          rollupOptions: {
-            input: {
-              app: fileURLToPath(new URL('./index.html', import.meta.url)),
-              godotHarness: fileURLToPath(new URL('./e2e/godot/index.html', import.meta.url)),
-            },
-          },
-        },
-      }
-    : {}),
   base,
 });
