@@ -177,3 +177,36 @@ describe('crystal substrate', () => {
     expect(pipeline().substrate).toEqual(pipeline().substrate);
   });
 });
+
+describe('crystal substrate ground spread (ADR-0004)', () => {
+  it('widens with the monarch`s published spread and still covers every base', () => {
+    // Places visited reach geometry only as a multiplier on the monarch's
+    // attributes; the volume never learns what a place is.
+    const { growth, substrate } = pipeline();
+    const travelled = {
+      ...growth,
+      bodies: growth.bodies.map((body) => (
+        body.id === 'crystal:mother'
+          ? { ...body, attributes: { ...body.attributes, groundSpread: 1.4 } }
+          : body
+      )),
+    };
+    const wider = buildCrystalGeometry({
+      growth: travelled,
+      composition: buildCrystalComposition({
+        growth: travelled,
+        config: DEFAULT_CRYSTAL_COMPOSITION_CONFIG,
+      }),
+      config: DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
+    }).meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+
+    expect(wider.bounds.max.x).toBeGreaterThan(substrate.bounds.max.x * 1.2);
+
+    // The load-bearing guarantee still holds at the wider size.
+    const rim = Math.min(Math.abs(wider.bounds.min.x), Math.abs(wider.bounds.max.x));
+    for (const body of travelled.bodies) {
+      expect(Math.hypot(body.anchor.x, body.anchor.z) + body.renderedRadius).toBeLessThan(rim);
+    }
+    expect(wider.bounds.min.y).toBeLessThan(Math.min(...travelled.bodies.map((b) => b.anchor.y)));
+  });
+});

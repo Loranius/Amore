@@ -356,6 +356,32 @@ export function childAzimuthRad(yearIndex: number): number {
   return round6(angle < 0 ? angle + Math.PI * 2 : angle);
 }
 
+// ── Ground ──────────────────────────────────────────────────
+
+/** Places beyond which more travel stops widening the ground much. */
+const GROUND_PLACES_HALF_SATURATION = 30;
+/** Widest the ground may grow beyond the druse's own footprint. */
+const GROUND_MAX_SPREAD = 0.45;
+
+/**
+ * How far the rock spreads beyond what the druse strictly needs, from the
+ * places the couple has been.
+ *
+ * The map was the second-largest module in a real couple's history — 26
+ * visited places — and drove nothing of its own: the substrate was derived
+ * purely from the druse's own footprint, so it carried no meaning at all.
+ * Where they have been is literally the ground they grow from.
+ *
+ * A multiplier rather than an absolute size, because the substrate still has
+ * to cover every crystal's buried base (ADR-0003). Widening it can never
+ * break that guarantee; narrowing it could, so this only ever grows.
+ */
+export function groundSpread(placesVisited: number): number {
+  const places = Number.isFinite(placesVisited) ? Math.max(0, placesVisited) : 0;
+  const reach = places / (places + GROUND_PLACES_HALF_SATURATION);
+  return round6(1 + GROUND_MAX_SPREAD * reach);
+}
+
 // ── Colour from fulfilled wishes ────────────────────────────
 
 /**

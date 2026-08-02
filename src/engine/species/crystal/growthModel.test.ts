@@ -14,6 +14,7 @@ import {
   childGrowthProgress,
   childRingIndex,
   facetThresholdForYears,
+  groundSpread,
   PORTAL_MODULE_COUNT,
   yearActivity,
   yearFill,
@@ -433,5 +434,34 @@ describe('how lived-in a year was', () => {
       expect(Number.isFinite(yearActivity(value, 10))).toBe(true);
       expect(Number.isFinite(yearActivity(3, value))).toBe(true);
     }
+  });
+});
+
+describe('ground spread from places visited', () => {
+  it('widens the rock with travel and then levels off', () => {
+    // The map was the second-largest module in a real couple's history and
+    // drove nothing of its own; the substrate was derived purely from the
+    // druse's footprint, so it carried no meaning.
+    expect(groundSpread(0)).toBe(1);
+    expect(groundSpread(26)).toBeGreaterThan(groundSpread(5));
+    expect(groundSpread(200)).toBeGreaterThan(groundSpread(26));
+
+    const earlyTen = groundSpread(20) - groundSpread(10);
+    const lateTen = groundSpread(120) - groundSpread(110);
+    expect(lateTen).toBeLessThan(earlyTen);
+  });
+
+  it('only ever widens, so it cannot uncover a buried base', () => {
+    // ADR-0003 hides each crystal's base cap under the rock. A multiplier
+    // below one could expose it, so the range is one and up by construction.
+    for (const places of [0, 1, 26, 10_000, Number.NaN, -4, Number.POSITIVE_INFINITY]) {
+      const spread = groundSpread(places);
+      expect(spread).toBeGreaterThanOrEqual(1);
+      expect(Number.isFinite(spread)).toBe(true);
+    }
+  });
+
+  it('never grows the rock into a plate', () => {
+    expect(groundSpread(Number.MAX_SAFE_INTEGER)).toBeLessThanOrEqual(1.5);
   });
 });

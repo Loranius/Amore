@@ -18,6 +18,7 @@ import {
   childDistance,
   childGrowthProgress,
   childRingIndex,
+  groundSpread,
   monarchAxialScale,
   monarchFacetCount,
   monarchRadialScale,
@@ -131,6 +132,10 @@ export function buildMotherInstruction(
     ringDistance: 0,
     tintRgb: [1, 1, 1] as const,
     iridescence: 0,
+    // Where the couple has been is the ground they grow from.
+    groundSpread: groundSpread(
+      occurred.filter((event) => eventModule(event.source) === 'map').length,
+    ),
     seed,
   };
 }
@@ -282,6 +287,8 @@ export function buildAnnualFormations(
         // A year with no gifts stays the white every crystal is born as.
         tintRgb: tint.rgb,
         iridescence: tint.iridescence,
+        // Only the monarch speaks for the ground.
+        groundSpread: 1,
         seed,
       };
     });
@@ -340,6 +347,7 @@ export function buildSkirtFormations(
       ringDistance: round6(SKIRT_RING_DISTANCE + seededUnit(seed, 'ring') * 0.07),
       tintRgb: [1, 1, 1] as const,
       iridescence: 0,
+      groundSpread: 1,
       seed,
     };
   });

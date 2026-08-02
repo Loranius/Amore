@@ -107,6 +107,7 @@ function commonAttributes(
     tintG: source.tintRgb[1],
     tintB: source.tintRgb[2],
     iridescence: source.iridescence,
+    groundSpread: source.groundSpread,
   };
 }
 

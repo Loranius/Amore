@@ -160,6 +160,12 @@ export interface CrystalGrowthInstruction {
    */
   tintRgb: readonly [number, number, number];
   iridescence: number;
+  /**
+   * How far the ground spreads beyond the druse's own footprint, as a
+   * multiplier of 1 or more. Published on the monarch only; the geometry
+   * volume reads a number and never learns what a "place" is.
+   */
+  groundSpread: number;
   seed: number;
 }
 
