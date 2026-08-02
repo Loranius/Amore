@@ -403,7 +403,9 @@ textarea::placeholder {
   margin: -16px -16px calc(-1 * (env(safe-area-inset-bottom, 0) + 88px));
   padding: 16px 16px calc(env(safe-area-inset-bottom, 0) + 88px);
   min-height: 100dvh;
-  background: var(--page-gradient);
+  /* Фон малює PortalBackdrop; тут лише запасний колір на випадок, поки
+     його шари ще не змонтовані. */
+  background: var(--portal-sky-bottom, var(--page-gradient));
 }
 /* Негативний z-index замість "підняти всіх сусідів" — так модалки/
    Lightbox (position:fixed, рендеряться тут же прямими дітьми .pink-page)

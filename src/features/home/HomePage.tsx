@@ -19,7 +19,7 @@ import {
 } from './homeArtifact';
 import { CrystalErrorBoundary } from './crystal3d/CrystalErrorBoundary';
 import { useWebglSupport } from './crystal3d/useWebglSupport';
-import { PortalDecor } from '@/features/auth/PortalDecor';
+import { PortalBackdrop } from './PortalBackdrop';
 
 const CrystalScene = lazy(() => import('./crystal3d/CrystalSceneEntry'));
 const ReefScene = lazy(() => import('./reef3d/ReefPreviewScene'));
@@ -69,7 +69,7 @@ export function HomePage() {
 
   return (
     <section className="home" data-home-artifact={artifact}>
-      <PortalDecor density="light" parallax={false} />
+      <PortalBackdrop />
       <Hero />
       <HomeArtifactSwitcher value={artifact} onChange={selectArtifact} />
       <h1 className="home-title">{HOME_ARTIFACT_LABELS[artifact]} Amore</h1>
