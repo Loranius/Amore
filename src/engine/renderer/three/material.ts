@@ -100,6 +100,11 @@ export function createThreeCrystalMaterial(source: CrystalBodyMaterial): THREE.M
     // space derivatives and discard the published ones — the same picture, but
     // arrived at by ignoring the state instead of drawing it.
     flatShading: false,
+    // Per-face tone rides in the geometry's colour attribute and multiplies
+    // into this colour, so the body still renders as the colour the couple
+    // earned — and, because it is geometry rather than material, bodies with
+    // the same optical signature still share one draw call.
+    vertexColors: true,
     envMapIntensity: source.envMapIntensity,
   });
   material.iridescence = source.iridescence;

@@ -110,8 +110,41 @@ export function orthonormalBasis(direction: GrowthVec3): { tangent: GrowthVec3; 
   return { tangent, bitangent };
 }
 
+/**
+ * 32-bit avalanche (the murmur3 finalizer).
+ *
+ * FNV-1a is a fine identity hash and stays the one that mints artifact seeds
+ * and signatures — but it is not a random source, and `seededUnit` was using it
+ * as one. Its last step is `hash ^= char; hash *= PRIME`, so two salts
+ * differing only in their final character land about `PRIME / 2^32` apart:
+ *
+ *   ...:0 -> 0.2245   ...:2 -> 0.2323
+ *   ...:1 -> 0.2205   ...:3 -> 0.2284
+ *
+ * Every seeded decision in the engine indexes its salt — facet jitter per
+ * segment, radius jitter per row, the rock's lumpiness per ring. All of them
+ * were reading a near-linear ramp instead of noise, which is a large part of
+ * why the crystal looked machined: the "irregular" facets were regular, and
+ * the "lumpy" rock was smooth.
+ */
+function avalanche(hash: number): number {
+  let mixed = hash >>> 0;
+  mixed ^= mixed >>> 16;
+  mixed = Math.imul(mixed, 0x7feb352d);
+  mixed ^= mixed >>> 15;
+  mixed = Math.imul(mixed, 0x846ca68b);
+  mixed ^= mixed >>> 16;
+  return mixed >>> 0;
+}
+
+/**
+ * Deterministic value in [0, 1).
+ *
+ * Half-open, not closed: dividing by 0xffffffff let it return exactly 1, which
+ * is out of range for every caller that uses it to pick an index or a fraction.
+ */
 export function seededUnit(seed: number, salt: string): number {
-  return stableHash32(`${seed}\u001f${salt}`) / 0xffffffff;
+  return avalanche(stableHash32(`${seed}\u001f${salt}`)) / 0x1_0000_0000;
 }
 
 export function angularDistance(left: number, right: number): number {

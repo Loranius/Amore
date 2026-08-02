@@ -1,6 +1,11 @@
 import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
 import { CRYSTAL_MATERIAL_QUALITY_PRESETS } from './config';
 import {
+  CRYSTAL_FACET_TINTING,
+  SUBSTRATE_FACET_TINTING,
+  facetTintingSignature,
+} from './facets';
+import {
   clamp01,
   crystalChannelColor,
   mixRgb,
@@ -75,6 +80,7 @@ function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string
     body.shader.inclusionDensity,
     body.shader.inclusionScale,
     body.shader.inclusionContrast,
+    facetTintingSignature(body.facets),
   ].map((value) => typeof value === 'number' ? value.toFixed(6) : String(value)).join('|');
 }
 
@@ -217,6 +223,7 @@ function buildBodyMaterial(
     transparent: false,
     depthWrite: true,
     shader,
+    facets: CRYSTAL_FACET_TINTING,
   };
   const material: CrystalBodyMaterial = {
     ...bodyWithoutSignature,
@@ -288,6 +295,7 @@ function buildSubstrateMaterial(
         0.28 * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
       ),
     },
+    facets: SUBSTRATE_FACET_TINTING,
   };
   return {
     ...bodyWithoutSignature,

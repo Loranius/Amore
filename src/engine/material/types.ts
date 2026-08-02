@@ -30,6 +30,13 @@ export interface CrystalShaderRecipe {
   inclusionContrast: number;
 }
 
+export interface CrystalFacetTinting {
+  /** Multipliers over the body's base colour, in palette order. */
+  tints: readonly CrystalRgb[];
+  /** Selection thresholds, same length and ascending; the last is 1. */
+  cumulativeWeights: readonly number[];
+}
+
 export interface CrystalBodyMaterial {
   materialVersion: 1;
   bodyId: string;
@@ -54,6 +61,8 @@ export interface CrystalBodyMaterial {
   transparent: false;
   depthWrite: true;
   shader: CrystalShaderRecipe;
+  /** Per-face tone over baseColor — see `facets.ts`. */
+  facets: CrystalFacetTinting;
 }
 
 export interface CrystalMaterialPalette {
