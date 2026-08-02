@@ -2,9 +2,7 @@ import { useCallback, useState, type KeyboardEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
-import { CrystalStats } from '../../CrystalStats';
 import { MemoryModal } from '../../MemoryModal';
-import { useCrystalDNA } from '../../useCrystal';
 import LegacyCrystalScene from '../CrystalScene';
 import { EvolutionCrystalObject } from './EvolutionCrystalObject';
 import {
@@ -24,7 +22,6 @@ export default function EvolutionCrystalPreviewScene() {
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
   const { pipeline, isPending, error } = useEvolutionCrystalPipeline(reduceMotion);
-  const { dna, deltas, isPending: statsPending } = useCrystalDNA();
   const [open, setOpen] = useState(false);
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
 
@@ -121,7 +118,6 @@ export default function EvolutionCrystalPreviewScene() {
         )}
       </div>
 
-      <CrystalStats dna={dna} deltas={deltas} isPending={statsPending} />
       {open && <MemoryModal onClose={() => setOpen(false)} />}
     </>
   );

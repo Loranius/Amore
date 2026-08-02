@@ -2334,24 +2334,6 @@ a.wl-card-title { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) {
   .crystal-loading-glow { animation: none; opacity: .8; }
 }
-/* Смужка статистики під кристалом */
-.crystal-stats { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 18px; }
-.crystal-stat-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  background: var(--surface);
-  border-radius: 14px;
-  padding: 8px 12px;
-  min-width: 64px;
-  box-shadow: 0 4px 12px rgba(58, 37, 48, 0.08);
-}
-.crystal-stat-icon { font-size: 16px; }
-.crystal-stat-value { font-weight: 700; font-size: 15px; }
-.crystal-stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-.crystal-stat-delta { font-size: 9px; color: var(--ok); font-weight: 600; }
-
 /* Модалка «Спогад» (клік по кристалу) */
 .memory-card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
 .memory-photo {

@@ -52,7 +52,6 @@ import { useCrystalSeed } from '../useHome';
 import { useMemories } from '@/features/memories/useMemories';
 import { useClusterGrowthFlash } from '../useCrystalSeen';
 import { hashSeedString } from '../mulberry32';
-import { CrystalStats } from '../CrystalStats';
 import { MemoryModal } from '../MemoryModal';
 import {
   generateArtifactDNA,
@@ -215,7 +214,7 @@ function CrystalSeed({ reduceMotion }: { reduceMotion: boolean }) {
 }
 
 export default function CrystalScene() {
-  const { dna, photos, deltas, isPending: dnaPending } = useCrystalDNA();
+  const { dna, photos, isPending: dnaPending } = useCrystalDNA();
   const { seed, isPending: seedPending } = useCrystalSeed();
   const { milestones, isPending: milestonesPending } = useMilestoneEvents();
   const { countries, cities, isPending: placesPending } = useCrystalPlaces();
@@ -426,8 +425,6 @@ export default function CrystalScene() {
           </button>
         )}
       </div>
-
-      <CrystalStats dna={dna} deltas={deltas} isPending={isPending} />
 
       {open && <MemoryModal onClose={() => setOpen(false)} />}
     </>

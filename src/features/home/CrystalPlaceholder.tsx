@@ -5,20 +5,12 @@
 // секунд. У цей час не можна підставляти інший силует: користувач має
 // бачити нейтральне світло, доки на його місце стане справжній артефакт.
 // ============================================================
-import { CrystalStats } from './CrystalStats';
-import { EMPTY_DELTAS, EMPTY_DNA } from './useCrystal';
-
 export function CrystalPlaceholder() {
   return (
-    <>
-      {/* Той самий .crystal-wrap, що й у сцени: рамка задає розмір,
-          тож підміна не зсуває нічого нижче. */}
-      <div className="crystal-wrap crystal-wrap--loading" aria-hidden="true">
-        <span className="crystal-loading-glow" />
-      </div>
-      {/* Смужка статистики теж на місці й у стані очікування — інакше
-          вона з'явилася б аж із 3D-сценою й підстрибнула б уся сторінка. */}
-      <CrystalStats dna={EMPTY_DNA} deltas={EMPTY_DELTAS} isPending />
-    </>
+    // Той самий .crystal-wrap, що й у сцени: рамка задає розмір,
+    // тож підміна не зсуває нічого нижче.
+    <div className="crystal-wrap crystal-wrap--loading" aria-hidden="true">
+      <span className="crystal-loading-glow" />
+    </div>
   );
 }
