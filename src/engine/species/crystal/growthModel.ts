@@ -250,6 +250,42 @@ export interface ChildDimensions {
 }
 
 /**
+ * Portal modules a year can draw on: calendar, plans, wishlist, map,
+ * memories, shopping.
+ *
+ * Kept here as a number rather than imported from the adapter layer, which
+ * Volume II has no business reaching into. `growthModel.test.ts` checks it
+ * against the real adapter source list so the two cannot drift.
+ */
+export const PORTAL_MODULE_COUNT = 6;
+
+/** Events in a single module beyond which more of the same adds little. */
+const YEAR_DEPTH_HALF_SATURATION = 12;
+
+/**
+ * How lived-in a year was, from 0 to 1.
+ *
+ * Weighted toward *breadth* — how many parts of the portal the year touched —
+ * rather than volume. Counting events made the measure almost entirely a
+ * photo count: in a real couple's fullest year, 48 of 80 events were photos,
+ * and photos already drive the monarch's facets, so volume both double-counted
+ * one module and drowned out the other five. Measured on that couple's four
+ * years, counting gave 0.25 / 0.14 / 0.33 / 0.87 — ranking a year of nothing
+ * but six photos *above* a year with a trip, an anniversary and a photo.
+ *
+ * This is the "module fill" the owner asked for from the start.
+ */
+export function yearActivity(moduleCount: number, eventCount: number): number {
+  // `Math.max(0, NaN)` is NaN and `Infinity / (Infinity + 12)` is NaN, so a
+  // count has to be proved finite before it is used, not merely floored.
+  const count = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);
+  const breadth = clamp01(count(moduleCount) / PORTAL_MODULE_COUNT);
+  const events = count(eventCount);
+  const depth = events / (events + YEAR_DEPTH_HALF_SATURATION);
+  return round6(0.6 * breadth + 0.4 * depth);
+}
+
+/**
  * How full a year is, from 0 to 1 — the fraction of the maximum a year's
  * crystal is entitled to.
  *
@@ -259,9 +295,18 @@ export interface ChildDimensions {
  * content dated inside a year belongs to that year whenever it is added.
  * What a closed year no longer does is grow with time or with anything
  * that happened outside it.
+ *
+ * The floor is what a year with nothing in it still gets. It was 0.55, which
+ * compressed a real couple's three closed years into 0.66/0.61/0.70 — a nine
+ * percent spread, invisible on screen, so three very different years looked
+ * identical. A lower floor lets a well-filled year actually look like one.
  */
-export function yearFill(progress: number, yearActivity: number): number {
-  return round6(clamp01(progress) * (0.55 + 0.45 * clamp01(yearActivity)));
+const EMPTY_YEAR_FLOOR = 0.3;
+
+export function yearFill(progress: number, activity: number): number {
+  return round6(
+    clamp01(progress) * (EMPTY_YEAR_FLOOR + (1 - EMPTY_YEAR_FLOOR) * clamp01(activity)),
+  );
 }
 
 /**

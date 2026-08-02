@@ -23,6 +23,7 @@ import {
   monarchRadialScale,
   relationshipYears,
   wishTint,
+  yearActivity,
   yearFill,
   type WishGiftTally,
 } from './growthModel';
@@ -235,10 +236,10 @@ export function buildAnnualFormations(
       const seed = stableSeed(artifact.deterministicSeed, id);
       const yearEvents = eventsWithin(artifact, year.startsAt, year.endsAt, asOfEpoch);
       const importantEventCount = yearEvents.filter(isImportantEvent).length;
-      // How full the year was, across every module — not just the important
-      // events, so a busy year without a logged anniversary is still a big
-      // crystal.
-      const yearActivity = saturate(yearEvents.length, 12);
+      // How lived-in the year was: mostly how many parts of the portal it
+      // touched, and only partly how much. See `yearActivity`.
+      const modules = new Set(yearEvents.map((event) => eventModule(event.source)));
+      const activity = yearActivity(modules.size, yearEvents.length);
 
       // Every year is measured against the monarch as she stands today, so
       // the ring stays proportional to her and a couple who filled in their
@@ -246,7 +247,7 @@ export function buildAnnualFormations(
       // is the year's *fill* — its share of the maximum — not its size in
       // absolute units.
       const progress = childGrowthProgress(year, asOf);
-      const fill = yearFill(progress, yearActivity);
+      const fill = yearFill(progress, activity);
       const size = childDimensions(monarchNow, fill);
       const ringIndex = childRingIndex(year.index);
       const tint = wishTint(wishTallyForYear(yearEvents, partners));
@@ -267,7 +268,7 @@ export function buildAnnualFormations(
         radialScale: size.radialScale,
         // Years carry more facets the fuller they were, within the same range
         // the monarch uses so the ring never out-detail the centre.
-        facetCount: 6 + Math.round(yearActivity * 2),
+        facetCount: 6 + Math.round(activity * 2),
         azimuthRad: childAzimuthRad(year.index),
         elevation: 1,
         radialBias: 0,

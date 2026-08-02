@@ -14,6 +14,8 @@ import {
   childGrowthProgress,
   childRingIndex,
   facetThresholdForYears,
+  PORTAL_MODULE_COUNT,
+  yearActivity,
   yearFill,
   mediaSparkleCount,
   monarchAxialScale,
@@ -378,5 +380,58 @@ describe('sparkles from media', () => {
   it('respects the device cap it is given', () => {
     expect(mediaSparkleCount(10_000, 18)).toBe(18);
     expect(mediaSparkleCount(10_000, 0)).toBe(0);
+  });
+});
+
+describe('how lived-in a year was', () => {
+  it('counts breadth across the portal above sheer volume', () => {
+    // The defect this replaces. On a real couple's data, counting events made
+    // a year of nothing but six photos rank *above* a year with a trip, an
+    // anniversary and a photo — because volume is really a photo count, and
+    // photos already drive the monarch's facets.
+    const sixModulesFewEvents = yearActivity(6, 10);
+    const oneModuleManyEvents = yearActivity(1, 60);
+
+    expect(sixModulesFewEvents).toBeGreaterThan(oneModuleManyEvents);
+  });
+
+  it('separates a couple`s real years instead of bunching them', () => {
+    // Measured: photos/places/calendar per year for the couple who prompted
+    // this. The old formula put the three closed years inside nine percent of
+    // each other, which is invisible on screen.
+    const closed = [
+      yearFill(1, yearActivity(3, 4)),
+      yearFill(1, yearActivity(2, 2)),
+      yearFill(1, yearActivity(1, 6)),
+    ];
+    const spread = Math.max(...closed) - Math.min(...closed);
+    expect(spread).toBeGreaterThan(0.1);
+
+    // And the fullest year is far clear of all of them.
+    expect(yearFill(1, yearActivity(6, 80))).toBeGreaterThan(Math.max(...closed) * 1.5);
+  });
+
+  it('rises with either signal and never leaves 0..1', () => {
+    expect(yearActivity(3, 10)).toBeGreaterThan(yearActivity(2, 10));
+    expect(yearActivity(3, 20)).toBeGreaterThan(yearActivity(3, 10));
+    expect(yearActivity(0, 0)).toBe(0);
+    expect(yearActivity(PORTAL_MODULE_COUNT, 10_000)).toBeLessThanOrEqual(1);
+    // More modules than exist cannot buy extra credit.
+    expect(yearActivity(99, 10)).toBe(yearActivity(PORTAL_MODULE_COUNT, 10));
+  });
+
+  it('still gives an empty year something rather than nothing', () => {
+    // A year the couple lived through is never a zero-height crystal, but it
+    // must be clearly smaller than one they filled.
+    const empty = yearFill(1, 0);
+    expect(empty).toBeGreaterThan(0.2);
+    expect(empty).toBeLessThan(yearFill(1, 1) * 0.4);
+  });
+
+  it('survives nonsense counts', () => {
+    for (const value of [Number.NaN, -5, Number.POSITIVE_INFINITY]) {
+      expect(Number.isFinite(yearActivity(value, 10))).toBe(true);
+      expect(Number.isFinite(yearActivity(3, value))).toBe(true);
+    }
   });
 });

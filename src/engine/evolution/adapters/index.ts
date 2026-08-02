@@ -7,6 +7,7 @@ export { adaptPlans } from './plans';
 export { EVOLUTION_ADAPTER_RULES_VERSION } from './rules';
 export { adaptShoppingItems } from './shopping';
 export { adaptWishlist } from './wishlist';
+export { EVOLUTION_ADAPTER_SOURCES } from './types';
 export type {
   AdapterDiagnostic,
   AdapterDiagnosticCode,
