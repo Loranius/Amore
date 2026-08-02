@@ -209,12 +209,17 @@ func _instruction_id_set(state) -> Dictionary:
 
 
 func _apply_crystal_shadow_policy(instance: MeshInstance3D) -> void:
+	# Every opaque Crystal body intentionally overlaps its neighbours at fused
+	# junctions. Letting any body receive those contact shadows paints black
+	# wedges across the mother Crystal that read as missing front geometry.
+	# Keep direct lighting and shadow casting, but suppress receive shadows on
+	# the complete fused mass, including generation zero.
 	var array_mesh := instance.mesh as ArrayMesh
 	if array_mesh == null or array_mesh.get_surface_count() == 0:
 		return
 	var material := array_mesh.surface_get_material(0) as StandardMaterial3D
 	if material != null:
-		material.disable_receive_shadows = int(instance.get_meta("generation", 0)) > 0
+		material.disable_receive_shadows = true
 
 
 func _apply_quality_settings() -> void:
