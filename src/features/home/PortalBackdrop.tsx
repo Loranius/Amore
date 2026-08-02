@@ -54,6 +54,16 @@ export function PortalBackdrop({ seed = 1 }: { seed?: number }) {
     motes: buildStarField(seed + 5381, 16, 340, 2.1),
   }), [seed]);
 
+  // The bottom navigation lives outside .home, so the token override on the
+  // section cannot reach it and it stayed a white pill on a night scene. A
+  // root-level marker is the smallest thing that lets page chrome follow the
+  // portal without every page growing a theme prop.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-portal-scene', 'true');
+    return () => root.removeAttribute('data-portal-scene');
+  }, []);
+
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -106,6 +116,13 @@ export function PortalBackdrop({ seed = 1 }: { seed?: number }) {
           transform: layerTransform(PARALLAX.near),
         }}
       />
+
+      <div className="portal-backdrop__layer portal-backdrop__pillar portal-backdrop__pillar--left" />
+      <div className="portal-backdrop__layer portal-backdrop__pillar portal-backdrop__pillar--right" />
+
+      <div className="portal-backdrop__layer portal-backdrop__floor">
+        <div className="portal-backdrop__floor-disc" />
+      </div>
 
       <div className="portal-backdrop__layer portal-backdrop__haze" />
 

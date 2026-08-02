@@ -9,6 +9,7 @@ import {
   EvolutionRuntimeProbe,
   type EvolutionRuntimeMetrics,
 } from './EvolutionRuntimeProbe';
+import { isEvolutionDiagnosticsEnabled } from './featureFlag';
 import { useEvolutionCrystalPipeline } from './useEvolutionCrystalPipeline';
 import './evolutionPreview.css';
 
@@ -18,6 +19,11 @@ function formatTopology(value: number): string {
 }
 
 export default function EvolutionCrystalPreviewScene() {
+  // Build metrics are a development instrument. They were rendering over the
+  // artifact in production, which is both noise on the portal's one hero
+  // surface and an internal detail (body counts, draw calls, build time) that
+  // means nothing to a couple looking at their crystal.
+  const [diagnosticsVisible] = useState(isEvolutionDiagnosticsEnabled);
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
@@ -105,10 +111,12 @@ export default function EvolutionCrystalPreviewScene() {
             target={[0, 0.2, 0]}
           />
         </Canvas>
-        <span className="evolution-preview-badge" aria-label="Метрики Evolution preview">
-          {badge}
-        </span>
-        {pipeline.diagnostics.length > 0 && (
+        {diagnosticsVisible && (
+          <span className="evolution-preview-badge" aria-label="Метрики Evolution preview">
+            {badge}
+          </span>
+        )}
+        {diagnosticsVisible && pipeline.diagnostics.length > 0 && (
           <span
             className="evolution-preview-diagnostics"
             title={pipeline.diagnostics.map((item) => item.message).join('\n')}
