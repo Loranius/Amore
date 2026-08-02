@@ -148,6 +148,18 @@ func _run() -> void:
 		_fail("Visual failure: Evolution Engine scene could not be loaded.")
 		return
 	var scene := packed_scene.instantiate()
+	var mother_instance: MeshInstance3D = CrystalMeshBuilder.new().create_mesh_instance(mother)
+	scene.call("_apply_crystal_shadow_policy", mother_instance)
+	var runtime_mesh := mother_instance.mesh as ArrayMesh
+	var runtime_material: StandardMaterial3D = null
+	if runtime_mesh != null and runtime_mesh.get_surface_count() > 0:
+		runtime_material = runtime_mesh.surface_get_material(0) as StandardMaterial3D
+	if runtime_material == null or not runtime_material.disable_receive_shadows:
+		mother_instance.free()
+		scene.free()
+		_fail("Visual failure: mother Crystal still receives opaque contact shadows.")
+		return
+	mother_instance.free()
 	if scene.has_node("Floor"):
 		scene.free()
 		_fail("Visual failure: a visible floor or pedestal is still present.")
