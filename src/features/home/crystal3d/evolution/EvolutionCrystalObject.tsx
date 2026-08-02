@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { Sparkles } from '@react-three/drei';
 import type { CrystalGeometryState } from '@/engine/geometry';
 import type { CrystalLifeState } from '@/engine/life';
@@ -9,6 +9,7 @@ import {
   applyCrystalLifeFrame,
   createThreeCrystalRenderBundle,
 } from '@/engine/renderer/three';
+import { isCrystalTap, type CrystalPointerSample } from './tapGesture';
 
 export interface EvolutionCrystalObjectProps {
   geometry: CrystalGeometryState;
@@ -23,6 +24,7 @@ export interface EvolutionCrystalObjectProps {
  */
 export function EvolutionCrystalObject({ geometry, material, life, onOpen }: EvolutionCrystalObjectProps) {
   const pulseUntil = useRef(0);
+  const pointerDown = useRef<CrystalPointerSample | null>(null);
   const bundle = useMemo(
     () => createThreeCrystalRenderBundle(geometry, material),
     [geometry, material],
@@ -45,10 +47,24 @@ export function EvolutionCrystalObject({ geometry, material, life, onOpen }: Evo
   return (
     <primitive
       object={bundle.group}
-      onPointerDown={() => {
+      onPointerDown={(event: ThreeEvent<PointerEvent>) => {
         pulseUntil.current = performance.now() + life.interactionPulseDuration * 1000;
+        pointerDown.current = {
+          x: event.nativeEvent.clientX,
+          y: event.nativeEvent.clientY,
+          at: performance.now(),
+        };
       }}
-      onClick={onOpen}
+      onClick={(event: ThreeEvent<MouseEvent>) => {
+        const start = pointerDown.current;
+        pointerDown.current = null;
+        const released = {
+          x: event.nativeEvent.clientX,
+          y: event.nativeEvent.clientY,
+          at: performance.now(),
+        };
+        if (isCrystalTap(start, released)) onOpen?.();
+      }}
     >
       {life.sparkleCount > 0 && (
         <Sparkles

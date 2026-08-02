@@ -16,8 +16,19 @@
 
    Обидва шари декоративні (aria-hidden) і не ловлять вказівник.
    ============================================================ */
+/* fixed, а не absolute: .content — контейнер прокрутки зі
+   `scrollbar-gutter: stable both-edges`, тож поза його падінгами лишається
+   ще по ~15px жолоба з кожного боку, і секція .home до країв екрана не
+   дістає. На світлій сторінці цього не було видно; під нічною сценою
+   жолоби стали світлою рамкою навколо порталу. Розтягнути саму секцію
+   (100vw плюс від'ємні поля) не вийшло — відсоток у полях і 100vw
+   рахуються від різних баз, коли жолоб з'їдає ширину контейнера, і секція
+   з'їжджає вбік. fixed рахується прямо від viewport'а: ні падінгів, ні
+   жолобів, ні відсотків. Цим же прийомом тут живуть модалки, і саме
+   заради нього .page-fade має animation-fill-mode: backwards (index.css) —
+   після анімації transform стає none і не перехоплює fixed-нащадків. */
 .portal-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
@@ -62,7 +73,8 @@
    артефакт. Живе окремим елементом, а не всередині .portal-backdrop:
    їй треба лежати ПОВЕРХ полотна, а фонові шари — під ним. */
 .portal-vignette {
-  position: absolute;
+  /* Той самий кадр, що й у неба (див. .portal-backdrop). */
+  position: fixed;
   inset: 0;
   z-index: 1;
   pointer-events: none;
@@ -157,7 +169,9 @@
 }
 
 .home[data-home-artifact='crystal'] #home-artifact-preview {
-  position: absolute;
+  /* Полотно мусить збігатися з небом і віньєткою до пікселя, тож
+     відраховується від того самого viewport'а. */
+  position: fixed;
   inset: 0;
   z-index: 0;
   width: 100%;

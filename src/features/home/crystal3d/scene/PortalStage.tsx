@@ -34,9 +34,12 @@ export function PortalStage({ seed, theme, quality, reduceMotion, children }: Po
       <directionalLight position={[3, 4, 2]} intensity={1.08} />
       <directionalLight position={[-2.5, 3.5, -3.5]} intensity={0.82} color="#fff1f6" />
       <pointLight position={[-3, -2, -2]} intensity={0.34} color="#e6a0bd" />
-      {/* Заповнювальне світло знизу-ззаду: без нього колони й далеке
-          поле провалюються в чорноту, а туман не має що підсвічувати. */}
-      <hemisphereLight args={[palette.daisLight, palette.field, 0.42]} />
+      {/* Заповнювальне світло: без нього колони й далеке поле провалюються
+          в чорноту, а туман не має що підсвічувати. «Земля» тут — колір
+          подіуму, а не поля: грані, повернуті вниз (нижній обвід каменю,
+          з якого росте друза), бачать саме камінь під собою, і з темним
+          полем вони йшли в суцільний чорний, який читався як діра. */}
+      <hemisphereLight args={[palette.daisLight, palette.dais, 0.5]} />
 
       <PortalEnvironment
         seed={seed}
