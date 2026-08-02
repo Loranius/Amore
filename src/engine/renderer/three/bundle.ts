@@ -19,6 +19,10 @@ export interface ThreeCrystalFit {
   scale: number;
   targetHeight: number;
   targetWidth: number;
+  /** Scale a fully grown crystal receives; smaller ones stay proportionally smaller. */
+  referenceScale: number;
+  /** True when the crystal was large enough to be clamped down to fit the frame. */
+  clamped: boolean;
 }
 
 export interface ThreeCrystalRenderBundle {
@@ -103,6 +107,16 @@ function buildBatch(source: BatchSource): ThreeCrystalBatch {
   };
 }
 
+/**
+ * Engine-unit size of a fully grown crystal — the one that should just about
+ * fill the frame. The monarch tops out a little under 1.75 units long once
+ * relationship maturity saturates, plus the substrate burial below y=0; the
+ * width allows for a wide spread of companions around her. These are reference
+ * points for scaling, not limits: anything larger is still clamped to fit.
+ */
+const REFERENCE_HEIGHT = 2;
+const REFERENCE_WIDTH = 1.7;
+
 function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalBatch[]): ThreeCrystalFit {
   const bounds = new THREE.Box3();
   let hasBounds = false;
@@ -119,12 +133,34 @@ function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalB
   const targetWidth = 3.45;
   const safeHeight = Math.max(0.001, sourceSize.y);
   const safeHorizontal = Math.max(0.001, sourceSize.x, sourceSize.z);
-  const scale = Math.min(targetHeight / safeHeight, targetWidth / safeHorizontal);
+
+  // Scaling every crystal to fill the frame made all of them the same size on
+  // screen, which silently cancelled the one thing the artifact is supposed to
+  // communicate: how long the couple has been together. A young crystal is
+  // genuinely smaller than an old one in engine units, so the fit uses a fixed
+  // reference instead — a fully grown crystal fills the frame, everything
+  // younger stays proportionally smaller.
+  const referenceScale = Math.min(
+    targetHeight / REFERENCE_HEIGHT,
+    targetWidth / REFERENCE_WIDTH,
+  );
+  // The frame is still a hard limit: an unusually large crystal (a very long
+  // relationship, or an unusually wide spread of companions) is clamped down
+  // rather than allowed to overflow.
+  const containScale = Math.min(targetHeight / safeHeight, targetWidth / safeHorizontal);
+  const scale = Math.min(referenceScale, containScale);
+  const clamped = containScale < referenceScale;
+
+  // Anchor the substrate plane rather than the bounding box. Centring made a
+  // small crystal float in the middle of the frame; standing every crystal on
+  // the same ground line is what makes a short one read as "still growing"
+  // instead of merely "far away".
+  const groundBaseline = 0.06 - targetHeight * 0.5;
 
   content.scale.setScalar(scale);
   content.position.set(
     -sourceCenter.x * scale,
-    -sourceCenter.y * scale + 0.06,
+    groundBaseline,
     -sourceCenter.z * scale,
   );
   content.userData['evolutionFit'] = {
@@ -133,9 +169,19 @@ function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalB
     scale,
     targetHeight,
     targetWidth,
+    referenceScale,
+    clamped,
   };
 
-  return { sourceCenter, sourceSize, scale, targetHeight, targetWidth };
+  return {
+    sourceCenter,
+    sourceSize,
+    scale,
+    targetHeight,
+    targetWidth,
+    referenceScale,
+    clamped,
+  };
 }
 
 export function createThreeCrystalRenderBundle(
