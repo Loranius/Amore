@@ -4,7 +4,11 @@ import { buildArtifactBlueprint, type EvolutionEventInput } from '../evolution';
 import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG, buildCrystalGeometry } from '../geometry';
 import { DEFAULT_GROWTH_ENGINE_CONFIG, buildGrowthState } from '../growth';
 import { DEFAULT_CRYSTAL_LIFE_CONFIG, buildCrystalLifeState, sampleCrystalLife } from '../life';
-import { createThreeCrystalRenderBundle, applyCrystalLifeFrame } from '../renderer/three';
+import {
+  createThreeCrystalRenderBundle,
+  applyCrystalLifeFrame,
+  crystalSceneRadius,
+} from '../renderer/three';
 import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../species/crystal';
 import { CONSISTENCY_WINDOW_MONTHS, consistency } from '../species/crystal/growthModel';
@@ -243,6 +247,58 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
         }
       }
     }
+  });
+
+  it('reports the same scene footprint the bundle actually applies', () => {
+    // The portal sizes its podium and its camera from crystalSceneRadius
+    // without building a bundle. If that answer drifted from the fit the
+    // renderer really applies, the podium would be built for one artifact and
+    // the artifact drawn at another size — so the two are pinned together.
+    const { geometry, material } = pipeline();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const half = Math.max(bundle.fit.sourceSize.x, bundle.fit.sourceSize.z) * 0.5;
+
+    expect(crystalSceneRadius(geometry)).toBeCloseTo(half * bundle.fit.scale, 5);
+    bundle.dispose();
+  });
+
+  it('measures the crystals apart from the rock they stand in', () => {
+    // Two different questions with two different answers: the podium has to
+    // cover the rock, the camera only has to frame the crystals. The rock is
+    // always the wider of the two — the substrate exists to occlude every
+    // buried base (ADR-0003), so it cannot be narrower.
+    const { geometry } = pipeline();
+    const withRock = crystalSceneRadius(geometry);
+    const crystalsOnly = crystalSceneRadius(geometry, { includeSubstrate: false });
+
+    expect(crystalsOnly).toBeGreaterThan(0);
+    expect(withRock).toBeGreaterThan(crystalsOnly);
+    expect(crystalSceneRadius(geometry, { includeSubstrate: true })).toBe(withRock);
+  });
+
+  it('widens with the ground the couple earned, not with the mesh count', () => {
+    // Places visited reach the podium only through the substrate's width
+    // (ADR-0004); nothing else about the artifact changes.
+    const { geometry } = pipeline();
+    const substrate = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+    const travelled = {
+      ...geometry,
+      meshes: geometry.meshes.map((mesh) => (
+        mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID
+          ? {
+              ...mesh,
+              bounds: {
+                ...mesh.bounds,
+                min: { ...mesh.bounds.min, x: mesh.bounds.min.x * 1.4, z: mesh.bounds.min.z * 1.4 },
+                max: { ...mesh.bounds.max, x: mesh.bounds.max.x * 1.4, z: mesh.bounds.max.z * 1.4 },
+              },
+            }
+          : mesh
+      )),
+    };
+
+    expect(substrate.bounds.max.x).toBeGreaterThan(0);
+    expect(crystalSceneRadius(travelled)).toBeGreaterThan(crystalSceneRadius(geometry));
   });
 
   it('does not mutate species, composition or geometry states', () => {

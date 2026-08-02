@@ -23,6 +23,7 @@ export { createThreeCrystalMaterial } from './material';
 export {
   applyCrystalLifeFrame,
   createThreeCrystalRenderBundle,
+  crystalSceneRadius,
   CRYSTAL_GROUND_BASELINE,
 } from './bundle';
 export type { ThreeCrystalRenderBundle } from './bundle';

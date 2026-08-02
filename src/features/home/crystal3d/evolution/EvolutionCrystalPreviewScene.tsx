@@ -1,5 +1,6 @@
 import { useCallback, useState, type KeyboardEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { crystalSceneRadius } from '@/engine/renderer/three';
 import { useTheme } from '@/providers/ThemeProvider';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { MemoryModal } from '../../MemoryModal';
@@ -108,6 +109,8 @@ export default function EvolutionCrystalPreviewScene() {
             theme={theme}
             quality={metrics.quality}
             reduceMotion={reduceMotion}
+            artifactSceneRadius={crystalSceneRadius(pipeline.geometry)}
+            crystalsSceneRadius={crystalSceneRadius(pipeline.geometry, { includeSubstrate: false })}
           >
             <EvolutionCrystalObject
               geometry={pipeline.geometry}

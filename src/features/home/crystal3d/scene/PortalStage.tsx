@@ -11,21 +11,37 @@ import { useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
-import { PORTAL_PALETTES, portalCameraFrame } from './portalScene';
+import { PORTAL_PALETTES, portalCameraFrame, portalDaisScale } from './portalScene';
 
 export interface PortalStageProps {
   seed: number;
   theme: 'light' | 'dark';
   quality: 'high' | 'balanced' | 'low' | 'fallback';
   reduceMotion: boolean;
+  /** Радіус каменю в одиницях сцени — подіум будується під нього. */
+  artifactSceneRadius: number;
+  /** Радіус самих кристалів — кадр камери будується під нього. */
+  crystalsSceneRadius: number;
   children: ReactNode;
 }
 
-export function PortalStage({ seed, theme, quality, reduceMotion, children }: PortalStageProps) {
+export function PortalStage({
+  seed,
+  theme,
+  quality,
+  reduceMotion,
+  artifactSceneRadius,
+  crystalsSceneRadius,
+  children,
+}: PortalStageProps) {
   const size = useThree((state) => state.size);
   const controls = useRef<OrbitControlsImpl>(null);
   const aspect = size.height > 0 ? size.width / size.height : 1;
-  const frame = useMemo(() => portalCameraFrame(aspect), [aspect]);
+  const frame = useMemo(
+    () => portalCameraFrame(aspect, crystalsSceneRadius),
+    [aspect, crystalsSceneRadius],
+  );
+  const daisScale = useMemo(() => portalDaisScale(artifactSceneRadius), [artifactSceneRadius]);
   const palette = PORTAL_PALETTES[theme];
 
   return (
@@ -47,6 +63,7 @@ export function PortalStage({ seed, theme, quality, reduceMotion, children }: Po
         quality={quality}
         frame={frame}
         aspect={aspect}
+        daisScale={daisScale}
       />
       <PortalCameraRig frame={frame} controls={controls} />
 

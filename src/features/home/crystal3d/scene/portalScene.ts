@@ -80,6 +80,9 @@ const DEG = Math.PI / 180;
 const FIT_HEIGHT = 5.2;
 const FIT_WIDTH = 2.3;
 
+/** Запас між крайнім кристалом і краєм кадру. */
+const FRAME_MARGIN = 1.08;
+
 /** Камера над площиною підлоги. Дає кут ≈17° — підлога читається як
  *  поверхня, що йде вглиб, а не як лінія. */
 const EYE_ABOVE_GROUND = 2.25;
@@ -110,13 +113,28 @@ export function portalHalfWidthAt(depth: number, aspect: number): number {
   return depth * halfHeightTangent() * Math.max(aspect, 0.1);
 }
 
-export function portalCameraFrame(aspect: number): PortalCameraFrame {
+/**
+ * Кадр камери під конкретний артефакт.
+ *
+ * `artifactRadius` — це те, скільки місця вшир займають самі кристали в
+ * одиницях сцени (`crystalSceneRadius(..., { includeSubstrate: false })`).
+ * Камінь і подіум сюди не входять свідомо: це підлога, їй нормально
+ * виходити за кадр, а от зрізаний кристал — це втрачений рік пари.
+ *
+ * Без цього аргументу ширина кадру була константою FIT_WIDTH = 2.3, тобто
+ * півширина 1.15. Виміряно на справжньому пайплайні: кристали доростають
+ * до 1.5 на десятому році — тобто зовнішні річні кристали десятирічної
+ * пари просто зрізались краєм екрана на вертикальному телефоні.
+ */
+export function portalCameraFrame(aspect: number, artifactRadius = 0): PortalCameraFrame {
   const tangent = halfHeightTangent();
   // Аспект приходить із viewport'а; на нульовій висоті контейнера він
   // вироджується, тож тримаємо його в межах реальних екранів.
   const safeAspect = Math.min(Math.max(Number.isFinite(aspect) ? aspect : 1, 0.3), 3.2);
+  const safeRadius = Number.isFinite(artifactRadius) ? Math.max(0, artifactRadius) : 0;
+  const width = Math.max(FIT_WIDTH, safeRadius * 2 * FRAME_MARGIN);
   const byHeight = FIT_HEIGHT / (2 * tangent);
-  const byWidth = FIT_WIDTH / (2 * tangent * safeAspect);
+  const byWidth = width / (2 * tangent * safeAspect);
   const distance = Math.max(byHeight, byWidth);
 
   const eyeY = PORTAL_GROUND_Y + EYE_ABOVE_GROUND;
@@ -154,8 +172,48 @@ const DAIS_PROFILE: readonly (readonly [number, number])[] = [
   [0, 0],
 ];
 
-/** Радіус верхньої площини подіуму. */
+/** Радіус верхньої площини подіуму в базовій геометрії. */
 export const PORTAL_DAIS_TOP_RADIUS = 1.3;
+
+/**
+ * Наскільки подіум має бути ширшим за камінь друзи. Інкрустація лежить на
+ * 1.19 з 1.3, тобто на 0.92 радіуса, — запас мусить лишати її видимою,
+ * інакше золоте кільце зникає під каменем і подіум перестає читатись як
+ * подіум.
+ */
+const DAIS_CLEARANCE = 1.16;
+
+/**
+ * Стеля масштабу подіуму — її задають колони.
+ *
+ * Колони стоять на полі, а не на подіумі. Найближча пара на найвужчому
+ * реальному кадрі відходить від осі на ≈2.99 (z = -2.6 плюс виніс по x).
+ * На висоті, де вони стоять (-PORTAL_FIELD_DROP), радіус подіуму — 1.66
+ * базової геометрії, тож 1.66 × 1.75 = 2.91 < 2.99: цоколі лишаються
+ * зовні.
+ *
+ * Ціна стелі чесна й обмежена: приблизно після п'ятнадцяти років друза
+ * доростає до краю подіуму й далі камінь торкається обводу замість того,
+ * щоб лишати запас. Це помітно менша вада, ніж колона, що пробиває плиту.
+ */
+const DAIS_MAX_SCALE = 1.75;
+
+/**
+ * Масштаб подіуму під конкретний артефакт.
+ *
+ * Подіум був константою, і це трималось рівно доти, доки всі друзи були
+ * дрібні. Але друза росте з роками, а камінь під нею — ще й з місцями, де
+ * пара була (ADR-0004): пара з двадцятьма шістьма містами вже стояла на
+ * плиті, вужчій за власний камінь, і золота інкрустація зникала під ним.
+ *
+ * Тільки збільшує: подіум, менший за спроєктований, зробив би сцену
+ * тіснішою, ніж її кадрувала камера.
+ */
+export function portalDaisScale(artifactSceneRadius: number): number {
+  const radius = Number.isFinite(artifactSceneRadius) ? Math.max(0, artifactSceneRadius) : 0;
+  const needed = (radius * DAIS_CLEARANCE) / PORTAL_DAIS_TOP_RADIUS;
+  return Math.min(DAIS_MAX_SCALE, Math.max(1, Number(needed.toFixed(4))));
+}
 /** Наскільки навколишнє поле нижче за верх подіуму. */
 export const PORTAL_FIELD_DROP = 0.3;
 

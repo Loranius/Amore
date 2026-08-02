@@ -38,6 +38,8 @@ export interface PortalEnvironmentProps {
    *  одні й ті самі числа, тож він приходить згори. */
   frame: PortalCameraFrame;
   aspect: number;
+  /** Масштаб подіуму під розмір друзи — див. portalDaisScale. */
+  daisScale: number;
 }
 
 function starCount(quality: PortalEnvironmentProps['quality']): number {
@@ -47,7 +49,7 @@ function starCount(quality: PortalEnvironmentProps['quality']): number {
   return 90;
 }
 
-export function PortalEnvironment({ seed, theme, quality, frame, aspect }: PortalEnvironmentProps) {
+export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisScale }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
 
@@ -108,8 +110,13 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect }: Porta
       </mesh>
 
       {/* Подіум: верхня площина рівно на PORTAL_GROUND_Y, тобто там, де
-          починається субстрат кристала. */}
-      <mesh geometry={daisGeometry} position={[0, PORTAL_GROUND_Y, 0]}>
+          починається субстрат кристала. Масштабується тільки по XZ —
+          вища плита їхала б угору відносно тієї самої площини. */}
+      <mesh
+        geometry={daisGeometry}
+        position={[0, PORTAL_GROUND_Y, 0]}
+        scale={[daisScale, 1, daisScale]}
+      >
         <meshStandardMaterial
           color={palette.dais}
           emissive={palette.daisEmissive}
@@ -121,7 +128,11 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect }: Porta
 
       {/* Інкрустація по обводу. Мікро-підйом над площиною — щоб не
           сперечатись за z-буфер із самим подіумом. */}
-      <mesh geometry={inlayGeometry} position={[0, PORTAL_GROUND_Y + 0.004, 0]}>
+      <mesh
+        geometry={inlayGeometry}
+        position={[0, PORTAL_GROUND_Y + 0.004, 0]}
+        scale={[daisScale, 1, daisScale]}
+      >
         <meshStandardMaterial
           color={palette.inlay}
           emissive={palette.inlay}
