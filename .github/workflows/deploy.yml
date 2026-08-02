@@ -1,6 +1,6 @@
-name: Deploy to GitHub Pages - Godot Canary-5
+name: Deploy to GitHub Pages - Godot Ramp-25
 
-# Permanent production deployment for the physically approved Phase 15 canary.
+# Permanent production deployment for the physically approved Phase 15 staged rollout.
 
 on:
   push:
@@ -29,11 +29,11 @@ jobs:
       VITE_TMDB_KEY: ${{ secrets.VITE_TMDB_KEY }}
       VITE_MAPBOX_TOKEN: ${{ secrets.VITE_MAPBOX_TOKEN }}
       VITE_EVOLUTION_GODOT: production
-      VITE_EVOLUTION_GODOT_RELEASE_STAGE: canary-5
+      VITE_EVOLUTION_GODOT_RELEASE_STAGE: ramp-25
       VITE_EVOLUTION_GODOT_RELEASE_ID: crystal-phase14-20260801
       VITE_EVOLUTION_GODOT_ACCEPTANCE_SHA256: b4bc9ed5a11efff70c89037ccaf09c2bb639a541e4fc95eea6f77765a5172d8e
       VITE_EVOLUTION_GODOT_KILL_SWITCH: 'off'
-      VITE_EVOLUTION_GODOT_ROLLOUT: '5'
+      VITE_EVOLUTION_GODOT_ROLLOUT: '25'
       BASE_PATH: /Amore/
       BUILD_GODOT_HARNESS: '1'
 
@@ -52,7 +52,7 @@ jobs:
           npm ci
           npm install --no-save --no-package-lock @playwright/test@1.61.1
 
-      - name: Validate strict production canary-5 controls
+      - name: Validate strict production ramp-25 controls
         shell: bash
         run: |
           set -euo pipefail
@@ -82,11 +82,11 @@ jobs:
 
           const expected = {
             mode: 'production',
-            stage: 'canary-5',
+            stage: 'ramp-25',
             releaseId: 'crystal-phase14-20260801',
             digest: 'b4bc9ed5a11efff70c89037ccaf09c2bb639a541e4fc95eea6f77765a5172d8e',
             killSwitch: 'off',
-            rollout: 5,
+            rollout: 25,
           };
           const actual = {
             mode: String(process.env.VITE_EVOLUTION_GODOT).trim().toLowerCase(),
@@ -98,9 +98,9 @@ jobs:
           };
 
           for (const [key, value] of Object.entries(expected)) {
-            if (actual[key] !== value) throw new Error(`Strict production canary mismatch: ${key}.`);
+            if (actual[key] !== value) throw new Error(`Strict production ramp mismatch: ${key}.`);
           }
-          console.log('Verified strict production canary-5 controls.');
+          console.log('Verified strict production ramp-25 controls.');
           NODE
 
       - name: Install Godot 4.7.1 and Web templates
@@ -225,7 +225,7 @@ jobs:
           grep -q 'id="root"' dist/index.html
           grep -q 'id="root"' dist/e2e/godot/index.html
 
-      - name: Prove canary and rollback locally before deployment
+      - name: Prove ramp-25 and rollback locally before deployment
         shell: bash
         run: |
           set -euo pipefail
@@ -278,7 +278,7 @@ jobs:
           await expect(preview).toHaveAttribute('data-godot-status', 'accepted', { timeout: 120_000 });
           await expect(page.locator('iframe[title="Amore Evolution Engine — Godot 4.7.1"]')).toBeVisible();
           if (pageErrors.length > 0) throw new Error(`Browser errors: ${pageErrors.join(' | ')}`);
-          await page.screenshot({ path: 'phase15-production-canary-local.png', fullPage: true });
+          await page.screenshot({ path: 'phase15-production-ramp25-local.png', fullPage: true });
 
           const rollback = await context.newPage();
           await rollback.goto(`${base}e2e/godot/?godotRollbackDrill=1&godotReleaseOps=1`, {
@@ -297,7 +297,7 @@ jobs:
           name: amore-godot-phase15-production-predeploy-${{ github.sha }}
           path: |
             dist/godot/evolution-engine/release-manifest.json
-            phase15-production-canary-local.png
+            phase15-production-ramp25-local.png
             phase15-production-rollback-local.png
           if-no-files-found: error
           retention-days: 30
@@ -315,7 +315,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Deploy production canary-5 to GitHub Pages
+      - name: Deploy production ramp-25 to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
 
@@ -380,7 +380,7 @@ jobs:
           console.log('Verified live production manifest and exact Godot assets.');
           NODE
 
-          printf '%s\n' "$root" > production-canary-url.txt
+          printf '%s\n' "$root" > production-ramp25-url.txt
           curl --fail --location --retry 6 --retry-delay 3 --retry-all-errors \
             "${root}godot/evolution-engine/release-manifest.json" \
             --output production-release-manifest.json
@@ -391,13 +391,13 @@ jobs:
         shell: bash
         run: |
           {
-            echo '## Godot Phase 15 Production Canary-5'
+            echo '## Godot Phase 15 Production Ramp-25'
             echo
             echo "Production URL: ${PAGE_URL%/}/"
             echo
             echo 'Release ID: crystal-phase14-20260801'
             echo
-            echo 'Effective rollout ceiling: 5%'
+            echo 'Effective rollout ceiling: 25%'
             echo
             echo 'Three.js remains active for non-canary cohorts and all Godot runtime failures.'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -407,7 +407,7 @@ jobs:
         with:
           name: amore-godot-phase15-production-live-${{ github.sha }}
           path: |
-            production-canary-url.txt
+            production-ramp25-url.txt
             production-release-manifest.json
           if-no-files-found: error
           retention-days: 30
