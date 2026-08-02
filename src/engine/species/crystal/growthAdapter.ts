@@ -36,7 +36,13 @@ function dominantMaxGeneration(_instruction: CrystalGrowthInstruction): number {
 }
 
 function dominantDirectionInheritance(instruction: CrystalGrowthInstruction): number {
-  if (instruction.kind === 'event-spire') return 0.24;
+  // Cluster-composition fix (visual QA, 2026-08-02): event-spires are the
+  // most visually prominent per-event bodies, so they most need to read as
+  // distinct fingers radiating from the mother rather than hugging its own
+  // axis -- raise their weight on the true host surface normal above even
+  // satellite/inclusion so the outward lean actually correlates with where
+  // each one is anchored, instead of a mostly-random preferred direction.
+  if (instruction.kind === 'event-spire') return 0.56;
   if (instruction.kind === 'satellite') return 0.36;
   if (instruction.kind === 'inclusion') return 0.48;
   return 0.5;

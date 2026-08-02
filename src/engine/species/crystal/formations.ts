@@ -94,9 +94,16 @@ function directionFor(
   const radialUnit = seededUnit(seed, `${id}:radial`);
 
   if (kind === 'event-spire') {
+    // Cluster-composition fix (visual QA, 2026-08-02): 0.72-0.96 read as
+    // "grows almost straight up," which visually nests an event-spire
+    // against the mother's own shaft instead of letting it read as its
+    // own crystal. Real geode satellites lean out at a real diagonal.
+    // See dominantDirectionInheritance() -- this only sets the *preferred*
+    // direction; the actual outward lean also depends on how much weight
+    // the true host surface normal gets in growthDirection().
     return {
       azimuthRad,
-      elevation: round6(0.72 + elevationUnit * 0.24),
+      elevation: round6(0.46 + elevationUnit * 0.3),
       radialBias: round6(0.18 + radialUnit * 0.37),
     };
   }

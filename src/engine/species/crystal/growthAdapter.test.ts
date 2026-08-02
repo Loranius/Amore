@@ -67,4 +67,30 @@ describe('Crystal Growth Center adapter', () => {
       expect(later.instructions.find((item) => item.id === oldInstruction.id)).toEqual(oldInstruction);
     }
   });
+
+  it('gives event-spires a real outward lean instead of growing parallel to the mother', () => {
+    // Cluster-composition fix (visual QA, 2026-08-02): a dominant instruction
+    // that is almost fully vertical (elevation close to 1) and barely
+    // inherits the host surface normal (low directionInheritance) ends up
+    // visually hugging the mother's own shaft instead of reading as its own
+    // radiating crystal. Both levers must move together for the fix to
+    // actually manifest -- see growthDirection() in growth/surface.ts, which
+    // blends preferredElevation and directionInheritance before clamping to
+    // minUpwardComponent.
+    const growth = blueprint([BASE_EVENT]);
+    const dominants = growth.instructions.filter(
+      (item) => item.growthCenterRole === 'dominant',
+    );
+    expect(dominants.length).toBeGreaterThan(0);
+
+    for (const dominant of dominants) {
+      // elevation=1 is fully vertical; staying well under 1 leaves real
+      // room for the surface normal to pull the direction outward.
+      expect(dominant.preferredElevation).toBeLessThan(0.8);
+      // Below ~0.4 the preferred direction (which ignores the anchor's
+      // actual position on the host) would dominate over the true outward
+      // surface normal, undoing the fix.
+      expect(dominant.directionInheritance).toBeGreaterThanOrEqual(0.4);
+    }
+  });
 });
