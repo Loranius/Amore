@@ -102,6 +102,12 @@ export interface CrystalSpeciesState {
   cohesion: number;
   energy: number;
   fracture: number;
+  /**
+   * How regularly the couple has shown up over the last year, 0 to 1
+   * (ADR-0004). Artifact-wide, like `purity` — it describes the couple's
+   * habit rather than any one body.
+   */
+  consistency: number;
   density: number;
   luminosity: number;
 }

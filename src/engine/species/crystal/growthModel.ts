@@ -394,6 +394,31 @@ export function groundSpread(placesVisited: number): number {
   return round6(1 + GROUND_MAX_SPREAD * reach);
 }
 
+// ── Consistency ─────────────────────────────────────────────
+
+/** Months of habit the measure looks back over. */
+export const CONSISTENCY_WINDOW_MONTHS = 12;
+
+/**
+ * How regularly the couple shows up, from 0 to 1.
+ *
+ * A different question from how much they log, and the more interesting one:
+ * a couple who adds something most months is tending the thing, while forty
+ * photos dumped in one weekend and silence either side is not the same
+ * relationship with the portal, however large the volume.
+ *
+ * Bounded to a rolling window so it stays answerable — over a whole
+ * relationship it would only ever fall, which would turn into exactly the
+ * kind of decay this artifact refuses to have.
+ */
+export function consistency(monthsTouched: number, monthsLived: number): number {
+  const touched = Number.isFinite(monthsTouched) ? Math.max(0, monthsTouched) : 0;
+  const lived = Number.isFinite(monthsLived) ? Math.max(0, monthsLived) : 0;
+  const window = Math.min(CONSISTENCY_WINDOW_MONTHS, lived);
+  if (window <= 0) return 0;
+  return round6(clamp01(Math.min(touched, window) / window));
+}
+
 // ── Colour from fulfilled wishes ────────────────────────────
 
 /**

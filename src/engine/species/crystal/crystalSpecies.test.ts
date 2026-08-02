@@ -356,3 +356,44 @@ describe('Crystal Species monarch dimensions are independent', () => {
     expect(monarchFor(trips(20)).axialScale).toBe(bare.axialScale);
   });
 });
+
+describe('Crystal Species consistency (ADR-0004)', () => {
+  function crystalWith(months: readonly string[]) {
+    return buildCrystalSpeciesBlueprint({
+      artifact: buildArtifact([
+        ...BASE_EVENTS,
+        ...months.map((month, index) => ({
+          id: `visit:${index}`,
+          occurredAt: `${month}-14`,
+          source: 'memories@1',
+          evidence: 'verified' as const,
+          channels: { remembrance: 0.4 },
+          portalActivity: 0.1,
+        })),
+      ]),
+      config: { asOf: '2026-07-01', rulesVersion: 'crystal-1.0.0' },
+    });
+  }
+
+  it('counts distinct months, not how much landed in them', () => {
+    // Ten photos in one month is one month of showing up.
+    const spread = crystalWith(['2025-09', '2025-11', '2026-01', '2026-03', '2026-05']);
+    const burst = crystalWith(['2026-05', '2026-05', '2026-05', '2026-05', '2026-05']);
+
+    expect(spread.state.consistency).toBeGreaterThan(burst.state.consistency);
+  });
+
+  it('ignores months older than the window', () => {
+    const recent = crystalWith(['2026-02', '2026-04', '2026-06']);
+    const ancient = crystalWith(['2024-02', '2024-04', '2024-06']);
+
+    expect(recent.state.consistency).toBeGreaterThan(ancient.state.consistency);
+  });
+
+  it('stays inside 0..1 for any history', () => {
+    for (const crystal of [crystalWith([]), crystalWith(Array.from({ length: 40 }, (_u, i) => `2026-0${(i % 7) + 1}`))]) {
+      expect(crystal.state.consistency).toBeGreaterThanOrEqual(0);
+      expect(crystal.state.consistency).toBeLessThanOrEqual(1);
+    }
+  });
+});

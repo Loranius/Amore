@@ -5,8 +5,10 @@ import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG, buildCrystalGeometry } from '../geomet
 import { DEFAULT_GROWTH_ENGINE_CONFIG, buildGrowthState } from '../growth';
 import { DEFAULT_CRYSTAL_LIFE_CONFIG, buildCrystalLifeState, sampleCrystalLife } from '../life';
 import { createThreeCrystalRenderBundle, applyCrystalLifeFrame } from '../renderer/three';
+import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../species/crystal';
-import { DEFAULT_CRYSTAL_MATERIAL_CONFIG } from './config';
+import { CONSISTENCY_WINDOW_MONTHS, consistency } from '../species/crystal/growthModel';
+import { CRYSTAL_MATERIAL_QUALITY_PRESETS, DEFAULT_CRYSTAL_MATERIAL_CONFIG } from './config';
 import { buildCrystalMaterialState } from './engine';
 
 const EVENTS: EvolutionEventInput[] = [
@@ -175,6 +177,72 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
 
     bundle.dispose();
     expect(bundle.group.children).toHaveLength(0);
+  });
+
+  it('clears the stone for a couple who shows up regularly (ADR-0004)', () => {
+    // Regularity, not volume, drives clarity. Both couples below are handed the
+    // identical artifact — same events, same pressures, same geometry — and
+    // differ only in the consistency their species state published, so a
+    // difference in inclusions can have come from nothing else.
+    const base = pipeline({ quality: 'high' });
+    const withConsistency = (monthsTouched: number) => {
+      const species = {
+        ...base.species,
+        state: {
+          ...base.species.state,
+          consistency: consistency(monthsTouched, CONSISTENCY_WINDOW_MONTHS),
+        },
+      };
+      return buildCrystalMaterialState({
+        species,
+        composition: base.composition,
+        geometry: base.geometry,
+        config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality: 'high' },
+      });
+    };
+    const inclusionsOf = (state: ReturnType<typeof withConsistency>) => state.bodies
+      .filter((body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID)
+      .map((body) => body.shader.inclusionDensity);
+
+    const regular = inclusionsOf(withConsistency(10));
+    const occasional = inclusionsOf(withConsistency(1));
+
+    expect(regular).toHaveLength(occasional.length);
+    expect(regular.some((density) => density > 0)).toBe(true);
+    for (let index = 0; index < regular.length; index += 1) {
+      const clear = regular[index]!;
+      const cloudy = occasional[index]!;
+      // Micro bodies publish 0 inclusions at any consistency, so the assertion
+      // is "never cloudier", with at least one body actually clearing.
+      expect(clear).toBeLessThanOrEqual(cloudy);
+    }
+    expect(regular.some((density, index) => density < occasional[index]!)).toBe(true);
+  });
+
+  it('keeps clarity inside the quality presets at every consistency', () => {
+    const base = pipeline({ quality: 'high' });
+    for (const quality of ['high', 'balanced', 'low', 'fallback'] as const) {
+      const ceiling = CRYSTAL_MATERIAL_QUALITY_PRESETS[quality].inclusionScale;
+      for (const monthsTouched of [0, 1, 6, 12, 99]) {
+        const material = buildCrystalMaterialState({
+          species: {
+            ...base.species,
+            state: {
+              ...base.species.state,
+              consistency: consistency(monthsTouched, CONSISTENCY_WINDOW_MONTHS),
+            },
+          },
+          composition: base.composition,
+          geometry: base.geometry,
+          config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality },
+        });
+        for (const body of material.bodies) {
+          expect(body.shader.inclusionDensity).toBeGreaterThanOrEqual(0);
+          expect(body.shader.inclusionDensity).toBeLessThanOrEqual(ceiling + 1e-6);
+          expect(Number.isFinite(body.shader.inclusionDensity)).toBe(true);
+        }
+      }
+    }
   });
 
   it('does not mutate species, composition or geometry states', () => {

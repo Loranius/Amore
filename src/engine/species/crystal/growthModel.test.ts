@@ -13,6 +13,8 @@ import {
   childDistance,
   childGrowthProgress,
   childRingIndex,
+  CONSISTENCY_WINDOW_MONTHS,
+  consistency,
   facetThresholdForYears,
   groundSpread,
   PORTAL_MODULE_COUNT,
@@ -466,5 +468,46 @@ describe('ground spread from places visited', () => {
 
   it('never grows the rock into a plate', () => {
     expect(groundSpread(Number.MAX_SAFE_INTEGER)).toBeLessThanOrEqual(1.5);
+  });
+});
+
+describe('consistency', () => {
+  it('rewards showing up regularly, not showing up hard once', () => {
+    // The signal volume cannot express: forty photos in one weekend and
+    // silence either side is not the same relationship with the portal as
+    // something small most months.
+    expect(consistency(10, 12)).toBeGreaterThan(consistency(1, 12));
+    expect(consistency(12, 12)).toBe(1);
+    expect(consistency(0, 12)).toBe(0);
+  });
+
+  it('judges a young couple on the months they have actually lived', () => {
+    // Three months in, having shown up all three, is perfect attendance —
+    // not a quarter of it.
+    expect(consistency(3, 3)).toBe(1);
+    expect(consistency(3, 12)).toBeLessThan(1);
+  });
+
+  it('cannot exceed one however the counts arrive', () => {
+    expect(consistency(50, 12)).toBe(1);
+    expect(consistency(5, 2)).toBe(1);
+  });
+
+  it('is zero before the couple has lived a month', () => {
+    expect(consistency(0, 0)).toBe(0);
+  });
+
+  it('looks back over a bounded window rather than all history', () => {
+    // Over a whole relationship this could only ever fall, which is decay by
+    // another name — exactly what the artifact refuses to do.
+    expect(CONSISTENCY_WINDOW_MONTHS).toBe(12);
+    expect(consistency(12, 240)).toBe(1);
+  });
+
+  it('survives nonsense counts', () => {
+    for (const value of [Number.NaN, -3, Number.POSITIVE_INFINITY]) {
+      expect(Number.isFinite(consistency(value, 12))).toBe(true);
+      expect(Number.isFinite(consistency(6, value))).toBe(true);
+    }
   });
 });

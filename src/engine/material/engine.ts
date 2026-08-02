@@ -107,10 +107,19 @@ function shaderRecipe(
   const state = input.species.state;
   const reflectionEnabled = input.config.allowProceduralReflection && preset.reflectionScale > 0;
   const micro = role === 'micro';
+  // Showing up regularly clears the stone (ADR-0004). A couple who adds
+  // something most months gets a crystal with fewer flaws in it than one who
+  // dumped an album in a single weekend and went quiet — a different question
+  // from how much they logged, and the more interesting one.
+  //
+  // It only ever reduces flaws. Letting a quiet stretch *add* them would make
+  // the artifact punish silence, which is the one thing it must never do.
+  const clarity = clamp01(state.consistency);
   const inclusionBase = clamp01(
-    state.fracture * 0.42
+    (state.fracture * 0.42
       + pressures.mutation * 0.26
-      + pressures.surfaceComplexity * 0.22,
+      + pressures.surfaceComplexity * 0.22)
+    * (1 - clarity * 0.55),
   );
 
   return {
