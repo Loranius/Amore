@@ -76,7 +76,7 @@ describe('monarch girth', () => {
   it('thickens with portal activity but only within the silhouette', () => {
     const axial = monarchAxialScale(3.6 * YEAR);
     const quiet = monarchRadialScale(axial, 0);
-    const busy = monarchRadialScale(axial, 104);
+    const busy = monarchRadialScale(axial, 47);
     const extreme = monarchRadialScale(axial, 100_000);
 
     expect(busy).toBeGreaterThan(quiet);
@@ -90,8 +90,11 @@ describe('monarch girth', () => {
 
   it('lands a typical couple near the silhouette the owner already accepted', () => {
     // The shipped monarch was about 4.6:1 and signed off at that shape.
+    // 47 is the real couple's count of *deliberate* acts — plans, gifts,
+    // places, milestones — not their 104 total events, since girth stopped
+    // counting photos.
     const axial = monarchAxialScale(3.6 * YEAR);
-    const aspect = axial / (2 * monarchRadialScale(axial, 104));
+    const aspect = axial / (2 * monarchRadialScale(axial, 47));
     expect(aspect).toBeGreaterThan(4.2);
     expect(aspect).toBeLessThan(5.4);
   });

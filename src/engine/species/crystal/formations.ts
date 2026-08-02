@@ -86,6 +86,31 @@ function occurredEvents(
   return artifact.events.filter((event) => event.occurredAtEpochMs <= epoch);
 }
 
+/**
+ * Modules that record something the couple decided to do, as opposed to
+ * something they kept or bought.
+ *
+ * The monarch's girth used to count every event, which on real data made it
+ * almost entirely a photo count — 56 of 104 — and photos already earn her
+ * facets. One module was deciding two of her three dimensions while the rest
+ * were noise. Counting deliberate acts instead makes the three genuinely
+ * independent: height is time, girth is what they did, facets are what they
+ * kept.
+ *
+ * Shopping is out for the same reason photos are: buying milk is not an act
+ * of the relationship, and the module produces one event per day regardless.
+ */
+const DELIBERATE_MODULES: ReadonlySet<string> = new Set([
+  'plans',
+  'wishlist',
+  'map',
+  'calendar',
+]);
+
+function deliberateActCount(events: readonly NormalizedEvolutionEvent[]): number {
+  return events.filter((event) => DELIBERATE_MODULES.has(eventModule(event.source))).length;
+}
+
 export function buildMotherInstruction(
   artifact: ArtifactBlueprint,
   asOf: string,
@@ -104,7 +129,7 @@ export function buildMotherInstruction(
   const daysTogether = daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0;
   const occurred = occurredEvents(artifact, asOf);
   const axialScale = monarchAxialScale(daysTogether);
-  const radialScale = monarchRadialScale(axialScale, occurred.length);
+  const radialScale = monarchRadialScale(axialScale, deliberateActCount(occurred));
 
   return {
     id: 'crystal:mother',

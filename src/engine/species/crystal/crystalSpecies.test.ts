@@ -301,3 +301,58 @@ describe('Crystal Species annual colour (ADR-0004)', () => {
     }
   });
 });
+
+describe('Crystal Species monarch dimensions are independent', () => {
+  function monarchFor(extra: readonly EvolutionEventInput[]) {
+    return buildCrystalSpeciesBlueprint({
+      artifact: buildArtifact([...BASE_EVENTS, ...extra]),
+      config: { asOf: '2026-07-01', rulesVersion: 'crystal-1.0.0' },
+    }).mother;
+  }
+
+  const photos = (count: number): EvolutionEventInput[] =>
+    Array.from({ length: count }, (_unused, index) => ({
+      id: `photo:${index}`,
+      occurredAt: `2025-0${(index % 9) + 1}-1${index % 10}`,
+      source: 'memories@1',
+      evidence: 'verified' as const,
+      channels: { remembrance: 0.5 },
+      portalActivity: 0.1,
+    }));
+
+  const trips = (count: number): EvolutionEventInput[] =>
+    Array.from({ length: count }, (_unused, index) => ({
+      id: `trip:${index}`,
+      occurredAt: `2025-0${(index % 9) + 1}-2${index % 8}`,
+      source: 'map@1',
+      evidence: 'verified' as const,
+      channels: { exploration: 0.7 },
+      portalActivity: 0.2,
+    }));
+
+  it('does not let photos thicken the monarch — they earn facets instead', () => {
+    // The double count this removes: girth used to be a total event count, of
+    // which 56 of 104 were photos on real data, and photos already drive
+    // facets. One module was deciding two of three dimensions.
+    const bare = monarchFor([]);
+    const withPhotos = monarchFor(photos(40));
+
+    expect(withPhotos.radialScale).toBe(bare.radialScale);
+    expect(withPhotos.facetCount).toBeGreaterThan(bare.facetCount);
+  });
+
+  it('lets deliberate acts thicken her without touching her facets', () => {
+    const bare = monarchFor([]);
+    const withTrips = monarchFor(trips(20));
+
+    expect(withTrips.radialScale).toBeGreaterThan(bare.radialScale);
+    expect(withTrips.facetCount).toBe(bare.facetCount);
+  });
+
+  it('keeps height answering only to time', () => {
+    // Neither kind of activity may make her taller.
+    const bare = monarchFor([]);
+    expect(monarchFor(photos(40)).axialScale).toBe(bare.axialScale);
+    expect(monarchFor(trips(20)).axialScale).toBe(bare.axialScale);
+  });
+});

@@ -50,11 +50,23 @@ export function monarchAxialScale(daysTogether: number): number {
 const MONARCH_STOUTEST_ASPECT = 3.8;
 const MONARCH_SLIMMEST_ASPECT = 6.2;
 
-/** Contributions beyond which extra activity stops thickening the monarch. */
-const MONARCH_ACTIVITY_SATURATION = 400;
+/**
+ * Deliberate acts beyond which more of them stop thickening the monarch.
+ *
+ * Rescaled when girth stopped counting every event and started counting only
+ * things the couple decided to do — plans, gifts, places, milestones. Those
+ * are roughly 45% of a real couple's total, so the old ceiling of 400 would
+ * have left the whole range unused and every crystal slender.
+ */
+const MONARCH_ACTIVITY_SATURATION = 150;
 
 /**
- * Girth of the monarch from how much the couple has put into the portal.
+ * Girth of the monarch from the deliberate acts behind her.
+ *
+ * `contributions` counts what the couple *did* — plans finished, wishes
+ * granted, places visited, milestones marked — not everything they logged.
+ * Counting everything made girth a photo count, and photos already earn her
+ * facets, so one module quietly decided two of her three dimensions.
  *
  * Activity moves the *proportion*, not an absolute thickness. Expressing it
  * as an aspect ratio rather than a radius is what makes it legible: a quiet
@@ -64,7 +76,7 @@ const MONARCH_ACTIVITY_SATURATION = 400;
  *
  * Activity thickens and never lengthens. That separation is what stops any
  * one module from running away with the artifact: a thousand photos cannot
- * make the monarch tall.
+ * make the monarch tall, and now they cannot make her thick either.
  */
 export function monarchRadialScale(axialScale: number, contributions: number): number {
   const total = Number.isFinite(contributions) ? Math.max(0, contributions) : 0;
