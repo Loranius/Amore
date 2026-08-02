@@ -15,8 +15,11 @@ import {
 } from './surfaceAtlas';
 import {
   attachmentFromSite,
+  sampleGroundSite,
   sampleGrowthRegionSite,
   sampleGrowthSite,
+  hostBurialCapacity,
+  type GrowthSiteCandidate,
 } from './surface';
 import type {
   BuildGrowthStateInput,
@@ -411,6 +414,41 @@ function chooseLegacyCandidate(
   };
 }
 
+/**
+ * A crystal formation that leads its own Growth Centre is a companion crystal,
+ * not an outgrowth of the monarch. Those root in the ground beside her; only
+ * their own local members still attach to a host body.
+ */
+function isGroundRooted(species: string, instruction: UniversalGrowthInstruction): boolean {
+  return species === 'crystal' && (instruction.growthCenterRole ?? null) === 'dominant';
+}
+
+function chooseGroundCandidate(
+  instruction: UniversalGrowthInstruction,
+  bodies: readonly GrowthBody[],
+  occupiedSites: readonly GrowthSurfaceOccupancy[],
+  config: GrowthEngineConfig,
+): { evaluation: CandidateEvaluation; usedFallback: boolean; rejectedCount: number } {
+  const root = bodies[0]!;
+  const evaluations: CandidateEvaluation[] = [];
+  for (let candidateIndex = 0; candidateIndex < config.candidateCount; candidateIndex += 1) {
+    const site = sampleGroundSite(root, instruction, candidateIndex);
+    evaluations.push(evaluateGrowthSite(site, instruction, bodies, occupiedSites, config));
+  }
+
+  evaluations.sort((left, right) => right.score - left.score
+    || left.site.candidateIndex - right.site.candidateIndex);
+  const accepted = evaluations.find((evaluation) => !evaluation.rejected);
+  const selected = accepted ?? evaluations[0];
+  if (!selected) throw new Error(`Growth Engine produced no ground candidates for "${instruction.id}".`);
+
+  return {
+    evaluation: selected,
+    usedFallback: accepted === undefined,
+    rejectedCount: evaluations.filter((evaluation) => evaluation.rejected).length,
+  };
+}
+
 function chooseCandidate(
   species: string,
   instruction: UniversalGrowthInstruction,
@@ -418,9 +456,49 @@ function chooseCandidate(
   occupiedSites: readonly GrowthSurfaceOccupancy[],
   config: GrowthEngineConfig,
 ): { evaluation: CandidateEvaluation; usedFallback: boolean; rejectedCount: number } {
+  if (isGroundRooted(species, instruction)) {
+    return chooseGroundCandidate(instruction, bodies, occupiedSites, config);
+  }
   return species === 'crystal'
     ? chooseAtlasCandidate(species, instruction, bodies, occupiedSites, config)
     : chooseLegacyCandidate(instruction, bodies, occupiedSites, config);
+}
+
+/**
+ * Shrinks a child so the base it buries stays inside its host.
+ *
+ * A child sinks into its host by roughly `renderedRadius * 0.58` (see the
+ * attached branch of buildCrystalProfile). Nothing previously related that
+ * depth to how much host there actually is, so a satellite could be assigned
+ * to a host thinner than its own burial and punch straight out the far side,
+ * leaving the junction unsealed and a base cap visible — the exact failure
+ * CRYSTAL_ATTACHMENT_INTEGRITY_PROFILE.md forbids. Whether it happened came
+ * down to placement luck, which is also why uniform radius rescales behaved
+ * non-monotonically.
+ *
+ * Shrinking the child is one of the responses Volume III sanctions for a body
+ * that does not fit, and unlike rejecting a site it cannot fall through to a
+ * fallback candidate that still does not fit. Small crystals growing on thin
+ * hosts is also what real druses do.
+ */
+function fitRadiusToHost(
+  desiredSkeletonRadius: number,
+  renderRadiusScale: number,
+  site: GrowthSiteCandidate | null,
+): number {
+  if (site === null) return round6(desiredSkeletonRadius);
+
+  const capacity = hostBurialCapacity(site.host, site.hostT);
+  if (!(capacity > 0) || !(renderRadiusScale > 0)) {
+    return round6(desiredSkeletonRadius);
+  }
+
+  // The sampler already reserved up to 40% of the capacity for burialDepth,
+  // and geometry sinks the mesh by extraSink on top of that. Half the capacity
+  // for extraSink keeps the total comfortably inside the host.
+  const maxRenderedRadius = (capacity * 0.5) / 0.58;
+  const maxSkeletonRadius = maxRenderedRadius / renderRadiusScale;
+  return round6(Math.min(desiredSkeletonRadius, maxSkeletonRadius));
 }
 
 function depositInstruction(
@@ -450,6 +528,7 @@ function depositInstruction(
   if (usedFallback) diagnostics.fallbackInstructionIds.push(instruction.id);
 
   const host = evaluation.site.host;
+  const groundRooted = isGroundRooted(blueprint.species, instruction);
   const centerDominant = localCenterMember && instruction.growthCenterId !== undefined
     ? bodies.find((body) => (body.growthCenterId ?? null) === instruction.growthCenterId
       && body.growthCenterRole === 'dominant')
@@ -457,7 +536,11 @@ function depositInstruction(
   const generationLimit = centerDominant === undefined
     ? Math.max(1, instruction.maxGeneration)
     : centerDominant.generation + Math.max(1, instruction.maxGeneration);
-  const generation = Math.min(host.generation + 1, generationLimit);
+  // A ground-rooted body grows from the substrate, so it is a root of its own
+  // colony rather than a descendant of whatever body happens to stand nearby.
+  const generation = groundRooted
+    ? 0
+    : Math.min(host.generation + 1, generationLimit);
   if (blockedSameColony && host.colonyId !== instruction.colonyId) {
     diagnostics.generationClampedInstructionIds.push(instruction.id);
   }
@@ -469,8 +552,12 @@ function depositInstruction(
     1,
   );
   const skeletonLength = instruction.axialScale * (0.72 + growthEnergy * 0.28);
-  const skeletonRadius = instruction.radialScale * (0.8 + growthEnergy * 0.2);
   const render = renderedScale(instruction.maturity);
+  const skeletonRadius = fitRadiusToHost(
+    instruction.radialScale * (0.8 + growthEnergy * 0.2),
+    render.radius,
+    groundRooted ? null : evaluation.site,
+  );
 
   const body: GrowthBody = {
     id: instruction.id,
@@ -486,8 +573,10 @@ function depositInstruction(
     seed: instruction.seed,
     emphasized: instruction.emphasized,
     generation,
-    hostBodyId: host.id,
-    attachment: attachmentFromSite(evaluation.site),
+    // No host body means no junction to seal and no base cap to remove: the
+    // body is closed and its base sits under the ground plane.
+    hostBodyId: groundRooted ? null : host.id,
+    attachment: groundRooted ? null : attachmentFromSite(evaluation.site),
     anchor: evaluation.site.anchor,
     direction: evaluation.site.direction,
     skeletonLength: round6(skeletonLength),

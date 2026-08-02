@@ -72,7 +72,15 @@ describe('Universal Growth Engine', () => {
     expect(reversed).toEqual(forward);
   });
 
-  it('attaches every non-root body to a reserved aggregate Surface Atlas region', () => {
+  // Companion crystals are ground-rooted as of the 2026-08-02 composition
+  // change: a formation that leads its own Growth Centre nucleates in the
+  // substrate beside the monarch rather than out of her shaft, so it has no
+  // host body, no attachment and no reserved atlas region. Only its local
+  // members still attach to a host.
+  const isGroundRooted = (body: { growthCenterRole?: string | null }): boolean =>
+    (body.growthCenterRole ?? null) === 'dominant';
+
+  it('attaches every hosted body to a reserved aggregate Surface Atlas region', () => {
     const blueprint = growthBlueprint(BASE_EVENTS);
     const state = buildGrowthState({
       blueprint,
@@ -87,7 +95,15 @@ describe('Universal Growth Engine', () => {
     expect(state.bodies[0]?.hostBodyId).toBeNull();
     expect(state.surfaceMap.occupiedSites).toHaveLength(blueprint.instructions.length);
 
-    for (const body of state.bodies.slice(1)) {
+    const groundRooted = state.bodies.slice(1).filter(isGroundRooted);
+    expect(groundRooted.length).toBeGreaterThan(0);
+    for (const body of groundRooted) {
+      expect(body.hostBodyId).toBeNull();
+      expect(body.attachment).toBeNull();
+      expect(body.generation).toBe(0);
+    }
+
+    for (const body of state.bodies.slice(1).filter((item) => !isGroundRooted(item))) {
       const occupancy = occupancyByBodyId.get(body.id);
       const surfaceRegionId = body.attachment?.surfaceRegionId;
 
@@ -116,9 +132,14 @@ describe('Universal Growth Engine', () => {
       blueprint: growthBlueprint(BASE_EVENTS),
       config: DEFAULT_GROWTH_ENGINE_CONFIG,
     });
-    const regionIds = state.surfaceMap.occupiedSites.map((site) => site.surfaceRegionId);
+    // Ground-rooted companions occupy substrate sites, which carry no atlas
+    // region; the uniqueness rule still has to hold for everything that does
+    // reserve one.
+    const regionIds = state.surfaceMap.occupiedSites
+      .map((site) => site.surfaceRegionId)
+      .filter((regionId): regionId is string => regionId !== undefined);
 
-    expect(regionIds.every((regionId) => typeof regionId === 'string')).toBe(true);
+    expect(regionIds.length).toBeGreaterThan(0);
     expect(new Set(regionIds).size).toBe(regionIds.length);
   });
 
@@ -134,7 +155,9 @@ describe('Universal Growth Engine', () => {
 
     for (const center of centers) {
       expect(center.dominantBodyId).toBe(center.sourceInstructionId);
-      expect(typeof center.surfaceRegionId).toBe('string');
+      // The centre's dominant now nucleates in the substrate, so the centre
+      // reserves no atlas region of its own.
+      expect(center.surfaceRegionId).toBeNull();
       expect(center.bodyIds.length).toBeGreaterThanOrEqual(3);
       expect(center.bodyIds.length).toBeLessThanOrEqual(6);
 
@@ -168,8 +191,11 @@ describe('Universal Growth Engine', () => {
 
     for (const body of state.bodies.slice(1)) {
       if (body.kind === 'crystal:event-spire') {
-        expect(body.hostBodyId).toBe(mother.id);
-        expect(body.generation).toBe(1);
+        // Stands in the ground beside the monarch rather than on her shaft.
+        expect(body.hostBodyId).toBeNull();
+        expect(body.generation).toBe(0);
+        expect(body.anchor.y).toBeLessThanOrEqual(0);
+        expect(Math.hypot(body.anchor.x, body.anchor.z)).toBeGreaterThan(0);
         expect(body.direction.y).toBeGreaterThanOrEqual(0.62);
         expect(body.skeletonLength).toBeLessThanOrEqual(1.3);
       } else if (body.kind === 'crystal:satellite') {

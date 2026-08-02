@@ -110,7 +110,11 @@ describe('Crystal Geometry', () => {
     expect(reordered.meshes.map((mesh) => mesh.bodyId)).toEqual(
       canonical.geometry.meshes.map((mesh) => mesh.bodyId),
     );
-    expect(reordered.junctions).toHaveLength(reorderedGrowth.bodies.length - 1);
+    // One junction per *attached* body. Ground-rooted companions have no host,
+    // so they publish no junction (2026-08-02 composition change).
+    expect(reordered.junctions).toHaveLength(
+      reorderedGrowth.bodies.filter((body) => body.hostBodyId !== null).length,
+    );
   });
 
   it('publishes normalized geological burial and center maturation metadata', () => {
@@ -140,7 +144,10 @@ describe('Crystal Geometry', () => {
     const { growth, geometry } = pipeline(BASE_EVENTS);
 
     expect(geometry.meshes).toHaveLength(growth.bodies.length);
-    expect(geometry.junctions).toHaveLength(growth.bodies.length - 1);
+    expect(geometry.junctions).toHaveLength(
+      growth.bodies.filter((body) => body.hostBodyId !== null).length,
+    );
+    expect(geometry.junctions.length).toBeGreaterThan(0);
     expect(geometry.diagnostics.budgetOmittedBodyIds).toEqual([]);
     expect(geometry.diagnostics.nonFiniteBodyIds).toEqual([]);
     expect(geometry.diagnostics.meshesWithoutVisibleTriangles).toEqual([]);

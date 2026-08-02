@@ -1,4 +1,5 @@
 import {
+  GROWTH_UP,
   add,
   clamp,
   directionFromAzimuthElevation,
@@ -41,6 +42,23 @@ function radiusAt(host: GrowthBody, hostT: number): number {
   return host.skeletonRadius
     * host.surfaceRadiusScale
     * (1 - clamp(hostT, 0, 1) * 0.62);
+}
+
+/**
+ * How deep a child may bury itself at this point on the host before its base
+ * leaves the host solid.
+ *
+ * Two limits apply and the tighter one wins. A child that grows roughly
+ * parallel to its host sinks back along the host's axis, so it cannot bury
+ * deeper than the host body that remains below the contact. A child that grows
+ * out sideways sinks toward the axis, so it is limited by how wide the host is
+ * there. Ignoring either one lets a small host be punched straight through,
+ * which leaves the junction unsealed and exposes a base cap.
+ */
+export function hostBurialCapacity(host: GrowthBody, hostT: number): number {
+  const axialRoom = clamp(hostT, 0, 1) * host.skeletonLength;
+  const radialRoom = radiusAt(host, hostT) * 1.2;
+  return Math.max(0, Math.min(axialRoom, radialRoom));
 }
 
 export function bodyEnd(body: Pick<GrowthBody, 'anchor' | 'direction' | 'skeletonLength'>): GrowthVec3 {
@@ -120,6 +138,86 @@ function remappedRegionSurface(
   };
 }
 
+/**
+ * Identifies sites on the substrate rather than on another body. It is not a
+ * real body and is never published — it exists so ground-rooted candidates
+ * share an angular-separation namespace and therefore spread around the
+ * monarch instead of piling into one sector.
+ */
+export const GROUND_HOST_ID = '__ground';
+
+function groundHost(root: GrowthBody): GrowthBody {
+  return { ...root, id: GROUND_HOST_ID, generation: 0 };
+}
+
+/**
+ * Places a body in the substrate around the monarch instead of on her shaft.
+ *
+ * Companion crystals used to attach to the monarch's own surface, which read
+ * as pieces stuck onto her — the reference art instead shows one spire with
+ * separate crystals rising from the same ground around it. Rooting them in the
+ * ground also removes the host/child junction entirely, so these bodies are no
+ * longer bound by whether their base ring stays enclosed in a host.
+ *
+ * The base still sits below y=0 and keeps its cap: the cap is occluded by the
+ * scene's ground rather than deleted, so no internal face is ever exposed even
+ * if the camera drops below the horizon.
+ */
+export function sampleGroundSite(
+  root: GrowthBody,
+  instruction: UniversalGrowthInstruction,
+  candidateIndex: number,
+): GrowthSiteCandidate {
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  const angleJitter = (seededUnit(instruction.seed, `ground:${candidateIndex}:angle`) - 0.5) * 0.85;
+  const azimuth = round6(
+    instruction.preferredAzimuthRad + candidateIndex * goldenAngle + angleJitter,
+  );
+  const outward = { x: Math.cos(azimuth), y: 0, z: Math.sin(azimuth) };
+
+  // Stand clear of the monarch's own footprint, with deterministic spread so
+  // the companions do not land on a perfect circle.
+  const radiusJitter = 0.82 + seededUnit(instruction.seed, `ground:${candidateIndex}:radius`) * 0.5;
+  const ringRadius = round6(
+    (root.skeletonRadius * 0.95 + instruction.radialScale * 0.95) * radiusJitter,
+  );
+  const surfacePoint = {
+    x: round6(outward.x * ringRadius),
+    y: 0,
+    z: round6(outward.z * ringRadius),
+  };
+
+  // radialBias already encodes "how far out this formation reaches", so it
+  // doubles as the outward tilt; ensureUpward keeps it from lying down flat.
+  const lean = clamp(instruction.radialBias, 0, 1) * 0.55;
+  const direction = ensureUpward(
+    add(scale(GROWTH_UP, 1 - lean), scale(outward, lean)),
+    instruction.minUpwardComponent,
+  );
+
+  const burialDepth = round6(instruction.radialScale * 0.9);
+  const anchor = add(surfacePoint, scale(direction, -burialDepth));
+
+  return {
+    siteKey: `${GROUND_HOST_ID}:site:${instruction.id}:${candidateIndex}`,
+    surfaceRegionId: null,
+    candidateIndex,
+    host: groundHost(root),
+    hostT: 0,
+    hostAngleRad: azimuth,
+    surfacePoint: roundVec(surfacePoint),
+    surfaceNormal: { x: 0, y: 1, z: 0 },
+    surfacePotential: 0.8,
+    surfaceStress: 0,
+    localDensity: 0,
+    growthShadow: 0,
+    competitionPressure: 0,
+    anchor: roundVec(anchor),
+    direction: roundVec(direction),
+    burialDepth,
+  };
+}
+
 /** Compatibility sampler retained for non-atlas callers. */
 export function sampleGrowthSite(
   host: GrowthBody,
@@ -145,7 +243,10 @@ export function sampleGrowthSite(
   const surfaceNormal = normalize(add(scale(radialNormal, 0.92), scale(host.direction, 0.08)));
   const direction = growthDirection(host, surfaceNormal, instruction);
 
-  const burialDepth = round6(instruction.radialScale * instruction.attachmentDepth);
+  const burialDepth = round6(Math.min(
+    instruction.radialScale * instruction.attachmentDepth,
+    hostBurialCapacity(host, hostT) * 0.4,
+  ));
   const anchor = add(surfacePoint, scale(direction, -burialDepth));
 
   return {
@@ -178,7 +279,10 @@ export function sampleGrowthRegionSite(
   const remapped = remappedRegionSurface(host, instruction, region);
   const surfaceNormal = normalize(remapped.surfaceNormal);
   const direction = growthDirection(host, surfaceNormal, instruction);
-  const burialDepth = round6(instruction.radialScale * instruction.attachmentDepth);
+  const burialDepth = round6(Math.min(
+    instruction.radialScale * instruction.attachmentDepth,
+    hostBurialCapacity(host, remapped.hostT) * 0.4,
+  ));
   const anchor = add(remapped.surfacePoint, scale(direction, -burialDepth));
 
   return {
