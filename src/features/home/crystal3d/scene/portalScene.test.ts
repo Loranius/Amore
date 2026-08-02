@@ -14,6 +14,7 @@ import {
   buildPortalStarField,
   measurePortalEnvironmentTriangles,
   portalCameraFrame,
+  portalDaisScale,
   portalHalfWidthAt,
   portalPillarInstances,
 } from './portalScene';
@@ -22,12 +23,26 @@ import {
 const ASPECTS = [0.42, 0.46, 0.62, 0.75, 1.33, 1.9];
 
 /**
- * Найширший і найвищий, що дав справжній пайплайн (20 років, 90 подій):
- * радіус друзи ≈0.68, висота ≈2.98 світових одиниць після fit-масштабу.
- * Кадр мусить вміщати саме це, а не абстрактну «одиницю».
+ * Виміряно на справжньому пайплайні через `crystalSceneRadius` — в
+ * одиницях сцени, тобто вже після fit-масштабу рендерера:
+ *
+ * | вік | кристали | камінь | висота |
+ * |---|---:|---:|---:|
+ * | 1 рік | 0.88 | 1.26 | 1.91 |
+ * | 4 роки | 1.00 | 1.49 | 2.50 |
+ * | 10 років | 1.42 | 2.39 | 3.19 |
+ * | 20 років | 1.50 | 2.50 | 2.71 |
+ *
+ * Попередні константи (радіус 0.68) були зняті ще до ADR-0004 і
+ * занижували ширину друзи більш ніж удвічі, тож перевірка «артефакт
+ * влазить у кадр» проходила на числі, якого артефакт ніколи не мав.
+ *
+ * Кадр мусить вміщати кристали. Камінь і подіум — підлога: їм дозволено
+ * виходити за край, і саме тому в таблиці два різні радіуси.
  */
-const WIDEST_ARTIFACT_RADIUS = 0.68;
-const TALLEST_ARTIFACT_HEIGHT = 2.98;
+const WIDEST_CRYSTAL_RADIUS = 1.5;
+const WIDEST_ROCK_RADIUS = 2.5;
+const TALLEST_ARTIFACT_HEIGHT = 3.19;
 
 describe('portal camera frame', () => {
   it('stands on the same plane the renderer puts the artifact on', () => {
@@ -36,13 +51,45 @@ describe('portal camera frame', () => {
     expect(PORTAL_GROUND_Y).toBe(CRYSTAL_GROUND_BASELINE);
   });
 
+  it('keeps every crystal inside the frame at every real aspect and age', () => {
+    for (const aspect of ASPECTS) {
+      for (const radius of [0, 0.88, 1.0, 1.42, WIDEST_CRYSTAL_RADIUS]) {
+        const frame = portalCameraFrame(aspect, radius);
+        expect(portalHalfWidthAt(frame.distance, aspect)).toBeGreaterThan(radius);
+      }
+    }
+  });
+
+  it('only ever backs the camera off, never pulls it in', () => {
+    // Кадр без артефакта — це нижня межа. Якби більший артефакт міг
+    // *наблизити* камеру, зростання читалось би задом наперед.
+    for (const aspect of ASPECTS) {
+      const base = portalCameraFrame(aspect).distance;
+      let previous = base;
+      for (const radius of [0.5, 0.88, 1.0, 1.42, 1.5, 3]) {
+        const distance = portalCameraFrame(aspect, radius).distance;
+        expect(distance).toBeGreaterThanOrEqual(previous - 1e-9);
+        expect(distance).toBeGreaterThanOrEqual(base - 1e-9);
+        previous = distance;
+      }
+    }
+  });
+
+  it('survives a degenerate artifact radius', () => {
+    for (const radius of [Number.NaN, Number.POSITIVE_INFINITY, -5]) {
+      const frame = portalCameraFrame(0.46, radius);
+      expect(frame.position.every(Number.isFinite)).toBe(true);
+      expect(frame.distance).toBe(portalCameraFrame(0.46).distance);
+    }
+  });
+
   it('keeps the whole artifact inside the frame at every real aspect', () => {
     for (const aspect of ASPECTS) {
-      const frame = portalCameraFrame(aspect);
+      const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
       const halfHeight = frame.distance * Math.tan((frame.fov / 2) * (Math.PI / 180));
       const halfWidth = portalHalfWidthAt(frame.distance, aspect);
 
-      expect(halfWidth).toBeGreaterThan(WIDEST_ARTIFACT_RADIUS);
+      expect(halfWidth).toBeGreaterThan(WIDEST_CRYSTAL_RADIUS);
       // Артефакт стоїть на землі, тож по висоті його тримає не половина
       // кадру, а відрізок від нижнього краю до верхівки.
       const frameTop = frame.target[1] + halfHeight;
@@ -82,7 +129,7 @@ describe('portal camera frame', () => {
   it('starts fog behind the artifact, not on it', () => {
     for (const aspect of ASPECTS) {
       const frame = portalCameraFrame(aspect);
-      expect(frame.fogNear).toBeGreaterThan(frame.distance - WIDEST_ARTIFACT_RADIUS * 2);
+      expect(frame.fogNear).toBeGreaterThan(frame.distance - WIDEST_CRYSTAL_RADIUS * 2);
       expect(frame.fogFar).toBeGreaterThan(frame.fogNear);
     }
   });
@@ -93,7 +140,9 @@ describe('portal pillars', () => {
     // Це і є причина рахувати x із кадру: прибиті координати, підібрані на
     // телефоні, на ноутбуці опинились би впритул до кристала.
     for (const aspect of ASPECTS) {
-      const frame = portalCameraFrame(aspect);
+      // Разом із найширшою друзою: колони мусять відійти разом із камерою,
+      // інакше найстарша пара отримала б колону впритул до кристала.
+      const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
       const instances = portalPillarInstances(frame, aspect);
       expect(instances).toHaveLength(PORTAL_PILLARS.length * 2);
 
@@ -106,7 +155,7 @@ describe('portal pillars', () => {
 
         expect(ratio).toBeCloseTo(placement.edgeFraction, 6);
         // Колона поза кристалом: інакше вона перекрила б артефакт.
-        expect(Math.abs(instance.position[0])).toBeGreaterThan(WIDEST_ARTIFACT_RADIUS * 1.5);
+        expect(Math.abs(instance.position[0])).toBeGreaterThan(WIDEST_CRYSTAL_RADIUS);
       }
     }
   });
@@ -145,8 +194,45 @@ describe('portal geometry', () => {
     geometry.dispose();
   });
 
-  it('keeps the dais top wider than the druse it carries', () => {
-    expect(PORTAL_DAIS_TOP_RADIUS).toBeGreaterThan(WIDEST_ARTIFACT_RADIUS * 1.5);
+  it('grows the dais top to stay wider than the rock it carries', () => {
+    // Це і є причина, з якої подіум перестав бути константою: камінь
+    // розростається з місцями, де пара була (ADR-0004), а плита — ні, тож
+    // друза вилазила за обвід і ховала інкрустацію під собою.
+    for (const rock of [0.9, 1.1, 1.315, 1.6, 2.0]) {
+      const top = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(rock);
+      expect(top).toBeGreaterThan(rock);
+      // Інкрустація лежить на 1.19 з 1.3 — вона мусить лишатись видимою.
+      expect(top * (1.19 / 1.3)).toBeGreaterThan(rock);
+    }
+  });
+
+  it('never shrinks the dais below the designed scene', () => {
+    for (const rock of [0, 0.2, 0.9, Number.NaN, -4, Number.POSITIVE_INFINITY]) {
+      const scale = portalDaisScale(rock);
+      expect(Number.isFinite(scale)).toBe(true);
+      expect(scale).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('stops the dais before it reaches the pillars', () => {
+    // Стеля DAIS_MAX_SCALE існує рівно заради цього: колони стоять на полі,
+    // і плита, що доросла до них, проткнулась би їхніми цоколями.
+    const maxScale = portalDaisScale(Number.MAX_SAFE_INTEGER);
+    // Радіус подіуму на висоті, де стоять колони.
+    const daisAtPillarHeight = 1.66 * maxScale;
+    for (const aspect of ASPECTS) {
+      const frame = portalCameraFrame(aspect);
+      for (const instance of portalPillarInstances(frame, aspect)) {
+        const axisDistance = Math.hypot(instance.position[0], instance.position[2]);
+        expect(axisDistance).toBeGreaterThan(daisAtPillarHeight);
+      }
+    }
+  });
+
+  it('carries the widest rock the pipeline produces, or says where it stops', () => {
+    // Чесна межа, а не обіцянка: на дуже старій друзі стеля з'їдає запас.
+    const top = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(WIDEST_ROCK_RADIUS);
+    expect(top).toBeGreaterThan(WIDEST_ROCK_RADIUS * 0.9);
   });
 
   it('merges the inlay and the pillar into one buffer each', () => {

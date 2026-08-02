@@ -1,4 +1,6 @@
 import type { ArtifactBlueprint } from '../../evolution';
+import { parseEvolutionInstant } from '../../evolution/calendar';
+import { CONSISTENCY_WINDOW_MONTHS, consistency } from './growthModel';
 import {
   channelEvenness,
   clamp01,
@@ -87,10 +89,38 @@ function lifeStage(
   return 'growth';
 }
 
+/**
+ * Distinct calendar months in which anything at all was logged, within the
+ * consistency window ending at the artifact's clock.
+ *
+ * Months rather than days because a relationship is not a streak counter: the
+ * question is "did this month have anything in it", not "how many days in a
+ * row".
+ */
+function monthsTouchedWithinWindow(artifact: ArtifactBlueprint, asOf: string): number {
+  const asOfEpoch = parseEvolutionInstant(asOf);
+  if (asOfEpoch === null) return 0;
+
+  const asOfDate = new Date(asOfEpoch);
+  const asOfMonth = asOfDate.getUTCFullYear() * 12 + asOfDate.getUTCMonth();
+  const months = new Set<number>();
+
+  for (const event of artifact.events) {
+    if (event.occurredAtEpochMs > asOfEpoch) continue;
+    const date = new Date(event.occurredAtEpochMs);
+    const month = date.getUTCFullYear() * 12 + date.getUTCMonth();
+    if (asOfMonth - month >= CONSISTENCY_WINDOW_MONTHS || month > asOfMonth) continue;
+    months.add(month);
+  }
+
+  return months.size;
+}
+
 export function buildCrystalState(
   artifact: ArtifactBlueprint,
   ageDays: number,
   pressures: CrystalSpeciesPressures,
+  asOf: string,
 ): CrystalSpeciesState {
   const epochCount = artifact.pressureLedger.epochs.length;
   const eventCount = artifact.pressureLedger.eventCount;
@@ -117,6 +147,10 @@ export function buildCrystalState(
     cohesion,
     energy,
     fracture,
+    consistency: consistency(
+      monthsTouchedWithinWindow(artifact, asOf),
+      Math.floor(ageDays / 30.44),
+    ),
     density: round6(clamp01((pressures.density - 1) / 0.3)),
     luminosity: pressures.luminosity,
   };

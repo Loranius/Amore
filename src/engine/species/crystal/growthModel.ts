@@ -50,11 +50,23 @@ export function monarchAxialScale(daysTogether: number): number {
 const MONARCH_STOUTEST_ASPECT = 3.8;
 const MONARCH_SLIMMEST_ASPECT = 6.2;
 
-/** Contributions beyond which extra activity stops thickening the monarch. */
-const MONARCH_ACTIVITY_SATURATION = 400;
+/**
+ * Deliberate acts beyond which more of them stop thickening the monarch.
+ *
+ * Rescaled when girth stopped counting every event and started counting only
+ * things the couple decided to do — plans, gifts, places, milestones. Those
+ * are roughly 45% of a real couple's total, so the old ceiling of 400 would
+ * have left the whole range unused and every crystal slender.
+ */
+const MONARCH_ACTIVITY_SATURATION = 150;
 
 /**
- * Girth of the monarch from how much the couple has put into the portal.
+ * Girth of the monarch from the deliberate acts behind her.
+ *
+ * `contributions` counts what the couple *did* — plans finished, wishes
+ * granted, places visited, milestones marked — not everything they logged.
+ * Counting everything made girth a photo count, and photos already earn her
+ * facets, so one module quietly decided two of her three dimensions.
  *
  * Activity moves the *proportion*, not an absolute thickness. Expressing it
  * as an aspect ratio rather than a radius is what makes it legible: a quiet
@@ -64,7 +76,7 @@ const MONARCH_ACTIVITY_SATURATION = 400;
  *
  * Activity thickens and never lengthens. That separation is what stops any
  * one module from running away with the artifact: a thousand photos cannot
- * make the monarch tall.
+ * make the monarch tall, and now they cannot make her thick either.
  */
 export function monarchRadialScale(axialScale: number, contributions: number): number {
   const total = Number.isFinite(contributions) ? Math.max(0, contributions) : 0;
@@ -250,6 +262,42 @@ export interface ChildDimensions {
 }
 
 /**
+ * Portal modules a year can draw on: calendar, plans, wishlist, map,
+ * memories, shopping.
+ *
+ * Kept here as a number rather than imported from the adapter layer, which
+ * Volume II has no business reaching into. `growthModel.test.ts` checks it
+ * against the real adapter source list so the two cannot drift.
+ */
+export const PORTAL_MODULE_COUNT = 6;
+
+/** Events in a single module beyond which more of the same adds little. */
+const YEAR_DEPTH_HALF_SATURATION = 12;
+
+/**
+ * How lived-in a year was, from 0 to 1.
+ *
+ * Weighted toward *breadth* — how many parts of the portal the year touched —
+ * rather than volume. Counting events made the measure almost entirely a
+ * photo count: in a real couple's fullest year, 48 of 80 events were photos,
+ * and photos already drive the monarch's facets, so volume both double-counted
+ * one module and drowned out the other five. Measured on that couple's four
+ * years, counting gave 0.25 / 0.14 / 0.33 / 0.87 — ranking a year of nothing
+ * but six photos *above* a year with a trip, an anniversary and a photo.
+ *
+ * This is the "module fill" the owner asked for from the start.
+ */
+export function yearActivity(moduleCount: number, eventCount: number): number {
+  // `Math.max(0, NaN)` is NaN and `Infinity / (Infinity + 12)` is NaN, so a
+  // count has to be proved finite before it is used, not merely floored.
+  const count = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);
+  const breadth = clamp01(count(moduleCount) / PORTAL_MODULE_COUNT);
+  const events = count(eventCount);
+  const depth = events / (events + YEAR_DEPTH_HALF_SATURATION);
+  return round6(0.6 * breadth + 0.4 * depth);
+}
+
+/**
  * How full a year is, from 0 to 1 — the fraction of the maximum a year's
  * crystal is entitled to.
  *
@@ -259,9 +307,18 @@ export interface ChildDimensions {
  * content dated inside a year belongs to that year whenever it is added.
  * What a closed year no longer does is grow with time or with anything
  * that happened outside it.
+ *
+ * The floor is what a year with nothing in it still gets. It was 0.55, which
+ * compressed a real couple's three closed years into 0.66/0.61/0.70 — a nine
+ * percent spread, invisible on screen, so three very different years looked
+ * identical. A lower floor lets a well-filled year actually look like one.
  */
-export function yearFill(progress: number, yearActivity: number): number {
-  return round6(clamp01(progress) * (0.55 + 0.45 * clamp01(yearActivity)));
+const EMPTY_YEAR_FLOOR = 0.3;
+
+export function yearFill(progress: number, activity: number): number {
+  return round6(
+    clamp01(progress) * (EMPTY_YEAR_FLOOR + (1 - EMPTY_YEAR_FLOOR) * clamp01(activity)),
+  );
 }
 
 /**
@@ -309,6 +366,57 @@ const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 export function childAzimuthRad(yearIndex: number): number {
   const angle = (yearIndex * GOLDEN_ANGLE) % (Math.PI * 2);
   return round6(angle < 0 ? angle + Math.PI * 2 : angle);
+}
+
+// ── Ground ──────────────────────────────────────────────────
+
+/** Places beyond which more travel stops widening the ground much. */
+const GROUND_PLACES_HALF_SATURATION = 30;
+/** Widest the ground may grow beyond the druse's own footprint. */
+const GROUND_MAX_SPREAD = 0.45;
+
+/**
+ * How far the rock spreads beyond what the druse strictly needs, from the
+ * places the couple has been.
+ *
+ * The map was the second-largest module in a real couple's history — 26
+ * visited places — and drove nothing of its own: the substrate was derived
+ * purely from the druse's own footprint, so it carried no meaning at all.
+ * Where they have been is literally the ground they grow from.
+ *
+ * A multiplier rather than an absolute size, because the substrate still has
+ * to cover every crystal's buried base (ADR-0003). Widening it can never
+ * break that guarantee; narrowing it could, so this only ever grows.
+ */
+export function groundSpread(placesVisited: number): number {
+  const places = Number.isFinite(placesVisited) ? Math.max(0, placesVisited) : 0;
+  const reach = places / (places + GROUND_PLACES_HALF_SATURATION);
+  return round6(1 + GROUND_MAX_SPREAD * reach);
+}
+
+// ── Consistency ─────────────────────────────────────────────
+
+/** Months of habit the measure looks back over. */
+export const CONSISTENCY_WINDOW_MONTHS = 12;
+
+/**
+ * How regularly the couple shows up, from 0 to 1.
+ *
+ * A different question from how much they log, and the more interesting one:
+ * a couple who adds something most months is tending the thing, while forty
+ * photos dumped in one weekend and silence either side is not the same
+ * relationship with the portal, however large the volume.
+ *
+ * Bounded to a rolling window so it stays answerable — over a whole
+ * relationship it would only ever fall, which would turn into exactly the
+ * kind of decay this artifact refuses to have.
+ */
+export function consistency(monthsTouched: number, monthsLived: number): number {
+  const touched = Number.isFinite(monthsTouched) ? Math.max(0, monthsTouched) : 0;
+  const lived = Number.isFinite(monthsLived) ? Math.max(0, monthsLived) : 0;
+  const window = Math.min(CONSISTENCY_WINDOW_MONTHS, lived);
+  if (window <= 0) return 0;
+  return round6(clamp01(Math.min(touched, window) / window));
 }
 
 // ── Colour from fulfilled wishes ────────────────────────────

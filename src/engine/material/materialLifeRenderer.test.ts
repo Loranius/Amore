@@ -4,9 +4,15 @@ import { buildArtifactBlueprint, type EvolutionEventInput } from '../evolution';
 import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG, buildCrystalGeometry } from '../geometry';
 import { DEFAULT_GROWTH_ENGINE_CONFIG, buildGrowthState } from '../growth';
 import { DEFAULT_CRYSTAL_LIFE_CONFIG, buildCrystalLifeState, sampleCrystalLife } from '../life';
-import { createThreeCrystalRenderBundle, applyCrystalLifeFrame } from '../renderer/three';
+import {
+  createThreeCrystalRenderBundle,
+  applyCrystalLifeFrame,
+  crystalSceneRadius,
+} from '../renderer/three';
+import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../species/crystal';
-import { DEFAULT_CRYSTAL_MATERIAL_CONFIG } from './config';
+import { CONSISTENCY_WINDOW_MONTHS, consistency } from '../species/crystal/growthModel';
+import { CRYSTAL_MATERIAL_QUALITY_PRESETS, DEFAULT_CRYSTAL_MATERIAL_CONFIG } from './config';
 import { buildCrystalMaterialState } from './engine';
 
 const EVENTS: EvolutionEventInput[] = [
@@ -175,6 +181,124 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
 
     bundle.dispose();
     expect(bundle.group.children).toHaveLength(0);
+  });
+
+  it('clears the stone for a couple who shows up regularly (ADR-0004)', () => {
+    // Regularity, not volume, drives clarity. Both couples below are handed the
+    // identical artifact — same events, same pressures, same geometry — and
+    // differ only in the consistency their species state published, so a
+    // difference in inclusions can have come from nothing else.
+    const base = pipeline({ quality: 'high' });
+    const withConsistency = (monthsTouched: number) => {
+      const species = {
+        ...base.species,
+        state: {
+          ...base.species.state,
+          consistency: consistency(monthsTouched, CONSISTENCY_WINDOW_MONTHS),
+        },
+      };
+      return buildCrystalMaterialState({
+        species,
+        composition: base.composition,
+        geometry: base.geometry,
+        config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality: 'high' },
+      });
+    };
+    const inclusionsOf = (state: ReturnType<typeof withConsistency>) => state.bodies
+      .filter((body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID)
+      .map((body) => body.shader.inclusionDensity);
+
+    const regular = inclusionsOf(withConsistency(10));
+    const occasional = inclusionsOf(withConsistency(1));
+
+    expect(regular).toHaveLength(occasional.length);
+    expect(regular.some((density) => density > 0)).toBe(true);
+    for (let index = 0; index < regular.length; index += 1) {
+      const clear = regular[index]!;
+      const cloudy = occasional[index]!;
+      // Micro bodies publish 0 inclusions at any consistency, so the assertion
+      // is "never cloudier", with at least one body actually clearing.
+      expect(clear).toBeLessThanOrEqual(cloudy);
+    }
+    expect(regular.some((density, index) => density < occasional[index]!)).toBe(true);
+  });
+
+  it('keeps clarity inside the quality presets at every consistency', () => {
+    const base = pipeline({ quality: 'high' });
+    for (const quality of ['high', 'balanced', 'low', 'fallback'] as const) {
+      const ceiling = CRYSTAL_MATERIAL_QUALITY_PRESETS[quality].inclusionScale;
+      for (const monthsTouched of [0, 1, 6, 12, 99]) {
+        const material = buildCrystalMaterialState({
+          species: {
+            ...base.species,
+            state: {
+              ...base.species.state,
+              consistency: consistency(monthsTouched, CONSISTENCY_WINDOW_MONTHS),
+            },
+          },
+          composition: base.composition,
+          geometry: base.geometry,
+          config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality },
+        });
+        for (const body of material.bodies) {
+          expect(body.shader.inclusionDensity).toBeGreaterThanOrEqual(0);
+          expect(body.shader.inclusionDensity).toBeLessThanOrEqual(ceiling + 1e-6);
+          expect(Number.isFinite(body.shader.inclusionDensity)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('reports the same scene footprint the bundle actually applies', () => {
+    // The portal sizes its podium and its camera from crystalSceneRadius
+    // without building a bundle. If that answer drifted from the fit the
+    // renderer really applies, the podium would be built for one artifact and
+    // the artifact drawn at another size — so the two are pinned together.
+    const { geometry, material } = pipeline();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const half = Math.max(bundle.fit.sourceSize.x, bundle.fit.sourceSize.z) * 0.5;
+
+    expect(crystalSceneRadius(geometry)).toBeCloseTo(half * bundle.fit.scale, 5);
+    bundle.dispose();
+  });
+
+  it('measures the crystals apart from the rock they stand in', () => {
+    // Two different questions with two different answers: the podium has to
+    // cover the rock, the camera only has to frame the crystals. The rock is
+    // always the wider of the two — the substrate exists to occlude every
+    // buried base (ADR-0003), so it cannot be narrower.
+    const { geometry } = pipeline();
+    const withRock = crystalSceneRadius(geometry);
+    const crystalsOnly = crystalSceneRadius(geometry, { includeSubstrate: false });
+
+    expect(crystalsOnly).toBeGreaterThan(0);
+    expect(withRock).toBeGreaterThan(crystalsOnly);
+    expect(crystalSceneRadius(geometry, { includeSubstrate: true })).toBe(withRock);
+  });
+
+  it('widens with the ground the couple earned, not with the mesh count', () => {
+    // Places visited reach the podium only through the substrate's width
+    // (ADR-0004); nothing else about the artifact changes.
+    const { geometry } = pipeline();
+    const substrate = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+    const travelled = {
+      ...geometry,
+      meshes: geometry.meshes.map((mesh) => (
+        mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID
+          ? {
+              ...mesh,
+              bounds: {
+                ...mesh.bounds,
+                min: { ...mesh.bounds.min, x: mesh.bounds.min.x * 1.4, z: mesh.bounds.min.z * 1.4 },
+                max: { ...mesh.bounds.max, x: mesh.bounds.max.x * 1.4, z: mesh.bounds.max.z * 1.4 },
+              },
+            }
+          : mesh
+      )),
+    };
+
+    expect(substrate.bounds.max.x).toBeGreaterThan(0);
+    expect(crystalSceneRadius(travelled)).toBeGreaterThan(crystalSceneRadius(geometry));
   });
 
   it('does not mutate species, composition or geometry states', () => {

@@ -102,6 +102,12 @@ export interface CrystalSpeciesState {
   cohesion: number;
   energy: number;
   fracture: number;
+  /**
+   * How regularly the couple has shown up over the last year, 0 to 1
+   * (ADR-0004). Artifact-wide, like `purity` — it describes the couple's
+   * habit rather than any one body.
+   */
+  consistency: number;
   density: number;
   luminosity: number;
 }
@@ -160,6 +166,12 @@ export interface CrystalGrowthInstruction {
    */
   tintRgb: readonly [number, number, number];
   iridescence: number;
+  /**
+   * How far the ground spreads beyond the druse's own footprint, as a
+   * multiplier of 1 or more. Published on the monarch only; the geometry
+   * volume reads a number and never learns what a "place" is.
+   */
+  groundSpread: number;
   seed: number;
 }
 

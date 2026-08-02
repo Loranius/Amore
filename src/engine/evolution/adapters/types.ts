@@ -5,13 +5,23 @@ import type {
   LeapDayPolicy,
 } from '../types';
 
-export type EvolutionAdapterSource =
-  | 'calendar'
-  | 'plans'
-  | 'wishlist'
-  | 'map'
-  | 'memories'
-  | 'shopping';
+/**
+ * Every portal module that can produce evolution events.
+ *
+ * An array rather than a bare union so the count is available at runtime:
+ * the crystal measures a year by how many of these it touched, and that
+ * needs a denominator. Same pattern as `EVOLUTION_CHANNELS`.
+ */
+export const EVOLUTION_ADAPTER_SOURCES = [
+  'calendar',
+  'plans',
+  'wishlist',
+  'map',
+  'memories',
+  'shopping',
+] as const;
+
+export type EvolutionAdapterSource = (typeof EVOLUTION_ADAPTER_SOURCES)[number];
 
 export type AdapterDiagnosticCode =
   | 'invalid_as_of'

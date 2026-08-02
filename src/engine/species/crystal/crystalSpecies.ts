@@ -42,7 +42,7 @@ export function buildCrystalSpeciesBlueprint(
 
   const pressures = buildCrystalPressures(currentArtifact);
   const ageDays = relationshipAgeDays(currentArtifact, asOf);
-  const state = buildCrystalState(currentArtifact, ageDays, pressures);
+  const state = buildCrystalState(currentArtifact, ageDays, pressures, asOf);
   const mother = buildMotherInstruction(currentArtifact, asOf);
   // The full artifact, not the filtered one: the formation builders bound
   // themselves by asOf, and diagnostics must still be able to name the facts

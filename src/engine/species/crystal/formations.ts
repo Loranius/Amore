@@ -18,11 +18,13 @@ import {
   childDistance,
   childGrowthProgress,
   childRingIndex,
+  groundSpread,
   monarchAxialScale,
   monarchFacetCount,
   monarchRadialScale,
   relationshipYears,
   wishTint,
+  yearActivity,
   yearFill,
   type WishGiftTally,
 } from './growthModel';
@@ -84,6 +86,31 @@ function occurredEvents(
   return artifact.events.filter((event) => event.occurredAtEpochMs <= epoch);
 }
 
+/**
+ * Modules that record something the couple decided to do, as opposed to
+ * something they kept or bought.
+ *
+ * The monarch's girth used to count every event, which on real data made it
+ * almost entirely a photo count — 56 of 104 — and photos already earn her
+ * facets. One module was deciding two of her three dimensions while the rest
+ * were noise. Counting deliberate acts instead makes the three genuinely
+ * independent: height is time, girth is what they did, facets are what they
+ * kept.
+ *
+ * Shopping is out for the same reason photos are: buying milk is not an act
+ * of the relationship, and the module produces one event per day regardless.
+ */
+const DELIBERATE_MODULES: ReadonlySet<string> = new Set([
+  'plans',
+  'wishlist',
+  'map',
+  'calendar',
+]);
+
+function deliberateActCount(events: readonly NormalizedEvolutionEvent[]): number {
+  return events.filter((event) => DELIBERATE_MODULES.has(eventModule(event.source))).length;
+}
+
 export function buildMotherInstruction(
   artifact: ArtifactBlueprint,
   asOf: string,
@@ -102,7 +129,7 @@ export function buildMotherInstruction(
   const daysTogether = daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0;
   const occurred = occurredEvents(artifact, asOf);
   const axialScale = monarchAxialScale(daysTogether);
-  const radialScale = monarchRadialScale(axialScale, occurred.length);
+  const radialScale = monarchRadialScale(axialScale, deliberateActCount(occurred));
 
   return {
     id: 'crystal:mother',
@@ -130,6 +157,10 @@ export function buildMotherInstruction(
     ringDistance: 0,
     tintRgb: [1, 1, 1] as const,
     iridescence: 0,
+    // Where the couple has been is the ground they grow from.
+    groundSpread: groundSpread(
+      occurred.filter((event) => eventModule(event.source) === 'map').length,
+    ),
     seed,
   };
 }
@@ -235,10 +266,10 @@ export function buildAnnualFormations(
       const seed = stableSeed(artifact.deterministicSeed, id);
       const yearEvents = eventsWithin(artifact, year.startsAt, year.endsAt, asOfEpoch);
       const importantEventCount = yearEvents.filter(isImportantEvent).length;
-      // How full the year was, across every module — not just the important
-      // events, so a busy year without a logged anniversary is still a big
-      // crystal.
-      const yearActivity = saturate(yearEvents.length, 12);
+      // How lived-in the year was: mostly how many parts of the portal it
+      // touched, and only partly how much. See `yearActivity`.
+      const modules = new Set(yearEvents.map((event) => eventModule(event.source)));
+      const activity = yearActivity(modules.size, yearEvents.length);
 
       // Every year is measured against the monarch as she stands today, so
       // the ring stays proportional to her and a couple who filled in their
@@ -246,7 +277,7 @@ export function buildAnnualFormations(
       // is the year's *fill* — its share of the maximum — not its size in
       // absolute units.
       const progress = childGrowthProgress(year, asOf);
-      const fill = yearFill(progress, yearActivity);
+      const fill = yearFill(progress, activity);
       const size = childDimensions(monarchNow, fill);
       const ringIndex = childRingIndex(year.index);
       const tint = wishTint(wishTallyForYear(yearEvents, partners));
@@ -267,7 +298,7 @@ export function buildAnnualFormations(
         radialScale: size.radialScale,
         // Years carry more facets the fuller they were, within the same range
         // the monarch uses so the ring never out-detail the centre.
-        facetCount: 6 + Math.round(yearActivity * 2),
+        facetCount: 6 + Math.round(activity * 2),
         azimuthRad: childAzimuthRad(year.index),
         elevation: 1,
         radialBias: 0,
@@ -281,6 +312,8 @@ export function buildAnnualFormations(
         // A year with no gifts stays the white every crystal is born as.
         tintRgb: tint.rgb,
         iridescence: tint.iridescence,
+        // Only the monarch speaks for the ground.
+        groundSpread: 1,
         seed,
       };
     });
@@ -339,6 +372,7 @@ export function buildSkirtFormations(
       ringDistance: round6(SKIRT_RING_DISTANCE + seededUnit(seed, 'ring') * 0.07),
       tintRgb: [1, 1, 1] as const,
       iridescence: 0,
+      groundSpread: 1,
       seed,
     };
   });

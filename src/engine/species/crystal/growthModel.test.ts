@@ -13,7 +13,12 @@ import {
   childDistance,
   childGrowthProgress,
   childRingIndex,
+  CONSISTENCY_WINDOW_MONTHS,
+  consistency,
   facetThresholdForYears,
+  groundSpread,
+  PORTAL_MODULE_COUNT,
+  yearActivity,
   yearFill,
   mediaSparkleCount,
   monarchAxialScale,
@@ -73,7 +78,7 @@ describe('monarch girth', () => {
   it('thickens with portal activity but only within the silhouette', () => {
     const axial = monarchAxialScale(3.6 * YEAR);
     const quiet = monarchRadialScale(axial, 0);
-    const busy = monarchRadialScale(axial, 104);
+    const busy = monarchRadialScale(axial, 47);
     const extreme = monarchRadialScale(axial, 100_000);
 
     expect(busy).toBeGreaterThan(quiet);
@@ -87,8 +92,11 @@ describe('monarch girth', () => {
 
   it('lands a typical couple near the silhouette the owner already accepted', () => {
     // The shipped monarch was about 4.6:1 and signed off at that shape.
+    // 47 is the real couple's count of *deliberate* acts — plans, gifts,
+    // places, milestones — not their 104 total events, since girth stopped
+    // counting photos.
     const axial = monarchAxialScale(3.6 * YEAR);
-    const aspect = axial / (2 * monarchRadialScale(axial, 104));
+    const aspect = axial / (2 * monarchRadialScale(axial, 47));
     expect(aspect).toBeGreaterThan(4.2);
     expect(aspect).toBeLessThan(5.4);
   });
@@ -378,5 +386,128 @@ describe('sparkles from media', () => {
   it('respects the device cap it is given', () => {
     expect(mediaSparkleCount(10_000, 18)).toBe(18);
     expect(mediaSparkleCount(10_000, 0)).toBe(0);
+  });
+});
+
+describe('how lived-in a year was', () => {
+  it('counts breadth across the portal above sheer volume', () => {
+    // The defect this replaces. On a real couple's data, counting events made
+    // a year of nothing but six photos rank *above* a year with a trip, an
+    // anniversary and a photo — because volume is really a photo count, and
+    // photos already drive the monarch's facets.
+    const sixModulesFewEvents = yearActivity(6, 10);
+    const oneModuleManyEvents = yearActivity(1, 60);
+
+    expect(sixModulesFewEvents).toBeGreaterThan(oneModuleManyEvents);
+  });
+
+  it('separates a couple`s real years instead of bunching them', () => {
+    // Measured: photos/places/calendar per year for the couple who prompted
+    // this. The old formula put the three closed years inside nine percent of
+    // each other, which is invisible on screen.
+    const closed = [
+      yearFill(1, yearActivity(3, 4)),
+      yearFill(1, yearActivity(2, 2)),
+      yearFill(1, yearActivity(1, 6)),
+    ];
+    const spread = Math.max(...closed) - Math.min(...closed);
+    expect(spread).toBeGreaterThan(0.1);
+
+    // And the fullest year is far clear of all of them.
+    expect(yearFill(1, yearActivity(6, 80))).toBeGreaterThan(Math.max(...closed) * 1.5);
+  });
+
+  it('rises with either signal and never leaves 0..1', () => {
+    expect(yearActivity(3, 10)).toBeGreaterThan(yearActivity(2, 10));
+    expect(yearActivity(3, 20)).toBeGreaterThan(yearActivity(3, 10));
+    expect(yearActivity(0, 0)).toBe(0);
+    expect(yearActivity(PORTAL_MODULE_COUNT, 10_000)).toBeLessThanOrEqual(1);
+    // More modules than exist cannot buy extra credit.
+    expect(yearActivity(99, 10)).toBe(yearActivity(PORTAL_MODULE_COUNT, 10));
+  });
+
+  it('still gives an empty year something rather than nothing', () => {
+    // A year the couple lived through is never a zero-height crystal, but it
+    // must be clearly smaller than one they filled.
+    const empty = yearFill(1, 0);
+    expect(empty).toBeGreaterThan(0.2);
+    expect(empty).toBeLessThan(yearFill(1, 1) * 0.4);
+  });
+
+  it('survives nonsense counts', () => {
+    for (const value of [Number.NaN, -5, Number.POSITIVE_INFINITY]) {
+      expect(Number.isFinite(yearActivity(value, 10))).toBe(true);
+      expect(Number.isFinite(yearActivity(3, value))).toBe(true);
+    }
+  });
+});
+
+describe('ground spread from places visited', () => {
+  it('widens the rock with travel and then levels off', () => {
+    // The map was the second-largest module in a real couple's history and
+    // drove nothing of its own; the substrate was derived purely from the
+    // druse's footprint, so it carried no meaning.
+    expect(groundSpread(0)).toBe(1);
+    expect(groundSpread(26)).toBeGreaterThan(groundSpread(5));
+    expect(groundSpread(200)).toBeGreaterThan(groundSpread(26));
+
+    const earlyTen = groundSpread(20) - groundSpread(10);
+    const lateTen = groundSpread(120) - groundSpread(110);
+    expect(lateTen).toBeLessThan(earlyTen);
+  });
+
+  it('only ever widens, so it cannot uncover a buried base', () => {
+    // ADR-0003 hides each crystal's base cap under the rock. A multiplier
+    // below one could expose it, so the range is one and up by construction.
+    for (const places of [0, 1, 26, 10_000, Number.NaN, -4, Number.POSITIVE_INFINITY]) {
+      const spread = groundSpread(places);
+      expect(spread).toBeGreaterThanOrEqual(1);
+      expect(Number.isFinite(spread)).toBe(true);
+    }
+  });
+
+  it('never grows the rock into a plate', () => {
+    expect(groundSpread(Number.MAX_SAFE_INTEGER)).toBeLessThanOrEqual(1.5);
+  });
+});
+
+describe('consistency', () => {
+  it('rewards showing up regularly, not showing up hard once', () => {
+    // The signal volume cannot express: forty photos in one weekend and
+    // silence either side is not the same relationship with the portal as
+    // something small most months.
+    expect(consistency(10, 12)).toBeGreaterThan(consistency(1, 12));
+    expect(consistency(12, 12)).toBe(1);
+    expect(consistency(0, 12)).toBe(0);
+  });
+
+  it('judges a young couple on the months they have actually lived', () => {
+    // Three months in, having shown up all three, is perfect attendance —
+    // not a quarter of it.
+    expect(consistency(3, 3)).toBe(1);
+    expect(consistency(3, 12)).toBeLessThan(1);
+  });
+
+  it('cannot exceed one however the counts arrive', () => {
+    expect(consistency(50, 12)).toBe(1);
+    expect(consistency(5, 2)).toBe(1);
+  });
+
+  it('is zero before the couple has lived a month', () => {
+    expect(consistency(0, 0)).toBe(0);
+  });
+
+  it('looks back over a bounded window rather than all history', () => {
+    // Over a whole relationship this could only ever fall, which is decay by
+    // another name — exactly what the artifact refuses to do.
+    expect(CONSISTENCY_WINDOW_MONTHS).toBe(12);
+    expect(consistency(12, 240)).toBe(1);
+  });
+
+  it('survives nonsense counts', () => {
+    for (const value of [Number.NaN, -3, Number.POSITIVE_INFINITY]) {
+      expect(Number.isFinite(consistency(value, 12))).toBe(true);
+      expect(Number.isFinite(consistency(6, value))).toBe(true);
+    }
   });
 });

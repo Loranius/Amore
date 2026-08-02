@@ -35,6 +35,27 @@ const SHAPE: readonly { readonly t: number; readonly radius: number }[] = [
   { t: 1, radius: 0.44 },
 ];
 
+/**
+ * How far the ground spreads beyond the druse's own footprint, from the
+ * monarch's published attribute. Geometry reads a multiplier and nothing
+ * more — it never learns that the number came from places the couple
+ * visited.
+ *
+ * Defaults to 1 for species and older states that publish nothing, so this
+ * can only ever widen the rock. That direction matters: the substrate must
+ * stay wide enough to occlude every buried base (ADR-0003), and a multiplier
+ * below 1 could break that.
+ */
+function groundSpreadOf(bodies: readonly GrowthBody[]): number {
+  for (const body of bodies) {
+    const published = body.attributes['groundSpread'];
+    if (typeof published === 'number' && Number.isFinite(published) && published >= 1) {
+      return Math.min(2, published);
+    }
+  }
+  return 1;
+}
+
 function footprintRadius(bodies: readonly GrowthBody[]): number {
   let widest = 0;
   for (const body of bodies) {
@@ -49,7 +70,7 @@ function footprintRadius(bodies: readonly GrowthBody[]): number {
   // ADR-0004 the druse is compact, and the same margins made the rock wider
   // than the monarch is tall — a boulder with crystals on it rather than the
   // other way round.
-  return round6(Math.max(0.16, widest * 1.06 + 0.02));
+  return round6(Math.max(0.16, widest * 1.06 + 0.02) * groundSpreadOf(bodies));
 }
 
 function substrateProfile(radius: number, height: number, depth: number): CrystalBodyProfile {

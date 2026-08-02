@@ -301,3 +301,99 @@ describe('Crystal Species annual colour (ADR-0004)', () => {
     }
   });
 });
+
+describe('Crystal Species monarch dimensions are independent', () => {
+  function monarchFor(extra: readonly EvolutionEventInput[]) {
+    return buildCrystalSpeciesBlueprint({
+      artifact: buildArtifact([...BASE_EVENTS, ...extra]),
+      config: { asOf: '2026-07-01', rulesVersion: 'crystal-1.0.0' },
+    }).mother;
+  }
+
+  const photos = (count: number): EvolutionEventInput[] =>
+    Array.from({ length: count }, (_unused, index) => ({
+      id: `photo:${index}`,
+      occurredAt: `2025-0${(index % 9) + 1}-1${index % 10}`,
+      source: 'memories@1',
+      evidence: 'verified' as const,
+      channels: { remembrance: 0.5 },
+      portalActivity: 0.1,
+    }));
+
+  const trips = (count: number): EvolutionEventInput[] =>
+    Array.from({ length: count }, (_unused, index) => ({
+      id: `trip:${index}`,
+      occurredAt: `2025-0${(index % 9) + 1}-2${index % 8}`,
+      source: 'map@1',
+      evidence: 'verified' as const,
+      channels: { exploration: 0.7 },
+      portalActivity: 0.2,
+    }));
+
+  it('does not let photos thicken the monarch — they earn facets instead', () => {
+    // The double count this removes: girth used to be a total event count, of
+    // which 56 of 104 were photos on real data, and photos already drive
+    // facets. One module was deciding two of three dimensions.
+    const bare = monarchFor([]);
+    const withPhotos = monarchFor(photos(40));
+
+    expect(withPhotos.radialScale).toBe(bare.radialScale);
+    expect(withPhotos.facetCount).toBeGreaterThan(bare.facetCount);
+  });
+
+  it('lets deliberate acts thicken her without touching her facets', () => {
+    const bare = monarchFor([]);
+    const withTrips = monarchFor(trips(20));
+
+    expect(withTrips.radialScale).toBeGreaterThan(bare.radialScale);
+    expect(withTrips.facetCount).toBe(bare.facetCount);
+  });
+
+  it('keeps height answering only to time', () => {
+    // Neither kind of activity may make her taller.
+    const bare = monarchFor([]);
+    expect(monarchFor(photos(40)).axialScale).toBe(bare.axialScale);
+    expect(monarchFor(trips(20)).axialScale).toBe(bare.axialScale);
+  });
+});
+
+describe('Crystal Species consistency (ADR-0004)', () => {
+  function crystalWith(months: readonly string[]) {
+    return buildCrystalSpeciesBlueprint({
+      artifact: buildArtifact([
+        ...BASE_EVENTS,
+        ...months.map((month, index) => ({
+          id: `visit:${index}`,
+          occurredAt: `${month}-14`,
+          source: 'memories@1',
+          evidence: 'verified' as const,
+          channels: { remembrance: 0.4 },
+          portalActivity: 0.1,
+        })),
+      ]),
+      config: { asOf: '2026-07-01', rulesVersion: 'crystal-1.0.0' },
+    });
+  }
+
+  it('counts distinct months, not how much landed in them', () => {
+    // Ten photos in one month is one month of showing up.
+    const spread = crystalWith(['2025-09', '2025-11', '2026-01', '2026-03', '2026-05']);
+    const burst = crystalWith(['2026-05', '2026-05', '2026-05', '2026-05', '2026-05']);
+
+    expect(spread.state.consistency).toBeGreaterThan(burst.state.consistency);
+  });
+
+  it('ignores months older than the window', () => {
+    const recent = crystalWith(['2026-02', '2026-04', '2026-06']);
+    const ancient = crystalWith(['2024-02', '2024-04', '2024-06']);
+
+    expect(recent.state.consistency).toBeGreaterThan(ancient.state.consistency);
+  });
+
+  it('stays inside 0..1 for any history', () => {
+    for (const crystal of [crystalWith([]), crystalWith(Array.from({ length: 40 }, (_u, i) => `2026-0${(i % 7) + 1}`))]) {
+      expect(crystal.state.consistency).toBeGreaterThanOrEqual(0);
+      expect(crystal.state.consistency).toBeLessThanOrEqual(1);
+    }
+  });
+});

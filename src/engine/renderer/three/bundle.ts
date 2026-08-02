@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { CrystalGeometryState, CrystalMeshData } from '../../geometry';
+import { CRYSTAL_SUBSTRATE_BODY_ID } from '../../geometry/substrate';
 import type { CrystalLifeFrame } from '../../life';
 import type { CrystalBodyMaterial, CrystalMaterialState } from '../../material';
 import { createThreeCrystalGeometry } from './bufferGeometry';
@@ -138,6 +139,104 @@ const TARGET_WIDTH = 5;
  */
 export const CRYSTAL_GROUND_BASELINE = 0.06 - TARGET_HEIGHT * 0.5;
 
+/**
+ * The scale the fit transform gives a druse of this size, from its bounding
+ * box alone. Extracted so the scene can ask the same question the renderer
+ * answers without building a bundle — see `crystalSceneRadius`.
+ */
+function fitScaleFor(size: { x: number; y: number; z: number }): {
+  scale: number;
+  referenceScale: number;
+  clamped: boolean;
+} {
+  const safeHeight = Math.max(0.001, size.y);
+  const safeHorizontal = Math.max(0.001, size.x, size.z);
+  // Scaling every crystal to fill the frame made all of them the same size on
+  // screen, which silently cancelled the one thing the artifact is supposed to
+  // communicate: how long the couple has been together. A young crystal is
+  // genuinely smaller than an old one in engine units, so the fit uses a fixed
+  // reference instead — a fully grown crystal fills the frame, everything
+  // younger stays proportionally smaller.
+  const referenceScale = Math.min(
+    TARGET_HEIGHT / REFERENCE_HEIGHT,
+    TARGET_WIDTH / REFERENCE_WIDTH,
+  );
+  // The frame is still a hard limit: an unusually large crystal (a very long
+  // relationship, or an unusually wide spread of companions) is clamped down
+  // rather than allowed to overflow.
+  const containScale = Math.min(TARGET_HEIGHT / safeHeight, TARGET_WIDTH / safeHorizontal);
+  return {
+    scale: Math.min(referenceScale, containScale),
+    referenceScale,
+    clamped: containScale < referenceScale,
+  };
+}
+
+export interface CrystalSceneRadiusOptions {
+  /**
+   * Whether the rock counts. The podium has to cover it; the camera does not
+   * have to frame it. Two consumers, two answers — see the callers in the
+   * portal scene.
+   */
+  includeSubstrate?: boolean;
+}
+
+/**
+ * How far the artifact reaches sideways once it is standing in the scene, in
+ * scene units.
+ *
+ * The portal sizes its podium and its camera from this. Both were constants
+ * before, which held only while every druse happened to be small: the ground
+ * widens with the places a couple has been (ADR-0004) and the whole druse grows
+ * with the years. A well-travelled couple stood on a plate narrower than their
+ * own rock with the podium's inlay buried under it, and a ten-year couple's
+ * outermost crystals reached past the edge of the frame.
+ *
+ * Derived from the published geometry rather than from a live bundle so the
+ * scene can size both on the same frame it mounts the artifact. The fit scale
+ * always comes from the whole druse — leaving the substrate out of the *scale*
+ * would make the crystals jump the moment the rock stopped being the widest
+ * thing.
+ */
+export function crystalSceneRadius(
+  geometry: CrystalGeometryState,
+  options: CrystalSceneRadiusOptions = {},
+): number {
+  if (geometry.meshes.length === 0) return 0;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+  for (const mesh of geometry.meshes) {
+    minX = Math.min(minX, mesh.bounds.min.x); maxX = Math.max(maxX, mesh.bounds.max.x);
+    minY = Math.min(minY, mesh.bounds.min.y); maxY = Math.max(maxY, mesh.bounds.max.y);
+    minZ = Math.min(minZ, mesh.bounds.min.z); maxZ = Math.max(maxZ, mesh.bounds.max.z);
+  }
+  const scale = fitScaleFor({ x: maxX - minX, y: maxY - minY, z: maxZ - minZ }).scale;
+
+  // The fit centres the druse on its own bounding box, so reach is measured
+  // from that centre rather than from the origin.
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
+  const counted = options.includeSubstrate === false
+    ? geometry.meshes.filter((mesh) => mesh.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID)
+    : geometry.meshes;
+  let reach = 0;
+  for (const mesh of counted) {
+    reach = Math.max(
+      reach,
+      Math.abs(mesh.bounds.max.x - centerX),
+      Math.abs(mesh.bounds.min.x - centerX),
+      Math.abs(mesh.bounds.max.z - centerZ),
+      Math.abs(mesh.bounds.min.z - centerZ),
+    );
+  }
+  return reach * scale;
+}
+
 function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalBatch[]): ThreeCrystalFit {
   const bounds = new THREE.Box3();
   let hasBounds = false;
@@ -152,25 +251,7 @@ function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalB
   const sourceSize = hasBounds ? bounds.getSize(new THREE.Vector3()) : new THREE.Vector3(1, 1, 1);
   const targetHeight = TARGET_HEIGHT;
   const targetWidth = TARGET_WIDTH;
-  const safeHeight = Math.max(0.001, sourceSize.y);
-  const safeHorizontal = Math.max(0.001, sourceSize.x, sourceSize.z);
-
-  // Scaling every crystal to fill the frame made all of them the same size on
-  // screen, which silently cancelled the one thing the artifact is supposed to
-  // communicate: how long the couple has been together. A young crystal is
-  // genuinely smaller than an old one in engine units, so the fit uses a fixed
-  // reference instead — a fully grown crystal fills the frame, everything
-  // younger stays proportionally smaller.
-  const referenceScale = Math.min(
-    targetHeight / REFERENCE_HEIGHT,
-    targetWidth / REFERENCE_WIDTH,
-  );
-  // The frame is still a hard limit: an unusually large crystal (a very long
-  // relationship, or an unusually wide spread of companions) is clamped down
-  // rather than allowed to overflow.
-  const containScale = Math.min(targetHeight / safeHeight, targetWidth / safeHorizontal);
-  const scale = Math.min(referenceScale, containScale);
-  const clamped = containScale < referenceScale;
+  const { scale, referenceScale, clamped } = fitScaleFor(sourceSize);
 
   // Anchor the substrate plane rather than the bounding box. Centring made a
   // small crystal float in the middle of the frame; standing every crystal on
