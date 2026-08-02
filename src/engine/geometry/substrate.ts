@@ -152,10 +152,18 @@ export function buildCrystalSubstrateMesh(
       // the same stone.
       const radial = 1 + (seededUnit(artifactSeed, `substrate:r:${rowIndex}:${segment}`) - 0.5) * 0.16;
       const lift = (seededUnit(artifactSeed, `substrate:y:${rowIndex}:${segment}`) - 0.5) * height * 0.3;
+      // sin on x and cos on z, not the other way round. The index winding below
+      // is copied from buildCrystalMesh, and that builder lays its rings out in
+      // the tangent/bitangent basis of the body axis — a basis with the opposite
+      // handedness to (cos → x, sin → z). Sharing the winding while flipping the
+      // ring turned every face inside out: back-face culling then removed the
+      // outer shell and left the interior showing, which is both a crater
+      // instead of a mound and a hole in the ADR-0003 guarantee that the rock
+      // occludes each crystal's base cap.
       positions.push(
-        round6(Math.cos(angle) * row.radiusX * radial),
+        round6(Math.sin(angle) * row.radiusX * radial),
         round6(row.y + lift),
-        round6(Math.sin(angle) * row.radiusZ * radial),
+        round6(Math.cos(angle) * row.radiusZ * radial),
       );
     }
   }

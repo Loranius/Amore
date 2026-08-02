@@ -128,6 +128,51 @@ describe('crystal substrate', () => {
     }
   });
 
+  it('faces outward like every other body', () => {
+    // Regression: the substrate reused buildCrystalMesh's index winding but
+    // laid its rings out with the opposite handedness (cos → x, sin → z), so
+    // every face pointed inward. Back-face culling then dropped the outer shell
+    // and drew the interior — the mound read as a crater, and ADR-0003's
+    // promise that the rock hides each crystal's base cap silently held only
+    // because the crystals happened to sit on top of the hole.
+    //
+    // Signed volume from the winding is the check that cannot be satisfied by
+    // accident: it is positive only when the triangles wind counter-clockwise
+    // seen from outside.
+    const { substrate, geometry } = pipeline();
+    const signedVolume = (mesh: typeof substrate): number => {
+      const p = mesh.positions;
+      let volume = 0;
+      for (let offset = 0; offset < mesh.indices.length; offset += 3) {
+        const a = mesh.indices[offset]! * 3;
+        const b = mesh.indices[offset + 1]! * 3;
+        const c = mesh.indices[offset + 2]! * 3;
+        volume += (
+          p[a]! * (p[b + 1]! * p[c + 2]! - p[b + 2]! * p[c + 1]!)
+          - p[a + 1]! * (p[b]! * p[c + 2]! - p[b + 2]! * p[c]!)
+          + p[a + 2]! * (p[b]! * p[c + 1]! - p[b + 1]! * p[c]!)
+        ) / 6;
+      }
+      return volume;
+    };
+
+    expect(signedVolume(substrate)).toBeGreaterThan(0);
+    // Same orientation as the crystals it stands with, not merely non-zero.
+    for (const mesh of geometry.meshes) {
+      expect(signedVolume(mesh)).toBeGreaterThan(0);
+    }
+
+    // And the normals agree with the winding: every one points away from the
+    // solid's centre.
+    const { center } = substrate.bounds;
+    for (let offset = 0; offset < substrate.positions.length; offset += 3) {
+      const outward = substrate.normals[offset]! * (substrate.positions[offset]! - center.x)
+        + substrate.normals[offset + 1]! * (substrate.positions[offset + 1]! - center.y)
+        + substrate.normals[offset + 2]! * (substrate.positions[offset + 2]! - center.z);
+      expect(outward).toBeGreaterThanOrEqual(0);
+    }
+  });
+
   it('is deterministic for the same couple', () => {
     expect(pipeline().substrate).toEqual(pipeline().substrate);
   });

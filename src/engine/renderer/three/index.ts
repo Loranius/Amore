@@ -20,5 +20,9 @@ export {
 } from './treeLife';
 export type { ThreeTreeLifeBinding } from './treeLife';
 export { createThreeCrystalMaterial } from './material';
-export { applyCrystalLifeFrame, createThreeCrystalRenderBundle } from './bundle';
+export {
+  applyCrystalLifeFrame,
+  createThreeCrystalRenderBundle,
+  CRYSTAL_GROUND_BASELINE,
+} from './bundle';
 export type { ThreeCrystalRenderBundle } from './bundle';

@@ -117,6 +117,17 @@ function buildBatch(source: BatchSource): ThreeCrystalBatch {
 const REFERENCE_HEIGHT = 2;
 const REFERENCE_WIDTH = 1.7;
 
+const TARGET_HEIGHT = 3.25;
+const TARGET_WIDTH = 3.45;
+
+/**
+ * Scene-space height of the plane the artifact stands on — engine y=0 after the
+ * fit transform. Exported because the portal environment has to put its floor
+ * on exactly this line: a platform even slightly off would either float above
+ * the substrate or slice through it.
+ */
+export const CRYSTAL_GROUND_BASELINE = 0.06 - TARGET_HEIGHT * 0.5;
+
 function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalBatch[]): ThreeCrystalFit {
   const bounds = new THREE.Box3();
   let hasBounds = false;
@@ -129,8 +140,8 @@ function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalB
 
   const sourceCenter = hasBounds ? bounds.getCenter(new THREE.Vector3()) : new THREE.Vector3();
   const sourceSize = hasBounds ? bounds.getSize(new THREE.Vector3()) : new THREE.Vector3(1, 1, 1);
-  const targetHeight = 3.25;
-  const targetWidth = 3.45;
+  const targetHeight = TARGET_HEIGHT;
+  const targetWidth = TARGET_WIDTH;
   const safeHeight = Math.max(0.001, sourceSize.y);
   const safeHorizontal = Math.max(0.001, sourceSize.x, sourceSize.z);
 
@@ -155,7 +166,7 @@ function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalB
   // small crystal float in the middle of the frame; standing every crystal on
   // the same ground line is what makes a short one read as "still growing"
   // instead of merely "far away".
-  const groundBaseline = 0.06 - targetHeight * 0.5;
+  const groundBaseline = CRYSTAL_GROUND_BASELINE;
 
   content.scale.setScalar(scale);
   content.position.set(

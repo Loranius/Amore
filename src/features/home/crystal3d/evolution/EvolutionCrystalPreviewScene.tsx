@@ -1,9 +1,14 @@
 import { useCallback, useState, type KeyboardEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { useTheme } from '@/providers/ThemeProvider';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { MemoryModal } from '../../MemoryModal';
 import LegacyCrystalScene from '../CrystalScene';
+import { PortalStage } from '../scene/PortalStage';
+import {
+  PORTAL_ENVIRONMENT_DRAW_CALLS,
+  PORTAL_ENVIRONMENT_TRIANGLES,
+} from '../scene/portalScene';
 import { EvolutionCrystalObject } from './EvolutionCrystalObject';
 import {
   EvolutionRuntimeProbe,
@@ -24,6 +29,7 @@ export default function EvolutionCrystalPreviewScene() {
   // surface and an internal detail (body counts, draw calls, build time) that
   // means nothing to a couple looking at their crystal.
   const [diagnosticsVisible] = useState(isEvolutionDiagnosticsEnabled);
+  const { theme } = useTheme();
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
@@ -86,30 +92,31 @@ export default function EvolutionCrystalPreviewScene() {
         data-evolution-runtime={runtime ? 'ready' : 'warming'}
         data-evolution-draw-calls={runtime?.drawCalls ?? ''}
         data-evolution-rendered-triangles={runtime?.triangles ?? ''}
+        data-portal-environment-draw-calls={PORTAL_ENVIRONMENT_DRAW_CALLS}
+        data-portal-environment-triangles={PORTAL_ENVIRONMENT_TRIANGLES}
       >
         <Canvas
           dpr={metrics.quality === 'high' ? [1, 2] : metrics.quality === 'balanced' ? [1, 1.75] : [1, 1.35]}
-          camera={{ position: [0, 0.2, 5.4], fov: 42 }}
+          // Стартова позиція — приблизно кадр для вертикального телефона.
+          // Точну дає PortalCameraRig із фактичного аспекту вже на першому
+          // кадрі; тут вона потрібна лише щоб цей кадр не почався здалеку.
+          camera={{ position: [0, 0.685, 7.1], fov: 42 }}
           gl={{ alpha: true, antialias: metrics.quality !== 'fallback' }}
         >
-          <ambientLight intensity={0.3} />
-          <directionalLight position={[3, 4, 2]} intensity={1.08} />
-          <directionalLight position={[-2.5, 3.5, -3.5]} intensity={0.82} color="#fff1f6" />
-          <pointLight position={[-3, -2, -2]} intensity={0.34} color="#e6a0bd" />
-          <EvolutionCrystalObject
-            geometry={pipeline.geometry}
-            material={pipeline.material}
-            life={pipeline.life}
-            onOpen={openModal}
-          />
+          <PortalStage
+            seed={pipeline.geometry.artifactSeed}
+            theme={theme}
+            quality={metrics.quality}
+            reduceMotion={reduceMotion}
+          >
+            <EvolutionCrystalObject
+              geometry={pipeline.geometry}
+              material={pipeline.material}
+              life={pipeline.life}
+              onOpen={openModal}
+            />
+          </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
-          <OrbitControls
-            enablePan={false}
-            enableZoom={false}
-            enableDamping={!reduceMotion}
-            dampingFactor={0.08}
-            target={[0, 0.2, 0]}
-          />
         </Canvas>
         {diagnosticsVisible && (
           <span className="evolution-preview-badge" aria-label="Метрики Evolution preview">

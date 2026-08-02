@@ -41,6 +41,19 @@ test.describe('Evolution crystal Pixel 8 Pro acceptance', () => {
     const materialCount = numberAttribute(await preview.getAttribute('data-evolution-materials'), 'materialCount');
     const topologyTriangles = numberAttribute(await preview.getAttribute('data-evolution-triangles'), 'topologyTriangles');
     const drawCalls = numberAttribute(await preview.getAttribute('data-evolution-draw-calls'), 'drawCalls');
+    // The crystal now shares its canvas with the 3D portal environment
+    // (field, dais, inlay, pillars, stars), so renderer.info counts those too.
+    // The budget below still has to be about the crystal, hence the scene's own
+    // cost is published by the component rather than folded into a looser
+    // constant — see crystal3d/scene/portalScene.ts.
+    const environmentDrawCalls = numberAttribute(
+      await preview.getAttribute('data-portal-environment-draw-calls'),
+      'environmentDrawCalls',
+    );
+    const environmentTriangles = numberAttribute(
+      await preview.getAttribute('data-portal-environment-triangles'),
+      'environmentTriangles',
+    );
     const renderedTriangles = numberAttribute(
       await preview.getAttribute('data-evolution-rendered-triangles'),
       'renderedTriangles',
@@ -50,11 +63,19 @@ test.describe('Evolution crystal Pixel 8 Pro acceptance', () => {
     expect(materialCount).toBeGreaterThan(0);
     expect(materialCount).toBeLessThanOrEqual(8);
     expect(drawCalls).toBeGreaterThan(0);
-    // One additional draw call is allowed for the optional Sparkles points object.
-    expect(drawCalls).toBeLessThanOrEqual(materialCount + 1);
-    expect(drawCalls).toBeLessThan(meshCount);
-    expect(renderedTriangles).toBeGreaterThan(0);
-    expect(renderedTriangles).toBeLessThanOrEqual(topologyTriangles);
+    // The invariant is unchanged: crystal bodies are batched by material, so the
+    // crystal costs about one draw call per material, not one per body. One
+    // extra is allowed for the optional Sparkles points object.
+    const crystalDrawCalls = drawCalls - environmentDrawCalls;
+    expect(crystalDrawCalls).toBeGreaterThan(0);
+    expect(crystalDrawCalls).toBeLessThanOrEqual(materialCount + 1);
+    expect(crystalDrawCalls).toBeLessThan(meshCount);
+    // Same correction as the draw calls: what must stay inside the published
+    // geometry budget is the crystal, and the environment draws a fixed,
+    // never-culled set of triangles on top of it.
+    const crystalTriangles = renderedTriangles - environmentTriangles;
+    expect(crystalTriangles).toBeGreaterThan(0);
+    expect(crystalTriangles).toBeLessThanOrEqual(topologyTriangles);
 
     await preview.screenshot({ path: testInfo.outputPath('evolution-crystal-pixel-8-pro.png') });
     await page.screenshot({

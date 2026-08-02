@@ -73,7 +73,7 @@ export function HomePage() {
       <Hero />
       <HomeArtifactSwitcher value={artifact} onChange={selectArtifact} />
       <h1 className="home-title">{HOME_ARTIFACT_LABELS[artifact]} Amore</h1>
-      <div id="home-artifact-preview" style={{ width: '100%' }}>
+      <div id="home-artifact-preview" className="home-artifact-preview">
         {webglSupported ? (
           <CrystalErrorBoundary key={artifact} fallback={rendererFallback}>
             <Suspense fallback={<CrystalPlaceholder />}>
