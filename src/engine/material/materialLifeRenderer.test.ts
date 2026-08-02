@@ -42,7 +42,11 @@ const EVENTS: EvolutionEventInput[] = [
   })),
 ];
 
-function pipeline(options?: { reducedMotion?: boolean; quality?: 'high' | 'balanced' | 'low' | 'fallback' }) {
+function pipeline(options?: {
+  reducedMotion?: boolean;
+  quality?: 'high' | 'balanced' | 'low' | 'fallback';
+  events?: readonly EvolutionEventInput[];
+}) {
   const artifact = buildArtifactBlueprint({
     coupleId: 'material-life-couple',
     config: {
@@ -51,7 +55,7 @@ function pipeline(options?: { reducedMotion?: boolean; quality?: 'high' | 'balan
       timeZone: 'Europe/Kyiv',
       leapDayPolicy: 'feb-28',
     },
-    events: EVENTS,
+    events: options?.events ?? EVENTS,
   });
   const species = buildCrystalSpeciesBlueprint({
     artifact,
@@ -299,6 +303,89 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
 
     expect(substrate.bounds.max.x).toBeGreaterThan(0);
     expect(crystalSceneRadius(travelled)).toBeGreaterThan(crystalSceneRadius(geometry));
+  });
+
+  it('keeps every crystal inside the optical band that reads as crystal', () => {
+    // The values are a contract, not a derivation: outside them a facet stops
+    // reading as mineral. Rougher than ~0.16 with clearcoat under ~0.75 is
+    // matte plastic; the couple's pressures choose where in the band a body
+    // sits, never whether it is in one.
+    for (const quality of ['high', 'balanced', 'low', 'fallback'] as const) {
+      const { material, geometry } = pipeline({ quality });
+      const crystals = material.bodies.filter(
+        (body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID,
+      );
+
+      expect(crystals.length).toBe(geometry.meshes.length - 1);
+      for (const body of crystals) {
+        expect(body.roughness, quality).toBeGreaterThanOrEqual(0.1);
+        expect(body.roughness, quality).toBeLessThanOrEqual(0.16);
+        expect(body.clearcoat, quality).toBeGreaterThanOrEqual(0.75);
+        expect(body.clearcoat, quality).toBeLessThanOrEqual(0.95);
+        expect(body.clearcoatRoughness, quality).toBeGreaterThanOrEqual(0.03);
+        expect(body.clearcoatRoughness, quality).toBeLessThanOrEqual(0.07);
+        expect(body.ior, quality).toBeGreaterThanOrEqual(1.52);
+        expect(body.ior, quality).toBeLessThanOrEqual(1.58);
+        expect(body.metalness, quality).toBe(0);
+        expect(body.transmission, quality).toBe(0);
+      }
+    }
+  });
+
+  it('keeps the shell from lighting its own facets', () => {
+    // Emissive ran as high as 0.32, which glows the body evenly from within and
+    // brightens every plane by the same amount — the one thing that erases the
+    // relief the geometry was just given. Glow belongs to the inner core.
+    for (const quality of ['high', 'balanced', 'low', 'fallback'] as const) {
+      for (const body of pipeline({ quality }).material.bodies) {
+        if (body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
+        expect(body.emissiveIntensity, quality).toBeGreaterThanOrEqual(0.02);
+        expect(body.emissiveIntensity, quality).toBeLessThanOrEqual(0.06);
+      }
+    }
+  });
+
+  it('still lets a couple sit somewhere of their own inside the band', () => {
+    // A band every couple sat at the same point in would be a constant, and the
+    // artifact would stop saying anything with its optics. Compared across
+    // couples rather than across bodies: bodies sharing a composition role are
+    // *supposed* to share optics, which is what lets them share a draw call.
+    const polished = pipeline({
+      quality: 'high',
+      events: Array.from({ length: 30 }, (_, index): EvolutionEventInput => ({
+        id: `kept-${index}`,
+        occurredAt: `2025-${String((index % 12) + 1).padStart(2, '0')}-08T12:00:00Z`,
+        source: 'memories@1',
+        evidence: 'verified',
+        channels: { remembrance: 1, significance: 0.8 },
+        portalActivity: 0.9,
+      })),
+    }).material;
+    const raw = pipeline({
+      quality: 'high',
+      events: [{
+        id: 'one',
+        occurredAt: '2025-03-02T12:00:00Z',
+        source: 'shopping@1',
+        evidence: 'historical-estimate',
+        channels: { stability: 0.2 },
+        portalActivity: 0.05,
+      }],
+    }).material;
+
+    const shellOf = (state: typeof polished) => state.bodies.find(
+      (body) => body.bodyId === 'crystal:mother',
+    )!;
+
+    expect(shellOf(polished).roughness).toBeLessThan(shellOf(raw).roughness);
+    expect(shellOf(polished).clearcoat).toBeGreaterThan(shellOf(raw).clearcoat);
+    // And both are still crystals.
+    for (const state of [polished, raw]) {
+      expect(shellOf(state).roughness).toBeGreaterThanOrEqual(0.1);
+      expect(shellOf(state).roughness).toBeLessThanOrEqual(0.16);
+      expect(shellOf(state).clearcoat).toBeGreaterThanOrEqual(0.75);
+      expect(shellOf(state).clearcoat).toBeLessThanOrEqual(0.95);
+    }
   });
 
   it('does not mutate species, composition or geometry states', () => {
