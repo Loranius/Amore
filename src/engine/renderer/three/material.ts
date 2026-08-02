@@ -94,7 +94,12 @@ export function createThreeCrystalMaterial(source: CrystalBodyMaterial): THREE.M
     opacity: 1,
     transparent: false,
     depthWrite: true,
-    flatShading: true,
+    // Off, and that is the point. Geometry now publishes one normal per
+    // triangle (splitCrystalMeshFaces), so the facets are in the artifact.
+    // Leaving flatShading on would have Three recompute normals from screen-
+    // space derivatives and discard the published ones — the same picture, but
+    // arrived at by ignoring the state instead of drawing it.
+    flatShading: false,
     envMapIntensity: source.envMapIntensity,
   });
   material.iridescence = source.iridescence;

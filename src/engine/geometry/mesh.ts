@@ -122,6 +122,57 @@ export function rebuildCrystalMeshNormals(mesh: CrystalMeshData): CrystalMeshDat
   return { ...mesh, normals: computeNormals(mesh.positions, mesh.indices) };
 }
 
+/**
+ * Splits a shell so every triangle owns its three vertices and carries its own
+ * face normal.
+ *
+ * `flatShading: true` on the Three material produced the same picture, and that
+ * was the problem: the *published* geometry still described a smooth surface,
+ * so what the couple's crystal looked like depended on a renderer flag rather
+ * than on the artifact. Anything else consuming the state — a second renderer,
+ * a snapshot, an export — would have got the smooth version.
+ *
+ * Costs roughly three times the vertices. The whole druse is around 1,500
+ * before the split against a budget of 18,000, so this buys correctness at a
+ * price the budget does not notice.
+ *
+ * Run after trimming, not before: trimming drops triangles from the index list,
+ * and splitting first would leave the removed triangles' vertices stranded in
+ * the buffer, inflating the reported vertex count with geometry nothing draws.
+ */
+export function splitCrystalMeshFaces(mesh: CrystalMeshData): CrystalMeshData {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+
+  for (let offset = 0; offset < mesh.indices.length; offset += 3) {
+    const corners = [
+      vertexAt(mesh.positions, mesh.indices[offset] ?? 0),
+      vertexAt(mesh.positions, mesh.indices[offset + 1] ?? 0),
+      vertexAt(mesh.positions, mesh.indices[offset + 2] ?? 0),
+    ] as const;
+    const face = normalize(cross(
+      subtract(corners[1], corners[0]),
+      subtract(corners[2], corners[0]),
+    ));
+    for (const corner of corners) {
+      indices.push(pushVertex(positions, corner));
+      normals.push(round6(face.x), round6(face.y), round6(face.z));
+    }
+  }
+
+  return {
+    ...mesh,
+    positions,
+    normals,
+    indices,
+    // Bounds are unchanged in principle — the same points, listed more times —
+    // but recomputing keeps the published state self-consistent rather than
+    // asking a reader to trust that.
+    bounds: computeBounds(positions),
+  };
+}
+
 /** Pure indexed mesh builder; no THREE, canvas, renderer or material imports. */
 export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): CrystalMeshData {
   const profile = buildCrystalProfile(body, lod);

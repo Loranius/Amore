@@ -1,7 +1,7 @@
 import type { GrowthBody } from '../growth';
 import { buildCrystalGeologyState } from '../species/crystal/geology';
 import { buildCrystalJunction } from './junction';
-import { buildCrystalMesh } from './mesh';
+import { buildCrystalMesh, splitCrystalMeshFaces } from './mesh';
 import { buildCrystalSubstrateMesh } from './substrate';
 import { trimCrystalMesh } from './trim';
 import type {
@@ -221,7 +221,7 @@ export function buildCrystalGeometry(
   });
   const solidById = new Map(solids.map((solid) => [solid.body.id, solid] as const));
 
-  const meshes = rawMeshes.map((mesh) => {
+  const trimmedMeshes = rawMeshes.map((mesh) => {
     const solid = solidById.get(mesh.bodyId);
     if (!solid) return mesh;
     const trimmed = trimCrystalMesh(mesh, solid, solids, input.config);
@@ -229,7 +229,7 @@ export function buildCrystalGeometry(
     if (!finiteMesh(trimmed)) diagnostics.nonFiniteBodyIds.push(mesh.bodyId);
     return trimmed;
   });
-  const meshById = new Map(meshes.map((mesh) => [mesh.bodyId, mesh] as const));
+  const meshById = new Map(trimmedMeshes.map((mesh) => [mesh.bodyId, mesh] as const));
 
   const junctions = input.growth.bodies.flatMap((body) => {
     if (body.hostBodyId === null) return [];
@@ -247,10 +247,18 @@ export function buildCrystalGeometry(
   // what ADR-0003 relies on it to cover. It is sized from the bodies that were
   // actually kept, and its cost still counts toward the reported budget.
   const substrate = buildCrystalSubstrateMesh(
-    meshes.map((mesh) => bodyById.get(mesh.bodyId)).filter((body) => body !== undefined),
+    trimmedMeshes.map((mesh) => bodyById.get(mesh.bodyId)).filter((body) => body !== undefined),
     input.growth.artifactSeed,
   );
-  if (substrate !== null) meshes.push(substrate);
+
+  // Every triangle gets its own three vertices and its own normal, last of all.
+  // Faceting has to live in the published state rather than in the renderer's
+  // flatShading flag, or the couple's crystal is a different shape depending on
+  // who is drawing it. Last because trimming works on the index list: splitting
+  // first would strand the removed triangles' vertices in the buffer and inflate
+  // the vertex count with geometry nothing draws.
+  const meshes = (substrate === null ? trimmedMeshes : [...trimmedMeshes, substrate])
+    .map(splitCrystalMeshFaces);
 
   const usedVertices = meshes.reduce((sum, mesh) => sum + mesh.positions.length / 3, 0);
   const usedTriangles = meshes.reduce((sum, mesh) => sum + mesh.visibleTriangleCount, 0);
