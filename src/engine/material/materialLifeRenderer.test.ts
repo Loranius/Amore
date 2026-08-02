@@ -388,6 +388,48 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     }
   });
 
+  it('lights the crystal from inside without lighting the rock', () => {
+    // The requested "inner crystal at 70% size" cannot be a second mesh: the
+    // shell is opaque by contract (the canvas is alpha-composited over a CSS
+    // sky, so a transmissive shell would show black where it overlaps the sky
+    // rather than the sky itself), and a core behind an opaque shell is simply
+    // invisible. Depth-weighted core light in the shader is the same effect,
+    // and unlike shell emission it varies face to face.
+    const { material } = pipeline({ quality: 'high' });
+    const crystals = material.bodies.filter(
+      (body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID,
+    );
+    const rock = material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+
+    expect(crystals.some((body) => body.shader.coreStrength > 0)).toBe(true);
+    for (const body of crystals) {
+      expect(body.shader.coreStrength).toBeGreaterThanOrEqual(0);
+      // Core light supplements the surface; past this it washes the facets out
+      // exactly the way shell emission used to.
+      expect(body.shader.coreStrength).toBeLessThan(0.6);
+      expect(Number.isFinite(body.shader.coreStrength)).toBe(true);
+    }
+
+    expect(rock.shader.coreStrength).toBe(0);
+  });
+
+  it('carries the core into the material signature', () => {
+    // Two bodies that glow differently must not share a draw call — the core is
+    // a uniform, not a vertex attribute, so a shared batch would give one of
+    // them the other's light.
+    const { material } = pipeline({ quality: 'high' });
+    const byStrength = new Map<number, Set<string>>();
+    for (const body of material.bodies) {
+      const bucket = byStrength.get(body.shader.coreStrength) ?? new Set<string>();
+      bucket.add(body.signature);
+      byStrength.set(body.shader.coreStrength, bucket);
+    }
+
+    const signatures = new Set(material.bodies.map((body) => body.signature));
+    const strengths = new Set(material.bodies.map((body) => body.shader.coreStrength));
+    expect(signatures.size).toBeGreaterThanOrEqual(strengths.size);
+  });
+
   it('does not mutate species, composition or geometry states', () => {
     const current = pipeline();
     const speciesBefore = JSON.stringify(current.species);

@@ -80,6 +80,8 @@ function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string
     body.shader.inclusionDensity,
     body.shader.inclusionScale,
     body.shader.inclusionContrast,
+    body.shader.coreStrength,
+    rgbSignature(body.shader.coreColor),
     facetTintingSignature(body.facets),
   ].map((value) => typeof value === 'number' ? value.toFixed(6) : String(value)).join('|');
 }
@@ -146,6 +148,7 @@ function shaderRecipe(
   const state = input.species.state;
   const reflectionEnabled = input.config.allowProceduralReflection && preset.reflectionScale > 0;
   const micro = role === 'micro';
+  const focal = role === 'focal';
   // Showing up regularly clears the stone (ADR-0004). A couple who adds
   // something most months gets a crystal with fewer flaws in it than one who
   // dumped an album in a single weekend and went quiet — a different question
@@ -175,6 +178,17 @@ function shaderRecipe(
     inclusionDensity: round6(micro ? 0 : inclusionBase * preset.inclusionScale),
     inclusionScale: round6(3.4 + pressures.density * 4.6 + pressures.surfaceComplexity * 2.2),
     inclusionContrast: round6((0.18 + state.fracture * 0.34) * preset.inclusionScale),
+    // A crystal is lit from within, but not evenly: the requested "inner
+    // crystal at 70% size" cannot be a second mesh here, because the shell is
+    // opaque by contract (the canvas is alpha-composited over a CSS sky, so a
+    // transmissive shell would show black where it overlaps the sky rather
+    // than the sky itself). Depth-weighted core light is the same effect
+    // without transparency — and it costs no draw call and no triangle.
+    coreStrength: round6(micro
+      ? 0
+      : (0.1 + pressures.luminosity * 0.16 + state.luminosity * 0.08)
+        * (emphasized ? 1.35 : focal ? 1 : 0.72)),
+    coreColor: emissiveColor,
   };
 }
 
@@ -343,6 +357,9 @@ function buildSubstrateMaterial(
       inclusionContrast: round6(
         0.28 * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
       ),
+      // Rock is not lit from within.
+      coreStrength: 0,
+      coreColor: baseColor,
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

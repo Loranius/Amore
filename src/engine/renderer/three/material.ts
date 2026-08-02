@@ -20,6 +20,8 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.inclusionDensity.toFixed(6),
     recipe.inclusionScale.toFixed(6),
     recipe.inclusionContrast.toFixed(6),
+    recipe.coreStrength.toFixed(6),
+    rgbKey(recipe.coreColor),
   ].join('|');
 }
 
@@ -32,6 +34,8 @@ uniform vec3 uEvolutionRimColor;
 uniform float uEvolutionInclusionDensity;
 uniform float uEvolutionInclusionScale;
 uniform float uEvolutionInclusionContrast;
+uniform float uEvolutionCoreStrength;
+uniform vec3 uEvolutionCoreColor;
 `;
 
 const FRAGMENT_BODY = /* glsl */ `
@@ -52,6 +56,15 @@ const FRAGMENT_BODY = /* glsl */ `
     ? smoothstep(1.0 - uEvolutionInclusionDensity, 1.0, evolutionBand * 0.5 + 0.5)
     : 0.0;
   outgoingLight *= 1.0 - evolutionInclusion * uEvolutionInclusionContrast;
+
+  // Light from inside the stone. The shell's own emission raises every plane by
+  // the same amount and flattens the relief; this is weighted by how squarely a
+  // face meets the eye, which stands in for how much crystal lies behind it.
+  // Faces turned toward the viewer glow, faces at the silhouette do not — and
+  // since every triangle carries its own normal, neighbouring facets separate
+  // instead of merging.
+  outgoingLight += uEvolutionCoreColor * uEvolutionCoreStrength
+    * evolutionFacing * evolutionFacing * evolutionFacing;
 `;
 
 function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: CrystalBodyMaterial['shader']): void {
@@ -59,6 +72,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     recipe.rimStrength <= 0
     && recipe.skyStrength <= 0
     && recipe.inclusionDensity <= 0
+    && recipe.coreStrength <= 0
   ) return;
 
   material.onBeforeCompile = (shader) => {
@@ -70,6 +84,8 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionInclusionDensity'] = { value: recipe.inclusionDensity };
     shader.uniforms['uEvolutionInclusionScale'] = { value: recipe.inclusionScale };
     shader.uniforms['uEvolutionInclusionContrast'] = { value: recipe.inclusionContrast };
+    shader.uniforms['uEvolutionCoreStrength'] = { value: recipe.coreStrength };
+    shader.uniforms['uEvolutionCoreColor'] = { value: toColor(recipe.coreColor) };
     shader.fragmentShader = shader.fragmentShader
       .replace('void main() {', `${FRAGMENT_PARS}\nvoid main() {`)
       .replace('#include <opaque_fragment>', `${FRAGMENT_BODY}\n#include <opaque_fragment>`);
