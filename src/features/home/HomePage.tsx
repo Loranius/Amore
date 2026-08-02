@@ -8,7 +8,6 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { Hero } from './Hero';
 import { CrystalPlaceholder } from './CrystalPlaceholder';
-import { HomePlansCard } from './HomePlansCard';
 import { HomeArtifactSwitcher } from './HomeArtifactSwitcher';
 import { HomeArtifactWebglFallback } from './HomeArtifactPreviewFallback';
 import {
@@ -85,7 +84,6 @@ export function HomePage() {
           </CrystalErrorBoundary>
         ) : rendererFallback}
       </div>
-      <HomePlansCard />
     </section>
   );
 }
