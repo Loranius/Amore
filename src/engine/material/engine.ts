@@ -1,3 +1,4 @@
+import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
 import { CRYSTAL_MATERIAL_QUALITY_PRESETS } from './config';
 import {
   clamp01,
@@ -199,6 +200,71 @@ function buildBodyMaterial(
   return { material, clamped };
 }
 
+/**
+ * The substrate is rock, not mineral: matte, unlit from within, and with none
+ * of the clearcoat or iridescence that makes the crystals read as gems. It is
+ * kept deliberately dark and low-chroma so it reads as ground the druse stands
+ * in rather than as another body competing for attention.
+ */
+function buildSubstrateMaterial(
+  input: BuildCrystalMaterialInput,
+  materialPalette: CrystalMaterialPalette,
+): CrystalBodyMaterial {
+  // Tinted toward the couple's own palette so the rock never looks imported
+  // from a different artifact, but pulled far down in lightness.
+  const tint = materialPalette.secondary;
+  const baseColor = rgb(
+    round6(0.16 + tint.r * 0.12),
+    round6(0.14 + tint.g * 0.11),
+    round6(0.16 + tint.b * 0.13),
+  );
+  const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
+    materialVersion: 1,
+    bodyId: CRYSTAL_SUBSTRATE_BODY_ID,
+    baseColor,
+    emissiveColor: baseColor,
+    roughness: 0.92,
+    metalness: 0,
+    clearcoat: 0,
+    clearcoatRoughness: 0.9,
+    ior: 1.45,
+    reflectivity: 0.08,
+    emissiveIntensity: 0,
+    envMapIntensity: 0,
+    iridescence: 0,
+    iridescenceIOR: 1.3,
+    iridescenceThicknessMin: 220,
+    iridescenceThicknessMax: 390,
+    transmission: 0,
+    opacity: 1,
+    transparent: false,
+    depthWrite: true,
+    shader: {
+      shaderVersion: 1,
+      rimStrength: 0,
+      skyStrength: 0,
+      skyColor: baseColor,
+      groundColor: baseColor,
+      rimColor: baseColor,
+      // Rock does have visible grain, unlike the near-clear crystals — but it
+      // is still procedural detail, so it follows the same quality tier as
+      // every other material rather than staying on when optics are off.
+      inclusionDensity: round6(
+        (0.45 + input.species.state.fracture * 0.25)
+        * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
+      ),
+      inclusionScale: 3.2,
+      inclusionContrast: round6(
+        0.28 * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
+      ),
+    },
+  };
+  return {
+    ...bodyWithoutSignature,
+    signature: materialSignature(bodyWithoutSignature),
+  };
+}
+
 /** Pure, renderer-independent crystal material derivation. */
 export function buildCrystalMaterialState(input: BuildCrystalMaterialInput): CrystalMaterialState {
   validateInput(input);
@@ -213,10 +279,16 @@ export function buildCrystalMaterialState(input: BuildCrystalMaterialInput): Cry
     if (!geometryIds.has(body.sourceBodyId)) missingGeometryBodyIds.push(body.sourceBodyId);
   }
   for (const mesh of input.geometry.meshes) {
+    // The substrate is published geometry with no growth body behind it, so it
+    // has no composition entry by design — that is not a data gap.
+    if (mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
     if (!compositionIds.has(mesh.bodyId)) missingCompositionBodyIds.push(mesh.bodyId);
   }
 
   const bodies = input.geometry.meshes.flatMap((mesh) => {
+    if (mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) {
+      return [buildSubstrateMaterial(input, materialPalette)];
+    }
     const result = buildBodyMaterial(input, materialPalette, mesh.bodyId);
     if (!result) return [];
     if (result.clamped) clampedBodyIds.push(mesh.bodyId);

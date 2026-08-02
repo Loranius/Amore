@@ -1,3 +1,4 @@
+import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
 import { stableHash32 } from '../evolution';
 import type { CrystalMaterialQuality } from '../material';
 import type {
@@ -48,6 +49,19 @@ function validateInput(input: BuildCrystalLifeInput): void {
 }
 
 function bodyLife(input: BuildCrystalLifeInput, bodyId: string): CrystalBodyLife {
+  // The substrate is rock. It carries no inner light, so it must not breathe
+  // or sparkle with the crystals — without this it would fall through to the
+  // default role and pulse like one.
+  if (bodyId === CRYSTAL_SUBSTRATE_BODY_ID) {
+    return {
+      bodyId,
+      phaseRad: 0,
+      speed: 0,
+      glowAmplitude: 0,
+      sparkleAffinity: 0,
+    };
+  }
+
   const composition = input.composition.bodies.find((body) => body.sourceBodyId === bodyId);
   const role = composition?.role ?? 'family';
   const roleGlow = role === 'focal' ? 1 : role === 'support' ? 0.78 : role === 'micro' ? 0.28 : 0.52;

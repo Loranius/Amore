@@ -5,6 +5,7 @@ import { DEFAULT_GROWTH_ENGINE_CONFIG, buildGrowthState } from '../growth';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../species/crystal';
 import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG } from './config';
 import { buildCrystalGeometry } from './engine';
+import { CRYSTAL_SUBSTRATE_BODY_ID } from './substrate';
 import type { CrystalGeometryConfig } from './types';
 
 const BASE_EVENTS: EvolutionEventInput[] = [
@@ -143,7 +144,10 @@ describe('Crystal Geometry', () => {
   it('produces valid indexed meshes and one junction per attached body', () => {
     const { growth, geometry } = pipeline(BASE_EVENTS);
 
-    expect(geometry.meshes).toHaveLength(growth.bodies.length);
+    // One mesh per body, plus the substrate the druse stands in (ADR-0003
+    // relies on it to occlude the crystals' buried base caps).
+    expect(geometry.meshes).toHaveLength(growth.bodies.length + 1);
+    expect(geometry.meshes.at(-1)?.bodyId).toBe(CRYSTAL_SUBSTRATE_BODY_ID);
     // One junction per attached body. Crystal bodies all stand in the ground
     // now (ADR-0003), so this count is legitimately zero for this species —
     // the rule still has to hold, and the count still has to match.
@@ -201,8 +205,10 @@ describe('Crystal Geometry', () => {
     expect(earlier.geology).toBeDefined();
     expect(later.geology).toBeDefined();
     expect(later.geology?.bodyCount ?? 0).toBeGreaterThan(earlier.geology?.bodyCount ?? 0);
-    expect(later.meshes).toHaveLength(later.geology?.bodyCount ?? 0);
+    // geology counts growth bodies; meshes additionally carry the substrate.
+    expect(later.meshes).toHaveLength((later.geology?.bodyCount ?? 0) + 1);
     for (const oldMesh of earlier.meshes) {
+      if (oldMesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
       const nextMesh = later.meshes.find((mesh) => mesh.bodyId === oldMesh.bodyId);
       expect(nextMesh).toBeDefined();
       expect(nextMesh?.profile.signature).toBe(oldMesh.profile.signature);

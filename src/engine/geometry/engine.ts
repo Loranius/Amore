@@ -2,6 +2,7 @@ import type { GrowthBody } from '../growth';
 import { buildCrystalGeologyState } from '../species/crystal/geology';
 import { buildCrystalJunction } from './junction';
 import { buildCrystalMesh } from './mesh';
+import { buildCrystalSubstrateMesh } from './substrate';
 import { trimCrystalMesh } from './trim';
 import type {
   BuildCrystalGeometryInput,
@@ -240,6 +241,16 @@ export function buildCrystalGeometry(
     if (!junction.sealed) diagnostics.unsealedJunctionIds.push(junction.id);
     return [junction];
   }).sort((left, right) => left.id.localeCompare(right.id));
+
+  // The substrate is published last and is never budget-omitted: it is what
+  // hides the crystals' buried base caps, so dropping it would expose exactly
+  // what ADR-0003 relies on it to cover. It is sized from the bodies that were
+  // actually kept, and its cost still counts toward the reported budget.
+  const substrate = buildCrystalSubstrateMesh(
+    meshes.map((mesh) => bodyById.get(mesh.bodyId)).filter((body) => body !== undefined),
+    input.growth.artifactSeed,
+  );
+  if (substrate !== null) meshes.push(substrate);
 
   const usedVertices = meshes.reduce((sum, mesh) => sum + mesh.positions.length / 3, 0);
   const usedTriangles = meshes.reduce((sum, mesh) => sum + mesh.visibleTriangleCount, 0);
