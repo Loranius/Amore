@@ -6,6 +6,7 @@ import {
   buildEvolutionMemoryLinks,
   buildEvolutionSourceSnapshot,
   evolutionWishlistFromPairArchive,
+  resolveCrystalColorPartners,
   stableEvolutionCoupleId,
 } from './sourceSnapshot';
 
@@ -19,6 +20,8 @@ function archiveItem(
     fulfilled_at: '2026-01-02T10:00:00Z',
     completed_at: '2026-01-02T10:00:00Z',
     is_shared: false,
+    owner: 1,
+    fulfilled_by: 2,
     ...overrides,
   };
 }
@@ -172,5 +175,36 @@ describe('Evolution real-data snapshot mapping', () => {
     expect(stableEvolutionCoupleId([8, 3, 8])).toBe('amore-couple:3-8');
     expect(stableEvolutionCoupleId([3, 8])).toBe('amore-couple:3-8');
     expect(() => stableEvolutionCoupleId([])).toThrow(/at least one user id/i);
+  });
+});
+
+describe('crystal colour partners (ADR-0004)', () => {
+  it('keeps the engine free of any notion of gender', () => {
+    // The engine takes two opaque ids. Deciding which partner holds which
+    // channel is an application concern precisely so it can move to a profile
+    // field later without the engine changing at all.
+    const partners = resolveCrystalColorPartners([
+      { id: 2, name: 'Лєна' },
+      { id: 1, name: 'Діма' },
+    ]);
+
+    expect(partners).toEqual({ first: 1, second: 2 });
+  });
+
+  it('is stable for an unrecognised couple rather than refusing to colour', () => {
+    const partners = resolveCrystalColorPartners([
+      { id: 9, name: 'Sam' },
+      { id: 4, name: 'Alex' },
+    ]);
+
+    // Arbitrary but consistent: the couple gets stable colours, just not
+    // necessarily the ones they would have chosen.
+    expect(partners).toEqual({ first: 4, second: 9 });
+    expect(resolveCrystalColorPartners([{ id: 9, name: 'Sam' }, { id: 4, name: 'Alex' }]))
+      .toEqual(partners);
+  });
+
+  it('returns nothing when there is no couple to colour for', () => {
+    expect(resolveCrystalColorPartners([])).toBeNull();
   });
 });

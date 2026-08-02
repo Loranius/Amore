@@ -243,11 +243,9 @@ describe('Universal Growth Engine', () => {
     expect(later.bodies).toHaveLength(
       earlier.bodies.length + laterBlueprint.instructions.length - earlierBlueprint.instructions.length,
     );
-    // ADR-0004 draws the line at the anniversary. Two bodies are *supposed*
-    // to answer to a new event: the monarch, who answers to everything, and
-    // the year currently in progress. Every closed year is a record of that
-    // year and must not move again — which is the property this test exists
-    // for, since the whole druse used to reshuffle on any new row.
+    // ADR-0004 draws the line at the anniversary: a closed year stops
+    // filling. The whole druse used to reshuffle on any new row, which is
+    // what this test exists to prevent.
     //
     // `competition`, `crowding` and `growthEnergy` are excluded because they
     // are readings of the neighbourhood rather than properties of the body:
@@ -259,15 +257,24 @@ describe('Universal Growth Engine', () => {
       for (const key of NEIGHBOURHOOD_READINGS) delete copy[key];
       return copy;
     };
+    // A closed year keeps its bearing and its proportions. Its absolute size
+    // tracks the monarch on purpose, so that a couple filling in an early
+    // year sees it answer; what may not move is where it stands and how it
+    // is shaped relative to everything else.
     const isClosedYear = (body: { id: string; maturity?: number }): boolean =>
       body.id.startsWith('crystal:year:') && body.maturity === 1;
 
     const closedYears = earlier.bodies.filter(isClosedYear);
     expect(closedYears.length).toBeGreaterThan(0);
     for (const oldBody of closedYears) {
-      const nextBody = later.bodies.find((body) => body.id === oldBody.id);
-      expect(nextBody).toBeDefined();
-      expect(authoritative(nextBody!)).toEqual(authoritative(oldBody));
+      const nextBody = later.bodies.find((body) => body.id === oldBody.id)!;
+      // Tolerance is the round6 quantisation of the anchor, which the ring
+      // distance carries into the bearing.
+      const bearing = (body: GrowthBody) => Math.atan2(body.anchor.z, body.anchor.x);
+      expect(bearing(nextBody)).toBeCloseTo(bearing(oldBody), 4);
+      expect(nextBody.renderedLength / nextBody.renderedRadius)
+        .toBeCloseTo(oldBody.renderedLength / oldBody.renderedRadius, 6);
+      expect(authoritative(nextBody).facetCount).toEqual(authoritative(oldBody).facetCount);
     }
 
     // And the carve-out is not a licence for nothing to happen: assert both

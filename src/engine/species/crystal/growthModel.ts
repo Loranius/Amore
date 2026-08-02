@@ -22,19 +22,23 @@ const DAYS_PER_YEAR = 365;
 /**
  * Height of the monarch from days spent together.
  *
- * The previous curve, `1 - exp(-days/1600)`, saturates: past roughly five
- * years the crystal stops growing at all, and every long relationship
- * renders identically. A logarithm never stops but decelerates hard —
- * forty years is only about a third taller than ten. That is the whole
- * point of the "harder progression": visible progress forever, without
- * the monarch ever becoming huge.
+ * The curve before this one, `1 - exp(-days/1600)`, saturates: past roughly
+ * five years the crystal stops growing at all, and every long relationship
+ * renders identically. A logarithm never stops but decelerates hard.
  *
- *   1 year  0.94    5 years  1.44    20 years  2.02
- *   3 years 1.28    10 years 1.72    40 years  2.33
+ * The constants were then lowered on the owner's reading of a three-year
+ * crystal — "too big already, and frightening to imagine at seven". So the
+ * monarch starts modest and the next few years add very little: seven years
+ * is under a fifth taller than three and a half, and forty is only a third
+ * taller than ten. What the couple should read in her is patience, not
+ * accumulation.
+ *
+ *   1 year  0.63    5 years  0.96    20 years  1.33
+ *   3.6 yrs 0.88    7 years  1.04    40 years  1.53
  */
 export function monarchAxialScale(daysTogether: number): number {
   const days = Number.isFinite(daysTogether) ? Math.max(0, daysTogether) : 0;
-  return round6(0.62 + 0.46 * Math.log(1 + days / DAYS_PER_YEAR));
+  return round6(0.42 + 0.3 * Math.log(1 + days / DAYS_PER_YEAR));
 }
 
 /**
@@ -218,20 +222,21 @@ export function childGrowthProgress(year: RelationshipYear, asOf: string): numbe
 /** A child never exceeds half the monarch she was frozen beside. */
 export const CHILD_MONARCH_SHARE = 0.5;
 /** Engine units of air that must remain between a child and the monarch. */
-export const CHILD_MIN_CLEARANCE = 0.12;
+export const CHILD_MIN_CLEARANCE = 0.1;
 /** Years per ring before a new, wider ring opens. */
 export const CHILD_RING_CAPACITY = 8;
 /**
  * How much further out each successive ring sits, and how far a year with no
  * important events stands back.
  *
- * Both are deliberately tight. Measured across ages, a looser ring made the
- * druse far wider than tall — at twenty years it was 4.2 wide against a 2.5
- * monarch, which reads as a pancake with the monarch lost in it. At these
- * values the footprint stays roughly as wide as it is tall at every age.
+ * Both are deliberately tight. A looser ring made the druse far wider than
+ * tall, and on a portrait phone that is not a tuning problem but a geometric
+ * one: an object wider than the screen is wide can never fill the screen's
+ * height, whatever the camera does. Keeping the footprint no wider than the
+ * artifact is tall is what lets the crystal read large on a phone.
  */
-const CHILD_RING_STEP = 0.3;
-const CHILD_EVENT_REACH = 0.22;
+const CHILD_RING_STEP = 0.26;
+const CHILD_EVENT_REACH = 0.14;
 /** Fraction of that reach one important event closes. */
 const CHILD_EVENT_STEP = 0.25;
 
@@ -245,23 +250,34 @@ export interface ChildDimensions {
 }
 
 /**
- * Size of a year's crystal.
+ * How full a year is, from 0 to 1 — the fraction of the maximum a year's
+ * crystal is entitled to.
  *
- * `monarchAxialAtClose` is the monarch's height at the year's *end*, not
- * today: a frozen year keeps the proportion it had when it closed. Since
- * the monarch keeps growing afterwards, older rings end up shorter than
- * newer ones on their own, and the ring reads as a growth history without
- * any extra mechanism.
+ * This is the quantity that stops at the anniversary. It is *not* the same
+ * as the crystal being immutable: a couple who joined the portal in their
+ * third year needs to be able to go back and fill in the first two, and
+ * content dated inside a year belongs to that year whenever it is added.
+ * What a closed year no longer does is grow with time or with anything
+ * that happened outside it.
+ */
+export function yearFill(progress: number, yearActivity: number): number {
+  return round6(clamp01(progress) * (0.55 + 0.45 * clamp01(yearActivity)));
+}
+
+/**
+ * Size of a year's crystal, as a share of the monarch as she stands today.
+ *
+ * An earlier version measured against the monarch's height at the year's
+ * *close*, which made a couple's first years permanently tiny however much
+ * they later filled them in — the opposite of what backfilling is for. Tying
+ * the ring to the current monarch keeps every year legible and keeps the
+ * owner's original rule literally true: half of the monarch, never more.
  */
 export function childDimensions(
-  monarchAxialAtClose: number,
-  progress: number,
-  yearActivity: number,
+  monarchAxialNow: number,
+  fill: number,
 ): ChildDimensions {
-  const activity = 0.7 + 0.3 * clamp01(yearActivity);
-  const axialScale = round6(
-    monarchAxialAtClose * CHILD_MONARCH_SHARE * clamp01(progress) * activity,
-  );
+  const axialScale = round6(monarchAxialNow * CHILD_MONARCH_SHARE * clamp01(fill));
   // Children stay a little stouter than the monarch so she keeps the eye.
   return { axialScale, radialScale: round6(axialScale / 8.5) };
 }

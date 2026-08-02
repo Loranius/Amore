@@ -5,7 +5,6 @@ import {
 } from '../../evolution';
 import { parseEvolutionInstant } from '../../evolution/calendar';
 import {
-  clamp01,
   daysBetweenExplicit,
   relationshipMaturityAt,
   round6,
@@ -23,6 +22,9 @@ import {
   monarchFacetCount,
   monarchRadialScale,
   relationshipYears,
+  wishTint,
+  yearFill,
+  type WishGiftTally,
 } from './growthModel';
 import type {
   CrystalArchetype,
@@ -177,14 +179,55 @@ function eventsWithin(
  * then*, and she keeps growing afterwards, the finished ring reads as a
  * growth history on its own.
  */
+/** Which partner each colour channel belongs to; see `CrystalSpeciesConfig`. */
+export type CrystalColorPartners = { first: number | null; second: number | null } | null;
+
+/**
+ * Wishes granted during one year, split into the three colour channels.
+ *
+ * A wish counts for a partner's channel only when the *other* one granted it:
+ * the colour is about what they gave each other, so fulfilling your own wish
+ * leaves the crystal exactly as white as it was.
+ */
+function wishTallyForYear(
+  yearEvents: readonly NormalizedEvolutionEvent[],
+  partners: CrystalColorPartners,
+): WishGiftTally {
+  const tally: WishGiftTally = { forFirst: 0, shared: 0, forSecond: 0 };
+  if (partners === null) return tally;
+
+  for (const event of yearEvents) {
+    if (eventModule(event.source) !== 'wishlist') continue;
+    const attribution = event.attribution;
+    if (attribution === undefined) continue;
+
+    if (attribution.shared) {
+      tally.shared += 1;
+      continue;
+    }
+    const { subjectId, actorId } = attribution;
+    if (subjectId === null || actorId === null || subjectId === actorId) continue;
+    if (subjectId === partners.first && actorId === partners.second) tally.forFirst += 1;
+    else if (subjectId === partners.second && actorId === partners.first) tally.forSecond += 1;
+  }
+
+  return tally;
+}
+
 export function buildAnnualFormations(
   artifact: ArtifactBlueprint,
   asOf: string,
+  partners: CrystalColorPartners = null,
 ): CrystalGrowthInstruction[] {
   const asOfEpoch = parseEvolutionInstant(asOf);
   if (asOfEpoch === null) return [];
-  const monarchAxial = (at: string): number =>
-    monarchAxialScale(daysBetweenExplicit(artifact.relationshipStartedAt, at) ?? 0);
+  const monarchNow = monarchAxialScale(
+    daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0,
+  );
+  const monarchRadialNow = monarchRadialScale(
+    monarchNow,
+    occurredEvents(artifact, asOf).length,
+  );
 
   return relationshipYears(artifact.relationshipStartedAt, asOf, artifact.leapDayPolicy)
     .map((year) => {
@@ -197,21 +240,16 @@ export function buildAnnualFormations(
       // crystal.
       const yearActivity = saturate(yearEvents.length, 12);
 
-      // A frozen year keeps the proportion it had when it closed; the year in
-      // progress measures against the monarch as she is today.
-      //
-      // "As she was then" has to mean her girth too, not only her height:
-      // sizing a closed year against today's activity would un-freeze it,
-      // because every new photo anywhere would move the whole finished ring.
-      const measuredAt = year.complete ? year.endsAt : asOf;
-      const monarchAtClose = monarchAxial(measuredAt);
-      const monarchRadialAtClose = monarchRadialScale(
-        monarchAtClose,
-        occurredEvents(artifact, measuredAt).length,
-      );
+      // Every year is measured against the monarch as she stands today, so
+      // the ring stays proportional to her and a couple who filled in their
+      // early years sees those crystals grow. What stops at the anniversary
+      // is the year's *fill* — its share of the maximum — not its size in
+      // absolute units.
       const progress = childGrowthProgress(year, asOf);
-      const size = childDimensions(monarchAtClose, progress, yearActivity);
+      const fill = yearFill(progress, yearActivity);
+      const size = childDimensions(monarchNow, fill);
       const ringIndex = childRingIndex(year.index);
+      const tint = wishTint(wishTallyForYear(yearEvents, partners));
 
       return {
         id,
@@ -223,7 +261,7 @@ export function buildAnnualFormations(
         tier: year.complete ? ('support' as const) : ('family' as const),
         archetype: chooseArchetype('remembrance', seed, id),
         emphasized: year.complete,
-        weight: round6(clamp01(progress * (0.6 + 0.4 * yearActivity))),
+        weight: fill,
         maturity: progress,
         axialScale: size.axialScale,
         radialScale: size.radialScale,
@@ -235,15 +273,14 @@ export function buildAnnualFormations(
         radialBias: 0,
         attachmentDepth: 0.2,
         ringDistance: childDistance({
-          monarchRadialScale: monarchRadialAtClose,
+          monarchRadialScale: monarchRadialNow,
           childRadialScale: size.radialScale,
           ringIndex,
           importantEventCount,
         }),
-        // White until the wishlist can tell the engine who granted what; see
-        // ADR-0004. White is the correct birth state, not a placeholder.
-        tintRgb: [1, 1, 1] as const,
-        iridescence: 0,
+        // A year with no gifts stays the white every crystal is born as.
+        tintRgb: tint.rgb,
+        iridescence: tint.iridescence,
         seed,
       };
     });
@@ -314,12 +351,13 @@ export function buildSkirtFormations(
 export function buildCrystalFormations(
   artifact: ArtifactBlueprint,
   asOf: string,
+  partners: CrystalColorPartners = null,
 ): { formations: CrystalGrowthInstruction[]; diagnostics: CrystalSpeciesDiagnostics } {
   const asOfEpoch = parseEvolutionInstant(asOf);
   if (asOfEpoch === null) throw new Error(`Invalid Crystal Species asOf: "${asOf}".`);
 
   const formations = [
-    ...buildAnnualFormations(artifact, asOf),
+    ...buildAnnualFormations(artifact, asOf, partners),
     ...buildSkirtFormations(artifact, asOf),
   ];
 

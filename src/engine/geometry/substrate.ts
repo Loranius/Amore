@@ -39,12 +39,17 @@ function footprintRadius(bodies: readonly GrowthBody[]): number {
   let widest = 0;
   for (const body of bodies) {
     const horizontal = Math.hypot(body.anchor.x, body.anchor.z);
-    widest = Math.max(widest, horizontal + body.renderedRadius * 1.7);
+    widest = Math.max(widest, horizontal + body.renderedRadius * 1.25);
   }
   // Enough margin that no crystal stands on the very lip, but no more: a wide
   // apron reads as a plate the druse was placed on rather than ground it grew
   // out of.
-  return round6(Math.max(0.2, widest * 1.12 + 0.04));
+  //
+  // The margins were loosened when bodies were scattered per event. Under
+  // ADR-0004 the druse is compact, and the same margins made the rock wider
+  // than the monarch is tall — a boulder with crystals on it rather than the
+  // other way round.
+  return round6(Math.max(0.16, widest * 1.06 + 0.02));
 }
 
 function substrateProfile(radius: number, height: number, depth: number): CrystalBodyProfile {
@@ -132,7 +137,7 @@ export function buildCrystalSubstrateMesh(
   const radius = footprintRadius(bodies);
   // A low mound, not a hill: it has to read as ground the crystals emerge
   // from, never as another body competing with them.
-  const height = round6(radius * 0.3);
+  const height = round6(radius * 0.22);
   // Depth is not cosmetic. Every crystal keeps its base cap and sinks it below
   // y=0; if the rock stops short of the deepest of them, that cap is exposed
   // from below and ADR-0003's guarantee breaks. Size it from the actual

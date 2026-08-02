@@ -123,6 +123,7 @@ export function normalizeEvolutionEvents(
       epochIndex: relationshipEpochIndex(relationshipStart, eventDate, config.leapDayPolicy),
       channels,
       portalActivity,
+      ...(input.attribution ? { attribution: input.attribution } : {}),
     });
   }
 

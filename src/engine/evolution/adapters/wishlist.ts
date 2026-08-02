@@ -69,6 +69,14 @@ export function adaptWishlist(
         stability: sharedBoost,
       }),
       portalActivity: 0.24,
+      // Carried through for the crystal's annual colour (ADR-0004). It is the
+      // only place in the pipeline that distinguishes a gift from one partner
+      // to the other from something they chose together.
+      attribution: {
+        subjectId: row.ownerId ?? null,
+        actorId: row.fulfilledById ?? null,
+        shared: row.isShared,
+      },
     });
   }
 

@@ -50,6 +50,7 @@ import { resolveCrystalRendererQuality } from '@/engine/renderer';
 import {
   buildEvolutionSourceSnapshot,
   evolutionWishlistFromPairArchive,
+  resolveCrystalColorPartners,
   stableEvolutionCoupleId,
 } from './sourceSnapshot';
 
@@ -163,6 +164,10 @@ export function useEvolutionCrystalPipeline(
     () => (users.data ?? []).map((user) => user.id).sort((left, right) => left - right),
     [users.data],
   );
+  const colorPartners = useMemo(
+    () => resolveCrystalColorPartners(users.data ?? []),
+    [users.data],
+  );
   const wishlist = useMemo(
     () => evolutionWishlistFromPairArchive(wishlistArchive.data ?? []),
     [wishlistArchive.data],
@@ -236,7 +241,11 @@ export function useEvolutionCrystalPipeline(
       });
       const species = buildCrystalSpeciesBlueprint({
         artifact: artifactResult.blueprint,
-        config: { asOf, rulesVersion: SPECIES_RULES_VERSION },
+        config: {
+          asOf,
+          rulesVersion: SPECIES_RULES_VERSION,
+          ...(colorPartners ? { colorPartners } : {}),
+        },
       });
       const growth = buildGrowthState({
         blueprint: crystalToGrowthBlueprint(species),
@@ -307,6 +316,7 @@ export function useEvolutionCrystalPipeline(
   }, [
     archive.data,
     asOf,
+    colorPartners,
     events.data,
     finishedMedia.data,
     isPending,

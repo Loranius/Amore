@@ -64,6 +64,13 @@ export interface WishlistSource {
   giftDate: string | null;
   isShared: boolean;
   priority: 'high' | 'medium' | 'low' | null;
+  /**
+   * Whose wish it was, and who granted it (ADR-0004). Optional because rows
+   * fulfilled before gift attribution existed have neither, and because the
+   * pair-wide archive RPC only started returning them in v2.
+   */
+  ownerId?: number | null;
+  fulfilledById?: number | null;
 }
 
 export interface MapPlaceSource {

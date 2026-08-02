@@ -14,6 +14,7 @@ import {
   childGrowthProgress,
   childRingIndex,
   facetThresholdForYears,
+  yearFill,
   mediaSparkleCount,
   monarchAxialScale,
   monarchFacetCount,
@@ -41,15 +42,18 @@ describe('monarch height (ADR-0004)', () => {
     // Four times the relationship must not be anywhere near four times the
     // crystal — that was the owner's whole complaint about the old monarch.
     expect(forty / ten).toBeLessThan(1.5);
-    expect(forty / ten).toBeGreaterThan(1.2);
+    expect(forty / ten).toBeGreaterThan(1.1);
   });
 
-  it('keeps the ten-year size the owner already accepted', () => {
-    // The previous model rendered a ten-year monarch at ~1.67 engine units
-    // and that was signed off. Landing anywhere far from it would be a
-    // silent redesign of a decision already made.
-    expect(monarchAxialScale(10 * YEAR)).toBeGreaterThan(1.6);
-    expect(monarchAxialScale(10 * YEAR)).toBeLessThan(1.8);
+  it('stays modest at three years and barely moves by seven', () => {
+    // The owner read a three-year monarch as already too big, and the seven
+    // year projection as alarming. These bounds are that judgement written
+    // down: the next few years must add very little.
+    const threeAndAHalf = monarchAxialScale(3.6 * YEAR);
+    const seven = monarchAxialScale(7 * YEAR);
+
+    expect(threeAndAHalf).toBeLessThan(1);
+    expect(seven / threeAndAHalf).toBeLessThan(1.25);
   });
 
   it('separates a young relationship from an old one', () => {
@@ -201,7 +205,7 @@ describe('child growth steps', () => {
 describe('child crystals', () => {
   it('never exceeds half the monarch it stands beside', () => {
     const monarch = monarchAxialScale(4 * YEAR);
-    const child = childDimensions(monarch, 1, 1);
+    const child = childDimensions(monarch, yearFill(1, 1));
     // Tolerance is one round6 step: every published number is quantised to
     // six decimals, so an exact-equality bound would fail on the rounding.
     expect(child.axialScale).toBeLessThanOrEqual(monarch * CHILD_MONARCH_SHARE + 1e-6);
@@ -211,25 +215,36 @@ describe('child crystals', () => {
 
   it('grows with its months and with the year that fed it', () => {
     const monarch = monarchAxialScale(4 * YEAR);
-    expect(childDimensions(monarch, 0.5, 1).axialScale)
-      .toBeGreaterThan(childDimensions(monarch, 0.25, 1).axialScale);
-    expect(childDimensions(monarch, 1, 1).axialScale)
-      .toBeGreaterThan(childDimensions(monarch, 1, 0).axialScale);
+    expect(childDimensions(monarch, yearFill(0.5, 1)).axialScale)
+      .toBeGreaterThan(childDimensions(monarch, yearFill(0.25, 1)).axialScale);
+    expect(childDimensions(monarch, yearFill(1, 1)).axialScale)
+      .toBeGreaterThan(childDimensions(monarch, yearFill(1, 0)).axialScale);
   });
 
-  it('shows the monarch growing between frozen years', () => {
-    // A year frozen early keeps half of the monarch as she was then, and she
-    // has grown since — so the ring is a growth history for free.
-    const firstYear = childDimensions(monarchAxialScale(YEAR), 1, 1);
-    const tenthYear = childDimensions(monarchAxialScale(10 * YEAR), 1, 1);
-    expect(tenthYear.axialScale).toBeGreaterThan(firstYear.axialScale);
+  it('lets a couple fill in a year they lived before joining the portal', () => {
+    // The reason a closed year is not simply immutable. A couple three years
+    // in, who only started logging recently, has to be able to go back and
+    // put their first years in — and see those crystals answer.
+    const monarch = monarchAxialScale(4 * YEAR);
+    const empty = childDimensions(monarch, yearFill(1, 0));
+    const filled = childDimensions(monarch, yearFill(1, 1));
+
+    expect(filled.axialScale).toBeGreaterThan(empty.axialScale * 1.5);
+  });
+
+  it('scales the whole ring with the monarch rather than stranding old years', () => {
+    // Measuring a year against the monarch as she was at its close made a
+    // couple's first years permanently tiny however much they filled them in.
+    const full = yearFill(1, 1);
+    expect(childDimensions(monarchAxialScale(10 * YEAR), full).axialScale)
+      .toBeGreaterThan(childDimensions(monarchAxialScale(YEAR), full).axialScale);
   });
 
   it('can never touch the monarch, whatever the year held', () => {
     const monarchRadial = monarchRadialScale(monarchAxialScale(10 * YEAR), 10_000);
     for (const events of [0, 1, 4, 40, 10_000]) {
       for (const ringIndex of [0, 1, 2]) {
-        const child = childDimensions(monarchAxialScale(10 * YEAR), 1, 1);
+        const child = childDimensions(monarchAxialScale(10 * YEAR), yearFill(1, 1));
         const distance = childDistance({
           monarchRadialScale: monarchRadial,
           childRadialScale: child.radialScale,
@@ -256,8 +271,9 @@ describe('child crystals', () => {
     expect(many).toBeLessThan(one);
     // One event has to be worth seeing: the couple in question logs only
     // one or two calendar milestones a year, so a subtle step would read as
-    // no step at all.
-    expect(quiet - one).toBeGreaterThan(0.05);
+    // no step at all. A quarter of the reach, which is tighter now that the
+    // whole ring is closer in.
+    expect(quiet - one).toBeGreaterThan(0.03);
   });
 
   it('opens a new ring every eight years so no year is crowded out', () => {

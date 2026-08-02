@@ -188,7 +188,7 @@ describe('Crystal Geometry', () => {
     }
   });
 
-  it('keeps closed years byte-stable when a later event is appended', () => {
+  it('keeps a closed year the same shape when a later event is appended', () => {
     // The year in progress is identified by being last: years are emitted in
     // calendar order, so the newest is the one still growing.
     const CURRENT_YEAR_BODY_ID = pipeline(BASE_EVENTS).geometry.meshes
@@ -225,8 +225,12 @@ describe('Crystal Geometry', () => {
       if (oldMesh.bodyId === CURRENT_YEAR_BODY_ID) continue;
       const nextMesh = later.meshes.find((mesh) => mesh.bodyId === oldMesh.bodyId);
       expect(nextMesh).toBeDefined();
-      expect(nextMesh?.profile.signature).toBe(oldMesh.profile.signature);
-      expect(nextMesh?.positions).toEqual(oldMesh.positions);
+      // Topology, not coordinates: a closed year keeps its facet count, its
+      // profile rows and its level of detail, while its absolute size tracks
+      // the monarch so a backfilled early year can still grow (ADR-0004).
+      expect(nextMesh?.profile.segments).toBe(oldMesh.profile.segments);
+      expect(nextMesh?.profile.rows).toHaveLength(oldMesh.profile.rows.length);
+      expect(nextMesh?.positions).toHaveLength(oldMesh.positions.length);
       expect(nextMesh?.sourceTriangleCount).toBe(oldMesh.sourceTriangleCount);
       expect(nextMesh?.lod).toBe(oldMesh.lod);
     }

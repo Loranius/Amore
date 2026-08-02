@@ -73,13 +73,16 @@ describe('Crystal Growth Center adapter', () => {
       },
     ]);
 
-    // A year that has already closed is a record of that year (ADR-0004), so
-    // nothing logged afterwards may move it. The year in progress is
-    // deliberately excluded: growing with new activity is its whole job.
+    // A closed year stops filling: nothing dated outside it may raise its
+    // share (ADR-0004). Its absolute size still tracks the monarch, so the
+    // comparison is on `weight` — the fill — not on the whole instruction.
+    // The year in progress is excluded: filling with new activity is its job.
     const closed = earlier.instructions.filter((item) => item.maturity === 1);
     expect(closed.length).toBeGreaterThan(0);
     for (const oldInstruction of closed) {
-      expect(later.instructions.find((item) => item.id === oldInstruction.id)).toEqual(oldInstruction);
+      const next = later.instructions.find((item) => item.id === oldInstruction.id)!;
+      expect(next.weight).toBe(oldInstruction.weight);
+      expect(next.preferredAzimuthRad).toBe(oldInstruction.preferredAzimuthRad);
     }
   });
 

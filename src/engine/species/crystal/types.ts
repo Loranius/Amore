@@ -60,6 +60,19 @@ export interface CrystalSpeciesConfig {
   asOf: string;
   /** Bump whenever species formulas or archetype rules change. */
   rulesVersion: string;
+  /**
+   * Which partner each colour channel belongs to (ADR-0004).
+   *
+   * Deliberately two opaque ids rather than anything about the people: the
+   * engine has no concept of gender and should not grow one. Which partner is
+   * which is an application-layer decision, so it can move to a profile field
+   * later without the engine noticing.
+   *
+   * Wishes belonging to `first` that `second` granted colour the red channel,
+   * the mirror image colours blue, and shared wishes colour green. Omit both
+   * and every annual crystal stays white.
+   */
+  colorPartners?: { first: number | null; second: number | null };
 }
 
 export interface CrystalSpeciesPressures {

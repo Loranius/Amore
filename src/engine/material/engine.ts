@@ -148,16 +148,37 @@ function buildBodyMaterial(
   const role = compositionBody.role;
   const micro = role === 'micro';
   const focal = role === 'focal';
-  const baseColor = bodyColor(materialPalette, role, emphasized);
+  // ADR-0004: an annual crystal carries a colour earned by the gifts the
+  // couple exchanged that year, and the artifact palette must not overwrite
+  // it. A year with no gifts publishes white, which multiplies out to the
+  // palette colour unchanged — so the two coexist without a special case for
+  // "uncoloured".
+  const tint = instruction?.tintRgb ?? null;
+  const paletteColor = bodyColor(materialPalette, role, emphasized);
+  const baseColor = tint === null
+    ? paletteColor
+    : {
+        r: round6(paletteColor.r * tint[0]),
+        g: round6(paletteColor.g * tint[1]),
+        b: round6(paletteColor.b * tint[2]),
+      };
   const emissiveColor = emphasized ? rgb(1, 0.66, 0.22) : materialPalette.core;
 
   const rawRoughness = (0.3 - pressures.refinement * 0.2 + state.fracture * 0.08)
     * (micro ? 1.55 : focal ? 0.62 : 0.92);
   const roughness = round6(Math.max(preset.roughnessFloor, Math.min(0.62, rawRoughness)));
   const clearcoat = round6(clamp01((0.58 + pressures.refinement * 0.38) * preset.clearcoatScale * (micro ? 0.46 : 1)));
-  const iridescenceAllowed = input.config.allowIridescence && !micro && !emphasized;
+  const iridescenceAllowed = input.config.allowIridescence && !micro;
+  // A year in which both partners gave as much as they received comes out
+  // nearly white — the balance shows as rainbow on the facets instead, which
+  // is why an evenly-shared year is the most beautiful rather than the
+  // greyest (ADR-0004).
+  const earnedIridescence = instruction?.iridescence ?? 0;
   const iridescence = round6(iridescenceAllowed
-    ? Math.min(preset.maxIridescence, 0.08 + pressures.refinement * 0.42 + pressures.brilliance * 0.12)
+    ? Math.min(
+        preset.maxIridescence,
+        0.08 + pressures.refinement * 0.42 + pressures.brilliance * 0.12 + earnedIridescence * 0.5,
+      )
     : 0);
   const emissiveIntensity = round6(clamp01(
     (emphasized ? 0.32 : focal ? 0.1 : 0.025)

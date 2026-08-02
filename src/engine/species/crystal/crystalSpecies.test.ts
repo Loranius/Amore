@@ -115,21 +115,46 @@ describe('Crystal Species', () => {
       .toEqual(base.formations.map((formation) => formation.id));
   });
 
-  it('freezes a finished year and keeps growing the current one', () => {
+  it('stops a finished year filling while the current one keeps filling', () => {
     const early = buildCrystal(BASE_EVENTS, '2025-07-01');
     const later = buildCrystal(BASE_EVENTS, '2025-11-01');
+    const find = (crystal: typeof early, id: string) =>
+      crystal.formations.find((formation) => formation.id === id)!;
 
-    const frozenId = 'crystal:year:1';
-    const frozenEarly = early.formations.find((formation) => formation.id === frozenId)!;
-    const frozenLater = later.formations.find((formation) => formation.id === frozenId)!;
-    expect(frozenLater.axialScale).toBe(frozenEarly.axialScale);
-    expect(frozenLater.maturity).toBe(1);
+    // A closed year's fill — its share of the maximum — no longer moves with
+    // time. Its absolute size may still track the monarch, which is what
+    // keeps early years legible once a couple fills them in.
+    expect(find(later, 'crystal:year:1').weight).toBe(find(early, 'crystal:year:1').weight);
+    expect(find(later, 'crystal:year:1').maturity).toBe(1);
 
-    const growingId = 'crystal:year:2';
-    const growingEarly = early.formations.find((formation) => formation.id === growingId)!;
-    const growingLater = later.formations.find((formation) => formation.id === growingId)!;
-    expect(growingLater.axialScale).toBeGreaterThan(growingEarly.axialScale);
-    expect(growingLater.maturity).toBeGreaterThan(growingEarly.maturity);
+    expect(find(later, 'crystal:year:2').weight)
+      .toBeGreaterThan(find(early, 'crystal:year:2').weight);
+  });
+
+  it('lets a couple fill in a year they had already lived', () => {
+    // The owner joined the portal in their third year and wants the first two
+    // to answer to content added now. Content dated inside a year belongs to
+    // that year whenever it arrives.
+    const bare = buildCrystal(BASE_EVENTS, '2026-07-01');
+    const backfilled = buildCrystal([
+      ...BASE_EVENTS,
+      ...Array.from({ length: 8 }, (_unused, index) => ({
+        id: `backfilled:${index}`,
+        occurredAt: `2024-0${(index % 8) + 1}-12`,
+        source: 'memories@1',
+        evidence: 'verified' as const,
+        channels: { remembrance: 0.5 },
+        portalActivity: 0.1,
+      })),
+    ], '2026-07-01');
+
+    const firstYear = (crystal: typeof bare) =>
+      crystal.formations.find((formation) => formation.id === 'crystal:year:1')!;
+
+    expect(firstYear(backfilled).weight).toBeGreaterThan(firstYear(bare).weight);
+    expect(firstYear(backfilled).axialScale).toBeGreaterThan(firstYear(bare).axialScale);
+    // And it must not add a body: the count still follows the calendar.
+    expect(backfilled.formations).toHaveLength(bare.formations.length);
   });
 
   it('lets time mature formations without changing their seeded morphology', () => {
@@ -147,12 +172,15 @@ describe('Crystal Species', () => {
     expect(later.mother.axialScale).toBeGreaterThan(earlier.mother.axialScale);
     expect(later.mother.maturity).toBeGreaterThan(earlier.mother.maturity);
 
-    // A year that has closed is a record: nothing about it may move again.
-    const frozen = (crystal: ReturnType<typeof buildCrystal>) =>
-      crystal.formations.filter((formation) => formation.maturity === 1 && formation.emphasized);
-    for (const before of frozen(earlier)) {
-      const after = later.formations.find((formation) => formation.id === before.id);
-      expect(after).toEqual(before);
+    // A closed year stops filling. Its size still follows the monarch, so
+    // compare the fill rather than the crystal.
+    const closed = earlier.formations.filter((formation) => formation.maturity === 1);
+    expect(closed.length).toBeGreaterThan(0);
+    for (const before of closed) {
+      const after = later.formations.find((formation) => formation.id === before.id)!;
+      expect(after.weight).toBe(before.weight);
+      expect(after.facetCount).toBe(before.facetCount);
+      expect(after.azimuthRad).toBe(before.azimuthRad);
     }
   });
 
@@ -193,5 +221,83 @@ describe('Crystal Species', () => {
     expect(legacy.density).toBeLessThanOrEqual(1.3);
     expect(legacy.dominant).not.toBeNull();
     expect(legacy.surfaceComplexity).toBeGreaterThan(0);
+  });
+});
+
+describe('Crystal Species annual colour (ADR-0004)', () => {
+  const PARTNERS = { first: 1, second: 2 };
+
+  function withGifts(gifts: readonly { subject: number; actor: number; shared?: boolean }[]) {
+    return buildCrystalSpeciesBlueprint({
+      artifact: buildArtifact([
+        ...BASE_EVENTS,
+        ...gifts.map((gift, index) => ({
+          id: `gift:${index}`,
+          occurredAt: '2025-03-1' + String(index % 10),
+          source: 'wishlist@1',
+          evidence: 'verified' as const,
+          channels: { achievement: 0.5, significance: 0.4 },
+          portalActivity: 0.2,
+          attribution: {
+            subjectId: gift.subject,
+            actorId: gift.actor,
+            shared: gift.shared === true,
+          },
+        })),
+      ]),
+      config: { asOf: '2026-07-01', rulesVersion: 'crystal-1.0.0', colorPartners: PARTNERS },
+    });
+  }
+
+  const secondYear = (crystal: ReturnType<typeof withGifts>) =>
+    crystal.formations.find((formation) => formation.id === 'crystal:year:2')!;
+
+  it('leaves a year with no gifts white', () => {
+    expect(secondYear(withGifts([])).tintRgb).toEqual([1, 1, 1]);
+    expect(secondYear(withGifts([])).iridescence).toBe(0);
+  });
+
+  it('tints toward whichever partner was given to', () => {
+    const toFirst = secondYear(withGifts(
+      Array.from({ length: 6 }, () => ({ subject: 1, actor: 2 })),
+    )).tintRgb;
+    const toSecond = secondYear(withGifts(
+      Array.from({ length: 6 }, () => ({ subject: 2, actor: 1 })),
+    )).tintRgb;
+
+    expect(toFirst[0]).toBeGreaterThan(toFirst[2]);
+    expect(toSecond[2]).toBeGreaterThan(toSecond[0]);
+  });
+
+  it('ignores a wish somebody granted themselves', () => {
+    // The colour is about what they gave *each other*.
+    const selfGranted = secondYear(withGifts(
+      Array.from({ length: 6 }, () => ({ subject: 1, actor: 1 })),
+    ));
+    expect(selfGranted.tintRgb).toEqual([1, 1, 1]);
+  });
+
+  it('rewards a balanced year with iridescence rather than grey', () => {
+    const balanced = secondYear(withGifts([
+      ...Array.from({ length: 3 }, () => ({ subject: 1, actor: 2 })),
+      ...Array.from({ length: 3 }, () => ({ subject: 2, actor: 1 })),
+      ...Array.from({ length: 3 }, () => ({ subject: 1, actor: 2, shared: true })),
+    ]));
+    const lopsided = secondYear(withGifts(
+      Array.from({ length: 9 }, () => ({ subject: 1, actor: 2 })),
+    ));
+
+    expect(balanced.iridescence).toBeGreaterThan(lopsided.iridescence);
+    expect(Math.min(...balanced.tintRgb)).toBeGreaterThan(Math.min(...lopsided.tintRgb));
+  });
+
+  it('stays white when the app could not say who is who', () => {
+    const uncoloured = buildCrystalSpeciesBlueprint({
+      artifact: buildArtifact(BASE_EVENTS),
+      config: { asOf: '2026-07-01', rulesVersion: 'crystal-1.0.0' },
+    });
+    for (const formation of uncoloured.formations) {
+      expect(formation.tintRgb).toEqual([1, 1, 1]);
+    }
   });
 });

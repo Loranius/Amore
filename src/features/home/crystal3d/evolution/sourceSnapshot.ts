@@ -24,7 +24,39 @@ export function archiveToWishlistSource(
     giftDate: item.completed_at,
     isShared: item.is_shared,
     priority: item.priority,
+    ownerId: item.owner,
+    fulfilledById: item.fulfilled_by,
   };
+}
+
+/**
+ * Which partner holds the red channel of a year's colour, and which the blue
+ * (ADR-0004).
+ *
+ * The engine takes two opaque ids and has no idea what they mean; deciding
+ * belongs here. Today it reads the partner's name, which is the pattern the
+ * rest of the app already uses for anything gendered (see
+ * `wishlist/partnerLabel.ts`). When the planned user profile lands, this
+ * function reads a field instead and nothing else changes.
+ *
+ * With no recognised names it falls back to id order, which is stable and
+ * arbitrary — the couple gets consistent colours, just not necessarily the
+ * ones they would have picked. Returns null only when there is no couple.
+ */
+export function resolveCrystalColorPartners(
+  users: readonly { id: number; name: string }[],
+): { first: number | null; second: number | null } | null {
+  if (users.length === 0) return null;
+
+  const byId = [...users].sort((left, right) => left.id - right.id);
+  const named = (name: string): number | null =>
+    byId.find((user) => user.name === name)?.id ?? null;
+
+  const first = named('Діма');
+  const second = named('Лєна');
+  if (first !== null && second !== null) return { first, second };
+
+  return { first: byId[0]?.id ?? null, second: byId[1]?.id ?? null };
 }
 
 export function evolutionWishlistFromPairArchive(

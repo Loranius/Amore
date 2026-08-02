@@ -13,6 +13,23 @@ export type LeapDayPolicy = 'feb-28' | 'mar-1';
 
 export type EvolutionPressureVector = Record<EvolutionChannel, number>;
 
+/**
+ * Who an event was for and who brought it about.
+ *
+ * Optional throughout: most facts belong to the couple rather than to one of
+ * them, and rows recorded before the portal tracked attribution have none.
+ * The crystal uses it to colour a year by the gifts exchanged during it
+ * (ADR-0004); it never affects pressure, timing or structure.
+ */
+export interface EvolutionEventAttribution {
+  /** The partner the event was for. */
+  subjectId: number | null;
+  /** The partner who brought it about. */
+  actorId: number | null;
+  /** True when the event belongs to both rather than to one of them. */
+  shared: boolean;
+}
+
 export interface EvolutionEventInput {
   id: string;
   episodeId?: string;
@@ -21,6 +38,7 @@ export interface EvolutionEventInput {
   evidence: EvolutionEvidence;
   channels: Partial<EvolutionPressureVector>;
   portalActivity?: number;
+  attribution?: EvolutionEventAttribution;
 }
 
 export interface EvolutionEngineConfig {
@@ -40,6 +58,8 @@ export interface NormalizedEvolutionEvent {
   epochIndex: number;
   channels: EvolutionPressureVector;
   portalActivity: number;
+  /** Absent when the source recorded none. */
+  attribution?: EvolutionEventAttribution;
 }
 
 export interface EvolutionEpochPressure {

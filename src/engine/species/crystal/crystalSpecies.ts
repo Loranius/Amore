@@ -47,7 +47,11 @@ export function buildCrystalSpeciesBlueprint(
   // The full artifact, not the filtered one: the formation builders bound
   // themselves by asOf, and diagnostics must still be able to name the facts
   // that lie in the future.
-  const { formations, diagnostics } = buildCrystalFormations(input.artifact, asOf);
+  const { formations, diagnostics } = buildCrystalFormations(
+    input.artifact,
+    asOf,
+    input.config.colorPartners ?? null,
+  );
   const colonies = buildColonies(currentArtifact.deterministicSeed, formations);
 
   return {
