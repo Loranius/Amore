@@ -7,7 +7,6 @@
 // ============================================================
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { Hero } from './Hero';
-import { Crystal } from './Crystal';
 import { CrystalPlaceholder } from './CrystalPlaceholder';
 import { HomePlansCard } from './HomePlansCard';
 import { HomeArtifactSwitcher } from './HomeArtifactSwitcher';
@@ -64,9 +63,10 @@ export function HomePage() {
     setArtifact(next);
   }, []);
 
-  const rendererFallback = artifact === 'crystal'
-    ? <Crystal />
-    : <HomeArtifactWebglFallback artifact={artifact} />;
+  // Never substitute another artifact silhouette for the selected 3D object.
+  // If WebGL is unavailable or the renderer fails, show a neutral explanation
+  // instead of the retired radial SVG crystal.
+  const rendererFallback = <HomeArtifactWebglFallback artifact={artifact} />;
 
   return (
     <section className="home" data-home-artifact={artifact}>

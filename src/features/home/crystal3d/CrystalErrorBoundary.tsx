@@ -1,9 +1,9 @@
 // ============================================================
-// CrystalErrorBoundary — фолбек на SVG-кристал при падінні 3D-сцени
+// CrystalErrorBoundary — нейтральний фолбек при падінні 3D-сцени
 // ------------------------------------------------------------
 // Three.js/WebGL — новий, ще не перевірений локально стек (немає npm у
 // середовищі розробки). Якщо ініціалізація впаде на будь-якому пристрої —
-// показуємо дітям-фолбеку (SVG Crystal) замість білого екрана.
+// показуємо переданий стан помилки замість білого екрана.
 // ============================================================
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
@@ -24,7 +24,7 @@ export class CrystalErrorBoundary extends Component<Props, State> {
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Crystal 3D scene failed, falling back to SVG:', error, errorInfo);
+    console.error('Crystal 3D scene failed, showing renderer fallback:', error, errorInfo);
   }
 
   override render() {
