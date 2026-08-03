@@ -41,8 +41,16 @@ export type { CrystalFacePlane };
  * faces still read as six equal faces; at this the difference is plain, and the
  * habit is still recognisably hexagonal because no face may cross its
  * neighbour's slot.
+ *
+ * Brought in from 0.34 after measuring the monarch's actual plane set: the gaps
+ * had spread to 21.8°..92.8°, and two faces only 22° apart are two faces
+ * catching the same light — an unequal *width* bought at the price of the
+ * neighbouring facets not turning. Width inequality mostly comes from the
+ * offsets anyway (`PRISM_OFFSET_MIN/MAX`, `DOMINANT_INSET`), which move a face
+ * in or out without touching how far it turns, so the character survives the
+ * tightening while every neighbour now genuinely faces somewhere else.
  */
-const AZIMUTH_JITTER = 0.34;
+const AZIMUTH_JITTER = 0.24;
 
 /**
  * How far a prism plane sits from the axis, as a fraction of the body radius.
@@ -92,9 +100,32 @@ const PRISM_FLARE_MAX = 0.2;
  * shaft at their own heights — which is the thing being asked for.
  */
 const CROWN_SHOULDER_SPREAD = 0.25;
-/** Guard rails on the face's inclination: below this a dome, above it a spike. */
-const CROWN_FACE_MIN_DEG = 46;
-const CROWN_FACE_MAX_DEG = 84;
+/**
+ * The band a termination face's inclination from horizontal may sit in.
+ *
+ * This is lattice, not proportion, and that distinction is the whole point. The
+ * inclination is derived from the body's own aspect — a termination `rise` tall
+ * over a face standing `radius` out — and for a tall, thin monarch that
+ * derivation ran into the old ceiling of 84°, leaving crown planes whose normals
+ * stood only 12–16° above horizontal. Measured off the live portal: the crown
+ * faces were within a few degrees of parallel to the prism faces below them, so
+ * the termination caught the same light as the shaft and the crystal read as a
+ * column with a shallow cap rather than as a quartz point.
+ *
+ * Real quartz does not work that way. The angle between a prism face and a
+ * rhombohedral face is fixed by the crystal lattice at about 141.8°, which puts
+ * the termination faces near 52° from horizontal whatever the prism's length. A
+ * quartz crystal twice as long gets twice the shaft, not a sharper point — a
+ * point that sharpens with height is a spire, and spires are carved rather than
+ * grown.
+ *
+ * So the band is narrow and centred on the mineral's own angle. The aspect
+ * ratio still chooses where inside it a given face sits, and the seeded shoulder
+ * spread still makes the faces unequal; neither may push the crystal out of the
+ * habit it is supposed to have.
+ */
+const CROWN_FACE_MIN_DEG = 42;
+const CROWN_FACE_MAX_DEG = 54;
 
 /** How far the tip sits off the axis, as a fraction of the radius. */
 const APEX_DRIFT = 0.3;

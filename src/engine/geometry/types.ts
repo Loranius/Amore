@@ -140,6 +140,26 @@ export interface CrystalMeshData {
    * Optional so persisted Geometry State v1 meshes stay readable.
    */
   uvs?: number[];
+  /**
+   * Which face each triangle belongs to — one entry per triangle, in index
+   * order.
+   *
+   * Published because the face is no longer inferable from the triangle's
+   * position. Under the lathe every face was exactly two triangles laid out in
+   * ring order, so `floor(triangle / 2) % ringLength` named it; readers relied
+   * on that, and since ADR-0006 it has been wrong. A polytope face is fanned
+   * into as many triangles as it has corners minus two — a different count on
+   * every face — and slivers are dropped, so no arithmetic on the triangle
+   * index recovers the face.
+   *
+   * That silently broke per-face tone (`facets.ts`): tints scattered across
+   * triangles instead of landing per plane, so neighbouring facets averaged to
+   * within a few percent of each other and the crystal read as a smooth shape.
+   * The identifiers are opaque and dense from zero; only equality is meaningful.
+   *
+   * Optional so persisted Geometry State v1 meshes stay readable.
+   */
+  faceIds?: number[];
   indices: number[];
   sourceTriangleCount: number;
   visibleTriangleCount: number;

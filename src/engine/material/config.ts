@@ -56,7 +56,7 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // 1.1.0: the shell became semi-transparent, the stone gained procedural
   // striations and veils, and the inner light now grows with the wishes that
   // were granted rather than merely taking their colour (ADR-0007).
-  rulesVersion: '1.2.0',
+  rulesVersion: '1.3.0',
   quality: 'balanced',
   allowIridescence: true,
   allowProceduralReflection: true,

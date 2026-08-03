@@ -210,6 +210,9 @@ export function splitCrystalMeshFaces(
     }
   }
 
+  // `faceIds` rides through untouched: this rebuilds every triangle in place,
+  // one for one and in the same order, so the face a triangle belonged to
+  // before the split is the face it belongs to after it.
   return {
     ...mesh,
     positions,
@@ -287,17 +290,26 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
   };
 
   let baseCapTriangleCount = 0;
+  // One identifier per emitted triangle, counted over the faces that actually
+  // emitted something. Using the plane index instead would leave gaps wherever
+  // a face collapsed to slivers, and readers treat these as dense.
+  const faceIds: number[] = [];
+  let faceId = 0;
   for (const face of ordered) {
     const loop = face.loop;
     const isBase = planes[face.planeIndex]!.kind === 'base';
+    let emitted = 0;
     for (let corner = 1; corner + 1 < loop.length; corner += 1) {
       const ia = loop[0]!;
       const ib = loop[corner]!;
       const ic = loop[corner + 1]!;
       if (area(ia, ib, ic) < sliverArea) continue;
       indices.push(ia, ib, ic);
+      faceIds.push(faceId);
+      emitted += 1;
       if (isBase) baseCapTriangleCount += 1;
     }
+    if (emitted > 0) faceId += 1;
   }
 
   const sourceTriangleCount = indices.length / 3;
@@ -309,6 +321,7 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
     profile,
     positions,
     normals: computeNormals(positions, indices),
+    faceIds,
     indices,
     sourceTriangleCount,
     visibleTriangleCount: sourceTriangleCount,
@@ -382,9 +395,15 @@ function buildLatheCrystalMesh(
     rowCenter(profile.geometryAnchor, body.direction, tangent, bitangent, lastRow),
   );
 
+  // Face identifiers for the lathe, matching what the shape actually is: the
+  // whole base cap is one plane, each side facet is one plane running the full
+  // height however many rows it crosses, and each triangle of the termination
+  // fan is its own.
+  const faceIds: number[] = [];
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
     indices.push(baseCenter, next, segment);
+    faceIds.push(0);
   }
   const baseCapTriangleCount = segments;
 
@@ -403,6 +422,7 @@ function buildLatheCrystalMesh(
       // shared ring the quad is planar, so both of its triangles have the same
       // normal and the split direction is invisible.
       indices.push(a, b, c, b, d, c);
+      faceIds.push(1 + segment, 1 + segment);
     }
   }
 
@@ -410,6 +430,7 @@ function buildLatheCrystalMesh(
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
     indices.push(topStart + segment, topStart + next, topCenter);
+    faceIds.push(1 + segments + segment);
   }
 
   const sourceTriangleCount = indices.length / 3;
@@ -421,6 +442,7 @@ function buildLatheCrystalMesh(
     profile,
     positions,
     normals: computeNormals(positions, indices),
+    faceIds,
     indices,
     sourceTriangleCount,
     visibleTriangleCount: sourceTriangleCount,

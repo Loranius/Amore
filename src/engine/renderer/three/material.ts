@@ -152,8 +152,21 @@ const FRAGMENT_BODY = /* glsl */ `
   float evolutionFresnel = pow( 1.0 - evolutionFacing, 5.0 );
   vec3 evolutionReflected = reflect( -evolutionViewDir, normal );
   float evolutionUpness = clamp( evolutionReflected.y * 0.5 + 0.5, 0.0, 1.0 );
+
+  // Steepened deliberately: a prism's faces are all near-vertical, so their
+  // reflected rays are all near-horizontal and a linear up/down mix hands every
+  // one of them the same colour. Pushing the gradient makes the small
+  // differences between facets into visible ones, which is what a reflection is
+  // for.
+  evolutionUpness = smoothstep( 0.25, 0.75, evolutionUpness );
   vec3 evolutionSky = mix( uEvolutionGroundColor, uEvolutionSkyColor, evolutionUpness );
-  outgoingLight += evolutionSky * uEvolutionSkyStrength * ( 0.25 + 0.75 * evolutionFresnel );
+  // No constant floor. It used to be a quarter plus three quarters of the
+  // Fresnel, and that quarter was added to every facet alike — a uniform lift wearing a reflection's name.
+  // Measured on the live portal it was a large part of why four neighbouring
+  // faces rendered within 9% of each other: the shell sat so high on the tone
+  // curve that a four-to-one difference in incoming light compressed to nothing.
+  // Reflection belongs at the silhouette, where reflectance actually climbs.
+  outgoingLight += evolutionSky * uEvolutionSkyStrength * evolutionFresnel;
   outgoingLight += uEvolutionRimColor * uEvolutionRimStrength * evolutionFresnel;
 
   float evolutionBand = sin(
@@ -371,7 +384,12 @@ export function createThreeCrystalMaterial(source: CrystalBodyMaterial): THREE.M
 
   material.userData['evolutionBodyId'] = source.bodyId;
   material.userData['evolutionSignature'] = source.signature;
-  material.userData['evolutionBaseEmissiveIntensity'] = source.emissiveIntensity;
+  // The *effective* base, not the recipe's. A body carrying a vein map has had
+  // its emissive raised to light that map, and the life frame rewrites this
+  // property every frame as `base * glow` — so publishing the recipe's own
+  // number here quietly undid the vein glow on the first frame after mount and
+  // it never appeared at all.
+  material.userData['evolutionBaseEmissiveIntensity'] = material.emissiveIntensity;
   applyEvolutionShader(material, source.shader);
   return material;
 }

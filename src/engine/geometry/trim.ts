@@ -206,6 +206,11 @@ export function trimCrystalMesh(
     .filter((solid) => solid.body.id !== self.body.id && boundsOverlap(self, solid, config.hiddenFaceEpsilon))
     .sort((left, right) => left.body.id.localeCompare(right.body.id));
   const kept: number[] = [];
+  // Face identifiers are per triangle, so dropping a triangle has to drop its
+  // identifier in the same step. Rebuilding them afterwards from the index list
+  // is not possible — the face a triangle belonged to is not recoverable from
+  // its corners once its neighbours are gone.
+  const keptFaceIds: number[] = [];
   const occluders = new Set<string>();
   let baseCapRemoved = false;
 
@@ -245,12 +250,14 @@ export function trimCrystalMesh(
       continue;
     }
     kept.push(ia, ib, ic);
+    if (mesh.faceIds !== undefined) keptFaceIds.push(mesh.faceIds[triangle] ?? 0);
   }
 
   const visibleTriangleCount = kept.length / 3;
   return rebuildCrystalMeshNormals({
     ...mesh,
     indices: kept,
+    ...(mesh.faceIds === undefined ? {} : { faceIds: keptFaceIds }),
     visibleTriangleCount,
     removedTriangleCount: mesh.sourceTriangleCount - visibleTriangleCount,
     baseCapRemoved,

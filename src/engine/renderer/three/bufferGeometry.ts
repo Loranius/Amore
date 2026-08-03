@@ -24,11 +24,19 @@ function facetColors(
 ): Float32Array {
   const vertexCount = mesh.positions.length / 3;
   const colors = new Float32Array(vertexCount * 3);
-  // Keyed on the *face*, not on the triangle. A side face is two coplanar
-  // triangles that must read as one plane; tinting them separately drew a seam
-  // straight down the middle of every face — the same mosaic the geometry pass
-  // was undoing. Faces are the ring's facets, so the face a triangle belongs to
-  // is its position in the ring.
+  // Keyed on the *face*, not on the triangle. A face is several coplanar
+  // triangles that must read as one plane; tinting them separately draws seams
+  // across every face — the same mosaic the geometry pass was undoing.
+  //
+  // The geometry publishes which face each triangle belongs to, and it has to:
+  // the arithmetic that used to stand here — `floor(triangle / 2)` modulo the
+  // ring length — encoded the lathe's two-triangles-per-facet layout, and
+  // ADR-0006 replaced the lathe with a polytope whose faces are fanned into a
+  // different number of triangles each. It went on returning an index, so
+  // nothing failed; the tints simply stopped landing on faces, neighbouring
+  // facets averaged to within a few percent of one another, and the crystal
+  // read as a smooth shape. Falls back for persisted meshes with no identifiers.
+  const faceIds = mesh.faceIds;
   const facesPerRing = Math.max(1, mesh.profile.ring?.length ?? mesh.profile.segments);
   for (let offset = 0; offset < mesh.indices.length; offset += 3) {
     const triangle = offset / 3;
@@ -36,7 +44,9 @@ function facetColors(
       material.facets,
       artifactSeed,
       mesh.bodyId,
-      Math.floor(triangle / 2) % facesPerRing,
+      faceIds === undefined
+        ? Math.floor(triangle / 2) % facesPerRing
+        : faceIds[triangle] ?? 0,
     );
     for (let slot = 0; slot < 3; slot += 1) {
       const vertex = (mesh.indices[offset + slot] ?? 0) * 3;

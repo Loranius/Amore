@@ -646,3 +646,133 @@ describe('crystal faceting — flat faces (ADR-0006)', () => {
     expect(signatures.size).toBe(8);
   });
 });
+
+describe('crystal faceting — the face a triangle belongs to', () => {
+  /**
+   * Per-face tone is the only thing separating one facet from the next on a
+   * device with iridescence and procedural reflection switched off, and it was
+   * silently landing on the wrong things.
+   *
+   * The renderer used to name a triangle's face arithmetically, as
+   * `floor(triangle / 2)` modulo the ring length. That encoded the lathe: two
+   * triangles per facet, facets in ring order. ADR-0006 replaced the lathe with
+   * a polytope whose faces are fanned into as many triangles as they have
+   * corners minus two — a different count on every face — and whose slivers are
+   * dropped entirely. The arithmetic went on returning a number, so nothing
+   * failed; the tints simply stopped landing per plane.
+   *
+   * Measured effect on the live portal: four neighbouring facets of the monarch
+   * rendered within 9% of each other's brightness. Hence identifiers published
+   * by the pass that actually does the fanning.
+   */
+  it('gives every triangle of one plane the same identifier, and neighbours different ones', () => {
+    const body = motherBody();
+    const mesh = buildCrystalMesh(body, 'high');
+    const faceIds = mesh.faceIds!;
+
+    expect(faceIds).toHaveLength(mesh.indices.length / 3);
+
+    // Group triangles by published identifier, then check each group really is
+    // one plane — the identifier is worth nothing if it does not track geometry.
+    const byFace = new Map<number, number[]>();
+    faceIds.forEach((id, triangle) => {
+      const bucket = byFace.get(id) ?? [];
+      bucket.push(triangle);
+      byFace.set(id, bucket);
+    });
+    expect(byFace.size).toBeGreaterThan(6);
+
+    const normalOf = (triangle: number) => {
+      const corner = (slot: number) => {
+        const index = mesh.indices[triangle * 3 + slot]!;
+        return {
+          x: mesh.positions[index * 3]!,
+          y: mesh.positions[index * 3 + 1]!,
+          z: mesh.positions[index * 3 + 2]!,
+        };
+      };
+      const a = corner(0);
+      const b = corner(1);
+      const c = corner(2);
+      const u = { x: b.x - a.x, y: b.y - a.y, z: b.z - a.z };
+      const v = { x: c.x - a.x, y: c.y - a.y, z: c.z - a.z };
+      const n = {
+        x: u.y * v.z - u.z * v.y,
+        y: u.z * v.x - u.x * v.z,
+        z: u.x * v.y - u.y * v.x,
+      };
+      const length = Math.hypot(n.x, n.y, n.z) || 1;
+      return { x: n.x / length, y: n.y / length, z: n.z / length };
+    };
+
+    const faceNormals: { x: number; y: number; z: number }[] = [];
+    for (const triangles of byFace.values()) {
+      const first = normalOf(triangles[0]!);
+      for (const triangle of triangles) {
+        const other = normalOf(triangle);
+        const dot = first.x * other.x + first.y * other.y + first.z * other.z;
+        // Same plane, so the same normal to within rounding.
+        expect(dot).toBeGreaterThan(0.9999);
+      }
+      faceNormals.push(first);
+    }
+
+    // And no two identifiers describe the same plane, which would hand one
+    // physical face two tones and draw a seam across it.
+    for (let left = 0; left < faceNormals.length; left += 1) {
+      for (let right = left + 1; right < faceNormals.length; right += 1) {
+        const a = faceNormals[left]!;
+        const b = faceNormals[right]!;
+        const dot = a.x * b.x + a.y * b.y + a.z * b.z;
+        expect(dot).toBeLessThan(0.9999);
+      }
+    }
+  });
+
+  it('keeps the identifiers in step with the triangles through the split', () => {
+    const body = motherBody();
+    const split = splitCrystalMeshFaces(buildCrystalMesh(body, 'high'));
+    expect(split.faceIds).toHaveLength(split.indices.length / 3);
+  });
+});
+
+describe('crystal faceting — the termination is lattice, not proportion', () => {
+  /**
+   * A quartz termination sits at the angle the lattice dictates, whatever the
+   * prism's length: the prism-to-rhombohedral angle is about 141.8°, which puts
+   * the crown faces near 52° from horizontal on a stubby crystal and a tall one
+   * alike. A point that sharpens as the body grows is a spire, not a crystal.
+   *
+   * The inclination is derived from the body's own aspect ratio, and on a tall
+   * monarch that derivation used to saturate its ceiling of 84°, leaving crown
+   * normals only 12–16° above horizontal — within a few degrees of the prism
+   * faces beneath them. The termination then caught the same light as the shaft,
+   * which is what made the crystal read as a capped column.
+   */
+  it('keeps crown faces in the quartz band however long the prism grows', () => {
+    const short = buildCrystalProfile(
+      crystalBody({ ...motherBody(), renderedLength: 0.7, renderedRadius: 0.3 }),
+      'high',
+    );
+    const tall = buildCrystalProfile(
+      crystalBody({ ...motherBody(), renderedLength: 3.4, renderedRadius: 0.18 }),
+      'high',
+    );
+
+    for (const profile of [short, tall]) {
+      const crowns = (profile.planes ?? []).filter((plane) => plane.kind === 'crown');
+      expect(crowns.length).toBeGreaterThan(3);
+      for (const plane of crowns) {
+        const pitch = Math.asin(Math.max(-1, Math.min(1, plane.normal.y))) * (180 / Math.PI);
+        // The complement of the 42..54° face band the lattice is held to, with
+        // room either side: the published planes have been through the body's
+        // anisotropy and lean, and an affine map takes planes to planes but
+        // does not preserve their angles. What matters is that the crown is
+        // nowhere near the 12..16° it used to sit at, where it was
+        // indistinguishable from the prism faces below it.
+        expect(pitch).toBeGreaterThan(30);
+        expect(pitch).toBeLessThan(56);
+      }
+    }
+  });
+});

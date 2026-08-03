@@ -142,6 +142,42 @@ function acrossBand(band: { readonly min: number; readonly max: number }, t: num
   return band.min + (band.max - band.min) * clamp01(t);
 }
 
+/**
+ * How bright the shell's *diffuse* albedo is allowed to be, as luminance.
+ *
+ * This is the difference between a crystal and a piece of chalk, and it was
+ * measured rather than chosen. The shell's albedo had drifted to a luminance of
+ * about 0.80 — near-white — and on top of that came ambient, hemisphere, the sky
+ * term, the core and the rim. Sampled off the live portal, four neighbouring
+ * facets of the monarch then rendered at 161..186 of 255: a spread under 9%,
+ * which the eye reads as one smooth surface no matter how well the geometry is
+ * faceted.
+ *
+ * The facets were not actually receiving the same light. Undoing the ACES curve
+ * on those samples puts them at roughly 0.36..1.6 in linear scene radiance — a
+ * range of more than four to one. The shell was simply sitting so high on the
+ * tone curve that the whole range landed in its shoulder, where everything
+ * compresses toward white. Quadrupling the key light widened the spread by
+ * nothing at all, which is exactly what a shoulder does.
+ *
+ * So the cap is not a darkening for taste: it moves the body down into the part
+ * of the curve where a difference in illumination is still a difference in
+ * pixels. It is also what quartz is — a mineral whose diffuse reflectance is
+ * modest and whose brightness comes from specular and from the light inside it,
+ * both of which are left untouched here.
+ *
+ * Hue and saturation are preserved exactly: all three channels scale by one
+ * factor, so the colour the couple earned (ADR-0004) is the colour that shows.
+ * Only its value moves.
+ */
+const SHELL_ALBEDO_LUMA = 0.46;
+
+function capShellValue(color: CrystalRgb): CrystalRgb {
+  const luma = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
+  if (luma <= SHELL_ALBEDO_LUMA || luma <= 1e-6) return color;
+  return scaleRgb(color, SHELL_ALBEDO_LUMA / luma);
+}
+
 function bodyColor(
   base: CrystalMaterialPalette,
   role: string,
@@ -157,7 +193,9 @@ function bodyColor(
           ? 0.32
           : 0.44;
   const target = emphasized ? rgb(1, 0.72, 0.28) : base.secondary;
-  return scaleRgb(mixRgb(base.primary, target, roleMix), role === 'micro' ? 0.84 : 1);
+  return capShellValue(
+    scaleRgb(mixRgb(base.primary, target, roleMix), role === 'micro' ? 0.84 : 1),
+  );
 }
 
 /**
@@ -265,7 +303,10 @@ function shaderRecipe(
     // One grain for the whole colony: a year crystal shows fewer cells of the
     // same size rather than a shrunk-to-fit copy of the pattern.
     surfaceTextureScale: micro ? 0 : round6(textureTier(SURFACE_CELLS_PER_UNIT, preset)),
-    surfaceReliefStrength: micro ? 0 : round6(textureTier(0.5, preset)),
+    // Light. The map is a mineral's grain, and a grain that stands up off the
+    // surface stops reading as stone and starts reading as hide — the crystal
+    // wants its relief in the facets, which the geometry already provides.
+    surfaceReliefStrength: micro ? 0 : round6(textureTier(0.22, preset)),
     // The veins glow in the colour the couple earned, not in the map's own —
     // the map is structure, ADR-0004 owns the colour.
     surfaceVeinStrength: micro ? 0 : round6(textureTier(0.6 + wishDepth(tint) * 0.7, preset)),
