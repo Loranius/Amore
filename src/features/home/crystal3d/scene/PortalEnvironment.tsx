@@ -165,7 +165,7 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisSca
         <meshStandardMaterial
           color={palette.crack}
           emissive={palette.crackGlow}
-          emissiveIntensity={0.28}
+          emissiveIntensity={0.2}
           roughness={0.9}
           metalness={0}
         />

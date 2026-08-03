@@ -322,10 +322,14 @@ function buildBodyMaterial(
 }
 
 /**
- * The substrate is rock, not mineral: matte, unlit from within, and with none
- * of the clearcoat or iridescence that makes the crystals read as gems. It is
- * kept deliberately dark and low-chroma so it reads as ground the druse stands
- * in rather than as another body competing for attention.
+ * The substrate is stone, not mineral: matte, unlit from within, and with none
+ * of the clearcoat or iridescence that makes the crystals read as gems.
+ *
+ * It used to be kept very dark so it read as earth. Visual review (2026-08-03)
+ * asked for the earth gone and the crystals rising straight out of a cut plate,
+ * so it now sits in the same lightness range as the portal's ritual slab and
+ * reads as continuous with it. Still well below the crystals: it must not
+ * compete with them, only carry them.
  */
 function buildSubstrateMaterial(
   input: BuildCrystalMaterialInput,
@@ -334,10 +338,14 @@ function buildSubstrateMaterial(
   // Tinted toward the couple's own palette so the rock never looks imported
   // from a different artifact, but pulled far down in lightness.
   const tint = materialPalette.secondary;
+  // Pale enough to read as cut stone rather than earth, dark enough that the
+  // crystals standing in it are still the brightest thing in the frame — at
+  // 0.40/0.35/0.48 the plate came out nearly as light as they are, and the
+  // druse stopped separating from the floor it grew out of.
   const baseColor = rgb(
-    round6(0.16 + tint.r * 0.12),
-    round6(0.14 + tint.g * 0.11),
-    round6(0.16 + tint.b * 0.13),
+    round6(0.31 + tint.r * 0.14),
+    round6(0.27 + tint.g * 0.13),
+    round6(0.39 + tint.b * 0.15),
   );
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
@@ -367,11 +375,12 @@ function buildSubstrateMaterial(
       skyColor: baseColor,
       groundColor: baseColor,
       rimColor: baseColor,
-      // Rock does have visible grain, unlike the near-clear crystals — but it
+      // Stone does have visible grain, unlike the near-clear crystals — but it
       // is still procedural detail, so it follows the same quality tier as
       // every other material rather than staying on when optics are off.
+      // Lighter than it was: at 0.45 the grain read as soil on a pale plate.
       inclusionDensity: round6(
-        (0.45 + input.species.state.fracture * 0.25)
+        (0.26 + input.species.state.fracture * 0.18)
         * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
       ),
       inclusionScale: 3.2,

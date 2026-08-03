@@ -9,13 +9,19 @@ import type {
 } from './types';
 
 /**
- * The rock the druse stands in.
+ * The plate the druse grew through.
  *
  * ADR-0003 made every crystal free-standing with its base sunk below y=0 and
  * its cap intact rather than trimmed. That is only sound while something
  * actually occludes the underside — this is that something. It is published
- * as geometry rather than left to the scene so it always scales with the
- * druse it has to cover, and so the artifact is self-contained.
+ * as geometry rather than left to the scene so it always scales with the druse
+ * it has to cover, and so the artifact is self-contained.
+ *
+ * It used to be a mound of earth. Visual review (2026-08-03) asked for the
+ * earth gone entirely and the crystals rising straight out of stone, so it is
+ * now a slab: flat, cut, and continuous with the ritual plate the portal lays
+ * around it. What it *is* did not change — the base caps still have to be
+ * covered by something that scales with the druse — only what it looks like.
  */
 export const CRYSTAL_SUBSTRATE_BODY_ID = 'crystal:substrate';
 
@@ -28,15 +34,14 @@ const SEGMENTS = 18;
  * crystals bury and height only by how the mound should read.
  */
 const SHAPE: readonly { readonly t: number; readonly radius: number }[] = [
-  { t: -1, radius: 0.5 },
-  { t: -0.5, radius: 0.86 },
+  { t: -1, radius: 0.52 },
+  { t: -0.5, radius: 0.9 },
   { t: 0, radius: 1 },
-  // The top used to fall away to 0.44 of the radius, which domed the earth
-  // into a boulder with the crystals on top of it. It is soil the crystals
-  // pushed through, not a hill they stand on, so the patch stays nearly flat
-  // out to its rim and only rounds off at the very edge.
-  { t: 0.55, radius: 0.94 },
-  { t: 1, radius: 0.78 },
+  // Flat on top, with only a cut edge. The profile used to dome away to 0.44
+  // of the radius, which is a boulder; a plate has a face and a chamfer and
+  // nothing else.
+  { t: 0.55, radius: 0.995 },
+  { t: 1, radius: 0.965 },
 ];
 
 /**
@@ -160,11 +165,8 @@ export function buildCrystalSubstrateMesh(
   if (bodies.length === 0) return null;
 
   const radius = footprintRadius(bodies);
-  // A patch of soil, not a mound. At 0.22 of its radius the earth read as a
-  // rock the druse was standing on; the crystals are supposed to have come up
-  // through it, which they cannot look like they did while it is taller than
-  // the part of them that shows below the shoulder.
-  const height = round6(radius * 0.075);
+  // Plate thickness, not mound height.
+  const height = round6(radius * 0.045);
   // Depth is not cosmetic. Every crystal keeps its base cap and sinks it below
   // y=0; if the rock stops short of the deepest of them, that cap is exposed
   // from below and ADR-0003's guarantee breaks. Size it from the actual
@@ -180,10 +182,11 @@ export function buildCrystalSubstrateMesh(
     const row = profile.rows[rowIndex]!;
     for (let segment = 0; segment < SEGMENTS; segment += 1) {
       const angle = (segment / SEGMENTS) * Math.PI * 2;
-      // Rock is lumpy. Both jitters are seeded so the same couple always gets
-      // the same stone.
-      const radial = 1 + (seededUnit(artifactSeed, `substrate:r:${rowIndex}:${segment}`) - 0.5) * 0.16;
-      const lift = (seededUnit(artifactSeed, `substrate:y:${rowIndex}:${segment}`) - 0.5) * height * 0.3;
+      // Cut stone, not rock: enough irregularity that the plate is not a
+      // machined disc, far less than the 16% radial jitter that made it read
+      // as a boulder. Seeded, so the same couple always gets the same stone.
+      const radial = 1 + (seededUnit(artifactSeed, `substrate:r:${rowIndex}:${segment}`) - 0.5) * 0.05;
+      const lift = (seededUnit(artifactSeed, `substrate:y:${rowIndex}:${segment}`) - 0.5) * height * 0.12;
       // sin on x and cos on z, not the other way round. The index winding below
       // is copied from buildCrystalMesh, and that builder lays its rings out in
       // the tangent/bitangent basis of the body axis — a basis with the opposite
