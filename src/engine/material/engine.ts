@@ -137,11 +137,33 @@ function bodyColor(
   return scaleRgb(mixRgb(base.primary, target, roleMix), role === 'micro' ? 0.84 : 1);
 }
 
+/**
+ * How much further the core pushes toward the pure hue than the shell was
+ * allowed to.
+ *
+ * `wishTint` deliberately stops short of a pure colour, with the note that a
+ * crystal is translucent stone and not stained glass — sound reasoning for a
+ * surface. A core is seen *through* that stone, so the same restraint reads as
+ * no colour at all; it can and should go further.
+ */
+const CORE_TINT_GAIN = 1.45;
+
+/** The colour a body's inner light takes from the gifts that earned it. */
+function coreTintColor(
+  base: CrystalRgb,
+  tint: readonly [number, number, number] | null,
+): CrystalRgb {
+  if (tint === null) return base;
+  const deepen = (channel: number): number => clamp01(1 - (1 - channel) * CORE_TINT_GAIN);
+  return mixRgb(base, rgb(deepen(tint[0]), deepen(tint[1]), deepen(tint[2])), 0.82);
+}
+
 function shaderRecipe(
   input: BuildCrystalMaterialInput,
   role: string,
   emphasized: boolean,
   emissiveColor: CrystalRgb,
+  tint: readonly [number, number, number] | null,
 ): CrystalShaderRecipe {
   const preset = CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality];
   const pressures = input.species.pressures;
@@ -187,8 +209,11 @@ function shaderRecipe(
     coreStrength: round6(micro
       ? 0
       : (0.1 + pressures.luminosity * 0.16 + state.luminosity * 0.08)
-        * (emphasized ? 1.35 : focal ? 1 : 0.72)),
-    coreColor: emissiveColor,
+        * (emphasized ? 1.35 : focal ? 1 : 0.72)
+        // A year that earned a colour shows it a little harder, or the colour
+        // it earned is the one thing about it nobody can see.
+        * (tint === null || (tint[0] === 1 && tint[1] === 1 && tint[2] === 1) ? 1 : 1.3)),
+    coreColor: coreTintColor(emissiveColor, tint),
   };
 }
 
@@ -210,20 +235,16 @@ function buildBodyMaterial(
   const role = compositionBody.role;
   const micro = role === 'micro';
   const focal = role === 'focal';
-  // ADR-0004: an annual crystal carries a colour earned by the gifts the
-  // couple exchanged that year, and the artifact palette must not overwrite
-  // it. A year with no gifts publishes white, which multiplies out to the
-  // palette colour unchanged — so the two coexist without a special case for
-  // "uncoloured".
+  // ADR-0004 gives an annual crystal a colour earned by the gifts the couple
+  // exchanged that year. It used to multiply the shell, which made the whole
+  // body that colour — the "solid rainbow shell" the reference pass rejected.
+  //
+  // The colour belongs to the core. Outside, every crystal keeps the colony's
+  // one mineral nature, so the druse reads as a druse rather than as a bag of
+  // differently coloured objects; inside, each year carries its own light. See
+  // coreTintColor and the shader's core term.
   const tint = instruction?.tintRgb ?? null;
-  const paletteColor = bodyColor(materialPalette, role, emphasized);
-  const baseColor = tint === null
-    ? paletteColor
-    : {
-        r: round6(paletteColor.r * tint[0]),
-        g: round6(paletteColor.g * tint[1]),
-        b: round6(paletteColor.b * tint[2]),
-      };
+  const baseColor = bodyColor(materialPalette, role, emphasized);
   const emissiveColor = emphasized ? rgb(1, 0.66, 0.22) : materialPalette.core;
 
   // Refined couples polish toward the smooth end of the band; fracture and the
@@ -257,7 +278,7 @@ function buildBodyMaterial(
       + pressures.luminosity * 0.3
       + state.luminosity * 0.15,
   ));
-  const shader = shaderRecipe(input, role, emphasized, emissiveColor);
+  const shader = shaderRecipe(input, role, emphasized, emissiveColor, tint);
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
     bodyId,

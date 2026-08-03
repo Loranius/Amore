@@ -430,6 +430,104 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(signatures.size).toBeGreaterThanOrEqual(strengths.size);
   });
 
+  it('puts the colour a year earned inside it, not on it', () => {
+    // ADR-0004 gives an annual crystal a colour from the gifts exchanged that
+    // year. Multiplying it into the shell made the whole body that colour — the
+    // solid rainbow shell the reference pass rejected. Outside, every crystal
+    // keeps the colony's one mineral nature; inside, each year carries its own
+    // light.
+    const base = pipeline({ quality: 'high' });
+    const yearId = base.species.formations.find((f) => f.kind === 'annual')!.id;
+    const withGift = (rgb: readonly [number, number, number]) => buildCrystalMaterialState({
+      species: {
+        ...base.species,
+        formations: base.species.formations.map((formation) => (
+          formation.id === yearId ? { ...formation, tintRgb: rgb } : formation
+        )),
+      },
+      composition: base.composition,
+      geometry: base.geometry,
+      config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality: 'high' },
+    }).bodies.find((body) => body.bodyId === yearId)!;
+
+    const plain = withGift([1, 1, 1]);
+    const red = withGift([1, 0.35, 0.4]);
+    const blue = withGift([0.38, 0.42, 1]);
+
+    // The shell does not move at all.
+    expect(red.baseColor).toEqual(plain.baseColor);
+    expect(blue.baseColor).toEqual(plain.baseColor);
+
+    // The core does, and in the direction the gifts point.
+    expect(red.shader.coreColor).not.toEqual(plain.shader.coreColor);
+    expect(red.shader.coreColor.r / red.shader.coreColor.b)
+      .toBeGreaterThan(blue.shader.coreColor.r / blue.shader.coreColor.b);
+  });
+
+  it('lets the core go further toward the hue than the shell was allowed to', () => {
+    // wishTint stops short of a pure colour because a crystal is translucent
+    // stone, not stained glass — right for a surface. A core is seen *through*
+    // that stone, so the same restraint reads as no colour at all.
+    const base = pipeline({ quality: 'high' });
+    const yearId = base.species.formations.find((f) => f.kind === 'annual')!.id;
+    const tint: readonly [number, number, number] = [1, 0.4, 0.45];
+    const body = buildCrystalMaterialState({
+      species: {
+        ...base.species,
+        formations: base.species.formations.map((formation) => (
+          formation.id === yearId ? { ...formation, tintRgb: tint } : formation
+        )),
+      },
+      composition: base.composition,
+      geometry: base.geometry,
+      config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality: 'high' },
+    }).bodies.find((candidate) => candidate.bodyId === yearId)!;
+
+    const core = body.shader.coreColor;
+    const spread = (colour: { r: number; g: number; b: number }) =>
+      Math.max(colour.r, colour.g, colour.b) - Math.min(colour.r, colour.g, colour.b);
+
+    expect(spread(core)).toBeGreaterThan(1 - Math.min(...tint));
+    for (const channel of [core.r, core.g, core.b]) {
+      expect(channel).toBeGreaterThanOrEqual(0);
+      expect(channel).toBeLessThanOrEqual(1);
+    }
+    // And a year that earned a colour shows it a little harder, or the colour
+    // is the one thing about that year nobody can see.
+    const plain = base.material.bodies.find((candidate) => candidate.bodyId === yearId)!;
+    expect(body.shader.coreStrength).toBeGreaterThan(plain.shader.coreStrength);
+  });
+
+  it('keeps one mineral nature across the whole colony', () => {
+    // Stated over the whole druse rather than over two bodies: no gift, in any
+    // year, may move any shell anywhere. The shell colour still varies with
+    // composition role and with emphasis — the year in progress is deliberately
+    // picked out — and both of those are untouched here.
+    const base = pipeline({ quality: 'high' });
+    const gifted = buildCrystalMaterialState({
+      species: {
+        ...base.species,
+        formations: base.species.formations.map((formation, index) => ({
+          ...formation,
+          tintRgb: [
+            index % 3 === 0 ? 1 : 0.3,
+            index % 3 === 1 ? 1 : 0.3,
+            index % 3 === 2 ? 1 : 0.3,
+          ] as [number, number, number],
+        })),
+      },
+      composition: base.composition,
+      geometry: base.geometry,
+      config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality: 'high' },
+    });
+
+    expect(gifted.bodies.map((body) => body.baseColor))
+      .toEqual(base.material.bodies.map((body) => body.baseColor));
+    // And the cores did move, or the fixture would be proving nothing.
+    expect(gifted.bodies.map((body) => body.shader.coreColor))
+      .not.toEqual(base.material.bodies.map((body) => body.shader.coreColor));
+  });
+
   it('does not mutate species, composition or geometry states', () => {
     const current = pipeline();
     const speciesBefore = JSON.stringify(current.species);
