@@ -14,14 +14,19 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { buildPortalPlatformGeometry } from './portalPlatformMesh';
+import { portalPlatformTexture } from './platformTexture';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import {
   PORTAL_FIELD_DROP,
   PORTAL_GROUND_Y,
   PORTAL_LAMP_RADIUS,
   PORTAL_PALETTES,
-  buildPortalDaisGeometry,
   buildPortalRuneGeometry,
+  PORTAL_DAIS_TOP_RADIUS,
+  buildPortalArchGeometry,
+  buildPortalTempleFloorGeometry,
+  portalArchInstances,
   buildPortalInlayGeometry,
   buildPortalLampGeometry,
   buildPortalPillarGeometry,
@@ -83,15 +88,22 @@ export function PortalEnvironment({
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
+  const archesRef = useRef<THREE.InstancedMesh>(null);
   const lampsRef = useRef<THREE.InstancedMesh>(null);
 
-  const daisGeometry = useMemo(() => buildPortalDaisGeometry(), []);
+  // The lathe podium the owner replaced with a modelled stone platform. The
+  // builder stays exported and tested — it is the fallback shape and the thing
+  // the dais scale is still defined against.
+  const daisGeometry = useMemo(() => buildPortalPlatformGeometry(), []);
   // Інкрустація тепер від насіння теж: вона повторює вигин плити, а плита
   // вигинається там, де тріснула саме в цієї пари.
   // Плита масштабується по XZ разом із подіумом, а виліт жили приходить в
   // одиницях сцени — тож переводимо його в локальні одиниці подіуму, інакше
   // на масштабованому подіумі слід жили був би не там, де він насправді.
   const veinReachLocal = veinReach / Math.max(1e-6, daisScale);
+  const archGeometry = useMemo(() => buildPortalArchGeometry(), []);
+  const platformTexture = useMemo(() => portalPlatformTexture(), []);
+  const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(seed), [seed]);
   const inlayGeometry = useMemo(
     () => buildPortalInlayGeometry(seed, veinBearings, veinReachLocal),
     [seed, veinBearings, veinReachLocal],
@@ -110,15 +122,18 @@ export function PortalEnvironment({
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
   const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
   const lamps = useMemo(() => portalLampInstances(frame, aspect), [frame, aspect]);
+  const arches = useMemo(() => portalArchInstances(frame, aspect), [frame, aspect]);
 
   useEffect(() => () => {
     daisGeometry.dispose();
+    archGeometry.dispose();
+    floorGeometry.dispose();
     inlayGeometry.dispose();
     pillarGeometry.dispose();
     lampGeometry.dispose();
     slabGeometry.dispose();
     runeGeometry.dispose();
-  }, [daisGeometry, inlayGeometry, pillarGeometry, lampGeometry, slabGeometry, runeGeometry]);
+  }, [daisGeometry, archGeometry, floorGeometry, inlayGeometry, pillarGeometry, lampGeometry, slabGeometry, runeGeometry]);
 
   const starGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
@@ -170,6 +185,23 @@ export function PortalEnvironment({
     mesh.computeBoundingSphere();
   }, [pillars]);
 
+  useLayoutEffect(() => {
+    const mesh = archesRef.current;
+    if (mesh === null) return;
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    for (let index = 0; index < arches.length; index += 1) {
+      const arch = arches[index]!;
+      position.set(arch.position[0], arch.position[1], arch.position[2]);
+      scale.set(arch.scale[0], arch.scale[1], arch.scale[2]);
+      mesh.setMatrixAt(index, matrix.compose(position, new THREE.Quaternion(), scale));
+    }
+    mesh.count = arches.length;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [arches]);
+
   return (
     <>
       <fog attach="fog" args={[palette.fog, frame.fogNear, frame.fogFar]} />
@@ -184,15 +216,33 @@ export function PortalEnvironment({
         <meshStandardMaterial color={palette.field} roughness={1} metalness={0} />
       </mesh>
 
+      {/* Підлога храму: плити по кільцях навколо подіуму. Лежить трохи вище за
+          поле, щоб шви між плитами показували темряву під ними, а не z-fight
+          із заливкою. Далі шістнадцяти юнітів її з'їдає туман — далі й немає
+          сенсу класти камінь. */}
+      <mesh
+        geometry={floorGeometry}
+        position={[0, PORTAL_GROUND_Y - PORTAL_FIELD_DROP + 0.02, 0]}
+      >
+        <meshStandardMaterial
+          color={palette.slab}
+          vertexColors
+          roughness={0.96}
+          metalness={0}
+          flatShading
+        />
+      </mesh>
+
       {/* Подіум: верхня площина рівно на PORTAL_GROUND_Y, тобто там, де
           починається субстрат кристала. Масштабується тільки по XZ —
           вища плита їхала б угору відносно тієї самої площини. */}
       <mesh
         geometry={daisGeometry}
         position={[0, PORTAL_GROUND_Y, 0]}
-        scale={[daisScale, 1, daisScale]}
+        scale={[daisScale * PORTAL_DAIS_TOP_RADIUS, daisScale * PORTAL_DAIS_TOP_RADIUS, daisScale * PORTAL_DAIS_TOP_RADIUS]}
       >
         <meshStandardMaterial
+          map={platformTexture}
           color={palette.dais}
           emissive={palette.daisEmissive}
           roughness={0.86}
@@ -235,7 +285,11 @@ export function PortalEnvironment({
         />
       </mesh>
 
-      {/* Інкрустація по обводу. Висоту вона несе у власній геометрії — та
+      {/* Інкрустація по обводу. Вона світиться, а не просто блищить: на
+          референсі підлога і є джерелом світла сцени — архітектура там майже
+          чорний силует, а освітлені лише небо в прорізах і візерунок на
+          подіумі. Наша була відблиском металу при 0.42 і не читалась як щось
+          увімкнене. Висоту вона несе у власній геометрії — та
           повторює вигин плити, — тож меш стоїть на площині подіуму без
           додаткового підйому. Тут лишалось `+ 0.079` від часів, коли кільця
           були пласкі: після переходу на вигнуті смуги воно додавалось до
@@ -248,7 +302,7 @@ export function PortalEnvironment({
         <meshStandardMaterial
           color={palette.inlay}
           emissive={palette.inlay}
-          emissiveIntensity={0.42}
+          emissiveIntensity={1.7}
           roughness={0.34}
           metalness={0.7}
         />
@@ -257,6 +311,17 @@ export function PortalEnvironment({
       <instancedMesh
         ref={pillarsRef}
         args={[pillarGeometry, undefined, pillars.length]}
+        frustumCulled={false}
+      >
+        <meshStandardMaterial color={palette.pillar} roughness={0.94} metalness={0.02} flatShading />
+      </instancedMesh>
+
+      {/* Арки над задніми парами. Той самий матеріал, що й колони: арка — це
+          той самий камінь, і найменша різниця в тоні прочиталась би як
+          прибудова, а не як проліт. */}
+      <instancedMesh
+        ref={archesRef}
+        args={[archGeometry, undefined, arches.length]}
         frustumCulled={false}
       >
         <meshStandardMaterial color={palette.pillar} roughness={0.94} metalness={0.02} flatShading />

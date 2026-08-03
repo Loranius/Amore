@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import { mulberry32 } from '../../mulberry32';
+import { buildPortalPlatformGeometry } from './portalPlatformMesh';
 
 /** Площина, на якій стоїть артефакт; уся сцена відраховується від неї. */
 export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
@@ -24,10 +25,11 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * тіл), тож він мусить знати внесок сцени — інакше довелось би просто
  * послабити межу й перевірка втратила б сенс.
  *
- * Поле + подіум + кам'яна платформа + руни + інкрустація + колони (один
- * InstancedMesh на всі три пари) + вогні на колонах (так само один) + зорі.
+ * Поле + підлога храму + подіум + кам'яна платформа + руни + інкрустація +
+ * колони (один InstancedMesh на всі три пари) + вогні на колонах (так само
+ * один) + арки (так само один) + зорі.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 8;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 10;
 
 /**
  * Скільки трикутників додає оточення. Той самий привід, що й у draw
@@ -38,7 +40,7 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 8;
  * будувати геометрію двічі. За тим, щоб воно не розійшлось із реальними
  * буферами, стежить portalScene.test.ts.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 3100;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 3091;
 
 /** Сегментів у диску поля; єдине місце, що задає його вартість. */
 const FIELD_SEGMENTS = 64;
@@ -55,10 +57,14 @@ export function measurePortalEnvironmentTriangles(
   bearings: readonly number[] = [],
   veinReach = 0,
 ): number {
-  const dais = buildPortalDaisGeometry();
+  // Сцена малює модельований постамент, а не латку — бюджет мусить рахувати
+  // те, що справді малюється.
+  const dais = buildPortalPlatformGeometry();
   const inlay = buildPortalInlayGeometry(seed, bearings, veinReach);
   const pillar = buildPortalPillarGeometry();
   const lamp = buildPortalLampGeometry();
+  const arch = buildPortalArchGeometry();
+  const floor = buildPortalTempleFloorGeometry(seed);
   const slab = buildPortalRitualSlabGeometry(seed, bearings, veinReach);
   const runes = buildPortalRuneGeometry(seed, bearings, veinReach);
   const triangles = (geometry: THREE.BufferGeometry): number => {
@@ -74,12 +80,17 @@ export function measurePortalEnvironmentTriangles(
     + triangles(slab)
     + triangles(runes)
     + triangles(pillar) * PORTAL_PILLARS.length * 2
-    + triangles(lamp) * PORTAL_PILLARS.length * 2;
+    + triangles(lamp) * PORTAL_PILLARS.length * 2
+    // One arch per pair standing behind the artifact, not per pillar.
+    + triangles(arch) * PORTAL_PILLARS.filter((pillar) => pillar.z <= -1).length
+    + triangles(floor);
 
   dais.dispose();
   inlay.dispose();
   pillar.dispose();
   lamp.dispose();
+  arch.dispose();
+  floor.dispose();
   slab.dispose();
   runes.dispose();
   return total;
@@ -611,25 +622,26 @@ export interface PortalPillarPlacement {
 }
 
 /**
- * Три пари, і третя — перед артефактом.
+ * Три пари, і всі три **позаду** артефакта.
  *
- * Дві задні пари давали глибину, але кристал стояв *перед* колонадою, як
- * перед декорацією. Святилище — це зала, а не тло: пара попереду замикає
- * простір із протилежного боку, і глядач опиняється всередині, а не навпроти.
+ * Тут колись стояла пара перед кристалом. Задум був у тому, щоб глядач
+ * опинявся всередині зали, а не навпроти неї, і як задум він чесний — але
+ * колона на передньому плані бореться з кристалом за увагу, а акцент тут
+ * рівно один. Ближню пару відсунуто за артефакт, і додано третю, ще дальшу:
+ * колонада тепер **відступає в глибину** й читається як тло, яким і має бути.
  *
- * Передня пара навмисно стоїть далеко вбік і близько до камери — вона
- * підрізається краєм кадру, і саме підрізана колона читається як «камера
- * всередині зали». Обмеження, яке її тримає: у проєкції на екран вона мусить
- * лишатись за межами артефакта, інакше замість обрамлення вийде затулянка.
- * За цим стежить portalScene.test.ts.
+ * Кожна дальша пара вища, ширша й ближча до осі кадру. Це не декоративний
+ * градієнт: перспектива й так зменшує далеке, тож колона тієї самої висоти на
+ * подвійній глибині виглядала б удвічі нижчою, і ряд читався б як спадна
+ * сходинка замість однакових колон, що йдуть углиб.
+ *
+ * Обмеження, яке їх тримає: у проєкції на екран жодна не заходить на артефакт,
+ * інакше замість обрамлення вийде затулянка. За цим стежить portalScene.test.ts.
  */
 export const PORTAL_PILLARS: readonly PortalPillarPlacement[] = [
-  // Дзеркало ближньої задньої пари: та сама глибина, висота, радіус і частка
-  // краю. Попередня передня пара була власного розміру на власній глибині й
-  // читалась як окрема декорація, а не як продовження тієї самої колонади.
-  { z: 2.6, edgeFraction: 0.94, height: 5.2, radius: 0.42 },
-  { z: -2.6, edgeFraction: 0.94, height: 5.2, radius: 0.42 },
+  { z: -3.2, edgeFraction: 0.94, height: 5.2, radius: 0.42 },
   { z: -7.4, edgeFraction: 0.86, height: 6.4, radius: 0.5 },
+  { z: -12.2, edgeFraction: 0.78, height: 7.4, radius: 0.58 },
 ];
 
 export interface PortalPillarInstance {
@@ -692,6 +704,257 @@ export function buildPortalPillarGeometry(): THREE.BufferGeometry {
   merged.computeVertexNormals();
   return merged;
 }
+
+// ── Підлога храму ───────────────────────────────────────────
+
+/** Скільки кілець плит лежить навколо подіуму. */
+const FLOOR_RINGS = 6;
+/** На скільки секторів поділене кожне кільце. */
+const FLOOR_SECTORS = 32;
+/** Де підлога починається і де закінчується, у світових одиницях. */
+const FLOOR_INNER = 2.1;
+const FLOOR_OUTER = 17;
+/** Ширина шва між плитами, у частках плити. */
+const FLOOR_JOINT = 0.055;
+
+/**
+ * Кам'яна підлога, викладена плитами по кільцях навколо подіуму.
+ *
+ * Досі за подіумом лежав один пласкій диск однієї барви на сорок два юніти —
+ * тобто підлоги не було взагалі, була заливка, яку з'їдав туман. Храм читається
+ * підлогою так само, як залою його роблять арки: поверхня без розкладки не має
+ * ні масштабу, ні напрямку, і око не має чим міряти відстань до колон.
+ *
+ * Кільцями, а не квадратною сіткою, і це не стилізація. Подіум круглий, друза
+ * стоїть на його осі, колони розходяться від неї — уся сцена концентрична, і
+ * квадратна плитка внесла б у неї другу, чужу вісь, яку видно рівно там, де
+ * вона розходиться з першою.
+ *
+ * Плити **не змикаються**: між ними лишається шов, крізь який видно темряву
+ * під підлогою. Шов і є те, що робить плиту плитою — без нього це суцільна
+ * поверхня, розфарбована смугами.
+ *
+ * Кільця розширюються назовні, бо перспектива стискає далеке: рівні по ширині
+ * кільця лягли б на екран усе густішими смугами й читались би як муар.
+ */
+export function buildPortalTempleFloorGeometry(seed: number): THREE.BufferGeometry {
+  const random = mulberry32(seed ^ 0x71a5);
+  const positions: number[] = [];
+  const colors: number[] = [];
+  const indices: number[] = [];
+
+  // Геометрична прогресія від внутрішнього краю до зовнішнього.
+  const growth = Math.pow(FLOOR_OUTER / FLOOR_INNER, 1 / FLOOR_RINGS);
+  for (let ring = 0; ring < FLOOR_RINGS; ring += 1) {
+    const inner = FLOOR_INNER * Math.pow(growth, ring);
+    const outer = FLOOR_INNER * Math.pow(growth, ring + 1);
+    const jointR = (outer - inner) * FLOOR_JOINT;
+    // Дальші кільця дістають менше секторів: плита, вужча за шов, — це шов.
+    const sectors = Math.max(8, Math.round(FLOOR_SECTORS / Math.pow(1.28, ring)));
+    const step = (Math.PI * 2) / sectors;
+    const jointA = step * FLOOR_JOINT;
+    // Кожне кільце зсунуте, щоб шви не збиралися в суцільні промені від осі —
+    // вони читалися б як тріщини, і то саме там, де ми вже маємо справжні.
+    const twist = random() * step;
+
+    for (let sector = 0; sector < sectors; sector += 1) {
+      const a0 = twist + sector * step + jointA;
+      const a1 = twist + (sector + 1) * step - jointA;
+      const r0 = inner + jointR;
+      const r1 = outer - jointR;
+      const first = positions.length / 3;
+      // Плити злегка різняться тоном — камінь, а не друк. Діапазон вузький:
+      // підлога мусить лишатись тлом, а строкатість тягне на себе увагу, яка
+      // тут належить кристалу.
+      const tone = 0.86 + random() * 0.28;
+      for (const [angle, radius] of [
+        [a0, r0], [a1, r0], [a1, r1], [a0, r1],
+      ] as const) {
+        positions.push(Math.sin(angle) * radius, 0, Math.cos(angle) * radius);
+        colors.push(tone, tone, tone);
+      }
+      indices.push(first, first + 2, first + 1, first, first + 3, first + 2);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+// ── Арки ────────────────────────────────────────────────────
+
+/**
+ * Скільки сегментів має половина стрілчастої арки.
+ *
+ * Вісім. Арка — це силует на тлі неба, а не поверхня, яку розглядають: усе, що
+ * від неї видно, — це лінія, де темний камінь межує зі світлим прорізом. Далі
+ * восьми сегментів додаються трикутники, яких на цій лінії не відрізнити.
+ */
+const ARCH_SEGMENTS = 8;
+
+/**
+ * Наскільки центр кола арки зміщений від осі прорізу, у частках півпрольоту.
+ *
+ * Це і є те, що робить арку **стрілчастою**, а не півкруглою. Стрілчаста арка —
+ * два дуги, чиї центри рознесені: кожна починається вертикально від капітелі й
+ * сходиться з іншою під кутом угорі. Нуль дав би римський півциркуль, який на
+ * референсі якраз не той — там гострий верх, і саме він тягне око вгору.
+ */
+const ARCH_POINT = 0.55;
+
+/** Товщина арки вздовж прольоту, у частках півпрольоту. */
+const ARCH_THICKNESS = 0.22;
+/** Наскільки арка глибша за колону, щоб не читалась як пласка накладка. */
+const ARCH_DEPTH = 1.05;
+
+/**
+ * Стрілчаста арка одиничного прольоту: півпроліт 1, п'ята на y=0, вістря вгорі.
+ *
+ * Будується як смуга — два кільця точок, внутрішнє й зовнішнє, — а не як
+ * витягнутий профіль: проліт у кожної пари колон свій, і смуга масштабується
+ * під нього по x, лишаючи товщину постійною по y. Витягування дало б арку, що
+ * товщає разом із прольотом.
+ *
+ * Одна геометрія на всі арки, як і в колон, щоб вони пішли одним
+ * InstancedMesh.
+ */
+export function buildPortalArchGeometry(): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const indices: number[] = [];
+
+  // Дуга правої половини: центр зміщено вліво від правої п'яти, тож дуга
+  // виходить із неї вертикально й приходить до осі під кутом.
+  const centerX = -ARCH_POINT;
+  const radius = 1 - centerX;
+  // Кут, під яким дуга перетинає вісь прольоту, — там вона й обривається,
+  // зустрічаючись із дзеркальною половиною.
+  const meetAngle = Math.acos(-centerX / radius);
+
+  const ring = (offset: number): number => {
+    const first = positions.length / 3;
+    for (let step = 0; step <= ARCH_SEGMENTS; step += 1) {
+      const angle = (step / ARCH_SEGMENTS) * meetAngle;
+      positions.push(
+        centerX + Math.cos(angle) * (radius + offset),
+        Math.sin(angle) * (radius + offset),
+        0,
+      );
+    }
+    return first;
+  };
+  const inner = ring(0);
+  const outer = ring(ARCH_THICKNESS);
+  for (let step = 0; step < ARCH_SEGMENTS; step += 1) {
+    const a = inner + step;
+    const b = inner + step + 1;
+    const c = outer + step;
+    const d = outer + step + 1;
+    indices.push(a, c, b, b, c, d);
+  }
+
+  const half = new THREE.BufferGeometry();
+  half.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  half.setIndex(indices);
+
+  // Дзеркало по x дає ліву половину. Віддзеркалення обертає намотку, тож
+  // індекси розвертаються назад — інакше половина арки зникає під відсіканням
+  // задніх граней.
+  const mirrored = half.clone();
+  const mirroredPositions = mirrored.getAttribute('position');
+  for (let index = 0; index < mirroredPositions.count; index += 1) {
+    mirroredPositions.setX(index, -mirroredPositions.getX(index));
+  }
+  const mirroredIndex = Array.from(mirrored.getIndex()!.array);
+  for (let offset = 0; offset < mirroredIndex.length; offset += 3) {
+    const swap = mirroredIndex[offset]!;
+    mirroredIndex[offset] = mirroredIndex[offset + 2]!;
+    mirroredIndex[offset + 2] = swap;
+  }
+  mirrored.setIndex(mirroredIndex);
+
+  const flat = mergeGeometries([half, mirrored]);
+  half.dispose();
+  mirrored.dispose();
+  if (flat === null) throw new Error('Portal arch geometry could not be merged.');
+
+  // Товщина по z. Без неї арка — площина, яка зникає, щойно камера відходить
+  // від осі, а колонада на широкому екрані дивиться на глядача збоку.
+  const solid = mergeGeometries([
+    flat.clone().translate(0, 0, ARCH_DEPTH * 0.5),
+    flat.clone().translate(0, 0, -ARCH_DEPTH * 0.5),
+  ]);
+  flat.dispose();
+  if (solid === null) throw new Error('Portal arch geometry could not be extruded.');
+  solid.computeVertexNormals();
+  return solid;
+}
+
+export interface PortalArchInstance {
+  position: readonly [number, number, number];
+  scale: readonly [number, number, number];
+}
+
+/**
+ * Арки над задніми парами колон.
+ *
+ * Тільки над задніми, і це не економія. Арка над передньою парою пройшла б
+ * через кадр рівно там, де стоїть кристал, — колонада перетворилась би на
+ * ґрати перед ним. Задні натомість роблять те, заради чого їх узято з
+ * референсу: змикають колони в **залу** й кадрують небо у високі прорізи, що
+ * ведуть око вниз до подіуму.
+ *
+ * П'ята арки стоїть на капітелі своєї пари, а проліт — це відстань між
+ * внутрішніми гранями колон, тож арка тримається колонади на будь-якому
+ * аспекті, замість того щоб мати власний розмір.
+ */
+export function portalArchInstances(
+  frame: PortalCameraFrame,
+  aspect: number,
+): PortalArchInstance[] {
+  const instances: PortalArchInstance[] = [];
+  for (const placement of PORTAL_PILLARS) {
+    if (placement.z > -1) continue;
+    const depth = Math.max(0.1, frame.distance - placement.z);
+    const axis = portalHalfWidthAt(depth, aspect) * placement.edgeFraction + placement.radius;
+    const span = Math.max(0.4, axis - placement.radius);
+    instances.push({
+      position: [
+        0,
+        PORTAL_GROUND_Y - PORTAL_FIELD_DROP + placement.height * ARCH_SPRING,
+        placement.z,
+      ],
+      // Півпроліт по x, а підйом — **світові одиниці**, не частка прольоту.
+      // Колони роз'їжджаються з аспектом, тож проліт на широкому екрані втричі
+      // ширший, ніж на телефоні; підйом, прив'язаний до нього, або лишав арку
+      // над кадром на широкому, або чіпляв кристал на вузькому. У справжній
+      // залі арка одна, а кадр її обрізає — сталий підйом і є цим.
+      scale: [span, ARCH_RISE, placement.radius],
+    });
+  }
+  return instances;
+}
+
+/**
+ * На якій частці висоти колони лежить п'ята арки.
+ *
+ * Не під капітеллю, хоч архітектурно їй там і місце. Колони навмисно вищі за
+ * кадр — вони мусять виходити за верхній край, щоб зала не мала стелі, — і
+ * п'ята, поставлена під капітеллю, опинялась на y≈2.8 при верхньому краї кадру
+ * 3.28, тобто арки не було видно взагалі. Виміряно, а не вгадано.
+ */
+const ARCH_SPRING = 0.49;
+/**
+ * Підйом арки над п'ятою, у світових одиницях.
+ *
+ * Опущено з 2.4: вістря опинялось під шапкою інтерфейсу, тобто арка була в
+ * кадрі, але не на екрані. Портал — це не рендер у вакуумі, і верхня третина
+ * його вікна зайнята текстом.
+ */
+const ARCH_RISE = 1.6;
 
 // ── Світло на колонах ───────────────────────────────────────
 
