@@ -229,17 +229,23 @@ describe('Crystal organic profile phase 3a', () => {
     expect(profile.burialStartY).toBe(0);
     expect(profile.burialCompression).toBe(1);
     expect(Math.abs(profile.twistTotal)).toBeGreaterThanOrEqual(0.11);
-    expect(leanMagnitude).toBeGreaterThanOrEqual(mother.renderedRadius * 0.129);
+    // Lean ceiling dropped from 0.26 to 0.09 of the radius (2026-08-03): the
+    // monarch is the colony's axis and has to read as near-vertical. It still
+    // leans — a perfectly upright crystal reads as placed rather than grown.
+    expect(leanMagnitude).toBeGreaterThan(0);
+    expect(leanMagnitude).toBeLessThanOrEqual(mother.renderedRadius * 0.09);
     // Cross-section rounded from 1.44:1 to 1.18:1 and the taper extended into
     // one extra row (2026-08-02 monarch reshape) — the monarch was reading as
     // a flat slab with a capped cylinder silhouette. Asymmetry is retained
     // deliberately; it just no longer dominates the shape.
     expect(profile.scaleX).toBe(0.9);
     expect(profile.scaleZ).toBe(1.06);
-    // Eight rows became ten in the faceting pass (2026-08-02): the shaft ran
-    // from 0.12 to 0.62 of its height without a single horizontal edge, and
-    // that unbroken stretch is what read as a ball.
-    expect(profile.rows).toHaveLength(10);
+    // Row count is no longer fixed: the crown carries zero to two extra
+    // bevels per body (2026-08-03 reference pass), so a monarch has nine to
+    // eleven slices. What must hold is that the shaft never runs without a
+    // horizontal edge in it — that unbroken stretch is what read as a ball.
+    expect(profile.rows.length).toBeGreaterThanOrEqual(9);
+    expect(profile.rows.length).toBeLessThanOrEqual(11);
   });
 
   it('keeps the facet count off the level-of-detail knob', () => {
@@ -262,15 +268,20 @@ describe('Crystal organic profile phase 3a', () => {
     expect(buildCrystalProfile(tooMany, 'high').segments).toBeLessThanOrEqual(24);
   });
 
-  it('tapers the monarch continuously instead of holding a cylinder', () => {
-    // The monarch is the composition's focal point, so its silhouette carries
-    // the most weight. Holding near-full radius up the shaft and then cutting
-    // to a point reads as a capped column rather than a spire.
+  it('builds the monarch as a prism with a shoulder, not as a bullet', () => {
+    // Semantic change (2026-08-03, reference pass): the monarch used to be
+    // widest at 12% of its height and taper from there. That is a bullet — and
+    // it is why the owner still read it as "a ball sticking out of the ground"
+    // after the faceting pass: no amount of facets rescues a silhouette with no
+    // straight run and no corner in it.
+    //
+    // The reference crystals are narrower at the base, swell gently up the
+    // shaft, and break at a shoulder into a short sharp termination. That
+    // shoulder is the widest point and it sits high.
     //
     // Measured on radiusX, the actual rendered ellipse radius. `row.radius` is
     // the conservative trim envelope — it folds in the axis-lean offset, which
-    // grows up the body, so it is not a silhouette measurement and can peak
-    // above the true shoulder.
+    // grows up the body, so it is not a silhouette measurement.
     const profile = buildCrystalProfile(motherBody(), 'high');
     const rows = profile.rows;
     const top = rows[rows.length - 1]!.y;
@@ -280,12 +291,10 @@ describe('Crystal organic profile phase 3a', () => {
     );
     const widest = rows[widestIndex]!.radiusX;
 
-    // The shoulder sits low on the body, not halfway up it.
-    expect(rows[widestIndex]!.y).toBeLessThan(top * 0.3);
+    // The shoulder sits where a quartz termination begins.
+    expect(rows[widestIndex]!.y / top).toBeGreaterThanOrEqual(0.6);
+    expect(rows[widestIndex]!.y / top).toBeLessThanOrEqual(0.82);
 
-    // Sample the silhouette rather than asserting strict row-to-row descent:
-    // the profile carries deliberate per-row asymmetry noise, and demanding
-    // monotonicity would be asserting that noise away.
     const radiusNear = (fraction: number): number => {
       const targetY = top * fraction;
       return rows.reduce(
@@ -296,9 +305,62 @@ describe('Crystal organic profile phase 3a', () => {
       ).radiusX;
     };
 
-    expect(radiusNear(0.6)).toBeLessThan(widest * 0.9);
-    expect(radiusNear(0.8)).toBeLessThan(widest * 0.7);
+    // Narrow at the base, and the swell is gentle — under a third of the
+    // radius across the whole shaft, so the sides still read as parallel.
+    expect(radiusNear(0)).toBeLessThan(widest * 0.85);
+    expect(radiusNear(0)).toBeGreaterThan(widest * 0.6);
+    expect(radiusNear(0.5)).toBeGreaterThan(radiusNear(0));
+    expect(radiusNear(0.5)).toBeLessThan(widest);
+
+    // And the termination is short and decisive rather than a long fade.
     expect(radiusNear(1)).toBeLessThan(widest * 0.1);
+  });
+
+  it('gives each crystal its own crown instead of one stamped shape', () => {
+    // Shoulder height and the number of secondary faces vary per body, so a
+    // colony does not read as one model placed several times.
+    const shoulders = new Set<number>();
+    const crownRowCounts = new Set<number>();
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const profile = buildCrystalProfile({ ...motherBody(), seed: seed * 7919 }, 'high');
+      const rows = profile.rows;
+      const top = rows[rows.length - 1]!.y;
+      const widestIndex = rows.reduce(
+        (best, row, index) => (row.radiusX > rows[best]!.radiusX ? index : best),
+        0,
+      );
+      const share = rows[widestIndex]!.y / top;
+
+      // Every crystal keeps a real shoulder in the documented band.
+      expect(share).toBeGreaterThanOrEqual(0.6);
+      expect(share).toBeLessThanOrEqual(0.82);
+      shoulders.add(Math.round(share * 100));
+      crownRowCounts.add(rows.length - widestIndex);
+    }
+
+    expect(shoulders.size).toBeGreaterThan(5);
+    // Zero to two extra bevels means three distinct crown row counts.
+    expect(crownRowCounts.size).toBeGreaterThan(1);
+  });
+
+  it('keeps the monarch nearer vertical than the crystals around it', () => {
+    // The monarch is the axis of the colony. Its lean used to be the largest of
+    // any body (0.26 against 0.1 for a default child) — the one crystal that
+    // has to read as the centre was leaning hardest while the children it
+    // should have leaned against stood straight.
+    const leanOf = (body: Parameters<typeof buildCrystalProfile>[0]): number => {
+      const profile = buildCrystalProfile(body, 'high');
+      return Math.hypot(profile.axisLeanX, profile.axisLeanZ) / body.renderedRadius;
+    };
+
+    let motherLeans = 0;
+    let childLeans = 0;
+    for (let seed = 1; seed <= 30; seed += 1) {
+      motherLeans += leanOf({ ...motherBody(), seed: seed * 6151 });
+      childLeans += leanOf({ ...crystalBody(), seed: seed * 6151 });
+    }
+
+    expect(motherLeans / 30).toBeLessThan(childLeans / 30);
   });
 
   it('tests trim occupancy against the bent elliptical shell, not a straight radius envelope', () => {

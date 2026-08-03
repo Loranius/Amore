@@ -83,14 +83,19 @@ function profileScales(archetype: string): { scaleX: number; scaleZ: number } {
 function shapeTuning(archetype: string, mother: boolean): ProfileShapeTuning {
   // The mother crystal is the dominant mobile silhouette. Phase 3A must remain
   // clearly readable even at low LOD instead of being limited to sub-pixel noise.
-  if (mother) return { asymmetry: 0.18, twist: 0.2, lean: 0.26, phase: 0.08 };
-  if (archetype === 'blade') return { asymmetry: 0.18, twist: 0.14, lean: 0.18, phase: 0.09 };
-  if (archetype === 'tabular') return { asymmetry: 0.14, twist: 0.1, lean: 0.12, phase: 0.07 };
-  if (archetype === 'needle') return { asymmetry: 0.06, twist: 0.16, lean: 0.14, phase: 0.055 };
-  if (archetype === 'massive') return { asymmetry: 0.12, twist: 0.075, lean: 0.08, phase: 0.05 };
-  if (archetype === 'fan') return { asymmetry: 0.17, twist: 0.18, lean: 0.2, phase: 0.095 };
-  if (archetype === 'etched') return { asymmetry: 0.16, twist: 0.17, lean: 0.15, phase: 0.11 };
-  return { asymmetry: 0.09, twist: 0.11, lean: 0.1, phase: 0.055 };
+  // The monarch is the axis of the colony: central, tallest, and near-vertical.
+  // Its lean used to be the *largest* of any body (0.26 against 0.1 for a
+  // default child), which is backwards — the one crystal that has to read as
+  // the centre was the one leaning hardest, and the children it should have
+  // been leaning against stood straight.
+  if (mother) return { asymmetry: 0.18, twist: 0.2, lean: 0.09, phase: 0.08 };
+  if (archetype === 'blade') return { asymmetry: 0.18, twist: 0.14, lean: 0.24, phase: 0.09 };
+  if (archetype === 'tabular') return { asymmetry: 0.14, twist: 0.1, lean: 0.16, phase: 0.07 };
+  if (archetype === 'needle') return { asymmetry: 0.06, twist: 0.16, lean: 0.2, phase: 0.055 };
+  if (archetype === 'massive') return { asymmetry: 0.12, twist: 0.075, lean: 0.12, phase: 0.05 };
+  if (archetype === 'fan') return { asymmetry: 0.17, twist: 0.18, lean: 0.26, phase: 0.095 };
+  if (archetype === 'etched') return { asymmetry: 0.16, twist: 0.17, lean: 0.2, phase: 0.11 };
+  return { asymmetry: 0.09, twist: 0.11, lean: 0.2, phase: 0.055 };
 }
 
 function signedUnit(seed: number, label: string): number {
@@ -108,32 +113,97 @@ function appendBaseRow(rows: BaseProfileRow[], y: number, radius: number): void 
   rows.push({ y: safeY, radius: safeRadius });
 }
 
-function buildMotherRows(length: number, radius: number): BaseProfileRow[] {
-  const rows: BaseProfileRow[] = [];
-  // A double-terminated prism that reads as a spire rather than a column.
-  // The previous profile held ~98% of full radius all the way to 66% of its
-  // height and then dropped to a point over the last third, which silhouettes
-  // as a fat cylinder with a cap stuck on top — the "too flat, too massive"
-  // note from visual QA (2026-08-02). Natural quartz terminations taper
-  // continuously, so the widest point now sits low and every row above it
-  // steps inward, giving one uninterrupted line from shoulder to tip.
-  //
-  // Ten slices rather than eight. The two extra sit in the long gaps of the
-  // shaft (0.12→0.40 and 0.40→0.62), which is where the old profile ran
-  // hundreds of pixels without a single horizontal edge — the stretch that
-  // read as a smooth ball. Each slice turns and drifts on its own, so a slice
-  // is not detail for its own sake: it is another place the surface can break.
-  appendBaseRow(rows, 0, radius * 0.16);
-  appendBaseRow(rows, length * 0.05, radius * 0.74);
-  appendBaseRow(rows, length * 0.12, radius);
-  appendBaseRow(rows, length * 0.26, radius * 0.975);
-  appendBaseRow(rows, length * 0.4, radius * 0.93);
-  appendBaseRow(rows, length * 0.51, radius * 0.865);
-  appendBaseRow(rows, length * 0.62, radius * 0.78);
-  appendBaseRow(rows, length * 0.8, radius * 0.54);
-  appendBaseRow(rows, length * 0.92, radius * 0.27);
-  appendBaseRow(rows, length, radius * 0.018);
-  return rows;
+/**
+ * Where the shaft ends and the termination begins, as a fraction of the body's
+ * own height. Seeded per body so no two crystals in a colony carry the same
+ * crown.
+ */
+const SHOULDER_MIN = 0.65;
+const SHOULDER_MAX = 0.78;
+
+/**
+ * Radius at the base, as a fraction of the widest point.
+ *
+ * The reference crystals are narrower where they leave the ground and widen
+ * gently on the way up. The previous profile did the opposite: widest at 12% of
+ * its height and tapering from there, which is a bullet, not a prism — and read
+ * as "a ball sticking out of the ground" no matter how well it was faceted.
+ * The widest point is now the shoulder, and this is where the crystal starts.
+ */
+const BASE_WAIST = 0.76;
+
+/**
+ * How far under the shoulder every slice below it must stay. Small enough that
+ * the shaft still swells visibly, large enough that the widest slice is never
+ * ambiguous.
+ */
+const SHOULDER_CLEARANCE = 0.985;
+
+function shoulderFraction(seed: number): number {
+  return SHOULDER_MIN + seededUnit(seed, 'geometry:shoulder') * (SHOULDER_MAX - SHOULDER_MIN);
+}
+
+/**
+ * How many extra cut planes this crystal carries in its termination.
+ *
+ * A quartz point is rarely a clean pyramid: most have one or two secondary
+ * faces between the shaft and the tip. Zero to two, seeded, so crowns differ
+ * from crystal to crystal without any of them becoming a pincushion.
+ */
+function extraBevelCount(seed: number): number {
+  return Math.floor(seededUnit(seed, 'geometry:crown-bevels') * 3);
+}
+
+/**
+ * The shared crystal profile: a narrow base, a shaft that widens gently to a
+ * shoulder, then a short sharp termination.
+ *
+ * One builder for the monarch and for every child. They differ in height,
+ * girth, facet count, shoulder height and tip bluntness — not in what kind of
+ * shape they are. A colony whose members are built by different code is a
+ * colony whose members read as different objects.
+ */
+function appendPrismRows(
+  rows: BaseProfileRow[],
+  options: {
+    seed: number;
+    bodyStart: number;
+    length: number;
+    radius: number;
+    tipRadius: number;
+    shoulderShare: number;
+  },
+): void {
+  const { seed, bodyStart, length, radius, tipRadius, shoulderShare } = options;
+  const at = (fraction: number): number => bodyStart + length * fraction;
+
+  // Shaft: a gentle swell rather than a taper. The whole rise is under a third
+  // of the radius, so the silhouette still reads as parallel-sided from a
+  // distance — which is what makes it a prism instead of a spindle.
+  appendBaseRow(rows, at(0), radius * BASE_WAIST);
+  appendBaseRow(rows, at(shoulderShare * 0.08), radius * 0.83);
+  appendBaseRow(rows, at(shoulderShare * 0.24), radius * 0.88);
+  appendBaseRow(rows, at(shoulderShare * 0.48), radius * 0.93);
+  appendBaseRow(rows, at(shoulderShare * 0.76), radius * 0.97);
+  appendBaseRow(rows, at(shoulderShare), radius);
+
+  // Termination. The crown is short — under a third of the height — so the
+  // edge where it meets the shaft is a real corner rather than the start of a
+  // long fade.
+  const crown = Math.max(1e-6, 1 - shoulderShare);
+  const bevels = extraBevelCount(seed);
+  const crownRows = 2 + bevels;
+  for (let step = 1; step <= crownRows; step += 1) {
+    const along = step / (crownRows + 1);
+    // Slightly convex: the termination narrows faster near the tip than near
+    // the shoulder, the way a real point does.
+    appendBaseRow(
+      rows,
+      at(shoulderShare + crown * along),
+      radius * (1 - Math.pow(along, 0.82)) * 0.97 + tipRadius * along,
+    );
+  }
+  appendBaseRow(rows, at(1), tipRadius);
 }
 
 function smoothStep(value: number): number {
@@ -234,8 +304,21 @@ function decorateRows(
   const bowX = signedUnit(body.seed, 'geometry:axis-bow-x') * Math.abs(axisLeanX + axisLeanZ) * 0.35;
   const bowZ = signedUnit(body.seed, 'geometry:axis-bow-z') * Math.abs(axisLeanX + axisLeanZ) * 0.35;
   const minimumScale = Math.max(0.0001, Math.min(scales.scaleX, scales.scaleZ));
+  // The shoulder is the widest slice of the base profile, and it has to stay
+  // the widest slice of the finished one. The per-slice swing is 5-10% while
+  // the shaft rises only 4-5% between rows, so without this a shaft slice can
+  // out-swell the shoulder — and a crystal whose widest point sits a third of
+  // the way up has no shoulder at all, which is the whole silhouette gone.
+  //
+  // Capping rather than shrinking the swing: the swing is what keeps the shaft
+  // from reading as a machined tube, and it is only ever wrong when it crosses
+  // this one line.
+  const shoulderIndex = rows.reduce(
+    (best, row, index) => (row.radius > rows[best]!.radius ? index : best),
+    0,
+  );
 
-  return rows.map((row, rowIndex) => {
+  const raw = rows.map((row, rowIndex) => {
     const t = Math.max(0, Math.min(1, row.y / lastY));
     const bend = Math.sin(Math.PI * t);
     // Each slice also steps sideways on its own. The lean and the bow are
@@ -272,9 +355,33 @@ function decorateRows(
       0.0001,
       row.radius * scales.scaleZ * compression * (1 - pulse + rowNoiseZ),
     );
-    const offsetEnvelope = Math.hypot(centerOffsetX, centerOffsetZ) / minimumScale;
+    return {
+      baseRadius: row.radius,
+      y: row.y,
+      radiusX,
+      radiusZ,
+      centerOffsetX,
+      centerOffsetZ,
+      rotation,
+      facetPhase,
+    };
+  });
+
+  // Enforce the shoulder. Clamping the finished radii rather than trimming the
+  // swing that produced them, because the swing is not the only thing that can
+  // cross the line: the elliptical pulse and the burial compression move a
+  // slice too, and an earlier attempt that only tamed the swing still let the
+  // pulse hand the widest radius to a slice a third of the way up.
+  const shoulderX = raw[shoulderIndex]?.radiusX ?? 0;
+  const shoulderZ = raw[shoulderIndex]?.radiusZ ?? 0;
+
+  return raw.map((row, rowIndex) => {
+    const capped = rowIndex < shoulderIndex;
+    const radiusX = capped ? Math.min(row.radiusX, shoulderX * SHOULDER_CLEARANCE) : row.radiusX;
+    const radiusZ = capped ? Math.min(row.radiusZ, shoulderZ * SHOULDER_CLEARANCE) : row.radiusZ;
+    const offsetEnvelope = Math.hypot(row.centerOffsetX, row.centerOffsetZ) / minimumScale;
     const conservativeRadius = Math.max(
-      row.radius,
+      row.baseRadius,
       radiusX / Math.max(0.0001, scales.scaleX),
       radiusZ / Math.max(0.0001, scales.scaleZ),
     ) + offsetEnvelope;
@@ -284,10 +391,10 @@ function decorateRows(
       radius: round6(conservativeRadius),
       radiusX: round6(radiusX),
       radiusZ: round6(radiusZ),
-      centerOffsetX: round6(centerOffsetX),
-      centerOffsetZ: round6(centerOffsetZ),
-      rotation: round6(rotation),
-      facetPhase: round6(facetPhase),
+      centerOffsetX: round6(row.centerOffsetX),
+      centerOffsetZ: round6(row.centerOffsetZ),
+      rotation: round6(row.rotation),
+      facetPhase: round6(row.facetPhase),
     };
   });
 }
@@ -316,51 +423,38 @@ export function buildCrystalProfile(
     : body.anchor;
   const radius = Math.max(0.0001, body.renderedRadius);
   const bodyStart = extraSink;
-  const baseRows: BaseProfileRow[] = mother
-    ? buildMotherRows(body.renderedLength, radius)
-    : [];
+  const baseRows: BaseProfileRow[] = [];
 
-  if (!mother) {
-    const prismEnd = bodyStart + body.renderedLength * (
-      archetype === 'tabular' || archetype === 'massive'
-        ? 0.66
-        : 0.58 + seededUnit(body.seed, 'geometry:prism-end') * 0.08
-    );
-    const pointStart = Math.max(
-      prismEnd + body.renderedLength * 0.1,
-      bodyStart + body.renderedLength * (0.72 + seededUnit(body.seed, 'geometry:point-start') * 0.05),
-    );
-    const blunt = archetype === 'tabular' || archetype === 'massive';
-    const broken = archetype === 'etched';
-    const tipRadius = broken
-      ? radius * 0.3
-      : blunt
-        ? radius * 0.16
-        : radius * 0.018;
+  // Blunt and broken terminations still exist — they are what makes a colony
+  // read as grown rather than manufactured — but they are now variations on
+  // one prism, not separate shapes.
+  const blunt = !mother && (archetype === 'tabular' || archetype === 'massive');
+  const broken = !mother && archetype === 'etched';
+  const tipRadius = broken
+    ? radius * 0.3
+    : blunt
+      ? radius * 0.16
+      : radius * 0.018;
 
-    if (attached) {
-      const buriedBase = Math.min(radius * 0.18, Math.max(radius * 0.055, extraSink * 0.28));
-      appendBaseRow(baseRows, 0, buriedBase);
-      appendBaseRow(baseRows, extraSink * 0.5, radius * 0.42);
-      appendBaseRow(baseRows, extraSink, radius * 0.82);
-    } else {
-      appendBaseRow(baseRows, 0, radius * 0.7);
-    }
-
-    appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.05, radius * 0.9);
-    appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.14, radius);
-    // Same reason as the monarch: the shaft used to run from 0.14 to ~0.6 with
-    // no horizontal edge in it at all.
-    appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.3, radius * 0.985);
-    appendBaseRow(baseRows, bodyStart + body.renderedLength * 0.44, radius * 0.97);
-    appendBaseRow(
-      baseRows,
-      prismEnd,
-      radius * (0.95 + seededUnit(body.seed, 'geometry:prism-radius') * 0.04),
-    );
-    appendBaseRow(baseRows, pointStart, radius * (broken ? 0.58 : 0.86));
-    appendBaseRow(baseRows, bodyStart + body.renderedLength * (broken ? 0.86 : 1), tipRadius);
+  if (attached) {
+    // The buried run below the host surface stays narrow: it is the part that
+    // has to disappear into the rock without showing a rim.
+    const buriedBase = Math.min(radius * 0.18, Math.max(radius * 0.055, extraSink * 0.28));
+    appendBaseRow(baseRows, 0, buriedBase);
+    appendBaseRow(baseRows, extraSink * 0.5, radius * 0.42);
+    appendBaseRow(baseRows, extraSink, radius * 0.68);
   }
+
+  appendPrismRows(baseRows, {
+    seed: body.seed,
+    bodyStart,
+    length: body.renderedLength,
+    radius,
+    tipRadius,
+    // A broken crystal has lost its point, so what is left of it is nearly all
+    // shaft.
+    shoulderShare: broken ? 0.88 : shoulderFraction(body.seed),
+  });
 
   // The monarch keeps a slight elliptical cross-section so it never reads as a
   // machined cylinder, but 0.78/1.12 was a 1.44:1 slab that looked flat from
