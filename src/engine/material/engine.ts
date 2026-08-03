@@ -315,14 +315,30 @@ function shaderRecipe(
     auroraDepth: 1,
     // One grain for the whole colony: a year crystal shows fewer cells of the
     // same size rather than a shrunk-to-fit copy of the pattern.
-    surfaceTextureScale: micro ? 0 : round6(textureTier(SURFACE_CELLS_PER_UNIT, preset)),
+    // No surface map on a crystal. Not a budget decision — the maps are still
+    // loaded and the vein still wears them.
+    //
+    // A grown crystal face is *clean*: that is what makes it a face rather than
+    // a fracture, and every reference the owner supplied shows it — flat planes,
+    // a painted rim, and whatever structure there is living inside the body
+    // rather than on it. A cellular map wrapped over the outside reads as hide
+    // at the size the portal draws a crystal, which is what it was doing, and it
+    // was also the last thing flattening the facets: a pattern that crosses an
+    // edge tells the eye the two planes are one surface.
+    //
+    // What it was there for is still there, procedurally and *within* the stone:
+    // the veils (`veilStrength`) are a 3D field, so they cloud the body without
+    // ever crossing a facet edge.
+    surfaceTextureScale: 0,
     // Light. The map is a mineral's grain, and a grain that stands up off the
     // surface stops reading as stone and starts reading as hide — the crystal
     // wants its relief in the facets, which the geometry already provides.
-    surfaceReliefStrength: micro ? 0 : round6(textureTier(0.22, preset)),
+    // Nothing to give relief to once the map is off, and a normal map without
+    // an albedo to agree with is just a rippled plane.
+    surfaceReliefStrength: 0,
     // The veins glow in the colour the couple earned, not in the map's own —
     // the map is structure, ADR-0004 owns the colour.
-    surfaceVeinStrength: micro ? 0 : round6(textureTier(0.6 + wishDepth(tint) * 0.7, preset)),
+    surfaceVeinStrength: 0,
     // Every tier, including fallback, and that is the point of it: this is the
     // one cue that costs nothing and does not depend on the lighting, so it is
     // the last thing that should be switched off on a weak phone rather than
@@ -330,6 +346,10 @@ function shaderRecipe(
     // because its facets are outlined by the surface itself.
     facetEdgeStrength: round6(micro ? 0 : emphasized ? 0.34 : focal ? 0.28 : 0.22),
     facetEdgeWidth: 1.4,
+    // Off on the smallest bodies for the usual reason — a gradient across nine
+    // pixels is a colour shift nobody reads as one.
+    axialTintStrength: round6(micro ? 0 : 0.55),
+    footColor: coreTintColor(emissiveColor, tint),
   };
 }
 
@@ -513,13 +533,22 @@ function buildBodyMaterial(
   // makes a facet visible is the light it reflects rather than the light behind
   // it. The smallest bodies stay solid — at their size transparency is a sort
   // order risk bought for pixels nobody can resolve.
-  const opacity = micro
-    ? 1
-    : round6(clamp01(
-      SHELL_OPACITY.min
-      + (SHELL_OPACITY.max - SHELL_OPACITY.min)
-        * clamp01(1 - state.purity * 0.55 - pressures.refinement * 0.25 + state.fracture * 0.3),
-    ));
+  // Opaque. Not nearly opaque — opaque.
+  //
+  // The band above is what a couple's clarity *would* buy if the shell were
+  // see-through, and it is kept because the reasoning is sound and the door may
+  // reopen. It is not spent: every reference crystal is opaque, none of them
+  // lose anything by it, and the light the couple earned never needed alpha in
+  // the first place — the core term adds it to the outgoing colour rather than
+  // letting the background through, so a sealed shell still glows.
+  //
+  // Being genuinely opaque also retires a real hazard rather than a cosmetic
+  // one. Alpha blending needs back-to-front ordering, and batching groups bodies
+  // by material signature, so within one batch there was no order at all
+  // (ADR-0007's standing risk). At `transparent: false` the depth buffer does
+  // the work and the question cannot be asked.
+  void SHELL_OPACITY;
+  const opacity = 1;
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
     bodyId,
@@ -558,7 +587,7 @@ function buildBodyMaterial(
     // is refractive. See ADR-0007.
     transmission: 0,
     opacity,
-    transparent: opacity < 1,
+    transparent: false,
     // Kept on. Each body is convex and back faces are culled, so a crystal
     // covers each of its own pixels exactly once and needs no sorting with
     // itself; writing depth is what stops one crystal's far side showing
@@ -720,6 +749,10 @@ function buildSubstrateMaterial(
       // less on a fracture than quartz does on a grown face.
       facetEdgeStrength: 0.12,
       facetEdgeWidth: 1.4,
+      // The rock has no foot and no tip: it is broken rubble, not a grown body,
+      // and there is no axis for a gradient to run along.
+      axialTintStrength: 0,
+      footColor: baseColor,
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

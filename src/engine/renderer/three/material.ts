@@ -35,6 +35,8 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.surfaceVeinStrength.toFixed(6),
     recipe.facetEdgeStrength.toFixed(6),
     recipe.facetEdgeWidth.toFixed(6),
+    recipe.axialTintStrength.toFixed(6),
+    rgbKey(recipe.footColor),
   ].join('|');
 }
 
@@ -56,12 +58,15 @@ varying vec3 vEvolutionObject;
 varying vec3 vEvolutionObjectNormal;
 attribute vec3 evolutionEdge;
 varying vec3 vEvolutionEdge;
+attribute float evolutionAxial;
+varying float vEvolutionAxial;
 `;
 
 const VERTEX_BODY = /* glsl */ `
   vEvolutionObject = position;
   vEvolutionObjectNormal = normal;
   vEvolutionEdge = evolutionEdge;
+  vEvolutionAxial = evolutionAxial;
 `;
 
 const FRAGMENT_PARS = /* glsl */ `
@@ -85,6 +90,9 @@ uniform float uEvolutionAuroraDepth;
 uniform float uEvolutionPhase;
 uniform float uEvolutionFacetEdgeStrength;
 uniform float uEvolutionFacetEdgeWidth;
+uniform float uEvolutionAxialTintStrength;
+uniform vec3 uEvolutionFootColor;
+varying float vEvolutionAxial;
 varying vec3 vEvolutionObject;
 varying vec3 vEvolutionObjectNormal;
 varying vec3 vEvolutionEdge;
@@ -233,6 +241,28 @@ const FRAGMENT_BODY = /* glsl */ `
   // the same term arriving as reflection rather than as opacity.
   outgoingLight += uEvolutionRimColor * evolutionFresnel * uEvolutionGlassStrength * 0.55;
 
+  // ── Foot to tip ───────────────────────────────────────────
+  // Every stylized reference crystal changes colour along its length: one hue
+  // where it left the rock, another at the point. It is a real habit — a
+  // phantom, or a change in what the fluid carried while the crystal grew — and
+  // it is a large part of why a reference gem reads as grown rather than
+  // moulded. A body of one flat colour reads as moulded however well it is lit.
+  //
+  // Both ends come from the couple. The foot takes the deepened core colour,
+  // which is what the granted wishes made (ADR-0004); the tip keeps the shell's
+  // own. So the gradient is the earned colour changing depth along the crystal,
+  // never a second colour introduced from outside it.
+  if ( uEvolutionAxialTintStrength > 0.0001 ) {
+    // Weighted toward the foot: a phantom sits low and fades out, it does not
+    // meet the tip halfway.
+    float evolutionFoot = pow( 1.0 - clamp( vEvolutionAxial, 0.0, 1.0 ), 1.8 );
+    outgoingLight = mix(
+      outgoingLight,
+      outgoingLight * uEvolutionFootColor,
+      evolutionFoot * uEvolutionAxialTintStrength
+    );
+  }
+
   // ── The facet's own rim ───────────────────────────────────
   // Drawn, not lit, and that is the whole point. Three stylized gem assets the
   // owner supplied all outline every facet in the surface itself — in albedo,
@@ -319,6 +349,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     && recipe.glassStrength <= 0
     && recipe.auroraStrength <= 0
     && recipe.facetEdgeStrength <= 0
+    && recipe.axialTintStrength <= 0
   ) return;
 
   material.onBeforeCompile = (shader) => {
@@ -342,6 +373,8 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionPhase'] = { value: 0 };
     shader.uniforms['uEvolutionFacetEdgeStrength'] = { value: recipe.facetEdgeStrength };
     shader.uniforms['uEvolutionFacetEdgeWidth'] = { value: recipe.facetEdgeWidth };
+    shader.uniforms['uEvolutionAxialTintStrength'] = { value: recipe.axialTintStrength };
+    shader.uniforms['uEvolutionFootColor'] = { value: toColor(recipe.footColor) };
     // Handed back so the life frame can advance it. Without a moving phase the
     // two colours sit still and the fissure is a lamp in a slot, not an aurora.
     material.userData['evolutionPhaseUniform'] = shader.uniforms['uEvolutionPhase'];

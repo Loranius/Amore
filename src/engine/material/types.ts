@@ -142,6 +142,19 @@ export interface CrystalShaderRecipe {
    * the body shrank, until a year crystal was more outline than crystal.
    */
   facetEdgeWidth: number;
+  /**
+   * How strongly the body's foot is tinted away from its tip.
+   *
+   * Every stylized reference crystal carries a colour that changes along its
+   * length, and a body of one flat colour reads as moulded however well it is
+   * lit. Both ends stay the couple's: the foot takes the deepened core colour
+   * the granted wishes made (ADR-0004), the tip keeps the shell's own, so this
+   * is the earned colour changing depth rather than a second colour brought in
+   * from outside.
+   */
+  axialTintStrength: number;
+  /** What the foot is tinted toward — a multiplier over the outgoing colour. */
+  footColor: CrystalRgb;
 }
 
 export interface CrystalFacetTinting {

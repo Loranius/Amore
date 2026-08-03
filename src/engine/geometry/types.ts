@@ -208,6 +208,30 @@ export interface CrystalMeshData {
    * reason, and it survives only for profiles that carry no planes.
    */
   borderEdges?: number[];
+  /**
+   * Where each vertex sits along the body's own axis — 0 at its foot, 1 at its
+   * tip, one entry per vertex.
+   *
+   * Published because the renderer cannot work it out. Bodies are batched by
+   * material signature, so one material draws several crystals of different
+   * heights at once; a uniform would give them all the monarch's scale, and
+   * object-space Y would need each body's own extent, which is exactly the
+   * thing a shared material does not have. A per-vertex fraction is the only
+   * form that survives batching.
+   *
+   * What it is for: every stylized reference crystal carries a colour that
+   * changes from foot to tip — one hue where it left the rock, another at the
+   * point. That is a real habit (a phantom, or a change in what the fluid
+   * carried while the crystal grew) and it is most of what makes a reference
+   * gem look grown rather than moulded.
+   *
+   * Measured along the axis rather than in world height so a crystal leaning at
+   * forty-five degrees still reads foot-to-tip along itself, not bottom-to-top
+   * of the screen.
+   *
+   * Optional so persisted Geometry State v1 meshes stay readable.
+   */
+  axialT?: number[];
   indices: number[];
   sourceTriangleCount: number;
   visibleTriangleCount: number;

@@ -155,6 +155,10 @@ export function splitCrystalMeshFaces(
   const normals: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
+  // Rebuilt alongside the vertices it belongs to: the split gives each triangle
+  // its own copies, so a per-vertex attribute has to be copied with them.
+  const sourceAxial = mesh.axialT;
+  const axialT: number[] = [];
 
   for (let offset = 0; offset < mesh.indices.length; offset += 3) {
     const sources = [
@@ -192,6 +196,7 @@ export function splitCrystalMeshFaces(
         round6(corner.x * vAxis.x + corner.y * vAxis.y + corner.z * vAxis.z),
       );
       indices.push(pushVertex(positions, corners[slot]!));
+      if (sourceAxial !== undefined) axialT.push(sourceAxial[sources[slot]!] ?? 0);
       // Faceted by default: a crystal's side is a flat plane and every triangle
       // on it must say so. `smooth` carries the mesh's own averaged normals
       // through the split instead — for a surface that is genuinely curved, a
@@ -218,6 +223,7 @@ export function splitCrystalMeshFaces(
     positions,
     normals,
     uvs,
+    ...(sourceAxial === undefined ? {} : { axialT }),
     indices,
     // Bounds are unchanged in principle — the same points, listed more times —
     // but recomputing keeps the published state self-consistent rather than
@@ -266,6 +272,14 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
   const positions: number[] = [];
   const indices: number[] = [];
   for (const vertex of polytope.vertices) pushVertex(positions, toWorld(vertex));
+
+  // Foot-to-tip fraction, taken in the body's own frame where the axis *is* the
+  // y coordinate. Doing it here rather than from world positions is what makes
+  // a crystal leaning at forty-five degrees still read along itself.
+  const axialLow = polytope.vertices.reduce((low, v) => Math.min(low, v.y), Infinity);
+  const axialHigh = polytope.vertices.reduce((high, v) => Math.max(high, v.y), -Infinity);
+  const axialSpan = Math.max(1e-6, axialHigh - axialLow);
+  const axialT = polytope.vertices.map((v) => round6((v.y - axialLow) / axialSpan));
 
   // Base first. Ordering faces by kind rather than by plane index would be the
   // same thing today — the base is plane zero — but the mesh must not depend on
@@ -338,6 +352,7 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
     normals: computeNormals(positions, indices),
     faceIds,
     borderEdges,
+    axialT,
     indices,
     sourceTriangleCount,
     visibleTriangleCount: sourceTriangleCount,

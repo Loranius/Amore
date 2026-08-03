@@ -123,6 +123,11 @@ export function createThreeCrystalGeometry(
   }
   const edges = facetEdgeWeights(mesh);
   if (edges !== null) geometry.setAttribute('evolutionEdge', new THREE.BufferAttribute(edges, 3));
+  // Foot-to-tip fraction. Per vertex rather than a uniform because one material
+  // draws several bodies of different heights (see `CrystalMeshData.axialT`).
+  if (mesh.axialT !== undefined && mesh.axialT.length === mesh.positions.length / 3) {
+    geometry.setAttribute('evolutionAxial', new THREE.Float32BufferAttribute(mesh.axialT, 1));
+  }
   geometry.setIndex(mesh.indices);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();

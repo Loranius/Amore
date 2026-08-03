@@ -190,5 +190,27 @@ The iridescent set is a catalogue: single terminated point, **double-terminated*
 at both ends, grown suspended rather than from a wall), short stubby prism lying down,
 blocky tabular chunk, and a **fan cluster** — many small crystals of varying length
 radiating from one base. Each also carries a **vertical colour gradient**, one hue at the
-foot and another at the tip. We have the single point and the fan; the tabular and
-double-terminated habits, and the gradient, are still open.
+foot and another at the tip. We have the single point, the fan and the
+gradient; the tabular and double-terminated habits are still open.
+
+## Two things that turned out to be the same mistake
+
+**Surface maps do not belong on a grown face, and transparency does not belong on
+a crystal.** Both were added in good faith, both measured as costing more than they
+gave, and both failed for the same underlying reason: they crossed the facet.
+
+- A cellular albedo wrapped over the outside reads as hide at portal size, and —
+  worse — the pattern runs *across* facet edges, which tells the eye the two planes
+  either side are one surface. That is precisely the opposite of what the painted rim
+  exists to say. Removing it raised the foot-to-tip contrast from 24 to 30 and the
+  facet spread from 104 to 124.
+- Transparency let the far facets show through the near ones, so two sets of edges
+  crossed and cancelled into a wireframe.
+
+What the map was for is still there, moved inside the stone: `veilStrength` is a 3D
+field, so it clouds the body and **cannot cross a facet edge**. That is the test to
+apply to any future surface idea — if it crosses an edge, it will flatten the crystal
+no matter how good it looks on a flat sample.
+
+Broken rock is the opposite case and keeps its map: it has no grown faces to keep
+clean, and grain is most of what separates stone from plastic.

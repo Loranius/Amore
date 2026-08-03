@@ -125,20 +125,25 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
       expect(body.transmission).toBe(0);
       expect(body.depthWrite).toBe(true);
       expect(body.signature.length).toBeGreaterThan(20);
-      // Never fully clear — the facets are made of reflected light, and a shell
-      // with no substance to it stops catching any. This is the alpha face-on;
-      // the glass term closes the silhouette toward solid in the shader.
-      expect(body.opacity).toBeGreaterThanOrEqual(0.52);
-      expect(body.opacity).toBeLessThanOrEqual(1);
-      expect(body.transparent).toBe(body.opacity < 1);
+      // Opaque, every body of it. Four stylized crystal references the owner
+      // supplied are opaque without exception and read as crystal better than
+      // ours did see-through: what carries a gem is its facets — their rims and
+      // how differently each catches light — and transparency was never doing
+      // that work. While the shell was open the far facets showed through the
+      // near ones and the two sets of edges cancelled into a wireframe.
+      //
+      // The earned light does not need alpha either. The core term adds it to
+      // the outgoing colour rather than letting the background through, so a
+      // sealed shell still glows.
+      expect(body.opacity).toBe(1);
+      expect(body.transparent).toBe(false);
     }
 
-    // The rock the crystals stand in is not glass.
-    const rock = first.material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
-    expect(rock.opacity).toBe(1);
-    expect(rock.transparent).toBe(false);
-    // ...and at least one crystal is.
-    expect(first.material.bodies.some((body) => body.transparent)).toBe(true);
+    // And with nothing transparent left, the standing sort hazard is retired
+    // rather than merely unlikely: alpha blending needs back-to-front ordering,
+    // batching groups bodies by material signature, and within one batch there
+    // was no ordering at all. The depth buffer answers it now.
+    expect(first.material.bodies.every((body) => !body.transparent)).toBe(true);
   });
 
   it('degrades expensive optics and ambient motion through quality tiers', () => {
@@ -629,37 +634,41 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     }
   });
 
-  it('gives the vein a far coarser grain than the crystals it grew', () => {
-    // Both wear the same mineral map, and they must not wear it at the same
-    // density. The vein spans an order of magnitude more engine units than any
-    // single body, so at the crystals' cell count the pattern repeats across it
-    // dozens of times and reads as snakeskin rather than as stone.
+  it('keeps the surface map on the rock and off the crystals', () => {
+    // A grown crystal face is clean — that is what makes it a face rather than a
+    // fracture — and every stylized reference the owner supplied shows exactly
+    // that: flat planes, a painted rim, and whatever structure there is living
+    // inside the body rather than on it.
     //
-    // This is published state rather than a renderer preference for a reason
-    // that cost a full debugging pass: `repeat` lives on a Three texture, not
-    // on a material, so a renderer that hands one shared instance to every body
-    // silently gives them all whichever density was written last. With that bug
-    // in place the vein wore the crystals' grain and changing this number moved
-    // nothing at all on screen. The renderer now clones per density; this is
-    // the assertion that says there are distinct densities to clone for.
+    // Wrapping a cellular map over the outside did two things wrong at once. At
+    // the size the portal draws a crystal it read as hide; and because the
+    // pattern crossed facet edges it told the eye the planes either side were
+    // one surface, which is the opposite of what the rim exists to say.
+    //
+    // Broken rock is the other case entirely. It has no grown faces to keep
+    // clean, and grain is most of what separates stone from plastic — so the
+    // map stays there, at its own much coarser density.
     const { material } = pipeline({ quality: 'high' });
     const rock = material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
     const crystals = material.bodies.filter((body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID);
 
     expect(rock.shader.surfaceTextureScale).toBeGreaterThan(0);
+    expect(rock.shader.surfaceReliefStrength).toBeGreaterThan(0);
     for (const body of crystals) {
-      expect(body.shader.surfaceTextureScale).toBeGreaterThan(rock.shader.surfaceTextureScale * 3);
+      expect(body.shader.surfaceTextureScale).toBe(0);
+      // A normal map with no albedo to agree with is a rippled plane, and a lit
+      // vein pattern on a clean face is the same mistake in another channel.
+      expect(body.shader.surfaceReliefStrength).toBe(0);
+      expect(body.shader.surfaceVeinStrength).toBe(0);
     }
 
-    // One grain for the whole colony: a year crystal shows fewer cells of the
-    // same size, never a shrunk-to-fit copy of the pattern.
-    const densities = new Set(crystals.map((body) => body.shader.surfaceTextureScale));
-    expect(densities.size).toBe(1);
+    // What the map was for is still there, and now it is where it belongs:
+    // inside the stone, as a 3D field that cannot cross a facet edge.
+    expect(crystals.some((body) => body.shader.veilStrength > 0)).toBe(true);
 
-    // The stone takes relief but no glowing veins — the light down there is the
-    // aurora, and two lit patterns in one crack would fight.
+    // No glowing veins on the rock either — the light down there is the aurora,
+    // and two lit patterns in one crack would fight.
     expect(rock.shader.surfaceVeinStrength).toBe(0);
-    expect(rock.shader.surfaceReliefStrength).toBeGreaterThan(0);
   });
 
   it('carries the core into the material signature', () => {
