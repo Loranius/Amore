@@ -46,6 +46,8 @@ function pipeline(options?: {
   reducedMotion?: boolean;
   quality?: 'high' | 'balanced' | 'low' | 'fallback';
   events?: readonly EvolutionEventInput[];
+  /** Overrides the monarch's earned tint, to vary gifts without inventing data. */
+  wishTint?: readonly [number, number, number];
 }) {
   const artifact = buildArtifactBlueprint({
     coupleId: 'material-life-couple',
@@ -57,10 +59,13 @@ function pipeline(options?: {
     },
     events: options?.events ?? EVENTS,
   });
-  const species = buildCrystalSpeciesBlueprint({
+  const built = buildCrystalSpeciesBlueprint({
     artifact,
     config: { asOf: '2026-07-29T12:00:00Z', rulesVersion: '1.0.0' },
   });
+  const species = options?.wishTint === undefined
+    ? built
+    : { ...built, mother: { ...built.mother, tintRgb: options.wishTint } };
   const growth = buildGrowthState({
     blueprint: crystalToGrowthBlueprint(species),
     config: DEFAULT_GROWTH_ENGINE_CONFIG,
@@ -95,7 +100,18 @@ function pipeline(options?: {
 }
 
 describe('Crystal Material, Life and Three renderer bridge', () => {
-  it('is deterministic and never enables transmission or transparent shells', () => {
+  it('is deterministic and never enables transmission, whatever the shell`s alpha', () => {
+    // The two are not the same prohibition, and only one of them is permanent.
+    //
+    // Transmission samples a render target that the CSS sky behind the alpha
+    // canvas is not in, so a transmissive shell renders black over the sky. No
+    // material setting fixes that, so it stays at zero.
+    //
+    // Alpha does not have the problem: a semi-transparent pixel over an empty
+    // region of the canvas carries its own alpha out to the compositor, which
+    // lays it over the CSS gradient correctly. The shell is see-through since
+    // ADR-0007 — and still writes depth, because each body is convex and back
+    // faces are culled, so it covers each of its own pixels exactly once.
     const first = pipeline();
     const second = pipeline();
 
@@ -106,11 +122,22 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(first.material.diagnostics.uniqueMaterialCount).toBeLessThan(first.material.bodies.length);
     for (const body of first.material.bodies) {
       expect(body.transmission).toBe(0);
-      expect(body.opacity).toBe(1);
-      expect(body.transparent).toBe(false);
       expect(body.depthWrite).toBe(true);
       expect(body.signature.length).toBeGreaterThan(20);
+      // Never fully clear — the facets are made of reflected light, and a shell
+      // with no substance to it stops catching any. This is the alpha face-on;
+      // the glass term closes the silhouette toward solid in the shader.
+      expect(body.opacity).toBeGreaterThanOrEqual(0.52);
+      expect(body.opacity).toBeLessThanOrEqual(1);
+      expect(body.transparent).toBe(body.opacity < 1);
     }
+
+    // The rock the crystals stand in is not glass.
+    const rock = first.material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+    expect(rock.opacity).toBe(1);
+    expect(rock.transparent).toBe(false);
+    // ...and at least one crystal is.
+    expect(first.material.bodies.some((body) => body.transparent)).toBe(true);
   });
 
   it('degrades expensive optics and ambient motion through quality tiers', () => {
@@ -179,7 +206,6 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     for (const batch of bundle.batches) {
       expect(batch.bodyIds.length).toBeGreaterThan(0);
       expect(batch.material.transmission).toBe(0);
-      expect(batch.material.transparent).toBe(false);
       expect(batch.mesh.userData['evolutionBodyIds']).toEqual(batch.bodyIds);
     }
 
@@ -438,6 +464,128 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(rock.emissiveIntensity).toBe(0);
     expect(rock.transmission).toBe(0);
     expect(rock.transparent).toBe(false);
+  });
+
+  it('makes the inner light grow with the wishes that were granted', () => {
+    // ADR-0004 gives a year its colour from the gifts the couple exchanged, and
+    // the colour belongs to the light inside rather than to the shell. What was
+    // missing is that the *amount* of light did not follow: a flat step said
+    // "some tint" or "none", so one gift read the same as twenty.
+    const { material, species } = pipeline({ quality: 'high' });
+    const instructions = [species.mother, ...species.formations];
+    const withTint = material.bodies.filter((body) => {
+      const tint = instructions.find((item) => item.id === body.bodyId)?.tintRgb;
+      return tint !== undefined && Math.min(...tint) < 1;
+    });
+    const withoutTint = material.bodies.filter((body) => {
+      if (body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) return false;
+      const tint = instructions.find((item) => item.id === body.bodyId)?.tintRgb;
+      return tint === undefined || Math.min(...tint) >= 1;
+    });
+
+    // The fixture couple grants no wishes, so every body is at the floor — the
+    // monotonic claim is checked directly on the derivation below instead.
+    for (const body of [...withTint, ...withoutTint]) {
+      expect(body.shader.coreStrength).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(body.shader.coreStrength)).toBe(true);
+    }
+
+    // Same couple, same body, more gifts granted: strictly more inner light,
+    // and the colour is the one the gifts earned rather than the shell's.
+    const stronger = [0, 0.4, 0.75].map((pull) => {
+      const tinted = pipeline({
+        quality: 'high',
+        wishTint: [1, 1 - pull, 1 - pull * 0.6] as const,
+      });
+      const focal = tinted.material.bodies.find(
+        (body) => body.bodyId === 'crystal:mother',
+      )!;
+      return focal.shader.coreStrength;
+    });
+    expect(stronger[1]!).toBeGreaterThan(stronger[0]!);
+    expect(stronger[2]!).toBeGreaterThan(stronger[1]!);
+  });
+
+  it('textures the stone in object space, and clouds the vein hardest', () => {
+    // The field has to be *in* the crystal. It was keyed on the view position,
+    // so the inclusions slid through the stone as the camera orbited — which is
+    // a screen effect wearing a texture's name. Object space is the fix, and it
+    // is a property of the shader rather than of the recipe, so what is checked
+    // here is the recipe that drives it.
+    const { material } = pipeline({ quality: 'high' });
+    const rock = material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+    const crystals = material.bodies.filter((body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID);
+
+    // The vein is milkier than any crystal on it — that cloud is what makes it
+    // read as quartz rather than as polished stone.
+    expect(rock.shader.veilStrength)
+      .toBeGreaterThan(Math.max(...crystals.map((body) => body.shader.veilStrength)));
+
+    for (const body of material.bodies) {
+      expect(body.shader.veilScale).toBeGreaterThan(0);
+      expect(Number.isFinite(body.shader.veilStrength)).toBe(true);
+    }
+  });
+
+  it('makes the shell read as glass rather than as fog', () => {
+    // Flat alpha is fog: a body evenly see-through everywhere, which real glass
+    // never is. What makes it glass is that reflectance climbs toward the
+    // silhouette — so the shader closes the alpha at the edge, lights that edge
+    // up, and deepens the colour along the longer path. All three ride on one
+    // published number, which is what this checks.
+    const { material } = pipeline({ quality: 'high' });
+    const crystals = material.bodies.filter((body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID);
+    const rock = material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+
+    expect(crystals.some((body) => body.shader.glassStrength > 0)).toBe(true);
+    for (const body of crystals) {
+      expect(body.shader.glassStrength).toBeGreaterThanOrEqual(0);
+      expect(body.shader.glassStrength).toBeLessThanOrEqual(1);
+    }
+    // The vein is quartz in stone, not a pane set into the floor.
+    expect(rock.shader.glassStrength).toBe(0);
+    expect(rock.opacity).toBe(1);
+
+    // Refraction stays impossible, and that is what the glass term exists to
+    // work around rather than to hide.
+    for (const body of material.bodies) expect(body.transmission).toBe(0);
+  });
+
+  it('lights the fissure with the wishes the couple granted, and only the fissure', () => {
+    // The seam is a crack the crystals came out of. A crack with nothing in it
+    // is a groove — what makes it read as their source is that something is lit
+    // down there, and ADR-0004 says what colour that light is.
+    const { material } = pipeline({ quality: 'high' });
+    const rock = material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+    const crystals = material.bodies.filter((body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID);
+
+    expect(rock.shader.auroraStrength).toBeGreaterThan(0);
+    for (const body of crystals) expect(body.shader.auroraStrength).toBe(0);
+
+    // Two colours, never the same one twice: a single hue at a single
+    // brightness is a lamp in a slot, however slowly it drifts.
+    const { auroraColor: first, auroraSecondColor: second } = rock.shader;
+    expect([first.r, first.g, first.b].every((channel) => channel >= 0 && channel <= 1)).toBe(true);
+    expect([second.r, second.g, second.b].every((channel) => channel >= 0 && channel <= 1)).toBe(true);
+    expect(`${first.r},${first.g},${first.b}`).not.toBe(`${second.r},${second.g},${second.b}`);
+
+    // More wishes granted, more light. A couple who has granted none still gets
+    // a lit crack — the artifact never punishes a couple for not having done a
+    // thing yet — but it is the floor rather than the whole range.
+    const granted = pipeline({ quality: 'high', wishTint: [1, 0.35, 0.6] as const });
+    const grantedRock = granted.material.bodies.find(
+      (body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID,
+    )!;
+    expect(grantedRock.shader.auroraStrength).toBeGreaterThan(rock.shader.auroraStrength);
+  });
+
+  it('turns every texture off at the fallback tier', () => {
+    // Procedural texture is noise per pixel, so it follows the same quality
+    // ladder as the other optics rather than staying on when they are off.
+    const { material } = pipeline({ quality: 'fallback' });
+    for (const body of material.bodies) {
+      expect(body.shader.veilStrength).toBe(0);
+    }
   });
 
   it('carries the core into the material signature', () => {

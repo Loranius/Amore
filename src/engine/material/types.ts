@@ -40,6 +40,69 @@ export interface CrystalShaderRecipe {
    */
   coreStrength: number;
   coreColor: CrystalRgb;
+  /**
+   * How much the shell behaves like glass rather than like translucent stone.
+   *
+   * One number, three effects, all of them the same physics: reflectance rises
+   * toward the silhouette. So the shell goes clear where you look straight
+   * through it and solid at the edge, the edge lights up exactly where it stops
+   * being transparent, and light crossing the body at an angle travels further
+   * and picks up more of the colour it carries.
+   *
+   * This is what glass looks like *without* refraction, which is the only kind
+   * available here — `transmission` samples a render target the CSS sky is not
+   * in (ADR-0007). Flat alpha alone reads as fog; the view-dependence is the
+   * whole difference.
+   */
+  glassStrength: number;
+  /**
+   * Milky veils inside the stone.
+   *
+   * Flattened along the axis so the noise forms lenses rather than speckle,
+   * because that is what a plane of fluid inclusions looks like. This is the
+   * texture the eye reads as depth once the shell is no longer opaque: it
+   * varies the stone's cloudiness, and with it how much light gets through.
+   *
+   * Procedural rather than an image. The mesh has no UV attribute at all: it is
+   * a polytope whose faces are different shapes on every crystal, so there is
+   * nothing to unwrap and no atlas that would fit. An object-space field needs
+   * no coordinates, costs no memory, and cannot seam.
+   *
+   * This is the only surface field left. Growth striations across the prism
+   * faces were tried alongside it and removed on sight (2026-08-03): they are
+   * a real quartz feature, but at the size the portal draws a crystal they read
+   * as horizontal stripes ruled onto it rather than as a growth record.
+   */
+  veilStrength: number;
+  veilScale: number;
+  /**
+   * The light in the fissure.
+   *
+   * Only the quartz vein carries it. The seam is a crack the crystals came out
+   * of, and a crack with nothing in it is a groove — what makes it read as the
+   * source rather than as a moulding is that something is lit down there.
+   *
+   * Two colours rather than one, drifting against each other, because that is
+   * what makes it an aurora instead of a lamp: a single hue at a single
+   * brightness is a bulb in a slot. Both come from the wishes the couple
+   * granted (ADR-0004), so the light in the ground is the same light the
+   * crystals carry inside them.
+   *
+   * Strongest at the bottom of the fissure and gone at the lip, so it lights
+   * the crack rather than washing the whole seam.
+   */
+  auroraStrength: number;
+  auroraColor: CrystalRgb;
+  auroraSecondColor: CrystalRgb;
+  /**
+   * How far below the seam's lip the light reaches full strength, in engine
+   * units.
+   *
+   * Published rather than assumed, because the fissure's depth scales with the
+   * druse: a constant tuned on one couple would light the whole seam on a
+   * small crystal and nothing at all on a large one.
+   */
+  auroraDepth: number;
 }
 
 export interface CrystalFacetTinting {
@@ -67,10 +130,20 @@ export interface CrystalBodyMaterial {
   iridescenceIOR: number;
   iridescenceThicknessMin: number;
   iridescenceThicknessMax: number;
-  /** Permanently disabled for transparent-canvas safety. */
+  /**
+   * Permanently zero, and not a matter of taste: Three's transmission samples a
+   * render target the CSS sky behind the alpha canvas is not in, so a
+   * transmissive shell shows black wherever it overlaps the sky.
+   */
   transmission: 0;
-  opacity: 1;
-  transparent: false;
+  /**
+   * Alpha, which the canvas *does* composite correctly — a semi-transparent
+   * pixel over an empty region carries its own alpha out to the CSS gradient.
+   * That is why the shell can be see-through while never being refractive
+   * (ADR-0007). The substrate stays at 1.
+   */
+  opacity: number;
+  transparent: boolean;
   depthWrite: true;
   shader: CrystalShaderRecipe;
   /** Per-face tone over baseColor — see `facets.ts`. */

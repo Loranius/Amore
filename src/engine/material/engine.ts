@@ -110,6 +110,22 @@ const SHELL_IOR = { min: 1.52, max: 1.58 } as const;
  */
 const SHELL_EMISSIVE = { min: 0.02, max: 0.06 } as const;
 
+/**
+ * How opaque the shell may be.
+ *
+ * This is the alpha *face-on*. The silhouette closes toward solid on its own
+ * through the glass term, so the band could come down once that existed: a
+ * crystal you can see straight through keeps a hard outline, which is what
+ * stopped the body dissolving into the background at the first, flatter
+ * setting.
+ *
+ * Never fully clear even so — a shell with nothing solid about it stops
+ * catching the key light, and the faceting, which is the whole point of the
+ * geometry, goes with it. Never fully opaque either, or the light the couple
+ * earned inside has nowhere to come out.
+ */
+const SHELL_OPACITY = { min: 0.52, max: 0.84 } as const;
+
 function intoBand(band: { readonly min: number; readonly max: number }, value: number): number {
   return round6(Math.max(band.min, Math.min(band.max, value)));
 }
@@ -206,16 +222,130 @@ function shaderRecipe(
     // transmissive shell would show black where it overlaps the sky rather
     // than the sky itself). Depth-weighted core light is the same effect
     // without transparency — and it costs no draw call and no triangle.
+    // Granted wishes are what the light inside is made of (ADR-0004), so they
+    // decide how much of it there is, not merely what colour it is. The step
+    // this replaces was a flat ×1.3 for "has any tint at all", which read the
+    // same for one gift as for twenty.
     coreStrength: round6(micro
       ? 0
       : (0.1 + pressures.luminosity * 0.16 + state.luminosity * 0.08)
         * (emphasized ? 1.35 : focal ? 1 : 0.72)
-        // A year that earned a colour shows it a little harder, or the colour
-        // it earned is the one thing about it nobody can see.
-        * (tint === null || (tint[0] === 1 && tint[1] === 1 && tint[2] === 1) ? 1 : 1.3)),
+        * (1 + wishDepth(tint) * CORE_WISH_GAIN)),
     coreColor: coreTintColor(emissiveColor, tint),
+    // A refined, unfractured couple's crystal is nearer glass; a clouded one is
+    // nearer stone. Kept off the smallest bodies, where the effect is a few
+    // pixels of edge and the cost is the same as on the monarch.
+    glassStrength: round6(micro ? 0 : clamp01(
+      0.42 + pressures.refinement * 0.34 + state.purity * 0.24 - state.fracture * 0.3,
+    )),
+    veilStrength: round6(micro ? 0 : textureTier(0.4 + inclusionBase * 0.5, preset)),
+    veilScale: round6(5.5 + pressures.surfaceComplexity * 3.5),
+    // The aurora belongs to the ground, not to the crystals standing in it.
+    auroraStrength: 0,
+    auroraColor: emissiveColor,
+    auroraSecondColor: emissiveColor,
+    auroraDepth: 1,
   };
 }
+
+/**
+ * The two colours the fissure glows in, from every wish the couple granted.
+ *
+ * Aggregated across the year crystals rather than taken from one of them: the
+ * vein is the ground they all grew out of, so the light in it is the couple's
+ * whole history of giving and not the most recent year's.
+ *
+ * The second colour is the first rotated through the channels. A real aurora is
+ * two hues sliding over one another; one hue at one brightness is a lamp in a
+ * slot, however slowly it moves.
+ */
+function auroraColors(
+  input: BuildCrystalMaterialInput,
+): { strength: number; first: CrystalRgb; second: CrystalRgb } {
+  const tints = [input.species.mother, ...input.species.formations]
+    .map((instruction) => instruction.tintRgb)
+    .filter((tint): tint is readonly [number, number, number] => tint !== undefined);
+
+  let depth = 0;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  for (const tint of tints) {
+    const earned = wishDepth(tint);
+    if (earned <= 0) continue;
+    depth = Math.max(depth, earned);
+    r += tint[0] * earned;
+    g += tint[1] * earned;
+    b += tint[2] * earned;
+    }
+  const total = r + g + b;
+  if (depth <= 0 || total <= 0) {
+    // No wishes granted yet. The fissure still glows, faintly and in the
+    // couple's own palette — an unlit crack reads as a gap in the floor, and
+    // the artifact must never punish a couple for not having done a thing yet.
+    const quiet = input.species.pressures.dominantChannel === 'culture'
+      ? rgb(0.52, 0.62, 0.95)
+      : rgb(0.58, 0.78, 0.9);
+    return { strength: AURORA_FLOOR, first: quiet, second: rgb(0.72, 0.56, 0.94) };
+  }
+
+  const scale = 3 / total;
+  const first = rgb(round6(clamp01(r * scale)), round6(clamp01(g * scale)), round6(clamp01(b * scale)));
+  return {
+    strength: round6(AURORA_FLOOR + (1 - AURORA_FLOOR) * depth),
+    first,
+    // Channels rotated, so the two colours are related but never the same.
+    second: rgb(first.b, first.r, first.g),
+  };
+}
+
+/** How high the vein stands above the platform, from the published mesh. */
+function substrateLip(input: BuildCrystalMaterialInput): number {
+  const mesh = input.geometry.meshes.find(
+    (candidate) => candidate.bodyId === CRYSTAL_SUBSTRATE_BODY_ID,
+  );
+  return mesh === undefined ? 0.02 : Math.max(1e-4, mesh.bounds.max.y);
+}
+
+/** What the fissure glows at before a single wish has been granted. */
+const AURORA_FLOOR = 0.3;
+
+/**
+ * How much of the wish cap a body's earned tint represents, from 0 to 1.
+ *
+ * `wishTint` builds its colour as `1 - (1 - hue) * pull` with `pull` three
+ * quarters of the strongest channel's fill, so the darkest component is exactly
+ * `1 - pull`. Inverting that recovers the fill itself — the number of gifts as
+ * a share of the cap — rather than guessing at it from the colour.
+ */
+function wishDepth(tint: readonly [number, number, number] | null): number {
+  if (tint === null) return 0;
+  return clamp01((1 - Math.min(tint[0], tint[1], tint[2])) / WISH_TINT_PULL);
+}
+
+/**
+ * How much of a texture survives a quality tier.
+ *
+ * Not a plain multiply by `inclusionScale`, which is what the first pass did:
+ * at the `low` tier that scale is 0.35, and a third of a subtle effect is
+ * nothing at all — the striations were invisible on exactly the phones most
+ * couples are holding. Off entirely at `fallback`, because there procedural
+ * noise is a per-pixel cost with a frame budget that cannot pay it; everywhere
+ * else it keeps at least half its strength.
+ */
+function textureTier(
+  base: number,
+  preset: (typeof CRYSTAL_MATERIAL_QUALITY_PRESETS)[keyof typeof CRYSTAL_MATERIAL_QUALITY_PRESETS],
+): number {
+  if (preset.inclusionScale <= 0) return 0;
+  return base * (0.5 + 0.5 * preset.inclusionScale);
+}
+
+/** The ceiling `wishTint` applies when it pulls a colour off white. */
+const WISH_TINT_PULL = 0.75;
+
+/** How much a fully granted year brightens its own core. */
+const CORE_WISH_GAIN = 0.85;
 
 function buildBodyMaterial(
   input: BuildCrystalMaterialInput,
@@ -279,6 +409,19 @@ function buildBodyMaterial(
       + state.luminosity * 0.15,
   ));
   const shader = shaderRecipe(input, role, emphasized, emissiveColor, tint);
+  // How much light gets through. A clear couple's crystal is more glass than
+  // stone; fracture and cloudiness close it up. The floor matters more than the
+  // ceiling: below roughly two thirds the facets stop reading, because what
+  // makes a facet visible is the light it reflects rather than the light behind
+  // it. The smallest bodies stay solid — at their size transparency is a sort
+  // order risk bought for pixels nobody can resolve.
+  const opacity = micro
+    ? 1
+    : round6(clamp01(
+      SHELL_OPACITY.min
+      + (SHELL_OPACITY.max - SHELL_OPACITY.min)
+        * clamp01(1 - state.purity * 0.55 - pressures.refinement * 0.25 + state.fracture * 0.3),
+    ));
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
     bodyId,
@@ -301,9 +444,23 @@ function buildBodyMaterial(
     iridescenceIOR: 1.3,
     iridescenceThicknessMin: round6(220 + pressures.warmth * 70),
     iridescenceThicknessMax: round6(390 + pressures.brilliance * 180),
+    // Transmission stays off, and for the same reason it always has: the canvas
+    // is alpha-composited over a CSS sky, and Three's transmission samples a
+    // render target that the sky is not in — a transmissive shell shows black
+    // where it overlaps the sky rather than the sky itself.
+    //
+    // Alpha is a different mechanism and does not have that problem. A
+    // semi-transparent pixel over an empty region of the canvas simply carries
+    // its own alpha out to the compositor, which lays it over the CSS gradient
+    // correctly. So the shell can be see-through after all; what it cannot be
+    // is refractive. See ADR-0007.
     transmission: 0,
-    opacity: 1,
-    transparent: false,
+    opacity,
+    transparent: opacity < 1,
+    // Kept on. Each body is convex and back faces are culled, so a crystal
+    // covers each of its own pixels exactly once and needs no sorting with
+    // itself; writing depth is what stops one crystal's far side showing
+    // through its near side.
     depthWrite: true,
     shader,
     facets: CRYSTAL_FACET_TINTING,
@@ -345,6 +502,7 @@ function buildSubstrateMaterial(
   // a strong hue stops being quartz.
   const tint = materialPalette.secondary;
   const grey = (tint.r + tint.g + tint.b) / 3;
+  const aurora = auroraColors(input);
   // Linear values, and the whole design of this material is in them. The dais
   // slab sits near 0.10–0.14 linear; this is a little over twice that — enough
   // that the seam reads as a second mineral, little enough that it stays part
@@ -410,6 +568,28 @@ function buildSubstrateMaterial(
       // order of magnitude below what any crystal carries.
       coreStrength: 0.02,
       coreColor: rgb(round6(0.46), round6(0.44), round6(0.55)),
+      // The vein is not glass. It is opaque quartz sitting in stone, and an
+      // edge that lit up would make the seam read as a pane set into the floor.
+      glassStrength: 0,
+      // Veils instead, and stronger than any crystal's. Milky quartz *is*
+      // cloud; the mottling is what separates the seam from polished stone at
+      // the distance the portal actually looks at it from.
+      veilStrength: round6(
+        textureTier(0.9, CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality]),
+      ),
+      veilScale: 7.5,
+      // Tiered like a texture rather than switched off outside `high`, but not
+      // scaled down as hard: this is the artifact's own light, and a couple on
+      // a mid-range phone should still see what they earned. Off only at
+      // `fallback`, where nothing procedural runs.
+      auroraStrength: round6(
+        textureTier(aurora.strength, CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality]),
+      ),
+      auroraColor: aurora.first,
+      auroraSecondColor: aurora.second,
+      // The lip's own height is the yardstick: the fissure runs a couple of
+      // those below it, and both scale with the druse.
+      auroraDepth: round6(Math.max(1e-4, substrateLip(input) * 2.2)),
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

@@ -398,5 +398,15 @@ export function applyCrystalLifeFrame(
           0,
         ) / batch.bodyIds.length;
     batch.material.emissiveIntensity = batch.baseEmissiveIntensity * multiplier;
+
+    // The aurora's drift. `sparklePhase` already advances with elapsed time and
+    // already freezes under reduced motion, so the curtain in the fissure
+    // inherits both without a second clock to keep in step — and a second clock
+    // is exactly how an artifact ends up with two things moving at rates that
+    // disagree.
+    const phase = batch.material.userData['evolutionPhaseUniform'] as
+      | { value: number }
+      | undefined;
+    if (phase !== undefined) phase.value = frame.sparklePhase;
   }
 }
