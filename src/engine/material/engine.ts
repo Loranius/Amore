@@ -123,8 +123,15 @@ const SHELL_EMISSIVE = { min: 0.02, max: 0.06 } as const;
  * catching the key light, and the faceting, which is the whole point of the
  * geometry, goes with it. Never fully opaque either, or the light the couple
  * earned inside has nowhere to come out.
+ *
+ * Raised from 0.52..0.84 on review (2026-08-03): at the low end the body was
+ * see-through enough that the far facets showed through the near ones, and two
+ * sets of edges crossing each other read as a wireframe rather than as depth.
+ * Glass is not mostly-transparent — a real quartz prism hides most of what is
+ * behind it and gives back an edge instead. The transparency that remains is
+ * there to let the earned light out, which is the one thing it is for.
  */
-const SHELL_OPACITY = { min: 0.52, max: 0.84 } as const;
+const SHELL_OPACITY = { min: 0.72, max: 0.94 } as const;
 
 function intoBand(band: { readonly min: number; readonly max: number }, value: number): number {
   return round6(Math.max(band.min, Math.min(band.max, value)));
@@ -204,8 +211,18 @@ function shaderRecipe(
 
   return {
     shaderVersion: 1,
-    rimStrength: round6(reflectionEnabled ? preset.reflectionScale * (micro ? 0.08 : emphasized ? 0.5 : 0.34) : 0),
-    skyStrength: round6(reflectionEnabled ? preset.reflectionScale * (micro ? 0.03 : 0.14) : 0),
+    // The whole of the crystal's reflection, and it has to be: an environment
+    // map is off by decision, not by omission (`render/envMap.ts`), because
+    // every route to one goes through a HalfFloat render target — the standing
+    // suspect for the white background on the owner's device. So what a real
+    // studio environment contributes gets computed instead: a Fresnel rim, and sky above
+    // against warmer ground below mixed by the reflected ray's vertical.
+    //
+    // Both raised on review (2026-08-03) — the shell was reading as tinted
+    // plastic. Reflection is most of what separates the two, and with no map to
+    // supply it these two terms are the entire budget.
+    rimStrength: round6(reflectionEnabled ? preset.reflectionScale * (micro ? 0.12 : emphasized ? 0.74 : 0.54) : 0),
+    skyStrength: round6(reflectionEnabled ? preset.reflectionScale * (micro ? 0.05 : 0.26) : 0),
     skyColor: mixRgb({ r: 0.82, g: 0.9, b: 1 }, input.species.pressures.dominantChannel === 'culture'
       ? { r: 0.78, g: 0.72, b: 1 }
       : { r: 0.9, g: 0.95, b: 1 }, 0.34),
@@ -236,7 +253,7 @@ function shaderRecipe(
     // nearer stone. Kept off the smallest bodies, where the effect is a few
     // pixels of edge and the cost is the same as on the monarch.
     glassStrength: round6(micro ? 0 : clamp01(
-      0.42 + pressures.refinement * 0.34 + state.purity * 0.24 - state.fracture * 0.3,
+      0.66 + pressures.refinement * 0.26 + state.purity * 0.2 - state.fracture * 0.24,
     )),
     veilStrength: round6(micro ? 0 : textureTier(0.4 + inclusionBase * 0.5, preset)),
     veilScale: round6(5.5 + pressures.surfaceComplexity * 3.5),
@@ -245,6 +262,13 @@ function shaderRecipe(
     auroraColor: emissiveColor,
     auroraSecondColor: emissiveColor,
     auroraDepth: 1,
+    // One grain for the whole colony: a year crystal shows fewer cells of the
+    // same size rather than a shrunk-to-fit copy of the pattern.
+    surfaceTextureScale: micro ? 0 : round6(textureTier(SURFACE_CELLS_PER_UNIT, preset)),
+    surfaceReliefStrength: micro ? 0 : round6(textureTier(0.5, preset)),
+    // The veins glow in the colour the couple earned, not in the map's own —
+    // the map is structure, ADR-0004 owns the colour.
+    surfaceVeinStrength: micro ? 0 : round6(textureTier(0.6 + wishDepth(tint) * 0.7, preset)),
   };
 }
 
@@ -306,6 +330,19 @@ function substrateLip(input: BuildCrystalMaterialInput): number {
   );
   return mesh === undefined ? 0.02 : Math.max(1e-4, mesh.bounds.max.y);
 }
+
+/**
+ * Texture cells per engine unit.
+ *
+ * Measured against the body it has to sit on rather than picked, and the window
+ * either side of it is narrow. Too coarse and a face holds less than one cell,
+ * so the map reads as a soft gradient — the pattern is there and the *texture*
+ * is not. Too fine and the cells drop under the size of the facets themselves,
+ * at which point the eye stops reading mineral and starts reading woven cloth
+ * laid over the crystal, which is worse than no map at all. This puts a handful
+ * of cells across a prism face, which is the grain quartz actually has.
+ */
+const SURFACE_CELLS_PER_UNIT = 11;
 
 /** What the fissure glows at before a single wish has been granted. */
 const AURORA_FLOOR = 0.3;
@@ -437,7 +474,11 @@ function buildBodyMaterial(
       acrossBand(SHELL_CLEARCOAT_ROUGHNESS, micro ? 0.8 : focal ? 0.1 : 0.45),
     ),
     ior: intoBand(SHELL_IOR, acrossBand(SHELL_IOR, state.purity)),
-    reflectivity: round6(clamp01(0.52 + state.purity * 0.34 + (focal ? 0.08 : 0))),
+    // Specular reach of the shell itself, under the clearcoat. Raised with the
+    // rim so the highlight the key light leaves on a facet is as strong as the
+    // reflection at its edge — otherwise the edge lights up and the face it
+    // belongs to stays matte, which reads as an outline drawn on plastic.
+    reflectivity: round6(clamp01(0.74 + state.purity * 0.26 + (focal ? 0.06 : 0))),
     emissiveIntensity,
     envMapIntensity: 0,
     iridescence,
@@ -590,6 +631,27 @@ function buildSubstrateMaterial(
       // The lip's own height is the yardstick: the fissure runs a couple of
       // those below it, and both scale with the druse.
       auroraDepth: round6(Math.max(1e-4, substrateLip(input) * 2.2)),
+      // The vein wears the same mineral as the crystals it grew, at a much
+      // coarser grain. Two reasons, and they compound: it is massive quartz
+      // rather than a grown face, so its domains are larger to begin with, and
+      // it spans an order of magnitude more of them than any single body does.
+      // The fraction is that small for exactly that reason: at anything near
+      // the crystals' density the pattern repeated some twenty-five times
+      // across the seam, and a cellular map repeated that often on dark stone
+      // stops reading as mineral and reads as snakeskin. Here it comes to a
+      // handful of broad domains, which is what massive quartz looks like.
+      surfaceTextureScale: round6(
+        textureTier(SURFACE_CELLS_PER_UNIT * 0.08, CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality]),
+      ),
+      surfaceReliefStrength: round6(
+        // Weaker than the crystals', not stronger. The vein is lit almost
+        // edge-on by the aurora below it, and at that grazing angle a relief
+        // that merely textures a crystal turns every cell into a raised scale.
+        textureTier(0.3, CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality]),
+      ),
+      // No glowing veins on the stone: the light down there is the aurora, and
+      // two lit patterns in the same crack would fight.
+      surfaceVeinStrength: 0,
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

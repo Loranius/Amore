@@ -103,10 +103,6 @@ export function buildCrystalLifeState(input: BuildCrystalLifeInput): CrystalLife
     reducedMotion: input.config.reducedMotion,
     quality: input.config.quality,
     rotationSpeed: round6(0.075 * motion),
-    tiltXAmplitude: round6(0.018 * motion),
-    tiltZAmplitude: round6(0.014 * motion),
-    levitationAmplitude: round6(0.095 * motion),
-    levitationSpeed: round6(0.17 * motion),
     breatheAmplitude: round6(0.0065 * motion),
     breatheSpeed: round6(0.32 * motion),
     sparkleCount,
@@ -130,9 +126,6 @@ export function sampleCrystalLife(input: SampleCrystalLifeInput): CrystalLifeFra
 
   return {
     rotationY: round6(moving ? elapsed * life.rotationSpeed : 0),
-    tiltX: round6(moving ? Math.sin(elapsed * 0.16) * life.tiltXAmplitude : 0),
-    tiltZ: round6(moving ? Math.sin(elapsed * 0.12 + 1.7) * life.tiltZAmplitude : 0),
-    positionY: round6(moving ? Math.sin(elapsed * life.levitationSpeed) * life.levitationAmplitude : 0),
     groupScale: round6(1 + (moving
       ? Math.sin(elapsed * life.breatheSpeed) * life.breatheAmplitude + pulse * 0.006
       : 0)),

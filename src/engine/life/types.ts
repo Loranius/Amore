@@ -40,11 +40,17 @@ export interface CrystalLifeState {
   artifactSeed: number;
   reducedMotion: boolean;
   quality: CrystalMaterialQuality;
+  /**
+   * Radians per second the artifact turns about its own vertical axis.
+   *
+   * Survives while levitation and tilt do not, and the difference is not
+   * taste. The platform is flat inside the vein's footprint and bows only
+   * outside it, so that flat region is a full annulus — rotationally symmetric.
+   * A turn about Y therefore moves the seam through stone of exactly the same
+   * height it left, and nothing can rise over it. Tilt broke that symmetry, and
+   * a turn then carried the low side around once per revolution.
+   */
   rotationSpeed: number;
-  tiltXAmplitude: number;
-  tiltZAmplitude: number;
-  levitationAmplitude: number;
-  levitationSpeed: number;
   breatheAmplitude: number;
   breatheSpeed: number;
   sparkleCount: number;
@@ -53,11 +59,18 @@ export interface CrystalLifeState {
   bodies: CrystalBodyLife[];
 }
 
+/**
+ * One sampled instant of the artifact's motion.
+ *
+ * Every term here is either a turn about the vertical axis or a uniform scale,
+ * and that is a hard rule rather than a coincidence: **the artifact is rooted.**
+ * Since ADR-0003 it is a druse standing on the ground, and since ADR-0007 it
+ * grows out of a fissure in that ground — so nothing in it may translate or tip
+ * relative to the stone it came out of. The renderer anchors the scale at the
+ * base for the same reason (`ThreeCrystalRenderBundle.baseY`).
+ */
 export interface CrystalLifeFrame {
   rotationY: number;
-  tiltX: number;
-  tiltZ: number;
-  positionY: number;
   groupScale: number;
   sparklePhase: number;
   bodyGlowMultiplier: Readonly<Record<string, number>>;

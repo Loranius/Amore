@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { GrowthBody } from '../growth';
 import { add, orthonormalBasis, scale } from '../growth/math';
-import { buildCrystalMesh } from './mesh';
+import { buildCrystalMesh, splitCrystalMeshFaces } from './mesh';
 import { intersectHalfSpaces, polytopeTolerance } from './polytope';
 import { buildCrystalProfile } from './profile';
 import { pointInsideCrystalSolid } from './trim';
@@ -575,6 +575,61 @@ describe('crystal faceting — flat faces (ADR-0006)', () => {
     const topY = Math.max(...polytope.vertices.map((vertex) => vertex.y));
     const tip = polytope.vertices.filter((vertex) => vertex.y > topY - 1e-6)[0]!;
     expect(Math.hypot(tip.x, tip.z)).toBeGreaterThan(0);
+  });
+
+  it('publishes a planar unwrap the surface maps can be sampled against', () => {
+    // The crystal has no atlas and cannot get one: its faces are a different
+    // shape on every couple. But each face is a plane, so its own plane
+    // parameterises it exactly — the projection stretches nothing, and the only
+    // seams land on facet edges, which are hard edges already.
+    //
+    // Without this attribute Three falls back to (0,0) at every vertex and the
+    // maps render as one texel smeared over the whole body.
+    for (const body of [motherBody(), crystalBody()]) {
+      const mesh = splitCrystalMeshFaces(buildCrystalMesh(body, 'high'));
+      const uvs = mesh.uvs!;
+      expect(uvs).toHaveLength((mesh.positions.length / 3) * 2);
+      expect(uvs.every(Number.isFinite)).toBe(true);
+
+      // Exact means: the triangle's area in texture space equals its area in
+      // space. A projection that skewed or scaled would not, and the pattern
+      // would stretch across the face it is meant to sit flat on.
+      for (let offset = 0; offset < mesh.indices.length; offset += 3) {
+        const corner = (slot: number) => {
+          const index = mesh.indices[offset + slot]!;
+          return {
+            position: [
+              mesh.positions[index * 3]!,
+              mesh.positions[index * 3 + 1]!,
+              mesh.positions[index * 3 + 2]!,
+            ] as const,
+            uv: [uvs[index * 2]!, uvs[index * 2 + 1]!] as const,
+          };
+        };
+        const [a, b, c] = [corner(0), corner(1), corner(2)];
+        const edge = (from: typeof a, to: typeof a) => [
+          to.position[0] - from.position[0],
+          to.position[1] - from.position[1],
+          to.position[2] - from.position[2],
+        ] as const;
+        const ab = edge(a, b);
+        const ac = edge(a, c);
+        const spatial = Math.hypot(
+          ab[1] * ac[2] - ab[2] * ac[1],
+          ab[2] * ac[0] - ab[0] * ac[2],
+          ab[0] * ac[1] - ab[1] * ac[0],
+        ) * 0.5;
+        const textured = Math.abs(
+          (b.uv[0] - a.uv[0]) * (c.uv[1] - a.uv[1])
+          - (c.uv[0] - a.uv[0]) * (b.uv[1] - a.uv[1]),
+        ) * 0.5;
+        if (spatial < 1e-9) continue;
+        // Three places, not more: the coordinates go through `round6` and the
+        // crystal is a tenth of a unit across, so a thousandth is quantisation.
+        // A projection that actually skewed would miss by tens of percent.
+        expect(textured / spatial).toBeCloseTo(1, 3);
+      }
+    }
   });
 
   it('is deterministic and unique per body', () => {

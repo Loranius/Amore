@@ -57,6 +57,12 @@ export function createThreeCrystalGeometry(
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(mesh.positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(mesh.normals, 3));
+  // Published per face, in engine units. Without it the surface maps would have
+  // nothing to sample against and Three would fall back to (0,0) on every
+  // vertex — one texel stretched across the whole crystal.
+  if (mesh.uvs !== undefined && mesh.uvs.length === (mesh.positions.length / 3) * 2) {
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs, 2));
+  }
   if (material) {
     geometry.setAttribute(
       'color',

@@ -37,6 +37,12 @@ export interface ThreeCrystalRenderBundle {
   materials: ReadonlyMap<string, THREE.MeshPhysicalMaterial>;
   drawCallCount: number;
   fit: ThreeCrystalFit;
+  /**
+   * Height of the artifact's lowest point in the root group's own frame.
+   *
+   * The pivot the breathing scale is anchored at — see `applyCrystalLifeFrame`.
+   */
+  baseY: number;
   dispose: () => void;
 }
 
@@ -282,7 +288,10 @@ function substrateReach(geometry: CrystalGeometryState, substrate: CrystalMeshDa
   ) * scale;
 }
 
-function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalBatch[]): ThreeCrystalFit {
+function fitCrystalContent(
+  content: THREE.Group,
+  batches: readonly ThreeCrystalBatch[],
+): ThreeCrystalFit & { baseY: number } {
   const bounds = new THREE.Box3();
   let hasBounds = false;
   for (const batch of batches) {
@@ -328,6 +337,7 @@ function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalB
     targetWidth,
     referenceScale,
     clamped,
+    baseY: groundBaseline + (hasBounds ? bounds.min.y * scale : 0),
   };
 }
 
@@ -358,7 +368,7 @@ export function createThreeCrystalRenderBundle(
       materials.set(bodyId, batch.material);
     }
   }
-  const fit = fitCrystalContent(content, batches);
+  const { baseY, ...fit } = fitCrystalContent(content, batches);
   group.userData['evolutionDrawCallCount'] = batches.length;
 
   return {
@@ -369,6 +379,7 @@ export function createThreeCrystalRenderBundle(
     materials,
     drawCallCount: batches.length,
     fit,
+    baseY,
     dispose: () => {
       for (const batch of batches) {
         batch.mesh.dispose();
@@ -384,9 +395,16 @@ export function applyCrystalLifeFrame(
   bundle: ThreeCrystalRenderBundle,
   frame: CrystalLifeFrame,
 ): void {
-  bundle.group.rotation.set(frame.tiltX, frame.rotationY, frame.tiltZ);
-  bundle.group.position.y = frame.positionY;
+  bundle.group.rotation.set(0, frame.rotationY, 0);
   bundle.group.scale.setScalar(frame.groupScale);
+  // Breathe about the base, not about the group's origin.
+  //
+  // The origin sits well above the artifact's foot, so a plain `setScalar`
+  // swings the foot by `baseY * (1 - scale)` — the seam rises out of the stone
+  // and sinks back into it, which is the one thing a rooted artifact must never
+  // do. Compensating here keeps the foot at a fixed height while the body still
+  // breathes, so the scale is a change of size rather than of position.
+  bundle.group.position.y = bundle.baseY * (1 - frame.groupScale);
 
   // Batched bodies share one material. Preserve deterministic per-body phases
   // by applying their mean glow to the shared optical batch.

@@ -121,6 +121,10 @@ function rowCenter(
 export /** cos(38°): past this a vertex normal is averaging across an edge, not a curve. */
 const SMOOTH_CREASE_COSINE = 0.788;
 
+/** Reference directions for the per-face texture basis; the second covers poles. */
+const UP: GrowthVec3 = { x: 0, y: 1, z: 0 };
+const SIDE: GrowthVec3 = { x: 1, y: 0, z: 0 };
+
 export function rebuildCrystalMeshNormals(mesh: CrystalMeshData): CrystalMeshData {
   return { ...mesh, normals: computeNormals(mesh.positions, mesh.indices) };
 }
@@ -149,6 +153,7 @@ export function splitCrystalMeshFaces(
 ): CrystalMeshData {
   const positions: number[] = [];
   const normals: number[] = [];
+  const uvs: number[] = [];
   const indices: number[] = [];
 
   for (let offset = 0; offset < mesh.indices.length; offset += 3) {
@@ -166,7 +171,26 @@ export function splitCrystalMeshFaces(
       subtract(corners[1], corners[0]),
       subtract(corners[2], corners[0]),
     ));
+    // Texture coordinates, projected onto the triangle's own plane.
+    //
+    // This is the only unwrap a crystal can have. It has no atlas and cannot
+    // get one — the faces are a different shape on every couple — but every
+    // face is planar, so its own plane is an exact parameterisation of it: no
+    // stretch anywhere, and the only seams fall on facet edges, which are hard
+    // edges already and hide them.
+    //
+    // The basis is derived from the face normal alone, so the two triangles of
+    // one face agree and the texture crosses between them without a break.
+    const reference = Math.abs(face.y) < 0.9 ? UP : SIDE;
+    const uAxis = normalize(cross(reference, face));
+    const vAxis = normalize(cross(face, uAxis));
+
     for (let slot = 0; slot < 3; slot += 1) {
+      const corner = corners[slot]!;
+      uvs.push(
+        round6(corner.x * uAxis.x + corner.y * uAxis.y + corner.z * uAxis.z),
+        round6(corner.x * vAxis.x + corner.y * vAxis.y + corner.z * vAxis.z),
+      );
       indices.push(pushVertex(positions, corners[slot]!));
       // Faceted by default: a crystal's side is a flat plane and every triangle
       // on it must say so. `smooth` carries the mesh's own averaged normals
@@ -190,6 +214,7 @@ export function splitCrystalMeshFaces(
     ...mesh,
     positions,
     normals,
+    uvs,
     indices,
     // Bounds are unchanged in principle — the same points, listed more times —
     // but recomputing keeps the published state self-consistent rather than

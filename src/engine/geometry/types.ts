@@ -121,6 +121,25 @@ export interface CrystalMeshData {
   profile: CrystalBodyProfile;
   positions: number[];
   normals: number[];
+  /**
+   * Per-face planar texture coordinates, in engine units.
+   *
+   * The crystal has no unwrap and cannot have one: it is a polytope whose faces
+   * are a different shape on every couple, so there is no atlas that would fit
+   * and no seam layout that would survive the next seed. Each face is planar
+   * though, so projecting it onto its own plane is exact — no stretch, no
+   * distortion, and the only seams are the facet edges, which are hard edges
+   * already.
+   *
+   * Left in engine units rather than normalised to 0..1 deliberately. Normalising
+   * per face would give a small crystal the same number of texture cells as the
+   * monarch, so the grain would shrink with the body instead of staying the
+   * grain of one mineral. Density is the material's decision, applied as a
+   * multiplier; this only says which way the face lies.
+   *
+   * Optional so persisted Geometry State v1 meshes stay readable.
+   */
+  uvs?: number[];
   indices: number[];
   sourceTriangleCount: number;
   visibleTriangleCount: number;

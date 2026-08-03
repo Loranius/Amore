@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { CrystalBodyMaterial, CrystalRgb, CrystalShaderRecipe } from '../../material';
+import { crystalSurfaceTextures } from './surfaceTextures';
 
 function toColor(color: CrystalRgb): THREE.Color {
   return new THREE.Color().setRGB(color.r, color.g, color.b);
@@ -29,6 +30,9 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     rgbKey(recipe.auroraColor),
     rgbKey(recipe.auroraSecondColor),
     recipe.auroraDepth.toFixed(6),
+    recipe.surfaceTextureScale.toFixed(6),
+    recipe.surfaceReliefStrength.toFixed(6),
+    recipe.surfaceVeinStrength.toFixed(6),
   ].join('|');
 }
 
@@ -345,6 +349,26 @@ export function createThreeCrystalMaterial(source: CrystalBodyMaterial): THREE.M
     source.iridescenceThicknessMin,
     source.iridescenceThicknessMax,
   ];
+  // Surface maps. The coordinates are published in engine units, so `repeat`
+  // is the density knob rather than a tiling count — see `surfaceTextureScale`.
+  const maps = crystalSurfaceTextures(source.shader.surfaceTextureScale);
+  if (maps !== null) {
+    material.map = maps.surface;
+    material.normalMap = maps.relief;
+    material.normalScale = new THREE.Vector2(
+      source.shader.surfaceReliefStrength,
+      source.shader.surfaceReliefStrength,
+    );
+    if (source.shader.surfaceVeinStrength > 0) {
+      material.emissiveMap = maps.veins;
+      // The veins ride the body's own emissive colour, so what glows in the
+      // cracks of the stone is the colour the couple earned rather than the
+      // blue the map was authored in.
+      material.emissiveIntensity = source.emissiveIntensity
+        + source.shader.surfaceVeinStrength;
+    }
+  }
+
   material.userData['evolutionBodyId'] = source.bodyId;
   material.userData['evolutionSignature'] = source.signature;
   material.userData['evolutionBaseEmissiveIntensity'] = source.emissiveIntensity;

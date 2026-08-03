@@ -103,6 +103,22 @@ export interface CrystalShaderRecipe {
    * small crystal and nothing at all on a large one.
    */
   auroraDepth: number;
+  /**
+   * How many texture cells fit into one engine unit of a face.
+   *
+   * The mesh publishes its texture coordinates in engine units (see
+   * `CrystalMeshData.uvs`) precisely so density is decided here rather than
+   * baked into the geometry: the grain belongs to the mineral, not to the size
+   * of the body, so a year crystal shows the same cells as the monarch at the
+   * same scale rather than a shrunken copy of them.
+   *
+   * Zero means the body takes no surface maps at all.
+   */
+  surfaceTextureScale: number;
+  /** How far the surface map's relief is allowed to push the shading normal. */
+  surfaceReliefStrength: number;
+  /** How brightly the veins in the map glow, in the body's own earned colour. */
+  surfaceVeinStrength: number;
 }
 
 export interface CrystalFacetTinting {

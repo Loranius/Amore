@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CRYSTAL_COMPOSITION_CONFIG, buildCrystalComposition } from '../composition';
 import { buildArtifactBlueprint, type EvolutionEventInput } from '../evolution';
@@ -164,12 +165,52 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
 
     expect(later).toEqual(first);
     expect(first.rotationY).toBe(0);
-    expect(first.positionY).toBe(0);
     expect(first.groupScale).toBe(1);
     expect(touched.rotationY).toBe(0);
-    expect(touched.positionY).toBe(0);
     expect(touched.groupScale).toBe(1);
     expect(Object.values(touched.bodyGlowMultiplier).some((value) => value > 1)).toBe(true);
+  });
+
+  it('never moves the artifact vertically, however long it has been alive', () => {
+    // The artifact is rooted: a druse standing on the ground (ADR-0003) that
+    // grows out of a fissure in it (ADR-0007). Any vertical motion at all makes
+    // the seam rise out of the stone and sink back into it.
+    //
+    // It did exactly that, twice reported. Levitation swung the whole group
+    // ±0.095 and a tilt of ±0.018/±0.014 rad swung the vein's far rim another
+    // ±0.06, against a seam standing only ~0.047 proud of the platform — so it
+    // buried itself twice a cycle, and the turn about Y carried the low side
+    // around once per revolution, which is what "it spirals down" was.
+    //
+    // Measured on the built bundle rather than on the frame, because the defect
+    // was never in one number: the pieces were individually modest and only the
+    // composed transform was wrong. This checks the thing the eye checks — how
+    // high off the ground the lowest point of the artifact actually sits.
+    const { material, geometry, life } = pipeline();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const floorOf = (seconds: number, pulse = 0) => {
+      applyCrystalLifeFrame(bundle, sampleCrystalLife({
+        life,
+        elapsedSeconds: seconds,
+        interactionPulse: pulse,
+      }));
+      bundle.group.updateMatrixWorld(true);
+      return new THREE.Box3().setFromObject(bundle.group).min.y;
+    };
+
+    const rest = floorOf(0);
+    // A full turn and then some, sampled off any period the motion might have.
+    for (const seconds of [0.5, 3.7, 11.3, 29, 42.6, 84, 137.2, 300]) {
+      expect(floorOf(seconds)).toBeCloseTo(rest, 5);
+    }
+    // Including while the couple is touching it — the pulse feeds the scale.
+    expect(floorOf(42.6, 1)).toBeCloseTo(rest, 5);
+
+    // And the reason it holds: the only transforms left are a turn about the
+    // vertical axis and a scale anchored at the foot.
+    expect(bundle.group.rotation.x).toBe(0);
+    expect(bundle.group.rotation.z).toBe(0);
+    bundle.dispose();
   });
 
   it('batches different geometries and fits them without mutating domain coordinates', () => {
@@ -187,7 +228,6 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(bundle.group.children).toEqual([bundle.content]);
     expect(bundle.content.children).toHaveLength(bundle.drawCallCount);
     expect(bundle.group.rotation.y).toBeCloseTo(frame.rotationY, 6);
-    expect(bundle.group.position.y).toBeCloseTo(frame.positionY, 6);
 
     expect(bundle.fit.sourceSize.x).toBeGreaterThan(0);
     expect(bundle.fit.sourceSize.y).toBeGreaterThan(0);
@@ -585,7 +625,41 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     const { material } = pipeline({ quality: 'fallback' });
     for (const body of material.bodies) {
       expect(body.shader.veilStrength).toBe(0);
+      expect(body.shader.surfaceTextureScale).toBe(0);
     }
+  });
+
+  it('gives the vein a far coarser grain than the crystals it grew', () => {
+    // Both wear the same mineral map, and they must not wear it at the same
+    // density. The vein spans an order of magnitude more engine units than any
+    // single body, so at the crystals' cell count the pattern repeats across it
+    // dozens of times and reads as snakeskin rather than as stone.
+    //
+    // This is published state rather than a renderer preference for a reason
+    // that cost a full debugging pass: `repeat` lives on a Three texture, not
+    // on a material, so a renderer that hands one shared instance to every body
+    // silently gives them all whichever density was written last. With that bug
+    // in place the vein wore the crystals' grain and changing this number moved
+    // nothing at all on screen. The renderer now clones per density; this is
+    // the assertion that says there are distinct densities to clone for.
+    const { material } = pipeline({ quality: 'high' });
+    const rock = material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+    const crystals = material.bodies.filter((body) => body.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID);
+
+    expect(rock.shader.surfaceTextureScale).toBeGreaterThan(0);
+    for (const body of crystals) {
+      expect(body.shader.surfaceTextureScale).toBeGreaterThan(rock.shader.surfaceTextureScale * 3);
+    }
+
+    // One grain for the whole colony: a year crystal shows fewer cells of the
+    // same size, never a shrunk-to-fit copy of the pattern.
+    const densities = new Set(crystals.map((body) => body.shader.surfaceTextureScale));
+    expect(densities.size).toBe(1);
+
+    // The stone takes relief but no glowing veins — the light down there is the
+    // aurora, and two lit patterns in one crack would fight.
+    expect(rock.shader.surfaceVeinStrength).toBe(0);
+    expect(rock.shader.surfaceReliefStrength).toBeGreaterThan(0);
   });
 
   it('carries the core into the material signature', () => {
