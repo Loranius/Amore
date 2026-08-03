@@ -11,6 +11,7 @@ import type {
   CrystalBodyProfile,
   CrystalLodLevel,
   CrystalProfileRow,
+  CrystalRingFacet,
 } from './types';
 
 interface BaseProfileRow {
@@ -44,31 +45,31 @@ export function crystalSegments(tier: GrowthTier, lod: CrystalLodLevel): number 
   return Math.max(4, Math.ceil(high * 0.6));
 }
 
-/** Smallest and largest ring a lathe may have and still close cleanly. */
-const MIN_SEGMENTS = 4;
-const MAX_SEGMENTS = 24;
-
 /**
- * Facet count of a body.
+ * How a body's cross-section is spent.
  *
- * Since ADR-0004 the species publishes this as data — the monarch earns her
- * facets with the couple's photos — so it is deliberately **not** reduced by
- * level of detail. A weaker phone must not show the same couple a differently
- * shaped crystal; LOD reduces profile rows and drops small bodies instead.
+ * ADR-0004 turned uploaded photos into facets, and the previous build spent
+ * them all on more sides — a monarch with many photos had up to 24 of them.
+ * Visual review rejected the result as a "pink obelisk": every face was narrow,
+ * and narrow faces read as noise rather than as a cut stone.
  *
- * Bodies from species that publish no facet count keep the old tier-and-LOD
- * behaviour.
+ * The main faces are now fixed at six or seven, and everything earned beyond
+ * them becomes a chamfer — a cut on one specific edge, adding a narrow face and
+ * a new edge without wrapping another belt of strips around the body.
  */
-function segmentsFor(
+function facetPlan(
   body: GrowthBody,
   mother: boolean,
-  lod: CrystalLodLevel,
-): number {
+): { mainFacets: number; chamfers: number } {
+  const min = mother ? MAIN_FACET_MIN : CHILD_FACET_MIN;
+  const max = mother ? MAIN_FACET_MAX : CHILD_FACET_MAX;
+  const mainFacets = min + (seededUnit(body.seed, 'geometry:main-facets') < 0.5 ? 0 : max - min);
+
   const published = body.attributes['facetCount'];
-  if (typeof published === 'number' && Number.isFinite(published)) {
-    return Math.max(MIN_SEGMENTS, Math.min(MAX_SEGMENTS, Math.round(published)));
-  }
-  return mother ? 8 : crystalSegments(body.tier, lod);
+  const earned = typeof published === 'number' && Number.isFinite(published)
+    ? Math.max(0, Math.round(published) - min)
+    : 0;
+  return { mainFacets, chamfers: Math.min(MAX_CHAMFERS, earned) };
 }
 
 function profileScales(archetype: string): { scaleX: number; scaleZ: number } {
@@ -118,7 +119,7 @@ function appendBaseRow(rows: BaseProfileRow[], y: number, radius: number): void 
  * own height. Seeded per body so no two crystals in a colony carry the same
  * crown.
  */
-const SHOULDER_MIN = 0.65;
+const SHOULDER_MIN = 0.7;
 const SHOULDER_MAX = 0.78;
 
 /**
@@ -130,27 +131,21 @@ const SHOULDER_MAX = 0.78;
  * as "a ball sticking out of the ground" no matter how well it was faceted.
  * The widest point is now the shoulder, and this is where the crystal starts.
  */
-const BASE_WAIST = 0.76;
-
-/**
- * How far under the shoulder every slice below it must stay. Small enough that
- * the shaft still swells visibly, large enough that the widest slice is never
- * ambiguous.
- */
-const SHOULDER_CLEARANCE = 0.985;
+const BASE_WAIST = 0.88;
 
 function shoulderFraction(seed: number): number {
   return SHOULDER_MIN + seededUnit(seed, 'geometry:shoulder') * (SHOULDER_MAX - SHOULDER_MIN);
 }
 
 /**
- * How many extra cut planes this crystal carries in its termination.
+ * Deliberate cuts in the termination — zero to two.
  *
- * A quartz point is rarely a clean pyramid: most have one or two secondary
- * faces between the shaft and the tip. Zero to two, seeded, so crowns differ
- * from crystal to crystal without any of them becoming a pincushion.
+ * A quartz point is rarely a clean pyramid; most have one or two secondary
+ * faces between shaft and tip. Deliberate is the operative word: these are the
+ * only horizontal divisions above the shoulder, so each one is a visible edge
+ * rather than a step in a stack.
  */
-function extraBevelCount(seed: number): number {
+function crownBevelCount(seed: number): number {
   return Math.floor(seededUnit(seed, 'geometry:crown-bevels') * 3);
 }
 
@@ -177,30 +172,31 @@ function appendPrismRows(
   const { seed, bodyStart, length, radius, tipRadius, shoulderShare } = options;
   const at = (fraction: number): number => bodyStart + length * fraction;
 
-  // Shaft: a gentle swell rather than a taper. The whole rise is under a third
-  // of the radius, so the silhouette still reads as parallel-sided from a
-  // distance — which is what makes it a prism instead of a spindle.
+  // Base and shoulder, and nothing between them.
+  //
+  // The shaft used to carry four intermediate slices. They were added to give
+  // the surface somewhere to break, back when a smooth lathe was the problem —
+  // but each one is another horizontal band across every side face, and once
+  // the faces are genuinely flat the bands are all the eye sees. The body of a
+  // quartz prism is one uninterrupted run.
+  //
+  // The swell across it is small on purpose: the radius is nearly constant, so
+  // the sides read as parallel and the shoulder is the only place the
+  // silhouette turns a corner.
   appendBaseRow(rows, at(0), radius * BASE_WAIST);
-  appendBaseRow(rows, at(shoulderShare * 0.08), radius * 0.83);
-  appendBaseRow(rows, at(shoulderShare * 0.24), radius * 0.88);
-  appendBaseRow(rows, at(shoulderShare * 0.48), radius * 0.93);
-  appendBaseRow(rows, at(shoulderShare * 0.76), radius * 0.97);
   appendBaseRow(rows, at(shoulderShare), radius);
 
-  // Termination. The crown is short — under a third of the height — so the
-  // edge where it meets the shaft is a real corner rather than the start of a
-  // long fade.
+  // Termination: the shoulder ring, up to two deliberate bevels, and the tip.
+  // With no bevels each crown face is a single large triangle from the shoulder
+  // straight to the point, which is what the references show.
   const crown = Math.max(1e-6, 1 - shoulderShare);
-  const bevels = extraBevelCount(seed);
-  const crownRows = 2 + bevels;
-  for (let step = 1; step <= crownRows; step += 1) {
-    const along = step / (crownRows + 1);
-    // Slightly convex: the termination narrows faster near the tip than near
-    // the shoulder, the way a real point does.
+  const bevels = crownBevelCount(seed);
+  for (let step = 1; step <= bevels; step += 1) {
+    const along = step / (bevels + 1);
     appendBaseRow(
       rows,
       at(shoulderShare + crown * along),
-      radius * (1 - Math.pow(along, 0.82)) * 0.97 + tipRadius * along,
+      radius * (1 - Math.pow(along, 0.8)) * 0.96 + tipRadius * along,
     );
   }
   appendBaseRow(rows, at(1), tipRadius);
@@ -212,179 +208,159 @@ function smoothStep(value: number): number {
 }
 
 /**
- * How far each slice turns relative to the one below it.
+ * Facets of the shaft, before any earned chamfers.
  *
- * A lathe whose rings all share one orientation is a prism, and a prism read as
- * "a smooth ball sticking out of the ground" in review: every quad between two
- * rings is a long vertical strip, all strips meet the light at the same angle,
- * and nothing on the surface tells you where one face ends and the next begins.
- * Turning each slice breaks those strips into ribbons that catch the light
- * separately — the single biggest difference between a lathe and a crystal.
- *
- * The whole body used to twist by about 11° in total. This is 6–12° **per
- * slice**, so an eight-row monarch turns through roughly 70°.
+ * Six or seven, and no more. Visual review rejected the previous crystal as a
+ * "pink obelisk with a mosaic of small triangles": earning up to 24 sides made
+ * every face narrow, and narrow faces read as noise rather than as a cut stone.
+ * A quartz prism has six large ones.
  */
-const SLICE_TURN_MIN_RAD = 6 * (Math.PI / 180);
-const SLICE_TURN_MAX_RAD = 12 * (Math.PI / 180);
+const MAIN_FACET_MIN = 6;
+const MAIN_FACET_MAX = 7;
+/** Children read as the monarch's own mineral, one or two faces simpler. */
+const CHILD_FACET_MIN = 5;
+const CHILD_FACET_MAX = 6;
 
 /**
- * Ceiling on the turn, as a fraction of one facet's angular width.
- *
- * Without it a 24-facet monarch (the couple with the most photos) would turn
- * each slice by most of a facet, shearing every quad into a sliver. The visual
- * effect of a turn is relative to facet width, not absolute, so a crystal with
- * many narrow facets needs a proportionally smaller step.
+ * How wide a chamfer is, as a fraction of the gap between two main facets.
+ * Narrow enough to read as a cut corner rather than as another side.
  */
-const SLICE_TURN_MAX_STEP_FRACTION = 0.4;
+const CHAMFER_WIDTH = 0.22;
+/** How far a chamfer sits inside the main radius — a cut removes material. */
+const CHAMFER_INSET = 0.965;
+/** Ceiling on earned chamfers, so a couple with thousands of photos still has a prism. */
+const MAX_CHAMFERS = 6;
 
-/** How far a slice may wander off the axis, as a fraction of its own radius. */
-const SLICE_DRIFT = 0.05;
-/** The tip wanders further — a terminated crystal is never centred over its base. */
-const SLICE_TIP_DRIFT = 0.14;
-
-/** Per-slice radius swing, 5–10% of the profile radius. */
-const SLICE_RADIUS_SWING_MIN = 0.05;
-const SLICE_RADIUS_SWING_MAX = 0.1;
-
-function sliceRadiusSwing(seed: number, rowIndex: number, axis: 'x' | 'z'): number {
-  const unit = seededUnit(seed, `geometry:slice-radius-swing:${axis}:${rowIndex}`);
-  return SLICE_RADIUS_SWING_MIN + unit * (SLICE_RADIUS_SWING_MAX - SLICE_RADIUS_SWING_MIN);
-}
+/** Main facets differ in width by up to this much, so the prism is cut rather than machined. */
+const FACET_WIDTH_JITTER = 0.16;
+/** ...and in radius by this much, which is a per-facet constant and so keeps faces flat. */
+const FACET_RADIUS_JITTER = 0.05;
 
 /**
- * Per-slice turn, accumulated from the base upward.
+ * The cross-section, built once and shared by every slice.
  *
- * Accumulated rather than interpolated: the point is that adjacent slices
- * differ, and any curve that eases in and out flattens exactly the slices where
- * the crystal is widest and most visible.
+ * Photos are the reason this is a list rather than a segment count. ADR-0004
+ * turned uploaded photos into facets, and the previous build spent them on more
+ * sides — which wrapped another belt of narrow strips around the whole body. A
+ * chamfer instead takes one specific edge and cuts it: a new, narrow face and a
+ * new edge, with the silhouette barely moved and the six large faces intact.
  */
-function sliceTurns(
+function buildRing(
   seed: number,
-  rowCount: number,
-  segments: number,
-  twistTotal: number,
-): number[] {
-  const step = (Math.PI * 2) / Math.max(1, segments);
-  const ceiling = step * SLICE_TURN_MAX_STEP_FRACTION;
-  // One handedness for the whole body. Seeding this independently let a crystal
-  // twist one way at body scale and the other slice by slice, which cancels
-  // into a shape that reads as a mistake rather than as growth.
-  const direction = twistTotal < 0 ? -1 : 1;
-  const turns: number[] = [];
-  let accumulated = 0;
-  for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
-    if (rowIndex > 0) {
-      const unit = seededUnit(seed, `geometry:slice-turn:${rowIndex}`);
-      const magnitude = Math.min(
-        ceiling,
-        SLICE_TURN_MIN_RAD + unit * (SLICE_TURN_MAX_RAD - SLICE_TURN_MIN_RAD),
-      );
-      accumulated += direction * magnitude;
-    }
-    turns.push(round6(accumulated));
+  mainFacets: number,
+  chamfers: number,
+  orientation: number,
+): CrystalRingFacet[] {
+  const step = (Math.PI * 2) / mainFacets;
+  const main: CrystalRingFacet[] = [];
+  for (let index = 0; index < mainFacets; index += 1) {
+    // Width jitter is applied to the *angle* of each edge and stays constant
+    // down the body, so faces vary in width without ever going non-planar.
+    const offset = signedUnit(seed, `geometry:facet-width:${index}`) * step * FACET_WIDTH_JITTER;
+    main.push({
+      angle: round6(orientation + index * step + offset),
+      radiusScale: round6(1 + signedUnit(seed, `geometry:facet-radius:${index}`) * FACET_RADIUS_JITTER),
+      chamfer: false,
+    });
   }
-  return turns;
+
+  const wanted = Math.max(0, Math.min(MAX_CHAMFERS, chamfers));
+  if (wanted === 0) return main;
+
+  // Each chamfer replaces one edge between two main facets. Distinct edges,
+  // spread by the golden ratio so consecutive earned facets never land next to
+  // each other and clump into one wide bevel.
+  const edges = new Set<number>();
+  for (let index = 0; index < wanted; index += 1) {
+    const candidate = Math.floor(((index * 0.6180339887 + seededUnit(seed, 'geometry:chamfer-phase')) % 1) * mainFacets);
+    for (let probe = 0; probe < mainFacets; probe += 1) {
+      const edge = (candidate + probe) % mainFacets;
+      if (!edges.has(edge)) { edges.add(edge); break; }
+    }
+  }
+
+  const ring: CrystalRingFacet[] = [];
+  for (let index = 0; index < mainFacets; index += 1) {
+    ring.push(main[index]!);
+    if (!edges.has(index)) continue;
+    const next = main[(index + 1) % mainFacets]!;
+    let gap = next.angle - main[index]!.angle;
+    if (gap <= 0) gap += Math.PI * 2;
+    ring.push({
+      angle: round6(main[index]!.angle + gap * (0.5 - CHAMFER_WIDTH * 0.5)),
+      radiusScale: round6(main[index]!.radiusScale * CHAMFER_INSET),
+      chamfer: true,
+    });
+    ring.push({
+      angle: round6(main[index]!.angle + gap * (0.5 + CHAMFER_WIDTH * 0.5)),
+      radiusScale: round6(next.radiusScale * CHAMFER_INSET),
+      chamfer: true,
+    });
+  }
+  return ring;
 }
 
 function decorateRows(
   rows: readonly BaseProfileRow[],
-  body: GrowthBody,
   scales: { scaleX: number; scaleZ: number },
-  tuning: ProfileShapeTuning,
   twistTotal: number,
   axisLeanX: number,
   axisLeanZ: number,
   burialStartY: number,
   burialCompression: number,
-  segments: number,
 ): CrystalProfileRow[] {
   const lastY = Math.max(1e-9, rows[rows.length - 1]?.y ?? 0);
-  const turns = sliceTurns(body.seed, rows.length, segments, twistTotal);
-  const phaseBias = signedUnit(body.seed, 'geometry:profile-phase-bias') * tuning.phase * 0.35;
-  const bowX = signedUnit(body.seed, 'geometry:axis-bow-x') * Math.abs(axisLeanX + axisLeanZ) * 0.35;
-  const bowZ = signedUnit(body.seed, 'geometry:axis-bow-z') * Math.abs(axisLeanX + axisLeanZ) * 0.35;
   const minimumScale = Math.max(0.0001, Math.min(scales.scaleX, scales.scaleZ));
-  // The shoulder is the widest slice of the base profile, and it has to stay
-  // the widest slice of the finished one. The per-slice swing is 5-10% while
-  // the shaft rises only 4-5% between rows, so without this a shaft slice can
-  // out-swell the shoulder — and a crystal whose widest point sits a third of
-  // the way up has no shoulder at all, which is the whole silhouette gone.
-  //
-  // Capping rather than shrinking the swing: the swing is what keeps the shaft
-  // from reading as a machined tube, and it is only ever wrong when it crosses
-  // this one line.
-  const shoulderIndex = rows.reduce(
-    (best, row, index) => (row.radius > rows[best]!.radius ? index : best),
-    0,
-  );
 
-  const raw = rows.map((row, rowIndex) => {
+  // Everything a slice is allowed to do is here, and the list is short on
+  // purpose: scale its radius, and translate its centre. Both keep the quad
+  // between two slices a trapezoid — bottom and top edges stay parallel, so the
+  // four corners are coplanar and both triangles share one normal.
+  //
+  // What used to be here and is gone: a per-slice turn, a per-slice sideways
+  // drift, a per-slice radius swing, a per-slice facet phase and an elliptical
+  // pulse that varied the X:Z ratio with height. Every one of them rotates or
+  // re-shapes the ring between two rows, which tilts the top edge out of
+  // parallel with the bottom one. The quad stops being flat, its two triangles
+  // take different normals, and the crystal renders as a mosaic of small
+  // triangles rather than as a handful of large faces (visual review,
+  // 2026-08-03). They were added to break up a smooth lathe; the answer to a
+  // smooth lathe is fewer, larger, genuinely flat faces.
+  const raw = rows.map((row) => {
     const t = Math.max(0, Math.min(1, row.y / lastY));
-    const bend = Math.sin(Math.PI * t);
-    // Each slice also steps sideways on its own. The lean and the bow are
-    // smooth curves — they move the whole silhouette without ever making two
-    // neighbouring slices disagree, which is what actually produces an edge.
-    // The last slice gets the largest step, so the tip finishes off the axis
-    // rather than centred over the base like a spun cone.
-    const tipward = rowIndex === rows.length - 1 ? SLICE_TIP_DRIFT : SLICE_DRIFT;
-    const driftScale = row.radius * tipward;
-    const driftX = signedUnit(body.seed, `geometry:slice-drift-x:${rowIndex}`) * driftScale;
-    const driftZ = signedUnit(body.seed, `geometry:slice-drift-z:${rowIndex}`) * driftScale;
-    const centerOffsetX = axisLeanX * smoothStep(t) + bowX * bend + driftX;
-    const centerOffsetZ = axisLeanZ * smoothStep(t) + bowZ * bend + driftZ;
-    const rotation = twistTotal * smoothStep(t) + (turns[rowIndex] ?? 0);
-    const facetPhase = phaseBias
-      + signedUnit(body.seed, `geometry:facet-phase:${rowIndex}`) * tuning.phase * bend;
+    // The axis leans as one piece. Linear in t rather than eased: a curve bends
+    // the body, and a bent prism has no flat side.
+    const centerOffsetX = axisLeanX * t;
+    const centerOffsetZ = axisLeanZ * t;
     const burialT = burialStartY > 1e-9
       ? Math.max(0, Math.min(1, row.y / burialStartY))
       : 1;
     const compression = burialStartY > 0 && row.y < burialStartY
       ? burialCompression + (1 - burialCompression) * smoothStep(burialT)
       : 1;
-    const pulse = Math.sin((t * Math.PI * 2) + phaseBias * 7) * tuning.asymmetry * 0.22;
-    // 5–10% per slice, stated rather than incidental: enough that the taper
-    // reads as a stack of distinct sections, small enough that the silhouette
-    // stays a crystal and not a stack of coins.
-    const rowNoiseX = signedUnit(body.seed, `geometry:radius-x:${rowIndex}`) * sliceRadiusSwing(body.seed, rowIndex, 'x');
-    const rowNoiseZ = signedUnit(body.seed, `geometry:radius-z:${rowIndex}`) * sliceRadiusSwing(body.seed, rowIndex, 'z');
-    const radiusX = Math.max(
-      0.0001,
-      row.radius * scales.scaleX * compression * (1 + pulse + rowNoiseX),
-    );
-    const radiusZ = Math.max(
-      0.0001,
-      row.radius * scales.scaleZ * compression * (1 - pulse + rowNoiseZ),
-    );
     return {
       baseRadius: row.radius,
       y: row.y,
-      radiusX,
-      radiusZ,
+      radiusX: Math.max(0.0001, row.radius * scales.scaleX * compression),
+      radiusZ: Math.max(0.0001, row.radius * scales.scaleZ * compression),
       centerOffsetX,
       centerOffsetZ,
-      rotation,
-      facetPhase,
+      // One orientation for the whole body. A crystal twists as a unit or not
+      // at all.
+      rotation: twistTotal,
+      facetPhase: 0,
     };
   });
 
-  // Enforce the shoulder. Clamping the finished radii rather than trimming the
-  // swing that produced them, because the swing is not the only thing that can
-  // cross the line: the elliptical pulse and the burial compression move a
-  // slice too, and an earlier attempt that only tamed the swing still let the
-  // pulse hand the widest radius to a slice a third of the way up.
-  const shoulderX = raw[shoulderIndex]?.radiusX ?? 0;
-  const shoulderZ = raw[shoulderIndex]?.radiusZ ?? 0;
-
-  return raw.map((row, rowIndex) => {
-    const capped = rowIndex < shoulderIndex;
-    const radiusX = capped ? Math.min(row.radiusX, shoulderX * SHOULDER_CLEARANCE) : row.radiusX;
-    const radiusZ = capped ? Math.min(row.radiusZ, shoulderZ * SHOULDER_CLEARANCE) : row.radiusZ;
+  return raw.map((row) => {
     const offsetEnvelope = Math.hypot(row.centerOffsetX, row.centerOffsetZ) / minimumScale;
     const conservativeRadius = Math.max(
       row.baseRadius,
-      radiusX / Math.max(0.0001, scales.scaleX),
-      radiusZ / Math.max(0.0001, scales.scaleZ),
+      row.radiusX / Math.max(0.0001, scales.scaleX),
+      row.radiusZ / Math.max(0.0001, scales.scaleZ),
     ) + offsetEnvelope;
+    const radiusX = row.radiusX;
+    const radiusZ = row.radiusZ;
 
     return {
       y: row.y,
@@ -476,20 +452,17 @@ export function buildCrystalProfile(
   const burialCompression = attached
     ? round6(0.62 + seededUnit(body.seed, 'geometry:burial-compression') * 0.14)
     : 1;
-  // Facet count first: the per-slice turn is measured against one facet's
-  // angular width, so the rows cannot be laid out until the ring is known.
-  const segments = segmentsFor(body, mother, lod);
+  const plan = facetPlan(body, mother);
+  const ring = buildRing(body.seed, plan.mainFacets, plan.chamfers, twistTotal);
+  const segments = ring.length;
   const rows = decorateRows(
     baseRows,
-    body,
     scales,
-    tuning,
     twistTotal,
     axisLeanX,
     axisLeanZ,
     burialStartY,
     burialCompression,
-    segments,
   );
   const signaturePayload = JSON.stringify({
     bodyId: body.id,
@@ -499,6 +472,7 @@ export function buildCrystalProfile(
     tier: body.tier,
     lod,
     segments,
+    ring,
     extraSink: round6(extraSink),
     geometryLength: round6(geometryLength),
     rows,
@@ -527,6 +501,7 @@ export function buildCrystalProfile(
     burialStartY,
     burialCompression,
     rows,
+    ring,
     signature: stableHash32(signaturePayload).toString(16).padStart(8, '0'),
   };
 }

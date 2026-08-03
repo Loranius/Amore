@@ -24,12 +24,19 @@ function facetColors(
 ): Float32Array {
   const vertexCount = mesh.positions.length / 3;
   const colors = new Float32Array(vertexCount * 3);
+  // Keyed on the *face*, not on the triangle. A side face is two coplanar
+  // triangles that must read as one plane; tinting them separately drew a seam
+  // straight down the middle of every face — the same mosaic the geometry pass
+  // was undoing. Faces are the ring's facets, so the face a triangle belongs to
+  // is its position in the ring.
+  const facesPerRing = Math.max(1, mesh.profile.ring?.length ?? mesh.profile.segments);
   for (let offset = 0; offset < mesh.indices.length; offset += 3) {
+    const triangle = offset / 3;
     const tint = facetTintFor(
       material.facets,
       artifactSeed,
       mesh.bodyId,
-      offset / 3,
+      Math.floor(triangle / 2) % facesPerRing,
     );
     for (let slot = 0; slot < 3; slot += 1) {
       const vertex = (mesh.indices[offset + slot] ?? 0) * 3;

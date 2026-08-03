@@ -6,7 +6,6 @@ import {
   orthonormalBasis,
   round6,
   scale,
-  seededUnit,
   subtract,
 } from '../growth/math';
 import type { GrowthBody, GrowthVec3 } from '../growth';
@@ -179,7 +178,12 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
   const { tangent, bitangent } = orthonormalBasis(body.direction);
   const positions: number[] = [];
   const indices: number[] = [];
-  const segments = profile.segments;
+  const ring = profile.ring ?? Array.from({ length: profile.segments }, (_, index) => ({
+    angle: (index / profile.segments) * Math.PI * 2,
+    radiusScale: 1,
+    chamfer: false,
+  }));
+  const segments = ring.length;
 
   for (let rowIndex = 0; rowIndex < profile.rows.length; rowIndex += 1) {
     const row = profile.rows[rowIndex]!;
@@ -190,20 +194,19 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
       bitangent,
       row,
     );
-    const angleStep = (Math.PI * 2) / segments;
-    for (let segment = 0; segment < segments; segment += 1) {
-      const facetAngleJitter = (seededUnit(body.seed, `geometry:facet-angle:${segment}`) - 0.5)
-        * angleStep * 0.28;
-      const rowAngleJitter = (seededUnit(body.seed, `geometry:facet-angle-row:${rowIndex}:${segment}`) - 0.5)
-        * angleStep * 0.07;
-      const angle = segment * angleStep + facetAngleJitter + rowAngleJitter
-        + row.rotation + row.facetPhase;
-      const facetJitter = seededUnit(body.seed, `geometry:facet:${segment}`) - 0.5;
-      const rowJitter = seededUnit(body.seed, `geometry:facet-row:${rowIndex}:${segment}`) - 0.5;
-      const jitter = 1 + facetJitter * 0.07 + rowJitter * 0.026;
+    // One ring for the whole body. Every slice reuses the same angles and the
+    // same per-facet radius multipliers, so the only thing that changes between
+    // two slices is an overall scale and a translation — and both keep the quad
+    // between them a trapezoid, which is what makes a side face flat.
+    //
+    // The jitter that used to live here was indexed by row as well as by facet,
+    // so the ring was subtly different at every height. That is what turned each
+    // side into a strip of non-planar quads and produced the triangle mosaic.
+    for (const facet of ring) {
+      const angle = facet.angle + row.rotation + row.facetPhase;
       const radial = add(
-        scale(tangent, Math.cos(angle) * row.radiusX * jitter),
-        scale(bitangent, Math.sin(angle) * row.radiusZ * jitter),
+        scale(tangent, Math.cos(angle) * row.radiusX * facet.radiusScale),
+        scale(bitangent, Math.sin(angle) * row.radiusZ * facet.radiusScale),
       );
       pushVertex(positions, add(center, radial));
     }
@@ -235,23 +238,12 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
       const b = currentStart + next;
       const c = nextStart + segment;
       const d = nextStart + next;
-      // Alternating the diagonal is what turns a lathe into something faceted.
-      // Splitting every quad the same way gave every triangle in the body the
-      // same pair of edge directions, so the whole surface caught the light at
-      // one angle and the crystal read as a smooth spun shape. A checkerboard
-      // makes neighbouring triangles lean opposite ways, and once each face
-      // carries its own normal (see the flat-shading pass below) that is what
-      // the eye reads as facets.
-      //
-      // An odd segment count would put two same-parity quads next to each other
-      // at the seam. That is a mild defect in the pattern, not in the mesh —
-      // both splits are valid triangulations of the same quad and wind the same
-      // way, so the shell stays closed and consistently oriented either way.
-      if ((row + segment) % 2 === 0) {
-        indices.push(a, b, c, b, d, c);
-      } else {
-        indices.push(a, b, d, a, d, c);
-      }
+      // One diagonal, always. The checkerboard that used to be here was meant
+      // to break up a smooth lathe, but it only worked by giving neighbouring
+      // triangles different normals — which is precisely the mosaic. With a
+      // shared ring the quad is planar, so both of its triangles have the same
+      // normal and the split direction is invisible.
+      indices.push(a, b, c, b, d, c);
     }
   }
 

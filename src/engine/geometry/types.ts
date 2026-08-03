@@ -24,6 +24,28 @@ export interface CrystalProfileRow {
   facetPhase: number;
 }
 
+/**
+ * One vertical facet of a crystal, as an angle around the axis and a radius
+ * multiplier at that angle.
+ *
+ * The ring is defined **once per body** and every slice reuses it. That is what
+ * makes a side face flat: with a shared ring, each row can only scale the radius
+ * and translate the centre, and both of those keep the quad between two rows a
+ * trapezoid — its bottom and top edges stay parallel, so the four corners are
+ * coplanar and both triangles get the same normal.
+ *
+ * Turning, drifting or re-jittering a ring per row breaks that parallelism. The
+ * quad stops being planar, its two triangles get different normals, and the
+ * crystal renders as a mosaic of small triangles instead of a few large faces —
+ * which is exactly what visual review rejected (2026-08-03).
+ */
+export interface CrystalRingFacet {
+  angle: number;
+  radiusScale: number;
+  /** True for the narrow chamfers earned from photos, false for the main faces. */
+  chamfer: boolean;
+}
+
 export interface CrystalBodyProfile {
   profileVersion: 1;
   bodyId: string;
@@ -41,6 +63,8 @@ export interface CrystalBodyProfile {
   burialStartY: number;
   burialCompression: number;
   rows: CrystalProfileRow[];
+  /** Shared cross-section. Optional so older persisted profiles stay readable. */
+  ring?: CrystalRingFacet[];
   signature: string;
 }
 
