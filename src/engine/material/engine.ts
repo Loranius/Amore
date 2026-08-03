@@ -310,6 +310,13 @@ function shaderRecipe(
     // The veins glow in the colour the couple earned, not in the map's own —
     // the map is structure, ADR-0004 owns the colour.
     surfaceVeinStrength: micro ? 0 : round6(textureTier(0.6 + wishDepth(tint) * 0.7, preset)),
+    // Every tier, including fallback, and that is the point of it: this is the
+    // one cue that costs nothing and does not depend on the lighting, so it is
+    // the last thing that should be switched off on a weak phone rather than
+    // the first. A stylized gem keeps reading as a gem on any stage precisely
+    // because its facets are outlined by the surface itself.
+    facetEdgeStrength: round6(micro ? 0 : emphasized ? 0.34 : focal ? 0.28 : 0.22),
+    facetEdgeWidth: 1.4,
   };
 }
 
@@ -693,6 +700,11 @@ function buildSubstrateMaterial(
       // No glowing veins on the stone: the light down there is the aurora, and
       // two lit patterns in the same crack would fight.
       surfaceVeinStrength: 0,
+      // Nor an outlined facet. The vein is massive quartz — a broken mass with
+      // no grown faces to outline — and drawing rims on its triangulation would
+      // advertise the mesh rather than the mineral.
+      facetEdgeStrength: 0,
+      facetEdgeWidth: 1.4,
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

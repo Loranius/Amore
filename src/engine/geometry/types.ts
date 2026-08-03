@@ -160,6 +160,35 @@ export interface CrystalMeshData {
    * Optional so persisted Geometry State v1 meshes stay readable.
    */
   faceIds?: number[];
+  /**
+   * Which of a triangle's three edges are edges of the facet itself — one
+   * bitmask per triangle, bit `k` set when the edge opposite corner `k` is a
+   * real border rather than an internal cut of the fan.
+   *
+   * Published so the renderer can light the facet edges without an unwrap.
+   * Studying three stylized gem assets the owner supplied (2026-08-03) showed
+   * the same technique in all of them, in every channel at once: albedo,
+   * roughness and emissive each treat a facet's rim differently from its
+   * interior, and the handpainted pack goes furthest — `KHR_materials_unlit`,
+   * no lighting model at all, the entire crystal painted into base colour. The
+   * facet edge is *drawn*, not lit.
+   *
+   * That matters here because measurement said lighting was never going to do
+   * it: with the key light switched off entirely the monarch's facets moved by
+   * about 3%. A crystal reads as a crystal because its planes are outlined, and
+   * an outline that survives the lighting has to come from the surface itself.
+   *
+   * A fan is what makes this need publishing. Every triangle of a face shares
+   * the face's plane, but only some of its edges are the polygon's — the rest
+   * are cuts through the middle of a flat face, and lighting those would draw a
+   * spider's web across every facet. Only the pass that builds the fan knows
+   * which is which.
+   *
+   * Optional: persisted Geometry State v1 meshes have none, and the lathe does
+   * not publish them either — its quads are cut across a face for a different
+   * reason, and it survives only for profiles that carry no planes.
+   */
+  borderEdges?: number[];
   indices: number[];
   sourceTriangleCount: number;
   visibleTriangleCount: number;

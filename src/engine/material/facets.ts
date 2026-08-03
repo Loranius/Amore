@@ -23,14 +23,26 @@ import type { CrystalFacetTinting, CrystalRgb } from './types';
 
 /**
  * Four tones: the body's own, a cooler darker one, a lighter lavender, and a
- * rare warm catch. Brightness stays within ±8–12% — past that the crystal
- * stops reading as one mineral and starts reading as a mosaic.
+ * rare warm catch.
+ *
+ * Widened from ±8–12% after studying three stylized gem assets the owner
+ * supplied. Their neighbouring facets run from deep maroon to bright pink —
+ * a difference far past anything lighting produces, painted into the albedo on
+ * purpose. The old range was written as a guard against the crystal "reading as
+ * a mosaic", and the guard was sound; but it was set when the tints were also
+ * landing on the wrong triangles, so the range was doing the work of a bug fix.
+ * With tone keyed on the actual face (`CrystalMeshData.faceIds`) a wider range
+ * separates planes instead of speckling them.
+ *
+ * Still multipliers over the body's base colour, so the couple's earned tint
+ * (ADR-0004) decides what the crystal *is*; these decide only which of its
+ * planes caught more of it.
  */
 const CRYSTAL_FACET_TINTS: readonly CrystalRgb[] = [
   { r: 1, g: 1, b: 1 },
-  { r: 0.88, g: 0.91, b: 0.98 },
-  { r: 1.07, g: 1.04, b: 1.12 },
-  { r: 1.12, g: 0.99, b: 1.04 },
+  { r: 0.7, g: 0.75, b: 0.9 },
+  { r: 1.24, g: 1.16, b: 1.3 },
+  { r: 1.34, g: 1.02, b: 1.12 },
 ];
 
 /**

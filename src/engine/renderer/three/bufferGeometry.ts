@@ -58,6 +58,48 @@ function facetColors(
   return colors;
 }
 
+/**
+ * Barycentric coordinates, with the fan's internal cuts switched off.
+ *
+ * Each corner of a triangle gets a 1 in its own slot and 0 in the others, so
+ * the interpolated value at any fragment is its barycentric position and slot
+ * `k` measures the distance to the edge opposite corner `k`. Taking the smallest
+ * of the three gives distance to the nearest edge, which is what draws an
+ * outline — the standard single-pass wireframe, put to a different use.
+ *
+ * The published `borderEdges` mask is what makes it an outline of the *facet*
+ * rather than of every triangle. A face is fanned, so most of its triangles have
+ * two edges running through the middle of a flat plane; forcing those slots to 1
+ * everywhere means they never approach zero and never light. Without the mask
+ * this draws a spider's web across each facet instead of a rim around it.
+ *
+ * Requires split geometry, where a triangle owns its three vertices — which is
+ * exactly what `splitCrystalMeshFaces` guarantees. Returns null otherwise rather
+ * than writing an attribute that would be wrong: vertices shared between
+ * triangles cannot each carry their own barycentric slot.
+ */
+function facetEdgeWeights(mesh: CrystalMeshData): Float32Array | null {
+  const borderEdges = mesh.borderEdges;
+  if (borderEdges === undefined) return null;
+  const vertexCount = mesh.positions.length / 3;
+  const triangleCount = mesh.indices.length / 3;
+  if (vertexCount !== triangleCount * 3) return null;
+
+  const weights = new Float32Array(vertexCount * 3);
+  for (let triangle = 0; triangle < triangleCount; triangle += 1) {
+    const mask = borderEdges[triangle] ?? 0;
+    for (let slot = 0; slot < 3; slot += 1) {
+      const vertex = (mesh.indices[triangle * 3 + slot] ?? 0) * 3;
+      for (let axis = 0; axis < 3; axis += 1) {
+        weights[vertex + axis] = (mask & (1 << axis)) === 0
+          ? 1
+          : (axis === slot ? 1 : 0);
+      }
+    }
+  }
+  return weights;
+}
+
 /** Thin renderer adapter. Geometry decisions stay in the pure Geometry Engine. */
 export function createThreeCrystalGeometry(
   mesh: CrystalMeshData,
@@ -79,6 +121,8 @@ export function createThreeCrystalGeometry(
       new THREE.BufferAttribute(facetColors(mesh, material, artifactSeed), 3),
     );
   }
+  const edges = facetEdgeWeights(mesh);
+  if (edges !== null) geometry.setAttribute('evolutionEdge', new THREE.BufferAttribute(edges, 3));
   geometry.setIndex(mesh.indices);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();

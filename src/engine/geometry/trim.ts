@@ -211,6 +211,7 @@ export function trimCrystalMesh(
   // is not possible — the face a triangle belonged to is not recoverable from
   // its corners once its neighbours are gone.
   const keptFaceIds: number[] = [];
+  const keptBorderEdges: number[] = [];
   const occluders = new Set<string>();
   let baseCapRemoved = false;
 
@@ -251,6 +252,7 @@ export function trimCrystalMesh(
     }
     kept.push(ia, ib, ic);
     if (mesh.faceIds !== undefined) keptFaceIds.push(mesh.faceIds[triangle] ?? 0);
+    if (mesh.borderEdges !== undefined) keptBorderEdges.push(mesh.borderEdges[triangle] ?? 0);
   }
 
   const visibleTriangleCount = kept.length / 3;
@@ -258,6 +260,7 @@ export function trimCrystalMesh(
     ...mesh,
     indices: kept,
     ...(mesh.faceIds === undefined ? {} : { faceIds: keptFaceIds }),
+    ...(mesh.borderEdges === undefined ? {} : { borderEdges: keptBorderEdges }),
     visibleTriangleCount,
     removedTriangleCount: mesh.sourceTriangleCount - visibleTriangleCount,
     baseCapRemoved,

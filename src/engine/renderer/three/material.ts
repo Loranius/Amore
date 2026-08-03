@@ -33,6 +33,8 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.surfaceTextureScale.toFixed(6),
     recipe.surfaceReliefStrength.toFixed(6),
     recipe.surfaceVeinStrength.toFixed(6),
+    recipe.facetEdgeStrength.toFixed(6),
+    recipe.facetEdgeWidth.toFixed(6),
   ].join('|');
 }
 
@@ -52,11 +54,14 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
 const VERTEX_PARS = /* glsl */ `
 varying vec3 vEvolutionObject;
 varying vec3 vEvolutionObjectNormal;
+attribute vec3 evolutionEdge;
+varying vec3 vEvolutionEdge;
 `;
 
 const VERTEX_BODY = /* glsl */ `
   vEvolutionObject = position;
   vEvolutionObjectNormal = normal;
+  vEvolutionEdge = evolutionEdge;
 `;
 
 const FRAGMENT_PARS = /* glsl */ `
@@ -78,8 +83,11 @@ uniform vec3 uEvolutionAuroraColor;
 uniform vec3 uEvolutionAuroraSecondColor;
 uniform float uEvolutionAuroraDepth;
 uniform float uEvolutionPhase;
+uniform float uEvolutionFacetEdgeStrength;
+uniform float uEvolutionFacetEdgeWidth;
 varying vec3 vEvolutionObject;
 varying vec3 vEvolutionObjectNormal;
+varying vec3 vEvolutionEdge;
 
 float evolutionHash( vec3 cell ) {
   return fract( sin( dot( cell, vec3( 127.1, 311.7, 74.7 ) ) ) * 43758.5453123 );
@@ -225,6 +233,30 @@ const FRAGMENT_BODY = /* glsl */ `
   // the same term arriving as reflection rather than as opacity.
   outgoingLight += uEvolutionRimColor * evolutionFresnel * uEvolutionGlassStrength * 0.55;
 
+  // ── The facet's own rim ───────────────────────────────────
+  // Drawn, not lit, and that is the whole point. Three stylized gem assets the
+  // owner supplied all outline every facet in the surface itself — in albedo,
+  // in roughness and in emissive at once, and the handpainted pack does it with
+  // no lighting model whatsoever. Measurement here agreed from the other side:
+  // with the key light switched off the monarch's facets moved by about 3%, so
+  // no amount of lighting was ever going to separate them.
+  //
+  // Screen-space derivatives keep the line one pixel wide wherever it lands, so a
+  // facet at the silhouette gets the same rim as one facing the viewer, and a
+  // year crystal the same rim as the monarch. A rim measured in object space
+  // would thicken as the body shrinks until a small crystal was nothing but
+  // outline.
+  if ( uEvolutionFacetEdgeStrength > 0.0001 ) {
+    // Floored, and not defensively: a suppressed edge carries 1 at all three
+    // corners, so its derivative is exactly zero and an unfloored smoothstep
+    // divides by it. The NaN that produces does not stay local — min() carries
+    // it across the whole facet, which renders as speckled noise over the body.
+    vec3 edgeWidth = max( fwidth( vEvolutionEdge ) * uEvolutionFacetEdgeWidth, vec3( 1e-5 ) );
+    vec3 edgeFalloff = smoothstep( vec3( 0.0 ), edgeWidth, vEvolutionEdge );
+    float evolutionRim = 1.0 - min( min( edgeFalloff.x, edgeFalloff.y ), edgeFalloff.z );
+    outgoingLight += uEvolutionRimColor * evolutionRim * uEvolutionFacetEdgeStrength;
+  }
+
   // ── Aurora in the fissure ─────────────────────────────────
   // Only the vein carries this, and only below its lip: the seam is a crack the
   // crystals came out of, and what makes it read as their source rather than as
@@ -286,6 +318,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     && recipe.veilStrength <= 0
     && recipe.glassStrength <= 0
     && recipe.auroraStrength <= 0
+    && recipe.facetEdgeStrength <= 0
   ) return;
 
   material.onBeforeCompile = (shader) => {
@@ -307,6 +340,8 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionAuroraSecondColor'] = { value: toColor(recipe.auroraSecondColor) };
     shader.uniforms['uEvolutionAuroraDepth'] = { value: recipe.auroraDepth };
     shader.uniforms['uEvolutionPhase'] = { value: 0 };
+    shader.uniforms['uEvolutionFacetEdgeStrength'] = { value: recipe.facetEdgeStrength };
+    shader.uniforms['uEvolutionFacetEdgeWidth'] = { value: recipe.facetEdgeWidth };
     // Handed back so the life frame can advance it. Without a moving phase the
     // two colours sit still and the fissure is a lamp in a slot, not an aurora.
     material.userData['evolutionPhaseUniform'] = shader.uniforms['uEvolutionPhase'];

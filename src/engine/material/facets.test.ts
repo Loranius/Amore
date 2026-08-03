@@ -14,13 +14,28 @@ const TINTINGS: readonly (readonly [string, CrystalFacetTinting])[] = [
 
 describe('per-face tone', () => {
   it('keeps every tone within a band that reads as one mineral', () => {
-    // Past roughly ±12% the crystal stops looking like one stone lit from
-    // several angles and starts looking like a mosaic of coloured tiles.
+    // The band was ±12%, on the reasoning that past it a crystal stops looking
+    // like one stone lit from several angles and starts looking like a mosaic
+    // of tiles. Widened after two findings that arrived together.
+    //
+    // The tints were landing on triangles rather than on faces — the keying
+    // still assumed the lathe's two-per-facet layout (ADR-0005 review) — so a
+    // wide range really would have speckled a face rather than toned it, and
+    // the narrow band was quietly compensating for a bug.
+    //
+    // And the three stylized gem assets the owner supplied put neighbouring
+    // facets a long way apart: deep maroon beside bright pink, far past
+    // anything lighting yields, painted into the albedo deliberately. With the
+    // keying fixed, that separation is what the range is for.
+    //
+    // Still bounded, because the original reasoning holds at some width: no
+    // tone may darken a face past a third or brighten it past a half, or the
+    // couple's earned colour stops being one colour.
     for (const [name, tinting] of TINTINGS) {
       for (const tint of tinting.tints) {
         const brightness = (tint.r + tint.g + tint.b) / 3;
-        expect(brightness, name).toBeGreaterThan(0.85);
-        expect(brightness, name).toBeLessThan(1.15);
+        expect(brightness, name).toBeGreaterThan(0.66);
+        expect(brightness, name).toBeLessThan(1.5);
       }
       // One tone must be neutral, or the body's earned colour would be
       // systematically shifted rather than varied around.

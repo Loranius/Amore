@@ -294,10 +294,16 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
   // emitted something. Using the plane index instead would leave gaps wherever
   // a face collapsed to slivers, and readers treat these as dense.
   const faceIds: number[] = [];
+  // Which edges of each triangle are edges of the facet. A fan cuts a polygon
+  // into triangles from one corner, so two of every triangle's edges are
+  // usually interior to a flat face — lighting those would draw a web across
+  // the facet instead of outlining it.
+  const borderEdges: number[] = [];
   let faceId = 0;
   for (const face of ordered) {
     const loop = face.loop;
     const isBase = planes[face.planeIndex]!.kind === 'base';
+    const last = loop.length - 1;
     let emitted = 0;
     for (let corner = 1; corner + 1 < loop.length; corner += 1) {
       const ia = loop[0]!;
@@ -306,6 +312,15 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
       if (area(ia, ib, ic) < sliverArea) continue;
       indices.push(ia, ib, ic);
       faceIds.push(faceId);
+      // Bit k marks the edge opposite corner k. Opposite the fan's apex lies
+      // (ib, ic), which walks the polygon's rim and is therefore always real;
+      // the other two run back to the apex and are real only at the two ends of
+      // the fan, where they coincide with the polygon's first and last edges.
+      borderEdges.push(
+        1
+        | (corner + 1 === last ? 2 : 0)
+        | (corner === 1 ? 4 : 0),
+      );
       emitted += 1;
       if (isBase) baseCapTriangleCount += 1;
     }
@@ -322,6 +337,7 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
     positions,
     normals: computeNormals(positions, indices),
     faceIds,
+    borderEdges,
     indices,
     sourceTriangleCount,
     visibleTriangleCount: sourceTriangleCount,

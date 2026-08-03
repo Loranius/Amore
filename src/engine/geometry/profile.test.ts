@@ -776,3 +776,51 @@ describe('crystal faceting — the termination is lattice, not proportion', () =
     }
   });
 });
+
+describe('crystal faceting — the facet rim (stylized gem technique)', () => {
+  /**
+   * The rim has to outline the facet, not the triangulation.
+   *
+   * Every face is fanned from one corner, so most of its triangles have two
+   * edges running through the middle of a flat plane. Lighting those would draw
+   * a spider's web across each facet — which is the failure mode the mask
+   * exists to prevent, and the reason this cannot be derived in the renderer.
+   */
+  it('marks the polygon rim and never an internal cut of the fan', () => {
+    const mesh = buildCrystalMesh(motherBody(), 'high');
+    const borderEdges = mesh.borderEdges!;
+    expect(borderEdges).toHaveLength(mesh.indices.length / 3);
+
+    const key = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
+    // An edge shared by two triangles of the *same* face is an internal cut; an
+    // edge on the rim is shared with a different face, or with nothing.
+    const faceIds = mesh.faceIds!;
+    const owners = new Map<string, number[]>();
+    for (let triangle = 0; triangle < borderEdges.length; triangle += 1) {
+      const corners = [0, 1, 2].map((slot) => mesh.indices[triangle * 3 + slot]!);
+      for (let slot = 0; slot < 3; slot += 1) {
+        const edge = key(corners[(slot + 1) % 3]!, corners[(slot + 2) % 3]!);
+        const bucket = owners.get(edge) ?? [];
+        bucket.push(triangle);
+        owners.set(edge, bucket);
+      }
+    }
+
+    let rimEdges = 0;
+    for (let triangle = 0; triangle < borderEdges.length; triangle += 1) {
+      const corners = [0, 1, 2].map((slot) => mesh.indices[triangle * 3 + slot]!);
+      for (let slot = 0; slot < 3; slot += 1) {
+        const edge = key(corners[(slot + 1) % 3]!, corners[(slot + 2) % 3]!);
+        const marked = (borderEdges[triangle]! & (1 << slot)) !== 0;
+        const sharedWithSameFace = (owners.get(edge) ?? []).some(
+          (other) => other !== triangle && faceIds[other] === faceIds[triangle],
+        );
+        // The two must never agree: an internal cut is exactly an edge shared
+        // with another triangle of the same face.
+        expect(marked).toBe(!sharedWithSameFace);
+        if (marked) rimEdges += 1;
+      }
+    }
+    expect(rimEdges).toBeGreaterThan(6);
+  });
+});

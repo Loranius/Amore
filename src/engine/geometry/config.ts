@@ -8,7 +8,7 @@ export const DEFAULT_CRYSTAL_GEOMETRY_CONFIG: CrystalGeometryConfig = {
   //
   // 1.4.0: the substrate became a quartz vein instead of a cut plate, the
   // monarch sinks into it, and the year crystals lean.
-  rulesVersion: '1.6.0',
+  rulesVersion: '1.7.0',
   maxVertices: 18_000,
   maxTriangles: 30_000,
   hiddenFaceEpsilon: 0.002,

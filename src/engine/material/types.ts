@@ -119,6 +119,29 @@ export interface CrystalShaderRecipe {
   surfaceReliefStrength: number;
   /** How brightly the veins in the map glow, in the body's own earned colour. */
   surfaceVeinStrength: number;
+  /**
+   * How brightly a facet's own rim is drawn, in `rimColor`.
+   *
+   * Drawn rather than lit, and that is a finding rather than a style. Three
+   * stylized gem assets the owner supplied all outline every facet **in the
+   * surface itself** — albedo, roughness and emissive each treat the rim
+   * differently from the interior — and the handpainted pack carries the whole
+   * look in base colour under `KHR_materials_unlit`, with no lighting model at
+   * all. Measurement on the portal agreed from the opposite direction: with the
+   * key light switched off the monarch's facets moved by about 3%, so lighting
+   * was never going to separate them however it was arranged.
+   *
+   * This is the one term that does not care where the light is, which is exactly
+   * why a stylized gem keeps reading as a gem on any stage.
+   */
+  facetEdgeStrength: number;
+  /**
+   * How wide that rim is, in screen pixels.
+   *
+   * Screen space, not object space: a rim measured on the body would thicken as
+   * the body shrank, until a year crystal was more outline than crystal.
+   */
+  facetEdgeWidth: number;
 }
 
 export interface CrystalFacetTinting {
