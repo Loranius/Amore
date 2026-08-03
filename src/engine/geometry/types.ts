@@ -46,6 +46,19 @@ export interface CrystalRingFacet {
   chamfer: boolean;
 }
 
+/**
+ * One cut. The solid is every point with `normal · p <= offset`, in the body's
+ * own frame: origin at `geometryAnchor`, +Y along the body's direction.
+ *
+ * `kind` is not decoration — the mesh publishes its base cap from the `base`
+ * plane and nothing else, and trimming relies on that.
+ */
+export interface CrystalFacePlane {
+  normal: GrowthVec3;
+  offset: number;
+  kind: 'base' | 'prism' | 'bevel' | 'crown' | 'safety';
+}
+
 export interface CrystalBodyProfile {
   profileVersion: 1;
   bodyId: string;
@@ -65,6 +78,21 @@ export interface CrystalBodyProfile {
   rows: CrystalProfileRow[];
   /** Shared cross-section. Optional so older persisted profiles stay readable. */
   ring?: CrystalRingFacet[];
+  /**
+   * The half-spaces the body is cut from, in its own frame.
+   *
+   * Since ADR-0006 this — not `rows` — is what the crystal actually *is*. A
+   * lathe could only ever produce faces that were equal by construction, and
+   * any attempt to vary them bent the quad between two slices out of plane.
+   * Here every face is a plane, so the set can be as unequal as a real crystal
+   * without a single face losing its flatness.
+   *
+   * `rows` is still published beside it as a conservative envelope, because
+   * readers that only need "how wide is this body at that height" should not
+   * have to solve a linear system — and because persisted Geometry State v1
+   * snapshots have no planes. Optional for exactly that reason.
+   */
+  planes?: CrystalFacePlane[];
   /**
    * Bearings, in radians, along which the quartz vein runs out from its node.
    *

@@ -241,11 +241,12 @@ describe('Crystal Geometry', () => {
     const unrestricted = pipeline(BASE_EVENTS).geometry;
     const constrained = pipeline(BASE_EVENTS, {
       ...DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
-      // Lowered with ADR-0003: a couple's crystal is ~5 bodies instead of ~38,
-      // so the old ceiling no longer forced any omission and the test stopped
-      // exercising the budget at all.
-      maxVertices: 120,
-      maxTriangles: 220,
+      // Lowered twice. First with ADR-0003, when a couple's crystal became ~5
+      // bodies instead of ~38; again with ADR-0006, when the plane model cut a
+      // body from ~80 triangles to ~45. Both times the old ceiling stopped
+      // forcing any omission and the test stopped exercising the budget at all.
+      maxVertices: 200,
+      maxTriangles: 90,
     }).geometry;
 
     expect(constrained.meshes.length).toBeGreaterThan(0);

@@ -7,17 +7,14 @@ import {
   seededUnit,
 } from '../growth/math';
 import type { GrowthAttributeValue, GrowthBody, GrowthTier } from '../growth';
+import { buildCrystalFacePlanes, transformCrystalPlane } from './planes';
+import { intersectHalfSpaces, polytopeTolerance } from './polytope';
 import type {
   CrystalBodyProfile,
   CrystalLodLevel,
   CrystalProfileRow,
   CrystalRingFacet,
 } from './types';
-
-interface BaseProfileRow {
-  y: number;
-  radius: number;
-}
 
 interface ProfileShapeTuning {
   asymmetry: number;
@@ -103,17 +100,6 @@ function signedUnit(seed: number, label: string): number {
   return seededUnit(seed, label) * 2 - 1;
 }
 
-function appendBaseRow(rows: BaseProfileRow[], y: number, radius: number): void {
-  const safeY = round6(Math.max(0, y));
-  const safeRadius = round6(Math.max(0.0001, radius));
-  const previous = rows[rows.length - 1];
-  if (previous && safeY <= previous.y + 1e-6) {
-    previous.radius = Math.max(previous.radius, safeRadius);
-    return;
-  }
-  rows.push({ y: safeY, radius: safeRadius });
-}
-
 /**
  * Where the shaft ends and the termination begins, as a fraction of the body's
  * own height. Seeded per body so no two crystals in a colony carry the same
@@ -121,17 +107,6 @@ function appendBaseRow(rows: BaseProfileRow[], y: number, radius: number): void 
  */
 const SHOULDER_MIN = 0.7;
 const SHOULDER_MAX = 0.78;
-
-/**
- * Radius at the base, as a fraction of the widest point.
- *
- * The reference crystals are narrower where they leave the ground and widen
- * gently on the way up. The previous profile did the opposite: widest at 12% of
- * its height and tapering from there, which is a bullet, not a prism — and read
- * as "a ball sticking out of the ground" no matter how well it was faceted.
- * The widest point is now the shoulder, and this is where the crystal starts.
- */
-const BASE_WAIST = 0.88;
 
 /**
  * How deep the monarch stands in the quartz vein, as a fraction of her visible
@@ -156,59 +131,6 @@ function shoulderFraction(seed: number): number {
  * shape they are. A colony whose members are built by different code is a
  * colony whose members read as different objects.
  */
-function appendPrismRows(
-  rows: BaseProfileRow[],
-  options: {
-    bodyStart: number;
-    length: number;
-    radius: number;
-    tipRadius: number;
-    shoulderShare: number;
-  },
-): void {
-  const { bodyStart, length, radius, tipRadius, shoulderShare } = options;
-  const at = (fraction: number): number => bodyStart + length * fraction;
-
-  // Base and shoulder, and nothing between them.
-  //
-  // The shaft used to carry four intermediate slices. They were added to give
-  // the surface somewhere to break, back when a smooth lathe was the problem —
-  // but each one is another horizontal band across every side face, and once
-  // the faces are genuinely flat the bands are all the eye sees. The body of a
-  // quartz prism is one uninterrupted run.
-  //
-  // The swell across it is small on purpose: the radius is nearly constant, so
-  // the sides read as parallel and the shoulder is the only place the
-  // silhouette turns a corner.
-  appendBaseRow(rows, at(0), radius * BASE_WAIST);
-  appendBaseRow(rows, at(shoulderShare), radius);
-
-  // Termination: shoulder ring straight to the point, and nothing in between.
-  //
-  // The crown carried up to two intermediate rows placed on `pow(along, 0.8)`.
-  // An exponent under one falls faster than a straight line right after the
-  // shoulder, so the radius was pinched inward there and eased out again toward
-  // the tip — the crown curved inward instead of running straight, which visual
-  // review caught (2026-08-03).
-  //
-  // Rather than straightening the curve, the rows are gone. A row that sits
-  // exactly on the line from shoulder to tip is invisible by construction, so
-  // it would cost vertices and show nothing; one that sits off the line is a
-  // curve again. Each crown face is now a single large triangle from the
-  // shoulder ring to the point, which is what the references show and what a
-  // quartz termination is.
-  //
-  // The "additional deliberate cuts" the brief asks for are the ring's
-  // chamfers, which run the full height of the crystal — a vertical cut, not a
-  // horizontal band.
-  appendBaseRow(rows, at(1), tipRadius);
-}
-
-function smoothStep(value: number): number {
-  const t = Math.max(0, Math.min(1, value));
-  return t * t * (3 - 2 * t);
-}
-
 /**
  * Facets of the shaft, before any earned chamfers.
  *
@@ -302,77 +224,81 @@ function buildRing(
   return ring;
 }
 
-function decorateRows(
-  rows: readonly BaseProfileRow[],
-  scales: { scaleX: number; scaleZ: number },
-  twistTotal: number,
-  axisLeanX: number,
-  axisLeanZ: number,
-  burialStartY: number,
-  burialCompression: number,
+/**
+ * The envelope `rows` describe, measured off the finished solid.
+ *
+ * Since ADR-0006 the rows are a *report*, not a recipe: the shape is the plane
+ * set, and this measures it so readers that only want "how wide is the body at
+ * that height" keep working unchanged — the renderer's fit, the composition's
+ * solids, the trim's bounds sweep.
+ *
+ * Two decisions make it correct rather than approximately correct.
+ *
+ * The sample heights are the solid's own vertex heights. A convex polytope's
+ * cross-section radius is piecewise linear in height with its breakpoints
+ * exactly there, so a piecewise-linear envelope through those samples is not an
+ * approximation of the body — it is the body. Sampling at evenly spaced heights
+ * instead smeared the shoulder across the whole shaft: on a monarch the base
+ * came out as wide as the widest slice and the tip at 90% of it, which is a
+ * cylinder, not a crystal.
+ *
+ * The radius is the circumscribed circle, not the per-axis extent. `trim.ts`
+ * reads a row as an *ellipse* with semi-axes `radiusX`/`radiusZ`, and an
+ * ellipse through the furthest point on each axis does not contain the polygon
+ * between them — a square's corners sit outside the ellipse through its edge
+ * midpoints. An envelope that cut inside the crystal would let the trim delete
+ * triangles that are genuinely visible.
+ */
+function envelopeRows(
+  polytope: NonNullable<ReturnType<typeof intersectHalfSpaces>>,
+  topY: number,
 ): CrystalProfileRow[] {
-  const lastY = Math.max(1e-9, rows[rows.length - 1]?.y ?? 0);
-  const minimumScale = Math.max(0.0001, Math.min(scales.scaleX, scales.scaleZ));
+  const edges = new Set<string>();
+  for (const face of polytope.faces) {
+    for (let index = 0; index < face.loop.length; index += 1) {
+      const from = face.loop[index]!;
+      const to = face.loop[(index + 1) % face.loop.length]!;
+      edges.add(from < to ? `${from}:${to}` : `${to}:${from}`);
+    }
+  }
+  const edgePairs = [...edges].sort().map((key) => key.split(':').map(Number) as [number, number]);
 
-  // Everything a slice is allowed to do is here, and the list is short on
-  // purpose: scale its radius, and translate its centre. Both keep the quad
-  // between two slices a trapezoid — bottom and top edges stay parallel, so the
-  // four corners are coplanar and both triangles share one normal.
-  //
-  // What used to be here and is gone: a per-slice turn, a per-slice sideways
-  // drift, a per-slice radius swing, a per-slice facet phase and an elliptical
-  // pulse that varied the X:Z ratio with height. Every one of them rotates or
-  // re-shapes the ring between two rows, which tilts the top edge out of
-  // parallel with the bottom one. The quad stops being flat, its two triangles
-  // take different normals, and the crystal renders as a mosaic of small
-  // triangles rather than as a handful of large faces (visual review,
-  // 2026-08-03). They were added to break up a smooth lathe; the answer to a
-  // smooth lathe is fewer, larger, genuinely flat faces.
-  const raw = rows.map((row) => {
-    const t = Math.max(0, Math.min(1, row.y / lastY));
-    // The axis leans as one piece. Linear in t rather than eased: a curve bends
-    // the body, and a bent prism has no flat side.
-    const centerOffsetX = axisLeanX * t;
-    const centerOffsetZ = axisLeanZ * t;
-    const burialT = burialStartY > 1e-9
-      ? Math.max(0, Math.min(1, row.y / burialStartY))
-      : 1;
-    const compression = burialStartY > 0 && row.y < burialStartY
-      ? burialCompression + (1 - burialCompression) * smoothStep(burialT)
-      : 1;
+  /** Furthest any point of the solid sits from the axis at this height. */
+  const reachAt = (y: number): number => {
+    let reach = 0;
+    for (const vertex of polytope.vertices) {
+      if (Math.abs(vertex.y - y) > 1e-9) continue;
+      reach = Math.max(reach, Math.hypot(vertex.x, vertex.z));
+    }
+    for (const [from, to] of edgePairs) {
+      const a = polytope.vertices[from]!;
+      const b = polytope.vertices[to]!;
+      const span = b.y - a.y;
+      if (Math.abs(span) < 1e-12) continue;
+      const t = (y - a.y) / span;
+      if (t < 0 || t > 1) continue;
+      reach = Math.max(reach, Math.hypot(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t));
+    }
+    return Math.max(1e-4, reach);
+  };
+
+  const heights = [...new Set(polytope.vertices.map((vertex) => round6(vertex.y)))]
+    .sort((left, right) => left - right);
+  // The tip is a sample even when no vertex sits exactly on it, so the envelope
+  // always spans the body a reader was told it has.
+  if ((heights[heights.length - 1] ?? 0) < topY - 1e-6) heights.push(round6(topY));
+
+  return heights.map((y) => {
+    const reach = round6(reachAt(y));
     return {
-      baseRadius: row.radius,
-      y: row.y,
-      radiusX: Math.max(0.0001, row.radius * scales.scaleX * compression),
-      radiusZ: Math.max(0.0001, row.radius * scales.scaleZ * compression),
-      centerOffsetX,
-      centerOffsetZ,
-      // One orientation for the whole body. A crystal twists as a unit or not
-      // at all.
-      rotation: twistTotal,
+      y,
+      radius: reach,
+      radiusX: reach,
+      radiusZ: reach,
+      centerOffsetX: 0,
+      centerOffsetZ: 0,
+      rotation: 0,
       facetPhase: 0,
-    };
-  });
-
-  return raw.map((row) => {
-    const offsetEnvelope = Math.hypot(row.centerOffsetX, row.centerOffsetZ) / minimumScale;
-    const conservativeRadius = Math.max(
-      row.baseRadius,
-      row.radiusX / Math.max(0.0001, scales.scaleX),
-      row.radiusZ / Math.max(0.0001, scales.scaleZ),
-    ) + offsetEnvelope;
-    const radiusX = row.radiusX;
-    const radiusZ = row.radiusZ;
-
-    return {
-      y: row.y,
-      radius: round6(conservativeRadius),
-      radiusX: round6(radiusX),
-      radiusZ: round6(radiusZ),
-      centerOffsetX: round6(row.centerOffsetX),
-      centerOffsetZ: round6(row.centerOffsetZ),
-      rotation: round6(row.rotation),
-      facetPhase: round6(row.facetPhase),
     };
   });
 }
@@ -413,43 +339,14 @@ export function buildCrystalProfile(
     ? add(body.anchor, scale(body.direction, -extraSink))
     : body.anchor;
   const radius = Math.max(0.0001, body.renderedRadius);
-  const bodyStart = extraSink;
-  const baseRows: BaseProfileRow[] = [];
 
   // Blunt and broken terminations still exist — they are what makes a colony
   // read as grown rather than manufactured — but they are now variations on
-  // one prism, not separate shapes.
+  // one prism, not separate shapes. Both are expressed as where the crown
+  // planes converge (see `buildCrystalFacePlanes`), not as a tip radius: a
+  // lathe needed a radius to close its fan, and there is no fan any more.
   const blunt = !mother && (archetype === 'tabular' || archetype === 'massive');
   const broken = !mother && archetype === 'etched';
-  const tipRadius = broken
-    ? radius * 0.3
-    : blunt
-      ? radius * 0.16
-      : radius * 0.018;
-
-  if (attached) {
-    // The buried run below the host surface stays narrow: it is the part that
-    // has to disappear into the rock without showing a rim.
-    const buriedBase = Math.min(radius * 0.18, Math.max(radius * 0.055, extraSink * 0.28));
-    appendBaseRow(baseRows, 0, buriedBase);
-    appendBaseRow(baseRows, extraSink * 0.5, radius * 0.42);
-    appendBaseRow(baseRows, extraSink, radius * 0.68);
-  } else if (extraSink > 0) {
-    // Sunk into the vein rather than attached to a host: the prism simply
-    // carries on downward at the width it leaves the quartz with. No taper —
-    // a narrowing tail would be a root, and a quartz crystal does not have one.
-    appendBaseRow(baseRows, 0, radius * BASE_WAIST);
-  }
-
-  appendPrismRows(baseRows, {
-    bodyStart,
-    length: body.renderedLength,
-    radius,
-    tipRadius,
-    // A broken crystal has lost its point, so what is left of it is nearly all
-    // shaft.
-    shoulderShare: broken ? 0.88 : shoulderFraction(body.seed),
-  });
 
   // The monarch keeps a slight elliptical cross-section so it never reads as a
   // machined cylinder, but 0.78/1.12 was a 1.44:1 slab that looked flat from
@@ -457,10 +354,6 @@ export function buildCrystalProfile(
   // presenting a consistent silhouette as the camera orbits.
   const scales = mother ? { scaleX: 0.9, scaleZ: 1.06 } : profileScales(archetype);
   const tuning = shapeTuning(archetype, mother);
-  const twistSign = signedUnit(body.seed, 'geometry:twist-sign') < 0 ? -1 : 1;
-  const twistTotal = round6(
-    twistSign * tuning.twist * (0.55 + seededUnit(body.seed, 'geometry:twist-strength') * 0.45),
-  );
   const leanAngle = seededUnit(body.seed, 'geometry:lean-angle') * Math.PI * 2;
   const leanMagnitude = radius * tuning.lean * (
     0.5 + seededUnit(body.seed, 'geometry:lean-strength') * 0.5
@@ -472,17 +365,40 @@ export function buildCrystalProfile(
     ? round6(0.62 + seededUnit(body.seed, 'geometry:burial-compression') * 0.14)
     : 1;
   const plan = facetPlan(body, mother);
-  const ring = buildRing(body.seed, plan.mainFacets, plan.chamfers, twistTotal);
+  const ring = buildRing(body.seed, plan.mainFacets, plan.chamfers, 0);
   const segments = ring.length;
-  const rows = decorateRows(
-    baseRows,
-    scales,
-    twistTotal,
-    axisLeanX,
-    axisLeanZ,
-    burialStartY,
-    burialCompression,
-  );
+
+  // The cut set, in a frame where the body is round and upright, then bent into
+  // its own by the two affine maps it is allowed: anisotropy and lean.
+  //
+  // Twist is not among them, and that is the one deliberate loss here. A twist
+  // rotates every height by a different angle, which is not affine — it turns a
+  // flat face into a helicoid, and a helicoid has to be tessellated into
+  // triangles that no longer share a normal. That is precisely the mosaic. A
+  // crystal's asymmetry now comes from the faces being unequal instead.
+  const planes = buildCrystalFacePlanes(body, {
+    baseY: 0,
+    topY: geometryLength,
+    radius,
+    mainFacets: plan.mainFacets,
+    bevels: plan.chamfers,
+    blunt,
+    broken,
+    shoulderShare: broken ? 0.88 : shoulderFraction(body.seed),
+    lod,
+  }).map((face) => transformCrystalPlane(
+    face,
+    scales.scaleX,
+    scales.scaleZ,
+    axisLeanX / Math.max(1e-6, geometryLength),
+    axisLeanZ / Math.max(1e-6, geometryLength),
+  ));
+
+  const polytope = intersectHalfSpaces(planes, polytopeTolerance(radius));
+  if (polytope === null) {
+    throw new Error(`Crystal Geometry could not close a solid for "${body.id}".`);
+  }
+  const rows = envelopeRows(polytope, geometryLength);
   const signaturePayload = JSON.stringify({
     bodyId: body.id,
     seed: body.seed,
@@ -492,11 +408,11 @@ export function buildCrystalProfile(
     lod,
     segments,
     ring,
+    planes,
     extraSink: round6(extraSink),
     geometryLength: round6(geometryLength),
     rows,
     scales,
-    twistTotal,
     axisLeanX,
     axisLeanZ,
     burialStartY,
@@ -514,13 +430,16 @@ export function buildCrystalProfile(
     geometryAnchor: roundVec(geometryAnchor),
     scaleX: scales.scaleX,
     scaleZ: scales.scaleZ,
-    twistTotal,
+    // Published as zero rather than dropped: the field is part of Geometry
+    // State v1 and a reader may still be looking at it. Nothing twists now.
+    twistTotal: 0,
     axisLeanX,
     axisLeanZ,
     burialStartY,
     burialCompression,
     rows,
     ring,
+    planes,
     signature: stableHash32(signaturePayload).toString(16).padStart(8, '0'),
   };
 }

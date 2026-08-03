@@ -95,6 +95,35 @@ export function pointInsideCrystalSolid(
 ): boolean {
   const relative = subtract(point, solid.profile.geometryAnchor);
   const y = dot(relative, solid.body.direction);
+
+  // Exact, when the body published what it was cut from (ADR-0006): a point is
+  // inside a half-space intersection precisely when it satisfies every
+  // half-space. No envelope, no interpolation, no conservatism to trade off.
+  //
+  // The elliptical-shell path below is the fallback for persisted Geometry
+  // State v1 profiles, which carry rows and no planes. It stays because a
+  // snapshot taken before this change still has to be readable.
+  const planes = solid.profile.planes;
+  if (planes !== undefined && planes.length > 0) {
+    const { tangent: axisX, bitangent: axisZ } = orthonormalBasis(solid.body.direction);
+    // The mesh maps local z through the negated bitangent to keep the frame
+    // right-handed (see buildCrystalMesh); reading a point back has to undo
+    // exactly that, or the test answers for a mirrored crystal.
+    const local = {
+      x: dot(relative, axisX),
+      y,
+      z: -dot(relative, axisZ),
+    };
+    for (const plane of planes) {
+      const distance = plane.normal.x * local.x
+        + plane.normal.y * local.y
+        + plane.normal.z * local.z
+        - plane.offset;
+      if (distance > epsilon) return false;
+    }
+    return true;
+  }
+
   const lastY = solid.profile.rows[solid.profile.rows.length - 1]?.y ?? 0;
   if (y < -epsilon || y > lastY + epsilon) return false;
 

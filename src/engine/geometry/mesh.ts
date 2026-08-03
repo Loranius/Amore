@@ -10,6 +10,7 @@ import {
 } from '../growth/math';
 import type { GrowthBody, GrowthVec3 } from '../growth';
 import { buildCrystalProfile } from './profile';
+import { intersectHalfSpaces, polytopeTolerance } from './polytope';
 import type {
   CrystalLodLevel,
   CrystalMeshBounds,
@@ -197,9 +198,117 @@ export function splitCrystalMeshFaces(
   };
 }
 
-/** Pure indexed mesh builder; no THREE, canvas, renderer or material imports. */
+/**
+ * Pure indexed mesh builder; no THREE, canvas, renderer or material imports.
+ *
+ * Since ADR-0006 a crystal is the intersection of its published half-spaces, so
+ * this walks the polytope's faces rather than a stack of rings. Each face is
+ * fanned from its own first vertex — every triangle of a face therefore lies in
+ * that face's plane, which is the property the whole faceting rests on: the
+ * faces may be as unequal as a real crystal's without a single one of them
+ * bending. The base plane's face is emitted first, because `trimCrystalMesh`
+ * identifies the base cap by triangle index.
+ */
 export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): CrystalMeshData {
   const profile = buildCrystalProfile(body, lod);
+  const planes = profile.planes;
+  if (planes === undefined || planes.length === 0) {
+    return buildLatheCrystalMesh(body, lod, profile);
+  }
+
+  const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius));
+  if (polytope === null) {
+    throw new Error(`Crystal Geometry could not mesh a solid for "${body.id}".`);
+  }
+
+  // `orthonormalBasis` gives a frame with `tangent × bitangent = direction`, so
+  // taking the body's axis as the *middle* coordinate — which is what the plane
+  // set is written in — makes (tangent, direction, bitangent) left-handed. The
+  // negated bitangent puts the handedness back, and without it every face winds
+  // inward: back-face culling then draws the inside of the crystal.
+  const { tangent, bitangent } = orthonormalBasis(body.direction);
+  const toWorld = (local: GrowthVec3): GrowthVec3 => add(
+    add(
+      add(profile.geometryAnchor, scale(tangent, local.x)),
+      scale(body.direction, local.y),
+    ),
+    scale(bitangent, -local.z),
+  );
+
+  const positions: number[] = [];
+  const indices: number[] = [];
+  for (const vertex of polytope.vertices) pushVertex(positions, toWorld(vertex));
+
+  // Base first. Ordering faces by kind rather than by plane index would be the
+  // same thing today — the base is plane zero — but the mesh must not depend on
+  // the generator's ordering to keep a published invariant true.
+  const ordered = [...polytope.faces].sort((left, right) => {
+    const rank = (face: typeof left): number => (planes[face.planeIndex]!.kind === 'base' ? 0 : 1);
+    return rank(left) - rank(right) || left.planeIndex - right.planeIndex;
+  });
+
+  // A sliver — three corners of a face that are very nearly collinear — covers
+  // no pixels, but its normal is whatever the rounding of its corners happened
+  // to leave, and every downstream pass takes normals from triangle geometry.
+  // One sliver is therefore one facet lit wrongly, so they are dropped rather
+  // than shaded. Scaled to the body: an absolute threshold would delete real
+  // faces on a year crystal and keep slivers on the monarch.
+  const sliverArea = Math.max(1e-12, body.renderedRadius * body.renderedRadius * 1e-5);
+  const area = (ia: number, ib: number, ic: number): number => {
+    const a = vertexAt(positions, ia);
+    const b = vertexAt(positions, ib);
+    const c = vertexAt(positions, ic);
+    return length(cross(subtract(b, a), subtract(c, a))) * 0.5;
+  };
+
+  let baseCapTriangleCount = 0;
+  for (const face of ordered) {
+    const loop = face.loop;
+    const isBase = planes[face.planeIndex]!.kind === 'base';
+    for (let corner = 1; corner + 1 < loop.length; corner += 1) {
+      const ia = loop[0]!;
+      const ib = loop[corner]!;
+      const ic = loop[corner + 1]!;
+      if (area(ia, ib, ic) < sliverArea) continue;
+      indices.push(ia, ib, ic);
+      if (isBase) baseCapTriangleCount += 1;
+    }
+  }
+
+  const sourceTriangleCount = indices.length / 3;
+  return {
+    meshVersion: 1,
+    bodyId: body.id,
+    hostBodyId: body.hostBodyId,
+    lod,
+    profile,
+    positions,
+    normals: computeNormals(positions, indices),
+    indices,
+    sourceTriangleCount,
+    visibleTriangleCount: sourceTriangleCount,
+    removedTriangleCount: 0,
+    baseCapTriangleCount,
+    baseCapRemoved: false,
+    occluderBodyIds: [],
+    bounds: computeBounds(positions),
+  };
+}
+
+/**
+ * The lathe that came before ADR-0006.
+ *
+ * Kept for profiles that carry no planes — persisted Geometry State v1
+ * snapshots, and any species that still describes itself as rings. It is not a
+ * fallback for a crystal: a crystal whose planes failed to close throws rather
+ * than quietly rendering as a different shape.
+ */
+function buildLatheCrystalMesh(
+  body: GrowthBody,
+  lod: CrystalLodLevel,
+  built?: ReturnType<typeof buildCrystalProfile>,
+): CrystalMeshData {
+  const profile = built ?? buildCrystalProfile(body, lod);
   const { tangent, bitangent } = orthonormalBasis(body.direction);
   const positions: number[] = [];
   const indices: number[] = [];

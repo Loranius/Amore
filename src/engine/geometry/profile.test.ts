@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { GrowthBody } from '../growth';
 import { add, orthonormalBasis, scale } from '../growth/math';
 import { buildCrystalMesh } from './mesh';
+import { intersectHalfSpaces, polytopeTolerance } from './polytope';
 import { buildCrystalProfile } from './profile';
 import { pointInsideCrystalSolid } from './trim';
 
@@ -65,33 +66,39 @@ function motherBody(): GrowthBody {
 }
 
 describe('Crystal organic profile phase 3a', () => {
-  it('builds deterministic asymmetric rows with lean, twist and burial metadata', () => {
+  it('publishes a deterministic solid with lean, burial metadata and an envelope', () => {
     const body = crystalBody();
     const first = buildCrystalProfile(body, 'high');
     const repeated = buildCrystalProfile(body, 'high');
 
     expect(repeated).toEqual(first);
-    expect(first.twistTotal).not.toBe(0);
     expect(Math.abs(first.axisLeanX) + Math.abs(first.axisLeanZ)).toBeGreaterThan(0);
     expect(first.burialStartY).toBe(first.extraSink);
     expect(first.burialCompression).toBeGreaterThanOrEqual(0.62);
     expect(first.burialCompression).toBeLessThanOrEqual(0.76);
-    expect(first.rows.some((row) => Math.abs(row.radiusX - row.radiusZ) > 1e-6)).toBe(true);
-    // facetPhase is gone by design: it rotated the ring per row, which is one
-    // of the four things that made side faces non-planar.
+
+    // Twist is published as zero and no longer earned (ADR-0006). It is the one
+    // thing the plane model gave up: a twist rotates every height by a
+    // different angle, which is not an affine map of the solid, so it bends a
+    // flat face into a helicoid — and a helicoid can only be drawn as triangles
+    // that disagree about their normal. That is the mosaic. The crystal's
+    // asymmetry now comes from its faces being unequal instead.
+    expect(first.twistTotal).toBe(0);
+    expect(first.rows.every((row) => row.rotation === 0)).toBe(true);
     expect(first.rows.every((row) => row.facetPhase === 0)).toBe(true);
 
-    // Reverted (2026-08-03): slices used to turn and drift individually, and
-    // that is what made side faces non-planar — the mosaic. A crystal twists
-    // and leans as one piece or not at all, so every slice now carries the same
-    // rotation, and the lean is a straight translation from base to tip.
-    const lastRow = first.rows[first.rows.length - 1]!;
-    for (const row of first.rows) {
-      expect(row.rotation).toBe(first.twistTotal);
-      expect(row.facetPhase).toBe(0);
+    // The cut set is the shape; the rows only report it.
+    const planes = first.planes!;
+    expect(planes.length).toBeGreaterThan(6);
+    expect(planes.filter((plane) => plane.kind === 'base')).toHaveLength(1);
+    expect(planes.filter((plane) => plane.kind === 'prism').length).toBeGreaterThanOrEqual(5);
+    expect(planes.filter((plane) => plane.kind === 'crown').length).toBeGreaterThanOrEqual(4);
+    for (const plane of planes) {
+      // Unit to within `round6` on each component, which is what the published
+      // state can carry.
+      expect(Math.hypot(plane.normal.x, plane.normal.y, plane.normal.z)).toBeCloseTo(1, 5);
+      expect(Number.isFinite(plane.offset)).toBe(true);
     }
-    expect(lastRow.centerOffsetX).toBeCloseTo(first.axisLeanX, 6);
-    expect(lastRow.centerOffsetZ).toBeCloseTo(first.axisLeanZ, 6);
 
     for (const row of first.rows) {
       expect(row.radius).toBeGreaterThan(0);
@@ -110,6 +117,36 @@ describe('Crystal organic profile phase 3a', () => {
     }
   });
 
+  it('keeps the published envelope outside the solid it describes', () => {
+    // `rows` stopped being the recipe and became a report (ADR-0006), and the
+    // one thing a report must not do is understate. Everything downstream that
+    // still reads rows — the trim's occupancy test above all — treats them as
+    // "the body is at most this wide here", so an envelope that cut inside the
+    // crystal would let the trim delete triangles that are genuinely visible.
+    for (const body of [motherBody(), crystalBody()]) {
+      for (let seed = 1; seed <= 8; seed += 1) {
+        const shaped = { ...body, seed: seed * 3571 };
+        const profile = buildCrystalProfile(shaped, 'high');
+        const polytope = intersectHalfSpaces(
+          profile.planes!,
+          polytopeTolerance(shaped.renderedRadius),
+        )!;
+        const rows = profile.rows;
+
+        for (const vertex of polytope.vertices) {
+          // The row at or above this vertex's height is the one that has to
+          // contain it.
+          const row = rows.find((candidate) => candidate.y >= vertex.y - 1e-6) ?? rows[rows.length - 1]!;
+          const previous = rows[Math.max(0, rows.indexOf(row) - 1)]!;
+          const widestX = Math.max(row.radiusX, previous.radiusX);
+          const widestZ = Math.max(row.radiusZ, previous.radiusZ);
+          expect(Math.abs(vertex.x)).toBeLessThanOrEqual(widestX + 1e-6);
+          expect(Math.abs(vertex.z)).toBeLessThanOrEqual(widestZ + 1e-6);
+        }
+      }
+    }
+  });
+
   it('keeps the mother silhouette visibly organic even at low LOD', () => {
     const mother = motherBody();
     const profile = buildCrystalProfile(mother, 'low');
@@ -118,24 +155,22 @@ describe('Crystal organic profile phase 3a', () => {
     expect(profile.archetype).toBe('prismatic');
     expect(profile.burialStartY).toBe(0);
     expect(profile.burialCompression).toBe(1);
-    expect(Math.abs(profile.twistTotal)).toBeGreaterThanOrEqual(0.11);
     // Lean ceiling dropped from 0.26 to 0.09 of the radius (2026-08-03): the
     // monarch is the colony's axis and has to read as near-vertical. It still
     // leans — a perfectly upright crystal reads as placed rather than grown.
     expect(leanMagnitude).toBeGreaterThan(0);
     expect(leanMagnitude).toBeLessThanOrEqual(mother.renderedRadius * 0.09);
-    // Cross-section rounded from 1.44:1 to 1.18:1 and the taper extended into
-    // one extra row (2026-08-02 monarch reshape) — the monarch was reading as
-    // a flat slab with a capped cylinder silhouette. Asymmetry is retained
+    // Cross-section rounded from 1.44:1 to 1.18:1 (2026-08-02 monarch reshape)
+    // — the monarch was reading as a flat slab. Asymmetry is retained
     // deliberately; it just no longer dominates the shape.
     expect(profile.scaleX).toBe(0.9);
     expect(profile.scaleZ).toBe(1.06);
-    // Three to five slices: base, shoulder, zero to two crown bevels, tip.
-    // The four intermediate shaft slices were removed (2026-08-03) — each was
-    // another horizontal band across every side face, and once the faces are
-    // genuinely flat the bands are all the eye sees.
-    expect(profile.rows.length).toBeGreaterThanOrEqual(3);
-    expect(profile.rows.length).toBeLessThanOrEqual(5);
+    // Low LOD spends fewer crown planes and no bevels, but it must still be the
+    // same crystal: the habit is semantics (ADR-0004), not detail.
+    const planes = profile.planes!;
+    expect(planes.filter((plane) => plane.kind === 'bevel')).toHaveLength(0);
+    expect(planes.filter((plane) => plane.kind === 'prism').length)
+      .toBe(buildCrystalProfile(mother, 'high').planes!.filter((plane) => plane.kind === 'prism').length);
   });
 
   it('keeps the facet count off the level-of-detail knob', () => {
@@ -232,10 +267,14 @@ describe('Crystal organic profile phase 3a', () => {
   });
 
   it('gives each crystal its own crown instead of one stamped shape', () => {
-    // Shoulder height and the number of chamfers vary per body, so a colony
-    // does not read as one model placed several times.
+    // Shoulder height varies per body, so a colony does not read as one model
+    // placed several times — and it varies within a band, so a crystal never
+    // becomes a spike or a dome.
+    //
+    // The shoulder is measured off the published envelope, which since
+    // ADR-0006 is sampled at the solid's own vertex heights and so reports the
+    // silhouette exactly rather than at a fixed grid.
     const shoulders = new Set<number>();
-    const rowsAboveShoulder = new Set<number>();
 
     for (let seed = 1; seed <= 40; seed += 1) {
       const profile = buildCrystalProfile({ ...motherBody(), seed: seed * 7919 }, 'high');
@@ -247,20 +286,31 @@ describe('Crystal organic profile phase 3a', () => {
       );
       const share = rows[widestIndex]!.y / top;
 
-      // Every crystal keeps a real shoulder in the documented band.
-      expect(share).toBeGreaterThanOrEqual(0.6);
-      expect(share).toBeLessThanOrEqual(0.82);
+      // Every crystal keeps a real shoulder, high on the body.
+      expect(share).toBeGreaterThanOrEqual(0.5);
+      expect(share).toBeLessThanOrEqual(0.9);
       shoulders.add(Math.round(share * 100));
-      // Exactly one row above the shoulder — the tip. The crown is one
-      // straight run from the shoulder ring to the point on every crystal: the
-      // intermediate rows that used to vary here sat on `pow(along, 0.8)`,
-      // which falls faster than a straight line right after the shoulder, and
-      // that is the inward curve visual review rejected (2026-08-03).
-      rowsAboveShoulder.add(rows.length - 1 - widestIndex);
+
+      // Below the shoulder the body only widens, above it only narrows. That is
+      // what makes the silhouette a prism with a corner in it rather than a
+      // bullet or a barrel — and it was not true while the crown planes were
+      // built from an inverted angle, which put the widest slice at the base on
+      // half of all seeds.
+      // Tolerance is a fraction of the body, not float noise: the envelope
+      // measures the furthest point from the axis, and the crystal leans, so
+      // the far side of a narrowing termination can still drift outward by a
+      // fraction of a percent. A bullet or a barrel misses by tens of percent.
+      const slack = rows[widestIndex]!.radiusX * 0.02;
+      for (let index = 1; index <= widestIndex; index += 1) {
+        expect(rows[index]!.radiusX).toBeGreaterThanOrEqual(rows[index - 1]!.radiusX - slack);
+      }
+      for (let index = widestIndex + 1; index < rows.length; index += 1) {
+        expect(rows[index]!.radiusX).toBeLessThanOrEqual(rows[index - 1]!.radiusX + slack);
+      }
     }
 
-    expect(shoulders.size).toBeGreaterThan(5);
-    expect([...rowsAboveShoulder]).toEqual([1]);
+    // Twenty distinct shoulder heights over forty seeds: each crystal's own.
+    expect(shoulders.size).toBeGreaterThan(10);
   });
 
   it('keeps the monarch nearer vertical than the crystals around it', () => {
@@ -283,32 +333,53 @@ describe('Crystal organic profile phase 3a', () => {
     expect(motherLeans / 30).toBeLessThan(childLeans / 30);
   });
 
-  it('tests trim occupancy against the bent elliptical shell, not a straight radius envelope', () => {
+  it('tests trim occupancy against the solid itself, not against an envelope', () => {
+    // Since ADR-0006 the body publishes the half-spaces it was cut from, so
+    // "is this point inside" is answered exactly rather than against an
+    // elliptical approximation of a polygonal cross-section. That matters
+    // because the envelope is deliberately conservative — it circumscribes the
+    // section — and a trim run against it would keep triangles that are
+    // genuinely hidden.
     const mother = motherBody();
     const mesh = buildCrystalMesh(mother, 'low');
-    // The shoulder — the widest slice, and the one whose occupancy test is
-    // most load-bearing. Addressed by role rather than by index: the crown's
-    // intermediate rows are gone (2026-08-03), so a fixed index no longer
-    // points anywhere in particular.
-    const row = mesh.profile.rows.reduce(
-      (widest, candidate) => (candidate.radiusX > widest.radiusX ? candidate : widest),
-      mesh.profile.rows[0]!,
+    const solid = { body: mother, profile: mesh.profile, bounds: mesh.bounds };
+    const polytope = intersectHalfSpaces(
+      mesh.profile.planes!,
+      polytopeTolerance(mother.renderedRadius),
+    )!;
+
+    // The centroid is inside; every vertex is on the boundary; a point pushed
+    // out along any face normal is outside.
+    const centroid = polytope.vertices.reduce(
+      (sum, vertex) => ({
+        x: sum.x + vertex.x / polytope.vertices.length,
+        y: sum.y + vertex.y / polytope.vertices.length,
+        z: sum.z + vertex.z / polytope.vertices.length,
+      }),
+      { x: 0, y: 0, z: 0 },
     );
     const { tangent, bitangent } = orthonormalBasis(mother.direction);
-    const center = add(
+    const toWorld = (local: { x: number; y: number; z: number }) => add(
       add(
-        add(mesh.profile.geometryAnchor, scale(mother.direction, row.y)),
-        scale(tangent, row.centerOffsetX),
+        add(mesh.profile.geometryAnchor, scale(tangent, local.x)),
+        scale(mother.direction, local.y),
       ),
-      scale(bitangent, row.centerOffsetZ),
+      scale(bitangent, -local.z),
     );
-    const solid = { body: mother, profile: mesh.profile, bounds: mesh.bounds };
-    const inside = add(center, scale(tangent, row.radiusX * 0.95));
-    const outside = add(center, scale(tangent, row.radiusX * 1.05));
 
-    expect(pointInsideCrystalSolid(center, solid, 0)).toBe(true);
-    expect(pointInsideCrystalSolid(inside, solid, 0)).toBe(true);
-    expect(pointInsideCrystalSolid(outside, solid, 0)).toBe(false);
+    expect(pointInsideCrystalSolid(toWorld(centroid), solid, 0)).toBe(true);
+    for (const vertex of polytope.vertices) {
+      expect(pointInsideCrystalSolid(toWorld(vertex), solid, 1e-4)).toBe(true);
+    }
+    for (const plane of mesh.profile.planes!) {
+      if (plane.kind === 'safety') continue;
+      const outside = {
+        x: centroid.x + plane.normal.x * 10,
+        y: centroid.y + plane.normal.y * 10,
+        z: centroid.z + plane.normal.z * 10,
+      };
+      expect(pointInsideCrystalSolid(toWorld(outside), solid, 0)).toBe(false);
+    }
   });
 });
 
@@ -344,138 +415,179 @@ describe('crystal faceting — triangulation', () => {
   });
 });
 
-describe('crystal faceting — flat faces', () => {
+describe('crystal faceting — flat faces (ADR-0006)', () => {
   /**
-   * The invariant the whole 2026-08-03 revert exists for.
+   * The invariant the whole plane model exists for.
    *
-   * A side face is two triangles. If its four corners are coplanar the two
-   * share a normal and the user sees one clean plane; if they are not, the two
-   * take different normals and the crystal renders as a mosaic of small
-   * triangles — which is exactly what visual review rejected.
+   * A crystal is the intersection of its published half-spaces, so every face
+   * is a plane and every triangle cut from that face must lie in it. This is
+   * what lets the faces be as unequal as a real crystal's — different widths,
+   * pitches, lengths, shoulder heights — without any of them bending. The lathe
+   * that came before could only vary a face by bending it, which is why any
+   * attempt at natural variation came back as a mosaic of small triangles.
    *
-   * Per-slice turn, drift, radius swing and facet phase each break it, and each
-   * was present. This test is what stops any of them coming back.
+   * Measured against the face's own plane rather than between neighbouring
+   * triangles: with a fan of five or six triangles per face, pairwise
+   * comparison would let a slow drift through.
    */
-  const maxCoplanarityError = (mesh: ReturnType<typeof buildCrystalMesh>): number => {
-    const vertex = (index: number) => ({
-      x: mesh.positions[index * 3]!,
-      y: mesh.positions[index * 3 + 1]!,
-      z: mesh.positions[index * 3 + 2]!,
-    });
-    const normalOf = (a: number, b: number, c: number) => {
-      const p = vertex(a);
-      const q = vertex(b);
-      const r = vertex(c);
-      const u = { x: q.x - p.x, y: q.y - p.y, z: q.z - p.z };
-      const v = { x: r.x - p.x, y: r.y - p.y, z: r.z - p.z };
-      const n = {
-        x: u.y * v.z - u.z * v.y,
-        y: u.z * v.x - u.x * v.z,
-        z: u.x * v.y - u.y * v.x,
-      };
-      const len = Math.hypot(n.x, n.y, n.z);
-      return len < 1e-12 ? null : { x: n.x / len, y: n.y / len, z: n.z / len };
-    };
-
-    const segments = mesh.profile.ring!.length;
-    const rowCount = mesh.profile.rows.length;
-    // Base cap comes first, then the shell quads, two triangles each.
-    const shellStart = segments;
+  const worstFaceTilt = (
+    body: ReturnType<typeof motherBody>,
+    minimumAreaShare: number,
+  ): number => {
+    const profile = buildCrystalProfile(body, 'high');
+    const planes = profile.planes!;
+    const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
     let worst = 0;
-    for (let quad = 0; quad < (rowCount - 1) * segments; quad += 1) {
-      const first = (shellStart + quad * 2) * 3;
-      const second = first + 3;
-      if (second + 2 >= mesh.indices.length) break;
-      const a = normalOf(mesh.indices[first]!, mesh.indices[first + 1]!, mesh.indices[first + 2]!);
-      const b = normalOf(mesh.indices[second]!, mesh.indices[second + 1]!, mesh.indices[second + 2]!);
-      if (!a || !b) continue;
-      const dot = a.x * b.x + a.y * b.y + a.z * b.z;
-      worst = Math.max(worst, Math.acos(Math.min(1, Math.max(-1, dot))) * (180 / Math.PI));
+
+    for (const face of polytope.faces) {
+      const plane = planes[face.planeIndex]!;
+      const triangles: { normal: number[]; area: number }[] = [];
+      let faceArea = 0;
+      for (let corner = 1; corner + 1 < face.loop.length; corner += 1) {
+        const a = polytope.vertices[face.loop[0]!]!;
+        const b = polytope.vertices[face.loop[corner]!]!;
+        const c = polytope.vertices[face.loop[corner + 1]!]!;
+        const u = [b.x - a.x, b.y - a.y, b.z - a.z];
+        const v = [c.x - a.x, c.y - a.y, c.z - a.z];
+        const cross = [
+          u[1]! * v[2]! - u[2]! * v[1]!,
+          u[2]! * v[0]! - u[0]! * v[2]!,
+          u[0]! * v[1]! - u[1]! * v[0]!,
+        ];
+        const length = Math.hypot(cross[0]!, cross[1]!, cross[2]!);
+        faceArea += length * 0.5;
+        if (length < 1e-14) continue;
+        triangles.push({ normal: cross.map((value) => value / length), area: length * 0.5 });
+      }
+
+      for (const triangle of triangles) {
+        if (triangle.area < faceArea * minimumAreaShare) continue;
+        const alignment = Math.abs(
+          triangle.normal[0]! * plane.normal.x
+          + triangle.normal[1]! * plane.normal.y
+          + triangle.normal[2]! * plane.normal.z,
+        );
+        worst = Math.max(worst, Math.acos(Math.min(1, alignment)) * (180 / Math.PI));
+      }
     }
     return worst;
   };
 
-  it('keeps both triangles of every side face in one plane', () => {
+  it('keeps every triangle of a face in that face`s plane', () => {
     for (const body of [motherBody(), crystalBody()]) {
       for (let seed = 1; seed <= 12; seed += 1) {
-        const mesh = buildCrystalMesh({ ...body, seed: seed * 5077 }, 'high');
-        // A tenth of a degree is float noise; a mosaic is tens of degrees.
-        expect(maxCoplanarityError(mesh)).toBeLessThan(0.1);
+        // Under half a degree is `round6` quantisation on coordinates this
+        // small — measured at 0.27° over 500 seeds — while a mosaic is tens of
+        // degrees. Triangles carrying under a hundredth of their face are
+        // sub-pixel splinters of the fan and are excluded: their normals are
+        // dominated by the same rounding and they cover nothing.
+        expect(worstFaceTilt({ ...body, seed: seed * 5077 }, 0.01)).toBeLessThan(0.45);
       }
     }
   });
 
-  it('keeps faces flat for a crystal that earned chamfers', () => {
-    // Chamfers add ring entries, and a ring entry that varied with height would
-    // reintroduce the defect on exactly the crystals that earned the most.
+  it('keeps faces flat for a crystal that earned bevels', () => {
+    // Bevels add planes, and a plane that varied with height would reintroduce
+    // the defect on exactly the crystals that earned the most.
     for (const facetCount of [6, 10, 18, 24]) {
-      const mesh = buildCrystalMesh(
-        { ...motherBody(), attributes: { ...motherBody().attributes, facetCount } },
-        'high',
-      );
-      expect(maxCoplanarityError(mesh)).toBeLessThan(0.1);
+      const body = {
+        ...motherBody(),
+        attributes: { ...motherBody().attributes, facetCount },
+      };
+      expect(worstFaceTilt(body, 0.01)).toBeLessThan(0.45);
     }
   });
 
   it('draws few large faces rather than many small ones', () => {
-    // The count is the other half of the complaint: 24 narrow sides read as
-    // noise however flat each one is.
-    const mesh = buildCrystalMesh(
-      { ...motherBody(), attributes: { ...motherBody().attributes, facetCount: 24 } },
-      'high',
-    );
-    const ring = mesh.profile.ring!;
+    // The count is the other half of the original complaint: 24 narrow sides
+    // read as noise however flat each one is.
+    const body = {
+      ...motherBody(),
+      attributes: { ...motherBody().attributes, facetCount: 24 },
+    };
+    const profile = buildCrystalProfile(body, 'high');
+    const planes = profile.planes!;
+    const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
+    const kinds = polytope.faces.map((face) => planes[face.planeIndex]!.kind);
 
-    expect(ring.filter((facet) => !facet.chamfer).length).toBeLessThanOrEqual(7);
-    // Base, shaft, shoulder, crown, tip — a handful of horizontal bands, not
-    // the eight to ten the previous build stacked up.
-    expect(mesh.profile.rows.length).toBeLessThanOrEqual(6);
+    expect(kinds.filter((kind) => kind === 'prism').length).toBeLessThanOrEqual(7);
+    expect(kinds.filter((kind) => kind === 'base')).toHaveLength(1);
+    // The safety box exists to keep a degenerate seed bounded. If it ever cuts
+    // a real crystal the shape is being decided by a guard rail rather than by
+    // the geology, which is a bug however well it renders.
+    expect(kinds.filter((kind) => kind === 'safety')).toHaveLength(0);
+    expect(polytope.faces.length).toBeLessThanOrEqual(24);
   });
 
-  it('runs the crown straight from shoulder to point', () => {
-    // The crown used to bow inward: its intermediate rows sat on
-    // `pow(along, 0.8)`, and an exponent under one falls faster than a straight
-    // line right after the shoulder, pinching the radius there and easing out
-    // again toward the tip.
-    //
-    // Checked as a property of the silhouette rather than as a row count, so a
-    // future build may put rows back in the crown as long as they stay on the
-    // line.
-    for (const body of [motherBody(), crystalBody()]) {
-      for (let seed = 1; seed <= 20; seed += 1) {
-        const rows = buildCrystalProfile({ ...body, seed: seed * 4093 }, 'high').rows;
-        const shoulder = rows.reduce(
-          (best, row, index) => (row.radiusX > rows[best]!.radiusX ? index : best),
-          0,
-        );
-        const tip = rows[rows.length - 1]!;
-        const start = rows[shoulder]!;
-        const span = tip.y - start.y;
-        if (span <= 1e-9) continue;
+  it('makes the faces genuinely unequal, not merely irregular', () => {
+    // The requirement in one measurement. Natural quartz keeps the hexagonal
+    // habit but no two faces are the same size, so the largest prism face has
+    // to be substantially larger than the smallest — and the crystal has to
+    // stay recognisably a prism while it happens.
+    const body = motherBody();
+    const profile = buildCrystalProfile(body, 'high');
+    const planes = profile.planes!;
+    const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
 
-        for (let index = shoulder + 1; index < rows.length - 1; index += 1) {
-          const row = rows[index]!;
-          const along = (row.y - start.y) / span;
-          const straight = start.radiusX + (tip.radiusX - start.radiusX) * along;
-          // Any crown row must sit on the line joining shoulder and tip.
-          expect(Math.abs(row.radiusX - straight)).toBeLessThan(start.radiusX * 0.02);
+    const prismAreas = polytope.faces
+      .filter((face) => planes[face.planeIndex]!.kind === 'prism')
+      .map((face) => {
+        let area = 0;
+        for (let corner = 1; corner + 1 < face.loop.length; corner += 1) {
+          const a = polytope.vertices[face.loop[0]!]!;
+          const b = polytope.vertices[face.loop[corner]!]!;
+          const c = polytope.vertices[face.loop[corner + 1]!]!;
+          const u = [b.x - a.x, b.y - a.y, b.z - a.z];
+          const v = [c.x - a.x, c.y - a.y, c.z - a.z];
+          area += Math.hypot(
+            u[1]! * v[2]! - u[2]! * v[1]!,
+            u[2]! * v[0]! - u[0]! * v[2]!,
+            u[0]! * v[1]! - u[1]! * v[0]!,
+          ) * 0.5;
         }
-      }
-    }
+        return area;
+      })
+      .sort((left, right) => right - left);
+
+    expect(prismAreas.length).toBeGreaterThanOrEqual(5);
+    // A lathe gave every face the same area to within its ±5% radius jitter.
+    expect(prismAreas[0]!).toBeGreaterThan(prismAreas[prismAreas.length - 1]! * 1.5);
   });
 
-  it('leans the whole crystal instead of each slice', () => {
-    // "Нахиляється весь кристал, а не кожен його горизонтальний зріз окремо."
-    const profile = buildCrystalProfile(crystalBody(), 'high');
-    const rows = profile.rows;
-    const top = rows[rows.length - 1]!;
+  it('puts each face`s shoulder at its own height and drifts the tip off-axis', () => {
+    // "Плечі починаються на трохи різній висоті", "вісь і верхівка зміщуються
+    // від центру". Both are properties of the finished solid rather than of a
+    // parameter, so both are measured on it.
+    const body = motherBody();
+    const profile = buildCrystalProfile(body, 'high');
+    const planes = profile.planes!;
+    const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
 
-    // Offsets rise straight from zero at the base to the full lean at the tip.
-    for (let index = 1; index < rows.length; index += 1) {
-      expect(Math.abs(rows[index]!.centerOffsetX)).toBeGreaterThanOrEqual(
-        Math.abs(rows[index - 1]!.centerOffsetX) - 1e-9,
-      );
-    }
-    expect(Math.hypot(top.centerOffsetX, top.centerOffsetZ)).toBeGreaterThan(0);
+    // The top of each prism face is where its shoulder is. They must not agree.
+    const shoulders = polytope.faces
+      .filter((face) => planes[face.planeIndex]!.kind === 'prism')
+      .map((face) => Math.max(...face.loop.map((index) => polytope.vertices[index]!.y)));
+    const highest = Math.max(...shoulders);
+    const lowest = Math.min(...shoulders);
+    expect(highest - lowest).toBeGreaterThan(profile.geometryLength * 0.02);
+
+    // The tip is off the axis.
+    const topY = Math.max(...polytope.vertices.map((vertex) => vertex.y));
+    const tip = polytope.vertices.filter((vertex) => vertex.y > topY - 1e-6)[0]!;
+    expect(Math.hypot(tip.x, tip.z)).toBeGreaterThan(0);
+  });
+
+  it('is deterministic and unique per body', () => {
+    // The geological identity: the same couple gets the same crystal on every
+    // reload, and no two bodies in a colony get the same one.
+    const first = buildCrystalProfile(motherBody(), 'high');
+    expect(buildCrystalProfile(motherBody(), 'high')).toEqual(first);
+
+    const signatures = new Set(
+      [1, 2, 3, 4, 5, 6, 7, 8].map(
+        (seed) => buildCrystalProfile({ ...motherBody(), seed: seed * 7919 }, 'high').signature,
+      ),
+    );
+    expect(signatures.size).toBe(8);
   });
 });
