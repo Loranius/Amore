@@ -20,7 +20,7 @@ import {
   PORTAL_GROUND_Y,
   PORTAL_PALETTES,
   buildPortalDaisGeometry,
-  buildPortalGroundCrackGeometry,
+  buildPortalRuneGeometry,
   buildPortalInlayGeometry,
   buildPortalPillarGeometry,
   buildPortalRitualSlabGeometry,
@@ -42,6 +42,14 @@ export interface PortalEnvironmentProps {
   aspect: number;
   /** Масштаб подіуму під розмір друзи — див. portalDaisScale. */
   daisScale: number;
+  /**
+   * Напрямки гілок кварцової жили (профіль субстрату, `veinBearings`).
+   *
+   * Камінь платформи піднімається саме над ними. Без них він піднімався б у
+   * власних, від насіння, — і тоді на подіумі було б дві незалежні системи
+   * розломів: жила в артефакті й вигини в сцені.
+   */
+  veinBearings: readonly number[];
 }
 
 function starCount(quality: PortalEnvironmentProps['quality']): number {
@@ -51,19 +59,35 @@ function starCount(quality: PortalEnvironmentProps['quality']): number {
   return 90;
 }
 
-export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisScale }: PortalEnvironmentProps) {
+export function PortalEnvironment({
+  seed,
+  theme,
+  quality,
+  frame,
+  aspect,
+  daisScale,
+  veinBearings,
+}: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
 
   const daisGeometry = useMemo(() => buildPortalDaisGeometry(), []);
   // Інкрустація тепер від насіння теж: вона повторює вигин плити, а плита
   // вигинається там, де тріснула саме в цієї пари.
-  const inlayGeometry = useMemo(() => buildPortalInlayGeometry(seed), [seed]);
+  const inlayGeometry = useMemo(
+    () => buildPortalInlayGeometry(seed, veinBearings),
+    [seed, veinBearings],
+  );
   const pillarGeometry = useMemo(() => buildPortalPillarGeometry(), []);
-  // Плита й тріщини — від насіння артефакта: розлом у кожної пари свій і
-  // незмінний, як і небо над ними.
-  const slabGeometry = useMemo(() => buildPortalRitualSlabGeometry(seed), [seed]);
-  const crackGeometry = useMemo(() => buildPortalGroundCrackGeometry(seed), [seed]);
+  // Камінь платформи вигинається над жилою, тож перебудовується разом із нею.
+  const slabGeometry = useMemo(
+    () => buildPortalRitualSlabGeometry(seed, veinBearings),
+    [seed, veinBearings],
+  );
+  const runeGeometry = useMemo(
+    () => buildPortalRuneGeometry(seed, veinBearings),
+    [seed, veinBearings],
+  );
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
   const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
 
@@ -72,8 +96,8 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisSca
     inlayGeometry.dispose();
     pillarGeometry.dispose();
     slabGeometry.dispose();
-    crackGeometry.dispose();
-  }, [daisGeometry, inlayGeometry, pillarGeometry, slabGeometry, crackGeometry]);
+    runeGeometry.dispose();
+  }, [daisGeometry, inlayGeometry, pillarGeometry, slabGeometry, runeGeometry]);
 
   const starGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
@@ -136,10 +160,10 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisSca
         />
       </mesh>
 
-      {/* Ритуальна плита. Кристал не поставлений на подіум — він проріс
-          крізь нього, і внутрішній обвід плити розламаний та піднятий там,
-          де камінь пішов угору. Масштаб той самий, що в подіума, інакше
-          пролом роз'їхався б із каменем, який його зробив. */}
+      {/* Кам'яна платформа: суцільна верхня поверхня без жодного отвору під
+          друзою. Кристали проросли крізь неї по кварцовій жилі, і камінь
+          піднятий рівно над її гілками. Масштаб той самий, що в подіума,
+          інакше вигин роз'їхався б із жилою, яка його зробила. */}
       <mesh
         geometry={slabGeometry}
         position={[0, PORTAL_GROUND_Y, 0]}
@@ -154,28 +178,30 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisSca
         />
       </mesh>
 
-      {/* Тріщини від пролому. Насамперед темні — це розкол каменю, а не
-          світляна доріжка; світіння лише натякає, що те, яке розсунуло плиту,
-          ще в ній. */}
+      {/* Рунічні візерунки по кільцю. Тріщини звідси пішли: єдиний розлом у
+          камені — це сама жила, яку публікує рушій. */}
       <mesh
-        geometry={crackGeometry}
+        geometry={runeGeometry}
         position={[0, PORTAL_GROUND_Y, 0]}
         scale={[daisScale, 1, daisScale]}
       >
         <meshStandardMaterial
-          color={palette.crack}
-          emissive={palette.crackGlow}
-          emissiveIntensity={0.2}
-          roughness={0.9}
-          metalness={0}
+          color={palette.rune}
+          emissive={palette.runeGlow}
+          emissiveIntensity={0.35}
+          roughness={0.62}
+          metalness={0.1}
         />
       </mesh>
 
-      {/* Інкрустація по обводу. Лежить на плиті, тож піднята на її товщину;
-          мікро-підйом понад те — щоб не сперечатись за z-буфер. */}
+      {/* Інкрустація по обводу. Висоту вона несе у власній геометрії — та
+          повторює вигин плити, — тож меш стоїть на площині подіуму без
+          додаткового підйому. Тут лишалось `+ 0.079` від часів, коли кільця
+          були пласкі: після переходу на вигнуті смуги воно додавалось до
+          вже врахованої висоти, і золото висіло на товщину плити над нею. */}
       <mesh
         geometry={inlayGeometry}
-        position={[0, PORTAL_GROUND_Y + 0.079, 0]}
+        position={[0, PORTAL_GROUND_Y, 0]}
         scale={[daisScale, 1, daisScale]}
       >
         <meshStandardMaterial

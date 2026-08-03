@@ -65,6 +65,16 @@ export interface CrystalBodyProfile {
   rows: CrystalProfileRow[];
   /** Shared cross-section. Optional so older persisted profiles stay readable. */
   ring?: CrystalRingFacet[];
+  /**
+   * Bearings, in radians, along which the quartz vein runs out from its node.
+   *
+   * Published because the vein does not stop at the artifact: the portal's
+   * stone platform bows where the seam runs under it, and a platform bowing in
+   * its own directions would read as a second, unrelated fracture system rather
+   * than as the same stone giving way. Only the substrate carries it, and only
+   * new builds — optional keeps persisted Geometry State v1 profiles readable.
+   */
+  veinBearings?: number[];
   signature: string;
 }
 

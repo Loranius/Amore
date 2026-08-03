@@ -246,9 +246,15 @@ export function buildCrystalGeometry(
   // hides the crystals' buried base caps, so dropping it would expose exactly
   // what ADR-0003 relies on it to cover. It is sized from the bodies that were
   // actually kept, and its cost still counts toward the reported budget.
+  // The meshes go in alongside the bodies because a body's anchor is not how
+  // deep its geometry actually reaches: the monarch is sunk into the vein by
+  // her profile (MONARCH_GROUND_SINK), not by her anchor, and an attached body
+  // adds `extraSink` on top of its own. Sizing the vein from anchors alone left
+  // it shallower than the very base caps it exists to hide.
   const substrate = buildCrystalSubstrateMesh(
     trimmedMeshes.map((mesh) => bodyById.get(mesh.bodyId)).filter((body) => body !== undefined),
     input.growth.artifactSeed,
+    trimmedMeshes,
   );
 
   // Every triangle gets its own three vertices and its own normal, last of all.
@@ -257,8 +263,13 @@ export function buildCrystalGeometry(
   // who is drawing it. Last because trimming works on the index list: splitting
   // first would strand the removed triangles' vertices in the buffer and inflate
   // the vertex count with geometry nothing draws.
+  // The vein is faceted like everything else. Smooth normals were carried here
+  // while the substrate was a curved plate — a collar lifted around each
+  // crystal, where per-triangle normals read as banding rather than as facets.
+  // The vein's top is flat and its wall is a straight band, so there is no
+  // curvature left to band and the low-poly facets are the point.
   const meshes = (substrate === null ? trimmedMeshes : [...trimmedMeshes, substrate])
-    .map(splitCrystalMeshFaces);
+    .map((mesh) => splitCrystalMeshFaces(mesh));
 
   const usedVertices = meshes.reduce((sum, mesh) => sum + mesh.positions.length / 3, 0);
   const usedTriangles = meshes.reduce((sum, mesh) => sum + mesh.visibleTriangleCount, 0);

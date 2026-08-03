@@ -24,7 +24,7 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * тіл), тож він мусить знати внесок сцени — інакше довелось би просто
  * послабити межу й перевірка втратила б сенс.
  *
- * Земля + подіум + ритуальна плита + тріщини + інкрустація + колони (один
+ * Поле + подіум + кам'яна платформа + руни + інкрустація + колони (один
  * InstancedMesh на всі три пари) + зорі.
  */
 export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
@@ -38,18 +38,24 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
  * будувати геометрію двічі. За тим, щоб воно не розійшлось із реальними
  * буферами, стежить portalScene.test.ts.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 2434;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 2812;
 
 /** Сегментів у диску поля; єдине місце, що задає його вартість. */
 const FIELD_SEGMENTS = 64;
 
-/** Реальна вартість оточення — джерело правди для константи вище. */
-export function measurePortalEnvironmentTriangles(seed = 1): number {
+/**
+ * Реальна вартість оточення — джерело правди для константи вище.
+ *
+ * Напрямки жили на вартість не впливають: вони зсувають вершини, але не
+ * додають і не прибирають жодного трикутника. Саме тому константа лишається
+ * однією на всі пари.
+ */
+export function measurePortalEnvironmentTriangles(seed = 1, bearings: readonly number[] = []): number {
   const dais = buildPortalDaisGeometry();
-  const inlay = buildPortalInlayGeometry(seed);
+  const inlay = buildPortalInlayGeometry(seed, bearings);
   const pillar = buildPortalPillarGeometry();
-  const slab = buildPortalRitualSlabGeometry(seed);
-  const cracks = buildPortalGroundCrackGeometry(seed);
+  const slab = buildPortalRitualSlabGeometry(seed, bearings);
+  const runes = buildPortalRuneGeometry(seed, bearings);
   const triangles = (geometry: THREE.BufferGeometry): number => {
     const index = geometry.getIndex();
     return index === null
@@ -61,14 +67,14 @@ export function measurePortalEnvironmentTriangles(seed = 1): number {
     + triangles(dais)
     + triangles(inlay)
     + triangles(slab)
-    + triangles(cracks)
+    + triangles(runes)
     + triangles(pillar) * PORTAL_PILLARS.length * 2;
 
   dais.dispose();
   inlay.dispose();
   pillar.dispose();
   slab.dispose();
-  cracks.dispose();
+  runes.dispose();
   return total;
 }
 
@@ -195,17 +201,20 @@ const DAIS_CLEARANCE = 1.34;
 /**
  * Стеля масштабу подіуму — її задають колони.
  *
- * Колони стоять на полі, а не на подіумі. Найближча пара на найвужчому
- * реальному кадрі відходить від осі на ≈2.99 (z = -2.6 плюс виніс по x).
- * На висоті, де вони стоять (-PORTAL_FIELD_DROP), радіус подіуму — 1.66
- * базової геометрії, тож 1.66 × 1.75 = 2.91 < 2.99: цоколі лишаються
- * зовні.
+ * Колони стоять на полі, а не на подіумі. Обмежує **передня** пара, і це не
+ * очевидно: вона дзеркальна задній по z, але стоїть ближче до камери, тож
+ * півширина кадру на її глибині менша й у світових координатах вона ближча до
+ * осі. На найвужчому реальному кадрі вона відходить від осі на ≈2.81 проти
+ * ≈2.99 у задньої.
+ *
+ * На висоті, де стоять цоколі (-PORTAL_FIELD_DROP), радіус подіуму — 1.66
+ * базової геометрії, тож 1.66 × 1.66 = 2.76 < 2.81: цоколі лишаються зовні.
  *
  * Ціна стелі чесна й обмежена: приблизно після п'ятнадцяти років друза
  * доростає до краю подіуму й далі камінь торкається обводу замість того,
  * щоб лишати запас. Це помітно менша вада, ніж колона, що пробиває плиту.
  */
-const DAIS_MAX_SCALE = 1.75;
+const DAIS_MAX_SCALE = 1.66;
 
 /**
  * Масштаб подіуму під конкретний артефакт.
@@ -233,51 +242,42 @@ export function buildPortalDaisGeometry(): THREE.LatheGeometry {
   return geometry;
 }
 
-// ── Ритуальна плита ─────────────────────────────────────────
-// Кристал не поставлений на подіум — він проріс крізь нього. Плита лежить
-// на верхній площині, її внутрішній обвід розламаний і піднятий там, де
-// камінь пішов угору, від пролому по каменю розходяться тріщини, а сама
-// плита вигнута там, де тріснула.
+// ── Кам'яна платформа ───────────────────────────────────────
+// Суцільна верхня поверхня подіуму. Кристали ростуть просто з неї — крізь
+// кварцову жилу, яку публікує рушій (engine/geometry/substrate.ts), — а
+// камінь навколо вигинається рівно там, де під ним іде жила.
+//
+// Тут була ритуальна плита-кільце з розламаним внутрішнім обводом: усередині
+// того обводу поверхня провалювалась на товщину плити, і під друзою виходило
+// кругле заглиблення. Огляд (2026-08-03) відхилив його — тепер обводу немає
+// зовсім, а пролом у камені є лише один, і це сама жила.
 
-function round4(value: number): number {
-  return Math.round(value * 10_000) / 10_000;
-}
-
-/**
- * Внутрішній обвід плити — рівно там, де стоїть камінь друзи.
- *
- * Спочатку тут було на 4% менше, «щоб не було щілини», і через це весь
- * розламаний обвід разом із піднятою губою ховався під каменем: пролом
- * будувався й не було його видно. Розкид нижче лишає частину сегментів під
- * каменем, а частину — назовні, і саме ці й читаються як уламки.
- */
-const SLAB_INNER = round4(PORTAL_DAIS_TOP_RADIUS / DAIS_CLEARANCE);
-
-/**
- * Де підважений злам сходить нанівець.
- *
- * Уламок піднімається вузькою губою просто біля пролому, а не через усю
- * плиту. Перша версія нахиляла всю верхню площину від внутрішнього обводу до
- * зовнішнього, і піднята частина накривала золоту інкрустацію — та виходила
- * пунктиром там, де сегмент був піднятий, і суцільною там, де ні.
- */
-const SLAB_LIP = 0.075;
 /** Зовнішній — трохи всередині обводу подіуму, щоб фаска подіуму лишалась видною. */
 const SLAB_OUTER = 1.27;
 const SLAB_THICKNESS = 0.075;
-const SLAB_SEGMENTS = 30;
-/** Частка сегментів, яку кристал підважив угору. */
-const SLAB_HEAVED_SHARE = 0.38;
-
-/** Скільки тріщин розходиться від пролому. */
-const CRACK_COUNT = 9;
+const SLAB_SEGMENTS = 36;
 
 /**
- * Напрямки тріщин. Спільні для тріщин і для плити: плита має вигинатись саме
- * там, де вона тріснула, тож обидва будівники мусять читати одні й ті самі
- * кути, а не два незалежні випадкові потоки.
+ * Скільки напрямків жили платформа підхоплює, якщо їх передали.
+ *
+ * Стримано: жила має 2–3 головні гілки, і камінь мусить читатись як їхнє
+ * продовження, а не як власна система розломів. Раніше тут було дев'ять
+ * рівномірних напрямків від власного насіння — саме та друга система.
  */
-export function portalCrackAngles(seed: number): number[] {
+const CRACK_COUNT = 3;
+
+/**
+ * Напрямки, у яких камінь платформи піднято.
+ *
+ * Перший аргумент — насіння артефакта, другий — напрямки гілок кварцової жили
+ * з опублікованого профілю субстрату. Коли вони є, камінь іде за ними: жила
+ * розсунула його зсередини, тож будь-який інший напрямок був би розломом
+ * нізвідки. Насіннєвий запас лишається для випадків, коли профіль старий і
+ * напрямків у ньому немає, — тоді краще стриманий вигин, ніж пласка плита.
+ */
+export function portalCrackAngles(seed: number, bearings: readonly number[] = []): number[] {
+  const fromVein = bearings.filter(Number.isFinite).slice(0, CRACK_COUNT);
+  if (fromVein.length > 0) return fromVein;
   const random = mulberry32(seed ^ 0x0c2ac);
   return Array.from(
     { length: CRACK_COUNT },
@@ -314,108 +314,103 @@ function slabSwell(angle: number, cracks: readonly number[]): number {
 }
 
 /**
- * Висота поверхні плити в точці.
+ * Профіль вигину вздовж радіуса.
  *
- * Одна функція на всіх, хто на плиті лежить: сама плита, тріщини й золота
+ * Вигин не купол, а гребінь: у самому центрі камінь плаский, підіймається
+ * одразу за друзою й полого сходить до обводу. Пласка серцевина тут не
+ * косметика — при куполі вершина припадала б рівно на вісь, де всі сегменти
+ * сходяться в одну точку, і поверхня стала б віялом різнонахилених клинів.
+ */
+function slabRidge(radius: number): number {
+  const along = Math.max(0, Math.min(1, radius / SLAB_OUTER));
+  const rise = Math.min(1, along / 0.3);
+  const eased = rise * rise * (3 - 2 * rise);
+  // Сила прийшла зсередини, тож на обводі від вигину лишається третина.
+  return eased * (1 - along * 0.7);
+}
+
+/**
+ * Висота поверхні платформи в точці.
+ *
+ * Одна функція на всіх, хто на камені лежить: сама платформа, руни й золота
  * інкрустація. Інкрустація спершу була пласким кільцем на сталій висоті — і
- * щойно плиту вигнуло, вигин її накрив, тобто золото зникло. Інкрустація
+ * щойно камінь вигнуло, вигин її накрив, тобто золото зникло. Інкрустація
  * вкладена *в* камінь, тож вона мусить вигинатись разом із ним.
  */
-export function portalSlabSurfaceY(angle: number, radius: number, seed: number): number {
-  return slabSurfaceY(angle, radius, portalCrackAngles(seed));
+export function portalSlabSurfaceY(
+  angle: number,
+  radius: number,
+  seed: number,
+  bearings: readonly number[] = [],
+): number {
+  return slabSurfaceY(angle, radius, portalCrackAngles(seed, bearings));
 }
 
 /** Наскільки інкрустація підведена над каменем плити. */
 export const PORTAL_INLAY_CLEARANCE = 0.005;
 
 function slabSurfaceY(angle: number, radius: number, cracks: readonly number[]): number {
-  const lip = SLAB_INNER + SLAB_LIP;
-  const span = Math.max(1e-6, SLAB_OUTER - lip);
-  const along = Math.max(0, Math.min(1, (radius - lip) / span));
-  // Сила прийшла зсередини, тож на обводі від вигину лишається третина.
-  return SLAB_THICKNESS + slabSwell(angle, cracks) * (1 - along * 0.7);
+  return SLAB_THICKNESS + slabSwell(angle, cracks) * slabRidge(radius);
 }
 
-interface SlabRim {
-  innerRadius: number;
-  lift: number;
-}
-
-function slabRim(seed: number): SlabRim[] {
-  const random = mulberry32(seed ^ 0x51ab);
-  const rim: SlabRim[] = [];
-  for (let index = 0; index < SLAB_SEGMENTS; index += 1) {
-    // Розлам нерівний, але не рваний: плита має лишитись плитою.
-    const inner = SLAB_INNER + (random() - 0.5) * 0.09;
-    const heaved = random() < SLAB_HEAVED_SHARE;
-    rim.push({ innerRadius: inner, lift: heaved ? 0.018 + random() * 0.05 : 0 });
-  }
-  return rim;
-}
+/** Радіуси кілець верхньої площини — від осі до обводу, без жодного розриву. */
+const SLAB_RINGS: readonly number[] = [0, 0.18, 0.36, 0.58, 0.8, 1];
 
 /**
- * Плита як суцільне тіло: верхня площина, внутрішній зріз розлому і
- * зовнішній обвід. Не індексована — сусідні уламки підняті по-різному, і
- * спільні вершини усереднили б нормалі саме там, де має бути ребро злому.
+ * Платформа як суцільне тіло: верхня площина від осі до обводу і зовнішній
+ * бортик. Не індексована — flatShading по гранях і є тим фасетним каменем, що
+ * на референсі, а спільні вершини усереднили б нормалі якраз на ребрах.
+ *
+ * `bearings` — напрямки гілок кварцової жили (профіль субстрату). Камінь
+ * піднімається саме над ними.
  */
-export function buildPortalRitualSlabGeometry(seed: number): THREE.BufferGeometry {
-  const rim = slabRim(seed);
-  const cracks = portalCrackAngles(seed);
+export function buildPortalRitualSlabGeometry(
+  seed: number,
+  bearings: readonly number[] = [],
+): THREE.BufferGeometry {
+  const cracks = portalCrackAngles(seed, bearings);
   const positions: number[] = [];
-  const push = (x: number, y: number, z: number): void => {
-    positions.push(x, y, z);
-  };
   const triangle = (
     a: readonly [number, number, number],
     b: readonly [number, number, number],
     c: readonly [number, number, number],
   ): void => {
-    push(a[0], a[1], a[2]);
-    push(b[0], b[1], b[2]);
-    push(c[0], c[1], c[2]);
+    positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
   };
+  const point = (angle: number, radius: number): readonly [number, number, number] => [
+    Math.sin(angle) * radius,
+    slabSurfaceY(angle, radius, cracks),
+    Math.cos(angle) * radius,
+  ];
 
   for (let index = 0; index < SLAB_SEGMENTS; index += 1) {
-    const next = (index + 1) % SLAB_SEGMENTS;
     const a0 = (index / SLAB_SEGMENTS) * Math.PI * 2;
-    const a1 = (next / SLAB_SEGMENTS) * Math.PI * 2;
-    const here = rim[index]!;
-    const there = rim[next]!;
-    const lipHere = here.innerRadius + SLAB_LIP;
-    const lipThere = there.innerRadius + SLAB_LIP;
-    const topHere = SLAB_THICKNESS + here.lift + slabSwell(a0, cracks);
-    const topThere = SLAB_THICKNESS + there.lift + slabSwell(a1, cracks);
-    const midHereY = slabSurfaceY(a0, lipHere, cracks);
-    const midThereY = slabSurfaceY(a1, lipThere, cracks);
-    const outHereY = slabSurfaceY(a0, SLAB_OUTER, cracks);
-    const outThereY = slabSurfaceY(a1, SLAB_OUTER, cracks);
+    const a1 = ((index + 1) / SLAB_SEGMENTS) * Math.PI * 2;
 
-    const inHere: readonly [number, number, number] = [Math.sin(a0) * here.innerRadius, topHere, Math.cos(a0) * here.innerRadius];
-    const inThere: readonly [number, number, number] = [Math.sin(a1) * there.innerRadius, topThere, Math.cos(a1) * there.innerRadius];
-    const midHere: readonly [number, number, number] = [Math.sin(a0) * lipHere, midHereY, Math.cos(a0) * lipHere];
-    const midThere: readonly [number, number, number] = [Math.sin(a1) * lipThere, midThereY, Math.cos(a1) * lipThere];
-    const outHere: readonly [number, number, number] = [Math.sin(a0) * SLAB_OUTER, outHereY, Math.cos(a0) * SLAB_OUTER];
-    const outThere: readonly [number, number, number] = [Math.sin(a1) * SLAB_OUTER, outThereY, Math.cos(a1) * SLAB_OUTER];
+    for (let ring = 0; ring < SLAB_RINGS.length - 1; ring += 1) {
+      const inner = SLAB_RINGS[ring]! * SLAB_OUTER;
+      const outer = SLAB_RINGS[ring + 1]! * SLAB_OUTER;
+      const o0 = point(a0, outer);
+      const o1 = point(a1, outer);
+      if (inner <= 0) {
+        // Серцевина: одне віяло на пласкій ділянці, тож усі його трикутники
+        // лежать в одній площині й flatShading не робить із них зірки.
+        triangle(point(a0, 0), o0, o1);
+        continue;
+      }
+      const i0 = point(a0, inner);
+      const i1 = point(a1, inner);
+      triangle(i0, o0, i1);
+      triangle(i1, o0, o1);
+    }
 
-    // Піднята губа біля пролому — вона одна й нахилена.
-    triangle(inHere, midHere, inThere);
-    triangle(inThere, midHere, midThere);
-    // Решта плити вигинається разом із тріщинами, але вже полого.
-    triangle(midHere, outHere, midThere);
-    triangle(midThere, outHere, outThere);
-
-    // Зріз розлому, повернутий до кристала: саме він читається як товщина
-    // каменю, крізь який кристал пройшов.
-    const inHereFloor: readonly [number, number, number] = [inHere[0], 0, inHere[2]];
-    const inThereFloor: readonly [number, number, number] = [inThere[0], 0, inThere[2]];
-    triangle(inHere, inThere, inHereFloor);
-    triangle(inThere, inThereFloor, inHereFloor);
-
-    // Зовнішній обвід.
-    const outHereFloor: readonly [number, number, number] = [outHere[0], 0, outHere[2]];
-    const outThereFloor: readonly [number, number, number] = [outThere[0], 0, outThere[2]];
-    triangle(outHere, outHereFloor, outThere);
-    triangle(outThere, outHereFloor, outThereFloor);
+    // Зовнішній бортик — товщина каменю, видима з-під фаски подіуму.
+    const out0 = point(a0, SLAB_OUTER);
+    const out1 = point(a1, SLAB_OUTER);
+    const floor0: readonly [number, number, number] = [out0[0], 0, out0[2]];
+    const floor1: readonly [number, number, number] = [out1[0], 0, out1[2]];
+    triangle(out0, floor0, out1);
+    triangle(out1, floor0, floor1);
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -424,56 +419,75 @@ export function buildPortalRitualSlabGeometry(seed: number): THREE.BufferGeometr
   return geometry;
 }
 
-/**
- * Тріщини лежать *на* плиті. Спершу вони були на 0.006 від підлоги подіуму,
- * тобто на сім сотих нижче за верх плити — тобто всередині каменю, і на екрані
- * їх не було взагалі.
- */
+/** Наскільки різьблення підведене над каменем плити. */
 const CRACK_CLEARANCE = PORTAL_INLAY_CLEARANCE;
 
+/** Скільки рун викарбувано на кільці. */
+const RUNE_COUNT = 12;
+/** Радіус, на якому вони лежать — між середнім і зовнішнім золотими кільцями. */
+/** Між першим і другим кільцем — там для них є смуга завширшки 0.07. */
+const RUNE_RADIUS = 1.1;
+const RUNE_SIZE = 0.05;
+
 /**
- * Тріщини від пролому назовні. Кожна звужується до нуля, тож вона згасає
- * сама, а не впирається в обвід плити.
+ * Рунічні візерунки по кільцю плити.
+ *
+ * Замінюють радіальні тріщини, які тут були: самі тріщини переїхали в геометрію
+ * рушія, де кожен кристал ріже плиту власними, а їхні довжина, ширина й глибина
+ * йдуть від його радіуса. Кільце лишилось порожнім, і на референсі саме там
+ * стоїть різьблення.
+ *
+ * Кожна руна — кутник із двох штрихів, як на референсі: рівно стільки форми,
+ * щоб читалось як знак, і жодної спроби зобразити алфавіт, якого не існує.
  */
-export function buildPortalGroundCrackGeometry(seed: number): THREE.BufferGeometry {
-  const random = mulberry32(seed ^ 0x51de);
-  const cracks = portalCrackAngles(seed);
+export function buildPortalRuneGeometry(
+  seed: number,
+  bearings: readonly number[] = [],
+): THREE.BufferGeometry {
+  const random = mulberry32(seed ^ 0x2c0de);
   const positions: number[] = [];
-  const strand = (angle: number, from: number, to: number, width: number): void => {
-    const drift = (random() - 0.5) * 0.22;
-    const tip = angle + drift;
+  const cracks = portalCrackAngles(seed, bearings);
+
+  const stroke = (
+    angle: number,
+    radius: number,
+    alongTangent: number,
+    alongRadial: number,
+    thickness: number,
+  ): void => {
     const sx = Math.sin(angle);
     const cz = Math.cos(angle);
-    const tx = Math.sin(tip);
-    const tz = Math.cos(tip);
-    const px = cz * width;
-    const pz = -sx * width;
-    const baseY = slabSurfaceY(angle, from, cracks) + CRACK_CLEARANCE;
-    const tipY = slabSurfaceY(tip, to, cracks) + CRACK_CLEARANCE;
-    // Намотка проти годинникової, якщо дивитись згори. Спершу тут був
-    // зворотний порядок, нормаль показувала вниз, і backface culling викидав
-    // кожну тріщину — на екрані їх не було взагалі, хоча геометрія будувалась.
+    // Локальні осі руни: вздовж радіуса й по дотичній.
+    const rx = sx;
+    const rz = cz;
+    const tx = cz;
+    const tz = -sx;
+    const cx = sx * radius;
+    const czz = cz * radius;
+    const y = slabSurfaceY(angle, radius, cracks) + CRACK_CLEARANCE;
+    const half = thickness * 0.5;
+    const corner = (u: number, v: number): readonly [number, number, number] => [
+      cx + tx * u + rx * v,
+      y,
+      czz + tz * u + rz * v,
+    ];
+    const a = corner(-alongTangent * 0.5 - half, -alongRadial * 0.5 - half);
+    const b = corner(alongTangent * 0.5 + half, alongRadial * 0.5 - half);
+    const c = corner(alongTangent * 0.5 + half, alongRadial * 0.5 + half);
+    const d = corner(-alongTangent * 0.5 - half, -alongRadial * 0.5 + half);
     positions.push(
-      sx * from + px, baseY, cz * from + pz,
-      sx * from - px, baseY, cz * from - pz,
-      tx * to, tipY, tz * to,
+      a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2],
+      a[0], a[1], a[2], c[0], c[1], c[2], d[0], d[1], d[2],
     );
   };
 
-  for (const angle of cracks) {
-    // Починаються там, де сходить нанівець піднята губа: під нею тріщину все
-    // одно не було б видно.
-    const from = SLAB_INNER + SLAB_LIP;
-    const reach = from + (0.3 + random() * 0.6) * (SLAB_OUTER - from);
-    // Ширина в одиницях геометрії подіуму: тонша за це — і на телефоні від
-    // тріщини лишається пара пікселів, тобто нічого.
-    strand(angle, from, reach, 0.042 + random() * 0.03);
-    // Кожна тріщина роздвоюється — камінь рідко тріскає однією лінією. Гілка
-    // є завжди, а не за кидком: інакше вартість оточення залежала б від
-    // насіння пари, а PORTAL_ENVIRONMENT_TRIANGLES — константа бюджету.
-    // Коротка гілка просто не читається, і це і є «без роздвоєння».
-    const branch = 0.12 + random() * 0.72;
-    strand(angle + (random() - 0.5) * 0.5, from + 0.02, from + (reach - from) * branch, 0.028);
+  for (let index = 0; index < RUNE_COUNT; index += 1) {
+    const angle = (index / RUNE_COUNT) * Math.PI * 2;
+    const size = RUNE_SIZE * (0.8 + random() * 0.4);
+    const flip = random() < 0.5 ? 1 : -1;
+    // Кутник: поперечний штрих і радіальний, що виходить з його кінця.
+    stroke(angle, RUNE_RADIUS, size * 1.6, 0, size * 0.22);
+    stroke(angle + (size * 0.7 * flip) / RUNE_RADIUS, RUNE_RADIUS + size * 0.55, 0, size * 1.1, size * 0.22);
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -486,12 +500,20 @@ export function buildPortalGroundCrackGeometry(seed: number): THREE.BufferGeomet
  * Золоті кільця по обводу верхньої площини. Два кільця одним buffer'ом —
  * інкрустація не варта другого draw call'а.
  */
-export function buildPortalInlayGeometry(seed: number): THREE.BufferGeometry {
-  const cracks = portalCrackAngles(seed);
-  // Обидва кільця лежать поза зоною зламу (SLAB_INNER + SLAB_LIP = 1.045) і
-  // повторюють вигин плити — інакше вигин їх накриває, і золото зникає рівно
+export function buildPortalInlayGeometry(
+  seed: number,
+  bearings: readonly number[] = [],
+): THREE.BufferGeometry {
+  const cracks = portalCrackAngles(seed, bearings);
+  // Три кільця різного радіуса, як на референсі: вузьке ближче до друзи,
+  // широке посередині, вузьке по обводу. Усі лежать далеко за жилою й
+  // повторюють вигин каменю — інакше вигин їх накриває, і золото зникає рівно
   // на гребенях, де воно найпомітніше.
-  const bands: readonly (readonly [number, number])[] = [[1.075, 1.115], [1.16, 1.19]];
+  const bands: readonly (readonly [number, number])[] = [
+    [1.045, 1.065],
+    [1.135, 1.155],
+    [1.245, 1.262],
+  ];
   const segments = 96;
   const positions: number[] = [];
   const point = (angle: number, radius: number): readonly [number, number, number] => [
@@ -554,7 +576,10 @@ export interface PortalPillarPlacement {
  * За цим стежить portalScene.test.ts.
  */
 export const PORTAL_PILLARS: readonly PortalPillarPlacement[] = [
-  { z: 3.6, edgeFraction: 1.04, height: 6.2, radius: 0.5 },
+  // Дзеркало ближньої задньої пари: та сама глибина, висота, радіус і частка
+  // краю. Попередня передня пара була власного розміру на власній глибині й
+  // читалась як окрема декорація, а не як продовження тієї самої колонади.
+  { z: 2.6, edgeFraction: 0.94, height: 5.2, radius: 0.42 },
   { z: -2.6, edgeFraction: 0.94, height: 5.2, radius: 0.42 },
   { z: -7.4, edgeFraction: 0.86, height: 6.4, radius: 0.5 },
 ];
@@ -670,9 +695,9 @@ export interface PortalPalette {
   daisEmissive: string;
   /** Ритуальна плита — той самий камінь, що подіум, але світліший на зламі. */
   slab: string;
-  /** Ґрунт, видний у розколі. Тепліший за камінь — це земля, а не порожнеча. */
-  crack: string;
-  crackGlow: string;
+  /** Різьблення на кільці плити. */
+  rune: string;
+  runeGlow: string;
   inlay: string;
   pillar: string;
   starOpacity: number;
@@ -689,11 +714,11 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
   light: {
     fog: '#3b2b57',
     field: '#2e2244',
-    dais: '#6d5f8a',
-    daisEmissive: '#20182f',
-    slab: '#8073a4',
-    crack: '#2b1d24',
-    crackGlow: '#b487e4',
+    dais: '#4c4a56',
+    daisEmissive: '#191720',
+    slab: '#5d5b6a',
+    rune: '#8d7fae',
+    runeGlow: '#c9a9f0',
     inlay: '#e2be80',
     pillar: '#6a5c8f',
     starOpacity: 0.85,
@@ -703,11 +728,11 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
   dark: {
     fog: '#221a33',
     field: '#1b1428',
-    dais: '#544a6d',
-    daisEmissive: '#161022',
-    slab: '#645887',
-    crack: '#1a1116',
-    crackGlow: '#9068c4',
+    dais: '#3a3844',
+    daisEmissive: '#121017',
+    slab: '#494757',
+    rune: '#6f6390',
+    runeGlow: '#a684d8',
     inlay: '#cea86e',
     pillar: '#4b4070',
     starOpacity: 1,

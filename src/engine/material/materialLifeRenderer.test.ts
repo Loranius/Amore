@@ -9,7 +9,7 @@ import {
   applyCrystalLifeFrame,
   crystalSceneRadius,
 } from '../renderer/three';
-import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
+import { CRYSTAL_SUBSTRATE_BODY_ID, crystalVeinRadiusAt } from '../geometry/substrate';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../species/crystal';
 import { CONSISTENCY_WINDOW_MONTHS, consistency } from '../species/crystal/growthModel';
 import { CRYSTAL_MATERIAL_QUALITY_PRESETS, DEFAULT_CRYSTAL_MATERIAL_CONFIG } from './config';
@@ -268,16 +268,32 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
 
   it('measures the crystals apart from the rock they stand in', () => {
     // Two different questions with two different answers: the podium has to
-    // cover the rock, the camera only has to frame the crystals. The rock is
-    // always the wider of the two — the substrate exists to occlude every
-    // buried base (ADR-0003), so it cannot be narrower.
-    const { geometry } = pipeline();
+    // cover the rock, the camera only has to frame the crystals.
+    //
+    // The rock used to be strictly the wider of the two, and that stopped being
+    // true when the year crystals started leaning outward: a crystal's tip now
+    // overhangs the seam it grew out of. That is correct — ADR-0003 asks the
+    // substrate to occlude every buried *base*, and a tip in the air has no
+    // base cap to hide. What the two measurements must still agree on is every
+    // body's footprint at the ground, which is checked in substrate.test.ts.
+    const { geometry, growth } = pipeline();
     const withRock = crystalSceneRadius(geometry);
     const crystalsOnly = crystalSceneRadius(geometry, { includeSubstrate: false });
 
     expect(crystalsOnly).toBeGreaterThan(0);
-    expect(withRock).toBeGreaterThan(crystalsOnly);
+    expect(withRock).toBeGreaterThanOrEqual(crystalsOnly);
     expect(crystalSceneRadius(geometry, { includeSubstrate: true })).toBe(withRock);
+
+    // And the rock is genuinely wider than where the crystals meet it, which is
+    // the half of the old assertion that still carries ADR-0003. Measured along
+    // each crystal's own bearing, because the vein is not radially symmetric and
+    // a single bounding radius says nothing about it.
+    for (const body of growth.bodies) {
+      const bearing = Math.atan2(body.anchor.x, body.anchor.z);
+      const reach = crystalVeinRadiusAt(growth.bodies, growth.artifactSeed, bearing);
+      expect(reach, body.id)
+        .toBeGreaterThan(Math.hypot(body.anchor.x, body.anchor.z) + body.renderedRadius);
+    }
   });
 
   it('widens with the ground the couple earned, not with the mesh count', () => {
@@ -388,7 +404,7 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     }
   });
 
-  it('lights the crystal from inside without lighting the rock', () => {
+  it('lights the crystal from inside, and the vein an order of magnitude less', () => {
     // The requested "inner crystal at 70% size" cannot be a second mesh: the
     // shell is opaque by contract (the canvas is alpha-composited over a CSS
     // sky, so a transmissive shell would show black where it overlaps the sky
@@ -410,7 +426,18 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
       expect(Number.isFinite(body.shader.coreStrength)).toBe(true);
     }
 
-    expect(rock.shader.coreStrength).toBe(0);
+    // The substrate used to be rock and carried no inner light at all. It is a
+    // quartz vein now (2026-08-03), so it does — but barely, and the ratio is
+    // the point: a seam that glowed like the crystals would turn the base into
+    // the brightest thing in the frame, which is the "glowing inlay" look review
+    // rejected. It also stays a non-uniform lift: the term is view-weighted, and
+    // the vein publishes `emissiveIntensity: 0`.
+    const brightestCrystal = Math.max(...crystals.map((body) => body.shader.coreStrength));
+    expect(rock.shader.coreStrength).toBeGreaterThan(0);
+    expect(rock.shader.coreStrength).toBeLessThan(brightestCrystal * 0.2);
+    expect(rock.emissiveIntensity).toBe(0);
+    expect(rock.transmission).toBe(0);
+    expect(rock.transparent).toBe(false);
   });
 
   it('carries the core into the material signature', () => {

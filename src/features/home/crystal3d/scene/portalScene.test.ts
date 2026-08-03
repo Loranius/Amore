@@ -10,6 +10,7 @@ import {
   PORTAL_PILLARS,
   buildPortalDaisGeometry,
   buildPortalInlayGeometry,
+  buildPortalRitualSlabGeometry,
   buildPortalPillarGeometry,
   buildPortalStarField,
   measurePortalEnvironmentTriangles,
@@ -257,11 +258,17 @@ describe('portal geometry', () => {
     // Це і є причина, з якої подіум перестав бути константою: камінь
     // розростається з місцями, де пара була (ADR-0004), а плита — ні, тож
     // друза вилазила за обвід і ховала інкрустацію під собою.
-    for (const rock of [0.9, 1.1, 1.315, 1.6, 2.0]) {
+    // Up to the ceiling only. Past it the podium stops growing on purpose —
+    // the front pillars stand on the field and a plinth that reached them
+    // would be pierced by their bases — and the next test states what happens
+    // there instead of pretending it does not.
+    const carried = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(Number.MAX_SAFE_INTEGER) / 1.34;
+    for (const rock of [0.9, 1.1, 1.315, carried * 0.99]) {
       const top = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(rock);
       expect(top).toBeGreaterThan(rock);
-      // Інкрустація лежить на 1.19 з 1.3 — вона мусить лишатись видимою.
-      expect(top * (1.19 / 1.3)).toBeGreaterThan(rock);
+      // Найзовнішнє золоте кільце лежить на 1.235 з 1.3 — воно мусить
+      // лишатись видимим.
+      expect(top * (1.235 / 1.3)).toBeGreaterThan(rock);
     }
   });
 
@@ -288,10 +295,19 @@ describe('portal geometry', () => {
     }
   });
 
-  it('carries the widest rock the pipeline produces, or says where it stops', () => {
-    // Чесна межа, а не обіцянка: на дуже старій друзі стеля з'їдає запас.
-    const top = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(WIDEST_ROCK_RADIUS);
-    expect(top).toBeGreaterThan(WIDEST_ROCK_RADIUS * 0.9);
+  it('says where it stops carrying the rock', () => {
+    // An honest bound, not a promise. The podium clears the rock up to roughly
+    // a fifteen-year druse; past that the ceiling bites and the rock reaches
+    // the rim. That is the smaller of the two faults — the alternative is a
+    // plinth grown out to the pillars and pierced by their bases.
+    const carried = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(Number.MAX_SAFE_INTEGER) / 1.34;
+
+    expect(carried).toBeGreaterThan(1.5);
+    // At the widest druse the pipeline produces, the rim is reached rather than
+    // cleared — stated so a future reader does not take the first test as
+    // covering every couple.
+    expect(PORTAL_DAIS_TOP_RADIUS * portalDaisScale(WIDEST_ROCK_RADIUS))
+      .toBeLessThan(WIDEST_ROCK_RADIUS);
   });
 
   it('merges the inlay and the pillar into one buffer each', () => {
@@ -367,6 +383,68 @@ describe('portal geometry', () => {
     // The bow fades outward: the force came from the middle.
     expect(portalSlabSurfaceY(cracks[0]!, 1.26, SEED))
       .toBeLessThan(portalSlabSurfaceY(cracks[0]!, 1.06, SEED));
+  });
+
+  it('follows the quartz vein rather than opening its own cracks', () => {
+    // "Існуючі зовнішні тріщини мають стати стриманим продовженням жили, а не
+    // другою системою розломів." The platform used to bow in nine directions of
+    // its own, seeded independently of the artifact — two unrelated fracture
+    // systems on one podium. Given the vein's branch bearings it takes them
+    // instead, and takes no more of them than the vein has main branches.
+    const bearings = [0.4, 2.1, 4.7, 5.9, 6.2];
+    const followed = portalCrackAngles(SEED, bearings);
+
+    expect(followed.length).toBeLessThanOrEqual(3);
+    for (const angle of followed) expect(bearings).toContain(angle);
+    // The stone really is higher over a branch than between branches.
+    const overBranch = portalSlabSurfaceY(followed[0]!, 0.5, SEED, bearings);
+    let between = Number.POSITIVE_INFINITY;
+    for (let step = 0; step < 360; step += 1) {
+      between = Math.min(
+        between,
+        portalSlabSurfaceY((step / 360) * Math.PI * 2, 0.5, SEED, bearings),
+      );
+    }
+    expect(overBranch).toBeGreaterThan(between);
+
+    // No bearings — an older persisted profile — still gets a restrained bow
+    // rather than a flat plate.
+    expect(portalCrackAngles(SEED).length).toBe(3);
+  });
+
+  it('keeps one continuous top surface with no hole under the druse', () => {
+    // The ritual slab was an annulus: inside its broken inner rim the surface
+    // dropped a plate-thickness to the bare dais, and the crystals stood in a
+    // circular pit. Visual review (2026-08-03) rejected it — the crystals grow
+    // straight out of the stone now, through the quartz vein, and the only
+    // fracture in the platform is that vein.
+    const bearings = [0.4, 2.1, 4.7];
+    const slab = buildPortalRitualSlabGeometry(SEED, bearings);
+    const position = slab.getAttribute('position');
+
+    // Every point of the top surface is at or above the plate's own thickness:
+    // nothing dips toward the dais, at any radius or bearing.
+    let reachedAxis = false;
+    for (let index = 0; index < position.count; index += 1) {
+      const y = position.getY(index);
+      const radius = Math.hypot(position.getX(index), position.getZ(index));
+      if (radius < 1e-6) reachedAxis = true;
+      // The outer rim wall runs down to the dais and is the one exception.
+      if (y < 1e-6) continue;
+      expect(y).toBeGreaterThanOrEqual(0.075 - 1e-6);
+    }
+    // ...and the surface is genuinely closed to the axis, not merely deep.
+    expect(reachedAxis).toBe(true);
+
+    // The centre is flat: the bow is a ridge that rises past the druse, so the
+    // axis — where every segment meets — cannot be a peak of differing slopes.
+    const axis = portalSlabSurfaceY(0, 0, SEED, bearings);
+    for (let step = 0; step < 32; step += 1) {
+      expect(portalSlabSurfaceY((step / 32) * Math.PI * 2, 0, SEED, bearings))
+        .toBeCloseTo(axis, 9);
+    }
+
+    slab.dispose();
   });
 
   it('accounts for every object the environment draws', () => {

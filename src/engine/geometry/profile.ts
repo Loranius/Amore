@@ -133,6 +133,16 @@ const SHOULDER_MAX = 0.78;
  */
 const BASE_WAIST = 0.88;
 
+/**
+ * How deep the monarch stands in the quartz vein, as a fraction of her visible
+ * length.
+ *
+ * Ten percent. Enough that the seam closes over her base and the meeting line
+ * is quartz rather than a clean circle of stone; not so much that the crystal
+ * loses height, which is the one thing it is supposed to communicate.
+ */
+const MONARCH_GROUND_SINK = 0.1;
+
 function shoulderFraction(seed: number): number {
   return SHOULDER_MIN + seededUnit(seed, 'geometry:shoulder') * (SHOULDER_MAX - SHOULDER_MIN);
 }
@@ -382,11 +392,24 @@ export function buildCrystalProfile(
   // requires a recognisable central prism in every renderer quality tier.
   const archetype = mother ? 'prismatic' : sourceArchetype;
   const attached = body.hostBodyId !== null && body.attachment !== null;
+  // The monarch stands *in* the quartz vein, not on it.
+  //
+  // She used to start exactly at y=0, which is what made her read as set down
+  // on a pad: the seam met her base in a clean circle all the way round, and a
+  // crystal that grew through stone does not do that. Sinking her a tenth of
+  // her visible height puts the meeting line under the quartz, so the vein
+  // closes over her base the way it closes over every child's.
+  //
+  // A fraction of length rather than a constant: it has to stay the same
+  // gesture on a one-year crystal and on a ten-year one.
+  const grounded = mother && !attached;
   const extraSink = attached
     ? Math.max(body.attachment?.burialDepth ?? 0, body.renderedRadius * 0.58)
-    : 0;
+    : grounded
+      ? body.renderedLength * MONARCH_GROUND_SINK
+      : 0;
   const geometryLength = body.renderedLength + extraSink;
-  const geometryAnchor = attached
+  const geometryAnchor = extraSink > 0
     ? add(body.anchor, scale(body.direction, -extraSink))
     : body.anchor;
   const radius = Math.max(0.0001, body.renderedRadius);
@@ -411,6 +434,11 @@ export function buildCrystalProfile(
     appendBaseRow(baseRows, 0, buriedBase);
     appendBaseRow(baseRows, extraSink * 0.5, radius * 0.42);
     appendBaseRow(baseRows, extraSink, radius * 0.68);
+  } else if (extraSink > 0) {
+    // Sunk into the vein rather than attached to a host: the prism simply
+    // carries on downward at the width it leaves the quartz with. No taper —
+    // a narrowing tail would be a root, and a quartz crystal does not have one.
+    appendBaseRow(baseRows, 0, radius * BASE_WAIST);
   }
 
   appendPrismRows(baseRows, {

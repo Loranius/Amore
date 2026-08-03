@@ -22,6 +22,8 @@ export interface PortalStageProps {
   artifactSceneRadius: number;
   /** Радіус самих кристалів — кадр камери будується під нього. */
   crystalsSceneRadius: number;
+  /** Напрямки гілок кварцової жили — камінь платформи вигинається над ними. */
+  veinBearings: readonly number[];
   children: ReactNode;
 }
 
@@ -32,6 +34,7 @@ export function PortalStage({
   reduceMotion,
   artifactSceneRadius,
   crystalsSceneRadius,
+  veinBearings,
   children,
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
@@ -75,6 +78,7 @@ export function PortalStage({
         frame={frame}
         aspect={aspect}
         daisScale={daisScale}
+        veinBearings={veinBearings}
       />
       <PortalCameraRig frame={frame} controls={controls} />
 

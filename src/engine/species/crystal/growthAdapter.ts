@@ -6,6 +6,7 @@ import type {
   UniversalGrowthColony,
   UniversalGrowthInstruction,
 } from '../../growth';
+import { CHILD_MIN_UPWARD } from './growthModel';
 import { stableSeed } from './math';
 import type {
   CrystalArchetype,
@@ -46,7 +47,14 @@ function dominantDirectionInheritance(instruction: CrystalGrowthInstruction): nu
 }
 
 function dominantMinUpwardComponent(instruction: CrystalGrowthInstruction): number {
-  return instruction.kind === 'skirt' ? 0.46 : 0.86;
+  // Year and plan crystals both lean 45–55° off the monarch's axis now, and
+  // this is the floor `ensureUpward` measures that against. At the old 0.86 it
+  // silently stood every child back up, so the published `radialBias` would
+  // have had no visible effect at all — and the skirt's old 0.46 sat below the
+  // band, which would have let a plan crystal lie down further than any year
+  // crystal may. One floor, matching the one band.
+  if (instruction.kind === 'annual' || instruction.kind === 'skirt') return CHILD_MIN_UPWARD;
+  return 0.86;
 }
 
 function dominantAttachmentDepth(instruction: CrystalGrowthInstruction): number {

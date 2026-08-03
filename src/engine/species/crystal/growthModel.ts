@@ -13,7 +13,8 @@
 // change size, facets, colour and sparkle instead of adding bodies.
 // ============================================================
 import type { LeapDayPolicy } from '../../evolution/types';
-import { clamp01, round6 } from './math';
+import { GROUND_LEAN_SCALE } from '../../growth';
+import { clamp01, round6, seededUnit } from './math';
 
 const DAYS_PER_YEAR = 365;
 
@@ -233,8 +234,18 @@ export function childGrowthProgress(year: RelationshipYear, asOf: string): numbe
 
 /** A child never exceeds half the monarch she was frozen beside. */
 export const CHILD_MONARCH_SHARE = 0.5;
-/** Engine units of air that must remain between a child and the monarch. */
-export const CHILD_MIN_CLEARANCE = 0.1;
+/**
+ * Engine units of air that must remain between a child and the monarch.
+ *
+ * Tightened from 0.1 once the children leaned off her axis. The number exists
+ * so contact is arithmetically impossible, and it only ever has to hold at the
+ * *base* — a leaning child diverges from the monarch all the way up, so the gap
+ * at the ground is the smallest gap there is. At 0.1 the ring stood far enough
+ * back to read as five separate crystals placed around a spire; the owner asked
+ * for one structure out of one deposit, and that means bases close enough to
+ * share a node of quartz.
+ */
+export const CHILD_MIN_CLEARANCE = 0.055;
 /** Years per ring before a new, wider ring opens. */
 export const CHILD_RING_CAPACITY = 8;
 /**
@@ -246,9 +257,16 @@ export const CHILD_RING_CAPACITY = 8;
  * one: an object wider than the screen is wide can never fill the screen's
  * height, whatever the camera does. Keeping the footprint no wider than the
  * artifact is tall is what lets the crystal read large on a phone.
+ *
+ * Both were pulled in again once the children started leaning outward. A
+ * standing child keeps the same distance from the monarch all the way up, so
+ * the ring had to be wide enough to look uncrowded at the tips. A leaning one
+ * diverges as it rises: its tightest point is its base, and the extra standoff
+ * was buying separation that the lean now provides for free — at the cost of a
+ * druse that spread wider than it stood tall.
  */
-const CHILD_RING_STEP = 0.26;
-const CHILD_EVENT_REACH = 0.14;
+const CHILD_RING_STEP = 0.2;
+const CHILD_EVENT_REACH = 0.05;
 /** Fraction of that reach one important event closes. */
 const CHILD_EVENT_STEP = 0.25;
 
@@ -359,6 +377,61 @@ export function childDistance(input: {
   const closeness = clamp01(Math.max(0, input.importantEventCount) * CHILD_EVENT_STEP);
   return round6(floor + (1 - closeness) * CHILD_EVENT_REACH);
 }
+
+/**
+ * How far a year's crystal leans away **from the monarch's axis**, in degrees.
+ *
+ * Measured off the monarch, not off the platform. The two differ by exactly the
+ * complement and the first pass used the platform, which put the children at
+ * 35–45° off the monarch — a visibly gentler splay than the crown the owner
+ * asked for. The monarch is the thing the ring is arranged around, so she is
+ * what the angle should be stated against.
+ *
+ * Every child used to stand straight up, which made the druse read as a row of
+ * pins around a post rather than as a colony: quartz siblings growing out of
+ * one seam fan away from it. Leaning them also separates their tips as they
+ * rise, so the gaps between them are visible from the portal's camera angle
+ * instead of closing up behind the monarch.
+ *
+ * Away from the axis, never toward it — the lean and the placement share one
+ * azimuth — so a lean can only ever increase the clearance `childDistance`
+ * already guarantees.
+ */
+export const CHILD_TILT_MIN_DEG = 45;
+export const CHILD_TILT_MAX_DEG = 55;
+
+/** The same angles as the engine states them: above the platform plane. */
+function tiltAbovePlatform(offMonarchDegrees: number): number {
+  return 90 - offMonarchDegrees;
+}
+
+/**
+ * The lean, expressed the way Volume III takes it.
+ *
+ * The engine mixes straight-up with straight-out as `up·(1−lean) + out·lean`
+ * and caps `lean` at `GROUND_LEAN_SCALE·radialBias`, so an angle θ above the
+ * platform needs `lean = 1/(1+tan θ)`. Inverting it here rather than
+ * hand-tuning a bias keeps the published number and the requirement in the same
+ * place: change the degrees and the geometry follows.
+ */
+export function childRadialBias(seed: number): number {
+  const offMonarch = CHILD_TILT_MIN_DEG
+    + seededUnit(seed, 'tilt') * (CHILD_TILT_MAX_DEG - CHILD_TILT_MIN_DEG);
+  const above = (tiltAbovePlatform(offMonarch) * Math.PI) / 180;
+  const lean = 1 / (1 + Math.tan(above));
+  return round6(clamp01(lean / GROUND_LEAN_SCALE));
+}
+
+/**
+ * The upward component a child at the steepest permitted lean still has.
+ *
+ * This is the floor `ensureUpward` measures against, so it has to sit at or
+ * below the *most* leaning child, not the least — set it to the shallow end and
+ * the engine quietly stands the strongly leaning ones back up.
+ */
+export const CHILD_MIN_UPWARD = round6(
+  Math.sin((tiltAbovePlatform(CHILD_TILT_MAX_DEG) * Math.PI) / 180),
+);
 
 /** Golden angle: successive years never line up, in one ring or across rings. */
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));

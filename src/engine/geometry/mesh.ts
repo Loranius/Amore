@@ -117,6 +117,9 @@ function rowCenter(
   );
 }
 
+export /** cos(38°): past this a vertex normal is averaging across an edge, not a curve. */
+const SMOOTH_CREASE_COSINE = 0.788;
+
 export function rebuildCrystalMeshNormals(mesh: CrystalMeshData): CrystalMeshData {
   return { ...mesh, normals: computeNormals(mesh.positions, mesh.indices) };
 }
@@ -139,24 +142,46 @@ export function rebuildCrystalMeshNormals(mesh: CrystalMeshData): CrystalMeshDat
  * and splitting first would leave the removed triangles' vertices stranded in
  * the buffer, inflating the reported vertex count with geometry nothing draws.
  */
-export function splitCrystalMeshFaces(mesh: CrystalMeshData): CrystalMeshData {
+export function splitCrystalMeshFaces(
+  mesh: CrystalMeshData,
+  options: { smooth?: boolean } = {},
+): CrystalMeshData {
   const positions: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];
 
   for (let offset = 0; offset < mesh.indices.length; offset += 3) {
+    const sources = [
+      mesh.indices[offset] ?? 0,
+      mesh.indices[offset + 1] ?? 0,
+      mesh.indices[offset + 2] ?? 0,
+    ] as const;
     const corners = [
-      vertexAt(mesh.positions, mesh.indices[offset] ?? 0),
-      vertexAt(mesh.positions, mesh.indices[offset + 1] ?? 0),
-      vertexAt(mesh.positions, mesh.indices[offset + 2] ?? 0),
+      vertexAt(mesh.positions, sources[0]),
+      vertexAt(mesh.positions, sources[1]),
+      vertexAt(mesh.positions, sources[2]),
     ] as const;
     const face = normalize(cross(
       subtract(corners[1], corners[0]),
       subtract(corners[2], corners[0]),
     ));
-    for (const corner of corners) {
-      indices.push(pushVertex(positions, corner));
-      normals.push(round6(face.x), round6(face.y), round6(face.z));
+    for (let slot = 0; slot < 3; slot += 1) {
+      indices.push(pushVertex(positions, corners[slot]!));
+      // Faceted by default: a crystal's side is a flat plane and every triangle
+      // on it must say so. `smooth` carries the mesh's own averaged normals
+      // through the split instead — for a surface that is genuinely curved, a
+      // per-triangle normal is not detail but banding, because the two
+      // triangles of a curved quad are never coplanar. The split still happens,
+      // so per-face vertex colour keeps working either way.
+      // A crease angle, not a flat "smooth everything". The plate's collar is
+      // gently curved and must not band; the wall of a crack is a near-vertical
+      // step and must stay sharp. Averaging across both gave soft wedges
+      // instead of cracks. Where the averaged normal has swung more than the
+      // threshold away from the face it belongs to, the face wins.
+      const averaged = vertexAt(mesh.normals, sources[slot]!);
+      const alignment = averaged.x * face.x + averaged.y * face.y + averaged.z * face.z;
+      const normal = options.smooth && alignment > SMOOTH_CREASE_COSINE ? averaged : face;
+      normals.push(round6(normal.x), round6(normal.y), round6(normal.z));
     }
   }
 

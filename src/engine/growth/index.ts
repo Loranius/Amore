@@ -1,5 +1,6 @@
 export { DEFAULT_GROWTH_ENGINE_CONFIG } from './config';
 export { buildGrowthState } from './engine';
+export { GROUND_LEAN_SCALE } from './surface';
 export {
   buildGrowthSurfaceAtlas,
   buildGrowthSurfaceAtlasFromMass,

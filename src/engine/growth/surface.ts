@@ -151,6 +151,22 @@ function groundHost(root: GrowthBody): GrowthBody {
 }
 
 /**
+ * The most a ground-rooted body may lean away from the axis, as the weight its
+ * outward bearing takes against straight up.
+ *
+ * Exported because the species layer has to be able to *ask for* an angle. A
+ * lean of `l` puts a body at `atan((1−l)/l)` above the platform, so this
+ * constant is the ceiling on how far any species can splay a formation — it was
+ * a bare 0.55 here and a private copy of the same number in `growthModel`, and
+ * two copies of a number that has to agree is a bug waiting to be written.
+ *
+ * 0.7 admits a lean of up to 55° off the monarch's axis, which is what the
+ * crystal's crown of year bodies asks for. Volume III still owns the ceiling;
+ * the species only picks a point under it.
+ */
+export const GROUND_LEAN_SCALE = 0.7;
+
+/**
  * Places a body in the substrate around the monarch instead of on her shaft.
  *
  * Companion crystals used to attach to the monarch's own surface, which read
@@ -207,7 +223,7 @@ export function sampleGroundSite(
 
   // radialBias already encodes "how far out this formation reaches", so it
   // doubles as the outward tilt; ensureUpward keeps it from lying down flat.
-  const lean = clamp(instruction.radialBias, 0, 1) * 0.55;
+  const lean = clamp(instruction.radialBias, 0, 1) * GROUND_LEAN_SCALE;
   const direction = ensureUpward(
     add(scale(GROWTH_UP, 1 - lean), scale(outward, lean)),
     instruction.minUpwardComponent,

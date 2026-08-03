@@ -17,6 +17,7 @@ import {
   childDimensions,
   childDistance,
   childGrowthProgress,
+  childRadialBias,
   childRingIndex,
   groundSpread,
   monarchAxialScale,
@@ -301,7 +302,10 @@ export function buildAnnualFormations(
         facetCount: 6 + Math.round(activity * 2),
         azimuthRad: childAzimuthRad(year.index),
         elevation: 1,
-        radialBias: 0,
+        // Leaning away from the monarch, 45–55° above the platform. See
+        // `childRadialBias`: the lean shares this crystal's own azimuth, so the
+        // tip travels radially outward and the clearance only ever grows.
+        radialBias: childRadialBias(seed),
         attachmentDepth: 0.2,
         ringDistance: childDistance({
           monarchRadialScale: monarchRadialNow,
@@ -319,8 +323,15 @@ export function buildAnnualFormations(
     });
 }
 
-/** Distance from the axis for the skirt: just clear of the substrate mound. */
-const SKIRT_RING_DISTANCE = 0.34;
+/**
+ * Distance from the axis for the skirt.
+ *
+ * Pulled in with the rest of the crown. At 0.34 the plan crystals stood in a
+ * ring of their own, well outside the year crystals and upright while those
+ * leaned — five separate objects on a platform rather than one thing growing
+ * out of one deposit, which is what the owner asked for.
+ */
+const SKIRT_RING_DISTANCE = 0.24;
 /** Beyond this the skirt reads as gravel; further plans thicken it instead. */
 const SKIRT_MAX_BODIES = 24;
 
@@ -367,7 +378,10 @@ export function buildSkirtFormations(
       facetCount: 5,
       azimuthRad: childAzimuthRad(index + 3),
       elevation: 1,
-      radialBias: 0,
+      // The same lean as a year crystal. A plan crystal is a smaller mark, not
+      // a different mineral — standing it upright among leaning siblings read
+      // as a pebble somebody dropped rather than as part of the colony.
+      radialBias: childRadialBias(seed),
       attachmentDepth: 0.12,
       ringDistance: round6(SKIRT_RING_DISTANCE + seededUnit(seed, 'ring') * 0.07),
       tintRgb: [1, 1, 1] as const,

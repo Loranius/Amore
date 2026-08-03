@@ -1,5 +1,6 @@
-import { useCallback, useState, type KeyboardEvent } from 'react';
+import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { crystalVeinBearings } from '@/engine/geometry';
 import { crystalRenderScale } from '@/engine/renderer';
 import { crystalSceneRadius } from '@/engine/renderer/three';
 import { useTheme } from '@/providers/ThemeProvider';
@@ -38,6 +39,11 @@ export default function EvolutionCrystalPreviewScene() {
   const { pipeline, isPending, error } = useEvolutionCrystalPipeline(reduceMotion);
   const [open, setOpen] = useState(false);
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
+  // Напрямки гілок кварцової жили. Меми в сцені тримаються за цей масив, тож
+  // він мусить бути стабільним посиланням — інакше камінь платформи
+  // перебудовувався б щокадру.
+  const meshes = pipeline?.geometry.meshes;
+  const veinBearings = useMemo(() => crystalVeinBearings(meshes ?? []), [meshes]);
 
   const openModal = useCallback(() => setOpen(true), []);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => {
@@ -115,6 +121,7 @@ export default function EvolutionCrystalPreviewScene() {
             reduceMotion={reduceMotion}
             artifactSceneRadius={crystalSceneRadius(pipeline.geometry)}
             crystalsSceneRadius={crystalSceneRadius(pipeline.geometry, { includeSubstrate: false })}
+            veinBearings={veinBearings}
           >
             <EvolutionCrystalObject
               geometry={pipeline.geometry}

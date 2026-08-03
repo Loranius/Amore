@@ -322,44 +322,62 @@ function buildBodyMaterial(
 }
 
 /**
- * The substrate is stone, not mineral: matte, unlit from within, and with none
- * of the clearcoat or iridescence that makes the crystals read as gems.
+ * The substrate is quartz — the vein the druse grew out of, not the ground it
+ * stands on.
  *
- * It used to be kept very dark so it read as earth. Visual review (2026-08-03)
- * asked for the earth gone and the crystals rising straight out of a cut plate,
- * so it now sits in the same lightness range as the portal's ritual slab and
- * reads as continuous with it. Still well below the crystals: it must not
- * compete with them, only carry them.
+ * It has been three things. Dark earth, then a grey cut plate; visual review
+ * (2026-08-03) rejected both, and the mesh is now a mineral seam opened through
+ * the portal's own stone (`geometry/substrate.ts`). So the material stops
+ * pretending to be rock: the portal's dais already publishes the stone, and this
+ * has to read as the *other* material in that pair or the seam disappears.
+ *
+ * Milky white with a lavender cast, a little lighter and a good deal less rough
+ * than the slab it cuts through — enough separation to read as quartz, nowhere
+ * near enough to compete with the crystals standing in it. Emphatically not a
+ * gem: no transmission, no iridescence, no bloom.
  */
 function buildSubstrateMaterial(
   input: BuildCrystalMaterialInput,
   materialPalette: CrystalMaterialPalette,
 ): CrystalBodyMaterial {
-  // Tinted toward the couple's own palette so the rock never looks imported
-  // from a different artifact, but pulled far down in lightness.
+  // Tinted toward the couple's own palette so the vein never looks imported
+  // from a different artifact — but only just, because milky quartz that takes
+  // a strong hue stops being quartz.
   const tint = materialPalette.secondary;
-  // Pale enough to read as cut stone rather than earth, dark enough that the
-  // crystals standing in it are still the brightest thing in the frame — at
-  // 0.40/0.35/0.48 the plate came out nearly as light as they are, and the
-  // druse stopped separating from the floor it grew out of.
+  const grey = (tint.r + tint.g + tint.b) / 3;
+  // Linear values, and the whole design of this material is in them. The dais
+  // slab sits near 0.10–0.14 linear; this is a little over twice that — enough
+  // that the seam reads as a second mineral, little enough that it stays part
+  // of the floor. Measured against both failures: at three times the stone the
+  // vein rendered as a white splash brighter than everything but the monarch,
+  // and at under twice it stopped being distinguishable from a shadow.
   const baseColor = rgb(
-    round6(0.31 + tint.r * 0.14),
-    round6(0.27 + tint.g * 0.13),
-    round6(0.39 + tint.b * 0.15),
+    round6(0.245 + grey * 0.045 + tint.r * 0.02),
+    round6(0.238 + grey * 0.045 + tint.g * 0.018),
+    round6(0.283 + grey * 0.045 + tint.b * 0.026),
   );
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
     bodyId: CRYSTAL_SUBSTRATE_BODY_ID,
     baseColor,
     emissiveColor: baseColor,
-    roughness: 0.92,
+    // Less rough than the slab (0.82) by a clear margin, and a thin clearcoat
+    // so the facets catch a highlight. Both are what separate polished mineral
+    // from cut stone at a glance.
+    roughness: 0.44,
     metalness: 0,
-    clearcoat: 0,
-    clearcoatRoughness: 0.9,
-    ior: 1.45,
-    reflectivity: 0.08,
+    clearcoat: 0.16,
+    clearcoatRoughness: 0.4,
+    // Quartz.
+    ior: 1.54,
+    reflectivity: 0.32,
+    // No uniform emissive. A flat lift over the whole seam is exactly the
+    // "glowing inlay" look review threw out; what light the vein carries comes
+    // from the view-weighted core term below.
     emissiveIntensity: 0,
-    envMapIntensity: 0,
+    // Low, not zero: the seam picking up the star field is most of what makes
+    // its facets visible at all, since it is only barely proud of the stone.
+    envMapIntensity: 0.3,
     iridescence: 0,
     iridescenceIOR: 1.3,
     iridescenceThicknessMin: 220,
@@ -375,21 +393,23 @@ function buildSubstrateMaterial(
       skyColor: baseColor,
       groundColor: baseColor,
       rimColor: baseColor,
-      // Stone does have visible grain, unlike the near-clear crystals — but it
-      // is still procedural detail, so it follows the same quality tier as
-      // every other material rather than staying on when optics are off.
-      // Lighter than it was: at 0.45 the grain read as soil on a pale plate.
+      // Milkiness, not grain. The old value at a coarse scale read as soil,
+      // which is precisely what the vein replaced; this is a fraction of it at
+      // a much finer scale, so it clouds the quartz instead of speckling it.
       inclusionDensity: round6(
-        (0.26 + input.species.state.fracture * 0.18)
+        (0.09 + input.species.state.fracture * 0.06)
         * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
       ),
-      inclusionScale: 3.2,
+      inclusionScale: 6.4,
       inclusionContrast: round6(
-        0.28 * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
+        0.14 * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
       ),
-      // Rock is not lit from within.
-      coreStrength: 0,
-      coreColor: baseColor,
+      // The faintest light from inside the seam. Weighted by how squarely a
+      // face meets the eye, so the vein's flat top lifts while its wall stays
+      // dark at the silhouette — the opposite of a uniform emissive, and an
+      // order of magnitude below what any crystal carries.
+      coreStrength: 0.02,
+      coreColor: rgb(round6(0.46), round6(0.44), round6(0.55)),
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

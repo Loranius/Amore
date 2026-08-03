@@ -41,17 +41,20 @@ const CRYSTAL_FACET_TINTS: readonly CrystalRgb[] = [
 const CRYSTAL_FACET_WEIGHTS: readonly number[] = [0.44, 0.74, 0.94, 1];
 
 /**
- * Rock is genuinely mottled rather than optically faceted, so it takes a wider
- * swing and no warm catch — a pink facet on the substrate would read as a
- * crystal growing sideways out of the ground.
+ * The plate takes no per-face tone at all.
+ *
+ * Tint is keyed on a body's position in its ring, which for a crystal is one
+ * face running the full height — exactly right. The plate is not a lathe with a
+ * ring: its top is a disc of concentric rings, so the same key hands every
+ * triangle in an angular sector the same tone at every radius, and the plate
+ * came out as a starburst of light and dark wedges radiating from the monarch.
+ *
+ * It loses nothing. The plate's grain comes from the shader's inclusion term,
+ * which is a 3D noise field and does not care about ring position.
  */
-const SUBSTRATE_FACET_TINTS: readonly CrystalRgb[] = [
-  { r: 1, g: 1, b: 1 },
-  { r: 0.84, g: 0.85, b: 0.89 },
-  { r: 1.11, g: 1.09, b: 1.06 },
-];
+const SUBSTRATE_FACET_TINTS: readonly CrystalRgb[] = [{ r: 1, g: 1, b: 1 }];
 
-const SUBSTRATE_FACET_WEIGHTS: readonly number[] = [0.4, 0.72, 1];
+const SUBSTRATE_FACET_WEIGHTS: readonly number[] = [1];
 
 export const CRYSTAL_FACET_TINTING: CrystalFacetTinting = {
   tints: CRYSTAL_FACET_TINTS,

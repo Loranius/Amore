@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { GROUND_LEAN_SCALE } from '../../growth';
 import {
   CHILD_GROWTH_STEPS,
   CHILD_MIN_CLEARANCE,
+  CHILD_MIN_UPWARD,
   CHILD_MONARCH_SHARE,
   CHILD_RING_CAPACITY,
+  CHILD_TILT_MAX_DEG,
+  CHILD_TILT_MIN_DEG,
   MONARCH_MAX_FACETS,
   MONARCH_MIN_FACETS,
   WISH_CHANNEL_CAP,
@@ -12,6 +16,7 @@ import {
   childDimensions,
   childDistance,
   childGrowthProgress,
+  childRadialBias,
   childRingIndex,
   CONSISTENCY_WINDOW_MONTHS,
   consistency,
@@ -260,9 +265,47 @@ describe('child crystals', () => {
           importantEventCount: events,
         });
         const gap = distance - monarchRadial - child.radialScale;
-        expect(gap).toBeGreaterThanOrEqual(CHILD_MIN_CLEARANCE);
+        // Epsilon for the `round6` the published distance goes through, not
+        // slack in the guarantee: the subtraction lands a unit in the last
+        // place under the clearance, which is float noise and not contact.
+        expect(gap).toBeGreaterThanOrEqual(CHILD_MIN_CLEARANCE - 1e-9);
       }
     }
+  });
+
+  it('leans every child 45–55° off the monarch`s axis, always outward', () => {
+    // The requirement, stated as the three things that can go wrong: an angle
+    // outside the band reads either as a standing pin or as a fallen crystal;
+    // a lean toward the axis would drive the child into the monarch — which is
+    // why the bias may never be negative and why the engine mixes it with the
+    // child's own outward bearing rather than a free direction; and a bias
+    // above 1 would be silently clamped, so the widest angle in the band has
+    // to be reachable rather than merely requested.
+    //
+    // Measured off the *monarch*, not off the platform. The first pass stated
+    // it against the platform, which put the crown 10° shallower than asked.
+    for (const seed of [1, 7, 4242, 99_991, 0x7fff_ffff]) {
+      const bias = childRadialBias(seed);
+      expect(bias).toBeGreaterThan(0);
+      expect(bias).toBeLessThanOrEqual(1);
+
+      // Volume III's lean, reproduced: up·(1−lean) + out·lean, normalised.
+      const lean = bias * GROUND_LEAN_SCALE;
+      const abovePlatform = (Math.atan2(1 - lean, lean) * 180) / Math.PI;
+      const offMonarch = 90 - abovePlatform;
+      expect(offMonarch).toBeGreaterThanOrEqual(CHILD_TILT_MIN_DEG - 1e-6);
+      expect(offMonarch).toBeLessThanOrEqual(CHILD_TILT_MAX_DEG + 1e-6);
+      // And the floor the adapter hands the engine cannot stand that lean
+      // back up: `ensureUpward` only intervenes below this.
+      expect(Math.sin((abovePlatform * Math.PI) / 180))
+        .toBeGreaterThanOrEqual(CHILD_MIN_UPWARD - 1e-6);
+    }
+
+    // Seeded, not constant: a colony of identically leaning siblings reads as
+    // machined. And deterministic, like everything else here.
+    const spread = new Set([1, 2, 3, 4, 5].map((seed) => childRadialBias(seed)));
+    expect(spread.size).toBeGreaterThan(1);
+    expect(childRadialBias(4242)).toBe(childRadialBias(4242));
   });
 
   it('draws closer with each important event', () => {
@@ -279,9 +322,12 @@ describe('child crystals', () => {
     expect(many).toBeLessThan(one);
     // One event has to be worth seeing: the couple in question logs only
     // one or two calendar milestones a year, so a subtle step would read as
-    // no step at all. A quarter of the reach, which is tighter now that the
-    // whole ring is closer in.
-    expect(quiet - one).toBeGreaterThan(0.03);
+    // no step at all. A quarter of the reach — tighter again now that the
+    // children lean outward and the whole ring was pulled in to match.
+    expect(quiet - one).toBeGreaterThan(0.01);
+    // Four events close the reach entirely and no more: the floor is the
+    // arithmetic clearance, which no amount of activity may eat into.
+    expect(many).toBeCloseTo(0.15 + 0.08 + CHILD_MIN_CLEARANCE, 6);
   });
 
   it('opens a new ring every eight years so no year is crowded out', () => {
