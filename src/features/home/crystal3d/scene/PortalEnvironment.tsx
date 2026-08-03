@@ -56,7 +56,9 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisSca
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
 
   const daisGeometry = useMemo(() => buildPortalDaisGeometry(), []);
-  const inlayGeometry = useMemo(() => buildPortalInlayGeometry(), []);
+  // Інкрустація тепер від насіння теж: вона повторює вигин плити, а плита
+  // вигинається там, де тріснула саме в цієї пари.
+  const inlayGeometry = useMemo(() => buildPortalInlayGeometry(seed), [seed]);
   const pillarGeometry = useMemo(() => buildPortalPillarGeometry(), []);
   // Плита й тріщини — від насіння артефакта: розлом у кожної пари свій і
   // незмінний, як і небо над ними.

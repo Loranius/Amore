@@ -31,8 +31,12 @@ const SHAPE: readonly { readonly t: number; readonly radius: number }[] = [
   { t: -1, radius: 0.5 },
   { t: -0.5, radius: 0.86 },
   { t: 0, radius: 1 },
-  { t: 0.5, radius: 0.83 },
-  { t: 1, radius: 0.44 },
+  // The top used to fall away to 0.44 of the radius, which domed the earth
+  // into a boulder with the crystals on top of it. It is soil the crystals
+  // pushed through, not a hill they stand on, so the patch stays nearly flat
+  // out to its rim and only rounds off at the very edge.
+  { t: 0.55, radius: 0.94 },
+  { t: 1, radius: 0.78 },
 ];
 
 /**
@@ -156,9 +160,11 @@ export function buildCrystalSubstrateMesh(
   if (bodies.length === 0) return null;
 
   const radius = footprintRadius(bodies);
-  // A low mound, not a hill: it has to read as ground the crystals emerge
-  // from, never as another body competing with them.
-  const height = round6(radius * 0.22);
+  // A patch of soil, not a mound. At 0.22 of its radius the earth read as a
+  // rock the druse was standing on; the crystals are supposed to have come up
+  // through it, which they cannot look like they did while it is taller than
+  // the part of them that shows below the shoulder.
+  const height = round6(radius * 0.075);
   // Depth is not cosmetic. Every crystal keeps its base cap and sinks it below
   // y=0; if the rock stops short of the deepest of them, that cap is exposed
   // from below and ADR-0003's guarantee breaks. Size it from the actual

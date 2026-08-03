@@ -13,11 +13,17 @@ import {
   buildPortalPillarGeometry,
   buildPortalStarField,
   measurePortalEnvironmentTriangles,
+  PORTAL_INLAY_CLEARANCE,
   portalCameraFrame,
+  portalCrackAngles,
   portalDaisScale,
+  portalSlabSurfaceY,
   portalHalfWidthAt,
   portalPillarInstances,
 } from './portalScene';
+
+/** Насіння артефакта для сцени; будь-яке стале підійде. */
+const SEED = 4242;
 
 /** Аспекти реальних кадрів: вузький телефон, Pixel 8 Pro, планшет, ноутбук. */
 const ASPECTS = [0.42, 0.46, 0.62, 0.75, 1.33, 1.9];
@@ -291,7 +297,7 @@ describe('portal geometry', () => {
   it('merges the inlay and the pillar into one buffer each', () => {
     // Бюджет draw call'ів у приймальному тесті рахує саме це: інкрустація
     // з двох кілець і колона з трьох частин мусять лишитись одним мешем.
-    const inlay = buildPortalInlayGeometry();
+    const inlay = buildPortalInlayGeometry(1);
     const pillar = buildPortalPillarGeometry();
 
     expect(inlay.groups.length).toBeLessThanOrEqual(1);
@@ -300,8 +306,12 @@ describe('portal geometry', () => {
     expect(pillar.getAttribute('position').count).toBeGreaterThan(0);
 
     inlay.computeBoundingBox();
-    // Кільця лежать у площині подіуму, а не стоять вертикально.
-    expect(Math.abs(inlay.boundingBox!.max.y - inlay.boundingBox!.min.y)).toBeLessThan(1e-6);
+    // Кільця більше не пласкі: вони повторюють вигин плити. Але вигин лишається
+    // вигином, а не стінкою — по вертикалі вони мусять бути на порядок нижчі
+    // за власну ширину.
+    const inlayHeight = inlay.boundingBox!.max.y - inlay.boundingBox!.min.y;
+    expect(inlayHeight).toBeGreaterThan(0);
+    expect(inlayHeight).toBeLessThan(0.2);
 
     pillar.computeBoundingBox();
     // Базова колона нормалізована: висота 1, радіус 1 — інакше scale в
@@ -312,6 +322,51 @@ describe('portal geometry', () => {
 
     inlay.dispose();
     pillar.dispose();
+  });
+
+  it('never buries the inlay in the slab it is set into', () => {
+    // This has now bitten twice. First the heaved rim covered the gold by the
+    // arc and drew it as a dashed line; then the plate started bowing along the
+    // cracks and covered it outright, because the inlay was a flat ring at a
+    // constant height. Gold set into stone has to follow the stone.
+    const inlay = buildPortalInlayGeometry(SEED);
+    const position = inlay.getAttribute('position');
+
+    for (let index = 0; index < position.count; index += 1) {
+      const x = position.getX(index);
+      const y = position.getY(index);
+      const z = position.getZ(index);
+      const angle = Math.atan2(x, z);
+      const radius = Math.hypot(x, z);
+      const stone = portalSlabSurfaceY(angle, radius, SEED);
+
+      expect(y).toBeGreaterThan(stone);
+      // And it is inlaid, not floating: the clearance is a hair, not a gap.
+      expect(y - stone).toBeCloseTo(PORTAL_INLAY_CLEARANCE, 5);
+    }
+
+    inlay.dispose();
+  });
+
+  it('bows the plate where it cracked, and nowhere else', () => {
+    // The plate is not merely split — something pushed it up from below, and
+    // the push is strongest along the cracks. Between them the stone has to
+    // stay flat, or the bows merge into a dome and the fracture stops reading
+    // as a fracture.
+    const cracks = portalCrackAngles(SEED);
+    const onCrack = portalSlabSurfaceY(cracks[0]!, 1.1, SEED);
+
+    // Furthest point from any crack, sampled coarsely.
+    let flattest = Number.POSITIVE_INFINITY;
+    for (let step = 0; step < 360; step += 1) {
+      const angle = (step / 360) * Math.PI * 2;
+      flattest = Math.min(flattest, portalSlabSurfaceY(angle, 1.1, SEED));
+    }
+
+    expect(onCrack).toBeGreaterThan(flattest);
+    // The bow fades outward: the force came from the middle.
+    expect(portalSlabSurfaceY(cracks[0]!, 1.26, SEED))
+      .toBeLessThan(portalSlabSurfaceY(cracks[0]!, 1.06, SEED));
   });
 
   it('accounts for every object the environment draws', () => {
