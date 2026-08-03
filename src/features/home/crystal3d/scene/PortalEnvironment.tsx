@@ -20,8 +20,10 @@ import {
   PORTAL_GROUND_Y,
   PORTAL_PALETTES,
   buildPortalDaisGeometry,
+  buildPortalGroundCrackGeometry,
   buildPortalInlayGeometry,
   buildPortalPillarGeometry,
+  buildPortalRitualSlabGeometry,
   buildPortalStarField,
   portalPillarInstances,
   type PortalCameraFrame,
@@ -56,6 +58,10 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisSca
   const daisGeometry = useMemo(() => buildPortalDaisGeometry(), []);
   const inlayGeometry = useMemo(() => buildPortalInlayGeometry(), []);
   const pillarGeometry = useMemo(() => buildPortalPillarGeometry(), []);
+  // Плита й тріщини — від насіння артефакта: розлом у кожної пари свій і
+  // незмінний, як і небо над ними.
+  const slabGeometry = useMemo(() => buildPortalRitualSlabGeometry(seed), [seed]);
+  const crackGeometry = useMemo(() => buildPortalGroundCrackGeometry(seed), [seed]);
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
   const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
 
@@ -63,7 +69,9 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisSca
     daisGeometry.dispose();
     inlayGeometry.dispose();
     pillarGeometry.dispose();
-  }, [daisGeometry, inlayGeometry, pillarGeometry]);
+    slabGeometry.dispose();
+    crackGeometry.dispose();
+  }, [daisGeometry, inlayGeometry, pillarGeometry, slabGeometry, crackGeometry]);
 
   const starGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
@@ -126,11 +134,46 @@ export function PortalEnvironment({ seed, theme, quality, frame, aspect, daisSca
         />
       </mesh>
 
-      {/* Інкрустація по обводу. Мікро-підйом над площиною — щоб не
-          сперечатись за z-буфер із самим подіумом. */}
+      {/* Ритуальна плита. Кристал не поставлений на подіум — він проріс
+          крізь нього, і внутрішній обвід плити розламаний та піднятий там,
+          де камінь пішов угору. Масштаб той самий, що в подіума, інакше
+          пролом роз'їхався б із каменем, який його зробив. */}
+      <mesh
+        geometry={slabGeometry}
+        position={[0, PORTAL_GROUND_Y, 0]}
+        scale={[daisScale, 1, daisScale]}
+      >
+        <meshStandardMaterial
+          color={palette.slab}
+          emissive={palette.daisEmissive}
+          roughness={0.82}
+          metalness={0.03}
+          flatShading
+        />
+      </mesh>
+
+      {/* Тріщини від пролому. Насамперед темні — це розкол каменю, а не
+          світляна доріжка; світіння лише натякає, що те, яке розсунуло плиту,
+          ще в ній. */}
+      <mesh
+        geometry={crackGeometry}
+        position={[0, PORTAL_GROUND_Y, 0]}
+        scale={[daisScale, 1, daisScale]}
+      >
+        <meshStandardMaterial
+          color={palette.crack}
+          emissive={palette.crackGlow}
+          emissiveIntensity={0.28}
+          roughness={0.9}
+          metalness={0}
+        />
+      </mesh>
+
+      {/* Інкрустація по обводу. Лежить на плиті, тож піднята на її товщину;
+          мікро-підйом понад те — щоб не сперечатись за z-буфер. */}
       <mesh
         geometry={inlayGeometry}
-        position={[0, PORTAL_GROUND_Y + 0.004, 0]}
+        position={[0, PORTAL_GROUND_Y + 0.079, 0]}
         scale={[daisScale, 1, daisScale]}
       >
         <meshStandardMaterial

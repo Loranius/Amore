@@ -149,13 +149,19 @@ describe('portal pillars', () => {
       for (let index = 0; index < instances.length; index += 1) {
         const instance = instances[index]!;
         const placement = PORTAL_PILLARS[Math.floor(index / 2)]!;
-        const depth = frame.distance + Math.abs(placement.z);
+        const depth = frame.distance - placement.z;
         const halfWidth = portalHalfWidthAt(depth, aspect);
-        const ratio = Math.abs(instance.position[0]) / halfWidth;
+        // edgeFraction places the pillar's inner *face*, not its axis — the
+        // difference is negligible far away and decides the whole frame up
+        // close, where the radius is comparable to the frame half-width.
+        const inner = (Math.abs(instance.position[0]) - placement.radius) / halfWidth;
 
-        expect(ratio).toBeCloseTo(placement.edgeFraction, 6);
-        // Колона поза кристалом: інакше вона перекрила б артефакт.
-        expect(Math.abs(instance.position[0])).toBeGreaterThan(WIDEST_CRYSTAL_RADIUS);
+        expect(inner).toBeCloseTo(placement.edgeFraction, 6);
+        // Whether a pillar clears the artifact is a screen-space question and
+        // lives in its own test. Comparing world-space |x| against the
+        // artifact's radius, as this line used to, compares two distances at
+        // different depths — it only ever agreed with the truth because every
+        // pillar sat behind the crystal.
       }
     }
   });
@@ -172,10 +178,57 @@ describe('portal pillars', () => {
     }
   });
 
-  it('stands behind the artifact so the druse is never occluded', () => {
-    for (const placement of PORTAL_PILLARS) {
-      expect(placement.z).toBeLessThan(-PORTAL_DAIS_TOP_RADIUS);
+  it('never lets a pillar stand in front of the druse', () => {
+    // Was `z < -daisTopRadius` for every pillar, which held only while the
+    // whole colonnade stood behind the artifact. A sanctuary has a near side
+    // too, so the real rule is stated instead: a pillar may occlude nothing
+    // either because it is behind the artifact, or because it projects clear
+    // of it on screen.
+    //
+    // Screen fraction of a pillar is exactly its edgeFraction, by construction
+    // — that is what edgeFraction means. The artifact's screen fraction is its
+    // radius over the frame half-width, and the camera guarantees a margin
+    // (FRAME_MARGIN), so anything at or beyond 1.0 is clear of it at every
+    // aspect and every age.
+    for (const aspect of ASPECTS) {
+      const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
+      const artifactFraction = WIDEST_CRYSTAL_RADIUS / portalHalfWidthAt(frame.distance, aspect);
+
+      for (const placement of PORTAL_PILLARS) {
+        const behind = placement.z < -PORTAL_DAIS_TOP_RADIUS;
+        const clearOnScreen = placement.edgeFraction > artifactFraction;
+        expect(behind || clearOnScreen, `z=${placement.z}`).toBe(true);
+      }
     }
+  });
+
+  it('closes the hall on the near side', () => {
+    // The crystal used to stand in front of the colonnade, like a prop before
+    // a backdrop. A sanctuary is a room: something has to be nearer than the
+    // artifact, or the viewer is outside looking in.
+    expect(PORTAL_PILLARS.some((placement) => placement.z > 0)).toBe(true);
+    expect(PORTAL_PILLARS.some((placement) => placement.z < 0)).toBe(true);
+  });
+
+  it('measures depth from the camera rather than from the axis', () => {
+    // `frame.distance + Math.abs(z)` matches the correct formula exactly for
+    // pillars behind the artifact, which is why it survived. For one in front
+    // it returns a larger depth instead of a smaller one, and the pillar drifts
+    // toward the centre of the frame — straight across the crystal.
+    const frame = portalCameraFrame(0.46, 1);
+    const instances = portalPillarInstances(frame, 0.46);
+    const front = PORTAL_PILLARS.findIndex((placement) => placement.z > 0);
+
+    expect(front).toBeGreaterThanOrEqual(0);
+    const near = instances[front * 2]!;
+    const placement = PORTAL_PILLARS[front]!;
+    const at = (depth: number): number =>
+      portalHalfWidthAt(depth, 0.46) * placement.edgeFraction + placement.radius;
+    const correct = at(frame.distance - placement.z);
+    const mirrored = at(frame.distance + placement.z);
+
+    expect(Math.abs(near.position[0])).toBeCloseTo(correct, 6);
+    expect(correct).toBeLessThan(mirrored);
   });
 });
 
@@ -262,8 +315,18 @@ describe('portal geometry', () => {
   });
 
   it('accounts for every object the environment draws', () => {
-    // Поле, подіум, інкрустація, колони (один InstancedMesh) і зорі.
-    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(5);
+    // Поле, подіум, ритуальна плита, тріщини, інкрустація, колони (один
+    // InstancedMesh на всі три пари) і зорі.
+    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(7);
+  });
+
+  it('costs the same for every couple', () => {
+    // The slab's fracture and the cracks are seeded per artifact, so their
+    // shape differs between couples — but the triangle budget is a constant
+    // the acceptance test subtracts, and a count that moved with the seed
+    // would make it a lie for everyone but the couple it was measured on.
+    const counts = [1, 77, 4242, 999_999].map((seed) => measurePortalEnvironmentTriangles(seed));
+    expect(new Set(counts).size).toBe(1);
   });
 });
 
