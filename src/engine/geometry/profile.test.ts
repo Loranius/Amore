@@ -232,10 +232,11 @@ describe('Crystal organic profile phase 3a', () => {
   });
 
   it('gives each crystal its own crown instead of one stamped shape', () => {
-    // Shoulder height and the number of secondary faces vary per body, so a
-    // colony does not read as one model placed several times.
+    // Shoulder height and the number of chamfers vary per body, so a colony
+    // does not read as one model placed several times.
     const shoulders = new Set<number>();
-    const crownRowCounts = new Set<number>();
+    const rowsAboveShoulder = new Set<number>();
+
     for (let seed = 1; seed <= 40; seed += 1) {
       const profile = buildCrystalProfile({ ...motherBody(), seed: seed * 7919 }, 'high');
       const rows = profile.rows;
@@ -250,12 +251,16 @@ describe('Crystal organic profile phase 3a', () => {
       expect(share).toBeGreaterThanOrEqual(0.6);
       expect(share).toBeLessThanOrEqual(0.82);
       shoulders.add(Math.round(share * 100));
-      crownRowCounts.add(rows.length - widestIndex);
+      // Exactly one row above the shoulder — the tip. The crown is one
+      // straight run from the shoulder ring to the point on every crystal: the
+      // intermediate rows that used to vary here sat on `pow(along, 0.8)`,
+      // which falls faster than a straight line right after the shoulder, and
+      // that is the inward curve visual review rejected (2026-08-03).
+      rowsAboveShoulder.add(rows.length - 1 - widestIndex);
     }
 
     expect(shoulders.size).toBeGreaterThan(5);
-    // Zero to two extra bevels means three distinct crown row counts.
-    expect(crownRowCounts.size).toBeGreaterThan(1);
+    expect([...rowsAboveShoulder]).toEqual([1]);
   });
 
   it('keeps the monarch nearer vertical than the crystals around it', () => {
@@ -281,7 +286,14 @@ describe('Crystal organic profile phase 3a', () => {
   it('tests trim occupancy against the bent elliptical shell, not a straight radius envelope', () => {
     const mother = motherBody();
     const mesh = buildCrystalMesh(mother, 'low');
-    const row = mesh.profile.rows[3]!;
+    // The shoulder — the widest slice, and the one whose occupancy test is
+    // most load-bearing. Addressed by role rather than by index: the crown's
+    // intermediate rows are gone (2026-08-03), so a fixed index no longer
+    // points anywhere in particular.
+    const row = mesh.profile.rows.reduce(
+      (widest, candidate) => (candidate.radiusX > widest.radiusX ? candidate : widest),
+      mesh.profile.rows[0]!,
+    );
     const { tangent, bitangent } = orthonormalBasis(mother.direction);
     const center = add(
       add(
@@ -418,6 +430,38 @@ describe('crystal faceting — flat faces', () => {
     // Base, shaft, shoulder, crown, tip — a handful of horizontal bands, not
     // the eight to ten the previous build stacked up.
     expect(mesh.profile.rows.length).toBeLessThanOrEqual(6);
+  });
+
+  it('runs the crown straight from shoulder to point', () => {
+    // The crown used to bow inward: its intermediate rows sat on
+    // `pow(along, 0.8)`, and an exponent under one falls faster than a straight
+    // line right after the shoulder, pinching the radius there and easing out
+    // again toward the tip.
+    //
+    // Checked as a property of the silhouette rather than as a row count, so a
+    // future build may put rows back in the crown as long as they stay on the
+    // line.
+    for (const body of [motherBody(), crystalBody()]) {
+      for (let seed = 1; seed <= 20; seed += 1) {
+        const rows = buildCrystalProfile({ ...body, seed: seed * 4093 }, 'high').rows;
+        const shoulder = rows.reduce(
+          (best, row, index) => (row.radiusX > rows[best]!.radiusX ? index : best),
+          0,
+        );
+        const tip = rows[rows.length - 1]!;
+        const start = rows[shoulder]!;
+        const span = tip.y - start.y;
+        if (span <= 1e-9) continue;
+
+        for (let index = shoulder + 1; index < rows.length - 1; index += 1) {
+          const row = rows[index]!;
+          const along = (row.y - start.y) / span;
+          const straight = start.radiusX + (tip.radiusX - start.radiusX) * along;
+          // Any crown row must sit on the line joining shoulder and tip.
+          expect(Math.abs(row.radiusX - straight)).toBeLessThan(start.radiusX * 0.02);
+        }
+      }
+    }
   });
 
   it('leans the whole crystal instead of each slice', () => {

@@ -138,18 +138,6 @@ function shoulderFraction(seed: number): number {
 }
 
 /**
- * Deliberate cuts in the termination — zero to two.
- *
- * A quartz point is rarely a clean pyramid; most have one or two secondary
- * faces between shaft and tip. Deliberate is the operative word: these are the
- * only horizontal divisions above the shoulder, so each one is a visible edge
- * rather than a step in a stack.
- */
-function crownBevelCount(seed: number): number {
-  return Math.floor(seededUnit(seed, 'geometry:crown-bevels') * 3);
-}
-
-/**
  * The shared crystal profile: a narrow base, a shaft that widens gently to a
  * shoulder, then a short sharp termination.
  *
@@ -161,7 +149,6 @@ function crownBevelCount(seed: number): number {
 function appendPrismRows(
   rows: BaseProfileRow[],
   options: {
-    seed: number;
     bodyStart: number;
     length: number;
     radius: number;
@@ -169,7 +156,7 @@ function appendPrismRows(
     shoulderShare: number;
   },
 ): void {
-  const { seed, bodyStart, length, radius, tipRadius, shoulderShare } = options;
+  const { bodyStart, length, radius, tipRadius, shoulderShare } = options;
   const at = (fraction: number): number => bodyStart + length * fraction;
 
   // Base and shoulder, and nothing between them.
@@ -186,19 +173,24 @@ function appendPrismRows(
   appendBaseRow(rows, at(0), radius * BASE_WAIST);
   appendBaseRow(rows, at(shoulderShare), radius);
 
-  // Termination: the shoulder ring, up to two deliberate bevels, and the tip.
-  // With no bevels each crown face is a single large triangle from the shoulder
-  // straight to the point, which is what the references show.
-  const crown = Math.max(1e-6, 1 - shoulderShare);
-  const bevels = crownBevelCount(seed);
-  for (let step = 1; step <= bevels; step += 1) {
-    const along = step / (bevels + 1);
-    appendBaseRow(
-      rows,
-      at(shoulderShare + crown * along),
-      radius * (1 - Math.pow(along, 0.8)) * 0.96 + tipRadius * along,
-    );
-  }
+  // Termination: shoulder ring straight to the point, and nothing in between.
+  //
+  // The crown carried up to two intermediate rows placed on `pow(along, 0.8)`.
+  // An exponent under one falls faster than a straight line right after the
+  // shoulder, so the radius was pinched inward there and eased out again toward
+  // the tip — the crown curved inward instead of running straight, which visual
+  // review caught (2026-08-03).
+  //
+  // Rather than straightening the curve, the rows are gone. A row that sits
+  // exactly on the line from shoulder to tip is invisible by construction, so
+  // it would cost vertices and show nothing; one that sits off the line is a
+  // curve again. Each crown face is now a single large triangle from the
+  // shoulder ring to the point, which is what the references show and what a
+  // quartz termination is.
+  //
+  // The "additional deliberate cuts" the brief asks for are the ring's
+  // chamfers, which run the full height of the crystal — a vertical cut, not a
+  // horizontal band.
   appendBaseRow(rows, at(1), tipRadius);
 }
 
@@ -422,7 +414,6 @@ export function buildCrystalProfile(
   }
 
   appendPrismRows(baseRows, {
-    seed: body.seed,
     bodyStart,
     length: body.renderedLength,
     radius,
