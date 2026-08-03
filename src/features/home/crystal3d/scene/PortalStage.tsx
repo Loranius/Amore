@@ -24,6 +24,8 @@ export interface PortalStageProps {
   crystalsSceneRadius: number;
   /** Напрямки гілок кварцової жили — камінь платформи вигинається над ними. */
   veinBearings: readonly number[];
+  /** Виліт жили в одиницях сцени — усередині нього камінь лишається пласким. */
+  veinReach: number;
   children: ReactNode;
 }
 
@@ -35,6 +37,7 @@ export function PortalStage({
   artifactSceneRadius,
   crystalsSceneRadius,
   veinBearings,
+  veinReach,
   children,
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
@@ -79,6 +82,7 @@ export function PortalStage({
         aspect={aspect}
         daisScale={daisScale}
         veinBearings={veinBearings}
+        veinReach={veinReach}
       />
       <PortalCameraRig frame={frame} controls={controls} />
 

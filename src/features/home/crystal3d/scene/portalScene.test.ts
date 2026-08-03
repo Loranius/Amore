@@ -240,18 +240,63 @@ describe('portal pillars', () => {
 });
 
 describe('portal geometry', () => {
-  it('caps the dais exactly on the artifact ground plane', () => {
-    // Верхня площина подіуму — контракт із субстратом кристала: він
-    // заглиблений приблизно на 0.14 і розрахований на те, що камінь його
-    // накриває, а не що він стирчить із порожнечі.
-    const geometry = buildPortalDaisGeometry();
-    geometry.computeBoundingBox();
-    const bounds = geometry.boundingBox!;
+  it('puts the platform`s stone surface exactly on the artifact ground plane', () => {
+    // The bug this exists for, and it shipped: the dais capped at 0 and the
+    // stone slab was then stacked *on top* of it, so the surface the crystals
+    // supposedly grow out of stood 0.075 above the plane the engine actually
+    // stands them on. Measured in scene units, the quartz vein rises 0.024
+    // above that plane — so the seam was 0.05 under the stone and invisible
+    // from every angle, and every crystal met the platform 0.075 up its own
+    // shaft. The dais is recessed by the slab's thickness now; the slab's top
+    // face is the contract.
+    const dais = buildPortalDaisGeometry();
+    const slab = buildPortalRitualSlabGeometry(SEED);
+    dais.computeBoundingBox();
+    slab.computeBoundingBox();
 
-    expect(bounds.max.y).toBeCloseTo(0, 9);
-    expect(bounds.min.y).toBeLessThan(-PORTAL_FIELD_DROP);
-    expect(bounds.max.x).toBeGreaterThan(PORTAL_DAIS_TOP_RADIUS);
-    geometry.dispose();
+    // The stone the eye sees is the slab. Its surface *at the seam* is the
+    // plane — outside the seam it bows up, which is the whole point of the
+    // bow, so the bounding box is not what carries this.
+    expect(portalSlabSurfaceY(0, 0, SEED, [0.4, 2.1], 0.4)).toBeCloseTo(0, 9);
+    // Float32 in the buffer attribute, hence 6 places rather than 9.
+    expect(slab.boundingBox!.min.y).toBeCloseTo(-0.075, 6);
+    // The dais is below it by exactly one slab, so there is neither a gap nor
+    // an overlap between the two.
+    expect(dais.boundingBox!.max.y).toBeCloseTo(slab.boundingBox!.min.y, 6);
+    expect(dais.boundingBox!.min.y).toBeLessThan(-PORTAL_FIELD_DROP);
+    expect(dais.boundingBox!.max.x).toBeGreaterThan(PORTAL_DAIS_TOP_RADIUS);
+
+    dais.dispose();
+    slab.dispose();
+  });
+
+  it('leaves the stone flat wherever the quartz vein runs under it', () => {
+    // The other half of the same bug. Even with the slab on the right plane,
+    // a bow that starts at the axis rises over the vein and hides it: the
+    // stone reached 0.118 while the vein topped out at 0.048. The bow has to
+    // begin outside the seam's own footprint, whatever that footprint is for
+    // this couple.
+    const bearings = [0.4, 2.1, 4.7];
+    for (const reach of [0.2, 0.45, 0.8]) {
+      for (let step = 0; step < 48; step += 1) {
+        const angle = (step / 48) * Math.PI * 2;
+        for (const radius of [0, reach * 0.5, reach * 0.99]) {
+          expect(portalSlabSurfaceY(angle, radius, SEED, bearings, reach)).toBeCloseTo(0, 9);
+        }
+      }
+      // ...and it does still bow, outside the seam.
+      let highest = 0;
+      for (let step = 0; step < 48; step += 1) {
+        highest = Math.max(highest, portalSlabSurfaceY(
+          (step / 48) * Math.PI * 2,
+          reach + (1.27 - reach) * 0.4,
+          SEED,
+          bearings,
+          reach,
+        ));
+      }
+      expect(highest).toBeGreaterThan(0);
+    }
   });
 
   it('grows the dais top to stay wider than the rock it carries', () => {
@@ -422,23 +467,25 @@ describe('portal geometry', () => {
     const slab = buildPortalRitualSlabGeometry(SEED, bearings);
     const position = slab.getAttribute('position');
 
-    // Every point of the top surface is at or above the plate's own thickness:
-    // nothing dips toward the dais, at any radius or bearing.
+    // Every vertex is either on the top surface — at the artifact's ground
+    // plane or bowed above it — or on the floor of the podium's recess. There
+    // is no intermediate height for a pit or a step to live at.
     let reachedAxis = false;
     for (let index = 0; index < position.count; index += 1) {
       const y = position.getY(index);
       const radius = Math.hypot(position.getX(index), position.getZ(index));
       if (radius < 1e-6) reachedAxis = true;
-      // The outer rim wall runs down to the dais and is the one exception.
-      if (y < 1e-6) continue;
-      expect(y).toBeGreaterThanOrEqual(0.075 - 1e-6);
+      const onFloor = Math.abs(y + 0.075) < 1e-6;
+      if (onFloor) continue;
+      expect(y).toBeGreaterThanOrEqual(-1e-6);
     }
     // ...and the surface is genuinely closed to the axis, not merely deep.
     expect(reachedAxis).toBe(true);
 
-    // The centre is flat: the bow is a ridge that rises past the druse, so the
+    // The centre is flat: the bow is a ridge that rises past the seam, so the
     // axis — where every segment meets — cannot be a peak of differing slopes.
     const axis = portalSlabSurfaceY(0, 0, SEED, bearings);
+    expect(axis).toBeCloseTo(0, 9);
     for (let step = 0; step < 32; step += 1) {
       expect(portalSlabSurfaceY((step / 32) * Math.PI * 2, 0, SEED, bearings))
         .toBeCloseTo(axis, 9);

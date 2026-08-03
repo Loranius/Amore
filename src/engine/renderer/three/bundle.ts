@@ -237,6 +237,51 @@ export function crystalSceneRadius(
   return reach * scale;
 }
 
+/**
+ * How far the quartz vein alone reaches, in scene units.
+ *
+ * The portal needs this to leave the seam alone. Its stone bows where the vein
+ * runs under it, and a bow that starts inside the vein's own footprint rises
+ * over the quartz and hides it — which is precisely what happened: the vein
+ * stood 0.024 above the artifact's ground plane while the stone around it stood
+ * at 0.075 and bowed to 0.118, so the seam was buried under the platform from
+ * every angle it was ever looked at.
+ *
+ * Same fit scale as `crystalSceneRadius`, so the two numbers describe the same
+ * artifact at the same size.
+ */
+export function crystalSubstrateSceneRadius(geometry: CrystalGeometryState): number {
+  const substrate = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID);
+  if (substrate === undefined) return 0;
+  // Measured against the whole druse's box and scale, not the substrate's own:
+  // the fit centres and scales everything together, so a substrate-only fit
+  // would answer a question about a different object.
+  return substrateReach(geometry, substrate);
+}
+
+function substrateReach(geometry: CrystalGeometryState, substrate: CrystalMeshData): number {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+  for (const mesh of geometry.meshes) {
+    minX = Math.min(minX, mesh.bounds.min.x); maxX = Math.max(maxX, mesh.bounds.max.x);
+    minY = Math.min(minY, mesh.bounds.min.y); maxY = Math.max(maxY, mesh.bounds.max.y);
+    minZ = Math.min(minZ, mesh.bounds.min.z); maxZ = Math.max(maxZ, mesh.bounds.max.z);
+  }
+  const scale = fitScaleFor({ x: maxX - minX, y: maxY - minY, z: maxZ - minZ }).scale;
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
+  return Math.max(
+    Math.abs(substrate.bounds.max.x - centerX),
+    Math.abs(substrate.bounds.min.x - centerX),
+    Math.abs(substrate.bounds.max.z - centerZ),
+    Math.abs(substrate.bounds.min.z - centerZ),
+  ) * scale;
+}
+
 function fitCrystalContent(content: THREE.Group, batches: readonly ThreeCrystalBatch[]): ThreeCrystalFit {
   const bounds = new THREE.Box3();
   let hasBounds = false;

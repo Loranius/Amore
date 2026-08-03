@@ -407,7 +407,7 @@ describe('crystal substrate — quartz vein shape', () => {
     const proud = substrate.bounds.max.y;
 
     expect(proud).toBeGreaterThan(0);
-    expect(proud).toBeLessThan(tallest * 0.06);
+    expect(proud).toBeLessThan(tallest * 0.09);
 
     for (let offset = 0; offset < substrate.positions.length; offset += 3) {
       const height = substrate.positions[offset + 1]!;

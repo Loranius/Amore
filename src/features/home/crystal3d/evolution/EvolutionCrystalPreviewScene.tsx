@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalVeinBearings } from '@/engine/geometry';
 import { crystalRenderScale } from '@/engine/renderer';
-import { crystalSceneRadius } from '@/engine/renderer/three';
+import { crystalSceneRadius, crystalSubstrateSceneRadius } from '@/engine/renderer/three';
 import { useTheme } from '@/providers/ThemeProvider';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { MemoryModal } from '../../MemoryModal';
@@ -122,6 +122,7 @@ export default function EvolutionCrystalPreviewScene() {
             artifactSceneRadius={crystalSceneRadius(pipeline.geometry)}
             crystalsSceneRadius={crystalSceneRadius(pipeline.geometry, { includeSubstrate: false })}
             veinBearings={veinBearings}
+            veinReach={crystalSubstrateSceneRadius(pipeline.geometry)}
           >
             <EvolutionCrystalObject
               geometry={pipeline.geometry}

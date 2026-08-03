@@ -51,8 +51,24 @@ const OUTLINE_SEGMENTS = 96;
  */
 const TOP_RINGS: readonly number[] = [0.82, 0.62, 0.44, 0.28];
 
-/** Vein thickness above the platform's stone, per unit of the node radius. */
-const VEIN_PROUD = 0.16;
+/** How much wider the buried floor is than the outline at the surface. */
+const FLOOR_FLARE = 1.06;
+
+/**
+ * Vein thickness above the platform's stone, per unit of the node radius.
+ *
+ * Settled by looking at it. The platform used to bury the seam entirely, so
+ * this number had never actually been seen: the earlier renders only *looked*
+ * like they had a vein because the stone was bowing in the vein's own shape
+ * over the top of it. Once the burial was fixed, twice this read as a plinth
+ * with a hard shadowed wall — a step the crystals stand on, which is the shape
+ * the vein exists to be rid of.
+ *
+ * At this height the wall is a hairline and what carries the seam is the
+ * colour of its top face against the stone, which is what a mineral seam
+ * actually is. Under one percent of the monarch's height.
+ */
+const VEIN_PROUD = 0.14;
 
 /**
  * Air between a crystal's base and the edge of the quartz around it.
@@ -308,7 +324,7 @@ function veinProfile(
   bearings: readonly number[],
 ): CrystalBodyProfile {
   const rows: CrystalProfileRow[] = [
-    { t: -1, scale: 0.88 },
+    { t: -1, scale: FLOOR_FLARE },
     { t: 1, scale: 1 },
   ].map((step) => ({
     y: round6(step.t < 0 ? step.t * depth : step.t * height),
@@ -430,7 +446,15 @@ export function buildCrystalSubstrateMesh(
   };
 
   // Floor, then the wall top, then the top face shrinking inward.
-  pushRing(0.88, -depth, Number.POSITIVE_INFINITY);
+  //
+  // The floor is *wider* than the top, and that is a lighting decision as much
+  // as a geological one. Tapering the other way — floor narrower — leans the
+  // wall outward as it rises, which points its normal downward, and a
+  // downward-facing face sees none of the key light: the seam came out ringed
+  // in a hard black outline that read as a plinth the crystals stand on. Wider
+  // below, the same wall leans inward and catches the light as a bevel. It also
+  // means the vein is broadest exactly where the base caps are buried.
+  pushRing(FLOOR_FLARE, -depth, Number.POSITIVE_INFINITY);
   pushRing(1, height, Number.POSITIVE_INFINITY);
   for (const scale of TOP_RINGS) {
     // Everything inside the monarch's own footprint is hidden by the monarch

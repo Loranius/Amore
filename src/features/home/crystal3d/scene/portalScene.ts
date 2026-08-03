@@ -50,12 +50,16 @@ const FIELD_SEGMENTS = 64;
  * додають і не прибирають жодного трикутника. Саме тому константа лишається
  * однією на всі пари.
  */
-export function measurePortalEnvironmentTriangles(seed = 1, bearings: readonly number[] = []): number {
+export function measurePortalEnvironmentTriangles(
+  seed = 1,
+  bearings: readonly number[] = [],
+  veinReach = 0,
+): number {
   const dais = buildPortalDaisGeometry();
-  const inlay = buildPortalInlayGeometry(seed, bearings);
+  const inlay = buildPortalInlayGeometry(seed, bearings, veinReach);
   const pillar = buildPortalPillarGeometry();
-  const slab = buildPortalRitualSlabGeometry(seed, bearings);
-  const runes = buildPortalRuneGeometry(seed, bearings);
+  const slab = buildPortalRitualSlabGeometry(seed, bearings, veinReach);
+  const runes = buildPortalRuneGeometry(seed, bearings, veinReach);
   const triangles = (geometry: THREE.BufferGeometry): number => {
     const index = geometry.getIndex();
     return index === null
@@ -169,9 +173,15 @@ export function portalCameraFrame(aspect: number, artifactRadius = 0): PortalCam
 }
 
 // ── Подіум ──────────────────────────────────────────────────
-// Профіль обертання, y відраховується від PORTAL_GROUND_Y. Верхня
-// площина — рівно 0: саме на ній стоїть субстрат кристала, і будь-яке
-// відхилення або підвісило б його в повітрі, або втопило.
+// Профіль обертання, y відраховується від PORTAL_GROUND_Y. Верхня площина
+// подіуму втоплена рівно на товщину кам'яної плити, бо плита лежить у цій
+// заглибині — а от ЇЇ верхня грань уже точно на нулі, тобто на площині, на
+// якій рушій ставить кристали. Будь-яке відхилення або підвісило б жилу в
+// повітрі, або втопило її в камені (2026-08-03: саме друге й було).
+
+/** Товщина кам'яної плити платформи. */
+const SLAB_THICKNESS = 0.075;
+
 const DAIS_PROFILE: readonly (readonly [number, number])[] = [
   [0, -0.62],
   [1.9, -0.62],
@@ -181,8 +191,10 @@ const DAIS_PROFILE: readonly (readonly [number, number])[] = [
   [1.44, -0.26],
   [1.44, -0.1],
   [1.3, -0.1],
-  [1.3, 0],
-  [0, 0],
+  // Recessed by exactly the platform's thickness. The stone slab lies in this
+  // recess, so it is the *slab's* top face that lands on 0 — see SLAB_TOP.
+  [1.3, -SLAB_THICKNESS],
+  [0, -SLAB_THICKNESS],
 ];
 
 /** Радіус верхньої площини подіуму в базовій геометрії. */
@@ -254,8 +266,22 @@ export function buildPortalDaisGeometry(): THREE.LatheGeometry {
 
 /** Зовнішній — трохи всередині обводу подіуму, щоб фаска подіуму лишалась видною. */
 const SLAB_OUTER = 1.27;
-const SLAB_THICKNESS = 0.075;
 const SLAB_SEGMENTS = 36;
+
+/**
+ * Верхня грань каменю — рівно площина артефакта.
+ *
+ * Це був справжній баг, і виміряний. Плита лежала **поверх** тієї самої
+ * площини, на якій рушій ставить кристали, тобто камінь стояв на 0.075 вище за
+ * основи кристалів і за кварцову жилу. Жила підіймається над площиною лише на
+ * 0.024 в одиницях сцени, тож вона була похована під платформою з будь-якого
+ * кута — а кристали виглядали зрізаними біля основи й підвішеними.
+ *
+ * Тепер плита втоплена в подіум: її низ на `-SLAB_THICKNESS`, верх на нулі.
+ * Ту саму глибину вибрано в профілі подіуму, тож видима товщина каменю не
+ * змінилась — змінилось лише те, від чого вона відраховується.
+ */
+const SLAB_TOP = 0;
 
 /**
  * Скільки напрямків жили платформа підхоплює, якщо їх передали.
@@ -316,13 +342,21 @@ function slabSwell(angle: number, cracks: readonly number[]): number {
 /**
  * Профіль вигину вздовж радіуса.
  *
- * Вигин не купол, а гребінь: у самому центрі камінь плаский, підіймається
- * одразу за друзою й полого сходить до обводу. Пласка серцевина тут не
- * косметика — при куполі вершина припадала б рівно на вісь, де всі сегменти
- * сходяться в одну точку, і поверхня стала б віялом різнонахилених клинів.
+ * Вигин не купол, а гребінь: над самою жилою камінь плаский, підіймається
+ * одразу за нею й полого сходить до обводу.
+ *
+ * Пласка серцевина тут не косметика, і причин дві. При куполі вершина
+ * припадала б рівно на вісь, де всі сегменти сходяться в одну точку, і
+ * поверхня стала б віялом різнонахилених клинів. А головне — вигин, що
+ * починається всередині сліду жили, підіймається **над кварцом** і ховає його:
+ * жила стоїть на 0.024 над площиною артефакта, а камінь вигинався до 0.118.
+ * Саме тому `veinReach` тут аргумент, а не константа: платформа зобов'язана
+ * лишити шов у спокої, хоч би якою широкою була жила в цієї пари.
  */
-function slabRidge(radius: number): number {
-  const along = Math.max(0, Math.min(1, radius / SLAB_OUTER));
+function slabRidge(radius: number, veinReach: number): number {
+  const clear = Math.max(0, Math.min(SLAB_OUTER * 0.75, veinReach));
+  const span = Math.max(1e-6, SLAB_OUTER - clear);
+  const along = Math.max(0, Math.min(1, (radius - clear) / span));
   const rise = Math.min(1, along / 0.3);
   const eased = rise * rise * (3 - 2 * rise);
   // Сила прийшла зсередини, тож на обводі від вигину лишається третина.
@@ -342,15 +376,21 @@ export function portalSlabSurfaceY(
   radius: number,
   seed: number,
   bearings: readonly number[] = [],
+  veinReach = 0,
 ): number {
-  return slabSurfaceY(angle, radius, portalCrackAngles(seed, bearings));
+  return slabSurfaceY(angle, radius, portalCrackAngles(seed, bearings), veinReach);
 }
 
 /** Наскільки інкрустація підведена над каменем плити. */
 export const PORTAL_INLAY_CLEARANCE = 0.005;
 
-function slabSurfaceY(angle: number, radius: number, cracks: readonly number[]): number {
-  return SLAB_THICKNESS + slabSwell(angle, cracks) * slabRidge(radius);
+function slabSurfaceY(
+  angle: number,
+  radius: number,
+  cracks: readonly number[],
+  veinReach: number,
+): number {
+  return SLAB_TOP + slabSwell(angle, cracks) * slabRidge(radius, veinReach);
 }
 
 /** Радіуси кілець верхньої площини — від осі до обводу, без жодного розриву. */
@@ -367,6 +407,7 @@ const SLAB_RINGS: readonly number[] = [0, 0.18, 0.36, 0.58, 0.8, 1];
 export function buildPortalRitualSlabGeometry(
   seed: number,
   bearings: readonly number[] = [],
+  veinReach = 0,
 ): THREE.BufferGeometry {
   const cracks = portalCrackAngles(seed, bearings);
   const positions: number[] = [];
@@ -379,7 +420,7 @@ export function buildPortalRitualSlabGeometry(
   };
   const point = (angle: number, radius: number): readonly [number, number, number] => [
     Math.sin(angle) * radius,
-    slabSurfaceY(angle, radius, cracks),
+    slabSurfaceY(angle, radius, cracks, veinReach),
     Math.cos(angle) * radius,
   ];
 
@@ -404,11 +445,13 @@ export function buildPortalRitualSlabGeometry(
       triangle(i1, o0, o1);
     }
 
-    // Зовнішній бортик — товщина каменю, видима з-під фаски подіуму.
+    // Зовнішній бортик — товщина каменю, видима з-під фаски подіуму. Низ
+    // тепер у заглибині подіуму, а не на його верхній площині: саме цей зсув
+    // і опускає всю плиту так, щоб її верх збігся з площиною артефакта.
     const out0 = point(a0, SLAB_OUTER);
     const out1 = point(a1, SLAB_OUTER);
-    const floor0: readonly [number, number, number] = [out0[0], 0, out0[2]];
-    const floor1: readonly [number, number, number] = [out1[0], 0, out1[2]];
+    const floor0: readonly [number, number, number] = [out0[0], -SLAB_THICKNESS, out0[2]];
+    const floor1: readonly [number, number, number] = [out1[0], -SLAB_THICKNESS, out1[2]];
     triangle(out0, floor0, out1);
     triangle(out1, floor0, floor1);
   }
@@ -443,6 +486,7 @@ const RUNE_SIZE = 0.05;
 export function buildPortalRuneGeometry(
   seed: number,
   bearings: readonly number[] = [],
+  veinReach = 0,
 ): THREE.BufferGeometry {
   const random = mulberry32(seed ^ 0x2c0de);
   const positions: number[] = [];
@@ -464,7 +508,7 @@ export function buildPortalRuneGeometry(
     const tz = -sx;
     const cx = sx * radius;
     const czz = cz * radius;
-    const y = slabSurfaceY(angle, radius, cracks) + CRACK_CLEARANCE;
+    const y = slabSurfaceY(angle, radius, cracks, veinReach) + CRACK_CLEARANCE;
     const half = thickness * 0.5;
     const corner = (u: number, v: number): readonly [number, number, number] => [
       cx + tx * u + rx * v,
@@ -503,6 +547,7 @@ export function buildPortalRuneGeometry(
 export function buildPortalInlayGeometry(
   seed: number,
   bearings: readonly number[] = [],
+  veinReach = 0,
 ): THREE.BufferGeometry {
   const cracks = portalCrackAngles(seed, bearings);
   // Три кільця різного радіуса, як на референсі: вузьке ближче до друзи,
@@ -518,7 +563,7 @@ export function buildPortalInlayGeometry(
   const positions: number[] = [];
   const point = (angle: number, radius: number): readonly [number, number, number] => [
     Math.sin(angle) * radius,
-    slabSurfaceY(angle, radius, cracks) + CRACK_CLEARANCE,
+    slabSurfaceY(angle, radius, cracks, veinReach) + CRACK_CLEARANCE,
     Math.cos(angle) * radius,
   ];
 

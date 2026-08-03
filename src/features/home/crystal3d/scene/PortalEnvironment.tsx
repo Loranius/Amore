@@ -50,6 +50,15 @@ export interface PortalEnvironmentProps {
    * розломів: жила в артефакті й вигини в сцені.
    */
   veinBearings: readonly number[];
+  /**
+   * Скільки місця жила займає на платформі, в одиницях сцени
+   * (`crystalSubstrateSceneRadius`).
+   *
+   * Камінь мусить лишити цей слід пласким. Без цього числа вигин починався в
+   * центрі, підіймався над кварцом і ховав його — жила стояла на 0.024 над
+   * площиною артефакта, а камінь навколо неї вигинався до 0.118.
+   */
+  veinReach: number;
 }
 
 function starCount(quality: PortalEnvironmentProps['quality']): number {
@@ -67,6 +76,7 @@ export function PortalEnvironment({
   aspect,
   daisScale,
   veinBearings,
+  veinReach,
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
@@ -74,19 +84,23 @@ export function PortalEnvironment({
   const daisGeometry = useMemo(() => buildPortalDaisGeometry(), []);
   // Інкрустація тепер від насіння теж: вона повторює вигин плити, а плита
   // вигинається там, де тріснула саме в цієї пари.
+  // Плита масштабується по XZ разом із подіумом, а виліт жили приходить в
+  // одиницях сцени — тож переводимо його в локальні одиниці подіуму, інакше
+  // на масштабованому подіумі слід жили був би не там, де він насправді.
+  const veinReachLocal = veinReach / Math.max(1e-6, daisScale);
   const inlayGeometry = useMemo(
-    () => buildPortalInlayGeometry(seed, veinBearings),
-    [seed, veinBearings],
+    () => buildPortalInlayGeometry(seed, veinBearings, veinReachLocal),
+    [seed, veinBearings, veinReachLocal],
   );
   const pillarGeometry = useMemo(() => buildPortalPillarGeometry(), []);
   // Камінь платформи вигинається над жилою, тож перебудовується разом із нею.
   const slabGeometry = useMemo(
-    () => buildPortalRitualSlabGeometry(seed, veinBearings),
-    [seed, veinBearings],
+    () => buildPortalRitualSlabGeometry(seed, veinBearings, veinReachLocal),
+    [seed, veinBearings, veinReachLocal],
   );
   const runeGeometry = useMemo(
-    () => buildPortalRuneGeometry(seed, veinBearings),
-    [seed, veinBearings],
+    () => buildPortalRuneGeometry(seed, veinBearings, veinReachLocal),
+    [seed, veinBearings, veinReachLocal],
   );
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
   const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);

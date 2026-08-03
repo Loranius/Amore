@@ -24,6 +24,7 @@ export {
   applyCrystalLifeFrame,
   createThreeCrystalRenderBundle,
   crystalSceneRadius,
+  crystalSubstrateSceneRadius,
   CRYSTAL_GROUND_BASELINE,
 } from './bundle';
 export type { ThreeCrystalRenderBundle } from './bundle';
