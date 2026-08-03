@@ -41,18 +41,56 @@ export const CRYSTAL_SUBSTRATE_BODY_ID = 'crystal:substrate';
 const OUTLINE_SEGMENTS = 96;
 
 /**
- * Concentric shrink factors for the top face.
+ * Rings across the top face, as a blend from the vein's outline in toward the
+ * monarch's own footprint.
  *
- * Every ring is the outline scaled toward the centre, so the top face follows
- * the vein's own shape instead of being a disc clipped to it. The innermost
- * ring is clamped against the monarch's own radius before it is capped, so the
- * cap sits underneath the monarch and can never be seen — that is what lets the
- * face close without the fan of large sectors review rejected as a pinwheel.
+ * A blend, not a scale — and that distinction is what makes the fissure
+ * possible at all. Scaling the outline and then clamping the result to the
+ * monarch's radius collapsed every interior ring onto one small circle: the top
+ * face was a lip and a hole with nothing in between, so there was no vertex
+ * anywhere that a trough could lower. The seam could only ever be flat.
+ *
+ * Blending keeps every ring the vein's own shape at its own distance in, so the
+ * face has interior resolution everywhere and the floor can actually fall. The
+ * innermost still lands on the monarch's footprint, which is what lets the face
+ * close under her without the fan of large sectors review rejected as a
+ * pinwheel.
  */
-const TOP_RINGS: readonly number[] = [0.82, 0.62, 0.44, 0.28];
+const TOP_RINGS: readonly number[] = [0.84, 0.68, 0.52, 0.37, 0.23, 0.11];
 
 /** How much wider the buried floor is than the outline at the surface. */
 const FLOOR_FLARE = 1.06;
+
+/**
+ * How deep the fissure runs between the crystals, per unit of the node radius.
+ *
+ * The seam was a flat top and read as a pad somebody set the crystals on. A
+ * crack is not flat: it stands proud at its lip and falls into shadow between,
+ * and that shadow is what makes it look like something the crystals came *out
+ * of* rather than something they stand *on*.
+ *
+ * Bounded by the vein's own floor in `buildCrystalSubstrateMesh`, so however
+ * deep this asks for, the trough can never cut through the underside and open
+ * the solid it is part of.
+ */
+const TROUGH_DEPTH = 1.3;
+
+/**
+ * How much of a crystal's own cover stays pinned at the lip before the floor
+ * starts to fall, and how much further it takes to reach the bottom.
+ *
+ * The first number is ADR-0003 in this shape: a base cap sits below y=0, so the
+ * surface above it may not sink. It can sit just inside one cover because the
+ * cover already carries `BASE_MARGIN` — the cap itself reaches only `1/1.12` of
+ * it — and the margin is what the rim spends.
+ *
+ * The second is how far past the rim the floor takes to reach the bottom. It
+ * was a cover and a half, which left the fissure a sliver: nine percent of the
+ * top face fell below the platform and the rest was lip, so the seam still read
+ * flat. Shorter, and the crack is a crack.
+ */
+const RIM_HOLD = 0.94;
+const TROUGH_FALL = 0.75;
 
 /**
  * Vein thickness above the platform's stone, per unit of the node radius.
@@ -430,18 +468,65 @@ export function buildCrystalSubstrateMesh(
     ...meshes.map((mesh) => mesh.bounds.min.y),
   );
   const depth = round6(Math.max(nodeRadius * 0.6, -deepestBurial + nodeRadius * 0.35));
+  // How far the fissure sinks between the crystals. Bounded by the vein's own
+  // floor with a margin, so the trough can never cut through the underside and
+  // open the solid it is part of.
+  const troughDepth = round6(Math.min(nodeRadius * TROUGH_DEPTH, depth * 0.55));
   const profile = veinProfile(widest, height, depth, veinBearings(bodies));
 
   const positions: number[] = [];
   const indices: number[] = [];
   const ringStarts: number[] = [];
 
-  const pushRing = (scale: number, y: number, clampTo: number): void => {
+  // How far a point on the top face sits from the nearest crystal's base, as a
+  // share of that crystal's own cover. Zero right at a crystal, one well away.
+  const clearanceOf = (x: number, z: number): number => {
+    let closest = Number.POSITIVE_INFINITY;
+    for (const body of bodies) {
+      const cover = baseCoverOf(body);
+      closest = Math.min(
+        closest,
+        Math.hypot(x - body.anchor.x, z - body.anchor.z) / Math.max(1e-6, cover),
+      );
+    }
+    return Number.isFinite(closest) ? closest : 1;
+  };
+
+  /**
+   * Height of the top face at a point — the whole reason the seam has depth.
+   *
+   * A flat top read as a pad the crystals were set on. A fissure is not flat:
+   * the stone stands proud at its lip and falls away into shadow between, and
+   * the crystals come *out* of that shadow.
+   *
+   * The rim around each crystal is the part that cannot move. Every base cap
+   * sits below y=0 and is ADR-0003's whole guarantee, so the surface holds at
+   * the lip wherever a cap needs covering and only starts falling outside the
+   * cover — which is exactly the shape of a crack with crystals growing from it.
+   */
+  const topHeightAt = (x: number, z: number): number => {
+    const clearance = clearanceOf(x, z);
+    if (clearance <= RIM_HOLD) return height;
+    const fall = Math.min(1, (clearance - RIM_HOLD) / TROUGH_FALL);
+    // Eased, so the rim rolls into the trough instead of stepping into it.
+    const eased = fall * fall * (3 - 2 * fall);
+    return height - (height + troughDepth) * eased;
+  };
+
+  const inner = Math.max(1e-4, monarchRadius * 0.92);
+  /**
+   * One ring. `toward` is 1 at the vein's outline and 0 at the monarch's
+   * footprint; `y` of null means the ring follows the fissure's own floor.
+   */
+  const pushRing = (toward: number, y: number | null): void => {
     ringStarts.push(positions.length / 3);
     for (let segment = 0; segment < OUTLINE_SEGMENTS; segment += 1) {
       const angle = (segment / OUTLINE_SEGMENTS) * Math.PI * 2;
-      const radius = Math.min(outline[segment]! * scale, clampTo);
-      positions.push(round6(Math.sin(angle) * radius), round6(y), round6(Math.cos(angle) * radius));
+      const edge = outline[segment]!;
+      const radius = edge <= inner ? edge : inner + (edge - inner) * toward;
+      const x = Math.sin(angle) * radius;
+      const z = Math.cos(angle) * radius;
+      positions.push(round6(x), round6(y ?? topHeightAt(x, z)), round6(z));
     }
   };
 
@@ -454,18 +539,17 @@ export function buildCrystalSubstrateMesh(
   // in a hard black outline that read as a plinth the crystals stand on. Wider
   // below, the same wall leans inward and catches the light as a bevel. It also
   // means the vein is broadest exactly where the base caps are buried.
-  pushRing(FLOOR_FLARE, -depth, Number.POSITIVE_INFINITY);
-  pushRing(1, height, Number.POSITIVE_INFINITY);
-  for (const scale of TOP_RINGS) {
-    // Everything inside the monarch's own footprint is hidden by the monarch
-    // standing on it, which is what lets the face close without a visible fan.
-    pushRing(scale, height, Math.max(1e-4, monarchRadius * 0.92));
-  }
+  pushRing(FLOOR_FLARE, -depth);
+  // The outer lip is the one top ring pinned flat: it is where the crack meets
+  // the platform, and a lip that wandered would read as a torn edge rather than
+  // as stone that split.
+  pushRing(1, height);
+  for (const toward of TOP_RINGS) pushRing(toward, null);
 
   const floorCenter = positions.length / 3;
   positions.push(0, round6(-depth), 0);
   const topCenter = positions.length / 3;
-  positions.push(0, round6(height), 0);
+  positions.push(0, round6(topHeightAt(0, 0)), 0);
 
   // Floor cap first, so its triangles are the published base cap.
   const floorStart = ringStarts[0]!;

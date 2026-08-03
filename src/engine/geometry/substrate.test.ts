@@ -230,13 +230,14 @@ describe('crystal substrate', () => {
     // fixed. These three statements are stronger, because each one is exact:
     //
     //  - the floor cap faces straight down, so the underside is closed;
-    //  - the top face faces straight up, so it is flat, with no depression;
+    //  - every triangle of the top surface still faces the sky, so the fissure
+    //    is a crack rather than a fold;
     //  - every wall normal leans away from the origin, which is the defining
     //    property of a star-shaped solid and the reason the branches can merge
     //    without the mesh folding through itself.
     const top = substrate.bounds.max.y;
     const floor = substrate.bounds.min.y;
-    const seen = { floor: 0, top: 0, wall: 0 };
+    const seen = { floor: 0, top: 0, wall: 0, fissure: 0 };
     for (let offset = 0; offset < substrate.indices.length; offset += 3) {
       const corners = [
         substrate.indices[offset]!,
@@ -249,22 +250,30 @@ describe('crystal substrate', () => {
         y: substrate.normals[corners[0]! * 3 + 1]!,
         z: substrate.normals[corners[0]! * 3 + 2]!,
       };
-      if (heights.every((height) => Math.abs(height - floor) < 1e-6)) {
+      const atFloor = heights.filter((height) => Math.abs(height - floor) < 1e-6).length;
+      if (atFloor === 3) {
         seen.floor += 1;
         expect(normal.y).toBeLessThan(-0.99);
-      } else if (heights.every((height) => Math.abs(height - top) < 1e-6)) {
-        seen.top += 1;
-        expect(normal.y).toBeGreaterThan(0.99);
-      } else {
+      } else if (atFloor > 0) {
+        // The outer wall — the only band that reaches the underside.
         seen.wall += 1;
         const centroidX = corners.reduce((sum, i) => sum + substrate.positions[i * 3]!, 0) / 3;
         const centroidZ = corners.reduce((sum, i) => sum + substrate.positions[i * 3 + 2]!, 0) / 3;
         expect(normal.x * centroidX + normal.z * centroidZ).toBeGreaterThan(0);
+      } else {
+        // The top surface, which since the fissure is a height field rather
+        // than a plane. Its normals no longer point straight up — that is the
+        // point — but every one of them still faces the sky, or the crack has
+        // folded over itself.
+        seen.top += 1;
+        expect(normal.y).toBeGreaterThan(0);
+        if (Math.abs(heights[0]! - top) > 1e-6) seen.fissure += 1;
       }
     }
     expect(seen.floor).toBeGreaterThan(0);
     expect(seen.top).toBeGreaterThan(0);
     expect(seen.wall).toBeGreaterThan(0);
+    expect(seen.fissure).toBeGreaterThan(0);
   });
 
   it('is deterministic for the same couple', () => {
@@ -397,11 +406,15 @@ describe('crystal substrate — quartz vein shape', () => {
     }
   });
 
-  it('lies practically flush with the platform and keeps a flat top', () => {
-    // Two rejected shapes in one check. The vein must not stand up as an inlay
-    // — it is proud of the stone by a fraction of a crystal — and its top must
-    // not dish, because the "central circular depression" is exactly what the
-    // old cut plate read as.
+  it('keeps a low lip and opens a fissure between the crystals', () => {
+    // The seam is proud of the platform by a fraction of a crystal — it is a
+    // seam, not an inlay — and between the crystals it falls away, because a
+    // flat top read as a pad somebody set them on.
+    //
+    // What this is *not* is the old cut plate's central circular depression:
+    // that dished around the axis regardless of where anything stood. This
+    // floor is keyed on distance to the nearest crystal, so it is a fissure the
+    // crystals came out of rather than a bowl they sit in.
     const { growth, substrate } = pipeline();
     const tallest = Math.max(...growth.bodies.map((body) => body.renderedLength));
     const proud = substrate.bounds.max.y;
@@ -409,14 +422,55 @@ describe('crystal substrate — quartz vein shape', () => {
     expect(proud).toBeGreaterThan(0);
     expect(proud).toBeLessThan(tallest * 0.09);
 
+    const floor = substrate.bounds.min.y;
+    let lip = 0;
+    let trough = 0;
     for (let offset = 0; offset < substrate.positions.length; offset += 3) {
       const height = substrate.positions[offset + 1]!;
-      // Every vertex is either on the flat top or on the buried floor; there is
-      // no intermediate height for a bowl or a collar to live at.
-      const onTop = Math.abs(height - substrate.bounds.max.y) < 1e-6;
-      const onFloor = Math.abs(height - substrate.bounds.min.y) < 1e-6;
-      expect(onTop || onFloor).toBe(true);
+      expect(height).toBeGreaterThanOrEqual(floor - 1e-6);
+      expect(height).toBeLessThanOrEqual(proud + 1e-6);
+      if (Math.abs(height - proud) < 1e-6) lip += 1;
+      // Below the platform but well clear of the vein's own underside: the
+      // fissure has to be a fissure, not a hole through the solid.
+      if (height < -1e-6 && height > floor + 1e-6) trough += 1;
     }
+    expect(lip).toBeGreaterThan(0);
+    expect(trough).toBeGreaterThan(0);
+  });
+
+  it('never sinks the fissure under a base cap', () => {
+    // The floor falls only outside each crystal's own cover, so the surface
+    // over a buried base cap stays at the lip. Get that wrong and the fissure
+    // opens exactly the face ADR-0003 exists to hide — from above, where it is
+    // most visible.
+    //
+    // Stated over the published vertices rather than by sampling the cap: the
+    // surface between vertices is an interpolation of them, so a vertex that
+    // holds is a stronger claim than a sample that happens to land well.
+    const { growth, substrate } = pipeline();
+    const proud = substrate.bounds.max.y;
+    // The cap's *own* reach — a crystal's radius as its tilted base projects it
+    // — not the cover the vein is built with. The cover carries a margin on top
+    // of this, and that margin is precisely what the rim is allowed to spend
+    // rolling into the trough. Testing against the cover instead would demand
+    // the surface stay flat over ground no cap occupies, which is the trough.
+    const capReachOf = (body: typeof growth.bodies[number]): number =>
+      body.renderedRadius / Math.max(0.35, Math.abs(body.direction.y));
+
+    let held = 0;
+    for (let offset = 0; offset < substrate.positions.length; offset += 3) {
+      const y = substrate.positions[offset + 1]!;
+      if (Math.abs(y - substrate.bounds.min.y) < 1e-6) continue;
+      const x = substrate.positions[offset]!;
+      const z = substrate.positions[offset + 2]!;
+      const overACap = growth.bodies.some(
+        (body) => Math.hypot(x - body.anchor.x, z - body.anchor.z) <= capReachOf(body),
+      );
+      if (!overACap) continue;
+      held += 1;
+      expect(y).toBeCloseTo(proud, 6);
+    }
+    expect(held).toBeGreaterThan(0);
   });
 
   it('never opens a hole under a crystal', () => {
