@@ -18,13 +18,16 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import {
   PORTAL_FIELD_DROP,
   PORTAL_GROUND_Y,
+  PORTAL_LAMP_RADIUS,
   PORTAL_PALETTES,
   buildPortalDaisGeometry,
   buildPortalRuneGeometry,
   buildPortalInlayGeometry,
+  buildPortalLampGeometry,
   buildPortalPillarGeometry,
   buildPortalRitualSlabGeometry,
   buildPortalStarField,
+  portalLampInstances,
   portalPillarInstances,
   type PortalCameraFrame,
 } from './portalScene';
@@ -80,6 +83,7 @@ export function PortalEnvironment({
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
+  const lampsRef = useRef<THREE.InstancedMesh>(null);
 
   const daisGeometry = useMemo(() => buildPortalDaisGeometry(), []);
   // Інкрустація тепер від насіння теж: вона повторює вигин плити, а плита
@@ -93,6 +97,7 @@ export function PortalEnvironment({
     [seed, veinBearings, veinReachLocal],
   );
   const pillarGeometry = useMemo(() => buildPortalPillarGeometry(), []);
+  const lampGeometry = useMemo(() => buildPortalLampGeometry(), []);
   // Камінь платформи вигинається над жилою, тож перебудовується разом із нею.
   const slabGeometry = useMemo(
     () => buildPortalRitualSlabGeometry(seed, veinBearings, veinReachLocal),
@@ -104,14 +109,16 @@ export function PortalEnvironment({
   );
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
   const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
+  const lamps = useMemo(() => portalLampInstances(frame, aspect), [frame, aspect]);
 
   useEffect(() => () => {
     daisGeometry.dispose();
     inlayGeometry.dispose();
     pillarGeometry.dispose();
+    lampGeometry.dispose();
     slabGeometry.dispose();
     runeGeometry.dispose();
-  }, [daisGeometry, inlayGeometry, pillarGeometry, slabGeometry, runeGeometry]);
+  }, [daisGeometry, inlayGeometry, pillarGeometry, lampGeometry, slabGeometry, runeGeometry]);
 
   const starGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
@@ -124,6 +131,26 @@ export function PortalEnvironment({
 
   // InstancedMesh матриці ставимо до першого кадру: інакше всі чотири
   // колони блимнули б в origin.
+  useLayoutEffect(() => {
+    const mesh = lampsRef.current;
+    if (mesh === null) return;
+    const matrix = new THREE.Matrix4();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3(
+      PORTAL_LAMP_RADIUS,
+      PORTAL_LAMP_RADIUS,
+      PORTAL_LAMP_RADIUS,
+    );
+    for (let index = 0; index < lamps.length; index += 1) {
+      const lamp = lamps[index]!;
+      position.set(lamp.position[0], lamp.position[1], lamp.position[2]);
+      mesh.setMatrixAt(index, matrix.compose(position, new THREE.Quaternion(), scale));
+    }
+    mesh.count = lamps.length;
+    mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
+  }, [lamps]);
+
   useLayoutEffect(() => {
     const mesh = pillarsRef.current;
     if (mesh === null) return;
@@ -234,6 +261,40 @@ export function PortalEnvironment({
       >
         <meshStandardMaterial color={palette.pillar} roughness={0.94} metalness={0.02} flatShading />
       </instancedMesh>
+
+      {/* Вогні на колонах. Геометрія горить на всіх — вона майже безкоштовна,
+          — а справжнє джерело світла запалює лише передня пара: кожен point
+          light коштує роботи в кожному фрагменті сцени. */}
+      <instancedMesh
+        ref={lampsRef}
+        args={[lampGeometry, undefined, lamps.length]}
+        frustumCulled={false}
+      >
+        <meshStandardMaterial
+          color={palette.lamp}
+          emissive={palette.lampGlow}
+          // Стримана навмисно. Сцена йде крізь ACES-тонмапінг, який усе, що
+          // яскравіше за одиницю, тягне до білого — на 3.4 полум'я виходило
+          // білим шпилем, тобто колір, який мав робити його вогнем, зникав саме
+          // тому, що його було багато.
+          emissiveIntensity={1.35}
+          roughness={0.46}
+          metalness={0.22}
+          flatShading
+        />
+      </instancedMesh>
+      {lamps.filter((lamp) => lamp.lit).map((lamp) => (
+        <pointLight
+          key={`${lamp.position[0]}:${lamp.position[2]}`}
+          position={[lamp.position[0], lamp.position[1], lamp.position[2]]}
+          // Згасання по квадрату з обмеженою дальністю: вогонь мусить дійти до
+          // кристала й не мити далеке поле, інакше туман перестає бути обрієм.
+          distance={frame.distance * 1.35}
+          decay={2}
+          intensity={palette.lampIntensity}
+          color={palette.lampGlow}
+        />
+      ))}
 
       <points geometry={starGeometry}>
         <pointsMaterial

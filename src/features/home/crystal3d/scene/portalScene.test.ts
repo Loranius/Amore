@@ -20,7 +20,9 @@ import {
   portalDaisScale,
   portalSlabSurfaceY,
   portalHalfWidthAt,
+  portalLampInstances,
   portalPillarInstances,
+  PORTAL_LAMP_LIGHT_COUNT,
 } from './portalScene';
 
 /** Насіння артефакта для сцени; будь-яке стале підійде. */
@@ -495,9 +497,40 @@ describe('portal geometry', () => {
   });
 
   it('accounts for every object the environment draws', () => {
-    // Поле, подіум, ритуальна плита, тріщини, інкрустація, колони (один
-    // InstancedMesh на всі три пари) і зорі.
-    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(7);
+    // Поле, подіум, кам'яна платформа, руни, інкрустація, колони (один
+    // InstancedMesh на всі три пари), вогні на них (так само один) і зорі.
+    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(8);
+  });
+
+  it('lights the crystal from the colonnade without lighting the whole field', () => {
+    // Вогонь горить на кожній колоні — геометрія майже безкоштовна, — але
+    // справжнє джерело світла запалює лише передня пара: кожен point light
+    // коштує роботи в кожному фрагменті кожного матеріалу сцени.
+    for (const aspect of ASPECTS) {
+      const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
+      const lamps = portalLampInstances(frame, aspect);
+      const pillars = portalPillarInstances(frame, aspect);
+
+      expect(lamps).toHaveLength(pillars.length);
+      expect(lamps.filter((lamp) => lamp.lit)).toHaveLength(PORTAL_LAMP_LIGHT_COUNT);
+
+      for (let index = 0; index < lamps.length; index += 1) {
+        const lamp = lamps[index]!;
+        const pillar = pillars[index]!;
+        // Вогонь стоїть на своїй колоні, під капітеллю, і винесений усередину —
+        // до кристала, а не назовні від нього.
+        expect(lamp.position[2]).toBe(pillar.position[2]);
+        expect(lamp.position[1]).toBeGreaterThan(pillar.position[1]);
+        expect(lamp.position[1]).toBeLessThan(pillar.position[1] + pillar.scale[1]);
+        expect(Math.abs(lamp.position[0])).toBeLessThan(Math.abs(pillar.position[0]));
+      }
+
+      // Запалена пара — найближча до глядача: саме з того боку на кристал і
+      // дивляться. Задній підсвіт у сцені вже є від directionalLight.
+      const litZ = lamps.filter((lamp) => lamp.lit).map((lamp) => lamp.position[2]);
+      expect(new Set(litZ).size).toBe(1);
+      expect(litZ[0]).toBe(Math.max(...lamps.map((lamp) => lamp.position[2])));
+    }
   });
 
   it('costs the same for every couple', () => {

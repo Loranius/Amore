@@ -25,9 +25,9 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * послабити межу й перевірка втратила б сенс.
  *
  * Поле + подіум + кам'яна платформа + руни + інкрустація + колони (один
- * InstancedMesh на всі три пари) + зорі.
+ * InstancedMesh на всі три пари) + вогні на колонах (так само один) + зорі.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 8;
 
 /**
  * Скільки трикутників додає оточення. Той самий привід, що й у draw
@@ -38,7 +38,7 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
  * будувати геометрію двічі. За тим, щоб воно не розійшлось із реальними
  * буферами, стежить portalScene.test.ts.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 2812;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 3100;
 
 /** Сегментів у диску поля; єдине місце, що задає його вартість. */
 const FIELD_SEGMENTS = 64;
@@ -58,6 +58,7 @@ export function measurePortalEnvironmentTriangles(
   const dais = buildPortalDaisGeometry();
   const inlay = buildPortalInlayGeometry(seed, bearings, veinReach);
   const pillar = buildPortalPillarGeometry();
+  const lamp = buildPortalLampGeometry();
   const slab = buildPortalRitualSlabGeometry(seed, bearings, veinReach);
   const runes = buildPortalRuneGeometry(seed, bearings, veinReach);
   const triangles = (geometry: THREE.BufferGeometry): number => {
@@ -72,11 +73,13 @@ export function measurePortalEnvironmentTriangles(
     + triangles(inlay)
     + triangles(slab)
     + triangles(runes)
-    + triangles(pillar) * PORTAL_PILLARS.length * 2;
+    + triangles(pillar) * PORTAL_PILLARS.length * 2
+    + triangles(lamp) * PORTAL_PILLARS.length * 2;
 
   dais.dispose();
   inlay.dispose();
   pillar.dispose();
+  lamp.dispose();
   slab.dispose();
   runes.dispose();
   return total;
@@ -690,6 +693,91 @@ export function buildPortalPillarGeometry(): THREE.BufferGeometry {
   return merged;
 }
 
+// ── Світло на колонах ───────────────────────────────────────
+
+/**
+ * Де на колоні стоїть вогонь, як частка її висоти.
+ *
+ * Не під капітеллю, хоч там йому й місце за архітектурою: капітель передньої
+ * пари лежить вище за верхній край кадру, тож вогонь було видно лише тому, хто
+ * задере камеру. Джерело світла, якого не видно, — це не джерело світла, а
+ * просто світло нізвідки. На цій висоті він у кадрі на кожному аспекті.
+ */
+const LAMP_HEIGHT_SHARE = 0.6;
+
+/** Наскільки вогонь винесений усередину, до кристала, від осі колони. */
+const LAMP_INSET = 0.62;
+
+/**
+ * Скільки колон несуть справжнє джерело світла.
+ *
+ * Два, і це не економія на вигляді, а на кадрі: кожен point light додає роботи
+ * в кожному фрагменті кожного матеріалу сцени. Вогні горять на **всіх** колонах
+ * — це геометрія, вона майже безкоштовна, — але освітлює кристал лише передня
+ * пара, бо саме вона стоїть із того боку, з якого на нього дивляться. Задні
+ * дали б контровий підсвіт, який тут уже є від directionalLight.
+ */
+export const PORTAL_LAMP_LIGHT_COUNT = 2;
+
+export interface PortalLampInstance {
+  position: readonly [number, number, number];
+  /** Чи від цього вогню запалюється справжнє джерело світла. */
+  lit: boolean;
+}
+
+/**
+ * Вогні на колонах для конкретного кадру.
+ *
+ * Порядок той самий, що в `portalPillarInstances`, і це не збіг: вогонь мусить
+ * стояти рівно на своїй колоні, а колони їдуть із кадром камери. Виводити їх
+ * окремо означало б два джерела правди для однієї позиції.
+ */
+export function portalLampInstances(
+  frame: PortalCameraFrame,
+  aspect: number,
+): PortalLampInstance[] {
+  const pillars = portalPillarInstances(frame, aspect);
+  // Найближча до глядача пара — та, у якої z найбільший.
+  const frontZ = Math.max(...PORTAL_PILLARS.map((placement) => placement.z));
+  return pillars.map((pillar) => {
+    const height = pillar.scale[1] * LAMP_HEIGHT_SHARE;
+    const inward = pillar.position[0] > 0 ? -1 : 1;
+    return {
+      position: [
+        pillar.position[0] + inward * pillar.scale[0] * LAMP_INSET,
+        pillar.position[1] + height,
+        pillar.position[2],
+      ] as const,
+      lit: Math.abs(pillar.position[2] - frontZ) < 1e-6,
+    };
+  });
+}
+
+/**
+ * Чаша вогню: маленька, гранована, з тією ж кількістю сторін, що й колона.
+ *
+ * Нормалізована так само, як колона, — радіусом 1, — тож масштаб інстансу
+ * означає саме габарит вогню.
+ */
+export function buildPortalLampGeometry(): THREE.BufferGeometry {
+  const bowl = new THREE.CylinderGeometry(1, 0.5, 0.55, 8, 1);
+  bowl.translate(0, 0.28, 0);
+  // Вузьке й високе. Перший конус був майже такої ж ширини, як чаша, і читався
+  // як шпиль на колоні, а не як вогонь у ній.
+  const flame = new THREE.ConeGeometry(0.62, 1.8, 8, 1);
+  flame.translate(0, 1.4, 0);
+
+  const merged = mergeGeometries([bowl, flame]);
+  bowl.dispose();
+  flame.dispose();
+  if (merged === null) throw new Error('Portal lamp geometry could not be merged.');
+  merged.computeVertexNormals();
+  return merged;
+}
+
+/** Габарит вогню в одиницях сцени. */
+export const PORTAL_LAMP_RADIUS = 0.19;
+
 // ── Зорі ────────────────────────────────────────────────────
 
 export interface PortalStarField {
@@ -745,6 +833,11 @@ export interface PortalPalette {
   runeGlow: string;
   inlay: string;
   pillar: string;
+  /** Чаша вогню на колоні. */
+  lamp: string;
+  /** Саме полум'я — і колір джерела світла, що від нього запалюється. */
+  lampGlow: string;
+  lampIntensity: number;
   starOpacity: number;
   daisLight: string;
   daisLightIntensity: number;
@@ -766,6 +859,9 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     runeGlow: '#c9a9f0',
     inlay: '#e2be80',
     pillar: '#6a5c8f',
+    lamp: '#241d33',
+    lampGlow: '#ff9c47',
+    lampIntensity: 11,
     starOpacity: 0.85,
     daisLight: '#d7b7f2',
     daisLightIntensity: 2.6,
@@ -780,6 +876,9 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     runeGlow: '#a684d8',
     inlay: '#cea86e',
     pillar: '#4b4070',
+    lamp: '#1b1628',
+    lampGlow: '#ff8c34',
+    lampIntensity: 13,
     starOpacity: 1,
     daisLight: '#b891dd',
     daisLightIntensity: 2.2,
