@@ -235,8 +235,21 @@ describe('crystal substrate', () => {
     //  - every wall normal leans away from the origin, which is the defining
     //    property of a star-shaped solid and the reason the branches can merge
     //    without the mesh folding through itself.
-    const top = substrate.bounds.max.y;
-    const floor = substrate.bounds.min.y;
+    // Scoped to the seam. Since the boulders were heaped on it the mesh's
+    // highest point is a rock rather than the seam's lip, and a rock is a
+    // closed solid with faces pointing every way — including down, which is
+    // what a rock resting on stone looks like from underneath. The three
+    // statements below are about the *seam's* shape and would be meaningless
+    // read across the rubble; the boulders have their own test.
+    const seamTriangles = substrate.profile.seamTriangleCount!;
+    const seamHeights: number[] = [];
+    for (let triangle = 0; triangle < seamTriangles; triangle += 1) {
+      for (let slot = 0; slot < 3; slot += 1) {
+        seamHeights.push(substrate.positions[substrate.indices[triangle * 3 + slot]! * 3 + 1]!);
+      }
+    }
+    const top = Math.max(...seamHeights);
+    const floor = Math.min(...seamHeights);
     const seen = { floor: 0, top: 0, wall: 0, fissure: 0 };
     for (let offset = 0; offset < substrate.indices.length; offset += 3) {
       const corners = [
@@ -244,6 +257,7 @@ describe('crystal substrate', () => {
         substrate.indices[offset + 1]!,
         substrate.indices[offset + 2]!,
       ];
+      if (offset / 3 >= seamTriangles) continue;
       const heights = corners.map((index) => substrate.positions[index * 3 + 1]!);
       const normal = {
         x: substrate.normals[corners[0]! * 3]!,
@@ -274,6 +288,43 @@ describe('crystal substrate', () => {
     expect(seen.top).toBeGreaterThan(0);
     expect(seen.wall).toBeGreaterThan(0);
     expect(seen.fissure).toBeGreaterThan(0);
+  });
+
+  it('heaps broken rock on the seam for the crystals to come out of', () => {
+    // The seam alone read as a plinth, and a plinth is what any smooth
+    // continuous surface under a crystal reads as. The reference the owner
+    // supplied is unambiguous about the alternative: a cluster erupts from a
+    // heap of broken rock, with the light coming up between the stones.
+    const { growth, substrate } = pipeline();
+    const seamTriangles = substrate.profile.seamTriangleCount!;
+    const total = substrate.indices.length / 3;
+
+    expect(seamTriangles).toBeGreaterThan(0);
+    expect(total).toBeGreaterThan(seamTriangles);
+
+    // Rock stands *on* the seam, which is the whole reason the seam's own tests
+    // had to be scoped: the mesh's highest point is now a boulder.
+    const seamTop = Math.max(...Array.from(
+      { length: seamTriangles * 3 },
+      (_, slot) => substrate.positions[substrate.indices[slot]! * 3 + 1]!,
+    ));
+    expect(substrate.bounds.max.y).toBeGreaterThan(seamTop);
+
+    // Never through a crystal. A boulder is substrate and may share the seam's
+    // own overlap with a buried base cap, but one standing through a shaft
+    // would be raw interpenetration of two closed solids — which the crystal
+    // attachment profile forbids outright.
+    for (let triangle = seamTriangles; triangle < total; triangle += 1) {
+      for (let slot = 0; slot < 3; slot += 1) {
+        const index = substrate.indices[triangle * 3 + slot]!;
+        const x = substrate.positions[index * 3]!;
+        const z = substrate.positions[index * 3 + 2]!;
+        for (const body of growth.bodies) {
+          const reach = Math.hypot(x - body.anchor.x, z - body.anchor.z);
+          expect(reach, body.id).toBeGreaterThan(body.renderedRadius * 0.4);
+        }
+      }
+    }
   });
 
   it('is deterministic for the same couple', () => {
@@ -417,16 +468,34 @@ describe('crystal substrate — quartz vein shape', () => {
     // crystals came out of rather than a bowl they sit in.
     const { growth, substrate } = pipeline();
     const tallest = Math.max(...growth.bodies.map((body) => body.renderedLength));
-    const proud = substrate.bounds.max.y;
+    // The seam's own lip, not the mesh's highest point — since the boulders were
+    // heaped on top, the highest point is a rock, and a rock is *supposed* to
+    // stand proud of the seam.
+    const seamTriangles = substrate.profile.seamTriangleCount!;
+    const seamHeights: number[] = [];
+    const seamPoints: { x: number; y: number; z: number }[] = [];
+    for (let triangle = 0; triangle < seamTriangles; triangle += 1) {
+      for (let slot = 0; slot < 3; slot += 1) {
+        const index = substrate.indices[triangle * 3 + slot]!;
+        const point = {
+          x: substrate.positions[index * 3]!,
+          y: substrate.positions[index * 3 + 1]!,
+          z: substrate.positions[index * 3 + 2]!,
+        };
+        seamHeights.push(point.y);
+        seamPoints.push(point);
+      }
+    }
+    const proud = Math.max(...seamHeights);
 
     expect(proud).toBeGreaterThan(0);
     expect(proud).toBeLessThan(tallest * 0.09);
 
-    const floor = substrate.bounds.min.y;
+    const floor = Math.min(...seamHeights);
     let lip = 0;
     let trough = 0;
-    for (let offset = 0; offset < substrate.positions.length; offset += 3) {
-      const height = substrate.positions[offset + 1]!;
+    for (const point of seamPoints) {
+      const height = point.y;
       expect(height).toBeGreaterThanOrEqual(floor - 1e-6);
       expect(height).toBeLessThanOrEqual(proud + 1e-6);
       if (Math.abs(height - proud) < 1e-6) lip += 1;
@@ -448,7 +517,26 @@ describe('crystal substrate — quartz vein shape', () => {
     // surface between vertices is an interpolation of them, so a vertex that
     // holds is a stronger claim than a sample that happens to land well.
     const { growth, substrate } = pipeline();
-    const proud = substrate.bounds.max.y;
+    // Seam vertices only: a boulder standing over a buried cap hides it further
+    // rather than exposing it, so holding rubble to the seam's lip would be
+    // asking the wrong question.
+    const seamTriangles = substrate.profile.seamTriangleCount!;
+    const seamHeights: number[] = [];
+    const seamPoints: { x: number; y: number; z: number }[] = [];
+    for (let triangle = 0; triangle < seamTriangles; triangle += 1) {
+      for (let slot = 0; slot < 3; slot += 1) {
+        const index = substrate.indices[triangle * 3 + slot]!;
+        const point = {
+          x: substrate.positions[index * 3]!,
+          y: substrate.positions[index * 3 + 1]!,
+          z: substrate.positions[index * 3 + 2]!,
+        };
+        seamHeights.push(point.y);
+        seamPoints.push(point);
+      }
+    }
+    const proud = Math.max(...seamHeights);
+    const seamFloor = Math.min(...seamHeights);
     // The cap's *own* reach — a crystal's radius as its tilted base projects it
     // — not the cover the vein is built with. The cover carries a margin on top
     // of this, and that margin is precisely what the rim is allowed to spend
@@ -458,11 +546,11 @@ describe('crystal substrate — quartz vein shape', () => {
       body.renderedRadius / Math.max(0.35, Math.abs(body.direction.y));
 
     let held = 0;
-    for (let offset = 0; offset < substrate.positions.length; offset += 3) {
-      const y = substrate.positions[offset + 1]!;
-      if (Math.abs(y - substrate.bounds.min.y) < 1e-6) continue;
-      const x = substrate.positions[offset]!;
-      const z = substrate.positions[offset + 2]!;
+    for (const point of seamPoints) {
+      const y = point.y;
+      if (Math.abs(y - seamFloor) < 1e-6) continue;
+      const x = point.x;
+      const z = point.z;
       const overACap = growth.bodies.some(
         (body) => Math.hypot(x - body.anchor.x, z - body.anchor.z) <= capReachOf(body),
       );

@@ -103,6 +103,25 @@ export interface CrystalBodyProfile {
    * new builds — optional keeps persisted Geometry State v1 profiles readable.
    */
   veinBearings?: number[];
+  /**
+   * How many of the substrate's leading triangles belong to the seam itself,
+   * before the rubble heaped on it.
+   *
+   * The seam and the boulders are one mesh — same stone, same material, one
+   * draw call — but they answer to different rules. The seam is the thing wide
+   * and deep enough that no crystal's base cap is ever exposed from below
+   * (ADR-0003), and it is checked against that; the boulders sit on top of it
+   * and are meant to stand proud of its lip, which would read as a violation to
+   * anything measuring the seam's own height. Published so the two can be told
+   * apart without guessing from geometry.
+   *
+   * Triangles, not vertices: the mesh is split before it is drawn and the split
+   * gives every triangle its own copies, so vertex indices do not survive it.
+   * Triangle order does, one for one, and the seam is emitted first.
+   *
+   * Substrate meshes only, and only new ones.
+   */
+  seamTriangleCount?: number;
   signature: string;
 }
 

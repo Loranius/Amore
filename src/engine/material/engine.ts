@@ -124,14 +124,27 @@ const SHELL_EMISSIVE = { min: 0.02, max: 0.06 } as const;
  * geometry, goes with it. Never fully opaque either, or the light the couple
  * earned inside has nowhere to come out.
  *
- * Raised from 0.52..0.84 on review (2026-08-03): at the low end the body was
+ * Raised twice on review (2026-08-03), the second time to the point of closing
+ * almost completely. Four stylized crystal references the owner supplied are
+ * **opaque without exception** — no alpha, no transmission, not one of them —
+ * and they read as crystal far better than ours did while see-through. What
+ * makes a gem look like a gem in all of them is the facets: their rims, and how
+ * differently each one catches light. Transparency was never carrying that, and
+ * while it was open the far facets showed through the near ones and the two
+ * sets of edges cancelled into a wireframe.
+ *
+ * A trace is left rather than none at all, because the earned light still has to
+ * get out and a perfectly sealed shell is a painted stone.
+ *
+ * The earlier note, kept because the reasoning still applies at every step:
+ * raised from 0.52..0.84 because at the low end the body was
  * see-through enough that the far facets showed through the near ones, and two
  * sets of edges crossing each other read as a wireframe rather than as depth.
  * Glass is not mostly-transparent — a real quartz prism hides most of what is
  * behind it and gives back an edge instead. The transparency that remains is
  * there to let the earned light out, which is the one thing it is for.
  */
-const SHELL_OPACITY = { min: 0.72, max: 0.94 } as const;
+const SHELL_OPACITY = { min: 0.94, max: 1 } as const;
 
 function intoBand(band: { readonly min: number; readonly max: number }, value: number): number {
   return round6(Math.max(band.min, Math.min(band.max, value)));
@@ -700,10 +713,12 @@ function buildSubstrateMaterial(
       // No glowing veins on the stone: the light down there is the aurora, and
       // two lit patterns in the same crack would fight.
       surfaceVeinStrength: 0,
-      // Nor an outlined facet. The vein is massive quartz — a broken mass with
-      // no grown faces to outline — and drawing rims on its triangulation would
-      // advertise the mesh rather than the mineral.
-      facetEdgeStrength: 0,
+      // The rubble takes a rim, the seam does not — and they share a material,
+      // so this is one number for both. It goes on: the boulders are faceted
+      // solids whose whole job is to read as broken rock, and broken rock is
+      // read from its edges. Weaker than the crystals', because stone catches
+      // less on a fracture than quartz does on a grown face.
+      facetEdgeStrength: 0.12,
       facetEdgeWidth: 1.4,
     },
     facets: SUBSTRATE_FACET_TINTING,

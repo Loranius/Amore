@@ -138,3 +138,57 @@ outline than crystal.
 - Horizontal banding across the prism was rejected on sight. Growth striations are real
   quartz, and at portal size they read as stripes ruled onto the crystal.
 - Do not commit or push without an explicit instruction.
+
+## The base: what a crystal grows out of
+
+Four more references (`low_poly_dirt_crystals`, `stalagmite ore cluster`,
+`iridescent gems`, a second `stylizedgem`) answer this directly, and they all answer
+it the same way.
+
+**A cluster erupts from a heap of broken rock — never from a plate, a disc or a groove.**
+The ore-cluster reference is the clearest: irregular faceted boulders of many sizes
+packed into a mound, crystals rising from the gaps between them, small crystals nestled
+among the stones at the foot, and the glow coming *up between the rocks* rather than out
+of a channel. A smooth continuous surface under a crystal reads as a plinth however it
+is shaped — that is what a plinth is — and no amount of shaping the seam fixed it.
+
+How ours is built now:
+
+- Boulders are the **same half-space intersection the crystals use** (ADR-0006). A
+  boulder is a faceted convex solid and we already have an exact deterministic way to
+  make one; they differ only in that their planes point anywhere rather than holding a
+  hexagonal habit. Do not reach for a noised sphere: rock breaks along flat faces, and
+  flat faces are what catch light differently from one another.
+- They are **heaped on the seam, not instead of it**. The seam still carries ADR-0003 —
+  it is the thing wide and deep enough that no base cap is exposed from below — and rock
+  piled on a guarantee does not weaken it.
+- `CrystalBodyProfile.seamTriangleCount` marks where the seam ends and the rubble
+  begins. In **triangles**, not vertices: the mesh is split before it is drawn and the
+  split gives every triangle its own copies, so vertex indices do not survive it.
+  Every seam invariant must be scoped by it, or the mesh's highest point is a rock and
+  the seam looks like it violated its own lip rule.
+- **Trim boulders to the gap; do not reject them for being in one.** Rejecting on
+  proximity threw away five in six and left two rocks on a bare seam. It is also the
+  wrong shape of rule: a small stone against a crystal's foot is exactly what the
+  reference shows, a large one there is the violation. Let the gap set the size, and
+  state the guarantee over the size — every vertex outside the crystal's own radius.
+
+## Transparency: not needed
+
+**All four references are opaque.** No alpha, no `KHR_materials_transmission`, nothing.
+They read as crystal better than ours did while see-through, and what carries them is the
+facets — their rims, and how differently each catches light. Ours is now effectively
+closed, with only a trace left so the earned light can get out.
+
+While the shell was open the far facets showed through the near ones and the two sets of
+edges cancelled into a wireframe. If someone proposes re-opening it, that is the thing to
+look for first.
+
+## Growth variants worth having
+
+The iridescent set is a catalogue: single terminated point, **double-terminated** (points
+at both ends, grown suspended rather than from a wall), short stubby prism lying down,
+blocky tabular chunk, and a **fan cluster** — many small crystals of varying length
+radiating from one base. Each also carries a **vertical colour gradient**, one hue at the
+foot and another at the tip. We have the single point and the fan; the tabular and
+double-terminated habits, and the gradient, are still open.
