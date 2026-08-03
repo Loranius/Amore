@@ -1,6 +1,11 @@
 import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
 import { CRYSTAL_MATERIAL_QUALITY_PRESETS } from './config';
 import {
+  CRYSTAL_FACET_TINTING,
+  SUBSTRATE_FACET_TINTING,
+  facetTintingSignature,
+} from './facets';
+import {
   clamp01,
   crystalChannelColor,
   mixRgb,
@@ -75,7 +80,43 @@ function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string
     body.shader.inclusionDensity,
     body.shader.inclusionScale,
     body.shader.inclusionContrast,
+    body.shader.coreStrength,
+    rgbSignature(body.shader.coreColor),
+    facetTintingSignature(body.facets),
   ].map((value) => typeof value === 'number' ? value.toFixed(6) : String(value)).join('|');
+}
+
+/**
+ * The optical band an outer crystal shell lives in.
+ *
+ * Every value below used to be derived from the couple's pressures across a
+ * wide range, and the wide range was the problem: at 0.3 roughness with 0.42
+ * clearcoat a facet reads as matte plastic, and at 0.32 emissive the body glows
+ * evenly from within, which flattens every plane at once — the shell lit its
+ * own facets to the same brightness and erased the relief the geometry had just
+ * been given.
+ *
+ * So the pressures still choose *where in the band* a crystal sits, and the
+ * band decides that it is a crystal at all. Quality tiers move a body inside
+ * the band too; they can no longer push it out of one.
+ */
+const SHELL_ROUGHNESS = { min: 0.1, max: 0.16 } as const;
+const SHELL_CLEARCOAT = { min: 0.75, max: 0.95 } as const;
+const SHELL_CLEARCOAT_ROUGHNESS = { min: 0.03, max: 0.07 } as const;
+const SHELL_IOR = { min: 1.52, max: 1.58 } as const;
+/**
+ * Glow belongs to the inner core, not to the shell. What is left here is the
+ * faint self-light of a mineral catching ambient, not a lamp inside it.
+ */
+const SHELL_EMISSIVE = { min: 0.02, max: 0.06 } as const;
+
+function intoBand(band: { readonly min: number; readonly max: number }, value: number): number {
+  return round6(Math.max(band.min, Math.min(band.max, value)));
+}
+
+/** Position within a band, 0 at min and 1 at max. */
+function acrossBand(band: { readonly min: number; readonly max: number }, t: number): number {
+  return band.min + (band.max - band.min) * clamp01(t);
 }
 
 function bodyColor(
@@ -107,6 +148,7 @@ function shaderRecipe(
   const state = input.species.state;
   const reflectionEnabled = input.config.allowProceduralReflection && preset.reflectionScale > 0;
   const micro = role === 'micro';
+  const focal = role === 'focal';
   // Showing up regularly clears the stone (ADR-0004). A couple who adds
   // something most months gets a crystal with fewer flaws in it than one who
   // dumped an album in a single weekend and went quiet — a different question
@@ -136,6 +178,17 @@ function shaderRecipe(
     inclusionDensity: round6(micro ? 0 : inclusionBase * preset.inclusionScale),
     inclusionScale: round6(3.4 + pressures.density * 4.6 + pressures.surfaceComplexity * 2.2),
     inclusionContrast: round6((0.18 + state.fracture * 0.34) * preset.inclusionScale),
+    // A crystal is lit from within, but not evenly: the requested "inner
+    // crystal at 70% size" cannot be a second mesh here, because the shell is
+    // opaque by contract (the canvas is alpha-composited over a CSS sky, so a
+    // transmissive shell would show black where it overlaps the sky rather
+    // than the sky itself). Depth-weighted core light is the same effect
+    // without transparency — and it costs no draw call and no triangle.
+    coreStrength: round6(micro
+      ? 0
+      : (0.1 + pressures.luminosity * 0.16 + state.luminosity * 0.08)
+        * (emphasized ? 1.35 : focal ? 1 : 0.72)),
+    coreColor: emissiveColor,
   };
 }
 
@@ -173,10 +226,19 @@ function buildBodyMaterial(
       };
   const emissiveColor = emphasized ? rgb(1, 0.66, 0.22) : materialPalette.core;
 
-  const rawRoughness = (0.3 - pressures.refinement * 0.2 + state.fracture * 0.08)
-    * (micro ? 1.55 : focal ? 0.62 : 0.92);
-  const roughness = round6(Math.max(preset.roughnessFloor, Math.min(0.62, rawRoughness)));
-  const clearcoat = round6(clamp01((0.58 + pressures.refinement * 0.38) * preset.clearcoatScale * (micro ? 0.46 : 1)));
+  // Refined couples polish toward the smooth end of the band; fracture and the
+  // smallest bodies push back toward the rough end.
+  const roughnessT = 1 - clamp01(
+    pressures.refinement * 0.86 - state.fracture * 0.3 - (micro ? 0.3 : focal ? -0.12 : 0),
+  );
+  const roughness = intoBand(
+    SHELL_ROUGHNESS,
+    Math.max(preset.roughnessFloor, acrossBand(SHELL_ROUGHNESS, roughnessT)),
+  );
+  const clearcoat = intoBand(
+    SHELL_CLEARCOAT,
+    acrossBand(SHELL_CLEARCOAT, pressures.refinement) * preset.clearcoatScale,
+  );
   const iridescenceAllowed = input.config.allowIridescence && !micro;
   // A year in which both partners gave as much as they received comes out
   // nearly white — the balance shows as rainbow on the facets instead, which
@@ -189,10 +251,11 @@ function buildBodyMaterial(
         0.08 + pressures.refinement * 0.42 + pressures.brilliance * 0.12 + earnedIridescence * 0.5,
       )
     : 0);
-  const emissiveIntensity = round6(clamp01(
-    (emphasized ? 0.32 : focal ? 0.1 : 0.025)
-      + pressures.luminosity * (emphasized ? 0.34 : 0.2)
-      + state.luminosity * 0.08,
+  const emissiveIntensity = intoBand(SHELL_EMISSIVE, acrossBand(
+    SHELL_EMISSIVE,
+    (emphasized ? 0.55 : focal ? 0.28 : 0.1)
+      + pressures.luminosity * 0.3
+      + state.luminosity * 0.15,
   ));
   const shader = shaderRecipe(input, role, emphasized, emissiveColor);
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
@@ -201,10 +264,15 @@ function buildBodyMaterial(
     baseColor,
     emissiveColor,
     roughness,
-    metalness: emphasized ? 0.08 : 0,
+    // Never metallic. A trace of metalness darkened the diffuse term and made
+    // the emphasized body read as painted rather than as mineral.
+    metalness: 0,
     clearcoat,
-    clearcoatRoughness: round6(focal ? 0.025 : micro ? 0.18 : 0.06),
-    ior: round6(1.5 + state.purity * 0.12),
+    clearcoatRoughness: intoBand(
+      SHELL_CLEARCOAT_ROUGHNESS,
+      acrossBand(SHELL_CLEARCOAT_ROUGHNESS, micro ? 0.8 : focal ? 0.1 : 0.45),
+    ),
+    ior: intoBand(SHELL_IOR, acrossBand(SHELL_IOR, state.purity)),
     reflectivity: round6(clamp01(0.52 + state.purity * 0.34 + (focal ? 0.08 : 0))),
     emissiveIntensity,
     envMapIntensity: 0,
@@ -217,16 +285,18 @@ function buildBodyMaterial(
     transparent: false,
     depthWrite: true,
     shader,
+    facets: CRYSTAL_FACET_TINTING,
   };
   const material: CrystalBodyMaterial = {
     ...bodyWithoutSignature,
     signature: materialSignature(bodyWithoutSignature),
   };
-  const clamped = roughness !== round6(rawRoughness)
-    || clearcoat === 0
-    || clearcoat === 1
-    || emissiveIntensity === 0
-    || emissiveIntensity === 1;
+  // "Clamped" now means the band caught this body, which is a diagnostic about
+  // the pressures rather than about the renderer.
+  const clamped = roughness === SHELL_ROUGHNESS.min
+    || roughness === SHELL_ROUGHNESS.max
+    || clearcoat === SHELL_CLEARCOAT.min
+    || clearcoat === SHELL_CLEARCOAT.max;
   return { material, clamped };
 }
 
@@ -287,7 +357,11 @@ function buildSubstrateMaterial(
       inclusionContrast: round6(
         0.28 * CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality].inclusionScale,
       ),
+      // Rock is not lit from within.
+      coreStrength: 0,
+      coreColor: baseColor,
     },
+    facets: SUBSTRATE_FACET_TINTING,
   };
   return {
     ...bodyWithoutSignature,

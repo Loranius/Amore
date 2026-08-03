@@ -47,13 +47,26 @@ describe('Tree Ground Contact Lab', () => {
     const contact = buildTreeLabPreview('medium').groundContact;
 
     expect(contact.visibleRootFrames.curves.length).toBe(contact.roots.length);
+    let reachedGround = 0;
     for (const curve of contact.visibleRootFrames.curves) {
       expect(curve.samples.length).toBeGreaterThanOrEqual(2);
+      // The load-bearing half: nothing visible may hang below the plane.
       expect(curve.samples.every(
         (sample) => sample.position.y >= contact.ground.levelY - 0.000001,
       )).toBe(true);
-      expect(curve.samples.at(-1)?.position.y).toBeCloseTo(contact.ground.levelY, 6);
+      // The other half applies to roots that reach the plane at all. This used
+      // to be asserted of every root, and passed only because seededUnit was
+      // returning a near-linear ramp rather than noise (see growth/math.ts), so
+      // every root happened to be steep enough to cross. With real noise some
+      // roots flare outward and end above the plane — the ground plane sits a
+      // fixed burial depth below the collar and nothing makes a root reach it.
+      const last = curve.samples.at(-1)!.position.y;
+      if (Math.abs(last - contact.ground.levelY) < 1e-6) reachedGround += 1;
     }
+
+    // The clip path still has to be exercised, or this test would pass on a
+    // build where clipping silently stopped happening.
+    expect(reachedGround).toBeGreaterThan(0);
   });
 
   it('keeps ground and old root contact descriptors stable as the tree ages', () => {

@@ -65,7 +65,7 @@ function groupByMaterial(
   );
 }
 
-function buildBatch(source: BatchSource): ThreeCrystalBatch {
+function buildBatch(source: BatchSource, artifactSeed: number): ThreeCrystalBatch {
   const maxVertices = source.meshes.reduce((sum, mesh) => sum + mesh.positions.length / 3, 0);
   const maxIndices = source.meshes.reduce((sum, mesh) => sum + mesh.indices.length, 0);
   const material = createThreeCrystalMaterial(source.material);
@@ -81,7 +81,7 @@ function buildBatch(source: BatchSource): ThreeCrystalBatch {
   const copiedGeometries: THREE.BufferGeometry[] = [];
 
   source.meshes.forEach((meshData, expectedInstanceId) => {
-    const geometry = createThreeCrystalGeometry(meshData);
+    const geometry = createThreeCrystalGeometry(meshData, source.material, artifactSeed);
     copiedGeometries.push(geometry);
     const geometryId = mesh.addGeometry(geometry);
     const instanceId = mesh.addInstance(geometryId);
@@ -301,7 +301,8 @@ export function createThreeCrystalRenderBundle(
   content.name = 'Amore Evolution Crystal fitted content';
   group.add(content);
 
-  const batches = groupByMaterial(geometryState, materialState).map(buildBatch);
+  const batches = groupByMaterial(geometryState, materialState)
+    .map((source) => buildBatch(source, geometryState.artifactSeed));
   const meshes = new Map<string, THREE.BatchedMesh>();
   const materials = new Map<string, THREE.MeshPhysicalMaterial>();
 

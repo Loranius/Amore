@@ -85,10 +85,32 @@ describe('Crystal organic profile phase 3a', () => {
     expect(first.rows.some((row) => Math.abs(row.radiusX - row.radiusZ) > 1e-6)).toBe(true);
     expect(first.rows.some((row) => Math.abs(row.facetPhase) > 1e-6)).toBe(true);
 
+    // Semantic change (faceting pass, 2026-08-02): the top slice no longer
+    // *equals* the body-wide twist and lean. Those two are smooth curves that
+    // move the whole silhouette together, and a shape whose every slice agrees
+    // with its neighbours has no edges in it — the crystal read as a spun ball.
+    // Each slice now turns and drifts on its own, so the top carries the
+    // accumulated turn plus its own drift, and is only *anchored* by the
+    // body-wide values.
     const lastRow = first.rows[first.rows.length - 1]!;
-    expect(lastRow.rotation).toBe(first.twistTotal);
-    expect(lastRow.centerOffsetX).toBe(first.axisLeanX);
-    expect(lastRow.centerOffsetZ).toBe(first.axisLeanZ);
+    expect(Math.sign(lastRow.rotation)).toBe(Math.sign(first.twistTotal));
+    expect(Math.abs(lastRow.rotation)).toBeGreaterThan(Math.abs(first.twistTotal));
+    expect(lastRow.centerOffsetX).not.toBe(first.axisLeanX);
+    // The tip drifts off the axis, but by a fraction of its own radius — it
+    // must not swing so far that the crystal leans over.
+    const tipDrift = Math.hypot(
+      lastRow.centerOffsetX - first.axisLeanX,
+      lastRow.centerOffsetZ - first.axisLeanZ,
+    );
+    expect(tipDrift).toBeGreaterThan(0);
+    expect(tipDrift).toBeLessThan(body.renderedRadius * 0.2);
+
+    // Neighbouring slices must actually disagree — this is the property the
+    // whole pass exists for, and the one a future simplification would break.
+    for (let index = 1; index < first.rows.length; index += 1) {
+      const turn = Math.abs(first.rows[index]!.rotation - first.rows[index - 1]!.rotation);
+      expect(turn).toBeGreaterThan(0.02);
+    }
 
     for (const row of first.rows) {
       expect(row.radius).toBeGreaterThan(0);
@@ -214,7 +236,10 @@ describe('Crystal organic profile phase 3a', () => {
     // deliberately; it just no longer dominates the shape.
     expect(profile.scaleX).toBe(0.9);
     expect(profile.scaleZ).toBe(1.06);
-    expect(profile.rows).toHaveLength(8);
+    // Eight rows became ten in the faceting pass (2026-08-02): the shaft ran
+    // from 0.12 to 0.62 of its height without a single horizontal edge, and
+    // that unbroken stretch is what read as a ball.
+    expect(profile.rows).toHaveLength(10);
   });
 
   it('keeps the facet count off the level-of-detail knob', () => {
@@ -295,5 +320,144 @@ describe('Crystal organic profile phase 3a', () => {
     expect(pointInsideCrystalSolid(center, solid, 0)).toBe(true);
     expect(pointInsideCrystalSolid(inside, solid, 0)).toBe(true);
     expect(pointInsideCrystalSolid(outside, solid, 0)).toBe(false);
+  });
+});
+
+describe('crystal faceting — slices', () => {
+  it('turns every slice against the one below it, within one facet width', () => {
+    // The property the whole faceting pass rests on. A lathe whose rings share
+    // an orientation has one long vertical strip per facet running the entire
+    // height; nothing on that strip tells the eye where a face begins.
+    for (const facetCount of [6, 8, 13, 24]) {
+      const body = {
+        ...motherBody(),
+        attributes: { ...motherBody().attributes, facetCount },
+      };
+      const profile = buildCrystalProfile(body, 'high');
+      const facetWidth = (Math.PI * 2) / facetCount;
+      let signs = new Set<number>();
+
+      for (let index = 1; index < profile.rows.length; index += 1) {
+        const turn = profile.rows[index]!.rotation - profile.rows[index - 1]!.rotation;
+        expect(Math.abs(turn)).toBeGreaterThan(0.02);
+        // Never more than a fraction of a facet: a turn approaching one full
+        // facet would shear every quad into a sliver instead of a face.
+        expect(Math.abs(turn)).toBeLessThan(facetWidth * 0.6);
+        signs.add(Math.sign(turn));
+      }
+
+      // One direction the whole way up. A crystal that reverses its twist
+      // halfway reads as a mistake rather than as growth.
+      expect(signs.size).toBe(1);
+    }
+  });
+
+  it('never lets the turn cost more than the facets are worth', () => {
+    // A 24-facet monarch has facets 15° wide. Turning each slice by the same
+    // absolute angle as a 6-facet one would shear them into slivers, so the
+    // step has to shrink as facets narrow.
+    const turnFor = (facetCount: number): number => {
+      const profile = buildCrystalProfile(
+        { ...motherBody(), attributes: { ...motherBody().attributes, facetCount } },
+        'high',
+      );
+      return Math.abs(profile.rows[1]!.rotation - profile.rows[0]!.rotation);
+    };
+
+    expect(turnFor(24)).toBeLessThan(turnFor(6));
+  });
+
+  it('drifts each slice sideways and finishes the tip off the axis', () => {
+    const profile = buildCrystalProfile(motherBody(), 'high');
+    const offsets = profile.rows.map((row) => ({ x: row.centerOffsetX, z: row.centerOffsetZ }));
+
+    // No two consecutive slices sit on the same axis point.
+    for (let index = 1; index < offsets.length; index += 1) {
+      const moved = Math.hypot(
+        offsets[index]!.x - offsets[index - 1]!.x,
+        offsets[index]!.z - offsets[index - 1]!.z,
+      );
+      expect(moved).toBeGreaterThan(0);
+    }
+
+    // And the apex is not centred over the base.
+    const tip = offsets[offsets.length - 1]!;
+    expect(Math.hypot(tip.x, tip.z)).toBeGreaterThan(0);
+  });
+
+  it('varies each slice radius by 5-10% and stays a crystal, not a stack of coins', () => {
+    const profile = buildCrystalProfile(motherBody(), 'high');
+    for (const row of profile.rows) {
+      // radiusX/radiusZ carry scale, pulse and the per-slice swing together;
+      // what must hold is that neither collapses or blows up.
+      expect(row.radiusX).toBeGreaterThan(0);
+      expect(row.radiusZ).toBeGreaterThan(0);
+      expect(row.radiusX / row.radiusZ).toBeGreaterThan(0.5);
+      expect(row.radiusX / row.radiusZ).toBeLessThan(2);
+    }
+
+    // Consecutive slices differ, but the profile still tapers monotonically
+    // enough to read as one crystal: no slice is wider than the widest below
+    // it by more than the swing allows.
+    const widths = profile.rows.map((row) => Math.max(row.radiusX, row.radiusZ));
+    const widest = Math.max(...widths);
+    expect(widths[widths.length - 1]).toBeLessThan(widest * 0.3);
+  });
+
+  it('is still deterministic for the same body', () => {
+    expect(buildCrystalProfile(motherBody(), 'high'))
+      .toEqual(buildCrystalProfile(motherBody(), 'high'));
+    expect(buildCrystalMesh(motherBody(), 'high'))
+      .toEqual(buildCrystalMesh(motherBody(), 'high'));
+  });
+});
+
+describe('crystal faceting — triangulation', () => {
+  it('alternates the quad diagonal instead of splitting every quad alike', () => {
+    // Regression: every quad was split a→c, so every triangle in the body
+    // shared one pair of edge directions and the whole surface caught light at
+    // a single angle. Checked structurally rather than visually: the shell must
+    // contain both diagonals.
+    const mesh = buildCrystalMesh(motherBody(), 'high');
+    const segments = mesh.profile.segments;
+    const rowCount = mesh.profile.rows.length;
+    const shellStart = segments; // base cap first
+    const shellEnd = shellStart + (rowCount - 1) * segments * 2;
+
+    const diagonals = new Set<string>();
+    for (let triangle = shellStart; triangle < shellEnd; triangle += 2) {
+      const offset = triangle * 3;
+      // Second vertex of the first triangle of each quad identifies the split:
+      // a,b,c for one diagonal and a,b,d for the other.
+      const third = mesh.indices[offset + 2]!;
+      const rowIndex = Math.floor((triangle - shellStart) / (segments * 2));
+      const nextStart = (rowIndex + 1) * segments;
+      diagonals.add(third === nextStart + ((Math.floor((triangle - shellStart) / 2) % segments))
+        ? 'a-c'
+        : 'a-d');
+    }
+
+    expect(diagonals.size).toBe(2);
+  });
+
+  it('keeps every triangle wound outward after the split alternates', () => {
+    // Both splits are valid triangulations of the same quad, but only if they
+    // wind the same way. Signed volume is positive only when they do.
+    for (const body of [motherBody(), crystalBody()]) {
+      const mesh = buildCrystalMesh(body, 'high');
+      let volume = 0;
+      for (let offset = 0; offset < mesh.indices.length; offset += 3) {
+        const a = mesh.indices[offset]! * 3;
+        const b = mesh.indices[offset + 1]! * 3;
+        const c = mesh.indices[offset + 2]! * 3;
+        const p = mesh.positions;
+        volume += (
+          p[a]! * (p[b + 1]! * p[c + 2]! - p[b + 2]! * p[c + 1]!)
+          - p[a + 1]! * (p[b]! * p[c + 2]! - p[b + 2]! * p[c]!)
+          + p[a + 2]! * (p[b]! * p[c + 1]! - p[b + 1]! * p[c]!)
+        ) / 6;
+      }
+      expect(volume).toBeGreaterThan(0);
+    }
   });
 });

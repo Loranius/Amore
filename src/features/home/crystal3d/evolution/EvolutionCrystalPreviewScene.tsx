@@ -1,5 +1,6 @@
 import { useCallback, useState, type KeyboardEvent } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { crystalRenderScale } from '@/engine/renderer';
 import { crystalSceneRadius } from '@/engine/renderer/three';
 import { useTheme } from '@/providers/ThemeProvider';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
@@ -97,7 +98,10 @@ export default function EvolutionCrystalPreviewScene() {
         data-portal-environment-triangles={PORTAL_ENVIRONMENT_TRIANGLES}
       >
         <Canvas
-          dpr={metrics.quality === 'high' ? [1, 2] : metrics.quality === 'balanced' ? [1, 1.75] : [1, 1.35]}
+          // Render scale, not optics, is how a dense screen is paid for — see
+          // crystalRenderScale. Kept in the engine so the tier and the scale
+          // cannot drift apart.
+          dpr={[1, crystalRenderScale(metrics.quality, typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
           // Стартова позиція — приблизно кадр для вертикального телефона.
           // Точну дає PortalCameraRig із фактичного аспекту вже на першому
           // кадрі; тут вона потрібна лише щоб цей кадр не почався здалеку.

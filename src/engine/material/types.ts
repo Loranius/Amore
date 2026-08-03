@@ -28,6 +28,25 @@ export interface CrystalShaderRecipe {
   inclusionDensity: number;
   inclusionScale: number;
   inclusionContrast: number;
+  /**
+   * Light from inside the stone.
+   *
+   * The shell's own emission lifts every plane by the same amount, which
+   * flattens exactly the relief the facets are for, so the glow moved here:
+   * strongest on faces turned toward the viewer, where the most crystal lies
+   * behind them, and absent at the silhouette. Every face has its own normal,
+   * so unlike emission this varies face to face — it deepens the relief
+   * instead of erasing it.
+   */
+  coreStrength: number;
+  coreColor: CrystalRgb;
+}
+
+export interface CrystalFacetTinting {
+  /** Multipliers over the body's base colour, in palette order. */
+  tints: readonly CrystalRgb[];
+  /** Selection thresholds, same length and ascending; the last is 1. */
+  cumulativeWeights: readonly number[];
 }
 
 export interface CrystalBodyMaterial {
@@ -54,6 +73,8 @@ export interface CrystalBodyMaterial {
   transparent: false;
   depthWrite: true;
   shader: CrystalShaderRecipe;
+  /** Per-face tone over baseColor — see `facets.ts`. */
+  facets: CrystalFacetTinting;
 }
 
 export interface CrystalMaterialPalette {

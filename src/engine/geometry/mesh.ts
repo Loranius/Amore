@@ -122,6 +122,57 @@ export function rebuildCrystalMeshNormals(mesh: CrystalMeshData): CrystalMeshDat
   return { ...mesh, normals: computeNormals(mesh.positions, mesh.indices) };
 }
 
+/**
+ * Splits a shell so every triangle owns its three vertices and carries its own
+ * face normal.
+ *
+ * `flatShading: true` on the Three material produced the same picture, and that
+ * was the problem: the *published* geometry still described a smooth surface,
+ * so what the couple's crystal looked like depended on a renderer flag rather
+ * than on the artifact. Anything else consuming the state — a second renderer,
+ * a snapshot, an export — would have got the smooth version.
+ *
+ * Costs roughly three times the vertices. The whole druse is around 1,500
+ * before the split against a budget of 18,000, so this buys correctness at a
+ * price the budget does not notice.
+ *
+ * Run after trimming, not before: trimming drops triangles from the index list,
+ * and splitting first would leave the removed triangles' vertices stranded in
+ * the buffer, inflating the reported vertex count with geometry nothing draws.
+ */
+export function splitCrystalMeshFaces(mesh: CrystalMeshData): CrystalMeshData {
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+
+  for (let offset = 0; offset < mesh.indices.length; offset += 3) {
+    const corners = [
+      vertexAt(mesh.positions, mesh.indices[offset] ?? 0),
+      vertexAt(mesh.positions, mesh.indices[offset + 1] ?? 0),
+      vertexAt(mesh.positions, mesh.indices[offset + 2] ?? 0),
+    ] as const;
+    const face = normalize(cross(
+      subtract(corners[1], corners[0]),
+      subtract(corners[2], corners[0]),
+    ));
+    for (const corner of corners) {
+      indices.push(pushVertex(positions, corner));
+      normals.push(round6(face.x), round6(face.y), round6(face.z));
+    }
+  }
+
+  return {
+    ...mesh,
+    positions,
+    normals,
+    indices,
+    // Bounds are unchanged in principle — the same points, listed more times —
+    // but recomputing keeps the published state self-consistent rather than
+    // asking a reader to trust that.
+    bounds: computeBounds(positions),
+  };
+}
+
 /** Pure indexed mesh builder; no THREE, canvas, renderer or material imports. */
 export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): CrystalMeshData {
   const profile = buildCrystalProfile(body, lod);
@@ -184,7 +235,23 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
       const b = currentStart + next;
       const c = nextStart + segment;
       const d = nextStart + next;
-      indices.push(a, b, c, b, d, c);
+      // Alternating the diagonal is what turns a lathe into something faceted.
+      // Splitting every quad the same way gave every triangle in the body the
+      // same pair of edge directions, so the whole surface caught the light at
+      // one angle and the crystal read as a smooth spun shape. A checkerboard
+      // makes neighbouring triangles lean opposite ways, and once each face
+      // carries its own normal (see the flat-shading pass below) that is what
+      // the eye reads as facets.
+      //
+      // An odd segment count would put two same-parity quads next to each other
+      // at the seam. That is a mild defect in the pattern, not in the mesh —
+      // both splits are valid triangulations of the same quad and wind the same
+      // way, so the shell stays closed and consistently oriented either way.
+      if ((row + segment) % 2 === 0) {
+        indices.push(a, b, c, b, d, c);
+      } else {
+        indices.push(a, b, d, a, d, c);
+      }
     }
   }
 
