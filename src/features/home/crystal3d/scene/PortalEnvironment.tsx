@@ -15,7 +15,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'rea
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { buildPortalPlatformGeometry } from './portalPlatformMesh';
-import { portalPlatformTexture } from './platformTexture';
+import { portalPlatformTexture, portalTileTextures } from './platformTexture';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import {
   PORTAL_FIELD_DROP,
@@ -103,7 +103,10 @@ export function PortalEnvironment({
   const veinReachLocal = veinReach / Math.max(1e-6, daisScale);
   const archGeometry = useMemo(() => buildPortalArchGeometry(), []);
   const platformTexture = useMemo(() => portalPlatformTexture(), []);
-  const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(seed), [seed]);
+  const tiles = useMemo(() => portalTileTextures(), []);
+  const tileTexture = tiles?.albedo ?? null;
+  const tileNormal = tiles?.normal ?? null;
+  const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(), []);
   const inlayGeometry = useMemo(
     () => buildPortalInlayGeometry(seed, veinBearings, veinReachLocal),
     [seed, veinBearings, veinReachLocal],
@@ -195,7 +198,8 @@ export function PortalEnvironment({
       const arch = arches[index]!;
       position.set(arch.position[0], arch.position[1], arch.position[2]);
       scale.set(arch.scale[0], arch.scale[1], arch.scale[2]);
-      mesh.setMatrixAt(index, matrix.compose(position, new THREE.Quaternion(), scale));
+      const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, arch.rotationY, 0));
+      mesh.setMatrixAt(index, matrix.compose(position, spin, scale));
     }
     mesh.count = arches.length;
     mesh.instanceMatrix.needsUpdate = true;
@@ -225,11 +229,11 @@ export function PortalEnvironment({
         position={[0, PORTAL_GROUND_Y - PORTAL_FIELD_DROP + 0.02, 0]}
       >
         <meshStandardMaterial
+          map={tileTexture}
+          normalMap={tileNormal}
           color={palette.slab}
-          vertexColors
           roughness={0.96}
           metalness={0}
-          flatShading
         />
       </mesh>
 

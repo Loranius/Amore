@@ -7,7 +7,8 @@ import {
   PORTAL_ENVIRONMENT_TRIANGLES,
   PORTAL_FIELD_DROP,
   PORTAL_GROUND_Y,
-  PORTAL_PILLARS,
+  PORTAL_COLONNADE_COUNT,
+  PORTAL_COLONNADE_RADIUS,
   buildPortalDaisGeometry,
   buildPortalInlayGeometry,
   buildPortalRitualSlabGeometry,
@@ -146,120 +147,62 @@ describe('portal camera frame', () => {
 });
 
 describe('portal pillars', () => {
-  it('stays at the frame edge on every aspect instead of drifting inward', () => {
-    // Це і є причина рахувати x із кадру: прибиті координати, підібрані на
-    // телефоні, на ноутбуці опинились би впритул до кристала.
+  it('stands as a ring around the podium rather than two rows at the frame edge', () => {
+    // The rows were a layout keyed on the *screen*: the pillars slid with
+    // aspect to hold its edges, and on a wide monitor they slid so far apart
+    // that no hall was left between them — two posts either side. A ring has
+    // its own shape and the frame merely crops it, which is how the reference
+    // hall is built and the whole reason this was rewritten.
     for (const aspect of ASPECTS) {
-      // Разом із найширшою друзою: колони мусять відійти разом із камерою,
-      // інакше найстарша пара отримала б колону впритул до кристала.
       const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
-      const instances = portalPillarInstances(frame, aspect);
-      expect(instances).toHaveLength(PORTAL_PILLARS.length * 2);
-
-      for (let index = 0; index < instances.length; index += 1) {
-        const instance = instances[index]!;
-        const placement = PORTAL_PILLARS[Math.floor(index / 2)]!;
-        const depth = frame.distance - placement.z;
-        const halfWidth = portalHalfWidthAt(depth, aspect);
-        // edgeFraction places the pillar's inner *face*, not its axis — the
-        // difference is negligible far away and decides the whole frame up
-        // close, where the radius is comparable to the frame half-width.
-        const inner = (Math.abs(instance.position[0]) - placement.radius) / halfWidth;
-
-        expect(inner).toBeCloseTo(placement.edgeFraction, 6);
-        // Whether a pillar clears the artifact is a screen-space question and
-        // lives in its own test. Comparing world-space |x| against the
-        // artifact's radius, as this line used to, compares two distances at
-        // different depths — it only ever agreed with the truth because every
-        // pillar sat behind the crystal.
+      const pillars = portalPillarInstances(frame, aspect);
+      expect(pillars.length).toBeGreaterThan(4);
+      for (const pillar of pillars) {
+        const radius = Math.hypot(pillar.position[0], pillar.position[2]);
+        expect(radius).toBeCloseTo(PORTAL_COLONNADE_RADIUS, 6);
+        expect(pillar.position[1]).toBeCloseTo(PORTAL_GROUND_Y - PORTAL_FIELD_DROP, 6);
       }
     }
   });
 
-  it('mirrors each pair across the axis and stands it on the field', () => {
-    const frame = portalCameraFrame(0.46);
-    const instances = portalPillarInstances(frame, 0.46);
-    for (let index = 0; index < instances.length; index += 2) {
-      const left = instances[index]!;
-      const right = instances[index + 1]!;
-      expect(left.position[0]).toBeCloseTo(-right.position[0], 9);
-      expect(left.position[2]).toBe(right.position[2]);
-      expect(left.position[1]).toBeCloseTo(PORTAL_GROUND_Y - PORTAL_FIELD_DROP, 9);
+  it('does not move with the aspect at all', () => {
+    // The point of the ring: the colonnade is a thing in the world, not a
+    // decoration fitted to the window. Two very different windows must see the
+    // same hall from the same place.
+    const narrow = portalCameraFrame(0.45, WIDEST_CRYSTAL_RADIUS);
+    const wide = portalCameraFrame(1.6, WIDEST_CRYSTAL_RADIUS);
+
+    expect(portalPillarInstances(narrow, 0.45)).toEqual(portalPillarInstances(wide, 1.6));
+  });
+
+  it('leaves the arcade open toward the viewer', () => {
+    // A closed ring puts a column straight in front of the crystal, and there
+    // is exactly one thing here meant to hold attention — the same reason the
+    // old near pair was removed. The gap faces the camera, so the viewer stands
+    // in the opening of the arcade rather than behind a post.
+    const frame = portalCameraFrame(0.45, WIDEST_CRYSTAL_RADIUS);
+    for (const pillar of portalPillarInstances(frame, 0.45)) {
+      // The camera sits on +Z looking toward -Z, so "in front of the artifact"
+      // is an azimuth near zero.
+      const azimuth = Math.abs(Math.atan2(pillar.position[0], pillar.position[2]));
+      expect(azimuth).toBeGreaterThan(0.2);
     }
   });
 
   it('never lets a pillar stand in front of the druse', () => {
-    // Was `z < -daisTopRadius` for every pillar, which held only while the
-    // whole colonnade stood behind the artifact. A sanctuary has a near side
-    // too, so the real rule is stated instead: a pillar may occlude nothing
-    // either because it is behind the artifact, or because it projects clear
-    // of it on screen.
-    //
-    // Screen fraction of a pillar is exactly its edgeFraction, by construction
-    // — that is what edgeFraction means. The artifact's screen fraction is its
-    // radius over the frame half-width, and the camera guarantees a margin
-    // (FRAME_MARGIN), so anything at or beyond 1.0 is clear of it at every
-    // aspect and every age.
+    // Kept from the row layout, because the property is the same one however
+    // the colonnade is arranged: a pillar whose screen projection overlaps the
+    // artifact stops framing it and starts hiding it.
     for (const aspect of ASPECTS) {
       const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
-      const artifactFraction = WIDEST_CRYSTAL_RADIUS / portalHalfWidthAt(frame.distance, aspect);
-
-      for (const placement of PORTAL_PILLARS) {
-        const behind = placement.z < -PORTAL_DAIS_TOP_RADIUS;
-        const clearOnScreen = placement.edgeFraction > artifactFraction;
-        expect(behind || clearOnScreen, `z=${placement.z}`).toBe(true);
+      for (const pillar of portalPillarInstances(frame, aspect)) {
+        if (pillar.position[2] <= 0) continue;
+        const depth = frame.distance - pillar.position[2];
+        if (depth <= 0.1) continue;
+        const inner = Math.abs(pillar.position[0]) - pillar.scale[0];
+        const artifactHalfWidth = WIDEST_CRYSTAL_RADIUS * (depth / frame.distance);
+        expect(inner).toBeGreaterThan(artifactHalfWidth);
       }
-    }
-  });
-
-  it('keeps the whole colonnade behind the artifact', () => {
-    // A pair used to stand in front of the crystal, on the reasoning that a
-    // sanctuary is a room and something has to be nearer than the artifact or
-    // the viewer is outside looking in. Honest reasoning, and reversed on
-    // review: a column in the foreground competes with the crystal for
-    // attention, and there is exactly one thing here meant to hold it.
-    //
-    // Depth now comes from the colonnade *receding* instead — three pairs, each
-    // further, taller and nearer the axis than the last.
-    expect(PORTAL_PILLARS.every((placement) => placement.z < 0)).toBe(true);
-    const byDepth = [...PORTAL_PILLARS].sort((left, right) => right.z - left.z);
-    for (let index = 1; index < byDepth.length; index += 1) {
-      const nearer = byDepth[index - 1]!;
-      const further = byDepth[index]!;
-      // Taller and wider with distance, or perspective alone would read the row
-      // as a descending step rather than as equal columns going back.
-      expect(further.height).toBeGreaterThan(nearer.height);
-      expect(further.radius).toBeGreaterThan(nearer.radius);
-      expect(further.edgeFraction).toBeLessThan(nearer.edgeFraction);
-    }
-  });
-
-  it('measures depth from the camera rather than from the axis', () => {
-    // `frame.distance + Math.abs(z)` matches the correct formula exactly for
-    // pillars behind the artifact, which is why it survived. For one in front
-    // it returns a larger depth instead of a smaller one, and the pillar drifts
-    // toward the centre of the frame — straight across the crystal.
-    // Stated over a synthetic placement in front, because no live one is there
-    // any more — the colonnade moved fully behind the artifact. That is exactly
-    // why the check has to stay: the two formulas *agree* for everything behind,
-    // so a live placement can no longer tell them apart, and the bug would come
-    // back silently the day a pair returns to the near side.
-    const frame = portalCameraFrame(0.46, 1);
-    const placement = { z: 2.6, edgeFraction: 0.94, height: 5.2, radius: 0.42 };
-    const at = (depth: number): number =>
-      portalHalfWidthAt(depth, 0.46) * placement.edgeFraction + placement.radius;
-    const correct = at(frame.distance - placement.z);
-    const mirrored = at(frame.distance + placement.z);
-
-    expect(correct).toBeLessThan(mirrored);
-
-    // And every live pillar sits where the same formula puts it.
-    const instances = portalPillarInstances(frame, 0.46);
-    for (let index = 0; index < PORTAL_PILLARS.length; index += 1) {
-      const live = PORTAL_PILLARS[index]!;
-      const expected = portalHalfWidthAt(frame.distance - live.z, 0.46) * live.edgeFraction
-        + live.radius;
-      expect(Math.abs(instances[index * 2]!.position[0])).toBeCloseTo(expected, 6);
     }
   });
 });
@@ -541,19 +484,27 @@ describe('portal geometry', () => {
       for (let index = 0; index < lamps.length; index += 1) {
         const lamp = lamps[index]!;
         const pillar = pillars[index]!;
-        // Вогонь стоїть на своїй колоні, під капітеллю, і винесений усередину —
-        // до кристала, а не назовні від нього.
-        expect(lamp.position[2]).toBe(pillar.position[2]);
+        // Вогонь стоїть на своїй колоні, під капітеллю, і винесений **усередину
+        // кільця** — до кристала, а не назовні від нього. «Вліво/вправо» мало
+        // сенс, поки колони стояли двома рядами; на кільці внутрішнє — це до
+        // осі, тобто на меншому радіусі.
         expect(lamp.position[1]).toBeGreaterThan(pillar.position[1]);
         expect(lamp.position[1]).toBeLessThan(pillar.position[1] + pillar.scale[1]);
-        expect(Math.abs(lamp.position[0])).toBeLessThan(Math.abs(pillar.position[0]));
+        expect(Math.hypot(lamp.position[0], lamp.position[2]))
+          .toBeLessThan(Math.hypot(pillar.position[0], pillar.position[2]));
       }
 
-      // Запалена пара — найближча до глядача: саме з того боку на кристал і
-      // дивляться. Задній підсвіт у сцені вже є від directionalLight.
-      const litZ = lamps.filter((lamp) => lamp.lit).map((lamp) => lamp.position[2]);
-      expect(new Set(litZ).size).toBe(1);
-      expect(litZ[0]).toBe(Math.max(...lamps.map((lamp) => lamp.position[2])));
+      // Запалені — ті, що стоять по краях розриву аркади, тобто найближчі до
+      // глядача: саме з того боку на кристал і дивляться. Задній підсвіт у
+      // сцені вже є від directionalLight.
+      const lit = lamps.filter((lamp) => lamp.lit);
+      const azimuthOf = (lamp: typeof lit[number]): number =>
+        Math.abs(Math.atan2(lamp.position[0], lamp.position[2]));
+      const widestLit = Math.max(...lit.map(azimuthOf));
+      for (const lamp of lamps) {
+        if (lamp.lit) continue;
+        expect(azimuthOf(lamp)).toBeGreaterThan(widestLit - 1e-9);
+      }
     }
   });
 
@@ -613,39 +564,40 @@ describe('portal arches', () => {
    * небо у високі прорізи, що ведуть око вниз до подіуму. Реалізація власна —
    * ассет не завантажується й позначений автором як AI-restricted.
    */
-  it('spans only the pairs standing behind the artifact', () => {
-    // Арка над передньою парою пройшла б через кадр рівно там, де стоїть
-    // кристал: колонада стала б ґратами перед ним.
+  it('spans between neighbouring columns of the ring', () => {
+    // This is what the row layout could not give. There the columns stood in
+    // pairs at the frame edges, so an arch between a pair reached across the
+    // whole width of the picture — a lintel over the scene rather than a bay of
+    // an arcade. On a ring the neighbours sit on a chord, and an arch over a
+    // chord is a bay.
     for (const aspect of ASPECTS) {
       const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
       const arches = portalArchInstances(frame, aspect);
+      const pillars = portalPillarInstances(frame, aspect);
       expect(arches.length).toBeGreaterThan(0);
+      // Never more bays than there are gaps between standing columns.
+      expect(arches.length).toBeLessThan(pillars.length);
+
+      const step = (Math.PI * 2) / PORTAL_COLONNADE_COUNT;
+      const spacing = 2 * PORTAL_COLONNADE_RADIUS * Math.sin(step * 0.5);
       for (const arch of arches) {
-        expect(arch.position[2]).toBeLessThan(0);
-        // Симетрична відносно осі кадру, інакше зала перекошена.
-        expect(arch.position[0]).toBe(0);
-        expect(arch.scale[0]).toBeGreaterThan(0);
+        // Half a chord, so a bay never spans more than one gap.
+        expect(arch.scale[0] * 2).toBeLessThan(spacing * 1.45);
+        // Standing on the ring, not drifting inside or outside it.
+        const radius = Math.hypot(arch.position[0], arch.position[2]);
+        expect(radius).toBeLessThan(PORTAL_COLONNADE_RADIUS + 1e-6);
+        expect(radius).toBeGreaterThan(PORTAL_COLONNADE_RADIUS * 0.9);
       }
     }
   });
 
-  it('keeps the apex inside the frame on every aspect', () => {
-    // Виміряно, а не вгадано, і одного разу вже було не так: п'ята стояла під
-    // капітеллю, тобто вище за верхній край кадру, і арки не було видно
-    // взагалі. Колони навмисно вищі за кадр — зала не має стелі, — тож
-    // «під капітеллю» тут не означає «на екрані».
-    for (const aspect of ASPECTS) {
-      const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
-      for (const arch of portalArchInstances(frame, aspect)) {
-        const depth = frame.distance - arch.position[2];
-        const halfHeight = portalHalfWidthAt(depth, aspect) / aspect;
-        const visibleTop = frame.target[1] + halfHeight;
-        const apex = arch.position[1] + arch.scale[1];
-
-        expect(apex).toBeLessThan(visibleTop);
-        // І вище за верхівку кристала, інакше проліт ляже на нього.
-        expect(arch.position[1]).toBeGreaterThan(0);
-      }
+  it('never bridges the opening the viewer looks through', () => {
+    // The gap faces the camera and nothing spans it: an arch there would be the
+    // one thing standing between the viewer and the crystal.
+    const frame = portalCameraFrame(0.45, WIDEST_CRYSTAL_RADIUS);
+    for (const arch of portalArchInstances(frame, 0.45)) {
+      const azimuth = Math.abs(Math.atan2(arch.position[0], arch.position[2]));
+      expect(azimuth).toBeGreaterThan(0.2);
     }
   });
 });
