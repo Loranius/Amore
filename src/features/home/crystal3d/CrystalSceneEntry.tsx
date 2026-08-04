@@ -1,4 +1,4 @@
-import { lazy, Suspense, useLayoutEffect, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import type { HomeArtifact } from '../homeArtifact';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
 import LegacyCrystalScene from './CrystalScene';
@@ -7,6 +7,10 @@ import { isEvolutionRendererPreviewEnabled } from './evolution/featureFlag';
 import { isTreeLabPreviewEnabled } from './treeLab/featureFlag';
 
 const TreeLabPreviewScene = lazy(() => import('./treeLab/TreeLabPreviewScene'));
+// Дерево в порталі — те, що бачить пара. Лабораторія лишається за прапорцем:
+// у ній видно бюджети, приймальний статус і джерело даних, і викидати цей
+// інструмент разом із рамкою було б втратою.
+const EvolutionTreePreviewScene = lazy(() => import('./evolution/EvolutionTreePreviewScene'));
 
 type RenderableHomeArtifact = Exclude<HomeArtifact, 'reef'>;
 
@@ -14,31 +18,9 @@ interface CrystalSceneEntryProps {
   artifact?: RenderableHomeArtifact;
 }
 
-function TreePortalPreviewScene() {
-  const [ready, setReady] = useState(false);
-
-  useLayoutEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      params.set('treeSource', 'portal');
-      params.set('treeLod', 'medium');
-      const search = params.toString();
-      window.history.replaceState(
-        window.history.state,
-        '',
-        `${window.location.pathname}${search ? `?${search}` : ''}${window.location.hash}`,
-      );
-    }
-    setReady(true);
-  }, []);
-
-  if (!ready) return <CrystalPlaceholder />;
-  return (
-    <Suspense fallback={<CrystalPlaceholder />}>
-      <TreeLabPreviewScene />
-    </Suspense>
-  );
-}
+// Тут стояв TreePortalPreviewScene — обгортка, яка дописувала в адресний
+// рядок `treeSource=portal&treeLod=medium` і показувала ту саму лабораторію.
+// Дерево більше не живе в рамці, тож підміняти параметри нема заради чого.
 
 /**
  * With an explicit Home selection this entry shows the newest accepted Crystal
@@ -51,13 +33,13 @@ export default function CrystalSceneEntry({ artifact }: CrystalSceneEntryProps) 
   );
 
   if (artifact === 'tree') {
-    return isTreeLabPreviewEnabled(search)
-      ? (
-          <Suspense fallback={<CrystalPlaceholder />}>
-            <TreeLabPreviewScene />
-          </Suspense>
-        )
-      : <TreePortalPreviewScene />;
+    return (
+      <Suspense fallback={<CrystalPlaceholder />}>
+        {isTreeLabPreviewEnabled(search)
+          ? <TreeLabPreviewScene />
+          : <EvolutionTreePreviewScene />}
+      </Suspense>
+    );
   }
 
   if (artifact === 'crystal') return <EvolutionCrystalPreviewScene />;

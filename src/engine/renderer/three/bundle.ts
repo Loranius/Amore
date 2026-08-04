@@ -128,14 +128,25 @@ function buildBatch(source: BatchSource, artifactSeed: number): ThreeCrystalBatc
 const REFERENCE_HEIGHT = 1.4;
 const REFERENCE_WIDTH = 2;
 
-const TARGET_HEIGHT = 3.25;
 /**
- * Deliberately wider than the height target. The frame's real horizontal
+ * The box every species is fitted into, in scene units.
+ *
+ * Exported because the crystal is no longer the only artifact standing in the
+ * portal. A tree fitted into a box of its own would be a different size on
+ * screen than a crystal of the same age, and the portal would read as two
+ * scenes rather than one — so the tree's fit reads these same two numbers
+ * (`treeFit.ts`).
+ *
+ * The width is deliberately larger than the height. The frame's real horizontal
  * limit is the camera, which backs off for a wide artifact; making this the
  * binding constraint too clamped a twenty-year druse so hard that it rendered
  * *shorter* than a ten-year one — growth running backwards.
  */
-const TARGET_WIDTH = 5;
+export const ARTIFACT_FIT_HEIGHT = 3.25;
+export const ARTIFACT_FIT_WIDTH = 5;
+
+const TARGET_HEIGHT = ARTIFACT_FIT_HEIGHT;
+const TARGET_WIDTH = ARTIFACT_FIT_WIDTH;
 
 /**
  * Scene-space height of the plane the artifact stands on — engine y=0 after the

@@ -162,13 +162,13 @@
    коробці 3:4 — там для сцени просто не було місця, а її краї різали
    колони рівно там, де вони мали йти за кадр.
 
-   Прив'язано до вибраного артефакта: дерево й риф лишаються об'єктами в
-   потоці сторінки, доки їхні сцени не перенесені так само. */
+   Прив'язано до вибраного артефакта: риф лишається об'єктом у потоці
+   сторінки, доки його сцена не перенесена так само. */
 .home-artifact-preview {
   width: 100%;
 }
 
-.home[data-home-artifact='crystal'] #home-artifact-preview {
+.home:is([data-home-artifact='crystal'], [data-home-artifact='tree']) #home-artifact-preview {
   /* Полотно мусить збігатися з небом і віньєткою до пікселя, тож
      відраховується від того самого viewport'а. */
   position: fixed;
@@ -178,7 +178,7 @@
   margin: 0;
 }
 
-.home[data-home-artifact='crystal'] .evolution-preview-wrap {
+.home:is([data-home-artifact='crystal'], [data-home-artifact='tree']) .evolution-preview-wrap {
   position: absolute;
   inset: 0;
   width: auto;
@@ -188,8 +188,8 @@
 
 /* Заглушка та повідомлення про відсутній WebGL займають той самий кадр,
    але тримають свій вміст по центру екрана, а не притиснутим до верху. */
-.home[data-home-artifact='crystal'] #home-artifact-preview > .crystal-wrap--loading,
-.home[data-home-artifact='crystal'] #home-artifact-preview > .home-artifact-preview-fallback {
+.home:is([data-home-artifact='crystal'], [data-home-artifact='tree']) #home-artifact-preview > .crystal-wrap--loading,
+.home:is([data-home-artifact='crystal'], [data-home-artifact='tree']) #home-artifact-preview > .home-artifact-preview-fallback {
   position: absolute;
   inset: 0;
   display: grid;
@@ -199,9 +199,12 @@
   margin: 0;
 }
 
-/* Дерево й риф ще живуть у потоці сторінки — рамка сцени для них
-   лишається такою, якою була до переносу кристала в 3D. */
-.home:not([data-home-artifact='crystal']) .crystal-wrap {
+/* Риф ще живе в потоці сторінки — рамка сцени для нього лишається такою,
+   якою була до переносу кристала в 3D. Дерево з неї вийшло разом із
+   кристалом: у коробці 3:4 колонада різалась краєм рамки, і зала за
+   деревом читалась як картинка, вставлена в сторінку, а не як місце, де
+   дерево стоїть. */
+.home:not([data-home-artifact='crystal']):not([data-home-artifact='tree']) .crystal-wrap {
   width: min(100vw, 460px);
   aspect-ratio: 3 / 4;
   margin-top: 4px;

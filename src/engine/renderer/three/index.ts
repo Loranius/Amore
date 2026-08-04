@@ -25,6 +25,10 @@ export {
   createThreeCrystalRenderBundle,
   crystalSceneRadius,
   crystalSubstrateSceneRadius,
+  ARTIFACT_FIT_HEIGHT,
+  ARTIFACT_FIT_WIDTH,
   CRYSTAL_GROUND_BASELINE,
 } from './bundle';
 export type { ThreeCrystalRenderBundle } from './bundle';
+export { fitThreeTree, measureThreeTreeReach } from './treeFit';
+export type { ThreeTreeFit, ThreeTreeFitContent, ThreeTreeReach } from './treeFit';
