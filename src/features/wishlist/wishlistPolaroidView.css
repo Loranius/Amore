@@ -18,8 +18,8 @@
   border-radius: 5px;
   background: #fffdfb;
   box-shadow:
-    0 17px 31px rgba(72, 45, 58, 0.16),
-    0 4px 9px rgba(72, 45, 58, 0.08),
+    0 17px 31px rgba(61, 45, 72, 0.16),
+    0 4px 9px rgba(61, 45, 72, 0.08),
     inset 0 0 0 1px rgba(255, 255, 255, 0.8);
   isolation: isolate;
   transform:
@@ -40,11 +40,11 @@
   border-radius: 3px;
   background: linear-gradient(
     100deg,
-    rgba(249, 216, 226, 0.72),
+    rgba(235, 216, 249, 0.72),
     rgba(255, 241, 220, 0.78),
     rgba(236, 218, 244, 0.72)
   );
-  box-shadow: 0 3px 7px rgba(70, 42, 54, 0.09);
+  box-shadow: 0 3px 7px rgba(58, 42, 70, 0.09);
   content: '';
   opacity: 0.92;
   pointer-events: none;
@@ -55,8 +55,8 @@
 .wl-polaroid-card:focus-within {
   z-index: 9;
   box-shadow:
-    0 23px 42px rgba(72, 45, 58, 0.22),
-    0 7px 15px rgba(72, 45, 58, 0.1);
+    0 23px 42px rgba(61, 45, 72, 0.22),
+    0 7px 15px rgba(61, 45, 72, 0.1);
   transform:
     translate(var(--wl-polaroid-x, 0), calc(var(--wl-polaroid-y, 0) - 4px))
     rotate(var(--wl-polaroid-rotate, -4deg))
@@ -73,8 +73,8 @@
   border: 0;
   border-radius: 2px;
   outline: 0;
-  background: #f5f1f2;
-  color: #40343a;
+  background: #f3f1f5;
+  color: #3b3440;
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -98,7 +98,7 @@
   aspect-ratio: 1 / 1.05;
   overflow: hidden;
   place-items: center;
-  background: #f5f1f2;
+  background: #f3f1f5;
 }
 
 .wl-polaroid-card__media .wl-product-visual {
@@ -145,7 +145,7 @@
 .wl-polaroid-card__media .wl-product-visual[data-image-mode='portrait-cutout'] > img {
   padding: 7%;
   object-fit: contain;
-  filter: drop-shadow(0 10px 9px rgba(48, 27, 38, 0.18));
+  filter: drop-shadow(0 10px 9px rgba(39, 27, 48, 0.18));
   transform: none;
 }
 
@@ -154,7 +154,7 @@
   width: 100%;
   height: 100%;
   place-items: center;
-  color: #b76183;
+  color: #9361b7;
   font-size: 34px;
 }
 
@@ -171,7 +171,7 @@
 .wl-polaroid-card__title {
   display: -webkit-box;
   overflow: hidden;
-  color: #40343a;
+  color: #3b3440;
   font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: clamp(14px, 4.1vw, 18px);
   font-weight: 700;
@@ -187,7 +187,7 @@
   align-items: center;
   gap: 5px;
   overflow: hidden;
-  color: #b76183;
+  color: #9361b7;
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.035em;
@@ -198,7 +198,7 @@
 
 [data-theme='dark'] .wl-polaroid-card {
   border-color: rgba(255, 255, 255, 0.2);
-  background: #e9e3e5;
+  background: #e6e3e9;
   box-shadow:
     0 20px 38px rgba(0, 0, 0, 0.32),
     0 5px 11px rgba(0, 0, 0, 0.2);

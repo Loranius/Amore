@@ -239,8 +239,8 @@
 }
 
 .sched .sched-cell--both-off {
-  background: linear-gradient(145deg, #df5b8e, #be356d);
-  box-shadow: 0 7px 16px rgba(190, 53, 109, 0.23);
+  background: linear-gradient(145deg, #a85bdf, #8535be);
+  box-shadow: 0 7px 16px rgba(133, 53, 190, 0.23);
 }
 
 .sched .sched-cell--both-off .sched-cell-symbol {
@@ -450,7 +450,7 @@
   align-items: flex-end;
   justify-content: center;
   padding: 14px;
-  background: rgba(28, 16, 23, 0.48);
+  background: rgba(23, 16, 28, 0.48);
   backdrop-filter: blur(4px);
   animation: sched-overlay-in 0.18s ease both;
 }

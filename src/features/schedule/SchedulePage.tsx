@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUsers } from '@/features/_shared/useUsers';
 import { currentYearMonth, daysInMonth, monthKeyOf, todayLocal, ymd } from '@/features/_shared/month';
 import { useCurrentUser } from '@/providers/AuthProvider';
+import { PortalDecor } from '@/features/auth/PortalDecor';
 import { useSchedule } from './useSchedule';
 import { useScheduleReminder } from './useScheduleReminder';
 import { useSharedDaysOff } from './useSharedDaysOff';
@@ -190,7 +191,11 @@ export function SchedulePage() {
   const nextSharedDate = sharedDates[0];
 
   return (
-    <section className="sched">
+    // Фон і декор раніше приходили від обгортки хабу «Календар». Графік
+    // більше під ним не живе — це власний розділ, тож він несе їх сам,
+    // як і решта розділів порталу.
+    <section className="sched pink-page">
+      <PortalDecor density="light" parallax={false} />
       <header className="sched-hero">
         <div><span className="sched-kicker">Календар пари</span><h1 className="sched-title">Графік</h1><p className="sched-subtitle">Побачте, коли ви обоє вільні, та заплануйте час разом.</p></div>
       </header>

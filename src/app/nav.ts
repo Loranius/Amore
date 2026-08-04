@@ -14,7 +14,7 @@
 import type { ReactNode } from 'react';
 import type { IconProps } from '@/components/icons/iconBase';
 import {
-  CalendarHeartIcon, CameraIcon, CartIcon, ClockIcon,
+  CameraIcon, CartIcon, ClockIcon,
   FilmIcon, GamepadIcon, HeartIcon, MoreIcon, PiggyBankIcon, PlansIcon,
   PotIcon, SettingsIcon, TicketIcon,
 } from '@/components/icons/NavIcon';
@@ -76,6 +76,10 @@ export const MORE_GROUPS: NavGroup[] = [
     items: [
       { to: '/memories', Icon: CameraIcon, label: 'Спогади' },
       { to: '/calendar', Icon: CalendarIcon, label: 'Календар' },
+      // Був сабтабом усередині «Календаря», тобто щоб дійти до графіка,
+      // треба було спершу знати, що він там. Тепер це власний розділ
+      // поруч із календарем — на один крок ближче й видно зі списку.
+      { to: '/schedule', Icon: ClockIcon, label: 'Графік' },
       { to: '/media', Icon: FilmIcon, label: 'Вотчліст' },
     ],
   },
@@ -101,13 +105,3 @@ export const MORE_ITEMS: NavItem[] = MORE_GROUPS.flatMap((g) => g.items);
 
 /** Шляхи, які мають підсвічувати кнопку «Ще» в нижній навігації. */
 export const MORE_PREFIXES: string[] = MORE_ITEMS.map((i) => i.to);
-
-
-/** Сабтаби хабу «Календар» (/calendar). */
-export const CALENDAR_TABS: NavItem[] = [
-  // Календар із серцем, а не звичайний: звичайний уже позначає сам
-  // розділ, і на десктопі обидва видно одночасно — пункт сайдбара й
-  // сабтаб під ним.
-  { to: '/calendar', Icon: CalendarHeartIcon, label: 'Події', end: true },
-  { to: '/calendar/schedule', Icon: ClockIcon, label: 'Графік' },
-];

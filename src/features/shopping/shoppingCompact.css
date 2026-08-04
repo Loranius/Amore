@@ -90,8 +90,8 @@
 }
 
 .shopping-check--on {
-  border-color: color-mix(in srgb, var(--accent) 86%, #b85b83);
-  background: color-mix(in srgb, var(--accent) 86%, #b85b83);
+  border-color: color-mix(in srgb, var(--accent) 86%, #915bb8);
+  background: color-mix(in srgb, var(--accent) 86%, #915bb8);
 }
 
 .shopping-check:disabled,

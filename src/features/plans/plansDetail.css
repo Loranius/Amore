@@ -198,7 +198,7 @@
   border: 0;
   border-radius: 15px;
   color: white;
-  background: color-mix(in srgb, var(--plan-detail-accent) 86%, #4c3340);
+  background: color-mix(in srgb, var(--plan-detail-accent) 86%, #42334c);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--plan-detail-accent) 24%, transparent);
   font: inherit;
   font-size: 13.5px;
@@ -466,7 +466,7 @@
   z-index: 1450;
   align-items: flex-end;
   padding: max(12px, env(safe-area-inset-top)) 0 0;
-  background: color-mix(in srgb, #2c2028 42%, transparent);
+  background: color-mix(in srgb, #27202c 42%, transparent);
   backdrop-filter: blur(16px) saturate(.9);
   -webkit-backdrop-filter: blur(16px) saturate(.9);
 }
@@ -482,7 +482,7 @@
   border-bottom: 0;
   border-radius: 26px 26px 0 0;
   background: color-mix(in srgb, var(--surface) 96%, transparent);
-  box-shadow: 0 -24px 70px rgba(29, 18, 24, .22);
+  box-shadow: 0 -24px 70px rgba(24, 18, 29, .22);
 }
 
 .plan-detail-sheet-handle {

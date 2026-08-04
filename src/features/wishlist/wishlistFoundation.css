@@ -5,10 +5,10 @@
   --wl-card-gap: clamp(18px, 2vw, 24px);
   --wl-card-radius: 26px;
   --wl-media-ratio: 4 / 3;
-  --wl-personal-accent: #d98aa8;
+  --wl-personal-accent: #b88ad9;
   --wl-partner-accent: #d69a73;
   --wl-shared-accent: #ad83d5;
-  --wl-memory-accent: #c87998;
+  --wl-memory-accent: #a779c8;
   --wl-hero-gradient: linear-gradient(
     135deg,
     color-mix(in srgb, var(--accent) 15%, var(--surface)),

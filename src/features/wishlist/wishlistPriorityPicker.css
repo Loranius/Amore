@@ -67,7 +67,7 @@
   justify-content: center;
   inset: 0;
   padding: 16px;
-  background: rgba(40, 27, 35, 0.42);
+  background: rgba(35, 27, 40, 0.42);
   backdrop-filter: blur(5px);
   -webkit-backdrop-filter: blur(5px);
   animation: wl-priority-backdrop-in 180ms ease both;
@@ -81,7 +81,7 @@
   border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
   border-radius: 28px;
   background: color-mix(in srgb, var(--surface) 98%, transparent);
-  box-shadow: 0 28px 80px rgba(32, 19, 27, 0.3);
+  box-shadow: 0 28px 80px rgba(27, 19, 32, 0.3);
   animation: wl-priority-sheet-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
   overscroll-behavior: contain;
 }

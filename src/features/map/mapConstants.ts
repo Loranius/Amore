@@ -6,9 +6,9 @@ import type { PinCategory, MapPinRow } from '@/types';
 // Значки живуть у components/icons/MapIcon: маркер mapbox — вузол DOM,
 // тож той самий шлях потрібен і React-компоненту, і імперативному коду.
 export const CATEGORIES: Record<PinCategory, { label: string; color: string }> = {
-  visited: { label: 'Були', color: '#E8829C' },
-  restaurant: { label: 'Ресторан', color: '#FF6B9D' },
-  favorite: { label: 'Улюблене', color: '#F6B9CC' },
+  visited: { label: 'Були', color: '#bd82e8' },
+  restaurant: { label: 'Ресторан', color: '#C16BFF' },
+  favorite: { label: 'Улюблене', color: '#ddb9f6' },
 };
 
 export const CATEGORY_ORDER: PinCategory[] = ['visited', 'restaurant', 'favorite'];

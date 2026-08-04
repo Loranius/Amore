@@ -41,8 +41,7 @@ amore-react/
     │   │   ├── Layout.tsx        # обгортка: <Outlet/> + BottomNav + Sidebar (desktop)
     │   │   ├── BottomNav.tsx     # NavLink-и; активність секції — з location
     │   │   ├── Sidebar.tsx
-    │   │   ├── MoreMenu.tsx      # шторка «Ще»
-    │   │   └── HubTabs.tsx       # сабтаби хабів (Календар / Ми)
+    │   │   └── MoreMenu.tsx      # шторка «Ще»
     │   ├── guards/
     │   │   └── RequireAuth.tsx   # редірект на /login без сесії Supabase + профілю
     │   └── ui/                   # Modal, Skeleton, Lightbox, Confetti, EmptyState
@@ -78,8 +77,9 @@ amore-react/
 | `/plans/:id`         | plans/PlanDetailsPage   | —  (новий)       |
 | `/piggybank`         | piggybank/PiggyBankPage | budget           |
 | `/budget`            | → редирект на `/piggybank` | budget        |
-| `/calendar`          | calendar/CalendarPage   | calendar (хаб)   |
-| `/calendar/schedule` | schedule/SchedulePage   | schedule         |
+| `/calendar`          | calendar/CalendarPage   | calendar         |
+| `/schedule`          | schedule/SchedulePage   | schedule         |
+| `/calendar/schedule` | → редирект на `/schedule` | schedule       |
 | `/calendar/photos`   | photo-calendar/…Page    | photo-calendar   |
 | `/us` → `/us/question` | question/QuestionPage | question (хаб)   |
 | `/us/capsule`        | capsule/CapsulePage     | capsule          |

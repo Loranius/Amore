@@ -46,7 +46,7 @@
  * darkens a large part of light catalogue photography. */
 .wishlist .wl-card-v3-media-shade {
   height: 30%;
-  background: linear-gradient(to top, rgba(35, 20, 29, 0.3), transparent);
+  background: linear-gradient(to top, rgba(29, 20, 35, 0.3), transparent);
 }
 
 .wishlist .wl-card-v3-content {

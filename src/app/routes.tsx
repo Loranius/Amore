@@ -1,8 +1,10 @@
 // ============================================================
 // РОУТИ — дерево react-router-dom
 // ------------------------------------------------------------
-// Хаби (Календар, Ми) — вкладені роути з <Outlet/>, а не приховані
-// секції. Мапу URL ↔ старий view див. STRUCTURE.md.
+// Кожен розділ — власний роут; хабів із сабтабами більше немає.
+// «Календар» був останнім, і тримав під собою «Графік» — тобто розділ,
+// який неможливо було знайти, не знаючи, що він там. Мапу URL ↔ старий
+// view див. STRUCTURE.md.
 //
 // HashRouter (не Browser): хостинг — GitHub Pages, де глибокі URL і
 // F5 ламаються без 404-фолбеку та правильного base. Хеш усе це знімає
@@ -12,7 +14,6 @@
 // ============================================================
 import { createHashRouter, Navigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { CalendarHub } from '@/components/layout/HubLayout';
 import { RequireAuth, RedirectIfAuthed } from '@/components/guards/RequireAuth';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { ShoppingPage } from '@/features/shopping/ShoppingPage';
@@ -56,18 +57,14 @@ export const router = createHashRouter([
           { path: 'budget', element: <Navigate to="/piggybank" replace /> },
           { path: 'shopping', element: <ShoppingPage /> },
 
-          // Хаб «Календар»: /calendar (Події) · /schedule
-          {
-            path: 'calendar',
-            element: <CalendarHub />,
-            children: [
-              { index: true, element: <CalendarPage /> },
-              { path: 'schedule', element: <SchedulePage /> },
-              // «Фото» став окремим розділом /memories. Редирект лишається,
-              // щоб збережені посилання й закладки не ламались.
-              { path: 'photos', element: <Navigate to="/memories" replace /> },
-            ],
-          },
+          { path: 'calendar', element: <CalendarPage /> },
+          // «Графік» був сабтабом календаря й тому ховався за ним. Тепер це
+          // власний розділ у «Ще»; стара адреса лишається редиректом, щоб
+          // збережені посилання й закладки не ламались — так само, як
+          // «Фото», що став окремим розділом /memories.
+          { path: 'schedule', element: <SchedulePage /> },
+          { path: 'calendar/schedule', element: <Navigate to="/schedule" replace /> },
+          { path: 'calendar/photos', element: <Navigate to="/memories" replace /> },
 
           { path: 'memories', element: <MemoriesPage /> },
           { path: 'media', element: <MediaPage /> },

@@ -6,8 +6,8 @@
 // CSS (.confetti-piece + keyframes) — в index.css.
 // ============================================================
 const COLORS = [
-  '#FF6B9D', '#E8829C', '#C45B79', '#FFB3C8',
-  '#FFD700', '#FF85A1', '#FFC0CB', '#F9A8D4',
+  '#C16BFF', '#bd82e8', '#985bc4', '#DFB3FF',
+  '#FFD700', '#CC85FF', '#E5C0FF', '#d7a8f9',
   '#A8D8EA', '#FFE066',
 ];
 

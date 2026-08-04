@@ -114,8 +114,8 @@
   inset: 0;
   z-index: -2;
   background:
-    linear-gradient(180deg, rgba(31,18,27,.05) 22%, rgba(31,18,27,.34) 58%, rgba(31,18,27,.88) 100%),
-    linear-gradient(90deg, rgba(31,18,27,.2), transparent 62%);
+    linear-gradient(180deg, rgba(26, 18, 31,.05) 22%, rgba(26, 18, 31,.34) 58%, rgba(26, 18, 31,.88) 100%),
+    linear-gradient(90deg, rgba(26, 18, 31,.2), transparent 62%);
   pointer-events: none;
 }
 
@@ -131,7 +131,7 @@
   border: 1px solid rgba(255,255,255,.32);
   border-radius: 999px;
   color: #fff;
-  background: rgba(39,24,34,.46);
+  background: rgba(33, 24, 39,.46);
   font-size: 10.5px;
   font-weight: 800;
   line-height: 1;
@@ -187,7 +187,7 @@
   border: 1px solid rgba(255,255,255,.28);
   border-radius: 11px;
   color: #fff;
-  background: rgba(39,24,34,.48);
+  background: rgba(33, 24, 39,.48);
   cursor: pointer;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -197,7 +197,7 @@
 .plan-links .plan-link-unlink:hover,
 .plan-links .plan-link-unlink:focus-visible {
   outline: none;
-  background: color-mix(in srgb, var(--danger) 72%, rgba(39,24,34,.58));
+  background: color-mix(in srgb, var(--danger) 72%, rgba(33, 24, 39,.58));
   transform: scale(1.04);
 }
 
@@ -220,7 +220,7 @@
   border: 1px solid rgba(255,255,255,.34);
   border-radius: 11px;
   color: #fff;
-  background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 72%, rgba(39,24,34,.46));
+  background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 72%, rgba(33, 24, 39,.46));
   box-shadow: 0 8px 18px rgba(0,0,0,.14);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);

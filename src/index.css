@@ -28,15 +28,15 @@
      автозаповнення. Без цього в темній темі вони лишались світлими —
      чорний календарик на темному полі. */
   color-scheme: light;
-  --bg: #fff7f9;
+  --bg: #fcf7ff;
   --surface: #ffffff;
-  --text: #3a2530;
-  --muted: #8a6b76;
-  --accent: #d98aa8;
+  --text: #31253a;
+  --muted: #7d6b8a;
+  --accent: #b88ad9;
   --danger: #d9534f;
   --ok: #4c9a72;
   --warn: #d9a441;
-  --page-gradient: linear-gradient(160deg, #fff7f9 0%, #fff0f4 50%, #ffe9ef 100%);
+  --page-gradient: linear-gradient(160deg, #fcf7ff 0%, #f9f0ff 50%, #f6e9ff 100%);
 
   /* ── Кольори типів подій ──────────────────────────────────
      Дві ролі на тип, бо одна фарба не тягне обидві роботи:
@@ -72,12 +72,12 @@
 
 [data-theme='dark'] {
   color-scheme: dark;
-  --bg: #201720;
-  --surface: #34252c;
-  --text: #f5e6ea;
-  --muted: #b48a9a;
-  --accent: #e6a0bd;
-  --page-gradient: linear-gradient(160deg, #2a1e26 0%, #241a22 50%, #1c131a 100%);
+  --bg: #1c1720;
+  --surface: #2e2534;
+  --text: #efe6f5;
+  --muted: #a28ab4;
+  --accent: #c9a0e6;
+  --page-gradient: linear-gradient(160deg, #251e2a 0%, #201a24 50%, #18131c 100%);
 
   /* Мітки в темній темі — власні: глибока вина (#8E2C52) на темному
      тлі давала 1.8:1 і крапка просто зникала. */
@@ -174,7 +174,7 @@ textarea::placeholder {
   font-size: 14px;
   line-height: 1.35;
   color: #fff;
-  background: #3a2530;
+  background: #31253a;
   box-shadow: var(--shadow-lg);
   animation: toast-in 0.28s ease both;
 }
@@ -418,47 +418,6 @@ textarea::placeholder {
    жодних змін для дітей. */
 .pink-page > .portal-decor { z-index: -1; }
 
-/* ── Хаби (сабтаби) — сегментований контрол зі слайд-індикатором */
-.hub-tabs {
-  display: inline-flex;
-  max-width: 100%;
-  margin-bottom: 16px;
-  padding: 4px;
-  border-radius: 999px;
-  background: var(--surface);
-  overflow-x: auto;
-}
-.hub-tabs-track {
-  position: relative;
-  display: flex;
-  gap: 2px;
-}
-.hub-tab {
-  position: relative;
-  z-index: 1;
-  appearance: none;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  padding: 8px 14px;
-  border-radius: 999px;
-  white-space: nowrap;
-  cursor: pointer;
-  text-decoration: none;
-  transition: color 0.3s ease;
-}
-.hub-tab.active { color: #fff; }
-.hub-tab > svg { vertical-align: -2px; margin-right: 3px; }
-.hub-tabs-indicator {
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: var(--accent);
-  transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
-  z-index: 0;
-}
-
 /* ── Меню «Ще» (шторка) ─────────────────────────────────────── */
 .more-menu-overlay {
   position: fixed;
@@ -619,7 +578,7 @@ textarea::placeholder {
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-radius: 32px;
-  box-shadow: 0 24px 60px rgba(219, 112, 147, 0.28);
+  box-shadow: 0 24px 60px rgba(174, 112, 219, 0.28);
   padding: 40px 32px;
   display: flex;
   flex-direction: column;
@@ -655,18 +614,18 @@ textarea::placeholder {
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
-  background: linear-gradient(180deg, #ffffff, #fff0f5);
-  box-shadow: 0 8px 22px rgba(219, 112, 147, 0.18);
+  background: linear-gradient(180deg, #ffffff, #f9f0ff);
+  box-shadow: 0 8px 22px rgba(174, 112, 219, 0.18);
   transition: transform 0.15s ease, background 0.15s ease;
 }
-.user-btn:hover { background: linear-gradient(180deg, #fff5f8, #ffe3ec); transform: translateY(-2px); }
+.user-btn:hover { background: linear-gradient(180deg, #fbf5ff, #f3e3ff); transform: translateY(-2px); }
 .user-btn:active { transform: translateY(0); }
 
 .pin-dots { display: flex; gap: 10px; }
 .pin-dot {
   width: 13px; height: 13px;
   border-radius: 50%;
-  background: rgba(58, 37, 48, 0.14);
+  background: rgba(49, 37, 58, 0.14);
   transition: background 0.15s ease;
 }
 .pin-dot.filled { background: var(--accent); }
@@ -867,22 +826,22 @@ textarea::placeholder {
   position: absolute;
   bottom: 0; left: 0;
   width: 100%; height: 55%;
-  background: #f7cdd6;
+  background: #e5cdf7;
   border-radius: 6px 6px 16px 16px;
-  box-shadow: 0 3px 8px rgba(58, 37, 48, 0.1);
+  box-shadow: 0 3px 8px rgba(49, 37, 58, 0.1);
 }
 .portal-cake-top {
   position: absolute;
   bottom: 50%; left: 15%;
   width: 70%; height: 32%;
-  background: #fde3ea;
+  background: #f2e3fd;
   border-radius: 10px 10px 4px 4px;
 }
 .portal-cake-candle {
   position: absolute;
   top: 6%; left: 46%;
   width: 8%; height: 22%;
-  background: #e7b8cb;
+  background: #d3b8e7;
   border-radius: 2px;
 }
 .portal-cake-flame {
@@ -1831,7 +1790,7 @@ a.wl-card-title { color: var(--accent); }
    dima-off — два м'які пастельні тони під стиль Pink Portal,
    none — колір НЕ міняється (лишається base .sched-cell). */
 .heat-summary { text-align: center; font-size: 14px; color: var(--text); margin: 0 0 10px; }
-.sched-cell--both-off { background: #d1477a; }
+.sched-cell--both-off { background: #9747d1; }
 .sched-cell--both-off .sched-cell-num,
 .sched-cell--both-off .sched-cell-heart { color: #fff; }
 /* Пастельні плашки (лише лєна/діма вільні) лишаються світлими в обох
@@ -1842,7 +1801,7 @@ a.wl-card-title { color: var(--accent); }
 .sched-cell--lena-off .sched-cell-num,
 .sched-cell--dima-off .sched-cell-num,
 .sched-cell--lena-off .sched-cell-who,
-.sched-cell--dima-off .sched-cell-who { color: #3a2530; }
+.sched-cell--dima-off .sched-cell-who { color: #31253a; }
 .sched-cell-who {
   font-size: 9px;
   font-weight: 700;
@@ -1861,7 +1820,7 @@ a.wl-card-title { color: var(--accent); }
 }
 .heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .heat-swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
-.heat-swatch--both-off { background: #d1477a; }
+.heat-swatch--both-off { background: #9747d1; }
 .heat-swatch--lena-off { background: #f6c6a8; }
 .heat-swatch--dima-off { background: #b7c3ea; }
 
@@ -2261,7 +2220,7 @@ a.wl-card-title { color: var(--accent); }
   bottom: 6px;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(58, 37, 48, 0.72);
+  background: rgba(49, 37, 58, 0.72);
   color: #fff;
   font-size: 11px;
   line-height: 1.6;
@@ -2282,8 +2241,8 @@ a.wl-card-title { color: var(--accent); }
   border: 0;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.82);
-  color: #c15a86;
-  box-shadow: 0 2px 8px rgba(193, 90, 134, 0.22);
+  color: #965ac1;
+  box-shadow: 0 2px 8px rgba(150, 90, 193, 0.22);
   cursor: pointer;
   -webkit-backdrop-filter: blur(4px);
   backdrop-filter: blur(4px);
@@ -2327,7 +2286,7 @@ a.wl-card-title { color: var(--accent); }
   max-height: 320px;
   object-fit: cover;
   border-radius: 14px;
-  box-shadow: 0 8px 20px rgba(58, 37, 48, 0.15);
+  box-shadow: 0 8px 20px rgba(49, 37, 58, 0.15);
 }
 .memory-date { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 4px 0 0; }
 .memory-comment { font-size: 15px; font-style: italic; color: var(--text); margin: 0; }

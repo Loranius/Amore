@@ -88,7 +88,7 @@
   box-shadow:
     0 14px 34px color-mix(in srgb, var(--text) 16%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.48),
-    inset 0 -7px 18px rgba(84, 42, 62, 0.08);
+    inset 0 -7px 18px rgba(66, 42, 84, 0.08);
   cursor: pointer;
   isolation: isolate;
   transform:
@@ -243,7 +243,7 @@
   justify-content: center;
   overflow-y: auto;
   padding: max(12px, env(safe-area-inset-top)) 0 0;
-  background: color-mix(in srgb, #2c2028 42%, transparent);
+  background: color-mix(in srgb, #27202c 42%, transparent);
   backdrop-filter: blur(16px) saturate(0.9);
   -webkit-backdrop-filter: blur(16px) saturate(0.9);
   animation: wl-cloud-overlay-in 180ms ease both;
@@ -266,7 +266,7 @@
       color-mix(in srgb, var(--surface) 82%, transparent)
     );
   box-shadow:
-    0 -22px 68px rgba(41, 24, 34, 0.3),
+    0 -22px 68px rgba(34, 24, 41, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.62);
   backdrop-filter: blur(28px) saturate(1.08);
   -webkit-backdrop-filter: blur(28px) saturate(1.08);
@@ -275,8 +275,8 @@
 }
 
 .wl-cloud-sheet[data-priority='high'] { --wl-cloud-sheet-accent: var(--accent); }
-.wl-cloud-sheet[data-priority='medium'] { --wl-cloud-sheet-accent: #c77593; }
-.wl-cloud-sheet[data-priority='low'] { --wl-cloud-sheet-accent: #9a7183; }
+.wl-cloud-sheet[data-priority='medium'] { --wl-cloud-sheet-accent: #a575c7; }
+.wl-cloud-sheet[data-priority='low'] { --wl-cloud-sheet-accent: #89719a; }
 
 .wl-cloud-sheet-handle {
   width: 44px;
@@ -492,7 +492,7 @@
   background: linear-gradient(
     135deg,
     var(--wl-cloud-sheet-accent),
-    color-mix(in srgb, var(--wl-cloud-sheet-accent) 72%, #a94f72)
+    color-mix(in srgb, var(--wl-cloud-sheet-accent) 72%, #834fa9)
   );
   color: #fff;
   box-shadow: 0 12px 28px color-mix(in srgb, var(--wl-cloud-sheet-accent) 24%, transparent);

@@ -47,7 +47,7 @@
     0 31px 62px color-mix(in srgb, var(--accent) 30%, transparent),
     0 12px 25px color-mix(in srgb, var(--text) 20%, transparent),
     inset 13px 15px 27px rgba(255,255,255,.66),
-    inset -17px -21px 33px rgba(82,37,60,.23),
+    inset -17px -21px 33px rgba(63, 37, 82,.23),
     inset 0 0 0 2px rgba(255,255,255,.45),
     inset 0 0 32px color-mix(in srgb, var(--accent) 15%, transparent);
 }
@@ -76,7 +76,7 @@
   border-radius: inherit;
   background:
     radial-gradient(ellipse at 68% 91%, rgba(255,255,255,.68), transparent 22%),
-    radial-gradient(circle at 76% 68%, transparent 50%, rgba(80,34,57,.2) 74%, transparent 90%),
+    radial-gradient(circle at 76% 68%, transparent 50%, rgba(61, 34, 80,.2) 74%, transparent 90%),
     radial-gradient(circle, transparent 68%, rgba(255,255,255,.8) 89%, rgba(255,255,255,.2) 100%);
   content: '';
   pointer-events: none;

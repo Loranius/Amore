@@ -33,19 +33,19 @@ interface Squiggle {
 }
 
 const HEARTS: Heart[] = [
-  { x: 6, y: 12, size: 26, rot: -45, dur: 6, delay: 0, color: '#f2a6bb' },
-  { x: 89, y: 8, size: 20, rot: -38, dur: 7, delay: 1, color: '#f6b8c8' },
-  { x: 3, y: 60, size: 18, rot: -52, dur: 8, delay: 2, color: '#eb8fab' },
-  { x: 93, y: 56, size: 24, rot: -40, dur: 6.5, delay: 0.5, color: '#f2a6bb' },
-  { x: 9, y: 87, size: 22, rot: -48, dur: 7.5, delay: 1.5, color: '#eb8fab' },
-  { x: 85, y: 90, size: 16, rot: -36, dur: 6, delay: 2.5, color: '#f6b8c8' },
+  { x: 6, y: 12, size: 26, rot: -45, dur: 6, delay: 0, color: '#d2a6f2' },
+  { x: 89, y: 8, size: 20, rot: -38, dur: 7, delay: 1, color: '#dcb8f6' },
+  { x: 3, y: 60, size: 18, rot: -52, dur: 8, delay: 2, color: '#c58feb' },
+  { x: 93, y: 56, size: 24, rot: -40, dur: 6.5, delay: 0.5, color: '#d2a6f2' },
+  { x: 9, y: 87, size: 22, rot: -48, dur: 7.5, delay: 1.5, color: '#c58feb' },
+  { x: 85, y: 90, size: 16, rot: -36, dur: 6, delay: 2.5, color: '#dcb8f6' },
 ];
 
 const FLOWERS: Flower[] = [
-  { x: 16, y: 30, size: 34, rot: 0, dur: 9, delay: 0, petalColor: '#f7c9d8', centerColor: '#e8a2ba' },
-  { x: 82, y: 26, size: 30, rot: 20, dur: 10, delay: 1, petalColor: '#f3d9e6', centerColor: '#e8a2ba' },
-  { x: 13, y: 74, size: 28, rot: -15, dur: 8, delay: 2, petalColor: '#f7c9d8', centerColor: '#e8a2ba' },
-  { x: 85, y: 70, size: 32, rot: 10, dur: 9.5, delay: 0.8, petalColor: '#f3d9e6', centerColor: '#e8a2ba' },
+  { x: 16, y: 30, size: 34, rot: 0, dur: 9, delay: 0, petalColor: '#e4c9f7', centerColor: '#cba2e8' },
+  { x: 82, y: 26, size: 30, rot: 20, dur: 10, delay: 1, petalColor: '#e8d9f3', centerColor: '#cba2e8' },
+  { x: 13, y: 74, size: 28, rot: -15, dur: 8, delay: 2, petalColor: '#e4c9f7', centerColor: '#cba2e8' },
+  { x: 85, y: 70, size: 32, rot: 10, dur: 9.5, delay: 0.8, petalColor: '#e8d9f3', centerColor: '#cba2e8' },
 ];
 
 const CAKES: Cake[] = [
@@ -55,15 +55,15 @@ const CAKES: Cake[] = [
 ];
 
 const DIAMONDS: Diamond[] = [
-  { x: 50, y: 14, size: 14, rot: 45, dur: 7, delay: 0.4, color: '#e6879f' },
-  { x: 30, y: 92, size: 12, rot: 45, dur: 6.5, delay: 1.1, color: '#f2a6bb' },
-  { x: 96, y: 20, size: 10, rot: 45, dur: 7.5, delay: 1.8, color: '#eb8fab' },
+  { x: 50, y: 14, size: 14, rot: 45, dur: 7, delay: 0.4, color: '#be87e6' },
+  { x: 30, y: 92, size: 12, rot: 45, dur: 6.5, delay: 1.1, color: '#d2a6f2' },
+  { x: 96, y: 20, size: 10, rot: 45, dur: 7.5, delay: 1.8, color: '#c58feb' },
 ];
 
 const SQUIGGLES: Squiggle[] = [
-  { x: 22, y: 6, size: 6, dur: 5, delay: 0, color: '#f0b6c8', dots: [0, -6, 0, 6, 0] },
-  { x: 74, y: 94, size: 6, dur: 6, delay: 1, color: '#eec0d3', dots: [0, -6, 0, 6, 0] },
-  { x: 2, y: 26, size: 5, dur: 5.5, delay: 0.4, color: '#f0b6c8', dots: [0, -5, 0, 5, 0] },
+  { x: 22, y: 6, size: 6, dur: 5, delay: 0, color: '#d8b6f0', dots: [0, -6, 0, 6, 0] },
+  { x: 74, y: 94, size: 6, dur: 6, delay: 1, color: '#dbc0ee', dots: [0, -6, 0, 6, 0] },
+  { x: 2, y: 26, size: 5, dur: 5.5, delay: 0.4, color: '#d8b6f0', dots: [0, -5, 0, 5, 0] },
 ];
 
 const PETAL_ANGLES = [0, 72, 144, 216, 288];
@@ -220,7 +220,7 @@ export function PortalDecor({ density = 'lively', parallax = true }: PortalDecor
   );
 }
 
-const CONFETTI_COLORS = ['#f2a6bb', '#f6b8c8', '#eb8fab', '#fbd6e4'];
+const CONFETTI_COLORS = ['#d2a6f2', '#dcb8f6', '#c58feb', '#ecd6fb'];
 const CONFETTI = Array.from({ length: 10 }, (_, i) => ({
   x: (i * 97) % 100,
   size: 8 + (i % 3) * 3,

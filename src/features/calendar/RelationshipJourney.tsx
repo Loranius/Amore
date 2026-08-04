@@ -15,8 +15,8 @@ import './relationshipJourneyImportance.css';
 const ROW_HEIGHT = 142;
 const HISTORY_BATCH = 8;
 const FUTURE_BATCH = 6;
-const REGULAR_ACCENT = '#c77a98';
-const IMPORTANT_ACCENT = '#bd5f84';
+const REGULAR_ACCENT = '#a77ac7';
+const IMPORTANT_ACCENT = '#965fbd';
 
 interface JourneyPath {
   height: number;
