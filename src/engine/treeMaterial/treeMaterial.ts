@@ -93,7 +93,19 @@ function materialRecipe(
 ): TreeMaterialRecipe {
   const id = `tree:material:${role}`;
   const resolvedRoughness = round6(clamp01(roughness));
-  const flatShading = role === 'bark';
+  // Nothing on this tree is flat-shaded any more, bark least of all.
+  //
+  // Bark used to be, and that single boolean was the whole of the "square,
+  // sharp-angled trunk" the owner reported: the sweep publishes a smooth
+  // normal per vertex, flat shading threw them away, and every quad of the
+  // tube became its own hard-edged facet — a brick wall wrapped round a
+  // cylinder. The reasonable-looking fix (more radial segments) would only
+  // have made the bricks smaller.
+  //
+  // Smooth shading alone gives a rubber pipe, which is why the wood is now in
+  // the geometry instead (`labs/organic/barkRelief.ts`): a lobed, swelling
+  // cross-section that these normals follow.
+  const flatShading = false;
   const side = role === 'foliage' ? 'double' : 'front';
   const signature = [
     rulesVersion,

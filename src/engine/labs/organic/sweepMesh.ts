@@ -12,12 +12,14 @@ import {
   subtract,
 } from '../../growth/math';
 import type { GrowthVec3 } from '../../growth/types';
+import { barkRelief, barkReliefPhase } from './barkRelief';
 import { DEFAULT_ORGANIC_SURFACE_CONFIG } from './surfaceConfig';
 import type {
   OrganicBranchCurve,
   OrganicCurveFrameSample,
   OrganicCurveFrameState,
   OrganicJunctionAnchor,
+  BarkReliefConfig,
   OrganicMeshLod,
   OrganicSurfaceConfig,
   OrganicSweepMesh,
@@ -232,6 +234,15 @@ function pushVec(target: number[], vector: GrowthVec3): void {
   target.push(round6(vector.x), round6(vector.y), round6(vector.z));
 }
 
+/** What a ring needs to know about the wood it is part of. */
+interface BarkReliefContext {
+  config: BarkReliefConfig;
+  /** Per-branch phase, so two branches are not the same log. */
+  phase: number;
+  /** Arc length from the branch's first sample, in engine units. */
+  axial: number;
+}
+
 function addRing(
   positions: number[],
   normals: number[],
@@ -241,16 +252,32 @@ function addRing(
   ringCount: number,
   radialSegments: number,
   parentJunctions: readonly ParentJunctionInfluence[],
+  bark: BarkReliefContext,
 ): void {
   for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
     const angle = radialIndex / radialSegments * Math.PI * 2;
+    const cosine = Math.cos(angle);
+    const sine = Math.sin(angle);
     const radialNormal = normalize(add(
-      scale(sample.normal, Math.cos(angle)),
-      scale(sample.binormal, Math.sin(angle)),
+      scale(sample.normal, cosine),
+      scale(sample.binormal, sine),
     ));
-    const resolvedRadius = sample.radius + junctionBulge(sample, radialNormal, parentJunctions);
-    pushVec(positions, add(sample.position, scale(radialNormal, resolvedRadius)));
-    pushVec(normals, radialNormal);
+    const bulged = sample.radius + junctionBulge(sample, radialNormal, parentJunctions);
+    const relief = barkRelief(angle, bark.axial, bulged, bark.phase, bark.config);
+    pushVec(positions, add(sample.position, scale(radialNormal, bulged * relief.radiusScale)));
+    // Tilt the normal onto the lobed surface. For a cross-section r(θ) the
+    // in-plane normal is r·u − r′·t, which is the radial direction leaned
+    // towards the tangential one by (∂r/∂θ)/r. Publishing the plain radial
+    // normal instead would light the trunk as a perfect cylinder and the
+    // relief would survive only on the silhouette.
+    const tangential = normalize(add(
+      scale(sample.normal, -sine),
+      scale(sample.binormal, cosine),
+    ));
+    pushVec(normals, normalize(subtract(
+      radialNormal,
+      scale(tangential, relief.angularSlope),
+    )));
     uvs.push(
       ringCount <= 1 ? 0 : round6(ringIndex / (ringCount - 1)),
       round6(radialIndex / radialSegments),
@@ -372,7 +399,13 @@ export function buildOrganicSweepMesh(
     const firstIndex = indices.length;
     const parentJunctions = junctionsByParent.get(curve.branchId) ?? [];
 
+    // Arc length, not the sample index: swellings measured in ring counts
+    // would crowd together on a short twig and stretch out on the trunk.
+    const phase = barkReliefPhase(curve.branchId);
+    let axial = 0;
     samples.forEach((sample, index) => {
+      const previous = samples[index - 1];
+      if (previous) axial += distance(previous.position, sample.position);
       addRing(
         positions,
         normals,
@@ -382,6 +415,7 @@ export function buildOrganicSweepMesh(
         samples.length,
         radialSegments,
         parentJunctions,
+        { config: config.bark, phase, axial },
       );
     });
     addTubeIndices(indices, firstVertex, samples.length, radialSegments);

@@ -3,6 +3,22 @@ import type { OrganicSkeletonState } from './types';
 
 export type OrganicMeshLod = 'high' | 'medium' | 'low';
 
+/** Shape of the wood itself — see `barkRelief.ts` for why it is geometry. */
+export interface BarkReliefConfig {
+  /** Primary lobes around the circumference. Bounded by the ring's vertices. */
+  lobeCount: number;
+  /** Finer overtone, so the cross-section is not a regular polygon. */
+  overtoneCount: number;
+  /** Swellings along the branch, in radians per engine unit of arc length. */
+  swellFrequency: number;
+  /** How far the lobes spiral, in radians per engine unit of arc length. */
+  twist: number;
+  /** Relief amplitude as a fraction of the local radius. */
+  depth: number;
+  /** Radius at which relief reaches full strength; thinner stays smooth. */
+  fadeRadius: number;
+}
+
 export interface OrganicSurfaceConfig {
   curveSamplesPerSegment: number;
   minimumRadius: number;
@@ -12,6 +28,7 @@ export interface OrganicSurfaceConfig {
   junctionSegmentsByLod: Readonly<Record<OrganicMeshLod, number>>;
   radialSegmentsByLod: Readonly<Record<OrganicMeshLod, number>>;
   axialStrideByLod: Readonly<Record<OrganicMeshLod, number>>;
+  bark: BarkReliefConfig;
 }
 
 export interface OrganicCurveFrameSample {
