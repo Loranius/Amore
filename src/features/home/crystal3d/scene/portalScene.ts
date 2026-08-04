@@ -15,6 +15,13 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import { mulberry32 } from '../../mulberry32';
 import { buildPortalPlatformGeometry } from './portalPlatformMesh';
+// Колона й арка приходять моделлю: різьблення капітелі й профіль архівольта
+// правилами не пишуться. Процедурні лишились нижче — вони визначають пропорції,
+// проти яких розкладка й досі перевіряється.
+import {
+  buildPortalArchGeometry as buildModelledArch,
+  buildPortalPillarGeometry as buildModelledPillar,
+} from './portalColonnadeMesh';
 
 /** Площина, на якій стоїть артефакт; уся сцена відраховується від неї. */
 export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
@@ -25,11 +32,10 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * тіл), тож він мусить знати внесок сцени — інакше довелось би просто
  * послабити межу й перевірка втратила б сенс.
  *
- * Поле + підлога храму + подіум + кам'яна платформа + руни + інкрустація +
- * колони (один InstancedMesh на всі три пари) + вогні на колонах (так само
- * один) + арки (так само один) + зорі.
+ * Поле + підлога храму + подіум + колони (один InstancedMesh на все кільце) +
+ * вогні на них (так само один) + арки (так само один) + зорі.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 10;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
 
 /**
  * Скільки трикутників додає оточення. Той самий привід, що й у draw
@@ -40,7 +46,7 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 10;
  * будувати геометрію двічі. За тим, щоб воно не розійшлось із реальними
  * буферами, стежить portalScene.test.ts.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 4193;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 8773;
 
 /** Сегментів у диску поля; єдине місце, що задає його вартість. */
 const FIELD_SEGMENTS = 64;
@@ -61,9 +67,9 @@ export function measurePortalEnvironmentTriangles(
   // те, що справді малюється.
   const dais = buildPortalPlatformGeometry();
   const inlay = buildPortalInlayGeometry(seed, bearings, veinReach);
-  const pillar = buildPortalPillarGeometry();
+  const pillar = buildModelledPillar();
   const lamp = buildPortalLampGeometry();
-  const arch = buildPortalArchGeometry();
+  const arch = buildModelledArch();
   const floor = buildPortalTempleFloorGeometry();
   const slab = buildPortalRitualSlabGeometry(seed, bearings, veinReach);
   const runes = buildPortalRuneGeometry(seed, bearings, veinReach);
@@ -80,9 +86,9 @@ export function measurePortalEnvironmentTriangles(
 
   const total = FIELD_SEGMENTS
     + triangles(dais)
-    + triangles(inlay)
-    + triangles(slab)
-    + triangles(runes)
+    // Плита, руни й інкрустація більше не малюються: друза стоїть на
+    // модельованому камені, і плита лише накривала його. Будівники лишились —
+    // через них досі визначений вигин каменю над жилою.
     // Колонада — кільце з розривом, тож рахується стільки колон, скільки
     // справді стоїть, і стільки арок, скільки між ними прольотів.
     + triangles(pillar) * standingPillars
@@ -222,12 +228,16 @@ export const PORTAL_DAIS_TOP_RADIUS = 1.3;
 /**
  * Наскільки подіум має бути ширшим за камінь друзи.
  *
- * Було 1.16 — рівно стільки, щоб золота інкрустація лишалась видимою. Тепер
- * ширше, бо між каменем і обводом має вміститись ритуальна плита, яку кристал
- * пробив, коли ріс: при 1.16 на неї лишалось 14% радіуса, тобто смужка, у якій
- * не видно ні тріщин, ні уламків.
+ * Міряється від каменю друзи, а камінь — не найширше, що є в артефакта:
+ * кристали ростуть із нього під кутом і виносяться далі за нього. При 1.34
+ * вони звисали з обводу, і друза стояла на постаменті лише основою. Тепер
+ * запасу вистачає на весь виліт.
+ *
+ * Стелю теж піднято: вона стерегла цоколі колон обабіч кадру, а відколи
+ * колонада — кільце радіусом PORTAL_COLONNADE_RADIUS, до неї лишається кілька
+ * постаментів запасу.
  */
-const DAIS_CLEARANCE = 1.34;
+const DAIS_CLEARANCE = 1.85;
 
 /**
  * Стеля масштабу подіуму — її задають колони.
@@ -245,7 +255,7 @@ const DAIS_CLEARANCE = 1.34;
  * доростає до краю подіуму й далі камінь торкається обводу замість того,
  * щоб лишати запас. Це помітно менша вада, ніж колона, що пробиває плиту.
  */
-const DAIS_MAX_SCALE = 1.66;
+const DAIS_MAX_SCALE = 2.6;
 
 /**
  * Масштаб подіуму під конкретний артефакт.
@@ -672,18 +682,29 @@ export interface PortalPillarInstance {
  *
  * Радіус — від подіуму, не від кадру: зала оточує артефакт, а не екран.
  */
-export const PORTAL_COLONNADE_COUNT = 14;
-export const PORTAL_COLONNADE_RADIUS = 8.4;
+export const PORTAL_COLONNADE_COUNT = 18;
+/**
+ * Радіус кільця більший за відстань камери, і це вимога, а не запас.
+ *
+ * Замкнене кільце ставить колони й перед артефактом теж. Поки радіус був
+ * менший за відстань камери, ці ближні колони опинялись **між** глядачем і
+ * кристалом. Винесене за камеру, кільце тим самим боком проходить позаду неї —
+ * у кадр не входить нічого, а аркада лишається замкненою.
+ */
+const COLONNADE_PILLAR_HEIGHT = 6.6;
+const COLONNADE_PILLAR_RADIUS = 0.52;
+export const PORTAL_COLONNADE_RADIUS = 13.2;
 
 /**
- * Наскільки широкий сектор перед артефактом лишається порожнім, у радіанах.
+ * Кільце замкнене — арка за аркою по всьому колу, без розриву.
  *
- * Кільце, замкнене повністю, поставило б колону просто перед кристалом — а
- * акцент тут рівно один, і саме через це передню пару прибрали з попередньої
- * розкладки. Розрив дивиться точно на камеру, тож глядач опиняється **в отворі
- * аркади**: кільце є, і воно відкрите саме з того боку, з якого дивляться.
+ * Тут був сектор, вирізаний перед артефактом: боялися, що замкнене кільце
+ * поставить колону просто перед кристалом. Виміряно — не поставить. Кільце
+ * стоїть на радіусі PORTAL_COLONNADE_RADIUS, а камера ближча за нього, тож
+ * колони «переднього» боку опиняються **позаду глядача** й у кадр не входять
+ * узагалі. Розрив нічого не рятував і лише робив аркаду незамкненою рівно там,
+ * де її однаково не видно.
  */
-const COLONNADE_OPENING = Math.PI * 0.62;
 
 export function portalPillarInstances(
   frame: PortalCameraFrame,
@@ -694,19 +715,23 @@ export function portalPillarInstances(
   const instances: PortalPillarInstance[] = [];
   const step = (Math.PI * 2) / PORTAL_COLONNADE_COUNT;
   for (let index = 0; index < PORTAL_COLONNADE_COUNT; index += 1) {
-    const angle = index * step;
-    // Камера стоїть на +Z і дивиться в бік -Z, тож «перед артефактом» — це
-    // азимут біля нуля.
-    const toCamera = Math.abs(Math.atan2(Math.sin(angle), Math.cos(angle)));
-    if (toCamera < COLONNADE_OPENING * 0.5) continue;
-    const placement = PORTAL_PILLARS[index % PORTAL_PILLARS.length]!;
+    // Півкроку зсуву, щоб жодна колона не стала точно на вісь позаду
+    // артефакта: з парною кількістю рівно одна там і опинялась, і в кадрі це
+    // читалось як чорна щогла, що проходить крізь кристал.
+    const angle = (index + 0.5) * step;
+    // Одна й та сама колона по всьому колу. Розкладка перебирала три різні —
+    // спадок від рядів, де дальша пара мусила бути вищою, щоб перспектива не
+    // читала ряд як сходинку. У кільці всі колони рівновіддалені від центру,
+    // тож різні висоти читаються не як глибина, а як щербатий ряд.
+    const placement = PORTAL_PILLARS[0]!;
+    void placement;
     instances.push({
       position: [
         Math.sin(angle) * PORTAL_COLONNADE_RADIUS,
         PORTAL_GROUND_Y - PORTAL_FIELD_DROP,
         Math.cos(angle) * PORTAL_COLONNADE_RADIUS,
       ],
-      scale: [placement.radius, placement.height, placement.radius],
+      scale: [COLONNADE_PILLAR_RADIUS, COLONNADE_PILLAR_HEIGHT, COLONNADE_PILLAR_RADIUS],
       // Кожна колона розвернута на власний кут, щоб грані восьмигранника не
       // збігались по всьому кільцю — інакше кільце читається як один
       // повторений спрайт.
@@ -737,9 +762,11 @@ export function portalArchInstances(
   // Сусідні за кільцем, а не за порядком у масиві: пропущені колони розривають
   // масив, і слідом за ним — аркаду.
   const spacing = 2 * PORTAL_COLONNADE_RADIUS * Math.sin(step * 0.5);
-  for (let index = 0; index < pillars.length - 1; index += 1) {
+  for (let index = 0; index < pillars.length; index += 1) {
     const left = pillars[index]!;
-    const right = pillars[index + 1]!;
+    // Замикається: останній проліт іде від крайньої колони до першої, інакше
+    // в замкненому кільці лишався б рівно один порожній прольот.
+    const right = pillars[(index + 1) % pillars.length]!;
     const dx = right.position[0] - left.position[0];
     const dz = right.position[2] - left.position[2];
     const chord = Math.hypot(dx, dz);
@@ -1023,10 +1050,9 @@ export function portalLampInstances(
   aspect: number,
 ): PortalLampInstance[] {
   const pillars = portalPillarInstances(frame, aspect);
-  // Горять на всіх, світять двоє — і це ті двоє, що стоять по краях розриву
-  // аркади, тобто найближчі до глядача. Вони єдині дивляться на кристал із
-  // того боку, з якого на нього дивляться; решта дала б контровий підсвіт,
-  // який тут уже є від directionalLight.
+  // Горять на всіх, світять двоє — найближчі до глядача за азимутом. Вони
+  // єдині дивляться на кристал із того боку, з якого на нього дивляться;
+  // решта дала б контровий підсвіт, який тут уже є від directionalLight.
   const towardCamera = pillars.map(
     (pillar) => Math.abs(Math.atan2(pillar.position[0], pillar.position[2])),
   );

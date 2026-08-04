@@ -15,7 +15,11 @@ import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'rea
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { buildPortalPlatformGeometry } from './portalPlatformMesh';
-import { portalPlatformTexture, portalTileTextures } from './platformTexture';
+import {
+  buildPortalArchGeometry as buildModelledArch,
+  buildPortalPillarGeometry as buildModelledPillar,
+} from './portalColonnadeMesh';
+import { portalColonnadeTexture, portalPlatformTexture, portalTileTextures } from './platformTexture';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import {
   PORTAL_FIELD_DROP,
@@ -24,12 +28,10 @@ import {
   PORTAL_PALETTES,
   buildPortalRuneGeometry,
   PORTAL_DAIS_TOP_RADIUS,
-  buildPortalArchGeometry,
   buildPortalTempleFloorGeometry,
   portalArchInstances,
   buildPortalInlayGeometry,
   buildPortalLampGeometry,
-  buildPortalPillarGeometry,
   buildPortalRitualSlabGeometry,
   buildPortalStarField,
   portalLampInstances,
@@ -101,9 +103,10 @@ export function PortalEnvironment({
   // одиницях сцени — тож переводимо його в локальні одиниці подіуму, інакше
   // на масштабованому подіумі слід жили був би не там, де він насправді.
   const veinReachLocal = veinReach / Math.max(1e-6, daisScale);
-  const archGeometry = useMemo(() => buildPortalArchGeometry(), []);
+  const archGeometry = useMemo(() => buildModelledArch(), []);
   const platformTexture = useMemo(() => portalPlatformTexture(), []);
   const tiles = useMemo(() => portalTileTextures(), []);
+  const colonnadeMap = useMemo(() => portalColonnadeTexture(), []);
   const tileTexture = tiles?.albedo ?? null;
   const tileNormal = tiles?.normal ?? null;
   const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(), []);
@@ -111,7 +114,7 @@ export function PortalEnvironment({
     () => buildPortalInlayGeometry(seed, veinBearings, veinReachLocal),
     [seed, veinBearings, veinReachLocal],
   );
-  const pillarGeometry = useMemo(() => buildPortalPillarGeometry(), []);
+  const pillarGeometry = useMemo(() => buildModelledPillar(), []);
   const lampGeometry = useMemo(() => buildPortalLampGeometry(), []);
   // Камінь платформи вигинається над жилою, тож перебудовується разом із нею.
   const slabGeometry = useMemo(
@@ -255,69 +258,22 @@ export function PortalEnvironment({
         />
       </mesh>
 
-      {/* Кам'яна платформа: суцільна верхня поверхня без жодного отвору під
-          друзою. Кристали проросли крізь неї по кварцовій жилі, і камінь
-          піднятий рівно над її гілками. Масштаб той самий, що в подіума,
-          інакше вигин роз'їхався б із жилою, яка його зробила. */}
-      <mesh
-        geometry={slabGeometry}
-        position={[0, PORTAL_GROUND_Y, 0]}
-        scale={[daisScale, 1, daisScale]}
-      >
-        <meshStandardMaterial
-          color={palette.slab}
-          emissive={palette.daisEmissive}
-          roughness={0.82}
-          metalness={0.03}
-          flatShading
-        />
-      </mesh>
-
-      {/* Рунічні візерунки по кільцю. Тріщини звідси пішли: єдиний розлом у
-          камені — це сама жила, яку публікує рушій. */}
-      <mesh
-        geometry={runeGeometry}
-        position={[0, PORTAL_GROUND_Y, 0]}
-        scale={[daisScale, 1, daisScale]}
-      >
-        <meshStandardMaterial
-          color={palette.rune}
-          emissive={palette.runeGlow}
-          emissiveIntensity={0.35}
-          roughness={0.62}
-          metalness={0.1}
-        />
-      </mesh>
-
-      {/* Інкрустація по обводу. Вона світиться, а не просто блищить: на
-          референсі підлога і є джерелом світла сцени — архітектура там майже
-          чорний силует, а освітлені лише небо в прорізах і візерунок на
-          подіумі. Наша була відблиском металу при 0.42 і не читалась як щось
-          увімкнене. Висоту вона несе у власній геометрії — та
-          повторює вигин плити, — тож меш стоїть на площині подіуму без
-          додаткового підйому. Тут лишалось `+ 0.079` від часів, коли кільця
-          були пласкі: після переходу на вигнуті смуги воно додавалось до
-          вже врахованої висоти, і золото висіло на товщину плити над нею. */}
-      <mesh
-        geometry={inlayGeometry}
-        position={[0, PORTAL_GROUND_Y, 0]}
-        scale={[daisScale, 1, daisScale]}
-      >
-        <meshStandardMaterial
-          color={palette.inlay}
-          emissive={palette.inlay}
-          emissiveIntensity={1.7}
-          roughness={0.34}
-          metalness={0.7}
-        />
-      </mesh>
+      {/* Тут лежала ритуальна плита з рунами й золотою інкрустацією — три
+          кільця по обводу. Вона була платформою, поки платформи не було: своя
+          поверхня, свій вигин над жилою, своє світло. Відколи друза стоїть на
+          модельованому камені, плита просто накривала його собою, і власник
+          побачив рівно це. Прибрано меші, не будівники: `buildPortalRitualSlab-
+          Geometry`, `buildPortalRuneGeometry` і `buildPortalInlayGeometry`
+          лишаються експортованими й покритими тестами — вигин над жилою досі
+          визначений через них, і викидати ці інваріанти разом із мешами було б
+          окремою зміною. */}
 
       <instancedMesh
         ref={pillarsRef}
         args={[pillarGeometry, undefined, pillars.length]}
         frustumCulled={false}
       >
-        <meshStandardMaterial color={palette.pillar} roughness={0.94} metalness={0.02} flatShading />
+        <meshStandardMaterial map={colonnadeMap} color={palette.pillar} roughness={0.94} metalness={0.02} />
       </instancedMesh>
 
       {/* Арки над задніми парами. Той самий матеріал, що й колони: арка — це
@@ -328,7 +284,7 @@ export function PortalEnvironment({
         args={[archGeometry, undefined, arches.length]}
         frustumCulled={false}
       >
-        <meshStandardMaterial color={palette.pillar} roughness={0.94} metalness={0.02} flatShading />
+        <meshStandardMaterial map={colonnadeMap} color={palette.pillar} roughness={0.94} metalness={0.02} />
       </instancedMesh>
 
       {/* Вогні на колонах. Геометрія горить на всіх — вона майже безкоштовна,

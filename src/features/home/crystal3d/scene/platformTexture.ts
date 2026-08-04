@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import platformUrl from '@/assets/portal/platform.webp';
+import colonnadeUrl from '@/assets/portal/colonnade.webp';
 import tilesUrl from '@/assets/portal/tiles.webp';
 import tilesNormalUrl from '@/assets/portal/tiles-normal.webp';
 
@@ -73,4 +74,26 @@ export function disposePortalTileTextures(): void {
   tiles?.albedo.dispose();
   tiles?.normal.dispose();
   tiles = null;
+}
+
+/**
+ * The colonnade's stone, greyscaled for the same reason as the rest: it takes
+ * the theme's pillar colour instead of bringing its own.
+ */
+let colonnade: THREE.Texture | null = null;
+
+export function portalColonnadeTexture(): THREE.Texture | null {
+  if (typeof document === 'undefined') return null;
+  if (colonnade !== null) return colonnade;
+  const texture = new THREE.TextureLoader().load(colonnadeUrl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  colonnade = texture;
+  return colonnade;
+}
+
+/** Test seam. */
+export function disposePortalColonnadeTexture(): void {
+  colonnade?.dispose();
+  colonnade = null;
 }

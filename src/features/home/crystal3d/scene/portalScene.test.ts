@@ -175,18 +175,26 @@ describe('portal pillars', () => {
     expect(portalPillarInstances(narrow, 0.45)).toEqual(portalPillarInstances(wide, 1.6));
   });
 
-  it('leaves the arcade open toward the viewer', () => {
-    // A closed ring puts a column straight in front of the crystal, and there
-    // is exactly one thing here meant to hold attention — the same reason the
-    // old near pair was removed. The gap faces the camera, so the viewer stands
-    // in the opening of the arcade rather than behind a post.
+  it('runs the whole way round, one unbroken row', () => {
+    // Arch after arch, all the circle. One row and one only — nothing stacked
+    // on the columns and nothing above the arcade.
     const frame = portalCameraFrame(0.45, WIDEST_CRYSTAL_RADIUS);
-    for (const pillar of portalPillarInstances(frame, 0.45)) {
-      // The camera sits on +Z looking toward -Z, so "in front of the artifact"
-      // is an azimuth near zero.
-      const azimuth = Math.abs(Math.atan2(pillar.position[0], pillar.position[2]));
-      expect(azimuth).toBeGreaterThan(0.2);
+    const pillars = portalPillarInstances(frame, 0.45);
+    expect(pillars).toHaveLength(PORTAL_COLONNADE_COUNT);
+
+    const step = (Math.PI * 2) / PORTAL_COLONNADE_COUNT;
+    const azimuths = pillars
+      .map((pillar) => Math.atan2(pillar.position[0], pillar.position[2]))
+      .map((angle) => (angle + Math.PI * 2) % (Math.PI * 2))
+      .sort((left, right) => left - right);
+    for (let index = 0; index < azimuths.length; index += 1) {
+      const gap = ((azimuths[(index + 1) % azimuths.length]! - azimuths[index]!) + Math.PI * 2)
+        % (Math.PI * 2);
+      expect(gap).toBeCloseTo(step, 6);
     }
+    // Every column stands on the same course: one row, one height.
+    const heights = new Set(pillars.map((pillar) => pillar.scale[1]));
+    expect(heights.size).toBe(1);
   });
 
   it('never lets a pillar stand in front of the druse', () => {
@@ -309,18 +317,22 @@ describe('portal geometry', () => {
   });
 
   it('says where it stops carrying the rock', () => {
-    // An honest bound, not a promise. The podium clears the rock up to roughly
-    // a fifteen-year druse; past that the ceiling bites and the rock reaches
-    // the rim. That is the smaller of the two faults — the alternative is a
-    // plinth grown out to the pillars and pierced by their bases.
-    const carried = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(Number.MAX_SAFE_INTEGER) / 1.34;
+    // The bound used to be an honest apology: the ceiling bit at roughly a
+    // fifteen-year druse and the rock reached the rim, accepted because the
+    // alternative was a plinth grown out to the pillars and pierced by their
+    // bases. That constraint is gone — the colonnade is a ring several podium
+    // widths out — so the ceiling could be lifted, and the widest druse the
+    // pipeline produces is now carried with room to spare.
+    //
+    // It still exists, because a podium that grows without limit stops being a
+    // podium and becomes the floor.
+    const carried = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(Number.MAX_SAFE_INTEGER);
 
-    expect(carried).toBeGreaterThan(1.5);
-    // At the widest druse the pipeline produces, the rim is reached rather than
-    // cleared — stated so a future reader does not take the first test as
-    // covering every couple.
+    expect(carried).toBeGreaterThan(WIDEST_ROCK_RADIUS);
     expect(PORTAL_DAIS_TOP_RADIUS * portalDaisScale(WIDEST_ROCK_RADIUS))
-      .toBeLessThan(WIDEST_ROCK_RADIUS);
+      .toBeGreaterThan(WIDEST_ROCK_RADIUS);
+    // And well inside the colonnade, which is the thing it must not reach.
+    expect(carried).toBeLessThan(PORTAL_COLONNADE_RADIUS * 0.6);
   });
 
   it('merges the inlay and the pillar into one buffer each', () => {
@@ -463,10 +475,9 @@ describe('portal geometry', () => {
   });
 
   it('accounts for every object the environment draws', () => {
-    // Поле, підлога храму, подіум, кам'яна платформа, руни, інкрустація,
-    // колони (один InstancedMesh на всі три пари), вогні на них (так само
-    // один), арки над задніми парами (так само один) і зорі.
-    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(10);
+    // Поле, підлога храму, подіум, колони (один InstancedMesh на все кільце),
+    // вогні на них (так само один), арки (так само один) і зорі.
+    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(7);
   });
 
   it('lights the crystal from the colonnade without lighting the whole field', () => {
@@ -575,8 +586,9 @@ describe('portal arches', () => {
       const arches = portalArchInstances(frame, aspect);
       const pillars = portalPillarInstances(frame, aspect);
       expect(arches.length).toBeGreaterThan(0);
-      // Never more bays than there are gaps between standing columns.
-      expect(arches.length).toBeLessThan(pillars.length);
+      // A closed ring: one bay per column, the last one closing back onto the
+      // first. Anything less means the arcade has a gap in it.
+      expect(arches.length).toBe(pillars.length);
 
       const step = (Math.PI * 2) / PORTAL_COLONNADE_COUNT;
       const spacing = 2 * PORTAL_COLONNADE_RADIUS * Math.sin(step * 0.5);
@@ -591,13 +603,23 @@ describe('portal arches', () => {
     }
   });
 
-  it('never bridges the opening the viewer looks through', () => {
-    // The gap faces the camera and nothing spans it: an arch there would be the
-    // one thing standing between the viewer and the crystal.
+  it('closes the ring without putting anything in front of the crystal', () => {
+    // The ring used to be cut open in front, for fear a closed one would stand
+    // a column between the viewer and the crystal. It does not: the ring's
+    // radius is larger than the camera's distance, so the near side of it is
+    // *behind* the viewer and never enters the frame. The gap was protecting
+    // nothing and left the arcade broken exactly where it could not be seen.
     const frame = portalCameraFrame(0.45, WIDEST_CRYSTAL_RADIUS);
-    for (const arch of portalArchInstances(frame, 0.45)) {
-      const azimuth = Math.abs(Math.atan2(arch.position[0], arch.position[2]));
-      expect(azimuth).toBeGreaterThan(0.2);
+    expect(PORTAL_COLONNADE_RADIUS).toBeGreaterThan(frame.distance);
+
+    // Stated over the ring rather than over individual columns: a column at a
+    // wide azimuth sits nearer than the camera in z and still never crosses the
+    // artifact, because it is far out to the side. Which column is safe is what
+    // the projection test above already decides; what this one fixes is that
+    // the ring's near arc passes behind the viewer at all.
+    for (const aspect of ASPECTS) {
+      expect(PORTAL_COLONNADE_RADIUS)
+        .toBeGreaterThan(portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS).distance);
     }
   });
 });
