@@ -15,10 +15,10 @@ section.wishlist.pink-page {
 
 /*
  * Keep the ambient background full-bleed, but center every visible page block
- * inside the same symmetric content column. Fixed overlays and decoration must
- * remain viewport-sized and are therefore excluded.
+ * inside the same symmetric content column. Fixed overlays must remain
+ * viewport-sized and are therefore excluded.
  */
-section.wishlist.pink-page > :not(.portal-decor):not(.modal-overlay):not(.wl-lightbox) {
+section.wishlist.pink-page > :not(.modal-overlay):not(.wl-lightbox) {
   box-sizing: border-box;
   max-width: var(--wl-page-max-width, 1240px);
   margin-inline: auto;

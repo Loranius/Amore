@@ -15,7 +15,6 @@ import {
   RefreshIcon,
   TrashIcon,
 } from '@/components/icons/UiIcon';
-import { PortalDecor } from '@/features/auth/PortalDecor';
 import { useUsersMap } from '@/features/_shared/useUsers';
 import {
   useShoppingItems,
@@ -149,7 +148,6 @@ export function ShoppingPage() {
 
   return (
     <section className="shopping shopping-page pink-page">
-      <PortalDecor density="light" parallax={false} />
 
       <header className="shopping-hero">
         <span className="shopping-hero-icon" aria-hidden="true"><BagIcon size={28} /></span>

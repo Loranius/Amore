@@ -8,7 +8,6 @@ import { useConfirm } from '@/providers/ConfirmProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
-import { PortalDecor } from '@/features/auth/PortalDecor';
 import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { WishlistBubbleView } from './WishlistBubbleView';
 import { WishlistFeedView } from './WishlistFeedView';
@@ -316,7 +315,6 @@ export function WishlistPage() {
   if (partnerError || !partner) {
     return (
       <section className="wishlist pink-page">
-        <PortalDecor density="light" parallax={false} />
         <div className="empty-state" role="alert">
           <p>Не вдалося визначити іншого користувача в парі.</p>
           <button type="button" className="btn btn-secondary" onClick={() => void refetchPartner()}>
@@ -387,7 +385,6 @@ export function WishlistPage() {
       className="wishlist pink-page"
       aria-busy={(!archiveOpen && isPending) || mutationBusy}
     >
-      <PortalDecor density="light" parallax={false} />
 
       {!archiveOpen && (
         <WishlistHero

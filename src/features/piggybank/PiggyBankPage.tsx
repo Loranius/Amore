@@ -7,7 +7,6 @@
 // ============================================================
 import { FreeLimitCard } from './FreeLimitCard';
 import { PiggyBankCard } from './PiggyBankCard';
-import { PortalDecor } from '@/features/auth/PortalDecor';
 import './budget.css';
 import './financeLayoutFix.css';
 import './goalDiscussionPolish.css';
@@ -15,7 +14,6 @@ import './goalDiscussionPolish.css';
 export function PiggyBankPage() {
   return (
     <section className="budget pink-page">
-      <PortalDecor density="light" parallax={false} />
       <h1 className="budget-title">Скарбничка</h1>
       <PiggyBankCard />
       <FreeLimitCard />

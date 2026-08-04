@@ -12,7 +12,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useUsers } from '@/features/_shared/useUsers';
-import { PortalDecor, PortalConfetti } from './PortalDecor';
+import { PortalConfetti } from './PortalConfetti';
 import type { AppUser } from '@/types';
 
 type Screen = 'select' | 'pin' | 'portal';
@@ -84,7 +84,6 @@ export function LoginPage() {
   if (screen === 'select') {
     return (
       <div className="auth-screen">
-        <PortalDecor />
         <div className="auth-card">
           <div className="auth-kicker">Amore</div>
           <h1 className="auth-title">Хто сьогодні заходить у портал? 💗</h1>
@@ -113,7 +112,6 @@ export function LoginPage() {
   if (screen === 'portal') {
     return (
       <div className="auth-screen">
-        <PortalDecor />
         <PortalConfetti />
         <div className="auth-card">
           <div className="auth-success-heart" aria-hidden="true" />
@@ -129,7 +127,6 @@ export function LoginPage() {
 
   return (
     <div className="auth-screen">
-      <PortalDecor />
       <div className={`auth-card${shake ? ' shake' : ''}`}>
         <div className="auth-kicker">Amore</div>
         <h1 className="auth-title">{selected?.name}</h1>

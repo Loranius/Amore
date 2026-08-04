@@ -35,7 +35,6 @@ import { useMapView } from './mapView';
 import { PinModal } from './PinModal';
 import { AddPinModal } from './AddPinModal';
 import { LocationHistoryModal } from './LocationHistoryModal';
-import { PortalDecor } from '@/features/auth/PortalDecor';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import type { MapPinRow, PinCategory, MapboxFeature } from '@/types';
 
@@ -234,7 +233,6 @@ export function MapPage() {
 
   return (
     <section className="map pink-page">
-      <PortalDecor density="light" parallax={false} />
       <div className="map-search-wrap">
         <input
           id="map-search"

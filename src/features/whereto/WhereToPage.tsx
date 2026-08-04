@@ -7,7 +7,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { OBLASTS, readWhereToCache, writeWhereToCache } from './whereToConstants';
 import { useWhereToLocation, useSaveLocation, useEventsSearch } from './useWhereTo';
-import { PortalDecor } from '@/features/auth/PortalDecor';
 import { Card } from '@/components/ui/Card';
 import type { WhereToLocation, WhereToEvent } from '@/types';
 
@@ -64,7 +63,6 @@ export function WhereToPage() {
 
   return (
     <section className="whereto pink-page">
-      <PortalDecor density="light" parallax={false} />
       <div className="wt-head">
         <button type="button" className="wt-city-btn" onClick={() => setCityModal(true)}>
           {location ? `📍 ${location.city} · змінити` : '📍 Обрати місто'}

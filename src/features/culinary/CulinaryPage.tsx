@@ -6,7 +6,6 @@
 import { useState } from 'react';
 import { Constructor } from './Constructor';
 import { Favorites } from './Favorites';
-import { PortalDecor } from '@/features/auth/PortalDecor';
 import { TabBar } from '@/components/ui/TabBar';
 
 type Tab = 'constructor' | 'favorites';
@@ -16,7 +15,6 @@ export function CulinaryPage() {
 
   return (
     <section className="culinary pink-page">
-      <PortalDecor density="light" parallax={false} />
       <TabBar<Tab>
         value={tab}
         onChange={setTab}

@@ -16,7 +16,6 @@ import { MediaDetailModal } from './MediaDetailModal';
 import { ReviewPanel } from './ReviewPanel';
 import { MediaFormModal, AddFromSearchModal } from './MediaModals';
 import { SwipeDeck } from '@/features/swipe/SwipeDeck';
-import { PortalDecor } from '@/features/auth/PortalDecor';
 import type { MediaItemRow, MediaType, MediaStatus, TmdbSearchResult } from '@/types';
 
 type Filter = 'all' | MediaStatus;
@@ -69,7 +68,6 @@ export function MediaPage() {
 
   return (
     <section className="media pink-page">
-      <PortalDecor density="light" parallax={false} />
       <div className="media-head">
         <h1>Вотчліст</h1>
         <button type="button" className="btn" onClick={() => setForm({ item: null })}>

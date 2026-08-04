@@ -393,7 +393,7 @@ textarea::placeholder {
 
 /* ── «Pink Portal» фон для інших сторінок (Календар-хаб, Вішлист,
    Фінанси, Покупки, Кулінарія, Куди піти, Карта, Вотчліст) — той
-   самий градієнт+PortalDecor, що на Home, як окрема утилітарна
+   самий градієнт, що на Home, як окрема утилітарна
    обгортка (без .home flex-розкладки — тільки фон/бліди). Токени й
    шрифт тепер задаються один раз у :root/[data-theme] (весь
    застосунок — Pink Portal, включно з темною темою), тут лишається
@@ -407,17 +407,6 @@ textarea::placeholder {
      його шари ще не змонтовані. */
   background: var(--portal-sky-bottom, var(--page-gradient));
 }
-/* Негативний z-index замість "підняти всіх сусідів" — так модалки/
-   Lightbox (position:fixed, рендеряться тут же прямими дітьми .pink-page)
-   не втрачають свій fixed/z-index через вищу специфічність попереднього
-   правила (.pink-page > :not(.portal-decor) мало специфічність 2 класи
-   проти 1 в .modal-overlay — і "перемагало", тож модалка малювалась
-   у звичайному потоці сторінки замість фулскріна оверлея). Від'ємний
-   z-index у власному stacking context .pink-page (position:relative)
-   малює декор НАД фоном, але ПІД звичайним статичним контентом — без
-   жодних змін для дітей. */
-.pink-page > .portal-decor { z-index: -1; }
-
 /* ── Меню «Ще» (шторка) ─────────────────────────────────────── */
 .more-menu-overlay {
   position: fixed;
@@ -745,141 +734,6 @@ textarea::placeholder {
   text-align: center;
 }
 
-/* ── Auth-екран: декоративний фон (серця/квіти/торти/хвильки) ─
-   Позиції/кольори — data-масиви в PortalDecor.tsx, тут лише форми. */
-@keyframes floatBob {
-  0%, 100% { transform: rotate(var(--r, 0deg)) translateY(0); }
-  50% { transform: rotate(var(--r, 0deg)) translateY(-14px); }
-}
-.portal-decor {
-  position: absolute;
-  inset: -40px;
-  pointer-events: none;
-  transition: transform 0.25s ease-out;
-}
-/* Фігури-декор — "інтерактивні моменти": підсвічуються на ховер,
-   попри те, що .portal-decor (контейнер) сам pointer-events:none. */
-.portal-heart,
-.portal-flower,
-.portal-cake,
-.portal-diamond {
-  pointer-events: auto;
-  cursor: pointer;
-  transition: filter 0.15s ease;
-}
-.portal-heart:hover,
-.portal-flower:hover,
-.portal-cake:hover,
-.portal-diamond:hover {
-  filter: brightness(1.12) saturate(1.15);
-}
-
-.portal-heart {
-  position: absolute;
-  width: var(--size);
-  height: var(--size);
-  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
-}
-.portal-heart::before,
-.portal-heart::after {
-  content: '';
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  background: inherit;
-}
-.portal-heart::before { top: -50%; left: 0; }
-.portal-heart::after { top: 0; left: 50%; }
-
-.portal-flower {
-  position: absolute;
-  width: var(--size);
-  height: var(--size);
-  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
-}
-.portal-flower-petal {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 42%;
-  height: 42%;
-  margin: -21% 0 0 -21%;
-  border-radius: 50%;
-}
-.portal-flower-center {
-  position: absolute;
-  top: 32%;
-  left: 32%;
-  width: 36%;
-  height: 36%;
-  border-radius: 50%;
-}
-
-.portal-cake {
-  position: absolute;
-  width: var(--size);
-  height: var(--size);
-  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
-}
-.portal-cake-base {
-  position: absolute;
-  bottom: 0; left: 0;
-  width: 100%; height: 55%;
-  background: #e5cdf7;
-  border-radius: 6px 6px 16px 16px;
-  box-shadow: 0 3px 8px rgba(49, 37, 58, 0.1);
-}
-.portal-cake-top {
-  position: absolute;
-  bottom: 50%; left: 15%;
-  width: 70%; height: 32%;
-  background: #f2e3fd;
-  border-radius: 10px 10px 4px 4px;
-}
-.portal-cake-candle {
-  position: absolute;
-  top: 6%; left: 46%;
-  width: 8%; height: 22%;
-  background: #d3b8e7;
-  border-radius: 2px;
-}
-.portal-cake-flame {
-  position: absolute;
-  top: -6%; left: 42%;
-  width: 16%; height: 16%;
-  background: #f6ad55;
-  border-radius: 50% 50% 50% 0;
-  transform: rotate(45deg);
-}
-
-/* Ромбик — просто квадрат, нахил 45° уже "зашитий" у --r (як і в сердець). */
-.portal-diamond {
-  position: absolute;
-  width: var(--size);
-  height: var(--size);
-  border-radius: 3px;
-  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
-}
-
-.portal-squiggle {
-  position: absolute;
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  animation: floatBob var(--dur) ease-in-out var(--delay) infinite;
-}
-.portal-squiggle-dot {
-  width: var(--size);
-  height: var(--size);
-  border-radius: 50%;
-  background: var(--dot-color);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .portal-heart, .portal-flower, .portal-cake, .portal-diamond, .portal-squiggle { animation: none; }
-  .portal-decor { transition: none; transform: none !important; }
-}
 
 .page-placeholder h1 { margin-top: 0; }
 

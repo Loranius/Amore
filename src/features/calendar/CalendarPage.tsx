@@ -8,7 +8,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useConfirm } from '@/providers/ConfirmProvider';
-import { PortalDecor } from '@/features/auth/PortalDecor';
 import { TabBar } from '@/components/ui/TabBar';
 import { EventIcon } from '@/components/icons/EventIcon';
 import { useEvents, useCalendarMutations } from './useCalendar';
@@ -82,11 +81,10 @@ export function CalendarPage() {
   };
 
   return (
-    // Фон і декор раніше приходили від обгортки хабу. Хаб зник разом зі
-    // своїм єдиним сабтабом, тож сторінка несе їх сама — рівно так, як
-    // це роблять усі інші розділи порталу.
+    // Фон раніше приходив від обгортки хабу. Хаб зник разом зі своїм
+    // єдиним сабтабом, тож сторінка несе його сама — рівно так, як це
+    // роблять усі інші розділи порталу.
     <section className="calendar pink-page">
-      <PortalDecor density="light" parallax={false} />
       <div className="cal-head">
         <h1>Календар</h1>
         <button type="button" className="btn" onClick={() => openNewEvent()}>
