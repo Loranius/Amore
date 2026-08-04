@@ -14,16 +14,21 @@ function rebuild(lod: 'high' | 'medium' | 'low') {
 }
 
 describe('Tree Ground Detail Lab', () => {
+  // Budget lowered 24 -> 8 per kind (72 -> 24 total) in tree-ground-detail
+  // v1.1.0. Nothing about the placement rule changed; the count did. Seventy-two
+  // small objects scattered evenly over the disc read as sprinkles on a biscuit,
+  // and thinning them was the fix — see config.ts. Equal parts per kind are kept
+  // because the stable-prefix invariant below depends on it.
   it('is deterministic and fills the exact medium mobile budget', () => {
     const first = rebuild('medium');
     const second = rebuild('medium');
 
     expect(second).toEqual(first);
-    expect(first.instances).toHaveLength(72);
-    expect(first.diagnostics.stoneCount).toBe(24);
-    expect(first.diagnostics.fallenLeafCount).toBe(24);
-    expect(first.diagnostics.mossCount).toBe(24);
-    expect(first.diagnostics.instanceBudget).toBe(72);
+    expect(first.instances).toHaveLength(24);
+    expect(first.diagnostics.stoneCount).toBe(8);
+    expect(first.diagnostics.fallenLeafCount).toBe(8);
+    expect(first.diagnostics.mossCount).toBe(8);
+    expect(first.diagnostics.instanceBudget).toBe(24);
     expect(first.diagnostics.renderedTriangleCount).toBe(
       first.template.triangleCount * first.instances.length,
     );
@@ -40,9 +45,9 @@ describe('Tree Ground Detail Lab', () => {
     const mediumIds = medium.instances.map((instance) => instance.id);
     const lowIds = low.instances.map((instance) => instance.id);
 
-    expect(high.instances).toHaveLength(108);
-    expect(medium.instances).toHaveLength(72);
-    expect(low.instances).toHaveLength(36);
+    expect(high.instances).toHaveLength(36);
+    expect(medium.instances).toHaveLength(24);
+    expect(low.instances).toHaveLength(12);
     expect(highIds.slice(0, mediumIds.length)).toEqual(mediumIds);
     expect(mediumIds.slice(0, lowIds.length)).toEqual(lowIds);
     expect(new Set(highIds).size).toBe(highIds.length);

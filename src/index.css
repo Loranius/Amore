@@ -254,11 +254,20 @@ textarea::placeholder {
   padding: 16px 16px calc(env(safe-area-inset-bottom, 0) + 88px);
 }
 
-/* fill-mode: backwards (не both!) — щоб після завершення переходу
-   transform не "застигав" на translateY(0): будь-яке значення
-   transform, відмінне від none, робить елемент containing block для
-   position:fixed нащадків (модалки/лайтбокси всередині сторінки
-   інакше центрувались би не в справжній viewport, а в межах .page-fade). */
+/* Лише прозорість — жодного transform, і це не смак.
+   Будь-яке значення transform, відмінне від none, робить елемент containing
+   block для position:fixed нащадків. Тут таких двоє, і обидва мусять бути
+   рівно у viewport: .portal-backdrop (небо порталу) і #home-artifact-preview
+   (полотно сцени). Поки анімація тривала, вони міряли себе від .page-fade,
+   тобто від контентної коробки .content — а це viewport мінус падінги й
+   мінус жолоби смуги прокрутки. Виміряно на 412px: 380px замість 412,
+   x 16..396. Саме цим і були дві світлі смуги по боках головної в перші
+   міліметри секунди після входу; на повільному з'єднанні цей кадр стоїть
+   довго й читається як зламана верстка.
+
+   fill-mode: backwards (не both) лишається: він тримає лише початковий кадр
+   до старту, а після завершення не «заморожує» кінцевий — з opacity це вже
+   не критично, але й підстав міняти немає. */
 .page-fade {
   animation-name: page-fade-in;
   animation-duration: 0.22s;
@@ -266,8 +275,8 @@ textarea::placeholder {
   animation-fill-mode: backwards;
 }
 @keyframes page-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ── Нижня навігація (мобільна) — плаваюча пігулка ──────────── */
@@ -1703,19 +1712,6 @@ textarea::placeholder {
 @media (prefers-reduced-motion: reduce) {
   .crystal-loading-glow { animation: none; opacity: .8; }
 }
-/* Модалка «Спогад» (клік по кристалу) */
-.memory-card { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
-.memory-photo {
-  width: 100%;
-  max-height: 320px;
-  object-fit: cover;
-  border-radius: 14px;
-  box-shadow: 0 8px 20px rgba(49, 37, 58, 0.15);
-}
-.memory-date { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; margin: 4px 0 0; }
-.memory-comment { font-size: 15px; font-style: italic; color: var(--text); margin: 0; }
-.memory-author { font-size: 12px; color: var(--muted); margin: 0; }
-
 /* ============================================================
    ФІНАНСИ (budget) — вільний ліміт + спільні цілі
    ============================================================ */

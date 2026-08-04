@@ -15,14 +15,13 @@ export interface EvolutionCrystalObjectProps {
   geometry: CrystalGeometryState;
   material: CrystalMaterialState;
   life: CrystalLifeState;
-  onOpen?: () => void;
 }
 
 /**
  * Thin R3F shell around the renderer-independent Phase 1-6 states.
  * It owns no evolution, species, composition, geometry or material decisions.
  */
-export function EvolutionCrystalObject({ geometry, material, life, onOpen }: EvolutionCrystalObjectProps) {
+export function EvolutionCrystalObject({ geometry, material, life }: EvolutionCrystalObjectProps) {
   const pulseUntil = useRef(0);
   const pointerDown = useRef<CrystalPointerSample | null>(null);
   const bundle = useMemo(
@@ -48,13 +47,18 @@ export function EvolutionCrystalObject({ geometry, material, life, onOpen }: Evo
     <primitive
       object={bundle.group}
       onPointerDown={(event: ThreeEvent<PointerEvent>) => {
-        pulseUntil.current = performance.now() + life.interactionPulseDuration * 1000;
         pointerDown.current = {
           x: event.nativeEvent.clientX,
           y: event.nativeEvent.clientY,
           at: performance.now(),
         };
       }}
+      // Пульс тепер на тапі, а не на будь-якому натисканні. Раніше він
+      // спрацьовував і коли палець просто крутив орбіту — кристал
+      // відповідав на рух, якого до нього не адресували.
+      //
+      // Тут же буде моушн-зум: тап лишається жестом, який щось означає, і
+      // жест уже відділено від перетягування (`tapGesture.ts`).
       onClick={(event: ThreeEvent<MouseEvent>) => {
         const start = pointerDown.current;
         pointerDown.current = null;
@@ -63,7 +67,8 @@ export function EvolutionCrystalObject({ geometry, material, life, onOpen }: Evo
           y: event.nativeEvent.clientY,
           at: performance.now(),
         };
-        if (isCrystalTap(start, released)) onOpen?.();
+        if (!isCrystalTap(start, released)) return;
+        pulseUntil.current = performance.now() + life.interactionPulseDuration * 1000;
       }}
     >
       {life.sparkleCount > 0 && (

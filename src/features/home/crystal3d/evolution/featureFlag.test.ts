@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { isEvolutionRendererPreviewEnabled } from './featureFlag';
+import { isEvolutionDiagnosticsEnabled } from './featureFlag';
 
-describe('Evolution renderer preview flag', () => {
-  it('enables only the explicit engine=evolution value', () => {
-    expect(isEvolutionRendererPreviewEnabled('?engine=evolution')).toBe(true);
-    expect(isEvolutionRendererPreviewEnabled('?gfx=off&engine=evolution')).toBe(true);
-    expect(isEvolutionRendererPreviewEnabled('engine=evolution')).toBe(true);
+describe('Evolution diagnostics flag', () => {
+  it('stays off unless asked for', () => {
+    // The overlay reads body counts, draw calls and build time over the
+    // artifact. On the home screen the artifact is the whole point, so the
+    // default has to be off rather than merely small.
+    expect(isEvolutionDiagnosticsEnabled('')).toBe(false);
+    expect(isEvolutionDiagnosticsEnabled('?evolutionDiagnostics=0')).toBe(false);
+    expect(isEvolutionDiagnosticsEnabled('?evolutionDiagnostics=off')).toBe(false);
+    expect(isEvolutionDiagnosticsEnabled('?other=1')).toBe(false);
+  });
 
-    expect(isEvolutionRendererPreviewEnabled('')).toBe(false);
-    expect(isEvolutionRendererPreviewEnabled('?engine=legacy')).toBe(false);
-    expect(isEvolutionRendererPreviewEnabled('?engine=Evolution')).toBe(false);
-    expect(isEvolutionRendererPreviewEnabled('?evolution=true')).toBe(false);
+  it('accepts the three spellings a developer would reach for', () => {
+    expect(isEvolutionDiagnosticsEnabled('?evolutionDiagnostics=1')).toBe(true);
+    expect(isEvolutionDiagnosticsEnabled('?evolutionDiagnostics=true')).toBe(true);
+    expect(isEvolutionDiagnosticsEnabled('?evolutionDiagnostics=on')).toBe(true);
   });
 });

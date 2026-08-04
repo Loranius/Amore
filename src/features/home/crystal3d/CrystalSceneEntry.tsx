@@ -1,9 +1,7 @@
 import { lazy, Suspense, useState } from 'react';
 import type { HomeArtifact } from '../homeArtifact';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
-import LegacyCrystalScene from './CrystalScene';
 import EvolutionCrystalPreviewScene from './evolution/EvolutionCrystalPreviewScene';
-import { isEvolutionRendererPreviewEnabled } from './evolution/featureFlag';
 import { isTreeLabPreviewEnabled } from './treeLab/featureFlag';
 
 const TreeLabPreviewScene = lazy(() => import('./treeLab/TreeLabPreviewScene'));
@@ -15,7 +13,7 @@ const EvolutionTreePreviewScene = lazy(() => import('./evolution/EvolutionTreePr
 type RenderableHomeArtifact = Exclude<HomeArtifact, 'reef'>;
 
 interface CrystalSceneEntryProps {
-  artifact?: RenderableHomeArtifact;
+  artifact: RenderableHomeArtifact;
 }
 
 // Тут стояв TreePortalPreviewScene — обгортка, яка дописувала в адресний
@@ -23,9 +21,15 @@ interface CrystalSceneEntryProps {
 // Дерево більше не живе в рамці, тож підміняти параметри нема заради чого.
 
 /**
- * With an explicit Home selection this entry shows the newest accepted Crystal
- * or Tree pipeline. Without one, old query-preview links and the legacy default
- * keep their previous behaviour.
+ * Показує прийнятий конвеєр для вибраного артефакта.
+ *
+ * `artifact` став обов'язковим, і разом із ним пішли дві гілки: «старий
+ * рендерер за замовчуванням» і прапорець `engine=evolution`. Обидві були
+ * недосяжні — єдиний, хто монтує цей вхід, це HomePage, а `resolveHomeArtifact`
+ * завжди повертає конкретний артефакт, ніколи undefined. Недосяжність коштувала
+ * не нуль: статичний імпорт старої сцени тягнув у чанк головної весь її окремий
+ * конвеєр — кластери, батчинг, публікацію, bloom. Аварійний фолбек на неї
+ * лишився, але лінивий, у EvolutionCrystalPreviewScene.
  */
 export default function CrystalSceneEntry({ artifact }: CrystalSceneEntryProps) {
   const [search] = useState(
@@ -42,17 +46,5 @@ export default function CrystalSceneEntry({ artifact }: CrystalSceneEntryProps) 
     );
   }
 
-  if (artifact === 'crystal') return <EvolutionCrystalPreviewScene />;
-
-  if (isTreeLabPreviewEnabled(search)) {
-    return (
-      <Suspense fallback={<CrystalPlaceholder />}>
-        <TreeLabPreviewScene />
-      </Suspense>
-    );
-  }
-
-  return isEvolutionRendererPreviewEnabled(search)
-    ? <EvolutionCrystalPreviewScene />
-    : <LegacyCrystalScene />;
+  return <EvolutionCrystalPreviewScene />;
 }

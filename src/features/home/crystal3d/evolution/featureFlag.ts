@@ -1,11 +1,8 @@
-export const EVOLUTION_RENDERER_QUERY_KEY = 'engine';
-export const EVOLUTION_RENDERER_QUERY_VALUE = 'evolution';
-
-/** Explicit preview flag. The legacy renderer remains the production default. */
-export function isEvolutionRendererPreviewEnabled(search: string): boolean {
-  const params = new URLSearchParams(search);
-  return params.get(EVOLUTION_RENDERER_QUERY_KEY) === EVOLUTION_RENDERER_QUERY_VALUE;
-}
+// Тут жив isEvolutionRendererPreviewEnabled — прапорець `engine=evolution`,
+// який перемикав головну зі старого рендерера на Evolution. Evolution уже не
+// прев'ю, а єдиний конвеєр, і сам ключ `engine` нікуди не подівся: його читає
+// resolveHomeArtifact (homeArtifact.ts), обираючи артефакт. Прапорець лишався
+// перемикачем без другого положення.
 
 export const EVOLUTION_DIAGNOSTICS_QUERY_KEY = 'evolutionDiagnostics';
 

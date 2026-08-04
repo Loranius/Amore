@@ -35,7 +35,7 @@
 // WebGLRenderer::renderTransmissionPass жорстко ставить
 // setClearColor(0xffffff, 0.5), щойно clearAlpha < 1.
 // ============================================================
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Sparkles } from '@react-three/drei';
 import * as THREE from 'three';
@@ -52,7 +52,6 @@ import { useCrystalSeed } from '../useHome';
 import { useMemories } from '@/features/memories/useMemories';
 import { useClusterGrowthFlash } from '../useCrystalSeen';
 import { hashSeedString } from '../mulberry32';
-import { MemoryModal } from '../MemoryModal';
 import {
   generateArtifactDNA,
   computeEvolutionPressures,
@@ -85,10 +84,9 @@ interface ClusterProps {
   reduceMotion: boolean;
   grew: boolean;
   gfx: GfxProfile;
-  onOpen: () => void;
 }
 
-function CrystalCluster({ material, branches, reduceMotion, grew, gfx, onOpen }: ClusterProps) {
+function CrystalCluster({ material, branches, reduceMotion, grew, gfx }: ClusterProps) {
   const groupRef = useRef<THREE.Group | null>(null);
   const flashLightRef = useRef<THREE.PointLight | null>(null);
   const flashUntil = useRef(grew ? performance.now() + 1300 : 0);
@@ -183,7 +181,7 @@ function CrystalCluster({ material, branches, reduceMotion, grew, gfx, onOpen }:
     <group ref={groupRef} onPointerDown={onTouch}>
       <pointLight ref={flashLightRef} position={[0, 0.5, 0]} color="#fff2cf" intensity={baseIntensity} distance={4} />
       {batches.map((batch) => (
-        <primitive key={batch.signature} object={batch.mesh} onClick={onOpen} />
+        <primitive key={batch.signature} object={batch.mesh} />
       ))}
     </group>
   );
@@ -318,30 +316,15 @@ export default function CrystalScene() {
   const branchKeys = useMemo(() => branches.map((b) => b.key), [branches]);
   const { grew } = useClusterGrowthFlash(branchKeys, isPending || empty);
 
-  const [open, setOpen] = useState(false);
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
 
   const sparkleCount = Math.min(60, 14 + branches.length * 1.2);
 
-  const openModal = () => setOpen(true);
-  const onKeyDownOpen = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      openModal();
-    }
-  };
-
   return (
     <>
-      <div
-        className="crystal-wrap"
-        role="button"
-        tabIndex={0}
-        aria-label="Кристал Amore — показати випадковий спогад"
-        onKeyDown={onKeyDownOpen}
-      >
+      <div className="crystal-wrap">
         <Canvas dpr={[1, 2]} camera={{ position: [0, 0.2, 5.4], fov: 42 }}>
           {/* Класичний трипунктовий риг замість «ambient + одне світло +
               рожевий підсвіт». Головне тут — КОНТРОВЕ світло позаду згори:
@@ -364,7 +347,6 @@ export default function CrystalScene() {
                 reduceMotion={reduceMotion}
                 grew={grew}
                 gfx={gfx}
-                onOpen={openModal}
               />
             ))}
           <Sparkles
@@ -426,7 +408,6 @@ export default function CrystalScene() {
         )}
       </div>
 
-      {open && <MemoryModal onClose={() => setOpen(false)} />}
     </>
   );
 }

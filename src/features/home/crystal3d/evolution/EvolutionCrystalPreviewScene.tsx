@@ -1,12 +1,10 @@
-import { useCallback, useMemo, useState, type KeyboardEvent } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalVeinBearings } from '@/engine/geometry';
 import { crystalRenderScale } from '@/engine/renderer';
 import { crystalSceneRadius, crystalSubstrateSceneRadius } from '@/engine/renderer/three';
 import { useTheme } from '@/providers/ThemeProvider';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
-import { MemoryModal } from '../../MemoryModal';
-import LegacyCrystalScene from '../CrystalScene';
 import { PortalStage } from '../scene/PortalStage';
 import {
   PORTAL_ENVIRONMENT_DRAW_CALLS,
@@ -20,6 +18,13 @@ import {
 import { isEvolutionDiagnosticsEnabled } from './featureFlag';
 import { useEvolutionCrystalPipeline } from './useEvolutionCrystalPipeline';
 import './evolutionPreview.css';
+
+// Аварійний шлях, і вантажиться він теж аварійно. Статичний імпорт зшивав
+// увесь старий рендерер — власний конвеєр кластерів, батчинг, публікацію,
+// bloom — у той самий чанк, що й головна: приблизно сотня кілобайт, яку
+// платить кожен, хто просто відкрив портал, заради гілки, у яку майже ніхто
+// ніколи не заходить.
+const LegacyCrystalScene = lazy(() => import('../CrystalScene'));
 
 function formatTopology(value: number): string {
   if (value < 1_000) return String(value);
@@ -37,7 +42,6 @@ export default function EvolutionCrystalPreviewScene() {
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
   const { pipeline, isPending, error } = useEvolutionCrystalPipeline(reduceMotion);
-  const [open, setOpen] = useState(false);
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   // Напрямки гілок кварцової жили. Меми в сцені тримаються за цей масив, тож
   // він мусить бути стабільним посиланням — інакше камінь платформи
@@ -45,7 +49,6 @@ export default function EvolutionCrystalPreviewScene() {
   const meshes = pipeline?.geometry.meshes;
   const veinBearings = useMemo(() => crystalVeinBearings(meshes ?? []), [meshes]);
 
-  const openModal = useCallback(() => setOpen(true), []);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => {
     setRuntime(next);
   }, []);
@@ -54,7 +57,9 @@ export default function EvolutionCrystalPreviewScene() {
     console.error('[Evolution crystal preview] fallback to legacy renderer:', error);
     return (
       <div className="evolution-preview-fallback">
-        <LegacyCrystalScene />
+        <Suspense fallback={<CrystalPlaceholder />}>
+          <LegacyCrystalScene />
+        </Suspense>
         <span className="evolution-preview-badge evolution-preview-badge--error">
           Evolution fallback
         </span>
@@ -64,12 +69,6 @@ export default function EvolutionCrystalPreviewScene() {
 
   if (isPending || !pipeline) return <CrystalPlaceholder />;
 
-  const onKeyDownOpen = (event: KeyboardEvent) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      openModal();
-    }
-  };
   const metrics = pipeline.metrics;
   const badge = [
     'Evolution',
@@ -84,10 +83,6 @@ export default function EvolutionCrystalPreviewScene() {
     <>
       <div
         className="crystal-wrap evolution-preview-wrap"
-        role="button"
-        tabIndex={0}
-        aria-label="Кристал Amore Evolution — показати випадковий спогад"
-        onKeyDown={onKeyDownOpen}
         data-evolution-preview="ready"
         data-evolution-renderer="three"
         data-evolution-quality={metrics.quality}
@@ -128,7 +123,6 @@ export default function EvolutionCrystalPreviewScene() {
               geometry={pipeline.geometry}
               material={pipeline.material}
               life={pipeline.life}
-              onOpen={openModal}
             />
           </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
@@ -147,8 +141,6 @@ export default function EvolutionCrystalPreviewScene() {
           </span>
         )}
       </div>
-
-      {open && <MemoryModal onClose={() => setOpen(false)} />}
     </>
   );
 }

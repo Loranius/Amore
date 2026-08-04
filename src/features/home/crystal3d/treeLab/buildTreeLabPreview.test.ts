@@ -124,7 +124,8 @@ describe('Tree production preview pipeline', () => {
     expect(build.crownSilhouette.diagnostics.adjustedOuterLeafCount).toBeGreaterThan(0);
     expect(build.crownSilhouette.diagnostics.negativeSpaceAccepted).toBe(true);
     expect(build.barkSurface.diagnostics.materialCount).toBe(2);
-    expect(build.groundDetails.instances).toHaveLength(72);
+    // 72 -> 24 with tree-ground-detail v1.1.0 (see groundDetail/config.ts).
+    expect(build.groundDetails.instances).toHaveLength(24);
     expect(build.groundDetails.diagnostics.totalMaterialCount).toBe(3);
     expect(build.life.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(
       build.life.leaves.length,
