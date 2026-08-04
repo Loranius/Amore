@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { buildArtifactBlueprint, type EvolutionEventInput } from '../../evolution';
-import { bridgeCrystalSpeciesToLegacyPressures } from '@/features/home/artifact/compat/evolutionV2Bridge';
 import { buildCrystalSpeciesBlueprint } from './crystalSpecies';
+// Called directly, not through a feature-layer wrapper: the engine may not
+// import application code, and the wrapper only forwarded this call.
+import { projectCrystalToLegacyPressures } from './legacyBridge';
 
 const BASE_EVENTS: EvolutionEventInput[] = [
   {
@@ -213,7 +215,7 @@ describe('Crystal Species', () => {
   });
 
   it('projects into the current renderer pressure contract safely', () => {
-    const legacy = bridgeCrystalSpeciesToLegacyPressures(buildCrystal());
+    const legacy = projectCrystalToLegacyPressures(buildCrystal());
     const shareTotal = Object.values(legacy.domainShare).reduce((sum, value) => sum + value, 0);
 
     expect(shareTotal).toBeCloseTo(1, 5);

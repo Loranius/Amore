@@ -1,27 +1,4 @@
-.wl-card-v3-menu-backdrop,
-.wl-card-v3-menu-mobile-head {
-  display: none;
-}
 
-.wl-card-v3-menu > button[role='menuitem'] > span {
-  display: none;
-}
-
-/* The action menu is a compact card-anchored dropdown on every viewport.
-   :has keeps the active card above sticky Wishlist tabs without changing
-   server-driven action capabilities or adding page-level overlays. */
-.wl-card-v3:has(.wl-card-v3-menu) {
-  z-index: 40;
-}
-
-.wl-card-v3-menu-wrap:has(.wl-card-v3-menu) {
-  z-index: 60;
-}
-
-.wl-card-v3-menu {
-  transform-origin: top right;
-  animation: wl-card-menu-in 170ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
 
 .wishlist :is(button, a, select, input, textarea):focus-visible {
   outline: 3px solid color-mix(in srgb, var(--accent) 44%, transparent);
@@ -59,58 +36,6 @@
 
   .wishlist > .tab-bar {
     top: max(6px, env(safe-area-inset-top));
-  }
-
-  .wl-card-v3-menu-wrap {
-    position: relative;
-  }
-
-  .wl-card-v3-menu {
-    position: absolute;
-    z-index: 60;
-    top: 44px;
-    right: 0;
-    bottom: auto;
-    left: auto;
-    width: min(176px, calc(100vw - 48px));
-    max-height: none;
-    padding: 4px;
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-    border-radius: 17px;
-    background: color-mix(in srgb, var(--surface) 97%, transparent);
-    box-shadow: 0 18px 42px color-mix(in srgb, var(--text) 18%, transparent);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-  }
-
-  .wl-card-v3-menu > button[role='menuitem'] {
-    display: flex;
-    width: 100%;
-    min-height: 44px;
-    align-items: center;
-    gap: 9px;
-    margin: 0;
-    padding: 10px 11px;
-    border-radius: 12px;
-    font-size: 13px;
-  }
-
-  .wl-card-v3-menu > button[role='menuitem'] > span {
-    display: grid;
-    width: 23px;
-    height: 23px;
-    flex: 0 0 23px;
-    place-items: center;
-    border-radius: 7px;
-    background: color-mix(in srgb, var(--accent) 9%, transparent);
-    color: var(--accent);
-    font-size: 13px;
-  }
-
-  .wl-card-v3-menu > .wl-card-v3-menu-danger > span {
-    background: color-mix(in srgb, var(--danger) 9%, transparent);
-    color: var(--danger);
   }
 
   .wishlist :is(
@@ -230,14 +155,6 @@
     padding-top: 24px;
     border-radius: 28px 28px 0 0;
   }
-
-  .wl-card-v3-reservation-actions {
-    grid-template-columns: 1fr;
-  }
-
-  .wl-card-v3-reservation-actions .wl-card-v3-secondary {
-    min-height: 44px;
-  }
 }
 
 @keyframes wl-card-menu-in {
@@ -252,9 +169,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .wl-card-v3-menu {
-    animation: none;
-  }
 
   .bottom-nav,
   .app-shell:has(.wishlist .modal-overlay) > .bottom-nav {

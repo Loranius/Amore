@@ -34,18 +34,4 @@
   .wishlist {
     padding-bottom: calc(132px + env(safe-area-inset-bottom, 0px));
   }
-
-  .wl-card-v3-menu-wrap {
-    margin-left: auto;
-  }
-
-  .wl-card-v3-photo img {
-    max-height: 460px;
-  }
-}
-
-@media (max-width: 420px) {
-  .wl-card-v3-reservation-actions {
-    grid-template-columns: 1fr;
-  }
 }

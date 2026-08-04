@@ -3,6 +3,11 @@
  * the .content padding with negative margins, while the redesign foundation
  * previously reset that margin to auto. That left the whole board inside the
  * scroll container's inner box and made it appear shifted on narrow screens.
+ *
+ * The horizontal clip this used to carry now lives on .content in index.css,
+ * where it protects every section rather than this one. A page-local copy was
+ * how the portal ended up with one section that could not drift sideways and
+ * eleven that could.
  */
 section.wishlist.pink-page {
   box-sizing: border-box;
@@ -10,7 +15,6 @@ section.wishlist.pink-page {
   max-width: none;
   margin-inline: -16px;
   padding-inline: 16px;
-  overflow-x: clip;
 }
 
 /*
@@ -22,15 +26,4 @@ section.wishlist.pink-page > :not(.modal-overlay):not(.wl-lightbox) {
   box-sizing: border-box;
   max-width: var(--wl-page-max-width, 1240px);
   margin-inline: auto;
-}
-
-/* A classic scrollbar must not reserve space on the right side only. */
-.content {
-  scrollbar-gutter: stable both-edges;
-}
-
-@supports not (overflow: clip) {
-  section.wishlist.pink-page {
-    overflow-x: hidden;
-  }
 }

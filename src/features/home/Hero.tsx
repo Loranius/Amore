@@ -1,13 +1,16 @@
 // ============================================================
-// Hero — привітання + лічильник днів + найближча подія над кристалом
+// Hero — привітання + лічильник днів над артефактом
 // ------------------------------------------------------------
-// Компактніша версія видалених у попередній фазі Greeting/Counter/
-// NextEvent (HomeBlocks.tsx) — тепер ділить сторінку з кристалом,
-// не займає весь екран.
+// Компактніша версія видалених у попередній фазі Greeting/Counter
+// (HomeBlocks.tsx) — тепер ділить сторінку з артефактом, не займає
+// весь екран.
+//
+// Рядок найближчого свята звідси прибрано: календар і так має власний
+// розділ, а на головній він відсував артефакт нижче — тобто головне на
+// цій сторінці поступалось місцем нагадуванню, яке його дублює.
 // ============================================================
 import { useMemo } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { useEvents } from '@/features/_shared/events';
 import { useStartDate } from './useHome';
 import { daysBetween, formatSinceDate, nextAnniversaryLabel } from './homeUtils';
 
@@ -17,30 +20,9 @@ const PERSONAL: Record<string, string[]> = {
   Діма: ['Як справи, Дімасік? 😎', 'Привіт, Дімонич 🤙'],
 };
 
-function useNextEventLabel(): string | null {
-  const { data: events = [] } = useEvents();
-  return useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const ev = events.find((e) => {
-      const d = new Date(e.date + 'T00:00:00');
-      return d >= today;
-    });
-    if (!ev) return null;
-
-    const eventDate = new Date(ev.date + 'T00:00:00');
-    const diffDays = Math.round((eventDate.getTime() - today.getTime()) / 86_400_000);
-    const dateStr = eventDate.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' });
-    const when = diffDays === 0 ? 'сьогодні! 🎉' : diffDays === 1 ? 'завтра' : `через ${diffDays} дн.`;
-    return `${ev.title} — ${dateStr} (${when})`;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events]);
-}
-
 export function Hero() {
   const me = useCurrentUser();
   const startDate = useStartDate();
-  const nextEvent = useNextEventLabel();
 
   const greeting = useMemo(() => {
     const pool = [...COMMON, ...(PERSONAL[me.name] ?? [])];
@@ -58,11 +40,6 @@ export function Hero() {
           <span className="home-hero-counter-label">днів разом · з {formatSinceDate(startDate)}</span>
           <span className="home-hero-anniversary">{nextAnniversaryLabel(startDate)}</span>
         </div>
-      )}
-      {nextEvent && (
-        <p className="home-hero-next-event">
-          <span aria-hidden="true">📅</span> {nextEvent}
-        </p>
       )}
     </section>
   );

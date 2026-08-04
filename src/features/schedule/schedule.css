@@ -303,13 +303,6 @@
   box-shadow: var(--shadow-sm);
 }
 
-.sched-edit-hint {
-  margin: 0 3px;
-  color: var(--muted);
-  font-size: 12px;
-  text-align: center;
-}
-
 .sched-board--editing .sched-cell {
   cursor: pointer;
 }

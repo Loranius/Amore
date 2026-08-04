@@ -9,7 +9,6 @@ import { FreeLimitCard } from './FreeLimitCard';
 import { PiggyBankCard } from './PiggyBankCard';
 import './budget.css';
 import './financeLayoutFix.css';
-import './goalDiscussionPolish.css';
 
 export function PiggyBankPage() {
   return (

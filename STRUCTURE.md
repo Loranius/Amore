@@ -47,15 +47,13 @@ amore-react/
     │   └── ui/                   # Modal, Skeleton, Lightbox, Confetti, EmptyState
     └── features/                 # 1 фіча = сторінка + хуки + локальні компоненти
         ├── auth/                 # LoginPage, UserSelect, PinPad
-        ├── home/                 # HomePage, Counter, PhotosCloud, WeekWidget, HomeWidgets, Greeting
+        ├── home/                 # HomePage, Hero, crystal3d/ (портал), reef3d/
         ├── wishlist/             # WishlistPage, useWishlist.ts, WishCard, WishFormModal
         ├── plans/                # PlansPage, PlanDetailsPage, planModel.ts, planMoney.ts
         ├── piggybank/            # PiggyBankPage («Скарбничка»), useBudget.ts, FreeLimitCard
         ├── calendar/             # CalendarPage, useCalendar.ts, EventList, calendarPlans.ts
         ├── schedule/             # SchedulePage, useSchedule.ts, useSharedDaysOff.ts
-        ├── photo-calendar/       # PhotoCalendarPage, usePhotoCalendar.ts
-        ├── question/             # QuestionPage, useDailyQuestion.ts
-        ├── capsule/              # CapsulePage, useCapsules.ts
+        ├── memories/             # MemoriesPage (замінила photo-calendar)
         ├── media/                # MediaPage, useMediaItems.ts, useTmdb.ts
         ├── swipe/                # SwipeDeck, useSwipeDeck.ts (framer-motion drag)
         ├── whereto/              # WhereToPage, useEventsFinder.ts
@@ -80,9 +78,8 @@ amore-react/
 | `/calendar`          | calendar/CalendarPage   | calendar         |
 | `/schedule`          | schedule/SchedulePage   | schedule         |
 | `/calendar/schedule` | → редирект на `/schedule` | schedule       |
-| `/calendar/photos`   | photo-calendar/…Page    | photo-calendar   |
-| `/us` → `/us/question` | question/QuestionPage | question (хаб)   |
-| `/us/capsule`        | capsule/CapsulePage     | capsule          |
+| `/calendar/photos`   | → редирект на `/memories` | photo-calendar |
+| `/memories`          | memories/MemoriesPage   | photo-calendar   |
 | `/media`             | media/MediaPage (+Swipe)| media            |
 | `/whereto`           | whereto/WhereToPage     | whereto          |
 | `/map`               | map/MapPage             | map              |
@@ -105,9 +102,7 @@ amore-react/
 | `wishlist:<owner>`     | `['wishlist', ownerId]`              |
 | `media:<type>:<status>`| `['media', { type, status }]`        |
 | `dishes`               | `['dishes']`                         |
-| `question:log:<date>`  | `['question', date]`                 |
 | `sched:<month>`        | `['schedule', month]`                |
-| `pcal:<month>`         | `['photoCalendar', month]`           |
 | `map_pins`             | `['mapPins']`                        |
 | `free_limit` / `savings_goals` | `['freeLimit']` / `['savingsGoals']` |
 
