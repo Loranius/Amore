@@ -1,13 +1,29 @@
 import type { EvolutionChannel, EvolutionPressureVector } from '../evolution';
 import type { CrystalRgb } from './types';
 
+/**
+ * What each pressure channel colours the stone.
+ *
+ * **All six live on one rose-to-amethyst arc, and that is the requirement
+ * rather than a preference.** The set this replaces spanned the wheel — amber
+ * for achievement, cyan for exploration, green for stability — and the palette
+ * mixes the dominant channel into the shell, so a couple who travel a lot got a
+ * *cyan* crystal and a steady one got a green stone. The brief forbids exactly
+ * that: one family from any angle, and no hue drift between couples or between
+ * faces.
+ *
+ * The channels still separate, they separate *within* the family: warm rose at
+ * one end, violet at the other. Green is the lowest channel in every one of
+ * them, which is what keeps a face from ever reading as yellow — yellow needs
+ * green high, and nothing here has it.
+ */
 const CHANNEL_COLORS: Record<EvolutionChannel, CrystalRgb> = {
-  achievement: { r: 0.96, g: 0.64, b: 0.28 },
-  remembrance: { r: 0.96, g: 0.47, b: 0.66 },
-  exploration: { r: 0.35, g: 0.78, b: 0.89 },
-  culture: { r: 0.64, g: 0.5, b: 0.92 },
-  stability: { r: 0.42, g: 0.78, b: 0.58 },
-  significance: { r: 0.94, g: 0.34, b: 0.54 },
+  achievement: { r: 0.98, g: 0.52, b: 0.66 },
+  remembrance: { r: 0.96, g: 0.47, b: 0.7 },
+  exploration: { r: 0.72, g: 0.55, b: 0.95 },
+  culture: { r: 0.68, g: 0.48, b: 0.94 },
+  stability: { r: 0.84, g: 0.55, b: 0.86 },
+  significance: { r: 0.94, g: 0.38, b: 0.72 },
 };
 
 export function clamp01(value: number): number {

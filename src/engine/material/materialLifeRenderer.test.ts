@@ -150,7 +150,12 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     const high = pipeline({ quality: 'high' });
     const fallback = pipeline({ quality: 'fallback' });
 
-    expect(high.material.bodies.some((body) => body.iridescence > 0)).toBe(true);
+    // ADR-0019: thin-film is gone at every tier, so this is no longer what
+    // separates high from low. It was a hue shift by construction — gold on one
+    // facet, green on the next — and the brief forbids the crystal leaving one
+    // rose/amethyst family from any angle. What still degrades with the tier is
+    // procedural reflection, clearcoat and the inclusion scale, asserted below.
+    expect(high.material.bodies.every((body) => body.iridescence === 0)).toBe(true);
     expect(high.life.sparkleCount).toBeGreaterThan(0);
     for (const body of fallback.material.bodies) {
       expect(body.iridescence).toBe(0);
@@ -793,7 +798,20 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
       // against 1.9057 for every other body — a 6.7% shift, and the yellow the
       // owner named. Without it every body sits at 1.9057, and what is left
       // here is the role ladder's residue, three orders of magnitude smaller.
-      expect(hue(body.baseColor)).toBeCloseTo(hue(open[0]!.baseColor), 2);
+      // ADR-0019 widened this tolerance from 3 decimals to 2. The role ladder
+      // now runs between a saturated rose and a pale lilac rather than between
+      // rose and an orange, so a body's role moves its red-to-blue ratio a
+      // little further than it did — measured, 1.9498 against 1.9439, or 0.3%.
+      // The requirement is that a closed year is not *painted* differently; a
+      // third of a percent of role residue is not that.
+      // Stated as a *relative* bound rather than in decimal places: the
+      // requirement is "the same hue", and how many decimals that is depends on
+      // how large the ratio happens to be, which is not something this test is
+      // about. Measured: 1.9498 against 1.9439, 0.3% apart.
+      expect(
+        Math.abs(hue(body.baseColor) / hue(open[0]!.baseColor) - 1),
+        body.bodyId,
+      ).toBeLessThan(0.01);
       expect(body.emissiveColor).toEqual(open[0]!.emissiveColor);
     }
   });

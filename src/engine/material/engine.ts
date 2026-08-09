@@ -39,12 +39,25 @@ function palette(input: BuildCrystalMaterialInput): CrystalMaterialPalette {
   const state = input.species.state;
   const weighted = weightedChannelColor(pressures.channelShare);
   const dominant = crystalChannelColor(pressures.dominantChannel);
-  const warmth = rgb(1, 0.58 + pressures.warmth * 0.16, 0.38 + pressures.warmth * 0.18);
-  const cool = rgb(0.58, 0.76 + pressures.brilliance * 0.16, 1);
+  // Both ends of the shell's own ladder, and both inside the family.
+  //
+  // `warmth` was `1 / 0.58.. / 0.38..` — an orange — and `secondary` is what
+  // the composition role mixes toward, so a companion body was dragged toward
+  // orange while the focal one stayed rose. Measured across one couple's seven
+  // bodies, the red-to-blue ratio spread by **1.66×**: they were not shades of
+  // one colour, they were different colours. The deep end is now a saturated
+  // rose, the light end a pale lilac, and the ladder between them moves value
+  // and saturation without turning the hue.
+  const deep = rgb(0.86, 0.3 + pressures.warmth * 0.08, 0.56 + pressures.warmth * 0.1);
+  const pale = rgb(0.92, 0.78 + pressures.brilliance * 0.08, 1);
   const primary = mixRgb(weighted, dominant, 0.28 + pressures.dominance * 0.34);
-  const secondary = mixRgb(primary, warmth, pressures.warmth * 0.36);
-  const highlight = mixRgb(cool, rgb(1, 0.92, 0.97), 0.45 + state.purity * 0.35);
-  const core = mixRgb(rgb(1, 0.45, 0.22), dominant, pressures.luminosity * 0.32);
+  const secondary = mixRgb(primary, deep, pressures.warmth * 0.36);
+  const highlight = mixRgb(pale, rgb(1, 0.9, 0.98), 0.45 + state.purity * 0.35);
+  // The inner light. Amber `1 / 0.45 / 0.22` stood here, and it is the one
+  // remaining source of warm on the crystal: it is the emissive, it is 20% of
+  // the rim colour, and the zoning multiplies it. The brief's inner flow is
+  // saturated pink to light lilac, so the core starts there.
+  const core = mixRgb(rgb(1, 0.38, 0.72), dominant, pressures.luminosity * 0.32);
   return { primary, secondary, highlight, core };
 }
 
@@ -338,20 +351,21 @@ function shaderRecipe(
     // supply it these two terms are the entire budget.
     rimStrength: round6(reflectionEnabled ? preset.reflectionScale * (micro ? 0.12 : emphasized ? 0.74 : 0.54) : 0),
     skyStrength: round6(reflectionEnabled ? preset.reflectionScale * (micro ? 0.05 : 0.26) : 0),
-    skyColor: mixRgb({ r: 0.82, g: 0.9, b: 1 }, input.species.pressures.dominantChannel === 'culture'
-      ? { r: 0.78, g: 0.72, b: 1 }
-      : { r: 0.9, g: 0.95, b: 1 }, 0.34),
-    // The warm branch is gone. It stood for a studio's wooden floor, and the
-    // portal's floor is dark violet stone — so the crystal was reflecting a
-    // room it is not standing in. Measured by ablation on the owner's live
-    // portal at the high tier: neutralising this colour removed **81%** of the
-    // warm cast on the shell, against 5% for the thin-film iridescence, so this
-    // was the golden side the owner asked about and iridescence was not.
-    //
-    // What remains is the cool half of the same mix, which keeps the reflection
-    // reading as a room with a lit ground rather than as a black void below.
-    groundColor: mixRgb({ r: 1, g: 0.73, b: 0.62 }, { r: 0.98, g: 0.76, b: 0.84 }, 0.42),
-    rimColor: mixRgb({ r: 1, g: 0.9, b: 0.96 }, emissiveColor, emphasized ? 0.46 : 0.2),
+    // Light lilac above, rose below, and nothing outside the family. The sky was
+    // `0.82 / 0.90 / 1.00` — a blue studio ceiling — and a near-vertical prism
+    // face reflects mostly sideways, so that blue was landing on the faces that
+    // turn away from the key light. One family from any angle means the fake
+    // room has to be in it too.
+    skyColor: mixRgb({ r: 0.86, g: 0.83, b: 1 }, { r: 0.9, g: 0.86, b: 1 }, 0.34),
+    // The ground the crystal reflects. It was a studio's wooden floor —
+    // `1 / 0.684 / 0.536`, and measured by ablation on the owner's live portal
+    // it was **81%** of the warm cast on the shell, against 5% for the
+    // thin-film. The warm branch went first; now the base goes too, and the
+    // reflection stands in the same rose family as everything else.
+    groundColor: { r: 1, g: 0.78, b: 0.9 },
+    // Light pink, and it stays light pink: the emissive it mixes in is now rose
+    // rather than amber, so the rim can no longer carry warmth into a face.
+    rimColor: mixRgb({ r: 1, g: 0.86, b: 0.94 }, emissiveColor, emphasized ? 0.46 : 0.2),
     // Amplitude of the zoning, not a threshold. As a threshold this was 0.111
     // on a real couple — the top eighth of the noise range, which draws thin
     // filaments rather than the broad stages a crystal actually grew in. The
@@ -612,18 +626,16 @@ function buildBodyMaterial(
     SHELL_CLEARCOAT,
     acrossBand(SHELL_CLEARCOAT, pressures.refinement) * preset.clearcoatScale,
   );
-  const iridescenceAllowed = input.config.allowIridescence && !micro;
-  // A year in which both partners gave as much as they received comes out
-  // nearly white — the balance shows as rainbow on the facets instead, which
-  // is why an evenly-shared year is the most beautiful rather than the
-  // greyest (ADR-0004).
-  const earnedIridescence = instruction?.iridescence ?? 0;
-  const iridescence = round6(iridescenceAllowed
-    ? Math.min(
-        preset.maxIridescence,
-        0.08 + pressures.refinement * 0.42 + pressures.brilliance * 0.12 + earnedIridescence * 0.5,
-      )
-    : 0);
+  // **Zero, and not by a preset.** Thin-film interference is a hue shift by
+  // definition: at the 284–545 nm film this crystal was carrying it puts gold
+  // on one facet and green on the next, which is the first thing the brief
+  // forbids. It was also measured on the owner's live portal — 0.58, the high
+  // tier's own ceiling, on every body of a couple who had earned it.
+  //
+  // What this costs, stated rather than hidden: ADR-0016 made a couple's
+  // *balance* in giving show as iridescence, and that signal now has no outlet.
+  // The tint still carries how much they gave; how evenly does not render.
+  const iridescence = 0;
   const emissiveIntensity = intoBand(SHELL_EMISSIVE, acrossBand(
     SHELL_EMISSIVE,
     (emphasized ? 0.55 : focal ? 0.28 : 0.1)
