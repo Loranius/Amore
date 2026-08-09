@@ -243,8 +243,15 @@ describe('Crystal organic profile phase 3a', () => {
     const widest = rows[widestIndex]!.radiusX;
 
     // The shoulder sits where a quartz termination begins.
+    //
+    // The ceiling moved 0.82 → 0.84 when the crown angle became the lattice's
+    // own 51.78° instead of a 42–54° band the aspect ratio was clamped into.
+    // That is arithmetic, not drift: a face at 51.78° drops `radius · tan` to
+    // the shaft, so the termination is 8% shorter than the 54° it always used
+    // to be clamped to, and a shorter termination starts higher. On this body
+    // the shoulder moved 0.8195 → 0.8216.
     expect(rows[widestIndex]!.y / top).toBeGreaterThanOrEqual(0.6);
-    expect(rows[widestIndex]!.y / top).toBeLessThanOrEqual(0.82);
+    expect(rows[widestIndex]!.y / top).toBeLessThanOrEqual(0.84);
 
     const radiusNear = (fraction: number): number => {
       const targetY = top * fraction;
@@ -286,9 +293,12 @@ describe('Crystal organic profile phase 3a', () => {
       );
       const share = rows[widestIndex]!.y / top;
 
-      // Every crystal keeps a real shoulder, high on the body.
+      // Every crystal keeps a real shoulder, high on the body. The ceiling
+      // moved 0.90 → 0.92 with the lattice crown angle, for the same reason as
+      // in the test above: a termination 8% shorter starts 8% further up. The
+      // worst seed of the forty here went 0.8994 → 0.9063.
       expect(share).toBeGreaterThanOrEqual(0.5);
-      expect(share).toBeLessThanOrEqual(0.9);
+      expect(share).toBeLessThanOrEqual(0.92);
       shoulders.add(Math.round(share * 100));
 
       // Below the shoulder the body only widens, above it only narrows. That is
@@ -739,17 +749,19 @@ describe('crystal faceting — the face a triangle belongs to', () => {
 describe('crystal faceting — the termination is lattice, not proportion', () => {
   /**
    * A quartz termination sits at the angle the lattice dictates, whatever the
-   * prism's length: the prism-to-rhombohedral angle is about 141.8°, which puts
-   * the crown faces near 52° from horizontal on a stubby crystal and a tall one
-   * alike. A point that sharpens as the body grows is a spire, not a crystal.
+   * prism's length: the prism-to-rhombohedral interfacial angle is 141°47′,
+   * which puts the crown faces at 51°47′ from horizontal on a stubby crystal
+   * and a tall one alike. A point that sharpens as the body grows is a spire,
+   * not a crystal.
    *
-   * The inclination is derived from the body's own aspect ratio, and on a tall
-   * monarch that derivation used to saturate its ceiling of 84°, leaving crown
-   * normals only 12–16° above horizontal — within a few degrees of the prism
-   * faces beneath them. The termination then caught the same light as the shaft,
-   * which is what made the crystal read as a capped column.
+   * The inclination used to be derived from the body's own aspect and then
+   * clamped into a 42–54° band. Measured across every body of three couples,
+   * 261 of 313 crown planes landed exactly on a bound of that band, and for the
+   * monarch it was 7 of 7 at every age — the aspect angle ran 66–76° against a
+   * ceiling of 54. So the crystal already had one fixed crown angle; it had it
+   * by accident, through a clamp, behind code that claimed otherwise.
    */
-  it('keeps crown faces in the quartz band however long the prism grows', () => {
+  it('gives every crown plane the lattice angle, however long the prism grows', () => {
     const short = buildCrystalProfile(
       crystalBody({ ...motherBody(), renderedLength: 0.7, renderedRadius: 0.3 }),
       'high',
@@ -762,18 +774,137 @@ describe('crystal faceting — the termination is lattice, not proportion', () =
     for (const profile of [short, tall]) {
       const crowns = (profile.planes ?? []).filter((plane) => plane.kind === 'crown');
       expect(crowns.length).toBeGreaterThan(3);
-      for (const plane of crowns) {
-        const pitch = Math.asin(Math.max(-1, Math.min(1, plane.normal.y))) * (180 / Math.PI);
-        // The complement of the 42..54° face band the lattice is held to, with
-        // room either side: the published planes have been through the body's
-        // anisotropy and lean, and an affine map takes planes to planes but
-        // does not preserve their angles. What matters is that the crown is
-        // nowhere near the 12..16° it used to sit at, where it was
-        // indistinguishable from the prism faces below it.
+      const pitches = crowns.map(
+        (plane) => Math.asin(Math.max(-1, Math.min(1, plane.normal.y))) * (180 / Math.PI),
+      );
+      for (const pitch of pitches) {
+        // 38.22° is the complement of the face's 51.78°. The published planes
+        // have been through the body's anisotropy and lean, and an affine map
+        // takes planes to planes but does not preserve their angles, so the
+        // tolerance is the distortion rather than slack in the angle itself.
         expect(pitch).toBeGreaterThan(30);
-        expect(pitch).toBeLessThan(56);
+        expect(pitch).toBeLessThan(46);
+      }
+      // Two bodies of very different aspect, one angle: the spread inside a
+      // body is anisotropy, and the two bodies' medians agree.
+      const median = (values: number[]): number => {
+        const sorted = [...values].sort((left, right) => left - right);
+        return sorted[Math.floor(sorted.length / 2)]!;
+      };
+      expect(median(pitches)).toBeGreaterThan(33);
+      expect(median(pitches)).toBeLessThan(43);
+    }
+  });
+
+  /**
+   * The r/z distinction, which is what makes a quartz point read as one.
+   *
+   * A termination carries two rhombohedra at the same angle — r and z, the same
+   * form rotated 60°. z grows faster, travels further from the centre and is
+   * eaten by its neighbours, so z faces come out markedly smaller. Every crown
+   * plane used to pass through one apex, which made the tip a ring of near-equal
+   * triangles: the "designed roof" the review named, and the finding Pass 1
+   * confirmed by measuring seven faces inside a 4° band.
+   */
+  it('alternates major and minor termination faces around the tip', () => {
+    const body = motherBody();
+    const profile = buildCrystalProfile(body, 'high');
+    const planes = profile.planes!;
+    const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
+
+    const faceArea = (loop: number[]): number => {
+      let area = 0;
+      for (let corner = 1; corner + 1 < loop.length; corner += 1) {
+        const a = polytope.vertices[loop[0]!]!;
+        const b = polytope.vertices[loop[corner]!]!;
+        const c = polytope.vertices[loop[corner + 1]!]!;
+        const u = [b.x - a.x, b.y - a.y, b.z - a.z];
+        const v = [c.x - a.x, c.y - a.y, c.z - a.z];
+        area += Math.hypot(
+          u[1]! * v[2]! - u[2]! * v[1]!,
+          u[2]! * v[0]! - u[0]! * v[2]!,
+          u[0]! * v[1]! - u[1]! * v[0]!,
+        ) * 0.5;
+      }
+      return area;
+    };
+
+    // Crown planes are emitted in one run and in order, so a plane's position
+    // within that run is its r/z parity.
+    const crownOrdinal = new Map<number, number>();
+    planes.forEach((plane, index) => {
+      if (plane.kind === 'crown') crownOrdinal.set(index, crownOrdinal.size);
+    });
+
+    const major: number[] = [];
+    const minor: number[] = [];
+    for (const face of polytope.faces) {
+      const ordinal = crownOrdinal.get(face.planeIndex);
+      if (ordinal === undefined) continue;
+      (ordinal % 2 === 0 ? major : minor).push(faceArea(face.loop));
+    }
+
+    expect(major.length).toBeGreaterThanOrEqual(3);
+    expect(minor.length).toBeGreaterThanOrEqual(2);
+
+    const mean = (values: number[]): number =>
+      values.reduce((sum, value) => sum + value, 0) / values.length;
+    // Two sizes, not a spread: every minor face is smaller than every major
+    // one, which is what turns a ring of triangles into a quartz point.
+    // On this body: majors 0.0250–0.0585, minors 0.0041–0.0304, mean ratio
+    // 0.358. Stated as means rather than as "every minor below every major",
+    // because the majors themselves span 2.3× — the smallest major overlaps the
+    // largest minor, and a crystal where they could not would be the stamped
+    // shape this replaces.
+    expect(mean(minor)).toBeLessThan(mean(major) * 0.5);
+  });
+
+  it('never lets a minor face collapse into a sliver', () => {
+    // §36: a facet too small to read is worse than no facet — it costs a plane,
+    // a normal and a rim, and renders as a scratch. The retreat that closes a
+    // minor face varies about thirtyfold across one crystal, because it depends
+    // on the azimuth gaps to the face's neighbours; quoted in radii it left one
+    // measured face at 1/368th the area of its neighbour. Quoted as a share of
+    // that closing distance it behaves the same on every face.
+    //
+    // Measured as a facet's span against the body's own width, so it is a
+    // statement about what the eye can resolve rather than about engine units.
+    const spans: number[] = [];
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const body = { ...motherBody(), seed: seed * 7919 };
+      const profile = buildCrystalProfile(body, 'high');
+      const planes = profile.planes!;
+      const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
+      const width = body.renderedRadius * 2;
+
+      for (const face of polytope.faces) {
+        if (planes[face.planeIndex]!.kind !== 'crown') continue;
+        let area = 0;
+        for (let corner = 1; corner + 1 < face.loop.length; corner += 1) {
+          const a = polytope.vertices[face.loop[0]!]!;
+          const b = polytope.vertices[face.loop[corner]!]!;
+          const c = polytope.vertices[face.loop[corner + 1]!]!;
+          const u = [b.x - a.x, b.y - a.y, b.z - a.z];
+          const v = [c.x - a.x, c.y - a.y, c.z - a.z];
+          area += Math.hypot(
+            u[1]! * v[2]! - u[2]! * v[1]!,
+            u[2]! * v[0]! - u[0]! * v[2]!,
+            u[0]! * v[1]! - u[1]! * v[0]!,
+          ) * 0.5;
+        }
+        spans.push(Math.sqrt(2 * area) / width);
       }
     }
+
+    // Measured over 258 crown facets on forty seeds: median 0.60 of the body's
+    // width, 5th percentile 0.141, floor 0.0149, and two facets below 0.05. The
+    // floor is the regression guard — a change that reopens the sliver takes it
+    // to 0.003, which is where the radius-quoted retreat left it.
+    expect(spans.length).toBeGreaterThan(200);
+    expect(Math.min(...spans)).toBeGreaterThan(0.012);
+    expect(spans.filter((span) => span < 0.05)).toHaveLength(2);
+    const sorted = [...spans].sort((left, right) => left - right);
+    expect(sorted[Math.floor(sorted.length / 2)]!).toBeGreaterThan(0.4);
   });
 });
 

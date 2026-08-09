@@ -159,7 +159,6 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
       expect(body.shader.inclusionDensity).toBe(0);
     }
     expect(fallback.life.sparkleCount).toBe(0);
-    expect(fallback.life.rotationSpeed).toBe(0);
   });
 
   it('freezes continuous motion under reduced-motion while preserving a subtle glow response', () => {
@@ -169,9 +168,7 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     const touched = sampleCrystalLife({ life, elapsedSeconds: 100, interactionPulse: 1 });
 
     expect(later).toEqual(first);
-    expect(first.rotationY).toBe(0);
     expect(first.groupScale).toBe(1);
-    expect(touched.rotationY).toBe(0);
     expect(touched.groupScale).toBe(1);
     expect(Object.values(touched.bodyGlowMultiplier).some((value) => value > 1)).toBe(true);
   });
@@ -184,8 +181,9 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     // It did exactly that, twice reported. Levitation swung the whole group
     // ±0.095 and a tilt of ±0.018/±0.014 rad swung the vein's far rim another
     // ±0.06, against a seam standing only ~0.047 proud of the platform — so it
-    // buried itself twice a cycle, and the turn about Y carried the low side
-    // around once per revolution, which is what "it spirals down" was.
+    // buried itself twice a cycle, and the turn about Y that used to sit in the
+    // frame carried the low side around once per revolution, which is what "it
+    // spirals down" was.
     //
     // Measured on the built bundle rather than on the frame, because the defect
     // was never in one number: the pieces were individually modest and only the
@@ -211,9 +209,11 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     // Including while the couple is touching it — the pulse feeds the scale.
     expect(floorOf(42.6, 1)).toBeCloseTo(rest, 5);
 
-    // And the reason it holds: the only transforms left are a turn about the
-    // vertical axis and a scale anchored at the foot.
+    // And the reason it holds: the only transform left is a scale anchored at
+    // the foot. Not one axis of rotation either — the self-spin is gone, so the
+    // artifact stands still and the viewer's finger moves the camera instead.
     expect(bundle.group.rotation.x).toBe(0);
+    expect(bundle.group.rotation.y).toBe(0);
     expect(bundle.group.rotation.z).toBe(0);
     bundle.dispose();
   });
@@ -232,7 +232,10 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     expect(bundle.drawCallCount).toBeLessThan(geometry.meshes.length);
     expect(bundle.group.children).toEqual([bundle.content]);
     expect(bundle.content.children).toHaveLength(bundle.drawCallCount);
-    expect(bundle.group.rotation.y).toBeCloseTo(frame.rotationY, 6);
+    // A live frame with a pulse in it still leaves the artifact facing the way
+    // it was built facing: the frame carries no rotation to apply.
+    expect(bundle.group.rotation.y).toBe(0);
+    expect(bundle.group.scale.x).toBeCloseTo(frame.groupScale, 6);
 
     expect(bundle.fit.sourceSize.x).toBeGreaterThan(0);
     expect(bundle.fit.sourceSize.y).toBeGreaterThan(0);

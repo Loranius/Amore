@@ -101,14 +101,6 @@ function signedUnit(seed: number, label: string): number {
 }
 
 /**
- * Where the shaft ends and the termination begins, as a fraction of the body's
- * own height. Seeded per body so no two crystals in a colony carry the same
- * crown.
- */
-const SHOULDER_MIN = 0.7;
-const SHOULDER_MAX = 0.78;
-
-/**
  * How deep the monarch stands in the quartz vein, as a fraction of her visible
  * length.
  *
@@ -117,10 +109,6 @@ const SHOULDER_MAX = 0.78;
  * loses height, which is the one thing it is supposed to communicate.
  */
 const MONARCH_GROUND_SINK = 0.1;
-
-function shoulderFraction(seed: number): number {
-  return SHOULDER_MIN + seededUnit(seed, 'geometry:shoulder') * (SHOULDER_MAX - SHOULDER_MIN);
-}
 
 /**
  * The shared crystal profile: a narrow base, a shaft that widens gently to a
@@ -384,7 +372,6 @@ export function buildCrystalProfile(
     bevels: plan.chamfers,
     blunt,
     broken,
-    shoulderShare: broken ? 0.88 : shoulderFraction(body.seed),
     lod,
   }).map((face) => transformCrystalPlane(
     face,

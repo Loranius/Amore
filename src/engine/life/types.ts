@@ -40,17 +40,6 @@ export interface CrystalLifeState {
   artifactSeed: number;
   reducedMotion: boolean;
   quality: CrystalMaterialQuality;
-  /**
-   * Radians per second the artifact turns about its own vertical axis.
-   *
-   * Survives while levitation and tilt do not, and the difference is not
-   * taste. The platform is flat inside the vein's footprint and bows only
-   * outside it, so that flat region is a full annulus — rotationally symmetric.
-   * A turn about Y therefore moves the seam through stone of exactly the same
-   * height it left, and nothing can rise over it. Tilt broke that symmetry, and
-   * a turn then carried the low side around once per revolution.
-   */
-  rotationSpeed: number;
   breatheAmplitude: number;
   breatheSpeed: number;
   sparkleCount: number;
@@ -62,15 +51,22 @@ export interface CrystalLifeState {
 /**
  * One sampled instant of the artifact's motion.
  *
- * Every term here is either a turn about the vertical axis or a uniform scale,
- * and that is a hard rule rather than a coincidence: **the artifact is rooted.**
- * Since ADR-0003 it is a druse standing on the ground, and since ADR-0007 it
- * grows out of a fissure in that ground — so nothing in it may translate or tip
- * relative to the stone it came out of. The renderer anchors the scale at the
- * base for the same reason (`ThreeCrystalRenderBundle.baseY`).
+ * Every term here is a uniform scale, and that is a hard rule rather than a
+ * coincidence: **the artifact is rooted.** Since ADR-0003 it is a druse
+ * standing on the ground, and since ADR-0007 it grows out of a fissure in that
+ * ground — so nothing in it may translate or tip relative to the stone it came
+ * out of. The renderer anchors the scale at the base for the same reason
+ * (`ThreeCrystalRenderBundle.baseY`).
+ *
+ * **Nor may it turn.** The artifact used to spin about its own axis at a
+ * seeded rate, which is the one motion a rooted body cannot have: a crystal in
+ * stone does not revolve, and the spin fought the viewer — the couple would
+ * drag it to a face they liked and it would carry that face away again. The
+ * only rotation left in the portal is the camera's, under the viewer's own
+ * finger (`OrbitControls` in `PortalStage`), so the artifact holds still and
+ * the couple walks around it.
  */
 export interface CrystalLifeFrame {
-  rotationY: number;
   groupScale: number;
   sparklePhase: number;
   bodyGlowMultiplier: Readonly<Record<string, number>>;

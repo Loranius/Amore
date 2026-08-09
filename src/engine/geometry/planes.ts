@@ -88,44 +88,51 @@ const PRISM_FLARE_MIN = 0.05;
 const PRISM_FLARE_MAX = 0.2;
 
 /**
- * How much a crown face's shoulder may sit above or below the body's own, as a
- * fraction of the termination's length.
+ * The inclination of a termination face from horizontal, in degrees.
  *
- * Varied as a *height*, not as an angle. A crystal ten radii tall has crown
- * faces around 70° from horizontal, and the tangent is savage there: nine
- * degrees of jitter turned a termination meant to be a quarter of the body into
- * three fifths of it, so seeded variation was quietly reshaping the crystal
- * rather than detailing it. Jittering the shoulder height and deriving the
- * angle from it means a quarter stays a quarter, and the faces still meet the
- * shaft at their own heights — which is the thing being asked for.
- */
-const CROWN_SHOULDER_SPREAD = 0.25;
-/**
- * The band a termination face's inclination from horizontal may sit in.
- *
- * This is lattice, not proportion, and that distinction is the whole point. The
- * inclination is derived from the body's own aspect — a termination `rise` tall
- * over a face standing `radius` out — and for a tall, thin monarch that
- * derivation ran into the old ceiling of 84°, leaving crown planes whose normals
- * stood only 12–16° above horizontal. Measured off the live portal: the crown
- * faces were within a few degrees of parallel to the prism faces below them, so
- * the termination caught the same light as the shaft and the crystal read as a
- * column with a shallow cap rather than as a quartz point.
- *
- * Real quartz does not work that way. The angle between a prism face and a
- * rhombohedral face is fixed by the crystal lattice at about 141.8°, which puts
- * the termination faces near 52° from horizontal whatever the prism's length. A
- * quartz crystal twice as long gets twice the shaft, not a sharper point — a
+ * One number, not a band, and not derived from anything. The interfacial angle
+ * between a quartz prism face and a rhombohedral face is fixed by the lattice
+ * at 141°47′, so the rhombohedral face's normal stands 38°13′ above horizontal
+ * and the face itself lies at 51°47′ — **whatever the prism's length**. A
+ * quartz crystal twice as long gets twice the shaft, not a sharper point; a
  * point that sharpens with height is a spire, and spires are carved rather than
  * grown.
  *
- * So the band is narrow and centred on the mineral's own angle. The aspect
- * ratio still chooses where inside it a given face sits, and the seeded shoulder
- * spread still makes the faces unequal; neither may push the crystal out of the
- * habit it is supposed to have.
+ * This replaces a 42–54° band whose position was derived from each body's own
+ * aspect. The derivation was dead code and measurement said so: across every
+ * body of three couples, 261 of 313 crown planes landed exactly on a bound of
+ * the band, and for the monarch it was 7 of 7, every couple, every age — the
+ * raw aspect angle ran 66–76° against a ceiling of 54. So the crystal already
+ * had one fixed crown angle. It just had it by accident, through a clamp, while
+ * the code around it claimed the angle followed the body.
+ *
+ * The variation the eye actually reads in a quartz termination is not angle. It
+ * is `MINOR_RETREAT` below.
  */
-const CROWN_FACE_MIN_DEG = 42;
-const CROWN_FACE_MAX_DEG = 54;
+const CROWN_FACE_DEG = 51.78;
+
+/**
+ * How far a minor termination plane has run toward closing, as a share of the
+ * retreat that would close it (see `minorFaceRetreat`).
+ *
+ * This is the r/z distinction, and it is what makes a quartz point look like
+ * one. A termination carries two rhombohedra, r and z, alternating around the
+ * crystal *at the same angle* — they are the same form rotated 60°. They differ
+ * because z grows faster, and a face that grows faster travels further from the
+ * centre and is eaten by its neighbours. So z faces come out small, and on many
+ * specimens they close up entirely and leave a termination that reads as three
+ * big faces: which is why so much quartz looks three-sided at the tip while
+ * being six-sided at the waist.
+ *
+ * Before this, every crown plane passed through the same apex, so the tip was a
+ * ring of near-equal triangles — the "designed roof" the review named.
+ *
+ * The band stops well short of 1. Area falls with the square of what is left,
+ * so a face taken past about 0.7 stops being a smaller facet and becomes a
+ * sliver, and a facet too small to read is §36's "tiny meaningless facet".
+ */
+const MINOR_RETREAT_MIN = 0.18;
+const MINOR_RETREAT_MAX = 0.45;
 
 /** How far the tip sits off the axis, as a fraction of the radius. */
 const APEX_DRIFT = 0.3;
@@ -151,6 +158,64 @@ const SAFETY_SPAN = 4;
 
 function signed(seed: number, label: string): number {
   return seededUnit(seed, label) * 2 - 1;
+}
+
+/**
+ * The smaller of a crown plane's two angular gaps to its neighbours, in radians.
+ *
+ * The smaller one, because it is the one that closes the face first, and a face
+ * that has closed on one side is gone whatever room it had on the other.
+ */
+function neighbourGap(azimuths: number[], index: number): number {
+  const count = azimuths.length;
+  const here = azimuths[index]!;
+  const wrap = (value: number) => {
+    let gap = value;
+    while (gap <= 0) gap += Math.PI * 2;
+    while (gap > Math.PI) gap = Math.PI * 2 - gap;
+    return gap;
+  };
+  const before = wrap(here - azimuths[(index - 1 + count) % count]!);
+  const after = wrap(azimuths[(index + 1) % count]! - here);
+  // A gap at or past a right angle makes the closed form below divide by a
+  // number crossing zero. Real gaps run 17°–79°; this only bounds the seed.
+  return Math.min(1.4, Math.max(1e-3, Math.min(before, after)));
+}
+
+/**
+ * How far a minor termination plane must stand off the apex to be `share` of
+ * the way to closing.
+ *
+ * Solved rather than tuned, because the retreat that closes a minor face is not
+ * a fixed distance — it varies about thirtyfold across one crystal. Put the apex
+ * at the origin and let all three planes carry the lattice pitch `p`. The two
+ * major neighbours sit at ±`gap` in azimuth and pass through the apex; the minor
+ * sits between them at a distance δ. The majors meet along a ray descending from
+ * the apex, and the minor face exists exactly while δ is short enough for the
+ * minor plane to still cut that ray above the shoulder. Working the cross
+ * product through gives the retreat at which it stops doing so:
+ *
+ *     δ* = drop · sin(p) · (1 − cos gap) / cos gap
+ *
+ * For a regular hexagon that is 0.12 of the radius; for the 17° gap this crystal
+ * family also produces, 0.008. A retreat quoted in radii therefore closes some
+ * faces outright and leaves others untouched — measured, and it did: one face
+ * survived at 1/368th the area of its neighbour, which is a sliver, not a facet.
+ *
+ * As a share of δ* it behaves the same on every face. The face's linear size
+ * falls with (1 − share), so its area falls with the square: half-closed is a
+ * quarter the area, which is the size difference between r and z that makes a
+ * quartz point read as one.
+ */
+function minorFaceRetreat(
+  drop: number,
+  sinPitch: number,
+  gap: number,
+  share: number,
+): number {
+  const cosGap = Math.cos(gap);
+  const closing = drop * sinPitch * (1 - cosGap) / cosGap;
+  return closing * share;
 }
 
 function plane(
@@ -182,8 +247,6 @@ export interface CrystalPlaneInput {
   blunt: boolean;
   /** Termination is missing: the crystal broke. */
   broken: boolean;
-  /** Where the shaft ends and the termination begins, as a share of height. */
-  shoulderShare: number;
   lod: CrystalLodLevel;
 }
 
@@ -315,9 +378,10 @@ export function buildCrystalFacePlanes(
   }
 
   // ── Termination ───────────────────────────────────────────
-  // Not a fan of identical triangles to a point on the axis. The apex drifts,
-  // every crown plane takes its own pitch and its own azimuth, and a couple of
-  // them cut short of the apex so the point is chiselled rather than turned.
+  // Not a fan of identical triangles to a point on the axis. Every plane takes
+  // the lattice's own angle and its own azimuth; the apex drifts; alternate
+  // planes stand back as minor rhombohedral faces; and a couple of the major
+  // ones cut short so the point is chiselled rather than turned.
   const apexAngle = seededUnit(body.seed, 'planes:apex-angle') * Math.PI * 2;
   const apexDrift = radius * APEX_DRIFT * seededUnit(body.seed, 'planes:apex-drift');
   const apex = {
@@ -330,36 +394,69 @@ export function buildCrystalFacePlanes(
     z: Math.sin(apexAngle) * apexDrift,
   };
 
-  // The inclination the body's own shoulder asks for: a termination that is
-  // `1 - shoulderShare` of the height tall over a face standing `radius` out.
-  const terminationRise = Math.max(1e-6, height * (1 - input.shoulderShare));
+  // The plane's *normal* stands at the complement of the face it describes.
+  // Taking the face's own inclination for the normal is an inversion that
+  // renders: it turned a termination meant to be a quarter of the body into one
+  // four percent of it, and the crystal became a column with a nub.
+  const pitch = (90 - CROWN_FACE_DEG) * (Math.PI / 180);
+  const cosPitch = Math.cos(pitch);
+  const sinPitch = Math.sin(pitch);
 
+  // How far this crystal's minor form has run, as a share of the retreat that
+  // would close it entirely. One draw for the whole body, because r and z are
+  // *forms*: a specimen develops them as sets, it does not negotiate each face
+  // separately. Individual faces still differ — through their azimuths, through
+  // the drifted apex, and through the prism faces of unequal width below them.
+  const minorShare = MINOR_RETREAT_MIN
+    + seededUnit(body.seed, 'planes:minor-retreat') * (MINOR_RETREAT_MAX - MINOR_RETREAT_MIN);
+  // The termination's own height: the drop from the apex to where a crown plane
+  // meets the shaft.
+  //
+  // Off the *narrowest* prism face rather than off the nominal radius, and the
+  // difference is not academic. Prism offsets run 0.77–1.06 of the radius, so a
+  // crown plane over a face that cuts deep has a third less room than the
+  // nominal figure claims — and a retreat sized for the nominal figure took a
+  // measured 94% of that face instead of the intended 45%, which is a sliver.
+  // The minimum is the safe reading: it can only make a minor face larger than
+  // intended, never smaller than the seed asked for.
+  const shaftReach = prisms.reduce((closest, entry) => Math.min(closest, entry.offset), radius);
+  const terminationDrop = shaftReach * Math.tan(CROWN_FACE_DEG * (Math.PI / 180));
 
+  // Alternating, so at low LOD the four surviving planes still surround the
+  // tip instead of leaving one flank to the safety box. `mainFacets` is six or
+  // seven; on seven the parity meets itself once at the wrap, which leaves two
+  // adjacent major faces and one wider sector — a distortion a real crystal has
+  // and a mathematical one does not.
   const crownCount = input.lod === 'low' ? Math.min(4, mainFacets) : mainFacets;
+  const crownStride = input.lod === 'low' ? Math.max(1, Math.floor(mainFacets / crownCount)) : 1;
+  const crownAzimuths: number[] = [];
   for (let index = 0; index < crownCount; index += 1) {
     // Sits over its own prism face, but not squarely: the offset azimuth is
     // what stops the crown from reading as a cap bolted onto the shaft.
-    const azimuth = azimuths[index % mainFacets]!
-      + signed(body.seed, `planes:crown-azimuth:${index}`) * step * 0.3;
-    const rise = terminationRise * (
-      1 + signed(body.seed, `planes:crown-pitch:${index}`) * CROWN_SHOULDER_SPREAD
+    crownAzimuths.push(
+      azimuths[(index * crownStride) % mainFacets]!
+      + signed(body.seed, `planes:crown-azimuth:${index}`) * step * 0.3,
     );
-    const faceDeg = Math.min(CROWN_FACE_MAX_DEG, Math.max(
-      CROWN_FACE_MIN_DEG,
-      Math.atan2(rise, Math.max(1e-6, radius)) * (180 / Math.PI),
-    ));
-    // The plane's *normal* stands at the complement of the face it describes.
-    // Taking the face's own inclination for the normal is an inversion that
-    // renders: it turned a termination meant to be a quarter of the body into
-    // one four percent of it, and the crystal became a column with a nub.
-    const pitch = (90 - faceDeg) * (Math.PI / 180);
-    const nx = Math.sin(azimuth) * Math.cos(pitch);
-    const nz = Math.cos(azimuth) * Math.cos(pitch);
-    const ny = Math.sin(pitch);
+  }
+
+  for (let index = 0; index < crownCount; index += 1) {
+    const azimuth = crownAzimuths[index]!;
+    const nx = Math.sin(azimuth) * cosPitch;
+    const nz = Math.cos(azimuth) * cosPitch;
+    const ny = sinPitch;
     const through = nx * apex.x + ny * apex.y + nz * apex.z;
-    // Negative cut = this plane bites into the tip and leaves a facet there.
-    const cut = Math.min(0, signed(body.seed, `planes:crown-cut:${index}`)) * APEX_CUT * radius;
-    planes.push(plane(nx, ny, nz, through + cut, 'crown'));
+    const offset = index % 2 === 1
+      // Positive = the plane has travelled outward past the apex, so it takes a
+      // smaller bite and leaves a smaller face.
+      ? minorFaceRetreat(
+        terminationDrop,
+        sinPitch,
+        neighbourGap(crownAzimuths, index),
+        minorShare * (0.88 + seededUnit(body.seed, `planes:minor:${index}`) * 0.24),
+      )
+      // Negative cut = this plane bites into the tip and leaves a facet there.
+      : Math.min(0, signed(body.seed, `planes:crown-cut:${index}`)) * APEX_CUT * radius;
+    planes.push(plane(nx, ny, nz, through + offset, 'crown'));
   }
 
   if (input.blunt || input.broken) {

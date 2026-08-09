@@ -89,7 +89,8 @@ describe('Crystal Life sparkles (ADR-0004)', () => {
   it('stops entirely when the viewer asked for reduced motion', () => {
     const still = lifeFor({ mediaFinishedCount: 500, reducedMotion: true });
     expect(still.sparkleCount).toBe(0);
-    expect(still.rotationSpeed).toBe(0);
+    expect(still.breatheAmplitude).toBe(0);
+    expect(still.breatheSpeed).toBe(0);
   });
 
   it('is deterministic for the same couple and the same inputs', () => {

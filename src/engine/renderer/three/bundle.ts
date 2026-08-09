@@ -406,7 +406,6 @@ export function applyCrystalLifeFrame(
   bundle: ThreeCrystalRenderBundle,
   frame: CrystalLifeFrame,
 ): void {
-  bundle.group.rotation.set(0, frame.rotationY, 0);
   bundle.group.scale.setScalar(frame.groupScale);
   // Breathe about the base, not about the group's origin.
   //

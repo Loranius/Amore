@@ -102,7 +102,6 @@ export function buildCrystalLifeState(input: BuildCrystalLifeInput): CrystalLife
     artifactSeed: input.species.artifactSeed,
     reducedMotion: input.config.reducedMotion,
     quality: input.config.quality,
-    rotationSpeed: round6(0.075 * motion),
     breatheAmplitude: round6(0.0065 * motion),
     breatheSpeed: round6(0.32 * motion),
     sparkleCount,
@@ -125,7 +124,6 @@ export function sampleCrystalLife(input: SampleCrystalLifeInput): CrystalLifeFra
   }
 
   return {
-    rotationY: round6(moving ? elapsed * life.rotationSpeed : 0),
     groupScale: round6(1 + (moving
       ? Math.sin(elapsed * life.breatheSpeed) * life.breatheAmplitude + pulse * 0.006
       : 0)),
