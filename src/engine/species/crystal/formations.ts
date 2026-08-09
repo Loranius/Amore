@@ -315,7 +315,7 @@ export function buildAnnualFormations(
     const ring = childRingIndex(year.index);
     ringOccupancy.set(ring, (ringOccupancy.get(ring) ?? 0) + 1);
   }
-  const widestChildRadialScale = childDimensions(monarchNow, 1, years.length).radialScale;
+  const widestChildRadialScale = childDimensions(monarchNow, 1, years.length, 0).radialScale;
 
   return years
     .map((year) => {
@@ -340,7 +340,7 @@ export function buildAnnualFormations(
         context.sharedDaysOff.filter((day) => withinYear(day, year.startsAt, year.endsAt)).length,
       );
       const fill = yearFill(progress, activity, togetherness);
-      const size = childDimensions(monarchNow, fill, years.length);
+      const size = childDimensions(monarchNow, fill, years.length, seed);
       const ringIndex = childRingIndex(year.index);
       const tint = wishTint(wishTally(yearEvents, context.partners));
 
@@ -416,7 +416,7 @@ export function buildSkirtFormations(
   const yearCount = relationshipYears(
     artifact.relationshipStartedAt, asOf, artifact.leapDayPolicy,
   ).length;
-  const widestChildRadialScale = childDimensions(monarchAxialNow, 1, yearCount).radialScale;
+  const widestChildRadialScale = childDimensions(monarchAxialNow, 1, yearCount, 0).radialScale;
   const outermostRingIndex = childRingIndex(Math.max(0, yearCount - 1));
   const outermostRingOccupancy = Math.max(
     1,

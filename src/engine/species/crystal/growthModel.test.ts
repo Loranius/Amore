@@ -4,7 +4,6 @@ import {
   CHILD_GROWTH_STEPS,
   CHILD_MIN_CLEARANCE,
   CHILD_MIN_UPWARD,
-  CHILD_MONARCH_SHARE,
   CHILD_RING_CAPACITY,
   CHILD_TILT_MAX_DEG,
   CHILD_TILT_MIN_DEG,
@@ -142,8 +141,12 @@ describe('monarch girth', () => {
     // Activity must never turn the spire into a block, nor a quiet couple's
     // crystal into a needle.
     // Tolerance covers the round6 quantisation of the published radius.
-    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(3.8 - 1e-4);
-    expect(axial / (2 * quiet)).toBeLessThanOrEqual(6.2 + 1e-4);
+    // ADR-0019: the band is the gem's, not the rod's. Nominal rather than
+    // measured — the finished silhouette comes out at about 0.84× this once the
+    // flare, the elliptical section and the burial are applied, and
+    // `gemSilhouette.test.ts` is what holds the shape a ruler would find.
+    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(2.14 - 1e-4);
+    expect(axial / (2 * quiet)).toBeLessThanOrEqual(2.5 + 1e-4);
   });
 
   it('lands a typical couple near the silhouette the owner already accepted', () => {
@@ -153,8 +156,10 @@ describe('monarch girth', () => {
     // counting photos.
     const axial = monarchAxialScale(3.6 * YEAR);
     const aspect = axial / (2 * monarchRadialScale(axial, 47));
-    expect(aspect).toBeGreaterThan(4.2);
-    expect(aspect).toBeLessThan(5.4);
+    // A typical couple lands mid-band, which for the gem is about 2.3 nominal
+    // and about 1.95 on the built mesh.
+    expect(aspect).toBeGreaterThan(2.15);
+    expect(aspect).toBeLessThan(2.45);
   });
 
   it('lets a longer relationship carry more girth at the same activity', () => {
@@ -267,12 +272,16 @@ describe('child growth steps', () => {
 });
 
 describe('child crystals', () => {
-  it('never exceeds half the monarch it stands beside', () => {
+  it('never exceeds the brief’s share of the monarch it stands beside', () => {
     const monarch = monarchAxialScale(4 * YEAR);
     const child = childDimensions(monarch, yearFill(1, 1));
     // Tolerance is one round6 step: every published number is quantised to
     // six decimals, so an exact-equality bound would fail on the rounding.
-    expect(child.axialScale).toBeLessThanOrEqual(monarch * CHILD_MONARCH_SHARE + 1e-6);
+    // ADR-0019 replaced the flat half with the brief's 18–52% band, and the
+    // fill is mapped into it rather than clamped against it — so the ceiling
+    // the owner set ("half of the monarch, never more") is now 0.52 and the
+    // floor keeps a quiet year readable instead of letting it vanish.
+    expect(child.axialScale).toBeLessThanOrEqual(monarch * 0.52 + 1e-6);
     expect(child.axialScale).toBeLessThan(monarch);
     expect(child.radialScale * 2).toBeLessThan(monarch);
   });

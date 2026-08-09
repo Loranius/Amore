@@ -340,7 +340,7 @@ export function buildCrystalProfile(
   // machined cylinder, but 0.78/1.12 was a 1.44:1 slab that looked flat from
   // the front and thin from the side. 1.18:1 keeps the organic asymmetry while
   // presenting a consistent silhouette as the camera orbits.
-  const scales = mother ? { scaleX: 0.9, scaleZ: 1.06 } : profileScales(archetype);
+  const scales = mother ? { scaleX: 0.94, scaleZ: 1.06 } : profileScales(archetype);
   const tuning = shapeTuning(archetype, mother);
   const leanAngle = seededUnit(body.seed, 'geometry:lean-angle') * Math.PI * 2;
   const leanMagnitude = radius * tuning.lean * (
