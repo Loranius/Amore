@@ -56,6 +56,12 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // 1.1.0: the shell became semi-transparent, the stone gained procedural
   // striations and veils, and the inner light now grows with the wishes that
   // were granted rather than merely taking their colour (ADR-0007).
+  // 1.10.0: the colour is the couple's giving, and it is one colour for the
+  // whole druse. The wish tint reaches the shell instead of only the core, the
+  // monarch publishes one tint for the colony, the foot-to-tip gradient is gone
+  // and so is the gold that marked a closed year — those two were the "one part
+  // yellow, one part pink" the owner named, and neither was about wishes.
+  //
   // 1.9.0: zoning moved inside the stone. The inclusion band used to multiply
   // the shaded result — specular highlight included — which is what a stain on
   // the surface does; it now modulates the light coming from within, and it is
@@ -72,7 +78,7 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // warm channel, and the `micro` value step was applied inside the albedo cap
   // that then divided it back out. Both were inert; the step now follows the
   // cap and every body's shell changes with its role.
-  rulesVersion: '1.9.0',
+  rulesVersion: '1.10.0',
   quality: 'balanced',
   allowIridescence: true,
   allowProceduralReflection: true,

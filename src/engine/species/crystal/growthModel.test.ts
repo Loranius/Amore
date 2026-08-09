@@ -8,13 +8,17 @@ import {
   CHILD_RING_CAPACITY,
   CHILD_TILT_MAX_DEG,
   CHILD_TILT_MIN_DEG,
+  MONARCH_FULL_TERM_YEARS,
   MONARCH_MAX_FACETS,
   MONARCH_MIN_FACETS,
   WISH_CHANNEL_CAP,
+  WISH_TOTAL_CAP,
   anniversaryOn,
   childAzimuthRad,
   childDimensions,
+  childClearance,
   childDistance,
+  skirtDistance,
   childGrowthProgress,
   childRadialBias,
   childRingIndex,
@@ -30,45 +34,88 @@ import {
   monarchFacetCount,
   monarchRadialScale,
   relationshipYears,
+  veteranGirth,
   wishTint,
 } from './growthModel';
 
 const YEAR = 365;
 
 describe('monarch height (ADR-0004)', () => {
-  it('never stops growing, unlike the curve it replaces', () => {
-    // The exponential it replaces saturated near five years: a twenty-year
-    // couple and a ten-year couple rendered the same crystal. Every decade
-    // must still be visibly taller than the one before it.
-    const decades = [10, 20, 30, 40].map((y) => monarchAxialScale(y * YEAR));
-    for (let index = 1; index < decades.length; index += 1) {
-      expect(decades[index]!).toBeGreaterThan(decades[index - 1]!);
+  it('grows to its full height over thirty years and then stops', () => {
+    // The owner's rule, and it replaces the previous one outright. The curve
+    // before this was `0.42 + 0.3·ln(1 + years)`, which never stopped — and the
+    // test here required every decade to be taller than the last, for a good
+    // reason at the time: the exponential *it* replaced saturated at five years
+    // and rendered a twenty-year couple the same as a ten-year one.
+    //
+    // Both of those readings are now superseded. Height answers "how long have
+    // we been together" over a term the owner set at thirty years; past it the
+    // history goes into girth and new faces instead (`veteranGirth`,
+    // `monarchFacetCount`), so the artifact keeps changing without the one
+    // dimension that has to be framed growing without bound.
+    for (const years of [1, 3, 7, 12, 20, 29]) {
+      expect(monarchAxialScale(years * YEAR))
+        .toBeLessThan(monarchAxialScale((years + 1) * YEAR));
     }
+    const full = monarchAxialScale(MONARCH_FULL_TERM_YEARS * YEAR);
+    expect(monarchAxialScale(40 * YEAR)).toBe(full);
+    expect(monarchAxialScale(80 * YEAR)).toBe(full);
   });
 
-  it('decelerates hard so the monarch never becomes huge', () => {
-    const ten = monarchAxialScale(10 * YEAR);
-    const forty = monarchAxialScale(40 * YEAR);
-    // Four times the relationship must not be anywhere near four times the
-    // crystal — that was the owner's whole complaint about the old monarch.
-    expect(forty / ten).toBeLessThan(1.5);
-    expect(forty / ten).toBeGreaterThan(1.1);
+  it('starts small on the first day', () => {
+    // A couple on day one has a crystal, not a promise of one — but a fifth of
+    // the full height, not a third. The old curve began at 0.42 against a full
+    // height of 1.4, so a relationship one day old was already 30% grown.
+    const first = monarchAxialScale(0);
+    const full = monarchAxialScale(MONARCH_FULL_TERM_YEARS * YEAR);
+    expect(first / full).toBeGreaterThan(0.15);
+    expect(first / full).toBeLessThan(0.25);
   });
 
-  it('stays modest at three years and barely moves by seven', () => {
-    // The owner read a three-year monarch as already too big, and the seven
-    // year projection as alarming. These bounds are that judgement written
-    // down: the next few years must add very little.
-    const threeAndAHalf = monarchAxialScale(3.6 * YEAR);
-    const seven = monarchAxialScale(7 * YEAR);
+  it('is well under half grown at three years', () => {
+    // The complaint this pass answers, written as a number: the owner read a
+    // three-year monarch as too big. On the old curve it stood at 60% of the
+    // full height with twenty-seven years still to come.
+    const three = monarchAxialScale(3 * YEAR);
+    const full = monarchAxialScale(MONARCH_FULL_TERM_YEARS * YEAR);
+    expect(three / full).toBeGreaterThan(0.28);
+    expect(three / full).toBeLessThan(0.4);
+  });
 
-    expect(threeAndAHalf).toBeLessThan(1);
-    expect(seven / threeAndAHalf).toBeLessThan(1.25);
+  it('still moves fastest in the years a young couple is living', () => {
+    // Starting low is only worth it if the early years feel like they count.
+    // Day one to three years has to be the biggest proportional gain in the
+    // whole term, or the artifact says nothing to the couples most likely to be
+    // looking at it.
+    const gain = (from: number, to: number) =>
+      monarchAxialScale(to * YEAR) / monarchAxialScale(from * YEAR);
+    expect(gain(0, 3)).toBeGreaterThan(gain(10, 13));
+    expect(gain(10, 13)).toBeGreaterThan(gain(25, 28));
   });
 
   it('separates a young relationship from an old one', () => {
     expect(monarchAxialScale(YEAR)).toBeLessThan(monarchAxialScale(5 * YEAR));
     expect(monarchAxialScale(5 * YEAR)).toBeLessThan(monarchAxialScale(10 * YEAR));
+  });
+
+  it('puts a veteran relationship into girth and faces instead', () => {
+    // What replaces the height once it has stopped. Both only ever grow, so
+    // neither can take back something the couple already had.
+    expect(veteranGirth(10 * YEAR)).toBe(1);
+    expect(veteranGirth(MONARCH_FULL_TERM_YEARS * YEAR)).toBe(1);
+    expect(veteranGirth(40 * YEAR)).toBeGreaterThan(1);
+    expect(veteranGirth(60 * YEAR)).toBeGreaterThan(veteranGirth(40 * YEAR));
+    // Stouter, never a boulder: the curve saturates.
+    expect(veteranGirth(200 * YEAR)).toBeLessThan(1.4);
+
+    // One face every five years past the term, on top of whatever the photos
+    // earned — so a fortieth year does not look exactly like a thirtieth.
+    const photos: number[] = [];
+    expect(monarchFacetCount(photos, MONARCH_FULL_TERM_YEARS * YEAR))
+      .toBe(monarchFacetCount(photos, 10 * YEAR));
+    expect(monarchFacetCount(photos, 40 * YEAR))
+      .toBeGreaterThan(monarchFacetCount(photos, MONARCH_FULL_TERM_YEARS * YEAR));
+    expect(monarchFacetCount(photos, 200 * YEAR)).toBeLessThanOrEqual(MONARCH_MAX_FACETS);
   });
 
   it('survives a nonsense age', () => {
@@ -253,22 +300,31 @@ describe('child crystals', () => {
       .toBeGreaterThan(childDimensions(monarchAxialScale(YEAR), full).axialScale);
   });
 
-  it('can never touch the monarch, whatever the year held', () => {
-    const monarchRadial = monarchRadialScale(monarchAxialScale(10 * YEAR), 10_000);
-    for (const events of [0, 1, 4, 40, 10_000]) {
+  it('can never touch the monarch, at any age or ring', () => {
+    // ADR-0016 brought the ring in until the bases share one node of quartz,
+    // so the floor is now the *only* thing between the two surfaces — there is
+    // no activity term left to absorb an error in it. Checked across ages
+    // because both radii move with the monarch and the floor has to survive
+    // their ratio changing, not just one couple's numbers.
+    for (const years of [0, 1, 3, 10, 30, 60]) {
+      const monarchAxial = monarchAxialScale(years * YEAR);
+      const monarchRadial = monarchRadialScale(monarchAxial, 10_000);
       for (const ringIndex of [0, 1, 2]) {
-        const child = childDimensions(monarchAxialScale(10 * YEAR), yearFill(1, 1));
+        const child = childDimensions(monarchAxial, yearFill(1, 1));
         const distance = childDistance({
           monarchRadialScale: monarchRadial,
           childRadialScale: child.radialScale,
           ringIndex,
-          importantEventCount: events,
         });
         const gap = distance - monarchRadial - child.radialScale;
         // Epsilon for the `round6` the published distance goes through, not
         // slack in the guarantee: the subtraction lands a unit in the last
         // place under the clearance, which is float noise and not contact.
-        expect(gap).toBeGreaterThanOrEqual(CHILD_MIN_CLEARANCE - 1e-9);
+        expect(gap, `${years}y ring ${ringIndex}`)
+          .toBeGreaterThanOrEqual(childClearance(monarchRadial, child.radialScale) - 1e-9);
+        // And never below the absolute floor, whatever the radii do.
+        expect(gap, `${years}y ring ${ringIndex}`)
+          .toBeGreaterThanOrEqual(CHILD_MIN_CLEARANCE - 1e-9);
       }
     }
   });
@@ -308,26 +364,47 @@ describe('child crystals', () => {
     expect(childRadialBias(4242)).toBe(childRadialBias(4242));
   });
 
-  it('draws closer with each important event', () => {
-    const base = {
-      monarchRadialScale: 0.15,
-      childRadialScale: 0.08,
-      ringIndex: 0,
-    };
-    const quiet = childDistance({ ...base, importantEventCount: 0 });
-    const one = childDistance({ ...base, importantEventCount: 1 });
-    const many = childDistance({ ...base, importantEventCount: 4 });
+  it('stands every child at the floor and nowhere else (ADR-0016)', () => {
+    // This replaces "draws closer with each important event". That mechanism
+    // added a standoff a busy year could close but never cross — a crystal
+    // reaching for a monarch it could not join — and the owner named it as the
+    // thing keeping the colony from growing out of one vein. What a year did
+    // with itself now shows in its size, facets and fill; where it stands is
+    // fixed, and it is as close as the geometry allows.
+    const base = { monarchRadialScale: 0.15, childRadialScale: 0.08 };
 
-    expect(one).toBeLessThan(quiet);
-    expect(many).toBeLessThan(one);
-    // One event has to be worth seeing: the couple in question logs only
-    // one or two calendar milestones a year, so a subtle step would read as
-    // no step at all. A quarter of the reach — tighter again now that the
-    // children lean outward and the whole ring was pulled in to match.
-    expect(quiet - one).toBeGreaterThan(0.01);
-    // Four events close the reach entirely and no more: the floor is the
-    // arithmetic clearance, which no amount of activity may eat into.
-    expect(many).toBeCloseTo(0.15 + 0.08 + CHILD_MIN_CLEARANCE, 6);
+    expect(childDistance({ ...base, ringIndex: 0 }))
+      .toBeCloseTo(0.15 + 0.08 + childClearance(0.15, 0.08), 6);
+    // And the floor is genuinely tight: the air between the two surfaces is a
+    // fraction of the child's own width, not a multiple of it. At 0.055 it was
+    // 0.080 against a child 0.040 across — two of its own widths of nothing.
+    expect(CHILD_MIN_CLEARANCE).toBeLessThan(0.08 * 0.5);
+  });
+
+  it('keeps the skirt outside the widest the year ring can grow', () => {
+    // The fixed 0.24 this replaces crossed the year ring in both directions:
+    // outside it at four years, inside it at twenty-five, so plan crystals
+    // ended up scattered among the years they are meant to hem.
+    for (const years of [1, 4, 25, 60]) {
+      const monarchAxial = monarchAxialScale(years * YEAR);
+      const monarchRadial = monarchRadialScale(monarchAxial, 200);
+      const widest = childDimensions(monarchAxial, 1).radialScale;
+      const skirtRadial = 0.14 * 0.3;
+
+      const ring = childDistance({
+        monarchRadialScale: monarchRadial,
+        childRadialScale: widest,
+        ringIndex: 0,
+      });
+      const skirt = skirtDistance({
+        monarchRadialScale: monarchRadial,
+        widestChildRadialScale: widest,
+        skirtRadialScale: skirtRadial,
+      });
+
+      // Clear of the year's outer surface, by the skirt's own radius and more.
+      expect(skirt - skirtRadial, `${years}y`).toBeGreaterThan(ring + widest);
+    }
   });
 
   it('opens a new ring every eight years so no year is crowded out', () => {
@@ -337,10 +414,10 @@ describe('child crystals', () => {
     expect(childRingIndex(CHILD_RING_CAPACITY * 2)).toBe(2);
 
     const inner = childDistance({
-      monarchRadialScale: 0.15, childRadialScale: 0.08, ringIndex: 0, importantEventCount: 2,
+      monarchRadialScale: 0.15, childRadialScale: 0.08, ringIndex: 0,
     });
     const outer = childDistance({
-      monarchRadialScale: 0.15, childRadialScale: 0.08, ringIndex: 1, importantEventCount: 2,
+      monarchRadialScale: 0.15, childRadialScale: 0.08, ringIndex: 1,
     });
     expect(outer).toBeGreaterThan(inner);
   });
@@ -364,38 +441,75 @@ describe('colour from fulfilled wishes', () => {
     expect(tint.iridescence).toBe(0);
   });
 
-  it('rewards a perfectly balanced year with rainbow, not grey', () => {
-    // The reason this is not a literal RGB triple. Ten, ten and ten is the
-    // best year a couple can have; mapped straight onto channels it would
-    // render grey — the dullest crystal on the platform.
-    const tint = wishTint({ forFirst: 10, shared: 10, forSecond: 10 });
-    expect(tint.rgb[0]).toBeCloseTo(1, 6);
-    expect(tint.rgb[1]).toBeCloseTo(1, 6);
-    expect(tint.rgb[2]).toBeCloseTo(1, 6);
-    expect(tint.iridescence).toBeCloseTo(1, 6);
+  it('never leaves a balanced couple colourless (ADR-0016)', () => {
+    // This reverses the rule it replaces, which asserted `[1, 1, 1]` here and
+    // called the resulting white the reward for balance, paid in iridescence.
+    // Measured on the owner's own portal, that reward is indistinguishable from
+    // having granted nothing at all: the live couple's fourth year was 2/2/2
+    // and published exactly `[1, 1, 1]`. Balance still drives iridescence — it
+    // just no longer cancels the colour on its way there.
+    const balanced = wishTint({ forFirst: 10, shared: 10, forSecond: 10 });
+    expect(balanced.iridescence).toBeCloseTo(1, 6);
+    expect(Math.min(...balanced.rgb)).toBeLessThan(0.7);
+
+    // Balance may cost a little chroma — the blend of three hues sits nearer
+    // the middle than any one of them does — but it may never cost most of it.
+    // Measured at the same total granted: 0.745 balanced against 0.825 for the
+    // most one-sided, which is 90%.
+    const distance = (tint: { rgb: readonly [number, number, number] }): number =>
+      tint.rgb.reduce((total, channel) => total + (1 - channel), 0);
+    for (const lopsided of [
+      { forFirst: 30, shared: 0, forSecond: 0 },
+      { forFirst: 0, shared: 30, forSecond: 0 },
+      { forFirst: 0, shared: 0, forSecond: 30 },
+    ]) {
+      expect(distance(balanced)).toBeGreaterThan(distance(wishTint(lopsided)) * 0.8);
+    }
+
+    // The small case matters more than the extreme one, because it is the one
+    // real couples are in: 2/2/2 has to be visibly coloured.
+    const small = wishTint({ forFirst: 2, shared: 2, forSecond: 2 });
+    expect(Math.min(...small.rgb)).toBeLessThan(0.95);
   });
 
-  it('tints toward the partner who was given to', () => {
-    const red = wishTint({ forFirst: 10, shared: 0, forSecond: 0 });
-    expect(red.rgb[0]).toBeGreaterThan(red.rgb[1]);
-    expect(red.rgb[0]).toBeGreaterThan(red.rgb[2]);
-    expect(red.iridescence).toBe(0);
+  it('points the colour at whoever was given to', () => {
+    // Each channel now aims at a mineral hue rather than at an RGB channel —
+    // rose, amethyst, aquamarine — so the assertion is that the three are
+    // distinguishable and each leans the way its own stone does.
+    const rose = wishTint({ forFirst: 10, shared: 0, forSecond: 0 });
+    const amethyst = wishTint({ forFirst: 0, shared: 10, forSecond: 0 });
+    const aqua = wishTint({ forFirst: 0, shared: 0, forSecond: 10 });
 
-    const blue = wishTint({ forFirst: 0, shared: 0, forSecond: 10 });
-    expect(blue.rgb[2]).toBeGreaterThan(blue.rgb[0]);
+    // Rose is the warmest, aqua the coolest, amethyst between them.
+    expect(rose.rgb[0]).toBeGreaterThan(amethyst.rgb[0]);
+    expect(amethyst.rgb[0]).toBeGreaterThan(aqua.rgb[0]);
+    expect(aqua.rgb[2]).toBeGreaterThanOrEqual(amethyst.rgb[2]);
+    expect(amethyst.rgb[2]).toBeGreaterThan(rose.rgb[2]);
 
-    const green = wishTint({ forFirst: 0, shared: 10, forSecond: 0 });
-    expect(green.rgb[1]).toBeGreaterThan(green.rgb[0]);
+    // One-sided giving earns no rainbow, whichever side it is.
+    for (const tint of [rose, amethyst, aqua]) expect(tint.iridescence).toBe(0);
   });
 
-  it('deepens with the count and then stops at the cap', () => {
+  it('deepens with the total granted, then stops at the cap', () => {
+    // Depth reads the *total* now, not the largest single channel — the defect
+    // this replaces made 3/3/3 and 3/0/0 pull identically, so giving three
+    // times as much bought nothing.
+    const distance = (tint: { rgb: readonly [number, number, number] }): number =>
+      tint.rgb.reduce((total, channel) => total + (1 - channel), 0);
+
     const few = wishTint({ forFirst: 2, shared: 0, forSecond: 0 });
     const many = wishTint({ forFirst: 9, shared: 0, forSecond: 0 });
-    const capped = wishTint({ forFirst: WISH_CHANNEL_CAP, shared: 0, forSecond: 0 });
-    const beyond = wishTint({ forFirst: 400, shared: 0, forSecond: 0 });
+    expect(distance(many)).toBeGreaterThan(distance(few));
 
-    expect(many.rgb[1]).toBeLessThan(few.rgb[1]);
-    expect(beyond).toEqual(capped);
+    const one = wishTint({ forFirst: 3, shared: 0, forSecond: 0 });
+    const three = wishTint({ forFirst: 3, shared: 3, forSecond: 3 });
+    expect(distance(three)).toBeGreaterThan(distance(one));
+
+    // Past both caps — the per-channel one for the hue, the total for the
+    // depth — nothing moves again.
+    expect(wishTint({ forFirst: 400, shared: 0, forSecond: 0 }))
+      .toEqual(wishTint({ forFirst: WISH_TOTAL_CAP, shared: 0, forSecond: 0 }));
+    expect(WISH_TOTAL_CAP).toBeGreaterThanOrEqual(WISH_CHANNEL_CAP);
   });
 
   it('stays a translucent stone rather than stained glass', () => {

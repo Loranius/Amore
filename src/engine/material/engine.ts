@@ -220,10 +220,42 @@ function roleValue(role: string): number {
   return 0.85;
 }
 
+/**
+ * How far the shell moves toward the couple's wish colour.
+ *
+ * The whole body, in proportion to what they have granted — the owner's rule,
+ * and it replaces two mechanisms at once.
+ *
+ * What it replaces, measured on a real couple with eight granted wishes: the
+ * shell did not read `tintRgb` at all, so none of that giving reached the
+ * outside of the crystal. What the couple saw instead was a **foot-to-tip
+ * split** — `axialTintStrength` at 0.55 painting the base toward the palette's
+ * core colour while the shell stayed pink — and, on closed years, a gold
+ * `emphasized` target on top of it. That is the "one part yellow, one part
+ * pink" the owner read as a defect, and neither half of it was wishes: the gold
+ * marks a year that has closed, and the split is a gradient.
+ *
+ * `wishTint` is already proportional — white at nothing granted, deepening
+ * toward the hue with the count until the cap — so the mix can take it whole
+ * rather than rescaling it.
+ */
+const WISH_SHELL_PULL = 0.8;
+
+/** The colony's one tint: every wish the couple has granted, from the monarch. */
+function colonyTintOf(
+  input: BuildCrystalMaterialInput,
+): readonly [number, number, number] | null {
+  const tint = input.species.mother.tintRgb ?? null;
+  if (tint === null) return null;
+  // Pure white is "nothing granted", and it must leave the mineral alone.
+  if (tint[0] === 1 && tint[1] === 1 && tint[2] === 1) return null;
+  return tint;
+}
+
 function bodyColor(
   base: CrystalMaterialPalette,
   role: string,
-  emphasized: boolean,
+  tint: readonly [number, number, number] | null,
 ): CrystalRgb {
   const roleMix = role === 'focal'
     ? 0.06
@@ -234,11 +266,13 @@ function bodyColor(
         : role === 'companion'
           ? 0.32
           : 0.44;
-  const target = emphasized ? rgb(1, 0.72, 0.28) : base.secondary;
-  return scaleRgb(
-    capShellValue(mixRgb(base.primary, target, roleMix)),
-    roleValue(role),
-  );
+  const mineral = capShellValue(mixRgb(base.primary, base.secondary, roleMix));
+  // A tint of pure white is a couple who have granted nothing, and it must
+  // leave the mineral exactly as it was rather than washing it out.
+  const wished = tint === null
+    ? mineral
+    : mixRgb(mineral, mixRgb(mineral, rgb(tint[0], tint[1], tint[2]), 1), WISH_SHELL_PULL);
+  return scaleRgb(capShellValue(wished), roleValue(role));
 }
 
 /**
@@ -393,9 +427,15 @@ function shaderRecipe(
     // because its facets are outlined by the surface itself.
     facetEdgeStrength: round6(micro ? 0 : emphasized ? 0.34 : focal ? 0.28 : 0.22),
     facetEdgeWidth: 1.4,
-    // Off on the smallest bodies for the usual reason — a gradient across nine
-    // pixels is a colour shift nobody reads as one.
-    axialTintStrength: round6(micro ? 0 : 0.55),
+    // Gone. This was the foot-to-tip gradient, and it is the other half of the
+    // two-tone the owner named: it painted the base toward the core colour
+    // while the shell stayed the mineral's, so a crystal read as two colours
+    // stacked. Its stated job — "a body of one flat colour reads as moulded" —
+    // is now done by the zoning inside the stone (ADR-0013), which varies
+    // *within* a facet instead of splitting the body across its length. The
+    // Pass 6 ablation measured this term at 0.50 of 255 on average, so what it
+    // was contributing was almost entirely the split.
+    axialTintStrength: 0,
     footColor: coreTintColor(emissiveColor, tint),
     // Off on the smallest bodies, and off on the fallback tier. Everywhere
     // else it is cheap — a fract, a smoothstep and one derivative — and it is
@@ -558,13 +598,23 @@ function buildBodyMaterial(
   // exchanged that year. It used to multiply the shell, which made the whole
   // body that colour — the "solid rainbow shell" the reference pass rejected.
   //
-  // The colour belongs to the core. Outside, every crystal keeps the colony's
-  // one mineral nature, so the druse reads as a druse rather than as a bag of
-  // differently coloured objects; inside, each year carries its own light. See
-  // coreTintColor and the shader's core term.
-  const tint = instruction?.tintRgb ?? null;
-  const baseColor = bodyColor(materialPalette, role, emphasized);
-  const emissiveColor = emphasized ? rgb(1, 0.66, 0.22) : materialPalette.core;
+  // The colour belongs to the whole crystal, and it is the colony's rather than
+  // each body's. That is a reversal of what stood here, and the owner's call:
+  // the note this replaces said "the colour belongs to the core… inside, each
+  // year carries its own light", which kept the druse one mineral on the
+  // outside — so eight granted wishes changed nothing a couple could see, and
+  // what they saw instead was a gradient and a closed-year gold that had
+  // nothing to do with giving.
+  //
+  // The monarch publishes one tint for the colony (`buildMotherInstruction`),
+  // so every body takes the same one and the druse still reads as one mineral —
+  // now a mineral whose colour is the couple's.
+  const tint = colonyTintOf(input);
+  const baseColor = bodyColor(materialPalette, role, tint);
+  // No gold for a closed year. It was the yellow half of the two-tone the owner
+  // named, it marked something the colour is not about, and the year crystals
+  // already say "closed" by standing at full size.
+  const emissiveColor = materialPalette.core;
 
   // Refined couples polish toward the smooth end of the band; fracture and the
   // smallest bodies push back toward the rough end.

@@ -23,6 +23,8 @@ import {
   monarchAxialScale,
   monarchFacetCount,
   monarchRadialScale,
+  skirtDistance,
+  veteranGirth,
   relationshipYears,
   wishTint,
   yearActivity,
@@ -115,6 +117,7 @@ function deliberateActCount(events: readonly NormalizedEvolutionEvent[]): number
 export function buildMotherInstruction(
   artifact: ArtifactBlueprint,
   asOf: string,
+  partners: CrystalColorPartners = null,
 ): CrystalGrowthInstruction {
   const seed = stableSeed(artifact.deterministicSeed, 'crystal:mother');
   const motherArchetypes: readonly CrystalArchetype[] = ['prismatic', 'massive', 'intergrown'];
@@ -129,8 +132,14 @@ export function buildMotherInstruction(
   // because no single module drives more than one of them.
   const daysTogether = daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0;
   const occurred = occurredEvents(artifact, asOf);
+  const colonyTint = wishTint(wishTally(occurred, partners));
   const axialScale = monarchAxialScale(daysTogether);
-  const radialScale = monarchRadialScale(axialScale, deliberateActCount(occurred));
+  // Past the full term the height stops and the couple's history goes into
+  // width instead — the owner's rule, and the reason the height curve can stop
+  // at all without the artifact going still.
+  const radialScale = round6(
+    monarchRadialScale(axialScale, deliberateActCount(occurred)) * veteranGirth(daysTogether),
+  );
 
   return {
     id: 'crystal:mother',
@@ -149,34 +158,33 @@ export function buildMotherInstruction(
     maturity: relationshipMaturityAt(artifact.relationshipStartedAt, asOf),
     axialScale,
     radialScale,
-    facetCount: monarchFacetCount(photoYearsOf(occurred)),
+    facetCount: monarchFacetCount(photoYearsOf(occurred), daysTogether),
     azimuthRad: round6(seededUnit(seed, 'azimuth') * Math.PI * 2),
     elevation: 1,
     radialBias: 0,
     attachmentDepth: 0.34,
     // The monarch stands on the axis; nothing to offset her by.
     ringDistance: 0,
-    tintRgb: [1, 1, 1] as const,
-    iridescence: 0,
+    // The colour of the whole druse, from every wish the couple has granted.
+    //
+    // It used to be `[1, 1, 1]` here and a per-year tint on the children, and
+    // the colour reached only the *core* — the inner light — never the shell.
+    // The owner asked for the opposite: the whole crystal carrying the giving,
+    // in proportion to it. So the monarch publishes one tint for the colony and
+    // Volume VI paints every body's shell with it (see `bodyColor`).
+    //
+    // `wishTint` is already proportional: no wishes leaves it white, and the
+    // pull toward the hue rises with the count until the cap. Aggregated over
+    // the whole history rather than one year, so the artifact answers "how much
+    // have we given each other" and not "how much did we give last year".
+    tintRgb: colonyTint.rgb,
+    iridescence: colonyTint.iridescence,
     // Where the couple has been is the ground they grow from.
     groundSpread: groundSpread(
       occurred.filter((event) => eventModule(event.source) === 'map').length,
     ),
     seed,
   };
-}
-
-/**
- * Events that count as important enough to pull a year's crystal closer to
- * the monarch, and to feed its size.
- *
- * Anniversaries and milestones only, by the owner's choice. Note this is a
- * deliberately sparse signal — a real couple logged six such records across
- * three and a half years — which is why one event is worth a quarter of the
- * distance rather than a nudge.
- */
-function isImportantEvent(event: NormalizedEvolutionEvent): boolean {
-  return eventModule(event.source) === 'calendar';
 }
 
 /**
@@ -221,7 +229,14 @@ export type CrystalColorPartners = { first: number | null; second: number | null
  * the colour is about what they gave each other, so fulfilling your own wish
  * leaves the crystal exactly as white as it was.
  */
-function wishTallyForYear(
+/**
+ * Granted wishes across a span of events, split by who they were for.
+ *
+ * Used both per year and — since the owner asked for the whole crystal to carry
+ * the couple's giving rather than each year carrying its own — across the whole
+ * history at once.
+ */
+function wishTally(
   yearEvents: readonly NormalizedEvolutionEvent[],
   partners: CrystalColorPartners,
 ): WishGiftTally {
@@ -266,7 +281,6 @@ export function buildAnnualFormations(
       const id = `crystal:year:${year.index + 1}`;
       const seed = stableSeed(artifact.deterministicSeed, id);
       const yearEvents = eventsWithin(artifact, year.startsAt, year.endsAt, asOfEpoch);
-      const importantEventCount = yearEvents.filter(isImportantEvent).length;
       // How lived-in the year was: mostly how many parts of the portal it
       // touched, and only partly how much. See `yearActivity`.
       const modules = new Set(yearEvents.map((event) => eventModule(event.source)));
@@ -281,7 +295,7 @@ export function buildAnnualFormations(
       const fill = yearFill(progress, activity);
       const size = childDimensions(monarchNow, fill);
       const ringIndex = childRingIndex(year.index);
-      const tint = wishTint(wishTallyForYear(yearEvents, partners));
+      const tint = wishTint(wishTally(yearEvents, partners));
 
       return {
         id,
@@ -311,7 +325,6 @@ export function buildAnnualFormations(
           monarchRadialScale: monarchRadialNow,
           childRadialScale: size.radialScale,
           ringIndex,
-          importantEventCount,
         }),
         // A year with no gifts stays the white every crystal is born as.
         tintRgb: tint.rgb,
@@ -323,15 +336,6 @@ export function buildAnnualFormations(
     });
 }
 
-/**
- * Distance from the axis for the skirt.
- *
- * Pulled in with the rest of the crown. At 0.34 the plan crystals stood in a
- * ring of their own, well outside the year crystals and upright while those
- * leaned — five separate objects on a platform rather than one thing growing
- * out of one deposit, which is what the owner asked for.
- */
-const SKIRT_RING_DISTANCE = 0.24;
 /** Beyond this the skirt reads as gravel; further plans thicken it instead. */
 const SKIRT_MAX_BODIES = 24;
 
@@ -348,6 +352,18 @@ export function buildSkirtFormations(
 ): CrystalGrowthInstruction[] {
   const asOfEpoch = parseEvolutionInstant(asOf);
   if (asOfEpoch === null) return [];
+
+  // The skirt is placed against the same two radii the year ring is, so the
+  // two can never cross however the monarch's proportions move. See
+  // `skirtDistance`; the fixed 0.24 it replaces did cross, in both directions.
+  const monarchAxialNow = monarchAxialScale(
+    daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0,
+  );
+  const monarchRadialNow = monarchRadialScale(
+    monarchAxialNow,
+    deliberateActCount(occurredEvents(artifact, asOf)),
+  );
+  const widestChildRadialScale = childDimensions(monarchAxialNow, 1).radialScale;
 
   const completed = artifact.events
     .filter((event) => eventModule(event.source) === 'plans')
@@ -383,7 +399,14 @@ export function buildSkirtFormations(
       // as a pebble somebody dropped rather than as part of the colony.
       radialBias: childRadialBias(seed),
       attachmentDepth: 0.12,
-      ringDistance: round6(SKIRT_RING_DISTANCE + seededUnit(seed, 'ring') * 0.07),
+      ringDistance: round6(
+        skirtDistance({
+          monarchRadialScale: monarchRadialNow,
+          widestChildRadialScale,
+          skirtRadialScale: scale * 0.3,
+        })
+        + seededUnit(seed, 'ring') * 0.03,
+      ),
       tintRgb: [1, 1, 1] as const,
       iridescence: 0,
       groundSpread: 1,

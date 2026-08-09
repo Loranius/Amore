@@ -21,25 +21,79 @@ const DAYS_PER_YEAR = 365;
 // ── Monarch ─────────────────────────────────────────────────
 
 /**
+ * The relationship's full term, in years.
+ *
+ * Thirty is the owner's number and it is a real decision, not a clamp: past it
+ * the monarch stops getting taller and the couple's history goes into girth and
+ * facets instead (`veteranGirth`, `monarchFacetCount`). A crystal that grows
+ * without bound eventually cannot be framed, and one that keeps climbing for
+ * fifty years tells a couple at three that they have almost nothing yet.
+ */
+export const MONARCH_FULL_TERM_YEARS = 30;
+
+/**
+ * Height on the first day, and at the full term, in engine units.
+ *
+ * The full height matches `REFERENCE_HEIGHT` in the renderer's fit, so a
+ * thirty-year monarch is exactly the crystal that fills the frame and every
+ * younger one is proportionally smaller. The seed is small but not a speck: a
+ * couple on day one has a crystal, not a promise of one.
+ */
+const MONARCH_SEED_HEIGHT = 0.26;
+const MONARCH_FULL_HEIGHT = 1.4;
+
+/**
+ * How the height is distributed across the term.
+ *
+ * Below one, so the early years are worth more than the late ones — but only
+ * mildly. A strongly decelerating curve is what the previous one was, and it is
+ * what the owner rejected: `0.42 + 0.3·ln(1 + years)` put a couple at **30% of
+ * full height on their first day** and **60% at three years**, so the artifact
+ * was nearly grown before the relationship was, and the next twenty-seven years
+ * had two fifths of the range left to say anything with.
+ *
+ *   day one   0.26   (19% of full)      10 years  0.78   (56%)
+ *   1 year    0.36   (26%)              20 years  1.11   (79%)
+ *   3 years   0.48   (34%)              30 years  1.40   (100%)
+ *
+ * Day one to three years is still an 83% gain, so the years that matter most to
+ * a young couple are the ones where the crystal changes fastest.
+ */
+const MONARCH_GROWTH_EXPONENT = 0.72;
+
+/**
  * Height of the monarch from days spent together.
  *
- * The curve before this one, `1 - exp(-days/1600)`, saturates: past roughly
- * five years the crystal stops growing at all, and every long relationship
- * renders identically. A logarithm never stops but decelerates hard.
- *
- * The constants were then lowered on the owner's reading of a three-year
- * crystal — "too big already, and frightening to imagine at seven". So the
- * monarch starts modest and the next few years add very little: seven years
- * is under a fifth taller than three and a half, and forty is only a third
- * taller than ten. What the couple should read in her is patience, not
- * accumulation.
- *
- *   1 year  0.63    5 years  0.96    20 years  1.33
- *   3.6 yrs 0.88    7 years  1.04    40 years  1.53
+ * Flat past the full term by construction rather than by a clamp bolted on: the
+ * progress term saturates at one, so thirty years and fifty years are the same
+ * height and the difference between them shows up as girth and facets.
  */
 export function monarchAxialScale(daysTogether: number): number {
   const days = Number.isFinite(daysTogether) ? Math.max(0, daysTogether) : 0;
-  return round6(0.42 + 0.3 * Math.log(1 + days / DAYS_PER_YEAR));
+  const progress = clamp01(days / DAYS_PER_YEAR / MONARCH_FULL_TERM_YEARS);
+  return round6(
+    MONARCH_SEED_HEIGHT
+    + (MONARCH_FULL_HEIGHT - MONARCH_SEED_HEIGHT) * Math.pow(progress, MONARCH_GROWTH_EXPONENT),
+  );
+}
+
+/**
+ * How much wider a crystal grows once it has stopped growing taller.
+ *
+ * Past the full term the couple's history has to keep showing somewhere, and
+ * the owner named the two places: width, and new faces. This is the width.
+ *
+ * Saturating rather than linear, so a fifty-year relationship is visibly
+ * stouter than a thirty-year one without a seventy-year one becoming a boulder.
+ * It only ever grows, so it can never take back girth the couple already had.
+ *
+ *   30 years  1.00    45 years  1.13    70 years  1.22
+ *   35 years  1.06    50 years  1.16    ∞         1.35
+ */
+export function veteranGirth(daysTogether: number): number {
+  const days = Number.isFinite(daysTogether) ? Math.max(0, daysTogether) : 0;
+  const beyond = Math.max(0, days / DAYS_PER_YEAR - MONARCH_FULL_TERM_YEARS);
+  return round6(1 + 0.35 * (beyond / (beyond + 25)));
 }
 
 /**
@@ -116,17 +170,33 @@ export function facetThresholdForYears(completedYears: number): number {
  * because time passed, so the cost is fixed per photo at the moment it
  * arrives.
  *
+ * Past the full term, time itself starts adding faces. That is the second half
+ * of the owner's rule for a veteran relationship — the first is `veteranGirth`
+ * — and it is what keeps a fortieth year from looking exactly like a thirtieth
+ * when the height can no longer say anything. One face every five years, which
+ * over the whole remaining range to the twenty-four-face ceiling is a slow,
+ * legible drift rather than a second growth curve.
+ *
+ * It can only add, so ADR-0004's hardest guarantee survives intact: a facet
+ * earned is never lost to the passage of time.
+ *
  * @param photoYears completed relationship years at each photo's date.
+ * @param daysTogether days the couple has been together, for the veteran term.
  */
-export function monarchFacetCount(photoYears: readonly number[]): number {
+export function monarchFacetCount(
+  photoYears: readonly number[],
+  daysTogether = 0,
+): number {
   let earned = 0;
   for (const years of photoYears) {
     if (!Number.isFinite(years)) continue;
     earned += 1 / facetThresholdForYears(Math.max(0, Math.floor(years)));
   }
+  const days = Number.isFinite(daysTogether) ? Math.max(0, daysTogether) : 0;
+  const beyondTerm = Math.max(0, days / DAYS_PER_YEAR - MONARCH_FULL_TERM_YEARS);
   return Math.min(
     MONARCH_MAX_FACETS,
-    MONARCH_MIN_FACETS + Math.floor(round6(earned)),
+    MONARCH_MIN_FACETS + Math.floor(round6(earned)) + Math.floor(beyondTerm / 5),
   );
 }
 
@@ -237,38 +307,70 @@ export const CHILD_MONARCH_SHARE = 0.5;
 /**
  * Engine units of air that must remain between a child and the monarch.
  *
- * Tightened from 0.1 once the children leaned off her axis. The number exists
- * so contact is arithmetically impossible, and it only ever has to hold at the
- * *base* — a leaning child diverges from the monarch all the way up, so the gap
- * at the ground is the smallest gap there is. At 0.1 the ring stood far enough
- * back to read as five separate crystals placed around a spire; the owner asked
- * for one structure out of one deposit, and that means bases close enough to
- * share a node of quartz.
+ * 0.1 → 0.055 → 0.012, and the last step is the one that made the druse a
+ * druse. Measured on four couples at 0.055: the air between the monarch's
+ * surface and a child's was **0.080 at the anchors and 0.095 mesh to mesh**,
+ * against a child's own diameter of 0.040. Every child stood more than two of
+ * its own widths off the monarch, which is why the colony kept reading as
+ * separate crystals arranged around a spire however tight the ring looked in
+ * plan.
+ *
+ * The number still exists, and it still makes contact arithmetically
+ * impossible — that is the whole reason it is a floor and not a target. What
+ * changed is that it is now the *only* term between the two surfaces, and it is
+ * small enough that the vein's capsules merge into one node under the monarch
+ * rather than reaching out to each child down its own branch (ADR-0003 builds
+ * the substrate as a union of capsules, so bases this close share one).
+ *
+ * It only has to hold at the *base*: a leaning child diverges from the monarch
+ * all the way up, so the gap at the ground is the smallest gap there is.
  */
-export const CHILD_MIN_CLEARANCE = 0.055;
+export const CHILD_MIN_CLEARANCE = 0.012;
+
+/**
+ * Extra clearance proportional to the two radii, for the corners a stated
+ * radius does not describe.
+ *
+ * `radialScale` is the distance to a *face*, and a crystal is a polygon: its
+ * corners stand `1/cos(π/n)` further out, which is about 4% at eleven facets
+ * and more on the smaller counts a child carries. That excess scales with the
+ * body, so an absolute clearance that is comfortable on a young couple is not
+ * on an old one — measured with a flat 0.012, the closest child hull stood
+ * 0.0035 outside the monarch at four years and **0.0010** at twenty-five,
+ * heading the wrong way.
+ *
+ * Twelve per cent of the two radii covers both bodies' corner excess about
+ * three times over, and it costs a fifth of what the old flat standoff did.
+ */
+const CHILD_CORNER_ALLOWANCE = 0.12;
 /** Years per ring before a new, wider ring opens. */
 export const CHILD_RING_CAPACITY = 8;
 /**
  * How much further out each successive ring sits, and how far a year with no
  * important events stands back.
  *
- * Both are deliberately tight. A looser ring made the druse far wider than
- * tall, and on a portrait phone that is not a tuning problem but a geometric
- * one: an object wider than the screen is wide can never fill the screen's
- * height, whatever the camera does. Keeping the footprint no wider than the
- * artifact is tall is what lets the crystal read large on a phone.
+ * Deliberately tight. A looser ring made the druse far wider than tall, and on
+ * a portrait phone that is not a tuning problem but a geometric one: an object
+ * wider than the screen is wide can never fill the screen's height, whatever
+ * the camera does. Keeping the footprint no wider than the artifact is tall is
+ * what lets the crystal read large on a phone.
  *
- * Both were pulled in again once the children started leaning outward. A
- * standing child keeps the same distance from the monarch all the way up, so
- * the ring had to be wide enough to look uncrowded at the tips. A leaning one
- * diverges as it rises: its tightest point is its base, and the extra standoff
- * was buying separation that the lean now provides for free — at the cost of a
+ * It was pulled in again once the children started leaning outward. A standing
+ * child keeps the same distance from the monarch all the way up, so the ring
+ * had to be wide enough to look uncrowded at the tips. A leaning one diverges
+ * as it rises: its tightest point is its base, and the extra standoff was
+ * buying separation that the lean now provides for free — at the cost of a
  * druse that spread wider than it stood tall.
+ *
+ * Only the *ring* step survives. The other constant that used to live here was
+ * `CHILD_EVENT_REACH`: an extra standoff that a year's important events could
+ * close, so a busy year drew its crystal toward the monarch while the clearance
+ * floor guaranteed it could never reach her. The owner asked for one common
+ * vein and named that mechanism as the thing in the way — a crystal reaching
+ * for the monarch it can never join. It is gone, and no term now stands between
+ * a child's base and the monarch's but the floor.
  */
 const CHILD_RING_STEP = 0.2;
-const CHILD_EVENT_REACH = 0.05;
-/** Fraction of that reach one important event closes. */
-const CHILD_EVENT_STEP = 0.25;
 
 export function childRingIndex(yearIndex: number): number {
   return Math.max(0, Math.floor(yearIndex / CHILD_RING_CAPACITY));
@@ -360,22 +462,69 @@ export function childDimensions(
 /**
  * Distance from the monarch's axis to a child's axis.
  *
- * Important events during the year pull the crystal inward, but the floor
- * is the sum of both radii plus a fixed clearance, so contact is
- * arithmetically impossible however many events a year holds.
+ * The sum of both radii plus a fixed clearance, and nothing else — so every
+ * child in a ring stands as close to the monarch as the geometry permits, and
+ * contact stays arithmetically impossible.
+ *
+ * A year's activity used to move this. It no longer does, and that is the
+ * point: distance from the mother is not something a couple earns, it is what
+ * makes the colony one body. What a year did with itself shows in the crystal's
+ * size, facets and fill, all of which are things the year *is* rather than
+ * where it stands.
  */
 export function childDistance(input: {
   monarchRadialScale: number;
   childRadialScale: number;
   ringIndex: number;
-  importantEventCount: number;
 }): number {
-  const floor = input.monarchRadialScale
+  return round6(
+    input.monarchRadialScale
     + input.childRadialScale
-    + CHILD_MIN_CLEARANCE
-    + input.ringIndex * CHILD_RING_STEP;
-  const closeness = clamp01(Math.max(0, input.importantEventCount) * CHILD_EVENT_STEP);
-  return round6(floor + (1 - closeness) * CHILD_EVENT_REACH);
+    + childClearance(input.monarchRadialScale, input.childRadialScale)
+    + input.ringIndex * CHILD_RING_STEP,
+  );
+}
+
+/** The floor between two bodies' stated radii; see the two constants above. */
+export function childClearance(monarchRadialScale: number, childRadialScale: number): number {
+  const monarch = Number.isFinite(monarchRadialScale) ? Math.max(0, monarchRadialScale) : 0;
+  const child = Number.isFinite(childRadialScale) ? Math.max(0, childRadialScale) : 0;
+  return round6(CHILD_MIN_CLEARANCE + CHILD_CORNER_ALLOWANCE * (monarch + child));
+}
+
+/**
+ * Engine units between the year ring's outer edge and the skirt.
+ *
+ * The skirt used to sit at a fixed 0.24 from the axis while the year ring was
+ * derived from the monarch's own girth, and the two crossed: at four years the
+ * plans stood 0.08 outside the years, and at twenty-five the *years* had grown
+ * past them, so the marks of finished plans ended up scattered among and behind
+ * the crystals they were meant to sit in front of. Deriving both from the same
+ * radii is what keeps the order fixed at every age.
+ */
+const SKIRT_CLEARANCE = 0.02;
+
+/**
+ * Distance from the monarch's axis to a plan crystal's axis.
+ *
+ * Just outside the widest a year crystal can be, so the skirt reads as a hem
+ * around the colony rather than as gravel dropped between its members. Uses the
+ * widest possible year rather than the years this couple actually has, so a
+ * couple who fills in an empty year later does not find their plan crystals
+ * suddenly overlapped by it.
+ */
+export function skirtDistance(input: {
+  monarchRadialScale: number;
+  widestChildRadialScale: number;
+  skirtRadialScale: number;
+}): number {
+  return round6(
+    input.monarchRadialScale
+    + input.widestChildRadialScale * 2
+    + childClearance(input.monarchRadialScale, input.widestChildRadialScale)
+    + input.skirtRadialScale
+    + SKIRT_CLEARANCE,
+  );
 }
 
 /**
@@ -533,11 +682,48 @@ export interface WishGiftTally {
   forSecond: number;
 }
 
-/** Wishes per channel per year beyond which the colour stops deepening. */
+/** Wishes in one channel beyond which it stops pulling the hue any further. */
 export const WISH_CHANNEL_CAP = 10;
 
+/** Wishes granted in total beyond which the colour stops deepening. */
+export const WISH_TOTAL_CAP = 14;
+
+/**
+ * The colour each channel points at.
+ *
+ * The mapping used to be the identity — `forFirst` drove red, `shared` green,
+ * `forSecond` blue — and that is what made an even split render **white**:
+ * three equal RGB channels are grey by definition, and grey over white is
+ * white. So the couple who gave each other the most, and gave most evenly, got
+ * a crystal with no colour in it.
+ *
+ * Pointing each channel at a *mineral* colour removes the coincidence. An even
+ * split lands on the blend of the three — `[0.66, 0.50, 0.85]`, amethyst — which
+ * is a colour, and at full depth the strongest one the crystal can reach rather
+ * than the palest.
+ *
+ * The chroma is in the anchors rather than in a normalisation step. A first
+ * attempt used paler anchors and rescaled the blend, and it came out weaker
+ * than the mapping it replaced: dividing by the largest channel drives that
+ * channel to white and can only darken the others, so a pale anchor set has
+ * nothing left to give. These three carry their own separation — 0.35 between
+ * the darkest and lightest channel — and the depth term does the rest.
+ *
+ * Chosen to stay inside one stone: rose quartz, amethyst and aquamarine are all
+ * pale silicates, so any mix of them still reads as quartz rather than as dye.
+ */
+const WISH_HUE_FOR_FIRST: readonly [number, number, number] = [1, 0.35, 0.55];
+const WISH_HUE_SHARED: readonly [number, number, number] = [0.62, 0.35, 1];
+const WISH_HUE_FOR_SECOND: readonly [number, number, number] = [0.35, 0.8, 1];
+
+/**
+ * Never all the way to the pure hue: a crystal is translucent stone, not
+ * stained glass, and it has to keep reading as crystal at every tint.
+ */
+const WISH_MAX_PULL = 0.75;
+
 export interface CrystalTint {
-  /** Linear RGB in 0..1; pure white when the year granted no wishes. */
+  /** Linear RGB in 0..1; pure white only when nothing was granted at all. */
   rgb: readonly [number, number, number];
   /** 0..1 rainbow strength on the facets. */
   iridescence: number;
@@ -546,47 +732,66 @@ export interface CrystalTint {
 const WHITE: CrystalTint = { rgb: [1, 1, 1], iridescence: 0 };
 
 /**
- * Colour of a year's crystal from the wishes granted during it.
+ * Colour of the crystal from the wishes the couple granted each other.
  *
- * Not a literal RGB triple. Mapping counts straight onto channels would
- * make a year with no gifts *black*, contradicting the white crystal every
- * body is born as, and — worse — would make a perfectly balanced year
- * (ten, ten and ten) render grey, so the best possible year looked like
- * the dullest.
+ * Not a literal RGB triple. Mapping counts straight onto channels would make a
+ * couple with no gifts *black*, contradicting the white crystal every body is
+ * born as.
  *
- * Instead the counts give tone and saturation over white, and how *evenly*
- * the couple gave decides iridescence. A year where both partners granted
- * as much as they received comes out almost white with a strong rainbow
- * across the facets, which is the right reward for balance and costs
- * nothing new — the material already carries an iridescence field.
+ * **Direction and depth are separate, and that is the fix.** They used not to
+ * be: the hue was the three counts normalised by the largest of them, and the
+ * pull was that largest count. Two consequences, both wrong, both measured on
+ * real data:
+ *
+ * - **Equal counts cancelled.** Normalising three equal numbers gives
+ *   `[1, 1, 1]`, and over white that is white. The live couple's fourth year
+ *   granted 2 / 2 / 2 and published a tint of exactly `[1, 1, 1]` —
+ *   indistinguishable from a couple who had granted nothing. The note this
+ *   replaces called that the reward for balance, paid in iridescence. On screen
+ *   it is the absence of colour, and the owner asked for it to be healed.
+ * - **Depth read one channel only.** 3/3/3 and 3/0/0 pulled equally, so giving
+ *   three times as much bought nothing.
+ *
+ * Now the **total** decides how far from white the crystal moves, so more
+ * giving is always more colour; the **mix** decides which way, by blending
+ * three mineral hues rather than three raw channels, so an even split lands on
+ * the blend instead of on grey. Iridescence still rewards balance — now as a
+ * second signal on top of a real colour rather than as a substitute for one.
  */
 export function wishTint(tally: WishGiftTally): CrystalTint {
-  const unit = (count: number): number =>
-    clamp01(Math.max(0, Number.isFinite(count) ? count : 0) / WISH_CHANNEL_CAP);
+  const count = (value: number): number => Math.max(0, Number.isFinite(value) ? value : 0);
+  const unit = (value: number): number => clamp01(count(value) / WISH_CHANNEL_CAP);
   const first = unit(tally.forFirst);
   const shared = unit(tally.shared);
   const second = unit(tally.forSecond);
 
-  const strongest = Math.max(first, shared, second);
-  if (strongest <= 0) return WHITE;
+  const spread = first + shared + second;
+  if (spread <= 0) return WHITE;
 
+  // How far from white: everything they granted, saturating.
+  const depth = clamp01(
+    (count(tally.forFirst) + count(tally.shared) + count(tally.forSecond)) / WISH_TOTAL_CAP,
+  );
+  // Which way: the three mineral hues in the proportion the couple gave them.
+  const hue = (channel: number): number => (
+    (WISH_HUE_FOR_FIRST[channel]! * first
+      + WISH_HUE_SHARED[channel]! * shared
+      + WISH_HUE_FOR_SECOND[channel]! * second) / spread
+  );
+  const pull = depth * WISH_MAX_PULL;
+
+  const strongest = Math.max(first, shared, second);
   const weakest = Math.min(first, shared, second);
-  const hue: readonly [number, number, number] = [
-    first / strongest,
-    shared / strongest,
-    second / strongest,
-  ];
-  // Never all the way to the pure hue: a crystal is translucent stone, not
-  // stained glass, and it has to keep reading as crystal at every tint.
-  const pull = strongest * 0.75;
 
   return {
     rgb: [
-      round6(1 - (1 - hue[0]) * pull),
-      round6(1 - (1 - hue[1]) * pull),
-      round6(1 - (1 - hue[2]) * pull),
+      round6(1 - (1 - hue(0)) * pull),
+      round6(1 - (1 - hue(1)) * pull),
+      round6(1 - (1 - hue(2)) * pull),
     ],
-    iridescence: round6((weakest / strongest) * strongest),
+    // Balance, scaled by how much there was to balance: one wish each is even,
+    // but it is not yet a rainbow.
+    iridescence: round6((weakest / strongest) * depth),
   };
 }
 
