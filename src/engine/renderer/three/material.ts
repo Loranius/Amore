@@ -36,6 +36,8 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.facetEdgeStrength.toFixed(6),
     recipe.facetEdgeWidth.toFixed(6),
     recipe.axialTintStrength.toFixed(6),
+    recipe.striationStrength.toFixed(6),
+    recipe.striationCount.toFixed(6),
     rgbKey(recipe.footColor),
   ].join('|');
 }
@@ -92,6 +94,8 @@ uniform float uEvolutionFacetEdgeStrength;
 uniform float uEvolutionFacetEdgeWidth;
 uniform float uEvolutionAxialTintStrength;
 uniform vec3 uEvolutionFootColor;
+uniform float uEvolutionStriationStrength;
+uniform float uEvolutionStriationCount;
 varying float vEvolutionAxial;
 varying vec3 vEvolutionObject;
 varying vec3 vEvolutionObjectNormal;
@@ -263,6 +267,54 @@ const FRAGMENT_BODY = /* glsl */ `
     );
   }
 
+  // ── Growth striation ──────────────────────────────────────
+  // Horizontal striation across the prism faces is *the* diagnostic feature of
+  // quartz — it is how the mineral is told from beryl at a glance — and the
+  // crystal had none of it anywhere. Pass 1's "almost no evidence of growth
+  // history" and the flat, machined read of the shaft are the same absence.
+  //
+  // Drawn rather than modelled, and that is a constraint rather than a
+  // shortcut: since ADR-0006 every face is planar by construction, and
+  // displacing the shaft to cut real steps would break the property the whole
+  // faceting rests on. A striation is a step a few microns deep, so what it
+  // does to a render is change a normal — exactly what is available here.
+  if ( uEvolutionStriationStrength > 0.0001 ) {
+    // The shaft only. Quartz prism faces are striated and the rhombohedral
+    // termination faces are smooth, so a band crossing the tip would be a
+    // texture nature does not put there. Read off the object normal, which is
+    // the face's own, so it does not depend on where the camera stands.
+    float evolutionShaft = 1.0 - smoothstep( 0.2, 0.45, abs( vEvolutionObjectNormal.y ) );
+
+    float evolutionBands = vEvolutionAxial * uEvolutionStriationCount;
+    // Bands per pixel. Below about two pixels a band the pattern stops being
+    // striation and becomes moiré, so it fades out instead of aliasing — the
+    // same failure the tree's bark striation hit when its frequency ran past
+    // the rings carrying it, and it rendered as nothing at all rather than as
+    // something wrong. Here it is honest to fade: a crystal seen from far
+    // enough away genuinely has no visible striation.
+    float evolutionBandWidth = max( fwidth( evolutionBands ), 1e-5 );
+    float evolutionResolvable = 1.0 - smoothstep( 0.16, 0.42, evolutionBandWidth );
+
+    // A step, not a ripple. Real striation is a terrace: a hard lip and a slow
+    // run back, so the line is drawn at the wrap and the ramp between the lines
+    // leans one way. A symmetric sine gives a corrugation, which reads as a
+    // machined thread — the exact impression this is here to remove.
+    float evolutionPhaseInBand = fract( evolutionBands );
+    float evolutionLip = 1.0 - smoothstep(
+      0.0,
+      evolutionBandWidth * 1.6,
+      min( evolutionPhaseInBand, 1.0 - evolutionPhaseInBand )
+    );
+    float evolutionTerrace = evolutionPhaseInBand - 0.5;
+
+    float evolutionStriation = uEvolutionStriationStrength
+      * evolutionShaft
+      * evolutionResolvable;
+    outgoingLight *= 1.0
+      + evolutionTerrace * evolutionStriation * 0.5
+      - evolutionLip * evolutionStriation;
+  }
+
   // ── The facet's own rim ───────────────────────────────────
   // Drawn, not lit, and that is the whole point. Three stylized gem assets the
   // owner supplied all outline every facet in the surface itself — in albedo,
@@ -350,6 +402,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     && recipe.auroraStrength <= 0
     && recipe.facetEdgeStrength <= 0
     && recipe.axialTintStrength <= 0
+    && recipe.striationStrength <= 0
   ) return;
 
   material.onBeforeCompile = (shader) => {
@@ -374,6 +427,8 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionFacetEdgeStrength'] = { value: recipe.facetEdgeStrength };
     shader.uniforms['uEvolutionFacetEdgeWidth'] = { value: recipe.facetEdgeWidth };
     shader.uniforms['uEvolutionAxialTintStrength'] = { value: recipe.axialTintStrength };
+    shader.uniforms['uEvolutionStriationStrength'] = { value: recipe.striationStrength };
+    shader.uniforms['uEvolutionStriationCount'] = { value: recipe.striationCount };
     shader.uniforms['uEvolutionFootColor'] = { value: toColor(recipe.footColor) };
     // Handed back so the life frame can advance it. Without a moving phase the
     // two colours sit still and the fissure is a lamp in a slot, not an aurora.

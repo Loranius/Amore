@@ -56,12 +56,17 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // 1.1.0: the shell became semi-transparent, the stone gained procedural
   // striations and veils, and the inner light now grows with the wishes that
   // were granted rather than merely taking their colour (ADR-0007).
+  // 1.8.0: the shaft carries growth striation — horizontal terraces across the
+  // prism faces, one per year the couple has been together, drawn in the shader
+  // because ADR-0006 makes every face planar and displacing it would break the
+  // property the faceting rests on.
+  //
   // 1.7.0: rank is carried by value. The role ladder mixed hue toward
   // `secondary`, which equals `primary` whenever a couple's events carry no
   // warm channel, and the `micro` value step was applied inside the albedo cap
   // that then divided it back out. Both were inert; the step now follows the
   // cap and every body's shell changes with its role.
-  rulesVersion: '1.7.0',
+  rulesVersion: '1.8.0',
   quality: 'balanced',
   allowIridescence: true,
   allowProceduralReflection: true,

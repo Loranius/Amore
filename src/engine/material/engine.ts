@@ -380,7 +380,31 @@ function shaderRecipe(
     // pixels is a colour shift nobody reads as one.
     axialTintStrength: round6(micro ? 0 : 0.55),
     footColor: coreTintColor(emissiveColor, tint),
+    // Off on the smallest bodies, and off on the fallback tier. Everywhere
+    // else it is cheap — a fract, a smoothstep and one derivative — and it is
+    // the only thing on the crystal that says anything grew over time.
+    striationStrength: round6(
+      micro || input.config.quality === 'fallback' ? 0 : focal ? 0.2 : 0.14,
+    ),
+    striationCount: striationCount(state.ageDays),
   };
+}
+
+/**
+ * One striation per year together, and never so few that the shaft looks blank
+ * or so many that they close into a hatch.
+ *
+ * The floor matters more than it looks. A couple in their first year would
+ * otherwise get a single line across the shaft, which reads as a defect rather
+ * than as a texture — a crystal has striations from the moment it has a prism
+ * face. The ceiling is where the pattern stops being resolvable on a phone: the
+ * monarch stands about three hundred pixels tall on a portrait screen, so
+ * thirty-six bands is eight pixels apart, and past that the shader's own
+ * derivative fade would be doing the work instead of the number.
+ */
+export function striationCount(ageDays: number): number {
+  const days = Number.isFinite(ageDays) ? Math.max(0, ageDays) : 0;
+  return Math.min(36, Math.max(4, Math.round(days / 365)));
 }
 
 /**
@@ -780,9 +804,13 @@ function buildSubstrateMaterial(
       facetEdgeStrength: 0.12,
       facetEdgeWidth: 1.4,
       // The rock has no foot and no tip: it is broken rubble, not a grown body,
-      // and there is no axis for a gradient to run along.
+      // and there is no axis for a gradient to run along. Growth striation is
+      // out for the same reason and more strongly: a striation records the
+      // increments a crystal grew in, and this is the stone it grew *out of*.
       axialTintStrength: 0,
       footColor: baseColor,
+      striationStrength: 0,
+      striationCount: 0,
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

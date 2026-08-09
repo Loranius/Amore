@@ -116,6 +116,10 @@ distribution* rather than the code path is what found all three.
 
 ## 6. What Pass 5 should be
 
+> Done — see `CRYSTAL_NATURALIZATION_PASS_5_STRIATION.md` and ADR-0012. Drawn in
+> the shader rather than modelled, because ADR-0006 makes every face planar and
+> displacing the shaft would break the property the faceting rests on.
+
 1. **Growth bands.** The only remaining item that adds evidence of history —
    there is none anywhere in the geometry or the shader today. The tree's
    geometric striation and its measured resolvability floor (four rings per
