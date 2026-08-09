@@ -311,9 +311,26 @@ function shaderRecipe(
       ? { r: 1, g: 0.62, b: 0.42 }
       : { r: 0.98, g: 0.76, b: 0.84 }, 0.42),
     rimColor: mixRgb({ r: 1, g: 0.9, b: 0.96 }, emissiveColor, emphasized ? 0.46 : 0.2),
-    inclusionDensity: round6(micro ? 0 : inclusionBase * preset.inclusionScale),
+    // Amplitude of the zoning, not a threshold. As a threshold this was 0.111
+    // on a real couple — the top eighth of the noise range, which draws thin
+    // filaments rather than the broad stages a crystal actually grew in. The
+    // floor is what stops a couple with a spotless history getting a body of
+    // one flat tone, which is the "pastel glass" reading itself.
+    //
+    // The slope is set so the range is actually used rather than clamped. At
+    // 2.6 — the first value that read well on the portal — a couple who logged
+    // in one burst came out at 1.303 and a steady couple at 0.950, so both hit
+    // the ceiling and the derivation stopped meaning anything. At 1.4 they come
+    // out 0.986 and 0.796, which is a quarter of the range apart and neither
+    // clamped. Both ends still read: 0.796 is above the amplitude measured to
+    // lift within-facet variation by 13% on the live portal.
+    inclusionDensity: round6(micro ? 0 : clamp01(0.58 + inclusionBase * 1.4) * preset.inclusionScale),
     inclusionScale: round6(3.4 + pressures.density * 4.6 + pressures.surfaceComplexity * 2.2),
-    inclusionContrast: round6((0.18 + state.fracture * 0.34) * preset.inclusionScale),
+    // How hard the boundary between two zones is: 0 leaves a soft gradient
+    // across the body, 1 gives stages with a visible line between them. A
+    // fractured history gets harder boundaries, which is what a crystal that
+    // stopped and restarted looks like.
+    inclusionContrast: round6(clamp01((0.18 + state.fracture * 0.34)) * preset.inclusionScale),
     // A crystal is lit from within, but not evenly: the requested "inner
     // crystal at 70% size" cannot be a second mesh here, because the shell is
     // opaque by contract (the canvas is alpha-composited over a CSS sky, so a

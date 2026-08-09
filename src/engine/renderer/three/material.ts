@@ -189,14 +189,43 @@ const FRAGMENT_BODY = /* glsl */ `
   outgoingLight += evolutionSky * uEvolutionSkyStrength * evolutionFresnel;
   outgoingLight += uEvolutionRimColor * uEvolutionRimStrength * evolutionFresnel;
 
+  // ── Zoning inside the stone ───────────────────────────────
+  // The band itself is unchanged; where it is applied is not, and that is the
+  // whole of this. It used to multiply the shaded result — the outgoing light,
+  // specular highlight included — which is what a stain on the *surface* does.
+  // A cloud inside quartz is not a stain: it is a region that scatters the
+  // light crossing it, so what it changes is the light coming from within.
+  //
+  // Measured before the move, by zeroing each term in turn and diffing the
+  // portal: the inclusion moved 0.42 of 255 on average, over 7% of the
+  // artifact's pixels. Pass 1's "no zoning, no inclusion depth at portal size"
+  // was that number. It was not too weak a constant — it was applied where the
+  // eye reads dirt rather than depth, and no amount of it would have become
+  // structure.
+  //
+  // The band is dropped from the surface entirely rather than kept at a lower
+  // weight. A fracture that shows on the outside is a real habit, but it is not
+  // this term, and two mechanisms sharing one number is how the last four
+  // passes' dead code came about.
   float evolutionBand = sin(
     dot( vEvolutionObject, vec3(0.83, 1.17, 0.61) ) * uEvolutionInclusionScale
     + dot( vEvolutionObjectNormal, vec3(2.1, 1.3, 1.7) )
   );
+  float evolutionZone = evolutionBand * 0.5 + 0.5;
+  // Zones, not veins. The old term thresholded this at 1 − density, and with a
+  // measured density of 0.111 that kept the top eighth of the range: thin
+  // filaments, which is what an inclusion *trail* looks like and not what
+  // zoning looks like. Sharpening toward the boundary instead keeps the whole
+  // body inside a zone of one kind or another, which is how a quartz crystal is
+  // actually built — it grew in stages and every part of it belongs to one.
+  evolutionZone = mix(
+    evolutionZone,
+    smoothstep( 0.35, 0.65, evolutionZone ),
+    uEvolutionInclusionContrast
+  );
   float evolutionInclusion = uEvolutionInclusionDensity > 0.0001
-    ? smoothstep(1.0 - uEvolutionInclusionDensity, 1.0, evolutionBand * 0.5 + 0.5)
+    ? ( evolutionZone - 0.5 ) * 2.0 * uEvolutionInclusionDensity
     : 0.0;
-  outgoingLight *= 1.0 - evolutionInclusion * uEvolutionInclusionContrast;
 
   // Veils lift toward milk rather than toward grey: a cloud inside quartz
   // scatters light, it does not absorb it.
@@ -387,8 +416,27 @@ const FRAGMENT_BODY = /* glsl */ `
   // Faces turned toward the viewer glow, faces at the silhouette do not — and
   // since every triangle carries its own normal, neighbouring facets separate
   // instead of merging.
-  outgoingLight += uEvolutionCoreColor * uEvolutionCoreStrength
-    * evolutionFacing * evolutionFacing * evolutionFacing;
+  float evolutionInner = evolutionFacing * evolutionFacing * evolutionFacing;
+
+  // And this is where the stone's zoning and its cloud arrive: on the inner
+  // light, not on the surface. Both *lift* it. Milky quartz is white because a
+  // cloud scatters the light crossing it back out — the veil block above says
+  // the same thing about the shell — so a zone the couple's history clouded
+  // reads as brighter from within, never as a dark patch.
+  //
+  // Weighting them by the inner light rather than adding them flat is what
+  // makes this depth rather than paint: both fade to nothing at the silhouette,
+  // where there is no stone between the eye and the far side to hold anything.
+  // A flat addition would have drawn the same pattern on a face seen edge-on,
+  // which is the one place a real inclusion cannot show.
+  float evolutionZoning = 1.0
+    + evolutionInclusion
+    + ( evolutionCloud - 0.5 ) * uEvolutionVeilStrength * 0.9;
+
+  outgoingLight += uEvolutionCoreColor
+    * uEvolutionCoreStrength
+    * evolutionInner
+    * max( 0.0, evolutionZoning );
 `;
 
 function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: CrystalBodyMaterial['shader']): void {

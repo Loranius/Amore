@@ -115,6 +115,11 @@ Pass 1 confirmed nine findings. After five passes:
 
 ## 6. What Pass 6 should be
 
+> Done — see `CRYSTAL_NATURALIZATION_PASS_6_INTERIOR.md` and ADR-0013. An
+> ablation of every shader term found the interior mechanisms measurable at
+> under half a percent of the range; the fix was where the inclusion was applied
+> rather than how strong it was.
+
 **Internal structure, and it is the hard one.** The shell is opaque by contract:
 the canvas alpha-composites over a CSS sky, so real transmission renders black.
 "Internal zoning" therefore has to be depth-weighted core light rather than
