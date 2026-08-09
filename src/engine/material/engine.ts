@@ -341,9 +341,16 @@ function shaderRecipe(
     skyColor: mixRgb({ r: 0.82, g: 0.9, b: 1 }, input.species.pressures.dominantChannel === 'culture'
       ? { r: 0.78, g: 0.72, b: 1 }
       : { r: 0.9, g: 0.95, b: 1 }, 0.34),
-    groundColor: mixRgb({ r: 1, g: 0.73, b: 0.62 }, input.species.pressures.warmth > 0.45
-      ? { r: 1, g: 0.62, b: 0.42 }
-      : { r: 0.98, g: 0.76, b: 0.84 }, 0.42),
+    // The warm branch is gone. It stood for a studio's wooden floor, and the
+    // portal's floor is dark violet stone — so the crystal was reflecting a
+    // room it is not standing in. Measured by ablation on the owner's live
+    // portal at the high tier: neutralising this colour removed **81%** of the
+    // warm cast on the shell, against 5% for the thin-film iridescence, so this
+    // was the golden side the owner asked about and iridescence was not.
+    //
+    // What remains is the cool half of the same mix, which keeps the reflection
+    // reading as a room with a lit ground rather than as a black void below.
+    groundColor: mixRgb({ r: 1, g: 0.73, b: 0.62 }, { r: 0.98, g: 0.76, b: 0.84 }, 0.42),
     rimColor: mixRgb({ r: 1, g: 0.9, b: 0.96 }, emissiveColor, emphasized ? 0.46 : 0.2),
     // Amplitude of the zoning, not a threshold. As a threshold this was 0.111
     // on a real couple — the top eighth of the noise range, which draws thin
