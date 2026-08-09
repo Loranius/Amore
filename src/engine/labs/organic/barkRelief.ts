@@ -65,6 +65,12 @@ export function barkRelief(
   const primary = config.lobeCount * angle + config.twist * axial + phase;
   const overtone = config.overtoneCount * angle - config.twist * 0.6 * axial + phase * 1.7;
   const swell = config.swellFrequency * axial + phase * 0.6;
+  // Growth rings, not decoration. Several times the frequency of the swelling
+  // and a fraction of its amplitude, so the outline gains a fine tremble on top
+  // of the big bulges instead of a second set of bulges. This is the layer that
+  // makes a smooth taper read as wood rather than as a turned dowel — the
+  // swelling says "grown", the striation says "grown in seasons".
+  const striation = config.striationFrequency * axial + phase * 2.3;
 
   // The swelling carries most of the weight, and that is a decision about
   // viewing distance rather than about wood. At portal size the trunk is about
@@ -73,12 +79,13 @@ export function barkRelief(
   // once and survives. The lobes stay because they break the outline's
   // symmetry as the tree turns — they are just not what does the reading.
   const shape =
-    0.34 * Math.cos(primary)
-    + 0.16 * Math.cos(overtone)
-    + 0.5 * Math.cos(swell);
+    0.3 * Math.cos(primary)
+    + 0.14 * Math.cos(overtone)
+    + 0.42 * Math.cos(swell)
+    + config.striationDepthRatio * Math.cos(striation);
   const dShape =
-    -0.34 * config.lobeCount * Math.sin(primary)
-    - 0.16 * config.overtoneCount * Math.sin(overtone);
+    -0.3 * config.lobeCount * Math.sin(primary)
+    - 0.14 * config.overtoneCount * Math.sin(overtone);
 
   const radiusScale = 1 + depth * shape;
   return {

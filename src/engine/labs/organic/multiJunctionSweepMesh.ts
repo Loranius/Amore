@@ -11,6 +11,7 @@ import {
 import type { GrowthVec3 } from '../../growth/types';
 import { DEFAULT_ORGANIC_SURFACE_CONFIG } from './surfaceConfig';
 import { buildOrganicSweepMesh as buildProductionSweepMesh } from './productionSweepMesh';
+import { ORGANIC_TRUNK_BRANCH_ID } from './surfaceTypes';
 import type {
   OrganicBranchCurve,
   OrganicCurveFrameSample,
@@ -176,7 +177,7 @@ function visibleJunctionGroups(
 ): JunctionGroup[] {
   const groups = collectJunctionGroups(frameState);
   const primaryKey = primaryForkKey(groups);
-  const trunk = frameState.curves.find((curve) => curve.branchId === 'organic:trunk');
+  const trunk = frameState.curves.find((curve) => curve.branchId === ORGANIC_TRUNK_BRANCH_ID);
   const maximumRadius = Math.max(
     1e-6,
     ...(trunk?.samples.map((sample) => sample.radius) ?? []),

@@ -3,8 +3,12 @@ export { DEFAULT_ORGANIC_SKELETON_CONFIG } from './config';
 export { buildOrganicCurveFrames } from './curveFrames';
 export { buildOrganicSkeleton } from './spaceColonization';
 export { DEFAULT_ORGANIC_SURFACE_CONFIG } from './surfaceConfig';
+export { barkRelief, barkReliefPhase } from './barkRelief';
+export type { BarkReliefSample } from './barkRelief';
+export { ORGANIC_TRUNK_BRANCH_ID } from './surfaceTypes';
 export { buildOrganicSweepMesh } from './multiJunctionSweepMesh';
 export type {
+  BarkReliefConfig,
   OrganicBranchCurve,
   OrganicCurveFrameSample,
   OrganicCurveFrameState,

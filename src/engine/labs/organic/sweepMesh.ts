@@ -14,6 +14,7 @@ import {
 import type { GrowthVec3 } from '../../growth/types';
 import { barkRelief, barkReliefPhase } from './barkRelief';
 import { DEFAULT_ORGANIC_SURFACE_CONFIG } from './surfaceConfig';
+import { ORGANIC_TRUNK_BRANCH_ID } from './surfaceTypes';
 import type {
   OrganicBranchCurve,
   OrganicCurveFrameSample,
@@ -57,6 +58,22 @@ function sampleByStride(
   return first && last ? [first, last] : [];
 }
 
+/**
+ * Де стоїть кільце коміра на шляху від батьківської гілки до дочірньої.
+ *
+ * Один графік для всього: і для позиції кільця, і для його радіуса, і для
+ * повороту рамки. Досі їх було два — центри йшли за `(index-1)/(ringCount-1)`,
+ * а радіус і рамка за `index/ringCount`. На п'яти кільцях це означає, що
+ * останнє кільце стоїть на 0.75 шляху, маючи радіус і поворот від 0.8: поверхня
+ * розходиться сама з собою, і стик гілки зі стовбуром отримує зайву складку.
+ * Індекси 0 і 1 — це врізка в батьківське тіло та вихід на його поверхню;
+ * звуження починається щойно після них.
+ */
+function junctionT(index: number, ringCount: number): number {
+  if (ringCount <= 1 || index <= 1) return 0;
+  return (index - 1) / (ringCount - 1);
+}
+
 function junctionCenters(
   curve: OrganicBranchCurve,
   joinSample: OrganicCurveFrameSample,
@@ -69,7 +86,7 @@ function junctionCenters(
 
   centers.push(junction.surfacePosition);
   for (let index = 2; index < ringCount; index += 1) {
-    const t = (index - 1) / (ringCount - 1);
+    const t = junctionT(index, ringCount);
     const eased = smoothstep(t);
     const guided = lerp(junction.surfacePosition, joinSample.position, eased);
     const arcLift = Math.sin(Math.PI * t) * junction.parentRadius * 0.16;
@@ -117,7 +134,7 @@ function buildJunctionSamples(
     const previous = centers[index - 1] ?? position;
     const next = centers[index + 1] ?? joinSample.position;
     const tangent = roundVec(normalize(subtract(next, previous), startTangent));
-    const t = index / ringCount;
+    const t = junctionT(index, ringCount);
     const frame = frameForJunctionSample(tangent, startNormal, joinSample.normal, t);
     const radius = junction.collarRadius
       + (joinSample.radius - junction.collarRadius) * smoothstep(t);
@@ -366,7 +383,7 @@ function radialSegmentsForCurve(
   );
   const radiusRatio = curveRadius / Math.max(1e-6, maximumRadius);
 
-  if (curve.branchId === 'organic:trunk' || curve.generation === 0 || radiusRatio >= 0.5) {
+  if (curve.branchId === ORGANIC_TRUNK_BRANCH_ID || curve.generation === 0 || radiusRatio >= 0.5) {
     return baseSegments;
   }
   if (curve.generation <= 1 || radiusRatio >= 0.22) {
@@ -420,7 +437,7 @@ export function buildOrganicSweepMesh(
     });
     addTubeIndices(indices, firstVertex, samples.length, radialSegments);
 
-    if (curve.branchId === 'organic:trunk') {
+    if (curve.branchId === ORGANIC_TRUNK_BRANCH_ID) {
       addCap(
         positions,
         normals,

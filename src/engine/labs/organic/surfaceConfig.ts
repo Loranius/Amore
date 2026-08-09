@@ -28,6 +28,13 @@ export const DEFAULT_ORGANIC_SURFACE_CONFIG: OrganicSurfaceConfig = {
     lobeCount: 3,
     overtoneCount: 5,
     swellFrequency: 7.4,
+    // Виміряно, а не підібрано: стовбур несе 37 кілець на ~2.8 одиниці, тобто
+    // крок кільця 0.082. При частоті 41 хвиля смуги виходила 0.153 — 1.9 кільця
+    // на хвилю, нижче за Найквіста, і смуги просто зникали в аліасингу. На 19
+    // хвиля 0.33, тобто чотири кільця на хвилю: геометрія її вже описує, і
+    // амплітуду можна дати помітну.
+    striationFrequency: 19,
+    striationDepthRatio: 0.26,
     twist: 4.6,
     depth: 0.14,
     fadeRadius: 0.06,

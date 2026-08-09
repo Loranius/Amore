@@ -84,3 +84,33 @@ describe('Trunk collar', () => {
     expect(DEFAULT_TREE_GROUND_CONTACT_CONFIG.collarBottomRadiusRatio).toBeGreaterThan(1.8);
   });
 });
+
+describe('Trunk collar wood', () => {
+  it('is shaped by the same relief as the trunk, at the trunk phase', () => {
+    // The collar is built by its own ring code, not by the sweep, and drew
+    // perfect circles. Against a trunk whose radius now swings ~14% around
+    // that circle the wood stepped in and out of it, and the intersection read
+    // as a seam between stump and trunk. A matching top radius does not fix
+    // that on its own — the lobes have to line up lobe for lobe, which means
+    // the collar has to use the trunk's phase and not its own.
+    const build = buildTreeLabPreview('medium');
+    const roots = build.rootGeometry;
+    const collarVertices = roots.diagnostics.collarVertexCount;
+    expect(collarVertices).toBeGreaterThan(0);
+
+    const positions = roots.mesh.positions;
+    const total = roots.diagnostics.vertexCount;
+    const terrain = roots.diagnostics.terrainVertexCount;
+    const collarStart = total - terrain - collarVertices;
+    const segments = collarVertices / 3;
+    const radii: number[] = [];
+    for (let slot = 0; slot < segments; slot += 1) {
+      const offset = (collarStart + slot) * 3;
+      radii.push(Math.hypot(positions[offset]!, positions[offset + 2]!));
+    }
+    const min = Math.min(...radii);
+    const max = Math.max(...radii);
+    // A perfect circle would have zero spread. The wood does not.
+    expect((max - min) / ((max + min) / 2)).toBeGreaterThan(0.04);
+  });
+});

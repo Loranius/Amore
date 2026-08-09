@@ -1,7 +1,7 @@
 import type { TreeRootGeometryConfig } from './types';
 
 export const DEFAULT_TREE_ROOT_GEOMETRY_CONFIG: TreeRootGeometryConfig = {
-  rulesVersion: 'tree-root-geometry-v1.2.0',
+  rulesVersion: 'tree-root-geometry-v1.3.0',
   surface: {
     curveSamplesPerSegment: 1,
     minimumRadius: 0.008,
@@ -32,6 +32,8 @@ export const DEFAULT_TREE_ROOT_GEOMETRY_CONFIG: TreeRootGeometryConfig = {
       lobeCount: 3,
       overtoneCount: 5,
       swellFrequency: 7.4,
+    striationFrequency: 19,
+    striationDepthRatio: 0.26,
       twist: 4.6,
       depth: 0.14,
       fadeRadius: 0.06,

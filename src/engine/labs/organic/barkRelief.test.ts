@@ -80,3 +80,21 @@ describe('barkRelief', () => {
     expect(Number.isFinite(a.angularSlope)).toBe(true);
   });
 });
+
+describe('bark striation', () => {
+  it('stays resolvable by the rings that carry it', () => {
+    // Measured, not chosen: the trunk carries 37 rings over ~2.8 engine units,
+    // so ring spacing is about 0.082. At frequency 41 the striation wavelength
+    // was 0.153 — 1.9 rings per wave, below Nyquist — and it aliased into
+    // nothing at all, which is why the trunk still read smooth after it was
+    // added. Four rings per wave is the floor for it to survive.
+    const ringSpacing = 2.8 / 37;
+    const wavelength = (Math.PI * 2) / config.striationFrequency;
+    expect(wavelength / ringSpacing).toBeGreaterThanOrEqual(3.5);
+  });
+
+  it('is a tremble on the swelling, not a second set of swellings', () => {
+    expect(config.striationFrequency).toBeGreaterThan(config.swellFrequency * 2);
+    expect(config.striationDepthRatio).toBeLessThan(0.42);
+  });
+});

@@ -1,7 +1,11 @@
 import { normalize } from '../growth/math';
 import type { TreeGroundContactState } from '../groundContact';
 import {
+  barkRelief,
+  barkReliefPhase,
   buildOrganicSweepMesh,
+  ORGANIC_TRUNK_BRANCH_ID,
+  type BarkReliefConfig,
   type OrganicMeshLod,
   type OrganicSweepMesh,
 } from '../labs/organic';
@@ -65,11 +69,28 @@ function validateInput(input: BuildTreeRootGeometryInput): void {
   }
 }
 
+/**
+ * Комір з тієї самої деревини, що й стовбур.
+ *
+ * Він будується власним кільцевим кодом, не розгорткою, і доти малював ідеальні
+ * кола. Відколи стовбур став лопатевим (`barkRelief`), його радіус на висоті
+ * стику гуляє приблизно на ±14% навколо кола коміра — тобто деревина то виходить
+ * назовні, то ховається всередину, і лінія їхнього перетину читається як шов
+ * між пеньком і стовбуром. Рівний верхній радіус це не лікує: сходинки немає,
+ * але хвиля лишається.
+ *
+ * Тож комір бере той самий рельєф, з фазою СТОВБУРА, а не власною: лопаті
+ * мусять збігтися лопать у лопать, інакше два різні дерева зустрінуться на
+ * одній висоті. Осьову координату міряємо від центру коміра — там же, звідки
+ * розгортка починає рахувати довжину дуги стовбура.
+ */
 function appendContactCollar(
   mesh: OrganicSweepMesh,
   contact: TreeGroundContactState,
   lod: OrganicMeshLod,
+  bark: BarkReliefConfig,
 ): { mesh: OrganicSweepMesh; vertexCount: number; triangleCount: number } {
+  const phase = barkReliefPhase(ORGANIC_TRUNK_BRANCH_ID);
   const segments = contact.collar.radialSegmentsByLod[lod];
   const yValues = [
     contact.collar.bottomY,
@@ -97,12 +118,20 @@ function appendContactCollar(
       const angle = (segment / segments) * Math.PI * 2;
       const cosine = Math.cos(angle);
       const sine = Math.sin(angle);
+      const relief = barkRelief(angle, y - contact.collar.center.y, radius, phase, bark);
+      const shaped = radius * relief.radiusScale;
       positions.push(
-        contact.collar.center.x + cosine * radius,
+        contact.collar.center.x + cosine * shaped,
         y,
-        contact.collar.center.z + sine * radius,
+        contact.collar.center.z + sine * shaped,
       );
-      const normal = normalize({ x: cosine, y: slope, z: sine });
+      // Нахил нормалі на лопатеву поверхню — той самий, що в розгортці: радіальний
+      // напрямок, відхилений до тангенційного на (∂r/∂θ)/r.
+      const normal = normalize({
+        x: cosine - (-sine) * relief.angularSlope,
+        y: slope,
+        z: sine - cosine * relief.angularSlope,
+      });
       normals.push(normal.x, normal.y, normal.z);
       uvs.push(segment / segments, ring / (yValues.length - 1));
     }
@@ -182,7 +211,7 @@ export function buildTreeRootGeometry(
   const sourceFrames = contact?.visibleRootFrames ?? roots.frames;
   const rawMesh = buildOrganicSweepMesh(sourceFrames, lod, config.surface);
   const collarResult = contact
-    ? appendContactCollar(rawMesh, contact, lod)
+    ? appendContactCollar(rawMesh, contact, lod, config.surface.bark)
     : { mesh: rawMesh, vertexCount: 0, triangleCount: 0 };
   const terrainResult = terrain
     ? appendTerrainSurface(collarResult.mesh, terrain)

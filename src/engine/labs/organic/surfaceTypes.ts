@@ -3,6 +3,9 @@ import type { OrganicSkeletonState } from './types';
 
 export type OrganicMeshLod = 'high' | 'medium' | 'low';
 
+/** The one curve every tree has. Repeated as a literal in five places before. */
+export const ORGANIC_TRUNK_BRANCH_ID = 'organic:trunk';
+
 /** Shape of the wood itself — see `barkRelief.ts` for why it is geometry. */
 export interface BarkReliefConfig {
   /** Primary lobes around the circumference. Bounded by the ring's vertices. */
@@ -11,6 +14,10 @@ export interface BarkReliefConfig {
   overtoneCount: number;
   /** Swellings along the branch, in radians per engine unit of arc length. */
   swellFrequency: number;
+  /** Growth striation: several times the swelling's frequency, a fraction of it. */
+  striationFrequency: number;
+  /** Striation amplitude, as a share of the shape's total weight. */
+  striationDepthRatio: number;
   /** How far the lobes spiral, in radians per engine unit of arc length. */
   twist: number;
   /** Relief amplitude as a fraction of the local radius. */

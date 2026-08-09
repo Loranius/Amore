@@ -12,6 +12,7 @@ import {
 } from '../../growth/math';
 import type { GrowthVec3 } from '../../growth/types';
 import { DEFAULT_ORGANIC_SURFACE_CONFIG } from './surfaceConfig';
+import { ORGANIC_TRUNK_BRANCH_ID } from './surfaceTypes';
 import type {
   OrganicBranchCurve,
   OrganicCurveFrameSample,
@@ -75,8 +76,8 @@ function branchOrder(
   const leftFirst = left[0];
   const rightFirst = right[0];
   if (!leftFirst || !rightFirst) return left.length - right.length;
-  if (leftFirst.branchId === 'organic:trunk') return -1;
-  if (rightFirst.branchId === 'organic:trunk') return 1;
+  if (leftFirst.branchId === ORGANIC_TRUNK_BRANCH_ID) return -1;
+  if (rightFirst.branchId === ORGANIC_TRUNK_BRANCH_ID) return 1;
   return leftFirst.sequence - rightFirst.sequence || leftFirst.branchId.localeCompare(rightFirst.branchId);
 }
 
@@ -99,7 +100,7 @@ function branchPoints(
   const first = branch[0];
   if (!first) return [];
   const points: CurvePoint[] = [];
-  if (first.branchId !== 'organic:trunk' && first.parentId) {
+  if (first.branchId !== ORGANIC_TRUNK_BRANCH_ID && first.parentId) {
     const parent = nodesById.get(first.parentId);
     if (parent) {
       const collarRadius = Math.min(parent.radius, Math.max(first.radius, first.radius * 1.12));
@@ -182,7 +183,7 @@ function buildBranchCurve(
   return {
     branchId: first.branchId,
     generation: first.generation,
-    parentNodeId: first.branchId === 'organic:trunk' ? null : first.parentId,
+    parentNodeId: first.branchId === ORGANIC_TRUNK_BRANCH_ID ? null : first.parentId,
     terminalNodeId: terminal.id,
     junction: null,
     samples,
