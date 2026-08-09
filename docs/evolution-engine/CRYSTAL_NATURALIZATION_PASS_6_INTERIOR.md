@@ -138,6 +138,11 @@ honest next thing if the owner wants it.
 
 ## 6. What is left
 
+> Done — see `CRYSTAL_NATURALIZATION_PASS_7_STAGE.md`. The key light earns its
+> place (a fifth of the crystal's facet separation); one light was contributing
+> a hundredth of a quantisation step; and the desktop portal turned out to have
+> no reachable navigation at all, with the canvas painting over the sidebar.
+
 **Lighting and mobile calibration**, which five passes have deliberately
 deferred because each was a response to whatever the geometry and material
 turned out to be. The ablation table above is the input to it: the crystal is
