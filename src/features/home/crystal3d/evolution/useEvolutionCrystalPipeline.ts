@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useEvents } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
 import { useMapPins } from '@/features/map/useMapPins';
-import { useFinishedMediaCount } from '@/features/media/useMedia';
+import { useFinishedMedia } from '@/features/media/useMedia';
 import { useMemories } from '@/features/memories/useMemories';
+import { useScheduleTogetherness } from '@/features/schedule/useSharedDaysOff';
 import { usePlans } from '@/features/plans/usePlans';
-import { useShoppingItems } from '@/features/shopping/useShoppingItems';
 import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
 import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
@@ -150,8 +150,8 @@ export function useEvolutionCrystalPipeline(
   const plans = usePlans();
   const pins = useMapPins();
   const archive = useMemories();
-  const shopping = useShoppingItems();
-  const finishedMedia = useFinishedMediaCount();
+  const finishedMedia = useFinishedMedia();
+  const togetherness = useScheduleTogetherness();
   const wishlistArchive = useQuery({
     queryKey: ['wishlist', 'evolution-archive', 'pair'],
     queryFn: fetchPairWishlistEvolutionArchive,
@@ -179,8 +179,8 @@ export function useEvolutionCrystalPipeline(
     || plans.isPending
     || pins.isPending
     || archive.isPending
-    || shopping.isPending
     || finishedMedia.isPending
+    || togetherness.isPending
     || wishlistArchive.isPending;
 
   const queryError = startDateQuery.error
@@ -189,8 +189,8 @@ export function useEvolutionCrystalPipeline(
     ?? plans.error
     ?? pins.error
     ?? archive.error
-    ?? shopping.error
     ?? finishedMedia.error
+    ?? togetherness.error
     ?? wishlistArchive.error;
 
   return useMemo<UseEvolutionCrystalPipelineResult>(() => {
@@ -226,7 +226,7 @@ export function useEvolutionCrystalPipeline(
         wishlist,
         pins: pins.data ?? [],
         archive: archive.data,
-        shopping: shopping.data ?? [],
+        media: finishedMedia.data ?? [],
       });
       const artifactResult = buildArtifactFromSnapshot({
         coupleId,
@@ -245,6 +245,9 @@ export function useEvolutionCrystalPipeline(
           asOf,
           rulesVersion: SPECIES_RULES_VERSION,
           ...(colorPartners ? { colorPartners } : {}),
+          // Days the two of them had off together. Not portal events — see
+          // `CrystalSpeciesConfig`.
+          sharedDaysOff: togetherness.data ?? [],
         },
       });
       const growth = buildGrowthState({
@@ -277,7 +280,7 @@ export function useEvolutionCrystalPipeline(
           ...DEFAULT_CRYSTAL_LIFE_CONFIG,
           quality,
           reducedMotion,
-          mediaFinishedCount: finishedMedia.data ?? 0,
+          mediaFinishedCount: (finishedMedia.data ?? []).length,
         },
       });
       const finished = performance.now();
@@ -319,13 +322,13 @@ export function useEvolutionCrystalPipeline(
     colorPartners,
     events.data,
     finishedMedia.data,
+    togetherness.data,
     isPending,
     pins.data,
     plans.data,
     quality,
     queryError,
     reducedMotion,
-    shopping.data,
     startDateQuery.data,
     userIds,
     wishlist,

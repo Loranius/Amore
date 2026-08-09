@@ -3,8 +3,8 @@ import type { WishlistEvolutionArchiveItem } from '@/features/wishlist/wishlistE
 import type {
   EventRow,
   MapPinRow,
+  MediaItemRow,
   PlanRow,
-  ShoppingItemRow,
 } from '@/types';
 import type {
   EvolutionSourceSnapshot,
@@ -94,13 +94,16 @@ export function buildEvolutionMemoryLinks(
   );
 }
 
+/** The three columns the engine reads; see `useFinishedMedia`. */
+export type MediaRowsForEvolution = Pick<MediaItemRow, 'id' | 'status' | 'created_at'>;
+
 export interface EvolutionSnapshotRows {
   events: readonly EventRow[];
   plans: readonly PlanRow[];
   wishlist: readonly WishlistSource[];
   pins: readonly MapPinRow[];
   archive: MemoriesArchive;
-  shopping: readonly ShoppingItemRow[];
+  media: readonly MediaRowsForEvolution[];
 }
 
 export function buildEvolutionSourceSnapshot(
@@ -143,10 +146,9 @@ export function buildEvolutionSourceSnapshot(
     memoryLinks: buildEvolutionMemoryLinks(
       input.archive.linkIds as Record<number, Partial<Record<string, number>>>,
     ),
-    shoppingItems: input.shopping.map((item) => ({
+    media: input.media.map((item) => ({
       id: item.id,
-      bought: item.bought,
-      boughtAt: item.bought_at,
+      status: item.status,
       createdAt: item.created_at,
     })),
   };

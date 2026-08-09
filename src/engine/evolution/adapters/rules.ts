@@ -53,5 +53,17 @@ export const MEMORY_PRESSURE_BY_PRECISION: Readonly<Record<string, number>> = {
   approx: 0.05,
 };
 
-export const SHOPPING_MAX_STABILITY = 0.1;
-export const SHOPPING_MAX_ACTIVITY = 0.07;
+/**
+ * What one finished film, series or book puts into the ledger.
+ *
+ * `culture` is the point: before this adapter, culture reached the artifact
+ * only from the map — a city or country name on a visited place — so a couple
+ * whose shared life is largely what they watch and read together had almost no
+ * cultural pressure at all. Small per item, because the watchlist is the
+ * highest-volume module after photos and one film is not an anniversary.
+ */
+export const MEDIA_FINISHED_PRESSURE = {
+  culture: 0.22,
+  remembrance: 0.1,
+  stability: 0.06,
+} satisfies Partial<EvolutionPressureVector>;

@@ -27,8 +27,10 @@ import {
   facetThresholdForYears,
   groundSpread,
   PORTAL_MODULE_COUNT,
+  SHARED_DAYS_OFF_FULL_YEAR,
   yearActivity,
   yearFill,
+  yearTogetherness,
   mediaSparkleCount,
   monarchAxialScale,
   monarchFacetCount,
@@ -592,6 +594,61 @@ describe('how lived-in a year was', () => {
     const empty = yearFill(1, 0);
     expect(empty).toBeGreaterThan(0.2);
     expect(empty).toBeLessThan(yearFill(1, 1) * 0.4);
+  });
+
+  it('counts shared days off as a second way a year can be full (ADR-0017)', () => {
+    // The work schedule is the only module in the portal that measures time
+    // *together* rather than records logged. Two years with identical portal
+    // activity must not look identical when one of them had five shared days
+    // off a month and the other had none.
+    const quiet = yearActivity(2, 6);
+    const apart = yearFill(1, quiet, yearTogetherness(2));
+    const together = yearFill(1, quiet, yearTogetherness(SHARED_DAYS_OFF_FULL_YEAR));
+
+    expect(together).toBeGreaterThan(apart);
+    // Worth seeing, not a rounding step.
+    expect(together - apart).toBeGreaterThan(0.15);
+    // And it can never overtake what the couple actually recorded.
+    expect(yearFill(1, 1, yearTogetherness(0)))
+      .toBeGreaterThan(yearFill(1, 0, yearTogetherness(SHARED_DAYS_OFF_FULL_YEAR)));
+  });
+
+  it('never lets the schedule take anything away, at any activity', () => {
+    // The defect this replaces, caught by a pipeline test rather than by
+    // reading the formula. The first version blended activity and togetherness
+    // — 0.65/0.35 — so a couple who *started keeping* the schedule and had a
+    // quiet year saw an already-published crystal shrink. Adopting a module may
+    // never cost a couple something they already had; ADR-0004 states that rule
+    // for facets and it holds for every signal that arrives late.
+    for (const activity of [0, 0.25, 0.5, 0.75, 1]) {
+      const withoutSchedule = yearFill(1, activity);
+      for (const days of [0, 1, 12, SHARED_DAYS_OFF_FULL_YEAR, 400]) {
+        expect(
+          yearFill(1, activity, yearTogetherness(days)),
+          `${activity} / ${days}d`,
+        ).toBeGreaterThanOrEqual(withoutSchedule);
+      }
+    }
+  });
+
+  it('credits only the days it can see, and saturates at the cap', () => {
+    // The second thing the live portal corrected. An earlier version divided
+    // by the months the schedule covered, so 18 shared days off across two
+    // covered months extrapolated to a *full* year — one stretch of a newly
+    // adopted module outvoting everything the couple had recorded. Flat
+    // counting says what is known and no more.
+    expect(yearTogetherness(18)).toBeCloseTo(0.3, 6);
+    expect(yearTogetherness(0)).toBe(0);
+    expect(yearFill(1, 0.5, 0)).toBe(yearFill(1, 0.5));
+    expect(yearTogetherness(SHARED_DAYS_OFF_FULL_YEAR * 4))
+      .toBe(yearTogetherness(SHARED_DAYS_OFF_FULL_YEAR));
+  });
+
+  it('survives nonsense schedule counts', () => {
+    for (const value of [Number.NaN, -5, Number.POSITIVE_INFINITY]) {
+      expect(Number.isFinite(yearTogetherness(value))).toBe(true);
+      expect(Number.isFinite(yearFill(1, 0.5, yearTogetherness(value)))).toBe(true);
+    }
   });
 
   it('survives nonsense counts', () => {

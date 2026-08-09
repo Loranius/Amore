@@ -29,6 +29,7 @@ import {
   wishTint,
   yearActivity,
   yearFill,
+  yearTogetherness,
   type WishGiftTally,
 } from './growthModel';
 import type {
@@ -100,8 +101,10 @@ function occurredEvents(
  * independent: height is time, girth is what they did, facets are what they
  * kept.
  *
- * Shopping is out for the same reason photos are: buying milk is not an act
- * of the relationship, and the module produces one event per day regardless.
+ * Photos and finished media are both out for the same reason: keeping a
+ * photograph and finishing a series are things that happened *to* the couple's
+ * shared life rather than decisions about it. Photos already earn facets, and
+ * media already carries the year's breadth and its cultural pressure.
  */
 const DELIBERATE_MODULES: ReadonlySet<string> = new Set([
   'plans',
@@ -223,6 +226,29 @@ function eventsWithin(
 export type CrystalColorPartners = { first: number | null; second: number | null } | null;
 
 /**
+ * Everything the colony needs beyond the artifact itself.
+ *
+ * An object rather than three more positional arguments: the list grows every
+ * time a module outside the event ledger earns a say, and a call site with four
+ * unlabelled trailing values is one transposition away from a silent defect.
+ */
+export interface CrystalColonyContext {
+  partners: CrystalColorPartners;
+  /** `YYYY-MM-DD` days both partners had off. See `CrystalSpeciesConfig`. */
+  sharedDaysOff: readonly string[];
+}
+
+export const EMPTY_COLONY_CONTEXT: CrystalColonyContext = {
+  partners: null,
+  sharedDaysOff: [],
+};
+
+/** `YYYY-MM-DD` prefixes, so bucketing by year needs no date parsing. */
+function withinYear(value: string, startsAt: string, endsAt: string): boolean {
+  return value >= startsAt.slice(0, value.length) && value < endsAt.slice(0, value.length);
+}
+
+/**
  * Wishes granted during one year, split into the three colour channels.
  *
  * A wish counts for a partner's channel only when the *other* one granted it:
@@ -264,7 +290,7 @@ function wishTally(
 export function buildAnnualFormations(
   artifact: ArtifactBlueprint,
   asOf: string,
-  partners: CrystalColorPartners = null,
+  context: CrystalColonyContext = EMPTY_COLONY_CONTEXT,
 ): CrystalGrowthInstruction[] {
   const asOfEpoch = parseEvolutionInstant(asOf);
   if (asOfEpoch === null) return [];
@@ -292,10 +318,16 @@ export function buildAnnualFormations(
       // is the year's *fill* — its share of the maximum — not its size in
       // absolute units.
       const progress = childGrowthProgress(year, asOf);
-      const fill = yearFill(progress, activity);
+      // Time the two of them actually had together, from the work schedule.
+      // Bucketed here rather than by the app so the engine keeps its own clock
+      // discipline: these are plain date prefixes compared as strings.
+      const togetherness = yearTogetherness(
+        context.sharedDaysOff.filter((day) => withinYear(day, year.startsAt, year.endsAt)).length,
+      );
+      const fill = yearFill(progress, activity, togetherness);
       const size = childDimensions(monarchNow, fill);
       const ringIndex = childRingIndex(year.index);
-      const tint = wishTint(wishTally(yearEvents, partners));
+      const tint = wishTint(wishTally(yearEvents, context.partners));
 
       return {
         id,
@@ -422,13 +454,13 @@ export function buildSkirtFormations(
 export function buildCrystalFormations(
   artifact: ArtifactBlueprint,
   asOf: string,
-  partners: CrystalColorPartners = null,
+  context: CrystalColonyContext = EMPTY_COLONY_CONTEXT,
 ): { formations: CrystalGrowthInstruction[]; diagnostics: CrystalSpeciesDiagnostics } {
   const asOfEpoch = parseEvolutionInstant(asOf);
   if (asOfEpoch === null) throw new Error(`Invalid Crystal Species asOf: "${asOf}".`);
 
   const formations = [
-    ...buildAnnualFormations(artifact, asOf, partners),
+    ...buildAnnualFormations(artifact, asOf, context),
     ...buildSkirtFormations(artifact, asOf),
   ];
 

@@ -1,10 +1,10 @@
 import type {
   EventRow,
   MapPinRow,
+  MediaItemRow,
   MemoryLinkRow,
   MemoryRow,
   PlanRow,
-  ShoppingItemRow,
   WishlistItemRow,
 } from '@/types';
 import type { EvolutionSourceSnapshot } from './types';
@@ -16,7 +16,7 @@ export interface AmoreEvolutionRows {
   mapPins: readonly MapPinRow[];
   memories: readonly MemoryRow[];
   memoryLinks: readonly MemoryLinkRow[];
-  shoppingItems: readonly ShoppingItemRow[];
+  media: readonly MediaItemRow[];
 }
 
 /**
@@ -70,10 +70,9 @@ export function toEvolutionSourceSnapshot(rows: AmoreEvolutionRows): EvolutionSo
       sourceType: link.source_type,
       sourceId: link.source_id,
     })),
-    shoppingItems: rows.shoppingItems.map((item) => ({
+    media: rows.media.map((item) => ({
       id: item.id,
-      bought: item.bought,
-      boughtAt: item.bought_at,
+      status: item.status,
       createdAt: item.created_at,
     })),
   };

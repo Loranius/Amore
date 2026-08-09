@@ -3,8 +3,8 @@ import { adaptCalendarEvents } from './calendar';
 import { adaptMapPlaces } from './map';
 import { adaptMemories } from './memories';
 import { adaptPlans } from './plans';
+import { adaptMedia } from './media';
 import { EVOLUTION_ADAPTER_RULES_VERSION } from './rules';
-import { adaptShoppingItems } from './shopping';
 import type {
   ArtifactFromSnapshotResult,
   BuildArtifactFromSnapshotInput,
@@ -25,7 +25,7 @@ export function adaptEvolutionSnapshot(
     adaptWishlist(snapshot.wishlistItems, context),
     adaptMapPlaces(snapshot.mapPlaces, context),
     adaptMemories(snapshot.memories, snapshot.memoryLinks, context),
-    adaptShoppingItems(snapshot.shoppingItems, context),
+    adaptMedia(snapshot.media, context),
   ]);
 }
 

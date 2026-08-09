@@ -18,7 +18,7 @@ export const EVOLUTION_ADAPTER_SOURCES = [
   'wishlist',
   'map',
   'memories',
-  'shopping',
+  'media',
 ] as const;
 
 export type EvolutionAdapterSource = (typeof EVOLUTION_ADAPTER_SOURCES)[number];
@@ -101,17 +101,20 @@ export interface MemorySourceRecord {
   createdAt: string;
 }
 
+export interface MediaSource {
+  id: number;
+  status: string;
+  /**
+   * When the row was created. It stands in for a completion date, which
+   * `media_items` does not keep — see `adaptMedia`.
+   */
+  createdAt: string | null;
+}
+
 export interface MemoryLinkSource {
   memoryId: number;
   sourceType: 'wish' | 'place' | 'goal' | 'event';
   sourceId: number;
-}
-
-export interface ShoppingItemSource {
-  id: number;
-  bought: boolean;
-  boughtAt: string | null;
-  createdAt: string;
 }
 
 /**
@@ -125,7 +128,7 @@ export interface EvolutionSourceSnapshot {
   mapPlaces: readonly MapPlaceSource[];
   memories: readonly MemorySourceRecord[];
   memoryLinks: readonly MemoryLinkSource[];
-  shoppingItems: readonly ShoppingItemSource[];
+  media: readonly MediaSource[];
 }
 
 export interface BuildArtifactFromSnapshotInput {

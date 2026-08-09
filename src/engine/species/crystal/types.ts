@@ -68,11 +68,25 @@ export interface CrystalSpeciesConfig {
    * which is an application-layer decision, so it can move to a profile field
    * later without the engine noticing.
    *
-   * Wishes belonging to `first` that `second` granted colour the red channel,
-   * the mirror image colours blue, and shared wishes colour green. Omit both
-   * and every annual crystal stays white.
+   * Wishes belonging to `first` that `second` granted pull the colony's tint
+   * one way, the mirror image the other, and shared wishes a third. Omit both
+   * and the crystal stays the white every body is born as.
    */
   colorPartners?: { first: number | null; second: number | null };
+  /**
+   * Days both partners had off, as plain `YYYY-MM-DD` strings.
+   *
+   * Not portal events, and deliberately not modelled as any: a shared day off
+   * is a fact about the couple's calendar rather than something they recorded
+   * in a module, so counting it as portal breadth would inflate both
+   * `yearActivity` and `consistency` with activity that never happened. It
+   * feeds one thing — how full a year's crystal is (`yearFill`) — and it can
+   * only ever add to it.
+   *
+   * Strings rather than parsed dates so the engine can bucket them by
+   * relationship year itself and stay free of a clock.
+   */
+  sharedDaysOff?: readonly string[];
 }
 
 export interface CrystalSpeciesPressures {

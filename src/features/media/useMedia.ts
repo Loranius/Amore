@@ -31,24 +31,28 @@ export function useMediaItems(type: MediaType) {
 }
 
 /**
- * How many films, series and books the couple has finished.
+ * Films, series and books the couple has finished.
  *
- * Only the count, and only `status = 'done'` — the crystal uses it for the
- * dust drifting around the artifact (ADR-0004) and needs nothing else. A
- * head-count query rather than a row fetch because the watchlist can run to
- * hundreds of rows and the artifact would throw all of them away.
+ * Only `status = 'done'`, and only the three columns the Evolution Engine can
+ * use. It used to be a head-count query — the crystal wanted a number for the
+ * dust drifting around the artifact and nothing else — but media is now the
+ * seventh event source, so a year needs to know *when* things were finished
+ * and not merely how many. The sparkle count is `rows.length` at the call site.
+ *
+ * `created_at` stands in for a completion date the table does not keep; see
+ * `adaptMedia` for what that costs.
  */
-export function useFinishedMediaCount() {
+export function useFinishedMedia() {
   return useQuery({
-    queryKey: [...qk.media(), 'finished-count'],
+    queryKey: [...qk.media(), 'finished'],
     staleTime: 5 * 60_000,
-    queryFn: async (): Promise<number> => {
-      const { count, error } = await supabase
+    queryFn: async (): Promise<Pick<MediaItemRow, 'id' | 'status' | 'created_at'>[]> => {
+      const { data, error } = await supabase
         .from('media_items')
-        .select('id', { count: 'exact', head: true })
+        .select('id,status,created_at')
         .eq('status', 'done');
       if (error) throw error;
-      return count ?? 0;
+      return data ?? [];
     },
   });
 }

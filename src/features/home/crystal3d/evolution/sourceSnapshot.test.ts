@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { MemoriesArchive } from '@/features/memories/useMemories';
 import type { WishlistEvolutionArchiveItem } from '@/features/wishlist/wishlistEvolutionArchive';
-import type { EventRow, MapPinRow, PlanRow, ShoppingItemRow } from '@/types';
+import type { EventRow, MapPinRow, PlanRow } from '@/types';
 import {
   buildEvolutionMemoryLinks,
   buildEvolutionSourceSnapshot,
@@ -136,17 +136,11 @@ describe('Evolution real-data snapshot mapping', () => {
         visited_at: '2025-03-02',
       } as MapPinRow],
       archive,
-      shopping: [{
+      media: [{
         id: 9,
-        title: 'Молоко',
-        qty: null,
-        category: 'Напої',
-        bought: true,
-        created_by: 1,
-        bought_by: 2,
-        bought_at: '2025-04-05T17:00:00Z',
+        status: 'done',
         created_at: '2025-04-05T12:00:00Z',
-      } as ShoppingItemRow],
+      }],
     });
 
     expect(snapshot.calendarEvents[0]).toEqual({
@@ -166,7 +160,7 @@ describe('Evolution real-data snapshot mapping', () => {
       createdAt: '2025-04-04T09:00:00Z',
     });
     expect(snapshot.memoryLinks).toEqual([{ memoryId: 30, sourceType: 'place', sourceId: 7 }]);
-    expect(snapshot.shoppingItems[0]).toMatchObject({ id: 9, bought: true });
+    expect(snapshot.media[0]).toEqual({ id: 9, status: 'done', createdAt: '2025-04-05T12:00:00Z' });
     expect(JSON.stringify(snapshot)).not.toContain('Не потрапляє у Blueprint');
     expect(JSON.stringify(snapshot)).not.toContain('example.test');
   });

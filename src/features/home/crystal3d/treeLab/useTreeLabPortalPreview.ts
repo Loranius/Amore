@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useEvents } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
 import { useMapPins } from '@/features/map/useMapPins';
+import { useFinishedMedia } from '@/features/media/useMedia';
 import { useMemories } from '@/features/memories/useMemories';
 import { usePlans } from '@/features/plans/usePlans';
-import { useShoppingItems } from '@/features/shopping/useShoppingItems';
 import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
 import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
@@ -72,7 +72,7 @@ export function useTreeLabPortalPreview(
   const plans = usePlans();
   const pins = useMapPins();
   const archive = useMemories();
-  const shopping = useShoppingItems();
+  const finishedMedia = useFinishedMedia();
   const wishlistArchive = useQuery({
     queryKey: ['wishlist', 'evolution-archive', 'pair'],
     queryFn: fetchPairWishlistEvolutionArchive,
@@ -95,7 +95,7 @@ export function useTreeLabPortalPreview(
     || plans.isPending
     || pins.isPending
     || archive.isPending
-    || shopping.isPending
+    || finishedMedia.isPending
     || wishlistArchive.isPending;
 
   const queryError = startDateQuery.error
@@ -104,7 +104,7 @@ export function useTreeLabPortalPreview(
     ?? plans.error
     ?? pins.error
     ?? archive.error
-    ?? shopping.error
+    ?? finishedMedia.error
     ?? wishlistArchive.error;
 
   return useMemo<UseTreeLabPortalPreviewResult>(() => {
@@ -138,7 +138,7 @@ export function useTreeLabPortalPreview(
         wishlist,
         pins: pins.data ?? [],
         archive: archive.data,
-        shopping: shopping.data ?? [],
+        media: finishedMedia.data ?? [],
       });
       const artifactResult = buildArtifactFromSnapshot({
         coupleId: stableEvolutionCoupleId(userIds),
@@ -184,7 +184,7 @@ export function useTreeLabPortalPreview(
     pins.data,
     plans.data,
     queryError,
-    shopping.data,
+    finishedMedia.data,
     startDateQuery.data,
     userIds,
     wishlist,

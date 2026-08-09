@@ -4,7 +4,7 @@ import { adaptMapPlaces } from './map';
 import { adaptMemories } from './memories';
 import { adaptPlans } from './plans';
 import { EVOLUTION_ADAPTER_RULES_VERSION } from './rules';
-import { adaptShoppingItems } from './shopping';
+import { adaptMedia } from './media';
 import { buildArtifactFromSnapshot } from './assemble';
 import { adaptWishlist } from './wishlist';
 import type {
@@ -27,7 +27,7 @@ function emptySnapshot(): EvolutionSourceSnapshot {
     mapPlaces: [],
     memories: [],
     memoryLinks: [],
-    shoppingItems: [],
+    media: [],
   };
 }
 
@@ -157,7 +157,7 @@ describe('plans and wishlist adapters', () => {
   });
 });
 
-describe('map, memories and shopping adapters', () => {
+describe('map, memories and media adapters', () => {
   it('maps verified visits and ignores map ideas without visited_at', () => {
     const result = adaptMapPlaces([
       {
@@ -202,17 +202,27 @@ describe('map, memories and shopping adapters', () => {
     expect(linked.events[0]?.channels.remembrance).toBeCloseTo(0.066);
   });
 
-  it('aggregates everyday shopping by day and keeps its influence minor', () => {
-    const result = adaptShoppingItems([
-      { id: 1, bought: true, boughtAt: '2025-08-12T10:00:00+03:00', createdAt: '2025-08-12' },
-      { id: 2, bought: true, boughtAt: '2025-08-12T18:00:00+03:00', createdAt: '2025-08-12' },
-      { id: 3, bought: false, boughtAt: null, createdAt: '2025-08-12' },
+  it('emits one culture event per finished item, and never claims it is verified', () => {
+    // ADR-0017: media is the seventh source. The evidence grade is the point —
+    // `media_items` has no completion date, so every event here is dated by the
+    // row's creation and must say so rather than pass as observed fact.
+    const result = adaptMedia([
+      { id: 1, status: 'done', createdAt: '2025-08-12T10:00:00+03:00' },
+      { id: 2, status: 'watching', createdAt: '2025-08-12T18:00:00+03:00' },
+      { id: 3, status: 'done', createdAt: null },
     ], context);
 
     expect(result.events).toHaveLength(1);
-    expect(result.events[0]?.id).toBe('shopping:2025-08-12:bought');
-    expect(result.events[0]?.channels.stability).toBeLessThanOrEqual(0.1);
-    expect(result.events[0]?.channels.achievement ?? 0).toBe(0);
+    expect(result.events[0]?.id).toBe('media:1:finished');
+    expect(result.events[0]?.evidence).toBe('historical-estimate');
+    expect(result.events[0]?.channels.culture).toBeGreaterThan(0);
+    // A film is not an anniversary: it may not carry significance at all.
+    expect(result.events[0]?.channels.significance ?? 0).toBe(0);
+
+    // A finished row with no date is reported, not silently dropped.
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]?.code).toBe('missing_completion_date');
+    expect(result.diagnostics[0]?.source).toBe('media');
   });
 });
 

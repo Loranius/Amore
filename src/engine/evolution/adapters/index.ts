@@ -3,9 +3,9 @@ export { toEvolutionSourceSnapshot, type AmoreEvolutionRows } from './amoreSnaps
 export { adaptCalendarEvents } from './calendar';
 export { adaptMapPlaces } from './map';
 export { adaptMemories } from './memories';
+export { adaptMedia } from './media';
 export { adaptPlans } from './plans';
 export { EVOLUTION_ADAPTER_RULES_VERSION } from './rules';
-export { adaptShoppingItems } from './shopping';
 export { adaptWishlist } from './wishlist';
 export { EVOLUTION_ADAPTER_SOURCES } from './types';
 export type {
@@ -20,8 +20,8 @@ export type {
   EvolutionSourceSnapshot,
   MapPlaceSource,
   MemoryLinkSource,
+  MediaSource,
   MemorySourceRecord,
   PlanSource,
-  ShoppingItemSource,
   WishlistSource,
 } from './types';

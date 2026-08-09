@@ -55,6 +55,7 @@ export const qk = {
       ? (['savingsGoalContributions'] as const)
       : (['savingsGoalContributions', goalId] as const)),
   sharedDaysOff: () => ['sharedDaysOff'] as const,
+  scheduleTogetherness: () => ['scheduleTogetherness'] as const,
 
   mapPins: () => ['mapPins'] as const,
   userLocations: () => ['userLocations'] as const,
@@ -86,7 +87,7 @@ export const realtimeInvalidation: Record<
   plans: [qk.plans()],
   plan_tasks: [qk.planTasks()],
   plan_links: [qk.planLinks()],
-  work_schedule: [['schedule'], qk.sharedDaysOff()],
+  work_schedule: [['schedule'], qk.sharedDaysOff(), qk.scheduleTogetherness()],
   map_pins: [qk.mapPins()],
   user_locations: [qk.userLocations()],
 } as const;
