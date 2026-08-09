@@ -191,6 +191,35 @@ function capShellValue(color: CrystalRgb): CrystalRgb {
   return scaleRgb(color, SHELL_ALBEDO_LUMA / luma);
 }
 
+/**
+ * How much of the shell's value a body keeps, by its rank in the colony.
+ *
+ * Rank has to be carried by *value*, and that is a correction rather than a
+ * preference. The hue mix below moves a body from `primary` toward `secondary`,
+ * and `secondary = mixRgb(primary, warmth, warmth · 0.36)` — so on a couple
+ * whose events carry no warm channel, `secondary` **is** `primary` and the
+ * whole ladder mixes a colour with itself. Measured on three couples, warmth
+ * came out 0 for all three and the monarch, the current year and every skirt
+ * crystal shared one identical RGB: 0.7768, 0.3601, 0.5162.
+ *
+ * The value step was already written — `role === 'micro' ? 0.84 : 1` — and it
+ * was inert too, for a different reason: it was applied *inside*
+ * `capShellValue`, which then divided it straight back out. Any colour above
+ * the cap comes out at exactly the cap, whatever was done to it first.
+ *
+ * So the step goes after the cap. The cap keeps its job — no body sits higher
+ * on the tone curve than 0.46 luma — and the ladder descends from there. The
+ * range is deliberately narrow: this is rank, not shadow, and a druse whose
+ * outer crystals read as grey has traded one flat colony for another.
+ */
+function roleValue(role: string): number {
+  if (role === 'focal') return 1;
+  if (role === 'support') return 0.95;
+  if (role === 'family') return 0.92;
+  if (role === 'companion') return 0.88;
+  return 0.85;
+}
+
 function bodyColor(
   base: CrystalMaterialPalette,
   role: string,
@@ -206,8 +235,9 @@ function bodyColor(
           ? 0.32
           : 0.44;
   const target = emphasized ? rgb(1, 0.72, 0.28) : base.secondary;
-  return capShellValue(
-    scaleRgb(mixRgb(base.primary, target, roleMix), role === 'micro' ? 0.84 : 1),
+  return scaleRgb(
+    capShellValue(mixRgb(base.primary, target, roleMix)),
+    roleValue(role),
   );
 }
 

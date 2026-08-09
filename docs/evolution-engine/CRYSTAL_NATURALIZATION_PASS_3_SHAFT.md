@@ -105,6 +105,9 @@ coherence.
 
 ## 5. What Pass 4 should be
 
+> Done — see `CRYSTAL_NATURALIZATION_PASS_4_COLONY.md` and ADR-0011. Two of the
+> three items turned out to be mechanisms that already existed and did nothing.
+
 1. **Cluster ecology.** Fourteen bodies at one radius, one height, one tilt
    band, every one of them `role=focal`. There is no hierarchy at all. Cheap to
    vary, deterministic, and it fixes the "positioned around" read — which is now

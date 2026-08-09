@@ -56,7 +56,12 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // 1.1.0: the shell became semi-transparent, the stone gained procedural
   // striations and veils, and the inner light now grows with the wishes that
   // were granted rather than merely taking their colour (ADR-0007).
-  rulesVersion: '1.6.0',
+  // 1.7.0: rank is carried by value. The role ladder mixed hue toward
+  // `secondary`, which equals `primary` whenever a couple's events carry no
+  // warm channel, and the `micro` value step was applied inside the albedo cap
+  // that then divided it back out. Both were inert; the step now follows the
+  // cap and every body's shell changes with its role.
+  rulesVersion: '1.7.0',
   quality: 'balanced',
   allowIridescence: true,
   allowProceduralReflection: true,

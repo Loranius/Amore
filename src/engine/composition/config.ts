@@ -4,7 +4,11 @@ import type {
 } from './types';
 
 export const DEFAULT_CRYSTAL_COMPOSITION_CONFIG: CrystalCompositionConfig = {
-  rulesVersion: '1.0.0',
+  // 1.1.0: a body's role comes from its tier alone. `generation === 0` used to
+  // stand in for "the monarch" and stopped being true when children became
+  // ground-rooted — every body in a crystal colony has generation 0, so every
+  // body came out `focal` and the hierarchy below it was unreachable.
+  rulesVersion: '1.1.0',
   sectorCount: 8,
   targetEmptySectorShare: 0.375,
 };

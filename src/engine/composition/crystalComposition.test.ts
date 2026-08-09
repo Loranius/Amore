@@ -122,3 +122,48 @@ describe('Crystal Composition', () => {
     }))).toEqual(originalTransforms);
   });
 });
+
+describe('Crystal Composition — rank', () => {
+  /**
+   * A colony needs more than one rank in it, and for a long time it had exactly
+   * one. `roleFor` treated `generation === 0` as "this is the monarch", which
+   * was true while every child grew *on* her and stopped being true the moment
+   * children became ground-rooted: a body growing out of the substrate is a
+   * root of its own colony, so the growth engine gives it generation 0 by
+   * design. Every body in the druse then came out `focal`.
+   *
+   * Measured on three couples before the fix: 19 of 19, 32 of 32 and 36 of 36
+   * bodies `focal`, while their tiers were correctly king / support / family /
+   * micro the whole time. That is the shape of the bug — a field derived from
+   * the wrong one of two things that used to agree.
+   */
+  it('gives the colony more than one rank', () => {
+    const composition = buildCrystalComposition({
+      growth: growthState(),
+      config: DEFAULT_CRYSTAL_COMPOSITION_CONFIG,
+    });
+
+    const roles = new Set(composition.bodies.map((body) => body.role));
+    expect(roles.size).toBeGreaterThan(1);
+    expect(composition.bodies.filter((body) => body.role === 'focal')).toHaveLength(1);
+  });
+
+  it('reads rank off the tier and not off the generation', () => {
+    const growth = growthState();
+    // The premise of the bug, asserted so it cannot quietly come back: every
+    // body really is generation 0, so generation carries no rank at all.
+    expect(growth.bodies.every((body) => body.generation === 0)).toBe(true);
+    expect(new Set(growth.bodies.map((body) => body.tier)).size).toBeGreaterThan(1);
+
+    const composition = buildCrystalComposition({
+      growth,
+      config: DEFAULT_CRYSTAL_COMPOSITION_CONFIG,
+    });
+    const tierOf = new Map(growth.bodies.map((body) => [body.id, body.tier]));
+    for (const body of composition.bodies) {
+      const tier = tierOf.get(body.sourceBodyId);
+      if (tier === 'king') expect(body.role).toBe('focal');
+      else expect(body.role).not.toBe('focal');
+    }
+  });
+});

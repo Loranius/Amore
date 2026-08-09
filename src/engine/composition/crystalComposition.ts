@@ -42,8 +42,30 @@ function validateInput(input: BuildCrystalCompositionInput): void {
   }
 }
 
+/**
+ * Rank in the colony, from the tier the species assigned — and from nothing
+ * else.
+ *
+ * `generation === 0` used to stand in for "this is the monarch", and it was
+ * true when every child grew *on* her. It stopped being true when children
+ * became ground-rooted: a body that grows out of the substrate is a root of its
+ * own colony, so the engine gives it generation 0 by design (`engine.ts`, "a
+ * ground-rooted body grows from the substrate"). Every body in a crystal
+ * colony has generation 0.
+ *
+ * So this returned `focal` for all of them, and the whole hierarchy below was
+ * unreachable. Measured on three couples: 19 of 19, 32 of 32 and 36 of 36
+ * bodies came out `focal`, while their tiers were correctly king / support /
+ * family / micro the entire time.
+ *
+ * That was not only a composition score reading flat. `buildBodyMaterial` mixes
+ * a body's colour toward the secondary by role — 0.06 for focal rising to 0.44
+ * for micro, with micro dimmed a further 16% — and it was handing every crystal
+ * in the druse the monarch's own treatment. The ladder was written, tested and
+ * inert.
+ */
 function roleFor(body: GrowthBody): CrystalCompositionRole {
-  if (body.generation === 0 || body.tier === 'king') return 'focal';
+  if (body.tier === 'king') return 'focal';
   if (body.tier === 'support') return 'support';
   if (body.tier === 'family') return 'family';
   if (body.tier === 'companion') return 'companion';

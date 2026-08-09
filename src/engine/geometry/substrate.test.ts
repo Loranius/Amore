@@ -613,12 +613,19 @@ describe('crystal substrate — quartz vein shape', () => {
     }
   });
 
-  it('tips every child outward, 45–55° off the monarch', () => {
+  it('tips every child outward, 30–58° off the monarch', () => {
     // The half of the lean that geometry cares about: a child leaning *inward*
     // would drive its tip through the monarch and its base out of the vein.
     // Checked on the built bodies rather than on `childRadialBias`, because
     // between the two sits `ensureUpward` — which stood the whole crown back
     // up while the adapter still published the old floor.
+    //
+    // The band widened from 45–55 to 30–58 because ten degrees was not a band:
+    // measured on three couples, every child of every colony landed inside it
+    // (45.2–54.9, 45.5–54.8, 45.3–54.9), which is a starburst rather than a
+    // colony. The outward requirement above is untouched, and it is the one
+    // this test exists for — the width of the band is variety, the sign of the
+    // lean is the guarantee.
     const { growth } = pipeline();
     const leaning = growth.bodies.filter(
       (body) => body.kind === 'crystal:annual' || body.kind === 'crystal:skirt',
@@ -634,8 +641,8 @@ describe('crystal substrate — quartz vein shape', () => {
 
       const abovePlatform = (Math.asin(Math.max(-1, Math.min(1, body.direction.y))) * 180)
         / Math.PI;
-      expect(90 - abovePlatform, body.id).toBeGreaterThanOrEqual(44);
-      expect(90 - abovePlatform, body.id).toBeLessThanOrEqual(56);
+      expect(90 - abovePlatform, body.id).toBeGreaterThanOrEqual(29);
+      expect(90 - abovePlatform, body.id).toBeLessThanOrEqual(59);
     }
   });
 

@@ -396,9 +396,34 @@ export function childDistance(input: {
  * Away from the axis, never toward it — the lean and the placement share one
  * azimuth — so a lean can only ever increase the clearance `childDistance`
  * already guarantees.
+ *
+ * **The band, and why it widened.** 45–55° was ten degrees across, and measured
+ * on three couples every child in every colony landed in it: 45.2–54.9,
+ * 45.5–54.8, 45.3–54.9. A colony whose members all lean by the same amount is a
+ * starburst, and a starburst is arranged rather than grown — Pass 1's
+ * "placement feels positioned, not grown", of which this was the last piece
+ * still flat after radius and size had opened up.
+ *
+ * A vug of quartz does not do this. Some crystals in one seam stand nearly
+ * upright, others lie well over, and the spread is the first thing that says
+ * "these grew where they happened to nucleate".
+ *
+ * Both ends are safe, and not by luck. Leaning further only carries the tip
+ * further out, and `CHILD_MIN_UPWARD` is derived from the maximum below rather
+ * than hand-set, so `ensureUpward` follows the band instead of quietly
+ * standing the steepest children back up. Standing straighter keeps the tip
+ * over its own base, and `childDistance` already puts that base clear of the
+ * monarch's surface by both radii plus `CHILD_MIN_CLEARANCE` — a floor no
+ * amount of activity may eat into, and one the lean is not part of.
+ *
+ * The maximum stops at 58° rather than going further because the engine holds a
+ * separate invariant: a body standing in the ground grows upward rather than
+ * out of the side, so its steepest permitted direction must still rise more
+ * than it reaches. 58° off the monarch is 32° above the platform, and
+ * sin 32° = 0.530. At 64° it was 0.438 and the invariant broke.
  */
-export const CHILD_TILT_MIN_DEG = 45;
-export const CHILD_TILT_MAX_DEG = 55;
+export const CHILD_TILT_MIN_DEG = 30;
+export const CHILD_TILT_MAX_DEG = 58;
 
 /** The same angles as the engine states them: above the platform plane. */
 function tiltAbovePlatform(offMonarchDegrees: number): number {
