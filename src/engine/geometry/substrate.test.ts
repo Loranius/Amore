@@ -613,19 +613,23 @@ describe('crystal substrate — quartz vein shape', () => {
     }
   });
 
-  it('tips every child outward, 30–58° off the monarch', () => {
+  it('tips every child outward, 7–26° off the monarch', () => {
     // The half of the lean that geometry cares about: a child leaning *inward*
     // would drive its tip through the monarch and its base out of the vein.
     // Checked on the built bodies rather than on `childRadialBias`, because
     // between the two sits `ensureUpward` — which stood the whole crown back
     // up while the adapter still published the old floor.
     //
-    // The band widened from 45–55 to 30–58 because ten degrees was not a band:
-    // measured on three couples, every child of every colony landed inside it
-    // (45.2–54.9, 45.5–54.8, 45.3–54.9), which is a starburst rather than a
-    // colony. The outward requirement above is untouched, and it is the one
-    // this test exists for — the width of the band is variety, the sign of the
-    // lean is the guarantee.
+    // The band has moved twice. 45–55 was not a band at all: measured on three
+    // couples every child landed inside it (45.2–54.9, 45.5–54.8, 45.3–54.9),
+    // a starburst rather than a colony, so it widened to 30–58. It is now
+    // 7–26, from the owner's reference cluster — its six crystals stand at
+    // 1.1–4.1° off vertical, and a ring that hugs the monarch's foot is the
+    // skirt they asked the children to become.
+    //
+    // The outward requirement is untouched through all three, and it is the one
+    // this test exists for: the width and placement of the band are variety,
+    // the sign of the lean is the guarantee.
     const { growth } = pipeline();
     const leaning = growth.bodies.filter(
       (body) => body.kind === 'crystal:annual' || body.kind === 'crystal:skirt',
@@ -641,8 +645,8 @@ describe('crystal substrate — quartz vein shape', () => {
 
       const abovePlatform = (Math.asin(Math.max(-1, Math.min(1, body.direction.y))) * 180)
         / Math.PI;
-      expect(90 - abovePlatform, body.id).toBeGreaterThanOrEqual(29);
-      expect(90 - abovePlatform, body.id).toBeLessThanOrEqual(59);
+      expect(90 - abovePlatform, body.id).toBeGreaterThanOrEqual(6);
+      expect(90 - abovePlatform, body.id).toBeLessThanOrEqual(27);
     }
   });
 

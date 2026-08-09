@@ -56,6 +56,11 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // 1.1.0: the shell became semi-transparent, the stone gained procedural
   // striations and veils, and the inner light now grows with the wishes that
   // were granted rather than merely taking their colour (ADR-0007).
+  // 1.11.0: the growth striation is gone. It was the diagnostic quartz texture
+  // and it was correct mineralogy, but on screen at portal size it read as
+  // horizontal black bands across the shaft, and the owner asked for it to
+  // stop being visible. Supersedes ADR-0012; recorded in ADR-0018.
+  //
   // 1.10.0: the colour is the couple's giving, and it is one colour for the
   // whole druse. The wish tint reaches the shell instead of only the core, the
   // monarch publishes one tint for the colony, the foot-to-tip gradient is gone
@@ -78,7 +83,7 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // warm channel, and the `micro` value step was applied inside the albedo cap
   // that then divided it back out. Both were inert; the step now follows the
   // cap and every body's shell changes with its role.
-  rulesVersion: '1.10.0',
+  rulesVersion: '1.11.0',
   quality: 'balanced',
   allowIridescence: true,
   allowProceduralReflection: true,

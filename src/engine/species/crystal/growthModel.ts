@@ -304,6 +304,50 @@ export function childGrowthProgress(year: RelationshipYear, asOf: string): numbe
 
 /** A child never exceeds half the monarch she was frozen beside. */
 export const CHILD_MONARCH_SHARE = 0.5;
+
+/**
+ * How many years a colony seats before its members start giving up room.
+ *
+ * Up to this many, every child is the owner's original half of the monarch.
+ * Past it they take a smaller share each — which is real mineralogy rather than
+ * a framing trick: crystals nucleating on one crowded seam compete for the same
+ * material, and a vug with thirty members has thirty small ones and a few
+ * large, not thirty of the largest.
+ */
+const CHILD_SHARE_FREE_COLONY = 4;
+
+/**
+ * How fast the share falls once the colony is crowded, as a power of its size.
+ *
+ * **Bounded by an invariant, not chosen for looks.** A closed year's crystal may
+ * never shrink, and each new year both adds a member and grows the monarch —
+ * so the share may fall no faster than the monarch rises. The monarch is
+ * `t^0.72` to the full term, and against the four-year colony the worst ratio
+ * is at thirty years: `ln(1.4/0.527) / ln(30/4) = 0.486`. Anything at or under
+ * that is safe; 0.35 leaves a third of the margin and still takes a
+ * twenty-year colony's radius down by nearly half.
+ */
+const CHILD_SHARE_FALLOFF = 0.35;
+
+/**
+ * A child's share of the monarch, from how crowded the colony is.
+ *
+ * Was the flat `CHILD_MONARCH_SHARE`, and that held while a druse was small.
+ * Measured once the ring was pulled in and the children thickened to the
+ * reference's proportions: a twenty-year colony reached **2.23 scene units
+ * wide against 2.36 tall** — a disc rather than a spire, and on a portrait
+ * phone a disc that wide forces the camera so far back that the artifact
+ * renders *smaller* than a four-year one. Twenty bodies of width `2r` need
+ * `20·2r` of circumference whatever else is true, so the only lever that
+ * answers is `r` itself.
+ */
+export function childMonarchShare(colonySize: number): number {
+  const size = Number.isFinite(colonySize) ? Math.max(1, Math.floor(colonySize)) : 1;
+  if (size <= CHILD_SHARE_FREE_COLONY) return CHILD_MONARCH_SHARE;
+  return round6(
+    CHILD_MONARCH_SHARE * Math.pow(size / CHILD_SHARE_FREE_COLONY, -CHILD_SHARE_FALLOFF),
+  );
+}
 /**
  * Engine units of air that must remain between a child and the monarch.
  *
@@ -343,34 +387,73 @@ export const CHILD_MIN_CLEARANCE = 0.012;
  * three times over, and it costs a fifth of what the old flat standoff did.
  */
 const CHILD_CORNER_ALLOWANCE = 0.12;
-/** Years per ring before a new, wider ring opens. */
-export const CHILD_RING_CAPACITY = 8;
 /**
- * How much further out each successive ring sits, and how far a year with no
- * important events stands back.
+ * Years per ring before a new, wider ring opens.
  *
- * Deliberately tight. A looser ring made the druse far wider than tall, and on
- * a portrait phone that is not a tuning problem but a geometric one: an object
- * wider than the screen is wide can never fill the screen's height, whatever
- * the camera does. Keeping the footprint no wider than the artifact is tall is
- * what lets the crystal read large on a phone.
- *
- * It was pulled in again once the children started leaning outward. A standing
- * child keeps the same distance from the monarch all the way up, so the ring
- * had to be wide enough to look uncrowded at the tips. A leaning one diverges
- * as it rises: its tightest point is its base, and the extra standoff was
- * buying separation that the lean now provides for free — at the cost of a
- * druse that spread wider than it stood tall.
- *
- * Only the *ring* step survives. The other constant that used to live here was
- * `CHILD_EVENT_REACH`: an extra standoff that a year's important events could
- * close, so a busy year drew its crystal toward the monarch while the clearance
- * floor guaranteed it could never reach her. The owner asked for one common
- * vein and named that mechanism as the thing in the way — a crystal reaching
- * for the monarch it can never join. It is gone, and no term now stands between
- * a child's base and the monarch's but the floor.
+ * Eight while nothing checked whether a ring could seat its members — which is
+ * why two of a nine-year couple's first-ring crystals ended up inside each
+ * other. Now that `ringSeatingRadius` guarantees the fit, a ring's capacity is
+ * a question about *depth* rather than about crowding, and a second ring is
+ * expensive: it costs a whole ring step of width on a portrait screen. Sixteen
+ * keeps most couples to one ring and a very long one to two.
  */
-const CHILD_RING_STEP = 0.2;
+export const CHILD_RING_CAPACITY = 16;
+/**
+ * The air between one ring of years and the next, beyond the bodies themselves.
+ *
+ * A constant `0.2` stood here, and it was a ring *step* rather than a gap —
+ * which held only while a child was slim. Thickening the children to the
+ * reference cluster's aspect (`childDimensions`) took a twenty-five-year
+ * child's radius from 0.074 to 0.105, so two adjacent rings needed 0.21 and had
+ * 0.20: the sweep put ring 2 **0.051 inside** ring 1. Deriving the step from the
+ * widest body a ring can hold is what makes it survive the next change to their
+ * proportions.
+ *
+ * Kept deliberately tight. A looser ring made the druse far wider than tall,
+ * and on a portrait phone that is not a tuning problem but a geometric one: an
+ * object wider than the screen is wide can never fill the screen's height,
+ * whatever the camera does.
+ *
+ * The other constant that used to live here was `CHILD_EVENT_REACH`: an extra
+ * standoff that a year's important events could close, so a busy year drew its
+ * crystal toward the monarch while the clearance floor guaranteed it could
+ * never reach her. The owner asked for one common vein and named that mechanism
+ * as the thing in the way — a crystal reaching for the monarch it can never
+ * join. It is gone, and no term now stands between a child's base and the
+ * monarch's but the floor.
+ */
+const CHILD_RING_GAP = 0.03;
+
+/** How much further out each successive ring of years sits. */
+export function childRingStep(widestChildRadialScale: number): number {
+  const widest = Number.isFinite(widestChildRadialScale)
+    ? Math.max(0, widestChildRadialScale)
+    : 0;
+  return round6(widest * 2 + CHILD_RING_GAP);
+}
+
+/**
+ * The smallest radius a ring can have and still seat everything standing in it.
+ *
+ * A ring is a circle, and `n` bodies of width `2r` with a gap between them need
+ * `n·(2r + gap)` of circumference — so the radius has a floor of its own that
+ * has nothing to do with the monarch. Leaving it out is what put two of a
+ * nine-year couple's eight first-ring crystals **0.0014 into each other**: the
+ * arithmetic floor said 0.158, the ring needed 0.233, and nothing in the
+ * placement was asking the question.
+ *
+ * Measured against how many bodies the ring **actually holds**, not the
+ * capacity it could hold. A young couple is the case the owner looks at, and
+ * sizing their two-crystal ring for eight would push it out for no reason. The
+ * cost is that a new year nudges its ring outward — which is honest: the colony
+ * makes room.
+ */
+export function ringSeatingRadius(occupancy: number, bodyRadialScale: number): number {
+  const seats = Number.isFinite(occupancy) ? Math.max(0, Math.floor(occupancy)) : 0;
+  const radius = Number.isFinite(bodyRadialScale) ? Math.max(0, bodyRadialScale) : 0;
+  if (seats <= 1) return 0;
+  return round6((seats * (radius * 2 + CHILD_RING_GAP)) / (Math.PI * 2));
+}
 
 export function childRingIndex(yearIndex: number): number {
   return Math.max(0, Math.floor(yearIndex / CHILD_RING_CAPACITY));
@@ -515,10 +598,20 @@ export function yearFill(
 export function childDimensions(
   monarchAxialNow: number,
   fill: number,
+  colonySize = 1,
 ): ChildDimensions {
-  const axialScale = round6(monarchAxialNow * CHILD_MONARCH_SHARE * clamp01(fill));
-  // Children stay a little stouter than the monarch so she keeps the eye.
-  return { axialScale, radialScale: round6(axialScale / 8.5) };
+  const axialScale = round6(
+    monarchAxialNow * childMonarchShare(colonySize) * clamp01(fill),
+  );
+  // Children stay stouter than the monarch so she keeps the eye, and the
+  // divisor comes from the reference cluster rather than from taste. Measured
+  // on its six crystals — height against mean cross-section — the aspects are
+  // 2.1, 2.8, 2.8, 2.9, 3.2 and 3.7, mean 3.0. At `/ 8.5` a child stood at 4.25,
+  // slimmer than every crystal in the reference and slimmer than a quartz
+  // sibling has any reason to be; `/ 6` puts it at 3.0, on the reference's own
+  // mean. A blunter child also reads as a skirt rather than as a spike, which
+  // is what the owner asked the ring to become.
+  return { axialScale, radialScale: round6(axialScale / 6) };
 }
 
 /**
@@ -537,13 +630,17 @@ export function childDimensions(
 export function childDistance(input: {
   monarchRadialScale: number;
   childRadialScale: number;
+  widestChildRadialScale: number;
   ringIndex: number;
+  ringOccupancy: number;
 }): number {
-  return round6(
-    input.monarchRadialScale
+  const againstMonarch = input.monarchRadialScale
     + input.childRadialScale
-    + childClearance(input.monarchRadialScale, input.childRadialScale)
-    + input.ringIndex * CHILD_RING_STEP,
+    + childClearance(input.monarchRadialScale, input.childRadialScale);
+  const againstSiblings = ringSeatingRadius(input.ringOccupancy, input.widestChildRadialScale);
+  return round6(
+    Math.max(againstMonarch, againstSiblings)
+    + input.ringIndex * childRingStep(input.widestChildRadialScale),
   );
 }
 
@@ -569,24 +666,42 @@ const SKIRT_CLEARANCE = 0.02;
 /**
  * Distance from the monarch's axis to a plan crystal's axis.
  *
- * Just outside the widest a year crystal can be, so the skirt reads as a hem
- * around the colony rather than as gravel dropped between its members. Uses the
- * widest possible year rather than the years this couple actually has, so a
- * couple who fills in an empty year later does not find their plan crystals
+ * Outside **every** ring of years, so the skirt reads as a hem around the whole
+ * colony rather than as gravel dropped between its members. Uses the widest a
+ * year crystal could be rather than the years this couple actually filled, so a
+ * couple who backfills an empty year later does not find their plan crystals
  * suddenly overlapped by it.
+ *
+ * `outermostRingIndex` is the one thing here that is not a proportion, and
+ * leaving it out is what let a nine-year couple's ring 1 sit **0.032 inside**
+ * its own skirt. A hem that only clears the first ring is not a hem.
  */
 export function skirtDistance(input: {
   monarchRadialScale: number;
   widestChildRadialScale: number;
   skirtRadialScale: number;
+  outermostRingIndex: number;
+  outermostRingOccupancy: number;
+  skirtCount: number;
 }): number {
-  return round6(
+  const ring = Number.isFinite(input.outermostRingIndex)
+    ? Math.max(0, Math.floor(input.outermostRingIndex))
+    : 0;
+  const outermostYearRing = Math.max(
     input.monarchRadialScale
-    + input.widestChildRadialScale * 2
-    + childClearance(input.monarchRadialScale, input.widestChildRadialScale)
-    + input.skirtRadialScale
-    + SKIRT_CLEARANCE,
-  );
+      + childClearance(input.monarchRadialScale, input.widestChildRadialScale)
+      + input.widestChildRadialScale,
+    ringSeatingRadius(input.outermostRingOccupancy, input.widestChildRadialScale),
+  ) + ring * childRingStep(input.widestChildRadialScale);
+
+  return round6(Math.max(
+    outermostYearRing
+      + input.widestChildRadialScale
+      + input.skirtRadialScale
+      + SKIRT_CLEARANCE,
+    // The hem is a circle too, and it holds up to twenty-four bodies.
+    ringSeatingRadius(input.skirtCount, input.skirtRadialScale),
+  ));
 }
 
 /**
@@ -598,43 +713,40 @@ export function skirtDistance(input: {
  * asked for. The monarch is the thing the ring is arranged around, so she is
  * what the angle should be stated against.
  *
- * Every child used to stand straight up, which made the druse read as a row of
- * pins around a post rather than as a colony: quartz siblings growing out of
- * one seam fan away from it. Leaning them also separates their tips as they
- * rise, so the gaps between them are visible from the portal's camera angle
- * instead of closing up behind the monarch.
- *
  * Away from the axis, never toward it — the lean and the placement share one
  * azimuth — so a lean can only ever increase the clearance `childDistance`
  * already guarantees.
  *
- * **The band, and why it widened.** 45–55° was ten degrees across, and measured
- * on three couples every child in every colony landed in it: 45.2–54.9,
- * 45.5–54.8, 45.3–54.9. A colony whose members all lean by the same amount is a
- * starburst, and a starburst is arranged rather than grown — Pass 1's
- * "placement feels positioned, not grown", of which this was the last piece
- * still flat after radius and size had opened up.
+ * **45–55°, then 30–58°, now 7–26°, and the reference is what settled it.**
+ * The owner supplied a low-poly quartz cluster and asked for the arrangement to
+ * be adapted from it. Measured on its six crystals, by principal axis in each
+ * body's own frame: **1.1°, 1.3°, 1.5°, 2.0°, 3.6°, 4.1° off vertical.** Every
+ * one of them stands. A real vug does not fan; the crystals nucleate on one
+ * seam and race the same way, and what varies between them is size, not
+ * bearing.
  *
- * A vug of quartz does not do this. Some crystals in one seam stand nearly
- * upright, others lie well over, and the spread is the first thing that says
- * "these grew where they happened to nucleate".
+ * The wide band came from reading Pass 1's "placement feels positioned" as a
+ * call for spread, and spread is what a starburst is. The band survives — a
+ * colony whose members all lean identically is arranged rather than grown — but
+ * around upright rather than around a crown, which is what turns the ring into
+ * the skirt the owner asked for: bodies hugging the monarch's foot instead of
+ * pointing away from it.
  *
- * Both ends are safe, and not by luck. Leaning further only carries the tip
- * further out, and `CHILD_MIN_UPWARD` is derived from the maximum below rather
- * than hand-set, so `ensureUpward` follows the band instead of quietly
- * standing the steepest children back up. Standing straighter keeps the tip
- * over its own base, and `childDistance` already puts that base clear of the
- * monarch's surface by both radii plus `CHILD_MIN_CLEARANCE` — a floor no
- * amount of activity may eat into, and one the lean is not part of.
+ * The floor is not zero. At exactly 0° a child's axis is parallel to the
+ * monarch's, so the clearance at the base is the clearance everywhere and a
+ * body's whole length runs at the arithmetic minimum. Seven degrees over a
+ * child four radii long carries its tip about half its own width further out,
+ * which is what keeps the guarantee a margin rather than a knife edge.
  *
- * The maximum stops at 58° rather than going further because the engine holds a
- * separate invariant: a body standing in the ground grows upward rather than
- * out of the side, so its steepest permitted direction must still rise more
- * than it reaches. 58° off the monarch is 32° above the platform, and
- * sin 32° = 0.530. At 64° it was 0.438 and the invariant broke.
+ * The old maximum stopped at 58° for a reason that no longer binds: a body
+ * standing in the ground must rise more than it reaches, and 58° off the
+ * monarch is 32° above the platform (sin 32° = 0.530). At 26° that is 64° above
+ * the platform, sin = 0.899, with room to spare. `CHILD_MIN_UPWARD` is still
+ * derived from the maximum rather than hand-set, so `ensureUpward` follows the
+ * band instead of quietly standing the steepest children back up.
  */
-export const CHILD_TILT_MIN_DEG = 30;
-export const CHILD_TILT_MAX_DEG = 58;
+export const CHILD_TILT_MIN_DEG = 7;
+export const CHILD_TILT_MAX_DEG = 26;
 
 /** The same angles as the engine states them: above the platform plane. */
 function tiltAbovePlatform(offMonarchDegrees: number): number {

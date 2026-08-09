@@ -23,6 +23,7 @@ export { createThreeCrystalMaterial } from './material';
 export {
   applyCrystalLifeFrame,
   createThreeCrystalRenderBundle,
+  crystalSceneHeight,
   crystalSceneRadius,
   crystalSubstrateSceneRadius,
   ARTIFACT_FIT_HEIGHT,

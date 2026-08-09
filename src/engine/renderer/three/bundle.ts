@@ -255,6 +255,40 @@ export function crystalSceneRadius(
 }
 
 /**
+ * How tall the druse stands, in scene units.
+ *
+ * The camera reads this rather than measuring a mounted bundle, for the same
+ * reason `crystalSceneRadius` exists: the scene has to size itself on the frame
+ * it mounts the artifact, not one frame later. Crystals only — the rock is
+ * floor, and floor is allowed to run off the bottom of the shot.
+ */
+export function crystalSceneHeight(geometry: CrystalGeometryState): number {
+  if (geometry.meshes.length === 0) return 0;
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let minZ = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let maxZ = Number.NEGATIVE_INFINITY;
+  for (const mesh of geometry.meshes) {
+    minX = Math.min(minX, mesh.bounds.min.x); maxX = Math.max(maxX, mesh.bounds.max.x);
+    minY = Math.min(minY, mesh.bounds.min.y); maxY = Math.max(maxY, mesh.bounds.max.y);
+    minZ = Math.min(minZ, mesh.bounds.min.z); maxZ = Math.max(maxZ, mesh.bounds.max.z);
+  }
+  const scale = fitScaleFor({ x: maxX - minX, y: maxY - minY, z: maxZ - minZ }).scale;
+
+  let top = 0;
+  for (const mesh of geometry.meshes) {
+    if (mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
+    top = Math.max(top, mesh.bounds.max.y);
+  }
+  // Measured from the artifact's ground plane, which the fit puts at engine
+  // y = 0 — not from the box's own floor, which is under the rock.
+  return Math.max(0, top) * scale;
+}
+
+/**
  * How far the quartz vein alone reaches, in scene units.
  *
  * The portal needs this to leave the seam alone. Its stone bows where the vein

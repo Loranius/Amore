@@ -2,7 +2,11 @@ import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalVeinBearings } from '@/engine/geometry';
 import { crystalRenderScale } from '@/engine/renderer';
-import { crystalSceneRadius, crystalSubstrateSceneRadius } from '@/engine/renderer/three';
+import {
+  crystalSceneHeight,
+  crystalSceneRadius,
+  crystalSubstrateSceneRadius,
+} from '@/engine/renderer/three';
 import { useTheme } from '@/providers/ThemeProvider';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
@@ -116,6 +120,7 @@ export default function EvolutionCrystalPreviewScene() {
             reduceMotion={reduceMotion}
             artifactSceneRadius={crystalSceneRadius(pipeline.geometry)}
             crystalsSceneRadius={crystalSceneRadius(pipeline.geometry, { includeSubstrate: false })}
+            artifactSceneHeight={crystalSceneHeight(pipeline.geometry)}
             veinBearings={veinBearings}
             veinReach={crystalSubstrateSceneRadius(pipeline.geometry)}
           >

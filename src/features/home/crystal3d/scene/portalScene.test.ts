@@ -55,6 +55,21 @@ const WIDEST_CRYSTAL_RADIUS = 1.5;
 const WIDEST_ROCK_RADIUS = 2.5;
 const TALLEST_ARTIFACT_HEIGHT = 3.19;
 
+/**
+ * Пари з таблиці вище як (радіус, висота).
+ *
+ * Кадр більше не сталий: із ADR-0018 він виводиться з висоти артефакта, тож
+ * питання «чи вміщається артефакт» має сенс лише для кадру, побудованого під
+ * **цей самий** артефакт. Тест, що будував кадр без висоти й перевіряв ним
+ * найвищий кристал, питав про два різні об'єкти.
+ */
+const AGES: readonly (readonly [number, number])[] = [
+  [0.88, 1.91],
+  [1.00, 2.50],
+  [1.42, 3.19],
+  [WIDEST_CRYSTAL_RADIUS, 2.71],
+];
+
 describe('portal camera frame', () => {
   it('stands on the same plane the renderer puts the artifact on', () => {
     // Подіум узгоджений із fit-трансформом рендерера через один експорт.
@@ -64,39 +79,94 @@ describe('portal camera frame', () => {
 
   it('keeps every crystal inside the frame at every real aspect and age', () => {
     for (const aspect of ASPECTS) {
-      for (const radius of [0, 0.88, 1.0, 1.42, WIDEST_CRYSTAL_RADIUS]) {
-        const frame = portalCameraFrame(aspect, radius);
+      for (const [radius, height] of AGES) {
+        const frame = portalCameraFrame(aspect, radius, height);
         expect(portalHalfWidthAt(frame.distance, aspect)).toBeGreaterThan(radius);
       }
     }
   });
 
-  it('only ever backs the camera off, never pulls it in', () => {
-    // Кадр без артефакта — це нижня межа. Якби більший артефакт міг
-    // *наблизити* камеру, зростання читалось би задом наперед.
+  it('only ever backs the camera off as the artifact grows', () => {
+    // Якби більший артефакт міг *наблизити* камеру, зростання читалось би
+    // задом наперед. Перевіряється і по ширині, і по висоті, бо з ADR-0018
+    // кадр веде висота, а ширина рятує вузькі екрани.
     for (const aspect of ASPECTS) {
-      const base = portalCameraFrame(aspect).distance;
-      let previous = base;
-      for (const radius of [0.5, 0.88, 1.0, 1.42, 1.5, 3]) {
-        const distance = portalCameraFrame(aspect, radius).distance;
+      let previous = 0;
+      for (const radius of [0, 0.5, 0.88, 1.0, 1.42, 1.5, 3]) {
+        const distance = portalCameraFrame(aspect, radius, 1.2).distance;
         expect(distance).toBeGreaterThanOrEqual(previous - 1e-9);
-        expect(distance).toBeGreaterThanOrEqual(base - 1e-9);
+        previous = distance;
+      }
+      previous = 0;
+      for (const height of [0.6, 1.2, 1.9, 2.5, 3.19, 4]) {
+        const distance = portalCameraFrame(aspect, 0.9, height).distance;
+        expect(distance).toBeGreaterThanOrEqual(previous - 1e-9);
         previous = distance;
       }
     }
   });
 
-  it('survives a degenerate artifact radius', () => {
+  it('zooms in on a young crystal and pulls back from a grown one (ADR-0018)', () => {
+    // Нова система відображення, яку попросив власник. Дві вимоги одночасно, і
+    // вони тягнуть у різні боки: молодий кристал має заповнювати екран як
+    // головний артефакт, а дорослий — показувати залу за собою й **усе одно**
+    // бути більшим на екрані.
+    // Виміряно на справжньому пайплайні (радіус, висота) в одиницях сцени.
+    const MEASURED: readonly (readonly [number, number])[] = [
+      [0.36, 0.82], [0.52, 0.97], [0.58, 1.21],
+      [0.91, 1.77], [1.30, 2.54], [1.46, 2.79],
+    ];
+    const seen = (aspect: number, radius: number, height: number) => {
+      const frame = portalCameraFrame(aspect, radius, height);
+      const visible = frame.distance * Math.tan((frame.fov / 2) * (Math.PI / 180)) * 2;
+      return { visible, share: height / visible };
+    };
+
+    for (const aspect of [0.46, 1.6]) {
+      const young = seen(aspect, ...MEASURED[0]!);
+      const grown = seen(aspect, ...MEASURED[MEASURED.length - 1]!);
+
+      // Видимої сцени стає більше — це і є «відзумовується назад». Виміряно:
+      // 4.06× на вертикальному телефоні, 2.95× на широкому екрані.
+      expect(grown.visible, `${aspect}`).toBeGreaterThan(young.visible * 2.8);
+      // А кристал при цьому не губиться: частка не падає з віком.
+      expect(grown.share, `${aspect}`).toBeGreaterThanOrEqual(young.share * 0.8);
+      // І в будь-якому віці він лишається головним об'єктом кадру. До
+      // ADR-0018 трирічна пара займала 23% висоти вертикального екрана.
+      for (const [radius, height] of MEASURED) {
+        expect(seen(aspect, radius, height).share, `${aspect} ${height}`)
+          .toBeGreaterThan(0.38);
+      }
+    }
+  });
+
+  it('centres the artifact instead of aiming above its tip', () => {
+    // Ціль була сталою 1.25 світової одиниці — вище за верхівку трирічного
+    // кристала (1.18), тобто камера цілилась у порожнечу над ним.
+    for (const height of [0.6, 1.18, 2.5, 3.25]) {
+      const frame = portalCameraFrame(0.46, 0.9, height);
+      const above = frame.target[1] - PORTAL_GROUND_Y;
+      expect(above, `${height}`).toBeGreaterThan(height * 0.3);
+      expect(above, `${height}`).toBeLessThan(height * 0.7);
+    }
+  });
+
+  it('survives a degenerate artifact radius or height', () => {
     for (const radius of [Number.NaN, Number.POSITIVE_INFINITY, -5]) {
       const frame = portalCameraFrame(0.46, radius);
       expect(frame.position.every(Number.isFinite)).toBe(true);
       expect(frame.distance).toBe(portalCameraFrame(0.46).distance);
     }
+    for (const height of [Number.NaN, Number.POSITIVE_INFINITY, -5, 0]) {
+      const frame = portalCameraFrame(0.46, 0.9, height);
+      expect(frame.position.every(Number.isFinite)).toBe(true);
+      expect(frame.distance).toBe(portalCameraFrame(0.46, 0.9).distance);
+    }
   });
 
   it('keeps the whole artifact inside the frame at every real aspect', () => {
     for (const aspect of ASPECTS) {
-      const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS);
+      const frame = portalCameraFrame(aspect, WIDEST_CRYSTAL_RADIUS, TALLEST_ARTIFACT_HEIGHT);
       const halfHeight = frame.distance * Math.tan((frame.fov / 2) * (Math.PI / 180));
       const halfWidth = portalHalfWidthAt(frame.distance, aspect);
 
@@ -111,9 +181,9 @@ describe('portal camera frame', () => {
   });
 
   it('backs off on narrow screens instead of cropping the scene', () => {
-    // Кадр по висоті фіксований; ширину рятує тільки відхід камери.
-    const narrow = portalCameraFrame(0.4);
-    const wide = portalCameraFrame(1.6);
+    // Кадр по висоті задає артефакт; ширину рятує тільки відхід камери.
+    const narrow = portalCameraFrame(0.4, 1.2, 2.5);
+    const wide = portalCameraFrame(1.6, 1.2, 2.5);
     expect(narrow.distance).toBeGreaterThan(wide.distance);
   });
 

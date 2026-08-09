@@ -22,6 +22,14 @@ export interface PortalStageProps {
   artifactSceneRadius: number;
   /** Радіус самих кристалів — кадр камери будується під нього. */
   crystalsSceneRadius: number;
+  /**
+   * Наскільки високо стоїть артефакт у сцені.
+   *
+   * Кадр камери йде за ним: малий кристал знімається зблизька як головний
+   * артефакт екрана, великий — здалеку, з залою за ним. Див.
+   * `portalCameraFrame`.
+   */
+  artifactSceneHeight: number;
   /** Напрямки гілок кварцової жили — камінь платформи вигинається над ними. */
   veinBearings: readonly number[];
   /** Виліт жили в одиницях сцени — усередині нього камінь лишається пласким. */
@@ -36,6 +44,7 @@ export function PortalStage({
   reduceMotion,
   artifactSceneRadius,
   crystalsSceneRadius,
+  artifactSceneHeight,
   veinBearings,
   veinReach,
   children,
@@ -44,8 +53,8 @@ export function PortalStage({
   const controls = useRef<OrbitControlsImpl>(null);
   const aspect = size.height > 0 ? size.width / size.height : 1;
   const frame = useMemo(
-    () => portalCameraFrame(aspect, crystalsSceneRadius),
-    [aspect, crystalsSceneRadius],
+    () => portalCameraFrame(aspect, crystalsSceneRadius, artifactSceneHeight),
+    [aspect, crystalsSceneRadius, artifactSceneHeight],
   );
   const daisScale = useMemo(() => portalDaisScale(artifactSceneRadius), [artifactSceneRadius]);
   const palette = PORTAL_PALETTES[theme];

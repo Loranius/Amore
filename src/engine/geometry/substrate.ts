@@ -686,14 +686,28 @@ export function buildCrystalSubstrateMesh(
       Number.POSITIVE_INFINITY,
     );
     if (gap <= 0) continue;
-    size = Math.min(size, gap);
-    // Below this it is gravel rendered as a dozen triangles nobody can resolve.
-    if (size < nodeRadius * BOULDER_SIZE_MIN * 0.5) continue;
     const solid = intersectHalfSpaces(
       boulderPlanes(artifactSeed, index),
       polytopeTolerance(1),
     );
     if (solid === null) continue;
+    // Trim against the solid's **corners**, not its planes. `size` scales the
+    // plane distances, and with nine planes a corner between three of them sits
+    // well outside the nearest face — measured on the built hulls, up to 1.6×.
+    // Trimming by `size` alone therefore let a boulder's corner cross a crystal
+    // it was supposed to stop short of, and the sweep caught exactly that on a
+    // thin first-year body once the children were thickened: a vertex 0.0019
+    // from an axis that wanted 0.0022.
+    //
+    // The same shape of defect as the child clearance in ADR-0016 — a radius
+    // that describes a face being used as though it described the whole solid.
+    let cornerReach = 0;
+    for (const vertex of solid.vertices) {
+      cornerReach = Math.max(cornerReach, Math.hypot(vertex.x, vertex.z));
+    }
+    size = Math.min(size, gap / Math.max(cornerReach, 1e-6));
+    // Below this it is gravel rendered as a dozen triangles nobody can resolve.
+    if (size < nodeRadius * BOULDER_SIZE_MIN * 0.5) continue;
 
     // Sunk so its widest part is at the stone's own surface: a boulder resting
     // *on* the plate reads as a pebble placed there, one half-buried reads as

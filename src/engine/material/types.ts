@@ -155,34 +155,6 @@ export interface CrystalShaderRecipe {
   axialTintStrength: number;
   /** What the foot is tinted toward — a multiplier over the outgoing colour. */
   footColor: CrystalRgb;
-  /**
-   * How hard the growth striations are drawn across the shaft, 0 for none.
-   *
-   * Horizontal striation perpendicular to the c-axis is *the* diagnostic
-   * feature of a quartz prism face — it is how a mineralogist tells quartz from
-   * beryl at a glance — and the crystal had none of it anywhere: not in the
-   * geometry, not in the shader. Pass 1's "almost no evidence of growth
-   * history" was the same absence read from the product side.
-   *
-   * Drawn rather than modelled, and that is a constraint rather than a
-   * shortcut. Since ADR-0006 every face is planar by construction and the
-   * architecture's own position is that vertex noise is not how this crystal
-   * gets detail; displacing the shaft would break the one property the whole
-   * faceting rests on. A striation is a step in the surface a few microns deep,
-   * so what it does to a render is change a normal — which is exactly what can
-   * be done without moving a vertex.
-   */
-  striationStrength: number;
-  /**
-   * How many striations the shaft carries from foot to tip.
-   *
-   * One per year the couple has been together. Striations *are* growth
-   * increments on a real crystal, so this is the one place where the mineral's
-   * own texture and the artifact's meaning are the same thing rather than one
-   * dressed as the other — and it is the monarch's only expression of the year
-   * count, which until now she carried solely as height.
-   */
-  striationCount: number;
 }
 
 export interface CrystalFacetTinting {

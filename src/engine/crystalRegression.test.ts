@@ -5,7 +5,7 @@ import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG, buildCrystalGeometry } from './geometr
 import { CRYSTAL_SUBSTRATE_BODY_ID } from './geometry/substrate';
 import { DEFAULT_GROWTH_ENGINE_CONFIG, buildGrowthState } from './growth';
 import { DEFAULT_CRYSTAL_MATERIAL_CONFIG } from './material';
-import { buildCrystalMaterialState, striationCount } from './material/engine';
+import { buildCrystalMaterialState } from './material/engine';
 import type { CrystalMaterialQuality } from './material/types';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from './species/crystal';
 
@@ -271,19 +271,6 @@ describe('Crystal regression sweep — the invariants each pass added', () => {
     }
   });
 
-  it.each(cases)('reads the year count off the shaft for $history at $years years', ({ history, years }) => {
-    // Pass 5. One striation per year, floored and capped where the pattern
-    // stops being resolvable.
-    const { species, material } = run(history, years);
-    const expected = striationCount(species.state.ageDays);
-    expect(expected).toBeGreaterThanOrEqual(4);
-    expect(expected).toBeLessThanOrEqual(36);
-    for (const body of material.bodies) {
-      if (body.shader.striationStrength <= 0) continue;
-      expect(body.shader.striationCount, `${history}/${years}y`).toBe(expected);
-    }
-  });
-
   it.each(cases)('keeps the zoning a derivation for $history at $years years', ({ history, years }) => {
     // Pass 6. The amplitude must stay inside its range on every history, or it
     // is a constant with a derivation's name on it.
@@ -364,6 +351,32 @@ describe('Crystal regression sweep — growth stays coherent', () => {
     }
   });
 
+  it.each(HISTORIES)('never shrinks a closed year of %s as the colony fills', (history) => {
+    // The invariant ADR-0018 put at risk. A child's share of the monarch now
+    // falls as the colony crowds — twenty bodies of a given width cannot fit a
+    // circle narrower than twenty of them — and each new year both takes a
+    // share away and grows the monarch. If the share fell faster than the
+    // monarch rose, a couple would watch their early years get *smaller* every
+    // anniversary. The bound is stated in `CHILD_SHARE_FALLOFF`; this is the
+    // same claim measured on the built bodies.
+    const previous = new Map<string, number>();
+    let compared = 0;
+    for (const years of AGES) {
+      const { growth } = observedAt(history, years);
+      for (const body of growth.bodies) {
+        if (!body.id.startsWith('crystal:year:')) continue;
+        const was = previous.get(body.id);
+        if (was !== undefined) {
+          compared += 1;
+          expect(body.renderedLength, `${history} ${body.id} at ${years}y`)
+            .toBeGreaterThanOrEqual(was - 1e-6);
+        }
+        previous.set(body.id, body.renderedLength);
+      }
+    }
+    expect(compared, `${history}: nothing was compared`).toBeGreaterThan(8);
+  });
+
   it.each(HISTORIES)('never shrinks %s and never loses a body', (history) => {
     // Bodies follow years, so the count can only climb.
     let previous = 0;
@@ -384,7 +397,7 @@ describe('Crystal regression sweep — every quality tier', () => {
       expect(material.bodies.length, `${history}/${quality}`).toBeGreaterThan(0);
       for (const body of material.bodies) {
         expect(Number.isFinite(body.baseColor.r), `${history}/${quality}`).toBe(true);
-        expect(body.shader.striationCount).toBeGreaterThanOrEqual(0);
+        expect(Number.isFinite(body.shader.inclusionDensity), `${history}/${quality}`).toBe(true);
       }
     }
   });

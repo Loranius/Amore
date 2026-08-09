@@ -18,6 +18,7 @@ import {
   childDistance,
   childGrowthProgress,
   childRadialBias,
+  CHILD_RING_CAPACITY,
   childRingIndex,
   groundSpread,
   monarchAxialScale,
@@ -301,8 +302,22 @@ export function buildAnnualFormations(
     monarchNow,
     occurredEvents(artifact, asOf).length,
   );
+  // The ring step follows the widest a year crystal could be, not the widest
+  // this couple happens to have: a backfilled year may not shift the ring the
+  // years around it already stand on.
+  const years = relationshipYears(
+    artifact.relationshipStartedAt, asOf, artifact.leapDayPolicy,
+  );
+  // How many bodies each ring actually seats. A ring is a circle, so this is
+  // half of what decides its radius — see `ringSeatingRadius`.
+  const ringOccupancy = new Map<number, number>();
+  for (const year of years) {
+    const ring = childRingIndex(year.index);
+    ringOccupancy.set(ring, (ringOccupancy.get(ring) ?? 0) + 1);
+  }
+  const widestChildRadialScale = childDimensions(monarchNow, 1, years.length).radialScale;
 
-  return relationshipYears(artifact.relationshipStartedAt, asOf, artifact.leapDayPolicy)
+  return years
     .map((year) => {
       const id = `crystal:year:${year.index + 1}`;
       const seed = stableSeed(artifact.deterministicSeed, id);
@@ -325,7 +340,7 @@ export function buildAnnualFormations(
         context.sharedDaysOff.filter((day) => withinYear(day, year.startsAt, year.endsAt)).length,
       );
       const fill = yearFill(progress, activity, togetherness);
-      const size = childDimensions(monarchNow, fill);
+      const size = childDimensions(monarchNow, fill, years.length);
       const ringIndex = childRingIndex(year.index);
       const tint = wishTint(wishTally(yearEvents, context.partners));
 
@@ -356,7 +371,9 @@ export function buildAnnualFormations(
         ringDistance: childDistance({
           monarchRadialScale: monarchRadialNow,
           childRadialScale: size.radialScale,
+          widestChildRadialScale,
           ringIndex,
+          ringOccupancy: ringOccupancy.get(ringIndex) ?? 1,
         }),
         // A year with no gifts stays the white every crystal is born as.
         tintRgb: tint.rgb,
@@ -395,7 +412,16 @@ export function buildSkirtFormations(
     monarchAxialNow,
     deliberateActCount(occurredEvents(artifact, asOf)),
   );
-  const widestChildRadialScale = childDimensions(monarchAxialNow, 1).radialScale;
+  // The hem has to clear every ring the couple has opened, not just the first.
+  const yearCount = relationshipYears(
+    artifact.relationshipStartedAt, asOf, artifact.leapDayPolicy,
+  ).length;
+  const widestChildRadialScale = childDimensions(monarchAxialNow, 1, yearCount).radialScale;
+  const outermostRingIndex = childRingIndex(Math.max(0, yearCount - 1));
+  const outermostRingOccupancy = Math.max(
+    1,
+    yearCount - outermostRingIndex * CHILD_RING_CAPACITY,
+  );
 
   const completed = artifact.events
     .filter((event) => eventModule(event.source) === 'plans')
@@ -436,6 +462,9 @@ export function buildSkirtFormations(
           monarchRadialScale: monarchRadialNow,
           widestChildRadialScale,
           skirtRadialScale: scale * 0.3,
+          outermostRingIndex,
+          outermostRingOccupancy,
+          skirtCount: completed.length,
         })
         + seededUnit(seed, 'ring') * 0.03,
       ),

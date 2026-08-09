@@ -71,6 +71,7 @@ function TreeInPortal({ build, theme }: { build: TreeLabPreviewBuild; theme: 'li
           // тієї ж причини, що й у кристала (камінь проти самих кристалів).
           artifactSceneRadius={fit.soilRadius}
           crystalsSceneRadius={fit.crownRadius}
+          artifactSceneHeight={fit.height}
           // Кварцової жили в дерева немає — камінь платформи не вигинається
           // ні над чим, і це не заглушка: вигин публікує субстрат кристала, а
           // в дерева субстрат інший.

@@ -22,6 +22,8 @@ import {
   childGrowthProgress,
   childRadialBias,
   childRingIndex,
+  childRingStep,
+  ringSeatingRadius,
   CONSISTENCY_WINDOW_MONTHS,
   consistency,
   facetThresholdForYears,
@@ -316,7 +318,9 @@ describe('child crystals', () => {
         const distance = childDistance({
           monarchRadialScale: monarchRadial,
           childRadialScale: child.radialScale,
+          widestChildRadialScale: child.radialScale,
           ringIndex,
+          ringOccupancy: 1,
         });
         const gap = distance - monarchRadial - child.radialScale;
         // Epsilon for the `round6` the published distance goes through, not
@@ -373,7 +377,12 @@ describe('child crystals', () => {
     // thing keeping the colony from growing out of one vein. What a year did
     // with itself now shows in its size, facets and fill; where it stands is
     // fixed, and it is as close as the geometry allows.
-    const base = { monarchRadialScale: 0.15, childRadialScale: 0.08 };
+    const base = {
+      monarchRadialScale: 0.15,
+      childRadialScale: 0.08,
+      widestChildRadialScale: 0.08,
+      ringOccupancy: 1,
+    };
 
     expect(childDistance({ ...base, ringIndex: 0 }))
       .toBeCloseTo(0.15 + 0.08 + childClearance(0.15, 0.08), 6);
@@ -383,29 +392,63 @@ describe('child crystals', () => {
     expect(CHILD_MIN_CLEARANCE).toBeLessThan(0.08 * 0.5);
   });
 
-  it('keeps the skirt outside the widest the year ring can grow', () => {
+  it('keeps the skirt outside every ring of years, not only the first', () => {
     // The fixed 0.24 this replaces crossed the year ring in both directions:
-    // outside it at four years, inside it at twenty-five, so plan crystals
-    // ended up scattered among the years they are meant to hem.
-    for (const years of [1, 4, 25, 60]) {
+    // outside it at four years, inside it at twenty-five. Then the first fix
+    // cleared only ring 0, which a nine-year couple already outgrows — the
+    // sweep put ring 1 a full 0.032 *inside* its own hem.
+    for (const years of [1, 4, 9, 25, 60]) {
       const monarchAxial = monarchAxialScale(years * YEAR);
       const monarchRadial = monarchRadialScale(monarchAxial, 200);
       const widest = childDimensions(monarchAxial, 1).radialScale;
       const skirtRadial = 0.14 * 0.3;
+      const outermostRingIndex = childRingIndex(Math.max(0, years - 1));
 
+      const occupancy = Math.max(1, years - outermostRingIndex * CHILD_RING_CAPACITY);
       const ring = childDistance({
         monarchRadialScale: monarchRadial,
         childRadialScale: widest,
-        ringIndex: 0,
+        widestChildRadialScale: widest,
+        ringIndex: outermostRingIndex,
+        ringOccupancy: occupancy,
       });
       const skirt = skirtDistance({
         monarchRadialScale: monarchRadial,
         widestChildRadialScale: widest,
         skirtRadialScale: skirtRadial,
+        outermostRingIndex,
+        outermostRingOccupancy: occupancy,
+        skirtCount: 6,
       });
 
-      // Clear of the year's outer surface, by the skirt's own radius and more.
+      // Clear of the outermost year's outer surface, by the skirt's own radius.
       expect(skirt - skirtRadial, `${years}y`).toBeGreaterThan(ring + widest);
+    }
+  });
+
+  it('seats a full ring without its own members touching', () => {
+    // The circle constraint the placement was not asking about: eight bodies of
+    // width 2r with a gap between them need n·(2r + gap) of circumference. The
+    // sweep found two of a nine-year couple's first-ring crystals 0.0014 into
+    // each other because the radius answered only to the monarch.
+    for (const years of [4, 9, 25]) {
+      const widest = childDimensions(monarchAxialScale(years * YEAR), 1).radialScale;
+      const radius = ringSeatingRadius(CHILD_RING_CAPACITY, widest);
+      const arcPerBody = (Math.PI * 2 * radius) / CHILD_RING_CAPACITY;
+      expect(arcPerBody, `${years}y`).toBeGreaterThan(widest * 2);
+    }
+    // One body needs no room made for it, and zero is not a ring.
+    expect(ringSeatingRadius(1, 0.1)).toBe(0);
+    expect(ringSeatingRadius(0, 0.1)).toBe(0);
+  });
+
+  it('opens each ring wide enough for the bodies standing in it', () => {
+    // The step used to be a flat 0.2, which held only while a child was slim.
+    // Thickening them to the reference cluster's aspect took a twenty-five-year
+    // child's radius past 0.1, so two adjacent rings needed 0.21 and had 0.20.
+    for (const years of [1, 4, 9, 25, 60]) {
+      const widest = childDimensions(monarchAxialScale(years * YEAR), 1).radialScale;
+      expect(childRingStep(widest), `${years}y`).toBeGreaterThan(widest * 2);
     }
   });
 
@@ -416,10 +459,12 @@ describe('child crystals', () => {
     expect(childRingIndex(CHILD_RING_CAPACITY * 2)).toBe(2);
 
     const inner = childDistance({
-      monarchRadialScale: 0.15, childRadialScale: 0.08, ringIndex: 0,
+      monarchRadialScale: 0.15, childRadialScale: 0.08, widestChildRadialScale: 0.08,
+      ringIndex: 0, ringOccupancy: 8,
     });
     const outer = childDistance({
-      monarchRadialScale: 0.15, childRadialScale: 0.08, ringIndex: 1,
+      monarchRadialScale: 0.15, childRadialScale: 0.08, widestChildRadialScale: 0.08,
+      ringIndex: 1, ringOccupancy: 8,
     });
     expect(outer).toBeGreaterThan(inner);
   });

@@ -12,7 +12,7 @@
 // ============================================================
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
+import { ARTIFACT_FIT_HEIGHT, CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import { mulberry32 } from '../../mulberry32';
 import { buildPortalPlatformGeometry } from './portalPlatformMesh';
 // Колона й арка приходять моделлю: різьблення капітелі й профіль архівольта
@@ -111,26 +111,72 @@ const FOV = 42;
 const DEG = Math.PI / 180;
 
 /**
- * Скільки світових одиниць мусить бути видно. Висота — головна: вона
- * задає, яку частину екрана займає кристал (зрілий — близько половини).
- * Ширина рятує вузькі екрани: на вертикальному телефоні кадр по висоті
- * не гарантує, що друза влізе вшир, і камера відходить.
+ * Яку частку висоти кадру займає сам кристал — молодий і повністю дорослий.
  *
- * Підтягнуто після зниження кривої монарха (ADR-0004): артефакт став
- * нижчим, тож камера мусить підійти ближче, інакше він губиться в кадрі.
+ * Це і є нова система відображення, яку попросив власник: **кадр іде за
+ * кристалом, а не навпаки**. Раніше висота кадру була сталою (5.2), тож із
+ * ростом кристала змінювався тільки він сам: трирічна пара займала 23% висоти
+ * екрана й губилась у порожній залі, яку ніхто не просив показувати.
+ *
+ * Тепер камера підходить до малого кристала впритул — він і є головний
+ * артефакт головного екрана — і відходить від великого, відкриваючи залу за
+ * ним. Частка зростає повільніше, ніж сам кристал, тож видимого простору
+ * стає більше, а кристал усе одно більший, ніж був молодим. Обидва рухи, які
+ * назвав власник, — це одна крива.
+ *
+ *   вік        кристал   кадр    частка
+ *   перший день  0.60     1.15     52%
+ *   3 роки       1.18     2.17     54%
+ *   10 років     1.80     3.10     58%
+ *   30 років     3.25     4.92     66%
+ *
+ * Кадр росте вчетверо, кристал — у п'ять із половиною разів.
  */
-const FIT_HEIGHT = 5.2;
-const FIT_WIDTH = 2.3;
+const FRAME_SHARE_YOUNG = 0.52;
+const FRAME_SHARE_GROWN = 0.66;
+
+/**
+ * Кадр для артефакта, про висоту якого нічого не відомо.
+ *
+ * Не «нуль»: сцену будують і без пайплайна (перелік трикутників, тести
+ * геометрії), і кадр нульової висоти дав би нульову відстань до камери.
+ */
+const FALLBACK_ARTIFACT_HEIGHT = 1.2;
+
+/**
+ * Ширина кадру як частка висоти.
+ *
+ * Була окремою сталою 2.3 проти 5.2, тобто 0.44. Лишається часткою, бо тепер
+ * рухається сама висота: ширина, що не йде за нею, або зрізала б широку друзу,
+ * або тримала б камеру далеко від вузької.
+ */
+const FRAME_WIDTH_SHARE = 0.44;
 
 /** Запас між крайнім кристалом і краєм кадру. */
 const FRAME_MARGIN = 1.08;
 
-/** Камера над площиною підлоги. Дає кут ≈17° — підлога читається як
- *  поверхня, що йде вглиб, а не як лінія. */
-const EYE_ABOVE_GROUND = 2.25;
-/** Куди дивиться камера: трохи нижче середини кристала, щоб над ним
- *  лишалось небо, а під ним — подіум. */
-const TARGET_ABOVE_GROUND = 1.25;
+/**
+ * Куди дивиться камера — як частка висоти артефакта.
+ *
+ * Було 1.25 світової одиниці, тобто **вище за верхівку** трирічного кристала
+ * (1.18): камера цілилась у порожнечу над ним, і кристал сидів у нижній
+ * третині кадру. Частка тримає його на місці в будь-якому віці.
+ *
+ * Вище за половину навмисно. Верхню третину полотна закриває шапка головного
+ * екрана — привітання, лічильник днів, перемикач видів і назва артефакта, — і
+ * при 0.46 верхівка кристала виходила рівно під назву. Камера, що цілиться
+ * трохи вище, опускає артефакт у вільну частину кадру.
+ */
+const TARGET_SHARE_OF_ARTIFACT = 0.58;
+
+/**
+ * Синус кута, під яким камера дивиться згори.
+ *
+ * Був наслідком двох абсолютних висот (2.25 і 1.25 при відстані ≈7.1, тобто
+ * 8°); тепер задається прямо, щоб кут не залежав від того, як далеко відійшла
+ * камера. Підлога має читатись як поверхня, що йде вглиб, а не як лінія.
+ */
+const EYE_ELEVATION_SIN = 0.14;
 
 export interface PortalCameraFrame {
   position: readonly [number, number, number];
@@ -168,21 +214,35 @@ export function portalHalfWidthAt(depth: number, aspect: number): number {
  * до 1.5 на десятому році — тобто зовнішні річні кристали десятирічної
  * пари просто зрізались краєм екрана на вертикальному телефоні.
  */
-export function portalCameraFrame(aspect: number, artifactRadius = 0): PortalCameraFrame {
+export function portalCameraFrame(
+  aspect: number,
+  artifactRadius = 0,
+  artifactHeight = FALLBACK_ARTIFACT_HEIGHT,
+): PortalCameraFrame {
   const tangent = halfHeightTangent();
   // Аспект приходить із viewport'а; на нульовій висоті контейнера він
   // вироджується, тож тримаємо його в межах реальних екранів.
   const safeAspect = Math.min(Math.max(Number.isFinite(aspect) ? aspect : 1, 0.3), 3.2);
   const safeRadius = Number.isFinite(artifactRadius) ? Math.max(0, artifactRadius) : 0;
-  const width = Math.max(FIT_WIDTH, safeRadius * 2 * FRAME_MARGIN);
-  const byHeight = FIT_HEIGHT / (2 * tangent);
+  const safeHeight = Number.isFinite(artifactHeight) && artifactHeight > 0
+    ? artifactHeight
+    : FALLBACK_ARTIFACT_HEIGHT;
+
+  // Наскільки кристал уже дорослий. ARTIFACT_FIT_HEIGHT — це висота, до якої
+  // припасовується повністю вирослий, тож ділення дає 0..1 без окремої стелі.
+  const grown = Math.min(1, Math.max(0, safeHeight / ARTIFACT_FIT_HEIGHT));
+  const share = FRAME_SHARE_YOUNG + (FRAME_SHARE_GROWN - FRAME_SHARE_YOUNG) * grown;
+  const height = safeHeight / share;
+  const width = Math.max(height * FRAME_WIDTH_SHARE, safeRadius * 2 * FRAME_MARGIN);
+
+  const byHeight = height / (2 * tangent);
   const byWidth = width / (2 * tangent * safeAspect);
   const distance = Math.max(byHeight, byWidth);
 
-  const eyeY = PORTAL_GROUND_Y + EYE_ABOVE_GROUND;
-  const targetY = PORTAL_GROUND_Y + TARGET_ABOVE_GROUND;
+  const targetY = PORTAL_GROUND_Y + safeHeight * TARGET_SHARE_OF_ARTIFACT;
   // Камера трохи вище за ціль, тож пряма відстань більша за z-виніс.
-  const rise = eyeY - targetY;
+  const rise = distance * EYE_ELEVATION_SIN;
+  const eyeY = targetY + rise;
   const z = Math.sqrt(Math.max(0, distance * distance - rise * rise));
 
   return {
