@@ -94,8 +94,11 @@ sequence that generalises beyond the crystal.
 
 ## 4. What is left
 
-**A regression run** across ages, couples, themes and orientations — Pass 10 of
-the owner's original brief, and now the only item untouched. This pass covered
+**A regression run** — done, see `CRYSTAL_NATURALIZATION_PASS_8_REGRESSION.md`.
+A 194-case engine matrix that runs in CI, validated by reintroducing the Pass 4
+bug and watching 25 cases go red; and a live sweep of thirteen routes at three
+viewports, which found `/map` down at every one of them because the token guard
+used `??` against an empty string. This pass covered
 two themes and three viewports on one couple; the sweep should cover the range
 of histories the six growth dependencies produce.
 

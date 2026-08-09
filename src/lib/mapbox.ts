@@ -7,9 +7,25 @@
 // ============================================================
 import type { MapboxFeature, GeocodeResult } from '@/types';
 
-export const MAPBOX_TOKEN =
-  import.meta.env.VITE_MAPBOX_TOKEN ??
+const FALLBACK_TOKEN =
   'pk.eyJ1IjoiZGVpbW8iLCJhIjoiY21xZ2pzMGh3MDB4ZjJxcG1rdGo1MnRldCJ9.zZLQQDugc3XC14fOWY1Ftw';
+
+/**
+ * The token, with an empty one treated as no token at all.
+ *
+ * `??` was the bug. It falls back only on null and undefined, and the shape an
+ * environment file actually takes when a key is present but unset is
+ * `VITE_MAPBOX_TOKEN=` — an empty string, which is neither. So the fallback
+ * never applied, `mapboxgl.accessToken` was set to '', and Mapbox threw "an API
+ * access token is required" during render, which the route error boundary
+ * caught: the whole map page became a crash screen. Found by sweeping every
+ * route at three viewports; `/map` was the only one showing the boundary.
+ *
+ * Trimmed as well as emptiness-checked, because a stray newline in a deployed
+ * environment variable produces a token that is truthy and still invalid.
+ */
+export const MAPBOX_TOKEN =
+  (import.meta.env.VITE_MAPBOX_TOKEN ?? '').trim() || FALLBACK_TOKEN;
 
 /** Пошук місць за текстом (для випадаючого списку). */
 export async function geocodePlaces(query: string): Promise<MapboxFeature[]> {
