@@ -63,6 +63,45 @@ const AZIMUTH_JITTER = 0.24;
 const PRISM_OFFSET_MIN = 0.86;
 const PRISM_OFFSET_MAX = 1.06;
 
+/**
+ * The same band for a crystal that grew fast: three fifths as wide.
+ *
+ * Not a smaller version of the mature range — a *tighter* one. Prism faces
+ * compete for room, and competition needs time; a juvenile's faces all advance
+ * together, so they come out close to equal. The mature body keeps the wide
+ * band because that unevenness is what its extra years bought it.
+ *
+ * It cannot be much tighter than this, and the reason is geometric rather than
+ * aesthetic. At 0.94–0.98 the prism planes stand at so nearly the same distance
+ * that their shoulder corners land at nearly the same height, and the crown
+ * planes clip those corners into degenerate triangles — the regression sweep
+ * put one at 0.0017 of its body's width. Bisected against the pass's other two
+ * changes to be sure it was this one: reverting the band alone cleared all
+ * twenty-five cases, reverting either of the others made it worse. 0.92–1.00
+ * still fails; 0.90–1.02 is clear with margin.
+ */
+const JUVENILE_OFFSET_MIN = 0.9;
+const JUVENILE_OFFSET_MAX = 1.02;
+
+/**
+ * How far a juvenile's minor rhombohedral faces have run toward closing.
+ *
+ * **Past** closing, deliberately, so they contribute no face at all and the
+ * termination is the major form alone — three broad faces where the monarch
+ * has six alternating ones. On a crystal that grew fast the minor rhombohedron
+ * is not small, it is absent, and that is a very common quartz habit.
+ *
+ * The first value tried was 0.72, which leaves 28% of a face's linear size —
+ * and on a body that is already tiny, 28% of small is a sliver. The regression
+ * sweep caught it at once: `sparse` at 25 years put a facet at 0.0011 of its
+ * body's width. That is the trap Pass 2 documented and this walked straight
+ * back into, which is the argument for the sweep existing.
+ *
+ * See `MINOR_RETREAT_MIN` for what the number means and why it is a share of
+ * the closing distance rather than a distance.
+ */
+const JUVENILE_MINOR_RETREAT = 1.15;
+
 /** The dominant face is pushed further in than the seeded range alone allows. */
 const DOMINANT_INSET = 0.9;
 
@@ -285,6 +324,26 @@ export interface CrystalPlaneInput {
   blunt: boolean;
   /** Termination is missing: the crystal broke. */
   broken: boolean;
+  /**
+   * Which habit to cut.
+   *
+   * `mature` is the monarch: many forms, unequal faces, subsidiary planes near
+   * the shoulder. `juvenile` is everything that grew fast around her.
+   *
+   * The distinction is a real one and not a size setting. A crystal that grew
+   * quickly develops **fewer forms** and **more equal faces** — supply is not
+   * the limit, so every prism face advances at the same rate and the minor
+   * forms never get time to appear. A crystal that grew slowly for years
+   * develops the subsidiary forms and the strongly unequal faces that come with
+   * competing for room.
+   *
+   * Measured before this existed: a child had eleven prism faces to the
+   * monarch's eleven, a crown carrying 0.11 of its prism area to her 0.10, and
+   * an aspect of 3.15 to her 4.01. It was a scaled monarch, exactly as Pass 1
+   * said — the archetype's anisotropy was the only thing separating them, and
+   * that only flattens, it does not change the habit.
+   */
+  habit: 'mature' | 'juvenile';
   lod: CrystalLodLevel;
 }
 
@@ -322,7 +381,8 @@ export function buildCrystalFacePlanes(
     azimuths.push(
       orientation
       + index * step
-      + signed(body.seed, `planes:azimuth:${index}`) * step * AZIMUTH_JITTER,
+      + signed(body.seed, `planes:azimuth:${index}`) * step
+        * (input.habit === 'juvenile' ? AZIMUTH_JITTER * 0.5 : AZIMUTH_JITTER),
     );
   }
 
@@ -332,14 +392,22 @@ export function buildCrystalFacePlanes(
   const shaft: { nx: number; ny: number; nz: number; d: number }[] = [];
   for (let index = 0; index < mainFacets; index += 1) {
     const azimuth = azimuths[index]!;
-    const spread = PRISM_OFFSET_MAX - PRISM_OFFSET_MIN;
-    let offset = radius * (
-      PRISM_OFFSET_MIN + seededUnit(body.seed, `planes:offset:${index}`) * spread
-    );
+    // A fast crystal's prism faces advance at the same rate, so their offsets
+    // sit close together; a slow one's compete and spread apart. The narrower
+    // band is also what removes a defect this pass measured: on children the
+    // largest prism face was up to **402 times** the smallest, against 9.65 on
+    // the monarch. That is a sliver on the shaft — the same class of defect
+    // Pass 2 and Pass 3 removed from the crown, and it was never guarded here.
+    const juvenile = input.habit === 'juvenile';
+    const low = juvenile ? JUVENILE_OFFSET_MIN : PRISM_OFFSET_MIN;
+    const high = juvenile ? JUVENILE_OFFSET_MAX : PRISM_OFFSET_MAX;
+    let offset = radius * (low + seededUnit(body.seed, `planes:offset:${index}`) * (high - low));
     // Two faces the eye can land on. Without them the set is unequal but
-    // uniformly so, which reads as noise rather than as habit.
-    if (index === dominant) offset *= DOMINANT_INSET;
-    if (index === secondDominant) offset *= DOMINANT_INSET + 0.04;
+    // uniformly so, which reads as noise rather than as habit. A juvenile has
+    // no dominant face for the same reason it has no minor forms: nothing had
+    // time to win.
+    if (!juvenile && index === dominant) offset *= DOMINANT_INSET;
+    if (!juvenile && index === secondDominant) offset *= DOMINANT_INSET + 0.04;
 
     // Each face carries its own flare, so no two verticals share a rhythm. The
     // plane is pinned at mid-height, so the flare opens the face at the top by
@@ -445,7 +513,10 @@ export function buildCrystalFacePlanes(
   // Converging is the whole mechanism. A plane that followed the flare — which
   // is what the earned bevels above do — cuts by the same amount at every
   // height and changes nothing about the monotonicity.
-  const shoulderCuts = input.lod === 'low'
+  // A subsidiary form that develops near a mature termination, so a juvenile
+  // does not carry one. This is most of what separates the two silhouettes:
+  // the monarch's shaft is interrupted and steps back, a child's runs clean.
+  const shoulderCuts = input.lod === 'low' || input.habit === 'juvenile'
     ? 0
     : 2 + Math.floor(seededUnit(body.seed, 'planes:shoulder-count') * 2);
   // The broad faces first. A step-back on the face the eye already landed on is
@@ -533,8 +604,14 @@ export function buildCrystalFacePlanes(
   // *forms*: a specimen develops them as sets, it does not negotiate each face
   // separately. Individual faces still differ — through their azimuths, through
   // the drifted apex, and through the prism faces of unequal width below them.
-  const minorShare = MINOR_RETREAT_MIN
-    + seededUnit(body.seed, 'planes:minor-retreat') * (MINOR_RETREAT_MAX - MINOR_RETREAT_MIN);
+  // The minor rhombohedron is a form too, and the same rule applies: on a fast
+  // crystal z never develops, so it closes almost completely and the tip reads
+  // as three big faces. That is a real and very common quartz habit, and here
+  // it is also the clearest contrast with the monarch's six-faced point.
+  const minorShare = input.habit === 'juvenile'
+    ? JUVENILE_MINOR_RETREAT
+    : MINOR_RETREAT_MIN
+      + seededUnit(body.seed, 'planes:minor-retreat') * (MINOR_RETREAT_MAX - MINOR_RETREAT_MIN);
   // The termination's own height: the drop from the apex to where a crown plane
   // meets the shaft.
   //

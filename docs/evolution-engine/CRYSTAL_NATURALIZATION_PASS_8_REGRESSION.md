@@ -99,6 +99,11 @@ are named honestly in Pass 6's table: two are properties of the architecture
 rather than defects, and one — a separate plane builder for the children — is
 real work that has not been done.
 
+> The children were done next, in `CRYSTAL_NATURALIZATION_PASS_9_CHILDREN.md`.
+> The sweep above earned its keep twice on its first outing: it caught a minor
+> face left at a fraction of its size, and a prism band narrowed until the crown
+> planes clipped the shoulder corners into degenerate triangles.
+
 The naturalization sequence is complete. What it leaves behind, beyond the
 crystal itself, is the procedure: **measure the output distribution, not the
 code path, and attribute every measurement by turning the suspect off.** It

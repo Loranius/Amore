@@ -372,6 +372,9 @@ export function buildCrystalProfile(
     bevels: plan.chamfers,
     blunt,
     broken,
+    // The monarch is the one body that grew slowly enough to develop the
+    // subsidiary forms; everything standing around her grew fast.
+    habit: mother ? 'mature' : 'juvenile',
     lod,
   }).map((face) => transformCrystalPlane(
     face,

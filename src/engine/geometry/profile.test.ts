@@ -1001,6 +1001,7 @@ describe('crystal faceting — the shaft is interrupted', () => {
         bevels: 1,
         blunt: false,
         broken: false,
+        habit: 'mature',
         lod: 'high',
       });
       const cuts = planes.filter((plane) => plane.kind === 'shoulder');
