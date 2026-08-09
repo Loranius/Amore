@@ -56,7 +56,7 @@ export interface CrystalRingFacet {
 export interface CrystalFacePlane {
   normal: GrowthVec3;
   offset: number;
-  kind: 'base' | 'prism' | 'bevel' | 'crown' | 'safety';
+  kind: 'base' | 'prism' | 'bevel' | 'shoulder' | 'crown' | 'safety';
 }
 
 export interface CrystalBodyProfile {

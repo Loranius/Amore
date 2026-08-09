@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { GrowthBody } from '../growth';
+import type { CrystalFacePlane } from './types';
 import { add, orthonormalBasis, scale } from '../growth/math';
 import { buildCrystalMesh, splitCrystalMeshFaces } from './mesh';
 import { intersectHalfSpaces, polytopeTolerance } from './polytope';
+import { buildCrystalFacePlanes } from './planes';
 import { buildCrystalProfile } from './profile';
 import { pointInsideCrystalSolid } from './trim';
 
@@ -896,15 +898,186 @@ describe('crystal faceting — the termination is lattice, not proportion', () =
       }
     }
 
-    // Measured over 258 crown facets on forty seeds: median 0.60 of the body's
-    // width, 5th percentile 0.141, floor 0.0149, and two facets below 0.05. The
+    // Measured over 255 crown facets on forty seeds: median 0.586 of the body's
+    // width, 5th percentile 0.126, floor 0.0362, and two facets below 0.05. The
     // floor is the regression guard — a change that reopens the sliver takes it
-    // to 0.003, which is where the radius-quoted retreat left it.
+    // to 0.003, which is where the radius-quoted retreat left it, and to 0.0071
+    // when the shoulder cuts narrowed the shaft locally and the drop was still
+    // being read off the body's global minimum.
     expect(spans.length).toBeGreaterThan(200);
-    expect(Math.min(...spans)).toBeGreaterThan(0.012);
+    expect(Math.min(...spans)).toBeGreaterThan(0.03);
     expect(spans.filter((span) => span < 0.05)).toHaveLength(2);
     const sorted = [...spans].sort((left, right) => left - right);
     expect(sorted[Math.floor(sorted.length / 2)]!).toBeGreaterThan(0.4);
+  });
+});
+
+describe('crystal faceting — the shaft is interrupted', () => {
+  /**
+   * Pass 1's strongest finding, measured: every prism face ran from the base to
+   * the shoulder as one unbroken strip. Over twelve seeds, **88 of 88 faces
+   * changed width monotonically**, and the median change across the whole
+   * height was 3.0° of arc.
+   *
+   * That is arithmetic rather than tuning. A face's width is decided by where
+   * its neighbours cut it; each neighbour is one plane with one fixed tilt; so
+   * the relative widths can only drift one way and the same face dominates from
+   * bottom to top, always. The fix has to be a plane that is not there low down.
+   */
+  const sectorsAt = (planes: CrystalFacePlane[], y: number): Map<number, number> => {
+    const found = new Map<number, number>();
+    const steps = 1440;
+    for (let step = 0; step < steps; step += 1) {
+      const angle = (step / steps) * Math.PI * 2;
+      const dx = Math.sin(angle);
+      const dz = Math.cos(angle);
+      let nearest = Infinity;
+      let owner = -1;
+      planes.forEach((plane, index) => {
+        const denominator = plane.normal.x * dx + plane.normal.z * dz;
+        if (denominator <= 1e-9) return;
+        const distance = (plane.offset - plane.normal.y * y) / denominator;
+        if (distance > 0 && distance < nearest) { nearest = distance; owner = index; }
+      });
+      if (owner >= 0) found.set(owner, (found.get(owner) ?? 0) + 360 / steps);
+    }
+    return found;
+  };
+
+  it('gives every crystal a face that only exists in the upper shaft', () => {
+    // The shoulder cut leans inward and crosses its host exactly once, so below
+    // that crossing it stands outside the body and owns no arc at all. A cut
+    // that owned arc at the base would be an ordinary bevel and would change
+    // nothing about the monotonicity — that is the property under test, not the
+    // count of cuts.
+    //
+    // Measured over 88 cuts on forty seeds: 87 own exactly 0° of arc at 0.15 of
+    // the height, one owns 2°, and the median arc at 0.70 is 45.5°. The 2° is
+    // the body's lean, not the cut: the published planes have been sheared, and
+    // this probe casts its rays from the untilted axis.
+    let silentLow = 0;
+    let cutCount = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const body = { ...motherBody(), seed: seed * 7919 };
+      const profile = buildCrystalProfile(body, 'high');
+      const planes = profile.planes!;
+      const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
+      const top = Math.max(...polytope.vertices.map((vertex) => vertex.y));
+
+      const cuts = planes
+        .map((plane, index) => ({ plane, index }))
+        .filter((entry) => entry.plane.kind === 'shoulder');
+      expect(cuts.length).toBeGreaterThanOrEqual(1);
+
+      const low = sectorsAt(planes, top * 0.15);
+      const high = sectorsAt(planes, top * 0.7);
+      let appearing = 0;
+      for (const cut of cuts) {
+        cutCount += 1;
+        const lowArc = low.get(cut.index) ?? 0;
+        expect(lowArc).toBeLessThan(3);
+        if (lowArc === 0) silentLow += 1;
+        if ((high.get(cut.index) ?? 0) > 1) appearing += 1;
+      }
+      expect(appearing).toBeGreaterThanOrEqual(1);
+    }
+    expect(silentLow / cutCount).toBeGreaterThan(0.95);
+  });
+
+  it('leans every shoulder cut inward, which is the whole mechanism', () => {
+    // Asserted on the body's own frame rather than on the published plane: the
+    // lean shears `normal.y` and can take a weakly converging cut a thousandth
+    // past zero, which says something about the lean and nothing about the cut.
+    //
+    // A cut that followed the flare — which is what the earned bevels do —
+    // would take the same bite at every height and interrupt nothing.
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const body = { ...motherBody(), seed: seed * 7919 };
+      const planes = buildCrystalFacePlanes(body, {
+        baseY: 0,
+        topY: body.renderedLength,
+        radius: body.renderedRadius,
+        mainFacets: 7,
+        bevels: 1,
+        blunt: false,
+        broken: false,
+        lod: 'high',
+      });
+      const cuts = planes.filter((plane) => plane.kind === 'shoulder');
+      expect(cuts.length).toBeGreaterThanOrEqual(1);
+      for (const cut of cuts) expect(cut.normal.y).toBeGreaterThan(0);
+      for (const prism of planes.filter((plane) => plane.kind === 'prism')) {
+        // And the prism faces lean the other way, so the break across a face is
+        // a real edge rather than a fold.
+        expect(prism.normal.y).toBeLessThan(0);
+      }
+    }
+  });
+
+  it('makes prism faces widen and then narrow, which one tilt each cannot', () => {
+    // The measurable form of "insufficient variation lower / middle / upper".
+    // Before the shoulder cuts this count was exactly zero, on every seed.
+    let nonMonotone = 0;
+    let total = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const body = { ...motherBody(), seed: seed * 7919 };
+      const profile = buildCrystalProfile(body, 'high');
+      const planes = profile.planes!;
+      const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
+      const top = Math.max(...polytope.vertices.map((vertex) => vertex.y));
+      const heights = [0.08, 0.24, 0.4, 0.56, 0.68, 0.78].map((share) => top * share);
+      const series = new Map<number, number[]>();
+      heights.forEach((y, slot) => {
+        for (const [index, degrees] of sectorsAt(planes, y)) {
+          if (planes[index]!.kind !== 'prism') continue;
+          const widths = series.get(index) ?? heights.map(() => 0);
+          widths[slot] = degrees;
+          series.set(index, widths);
+        }
+      });
+      for (const widths of series.values()) {
+        total += 1;
+        const deltas = widths.slice(1).map((width, slot) => width - widths[slot]!);
+        if (deltas.some((delta) => delta > 0.5) && deltas.some((delta) => delta < -0.5)) {
+          nonMonotone += 1;
+        }
+      }
+    }
+    // Measured: 47 of 261. Held as a share rather than a count so the assertion
+    // survives a seed changing which face a cut lands on.
+    expect(total).toBeGreaterThan(200);
+    expect(nonMonotone / total).toBeGreaterThan(0.1);
+  });
+
+  it('keeps the shoulder cut in the upper shaft, so the body is not a barrel', () => {
+    // A cut pinned low takes the corner away from the part of the shaft that is
+    // supposed to be widest, and the broadest slice slides to mid-shaft.
+    // Measured across forty seeds the widest vertex sits at 0.657..0.950 of the
+    // height; at four times the convergence it fell to 0.44.
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const body = { ...motherBody(), seed: seed * 7919 };
+      const profile = buildCrystalProfile(body, 'high');
+      const polytope = intersectHalfSpaces(
+        profile.planes!,
+        polytopeTolerance(body.renderedRadius),
+      )!;
+      const top = Math.max(...polytope.vertices.map((vertex) => vertex.y));
+      const widest = polytope.vertices.reduce(
+        (best, vertex) => (
+          Math.hypot(vertex.x, vertex.z) > Math.hypot(best.x, best.z) ? vertex : best
+        ),
+        polytope.vertices[0]!,
+      );
+      expect(widest.y / top).toBeGreaterThan(0.6);
+    }
+  });
+
+  it('drops the cuts at low LOD, where the break is under a pixel', () => {
+    const body = motherBody();
+    const low = buildCrystalProfile(body, 'low').planes!;
+    expect(low.filter((plane) => plane.kind === 'shoulder')).toHaveLength(0);
+    const high = buildCrystalProfile(body, 'high').planes!;
+    expect(high.filter((plane) => plane.kind === 'shoulder').length).toBeGreaterThan(0);
   });
 });
 

@@ -122,6 +122,10 @@ through roughly 51° of turn in the same window.
 
 ## 5. What Pass 3 should be
 
+> Done — see `CRYSTAL_NATURALIZATION_PASS_3_SHAFT.md` and ADR-0010. The shaft is
+> interrupted: 47 of 261 prism faces now widen and then narrow, where the count
+> was zero on every seed.
+
 Unchanged from Pass 1's ordering, minus the item just done:
 
 1. **Facet competition** — a second tilt term per prism plane, so a face's width

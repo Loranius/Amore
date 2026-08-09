@@ -153,6 +153,44 @@ const APEX_CUT = 0.16;
 const BEVEL_INSET_MIN = 0.9;
 const BEVEL_INSET_MAX = 0.96;
 
+/**
+ * Where a shoulder cut starts, as a share of the body's height.
+ *
+ * The upper half only. Lower than this the cut takes the corner away from the
+ * part of the shaft that is supposed to be the widest, and the body's broadest
+ * slice slides down to mid-shaft — which is a barrel, and the silhouette the
+ * whole profile exists to avoid.
+ */
+const SHOULDER_CUT_MIN = 0.55;
+const SHOULDER_CUT_MAX = 0.78;
+
+/**
+ * How far a shoulder cut has pulled in by the time it reaches the shoulder, as
+ * a fraction of the body radius.
+ *
+ * The cut has to *converge* with the body, and that is the whole mechanism
+ * rather than a strength setting. A vertical plane pinned to the face cannot do
+ * this job: the face only flares by `PRISM_FLARE` — 0.05 to 0.2 of the radius
+ * over the *entire* height — so above a pin at three quarters height there is
+ * about 0.015 of a radius left for it to take. Measured, it took exactly that:
+ * a facet 5.6° wide at the top sample and 0° below it, which reversed the trend
+ * of precisely 7 of 113 neighbours.
+ *
+ * A plane that leans inward crosses its host once, at the pin, and takes the
+ * face from there up. Below the pin it is outside the body and contributes
+ * nothing at all.
+ *
+ * The number is small on purpose. What makes the break read is not the
+ * silhouette — two to five percent of the radius is about a pixel at portal
+ * size — but the *shading*: the host leans out by 3–11° from vertical and the
+ * upper storey leans in by 4–10°, so the two catch the key light differently
+ * either side of a hard edge. Larger values were measured and they stop being
+ * a step: at 0.04–0.08 the body's widest slice slid from 0.66 of its height
+ * down to 0.44, which is a crystal that necks before its point.
+ */
+const SHOULDER_CONVERGE_MIN = 0.02;
+const SHOULDER_CONVERGE_MAX = 0.055;
+
 /** Sanity box, so a degenerate seed can never produce an unbounded solid. */
 const SAFETY_SPAN = 4;
 
@@ -289,6 +327,9 @@ export function buildCrystalFacePlanes(
   }
 
   const prisms: { azimuth: number; ny: number; offset: number; d: number }[] = [];
+  // Every plane that bounds the shaft, kept so the termination can ask how far
+  // out the body actually stands beneath each of its own faces.
+  const shaft: { nx: number; ny: number; nz: number; d: number }[] = [];
   for (let index = 0; index < mainFacets; index += 1) {
     const azimuth = azimuths[index]!;
     const spread = PRISM_OFFSET_MAX - PRISM_OFFSET_MIN;
@@ -315,6 +356,7 @@ export function buildCrystalFacePlanes(
     const midY = baseY + height * 0.5;
     const d = offset + ny * midY;
     prisms.push({ azimuth, ny, offset, d });
+    shaft.push({ nx: Math.sin(azimuth), ny, nz: Math.cos(azimuth), d });
     planes.push(plane(Math.sin(azimuth), ny, Math.cos(azimuth), d, 'prism'));
   }
 
@@ -366,14 +408,98 @@ export function buildCrystalFacePlanes(
     const cornerReach = Math.hypot(cornerX, cornerZ);
     if (!(cornerReach > 0)) continue;
 
+    const bevelNy = (left.ny + right.ny) * 0.5;
+    const bevelD = cornerReach * inset + bevelNy * midY;
+    shaft.push({ nx: Math.sin(azimuth), ny: bevelNy, nz: Math.cos(azimuth), d: bevelD });
     planes.push(plane(
       Math.sin(azimuth),
       // Follows the flare of the faces it sits between, so a bevel never
       // reverses the direction the body opens in.
-      (left.ny + right.ny) * 0.5,
+      bevelNy,
       Math.cos(azimuth),
-      cornerReach * inset + (left.ny + right.ny) * 0.5 * midY,
+      bevelD,
       'bevel',
+    ));
+  }
+
+  // ── Shoulder cuts ─────────────────────────────────────────
+  //
+  // The strongest finding of the naturalization review, measured: every prism
+  // face runs from the base to the shoulder as one unbroken strip. Across
+  // twelve seeds, **88 of 88 faces changed width monotonically** over the
+  // shaft, and the median change across the whole height was 3.0° of arc. That
+  // is not a tuning problem, it is arithmetic: a face's width is decided by
+  // where its neighbours cut it, each neighbour is one plane with one fixed
+  // tilt, so the relative widths can only drift one way. The same face
+  // dominates from bottom to top, always.
+  //
+  // A plane that only bites high up breaks that, and it does it the way quartz
+  // does — with a form that develops near the termination and not below it. The
+  // plane sits at a prism face's own azimuth but leans *inward* as it rises, so
+  // it crosses that face exactly once, at a seeded height. Below the crossing it
+  // stands outside the body and contributes nothing at all; above it, it takes
+  // progressively more. The strip becomes two storeys with a shallow break
+  // across it, the upper storey narrows, and the neighbours take the room —
+  // which is what makes their widths rise and then fall.
+  //
+  // Converging is the whole mechanism. A plane that followed the flare — which
+  // is what the earned bevels above do — cuts by the same amount at every
+  // height and changes nothing about the monotonicity.
+  const shoulderCuts = input.lod === 'low'
+    ? 0
+    : 2 + Math.floor(seededUnit(body.seed, 'planes:shoulder-count') * 2);
+  // The broad faces first. A step-back on the face the eye already landed on is
+  // legible; the same cut on the narrowest face is noise.
+  const shoulderFacets = [
+    dominant,
+    secondDominant,
+    (dominant + 3) % mainFacets,
+    (secondDominant + 3) % mainFacets,
+  ];
+  const cutFacets = new Set<number>();
+  for (let index = 0; index < shoulderCuts; index += 1) {
+    const facet = shoulderFacets[index % shoulderFacets.length]!;
+    // Two storeys, not three: a second cut on the same face would leave a band
+    // too shallow to read as anything but a shading seam.
+    if (cutFacets.has(facet)) continue;
+    cutFacets.add(facet);
+    const host = prisms[facet]!;
+
+    // Where the cut starts. Kept in the upper half of the shaft: lower down it
+    // would move the body's widest slice below the shoulder, and a crystal
+    // whose widest point is mid-shaft is a barrel.
+    const pinShare = SHOULDER_CUT_MIN
+      + seededUnit(body.seed, `planes:shoulder-pin:${index}`)
+        * (SHOULDER_CUT_MAX - SHOULDER_CUT_MIN);
+    const pinY = baseY + height * pinShare;
+    const reach = host.d - host.ny * pinY;
+    if (!(reach > 0)) continue;
+
+    // A positive `ny` pulls the plane inward as it rises. Sized off the run it
+    // has left rather than off the whole body, so a cut pinned high leans
+    // harder and a cut pinned low leans gently — both arrive at the shoulder
+    // having taken the same bite, and neither reaches it having taken none.
+    const converge = radius * (
+      SHOULDER_CONVERGE_MIN
+      + seededUnit(body.seed, `planes:shoulder-converge:${index}`)
+        * (SHOULDER_CONVERGE_MAX - SHOULDER_CONVERGE_MIN)
+    );
+    const ny = converge / Math.max(1e-6, height * (1 - pinShare));
+
+    // Slightly off its host's azimuth, so the break across the face is a real
+    // edge with two different normals either side of it rather than a fold in
+    // one plane. The offset is small: a large one turns the upper storey into a
+    // separate face pointing somewhere else, and the two stop reading as one
+    // face that stepped.
+    const azimuth = host.azimuth
+      + signed(body.seed, `planes:shoulder-azimuth:${index}`) * step * 0.12;
+    shaft.push({ nx: Math.sin(azimuth), ny, nz: Math.cos(azimuth), d: reach + ny * pinY });
+    planes.push(plane(
+      Math.sin(azimuth),
+      ny,
+      Math.cos(azimuth),
+      reach + ny * pinY,
+      'shoulder',
     ));
   }
 
@@ -412,15 +538,28 @@ export function buildCrystalFacePlanes(
   // The termination's own height: the drop from the apex to where a crown plane
   // meets the shaft.
   //
-  // Off the *narrowest* prism face rather than off the nominal radius, and the
-  // difference is not academic. Prism offsets run 0.77–1.06 of the radius, so a
-  // crown plane over a face that cuts deep has a third less room than the
-  // nominal figure claims — and a retreat sized for the nominal figure took a
-  // measured 94% of that face instead of the intended 45%, which is a sliver.
-  // The minimum is the safe reading: it can only make a minor face larger than
-  // intended, never smaller than the seed asked for.
-  const shaftReach = prisms.reduce((closest, entry) => Math.min(closest, entry.offset), radius);
-  const terminationDrop = shaftReach * Math.tan(CROWN_FACE_DEG * (Math.PI / 180));
+  // Asked of the shaft beneath each crown face rather than taken off the
+  // nominal radius, and the difference is not academic. Prism offsets run
+  // 0.77–1.06 of the radius and a shoulder cut pulls its own face in further,
+  // so a crown plane over a face that cuts deep has a third less room than the
+  // nominal figure claims. A retreat sized for the nominal figure took a
+  // measured 94% of one face instead of the intended 45%, which is a sliver;
+  // a global minimum fixed most of it and missed the shoulder cuts, because
+  // those narrow the shaft *locally* and never became the body's minimum.
+  const nominalDrop = radius * Math.tan(CROWN_FACE_DEG * (Math.PI / 180));
+  const shoulderY = apex.y - nominalDrop;
+  const dropUnder = (azimuth: number): number => {
+    const ux = Math.sin(azimuth);
+    const uz = Math.cos(azimuth);
+    let reach = Infinity;
+    for (const face of shaft) {
+      const denominator = face.nx * ux + face.nz * uz;
+      if (denominator <= 1e-9) continue;
+      const distance = (face.d - face.ny * shoulderY) / denominator;
+      if (distance > 0) reach = Math.min(reach, distance);
+    }
+    return (Number.isFinite(reach) ? reach : radius) * Math.tan(CROWN_FACE_DEG * (Math.PI / 180));
+  };
 
   // Alternating, so at low LOD the four surviving planes still surround the
   // tip instead of leaving one flank to the safety box. `mainFacets` is six or
@@ -449,7 +588,7 @@ export function buildCrystalFacePlanes(
       // Positive = the plane has travelled outward past the apex, so it takes a
       // smaller bite and leaves a smaller face.
       ? minorFaceRetreat(
-        terminationDrop,
+        dropUnder(azimuth),
         sinPitch,
         neighbourGap(crownAzimuths, index),
         minorShare * (0.88 + seededUnit(body.seed, `planes:minor:${index}`) * 0.24),
