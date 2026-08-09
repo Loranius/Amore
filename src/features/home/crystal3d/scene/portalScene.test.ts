@@ -180,6 +180,37 @@ describe('portal camera frame', () => {
     }
   });
 
+  it('sizes the frame at the artifact’s near side, not at its axis', () => {
+    // Виміряно проєкцією справжніх вершин через справжній кадр: до цієї
+    // поправки двадцятирічна друза на широкому екрані виходила на 1% за
+    // нижній край, а з пропорціями самоцвіта (видовженість 2.2 замість 4.8)
+    // — **на 14%**, разом із юбкою й жилою. Причина ортографічна: передній
+    // край друзи стоїть на `radius` ближче до камери, ніж вісь, на якій
+    // сидить точка прицілу, тож проєктується більшим і нижчим.
+    for (const height of [1.2, 2.5, 3.19]) {
+      let previous = 0;
+      for (const radius of [0, 0.5, 1, 1.6]) {
+        const distance = portalCameraFrame(1.6, radius, height).distance;
+        // Ширший артефакт відсуває камеру навіть тоді, коли кадр тримає
+        // висота — саме цього й бракувало.
+        expect(distance, `${height} / ${radius}`).toBeGreaterThan(previous);
+        previous = distance;
+      }
+      // І рівно на радіус, коли ширина не є обмеженням.
+      const slim = portalCameraFrame(1.6, 0, height).distance;
+      const wide = portalCameraFrame(1.6, 0.5, height).distance;
+      expect(wide - slim, `${height}`).toBeCloseTo(0.5, 6);
+    }
+
+    // Ширина такої поправки не отримує: тіла, що задають горизонтальний
+    // розмір, стоять збоку від осі, на майже тій самій глибині.
+    const narrowScreen = portalCameraFrame(0.42, 1.5, 1.2);
+    expect(narrowScreen.distance).toBeCloseTo(
+      (1.5 * 2 * 1.08) / (2 * Math.tan((42 / 2) * (Math.PI / 180)) * 0.42),
+      6,
+    );
+  });
+
   it('backs off on narrow screens instead of cropping the scene', () => {
     // Кадр по висоті задає артефакт; ширину рятує тільки відхід камери.
     const narrow = portalCameraFrame(0.4, 1.2, 2.5);

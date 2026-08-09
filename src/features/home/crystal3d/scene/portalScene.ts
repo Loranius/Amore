@@ -124,16 +124,26 @@ const DEG = Math.PI / 180;
  * стає більше, а кристал усе одно більший, ніж був молодим. Обидва рухи, які
  * назвав власник, — це одна крива.
  *
- *   вік        кристал   кадр    частка
- *   перший день  0.60     1.15     52%
- *   3 роки       1.18     2.17     54%
- *   10 років     1.80     3.10     58%
- *   30 років     3.25     4.92     66%
+ * Частка задає **висотну** гілку. На вузькому екрані зазвичай зв'язує не вона,
+ * а ширина: друза там займає 64–88% ширини кадру, і кадр по висоті виходить із
+ * цього, а не з цих сталих. Тож на телефоні ці числа майже нічого не міняють —
+ * вони вирішують кадр на планшеті й ноутбуці.
  *
- * Кадр росте вчетверо, кристал — у п'ять із половиною разів.
+ * Підняті з 0.52/0.66 разом із поправкою на ближній край нижче: та поправка
+ * відсуває камеру, і без цього підйому широкий екран втратив би 10 пунктів.
+ *
+ * Виміряно проєкцією справжніх вершин через справжній кадр — частка **висоти
+ * екрана**, яку займають кристали:
+ *
+ *   вік          телефон 0.46   ноутбук 1.6
+ *   1 рік            65%            68%
+ *   4 роки           56%            65%
+ *   10 років         54%            68%
+ *   20 років         54%            70%
+ *   30 років         47%            69%
  */
-const FRAME_SHARE_YOUNG = 0.52;
-const FRAME_SHARE_GROWN = 0.66;
+const FRAME_SHARE_YOUNG = 0.62;
+const FRAME_SHARE_GROWN = 0.76;
 
 /**
  * Кадр для артефакта, про висоту якого нічого не відомо.
@@ -235,7 +245,27 @@ export function portalCameraFrame(
   const height = safeHeight / share;
   const width = Math.max(height * FRAME_WIDTH_SHARE, safeRadius * 2 * FRAME_MARGIN);
 
-  const byHeight = height / (2 * tangent);
+  // Height is solved at the artifact's **near side**, not at its axis.
+  //
+  // The rule used to divide the wanted frame by the tangent and stop there,
+  // which is an orthographic answer to a perspective question: the front of the
+  // druse stands `safeRadius` closer to the camera than the axis the aim point
+  // sits on, so it projects larger and lower than the arithmetic says. On a
+  // slim spire the error is invisible — measured on main, 1% of the frame at
+  // twenty years on a wide screen. On a wide artifact it is not: the same
+  // measurement with a gem-proportioned monarch put **14% of the colony below
+  // the bottom edge**, skirt and vein included.
+  //
+  // Adding the radius to the solved distance is the whole fix: it puts the
+  // near side, rather than the axis, on the plane the frame was sized for.
+  //
+  // Width does **not** get the same term, and that asymmetry is the geometry
+  // rather than a compromise: the bodies that set the horizontal extent stand
+  // to the *side* of the axis, at very nearly the axis's own depth, while the
+  // body that sets the vertical extent stands in *front* of it. Adding the
+  // radius to both cost 10 points of screen width on a phone and bought
+  // nothing — the clipping this fixes was entirely vertical.
+  const byHeight = height / (2 * tangent) + safeRadius;
   const byWidth = width / (2 * tangent * safeAspect);
   const distance = Math.max(byHeight, byWidth);
 
