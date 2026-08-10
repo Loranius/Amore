@@ -1,5 +1,20 @@
 import { createContext, useContext } from 'react';
 import type { HomeArtifact } from '../home/homeArtifact';
+import type { WishSubject } from '../home/crystal3d/scene/wishCrystals';
+
+/**
+ * Що модуль показує у світі, і що робити, коли по ньому клацнули.
+ *
+ * Перший випадок каналу «модуль каже світу, що він показує»: вішліст віддає
+ * свої бажання, світ малює їх тілами (§28), і дотик повертається назад тим
+ * самим шляхом. Канал названий за вішлістом, а не узагальнений наперед — коли
+ * другий модуль попросить того самого, узагальнення матиме дві точки замість
+ * однієї здогадки.
+ */
+export interface WorldWishBoard {
+  wishes: readonly WishSubject[];
+  onSelect: (wishId: number) => void;
+}
 
 /**
  * Which living artifact the couple is looking at, and who may change it.
@@ -24,6 +39,9 @@ export interface ArtifactWorldValue {
    * created just to ask the same question.
    */
   webglSupported: boolean;
+  /** Дошка бажань, поки її показує маршрут. `null` — артефакт стоїть сам. */
+  wishBoard: WorldWishBoard | null;
+  showWishBoard: (board: WorldWishBoard | null) => void;
 }
 
 export const ArtifactWorldContext = createContext<ArtifactWorldValue | null>(null);

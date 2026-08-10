@@ -10,7 +10,9 @@ import { Lightbox } from '@/components/ui/Lightbox';
 import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
 import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
+import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { WishlistBubbleView } from './WishlistBubbleView';
+import { WishlistCrystalView } from './WishlistCrystalView';
 import { WishlistFeedView } from './WishlistFeedView';
 import { WishlistPolaroidView } from './WishlistPolaroidView';
 import { WishFormModal } from './WishFormModal';
@@ -140,6 +142,8 @@ export function WishlistPage() {
   // списки, кнопки й прокрутка, і віддати їх артефакту означало б зробити
   // вішліст декорацією.
   useWorldVisibleRoute();
+  const { webglSupported } = useArtifactWorld();
+  const worldVisible = webglSupported;
   const me = useCurrentUser();
   const toast = useToast();
   const {
@@ -506,7 +510,15 @@ export function WishlistPage() {
                   seed={polaroidSeeds[tab]}
                 />
               ) : (
-                <WishlistBubbleView {...sharedViewProps} />
+                // Кристалічний вигляд заміняє бульбашки, поки маршрут показує
+                // світ: бажання малює сцена, а сторінка лишає доступний шлях
+                // до кожного з них. Без світу — жодного WebGL, і бульбашки
+                // лишаються тим, чим були (§52).
+                worldVisible ? (
+                  <WishlistCrystalView {...sharedViewProps} />
+                ) : (
+                  <WishlistBubbleView {...sharedViewProps} />
+                )
               )}
 
               {canShowArchive && (

@@ -10,8 +10,8 @@ import {
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
-import { useCoupleWishStats } from '@/features/wishlist/useWishlist';
-import { wishCrystalCost } from '../scene/wishCrystals';
+import { useArtifactWorld } from '@/features/world/artifactWorldContext';
+import { wishCrystalCost, type WishSubject } from '../scene/wishCrystals';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
 import {
@@ -39,6 +39,10 @@ function formatTopology(value: number): string {
   return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
 }
 
+/** Стала порожнеча: `?? []` створювала б новий масив щорендера, а на ньому
+ *  висить перебудова матеріалів дошки бажань. */
+const NO_WISHES: readonly WishSubject[] = [];
+
 export default function EvolutionCrystalPreviewScene() {
   // Build metrics are a development instrument. They were rendering over the
   // artifact in production, which is both noise on the portal's one hero
@@ -56,11 +60,10 @@ export default function EvolutionCrystalPreviewScene() {
   // `PortalStageProps.pose`.
   const { pose } = useWorldPose();
   const motionMode = useWorldMotionMode();
-  // Активні бажання — стан застосунку, не історія пари, тож вони приходять
-  // повз рушій (див. `wishCrystals.ts`). Один легкий RPC, і той уже в кеші,
-  // якщо пара відкривала Вішлист.
-  const { data: wishStats } = useCoupleWishStats();
-  const activeWishes = wishStats ? Math.max(0, wishStats.total - wishStats.done) : 0;
+  // Бажання приходять від самого модуля, а не з окремого запиту: він знає,
+  // яка вкладка відкрита й що в ній видно, і повторювати цю логіку в сцені
+  // означало б мати дві відповіді на одне питання.
+  const { wishBoard } = useArtifactWorld();
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   // Напрямки гілок кварцової жили. Меми в сцені тримаються за цей масив, тож
   // він мусить бути стабільним посиланням — інакше камінь платформи
@@ -92,7 +95,12 @@ export default function EvolutionCrystalPreviewScene() {
   // Ціна хмари бажань публікується окремо — так само, як ціна оточення.
   // Бюджет артефакта має лишатись про артефакт: донька, позичена дванадцять
   // разів, у топології порахована один раз.
-  const wishCost = wishCrystalCost(pipeline.geometry, activeWishes, metrics.quality);
+  const wishCost = wishCrystalCost(
+    pipeline.geometry,
+    wishBoard?.wishes ?? NO_WISHES,
+    metrics.quality,
+    pose.azimuth,
+  );
   // The reliquary replaces the old quartz ground mesh visually. Size it from
   // the crystals that remain visible, otherwise the hidden vein still inflates
   // the bronze disc until its rim fills the phone viewport.
@@ -159,8 +167,11 @@ export default function EvolutionCrystalPreviewScene() {
               material={pipeline.material}
               life={pipeline.life}
               substrateVisible={false}
-              activeWishes={activeWishes}
+              wishes={wishBoard?.wishes ?? NO_WISHES}
               quality={metrics.quality}
+              wishFacing={pose.azimuth}
+              reduceMotion={reduceMotion}
+              {...(wishBoard ? { onWishSelect: wishBoard.onSelect } : {})}
             />
           </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

@@ -2,46 +2,57 @@ import { CRYSTAL_SUBSTRATE_BODY_ID, type CrystalGeometryState } from '@/engine/g
 import { mulberry32 } from '../../mulberry32';
 
 // ============================================================
-// Бажання, які ще не збулись — кристали навколо корони (бриф §28–§29).
+// Бажання як тіла — розкладка кристалів вішліста (бриф §28–§30).
 // ------------------------------------------------------------
 // **Чому це не рушій.** Evolution Engine моделює те, що *сталося*: адаптер
 // вішліста бере рівно виконані бажання (`if (!row.fulfilled) continue`), і
-// опублікований стан незмінний. Активне бажання — не подія, воно змінюється
+// опублікований стан незмінний. Активне бажання — не подія: воно змінюється
 // щодня і завтра може зникнути. Вставити його в конвеєр означало б зробити
-// історію мінливою.
+// історію пари мінливою.
 //
-// Тож ці кристали — шар світу, а не рушія: presentation поточного стану
-// застосунку навколо артефакта. Мінеральна сім'я при цьому та сама не за
-// схожістю, а буквально — рендер бере готову геометрію доньки монарха
-// (див. `WishCrystals.tsx`), тож нової форми тут не вигадується.
+// **Чому дошка, а не орбіта.** Перша редакція розвішувала бажання кільцем
+// навколо корони. На головній вони були декорацією, якої ніхто не просив, а на
+// вішлісті половина ховалась за монархом. Тепер це дошка, повернута до камери
+// маршруту: видно всі, і кожне можна взяти пальцем.
 //
 // **Що вже є.** Збуте бажання й так змінює артефакт: `wishTint` фарбує всю
 // друзу від подарунків, які пара зробила одне одному (ADR-0015). Тобто §31
-// брифу — «збуте бажання входить у тіло каменю» — наполовину вже правда, і
-// ці супутники домальовують другу половину: те, чого ще прагнуть.
+// брифу — «збуте бажання входить у тіло каменю» — наполовину вже правда, і ці
+// тіла домальовують другу половину: те, чого ще прагнуть.
 // ============================================================
 
-/** Розміри монарха в одиницях рушія — супутники розставляються від них. */
+/** Розміри монарха в одиницях рушія — дошка будується від них. */
 export interface WishSatelliteBounds {
   height: number;
   radius: number;
 }
 
-export interface WishSatellite {
+/** Те, що дошка знає про бажання. Назва, ціна, статус лишаються переднім UI. */
+export interface WishSubject {
+  id: number;
+  /** Фото бажання; воно ляже всередину кристала. */
+  photo: string | null;
+  priority: 'high' | 'medium' | 'low' | null;
+}
+
+export interface WishCrystal {
+  /** null у згорнутого залишку — його не можна відкрити як одне бажання. */
+  id: number | null;
+  photo: string | null;
   /** Позиція в одиницях рушія, у кадрі `bundle.content`. */
   position: readonly [number, number, number];
-  /** Множник до розміру донорської геометрії. */
-  scale: number;
-  rotationY: number;
-  /** Нахил від вертикалі, радіани. */
-  tilt: number;
+  /** Бажана висота тіла в одиницях рушія. */
+  size: number;
+  /** Стартовий кут навколо власної осі. */
+  spin: number;
+  /** Фаза левітації, щоб сусіди не гойдались в такт. */
+  bob: number;
   /**
    * Скільки бажань стоїть за цим кристалом.
    *
-   * §29 прямо забороняє показувати сотні одночасно й просить натомість
-   * кластери або пріоритизацію. Останній супутник збирає залишок, тож сума
-   * `represents` завжди дорівнює числу активних бажань — на екрані їх менше,
-   * але жодне не зникає безслідно.
+   * §29 прямо забороняє показувати сотні одночасно й просить кластери або
+   * пріоритизацію. Останній збирає залишок, тож сума `represents` завжди
+   * дорівнює числу активних бажань.
    */
   represents: number;
 }
@@ -49,119 +60,119 @@ export interface WishSatellite {
 export type WishSatelliteQuality = 'high' | 'balanced' | 'low' | 'fallback';
 
 /**
- * Скільки кристалів світ погоджується малювати.
+ * Скільки тіл світ погоджується малювати.
  *
- * Не «скільки влізе»: це друга сцена поверх артефакта, і §43 називає
- * постійну WebGL-пам'ять першим ризиком. Одна інстансована сітка на всіх,
- * але вершини все одно множаться.
+ * Не «скільки влізе»: кожне несе власну текстуру, тобто власний матеріал і
+ * власний draw call, а §43 називає постійну WebGL-пам'ять першим ризиком
+ * мобільного.
  */
 export function wishSatelliteCap(quality: WishSatelliteQuality): number {
   if (quality === 'high') return 12;
   if (quality === 'balanced') return 9;
   if (quality === 'low') return 6;
-  // Запасний профіль малює артефакт і більше нічого.
   return 0;
 }
 
-export interface WishSatelliteInput {
-  /** Скільки бажань пари ще не збулось. */
-  activeWishes: number;
+export interface WishBoardInput {
+  wishes: readonly WishSubject[];
   /** Насіння артефакта — у кожної пари свій розсип, і він незмінний. */
   seed: number;
   bounds: WishSatelliteBounds;
   quality: WishSatelliteQuality;
+  /** Азимут камери маршруту: дошка стоїть перпендикулярно до погляду. */
+  facing: number;
 }
 
-/** Золотий кут — розкладка, у якій сусіди ніколи не збігаються за напрямком. */
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+/** Скільки бажань у ряд. Більше — і на телефоні вони стають марками. */
+const COLUMNS = 3;
 
-/**
- * Найближче до осі, куди дозволено ставити супутник, як частка радіуса друзи.
- *
- * Більше за одиницю навмисно: монарх звужується догори, але його доньки
- * стоять унизу й широко, і «трохи всередині радіуса» на висоті корони — це
- * все одно перетин із гілкою друзи. Перевірка `hypot(x, z) > radius` — те, що
- * тримає тест, і вона можлива саме тому, що поріг абсолютний.
- */
-const MIN_ORBIT = 1.04;
-const MAX_ORBIT = 1.12;
+/** Розмір тіла як частка висоти монарха. */
+const SIZE_BY_PRIORITY: Readonly<Record<string, number>> = {
+  high: 0.2,
+  medium: 0.17,
+  low: 0.145,
+};
+const SIZE_DEFAULT = 0.17;
 
-/**
- * Смуга висот, у якій живуть бажання: плечі монарха, не вище вістря.
- *
- * Було 0.72–1.06, тобто трохи вище вершини. На живому порталі верхні
- * супутники зрізало краєм екрана: кадр будується під сам артефакт, і запасу
- * над вістрям на вертикальному телефоні майже немає.
- */
-const MIN_RISE = 0.58;
-const MAX_RISE = 0.96;
-
-/**
- * Висота супутника як частка висоти монарха, до розкиду.
- *
- * Було 0.085 — на живому порталі це читалось як уламки завбільшки з доньку,
- * а не як дрібні кристали бажань, яких просить §29.
- */
-const SATELLITE_HEIGHT_SHARE = 0.05;
+/** Наскільки дошка стоїть перед артефактом, у радіусах друзи. */
+const BOARD_STANDOFF = 1.35;
+/** Крок сітки, у власних розмірах тіла. */
+const COLUMN_STEP = 1.5;
+const ROW_STEP = 1.45;
+/** Центр дошки як частка висоти монарха. */
+const BOARD_CENTRE_RISE = 0.72;
 
 function finite(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
 
-export function buildWishSatellites(input: WishSatelliteInput): readonly WishSatellite[] {
+export function buildWishBoard(input: WishBoardInput): readonly WishCrystal[] {
   const cap = wishSatelliteCap(input.quality);
-  const active = Math.max(0, Math.floor(finite(input.activeWishes, 0)));
+  const active = input.wishes.length;
   const shown = Math.min(active, cap);
   if (shown === 0) return [];
 
   const height = Math.max(1e-3, finite(input.bounds.height, 1));
   const radius = Math.max(1e-3, finite(input.bounds.radius, 1));
+  const facing = finite(input.facing, 0);
   const random = mulberry32(Math.floor(finite(input.seed, 0)) >>> 0);
-  // Одна фаза на всю розкладку, а не випадковий кут у кожного: інакше
-  // «трохи різні» ставали б «як попало», і на екрані це читається як шум.
-  const phase = random() * Math.PI * 2;
 
-  const satellites: WishSatellite[] = [];
+  // Дошка стоїть у площині, перпендикулярній до погляду: «праворуч» — вектор,
+  // повернутий на чверть від напрямку камери. Тому бажання не ховаються за
+  // монархом, під яким би кутом камера не стояла.
+  const rightX = Math.cos(facing);
+  const rightZ = -Math.sin(facing);
+  const outX = Math.sin(facing);
+  const outZ = Math.cos(facing);
+
+  const rows = Math.ceil(shown / COLUMNS);
+  const unit = height * SIZE_DEFAULT;
+  const centreRise = height * BOARD_CENTRE_RISE;
+  const standoff = radius * BOARD_STANDOFF;
+
+  const crystals: WishCrystal[] = [];
   for (let index = 0; index < shown; index += 1) {
-    // frac іде від 0 до 1 по всій розкладці — так висота й орбіта
-    // розподіляються рівно, скільки б бажань не було.
-    const frac = shown === 1 ? 0.5 : index / (shown - 1);
-    const angle = phase + index * GOLDEN_ANGLE;
-    const orbit = radius * (MIN_ORBIT + (MAX_ORBIT - MIN_ORBIT) * random());
-    const rise = height * (MIN_RISE + (MAX_RISE - MIN_RISE) * frac);
-    const jitter = 0.86 + random() * 0.28;
+    const wish = input.wishes[index]!;
+    const column = index % COLUMNS;
+    const row = Math.floor(index / COLUMNS);
+    const columnsHere = Math.min(COLUMNS, shown - row * COLUMNS);
 
-    // Останній збирає залишок (§29): на екрані дванадцять кристалів, а
-    // бажань за ними може бути скільки завгодно.
     const last = index === shown - 1;
     const represents = last ? active - shown + 1 : 1;
-    // Росте від кількості, але повільно: кластер із тридцяти не має бути
-    // втричі більшим за одиничне бажання, інакше він читається як другий
-    // монарх.
-    const cluster = represents > 1 ? 1 + Math.min(0.5, Math.log2(represents) * 0.14) : 1;
+    const cluster = represents > 1 ? 1 + Math.min(0.4, Math.log2(represents) * 0.12) : 1;
+    const jitter = 0.92 + random() * 0.16;
+    const size = height
+      * (wish.priority ? (SIZE_BY_PRIORITY[wish.priority] ?? SIZE_DEFAULT) : SIZE_DEFAULT)
+      * jitter * cluster;
 
-    satellites.push({
+    // Ряди центруються самі, тож неповний останній ряд не з'їжджає вбік.
+    const offset = (column - (columnsHere - 1) / 2) * unit * COLUMN_STEP;
+    const rise = centreRise + ((rows - 1) / 2 - row) * unit * ROW_STEP;
+
+    crystals.push({
+      id: represents > 1 ? null : wish.id,
+      photo: wish.photo,
       position: [
-        Math.cos(angle) * orbit,
+        rightX * offset + outX * standoff,
         rise,
-        Math.sin(angle) * orbit,
+        rightZ * offset + outZ * standoff,
       ],
-      scale: height * SATELLITE_HEIGHT_SHARE * jitter * cluster,
-      rotationY: random() * Math.PI * 2,
-      tilt: (random() - 0.5) * 0.5,
+      size,
+      spin: random() * Math.PI * 2,
+      bob: random() * Math.PI * 2,
       represents,
     });
   }
 
-  return satellites;
+  return crystals;
 }
 
 /**
  * Габарити монарха в одиницях рушія.
  *
- * Береться з опублікованої геометрії, а не з кадру сцени: супутники живуть у
- * тому ж кадрі, що й тіла, і перерахунок через підгонку означав би друге
- * джерело правди про те, який артефакт описується.
+ * Береться з опублікованої геометрії, а не з кадру сцени: тіла живуть у тому ж
+ * кадрі, що й друза, і перерахунок через підгонку означав би друге джерело
+ * правди про те, який артефакт описується.
  */
 export function wishSatelliteBounds(geometry: CrystalGeometryState): WishSatelliteBounds {
   let height = 0;
@@ -211,28 +222,30 @@ export function pickWishDonor(
 }
 
 /**
- * Чого коштує хмара бажань — публікується окремо від артефакта.
+ * Чого коштує дошка — публікується окремо від артефакта.
  *
  * Той самий прийом, що й для оточення порталу: бюджет артефакта має лишатись
- * про артефакт. Без цього приймальний тест порівнював би намальовані трикутники
- * з топологією друзи й бачив би, що їх стало більше — бо донька, позичена
- * дванадцять разів, порахована в топології один раз.
+ * про артефакт. Без цього приймальний тест порівнював би намальовані
+ * трикутники з топологією друзи й бачив би, що їх стало більше — бо донька,
+ * позичена дванадцять разів, порахована в топології один раз.
  */
 export function wishCrystalCost(
   geometry: CrystalGeometryState,
-  activeWishes: number,
+  wishes: readonly WishSubject[],
   quality: WishSatelliteQuality,
+  facing: number,
 ): { instances: number; triangles: number } {
-  const satellites = buildWishSatellites({
-    activeWishes,
+  const crystals = buildWishBoard({
+    wishes,
     seed: geometry.artifactSeed,
     bounds: wishSatelliteBounds(geometry),
     quality,
+    facing,
   });
   const donor = pickWishDonor(geometry);
-  if (satellites.length === 0 || donor === null) return { instances: 0, triangles: 0 };
+  if (crystals.length === 0 || donor === null) return { instances: 0, triangles: 0 };
   return {
-    instances: satellites.length,
-    triangles: satellites.length * Math.floor(donor.positions.length / 9),
+    instances: crystals.length,
+    triangles: crystals.length * Math.floor(donor.positions.length / 9),
   };
 }

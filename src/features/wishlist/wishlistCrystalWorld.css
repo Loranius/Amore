@@ -103,3 +103,47 @@
 [data-portal-scene='true'] .wishlist .wl-cloud-item::after {
   display: none;
 }
+
+/* ── Crystal View: сторінка мовчить, говорить світ ──────────
+   Тіла бажань малює сцена. Тут лишається лише доступний шлях до кожного з
+   них — справжні кнопки, які бачить читач екрана й до яких доходить Tab.
+   §48 вимагає цього прямо: користуватись Amore має бути можливо, не
+   розуміючи тривимірної сцени. Саме ці кнопки «натискає» й дотик по
+   кристалу, тож шлях відкриття один, а не два. */
+[data-portal-scene='true'] .wishlist .wl-crystal-view {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Місце під дошку: бажання висять у сцені, і сторінка не має її закривати. */
+  min-height: 52dvh;
+}
+
+[data-portal-scene='true'] .wishlist .wl-crystal-trigger {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Але не для клавіатури: у фокусі кнопка стає видимою поверх світу, інакше
+   пара, яка ходить табом, не бачила б, де вона. */
+[data-portal-scene='true'] .wishlist .wl-crystal-trigger:focus-visible {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--world-border-active);
+  border-radius: var(--radius-md);
+  overflow: visible;
+  clip-path: none;
+  background: var(--world-surface);
+  color: var(--world-text);
+  font: inherit;
+  text-align: start;
+}
