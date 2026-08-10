@@ -28,7 +28,7 @@ export interface PortalStageProps {
   theme: 'light' | 'dark';
   quality: 'high' | 'balanced' | 'low' | 'fallback';
   reduceMotion: boolean;
-  /** Радіус каменю в одиницях сцени — подіум будується під нього. */
+  /** Радіус видимого опорного сліду — подіум будується під нього. */
   artifactSceneRadius: number;
   /** Радіус самих кристалів — кадр камери будується під нього. */
   crystalsSceneRadius: number;

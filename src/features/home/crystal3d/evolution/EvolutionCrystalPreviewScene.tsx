@@ -82,6 +82,13 @@ export default function EvolutionCrystalPreviewScene() {
   if (isPending || !pipeline) return <CrystalPlaceholder />;
 
   const metrics = pipeline.metrics;
+  // The reliquary replaces the old quartz ground mesh visually. Size it from
+  // the crystals that remain visible, otherwise the hidden vein still inflates
+  // the bronze disc until its rim fills the phone viewport.
+  const visibleCrystalRadius = crystalSceneRadius(
+    pipeline.geometry,
+    { includeSubstrate: false },
+  );
   const badge = [
     'Evolution',
     metrics.quality,
@@ -126,8 +133,8 @@ export default function EvolutionCrystalPreviewScene() {
             theme={theme}
             quality={metrics.quality}
             reduceMotion={reduceMotion}
-            artifactSceneRadius={crystalSceneRadius(pipeline.geometry)}
-            crystalsSceneRadius={crystalSceneRadius(pipeline.geometry, { includeSubstrate: false })}
+            artifactSceneRadius={visibleCrystalRadius}
+            crystalsSceneRadius={visibleCrystalRadius}
             artifactSceneHeight={crystalSceneHeight(pipeline.geometry)}
             veinBearings={veinBearings}
             veinReach={crystalSubstrateSceneRadius(pipeline.geometry)}
@@ -138,6 +145,7 @@ export default function EvolutionCrystalPreviewScene() {
               geometry={pipeline.geometry}
               material={pipeline.material}
               life={pipeline.life}
+              substrateVisible={false}
             />
           </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

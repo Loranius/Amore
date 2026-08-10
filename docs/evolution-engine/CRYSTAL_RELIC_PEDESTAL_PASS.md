@@ -2,7 +2,7 @@
 
 ## Scope
 
-Replace the flat stone portal platform with a renderer-only, stepped bronze reliquary beneath the existing relationship crystal. The pass adds dark engraved details, a violet glass light band, and deterministic brushed-metal surface maps while preserving the authoritative crystal, substrate, and child attachments.
+Replace the flat stone portal platform with a renderer-only, stepped bronze reliquary beneath the existing relationship crystal. The pass adds dark engraved details, a violet glass light band, and deterministic brushed-metal surface maps while preserving the authoritative crystal and child attachments. The engine-owned quartz substrate remains in state but is omitted from this portal presentation so it cannot visually replace the new metal base.
 
 ## Requirement IDs
 
@@ -14,6 +14,8 @@ Replace the flat stone portal platform with a renderer-only, stepped bronze reli
 - `src/features/home/crystal3d/scene/portalRelicPedestal.ts` — new bounded geometry and texture builders for the bronze body, engravings, violet glass, roughness map, and tangent-space normal map.
 - `src/features/home/crystal3d/scene/PortalEnvironment.tsx` — renders the reliquary as three merged optical layers and disposes all generated GPU resources.
 - `src/features/home/crystal3d/scene/portalScene.ts` — publishes the measured environment budget of 9 draw calls and 14,752 triangles; exposes the relic top and outer radii through the existing dais contract.
+- `src/engine/renderer/three/bundle.ts` and `EvolutionCrystalObject.tsx` — expose and consume a BatchedMesh instance-visibility switch so the portal can omit only the quartz substrate without changing published geometry.
+- `EvolutionCrystalPreviewScene.tsx` — sizes the reliquary from the visible crystal colony rather than the hidden quartz reach.
 - `src/features/home/crystal3d/scene/portalRelicPedestal.test.ts` and `portalScene.test.ts` — cover the ground plane, bounds, draw-layer merging, glow placement, deterministic maps, and exact scene budget.
 
 No engine state, persistence schema, serialized payload, or application API changed.
@@ -21,14 +23,15 @@ No engine state, persistence schema, serialized payload, or application API chan
 ## Design Notes
 
 - The top metal plane is authored at local `y = 0` and the group is placed at `PORTAL_GROUND_Y`; every crystal keeps its accepted engine position.
+- The lathe profile is traversed bottom-to-top so its top cap faces `+Y` and its skirt faces outward. The initial reverse winding made the cap disappear through back-face culling and exposed the temple floor inside the rings.
 - Artifact-dependent scaling applies only on X/Z. The reliquary depth is fixed, so relationship age cannot move the ground plane or camera target.
 - A lathed shell and raised rims form the dark-bronze stepped silhouette. Engravings and violet glass are separately merged, producing three pedestal draw calls rather than one mesh per ring or glyph.
 - The body uses `MeshPhysicalMaterial` with metalness, controlled roughness, clearcoat, and deterministic 64×64 roughness/normal textures. No asset fetch or runtime randomness is introduced.
-- The existing quartz substrate remains visible above the metal and continues to hide accepted crystal base caps.
+- The quartz substrate body is hidden only at BatchedMesh-instance level in the Home portal. The solid upward-facing metal top fills the ground plane behind accepted, cap-trimmed crystal bases; monarch and child instances remain visible.
 
 ## Tests Added or Changed
 
-- Added geometry-plane, depth, radius, merged-layer, triangle-bound, light-band, and deterministic texture tests.
+- Added geometry-plane, upward-normal, depth, radius, merged-layer, triangle-bound, light-band, deterministic texture, and body-visibility tests.
 - Updated the environment draw-call and exact triangle-budget assertions.
 - Re-ran the portal lighting tests to retain the established scene illumination contract.
 
@@ -37,14 +40,14 @@ No engine state, persistence schema, serialized payload, or application API chan
 | Command | Result | Notes |
 |---|---|---|
 | `npm run typecheck` | PASS | TypeScript clean. |
-| `npm test -- src/features/home/crystal3d/scene/portalRelicPedestal.test.ts src/features/home/crystal3d/scene/portalScene.test.ts src/features/home/crystal3d/scene/portalLighting.test.ts` | PASS | 47/47 tests. |
-| `npm test` | BASELINE FAIL | 1,282/1,283 pass. The unrelated append-only fixture in `constraints.test.ts` fails identically on clean `origin/main` (age-1 events/wishes comparison). |
+| `npm test -- src/features/home/crystal3d/scene/portalRelicPedestal.test.ts src/features/home/crystal3d/scene/portalScene.test.ts src/features/home/crystal3d/scene/portalLighting.test.ts src/engine/renderer/three/crystalFit.test.ts` | PASS | 51/51 tests. |
+| `npm test` | BASELINE FAIL | 1,283/1,284 pass. The unrelated append-only fixture in `constraints.test.ts` fails identically on clean `origin/main` (age-1 events/wishes comparison). |
 | `BASE_PATH=/Amore/ npm run build` | PASS | Production/PWA build completes; existing CSS and chunk-size warnings remain. |
 | `npm run verify:pages-build` | PASS | GitHub Pages artifact verified for `/Amore/`. |
 
 ## Determinism and Fixture Evidence
 
-Both 64×64 material maps are built from coordinate-only formulae and are byte-identical across repeated construction. The environment triangle constant is asserted against the geometry buffers actually rendered. The crystal pipeline and its source fixture are not changed.
+Both 64×64 material maps are built from coordinate-only formulae and are byte-identical across repeated construction. The environment triangle constant is asserted against the geometry buffers actually rendered. Substrate omission toggles renderer instance visibility only; the crystal pipeline and its source fixture are not changed.
 
 ## Serialization/Migration Evidence
 
@@ -52,7 +55,7 @@ Not applicable. The pass creates transient Three.js presentation resources only;
 
 ## Architecture Boundary Check
 
-The new builders live in `features/home/crystal3d/scene`, consume no engine mutation API, and return only Three.js geometry/texture resources. `PortalEnvironment` mounts them below `CRYSTAL_GROUND_BASELINE` and disposes them on unmount. Engine-owned geometry, attachment records, material bindings, IDs, hashes, and replay order are untouched.
+The new builders live in `features/home/crystal3d/scene`, consume no engine mutation API, and return only Three.js geometry/texture resources. `PortalEnvironment` mounts them below `CRYSTAL_GROUND_BASELINE` and disposes them on unmount. The substrate switch calls `BatchedMesh.setVisibleAt` after bundle creation; engine-owned geometry, attachment records, material bindings, IDs, hashes, and replay order are untouched.
 
 ## Remaining Risks
 
