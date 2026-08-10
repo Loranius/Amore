@@ -10,6 +10,8 @@ import {
   createThreeCrystalRenderBundle,
   setThreeCrystalBodyVisible,
 } from '@/engine/renderer/three';
+import { createThreeWishCrystalCloud } from '../scene/wishCrystalCloud';
+import type { WishSatelliteQuality } from '../scene/wishCrystals';
 import { isCrystalTap, type CrystalPointerSample } from './tapGesture';
 
 export interface EvolutionCrystalObjectProps {
@@ -18,6 +20,15 @@ export interface EvolutionCrystalObjectProps {
   life: CrystalLifeState;
   /** Portal presentation may seat the crystals directly in a solid plinth. */
   substrateVisible?: boolean;
+  /**
+   * Скільки бажань пари ще не збулось — кристали навколо корони (§28).
+   *
+   * Число, а не рядки: активне бажання не подія і в рушій не потрапляє, тож
+   * сцені досить кількості. Ідентичність знадобиться наступному кроку — вибору
+   * бажання (§30), — і тоді цей проп зросте разом із ним.
+   */
+  activeWishes?: number;
+  quality?: WishSatelliteQuality;
 }
 
 /**
@@ -29,6 +40,8 @@ export function EvolutionCrystalObject({
   material,
   life,
   substrateVisible = true,
+  activeWishes = 0,
+  quality = 'balanced',
 }: EvolutionCrystalObjectProps) {
   const pulseUntil = useRef(0);
   const pointerDown = useRef<CrystalPointerSample | null>(null);
@@ -50,7 +63,22 @@ export function EvolutionCrystalObject({
     [bundle, geometry, life],
   );
 
+  // Бажання будуються поруч із бандлом і живуть окремо від нього: їх число
+  // змінюється, коли пара додає мрію, а геометрія артефакта — ні, і
+  // перебудовувати друзу заради дванадцяти матриць було б марно.
+  const wishes = useMemo(
+    () => createThreeWishCrystalCloud({
+      bundle,
+      geometry,
+      material,
+      activeWishes,
+      quality,
+    }),
+    [bundle, geometry, material, activeWishes, quality],
+  );
+
   useEffect(() => () => bundle.dispose(), [bundle]);
+  useEffect(() => () => wishes?.dispose(), [wishes]);
   // The factory parents the cloud itself, next to the crystal batches and
   // under the same fit transform, so there is no placement here to get wrong.
   useEffect(() => () => sparks?.dispose(), [sparks]);

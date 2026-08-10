@@ -58,6 +58,19 @@ test.describe('Evolution crystal Pixel 8 Pro acceptance', () => {
       await preview.getAttribute('data-evolution-rendered-triangles'),
       'renderedTriangles',
     );
+    // Кристали бажань (§28) — окрема інстансована сітка поверх артефакта:
+    // один draw call і форма доньки, позичена стільки разів, скільки бажань
+    // показано. У топології артефакта вона порахована один раз, тож обидва
+    // бюджети нижче віднімають її так само, як віднімають оточення.
+    const wishCrystals = numberAttribute(
+      await preview.getAttribute('data-evolution-wish-crystals'),
+      'wishCrystals',
+    );
+    const wishTriangles = numberAttribute(
+      await preview.getAttribute('data-evolution-wish-triangles'),
+      'wishTriangles',
+    );
+    expect(wishCrystals).toBeLessThanOrEqual(12);
 
     expect(meshCount).toBeGreaterThan(0);
     expect(materialCount).toBeGreaterThan(0);
@@ -66,14 +79,14 @@ test.describe('Evolution crystal Pixel 8 Pro acceptance', () => {
     // The invariant is unchanged: crystal bodies are batched by material, so the
     // crystal costs about one draw call per material, not one per body. One
     // extra is allowed for the optional Sparkles points object.
-    const crystalDrawCalls = drawCalls - environmentDrawCalls;
+    const crystalDrawCalls = drawCalls - environmentDrawCalls - (wishCrystals > 0 ? 1 : 0);
     expect(crystalDrawCalls).toBeGreaterThan(0);
     expect(crystalDrawCalls).toBeLessThanOrEqual(materialCount + 1);
     expect(crystalDrawCalls).toBeLessThan(meshCount);
     // Same correction as the draw calls: what must stay inside the published
     // geometry budget is the crystal, and the environment draws a fixed,
     // never-culled set of triangles on top of it.
-    const crystalTriangles = renderedTriangles - environmentTriangles;
+    const crystalTriangles = renderedTriangles - environmentTriangles - wishTriangles;
     expect(crystalTriangles).toBeGreaterThan(0);
     expect(crystalTriangles).toBeLessThanOrEqual(topologyTriangles);
 

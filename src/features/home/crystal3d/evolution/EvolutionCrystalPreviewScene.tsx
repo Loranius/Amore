@@ -10,6 +10,8 @@ import {
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
+import { useCoupleWishStats } from '@/features/wishlist/useWishlist';
+import { wishCrystalCost } from '../scene/wishCrystals';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
 import {
@@ -54,6 +56,11 @@ export default function EvolutionCrystalPreviewScene() {
   // `PortalStageProps.pose`.
   const { pose } = useWorldPose();
   const motionMode = useWorldMotionMode();
+  // Активні бажання — стан застосунку, не історія пари, тож вони приходять
+  // повз рушій (див. `wishCrystals.ts`). Один легкий RPC, і той уже в кеші,
+  // якщо пара відкривала Вішлист.
+  const { data: wishStats } = useCoupleWishStats();
+  const activeWishes = wishStats ? Math.max(0, wishStats.total - wishStats.done) : 0;
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   // Напрямки гілок кварцової жили. Меми в сцені тримаються за цей масив, тож
   // він мусить бути стабільним посиланням — інакше камінь платформи
@@ -82,6 +89,10 @@ export default function EvolutionCrystalPreviewScene() {
   if (isPending || !pipeline) return <CrystalPlaceholder />;
 
   const metrics = pipeline.metrics;
+  // Ціна хмари бажань публікується окремо — так само, як ціна оточення.
+  // Бюджет артефакта має лишатись про артефакт: донька, позичена дванадцять
+  // разів, у топології порахована один раз.
+  const wishCost = wishCrystalCost(pipeline.geometry, activeWishes, metrics.quality);
   // The reliquary replaces the old quartz ground mesh visually. Size it from
   // the crystals that remain visible, otherwise the hidden vein still inflates
   // the bronze disc until its rim fills the phone viewport.
@@ -114,6 +125,8 @@ export default function EvolutionCrystalPreviewScene() {
         data-evolution-runtime={runtime ? 'ready' : 'warming'}
         data-evolution-draw-calls={runtime?.drawCalls ?? ''}
         data-evolution-rendered-triangles={runtime?.triangles ?? ''}
+        data-evolution-wish-crystals={wishCost.instances}
+        data-evolution-wish-triangles={wishCost.triangles}
         data-portal-environment-draw-calls={PORTAL_ENVIRONMENT_DRAW_CALLS}
         data-portal-environment-triangles={PORTAL_ENVIRONMENT_TRIANGLES}
       >
@@ -146,6 +159,8 @@ export default function EvolutionCrystalPreviewScene() {
               material={pipeline.material}
               life={pipeline.life}
               substrateVisible={false}
+              activeWishes={activeWishes}
+              quality={metrics.quality}
             />
           </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
