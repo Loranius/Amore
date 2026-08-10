@@ -1,4 +1,5 @@
 export { buildCrystalSpeciesBlueprint } from './crystalSpecies';
+export { CRYSTAL_MONARCH_BODY_ID } from './formations';
 export { crystalToGrowthBlueprint } from './growthAdapter';
 export { projectCrystalToLegacyPressures } from './legacyBridge';
 export { buildCrystalGeologyState } from './geology';

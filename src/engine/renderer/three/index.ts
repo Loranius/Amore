@@ -20,6 +20,8 @@ export {
 } from './treeLife';
 export type { ThreeTreeLifeBinding } from './treeLife';
 export { createThreeCrystalMaterial } from './material';
+export { createThreeCrystalInnerSparks } from './innerSparks';
+export type { ThreeCrystalInnerSparks } from './innerSparks';
 export {
   applyCrystalLifeFrame,
   createThreeCrystalRenderBundle,

@@ -37,6 +37,10 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.facetEdgeWidth.toFixed(6),
     recipe.axialTintStrength.toFixed(6),
     rgbKey(recipe.footColor),
+    recipe.innerFlowStrength.toFixed(6),
+    recipe.innerFlowTurns.toFixed(6),
+    rgbKey(recipe.innerFlowColor),
+    rgbKey(recipe.innerFlowSecondColor),
   ].join('|');
 }
 
@@ -60,6 +64,8 @@ attribute vec3 evolutionEdge;
 varying vec3 vEvolutionEdge;
 attribute float evolutionAxial;
 varying float vEvolutionAxial;
+attribute vec3 evolutionBodyCoord;
+varying vec3 vEvolutionBodyCoord;
 `;
 
 const VERTEX_BODY = /* glsl */ `
@@ -67,6 +73,7 @@ const VERTEX_BODY = /* glsl */ `
   vEvolutionObjectNormal = normal;
   vEvolutionEdge = evolutionEdge;
   vEvolutionAxial = evolutionAxial;
+  vEvolutionBodyCoord = evolutionBodyCoord;
 `;
 
 const FRAGMENT_PARS = /* glsl */ `
@@ -92,10 +99,16 @@ uniform float uEvolutionFacetEdgeStrength;
 uniform float uEvolutionFacetEdgeWidth;
 uniform float uEvolutionAxialTintStrength;
 uniform vec3 uEvolutionFootColor;
+uniform float uEvolutionInnerFlowStrength;
+uniform float uEvolutionInnerFlowTurns;
+uniform float uEvolutionInnerFlowPhase;
+uniform vec3 uEvolutionInnerFlowColor;
+uniform vec3 uEvolutionInnerFlowSecondColor;
 varying float vEvolutionAxial;
 varying vec3 vEvolutionObject;
 varying vec3 vEvolutionObjectNormal;
 varying vec3 vEvolutionEdge;
+varying vec3 vEvolutionBodyCoord;
 
 float evolutionHash( vec3 cell ) {
   return fract( sin( dot( cell, vec3( 127.1, 311.7, 74.7 ) ) ) * 43758.5453123 );
@@ -385,6 +398,90 @@ const FRAGMENT_BODY = /* glsl */ `
     * uEvolutionCoreStrength
     * evolutionInner
     * max( 0.0, evolutionZoning );
+
+  // ── Energy turning inside the monarch ─────────────────────
+  // The one thing in the colony that moves, and the one body that has it. Every
+  // other optical term here says what the stone is made of; this says that
+  // something is alive in the middle of it.
+  //
+  // It cannot be a second mesh. The shell is opaque by contract — the canvas is
+  // alpha-composited over a CSS sky, so a transmissive body shows black where
+  // it overlaps the sky rather than the sky itself (ADR-0007) — so anything
+  // inside the crystal has to be drawn by the shell's own fragments, as light
+  // arriving from behind them.
+  if ( uEvolutionInnerFlowStrength > 0.0001 ) {
+    // The body's own frame: x and z in −1..1 across its widest slice, y from 0
+    // at the foot to 1 at the tip. Published by the geometry engine
+    // (CrystalMeshData.bodyCoord) rather than derived from position here,
+    // and it has to be: the batch's instance matrices are identity, so
+    // position is artifact space and a body's own centre, height and girth
+    // are not recoverable from it. The frame also divides x and z by the *same*
+    // span, so an elliptical cross-section does not map onto a circle and send
+    // the flow wandering off-centre as the crystal turns.
+    vec3 evolutionBody = vEvolutionBodyCoord;
+
+    // Where the eye is, in that frame's horizontal plane. Nothing between the
+    // body and the world carries a rotation — instance matrices are identity
+    // and the artifact group only scales and lifts — so world XZ is body XZ, to
+    // within the few degrees of lean each crystal's habit gives it.
+    vec3 evolutionWorldView = inverseTransformDirection( evolutionViewDir, viewMatrix );
+    vec2 evolutionViewXZ = normalize( evolutionWorldView.xz + vec2( 1e-4, 1e-4 ) );
+    float evolutionAzimuth = atan( evolutionViewXZ.y, evolutionViewXZ.x );
+
+    // A real helix rather than a screen pattern: at height y it stands at
+    // azimuth 2π(turns·y + phase), so it climbs the body and drifts around it.
+    // rel is where that stretch of it lies relative to the viewer, which is
+    // the only quantity the two lines below need.
+    float evolutionCoil = 6.2831
+      * ( uEvolutionInnerFlowTurns * evolutionBody.y + uEvolutionInnerFlowPhase );
+    float evolutionRel = evolutionCoil - evolutionAzimuth;
+
+    // Both the ribbon and this fragment, measured on the one axis that matters:
+    // horizontally across the line of sight. sin(rel) is exactly where the
+    // helix crosses that axis at this height.
+    float evolutionFlowCenter = sin( evolutionRel ) * 0.52;
+    float evolutionScreenSide =
+      evolutionBody.z * evolutionViewXZ.x - evolutionBody.x * evolutionViewXZ.y;
+    float evolutionFlowBand = 1.0 - smoothstep(
+      0.0,
+      0.42,
+      abs( evolutionScreenSide - evolutionFlowCenter )
+    );
+
+    // Behind the front facet, which is the whole of why this reads as depth.
+    // cos(rel) is positive on the near half of every turn and negative on the
+    // far half; only the far half has stone in front of it. Keeping the near
+    // half would paint the ribbon onto the surface, which is the failure this
+    // term exists to prevent — and it is also what makes the flow correct
+    // through 360°, since the half that is dropped changes as the couple
+    // turns the portal.
+    float evolutionBehind = 0.5 - 0.5 * cos( evolutionRel );
+
+    // Nothing at the foot, which is buried in the vein, and nothing at the tip,
+    // where the body is too narrow for anything to turn inside it.
+    float evolutionFlowEnvelope = smoothstep( 0.06, 0.17, evolutionBody.y )
+      * ( 1.0 - smoothstep( 0.84, 0.96, evolutionBody.y ) );
+
+    // Rose into amethyst along the ribbon, so it flows instead of sitting there
+    // as a bar of one colour. Both ends are the palette's own family and the
+    // mix cannot leave it.
+    vec3 evolutionFlowColor = mix(
+      uEvolutionInnerFlowColor,
+      uEvolutionInnerFlowSecondColor,
+      0.5 + 0.5 * sin( evolutionRel * 0.5 + evolutionBody.y * 4.1 )
+    );
+
+    outgoingLight += evolutionFlowColor
+      * uEvolutionInnerFlowStrength
+      * evolutionFlowEnvelope
+      * evolutionFlowBand
+      * evolutionBehind
+      // Weighted by how squarely the facet meets the eye, for the same reason
+      // the core light is: a facet at the silhouette has no stone behind it to
+      // carry a glow, so drawing one there would put the flow *on* the crystal
+      // rather than in it.
+      * evolutionInner;
+  }
 `;
 
 function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: CrystalBodyMaterial['shader']): void {
@@ -398,6 +495,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     && recipe.auroraStrength <= 0
     && recipe.facetEdgeStrength <= 0
     && recipe.axialTintStrength <= 0
+    && recipe.innerFlowStrength <= 0
   ) return;
 
   material.onBeforeCompile = (shader) => {
@@ -423,9 +521,21 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionFacetEdgeWidth'] = { value: recipe.facetEdgeWidth };
     shader.uniforms['uEvolutionAxialTintStrength'] = { value: recipe.axialTintStrength };
     shader.uniforms['uEvolutionFootColor'] = { value: toColor(recipe.footColor) };
+    shader.uniforms['uEvolutionInnerFlowStrength'] = { value: recipe.innerFlowStrength };
+    shader.uniforms['uEvolutionInnerFlowTurns'] = { value: recipe.innerFlowTurns };
+    shader.uniforms['uEvolutionInnerFlowPhase'] = { value: 0 };
+    shader.uniforms['uEvolutionInnerFlowColor'] = { value: toColor(recipe.innerFlowColor) };
+    shader.uniforms['uEvolutionInnerFlowSecondColor'] = {
+      value: toColor(recipe.innerFlowSecondColor),
+    };
     // Handed back so the life frame can advance it. Without a moving phase the
     // two colours sit still and the fissure is a lamp in a slot, not an aurora.
     material.userData['evolutionPhaseUniform'] = shader.uniforms['uEvolutionPhase'];
+    // Its own clock, an order of magnitude slower than the sparkle's. Sharing
+    // one would have spun the helix at the rate dust twinkles at, and the flow
+    // would read as an animation playing on the crystal rather than as
+    // convection inside it (`CrystalLifeState.innerFlowSpeed`).
+    material.userData['evolutionInnerFlowPhaseUniform'] = shader.uniforms['uEvolutionInnerFlowPhase'];
     shader.vertexShader = shader.vertexShader
       .replace('void main() {', `${VERTEX_PARS}\nvoid main() {`)
       // After `begin_vertex`, where `position` is still the untransformed

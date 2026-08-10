@@ -40,6 +40,16 @@ import type {
   CrystalSpeciesDiagnostics,
 } from './types';
 
+/**
+ * The one body every colony has, whatever else it grew.
+ *
+ * Exported because the string had spread: the profile builder tests for it, the
+ * seed is salted with it, and the renderer now has to find her bounds to hang
+ * the lights inside her. A literal repeated across four volumes is a rename
+ * waiting to break three of them silently.
+ */
+export const CRYSTAL_MONARCH_BODY_ID = 'crystal:mother';
+
 const ARCHETYPES: Readonly<Record<EvolutionChannel, readonly CrystalArchetype[]>> = {
   achievement: ['twin', 'intergrown', 'prismatic'],
   remembrance: ['etched', 'tabular', 'prismatic'],
@@ -123,7 +133,7 @@ export function buildMotherInstruction(
   asOf: string,
   partners: CrystalColorPartners = null,
 ): CrystalGrowthInstruction {
-  const seed = stableSeed(artifact.deterministicSeed, 'crystal:mother');
+  const seed = stableSeed(artifact.deterministicSeed, CRYSTAL_MONARCH_BODY_ID);
   const motherArchetypes: readonly CrystalArchetype[] = ['prismatic', 'massive', 'intergrown'];
   const archetypeIndex = Math.min(
     motherArchetypes.length - 1,
@@ -146,7 +156,7 @@ export function buildMotherInstruction(
   );
 
   return {
-    id: 'crystal:mother',
+    id: CRYSTAL_MONARCH_BODY_ID,
     sourceEventId: null,
     sourceEpisodeId: null,
     epochIndex: 0,
@@ -315,7 +325,7 @@ export function buildAnnualFormations(
     const ring = childRingIndex(year.index);
     ringOccupancy.set(ring, (ringOccupancy.get(ring) ?? 0) + 1);
   }
-  const widestChildRadialScale = childDimensions(monarchNow, 1, years.length).radialScale;
+  const widestChildRadialScale = childDimensions(monarchNow, 1, years.length, 0).radialScale;
 
   return years
     .map((year) => {
@@ -340,7 +350,7 @@ export function buildAnnualFormations(
         context.sharedDaysOff.filter((day) => withinYear(day, year.startsAt, year.endsAt)).length,
       );
       const fill = yearFill(progress, activity, togetherness);
-      const size = childDimensions(monarchNow, fill, years.length);
+      const size = childDimensions(monarchNow, fill, years.length, seed);
       const ringIndex = childRingIndex(year.index);
       const tint = wishTint(wishTally(yearEvents, context.partners));
 
@@ -416,7 +426,7 @@ export function buildSkirtFormations(
   const yearCount = relationshipYears(
     artifact.relationshipStartedAt, asOf, artifact.leapDayPolicy,
   ).length;
-  const widestChildRadialScale = childDimensions(monarchAxialNow, 1, yearCount).radialScale;
+  const widestChildRadialScale = childDimensions(monarchAxialNow, 1, yearCount, 0).radialScale;
   const outermostRingIndex = childRingIndex(Math.max(0, yearCount - 1));
   const outermostRingOccupancy = Math.max(
     1,

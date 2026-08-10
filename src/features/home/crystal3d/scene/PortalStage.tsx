@@ -11,7 +11,15 @@ import { useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
-import { PORTAL_PALETTES, portalCameraFrame, portalDaisScale } from './portalScene';
+import {
+  PORTAL_AMBIENT_INTENSITY,
+  PORTAL_HEMISPHERE_INTENSITY,
+  PORTAL_KEY_LIGHT,
+  PORTAL_PALETTES,
+  PORTAL_RIM_LIGHT,
+  portalCameraFrame,
+  portalDaisScale,
+} from './portalScene';
 
 export interface PortalStageProps {
   seed: number;
@@ -69,11 +77,28 @@ export function PortalStage({
           заповнювались, і скільки б фасетів не мала геометрія, кристал
           читався рівним. Різниця яскравості між сусідніми площинами — це
           і є те, що робить грань гранню. */}
-      <ambientLight intensity={0.1} />
-      <directionalLight position={[3, 4, 2]} intensity={1.42} />
+      <ambientLight intensity={PORTAL_AMBIENT_INTENSITY} />
+      {/* Ключ ліворуч-згори і теплий, а не білий (§10 брифу).
+          Камера дивиться з +Z на початок координат, тож екранне «ліворуч» —
+          це від'ємний X; світло стояло на +3, тобто праворуч.
+
+          1.42 → 1.9. Не «щоб яскравіше»: заливку виміряно, і без цього
+          підняття ключ програвав їй. Див. коментар до кореневого світла. */}
+      <directionalLight
+        position={[...PORTAL_KEY_LIGHT.position]}
+        intensity={PORTAL_KEY_LIGHT.intensity}
+        color={PORTAL_KEY_LIGHT.color}
+      />
       {/* Не другий ключ, а контровий підсвіт: рівно стільки, щоб тіньовий
-          бік не йшов у чорноту. */}
-      <directionalLight position={[-2.5, 3.5, -3.5]} intensity={0.26} color="#fff1f6" />
+          бік не йшов у чорноту. Прохолодний бузковий проти теплого ключа —
+          пара, яку вимагає §10; був майже білий рожевий, тобто того ж
+          відтінку, що й ключ, і контраст між боками нічого не додавав.
+          Стоїть навпроти нового ключа, бо асиметрія — це і є весь сенс. */}
+      <directionalLight
+        position={[...PORTAL_RIM_LIGHT.position]}
+        intensity={PORTAL_RIM_LIGHT.intensity}
+        color={PORTAL_RIM_LIGHT.color}
+      />
       {/* Точкового світла тут більше немає. Виміряно занулюванням на живому
           порталі: воно зсувало сцену на 0.02 зі 255, а артефакт — на 0.01,
           тобто нижче за одиницю квантування. Причина арифметична: точкове
@@ -86,7 +111,7 @@ export function PortalStage({
           вниз (нижній обвід каменю, з якого росте друза), бачать саме камінь
           під собою, і з темним полем вони йшли в суцільний чорний, який
           читався як діра. */}
-      <hemisphereLight args={[palette.daisLight, palette.dais, 0.24]} />
+      <hemisphereLight args={[palette.daisLight, palette.dais, PORTAL_HEMISPHERE_INTENSITY]} />
 
       <PortalEnvironment
         seed={seed}

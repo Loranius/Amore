@@ -39,12 +39,25 @@ function palette(input: BuildCrystalMaterialInput): CrystalMaterialPalette {
   const state = input.species.state;
   const weighted = weightedChannelColor(pressures.channelShare);
   const dominant = crystalChannelColor(pressures.dominantChannel);
-  const warmth = rgb(1, 0.58 + pressures.warmth * 0.16, 0.38 + pressures.warmth * 0.18);
-  const cool = rgb(0.58, 0.76 + pressures.brilliance * 0.16, 1);
+  // Both ends of the shell's own ladder, and both inside the family.
+  //
+  // `warmth` was `1 / 0.58.. / 0.38..` — an orange — and `secondary` is what
+  // the composition role mixes toward, so a companion body was dragged toward
+  // orange while the focal one stayed rose. Measured across one couple's seven
+  // bodies, the red-to-blue ratio spread by **1.66×**: they were not shades of
+  // one colour, they were different colours. The deep end is now a saturated
+  // rose, the light end a pale lilac, and the ladder between them moves value
+  // and saturation without turning the hue.
+  const deep = rgb(0.86, 0.3 + pressures.warmth * 0.08, 0.56 + pressures.warmth * 0.1);
+  const pale = rgb(0.92, 0.78 + pressures.brilliance * 0.08, 1);
   const primary = mixRgb(weighted, dominant, 0.28 + pressures.dominance * 0.34);
-  const secondary = mixRgb(primary, warmth, pressures.warmth * 0.36);
-  const highlight = mixRgb(cool, rgb(1, 0.92, 0.97), 0.45 + state.purity * 0.35);
-  const core = mixRgb(rgb(1, 0.45, 0.22), dominant, pressures.luminosity * 0.32);
+  const secondary = mixRgb(primary, deep, pressures.warmth * 0.36);
+  const highlight = mixRgb(pale, rgb(1, 0.9, 0.98), 0.45 + state.purity * 0.35);
+  // The inner light. Amber `1 / 0.45 / 0.22` stood here, and it is the one
+  // remaining source of warm on the crystal: it is the emissive, it is 20% of
+  // the rim colour, and the zoning multiplies it. The brief's inner flow is
+  // saturated pink to light lilac, so the core starts there.
+  const core = mixRgb(rgb(1, 0.38, 0.72), dominant, pressures.luminosity * 0.32);
   return { primary, secondary, highlight, core };
 }
 
@@ -82,6 +95,15 @@ function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string
     body.shader.inclusionContrast,
     body.shader.coreStrength,
     rgbSignature(body.shader.coreColor),
+    // The flow belongs in the signature rather than being left to fall out of
+    // the terms above. Bodies are batched by signature and a batch shares one
+    // material, so if a body carrying the flow ever landed in a batch with one
+    // that does not, the daughters would light up with the monarch. Today the
+    // role already separates them through `baseColor` and `coreStrength`, which
+    // is precisely the kind of accident that stops holding when a constant is
+    // retuned.
+    body.shader.innerFlowStrength,
+    body.shader.innerFlowTurns,
     facetTintingSignature(body.facets),
   ].map((value) => typeof value === 'number' ? value.toFixed(6) : String(value)).join('|');
 }
@@ -338,20 +360,21 @@ function shaderRecipe(
     // supply it these two terms are the entire budget.
     rimStrength: round6(reflectionEnabled ? preset.reflectionScale * (micro ? 0.12 : emphasized ? 0.74 : 0.54) : 0),
     skyStrength: round6(reflectionEnabled ? preset.reflectionScale * (micro ? 0.05 : 0.26) : 0),
-    skyColor: mixRgb({ r: 0.82, g: 0.9, b: 1 }, input.species.pressures.dominantChannel === 'culture'
-      ? { r: 0.78, g: 0.72, b: 1 }
-      : { r: 0.9, g: 0.95, b: 1 }, 0.34),
-    // The warm branch is gone. It stood for a studio's wooden floor, and the
-    // portal's floor is dark violet stone — so the crystal was reflecting a
-    // room it is not standing in. Measured by ablation on the owner's live
-    // portal at the high tier: neutralising this colour removed **81%** of the
-    // warm cast on the shell, against 5% for the thin-film iridescence, so this
-    // was the golden side the owner asked about and iridescence was not.
-    //
-    // What remains is the cool half of the same mix, which keeps the reflection
-    // reading as a room with a lit ground rather than as a black void below.
-    groundColor: mixRgb({ r: 1, g: 0.73, b: 0.62 }, { r: 0.98, g: 0.76, b: 0.84 }, 0.42),
-    rimColor: mixRgb({ r: 1, g: 0.9, b: 0.96 }, emissiveColor, emphasized ? 0.46 : 0.2),
+    // Light lilac above, rose below, and nothing outside the family. The sky was
+    // `0.82 / 0.90 / 1.00` — a blue studio ceiling — and a near-vertical prism
+    // face reflects mostly sideways, so that blue was landing on the faces that
+    // turn away from the key light. One family from any angle means the fake
+    // room has to be in it too.
+    skyColor: mixRgb({ r: 0.86, g: 0.83, b: 1 }, { r: 0.9, g: 0.86, b: 1 }, 0.34),
+    // The ground the crystal reflects. It was a studio's wooden floor —
+    // `1 / 0.684 / 0.536`, and measured by ablation on the owner's live portal
+    // it was **81%** of the warm cast on the shell, against 5% for the
+    // thin-film. The warm branch went first; now the base goes too, and the
+    // reflection stands in the same rose family as everything else.
+    groundColor: { r: 1, g: 0.78, b: 0.9 },
+    // Light pink, and it stays light pink: the emissive it mixes in is now rose
+    // rather than amber, so the rim can no longer carry warmth into a face.
+    rimColor: mixRgb({ r: 1, g: 0.86, b: 0.94 }, emissiveColor, emphasized ? 0.46 : 0.2),
     // Amplitude of the zoning, not a threshold. As a threshold this was 0.111
     // on a real couple — the top eighth of the noise range, which draws thin
     // filaments rather than the broad stages a crystal actually grew in. The
@@ -444,6 +467,49 @@ function shaderRecipe(
     // was contributing was almost entirely the split.
     axialTintStrength: 0,
     footColor: coreTintColor(emissiveColor, tint),
+    // The monarch only. `focal` is the composition role exactly one body ever
+    // holds (`roleFor`: the king tier and nothing else), so this is the same
+    // "one body per artifact" the composition already guarantees rather than a
+    // second rule that could disagree with it.
+    //
+    // Earned, not decorative: the same two terms that decide how brightly the
+    // stone glows from within decide how strong the flow inside it is, because
+    // it is the same light. A couple who granted nothing still gets a monarch
+    // with something turning in her — the floor is what makes her the monarch —
+    // but a couple who gave gets visibly more of it.
+    innerFlowStrength: round6(focal
+      ? (0.34 + pressures.luminosity * 0.2 + state.luminosity * 0.1)
+        * (1 + wishDepth(tint) * CORE_WISH_GAIN * 0.5)
+      : 0),
+    // Measured, not chosen. The flow is only drawn on the far half of each turn
+    // (the half with stone in front of it), so the count decides whether there
+    // is a lit stretch inside the envelope at *every* azimuth — which is what
+    // "correct through 360°" means for this term.
+    //
+    // Swept by ablation at 0/90/180/270° on a SwiftShader context, reading the
+    // weakest angle of the four, since that is the one that decides whether the
+    // flow ever disappears:
+    //
+    //   turns   weakest angle: pixels moved / peak delta
+    //   0.90            1.8% /  9      under a full turn — gone at 0°
+    //   1.15            5.5% / 17
+    //   1.35            7.4% / 26      ← strongest floor of every value tried
+    //   1.70            7.2% / 28      mean at the weakest angle halves
+    //   2.10            4.5% / 20      turns crowd, the band overlaps itself
+    //
+    // Both failure modes are real and they pull opposite ways: below one turn
+    // there are azimuths with no far-side stretch inside the envelope at all,
+    // and well above it the stretches land close enough together to average
+    // back into an even glow. 1.35 is the floor between them.
+    innerFlowTurns: 1.35,
+    // Fixed rose and fixed amethyst, and deliberately *not* mixed toward the
+    // couple's earned colour. §6 forbids per-region hue drift, and the earned
+    // colour reaches this term already: the flow is added on top of a shell that
+    // is the couple's colour, under a core light that is the couple's colour.
+    // Tinting the ribbon as well would have put a second hue inside the body,
+    // which is exactly the two-tone the whole palette pass removed.
+    innerFlowColor: { r: 1, g: 0.34, b: 0.76 },
+    innerFlowSecondColor: { r: 0.82, g: 0.46, b: 1 },
   };
 }
 
@@ -612,18 +678,16 @@ function buildBodyMaterial(
     SHELL_CLEARCOAT,
     acrossBand(SHELL_CLEARCOAT, pressures.refinement) * preset.clearcoatScale,
   );
-  const iridescenceAllowed = input.config.allowIridescence && !micro;
-  // A year in which both partners gave as much as they received comes out
-  // nearly white — the balance shows as rainbow on the facets instead, which
-  // is why an evenly-shared year is the most beautiful rather than the
-  // greyest (ADR-0004).
-  const earnedIridescence = instruction?.iridescence ?? 0;
-  const iridescence = round6(iridescenceAllowed
-    ? Math.min(
-        preset.maxIridescence,
-        0.08 + pressures.refinement * 0.42 + pressures.brilliance * 0.12 + earnedIridescence * 0.5,
-      )
-    : 0);
+  // **Zero, and not by a preset.** Thin-film interference is a hue shift by
+  // definition: at the 284–545 nm film this crystal was carrying it puts gold
+  // on one facet and green on the next, which is the first thing the brief
+  // forbids. It was also measured on the owner's live portal — 0.58, the high
+  // tier's own ceiling, on every body of a couple who had earned it.
+  //
+  // What this costs, stated rather than hidden: ADR-0016 made a couple's
+  // *balance* in giving show as iridescence, and that signal now has no outlet.
+  // The tint still carries how much they gave; how evenly does not render.
+  const iridescence = 0;
   const emissiveIntensity = intoBand(SHELL_EMISSIVE, acrossBand(
     SHELL_EMISSIVE,
     (emphasized ? 0.55 : focal ? 0.28 : 0.1)
@@ -744,11 +808,23 @@ function buildSubstrateMaterial(
   // of the floor. Measured against both failures: at three times the stone the
   // vein rendered as a white splash brighter than everything but the monarch,
   // and at under twice it stopped being distinguishable from a shadow.
-  const baseColor = rgb(
-    round6(0.245 + grey * 0.045 + tint.r * 0.02),
-    round6(0.238 + grey * 0.045 + tint.g * 0.018),
-    round6(0.283 + grey * 0.045 + tint.b * 0.026),
-  );
+  const rootValue = 0.2553 + grey * 0.066;
+  // **The crystals' own colour, at a fraction of their value.** The brief's §4
+  // asks for a root that is darker in the same hue, and the three constants
+  // this replaces — 0.245 / 0.238 / 0.283 — were a lavender grey with blue
+  // highest, chosen back when the seam only had to read as "not the slab".
+  // Measured across a real colony they put the root's red-to-blue ratio at
+  // 0.885 against the monarch's 1.267: darker, yes, but 43% bluer, which is a
+  // different colour rather than a deeper one.
+  //
+  // Deriving it from the shell means the root cannot drift again when the
+  // palette moves — which is exactly how those three constants came to disagree
+  // with it. Only the *value* is set here, and it is the value the constants
+  // produced, so the brightness relationship with the dais that the paragraph
+  // above measured survives untouched and the single thing that changes is hue.
+  const shell = bodyColor(materialPalette, 'focal', colonyTintOf(input));
+  const shellValue = (shell.r + shell.g + shell.b) / 3;
+  const baseColor = scaleRgb(shell, rootValue / Math.max(1e-6, shellValue));
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
     bodyId: CRYSTAL_SUBSTRATE_BODY_ID,
@@ -859,6 +935,13 @@ function buildSubstrateMaterial(
       // increments a crystal grew in, and this is the stone it grew *out of*.
       axialTintStrength: 0,
       footColor: baseColor,
+      // Nothing turns inside the ground. The flow is what marks the monarch out
+      // from everything else in the scene, and a lit substrate would be the
+      // loudest thing competing with her.
+      innerFlowStrength: 0,
+      innerFlowTurns: 0,
+      innerFlowColor: baseColor,
+      innerFlowSecondColor: baseColor,
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

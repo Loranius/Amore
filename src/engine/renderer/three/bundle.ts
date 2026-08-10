@@ -470,5 +470,14 @@ export function applyCrystalLifeFrame(
       | { value: number }
       | undefined;
     if (phase !== undefined) phase.value = frame.sparklePhase;
+
+    // The monarch's inner flow, on its own clock. Both phases freeze together
+    // under reduced motion, because both are zero in the sampled frame rather
+    // than being skipped here — the helix stays exactly where the couple's seed
+    // put it and simply stops turning.
+    const flowPhase = batch.material.userData['evolutionInnerFlowPhaseUniform'] as
+      | { value: number }
+      | undefined;
+    if (flowPhase !== undefined) flowPhase.value = frame.innerFlowPhase;
   }
 }

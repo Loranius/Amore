@@ -43,7 +43,19 @@ jobs:
         run: npm ci
 
       - name: Install isolated Playwright runner
-        run: npm install --no-save --no-package-lock @playwright/test@1.61.1
+        # `--no-package-lock` is what makes this step ignore the lock and
+        # re-resolve the whole application tree from `package.json`, and that is
+        # what broke it: `@react-three/postprocessing` is pinned as `^3.0.0`, the
+        # lock holds 3.0.4, and 3.0.5 shipped a peer requirement of
+        # `three >= 0.182.0` against this project's `three@^0.170.0`. The step
+        # installs Playwright and nothing else, so a third party tightening a
+        # peer range has no business failing it — `npm ci` above already
+        # installed the real tree from the lock, correctly.
+        #
+        # Reproduced against a bare copy of package.json: the command fails with
+        # ERESOLVE as written, and succeeds with this flag. The application's own
+        # dependency resolution is untouched, since only `npm ci` decides that.
+        run: npm install --no-save --no-package-lock --legacy-peer-deps @playwright/test@1.61.1
 
       - name: Install Chromium and system dependencies
         run: npx playwright install --with-deps chromium

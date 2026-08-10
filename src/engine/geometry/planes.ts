@@ -50,7 +50,7 @@ export type { CrystalFacePlane };
  * in or out without touching how far it turns, so the character survives the
  * tightening while every neighbour now genuinely faces somewhere else.
  */
-const AZIMUTH_JITTER = 0.24;
+const AZIMUTH_JITTER = 0.16;
 
 /**
  * How far a prism plane sits from the axis, as a fraction of the body radius.
@@ -60,7 +60,7 @@ const AZIMUTH_JITTER = 0.24;
  * deliberately wide — this is the main lever on "one or two broad faces, a few
  * markedly narrower".
  */
-const PRISM_OFFSET_MIN = 0.86;
+const PRISM_OFFSET_MIN = 0.94;
 const PRISM_OFFSET_MAX = 1.06;
 
 /**
@@ -103,7 +103,7 @@ const JUVENILE_OFFSET_MAX = 1.02;
 const JUVENILE_MINOR_RETREAT = 1.15;
 
 /** The dominant face is pushed further in than the seeded range alone allows. */
-const DOMINANT_INSET = 0.9;
+const DOMINANT_INSET = 0.94;
 
 /**
  * How much wider a prism face stands at its top than at the base, as a fraction
@@ -118,13 +118,34 @@ const DOMINANT_INSET = 0.9;
  * The range is per face, so no two verticals share a rhythm — the flare is
  * unequal, its direction is not.
  *
+ * **Raised from 0.05–0.2 for the gem silhouette.** A face is pinned at
+ * mid-height, so its reach at the base is `offset − flare/2` and at the shoulder
+ * `offset + flare/2`: the root-to-widest ratio is therefore
+ * `(1 − f/2)/(1 + f/2)`, which at 0.05–0.2 gives **82–95%** — a body with
+ * near-parallel sides. The brief asks for **62–75%**, which needs f between
+ * 0.286 and 0.47, so the band is set inside that with a little margin at each
+ * end. This is what makes the stone taper into its root instead of standing on
+ * a flat cut.
+ *
  * Expressed as a taper rather than as an angle on purpose: the tilt needed to
  * move a face by a tenth of the radius over a body ten radii tall is under a
  * degree, and thinking in degrees here invites a number that closes the crystal
  * into a cone before it reaches its shoulder.
  */
-const PRISM_FLARE_MIN = 0.05;
-const PRISM_FLARE_MAX = 0.2;
+const PRISM_FLARE_MIN = 0.3;
+const PRISM_FLARE_MAX = 0.46;
+
+/**
+ * The same taper on a crystal that grew fast: a fifth as strong.
+ *
+ * Same argument as the offset band above, and the same mineralogy: a juvenile's
+ * prism faces all advance together, so they come out near-parallel rather than
+ * tapering into a root. It is also what keeps a child at the brief's 2.5–3.2
+ * while the monarch sits at 1.9 — measured, the gem taper applied to a child
+ * pulled it to 1.7, which is a second monarch rather than a daughter.
+ */
+const JUVENILE_FLARE_MIN = 0.06;
+const JUVENILE_FLARE_MAX = 0.16;
 
 /**
  * The inclination of a termination face from horizontal, in degrees.
@@ -137,8 +158,14 @@ const PRISM_FLARE_MAX = 0.2;
  * point that sharpens with height is a spire, and spires are carved rather than
  * grown.
  *
- * This replaces a 42–54° band whose position was derived from each body's own
- * aspect. The derivation was dead code and measurement said so: across every
+ * **A band again, but a narrow and deliberate one.** The brief allows 40–58°;
+ * the crown's share of the height is `tan(θ) / (2 · aspect)`, so on a 1.92 gem
+ * the brief's own 26–34% crown pins θ to 44.9°–52.6°. The band below sits
+ * inside that intersection, centred on the lattice angle, so the termination
+ * varies between couples without ever leaving either requirement.
+ *
+ * The fixed value replaced a 42–54° band whose position was derived from each
+ * body's own aspect. The derivation was dead code and measurement said so: across every
  * body of three couples, 261 of 313 crown planes landed exactly on a bound of
  * the band, and for the monarch it was 7 of 7, every couple, every age — the
  * raw aspect angle ran 66–76° against a ceiling of 54. So the crystal already
@@ -148,7 +175,21 @@ const PRISM_FLARE_MAX = 0.2;
  * The variation the eye actually reads in a quartz termination is not angle. It
  * is `MINOR_RETREAT` below.
  */
-const CROWN_FACE_DEG = 51.78;
+const CROWN_FACE_MIN_DEG = 49;
+const CROWN_FACE_MAX_DEG = 56;
+
+/**
+ * This body's crown angle, seeded once inside the band.
+ *
+ * One draw for the whole crystal, because a termination is a *form*: every face
+ * of it carries the same pitch, and a per-face angle is what turns a crown into
+ * a dome. What differs between the faces is azimuth, apex drift, and how far
+ * each minor face has retreated.
+ */
+function crownFaceDeg(seed: number): number {
+  return CROWN_FACE_MIN_DEG
+    + seededUnit(seed, 'planes:crown-pitch') * (CROWN_FACE_MAX_DEG - CROWN_FACE_MIN_DEG);
+}
 
 /**
  * How far a minor termination plane has run toward closing, as a share of the
@@ -166,15 +207,27 @@ const CROWN_FACE_DEG = 51.78;
  * Before this, every crown plane passed through the same apex, so the tip was a
  * ring of near-equal triangles — the "designed roof" the review named.
  *
+ * **Pulled in for the gem crown.** A wide body's crown planes stand at much
+ * shallower azimuthal gaps relative to their own size, so the same *share* of
+ * closing takes more of the face: the sliver sweep found a minor facet at
+ * 0.011 of its neighbour's span against a floor of 0.03. Ceiling down to 0.34.
+ *
  * The band stops well short of 1. Area falls with the square of what is left,
  * so a face taken past about 0.7 stops being a smaller facet and becomes a
  * sliver, and a facet too small to read is §36's "tiny meaningless facet".
  */
-const MINOR_RETREAT_MIN = 0.18;
-const MINOR_RETREAT_MAX = 0.45;
+const MINOR_RETREAT_MIN = 0.16;
+const MINOR_RETREAT_MAX = 0.34;
 
-/** How far the tip sits off the axis, as a fraction of the radius. */
-const APEX_DRIFT = 0.3;
+/**
+ * How far the tip sits off the axis, as a fraction of the radius.
+ *
+ * The brief states it against the body's **full width**, 4–7%, which on a
+ * radius is 8–14%. Floored rather than seeded from zero: an apex exactly on the
+ * axis is the machined point every pass since Pass 2 has been removing.
+ */
+const APEX_DRIFT_MIN = 0.08;
+const APEX_DRIFT_MAX = 0.14;
 
 /**
  * How far a termination plane may cut past the apex, as a fraction of the
@@ -199,9 +252,15 @@ const BEVEL_INSET_MAX = 0.96;
  * part of the shaft that is supposed to be the widest, and the body's broadest
  * slice slides down to mid-shaft — which is a barrel, and the silhouette the
  * whole profile exists to avoid.
+ *
+ * **Lowered for the gem.** The crown now takes 23–30% of the height, so a pin
+ * at 0.78 lands *inside the termination* and the cut lives entirely in stone
+ * the crown planes have already removed — it emitted a plane that bounded
+ * nothing. Measured: the "a face that only exists in the upper shaft" sweep
+ * went from one per seed to none. The band now sits clear below the shoulder.
  */
-const SHOULDER_CUT_MIN = 0.55;
-const SHOULDER_CUT_MAX = 0.78;
+const SHOULDER_CUT_MIN = 0.50;
+const SHOULDER_CUT_MAX = 0.66;
 
 /**
  * How far a shoulder cut has pulled in by the time it reaches the shoulder, as
@@ -219,6 +278,14 @@ const SHOULDER_CUT_MAX = 0.78;
  * face from there up. Below the pin it is outside the body and contributes
  * nothing at all.
  *
+ * **Raised with the gem taper.** These numbers were sized against a flare of
+ * 0.05–0.2 of the radius; the gem silhouette flares 0.3–0.46, so over the top
+ * third of the shaft the host face now travels about 0.1 of a radius *outward*
+ * while the cut was pulling 0.02–0.055 inward. The cut never crossed its host,
+ * and `profile.test.ts`'s "a face that only exists in the upper shaft" went
+ * from finding one on every seed to finding none. Scaled by roughly the same
+ * factor as the flare, the break bites again.
+ *
  * The number is small on purpose. What makes the break read is not the
  * silhouette — two to five percent of the radius is about a pixel at portal
  * size — but the *shading*: the host leans out by 3–11° from vertical and the
@@ -227,8 +294,8 @@ const SHOULDER_CUT_MAX = 0.78;
  * a step: at 0.04–0.08 the body's widest slice slid from 0.66 of its height
  * down to 0.44, which is a crystal that necks before its point.
  */
-const SHOULDER_CONVERGE_MIN = 0.02;
-const SHOULDER_CONVERGE_MAX = 0.055;
+const SHOULDER_CONVERGE_MIN = 0.09;
+const SHOULDER_CONVERGE_MAX = 0.17;
 
 /** Sanity box, so a degenerate seed can never produce an unbounded solid. */
 const SAFETY_SPAN = 4;
@@ -416,9 +483,10 @@ export function buildCrystalFacePlanes(
     // A positive `ny` tips the plane so the face stands further out at the base
     // than at the top, so the flare enters negated: this crystal is narrower
     // where it leaves the quartz.
+    const flareLow = juvenile ? JUVENILE_FLARE_MIN : PRISM_FLARE_MIN;
+    const flareHigh = juvenile ? JUVENILE_FLARE_MAX : PRISM_FLARE_MAX;
     const flare = radius * (
-      PRISM_FLARE_MIN
-      + seededUnit(body.seed, `planes:flare:${index}`) * (PRISM_FLARE_MAX - PRISM_FLARE_MIN)
+      flareLow + seededUnit(body.seed, `planes:flare:${index}`) * (flareHigh - flareLow)
     );
     const ny = -flare / height;
     const midY = baseY + height * 0.5;
@@ -580,7 +648,10 @@ export function buildCrystalFacePlanes(
   // planes stand back as minor rhombohedral faces; and a couple of the major
   // ones cut short so the point is chiselled rather than turned.
   const apexAngle = seededUnit(body.seed, 'planes:apex-angle') * Math.PI * 2;
-  const apexDrift = radius * APEX_DRIFT * seededUnit(body.seed, 'planes:apex-drift');
+  const apexDrift = radius * (
+    APEX_DRIFT_MIN
+    + seededUnit(body.seed, 'planes:apex-drift') * (APEX_DRIFT_MAX - APEX_DRIFT_MIN)
+  );
   const apex = {
     x: Math.cos(apexAngle) * apexDrift,
     y: input.broken
@@ -595,7 +666,8 @@ export function buildCrystalFacePlanes(
   // Taking the face's own inclination for the normal is an inversion that
   // renders: it turned a termination meant to be a quarter of the body into one
   // four percent of it, and the crystal became a column with a nub.
-  const pitch = (90 - CROWN_FACE_DEG) * (Math.PI / 180);
+  const crownDeg = crownFaceDeg(body.seed);
+  const pitch = (90 - crownDeg) * (Math.PI / 180);
   const cosPitch = Math.cos(pitch);
   const sinPitch = Math.sin(pitch);
 
@@ -623,7 +695,7 @@ export function buildCrystalFacePlanes(
   // measured 94% of one face instead of the intended 45%, which is a sliver;
   // a global minimum fixed most of it and missed the shoulder cuts, because
   // those narrow the shaft *locally* and never became the body's minimum.
-  const nominalDrop = radius * Math.tan(CROWN_FACE_DEG * (Math.PI / 180));
+  const nominalDrop = radius * Math.tan(crownDeg * (Math.PI / 180));
   const shoulderY = apex.y - nominalDrop;
   const dropUnder = (azimuth: number): number => {
     const ux = Math.sin(azimuth);
@@ -635,7 +707,7 @@ export function buildCrystalFacePlanes(
       const distance = (face.d - face.ny * shoulderY) / denominator;
       if (distance > 0) reach = Math.min(reach, distance);
     }
-    return (Number.isFinite(reach) ? reach : radius) * Math.tan(CROWN_FACE_DEG * (Math.PI / 180));
+    return (Number.isFinite(reach) ? reach : radius) * Math.tan(crownDeg * (Math.PI / 180));
   };
 
   // Alternating, so at low LOD the four surviving planes still surround the

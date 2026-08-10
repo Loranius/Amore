@@ -4,7 +4,6 @@ import {
   CHILD_GROWTH_STEPS,
   CHILD_MIN_CLEARANCE,
   CHILD_MIN_UPWARD,
-  CHILD_MONARCH_SHARE,
   CHILD_RING_CAPACITY,
   CHILD_TILT_MAX_DEG,
   CHILD_TILT_MIN_DEG,
@@ -33,7 +32,7 @@ import {
   yearActivity,
   yearFill,
   yearTogetherness,
-  mediaSparkleCount,
+  mediaSparkReach,
   monarchAxialScale,
   monarchFacetCount,
   monarchRadialScale,
@@ -142,8 +141,13 @@ describe('monarch girth', () => {
     // Activity must never turn the spire into a block, nor a quiet couple's
     // crystal into a needle.
     // Tolerance covers the round6 quantisation of the published radius.
-    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(3.8 - 1e-4);
-    expect(axial / (2 * quiet)).toBeLessThanOrEqual(6.2 + 1e-4);
+    // ADR-0019: the band is the gem's, not the rod's. Nominal rather than
+    // measured — the finished silhouette comes out at about 0.84× this once the
+    // flare, the elliptical section and the burial are applied, and
+    // `gemSilhouette.test.ts` is what holds the shape a ruler would find.
+    // Doubled with the halving (2026-08-10, owner's instruction).
+    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(4.28 - 1e-4);
+    expect(axial / (2 * quiet)).toBeLessThanOrEqual(5 + 1e-3);
   });
 
   it('lands a typical couple near the silhouette the owner already accepted', () => {
@@ -153,8 +157,12 @@ describe('monarch girth', () => {
     // counting photos.
     const axial = monarchAxialScale(3.6 * YEAR);
     const aspect = axial / (2 * monarchRadialScale(axial, 47));
-    expect(aspect).toBeGreaterThan(4.2);
-    expect(aspect).toBeLessThan(5.4);
+    // A typical couple lands mid-band. Doubled on 2026-08-10 when the owner,
+    // looking at the rendered portal, asked for the monarch's diameter to be
+    // halved — `radius = axial / (2·aspect)`, so halving the one doubles the
+    // other. About 4.6 nominal now, and about 3.9 on the built mesh.
+    expect(aspect).toBeGreaterThan(4.3);
+    expect(aspect).toBeLessThan(4.9);
   });
 
   it('lets a longer relationship carry more girth at the same activity', () => {
@@ -267,12 +275,16 @@ describe('child growth steps', () => {
 });
 
 describe('child crystals', () => {
-  it('never exceeds half the monarch it stands beside', () => {
+  it('never exceeds the brief’s share of the monarch it stands beside', () => {
     const monarch = monarchAxialScale(4 * YEAR);
     const child = childDimensions(monarch, yearFill(1, 1));
     // Tolerance is one round6 step: every published number is quantised to
     // six decimals, so an exact-equality bound would fail on the rounding.
-    expect(child.axialScale).toBeLessThanOrEqual(monarch * CHILD_MONARCH_SHARE + 1e-6);
+    // ADR-0019 replaced the flat half with the brief's 18–52% band, and the
+    // fill is mapped into it rather than clamped against it — so the ceiling
+    // the owner set ("half of the monarch, never more") is now 0.52 and the
+    // floor keeps a quiet year readable instead of letting it vanish.
+    expect(child.axialScale).toBeLessThanOrEqual(monarch * 0.52 + 1e-6);
     expect(child.axialScale).toBeLessThan(monarch);
     expect(child.radialScale * 2).toBeLessThan(monarch);
   });
@@ -573,26 +585,40 @@ describe('colour from fulfilled wishes', () => {
   });
 });
 
-describe('sparkles from media', () => {
-  it('always leaves some life around the artifact', () => {
-    expect(mediaSparkleCount(0, 42)).toBe(6);
+describe('lights inside the monarch, from media', () => {
+  it('returns a share rather than a count, so the caller owns the band', () => {
+    // The change of shape, stated. This used to return a count with a floor of
+    // six and a caller-supplied cap, which was right while it drove a cloud of
+    // dust whose size was its only variable. Now that the lights live inside a
+    // per-tier band (brief §9), a floored count folded into that band clipped
+    // the signal away at the bottom: twenty-five finished titles and none at
+    // all both landed on the band's floor.
+    expect(mediaSparkReach(0)).toBe(0);
+    expect(mediaSparkReach(10_000)).toBe(1);
   });
 
   it('grows with what the couple finished, with diminishing returns', () => {
-    expect(mediaSparkleCount(25, 128)).toBeLessThan(mediaSparkleCount(169, 128));
-    expect(mediaSparkleCount(169, 128)).toBeLessThan(mediaSparkleCount(400, 128));
+    expect(mediaSparkReach(25)).toBeLessThan(mediaSparkReach(100));
+    expect(mediaSparkReach(0)).toBeLessThan(mediaSparkReach(25));
 
     // Diminishing returns means the same *number* of extra titles buys less
-    // dust the more you already have — not that a larger multiple buys less,
-    // which is a different (and false) claim.
-    const earlyHundred = mediaSparkleCount(200, 128) - mediaSparkleCount(100, 128);
-    const lateHundred = mediaSparkleCount(600, 128) - mediaSparkleCount(500, 128);
-    expect(lateHundred).toBeLessThan(earlyHundred);
+    // light the more you already have — not that a larger multiple buys less,
+    // which is a different (and false) claim. Measured below saturation, since
+    // above it every increment buys nothing by design.
+    const earlyTwenty = mediaSparkReach(30) - mediaSparkReach(10);
+    const lateTwenty = mediaSparkReach(110) - mediaSparkReach(90);
+    expect(lateTwenty).toBeLessThan(earlyTwenty);
   });
 
-  it('respects the device cap it is given', () => {
-    expect(mediaSparkleCount(10_000, 18)).toBe(18);
-    expect(mediaSparkleCount(10_000, 0)).toBe(0);
+  it('never leaves the 0–1 range, whatever it is handed', () => {
+    expect(mediaSparkReach(Number.NaN)).toBe(0);
+    expect(mediaSparkReach(-5)).toBe(0);
+    // Infinity is nonsense input, not an enormous library, so it takes the same
+    // floor everything else unreadable takes — the convention the counted
+    // version already followed by returning its floor rather than its cap.
+    expect(mediaSparkReach(Number.POSITIVE_INFINITY)).toBe(0);
+    // A real, large library does saturate at the top.
+    expect(mediaSparkReach(10_000)).toBe(1);
   });
 });
 

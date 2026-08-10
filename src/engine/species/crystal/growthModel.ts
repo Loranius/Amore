@@ -98,12 +98,67 @@ export function veteranGirth(daysTogether: number): number {
 
 /**
  * Stoutest and slimmest silhouettes the monarch may take, as
- * height-to-width ratios. Below ~3.8:1 she reads as a block rather than a
- * spire; above ~6.2:1 as a needle. The shipped monarch the owner accepted
- * sat at about 4.6:1, which is where a typical couple lands here.
+ * height-to-full-width ratios.
+ *
+ * **A cut gem, not a quartz rod.** The owner's reference measures 2.3 by
+ * silhouette and the brief sets the target band at 1.80–2.10 with a typical
+ * 1.92, against the 3.8–6.2 that stood here. That is not a tuning step, it is a
+ * different body, and three other things fall into place with it rather than
+ * needing their own numbers:
+ *
+ * - the crown. Its drop is `radius · tan(crown angle)`, so at 1.92 the lattice's
+ *   own angle already spends **26–34%** of the height on the termination, which
+ *   is the band the brief asks for. On a 5:1 rod the same angle spends 13%,
+ *   which is the "small cap on a long prism" the reference is not;
+ * - where the body is widest. The shaft flares upward and the crown starts at
+ *   the shoulder, so the widest slice lands at `1 − crownShare` — **66–74%** of
+ *   the height, against the brief's 58–72%;
+ * - how much of the frame it fills. A wide artifact is width-bound on a phone,
+ *   which is why the camera had to start solving its frame at the artifact's
+ *   near side before this could land at all.
+ *
+ * Activity still moves the proportion inside the band, so a couple who put more
+ * in still gets a stouter stone.
+ *
+ * **The numbers here are nominal, not the silhouette.** Three things stand
+ * between this ratio and the one a ruler measures on the finished body: the
+ * prism flare widens the shoulder by `1 + f/2`, the monarch's cross-section is
+ * 6% wider in Z than round, and she is sunk a tenth of her length into the vein
+ * so the mesh is taller than the visible crystal. Measured across four couples
+ * and four ages, the finished aspect comes out at **0.84×** the number here —
+ * so the band is set at 2.14–2.50 to land the silhouette on the brief's
+ * 1.80–2.10. `__silhouette` measures the built mesh rather than trusting this.
  */
-const MONARCH_STOUTEST_ASPECT = 3.8;
-const MONARCH_SLIMMEST_ASPECT = 6.2;
+/**
+ * **Halved on the owner's instruction (2026-08-10), looking at the portal.**
+ *
+ * > «Кристал монарх занадто широкий, зменш його діаметр трохи, десь в половину»
+ *
+ * Doubling the aspect halves the diameter, since `radius = axial / (2·aspect)`.
+ * Measured on the built mesh, the finished silhouette moves from 1.89–2.16 to
+ * 3.78–4.32, so this **supersedes the brief's §2 band of 1.80–2.10** rather
+ * than sitting inside it. Recorded rather than reconciled: the owner is looking
+ * at the rendered crystal, and the band was a number written before there was
+ * one to look at.
+ *
+ * Two of the three things the paragraph below says fall out of the ratio move
+ * with it, and both are consequences rather than surprises:
+ *
+ * - the crown's drop is `radius · tan(crown angle)`, so halving the radius
+ *   halves the share of the height the termination spends — 26–34% becomes
+ *   13–17%, which is the "small cap on a long prism" the gem pass moved away
+ *   from. It is what a narrower body geometrically *is* at a fixed lattice
+ *   angle; changing the angle to hold the old share would make the crystal
+ *   stop obeying quartz;
+ * - the widest slice stays where it was as a share of the height, because the
+ *   flare and the shoulder are both fractions rather than distances.
+ *
+ * The root compensates separately: its own height is a multiple of the
+ * monarch's radius, so without a change there it would have halved too and
+ * dropped out of the brief's §4 band. See `VEIN_PROUD`.
+ */
+const MONARCH_STOUTEST_ASPECT = 4.28;
+const MONARCH_SLIMMEST_ASPECT = 5;
 
 /**
  * Deliberate acts beyond which more of them stop thickening the monarch.
@@ -595,23 +650,55 @@ export function yearFill(
  * the ring to the current monarch keeps every year legible and keeps the
  * owner's original rule literally true: half of the monarch, never more.
  */
+/**
+ * How tall a child may stand against the monarch, as a share of her height.
+ *
+ * The brief's band. The floor matters as much as the ceiling: a year with
+ * almost nothing in it still has to read as a crystal in the ring rather than
+ * as a chip, and `yearFill`'s own floor alone let one fall to 15%.
+ */
+const CHILD_HEIGHT_MIN_SHARE = 0.18;
+const CHILD_HEIGHT_MAX_SHARE = 0.52;
+
+/**
+ * A child's own height-to-width ratio, seeded inside the brief's 2.5–3.2.
+ *
+ * Seeded rather than fixed because the reference cluster's daughters are not
+ * one shape: measured on it, 2.1 to 3.7. A single divisor gave every child the
+ * same silhouette at a different size, which is the "scaled monarch" Pass 9
+ * removed from their habit and would have quietly reintroduced through their
+ * proportions.
+ *
+ * Nominal, like the monarch's band: the archetype's anisotropy widens a child
+ * by up to 1.18 and its own flare by another 1.05, so the finished silhouette
+ * comes out at about **0.75×** this. 3.4–4.3 lands the measured aspect on the
+ * brief's 2.5–3.2.
+ */
+const CHILD_ASPECT_MIN = 3.4;
+const CHILD_ASPECT_MAX = 4.3;
+
 export function childDimensions(
   monarchAxialNow: number,
   fill: number,
   colonySize = 1,
+  seed = 0,
 ): ChildDimensions {
-  const axialScale = round6(
-    monarchAxialNow * childMonarchShare(colonySize) * clamp01(fill),
-  );
-  // Children stay stouter than the monarch so she keeps the eye, and the
-  // divisor comes from the reference cluster rather than from taste. Measured
-  // on its six crystals — height against mean cross-section — the aspects are
-  // 2.1, 2.8, 2.8, 2.9, 3.2 and 3.7, mean 3.0. At `/ 8.5` a child stood at 4.25,
-  // slimmer than every crystal in the reference and slimmer than a quartz
-  // sibling has any reason to be; `/ 6` puts it at 3.0, on the reference's own
-  // mean. A blunter child also reads as a skirt rather than as a spike, which
-  // is what the owner asked the ring to become.
-  return { axialScale, radialScale: round6(axialScale / 6) };
+  // The fill is mapped **into** the band rather than clamped against it. A
+  // clamp looked equivalent and was not: a quiet year sat exactly on the floor,
+  // so adding content to it moved nothing at all — the growth engine's own
+  // "a later event still grows the year in progress" test caught it, comparing
+  // 0.080642 with 0.080642. Mapping keeps every year responsive across the
+  // whole range while still landing inside the brief's 18–52%.
+  const t = clamp01(childMonarchShare(colonySize) * clamp01(fill) / CHILD_MONARCH_SHARE);
+  const axialScale = round6(monarchAxialNow * (
+    CHILD_HEIGHT_MIN_SHARE + (CHILD_HEIGHT_MAX_SHARE - CHILD_HEIGHT_MIN_SHARE) * t
+  ));
+  // Slimmer than the monarch, and by a wide margin now that she is a gem: she
+  // sits near 1.9 and they sit near 2.9, so she reads as the one body the ring
+  // is arranged around rather than as the largest of seven similar ones.
+  const aspect = CHILD_ASPECT_MIN
+    + seededUnit(seed, 'child:aspect') * (CHILD_ASPECT_MAX - CHILD_ASPECT_MIN);
+  return { axialScale, radialScale: round6(axialScale / (2 * aspect)) };
 }
 
 /**
@@ -745,8 +832,8 @@ export function skirtDistance(input: {
  * derived from the maximum rather than hand-set, so `ensureUpward` follows the
  * band instead of quietly standing the steepest children back up.
  */
-export const CHILD_TILT_MIN_DEG = 7;
-export const CHILD_TILT_MAX_DEG = 26;
+export const CHILD_TILT_MIN_DEG = 5;
+export const CHILD_TILT_MAX_DEG = 16;
 
 /** The same angles as the engine states them: above the platform plane. */
 function tiltAbovePlatform(offMonarchDegrees: number): number {
@@ -969,19 +1056,31 @@ export function wishTint(tally: WishGiftTally): CrystalTint {
   };
 }
 
-// ── Sparkles from media ─────────────────────────────────────
-
-/** Floor so the artifact always has a little life around it. */
-const SPARKLE_FLOOR = 6;
+// ── Lights inside the monarch, from media ───────────────────
 
 /**
- * Crystal dust around the artifact, from films, series and books the
- * couple finished. Square root, because the difference between 20 and 40
- * watched should be visible while the difference between 400 and 800 is
- * not worth another twenty particles.
+ * How many finished films, series and books saturate the couple's share.
+ *
+ * Square root all the way, because the difference between twenty watched and
+ * forty should be visible while the difference between four hundred and eight
+ * hundred is not worth another light.
  */
-export function mediaSparkleCount(finishedCount: number, cap: number): number {
+const MEDIA_SPARK_FULL = 120;
+
+/**
+ * The couple's media history as a 0–1 share, for whoever is placing lights.
+ *
+ * A **share, not a count**, and that is a correction. This returned a count
+ * with a floor of six and a caller-supplied cap, which was right while it drove
+ * a cloud of dust whose size was its only variable. The lights now live inside
+ * the monarch inside a band per quality tier (brief §9), and folding a floored
+ * count into a band clipped the signal away at the bottom: a couple with
+ * twenty-five finished titles and a couple with none both came out at the
+ * band's floor of twenty-four, so adding a whole shelf of books moved nothing.
+ * Returning the share lets the caller map it across its own band instead, and
+ * every part of the range does something.
+ */
+export function mediaSparkReach(finishedCount: number): number {
   const finished = Number.isFinite(finishedCount) ? Math.max(0, finishedCount) : 0;
-  const requested = SPARKLE_FLOOR + Math.round(Math.sqrt(finished) * 2.4);
-  return Math.max(0, Math.min(Math.max(0, cap), requested));
+  return round6(clamp01(Math.sqrt(finished) / Math.sqrt(MEDIA_SPARK_FULL)));
 }

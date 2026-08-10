@@ -106,9 +106,21 @@ const TROUGH_FALL = 0.75;
  *
  * At this height the wall is a hairline and what carries the seam is the
  * colour of its top face against the stone, which is what a mineral seam
- * actually is. Under one percent of the monarch's height.
+ * actually is.
+ *
+ * **A share of the monarch's height, not of her radius.** It was
+ * `nodeRadius × 0.14`, and the comment above it claimed "under one percent of
+ * the monarch's height" — wrong by roughly six times; measured, it produced
+ * 4.3–7.3%, which happened to be the brief's §4 band of 4–8%. Happened to be:
+ * the node radius is 1.6 monarch radii, so the root's height was a function of
+ * how *thick* she was. When the owner halved her diameter (2026-08-10) the root
+ * halved with her and fell to 2.1–6.8%, out of the band from below.
+ *
+ * §4 states the requirement against her height, so that is what this is now
+ * measured against, and the coupling to her girth is gone. Mid-band, so
+ * neither end of the couple's range can leave it.
  */
-const VEIN_PROUD = 0.14;
+const VEIN_PROUD_OF_MONARCH_HEIGHT = 0.055;
 
 /**
  * Air between a crystal's base and the edge of the quartz around it.
@@ -508,7 +520,12 @@ export function buildCrystalSubstrateMesh(
 
   // Barely proud of the stone: the brief asks for a seam lying practically
   // flush with the platform, not an inlay set on top of it.
-  const height = round6(nodeRadius * VEIN_PROUD);
+  //
+  // The monarch's own length is the root's ruler. She is the first body — the
+  // colony's root in the growth sense — so this needs nothing the builder does
+  // not already hold.
+  const monarchLength = Math.max(1e-6, bodies[0]!.renderedLength);
+  const height = round6(monarchLength * VEIN_PROUD_OF_MONARCH_HEIGHT);
   // Depth is not cosmetic. Every crystal keeps its base cap and sinks it below
   // y=0; if the vein stops short of the deepest of them, that cap is exposed
   // from below and ADR-0003's guarantee breaks.
@@ -662,7 +679,24 @@ export function buildCrystalSubstrateMesh(
     // boulder aimed there is a boulder that will be rejected; candidates spent
     // on ground that can never take one are candidates wasted, and the first
     // pass placed twenty-six to keep one.
-    const along = 0.42 + seededUnit(artifactSeed, `${label}:along`) * 0.74;
+    // How far out along a branch a stone lies, as a share of that branch's
+    // reach.
+    //
+    // Widened from 0.42–1.16 when the owner halved the monarch's diameter
+    // (2026-08-10). The old band was set while the crystals were stout and the
+    // binding constraint was the gap *between* them; measured after the halving,
+    // 97–100% of boulders were being trimmed against a crystal and the largest
+    // survivors sat in the trough, so nothing stood above the seam's lip at
+    // three colony sizes out of five — and the reference is unambiguous that a
+    // cluster erupts from broken rock rather than standing on a step.
+    //
+    // The room did not disappear, it moved outward. Swept by measuring the
+    // shortest clearance over the lip across five colony sizes:
+    //
+    //   0.42 + 1.16    nothing above the lip at 4, 7 and 14 years
+    //   0.42 + 1.47    0.0025 — positive, but by a hair
+    //   0.55 + 1.60    0.0177 with at least 384 boulder triangles everywhere
+    const along = 0.55 + seededUnit(artifactSeed, `${label}:along`) * 1.05;
     const x = Math.sin(angle) * reach * along;
     const z = Math.cos(angle) * reach * along;
     let size = nodeRadius * (

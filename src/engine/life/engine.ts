@@ -1,10 +1,11 @@
 import { CRYSTAL_SUBSTRATE_BODY_ID } from '../geometry/substrate';
-import { mediaSparkleCount } from '../species/crystal/growthModel';
+import { mediaSparkReach } from '../species/crystal/growthModel';
 import { stableHash32 } from '../evolution';
 import type { CrystalMaterialQuality } from '../material';
 import type {
   BuildCrystalLifeInput,
   CrystalBodyLife,
+  CrystalInnerSpark,
   CrystalLifeFrame,
   CrystalLifeState,
   SampleCrystalLifeInput,
@@ -29,11 +30,47 @@ function qualityMotionScale(quality: CrystalMaterialQuality): number {
   return 0;
 }
 
-function qualitySparkleCap(quality: CrystalMaterialQuality): number {
-  if (quality === 'high') return 64;
-  if (quality === 'balanced') return 42;
-  if (quality === 'low') return 18;
-  return 0;
+/**
+ * How many lights may hang inside the monarch, by quality tier.
+ *
+ * The crystal brief's §9 bands. Nothing on the two weakest tiers, and that is
+ * a decision rather than a saving: a scatter of additive points over a crystal
+ * drawn small on a weak phone reads as noise on the screen, not as light caught
+ * in a stone. Better absent than misread.
+ */
+function innerSparkBand(quality: CrystalMaterialQuality): { min: number; max: number } {
+  if (quality === 'high') return { min: 24, max: 48 };
+  if (quality === 'balanced') return { min: 8, max: 16 };
+  return { min: 0, max: 0 };
+}
+
+/**
+ * The monarch's silhouette, as the largest radius a spark may sit at.
+ *
+ * A spark is an inclusion, so it has to be *inside* the stone: the cloud is
+ * drawn additively over the shell (an opaque body cannot be seen through), and
+ * a point that strays outside the silhouette stops reading as something caught
+ * in the crystal and starts reading as dust in front of it.
+ *
+ * The body narrows both ways from its widest slice — the gem pass put that at
+ * 58–72% of the height with a root 62–75% of the maximum — so a constant radius
+ * would put every high spark outside the crown. This is the inscribed cone
+ * pair: rising from the root share to 1 at the widest slice, then falling to
+ * nothing at the tip.
+ */
+const SPARK_ROOT_SHARE = 0.62;
+const SPARK_WIDEST_AT = 0.65;
+/** Margin inside that silhouette, so a spark never lands on a facet. */
+const SPARK_INSET = 0.66;
+/** The band sparks occupy, matching the inner flow's envelope. */
+const SPARK_LOW = 0.1;
+const SPARK_HIGH = 0.88;
+
+function sparkEnvelope(height: number): number {
+  const rising = SPARK_ROOT_SHARE
+    + (1 - SPARK_ROOT_SHARE) * Math.min(1, height / SPARK_WIDEST_AT);
+  const falling = (1 - height) / Math.max(1e-6, 1 - SPARK_WIDEST_AT);
+  return Math.max(0, Math.min(rising, falling));
 }
 
 function validateInput(input: BuildCrystalLifeInput): void {
@@ -79,17 +116,66 @@ function bodyLife(input: BuildCrystalLifeInput, bodyId: string): CrystalBodyLife
   };
 }
 
+/**
+ * The lights inside the monarch: how many, and where each one sits.
+ *
+ * Seeded throughout, so a couple's crystal carries the same inclusions every
+ * time it is drawn. Under reduced motion the sparks stay exactly where they are
+ * and stop twinkling — the same treatment the inner flow gets, and for the same
+ * reason: stillness was asked for, not emptiness.
+ */
+function innerSparks(input: BuildCrystalLifeInput): CrystalInnerSpark[] {
+  const band = innerSparkBand(input.config.quality);
+  if (band.max === 0) return [];
+  // The media curve decides where in the band a couple lands, so ADR-0004's
+  // "the dust counts what they watched and read" survives the move inside the
+  // crystal instead of being quietly dropped with the cloud that carried it.
+  // The band's floor still holds: a couple who has finished nothing gets a
+  // monarch with lights in her, just fewer of them.
+  //
+  // Mapped *across* the band rather than clamped against its floor. Clamping
+  // was the first version and it clipped the signal away at the bottom — a
+  // couple with twenty-five finished titles and a couple with none both landed
+  // on twenty-four, so a whole shelf of books moved nothing. The same failure,
+  // in the same shape, as clamping a quiet year's fill into a height band.
+  const reach = mediaSparkReach(input.config.mediaFinishedCount);
+  const count = Math.min(
+    input.config.maxSparkles,
+    band.min + Math.round((band.max - band.min) * reach),
+  );
+  const seed = input.species.artifactSeed;
+  const moving = !input.config.reducedMotion;
+
+  const sparks: CrystalInnerSpark[] = [];
+  for (let index = 0; index < count; index += 1) {
+    const height = SPARK_LOW
+      + seededUnit(seed, `spark:${index}:y`) * (SPARK_HIGH - SPARK_LOW);
+    // Square root of the draw, so the points spread evenly over the *area* of
+    // each slice. Taking the draw raw crowds them onto the axis, which reads as
+    // a lit rod down the middle of the crystal rather than as scattered
+    // inclusions.
+    const radius = Math.sqrt(seededUnit(seed, `spark:${index}:r`))
+      * SPARK_INSET
+      * sparkEnvelope(height);
+    const angle = seededUnit(seed, `spark:${index}:angle`) * Math.PI * 2;
+    sparks.push({
+      x: round6(Math.cos(angle) * radius),
+      y: round6(height),
+      z: round6(Math.sin(angle) * radius),
+      phaseRad: round6(seededUnit(seed, `spark:${index}:phase`) * Math.PI * 2),
+      speed: round6(moving
+        ? 0.6 + seededUnit(seed, `spark:${index}:speed`) * 1.4
+        : 0),
+      size: round6(1.1 + seededUnit(seed, `spark:${index}:size`) * 1.5),
+    });
+  }
+  return sparks;
+}
+
 /** Pure deterministic Life Engine. It never changes topology or growth transforms. */
 export function buildCrystalLifeState(input: BuildCrystalLifeInput): CrystalLifeState {
   validateInput(input);
   const motion = input.config.reducedMotion ? 0 : qualityMotionScale(input.config.quality);
-  const sparkleCap = Math.min(input.config.maxSparkles, qualitySparkleCap(input.config.quality));
-  // Crystal dust now counts what the couple watched and read (ADR-0004)
-  // instead of how many bodies the druse happens to have — the body count
-  // stopped being a measure of anything once it followed the calendar.
-  const sparkleCount = input.config.reducedMotion
-    ? 0
-    : mediaSparkleCount(input.config.mediaFinishedCount, sparkleCap);
 
   return {
     lifeStateVersion: 1,
@@ -104,8 +190,13 @@ export function buildCrystalLifeState(input: BuildCrystalLifeInput): CrystalLife
     quality: input.config.quality,
     breatheAmplitude: round6(0.0065 * motion),
     breatheSpeed: round6(0.32 * motion),
-    sparkleCount,
+    innerSparks: innerSparks(input),
     sparkleSpeed: round6(0.18 * motion),
+    // Mid-band of the 0.018–0.025 turns/sec the crystal brief allows the inner
+    // flow. A tenth of the sparkle's rate, which is the point: one turn takes
+    // about fifty seconds, so a couple looking at the portal sees the light
+    // move without ever catching it in the act.
+    innerFlowSpeed: round6(0.021 * motion),
     interactionPulseDuration: input.config.reducedMotion ? 0.28 : 0.46,
     bodies: input.material.bodies.map((body) => bodyLife(input, body.bodyId)),
   };
@@ -128,6 +219,7 @@ export function sampleCrystalLife(input: SampleCrystalLifeInput): CrystalLifeFra
       ? Math.sin(elapsed * life.breatheSpeed) * life.breatheAmplitude + pulse * 0.006
       : 0)),
     sparklePhase: round6(moving ? (elapsed * life.sparkleSpeed) % 1 : 0),
+    innerFlowPhase: round6(moving ? (elapsed * life.innerFlowSpeed) % 1 : 0),
     bodyGlowMultiplier,
   };
 }

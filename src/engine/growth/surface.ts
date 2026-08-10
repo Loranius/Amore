@@ -167,6 +167,48 @@ function groundHost(root: GrowthBody): GrowthBody {
 export const GROUND_LEAN_SCALE = 0.7;
 
 /**
+ * How deep a ground-standing body sits in the substrate, as a share of its own
+ * length.
+ *
+ * **Of its length, not of its girth**, and that is the whole of this function.
+ * It was `radialScale * 0.9` — a fixed multiple of the body's *radius* — so how
+ * far a crystal sank depended on how fat it was rather than on how tall, and
+ * the same rule buried a slender body and a stout one by wildly different
+ * fractions of themselves. Measured across five colony sizes, from one year to
+ * twenty-five:
+ *
+ *   year crystals   aspect 3.4–4.3   buried 10.5–13.2% of their length
+ *   skirt bodies    aspect ≈ 1.67    buried 26.9%
+ *
+ * A quarter of a body below the surface is not a crystal growing out of a root,
+ * it is a stub set into one — and the 26.9% is identical at every colony size,
+ * which is the signature of a constant that never knew what it was measuring.
+ *
+ * The band is 8–14%, and where in it a body lands is its stoutness: a wide body
+ * displaces more before the ground holds it, so it settles deeper. That keeps
+ * the original intuition — girth does matter — while making it choose a point
+ * inside a bounded band instead of setting the depth outright.
+ */
+const GROUND_BURIAL_MIN_SHARE = 0.08;
+const GROUND_BURIAL_MAX_SHARE = 0.14;
+/** Aspect ratios the band is stretched between: a spire, and a squat block. */
+const GROUND_BURIAL_SLIM_ASPECT = 4.3;
+const GROUND_BURIAL_STOUT_ASPECT = 1.6;
+
+function groundBurialShare(instruction: UniversalGrowthInstruction): number {
+  const radius = Math.max(1e-6, instruction.radialScale);
+  const aspect = Math.max(1e-6, instruction.axialScale) / (radius * 2);
+  const stoutness = clamp(
+    (GROUND_BURIAL_SLIM_ASPECT - aspect)
+    / (GROUND_BURIAL_SLIM_ASPECT - GROUND_BURIAL_STOUT_ASPECT),
+    0,
+    1,
+  );
+  return GROUND_BURIAL_MIN_SHARE
+    + (GROUND_BURIAL_MAX_SHARE - GROUND_BURIAL_MIN_SHARE) * stoutness;
+}
+
+/**
  * Places a body in the substrate around the monarch instead of on her shaft.
  *
  * Companion crystals used to attach to the monarch's own surface, which read
@@ -229,7 +271,7 @@ export function sampleGroundSite(
     instruction.minUpwardComponent,
   );
 
-  const burialDepth = round6(instruction.radialScale * 0.9);
+  const burialDepth = round6(instruction.axialScale * groundBurialShare(instruction));
   const anchor = add(surfacePoint, scale(direction, -burialDepth));
 
   return {

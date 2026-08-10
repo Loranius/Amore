@@ -25,24 +25,22 @@ import type { CrystalFacetTinting, CrystalRgb } from './types';
  * Four tones: the body's own, a cooler darker one, a lighter lavender, and a
  * rare warm catch.
  *
- * Widened from ±8–12% after studying three stylized gem assets the owner
- * supplied. Their neighbouring facets run from deep maroon to bright pink —
- * a difference far past anything lighting produces, painted into the albedo on
- * purpose. The old range was written as a guard against the crystal "reading as
- * a mosaic", and the guard was sound; but it was set when the tints were also
- * landing on the wrong triangles, so the range was doing the work of a bug fix.
- * With tone keyed on the actual face (`CrystalMeshData.faceIds`) a wider range
- * separates planes instead of speckling them.
+ * **Value only. Not one of them moves the hue.** The set this replaces pulled
+ * one tone toward blue (`0.70 / 0.75 / 0.90`), one toward violet and one toward
+ * warm pink — so two neighbouring faces of the same crystal were different
+ * *colours*, which is what the brief forbids outright. The permitted difference
+ * between faces is brightness of the one colour, and these are the brief's own
+ * four steps: 0.73 dark, 1.0 neutral, 1.18 light, 1.30 for the rare catch.
  *
- * Still multipliers over the body's base colour, so the couple's earned tint
- * (ADR-0004) decides what the crystal *is*; these decide only which of its
- * planes caught more of it.
+ * Multipliers over the body's base colour, so the couple's earned tint
+ * (ADR-0004) still decides what the crystal *is*; these decide only which of
+ * its planes caught more of it.
  */
 const CRYSTAL_FACET_TINTS: readonly CrystalRgb[] = [
   { r: 1, g: 1, b: 1 },
-  { r: 0.7, g: 0.75, b: 0.9 },
-  { r: 1.24, g: 1.16, b: 1.3 },
-  { r: 1.34, g: 1.02, b: 1.12 },
+  { r: 0.73, g: 0.73, b: 0.73 },
+  { r: 1.18, g: 1.18, b: 1.18 },
+  { r: 1.3, g: 1.3, b: 1.3 },
 ];
 
 /**

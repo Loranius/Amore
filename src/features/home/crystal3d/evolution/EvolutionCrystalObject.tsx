@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { Sparkles } from '@react-three/drei';
 import type { CrystalGeometryState } from '@/engine/geometry';
 import type { CrystalLifeState } from '@/engine/life';
 import { sampleCrystalLife } from '@/engine/life';
 import type { CrystalMaterialState } from '@/engine/material';
 import {
   applyCrystalLifeFrame,
+  createThreeCrystalInnerSparks,
   createThreeCrystalRenderBundle,
 } from '@/engine/renderer/three';
 import { isCrystalTap, type CrystalPointerSample } from './tapGesture';
@@ -29,7 +29,19 @@ export function EvolutionCrystalObject({ geometry, material, life }: EvolutionCr
     [geometry, material],
   );
 
+  // The lights inside the monarch (brief §9). Built beside the bundle rather
+  // than inside it because they depend on the life state, which changes on its
+  // own — quality tier, reduced motion — and rebuilding every batch to move a
+  // point cloud would throw away the geometry upload with it.
+  const sparks = useMemo(
+    () => createThreeCrystalInnerSparks(bundle, geometry, life),
+    [bundle, geometry, life],
+  );
+
   useEffect(() => () => bundle.dispose(), [bundle]);
+  // The factory parents the cloud itself, next to the crystal batches and
+  // under the same fit transform, so there is no placement here to get wrong.
+  useEffect(() => () => sparks?.dispose(), [sparks]);
 
   useFrame((state) => {
     const now = performance.now();
@@ -41,6 +53,12 @@ export function EvolutionCrystalObject({ geometry, material, life }: EvolutionCr
       elapsedSeconds: state.clock.elapsedTime,
       interactionPulse: pulse,
     }));
+    // Uniform only, per the brief's §8/§11: no allocation and no geometry
+    // rebuild in the frame loop. Each spark's own speed rides in an attribute,
+    // so one clock drives a cloud that never blinks in unison — and under
+    // reduced motion every speed is zero, which freezes the twinkle without
+    // this having to know anything about it.
+    if (sparks !== null) sparks.phaseUniform.value = state.clock.elapsedTime;
   });
 
   return (
@@ -71,16 +89,6 @@ export function EvolutionCrystalObject({ geometry, material, life }: EvolutionCr
         pulseUntil.current = performance.now() + life.interactionPulseDuration * 1000;
       }}
     >
-      {life.sparkleCount > 0 && (
-        <Sparkles
-          count={life.sparkleCount}
-          scale={3.2}
-          size={1.8}
-          speed={life.sparkleSpeed}
-          color="#ffe9f2"
-          position={[0, 0.2, 0]}
-        />
-      )}
     </primitive>
   );
 }

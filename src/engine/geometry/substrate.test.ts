@@ -613,7 +613,7 @@ describe('crystal substrate — quartz vein shape', () => {
     }
   });
 
-  it('tips every child outward, 7–26° off the monarch', () => {
+  it('tips every child outward, 5–16° off the monarch', () => {
     // The half of the lean that geometry cares about: a child leaning *inward*
     // would drive its tip through the monarch and its base out of the vein.
     // Checked on the built bodies rather than on `childRadialBias`, because
@@ -645,8 +645,10 @@ describe('crystal substrate — quartz vein shape', () => {
 
       const abovePlatform = (Math.asin(Math.max(-1, Math.min(1, body.direction.y))) * 180)
         / Math.PI;
-      expect(90 - abovePlatform, body.id).toBeGreaterThanOrEqual(6);
-      expect(90 - abovePlatform, body.id).toBeLessThanOrEqual(27);
+      // ADR-0019: the brief's band, tighter again than Pass 12's — a compact
+      // circlet around the gem rather than a fan.
+      expect(90 - abovePlatform, body.id).toBeGreaterThanOrEqual(4);
+      expect(90 - abovePlatform, body.id).toBeLessThanOrEqual(17);
     }
   });
 

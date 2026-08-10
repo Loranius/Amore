@@ -155,6 +155,37 @@ export interface CrystalShaderRecipe {
   axialTintStrength: number;
   /** What the foot is tinted toward — a multiplier over the outgoing colour. */
   footColor: CrystalRgb;
+  /**
+   * Pink energy turning inside the monarch.
+   *
+   * A real helix in the body's own normalised frame (`CrystalMeshData.bodyCoord`),
+   * not a screen effect and not a second mesh: the shell is opaque by contract
+   * (ADR-0007), so anything "inside" it has to be drawn by the shell's own
+   * fragments as light arriving from behind them. That is why the term is
+   * weighted by how squarely a face meets the eye — a facet at the silhouette
+   * has no stone behind it to carry the glow, and a facet turned toward the
+   * viewer has the whole body.
+   *
+   * **The monarch only, and that is a rule rather than a budget.** The colony
+   * reads as one mineral because every body shares the couple's colour; what
+   * makes the monarch the monarch is that she is the one with something moving
+   * in her. Lighting the daughters the same way would make seven equal lanterns
+   * out of a crystal and its brood.
+   */
+  innerFlowStrength: number;
+  /**
+   * How many turns the helix makes between the monarch's foot and her tip.
+   *
+   * Separate from the rate it drifts at (`CrystalLifeState.innerFlowSpeed`): one
+   * is the shape of the coil, the other is how fast it turns. Below about one
+   * turn the ribbon reads as a bent line rather than a spiral; far above it the
+   * turns land closer together than the body is wide and the whole thing goes
+   * back to being an even glow.
+   */
+  innerFlowTurns: number;
+  /** The two colours the flow drifts between — rose into amethyst, per §6. */
+  innerFlowColor: CrystalRgb;
+  innerFlowSecondColor: CrystalRgb;
 }
 
 export interface CrystalFacetTinting {
