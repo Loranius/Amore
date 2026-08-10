@@ -25,6 +25,7 @@ import { BottomNav } from './BottomNav';
 import { MoreMenu } from './MoreMenu';
 import { SettingsModal } from '@/features/settings/SettingsModal';
 import { useWishlistStorageCleanup } from '@/features/wishlist/useWishlistStorageCleanup';
+import { ArtifactWorld, ArtifactWorldProvider } from '@/features/world/ArtifactWorld';
 import { useRealtime } from '@/lib/realtime';
 
 export function Layout() {
@@ -52,24 +53,34 @@ export function Layout() {
   }, [moreOpen, settingsOpen]);
 
   return (
-    <div className="app-shell">
-      <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
+    // The world wraps the whole shell rather than sitting beside the content,
+    // because the bottom navigation and the "More" sheet belong to it too —
+    // they are drawn over the world, not outside it (ADR-0020).
+    <ArtifactWorldProvider>
+      <div className="app-shell">
+        {/* Mounted here, once per authenticated session. Every route change
+            below leaves it alone: the WebGL context, its warmed shaders and the
+            published artifact all survive, so Home → Shopping → Home is
+            movement inside one place rather than two page loads. */}
+        <ArtifactWorld />
+        <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
 
-      <main className="content" ref={contentRef}>
-        <div key={pathname} className="page-fade">
-          <Outlet />
-        </div>
-      </main>
+        <main className="content" ref={contentRef}>
+          <div key={pathname} className="page-fade">
+            <Outlet />
+          </div>
+        </main>
 
-      <BottomNav onOpenMore={() => setMoreOpen(true)} />
+        <BottomNav onOpenMore={() => setMoreOpen(true)} />
 
-      <MoreMenu
-        open={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
+        <MoreMenu
+          open={moreOpen}
+          onClose={() => setMoreOpen(false)}
+          onOpenSettings={() => setSettingsOpen(true)}
+        />
 
-      <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-    </div>
+        <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      </div>
+    </ArtifactWorldProvider>
   );
 }

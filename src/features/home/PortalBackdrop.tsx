@@ -13,23 +13,13 @@
 // вантажиться, і єдиний фон без WebGL) і віньєтка, яка в 3D була б
 // повноекранним постпроцесом.
 // ============================================================
-import { useEffect, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
 import { useTheme } from '@/providers/ThemeProvider';
 import { PORTAL_PALETTES } from './crystal3d/scene/portalScene';
 import './portalBackdrop.css';
 
 export function PortalBackdrop() {
   const { theme } = useTheme();
-  // The bottom navigation lives outside .home, so the token override on the
-  // section cannot reach it and it stayed a white pill on a night scene. A
-  // root-level marker is the smallest thing that lets page chrome follow the
-  // portal without every page growing a theme prop.
-  useEffect(() => {
-    const root = document.documentElement;
-    root.setAttribute('data-portal-scene', 'true');
-    return () => root.removeAttribute('data-portal-scene');
-  }, []);
-
   return (
     <>
       <div

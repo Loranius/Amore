@@ -94,13 +94,17 @@
    має перефарбовувати сцену — тоді досить перевизначити цей блок під
    data-species, не чіпаючи саму розкладку. Палітра 3D-частини живе в
    crystal3d/scene/portalScene.ts і тримається тих самих ролей. */
-.home {
+/* Оголошені на шарі світу, а не на головній. Поки вони жили на `.home`,
+   винесення фону зі сторінки (ADR-0020) залишало градієнт без жодного
+   зі своїх кольорів — тобто небо ставало білим, і крізь портал світив
+   `--bg`. Знайдено скріншотом, не читанням. */
+.artifact-world {
   --portal-sky-top: #221a33;
   --portal-sky-mid: #33254a;
   --portal-vignette: rgba(14, 9, 22, 0.62);
 }
 
-[data-theme='dark'] .home {
+[data-theme='dark'] .artifact-world {
   --portal-sky-top: #140f1f;
   --portal-sky-mid: #1e1630;
   --portal-vignette: rgba(6, 4, 11, 0.74);
@@ -112,11 +116,10 @@
   position: relative;
 }
 
-/* Текст над фоном. Без цього він ліг би в той самий контекст, що й шари,
-   і фон перекрив би заголовок. Обидва декоративні шари виведені з-під
-   правила: небо мусить лишитись під полотном, віньєтка — над ним, і
-   жодному з них не можна віддавати position: relative. */
-.home > *:not(.portal-backdrop):not(.portal-vignette) {
+/* Текст над фоном. Виняток для двох декоративних шарів більше не
+   потрібен — вони переїхали у шар світу разом із фоном, і дітьми
+   головної не є. */
+.home > * {
   position: relative;
   z-index: 1;
 }
@@ -168,44 +171,14 @@
   width: 100%;
 }
 
-.home:is([data-home-artifact='crystal'], [data-home-artifact='tree']) #home-artifact-preview {
-  /* Полотно мусить збігатися з небом і віньєткою до пікселя, тож
-     відраховується від того самого viewport'а. */
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  width: 100%;
-  margin: 0;
-}
+/* Кадр сцени переїхав у artifactWorld.css разом із самою сценою
+   (ADR-0020): він описує світ, а не головну, і поки залежав від
+   `.home ...`, виніс сцену з `.home` означало мовчки повернути її до
+   картки 320×320. */
 
-.home:is([data-home-artifact='crystal'], [data-home-artifact='tree']) .evolution-preview-wrap {
-  position: absolute;
-  inset: 0;
-  width: auto;
-  aspect-ratio: auto;
-  margin: 0;
-}
+/* Риф теж переїхав у світ. Він лишався карткою 3:4 у потоці сторінки,
+   поки жив у `.home`; з одним спільним шаром світу такої можливості
+   більше немає — і це радше правильно: артефакт один, шар один. Зміна
+   названа тут, бо вона видима, а не випливає з рефакторингу сама
+   собою. */
 
-/* Заглушка та повідомлення про відсутній WebGL займають той самий кадр,
-   але тримають свій вміст по центру екрана, а не притиснутим до верху. */
-.home:is([data-home-artifact='crystal'], [data-home-artifact='tree']) #home-artifact-preview > .crystal-wrap--loading,
-.home:is([data-home-artifact='crystal'], [data-home-artifact='tree']) #home-artifact-preview > .home-artifact-preview-fallback {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  width: auto;
-  aspect-ratio: auto;
-  margin: 0;
-}
-
-/* Риф ще живе в потоці сторінки — рамка сцени для нього лишається такою,
-   якою була до переносу кристала в 3D. Дерево з неї вийшло разом із
-   кристалом: у коробці 3:4 колонада різалась краєм рамки, і зала за
-   деревом читалась як картинка, вставлена в сторінку, а не як місце, де
-   дерево стоїть. */
-.home:not([data-home-artifact='crystal']):not([data-home-artifact='tree']) .crystal-wrap {
-  width: min(100vw, 460px);
-  aspect-ratio: 3 / 4;
-  margin-top: 4px;
-}

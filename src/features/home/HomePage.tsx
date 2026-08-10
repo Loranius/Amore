@@ -1,89 +1,36 @@
 // ============================================================
-// HomePage — головна: Hero + вибраний Evolution-об’єкт
+// HomePage — головна: Hero над артефактом, який їй більше не належить.
 // ------------------------------------------------------------
-// Кристал, Дерево і Риф показують accepted renderer pipelines.
-// Вибір живе в URL + localStorage, тому об’єкти можна порівнювати без
-// переходів між технічними query-preview сторінками.
+// Сцену звідси знято (ADR-0020). Вона монтується оболонкою й переживає
+// зміну маршруту, а головна лишається тим, чим і має бути: нейтральним
+// станом світу — місцем, куди пара повертається до центру.
+//
+// Тут лишились привітання, перемикач артефакта й заголовок. Перемикач
+// тепер керує світом, а не володіє ним: вибір живе в
+// `ArtifactWorldProvider`, інакше пара, яка обрала дерево, поверталася б
+// із покупок до кристала.
+//
+// Порожнього місця під артефакт тут теж немає: світ фіксований на всю
+// видиму область і лежить під сторінкою, тож привітання й перемикач
+// лягають на нього згори — рівно так, як було до переносу.
 // ============================================================
-import { lazy, Suspense, useCallback, useState } from 'react';
 import { Hero } from './Hero';
-import { CrystalPlaceholder } from './CrystalPlaceholder';
 import { HomeArtifactSwitcher } from './HomeArtifactSwitcher';
-import { HomeArtifactWebglFallback } from './HomeArtifactPreviewFallback';
-import {
-  HOME_ARTIFACT_LABELS,
-  HOME_ARTIFACT_STORAGE_KEY,
-  resolveHomeArtifact,
-  withHomeArtifactSearch,
-  type HomeArtifact,
-} from './homeArtifact';
-import { CrystalErrorBoundary } from './crystal3d/CrystalErrorBoundary';
-import { useWebglSupport } from './crystal3d/useWebglSupport';
-import { PortalBackdrop } from './PortalBackdrop';
-
-const CrystalScene = lazy(() => import('./crystal3d/CrystalSceneEntry'));
-const ReefScene = lazy(() => import('./reef3d/ReefPreviewScene'));
-
-function storedArtifact(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(HOME_ARTIFACT_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function persistArtifact(artifact: HomeArtifact): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(HOME_ARTIFACT_STORAGE_KEY, artifact);
-  } catch {
-    // Storage may be unavailable in private or hardened browser modes.
-  }
-}
+import { HOME_ARTIFACT_LABELS } from './homeArtifact';
+import { useArtifactWorld } from '../world/artifactWorldContext';
+import { useWorldVisibleRoute } from '../world/useWorldVisibleRoute';
 
 export function HomePage() {
-  const webglSupported = useWebglSupport();
-  const [artifact, setArtifact] = useState<HomeArtifact>(() => resolveHomeArtifact(
-    typeof window === 'undefined' ? '' : window.location.search,
-    storedArtifact(),
-  ));
-
-  const selectArtifact = useCallback((next: HomeArtifact) => {
-    persistArtifact(next);
-    if (typeof window !== 'undefined') {
-      const search = withHomeArtifactSearch(window.location.search, next);
-      window.history.replaceState(
-        window.history.state,
-        '',
-        `${window.location.pathname}${search}${window.location.hash}`,
-      );
-    }
-    setArtifact(next);
-  }, []);
-
-  // Never substitute another artifact silhouette for the selected 3D object.
-  // If WebGL is unavailable or the renderer fails, show a neutral explanation
-  // instead of the retired radial SVG crystal.
-  const rendererFallback = <HomeArtifactWebglFallback artifact={artifact} />;
+  const { artifact, selectArtifact } = useArtifactWorld();
+  // Home is the one route the world shows through today, so it is the one
+  // route whose chrome follows it. Phase 2 adds the rest.
+  useWorldVisibleRoute();
 
   return (
-    <section className="home" data-home-artifact={artifact}>
-      <PortalBackdrop />
+    <section className="home home--world" data-home-artifact={artifact}>
       <Hero />
       <HomeArtifactSwitcher value={artifact} onChange={selectArtifact} />
       <h1 className="home-title">{HOME_ARTIFACT_LABELS[artifact]} Amore</h1>
-      <div id="home-artifact-preview" className="home-artifact-preview">
-        {webglSupported ? (
-          <CrystalErrorBoundary key={artifact} fallback={rendererFallback}>
-            <Suspense fallback={<CrystalPlaceholder />}>
-              {artifact === 'reef'
-                ? <ReefScene />
-                : <CrystalScene key={artifact} artifact={artifact} />}
-            </Suspense>
-          </CrystalErrorBoundary>
-        ) : rendererFallback}
-      </div>
     </section>
   );
 }
