@@ -15,6 +15,9 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
   test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
 
   test('switches between the accepted Crystal, Tree and Reef renderers', async ({ page }) => {
+    // Три тривимірні конвеєри поспіль — кристал, дерево, риф — в одному
+    // тесті. Спільний бюджет має лишатись про звичайний екран.
+    test.slow();
     await login(page, '?artifact=crystal#/login');
 
     const home = page.locator('.home');
@@ -31,9 +34,15 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await page.getByRole('tab', { name: 'Дерево', exact: true }).click();
     await expect(home).toHaveAttribute('data-home-artifact', 'tree');
     await expect(page.getByRole('heading', { name: 'Дерево Amore' })).toBeVisible();
-    const tree = page.locator('[data-tree-lab-preview="ready"]');
+    // Дерево на головній — не лабораторія.
+    //
+    // Тут стояв маркер лабораторії (`data-tree-lab-preview`), і саме тому цей
+    // тест падав: дерево давно винесене з тієї рамки, а лабораторія лишилась
+    // за прапорцем `engine=tree-lab` (див. `CrystalSceneEntry`). Пара на
+    // головній бачить `EvolutionTreePreviewScene`, який публікує спільний
+    // маркер сцени з видом «tree» — саме його тут і треба чекати.
+    const tree = page.locator('[data-evolution-preview="ready"][data-evolution-species="tree"]');
     await expect(tree).toBeVisible({ timeout: 25_000 });
-    await expect(tree).toHaveAttribute('data-tree-lab-source', /portal|fixture-fallback/);
     await page.screenshot({
       path: 'test-results/home-artifact-tree-pixel-8-pro.png',
       fullPage: true,

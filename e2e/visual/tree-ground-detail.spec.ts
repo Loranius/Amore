@@ -1,4 +1,34 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Locator } from '@playwright/test';
+import { DEFAULT_TREE_GROUND_DETAIL_CONFIG } from '../../src/engine/groundDetail/config';
+
+/**
+ * Приймальний статус разом із причиною в одному повідомленні.
+ *
+ * Окрема перевірка «немає порушень» перед «статус pass» виглядала слушно й
+ * була ненадійною: поки конвеєр прогрівається, статус — «warming», а список
+ * порушень порожній, тож перевірка проходила саме в ту мить і причину все
+ * одно ховала. Тут статус і причина читаються разом і разом же чекають:
+ * «очікували pass, дістали fail build-ms» — це вже готова відповідь, а не
+ * привід іти в логи збірки.
+ */
+async function expectTreeAcceptancePass(preview: Locator, timeout = 20_000) {
+  await expect(async () => {
+    const status = await preview.getAttribute('data-tree-lab-acceptance');
+    const violations = await preview.getAttribute('data-tree-lab-violations');
+    expect(`${status ?? '—'} ${violations ?? ''}`.trim()).toBe('pass');
+  }).toPass({ timeout });
+}
+
+
+// Очікувані числа беруться з опублікованої конфігурації, а не пишуться тут.
+//
+// Тут стояли 72 і 24×3. Кількість дрібниць свідомо зменшили втричі («читались
+// як посипка на печиві»), модульний тест оновили, а цей — ні: він падав шість
+// днів і не повідомляв нікому нічого. Похідне число ламається лише тоді, коли
+// ламається сам інваріант — що видів рівно три, що вони порівну і що всі
+// намальовані одним викликом.
+const PER_KIND = DEFAULT_TREE_GROUND_DETAIL_CONFIG.maximumInstancesByKindByLod.medium;
+const EXPECTED_INSTANCES = PER_KIND.stone + PER_KIND['fallen-leaf'] + PER_KIND.moss;
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
@@ -25,7 +55,7 @@ test.describe('Tree Ground Detail Pixel 8 Pro acceptance', () => {
 
     const preview = page.locator('[data-tree-lab-preview="ready"]');
     await expect(preview).toBeVisible({ timeout: 20_000 });
-    await expect(preview).toHaveAttribute('data-tree-lab-acceptance', 'pass', { timeout: 20_000 });
+    await expectTreeAcceptancePass(preview, 20_000);
     await expect(preview).toHaveAttribute('data-tree-lab-ground-detail', 'true');
     await expect(preview).toHaveAttribute('data-tree-lab-ground-detail-id', 'tree:ground-detail:field');
     await expect(preview).toHaveAttribute(
@@ -85,12 +115,15 @@ test.describe('Tree Ground Detail Pixel 8 Pro acceptance', () => {
       'totalDrawCalls',
     );
 
-    expect(instances).toBe(72);
-    expect(stones).toBe(24);
-    expect(leaves).toBe(24);
-    expect(moss).toBe(24);
+    expect(instances).toBe(EXPECTED_INSTANCES);
+    expect(stones).toBe(PER_KIND.stone);
+    expect(leaves).toBe(PER_KIND['fallen-leaf']);
+    expect(moss).toBe(PER_KIND.moss);
+    // Порівну по видах — не смак: нижчі LOD мусять бути префіксами вищих, а
+    // нерівні частки цю властивість ламають (див. `groundDetail/config.ts`).
+    expect(new Set([stones, leaves, moss]).size).toBe(1);
     expect(stones + leaves + moss).toBe(instances);
-    expect(budget).toBe(72);
+    expect(budget).toBe(EXPECTED_INSTANCES);
     expect(sharedTriangles).toBeGreaterThan(0);
     expect(renderedTriangles).toBe(sharedTriangles * instances);
     expect(detailDrawCalls).toBe(1);

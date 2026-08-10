@@ -62,59 +62,91 @@ test.describe('Amore mobile visual preview', () => {
       await priorityToggle.click();
     }
 
-    const grid = page.locator('.wishlist-grid');
-    await expect(grid).toBeVisible();
-    await grid.scrollIntoViewIfNeeded();
+    // ── Вішліст у світі: сфери ─────────────────────────────
+    //
+    // Тут стояла перевірка `.wishlist-grid` і бульбашкового вигляду з його
+    // псевдошарами. Обидва зникли з цього шляху: коли WebGL є, бажання
+    // показує власний шар сфер (ADR-0028), а бульбашки лишились запасним
+    // виглядом без WebGL — тобто в цьому середовищі недосяжним. Тест падав
+    // саме на `.wishlist-grid`, і це перше, що мав би сказати CI у день
+    // переходу; він мовчав, бо на push у main не запускався взагалі.
+    const sphereField = page.locator('.wl-sphere-field');
+    await expect(sphereField).toBeVisible();
 
-    const bubbleView = page.locator('.wl-bubble-view');
-    await expect(bubbleView).toBeVisible();
+    const spheres = sphereField.locator('.wl-sphere');
+    const sphereCount = await spheres.count();
+    expect(sphereCount).toBeGreaterThan(0);
 
-    const firstBubbleItem = bubbleView.locator('.wl-cloud-item').first();
-    if (await firstBubbleItem.count()) {
-      const pseudoLayers = await firstBubbleItem.evaluate((item) => {
-        const bubble = item.querySelector<HTMLElement>('.wl-cloud-bubble');
-        if (!bubble) throw new Error('Wishlist bubble was not found.');
-
-        const itemBefore = getComputedStyle(item, '::before');
-        const itemAfter = getComputedStyle(item, '::after');
-        const bubbleBefore = getComputedStyle(bubble, '::before');
-
-        return {
-          parentIsBubbleView: item.parentElement?.classList.contains('wl-bubble-view') ?? false,
-          itemBeforeDisplay: itemBefore.display,
-          itemAfterDisplay: itemAfter.display,
-          bubbleBeforeDisplay: bubbleBefore.display,
-          bubbleBeforeAnimation: bubbleBefore.animationName,
-        };
-      });
-
-      // Інваріант той самий, що й був: за бульбашкою не стоять
-      // декоративні шари туману. Стереже його `display: none` —
-      // псевдоелемент без боксу не малюється й не анімується взагалі,
-      // тож окремо перевіряти його animationName нема сенсу: це назва
-      // правила, яке однаково нікуди не застосовується. Ці дві
-      // перевірки прибрані як такі, що ловили не те.
-      //
-      // Змінилось по суті одне: `.wl-cloud-bubble::before` більше не
-      // туман, а САМА бульбашка. У перловому вигляді цей шар був
-      // овальною «мильною плівкою» позаду лінзи, і його вимикали. В
-      // об'ємному склі (wishlistBubbleGlass.css) він накриває весь диск
-      // і несе світлотінь та відблиски — без нього бульбашка перестає
-      // бути бульбашкою. Тому `display: block` тут тепер вимога, а не
-      // регресія. Його анімація лишається вимкненою: об'єм не крутиться.
-      expect(pseudoLayers).toEqual({
-        parentIsBubbleView: true,
-        itemBeforeDisplay: 'none',
-        itemAfterDisplay: 'none',
-        bubbleBeforeDisplay: 'block',
-        bubbleBeforeAnimation: 'none',
-      });
+    // §48: користуватись можна, не розуміючи тривимірної сцени. Сфера — це
+    // кнопка з назвою бажання, і саме назву читає програма читання екрана.
+    for (let index = 0; index < Math.min(sphereCount, 5); index += 1) {
+      await expect(spheres.nth(index)).toHaveAccessibleName(/\S/);
     }
 
-    await bubbleView.screenshot({
-      path: testInfo.outputPath('05-wishlist-bubbles.png'),
+    // І жодна не за краєм: сузір'я розкладається в пікселях поля, а поле —
+    // це екран телефона.
+    const outside = await sphereField.evaluate((field) => {
+      const box = field.getBoundingClientRect();
+      return Array.from(field.querySelectorAll('.wl-sphere')).filter((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.left < box.left - 1
+          || rect.right > box.right + 1
+          || rect.top < 0
+          || rect.bottom > window.innerHeight;
+      }).length;
+    });
+    expect(outside).toBe(0);
+
+    await page.screenshot({
+      path: testInfo.outputPath('05-wishlist-spheres.png'),
+      fullPage: true,
     });
 
+    // Дотик по сфері відкриває той самий аркуш деталей, що й раніше: змінилось
+    // подання, а не дані.
+    await spheres.first().click();
+    const sphereSheet = page.locator('.wl-cloud-sheet');
+    await expect(sphereSheet).toBeVisible();
+    await expect(sphereSheet.locator('.wl-cloud-sheet-title')).not.toBeEmpty();
+    await sphereSheet.screenshot({
+      path: testInfo.outputPath('05b-wishlist-sphere-details.png'),
+    });
+    await page.getByRole('button', { name: 'Закрити деталі мрії' }).click();
+    await expect(sphereSheet).toBeHidden();
+
+    // Вигляд перемикається в аркуші навігації — у світі панелі пріоритетів
+    // немає, і саме тому решта цього тесту раніше мовчки пропускалась.
+    const openWorldNav = async () => {
+      await page.locator('.wl-world-nav-toggle').click();
+      await expect(page.locator('.wl-world-sheet')).toBeVisible();
+    };
+    const chooseView = async (label: string) => {
+      await openWorldNav();
+      await page.locator('.wl-world-sheet').getByRole('button', { name: label, exact: true }).click();
+      await page.locator('.wl-world-scrim').click({ position: { x: 10, y: 10 } });
+      await expect(page.locator('.wl-world-sheet')).toBeHidden();
+    };
+
+    await chooseView('Список');
+    {
+      const feed = page.locator('.wl-feed-view');
+      await expect(feed).toBeVisible();
+      await feed.screenshot({ path: testInfo.outputPath('06-wishlist-feed.png') });
+    }
+
+    await chooseView('Полароїд');
+    {
+      const polaroids = page.locator('.wl-polaroid-view');
+      await expect(polaroids).toBeVisible();
+      await polaroids.screenshot({ path: testInfo.outputPath('08-wishlist-polaroids.png') });
+    }
+
+    await chooseView('Кристали');
+    await expect(sphereField).toBeVisible();
+
+    // Нижче — детальні перевірки карток списку й полароїдів. Вони тримаються
+    // за панель пріоритетів, тобто працюють на шляху без WebGL; у світі цей
+    // блок пропускається, як і пропускався досі.
     if (await priorityToggle.isVisible()) {
       await priorityToggle.click();
       const feedOption = page.locator('.wl-board-view-option[data-view="feed"]');

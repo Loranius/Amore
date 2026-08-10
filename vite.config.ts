@@ -55,6 +55,37 @@ export default defineConfig({
       },
     }),
   ],
+  // ── Локальний проксі до Supabase ────────────────────────────
+  // Порожня змінна — і тут нічого немає: у CI та в продакшені сторінка йде до
+  // Supabase напряму, як і йшла.
+  //
+  // Змінна потрібна там, де сторінка до мережі не дістає, а сам Node — дістає
+  // (пісочниця агента). Без неї весь браузерний набір падав локально на
+  // «waiting for button Діма»: логін просто не міг завантажити користувачів, і
+  // жодну справжню ваду з набору побачити було неможливо — лише в логах CI,
+  // по п'ятнадцять хвилин на спробу.
+  //
+  //   LOCAL_SUPABASE_PROXY=https://…supabase.co \
+  //   VITE_SUPABASE_URL=http://127.0.0.1:4173/__supabase npm run build
+  //
+  // Збірку з таким VITE_SUPABASE_URL не можна публікувати — адреса в ній
+  // локальна. Вона й не публікується: деплой збирається окремим кроком у CI зі
+  // справжніми змінними.
+  ...(process.env.LOCAL_SUPABASE_PROXY?.trim()
+    ? {
+        preview: {
+          proxy: {
+            '/__supabase': {
+              target: process.env.LOCAL_SUPABASE_PROXY.trim(),
+              changeOrigin: true,
+              ws: true,
+              rewrite: (path: string) => path.replace(/^\/__supabase/, ''),
+            },
+          },
+        },
+      }
+    : {}),
+
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

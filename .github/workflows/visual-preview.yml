@@ -1,6 +1,25 @@
 name: Visual Preview
 
 on:
+  # Раніше набір ішов лише на pull request. Робота ж давно йде прямими
+  # пушами в main — і перевірка просто не запускалась: останній її прогін
+  # був за півдня до того, як це помітили, а до того вона була червоною
+  # шість днів поспіль і нікому нічого не казала.
+  push:
+    branches:
+      - main
+    # Ті самі шляхи, що й для pull request: п'ятнадцятихвилинний набір не має
+    # запускатись на зміну документа чи скрипта.
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'e2e/**'
+      - 'index.html'
+      - 'vite.config.ts'
+      - 'playwright.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/visual-preview.yml'
   pull_request:
     branches:
       - main
@@ -75,8 +94,13 @@ jobs:
           VISUAL_USER_NAME: ${{ secrets.VISUAL_USER_NAME }}
           VISUAL_USER_PIN: ${{ secrets.VISUAL_USER_PIN }}
 
+      # Знімки — за потреби, а не завжди.
+      #
+      # Кожен прогін клав у сховище 306 МБ відео й трас навіть тоді, коли все
+      # зелене. Дивляться на них рівно тоді, коли щось упало; успішний прогін
+      # лишає по собі рядок «зелено» і нічого більше.
       - name: Upload screenshots, traces and report
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: amore-mobile-visual-preview-${{ github.run_number }}

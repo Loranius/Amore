@@ -10,6 +10,19 @@ function expectQuantized(value: number, steps: number) {
 }
 
 describe('Tree Material Lab', () => {
+  it('pins the published rules version, so a bump is a decision', () => {
+    // Версія правил — частина опублікованого стану: вона входить у ключ
+    // матеріала й у контрольні точки. Досі її не тримав жоден тест, і коли
+    // v1.0.0 стала v1.1.0 разом зі зміною кори, про це дізнався лише
+    // браузерний набір — через шість днів і як «червона перевірка, яку всі
+    // ігнорують». Тепер бамп ламає цей тест одразу й вимагає пояснення.
+    expect(DEFAULT_TREE_MATERIAL_CONFIG.rulesVersion).toBe('tree-material-v1.1.0');
+    const materials = buildTreeLabPreview('medium').materials;
+    for (const material of materials.materials) {
+      expect(material.signature.startsWith(`${DEFAULT_TREE_MATERIAL_CONFIG.rulesVersion}|`)).toBe(true);
+    }
+  });
+
   it('is deterministic and publishes exactly bark plus foliage', () => {
     const first = buildTreeLabPreview('medium').materials;
     const second = buildTreeLabPreview('medium').materials;
