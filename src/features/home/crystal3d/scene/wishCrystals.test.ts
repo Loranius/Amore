@@ -95,8 +95,14 @@ describe('board layout (brief §28–§29)', () => {
     const high = buildWishBoard({ ...BASE, wishes: [{ id: 1, photo: null, priority: 'high' }] })[0]!;
     const low = buildWishBoard({ ...BASE, wishes: [{ id: 1, photo: null, priority: 'low' }] })[0]!;
     expect(high.size).toBeGreaterThan(low.size);
-    // But not by so much that a low wish becomes a speck.
-    expect(high.size / low.size).toBeLessThan(1.6);
+    const medium = buildWishBoard({ ...BASE, wishes: [{ id: 1, photo: null, priority: 'medium' }] })[0]!;
+    // Три ваги — три помітно різні тіла: власник просив, щоб різницю було
+    // видно з першого погляду.
+    expect(medium.size).toBeGreaterThan(low.size);
+    expect(high.size).toBeGreaterThan(medium.size);
+    expect(high.size / low.size).toBeGreaterThan(1.4);
+    // Але не настільки, щоб найменше бажання стало крихтою.
+    expect(high.size / low.size).toBeLessThan(2);
   });
 
   it('gives every wish its own start, so the board is not a marching band', () => {

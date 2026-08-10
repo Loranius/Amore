@@ -3,10 +3,10 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { CrystalGeometryState } from '@/engine/geometry';
 import type { CrystalMaterialState } from '@/engine/material';
-import { createThreeCrystalGeometry, type ThreeCrystalRenderBundle } from '@/engine/renderer/three';
+import type { ThreeCrystalRenderBundle } from '@/engine/renderer/three';
+import { buildWishCrystalGeometry } from './wishCrystalGeometry';
 import {
   buildWishBoard,
-  pickWishDonor,
   wishSatelliteBounds,
   type WishCrystal,
   type WishSatelliteQuality,
@@ -95,82 +95,68 @@ const DRAG_TURNS_PER_SCREEN = 1.6;
 const TAP_SLOP = 12;
 
 /**
- * Плоска проєкція фото на силует тіла.
+ * Радіус включення у власних висотах тіла.
  *
- * Власні UV кристала — по-фасетні й в одиницях рушія: вони існують для зерна
- * поверхні, і фото на них розпалось би на клапті. Тут же координата береться з
- * позиції вершини, тобто картинка натягнута на силует цілком.
+ * Виміряно на живому порталі: менше читалось плямою, більше — торкається
+ * граней і перестає бути включенням.
  */
-function projectPhotoUv(geometry: THREE.BufferGeometry): number {
-  const position = geometry.getAttribute('position');
-  geometry.computeBoundingBox();
-  const box = geometry.boundingBox;
-  if (box === null) return 1;
-  const spanX = Math.max(1e-6, box.max.x - box.min.x);
-  const spanY = Math.max(1e-6, box.max.y - box.min.y);
-  const uv = new Float32Array(position.count * 2);
-  for (let index = 0; index < position.count; index += 1) {
-    uv[index * 2] = (position.getX(index) - box.min.x) / spanX;
-    uv[index * 2 + 1] = (position.getY(index) - box.min.y) / spanY;
-  }
-  geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  // Тіло вище, ніж ширше, тож коло в координатах текстури було б еліпсом на
-  // екрані. Пропорція повертається нагору й виправляє маску.
-  return spanX / spanY;
-}
+const INCLUSION_RADIUS = 0.19;
 
 /**
- * Радіус включення у висотах тіла.
+ * Фото — включення В камені, і воно нерухоме, поки камінь обертається.
  *
- * 0.26 → 0.34: виміряно на живому порталі, менше включення читалось як
- * пляма, а не як фото. Більше за 0.36 воно торкається граней і перестає бути
- * включенням.
+ * Власник сформулював обидві половини: фотографія всередині кристалика,
+ * круглою вставкою, **статична, її завжди видно** — а саме тіло повільно
+ * крутиться навколо своєї осі.
+ *
+ * Тому маска рахується не в об'єктному просторі, а у **просторі камери**:
+ * зміщення фрагмента від центру тіла, взяте по осях екрана. Обертання тіла на
+ * це зміщення не впливає, тож фото стоїть на місці, поки грані пропливають
+ * повз нього. В об'єктному просторі (перша редакція) воно оберталося разом із
+ * тілом і зникало, щойно кристал ставав ребром до глядача.
+ *
+ * Шейдер не множить колір на карту — так робить `map` за замовчуванням, і так
+ * виходить наліпка на гранях. Він **підмінює** колір усередині круглої маски
+ * й лишає камінь каменем зовні.
  */
-const INCLUSION_RADIUS = 0.34;
-
-/**
- * Фото — включення В камені, а не малюнок НА ньому.
- *
- * Власник сформулював це прямо: фотографія всередині кристалика у формі
- * круга, а сам кристалик кольору монарха й доньок. Тому шейдер не множить
- * колір на карту (так робить `map` за замовчуванням і так виходить наліпка на
- * гранях) — він **підмінює** колір усередині круглої маски й лишає камінь
- * каменем зовні.
- *
- * Маска рахується в об'єктному просторі з поправкою на пропорцію тіла, тож це
- * коло, а не еліпс. Край розмито на два відсотки радіуса — включення в камені
- * не має паперового обрізу.
- */
-function includePhoto(
-  material: THREE.MeshPhysicalMaterial,
-  aspect: number,
-): void {
+function includePhoto(material: THREE.MeshPhysicalMaterial): void {
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uWishAspect = { value: aspect };
     shader.uniforms.uWishRadius = { value: INCLUSION_RADIUS };
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+         varying vec2 vWishOffset;`,
+      )
+      .replace(
+        '#include <project_vertex>',
+        `#include <project_vertex>
+         // Центр тіла в просторі камери — і зміщення фрагмента від нього по
+         // осях екрана, у власних висотах тіла.
+         vec4 wishCentre = modelViewMatrix * vec4( 0.0, 0.0, 0.0, 1.0 );
+         float wishScale = length( vec3( modelMatrix[ 1 ][ 0 ], modelMatrix[ 1 ][ 1 ], modelMatrix[ 1 ][ 2 ] ) );
+         vWishOffset = ( mvPosition.xy - wishCentre.xy ) / max( wishScale, 1e-5 );`,
+      );
     shader.fragmentShader = shader.fragmentShader
       .replace(
         'void main() {',
-        `uniform float uWishAspect;
-         uniform float uWishRadius;
+        `uniform float uWishRadius;
+         varying vec2 vWishOffset;
          void main() {`,
       )
       .replace(
         '#include <map_fragment>',
-        `vec2 wishOffset = ( vMapUv - 0.5 ) * vec2( uWishAspect, 1.0 );
-         float wishDistance = length( wishOffset );
-         float wishMask = 1.0 - smoothstep( uWishRadius * 0.98, uWishRadius, wishDistance );
-         vec2 wishUv = wishOffset / ( 2.0 * uWishRadius ) + 0.5;
+        `float wishDistance = length( vWishOffset );
+         float wishMask = 1.0 - smoothstep( uWishRadius * 0.94, uWishRadius, wishDistance );
+         vec2 wishUv = vWishOffset / ( 2.0 * uWishRadius ) + 0.5;
          vec4 wishTexel = texture2D( map, clamp( wishUv, 0.0, 1.0 ) );
          diffuseColor.rgb = mix( diffuseColor.rgb, wishTexel.rgb, wishMask );
-         // Включення ще й трохи світиться, інакше на тіньовому боці каменю
-         // його не видно: дошка стоїть між камерою й ключовим світлом.
-         totalEmissiveRadiance += wishTexel.rgb * wishMask * 0.7;`,
+         // Включення ще й світиться: дошка стоїть між камерою й ключовим
+         // світлом, і без цього фото тонуло б у тіньовому боці каменю.
+         totalEmissiveRadiance += wishTexel.rgb * wishMask * 0.85;`,
       );
   };
-  // Три матеріали з однаковим кодом мають ділити програму; без ключа кожен
-  // компілював би власну.
-  material.customProgramCacheKey = () => `wish-inclusion:${aspect.toFixed(3)}`;
+  material.customProgramCacheKey = () => 'wish-inclusion:view-space';
 }
 
 
@@ -210,28 +196,14 @@ export function WishCrystalBoard({
     [wishes, geometry, quality, facing],
   );
 
-  const donor = useMemo(() => pickWishDonor(geometry), [geometry]);
-  const donorMaterial = useMemo(
-    () => (donor ? material.bodies.find((body) => body.bodyId === donor.bodyId) ?? null : null),
-    [donor, material],
-  );
+  // Колір — монарха, а не найменшої доньки. Власник просив прямо: бажання
+  // мають бути кольору головного кристала. Донька в цієї пари виявилась
+  // блідішою, і на екрані тіла читались сірими уламками замість аметиста.
+  const donorMaterial = useMemo(() => material.bodies[0] ?? null, [material]);
 
-  const shape = useMemo(() => {
-    if (donor === null || donorMaterial === null) return null;
-    const built = createThreeCrystalGeometry(donor, donorMaterial, geometry.artifactSeed);
-    built.computeBoundingBox();
-    const box = built.boundingBox;
-    if (box === null) return null;
-    built.translate(
-      -(box.min.x + box.max.x) / 2,
-      -(box.min.y + box.max.y) / 2,
-      -(box.min.z + box.max.z) / 2,
-    );
-    const aspect = projectPhotoUv(built);
-    built.computeBoundingBox();
-    const height = Math.max(1e-6, (built.boundingBox?.max.y ?? 1) - (built.boundingBox?.min.y ?? 0));
-    return { geometry: built, height, aspect };
-  }, [donor, donorMaterial, geometry.artifactSeed]);
+  // Форма своя (див. `wishCrystalGeometry.ts`) і має висоту рівно 1, тож
+  // масштаб інстансу і є бажана висота тіла.
+  const shape = useMemo(() => buildWishCrystalGeometry(), []);
 
   // Один матеріал на бажання: спільна геометрія, різні фото.
   //
@@ -283,20 +255,20 @@ export function WishCrystalBoard({
         // Камінь лишається каменем: колір той самий, що в доньки монарха, з
         // якої взято форму. Фото живе всередині, круглим включенням.
         item.map = wishTexture(crystal.photo);
-        includePhoto(item, shape?.aspect ?? 1);
+        includePhoto(item);
       }
       return item;
     });
     owned.current = built;
     return built;
-  }, [donorMaterial, crystals, shape]);
+  }, [donorMaterial, crystals]);
 
   useEffect(() => () => {
     for (const item of owned.current) item.dispose();
     owned.current = [];
   }, []);
 
-  useEffect(() => () => { shape?.geometry.dispose(); }, [shape]);
+  useEffect(() => () => { shape.dispose(); }, [shape]);
 
   // Дошка живе в кадрі підгонки, поруч із тілами друзи.
   useEffect(() => {
@@ -310,7 +282,7 @@ export function WishCrystalBoard({
   // дошка. Рахується один раз на кадр, а не на тіло.
   const toCameraX = Math.sin(facing);
   const toCameraZ = Math.cos(facing);
-  const shapeHeight = shape?.height ?? 1;
+
 
   useFrame((state, delta) => {
     const node = group.current;
@@ -343,7 +315,7 @@ export function WishCrystalBoard({
       const bob = Math.sin(time * ((2 * Math.PI) / BOB_PERIOD) + crystal.bob);
       child.position.x = crystal.position[0] + toCameraX * advance * crystal.size;
       child.position.z = crystal.position[2] + toCameraZ * advance * crystal.size;
-      child.scale.setScalar((crystal.size / shapeHeight) * grow);
+      child.scale.setScalar(crystal.size * grow);
       child.position.y = crystal.position[1] + bob * crystal.size * BOB_AMPLITUDE;
       child.rotation.y = crystal.spin + (spins.current.get(index) ?? 0);
       // Дуже повільний власний обіг, поки бажання не чіпають: камінь живий,
@@ -352,7 +324,7 @@ export function WishCrystalBoard({
     }
   });
 
-  if (shape === null || crystals.length === 0 || materials.length === 0) return null;
+  if (crystals.length === 0 || materials.length === 0) return null;
 
   const onPointerDown = (index: number) => (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
@@ -390,10 +362,10 @@ export function WishCrystalBoard({
       {crystals.map((crystal: WishCrystal, index) => (
         <mesh
           key={crystal.id ?? `cluster-${index}`}
-          geometry={shape.geometry}
+          geometry={shape}
           material={materials[index]!}
           position={[crystal.position[0], crystal.position[1], crystal.position[2]]}
-          scale={crystal.size / shape.height}
+          scale={crystal.size}
           renderOrder={crystal.id === focused ? 1 : 0}
           onPointerDown={onPointerDown(index)}
           onPointerMove={onPointerMove}
