@@ -23,6 +23,15 @@ import { portalColonnadeTexture, portalPlatformTexture, portalTileTextures } fro
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
+  NO_MANUAL_TURN,
+  advanceSceneDirector,
+  createSceneDirector,
+  sceneDirectorPose,
+  shortestTurn,
+  type SceneDirectorState,
+  type WorldMotionMode,
+} from '@/features/world/sceneDirector';
+import {
   PORTAL_FIELD_DROP,
   PORTAL_GROUND_Y,
   PORTAL_LAMP_RADIUS,
@@ -30,6 +39,7 @@ import {
   buildPortalRuneGeometry,
   portalLampReach,
   PORTAL_DAIS_TOP_RADIUS,
+  portalCameraTurn,
   portalCameraView,
   buildPortalTempleFloorGeometry,
   portalArchInstances,
@@ -402,38 +412,70 @@ export function PortalEnvironment({
  * змішувати їх в одному числі означало б зламати обидва, щойно кристал
  * підросте.
  *
- * Стрибок, а не перехід: плавність, переривання й режими руху — Фаза 4
- * (`SceneDirector`). Сьогодні поза застосовується одразу, і це видно
- * лише на маршрутах, крізь які світ показано, тобто поки що на головній.
+ * Рух — не стрибок: між позами камеру веде директор сцени (ADR-0022).
+ * Тут лишається тільки те, що директор не може знати, — переклад пози в
+ * координати сцени й зчитування назад того, що зробив палець.
  */
 export function PortalCameraRig({
   frame,
   controls,
   pose,
+  mode,
 }: {
   frame: PortalCameraFrame;
   controls: RefObject<OrbitControlsImpl | null>;
-  pose?: WorldCameraPose;
+  pose?: WorldCameraPose | undefined;
+  /** Режим руху світу; читається щокадру, тож приходить рефом (§27). */
+  mode?: { current: Exclude<WorldMotionMode, 'navigation'> } | undefined;
 }) {
   const camera = useThree((state) => state.camera);
-  const applied = useRef('');
+  const director = useRef<SceneDirectorState>(createSceneDirector(pose ?? CRYSTAL_CENTRE_POSE));
+  // Що директор написав минулого кадру. Різниця між цим і тим, де камера
+  // насправді опинилась, — і є те, що зробив палець через OrbitControls:
+  // інакше кожен кадр стирав би ручний оберт.
+  const written = useRef<{ azimuth: number; elevation: number } | null>(null);
 
-  useFrame(() => {
-    const view = pose ?? CRYSTAL_CENTRE_POSE;
-    const signature = `${frame.position.join(':')}|${view.azimuth}:${view.targetHeight}:${view.elevation}:${view.distance}`;
-    if (applied.current === signature) return;
-    applied.current = signature;
+  useFrame((_, delta) => {
+    const orbit = controls.current;
+    const target = pose ?? CRYSTAL_CENTRE_POSE;
 
+    let drift = NO_MANUAL_TURN;
+    if (written.current && orbit) {
+      const actual = portalCameraTurn(
+        [camera.position.x, camera.position.y, camera.position.z],
+        [orbit.target.x, orbit.target.y, orbit.target.z],
+      );
+      drift = {
+        azimuth: shortestTurn(written.current.azimuth, actual.azimuth),
+        elevation: actual.elevation - written.current.elevation,
+      };
+    }
+
+    director.current = advanceSceneDirector(director.current, {
+      target,
+      mode: mode?.current ?? 'idle',
+      dt: delta,
+      drift,
+    });
+
+    const view = sceneDirectorPose(director.current);
     const placed = portalCameraView(frame, view);
     camera.position.set(placed.position[0], placed.position[1], placed.position[2]);
-    if (camera instanceof THREE.PerspectiveCamera) {
+    if (camera instanceof THREE.PerspectiveCamera && camera.fov !== frame.fov) {
       camera.fov = frame.fov;
       camera.updateProjectionMatrix();
     }
-    const orbit = controls.current;
     if (orbit) {
       orbit.target.set(placed.target[0], placed.target[1], placed.target[2]);
       orbit.update();
+      // Знімок береться ПІСЛЯ update(), а не з того, що ми щойно написали:
+      // update() дотягує власне згасання орбіти, і якби воно потрапило в
+      // знімок як «різниця», директор порахував би власний рух за рух пальця
+      // і поїхав би сам по собі.
+      written.current = portalCameraTurn(
+        [camera.position.x, camera.position.y, camera.position.z],
+        [orbit.target.x, orbit.target.y, orbit.target.z],
+      );
     }
   });
 

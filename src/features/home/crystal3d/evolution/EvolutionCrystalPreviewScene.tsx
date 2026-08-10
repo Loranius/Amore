@@ -8,6 +8,8 @@ import {
   crystalSubstrateSceneRadius,
 } from '@/engine/renderer/three';
 import { useTheme } from '@/providers/ThemeProvider';
+import { useWorldPose } from '@/features/world/useWorldPose';
+import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
 import {
@@ -46,6 +48,12 @@ export default function EvolutionCrystalPreviewScene() {
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
   const { pipeline, isPending, error } = useEvolutionCrystalPipeline(reduceMotion);
+  // Обидва — ЗЗОВНІ полотна. Всередині <Canvas> живе окремий корінь React, і
+  // зміна маршруту не перемальовує його сама; тут же зміна маршруту
+  // перемальовує цей компонент, а з ним і дітей полотна. Див. коментар до
+  // `PortalStageProps.pose`.
+  const { pose } = useWorldPose();
+  const motionMode = useWorldMotionMode();
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   // Напрямки гілок кварцової жили. Меми в сцені тримаються за цей масив, тож
   // він мусить бути стабільним посиланням — інакше камінь платформи
@@ -123,6 +131,8 @@ export default function EvolutionCrystalPreviewScene() {
             artifactSceneHeight={crystalSceneHeight(pipeline.geometry)}
             veinBearings={veinBearings}
             veinReach={crystalSubstrateSceneRadius(pipeline.geometry)}
+            pose={pose}
+            motionMode={motionMode}
           >
             <EvolutionCrystalObject
               geometry={pipeline.geometry}

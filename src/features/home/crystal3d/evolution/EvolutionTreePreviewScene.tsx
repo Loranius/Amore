@@ -18,6 +18,8 @@ import { crystalRenderScale } from '@/engine/renderer';
 import { fitThreeTree, measureThreeTreeReach } from '@/engine/renderer/three';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
+import { useWorldPose } from '@/features/world/useWorldPose';
+import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from './EvolutionRuntimeProbe';
 import { TreeLabObject } from '../treeLab/TreeLabObject';
 import { resolveTreeLabLod } from '../treeLab/featureFlag';
@@ -31,6 +33,10 @@ function TreeInPortal({ build, theme }: { build: TreeLabPreviewBuild; theme: 'li
   );
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setRuntime(next), []);
+  // Ззовні полотна — з тієї ж причини, що й у кристала: у <Canvas> власний
+  // корінь React, і контекст маршрутизатора не перемальовує його сам.
+  const { pose } = useWorldPose();
+  const motionMode = useWorldMotionMode();
   // Дерево приходить у власних одиницях рушія — вищим за всю сцену й з
   // підошвою на нулі, а не на підлозі порталу. Кристал ту саму різницю
   // прибирає підгонкою в bundle.ts; тут та сама підгонка, у той самий кадр.
@@ -77,6 +83,8 @@ function TreeInPortal({ build, theme }: { build: TreeLabPreviewBuild; theme: 'li
           // в дерева субстрат інший.
           veinBearings={[]}
           veinReach={0}
+          pose={pose}
+          motionMode={motionMode}
         >
           <group position={[0, fit.groundY, 0]} scale={fit.scale}>
             <TreeLabObject

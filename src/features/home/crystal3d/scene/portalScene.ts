@@ -253,6 +253,33 @@ export function portalCameraView(
   };
 }
 
+/**
+ * The bearing and rise a camera actually stands at — the inverse of the two
+ * angular halves of `portalCameraView`.
+ *
+ * The director needs this to notice what the couple's finger did: orbit
+ * controls move the camera themselves, and the only way to keep a hand turn
+ * instead of overwriting it is to read back the difference between where the
+ * camera is and where the director last put it (ADR-0022).
+ *
+ * Distance is not returned because nothing changes it — orbiting is rotation
+ * and zoom is disabled — so reading it back would only feed rounding error
+ * into a value the atlas owns.
+ */
+export function portalCameraTurn(
+  position: readonly [number, number, number],
+  target: readonly [number, number, number],
+): { azimuth: number; elevation: number } {
+  const dx = position[0] - target[0];
+  const dy = position[1] - target[1];
+  const dz = position[2] - target[2];
+  const distance = Math.hypot(dx, dy, dz);
+  return {
+    azimuth: Math.atan2(dx, dz),
+    elevation: distance > 1e-9 ? dy / distance : 0,
+  };
+}
+
 function halfHeightTangent(): number {
   return Math.tan((FOV / 2) * DEG);
 }

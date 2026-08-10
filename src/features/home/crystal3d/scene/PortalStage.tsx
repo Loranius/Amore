@@ -11,7 +11,8 @@ import { useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
-import { useWorldPose } from '@/features/world/useWorldPose';
+import type { WorldCameraPose } from '@/features/world/crystalAtlas';
+import type { WorldMotionMode } from '@/features/world/sceneDirector';
 import {
   PORTAL_AMBIENT_INTENSITY,
   PORTAL_HEMISPHERE_INTENSITY,
@@ -43,6 +44,19 @@ export interface PortalStageProps {
   veinBearings: readonly number[];
   /** Виліт жили в одиницях сцени — усередині нього камінь лишається пласким. */
   veinReach: number;
+  /**
+   * Куди дивиться світ на поточному маршруті (атлас, ADR-0021).
+   *
+   * Приходить пропом, а не з `useWorldPose()` тут, і це не стиль. `<Canvas>`
+   * тримає власний корінь React; зміна контексту ззовні не перемальовує його
+   * сама по собі. Виміряно на живому порталі: коли позу читали всередині
+   * полотна, зміна маршруту доїжджала до камери **через 30 секунд** — рівно
+   * тоді, коли щось інше змушувало перемалюватись батька. Проп проходить
+   * через дітей `<Canvas>`, і це працює завжди.
+   */
+  pose?: WorldCameraPose | undefined;
+  /** Режим руху світу (§27). Реф — його читає цикл рендера, не DOM. */
+  motionMode?: { current: Exclude<WorldMotionMode, 'navigation'> } | undefined;
   children: ReactNode;
 }
 
@@ -56,6 +70,8 @@ export function PortalStage({
   artifactSceneHeight,
   veinBearings,
   veinReach,
+  pose,
+  motionMode,
   children,
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
@@ -67,10 +83,6 @@ export function PortalStage({
   );
   const daisScale = useMemo(() => portalDaisScale(artifactSceneRadius), [artifactSceneRadius]);
   const palette = PORTAL_PALETTES[theme];
-  // Де стоїть світ для поточного маршруту (атлас, ADR-0021). Чиста
-  // функція шляху — тож глибоке посилання дає той самий стан, що й
-  // прихід сюди кроками (§25).
-  const { pose } = useWorldPose();
 
   return (
     <>
@@ -128,7 +140,7 @@ export function PortalStage({
         veinBearings={veinBearings}
         veinReach={veinReach}
       />
-      <PortalCameraRig frame={frame} controls={controls} pose={pose} />
+      <PortalCameraRig frame={frame} controls={controls} pose={pose} mode={motionMode} />
 
       {children}
 
@@ -142,7 +154,10 @@ export function PortalStage({
         // означало б показати виворіт подіуму й вивернуті нормалі поля.
         minPolarAngle={Math.PI * 0.22}
         maxPolarAngle={Math.PI * 0.5}
-        target={[frame.target[0], frame.target[1], frame.target[2]]}
+        // Цілі тут більше немає, і це не пропуск: її щокадру ставить
+        // PortalCameraRig, бо вона залежить від пози маршруту (targetHeight),
+        // а не лише від кадру. Проп повертав би її до кадру на кожному
+        // перемальовуванні — два власники однієї величини.
       />
     </>
   );
