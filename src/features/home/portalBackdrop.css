@@ -98,16 +98,18 @@
    винесення фону зі сторінки (ADR-0020) залишало градієнт без жодного
    зі своїх кольорів — тобто небо ставало білим, і крізь портал світив
    `--bg`. Знайдено скріншотом, не читанням. */
+/* Небо бере колір оточення зі світу, а не тримає власну копію.
+   `--portal-sky-mid` лишається окремим значенням, бо це середина
+   градієнта, а не роль: воно існує рівно для того, щоб перехід від
+   верху до горизонту не був лінійним. */
 .artifact-world {
-  --portal-sky-top: #221a33;
-  --portal-sky-mid: #33254a;
-  --portal-vignette: rgba(14, 9, 22, 0.62);
-}
-
-[data-theme='dark'] .artifact-world {
-  --portal-sky-top: #140f1f;
-  --portal-sky-mid: #1e1630;
-  --portal-vignette: rgba(6, 4, 11, 0.74);
+  --portal-sky-top: var(--world-bg);
+  /* 90/10, а не «на око»: саме ця пропорція відтворює колишні літерали
+     (#33254a у світлій, #1e1630 у темній) з точністю до кількох одиниць
+     на канал. Перша спроба на 72% дала помітно світліше небо — токени
+     мали замінити значення, а не змінити їх. */
+  --portal-sky-mid: color-mix(in srgb, var(--world-bg) 90%, var(--world-primary));
+  --portal-vignette: var(--world-vignette);
 }
 
 /* Сторінка більше не малює власний плаский градієнт — його місце зайняв
@@ -130,10 +132,10 @@
    механізмом і тому автоматично покриває все, що з'явиться на головній
    згодом. */
 .home {
-  --text: #f6efff;
-  --muted: #b7a6d2;
-  --surface: rgba(255, 255, 255, 0.07);
-  --accent: #dcb6f5;
+  --text: var(--world-text);
+  --muted: var(--world-accent-soft);
+  --surface: var(--world-surface-soft);
+  --accent: var(--world-accent);
 }
 
 /* ── Навігація в межах сцени ────────────────────────────────
@@ -141,22 +143,22 @@
    не дістає — звідси окремий маркер на корені. Світла пігулка на нічному
    порталі читалась як чужий елемент поверх картинки. */
 [data-portal-scene='true'] .bottom-nav {
-  background: rgba(30, 22, 46, 0.72);
-  border-color: rgba(214, 190, 246, 0.16);
-  box-shadow: 0 14px 34px rgba(6, 4, 12, 0.5);
+  background: var(--world-surface);
+  border-color: var(--world-border);
+  box-shadow: 0 14px 34px var(--world-shadow);
   backdrop-filter: blur(14px);
 }
 
 [data-portal-scene='true'] .bottom-nav .nav-btn {
-  color: #c9b8e4;
+  color: var(--world-text-muted);
 }
 
 [data-portal-scene='true'] .bottom-nav .nav-btn.active {
-  color: #f6efff;
+  color: var(--world-text);
 }
 
 [data-portal-scene='true'] .bottom-nav-indicator {
-  background: rgba(220, 182, 245, 0.18);
+  background: var(--world-glow);
 }
 
 /* ── Сцена на весь екран ────────────────────────────────────
