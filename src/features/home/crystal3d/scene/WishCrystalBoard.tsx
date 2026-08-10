@@ -160,9 +160,13 @@ function includePhoto(material: THREE.MeshPhysicalMaterial): void {
          vec2 wishUv = vWishOffset / ( 2.0 * uWishRadius ) + 0.5;
          vec4 wishTexel = texture2D( map, clamp( wishUv, 0.0, 1.0 ) );
          diffuseColor.rgb = mix( diffuseColor.rgb, wishTexel.rgb, wishMask );
-         // Включення ще й світиться: дошка стоїть між камерою й ключовим
-         // світлом, і без цього фото тонуло б у тіньовому боці каменю.
-         totalEmissiveRadiance += wishTexel.rgb * wishMask * 0.85;`,
+         // Власне рожеве світло каменю всередині вставки гасне, інакше воно
+         // лягає плівкою поверх фото й знебарвлює його — рівно те, що видно
+         // було на живому порталі, щойно тіла стали рожевими.
+         totalEmissiveRadiance *= 1.0 - wishMask * 0.88;
+         // А саме включення світиться власним кольором фото: дошка стоїть між
+         // камерою й ключовим світлом, і без цього фото тонуло б у тіні.
+         totalEmissiveRadiance += wishTexel.rgb * wishMask * 0.9;`,
       );
   };
   material.customProgramCacheKey = () => 'wish-inclusion:view-space';
@@ -277,6 +281,17 @@ export function WishCrystalBoard({
       donorMaterial.baseColor.g,
       donorMaterial.baseColor.b,
     );
+    // Світло тіла — теж опублікований колір монарха, а не білий.
+    //
+    // Це і був той «сірий блідий камінь», який побачив власник: біле власне
+    // світло знебарвлює будь-яку базу, і рожевий аметист виходив попелястим.
+    // Рушій публікує emissiveColor поруч із baseColor саме для цього — це та
+    // сама гама, якою пофарбована друза від виконаних бажань (ADR-0015).
+    const glow = new THREE.Color(
+      donorMaterial.emissiveColor.r,
+      donorMaterial.emissiveColor.g,
+      donorMaterial.emissiveColor.b,
+    );
     const built = crystals.map((crystal) => {
       const item = new THREE.MeshPhysicalMaterial({
         color: stone,
@@ -294,8 +309,8 @@ export function WishCrystalBoard({
         // Тіла дошки стоять МІЖ камерою й артефактом, а ключове світло — за
         // ними: освітлений бік дивиться від глядача. Виміряно — без власного
         // світла камінь виходив майже чорним.
-        emissive: new THREE.Color(0xffffff),
-        emissiveIntensity: 0.22,
+        emissive: glow,
+        emissiveIntensity: 0.55,
       });
       if (crystal.photo !== null) {
         // Камінь лишається каменем: колір той самий, що в доньки монарха, з
@@ -375,7 +390,8 @@ export function WishCrystalBoard({
   const onPointerDown = (index: number) => (event: ThreeEvent<PointerEvent>) => {
     event.stopPropagation();
     drag.current = { index, x: event.clientX, y: event.clientY, moved: 0 };
-    (event.target as Element | null)?.setPointerCapture?.(event.pointerId);
+    // Захоплення вказівника тут було: воно віддавало подальші події полотну, і
+    // відпускання до тіла вже не доходило — бажання не відкривалось.
   };
 
   const onPointerMove = (event: ThreeEvent<PointerEvent>) => {
@@ -391,14 +407,13 @@ export function WishCrystalBoard({
     spins.current.set(current.index, (spins.current.get(current.index) ?? 0) + turn);
   };
 
-  const onPointerUp = (index: number) => (event: ThreeEvent<PointerEvent>) => {
+  const onClick = (index: number) => (event: ThreeEvent<MouseEvent>) => {
     const current = drag.current;
     drag.current = null;
-    if (current === null || current.index !== index) return;
     event.stopPropagation();
     // Тап — це не рух. Той самий поріг, що й у монарха: інакше кожен оберт
     // закінчувався б відкритою карткою.
-    if (current.moved > TAP_SLOP) return;
+    if (current !== null && current.moved > TAP_SLOP) return;
     const crystal = crystals[index];
     if (crystal?.id != null) onSelect?.(crystal.id);
   };
@@ -415,7 +430,7 @@ export function WishCrystalBoard({
           renderOrder={crystal.id === focused ? 1 : 0}
           onPointerDown={onPointerDown(index)}
           onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp(index)}
+          onClick={onClick(index)}
           onPointerCancel={() => { drag.current = null; }}
         />
       ))}

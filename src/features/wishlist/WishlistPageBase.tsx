@@ -142,7 +142,6 @@ export function WishlistPage() {
   // Перший модуль, який впускає світ (§28). Дотики лишаються сторінці: тут
   // списки, кнопки й прокрутка, і віддати їх артефакту означало б зробити
   // вішліст декорацією.
-  useWorldVisibleRoute();
   const { webglSupported } = useArtifactWorld();
   const worldVisible = webglSupported;
   const me = useCurrentUser();
@@ -209,6 +208,11 @@ export function WishlistPage() {
       ? filterSharedWishes(sharedItems, sharedFilter, me.id, partner.id)
       : items;
   const activeBoardView = { ...boardViews[tab], view: preferredView };
+  // У кристалічному вигляді дотики в порожній області належать сцені: саме
+  // там висять тіла бажань, і без цього сторінка забирала кожен клік собі —
+  // виміряно на живому порталі, бажання не відкривались і не оберталися.
+  // У списку й полароїдах усе навпаки: там сторінка, і їй потрібен скрол.
+  useWorldVisibleRoute({ artifactInput: worldVisible && activeBoardView.view === 'bubbles' });
   const boardFilterCounts = wishlistPriorityFilterCounts(contextItems);
   const visibleItems = applyWishlistBoardView(contextItems, activeBoardView);
 
@@ -409,24 +413,23 @@ export function WishlistPage() {
         />
       )}
 
-      {/* У світі вся службова навігація живе в аркуші (WishlistWorldNav):
-          власник просив, щоб у закритому стані на екрані лишались сцена,
-          кристали й нижня навігація. Поза світом усе як було. */}
-      {!worldVisible && (
-        <div className="wl-wishlist-controls">
-          <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
+      {/* Верхній перемикач «Мої / Лєни / Спільні» лишається на екрані —
+          власник попросив повернути його як було. У світі при ньому немає
+          панелі виглядів: стан і вигляд живуть в аркуші (WishlistWorldNav),
+          щоб не перекривати кристали двома рядами хрому. */}
+      <div className="wl-wishlist-controls">
+        <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
 
-          {!archiveOpen && !isPending && !isError && contextItems.length > 0 && (
-            <WishlistBoardToolbar
-              value={activeBoardView}
-              counts={boardFilterCounts}
-              resultCount={visibleItems.length}
-              onChange={changeBoardView}
-              onPolaroidReshuffle={reshufflePolaroids}
-            />
-          )}
-        </div>
-      )}
+        {!worldVisible && !archiveOpen && !isPending && !isError && contextItems.length > 0 && (
+          <WishlistBoardToolbar
+            value={activeBoardView}
+            counts={boardFilterCounts}
+            resultCount={visibleItems.length}
+            onChange={changeBoardView}
+            onPolaroidReshuffle={reshufflePolaroids}
+          />
+        )}
+      </div>
 
       {worldVisible && (
         <WishlistWorldNav
@@ -443,9 +446,8 @@ export function WishlistPage() {
           archiveOpen={archiveOpen}
           onArchiveChange={setArchiveOpen}
           archiveAvailable={canShowArchive}
-          priority={activeBoardView.priority}
-          onPriorityChange={(priority) => changeBoardView({ ...activeBoardView, priority })}
-          priorityCounts={boardFilterCounts}
+          view={activeBoardView.view}
+          onViewChange={(view) => changeBoardView({ ...activeBoardView, view })}
           onAdd={() => setAdding(true)}
           busy={mutationBusy}
         />
@@ -464,7 +466,7 @@ export function WishlistPage() {
         />
       ) : (
         <>
-          {tab === 'partner' && !isPending && !isError && (
+          {tab === 'partner' && !worldVisible && !isPending && !isError && (
             <WishlistPartnerToolbar
               value={partnerFilter}
               counts={partnerCounts}
@@ -472,7 +474,7 @@ export function WishlistPage() {
             />
           )}
 
-          {tab === 'shared' && !isPending && !isError && (
+          {tab === 'shared' && !worldVisible && !isPending && !isError && (
             <WishlistSharedToolbar
               value={sharedFilter}
               partnerName={partner.name}

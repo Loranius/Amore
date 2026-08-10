@@ -54,7 +54,15 @@ describe('scope (brief §42, §55)', () => {
     expect(lists.length).toBeGreaterThan(3);
     for (const list of lists) {
       for (const selector of list.split(',')) {
-        expect(selector.trim().startsWith("[data-portal-scene='true']"), selector).toBe(true);
+        // Обидва маркери ставить один хук і завжди разом: `data-world-input`
+        // без `data-portal-scene` не існує. Тож правило під ним так само не
+        // може дістати сторінку, на якій світу не видно.
+        const trimmed = selector.trim();
+        expect(
+          trimmed.startsWith("[data-portal-scene='true']")
+            || trimmed.startsWith("[data-world-input='artifact']"),
+          selector,
+        ).toBe(true);
       }
     }
   });

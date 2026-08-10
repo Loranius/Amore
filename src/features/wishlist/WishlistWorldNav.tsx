@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { WishlistPriorityFilter } from './wishlistBoardView';
+import type { WishlistViewMode } from './wishlistBoardView';
 
 // ============================================================
 // Навігація вішліста у світі — уся службова частина в одному аркуші.
@@ -26,18 +26,24 @@ export interface WishlistWorldNavProps {
   onArchiveChange: (open: boolean) => void;
   /** Чи має ця вкладка архів узагалі. */
   archiveAvailable: boolean;
-  priority: WishlistPriorityFilter;
-  onPriorityChange: (priority: WishlistPriorityFilter) => void;
-  priorityCounts: Readonly<Record<WishlistPriorityFilter, number>>;
+  /** Як показувати бажання: кристалами, списком або полароїдами. */
+  view: WishlistViewMode;
+  onViewChange: (view: WishlistViewMode) => void;
   onAdd: () => void;
   busy: boolean;
 }
 
-const PRIORITIES: readonly { value: WishlistPriorityFilter; label: string }[] = [
-  { value: 'all', label: 'Усі' },
-  { value: 'high', label: 'Жадане' },
-  { value: 'medium', label: 'Бажане' },
-  { value: 'low', label: 'Приємне' },
+/**
+ * Вигляди дошки.
+ *
+ * «Бульбашки» стали «Кристалами»: у світі це вже не кульки, а тіла. Сортування
+ * за вагою мрії власник просив прибрати — воно лишається в неcвітовому вигляді
+ * сторінки, де є місце для повної панелі.
+ */
+const VIEWS: readonly { value: WishlistViewMode; label: string }[] = [
+  { value: 'bubbles', label: 'Кристали' },
+  { value: 'feed', label: 'Список' },
+  { value: 'polaroid', label: 'Полароїд' },
 ];
 
 const TAB_ORDER: readonly WishlistWorldTab[] = ['me', 'partner', 'shared'];
@@ -69,9 +75,8 @@ export function WishlistWorldNav({
   archiveOpen,
   onArchiveChange,
   archiveAvailable,
-  priority,
-  onPriorityChange,
-  priorityCounts,
+  view,
+  onViewChange,
   onAdd,
   busy,
 }: WishlistWorldNavProps) {
@@ -166,23 +171,6 @@ export function WishlistWorldNav({
           >
             <div className="wl-world-sheet-handle" aria-hidden="true" />
 
-            <div className="wl-world-group" role="group" aria-label="Чиї бажання">
-              {TAB_ORDER.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  className="wl-world-chip"
-                  aria-pressed={value === tab}
-                  onClick={() => { onTabChange(value); }}
-                >
-                  {tabLabels[value]}
-                  {tabCounts[value] !== null && (
-                    <span className="wl-world-chip-count">{tabCounts[value]}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-
             <div className="wl-world-group" role="group" aria-label="Стан бажань">
               <button
                 type="button"
@@ -203,17 +191,16 @@ export function WishlistWorldNav({
               </button>
             </div>
 
-            <div className="wl-world-group" role="group" aria-label="Вага мрії">
-              {PRIORITIES.map((item) => (
+            <div className="wl-world-group" role="group" aria-label="Вигляд бажань">
+              {VIEWS.map((item) => (
                 <button
                   key={item.value}
                   type="button"
                   className="wl-world-chip"
-                  aria-pressed={item.value === priority}
-                  onClick={() => onPriorityChange(item.value)}
+                  aria-pressed={item.value === view}
+                  onClick={() => onViewChange(item.value)}
                 >
                   {item.label}
-                  <span className="wl-world-chip-count">{priorityCounts[item.value]}</span>
                 </button>
               ))}
             </div>
