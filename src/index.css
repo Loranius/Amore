@@ -1,4 +1,10 @@
 @import 'tailwindcss';
+/* Токени світу — раніше їх тягнув лише `artifactWorld.css`, тобто вони
+   існували тільки там, де змонтований світ. Boot-екран показується ДО
+   нього (RequireAuth перевіряє сесію), і без цього рядка його
+   `var(--world-bg-deep)` не мав би значення — тобто білий екран, який
+   §49 і забороняє. Ролі світу потрібні всьому застосунку. */
+@import './features/world/worldTheme.css';
 
 /* ============================================================
    ТОКЕНИ ТЕМ — «Pink Portal» тепер єдине джерело правди для
@@ -91,16 +97,34 @@
 
 }
 
-html,
+/* Земля документа — світова, і вона видна лише там, де над нею ще нічого
+   немає: до першого кадру React і поки вантажиться модуль (§49–§50). Усе
+   інше малює власний фон. */
+html {
+  background: var(--world-bg-deep);
+}
+
 body {
   margin: 0;
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
   font-family: 'Nunito', system-ui, sans-serif;
   /* iOS: не роздувати шрифт в landscape; не давати "гумовому" відскоку
      краю сторінки оголювати порожнечу за межами відео-фону. */
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
+}
+
+/* Сторінки, які ще не мають власного фону (Вішлист, Плани, Спогади, Гра),
+   стояли просто на кольорі документа. Тепер документ належить світу, тож
+   папір під ними тримає сам контейнер — доки їхня фаза не перенесе їх у
+   світ. Там, де світ уже видно, паперу немає: він закрив би сцену. */
+.app-shell > .content {
+  background: var(--bg);
+}
+
+[data-portal-scene='true'] .app-shell > .content {
+  background: none;
 }
 
 /* Native-подібний тач: без сірого прямокутника на iOS і без затримки/
@@ -541,17 +565,25 @@ textarea::placeholder {
 .btn-danger { background: var(--danger); }
 .btn-ghost { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
 
-/* ── Boot-екран ─────────────────────────────────────────────── */
+/* ── Boot-екран ───────────────────────────────────────────────
+   Земля світу, а не колір сторінки. §49 брифу забороняє помітний білий
+   спалах при старті, і це було не припущення: виміряно на живому
+   порталі — середня яскравість першого кадру 247.6 із 255, тобто екран
+   практично білий, а одразу за ним приходить нічний портал.
+
+   Цей екран показує `RequireAuth`, поки перевіряється сесія, тобто на
+   КОЖНОМУ холодному старті пари. Тому він бере колір того, що буде
+   далі, а не того, що було. */
 .boot-screen {
   min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg);
+  background: var(--world-bg-deep);
 }
 .boot-heart {
   font-size: 48px;
-  color: var(--accent);
+  color: var(--world-primary);
   animation: boot-pulse 1.1s ease-in-out infinite;
 }
 @keyframes boot-pulse {
