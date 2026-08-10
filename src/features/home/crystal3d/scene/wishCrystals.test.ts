@@ -27,7 +27,7 @@ function wishes(count: number): readonly WishSubject[] {
 const BASE: WishBoardInput = {
   wishes: wishes(7),
   seed: 4211,
-  bounds: { height: 3.4, radius: 1.25 },
+  bounds: { height: 3.4, radius: 1.25, silhouetteRadius: 0.42 },
   quality: 'high',
   facing: 0,
   // Приблизно вертикальний телефон на відстані кадру вішліста.
@@ -112,17 +112,65 @@ describe('board layout (brief §28–§29)', () => {
     }
   });
 
-  it('centres a short last row instead of letting it drift left', () => {
-    // Seven wishes are three, three and one. A one-wish row laid out from the
-    // left edge reads as a mistake rather than as a row.
-    const board = buildWishBoard(BASE);
-    const last = board[board.length - 1]!;
-    const facing = BASE.facing;
-    const rightX = Math.cos(facing);
-    const rightZ = -Math.sin(facing);
-    const sideways = (last.position[0] - BASE.centre[0]) * rightX
-      + (last.position[2] - BASE.centre[2]) * rightZ;
-    expect(Math.abs(sideways)).toBeLessThan(1e-9);
+  it('leaves the monarch a clear corridor down the middle', () => {
+    // Змінена вимога, і змінена навмисно. Раніше цей файл вимагав, щоб
+    // короткий останній ряд стояв **по центру** — тобто рівно на осі погляду,
+    // тобто рівно на монархові. Власник попросив протилежного: маленькі
+    // кристали не мають перекривати силует головного каменю, ієрархія —
+    // монарх, далі бажання, далі те, що в них усередині. Отже вісь тепер
+    // заборонена зона, а не бажане місце.
+    for (const count of [1, 2, 3, 7, 12]) {
+      for (const facing of [0, 1.1, -2.4]) {
+        const rightX = Math.cos(facing);
+        const rightZ = -Math.sin(facing);
+        const centre = [
+          Math.sin(facing) * 1.28,
+          BASE.centre[1],
+          Math.cos(facing) * 1.28,
+        ] as const;
+        for (const crystal of buildWishBoard({ ...BASE, wishes: wishes(count), facing, centre })) {
+          const sideways = (crystal.position[0] - centre[0]) * rightX
+            + (crystal.position[2] - centre[2]) * rightZ;
+          // Не центр тіла, а його ближній край: перекриває силует саме він.
+          expect(Math.abs(sideways) - crystal.size / 2, `${count}/${facing}`)
+            .toBeGreaterThan(BASE.bounds.silhouetteRadius);
+        }
+      }
+    }
+  });
+
+  it('fills a short row from the corridor outwards, not from the edges', () => {
+    // Коридор не має ставати діркою: два бажання в ряду стоять обабіч
+    // монарха, а не по кутах екрана.
+    const rightX = Math.cos(BASE.facing);
+    const rightZ = -Math.sin(BASE.facing);
+    const sideways = (crystal: WishCrystal): number =>
+      (crystal.position[0] - BASE.centre[0]) * rightX
+      + (crystal.position[2] - BASE.centre[2]) * rightZ;
+    // Сім бажань — це повні ряди й один зайвий: він і показує, куди йде
+    // неповний ряд. Порівняння всередині однієї дошки, бо клітинку задає
+    // кількість рядів, і в дошки з іншим числом бажань вона інша.
+    const board = buildWishBoard({ ...BASE, wishes: wishes(7) });
+    const orphan = board[board.length - 1]!;
+    const innermost = Math.min(...board.map((crystal) => Math.abs(sideways(crystal))));
+    expect(Math.abs(sideways(orphan))).toBeCloseTo(innermost, 9);
+  });
+
+  it('spreads the rows over the height it was given, not over the cell', () => {
+    // Виміряно на живому порталі: коридор під монарха звужує клітинку, і якщо
+    // крок між рядами дорівнює їй, дошка збирається в дві короткі рейки, а
+    // половина кадру лишається порожньою. Ряди мають користуватись висотою —
+    // її коридор не забирає.
+    const board = buildWishBoard({ ...BASE, wishes: wishes(6) });
+    const top = Math.max(...board.map((crystal) => crystal.position[1]));
+    const bottom = Math.min(...board.map((crystal) => crystal.position[1]));
+    const rows = new Set(board.map((crystal) => crystal.position[1])).size;
+    const biggest = Math.max(...board.map((crystal) => crystal.size));
+    // Крок між рядами більший за саме тіло — рядки розсунуті, а не складені.
+    expect((top - bottom) / (rows - 1)).toBeGreaterThan(biggest);
+    expect(top - bottom).toBeGreaterThan(BASE.viewport.halfHeight * 0.75);
+    // Але не за межі відведеної смуги: знизу док, згори панель вкладок.
+    expect(top - bottom).toBeLessThan(BASE.viewport.halfHeight * 1.4);
   });
 
   it('sizes a wish by how much it is wanted', () => {
@@ -194,7 +242,7 @@ describe('bounds (brief §29, §43)', () => {
       ...BASE,
       seed: Number.NaN,
       facing: Number.NaN,
-      bounds: { height: Number.NaN, radius: Number.NaN },
+      bounds: { height: Number.NaN, radius: Number.NaN, silhouetteRadius: Number.NaN },
     });
     expect(board.length).toBeGreaterThan(0);
     for (const crystal of board) {

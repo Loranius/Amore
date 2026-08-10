@@ -5,6 +5,7 @@ import type { CrystalGeometryState } from '@/engine/geometry';
 import type { CrystalMaterialState } from '@/engine/material';
 import type { ThreeCrystalRenderBundle } from '@/engine/renderer/three';
 import { buildWishCrystalGeometry } from './wishCrystalGeometry';
+import { WISH_PREVIEW_CALM, WISH_PREVIEW_CLEAR } from './wishPreviewStyle';
 import {
   buildWishBoard,
   wishBoardCentre,
@@ -106,10 +107,20 @@ const TAP_SLOP = 12;
 /**
  * Радіус включення у власних висотах тіла.
  *
- * Виміряно на живому порталі: менше читалось плямою, більше — торкається
- * граней і перестає бути включенням.
+ * Зменшено з 0.19: власник попросив лишити більше повітря всередині форми —
+ * контейнером має лишатись сам кристал, а не рамка навколо картинки.
  */
-const INCLUSION_RADIUS = 0.19;
+const INCLUSION_RADIUS = 0.155;
+
+/**
+ * Наскільки прев'ю приглушене у спокої, і наскільки — коли бажання відкрите.
+ *
+ * Числа живуть у `wishPreviewStyle.ts` під тестом; тут вони лише підставляються
+ * в текст шейдера. Шейдер перевірити нічим, а перевернуту пару видно тільки на
+ * живому екрані — тож вимога тримається там, де її можна тримати.
+ */
+const CALM = WISH_PREVIEW_CALM;
+const CLEAR = WISH_PREVIEW_CLEAR;
 
 /**
  * Фото — включення В камені, і воно нерухоме, поки камінь обертається.
@@ -128,9 +139,16 @@ const INCLUSION_RADIUS = 0.19;
  * виходить наліпка на гранях. Він **підмінює** колір усередині круглої маски
  * й лишає камінь каменем зовні.
  */
-function includePhoto(material: THREE.MeshPhysicalMaterial): void {
+function includePhoto(material: THREE.MeshPhysicalMaterial, tint: THREE.Color): void {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uWishRadius = { value: INCLUSION_RADIUS };
+    // 0 — спокійне прев'ю в сцені, 1 — відкрите бажання. Веде його той самий
+    // рух фокуса, що підіймає тіло вперед (§30).
+    shader.uniforms.uWishFocus = { value: 0 };
+    shader.uniforms.uWishTint = { value: tint };
+    // Шейдер потрібен щокадру, щоб рухати фокус; іншого шляху до уніформів
+    // після компіляції немає.
+    material.userData.wishShader = shader;
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -150,23 +168,50 @@ function includePhoto(material: THREE.MeshPhysicalMaterial): void {
       .replace(
         'void main() {',
         `uniform float uWishRadius;
+         uniform float uWishFocus;
+         uniform vec3 uWishTint;
          varying vec2 vWishOffset;
          void main() {`,
       )
       .replace(
         '#include <map_fragment>',
         `float wishDistance = length( vWishOffset );
-         float wishMask = 1.0 - smoothstep( uWishRadius * 0.94, uWishRadius, wishDistance );
+         // М'який край: включення в камені не має паперового обрізу.
+         float wishMask = 1.0 - smoothstep( uWishRadius * 0.82, uWishRadius, wishDistance );
          vec2 wishUv = vWishOffset / ( 2.0 * uWishRadius ) + 0.5;
          vec4 wishTexel = texture2D( map, clamp( wishUv, 0.0, 1.0 ) );
-         diffuseColor.rgb = mix( diffuseColor.rgb, wishTexel.rgb, wishMask );
-         // Власне рожеве світло каменю всередині вставки гасне, інакше воно
-         // лягає плівкою поверх фото й знебарвлює його — рівно те, що видно
-         // було на живому порталі, щойно тіла стали рожевими.
-         totalEmissiveRadiance *= 1.0 - wishMask * 0.88;
-         // А саме включення світиться власним кольором фото: дошка стоїть між
-         // камерою й ключовим світлом, і без цього фото тонуло б у тіні.
-         totalEmissiveRadiance += wishTexel.rgb * wishMask * 0.9;`,
+
+         // ── Стилізація прев'ю ──────────────────────────────────
+         // Сире фото поруч із м'якою сценою читається чужорідною наліпкою.
+         // Тому в сцені воно приглушене, а різкість приходить із фокусом.
+         float wishSaturation = mix( ${CALM.saturation.toFixed(2)}, ${CLEAR.saturation.toFixed(2)}, uWishFocus );
+         float wishContrast = mix( ${CALM.contrast.toFixed(2)}, ${CLEAR.contrast.toFixed(2)}, uWishFocus );
+         float wishOpacity = mix( ${CALM.opacity.toFixed(2)}, ${CLEAR.opacity.toFixed(2)}, uWishFocus );
+         float wishTintAmount = mix( ${CALM.tint.toFixed(2)}, ${CLEAR.tint.toFixed(2)}, uWishFocus );
+
+         float wishLuma = dot( wishTexel.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+         vec3 wishCalm = mix( vec3( wishLuma ), wishTexel.rgb, wishSaturation );
+         // Контраст стискається до середини, а не до чорного: темне фото не
+         // має ставати чорним кружком усередині світлого каменю.
+         wishCalm = mix( vec3( 0.45 ), wishCalm, wishContrast );
+         // І тонується в палітру світу — тим самим кольором, яким світиться
+         // сам камінь.
+         wishCalm = mix( wishCalm, wishCalm * uWishTint * 1.35, wishTintAmount );
+
+         // Накладається НА камінь, а не замість нього: крізь прев'ю видно
+         // тіло, тож предмет виглядає запечатаним у кристалі.
+         diffuseColor.rgb = mix( diffuseColor.rgb, wishCalm, wishMask * wishOpacity );
+
+         // Власне світло каменю всередині вставки притишується, але не
+         // гасне — інакше включення читається дірою.
+         totalEmissiveRadiance *= 1.0 - wishMask * 0.45;
+         totalEmissiveRadiance += wishCalm * wishMask * mix( 0.22, 0.6, uWishFocus );
+
+         // Тонке кільце світла по краю включення: воно й дає відчуття, що
+         // предмет запечатаний, а не наклеєний.
+         float wishRing = smoothstep( uWishRadius * 0.7, uWishRadius * 0.94, wishDistance )
+           * ( 1.0 - smoothstep( uWishRadius * 0.94, uWishRadius * 1.08, wishDistance ) );
+         totalEmissiveRadiance += uWishTint * wishRing * 0.5;`,
       );
   };
   material.customProgramCacheKey = () => 'wish-inclusion:view-space';
@@ -326,7 +371,7 @@ export function WishCrystalBoard({
         // Камінь лишається каменем: колір той самий, що в доньки монарха, з
         // якої взято форму. Фото живе всередині, круглим включенням.
         item.map = wishTexture(crystal.photo);
-        includePhoto(item);
+        includePhoto(item, glow);
       }
       return item;
     });
@@ -385,6 +430,11 @@ export function WishCrystalBoard({
       const advance = eased > 0 ? eased * FOCUS_ADVANCE : eased * RECEDE;
       const grow = 1 + Math.max(0, eased) * (FOCUS_GROWTH - 1);
       const material = child.material as THREE.MeshPhysicalMaterial;
+      // §30 про прев'ю: «зображення може ставати трохи чіткішим». Той самий
+      // рух фокуса, що виводить тіло вперед, знімає з картинки приглушення —
+      // одна величина на обидва вияви, тож розійтись вони не можуть.
+      const shader = material.userData.wishShader as { uniforms: Record<string, { value: unknown }> } | undefined;
+      if (shader !== undefined) shader.uniforms.uWishFocus!.value = Math.max(0, eased);
       const dim = 1 - Math.max(0, -eased) * RECEDE_FADE;
       if (material.opacity !== dim) {
         material.opacity = dim;

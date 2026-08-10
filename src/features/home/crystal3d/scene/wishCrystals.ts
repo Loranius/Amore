@@ -25,6 +25,15 @@ import { mulberry32 } from '../../mulberry32';
 export interface WishSatelliteBounds {
   height: number;
   radius: number;
+  /**
+   * Півширина силуету монарха там, де перед ним стоїть дошка.
+   *
+   * Не радіус усієї друзи: доньки біля основи розкидані широко, і звільняти
+   * місце під них означало б віддати дошці лише краї екрана. Мова про
+   * вертикальне стебло у верхній половині — те, що на екрані й читається як
+   * монарх. Саме його дошка більше не перекриває.
+   */
+  silhouetteRadius: number;
 }
 
 /** Те, що дошка знає про бажання. Назва, ціна, статус лишаються переднім UI. */
@@ -105,8 +114,50 @@ export interface WishBoardInput {
   centre: readonly [number, number, number];
 }
 
-/** Скільки бажань у ряд. Більше — і на телефоні вони стають марками. */
-const COLUMNS = 3;
+/**
+ * Скільки колонок дошка пробує — і чому саме парні числа.
+ *
+ * Була одна непарна трійка, і середня колонка стояла рівно на осі погляду,
+ * тобто рівно на монархові. Власник назвав це прямо: маленькі кристали не
+ * мають перекривати силует головного каменю, ієрархія — монарх, потім
+ * бажання, потім те, що в них усередині. Парна кількість лишає посередині
+ * коридор, і на осі не стоїть ніхто.
+ *
+ * Скільки саме — вирішує екран: вибирається та розкладка, у якій клітинка
+ * більша. На вертикальному телефоні це дві колонки в кілька рядів, на
+ * широкому — чотири в два.
+ */
+const COLUMN_CHOICES: readonly number[] = [2, 4];
+
+/**
+ * Наскільки коридор ширший за сам силует.
+ *
+ * Рівно силует, і цього досить із запасом: коридор відміряний в одиницях
+ * рушія на осі артефакта, а дошка стоїть ближче до камери — той самий
+ * відрізок на її площині перекриває більший кут. Виміряно на живому порталі:
+ * з множником 1.15 монарх забирав дві третини півширини кадру, і бажанням
+ * лишались вузькі рейки по краях.
+ */
+const SILHOUETTE_CLEARANCE = 1.0;
+
+/**
+ * З якої висоти вважається силует монарха.
+ *
+ * Дошка висить біля корони (`BOARD_CENTRE_SHARE` = 0.86 висоти), тож міряти
+ * треба верхню половину. Нижче стоять доньки, і їхній розкид — не той силует,
+ * про який ідеться.
+ */
+const SILHOUETTE_BAND = 0.5;
+
+/**
+ * Наскільки широким тіло може стати відносно власної клітинки.
+ *
+ * Вага мрії, розсип і кластерний множник перемножуються, і на найважчому
+ * бажанні з великим залишком добуток переростав клітинку — крайня колонка
+ * виходила за край кадру. Стеля тримає й те, і те: тіло не ширше за клітинку,
+ * отже не наїжджає ні на сусіда, ні на край.
+ */
+const MAX_CELL_SHARE = 0.96;
 
 /**
  * Яку частку видимої області займає дошка.
@@ -118,7 +169,7 @@ const COLUMNS = 3;
 const FILL_WIDTH = 0.94;
 const FILL_HEIGHT = 0.66;
 /** Яку частку своєї клітинки займає тіло — решта є проміжком. */
-const CELL_FILL = 0.62;
+const CELL_FILL = 0.78;
 
 /**
  * Розмір тіла як частка висоти монарха, за вагою мрії.
@@ -183,18 +234,43 @@ export function buildWishBoard(input: WishBoardInput): readonly WishCrystal[] {
   const rightX = Math.cos(facing);
   const rightZ = -Math.sin(facing);
 
-  const columns = Math.min(COLUMNS, shown);
-  const rows = Math.ceil(shown / columns);
-
   // Клітинка — те, що справді лишає екран, а не те, що хотілося б. Береться
   // менша з двох, інакше сітка вилазить по одній з осей.
   const halfWidth = Math.max(1e-3, finite(input.viewport.halfWidth, height));
   const halfHeight = Math.max(1e-3, finite(input.viewport.halfHeight, height));
-  const cell = Math.min(
-    (halfWidth * 2 * FILL_WIDTH) / columns,
-    (halfHeight * 2 * FILL_HEIGHT) / rows,
-  );
+
+  // Коридор під силует монарха. Він відміряний в одиницях рушія на осі
+  // артефакта, а дошка стоїть ближче до камери — отже той самий відрізок на
+  // її площині перекриває більший кут. Похибка в бік запасу, і це навмисно.
+  const corridor = Math.max(0, finite(input.bounds.silhouetteRadius, 0)) * SILHOUETTE_CLEARANCE;
+  // Ширина, що лишається колонкам, коли коридор віддано монарху.
+  const usable = Math.max(1e-3, halfWidth * 2 * FILL_WIDTH - corridor * 2);
+
+  // Розкладка вибирається за розміром клітинки: та сама дошка на телефоні
+  // стає вузькою і високою, на широкому екрані — низькою і широкою.
+  let columns = 2;
+  let cell = 0;
+  for (const candidate of COLUMN_CHOICES) {
+    const candidateRows = Math.ceil(shown / candidate);
+    const candidateCell = Math.min(
+      usable / candidate,
+      (halfHeight * 2 * FILL_HEIGHT) / candidateRows,
+    );
+    if (candidateCell > cell) {
+      cell = candidateCell;
+      columns = candidate;
+    }
+  }
+  const rows = Math.ceil(shown / columns);
   const unit = cell;
+  // Крок між рядами — окремо від кроку між колонками.
+  //
+  // Коридор з'їдає ширину, тож клітинку задає саме вона: тіла виходять
+  // невеликими, і ряди тулились докупи, лишаючи половину кадру порожньою. По
+  // висоті ж місця вдосталь — отже ряди розходяться на всю відведену смугу, а
+  // не на розмір клітинки. Тісніше за клітинку крок не стає ніколи.
+  const rowStep = Math.max(cell, (halfHeight * 2 * FILL_HEIGHT) / rows);
+  const perSide = columns / 2;
   const centreX = finite(input.centre[0], 0);
   const centreY = finite(input.centre[1], height * BOARD_CENTRE_RISE);
   const centreZ = finite(input.centre[2], 0);
@@ -214,11 +290,16 @@ export function buildWishBoard(input: WishBoardInput): readonly WishCrystal[] {
     // висоти монарха: клітинку задає екран, тож дошка вміщається завжди.
     const weight = (wish.priority ? (SIZE_BY_PRIORITY[wish.priority] ?? SIZE_DEFAULT) : SIZE_DEFAULT)
       / SIZE_DEFAULT;
-    const size = cell * CELL_FILL * weight * jitter * cluster;
+    const size = Math.min(cell * MAX_CELL_SHARE, cell * CELL_FILL * weight * jitter * cluster);
 
-    // Ряди центруються самі, тож неповний останній ряд не з'їжджає вбік.
-    const offset = (column - (columnsHere - 1) / 2) * unit;
-    const rise = centreY + ((rows - 1) / 2 - row) * unit;
+    // Неповний ряд займає внутрішні місця, а не крайні: інакше два бажання
+    // стояли б по кутах екрана, а посередині зяяла б дірка на всю ширину.
+    const slot = column + Math.floor((columns - columnsHere) / 2);
+    const side = slot < perSide ? -1 : 1;
+    // 0 — найближче до коридору; далі назовні.
+    const rank = slot < perSide ? perSide - 1 - slot : slot - perSide;
+    const offset = side * (corridor + (rank + 0.5) * unit);
+    const rise = centreY + ((rows - 1) / 2 - row) * rowStep;
 
     crystals.push({
       id: represents > 1 ? null : wish.id,
@@ -258,7 +339,21 @@ export function wishSatelliteBounds(geometry: CrystalGeometryState): WishSatelli
       if (span > radius) radius = span;
     }
   }
-  return { height, radius };
+  // Другий прохід — уже знаючи висоту: наскільки широкий силует там, де
+  // висить дошка. Верхня половина, бо саме там вона стоїть; ширина основи з
+  // розкиданими доньками до цього питання не належить.
+  let silhouetteRadius = 0;
+  const shoulder = height * SILHOUETTE_BAND;
+  for (const mesh of geometry.meshes) {
+    if (mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
+    const positions = mesh.positions;
+    for (let index = 0; index + 2 < positions.length; index += 3) {
+      if (positions[index + 1]! < shoulder) continue;
+      const span = Math.hypot(positions[index]!, positions[index + 2]!);
+      if (span > silhouetteRadius) silhouetteRadius = span;
+    }
+  }
+  return { height, radius, silhouetteRadius };
 }
 
 /**
