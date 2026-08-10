@@ -9,6 +9,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { TabBar, type TabBarItem } from '@/components/ui/TabBar';
 import { usePartnerQuery } from '@/features/_shared/useUsers';
+import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { WishlistBubbleView } from './WishlistBubbleView';
 import { WishlistFeedView } from './WishlistFeedView';
 import { WishlistPolaroidView } from './WishlistPolaroidView';
@@ -49,6 +50,7 @@ import {
   type WishFormPayload,
 } from './useWishlist';
 import type { WishlistItemV3 } from './wishlistRpc';
+import './wishlistCrystalWorld.css';
 import './wishlistV3.mobile.css';
 import './wishlistGiftArchive.css';
 import './wishlistArchiveRedesign.css';
@@ -134,6 +136,10 @@ function sharedEmptyState(filter: SharedWishFilter, partnerName: string) {
 }
 
 export function WishlistPage() {
+  // Перший модуль, який впускає світ (§28). Дотики лишаються сторінці: тут
+  // списки, кнопки й прокрутка, і віддати їх артефакту означало б зробити
+  // вішліст декорацією.
+  useWorldVisibleRoute();
   const me = useCurrentUser();
   const toast = useToast();
   const {

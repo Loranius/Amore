@@ -24,7 +24,8 @@ export function HomePage() {
   const { artifact, selectArtifact } = useArtifactWorld();
   // Home is the one route the world shows through today, so it is the one
   // route whose chrome follows it. Phase 2 adds the rest.
-  useWorldVisibleRoute();
+  // Головна віддає дотики артефакту: кристал тут і є сторінка.
+  useWorldVisibleRoute({ artifactInput: true });
 
   return (
     <section className="home home--world" data-home-artifact={artifact}>

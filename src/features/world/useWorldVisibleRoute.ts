@@ -16,10 +16,30 @@ import { useEffect } from 'react';
  * shopping list is precisely the discontinuity this work exists to remove, not
  * to spread. Phase 2 opts the modules in deliberately, as their surfaces turn.
  */
-export function useWorldVisibleRoute(): void {
+export interface WorldVisibleRouteOptions {
+  /**
+   * Чи віддає маршрут дотики самому артефакту.
+   *
+   * Головна — так: там кристал і Є сторінка, і вміст мусить пропускати палець
+   * до полотна. Модуль — ні: у Вішліста свої списки, кнопки й прокрутка, і
+   * забрати в них дотики означало б зробити сторінку декорацією.
+   *
+   * Раніше це була та сама ознака, що й видимість світу, і поки світ бачила
+   * лише головна, різниці не було. Перший модуль, який впустив світ, ту
+   * різницю й виявляє.
+   */
+  artifactInput?: boolean;
+}
+
+export function useWorldVisibleRoute(options: WorldVisibleRouteOptions = {}): void {
+  const artifactInput = options.artifactInput ?? false;
   useEffect(() => {
     const root = document.documentElement;
     root.setAttribute('data-portal-scene', 'true');
-    return () => root.removeAttribute('data-portal-scene');
-  }, []);
+    if (artifactInput) root.setAttribute('data-world-input', 'artifact');
+    return () => {
+      root.removeAttribute('data-portal-scene');
+      root.removeAttribute('data-world-input');
+    };
+  }, [artifactInput]);
 }

@@ -68,7 +68,7 @@
    звичайний скрол-контейнер, і забирати в нього дотики означало б
    зламати гортання списків. Скрол головної при цьому не страждає:
    вона більше не вища за екран (див. `.home--world`). */
-[data-portal-scene='true'] .app-shell > .content {
+[data-world-input='artifact'] .app-shell > .content {
   pointer-events: none;
 }
 

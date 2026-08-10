@@ -1,0 +1,105 @@
+/* ============================================================
+   Вішліст у Crystal World — бриф §28–§30, Фаза 7b.
+   ------------------------------------------------------------
+   Перший модуль, який впускає світ. Усе тут під маркером маршруту: поза ним
+   вішліст лишається тим, чим був, і жодна інша сторінка не змінюється.
+
+   **Не «прозоро», а «без білого».** §10 і §55 забороняють робити кожну
+   сторінку прозорою — застосунок стане нечитабельним. Тож папір іде, а
+   замість нього приходить керована ієрархія: одна скляна поверхня на
+   вкладки й кнопки (§44 просить саме один сильніший батько замість
+   розмиття на кожній картці), і **жодного фону** під самими бажаннями —
+   вони висять кристалами, як просив власник.
+   ============================================================ */
+
+/* Сторінка віддає папір світу. Токени перевизначаються, а не кожен елемент:
+   модуль написаний на `--text`, `--muted`, `--surface`, тож одного блоку
+   досить, щоб його власні стилі почали говорити мовою світу. */
+[data-portal-scene='true'] .wishlist.pink-page {
+  background: none;
+  --text: var(--world-text);
+  --muted: var(--world-text-muted);
+  --surface: var(--world-surface);
+  --accent: var(--world-accent);
+  --danger: var(--world-danger);
+  --ok: var(--world-success);
+  --warn: var(--world-warning);
+}
+
+/* ── Скло вкладок (§44) ─────────────────────────────────────
+   Одна поверхня на весь блок керування — перемикач «Мої / Партнер /
+   Спільні» і панель виглядів. Розмиття тут і тільки тут: далі по сторінці
+   його немає жодного, бо тридцять карток із власним `backdrop-filter` — це
+   те, що §44 називає прямо. */
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  margin-inline: -4px;
+  padding: 8px 4px;
+  border: 1px solid var(--world-border);
+  border-radius: var(--radius-lg);
+  background: var(--world-surface);
+  box-shadow:
+    inset 0 1px 0 var(--world-glow),
+    0 10px 26px var(--world-shadow);
+  backdrop-filter: blur(16px);
+}
+
+/* ── Бажання стають кристалами ──────────────────────────────
+   Головне, що просив власник: за самим бажанням нічого не має бути, а сама
+   мрія висить кристалом. Дошка лишається дошкою — фізика, відштовхування й
+   розкладка ті самі, — зникає скляна кулька, а силует стає гранованим.
+
+   **Специфічність тут не про стиль.** Кулька зібрана в одинадцяти файлах, і
+   найсильніший селектор серед них —
+   `.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble` (0,4,0). Перша
+   редакція цих правил мала 0,3,0 і програвала: на живому порталі від кульки
+   лишався світлий обідок. Тому ланцюг повторено повністю. */
+[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  /* Шестигранник із вістрям — той самий силует, що в монарха на екрані:
+     огранка, а не коло. Обрізка не змінює розкладки, тож фізика бульбашок
+     працює далі на тих самих колах. */
+  clip-path: polygon(50% 0%, 88% 21%, 88% 79%, 50% 100%, 12% 79%, 12% 21%);
+  /* Кант по силуету — єдиний спосіб окреслити обрізану форму: звичайний
+     `border` обрізається разом із нею. */
+  filter: drop-shadow(0 0 1.5px var(--world-border-active))
+    drop-shadow(0 8px 18px var(--world-shadow));
+}
+
+/* Верхній відблиск кульки не потрібен — він круглий і читається як скло. */
+[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble::before {
+  display: none;
+}
+
+/* А ось нижній шар лишається — але замість обідка й лінзи він тепер несе
+   світло на гранях.
+   Причина виміряна: без нього темне фото на темному світі читалось як діра, а
+   не як кристал, і жоден кант завтовшки в піксель цього не рятував. Дві
+   схрещені смуги світла — це і є те, що робить грань гранню (та сама логіка,
+   що в освітленні порталу). */
+[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble::after {
+  display: block;
+  background:
+    linear-gradient(152deg, rgba(255, 255, 255, 0.22) 0%, transparent 34%),
+    linear-gradient(304deg, color-mix(in srgb, var(--world-primary) 30%, transparent) 0%, transparent 44%);
+  mix-blend-mode: screen;
+}
+
+/* Медіа всередині повторює силует: кругла маска на гранованому тілі лишала б
+   світлий серп по краю. */
+[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble-media,
+[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble-placeholder {
+  border-radius: 0;
+  background: none;
+}
+
+/* Тінь під бульбашкою малювалась кольором тексту — на світлому папері це
+   м'яка сіра пляма, на нічному світі світла. */
+[data-portal-scene='true'] .wishlist .wl-cloud-item::after {
+  display: none;
+}
