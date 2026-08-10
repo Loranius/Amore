@@ -106,6 +106,11 @@ export function buildCrystalLifeState(input: BuildCrystalLifeInput): CrystalLife
     breatheSpeed: round6(0.32 * motion),
     sparkleCount,
     sparkleSpeed: round6(0.18 * motion),
+    // Mid-band of the 0.018–0.025 turns/sec the crystal brief allows the inner
+    // flow. A tenth of the sparkle's rate, which is the point: one turn takes
+    // about fifty seconds, so a couple looking at the portal sees the light
+    // move without ever catching it in the act.
+    innerFlowSpeed: round6(0.021 * motion),
     interactionPulseDuration: input.config.reducedMotion ? 0.28 : 0.46,
     bodies: input.material.bodies.map((body) => bodyLife(input, body.bodyId)),
   };
@@ -128,6 +133,7 @@ export function sampleCrystalLife(input: SampleCrystalLifeInput): CrystalLifeFra
       ? Math.sin(elapsed * life.breatheSpeed) * life.breatheAmplitude + pulse * 0.006
       : 0)),
     sparklePhase: round6(moving ? (elapsed * life.sparkleSpeed) % 1 : 0),
+    innerFlowPhase: round6(moving ? (elapsed * life.innerFlowSpeed) % 1 : 0),
     bodyGlowMultiplier,
   };
 }

@@ -159,6 +159,8 @@ export function splitCrystalMeshFaces(
   // its own copies, so a per-vertex attribute has to be copied with them.
   const sourceAxial = mesh.axialT;
   const axialT: number[] = [];
+  const sourceBodyCoord = mesh.bodyCoord;
+  const bodyCoord: number[] = [];
 
   for (let offset = 0; offset < mesh.indices.length; offset += 3) {
     const sources = [
@@ -197,6 +199,14 @@ export function splitCrystalMeshFaces(
       );
       indices.push(pushVertex(positions, corners[slot]!));
       if (sourceAxial !== undefined) axialT.push(sourceAxial[sources[slot]!] ?? 0);
+      if (sourceBodyCoord !== undefined) {
+        const from = (sources[slot] ?? 0) * 3;
+        bodyCoord.push(
+          sourceBodyCoord[from] ?? 0,
+          sourceBodyCoord[from + 1] ?? 0,
+          sourceBodyCoord[from + 2] ?? 0,
+        );
+      }
       // Faceted by default: a crystal's side is a flat plane and every triangle
       // on it must say so. `smooth` carries the mesh's own averaged normals
       // through the split instead — for a surface that is genuinely curved, a
@@ -224,6 +234,7 @@ export function splitCrystalMeshFaces(
     normals,
     uvs,
     ...(sourceAxial === undefined ? {} : { axialT }),
+    ...(sourceBodyCoord === undefined ? {} : { bodyCoord }),
     indices,
     // Bounds are unchanged in principle — the same points, listed more times —
     // but recomputing keeps the published state self-consistent rather than
@@ -280,6 +291,29 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
   const axialHigh = polytope.vertices.reduce((high, v) => Math.max(high, v.y), -Infinity);
   const axialSpan = Math.max(1e-6, axialHigh - axialLow);
   const axialT = polytope.vertices.map((v) => round6((v.y - axialLow) / axialSpan));
+
+  // Normalised body coordinates: x and z in -1..1 across the body's own widest
+  // slice, y in 0..1 from root to tip. Taken in the same local frame as
+  // `axialT` and for the same reason — the inner flow is a shape *inside this
+  // crystal*, so it has to be described in the crystal's own space and not in
+  // the scene's. A leaning child would otherwise carry a spiral leaning the
+  // other way.
+  //
+  // One divisor for both x and z rather than one each: dividing separately
+  // would map an elliptical cross-section onto a circle and make the flow
+  // wander off-centre as it turned.
+  const radialSpan = Math.max(
+    1e-6,
+    polytope.vertices.reduce((far, v) => Math.max(far, Math.hypot(v.x, v.z)), 0),
+  );
+  const bodyCoord: number[] = [];
+  for (const vertex of polytope.vertices) {
+    bodyCoord.push(
+      round6(vertex.x / radialSpan),
+      round6((vertex.y - axialLow) / axialSpan),
+      round6(vertex.z / radialSpan),
+    );
+  }
 
   // Base first. Ordering faces by kind rather than by plane index would be the
   // same thing today — the base is plane zero — but the mesh must not depend on
@@ -353,6 +387,7 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
     faceIds,
     borderEdges,
     axialT,
+    bodyCoord,
     indices,
     sourceTriangleCount,
     visibleTriangleCount: sourceTriangleCount,

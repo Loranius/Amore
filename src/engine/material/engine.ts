@@ -95,6 +95,15 @@ function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string
     body.shader.inclusionContrast,
     body.shader.coreStrength,
     rgbSignature(body.shader.coreColor),
+    // The flow belongs in the signature rather than being left to fall out of
+    // the terms above. Bodies are batched by signature and a batch shares one
+    // material, so if a body carrying the flow ever landed in a batch with one
+    // that does not, the daughters would light up with the monarch. Today the
+    // role already separates them through `baseColor` and `coreStrength`, which
+    // is precisely the kind of accident that stops holding when a constant is
+    // retuned.
+    body.shader.innerFlowStrength,
+    body.shader.innerFlowTurns,
     facetTintingSignature(body.facets),
   ].map((value) => typeof value === 'number' ? value.toFixed(6) : String(value)).join('|');
 }
@@ -458,6 +467,49 @@ function shaderRecipe(
     // was contributing was almost entirely the split.
     axialTintStrength: 0,
     footColor: coreTintColor(emissiveColor, tint),
+    // The monarch only. `focal` is the composition role exactly one body ever
+    // holds (`roleFor`: the king tier and nothing else), so this is the same
+    // "one body per artifact" the composition already guarantees rather than a
+    // second rule that could disagree with it.
+    //
+    // Earned, not decorative: the same two terms that decide how brightly the
+    // stone glows from within decide how strong the flow inside it is, because
+    // it is the same light. A couple who granted nothing still gets a monarch
+    // with something turning in her — the floor is what makes her the monarch —
+    // but a couple who gave gets visibly more of it.
+    innerFlowStrength: round6(focal
+      ? (0.34 + pressures.luminosity * 0.2 + state.luminosity * 0.1)
+        * (1 + wishDepth(tint) * CORE_WISH_GAIN * 0.5)
+      : 0),
+    // Measured, not chosen. The flow is only drawn on the far half of each turn
+    // (the half with stone in front of it), so the count decides whether there
+    // is a lit stretch inside the envelope at *every* azimuth — which is what
+    // "correct through 360°" means for this term.
+    //
+    // Swept by ablation at 0/90/180/270° on a SwiftShader context, reading the
+    // weakest angle of the four, since that is the one that decides whether the
+    // flow ever disappears:
+    //
+    //   turns   weakest angle: pixels moved / peak delta
+    //   0.90            1.8% /  9      under a full turn — gone at 0°
+    //   1.15            5.5% / 17
+    //   1.35            7.4% / 26      ← strongest floor of every value tried
+    //   1.70            7.2% / 28      mean at the weakest angle halves
+    //   2.10            4.5% / 20      turns crowd, the band overlaps itself
+    //
+    // Both failure modes are real and they pull opposite ways: below one turn
+    // there are azimuths with no far-side stretch inside the envelope at all,
+    // and well above it the stretches land close enough together to average
+    // back into an even glow. 1.35 is the floor between them.
+    innerFlowTurns: 1.35,
+    // Fixed rose and fixed amethyst, and deliberately *not* mixed toward the
+    // couple's earned colour. §6 forbids per-region hue drift, and the earned
+    // colour reaches this term already: the flow is added on top of a shell that
+    // is the couple's colour, under a core light that is the couple's colour.
+    // Tinting the ribbon as well would have put a second hue inside the body,
+    // which is exactly the two-tone the whole palette pass removed.
+    innerFlowColor: { r: 1, g: 0.34, b: 0.76 },
+    innerFlowSecondColor: { r: 0.82, g: 0.46, b: 1 },
   };
 }
 
@@ -871,6 +923,13 @@ function buildSubstrateMaterial(
       // increments a crystal grew in, and this is the stone it grew *out of*.
       axialTintStrength: 0,
       footColor: baseColor,
+      // Nothing turns inside the ground. The flow is what marks the monarch out
+      // from everything else in the scene, and a lit substrate would be the
+      // loudest thing competing with her.
+      innerFlowStrength: 0,
+      innerFlowTurns: 0,
+      innerFlowColor: baseColor,
+      innerFlowSecondColor: baseColor,
     },
     facets: SUBSTRATE_FACET_TINTING,
   };

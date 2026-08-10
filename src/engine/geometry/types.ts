@@ -232,6 +232,16 @@ export interface CrystalMeshData {
    * Optional so persisted Geometry State v1 meshes stay readable.
    */
   axialT?: number[];
+  /**
+   * Normalised body coordinates, three per vertex: x and z in -1..1 across the
+   * body's widest slice, y in 0..1 from root to tip.
+   *
+   * The frame the inner flow is described in. It is a shape *inside* the
+   * crystal, so it has to live in the crystal's own space — in world space a
+   * leaning child would carry a spiral leaning the other way, and a tall body
+   * and a short one would carry different-sized ones.
+   */
+  bodyCoord?: number[];
   indices: number[];
   sourceTriangleCount: number;
   visibleTriangleCount: number;

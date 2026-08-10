@@ -44,6 +44,20 @@ export interface CrystalLifeState {
   breatheSpeed: number;
   sparkleCount: number;
   sparkleSpeed: number;
+  /**
+   * How fast the energy inside the monarch turns, in whole turns per second.
+   *
+   * Its own clock rather than the sparkle's, and by an order of magnitude: dust
+   * catching the light is a twinkle, and the flow in the body's core is a slow
+   * convection. Sharing `sparkleSpeed` would have spun the helix ten times too
+   * fast, at which point it stops reading as something moving inside stone and
+   * starts reading as an animation playing on it.
+   *
+   * Zero under reduced motion, through the same `motion` gate as every other
+   * term here — so the helix is still drawn, and still exactly where the
+   * couple's seed puts it, but it holds still.
+   */
+  innerFlowSpeed: number;
   interactionPulseDuration: number;
   bodies: CrystalBodyLife[];
 }
@@ -69,6 +83,8 @@ export interface CrystalLifeState {
 export interface CrystalLifeFrame {
   groupScale: number;
   sparklePhase: number;
+  /** Turns completed by the monarch's inner flow, wrapped to 0..1. */
+  innerFlowPhase: number;
   bodyGlowMultiplier: Readonly<Record<string, number>>;
 }
 

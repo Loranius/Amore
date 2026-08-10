@@ -128,6 +128,13 @@ export function createThreeCrystalGeometry(
   if (mesh.axialT !== undefined && mesh.axialT.length === mesh.positions.length / 3) {
     geometry.setAttribute('evolutionAxial', new THREE.Float32BufferAttribute(mesh.axialT, 1));
   }
+  // The body's own normalised frame, which is where the inner flow is drawn.
+  if (mesh.bodyCoord !== undefined && mesh.bodyCoord.length === mesh.positions.length) {
+    geometry.setAttribute(
+      'evolutionBodyCoord',
+      new THREE.Float32BufferAttribute(mesh.bodyCoord, 3),
+    );
+  }
   geometry.setIndex(mesh.indices);
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
