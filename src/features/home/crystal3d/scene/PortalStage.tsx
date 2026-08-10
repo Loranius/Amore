@@ -11,6 +11,7 @@ import { useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
+import { useWorldPose } from '@/features/world/useWorldPose';
 import {
   PORTAL_AMBIENT_INTENSITY,
   PORTAL_HEMISPHERE_INTENSITY,
@@ -66,6 +67,10 @@ export function PortalStage({
   );
   const daisScale = useMemo(() => portalDaisScale(artifactSceneRadius), [artifactSceneRadius]);
   const palette = PORTAL_PALETTES[theme];
+  // Де стоїть світ для поточного маршруту (атлас, ADR-0021). Чиста
+  // функція шляху — тож глибоке посилання дає той самий стан, що й
+  // прихід сюди кроками (§25).
+  const { pose } = useWorldPose();
 
   return (
     <>
@@ -123,7 +128,7 @@ export function PortalStage({
         veinBearings={veinBearings}
         veinReach={veinReach}
       />
-      <PortalCameraRig frame={frame} controls={controls} />
+      <PortalCameraRig frame={frame} controls={controls} pose={pose} />
 
       {children}
 
