@@ -101,11 +101,11 @@ const TAP_SLOP = 12;
  * поверхні, і фото на них розпалось би на клапті. Тут же координата береться з
  * позиції вершини, тобто картинка натягнута на силует цілком.
  */
-function projectPhotoUv(geometry: THREE.BufferGeometry): void {
+function projectPhotoUv(geometry: THREE.BufferGeometry): number {
   const position = geometry.getAttribute('position');
   geometry.computeBoundingBox();
   const box = geometry.boundingBox;
-  if (box === null) return;
+  if (box === null) return 1;
   const spanX = Math.max(1e-6, box.max.x - box.min.x);
   const spanY = Math.max(1e-6, box.max.y - box.min.y);
   const uv = new Float32Array(position.count * 2);
@@ -114,7 +114,66 @@ function projectPhotoUv(geometry: THREE.BufferGeometry): void {
     uv[index * 2 + 1] = (position.getY(index) - box.min.y) / spanY;
   }
   geometry.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  // Тіло вище, ніж ширше, тож коло в координатах текстури було б еліпсом на
+  // екрані. Пропорція повертається нагору й виправляє маску.
+  return spanX / spanY;
 }
+
+/**
+ * Радіус включення у висотах тіла.
+ *
+ * 0.26 → 0.34: виміряно на живому порталі, менше включення читалось як
+ * пляма, а не як фото. Більше за 0.36 воно торкається граней і перестає бути
+ * включенням.
+ */
+const INCLUSION_RADIUS = 0.34;
+
+/**
+ * Фото — включення В камені, а не малюнок НА ньому.
+ *
+ * Власник сформулював це прямо: фотографія всередині кристалика у формі
+ * круга, а сам кристалик кольору монарха й доньок. Тому шейдер не множить
+ * колір на карту (так робить `map` за замовчуванням і так виходить наліпка на
+ * гранях) — він **підмінює** колір усередині круглої маски й лишає камінь
+ * каменем зовні.
+ *
+ * Маска рахується в об'єктному просторі з поправкою на пропорцію тіла, тож це
+ * коло, а не еліпс. Край розмито на два відсотки радіуса — включення в камені
+ * не має паперового обрізу.
+ */
+function includePhoto(
+  material: THREE.MeshPhysicalMaterial,
+  aspect: number,
+): void {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uWishAspect = { value: aspect };
+    shader.uniforms.uWishRadius = { value: INCLUSION_RADIUS };
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        'void main() {',
+        `uniform float uWishAspect;
+         uniform float uWishRadius;
+         void main() {`,
+      )
+      .replace(
+        '#include <map_fragment>',
+        `vec2 wishOffset = ( vMapUv - 0.5 ) * vec2( uWishAspect, 1.0 );
+         float wishDistance = length( wishOffset );
+         float wishMask = 1.0 - smoothstep( uWishRadius * 0.98, uWishRadius, wishDistance );
+         vec2 wishUv = wishOffset / ( 2.0 * uWishRadius ) + 0.5;
+         vec4 wishTexel = texture2D( map, clamp( wishUv, 0.0, 1.0 ) );
+         diffuseColor.rgb = mix( diffuseColor.rgb, wishTexel.rgb, wishMask );
+         // Включення ще й трохи світиться, інакше на тіньовому боці каменю
+         // його не видно: дошка стоїть між камерою й ключовим світлом.
+         totalEmissiveRadiance += wishTexel.rgb * wishMask * 0.7;`,
+      );
+  };
+  // Три матеріали з однаковим кодом мають ділити програму; без ключа кожен
+  // компілював би власну.
+  material.customProgramCacheKey = () => `wish-inclusion:${aspect.toFixed(3)}`;
+}
+
+
 
 export function WishCrystalBoard({
   bundle,
@@ -168,10 +227,10 @@ export function WishCrystalBoard({
       -(box.min.y + box.max.y) / 2,
       -(box.min.z + box.max.z) / 2,
     );
-    projectPhotoUv(built);
+    const aspect = projectPhotoUv(built);
     built.computeBoundingBox();
     const height = Math.max(1e-6, (built.boundingBox?.max.y ?? 1) - (built.boundingBox?.min.y ?? 0));
-    return { geometry: built, height };
+    return { geometry: built, height, aspect };
   }, [donor, donorMaterial, geometry.artifactSeed]);
 
   // Один матеріал на бажання: спільна геометрія, різні фото.
@@ -214,25 +273,23 @@ export function WishCrystalBoard({
         // Тіла дошки стоять МІЖ камерою й артефактом, а ключове світло — за
         // ними. Виміряно: без власного світла вони виходили майже чорними, бо
         // освітлений бік дивився від глядача.
+        // Тіла дошки стоять МІЖ камерою й артефактом, а ключове світло — за
+        // ними: освітлений бік дивиться від глядача. Виміряно — без власного
+        // світла камінь виходив майже чорним.
         emissive: new THREE.Color(0xffffff),
-        emissiveIntensity: 0.3,
+        emissiveIntensity: 0.22,
       });
       if (crystal.photo !== null) {
-        const texture = wishTexture(crystal.photo);
-        item.map = texture;
-        // Біла база — щоб фото показалось як є, а не крізь колір каменю.
-        item.color = new THREE.Color(0xffffff);
-        // І воно світиться зсередини: саме це робить картинку читабельною з
-        // будь-якого боку, як просив власник, і знімає залежність від того, з
-        // якого боку стоїть лампа.
-        item.emissiveMap = texture;
-        item.emissiveIntensity = 0.6;
+        // Камінь лишається каменем: колір той самий, що в доньки монарха, з
+        // якої взято форму. Фото живе всередині, круглим включенням.
+        item.map = wishTexture(crystal.photo);
+        includePhoto(item, shape?.aspect ?? 1);
       }
       return item;
     });
     owned.current = built;
     return built;
-  }, [donorMaterial, crystals]);
+  }, [donorMaterial, crystals, shape]);
 
   useEffect(() => () => {
     for (const item of owned.current) item.dispose();

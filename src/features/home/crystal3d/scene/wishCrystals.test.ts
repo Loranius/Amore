@@ -138,7 +138,10 @@ describe('bounds (brief §29, §43)', () => {
     const one = buildWishBoard({ ...BASE, wishes: twelve });
     const crowd = buildWishBoard({ ...BASE, wishes: many });
     expect(crowd[crowd.length - 1]!.size).toBeGreaterThan(one[one.length - 1]!.size);
-    expect(crowd[crowd.length - 1]!.size).toBeLessThan(BASE.bounds.height * 0.35);
+    // Половина висоти монарха — межа, за якою тіло перестає читатись як
+    // бажання поруч із артефактом. Підняте з 0.35 разом із самими тілами:
+    // вони виросли, бо фото всередині них не читалось.
+    expect(crowd[crowd.length - 1]!.size).toBeLessThan(BASE.bounds.height * 0.5);
   });
 
   it('draws nothing when there is nothing to wish for, or nothing to draw with', () => {
