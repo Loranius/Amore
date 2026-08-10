@@ -13,6 +13,7 @@ import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { WishlistBubbleView } from './WishlistBubbleView';
 import { WishlistCrystalView } from './WishlistCrystalView';
+import { WishlistWorldNav } from './WishlistWorldNav';
 import { WishlistFeedView } from './WishlistFeedView';
 import { WishlistPolaroidView } from './WishlistPolaroidView';
 import { WishFormModal } from './WishFormModal';
@@ -396,7 +397,7 @@ export function WishlistPage() {
       aria-busy={(!archiveOpen && isPending) || mutationBusy}
     >
 
-      {!archiveOpen && (
+      {!archiveOpen && !worldVisible && (
         <WishlistHero
           tab={tab}
           meName={me.name}
@@ -408,19 +409,47 @@ export function WishlistPage() {
         />
       )}
 
-      <div className="wl-wishlist-controls">
-        <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
+      {/* У світі вся службова навігація живе в аркуші (WishlistWorldNav):
+          власник просив, щоб у закритому стані на екрані лишались сцена,
+          кристали й нижня навігація. Поза світом усе як було. */}
+      {!worldVisible && (
+        <div className="wl-wishlist-controls">
+          <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
 
-        {!archiveOpen && !isPending && !isError && contextItems.length > 0 && (
-          <WishlistBoardToolbar
-            value={activeBoardView}
-            counts={boardFilterCounts}
-            resultCount={visibleItems.length}
-            onChange={changeBoardView}
-            onPolaroidReshuffle={reshufflePolaroids}
-          />
-        )}
-      </div>
+          {!archiveOpen && !isPending && !isError && contextItems.length > 0 && (
+            <WishlistBoardToolbar
+              value={activeBoardView}
+              counts={boardFilterCounts}
+              resultCount={visibleItems.length}
+              onChange={changeBoardView}
+              onPolaroidReshuffle={reshufflePolaroids}
+            />
+          )}
+        </div>
+      )}
+
+      {worldVisible && (
+        <WishlistWorldNav
+          tab={tab}
+          onTabChange={changeTab}
+          tabLabels={{ me: 'Мої', partner: partnerGenitive(partner.name), shared: 'Спільні' }}
+          tabCounts={{
+            me: ownQuery.isPending || ownQuery.isError ? null : ownItems.length,
+            partner: partnerWishlistQuery.isPending || partnerWishlistQuery.isError
+              ? null
+              : partnerItems.length,
+            shared: sharedQuery.isPending || sharedQuery.isError ? null : sharedItems.length,
+          }}
+          archiveOpen={archiveOpen}
+          onArchiveChange={setArchiveOpen}
+          archiveAvailable={canShowArchive}
+          priority={activeBoardView.priority}
+          onPriorityChange={(priority) => changeBoardView({ ...activeBoardView, priority })}
+          priorityCounts={boardFilterCounts}
+          onAdd={() => setAdding(true)}
+          busy={mutationBusy}
+        />
+      )}
 
       {archiveOpen && canShowArchive ? (
         <WishArchive

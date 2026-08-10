@@ -17,16 +17,23 @@ const BARE = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
 /** Selectors, read by tracking braces rather than by guessing at line ends. */
 function selectors(css: string): string[] {
   const found: string[] = [];
-  const stack: ('at' | 'rule')[] = [];
+  // `@keyframes` теж at-rule, але його діти — не селектори, а `from`/`to`.
+  // Перша редакція цього обхідника рахувала їх селекторами й вимагала від них
+  // маркера маршруту.
+  const stack: ('at' | 'keyframes' | 'rule')[] = [];
   let head = '';
   for (const char of css) {
     const inDeclarations = stack[stack.length - 1] === 'rule';
     if (char === '{') {
       const text = head.trim();
       head = '';
-      if (text.startsWith('@')) { stack.push('at'); continue; }
+      if (text.startsWith('@')) {
+        stack.push(text.startsWith('@keyframes') ? 'keyframes' : 'at');
+        continue;
+      }
+      const insideKeyframes = stack[stack.length - 1] === 'keyframes';
       stack.push('rule');
-      if (text !== '') found.push(text);
+      if (text !== '' && !insideKeyframes) found.push(text);
     } else if (char === '}') {
       head = '';
       stack.pop();
@@ -69,14 +76,15 @@ describe('scope (brief §42, §55)', () => {
 });
 
 describe('surfaces (brief §10, §44)', () => {
-  it('blurs the controls and nothing else', () => {
+  it('blurs the sheet and nothing else', () => {
     // §44 asks for one stronger parent glass surface rather than an
-    // independent backdrop-filter per card. The tab bar is that parent; a
-    // board of wishes is not.
+    // independent backdrop-filter per element. The sheet is that surface. The
+    // 46px round button is not: a backdrop pass on it buys nothing the
+    // translucent fill and the hairline edge do not already give.
     const blurs = BARE.match(/backdrop-filter:\s*blur/g) ?? [];
     expect(blurs).toHaveLength(1);
-    const controls = BARE.slice(BARE.indexOf('.wl-wishlist-controls'));
-    expect(controls.slice(0, controls.indexOf('}'))).toMatch(/backdrop-filter:\s*blur/);
+    const sheet = BARE.slice(BARE.indexOf('.wl-world-sheet {'));
+    expect(sheet.slice(0, sheet.indexOf('}'))).toMatch(/backdrop-filter:\s*blur/);
   });
 
   it('takes the paper away without making the page transparent', () => {
