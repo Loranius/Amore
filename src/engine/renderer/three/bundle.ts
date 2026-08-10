@@ -436,6 +436,29 @@ export function createThreeCrystalRenderBundle(
   };
 }
 
+/**
+ * Presentation-only visibility switch for one published body.
+ *
+ * BatchedMesh instance order is deliberately identical to `bodyIds` (enforced
+ * in `buildBatch`), so a portal can omit the quartz substrate without cloning
+ * geometry, changing material groups, or mutating authoritative engine state.
+ */
+export function setThreeCrystalBodyVisible(
+  bundle: ThreeCrystalRenderBundle,
+  bodyId: string,
+  visible: boolean,
+): boolean {
+  let matched = false;
+  for (const batch of bundle.batches) {
+    for (let instanceId = 0; instanceId < batch.bodyIds.length; instanceId += 1) {
+      if (batch.bodyIds[instanceId] !== bodyId) continue;
+      batch.mesh.setVisibleAt(instanceId, visible);
+      matched = true;
+    }
+  }
+  return matched;
+}
+
 export function applyCrystalLifeFrame(
   bundle: ThreeCrystalRenderBundle,
   frame: CrystalLifeFrame,

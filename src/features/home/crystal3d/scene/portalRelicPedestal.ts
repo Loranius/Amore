@@ -88,7 +88,14 @@ function merge(parts: readonly THREE.BufferGeometry[], label: string): THREE.Buf
 
 /** One continuous bronze shell plus its raised rims. */
 export function buildPortalRelicBodyGeometry(): THREE.BufferGeometry {
-  const profile = BODY_PROFILE.map(([radius, y]) => new THREE.Vector2(radius, y));
+  // LatheGeometry derives winding from profile order. Walking from the top
+  // centre towards the outer skirt points the entire shell inward: the top is
+  // back-face culled from above and the temple tiles show through it. Traverse
+  // the closed section from the bottom centre back up instead, so the load-
+  // bearing disc faces +Y and every skirt tier faces away from the axis.
+  const profile = [...BODY_PROFILE]
+    .reverse()
+    .map(([radius, y]) => new THREE.Vector2(radius, y));
   const body = new THREE.LatheGeometry(profile, RADIAL_SEGMENTS);
   const parts: THREE.BufferGeometry[] = [
     body,
