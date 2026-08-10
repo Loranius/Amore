@@ -1,11 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_CRYSTAL_COMPOSITION_CONFIG, buildCrystalComposition } from '../../composition';
 import { buildArtifactBlueprint, type EvolutionEventInput } from '../../evolution';
-import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG, buildCrystalGeometry } from '../../geometry';
+import {
+  CRYSTAL_SUBSTRATE_BODY_ID,
+  DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
+  buildCrystalGeometry,
+} from '../../geometry';
 import { DEFAULT_GROWTH_ENGINE_CONFIG, buildGrowthState } from '../../growth';
 import { DEFAULT_CRYSTAL_MATERIAL_CONFIG, buildCrystalMaterialState } from '../../material';
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../../species/crystal';
-import { createThreeCrystalRenderBundle } from './bundle';
+import {
+  createThreeCrystalRenderBundle,
+  setThreeCrystalBodyVisible,
+  type ThreeCrystalRenderBundle,
+} from './bundle';
 
 const AS_OF = '2026-07-01T12:00:00Z';
 
@@ -30,7 +38,11 @@ function events(startYear: number): EvolutionEventInput[] {
   ];
 }
 
-function fitFor(startedAt: string, startYear: number) {
+function fitFor(
+  startedAt: string,
+  startYear: number,
+  inspect?: (bundle: ThreeCrystalRenderBundle) => void,
+) {
   const artifact = buildArtifactBlueprint({
     coupleId: 'crystal-fit-couple',
     config: {
@@ -62,6 +74,7 @@ function fitFor(startedAt: string, startYear: number) {
     config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality: 'balanced' },
   });
   const bundle = createThreeCrystalRenderBundle(geometry, material);
+  inspect?.(bundle);
   const fit = bundle.fit;
   const renderedHeight = fit.sourceSize.y * fit.scale;
   bundle.dispose();
@@ -106,5 +119,28 @@ describe('crystal render fit', () => {
         .toBeLessThanOrEqual(fit.targetWidth + 1e-6);
       expect(fit.scale).toBeLessThanOrEqual(fit.referenceScale + 1e-6);
     }
+  });
+
+  it('can omit only the substrate as a renderer presentation choice', () => {
+    fitFor('2022-06-14', 2022, (bundle) => {
+      expect(setThreeCrystalBodyVisible(bundle, CRYSTAL_SUBSTRATE_BODY_ID, false)).toBe(true);
+
+      let hiddenSubstrate = 0;
+      let visibleCrystals = 0;
+      for (const batch of bundle.batches) {
+        batch.bodyIds.forEach((bodyId, instanceId) => {
+          if (bodyId === CRYSTAL_SUBSTRATE_BODY_ID) {
+            expect(batch.mesh.getVisibleAt(instanceId)).toBe(false);
+            hiddenSubstrate += 1;
+          } else {
+            expect(batch.mesh.getVisibleAt(instanceId)).toBe(true);
+            visibleCrystals += 1;
+          }
+        });
+      }
+
+      expect(hiddenSubstrate).toBe(1);
+      expect(visibleCrystals).toBeGreaterThan(0);
+    });
   });
 });

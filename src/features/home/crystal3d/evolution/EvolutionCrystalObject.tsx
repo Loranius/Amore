@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import type { CrystalGeometryState } from '@/engine/geometry';
+import { CRYSTAL_SUBSTRATE_BODY_ID, type CrystalGeometryState } from '@/engine/geometry';
 import type { CrystalLifeState } from '@/engine/life';
 import { sampleCrystalLife } from '@/engine/life';
 import type { CrystalMaterialState } from '@/engine/material';
@@ -8,6 +8,7 @@ import {
   applyCrystalLifeFrame,
   createThreeCrystalInnerSparks,
   createThreeCrystalRenderBundle,
+  setThreeCrystalBodyVisible,
 } from '@/engine/renderer/three';
 import { isCrystalTap, type CrystalPointerSample } from './tapGesture';
 
@@ -15,18 +16,29 @@ export interface EvolutionCrystalObjectProps {
   geometry: CrystalGeometryState;
   material: CrystalMaterialState;
   life: CrystalLifeState;
+  /** Portal presentation may seat the crystals directly in a solid plinth. */
+  substrateVisible?: boolean;
 }
 
 /**
  * Thin R3F shell around the renderer-independent Phase 1-6 states.
  * It owns no evolution, species, composition, geometry or material decisions.
  */
-export function EvolutionCrystalObject({ geometry, material, life }: EvolutionCrystalObjectProps) {
+export function EvolutionCrystalObject({
+  geometry,
+  material,
+  life,
+  substrateVisible = true,
+}: EvolutionCrystalObjectProps) {
   const pulseUntil = useRef(0);
   const pointerDown = useRef<CrystalPointerSample | null>(null);
   const bundle = useMemo(
-    () => createThreeCrystalRenderBundle(geometry, material),
-    [geometry, material],
+    () => {
+      const next = createThreeCrystalRenderBundle(geometry, material);
+      setThreeCrystalBodyVisible(next, CRYSTAL_SUBSTRATE_BODY_ID, substrateVisible);
+      return next;
+    },
+    [geometry, material, substrateVisible],
   );
 
   // The lights inside the monarch (brief §9). Built beside the bundle rather

@@ -25,6 +25,7 @@ export type { ThreeCrystalInnerSparks } from './innerSparks';
 export {
   applyCrystalLifeFrame,
   createThreeCrystalRenderBundle,
+  setThreeCrystalBodyVisible,
   crystalSceneHeight,
   crystalSceneRadius,
   crystalSubstrateSceneRadius,

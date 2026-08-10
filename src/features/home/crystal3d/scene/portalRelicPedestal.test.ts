@@ -23,18 +23,27 @@ describe('portal relic pedestal', () => {
   it('keeps one solid setting exactly on the crystal ground plane', () => {
     const body = buildPortalRelicBodyGeometry();
     const position = body.getAttribute('position');
+    const normal = body.getAttribute('normal');
     let centreOnGround = false;
     let topEdgeOnGround = false;
+    let upwardTopVertices = 0;
+    let downwardTopVertices = 0;
 
     for (let index = 0; index < position.count; index += 1) {
       const radius = Math.hypot(position.getX(index), position.getZ(index));
       const y = position.getY(index);
       if (radius < 1e-6 && Math.abs(y) < 1e-6) centreOnGround = true;
       if (Math.abs(radius - 1.05) < 1e-4 && Math.abs(y) < 1e-6) topEdgeOnGround = true;
+      if (radius <= 1.051 && Math.abs(y) < 1e-6) {
+        if (normal.getY(index) > 0.9) upwardTopVertices += 1;
+        if (normal.getY(index) < -0.9) downwardTopVertices += 1;
+      }
     }
 
     expect(centreOnGround).toBe(true);
     expect(topEdgeOnGround).toBe(true);
+    expect(upwardTopVertices).toBeGreaterThan(0);
+    expect(downwardTopVertices).toBe(0);
     expect(PORTAL_RELIC_TOP_RADIUS).toBeGreaterThan(1.05);
     expect(body.boundingBox!.min.y).toBeCloseTo(-PORTAL_RELIC_DEPTH, 6);
     expect(body.boundingBox!.max.x).toBeCloseTo(PORTAL_RELIC_OUTER_RADIUS, 6);
