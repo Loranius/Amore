@@ -41,7 +41,8 @@ For every implementation task:
 5. Add or update tests in the same change.
 6. Run format, lint, typecheck, unit, contract, determinism, serialization, and build gates that apply.
 7. Run `python scripts/validate_documentation.py` when documentation changes.
-8. Report changed files, satisfied requirement IDs, commands executed, results, and remaining risks.
+8. For any change a couple would see, verify it on the running portal with `npm run live -- <route>` before claiming it works, and report what was measured. Read `scripts/live/README.md` first: it lists five ways a live screenshot has already lied in this project — a stale service worker, missing CORS on textures, no WebGL, an unspoofed device tier, and screenshots taken before the scene settles. Do not hand-roll a new harness; the traps are closed in that one.
+9. Report changed files, satisfied requirement IDs, commands executed, results, and remaining risks.
 
 ## Prohibitions
 

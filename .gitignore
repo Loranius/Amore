@@ -16,6 +16,11 @@ test-results
 # і жодної користі: локально файл усе одно згенерується заново.
 *.tsbuildinfo
 
+# Знімки живої перевірки (scripts/live) — робочий матеріал, не артефакт.
+.live
+# Локальні облікові дані для входу в портал під час перевірки.
+.env.live
+
 # dev-only crystal render harness (never committed)
 crystal-preview.html
 src/crystal-preview.tsx

@@ -6,7 +6,9 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    // Скрипти живої перевірки теж мають чисту частину — розбір аргументів,
+    // де мовчазна помилка коштує знімка не того екрана.
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.mjs'],
   },
   // Той самий аліас, що у vite.config.ts. Донедавна тести жили лише в
   // artifact/, де всі імпорти відносні, тож аліас був не потрібен — і

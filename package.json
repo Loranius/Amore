@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "verify:pages-build": "node scripts/verify-pages-build.mjs"
+    "verify:pages-build": "node scripts/verify-pages-build.mjs",
+    "live": "node scripts/live/shot.mjs",
+    "live:diff": "node scripts/live/diff.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.0.0",
