@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame, type ThreeEvent } from '@react-three/fiber';
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { CrystalGeometryState } from '@/engine/geometry';
 import type { CrystalMaterialState } from '@/engine/material';
@@ -7,6 +7,7 @@ import type { ThreeCrystalRenderBundle } from '@/engine/renderer/three';
 import { buildWishCrystalGeometry } from './wishCrystalGeometry';
 import {
   buildWishBoard,
+  wishBoardCentre,
   wishSatelliteBounds,
   type WishCrystal,
   type WishSatelliteQuality,
@@ -72,6 +73,14 @@ function wishTexture(url: string): THREE.Texture {
   WISH_TEXTURES.set(url, texture);
   return texture;
 }
+
+/**
+ * Де стоїть центр дошки, як частка висоти монарха.
+ *
+ * Збігається з `targetHeight` пози вішліста в атласі (ADR-0021): камера
+ * дивиться саме туди, і дошка має бути там, куди дивиться камера.
+ */
+const BOARD_CENTRE_SHARE = 0.86;
 
 /**
  * Наскільки вибране тіло виходить уперед, а решта відступає (§30).
@@ -185,15 +194,52 @@ export function WishCrystalBoard({
   /** Наскільки кожне тіло вже дійшло до свого стану фокуса, 0..1. */
   const focusEase = useRef<number[]>([]);
 
+  // Скільки місця дає екран на глибині дошки — в одиницях рушія.
+  //
+  // Береться з живої камери, а не з припущення: кадр будується під артефакт,
+  // а не під бажання, і на телефоні сітка у власних розмірах виходила за
+  // краї — крайні тіла зрізало, нижній ряд ховався за доком.
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
+  const bounds = useMemo(() => wishSatelliteBounds(geometry), [geometry]);
+  // Де стоїть дошка і скільки місця їй дає екран.
+  //
+  // Центр беремо на **осі погляду** камери, а не на осі артефакта: камера
+  // дивиться під кутом, і центр кадру з віссю каменю не збігається. Виміряно
+  // на телефоні — коли дошку центрували на артефакті, праву колонку зрізало.
+  const placement = useMemo(() => {
+    const fit = Math.max(1e-6, bundle.fit.scale);
+    bundle.content.updateWorldMatrix(true, false);
+    const axis = wishBoardCentre(bounds, facing, bounds.height * BOARD_CENTRE_SHARE);
+    const axisWorld = new THREE.Vector3(axis[0], axis[1], axis[2])
+      .applyMatrix4(bundle.content.matrixWorld);
+    const forward = new THREE.Vector3();
+    camera.getWorldDirection(forward);
+    const depth = Math.max(0.2, axisWorld.clone().sub(camera.position).dot(forward));
+    const centreWorld = camera.position.clone().add(forward.clone().multiplyScalar(depth));
+    const centre = bundle.content.worldToLocal(centreWorld);
+
+    const perspective = camera instanceof THREE.PerspectiveCamera ? camera : null;
+    const fov = ((perspective?.fov ?? 42) * Math.PI) / 180;
+    const aspect = size.height > 0 ? size.width / size.height : 1;
+    const halfHeight = Math.tan(fov / 2) * depth;
+    return {
+      centre: [centre.x, centre.y, centre.z] as const,
+      viewport: { halfWidth: (halfHeight * aspect) / fit, halfHeight: halfHeight / fit },
+    };
+  }, [camera, size.width, size.height, bundle, bounds, facing]);
+
   const crystals = useMemo(
     () => buildWishBoard({
       wishes,
       seed: geometry.artifactSeed,
-      bounds: wishSatelliteBounds(geometry),
+      bounds,
       quality,
       facing,
+      viewport: placement.viewport,
+      centre: placement.centre,
     }),
-    [wishes, geometry, quality, facing],
+    [wishes, geometry.artifactSeed, bounds, quality, facing, placement],
   );
 
   // Колір — монарха, а не найменшої доньки. Власник просив прямо: бажання

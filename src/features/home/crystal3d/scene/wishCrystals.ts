@@ -73,6 +73,18 @@ export function wishSatelliteCap(quality: WishSatelliteQuality): number {
   return 0;
 }
 
+/**
+ * Скільки місця дошці дає екран, в одиницях рушія, на її власній глибині.
+ *
+ * Без цього дошка будувалась у власних розмірах і на телефоні виходила за
+ * краї: крайні бажання зрізало, а нижній ряд ховався за доком. Тепер сітка
+ * вписується у видиму область, тож усі бажання на одному екрані.
+ */
+export interface WishBoardViewport {
+  halfWidth: number;
+  halfHeight: number;
+}
+
 export interface WishBoardInput {
   wishes: readonly WishSubject[];
   /** Насіння артефакта — у кожної пари свій розсип, і він незмінний. */
@@ -81,10 +93,32 @@ export interface WishBoardInput {
   quality: WishSatelliteQuality;
   /** Азимут камери маршруту: дошка стоїть перпендикулярно до погляду. */
   facing: number;
+  viewport: WishBoardViewport;
+  /**
+   * Центр дошки в кадрі артефакта.
+   *
+   * Приходить із компонента, бо це точка на **осі погляду** камери, а не на
+   * осі артефакта. Виміряно на телефоні: коли дошку центрували на артефакті,
+   * праву колонку зрізало краєм екрана — камера дивиться під кутом, і центр
+   * кадру не збігається з віссю каменю.
+   */
+  centre: readonly [number, number, number];
 }
 
 /** Скільки бажань у ряд. Більше — і на телефоні вони стають марками. */
 const COLUMNS = 3;
+
+/**
+ * Яку частку видимої області займає дошка.
+ *
+ * По ширині майже всю; по висоті — менше, бо знизу плаває док, а згори
+ * стоїть заголовок сторінки, і ховати бажання під ними означало б не
+ * показати їх узагалі.
+ */
+const FILL_WIDTH = 0.94;
+const FILL_HEIGHT = 0.66;
+/** Яку частку своєї клітинки займає тіло — решта є проміжком. */
+const CELL_FILL = 0.62;
 
 /**
  * Розмір тіла як частка висоти монарха, за вагою мрії.
@@ -109,14 +143,28 @@ const SIZE_DEFAULT = 0.25;
  * кадр — виміряно на живому порталі.
  */
 const BOARD_STANDOFF = 1.02;
-/** Крок сітки, у власних розмірах тіла. */
-const COLUMN_STEP = 1.5;
-const ROW_STEP = 1.45;
 /** Центр дошки як частка висоти монарха. */
 const BOARD_CENTRE_RISE = 0.72;
 
 function finite(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * Центр дошки в кадрі артефакта.
+ *
+ * Експортується, бо видиму ширину треба міряти саме на цій глибині: дошка
+ * стоїть ближче до камери за вісь артефакта, і різниця між «біля осі» та «біля
+ * дошки» — це і є та похибка, через яку крайні бажання зрізало.
+ */
+export function wishBoardCentre(
+  bounds: WishSatelliteBounds,
+  facing: number,
+  centreRise: number,
+): readonly [number, number, number] {
+  const radius = Math.max(1e-3, finite(bounds.radius, 1));
+  const standoff = radius * BOARD_STANDOFF;
+  return [Math.sin(facing) * standoff, centreRise, Math.cos(facing) * standoff];
 }
 
 export function buildWishBoard(input: WishBoardInput): readonly WishCrystal[] {
@@ -126,7 +174,6 @@ export function buildWishBoard(input: WishBoardInput): readonly WishCrystal[] {
   if (shown === 0) return [];
 
   const height = Math.max(1e-3, finite(input.bounds.height, 1));
-  const radius = Math.max(1e-3, finite(input.bounds.radius, 1));
   const facing = finite(input.facing, 0);
   const random = mulberry32(Math.floor(finite(input.seed, 0)) >>> 0);
 
@@ -135,40 +182,51 @@ export function buildWishBoard(input: WishBoardInput): readonly WishCrystal[] {
   // монархом, під яким би кутом камера не стояла.
   const rightX = Math.cos(facing);
   const rightZ = -Math.sin(facing);
-  const outX = Math.sin(facing);
-  const outZ = Math.cos(facing);
 
-  const rows = Math.ceil(shown / COLUMNS);
-  const unit = height * SIZE_DEFAULT;
-  const centreRise = height * BOARD_CENTRE_RISE;
-  const standoff = radius * BOARD_STANDOFF;
+  const columns = Math.min(COLUMNS, shown);
+  const rows = Math.ceil(shown / columns);
+
+  // Клітинка — те, що справді лишає екран, а не те, що хотілося б. Береться
+  // менша з двох, інакше сітка вилазить по одній з осей.
+  const halfWidth = Math.max(1e-3, finite(input.viewport.halfWidth, height));
+  const halfHeight = Math.max(1e-3, finite(input.viewport.halfHeight, height));
+  const cell = Math.min(
+    (halfWidth * 2 * FILL_WIDTH) / columns,
+    (halfHeight * 2 * FILL_HEIGHT) / rows,
+  );
+  const unit = cell;
+  const centreX = finite(input.centre[0], 0);
+  const centreY = finite(input.centre[1], height * BOARD_CENTRE_RISE);
+  const centreZ = finite(input.centre[2], 0);
 
   const crystals: WishCrystal[] = [];
   for (let index = 0; index < shown; index += 1) {
     const wish = input.wishes[index]!;
-    const column = index % COLUMNS;
-    const row = Math.floor(index / COLUMNS);
-    const columnsHere = Math.min(COLUMNS, shown - row * COLUMNS);
+    const column = index % columns;
+    const row = Math.floor(index / columns);
+    const columnsHere = Math.min(columns, shown - row * columns);
 
     const last = index === shown - 1;
     const represents = last ? active - shown + 1 : 1;
     const cluster = represents > 1 ? 1 + Math.min(0.4, Math.log2(represents) * 0.12) : 1;
-    const jitter = 0.92 + random() * 0.16;
-    const size = height
-      * (wish.priority ? (SIZE_BY_PRIORITY[wish.priority] ?? SIZE_DEFAULT) : SIZE_DEFAULT)
-      * jitter * cluster;
+    const jitter = 0.94 + random() * 0.12;
+    // Вага мрії лишається розміром, але тепер вона частка клітинки, а не
+    // висоти монарха: клітинку задає екран, тож дошка вміщається завжди.
+    const weight = (wish.priority ? (SIZE_BY_PRIORITY[wish.priority] ?? SIZE_DEFAULT) : SIZE_DEFAULT)
+      / SIZE_DEFAULT;
+    const size = cell * CELL_FILL * weight * jitter * cluster;
 
     // Ряди центруються самі, тож неповний останній ряд не з'їжджає вбік.
-    const offset = (column - (columnsHere - 1) / 2) * unit * COLUMN_STEP;
-    const rise = centreRise + ((rows - 1) / 2 - row) * unit * ROW_STEP;
+    const offset = (column - (columnsHere - 1) / 2) * unit;
+    const rise = centreY + ((rows - 1) / 2 - row) * unit;
 
     crystals.push({
       id: represents > 1 ? null : wish.id,
       photo: wish.photo,
       position: [
-        rightX * offset + outX * standoff,
+        centreX + rightX * offset,
         rise,
-        rightZ * offset + outZ * standoff,
+        centreZ + rightZ * offset,
       ],
       size,
       spin: random() * Math.PI * 2,
@@ -248,12 +306,17 @@ export function wishCrystalCost(
   quality: WishSatelliteQuality,
   facing: number,
 ): { instances: number; triangles: number } {
+  const bounds = wishSatelliteBounds(geometry);
   const crystals = buildWishBoard({
     wishes,
     seed: geometry.artifactSeed,
-    bounds: wishSatelliteBounds(geometry),
+    bounds,
     quality,
     facing,
+    // Ціна не залежить від того, скільки місця на екрані: вона про кількість
+    // тіл, а їх задає стеля профілю якості.
+    viewport: { halfWidth: bounds.height, halfHeight: bounds.height },
+    centre: wishBoardCentre(bounds, facing, bounds.height * BOARD_CENTRE_RISE),
   });
   const donor = pickWishDonor(geometry);
   if (crystals.length === 0 || donor === null) return { instances: 0, triangles: 0 };

@@ -30,6 +30,9 @@ const BASE: WishBoardInput = {
   bounds: { height: 3.4, radius: 1.25 },
   quality: 'high',
   facing: 0,
+  // Приблизно вертикальний телефон на відстані кадру вішліста.
+  viewport: { halfWidth: 1.6, halfHeight: 3.4 },
+  centre: [0, 3.4 * 0.86, 1.28],
 };
 
 const QUALITIES: readonly WishSatelliteQuality[] = ['high', 'balanced', 'low', 'fallback'];
@@ -45,17 +48,18 @@ describe('board layout (brief §28–§29)', () => {
     expect(buildWishBoard({ ...BASE, seed: BASE.seed + 1 })).not.toEqual(first);
   });
 
-  it('stands in front of the artifact, whichever way the camera looks', () => {
+  it('stays one flat board facing the camera, at any bearing', () => {
     // The first version hung the wishes on a ring around the crown, and half
-    // of them ended up behind the monarch. The board is built in the plane
-    // across the camera's bearing, so this holds at any azimuth.
+    // ended up behind the monarch. The board is now a plane across the
+    // camera's bearing: every wish shares the centre's depth, so none of them
+    // can drift behind another.
     for (const facing of [0, 1.1, -2.4, Math.PI]) {
       const outX = Math.sin(facing);
       const outZ = Math.cos(facing);
+      const centreDepth = BASE.centre[0] * outX + BASE.centre[2] * outZ;
       for (const crystal of buildWishBoard({ ...BASE, facing })) {
-        const [x, , z] = crystal.position;
-        // Positive projection on the camera's own direction = in front of it.
-        expect(x * outX + z * outZ, String(facing)).toBeGreaterThan(BASE.bounds.radius);
+        const depth = crystal.position[0] * outX + crystal.position[2] * outZ;
+        expect(depth, String(facing)).toBeCloseTo(centreDepth, 9);
       }
     }
   });
@@ -79,6 +83,35 @@ describe('board layout (brief §28–§29)', () => {
     }
   });
 
+  it('fits every wish inside the frame it was given', () => {
+    // Виміряно на телефоні власника: сітка будувалась у власних розмірах, і
+    // крайні бажання зрізало краєм екрана, а нижній ряд ховався за доком.
+    // Тепер клітинку задає видима область, тож це має триматись на будь-якій
+    // кількості бажань і на будь-якому екрані.
+    for (const view of [
+      { halfWidth: 1.6, halfHeight: 3.4 },
+      { halfWidth: 0.9, halfHeight: 2.0 },
+      { halfWidth: 4.2, halfHeight: 2.4 },
+    ]) {
+      for (const count of [1, 4, 7, 12, 40]) {
+        const board = buildWishBoard({ ...BASE, wishes: wishes(count), viewport: view });
+        const facing = BASE.facing;
+        const rightX = Math.cos(facing);
+        const rightZ = -Math.sin(facing);
+        for (const crystal of board) {
+          const sideways = (crystal.position[0] - BASE.centre[0]) * rightX
+            + (crystal.position[2] - BASE.centre[2]) * rightZ;
+          const label = `${view.halfWidth}x${view.halfHeight}/${count}`;
+          expect(Math.abs(sideways) + crystal.size / 2, label).toBeLessThan(view.halfWidth);
+          expect(
+            Math.abs(crystal.position[1] - BASE.centre[1]) + crystal.size / 2,
+            label,
+          ).toBeLessThan(view.halfHeight);
+        }
+      }
+    }
+  });
+
   it('centres a short last row instead of letting it drift left', () => {
     // Seven wishes are three, three and one. A one-wish row laid out from the
     // left edge reads as a mistake rather than as a row.
@@ -87,7 +120,8 @@ describe('board layout (brief §28–§29)', () => {
     const facing = BASE.facing;
     const rightX = Math.cos(facing);
     const rightZ = -Math.sin(facing);
-    const sideways = last.position[0] * rightX + last.position[2] * rightZ;
+    const sideways = (last.position[0] - BASE.centre[0]) * rightX
+      + (last.position[2] - BASE.centre[2]) * rightZ;
     expect(Math.abs(sideways)).toBeLessThan(1e-9);
   });
 
