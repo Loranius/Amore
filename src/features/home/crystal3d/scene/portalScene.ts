@@ -14,7 +14,13 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ARTIFACT_FIT_HEIGHT, CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import { mulberry32 } from '../../mulberry32';
-import { buildPortalPlatformGeometry } from './portalPlatformMesh';
+import {
+  PORTAL_RELIC_OUTER_RADIUS,
+  PORTAL_RELIC_TOP_RADIUS,
+  buildPortalRelicBodyGeometry,
+  buildPortalRelicEngravingGeometry,
+  buildPortalRelicGlowGeometry,
+} from './portalRelicPedestal';
 // Колона й арка приходять моделлю: різьблення капітелі й профіль архівольта
 // правилами не пишуться. Процедурні лишились нижче — вони визначають пропорції,
 // проти яких розкладка й досі перевіряється.
@@ -32,10 +38,11 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * тіл), тож він мусить знати внесок сцени — інакше довелось би просто
  * послабити межу й перевірка втратила б сенс.
  *
- * Поле + підлога храму + подіум + колони (один InstancedMesh на все кільце) +
- * вогні на них (так само один) + арки (так само один) + зорі.
+ * Поле + підлога храму + три оптичні шари релікварію (бронза, гравіювання,
+ * фіолетове скло) + колони (один InstancedMesh на все кільце) + вогні на них
+ * (так само один) + арки (так само один) + зорі.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 9;
 
 /**
  * Скільки трикутників додає оточення. Той самий привід, що й у draw
@@ -46,7 +53,7 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
  * будувати геометрію двічі. За тим, щоб воно не розійшлось із реальними
  * буферами, стежить portalScene.test.ts.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 8773;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 14_752;
 
 /** Сегментів у диску поля; єдине місце, що задає його вартість. */
 const FIELD_SEGMENTS = 64;
@@ -59,20 +66,17 @@ const FIELD_SEGMENTS = 64;
  * однією на всі пари.
  */
 export function measurePortalEnvironmentTriangles(
-  seed = 1,
-  bearings: readonly number[] = [],
-  veinReach = 0,
+  _seed = 1,
+  _bearings: readonly number[] = [],
+  _veinReach = 0,
 ): number {
-  // Сцена малює модельований постамент, а не латку — бюджет мусить рахувати
-  // те, що справді малюється.
-  const dais = buildPortalPlatformGeometry();
-  const inlay = buildPortalInlayGeometry(seed, bearings, veinReach);
+  const relicBody = buildPortalRelicBodyGeometry();
+  const relicEngraving = buildPortalRelicEngravingGeometry();
+  const relicGlow = buildPortalRelicGlowGeometry();
   const pillar = buildModelledPillar();
   const lamp = buildPortalLampGeometry();
   const arch = buildModelledArch();
   const floor = buildPortalTempleFloorGeometry();
-  const slab = buildPortalRitualSlabGeometry(seed, bearings, veinReach);
-  const runes = buildPortalRuneGeometry(seed, bearings, veinReach);
   const standingPillars = portalPillarInstances(
     portalCameraFrame(0.5, 1),
     0.5,
@@ -85,10 +89,9 @@ export function measurePortalEnvironmentTriangles(
   };
 
   const total = FIELD_SEGMENTS
-    + triangles(dais)
-    // Плита, руни й інкрустація більше не малюються: друза стоїть на
-    // модельованому камені, і плита лише накривала його. Будівники лишились —
-    // через них досі визначений вигин каменю над жилою.
+    + triangles(relicBody)
+    + triangles(relicEngraving)
+    + triangles(relicGlow)
     // Колонада — кільце з розривом, тож рахується стільки колон, скільки
     // справді стоїть, і стільки арок, скільки між ними прольотів.
     + triangles(pillar) * standingPillars
@@ -96,14 +99,13 @@ export function measurePortalEnvironmentTriangles(
     + triangles(arch) * (standingPillars - 1)
     + triangles(floor);
 
-  dais.dispose();
-  inlay.dispose();
+  relicBody.dispose();
+  relicEngraving.dispose();
+  relicGlow.dispose();
   pillar.dispose();
   lamp.dispose();
   arch.dispose();
   floor.dispose();
-  slab.dispose();
-  runes.dispose();
   return total;
 }
 
@@ -395,7 +397,9 @@ const DAIS_PROFILE: readonly (readonly [number, number])[] = [
 ];
 
 /** Радіус верхньої площини подіуму в базовій геометрії. */
-export const PORTAL_DAIS_TOP_RADIUS = 1.3;
+export const PORTAL_DAIS_TOP_RADIUS = PORTAL_RELIC_TOP_RADIUS;
+/** Зовнішній металевий край релікварію в базовому масштабі сцени. */
+export const PORTAL_DAIS_OUTER_RADIUS = PORTAL_RELIC_OUTER_RADIUS;
 
 /**
  * Наскільки подіум має бути ширшим за камінь друзи.
@@ -1401,12 +1405,12 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
   light: {
     fog: '#3b2b57',
     field: '#2e2244',
-    dais: '#4c4a56',
-    daisEmissive: '#191720',
+    dais: '#81523c',
+    daisEmissive: '#180b0d',
     slab: '#5d5b6a',
-    rune: '#8d7fae',
-    runeGlow: '#c9a9f0',
-    inlay: '#e2be80',
+    rune: '#2b1719',
+    runeGlow: '#cf8cff',
+    inlay: '#b65cff',
     pillar: '#6a5c8f',
     lamp: '#241d33',
     lampGlow: '#ff9c47',
@@ -1421,12 +1425,12 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
   dark: {
     fog: '#221a33',
     field: '#1b1428',
-    dais: '#3a3844',
-    daisEmissive: '#121017',
+    dais: '#5b362e',
+    daisEmissive: '#10070a',
     slab: '#494757',
-    rune: '#6f6390',
-    runeGlow: '#a684d8',
-    inlay: '#cea86e',
+    rune: '#1d1115',
+    runeGlow: '#b96ff2',
+    inlay: '#9747d8',
     pillar: '#4b4070',
     lamp: '#1b1628',
     lampGlow: '#ff8c34',

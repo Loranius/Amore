@@ -14,12 +14,18 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { buildPortalPlatformGeometry } from './portalPlatformMesh';
 import {
   buildPortalArchGeometry as buildModelledArch,
   buildPortalPillarGeometry as buildModelledPillar,
 } from './portalColonnadeMesh';
-import { portalColonnadeTexture, portalPlatformTexture, portalTileTextures } from './platformTexture';
+import { portalColonnadeTexture, portalTileTextures } from './platformTexture';
+import {
+  buildPortalBrushedMetalNormalTexture,
+  buildPortalBrushedMetalTexture,
+  buildPortalRelicBodyGeometry,
+  buildPortalRelicEngravingGeometry,
+  buildPortalRelicGlowGeometry,
+} from './portalRelicPedestal';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -36,16 +42,12 @@ import {
   PORTAL_GROUND_Y,
   PORTAL_LAMP_RADIUS,
   PORTAL_PALETTES,
-  buildPortalRuneGeometry,
   portalLampReach,
-  PORTAL_DAIS_TOP_RADIUS,
   portalCameraTurn,
   portalCameraView,
   buildPortalTempleFloorGeometry,
   portalArchInstances,
-  buildPortalInlayGeometry,
   buildPortalLampGeometry,
-  buildPortalRitualSlabGeometry,
   buildPortalStarField,
   portalLampInstances,
   portalPillarInstances,
@@ -66,20 +68,14 @@ export interface PortalEnvironmentProps {
   /** Масштаб подіуму під розмір друзи — див. portalDaisScale. */
   daisScale: number;
   /**
-   * Напрямки гілок кварцової жили (профіль субстрату, `veinBearings`).
-   *
-   * Камінь платформи піднімається саме над ними. Без них він піднімався б у
-   * власних, від насіння, — і тоді на подіумі було б дві незалежні системи
-   * розломів: жила в артефакті й вигини в сцені.
+   * Напрямки кварцової жили лишаються частиною контракту сцени для наступного
+   * персоналізованого inlay-pass. Круглий механічний релікварій навмисно не
+   * деформується за тріщинами: їх уже правдиво показує engine-owned substrate.
    */
   veinBearings: readonly number[];
   /**
-   * Скільки місця жила займає на платформі, в одиницях сцени
-   * (`crystalSubstrateSceneRadius`).
-   *
-   * Камінь мусить лишити цей слід пласким. Без цього числа вигин починався в
-   * центрі, підіймався над кварцом і ховав його — жила стояла на 0.024 над
-   * площиною артефакта, а камінь навколо неї вигинався до 0.118.
+   * Радіус engine-owned substrate. Передається далі тим самим стабільним API,
+   * але метал залишається нижче ground plane й не може накрити кварцову жилу.
    */
   veinReach: number;
 }
@@ -98,61 +94,42 @@ export function PortalEnvironment({
   frame,
   aspect,
   daisScale,
-  veinBearings,
-  veinReach,
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
   const archesRef = useRef<THREE.InstancedMesh>(null);
   const lampsRef = useRef<THREE.InstancedMesh>(null);
 
-  // The lathe podium the owner replaced with a modelled stone platform. The
-  // builder stays exported and tested — it is the fallback shape and the thing
-  // the dais scale is still defined against.
-  const daisGeometry = useMemo(() => buildPortalPlatformGeometry(), []);
-  // Інкрустація тепер від насіння теж: вона повторює вигин плити, а плита
-  // вигинається там, де тріснула саме в цієї пари.
-  // Плита масштабується по XZ разом із подіумом, а виліт жили приходить в
-  // одиницях сцени — тож переводимо його в локальні одиниці подіуму, інакше
-  // на масштабованому подіумі слід жили був би не там, де він насправді.
-  const veinReachLocal = veinReach / Math.max(1e-6, daisScale);
+  const relicBodyGeometry = useMemo(() => buildPortalRelicBodyGeometry(), []);
+  const relicEngravingGeometry = useMemo(() => buildPortalRelicEngravingGeometry(), []);
+  const relicGlowGeometry = useMemo(() => buildPortalRelicGlowGeometry(), []);
+  const brushedMetal = useMemo(() => buildPortalBrushedMetalTexture(), []);
+  const brushedMetalNormal = useMemo(() => buildPortalBrushedMetalNormalTexture(), []);
+  const brushedNormalScale = useMemo(() => new THREE.Vector2(0.18, 0.32), []);
   const archGeometry = useMemo(() => buildModelledArch(), []);
-  const platformTexture = useMemo(() => portalPlatformTexture(), []);
   const tiles = useMemo(() => portalTileTextures(), []);
   const colonnadeMap = useMemo(() => portalColonnadeTexture(), []);
   const tileTexture = tiles?.albedo ?? null;
   const tileNormal = tiles?.normal ?? null;
   const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(), []);
-  const inlayGeometry = useMemo(
-    () => buildPortalInlayGeometry(seed, veinBearings, veinReachLocal),
-    [seed, veinBearings, veinReachLocal],
-  );
   const pillarGeometry = useMemo(() => buildModelledPillar(), []);
   const lampGeometry = useMemo(() => buildPortalLampGeometry(), []);
-  // Камінь платформи вигинається над жилою, тож перебудовується разом із нею.
-  const slabGeometry = useMemo(
-    () => buildPortalRitualSlabGeometry(seed, veinBearings, veinReachLocal),
-    [seed, veinBearings, veinReachLocal],
-  );
-  const runeGeometry = useMemo(
-    () => buildPortalRuneGeometry(seed, veinBearings, veinReachLocal),
-    [seed, veinBearings, veinReachLocal],
-  );
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
   const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
   const lamps = useMemo(() => portalLampInstances(frame, aspect), [frame, aspect]);
   const arches = useMemo(() => portalArchInstances(frame, aspect), [frame, aspect]);
 
   useEffect(() => () => {
-    daisGeometry.dispose();
+    relicBodyGeometry.dispose();
+    relicEngravingGeometry.dispose();
+    relicGlowGeometry.dispose();
+    brushedMetal.dispose();
+    brushedMetalNormal.dispose();
     archGeometry.dispose();
     floorGeometry.dispose();
-    inlayGeometry.dispose();
     pillarGeometry.dispose();
     lampGeometry.dispose();
-    slabGeometry.dispose();
-    runeGeometry.dispose();
-  }, [daisGeometry, archGeometry, floorGeometry, inlayGeometry, pillarGeometry, lampGeometry, slabGeometry, runeGeometry]);
+  }, [relicBodyGeometry, relicEngravingGeometry, relicGlowGeometry, brushedMetal, brushedMetalNormal, archGeometry, floorGeometry, pillarGeometry, lampGeometry]);
 
   const starGeometry = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
@@ -253,33 +230,48 @@ export function PortalEnvironment({
         />
       </mesh>
 
-      {/* Подіум: верхня площина рівно на PORTAL_GROUND_Y, тобто там, де
-          починається субстрат кристала. Масштабується тільки по XZ —
-          вища плита їхала б угору відносно тієї самої площини. */}
-      <mesh
-        geometry={daisGeometry}
+      {/* Артефактний релікварій. Верх лишається точно на PORTAL_GROUND_Y —
+          кварцова жила та всі кристали продовжують стояти на своїй незмінній
+          площині. Росте лише ширина XZ; товщина металу не залежить від віку
+          пари й тому не тягне сцену вниз із кожною річницею. */}
+      <group
         position={[0, PORTAL_GROUND_Y, 0]}
-        scale={[daisScale * PORTAL_DAIS_TOP_RADIUS, daisScale * PORTAL_DAIS_TOP_RADIUS, daisScale * PORTAL_DAIS_TOP_RADIUS]}
+        scale={[daisScale, 1, daisScale]}
       >
-        <meshStandardMaterial
-          map={platformTexture}
-          color={palette.dais}
-          emissive={palette.daisEmissive}
-          roughness={0.86}
-          metalness={0.04}
-          flatShading
-        />
-      </mesh>
-
-      {/* Тут лежала ритуальна плита з рунами й золотою інкрустацією — три
-          кільця по обводу. Вона була платформою, поки платформи не було: своя
-          поверхня, свій вигин над жилою, своє світло. Відколи друза стоїть на
-          модельованому камені, плита просто накривала його собою, і власник
-          побачив рівно це. Прибрано меші, не будівники: `buildPortalRitualSlab-
-          Geometry`, `buildPortalRuneGeometry` і `buildPortalInlayGeometry`
-          лишаються експортованими й покритими тестами — вигин над жилою досі
-          визначений через них, і викидати ці інваріанти разом із мешами було б
-          окремою зміною. */}
+        <mesh geometry={relicBodyGeometry}>
+          <meshPhysicalMaterial
+            roughnessMap={brushedMetal}
+            normalMap={brushedMetalNormal}
+            normalScale={brushedNormalScale}
+            color={palette.dais}
+            emissive={palette.daisEmissive}
+            emissiveIntensity={0.16}
+            metalness={0.72}
+            roughness={0.38}
+            clearcoat={0.34}
+            clearcoatRoughness={0.18}
+          />
+        </mesh>
+        <mesh geometry={relicEngravingGeometry}>
+          <meshStandardMaterial
+            color={palette.rune}
+            emissive={palette.daisEmissive}
+            emissiveIntensity={0.08}
+            metalness={0.7}
+            roughness={0.5}
+          />
+        </mesh>
+        <mesh geometry={relicGlowGeometry}>
+          <meshStandardMaterial
+            color={palette.inlay}
+            emissive={palette.runeGlow}
+            emissiveIntensity={theme === 'dark' ? 2.45 : 2.15}
+            metalness={0.08}
+            roughness={0.22}
+            toneMapped={false}
+          />
+        </mesh>
+      </group>
 
       <instancedMesh
         ref={pillarsRef}
