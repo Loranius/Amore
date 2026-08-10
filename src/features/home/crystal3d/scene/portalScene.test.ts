@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import {
   PORTAL_DAIS_TOP_RADIUS,
+  PORTAL_DAIS_OUTER_RADIUS,
   PORTAL_ENVIRONMENT_DRAW_CALLS,
   PORTAL_ENVIRONMENT_TRIANGLES,
   PORTAL_FIELD_DROP,
@@ -388,9 +389,9 @@ describe('portal geometry', () => {
     for (const rock of [0.9, 1.1, 1.315, carried * 0.99]) {
       const top = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(rock);
       expect(top).toBeGreaterThan(rock);
-      // Найзовнішнє золоте кільце лежить на 1.235 з 1.3 — воно мусить
-      // лишатись видимим.
-      expect(top * (1.235 / 1.3)).toBeGreaterThan(rock);
+      // Верхній напис лежить на 1.215 з 1.3 — він мусить лишатись видимим
+      // навколо engine-owned substrate.
+      expect(top * (1.215 / PORTAL_DAIS_TOP_RADIUS)).toBeGreaterThan(rock);
     }
   });
 
@@ -406,8 +407,8 @@ describe('portal geometry', () => {
     // Стеля DAIS_MAX_SCALE існує рівно заради цього: колони стоять на полі,
     // і плита, що доросла до них, проткнулась би їхніми цоколями.
     const maxScale = portalDaisScale(Number.MAX_SAFE_INTEGER);
-    // Радіус подіуму на висоті, де стоять колони.
-    const daisAtPillarHeight = 1.66 * maxScale;
+    // Консервативно беремо повний зовнішній край нового релікварію.
+    const daisAtPillarHeight = PORTAL_DAIS_OUTER_RADIUS * maxScale;
     for (const aspect of ASPECTS) {
       const frame = portalCameraFrame(aspect);
       for (const instance of portalPillarInstances(frame, aspect)) {
@@ -576,9 +577,9 @@ describe('portal geometry', () => {
   });
 
   it('accounts for every object the environment draws', () => {
-    // Поле, підлога храму, подіум, колони (один InstancedMesh на все кільце),
-    // вогні на них (так само один), арки (так само один) і зорі.
-    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(7);
+    // Поле, підлога храму, три шари релікварію, колони (один InstancedMesh на
+    // все кільце), вогні на них (так само один), арки й зорі.
+    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(9);
   });
 
   it('lights the crystal from the colonnade without lighting the whole field', () => {
