@@ -1605,6 +1605,18 @@ textarea::placeholder {
   min-height: 100dvh;
   background: var(--page-gradient);
 }
+/* Головна, крізь яку видно світ (ADR-0020).
+
+   `.home` лишається з власним градієнтом — він потрібен, поки світ не
+   змонтований, і як єдиний фон без WebGL. Модифікатор знімає його рівно
+   тоді, коли світ малює під сторінкою.
+
+   `background: none`, а не `transparent`: властивість скорочена, і
+   `transparent` лишив би `background-image` градієнта на місці. */
+.home--world {
+  background: none;
+}
+
 .home-title {
   font-family: 'Fredoka', sans-serif;
   font-size: 20px;
