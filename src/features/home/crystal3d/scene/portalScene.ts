@@ -177,7 +177,16 @@ const FRAME_MARGIN = 1.08;
  * при 0.46 верхівка кристала виходила рівно під назву. Камера, що цілиться
  * трохи вище, опускає артефакт у вільну частину кадру.
  */
-const TARGET_SHARE_OF_ARTIFACT = 0.58;
+/**
+ * Куди кадр ставить ціль камери, як частку висоти артефакта.
+ *
+ * Експортується, бо атлас маршрутів (ADR-0021) відновлює з цього числа
+ * висоту артефакта в одиницях сцени: кадр — єдине місце, де вона вже
+ * порахована, і другий проп означав би два описи одного артефакта, які
+ * можуть розійтись.
+ */
+export const PORTAL_TARGET_SHARE_OF_ARTIFACT = 0.58;
+const TARGET_SHARE_OF_ARTIFACT = PORTAL_TARGET_SHARE_OF_ARTIFACT;
 
 /**
  * Синус кута, під яким камера дивиться згори.
@@ -196,6 +205,52 @@ export interface PortalCameraFrame {
   distance: number;
   fogNear: number;
   fogFar: number;
+}
+
+/** Куди дивиться камера й звідки, після накладання пози атласу. */
+export interface PortalCameraView {
+  position: readonly [number, number, number];
+  target: readonly [number, number, number];
+}
+
+/**
+ * Кадр, повернутий на позу маршруту (ADR-0021).
+ *
+ * Накладання, а не заміщення: `portalCameraFrame` лишається єдиним місцем, де
+ * вирішується, як артефакт вміщається в екран під даний аспект, а поза лише
+ * обертає камеру навколо тієї ж цілі й підсовує її ближче або далі.
+ *
+ * Обидві величини пози — в одиницях кадру: `distance` множить відстань
+ * око–ціль, `elevation` — синус кута підйому. Тому центральна поза відтворює
+ * кадр **точно**, і це стереже тест: у попередній редакції `elevation` була
+ * часткою висоти артефакта, і головна тихо змінила б ракурс.
+ */
+export function portalCameraView(
+  frame: PortalCameraFrame,
+  pose: { azimuth: number; targetHeight: number; elevation: number; distance: number },
+): PortalCameraView {
+  // Висота артефакта, відновлена з кадру: він ставить ціль на
+  // TARGET_SHARE_OF_ARTIFACT його висоти над землею. Брати її звідси, а не
+  // окремим аргументом, — щоб поза й кадр не могли розійтись у тому, який
+  // артефакт вони описують.
+  const artifactHeight = Math.max(
+    1e-3,
+    (frame.target[1] - PORTAL_GROUND_Y) / TARGET_SHARE_OF_ARTIFACT,
+  );
+  const targetY = PORTAL_GROUND_Y + artifactHeight * pose.targetHeight;
+
+  const eyeDistance = Math.max(1e-3, frame.distance * pose.distance);
+  const rise = eyeDistance * pose.elevation;
+  const radius = Math.sqrt(Math.max(0, eyeDistance * eyeDistance - rise * rise));
+
+  return {
+    position: [
+      frame.target[0] + Math.sin(pose.azimuth) * radius,
+      targetY + rise,
+      frame.target[2] + Math.cos(pose.azimuth) * radius,
+    ],
+    target: [frame.target[0], targetY, frame.target[2]],
+  };
 }
 
 function halfHeightTangent(): number {

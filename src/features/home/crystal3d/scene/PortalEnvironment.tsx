@@ -21,6 +21,7 @@ import {
 } from './portalColonnadeMesh';
 import { portalColonnadeTexture, portalPlatformTexture, portalTileTextures } from './platformTexture';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
   PORTAL_FIELD_DROP,
   PORTAL_GROUND_Y,
@@ -29,6 +30,7 @@ import {
   buildPortalRuneGeometry,
   portalLampReach,
   PORTAL_DAIS_TOP_RADIUS,
+  portalCameraView,
   buildPortalTempleFloorGeometry,
   portalArchInstances,
   buildPortalInlayGeometry,
@@ -387,33 +389,50 @@ export function PortalEnvironment({
 }
 
 /**
- * Тримає камеру й орбіту на кадрі з portalCameraFrame. Кадр залежить від
- * аспекту, а той змінюється при повороті телефона — прибити позицію до
- * пропсів <Canvas> означало б лишити вертикальний екран із кристалом,
- * що вилазить за краї.
+ * Тримає камеру й орбіту на кадрі з portalCameraFrame, зміщеному позою
+ * поточного маршруту (атлас, ADR-0021).
+ *
+ * Кадр залежить від аспекту, а той змінюється при повороті телефона —
+ * прибити позицію до пропсів <Canvas> означало б лишити вертикальний
+ * екран із кристалом, що вилазить за краї.
+ *
+ * Поза тут **накладається**, а не замінює кадр. Кадр знає, як умістити
+ * артефакт цієї пари в цей екран; атлас знає, з якого боку й з якої
+ * висоти на нього дивитись. Перше — арифметика, друге — сенс, і
+ * змішувати їх в одному числі означало б зламати обидва, щойно кристал
+ * підросте.
+ *
+ * Стрибок, а не перехід: плавність, переривання й режими руху — Фаза 4
+ * (`SceneDirector`). Сьогодні поза застосовується одразу, і це видно
+ * лише на маршрутах, крізь які світ показано, тобто поки що на головній.
  */
 export function PortalCameraRig({
   frame,
   controls,
+  pose,
 }: {
   frame: PortalCameraFrame;
   controls: RefObject<OrbitControlsImpl | null>;
+  pose?: WorldCameraPose;
 }) {
   const camera = useThree((state) => state.camera);
   const applied = useRef('');
 
   useFrame(() => {
-    const signature = frame.position.join(':');
+    const view = pose ?? CRYSTAL_CENTRE_POSE;
+    const signature = `${frame.position.join(':')}|${view.azimuth}:${view.targetHeight}:${view.elevation}:${view.distance}`;
     if (applied.current === signature) return;
     applied.current = signature;
-    camera.position.set(frame.position[0], frame.position[1], frame.position[2]);
+
+    const placed = portalCameraView(frame, view);
+    camera.position.set(placed.position[0], placed.position[1], placed.position[2]);
     if (camera instanceof THREE.PerspectiveCamera) {
       camera.fov = frame.fov;
       camera.updateProjectionMatrix();
     }
     const orbit = controls.current;
     if (orbit) {
-      orbit.target.set(frame.target[0], frame.target[1], frame.target[2]);
+      orbit.target.set(placed.target[0], placed.target[1], placed.target[2]);
       orbit.update();
     }
   });
