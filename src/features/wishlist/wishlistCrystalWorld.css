@@ -147,3 +147,36 @@
   font: inherit;
   text-align: start;
 }
+
+/* ── Аркуш бажання (§18, §30) ───────────────────────────────
+   «Crystal Sheet appears» — саме аркуш над світом, а не біла сторінка
+   поверх нього. Виміряно на живому порталі: вибір бажання відкривав
+   світлу шторку, крізь яку світу не було видно взагалі.
+
+   Правила стоять тут, а не в блоці токенів сторінки, бо аркуш
+   рендериться порталом — поза `.wishlist`, — і перевизначення на секції
+   до нього не доходить. Маркер маршруту стоїть на корені документа, тож
+   доходить він. */
+[data-portal-scene='true'] .wl-cloud-sheet {
+  --text: var(--world-text);
+  --muted: var(--world-text-muted);
+  --surface: var(--world-surface);
+  --accent: var(--world-accent);
+  --danger: var(--world-danger);
+  border-color: var(--world-border);
+  background: var(--world-surface-strong);
+  box-shadow:
+    inset 0 1px 0 var(--world-glow),
+    0 -22px 68px var(--world-shadow);
+  color: var(--world-text);
+}
+
+/* Підкладка притемнює, а не зафарбовує: бажання лишається видно позаду
+   свого ж аркуша. */
+[data-portal-scene='true'] .wl-cloud-sheet-overlay {
+  background: var(--world-vignette);
+}
+
+[data-portal-scene='true'] .wl-cloud-sheet-handle {
+  background: var(--world-border-active);
+}

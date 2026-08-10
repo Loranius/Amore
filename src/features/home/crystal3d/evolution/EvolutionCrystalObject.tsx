@@ -30,6 +30,8 @@ export interface EvolutionCrystalObjectProps {
   quality?: WishSatelliteQuality;
   /** Азимут камери маршруту — дошка повертається до неї лицем. */
   wishFacing?: number;
+  /** Бажання, аркуш якого відкрито (§30). */
+  focused?: number | null;
   reduceMotion?: boolean;
   onWishSelect?: (wishId: number) => void;
 }
@@ -46,6 +48,7 @@ export function EvolutionCrystalObject({
   wishes,
   quality = 'balanced',
   wishFacing = 0,
+  focused = null,
   reduceMotion = false,
   onWishSelect,
 }: EvolutionCrystalObjectProps) {
@@ -128,6 +131,7 @@ export function EvolutionCrystalObject({
           wishes={wishes}
           quality={quality}
           facing={wishFacing}
+          focused={focused}
           reduceMotion={reduceMotion}
           {...(onWishSelect ? { onSelect: onWishSelect } : {})}
         />

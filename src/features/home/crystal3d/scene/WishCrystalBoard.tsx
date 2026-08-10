@@ -40,6 +40,8 @@ export interface WishCrystalBoardProps {
   /** Азимут камери маршруту — дошка стоїть до неї лицем. */
   facing: number;
   reduceMotion: boolean;
+  /** Бажання, аркуш якого відкрито — воно виходить уперед (§30). */
+  focused?: number | null;
   onSelect?: (wishId: number) => void;
 }
 
@@ -70,6 +72,19 @@ function wishTexture(url: string): THREE.Texture {
   WISH_TEXTURES.set(url, texture);
   return texture;
 }
+
+/**
+ * Наскільки вибране тіло виходить уперед, а решта відступає (§30).
+ *
+ * «Slightly» у брифі — не фігура мови: дошка стоїть близько до камери, і
+ * рух на власний розмір уже виводить сусідів за край екрана.
+ */
+const FOCUS_ADVANCE = 0.55;
+const FOCUS_GROWTH = 1.22;
+const RECEDE = 0.35;
+const RECEDE_FADE = 0.32;
+/** Період піврозпаду наближення до стану фокуса, секунди. */
+const FOCUS_HALF_LIFE = 0.22;
 
 /** Наскільки тіло гойдається, у власних висотах. */
 const BOB_AMPLITUDE = 0.055;
@@ -109,6 +124,7 @@ export function WishCrystalBoard({
   quality,
   facing,
   reduceMotion,
+  focused = null,
   onSelect,
 }: WishCrystalBoardProps) {
   const group = useRef<THREE.Group>(null);
@@ -121,6 +137,8 @@ export function WishCrystalBoard({
   const owned = useRef<THREE.MeshPhysicalMaterial[]>([]);
   const spins = useRef<Map<number, number>>(new Map());
   const drag = useRef<{ index: number; x: number; y: number; moved: number } | null>(null);
+  /** Наскільки кожне тіло вже дійшло до свого стану фокуса, 0..1. */
+  const focusEase = useRef<number[]>([]);
 
   const crystals = useMemo(
     () => buildWishBoard({
@@ -231,16 +249,44 @@ export function WishCrystalBoard({
     return () => { node.removeFromParent(); };
   }, [bundle]);
 
-  useFrame((state) => {
+  // Напрямок «до камери» в кадрі артефакта — той самий, за яким побудована
+  // дошка. Рахується один раз на кадр, а не на тіло.
+  const toCameraX = Math.sin(facing);
+  const toCameraZ = Math.cos(facing);
+  const shapeHeight = shape?.height ?? 1;
+
+  useFrame((state, delta) => {
     const node = group.current;
     if (node === null) return;
     const time = reduceMotion ? 0 : state.clock.elapsedTime;
+    // Той самий підхід, що й у директора сцени (ADR-0022): експонента без
+    // розкладу. Пара може вибрати друге бажання, не дочекавшись першого, і
+    // перервати тут нічого — рух просто змінює ціль.
+    const step = reduceMotion ? 1 : 1 - Math.pow(2, -Math.min(delta, 1 / 15) / FOCUS_HALF_LIFE);
     for (let index = 0; index < node.children.length; index += 1) {
       const child = node.children[index];
       const crystal = crystals[index];
       if (!(child instanceof THREE.Mesh) || crystal === undefined) continue;
+
+      // §30: вибране виходить уперед, решта відступає й гасне.
+      const wanted = focused === null ? 0 : (crystal.id === focused ? 1 : -1);
+      const eased = (focusEase.current[index] ?? 0) + (wanted - (focusEase.current[index] ?? 0)) * step;
+      focusEase.current[index] = eased;
+      const advance = eased > 0 ? eased * FOCUS_ADVANCE : eased * RECEDE;
+      const grow = 1 + Math.max(0, eased) * (FOCUS_GROWTH - 1);
+      const material = child.material as THREE.MeshPhysicalMaterial;
+      const dim = 1 - Math.max(0, -eased) * RECEDE_FADE;
+      if (material.opacity !== dim) {
+        material.opacity = dim;
+        material.transparent = dim < 1;
+        material.needsUpdate = true;
+      }
+
       // Левітація: кожне тіло має власну фазу, тож дошка дихає, а не пульсує.
       const bob = Math.sin(time * ((2 * Math.PI) / BOB_PERIOD) + crystal.bob);
+      child.position.x = crystal.position[0] + toCameraX * advance * crystal.size;
+      child.position.z = crystal.position[2] + toCameraZ * advance * crystal.size;
+      child.scale.setScalar((crystal.size / shapeHeight) * grow);
       child.position.y = crystal.position[1] + bob * crystal.size * BOB_AMPLITUDE;
       child.rotation.y = crystal.spin + (spins.current.get(index) ?? 0);
       // Дуже повільний власний обіг, поки бажання не чіпають: камінь живий,
@@ -291,6 +337,7 @@ export function WishCrystalBoard({
           material={materials[index]!}
           position={[crystal.position[0], crystal.position[1], crystal.position[2]]}
           scale={crystal.size / shape.height}
+          renderOrder={crystal.id === focused ? 1 : 0}
           onPointerDown={onPointerDown(index)}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp(index)}

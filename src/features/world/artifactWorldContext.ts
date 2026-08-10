@@ -14,6 +14,14 @@ import type { WishSubject } from '../home/crystal3d/scene/wishCrystals';
 export interface WorldWishBoard {
   wishes: readonly WishSubject[];
   onSelect: (wishId: number) => void;
+  /**
+   * Бажання, аркуш якого зараз відкрито, — або `null`.
+   *
+   * §30 просить, щоб вибране тіло вийшло вперед, а решта відступила. Хто
+   * вибраний, знає сторінка: це стан її аркуша деталей, і дублювати його в
+   * сцені означало б два джерела правди про одне вікно.
+   */
+  focused: number | null;
 }
 
 /**

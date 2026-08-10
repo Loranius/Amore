@@ -64,6 +64,14 @@ export default function EvolutionCrystalPreviewScene() {
   // яка вкладка відкрита й що в ній видно, і повторювати цю логіку в сцені
   // означало б мати дві відповіді на одне питання.
   const { wishBoard } = useArtifactWorld();
+  // §30: «camera slightly reframes». Не окремий рух і не друга система — та
+  // сама поза маршруту, підсунута ближче на сім відсотків. Веде її директор
+  // сцени (ADR-0022), тож перехід плавний і його можна перервати вибором
+  // іншого бажання.
+  const focusedPose = useMemo(
+    () => (wishBoard?.focused == null ? pose : { ...pose, distance: pose.distance * 0.93 }),
+    [pose, wishBoard?.focused],
+  );
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   // Напрямки гілок кварцової жили. Меми в сцені тримаються за цей масив, тож
   // він мусить бути стабільним посиланням — інакше камінь платформи
@@ -159,7 +167,7 @@ export default function EvolutionCrystalPreviewScene() {
             artifactSceneHeight={crystalSceneHeight(pipeline.geometry)}
             veinBearings={veinBearings}
             veinReach={crystalSubstrateSceneRadius(pipeline.geometry)}
-            pose={pose}
+            pose={focusedPose}
             motionMode={motionMode}
           >
             <EvolutionCrystalObject
@@ -171,6 +179,7 @@ export default function EvolutionCrystalPreviewScene() {
               quality={metrics.quality}
               wishFacing={pose.azimuth}
               reduceMotion={reduceMotion}
+              focused={wishBoard?.focused ?? null}
               {...(wishBoard ? { onWishSelect: wishBoard.onSelect } : {})}
             />
           </PortalStage>

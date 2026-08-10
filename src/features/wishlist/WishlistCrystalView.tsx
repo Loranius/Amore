@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import type { WishSubject } from '@/features/home/crystal3d/scene/wishCrystals';
 import { WishCard } from './WishCard';
@@ -36,9 +36,59 @@ function wishPriority(value: string | null): WishSubject['priority'] {
   return null;
 }
 
+/**
+ * Кнопка бажання, яка ще й повідомляє, чи відкрито його аркуш.
+ *
+ * Окремим компонентом, бо `renderTrigger` викликається під час рендера
+ * картки — хука там поставити нікуди, а повідомляти про стан треба ефектом.
+ */
+function WishTrigger({
+  id,
+  title,
+  detailsOpen,
+  openDetails,
+  onOpenChange,
+  register,
+}: {
+  id: number;
+  title: string;
+  detailsOpen: boolean;
+  openDetails: () => void;
+  onOpenChange: (id: number, open: boolean) => void;
+  register: (id: number, node: HTMLButtonElement | null) => void;
+}) {
+  useEffect(() => {
+    onOpenChange(id, detailsOpen);
+  }, [id, detailsOpen, onOpenChange]);
+
+  return (
+    <button
+      type="button"
+      className="wl-crystal-trigger"
+      ref={(node) => { register(id, node); }}
+      onClick={openDetails}
+    >
+      {title}
+    </button>
+  );
+}
+
 export function WishlistCrystalView({ items, ...card }: WishlistCrystalViewProps) {
   const { showWishBoard } = useArtifactWorld();
   const triggers = useRef(new Map<number, HTMLButtonElement>());
+  const [focused, setFocused] = useState<number | null>(null);
+
+  const register = useCallback((id: number, node: HTMLButtonElement | null) => {
+    if (node === null) triggers.current.delete(id);
+    else triggers.current.set(id, node);
+  }, []);
+
+  const onOpenChange = useCallback((id: number, open: boolean) => {
+    setFocused((current) => {
+      if (open) return id;
+      return current === id ? null : current;
+    });
+  }, []);
 
   const wishes = useMemo<readonly WishSubject[]>(
     () => items.map((item) => ({
@@ -55,9 +105,10 @@ export function WishlistCrystalView({ items, ...card }: WishlistCrystalViewProps
     showWishBoard({
       wishes,
       onSelect: (wishId) => { triggers.current.get(wishId)?.click(); },
+      focused,
     });
     return () => showWishBoard(null);
-  }, [wishes, showWishBoard]);
+  }, [wishes, focused, showWishBoard]);
 
   return (
     <div className="wl-crystal-view">
@@ -75,18 +126,15 @@ export function WishlistCrystalView({ items, ...card }: WishlistCrystalViewProps
           onPurchased={card.onPurchased}
           onFulfill={card.onFulfill}
           onMove={card.onMove}
-          renderTrigger={({ openDetails }) => (
-            <button
-              type="button"
-              className="wl-crystal-trigger"
-              ref={(node) => {
-                if (node === null) triggers.current.delete(item.id);
-                else triggers.current.set(item.id, node);
-              }}
-              onClick={openDetails}
-            >
-              {item.title}
-            </button>
+          renderTrigger={({ openDetails, detailsOpen }) => (
+            <WishTrigger
+              id={item.id}
+              title={item.title}
+              detailsOpen={detailsOpen}
+              openDetails={openDetails}
+              onOpenChange={onOpenChange}
+              register={register}
+            />
           )}
         />
       ))}
