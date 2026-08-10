@@ -156,14 +156,17 @@ describe('Crystal Material, Life and Three renderer bridge', () => {
     // rose/amethyst family from any angle. What still degrades with the tier is
     // procedural reflection, clearcoat and the inclusion scale, asserted below.
     expect(high.material.bodies.every((body) => body.iridescence === 0)).toBe(true);
-    expect(high.life.sparkleCount).toBeGreaterThan(0);
+    expect(high.life.innerSparks.length).toBeGreaterThan(0);
     for (const body of fallback.material.bodies) {
       expect(body.iridescence).toBe(0);
       expect(body.shader.rimStrength).toBe(0);
       expect(body.shader.skyStrength).toBe(0);
       expect(body.shader.inclusionDensity).toBe(0);
     }
-    expect(fallback.life.sparkleCount).toBe(0);
+    // Nothing inside the monarch on the weakest tier: a scatter of additive
+    // points over a crystal drawn small reads as noise on the screen rather
+    // than as light caught in a stone (brief §9).
+    expect(fallback.life.innerSparks).toHaveLength(0);
   });
 
   it('freezes continuous motion under reduced-motion while preserving a subtle glow response', () => {

@@ -1028,19 +1028,31 @@ export function wishTint(tally: WishGiftTally): CrystalTint {
   };
 }
 
-// ── Sparkles from media ─────────────────────────────────────
-
-/** Floor so the artifact always has a little life around it. */
-const SPARKLE_FLOOR = 6;
+// ── Lights inside the monarch, from media ───────────────────
 
 /**
- * Crystal dust around the artifact, from films, series and books the
- * couple finished. Square root, because the difference between 20 and 40
- * watched should be visible while the difference between 400 and 800 is
- * not worth another twenty particles.
+ * How many finished films, series and books saturate the couple's share.
+ *
+ * Square root all the way, because the difference between twenty watched and
+ * forty should be visible while the difference between four hundred and eight
+ * hundred is not worth another light.
  */
-export function mediaSparkleCount(finishedCount: number, cap: number): number {
+const MEDIA_SPARK_FULL = 120;
+
+/**
+ * The couple's media history as a 0–1 share, for whoever is placing lights.
+ *
+ * A **share, not a count**, and that is a correction. This returned a count
+ * with a floor of six and a caller-supplied cap, which was right while it drove
+ * a cloud of dust whose size was its only variable. The lights now live inside
+ * the monarch inside a band per quality tier (brief §9), and folding a floored
+ * count into a band clipped the signal away at the bottom: a couple with
+ * twenty-five finished titles and a couple with none both came out at the
+ * band's floor of twenty-four, so adding a whole shelf of books moved nothing.
+ * Returning the share lets the caller map it across its own band instead, and
+ * every part of the range does something.
+ */
+export function mediaSparkReach(finishedCount: number): number {
   const finished = Number.isFinite(finishedCount) ? Math.max(0, finishedCount) : 0;
-  const requested = SPARKLE_FLOOR + Math.round(Math.sqrt(finished) * 2.4);
-  return Math.max(0, Math.min(Math.max(0, cap), requested));
+  return round6(clamp01(Math.sqrt(finished) / Math.sqrt(MEDIA_SPARK_FULL)));
 }

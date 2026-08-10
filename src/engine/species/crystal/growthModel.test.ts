@@ -32,7 +32,7 @@ import {
   yearActivity,
   yearFill,
   yearTogetherness,
-  mediaSparkleCount,
+  mediaSparkReach,
   monarchAxialScale,
   monarchFacetCount,
   monarchRadialScale,
@@ -582,26 +582,40 @@ describe('colour from fulfilled wishes', () => {
   });
 });
 
-describe('sparkles from media', () => {
-  it('always leaves some life around the artifact', () => {
-    expect(mediaSparkleCount(0, 42)).toBe(6);
+describe('lights inside the monarch, from media', () => {
+  it('returns a share rather than a count, so the caller owns the band', () => {
+    // The change of shape, stated. This used to return a count with a floor of
+    // six and a caller-supplied cap, which was right while it drove a cloud of
+    // dust whose size was its only variable. Now that the lights live inside a
+    // per-tier band (brief §9), a floored count folded into that band clipped
+    // the signal away at the bottom: twenty-five finished titles and none at
+    // all both landed on the band's floor.
+    expect(mediaSparkReach(0)).toBe(0);
+    expect(mediaSparkReach(10_000)).toBe(1);
   });
 
   it('grows with what the couple finished, with diminishing returns', () => {
-    expect(mediaSparkleCount(25, 128)).toBeLessThan(mediaSparkleCount(169, 128));
-    expect(mediaSparkleCount(169, 128)).toBeLessThan(mediaSparkleCount(400, 128));
+    expect(mediaSparkReach(25)).toBeLessThan(mediaSparkReach(100));
+    expect(mediaSparkReach(0)).toBeLessThan(mediaSparkReach(25));
 
     // Diminishing returns means the same *number* of extra titles buys less
-    // dust the more you already have — not that a larger multiple buys less,
-    // which is a different (and false) claim.
-    const earlyHundred = mediaSparkleCount(200, 128) - mediaSparkleCount(100, 128);
-    const lateHundred = mediaSparkleCount(600, 128) - mediaSparkleCount(500, 128);
-    expect(lateHundred).toBeLessThan(earlyHundred);
+    // light the more you already have — not that a larger multiple buys less,
+    // which is a different (and false) claim. Measured below saturation, since
+    // above it every increment buys nothing by design.
+    const earlyTwenty = mediaSparkReach(30) - mediaSparkReach(10);
+    const lateTwenty = mediaSparkReach(110) - mediaSparkReach(90);
+    expect(lateTwenty).toBeLessThan(earlyTwenty);
   });
 
-  it('respects the device cap it is given', () => {
-    expect(mediaSparkleCount(10_000, 18)).toBe(18);
-    expect(mediaSparkleCount(10_000, 0)).toBe(0);
+  it('never leaves the 0–1 range, whatever it is handed', () => {
+    expect(mediaSparkReach(Number.NaN)).toBe(0);
+    expect(mediaSparkReach(-5)).toBe(0);
+    // Infinity is nonsense input, not an enormous library, so it takes the same
+    // floor everything else unreadable takes — the convention the counted
+    // version already followed by returning its floor rather than its cap.
+    expect(mediaSparkReach(Number.POSITIVE_INFINITY)).toBe(0);
+    // A real, large library does saturate at the top.
+    expect(mediaSparkReach(10_000)).toBe(1);
   });
 });
 

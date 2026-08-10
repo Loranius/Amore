@@ -40,6 +40,16 @@ import type {
   CrystalSpeciesDiagnostics,
 } from './types';
 
+/**
+ * The one body every colony has, whatever else it grew.
+ *
+ * Exported because the string had spread: the profile builder tests for it, the
+ * seed is salted with it, and the renderer now has to find her bounds to hang
+ * the lights inside her. A literal repeated across four volumes is a rename
+ * waiting to break three of them silently.
+ */
+export const CRYSTAL_MONARCH_BODY_ID = 'crystal:mother';
+
 const ARCHETYPES: Readonly<Record<EvolutionChannel, readonly CrystalArchetype[]>> = {
   achievement: ['twin', 'intergrown', 'prismatic'],
   remembrance: ['etched', 'tabular', 'prismatic'],
@@ -123,7 +133,7 @@ export function buildMotherInstruction(
   asOf: string,
   partners: CrystalColorPartners = null,
 ): CrystalGrowthInstruction {
-  const seed = stableSeed(artifact.deterministicSeed, 'crystal:mother');
+  const seed = stableSeed(artifact.deterministicSeed, CRYSTAL_MONARCH_BODY_ID);
   const motherArchetypes: readonly CrystalArchetype[] = ['prismatic', 'massive', 'intergrown'];
   const archetypeIndex = Math.min(
     motherArchetypes.length - 1,
@@ -146,7 +156,7 @@ export function buildMotherInstruction(
   );
 
   return {
-    id: 'crystal:mother',
+    id: CRYSTAL_MONARCH_BODY_ID,
     sourceEventId: null,
     sourceEpisodeId: null,
     epochIndex: 0,

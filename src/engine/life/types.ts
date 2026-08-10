@@ -29,6 +29,34 @@ export interface CrystalBodyLife {
   sparkleAffinity: number;
 }
 
+/**
+ * One point of light caught inside the monarch.
+ *
+ * Position is in **the monarch's own normalised frame** — x and z in -1..1
+ * across her widest slice, y from 0 at the foot to 1 at the tip, the same frame
+ * the geometry publishes as `CrystalMeshData.bodyCoord`. Published that way so
+ * this volume needs no geometry of its own: the renderer already holds the
+ * monarch's bounds and maps a unit frame into them, and Life reading Geometry
+ * would be a new dependency bought for a number the renderer already has.
+ *
+ * Every field is seeded from the artifact seed, so a couple's crystal has the
+ * same inclusions every time it is drawn. The cloud this replaces was drei's
+ * `<Sparkles>`, which draws its sizes from `Math.random()` — two mounts of one
+ * couple's artifact produced two different artifacts, which the determinism
+ * standard forbids outright.
+ */
+export interface CrystalInnerSpark {
+  x: number;
+  y: number;
+  z: number;
+  /** Where in its own twinkle this spark starts, so they never blink together. */
+  phaseRad: number;
+  /** Radians per second of that twinkle. Zero under reduced motion. */
+  speed: number;
+  /** Point size in pixels before attenuation. */
+  size: number;
+}
+
 export interface CrystalLifeState {
   lifeStateVersion: 1;
   rulesVersion: string;
@@ -42,7 +70,20 @@ export interface CrystalLifeState {
   quality: CrystalMaterialQuality;
   breatheAmplitude: number;
   breatheSpeed: number;
-  sparkleCount: number;
+  /**
+   * The lights inside the monarch, and nowhere else in the colony.
+   *
+   * This replaces `sparkleCount`, which fed a cloud of dust floating *around*
+   * the whole artifact at three times its size. Two reasons it went: the cloud
+   * was drei's `<Sparkles>`, whose sizes come from `Math.random()`, and dust in
+   * the air says nothing about the couple — the crystal is the artifact, and
+   * what belongs inside it is what the couple has finished and kept.
+   *
+   * Empty on the two weakest tiers, which is a decision rather than a budget:
+   * a handful of additive points over a small crystal on a weak phone reads as
+   * noise on the screen rather than as light in a stone.
+   */
+  innerSparks: readonly CrystalInnerSpark[];
   sparkleSpeed: number;
   /**
    * How fast the energy inside the monarch turns, in whole turns per second.
