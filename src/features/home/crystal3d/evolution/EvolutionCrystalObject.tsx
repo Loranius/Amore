@@ -34,21 +34,14 @@ export function EvolutionCrystalObject({ geometry, material, life }: EvolutionCr
   // own — quality tier, reduced motion — and rebuilding every batch to move a
   // point cloud would throw away the geometry upload with it.
   const sparks = useMemo(
-    () => createThreeCrystalInnerSparks(geometry, life),
-    [geometry, life],
+    () => createThreeCrystalInnerSparks(bundle, geometry, life),
+    [bundle, geometry, life],
   );
 
   useEffect(() => () => bundle.dispose(), [bundle]);
-  useEffect(() => {
-    if (sparks === null) return undefined;
-    // Inside the artifact's own group, so the cloud breathes and scales with
-    // the crystal instead of hanging in the scene beside it.
-    bundle.group.add(sparks.points);
-    return () => {
-      bundle.group.remove(sparks.points);
-      sparks.dispose();
-    };
-  }, [bundle, sparks]);
+  // The factory parents the cloud itself, next to the crystal batches and
+  // under the same fit transform, so there is no placement here to get wrong.
+  useEffect(() => () => sparks?.dispose(), [sparks]);
 
   useFrame((state) => {
     const now = performance.now();

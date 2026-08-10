@@ -14,6 +14,7 @@ import {
   buildCrystalSpeciesBlueprint,
   crystalToGrowthBlueprint,
 } from '../../species/crystal';
+import { createThreeCrystalRenderBundle } from './bundle';
 import { createThreeCrystalInnerSparks } from './innerSparks';
 
 // The brief's section 9. One deterministic point cloud, inside the monarch and
@@ -76,7 +77,7 @@ function build(overrides: Partial<CrystalLifeConfig> = {}) {
       ...overrides,
     },
   });
-  return { geometry, life };
+  return { geometry, material, life };
 }
 
 describe('lights inside the monarch (crystal cluster brief §9)', () => {
@@ -87,16 +88,17 @@ describe('lights inside the monarch (crystal cluster brief §9)', () => {
     // because the shell is opaque by contract (ADR-0007) — with the test on,
     // every spark inside the monarch is behind her surface and nothing is
     // drawn at all.
-    const { geometry, life } = build();
-    const sparks = createThreeCrystalInnerSparks(geometry, life)!;
+    const { geometry, material, life } = build();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const sparks = createThreeCrystalInnerSparks(bundle, geometry, life)!;
     expect(sparks).not.toBeNull();
 
     expect(sparks.points).toBeInstanceOf(THREE.Points);
-    const material = sparks.points.material as THREE.ShaderMaterial;
-    expect(material.blending).toBe(THREE.AdditiveBlending);
-    expect(material.depthWrite).toBe(false);
-    expect(material.depthTest).toBe(false);
-    expect(material.transparent).toBe(true);
+    const pointsMaterial = sparks.points.material as THREE.ShaderMaterial;
+    expect(pointsMaterial.blending).toBe(THREE.AdditiveBlending);
+    expect(pointsMaterial.depthWrite).toBe(false);
+    expect(pointsMaterial.depthTest).toBe(false);
+    expect(pointsMaterial.transparent).toBe(true);
     // After the crystal batches, so the additive pass lands on a finished shell.
     expect(sparks.points.renderOrder).toBeGreaterThan(0);
 
@@ -108,12 +110,41 @@ describe('lights inside the monarch (crystal cluster brief §9)', () => {
     sparks.dispose();
   });
 
+  it('hangs the cloud under the same fit transform as the crystal', () => {
+    // **The defect this is here for, and it only ever showed in a render.**
+    // The bundle is two nested groups: `group` carries the life frame's
+    // breathing, `content` inside it carries the fit — a scale of about 2.3 and
+    // an offset that take the artifact from engine units to the size it is
+    // drawn at. The batches live in `content`. The cloud was added to `group`,
+    // so it missed the fit entirely and rendered in raw engine coordinates: on
+    // the portal the lights hung in the sky above the crystal.
+    //
+    // The other tests here compare spark positions against monarch positions in
+    // engine units, where the two agree no matter how either is parented. This
+    // one asserts the scene graph.
+    const { geometry, material, life } = build();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const sparks = createThreeCrystalInnerSparks(bundle, geometry, life)!;
+
+    expect(sparks.points.parent, 'the cloud is parented at all').not.toBeNull();
+    expect(sparks.points.parent).toBe(bundle.content);
+    // And so is every crystal batch — the same parent, so the same transform.
+    for (const batch of bundle.batches) {
+      expect(batch.mesh.parent, batch.signature.slice(0, 16)).toBe(sparks.points.parent);
+    }
+
+    // Disposing takes it back out rather than leaving a dead cloud in the scene.
+    sparks.dispose();
+    expect(sparks.points.parent).toBeNull();
+  });
+
   it('puts every light inside the monarch’s own bounds', () => {
     // A spark that strays outside her silhouette stops reading as an inclusion
     // and starts reading as dust in front of the crystal — which, since the
     // cloud is drawn over everything, is exactly what it would look like.
-    const { geometry, life } = build();
-    const sparks = createThreeCrystalInnerSparks(geometry, life)!;
+    const { geometry, material, life } = build();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const sparks = createThreeCrystalInnerSparks(bundle, geometry, life)!;
     const monarch = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_MONARCH_BODY_ID)!;
     const bounds = monarch.bounds;
     const position = sparks.points.geometry.getAttribute('position');
@@ -143,8 +174,10 @@ describe('lights inside the monarch (crystal cluster brief §9)', () => {
     // forbids outright.
     const first = build();
     const second = build();
-    const left = createThreeCrystalInnerSparks(first.geometry, first.life)!;
-    const right = createThreeCrystalInnerSparks(second.geometry, second.life)!;
+    const firstBundle = createThreeCrystalRenderBundle(first.geometry, first.material);
+    const secondBundle = createThreeCrystalRenderBundle(second.geometry, second.material);
+    const left = createThreeCrystalInnerSparks(firstBundle, first.geometry, first.life)!;
+    const right = createThreeCrystalInnerSparks(secondBundle, second.geometry, second.life)!;
 
     for (const name of ['position', 'sparkPhase', 'sparkSpeed', 'sparkSize']) {
       expect(
@@ -161,9 +194,10 @@ describe('lights inside the monarch (crystal cluster brief §9)', () => {
     // crystal drawn small on a weak phone reads as noise on the screen rather
     // than as light caught in a stone. Better absent than misread.
     for (const quality of ['low', 'fallback'] as const) {
-      const { geometry, life } = build({ quality });
+      const { geometry, material, life } = build({ quality });
+      const bundle = createThreeCrystalRenderBundle(geometry, material);
       expect(life.innerSparks, quality).toHaveLength(0);
-      expect(createThreeCrystalInnerSparks(geometry, life), quality).toBeNull();
+      expect(createThreeCrystalInnerSparks(bundle, geometry, life), quality).toBeNull();
     }
   });
 
@@ -173,16 +207,18 @@ describe('lights inside the monarch (crystal cluster brief §9)', () => {
     // nothing changes; the positions are untouched.
     const moving = build({ reducedMotion: false });
     const still = build({ reducedMotion: true });
+    const movingBundle = createThreeCrystalRenderBundle(moving.geometry, moving.material);
+    const stillBundle = createThreeCrystalRenderBundle(still.geometry, still.material);
     expect(still.life.innerSparks.length).toBe(moving.life.innerSparks.length);
 
-    const frozen = createThreeCrystalInnerSparks(still.geometry, still.life)!;
+    const frozen = createThreeCrystalInnerSparks(stillBundle, still.geometry, still.life)!;
     const speeds = Array.from(frozen.points.geometry.getAttribute('sparkSpeed').array);
     expect(speeds.every((speed) => speed === 0)).toBe(true);
     expect(
       Array.from(frozen.points.geometry.getAttribute('position').array),
     ).toEqual(
       Array.from(
-        createThreeCrystalInnerSparks(moving.geometry, moving.life)!.points.geometry
+        createThreeCrystalInnerSparks(movingBundle, moving.geometry, moving.life)!.points.geometry
           .getAttribute('position').array,
       ),
     );

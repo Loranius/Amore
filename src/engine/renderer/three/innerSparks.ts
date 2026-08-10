@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { CrystalGeometryState } from '../../geometry';
 import type { CrystalLifeState } from '../../life';
 import { CRYSTAL_MONARCH_BODY_ID } from '../../species/crystal';
+import type { ThreeCrystalRenderBundle } from './bundle';
 
 /**
  * The lights caught inside the monarch.
@@ -28,6 +29,7 @@ export interface ThreeCrystalInnerSparks {
   points: THREE.Points;
   /** Advanced by the life frame; the twinkle reads it. */
   phaseUniform: { value: number };
+  /** Removes the cloud from the scene graph and frees its buffers. */
   dispose(): void;
 }
 
@@ -100,7 +102,26 @@ void main() {
 }
 `;
 
+/**
+ * Builds the cloud **and parents it**, rather than handing back a loose object
+ * for the caller to place.
+ *
+ * That is a correction, and the defect it fixes only ever showed in a real
+ * render. The bundle is two nested groups: `group` carries the life frame's
+ * breathing, and `content` inside it carries the fit — the scale and offset
+ * that take an artifact from engine units to the size it is drawn at. The
+ * crystal batches live in `content`. The first version of this returned the
+ * points for the caller to add, the caller added them to `group`, and the cloud
+ * missed the fit entirely: a scale of about 2.3 and a translation. The lights
+ * rendered in raw engine coordinates, which on the portal put them in the sky
+ * above the crystal.
+ *
+ * The unit test did not catch it because it compared spark positions against
+ * monarch positions in engine units, where the two do agree. Taking the parent
+ * here means there is no placement left for a caller to get wrong.
+ */
 export function createThreeCrystalInnerSparks(
+  bundle: ThreeCrystalRenderBundle,
   geometry: CrystalGeometryState,
   life: CrystalLifeState,
 ): ThreeCrystalInnerSparks | null {
@@ -161,10 +182,14 @@ export function createThreeCrystalInnerSparks(
   // After the crystal batches, so the additive pass lands on a finished shell.
   points.renderOrder = 10;
 
+  // Beside the crystal batches, under the fit — never beside the fit.
+  bundle.content.add(points);
+
   return {
     points,
     phaseUniform,
     dispose: () => {
+      points.removeFromParent();
       bufferGeometry.dispose();
       material.dispose();
     },

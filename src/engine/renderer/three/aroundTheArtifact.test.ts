@@ -342,12 +342,24 @@ describe('the artifact from 0°, 90°, 180° and 270° (crystal cluster brief §
     // half-spaces, so she is convex by construction and the projection of a
     // convex body is a convex polygon.
     for (const { label, years, events } of COLONIES) {
-      const { geometry, life } = colony(years, events);
-      const sparks = createThreeCrystalInnerSparks(geometry, life)!;
+      const { geometry, material, life } = colony(years, events);
+      const bundle = createThreeCrystalRenderBundle(geometry, material);
+      const sparks = createThreeCrystalInnerSparks(bundle, geometry, life)!;
       expect(sparks, label).not.toBeNull();
       const monarch = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_MONARCH_BODY_ID)!;
-      const sceneRadius = crystalSceneRadius(geometry, { includeSubstrate: false });
-      const sceneHeight = crystalSceneHeight(geometry);
+      // **Each through its own world matrix.** The first version of this test
+      // projected both the monarch and the sparks from raw engine units, where
+      // they agree however either one is parented — which is exactly why it
+      // passed while the cloud was hanging in the sky above the portal's
+      // crystal, missing the fit transform the batches carry.
+      bundle.group.updateMatrixWorld(true);
+      const monarchWorld = bundle.meshes.get(CRYSTAL_MONARCH_BODY_ID)?.matrixWorld
+        ?? bundle.content.matrixWorld;
+      const sparkWorld = sparks.points.matrixWorld;
+      const point = new THREE.Vector3();
+      const sceneRadius = crystalSceneRadius(geometry, { includeSubstrate: false })
+        * bundle.fit.scale;
+      const sceneHeight = crystalSceneHeight(geometry) * bundle.fit.scale;
       const position = sparks.points.geometry.getAttribute('position');
 
       for (const aspect of ASPECTS) {
@@ -355,24 +367,24 @@ describe('the artifact from 0°, 90°, 180° and 270° (crystal cluster brief §
           const camera = cameraAt(bearing, aspect.value, sceneRadius, sceneHeight);
           const outline: { x: number; y: number }[] = [];
           for (let index = 0; index < monarch.positions.length; index += 3) {
-            const ndc = project(
-              camera,
+            point.set(
               monarch.positions[index]!,
               monarch.positions[index + 1]!,
               monarch.positions[index + 2]!,
-            );
+            ).applyMatrix4(monarchWorld);
+            const ndc = project(camera, point.x, point.y, point.z);
             if (ndc !== null) outline.push(ndc);
           }
           const silhouette = hull(outline);
           expect(silhouette.length, `${label} ${bearing}° outline`).toBeGreaterThan(2);
 
           for (let index = 0; index < position.count; index += 1) {
-            const ndc = project(
-              camera,
+            point.set(
               position.getX(index),
               position.getY(index),
               position.getZ(index),
-            );
+            ).applyMatrix4(sparkWorld);
+            const ndc = project(camera, point.x, point.y, point.z);
             expect(ndc, `${label} ${aspect.label} ${bearing}° spark ${index}`).not.toBeNull();
             expect(
               insideHull(silhouette, ndc!, 1e-6),
@@ -382,6 +394,7 @@ describe('the artifact from 0°, 90°, 180° and 270° (crystal cluster brief §
         }
       }
       sparks.dispose();
+      bundle.dispose();
     }
   });
 
