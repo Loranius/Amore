@@ -12,7 +12,7 @@ import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { WishlistBubbleView } from './WishlistBubbleView';
-import { WishlistCrystalView } from './WishlistCrystalView';
+import { WishlistSphereView } from './WishlistSphereView';
 import { WishlistWorldNav } from './WishlistWorldNav';
 import { WishlistFeedView } from './WishlistFeedView';
 import { WishlistPolaroidView } from './WishlistPolaroidView';
@@ -54,6 +54,7 @@ import {
 } from './useWishlist';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistCrystalWorld.css';
+import './wishlistSpheres.css';
 import './wishlistV3.mobile.css';
 import './wishlistGiftArchive.css';
 import './wishlistArchiveRedesign.css';
@@ -202,17 +203,32 @@ export function WishlistPage() {
   const refetchItems = activeQuery.refetch;
   const partnerCounts = partnerWishFilterCounts(partnerItems, me.id);
   const sharedCounts = sharedWishFilterCounts(sharedItems, me.id, partner?.id ?? -1);
-  const contextItems = tab === 'partner'
-    ? filterPartnerWishes(partnerItems, partnerFilter, me.id)
-    : tab === 'shared' && partner
-      ? filterSharedWishes(sharedItems, sharedFilter, me.id, partner.id)
-      : items;
+  // Під-фільтри вкладок партнера й спільних живуть у власних панелях, а тих
+  // панелей у світі немає — сфери показують те саме, що рахує лічильник на
+  // вкладці. Виміряно на живому порталі: «Лєни 1» і порожній екран під ним,
+  // бо типовий фільтр «Доступні» ховав єдине бажання, а перемкнути його не
+  // було чим.
+  const contextItems = worldVisible
+    ? items
+    : tab === 'partner'
+      ? filterPartnerWishes(partnerItems, partnerFilter, me.id)
+      : tab === 'shared' && partner
+        ? filterSharedWishes(sharedItems, sharedFilter, me.id, partner.id)
+        : items;
   const activeBoardView = { ...boardViews[tab], view: preferredView };
-  // У кристалічному вигляді дотики в порожній області належать сцені: саме
-  // там висять тіла бажань, і без цього сторінка забирала кожен клік собі —
-  // виміряно на живому порталі, бажання не відкривались і не оберталися.
-  // У списку й полароїдах усе навпаки: там сторінка, і їй потрібен скрол.
-  useWorldVisibleRoute({ artifactInput: worldVisible && activeBoardView.view === 'bubbles' });
+  // Дотики лишаються сторінці — усі. Бажання більше не живуть у сцені: сфери
+  // це власний presentation-шар вішліста, і саме він мусить ловити дотик.
+  // Сцена монарха тут фон, а фон нічого не ловить.
+  useWorldVisibleRoute();
+  // §9: сцена монарха лишається фоном вішліста — тим самим, що й на головній,
+  // але приглушеним. Приглушення живе на маркері модуля, а не в самій сцені:
+  // жодного глобального параметра не змінено, і головна виглядає як була.
+  useEffect(() => {
+    if (!worldVisible) return;
+    const root = document.documentElement;
+    root.setAttribute('data-wishlist-scene', 'dim');
+    return () => { root.removeAttribute('data-wishlist-scene'); };
+  }, [worldVisible]);
   const boardFilterCounts = wishlistPriorityFilterCounts(contextItems);
   const visibleItems = applyWishlistBoardView(contextItems, activeBoardView);
 
@@ -547,12 +563,14 @@ export function WishlistPage() {
                   seed={polaroidSeeds[tab]}
                 />
               ) : (
-                // Кристалічний вигляд заміняє бульбашки, поки маршрут показує
-                // світ: бажання малює сцена, а сторінка лишає доступний шлях
-                // до кожного з них. Без світу — жодного WebGL, і бульбашки
-                // лишаються тим, чим були (§52).
+                // Сфери — головна мова вішліста, поки маршрут показує світ.
+                // Без світу лишаються бульбашки: вони не потребують ані
+                // WebGL, ані сцени за собою (§52).
                 worldVisible ? (
-                  <WishlistCrystalView {...sharedViewProps} />
+                  <WishlistSphereView
+                    {...sharedViewProps}
+                    onShowAll={() => changeBoardView({ ...activeBoardView, view: 'feed' })}
+                  />
                 ) : (
                   <WishlistBubbleView {...sharedViewProps} />
                 )

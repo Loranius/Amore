@@ -26,117 +26,13 @@
   --warn: var(--world-warning);
 }
 
-/* ── Бажання стають кристалами ──────────────────────────────
-   Головне, що просив власник: за самим бажанням нічого не має бути, а сама
-   мрія висить кристалом. Дошка лишається дошкою — фізика, відштовхування й
-   розкладка ті самі, — зникає скляна кулька, а силует стає гранованим.
+/* Тут була огранка: правила перетворювали кульки бульбашкового вигляду на
+   шестигранні кристали. Вимога змінилась прямим текстом — «не роби
+   crystal-shaped UI», — і бульбашковий вигляд лишається запасним шляхом без
+   WebGL, тобто має виглядати собою. Кристалів у вішлісті більше немає, ні
+   тілами у сцені, ні формою в CSS.
 
-   **Специфічність тут не про стиль.** Кулька зібрана в одинадцяти файлах, і
-   найсильніший селектор серед них —
-   `.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble` (0,4,0). Перша
-   редакція цих правил мала 0,3,0 і програвала: на живому порталі від кульки
-   лишався світлий обідок. Тому ланцюг повторено повністю. */
-[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble {
-  border-color: transparent;
-  background: none;
-  box-shadow: none;
-  backdrop-filter: none;
-  /* Шестигранник із вістрям — той самий силует, що в монарха на екрані:
-     огранка, а не коло. Обрізка не змінює розкладки, тож фізика бульбашок
-     працює далі на тих самих колах. */
-  clip-path: polygon(50% 0%, 88% 21%, 88% 79%, 50% 100%, 12% 79%, 12% 21%);
-  /* Кант по силуету — єдиний спосіб окреслити обрізану форму: звичайний
-     `border` обрізається разом із нею. */
-  filter: drop-shadow(0 0 1.5px var(--world-border-active))
-    drop-shadow(0 8px 18px var(--world-shadow));
-}
-
-/* Верхній відблиск кульки не потрібен — він круглий і читається як скло. */
-[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble::before {
-  display: none;
-}
-
-/* А ось нижній шар лишається — але замість обідка й лінзи він тепер несе
-   світло на гранях.
-   Причина виміряна: без нього темне фото на темному світі читалось як діра, а
-   не як кристал, і жоден кант завтовшки в піксель цього не рятував. Дві
-   схрещені смуги світла — це і є те, що робить грань гранню (та сама логіка,
-   що в освітленні порталу). */
-[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble::after {
-  display: block;
-  background:
-    linear-gradient(152deg, rgba(255, 255, 255, 0.22) 0%, transparent 34%),
-    linear-gradient(304deg, color-mix(in srgb, var(--world-primary) 30%, transparent) 0%, transparent 44%);
-  mix-blend-mode: screen;
-}
-
-/* Медіа всередині повторює силует: кругла маска на гранованому тілі лишала б
-   світлий серп по краю. */
-[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble-media,
-[data-portal-scene='true'] .wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble-placeholder {
-  border-radius: 0;
-  background: none;
-}
-
-/* Тінь під бульбашкою малювалась кольором тексту — на світлому папері це
-   м'яка сіра пляма, на нічному світі світла. */
-[data-portal-scene='true'] .wishlist .wl-cloud-item::after {
-  display: none;
-}
-
-/* ── Crystal View: сторінка мовчить, говорить світ ──────────
-   Тіла бажань малює сцена. Тут лишається лише доступний шлях до кожного з
-   них — справжні кнопки, які бачить читач екрана й до яких доходить Tab.
-   §48 вимагає цього прямо: користуватись Amore має бути можливо, не
-   розуміючи тривимірної сцени. Саме ці кнопки «натискає» й дотик по
-   кристалу, тож шлях відкриття один, а не два. */
-[data-portal-scene='true'] .wishlist .wl-crystal-view {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  /* Місце під дошку: бажання висять у сцені, і сторінка не має її закривати. */
-  min-height: 52dvh;
-  /* І не має ловити дотики.
-     Виміряно на живому порталі: цей блок лежить НАД полотном і забирав собі
-     кожен дотик у зоні бажань — тіла не оберталися пальцем і не відкривались,
-     бо жодна подія до сцени не доходила. */
-  pointer-events: none;
-}
-
-/* Кнопка лишається клавіатурною: у фокусі вона видима й натискається. */
-[data-portal-scene='true'] .wishlist .wl-crystal-trigger:focus-visible {
-  pointer-events: auto;
-}
-
-[data-portal-scene='true'] .wishlist .wl-crystal-trigger {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  border: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
-
-/* Але не для клавіатури: у фокусі кнопка стає видимою поверх світу, інакше
-   пара, яка ходить табом, не бачила б, де вона. */
-[data-portal-scene='true'] .wishlist .wl-crystal-trigger:focus-visible {
-  position: static;
-  width: auto;
-  height: auto;
-  margin: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--world-border-active);
-  border-radius: var(--radius-md);
-  overflow: visible;
-  clip-path: none;
-  background: var(--world-surface);
-  color: var(--world-text);
-  font: inherit;
-  text-align: start;
-}
+   Сфери живуть окремо: `wishlistSpheres.css`. */
 
 /* ── Аркуш бажання (§18, §30) ───────────────────────────────
    «Crystal Sheet appears» — саме аркуш над світом, а не біла сторінка
@@ -377,22 +273,6 @@
   }
 }
 
-/* ── Дотики у кристалічному вигляді ─────────────────────────
-   Сторінка лежить над полотном і за замовчуванням забирає кожен дотик собі.
-   На головній це вирішено маркером `data-world-input`; вішліст вмикає його
-   лише у вигляді «Кристали», де порожня область справді належить сцені.
-
-   Пропускає секція, а не її діти: панель вкладок, аркуші й плаваюча кнопка
-   лишаються клікабельними. Дошка бажань — навпаки, наскрізна: тіла ловить
-   сцена, а прихована кнопка бажання потрібна лише клавіатурі. */
-[data-world-input='artifact'] .wishlist {
-  pointer-events: none;
-}
-
-[data-world-input='artifact'] .wishlist > * {
-  pointer-events: auto;
-}
-
-[data-world-input='artifact'] .wishlist .wl-crystal-view {
-  pointer-events: none;
-}
+/* Дотики лишаються сторінці. Поки бажання жили у сцені, вішліст віддавав їй
+   порожню область маркером `data-world-input`; сфери — свій власний шар, і
+   забирати в нього дотики не можна. */

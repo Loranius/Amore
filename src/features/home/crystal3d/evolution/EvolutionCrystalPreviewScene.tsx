@@ -10,8 +10,6 @@ import {
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
-import { useArtifactWorld } from '@/features/world/artifactWorldContext';
-import { wishCrystalCost, type WishSubject } from '../scene/wishCrystals';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
 import {
@@ -39,10 +37,6 @@ function formatTopology(value: number): string {
   return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}k`;
 }
 
-/** Стала порожнеча: `?? []` створювала б новий масив щорендера, а на ньому
- *  висить перебудова матеріалів дошки бажань. */
-const NO_WISHES: readonly WishSubject[] = [];
-
 export default function EvolutionCrystalPreviewScene() {
   // Build metrics are a development instrument. They were rendering over the
   // artifact in production, which is both noise on the portal's one hero
@@ -60,18 +54,6 @@ export default function EvolutionCrystalPreviewScene() {
   // `PortalStageProps.pose`.
   const { pose, region } = useWorldPose();
   const motionMode = useWorldMotionMode();
-  // Бажання приходять від самого модуля, а не з окремого запиту: він знає,
-  // яка вкладка відкрита й що в ній видно, і повторювати цю логіку в сцені
-  // означало б мати дві відповіді на одне питання.
-  const { wishBoard } = useArtifactWorld();
-  // §30: «camera slightly reframes». Не окремий рух і не друга система — та
-  // сама поза маршруту, підсунута ближче на сім відсотків. Веде її директор
-  // сцени (ADR-0022), тож перехід плавний і його можна перервати вибором
-  // іншого бажання.
-  const focusedPose = useMemo(
-    () => (wishBoard?.focused == null ? pose : { ...pose, distance: pose.distance * 0.93 }),
-    [pose, wishBoard?.focused],
-  );
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   // Напрямки гілок кварцової жили. Меми в сцені тримаються за цей масив, тож
   // він мусить бути стабільним посиланням — інакше камінь платформи
@@ -100,15 +82,6 @@ export default function EvolutionCrystalPreviewScene() {
   if (isPending || !pipeline) return <CrystalPlaceholder />;
 
   const metrics = pipeline.metrics;
-  // Ціна хмари бажань публікується окремо — так само, як ціна оточення.
-  // Бюджет артефакта має лишатись про артефакт: донька, позичена дванадцять
-  // разів, у топології порахована один раз.
-  const wishCost = wishCrystalCost(
-    pipeline.geometry,
-    wishBoard?.wishes ?? NO_WISHES,
-    metrics.quality,
-    pose.azimuth,
-  );
   // The reliquary replaces the old quartz ground mesh visually. Size it from
   // the crystals that remain visible, otherwise the hidden vein still inflates
   // the bronze disc until its rim fills the phone viewport.
@@ -141,8 +114,6 @@ export default function EvolutionCrystalPreviewScene() {
         data-evolution-runtime={runtime ? 'ready' : 'warming'}
         data-evolution-draw-calls={runtime?.drawCalls ?? ''}
         data-evolution-rendered-triangles={runtime?.triangles ?? ''}
-        data-evolution-wish-crystals={wishCost.instances}
-        data-evolution-wish-triangles={wishCost.triangles}
         data-portal-environment-draw-calls={PORTAL_ENVIRONMENT_DRAW_CALLS}
         data-portal-environment-triangles={PORTAL_ENVIRONMENT_TRIANGLES}
       >
@@ -167,7 +138,7 @@ export default function EvolutionCrystalPreviewScene() {
             artifactSceneHeight={crystalSceneHeight(pipeline.geometry)}
             veinBearings={veinBearings}
             veinReach={crystalSubstrateSceneRadius(pipeline.geometry)}
-            pose={focusedPose}
+            pose={pose}
             // Крутити сцену пальцем можна лише вдома: у модулі камера стає в
             // позу маршруту й лишається там, інакше дошка бажань і глядач
             // дивляться в різні боки.
@@ -179,12 +150,6 @@ export default function EvolutionCrystalPreviewScene() {
               material={pipeline.material}
               life={pipeline.life}
               substrateVisible={false}
-              wishes={wishBoard?.wishes ?? NO_WISHES}
-              quality={metrics.quality}
-              wishFacing={pose.azimuth}
-              reduceMotion={reduceMotion}
-              focused={wishBoard?.focused ?? null}
-              {...(wishBoard ? { onWishSelect: wishBoard.onSelect } : {})}
             />
           </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

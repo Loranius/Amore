@@ -67,19 +67,15 @@ describe('scope (brief §42, §55)', () => {
     }
   });
 
-  it('wins against the bubble’s own shell', () => {
-    // Measured on the live portal: the first version of these rules used
-    // `.wishlist .wl-cloud-bubble` (0,3,0) and lost to
-    // `.wishlist .wishlist-grid .wl-cloud-item .wl-cloud-bubble` (0,4,0) in
-    // wishlistBubbleGlass.css — the glass ball kept a bright rim on the night
-    // scene. The full chain is repeated deliberately.
-    const bubbleRules = selectors(BARE).filter((list) => list.includes('.wl-cloud-bubble'));
-    expect(bubbleRules.length).toBeGreaterThan(0);
-    for (const list of bubbleRules) {
-      for (const selector of list.split(',')) {
-        expect(selector, selector).toContain('.wishlist-grid .wl-cloud-item');
-      }
-    }
+  it('leaves the fallback bubbles alone', () => {
+    // Змінена вимога, і змінена власником прямим текстом: «не роби
+    // crystal-shaped UI». Тут стояли правила, які обрізали кульку
+    // бульбашкового вигляду в шестигранник, і тест стеріг їхню специфічність.
+    // Кристалів у вішлісті більше немає — ні тілами у сцені, ні формою в CSS,
+    // — а бульбашковий вигляд лишається запасним шляхом без WebGL і має
+    // виглядати собою.
+    expect(BARE).not.toContain('.wl-cloud-bubble');
+    expect(BARE).not.toMatch(/clip-path:\s*polygon/);
   });
 });
 
@@ -113,25 +109,5 @@ describe('surfaces (brief §10, §44)', () => {
     for (const literal of literals) {
       expect(literal, literal).toMatch(/^rgba\(255, 255, 255,/);
     }
-  });
-});
-
-describe('wishes as crystals (brief §28)', () => {
-  it('cuts the wish to a faceted silhouette instead of a bubble', () => {
-    const bubble = BARE.slice(BARE.indexOf(".wl-cloud-bubble {"));
-    const body = bubble.slice(0, bubble.indexOf('}'));
-    expect(body).toMatch(/clip-path:\s*polygon/);
-    expect(body).toMatch(/background:\s*none/);
-    expect(body).toMatch(/box-shadow:\s*none/);
-  });
-
-  it('keeps light on the facets, which is what makes it read as stone', () => {
-    // Measured: with the overlay simply hidden, a dark product photo on the
-    // night world read as a hole in the scene, and a one-pixel rim did not
-    // save it.
-    const after = BARE.slice(BARE.indexOf('.wl-cloud-bubble::after'));
-    const body = after.slice(after.indexOf('{'), after.indexOf('}'));
-    expect(body).toMatch(/display:\s*block/);
-    expect(body).toMatch(/linear-gradient/);
   });
 });

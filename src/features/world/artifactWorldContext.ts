@@ -1,28 +1,12 @@
 import { createContext, useContext } from 'react';
 import type { HomeArtifact } from '../home/homeArtifact';
-import type { WishSubject } from '../home/crystal3d/scene/wishCrystals';
 
-/**
- * Що модуль показує у світі, і що робити, коли по ньому клацнули.
- *
- * Перший випадок каналу «модуль каже світу, що він показує»: вішліст віддає
- * свої бажання, світ малює їх тілами (§28), і дотик повертається назад тим
- * самим шляхом. Канал названий за вішлістом, а не узагальнений наперед — коли
- * другий модуль попросить того самого, узагальнення матиме дві точки замість
- * однієї здогадки.
- */
-export interface WorldWishBoard {
-  wishes: readonly WishSubject[];
-  onSelect: (wishId: number) => void;
-  /**
-   * Бажання, аркуш якого зараз відкрито, — або `null`.
-   *
-   * §30 просить, щоб вибране тіло вийшло вперед, а решта відступила. Хто
-   * вибраний, знає сторінка: це стан її аркуша деталей, і дублювати його в
-   * сцені означало б два джерела правди про одне вікно.
-   */
-  focused: number | null;
-}
+// Тут жив канал «модуль каже світу, що показувати»: вішліст віддавав свої
+// бажання, а сцена малювала їх тілами навколо монарха. Канал прибрано разом
+// із тими тілами — вішліст отримав власний presentation layer (сфери), і
+// тепер сцена монарха є для нього фоном, а не виконавцем. Коли якийсь модуль
+// справді попросить світ щось намалювати, канал з'явиться під ту вимогу, а не
+// під спогад про цю.
 
 /**
  * Which living artifact the couple is looking at, and who may change it.
@@ -47,9 +31,6 @@ export interface ArtifactWorldValue {
    * created just to ask the same question.
    */
   webglSupported: boolean;
-  /** Дошка бажань, поки її показує маршрут. `null` — артефакт стоїть сам. */
-  wishBoard: WorldWishBoard | null;
-  showWishBoard: (board: WorldWishBoard | null) => void;
 }
 
 export const ArtifactWorldContext = createContext<ArtifactWorldValue | null>(null);

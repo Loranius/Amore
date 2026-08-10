@@ -1,0 +1,271 @@
+/* ============================================================
+   Wish Spheres — власна presentation-мова вішліста.
+   ------------------------------------------------------------
+   Сфера має читатись як магічна скляна куля, всередині якої лежить предмет
+   бажання, а не як кругла кнопка з аватаркою. Тому шарів чотири: оболонка,
+   світіння, обідець і саме зображення — і жоден із них не є рамкою навколо
+   фото.
+
+   **Ціна навмисно низька.** Жодного `backdrop-filter` на сферу, жодного
+   розмиття по кулі, жодної другої сцени: скло тут — це градієнти й дві
+   внутрішні тіні, тобто один композитний шар на бажання. §18 вимагає саме
+   цього, а ілюзія важливіша за фізичну коректність.
+   ============================================================ */
+
+.wl-sphere-field {
+  position: relative;
+  /* Поле займає екран під вкладками — сузір'я розкладається в його пікселях. */
+  min-height: 68dvh;
+  margin: 0;
+  /* Порожнє місце між сферами належить сторінці, а не сцені: фон монарха
+     нічого не ловить, і прокрутка вішліста лишається прокруткою. */
+  touch-action: manipulation;
+}
+
+/* ── Сама сфера ─────────────────────────────────────────── */
+.wl-sphere-field .wl-sphere {
+  position: absolute;
+  left: var(--sphere-x);
+  top: var(--sphere-y);
+  width: var(--sphere-size);
+  height: var(--sphere-size);
+  padding: 0;
+  border: 0;
+  background: none;
+  /* Центрування окремою властивістю, не через transform: transform лишається
+     вільним для паралаксу, а анімація дрейфу живе на внутрішньому шарі. */
+  translate: -50% -50%;
+  transform: translate3d(
+    calc(var(--field-tilt-x, 0) * var(--sphere-parallax, 0) * -1px),
+    calc(var(--field-tilt-y, 0) * var(--sphere-parallax, 0) * -1px),
+    0
+  );
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  animation: wl-sphere-enter 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wl-sphere-field .wl-sphere[data-layer='far'] { opacity: 0.82; z-index: 1; }
+.wl-sphere-field .wl-sphere[data-layer='mid'] { opacity: 0.92; z-index: 2; }
+.wl-sphere-field .wl-sphere[data-layer='near'] { opacity: 1; z-index: 3; }
+
+.wl-sphere-field .wl-sphere:focus-visible {
+  outline: 2px solid var(--world-accent, #d7b8ff);
+  outline-offset: 6px;
+  border-radius: 50%;
+}
+
+/* ── Оболонка: скло, а не пластик ───────────────────────── */
+.wl-sphere-field .wl-sphere__body {
+  position: absolute;
+  inset: 0;
+  display: block;
+  border-radius: 50%;
+  overflow: hidden;
+  /* Нейтральна оболонка з ледь помітним lavender: рожевою кулю робити не
+     можна — вимога прямим текстом. */
+  background:
+    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.07) 36%, transparent 62%),
+    radial-gradient(circle at 52% 74%, rgba(196, 170, 255, 0.16), transparent 68%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07), rgba(126, 104, 168, 0.14));
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.4),
+    inset 0 -12px 20px -14px rgba(198, 150, 255, 0.75),
+    0 10px 24px rgba(12, 8, 24, 0.4);
+  scale: 1;
+  animation: wl-sphere-float var(--sphere-period, 7s) ease-in-out var(--sphere-phase, 0s) infinite alternate;
+  transition: scale 320ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 320ms ease;
+}
+
+/* ── Предмет усередині ──────────────────────────────────
+   Не аватарка: зображення менше за кулю, вписане цілком, і його край не
+   обрізається колом, а згасає. Фотографія з власним тлом так лишається
+   впізнаваною, але не показує різкої рамки. */
+.wl-sphere-field .wl-sphere__image {
+  position: absolute;
+  inset: 13%;
+  width: 74%;
+  height: 74%;
+  object-fit: contain;
+  opacity: 0.88;
+  /* 70–90% насиченості, трохи менший контраст, слабкий бузковий відтінок —
+     предмет лишається впізнаваним, але живе всередині скла. */
+  filter: saturate(0.82) contrast(0.95) brightness(1.03) drop-shadow(0 0 6px rgba(206, 170, 255, 0.35));
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 54%, rgba(0, 0, 0, 0.72) 72%, transparent 92%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 54%, rgba(0, 0, 0, 0.72) 72%, transparent 92%);
+  transition: opacity 320ms ease, filter 320ms ease;
+}
+
+/* Бажання без фото: не порожня куля, а зернина світла всередині скла. */
+.wl-sphere-field .wl-sphere__seed {
+  position: absolute;
+  inset: 30%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 42% 38%, rgba(255, 255, 255, 0.7), rgba(200, 168, 255, 0.35) 55%, transparent 78%);
+}
+
+/* ── Внутрішнє світіння ─────────────────────────────────
+   Дуже слабке, і воно дихає окремо від дрейфу — інакше сфера пульсує в такт
+   із рухом і читається як кнопка, що привертає увагу. */
+.wl-sphere-field .wl-sphere__glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 58%, rgba(214, 160, 255, 0.26), transparent 66%);
+  mix-blend-mode: screen;
+  opacity: 0.75;
+  animation: wl-sphere-glow calc(var(--sphere-period, 7s) * 1.6) ease-in-out var(--sphere-phase, 0s) infinite alternate;
+  transition: opacity 320ms ease;
+}
+
+/* ── Обідець скла ───────────────────────────────────────
+   Тонка світла дуга по частині контуру, а не товстий бордер: маска лишає
+   кільце завтовшки два пікселі, а градієнт гасить його на протилежному боці. */
+.wl-sphere-field .wl-sphere__rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    142deg,
+    rgba(255, 255, 255, 0.9) 0%,
+    rgba(255, 255, 255, 0.1) 34%,
+    transparent 58%,
+    rgba(206, 168, 255, 0.55) 100%
+  );
+  -webkit-mask: radial-gradient(closest-side circle, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+  mask: radial-gradient(closest-side circle, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+}
+
+/* ── Дотик: фокус на обраній, відступ решти (§13) ───────── */
+.wl-sphere-field .wl-sphere[data-focused='true'] {
+  z-index: 6;
+}
+
+.wl-sphere-field .wl-sphere[data-focused='true'] .wl-sphere__body {
+  scale: 1.16;
+  /* Дрейф зупиняється: обране бажання стоїть, поки на нього дивляться. */
+  animation-play-state: paused;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.5),
+    inset 0 -12px 22px -12px rgba(206, 160, 255, 0.85),
+    0 14px 34px rgba(12, 8, 24, 0.5);
+}
+
+/* Фото активного бажання стає максимально читабельним — саме тут різкість і
+   потрібна, а не в спокої. */
+.wl-sphere-field .wl-sphere[data-focused='true'] .wl-sphere__image {
+  opacity: 0.98;
+  filter: saturate(1) contrast(1.04) brightness(1.02) drop-shadow(0 0 8px rgba(214, 176, 255, 0.45));
+}
+
+.wl-sphere-field .wl-sphere[data-focused='true'] .wl-sphere__glow {
+  opacity: 1;
+  animation-play-state: paused;
+}
+
+/* Решта не зникає — вона просто відступає. */
+.wl-sphere-field .wl-sphere[data-dimmed='true'] {
+  opacity: 0.45;
+}
+
+.wl-sphere-field .wl-sphere[data-dimmed='true'] .wl-sphere__glow {
+  opacity: 0.3;
+}
+
+/* ── Перемикання вкладки: перехід, а не перемальовування ── */
+.wl-sphere-field[data-phase='out'] .wl-sphere {
+  opacity: 0;
+  transition: opacity 170ms ease;
+}
+
+/* ── Решта, що не вмістилась у стелю ─────────────────────── */
+.wl-sphere-field .wl-sphere-more {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  transform: translateX(-50%);
+  min-height: 38px;
+  padding: 8px 16px;
+  border: 1px solid var(--world-border, rgba(255, 255, 255, 0.18));
+  border-radius: 999px;
+  background: var(--world-surface, rgba(32, 24, 52, 0.7));
+  color: var(--world-text, #f2ecff);
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  z-index: 7;
+}
+
+@keyframes wl-sphere-float {
+  from {
+    transform: translate3d(calc(var(--sphere-drift-x, 2px) * -0.5), calc(var(--sphere-drift-y, 5px) * -0.5), 0);
+  }
+  to {
+    transform: translate3d(calc(var(--sphere-drift-x, 2px) * 0.5), calc(var(--sphere-drift-y, 5px) * 0.5), 0);
+  }
+}
+
+@keyframes wl-sphere-glow {
+  from { opacity: 0.55; }
+  to { opacity: 0.9; }
+}
+
+@keyframes wl-sphere-enter {
+  from { opacity: 0; scale: 0.82; }
+}
+
+/* ── Слабкі пристрої (§19) ───────────────────────────────
+   Навіть тут сфера лишається сферою: оболонка, обідець, зображення й дрейф.
+   Зникає тільки те, що коштує композиції — світіння з режимом накладання і
+   м'яка тінь навколо предмета. */
+.wl-sphere-field[data-quality='low'] .wl-sphere__glow,
+.wl-sphere-field[data-quality='fallback'] .wl-sphere__glow {
+  mix-blend-mode: normal;
+  animation: none;
+  opacity: 0.5;
+}
+
+.wl-sphere-field[data-quality='low'] .wl-sphere__image,
+.wl-sphere-field[data-quality='fallback'] .wl-sphere__image {
+  filter: saturate(0.85) contrast(0.96);
+}
+
+/* ── Спокійний рух (§20) ─────────────────────────────────
+   Позиції лишаються просторовими, зникає лише сам рух; перехід дотику
+   коротший і простіший. */
+@media (prefers-reduced-motion: reduce) {
+  .wl-sphere-field .wl-sphere,
+  .wl-sphere-field .wl-sphere__body,
+  .wl-sphere-field .wl-sphere__glow {
+    animation: none;
+  }
+
+  .wl-sphere-field .wl-sphere__body {
+    transition: scale 120ms linear;
+  }
+
+  .wl-sphere-field .wl-sphere {
+    transition: opacity 120ms linear;
+    transform: none;
+  }
+}
+
+/* ── Сцена монарха як фон вішліста (§9) ──────────────────
+   Той самий світ, що й на головній, — але на півкроку назад: вішліст має
+   власну функціональну зону, і герой у ньому вже не монарх.
+
+   Приглушення робить накладка, а не фільтр і не параметр сцени. Фільтр по
+   повноекранному полотну — це зайвий прохід на кожен кадр, а зміна самої
+   сцени дійшла б і до головної. Маркер ставить сторінка вішліста й знімає
+   його, коли йде. */
+[data-wishlist-scene='dim'] .artifact-world::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(126% 84% at 50% 64%, transparent 26%, rgba(14, 9, 28, 0.46) 100%),
+    rgba(18, 12, 32, 0.2);
+  pointer-events: none;
+}

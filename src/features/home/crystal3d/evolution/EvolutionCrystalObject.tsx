@@ -10,8 +10,6 @@ import {
   createThreeCrystalRenderBundle,
   setThreeCrystalBodyVisible,
 } from '@/engine/renderer/three';
-import { WishCrystalBoard } from '../scene/WishCrystalBoard';
-import type { WishSatelliteQuality, WishSubject } from '../scene/wishCrystals';
 import { isCrystalTap, type CrystalPointerSample } from './tapGesture';
 
 export interface EvolutionCrystalObjectProps {
@@ -20,20 +18,6 @@ export interface EvolutionCrystalObjectProps {
   life: CrystalLifeState;
   /** Portal presentation may seat the crystals directly in a solid plinth. */
   substrateVisible?: boolean;
-  /**
-   * Бажання, які ще не збулись — кожне окремим тілом (§28).
-   *
-   * Порожній список означає, що маршрут їх не показує: на головній артефакт
-   * стоїть сам, бажання належать області вішліста.
-   */
-  wishes?: readonly WishSubject[];
-  quality?: WishSatelliteQuality;
-  /** Азимут камери маршруту — дошка повертається до неї лицем. */
-  wishFacing?: number;
-  /** Бажання, аркуш якого відкрито (§30). */
-  focused?: number | null;
-  reduceMotion?: boolean;
-  onWishSelect?: (wishId: number) => void;
 }
 
 /**
@@ -45,12 +29,6 @@ export function EvolutionCrystalObject({
   material,
   life,
   substrateVisible = true,
-  wishes,
-  quality = 'balanced',
-  wishFacing = 0,
-  focused = null,
-  reduceMotion = false,
-  onWishSelect,
 }: EvolutionCrystalObjectProps) {
   const pulseUntil = useRef(0);
   const pointerDown = useRef<CrystalPointerSample | null>(null);
@@ -122,20 +100,6 @@ export function EvolutionCrystalObject({
         if (!isCrystalTap(start, released)) return;
         pulseUntil.current = performance.now() + life.interactionPulseDuration * 1000;
       }}
-    >
-      {wishes !== undefined && wishes.length > 0 && (
-        <WishCrystalBoard
-          bundle={bundle}
-          geometry={geometry}
-          material={material}
-          wishes={wishes}
-          quality={quality}
-          facing={wishFacing}
-          focused={focused}
-          reduceMotion={reduceMotion}
-          {...(onWishSelect ? { onSelect: onWishSelect } : {})}
-        />
-      )}
-    </primitive>
+    />
   );
 }

@@ -27,7 +27,6 @@ import {
   ArtifactWorldContext,
   useArtifactWorld,
   type ArtifactWorldValue,
-  type WorldWishBoard,
 } from './artifactWorldContext';
 import './artifactWorld.css';
 
@@ -81,17 +80,9 @@ export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
     setArtifact(next);
   }, []);
 
-  // Дошка бажань живе тут, а не на сторінці: сцена переживає маршрут, і
-  // передати їй список через контекст — єдиний спосіб, який не тягне вішліст
-  // у шар світу як залежність.
-  const [wishBoard, setWishBoard] = useState<WorldWishBoard | null>(null);
-  const showWishBoard = useCallback((next: WorldWishBoard | null) => {
-    setWishBoard(next);
-  }, []);
-
   const value = useMemo<ArtifactWorldValue>(
-    () => ({ artifact, selectArtifact, webglSupported, wishBoard, showWishBoard }),
-    [artifact, selectArtifact, webglSupported, wishBoard, showWishBoard],
+    () => ({ artifact, selectArtifact, webglSupported }),
+    [artifact, selectArtifact, webglSupported],
   );
 
   return (
