@@ -808,11 +808,23 @@ function buildSubstrateMaterial(
   // of the floor. Measured against both failures: at three times the stone the
   // vein rendered as a white splash brighter than everything but the monarch,
   // and at under twice it stopped being distinguishable from a shadow.
-  const baseColor = rgb(
-    round6(0.245 + grey * 0.045 + tint.r * 0.02),
-    round6(0.238 + grey * 0.045 + tint.g * 0.018),
-    round6(0.283 + grey * 0.045 + tint.b * 0.026),
-  );
+  const rootValue = 0.2553 + grey * 0.066;
+  // **The crystals' own colour, at a fraction of their value.** The brief's §4
+  // asks for a root that is darker in the same hue, and the three constants
+  // this replaces — 0.245 / 0.238 / 0.283 — were a lavender grey with blue
+  // highest, chosen back when the seam only had to read as "not the slab".
+  // Measured across a real colony they put the root's red-to-blue ratio at
+  // 0.885 against the monarch's 1.267: darker, yes, but 43% bluer, which is a
+  // different colour rather than a deeper one.
+  //
+  // Deriving it from the shell means the root cannot drift again when the
+  // palette moves — which is exactly how those three constants came to disagree
+  // with it. Only the *value* is set here, and it is the value the constants
+  // produced, so the brightness relationship with the dais that the paragraph
+  // above measured survives untouched and the single thing that changes is hue.
+  const shell = bodyColor(materialPalette, 'focal', colonyTintOf(input));
+  const shellValue = (shell.r + shell.g + shell.b) / 3;
+  const baseColor = scaleRgb(shell, rootValue / Math.max(1e-6, shellValue));
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
     bodyId: CRYSTAL_SUBSTRATE_BODY_ID,

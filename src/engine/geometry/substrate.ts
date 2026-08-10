@@ -106,7 +106,15 @@ const TROUGH_FALL = 0.75;
  *
  * At this height the wall is a hairline and what carries the seam is the
  * colour of its top face against the stone, which is what a mineral seam
- * actually is. Under one percent of the monarch's height.
+ * actually is.
+ *
+ * Measured rather than asserted, because the claim that used to stand here —
+ * "under one percent of the monarch's height" — was wrong by roughly six times.
+ * It is `nodeRadius × 0.14`, and the node radius is itself 1.6 monarch radii,
+ * so what the whole root stands above the stone is 4.3–7.3% of the monarch's
+ * height across colonies from one year to twenty-five. That is the crystal
+ * brief's §4 band (4–8%) without a change, which is the only reason the number
+ * survives this pass; the sentence describing it did not.
  */
 const VEIN_PROUD = 0.14;
 
