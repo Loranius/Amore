@@ -58,7 +58,7 @@ export default function EvolutionCrystalPreviewScene() {
   // зміна маршруту не перемальовує його сама; тут же зміна маршруту
   // перемальовує цей компонент, а з ним і дітей полотна. Див. коментар до
   // `PortalStageProps.pose`.
-  const { pose } = useWorldPose();
+  const { pose, region } = useWorldPose();
   const motionMode = useWorldMotionMode();
   // Бажання приходять від самого модуля, а не з окремого запиту: він знає,
   // яка вкладка відкрита й що в ній видно, і повторювати цю логіку в сцені
@@ -168,6 +168,10 @@ export default function EvolutionCrystalPreviewScene() {
             veinBearings={veinBearings}
             veinReach={crystalSubstrateSceneRadius(pipeline.geometry)}
             pose={focusedPose}
+            // Крутити сцену пальцем можна лише вдома: у модулі камера стає в
+            // позу маршруту й лишається там, інакше дошка бажань і глядач
+            // дивляться в різні боки.
+            allowOrbit={region === 'centre'}
             motionMode={motionMode}
           >
             <EvolutionCrystalObject

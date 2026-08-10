@@ -362,11 +362,17 @@ export function WishlistPage() {
 
   const partnerEmptyCopy = tab === 'partner' ? partnerEmptyState(partnerFilter) : null;
   const sharedEmptyCopy = tab === 'shared' ? sharedEmptyState(sharedFilter, partner.name) : null;
-  const canShowArchive = tab === 'me' || tab === 'shared';
+  // Виконані видно на всіх трьох вкладках.
+  //
+  // Раніше вкладка партнера архіву не мала, і подаровані спогади діставались
+  // лише через окрему кнопку «Виконані бажання: …» над панеллю. Власник
+  // попросив прибрати ту кнопку й дати «Виконані» просто в аркуші: пара має
+  // бачити, що вони здійснили одне для одного, там само, де все інше.
+  const canShowArchive = true;
+  const archiveOwnerId = tab === 'me' ? me.id : tab === 'partner' ? partner.id : null;
 
   const changeTab = (nextTab: Tab) => {
     setTab(nextTab);
-    if (nextTab === 'partner') setArchiveOpen(false);
   };
 
   const changeBoardView = (nextView: WishlistBoardViewState) => {
@@ -456,7 +462,7 @@ export function WishlistPage() {
       {archiveOpen && canShowArchive ? (
         <WishArchive
           scope={tab === 'shared' ? 'shared' : 'personal'}
-          ownerId={tab === 'me' ? me.id : null}
+          ownerId={archiveOwnerId}
           onPhotoClick={setLightbox}
           openRequested={archiveRequested}
           openRequestKey={notificationRequest}
@@ -555,7 +561,7 @@ export function WishlistPage() {
               {canShowArchive && (
                 <WishArchive
                   scope={tab === 'shared' ? 'shared' : 'personal'}
-                  ownerId={tab === 'me' ? me.id : null}
+                  ownerId={archiveOwnerId}
                   onPhotoClick={setLightbox}
                   openRequested={archiveRequested}
                   openRequestKey={notificationRequest}

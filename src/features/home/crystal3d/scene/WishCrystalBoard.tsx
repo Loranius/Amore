@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { CrystalGeometryState } from '@/engine/geometry';
@@ -205,6 +205,16 @@ export function WishCrystalBoard({
   // краї — крайні тіла зрізало, нижній ряд ховався за доком.
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
+  // Камера приїжджає не одразу: директор веде її в позу маршруту близько
+  // секунди (ADR-0022). Дошку рахували один раз, поки камера ще була в
+  // стартовій позиції, — і після перезавантаження сторінки вона лишалась
+  // побудованою під той перший кадр: два величезні тіла збоку замість сітки.
+  //
+  // Тому місце дошки перераховується, коли камера справді зрушила. Лічильник,
+  // а не позиція в залежностях: позиція міняється щокадру, і меми
+  // перебудовувались би шістдесят разів на секунду.
+  const [cameraTick, setCameraTick] = useState(0);
+  const lastCamera = useRef<THREE.Vector3 | null>(null);
   const bounds = useMemo(() => wishSatelliteBounds(geometry), [geometry]);
   // Де стоїть дошка і скільки місця їй дає екран.
   //
@@ -231,7 +241,7 @@ export function WishCrystalBoard({
       centre: [centre.x, centre.y, centre.z] as const,
       viewport: { halfWidth: (halfHeight * aspect) / fit, halfHeight: halfHeight / fit },
     };
-  }, [camera, size.width, size.height, bundle, bounds, facing]);
+  }, [camera, size.width, size.height, bundle, bounds, facing, cameraTick]);
 
   const crystals = useMemo(
     () => buildWishBoard({
@@ -346,6 +356,16 @@ export function WishCrystalBoard({
 
 
   useFrame((state, delta) => {
+    // Чи камера ще їде. Поріг у соту частку сцени: менший рух — це дихання
+    // світу (§26), і перебудовувати дошку через нього не треба.
+    const previous = lastCamera.current;
+    if (previous === null) {
+      lastCamera.current = camera.position.clone();
+    } else if (previous.distanceTo(camera.position) > 0.01) {
+      previous.copy(camera.position);
+      setCameraTick((tick) => tick + 1);
+    }
+
     const node = group.current;
     if (node === null) return;
     const time = reduceMotion ? 0 : state.clock.elapsedTime;

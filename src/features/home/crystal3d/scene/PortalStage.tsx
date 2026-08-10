@@ -57,6 +57,15 @@ export interface PortalStageProps {
   pose?: WorldCameraPose | undefined;
   /** Режим руху світу (§27). Реф — його читає цикл рендера, не DOM. */
   motionMode?: { current: Exclude<WorldMotionMode, 'navigation'> } | undefined;
+  /**
+   * Чи можна крутити сцену пальцем.
+   *
+   * Тільки на головній. У модулі камера приходить у позу маршруту й лишається
+   * там: власник сформулював це прямо — «зробити покрут і стати сталим». Поки
+   * орбіту дозволяли всюди, дошка бажань будувалась під один азимут, а глядач
+   * від'їжджав на інший, і половину бажань доводилось дошукувати обертом.
+   */
+  allowOrbit?: boolean | undefined;
   children: ReactNode;
 }
 
@@ -72,6 +81,7 @@ export function PortalStage({
   veinReach,
   pose,
   motionMode,
+  allowOrbit = true,
   children,
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
@@ -148,6 +158,7 @@ export function PortalStage({
         ref={controls}
         enablePan={false}
         enableZoom={false}
+        enableRotate={allowOrbit}
         enableDamping={!reduceMotion}
         dampingFactor={0.08}
         // Сцена стоїть на землі: дозволити камері пірнути під підлогу
