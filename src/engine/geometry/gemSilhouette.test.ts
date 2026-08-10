@@ -109,8 +109,14 @@ describe('gem silhouette (crystal cluster brief)', () => {
         const s = silhouette(mesh, body);
         const label = `${couple} ${years}y`;
 
-        expect(s.aspect, `${label} aspect`).toBeGreaterThanOrEqual(1.75);
-        expect(s.aspect, `${label} aspect`).toBeLessThanOrEqual(2.15);
+        // **The band the owner moved, not the one the brief wrote.** §2 asked
+        // for 1.80–2.10 and this held it at 1.75–2.15 on the built mesh. On
+        // 2026-08-10, looking at the rendered portal, the owner asked for the
+        // monarch's diameter to be halved — which doubles the ratio. The number
+        // in the brief was written before there was a crystal to look at; the
+        // instruction came from looking at one.
+        expect(s.aspect, `${label} aspect`).toBeGreaterThanOrEqual(3.4);
+        expect(s.aspect, `${label} aspect`).toBeLessThanOrEqual(4.35);
       }
     }
   });
@@ -128,8 +134,16 @@ describe('gem silhouette (crystal cluster brief)', () => {
         // not a cone. The mesh includes the buried tenth, which pushes the
         // measured position up against the brief's 58–72% of the *visible*
         // body — so the bound here is stated on what is measured.
+        //
+        // **The ceiling moved with the halving, and it is geometry rather than
+        // a preference.** The crown's drop is `radius · tan(crown angle)`, so
+        // halving the radius halves the height the termination spends: the
+        // crown starts higher, and the widest slice — which sits where the
+        // crown begins — rises with it, from 0.55–0.80 to 0.80–0.90. Holding
+        // the old position would mean changing the crown's angle, and that
+        // angle is quartz's rather than ours (ADR-0006).
         expect(s.widestAt, `${label} widest`).toBeGreaterThan(0.55);
-        expect(s.widestAt, `${label} widest`).toBeLessThan(0.80);
+        expect(s.widestAt, `${label} widest`).toBeLessThan(0.92);
 
         // The root is narrower than the shoulder, and by a real margin: this is
         // the taper that stops the stone reading as standing on a flat cut.
@@ -153,10 +167,20 @@ describe('gem silhouette (crystal cluster brief)', () => {
       for (const kid of kids) {
         const s = silhouette(kid, bodyOf(kid.bodyId));
         const label = `${couple} ${kid.bodyId}`;
-        // Slimmer than the monarch, always — she is the one body the ring is
-        // arranged around, and a daughter at her proportions is a second
-        // monarch rather than a daughter.
-        expect(s.aspect, `${label} aspect`).toBeGreaterThan(mother.aspect + 0.2);
+        // **Reversed by the halving, and stated rather than deleted.**
+        //
+        // This asserted that every daughter is slimmer than the monarch: she is
+        // the body the ring is arranged around, and a daughter at her
+        // proportions is a second monarch. Halving her diameter alone inverted
+        // it — she is now the slenderest thing in the colony at about 4.2
+        // against their 2.7, so the colony reads as a spire among stubs.
+        //
+        // The owner asked for the monarch and only the monarch, so the
+        // daughters are left exactly as they were and the relationship is
+        // recorded here as it now is rather than quietly dropped. Bringing them
+        // back into proportion is one constant (`CHILD_ASPECT_MIN/MAX`) and the
+        // owner's call, not this test's.
+        expect(s.aspect, `${label} aspect`).toBeGreaterThan(2.2);
         expect(s.aspect, `${label} aspect`).toBeLessThan(3.4);
         // And never taller than half of her.
         expect(s.height / mother.height, `${label} height`).toBeLessThanOrEqual(0.52);

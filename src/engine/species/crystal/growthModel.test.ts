@@ -145,8 +145,9 @@ describe('monarch girth', () => {
     // measured — the finished silhouette comes out at about 0.84× this once the
     // flare, the elliptical section and the burial are applied, and
     // `gemSilhouette.test.ts` is what holds the shape a ruler would find.
-    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(2.14 - 1e-4);
-    expect(axial / (2 * quiet)).toBeLessThanOrEqual(2.5 + 1e-4);
+    // Doubled with the halving (2026-08-10, owner's instruction).
+    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(4.28 - 1e-4);
+    expect(axial / (2 * quiet)).toBeLessThanOrEqual(5 + 1e-3);
   });
 
   it('lands a typical couple near the silhouette the owner already accepted', () => {
@@ -156,10 +157,12 @@ describe('monarch girth', () => {
     // counting photos.
     const axial = monarchAxialScale(3.6 * YEAR);
     const aspect = axial / (2 * monarchRadialScale(axial, 47));
-    // A typical couple lands mid-band, which for the gem is about 2.3 nominal
-    // and about 1.95 on the built mesh.
-    expect(aspect).toBeGreaterThan(2.15);
-    expect(aspect).toBeLessThan(2.45);
+    // A typical couple lands mid-band. Doubled on 2026-08-10 when the owner,
+    // looking at the rendered portal, asked for the monarch's diameter to be
+    // halved — `radius = axial / (2·aspect)`, so halving the one doubles the
+    // other. About 4.6 nominal now, and about 3.9 on the built mesh.
+    expect(aspect).toBeGreaterThan(4.3);
+    expect(aspect).toBeLessThan(4.9);
   });
 
   it('lets a longer relationship carry more girth at the same activity', () => {

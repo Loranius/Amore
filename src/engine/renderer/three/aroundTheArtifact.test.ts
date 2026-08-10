@@ -322,7 +322,17 @@ describe('the artifact from 0°, 90°, 180° and 270° (crystal cluster brief §
       // apparent width by that ratio and by the habit's own asymmetry, and no
       // more.
       const spread = Math.max(...ratios) / Math.min(...ratios);
-      expect(spread, `${label} spread across bearings`).toBeLessThan(1.2);
+      // Loosened from 1.20 to 1.25 with the owner's halving of the monarch's
+      // diameter (2026-08-10), and the reason is geometric rather than a
+      // slipped tolerance. The published cross-section is 0.94 by 1.06, so a
+      // quarter turn changes the apparent width by 1.13 whatever the size. What
+      // moved is the rest of the budget: the crown's drop is
+      // `radius · tan(angle)`, so halving the radius halves the share of the
+      // height the termination spends, the widest slice climbs toward the tip,
+      // and the silhouette's width is set by a part of the body where the
+      // habit's own azimuth jitter is a larger fraction of a smaller radius.
+      // Measured worst case across the three colony sizes: 1.205.
+      expect(spread, `${label} spread across bearings`).toBeLessThan(1.25);
       for (const ratio of ratios) {
         expect(Number.isFinite(ratio), label).toBe(true);
         expect(ratio, label).toBeGreaterThan(1);

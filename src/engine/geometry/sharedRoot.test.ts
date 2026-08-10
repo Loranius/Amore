@@ -102,7 +102,20 @@ describe('the root the whole colony grows out of (crystal cluster brief §4)', (
       const root = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
       const monarch = geometry.meshes.find((mesh) => mesh.bodyId === MONARCH_ID)!;
       const monarchSpan = verticalSpan(monarch);
-      const share = verticalSpan(root).high / (monarchSpan.high - monarchSpan.low);
+      // **The seam, not the mesh's highest point.** Broken rock stands on the
+      // root — that is what stops the seam reading as a plinth — so the mesh's
+      // top is a boulder, and measuring it answers "how tall is the tallest
+      // stone" rather than "how much root is showing". This test measured the
+      // bounding box and passed for as long as the two happened to be close;
+      // it failed the moment the rubble was allowed to sit further out and
+      // grew taller. Geometry publishes `seamTriangleCount` for exactly this.
+      const seamTriangles = root.profile.seamTriangleCount ?? 0;
+      expect(seamTriangles, `${years}y has a seam at all`).toBeGreaterThan(0);
+      let seamTop = -Infinity;
+      for (let slot = 0; slot < seamTriangles * 3; slot += 1) {
+        seamTop = Math.max(seamTop, root.positions[root.indices[slot]! * 3 + 1]!);
+      }
+      const share = seamTop / (monarchSpan.high - monarchSpan.low);
       expect(share, `${years}y`).toBeGreaterThanOrEqual(0.04);
       expect(share, `${years}y`).toBeLessThanOrEqual(0.08);
     }

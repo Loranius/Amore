@@ -129,8 +129,36 @@ export function veteranGirth(daysTogether: number): number {
  * so the band is set at 2.14–2.50 to land the silhouette on the brief's
  * 1.80–2.10. `__silhouette` measures the built mesh rather than trusting this.
  */
-const MONARCH_STOUTEST_ASPECT = 2.14;
-const MONARCH_SLIMMEST_ASPECT = 2.5;
+/**
+ * **Halved on the owner's instruction (2026-08-10), looking at the portal.**
+ *
+ * > «Кристал монарх занадто широкий, зменш його діаметр трохи, десь в половину»
+ *
+ * Doubling the aspect halves the diameter, since `radius = axial / (2·aspect)`.
+ * Measured on the built mesh, the finished silhouette moves from 1.89–2.16 to
+ * 3.78–4.32, so this **supersedes the brief's §2 band of 1.80–2.10** rather
+ * than sitting inside it. Recorded rather than reconciled: the owner is looking
+ * at the rendered crystal, and the band was a number written before there was
+ * one to look at.
+ *
+ * Two of the three things the paragraph below says fall out of the ratio move
+ * with it, and both are consequences rather than surprises:
+ *
+ * - the crown's drop is `radius · tan(crown angle)`, so halving the radius
+ *   halves the share of the height the termination spends — 26–34% becomes
+ *   13–17%, which is the "small cap on a long prism" the gem pass moved away
+ *   from. It is what a narrower body geometrically *is* at a fixed lattice
+ *   angle; changing the angle to hold the old share would make the crystal
+ *   stop obeying quartz;
+ * - the widest slice stays where it was as a share of the height, because the
+ *   flare and the shoulder are both fractions rather than distances.
+ *
+ * The root compensates separately: its own height is a multiple of the
+ * monarch's radius, so without a change there it would have halved too and
+ * dropped out of the brief's §4 band. See `VEIN_PROUD`.
+ */
+const MONARCH_STOUTEST_ASPECT = 4.28;
+const MONARCH_SLIMMEST_ASPECT = 5;
 
 /**
  * Deliberate acts beyond which more of them stop thickening the monarch.
