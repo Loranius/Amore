@@ -33,10 +33,28 @@ export function useWorldMotionMode(): { current: RequestedMode } {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    /** True while a text field has focus — that is, while a keyboard is up. */
+    const editing = () => {
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement)) return false;
+      return active.isContentEditable
+        || active instanceof HTMLTextAreaElement
+        || active instanceof HTMLSelectElement
+        || (active instanceof HTMLInputElement
+          && !['checkbox', 'radio', 'button', 'submit'].includes(active.type));
+    };
+
     const resolve = () => {
       if (reduced.current) mode.current = 'reduced';
       else if (modal.current) mode.current = 'modal';
-      else if (performance.now() - lastInteraction.current < INTERACTION_LINGER_MS) {
+      else if (
+        // §17 ends on this: "The camera / world should become quieter while
+        // the keyboard is open." A keystroke linger would not cover it — a
+        // couple stares at a half-typed field far longer than 1.5 s, and the
+        // world would start drifting under the keyboard while they think.
+        editing()
+        || performance.now() - lastInteraction.current < INTERACTION_LINGER_MS
+      ) {
         mode.current = 'interaction';
       } else mode.current = 'idle';
     };
@@ -74,6 +92,10 @@ export function useWorldMotionMode(): { current: RequestedMode } {
     };
     const events: readonly (keyof WindowEventMap)[] = [
       'scroll', 'wheel', 'keydown', 'pointerdown', 'touchmove',
+      // Focus changes are what turn the keyboard on and off; without them the
+      // world would only settle back 1.5 s after the last keystroke, which is
+      // not the same thing as the field being closed.
+      'focusin', 'focusout',
     ];
     for (const event of events) {
       window.addEventListener(event, touched, { passive: true, capture: true });

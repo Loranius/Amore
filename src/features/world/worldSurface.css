@@ -1,0 +1,197 @@
+/* ============================================================
+   Поверхні світу — Crystal Glass (бриф §11–§19, Фаза 5).
+   ------------------------------------------------------------
+   Фаза 2 дала кольори, ця дає **поверхні**: три рівні переднього плану,
+   активний стан, первинну дію, поле вводу, лист і док.
+
+   **Чому тут немає нових класів.** Бриф просить «reusable foreground UI
+   language» (§11), і спокуса — завести `.world-card`, `.world-action` і
+   переписати під них розмітку дванадцяти модулів. Це була б та сама
+   велика одноразова переробка, від якої бриф застерігає в преамбулі.
+   Натомість мова описана на **вже наявних** класах оболонки: `.card`,
+   `.btn`, `.modal-sheet`, `.bottom-nav`. Модуль переходить на неї не
+   правкою розмітки, а тим, що його маршрут впустив світ.
+
+   **Чому все під `[data-portal-scene='true']`.** Ці поверхні існують,
+   щоб стояти НАД світом. Там, де світу не видно (сьогодні це все, крім
+   головної), темна картка на світлій сторінці — не «частково
+   переведено», а зламано. Тож правило одне: поверхні світу з'являються
+   там, де є світ, і фази 6–12 вмикають їх маршрутом, а не копіюванням
+   стилів.
+
+   **Прозорість не є метою** (§10). Рівень 1 непрозорий навмисно: під
+   календарем і довгими списками світ має лишатись поруч, а не крізь
+   текст.
+   ============================================================ */
+
+/* ── Чорнило поверхонь ──────────────────────────────────────
+   Поверхня — це не лише її фон. Вміст усередині (підписи, іконки,
+   другорядний текст) фарбується токенами сторінки, а вони світлі —
+   і перша жива перевірка це й показала: лист над світом вийшов темним,
+   а текст у ньому лишився темно-фіолетовим, тобто нечитабельним.
+
+   Тож поверхня перевизначає самі токени, а не кожен свій елемент. Той
+   самий механізм, яким `.home` уже перевертає світлотінь сцени, — і він
+   покриває вміст, якого ще не існує. */
+[data-portal-scene='true'] .modal-sheet,
+[data-portal-scene='true'] .more-menu-sheet,
+[data-portal-scene='true'] .card {
+  --text: var(--world-text);
+  --muted: var(--world-text-muted);
+  --surface: var(--world-surface-soft);
+  --accent: var(--world-accent);
+  --danger: var(--world-danger);
+}
+
+/* ── Рівень 1 · Робоча поверхня (§12) ───────────────────────
+   Щільні інтерфейси: форми, списки, календар. Найбільша щільність,
+   мінеральний кант, максимальний контраст тексту. */
+[data-portal-scene='true'] .modal-sheet,
+[data-portal-scene='true'] .more-menu-sheet {
+  background: var(--world-surface-strong);
+  border: 1px solid var(--world-border);
+  border-radius: var(--radius-lg);
+  color: var(--world-text);
+  /* Кант, а не світіння: 1px внутрішньої лінії згори — це відблиск на
+     полірованій грані, і він читається як матеріал. Зовнішня тінь —
+     тінь, тобто темна; кольорове «сяйво» навколо панелі перетворює
+     інтерфейс на неонову вивіску, чого §11 і §16 просять уникати. */
+  box-shadow:
+    inset 0 1px 0 var(--world-glow),
+    0 24px 60px var(--world-shadow);
+}
+
+/* ── Рівень 2 · Картка (§13) ────────────────────────────────
+   Середня щільність, стриманий кант, невеликий відрив по глибині.
+   Свідомо БЕЗ backdrop-filter: бриф прямо забороняє дороге розмиття на
+   кожній картці, а карток на екрані буває тридцять. */
+[data-portal-scene='true'] .card {
+  background: var(--world-surface);
+  border: 1px solid var(--world-border);
+  border-radius: var(--radius-md);
+  color: var(--world-text);
+  box-shadow: 0 6px 18px var(--world-shadow);
+}
+
+/* ── Рівень 3 · Контроли (§14) ──────────────────────────────
+   Чипи, сегменти, дрібні кнопки. Легкі й компактні. */
+[data-portal-scene='true'] .btn-secondary,
+[data-portal-scene='true'] .btn-ghost {
+  background: var(--world-surface-soft);
+  border: 1px solid var(--world-border);
+  color: var(--world-text-muted);
+}
+
+/* Активний стан — чотирма каналами, а не відтінком (§15).
+   Бриф прямо забороняє передавати стан самим лише фіолетовим: заливка
+   стає щільнішою, кант яскравішим, текст контрастнішим, і поверхня
+   трохи підіймається. Кожен із чотирьох читається окремо — на сонці,
+   у темряві й у монохромі. */
+[data-portal-scene='true'] .btn-secondary[aria-pressed='true'],
+[data-portal-scene='true'] .btn-secondary.active,
+[data-portal-scene='true'] .btn-ghost.active {
+  background: color-mix(in srgb, var(--world-primary) 22%, transparent);
+  border-color: var(--world-border-active);
+  color: var(--world-text);
+  transform: translateY(-1px);
+}
+
+/* ── Первинна дія (§16) ─────────────────────────────────────
+   Активний полірований аметист: глибше тіло, яскравіший верхній кант,
+   світлий читабельний текст. Внутрішній відблиск — один піксель, а не
+   градієнт: кнопка лишається кнопкою, а не самоцвітом. */
+[data-portal-scene='true'] .btn {
+  background: var(--world-primary-soft);
+  border: 1px solid var(--world-border-active);
+  color: var(--world-bg-deep);
+  box-shadow:
+    inset 0 1px 0 var(--world-glow),
+    0 4px 12px var(--world-shadow);
+}
+
+[data-portal-scene='true'] .btn-danger {
+  background: var(--world-danger);
+  color: var(--world-bg-deep);
+}
+
+/* ── Поле вводу (§17) ───────────────────────────────────────
+   Темна мінеральна виїмка, а не біле поле форми: фон темніший за
+   поверхню, на якій лежить, і внутрішня тінь дає заглиблення. Область
+   редагування має бути очевидною — звідси видимий кант навіть у спокої. */
+[data-portal-scene='true'] input:not([type='checkbox']):not([type='radio']),
+[data-portal-scene='true'] select,
+[data-portal-scene='true'] textarea {
+  background: var(--world-recess);
+  border: 1px solid var(--world-border);
+  border-radius: var(--radius-sm);
+  color: var(--world-text);
+  box-shadow: inset 0 2px 6px var(--world-shadow);
+}
+
+[data-portal-scene='true'] input::placeholder,
+[data-portal-scene='true'] textarea::placeholder {
+  color: var(--world-text-muted);
+}
+
+/* Фокус — окремий сильний стан, і він не покладається на колір канта:
+   обведення поза межами поля видно на будь-якому фоні, зокрема тим, хто
+   не розрізняє фіолетовий від сірого. */
+[data-portal-scene='true'] input:focus-visible,
+[data-portal-scene='true'] select:focus-visible,
+[data-portal-scene='true'] textarea:focus-visible {
+  outline: 2px solid var(--world-accent);
+  outline-offset: 2px;
+  border-color: var(--world-border-active);
+}
+
+/* ── Лист над світом (§18) ──────────────────────────────────
+   Не «сторінка замість світу», а шар над ним. Тому підкладка притемнює,
+   а не зафарбовує: артефакт має лишатись видимим позаду. */
+[data-portal-scene='true'] .modal-overlay,
+[data-portal-scene='true'] .more-menu-overlay {
+  background: var(--world-vignette);
+}
+
+/* ── Док (§19) ──────────────────────────────────────────────
+   Переїхав сюди з portalBackdrop.css, де жив як чотири правки поверх
+   світлої пігулки. Це не косметика: док рендериться поза `.home`, тобто
+   перевизначення токенів на секції його не дістає, і поки він жив у
+   файлі головної, кожен наступний маршрут, що впустить світ, мусив би
+   про нього пам'ятати.
+
+   Темна напівпрозора поверхня з керованим кантом, помітний активний
+   модуль, обізнаність про safe-area. Не вищий, ніж був. */
+[data-portal-scene='true'] .bottom-nav {
+  background: var(--world-surface);
+  border: 1px solid var(--world-border);
+  box-shadow:
+    inset 0 1px 0 var(--world-glow),
+    0 14px 34px var(--world-shadow);
+  /* Єдине розмиття в усій мові — і воно тут, бо док один на екран і
+     лежить просто на артефакті. На картках його немає навмисно (§13). */
+  backdrop-filter: blur(14px);
+}
+
+[data-portal-scene='true'] .bottom-nav .nav-btn {
+  color: var(--world-text-muted);
+}
+
+[data-portal-scene='true'] .bottom-nav .nav-btn.active {
+  color: var(--world-text);
+}
+
+/* Активний модуль — знову чотири канали (§15): підкладка щільніша,
+   кант яскравіший, іконка світліша, і сам індикатор трохи піднятий
+   внутрішнім відблиском. */
+[data-portal-scene='true'] .bottom-nav-indicator {
+  background: color-mix(in srgb, var(--world-primary) 20%, transparent);
+  border: 1px solid var(--world-border-active);
+  box-shadow: inset 0 1px 0 var(--world-glow);
+}
+
+/* Зменшений рух стосується й інтерфейсу, не лише камери (§47). */
+@media (prefers-reduced-motion: reduce) {
+  [data-portal-scene='true'] .bottom-nav-indicator {
+    transition: none;
+  }
+}

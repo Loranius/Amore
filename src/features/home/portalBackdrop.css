@@ -138,29 +138,6 @@
   --accent: var(--world-accent);
 }
 
-/* ── Навігація в межах сцени ────────────────────────────────
-   Панель рендериться поза .home, тож перевизначення токенів на секції її
-   не дістає — звідси окремий маркер на корені. Світла пігулка на нічному
-   порталі читалась як чужий елемент поверх картинки. */
-[data-portal-scene='true'] .bottom-nav {
-  background: var(--world-surface);
-  border-color: var(--world-border);
-  box-shadow: 0 14px 34px var(--world-shadow);
-  backdrop-filter: blur(14px);
-}
-
-[data-portal-scene='true'] .bottom-nav .nav-btn {
-  color: var(--world-text-muted);
-}
-
-[data-portal-scene='true'] .bottom-nav .nav-btn.active {
-  color: var(--world-text);
-}
-
-[data-portal-scene='true'] .bottom-nav-indicator {
-  background: var(--world-glow);
-}
-
 /* ── Сцена на весь екран ────────────────────────────────────
    Кристал перестав бути картинкою в рамці посеред сторінки: разом із
    подіумом, колонами й полем він тепер і Є головна. Рамка тримала його в
