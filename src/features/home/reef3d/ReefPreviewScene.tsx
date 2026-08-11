@@ -8,6 +8,18 @@ import {
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { ReefObject } from './ReefObject';
 import { ReefStage } from './ReefStage';
+import {
+  REEF_FOUNDATION_PASS,
+  REEF_FOUNDATION_PRESENTATION_VERSION,
+} from './reefFoundationPresentation';
+import {
+  REEF_MATERIAL_PASS,
+  REEF_MATERIAL_PRESENTATION_VERSION,
+} from './reefMaterialPresentation';
+import {
+  REEF_COLONY_SHAPE_PASS,
+  REEF_PRESENTATION_VERSION,
+} from './reefPresentation';
 import type { ReefThreeSceneState } from './reefThreeAdapter';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
@@ -82,6 +94,12 @@ export default function ReefPreviewScene() {
       data-reef-preview="ready"
       data-reef-source="portal"
       data-reef-scene="underwater-world"
+      data-reef-presentation={REEF_PRESENTATION_VERSION}
+      data-reef-shape-pass={REEF_COLONY_SHAPE_PASS}
+      data-reef-material-presentation={REEF_MATERIAL_PRESENTATION_VERSION}
+      data-reef-material-pass={REEF_MATERIAL_PASS}
+      data-reef-foundation-presentation={REEF_FOUNDATION_PRESENTATION_VERSION}
+      data-reef-foundation-pass={REEF_FOUNDATION_PASS}
       data-reef-acceptance={runtimeAcceptance.status}
       data-reef-static-acceptance={build.acceptance.staticStatus}
       data-reef-violations={runtimeAcceptance.violations.join(',')}
