@@ -1,0 +1,850 @@
+<title>Перехід «Головна → Вішліст»</title>
+<style>
+  /* ============================================================
+     Шаблон переходу з головної у вішліст.
+     ------------------------------------------------------------
+     Це макет хореографії, а не порталу: кристал тут намальований CSS-гранями,
+     а не Three.js, і сфери порожні всередині. Під перевіркою рівно те, заради
+     чого шаблон існує, — коли що починається, скільки триває і як воно
+     сходиться в один рух.
+
+     Палітра й мова скла взяті з порталу (`worldTheme.css`,
+     `wishlistSpheres.css`), щоб макет можна було порівнювати з живим екраном,
+     а не з уявою.
+     ============================================================ */
+
+  /* Портал темний завжди — це екран пристрою, тому телефон лишається темним
+     у будь-якій темі. А сторінка навколо нього слухає тему глядача. */
+  :root {
+    --page-bg: #f4f1f7;
+    --page-panel: #ffffff;
+    --page-ink: #241c33;
+    --page-muted: #6b6280;
+    --page-line: rgba(60, 44, 88, 0.14);
+    --page-accent: #7b4fa8;
+
+    /* Токени порталу — не змінювати без worldTheme.css. */
+    --world-bg: #221a33;
+    --world-bg-deep: #0b0813;
+    --world-surface-strong: #2a2140;
+    --world-primary: #c9a0e6;
+    --world-accent: #dcb6f5;
+    --world-text: #f6efff;
+    --world-text-muted: #c9b8e4;
+    --world-border: rgba(214, 190, 246, 0.16);
+
+    --font: 'Nunito', ui-rounded, 'Segoe UI Variable', system-ui, sans-serif;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-bg: #17131f;
+      --page-panel: #201a2c;
+      --page-ink: #f1ecf8;
+      --page-muted: #a397b8;
+      --page-line: rgba(214, 190, 246, 0.16);
+      --page-accent: #dcb6f5;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --page-bg: #17131f;
+    --page-panel: #201a2c;
+    --page-ink: #f1ecf8;
+    --page-muted: #a397b8;
+    --page-line: rgba(214, 190, 246, 0.16);
+    --page-accent: #dcb6f5;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: var(--font);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 32px 20px 64px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  header { display: flex; flex-direction: column; gap: 10px; max-width: 62ch; }
+
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--page-muted);
+    font-weight: 700;
+  }
+
+  h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; text-wrap: balance; font-weight: 800; }
+  h2 { margin: 0 0 2px; font-size: 17px; font-weight: 800; }
+  p { margin: 0; color: var(--page-muted); }
+  header p { font-size: 16px; }
+
+  .split {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(320px, 1fr);
+    gap: 36px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .split { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  /* ── Телефон ───────────────────────────────────────────── */
+
+  .device-col { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+
+  .device-fit { width: 100%; display: flex; justify-content: center; }
+
+  .phone {
+    width: 412px;
+    height: 915px;
+    flex: none;
+    border-radius: 40px;
+    padding: 6px;
+    background: linear-gradient(160deg, #3a3050, #14101d);
+    box-shadow: 0 30px 70px rgba(12, 8, 24, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    transform-origin: top center;
+  }
+
+  .screen {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    border-radius: 34px;
+    overflow: hidden;
+    background: radial-gradient(120% 80% at 50% 12%, var(--world-bg), var(--world-bg-deep) 78%);
+    color: var(--world-text);
+    isolation: isolate;
+  }
+
+  /* ── Сцена: кристал і оберт навколо нього ──────────────── */
+
+  /* Зал позаду кристала.
+     Не прикраса: скло читається склом лише тоді, коли воно СВІТЛІШЕ за те, що
+     позаду. Перша редакція лишила фон рівно чорним — і сфери вийшли чорними
+     кнопками з білими наліпками. У порталі за монархом стоїть освітлений зал,
+     тож тут він теж потрібен. */
+  .hall {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(88% 52% at 50% 74%, rgba(150, 120, 196, 0.34), transparent 72%),
+      linear-gradient(180deg, rgba(58, 45, 88, 0.55) 0%, rgba(48, 37, 74, 0.42) 46%, rgba(20, 15, 31, 0.9) 88%);
+  }
+
+  .hall::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 34%;
+    background: linear-gradient(180deg, transparent, rgba(9, 6, 16, 0.75));
+  }
+
+  .stage {
+    position: absolute;
+    inset: 0;
+    perspective: 1000px;
+    perspective-origin: 50% 62%;
+  }
+
+  .world {
+    position: absolute;
+    left: 50%;
+    /* Основа кристала на 78% висоти екрана. Виміряно по живому порталу:
+       там силует займає від 41% до 83%, і макет із базою на 63% лишав під
+       артефактом порожню смугу, якої на справжньому екрані немає. */
+    top: 78%;
+    width: 0;
+    height: 0;
+    transform-style: preserve-3d;
+    /* Оберт камери навколо кристала = оберт світу в інший бік. Мінус — щоб
+       передня грань відходила ліворуч і праворуч звільнялось місце: саме
+       звідти випливають бажання. */
+    transform: rotateX(8deg) rotateY(var(--turn, 0deg));
+    transition: transform var(--t-orbit) var(--ease-orbit);
+  }
+
+  .floor {
+    position: absolute;
+    left: -190px;
+    top: -14px;
+    width: 380px;
+    height: 150px;
+    border-radius: 50%;
+    background: radial-gradient(closest-side, rgba(201, 160, 230, 0.16), transparent 76%);
+    transform: rotateX(90deg);
+  }
+
+  .prism { position: absolute; transform-style: preserve-3d; }
+
+  .facet {
+    position: absolute;
+    left: -27px;
+    top: -330px;
+    width: 54px;
+    height: 330px;
+    background: linear-gradient(174deg, rgba(255, 255, 255, 0.9), rgba(226, 209, 247, 0.72) 42%, rgba(178, 152, 214, 0.62));
+    transform: rotateY(var(--a)) translateZ(47px);
+    box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.5);
+  }
+
+  .facet:nth-child(even) {
+    background: linear-gradient(174deg, rgba(240, 231, 252, 0.82), rgba(197, 174, 232, 0.66) 46%, rgba(150, 126, 188, 0.6));
+  }
+
+  .tip {
+    position: absolute;
+    left: -27px;
+    top: -434px;
+    width: 54px;
+    height: 104px;
+    background: linear-gradient(184deg, rgba(255, 255, 255, 0.94), rgba(214, 194, 243, 0.7));
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    transform: rotateY(var(--a)) translateZ(47px) rotateX(26deg);
+    transform-origin: 50% 100%;
+  }
+
+  .tip:nth-child(even) { background: linear-gradient(184deg, rgba(236, 226, 252, 0.86), rgba(186, 162, 224, 0.66)); }
+
+  /* Молодші кристали біля основи — тільки щоб силует читався як друза. */
+  .shard {
+    position: absolute;
+    left: -14px;
+    top: -120px;
+    width: 28px;
+    height: 120px;
+    background: linear-gradient(180deg, rgba(245, 238, 255, 0.8), rgba(163, 138, 202, 0.6));
+    clip-path: polygon(50% 0, 100% 22%, 100% 100%, 0 100%, 0 22%);
+    transform: rotateY(var(--a)) translateZ(74px);
+  }
+
+  /* ── Приглушення фону, коли відкритий вішліст ──────────── */
+
+  .wash {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(120% 70% at 50% 78%, rgba(11, 8, 19, 0.62), rgba(11, 8, 19, 0.34));
+    opacity: 0;
+    transition: opacity var(--t-wash) ease var(--d-wash);
+    pointer-events: none;
+  }
+
+  /* ── Вкладки вішліста ──────────────────────────────────── */
+
+  .tabs {
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 18px;
+    display: flex;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--world-border);
+    background: rgba(42, 33, 64, 0.62);
+    opacity: 0;
+    transform: translateY(-16px);
+    transition: opacity var(--t-tabs) ease var(--d-tabs), transform var(--t-tabs) cubic-bezier(0.22, 1, 0.36, 1) var(--d-tabs);
+  }
+
+  .tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 11px 8px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--world-text-muted);
+  }
+
+  .tab[aria-selected="true"] { background: rgba(201, 160, 230, 0.6); color: #241636; }
+
+  .tab .count {
+    min-width: 22px;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: rgba(20, 15, 31, 0.35);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tab[aria-selected="true"] .count { background: rgba(255, 255, 255, 0.42); }
+
+  /* ── Поле бажань ───────────────────────────────────────── */
+
+  .field { position: absolute; left: 0; right: 0; top: 86px; bottom: 118px; pointer-events: none; }
+
+  .bubble {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: var(--d);
+    height: var(--d);
+    margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2);
+    opacity: 0;
+  }
+
+  .bubble.is-in {
+    animation: bubble-in var(--t-bubble) cubic-bezier(0.18, 0.72, 0.24, 1) var(--delay) both;
+  }
+
+  .bubble.is-out {
+    animation: bubble-out var(--t-bubble-out) cubic-bezier(0.5, 0, 0.75, 0) var(--delay-out) both;
+  }
+
+  /* Вхід дугою: сфера не їде по лінійці, а завертає до свого місця.
+     Проміжна точка — трохи вище й правіше цілі. */
+  @keyframes bubble-in {
+    0%   { transform: translate(var(--from-x), var(--from-y)) scale(0.5); opacity: 0; }
+    18%  { opacity: 1; }
+    62%  { transform: translate(var(--mid-x), var(--mid-y)) scale(1.06); opacity: 1; }
+    100% { transform: translate(var(--x), var(--y)) scale(1); opacity: 1; }
+  }
+
+  @keyframes bubble-out {
+    0%   { transform: translate(var(--x), var(--y)) scale(1); opacity: 1; }
+    100% { transform: translate(var(--from-x), var(--from-y)) scale(0.5); opacity: 0; }
+  }
+
+  /* Скло — та сама будова, що в порталі: оболонка, світіння, обідець,
+     предмет. Жодного backdrop-filter: один композитний шар на бажання. */
+  .glass {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.12) 38%, transparent 64%),
+      radial-gradient(circle at 52% 76%, rgba(206, 180, 255, 0.28), transparent 70%),
+      radial-gradient(circle at 50% 50%, rgba(226, 214, 250, 0.3), rgba(150, 126, 196, 0.34));
+    box-shadow:
+      inset 0 1px 1px rgba(255, 255, 255, 0.55),
+      inset 0 -14px 22px -14px rgba(214, 176, 255, 0.9),
+      0 10px 24px rgba(12, 8, 24, 0.4);
+    animation: float var(--period) ease-in-out var(--phase) infinite alternate;
+  }
+
+  .rim {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(from 210deg, transparent 0deg, rgba(255, 255, 255, 0.62) 26deg, transparent 74deg);
+    -webkit-mask: radial-gradient(circle, transparent 62%, #000 66%, #000 76%, transparent 80%);
+    mask: radial-gradient(circle, transparent 62%, #000 66%, #000 76%, transparent 80%);
+    opacity: 0.8;
+  }
+
+  /* Предмет усередині скла, а не наліпка на кулі: менший за кулю, приглушений
+     і з тим самим радіальним згасанням краю, що в порталі. */
+  .item {
+    position: absolute;
+    inset: 24%;
+    fill: rgba(70, 52, 104, 0.72);
+    opacity: 0.9;
+    filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.35));
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 56%, rgba(0, 0, 0, 0.7) 76%, transparent 94%);
+    mask-image: radial-gradient(circle at 50% 50%, #000 56%, rgba(0, 0, 0, 0.7) 76%, transparent 94%);
+  }
+
+  @keyframes float {
+    from { transform: translate(0, 0); }
+    to   { transform: translate(var(--drift-x), var(--drift-y)); }
+  }
+
+  /* ── Док ───────────────────────────────────────────────── */
+
+  .dock {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 16px;
+    display: flex;
+    gap: 4px;
+    padding: 8px;
+    border-radius: 26px;
+    border: 1px solid var(--world-border);
+    background: rgba(30, 22, 46, 0.86);
+  }
+
+  .dock button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 9px 4px;
+    border: 0;
+    border-radius: 18px;
+    background: none;
+    color: var(--world-text-muted);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 220ms ease, color 220ms ease;
+  }
+
+  .dock button[aria-current="page"] { background: rgba(201, 160, 230, 0.22); color: var(--world-accent); }
+  .dock button:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
+  .dock svg { width: 22px; height: 22px; fill: currentColor; }
+
+  /* ── Керування макетом ─────────────────────────────────── */
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+  .controls button, .controls label {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 15px;
+    border-radius: 999px;
+    border: 1px solid var(--page-line);
+    background: var(--page-panel);
+    color: var(--page-ink);
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .controls button:hover { border-color: var(--page-accent); }
+  .controls button:focus-visible, .controls select:focus-visible { outline: 2px solid var(--page-accent); outline-offset: 2px; }
+  .controls select { border: 0; background: none; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+
+  /* ── Специфікація ──────────────────────────────────────── */
+
+  .spec { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+
+  .card {
+    border: 1px solid var(--page-line);
+    border-radius: 16px;
+    background: var(--page-panel);
+    padding: 18px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .track { display: flex; flex-direction: column; gap: 9px; }
+
+  .beat { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 12px; align-items: start; }
+
+  .beat .when {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--page-accent);
+    padding-top: 2px;
+    font-weight: 700;
+  }
+
+  .beat .what { font-size: 14px; }
+  .beat .what b { display: block; font-size: 14px; }
+  .beat .what span { color: var(--page-muted); }
+
+  .bars { display: flex; flex-direction: column; gap: 6px; }
+
+  .bar { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 10px; align-items: center; font-size: 13px; }
+  .bar .rail { position: relative; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--page-accent) 12%, transparent); overflow: hidden; }
+  .bar .run { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--page-accent); opacity: 0.85; }
+  .bar .run.soft { opacity: 0.4; }
+
+  .scale { display: grid; grid-template-columns: 108px minmax(0, 1fr); gap: 10px; font-family: var(--mono); font-size: 11px; color: var(--page-muted); }
+  .scale .ticks { display: flex; justify-content: space-between; }
+
+  ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 14px; color: var(--page-muted); }
+  li b { color: var(--page-ink); }
+
+  .flag { border-left: 3px solid var(--page-accent); padding-left: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .flag b { font-size: 14px; }
+  .flag p { font-size: 14px; }
+
+  code { font-family: var(--mono); font-size: 0.92em; background: color-mix(in srgb, var(--page-accent) 10%, transparent); padding: 1px 5px; border-radius: 5px; color: var(--page-ink); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .world, .wash, .tabs { transition-duration: 1ms; }
+    .bubble.is-in, .bubble.is-out { animation-duration: 1ms; animation-delay: 0ms; }
+    .glass { animation: none; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">Шаблон переходу · Amore</span>
+    <h1>Головна → Вішліст: чверть оберту навколо кристала</h1>
+    <p>
+      Дотик до «Вішлиста» повертає камеру на 90° навколо монарха. Поки він
+      обертається, з правого краю починають випливати бажання й розходяться
+      по своїх місцях — щоразу нових. Натисніть «Вішлист» у доці.
+    </p>
+  </header>
+
+  <div class="split">
+    <section class="device-col">
+      <div class="device-fit">
+        <div class="phone" id="phone" data-route="home">
+          <div class="screen">
+            <div class="hall"></div>
+            <div class="stage">
+              <div class="world" id="world">
+                <div class="floor"></div>
+                <div class="prism" id="prism"></div>
+              </div>
+            </div>
+
+            <div class="wash" id="wash"></div>
+
+            <div class="tabs" id="tabs">
+              <span class="tab" aria-selected="true">Мої <span class="count">7</span></span>
+              <span class="tab" aria-selected="false">Лєни <span class="count">1</span></span>
+              <span class="tab" aria-selected="false">Спільні <span class="count">3</span></span>
+            </div>
+
+            <div class="field" id="field"></div>
+
+            <nav class="dock">
+              <button type="button" id="to-wishlist">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7h-2.2A3 3 0 0 0 12 4.4 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h18V8a1 1 0 0 0-1-1Zm-6 0h-1V6a1 1 0 1 1 1 1Zm-4 0a1 1 0 1 1 1-1v1ZM4 13v6a1 1 0 0 0 1 1h6v-7Zm9 7h6a1 1 0 0 0 1-1v-6h-7Z"/></svg>
+                Вішлист
+              </button>
+              <button type="button" id="to-plans">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h11v2H4Zm0 6h11v2H4Zm0 6h11v2H4Zm14.3-11.7 1.4 1.4-3.5 3.5-2.2-2.2 1.4-1.4.8.8Zm0 6 1.4 1.4-3.5 3.5-2.2-2.2 1.4-1.4.8.8Z"/></svg>
+                Плани
+              </button>
+              <button type="button" id="to-home" aria-current="page">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13Z"/></svg>
+                Головна
+              </button>
+              <button type="button" id="to-shopping">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h14l-1.6 8H7.4L6 6Zm0 0-.5-2H3v2h1.2ZM8 21a1.6 1.6 0 1 1 0-3.2A1.6 1.6 0 0 1 8 21Zm9 0a1.6 1.6 0 1 1 0-3.2A1.6 1.6 0 0 1 17 21Z"/></svg>
+                Покупки
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button type="button" id="replay">Програти ще раз</button>
+        <button type="button" id="reseed">Нові місця</button>
+        <label for="speed">Швидкість
+          <select id="speed">
+            <option value="1">1×</option>
+            <option value="0.5">0.5×</option>
+            <option value="0.25">0.25×</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="spec">
+      <div class="card">
+        <h2>Хронометраж</h2>
+        <p>Числа звідси керують макетом — сторінка друкує їх із того самого джерела, з якого їх бере анімація.</p>
+        <div class="track" id="track"></div>
+      </div>
+
+      <div class="card">
+        <h2>Одночасність</h2>
+        <p>Оберт і поява бажань мусять перекриватись, а не йти чергою: інакше це два переходи підряд.</p>
+        <div class="bars" id="bars"></div>
+        <div class="scale"><span></span><span class="ticks" id="ticks"></span></div>
+      </div>
+
+      <div class="card">
+        <h2>Місця щоразу нові</h2>
+        <ul>
+          <li><b>Новий засів на кожне відкриття.</b> Позиції беруться при вході у вішліст, а не при кожному перемальовуванні: інакше сфера стрибала б під пальцем і фізика не мала б куди повертати кулю.</li>
+          <li><b>Силует лишається вільним.</b> Місце шукається поза коридором монарха, який звужується догори — саме те правило, що вже є в розкладці.</li>
+          <li><b>Розмір — вага мрії.</b> Приємне / бажане / жадане, як на живому екрані.</li>
+          <li><b>Порядок появи випадковий.</b> Не зверху вниз і не за списком — інакше видно чергу, а не сузір'я.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Два рішення за вами</h2>
+        <div class="flag">
+          <b>90° уже зайняті.</b>
+          <p>Сьогодні вішліст стоїть на −30° (<code>aspiration</code>). Чверть оберту в бік, який відкриває правий край, — це +90°, а там уже стоять Покупки (<code>provision</code>); −90° — Спогади. Або два модулі ділять один азимут, або атлас переставляється.</p>
+        </div>
+        <div class="flag">
+          <b>Випадковість проти сталості.</b>
+          <p>ADR-0028 вимагає, щоб бажання мало <em>своє</em> місце й не стрибало. Тут це збережено вужче: місця нові на кожен вхід, але сталі всередині візиту. Якщо потрібна саме повна випадковість — з неї випадає повернення куль у сузір'я.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Що тут несправжнє</h2>
+        <ul>
+          <li>Кристал намальований CSS-гранями. У порталі це Three.js, і оберт робить директор сцени експонентою (<code>TRAVEL_HALF_LIFE 0.22</code>), а не кривою Безьє — тут крива підібрана під те саме відчуття.</li>
+          <li>Усередині сфер силуети, а не фото бажань.</li>
+          <li>Шрифт системний: артефакт не має права тягнути шрифти ззовні. У порталі — Nunito й Fredoka.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Одне джерело чисел: і анімація, і надрукований хронометраж.
+  // ------------------------------------------------------------
+  // Специфікація, яку доводиться зводити руками, розходиться з тим, що
+  // насправді грає, на першій же правці.
+  // ============================================================
+  const T = {
+    orbit:      { at: 0,   run: 1100, what: 'Оберт камери', note: 'Чверть оберту навколо монарха, 0° → 90°. Швидкий початок, довгий м’який хвіст.' },
+    wash:       { at: 220, run: 420,  what: 'Фон приглушується', note: 'Монарх лишається впізнаваним, але перестає бути головним.' },
+    tabs:       { at: 300, run: 320,  what: 'Вкладки з’їжджають згори', note: '«Мої / Лєни / Спільні» — ідентичність модуля приходить разом із ним.' },
+    bubbles:    { at: 360, run: 1500, what: 'Бажання випливають', note: 'З правого краю, дугою, з інтервалом 120 мс між сусідніми.' },
+    stagger:    120,
+    exit:       { run: 620, stagger: 70 },
+  };
+
+  const EASE_ORBIT = 'cubic-bezier(0.16, 1, 0.3, 1)';
+
+  const WISHES = [
+    { title: 'Штатна магнітола Teyes', weight: 'high',   glyph: 'radio' },
+    { title: 'Google Pixel',           weight: 'high',   glyph: 'phone' },
+    { title: 'Парфуми',                weight: 'medium', glyph: 'bottle' },
+    { title: 'Гаманець',               weight: 'medium', glyph: 'wallet' },
+    { title: 'Футболка з принтом',     weight: 'low',    glyph: 'tee' },
+    { title: 'Футболка з малюнком',    weight: 'medium', glyph: 'tee' },
+    { title: 'Біла рубашка',           weight: 'high',   glyph: 'shirt' },
+  ];
+
+  // Діаметри з живого екрана: приємне 62–68, бажане 73–81, жадане 86–95.
+  const SIZE = { low: [62, 68], medium: [73, 81], high: [86, 95] };
+
+  const GLYPH = {
+    radio:  'M3 7h18v10H3Zm2 2v6h7V9Zm11 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z',
+    phone:  'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm3 1.6v1h4v-1Z',
+    bottle: 'M10 2h4v3h-4Zm-1 4h6a3 3 0 0 1 3 3v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9a3 3 0 0 1 3-3Zm0 4v3h6v-3Z',
+    wallet: 'M4 6h13a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Zm12 6a1.6 1.6 0 1 0 0 3.2 1.6 1.6 0 0 0 0-3.2Z',
+    tee:    'M9 3h6l5 3-2 4-2-1v12H8V9L6 10 4 6Z',
+    shirt:  'M9 3h6l5 3-2 4-2-1v12H8V9L6 10 4 6Zm3 1 0 4 0-4Zm-1 3h2v13h-2Z',
+  };
+
+  const phone   = document.getElementById('phone');
+  const world   = document.getElementById('world');
+  const field   = document.getElementById('field');
+  const speedEl = document.getElementById('speed');
+
+  // ── Кристал ─────────────────────────────────────────────
+  (function buildCrystal() {
+    const prism = document.getElementById('prism');
+    let html = '';
+    for (let i = 0; i < 6; i += 1) html += `<div class="facet" style="--a:${i * 60}deg"></div>`;
+    for (let i = 0; i < 6; i += 1) html += `<div class="tip" style="--a:${i * 60}deg"></div>`;
+    // Молодші кристали трьома площинами кожен, а не однією.
+    //
+    // Одна площина зникає, щойно камера стає до неї ребром, — і саме це видно
+    // було на знімку макета: на головній вони читались, а на чверті оберту
+    // перетворювались на волосини. Три площини дають силует із будь-якого боку.
+    for (const [a, h, z] of [[28, 96, 74], [96, 74, 78], [188, 110, 70], [268, 64, 80], [330, 86, 72]]) {
+      for (let k = 0; k < 3; k += 1) {
+        html += `<div class="shard" style="height:${h}px;top:${-h}px;`
+          + `transform:rotateY(${a}deg) translateZ(${z}px) rotateY(${k * 60}deg)"></div>`;
+      }
+    }
+    prism.innerHTML = html;
+  })();
+
+  // ── Швидкість ───────────────────────────────────────────
+  function applyTiming() {
+    // «0.25×» — це чверть швидкості, тобто вчетверо ДОВШЕ. Перша редакція
+    // множила тривалості просто на значення й робила рух учетверо швидшим:
+    // знімок «середина оберту» показував уже завершений перехід.
+    const k = 1 / (Number(speedEl.value) || 1);
+    const s = phone.style;
+    s.setProperty('--t-orbit', `${T.orbit.run * k}ms`);
+    s.setProperty('--ease-orbit', EASE_ORBIT);
+    s.setProperty('--t-wash', `${T.wash.run * k}ms`);
+    s.setProperty('--d-wash', `${T.wash.at * k}ms`);
+    s.setProperty('--t-tabs', `${T.tabs.run * k}ms`);
+    s.setProperty('--d-tabs', `${T.tabs.at * k}ms`);
+    s.setProperty('--t-bubble', `${T.bubbles.run * k}ms`);
+    s.setProperty('--t-bubble-out', `${T.exit.run * k}ms`);
+    return k;
+  }
+
+  // ── Місця: нові на кожне відкриття ──────────────────────
+  //
+  // Коридор монарха звужується догори — те саме правило, що в розкладці
+  // порталу: сфера не має права сісти на силует.
+  function corridor(unitY) {
+    return 46 + unitY * 92;
+  }
+
+  function layout() {
+    const w = field.clientWidth;
+    const h = field.clientHeight;
+    const centreX = w * 0.5;
+    const placed = [];
+
+    for (const wish of WISHES) {
+      const [lo, hi] = SIZE[wish.weight];
+      const d = lo + Math.random() * (hi - lo);
+      const r = d / 2;
+      let best = null;
+
+      for (let attempt = 0; attempt < 200; attempt += 1) {
+        const x = r + 8 + Math.random() * Math.max(1, w - 2 * (r + 8));
+        const y = r + 6 + Math.random() * Math.max(1, h * 0.82 - 2 * r);
+        const clear = Math.abs(x - centreX) - r - corridor(y / h);
+        let nearest = Infinity;
+        for (const other of placed) {
+          nearest = Math.min(nearest, Math.hypot(x - other.x, y - other.y) - (r + other.r) - 8);
+        }
+        const score = Math.min(clear, nearest === Infinity ? w : nearest);
+        if (best === null || score > best.score) best = { x, y, score };
+        if (score > 0) break;
+      }
+
+      placed.push({ ...wish, x: best.x, y: best.y, d, r });
+    }
+
+    // Порядок появи випадковий: черга читалась би як список, а не як сузір'я.
+    const order = placed.map((_, index) => index);
+    for (let i = order.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    placed.forEach((item, index) => { item.beat = order.indexOf(index); });
+    return placed;
+  }
+
+  function render() {
+    const w = field.clientWidth;
+    field.innerHTML = layout().map((item) => {
+      const fromX = w + item.d;
+      const fromY = item.y + 40 + Math.random() * 90;
+      const midX = item.x + (fromX - item.x) * 0.34;
+      const midY = item.y - 26 - Math.random() * 34;
+      return `
+        <div class="bubble" role="img" aria-label="${item.title}" style="
+          --d:${item.d.toFixed(1)}px;
+          --x:${item.x.toFixed(1)}px;      --y:${item.y.toFixed(1)}px;
+          --from-x:${fromX.toFixed(1)}px;  --from-y:${fromY.toFixed(1)}px;
+          --mid-x:${midX.toFixed(1)}px;    --mid-y:${midY.toFixed(1)}px;
+          --delay:${item.beat * T.stagger}ms;
+          --delay-out:${item.beat * T.exit.stagger}ms;
+          --period:${(5 + Math.random() * 4).toFixed(1)}s;
+          --phase:${(-Math.random() * 6).toFixed(1)}s;
+          --drift-x:${(1 + Math.random() * 3).toFixed(1)}px;
+          --drift-y:${(-3 - Math.random() * 4).toFixed(1)}px;
+        ">
+          <span class="glass"></span>
+          <svg class="item" viewBox="0 0 24 24" aria-hidden="true"><path d="${GLYPH[item.glyph]}"></path></svg>
+          <span class="rim"></span>
+        </div>`;
+    }).join('');
+  }
+
+  // ── Перехід ─────────────────────────────────────────────
+  function go(route) {
+    const k = applyTiming();
+    const open = route === 'wishlist';
+
+    if (open) render();
+
+    phone.dataset.route = route;
+    world.style.setProperty('--turn', open ? '-90deg' : '0deg');
+    document.getElementById('wash').style.opacity = open ? '1' : '0';
+    const tabs = document.getElementById('tabs');
+    tabs.style.opacity = open ? '1' : '0';
+    tabs.style.transform = open ? 'translateY(0)' : 'translateY(-16px)';
+
+    for (const bubble of field.children) {
+      bubble.classList.remove('is-in', 'is-out');
+      void bubble.offsetWidth;
+      bubble.style.animationDelay = '';
+      bubble.classList.add(open ? 'is-in' : 'is-out');
+    }
+    if (open) {
+      field.style.transitionDelay = '';
+      for (const bubble of field.children) {
+        const base = Number(bubble.style.getPropertyValue('--delay').replace('ms', ''));
+        bubble.style.setProperty('--delay', `${(T.bubbles.at + base) * k}ms`);
+      }
+    }
+
+    document.getElementById('to-wishlist').setAttribute('aria-current', open ? 'page' : 'false');
+    document.getElementById('to-home').setAttribute('aria-current', open ? 'false' : 'page');
+  }
+
+  document.getElementById('to-wishlist').addEventListener('click', () => go('wishlist'));
+  document.getElementById('to-home').addEventListener('click', () => go('home'));
+  document.getElementById('to-plans').addEventListener('click', () => go('home'));
+  document.getElementById('to-shopping').addEventListener('click', () => go('home'));
+  document.getElementById('replay').addEventListener('click', () => {
+    go('home');
+    setTimeout(() => go('wishlist'), 700 * (Number(speedEl.value) || 1));
+  });
+  document.getElementById('reseed').addEventListener('click', () => {
+    if (phone.dataset.route === 'wishlist') go('wishlist'); else go('home');
+  });
+  speedEl.addEventListener('change', applyTiming);
+
+  // ── Друк специфікації з тих самих чисел ─────────────────
+  (function printSpec() {
+    const beats = [T.orbit, T.wash, T.tabs, T.bubbles];
+    const last = Math.max(...beats.map((b) => b.at + b.run), T.bubbles.at + T.bubbles.run + T.stagger * (WISHES.length - 1));
+    const span = Math.ceil(last / 500) * 500;
+
+    document.getElementById('track').innerHTML = beats.map((b) => `
+      <div class="beat">
+        <span class="when">${b.at} → ${b.at + b.run}</span>
+        <span class="what"><b>${b.what}</b><span>${b.note}</span></span>
+      </div>`).join('');
+
+    document.getElementById('bars').innerHTML = beats.map((b) => {
+      const tail = b === T.bubbles ? T.stagger * (WISHES.length - 1) : 0;
+      return `
+        <div class="bar">
+          <span>${b.what}</span>
+          <span class="rail">
+            <span class="run" style="left:${(b.at / span) * 100}%;width:${(b.run / span) * 100}%"></span>
+            ${tail ? `<span class="run soft" style="left:${((b.at + b.run) / span) * 100}%;width:${(tail / span) * 100}%"></span>` : ''}
+          </span>
+        </div>`;
+    }).join('');
+
+    document.getElementById('ticks').innerHTML = [0, 0.25, 0.5, 0.75, 1]
+      .map((f) => `<span>${Math.round(span * f)}</span>`).join('');
+  })();
+
+  // ── Телефон вписується у вікно ──────────────────────────
+  function fit() {
+    const holder = phone.parentElement;
+    const room = Math.min(holder.clientWidth, window.innerHeight - 190);
+    const scale = Math.min(1, holder.clientWidth / 412, (window.innerHeight - 190) / 915);
+    phone.style.transform = `scale(${scale.toFixed(3)})`;
+    holder.style.height = `${915 * scale}px`;
+    void room;
+  }
+
+  window.addEventListener('resize', fit);
+  fit();
+  applyTiming();
+  render();
+  for (const bubble of field.children) bubble.style.opacity = '0';
+</script>
