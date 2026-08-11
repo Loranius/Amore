@@ -261,7 +261,6 @@ export function RelationshipJourney({
               <footer className="relationship-journey-future">
                 <strong>Історія триває</strong>
                 <p>Нові звичайні та великі події продовжуватимуть цей шлях.</p>
-                <button type="button" className="btn" onClick={onAdd}><PlusIcon size={14} /> Додати подію</button>
               </footer>
             </>
           )}
