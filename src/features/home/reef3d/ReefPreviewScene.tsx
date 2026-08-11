@@ -39,9 +39,9 @@ function useReducedMotion(): boolean {
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
   const reducedMotion = useReducedMotion();
-  const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
+  const [worldRuntime, setWorldRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const [sceneState, setSceneState] = useState<ReefThreeSceneState | null>(null);
-  const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setRuntime(next), []);
+  const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setWorldRuntime(next), []);
   const onSceneReady = useCallback((next: ReefThreeSceneState) => setSceneState(next), []);
 
   if (portal.isPending) return <CrystalPlaceholder />;
@@ -62,10 +62,12 @@ export default function ReefPreviewScene() {
   }
 
   const { build, diagnostics } = portal.preview;
-  const reportedDrawCalls = runtime?.drawCalls
-    ?? (reducedMotion ? sceneState?.diagnostics.drawCalls ?? null : null);
-  const reportedTriangles = runtime?.triangles
-    ?? (reducedMotion ? sceneState?.diagnostics.triangles ?? null : null);
+  // Reef acceptance must describe the generated reef, not the decorative
+  // underwater world around it. ReefObject exposes exact production geometry
+  // diagnostics when its accepted Three scene is created; the global probe is
+  // kept separately so world-level performance can still be inspected.
+  const reportedDrawCalls = sceneState?.diagnostics.drawCalls ?? null;
+  const reportedTriangles = sceneState?.diagnostics.triangles ?? null;
   const runtimeAcceptance = evaluateReefProductionRuntimeAcceptance({
     contract: build.acceptance,
     buildMs: build.buildMs,
@@ -106,6 +108,8 @@ export default function ReefPreviewScene() {
       data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}
       data-reef-runtime-draw-calls={reportedDrawCalls ?? ''}
       data-reef-runtime-triangles={reportedTriangles ?? ''}
+      data-reef-world-draw-calls={worldRuntime?.drawCalls ?? ''}
+      data-reef-world-triangles={worldRuntime?.triangles ?? ''}
       data-reef-build-ms={build.buildMs}
       data-reef-current-cycle={build.life.current.cycleSeconds}
     >
