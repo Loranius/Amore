@@ -3,6 +3,7 @@ import { WishCard } from './WishCard';
 import { buildWishSphereField, type WishSpherePlacement } from './wishSphereField';
 import { useWishSphereBilliards, type WishSphereBilliards } from './useWishSphereBilliards';
 import { readWishlistQuality } from './wishlistQuality';
+import { startWishSphereFarewell } from './wishSphereFarewell';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistSpheres.css';
 
@@ -247,6 +248,34 @@ export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphere
     still,
     parallaxByLayer: PARALLAX_BY_LAYER,
   });
+
+  // Вихід із модуля: кулі не зникають, а летять далі — ліворуч.
+  //
+  // Знімок робиться в мить зняття компонента, поки вузли ще на місці, а
+  // рішення відкладене на кадр: перемикання вигляду (Кристали → Список) теж
+  // знімає сфери, але з модуля ми при цьому не виходимо, і кулі, що летять
+  // через список, були б непорозумінням. Якщо сторінка вішліста лишилась —
+  // знімок викидається, так і не з'явившись на екрані.
+  //
+  // Саме layout-ефект, і це виміряно: у пасивного `useEffect` cleanup
+  // викликається ВЖЕ ПІСЛЯ того, як React зняв вузли й обнулив рефи, — на
+  // живому порталі шар не з'являвся зовсім, бо клонувати не було чого. Знищення
+  // layout-ефектів React проганяє до видалення вузлів, тож поле тут іще на
+  // місці. Вузол береться з часу монтування з тієї ж причини: реф до моменту
+  // прибирання вже порожній.
+  const stillRef = useRef(still);
+  stillRef.current = still;
+  useLayoutEffect(() => {
+    const node = field.current;
+    return () => {
+      if (node === null || stillRef.current) return;
+      const cancel = startWishSphereFarewell(node);
+      if (cancel === null) return;
+      window.requestAnimationFrame(() => {
+        if (document.querySelector('.wishlist') !== null) cancel();
+      });
+    };
+  }, []);
 
   const onOpenChange = useCallback((id: number, open: boolean) => {
     setFocused((current) => (open ? id : current === id ? null : current));

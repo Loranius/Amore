@@ -64,26 +64,76 @@
   border-radius: 50%;
 }
 
-/* ── Оболонка: скло, а не пластик ───────────────────────── */
+/* ── Оболонка: скло, а не пластик ─────────────────────────
+   Власник подивився на сфери й попросив повернути те, що було в самих перших
+   бульбашок: «щоб воно було більш об'ємним і фіолетовий ефект… тоді бульбашка
+   була ідеальна».
+
+   Об'єм робить не одна тінь, а протиставлення. Тут їх шість, і кожна має свою
+   роботу:
+     1. зовнішнє фіолетове сяйво — куля світиться в темряву, а не лежить на ній;
+     2. темна тінь падіння — вона таки має вагу;
+     3. внутрішнє світло згори-ліворуч — звідти світить зал;
+     4. внутрішня тінь знизу-праворуч — протилежний бік товщі скла;
+     5. білий волосяний обідець усередині контуру — край скла, а не бордер;
+     6. фіолетове внутрішнє світіння по всій товщі.
+   Прибери будь-яку пару з протилежних (3 і 4) — і куля миттєво стає пласким
+   кружечком. Саме на цьому й трималась «ідеальна» бульбашка. */
 .wl-sphere-field .wl-sphere__body {
   position: absolute;
   inset: 0;
   display: block;
   border-radius: 50%;
   overflow: hidden;
-  /* Нейтральна оболонка з ледь помітним lavender: рожевою кулю робити не
-     можна — вимога прямим текстом. */
+  /* Лавандове скло з фіолетовою глибиною знизу. Рожевою кулю робити не можна —
+     вимога прямим текстом, і фіолетовий їй не суперечить. */
   background:
-    radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.07) 36%, transparent 62%),
-    radial-gradient(circle at 52% 74%, rgba(196, 170, 255, 0.16), transparent 68%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07), rgba(126, 104, 168, 0.14));
+    radial-gradient(circle at 27% 19%, rgba(255, 255, 255, 0.6), transparent 16%),
+    radial-gradient(circle at 72% 81%, rgba(178, 126, 240, 0.5), transparent 38%),
+    /* Центр навмисно порожній. Скло тримається на краях, а посередині його
+       товща найтонша — саме тому крізь неї видно предмет. Перша спроба
+       поклала сюди суцільний градієнт на всю кулю, і на 60–95 px це вийшла
+       молочна пелена: та сама доза, що на 160-піксельній бульбашці лягала по
+       краю, тут накрила фото цілком. */
+    radial-gradient(circle at 50% 50%, transparent 46%, rgba(126, 92, 182, 0.3) 88%),
+    linear-gradient(145deg, rgba(233, 223, 252, 0.1), rgba(104, 74, 158, 0.16));
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.4),
-    inset 0 -12px 20px -14px rgba(198, 150, 255, 0.75),
-    0 10px 24px rgba(12, 8, 24, 0.4);
+    0 18px 38px rgba(150, 96, 224, 0.3),
+    0 10px 22px rgba(12, 8, 24, 0.45),
+    /* Внутрішні тіні мілкі: 22 px розмиття на 70-піксельній кулі дістає до
+       середини, 12 — лишається на краю, де об'єм і читається. */
+    inset 7px 8px 12px -4px rgba(255, 255, 255, 0.5),
+    inset -9px -11px 16px -6px rgba(58, 32, 92, 0.5),
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.3),
+    inset 0 0 16px -2px rgba(186, 138, 246, 0.4);
   scale: 1;
   animation: wl-sphere-float var(--sphere-period, 7s) ease-in-out var(--sphere-phase, 0s) infinite alternate;
   transition: scale 320ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 320ms ease;
+}
+
+/* Блік — над предметом, а не під ним.
+   Це і є різниця між «предмет усередині скла» і «предмет із наліпкою збоку»:
+   скло має бути ПЕРЕД тим, що в ньому лежить. */
+.wl-sphere-field .wl-sphere__body::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  top: 7%;
+  left: 12%;
+  width: 40%;
+  height: 21%;
+  border-radius: 50%;
+  background: radial-gradient(
+    ellipse,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 255, 255, 0.5) 36%,
+    rgba(255, 255, 255, 0.12) 66%,
+    transparent 82%
+  );
+  filter: blur(2px);
+  opacity: 0.85;
+  transform: rotate(-20deg);
+  pointer-events: none;
 }
 
 /* ── Предмет усередині ──────────────────────────────────
@@ -120,9 +170,9 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 58%, rgba(214, 160, 255, 0.26), transparent 66%);
+  background: radial-gradient(circle at 50% 58%, rgba(206, 148, 255, 0.34), transparent 66%);
   mix-blend-mode: screen;
-  opacity: 0.75;
+  opacity: 0.85;
   animation: wl-sphere-glow calc(var(--sphere-period, 7s) * 1.6) ease-in-out var(--sphere-phase, 0s) infinite alternate;
   transition: opacity 320ms ease;
 }
@@ -143,6 +193,19 @@
   );
   -webkit-mask: radial-gradient(closest-side circle, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
   mask: radial-gradient(closest-side circle, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
+}
+
+/* Відбите світло знизу — те, що в першій бульбашці робило скло товстим.
+   Без нього низ кулі провалюється в тінь і куля читається як напівсфера. */
+.wl-sphere-field .wl-sphere__rim::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 68% 90%, rgba(255, 255, 255, 0.5), transparent 24%),
+    radial-gradient(circle at 74% 66%, transparent 52%, rgba(58, 32, 92, 0.24) 76%, transparent 92%);
+  pointer-events: none;
 }
 
 /* ── Дотик: фокус на обраній, відступ решти (§13) ───────── */
@@ -187,6 +250,42 @@
   transition: opacity 170ms ease;
 }
 
+/* ── Прощання: кулі йдуть далі, ліворуч ───────────────────
+   Шар-двійник живе поверх застосунку рівно стільки, скільки триває виліт.
+   Дотиків не ловить, у дереві доступності його немає. */
+.wl-sphere-field.wl-sphere-farewell {
+  position: fixed;
+  z-index: 5;
+  /* Поле має власну мінімальну висоту під екран; двійникові вона зайва — його
+     розмір знято з оригіналу до пікселя. */
+  min-height: 0;
+  margin: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.wl-sphere-farewell .wl-sphere-farewell__slot {
+  position: absolute;
+  inset: 0;
+  display: block;
+  /* Політ живе на обгортці, а не на самій кулі: у кулі власний `transform`
+     із її місцем, і другий власник затер би його. Два рівні складаються. */
+  animation: wl-sphere-away var(--away-run, 620ms) cubic-bezier(0.5, 0, 0.85, 0.4)
+    var(--away-delay, 0ms) both;
+}
+
+/* Прискорення, а не гальмування: куля входила, сповільнюючись до свого місця,
+   і виходить, розганяючись за край. Це той самий рух, а не програна назад
+   поява. */
+@keyframes wl-sphere-away {
+  from { transform: translate3d(0, 0, 0); opacity: 1; }
+  to { transform: translate3d(var(--away-x, -120%), -16px, 0) scale(0.72); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-sphere-farewell { display: none; }
+}
+
 /* ── Решта, що не вмістилась у стелю ─────────────────────── */
 .wl-sphere-field .wl-sphere-more {
   position: absolute;
@@ -229,6 +328,15 @@
   mix-blend-mode: normal;
   animation: none;
   opacity: 0.5;
+}
+
+/* Блік лишається — він робить об'єм; але без розмиття, бо `filter` на кожній
+   кулі це прохід на сферу за кадр. Різкий край блікові пробачають, пласку
+   кулю — ні. */
+.wl-sphere-field[data-quality='low'] .wl-sphere__body::before,
+.wl-sphere-field[data-quality='fallback'] .wl-sphere__body::before {
+  filter: none;
+  opacity: 0.75;
 }
 
 .wl-sphere-field[data-quality='low'] .wl-sphere__image,
