@@ -62,8 +62,6 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
       <Canvas
         dpr={[1, crystalRenderScale('balanced', typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
         camera={{ position: [0, 0.9, 7.1], fov: 42 }}
-        // Opaque canvas is intentional: the global crystal PortalBackdrop still
-        // lives under ArtifactWorld, but the tree owns every pixel of its sky.
         gl={{ alpha: false, antialias: true }}
       >
         <TreeStage
