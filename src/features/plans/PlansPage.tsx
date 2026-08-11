@@ -1,381 +1,294 @@
 // ============================================================
-// «Плани» — огляд спільних задумів.
+// «Плани» — об'єднаний модуль: події пари й календар з планами.
 // ------------------------------------------------------------
-// Головний екран відповідає лише на три питання: що найближче, які три
-// плани йдуть далі та які ідеї ще не мають дати. Повні списки відкриваються
-// окремим bottom sheet і не перевантажують мобільний екран.
+// Власник звів два модулі в один: «об'єднати плани і календар. На один модуль
+// буде менше». Верхня панель — та сама скляна панель вкладок, що у вішліста, і
+// вкладок рівно дві:
+//
+//   Події    — «Наш шлях» із календаря. Саме ці події живлять кристал, і
+//              функціонал лишився той самий.
+//   Календар — місяць першим екраном, під ним плани плитками у два стовпці.
+//
+// **Що зникло, і чому саме це.** Вкладка «Дні народження» — самі дати лишились
+// подіями й видно їх у сітці, а окремий список під них дублював календар.
+// Перемикач виглядів (список / місяць / рік) — дві вкладки нагорі і Є
+// перемикачем, а третій поверх перемикачів робив би з екрана панель керування.
+// Решта кнопок у верхньому куті: лишилась одна дія, і вона йде за вкладкою.
+//
+// **Дані не змінились.** Ті самі запити, мутації й типи; об'єднання — це
+// маршрут і композиція. Кристал так само росте з подій пари.
 // ============================================================
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  CalendarIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  CloseIcon,
-  PlusIcon,
-} from '@/components/icons/UiIcon';
-import { pluralUA } from '@/lib/utils';
+import { useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PlusIcon } from '@/components/icons/UiIcon';
+import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
+import { useArtifactWorld } from '@/features/world/artifactWorldContext';
+import { useDimmedWorld } from '@/features/world/worldDim';
+import { currentYearMonth, stepMonth } from '@/features/_shared/month';
+import { useCalendarMutations, useEvents } from '@/features/calendar/useCalendar';
+import { enrichEvent, sortEnriched } from '@/features/calendar/calendarUtils';
+import { CalendarMonthView } from '@/features/calendar/CalendarViews';
+import { RelationshipJourney } from '@/features/calendar/RelationshipJourney';
+import { AddEventModal } from '@/features/calendar/AddEventModal';
 import { AddPlanModal } from './AddPlanModal';
-import { NextPlanCard } from './NextPlanCard';
-import { PlanCard } from './PlanCard';
-import { PLAN_CATEGORIES } from './planConstants';
+import { PlanTile } from './PlanTile';
+import { groupPlans } from './planGroups';
 import { usePlanMutations, usePlans } from './usePlans';
-import { isClosed, nextPlan, planDateLabel, sortPlans } from './planModel';
+import '@/features/world/worldDim.css';
 import './plans.css';
-import './plansOverview.css';
-import './plansMotion.css';
-import type { PlanRow } from '@/types';
+import './plansModule.css';
+import type { EventRow, EventType } from '@/types';
 
-const UPCOMING_PREVIEW = 3;
-const IDEAS_PREVIEW = 3;
-const NEW_ITEM_HIGHLIGHT_MS = 900;
+/** Розділ модуля. Календар перший: власник просив, щоб його бачили одразу. */
+type Section = 'calendar' | 'events';
 
-type OverviewSheet = 'upcoming' | 'ideas' | null;
+/**
+ * Подія, яку тут заводять, — це подія пари.
+ *
+ * Дні народження лишаються окремим типом і живуть у сітці, але створює їх та
+ * сама форма: тип обирають у ній, а не вкладкою нагорі.
+ */
+type EventKind = Extract<EventType, 'anniversary' | 'birthday'>;
 
-function enterStyle(order: number): CSSProperties {
-  return { '--plans-enter-order': order } as CSSProperties;
+type EventModal = { row: EventRow | null; date?: string | undefined; type: EventKind } | null;
+
+function requestedSection(value: string | null): Section {
+  return value === 'events' ? 'events' : 'calendar';
 }
 
 export function PlansPage() {
   const navigate = useNavigate();
-  const {
-    data: plans = [],
-    isPending,
-    isError,
-    isFetching,
-    refetch,
-  } = usePlans();
-  const { addPlan, confirmPlan } = usePlanMutations();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [adding, setAdding] = useState(false);
+  // Модуль впускає світ, як вішліст: сцена лишається фоном, дотики — сторінці.
+  const { webglSupported } = useArtifactWorld();
+  const worldVisible = webglSupported;
+  useWorldVisibleRoute();
+  useDimmedWorld(worldVisible);
+
+  // Розділ живе в адресі, і ТІЛЬКИ в ній.
+  //
+  // Спершу він був станом, який ефект відображав в адресу, — і це давало
+  // тиху ваду: посилання `?tab=events` спрацьовувало лише при монтуванні.
+  // Відкрий його, стоячи вже на «Планах», — і ефект миттєво переписував
+  // адресу зі свого стану, тобто повертав календар. Виміряно на живому
+  // порталі: два переходи в одному сеансі, і другий показував не те, що
+  // просили.
+  const section = requestedSection(searchParams.get('tab'));
+  const setSection = (next: Section) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'calendar') params.delete('tab');
+    else params.set('tab', next);
+    setSearchParams(params, { replace: true });
+  };
+  const [{ yr, mo }, setYm] = useState(currentYearMonth);
+  const [addingPlan, setAddingPlan] = useState(false);
   const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
-  const [highlightedPlanId, setHighlightedPlanId] = useState<number | null>(null);
-  const [closedOpen, setClosedOpen] = useState(false);
-  const [sheet, setSheet] = useState<OverviewSheet>(null);
+  const [eventModal, setEventModal] = useState<EventModal>(null);
+  const [showClosed, setShowClosed] = useState(false);
 
-  const sorted = useMemo(() => sortPlans(plans), [plans]);
-  const nearest = useMemo(() => nextPlan(plans), [plans]);
-  const active = useMemo(() => sorted.filter((plan) => !isClosed(plan)), [sorted]);
-  const upcoming = useMemo(
-    () => active.filter((plan) => plan.start_date !== null && plan.id !== nearest?.id),
-    [active, nearest?.id],
+  const plansQuery = usePlans();
+  const eventsQuery = useEvents();
+  const { addPlan, confirmPlan } = usePlanMutations();
+  const { addEvent, updateEvent } = useCalendarMutations();
+
+  const plans = useMemo(() => plansQuery.data ?? [], [plansQuery.data]);
+  const events = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
+
+  // Старі holiday-рядки лишаються в базі, але особистим календарем пари не є.
+  const personal = useMemo(
+    () => events.filter((event) => event.type === 'anniversary' || event.type === 'birthday'),
+    [events],
   );
-  const ideas = useMemo(
-    () => active.filter((plan) => plan.start_date === null),
-    [active],
+  const enriched = useMemo(() => personal.map(enrichEvent).sort(sortEnriched), [personal]);
+  const journeyEvents = useMemo(
+    () => personal.filter((event) => event.type === 'anniversary'),
+    [personal],
   );
-  const closed = useMemo(() => sorted.filter(isClosed), [sorted]);
 
-  const visibleUpcoming = upcoming.slice(0, UPCOMING_PREVIEW);
-  const visibleIdeas = ideas.slice(0, IDEAS_PREVIEW);
+  const groups = useMemo(() => groupPlans(plans), [plans]);
+  const activeCount = groups.upcoming.length + groups.ideas.length;
 
-  useEffect(() => {
-    if (highlightedPlanId === null) return;
-    const timer = window.setTimeout(() => setHighlightedPlanId(null), NEW_ITEM_HIGHLIGHT_MS);
-    return () => window.clearTimeout(timer);
-  }, [highlightedPlanId]);
-
-  const openAdd = () => {
-    addPlan.reset();
-    setCreatedPlanId(null);
-    setAdding(true);
+  const openNewEvent = (type: EventKind = 'anniversary', date?: string) => {
+    setEventModal({ row: null, type, date });
   };
 
-  const closeAdd = () => {
+  const openExistingEvent = (event: EventRow) => {
+    setEventModal({ row: event, type: event.type === 'birthday' ? 'birthday' : 'anniversary' });
+  };
+
+  const closeAddPlan = () => {
     if (addPlan.isPending) return;
-    if (createdPlanId !== null) setHighlightedPlanId(createdPlanId);
-    setAdding(false);
+    setAddingPlan(false);
     setCreatedPlanId(null);
   };
+
+  const busy = plansQuery.isPending || eventsQuery.isPending;
+  const failed = plansQuery.isError || eventsQuery.isError;
 
   return (
-    <section className="plans plans-overview plans-overview--motion">
-      <header className="plans-overview-hero" style={enterStyle(0)}>
-        <div className="plans-overview-hero-copy">
-          <span className="plans-overview-eyebrow">Разом попереду</span>
-          <h1>Плани</h1>
-          <p>Зберігайте спільні ідеї, обирайте дату й поступово перетворюйте їх на справжні моменти.</p>
-        </div>
-        <button type="button" className="btn plans-overview-add" onClick={openAdd}>
-          <PlusIcon size={18} />
-          <span>Додати</span>
+    <section
+      className="plans-module"
+      data-world={worldVisible ? 'true' : undefined}
+      data-section={section}
+    >
+      <div className="pm-tabs" role="tablist" aria-label="Розділи планів">
+        <button
+          type="button"
+          role="tab"
+          className="pm-tab"
+          aria-selected={section === 'events'}
+          onClick={() => setSection('events')}
+        >
+          Події <span className="pm-tab-count">{journeyEvents.length}</span>
         </button>
-      </header>
+        <button
+          type="button"
+          role="tab"
+          className="pm-tab"
+          aria-selected={section === 'calendar'}
+          onClick={() => setSection('calendar')}
+        >
+          Календар <span className="pm-tab-count">{activeCount}</span>
+        </button>
+      </div>
 
-      {isPending ? (
-        <PlansOverviewSkeleton />
-      ) : isError ? (
-        <div className="empty-state plans-error" role="alert">
-          <p>Не вдалося завантажити плани.</p>
-          <button type="button" className="btn" disabled={isFetching} onClick={() => void refetch()}>
-            {isFetching ? 'Пробую…' : 'Спробувати ще'}
+      {failed ? (
+        <div className="empty-state pm-error" role="alert">
+          <p>Не вдалося завантажити плани й події.</p>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => { void plansQuery.refetch(); void eventsQuery.refetch(); }}
+          >
+            Спробувати ще
           </button>
         </div>
-      ) : plans.length === 0 ? (
-        <section className="plans-overview-empty" style={enterStyle(1)}>
-          <span aria-hidden="true">✦</span>
-          <h2>Що зробимо разом?</h2>
-          <p>Почніть із короткої ідеї. Дату, місце, бюджет і кроки можна додати пізніше.</p>
-          <button type="button" className="btn" onClick={openAdd}>Додати перший план</button>
-        </section>
-      ) : (
-        <>
-          {nearest && (
-            <section
-              className="plans-overview-nearest"
-              aria-labelledby="plans-nearest-title"
-              style={enterStyle(1)}
-            >
-              <header className="plans-widget-heading plans-widget-heading--nearest">
-                <h2 id="plans-nearest-title">Найближче</h2>
-              </header>
-              <NextPlanCard plan={nearest} highlighted={nearest.id === highlightedPlanId} />
-            </section>
-          )}
+      ) : busy ? (
+        <div className="pm-sheet" aria-busy="true">
+          <div className="pm-skeleton pm-skeleton--month" />
+          <div className="pm-tiles">
+            <div className="pm-skeleton pm-skeleton--tile" />
+            <div className="pm-skeleton pm-skeleton--tile" />
+          </div>
+        </div>
+      ) : section === 'calendar' ? (
+        <div className="pm-sheet">
+          <CalendarMonthView
+            events={personal}
+            plans={plans}
+            yr={yr}
+            mo={mo}
+            onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
+            onGoToday={() => setYm(currentYearMonth())}
+            onAddOn={(date) => openNewEvent('anniversary', date)}
+            onOpenEvent={(event) => openExistingEvent(
+              enriched.find((item) => item.id === event.id) ?? event,
+            )}
+            onOpenPlan={(id) => navigate(`/plans/${id}`)}
+          />
 
-          {upcoming.length > 0 && (
-            <section
-              className="plans-overview-section"
-              aria-labelledby="plans-upcoming-title"
-              style={enterStyle(2)}
-            >
-              <header className="plans-widget-heading">
-                <div>
-                  <h2 id="plans-upcoming-title">Попереду</h2>
-                  <p>Три найближчі плани після головного.</p>
-                </div>
-                {upcoming.length > UPCOMING_PREVIEW ? (
-                  <button type="button" className="plans-widget-all" onClick={() => setSheet('upcoming')}>
-                    Усі плани <ChevronRightIcon size={15} />
-                  </button>
-                ) : (
-                  <span className="plans-widget-count">
-                    {upcoming.length} {pluralUA(upcoming.length, ['план', 'плани', 'планів'])}
-                  </span>
-                )}
-              </header>
+          <PlanSection
+            title="Найближчі плани"
+            note={`${groups.upcoming.length}`}
+            plans={groups.upcoming}
+            onConfirm={(id) => confirmPlan.mutate(id)}
+            empty="Жодного плану з датою. Додайте перший — він одразу стане в сітці вище."
+          />
 
-              <div className="plans-upcoming-grid">
-                {visibleUpcoming.map((plan, index) => (
-                  <UpcomingPlanTile
-                    key={plan.id}
-                    plan={plan}
-                    order={index}
-                    highlighted={plan.id === highlightedPlanId}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+          <PlanSection
+            title="Ідеї без дати"
+            note="колись"
+            plans={groups.ideas}
+            onConfirm={(id) => confirmPlan.mutate(id)}
+            empty="Ідей поки немає."
+          />
 
-          <section
-            className="plans-overview-section plans-overview-ideas"
-            aria-labelledby="plans-ideas-title"
-            style={enterStyle(3)}
-          >
-            <header className="plans-widget-heading plans-widget-heading--ideas">
-              <div>
-                <h2 id="plans-ideas-title">Ідеї без дати</h2>
-                <p>Легкі задуми, які ще не треба планувати детально.</p>
-              </div>
-              {ideas.length > IDEAS_PREVIEW && (
-                <button type="button" className="plans-widget-all" onClick={() => setSheet('ideas')}>
-                  Усі ідеї <ChevronRightIcon size={15} />
-                </button>
-              )}
-            </header>
-
-            <div className="plans-idea-rail">
-              {visibleIdeas.map((plan, index) => (
-                <IdeaChip
-                  key={plan.id}
-                  plan={plan}
-                  order={index}
-                  highlighted={plan.id === highlightedPlanId}
-                />
-              ))}
-              <button type="button" className="plans-idea-chip plans-idea-chip--add" onClick={openAdd}>
-                <PlusIcon size={19} />
-                <span>Додати ідею</span>
+          {groups.closed.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="pm-section-toggle"
+                aria-expanded={showClosed}
+                onClick={() => setShowClosed((current) => !current)}
+              >
+                Завершені <span>{groups.closed.length}</span>
               </button>
-            </div>
-          </section>
-
-          {closed.length > 0 && (
-            <details
-              className="plans-overview-closed"
-              open={closedOpen}
-              onToggle={(event) => setClosedOpen(event.currentTarget.open)}
-              style={enterStyle(4)}
-            >
-              <summary>
-                <span>
-                  <small>Не потребують уваги зараз</small>
-                  <strong>Виконані, відкладені й скасовані</strong>
-                </span>
-                <span className="plans-overview-closed-tail">
-                  <b key={closed.length} className="plans-overview-count-pop">{closed.length}</b>
-                  <ChevronDownIcon size={18} />
-                </span>
-              </summary>
-              {closedOpen && (
-                <div className="plan-list plans-overview-closed-list">
-                  {closed.map((plan) => <PlanCard key={plan.id} plan={plan} />)}
+              {showClosed && (
+                <div className="pm-tiles">
+                  {groups.closed.map((plan) => <PlanTile key={plan.id} plan={plan} />)}
                 </div>
               )}
-            </details>
+            </>
           )}
-        </>
+        </div>
+      ) : (
+        <div className="pm-sheet pm-sheet--journey">
+          <RelationshipJourney
+            events={journeyEvents}
+            onOpen={openExistingEvent}
+            onAdd={() => openNewEvent('anniversary')}
+          />
+        </div>
       )}
 
-      {adding && (
+      <button
+        type="button"
+        className="pm-fab"
+        onClick={() => (section === 'calendar' ? setAddingPlan(true) : openNewEvent('anniversary'))}
+      >
+        <PlusIcon size={17} />
+        {section === 'calendar' ? 'План' : 'Подія'}
+      </button>
+
+      {addingPlan && (
         <AddPlanModal
           busy={addPlan.isPending}
           createdPlanId={createdPlanId}
-          onClose={closeAdd}
+          onClose={closeAddPlan}
           onSubmit={(input) => addPlan.mutate(input, {
             onSuccess: (plan) => setCreatedPlanId(plan.id),
           })}
-          onContinue={(id) => {
-            setAdding(false);
-            setCreatedPlanId(null);
-            setHighlightedPlanId(null);
-            navigate(`/plans/${id}`);
-          }}
+          onContinue={(id) => { closeAddPlan(); navigate(`/plans/${id}`); }}
         />
       )}
 
-      {sheet && (
-        <PlansOverviewSheet
-          kind={sheet}
-          plans={sheet === 'upcoming' ? upcoming : ideas}
-          onClose={() => setSheet(null)}
-          onConfirm={(id) => confirmPlan.mutate(id)}
+      {eventModal && (
+        <AddEventModal
+          event={eventModal.row}
+          initialDate={eventModal.date}
+          initialType={eventModal.type}
+          onClose={() => setEventModal(null)}
+          onSubmit={(input) => {
+            if (eventModal.row) updateEvent.mutate({ id: eventModal.row.id, input });
+            else addEvent.mutate(input);
+          }}
         />
       )}
     </section>
   );
 }
 
-function UpcomingPlanTile({
-  plan,
-  order,
-  highlighted,
-}: {
-  plan: PlanRow;
-  order: number;
-  highlighted: boolean;
-}) {
-  const category = PLAN_CATEGORIES[plan.category];
-  const date = planDateLabel(plan);
-  const style = {
-    '--plan-accent': category.color,
-    '--plans-item-order': order,
-  } as CSSProperties;
-
-  return (
-    <article className={`plans-upcoming-tile${highlighted ? ' is-new' : ''}`} style={style}>
-      <Link className="plans-upcoming-tile-open" to={`/plans/${plan.id}`} aria-label={`Відкрити план «${plan.title}»`} />
-      <span className={`plans-upcoming-media${plan.cover_url ? ' plans-upcoming-media--photo' : ''}`} aria-hidden={!plan.cover_url}>
-        {plan.cover_url ? (
-          <img src={plan.cover_url} alt="" loading="lazy" decoding="async" fetchPriority="low" />
-        ) : (
-          <category.Icon size={30} />
-        )}
-      </span>
-      <span className="plans-upcoming-category">
-        <category.Icon size={12} />
-        {category.label}
-      </span>
-      <strong>{plan.title}</strong>
-      {date && (
-        <span className="plans-upcoming-date">
-          <CalendarIcon size={13} />
-          {date}
-        </span>
-      )}
-    </article>
-  );
-}
-
-function IdeaChip({
-  plan,
-  order,
-  highlighted,
-}: {
-  plan: PlanRow;
-  order: number;
-  highlighted: boolean;
-}) {
-  const category = PLAN_CATEGORIES[plan.category];
-  const style = {
-    '--plan-accent': category.color,
-    '--plans-item-order': order,
-  } as CSSProperties;
-
-  return (
-    <Link
-      className={`plans-idea-chip${highlighted ? ' is-new' : ''}`}
-      style={style}
-      to={`/plans/${plan.id}`}
-    >
-      <span aria-hidden="true"><category.Icon size={20} /></span>
-      <strong>{plan.title}</strong>
-    </Link>
-  );
-}
-
-function PlansOverviewSheet({
-  kind,
-  plans,
-  onClose,
-  onConfirm,
-}: {
-  kind: Exclude<OverviewSheet, null>;
-  plans: PlanRow[];
-  onClose: () => void;
+function PlanSection({ title, note, plans, onConfirm, empty }: {
+  title: string;
+  note: string;
+  plans: readonly import('@/types').PlanRow[];
   onConfirm: (id: number) => void;
+  empty: string;
 }) {
-  const title = kind === 'upcoming' ? 'Усі плани попереду' : 'Усі ідеї без дати';
-  const eyebrow = kind === 'upcoming' ? 'Заплановано' : 'Ще без дати';
-
   return (
-    <div
-      className="modal-overlay plans-overview-sheet-overlay"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <section
-        className="modal-sheet plans-overview-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="plans-overview-sheet-title"
-      >
-        <header>
-          <div>
-            <small>{eyebrow}</small>
-            <h2 id="plans-overview-sheet-title">{title}</h2>
-            <p>{plans.length} {pluralUA(plans.length, ['план', 'плани', 'планів'])}</p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Закрити список">
-            <CloseIcon size={20} />
-          </button>
-        </header>
-        <div className="plan-list plans-overview-sheet-list">
-          {plans.map((plan) => <PlanCard key={plan.id} plan={plan} onConfirm={onConfirm} />)}
+    <>
+      <div className="pm-section-head">
+        <h2>{title}</h2>
+        <span>{note}</span>
+      </div>
+      {plans.length === 0 ? (
+        <p className="pm-section-empty">{empty}</p>
+      ) : (
+        <div className="pm-tiles">
+          {plans.map((plan) => <PlanTile key={plan.id} plan={plan} onConfirm={onConfirm} />)}
         </div>
-      </section>
-    </div>
-  );
-}
-
-function PlansOverviewSkeleton() {
-  return (
-    <div className="plans-overview-skeleton" aria-hidden="true">
-      <span className="plans-overview-skeleton-featured" />
-      <span />
-      <span />
-    </div>
+      )}
+    </>
   );
 }

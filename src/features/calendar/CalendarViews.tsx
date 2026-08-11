@@ -29,8 +29,8 @@ import { EventIcon } from '@/components/icons/EventIcon';
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { PLAN_CATEGORIES } from '@/features/plans/planConstants';
 import { TYPES } from './calendarUtils';
-import { eventsByDay, yearHeat, yearSummary } from './calendarMonth';
-import { planMuted, planYearTotal, plansByDay, plansByMonth } from './calendarPlans';
+import { eventsByDay } from './calendarMonth';
+import { planMuted, plansByDay } from './calendarPlans';
 import type { EventRow, PlanRow } from '@/types';
 
 /** Скільки позначок вміщується в клітинку дня, перш ніж вони зіллються. */
@@ -324,74 +324,8 @@ function DayPanel({
 }
 
 // ── Рік ──────────────────────────────────────────────────────
-export function CalendarYearView({
-  events, plans, yr, onStepYear, onGoToday, onOpenMonth,
-}: {
-  events: EventRow[];
-  plans: PlanRow[];
-  yr: number;
-  onStepYear: (delta: number) => void;
-  onGoToday: () => void;
-  onOpenMonth: (month: number) => void;
-}) {
-  const planCounts = plansByMonth(plans, yr);
-  const eventMonths = yearSummary(events, yr);
-  // Плани входять у кількість ДО розрахунку насиченості: інакше місяць
-  // із тижневим походом і без подій лишився б блідим, а питання
-  // річного огляду — «де в нас густо», а не «де густо на події».
-  const months = yearHeat(
-    eventMonths.map((m) => ({ ...m, count: m.count + (planCounts[m.month - 1] ?? 0) })),
-  );
-  const eventTotal = eventMonths.reduce((n, m) => n + m.count, 0);
-  // Рахуємо РІЗНІ плани, а не суму по місяцях: похід через межу року
-  // інакше став би двома.
-  const planTotal = planYearTotal(plans, yr);
-  const now = currentYearMonth();
-
-  return (
-    <div className="cal-year">
-      <div className="cal-month-nav">
-        <button type="button" className="cal-nav-btn" onClick={() => onStepYear(-1)} aria-label="Попередній рік">
-          <ChevronLeftIcon size={18} />
-        </button>
-        <b>{yr}</b>
-        <TodayButton show={yr !== now.yr} onClick={onGoToday} />
-        <button type="button" className="cal-nav-btn" onClick={() => onStepYear(1)} aria-label="Наступний рік">
-          <ChevronRightIcon size={18} />
-        </button>
-      </div>
-
-      {/* Події й плани рахуються окремо: злити їх в одне число означало б
-          назвати похід подією, а це вже інший модуль. */}
-      <p className="cal-year-total">
-        {eventTotal} {pluralUA(eventTotal, ['подія', 'події', 'подій'])} за рік
-        {planTotal > 0 && <> · {planTotal} {pluralUA(planTotal, ['план', 'плани', 'планів'])}</>}
-      </p>
-
-      <div className="cal-year-grid">
-        {months.map((m) => (
-          <button
-            key={m.month}
-            type="button"
-            className={`cal-year-cell${m.count ? ' cal-year-cell--has' : ''}${m.month === now.mo && yr === now.yr ? ' cal-year-cell--now' : ''}`}
-            // Насиченість пропорційна кількості: до цього огляд був
-            // двійковим і на питання «де густо» не відповідав.
-            style={{ '--cal-heat': m.heat } as React.CSSProperties}
-            onClick={() => onOpenMonth(m.month)}
-          >
-            <b>{MONTHS_UA[m.month - 1]}</b>
-            <span className="cal-year-dots">
-              {m.types.map((t) => (
-                <i key={t} style={{ background: TYPES[t as keyof typeof TYPES].mark }} />
-              ))}
-              {/* Одна смужка на весь місяць, а не по одній на план:
-                  крапки тут відповідають на «що саме», а не «скільки». */}
-              {(planCounts[m.month - 1] ?? 0) > 0 && <i className="cal-dot-plan" />}
-            </span>
-            <small>{m.count || '—'}</small>
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+//
+// Огляду року тут більше немає. Він жив на сторінці календаря, а сторінки не
+// стало: власник звів календар і плани в один модуль із двома вкладками, і
+// третій поверх перемикачів (список / місяць / рік) робив би з екрана панель
+// керування. Місяць лишився — його показують першим.

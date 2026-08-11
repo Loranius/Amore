@@ -12,7 +12,7 @@
 // одну подію в різні дні.
 // ============================================================
 import { describe, expect, it } from 'vitest';
-import { dayInMonth, eventsByDay, yearHeat, yearSummary } from './calendarMonth';
+import { dayInMonth, eventsByDay } from './calendarMonth';
 import type { EventRow } from '@/types';
 
 let nextId = 1;
@@ -86,67 +86,6 @@ describe('eventsByDay', () => {
   });
 });
 
-describe('yearSummary', () => {
-  it('дає рівно дванадцять місяців', () => {
-    const months = yearSummary([], 2026);
-    expect(months).toHaveLength(12);
-    expect(months.map((m) => m.month)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-  });
-
-  it('рахує події місяця й перелічує їхні типи без повторів', () => {
-    const summary = yearSummary([
-      event('1963-07-05', true, 'birthday'),
-      event('2000-07-14', true, 'birthday'),
-      event('2022-07-13', true, 'anniversary'),
-      event('2026-12-25', true, 'holiday'),
-    ], 2026);
-
-    const july = summary[6]!;
-    expect(july.count).toBe(3);
-    expect(july.types.sort()).toEqual(['anniversary', 'birthday']);
-
-    expect(summary[11]!.count).toBe(1);
-    expect(summary[0]!.count).toBe(0);
-    expect(summary[0]!.types).toEqual([]);
-  });
-
-  it('щорічні події однакові в будь-якому році, разові — ні', () => {
-    const events = [event('2020-05-10', true), event('2026-05-11', false)];
-    expect(yearSummary(events, 2026)[4]!.count).toBe(2);
-    expect(yearSummary(events, 2027)[4]!.count).toBe(1);
-  });
-});
-
-describe('yearHeat', () => {
-  const months = (...counts: number[]) =>
-    counts.map((count, i) => ({ month: i + 1, count, types: [] }));
-
-  it('порожній місяць має рівно нуль, а не «трохи»', () => {
-    const heat = yearHeat(months(0, 3));
-    expect(heat[0]!.heat).toBe(0);
-    expect(heat[1]!.heat).toBeGreaterThan(0);
-  });
-
-  it('рік без подій не ділить на нуль', () => {
-    expect(yearHeat(months(0, 0, 0)).every((m) => m.heat === 0)).toBe(true);
-  });
-
-  it('найгустіший місяць — одиниця, решта пропорційно', () => {
-    const heat = yearHeat(months(0, 1, 2, 4));
-    expect(heat[3]!.heat).toBeCloseTo(1);
-    expect(heat[2]!.heat).toBeCloseTo(0.35 + 0.65 * 0.5);
-    expect(heat[1]!.heat).toBeCloseTo(0.35 + 0.65 * 0.25);
-  });
-
-  it('ненульова насиченість не опускається нижче 0.35 — інакше місяць з '
-    + 'однією подією не відрізнити від порожнього', () => {
-    // Рік, де є місяць із двадцятьма подіями й місяць з однією.
-    const heat = yearHeat(months(20, 1));
-    expect(heat[1]!.heat).toBeGreaterThanOrEqual(0.35);
-  });
-
-  it('не змінює вихідні поля місяця', () => {
-    const src = [{ month: 7, count: 2, types: ['birthday'] }];
-    expect(yearHeat(src)[0]).toMatchObject({ month: 7, count: 2, types: ['birthday'] });
-  });
-});
+// Перевірки `yearSummary` і `yearHeat` пішли разом із самими функціями: річний
+// огляд жив на сторінці календаря, а сторінки не стало — календар тепер
+// вкладка «Планів». Тест, що переживає свій предмет, стереже порожнечу.

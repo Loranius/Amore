@@ -113,7 +113,17 @@ const CRYSTAL_ATLAS: Readonly<Record<WorldRegion, WorldCameraPose>> = {
 
   // An upper forward facet: what has been decided is still ahead, and faces
   // the couple.
-  intention: pose({ azimuth: SIXTH * 0.5, targetHeight: 0.72, elevation: 0.04, distance: 0.84 }),
+  //
+  // Half a quarter, and the owner asked for exactly that: "при переході на
+  // плани кристал робить оберт на 45 градусів замість 90 як це було в
+  // Вішлисті. При переході з планів на вішлист оберт робиться знову таки на
+  // 45 градусів."
+  //
+  // So the three near regions are evenly spaced along one arc — Home at 0,
+  // Plans at 45°, Wishlist at 90° — and every step between neighbours is the
+  // same turn in the same direction. A couple learning the place of things
+  // learns a rhythm, not a set of exceptions.
+  intention: pose({ azimuth: QUARTER * 0.5, targetHeight: 0.72, elevation: 0.04, distance: 0.84 }),
 
   // A lower side facet, near and plain. §21 asks for closer and lower, but
   // warns in the same breath to keep a large readable foreground — so this is

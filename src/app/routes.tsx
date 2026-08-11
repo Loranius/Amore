@@ -27,7 +27,6 @@ import { PageSkeleton } from '@/components/ui/PageSkeleton';
 
 const ShoppingPage = lazy(() => import('@/features/shopping/ShoppingPage').then((m) => ({ default: m.ShoppingPage })));
 const WishlistPage = lazy(() => import('@/features/wishlist/WishlistPage').then((m) => ({ default: m.WishlistPage })));
-const CalendarPage = lazy(() => import('@/features/calendar/CalendarPage').then((m) => ({ default: m.CalendarPage })));
 const SchedulePage = lazy(() => import('@/features/schedule/SchedulePage').then((m) => ({ default: m.SchedulePage })));
 const MemoriesPage = lazy(() => import('@/features/memories/MemoriesPage').then((m) => ({ default: m.MemoriesPage })));
 const MediaPage = lazy(() => import('@/features/media/MediaPage').then((m) => ({ default: m.MediaPage })));
@@ -79,7 +78,11 @@ export const router = createHashRouter([
           { path: 'budget', element: <Navigate to="/piggybank" replace /> },
           { path: 'shopping', element: page(<ShoppingPage />) },
 
-          { path: 'calendar', element: page(<CalendarPage />) },
+          // Календар більше не окремий модуль: він став вкладкою всередині
+          // «Планів». Адреса лишається перенаправленням, бо на неї ведуть
+          // збережені посилання й сповіщення — так само, як /budget веде в
+          // «Скарбничку».
+          { path: 'calendar', element: <Navigate to="/plans" replace /> },
           // «Графік» був сабтабом календаря й тому ховався за ним. Тепер це
           // власний розділ у «Ще»; стара адреса лишається редиректом, щоб
           // збережені посилання й закладки не ламались — так само, як

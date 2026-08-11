@@ -6,7 +6,7 @@
 // вони відповідають лише на «чи випадає план на цей день».
 // ============================================================
 import { describe, expect, it } from 'vitest';
-import { planShowsInGrid, plansByDay, plansByMonth } from './calendarPlans';
+import { planShowsInGrid, plansByDay } from './calendarPlans';
 import type { PlanRow } from '@/types';
 
 const plan = (over: Partial<PlanRow> = {}): PlanRow => ({
@@ -80,22 +80,5 @@ describe('plansByDay', () => {
   });
 });
 
-describe('plansByMonth', () => {
-  it('план рахується раз на місяць, навіть якщо займає тиждень', () => {
-    // У річному огляді число означає «скільки в нас справ», а не
-    // «скільки зайнято днів».
-    const week = plan({ date_precision: 'range', start_date: '2026-08-10', end_date: '2026-08-16' });
-    expect(plansByMonth([week], 2026)[7]).toBe(1);
-  });
-
-  it('план через межу місяця рахується в обох', () => {
-    const trip = plan({ date_precision: 'range', start_date: '2026-08-30', end_date: '2026-09-02' });
-    const months = plansByMonth([trip], 2026);
-    expect(months[7]).toBe(1);
-    expect(months[8]).toBe(1);
-  });
-
-  it('порожній рік — дванадцять нулів, а не порожній масив', () => {
-    expect(plansByMonth([], 2026)).toEqual(Array.from({ length: 12 }, () => 0));
-  });
-});
+// Перевірка `plansByMonth` пішла разом із функцією — вона рахувала плани для
+// річного огляду календаря, якого більше немає.

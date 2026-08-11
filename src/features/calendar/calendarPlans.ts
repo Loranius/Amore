@@ -79,39 +79,13 @@ export function plansByDay(
   return out;
 }
 
-/**
- * Скільки РІЗНИХ планів припадає на кожен місяць року (12 чисел, з січня).
- *
- * План рахується один раз на місяць, навіть якщо займає в ньому тиждень:
- * у річному огляді число означає «скільки в нас справ», а не «скільки
- * зайнято днів».
- */
-export function plansByMonth(plans: readonly PlanRow[], yr: number): number[] {
-  return Array.from({ length: 12 }, (_, i) => {
-    const byDay = plansByDay(plans, yr, i + 1);
-    const ids = new Set<number>();
-    for (const list of byDay.values()) for (const p of list) ids.add(p.id);
-    return ids.size;
-  });
-}
 
-/**
- * Скільки РІЗНИХ планів у році — для підпису річного огляду.
- *
- * Не сума `plansByMonth`: похід 30 грудня — 2 січня стоїть у двох
- * місяцях, але план у пари один.
- */
-export function planYearTotal(plans: readonly PlanRow[], yr: number): number {
-  const ids = new Set<number>();
-  for (let mo = 1; mo <= 12; mo++) {
-    for (const list of plansByDay(plans, yr, mo).values()) {
-      for (const p of list) ids.add(p.id);
-    }
-  }
-  return ids.size;
-}
 
 /** Чи план уже закритий — для приглушеного вигляду рядка в сітці. */
 export function planMuted(plan: PlanRow): boolean {
   return PLAN_STATUSES[plan.status].closed;
 }
+
+// `planYearTotal` і `plansByMonth` жили тут для річного огляду календаря. Огляд
+// пішов разом зі сторінкою, коли календар став вкладкою «Планів», — і функції
+// пішли за ним, щоб не лишитись кодом без викликача.

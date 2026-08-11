@@ -86,11 +86,6 @@ describe('the price stays low (§18)', () => {
     expect(BARE).not.toContain('backdrop-filter');
   });
 
-  it('dims the background scene with a wash', () => {
-    const wash = block("[data-wishlist-scene='dim'] .artifact-world::after");
-    expect(wash).toMatch(/background:/);
-  });
-
   it('blurs the background lightly, and not at all on a weak device', () => {
     // Змінена вимога, і змінив її власник: «додай легенький блюр на фоні в
     // вішлисті, щоб трішки відділити модуль від фону».
@@ -99,7 +94,16 @@ describe('the price stays low (§18)', () => {
     // правильна — розмиття повноекранного анімованого полотна браузер
     // перераховує щокадру. Тому заборона не зникла, а звузилась до того, де
     // вона справді потрібна: на слабкому профілі розмиття немає.
-    const scene = block("[data-wishlist-scene='dim'] .artifact-world");
+    //
+    // Правила переїхали з файлу вішліста у `features/world/worldDim.css`, коли
+    // того самого приглушення забажав другий модуль. Перевіряються там, де
+    // живуть, — але перевіряються ті самі властивості.
+    const dim = readFileSync(join(ROOT, 'src/features/world/worldDim.css'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    const at = dim.indexOf("[data-world-scene='dim'] .artifact-world {");
+    expect(at, 'правило розмиття має існувати').toBeGreaterThan(-1);
+    const scene = dim.slice(at, dim.indexOf('}', at));
+    expect(dim).toMatch(/\.artifact-world::after \{[^}]*background:/);
     const radius = /blur\((\d+(?:\.\d+)?)px\)/.exec(scene);
     expect(radius, 'фон має розмиватись').not.toBeNull();
     // «Легенький»: фон лишається впізнаваним, а не перетворюється на пляму.
@@ -110,20 +114,25 @@ describe('the price stays low (§18)', () => {
     expect(scene).toMatch(/transform:\s*scale\(1\.0[1-9]\)/);
 
     // Слабкий профіль розмиття не платить.
-    const spared = BARE.slice(BARE.indexOf("[data-wishlist-quality='low']"));
+    const spared = dim.slice(dim.indexOf("[data-world-quality='low']"));
     expect(spared).toMatch(/filter:\s*none/);
-    expect(BARE).toContain("[data-wishlist-quality='fallback']");
+    expect(dim).toContain("[data-world-quality='fallback']");
   });
 });
 
 describe('the wishlist changes nothing on Home', () => {
-  it('reaches the shared scene only through the wishlist marker', () => {
-    // Головна має виглядати так само, як до цієї роботи. Єдине правило, що
-    // взагалі торкається спільної сцени, стоїть під маркером, який ставить і
-    // знімає сторінка вішліста.
-    for (const line of BARE.split('\n')) {
+  it('reaches the shared scene only through the module marker', () => {
+    // Головна має виглядати так само, як до цієї роботи. Це і є та вимога,
+    // заради якої перевірка існує, — і вона не змінилась від переїзду правил
+    // у спільний файл: сам вішліст спільної сцени більше не торкається взагалі,
+    // а те, що торкається, стоїть під маркером, який ставить і знімає сторінка
+    // модуля.
+    expect(BARE).not.toContain('.artifact-world');
+    const dim = readFileSync(join(ROOT, 'src/features/world/worldDim.css'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const line of dim.split('\n')) {
       if (!line.includes('.artifact-world')) continue;
-      expect(line, line).toContain("[data-wishlist-scene='dim']");
+      expect(line, line).toContain("[data-world-scene='dim']");
     }
   });
 });

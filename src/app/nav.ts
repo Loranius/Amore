@@ -18,7 +18,7 @@ import {
   FilmIcon, GamepadIcon, HeartIcon, MoreIcon, PiggyBankIcon, PlansIcon,
   PotIcon, SettingsIcon, TicketIcon,
 } from '@/components/icons/NavIcon';
-import { CalendarIcon, GiftIcon } from '@/components/icons/UiIcon';
+import { GiftIcon } from '@/components/icons/UiIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
 
 export type NavIconComponent = (props: IconProps) => ReactNode;
@@ -68,17 +68,16 @@ export interface NavGroup {
 /**
  * Розділи під кнопкою «Ще» (мобільне меню) і в десктоп-сайдбарі, згруповані
  * за частотою використання (лише для легкого візуального розділення в
- * MoreMenu — не нові хаби/роути). `/calendar` — хаб із сабтабами.
+ * MoreMenu — не нові хаби/роути).
  */
 export const MORE_GROUPS: NavGroup[] = [
   {
     label: 'Часто',
     items: [
       { to: '/memories', Icon: CameraIcon, label: 'Спогади' },
-      { to: '/calendar', Icon: CalendarIcon, label: 'Календар' },
-      // Був сабтабом усередині «Календаря», тобто щоб дійти до графіка,
-      // треба було спершу знати, що він там. Тепер це власний розділ
-      // поруч із календарем — на один крок ближче й видно зі списку.
+      // Календаря тут більше немає: він став вкладкою всередині «Планів», а
+      // «Плани» стоять у доці. Лишити його і в меню означало б два входи в
+      // те саме місце — і пара вчила б портал двічі.
       { to: '/schedule', Icon: ClockIcon, label: 'Графік' },
       { to: '/media', Icon: FilmIcon, label: 'Вотчліст' },
     ],

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { WishCard } from './WishCard';
 import { buildWishSphereField, type WishSpherePlacement } from './wishSphereField';
 import { useWishSphereBilliards, type WishSphereBilliards } from './useWishSphereBilliards';
-import { readWishlistQuality } from './wishlistQuality';
+import { readWorldQuality } from '@/features/world/worldDim';
 import { startWishSphereFarewell } from './wishSphereFarewell';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistSpheres.css';
@@ -212,7 +212,7 @@ export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphere
   const field = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [focused, setFocused] = useState<number | null>(null);
-  const [quality] = useState(readWishlistQuality);
+  const [quality] = useState(readWorldQuality);
   const [still] = useState(prefersReducedMotion);
   const { shown, phase } = useSwappedItems(items, still);
 

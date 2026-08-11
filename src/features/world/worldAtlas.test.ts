@@ -22,7 +22,15 @@ import {
 // own is the failure.
 // ============================================================
 
-/** Every authenticated route the router serves, from `app/routes.tsx`. */
+/**
+ * Every authenticated route the router serves a *page* for, from
+ * `app/routes.tsx`.
+ *
+ * `/calendar` is no longer among them: the owner merged Calendar into Plans
+ * ("об'єднати плани і календар"), and the address now redirects. A redirect has
+ * no region of its own — it has arrived somewhere else before the camera is
+ * asked anything.
+ */
 const ROUTES = [
   '/',
   '/wishlist',
@@ -30,7 +38,6 @@ const ROUTES = [
   '/plans/42',
   '/shopping',
   '/memories',
-  '/calendar',
   '/schedule',
   '/media',
   '/piggybank',
@@ -154,14 +161,30 @@ describe('region → crystal pose (brief §21)', () => {
     }
   });
 
-  it('keeps time’s two regions next to each other', () => {
-    // §21 asks outright: "Transition between Calendar and Schedule should be
-    // spatially short." A sixth of a turn, against the half-turns elsewhere.
-    const calendar = crystalPoseForRegion(worldRegionForRoute('/calendar'));
-    const schedule = crystalPoseForRegion(worldRegionForRoute('/schedule'));
-    const apart = Math.abs(calendar.azimuth - schedule.azimuth);
-    expect(apart).toBeGreaterThan(0.25);
-    expect(apart).toBeLessThan(Math.PI / 2);
+  it('steps the three near modules a quarter of a quarter apart', () => {
+    // CHANGED REQUIREMENT, and the owner changed it. This used to hold §21's
+    // "transition between Calendar and Schedule should be spatially short" —
+    // but Calendar is no longer a module, so the pair that rule protected does
+    // not exist any more.
+    //
+    // What replaced it is the owner's own words about the near arc: "при
+    // переході на плани кристал робить оберт на 45 градусів замість 90 як це
+    // було в Вішлисті. При переході з планів на вішлист оберт робиться знову
+    // таки на 45 градусів."
+    //
+    // So the requirement now is a rhythm rather than a pair: equal steps, one
+    // direction. The three routes the couple uses daily sit on one arc.
+    const home = crystalPoseForRegion(worldRegionForRoute('/'));
+    const plans = crystalPoseForRegion(worldRegionForRoute('/plans'));
+    const wishlist = crystalPoseForRegion(worldRegionForRoute('/wishlist'));
+    const quarter = Math.PI / 2;
+
+    expect(home.azimuth).toBe(0);
+    expect(plans.azimuth).toBeCloseTo(quarter / 2, 10);
+    expect(wishlist.azimuth).toBeCloseTo(quarter, 10);
+    // Equal steps, and both the same way round: a couple learning where things
+    // are learns one rhythm, not a set of exceptions.
+    expect(plans.azimuth - home.azimuth).toBeCloseTo(wishlist.azimuth - plans.azimuth, 10);
   });
 
   it('keeps every elevation a sine, not a height', () => {

@@ -1,0 +1,364 @@
+/* ============================================================
+   Об'єднаний модуль «Плани» — власна поверхня поверх світу.
+   ------------------------------------------------------------
+   Другий модуль зі своєю мовою після вішліста, і мова тут навмисно та сама
+   там, де вона вже склалась: скляна панель вкладок нагорі, приглушений і
+   розмитий світ позаду, одна кнопка дії внизу. Спільне лишається спільним —
+   пара вчить портал один раз.
+
+   Що НЕ те саме: вішліст — це простір із сузір'ям, а тут аркуш із сіткою й
+   плитками. Скло тому не грає в об'єм: воно тільки відділяє папір від фону.
+
+   Файл також перефарбовує сітку календаря й «Наш шлях» у токени світу. Це
+   навмисно тут, а не в їхніх власних файлах: обидва компоненти лишаються
+   придатними поза світом (вони не знають про кристал), а перефарбовує їх той,
+   хто вніс їх у світ.
+   ============================================================ */
+
+.plans-module {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100%;
+  padding: 0 0 96px;
+}
+
+/* ── Верхня панель: та сама, що у вішліста ───────────────── */
+
+.plans-module .pm-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 6px;
+  margin: 0 0 2px;
+  padding: 6px;
+  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  border-radius: var(--radius-pill, 999px);
+  background: var(--world-surface, rgba(42, 33, 64, 0.82));
+  backdrop-filter: blur(10px);
+}
+
+.plans-module .pm-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 8px;
+  border: 0;
+  border-radius: var(--radius-pill, 999px);
+  background: none;
+  color: var(--world-text-muted, #c9b8e4);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 200ms ease, color 200ms ease;
+}
+
+.plans-module .pm-tab[aria-selected='true'] {
+  background: var(--world-primary, #c9a0e6);
+  color: #241636;
+}
+
+.plans-module .pm-tab:focus-visible {
+  outline: 2px solid var(--world-accent, #dcb6f5);
+  outline-offset: 2px;
+}
+
+.plans-module .pm-tab-count {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(20, 15, 31, 0.35);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plans-module .pm-tab[aria-selected='true'] .pm-tab-count {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+/* ── Аркуш ───────────────────────────────────────────────── */
+
+.plans-module .pm-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  /* Перемикання вкладки — поява, а не перемальовування: той самий підхід, що
+     в сузір'ї бажань (§17). */
+  animation: pm-sheet-in 220ms ease both;
+}
+
+@keyframes pm-sheet-in {
+  from { opacity: 0; transform: translateY(6px); }
+}
+
+.plans-module .pm-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 16px 2px 8px;
+}
+
+.plans-module .pm-section-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--world-text, #f6efff);
+}
+
+.plans-module .pm-section-head span {
+  font-size: 12px;
+  color: var(--world-text-muted, #c9b8e4);
+  font-variant-numeric: tabular-nums;
+}
+
+.plans-module .pm-section-empty {
+  margin: 0 2px;
+  font-size: 13px;
+  color: var(--world-text-muted, #c9b8e4);
+}
+
+.plans-module .pm-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 16px 0 8px;
+  padding: 11px 14px;
+  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  border-radius: 14px;
+  background: var(--world-surface-soft, rgba(255, 255, 255, 0.07));
+  color: var(--world-text, #f6efff);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plans-module .pm-section-toggle span {
+  color: var(--world-text-muted, #c9b8e4);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Плитки планів: два стовпці ──────────────────────────── */
+
+.plans-module .pm-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.plans-module .pm-tile {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 12px 10px;
+  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  border-radius: 16px;
+  background: var(--world-surface, rgba(42, 33, 64, 0.82));
+  box-shadow: 0 10px 24px var(--world-shadow, rgba(6, 4, 12, 0.5));
+}
+
+/* Смужка категорії — єдиний колір, який модуль бере не з палітри світу.
+   Категорія плану має власний колір по всьому порталу, і міняти його тут
+   означало б, що «Подорож» синя на одному екрані й бузкова на іншому. */
+.plans-module .pm-tile::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--plan-color, var(--world-primary, #c9a0e6));
+}
+
+.plans-module .pm-tile--closed { opacity: 0.62; }
+
+/* Відкриття — накладка-кнопка на всю плитку, а не onClick по контейнеру:
+   інакше плитку не сфокусувати з клавіатури й читалка не знає, що вона
+   клікабельна. Той самий патерн, що в картці плану. */
+.plans-module .pm-tile-open {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.plans-module .pm-tile-open:focus-visible {
+  outline: 2px solid var(--world-accent, #dcb6f5);
+  outline-offset: -2px;
+}
+
+.plans-module .pm-tile-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--plan-color, var(--world-primary, #c9a0e6));
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.plans-module .pm-tile-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--world-text, #f6efff);
+}
+
+.plans-module .pm-tile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--world-text-muted, #c9b8e4);
+  font-variant-numeric: tabular-nums;
+}
+
+.plans-module .pm-tile-someday { font-style: italic; }
+.plans-module .pm-tile-when { color: var(--world-accent, #dcb6f5); }
+.plans-module .pm-tile-overdue { color: var(--world-danger, #e2707f); }
+.plans-module .pm-tile-status { display: inline-flex; align-items: center; gap: 4px; }
+
+.plans-module .pm-tile-confirm {
+  position: relative;
+  margin-top: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--world-border-active, rgba(220, 182, 245, 0.42));
+  border-radius: var(--radius-pill, 999px);
+  background: none;
+  color: var(--world-accent, #dcb6f5);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── Одна кнопка дії ─────────────────────────────────────── */
+
+.plans-module .pm-fab {
+  position: fixed;
+  z-index: 6;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 18px;
+  border: 1px solid var(--world-border-active, rgba(220, 182, 245, 0.42));
+  border-radius: var(--radius-pill, 999px);
+  background: linear-gradient(140deg, var(--world-primary, #c9a0e6), #965fbd);
+  color: #1b1226;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 12px 28px var(--world-shadow, rgba(6, 4, 12, 0.5));
+  cursor: pointer;
+}
+
+.plans-module .pm-fab:focus-visible {
+  outline: 2px solid var(--world-accent, #dcb6f5);
+  outline-offset: 3px;
+}
+
+/* ── Очікування й помилка ────────────────────────────────── */
+
+.plans-module .pm-skeleton {
+  border-radius: 18px;
+  background: var(--world-surface-soft, rgba(255, 255, 255, 0.07));
+  animation: pm-pulse 1.4s ease-in-out infinite;
+}
+
+.plans-module .pm-skeleton--month { height: 320px; }
+.plans-module .pm-skeleton--tile { height: 92px; }
+
+@keyframes pm-pulse {
+  50% { opacity: 0.55; }
+}
+
+.plans-module .pm-error { color: var(--world-text, #f6efff); }
+
+/* ── Календар і «Наш шлях» у кольорах світу ──────────────
+   Перевизначаються ТОКЕНИ, а не перелік класів, — той самий підхід, що у
+   вішліста (`wishlistCrystalWorld.css`). Обидва принесені компоненти написані
+   на `--text`, `--muted`, `--surface`, тож одного блоку досить, щоб вони
+   заговорили мовою світу.
+
+   Перша спроба перелічувала класи, і живий портал показав, чому це не
+   працює: `.cal-day-event` бере `var(--surface)` і лишився БІЛИМ рядком
+   посеред темного модуля, бо в переліку його не було. Перелік завжди
+   відстає від компонента, який перефарбовує. */
+[data-portal-scene='true'] .plans-module {
+  /* Колір тексту теж, а не лише токен: назва місяця — це голий `<b>`, який
+     нічого не оголошує й успадковує колір сторінки. Виміряно на живому
+     порталі: «Серпень 2026» лишився темним на темному й читався ледь-ледь. */
+  color: var(--world-text);
+  --text: var(--world-text);
+  --muted: var(--world-text-muted);
+  --surface: var(--world-surface);
+  --surface-2: var(--world-surface-strong);
+  --border: var(--world-border);
+  --accent: var(--world-accent);
+  --danger: var(--world-danger);
+  --ok: var(--world-success);
+  --warn: var(--world-warning);
+}
+
+.plans-module .cal-month,
+.plans-module .cal-year {
+  padding: 12px;
+  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  border-radius: 20px;
+  background: var(--world-surface, rgba(42, 33, 64, 0.82));
+  box-shadow: 0 12px 30px var(--world-shadow, rgba(6, 4, 12, 0.5));
+}
+
+/* Довга назва події не має розпирати картку за екран: список під сіткою
+   живе в тій самій ширині, що й сітка. Виміряно на живому порталі — рядок
+   «День народження Каріни» вилазив за правий край картки. */
+.plans-module .cal-month-list,
+.plans-module .cal-day-block,
+.plans-module .cal-day-event { min-width: 0; max-width: 100%; }
+
+.plans-module .cal-nav-btn,
+.plans-module .cal-today-btn {
+  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  background: var(--world-recess, rgba(9, 6, 16, 0.42));
+}
+
+.plans-module .cal-cell {
+  background: var(--world-surface-soft, rgba(255, 255, 255, 0.07));
+}
+
+.plans-module .cal-cell--pad { background: none; }
+
+/* ── «Наш шлях» ──────────────────────────────────────────── */
+
+.plans-module .pm-sheet--journey { padding-top: 4px; }
+
+/* ── Поза світом ─────────────────────────────────────────── */
+
+/* Без WebGL сцени немає, і скляна панель висіла б над білим папером сторінки.
+   Модуль тоді бере звичайні токени порталу — структура та сама, шкіра інша. */
+.plans-module:not([data-world='true']) .pm-tabs,
+.plans-module:not([data-world='true']) .pm-tile,
+.plans-module:not([data-world='true']) .cal-month {
+  border-color: var(--border, rgba(0, 0, 0, 0.1));
+  background: var(--surface, #fff);
+}
+
+.plans-module:not([data-world='true']) .pm-tile-title,
+.plans-module:not([data-world='true']) .pm-section-head h2 {
+  color: var(--text, #241c33);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans-module .pm-sheet,
+  .plans-module .pm-skeleton { animation: none; }
+}
