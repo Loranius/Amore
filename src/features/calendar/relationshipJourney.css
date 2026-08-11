@@ -91,9 +91,27 @@
   vector-effect: non-scaling-stroke;
   stroke-linecap: round;
   stroke-linejoin: round;
+  stroke-dasharray: 4 10;
 }
-.relationship-journey-path-base { stroke: color-mix(in srgb, var(--text) 10%, transparent); stroke-width: 8; }
-.relationship-journey-path-dash { stroke: color-mix(in srgb, var(--accent) 52%, var(--text)); stroke-width: 2; stroke-dasharray: 4 10; }
+/*
+ * Неон — лише пунктир. Нижній path повторює той самий dasharray і працює
+ * виключно як розмите світіння, тому під ним немає старої суцільної дороги.
+ * Колір приходить із ArtifactDNA того самого couple-seed, що фарбує монарх.
+ */
+.relationship-journey-path-base {
+  stroke: var(--relationship-journey-neon, var(--accent));
+  stroke-width: 6;
+  opacity: .34;
+  filter: blur(4px);
+}
+.relationship-journey-path-dash {
+  stroke: var(--relationship-journey-neon-core, var(--relationship-journey-neon, var(--accent)));
+  stroke-width: 2.25;
+  opacity: .98;
+  filter:
+    drop-shadow(0 0 2px var(--relationship-journey-neon, var(--accent)))
+    drop-shadow(0 0 6px var(--relationship-journey-neon, var(--accent)));
+}
 .relationship-journey-nodes { position: relative; z-index: 2; }
 .relationship-journey-node {
   --relationship-journey-node-x: 72%;
@@ -218,6 +236,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .relationship-journey-path-base,
   .relationship-journey-path-dash { animation: relationship-journey-drift 22s linear infinite; }
   .relationship-journey-fog > span { animation: relationship-journey-cloud 18s ease-in-out infinite alternate; }
   .relationship-journey-fog > span:last-child { animation-delay: -7s; }
@@ -226,6 +245,7 @@
 @keyframes relationship-journey-cloud { from { transform: translate3d(-8px, 0, 0); } to { transform: translate3d(11px, -3px, 0); } }
 
 @media (prefers-reduced-motion: reduce) {
+  .relationship-journey-path-base,
   .relationship-journey-path-dash,
   .relationship-journey-fog > span { animation: none !important; }
 }
