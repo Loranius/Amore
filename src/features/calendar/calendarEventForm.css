@@ -1,79 +1,125 @@
 /* ============================================================
-   Контекстна форма «Наших свят» і днів народження.
+   Календарна подія — той самий visual language, що AddPlanModal.
+   Великий вступ, акцентне поле, компактні скляні секції та pill-actions.
    ============================================================ */
+
+.cal-entry-overlay {
+  z-index: 80;
+  align-items: flex-end;
+  padding: 18px 12px max(18px, env(safe-area-inset-bottom));
+}
+
 .cal-entry-sheet {
+  --cal-entry-accent: var(--accent);
+  width: min(100%, 560px);
+  max-height: min(90dvh, 760px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 18%, transparent);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--cal-entry-accent) 14%, transparent), transparent 34%),
+    var(--surface);
+  box-shadow: 0 24px 70px color-mix(in srgb, #000 30%, transparent);
+}
+
+.cal-entry-form {
   display: grid;
-  gap: 14px;
+  gap: 20px;
+  padding: 24px 20px 20px;
 }
 
-.cal-entry-context {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 12px 13px;
-  border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
-}
-
-.cal-entry-context > span {
+.cal-entry-head {
   display: grid;
-  width: 40px;
-  height: 40px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  color: var(--accent);
+  gap: 7px;
 }
 
-.cal-entry-context > div {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
+.cal-entry-eyebrow {
+  color: color-mix(in srgb, var(--cal-entry-accent) 78%, var(--text));
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
 }
 
-.cal-entry-context strong {
-  font-size: 13.5px;
+.cal-entry-head h2 {
+  margin: 0;
+  font-size: clamp(22px, 6vw, 29px);
+  line-height: 1.12;
+  letter-spacing: -.035em;
 }
 
-.cal-entry-context small {
+.cal-entry-head p {
+  margin: 0;
+  max-width: 42ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.cal-entry-title-field {
+  position: relative;
+  display: block;
+}
+
+.cal-entry-title-field textarea {
+  display: block;
+  width: 100%;
+  min-height: 108px;
+  resize: none;
+  padding: 18px 18px 30px;
+  border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 34%, transparent);
+  border-radius: 21px;
+  outline: none;
+  background: color-mix(in srgb, var(--cal-entry-accent) 5%, var(--bg));
+  color: var(--text);
+  font: inherit;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.35;
+  transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.cal-entry-title-field textarea::placeholder {
+  color: color-mix(in srgb, var(--muted) 78%, transparent);
+  font-weight: 500;
+}
+
+.cal-entry-title-field textarea:focus {
+  border-color: color-mix(in srgb, var(--cal-entry-accent) 72%, transparent);
+  background: color-mix(in srgb, var(--cal-entry-accent) 8%, var(--bg));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--cal-entry-accent) 10%, transparent);
+}
+
+.cal-entry-title-field small {
+  position: absolute;
+  right: 15px;
+  bottom: 11px;
   color: var(--muted);
   font-size: 10.5px;
-  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
 }
 
-.cal-significance {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
+.cal-entry-accordion,
+.cal-entry-field-card,
+.cal-entry-people-card,
+.cal-entry-toggle-card {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--bg) 55%, var(--surface));
+}
+
+.cal-entry-accordion-toggle {
+  display: flex;
+  width: 100%;
+  min-height: 62px;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 13px;
   border: 0;
-}
-
-.cal-significance legend {
-  margin-bottom: 8px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 720;
-}
-
-.cal-significance-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-}
-
-.cal-significance-option {
-  display: grid;
-  align-content: start;
-  justify-items: start;
-  min-width: 0;
-  min-height: 132px;
-  gap: 10px;
-  padding: 13px;
-  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  border-radius: 19px;
-  background: var(--surface);
+  background: transparent;
   color: var(--text);
   font: inherit;
   text-align: left;
@@ -81,78 +127,310 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.cal-significance-option.active {
-  border-color: color-mix(in srgb, var(--accent) 62%, transparent);
-  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+.cal-entry-accordion-toggle--note {
+  min-height: 54px;
 }
 
-.cal-significance-option--major.active {
-  border-color: color-mix(in srgb, #965fbd 72%, transparent);
-  background: color-mix(in srgb, #965fbd 9%, var(--surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #965fbd 28%, transparent);
-}
-
-.cal-significance-icon {
+.cal-entry-accordion-icon {
   display: grid;
-  width: 39px;
-  height: 39px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
   place-items: center;
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--accent) 11%, var(--surface));
-  color: var(--accent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--cal-entry-accent) 12%, var(--surface));
+  color: var(--cal-entry-accent);
 }
 
-.cal-significance-option--major .cal-significance-icon {
-  background: color-mix(in srgb, #965fbd 13%, var(--surface));
-  color: #965fbd;
-}
-
-.cal-significance-option > span:last-child {
+.cal-entry-accordion-copy {
   display: grid;
   min-width: 0;
-  gap: 4px;
+  flex: 1 1 auto;
+  gap: 1px;
 }
 
-.cal-significance-option strong {
+.cal-entry-accordion-copy small,
+.cal-entry-field-label {
+  color: var(--muted);
+  font-size: 10.5px;
+}
+
+.cal-entry-accordion-copy strong {
+  overflow: hidden;
   font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.cal-significance-option small {
+.cal-entry-accordion-optional {
+  flex: 0 0 auto;
   color: var(--muted);
   font-size: 10px;
+}
+
+.cal-entry-accordion-toggle > svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform .18s ease;
+}
+
+.cal-entry-accordion-toggle.open > svg {
+  transform: rotate(180deg);
+}
+
+.cal-entry-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  padding: 0 10px 10px;
+  animation: cal-entry-reveal .18s ease both;
+}
+
+.cal-entry-type-option {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-entry-type-option > svg {
+  color: currentColor;
+}
+
+.cal-entry-type-option > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.cal-entry-type-option strong {
+  color: var(--text);
+  font-size: 11.5px;
+}
+
+.cal-entry-type-option small {
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.3;
+}
+
+.cal-entry-type-option.active {
+  border-color: color-mix(in srgb, var(--cal-entry-accent) 42%, transparent);
+  background: color-mix(in srgb, var(--cal-entry-accent) 10%, var(--surface));
+  color: color-mix(in srgb, var(--cal-entry-accent) 78%, var(--text));
+  font-weight: 750;
+}
+
+.cal-entry-type-option--major.active {
+  border-color: color-mix(in srgb, #a675c6 54%, transparent);
+  background: color-mix(in srgb, #a675c6 11%, var(--surface));
+  color: #b88ad5;
+}
+
+.cal-entry-people-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 13px 13px;
+}
+
+.cal-entry-people-card .chips {
+  margin: 0;
+}
+
+.cal-entry-field-card {
+  display: grid;
+  gap: 7px;
+  padding: 11px 13px 13px;
+}
+
+.cal-entry-date-card input[type='date'] {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 13px;
+  outline: none;
+  background: color-mix(in srgb, var(--bg) 72%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.cal-entry-date-card input[type='date']:focus {
+  border-color: color-mix(in srgb, var(--cal-entry-accent) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cal-entry-accent) 9%, transparent);
+}
+
+.cal-entry-note {
+  display: block;
+  padding: 0 11px 11px;
+  animation: cal-entry-reveal .18s ease both;
+}
+
+.cal-entry-note textarea {
+  display: block;
+  width: 100%;
+  min-height: 78px;
+  resize: vertical;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 13px;
+  outline: none;
+  background: color-mix(in srgb, var(--bg) 70%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.cal-entry-note textarea:focus {
+  border-color: color-mix(in srgb, var(--cal-entry-accent) 50%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cal-entry-accent) 8%, transparent);
+}
+
+.cal-entry-toggle-card {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 13px;
+  cursor: pointer;
+}
+
+.cal-entry-toggle-card input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--cal-entry-accent);
+}
+
+.cal-entry-toggle-card > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.cal-entry-toggle-card strong {
+  font-size: 12.5px;
+}
+
+.cal-entry-toggle-card small {
+  color: var(--muted);
+  font-size: 9.8px;
   line-height: 1.35;
 }
 
-.cal-significance-option:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 42%, transparent);
-  outline-offset: 2px;
+.cal-entry-reminder-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: -3px 0 0;
+  padding: 10px 12px;
+  border-radius: 15px;
+  background: color-mix(in srgb, var(--cal-entry-accent) 7%, transparent);
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.45;
 }
 
-@media (max-width: 370px) {
-  .cal-significance-grid {
+.cal-entry-reminder-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: color-mix(in srgb, var(--cal-entry-accent) 75%, var(--text));
+}
+
+.cal-entry-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 2px;
+}
+
+.cal-entry-cancel {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cal-entry-save {
+  min-height: 44px;
+  padding-inline: 20px;
+  border-radius: 999px;
+  background: var(--cal-entry-accent);
+}
+
+@keyframes cal-entry-reveal {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 640px) {
+  .cal-entry-overlay {
+    align-items: center;
+  }
+}
+
+@media (max-height: 700px) {
+  .cal-entry-overlay {
+    padding-top: 8px;
+  }
+
+  .cal-entry-sheet {
+    max-height: calc(100dvh - 16px - env(safe-area-inset-bottom));
+    border-radius: 23px 23px 18px 18px;
+  }
+
+  .cal-entry-form {
+    gap: 14px;
+    padding-top: 18px;
+  }
+
+  .cal-entry-head p {
+    display: none;
+  }
+
+  .cal-entry-title-field textarea {
+    min-height: 86px;
+  }
+}
+
+@media (max-width: 380px) {
+  .cal-entry-sheet {
+    border-radius: 23px;
+  }
+
+  .cal-entry-form {
+    padding-inline: 15px;
+  }
+
+  .cal-entry-type-grid {
     grid-template-columns: 1fr;
   }
 
-  .cal-significance-option {
-    grid-template-columns: 39px minmax(0, 1fr);
-    align-items: center;
-    min-height: 0;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .cal-significance-option {
-    transition: border-color .15s ease, background-color .15s ease, transform .15s ease;
-  }
-
-  .cal-significance-option:active {
-    transform: scale(.985);
+  .cal-entry-accordion-optional {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cal-significance-option {
+  .cal-entry-accordion-toggle > svg,
+  .cal-entry-type-grid,
+  .cal-entry-note {
+    animation: none;
     transition: none;
   }
 }
