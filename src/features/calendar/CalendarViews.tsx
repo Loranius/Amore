@@ -1,23 +1,14 @@
 // ============================================================
 // Сітка місяця й огляд року.
 // ------------------------------------------------------------
-// Список відповідає «що найближче». Сітка — «що в липні», рік — «коли в
-// нас густо». Модуль зветься календарем від першого дня й досі жодного
-// з цих двох питань не брав на себе.
+// Сітка показує повну картину місяця: календарні події, події «Нашого
+// шляху» й плани. Список ПІД сіткою навмисно вужчий: там лишаються тільки
+// утилітарні календарні записи (дні народження, свята й нагадування).
+// Плани вже мають власні секції нижче на сторінці, а події стосунків —
+// окрему вкладку «Події», тому дублювати їх тут не потрібно.
 //
-// На відміну від списку, обидва вигляди показують УСІ типи одразу: сенс
-// календаря саме в тому, щоб побачити день народження й річницю поруч.
-// Тому вкладки типів у них не показуються.
-//
-// Сітка була німою: дні малювались як <div>, тож тапнути 5 липня і щось
-// із ним зробити було неможливо — а це головний жест будь-якого
-// календаря. Тепер день це кнопка, вибраний день відкриває свою панель
-// замість списку місяця, і з неї ж додається подія САМЕ на цю дату.
-//
-// Плани приходять ОКРЕМИМ пропом із власної таблиці: у календарі вони
-// гості, а не події. Тому в них свій значок-позначка (смужка проти
-// круглої крапки), свій колір категорії й тап веде не в модалку події,
-// а на сторінку плану.
+// Вибраний день лишається повним контекстом дня: у DayPanel видно і події,
+// і плани, бо це вже не місячний дубль, а детальний перегляд конкретної дати.
 // ============================================================
 import { useState } from 'react';
 import {
@@ -50,6 +41,16 @@ function TodayButton({ show, onClick }: { show: boolean; onClick: () => void }) 
       Сьогодні
     </button>
   );
+}
+
+/**
+ * Чи належить подія до короткого місячного списку під календарем.
+ *
+ * anniversary — це «Наш шлях», він уже має окрему вкладку.
+ * birthday / holiday — саме календарні записи, заради яких цей список і є.
+ */
+function showInMonthList(event: EventRow): boolean {
+  return event.type === 'birthday' || event.type === 'holiday';
 }
 
 // ── Місяць ───────────────────────────────────────────────────
@@ -91,31 +92,15 @@ export function CalendarMonthView({
     ...Array.from({ length: total }, (_, i) => i + 1),
   ];
 
-  // Список під сіткою — об'єднання днів із подіями і днів із планами:
-  // день, у якому є лише план, мусить у ньому бути, інакше сітка знову
-  // стане німою рівно для планів.
-  const chosen = [...new Set([...byDay.keys(), ...planDays.keys()])].sort((a, b) => a - b);
-
-  // Багатоденний план стоїть у списку РАЗ — під своїм першим днем у цьому
-  // місяці, з підписом «3 дні». У сітці й у панелі дня він займає кожен
-  // свій день (там питання «що 22-го»), але списком три однакові рядки
-  // поспіль нічого не додавали б.
-  const listPlans = new Map<number, Array<{ plan: PlanRow; span: number }>>();
-  const spans = new Map<number, number>();
-  for (const list of planDays.values()) {
-    for (const p of list) spans.set(p.id, (spans.get(p.id) ?? 0) + 1);
+  // Короткий список під сіткою — ТІЛЬКИ календарні записи. Саму сітку не
+  // фільтруємо: на ній і надалі видно всі маркери, включно з планами та
+  // подіями «Нашого шляху».
+  const monthListByDay = new Map<number, EventRow[]>();
+  for (const [day, dayEvents] of byDay.entries()) {
+    const visible = dayEvents.filter(showInMonthList);
+    if (visible.length > 0) monthListByDay.set(day, visible);
   }
-  const listed = new Set<number>();
-  for (const day of chosen) {
-    for (const p of planDays.get(day) ?? []) {
-      if (listed.has(p.id)) continue;
-      listed.add(p.id);
-      const bucket = listPlans.get(day);
-      const entry = { plan: p, span: spans.get(p.id) ?? 1 };
-      if (bucket) bucket.push(entry);
-      else listPlans.set(day, [entry]);
-    }
-  }
+  const chosen = [...monthListByDay.keys()].sort((a, b) => a - b);
 
   return (
     <div className="cal-month">
@@ -145,9 +130,9 @@ export function CalendarMonthView({
           const iso = ymd(yr, mo, day);
           const isToday = iso === today;
           const isSel = selected === day;
-          // Не більше трьох позначок разом: далі вони зливаються в пляму
-          // й перестають щось означати. Події йдуть першими — план
-          // однаково видно смужкою в списку під сіткою.
+          // Не більше трьох позначок разом: далі вони зливаються в пляму.
+          // Тут навмисно лишаються ВСІ типи: список нижче фільтрується,
+          // а сама календарна сітка повинна давати повну картину дня.
           const dots = [...list.slice(0, MAX_DOTS), ...dayPlans].slice(0, MAX_DOTS);
           return (
             <button
@@ -196,26 +181,17 @@ export function CalendarMonthView({
           onClear={() => setSelected(null)}
         />
       ) : chosen.length === 0 ? (
-        /* Під сіткою — самі події й плани місяця. Крапка каже «щось є»,
-           але не каже що; без цього списку сітка була б красивою й німою. */
-        <p className="empty-state">Цього місяця нічого немає.</p>
+        <p className="empty-state">Цього місяця немає календарних подій.</p>
       ) : (
         <div className="cal-month-list">
           {chosen.map((day) => {
-            const dayEvents = byDay.get(day) ?? [];
-            const dayPlans = listPlans.get(day) ?? [];
-            // День, у якому лишились самі «продовження» багатоденного
-            // плану, у списку не потрібен: заголовок дати без жодного
-            // рядка під ним.
-            if (dayEvents.length === 0 && dayPlans.length === 0) return null;
+            const dayEvents = monthListByDay.get(day) ?? [];
+            if (dayEvents.length === 0) return null;
             return (
               <div key={day} className="cal-day-block">
                 <div className="cal-day-num">{formatDateUA(ymd(yr, mo, day), { year: false })}</div>
                 {dayEvents.map((ev) => (
                   <EventLine key={`e${ev.id}`} ev={ev} onOpen={onOpenEvent} />
-                ))}
-                {dayPlans.map(({ plan, span }) => (
-                  <PlanLine key={`p${plan.id}`} plan={plan} span={span} onOpen={onOpenPlan} />
                 ))}
               </div>
             );
