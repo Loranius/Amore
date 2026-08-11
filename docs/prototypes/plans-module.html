@@ -1,0 +1,828 @@
+<title>Плани + Календар: один модуль</title>
+<style>
+  /* ============================================================
+     Шаблон об'єднаного модуля «Плани».
+     ------------------------------------------------------------
+     Це макет структури, а не порталу: кристал намальований CSS-гранями, дані
+     ілюстративні. Під перевіркою те, заради чого шаблон існує, — що з чим
+     сусідить, що видно першим і куди подівся функціонал, який був у двох
+     модулях.
+
+     Палітра взята з порталу (`worldTheme.css`), кольори категорій планів — з
+     `planConstants.ts`, щоб макет можна було порівнювати з живим екраном.
+     ============================================================ */
+
+  :root {
+    --page-bg: #f4f1f7;
+    --page-panel: #ffffff;
+    --page-ink: #241c33;
+    --page-muted: #6b6280;
+    --page-line: rgba(60, 44, 88, 0.14);
+    --page-accent: #7b4fa8;
+
+    /* Токени порталу — не змінювати без worldTheme.css. */
+    --world-bg: #221a33;
+    --world-bg-deep: #0b0813;
+    --world-surface-strong: #2a2140;
+    --world-primary: #c9a0e6;
+    --world-accent: #dcb6f5;
+    --world-text: #f6efff;
+    --world-text-muted: #c9b8e4;
+    --world-border: rgba(214, 190, 246, 0.16);
+
+    --font: 'Nunito', ui-rounded, 'Segoe UI Variable', system-ui, sans-serif;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-bg: #17131f;
+      --page-panel: #201a2c;
+      --page-ink: #f1ecf8;
+      --page-muted: #a397b8;
+      --page-line: rgba(214, 190, 246, 0.16);
+      --page-accent: #dcb6f5;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --page-bg: #17131f;
+    --page-panel: #201a2c;
+    --page-ink: #f1ecf8;
+    --page-muted: #a397b8;
+    --page-line: rgba(214, 190, 246, 0.16);
+    --page-accent: #dcb6f5;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: var(--font);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 32px 20px 64px; display: flex; flex-direction: column; gap: 28px; }
+  header { display: flex; flex-direction: column; gap: 10px; max-width: 64ch; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--page-muted); font-weight: 700; }
+  h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; text-wrap: balance; font-weight: 800; }
+  h2 { margin: 0 0 2px; font-size: 17px; font-weight: 800; }
+  p { margin: 0; color: var(--page-muted); }
+  header p { font-size: 16px; }
+
+  .split { display: grid; grid-template-columns: minmax(0, auto) minmax(320px, 1fr); gap: 36px; align-items: start; }
+  @media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
+
+  /* ── Телефон ───────────────────────────────────────────── */
+
+  .device-col { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+  .device-fit { width: 100%; display: flex; justify-content: center; }
+
+  .phone {
+    width: 412px; height: 915px; flex: none;
+    border-radius: 40px; padding: 6px;
+    background: linear-gradient(160deg, #3a3050, #14101d);
+    box-shadow: 0 30px 70px rgba(12, 8, 24, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    transform-origin: top center;
+  }
+
+  .screen {
+    position: relative; width: 100%; height: 100%;
+    border-radius: 34px; overflow: hidden;
+    background: radial-gradient(120% 80% at 50% 12%, var(--world-bg), var(--world-bg-deep) 78%);
+    color: var(--world-text);
+    isolation: isolate;
+  }
+
+  /* Фон: зал, кристал і те саме розмиття, що у вішлісті. */
+  .backdrop {
+    position: absolute; inset: 0;
+    filter: blur(4px);
+    transform: scale(1.03);
+  }
+
+  .hall {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(88% 52% at 50% 74%, rgba(150, 120, 196, 0.34), transparent 72%),
+      linear-gradient(180deg, rgba(58, 45, 88, 0.55) 0%, rgba(48, 37, 74, 0.42) 46%, rgba(20, 15, 31, 0.9) 88%);
+  }
+
+  .hall::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 34%;
+    background: linear-gradient(180deg, transparent, rgba(9, 6, 16, 0.75));
+  }
+
+  .stage { position: absolute; inset: 0; perspective: 1000px; perspective-origin: 50% 62%; }
+
+  .world {
+    position: absolute; left: 50%; top: 78%; width: 0; height: 0;
+    transform-style: preserve-3d;
+    transform: rotateX(8deg) rotateY(var(--turn, 0deg));
+    transition: transform var(--t-orbit, 1100ms) cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .prism { position: absolute; transform-style: preserve-3d; }
+
+  .facet {
+    position: absolute; left: -27px; top: -330px; width: 54px; height: 330px;
+    background: linear-gradient(174deg, rgba(255,255,255,.9), rgba(226,209,247,.72) 42%, rgba(178,152,214,.62));
+    transform: rotateY(var(--a)) translateZ(47px);
+    box-shadow: inset 0 0 24px rgba(255,255,255,.5);
+  }
+  .facet:nth-child(even) { background: linear-gradient(174deg, rgba(240,231,252,.82), rgba(197,174,232,.66) 46%, rgba(150,126,188,.6)); }
+
+  .tip {
+    position: absolute; left: -27px; top: -434px; width: 54px; height: 104px;
+    background: linear-gradient(184deg, rgba(255,255,255,.94), rgba(214,194,243,.7));
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    transform: rotateY(var(--a)) translateZ(47px) rotateX(26deg);
+    transform-origin: 50% 100%;
+  }
+  .tip:nth-child(even) { background: linear-gradient(184deg, rgba(236,226,252,.86), rgba(186,162,224,.66)); }
+
+  .shard {
+    position: absolute; left: -14px; width: 28px;
+    background: linear-gradient(180deg, rgba(245,238,255,.8), rgba(163,138,202,.6));
+    clip-path: polygon(50% 0, 100% 22%, 100% 100%, 0 100%, 0 22%);
+  }
+
+  .wash {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 70% at 50% 78%, rgba(11, 8, 19, 0.62), rgba(11, 8, 19, 0.34));
+  }
+
+  /* ── Верхня панель: та сама, що у вішлісті ─────────────── */
+
+  .tabs {
+    position: absolute; left: 16px; right: 16px; top: 18px; z-index: 3;
+    display: flex; gap: 6px; padding: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--world-border);
+    background: rgba(42, 33, 64, 0.62);
+  }
+
+  .tab {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 11px 8px; border: 0; border-radius: 999px;
+    background: none; color: var(--world-text-muted);
+    font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: background 200ms ease, color 200ms ease;
+  }
+  .tab[aria-selected="true"] { background: rgba(201, 160, 230, 0.6); color: #241636; }
+  .tab:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
+  .tab .count {
+    min-width: 22px; padding: 1px 6px; border-radius: 999px;
+    background: rgba(20, 15, 31, 0.35); font-size: 12px; font-variant-numeric: tabular-nums;
+  }
+  .tab[aria-selected="true"] .count { background: rgba(255, 255, 255, 0.42); }
+
+  /* ── Полотно модуля ────────────────────────────────────── */
+
+  .sheet {
+    position: absolute; z-index: 2;
+    left: 0; right: 0; top: 82px; bottom: 96px;
+    overflow-y: auto; overscroll-behavior: contain;
+    /* Нижній відступ під кнопку дії: без нього останній план і останній вузол
+       шляху лишаються під нею й дочитати їх неможливо. */
+    padding: 10px 16px 76px;
+    scrollbar-width: none;
+  }
+  .sheet::-webkit-scrollbar { display: none; }
+  .sheet[hidden] { display: none; }
+
+  .glass-card {
+    border: 1px solid var(--world-border);
+    border-radius: 20px;
+    background: rgba(42, 33, 64, 0.58);
+    box-shadow: 0 12px 30px rgba(9, 6, 16, 0.4);
+  }
+
+  /* ── Календар ──────────────────────────────────────────── */
+
+  .month { padding: 14px 14px 12px; }
+
+  .month-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    margin-bottom: 10px;
+  }
+  .month-title { font-size: 17px; font-weight: 800; text-transform: capitalize; }
+  .month-nav { display: flex; gap: 6px; }
+  .month-nav button {
+    width: 30px; height: 30px; display: grid; place-items: center;
+    border: 1px solid var(--world-border); border-radius: 10px;
+    background: rgba(20, 15, 31, 0.3); color: var(--world-text);
+    font: inherit; font-size: 15px; cursor: pointer;
+  }
+
+  .weekdays, .days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .weekdays span {
+    text-align: center; font-size: 11px; font-weight: 700;
+    color: var(--world-text-muted); padding-bottom: 4px;
+  }
+
+  .day {
+    position: relative; aspect-ratio: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    border: 0; border-radius: 10px; padding: 0;
+    background: rgba(255, 255, 255, 0.03); color: var(--world-text);
+    font: inherit; font-size: 13px; font-variant-numeric: tabular-nums; cursor: pointer;
+  }
+  .day[data-out="true"] { color: rgba(201, 184, 228, 0.32); background: none; }
+  .day[data-today="true"] { outline: 1.5px solid var(--world-accent); font-weight: 800; }
+  .day[aria-pressed="true"] { background: rgba(201, 160, 230, 0.32); }
+  .day:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 1px; }
+
+  .dots { display: flex; gap: 2px; height: 5px; }
+  .dot { width: 5px; height: 5px; border-radius: 50%; }
+  .dot[data-kind="event"] { background: #dcb6f5; }
+  .dot[data-kind="milestone"] { background: #ffd27a; }
+  .dot[data-kind="birthday"] { background: #7fd0a6; }
+  .dot[data-kind="plan"] { background: var(--plan-color, #5BA3D9); }
+
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;
+    font-size: 11px; color: var(--world-text-muted);
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+  /* ── День у фокусі ─────────────────────────────────────── */
+
+  .day-focus { margin-top: 12px; padding: 12px 14px; }
+  .day-focus h3 { margin: 0 0 8px; font-size: 14px; font-weight: 800; }
+  .day-focus ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .day-focus li { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .day-focus .empty { font-size: 13px; color: var(--world-text-muted); }
+
+  /* ── Плитки планів ─────────────────────────────────────── */
+
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    margin: 18px 2px 9px;
+  }
+  .section-head h3 { margin: 0; font-size: 15px; font-weight: 800; }
+  .section-head span { font-size: 12px; color: var(--world-text-muted); }
+
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+
+  .tile {
+    position: relative; overflow: hidden;
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 11px 11px 10px;
+    border: 1px solid var(--world-border); border-radius: 16px;
+    background: rgba(42, 33, 64, 0.58);
+    color: inherit; text-align: left; font: inherit; cursor: pointer;
+  }
+  .tile::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+    background: var(--plan-color, #5BA3D9);
+  }
+  .tile:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
+  .tile-cat { font-size: 11px; font-weight: 800; color: var(--plan-color, #5BA3D9); }
+  .tile-title { font-size: 14px; font-weight: 700; line-height: 1.25; }
+  .tile-when { font-size: 12px; color: var(--world-text-muted); font-variant-numeric: tabular-nums; }
+  .tile[data-idea="true"] .tile-when { font-style: italic; }
+
+  /* ── «Наш шлях» ────────────────────────────────────────── */
+
+  .journey { position: relative; padding: 8px 0 4px; }
+  /* Крива за вузлами: саме вона робить зі списку шлях. Малюється після
+     розкладки, по справжніх центрах вузлів, — інакше довші назви переносяться
+     і лінія відходить від точок. */
+  .journey svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .journey ol { position: relative; margin: 0; padding: 0; list-style: none; }
+  .journey li { position: relative; min-height: 104px; display: flex; align-items: center; }
+  .journey li[data-side="left"] { justify-content: flex-start; }
+  .journey li[data-side="right"] { justify-content: flex-end; }
+  .journey li.today-row { min-height: 44px; justify-content: center; }
+
+  .node {
+    position: relative; width: 62%;
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 10px 12px;
+    border: 1px solid var(--world-border); border-radius: 16px;
+    background: rgba(42, 33, 64, 0.66);
+  }
+  .node[data-milestone="true"] {
+    border-color: rgba(255, 210, 122, 0.5);
+    box-shadow: 0 0 0 1px rgba(255, 210, 122, 0.18), 0 10px 24px rgba(9, 6, 16, 0.45);
+  }
+  .node-date { font-size: 11px; color: var(--world-text-muted); font-variant-numeric: tabular-nums; }
+  .node-title { font-size: 14px; font-weight: 700; }
+  .node-badge {
+    align-self: flex-start;
+    display: inline-flex; align-items: center; gap: 4px; margin-top: 5px;
+    padding: 2px 8px; border-radius: 999px;
+    background: rgba(255, 210, 122, 0.16); color: #ffd27a;
+    font-size: 11px; font-weight: 700;
+  }
+  .node-dot {
+    position: absolute; top: 50%; width: 11px; height: 11px; border-radius: 50%;
+    background: #a77ac7; box-shadow: 0 0 0 4px rgba(167, 122, 199, 0.2);
+    translate: 0 -50%;
+  }
+  .journey li[data-side="left"] .node-dot { right: -22px; }
+  .journey li[data-side="right"] .node-dot { left: -22px; }
+  .node[data-milestone="true"] .node-dot { background: #ffd27a; width: 14px; height: 14px; box-shadow: 0 0 0 5px rgba(255, 210, 122, 0.18); }
+
+  .journey-today {
+    width: 100%; display: flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 700; color: var(--world-accent);
+  }
+  .journey-today::before, .journey-today::after {
+    content: ''; flex: 1; height: 1px; background: var(--world-border);
+  }
+
+  /* ── Єдина кнопка дії ──────────────────────────────────── */
+
+  .fab {
+    position: absolute; z-index: 4; right: 16px; bottom: 108px;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 12px 18px; border: 1px solid rgba(220, 182, 245, 0.4);
+    border-radius: 999px;
+    background: linear-gradient(140deg, rgba(201, 160, 230, 0.92), rgba(150, 95, 189, 0.92));
+    color: #1b1226; font: inherit; font-size: 14px; font-weight: 800;
+    box-shadow: 0 12px 28px rgba(9, 6, 16, 0.5);
+    cursor: pointer;
+  }
+  .fab:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 3px; }
+
+  /* ── Док ───────────────────────────────────────────────── */
+
+  .dock {
+    position: absolute; z-index: 4; left: 14px; right: 14px; bottom: 16px;
+    display: flex; gap: 4px; padding: 8px;
+    border-radius: 26px; border: 1px solid var(--world-border);
+    background: rgba(30, 22, 46, 0.86);
+  }
+  .dock button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 9px 4px; border: 0; border-radius: 18px; background: none;
+    color: var(--world-text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+    transition: background 220ms ease, color 220ms ease;
+  }
+  .dock button[aria-current="page"] { background: rgba(201, 160, 230, 0.22); color: var(--world-accent); }
+  .dock button:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
+  .dock svg { width: 22px; height: 22px; fill: currentColor; }
+
+  /* ── Керування макетом ─────────────────────────────────── */
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .controls button {
+    padding: 9px 15px; border-radius: 999px; border: 1px solid var(--page-line);
+    background: var(--page-panel); color: var(--page-ink);
+    font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .controls button:hover { border-color: var(--page-accent); }
+  .controls button:focus-visible { outline: 2px solid var(--page-accent); outline-offset: 2px; }
+
+  /* ── Специфікація ──────────────────────────────────────── */
+
+  .spec { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+  .card {
+    border: 1px solid var(--page-line); border-radius: 16px;
+    background: var(--page-panel); padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 14px; color: var(--page-muted); }
+  ul.plain b { color: var(--page-ink); }
+  .flag { border-left: 3px solid var(--page-accent); padding-left: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .flag b { font-size: 14px; }
+  .flag p { font-size: 14px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: color-mix(in srgb, var(--page-accent) 10%, transparent); padding: 1px 5px; border-radius: 5px; color: var(--page-ink); }
+
+  .turns { display: flex; flex-direction: column; gap: 8px; }
+  .turn { display: grid; grid-template-columns: 118px minmax(0, 1fr) 54px; gap: 10px; align-items: center; font-size: 13px; }
+  .turn .rail { position: relative; height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--page-accent) 12%, transparent); }
+  .turn .pin { position: absolute; top: -3px; width: 16px; height: 16px; border-radius: 50%; background: var(--page-accent); }
+  .turn .deg { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--page-muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .world { transition-duration: 1ms; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">Шаблон модуля · Amore</span>
+    <h1>Плани і Календар стають одним модулем</h1>
+    <p>
+      Дві вкладки замість двох модулів: «Події» — це «Наш шлях» із календаря,
+      «Календар» — місяць, під ним плани плитками. Одна кнопка дії. Кристал
+      робить чверть від чверті — 45° між головною і планами, ще 45° до вішліста.
+    </p>
+  </header>
+
+  <div class="split">
+    <section class="device-col">
+      <div class="device-fit">
+        <div class="phone" id="phone">
+          <div class="screen">
+            <div class="backdrop">
+              <div class="hall"></div>
+              <div class="stage"><div class="world" id="world"><div class="prism" id="prism"></div></div></div>
+            </div>
+            <div class="wash"></div>
+
+            <div class="tabs" role="tablist" aria-label="Розділи планів">
+              <button type="button" class="tab" role="tab" id="tab-events" aria-selected="false" aria-controls="panel-events">
+                Події <span class="count" id="count-events">0</span>
+              </button>
+              <button type="button" class="tab" role="tab" id="tab-calendar" aria-selected="true" aria-controls="panel-calendar">
+                Календар <span class="count" id="count-plans">0</span>
+              </button>
+            </div>
+
+            <div class="sheet" id="panel-calendar" role="tabpanel" aria-labelledby="tab-calendar">
+              <div class="glass-card month">
+                <div class="month-head">
+                  <span class="month-title" id="month-title">серпень 2026</span>
+                  <span class="month-nav">
+                    <button type="button" id="prev-month" aria-label="Попередній місяць">‹</button>
+                    <button type="button" id="today" aria-label="Сьогодні">•</button>
+                    <button type="button" id="next-month" aria-label="Наступний місяць">›</button>
+                  </span>
+                </div>
+                <div class="weekdays" aria-hidden="true">
+                  <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>нд</span>
+                </div>
+                <div class="days" id="days"></div>
+                <div class="legend">
+                  <span><i class="dot" data-kind="event"></i> подія</span>
+                  <span><i class="dot" data-kind="milestone"></i> віха</span>
+                  <span><i class="dot" data-kind="birthday"></i> день народження</span>
+                  <span><i class="dot" data-kind="plan"></i> план</span>
+                </div>
+              </div>
+
+              <div class="glass-card day-focus" id="day-focus"></div>
+
+              <div class="section-head">
+                <h3>Найближчі плани</h3>
+                <span id="plans-note"></span>
+              </div>
+              <div class="tiles" id="tiles-upcoming"></div>
+
+              <div class="section-head">
+                <h3>Ідеї без дати</h3>
+                <span>колись</span>
+              </div>
+              <div class="tiles" id="tiles-ideas"></div>
+
+              <div class="section-head">
+                <h3>Завершені</h3>
+                <span id="closed-note"></span>
+              </div>
+              <div class="tiles" id="tiles-closed"></div>
+            </div>
+
+            <div class="sheet" id="panel-events" role="tabpanel" aria-labelledby="tab-events" hidden>
+              <div class="journey" id="journey-box">
+                <svg id="journey-path" aria-hidden="true" preserveAspectRatio="none"></svg>
+                <ol id="journey"></ol>
+              </div>
+            </div>
+
+            <button type="button" class="fab" id="fab">+ План</button>
+
+            <nav class="dock">
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7h-2.2A3 3 0 0 0 12 4.4 3 3 0 0 0 6.2 7H4a1 1 0 0 0-1 1v3h18V8a1 1 0 0 0-1-1Zm-6 0h-1V6a1 1 0 1 1 1 1Zm-4 0a1 1 0 1 1 1-1v1ZM4 13v6a1 1 0 0 0 1 1h6v-7Zm9 7h6a1 1 0 0 0 1-1v-6h-7Z"/></svg>
+                Вішлист
+              </button>
+              <button type="button" aria-current="page">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h11v2H4Zm0 6h11v2H4Zm0 6h11v2H4Zm14.3-11.7 1.4 1.4-3.5 3.5-2.2-2.2 1.4-1.4.8.8Zm0 6 1.4 1.4-3.5 3.5-2.2-2.2 1.4-1.4.8.8Z"/></svg>
+                Плани
+              </button>
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13Z"/></svg>
+                Головна
+              </button>
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6h14l-1.6 8H7.4L6 6Zm0 0-.5-2H3v2h1.2ZM8 21a1.6 1.6 0 1 1 0-3.2A1.6 1.6 0 0 1 8 21Zm9 0a1.6 1.6 0 1 1 0-3.2A1.6 1.6 0 0 1 17 21Z"/></svg>
+                Покупки
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button type="button" data-turn="0">Головна · 0°</button>
+        <button type="button" data-turn="-45" aria-pressed="true">Плани · 45°</button>
+        <button type="button" data-turn="-90">Вішлист · 90°</button>
+      </div>
+    </section>
+
+    <section class="spec">
+      <div class="card">
+        <h2>Оберт: 0 → 45 → 90</h2>
+        <p>Кожен модуль на своєму місці навколо артефакта, і сусіди стоять поруч. Кнопки над телефоном крутять кристал.</p>
+        <div class="turns">
+          <div class="turn"><span>Головна</span><span class="rail"><i class="pin" style="left:0"></i></span><span class="deg">0°</span></div>
+          <div class="turn"><span>Плани</span><span class="rail"><i class="pin" style="left:50%"></i></span><span class="deg">45°</span></div>
+          <div class="turn"><span>Вішлист</span><span class="rail"><i class="pin" style="left:calc(100% - 16px)"></i></span><span class="deg">90°</span></div>
+        </div>
+        <p>Напрямок один — камера йде праворуч, кристал відходить ліворуч. З планів у вішліст це ще 45°, а не поворот назад.</p>
+      </div>
+
+      <div class="card">
+        <h2>Що куди поділось</h2>
+        <ul class="plain">
+          <li><b>«Наші свята» + «Наш шлях» → вкладка «Події».</b> Стежка з вузлами лишається як є; віхи (<code>is_milestone</code>) важчі за звичайні моменти. Саме ці події живлять кристал.</li>
+          <li><b>Місяць, рік і список → вкладка «Календар».</b> Першим бачиш місяць; під ним плани плитками у два стовпці.</li>
+          <li><b>Вкладка «Дні народження» зникає.</b> Самі дні народження лишаються подіями й показуються в сітці зеленою міткою — просто окремого списку під них більше немає.</li>
+          <li><b>Перемикач виглядів (список / місяць / рік) зникає.</b> Дві вкладки нагорі і є перемикачем; третій поверх перемикачів був би тим самим, чим у вішлісті була панель фільтрів.</li>
+          <li><b>Одна кнопка дії.</b> «+ План» унизу праворуч. Подію додають дотиком по дню в сітці або по стежці у «Подіях» — там, де вона й з'явиться.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Чого я не міняв</h2>
+        <ul class="plain">
+          <li>Картка плану, її сторінка, задачі, гроші, посилання й спогади — усе лишається, плитка веде туди ж, куди вела картка.</li>
+          <li>Категорії планів і їхні кольори — з <code>planConstants.ts</code>, ті самі одинадцять.</li>
+          <li>Запити, мутації й типи подій. Об'єднання — це маршрут і композиція, а не дані.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Три речі, які варто вирішити до роботи</h2>
+        <div class="flag">
+          <b>Скріна я не бачив.</b>
+          <p>«Наш шлях» тут відтворений із коду <code>RelationshipJourney.tsx</code> — звивиста стежка, вузли по черзі ліворуч і праворуч, віхи більші. Якщо на вашому скріні він інакший, поправлю за ним.</p>
+        </div>
+        <div class="flag">
+          <b>Що робити зі старим маршрутом <code>/calendar</code>.</b>
+          <p>Пропоную лишити його як перенаправлення на <code>/plans</code>: посилання зі сповіщень і закладки не мають вести в порожнечу. Сам пункт із меню зникає.</p>
+        </div>
+        <div class="flag">
+          <b>Дні народження в базі лишаються.</b>
+          <p>Зникає вкладка, а не дані: рядки <code>type='birthday'</code> живуть далі й видно їх у сітці. Видаляти їх я не буду без окремого слова — це чужі дати, і повернути їх буде нізвідки.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Що тут несправжнє</h2>
+        <ul class="plain">
+          <li>Кристал намальований CSS-гранями; у порталі це Three.js, і оберт веде директор сцени експонентою.</li>
+          <li>Плани й події вигадані — я не знаю ваших. Місяць справжній: сітка будується з сьогоднішньої дати.</li>
+          <li>Шрифт системний: артефакт не має права тягнути шрифти ззовні. У порталі — Nunito й Fredoka.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Дані макета. Місяць справжній — сітка будується з поточної дати, щоб було
+  // видно, як лягають вихідні й «сьогодні».
+  // ============================================================
+  const CATEGORY = {
+    date: { label: 'Побачення', color: '#FF6B9D' },
+    trip: { label: 'Подорож', color: '#5BA3D9' },
+    ride: { label: 'Поїздка', color: '#6FB1C4' },
+    place: { label: 'Місце', color: '#7EC8A9' },
+    event: { label: 'Захід', color: '#D9A441' },
+    activity: { label: 'Активність', color: '#E8829C' },
+    rest: { label: 'Відпочинок', color: '#B98A9A' },
+    holiday: { label: 'Свято', color: '#C9922F' },
+    learning: { label: 'Навчання', color: '#9B6EA8' },
+    home: { label: 'Для дому', color: '#8A9BB8' },
+    other: { label: 'Інше', color: '#A08D97' },
+  };
+
+  const today = new Date();
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const shift = (days) => { const d = new Date(today); d.setDate(d.getDate() + days); return iso(d); };
+
+  const PLANS = [
+    { title: 'Вихідні у Карпатах', category: 'trip', date: shift(9), closed: false },
+    { title: 'Вечеря на річницю', category: 'date', date: shift(3), closed: false },
+    { title: 'Концерт у Львові', category: 'event', date: shift(21), closed: false },
+    { title: 'Полиця в спальню', category: 'home', date: shift(14), closed: false },
+    { title: 'Курс італійської', category: 'learning', date: null, closed: false },
+    { title: 'Сплав Дністром', category: 'activity', date: null, closed: false },
+    { title: 'Ніч у стеклянному домі', category: 'rest', date: null, closed: false },
+    { title: 'Пікнік на Трухановому', category: 'place', date: shift(-6), closed: true },
+    { title: 'Кіно просто неба', category: 'event', date: shift(-19), closed: true },
+  ];
+
+  const EVENTS = [
+    { title: 'Познайомились', date: '2022-12-26', milestone: true, type: 'anniversary' },
+    { title: 'Перша подорож удвох', date: '2023-05-14', milestone: false, type: 'anniversary' },
+    { title: 'Переїхали разом', date: '2024-02-01', milestone: true, type: 'anniversary' },
+    { title: 'Рік у новій квартирі', date: '2025-02-01', milestone: false, type: 'anniversary' },
+    { title: 'Заручини', date: shift(-40), milestone: true, type: 'anniversary' },
+    { title: 'Річниця', date: shift(5), milestone: true, type: 'anniversary' },
+    { title: 'День народження Лєни', date: shift(11), milestone: false, type: 'birthday' },
+    { title: 'День народження Діми', date: shift(-2), milestone: false, type: 'birthday' },
+  ];
+
+  const MONTHS = ['січень','лютий','березень','квітень','травень','червень','липень','серпень','вересень','жовтень','листопад','грудень'];
+
+  let cursor = { year: today.getFullYear(), month: today.getMonth() };
+  let picked = iso(today);
+
+  const $ = (id) => document.getElementById(id);
+
+  function marksFor(date) {
+    const marks = [];
+    for (const event of EVENTS) {
+      if (event.date !== date) continue;
+      marks.push({ kind: event.type === 'birthday' ? 'birthday' : (event.milestone ? 'milestone' : 'event'), title: event.title });
+    }
+    for (const plan of PLANS) {
+      if (plan.date !== date) continue;
+      marks.push({ kind: 'plan', title: plan.title, color: CATEGORY[plan.category].color });
+    }
+    return marks;
+  }
+
+  function drawMonth() {
+    $('month-title').textContent = `${MONTHS[cursor.month]} ${cursor.year}`;
+    const first = new Date(cursor.year, cursor.month, 1);
+    // Тиждень починається з понеділка — так само, як у порталі.
+    const lead = (first.getDay() + 6) % 7;
+    const start = new Date(cursor.year, cursor.month, 1 - lead);
+
+    const cells = [];
+    for (let index = 0; index < 42; index += 1) {
+      const day = new Date(start);
+      day.setDate(start.getDate() + index);
+      const key = iso(day);
+      const marks = marksFor(key).slice(0, 4);
+      cells.push(`
+        <button type="button" class="day"
+          data-date="${key}"
+          data-out="${day.getMonth() !== cursor.month}"
+          data-today="${key === iso(today)}"
+          aria-pressed="${key === picked}">
+          <span>${day.getDate()}</span>
+          <span class="dots">${marks.map((m) => `<i class="dot" data-kind="${m.kind}"${m.color ? ` style="--plan-color:${m.color}"` : ''}></i>`).join('')}</span>
+        </button>`);
+      if (index >= 34 && day.getMonth() !== cursor.month) break;
+    }
+    $('days').innerHTML = cells.join('');
+    for (const button of $('days').children) {
+      button.addEventListener('click', () => { picked = button.dataset.date; drawMonth(); drawFocus(); });
+    }
+  }
+
+  function humanDate(key) {
+    return new Date(`${key}T00:00:00`).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' });
+  }
+
+  function drawFocus() {
+    const marks = marksFor(picked);
+    $('day-focus').innerHTML = `
+      <h3>${humanDate(picked)}</h3>
+      ${marks.length === 0
+        ? '<p class="empty">Нічого не заплановано. Дотик по дню відкриє «+ подія».</p>'
+        : `<ul>${marks.map((m) => `<li><i class="dot" data-kind="${m.kind}"${m.color ? ` style="--plan-color:${m.color}"` : ''}></i>${m.title}</li>`).join('')}</ul>`}
+    `;
+  }
+
+  function tile(plan) {
+    const cat = CATEGORY[plan.category];
+    const when = plan.date === null
+      ? 'без дати'
+      : new Date(`${plan.date}T00:00:00`).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' });
+    return `
+      <button type="button" class="tile" style="--plan-color:${cat.color}" data-idea="${plan.date === null}">
+        <span class="tile-cat">${cat.label}</span>
+        <span class="tile-title">${plan.title}</span>
+        <span class="tile-when">${when}</span>
+      </button>`;
+  }
+
+  function drawPlans() {
+    const active = PLANS.filter((p) => !p.closed);
+    const upcoming = active.filter((p) => p.date !== null).sort((a, b) => a.date.localeCompare(b.date));
+    const ideas = active.filter((p) => p.date === null);
+    const closed = PLANS.filter((p) => p.closed);
+    $('tiles-upcoming').innerHTML = upcoming.map(tile).join('');
+    $('tiles-ideas').innerHTML = ideas.map(tile).join('');
+    $('tiles-closed').innerHTML = closed.map(tile).join('');
+    $('plans-note').textContent = `${upcoming.length} з датою`;
+    $('closed-note').textContent = `${closed.length}`;
+    $('count-plans').textContent = String(active.length);
+  }
+
+  function drawJourney() {
+    const sorted = EVENTS.filter((e) => e.type === 'anniversary').sort((a, b) => a.date.localeCompare(b.date));
+    const now = iso(today);
+    let markerPlaced = false;
+    let side = 0;
+    const rows = sorted.map((event) => {
+      const marker = !markerPlaced && event.date > now
+        ? (markerPlaced = true, '<li class="today-row"><span class="journey-today">сьогодні</span></li>')
+        : '';
+      // Бік чергується по ВУЗЛАХ, а не по рядках: мітка «сьогодні» — теж
+      // рядок, і без цього вона перевертала б усе, що після неї.
+      const at = side++ % 2 === 0 ? 'left' : 'right';
+      return `${marker}<li data-side="${at}">
+        <span class="node" data-milestone="${event.milestone}">
+          <span class="node-dot"></span>
+          <span class="node-date">${new Date(`${event.date}T00:00:00`).toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+          <span class="node-title">${event.title}</span>
+          ${event.milestone ? '<span class="node-badge">віха · росте кристал</span>' : ''}
+        </span>
+      </li>`;
+    });
+    $('journey').innerHTML = rows.join('');
+    $('count-events').textContent = String(sorted.length);
+    drawJourneyPath();
+  }
+
+  /** Крива крізь центри вузлів — по факту розкладки, а не за формулою. */
+  function drawJourneyPath() {
+    const box = $('journey-box').getBoundingClientRect();
+    const dots = Array.from(document.querySelectorAll('#journey .node-dot')).map((node) => {
+      const b = node.getBoundingClientRect();
+      return { x: b.x + b.width / 2 - box.x, y: b.y + b.height / 2 - box.y };
+    });
+    if (dots.length === 0 || box.height < 1) return;
+
+    const points = [{ x: box.width / 2, y: 0 }, ...dots, { x: box.width / 2, y: box.height }];
+    let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+    for (let index = 1; index < points.length; index += 1) {
+      const from = points[index - 1];
+      const to = points[index];
+      const middle = (from.y + to.y) / 2;
+      d += ` C ${from.x.toFixed(1)} ${middle.toFixed(1)}, ${to.x.toFixed(1)} ${middle.toFixed(1)}, ${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
+    }
+    const svg = $('journey-path');
+    svg.setAttribute('viewBox', `0 0 ${box.width.toFixed(1)} ${box.height.toFixed(1)}`);
+    svg.innerHTML = `<path d="${d}" fill="none" stroke="rgba(201,160,230,0.34)" stroke-width="2" stroke-linecap="round" stroke-dasharray="1 7" />`;
+  }
+
+  // ── Вкладки ─────────────────────────────────────────────
+  function showTab(name) {
+    for (const key of ['events', 'calendar']) {
+      const selected = key === name;
+      $(`tab-${key}`).setAttribute('aria-selected', String(selected));
+      $(`panel-${key}`).hidden = !selected;
+    }
+    // Кнопка дії йде за вкладкою: у «Подіях» додають подію, а не план.
+    $('fab').textContent = name === 'events' ? '+ Подія' : '+ План';
+  }
+  $('tab-events').addEventListener('click', () => { showTab('events'); drawJourneyPath(); });
+  $('tab-calendar').addEventListener('click', () => showTab('calendar'));
+
+  $('prev-month').addEventListener('click', () => {
+    cursor = cursor.month === 0 ? { year: cursor.year - 1, month: 11 } : { year: cursor.year, month: cursor.month - 1 };
+    drawMonth();
+  });
+  $('next-month').addEventListener('click', () => {
+    cursor = cursor.month === 11 ? { year: cursor.year + 1, month: 0 } : { year: cursor.year, month: cursor.month + 1 };
+    drawMonth();
+  });
+  $('today').addEventListener('click', () => {
+    cursor = { year: today.getFullYear(), month: today.getMonth() };
+    picked = iso(today);
+    drawMonth(); drawFocus();
+  });
+
+  // ── Кристал ─────────────────────────────────────────────
+  (function buildCrystal() {
+    let html = '';
+    for (let i = 0; i < 6; i += 1) html += `<div class="facet" style="--a:${i * 60}deg"></div>`;
+    for (let i = 0; i < 6; i += 1) html += `<div class="tip" style="--a:${i * 60}deg"></div>`;
+    for (const [a, h, z] of [[28, 96, 74], [96, 74, 78], [188, 110, 70], [268, 64, 80], [330, 86, 72]]) {
+      for (let k = 0; k < 3; k += 1) {
+        html += `<div class="shard" style="height:${h}px;top:${-h}px;transform:rotateY(${a}deg) translateZ(${z}px) rotateY(${k * 60}deg)"></div>`;
+      }
+    }
+    $('prism').innerHTML = html;
+  })();
+
+  for (const button of document.querySelectorAll('.controls button')) {
+    button.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('.controls button')) other.removeAttribute('aria-pressed');
+      button.setAttribute('aria-pressed', 'true');
+      $('world').style.setProperty('--turn', `${button.dataset.turn}deg`);
+    });
+  }
+
+  // ── Телефон вписується у вікно ──────────────────────────
+  function fit() {
+    const holder = $('phone').parentElement;
+    const scale = Math.min(1, holder.clientWidth / 412, (window.innerHeight - 190) / 915);
+    $('phone').style.transform = `scale(${scale.toFixed(3)})`;
+    holder.style.height = `${915 * scale}px`;
+  }
+  window.addEventListener('resize', () => { fit(); drawJourneyPath(); });
+
+  drawMonth();
+  drawFocus();
+  drawPlans();
+  drawJourney();
+  showTab('calendar');
+  $('world').style.setProperty('--turn', '-45deg');
+  fit();
+</script>
