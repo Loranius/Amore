@@ -11,7 +11,7 @@ async function enterPin(page: Page, pin: string) {
 }
 
 test.describe('Plans mobile visual preview', () => {
-  test('captures the approved Plans widget system', async ({ page }, testInfo) => {
+  test('captures the current unified Plans module', async ({ page }, testInfo) => {
     if (!visualUserName || !visualUserPin) {
       testInfo.annotations.push({
         type: 'notice',
@@ -28,63 +28,51 @@ test.describe('Plans mobile visual preview', () => {
     await page.waitForURL(/#\/?$/, { timeout: 20_000 });
     await page.goto('./#/plans', { waitUntil: 'networkidle' });
 
-    const overview = page.locator('.plans-overview');
-    await expect(overview).toBeVisible();
-    await page.waitForTimeout(1_200);
+    const module = page.locator('.plans-module');
+    await expect(module).toBeVisible();
+    await expect(module).toHaveAttribute('data-section', 'calendar');
 
-    const addButton = page.locator('.plans-overview-add');
+    const tabs = page.getByRole('tablist', { name: 'Розділи планів' });
+    await expect(tabs.getByRole('tab', { name: /Календар/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(tabs.getByRole('tab', { name: /Події/ })).toBeVisible();
+
+    // The old overview/featured/upcoming widget system was removed when Plans
+    // and Calendar were unified. The month surface is now the primary module.
+    await expect(page.locator('.pm-sheet')).toBeVisible();
+    await expect(page.locator('.cal-month')).toBeVisible();
+
+    const addButton = page.locator('.pm-fab');
     await expect(addButton).toBeVisible();
     const addBox = await addButton.boundingBox();
     expect(addBox).not.toBeNull();
-    expect(addBox!.width).toBeLessThanOrEqual(56);
-    expect(addBox!.height).toBeLessThanOrEqual(56);
+    if (addBox) {
+      const viewport = page.viewportSize();
+      expect(viewport).not.toBeNull();
+      expect(addBox.x).toBeGreaterThanOrEqual(-1);
+      expect(addBox.x + addBox.width).toBeLessThanOrEqual((viewport?.width ?? 0) + 1);
+    }
 
     await page.screenshot({
       path: testInfo.outputPath('plans-mobile-full.png'),
       fullPage: true,
     });
 
-    const featured = page.locator('.plans-featured-card');
-    if (await featured.count()) {
-      await featured.screenshot({ path: testInfo.outputPath('plans-nearest-widget.png') });
-    }
-
-    const upcoming = page.locator('.plans-upcoming-grid');
-    if (await upcoming.count()) {
-      await upcoming.screenshot({ path: testInfo.outputPath('plans-upcoming-three.png') });
-    }
-
-    const ideas = page.locator('.plans-idea-rail');
-    if (await ideas.count()) {
-      await ideas.screenshot({ path: testInfo.outputPath('plans-undated-ideas.png') });
-    }
-
+    // Calendar's single CTA first asks whether the user wants a Plan or an
+    // Event. This chooser is part of the approved current interaction model.
     await addButton.click();
     const createSheet = page.locator('.plan-create-sheet');
     await expect(createSheet).toBeVisible();
+    await expect(createSheet.getByRole('heading', { name: 'Що створюємо?' })).toBeVisible();
+    await createSheet.screenshot({ path: testInfo.outputPath('plans-create-chooser.png') });
+
+    await createSheet.getByRole('button', { name: /^План\b/ }).click();
+    await expect(createSheet.getByRole('heading', { name: 'Що хочете зробити разом?' })).toBeVisible();
+
     await createSheet.getByRole('button', { name: /Обкладинка плану/ }).click();
     await expect(createSheet.locator('.plan-create-photo-picker')).toBeVisible();
     await createSheet.screenshot({ path: testInfo.outputPath('plan-create-photo-picker.png') });
+
     await createSheet.getByRole('button', { name: 'Скасувати' }).click();
     await expect(createSheet).toBeHidden();
-
-    if (await featured.count()) {
-      await featured.first().click();
-      await expect(page.locator('.plan-detail-page')).toBeVisible();
-
-      const related = page.locator('details.plan-disclosure').filter({ hasText: 'Пов’язане' }).first();
-      if (await related.count()) {
-        if ((await related.getAttribute('open')) === null) {
-          await related.locator('summary').click();
-        }
-
-        const tiles = related.locator('.plan-link-grid');
-        if (await tiles.count()) {
-          await expect(tiles).toBeVisible();
-          await page.waitForTimeout(900);
-          await related.screenshot({ path: testInfo.outputPath('plan-related-photo-tiles.png') });
-        }
-      }
-    }
   });
 });
