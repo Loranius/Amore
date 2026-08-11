@@ -455,16 +455,6 @@ export function WishlistPage() {
 
       {worldVisible && (
         <WishlistWorldNav
-          tab={tab}
-          onTabChange={changeTab}
-          tabLabels={{ me: 'Мої', partner: partnerGenitive(partner.name), shared: 'Спільні' }}
-          tabCounts={{
-            me: ownQuery.isPending || ownQuery.isError ? null : ownItems.length,
-            partner: partnerWishlistQuery.isPending || partnerWishlistQuery.isError
-              ? null
-              : partnerItems.length,
-            shared: sharedQuery.isPending || sharedQuery.isError ? null : sharedItems.length,
-          }}
           archiveOpen={archiveOpen}
           onArchiveChange={setArchiveOpen}
           archiveAvailable={canShowArchive}

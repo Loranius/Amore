@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type { WishlistViewMode } from './wishlistBoardView';
 
 // ============================================================
@@ -9,18 +9,20 @@ import type { WishlistViewMode } from './wishlistBoardView';
 // вкладки, «Виконані» й фільтр ваги більше не стоять поверх кристалів
 // постійно — вони живуть тут і з'являються на вимогу.
 //
-// Свайп по вільній області — тільки скорочення, не єдиний шлях: усе, що він
-// робить, є в аркуші кнопками (§48 — жодної дії лише через жест).
+// **Свайпу між вкладками тут більше немає, і не через смак.** Він слухав
+// `pointerdown` на вікні й виключав лише навігацію та аркуші, тож тягнення
+// кулі бажання проходило повз фільтр: проводиш пальцем по бажанню зліва
+// направо — і замість того, щоб штовхнути кулю, портал відкриває сусідню
+// вкладку. Двох власників одного горизонтального жесту на одному екрані бути
+// не може, а куля — це те, з чим справді граються.
+//
+// Вкладки перемикаються кнопками вгорі; §48 і так вимагав, щоб жодна дія не
+// існувала лише через жест, тож нічого не втрачено.
 // ============================================================
 
 export type WishlistWorldTab = 'me' | 'partner' | 'shared';
 
 export interface WishlistWorldNavProps {
-  tab: WishlistWorldTab;
-  onTabChange: (tab: WishlistWorldTab) => void;
-  /** Підписи вкладок: «Мої», ім'я партнера в родовому, «Спільні». */
-  tabLabels: Readonly<Record<WishlistWorldTab, string>>;
-  tabCounts: Readonly<Record<WishlistWorldTab, number | null>>;
   /** Виконані бажання замість активних. */
   archiveOpen: boolean;
   onArchiveChange: (open: boolean) => void;
@@ -46,11 +48,6 @@ const VIEWS: readonly { value: WishlistViewMode; label: string }[] = [
   { value: 'polaroid', label: 'Полароїд' },
 ];
 
-const TAB_ORDER: readonly WishlistWorldTab[] = ['me', 'partner', 'shared'];
-
-/** Скільки живе підпис після свайпу. */
-const HINT_MS = 1400;
-
 /**
  * Три пластини, а не гамбургер.
  *
@@ -68,10 +65,6 @@ function LayersIcon() {
 }
 
 export function WishlistWorldNav({
-  tab,
-  onTabChange,
-  tabLabels,
-  tabCounts,
   archiveOpen,
   onArchiveChange,
   archiveAvailable,
@@ -81,71 +74,9 @@ export function WishlistWorldNav({
   busy,
 }: WishlistWorldNavProps) {
   const [open, setOpen] = useState(false);
-  const [hint, setHint] = useState<string | null>(null);
-  const hintTimer = useRef<number | null>(null);
-
-  const showHint = useCallback((next: WishlistWorldTab) => {
-    const count = tabCounts[next];
-    const noun = count === null
-      ? ''
-      : ` · ${count} ${count === 1 ? 'бажання' : count < 5 ? 'бажання' : 'бажань'}`;
-    setHint(`${tabLabels[next]}${noun}`);
-    if (hintTimer.current !== null) window.clearTimeout(hintTimer.current);
-    hintTimer.current = window.setTimeout(() => setHint(null), HINT_MS);
-  }, [tabCounts, tabLabels]);
-
-  useEffect(() => () => {
-    if (hintTimer.current !== null) window.clearTimeout(hintTimer.current);
-  }, []);
-
-  // Свайп по вільній області сцени. Слухається на вікні, а не на самій
-  // сцені: полотно живе в іншому шарі DOM, і вішати на нього обробники
-  // означало б тягти вішліст у шар світу.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    let startX = 0;
-    let startY = 0;
-    let tracking = false;
-
-    const onStart = (event: PointerEvent) => {
-      const target = event.target as HTMLElement | null;
-      // Тільки вільна область: над кнопками, аркушем і навігацією свайп
-      // нічого не перемикає.
-      if (target?.closest('.wl-world-nav, .bottom-nav, .modal-overlay, .wl-cloud-sheet-overlay')) return;
-      tracking = true;
-      startX = event.clientX;
-      startY = event.clientY;
-    };
-
-    const onEnd = (event: PointerEvent) => {
-      if (!tracking) return;
-      tracking = false;
-      const dx = event.clientX - startX;
-      const dy = event.clientY - startY;
-      // Горизонтальний і достатній: інакше це обертання кристала або скрол.
-      if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-      const index = TAB_ORDER.indexOf(tab);
-      const next = TAB_ORDER[Math.min(TAB_ORDER.length - 1, Math.max(0, index + (dx < 0 ? 1 : -1)))];
-      if (next === undefined || next === tab) return;
-      onTabChange(next);
-      showHint(next);
-    };
-
-    window.addEventListener('pointerdown', onStart, { passive: true });
-    window.addEventListener('pointerup', onEnd, { passive: true });
-    window.addEventListener('pointercancel', () => { tracking = false; }, { passive: true });
-    return () => {
-      window.removeEventListener('pointerdown', onStart);
-      window.removeEventListener('pointerup', onEnd);
-    };
-  }, [tab, onTabChange, showHint]);
 
   return (
     <div className="wl-world-nav">
-      {hint !== null && (
-        <p className="wl-world-hint" role="status" aria-live="polite">{hint}</p>
-      )}
-
       <button
         type="button"
         className="wl-world-nav-toggle"

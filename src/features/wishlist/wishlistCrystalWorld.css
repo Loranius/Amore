@@ -121,30 +121,6 @@
   outline-offset: 3px;
 }
 
-/* Підпис після свайпу: живе ~1.4 с і не ловить дотиків. */
-[data-portal-scene='true'] .wishlist .wl-world-hint {
-  position: absolute;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 150px);
-  margin: 0;
-  padding: 8px 16px;
-  transform: translateX(-50%);
-  border: 1px solid var(--world-border);
-  border-radius: var(--radius-pill);
-  background: var(--world-surface);
-  color: var(--world-text);
-  font-size: 14px;
-  font-weight: 700;
-  white-space: nowrap;
-  box-shadow: 0 8px 20px var(--world-shadow);
-  animation: wl-world-hint-in 220ms ease both;
-}
-
-@keyframes wl-world-hint-in {
-  from { opacity: 0; transform: translate(-50%, 6px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-
 /* Підкладка притемнює, а не зафарбовує: кристали видно за аркушем. */
 [data-portal-scene='true'] .wishlist .wl-world-scrim {
   position: absolute;
@@ -267,8 +243,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-portal-scene='true'] .wishlist .wl-world-sheet,
-  [data-portal-scene='true'] .wishlist .wl-world-hint {
+  [data-portal-scene='true'] .wishlist .wl-world-sheet {
     animation: none;
   }
 }
