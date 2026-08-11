@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 
@@ -40,7 +40,7 @@ export function ReefStage({
   children,
 }: {
   reducedMotion: boolean;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   const size = useThree((state) => state.size);
   const aspect = size.height > 0 ? size.width / size.height : 1;
@@ -120,7 +120,7 @@ export function ReefStage({
 function ReefCameraPlacement({ distance }: { distance: number }) {
   const camera = useThree((state) => state.camera);
 
-  useMemo(() => {
+  useEffect(() => {
     camera.position.set(0, 2.65, distance);
     camera.lookAt(0, 0.85, 0);
     camera.updateProjectionMatrix();
