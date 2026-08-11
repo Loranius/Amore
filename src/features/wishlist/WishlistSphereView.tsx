@@ -7,6 +7,7 @@ import {
   type WishSphereQuality,
   type WishSpherePlacement,
 } from './wishSphereField';
+import { useWishSphereBilliards, type WishSphereBilliards } from './useWishSphereBilliards';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistSpheres.css';
 
@@ -45,6 +46,12 @@ export interface WishlistSphereViewProps {
   onShowAll?: () => void;
 }
 
+/** Вага мрії з рядка бази — саме вона вирішує розмір кулі. */
+function wishPriority(value: string | null): 'high' | 'medium' | 'low' | null {
+  if (value === 'high' || value === 'medium' || value === 'low') return value;
+  return null;
+}
+
 /**
  * Профіль пристрою для сфер.
  *
@@ -69,12 +76,6 @@ function readQuality(): WishSphereQuality {
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-/** Паралакс — лише там, де є справжній курсор: на телефоні його нічим вести. */
-function hasFinePointer(): boolean {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
-  return window.matchMedia('(pointer: fine)').matches;
 }
 
 /**
@@ -137,6 +138,7 @@ function WishSphere({
   openDetails,
   onOpenChange,
   still,
+  billiards,
 }: {
   item: WishlistItemV3;
   place: WishSpherePlacement;
@@ -146,6 +148,7 @@ function WishSphere({
   openDetails: () => void;
   onOpenChange: (id: number, open: boolean) => void;
   still: boolean;
+  billiards: WishSphereBilliards;
 }) {
   useEffect(() => {
     onOpenChange(item.id, detailsOpen);
@@ -167,17 +170,24 @@ function WishSphere({
       data-focused={focused ? 'true' : undefined}
       data-dimmed={dimmed ? 'true' : undefined}
       data-still={still ? 'true' : undefined}
+      ref={(node) => { billiards.register(item.id, node); }}
       style={{
-        '--sphere-x': `${place.x * 100}%`,
-        '--sphere-y': `${place.y * 100}%`,
+        // Положення сюди більше не пишеться: його щокадру ставить фізика
+        // (`useWishSphereBilliards`) одним рядком `transform`. Два власники
+        // одного стилю затирали б одне одного.
         '--sphere-size': `${place.diameter}px`,
         '--sphere-drift-x': `${place.driftX}px`,
         '--sphere-drift-y': `${place.driftY}px`,
         '--sphere-period': `${place.period}s`,
         '--sphere-phase': `-${place.phase}s`,
-        '--sphere-parallax': `${PARALLAX_BY_LAYER[place.layer]}`,
       } as React.CSSProperties}
-      onClick={openDetails}
+      onPointerDown={(event) => { billiards.onPointerDown(item.id, event); }}
+      onClick={() => {
+        // Кидок — не тап. Без цього кожен удар по кулі закінчувався б
+        // відкритою карткою, і грати було б неможливо.
+        if (billiards.wasThrown(item.id)) return;
+        openDetails();
+      }}
     >
       <span className="wl-sphere__body" aria-hidden="true">
         {photo === null ? (
@@ -275,7 +285,7 @@ export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphere
   const places = useMemo(() => {
     if (size.width === 0 || size.height === 0) return [];
     return buildWishSphereField({
-      subjects: shown.map((item) => ({ id: item.id })),
+      subjects: shown.map((item) => ({ id: item.id, priority: wishPriority(item.priority) })),
       field: size,
       quality,
       ...(keepOut === null ? {} : { keepOut }),
@@ -287,31 +297,19 @@ export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphere
     [places],
   );
 
+  // Інерція, зіткнення й перетягування. Власник попросив повернути те, що було
+  // в бульбашок: кулю можна штовхнути, і вона поводиться як куля.
+  const billiards = useWishSphereBilliards({
+    places,
+    size,
+    keepOut,
+    still,
+    parallaxByLayer: PARALLAX_BY_LAYER,
+  });
+
   const onOpenChange = useCallback((id: number, open: boolean) => {
     setFocused((current) => (open ? id : current === id ? null : current));
   }, []);
-
-  // Паралакс. Один rAF на все поле, дві CSS-змінні — не фізика й не по кулі.
-  useEffect(() => {
-    const node = field.current;
-    if (node === null || still || !hasFinePointer()) return;
-    let frame = 0;
-    const onMove = (event: PointerEvent) => {
-      if (frame !== 0) return;
-      frame = window.requestAnimationFrame(() => {
-        frame = 0;
-        const box = node.getBoundingClientRect();
-        if (box.width === 0 || box.height === 0) return;
-        node.style.setProperty('--field-tilt-x', String((event.clientX - box.left) / box.width - 0.5));
-        node.style.setProperty('--field-tilt-y', String((event.clientY - box.top) / box.height - 0.5));
-      });
-    };
-    window.addEventListener('pointermove', onMove, { passive: true });
-    return () => {
-      window.removeEventListener('pointermove', onMove);
-      if (frame !== 0) window.cancelAnimationFrame(frame);
-    };
-  }, [still]);
 
   const hidden = Math.max(0, shown.length - places.length);
 
@@ -350,6 +348,7 @@ export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphere
                 openDetails={openDetails}
                 onOpenChange={onOpenChange}
                 still={still}
+                billiards={billiards}
               />
             )}
           />

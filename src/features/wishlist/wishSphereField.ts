@@ -23,6 +23,14 @@ export type WishSphereLayer = 'far' | 'mid' | 'near';
 
 export interface WishSphereSubject {
   id: number;
+  /**
+   * Вага мрії. Вона й вирішує розмір кулі.
+   *
+   * Власник сформулював прямо: приємне — маленька куля, бажане — середня,
+   * жадане — велика. Шар глибини лишається, але тепер він лише відтінок:
+   * коли розмір означає дві різні речі одночасно, він не означає жодної.
+   */
+  priority?: 'high' | 'medium' | 'low' | null;
 }
 
 /** Розмір області, у якій живе сузір'я, у пікселях. */
@@ -107,16 +115,30 @@ export function monarchKeepOut(keepOut: WishSphereKeepOut, y: number): number {
 }
 
 /**
- * Глибина трьома шарами — делікатно.
+ * Вага мрії — головний множник розміру.
  *
- * Розкид тримається так, щоб і найдальша сфера лишалась у діапазоні, який
- * назвав власник: 44–64 px на телефоні. Перша редакція мала far 0.8 при
- * ширшій базі, і на живому порталі дальні сфери виходили по 38 px.
+ * Розкид 0.85 / 1.0 / 1.18 дає між крайніми відношення 1.39: різницю видно з
+ * першого погляду, але найлегше бажання не стає крихтою.
+ */
+const PRIORITY_SCALE: Readonly<Record<string, number>> = {
+  high: 1.18,
+  medium: 1,
+  low: 0.85,
+};
+const PRIORITY_DEFAULT = 1;
+
+/**
+ * Глибина трьома шарами — тепер справді делікатно.
+ *
+ * Було 0.86 / 1 / 1.12, і шар важив майже стільки ж, скільки має важити вага
+ * мрії. Відтоді як розмір означає пріоритет, глибина лишає собі ±5%: цього
+ * досить, щоб дальня куля читалась дальшою, і замало, щоб переплутати її з
+ * легшим бажанням.
  */
 const LAYER_SCALE: Readonly<Record<WishSphereLayer, number>> = {
-  far: 0.86,
+  far: 0.95,
   mid: 1,
-  near: 1.12,
+  near: 1.05,
 };
 
 /** Скільки місця сфера лишає навколо себе, у власних діаметрах. */
@@ -135,16 +157,19 @@ function layerOf(unit: number): WishSphereLayer {
 }
 
 /**
- * Базовий діаметр сфери в пікселях.
+ * Базовий діаметр сфери в пікселях — розмір «бажаного» на середньому шарі.
  *
- * Власник задав орієнтир прямо: 44–64 px на телефоні, і жодних куль по сто.
- * Тому це частка меншого боку поля, затиснута в межі — на планшеті сфери не
- * розростаються, на вузькому екрані не зникають.
+ * Піднято з 52–57: власник подивився на живий екран і сказав, що кулі надто
+ * дрібні. З вагою мрії (0.85…1.18) і глибиною (±5%) це дає приблизно від 47 px
+ * для приємного на дальньому шарі до 82 px для жаданого на ближньому.
+ *
+ * Стеля лишається: сто пікселів — це вже не бажання поруч із артефактом, а
+ * другий артефакт. Монарх має лишатись незрівнянно важливішим.
  */
 export function wishSphereBaseDiameter(field: WishSphereFieldSize): number {
   const width = Math.max(1, finite(field.width, 360));
   const height = Math.max(1, finite(field.height, 640));
-  return Math.min(57, Math.max(52, Math.min(width, height) * 0.135));
+  return Math.min(66, Math.max(58, Math.min(width, height) * 0.155));
 }
 
 export interface WishSphereFieldInput {
@@ -182,7 +207,8 @@ export function buildWishSphereField(
   for (const subject of subjects) {
     const random = mulberry32((Math.floor(finite(subject.id, 0)) >>> 0) ^ 0x9e3779b9);
     const layer = layerOf(random());
-    const diameter = base * LAYER_SCALE[layer];
+    const weight = subject.priority ? (PRIORITY_SCALE[subject.priority] ?? PRIORITY_DEFAULT) : PRIORITY_DEFAULT;
+    const diameter = base * weight * LAYER_SCALE[layer];
     // Півширина й піввисота сфери в частках поля — усе порівняння йде в них.
     const halfX = (diameter / 2) / width;
     const halfY = (diameter / 2) / height;

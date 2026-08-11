@@ -94,10 +94,16 @@ describe('wish sphere constellation', () => {
     }
   });
 
-  it('does not let two spheres overlap', () => {
-    // Дванадцять — реалістична повна дошка. На самій стелі (шістнадцять)
-    // розкладка радше стисне сусідів, ніж пустить сферу на монарха: силует
-    // — вимога, тіснота — компроміс.
+  it('never stacks two spheres in one place', () => {
+    // Змінена вимога. Раніше тут вимагалась повна відсутність дотику, і
+    // розкладка це тримала — поки кулі були дрібні. Відколи розмір означає
+    // вагу мрії, вони більші, і дванадцять великих куль у кадр без жодного
+    // дотику вже не завжди стають.
+    //
+    // Гарантію перебрала на себе фізика: `stepWishSpheres` розсовує будь-яке
+    // перекриття за частку секунди (див. `wishSphereMotion.test.ts`), і саме
+    // там вона тепер під тестом. Розкладці лишається не ставити двох в одну
+    // точку — інакше перший же кадр вистрілив би ними в різні боки.
     const board = buildWishSphereField({ ...PHONE, subjects: subjects(12) });
     for (const a of board) {
       for (const b of board) {
@@ -106,17 +112,38 @@ describe('wish sphere constellation', () => {
           (a.x - b.x) * PHONE.field.width,
           (a.y - b.y) * PHONE.field.height,
         );
-        expect(gap, `${a.id}~${b.id}`).toBeGreaterThan((a.diameter + b.diameter) / 2);
+        expect(gap, `${a.id}~${b.id}`).toBeGreaterThan(Math.max(a.diameter, b.diameter) / 2);
       }
     }
   });
 
-  it('stays small enough that the monarch outweighs it', () => {
-    // 44–64 px на телефоні — орієнтир власника, і «жодних куль по 100+».
-    const board = buildWishSphereField({ ...PHONE, subjects: subjects(12) });
+  it('sizes a sphere by how much the wish is wanted', () => {
+    // Вимога власника, сформульована прямо: приємне — маленька куля, бажане —
+    // середня, жадане — велика. Порівняння йде на одному й тому самому id,
+    // тобто на одному шарі глибини: інакше вимірювався б шар, а не вага.
+    const of = (priority: 'high' | 'medium' | 'low') =>
+      buildWishSphereField({ ...PHONE, subjects: [{ id: 7, priority }] })[0]!.diameter;
+    expect(of('high')).toBeGreaterThan(of('medium'));
+    expect(of('medium')).toBeGreaterThan(of('low'));
+    // Помітно з першого погляду, але найлегше бажання не стає крихтою.
+    expect(of('high') / of('low')).toBeGreaterThan(1.25);
+    expect(of('high') / of('low')).toBeLessThan(1.6);
+  });
+
+  it('is bigger than it was, and still smaller than the monarch', () => {
+    // Попередній діапазон 44–64 px власник подивився на живому екрані й сказав
+    // «занадто малий». Стеля лишається: сто пікселів — це вже не бажання
+    // поруч із артефактом, а другий артефакт.
+    const board = buildWishSphereField({
+      ...PHONE,
+      subjects: subjects(12).map((subject, index) => ({
+        ...subject,
+        priority: (['high', 'medium', 'low', null] as const)[index % 4]!,
+      })),
+    });
     for (const size of diameters(board)) {
-      expect(size).toBeGreaterThanOrEqual(44);
-      expect(size).toBeLessThanOrEqual(64);
+      expect(size).toBeGreaterThanOrEqual(46);
+      expect(size).toBeLessThanOrEqual(92);
     }
     // І на широкому екрані теж: розмір іде за меншим боком поля.
     const wide = buildWishSphereField({
@@ -124,7 +151,7 @@ describe('wish sphere constellation', () => {
       subjects: subjects(12),
       field: { width: 1600, height: 900 },
     });
-    for (const size of diameters(wide)) expect(size).toBeLessThanOrEqual(70);
+    for (const size of diameters(wide)) expect(size).toBeLessThanOrEqual(92);
   });
 
   it('spreads the wishes over three depth layers, delicately', () => {
