@@ -4,6 +4,13 @@
 
 - `CLAUDE.md`
 
+## Стан роботи
+
+- [Стан модулів Amore](docs/MODULE_STATUS.md) — що готове, що означає
+  «готове», і які вади знає CI
+- [Implementation Status](docs/IMPLEMENTATION_STATUS.md) — стан рушія
+  (Волюми I–VII)
+
 ## Governance
 
 - [AI Execution Requirements](docs/00_GOVERNANCE/AI_EXECUTION_REQUIREMENTS.md)

@@ -13,7 +13,8 @@ Before changing code:
 3. Read `docs/01_CONTRACTS/DETERMINISM_STANDARD.md` and `docs/01_CONTRACTS/TESTING_VALIDATION_STRATEGY.md`.
 4. Read the current volume in `docs/02_VOLUMES/` and its checklist in `docs/03_CHECKLISTS/`.
 5. For Amore crystal work, read `docs/01_CONTRACTS/CRYSTAL_ATTACHMENT_INTEGRITY_PROFILE.md`.
-6. Read every upstream volume contract used by the task.
+6. Before changing a product module, read `docs/MODULE_STATUS.md` — it states what each module's current state is, what "done" means, and which defects CI already knows about. Update it in the same change whenever a module's state changes; a status file nobody updates is worse than none.
+7. Read every upstream volume contract used by the task.
 
 Do not load every document without need. Read the index, then open only the relevant normative files.
 
