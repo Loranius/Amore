@@ -1,23 +1,20 @@
 // ============================================================
-// EvolutionTreePreviewScene — дерево в порталі, а не в рамці.
+// EvolutionTreePreviewScene — дерево у власному світі.
 // ------------------------------------------------------------
-// Дерево досі жило в TreeLabPreviewScene — власному вікні з бейджами
-// бюджету, окремою орбітою і власним фоном. Це була лабораторія, і як
-// лабораторія вона чесна: там видно кількість трикутників, статус
-// приймального тесту й джерело даних. Але власник дивиться не на
-// лабораторію, а на портал, і дерево там мусить стояти в тій самій залі,
-// що й кристал, — на тому ж камені, під тією ж колонадою, у тому ж
-// освітленні.
+// Production-дерево й далі приходить з того самого Evolution/tree pipeline:
+// ті самі персоналізовані гілки, корені, листя, матеріали, сезонність і вітер.
+// Змінюється лише renderer environment. Храм кристала сюди більше не
+// монтується: дерево має власний пагорб, денне небо та сонячне освітлення.
 //
-// Тож сцена тут рівно та сама, що в кристала: `PortalStage` з усім, що в
-// ньому, і артефакт усередині. Різниця лише в тому, який артефакт.
+// Камерний директор лишається спільним навмисно. Він не є частиною храму —
+// це навігація світом, завдяки якій повороти між маршрутами не стрибають.
 // ============================================================
 import { useCallback, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalRenderScale } from '@/engine/renderer';
 import { fitThreeTree, measureThreeTreeReach } from '@/engine/renderer/three';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
-import { PortalStage } from '../scene/PortalStage';
+import { TreeStage } from '../treeScene/TreeStage';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from './EvolutionRuntimeProbe';
@@ -26,7 +23,7 @@ import { resolveTreeLabLod } from '../treeLab/featureFlag';
 import { useTreeLabPortalPreview } from '../treeLab/useTreeLabPortalPreview';
 import type { TreeLabPreviewBuild } from '../treeLab/buildTreeLabPreview';
 
-function TreeInPortal({ build, theme }: { build: TreeLabPreviewBuild; theme: 'light' | 'dark' }) {
+function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'light' | 'dark' }) {
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined'
       && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -37,16 +34,14 @@ function TreeInPortal({ build, theme }: { build: TreeLabPreviewBuild; theme: 'li
   // корінь React, і контекст маршрутизатора не перемальовує його сам.
   const { pose } = useWorldPose();
   const motionMode = useWorldMotionMode();
-  // Дерево приходить у власних одиницях рушія — вищим за всю сцену й з
-  // підошвою на нулі, а не на підлозі порталу. Кристал ту саму різницю
-  // прибирає підгонкою в bundle.ts; тут та сама підгонка, у той самий кадр.
+  // Дерево приходить у власних одиницях рушія. Підгонка лишається єдиним
+  // мостом між engine-space і scene-space; нове оточення не втручається в
+  // геометрію артефакта і не створює другого tree implementation.
   const fit = useMemo(
     () => fitThreeTree(measureThreeTreeReach({
       mesh: build.mesh,
       rootGeometry: build.rootGeometry,
       leaves: build.leaves,
-      // Крону міряємо тим самим, чим її малює InstancedMesh: силует і глибина
-      // крони перевидають і позицію листка, і його масштаб.
       canopyDepth: build.canopyDepth,
       crownSilhouette: build.crownSilhouette,
       groundDetails: build.groundDetails,
@@ -60,29 +55,24 @@ function TreeInPortal({ build, theme }: { build: TreeLabPreviewBuild; theme: 'li
       data-evolution-preview="ready"
       data-evolution-renderer="three"
       data-evolution-species="tree"
+      data-tree-scene="outdoor"
       data-evolution-draw-calls={runtime?.drawCalls ?? ''}
       data-evolution-rendered-triangles={runtime?.triangles ?? ''}
     >
       <Canvas
         dpr={[1, crystalRenderScale('balanced', typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
-        camera={{ position: [0, 0.685, 7.1], fov: 42 }}
-        gl={{ alpha: true, antialias: true }}
+        camera={{ position: [0, 0.9, 7.1], fov: 42 }}
+        // Opaque canvas is intentional: the global crystal PortalBackdrop still
+        // lives under ArtifactWorld, but the tree owns every pixel of its sky.
+        gl={{ alpha: false, antialias: true }}
       >
-        <PortalStage
-          seed={build.seed}
+        <TreeStage
           theme={theme}
-          quality="balanced"
           reduceMotion={reduceMotion}
-          // Подіум накриває ґрунт, камера кадрує крону — два різні радіуси з
-          // тієї ж причини, що й у кристала (камінь проти самих кристалів).
-          artifactSceneRadius={fit.soilRadius}
-          crystalsSceneRadius={fit.crownRadius}
-          artifactSceneHeight={fit.height}
-          // Кварцової жили в дерева немає — камінь платформи не вигинається
-          // ні над чим, і це не заглушка: вигин публікує субстрат кристала, а
-          // в дерева субстрат інший.
-          veinBearings={[]}
-          veinReach={0}
+          soilRadius={fit.soilRadius}
+          crownRadius={fit.crownRadius}
+          treeHeight={fit.height}
+          groundY={fit.groundY}
           pose={pose}
           motionMode={motionMode}
         >
@@ -104,7 +94,7 @@ function TreeInPortal({ build, theme }: { build: TreeLabPreviewBuild; theme: 'li
               reducedMotion={reduceMotion}
             />
           </group>
-        </PortalStage>
+        </TreeStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
       </Canvas>
     </div>
@@ -120,5 +110,5 @@ export default function EvolutionTreePreviewScene({ theme = 'dark' }: { theme?: 
 
   if (isPending) return <CrystalPlaceholder />;
   if (error || !preview) return <CrystalPlaceholder />;
-  return <TreeInPortal build={preview.build} theme={theme} />;
+  return <TreeInWorld build={preview.build} theme={theme} />;
 }
