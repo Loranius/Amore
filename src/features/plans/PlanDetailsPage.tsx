@@ -46,6 +46,11 @@ import './plans.css';
 import './plansDetail.css';
 import './plansMemories.css';
 import type { PlanDatePrecision, PlanStatus } from '@/types';
+import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
+import { useArtifactWorld } from '@/features/world/artifactWorldContext';
+import { useDimmedWorld } from '@/features/world/worldDim';
+import '@/features/world/worldDim.css';
+import './plansModule.css';
 
 const PRECISIONS: PlanDatePrecision[] = ['none', 'day', 'range', 'month', 'season', 'year'];
 const ACTIVE_STATUSES = PLAN_STATUS_ORDER.filter((key) => !PLAN_STATUSES[key].closed);
@@ -62,6 +67,13 @@ const STATUS_HELP: Record<PlanStatus, string> = {
 };
 
 export function PlanDetailsPage() {
+  // Сторінка плану — той самий модуль, лише глибше: та сама сцена позаду й та
+  // сама палітра. Власник показав знімком, що без цього вона лишалась білим
+  // аркушем посеред темного порталу.
+  const { webglSupported } = useArtifactWorld();
+  useWorldVisibleRoute();
+  useDimmedWorld(webglSupported);
+
   const { id } = useParams();
   const parsedPlanId = Number(id);
   const planId = Number.isSafeInteger(parsedPlanId) && parsedPlanId > 0 ? parsedPlanId : null;

@@ -109,11 +109,18 @@ export function PlansPage() {
   const groups = useMemo(() => groupPlans(plans), [plans]);
   const activeCount = groups.upcoming.length + groups.ideas.length;
 
+  // Кожна модалка живе у своїй вкладці, і це вимога власника, а не охайність:
+  // «перший скрін модалка має бути лише в календарі, другий скрін модалка має
+  // бути лише в подіях».
+  //
+  // Тому подію не заводять із сітки місяця. Дотик по події в сітці переводить
+  // у «Події» — туди, де події живуть, і де її видно на шляху цілком.
   const openNewEvent = (type: EventKind = 'anniversary', date?: string) => {
     setEventModal({ row: null, type, date });
   };
 
   const openExistingEvent = (event: EventRow) => {
+    setSection('events');
     setEventModal({ row: event, type: event.type === 'birthday' ? 'birthday' : 'anniversary' });
   };
 
@@ -181,7 +188,9 @@ export function PlansPage() {
             mo={mo}
             onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
             onGoToday={() => setYm(currentYearMonth())}
-            onAddOn={(date) => openNewEvent('anniversary', date)}
+            // Календар не заводить подій: дотик по дню лише показує, що на
+            // ньому. Створення живе у «Подіях».
+            onAddOn={() => setSection('events')}
             onOpenEvent={(event) => openExistingEvent(
               enriched.find((item) => item.id === event.id) ?? event,
             )}
@@ -241,7 +250,11 @@ export function PlansPage() {
         {section === 'calendar' ? 'План' : 'Подія'}
       </button>
 
-      {addingPlan && (
+      {/* Аркуш плану — тільки в календарі, аркуш події — тільки в «Подіях».
+          Умова стоїть на самому рендері, а не лише на тому, хто його
+          відкриває: перемикання вкладки з відкритою модалкою інакше лишало б
+          її висіти над чужим розділом. */}
+      {addingPlan && section === 'calendar' && (
         <AddPlanModal
           busy={addPlan.isPending}
           createdPlanId={createdPlanId}
@@ -253,7 +266,7 @@ export function PlansPage() {
         />
       )}
 
-      {eventModal && (
+      {eventModal && section === 'events' && (
         <AddEventModal
           event={eventModal.row}
           initialDate={eventModal.date}

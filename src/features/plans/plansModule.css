@@ -294,20 +294,27 @@
    працює: `.cal-day-event` бере `var(--surface)` і лишився БІЛИМ рядком
    посеред темного модуля, бо в переліку його не було. Перелік завжди
    відстає від компонента, який перефарбовує. */
-[data-portal-scene='true'] .plans-module {
+[data-portal-scene='true'] .plans-module,
+[data-portal-scene='true'] .plan-detail-page {
   /* Колір тексту теж, а не лише токен: назва місяця — це голий `<b>`, який
      нічого не оголошує й успадковує колір сторінки. Виміряно на живому
      порталі: «Серпень 2026» лишився темним на темному й читався ледь-ледь. */
   color: var(--world-text);
   --text: var(--world-text);
   --muted: var(--world-text-muted);
-  --surface: var(--world-surface);
-  --surface-2: var(--world-surface-strong);
+  --surface: var(--world-surface-strong);
+  --surface-2: var(--world-surface);
   --border: var(--world-border);
   --accent: var(--world-accent);
   --danger: var(--world-danger);
   --ok: var(--world-success);
   --warn: var(--world-warning);
+  /* `--bg` теж, і саме його бракувало.
+     Поля вводу в аркушах створення змішуються з фоном СТОРІНКИ
+     (`color-mix(... var(--bg))`), а не з поверхнею. Без цього токена вони
+     лишались майже білими на темному аркуші — власник показав це знімком:
+     «поправ кольори поля вводу і вибору плану (вони зараз сірі)». */
+  --bg: var(--world-bg-deep);
 }
 
 .plans-module .cal-month,
@@ -362,3 +369,28 @@
   .plans-module .pm-sheet,
   .plans-module .pm-skeleton { animation: none; }
 }
+
+/* ── Сторінка плану — той самий модуль, лише глибше ──────
+   Власник: «третій і четвертий скрін треба адаптувати під модуль, по
+   кольоровій гамі, з таким самим фоном». Сторінка плану лишається окремим
+   маршрутом, але це той самий модуль: та сама сцена позаду, та сама палітра,
+   той самий папір.
+
+   Токени вона бере з блоку вище — саме тому там два селектори, а не один. */
+[data-portal-scene='true'] .plan-detail-page {
+  background: none;
+}
+
+[data-portal-scene='true'] .plan-detail-page .plan-detail-hero,
+[data-portal-scene='true'] .plan-detail-page .plan-disclosure,
+[data-portal-scene='true'] .plan-detail-page .plan-detail-fact,
+[data-portal-scene='true'] .plan-detail-page .plan-link-card {
+  border-color: var(--world-border);
+  background: var(--world-surface);
+  box-shadow: 0 12px 30px var(--world-shadow);
+}
+
+/* Кола за героєм малювались світлими плямами по світлому паперу. На темному
+   фоні вони перетворювались на дві сірі кулі — прибираємо, бо їхня роль
+   (легка глибина паперу) тут дістається самій сцені. */
+[data-portal-scene='true'] .plan-detail-page .plan-detail-orbit { opacity: 0.12; }
