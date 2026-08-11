@@ -20,8 +20,14 @@ const WORLD: WishSphereWorld = {
   obstacle: { centreX: 260, tipY: 240, tipWidth: 60, baseWidth: 140 },
 };
 
+/**
+ * Куля для тесту. Місце в сузір'ї за умовчанням там, де куля стоїть: у
+ * перевірках, які не про повернення, вона має лишатись удома, інакше вони
+ * міряли б повернення замість того, що написано в їхній назві.
+ */
 function body(patch: Partial<WishSphereBody> & { id: number }): WishSphereBody {
-  return { x: 100, y: 100, vx: 0, vy: 0, radius: 30, ...patch };
+  const base = { x: 100, y: 100, vx: 0, vy: 0, radius: 30, calm: 0, ...patch };
+  return { ...base, homeX: patch.homeX ?? base.x, homeY: patch.homeY ?? base.y };
 }
 
 /** Проганяє світ уперед рівними кроками по 16 мс. */
@@ -41,12 +47,14 @@ describe('inertia', () => {
   it('carries a pushed sphere and then stops it', () => {
     // Обидві половини — вимога: без інерції це кнопка, що телепортується, без
     // тертя куля ніколи не зупиняється й тримає цикл кадрів вічно.
+    //
+    // Міряється до того, як почне збиратись сузір'я: інакше замість тертя тут
+    // перевірялось би повернення, яке спиняє кулю з іншої причини.
     const start = body({ id: 1, x: 60, y: 500, vx: 420, vy: 0 });
     const moved = settle([start], WORLD, 0.2);
     expect(moved[0]!.x).toBeGreaterThan(start.x + 20);
 
-    const stopped = settle([start], WORLD, 6);
-    expect(wishSpheresAtRest(stopped)).toBe(true);
+    const stopped = settle([start], WORLD, 2);
     expect(stopped[0]!.vx).toBe(0);
     expect(stopped[0]!.vy).toBe(0);
   });
@@ -71,12 +79,16 @@ describe('collisions', () => {
     // Розкладка може поставити кулі впритул — після зміни розміру за
     // пріоритетом це стало звичайною справою. Розв'язувати перекриття мусить
     // саме крок, а не розкладка.
+    //
+    // Місця в сузір'ї задані окремо й нарізно: перекриття тут — початкова
+    // умова, а не домівка. Інакше перевірка мовчки перетворилась би на «чи
+    // переважує розштовхування повернення».
     const stacked = [
-      body({ id: 1, x: 200, y: 500, radius: 36 }),
-      body({ id: 2, x: 206, y: 502, radius: 30 }),
-      body({ id: 3, x: 203, y: 498, radius: 24 }),
+      body({ id: 1, x: 200, y: 500, radius: 36, homeX: 60, homeY: 500 }),
+      body({ id: 2, x: 206, y: 502, radius: 30, homeX: 60, homeY: 400 }),
+      body({ id: 3, x: 203, y: 498, radius: 24, homeX: 60, homeY: 310 }),
     ];
-    const state = settle(stacked, WORLD, 5);
+    const state = settle(stacked, WORLD, 2);
     for (const a of state) {
       for (const b of state) {
         if (a === b) continue;
@@ -120,9 +132,12 @@ describe('the monarch is a cushion, not empty space', () => {
   it('never leaves a sphere inside the silhouette', () => {
     // Ієрархія «монарх → бажання» не має триматись на тому, що ніхто нічого не
     // кинув у центр.
+    // Домівки задані явно й обидві поза каменем — такими їх і дає розкладка.
+    // Куля, чиє місце було б усередині силуету, перевіряла б не відскок, а
+    // те, хто дужчий: повернення чи камінь.
     const thrown = [
-      body({ id: 1, x: 60, y: 520, vx: 900, vy: -200 }),
-      body({ id: 2, x: 380, y: 560, vx: -1200, vy: -100, radius: 40 }),
+      body({ id: 1, x: 60, y: 520, vx: 900, vy: -200, homeX: 60, homeY: 520 }),
+      body({ id: 2, x: 380, y: 560, vx: -1200, vy: -100, radius: 40, homeX: 70, homeY: 420 }),
     ];
     const state = settle(thrown, WORLD, 6);
     const obstacle = WORLD.obstacle!;
@@ -133,6 +148,113 @@ describe('the monarch is a cushion, not empty space', () => {
       expect(Math.abs(item.x - obstacle.centreX), `${item.id}`)
         .toBeGreaterThanOrEqual(halfWidth + item.radius - 1e-6);
     }
+  });
+});
+
+describe('the constellation gathers itself', () => {
+  // Вимога власника: «щоб вони м'яко поверталися у своє сузір'я за кілька
+  // секунд спокою». Стіл лишається столом — але композицію не можна розсипати
+  // назавжди одним рухом пальця.
+  const TABLE: WishSphereWorld = { width: 412, height: 620 };
+  const AWAY = { id: 1, x: 300, y: 520, homeX: 110, homeY: 300 } as const;
+
+  function distanceHome(item: WishSphereBody): number {
+    return Math.hypot(item.x - item.homeX, item.y - item.homeY);
+  }
+
+  it('leaves a pushed sphere where it stopped for the first couple of seconds', () => {
+    // «За кілька секунд спокою», а не «щойно відпустили»: куля, яку тягне
+    // назад одразу, — це не стіл, а гумка, і гратись нею неможливо.
+    const after = settle([body({ ...AWAY })], TABLE, 2);
+    expect(after[0]!.x).toBeCloseTo(300, 6);
+    expect(after[0]!.y).toBeCloseTo(520, 6);
+    // І цикл кадрів при цьому спинятись не має права: зупинений тут, він
+    // просто ніколи б не дожив до повернення.
+    expect(wishSpheresAtRest(after)).toBe(false);
+  });
+
+  it('brings it home, and then really stops', () => {
+    // «Вдома» з точністю до кількох пікселів: далі куля не йде, бо на такій
+    // відстані швидкість повернення вже нижча за поріг нерухомості. Це менше
+    // за розмах її власного дрейфу, тобто оку невидиме.
+    const after = settle([body({ ...AWAY })], TABLE, 8);
+    expect(distanceHome(after[0]!)).toBeLessThanOrEqual(6);
+    expect(wishSpheresAtRest(after)).toBe(true);
+  });
+
+  it('glides rather than snaps, and never overshoots its place', () => {
+    // Проліт крізь місце з поверненням назад читався б як пружина. Тут рух
+    // експоненційний: відстань лише зменшується.
+    let state = [body({ ...AWAY })];
+    let previous = distanceHome(state[0]!);
+    let fastest = 0;
+    for (let step = 0; step < 60 * 8; step += 1) {
+      state = stepWishSpheres(state, TABLE, 1 / 60);
+      const now = distanceHome(state[0]!);
+      expect(now).toBeLessThanOrEqual(previous + 1e-6);
+      previous = now;
+      fastest = Math.max(fastest, Math.hypot(state[0]!.vx, state[0]!.vy));
+    }
+    // М'яко — це ще й «не пострілом»: стеля швидкості повернення значно нижча
+    // за кидок пальцем.
+    expect(fastest).toBeLessThanOrEqual(230);
+  });
+
+  it('does not gather while a finger is still on the table', () => {
+    // Спокій — властивість столу, а не окремої кулі: поки одну тягнуть, решта
+    // не має роз'їжджатись по місцях у неї під рукою.
+    let state = [body({ ...AWAY }), body({ id: 2, x: 80, y: 120 })];
+    for (let step = 0; step < 60 * 8; step += 1) {
+      state = stepWishSpheres(state, { ...TABLE, held: 2 }, 1 / 60);
+    }
+    expect(state[0]!.x).toBeCloseTo(300, 6);
+    expect(state[0]!.y).toBeCloseTo(520, 6);
+  });
+
+  it('gives up rather than fighting a neighbour for its place forever', () => {
+    // Розкладка може поставити два місця впритул — тест сузір'я вимагає лише,
+    // щоб вони не збіглись у точку. Дві кулі, які тягне одна крізь одну,
+    // штовхались би вічно, а разом із ними вічно крутився б цикл кадрів.
+    const state = settle([
+      body({ id: 1, x: 100, y: 300, radius: 40, homeX: 200, homeY: 300 }),
+      body({ id: 2, x: 320, y: 300, radius: 40, homeX: 214, homeY: 300 }),
+    ], TABLE, 16);
+    expect(wishSpheresAtRest(state)).toBe(true);
+  });
+
+  it('counts the calm in real seconds, not in frames', () => {
+    // Виміряно на живому порталі, і це була справжня вада, а не примха
+    // стенда: у безголовому Chromium сцена малюється програмно, кадри йдуть по
+    // три на секунду — і крок 0.33 с обрізався до 1/30. За дев'ять справжніх
+    // секунд «спокою» набігала одна, сузір'я не збиралось зовсім. На
+    // повільному телефоні вийшло б те саме, тільки не так помітно.
+    let slow = [body({ ...AWAY })];
+    for (let step = 0; step < 12; step += 1) slow = stepWishSpheres(slow, TABLE, 1 / 3);
+    // Чотири справжні секунди трьома кадрами на секунду — повернення вже мусить
+    // іти, хоч сумарний крок фізики тут менший за секунду.
+    expect(distanceHome(slow[0]!)).toBeLessThan(Math.hypot(300 - 110, 520 - 300));
+  });
+
+  it('does not skip the whole attempt after a long absence', () => {
+    // Вкладка, до якої не повертались хвилину, приносить першим кадром
+    // величезну різницю часу. Без стелі на крок відліку куля перестрибнула б
+    // усе вікно спроби й лишилась би там, куди її колись відкотили.
+    //
+    // І вікно спроби мусить мірятись часом фізики, а не годинником: інакше
+    // на рідких кадрах воно спливає на півдорозі. Виміряно — куля спинялась за
+    // 166 px від свого місця.
+    let state = [body({ ...AWAY })];
+    for (let step = 0; step < 150; step += 1) state = stepWishSpheres(state, TABLE, 30);
+    expect(distanceHome(state[0]!)).toBeLessThanOrEqual(6);
+  });
+
+  it('returns at the same pace whatever the frame rate', () => {
+    const start = [body({ ...AWAY })];
+    let fast = [...start];
+    for (let step = 0; step < 120 * 5; step += 1) fast = stepWishSpheres(fast, TABLE, 1 / 120);
+    let slow = [...start];
+    for (let step = 0; step < 30 * 5; step += 1) slow = stepWishSpheres(slow, TABLE, 1 / 30);
+    expect(Math.hypot(fast[0]!.x - slow[0]!.x, fast[0]!.y - slow[0]!.y)).toBeLessThan(6);
   });
 });
 

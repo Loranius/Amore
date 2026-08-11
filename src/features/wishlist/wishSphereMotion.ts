@@ -28,6 +28,11 @@ export interface WishSphereBody {
   vx: number;
   vy: number;
   radius: number;
+  /** Місце кулі в сузір'ї — те, яке дала розкладка. Сюди вона повертається. */
+  homeX: number;
+  homeY: number;
+  /** Скільки секунд поспіль кулю ніхто не чіпав. */
+  calm: number;
 }
 
 /** Силует монарха в пікселях поля — кулі від нього відбиваються. */
@@ -73,6 +78,83 @@ const REST_SPEED = 4;
 /** Найбільший крок інтегрування, секунди — захист від тунелювання. */
 const MAX_STEP = 1 / 30;
 
+/**
+ * Найбільший крок відліку спокою, секунди.
+ *
+ * Відлік — годинник, а не інтегрування, тож він іде за справжнім часом, а не
+ * за обрізаним кроком фізики. Виміряно на живому порталі: у безголовому
+ * Chromium сцена малюється програмно і кадри йдуть по три на секунду, тобто
+ * `MAX_STEP` обрізав кожен утричі — за дев'ять справжніх секунд «спокою»
+ * набігала одна, і сузір'я не збиралось ніколи. На повільному телефоні
+ * сталося б те саме, тільки м'якше.
+ *
+ * Стеля все одно потрібна: після довгої відсутності вкладки перший кадр
+ * приносить величезну різницю часу, і без обмеження куля перестрибнула б усе
+ * вікно спроби, так і не рушивши з місця.
+ */
+const MAX_CALM_STEP = 0.25;
+
+// ── Повернення в сузір'я ──
+//
+// Власник: «щоб вони м'яко поверталися у своє сузір'я за кілька секунд
+// спокою». Стіл лишається столом — кулі так само котяться й б'ються, — але
+// розсипана композиція збирається сама, без окремої кнопки.
+
+/** Скільки секунд спокою до того, як сузір'я почне збиратись. */
+const RETURN_AFTER = 2.6;
+
+/**
+ * Скільки секунд триває спроба повернутись.
+ *
+ * Не косметика, а гарантія зупинки. Місця в сузір'ї можуть стояти впритул, і
+ * дві кулі, які тягне додому крізь одна одну, штовхались би вічно — а разом із
+ * ними вічно крутився б цикл кадрів. Після цього вікна куля лишається там, де
+ * є: краще на пів кроку не вдома, ніж телефон, що не засинає.
+ */
+const RETURN_WINDOW = 7;
+
+/**
+ * Швидкість зближення з домівкою: частка відстані за секунду.
+ *
+ * Експонента, а не тривалість: куля за півкроку від місця не має летіти так
+ * само довго, як куля з іншого краю кадру. Половина шляху за ~0.53 с.
+ */
+const RETURN_RATE = 1.3;
+
+/** Стеля швидкості повернення — щоб здалеку це був дрейф, а не постріл. */
+const RETURN_MAX_SPEED = 220;
+
+/** Частка старої швидкості за секунду при переході на курс додому. */
+const RETURN_BLEND = 0.02;
+
+/**
+ * Ближче за це до свого місця куля вважається вдома.
+ *
+ * Число не з голови, і першу спробу (3 px) виміряв тест: куля спинялась за
+ * 3.7 px від місця й далі не йшла. Так і має бути — на короткій відстані
+ * бажана швидкість повернення (`away * RETURN_RATE`, ще й пригальмована
+ * тертям і переходом на курс) падає під поріг нерухомості, і тертя її обнуляє.
+ * Реальний рубіж — близько 4.7 px, тож поріг має лежати вище, інакше «вдома»
+ * не настане ніколи і цикл кадрів крутитиметься до кінця вікна спроби.
+ *
+ * Шість пікселів око не бачить: власний дрейф сфери й так 3–7 px.
+ */
+const HOME_SETTLE = 6;
+
+/**
+ * Вище цієї швидкості куля вважається такою, що нею грають, а не такою, що
+ * повертається. Стеля повернення (220) з запасом нижча: власний рух додому
+ * ніколи не скидає власний же відлік спокою.
+ */
+const RETURN_INTERRUPT_SPEED = 320;
+
+function atHome(body: WishSphereBody): boolean {
+  return Math.hypot(
+    finite(body.homeX, body.x) - body.x,
+    finite(body.homeY, body.y) - body.y,
+  ) <= HOME_SETTLE;
+}
+
 function finite(value: number, fallback: number): number {
   return Number.isFinite(value) ? value : fallback;
 }
@@ -89,20 +171,32 @@ export function stepWishSpheres(
   world: WishSphereWorld,
   delta: number,
 ): WishSphereBody[] {
-  const dt = Math.min(MAX_STEP, Math.max(0, finite(delta, 0)));
+  const elapsed = Math.max(0, finite(delta, 0));
+  const dt = Math.min(MAX_STEP, elapsed);
+  const calmStep = Math.min(MAX_CALM_STEP, elapsed);
   const width = Math.max(1, finite(world.width, 1));
   const height = Math.max(1, finite(world.height, 1));
   const held = world.held ?? null;
 
+  // Поки палець на столі, спокою немає ні в кого: відлік до повернення має
+  // починатись тоді, коли грати перестали, а не коли перестала рухатись одна
+  // конкретна куля.
+  const playing = held !== null;
+
   const next = bodies.map((body) => {
     const radius = Math.max(1, finite(body.radius, 1));
+    const x = finite(body.x, width / 2);
+    const y = finite(body.y, height / 2);
     const item: WishSphereBody = {
       id: body.id,
-      x: finite(body.x, width / 2),
-      y: finite(body.y, height / 2),
+      x,
+      y,
       vx: finite(body.vx, 0),
       vy: finite(body.vy, 0),
       radius,
+      homeX: finite(body.homeX, x),
+      homeY: finite(body.homeY, y),
+      calm: playing ? 0 : Math.max(0, finite(body.calm, 0)),
     };
     if (item.id === held || dt === 0) return item;
 
@@ -114,6 +208,39 @@ export function stepWishSpheres(
       item.vx = 0;
       item.vy = 0;
     }
+
+    // Спокій і повернення.
+    //
+    // Відлік іде від швидкості, а не від «події»: удар сусіда — теж дотик,
+    // хоч пальця в ньому й немає. Поріг із запасом вищий за стелю самого
+    // повернення, інакше куля, що летить додому, щокадру скидала б собі ж
+    // відлік і не долітала б ніколи.
+    //
+    // До порога відлік іде справжнім часом, після порога — часом фізики. Це не
+    // хитрість, а дві різні величини в одному лічильнику: «скільки кулю не
+    // чіпали» питається про годинник на стіні, а «скільки вона вже летить
+    // додому» — про той самий час, яким рухається сама куля. Змішай їх — і на
+    // повільних кадрах вікно спроби спливе на півдорозі: виміряно, куля
+    // спинялась за півтори сотні пікселів від місця.
+    if (!playing && Math.hypot(item.vx, item.vy) <= RETURN_INTERRUPT_SPEED) {
+      item.calm += item.calm >= RETURN_AFTER ? dt : calmStep;
+    } else {
+      item.calm = 0;
+    }
+    if (item.calm >= RETURN_AFTER && item.calm < RETURN_AFTER + RETURN_WINDOW) {
+      const dx = item.homeX - item.x;
+      const dy = item.homeY - item.y;
+      const away = Math.hypot(dx, dy);
+      if (away > HOME_SETTLE) {
+        const wanted = Math.min(RETURN_MAX_SPEED, away * RETURN_RATE);
+        // Курс не підмінює швидкість, а переймає її: куля, яку ще несе,
+        // згортає до свого місця дугою, а не зламом.
+        const take = 1 - Math.pow(RETURN_BLEND, dt);
+        item.vx += ((dx / away) * wanted - item.vx) * take;
+        item.vy += ((dy / away) * wanted - item.vy) * take;
+      }
+    }
+
     item.x += item.vx * dt;
     item.y += item.vy * dt;
 
@@ -298,7 +425,19 @@ function pushOutOfObstacle(bodies: WishSphereBody[], frame: ObstacleFrame, bounc
   }
 }
 
-/** Чи все зупинилось — цикл кадрів можна не крутити. */
+/**
+ * Чи все зупинилось — цикл кадрів можна не крутити.
+ *
+ * Нерухомості замало відколи кулі повертаються: куля, яку відкотили вбік і
+ * відпустили, стоїть нерухомо всі перші дві з половиною секунди, і зупинений
+ * тут цикл просто ніколи б не дожив до повернення. Тож спокій — це «стоїть І
+ * стоїть на своєму місці», а для тих, кому додому не дійти, — «спроба
+ * скінчилась».
+ */
 export function wishSpheresAtRest(bodies: readonly WishSphereBody[]): boolean {
-  return bodies.every((body) => body.vx === 0 && body.vy === 0);
+  return bodies.every((body) => (
+    body.vx === 0
+    && body.vy === 0
+    && (atHome(body) || finite(body.calm, 0) >= RETURN_AFTER + RETURN_WINDOW)
+  ));
 }

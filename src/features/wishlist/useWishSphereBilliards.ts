@@ -153,6 +153,11 @@ export function useWishSphereBilliards({
       vx: 0,
       vy: 0,
       radius: place.diameter / 2,
+      // Місце з розкладки — і початок, і те, куди куля повернеться, коли її
+      // облишать. Стіл лишається столом, але сузір'я збирається саме.
+      homeX: place.x * size.width,
+      homeY: place.y * size.height,
+      calm: 0,
     }));
     layers.current = new Map(places.map((place) => [place.id, place.layer]));
     paint();
