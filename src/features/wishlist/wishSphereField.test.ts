@@ -130,28 +130,41 @@ describe('wish sphere constellation', () => {
     expect(of('high') / of('low')).toBeLessThan(1.6);
   });
 
-  it('is bigger than it was, and still smaller than the monarch', () => {
-    // Попередній діапазон 44–64 px власник подивився на живому екрані й сказав
-    // «занадто малий». Стеля лишається: сто пікселів — це вже не бажання
-    // поруч із артефактом, а другий артефакт.
-    const board = buildWishSphereField({
-      ...PHONE,
-      subjects: subjects(12).map((subject, index) => ({
-        ...subject,
-        priority: (['high', 'medium', 'low', null] as const)[index % 4]!,
-      })),
-    });
-    for (const size of diameters(board)) {
-      expect(size).toBeGreaterThanOrEqual(46);
-      expect(size).toBeLessThanOrEqual(92);
-    }
-    // І на широкому екрані теж: розмір іде за меншим боком поля.
+  it('is bigger again, and still nowhere near the monarch', () => {
+    // Розмір піднімався двічі, обидва рази з живого екрана: 44–64 → «занадто
+    // малий», далі → «погано видно саме фото бажання», ще на 20%.
+    //
+    // Міряються КРАЙНІ значення, а не випадковий набір із дванадцяти. Перша
+    // редакція цієї перевірки брала дванадцять бажань і питала, чи всі влізли
+    // в межі, — і коли базовий діаметр виріс на 20%, вона лишилась зеленою,
+    // хоч найбільша можлива куля межу перетнула: у той набір просто не
+    // потрапило жаданого бажання на ближньому шарі. Стеля, якої ніщо не
+    // торкається, нічого не стереже.
+    //
+    // Шар глибини виводиться з id, тож крайні випадки шукаються перебором id.
+    const of = (priority: 'high' | 'medium' | 'low', id: number) =>
+      buildWishSphereField({ ...PHONE, subjects: [{ id, priority }] })[0]!.diameter;
+    const across = (priority: 'high' | 'medium' | 'low') =>
+      Array.from({ length: 300 }, (_, index) => of(priority, index + 1));
+
+    const smallest = Math.min(...across('low'));
+    const biggest = Math.max(...across('high'));
+    // Найменша куля — приємне бажання на дальньому шарі. Раніше таких було 47.
+    expect(smallest).toBeGreaterThanOrEqual(58);
+    // Сто пікселів — це вже не бажання поруч із артефактом, а другий артефакт.
+    expect(biggest).toBeLessThan(100);
+    // Крок між сусідніми вагами лишається помітним оку, а не «на волосину».
+    expect(Math.min(...across('medium'))).toBeGreaterThan(Math.max(...across('low')));
+    expect(Math.min(...across('high'))).toBeGreaterThan(Math.max(...across('medium')));
+
+    // І на широкому екрані теж: розмір іде за меншим боком поля, тож там межа
+    // впирається у власну стелю базового діаметра, а не в розмір екрана.
     const wide = buildWishSphereField({
       ...PHONE,
-      subjects: subjects(12),
+      subjects: subjects(120).map((subject) => ({ ...subject, priority: 'high' as const })),
       field: { width: 1600, height: 900 },
     });
-    for (const size of diameters(wide)) expect(size).toBeLessThanOrEqual(92);
+    for (const size of diameters(wide)) expect(size).toBeLessThan(100);
   });
 
   it('spreads the wishes over three depth layers, delicately', () => {

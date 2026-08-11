@@ -109,6 +109,19 @@ export function useWishSphereBilliards({
     }
   }, [parallaxByLayer]);
 
+  // Цикл кадрів мусить брати СВІЖИЙ крок, а не той, з яким його запустили.
+  //
+  // `requestAnimationFrame(tick)` замовляє конкретне замикання, і воно ж
+  // перезамовляє себе далі — тобто цикл, раз запущений, назавжди лишається зі
+  // старим світом. Виміряно на живому порталі, і вада була видима з першого
+  // погляду: поле міряється після монтування, тож перший кадр замовлявся з
+  // розміром 0×0. Поки він чекав своєї черги, розмір приїздив, тіла
+  // перебудовувались правильно — а потім прокидався той самий старий кадр,
+  // затискав усі сім куль у світ 1×1 і перезамовляв себе. Усе сузір'я лежало
+  // купою в лівому верхньому куті.
+  const step = useRef<(now: number) => void>(() => {});
+  const pump = useCallback((now: number) => { step.current(now); }, []);
+
   const tick = useCallback((now: number) => {
     frame.current = 0;
     const previous = last.current === 0 ? now : last.current;
@@ -125,17 +138,21 @@ export function useWishSphereBilliards({
 
     // Кадри замовляються, лише поки є що рухати.
     if (held.current !== null || !wishSpheresAtRest(bodies.current)) {
-      frame.current = window.requestAnimationFrame(tick);
+      frame.current = window.requestAnimationFrame(pump);
     } else {
       last.current = 0;
     }
-  }, [obstacle, paint, size.height, size.width]);
+  }, [obstacle, paint, pump, size.height, size.width]);
+
+  step.current = tick;
 
   const wake = useCallback(() => {
-    if (still || frame.current !== 0) return;
+    // Поле ще не зміряне — рухати нічого: крок у світі 1×1 лише зіштовхнув би
+    // усіх у куток.
+    if (still || frame.current !== 0 || size.width < 2 || size.height < 2) return;
     last.current = 0;
-    frame.current = window.requestAnimationFrame(tick);
-  }, [still, tick]);
+    frame.current = window.requestAnimationFrame(pump);
+  }, [pump, size.height, size.width, still]);
 
   // Народження тіл і перше малювання — в одному шарі, і саме в такому порядку.
   //
@@ -161,6 +178,14 @@ export function useWishSphereBilliards({
     }));
     layers.current = new Map(places.map((place) => [place.id, place.layer]));
     paint();
+    // Один поштовх циклу одразу після народження тіл.
+    //
+    // Розкладка при повній дошці ставить сусідів упритул і навіть із
+    // перекриттям — при 16 бажаннях виміряно до 22 px, — а розсовує їх крок
+    // фізики, не вона. Без цього поштовху цикл кадрів не запускався взагалі
+    // (усі стоять на своїх місцях і мовчать), і перекриття лишалось на екрані
+    // до першого дотику пальцем. Зупиниться він сам, щойно все розійдеться.
+    wake();
     // Розкладка вже дала кожній кулі місце; сюди її веде саме `signature`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, size.width, size.height, paint]);
