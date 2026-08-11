@@ -65,7 +65,7 @@ test.describe('Plans mobile visual preview', () => {
     await expect(createSheet.getByRole('heading', { name: 'Що створюємо?' })).toBeVisible();
     await createSheet.screenshot({ path: testInfo.outputPath('plans-create-chooser.png') });
 
-    await createSheet.getByRole('button', { name: /^План\b/ }).click();
+    await createSheet.getByRole('button', { name: /^План(?:\s|$)/ }).click();
     await expect(createSheet.getByRole('heading', { name: 'Що хочете зробити разом?' })).toBeVisible();
 
     await createSheet.getByRole('button', { name: /Обкладинка плану/ }).click();
