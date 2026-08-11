@@ -8,6 +8,8 @@ import { memo, useMemo, useState, type CSSProperties } from 'react';
 import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 import { PlusIcon } from '@/components/icons/UiIcon';
+import { generateArtifactDNA } from '@/features/home/artifact/artifactDNA';
+import { useCrystalSeed } from '@/features/home/useHome';
 import type { EventRow } from '@/types';
 import './relationshipJourney.css';
 import './relationshipJourneyImportance.css';
@@ -17,6 +19,8 @@ const HISTORY_BATCH = 8;
 const FUTURE_BATCH = 6;
 const REGULAR_ACCENT = '#a77ac7';
 const IMPORTANT_ACCENT = '#965fbd';
+/** HSL hue базового `BASE_PALETTE.core[0]` (#6d4fa8) у crystalCluster.ts. */
+const CRYSTAL_CORE_BASE_HUE = 260.2247191011;
 
 interface JourneyPath {
   height: number;
@@ -60,6 +64,15 @@ function makePath(xs: readonly number[]): JourneyPath {
     d += ` C ${previous.x} ${middleY}, ${current.x} ${middleY}, ${current.x} ${current.y}`;
   }
   return { height, d };
+}
+
+function crystalJourneyStyle(seed: string | null): CSSProperties {
+  const rotation = seed ? generateArtifactDNA(seed).hueRotation : 0;
+  const hue = (CRYSTAL_CORE_BASE_HUE + rotation) % 360;
+  return {
+    '--relationship-journey-neon': `hsl(${hue.toFixed(1)} 88% 72%)`,
+    '--relationship-journey-neon-core': `hsl(${hue.toFixed(1)} 96% 88%)`,
+  } as CSSProperties;
 }
 
 const JourneyNode = memo(function JourneyNode({
@@ -123,6 +136,8 @@ export function RelationshipJourney({
   const [expanded, setExpanded] = useState(true);
   const [historyLimit, setHistoryLimit] = useState(HISTORY_BATCH);
   const [futureLimit, setFutureLimit] = useState(FUTURE_BATCH);
+  const { seed } = useCrystalSeed();
+  const journeyStyle = useMemo(() => crystalJourneyStyle(seed), [seed]);
   const today = localDateKey();
 
   const moments = useMemo(
@@ -149,6 +164,7 @@ export function RelationshipJourney({
   return (
     <details
       className="relationship-journey"
+      style={journeyStyle}
       open={expanded}
       onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
