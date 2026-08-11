@@ -123,7 +123,6 @@ function ReefCameraPlacement({ distance }: { distance: number }) {
   useEffect(() => {
     camera.position.set(0, 2.65, distance);
     camera.lookAt(0, 0.85, 0);
-    camera.updateProjectionMatrix();
   }, [camera, distance]);
 
   return null;
