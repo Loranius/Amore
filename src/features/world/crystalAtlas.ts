@@ -96,7 +96,20 @@ const CRYSTAL_ATLAS: Readonly<Record<WorldRegion, WorldCameraPose>> = {
 
   // The crown. Dreams sit at the top of the body and the camera rises to
   // them — §21's "moves upward and slightly closer".
-  aspiration: pose({ azimuth: -SIXTH * 0.5, targetHeight: 0.86, elevation: -0.05, distance: 0.78 }),
+  //
+  // A quarter turn, not a twelfth. The owner watched a prototype of the
+  // Home → Wishlist transition and asked for exactly this: "оберт навколо
+  // кристала має становити 90 градусів". The direction is not free either —
+  // the camera stands at `sin(azimuth)`, so a positive quarter puts it to the
+  // artifact's right, the stone appears to swing left, and the right edge of
+  // the screen opens. That is where the wishes come in from.
+  //
+  // It shares a bearing with `provision` (Shopping), and that is allowed
+  // rather than overlooked: the atlas asks each region to be *either* a real
+  // turn *or* a real climb away from every other, and these two are as far
+  // apart in height as the atlas goes — the crown at 0.86 against a low side
+  // facet at 0.38. Same compass point, opposite ends of the body.
+  aspiration: pose({ azimuth: QUARTER, targetHeight: 0.86, elevation: -0.05, distance: 0.78 }),
 
   // An upper forward facet: what has been decided is still ahead, and faces
   // the couple.

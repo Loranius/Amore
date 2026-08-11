@@ -78,41 +78,16 @@ const BOTTOM_BAND = 0.86;
 /** Відступ від бічних країв, у частках ширини. */
 const SIDE_MARGIN = 0.1;
 
-/**
- * Силует монарха — заборонена зона, у координатах самого поля.
- *
- * Приходить ззовні, а не задана тут сталими, і це виміряна необхідність:
- * поле сфер починається під панеллю вкладок, а монарх стоїть у вікні. Поки
- * зона рахувалась у частках поля, вона з'їжджала вгору й убік — на живому
- * порталі дві сфери сіли просто на камінь. Перерахунок з вікна в поле робить
- * компонент, який єдиний знає, де поле лежить.
- */
-export interface WishSphereKeepOut {
-  /** Вісь монарха в частках ширини поля. */
-  centreX: number;
-  /** Висота вершини в частках висоти поля; вище неї зона порожня. */
-  tipY: number;
-  /** Півширина силуету біля вершини і біля низу кадру, у частках ширини. */
-  tipWidth: number;
-  baseWidth: number;
-}
-
-/** Зона за замовчуванням: приблизно те, що видно на вертикальному телефоні. */
-export const DEFAULT_MONARCH_KEEP_OUT: WishSphereKeepOut = {
-  centreX: 0.5,
-  tipY: 0.34,
-  tipWidth: 0.14,
-  baseWidth: 0.4,
-};
-
-export function monarchKeepOut(keepOut: WishSphereKeepOut, y: number): number {
-  const tip = finite(keepOut.tipY, 0.34);
-  if (!Number.isFinite(y) || y < tip) return 0;
-  const depth = tip >= 1 ? 1 : Math.min(1, Math.max(0, (y - tip) / (1 - tip)));
-  const near = Math.max(0, finite(keepOut.tipWidth, 0.14));
-  const far = Math.max(near, finite(keepOut.baseWidth, 0.4));
-  return near + depth * (far - near);
-}
+// Силует монарха більше не бере участі в розкладці.
+//
+// Власник: «кристал має стати фоном, а не активним об'єктом у модулі
+// вішліста». Заборонена зона під нього була саме тим, що робило його активним:
+// поле сфер мусило знати, де стоїть камінь у вікні, перераховувати його в свої
+// координати й обходити. Модуль залежав від пози камери маршруту — рівно та
+// залежність, від якої ADR-0028 його й звільняв.
+//
+// Тепер сузір'я розкладається по всьому полю, а фон відсувають назад
+// приглушення й розмиття — засобами презентації, а не геометрії.
 
 /**
  * Вага мрії — головний множник розміру.
@@ -182,8 +157,6 @@ export interface WishSphereFieldInput {
   subjects: readonly WishSphereSubject[];
   field: WishSphereFieldSize;
   quality: WishSphereQuality;
-  /** Силует монарха в координатах поля; без нього береться приблизний. */
-  keepOut?: WishSphereKeepOut;
 }
 
 /**
@@ -191,10 +164,13 @@ export interface WishSphereFieldInput {
  *
  * Кожна сфера отримує власний детермінований генератор, засіяний її id: місце,
  * шар, розмір і фаза дрейфу — усе звідти. Розкладка перебирає до `ATTEMPTS`
- * кандидатів і бере перший, що не наліг на сусіда, не заліз у силует монарха й
- * не виїхав за поля; якщо жоден не підійшов, лишається найкращий із бачених.
- * Перебір скінченний і детермінований, тож результат той самий за тих самих
- * вхідних даних.
+ * кандидатів і бере перший, що не наліг на сусіда й не виїхав за поля; якщо
+ * жоден не підійшов, лишається найкращий із бачених. Перебір скінченний і
+ * детермінований, тож результат той самий за тих самих вхідних даних.
+ *
+ * Єдина умова тут — сусіди. Силует монарха брав участь у виборі місця, поки
+ * кристал вважався об'єктом модуля; тепер він фон, і поле належить бажанням
+ * цілком.
  */
 export function buildWishSphereField(
   input: WishSphereFieldInput,
@@ -206,8 +182,6 @@ export function buildWishSphereField(
   const width = Math.max(1, finite(input.field.width, 360));
   const height = Math.max(1, finite(input.field.height, 640));
   const base = wishSphereBaseDiameter(input.field);
-  const keepOut = input.keepOut ?? DEFAULT_MONARCH_KEEP_OUT;
-  const axis = Math.min(1, Math.max(0, finite(keepOut.centreX, 0.5)));
 
   const placed: WishSpherePlacement[] = [];
   for (const subject of subjects) {
@@ -224,8 +198,7 @@ export function buildWishSphereField(
       const x = SIDE_MARGIN + halfX + random() * Math.max(0, 1 - 2 * (SIDE_MARGIN + halfX));
       const y = TOP_BAND + halfY + random() * Math.max(0, BOTTOM_BAND - TOP_BAND - 2 * halfY);
 
-      // Наскільки сфера не долізла до монарха: від'ємне — вона на ньому.
-      const clearance = Math.abs(x - axis) - halfX - monarchKeepOut(keepOut, y);
+      // Скільки місця лишилось до найближчого сусіда: більше — вільніше стоїть.
       let nearest = Infinity;
       for (const other of placed) {
         const wanted = ((diameter + other.diameter) / 2) * SPACING;
@@ -233,23 +206,12 @@ export function buildWishSphereField(
         const dy = (y - other.y) * height;
         nearest = Math.min(nearest, Math.hypot(dx, dy) - wanted);
       }
-      // Обидві умови в одній величині: більша — вільніше стоїть.
-      const score = Math.min(clearance * width, nearest === Infinity ? width : nearest);
+      const score = nearest === Infinity ? width : nearest;
       if (best === null || score > best.score) best = { x, y, score };
       if (score > 0) break;
     }
 
-    // Останній рубіж: якщо жоден кандидат не вийшов чистим, найкращий із них
-    // все одно виштовхується з силуету монарха. Це не смак — це вимога, і
-    // порушити її не можна навіть тоді, коли місця обмаль; тіснота між самими
-    // сферами при повній дошці — менша з двох бід.
-    const spot = best ?? { x: axis, y: 0.5, score: 0 };
-    const forbidden = monarchKeepOut(keepOut, spot.y) + halfX;
-    if (Math.abs(spot.x - axis) < forbidden) {
-      const side = spot.x < axis ? -1 : 1;
-      const pushed = axis + side * forbidden;
-      spot.x = Math.min(1 - halfX, Math.max(halfX, pushed));
-    }
+    const spot = best ?? { x: 0.5, y: 0.5, score: 0 };
     placed.push({
       id: subject.id,
       x: spot.x,

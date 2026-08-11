@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { resolveCrystalRendererQuality } from '@/engine/renderer';
 import { WishCard } from './WishCard';
-import {
-  buildWishSphereField,
-  type WishSphereKeepOut,
-  type WishSphereQuality,
-  type WishSpherePlacement,
-} from './wishSphereField';
+import { buildWishSphereField, type WishSpherePlacement } from './wishSphereField';
 import { useWishSphereBilliards, type WishSphereBilliards } from './useWishSphereBilliards';
+import { readWishlistQuality } from './wishlistQuality';
 import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistSpheres.css';
 
@@ -52,68 +47,18 @@ function wishPriority(value: string | null): 'high' | 'medium' | 'low' | null {
   return null;
 }
 
-/**
- * Профіль пристрою для сфер.
- *
- * Той самий, за яким живе решта світу (`resolveCrystalRendererQuality`), і це
- * не збіг: §19 просить інтегруватись у наявну систему якості, а не заводити
- * другу відповідь на те саме питання про пристрій.
- */
-function readQuality(): WishSphereQuality {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') return 'low';
-  const extended = navigator as Navigator & { deviceMemory?: number };
-  return resolveCrystalRendererQuality({
-    webgl: true,
-    webgl2: typeof WebGL2RenderingContext !== 'undefined',
-    deviceMemoryGb: typeof extended.deviceMemory === 'number' ? extended.deviceMemory : null,
-    hardwareConcurrency: Number.isFinite(navigator.hardwareConcurrency)
-      ? navigator.hardwareConcurrency
-      : null,
-    devicePixelRatio: window.devicePixelRatio,
-  });
-}
-
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-/**
- * Де стоїть монарх у вікні — виміряно на живому порталі.
- *
- * Не здогадка й не константа сцени: поза вішліста фіксована (камера приходить
- * у неї й лишається), тож силует займає те саме місце кадру щоразу. Числа
- * зняті зі знімка вертикального телефона — вісь трохи правіше центру, вершина
- * близько 42% висоти, донизу друза розходиться до третини ширини.
- *
- * Широкий екран кадрує той самий артефакт інакше: він менший і ближчий до
- * центру, тож зона вужча.
- */
-const MONARCH_IN_VIEWPORT = {
-  portrait: { centreX: 0.63, tipY: 0.42, tipWidth: 0.15, baseWidth: 0.34 },
-  wide: { centreX: 0.54, tipY: 0.44, tipWidth: 0.1, baseWidth: 0.22 },
-};
-
-/**
- * Силует монарха, переведений у координати поля сфер.
- *
- * Поле починається під панеллю вкладок і закінчується над доком, тобто його
- * нуль — не нуль вікна. Поки зону рахували в частках поля, вона з'їжджала, і
- * на живому порталі дві сфери сіли просто на камінь.
- */
-function monarchKeepOutFor(rect: DOMRect): WishSphereKeepOut {
-  const vw = Math.max(1, window.innerWidth);
-  const vh = Math.max(1, window.innerHeight);
-  const source = vw / vh > 1.2 ? MONARCH_IN_VIEWPORT.wide : MONARCH_IN_VIEWPORT.portrait;
-  const width = Math.max(1, rect.width);
-  const height = Math.max(1, rect.height);
-  return {
-    centreX: (source.centreX * vw - rect.left) / width,
-    tipY: (source.tipY * vh - rect.top) / height,
-    tipWidth: (source.tipWidth * vw) / width,
-    baseWidth: (source.baseWidth * vw) / width,
-  };
-}
+// Де стоїть монарх у вікні, модуль більше не рахує.
+//
+// Тут жила таблиця його силуету в координатах вікна й переведення її в
+// координати поля. Власник: «кристал має стати фоном, а не активним об'єктом у
+// модулі вішліста» — а знання про те, де саме він стоїть, і робило вішліст
+// залежним від пози камери маршруту. Фон відсувають назад приглушення й
+// розмиття, не геометрія.
 
 /** Наскільки шар зміщується від паралаксу, у пікселях на половину екрана. */
 const PARALLAX_BY_LAYER: Readonly<Record<WishSpherePlacement['layer'], number>> = {
@@ -255,9 +200,8 @@ function useSwappedItems(items: WishlistItemV3[], instant: boolean): {
 export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphereViewProps) {
   const field = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [keepOut, setKeepOut] = useState<WishSphereKeepOut | null>(null);
   const [focused, setFocused] = useState<number | null>(null);
-  const [quality] = useState(readQuality);
+  const [quality] = useState(readWishlistQuality);
   const [still] = useState(prefersReducedMotion);
   const { shown, phase } = useSwappedItems(items, still);
 
@@ -268,7 +212,6 @@ export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphere
     if (node === null) return;
     const measure = () => {
       const box = node.getBoundingClientRect();
-      setKeepOut(monarchKeepOutFor(box));
       setSize((current) => (
         Math.abs(current.width - box.width) < 1 && Math.abs(current.height - box.height) < 1
           ? current
@@ -288,9 +231,8 @@ export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphere
       subjects: shown.map((item) => ({ id: item.id, priority: wishPriority(item.priority) })),
       field: size,
       quality,
-      ...(keepOut === null ? {} : { keepOut }),
     });
-  }, [shown, size, quality, keepOut]);
+  }, [shown, size, quality]);
 
   const placeById = useMemo(
     () => new Map(places.map((place) => [place.id, place])),
@@ -302,7 +244,6 @@ export function WishlistSphereView({ items, onShowAll, ...card }: WishlistSphere
   const billiards = useWishSphereBilliards({
     places,
     size,
-    keepOut,
     still,
     parallaxByLayer: PARALLAX_BY_LAYER,
   });

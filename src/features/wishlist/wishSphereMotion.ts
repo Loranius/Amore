@@ -35,20 +35,20 @@ export interface WishSphereBody {
   calm: number;
 }
 
-/** Силует монарха в пікселях поля — кулі від нього відбиваються. */
-export interface WishSphereObstacle {
-  centreX: number;
-  /** Висота вершини; вище неї перешкоди немає. */
-  tipY: number;
-  /** Півширина біля вершини і біля низу кадру. */
-  tipWidth: number;
-  baseWidth: number;
-}
+// Силует монарха більше не борт.
+//
+// Власник: «кристал має стати фоном, а не активним об'єктом у модулі
+// вішліста». Поки куля від нього відскакувала, він був об'єктом столу — і саме
+// з цього росли обидві виміряні тут вади: смуга праворуч від каменю вужча за
+// кулю, тож легального місця там не існувало взагалі, і кулю доводилось
+// виштовхувати вгору по схилу, щоб вона не застрягла назавжди.
+//
+// Тепер бортами лишились тільки краї кадру, а фон відсувають назад приглушення
+// й розмиття — засоби презентації, а не фізики.
 
 export interface WishSphereWorld {
   width: number;
   height: number;
-  obstacle?: WishSphereObstacle | undefined;
   /** Куля, яку зараз тримає палець: вона не рухається сама, але штовхає інших. */
   held?: number | null | undefined;
 }
@@ -162,7 +162,7 @@ function finite(value: number, fallback: number): number {
 /**
  * Один крок світу куль.
  *
- * Порядок навмисний: тертя → рух → стінки → перешкода → зіткнення. Зіткнення
+ * Порядок навмисний: тертя → повернення → рух → стінки → зіткнення. Зіткнення
  * останні, бо саме вони мусять лишити картину без перекриттів; якби після них
  * ішов зсув від стінки, куля могла б знову опинитись у сусідові.
  */
@@ -263,20 +263,6 @@ export function stepWishSpheres(
     return item;
   });
 
-  // Монарх — теж борт, а не порожнє місце.
-  //
-  // Без цього куля, кинута в центр, лягала б просто на камінь: ієрархія
-  // «монарх → бажання» трималась би лише доти, доки нікому не спало б на думку
-  // щось кинути.
-  const obstacle = world.obstacle;
-  if (obstacle !== undefined) {
-    const axis = finite(obstacle.centreX, width / 2);
-    const tip = finite(obstacle.tipY, height);
-    const near = Math.max(0, finite(obstacle.tipWidth, 0));
-    const far = Math.max(near, finite(obstacle.baseWidth, 0));
-    pushOutOfObstacle(next, { axis, tip, near, far, width, height, held, dt }, true);
-  }
-
   // Зіткнення кожної пари. Маса за площею: велика куля не відлітає від малої.
   for (let a = 0; a < next.length; a += 1) {
     for (let b = a + 1; b < next.length; b += 1) {
@@ -329,29 +315,6 @@ export function stepWishSpheres(
     }
   }
 
-  // Перешкода ще раз, уже без відскоку.
-  //
-  // Зіткнення розсовують кулі після того, як силует перевірено, — і сусід
-  // цілком може заштовхати когось назад на камінь. Виміряно тестом: без цього
-  // проходу куля лишалась за десять пікселів усередині монарха. Тут лише
-  // положення: швидкість свій відскок уже отримала.
-  if (obstacle !== undefined) {
-    pushOutOfObstacle(
-      next,
-      {
-        axis: finite(obstacle.centreX, width / 2),
-        tip: finite(obstacle.tipY, height),
-        near: Math.max(0, finite(obstacle.tipWidth, 0)),
-        far: Math.max(Math.max(0, finite(obstacle.tipWidth, 0)), finite(obstacle.baseWidth, 0)),
-        width,
-        height,
-        held,
-        dt,
-      },
-      false,
-    );
-  }
-
   // Останній штрих — повернути всіх у кадр.
   //
   // Зіткнення розсовують кулі, і крайню з них може виштовхнути за борт уже
@@ -363,66 +326,6 @@ export function stepWishSpheres(
   }
 
   return next;
-}
-
-interface ObstacleFrame {
-  axis: number;
-  tip: number;
-  near: number;
-  far: number;
-  width: number;
-  height: number;
-  held: number | null;
-  dt: number;
-}
-
-/** Як швидко камінь виштовхує кулю вгору, пікселів за секунду. */
-const SLIDE_SPEED = 900;
-
-/**
- * Виштовхує кулі із силуету монарха.
- *
- * Утримувана куля виняток: поки її веде палець, вона слухає палець, а не
- * камінь. Інакше перетягування через центр екрана відчувалось би як боротьба з
- * інтерфейсом. Щойно її відпустять, вона перестає бути винятком і наступний же
- * крок виставить її назовні.
- */
-function pushOutOfObstacle(bodies: WishSphereBody[], frame: ObstacleFrame, bounce: boolean): void {
-  for (const item of bodies) {
-    if (item.id === frame.held) continue;
-    if (item.y + item.radius < frame.tip) continue;
-    const depth = Math.min(
-      1,
-      Math.max(0, (item.y - frame.tip) / Math.max(1e-6, frame.height - frame.tip)),
-    );
-    const halfWidth = frame.near + depth * (frame.far - frame.near) + item.radius;
-    const offset = item.x - frame.axis;
-    if (Math.abs(offset) >= halfWidth) continue;
-
-    const side = offset === 0 ? (item.id % 2 === 0 ? -1 : 1) : Math.sign(offset);
-    const wanted = frame.axis + side * halfWidth;
-    if (wanted - item.radius >= 0 && wanted + item.radius <= frame.width) {
-      item.x = wanted;
-      if (bounce) item.vx = side * Math.abs(item.vx) * RESTITUTION;
-      continue;
-    }
-
-    // Убік нема куди — і це не крайній випадок, а звичайний.
-    //
-    // Монарх стоїть правіше центру, тож смуга між ним і правим краєм вужча за
-    // саму кулю: легального місця з того боку не існує взагалі. Виміряно —
-    // куля застрягала там назавжди, за десять пікселів усередині каменю, бо
-    // виштовхування вбік щоразу відміняв упор у край кадру.
-    //
-    // Камінь звужується догори, тож вихід є завжди — угору. Не стрибком:
-    // куля з'їжджає по схилу, поки не звільниться, і це читається як
-    // виштовхування, а не як телепорт крізь камінь.
-    const ceiling = frame.tip - item.radius;
-    if (item.y > ceiling) {
-      item.y = Math.max(ceiling, item.y - SLIDE_SPEED * frame.dt);
-      if (bounce) item.vy = Math.min(item.vy, -SLIDE_SPEED * 0.35);
-    }
-  }
 }
 
 /**

@@ -14,6 +14,7 @@ import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { WishlistBubbleView } from './WishlistBubbleView';
 import { WishlistSphereView } from './WishlistSphereView';
 import { WishlistWorldNav } from './WishlistWorldNav';
+import { readWishlistQuality } from './wishlistQuality';
 import { WishlistFeedView } from './WishlistFeedView';
 import { WishlistPolaroidView } from './WishlistPolaroidView';
 import { WishFormModal } from './WishFormModal';
@@ -223,11 +224,21 @@ export function WishlistPage() {
   // §9: сцена монарха лишається фоном вішліста — тим самим, що й на головній,
   // але приглушеним. Приглушення живе на маркері модуля, а не в самій сцені:
   // жодного глобального параметра не змінено, і головна виглядає як була.
+  //
+  // Разом із маркером іде профіль пристрою. Приглушення тепер не лише
+  // накладка: власник попросив «легенький блюр на фоні, щоб трішки відділити
+  // модуль від фону», а розмиття по повноекранному полотну — це справжній
+  // прохід на кожен кадр. На слабкому пристрої його не буде, і вирішує це CSS
+  // за тим самим профілем, за яким живе решта світу.
   useEffect(() => {
     if (!worldVisible) return;
     const root = document.documentElement;
     root.setAttribute('data-wishlist-scene', 'dim');
-    return () => { root.removeAttribute('data-wishlist-scene'); };
+    root.setAttribute('data-wishlist-quality', readWishlistQuality());
+    return () => {
+      root.removeAttribute('data-wishlist-scene');
+      root.removeAttribute('data-wishlist-quality');
+    };
   }, [worldVisible]);
   const boardFilterCounts = wishlistPriorityFilterCounts(contextItems);
   const visibleItems = applyWishlistBoardView(contextItems, activeBoardView);

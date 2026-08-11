@@ -14,11 +14,9 @@ import {
 // тому вони тут, а не «перевірені оком».
 // ============================================================
 
-const WORLD: WishSphereWorld = {
-  width: 412,
-  height: 620,
-  obstacle: { centreX: 260, tipY: 240, tipWidth: 60, baseWidth: 140 },
-};
+// Стіл без перешкод: силует монарха більше не борт. Власник зробив кристал
+// фоном модуля, і фізика про нього нічого не знає.
+const WORLD: WishSphereWorld = { width: 412, height: 620 };
 
 /**
  * Куля для тесту. Місце в сузір'ї за умовчанням там, де куля стоїть: у
@@ -49,12 +47,18 @@ describe('inertia', () => {
     // тертя куля ніколи не зупиняється й тримає цикл кадрів вічно.
     //
     // Міряється до того, як почне збиратись сузір'я: інакше замість тертя тут
-    // перевірялось би повернення, яке спиняє кулю з іншої причини.
+    // перевірялось би повернення, яке спиняє кулю з іншої причини. Звідси й
+    // 2.4 с — під порогом 2.6.
+    //
+    // Дві секунди тут стояли, поки на столі був камінь: куля доїжджала до
+    // силуету, відскакувала й гасла швидше. Відколи кристал став фоном, вона
+    // котиться вільно, і чисте тертя гасить 420 px/с до порога нерухомості за
+    // 2.19 с. Число змінилось, властивість — ні.
     const start = body({ id: 1, x: 60, y: 500, vx: 420, vy: 0 });
     const moved = settle([start], WORLD, 0.2);
     expect(moved[0]!.x).toBeGreaterThan(start.x + 20);
 
-    const stopped = settle([start], WORLD, 2);
+    const stopped = settle([start], WORLD, 2.4);
     expect(stopped[0]!.vx).toBe(0);
     expect(stopped[0]!.vy).toBe(0);
   });
@@ -84,9 +88,9 @@ describe('collisions', () => {
     // умова, а не домівка. Інакше перевірка мовчки перетворилась би на «чи
     // переважує розштовхування повернення».
     const stacked = [
-      body({ id: 1, x: 200, y: 500, radius: 36, homeX: 60, homeY: 500 }),
-      body({ id: 2, x: 206, y: 502, radius: 30, homeX: 60, homeY: 400 }),
-      body({ id: 3, x: 203, y: 498, radius: 24, homeX: 60, homeY: 310 }),
+      body({ id: 1, x: 200, y: 500, radius: 36, homeX: 90, homeY: 500 }),
+      body({ id: 2, x: 206, y: 502, radius: 30, homeX: 90, homeY: 400 }),
+      body({ id: 3, x: 203, y: 498, radius: 24, homeX: 90, homeY: 310 }),
     ];
     const state = settle(stacked, WORLD, 2);
     for (const a of state) {
@@ -102,9 +106,6 @@ describe('collisions', () => {
     // Це і є «як кулі в більярді»: та, у яку влучили, рушає з місця, а та, що
     // вдарила, втрачає частину швидкості.
     //
-    // Стіл тут вільний — без силуету монарха. Перша редакція цієї перевірки
-    // ставила обидві кулі просто в камінь, і рухав їх він, а не удар: тест
-    // показував не те, що перевіряв.
     const table: WishSphereWorld = { width: WORLD.width, height: WORLD.height };
     const cue = body({ id: 1, x: 80, y: 560, vx: 600, vy: 0, radius: 30 });
     const target = body({ id: 2, x: 145, y: 560, vx: 0, vy: 0, radius: 30 });
@@ -125,29 +126,6 @@ describe('collisions', () => {
     expect(state[0]!.x).toBe(200);
     expect(state[0]!.y).toBe(500);
     expect(state[1]!.x).toBeGreaterThan(240);
-  });
-});
-
-describe('the monarch is a cushion, not empty space', () => {
-  it('never leaves a sphere inside the silhouette', () => {
-    // Ієрархія «монарх → бажання» не має триматись на тому, що ніхто нічого не
-    // кинув у центр.
-    // Домівки задані явно й обидві поза каменем — такими їх і дає розкладка.
-    // Куля, чиє місце було б усередині силуету, перевіряла б не відскок, а
-    // те, хто дужчий: повернення чи камінь.
-    const thrown = [
-      body({ id: 1, x: 60, y: 520, vx: 900, vy: -200, homeX: 60, homeY: 520 }),
-      body({ id: 2, x: 380, y: 560, vx: -1200, vy: -100, radius: 40, homeX: 70, homeY: 420 }),
-    ];
-    const state = settle(thrown, WORLD, 6);
-    const obstacle = WORLD.obstacle!;
-    for (const item of state) {
-      if (item.y + item.radius < obstacle.tipY) continue;
-      const depth = Math.min(1, Math.max(0, (item.y - obstacle.tipY) / (WORLD.height - obstacle.tipY)));
-      const halfWidth = obstacle.tipWidth + depth * (obstacle.baseWidth - obstacle.tipWidth);
-      expect(Math.abs(item.x - obstacle.centreX), `${item.id}`)
-        .toBeGreaterThanOrEqual(halfWidth + item.radius - 1e-6);
-    }
   });
 });
 
@@ -272,12 +250,20 @@ describe('the step is honest', () => {
   it('does not depend on the frame rate for where a sphere lands', () => {
     // Тертя експоненційне саме заради цього: на швидкому екрані куля має
     // котитись так само далеко, як на повільному.
+    //
+    // Допуск виражений часткою пройденого шляху, а не пікселями. Пікселі тут
+    // стояли, поки куля впиралась у силует монарха: борт зрізав розбіжність, і
+    // «менше за шість» виглядало точністю, якою насправді був упор. На вільному
+    // столі видно справжню ціну кроку Ейлера — 2.6% шляху, і саме її тут і
+    // названо.
     const start = [body({ id: 1, x: 60, y: 560, vx: 500, vy: 0 })];
     let fast = [...start];
     for (let i = 0; i < 240; i += 1) fast = stepWishSpheres(fast, WORLD, 1 / 120);
     let slow = [...start];
     for (let i = 0; i < 60; i += 1) slow = stepWishSpheres(slow, WORLD, 1 / 30);
-    expect(Math.abs(fast[0]!.x - slow[0]!.x)).toBeLessThan(6);
+    const rolled = Math.abs(slow[0]!.x - 60);
+    expect(rolled).toBeGreaterThan(150);
+    expect(Math.abs(fast[0]!.x - slow[0]!.x)).toBeLessThan(rolled * 0.04);
   });
 
   it('survives nonsense instead of spreading NaN', () => {

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { stepWishSpheres, wishSpheresAtRest, type WishSphereBody } from './wishSphereMotion';
 import {
-  stepWishSpheres,
-  wishSpheresAtRest,
-  type WishSphereBody,
-  type WishSphereObstacle,
-} from './wishSphereMotion';
-import type { WishSphereKeepOut, WishSpherePlacement } from './wishSphereField';
+  wishSphereEntrance,
+  wishSphereEntranceOrder,
+  wishSphereEntranceSpan,
+} from './wishSphereEntrance';
+import type { WishSpherePlacement } from './wishSphereField';
 
 // ============================================================
 // Куля під пальцем — місток між фізикою і DOM.
@@ -51,29 +51,14 @@ export interface WishSphereBilliards {
   wasThrown: (id: number) => boolean;
 }
 
-function obstacleFor(
-  keepOut: WishSphereKeepOut | null,
-  size: { width: number; height: number },
-): WishSphereObstacle | undefined {
-  if (keepOut === null) return undefined;
-  return {
-    centreX: keepOut.centreX * size.width,
-    tipY: keepOut.tipY * size.height,
-    tipWidth: keepOut.tipWidth * size.width,
-    baseWidth: keepOut.baseWidth * size.width,
-  };
-}
-
 export function useWishSphereBilliards({
   places,
   size,
-  keepOut,
   still,
   parallaxByLayer,
 }: {
   places: readonly WishSpherePlacement[];
   size: { width: number; height: number };
-  keepOut: WishSphereKeepOut | null;
   still: boolean;
   parallaxByLayer: Readonly<Record<WishSpherePlacement['layer'], number>>;
 }): WishSphereBilliards {
@@ -85,8 +70,18 @@ export function useWishSphereBilliards({
   const thrown = useRef(new Set<number>());
   const frame = useRef(0);
   const last = useRef(0);
-
-  const obstacle = useMemo(() => obstacleFor(keepOut, size), [keepOut, size]);
+  // Вхід у кадр: коли набір з'явився і в якому порядку кулі випливають.
+  //
+  // Нуль означає «входу немає» — так буває при зміні розміру поля, при
+  // `prefers-reduced-motion` і після того, як усе прилетіло.
+  const entranceAt = useRef(0);
+  const beats = useRef(new Map<number, number>());
+  const shownSignature = useRef('');
+  // Розмір поля потрібен малюванню, але не має перебудовувати його щоразу:
+  // `paint` перестворюється лише від паралаксу, і саме тому цикл кадрів не
+  // зривається на кожну зміну розміру.
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
 
   // Тіла народжуються з розкладки й переживають перемальовування.
   //
@@ -96,17 +91,50 @@ export function useWishSphereBilliards({
   const signature = places.map((place) => `${place.id}:${place.diameter.toFixed(1)}`).join('|');
 
   const paint = useCallback(() => {
+    const elapsed = entranceAt.current === 0 ? 0 : performance.now() - entranceAt.current;
+    let flying = false;
+
     for (const body of bodies.current) {
       const node = nodes.current.get(body.id);
       if (node === undefined) continue;
       const layer = layers.current.get(body.id) ?? 'mid';
       const depth = parallaxByLayer[layer];
+
+      // Вхід — це зсув від власного місця, а не окреме життя елемента.
+      //
+      // Положення щокадру пише фізика; CSS-анімація того ж `transform`
+      // затирала б її щокадру ж. Тому політ складається сюди, у той самий
+      // рядок, — так само, як паралакс.
+      const entrance = entranceAt.current === 0
+        ? null
+        : wishSphereEntrance({
+          elapsed,
+          beat: beats.current.get(body.id) ?? 0,
+          // Куля починає за правим краєм поля: не «десь праворуч», а рівно
+          // за межею, щоб її не було видно до свого такту.
+          travel: Math.max(0, sizeRef.current.width + body.radius * 1.6 - body.homeX),
+        });
+      if (entrance !== null && entrance.flying) flying = true;
+
       // Паралакс складається з фізикою в одному рядку: два власники того
       // самого `transform` затирали б одне одного щокадру.
-      const x = body.x - tilt.current.x * depth;
-      const y = body.y - tilt.current.y * depth;
-      node.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)`;
+      const x = body.x - tilt.current.x * depth + (entrance?.dx ?? 0);
+      const y = body.y - tilt.current.y * depth + (entrance?.dy ?? 0);
+      const scale = entrance === null || !entrance.flying ? '' : ` scale(${entrance.scale.toFixed(3)})`;
+      node.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0)${scale}`;
+      // Непрозорість повертається під владу CSS, щойно куля прилетіла: інакше
+      // вбудований стиль назавжди перекрив би прозорість шару глибини.
+      if (entrance !== null && entrance.flying) node.style.opacity = entrance.opacity.toFixed(3);
+      else if (node.style.opacity !== '') node.style.opacity = '';
     }
+
+    // Коли останній долетів, входу більше немає: далі малює сама фізика.
+    //
+    // Друга умова — жорсткий рубіж, а не підстраховка з ввічливості: вхід
+    // тримає цикл кадрів увімкненим, і якби `flying` колись не згас (скажімо,
+    // від нескінченного `travel`), телефон крутив би кадри вічно.
+    const span = wishSphereEntranceSpan(bodies.current.length);
+    if (entranceAt.current !== 0 && (!flying || elapsed > span + 200)) entranceAt.current = 0;
   }, [parallaxByLayer]);
 
   // Цикл кадрів мусить брати СВІЖИЙ крок, а не той, з яким його запустили.
@@ -131,18 +159,18 @@ export function useWishSphereBilliards({
     bodies.current = stepWishSpheres(bodies.current, {
       width: size.width,
       height: size.height,
-      obstacle,
       held: held.current?.id ?? null,
     }, delta);
     paint();
 
-    // Кадри замовляються, лише поки є що рухати.
-    if (held.current !== null || !wishSpheresAtRest(bodies.current)) {
+    // Кадри замовляються, лише поки є що рухати. Вхід теж рух: під час нього
+    // тіла стоять удома й фізика мовчить, а летить намальований зсув.
+    if (held.current !== null || entranceAt.current !== 0 || !wishSpheresAtRest(bodies.current)) {
       frame.current = window.requestAnimationFrame(pump);
     } else {
       last.current = 0;
     }
-  }, [obstacle, paint, pump, size.height, size.width]);
+  }, [paint, pump, size.height, size.width]);
 
   step.current = tick;
 
@@ -177,6 +205,24 @@ export function useWishSphereBilliards({
       calm: 0,
     }));
     layers.current = new Map(places.map((place) => [place.id, place.layer]));
+
+    // Вхід рахується від появи САМОГО НАБОРУ, а не від будь-якого перерахунку.
+    //
+    // Ефект перезапускається ще й на зміну розміру поля — на повороті екрана
+    // або коли з'їжджає клавіатура. Програвати виліт із-за краю ще раз тоді
+    // означало б, що сузір'я розлітається від дотику до нічого.
+    const fresh = shownSignature.current !== signature;
+    shownSignature.current = signature;
+    if (fresh && !still && places.length > 0) {
+      beats.current = wishSphereEntranceOrder(places.map((place) => place.id));
+      entranceAt.current = performance.now();
+    } else if (!fresh) {
+      // Розмір змінився посеред польоту — політ триває, але з нових місць.
+      beats.current = wishSphereEntranceOrder(places.map((place) => place.id));
+    } else {
+      entranceAt.current = 0;
+    }
+
     paint();
     // Один поштовх циклу одразу після народження тіл.
     //
@@ -188,7 +234,7 @@ export function useWishSphereBilliards({
     wake();
     // Розкладка вже дала кожній кулі місце; сюди її веде саме `signature`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, size.width, size.height, paint]);
+  }, [signature, size.width, size.height, paint, still]);
 
   useEffect(() => () => {
     if (frame.current !== 0) window.cancelAnimationFrame(frame.current);
@@ -226,6 +272,10 @@ export function useWishSphereBilliards({
 
   const onPointerDown = useCallback((id: number, event: React.PointerEvent<HTMLElement>) => {
     if (still) return;
+    // Куля ще в польоті — вона нічия. Інакше палець забирав би її на півдорозі
+    // й вона лишалась би намальованою збоку від власного тіла: фізика веде
+    // тіло за пальцем, а зсув входу малює його деінде.
+    if (entranceAt.current !== 0) return;
     const node = event.currentTarget;
     const box = node.parentElement?.getBoundingClientRect();
     if (box === undefined) return;

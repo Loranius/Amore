@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildWishSphereField,
-  DEFAULT_MONARCH_KEEP_OUT,
-  monarchKeepOut,
   wishSphereBaseDiameter,
   wishSphereCapacity,
   type WishSphereFieldInput,
@@ -13,7 +11,7 @@ import {
 // Сузір'я бажань — вимоги власника до просторової композиції вішліста.
 // ------------------------------------------------------------
 // Тримають рівно те, що названо вимогою: жодної сітки, стабільні позиції між
-// перемальовуваннями, сфери меншi за монарха й такі, що його не перекривають.
+// перемальовуваннями, сфери меншi за монарха й такі, що не злипаються в точку.
 // Краса розкладки — смак; ці властивості — ні.
 // ============================================================
 
@@ -58,21 +56,22 @@ describe('wish sphere constellation', () => {
     expect(rows.size).toBeGreaterThan(board.length * 0.75);
   });
 
-  it('leaves the monarch its silhouette', () => {
-    // Монарх у вішлісті — фон, але фон, який має лишатись упізнаваним. Жодна
-    // сфера не заходить у його силует.
-    for (const count of [1, 3, 7, 12, 16]) {
-      const board = buildWishSphereField({ ...PHONE, subjects: subjects(count) });
-      for (const sphere of board) {
-        const halfX = (sphere.diameter / 2) / PHONE.field.width;
-        expect(
-          Math.abs(sphere.x - DEFAULT_MONARCH_KEEP_OUT.centreX) - halfX,
-          `${count}/${sphere.id}`,
-        ).toBeGreaterThanOrEqual(
-          monarchKeepOut(DEFAULT_MONARCH_KEEP_OUT, sphere.y) - 1e-9,
-        );
-      }
-    }
+  it('uses the whole field, the crystal being background now', () => {
+    // Змінена вимога, і змінив її власник: «кристал має стати фоном, а не
+    // активним об'єктом у модулі вішліста».
+    //
+    // Раніше тут перевірялось протилежне — що жодна сфера не заходить у силует
+    // монарха. Та заборона робила розкладку залежною від пози камери маршруту:
+    // модуль мусив знати, де саме стоїть камінь у вікні.
+    //
+    // Тепер перевіряється, що середня смуга справді відкрита. Не «сфера там
+    // буває»: при шістнадцяти бажаннях у центральній третині поля мусить стояти
+    // хоч кілька, інакше заборона десь лишилась.
+    const board = buildWishSphereField({ ...PHONE, subjects: subjects(16) });
+    const middle = board.filter((sphere) => sphere.x > 0.36 && sphere.x < 0.64);
+    expect(middle.length).toBeGreaterThanOrEqual(3);
+    // І нижня частина середини — теж: саме там силует був найширшим.
+    expect(middle.some((sphere) => sphere.y > 0.55)).toBe(true);
   });
 
   it('keeps every sphere inside the field, clear of the tabs and the dock', () => {

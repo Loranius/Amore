@@ -61,12 +61,33 @@ describe('the price stays low (§18)', () => {
     expect(BARE).not.toContain('backdrop-filter');
   });
 
-  it('dims the background scene with a wash, not with a filter over the canvas', () => {
-    // Фільтр по повноекранному полотну — зайвий прохід на кожен кадр, і на
-    // слабкому пристрої це помітно.
+  it('dims the background scene with a wash', () => {
     const wash = block("[data-wishlist-scene='dim'] .artifact-world::after");
     expect(wash).toMatch(/background:/);
-    expect(BARE).not.toMatch(/\.artifact-world[^{]*\{[^}]*filter:/);
+  });
+
+  it('blurs the background lightly, and not at all on a weak device', () => {
+    // Змінена вимога, і змінив її власник: «додай легенький блюр на фоні в
+    // вішлисті, щоб трішки відділити модуль від фону».
+    //
+    // Раніше тут стояла заборона: жодного фільтра по полотну. Причина була
+    // правильна — розмиття повноекранного анімованого полотна браузер
+    // перераховує щокадру. Тому заборона не зникла, а звузилась до того, де
+    // вона справді потрібна: на слабкому профілі розмиття немає.
+    const scene = block("[data-wishlist-scene='dim'] .artifact-world");
+    const radius = /blur\((\d+(?:\.\d+)?)px\)/.exec(scene);
+    expect(radius, 'фон має розмиватись').not.toBeNull();
+    // «Легенький»: фон лишається впізнаваним, а не перетворюється на пляму.
+    expect(Number(radius![1])).toBeGreaterThan(0);
+    expect(Number(radius![1])).toBeLessThanOrEqual(6);
+    // Без масштабу розмиття лишає світлу смугу по краях екрана: `blur()` бере
+    // за межами елемента прозорість.
+    expect(scene).toMatch(/transform:\s*scale\(1\.0[1-9]\)/);
+
+    // Слабкий профіль розмиття не платить.
+    const spared = BARE.slice(BARE.indexOf("[data-wishlist-quality='low']"));
+    expect(spared).toMatch(/filter:\s*none/);
+    expect(BARE).toContain("[data-wishlist-quality='fallback']");
   });
 });
 
