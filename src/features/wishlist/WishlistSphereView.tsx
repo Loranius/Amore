@@ -100,13 +100,20 @@ function WishSphere({
     onOpenChange(item.id, detailsOpen);
   }, [item.id, detailsOpen, onOpenChange]);
 
-  // Оброблене фото має перевагу: воно вже без фону, тобто всередині сфери
-  // читається предметом, а не прямокутником із чужим тлом.
-  const source = item.processed_image_url ?? item.image_url ?? null;
-  // Збите фото не має лишати в кулі іконку зламаного зображення: сфера
-  // повертається до зернини світла — так само, як бажання зовсім без фото.
-  const [broken, setBroken] = useState(false);
-  const photo = broken ? null : source;
+  // Два кандидати, і саме в такому порядку.
+  //
+  // Перевагу має ПОВНЕ фото: відколи воно заповнює кулю цілком, вирізаний
+  // предмет (`processed_image_url`) дає збільшений шматок на порожнечі —
+  // рівно не те, що просив власник («ціла куля відображала своє фото»).
+  //
+  // Але оригінал часто лежить на сайті магазину, і туди можна не достукатись.
+  // Виміряно на живому порталі: проста заміна одного джерела на інше лишила
+  // три кулі з семи порожніми. Тому не заміна, а черга: не завантажився
+  // оригінал — беремо оброблене, не вийшло і воно — зернина світла.
+  const candidates = [item.image_url, item.processed_image_url]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+  const [attempt, setAttempt] = useState(0);
+  const photo = candidates[attempt] ?? null;
 
   return (
     <button
@@ -145,7 +152,10 @@ function WishSphere({
             alt=""
             loading="lazy"
             decoding="async"
-            onError={() => setBroken(true)}
+            // Ключ за адресою: без нього браузер лишає збите зображення й
+            // події про наступного кандидата не буде.
+            key={photo}
+            onError={() => setAttempt((current) => current + 1)}
           />
         )}
         <span className="wl-sphere__glow" />

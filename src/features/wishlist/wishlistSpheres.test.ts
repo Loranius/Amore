@@ -22,14 +22,39 @@ function block(selector: string): string {
 }
 
 describe('the sphere is glass, not an avatar', () => {
-  it('fits the object inside instead of cropping a photo to a circle', () => {
-    // Вимога сформульована як заборона: «circle → photograph cropped into
-    // circle → border» робити не можна. Тому зображення вписується цілком
-    // (`contain`), займає менше за кулю й гасне маскою, а не обрізається.
+  it('fills the whole ball with the photo, and keeps the glass on top of it', () => {
+    // ЗМІНЕНА ВИМОГА, і змінив її власник: «зроби фото в сфері круглими, щоб
+    // фото в кулі виглядало органічно без кутів, фото розтягни рівномірно по
+    // кулі, щоб ціла куля відображала своє фото».
+    //
+    // Тут стояла протилежна перевірка: зображення мусило вписуватись цілком
+    // (`contain`), займати менше за кулю й гаснути маскою — початковий бриф
+    // забороняв кругле обрізання прямим текстом, бо куля перетворювалась би на
+    // аватарку.
+    //
+    // Заборона не зникла, а переїхала. Різницю між «предмет під склом» і
+    // «аватарка в рамці» тепер тримає не розмір фото, а те, що лежить ПОВЕРХ
+    // нього, — і саме це перевіряється нижче. Приберуть шар скла — тест
+    // впаде, бо тоді в кулі справді лишиться сама лиш кругла фотографія.
     const image = block('.wl-sphere-field .wl-sphere__image');
-    expect(image).toMatch(/object-fit:\s*contain/);
-    expect(image).not.toMatch(/object-fit:\s*cover/);
-    expect(image).toMatch(/mask-image:\s*radial-gradient/);
+    expect(image).toMatch(/object-fit:\s*cover/);
+    expect(image).toMatch(/inset:\s*0/);
+    expect(image).toMatch(/border-radius:\s*50%/);
+
+    // Скло поверх фото: рожева димка, світло згори й товща знизу — в одному
+    // шарі, і він мусить лежати вище за фото.
+    const glass = block('.wl-sphere-field .wl-sphere__body::after');
+    expect(glass).toMatch(/z-index:\s*[1-9]/);
+    expect(glass).toMatch(/radial-gradient/);
+    // Рожева димка названа вимогою окремо, тож і перевіряється окремо: у
+    // шарі мусить бути справді рожевий, а не ще один бузковий.
+    const pinks = [...glass.matchAll(/rgba\((\d+),\s*(\d+),\s*(\d+)/g)]
+      .map(([, r, g, b]) => ({ r: Number(r), g: Number(g), b: Number(b) }));
+    expect(pinks.some((c) => c.r > 200 && c.b > 150 && c.r - c.g > 60)).toBe(true);
+
+    // І блік — над усім: скло перед предметом, а не поруч із ним.
+    const specular = block('.wl-sphere-field .wl-sphere__body::before');
+    expect(specular).toMatch(/z-index:\s*[1-9]/);
   });
 
   it('keeps the object recognisable rather than turning it into a pink blur', () => {
