@@ -1,30 +1,24 @@
 // ============================================================
 // «Плани» — об'єднаний модуль: події пари й календар з планами.
 // ------------------------------------------------------------
-// Власник звів два модулі в один: «об'єднати плани і календар. На один модуль
-// буде менше». Верхня панель — та сама скляна панель вкладок, що у вішліста, і
-// вкладок рівно дві:
+// У календарі живуть ДВІ різні сутності:
+//   plan  — те, що пара збирається зробити; має статус, бюджет, задачі й
+//           окрему плитку під календарем;
+//   event — дата / свято / день народження; лишається позначкою в календарі
+//           й отримує Telegram-нагадування, але НЕ стає планом.
 //
-//   Події    — «Наш шлях» із календаря. Саме ці події живлять кристал, і
-//              функціонал лишився той самий.
-//   Календар — місяць першим екраном, під ним плани плитками у два стовпці.
-//
-// **Що зникло, і чому саме це.** Вкладка «Дні народження» — самі дати лишились
-// подіями й видно їх у сітці, а окремий список під них дублював календар.
-// Перемикач виглядів (список / місяць / рік) — дві вкладки нагорі і Є
-// перемикачем, а третій поверх перемикачів робив би з екрана панель керування.
-// Решта кнопок у верхньому куті: лишилась одна дія, і вона йде за вкладкою.
-//
-// **Дані не змінились.** Ті самі запити, мутації й типи; об'єднання — це
-// маршрут і композиція. Кристал так само росте з подій пари.
+// «Події» нагорі — окремий контекст: це тільки «Наш шлях» (anniversary),
+// тобто моменти історії пари, а не звичайні календарні нагадування.
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { EventIcon } from '@/components/icons/EventIcon';
+import { BulbIcon } from '@/components/icons/PlanIcon';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { useDimmedWorld } from '@/features/world/worldDim';
-import { currentYearMonth, stepMonth } from '@/features/_shared/month';
+import { currentYearMonth, formatDateUA, stepMonth } from '@/features/_shared/month';
 import { useCalendarMutations, useEvents } from '@/features/calendar/useCalendar';
 import { enrichEvent, sortEnriched } from '@/features/calendar/calendarUtils';
 import { CalendarMonthView } from '@/features/calendar/CalendarViews';
@@ -42,15 +36,14 @@ import type { EventRow, EventType } from '@/types';
 /** Розділ модуля. Календар перший: власник просив, щоб його бачили одразу. */
 type Section = 'calendar' | 'events';
 
-/**
- * Подія, яку тут заводять, — це подія пари.
- *
- * Дні народження лишаються окремим типом і живуть у сітці, але створює їх та
- * сама форма: тип обирають у ній, а не вкладкою нагорі.
- */
-type EventKind = Extract<EventType, 'anniversary' | 'birthday'>;
+type EventKind = Extract<EventType, 'anniversary' | 'birthday' | 'holiday'>;
 
-type EventModal = { row: EventRow | null; date?: string | undefined; type: EventKind } | null;
+type EventModal = {
+  row: EventRow | null;
+  date?: string | undefined;
+  type: EventKind;
+  surface: Section;
+} | null;
 
 function requestedSection(value: string | null): Section {
   return value === 'events' ? 'events' : 'calendar';
@@ -66,14 +59,6 @@ export function PlansPage() {
   useWorldVisibleRoute();
   useDimmedWorld(worldVisible);
 
-  // Розділ живе в адресі, і ТІЛЬКИ в ній.
-  //
-  // Спершу він був станом, який ефект відображав в адресу, — і це давало
-  // тиху ваду: посилання `?tab=events` спрацьовувало лише при монтуванні.
-  // Відкрий його, стоячи вже на «Планах», — і ефект миттєво переписував
-  // адресу зі свого стану, тобто повертав календар. Виміряно на живому
-  // порталі: два переходи в одному сеансі, і другий показував не те, що
-  // просили.
   const section = requestedSection(searchParams.get('tab'));
   const setSection = (next: Section) => {
     const params = new URLSearchParams(searchParams);
@@ -81,10 +66,13 @@ export function PlansPage() {
     else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
+
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
   const [addingPlan, setAddingPlan] = useState(false);
   const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
   const [eventModal, setEventModal] = useState<EventModal>(null);
+  const [createChooserOpen, setCreateChooserOpen] = useState(false);
+  const [createChooserDate, setCreateChooserDate] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
 
   const plansQuery = usePlans();
@@ -95,33 +83,65 @@ export function PlansPage() {
   const plans = useMemo(() => plansQuery.data ?? [], [plansQuery.data]);
   const events = useMemo(() => eventsQuery.data ?? [], [eventsQuery.data]);
 
-  // Старі holiday-рядки лишаються в базі, але особистим календарем пари не є.
-  const personal = useMemo(
-    () => events.filter((event) => event.type === 'anniversary' || event.type === 'birthday'),
+  // Календар показує важливі моменти, дні народження й звичайні календарні
+  // дати/свята. Вони всі живуть у `events`, тому ніколи не потрапляють у
+  // PlanSection нижче.
+  const calendarEvents = useMemo(
+    () => events.filter((event) => (
+      event.type === 'anniversary' || event.type === 'birthday' || event.type === 'holiday'
+    )),
     [events],
   );
-  const enriched = useMemo(() => personal.map(enrichEvent).sort(sortEnriched), [personal]);
+  const enriched = useMemo(
+    () => calendarEvents.map(enrichEvent).sort(sortEnriched),
+    [calendarEvents],
+  );
   const journeyEvents = useMemo(
-    () => personal.filter((event) => event.type === 'anniversary'),
-    [personal],
+    () => calendarEvents.filter((event) => event.type === 'anniversary'),
+    [calendarEvents],
   );
 
   const groups = useMemo(() => groupPlans(plans), [plans]);
   const activeCount = groups.upcoming.length + groups.ideas.length;
 
-  // Кожна модалка живе у своїй вкладці, і це вимога власника, а не охайність:
-  // «перший скрін модалка має бути лише в календарі, другий скрін модалка має
-  // бути лише в подіях».
-  //
-  // Тому подію не заводять із сітки місяця. Дотик по події в сітці переводить
-  // у «Події» — туди, де події живуть, і де її видно на шляху цілком.
-  const openNewEvent = (type: EventKind = 'anniversary', date?: string) => {
-    setEventModal({ row: null, type, date });
+  const openNewEvent = (
+    type: EventKind = 'anniversary',
+    date?: string,
+    surface: Section = type === 'anniversary' ? 'events' : 'calendar',
+  ) => {
+    setEventModal({ row: null, type, date, surface });
   };
 
   const openExistingEvent = (event: EventRow) => {
-    setSection('events');
-    setEventModal({ row: event, type: event.type === 'birthday' ? 'birthday' : 'anniversary' });
+    const type: EventKind = event.type === 'birthday'
+      ? 'birthday'
+      : event.type === 'holiday'
+        ? 'holiday'
+        : 'anniversary';
+    const surface: Section = type === 'anniversary' ? 'events' : 'calendar';
+    setSection(surface);
+    setEventModal({ row: event, type, surface });
+  };
+
+  const openCalendarCreate = (date?: string) => {
+    setCreateChooserDate(date ?? null);
+    setCreateChooserOpen(true);
+  };
+
+  const closeCalendarCreate = () => {
+    setCreateChooserOpen(false);
+    setCreateChooserDate(null);
+  };
+
+  const choosePlan = () => {
+    closeCalendarCreate();
+    setAddingPlan(true);
+  };
+
+  const chooseCalendarEvent = () => {
+    const date = createChooserDate ?? undefined;
+    closeCalendarCreate();
+    openNewEvent('holiday', date, 'calendar');
   };
 
   const closeAddPlan = () => {
@@ -182,15 +202,15 @@ export function PlansPage() {
       ) : section === 'calendar' ? (
         <div className="pm-sheet">
           <CalendarMonthView
-            events={personal}
+            events={calendarEvents}
             plans={plans}
             yr={yr}
             mo={mo}
             onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
             onGoToday={() => setYm(currentYearMonth())}
-            // Календар не заводить подій: дотик по дню лише показує, що на
-            // ньому. Створення живе у «Подіях».
-            onAddOn={() => setSection('events')}
+            // Тап по конкретному дню передає дату в спільний вибір
+            // «План / Подія». Якщо користувач обирає подію — дата вже стоїть.
+            onAddOn={(date) => openCalendarCreate(date)}
             onOpenEvent={(event) => openExistingEvent(
               enriched.find((item) => item.id === event.id) ?? event,
             )}
@@ -236,7 +256,7 @@ export function PlansPage() {
           <RelationshipJourney
             events={journeyEvents}
             onOpen={openExistingEvent}
-            onAdd={() => openNewEvent('anniversary')}
+            onAdd={() => openNewEvent('anniversary', undefined, 'events')}
           />
         </div>
       )}
@@ -244,16 +264,23 @@ export function PlansPage() {
       <button
         type="button"
         className="pm-fab"
-        onClick={() => (section === 'calendar' ? setAddingPlan(true) : openNewEvent('anniversary'))}
+        onClick={() => (section === 'calendar'
+          ? openCalendarCreate()
+          : openNewEvent('anniversary', undefined, 'events'))}
       >
         <PlusIcon size={17} />
-        {section === 'calendar' ? 'План' : 'Подія'}
+        {section === 'calendar' ? 'Додати' : 'Подія'}
       </button>
 
-      {/* Аркуш плану — тільки в календарі, аркуш події — тільки в «Подіях».
-          Умова стоїть на самому рендері, а не лише на тому, хто його
-          відкриває: перемикання вкладки з відкритою модалкою інакше лишало б
-          її висіти над чужим розділом. */}
+      {createChooserOpen && section === 'calendar' && (
+        <CalendarCreateChooser
+          date={createChooserDate}
+          onClose={closeCalendarCreate}
+          onPlan={choosePlan}
+          onEvent={chooseCalendarEvent}
+        />
+      )}
+
       {addingPlan && section === 'calendar' && (
         <AddPlanModal
           busy={addPlan.isPending}
@@ -266,7 +293,7 @@ export function PlansPage() {
         />
       )}
 
-      {eventModal && section === 'events' && (
+      {eventModal && section === eventModal.surface && (
         <AddEventModal
           event={eventModal.row}
           initialDate={eventModal.date}
@@ -279,6 +306,72 @@ export function PlansPage() {
         />
       )}
     </section>
+  );
+}
+
+function CalendarCreateChooser({ date, onClose, onPlan, onEvent }: {
+  date: string | null;
+  onClose: () => void;
+  onPlan: () => void;
+  onEvent: () => void;
+}) {
+  return (
+    <div
+      className="modal-overlay plan-create-overlay"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="modal-sheet plan-create-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="calendar-create-title"
+      >
+        <div className="plan-create-form">
+          <header className="plan-create-head">
+            <span className="plan-create-eyebrow">Додати в календар</span>
+            <h2 id="calendar-create-title">Що створюємо?</h2>
+            <p>
+              {date
+                ? `Дата вже вибрана: ${formatDateUA(date)}. Оберіть, що має на ній з’явитися.`
+                : 'План піде ще й у список нижче. Подія залишиться тільки позначкою в календарі.'}
+            </p>
+          </header>
+
+          <div className="plan-create-type-grid" aria-label="Що додати в календар">
+            <button
+              type="button"
+              className="plan-create-type-option"
+              onClick={onPlan}
+            >
+              <BulbIcon size={18} />
+              <span style={{ display: 'grid', gap: 2, textAlign: 'left' }}>
+                <strong>План</strong>
+                <small>Поїздка, побачення, місце або інша спільна справа.</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="plan-create-type-option"
+              onClick={onEvent}
+            >
+              <EventIcon type="holiday" size={18} />
+              <span style={{ display: 'grid', gap: 2, textAlign: 'left' }}>
+                <strong>Подія</strong>
+                <small>День народження, свято, особиста дата або нагадування.</small>
+              </span>
+            </button>
+          </div>
+
+          <div className="plan-create-actions">
+            <button type="button" className="plan-create-cancel" onClick={onClose}>
+              Скасувати
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
