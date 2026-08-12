@@ -1,73 +1,50 @@
 import { useEffect, useMemo, useRef } from 'react';
+import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-
-type Vec3 = readonly [number, number, number];
+import { collectReefSupportMeshes, raycastReefSupport } from './reefSupportPlacement';
 
 type SupportBed = {
   center: readonly [number, number];
   radius: readonly [number, number];
-  topY: number;
-  edgeDrop: number;
 };
 
-type Bush = {
-  position: Vec3;
+type BushCandidate = {
+  x: number;
+  z: number;
   rotation: number;
   scale: number;
   tone: number;
   spread: number;
 };
 
-type Cushion = {
-  position: Vec3;
-  rotation: Vec3;
-  scale: Vec3;
-  tone: number;
-};
-
-type Plate = {
-  position: Vec3;
-  rotation: Vec3;
-  scale: Vec3;
+type CushionCandidate = {
+  x: number;
+  z: number;
+  rotation: readonly [number, number, number];
+  scale: readonly [number, number, number];
   tone: number;
 };
 
 const BUSH_COUNT = 24;
 const CUSHION_COUNT = 14;
-const PLATE_COUNT = 8;
 
 /**
- * Sculpt pass 4 support map. The first two beds form one broad lower tier, beds
- * 2/3 form the offset middle tier, and bed 4 is the compact crown. The final two
- * shoulder beds remain low around the planted base.
+ * Sampling domains only. Final Y placement no longer comes from an estimated
+ * support height: every candidate must hit the actual hero-rock geometry.
  */
 const SUPPORT_BEDS: readonly SupportBed[] = [
-  { center: [-0.98, 0.55], radius: [1.02, 0.66], topY: 0.34, edgeDrop: 0.035 },
-  { center: [0.74, 0.3], radius: [0.96, 0.58], topY: 0.35, edgeDrop: 0.04 },
-  { center: [-0.3, -0.46], radius: [0.8, 0.52], topY: 0.8, edgeDrop: 0.035 },
-  { center: [0.48, 0.05], radius: [0.64, 0.45], topY: 0.81, edgeDrop: 0.03 },
-  { center: [-0.18, 0.08], radius: [0.48, 0.35], topY: 1.18, edgeDrop: 0.025 },
-  { center: [-1.12, 0.14], radius: [0.56, 0.48], topY: 0.1, edgeDrop: 0.055 },
-  { center: [1.12, 0.18], radius: [0.56, 0.48], topY: 0.1, edgeDrop: 0.055 },
+  { center: [-0.98, 0.55], radius: [1.02, 0.66] },
+  { center: [0.74, 0.3], radius: [0.96, 0.58] },
+  { center: [-0.3, -0.46], radius: [0.8, 0.52] },
+  { center: [0.48, 0.05], radius: [0.64, 0.45] },
+  { center: [-0.18, 0.08], radius: [0.48, 0.35] },
 ] as const;
 
-/**
- * Sculpt pass 5 density weighting.
- *
- * The old round-robin distribution spent too much of the limited instance
- * budget on the two low shoulder beds. Repeated terrace indices deliberately
- * bias existing props upward without adding draw calls or geometry. The crown
- * appears often enough to feel alive but remains less dense than the middle tier.
- */
-const BUSH_BED_INDICES = [0, 1, 2, 3, 4, 2, 3, 4, 5, 6] as const;
-const CUSHION_BED_INDICES = [0, 1, 2, 3, 4, 2, 3, 4] as const;
-
-/**
- * Sculpt pass 6 keeps pale plate corals away from the most exposed lower-right
- * edge and biases them toward the middle/crown terraces where they can read as
- * embedded shelf growth instead of detached white shards on the silhouette.
- */
-const PLATE_BED_INDICES = [0, 2, 3, 4, 2, 3, 4] as const;
+// Keep the lightweight instance budget on the real terrace footprint. The old
+// low shoulder beds are intentionally gone because they were the main source of
+// unsupported peripheral growth after the artistic foundation changed.
+const BUSH_BED_INDICES = [0, 1, 2, 3, 4, 2, 3, 4] as const;
+const CUSHION_BED_INDICES = [0, 1, 2, 3, 4, 2, 3] as const;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
@@ -94,63 +71,47 @@ function pointInBed(
   ];
 }
 
-function supportHeightAt(x: number, z: number): number {
-  let supportY = -0.25;
-
-  for (const bed of SUPPORT_BEDS) {
-    const dx = (x - bed.center[0]) / bed.radius[0];
-    const dz = (z - bed.center[1]) / bed.radius[1];
-    const distance = Math.sqrt(dx * dx + dz * dz);
-    if (distance > 1) continue;
-
-    const surfaceY = bed.topY - distance * bed.edgeDrop;
-    supportY = Math.max(supportY, surfaceY);
-  }
-
-  return supportY;
-}
-
 function terraceScaleForBed(bedIndex: number): number {
   if (bedIndex === 4) return 0.78;
   if (bedIndex === 2 || bedIndex === 3) return 0.76;
-  if (bedIndex >= 5) return 0.78;
   return 0.9;
 }
 
-function buildBushes(): Bush[] {
+function buildBushCandidates(): BushCandidate[] {
   return Array.from({ length: BUSH_COUNT }, (_, index) => {
     const bedIndex = BUSH_BED_INDICES[index % BUSH_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const inset = bedIndex === 4 ? 0.58 : 0.66;
+    const inset = bedIndex === 4 ? 0.54 : 0.62;
     const [x, z] = pointInBed(index, 1, bed, inset);
-    const scale = heightBand(seededUnit(index, 3)) * terraceScaleForBed(bedIndex);
 
     return {
-      position: [x, supportHeightAt(x, z) + seededUnit(index, 4) * 0.01, z],
+      x,
+      z,
       rotation: seededUnit(index, 5) * Math.PI * 2,
-      scale,
+      scale: heightBand(seededUnit(index, 3)) * terraceScaleForBed(bedIndex),
       tone: seededUnit(index, 6),
-      spread: THREE.MathUtils.lerp(0.15, 0.26, seededUnit(index, 7)),
+      spread: THREE.MathUtils.lerp(0.15, 0.24, seededUnit(index, 7)),
     };
   });
 }
 
-function buildCushions(): Cushion[] {
+function buildCushionCandidates(): CushionCandidate[] {
   return Array.from({ length: CUSHION_COUNT }, (_, index) => {
     const bedIndex = CUSHION_BED_INDICES[index % CUSHION_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const inset = bedIndex === 4 ? 0.52 : 0.6;
+    const inset = bedIndex === 4 ? 0.48 : 0.56;
     const [x, z] = pointInBed(index, 11, bed, inset);
     const crownScale = bedIndex === 4 ? 0.78 : 1;
     const squash = THREE.MathUtils.lerp(0.14, 0.23, seededUnit(index, 13)) * crownScale;
     const width = THREE.MathUtils.lerp(0.23, 0.4, seededUnit(index, 14)) * crownScale;
 
     return {
-      position: [x, supportHeightAt(x, z) + squash * 0.82, z],
+      x,
+      z,
       rotation: [
-        (seededUnit(index, 16) - 0.5) * 0.14,
+        (seededUnit(index, 16) - 0.5) * 0.1,
         seededUnit(index, 17) * Math.PI * 2,
-        (seededUnit(index, 18) - 0.5) * 0.12,
+        (seededUnit(index, 18) - 0.5) * 0.08,
       ],
       scale: [width, squash, width * THREE.MathUtils.lerp(0.84, 1.14, seededUnit(index, 19))],
       tone: seededUnit(index, 20),
@@ -158,68 +119,47 @@ function buildCushions(): Cushion[] {
   });
 }
 
-function buildPlates(): Plate[] {
-  return Array.from({ length: PLATE_COUNT }, (_, index) => {
-    const bedIndex = PLATE_BED_INDICES[index % PLATE_BED_INDICES.length]!;
-    const bed = SUPPORT_BEDS[bedIndex]!;
-
-    // Plates are the widest pale props, so keep their centres well inside the
-    // support footprint. The crown gets the strongest inset because its shelf
-    // is the smallest and any overhang is especially obvious against open water.
-    const inset = bedIndex === 4 ? 0.32 : bedIndex >= 2 ? 0.4 : 0.44;
-    const [x, z] = pointInBed(index, 31, bed, inset);
-    const crownScale = bedIndex === 4 ? 0.62 : bedIndex >= 2 ? 0.78 : 0.86;
-    const radius = THREE.MathUtils.lerp(0.16, 0.27, seededUnit(index, 33)) * crownScale;
-    const thickness = THREE.MathUtils.lerp(0.045, 0.07, seededUnit(index, 38)) * crownScale;
-    const supportY = supportHeightAt(x, z);
-
-    return {
-      // Sink roughly one quarter of the plate below the support surface. The
-      // visible top still reads as coral growth while the base no longer looks
-      // pasted onto the side of a ledge.
-      position: [x, supportY + thickness * 0.26, z],
-      rotation: [
-        THREE.MathUtils.lerp(-0.07, 0.07, seededUnit(index, 35)),
-        seededUnit(index, 36) * Math.PI * 2,
-        THREE.MathUtils.lerp(-0.06, 0.06, seededUnit(index, 37)),
-      ],
-      scale: [radius, thickness, radius * 0.84],
-      tone: seededUnit(index, 39),
-    };
-  });
-}
-
 function BushCorals() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const bushes = useMemo(buildBushes, []);
-  const armCount = bushes.length * 3;
+  const scene = useThree((state) => state.scene);
+  const candidates = useMemo(buildBushCandidates, []);
+  const armCapacity = candidates.length * 3;
 
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
 
+    const supportMeshes = collectReefSupportMeshes(scene);
+    if (supportMeshes.length === 0) {
+      mesh.count = 0;
+      return;
+    }
+
     const dummy = new THREE.Object3D();
     const dark = new THREE.Color('#645982');
     const light = new THREE.Color('#9a718d');
     const color = new THREE.Color();
+    let instanceIndex = 0;
 
-    bushes.forEach((bush, bushIndex) => {
+    for (const bush of candidates) {
+      const hit = raycastReefSupport(supportMeshes, bush.x, bush.z, 0.28);
+      if (!hit) continue;
+
       for (let armIndex = 0; armIndex < 3; armIndex += 1) {
-        const instanceIndex = bushIndex * 3 + armIndex;
         const armOffset = armIndex - 1;
         const height = bush.scale * (0.56 + armIndex * 0.09);
         const localAngle = bush.rotation + armOffset * bush.spread * 2.8;
         const outward = Math.abs(armOffset) * bush.spread;
 
         dummy.position.set(
-          bush.position[0] + Math.cos(localAngle) * outward * 0.42,
-          bush.position[1] + height * 0.31,
-          bush.position[2] + Math.sin(localAngle) * outward * 0.42,
+          bush.x + Math.cos(localAngle) * outward * 0.34,
+          hit.point.y + 0.008 + height * 0.31,
+          bush.z + Math.sin(localAngle) * outward * 0.34,
         );
         dummy.rotation.set(
-          Math.sin(localAngle) * armOffset * 0.17,
+          Math.sin(localAngle) * armOffset * 0.15,
           localAngle,
-          -Math.cos(localAngle) * armOffset * 0.21,
+          -Math.cos(localAngle) * armOffset * 0.18,
         );
         dummy.scale.set(
           0.82 + bush.tone * 0.2,
@@ -231,15 +171,17 @@ function BushCorals() {
 
         color.copy(dark).lerp(light, Math.min(1, bush.tone * 0.72 + armIndex * 0.12));
         mesh.setColorAt(instanceIndex, color);
+        instanceIndex += 1;
       }
-    });
+    }
 
+    mesh.count = instanceIndex;
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [bushes]);
+  }, [candidates, scene]);
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, armCount]}>
+    <instancedMesh ref={meshRef} args={[undefined, undefined, armCapacity]}>
       <cylinderGeometry args={[0.032, 0.072, 0.62, 6]} />
       <meshStandardMaterial color="#ffffff" roughness={0.94} metalness={0} />
     </instancedMesh>
@@ -248,83 +190,65 @@ function BushCorals() {
 
 function CushionCorals() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
-  const cushions = useMemo(buildCushions, []);
+  const scene = useThree((state) => state.scene);
+  const candidates = useMemo(buildCushionCandidates, []);
 
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
 
+    const supportMeshes = collectReefSupportMeshes(scene);
+    if (supportMeshes.length === 0) {
+      mesh.count = 0;
+      return;
+    }
+
     const dummy = new THREE.Object3D();
     const dark = new THREE.Color('#667866');
     const light = new THREE.Color('#a88a72');
     const color = new THREE.Color();
+    let instanceIndex = 0;
 
-    cushions.forEach((cushion, index) => {
-      dummy.position.set(cushion.position[0], cushion.position[1], cushion.position[2]);
+    for (const cushion of candidates) {
+      const hit = raycastReefSupport(supportMeshes, cushion.x, cushion.z, 0.34);
+      if (!hit) continue;
+
+      dummy.position.set(
+        cushion.x,
+        hit.point.y + cushion.scale[1] * 0.88,
+        cushion.z,
+      );
       dummy.rotation.set(cushion.rotation[0], cushion.rotation[1], cushion.rotation[2]);
       dummy.scale.set(cushion.scale[0], cushion.scale[1], cushion.scale[2]);
       dummy.updateMatrix();
-      mesh.setMatrixAt(index, dummy.matrix);
+      mesh.setMatrixAt(instanceIndex, dummy.matrix);
       color.copy(dark).lerp(light, cushion.tone);
-      mesh.setColorAt(index, color);
-    });
+      mesh.setColorAt(instanceIndex, color);
+      instanceIndex += 1;
+    }
 
+    mesh.count = instanceIndex;
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [cushions]);
+  }, [candidates, scene]);
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, cushions.length]}>
+    <instancedMesh ref={meshRef} args={[undefined, undefined, candidates.length]}>
       <icosahedronGeometry args={[1, 1]} />
       <meshStandardMaterial color="#ffffff" roughness={0.97} metalness={0} />
     </instancedMesh>
   );
 }
 
-function PlateCorals() {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const plates = useMemo(buildPlates, []);
-
-  useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-
-    const dummy = new THREE.Object3D();
-    const dark = new THREE.Color('#6c8373');
-    const light = new THREE.Color('#9eae91');
-    const color = new THREE.Color();
-
-    plates.forEach((plate, index) => {
-      dummy.position.set(plate.position[0], plate.position[1], plate.position[2]);
-      dummy.rotation.set(plate.rotation[0], plate.rotation[1], plate.rotation[2]);
-      dummy.scale.set(plate.scale[0], plate.scale[1], plate.scale[2]);
-      dummy.updateMatrix();
-      mesh.setMatrixAt(index, dummy.matrix);
-      color.copy(dark).lerp(light, plate.tone * 0.86);
-      mesh.setColorAt(index, color);
-    });
-
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-  }, [plates]);
-
-  return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, plates.length]}>
-      <cylinderGeometry args={[1, 1.06, 1, 7, 1]} />
-      <meshStandardMaterial color="#ffffff" roughness={0.97} metalness={0} />
-    </instancedMesh>
-  );
-}
-
 /**
- * Reef density sculpt pass 6: pale plate growth is smaller, flatter, deeper
- * inside terrace footprints and partially embedded into the shelf surface.
+ * Density hard-grounding pass. Pale supplemental plate corals are removed and
+ * every remaining prop is rendered only after a downward ray hits the actual
+ * hero support geometry with a sufficiently upward-facing surface normal.
  */
 export function ReefDensityLayer() {
   return (
-    <group name="reef-density-embedded-plates">
+    <group name="reef-density-real-support">
       <CushionCorals />
-      <PlateCorals />
       <BushCorals />
     </group>
   );
