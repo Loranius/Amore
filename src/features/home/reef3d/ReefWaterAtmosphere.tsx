@@ -43,7 +43,7 @@ function AnimatedCaustic({
       rotation={[-Math.PI / 2, 0, rotation]}
       scale={[scale[0], scale[1], scale[2]]}
     >
-      <ringGeometry args={[0.58, 1.05, 40]} />
+      <ringGeometry args={[0.58, 1.05, 28]} />
       <meshBasicMaterial
         ref={materialRef}
         color="#c7fff6"
@@ -90,7 +90,7 @@ function LightShaft({
       rotation={[rotation[0], rotation[1], rotation[2]]}
       scale={[scale[0], scale[1], scale[2]]}
     >
-      <coneGeometry args={[1, 1, 24, 1, true]} />
+      <coneGeometry args={[1, 1, 16, 1, true]} />
       <meshBasicMaterial
         ref={materialRef}
         color="#bffbf3"
@@ -112,7 +112,7 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
   const groupRef = useRef<Group>(null);
   const pointsRef = useRef<Points>(null);
   const positions = useMemo(() => {
-    const count = 72;
+    const count = 64;
     const values = new Float32Array(count * 3);
     for (let index = 0; index < count; index += 1) {
       const offset = index * 3;
@@ -149,7 +149,7 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
           color="#d8fffa"
           size={0.035}
           transparent
-          opacity={0.24}
+          opacity={0.22}
           depthWrite={false}
           sizeAttenuation
           toneMapped={false}
@@ -160,29 +160,29 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
 }
 
 /**
- * Stage 2 underwater atmosphere.
+ * Lightweight underwater atmosphere.
  *
- * This layer adds movement and optical depth only. It deliberately avoids
- * texture downloads, post-processing and expensive volumetrics so the reef
- * remains suitable for the mobile portal.
+ * Stage 4 keeps the Stage 2 composition but lowers geometry density and a little
+ * particle opacity. Fog and transparency provide the volume impression; no
+ * texture downloads, post-processing or expensive volumetrics are introduced.
  */
 export function ReefWaterAtmosphere({ reducedMotion }: { reducedMotion: boolean }) {
   return (
-    <group name="reef-water-atmosphere-stage-2">
+    <group name="reef-water-atmosphere-stage-4">
       {/* A translucent back veil strengthens depth separation behind the reef. */}
       <mesh position={[0, 2.6, -10.5]} scale={[14, 7.5, 1]}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial
           color="#1c7080"
           transparent
-          opacity={0.14}
+          opacity={0.12}
           depthWrite={false}
           toneMapped={false}
         />
       </mesh>
 
-      {/* Surface shafts stay broad and faint. The geometry is intentionally
-          coarse; fog and transparency create the volume impression. */}
+      {/* Surface shafts stay broad and faint. Coarse geometry is enough because
+          fog and transparency hide the silhouette of the cones. */}
       <LightShaft
         position={[-3.2, 3.6, -1.8]}
         rotation={[0.04, 0, 0.18]}
