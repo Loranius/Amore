@@ -12,6 +12,7 @@ type PlateLedgeProps = {
   scale: Vec3;
   rotation?: Vec3;
   color: string;
+  variant: 0 | 1 | 2 | 3 | 4;
 };
 
 const PALETTE = {
@@ -57,33 +58,38 @@ const BASE_CORE_MASSES: readonly RockMassProps[] = [
 const BASE_PLATE_LEDGES: readonly PlateLedgeProps[] = [
   {
     position: [-0.92, 0.24, 0.54],
-    scale: [1.22, 0.16, 0.82],
+    scale: [1.22, 0.18, 0.82],
     rotation: [0.04, 0.22, 0.04],
     color: '#8eb2aa',
+    variant: 0,
   },
   {
     position: [0.72, 0.36, 0.24],
-    scale: [1.28, 0.17, 0.84],
+    scale: [1.28, 0.2, 0.84],
     rotation: [-0.05, -0.2, 0.03],
     color: '#96bbb1',
+    variant: 1,
   },
   {
     position: [-0.18, 0.72, -0.46],
-    scale: [1.08, 0.15, 0.72],
+    scale: [1.08, 0.18, 0.72],
     rotation: [0.06, 0.14, -0.05],
     color: '#85aaa5',
+    variant: 2,
   },
   {
     position: [0.42, 0.94, 0.06],
-    scale: [0.9, 0.13, 0.64],
+    scale: [0.9, 0.16, 0.64],
     rotation: [-0.03, -0.16, 0.04],
     color: '#a0c2b7',
+    variant: 3,
   },
   {
     position: [-0.38, 1.1, 0.14],
-    scale: [0.72, 0.11, 0.52],
+    scale: [0.72, 0.14, 0.52],
     rotation: [0.05, 0.26, -0.03],
     color: '#91b7af',
+    variant: 4,
   },
 ] as const;
 
@@ -159,23 +165,68 @@ function RockMass({
   );
 }
 
+/**
+ * A ledge is built from three overlapping low-poly plates rather than one clean
+ * cylinder. The overlap breaks the circular silhouette, creates small bays and
+ * noses around the edge, and gives the shelf enough thickness to read as rock
+ * grown out of the reef core instead of a paper-thin disc.
+ */
 function PlateLedge({
   position,
   scale,
   rotation = [0, 0, 0],
   color,
+  variant,
 }: PlateLedgeProps) {
+  const direction = variant % 2 === 0 ? -1 : 1;
+  const depthBias = (variant % 3 - 1) * 0.12;
+  const yawBias = (variant - 2) * 0.055;
+
   return (
-    <mesh
+    <group
       position={[position[0], position[1], position[2]]}
-      scale={[scale[0], scale[1], scale[2]]}
       rotation={[rotation[0], rotation[1], rotation[2]]}
-      receiveShadow={false}
-      castShadow={false}
     >
-      <cylinderGeometry args={[1, 1.08, 0.22, 14]} />
-      <meshStandardMaterial color={color} roughness={0.96} metalness={0} />
-    </mesh>
+      <mesh
+        scale={[scale[0], scale[1], scale[2]]}
+        rotation={[0, yawBias, 0]}
+        receiveShadow={false}
+        castShadow={false}
+      >
+        <cylinderGeometry args={[1, 0.8, 1, 9, 1]} />
+        <meshStandardMaterial color={color} roughness={0.97} metalness={0} />
+      </mesh>
+
+      <mesh
+        position={[
+          direction * scale[0] * 0.43,
+          -scale[1] * 0.12,
+          scale[2] * (0.12 + depthBias),
+        ]}
+        scale={[scale[0] * 0.58, scale[1] * 0.88, scale[2] * 0.64]}
+        rotation={[0, direction * (0.28 + variant * 0.025), 0]}
+        receiveShadow={false}
+        castShadow={false}
+      >
+        <cylinderGeometry args={[1, 0.76, 1, 7, 1]} />
+        <meshStandardMaterial color={color} roughness={0.98} metalness={0} />
+      </mesh>
+
+      <mesh
+        position={[
+          -direction * scale[0] * 0.31,
+          scale[1] * 0.05,
+          -scale[2] * (0.24 - depthBias * 0.5),
+        ]}
+        scale={[scale[0] * 0.46, scale[1] * 0.76, scale[2] * 0.52]}
+        rotation={[0, -direction * (0.34 - variant * 0.018), 0]}
+        receiveShadow={false}
+        castShadow={false}
+      >
+        <cylinderGeometry args={[1, 0.72, 1, 7, 1]} />
+        <meshStandardMaterial color={color} roughness={0.98} metalness={0} />
+      </mesh>
+    </group>
   );
 }
 
