@@ -61,7 +61,13 @@ const SUPPORT_BEDS: readonly SupportBed[] = [
  */
 const BUSH_BED_INDICES = [0, 1, 2, 3, 4, 2, 3, 4, 5, 6] as const;
 const CUSHION_BED_INDICES = [0, 1, 2, 3, 4, 2, 3, 4] as const;
-const PLATE_BED_INDICES = [0, 1, 2, 3, 2, 3, 4] as const;
+
+/**
+ * Sculpt pass 6 keeps pale plate corals away from the most exposed lower-right
+ * edge and biases them toward the middle/crown terraces where they can read as
+ * embedded shelf growth instead of detached white shards on the silhouette.
+ */
+const PLATE_BED_INDICES = [0, 2, 3, 4, 2, 3, 4] as const;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
@@ -156,20 +162,28 @@ function buildPlates(): Plate[] {
   return Array.from({ length: PLATE_COUNT }, (_, index) => {
     const bedIndex = PLATE_BED_INDICES[index % PLATE_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const inset = bedIndex === 4 ? 0.44 : 0.52;
+
+    // Plates are the widest pale props, so keep their centres well inside the
+    // support footprint. The crown gets the strongest inset because its shelf
+    // is the smallest and any overhang is especially obvious against open water.
+    const inset = bedIndex === 4 ? 0.32 : bedIndex >= 2 ? 0.4 : 0.44;
     const [x, z] = pointInBed(index, 31, bed, inset);
-    const crownScale = bedIndex === 4 ? 0.68 : bedIndex >= 2 ? 0.86 : 1;
-    const radius = THREE.MathUtils.lerp(0.19, 0.32, seededUnit(index, 33)) * crownScale;
-    const thickness = THREE.MathUtils.lerp(0.06, 0.09, seededUnit(index, 38)) * crownScale;
+    const crownScale = bedIndex === 4 ? 0.62 : bedIndex >= 2 ? 0.78 : 0.86;
+    const radius = THREE.MathUtils.lerp(0.16, 0.27, seededUnit(index, 33)) * crownScale;
+    const thickness = THREE.MathUtils.lerp(0.045, 0.07, seededUnit(index, 38)) * crownScale;
+    const supportY = supportHeightAt(x, z);
 
     return {
-      position: [x, supportHeightAt(x, z) + thickness * 0.5, z],
+      // Sink roughly one quarter of the plate below the support surface. The
+      // visible top still reads as coral growth while the base no longer looks
+      // pasted onto the side of a ledge.
+      position: [x, supportY + thickness * 0.26, z],
       rotation: [
-        THREE.MathUtils.lerp(-0.13, 0.13, seededUnit(index, 35)),
+        THREE.MathUtils.lerp(-0.07, 0.07, seededUnit(index, 35)),
         seededUnit(index, 36) * Math.PI * 2,
-        THREE.MathUtils.lerp(-0.11, 0.11, seededUnit(index, 37)),
+        THREE.MathUtils.lerp(-0.06, 0.06, seededUnit(index, 37)),
       ],
-      scale: [radius, thickness, radius * 0.82],
+      scale: [radius, thickness, radius * 0.84],
       tone: seededUnit(index, 39),
     };
   });
@@ -276,8 +290,8 @@ function PlateCorals() {
     if (!mesh) return;
 
     const dummy = new THREE.Object3D();
-    const dark = new THREE.Color('#718b79');
-    const light = new THREE.Color('#b2c19d');
+    const dark = new THREE.Color('#6c8373');
+    const light = new THREE.Color('#9eae91');
     const color = new THREE.Color();
 
     plates.forEach((plate, index) => {
@@ -286,7 +300,7 @@ function PlateCorals() {
       dummy.scale.set(plate.scale[0], plate.scale[1], plate.scale[2]);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
-      color.copy(dark).lerp(light, plate.tone);
+      color.copy(dark).lerp(light, plate.tone * 0.86);
       mesh.setColorAt(index, color);
     });
 
@@ -296,20 +310,19 @@ function PlateCorals() {
 
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, plates.length]}>
-      <cylinderGeometry args={[1, 1.08, 1, 7, 1]} />
-      <meshStandardMaterial color="#ffffff" roughness={0.95} metalness={0} />
+      <cylinderGeometry args={[1, 1.06, 1, 7, 1]} />
+      <meshStandardMaterial color="#ffffff" roughness={0.97} metalness={0} />
     </instancedMesh>
   );
 }
 
 /**
- * Reef density sculpt pass 5: the same lightweight instance budget is now
- * concentrated on the three terrace levels, especially the middle and crown,
- * rather than being spent around the peripheral shoulders.
+ * Reef density sculpt pass 6: pale plate growth is smaller, flatter, deeper
+ * inside terrace footprints and partially embedded into the shelf surface.
  */
 export function ReefDensityLayer() {
   return (
-    <group name="reef-density-upper-terraces">
+    <group name="reef-density-embedded-plates">
       <CushionCorals />
       <PlateCorals />
       <BushCorals />
