@@ -70,12 +70,13 @@ export function ReefObject({
     }
   });
 
-  // The foundation is intentionally buried into the environment mound.
-  // Keeping the old +0.52 lift exposed the closed shell skirt as a floating island.
+  // The hero now intersects the compact vertical rock core instead of hovering
+  // above a broad environmental shelf. This keeps colony roots readable while
+  // letting the foundation disappear into the layered base from side angles.
   return (
     <group
       rotation={[-0.08, -0.18, 0]}
-      position={[0, 0.04, 0]}
+      position={[0, 0.12, 0]}
       scale={1.05}
     >
       <mesh
