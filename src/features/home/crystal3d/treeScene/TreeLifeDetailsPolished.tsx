@@ -271,7 +271,11 @@ function Flowers({ theme, hillRadius, soilRadius, groundY }: Props) {
     const heads = headRef.current;
     if (!stems || !heads) return;
     const dummy = new THREE.Object3D();
-    const colors = [new THREE.Color(palette.flowerA), new THREE.Color(palette.flowerB), new THREE.Color(palette.flowerC)];
+    const colors: readonly [THREE.Color, THREE.Color, THREE.Color] = [
+      new THREE.Color(palette.flowerA),
+      new THREE.Color(palette.flowerB),
+      new THREE.Color(palette.flowerC),
+    ];
     flowers.forEach((item, index) => {
       const height = 0.18 + item.tone * 0.12;
       dummy.position.set(item.x, item.y + height * 0.5, item.z);
@@ -283,7 +287,8 @@ function Flowers({ theme, hillRadius, soilRadius, groundY }: Props) {
       dummy.scale.setScalar(0.78 + item.scale * 0.25);
       dummy.updateMatrix();
       heads.setMatrixAt(index, dummy.matrix);
-      heads.setColorAt(index, colors[Math.min(2, Math.floor(item.tone * 3))]);
+      const colorIndex = Math.min(2, Math.floor(item.tone * 3));
+      heads.setColorAt(index, colors[colorIndex] ?? colors[0]);
     });
     stems.instanceMatrix.needsUpdate = true;
     heads.instanceMatrix.needsUpdate = true;
@@ -306,17 +311,18 @@ function Flowers({ theme, hillRadius, soilRadius, groundY }: Props) {
 function Clouds({ theme, groundY, reducedMotion }: Pick<Props, 'theme' | 'groundY' | 'reducedMotion'>) {
   const group = useRef<THREE.Group>(null);
   const palette = PALETTE[theme];
+  const cloudGroups: Array<[number, number, number, number]> = [
+    [-10, groundY + 10.5, -25, 1.1],
+    [1.5, groundY + 12.2, -30, 0.9],
+    [11, groundY + 9.8, -26, 1.05],
+  ];
   useFrame((state) => {
     if (reducedMotion || !group.current) return;
     group.current.position.x = Math.sin(state.clock.elapsedTime * 0.028) * 0.9;
   });
   return (
     <group ref={group}>
-      {[
-        [-10, groundY + 10.5, -25, 1.1],
-        [1.5, groundY + 12.2, -30, 0.9],
-        [11, groundY + 9.8, -26, 1.05],
-      ].map(([x, y, z, s], index) => (
+      {cloudGroups.map(([x, y, z, s], index) => (
         <group key={index} position={[x, y, z]} scale={s}>
           {[-1.1, -0.45, 0.25, 0.95].map((offset, puff) => (
             <mesh key={puff} position={[offset, Math.sin(puff * 1.3) * 0.18, (puff % 2) * 0.18]}>
