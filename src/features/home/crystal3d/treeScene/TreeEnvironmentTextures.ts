@@ -5,14 +5,14 @@ type Theme = 'light' | 'dark';
 
 const PALETTE = {
   light: {
-    grassA: '#647e4c', grassB: '#82975e', grassDark: '#425b37', dry: '#918c68',
-    earthA: '#674f38', earthB: '#8a6b4c', earthDark: '#45372b', pebble: '#a39a87',
-    skyTop: '#68add9', skyHorizon: '#d5e8e8', cloud: '#f7f7ef',
+    grassA: '#718d55', grassB: '#93aa6c', grassDark: '#536d42', dry: '#a39b72',
+    earthA: '#7b6148', earthB: '#9b7b59', earthDark: '#5b4938', pebble: '#aaa18f',
+    skyTop: '#72b8e8', skyMid: '#a9d4ea', skyHorizon: '#deedf0', cloud: '#f8f9f2',
   },
   dark: {
-    grassA: '#4b663b', grassB: '#68824b', grassDark: '#30472e', dry: '#7d7858',
-    earthA: '#574333', earthB: '#725940', earthDark: '#3c3028', pebble: '#817a6d',
-    skyTop: '#5797bf', skyHorizon: '#bdcfca', cloud: '#e7ebe3',
+    grassA: '#5f7c48', grassB: '#7f9b5e', grassDark: '#48623a', dry: '#918a64',
+    earthA: '#6d5743', earthB: '#8b7053', earthDark: '#514236', pebble: '#948d80',
+    skyTop: '#63abe0', skyMid: '#96c9df', skyHorizon: '#d2e6ea', cloud: '#eef3ef',
   },
 } as const;
 
@@ -43,6 +43,16 @@ const configure = (texture: THREE.CanvasTexture, repeat = false) => {
   return texture;
 };
 
+function irregularRootMask(wx: number, wz: number, soilRadius: number) {
+  const radial = Math.hypot(wx, wz);
+  const angle = Math.atan2(wz, wx);
+  const lobe = Math.sin(angle * 5 + 0.7) * 0.13 + Math.sin(angle * 9 - 1.1) * 0.055;
+  const localNoise = (hash2(Math.floor(wx * 1.45), Math.floor(wz * 1.45), 7) - 0.5) * 0.15;
+  const edge = soilRadius * (0.72 + lobe + localNoise);
+  const fade = Math.max(0.42, soilRadius * 0.58);
+  return clamp01(1 - (radial - edge) / fade);
+}
+
 function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
   const p = PALETTE[theme];
   const size = 512;
@@ -61,20 +71,22 @@ function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
     for (let x = 0; x < size; x += 1) {
       const wx = (x / (size - 1) - 0.5) * hillRadius * 2;
       const wz = (y / (size - 1) - 0.5) * hillRadius * 2;
-      const radial = Math.hypot(wx, wz);
-      const rootMask = clamp01(1 - (radial - soilRadius * 0.68) / Math.max(0.5, soilRadius * 1.35));
-      const coarse = hash2(Math.floor(x / 18), Math.floor(y / 18), 13);
-      const fine = hash2(Math.floor(x / 5), Math.floor(y / 5), 17);
-      const earthMask = clamp01(rootMask * 0.9 + Math.max(0, coarse - 0.77) * 1.65);
-      const dryMask = clamp01(Math.max(0, fine - 0.72) * 0.72);
+      const rootMask = irregularRootMask(wx, wz, soilRadius);
+      const coarse = hash2(Math.floor(x / 22), Math.floor(y / 22), 13);
+      const fine = hash2(Math.floor(x / 6), Math.floor(y / 6), 17);
+      const earthPatch = Math.max(0, coarse - 0.83) * 1.15;
+      const earthMask = clamp01(rootMask * 0.7 + earthPatch);
+      const dryMask = clamp01(Math.max(0, fine - 0.76) * 0.55);
+
       const color = grassA.clone()
-        .lerp(grassB, hash2(x, y, 23) * 0.44)
+        .lerp(grassB, 0.18 + hash2(x, y, 23) * 0.48)
         .lerp(dry, dryMask);
       const earth = earthA.clone()
-        .lerp(earthB, hash2(x, y, 29) * 0.52)
-        .lerp(earthDark, hash2(x * 2, y * 2, 31) * 0.17);
+        .lerp(earthB, 0.18 + hash2(x, y, 29) * 0.5)
+        .lerp(earthDark, hash2(x * 2, y * 2, 31) * 0.08);
       color.lerp(earth, earthMask);
-      color.offsetHSL(0, 0, (hash2(x * 3, y * 3, 37) - 0.5) * (earthMask > 0.45 ? 0.13 : 0.065));
+      color.offsetHSL(0, 0, (hash2(x * 3, y * 3, 37) - 0.5) * (earthMask > 0.5 ? 0.075 : 0.045));
+
       const i = (y * size + x) * 4;
       image.data[i] = Math.round(clamp01(color.r) * 255);
       image.data[i + 1] = Math.round(clamp01(color.g) * 255);
@@ -85,29 +97,30 @@ function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
   ctx.putImageData(image, 0, 0);
 
   ctx.lineCap = 'round';
-  for (let i = 0; i < 1700; i += 1) {
+  for (let i = 0; i < 2050; i += 1) {
     const x = hash2(i, 1, 41) * size;
     const y = hash2(i, 2, 43) * size;
     const wx = (x / size - 0.5) * hillRadius * 2;
     const wz = (y / size - 0.5) * hillRadius * 2;
-    const rootMask = clamp01(1 - (Math.hypot(wx, wz) - soilRadius * 0.68) / Math.max(0.5, soilRadius * 1.35));
-    if (rootMask > 0.62 && hash2(i, 3, 47) < rootMask) continue;
-    const len = 2 + hash2(i, 4, 53) * 6;
-    ctx.strokeStyle = rgba(hash2(i, 5, 59) > 0.5 ? p.grassDark : p.grassB, 0.24);
-    ctx.lineWidth = 0.45 + hash2(i, 6, 61) * 0.7;
+    const rootMask = irregularRootMask(wx, wz, soilRadius);
+    if (rootMask > 0.58 && hash2(i, 3, 47) < rootMask * 0.82) continue;
+    const len = 2.5 + hash2(i, 4, 53) * 6.5;
+    ctx.strokeStyle = rgba(hash2(i, 5, 59) > 0.43 ? p.grassDark : p.grassB, 0.28);
+    ctx.lineWidth = 0.55 + hash2(i, 6, 61) * 0.82;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + (hash2(i, 7, 67) - 0.42) * 2.5, y - len);
+    ctx.lineTo(x + (hash2(i, 7, 67) - 0.42) * 3, y - len);
     ctx.stroke();
   }
 
-  for (let i = 0; i < 460; i += 1) {
+  for (let i = 0; i < 380; i += 1) {
     const a = hash2(i, 1, 71) * Math.PI * 2;
-    const r = Math.sqrt(hash2(i, 2, 73)) * Math.min(110, 58 + soilRadius * 24);
+    const irregular = 0.82 + Math.sin(a * 5 + 0.7) * 0.14 + (hash2(i, 8, 77) - 0.5) * 0.18;
+    const r = Math.sqrt(hash2(i, 2, 73)) * Math.min(104, 52 + soilRadius * 22) * irregular;
     const x = size * 0.5 + Math.cos(a) * r;
     const y = size * 0.5 + Math.sin(a) * r;
-    const radius = 0.45 + hash2(i, 3, 79) * 1.25;
-    ctx.fillStyle = rgba(hash2(i, 4, 83) > 0.74 ? p.pebble : p.earthDark, 0.31);
+    const radius = 0.4 + hash2(i, 3, 79) * 1.05;
+    ctx.fillStyle = rgba(hash2(i, 4, 83) > 0.76 ? p.pebble : p.earthDark, 0.25);
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -118,36 +131,41 @@ function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
 
 export function createGrassBladeTexture(theme: Theme) {
   const p = PALETTE[theme];
-  const el = canvas(64, 256);
+  const el = canvas(96, 256);
   const ctx = el.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D unavailable');
-  ctx.clearRect(0, 0, 64, 256);
+  ctx.clearRect(0, 0, el.width, el.height);
+
   const g = ctx.createLinearGradient(0, 256, 0, 0);
   g.addColorStop(0, rgba(p.grassDark, 1));
-  g.addColorStop(0.5, rgba(p.grassA, 1));
-  g.addColorStop(1, rgba(p.grassB, 0.96));
+  g.addColorStop(0.42, rgba(p.grassA, 1));
+  g.addColorStop(1, rgba(p.grassB, 1));
   ctx.fillStyle = g;
+
   ctx.beginPath();
-  ctx.moveTo(20, 256);
-  ctx.bezierCurveTo(19, 182, 20, 80, 31, 2);
-  ctx.bezierCurveTo(40, 82, 46, 184, 44, 256);
+  ctx.moveTo(22, 256);
+  ctx.bezierCurveTo(20, 184, 28, 78, 45, 3);
+  ctx.bezierCurveTo(61, 88, 70, 190, 68, 256);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = rgba(p.grassB, 0.34);
-  ctx.lineWidth = 1;
+
+  ctx.strokeStyle = rgba(p.grassB, 0.42);
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(32, 248);
-  ctx.quadraticCurveTo(31, 128, 31, 10);
+  ctx.moveTo(46, 247);
+  ctx.quadraticCurveTo(45, 126, 45, 12);
   ctx.stroke();
-  for (let i = 0; i < 18; i += 1) {
-    const y = 28 + hash2(i, 1, 89) * 206;
-    ctx.strokeStyle = rgba(p.grassDark, 0.07 + hash2(i, 2, 97) * 0.1);
-    ctx.lineWidth = 0.55;
+
+  for (let i = 0; i < 22; i += 1) {
+    const y = 30 + hash2(i, 1, 89) * 202;
+    ctx.strokeStyle = rgba(p.grassDark, 0.055 + hash2(i, 2, 97) * 0.08);
+    ctx.lineWidth = 0.65;
     ctx.beginPath();
-    ctx.moveTo(25, y);
-    ctx.lineTo(40, y - 7 - hash2(i, 3, 101) * 7);
+    ctx.moveTo(33 + hash2(i, 4, 99) * 5, y);
+    ctx.lineTo(58 + hash2(i, 5, 100) * 4, y - 8 - hash2(i, 3, 101) * 8);
     ctx.stroke();
   }
+
   return configure(new THREE.CanvasTexture(el));
 }
 
@@ -158,29 +176,31 @@ function skyTexture(theme: Theme) {
   const el = canvas(w, h);
   const ctx = el.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D unavailable');
+
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, p.skyTop);
-  g.addColorStop(0.58, new THREE.Color(p.skyTop).lerp(new THREE.Color(p.skyHorizon), 0.62).getStyle());
-  g.addColorStop(0.82, p.skyHorizon);
-  g.addColorStop(1, new THREE.Color(p.skyHorizon).lerp(new THREE.Color('#ffffff'), 0.12).getStyle());
+  g.addColorStop(0.48, p.skyMid);
+  g.addColorStop(0.8, p.skyHorizon);
+  g.addColorStop(1, new THREE.Color(p.skyHorizon).lerp(new THREE.Color('#ffffff'), 0.08).getStyle());
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
 
   const blob = (x: number, y: number, r: number, alpha: number) => {
     const rg = ctx.createRadialGradient(x, y, r * 0.08, x, y, r);
     rg.addColorStop(0, rgba(p.cloud, alpha));
-    rg.addColorStop(0.55, rgba(p.cloud, alpha * 0.48));
+    rg.addColorStop(0.52, rgba(p.cloud, alpha * 0.46));
     rg.addColorStop(1, rgba(p.cloud, 0));
     ctx.fillStyle = rg;
     ctx.fillRect(x - r, y - r, r * 2, r * 2);
   };
-  for (let band = 0; band < 7; band += 1) {
+
+  for (let band = 0; band < 5; band += 1) {
     const baseX = hash2(band, 1, 109) * w;
-    const baseY = 210 + hash2(band, 2, 113) * 140;
-    for (let j = 0; j < 6; j += 1) {
-      const x = (baseX + (j - 3) * (44 + hash2(j, band, 127) * 30) + w) % w;
-      const y = baseY + (hash2(j, band, 131) - 0.5) * 28;
-      blob(x, y, 72 + hash2(j, band, 137) * 70, 0.07 + hash2(j, band, 139) * 0.045);
+    const baseY = 230 + hash2(band, 2, 113) * 118;
+    for (let j = 0; j < 5; j += 1) {
+      const x = (baseX + (j - 2) * (52 + hash2(j, band, 127) * 30) + w) % w;
+      const y = baseY + (hash2(j, band, 131) - 0.5) * 24;
+      blob(x, y, 72 + hash2(j, band, 137) * 68, 0.045 + hash2(j, band, 139) * 0.035);
     }
   }
 
@@ -196,10 +216,12 @@ export function useTreeEnvironmentTextures(theme: Theme, hillRadius: number, soi
     grassBlade: createGrassBladeTexture(theme),
     sky: skyTexture(theme),
   }), [theme, hillRadius, soilRadius]);
+
   useEffect(() => () => {
     textures.ground.dispose();
     textures.grassBlade.dispose();
     textures.sky.dispose();
   }, [textures]);
+
   return textures;
 }
