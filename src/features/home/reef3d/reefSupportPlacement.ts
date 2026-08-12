@@ -18,7 +18,7 @@ export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
 }
 
 export function raycastReefSupport(
-  supportMeshes: readonly THREE.Mesh[],
+  supportMeshes: THREE.Mesh[],
   x: number,
   z: number,
   minNormalY = 0.24,
