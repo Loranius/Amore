@@ -1,6 +1,7 @@
 import { useEffect, useMemo, type ReactNode } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
+import { ReefEnvironment } from './ReefEnvironment';
 
 function CausticPatch({
   position,
@@ -69,28 +70,10 @@ export function ReefStage({
         />
       </mesh>
 
-      {/* Wide seabed, then a softer mound under the accepted reef foundation. */}
-      <mesh position={[0, -0.34, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[18, 64]} />
-        <meshStandardMaterial color="#8a8771" roughness={1} metalness={0} />
-      </mesh>
-      <mesh position={[0, -0.24, 0]} scale={[3.5, 0.42, 3.1]}>
-        <sphereGeometry args={[1, 48, 20, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color="#747867" roughness={1} metalness={0} />
-      </mesh>
+      <ReefEnvironment />
 
-      {/* Distant silhouettes create depth without stealing attention from the
-          generated colony. */}
-      <mesh position={[-5.5, -0.8, -7.5]} scale={[2.8, 0.75, 2.2]} rotation={[0, 0.3, 0]}>
-        <dodecahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color="#355f61" roughness={1} metalness={0} />
-      </mesh>
-      <mesh position={[6.2, -1.05, -9]} scale={[3.4, 0.85, 2.5]} rotation={[0, -0.45, 0]}>
-        <dodecahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color="#2d5960" roughness={1} metalness={0} />
-      </mesh>
-
-      {/* Soft caustic hints on the seabed; no texture downloads or post FX. */}
+      {/* Existing lightweight caustic hints stay isolated from Stage 1 terrain;
+          the next pass can replace them with animated underwater light. */}
       <CausticPatch position={[-1.7, -0.31, 1.8]} scale={[1.6, 1.1, 1]} rotation={0.35} />
       <CausticPatch position={[1.6, -0.31, 0.9]} scale={[1.1, 0.8, 1]} rotation={-0.25} />
       <CausticPatch position={[0.4, -0.31, -2]} scale={[2, 1.2, 1]} rotation={0.1} />
