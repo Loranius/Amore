@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-type HeightAt = (x: number, z: number) => number;
-
 type LifeInstance = {
   x: number;
   y: number;
@@ -13,19 +11,31 @@ type LifeInstance = {
   tone: number;
 };
 
+type BreezeGrassInstance = {
+  x: number;
+  y: number;
+  z: number;
+  rotation: number;
+  height: number;
+  width: number;
+  tone: number;
+  phase: number;
+};
+
 type TreeLifeDetailsProps = {
   theme: 'light' | 'dark';
   hillRadius: number;
   soilRadius: number;
   groundY: number;
   reducedMotion: boolean;
-  heightAt: HeightAt;
 };
 
 const LIFE_PALETTES = {
   light: {
     stemA: '#5f7f43',
     stemB: '#789a52',
+    breezeA: '#617e47',
+    breezeB: '#8aa45e',
     flowerWhite: '#f7f2df',
     flowerGold: '#e6c969',
     flowerViolet: '#a898bf',
@@ -39,6 +49,8 @@ const LIFE_PALETTES = {
   dark: {
     stemA: '#49683a',
     stemB: '#65834a',
+    breezeA: '#4f6e3c',
+    breezeB: '#718b50',
     flowerWhite: '#e9e6d8',
     flowerGold: '#d5b95d',
     flowerViolet: '#9183aa',
@@ -51,12 +63,53 @@ const LIFE_PALETTES = {
   },
 } as const;
 
-const hash = (index: number, salt: number) => {
-  const value = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453123;
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const smoothStep = (edge0: number, edge1: number, value: number) => {
+  const t = clamp01((value - edge0) / Math.max(0.0001, edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
+
+const hash2 = (x: number, z: number, salt: number) => {
+  const value = Math.sin(x * 127.1 + z * 311.7 + salt * 74.7) * 43758.5453123;
   return value - Math.floor(value);
 };
 
-function buildFlowers(hillRadius: number, soilRadius: number, heightAt: HeightAt) {
+const hash = (index: number, salt: number) => hash2(index, salt * 0.17, salt);
+
+const valueNoise = (x: number, z: number, salt: number) => {
+  const x0 = Math.floor(x);
+  const z0 = Math.floor(z);
+  const tx = x - x0;
+  const tz = z - z0;
+  const sx = tx * tx * (3 - 2 * tx);
+  const sz = tz * tz * (3 - 2 * tz);
+  const n00 = hash2(x0, z0, salt);
+  const n10 = hash2(x0 + 1, z0, salt);
+  const n01 = hash2(x0, z0 + 1, salt);
+  const n11 = hash2(x0 + 1, z0 + 1, salt);
+  const nx0 = THREE.MathUtils.lerp(n00, n10, sx);
+  const nx1 = THREE.MathUtils.lerp(n01, n11, sx);
+  return THREE.MathUtils.lerp(nx0, nx1, sz);
+};
+
+// Mirrors TreeStage terrain exactly so all small props sit on the actual hill
+// rather than on a second approximate ground plane.
+const terrainHeight = (x: number, z: number, radius: number) => {
+  const radial = Math.min(1, Math.hypot(x, z) / radius);
+  const distance = Math.hypot(x, z);
+  const summitMask = smoothStep(0.55, 2.2, distance);
+  const dome = -radius * 0.2 * Math.pow(radial, 1.58);
+  const broad = (valueNoise(x * 0.25, z * 0.25, 3) - 0.5) * 0.72;
+  const medium = (valueNoise(x * 0.62, z * 0.62, 11) - 0.5) * 0.22;
+  const ridge = Math.sin(x * 0.53 + z * 0.19) * 0.055;
+  const edgeWeight = 0.48 + radial * 0.52;
+  return dome + (broad + medium + ridge) * summitMask * edgeWeight;
+};
+
+const groundHeight = (x: number, z: number, hillRadius: number, groundY: number) =>
+  groundY + terrainHeight(x, z, hillRadius);
+
+function buildFlowers(hillRadius: number, soilRadius: number, groundY: number) {
   const count = 44;
   const minRadius = Math.max(soilRadius * 1.55, 1.25);
   const maxRadius = hillRadius * 0.68;
@@ -73,7 +126,7 @@ function buildFlowers(hillRadius: number, soilRadius: number, heightAt: HeightAt
     const z = Math.sin(angle) * radial;
     items.push({
       x,
-      y: heightAt(x, z),
+      y: groundHeight(x, z, hillRadius, groundY),
       z,
       rotation: hash(i, 7) * Math.PI * 2,
       scale: THREE.MathUtils.lerp(0.72, 1.22, hash(i, 11)),
@@ -84,7 +137,38 @@ function buildFlowers(hillRadius: number, soilRadius: number, heightAt: HeightAt
   return items;
 }
 
-function buildRootLitter(soilRadius: number, heightAt: HeightAt) {
+function buildBreezeGrass(hillRadius: number, soilRadius: number, groundY: number) {
+  const count = 96;
+  const minRadius = Math.max(soilRadius * 1.25, 1.05);
+  const maxRadius = hillRadius * 0.72;
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const items: BreezeGrassInstance[] = [];
+
+  for (let i = 0; i < count; i += 1) {
+    const angle = i * golden + (hash(i, 83) - 0.5) * 0.9;
+    const radial = Math.sqrt(
+      minRadius * minRadius
+      + (maxRadius * maxRadius - minRadius * minRadius) * hash(i, 89),
+    );
+    const x = Math.cos(angle) * radial;
+    const z = Math.sin(angle) * radial;
+    const height = THREE.MathUtils.lerp(0.34, 0.68, hash(i, 97));
+    items.push({
+      x,
+      y: groundHeight(x, z, hillRadius, groundY) + height * 0.5,
+      z,
+      rotation: angle + hash(i, 101) * Math.PI,
+      height,
+      width: THREE.MathUtils.lerp(0.72, 1.16, hash(i, 103)),
+      tone: hash(i, 107),
+      phase: hash(i, 109) * Math.PI * 2,
+    });
+  }
+
+  return items;
+}
+
+function buildRootLitter(hillRadius: number, soilRadius: number, groundY: number) {
   const count = 28;
   const items: LifeInstance[] = [];
 
@@ -99,7 +183,7 @@ function buildRootLitter(soilRadius: number, heightAt: HeightAt) {
     const z = Math.sin(angle) * radial;
     items.push({
       x,
-      y: heightAt(x, z) + 0.018,
+      y: groundHeight(x, z, hillRadius, groundY) + 0.018,
       z,
       rotation: hash(i, 23) * Math.PI * 2,
       scale: THREE.MathUtils.lerp(0.75, 1.35, hash(i, 29)),
@@ -110,7 +194,7 @@ function buildRootLitter(soilRadius: number, heightAt: HeightAt) {
   return items;
 }
 
-function buildTwigs(soilRadius: number, heightAt: HeightAt) {
+function buildTwigs(hillRadius: number, soilRadius: number, groundY: number) {
   const count = 12;
   const items: LifeInstance[] = [];
 
@@ -125,7 +209,7 @@ function buildTwigs(soilRadius: number, heightAt: HeightAt) {
     const z = Math.sin(angle) * radial;
     items.push({
       x,
-      y: heightAt(x, z) + 0.025,
+      y: groundHeight(x, z, hillRadius, groundY) + 0.025,
       z,
       rotation: angle + hash(i, 43) * 1.2,
       scale: THREE.MathUtils.lerp(0.72, 1.45, hash(i, 47)),
@@ -140,14 +224,14 @@ function MeadowFlowers({
   theme,
   hillRadius,
   soilRadius,
-  heightAt,
-}: Pick<TreeLifeDetailsProps, 'theme' | 'hillRadius' | 'soilRadius' | 'heightAt'>) {
+  groundY,
+}: Pick<TreeLifeDetailsProps, 'theme' | 'hillRadius' | 'soilRadius' | 'groundY'>) {
   const stemsRef = useRef<THREE.InstancedMesh>(null);
   const headsRef = useRef<THREE.InstancedMesh>(null);
   const palette = LIFE_PALETTES[theme];
   const flowers = useMemo(
-    () => buildFlowers(hillRadius, soilRadius, heightAt),
-    [hillRadius, soilRadius, heightAt],
+    () => buildFlowers(hillRadius, soilRadius, groundY),
+    [hillRadius, soilRadius, groundY],
   );
 
   useEffect(() => {
@@ -204,16 +288,91 @@ function MeadowFlowers({
   );
 }
 
+function BreezeGrass({
+  theme,
+  hillRadius,
+  soilRadius,
+  groundY,
+  reducedMotion,
+}: TreeLifeDetailsProps) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const dummyRef = useRef(new THREE.Object3D());
+  const tickRef = useRef(0);
+  const palette = LIFE_PALETTES[theme];
+  const grass = useMemo(
+    () => buildBreezeGrass(hillRadius, soilRadius, groundY),
+    [hillRadius, soilRadius, groundY],
+  );
+
+  useEffect(() => {
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const dummy = dummyRef.current;
+    const a = new THREE.Color(palette.breezeA);
+    const b = new THREE.Color(palette.breezeB);
+    const color = new THREE.Color();
+
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    grass.forEach((blade, index) => {
+      dummy.position.set(blade.x, blade.y, blade.z);
+      dummy.rotation.set(0, blade.rotation, 0);
+      dummy.scale.set(blade.width, blade.height / 0.48, 1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+      color.copy(a).lerp(b, blade.tone);
+      mesh.setColorAt(index, color);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [grass, palette.breezeA, palette.breezeB]);
+
+  useFrame((state, delta) => {
+    if (reducedMotion) return;
+    tickRef.current += delta;
+    if (tickRef.current < 0.05) return;
+    tickRef.current = 0;
+
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    const dummy = dummyRef.current;
+    const time = state.clock.elapsedTime;
+
+    grass.forEach((blade, index) => {
+      const sway = Math.sin(time * 1.15 + blade.phase + blade.x * 0.14) * 0.065;
+      dummy.position.set(blade.x, blade.y, blade.z);
+      dummy.rotation.set(sway * 0.18, blade.rotation, sway);
+      dummy.scale.set(blade.width, blade.height / 0.48, 1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(index, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, grass.length]}>
+      <planeGeometry args={[0.065, 0.48]} />
+      <meshStandardMaterial color="#ffffff" roughness={1} side={THREE.DoubleSide} />
+    </instancedMesh>
+  );
+}
+
 function RootLitter({
   theme,
+  hillRadius,
   soilRadius,
-  heightAt,
-}: Pick<TreeLifeDetailsProps, 'theme' | 'soilRadius' | 'heightAt'>) {
+  groundY,
+}: Pick<TreeLifeDetailsProps, 'theme' | 'hillRadius' | 'soilRadius' | 'groundY'>) {
   const leavesRef = useRef<THREE.InstancedMesh>(null);
   const twigsRef = useRef<THREE.InstancedMesh>(null);
   const palette = LIFE_PALETTES[theme];
-  const leaves = useMemo(() => buildRootLitter(soilRadius, heightAt), [soilRadius, heightAt]);
-  const twigs = useMemo(() => buildTwigs(soilRadius, heightAt), [soilRadius, heightAt]);
+  const leaves = useMemo(
+    () => buildRootLitter(hillRadius, soilRadius, groundY),
+    [hillRadius, soilRadius, groundY],
+  );
+  const twigs = useMemo(
+    () => buildTwigs(hillRadius, soilRadius, groundY),
+    [hillRadius, soilRadius, groundY],
+  );
 
   useEffect(() => {
     const mesh = leavesRef.current;
@@ -384,19 +543,30 @@ export function TreeLifeDetails({
   soilRadius,
   groundY,
   reducedMotion,
-  heightAt,
 }: TreeLifeDetailsProps) {
   const palette = LIFE_PALETTES[theme];
 
   return (
     <>
+      <BreezeGrass
+        theme={theme}
+        hillRadius={hillRadius}
+        soilRadius={soilRadius}
+        groundY={groundY}
+        reducedMotion={reducedMotion}
+      />
       <MeadowFlowers
         theme={theme}
         hillRadius={hillRadius}
         soilRadius={soilRadius}
-        heightAt={heightAt}
+        groundY={groundY}
       />
-      <RootLitter theme={theme} soilRadius={soilRadius} heightAt={heightAt} />
+      <RootLitter
+        theme={theme}
+        hillRadius={hillRadius}
+        soilRadius={soilRadius}
+        groundY={groundY}
+      />
       <CloudLayer theme={theme} groundY={groundY} reducedMotion={reducedMotion} />
       <Butterfly
         base={[1.55, groundY + 2.15, 0.55]}
