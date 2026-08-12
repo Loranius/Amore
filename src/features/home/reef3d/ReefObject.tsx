@@ -70,11 +70,11 @@ export function ReefObject({
     }
   });
 
+  // The foundation is intentionally buried into the environment mound.
+  // Keeping the old +0.52 lift exposed the closed shell skirt as a floating island.
   return (
     <group
       rotation={[-0.08, -0.18, 0]}
-      // The foundation is now intentionally buried into the environment mound.
-      // Keeping the old +0.52 lift exposed the closed shell's skirt as a floating island.
       position={[0, 0.04, 0]}
       scale={1.05}
     >
