@@ -105,80 +105,81 @@ const CORE_LOWER_FILL: readonly RockMassProps[] = [
 ] as const;
 
 /**
- * Backing masses stay mostly inside the core while the visible shelves project
- * farther outward. That keeps each terrace structurally attached without
- * swallowing the ledge silhouette back into the mound.
+ * Sculpt pass 4 roots mirror three readable shelf levels. Paired roots on the
+ * lower and middle tiers overlap the core, while the crown keeps one compact
+ * anchor so the shelves stay attached without becoming five separate bands.
  */
 const BASE_LEDGE_ROOTS: readonly RockMassProps[] = [
   {
-    position: [-0.5, 0.05, 0.24],
-    scale: [0.76, 0.48, 0.64],
+    position: [-0.54, 0.08, 0.26],
+    scale: [0.8, 0.5, 0.66],
     rotation: [0.06, 0.26, -0.05],
     color: '#4f6861',
   },
   {
-    position: [0.43, 0.15, 0.1],
-    scale: [0.8, 0.46, 0.65],
+    position: [0.45, 0.1, 0.12],
+    scale: [0.82, 0.48, 0.66],
     rotation: [-0.04, -0.22, 0.04],
     color: '#536c64',
   },
   {
-    position: [-0.11, 0.5, -0.23],
-    scale: [0.7, 0.42, 0.58],
+    position: [-0.14, 0.54, -0.25],
+    scale: [0.68, 0.4, 0.56],
     rotation: [0.08, 0.16, -0.04],
     color: '#587067',
   },
   {
-    position: [0.24, 0.69, -0.03],
-    scale: [0.58, 0.36, 0.5],
+    position: [0.28, 0.57, -0.01],
+    scale: [0.56, 0.34, 0.48],
     rotation: [-0.03, -0.18, 0.05],
     color: '#5c7369',
   },
   {
-    position: [-0.19, 0.84, 0.05],
-    scale: [0.48, 0.3, 0.42],
+    position: [-0.12, 0.92, 0.03],
+    scale: [0.44, 0.28, 0.4],
     rotation: [0.05, 0.24, -0.03],
     color: '#61786d',
   },
 ] as const;
 
 /**
- * Sculpt pass 3: shelves project 20–35% farther from the core and gain a modest
- * footprint increase. The lower terraces remain the broadest while the crown
- * stays compact, so the cascade reads clearly from side and three-quarter views.
+ * Sculpt pass 4: five physical ledges are grouped into three visual tiers.
+ * Ledges 0/1 share one broad lower shelf height, 2/3 share an asymmetric middle
+ * shelf, and ledge 4 forms a small crown. Larger vertical gaps make the cascade
+ * readable at mobile scale while preserving the irregular organic footprint.
  */
 const BASE_PLATE_LEDGES: readonly PlateLedgeProps[] = [
   {
-    position: [-0.92, 0.18, 0.52],
-    scale: [1.38, 0.18, 0.9],
+    position: [-0.98, 0.22, 0.55],
+    scale: [1.52, 0.2, 0.98],
     rotation: [0.04, 0.22, 0.04],
     color: '#8eb2aa',
     variant: 0,
   },
   {
-    position: [0.72, 0.3, 0.24],
-    scale: [1.44, 0.2, 0.92],
+    position: [0.74, 0.24, 0.3],
+    scale: [1.4, 0.18, 0.88],
     rotation: [-0.05, -0.2, 0.03],
     color: '#96bbb1',
     variant: 1,
   },
   {
-    position: [-0.18, 0.65, -0.43],
-    scale: [1.2, 0.18, 0.8],
+    position: [-0.3, 0.69, -0.46],
+    scale: [1.16, 0.18, 0.78],
     rotation: [0.06, 0.14, -0.05],
     color: '#85aaa5',
     variant: 2,
   },
   {
-    position: [0.42, 0.86, 0.04],
-    scale: [1.0, 0.16, 0.7],
+    position: [0.48, 0.72, 0.05],
+    scale: [0.96, 0.16, 0.68],
     rotation: [-0.03, -0.16, 0.04],
     color: '#a0c2b7',
     variant: 3,
   },
   {
-    position: [-0.36, 1.02, 0.12],
-    scale: [0.8, 0.14, 0.58],
+    position: [-0.18, 1.1, 0.08],
+    scale: [0.72, 0.14, 0.52],
     rotation: [0.05, 0.26, -0.03],
     color: '#91b7af',
     variant: 4,
@@ -409,13 +410,12 @@ function ReefContactShadow() {
 /**
  * Static terrain surrounding the production reef.
  *
- * The old broad gray hemisphere is intentionally gone. The hero now rises from
- * one overlapping asymmetric coral-rock spine with exposed cascading ledges,
- * closer to the layered reference silhouette while the seabed stays visible.
+ * The hero now uses a three-tier cascade: broad lower ledge, offset middle ledge
+ * and compact crown, while the seabed stays continuous around the rock spine.
  */
 export function ReefEnvironment() {
   return (
-    <group name="reef-environment-cascade-ledges">
+    <group name="reef-environment-three-tier-cascade">
       <mesh position={[0, -0.36, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow={false}>
         <circleGeometry args={[18, 48]} />
         <meshStandardMaterial color={PALETTE.floor} roughness={1} metalness={0} />
