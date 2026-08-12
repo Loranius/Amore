@@ -4,6 +4,7 @@ import { useThree } from '@react-three/fiber';
 import { ReefEnvironment } from './ReefEnvironment';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefLife } from './ReefLife';
+import { ReefDensityLayer } from './ReefDensityLayer';
 
 /**
  * Dedicated underwater world for the reef.
@@ -28,15 +29,11 @@ export function ReefStage({
       <color attach="background" args={['#0a4d61']} />
       <fog attach="fog" args={['#176b77', 5.4, 22.5]} />
 
-      {/* Stage 4 lighting: enough cool fill to preserve coral colour, while the
-          main surface key stays directional so the colony keeps readable form. */}
       <ambientLight intensity={0.2} />
       <hemisphereLight args={['#9ce4e8', '#143d42', 0.82]} />
       <directionalLight position={[-4.5, 10, 4]} intensity={2.18} color="#d8f8ef" />
       <directionalLight position={[5, 3, -5]} intensity={0.44} color="#4ba8ba" />
 
-      {/* A cheap readable water ceiling. Stage 4 lowers its opacity so it reads
-          as surface separation rather than a translucent disk above the reef. */}
       <mesh position={[0, 7.2, -2]} rotation={[Math.PI / 2, 0, 0]}>
         <circleGeometry args={[18, 36]} />
         <meshBasicMaterial
@@ -51,6 +48,7 @@ export function ReefStage({
       <ReefEnvironment />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <ReefLife reducedMotion={reducedMotion} />
+      <ReefDensityLayer />
 
       {children}
 
@@ -69,8 +67,6 @@ export function ReefStage({
         target={[0, 0.85, 0]}
       />
 
-      {/* Keep the accepted mobile framing while letting wider viewports stay
-          closer to the hero reef. */}
       <ReefCameraPlacement distance={cameraDistance} />
     </>
   );
