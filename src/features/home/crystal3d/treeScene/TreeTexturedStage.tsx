@@ -37,16 +37,16 @@ type GroundInstance = {
 
 const PALETTE = {
   light: {
-    sky: '#b9ddf3', fog: '#d7e8df', distantGrass: '#7c9564',
-    stoneA: '#7d8177', stoneB: '#5f675e', hazeHill: '#8da58b', hazeHillFar: '#a9beb2',
+    sky: '#8fc6e6', fog: '#d8e8e4', distantGrass: '#829d66',
+    stoneA: '#858a7f', stoneB: '#687066', hazeHill: '#91aa91', hazeHillFar: '#adbfba',
     shadow: '#263527', sun: '#fff2bd', sunHalo: '#fff4c7', sunLight: '#ffe8bd',
-    skyLight: '#d8ecff', groundLight: '#6f7d54', rim: '#c8ddff',
+    skyLight: '#d8ecff', groundLight: '#73845a', rim: '#c8ddff',
   },
   dark: {
-    sky: '#8dbbd8', fog: '#b8d0c8', distantGrass: '#617a50',
-    stoneA: '#666d64', stoneB: '#4e5750', hazeHill: '#718b78', hazeHillFar: '#91a99a',
+    sky: '#78b7d7', fog: '#bfd8db', distantGrass: '#6c8755',
+    stoneA: '#737a70', stoneB: '#596159', hazeHill: '#78947f', hazeHillFar: '#9aafa2',
     shadow: '#1f2b22', sun: '#ffe9a8', sunHalo: '#ffedb8', sunLight: '#ffdfad',
-    skyLight: '#bfdcf0', groundLight: '#516247', rim: '#b7d2f3',
+    skyLight: '#c8e2f3', groundLight: '#5b704f', rim: '#bdd8f6',
   },
 } as const;
 
@@ -105,10 +105,12 @@ function buildTerrainGeometry(radius: number) {
       uvs.push(clamp01(x / (radius * 2) + 0.5), clamp01(z / (radius * 2) + 0.5));
     }
   }
+
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
     indices.push(0, 1 + next, 1 + segment);
   }
+
   for (let ring = 1; ring < rings; ring += 1) {
     const currentStart = 1 + (ring - 1) * segments;
     const nextStart = 1 + ring * segments;
@@ -121,6 +123,44 @@ function buildTerrainGeometry(radius: number) {
       indices.push(a, d, c, a, b, d);
     }
   }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function buildGrassTuftGeometry() {
+  const positions: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const cards = [
+    { yaw: 0, width: 0.13, height: 0.42, x: 0, z: 0 },
+    { yaw: 1.08, width: 0.11, height: 0.36, x: 0.025, z: 0.008 },
+    { yaw: -1.02, width: 0.105, height: 0.34, x: -0.022, z: 0.018 },
+    { yaw: 2.06, width: 0.085, height: 0.29, x: 0.015, z: -0.018 },
+    { yaw: -2.14, width: 0.08, height: 0.27, x: -0.018, z: -0.012 },
+  ] as const;
+  const baseY = -0.21;
+
+  cards.forEach((card) => {
+    const start = positions.length / 3;
+    const rx = Math.cos(card.yaw) * card.width * 0.5;
+    const rz = -Math.sin(card.yaw) * card.width * 0.5;
+    const topY = baseY + card.height;
+    positions.push(
+      card.x - rx, baseY, card.z - rz,
+      card.x + rx, baseY, card.z + rz,
+      card.x + rx, topY, card.z + rz,
+      card.x - rx, topY, card.z - rz,
+    );
+    uvs.push(0, 0, 1, 0, 1, 1, 0, 1);
+    indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+  });
+
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
@@ -132,10 +172,11 @@ function buildTerrainGeometry(radius: number) {
 
 function buildGrassInstances(hillRadius: number, soilRadius: number, groundY: number) {
   const instances: GroundInstance[] = [];
-  const count = 320;
-  const minRadius = Math.max(soilRadius * 1.35, 1.05);
-  const maxRadius = hillRadius * 0.78;
+  const count = 235;
+  const minRadius = Math.max(soilRadius * 1.38, 1.08);
+  const maxRadius = hillRadius * 0.76;
   const golden = Math.PI * (3 - Math.sqrt(5));
+
   for (let i = 0; i < count; i += 1) {
     const radialSeed = hash2(i, 2, 101);
     const angle = i * golden + (hash2(i, 3, 103) - 0.5) * 0.82;
@@ -143,14 +184,18 @@ function buildGrassInstances(hillRadius: number, soilRadius: number, groundY: nu
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     const localY = terrainHeight(x, z, hillRadius);
-    const bladeHeight = THREE.MathUtils.lerp(0.22, 0.54, hash2(i, 4, 107));
-    const bladeWidth = THREE.MathUtils.lerp(0.72, 1.25, hash2(i, 5, 109));
+    const bladeHeight = THREE.MathUtils.lerp(0.3, 0.58, hash2(i, 4, 107));
+    const tuftWidth = THREE.MathUtils.lerp(0.82, 1.2, hash2(i, 5, 109));
     instances.push({
-      x, y: groundY + localY + bladeHeight * 0.5, z,
-      rotationX: (hash2(i, 6, 113) - 0.5) * 0.12,
+      x,
+      y: groundY + localY + bladeHeight * 0.5,
+      z,
+      rotationX: (hash2(i, 6, 113) - 0.5) * 0.08,
       rotationY: angle + hash2(i, 7, 127) * Math.PI,
-      rotationZ: (hash2(i, 8, 131) - 0.5) * 0.18,
-      scaleX: bladeWidth, scaleY: bladeHeight / 0.42, scaleZ: 1,
+      rotationZ: (hash2(i, 8, 131) - 0.5) * 0.12,
+      scaleX: tuftWidth,
+      scaleY: bladeHeight / 0.42,
+      scaleZ: tuftWidth,
       tone: hash2(i, 9, 137),
     });
   }
@@ -162,6 +207,7 @@ function buildRockInstances(hillRadius: number, soilRadius: number, groundY: num
   const count = 18;
   const minRadius = Math.max(soilRadius * 1.5, 1.5);
   const maxRadius = hillRadius * 0.73;
+
   for (let i = 0; i < count; i += 1) {
     const angle = (i / count) * Math.PI * 2 + hash2(i, 1, 211) * 0.8;
     const radius = THREE.MathUtils.lerp(minRadius, maxRadius, 0.18 + hash2(i, 2, 223) * 0.82);
@@ -171,11 +217,16 @@ function buildRockInstances(hillRadius: number, soilRadius: number, groundY: num
     const scaleY = THREE.MathUtils.lerp(0.14, 0.35, hash2(i, 4, 229));
     const scaleZ = THREE.MathUtils.lerp(0.22, 0.52, hash2(i, 5, 233));
     instances.push({
-      x, y: groundY + terrainHeight(x, z, hillRadius) + scaleY * 0.18, z,
+      x,
+      y: groundY + terrainHeight(x, z, hillRadius) + scaleY * 0.18,
+      z,
       rotationX: (hash2(i, 6, 239) - 0.5) * 0.52,
       rotationY: hash2(i, 7, 241) * Math.PI * 2,
       rotationZ: (hash2(i, 8, 251) - 0.5) * 0.42,
-      scaleX, scaleY, scaleZ, tone: hash2(i, 9, 257),
+      scaleX,
+      scaleY,
+      scaleZ,
+      tone: hash2(i, 9, 257),
     });
   }
   return instances;
@@ -202,11 +253,13 @@ export function TreeTexturedStage({
   const palette = PALETTE[theme];
   const hillRadius = useMemo(() => Math.max(8, soilRadius * 4.2, crownRadius * 3.8), [soilRadius, crownRadius]);
   const terrainGeometry = useMemo(() => buildTerrainGeometry(hillRadius), [hillRadius]);
+  const grassGeometry = useMemo(() => buildGrassTuftGeometry(), []);
   const grassInstances = useMemo(() => buildGrassInstances(hillRadius, soilRadius, groundY), [hillRadius, soilRadius, groundY]);
   const rockInstances = useMemo(() => buildRockInstances(hillRadius, soilRadius, groundY), [hillRadius, soilRadius, groundY]);
   const textures = useTreeEnvironmentTextures(theme, hillRadius, soilRadius);
 
   useEffect(() => () => terrainGeometry.dispose(), [terrainGeometry]);
+  useEffect(() => () => grassGeometry.dispose(), [grassGeometry]);
 
   useEffect(() => {
     const mesh = grassRef.current;
@@ -251,41 +304,40 @@ export function TreeTexturedStage({
   return (
     <>
       <color attach="background" args={[palette.sky]} />
-      <fog attach="fog" args={[palette.fog, frame.distance * 0.78, frame.distance + 31]} />
+      <fog attach="fog" args={[palette.fog, frame.distance * 0.84, frame.distance + 32]} />
 
       <mesh frustumCulled={false}>
         <sphereGeometry args={[skyRadius, 48, 24]} />
         <meshBasicMaterial map={textures.sky} side={THREE.BackSide} depthWrite={false} fog={false} />
       </mesh>
 
-      <ambientLight intensity={0.2} />
-      <hemisphereLight args={[palette.skyLight, palette.groundLight, 1.02]} />
-      <directionalLight position={[-7, 10, 5]} intensity={2.3} color={palette.sunLight} />
-      <directionalLight position={[5, 4, -6]} intensity={0.28} color={palette.rim} />
+      <ambientLight intensity={0.22} />
+      <hemisphereLight args={[palette.skyLight, palette.groundLight, 1.05]} />
+      <directionalLight position={[-7, 10, 5]} intensity={2.25} color={palette.sunLight} />
+      <directionalLight position={[5, 4, -6]} intensity={0.3} color={palette.rim} />
 
       <mesh geometry={terrainGeometry} position={[0, groundY, 0]} receiveShadow>
-        <meshStandardMaterial map={textures.ground} roughness={0.94} metalness={0} />
+        <meshStandardMaterial map={textures.ground} roughness={0.96} metalness={0} />
       </mesh>
 
       <mesh position={[0.08, groundY + 0.018, -0.04]} rotation={[-Math.PI / 2, 0, 0]} scale={[rootShadowScaleX, rootShadowScaleZ, 1]}>
         <circleGeometry args={[1, 40]} />
-        <meshBasicMaterial color={palette.shadow} transparent opacity={0.13} depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
+        <meshBasicMaterial color={palette.shadow} transparent opacity={0.1} depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
       </mesh>
       <mesh position={[0.72, groundY + 0.014, -0.5]} rotation={[-Math.PI / 2, 0, -0.18]} scale={[crownShadowScaleX, crownShadowScaleZ, 1]}>
         <circleGeometry args={[1, 48]} />
-        <meshBasicMaterial color={palette.shadow} transparent opacity={0.05} depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
+        <meshBasicMaterial color={palette.shadow} transparent opacity={0.04} depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
       </mesh>
 
-      <instancedMesh ref={grassRef} args={[undefined, undefined, grassInstances.length]}>
-        <planeGeometry args={[0.11, 0.42, 1, 1]} />
-        <meshStandardMaterial
+      <instancedMesh ref={grassRef} args={[undefined, undefined, grassInstances.length]} geometry={grassGeometry}>
+        <meshBasicMaterial
           map={textures.grassBlade}
           color="#ffffff"
-          roughness={0.92}
           side={THREE.DoubleSide}
           transparent
-          alphaTest={0.24}
+          alphaTest={0.16}
           depthWrite
+          toneMapped
         />
       </instancedMesh>
 
@@ -309,11 +361,11 @@ export function TreeTexturedStage({
 
       <mesh position={[-9.5, groundY + 8.5, -17]}>
         <sphereGeometry args={[1.7, 20, 14]} />
-        <meshBasicMaterial color={palette.sunHalo} transparent opacity={0.045} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={palette.sunHalo} transparent opacity={0.035} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh position={[-9.5, groundY + 8.5, -17]}>
         <sphereGeometry args={[1.02, 20, 14]} />
-        <meshBasicMaterial color={palette.sunHalo} transparent opacity={0.1} depthWrite={false} toneMapped={false} />
+        <meshBasicMaterial color={palette.sunHalo} transparent opacity={0.085} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh position={[-9.5, groundY + 8.5, -17]}>
         <sphereGeometry args={[0.58, 24, 16]} />
