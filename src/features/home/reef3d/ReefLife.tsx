@@ -39,7 +39,7 @@ function buildSeaGrass(): LifeInstance[] {
   ] as const;
 
   return Array.from({ length: SEA_GRASS_COUNT }, (_, index) => {
-    const cluster = clusters[index % clusters.length];
+    const cluster = clusters[index % clusters.length]!;
     const angle = seededUnit(index, 1) * Math.PI * 2;
     const radius = Math.sqrt(seededUnit(index, 2)) * cluster.radius;
     const x = cluster.center[0] + Math.cos(angle) * radius;
@@ -233,7 +233,7 @@ function DistantFish({ reducedMotion }: { reducedMotion: boolean }) {
 
       bodyDummy.position.set(x, y, z);
       bodyDummy.rotation.set(0, heading, 0);
-      bodyDummy.scale.set(item.scale * 1.8, item.scale * 0.72, item.scale * 0.72);
+      bodyDummy.scale.set(item.scale * 0.72, item.scale * 0.72, item.scale * 1.8);
       bodyDummy.updateMatrix();
       bodies.setMatrixAt(index, bodyDummy.matrix);
 
