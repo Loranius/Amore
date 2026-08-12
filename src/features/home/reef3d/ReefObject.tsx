@@ -16,8 +16,8 @@ import {
   type ReefThreeSceneState,
 } from './reefThreeAdapter';
 
-const SCULPT_PASS_23 = 'reef-sculpt-pass-2-3';
-const AMBER_PATCH_COLOR = new THREE.Color('#85785f');
+const SCULPT_PASS_34 = 'reef-sculpt-pass-3-4';
+const EMBEDDED_PATCH_COLOR = new THREE.Color('#6f7567');
 
 function rescaleRange(
   batch: ReefRenderableBatch,
@@ -72,29 +72,57 @@ function muteMassiveRange(batch: ReefRenderableBatch, runtime: ReefBatchRuntimeR
     index += 1
   ) {
     const offset = index * 3;
-    const sourceR = batch.baseColors[offset] ?? AMBER_PATCH_COLOR.r;
-    const sourceG = batch.baseColors[offset + 1] ?? AMBER_PATCH_COLOR.g;
-    const sourceB = batch.baseColors[offset + 2] ?? AMBER_PATCH_COLOR.b;
-    const blend = 0.68;
-    batch.baseColors[offset] = sourceR + (AMBER_PATCH_COLOR.r - sourceR) * blend;
-    batch.baseColors[offset + 1] = sourceG + (AMBER_PATCH_COLOR.g - sourceG) * blend;
-    batch.baseColors[offset + 2] = sourceB + (AMBER_PATCH_COLOR.b - sourceB) * blend;
+    const sourceR = batch.baseColors[offset] ?? EMBEDDED_PATCH_COLOR.r;
+    const sourceG = batch.baseColors[offset + 1] ?? EMBEDDED_PATCH_COLOR.g;
+    const sourceB = batch.baseColors[offset + 2] ?? EMBEDDED_PATCH_COLOR.b;
+    const blend = 0.82;
+    batch.baseColors[offset] = sourceR + (EMBEDDED_PATCH_COLOR.r - sourceR) * blend;
+    batch.baseColors[offset + 1] = sourceG + (EMBEDDED_PATCH_COLOR.g - sourceG) * blend;
+    batch.baseColors[offset + 2] = sourceB + (EMBEDDED_PATCH_COLOR.b - sourceB) * blend;
   }
+}
+
+function translateRange(
+  batch: ReefRenderableBatch,
+  runtime: ReefBatchRuntimeRange,
+  targetPivot: THREE.Vector3,
+): void {
+  const sourcePivot = runtime.motion.pivot;
+  const deltaX = targetPivot.x - sourcePivot.x;
+  const deltaY = targetPivot.y - sourcePivot.y;
+  const deltaZ = targetPivot.z - sourcePivot.z;
+
+  for (
+    let index = runtime.range.vertexStart;
+    index < runtime.range.vertexStart + runtime.range.vertexCount;
+    index += 1
+  ) {
+    const offset = index * 3;
+    batch.basePositions[offset] = (batch.basePositions[offset] ?? sourcePivot.x) + deltaX;
+    batch.basePositions[offset + 1] = (batch.basePositions[offset + 1] ?? sourcePivot.y) + deltaY;
+    batch.basePositions[offset + 2] = (batch.basePositions[offset + 2] ?? sourcePivot.z) + deltaZ;
+  }
+
+  runtime.motion = {
+    ...runtime.motion,
+    pivot: {
+      x: targetPivot.x,
+      y: targetPivot.y,
+      z: targetPivot.z,
+    },
+  };
 }
 
 function shouldKeepRange(runtime: ReefBatchRuntimeRange, supportY: number): boolean {
   const { morphotype, sequence } = runtime.range;
 
-  // Green plating colonies were forming one dense mushroom cap on the crown.
-  // Thin only the upper tier; middle/lower plates remain to preserve variety.
   if (morphotype === 'plating' && supportY > 0.7) {
     return sequence % 3 !== 0;
   }
 
-  // Warm massive colonies were reading as inserted amber wedges. Keep enough
-  // accents for colour variation, but remove one third before shrinking them.
+  // Stage 3: amber massive colonies become rare accents instead of a side wall.
   if (morphotype === 'massive') {
-    return sequence % 3 !== 1;
+    return sequence % 2 === 0;
   }
 
   return true;
@@ -106,8 +134,6 @@ function sculptSupportedRange(
   supportY: number,
 ): void {
   if (runtime.range.morphotype === 'plating') {
-    // About forty percent smaller overall; crown plates get an extra reduction
-    // so open rock remains visible between the surviving green colonies.
     rescaleRange(
       batch,
       runtime,
@@ -117,11 +143,41 @@ function sculptSupportedRange(
   }
 
   if (runtime.range.morphotype === 'massive') {
-    // Convert tall amber chunks into low embedded cushion/encrusting accents.
-    // Scaling around the motion pivot preserves the exact support contact.
-    rescaleRange(batch, runtime, [0.5, 0.32, 0.5]);
+    // Stage 3: turn the remaining amber wedges into low, rock-hugging patches.
+    rescaleRange(batch, runtime, [0.38, 0.18, 0.38]);
     muteMassiveRange(batch, runtime);
   }
+}
+
+function pullBranchingRangeInward(
+  batch: ReefRenderableBatch,
+  runtime: ReefBatchRuntimeRange,
+  group: THREE.Group,
+  supportMeshes: readonly THREE.Mesh[],
+  pivotWorld: THREE.Vector3,
+): void {
+  const morphotype = runtime.range.morphotype;
+  if (morphotype !== 'branching' && morphotype !== 'sea-fan') return;
+
+  const radius = Math.hypot(pivotWorld.x, pivotWorld.z);
+  if (radius < 0.68) return;
+  if (runtime.range.sequence % 4 === 0) return;
+
+  // Pull most outer fans/branches 26-34% toward the hero center. The new root
+  // is accepted only if an actual upward-facing hero-support surface exists.
+  const inward = morphotype === 'sea-fan' ? 0.74 : 0.66;
+  const targetHit = raycastReefSupport(
+    supportMeshes,
+    pivotWorld.x * inward,
+    pivotWorld.z * inward,
+    0.3,
+  );
+  if (!targetHit) return;
+
+  const targetWorld = targetHit.point.clone();
+  targetWorld.y += 0.012;
+  const targetLocal = group.worldToLocal(targetWorld);
+  translateRange(batch, runtime, targetLocal);
 }
 
 function syncBatchAttributes(batch: ReefRenderableBatch): void {
@@ -161,13 +217,10 @@ export function ReefObject({
   );
 
   /**
-   * Production colonies were originally attached to the procedural foundation.
-   * That foundation is intentionally hidden in the portal, so ranges whose base
-   * no longer sits on the visible artistic rock must not remain visible in air.
-   *
-   * Sculpt pass 2/3 also happens here after real support is known: upper green
-   * plating colonies are thinned and reduced, while warm massive colonies become
-   * small embedded accents. No generator/layout contract is changed.
+   * Only production ranges that touch the visible artistic reef survive.
+   * Stage 3 reduces massive colonies to embedded accents. Stage 4 relocates
+   * most outer branching/sea-fan ranges onto real inner terrace support so the
+   * center regains coral structure without reintroducing levitation.
    */
   useEffect(() => {
     const group = groupRef.current;
@@ -182,7 +235,7 @@ export function ReefObject({
     for (const batch of reefScene.batches) {
       const supportedRanges = [] as typeof batch.runtimeRanges;
       const supportedIndices: number[] = [];
-      const sculptAlreadyApplied = batch.geometry.userData.reefSculptPass === SCULPT_PASS_23;
+      const sculptAlreadyApplied = batch.geometry.userData.reefSculptPass === SCULPT_PASS_34;
 
       for (const runtime of batch.runtimeRanges) {
         pivot.set(runtime.motion.pivot.x, runtime.motion.pivot.y, runtime.motion.pivot.z);
@@ -197,6 +250,7 @@ export function ReefObject({
 
         if (!sculptAlreadyApplied) {
           sculptSupportedRange(batch, runtime, hit.point.y);
+          pullBranchingRangeInward(batch, runtime, group, supportMeshes, pivot);
         }
 
         supportedRanges.push(runtime);
@@ -211,7 +265,7 @@ export function ReefObject({
       batch.geometry.setIndex(supportedIndices);
       if (!sculptAlreadyApplied) {
         syncBatchAttributes(batch);
-        batch.geometry.userData.reefSculptPass = SCULPT_PASS_23;
+        batch.geometry.userData.reefSculptPass = SCULPT_PASS_34;
       }
       batch.geometry.computeBoundingBox();
       batch.geometry.computeBoundingSphere();
@@ -256,9 +310,6 @@ export function ReefObject({
     }
   });
 
-  // The generated foundation remains an internal generator/attachment contract,
-  // but only production colony ranges that genuinely contact the visible hero
-  // support are allowed through the presentation layer.
   return (
     <group
       ref={groupRef}
