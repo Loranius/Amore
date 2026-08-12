@@ -25,23 +25,24 @@ export function ReefStage({
 
   return (
     <>
-      <color attach="background" args={['#0b5267']} />
-      <fog attach="fog" args={['#176d7b', 5.9, 23]} />
+      <color attach="background" args={['#0a4d61']} />
+      <fog attach="fog" args={['#176b77', 5.4, 22.5]} />
 
-      {/* Cool water fill plus two directional surface contributions. */}
-      <ambientLight intensity={0.23} />
-      <hemisphereLight args={['#9fe8ee', '#123942', 0.86]} />
-      <directionalLight position={[-4.5, 10, 4]} intensity={2.25} color="#d9fbf0" />
-      <directionalLight position={[5, 3, -5]} intensity={0.48} color="#4fb4c7" />
+      {/* Stage 4 lighting: enough cool fill to preserve coral colour, while the
+          main surface key stays directional so the colony keeps readable form. */}
+      <ambientLight intensity={0.2} />
+      <hemisphereLight args={['#9ce4e8', '#143d42', 0.82]} />
+      <directionalLight position={[-4.5, 10, 4]} intensity={2.18} color="#d8f8ef" />
+      <directionalLight position={[5, 3, -5]} intensity={0.44} color="#4ba8ba" />
 
-      {/* Cheap readable water ceiling; Stage 2 light shafts visually connect
-          this surface to the terrain without requiring a water simulation. */}
+      {/* A cheap readable water ceiling. Stage 4 lowers its opacity so it reads
+          as surface separation rather than a translucent disk above the reef. */}
       <mesh position={[0, 7.2, -2]} rotation={[Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[18, 48]} />
+        <circleGeometry args={[18, 36]} />
         <meshBasicMaterial
-          color="#8fe3e2"
+          color="#8bdedc"
           transparent
-          opacity={0.105}
+          opacity={0.09}
           depthWrite={false}
           toneMapped={false}
         />
@@ -59,15 +60,17 @@ export function ReefStage({
         enableZoom
         enableDamping={!reducedMotion}
         dampingFactor={0.06}
-        minDistance={6.1}
+        rotateSpeed={0.58}
+        zoomSpeed={0.7}
+        minDistance={6.3}
         maxDistance={12.4}
         minPolarAngle={0.58}
         maxPolarAngle={1.42}
         target={[0, 0.85, 0]}
       />
 
-      {/* Keep the initial frame responsive without coupling reef geometry to
-          the crystal camera solver. */}
+      {/* Keep the accepted mobile framing while letting wider viewports stay
+          closer to the hero reef. */}
       <ReefCameraPlacement distance={cameraDistance} />
     </>
   );
