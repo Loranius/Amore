@@ -5,6 +5,7 @@ import { ReefEnvironment } from './ReefEnvironment';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefLife } from './ReefLife';
 import { ReefDensityLayer } from './ReefDensityLayer';
+import { BackgroundWhale } from './BackgroundWhale';
 
 /**
  * Dedicated underwater world for the reef.
@@ -47,6 +48,7 @@ export function ReefStage({
 
       <ReefEnvironment />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
+      <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefLife reducedMotion={reducedMotion} />
       <group
         name="reef-density-compact-placement"
