@@ -5,16 +5,13 @@
 // ті самі персоналізовані гілки, корені, листя, матеріали, сезонність і вітер.
 // Змінюється лише renderer environment. Храм кристала сюди більше не
 // монтується: дерево має власний пагорб, денне небо та сонячне освітлення.
-//
-// Камерний директор лишається спільним навмисно. Він не є частиною храму —
-// це навігація світом, завдяки якій повороти між маршрутами не стрибають.
 // ============================================================
 import { useCallback, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalRenderScale } from '@/engine/renderer';
 import { fitThreeTree, measureThreeTreeReach } from '@/engine/renderer/three';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
-import { TreeStage } from '../treeScene/TreeStage';
+import { TreeTexturedStage } from '../treeScene/TreeTexturedStage';
 import { TreeLifeDetails } from '../treeScene/TreeLifeDetails';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
@@ -31,13 +28,8 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
   );
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setRuntime(next), []);
-  // Ззовні полотна — з тієї ж причини, що й у кристала: у <Canvas> власний
-  // корінь React, і контекст маршрутизатора не перемальовує його сам.
   const { pose } = useWorldPose();
   const motionMode = useWorldMotionMode();
-  // Дерево приходить у власних одиницях рушія. Підгонка лишається єдиним
-  // мостом між engine-space і scene-space; нове оточення не втручається в
-  // геометрію артефакта і не створює другого tree implementation.
   const fit = useMemo(
     () => fitThreeTree(measureThreeTreeReach({
       mesh: build.mesh,
@@ -60,7 +52,7 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
       data-evolution-preview="ready"
       data-evolution-renderer="three"
       data-evolution-species="tree"
-      data-tree-scene="outdoor"
+      data-tree-scene="outdoor-textured"
       data-evolution-draw-calls={runtime?.drawCalls ?? ''}
       data-evolution-rendered-triangles={runtime?.triangles ?? ''}
     >
@@ -69,7 +61,7 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
         camera={{ position: [0, 0.9, 7.1], fov: 42 }}
         gl={{ alpha: false, antialias: true }}
       >
-        <TreeStage
+        <TreeTexturedStage
           theme={theme}
           reduceMotion={reduceMotion}
           soilRadius={fit.soilRadius}
@@ -104,7 +96,7 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
               reducedMotion={reduceMotion}
             />
           </group>
-        </TreeStage>
+        </TreeTexturedStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
       </Canvas>
     </div>
