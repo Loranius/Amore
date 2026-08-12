@@ -105,75 +105,80 @@ const CORE_LOWER_FILL: readonly RockMassProps[] = [
 ] as const;
 
 /**
- * Small backing masses sit under the inner half of each ledge. They intentionally
- * overlap both the central core and the shelf so the eye reads one eroded rock
- * body instead of a stack of detached plates.
+ * Backing masses stay mostly inside the core while the visible shelves project
+ * farther outward. That keeps each terrace structurally attached without
+ * swallowing the ledge silhouette back into the mound.
  */
 const BASE_LEDGE_ROOTS: readonly RockMassProps[] = [
   {
-    position: [-0.42, 0.04, 0.2],
-    scale: [0.74, 0.48, 0.62],
+    position: [-0.5, 0.05, 0.24],
+    scale: [0.76, 0.48, 0.64],
     rotation: [0.06, 0.26, -0.05],
     color: '#4f6861',
   },
   {
-    position: [0.36, 0.14, 0.08],
-    scale: [0.78, 0.46, 0.64],
+    position: [0.43, 0.15, 0.1],
+    scale: [0.8, 0.46, 0.65],
     rotation: [-0.04, -0.22, 0.04],
     color: '#536c64',
   },
   {
-    position: [-0.08, 0.49, -0.2],
+    position: [-0.11, 0.5, -0.23],
     scale: [0.7, 0.42, 0.58],
     rotation: [0.08, 0.16, -0.04],
     color: '#587067',
   },
   {
-    position: [0.2, 0.68, -0.04],
+    position: [0.24, 0.69, -0.03],
     scale: [0.58, 0.36, 0.5],
     rotation: [-0.03, -0.18, 0.05],
     color: '#5c7369',
   },
   {
-    position: [-0.16, 0.83, 0.04],
+    position: [-0.19, 0.84, 0.05],
     scale: [0.48, 0.3, 0.42],
     rotation: [0.05, 0.24, -0.03],
     color: '#61786d',
   },
 ] as const;
 
+/**
+ * Sculpt pass 3: shelves project 20–35% farther from the core and gain a modest
+ * footprint increase. The lower terraces remain the broadest while the crown
+ * stays compact, so the cascade reads clearly from side and three-quarter views.
+ */
 const BASE_PLATE_LEDGES: readonly PlateLedgeProps[] = [
   {
-    position: [-0.72, 0.17, 0.38],
-    scale: [1.22, 0.18, 0.82],
+    position: [-0.92, 0.18, 0.52],
+    scale: [1.38, 0.18, 0.9],
     rotation: [0.04, 0.22, 0.04],
     color: '#8eb2aa',
     variant: 0,
   },
   {
-    position: [0.55, 0.28, 0.16],
-    scale: [1.28, 0.2, 0.84],
+    position: [0.72, 0.3, 0.24],
+    scale: [1.44, 0.2, 0.92],
     rotation: [-0.05, -0.2, 0.03],
     color: '#96bbb1',
     variant: 1,
   },
   {
-    position: [-0.12, 0.63, -0.32],
-    scale: [1.08, 0.18, 0.72],
+    position: [-0.18, 0.65, -0.43],
+    scale: [1.2, 0.18, 0.8],
     rotation: [0.06, 0.14, -0.05],
     color: '#85aaa5',
     variant: 2,
   },
   {
-    position: [0.31, 0.84, 0.01],
-    scale: [0.9, 0.16, 0.64],
+    position: [0.42, 0.86, 0.04],
+    scale: [1.0, 0.16, 0.7],
     rotation: [-0.03, -0.16, 0.04],
     color: '#a0c2b7',
     variant: 3,
   },
   {
-    position: [-0.27, 0.99, 0.08],
-    scale: [0.72, 0.14, 0.52],
+    position: [-0.36, 1.02, 0.12],
+    scale: [0.8, 0.14, 0.58],
     rotation: [0.05, 0.26, -0.03],
     color: '#91b7af',
     variant: 4,
@@ -405,12 +410,12 @@ function ReefContactShadow() {
  * Static terrain surrounding the production reef.
  *
  * The old broad gray hemisphere is intentionally gone. The hero now rises from
- * one overlapping asymmetric coral-rock spine with embedded ledges, closer to
- * the layered reference silhouette while the seabed stays visible around it.
+ * one overlapping asymmetric coral-rock spine with exposed cascading ledges,
+ * closer to the layered reference silhouette while the seabed stays visible.
  */
 export function ReefEnvironment() {
   return (
-    <group name="reef-environment-vertical-core">
+    <group name="reef-environment-cascade-ledges">
       <mesh position={[0, -0.36, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow={false}>
         <circleGeometry args={[18, 48]} />
         <meshStandardMaterial color={PALETTE.floor} roughness={1} metalness={0} />
