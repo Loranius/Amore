@@ -24,6 +24,8 @@ interface TreeStageProps {
 const TREE_PALETTES = {
   light: {
     sky: '#b9ddf3',
+    skyZenith: '#6eb7e2',
+    skyHorizon: '#d7ebed',
     fog: '#d7e8df',
     grass: '#6d8655',
     distantGrass: '#7c9564',
@@ -32,7 +34,11 @@ const TREE_PALETTES = {
     grassBladeAlt: '#536f42',
     stoneA: '#7d8177',
     stoneB: '#5f675e',
+    hazeHill: '#8da58b',
+    hazeHillFar: '#a9beb2',
+    shadow: '#263527',
     sun: '#fff2bd',
+    sunHalo: '#fff4c7',
     sunLight: '#ffe8bd',
     skyLight: '#d8ecff',
     groundLight: '#6f7d54',
@@ -43,6 +49,8 @@ const TREE_PALETTES = {
     // cooler haze keep the foreground chrome legible without turning the
     // tree back into the portal's night temple.
     sky: '#8dbbd8',
+    skyZenith: '#5d9fc7',
+    skyHorizon: '#c4d9d5',
     fog: '#b8d0c8',
     grass: '#4d6840',
     distantGrass: '#617a50',
@@ -51,7 +59,11 @@ const TREE_PALETTES = {
     grassBladeAlt: '#3f5b35',
     stoneA: '#666d64',
     stoneB: '#4e5750',
+    hazeHill: '#718b78',
+    hazeHillFar: '#91a99a',
+    shadow: '#1f2b22',
     sun: '#ffe9a8',
+    sunHalo: '#ffedb8',
     sunLight: '#ffdfad',
     skyLight: '#bfdcf0',
     groundLight: '#516247',
@@ -176,6 +188,32 @@ function buildTerrainGeometry(radius: number, soilRadius: number, palette: TreeP
   return geometry;
 }
 
+function buildSkyGeometry(radius: number, palette: TreePalette) {
+  const geometry = new THREE.SphereGeometry(radius, 48, 24);
+  const position = geometry.getAttribute('position');
+  const colors = new Float32Array(position.count * 3);
+  const zenith = new THREE.Color(palette.skyZenith);
+  const horizon = new THREE.Color(palette.skyHorizon);
+  const lower = new THREE.Color(palette.fog);
+  const color = new THREE.Color();
+
+  for (let index = 0; index < position.count; index += 1) {
+    const normalizedY = clamp01(position.getY(index) / radius * 0.5 + 0.5);
+    if (normalizedY < 0.5) {
+      color.copy(lower).lerp(horizon, smoothStep(0.16, 0.5, normalizedY));
+    } else {
+      color.copy(horizon).lerp(zenith, smoothStep(0.5, 0.96, normalizedY));
+    }
+    const offset = index * 3;
+    colors[offset] = color.r;
+    colors[offset + 1] = color.g;
+    colors[offset + 2] = color.b;
+  }
+
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  return geometry;
+}
+
 function buildGrassInstances(hillRadius: number, soilRadius: number, groundY: number) {
   const instances: GroundInstance[] = [];
   const count = 320;
@@ -281,6 +319,10 @@ export function TreeStage({
     () => buildTerrainGeometry(hillRadius, soilRadius, palette),
     [hillRadius, soilRadius, palette],
   );
+  const skyGeometry = useMemo(
+    () => buildSkyGeometry(Math.max(52, frame.distance + 30), palette),
+    [frame.distance, palette],
+  );
   const grassInstances = useMemo(
     () => buildGrassInstances(hillRadius, soilRadius, groundY),
     [hillRadius, soilRadius, groundY],
@@ -291,6 +333,7 @@ export function TreeStage({
   );
 
   useEffect(() => () => terrainGeometry.dispose(), [terrainGeometry]);
+  useEffect(() => () => skyGeometry.dispose(), [skyGeometry]);
 
   useEffect(() => {
     const mesh = grassRef.current;
@@ -334,24 +377,71 @@ export function TreeStage({
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [rockInstances, palette.stoneA, palette.stoneB]);
 
+  const rootShadowScaleX = Math.max(1.15, soilRadius * 1.45);
+  const rootShadowScaleZ = Math.max(0.68, soilRadius * 0.82);
+  const crownShadowScaleX = Math.max(1.9, crownRadius * 0.95);
+  const crownShadowScaleZ = Math.max(0.95, crownRadius * 0.48);
+
   return (
     <>
       <color attach="background" args={[palette.sky]} />
-      <fog attach="fog" args={[palette.fog, frame.distance * 0.9, frame.distance + 34]} />
+      <fog attach="fog" args={[palette.fog, frame.distance * 0.78, frame.distance + 31]} />
 
-      {/* Daylight is intentionally asymmetric: one warm sun defines the bark
-          and crown volumes, while hemisphere/rim light only prevents the far
-          side from collapsing into black. */}
-      <ambientLight intensity={0.34} />
-      <hemisphereLight args={[palette.skyLight, palette.groundLight, 0.9]} />
-      <directionalLight position={[-7, 10, 5]} intensity={2.15} color={palette.sunLight} />
-      <directionalLight position={[5, 4, -6]} intensity={0.34} color={palette.rim} />
+      {/* Pass 2 sky: vertex-coloured dome gives a bright horizon and deeper
+          zenith without HDRI, textures or post-processing. */}
+      <mesh geometry={skyGeometry} frustumCulled={false}>
+        <meshBasicMaterial
+          vertexColors
+          side={THREE.BackSide}
+          depthWrite={false}
+          fog={false}
+        />
+      </mesh>
 
-      {/* Pass 1 terrain: a deterministic radial mesh instead of a smooth sphere.
-          Vertex colours create grass, dry grass and exposed-earth patches with
-          no texture download or additional material pass. */}
+      {/* Natural daylight: less flat ambient fill, stronger sky bounce and one
+          warm directional source. No realtime shadow map is required. */}
+      <ambientLight intensity={0.2} />
+      <hemisphereLight args={[palette.skyLight, palette.groundLight, 1.02]} />
+      <directionalLight position={[-7, 10, 5]} intensity={2.3} color={palette.sunLight} />
+      <directionalLight position={[5, 4, -6]} intensity={0.28} color={palette.rim} />
+
+      {/* Pass 1 terrain: deterministic uneven mesh with grass/earth vertex
+          colouring and no downloaded texture. */}
       <mesh geometry={terrainGeometry} position={[0, groundY, 0]} receiveShadow>
         <meshStandardMaterial vertexColors roughness={0.97} metalness={0} />
+      </mesh>
+
+      {/* Cheap soft shadow proxies visually anchor the roots and crown to the
+          summit without paying for hundreds of leaf shadow casters. */}
+      <mesh
+        position={[0.08, groundY + 0.018, -0.04]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        scale={[rootShadowScaleX, rootShadowScaleZ, 1]}
+      >
+        <circleGeometry args={[1, 40]} />
+        <meshBasicMaterial
+          color={palette.shadow}
+          transparent
+          opacity={0.14}
+          depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={-1}
+        />
+      </mesh>
+      <mesh
+        position={[0.72, groundY + 0.014, -0.5]}
+        rotation={[-Math.PI / 2, 0, -0.18]}
+        scale={[crownShadowScaleX, crownShadowScaleZ, 1]}
+      >
+        <circleGeometry args={[1, 48]} />
+        <meshBasicMaterial
+          color={palette.shadow}
+          transparent
+          opacity={0.055}
+          depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={-1}
+        />
       </mesh>
 
       {/* Hundreds of blades remain one draw call. A small exclusion zone around
@@ -369,8 +459,8 @@ export function TreeStage({
         <meshStandardMaterial color="#ffffff" roughness={0.94} metalness={0} />
       </instancedMesh>
 
-      {/* A lower distant mound keeps the horizon from becoming a perfectly
-          straight fog line, but stays cheap and visually subordinate. */}
+      {/* Atmospheric perspective: near vegetation keeps saturation while the
+          next ridges converge toward the fog colour as depth increases. */}
       <mesh
         position={[hillRadius * 0.72, groundY - hillRadius * 0.43, -hillRadius * 1.32]}
         scale={[1.55, 0.28, 1]}
@@ -378,11 +468,44 @@ export function TreeStage({
         <sphereGeometry args={[hillRadius * 0.9, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color={palette.distantGrass} roughness={1} metalness={0} />
       </mesh>
+      <mesh
+        position={[-hillRadius * 1.18, groundY - hillRadius * 0.62, -hillRadius * 2.12]}
+        scale={[2.05, 0.31, 1.15]}
+      >
+        <sphereGeometry args={[hillRadius * 0.82, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={palette.hazeHill} roughness={1} metalness={0} />
+      </mesh>
+      <mesh
+        position={[hillRadius * 1.08, groundY - hillRadius * 0.8, -hillRadius * 3.05]}
+        scale={[2.75, 0.28, 1.35]}
+      >
+        <sphereGeometry args={[hillRadius * 0.86, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <meshStandardMaterial color={palette.hazeHillFar} roughness={1} metalness={0} />
+      </mesh>
 
-      {/* The sun is geometry rather than another light source: the single
-          directional light above remains the actual illumination model. */}
+      {/* Sun core + two translucent shells create a cheap atmospheric halo. */}
       <mesh position={[-9.5, groundY + 8.5, -17]}>
-        <sphereGeometry args={[0.62, 24, 16]} />
+        <sphereGeometry args={[1.7, 20, 14]} />
+        <meshBasicMaterial
+          color={palette.sunHalo}
+          transparent
+          opacity={0.045}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh position={[-9.5, groundY + 8.5, -17]}>
+        <sphereGeometry args={[1.02, 20, 14]} />
+        <meshBasicMaterial
+          color={palette.sunHalo}
+          transparent
+          opacity={0.1}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh position={[-9.5, groundY + 8.5, -17]}>
+        <sphereGeometry args={[0.58, 24, 16]} />
         <meshBasicMaterial color={palette.sun} toneMapped={false} />
       </mesh>
 
