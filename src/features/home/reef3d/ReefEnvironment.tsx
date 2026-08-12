@@ -22,36 +22,85 @@ const PALETTE = {
   contact: '#173f43',
 } as const;
 
+/**
+ * Main core masses overlap aggressively so the hero reads as one continuous
+ * coral-rock mound. The centre is deliberately wider and heavier than the
+ * shoulders, while the upper pair keeps an uneven stepped silhouette.
+ */
 const BASE_CORE_MASSES: readonly RockMassProps[] = [
   {
-    position: [-0.82, -0.08, 0.18],
-    scale: [1.18, 0.78, 0.98],
-    rotation: [0.08, 0.3, -0.08],
+    position: [-0.72, -0.02, 0.18],
+    scale: [1.42, 0.96, 1.18],
+    rotation: [0.08, 0.26, -0.06],
     color: '#526a63',
   },
   {
-    position: [0.08, 0.03, -0.12],
-    scale: [1.42, 1.02, 1.16],
-    rotation: [-0.04, -0.2, 0.04],
+    position: [0.02, 0.08, -0.04],
+    scale: [1.86, 1.24, 1.42],
+    rotation: [-0.03, -0.16, 0.03],
     color: '#5b7168',
   },
   {
-    position: [0.92, -0.04, 0.3],
-    scale: [1.06, 0.72, 0.9],
-    rotation: [0.05, 0.18, 0.05],
+    position: [0.76, 0, 0.24],
+    scale: [1.34, 0.94, 1.08],
+    rotation: [0.05, 0.16, 0.04],
     color: '#4d6862',
   },
   {
-    position: [-0.34, 0.62, 0.08],
-    scale: [0.88, 0.72, 0.76],
-    rotation: [0.12, 0.38, -0.04],
+    position: [-0.18, 0.66, 0.06],
+    scale: [1.02, 0.84, 0.86],
+    rotation: [0.1, 0.28, -0.03],
     color: '#63786e',
   },
   {
-    position: [0.48, 0.74, -0.32],
-    scale: [0.72, 0.62, 0.66],
-    rotation: [-0.04, -0.28, 0.06],
+    position: [0.4, 0.74, -0.18],
+    scale: [0.9, 0.74, 0.78],
+    rotation: [-0.03, -0.22, 0.05],
     color: '#597269',
+  },
+] as const;
+
+/** Bridge stones weld the large core lobes through the middle. */
+const CORE_BRIDGE_MASSES: readonly RockMassProps[] = [
+  {
+    position: [-0.36, 0.18, 0.12],
+    scale: [0.92, 0.56, 0.82],
+    rotation: [0.04, 0.18, -0.02],
+    color: '#556d66',
+  },
+  {
+    position: [0.42, 0.22, 0.06],
+    scale: [0.96, 0.58, 0.84],
+    rotation: [-0.02, -0.16, 0.03],
+    color: '#567067',
+  },
+  {
+    position: [0.06, 0.42, -0.12],
+    scale: [1.02, 0.52, 0.76],
+    rotation: [0.02, 0.1, -0.01],
+    color: '#61776d',
+  },
+] as const;
+
+/** Lower fill closes daylight gaps and gives the mound one planted footprint. */
+const CORE_LOWER_FILL: readonly RockMassProps[] = [
+  {
+    position: [-0.92, -0.18, 0.34],
+    scale: [0.92, 0.46, 0.72],
+    rotation: [0.02, 0.14, 0.02],
+    color: '#4d6761',
+  },
+  {
+    position: [0, -0.16, 0.18],
+    scale: [1.1, 0.5, 0.88],
+    rotation: [0.01, -0.08, 0.01],
+    color: '#506a64',
+  },
+  {
+    position: [0.96, -0.18, 0.28],
+    scale: [0.88, 0.44, 0.7],
+    rotation: [-0.02, -0.12, 0.02],
+    color: '#4b6660',
   },
 ] as const;
 
@@ -356,8 +405,8 @@ function ReefContactShadow() {
  * Static terrain surrounding the production reef.
  *
  * The old broad gray hemisphere is intentionally gone. The hero now rises from
- * a compact, asymmetric coral-rock spine with embedded ledges, closer to the
- * layered reference silhouette while the continuous seabed stays visible around it.
+ * one overlapping asymmetric coral-rock spine with embedded ledges, closer to
+ * the layered reference silhouette while the seabed stays visible around it.
  */
 export function ReefEnvironment() {
   return (
@@ -371,6 +420,12 @@ export function ReefEnvironment() {
 
       {BASE_CORE_MASSES.map((rock, index) => (
         <RockMass key={`reef-base-core-${index}`} {...rock} />
+      ))}
+      {CORE_BRIDGE_MASSES.map((rock, index) => (
+        <RockMass key={`reef-core-bridge-${index}`} {...rock} />
+      ))}
+      {CORE_LOWER_FILL.map((rock, index) => (
+        <RockMass key={`reef-core-fill-${index}`} {...rock} />
       ))}
       {BASE_LEDGE_ROOTS.map((rock, index) => (
         <RockMass key={`reef-ledge-root-${index}`} {...rock} />
