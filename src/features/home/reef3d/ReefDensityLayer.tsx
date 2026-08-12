@@ -39,8 +39,7 @@ const PLATE_COUNT = 8;
 /**
  * Sculpt pass 4 support map. The first two beds form one broad lower tier, beds
  * 2/3 form the offset middle tier, and bed 4 is the compact crown. The final two
- * shoulder beds remain low around the planted base. This keeps the procedural
- * props synchronized with the three readable terrace levels.
+ * shoulder beds remain low around the planted base.
  */
 const SUPPORT_BEDS: readonly SupportBed[] = [
   { center: [-0.98, 0.55], radius: [1.02, 0.66], topY: 0.34, edgeDrop: 0.035 },
@@ -52,9 +51,17 @@ const SUPPORT_BEDS: readonly SupportBed[] = [
   { center: [1.12, 0.18], radius: [0.56, 0.48], topY: 0.1, edgeDrop: 0.055 },
 ] as const;
 
-const BUSH_BED_INDICES = [0, 1, 2, 3, 4, 5, 6] as const;
-const CUSHION_BED_INDICES = [0, 1, 2, 5, 6] as const;
-const PLATE_BED_INDICES = [0, 1, 2] as const;
+/**
+ * Sculpt pass 5 density weighting.
+ *
+ * The old round-robin distribution spent too much of the limited instance
+ * budget on the two low shoulder beds. Repeated terrace indices deliberately
+ * bias existing props upward without adding draw calls or geometry. The crown
+ * appears often enough to feel alive but remains less dense than the middle tier.
+ */
+const BUSH_BED_INDICES = [0, 1, 2, 3, 4, 2, 3, 4, 5, 6] as const;
+const CUSHION_BED_INDICES = [0, 1, 2, 3, 4, 2, 3, 4] as const;
+const PLATE_BED_INDICES = [0, 1, 2, 3, 2, 3, 4] as const;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
@@ -97,14 +104,20 @@ function supportHeightAt(x: number, z: number): number {
   return supportY;
 }
 
+function terraceScaleForBed(bedIndex: number): number {
+  if (bedIndex === 4) return 0.78;
+  if (bedIndex === 2 || bedIndex === 3) return 0.76;
+  if (bedIndex >= 5) return 0.78;
+  return 0.9;
+}
+
 function buildBushes(): Bush[] {
   return Array.from({ length: BUSH_COUNT }, (_, index) => {
     const bedIndex = BUSH_BED_INDICES[index % BUSH_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const [x, z] = pointInBed(index, 1, bed, 0.68);
-    const highTerraceScale = bed.topY >= 0.7 ? 0.72 : 0.94;
-    const shoulderScale = bedIndex >= 5 ? 0.82 : 1;
-    const scale = heightBand(seededUnit(index, 3)) * highTerraceScale * shoulderScale;
+    const inset = bedIndex === 4 ? 0.58 : 0.66;
+    const [x, z] = pointInBed(index, 1, bed, inset);
+    const scale = heightBand(seededUnit(index, 3)) * terraceScaleForBed(bedIndex);
 
     return {
       position: [x, supportHeightAt(x, z) + seededUnit(index, 4) * 0.01, z],
@@ -120,9 +133,11 @@ function buildCushions(): Cushion[] {
   return Array.from({ length: CUSHION_COUNT }, (_, index) => {
     const bedIndex = CUSHION_BED_INDICES[index % CUSHION_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const [x, z] = pointInBed(index, 11, bed, 0.62);
-    const squash = THREE.MathUtils.lerp(0.14, 0.23, seededUnit(index, 13));
-    const width = THREE.MathUtils.lerp(0.23, 0.4, seededUnit(index, 14));
+    const inset = bedIndex === 4 ? 0.52 : 0.6;
+    const [x, z] = pointInBed(index, 11, bed, inset);
+    const crownScale = bedIndex === 4 ? 0.78 : 1;
+    const squash = THREE.MathUtils.lerp(0.14, 0.23, seededUnit(index, 13)) * crownScale;
+    const width = THREE.MathUtils.lerp(0.23, 0.4, seededUnit(index, 14)) * crownScale;
 
     return {
       position: [x, supportHeightAt(x, z) + squash * 0.82, z],
@@ -141,9 +156,11 @@ function buildPlates(): Plate[] {
   return Array.from({ length: PLATE_COUNT }, (_, index) => {
     const bedIndex = PLATE_BED_INDICES[index % PLATE_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const [x, z] = pointInBed(index, 31, bed, 0.54);
-    const radius = THREE.MathUtils.lerp(0.19, 0.32, seededUnit(index, 33));
-    const thickness = THREE.MathUtils.lerp(0.06, 0.09, seededUnit(index, 38));
+    const inset = bedIndex === 4 ? 0.44 : 0.52;
+    const [x, z] = pointInBed(index, 31, bed, inset);
+    const crownScale = bedIndex === 4 ? 0.68 : bedIndex >= 2 ? 0.86 : 1;
+    const radius = THREE.MathUtils.lerp(0.19, 0.32, seededUnit(index, 33)) * crownScale;
+    const thickness = THREE.MathUtils.lerp(0.06, 0.09, seededUnit(index, 38)) * crownScale;
 
     return {
       position: [x, supportHeightAt(x, z) + thickness * 0.5, z],
@@ -286,11 +303,13 @@ function PlateCorals() {
 }
 
 /**
- * Reef density sculpt pass 4: support beds mirror the three-tier ledge cascade.
+ * Reef density sculpt pass 5: the same lightweight instance budget is now
+ * concentrated on the three terrace levels, especially the middle and crown,
+ * rather than being spent around the peripheral shoulders.
  */
 export function ReefDensityLayer() {
   return (
-    <group name="reef-density-three-tier-cascade">
+    <group name="reef-density-upper-terraces">
       <CushionCorals />
       <PlateCorals />
       <BushCorals />
