@@ -32,17 +32,17 @@ type Plate = {
   tone: number;
 };
 
-const BUSH_COUNT = 28;
-const CUSHION_COUNT = 18;
-const PLATE_COUNT = 12;
+// Cleanup pass: keep enough density for a living reef while removing the most
+// obvious peripheral outliers that read as floating or detached props.
+const BUSH_COUNT = 24;
+const CUSHION_COUNT = 14;
+const PLATE_COUNT = 8;
 
 /**
  * Cheap support map for the visible reef environment.
  *
- * The first five beds follow the current embedded ledges from bottom to crown;
- * the final two sit on the lower left/right shoulders of the unified rock mound.
- * Density props are generated inside these footprints, then supportHeightAt()
- * places their base on the highest valid surface instead of the old flat plane.
+ * The first five beds follow the embedded ledges from bottom to crown; the last
+ * two sit on the lower left/right shoulders of the unified rock mound.
  */
 const SUPPORT_BEDS: readonly SupportBed[] = [
   { center: [-0.72, 0.38], radius: [0.82, 0.54], topY: 0.28, edgeDrop: 0.035 },
@@ -54,8 +54,11 @@ const SUPPORT_BEDS: readonly SupportBed[] = [
   { center: [1.12, 0.18], radius: [0.56, 0.48], topY: 0.1, edgeDrop: 0.055 },
 ] as const;
 
+const BUSH_BED_INDICES = [0, 1, 2, 3, 4, 5, 6] as const;
 const CUSHION_BED_INDICES = [0, 1, 2, 5, 6] as const;
-const PLATE_BED_INDICES = [0, 1, 2, 5, 6] as const;
+// Plate corals stay on actual shelf surfaces only. Keeping them off the lower
+// shoulders removes the detached pale shards visible around the base.
+const PLATE_BED_INDICES = [0, 1, 2] as const;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
@@ -68,10 +71,14 @@ function heightBand(seed: number): number {
   return THREE.MathUtils.lerp(1.04, 1.26, (seed - 0.8) / 0.2);
 }
 
-function pointInBed(index: number, salt: number, bed: SupportBed): readonly [number, number] {
+function pointInBed(
+  index: number,
+  salt: number,
+  bed: SupportBed,
+  inset: number,
+): readonly [number, number] {
   const angle = seededUnit(index, salt) * Math.PI * 2;
-  // Keep roots away from the unsupported extreme rim of each shelf.
-  const radius = Math.sqrt(seededUnit(index, salt + 1)) * 0.78;
+  const radius = Math.sqrt(seededUnit(index, salt + 1)) * inset;
   return [
     bed.center[0] + Math.cos(angle) * bed.radius[0] * radius,
     bed.center[1] + Math.sin(angle) * bed.radius[1] * radius,
@@ -96,17 +103,21 @@ function supportHeightAt(x: number, z: number): number {
 
 function buildBushes(): Bush[] {
   return Array.from({ length: BUSH_COUNT }, (_, index) => {
-    const bed = SUPPORT_BEDS[index % SUPPORT_BEDS.length]!;
-    const [x, z] = pointInBed(index, 1, bed);
+    const bedIndex = BUSH_BED_INDICES[index % BUSH_BED_INDICES.length]!;
+    const bed = SUPPORT_BEDS[bedIndex]!;
+    // Branch roots can approach the shelf edge, but not enough for their arms to
+    // visibly overhang unsupported space.
+    const [x, z] = pointInBed(index, 1, bed, 0.68);
     const highTerraceScale = bed.topY >= 0.7 ? 0.72 : 0.94;
-    const scale = heightBand(seededUnit(index, 3)) * highTerraceScale;
+    const shoulderScale = bedIndex >= 5 ? 0.82 : 1;
+    const scale = heightBand(seededUnit(index, 3)) * highTerraceScale * shoulderScale;
 
     return {
-      position: [x, supportHeightAt(x, z) + seededUnit(index, 4) * 0.012, z],
+      position: [x, supportHeightAt(x, z) + seededUnit(index, 4) * 0.01, z],
       rotation: seededUnit(index, 5) * Math.PI * 2,
       scale,
       tone: seededUnit(index, 6),
-      spread: THREE.MathUtils.lerp(0.16, 0.29, seededUnit(index, 7)),
+      spread: THREE.MathUtils.lerp(0.15, 0.26, seededUnit(index, 7)),
     };
   });
 }
@@ -115,18 +126,18 @@ function buildCushions(): Cushion[] {
   return Array.from({ length: CUSHION_COUNT }, (_, index) => {
     const bedIndex = CUSHION_BED_INDICES[index % CUSHION_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const [x, z] = pointInBed(index, 11, bed);
-    const squash = THREE.MathUtils.lerp(0.14, 0.25, seededUnit(index, 13));
-    const width = THREE.MathUtils.lerp(0.24, 0.44, seededUnit(index, 14));
+    const [x, z] = pointInBed(index, 11, bed, 0.62);
+    const squash = THREE.MathUtils.lerp(0.14, 0.23, seededUnit(index, 13));
+    const width = THREE.MathUtils.lerp(0.23, 0.4, seededUnit(index, 14));
 
     return {
       position: [x, supportHeightAt(x, z) + squash * 0.82, z],
       rotation: [
-        (seededUnit(index, 16) - 0.5) * 0.16,
+        (seededUnit(index, 16) - 0.5) * 0.14,
         seededUnit(index, 17) * Math.PI * 2,
-        (seededUnit(index, 18) - 0.5) * 0.14,
+        (seededUnit(index, 18) - 0.5) * 0.12,
       ],
-      scale: [width, squash, width * THREE.MathUtils.lerp(0.82, 1.18, seededUnit(index, 19))],
+      scale: [width, squash, width * THREE.MathUtils.lerp(0.84, 1.14, seededUnit(index, 19))],
       tone: seededUnit(index, 20),
     };
   });
@@ -136,16 +147,18 @@ function buildPlates(): Plate[] {
   return Array.from({ length: PLATE_COUNT }, (_, index) => {
     const bedIndex = PLATE_BED_INDICES[index % PLATE_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const [x, z] = pointInBed(index, 31, bed);
-    const radius = THREE.MathUtils.lerp(0.2, 0.36, seededUnit(index, 33));
-    const thickness = THREE.MathUtils.lerp(0.06, 0.1, seededUnit(index, 38));
+    // Plates have the widest footprint, so keep their centres deepest inside a
+    // ledge. This is the strongest guard against detached-looking pale shards.
+    const [x, z] = pointInBed(index, 31, bed, 0.54);
+    const radius = THREE.MathUtils.lerp(0.19, 0.32, seededUnit(index, 33));
+    const thickness = THREE.MathUtils.lerp(0.06, 0.09, seededUnit(index, 38));
 
     return {
       position: [x, supportHeightAt(x, z) + thickness * 0.5, z],
       rotation: [
-        THREE.MathUtils.lerp(-0.16, 0.16, seededUnit(index, 35)),
+        THREE.MathUtils.lerp(-0.13, 0.13, seededUnit(index, 35)),
         seededUnit(index, 36) * Math.PI * 2,
-        THREE.MathUtils.lerp(-0.14, 0.14, seededUnit(index, 37)),
+        THREE.MathUtils.lerp(-0.11, 0.11, seededUnit(index, 37)),
       ],
       scale: [radius, thickness, radius * 0.82],
       tone: seededUnit(index, 39),
@@ -281,15 +294,15 @@ function PlateCorals() {
 }
 
 /**
- * Reef density integration pass.
+ * Reef density cleanup pass.
  *
- * All supplemental corals are now rooted to explicit ledge/core support beds.
- * This removes the old flat-plane assumption that let branches pierce shelves
- * or float beside the mound while keeping the layer fully instanced and static.
+ * Supplemental growth remains surface-anchored, but roots are now kept farther
+ * from shelf rims and the widest plate corals are restricted to real ledges.
+ * This removes the detached/floating outliers without adding runtime work.
  */
 export function ReefDensityLayer() {
   return (
-    <group name="reef-density-surface-anchored">
+    <group name="reef-density-cleanup-pass">
       <CushionCorals />
       <PlateCorals />
       <BushCorals />
