@@ -7,13 +7,112 @@ type RockMassProps = {
   color?: string;
 };
 
+type PlateLedgeProps = {
+  position: Vec3;
+  scale: Vec3;
+  rotation?: Vec3;
+  color: string;
+};
+
 const PALETTE = {
   floor: '#69776d',
-  shelf: '#647168',
   sand: '#9d9883',
   rock: '#42615e',
   contact: '#173f43',
 } as const;
+
+const BASE_CORE_MASSES: readonly RockMassProps[] = [
+  {
+    position: [-0.82, -0.08, 0.18],
+    scale: [1.18, 0.78, 0.98],
+    rotation: [0.08, 0.3, -0.08],
+    color: '#526a63',
+  },
+  {
+    position: [0.08, 0.03, -0.12],
+    scale: [1.42, 1.02, 1.16],
+    rotation: [-0.04, -0.2, 0.04],
+    color: '#5b7168',
+  },
+  {
+    position: [0.92, -0.04, 0.3],
+    scale: [1.06, 0.72, 0.9],
+    rotation: [0.05, 0.18, 0.05],
+    color: '#4d6862',
+  },
+  {
+    position: [-0.34, 0.62, 0.08],
+    scale: [0.88, 0.72, 0.76],
+    rotation: [0.12, 0.38, -0.04],
+    color: '#63786e',
+  },
+  {
+    position: [0.48, 0.74, -0.32],
+    scale: [0.72, 0.62, 0.66],
+    rotation: [-0.04, -0.28, 0.06],
+    color: '#597269',
+  },
+] as const;
+
+const BASE_PLATE_LEDGES: readonly PlateLedgeProps[] = [
+  {
+    position: [-0.92, 0.24, 0.54],
+    scale: [1.22, 0.16, 0.82],
+    rotation: [0.04, 0.22, 0.04],
+    color: '#8eb2aa',
+  },
+  {
+    position: [0.72, 0.36, 0.24],
+    scale: [1.28, 0.17, 0.84],
+    rotation: [-0.05, -0.2, 0.03],
+    color: '#96bbb1',
+  },
+  {
+    position: [-0.18, 0.72, -0.46],
+    scale: [1.08, 0.15, 0.72],
+    rotation: [0.06, 0.14, -0.05],
+    color: '#85aaa5',
+  },
+  {
+    position: [0.42, 0.94, 0.06],
+    scale: [0.9, 0.13, 0.64],
+    rotation: [-0.03, -0.16, 0.04],
+    color: '#a0c2b7',
+  },
+  {
+    position: [-0.38, 1.1, 0.14],
+    scale: [0.72, 0.11, 0.52],
+    rotation: [0.05, 0.26, -0.03],
+    color: '#91b7af',
+  },
+] as const;
+
+const BASE_DEBRIS: readonly RockMassProps[] = [
+  {
+    position: [-1.72, -0.27, 0.72],
+    scale: [0.44, 0.18, 0.34],
+    rotation: [0.04, 0.24, 0.02],
+    color: '#68786f',
+  },
+  {
+    position: [1.62, -0.25, 0.56],
+    scale: [0.4, 0.16, 0.31],
+    rotation: [-0.02, -0.28, 0.03],
+    color: '#708078',
+  },
+  {
+    position: [-1.35, -0.26, -0.84],
+    scale: [0.36, 0.14, 0.29],
+    rotation: [0.03, 0.2, -0.02],
+    color: '#63746c',
+  },
+  {
+    position: [1.28, -0.26, -0.92],
+    scale: [0.46, 0.17, 0.33],
+    rotation: [0.01, -0.22, 0.04],
+    color: '#6d7e75',
+  },
+] as const;
 
 const NEAR_ROCKS: readonly RockMassProps[] = [
   { position: [-5.4, -0.22, 2.3], scale: [2.45, 0.72, 1.85], rotation: [0.08, 0.28, -0.06] },
@@ -56,6 +155,26 @@ function RockMass({
     >
       <dodecahedronGeometry args={[1, 0]} />
       <meshStandardMaterial color={color} roughness={0.98} metalness={0} />
+    </mesh>
+  );
+}
+
+function PlateLedge({
+  position,
+  scale,
+  rotation = [0, 0, 0],
+  color,
+}: PlateLedgeProps) {
+  return (
+    <mesh
+      position={[position[0], position[1], position[2]]}
+      scale={[scale[0], scale[1], scale[2]]}
+      rotation={[rotation[0], rotation[1], rotation[2]]}
+      receiveShadow={false}
+      castShadow={false}
+    >
+      <cylinderGeometry args={[1, 1.08, 0.22, 14]} />
+      <meshStandardMaterial color={color} roughness={0.96} metalness={0} />
     </mesh>
   );
 }
@@ -109,15 +228,15 @@ function ReefContactShadow() {
   return (
     <>
       <mesh
-        position={[0.05, -0.018, 0.05]}
+        position={[0.02, -0.335, 0.02]}
         rotation={[-Math.PI / 2, 0, -0.08]}
-        scale={[2.15, 1.38, 1]}
+        scale={[1.45, 1.02, 1]}
       >
-        <circleGeometry args={[1, 32]} />
+        <circleGeometry args={[1, 28]} />
         <meshBasicMaterial
           color={PALETTE.contact}
           transparent
-          opacity={0.12}
+          opacity={0.1}
           depthWrite={false}
           toneMapped={false}
           polygonOffset
@@ -125,15 +244,15 @@ function ReefContactShadow() {
         />
       </mesh>
       <mesh
-        position={[0.12, -0.017, -0.06]}
-        rotation={[-Math.PI / 2, 0, 0.12]}
-        scale={[3.15, 1.9, 1]}
+        position={[0.06, -0.334, -0.03]}
+        rotation={[-Math.PI / 2, 0, 0.1]}
+        scale={[2.2, 1.35, 1]}
       >
-        <circleGeometry args={[1, 24]} />
+        <circleGeometry args={[1, 22]} />
         <meshBasicMaterial
           color={PALETTE.contact}
           transparent
-          opacity={0.04}
+          opacity={0.03}
           depthWrite={false}
           toneMapped={false}
           polygonOffset
@@ -147,37 +266,34 @@ function ReefContactShadow() {
 /**
  * Static terrain surrounding the production reef.
  *
- * The central seabed now rises into the accepted foundation instead of sitting
- * far below it. That hides the closed shell's underside and makes the hero read
- * as one tiered reef mound growing from sediment rather than a floating tray.
+ * The old broad gray hemisphere is intentionally gone. The hero now rises from
+ * a compact, asymmetric coral-rock spine with embedded ledges, closer to the
+ * layered reference silhouette while the continuous seabed stays visible around it.
  */
 export function ReefEnvironment() {
   return (
-    <group name="reef-environment-foundation-blend">
-      {/* A broad floor gives every camera angle a continuous seabed. */}
+    <group name="reef-environment-vertical-core">
       <mesh position={[0, -0.36, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow={false}>
         <circleGeometry args={[18, 48]} />
         <meshStandardMaterial color={PALETTE.floor} roughness={1} metalness={0} />
       </mesh>
 
-      {/* Raised top hemisphere: its crown meets the lowered production reef,
-          while its edges sink back into the broad floor. There is no vertical
-          cylinder wall, so it cannot read as a second pedestal. */}
-      <mesh position={[0, -0.28, 0]} scale={[4.35, 0.255, 3.72]} receiveShadow={false}>
-        <sphereGeometry args={[1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={PALETTE.shelf} roughness={1} metalness={0} />
-      </mesh>
-
       <ReefContactShadow />
 
-      {/* Pale sediment breaks the floor into natural patches while preserving a
-          clean central footprint for the procedural colony. */}
+      {BASE_CORE_MASSES.map((rock, index) => (
+        <RockMass key={`reef-base-core-${index}`} {...rock} />
+      ))}
+      {BASE_PLATE_LEDGES.map((ledge, index) => (
+        <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} />
+      ))}
+      {BASE_DEBRIS.map((rock, index) => (
+        <RockMass key={`reef-base-debris-${index}`} {...rock} />
+      ))}
+
       {SAND_PATCHES.map((patch, index) => (
         <SandPatch key={`reef-sand-${index}`} {...patch} />
       ))}
 
-      {/* Low, asymmetric shelves frame the hero object instead of surrounding
-          it with a perfect ring. */}
       {NEAR_ROCKS.map((rock, index) => (
         <RockMass key={`reef-near-rock-${index}`} {...rock} />
       ))}
@@ -185,8 +301,6 @@ export function ReefEnvironment() {
         <RockMass key={`reef-terrace-${index}`} {...rock} />
       ))}
 
-      {/* Three depth layers. Fog does the expensive visual work; geometry stays
-          deliberately coarse and cheap enough for the mobile portal. */}
       <DistantSpire position={[-6.8, -0.35, -8.7]} scale={1.25} rotation={0.28} />
       <DistantSpire position={[6.9, -0.6, -9.8]} scale={1.42} rotation={-0.38} />
       <DistantSpire position={[-2.4, -0.9, -12.8]} scale={0.9} rotation={-0.12} />
