@@ -5,11 +5,11 @@ Original source: https://sketchfab.com/3d-models/glow-whale-b682779d8ee8498fa4f5
 License: Creative Commons Attribution 4.0 International (CC BY 4.0)
 License text: https://creativecommons.org/licenses/by/4.0/
 
-Modifications for Amore:
-- optimized specifically for a distant underwater background role
-- removed skeletal animation/skin data from the shipped background copy
-- removed unused texture channels and normal/specular maps
-- reduced embedded texture resolution
-- retained the original model metadata inside the optimized GLB
+Runtime derivative used by Amore:
+- rebuilt as a very low-poly distant-background silhouette for mobile performance
+- decimated to 88 vertices / 185 triangles
+- baked broad diffuse/emissive appearance into vertex colors
+- removed textures, rig, skinning and skeletal animation from the shipped copy
+- keeps the recognizable whale silhouette while movement is animated by the reef scene code
 
-The original uploaded GLB remains the source asset; the repository copy is a lightweight derivative for runtime use.
+The original uploaded GLB is the source asset. Attribution and source metadata are preserved here because the tiny runtime derivative intentionally strips nonessential GLB metadata.
