@@ -25,13 +25,12 @@ type CushionCandidate = {
   tone: number;
 };
 
-const BUSH_COUNT = 24;
-const CUSHION_COUNT = 14;
+const BUSH_COUNT = 26;
+const CUSHION_COUNT = 12;
 
 /**
- * Sampling domains follow the newly sculpted shelf footprints. These domains
- * only propose X/Z candidates; final placement still requires a real downward
- * ray hit on reef-hero-support, so no estimated height can create levitation.
+ * These are candidate domains only. Final Y placement still requires a real
+ * downward ray hit on reef-hero-support, so no candidate can float in air.
  */
 const SUPPORT_BEDS: readonly SupportBed[] = [
   { center: [-0.82, 0.47], radius: [0.9, 0.58] },
@@ -41,10 +40,10 @@ const SUPPORT_BEDS: readonly SupportBed[] = [
   { center: [-0.12, 0.06], radius: [0.42, 0.31] },
 ] as const;
 
-// Keep the lightweight instance budget on the real terrace footprint. The old
-// low shoulder beds are intentionally gone because they were the main source of
-// unsupported peripheral growth after the artistic foundation changed.
-const BUSH_BED_INDICES = [0, 1, 2, 3, 4, 2, 3, 4] as const;
+// Stage 4 deliberately biases branching growth toward the middle/crown beds.
+// Beds 0/1 still receive a few accents so the silhouette does not collapse into
+// one central bouquet, but most cheap branch props now live on 2/3/4.
+const BUSH_BED_INDICES = [2, 3, 4, 3, 4, 2, 3, 4, 1, 3, 4, 2, 0] as const;
 const CUSHION_BED_INDICES = [0, 1, 2, 3, 4, 2, 3] as const;
 
 function seededUnit(index: number, salt: number): number {
@@ -73,16 +72,16 @@ function pointInBed(
 }
 
 function terraceScaleForBed(bedIndex: number): number {
-  if (bedIndex === 4) return 0.78;
-  if (bedIndex === 2 || bedIndex === 3) return 0.76;
-  return 0.9;
+  if (bedIndex === 4) return 0.76;
+  if (bedIndex === 2 || bedIndex === 3) return 0.82;
+  return 0.88;
 }
 
 function buildBushCandidates(): BushCandidate[] {
   return Array.from({ length: BUSH_COUNT }, (_, index) => {
     const bedIndex = BUSH_BED_INDICES[index % BUSH_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const inset = bedIndex === 4 ? 0.54 : 0.62;
+    const inset = bedIndex === 4 ? 0.42 : bedIndex === 2 || bedIndex === 3 ? 0.5 : 0.56;
     const [x, z] = pointInBed(index, 1, bed, inset);
 
     return {
@@ -91,7 +90,7 @@ function buildBushCandidates(): BushCandidate[] {
       rotation: seededUnit(index, 5) * Math.PI * 2,
       scale: heightBand(seededUnit(index, 3)) * terraceScaleForBed(bedIndex),
       tone: seededUnit(index, 6),
-      spread: THREE.MathUtils.lerp(0.15, 0.24, seededUnit(index, 7)),
+      spread: THREE.MathUtils.lerp(0.14, 0.22, seededUnit(index, 7)),
     };
   });
 }
@@ -100,11 +99,11 @@ function buildCushionCandidates(): CushionCandidate[] {
   return Array.from({ length: CUSHION_COUNT }, (_, index) => {
     const bedIndex = CUSHION_BED_INDICES[index % CUSHION_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    const inset = bedIndex === 4 ? 0.48 : 0.56;
+    const inset = bedIndex === 4 ? 0.46 : 0.54;
     const [x, z] = pointInBed(index, 11, bed, inset);
-    const crownScale = bedIndex === 4 ? 0.78 : 1;
-    const squash = THREE.MathUtils.lerp(0.14, 0.23, seededUnit(index, 13)) * crownScale;
-    const width = THREE.MathUtils.lerp(0.23, 0.4, seededUnit(index, 14)) * crownScale;
+    const crownScale = bedIndex === 4 ? 0.72 : 0.9;
+    const squash = THREE.MathUtils.lerp(0.13, 0.2, seededUnit(index, 13)) * crownScale;
+    const width = THREE.MathUtils.lerp(0.21, 0.34, seededUnit(index, 14)) * crownScale;
 
     return {
       x,
@@ -143,7 +142,7 @@ function BushCorals() {
     let instanceIndex = 0;
 
     for (const bush of candidates) {
-      const hit = raycastReefSupport(supportMeshes, bush.x, bush.z, 0.28);
+      const hit = raycastReefSupport(supportMeshes, bush.x, bush.z, 0.3);
       if (!hit) continue;
 
       for (let armIndex = 0; armIndex < 3; armIndex += 1) {
@@ -153,9 +152,9 @@ function BushCorals() {
         const outward = Math.abs(armOffset) * bush.spread;
 
         dummy.position.set(
-          bush.x + Math.cos(localAngle) * outward * 0.34,
+          bush.x + Math.cos(localAngle) * outward * 0.3,
           hit.point.y + 0.008 + height * 0.31,
-          bush.z + Math.sin(localAngle) * outward * 0.34,
+          bush.z + Math.sin(localAngle) * outward * 0.3,
         );
         dummy.rotation.set(
           Math.sin(localAngle) * armOffset * 0.15,
@@ -206,7 +205,7 @@ function CushionCorals() {
 
     const dummy = new THREE.Object3D();
     const dark = new THREE.Color('#667866');
-    const light = new THREE.Color('#a88a72');
+    const light = new THREE.Color('#8f816d');
     const color = new THREE.Color();
     let instanceIndex = 0;
 
@@ -216,14 +215,14 @@ function CushionCorals() {
 
       dummy.position.set(
         cushion.x,
-        hit.point.y + cushion.scale[1] * 0.88,
+        hit.point.y + cushion.scale[1] * 0.82,
         cushion.z,
       );
       dummy.rotation.set(cushion.rotation[0], cushion.rotation[1], cushion.rotation[2]);
       dummy.scale.set(cushion.scale[0], cushion.scale[1], cushion.scale[2]);
       dummy.updateMatrix();
       mesh.setMatrixAt(instanceIndex, dummy.matrix);
-      color.copy(dark).lerp(light, cushion.tone);
+      color.copy(dark).lerp(light, cushion.tone * 0.72);
       mesh.setColorAt(instanceIndex, color);
       instanceIndex += 1;
     }
@@ -242,13 +241,12 @@ function CushionCorals() {
 }
 
 /**
- * Density hard-grounding pass. Pale supplemental plate corals are removed and
- * every remaining prop is rendered only after a downward ray hits the actual
- * hero support geometry with a sufficiently upward-facing surface normal.
+ * Stage 4 density pass: branching accents are concentrated toward the inner
+ * terraces, while every visible prop still requires a real hero-support hit.
  */
 export function ReefDensityLayer() {
   return (
-    <group name="reef-density-real-support">
+    <group name="reef-density-inner-growth">
       <CushionCorals />
       <BushCorals />
     </group>
