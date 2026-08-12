@@ -3,8 +3,8 @@ import type { ReefFoundationSurface } from '@/engine/species/reef';
 import type { ReefPreviewBuild } from './buildReefPreview';
 import type { ReefThreeSceneState } from './reefThreeAdapter';
 
-export const REEF_FOUNDATION_PRESENTATION_VERSION = 'reef-foundation-v1';
-export const REEF_FOUNDATION_PASS = 'phase-12-foundation-seafloor';
+export const REEF_FOUNDATION_PRESENTATION_VERSION = 'reef-foundation-v2';
+export const REEF_FOUNDATION_PASS = 'foundation-tiered-mound';
 
 export const REEF_FOUNDATION_PROFILE = Object.freeze({
   primaryEdgeLobes: 3,
@@ -12,13 +12,19 @@ export const REEF_FOUNDATION_PROFILE = Object.freeze({
   primaryEdgeAmplitude: 0.105,
   secondaryEdgeAmplitude: 0.046,
   asymmetricEdgeAmplitude: 0.038,
-  bottomTaper: 0.94,
-  topReliefRatio: 0.016,
-  edgeShelfRatio: 0.014,
-  edgeErosionRatio: 0.018,
-  bottomDepthVariationRatio: 0.018,
+  bottomTaper: 0.82,
+  topReliefRatio: 0.012,
+  edgeShelfRatio: 0.01,
+  edgeErosionRatio: 0.024,
+  bottomDepthVariationRatio: 0.006,
   colonyBedLiftRatio: 0.009,
   colonyBedRadiusMultiplier: 1.65,
+  visibleSkirtDepthRatio: 0.052,
+  crownTerraceRatio: 0.042,
+  middleTerraceRatio: 0.026,
+  lowerTerraceRatio: 0.014,
+  terraceAsymmetryRatio: 0.008,
+  outerSinkRatio: 0.02,
 });
 
 const TAU = Math.PI * 2;
@@ -56,6 +62,18 @@ function maximumRadius(positions: Float32Array): number {
     );
   }
   return maximum;
+}
+
+function minimumTopY(
+  positions: Float32Array,
+  surfaces: readonly { surface: ReefFoundationSurface }[],
+): number {
+  let minimum = Number.POSITIVE_INFINITY;
+  surfaces.forEach((vertex, index) => {
+    if (vertex.surface !== 'top') return;
+    minimum = Math.min(minimum, positions[index * 3 + 1] ?? 0);
+  });
+  return Number.isFinite(minimum) ? minimum : 0;
 }
 
 function colonyBedLift(
@@ -101,10 +119,39 @@ function radialSilhouetteScale(
   ) * REEF_FOUNDATION_PROFILE.secondaryEdgeAmplitude;
   const asymmetric = Math.cos(angle - phase * 0.35)
     * REEF_FOUNDATION_PROFILE.asymmetricEdgeAmplitude;
-  const upperScale = 1 + edge * (primary + secondary + asymmetric);
+  const upperScale = (1 + edge * (primary + secondary + asymmetric))
+    * (1 - edge * 0.022);
   return surface === 'side'
     ? upperScale * REEF_FOUNDATION_PROFILE.bottomTaper
     : upperScale;
+}
+
+function tieredMoundRelief(
+  angle: number,
+  radiusT: number,
+  phase: number,
+  maximumFoundationRadius: number,
+): number {
+  // Three broad, softened terraces turn the old flat tray into one coral mound.
+  // The steps overlap so the topology remains continuous and colony feet simply
+  // settle slightly into the rock instead of floating above new geometry.
+  const crown = (1 - smoothstep(0.18, 0.34, radiusT))
+    * maximumFoundationRadius
+    * REEF_FOUNDATION_PROFILE.crownTerraceRatio;
+  const middle = (1 - smoothstep(0.42, 0.57, radiusT))
+    * maximumFoundationRadius
+    * REEF_FOUNDATION_PROFILE.middleTerraceRatio;
+  const lower = (1 - smoothstep(0.66, 0.8, radiusT))
+    * maximumFoundationRadius
+    * REEF_FOUNDATION_PROFILE.lowerTerraceRatio;
+  const asymmetry = Math.sin(angle * 2.15 + phase * 0.74)
+    * maximumFoundationRadius
+    * REEF_FOUNDATION_PROFILE.terraceAsymmetryRatio
+    * (1 - smoothstep(0.74, 1, radiusT));
+  const outerSink = -maximumFoundationRadius
+    * REEF_FOUNDATION_PROFILE.outerSinkRatio
+    * smoothstep(0.78, 1, radiusT);
+  return crown + middle + lower + asymmetry + outerSink;
 }
 
 function topRelief(
@@ -129,13 +176,17 @@ function topRelief(
     * REEF_FOUNDATION_PROFILE.edgeErosionRatio
     * smoothstep(0.76, 1, radiusT)
     * (0.72 + Math.sin(angle * 3 - phase * 0.91) * 0.28);
-  return shelf + crossCurrent + edgeShelf + edgeErosion;
+  return tieredMoundRelief(angle, radiusT, phase, maximumFoundationRadius)
+    + shelf
+    + crossCurrent
+    + edgeShelf
+    + edgeErosion;
 }
 
 /**
- * Phase 12 sculpts only the already published renderer foundation. It keeps
- * the accepted shell topology, indices, source vertices, attachments, colony
- * geometry, draw calls and materials unchanged.
+ * Presentation-only foundation sculpt. The accepted shell topology, indices,
+ * source vertices, attachments, colony geometry, draw calls and materials stay
+ * unchanged; only the rendered vertex positions are shaped for the portal.
  */
 export function applyReefFoundationPresentation(
   scene: ReefThreeSceneState,
@@ -152,11 +203,14 @@ export function applyReefFoundationPresentation(
   const positionAttribute = geometry.getAttribute('position') as BufferAttribute;
   const positions = mutableArray(positionAttribute);
   if (build.foundation.vertices.length * 3 !== positions.length) {
-    throw new Error('Reef Phase 12 requires one source foundation vertex per rendered vertex.');
+    throw new Error('Reef foundation presentation requires one source vertex per rendered vertex.');
   }
 
   const radius = maximumRadius(positions);
   const phase = stablePhase(build.species.artifactSeed);
+  const topMinimum = minimumTopY(positions, build.foundation.vertices);
+  const compressedBottomY = topMinimum
+    - radius * REEF_FOUNDATION_PROFILE.visibleSkirtDepthRatio;
 
   build.foundation.vertices.forEach((sourceVertex, index) => {
     const offset = index * 3;
@@ -184,7 +238,9 @@ export function applyReefFoundationPresentation(
       const depthVariation = Math.sin(angle * 4 - phase * 0.82)
         * radius
         * REEF_FOUNDATION_PROFILE.bottomDepthVariationRatio;
-      positions[offset + 1] = sourceY - Math.abs(depthVariation) * 0.45 + depthVariation * 0.55;
+      positions[offset + 1] = compressedBottomY + depthVariation;
+    } else {
+      positions[offset + 1] = compressedBottomY;
     }
   });
 
@@ -197,6 +253,8 @@ export function applyReefFoundationPresentation(
   geometry.userData.reefFoundationPresentationVersion = REEF_FOUNDATION_PRESENTATION_VERSION;
   geometry.userData.reefFoundationPass = REEF_FOUNDATION_PASS;
   geometry.userData.reefFoundationBottomTaper = REEF_FOUNDATION_PROFILE.bottomTaper;
+  geometry.userData.reefFoundationVisibleSkirtDepthRatio
+    = REEF_FOUNDATION_PROFILE.visibleSkirtDepthRatio;
 
   return scene;
 }
