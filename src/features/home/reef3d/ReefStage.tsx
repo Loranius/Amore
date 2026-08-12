@@ -3,12 +3,13 @@ import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { ReefEnvironment } from './ReefEnvironment';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
+import { ReefLife } from './ReefLife';
 
 /**
  * Dedicated underwater world for the reef.
  *
  * The reef production object remains untouched. This component owns only the
- * world around it: water colour, depth fog, seabed, atmosphere and camera.
+ * world around it: water colour, depth fog, seabed, atmosphere, life and camera.
  * Nothing from the crystal temple or the old laboratory card is mounted here.
  */
 export function ReefStage({
@@ -48,6 +49,7 @@ export function ReefStage({
 
       <ReefEnvironment />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
+      <ReefLife reducedMotion={reducedMotion} />
 
       {children}
 
