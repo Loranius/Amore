@@ -11,8 +11,131 @@ import {
   createReefThreeScene,
   disposeReefThreeScene,
   sampleReefBatchFrame,
+  type ReefBatchRuntimeRange,
+  type ReefRenderableBatch,
   type ReefThreeSceneState,
 } from './reefThreeAdapter';
+
+const SCULPT_PASS_23 = 'reef-sculpt-pass-2-3';
+const AMBER_PATCH_COLOR = new THREE.Color('#85785f');
+
+function rescaleRange(
+  batch: ReefRenderableBatch,
+  runtime: ReefBatchRuntimeRange,
+  scale: readonly [number, number, number],
+): void {
+  const [scaleX, scaleY, scaleZ] = scale;
+  const pivot = runtime.motion.pivot;
+  let maximumAxialDistance = 1e-6;
+
+  for (
+    let index = runtime.range.vertexStart;
+    index < runtime.range.vertexStart + runtime.range.vertexCount;
+    index += 1
+  ) {
+    const offset = index * 3;
+    const relativeX = (batch.basePositions[offset] ?? pivot.x) - pivot.x;
+    const relativeY = (batch.basePositions[offset + 1] ?? pivot.y) - pivot.y;
+    const relativeZ = (batch.basePositions[offset + 2] ?? pivot.z) - pivot.z;
+
+    const x = relativeX * scaleX;
+    const y = relativeY * scaleY;
+    const z = relativeZ * scaleZ;
+    batch.basePositions[offset] = pivot.x + x;
+    batch.basePositions[offset + 1] = pivot.y + y;
+    batch.basePositions[offset + 2] = pivot.z + z;
+
+    const normalX = (batch.baseNormals[offset] ?? 0) / scaleX;
+    const normalY = (batch.baseNormals[offset + 1] ?? 1) / scaleY;
+    const normalZ = (batch.baseNormals[offset + 2] ?? 0) / scaleZ;
+    const normalLength = Math.max(1e-6, Math.hypot(normalX, normalY, normalZ));
+    batch.baseNormals[offset] = normalX / normalLength;
+    batch.baseNormals[offset + 1] = normalY / normalLength;
+    batch.baseNormals[offset + 2] = normalZ / normalLength;
+
+    const axialDistance = Math.max(
+      0,
+      x * runtime.motion.axis.x
+        + y * runtime.motion.axis.y
+        + z * runtime.motion.axis.z,
+    );
+    maximumAxialDistance = Math.max(maximumAxialDistance, axialDistance);
+  }
+
+  runtime.maximumAxialDistance = maximumAxialDistance;
+}
+
+function muteMassiveRange(batch: ReefRenderableBatch, runtime: ReefBatchRuntimeRange): void {
+  for (
+    let index = runtime.range.vertexStart;
+    index < runtime.range.vertexStart + runtime.range.vertexCount;
+    index += 1
+  ) {
+    const offset = index * 3;
+    const sourceR = batch.baseColors[offset] ?? AMBER_PATCH_COLOR.r;
+    const sourceG = batch.baseColors[offset + 1] ?? AMBER_PATCH_COLOR.g;
+    const sourceB = batch.baseColors[offset + 2] ?? AMBER_PATCH_COLOR.b;
+    const blend = 0.68;
+    batch.baseColors[offset] = sourceR + (AMBER_PATCH_COLOR.r - sourceR) * blend;
+    batch.baseColors[offset + 1] = sourceG + (AMBER_PATCH_COLOR.g - sourceG) * blend;
+    batch.baseColors[offset + 2] = sourceB + (AMBER_PATCH_COLOR.b - sourceB) * blend;
+  }
+}
+
+function shouldKeepRange(runtime: ReefBatchRuntimeRange, supportY: number): boolean {
+  const { morphotype, sequence } = runtime.range;
+
+  // Green plating colonies were forming one dense mushroom cap on the crown.
+  // Thin only the upper tier; middle/lower plates remain to preserve variety.
+  if (morphotype === 'plating' && supportY > 0.7) {
+    return sequence % 3 !== 0;
+  }
+
+  // Warm massive colonies were reading as inserted amber wedges. Keep enough
+  // accents for colour variation, but remove one third before shrinking them.
+  if (morphotype === 'massive') {
+    return sequence % 3 !== 1;
+  }
+
+  return true;
+}
+
+function sculptSupportedRange(
+  batch: ReefRenderableBatch,
+  runtime: ReefBatchRuntimeRange,
+  supportY: number,
+): void {
+  if (runtime.range.morphotype === 'plating') {
+    // About forty percent smaller overall; crown plates get an extra reduction
+    // so open rock remains visible between the surviving green colonies.
+    rescaleRange(
+      batch,
+      runtime,
+      supportY > 0.7 ? [0.54, 0.62, 0.54] : [0.62, 0.7, 0.62],
+    );
+    return;
+  }
+
+  if (runtime.range.morphotype === 'massive') {
+    // Convert tall amber chunks into low embedded cushion/encrusting accents.
+    // Scaling around the motion pivot preserves the exact support contact.
+    rescaleRange(batch, runtime, [0.5, 0.32, 0.5]);
+    muteMassiveRange(batch, runtime);
+  }
+}
+
+function syncBatchAttributes(batch: ReefRenderableBatch): void {
+  const positionAttribute = batch.geometry.getAttribute('position') as THREE.BufferAttribute;
+  const normalAttribute = batch.geometry.getAttribute('normal') as THREE.BufferAttribute;
+  const colorAttribute = batch.geometry.getAttribute('color') as THREE.BufferAttribute;
+
+  (positionAttribute.array as Float32Array).set(batch.basePositions);
+  (normalAttribute.array as Float32Array).set(batch.baseNormals);
+  (colorAttribute.array as Float32Array).set(batch.baseColors);
+  positionAttribute.needsUpdate = true;
+  normalAttribute.needsUpdate = true;
+  colorAttribute.needsUpdate = true;
+}
 
 export function ReefObject({
   build,
@@ -42,10 +165,9 @@ export function ReefObject({
    * That foundation is intentionally hidden in the portal, so ranges whose base
    * no longer sits on the visible artistic rock must not remain visible in air.
    *
-   * Each colony range owns a contiguous index slice. We keep only ranges whose
-   * motion pivot is within a small contact tolerance of a real hero-support hit;
-   * unsupported ranges disappear from the batch index buffer without changing
-   * the generator contract or adding draw calls.
+   * Sculpt pass 2/3 also happens here after real support is known: upper green
+   * plating colonies are thinned and reduced, while warm massive colonies become
+   * small embedded accents. No generator/layout contract is changed.
    */
   useEffect(() => {
     const group = groupRef.current;
@@ -60,6 +182,7 @@ export function ReefObject({
     for (const batch of reefScene.batches) {
       const supportedRanges = [] as typeof batch.runtimeRanges;
       const supportedIndices: number[] = [];
+      const sculptAlreadyApplied = batch.geometry.userData.reefSculptPass === SCULPT_PASS_23;
 
       for (const runtime of batch.runtimeRanges) {
         pivot.set(runtime.motion.pivot.x, runtime.motion.pivot.y, runtime.motion.pivot.z);
@@ -70,6 +193,11 @@ export function ReefObject({
 
         const contactGap = Math.abs(pivot.y - hit.point.y);
         if (contactGap > 0.18) continue;
+        if (!shouldKeepRange(runtime, hit.point.y)) continue;
+
+        if (!sculptAlreadyApplied) {
+          sculptSupportedRange(batch, runtime, hit.point.y);
+        }
 
         supportedRanges.push(runtime);
         const end = runtime.range.indexStart + runtime.range.indexCount;
@@ -81,6 +209,10 @@ export function ReefObject({
 
       batch.runtimeRanges = supportedRanges;
       batch.geometry.setIndex(supportedIndices);
+      if (!sculptAlreadyApplied) {
+        syncBatchAttributes(batch);
+        batch.geometry.userData.reefSculptPass = SCULPT_PASS_23;
+      }
       batch.geometry.computeBoundingBox();
       batch.geometry.computeBoundingSphere();
       batch.geometry.userData.reefVisibleRangeCount = supportedRanges.length;
