@@ -44,7 +44,7 @@ export function ReefStage({
 }) {
   const size = useThree((state) => state.size);
   const aspect = size.height > 0 ? size.width / size.height : 1;
-  const cameraDistance = useMemo(() => (aspect < 0.72 ? 8.9 : 8.15), [aspect]);
+  const cameraDistance = useMemo(() => (aspect < 0.72 ? 10 : 8.15), [aspect]);
 
   return (
     <>
