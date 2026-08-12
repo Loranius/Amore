@@ -2,38 +2,13 @@ import { useEffect, useMemo, type ReactNode } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { ReefEnvironment } from './ReefEnvironment';
-
-function CausticPatch({
-  position,
-  scale,
-  rotation = 0,
-}: {
-  position: readonly [number, number, number];
-  scale: readonly [number, number, number];
-  rotation?: number;
-}) {
-  return (
-    <mesh
-      position={[position[0], position[1], position[2]]}
-      rotation={[-Math.PI / 2, 0, rotation]}
-      scale={[scale[0], scale[1], scale[2]]}
-    >
-      <ringGeometry args={[0.7, 1, 36]} />
-      <meshBasicMaterial
-        color="#b7f5ee"
-        transparent
-        opacity={0.055}
-        depthWrite={false}
-      />
-    </mesh>
-  );
-}
+import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 
 /**
  * Dedicated underwater world for the reef.
  *
  * The reef production object remains untouched. This component owns only the
- * world around it: water colour, depth fog, seabed, light shafts and camera.
+ * world around it: water colour, depth fog, seabed, atmosphere and camera.
  * Nothing from the crystal temple or the old laboratory card is mounted here.
  */
 export function ReefStage({
@@ -50,33 +25,29 @@ export function ReefStage({
   return (
     <>
       <color attach="background" args={['#0b5267']} />
-      <fog attach="fog" args={['#176d7b', 6.8, 24]} />
+      <fog attach="fog" args={['#176d7b', 5.9, 23]} />
 
-      {/* Cool water fill + one warm shaft from the surface. */}
-      <ambientLight intensity={0.25} />
-      <hemisphereLight args={['#9fe8ee', '#123942', 0.88]} />
-      <directionalLight position={[-4.5, 10, 4]} intensity={2.35} color="#d9fbf0" />
-      <directionalLight position={[5, 3, -5]} intensity={0.52} color="#4fb4c7" />
+      {/* Cool water fill plus two directional surface contributions. */}
+      <ambientLight intensity={0.23} />
+      <hemisphereLight args={['#9fe8ee', '#123942', 0.86]} />
+      <directionalLight position={[-4.5, 10, 4]} intensity={2.25} color="#d9fbf0" />
+      <directionalLight position={[5, 3, -5]} intensity={0.48} color="#4fb4c7" />
 
-      {/* Water surface: deliberately simple geometry so the scene stays cheap
-          on mobile. It gives the eye a readable "above" without a water shader. */}
+      {/* Cheap readable water ceiling; Stage 2 light shafts visually connect
+          this surface to the terrain without requiring a water simulation. */}
       <mesh position={[0, 7.2, -2]} rotation={[Math.PI / 2, 0, 0]}>
         <circleGeometry args={[18, 48]} />
         <meshBasicMaterial
           color="#8fe3e2"
           transparent
-          opacity={0.11}
+          opacity={0.105}
           depthWrite={false}
+          toneMapped={false}
         />
       </mesh>
 
       <ReefEnvironment />
-
-      {/* Existing lightweight caustic hints stay isolated from Stage 1 terrain;
-          the next pass can replace them with animated underwater light. */}
-      <CausticPatch position={[-1.7, -0.31, 1.8]} scale={[1.6, 1.1, 1]} rotation={0.35} />
-      <CausticPatch position={[1.6, -0.31, 0.9]} scale={[1.1, 0.8, 1]} rotation={-0.25} />
-      <CausticPatch position={[0.4, -0.31, -2]} scale={[2, 1.2, 1]} rotation={0.1} />
+      <ReefWaterAtmosphere reducedMotion={reducedMotion} />
 
       {children}
 
