@@ -36,7 +36,7 @@ const BASE_CORE_MASSES: readonly RockMassProps[] = [
   },
   {
     position: [0.02, 0.08, -0.04],
-    scale: [1.86, 1.24, 1.42],
+    scale: [1.45, 0.97, 1.11],
     rotation: [-0.03, -0.16, 0.03],
     color: '#5b7168',
   },
