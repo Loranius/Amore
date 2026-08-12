@@ -109,15 +109,15 @@ function ReefContactShadow() {
   return (
     <>
       <mesh
-        position={[0.05, -0.204, 0.05]}
+        position={[0.05, -0.018, 0.05]}
         rotation={[-Math.PI / 2, 0, -0.08]}
         scale={[2.15, 1.38, 1]}
       >
-        <circleGeometry args={[1, 36]} />
+        <circleGeometry args={[1, 32]} />
         <meshBasicMaterial
           color={PALETTE.contact}
           transparent
-          opacity={0.11}
+          opacity={0.12}
           depthWrite={false}
           toneMapped={false}
           polygonOffset
@@ -125,15 +125,15 @@ function ReefContactShadow() {
         />
       </mesh>
       <mesh
-        position={[0.12, -0.203, -0.06]}
+        position={[0.12, -0.017, -0.06]}
         rotation={[-Math.PI / 2, 0, 0.12]}
         scale={[3.15, 1.9, 1]}
       >
-        <circleGeometry args={[1, 28]} />
+        <circleGeometry args={[1, 24]} />
         <meshBasicMaterial
           color={PALETTE.contact}
           transparent
-          opacity={0.035}
+          opacity={0.04}
           depthWrite={false}
           toneMapped={false}
           polygonOffset
@@ -147,22 +147,23 @@ function ReefContactShadow() {
 /**
  * Static terrain surrounding the production reef.
  *
- * Stage 4 keeps this world subordinate to the generated colony: cool terrain
- * colours converge toward the water fog, while two cheap contact-shadow proxies
- * anchor the accepted foundation to the shelf without enabling realtime shadows.
+ * The central seabed now rises into the accepted foundation instead of sitting
+ * far below it. That hides the closed shell's underside and makes the hero read
+ * as one tiered reef mound growing from sediment rather than a floating tray.
  */
 export function ReefEnvironment() {
   return (
-    <group name="reef-environment-stage-4">
+    <group name="reef-environment-foundation-blend">
       {/* A broad floor gives every camera angle a continuous seabed. */}
       <mesh position={[0, -0.36, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow={false}>
         <circleGeometry args={[18, 48]} />
         <meshStandardMaterial color={PALETTE.floor} roughness={1} metalness={0} />
       </mesh>
 
-      {/* A very shallow shelf visually joins the reef foundation to the floor
-          without reading as a pedestal or a second coral base. */}
-      <mesh position={[0, -0.39, 0]} scale={[4.25, 0.18, 3.65]} receiveShadow={false}>
+      {/* Raised top hemisphere: its crown meets the lowered production reef,
+          while its edges sink back into the broad floor. There is no vertical
+          cylinder wall, so it cannot read as a second pedestal. */}
+      <mesh position={[0, -0.28, 0]} scale={[4.35, 0.255, 3.72]} receiveShadow={false}>
         <sphereGeometry args={[1, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color={PALETTE.shelf} roughness={1} metalness={0} />
       </mesh>
