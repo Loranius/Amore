@@ -55,37 +55,75 @@ const BASE_CORE_MASSES: readonly RockMassProps[] = [
   },
 ] as const;
 
+/**
+ * Small backing masses sit under the inner half of each ledge. They intentionally
+ * overlap both the central core and the shelf so the eye reads one eroded rock
+ * body instead of a stack of detached plates.
+ */
+const BASE_LEDGE_ROOTS: readonly RockMassProps[] = [
+  {
+    position: [-0.42, 0.04, 0.2],
+    scale: [0.74, 0.48, 0.62],
+    rotation: [0.06, 0.26, -0.05],
+    color: '#4f6861',
+  },
+  {
+    position: [0.36, 0.14, 0.08],
+    scale: [0.78, 0.46, 0.64],
+    rotation: [-0.04, -0.22, 0.04],
+    color: '#536c64',
+  },
+  {
+    position: [-0.08, 0.49, -0.2],
+    scale: [0.7, 0.42, 0.58],
+    rotation: [0.08, 0.16, -0.04],
+    color: '#587067',
+  },
+  {
+    position: [0.2, 0.68, -0.04],
+    scale: [0.58, 0.36, 0.5],
+    rotation: [-0.03, -0.18, 0.05],
+    color: '#5c7369',
+  },
+  {
+    position: [-0.16, 0.83, 0.04],
+    scale: [0.48, 0.3, 0.42],
+    rotation: [0.05, 0.24, -0.03],
+    color: '#61786d',
+  },
+] as const;
+
 const BASE_PLATE_LEDGES: readonly PlateLedgeProps[] = [
   {
-    position: [-0.92, 0.24, 0.54],
+    position: [-0.72, 0.17, 0.38],
     scale: [1.22, 0.18, 0.82],
     rotation: [0.04, 0.22, 0.04],
     color: '#8eb2aa',
     variant: 0,
   },
   {
-    position: [0.72, 0.36, 0.24],
+    position: [0.55, 0.28, 0.16],
     scale: [1.28, 0.2, 0.84],
     rotation: [-0.05, -0.2, 0.03],
     color: '#96bbb1',
     variant: 1,
   },
   {
-    position: [-0.18, 0.72, -0.46],
+    position: [-0.12, 0.63, -0.32],
     scale: [1.08, 0.18, 0.72],
     rotation: [0.06, 0.14, -0.05],
     color: '#85aaa5',
     variant: 2,
   },
   {
-    position: [0.42, 0.94, 0.06],
+    position: [0.31, 0.84, 0.01],
     scale: [0.9, 0.16, 0.64],
     rotation: [-0.03, -0.16, 0.04],
     color: '#a0c2b7',
     variant: 3,
   },
   {
-    position: [-0.38, 1.1, 0.14],
+    position: [-0.27, 0.99, 0.08],
     scale: [0.72, 0.14, 0.52],
     rotation: [0.05, 0.26, -0.03],
     color: '#91b7af',
@@ -333,6 +371,9 @@ export function ReefEnvironment() {
 
       {BASE_CORE_MASSES.map((rock, index) => (
         <RockMass key={`reef-base-core-${index}`} {...rock} />
+      ))}
+      {BASE_LEDGE_ROOTS.map((rock, index) => (
+        <RockMass key={`reef-ledge-root-${index}`} {...rock} />
       ))}
       {BASE_PLATE_LEDGES.map((ledge, index) => (
         <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} />
