@@ -50,13 +50,10 @@ export function ReefStage({
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefLife reducedMotion={reducedMotion} />
-      <group
-        name="reef-density-compact-placement"
-        position={[0, 0.08, 0]}
-        scale={[0.76, 1, 0.76]}
-      >
-        <ReefDensityLayer />
-      </group>
+
+      {/* Density now lives in the same world coordinate space as the support
+          meshes. The old 0.76 X/Z wrapper was one source of visual detachment. */}
+      <ReefDensityLayer />
 
       {children}
 
