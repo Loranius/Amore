@@ -143,44 +143,44 @@ const BASE_LEDGE_ROOTS: readonly RockMassProps[] = [
 ] as const;
 
 /**
- * The ledges stay structurally present, but their previous pale cyan materials
- * were reading as white patches from the mobile camera. They now sit inside the
- * same dark teal stone family as the core so the terraces read by silhouette,
- * thickness and shadow instead of by a bright painted band.
+ * Organic shelf sculpt. The five physical shelves still resolve into three
+ * readable height tiers, but their footprints are pulled inward and thickened.
+ * The lower pair stays broad, the middle pair offsets asymmetrically, and the
+ * crown is deliberately compact so no tier reads as a clean stacked disc.
  */
 const BASE_PLATE_LEDGES: readonly PlateLedgeProps[] = [
   {
-    position: [-0.98, 0.22, 0.55],
-    scale: [1.52, 0.2, 0.98],
-    rotation: [0.04, 0.22, 0.04],
+    position: [-0.82, 0.19, 0.47],
+    scale: [1.34, 0.25, 0.84],
+    rotation: [0.06, 0.18, 0.06],
     color: '#58736d',
     variant: 0,
   },
   {
-    position: [0.74, 0.24, 0.3],
-    scale: [1.4, 0.18, 0.88],
-    rotation: [-0.05, -0.2, 0.03],
+    position: [0.62, 0.23, 0.22],
+    scale: [1.2, 0.21, 0.76],
+    rotation: [-0.06, -0.24, 0.02],
     color: '#607a73',
     variant: 1,
   },
   {
-    position: [-0.3, 0.69, -0.46],
-    scale: [1.16, 0.18, 0.78],
-    rotation: [0.06, 0.14, -0.05],
+    position: [-0.23, 0.65, -0.36],
+    scale: [0.98, 0.22, 0.67],
+    rotation: [0.07, 0.18, -0.07],
     color: '#526f6a',
     variant: 2,
   },
   {
-    position: [0.48, 0.72, 0.05],
-    scale: [0.96, 0.16, 0.68],
-    rotation: [-0.03, -0.16, 0.04],
+    position: [0.38, 0.71, 0.01],
+    scale: [0.82, 0.19, 0.58],
+    rotation: [-0.04, -0.2, 0.05],
     color: '#5f7971',
     variant: 3,
   },
   {
-    position: [-0.18, 1.1, 0.08],
-    scale: [0.72, 0.14, 0.52],
-    rotation: [0.05, 0.26, -0.03],
+    position: [-0.12, 1.05, 0.06],
+    scale: [0.62, 0.18, 0.44],
+    rotation: [0.07, 0.29, -0.04],
     color: '#5a756d',
     variant: 4,
   },
@@ -259,10 +259,10 @@ function RockMass({
 }
 
 /**
- * A ledge is built from three overlapping low-poly plates rather than one clean
- * cylinder. The overlap breaks the circular silhouette, creates small bays and
- * noses around the edge, and gives the shelf enough thickness to read as rock
- * grown out of the reef core instead of a paper-thin disc.
+ * Four flattened rock lobes replace the old concentric cylinder plates. Their
+ * offsets, thicknesses and rotations deliberately disagree so the silhouette
+ * has noses, bays and stepped undersides from every orbit angle. The rear lobe
+ * sits lowest and deepest, visually burying the shelf into the core.
  */
 function PlateLedge({
   position,
@@ -272,8 +272,8 @@ function PlateLedge({
   variant,
 }: PlateLedgeProps) {
   const direction = variant % 2 === 0 ? -1 : 1;
-  const depthBias = (variant % 3 - 1) * 0.12;
-  const yawBias = (variant - 2) * 0.055;
+  const yawBias = (variant - 2) * 0.07;
+  const depthBias = (variant % 3 - 1) * scale[2] * 0.11;
 
   return (
     <group
@@ -281,43 +281,71 @@ function PlateLedge({
       rotation={[rotation[0], rotation[1], rotation[2]]}
     >
       <mesh
-        scale={[scale[0], scale[1], scale[2]]}
-        rotation={[0, yawBias, 0]}
+        position={[0, -scale[1] * 0.08, 0]}
+        scale={[scale[0] * 0.7, scale[1] * 1.3, scale[2] * 0.68]}
+        rotation={[0.025 * direction, yawBias, -0.03 * direction]}
         receiveShadow={false}
         castShadow={false}
       >
-        <cylinderGeometry args={[1, 0.8, 1, 9, 1]} />
-        <meshStandardMaterial color={color} roughness={0.97} metalness={0} />
+        <dodecahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color={color} roughness={0.98} metalness={0} />
       </mesh>
 
       <mesh
         position={[
-          direction * scale[0] * 0.43,
-          -scale[1] * 0.12,
-          scale[2] * (0.12 + depthBias),
+          direction * scale[0] * 0.47,
+          -scale[1] * 0.18,
+          scale[2] * 0.09 + depthBias,
         ]}
-        scale={[scale[0] * 0.58, scale[1] * 0.88, scale[2] * 0.64]}
-        rotation={[0, direction * (0.28 + variant * 0.025), 0]}
+        scale={[scale[0] * 0.5, scale[1] * 1.05, scale[2] * 0.52]}
+        rotation={[
+          0.055 * direction,
+          direction * (0.4 + variant * 0.035),
+          0.07 * direction,
+        ]}
         receiveShadow={false}
         castShadow={false}
       >
-        <cylinderGeometry args={[1, 0.76, 1, 7, 1]} />
-        <meshStandardMaterial color={color} roughness={0.98} metalness={0} />
+        <dodecahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color={color} roughness={0.99} metalness={0} />
       </mesh>
 
       <mesh
         position={[
           -direction * scale[0] * 0.31,
-          scale[1] * 0.05,
-          -scale[2] * (0.24 - depthBias * 0.5),
+          scale[1] * 0.03,
+          -scale[2] * 0.24 - depthBias * 0.6,
         ]}
-        scale={[scale[0] * 0.46, scale[1] * 0.76, scale[2] * 0.52]}
-        rotation={[0, -direction * (0.34 - variant * 0.018), 0]}
+        scale={[scale[0] * 0.44, scale[1] * 0.9, scale[2] * 0.46]}
+        rotation={[
+          -0.04 * direction,
+          -direction * (0.34 - variant * 0.02),
+          -0.045 * direction,
+        ]}
         receiveShadow={false}
         castShadow={false}
       >
-        <cylinderGeometry args={[1, 0.72, 1, 7, 1]} />
-        <meshStandardMaterial color={color} roughness={0.98} metalness={0} />
+        <dodecahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color={color} roughness={0.99} metalness={0} />
+      </mesh>
+
+      <mesh
+        position={[
+          direction * scale[0] * 0.07,
+          -scale[1] * 0.28,
+          -scale[2] * 0.39,
+        ]}
+        scale={[scale[0] * 0.5, scale[1] * 1.42, scale[2] * 0.38]}
+        rotation={[
+          0.08,
+          -yawBias * 1.5 + direction * 0.08,
+          -0.05 * direction,
+        ]}
+        receiveShadow={false}
+        castShadow={false}
+      >
+        <dodecahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color={color} roughness={1} metalness={0} />
       </mesh>
     </group>
   );
