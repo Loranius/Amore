@@ -3,28 +3,28 @@ import type { ReefFoundationSurface } from '@/engine/species/reef';
 import type { ReefPreviewBuild } from './buildReefPreview';
 import type { ReefThreeSceneState } from './reefThreeAdapter';
 
-export const REEF_FOUNDATION_PRESENTATION_VERSION = 'reef-foundation-v2';
-export const REEF_FOUNDATION_PASS = 'foundation-tiered-mound';
+export const REEF_FOUNDATION_PRESENTATION_VERSION = 'reef-foundation-v3';
+export const REEF_FOUNDATION_PASS = 'foundation-vertical-core';
 
 export const REEF_FOUNDATION_PROFILE = Object.freeze({
-  primaryEdgeLobes: 3,
-  secondaryEdgeLobes: 7,
-  primaryEdgeAmplitude: 0.105,
-  secondaryEdgeAmplitude: 0.046,
-  asymmetricEdgeAmplitude: 0.038,
-  bottomTaper: 0.82,
-  topReliefRatio: 0.012,
-  edgeShelfRatio: 0.01,
-  edgeErosionRatio: 0.024,
-  bottomDepthVariationRatio: 0.006,
-  colonyBedLiftRatio: 0.009,
-  colonyBedRadiusMultiplier: 1.65,
-  visibleSkirtDepthRatio: 0.052,
-  crownTerraceRatio: 0.042,
-  middleTerraceRatio: 0.026,
-  lowerTerraceRatio: 0.014,
-  terraceAsymmetryRatio: 0.008,
-  outerSinkRatio: 0.02,
+  primaryEdgeLobes: 4,
+  secondaryEdgeLobes: 9,
+  primaryEdgeAmplitude: 0.118,
+  secondaryEdgeAmplitude: 0.055,
+  asymmetricEdgeAmplitude: 0.048,
+  bottomTaper: 0.805,
+  topReliefRatio: 0.015,
+  edgeShelfRatio: 0.014,
+  edgeErosionRatio: 0.034,
+  bottomDepthVariationRatio: 0.005,
+  colonyBedLiftRatio: 0.008,
+  colonyBedRadiusMultiplier: 1.35,
+  visibleSkirtDepthRatio: 0.03,
+  crownTerraceRatio: 0.058,
+  middleTerraceRatio: 0.041,
+  lowerTerraceRatio: 0.024,
+  terraceAsymmetryRatio: 0.012,
+  outerSinkRatio: 0.036,
 });
 
 const TAU = Math.PI * 2;
@@ -110,7 +110,7 @@ function radialSilhouetteScale(
   phase: number,
   surface: ReefFoundationSurface,
 ): number {
-  const edge = smoothstep(0.58, 1, radiusT);
+  const edge = smoothstep(0.52, 1, radiusT);
   const primary = Math.sin(
     angle * REEF_FOUNDATION_PROFILE.primaryEdgeLobes + phase,
   ) * REEF_FOUNDATION_PROFILE.primaryEdgeAmplitude;
@@ -119,8 +119,9 @@ function radialSilhouetteScale(
   ) * REEF_FOUNDATION_PROFILE.secondaryEdgeAmplitude;
   const asymmetric = Math.cos(angle - phase * 0.35)
     * REEF_FOUNDATION_PROFILE.asymmetricEdgeAmplitude;
-  const upperScale = (1 + edge * (primary + secondary + asymmetric))
-    * (1 - edge * 0.022);
+  const directionalCut = Math.sin(angle * 2 - phase * 0.2) * 0.018 * edge;
+  const upperScale = (1 + edge * (primary + secondary + asymmetric) + directionalCut)
+    * (1 - edge * 0.055);
   return surface === 'side'
     ? upperScale * REEF_FOUNDATION_PROFILE.bottomTaper
     : upperScale;
@@ -132,26 +133,27 @@ function tieredMoundRelief(
   phase: number,
   maximumFoundationRadius: number,
 ): number {
-  // Three broad, softened terraces turn the old flat tray into one coral mound.
-  // The steps overlap so the topology remains continuous and colony feet simply
-  // settle slightly into the rock instead of floating above new geometry.
-  const crown = (1 - smoothstep(0.18, 0.34, radiusT))
+  const crown = (1 - smoothstep(0.16, 0.32, radiusT))
     * maximumFoundationRadius
     * REEF_FOUNDATION_PROFILE.crownTerraceRatio;
-  const middle = (1 - smoothstep(0.42, 0.57, radiusT))
+  const middle = (1 - smoothstep(0.38, 0.54, radiusT))
     * maximumFoundationRadius
     * REEF_FOUNDATION_PROFILE.middleTerraceRatio;
-  const lower = (1 - smoothstep(0.66, 0.8, radiusT))
+  const lower = (1 - smoothstep(0.62, 0.78, radiusT))
     * maximumFoundationRadius
     * REEF_FOUNDATION_PROFILE.lowerTerraceRatio;
   const asymmetry = Math.sin(angle * 2.15 + phase * 0.74)
     * maximumFoundationRadius
     * REEF_FOUNDATION_PROFILE.terraceAsymmetryRatio
-    * (1 - smoothstep(0.74, 1, radiusT));
+    * (1 - smoothstep(0.72, 1, radiusT));
+  const crossStep = Math.cos(angle * 3.1 - phase * 0.46)
+    * maximumFoundationRadius
+    * 0.006
+    * (1 - smoothstep(0.7, 1, radiusT));
   const outerSink = -maximumFoundationRadius
     * REEF_FOUNDATION_PROFILE.outerSinkRatio
-    * smoothstep(0.78, 1, radiusT);
-  return crown + middle + lower + asymmetry + outerSink;
+    * smoothstep(0.72, 1, radiusT);
+  return crown + middle + lower + asymmetry + crossStep + outerSink;
 }
 
 function topRelief(
@@ -171,10 +173,10 @@ function topRelief(
   const edgeShelf = Math.sin(angle * 5 + phase * 1.17)
     * maximumFoundationRadius
     * REEF_FOUNDATION_PROFILE.edgeShelfRatio
-    * smoothstep(0.6, 1, radiusT);
+    * smoothstep(0.56, 1, radiusT);
   const edgeErosion = -maximumFoundationRadius
     * REEF_FOUNDATION_PROFILE.edgeErosionRatio
-    * smoothstep(0.76, 1, radiusT)
+    * smoothstep(0.7, 1, radiusT)
     * (0.72 + Math.sin(angle * 3 - phase * 0.91) * 0.28);
   return tieredMoundRelief(angle, radiusT, phase, maximumFoundationRadius)
     + shelf
@@ -186,7 +188,7 @@ function topRelief(
 /**
  * Presentation-only foundation sculpt. The accepted shell topology, indices,
  * source vertices, attachments, colony geometry, draw calls and materials stay
- * unchanged; only the rendered vertex positions are shaped for the portal.
+ * unchanged; only rendered positions are compressed into the new vertical base.
  */
 export function applyReefFoundationPresentation(
   scene: ReefThreeSceneState,
