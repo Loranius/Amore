@@ -1,78 +1,204 @@
-import { useGLTF } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
-const WHALE_URL = `${import.meta.env.BASE_URL}models/glow_whale_background.glb`;
+const WHALE_PART_BASE = `${import.meta.env.BASE_URL}models/glow_whale_native/`;
+const WHALE_PART_COUNT = 15;
+const WHALE_CLIP_NAME = 'move f';
+
+type LoadedWhale = {
+  scene: THREE.Group;
+  animations: THREE.AnimationClip[];
+};
+
+type DecompressionStreamConstructor = new (
+  format: 'gzip',
+) => TransformStream<Uint8Array, Uint8Array>;
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value.replace(/\s/g, ''));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function inflateWhaleAsset(compressed: Uint8Array): Promise<ArrayBuffer> {
+  const DecompressionStreamApi = (
+    globalThis as typeof globalThis & {
+      DecompressionStream?: DecompressionStreamConstructor;
+    }
+  ).DecompressionStream;
+
+  if (!DecompressionStreamApi) {
+    throw new Error('This browser does not support gzip DecompressionStream.');
+  }
+
+  const source = compressed.buffer.slice(
+    compressed.byteOffset,
+    compressed.byteOffset + compressed.byteLength,
+  ) as ArrayBuffer;
+  const stream = new Blob([source])
+    .stream()
+    .pipeThrough(new DecompressionStreamApi('gzip'));
+
+  return new Response(stream).arrayBuffer();
+}
+
+function parseWhaleGltf(buffer: ArrayBuffer): Promise<GLTF> {
+  const loader = new GLTFLoader();
+  return new Promise((resolve, reject) => {
+    loader.parse(buffer, WHALE_PART_BASE, resolve, reject);
+  });
+}
+
+async function loadNativeWhale(): Promise<LoadedWhale> {
+  const parts = await Promise.all(
+    Array.from({ length: WHALE_PART_COUNT }, async (_, index) => {
+      const name = `part-${String(index).padStart(2, '0')}.txt`;
+      const response = await fetch(`${WHALE_PART_BASE}${name}`);
+      if (!response.ok) {
+        throw new Error(`Unable to load whale asset part ${name}: ${response.status}`);
+      }
+      return response.text();
+    }),
+  );
+
+  const compressed = decodeBase64(parts.join(''));
+  const buffer = await inflateWhaleAsset(compressed);
+  const gltf = await parseWhaleGltf(buffer);
+  const scene = cloneSkeleton(gltf.scene) as THREE.Group;
+
+  scene.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+
+    object.castShadow = false;
+    object.receiveShadow = false;
+    object.frustumCulled = true;
+
+    const materials = Array.isArray(object.material)
+      ? object.material
+      : [object.material];
+
+    for (const material of materials) {
+      if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+
+      // Keep the model-authored texture stack. Only tune the physically based
+      // response for the dark underwater scene; maps themselves are untouched.
+      material.metalness = 0;
+      material.roughness = Math.max(0.68, material.roughness);
+      if (material.emissiveMap) material.emissiveIntensity = 1.55;
+      material.needsUpdate = true;
+    }
+  });
+
+  return {
+    scene,
+    animations: gltf.animations,
+  };
+}
 
 /**
- * Distant bioluminescent whale for the underwater background.
+ * Native animated Glow Whale used as distant reef life.
  *
- * The source GLB is intentionally optimized for this role: the reef only needs a
- * readable silhouette, colour and emissive pattern at distance, so the original
- * heavy asset is reduced before being shipped to mobile clients.
+ * The runtime GLB keeps the source skeleton, the native forward-swim clip and
+ * the embedded diffuse/emissive/normal texture stack. Only the outer route moves
+ * the whole animal through the background; body/tail motion comes from the GLB.
  */
 export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
   const routeRef = useRef<THREE.Group>(null);
-  const modelRef = useRef<THREE.Group>(null);
   const indicatorRef = useRef<THREE.Mesh>(null);
-  const gltf = useGLTF(WHALE_URL);
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const [whale, setWhale] = useState<LoadedWhale | null>(null);
 
-  const whale = useMemo(() => {
-    const cloned = gltf.scene.clone(true);
+  useEffect(() => {
+    let cancelled = false;
 
-    cloned.traverse((child) => {
-      if (!(child instanceof THREE.Mesh)) return;
-      child.castShadow = false;
-      child.receiveShadow = false;
-    });
+    loadNativeWhale()
+      .then((loaded) => {
+        if (cancelled) return;
+        setWhale(loaded);
+      })
+      .catch((error: unknown) => {
+        if (import.meta.env.DEV) {
+          console.warn('[reef] Native whale asset failed to load.', error);
+        }
+      });
 
-    return cloned;
-  }, [gltf.scene]);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  useFrame(({ clock, camera }) => {
+  useEffect(() => {
+    if (!whale) return;
+
+    const mixer = new THREE.AnimationMixer(whale.scene);
+    const clip =
+      THREE.AnimationClip.findByName(whale.animations, WHALE_CLIP_NAME)
+      ?? whale.animations[0];
+
+    if (clip) {
+      const action = mixer.clipAction(clip);
+      action.reset();
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.clampWhenFinished = false;
+      action.play();
+    }
+
+    mixer.timeScale = reducedMotion ? 0 : 0.9;
+    mixerRef.current = mixer;
+
+    return () => {
+      mixer.stopAllAction();
+      mixer.uncacheRoot(whale.scene);
+      mixerRef.current = null;
+    };
+  }, [reducedMotion, whale]);
+
+  useFrame(({ clock, camera }, delta) => {
     const route = routeRef.current;
-    const model = modelRef.current;
     const indicator = indicatorRef.current;
-    if (!route || !model || !indicator) return;
+    if (!route || !indicator) return;
 
     if (reducedMotion) {
-      route.position.set(6.2, 3.05, -10.4);
-      model.rotation.set(0.035, -Math.PI / 2, -0.02);
+      route.position.set(6.2, 2.9, -10.1);
       indicator.scale.setScalar(1);
       indicator.quaternion.copy(camera.quaternion);
       return;
     }
 
+    mixerRef.current?.update(delta);
+
     const t = clock.getElapsedTime();
-    const progress = (t * 0.018) % 1;
+    const progress = (t * 0.03) % 1;
 
-    // The whale crosses behind the reef slowly, then resets while already
-    // outside the useful camera framing. The small Y/Z drift prevents it from
-    // feeling like a model sliding on rails.
+    // The native clip animates the whale itself. This group only advances the
+    // entire animal through the distant water volume at a steady, quiet pace.
     route.position.set(
-      THREE.MathUtils.lerp(10.5, -10.5, progress),
-      3.1 + Math.sin(t * 0.28) * 0.24,
-      -10.8 + Math.sin(t * 0.16) * 0.62,
+      THREE.MathUtils.lerp(9.5, -9.5, progress),
+      2.85 + Math.sin(t * 0.16) * 0.1,
+      -9.8 + Math.sin(t * 0.11) * 0.22,
     );
 
-    model.rotation.set(
-      0.035 + Math.sin(t * 0.24) * 0.025,
-      -Math.PI / 2 + Math.sin(t * 0.13) * 0.07,
-      Math.sin(t * 0.31) * 0.035,
-    );
-
-    // A quiet diegetic indicator: no HUD label, just a cyan pulse that makes the
-    // distant whale discoverable through fog without competing with the hero reef.
     const pulse = 0.92 + Math.sin(t * 1.9) * 0.12;
     indicator.scale.setScalar(pulse);
     indicator.quaternion.copy(camera.quaternion);
   });
 
+  if (!whale) return null;
+
   return (
     <group ref={routeRef} name="reef-background-whale">
-      <group ref={modelRef} scale={11.5}>
-        <primitive object={whale} />
+      <group
+        name="reef-background-whale-native-model"
+        rotation={[0, -Math.PI / 2, 0]}
+        scale={10.5}
+      >
+        <primitive object={whale.scene} />
       </group>
 
       <mesh ref={indicatorRef} position={[0, 0.72, 0]} renderOrder={3}>
@@ -88,5 +214,3 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
     </group>
   );
 }
-
-useGLTF.preload(WHALE_URL);
