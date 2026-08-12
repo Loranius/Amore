@@ -27,6 +27,12 @@ import { formatTopologyViolations, validateTopology } from '../geometry/validate
 const shellEntries = (p: ReturnType<typeof publishCrystal>) =>
   p.bodies.map((b) => ({ solid: b.solid, hostKey: b.branch.hostKey, geometry: b.geometry }));
 
+// This is a correctness stress matrix, not a performance benchmark. The
+// max-children case probes every published LOD from many exterior and close-up
+// junction views and can legitimately cross Vitest's 5s default on a loaded
+// GitHub runner. Keep the larger budget local to this one heavy assertion.
+const STRESS_SHELL_TIMEOUT_MS = 15_000;
+
 describe('§8 матриця видів — реальна маса', () => {
   it('повний оберт + верх + похилі + низ: жодного вивороту оболонки', () => {
     for (const seed of SEEDS) {
@@ -75,7 +81,7 @@ describe('§8 стрес-конфігурації', () => {
             'external shell: 0 порушень',
           );
         }
-      });
+      }, STRESS_SHELL_TIMEOUT_MS);
     });
   }
 });
