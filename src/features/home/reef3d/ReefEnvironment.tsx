@@ -143,45 +143,45 @@ const BASE_LEDGE_ROOTS: readonly RockMassProps[] = [
 ] as const;
 
 /**
- * Sculpt pass 4: five physical ledges are grouped into three visual tiers.
- * Ledges 0/1 share one broad lower shelf height, 2/3 share an asymmetric middle
- * shelf, and ledge 4 forms a small crown. Larger vertical gaps make the cascade
- * readable at mobile scale while preserving the irregular organic footprint.
+ * The ledges stay structurally present, but their previous pale cyan materials
+ * were reading as white patches from the mobile camera. They now sit inside the
+ * same dark teal stone family as the core so the terraces read by silhouette,
+ * thickness and shadow instead of by a bright painted band.
  */
 const BASE_PLATE_LEDGES: readonly PlateLedgeProps[] = [
   {
     position: [-0.98, 0.22, 0.55],
     scale: [1.52, 0.2, 0.98],
     rotation: [0.04, 0.22, 0.04],
-    color: '#8eb2aa',
+    color: '#58736d',
     variant: 0,
   },
   {
     position: [0.74, 0.24, 0.3],
     scale: [1.4, 0.18, 0.88],
     rotation: [-0.05, -0.2, 0.03],
-    color: '#96bbb1',
+    color: '#607a73',
     variant: 1,
   },
   {
     position: [-0.3, 0.69, -0.46],
     scale: [1.16, 0.18, 0.78],
     rotation: [0.06, 0.14, -0.05],
-    color: '#85aaa5',
+    color: '#526f6a',
     variant: 2,
   },
   {
     position: [0.48, 0.72, 0.05],
     scale: [0.96, 0.16, 0.68],
     rotation: [-0.03, -0.16, 0.04],
-    color: '#a0c2b7',
+    color: '#5f7971',
     variant: 3,
   },
   {
     position: [-0.18, 1.1, 0.08],
     scale: [0.72, 0.14, 0.52],
     rotation: [0.05, 0.26, -0.03],
-    color: '#91b7af',
+    color: '#5a756d',
     variant: 4,
   },
 ] as const;
@@ -423,24 +423,26 @@ export function ReefEnvironment() {
 
       <ReefContactShadow />
 
-      {BASE_CORE_MASSES.map((rock, index) => (
-        <RockMass key={`reef-base-core-${index}`} {...rock} />
-      ))}
-      {CORE_BRIDGE_MASSES.map((rock, index) => (
-        <RockMass key={`reef-core-bridge-${index}`} {...rock} />
-      ))}
-      {CORE_LOWER_FILL.map((rock, index) => (
-        <RockMass key={`reef-core-fill-${index}`} {...rock} />
-      ))}
-      {BASE_LEDGE_ROOTS.map((rock, index) => (
-        <RockMass key={`reef-ledge-root-${index}`} {...rock} />
-      ))}
-      {BASE_PLATE_LEDGES.map((ledge, index) => (
-        <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} />
-      ))}
-      {BASE_DEBRIS.map((rock, index) => (
-        <RockMass key={`reef-base-debris-${index}`} {...rock} />
-      ))}
+      <group name="reef-hero-support">
+        {BASE_CORE_MASSES.map((rock, index) => (
+          <RockMass key={`reef-base-core-${index}`} {...rock} />
+        ))}
+        {CORE_BRIDGE_MASSES.map((rock, index) => (
+          <RockMass key={`reef-core-bridge-${index}`} {...rock} />
+        ))}
+        {CORE_LOWER_FILL.map((rock, index) => (
+          <RockMass key={`reef-core-fill-${index}`} {...rock} />
+        ))}
+        {BASE_LEDGE_ROOTS.map((rock, index) => (
+          <RockMass key={`reef-ledge-root-${index}`} {...rock} />
+        ))}
+        {BASE_PLATE_LEDGES.map((ledge, index) => (
+          <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} />
+        ))}
+        {BASE_DEBRIS.map((rock, index) => (
+          <RockMass key={`reef-base-debris-${index}`} {...rock} />
+        ))}
+      </group>
 
       {SAND_PATCHES.map((patch, index) => (
         <SandPatch key={`reef-sand-${index}`} {...patch} />
