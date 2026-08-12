@@ -39,17 +39,17 @@ const CUSHION_COUNT = 14;
 const PLATE_COUNT = 8;
 
 /**
- * Cheap support map for the visible reef environment.
- *
- * The first five beds follow the embedded ledges from bottom to crown; the last
- * two sit on the lower left/right shoulders of the unified rock mound.
+ * Support map synchronized with sculpt pass 3. The first five beds now follow
+ * the outward-projected cascade ledges; the final two remain on the planted
+ * lower shoulders. Growth therefore travels with the terraces instead of being
+ * left behind on the previous embedded shelf centres.
  */
 const SUPPORT_BEDS: readonly SupportBed[] = [
-  { center: [-0.72, 0.38], radius: [0.82, 0.54], topY: 0.28, edgeDrop: 0.035 },
-  { center: [0.55, 0.16], radius: [0.86, 0.56], topY: 0.39, edgeDrop: 0.04 },
-  { center: [-0.12, -0.32], radius: [0.72, 0.48], topY: 0.74, edgeDrop: 0.035 },
-  { center: [0.31, 0.01], radius: [0.6, 0.42], topY: 0.93, edgeDrop: 0.03 },
-  { center: [-0.27, 0.08], radius: [0.46, 0.34], topY: 1.07, edgeDrop: 0.025 },
+  { center: [-0.92, 0.52], radius: [0.94, 0.6], topY: 0.3, edgeDrop: 0.035 },
+  { center: [0.72, 0.24], radius: [0.98, 0.62], topY: 0.41, edgeDrop: 0.04 },
+  { center: [-0.18, -0.43], radius: [0.82, 0.52], topY: 0.76, edgeDrop: 0.035 },
+  { center: [0.42, 0.04], radius: [0.66, 0.46], topY: 0.95, edgeDrop: 0.03 },
+  { center: [-0.36, 0.12], radius: [0.52, 0.37], topY: 1.1, edgeDrop: 0.025 },
   { center: [-1.12, 0.14], radius: [0.56, 0.48], topY: 0.1, edgeDrop: 0.055 },
   { center: [1.12, 0.18], radius: [0.56, 0.48], topY: 0.1, edgeDrop: 0.055 },
 ] as const;
@@ -294,15 +294,14 @@ function PlateCorals() {
 }
 
 /**
- * Reef density cleanup pass.
+ * Reef density sculpt pass 3.
  *
- * Supplemental growth remains surface-anchored, but roots are now kept farther
- * from shelf rims and the widest plate corals are restricted to real ledges.
- * This removes the detached/floating outliers without adding runtime work.
+ * Supplemental growth remains pruned and surface-anchored, but the support map
+ * now follows the exposed cascade shelves so every prop moves with its terrace.
  */
 export function ReefDensityLayer() {
   return (
-    <group name="reef-density-cleanup-pass">
+    <group name="reef-density-cascade-ledges">
       <CushionCorals />
       <PlateCorals />
       <BushCorals />
