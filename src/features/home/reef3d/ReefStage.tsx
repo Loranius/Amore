@@ -44,7 +44,7 @@ export function ReefStage({
 }) {
   const size = useThree((state) => state.size);
   const aspect = size.height > 0 ? size.width / size.height : 1;
-  const cameraDistance = useMemo(() => (aspect < 0.72 ? 10 : 8.15), [aspect]);
+  const cameraDistance = useMemo(() => (aspect < 0.72 ? 11.2 : 8.15), [aspect]);
 
   return (
     <>
@@ -104,7 +104,7 @@ export function ReefStage({
         enableDamping={!reducedMotion}
         dampingFactor={0.06}
         minDistance={6.1}
-        maxDistance={10.6}
+        maxDistance={12.4}
         minPolarAngle={0.58}
         maxPolarAngle={1.42}
         target={[0, 0.85, 0]}
