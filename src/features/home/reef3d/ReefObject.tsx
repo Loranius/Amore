@@ -70,16 +70,19 @@ export function ReefObject({
     }
   });
 
-  // The hero now intersects the compact vertical rock core instead of hovering
-  // above a broad environmental shelf. This keeps colony roots readable while
-  // letting the foundation disappear into the layered base from side angles.
+  // The generated foundation is still built, sculpted and reported through the
+  // accepted scene contract, but it is no longer a visible portal surface. It
+  // remains an internal attachment substrate while the environment supplies the
+  // artistic coral-rock base. Horizontal compression pulls the generated colonies
+  // around that compact vertical core without changing their vertical growth.
   return (
     <group
       rotation={[-0.08, -0.18, 0]}
-      position={[0, 0.12, 0]}
-      scale={1.05}
+      position={[0, 0.02, 0]}
+      scale={[0.68, 1.05, 0.68]}
     >
       <mesh
+        visible={false}
         geometry={scene.foundation.geometry}
         material={scene.foundation.material}
         receiveShadow={false}
