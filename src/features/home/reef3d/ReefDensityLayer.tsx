@@ -29,15 +29,16 @@ const BUSH_COUNT = 24;
 const CUSHION_COUNT = 14;
 
 /**
- * Sampling domains only. Final Y placement no longer comes from an estimated
- * support height: every candidate must hit the actual hero-rock geometry.
+ * Sampling domains follow the newly sculpted shelf footprints. These domains
+ * only propose X/Z candidates; final placement still requires a real downward
+ * ray hit on reef-hero-support, so no estimated height can create levitation.
  */
 const SUPPORT_BEDS: readonly SupportBed[] = [
-  { center: [-0.98, 0.55], radius: [1.02, 0.66] },
-  { center: [0.74, 0.3], radius: [0.96, 0.58] },
-  { center: [-0.3, -0.46], radius: [0.8, 0.52] },
-  { center: [0.48, 0.05], radius: [0.64, 0.45] },
-  { center: [-0.18, 0.08], radius: [0.48, 0.35] },
+  { center: [-0.82, 0.47], radius: [0.9, 0.58] },
+  { center: [0.62, 0.22], radius: [0.82, 0.54] },
+  { center: [-0.23, -0.36], radius: [0.68, 0.46] },
+  { center: [0.38, 0.01], radius: [0.56, 0.4] },
+  { center: [-0.12, 0.06], radius: [0.42, 0.31] },
 ] as const;
 
 // Keep the lightweight instance budget on the real terrace footprint. The old
