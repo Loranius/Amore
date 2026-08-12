@@ -43,6 +43,7 @@ interface TreeLabObjectProps {
   materials: TreeMaterialState;
   life: TreeLifeState;
   reducedMotion: boolean;
+  showGroundDetails?: boolean;
 }
 
 export function TreeLabObject({
@@ -60,6 +61,7 @@ export function TreeLabObject({
   materials,
   life,
   reducedMotion,
+  showGroundDetails = true,
 }: TreeLabObjectProps) {
   const motionRoot = useRef<THREE.Group>(null);
   const lifeBinding = useRef<ThreeTreeLifeBinding | null>(null);
@@ -150,7 +152,7 @@ export function TreeLabObject({
           }}
         />
       )}
-      {groundDetails.instances.length > 0 && <primitive object={groundDetailMesh} />}
+      {showGroundDetails && groundDetails.instances.length > 0 && <primitive object={groundDetailMesh} />}
       <group ref={motionRoot}>
         <mesh
           geometry={branchGeometry}
