@@ -48,7 +48,13 @@ export function ReefStage({
       <ReefEnvironment />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <ReefLife reducedMotion={reducedMotion} />
-      <ReefDensityLayer />
+      <group
+        name="reef-density-compact-placement"
+        position={[0, 0.08, 0]}
+        scale={[0.76, 1, 0.76]}
+      >
+        <ReefDensityLayer />
+      </group>
 
       {children}
 
