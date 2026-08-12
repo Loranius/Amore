@@ -32,32 +32,28 @@ type Plate = {
   tone: number;
 };
 
-// Cleanup pass: keep enough density for a living reef while removing the most
-// obvious peripheral outliers that read as floating or detached props.
 const BUSH_COUNT = 24;
 const CUSHION_COUNT = 14;
 const PLATE_COUNT = 8;
 
 /**
- * Support map synchronized with sculpt pass 3. The first five beds now follow
- * the outward-projected cascade ledges; the final two remain on the planted
- * lower shoulders. Growth therefore travels with the terraces instead of being
- * left behind on the previous embedded shelf centres.
+ * Sculpt pass 4 support map. The first two beds form one broad lower tier, beds
+ * 2/3 form the offset middle tier, and bed 4 is the compact crown. The final two
+ * shoulder beds remain low around the planted base. This keeps the procedural
+ * props synchronized with the three readable terrace levels.
  */
 const SUPPORT_BEDS: readonly SupportBed[] = [
-  { center: [-0.92, 0.52], radius: [0.94, 0.6], topY: 0.3, edgeDrop: 0.035 },
-  { center: [0.72, 0.24], radius: [0.98, 0.62], topY: 0.41, edgeDrop: 0.04 },
-  { center: [-0.18, -0.43], radius: [0.82, 0.52], topY: 0.76, edgeDrop: 0.035 },
-  { center: [0.42, 0.04], radius: [0.66, 0.46], topY: 0.95, edgeDrop: 0.03 },
-  { center: [-0.36, 0.12], radius: [0.52, 0.37], topY: 1.1, edgeDrop: 0.025 },
+  { center: [-0.98, 0.55], radius: [1.02, 0.66], topY: 0.34, edgeDrop: 0.035 },
+  { center: [0.74, 0.3], radius: [0.96, 0.58], topY: 0.35, edgeDrop: 0.04 },
+  { center: [-0.3, -0.46], radius: [0.8, 0.52], topY: 0.8, edgeDrop: 0.035 },
+  { center: [0.48, 0.05], radius: [0.64, 0.45], topY: 0.81, edgeDrop: 0.03 },
+  { center: [-0.18, 0.08], radius: [0.48, 0.35], topY: 1.18, edgeDrop: 0.025 },
   { center: [-1.12, 0.14], radius: [0.56, 0.48], topY: 0.1, edgeDrop: 0.055 },
   { center: [1.12, 0.18], radius: [0.56, 0.48], topY: 0.1, edgeDrop: 0.055 },
 ] as const;
 
 const BUSH_BED_INDICES = [0, 1, 2, 3, 4, 5, 6] as const;
 const CUSHION_BED_INDICES = [0, 1, 2, 5, 6] as const;
-// Plate corals stay on actual shelf surfaces only. Keeping them off the lower
-// shoulders removes the detached pale shards visible around the base.
 const PLATE_BED_INDICES = [0, 1, 2] as const;
 
 function seededUnit(index: number, salt: number): number {
@@ -105,8 +101,6 @@ function buildBushes(): Bush[] {
   return Array.from({ length: BUSH_COUNT }, (_, index) => {
     const bedIndex = BUSH_BED_INDICES[index % BUSH_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    // Branch roots can approach the shelf edge, but not enough for their arms to
-    // visibly overhang unsupported space.
     const [x, z] = pointInBed(index, 1, bed, 0.68);
     const highTerraceScale = bed.topY >= 0.7 ? 0.72 : 0.94;
     const shoulderScale = bedIndex >= 5 ? 0.82 : 1;
@@ -147,8 +141,6 @@ function buildPlates(): Plate[] {
   return Array.from({ length: PLATE_COUNT }, (_, index) => {
     const bedIndex = PLATE_BED_INDICES[index % PLATE_BED_INDICES.length]!;
     const bed = SUPPORT_BEDS[bedIndex]!;
-    // Plates have the widest footprint, so keep their centres deepest inside a
-    // ledge. This is the strongest guard against detached-looking pale shards.
     const [x, z] = pointInBed(index, 31, bed, 0.54);
     const radius = THREE.MathUtils.lerp(0.19, 0.32, seededUnit(index, 33));
     const thickness = THREE.MathUtils.lerp(0.06, 0.09, seededUnit(index, 38));
@@ -294,14 +286,11 @@ function PlateCorals() {
 }
 
 /**
- * Reef density sculpt pass 3.
- *
- * Supplemental growth remains pruned and surface-anchored, but the support map
- * now follows the exposed cascade shelves so every prop moves with its terrace.
+ * Reef density sculpt pass 4: support beds mirror the three-tier ledge cascade.
  */
 export function ReefDensityLayer() {
   return (
-    <group name="reef-density-cascade-ledges">
+    <group name="reef-density-three-tier-cascade">
       <CushionCorals />
       <PlateCorals />
       <BushCorals />
