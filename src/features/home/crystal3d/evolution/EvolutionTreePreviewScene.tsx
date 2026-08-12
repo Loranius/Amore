@@ -12,7 +12,7 @@ import { crystalRenderScale } from '@/engine/renderer';
 import { fitThreeTree, measureThreeTreeReach } from '@/engine/renderer/three';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { TreeTexturedStage } from '../treeScene/TreeTexturedStage';
-import { TreeLifeDetails } from '../treeScene/TreeLifeDetails';
+import { TreeLifeDetailsPolished } from '../treeScene/TreeLifeDetailsPolished';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from './EvolutionRuntimeProbe';
@@ -71,7 +71,7 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
           pose={pose}
           motionMode={motionMode}
         >
-          <TreeLifeDetails
+          <TreeLifeDetailsPolished
             theme={theme}
             hillRadius={hillRadius}
             soilRadius={fit.soilRadius}
@@ -94,6 +94,7 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
               materials={build.materials}
               life={build.life}
               reducedMotion={reduceMotion}
+              showGroundDetails={false}
             />
           </group>
         </TreeTexturedStage>
