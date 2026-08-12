@@ -15,6 +15,7 @@ import { crystalRenderScale } from '@/engine/renderer';
 import { fitThreeTree, measureThreeTreeReach } from '@/engine/renderer/three';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { TreeStage } from '../treeScene/TreeStage';
+import { TreeLifeDetails } from '../treeScene/TreeLifeDetails';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from './EvolutionRuntimeProbe';
@@ -48,6 +49,10 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
     })),
     [build],
   );
+  const hillRadius = useMemo(
+    () => Math.max(8, fit.soilRadius * 4.2, fit.crownRadius * 3.8),
+    [fit.soilRadius, fit.crownRadius],
+  );
 
   return (
     <div
@@ -74,6 +79,13 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
           pose={pose}
           motionMode={motionMode}
         >
+          <TreeLifeDetails
+            theme={theme}
+            hillRadius={hillRadius}
+            soilRadius={fit.soilRadius}
+            groundY={fit.groundY}
+            reducedMotion={reduceMotion}
+          />
           <group position={[0, fit.groundY, 0]} scale={fit.scale}>
             <TreeLabObject
               mesh={build.mesh}
