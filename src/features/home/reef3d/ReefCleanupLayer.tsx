@@ -51,6 +51,22 @@ const SEAM_FILLERS: readonly FacetedMass[] = [
   { position: [0.42, 0.2, -0.02], scale: [0.43, 0.23, 0.37], rotation: [-0.03, -0.19, 0.02], color: '#4d6861' },
 ] as const;
 
+/**
+ * Small asymmetric bridge masses soften the obvious edges between the three
+ * large shelf tiers. They intentionally overlap existing rock instead of adding
+ * another readable band, so the mound reads as one eroded formation.
+ */
+const SHELF_TRANSITIONS: readonly FacetedMass[] = [
+  { position: [-1.32, -0.02, 0.62], scale: [0.34, 0.22, 0.28], rotation: [0.08, 0.38, -0.12], color: '#48645f' },
+  { position: [1.28, -0.03, 0.52], scale: [0.32, 0.2, 0.27], rotation: [-0.05, -0.34, 0.09], color: '#4b6761' },
+  { position: [-0.86, 0.28, 0.32], scale: [0.38, 0.2, 0.3], rotation: [0.11, 0.24, -0.08], color: '#536d65' },
+  { position: [0.84, 0.31, 0.24], scale: [0.36, 0.19, 0.29], rotation: [-0.09, -0.27, 0.07], color: '#587168' },
+  { position: [-0.48, 0.52, -0.08], scale: [0.31, 0.18, 0.25], rotation: [0.07, -0.18, -0.09], color: '#5b7269' },
+  { position: [0.48, 0.55, -0.02], scale: [0.29, 0.17, 0.24], rotation: [-0.08, 0.21, 0.08], color: '#60766d' },
+  { position: [-0.3, 0.78, 0.02], scale: [0.24, 0.15, 0.2], rotation: [0.1, 0.31, -0.07], color: '#61786e' },
+  { position: [0.24, 0.81, -0.08], scale: [0.22, 0.14, 0.19], rotation: [-0.07, -0.29, 0.06], color: '#5b746b' },
+] as const;
+
 function FloorMaskMesh({ position, scale, rotation }: FloorMask) {
   return (
     <mesh
@@ -82,7 +98,7 @@ function CleanupMass({ position, scale, rotation, color }: FacetedMass) {
   );
 }
 
-/** Visual integration pass layered around, not instead of, the existing reef. */
+/** Visual integration and erosion pass layered around the existing reef. */
 export function ReefCleanupLayer() {
   return (
     <group name="reef-cleanup-integration">
@@ -94,6 +110,9 @@ export function ReefCleanupLayer() {
       ))}
       {SEAM_FILLERS.map((mass, index) => (
         <CleanupMass key={`reef-seam-filler-${index}`} {...mass} />
+      ))}
+      {SHELF_TRANSITIONS.map((mass, index) => (
+        <CleanupMass key={`reef-shelf-transition-${index}`} {...mass} />
       ))}
     </group>
   );
