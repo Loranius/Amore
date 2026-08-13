@@ -62,11 +62,10 @@ export function writeReefFishMatrices(
     const dy = Math.cos(wave) * item.heightDrift * 1.7;
     const heading = Math.atan2(dx, dz);
     const pitch = Math.atan2(dy, Math.max(0.001, Math.hypot(dx, dz))) * 0.5;
-    const wiggle = Math.sin(time * 2.7 + item.phase) * 0.04;
     const bank = THREE.MathUtils.clamp(-dx * 0.04, -0.14, 0.14);
 
     dummy.position.set(x, y, z);
-    dummy.rotation.set(-pitch, heading + FISH_FORWARD_YAW_OFFSET + wiggle, bank);
+    dummy.rotation.set(-pitch, heading + FISH_FORWARD_YAW_OFFSET, bank);
     dummy.scale.setScalar(item.scale);
     dummy.updateMatrix();
     mesh.setMatrixAt(index, dummy.matrix);
