@@ -18,7 +18,7 @@ export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
 }
 
 export function raycastReefSupport(
-  supportMeshes: THREE.Mesh[],
+  supportMeshes: readonly THREE.Mesh[],
   x: number,
   z: number,
   minNormalY = 0.24,
@@ -30,7 +30,10 @@ export function raycastReefSupport(
   RAYCASTER.near = 0;
   RAYCASTER.far = 6.5;
 
-  const hits = RAYCASTER.intersectObjects(supportMeshes, false);
+  // Three.js types currently require a mutable Object3D array even though the
+  // raycaster only reads it. Keep our public placement API readonly and bridge
+  // the type boundary with a shallow copy at the raycast edge.
+  const hits = RAYCASTER.intersectObjects(Array.from(supportMeshes), false);
   for (const hit of hits) {
     if (!hit.face) continue;
     WORLD_NORMAL.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
