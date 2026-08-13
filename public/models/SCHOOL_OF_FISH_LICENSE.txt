@@ -1,0 +1,11 @@
+School Of Fish
+
+Original model: "School Of Fish"
+Creator: Titanas YT (@pcarnage252)
+Source: https://sketchfab.com/3d-models/school-of-fish-25494f5c4ead471ab8205aadfbfec0bc
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License: https://creativecommons.org/licenses/by/4.0/
+
+This project uses an optimized derivative for the Amore reef scene. Geometry storage, embedded textures, PBR material representation, and animation key density were optimized for web delivery. The original authored fish school, rig, and swimming animation remain the source of the visual asset.
+
+Changes made for web use: exact duplicate-vertex removal, texture downscaling/compression, legacy material conversion to core metallic-roughness PBR, and bounded animation curve reduction.
