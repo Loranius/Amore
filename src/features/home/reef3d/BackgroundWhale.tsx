@@ -55,9 +55,6 @@ function parseWhaleGltf(buffer: ArrayBuffer): Promise<GLTF> {
   const loader = new GLTFLoader();
   const dracoLoader = new DRACOLoader();
 
-  // The source is the original rigged Sketchfab GLB, not the old simplified
-  // runtime silhouette. Support both compression paths that authored GLBs can
-  // carry while keeping the native skin, clips and texture stack intact.
   dracoLoader.setDecoderPath(DRACO_DECODER_BASE);
   loader.setDRACOLoader(dracoLoader);
   loader.setMeshoptDecoder(MeshoptDecoder);
@@ -100,10 +97,6 @@ async function loadNativeWhale(): Promise<LoadedWhale> {
 
     object.castShadow = false;
     object.receiveShadow = false;
-
-    // Animated skinned bounds from the source asset are not guaranteed to stay
-    // representative after skeleton cloning. Keep the native whale renderable
-    // throughout the swim route instead of letting stale bounds cull it.
     object.frustumCulled = !(object instanceof THREE.SkinnedMesh);
 
     const materials = Array.isArray(object.material)
@@ -113,11 +106,9 @@ async function loadNativeWhale(): Promise<LoadedWhale> {
     for (const material of materials) {
       if (!(material instanceof THREE.MeshStandardMaterial)) continue;
 
-      // Keep the model-authored texture stack. Only tune the physically based
-      // response for the dark underwater scene; maps themselves are untouched.
       material.metalness = 0;
-      material.roughness = Math.max(0.68, material.roughness);
-      if (material.emissiveMap) material.emissiveIntensity = 1.85;
+      material.roughness = Math.max(0.72, material.roughness);
+      if (material.emissiveMap) material.emissiveIntensity = 1.35;
       material.needsUpdate = true;
     }
   });
@@ -129,15 +120,12 @@ async function loadNativeWhale(): Promise<LoadedWhale> {
 }
 
 /**
- * Native animated Glow Whale used as distant reef life.
- *
- * The runtime GLB keeps the source skeleton, the native forward-swim clip and
- * the embedded diffuse/emissive/normal texture stack. Only the outer route moves
- * the whole animal through the background; body/tail motion comes from the GLB.
+ * Native animated Glow Whale used only as distant background life.
+ * The source animation and textures stay intact; scene motion merely carries
+ * the whole animal slowly behind the reef where fog can establish scale.
  */
 export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
   const routeRef = useRef<THREE.Group>(null);
-  const indicatorRef = useRef<THREE.Mesh>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
   const [whale, setWhale] = useState<LoadedWhale | null>(null);
 
@@ -176,7 +164,7 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
       action.play();
     }
 
-    mixer.timeScale = reducedMotion ? 0 : 0.9;
+    mixer.timeScale = reducedMotion ? 0 : 0.72;
     mixerRef.current = mixer;
 
     return () => {
@@ -186,34 +174,25 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
     };
   }, [reducedMotion, whale]);
 
-  useFrame(({ clock, camera }, delta) => {
+  useFrame(({ clock }, delta) => {
     const route = routeRef.current;
-    const indicator = indicatorRef.current;
-    if (!route || !indicator) return;
+    if (!route) return;
 
     if (reducedMotion) {
-      route.position.set(2.6, 2.45, -6.6);
-      indicator.scale.setScalar(1);
-      indicator.quaternion.copy(camera.quaternion);
+      route.position.set(3.4, 3.35, -11.6);
       return;
     }
 
     mixerRef.current?.update(delta);
 
     const t = clock.getElapsedTime();
-    // Start near the centre instead of making a fresh page wait through an
-    // off-screen approach. The full route still exits naturally at both sides.
-    const progress = (0.5 + t * 0.022) % 1;
+    const progress = (0.36 + t * 0.012) % 1;
 
     route.position.set(
-      THREE.MathUtils.lerp(6.2, -6.2, progress),
-      2.48 + Math.sin(t * 0.16) * 0.1,
-      -6.65 + Math.sin(t * 0.11) * 0.18,
+      THREE.MathUtils.lerp(8.2, -8.2, progress),
+      3.25 + Math.sin(t * 0.12) * 0.08,
+      -11.4 + Math.sin(t * 0.08) * 0.22,
     );
-
-    const pulse = 0.92 + Math.sin(t * 1.9) * 0.12;
-    indicator.scale.setScalar(pulse);
-    indicator.quaternion.copy(camera.quaternion);
   });
 
   if (!whale) return null;
@@ -223,21 +202,10 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
       <group
         name="reef-background-whale-native-model"
         rotation={[0, -Math.PI / 2, 0]}
-        scale={11.5}
+        scale={4.6}
       >
         <primitive object={whale.scene} />
       </group>
-
-      <mesh ref={indicatorRef} position={[0, 0.72, 0]} renderOrder={3}>
-        <ringGeometry args={[0.085, 0.135, 24]} />
-        <meshBasicMaterial
-          color="#8df3ff"
-          transparent
-          opacity={0.56}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
     </group>
   );
 }
