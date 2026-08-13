@@ -4,7 +4,9 @@ import { useThree } from '@react-three/fiber';
 import { ReefEnvironment } from './ReefEnvironment';
 import { ReefCleanupLayer } from './ReefCleanupLayer';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
-import { ReefLife } from './ReefLife';
+import { ReefSeaGrass } from './ReefSeaGrass';
+import { ReefSessileLife } from './ReefSessileLife';
+import { ReefFishSchool } from './ReefFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 
@@ -52,7 +54,9 @@ export function ReefStage({
       <ReefCleanupLayer />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
-      <ReefLife reducedMotion={reducedMotion} />
+      <ReefSeaGrass reducedMotion={reducedMotion} />
+      <ReefSessileLife reducedMotion={reducedMotion} />
+      <ReefFishSchool reducedMotion={reducedMotion} />
 
       {/* Density now lives in the same world coordinate space as the support
           meshes. The old 0.76 X/Z wrapper was one source of visual detachment. */}
