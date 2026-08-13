@@ -14,8 +14,19 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
     const next = createKenneyFishGeometry();
     next.computeVertexNormals();
     next.normalizeNormals();
+
+    const swimParams = new Float32Array(fish.length * 3);
+    fish.forEach((item, index) => {
+      const speedT = THREE.MathUtils.clamp((item.speed - 0.12) / 0.11, 0, 1);
+      const scaleT = THREE.MathUtils.clamp((item.scale - 0.34) / 0.2, 0, 1);
+      swimParams[index * 3] = item.phase * 1.67 + index * 0.83;
+      swimParams[index * 3 + 1] = THREE.MathUtils.lerp(2.2, 3.8, speedT);
+      swimParams[index * 3 + 2] = THREE.MathUtils.lerp(0.05, 0.09, scaleT);
+    });
+    next.setAttribute('instanceSwimParams', new THREE.InstancedBufferAttribute(swimParams, 3));
+
     return next;
-  }, []);
+  }, [fish]);
   const material = useMemo(() => createFishSwimMaterial(swimTime.current), []);
 
   useEffect(() => () => {
