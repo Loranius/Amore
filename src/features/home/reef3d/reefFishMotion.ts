@@ -15,6 +15,9 @@ export type ReefFishInstance = {
 export const REEF_FISH_TINTS = ['#83b5aa', '#759caf', '#b2a675', '#8aa6a2', '#9b82ad'] as const;
 
 const FISH_COUNT = 8;
+// The vendored Kenney mesh is visually authored opposite our local +Z travel axis.
+// Keep the motion math in velocity space and correct the asset orientation once here.
+const FISH_FORWARD_YAW_OFFSET = Math.PI;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
@@ -63,7 +66,7 @@ export function writeReefFishMatrices(
     const bank = THREE.MathUtils.clamp(-dx * 0.04, -0.14, 0.14);
 
     dummy.position.set(x, y, z);
-    dummy.rotation.set(-pitch, heading + wiggle, bank);
+    dummy.rotation.set(-pitch, heading + FISH_FORWARD_YAW_OFFSET + wiggle, bank);
     dummy.scale.setScalar(item.scale);
     dummy.updateMatrix();
     mesh.setMatrixAt(index, dummy.matrix);
