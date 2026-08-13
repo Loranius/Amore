@@ -1,4 +1,9 @@
 import * as THREE from 'three';
+import {
+  applyReefRoamingSteering,
+  enforceReefRoamingBounds,
+  REEF_FISH_ROAMING_BOUNDS,
+} from './reefFishRoamingBounds';
 
 export type ReefFishInstance = {
   speed: number;
@@ -29,11 +34,19 @@ function seededUnit(index: number, salt: number): number {
 function targetFor(index: number, sequence: number): THREE.Vector3 {
   const salt = sequence * 17;
   const angle = seededUnit(index, 41 + salt) * Math.PI * 2;
-  const radius = THREE.MathUtils.lerp(2.45, 4.15, seededUnit(index, 42 + salt));
+  const radius = THREE.MathUtils.lerp(
+    REEF_FISH_ROAMING_BOUNDS.targetMinRadius,
+    REEF_FISH_ROAMING_BOUNDS.targetMaxRadius,
+    seededUnit(index, 42 + salt),
+  );
   return new THREE.Vector3(
-    Math.cos(angle) * radius + THREE.MathUtils.lerp(-0.24, 0.24, seededUnit(index, 43 + salt)),
-    THREE.MathUtils.lerp(0.62, 2.55, seededUnit(index, 44 + salt)),
-    Math.sin(angle) * radius + THREE.MathUtils.lerp(-0.24, 0.24, seededUnit(index, 45 + salt)),
+    Math.cos(angle) * radius,
+    THREE.MathUtils.lerp(
+      REEF_FISH_ROAMING_BOUNDS.targetMinY,
+      REEF_FISH_ROAMING_BOUNDS.targetMaxY,
+      seededUnit(index, 44 + salt),
+    ),
+    Math.sin(angle) * radius,
   );
 }
 
@@ -89,12 +102,25 @@ export function writeReefFishRoamingMatrices(
       desiredVelocity.normalize().multiplyScalar(item.cruiseSpeed);
     }
 
+    applyReefRoamingSteering(
+      state.position,
+      state.velocity,
+      desiredVelocity,
+      item.cruiseSpeed,
+      index,
+      state.targetSequence,
+    );
+    if (desiredVelocity.lengthSq() > 0.0001) {
+      desiredVelocity.normalize().multiplyScalar(item.cruiseSpeed);
+    }
+
     if (dt > 0) {
       const steeringAlpha = 1 - Math.exp(-item.turnResponsiveness * dt);
       state.velocity.lerp(desiredVelocity, steeringAlpha);
       const maxSpeed = item.cruiseSpeed * 1.08;
       if (state.velocity.lengthSq() > maxSpeed * maxSpeed) state.velocity.setLength(maxSpeed);
       state.position.addScaledVector(state.velocity, dt);
+      enforceReefRoamingBounds(state.position, state.velocity);
     }
 
     const horizontalSpeed = Math.max(0.001, Math.hypot(state.velocity.x, state.velocity.z));
