@@ -1,12 +1,15 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const WHALE_PART_BASE = `${import.meta.env.BASE_URL}models/glow_whale_native/`;
 const WHALE_PART_COUNT = 15;
 const WHALE_CLIP_NAME = 'move f';
+const DRACO_DECODER_BASE = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
 
 type LoadedWhale = {
   scene: THREE.Group;
@@ -50,8 +53,28 @@ async function inflateWhaleAsset(compressed: Uint8Array): Promise<ArrayBuffer> {
 
 function parseWhaleGltf(buffer: ArrayBuffer): Promise<GLTF> {
   const loader = new GLTFLoader();
+  const dracoLoader = new DRACOLoader();
+
+  // The source is the original rigged Sketchfab GLB, not the old simplified
+  // runtime silhouette. Support both compression paths that authored GLBs can
+  // carry while keeping the native skin, clips and texture stack intact.
+  dracoLoader.setDecoderPath(DRACO_DECODER_BASE);
+  loader.setDRACOLoader(dracoLoader);
+  loader.setMeshoptDecoder(MeshoptDecoder);
+
   return new Promise((resolve, reject) => {
-    loader.parse(buffer, WHALE_PART_BASE, resolve, reject);
+    loader.parse(
+      buffer,
+      WHALE_PART_BASE,
+      (gltf) => {
+        dracoLoader.dispose();
+        resolve(gltf);
+      },
+      (error) => {
+        dracoLoader.dispose();
+        reject(error);
+      },
+    );
   });
 }
 
@@ -94,7 +117,7 @@ async function loadNativeWhale(): Promise<LoadedWhale> {
       // response for the dark underwater scene; maps themselves are untouched.
       material.metalness = 0;
       material.roughness = Math.max(0.68, material.roughness);
-      if (material.emissiveMap) material.emissiveIntensity = 1.55;
+      if (material.emissiveMap) material.emissiveIntensity = 1.85;
       material.needsUpdate = true;
     }
   });
@@ -169,7 +192,7 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
     if (!route || !indicator) return;
 
     if (reducedMotion) {
-      route.position.set(2.8, 2.5, -7.4);
+      route.position.set(2.6, 2.45, -6.6);
       indicator.scale.setScalar(1);
       indicator.quaternion.copy(camera.quaternion);
       return;
@@ -183,9 +206,9 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
     const progress = (0.5 + t * 0.022) % 1;
 
     route.position.set(
-      THREE.MathUtils.lerp(7.4, -7.4, progress),
-      2.52 + Math.sin(t * 0.16) * 0.1,
-      -7.45 + Math.sin(t * 0.11) * 0.2,
+      THREE.MathUtils.lerp(6.2, -6.2, progress),
+      2.48 + Math.sin(t * 0.16) * 0.1,
+      -6.65 + Math.sin(t * 0.11) * 0.18,
     );
 
     const pulse = 0.92 + Math.sin(t * 1.9) * 0.12;
@@ -200,17 +223,17 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
       <group
         name="reef-background-whale-native-model"
         rotation={[0, -Math.PI / 2, 0]}
-        scale={10.5}
+        scale={11.5}
       >
         <primitive object={whale.scene} />
       </group>
 
       <mesh ref={indicatorRef} position={[0, 0.72, 0]} renderOrder={3}>
-        <ringGeometry args={[0.075, 0.12, 24]} />
+        <ringGeometry args={[0.085, 0.135, 24]} />
         <meshBasicMaterial
           color="#8df3ff"
           transparent
-          opacity={0.52}
+          opacity={0.56}
           depthWrite={false}
           toneMapped={false}
         />
