@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyFishSeparationSteering } from './reefFishSeparation';
 import {
   applyReefRoamingSteering,
   enforceReefRoamingBounds,
@@ -102,6 +103,7 @@ export function writeReefFishRoamingMatrices(
       desiredVelocity.normalize().multiplyScalar(item.cruiseSpeed);
     }
 
+    applyFishSeparationSteering(desiredVelocity, roaming, fish, index, item.cruiseSpeed);
     applyReefRoamingSteering(
       state.position,
       state.velocity,
