@@ -39,7 +39,7 @@ const CUSHION_COUNT = 12;
 const MAX_PLACEMENT_ATTEMPTS = 18;
 const CROWN_MIN_Y = 0.82;
 const CROWN_CUSHION_LIMIT = 2;
-const CROWN_BUSH_LIMIT = 3;
+const CROWN_BUSH_LIMIT = 1;
 
 /**
  * These are candidate domains only. Final Y placement still requires a real
@@ -53,10 +53,9 @@ const SUPPORT_BEDS: readonly SupportBed[] = [
   { center: [-0.12, 0.06], radius: [0.42, 0.31] },
 ] as const;
 
-// The crown is intentionally represented less often than the middle terraces.
-// The previous sequence sent eight branch candidates into the tiny crown domain,
-// which made it very easy for them to pierce the round cushion colonies there.
-const BUSH_BED_INDICES = [2, 3, 4, 3, 2, 3, 1, 3, 2, 0, 3, 2, 4] as const;
+// Middle terraces carry most branch density. The tiny crown receives only one
+// candidate in the whole cycle so the authored reef fan remains the visual hero.
+const BUSH_BED_INDICES = [2, 3, 2, 3, 1, 3, 2, 0, 3, 2, 4, 2, 3] as const;
 const CUSHION_BED_INDICES = [0, 1, 2, 3, 4, 2, 3] as const;
 
 function seededUnit(index: number, salt: number): number {
@@ -70,11 +69,6 @@ function heightBand(seed: number): number {
   return THREE.MathUtils.lerp(1.04, 1.26, (seed - 0.8) / 0.2);
 }
 
-/**
- * Deterministic retry point inside an elliptical support bed. Radius is a range,
- * not just a maximum: this lets round colonies occupy the inner crown while
- * branching accents deliberately search the outer rim.
- */
 function pointInBedRange(
   index: number,
   salt: number,
@@ -95,7 +89,7 @@ function pointInBedRange(
 }
 
 function terraceScaleForBed(bedIndex: number): number {
-  if (bedIndex === 4) return 0.76;
+  if (bedIndex === 4) return 0.62;
   if (bedIndex === 2 || bedIndex === 3) return 0.82;
   return 0.88;
 }
@@ -118,8 +112,6 @@ function buildBushCandidates(): BushCandidate[] {
 function buildCushionCandidates(): CushionCandidate[] {
   return Array.from({ length: CUSHION_COUNT }, (_, index) => {
     const bedIndex = CUSHION_BED_INDICES[index % CUSHION_BED_INDICES.length]!;
-    // Crown cushions stay smaller than the middle-tier colonies so there is a
-    // readable rim of rock around them and room for separate branch accents.
     const crownScale = bedIndex === 4 ? 0.62 : 0.9;
     const squash = THREE.MathUtils.lerp(0.13, 0.2, seededUnit(index, 13)) * crownScale;
     const width = THREE.MathUtils.lerp(0.21, 0.34, seededUnit(index, 14)) * crownScale;
@@ -140,8 +132,7 @@ function buildCushionCandidates(): CushionCandidate[] {
 
 function placementRadii(kind: 'cushion' | 'bush', bedIndex: number): readonly [number, number] {
   if (bedIndex === 4) {
-    // Round colonies occupy the inner crown. Branches search only the rim.
-    return kind === 'cushion' ? [0.12, 0.68] : [0.72, 0.98];
+    return kind === 'cushion' ? [0.12, 0.68] : [0.82, 0.99];
   }
 
   return kind === 'cushion' ? [0.08, 0.72] : [0.14, 0.82];
@@ -157,8 +148,6 @@ function horizontalClearance(a: OccupiedFootprint, b: OccupiedFootprint): number
   if (a.kind !== b.kind) gap = 0.115;
   else if (a.kind === 'cushion') gap = 0.04;
 
-  // The crown is the focal point and gets extra breathing room. This is the
-  // important guard against the pink branches piercing the round grey colonies.
   if (a.isCrown || b.isCrown) gap += 0.045;
   return gap;
 }
@@ -176,12 +165,6 @@ function canOccupy(candidate: OccupiedFootprint, occupied: readonly OccupiedFoot
   return true;
 }
 
-/**
- * One placement pass owns both coral types. The previous implementation mounted
- * CushionCorals and BushCorals independently, so neither knew which space the
- * other had already occupied. Here cushions reserve their real footprint first;
- * branches then retry deterministic positions until they find free support.
- */
 function DensityCorals() {
   const bushMeshRef = useRef<THREE.InstancedMesh>(null);
   const footingRef = useRef<THREE.InstancedMesh>(null);
@@ -223,8 +206,6 @@ function DensityCorals() {
     let crownCushions = 0;
     let crownBushes = 0;
 
-    // Reserve broad, round colonies first. They are the objects most visibly
-    // pierced in the mobile screenshots, so their footprint has priority.
     for (const cushion of cushions) {
       const bed = SUPPORT_BEDS[cushion.bedIndex]!;
       const [minimumRadius, maximumRadius] = placementRadii('cushion', cushion.bedIndex);
@@ -269,9 +250,6 @@ function DensityCorals() {
       }
     }
 
-    // Branches now search around the already-reserved cushion footprints. On the
-    // crown their radial range is deliberately outer-only, so even successful
-    // candidates frame the round colonies instead of growing through them.
     for (const bush of bushes) {
       const bed = SUPPORT_BEDS[bush.bedIndex]!;
       const [minimumRadius, maximumRadius] = placementRadii('bush', bush.bedIndex);
@@ -382,8 +360,8 @@ function DensityCorals() {
 }
 
 /**
- * Stage 4 density pass: all sessile props now share one collision-aware placement
- * pass, while every visible prop still requires a real hero-support ray hit.
+ * Stage 4 density pass: all sessile props share one collision-aware placement
+ * pass; the crown remains intentionally sparse around the authored hero coral.
  */
 export function ReefDensityLayer() {
   return (
