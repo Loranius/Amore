@@ -77,7 +77,11 @@ async function loadNativeWhale(): Promise<LoadedWhale> {
 
     object.castShadow = false;
     object.receiveShadow = false;
-    object.frustumCulled = true;
+
+    // Animated skinned bounds from the source asset are not guaranteed to stay
+    // representative after skeleton cloning. Keep the native whale renderable
+    // throughout the swim route instead of letting stale bounds cull it.
+    object.frustumCulled = !(object instanceof THREE.SkinnedMesh);
 
     const materials = Array.isArray(object.material)
       ? object.material
@@ -165,7 +169,7 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
     if (!route || !indicator) return;
 
     if (reducedMotion) {
-      route.position.set(6.2, 2.9, -10.1);
+      route.position.set(2.8, 2.5, -7.4);
       indicator.scale.setScalar(1);
       indicator.quaternion.copy(camera.quaternion);
       return;
@@ -174,14 +178,14 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
     mixerRef.current?.update(delta);
 
     const t = clock.getElapsedTime();
-    const progress = (t * 0.03) % 1;
+    // Start near the centre instead of making a fresh page wait through an
+    // off-screen approach. The full route still exits naturally at both sides.
+    const progress = (0.5 + t * 0.022) % 1;
 
-    // The native clip animates the whale itself. This group only advances the
-    // entire animal through the distant water volume at a steady, quiet pace.
     route.position.set(
-      THREE.MathUtils.lerp(9.5, -9.5, progress),
-      2.85 + Math.sin(t * 0.16) * 0.1,
-      -9.8 + Math.sin(t * 0.11) * 0.22,
+      THREE.MathUtils.lerp(7.4, -7.4, progress),
+      2.52 + Math.sin(t * 0.16) * 0.1,
+      -7.45 + Math.sin(t * 0.11) * 0.2,
     );
 
     const pulse = 0.92 + Math.sin(t * 1.9) * 0.12;

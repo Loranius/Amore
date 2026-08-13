@@ -121,29 +121,49 @@ function buildCushionCandidates(): CushionCandidate[] {
 
 function BushCorals() {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const footingRef = useRef<THREE.InstancedMesh>(null);
   const scene = useThree((state) => state.scene);
   const candidates = useMemo(buildBushCandidates, []);
   const armCapacity = candidates.length * 3;
 
   useEffect(() => {
     const mesh = meshRef.current;
-    if (!mesh) return;
+    const footingMesh = footingRef.current;
+    if (!mesh || !footingMesh) return;
 
     const supportMeshes = collectReefSupportMeshes(scene);
     if (supportMeshes.length === 0) {
       mesh.count = 0;
+      footingMesh.count = 0;
       return;
     }
 
     const dummy = new THREE.Object3D();
     const dark = new THREE.Color('#645982');
     const light = new THREE.Color('#9a718d');
+    const footingDark = new THREE.Color('#3d5854');
+    const footingLight = new THREE.Color('#65736a');
     const color = new THREE.Color();
+    const footingColor = new THREE.Color();
     let instanceIndex = 0;
+    let footingIndex = 0;
 
     for (const bush of candidates) {
       const hit = raycastReefSupport(supportMeshes, bush.x, bush.z, 0.3);
       if (!hit) continue;
+
+      // A small embedded rock collar makes the branch-to-shelf contact readable.
+      // It intentionally sinks below the hit point so it reads as substrate, not
+      // as a separate pebble balancing underneath the coral.
+      const footingWidth = 0.088 + bush.scale * 0.024;
+      dummy.position.set(bush.x, hit.point.y + 0.024, bush.z);
+      dummy.rotation.set(0.02, bush.rotation * 0.38, -0.015);
+      dummy.scale.set(footingWidth * 1.2, 0.04, footingWidth);
+      dummy.updateMatrix();
+      footingMesh.setMatrixAt(footingIndex, dummy.matrix);
+      footingColor.copy(footingDark).lerp(footingLight, bush.tone * 0.58);
+      footingMesh.setColorAt(footingIndex, footingColor);
+      footingIndex += 1;
 
       for (let armIndex = 0; armIndex < 3; armIndex += 1) {
         const armOffset = armIndex - 1;
@@ -176,15 +196,24 @@ function BushCorals() {
     }
 
     mesh.count = instanceIndex;
+    footingMesh.count = footingIndex;
     mesh.instanceMatrix.needsUpdate = true;
+    footingMesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    if (footingMesh.instanceColor) footingMesh.instanceColor.needsUpdate = true;
   }, [candidates, scene]);
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, armCapacity]}>
-      <cylinderGeometry args={[0.032, 0.072, 0.62, 6]} />
-      <meshStandardMaterial color="#ffffff" roughness={0.94} metalness={0} />
-    </instancedMesh>
+    <>
+      <instancedMesh ref={footingRef} args={[undefined, undefined, candidates.length]}>
+        <dodecahedronGeometry args={[1, 0]} />
+        <meshStandardMaterial color="#ffffff" roughness={1} metalness={0} />
+      </instancedMesh>
+      <instancedMesh ref={meshRef} args={[undefined, undefined, armCapacity]}>
+        <cylinderGeometry args={[0.032, 0.072, 0.62, 6]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.94} metalness={0} />
+      </instancedMesh>
+    </>
   );
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo, type ReactNode } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { ReefEnvironment } from './ReefEnvironment';
+import { ReefCleanupLayer } from './ReefCleanupLayer';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefLife } from './ReefLife';
 import { ReefDensityLayer } from './ReefDensityLayer';
@@ -34,6 +35,7 @@ export function ReefStage({
       <hemisphereLight args={['#9ce4e8', '#143d42', 0.82]} />
       <directionalLight position={[-4.5, 10, 4]} intensity={2.18} color="#d8f8ef" />
       <directionalLight position={[5, 3, -5]} intensity={0.44} color="#4ba8ba" />
+      <directionalLight position={[-5.5, 2.8, 6.5]} intensity={0.18} color="#b9c9ae" />
 
       <mesh position={[0, 7.2, -2]} rotation={[Math.PI / 2, 0, 0]}>
         <circleGeometry args={[18, 36]} />
@@ -47,6 +49,7 @@ export function ReefStage({
       </mesh>
 
       <ReefEnvironment />
+      <ReefCleanupLayer />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefLife reducedMotion={reducedMotion} />
