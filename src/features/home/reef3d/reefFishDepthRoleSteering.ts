@@ -72,8 +72,6 @@ export function applyFishDepthRoleSteering(
     }
   }
 
-  // Keep the compositional foreground/background roles meaningful even after
-  // separation or reef avoidance temporarily pushes a fish across its sector.
   if (role === 'near' && position.z < 0.72) {
     const threat = THREE.MathUtils.clamp((0.72 - position.z) / 1.25, 0, 1);
     desiredVelocity.z += cruiseSpeed * (0.4 + threat * 1.25);
@@ -81,4 +79,14 @@ export function applyFishDepthRoleSteering(
     const threat = THREE.MathUtils.clamp((position.z + 0.82) / 1.25, 0, 1);
     desiredVelocity.z -= cruiseSpeed * (0.4 + threat * 1.25);
   }
+}
+
+export function applyFishDepthRoleSteeringByIndex(
+  index: number,
+  position: THREE.Vector3,
+  desiredVelocity: THREE.Vector3,
+  cruiseSpeed: number,
+): void {
+  const profile = getReefFishDepthProfile(index);
+  applyFishDepthRoleSteering(index, profile.role, position, desiredVelocity, cruiseSpeed);
 }
