@@ -14,16 +14,15 @@ type FloorMask = {
 };
 
 /**
- * The legacy warm sand circles read as bright flat stickers in the final water
- * grade. Cover their exact 20-sided footprint with the seabed material instead
- * of stacking another visible accent on top. This removes the pale patches
- * without touching the surrounding rock composition.
+ * The legacy warm sand circles still exist below this cleanup layer. The masks
+ * deliberately extend a little beyond those 20-sided footprints: matching the
+ * old size exactly left a thin pale antialiased rim visible on mobile.
  */
 const FLOOR_MASKS: readonly FloorMask[] = [
-  { position: [-1.7, -0.337, 2.1], scale: [1.8, 1.05, 1], rotation: 0.2 },
-  { position: [1.55, -0.336, 2.6], scale: [1.45, 0.88, 1], rotation: -0.3 },
-  { position: [-1.25, -0.335, -2.5], scale: [1.7, 0.82, 1], rotation: -0.18 },
-  { position: [1.8, -0.334, -2.1], scale: [1.35, 0.72, 1], rotation: 0.34 },
+  { position: [-1.7, -0.337, 2.1], scale: [1.94, 1.13, 1], rotation: 0.2 },
+  { position: [1.55, -0.336, 2.6], scale: [1.57, 0.95, 1], rotation: -0.3 },
+  { position: [-1.25, -0.335, -2.5], scale: [1.84, 0.89, 1], rotation: -0.18 },
+  { position: [1.8, -0.334, -2.1], scale: [1.46, 0.78, 1], rotation: 0.34 },
 ] as const;
 
 /** Small low-profile chips keep the recovered seabed from becoming sterile. */
@@ -62,7 +61,7 @@ function FloorMaskMesh({ position, scale, rotation }: FloorMask) {
       receiveShadow={false}
       renderOrder={1}
     >
-      <circleGeometry args={[1, 20]} />
+      <circleGeometry args={[1, 24]} />
       <meshStandardMaterial color="#69776d" roughness={1} metalness={0} />
     </mesh>
   );
