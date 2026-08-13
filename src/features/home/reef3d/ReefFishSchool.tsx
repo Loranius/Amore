@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
+import { createFishSwimMaterial } from './createFishSwimMaterial';
 import { createKenneyFishGeometry } from './kenneyFishGeometry';
 import { buildReefFish, REEF_FISH_TINTS, writeReefFishMatrices } from './reefFishMotion';
 
 export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const swimTime = useRef({ value: 0 });
   const fish = useMemo(buildReefFish, []);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const geometry = useMemo(() => {
@@ -14,6 +16,12 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
     next.normalizeNormals();
     return next;
   }, []);
+  const material = useMemo(() => createFishSwimMaterial(swimTime.current), []);
+
+  useEffect(() => () => {
+    material.dispose();
+    geometry.dispose();
+  }, [geometry, material]);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -29,6 +37,7 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
   }, [dummy, fish]);
 
   useFrame((state) => {
+    swimTime.current.value = reducedMotion ? 0 : state.clock.elapsedTime;
     if (!reducedMotion && meshRef.current) {
       writeReefFishMatrices(meshRef.current, dummy, fish, state.clock.elapsedTime);
     }
@@ -37,18 +46,9 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
   return (
     <instancedMesh
       ref={meshRef}
-      args={[geometry, undefined, fish.length]}
+      args={[geometry, material, fish.length]}
       frustumCulled={false}
       name="reef-local-kenney-fish-school"
-    >
-      <meshStandardMaterial
-        vertexColors
-        color="#ffffff"
-        roughness={0.82}
-        metalness={0}
-        flatShading
-        side={THREE.DoubleSide}
-      />
-    </instancedMesh>
+    />
   );
 }
