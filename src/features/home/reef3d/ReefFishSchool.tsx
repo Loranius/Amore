@@ -1,75 +1,64 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useEffect } from 'react';
+import { useAnimations, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
-import { createFishSwimMaterialV2 } from './createFishSwimMaterialV2';
-import { applyReefFishColors, createReefFishRenderGeometry } from './reefFishRenderKit';
-import { buildDepthReefFish, createDepthRoamingState } from './reefFishDepthState';
-import { writeDepthReefFishMatrices } from './reefFishDepthMotion';
-import { applyFishDepthRoleSteeringByIndex } from './reefFishDepthRoleSteering';
 
+const SCHOOL_OF_FISH_MODEL_URL = `${import.meta.env.BASE_URL}models/school_of_fish_reef.glb`;
+
+/**
+ * Native animated fish school sourced from the School Of Fish GLB.
+ *
+ * The model already contains the authored spatial trajectories for all nine
+ * fish, so we deliberately do not layer the old procedural roaming/steering
+ * system on top of it. Three.js only advances the original `swimming` clip.
+ */
 export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null);
-  const swimTime = useRef({ value: 0 });
-  const fish = useMemo(buildDepthReefFish, []);
-  const roaming = useMemo(() => createDepthRoamingState(fish), [fish]);
-  const dummy = useMemo(() => new THREE.Object3D(), []);
-  const roleSteering = useMemo(() => new THREE.Vector3(), []);
-  const geometry = useMemo(() => createReefFishRenderGeometry(fish), [fish]);
-  const material = useMemo(() => createFishSwimMaterialV2(swimTime.current), []);
-
-  useEffect(() => () => {
-    material.dispose();
-    geometry.dispose();
-  }, [geometry, material]);
+  const { scene, animations } = useGLTF(SCHOOL_OF_FISH_MODEL_URL);
+  const { actions } = useAnimations(animations, scene);
 
   useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    applyReefFishColors(mesh, fish);
-    writeDepthReefFishMatrices(mesh, dummy, fish, roaming, 0, 0);
-  }, [dummy, fish, roaming]);
+    scene.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      // Skinned meshes can move beyond their bind-pose bounds during the long
+      // authored school loop. Disabling per-mesh frustum culling prevents fish
+      // from disappearing while crossing the edges of the camera frustum.
+      object.frustumCulled = false;
+      object.castShadow = false;
+      object.receiveShadow = false;
+    });
+  }, [scene]);
 
-  useFrame((state, delta) => {
-    swimTime.current.value = reducedMotion ? 0 : state.clock.elapsedTime;
-    if (!reducedMotion && meshRef.current) {
-      const dt = THREE.MathUtils.clamp(delta, 0, 0.05);
-      const roleAlpha = 1 - Math.exp(-2.8 * dt);
+  useEffect(() => {
+    const swim = actions.swimming;
+    if (!swim) return undefined;
 
-      fish.forEach((item, index) => {
-        const fishState = roaming[index];
-        if (!fishState) return;
-        roleSteering.set(0, 0, 0);
-        applyFishDepthRoleSteeringByIndex(
-          index,
-          fishState.position,
-          roleSteering,
-          item.cruiseSpeed,
-        );
-        fishState.velocity.addScaledVector(roleSteering, roleAlpha);
-        const maxSpeed = item.cruiseSpeed * 1.1;
-        if (fishState.velocity.lengthSq() > maxSpeed * maxSpeed) {
-          fishState.velocity.setLength(maxSpeed);
-        }
-      });
+    swim
+      .reset()
+      .setLoop(THREE.LoopRepeat, Infinity)
+      .fadeIn(0.25)
+      .play();
 
-      writeDepthReefFishMatrices(
-        meshRef.current,
-        dummy,
-        fish,
-        roaming,
-        state.clock.elapsedTime,
-        delta,
-      );
-    }
-  });
+    return () => {
+      swim.stop();
+    };
+  }, [actions]);
+
+  useEffect(() => {
+    const swim = actions.swimming;
+    if (!swim) return;
+    // Respect the existing portal-wide reduced-motion contract without
+    // swapping models or resetting the animation when the preference changes.
+    swim.timeScale = reducedMotion ? 0 : 1;
+  }, [actions, reducedMotion]);
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, fish.length]}
-      frustumCulled={false}
-      name="reef-local-kenney-fish-school-depth-roaming"
+    <primitive
+      object={scene}
+      name="reef-native-school-of-fish"
+      position={[-0.45, 0.55, 0.15]}
+      scale={0.00058}
+      dispose={null}
     />
   );
 }
+
+useGLTF.preload(SCHOOL_OF_FISH_MODEL_URL);
