@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { createFishSwimMaterial } from './createFishSwimMaterial';
+import { createFishSwimMaterialV2 } from './createFishSwimMaterialV2';
 import { createKenneyFishGeometry } from './kenneyFishGeometry';
 import { buildReefFish, REEF_FISH_TINTS, writeReefFishMatrices } from './reefFishMotion';
 
@@ -27,7 +27,7 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
 
     return next;
   }, [fish]);
-  const material = useMemo(() => createFishSwimMaterial(swimTime.current), []);
+  const material = useMemo(() => createFishSwimMaterialV2(swimTime.current), []);
 
   useEffect(() => () => {
     material.dispose();
