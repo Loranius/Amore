@@ -8,7 +8,12 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const fish = useMemo(buildReefFish, []);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const geometry = useMemo(createKenneyFishGeometry, []);
+  const geometry = useMemo(() => {
+    const next = createKenneyFishGeometry();
+    next.computeVertexNormals();
+    next.normalizeNormals();
+    return next;
+  }, []);
 
   useEffect(() => {
     const mesh = meshRef.current;
@@ -36,7 +41,14 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
       frustumCulled={false}
       name="reef-local-kenney-fish-school"
     >
-      <meshStandardMaterial vertexColors roughness={0.86} metalness={0} flatShading />
+      <meshStandardMaterial
+        vertexColors
+        color="#ffffff"
+        roughness={0.82}
+        metalness={0}
+        flatShading
+        side={THREE.DoubleSide}
+      />
     </instancedMesh>
   );
 }
