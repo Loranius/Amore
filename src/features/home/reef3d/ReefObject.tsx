@@ -117,6 +117,7 @@ export function ReefObject({
       {reefScene.batches.map((batch) => (
         <mesh
           key={batch.id}
+          visible={false}
           geometry={batch.geometry}
           material={batch.material}
           receiveShadow={false}
