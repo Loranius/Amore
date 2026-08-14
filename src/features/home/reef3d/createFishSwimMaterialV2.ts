@@ -3,21 +3,21 @@ import * as THREE from 'three';
 export type FishSwimUniform = { value: number };
 
 /**
- * Low-cost lit material for the roaming fish.
+ * Stable unlit material for the roaming fish.
  *
- * The reef is intentionally dark and foggy, so a pure physically-lit material
- * can collapse small fish into black silhouettes on mobile. Lambert keeps the
- * low-poly shading while the restrained emissive floor preserves their colour
- * when they pass through the darker parts of the scene.
+ * The reef uses strong depth fog and directional lighting. On mobile the tiny
+ * low-poly fish were receiving almost no diffuse light, so even bright instance
+ * colours collapsed into dark teal/black silhouettes. Fish colour is gameplay
+ * readability, not a physically-lit surface, so keep the per-instance palette
+ * independent from scene lighting and fog while preserving the swim deformation.
  */
-export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshLambertMaterial {
-  const material = new THREE.MeshLambertMaterial({
+export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshBasicMaterial {
+  const material = new THREE.MeshBasicMaterial({
     vertexColors: true,
-    color: '#f4fffc',
-    emissive: '#285b59',
-    emissiveIntensity: 0.42,
-    flatShading: true,
+    color: '#ffffff',
     side: THREE.DoubleSide,
+    fog: false,
+    toneMapped: false,
   });
 
   material.onBeforeCompile = (shader) => {
@@ -41,6 +41,6 @@ export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshL
       );
   };
 
-  material.customProgramCacheKey = () => 'reef-fish-swim-v3-visible-lambert';
+  material.customProgramCacheKey = () => 'reef-fish-swim-v4-unlit-instance-colors';
   return material;
 }
