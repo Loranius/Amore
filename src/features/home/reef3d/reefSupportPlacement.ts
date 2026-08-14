@@ -6,10 +6,18 @@ const ORIGIN = new THREE.Vector3();
 const WORLD_NORMAL = new THREE.Vector3();
 const RAYCASTER = new THREE.Raycaster();
 const SLOT_WORLD_POINT = new THREE.Vector3();
+const CORAL_ARCH_CLEARANCE_OFFSETS = [
+  [0, 0],
+  [0.14, 0],
+  [-0.14, 0],
+  [0, 0.14],
+  [0, -0.14],
+] as const;
 
 interface SerializedReefSupportSlot {
   id: string;
   position: { x: number; y: number; z: number };
+  radius: number;
   availableFromEpoch?: number;
 }
 
@@ -26,6 +34,8 @@ function isSerializedSupportSlot(value: unknown): value is SerializedReefSupport
     && finite(candidate.position?.x)
     && finite(candidate.position?.y)
     && finite(candidate.position?.z)
+    && finite(candidate.radius)
+    && candidate.radius > 0
     && (candidate.availableFromEpoch === undefined || finite(candidate.availableFromEpoch));
 }
 
@@ -43,6 +53,28 @@ export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
     if (object instanceof THREE.Mesh) meshes.push(object);
   });
   return meshes;
+}
+
+function isReefArchSupport(mesh: THREE.Mesh): boolean {
+  return mesh.geometry.userData.reefSupportSurfaceKind === 'arch'
+    || typeof mesh.geometry.userData.reefSourceArchId === 'string';
+}
+
+/**
+ * Generic colony anchors belong on terrain. Arch bodies are intentionally
+ * excluded because a downward ray can otherwise accept a sloping arch facet
+ * and make a vertical coral intersect the limestone.
+ */
+export function collectReefTerrainSupportMeshes(
+  supportMeshes: readonly THREE.Mesh[],
+): THREE.Mesh[] {
+  return supportMeshes.filter((mesh) => !isReefArchSupport(mesh));
+}
+
+export function collectReefArchSupportMeshes(
+  supportMeshes: readonly THREE.Mesh[],
+): THREE.Mesh[] {
+  return supportMeshes.filter(isReefArchSupport);
 }
 
 /** Collects authored horizontal shelves so the allocator does not have to hit them by chance. */
@@ -64,6 +96,12 @@ export function collectReefSupportSlotCandidates(
         id: value.id,
         x: round6(SLOT_WORLD_POINT.x),
         z: round6(SLOT_WORLD_POINT.z),
+        position: {
+          x: round6(SLOT_WORLD_POINT.x),
+          y: round6(SLOT_WORLD_POINT.y),
+          z: round6(SLOT_WORLD_POINT.z),
+        },
+        maxFootprintRadius: round6(value.radius * 0.72),
         ...(value.availableFromEpoch === undefined
           ? {}
           : { availableFromEpoch: value.availableFromEpoch }),
@@ -99,4 +137,27 @@ export function raycastReefSupport(
   }
 
   return null;
+}
+
+/**
+ * Finds a horizontal terrain anchor only when the coral's vertical clearance
+ * column is free of limestone. This prevents a colony rooted on the terrace
+ * below an arch from growing upward through the arch body.
+ */
+export function raycastReefCoralTerrainSupport(
+  terrainMeshes: readonly THREE.Mesh[],
+  archMeshes: readonly THREE.Mesh[],
+  x: number,
+  z: number,
+  minNormalY = 0.68,
+): THREE.Intersection | null {
+  const terrainHit = raycastReefSupport(terrainMeshes, x, z, minNormalY);
+  if (!terrainHit) return null;
+
+  for (const [offsetX, offsetZ] of CORAL_ARCH_CLEARANCE_OFFSETS) {
+    const blocker = raycastReefSupport(archMeshes, x + offsetX, z + offsetZ, -1);
+    if (blocker && blocker.point.y > terrainHit.point.y + 0.025) return null;
+  }
+
+  return terrainHit;
 }

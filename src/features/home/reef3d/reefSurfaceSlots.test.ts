@@ -123,10 +123,17 @@ describe('reef surface slots', () => {
   it('does not move an older colony onto a shelf from a future growth epoch', () => {
     const candidates = [
       { id: 'current-surface', x: 0, z: 0 },
-      { id: 'future-arch-shelf', x: 1.6, z: 0, availableFromEpoch: 2 },
+      {
+        id: 'future-arch-shelf',
+        x: 1.6,
+        z: 0,
+        position: { x: 1.6, y: 1.34, z: 0 },
+        maxFootprintRadius: 0.22,
+        availableFromEpoch: 2,
+      },
     ];
     const sample: ReefSurfaceSampler = (x, z) => (
-      (x === 0 || x === 1.6) && z === 0 ? { x, y: 0.8, z } : null
+      x === 0 && z === 0 ? { x, y: 0.8, z } : null
     );
     const older = allocateReefSurfaceSlots({
       requests: [{
@@ -147,5 +154,16 @@ describe('reef surface slots', () => {
 
     expect(older.slots[0]?.candidateId).toBe('current-surface');
     expect(contemporary.slots[0]?.candidateId).toBe('future-arch-shelf');
+    expect(contemporary.slots[0]?.position).toEqual({ x: 1.6, y: 1.34, z: 0 });
+
+    const oversized = allocateReefSurfaceSlots({
+      requests: [{
+        ...request('oversized-colony', 3, 2, 0, 0.28),
+        epochIndex: 2,
+      }],
+      candidates,
+      sample,
+    });
+    expect(oversized.slots[0]?.candidateId).toBe('current-surface');
   });
 });

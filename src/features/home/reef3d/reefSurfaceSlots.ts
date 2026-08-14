@@ -1,4 +1,4 @@
-export const REEF_SURFACE_SLOT_VERSION = 'reef-surface-slots-v1';
+export const REEF_SURFACE_SLOT_VERSION = 'reef-surface-slots-v2';
 
 const TAU = Math.PI * 2;
 const SLOT_SPACING = 0.34;
@@ -14,6 +14,10 @@ export interface ReefSurfaceSlotCandidate {
   id: string;
   x: number;
   z: number;
+  /** Exact authored support point, used for shelves that must not be re-raycast. */
+  position?: ReefSurfacePoint;
+  /** Largest colony footprint that fits fully on this authored support. */
+  maxFootprintRadius?: number;
   /** Optional growth epoch that must exist before this support can be used. */
   availableFromEpoch?: number;
 }
@@ -60,6 +64,7 @@ interface SampledCandidate {
   kind: ReefAllocatedSurfaceSlot['kind'];
   position: ReefSurfacePoint;
   availableFromEpoch?: number;
+  maxFootprintRadius?: number;
 }
 
 function round6(value: number): number {
@@ -159,6 +164,10 @@ function isAvailableForRequest(
   candidate: SampledCandidate,
   request: ReefSurfaceSlotRequest,
 ): boolean {
+  if (
+    candidate.maxFootprintRadius !== undefined
+    && request.footprintRadius > candidate.maxFootprintRadius + 1e-8
+  ) return false;
   if (candidate.availableFromEpoch === undefined || request.epochIndex === undefined) return true;
   return candidate.availableFromEpoch <= request.epochIndex;
 }
@@ -187,7 +196,9 @@ export function allocateReefSurfaceSlots({
     return result;
   };
   const registry = candidates.flatMap<SampledCandidate>((candidate) => {
-    const position = sampleAt(candidate.x, candidate.z);
+    const position = candidate.position
+      ? { ...candidate.position }
+      : sampleAt(candidate.x, candidate.z);
     return position
       ? [{
           id: candidate.id,
@@ -196,6 +207,9 @@ export function allocateReefSurfaceSlots({
           ...(candidate.availableFromEpoch === undefined
             ? {}
             : { availableFromEpoch: candidate.availableFromEpoch }),
+          ...(candidate.maxFootprintRadius === undefined
+            ? {}
+            : { maxFootprintRadius: candidate.maxFootprintRadius }),
         }]
       : [];
   });

@@ -10,9 +10,11 @@ import {
   REEF_LIVING_CANOPY_VERSION,
 } from './reefLivingCanopy';
 import {
+  collectReefArchSupportMeshes,
   collectReefSupportMeshes,
   collectReefSupportSlotCandidates,
-  raycastReefSupport,
+  collectReefTerrainSupportMeshes,
+  raycastReefCoralTerrainSupport,
 } from './reefSupportPlacement';
 import {
   allocateReefSurfaceSlots,
@@ -53,6 +55,8 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
 
   useEffect(() => {
     const supportMeshes = collectReefSupportMeshes(scene);
+    const terrainSupportMeshes = collectReefTerrainSupportMeshes(supportMeshes);
+    const archSupportMeshes = collectReefArchSupportMeshes(supportMeshes);
     const candidates = [
       ...buildReefSurfaceSlotCandidates({
         foundationRadius: build.structures.visibleFoundationRadius,
@@ -64,7 +68,12 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
       requests: plan.requests,
       candidates,
       sample: (x, z) => {
-        const hit = raycastReefSupport(supportMeshes, x, z, 0.2);
+        const hit = raycastReefCoralTerrainSupport(
+          terrainSupportMeshes,
+          archSupportMeshes,
+          x,
+          z,
+        );
         return hit
           ? { x: hit.point.x, y: hit.point.y, z: hit.point.z }
           : null;

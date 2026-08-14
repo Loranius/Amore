@@ -15,10 +15,6 @@ import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 import {
-  ReefBackdropCorals,
-  type ReefBackdropMetrics,
-} from './ReefBackdropCorals';
-import {
   reefCameraFrameForAspect,
   REEF_ATMOSPHERE_PROFILE,
   REEF_LIGHTING_PROFILE,
@@ -35,13 +31,11 @@ import {
  */
 export function ReefStage({
   build,
-  onBackdropReady,
   onFishReady,
   reducedMotion,
   children,
 }: {
   build: ReefPreviewBuild;
-  onBackdropReady?: (metrics: ReefBackdropMetrics) => void;
   onFishReady?: (metrics: ReefFishSchoolMetrics) => void;
   reducedMotion: boolean;
   children: ReactNode;
@@ -88,7 +82,6 @@ export function ReefStage({
 
       <ReefEnvironment build={build} />
       <ReefDensityLayer build={build} />
-      <ReefBackdropCorals onReady={onBackdropReady} />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefSeaGrass reducedMotion={reducedMotion} />

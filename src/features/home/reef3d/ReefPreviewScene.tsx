@@ -9,11 +9,6 @@ import {
 import { ReefObject } from './ReefObject';
 import { ReefStage } from './ReefStage';
 import type { ReefFishSchoolMetrics } from './ReefFishSchool';
-import type { ReefBackdropMetrics } from './ReefBackdropCorals';
-import {
-  REEF_BACKDROP_MODEL,
-  REEF_BACKDROP_PRESENTATION,
-} from './reefAssetManifest';
 import {
   REEF_FISH_SCHOOL_MODEL,
   REEF_FISH_SCHOOL_ROUTE_PROFILE,
@@ -70,15 +65,10 @@ function useReducedMotion(): boolean {
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
   const reducedMotion = useReducedMotion();
-  const [backdropRuntime, setBackdropRuntime] = useState<ReefBackdropMetrics | null>(null);
   const [fishRuntime, setFishRuntime] = useState<ReefFishSchoolMetrics | null>(null);
   const [worldRuntime, setWorldRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const [sceneState, setSceneState] = useState<ReefThreeSceneState | null>(null);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setWorldRuntime(next), []);
-  const onBackdropReady = useCallback(
-    (next: ReefBackdropMetrics) => setBackdropRuntime(next),
-    [],
-  );
   const onFishReady = useCallback((next: ReefFishSchoolMetrics) => setFishRuntime(next), []);
   const onSceneReady = useCallback((next: ReefThreeSceneState) => setSceneState(next), []);
 
@@ -173,14 +163,6 @@ export default function ReefPreviewScene() {
       data-reef-materials={build.diagnostics.materialCount}
       data-reef-motion-bindings={build.diagnostics.motionBindingCount}
       data-reef-visible-colonies={visibleColonyRanges ?? ''}
-      data-reef-backdrop-model={backdropRuntime ? REEF_BACKDROP_MODEL : 'loading'}
-      data-reef-backdrop-presentation={REEF_BACKDROP_PRESENTATION}
-      data-reef-backdrop-source-meshes={backdropRuntime?.sourceMeshes ?? ''}
-      data-reef-backdrop-triangles={backdropRuntime?.triangles ?? ''}
-      data-reef-backdrop-draw-calls={backdropRuntime?.drawCalls ?? ''}
-      data-reef-backdrop-width={backdropRuntime?.width ?? ''}
-      data-reef-backdrop-height={backdropRuntime?.height ?? ''}
-      data-reef-backdrop-depth={backdropRuntime?.depth ?? ''}
       data-reef-fish-model={fishRuntime ? REEF_FISH_SCHOOL_MODEL : 'loading'}
       data-reef-fish-meshes={fishRuntime?.meshes ?? ''}
       data-reef-fish-width={fishRuntime?.width ?? ''}
@@ -212,7 +194,6 @@ export default function ReefPreviewScene() {
       >
         <ReefStage
           build={build}
-          onBackdropReady={onBackdropReady}
           onFishReady={onFishReady}
           reducedMotion={reducedMotion}
         >

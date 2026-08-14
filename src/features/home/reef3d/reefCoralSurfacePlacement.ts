@@ -8,8 +8,10 @@ import {
   type ReefSurfaceSlotRequest,
 } from './reefSurfaceSlots';
 import {
+  collectReefArchSupportMeshes,
   collectReefSupportSlotCandidates,
-  raycastReefSupport,
+  collectReefTerrainSupportMeshes,
+  raycastReefCoralTerrainSupport,
 } from './reefSupportPlacement';
 import type {
   ReefBatchRuntimeRange,
@@ -17,7 +19,7 @@ import type {
   ReefThreeSceneState,
 } from './reefThreeAdapter';
 
-export const REEF_CORAL_SURFACE_PLACEMENT_PASS = 'reef-coral-surface-placement-v1';
+export const REEF_CORAL_SURFACE_PLACEMENT_PASS = 'reef-coral-surface-placement-v2';
 const LIVING_CANOPY_SCULPT_PASS = 'reef-living-canopy-sculpt-v1';
 
 interface RuntimePlacement {
@@ -212,6 +214,8 @@ export function applyReefCoralSurfacePlacement({
     }
   }
 
+  const terrainSupportMeshes = collectReefTerrainSupportMeshes(supportMeshes);
+  const archSupportMeshes = collectReefArchSupportMeshes(supportMeshes);
   const candidates = [
     ...buildReefSurfaceSlotCandidates({
       foundationRadius: build.structures.visibleFoundationRadius,
@@ -223,7 +227,12 @@ export function applyReefCoralSurfacePlacement({
     requests: runtimePlacements.map((placement) => placement.request),
     candidates,
     sample: (x, z) => {
-      const hit = raycastReefSupport(supportMeshes, x, z, 0.2);
+      const hit = raycastReefCoralTerrainSupport(
+        terrainSupportMeshes,
+        archSupportMeshes,
+        x,
+        z,
+      );
       return hit
         ? { x: hit.point.x, y: hit.point.y, z: hit.point.z }
         : null;

@@ -239,6 +239,7 @@ function GrowthArch({
       castShadow={false}
       userData={{
         reefSupportSurface: true,
+        reefSupportSurfaceKind: 'arch',
         reefLimestoneArchPass: REEF_LIMESTONE_ARCH_PASS,
       }}
     />
