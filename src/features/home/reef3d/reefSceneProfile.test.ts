@@ -34,7 +34,7 @@ function luminance(hex: string): number {
 }
 
 describe('reef final scene profile', () => {
-  it('keeps every initial camera inside the bounded front orbit', () => {
+  it('keeps every initial camera inside the full reef orbit', () => {
     for (const aspect of [0.48, 0.71, 0.72, 1, 1.78]) {
       const frame = reefCameraFrameForAspect(aspect);
       const angles = sphericalAngles(frame.position, frame.target);
@@ -49,12 +49,12 @@ describe('reef final scene profile', () => {
     }
   });
 
-  it('uses a narrower-than-quarter-turn arc and a higher terrace-reading angle', () => {
-    expect(
-      REEF_CAMERA_ORBIT_PROFILE.maxAzimuthAngle
-        - REEF_CAMERA_ORBIT_PROFILE.minAzimuthAngle,
-    ).toBeLessThan(Math.PI / 2);
-    expect(REEF_CAMERA_ORBIT_PROFILE.maxPolarAngle).toBeLessThan(1.4);
+  it('keeps azimuth unbounded for 360 rotation and a safe above-seabed polar range', () => {
+    expect(REEF_CAMERA_ORBIT_PROFILE.minAzimuthAngle).toBe(Number.NEGATIVE_INFINITY);
+    expect(REEF_CAMERA_ORBIT_PROFILE.maxAzimuthAngle).toBe(Number.POSITIVE_INFINITY);
+    expect(REEF_CAMERA_ORBIT_PROFILE.minPolarAngle).toBeLessThan(0.8);
+    expect(REEF_CAMERA_ORBIT_PROFILE.maxPolarAngle).toBeGreaterThan(1.4);
+    expect(REEF_CAMERA_ORBIT_PROFILE.maxPolarAngle).toBeLessThan(Math.PI / 2);
     expect(REEF_CAMERA_ORBIT_PROFILE.foregroundClearRadius).toBeGreaterThanOrEqual(3);
     expect(reefCameraFrameForAspect(0.5).distance)
       .toBeGreaterThan(reefCameraFrameForAspect(1).distance);
