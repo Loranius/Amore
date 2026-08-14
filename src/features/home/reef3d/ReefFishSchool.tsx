@@ -1,6 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useAnimations, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import {
+  createReefFishRouteClips,
+  REEF_FISH_ROUTE_PLAYBACK_RATE,
+} from './reefFishSchoolMotion';
 import {
   REEF_FISH_SCHOOL_POSITION,
   REEF_FISH_SCHOOL_SCALE,
@@ -12,6 +16,8 @@ export interface ReefFishSchoolMetrics {
   depth: number;
   height: number;
   meshes: number;
+  routes: number;
+  scale: number;
   width: number;
 }
 
@@ -34,7 +40,12 @@ function roundMetric(value: number): number {
 export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) {
   const schoolRef = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(SCHOOL_OF_FISH_MODEL_URL);
-  const { actions } = useAnimations(animations, scene);
+  const routes = useMemo(
+    () => animations[0] ? createReefFishRouteClips(animations[0]) : [],
+    [animations],
+  );
+  const routeClips = useMemo(() => routes.map(({ clip }) => clip), [routes]);
+  const { actions } = useAnimations(routeClips, scene);
 
   useEffect(() => {
     scene.traverse((object) => {
@@ -49,27 +60,30 @@ export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) 
   }, [scene]);
 
   useEffect(() => {
-    const swim = actions.swimming;
-    if (!swim) return undefined;
+    const activeActions = routes.flatMap(({ clip, phase }) => {
+      const action = actions[clip.name];
+      if (!action) return [];
 
-    swim
-      .reset()
-      .setLoop(THREE.LoopRepeat, Infinity)
-      .fadeIn(0.25)
-      .play();
+      action.reset();
+      action.setLoop(THREE.LoopRepeat, Infinity);
+      action.time = clip.duration * phase;
+      action.fadeIn(0.25).play();
+      return [action];
+    });
 
     return () => {
-      swim.stop();
+      activeActions.forEach((action) => action.stop());
     };
-  }, [actions]);
+  }, [actions, routes]);
 
   useEffect(() => {
-    const swim = actions.swimming;
-    if (!swim) return;
     // Respect the existing portal-wide reduced-motion contract without
     // swapping models or resetting the animation when the preference changes.
-    swim.timeScale = reducedMotion ? 0 : 1;
-  }, [actions, reducedMotion]);
+    routes.forEach(({ clip }) => {
+      const action = actions[clip.name];
+      if (action) action.timeScale = reducedMotion ? 0 : REEF_FISH_ROUTE_PLAYBACK_RATE;
+    });
+  }, [actions, reducedMotion, routes]);
 
   useEffect(() => {
     const school = schoolRef.current;
@@ -89,9 +103,11 @@ export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) 
       depth: roundMetric(size.z),
       height: roundMetric(size.y),
       meshes,
+      routes: routes.length,
+      scale: REEF_FISH_SCHOOL_SCALE,
       width: roundMetric(size.x),
     });
-  }, [onReady, scene]);
+  }, [onReady, routes.length, scene]);
 
   return (
     <group
