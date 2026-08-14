@@ -62,7 +62,12 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
         foundationRadius: build.structures.visibleFoundationRadius,
         seed: build.species.moduleEvolution.identitySeed,
       }),
-      ...collectReefSupportSlotCandidates(supportMeshes),
+      // The old continuous arch shell is now invisible and no longer matches
+      // the visible irregular rock-chain silhouette. Never plant visible coral
+      // on its authored attachment slots: use only shelves that belong to real
+      // terrain/outcrop/terrace meshes, while the hidden arch still acts as a
+      // clearance blocker for nearby terrain candidates.
+      ...collectReefSupportSlotCandidates(terrainSupportMeshes),
     ];
     const allocation = allocateReefSurfaceSlots({
       requests: plan.requests,
