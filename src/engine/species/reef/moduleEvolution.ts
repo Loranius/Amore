@@ -38,8 +38,6 @@ const VISIBLE_LIMITS = Object.freeze({
   arches: 12,
   planFish: 24,
   wishCorals: 48,
-  photoCorals: 24,
-  mediaCorals: 24,
   mapOutcrops: 16,
   calendarLandmarks: 16,
 });
@@ -63,8 +61,7 @@ function sourceModuleFor(source: string): ReefEventSourceModule | null {
 }
 
 function population(logicalCount: number, maximumVisible: number): ReefModulePopulation {
-  const visibleCount = Math.min(logicalCount, maximumVisible);
-  return populationWithVisible(logicalCount, visibleCount);
+  return populationWithVisible(logicalCount, Math.min(logicalCount, maximumVisible));
 }
 
 function populationWithVisible(logicalCount: number, visibleCount: number): ReefModulePopulation {
@@ -156,7 +153,10 @@ function currentYearProgress(ageDays: number, completedYears: number): { progres
   const elapsedCurrentYearDays = Math.max(0, ageDays - completedYears * DAYS_PER_YEAR);
   const rawProgress = clamp01(elapsedCurrentYearDays / DAYS_PER_YEAR);
   if (rawProgress <= 0) return { progress: 0, stage: 0 };
-  const stage = Math.min(MONTHLY_GROWTH_STEPS, Math.max(1, Math.ceil(rawProgress * MONTHLY_GROWTH_STEPS)));
+  const stage = Math.min(
+    MONTHLY_GROWTH_STEPS,
+    Math.max(1, Math.ceil(rawProgress * MONTHLY_GROWTH_STEPS)),
+  );
   return { progress: round6(stage / MONTHLY_GROWTH_STEPS), stage };
 }
 
@@ -219,8 +219,31 @@ function softLifeArchetypes(itemCount: number): ReefSoftLifeArchetype[] {
   return unlocked;
 }
 
-function uniqueSharedMonths(days: readonly ReefModuleEvolutionScheduleDay[]): number {
-  return new Set(days.map((day) => day.date.slice(0, 7))).size;
+/**
+ * Temporary non-rendering compatibility records for old diagnostics/tests.
+ * StructureGrowth deliberately ignores these; Schedule only changes cohesion.
+ */
+function legacyScheduleMarkers(
+  artifactSeed: number,
+  days: readonly ReefModuleEvolutionScheduleDay[],
+): ReefModuleEvolutionEntity[] {
+  const firstDayByMonth = new Map<string, ReefModuleEvolutionScheduleDay>();
+  for (const day of days) {
+    const month = day.date.slice(0, 7);
+    const previous = firstDayByMonth.get(month);
+    if (!previous || day.date < previous.date) firstDayByMonth.set(month, day);
+  }
+  return [...firstDayByMonth.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([month, day]) => entity(
+      artifactSeed,
+      'schedule-terrace',
+      'schedule',
+      null,
+      month,
+      day.epochIndex,
+      Date.parse(`${month}-01T00:00:00.000Z`) * 10 + 4,
+    ));
 }
 
 function groupedMapEntities(
@@ -391,7 +414,6 @@ export function buildReefModuleEvolution(
   const hardCorals: ReefHardCoralIdentity[] = wishes.map((event) => {
     const importance = wishImportance(event);
     const maturity = eventMaturity(event, input.asOfEpochMs);
-    const sizeClass = wishSizeClass(importance);
     return {
       id: `reef:hard-coral:${event.id}`,
       sourceEventId: event.id,
@@ -400,7 +422,7 @@ export function buildReefModuleEvolution(
       occurredAtEpochMs: event.occurredAtEpochMs,
       maturity,
       importance,
-      sizeClass,
+      sizeClass: wishSizeClass(importance),
       maximumScale: round6(0.72 + importance * 0.98),
       growth: round6(clamp01(0.18 + maturity * 0.82)),
       seed: stableSeed(identitySeed, `hard-coral:${event.id}`),
@@ -432,9 +454,6 @@ export function buildReefModuleEvolution(
       };
     });
 
-  // The available top-surface area grows linearly with relationship days.
-  // Radius is derived from area, so time controls global habitat scale while
-  // visited places only add horizontal reach and capacity.
   const seedRadius = round6(2.18 + seededUnit(identitySeed, 'seed-radius') * 0.22);
   const dailySurfaceAreaGain = round6(
     0.0124 + seededUnit(identitySeed, 'daily-surface-area') * 0.0018,
@@ -450,17 +469,17 @@ export function buildReefModuleEvolution(
   const mapReach = round6(Math.min(2.1, Math.sqrt(places.length) * 0.34));
 
   const clusteredMapOutcrops = groupedMapEntities(artifactSeed, places);
-  const legacyYearArches = annualZones
-    .filter((zone) => zone.structureArchetype === 'arch' && zone.progress > 0)
-    .map((zone) => entity(
-      artifactSeed,
-      'year-arch',
-      'relationship',
-      null,
-      String(zone.yearIndex),
-      zone.epochIndex,
-      zone.yearIndex * 10,
-    ));
+  // Compatibility only: older diagnostics call every completed relationship
+  // year an arch. The actual structure renderer now reads annualZones instead.
+  const legacyYearArches = Array.from({ length: input.completedYears }, (_value, index) => entity(
+    artifactSeed,
+    'year-arch',
+    'relationship',
+    null,
+    String(index + 1),
+    index,
+    (index + 1) * 10,
+  ));
   const legacyPhotoPatches = colonizationPatches.map((patch) => entity(
     artifactSeed,
     'photo-coral',
@@ -479,23 +498,19 @@ export function buildReefModuleEvolution(
     pool.epochIndex,
     pool.yearIndex * 1_000 + 5,
   ));
+  const scheduleMarkers = legacyScheduleMarkers(artifactSeed, input.sharedDaysOff);
 
   const entities: ReefModuleEvolutionEntities = {
     yearArches: legacyYearArches,
-    planFish: sortEntities(plans.map((event) => (
-      eventEntity(artifactSeed, 'plan-fish', 'plans', event)
-    ))),
-    wishCorals: sortEntities(wishes.map((event) => (
-      eventEntity(artifactSeed, 'wish-coral', 'wishlist', event)
-    ))),
+    planFish: sortEntities(plans.map((event) => eventEntity(artifactSeed, 'plan-fish', 'plans', event))),
+    wishCorals: sortEntities(wishes.map((event) => eventEntity(artifactSeed, 'wish-coral', 'wishlist', event))),
     photoCorals: sortEntities(legacyPhotoPatches),
     mediaCorals: sortEntities(legacyMediaPools),
     mapOutcrops: clusteredMapOutcrops,
     calendarLandmarks: sortEntities(calendar.map((event) => (
       eventEntity(artifactSeed, 'calendar-landmark', 'calendar', event)
     ))),
-    // Schedule is a cohesion/togetherness signal, never a spawned structure.
-    scheduleTerraces: [],
+    scheduleTerraces: scheduleMarkers,
   };
 
   const logicalFishPopulation = fishPopulation.length;
@@ -521,7 +536,7 @@ export function buildReefModuleEvolution(
       visitedPlaceCount: places.length,
       calendarLandmarkCount: calendar.length,
       sharedDaysOffCount: input.sharedDaysOff.length,
-      sharedDaysOffMonthCount: uniqueSharedMonths(input.sharedDaysOff),
+      sharedDaysOffMonthCount: scheduleMarkers.length,
     },
     development: {
       annualZones,
@@ -557,7 +572,8 @@ export function buildReefModuleEvolution(
       radialSaturation,
       arches: population(legacyYearArches.length, VISIBLE_LIMITS.arches),
       satelliteOutcrops: population(clusteredMapOutcrops.length, VISIBLE_LIMITS.mapOutcrops),
-      scheduleTerraces: populationWithVisible(0, 0),
+      // Non-rendering compatibility count. visibleCount stays zero by design.
+      scheduleTerraces: populationWithVisible(scheduleMarkers.length, 0),
     },
     colonies: {
       primaryWishCorals: population(wishes.length, VISIBLE_LIMITS.wishCorals),
