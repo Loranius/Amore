@@ -22,31 +22,57 @@ type SchoolFish = {
   scale: number;
 };
 
-const DISTANT_RIDGE_MASSES = 22;
-const DISTANT_VEGETATION_COUNT = 38;
-const SCHOOL_SIZE = 22;
+const TAU = Math.PI * 2;
+const MIDGROUND_MASS_COUNT = 18;
+const DISTANT_MASS_COUNT = 28;
+const DISTANT_VEGETATION_COUNT = 72;
+const SCHOOL_SIZE = 18;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
   return value - Math.floor(value);
 }
 
-function buildRidge(): RidgeMass[] {
-  return Array.from({ length: DISTANT_RIDGE_MASSES }, (_value, index) => {
-    const side = index % 2 === 0 ? -1 : 1;
-    const lane = Math.floor(index / 2);
-    const x = side * (2.8 + seededUnit(index, 1) * 6.3);
-    const z = -7.2 - lane * 0.48 - seededUnit(index, 2) * 2.2;
-    const height = THREE.MathUtils.lerp(0.72, 2.1, seededUnit(index, 3));
-    const width = THREE.MathUtils.lerp(1.05, 2.45, seededUnit(index, 4));
-    const depth = THREE.MathUtils.lerp(0.8, 1.75, seededUnit(index, 5));
+function buildRingMasses({
+  count,
+  innerRadius,
+  outerRadius,
+  heightRange,
+  seedOffset,
+}: {
+  count: number;
+  innerRadius: number;
+  outerRadius: number;
+  heightRange: readonly [number, number];
+  seedOffset: number;
+}): RidgeMass[] {
+  return Array.from({ length: count }, (_value, index) => {
+    const seededIndex = index + seedOffset;
+    const baseAngle = index / count * TAU;
+    const angle = baseAngle + (seededUnit(seededIndex, 1) - 0.5) * (TAU / count) * 0.88;
+    const radius = THREE.MathUtils.lerp(
+      innerRadius,
+      outerRadius,
+      seededUnit(seededIndex, 2),
+    );
+    const height = THREE.MathUtils.lerp(
+      heightRange[0],
+      heightRange[1],
+      seededUnit(seededIndex, 3),
+    );
+    const width = THREE.MathUtils.lerp(0.78, 1.92, seededUnit(seededIndex, 4));
+    const depth = THREE.MathUtils.lerp(0.72, 1.58, seededUnit(seededIndex, 5));
 
     return {
-      position: [x, -0.52 + height * 0.32, z],
+      position: [
+        Math.cos(angle) * radius,
+        -0.5 + height * 0.31,
+        Math.sin(angle) * radius,
+      ],
       rotation: [
-        (seededUnit(index, 6) - 0.5) * 0.16,
-        seededUnit(index, 7) * Math.PI,
-        (seededUnit(index, 8) - 0.5) * 0.12,
+        (seededUnit(seededIndex, 6) - 0.5) * 0.18,
+        -angle + seededUnit(seededIndex, 7) * 0.48,
+        (seededUnit(seededIndex, 8) - 0.5) * 0.14,
       ],
       scale: [width, height, depth],
     };
@@ -54,46 +80,88 @@ function buildRidge(): RidgeMass[] {
 }
 
 function buildVegetation(): VegetationInstance[] {
+  const clusterCount = 8;
   return Array.from({ length: DISTANT_VEGETATION_COUNT }, (_value, index) => {
-    const side = index % 2 === 0 ? -1 : 1;
-    const x = side * (3.2 + seededUnit(index, 11) * 5.4);
-    const z = -6.4 - seededUnit(index, 12) * 5.6;
-    const scale = THREE.MathUtils.lerp(0.52, 1.25, seededUnit(index, 13));
+    const cluster = index % clusterCount;
+    const clusterAngle = cluster / clusterCount * TAU + seededUnit(cluster, 31) * 0.28;
+    const angle = clusterAngle + (seededUnit(index, 11) - 0.5) * 0.52;
+    const radius = THREE.MathUtils.lerp(5.1, 9.2, seededUnit(index, 12));
+    const scale = THREE.MathUtils.lerp(0.48, 1.18, seededUnit(index, 13));
 
     return {
-      position: [x, -0.26, z],
-      rotation: seededUnit(index, 14) * Math.PI * 2,
+      position: [
+        Math.cos(angle) * radius,
+        -0.27,
+        Math.sin(angle) * radius,
+      ],
+      rotation: -angle + seededUnit(index, 14) * 0.5,
       scale: [
-        THREE.MathUtils.lerp(0.55, 1.05, seededUnit(index, 15)) * scale,
+        THREE.MathUtils.lerp(0.52, 0.94, seededUnit(index, 15)) * scale,
         scale,
-        THREE.MathUtils.lerp(0.55, 0.9, seededUnit(index, 16)) * scale,
+        THREE.MathUtils.lerp(0.5, 0.82, seededUnit(index, 16)) * scale,
       ],
     };
   });
 }
 
 function buildSchool(seedOffset: number): SchoolFish[] {
-  return Array.from({ length: SCHOOL_SIZE }, (_value, index) => {
-    const column = index % 7;
-    const row = Math.floor(index / 7);
-    const jitterX = (seededUnit(index + seedOffset, 21) - 0.5) * 0.42;
-    const jitterY = (seededUnit(index + seedOffset, 22) - 0.5) * 0.24;
-    const jitterZ = (seededUnit(index + seedOffset, 23) - 0.5) * 0.5;
-    return {
-      position: [
-        column * 0.34 + jitterX,
-        row * 0.23 + jitterY,
-        jitterZ,
-      ],
-      rotation: (seededUnit(index + seedOffset, 24) - 0.5) * 0.2,
-      scale: THREE.MathUtils.lerp(0.72, 1.18, seededUnit(index + seedOffset, 25)),
-    };
-  });
+  return Array.from({ length: SCHOOL_SIZE }, (_value, index) => ({
+    position: [
+      (seededUnit(index + seedOffset, 21) - 0.5) * 1.95,
+      (seededUnit(index + seedOffset, 22) - 0.5) * 0.72,
+      (seededUnit(index + seedOffset, 23) - 0.5) * 0.92,
+    ],
+    rotation: (seededUnit(index + seedOffset, 24) - 0.5) * 0.3,
+    scale: THREE.MathUtils.lerp(0.72, 1.14, seededUnit(index + seedOffset, 25)),
+  }));
 }
 
-function DistantRidge() {
+function createDistantFishGeometry(): THREE.BufferGeometry {
+  const nose: Vec3 = [0.24, 0, 0];
+  const rear: Vec3 = [-0.12, 0, 0];
+  const top: Vec3 = [0, 0.085, 0];
+  const bottom: Vec3 = [0, -0.085, 0];
+  const near: Vec3 = [0, 0, 0.058];
+  const far: Vec3 = [0, 0, -0.058];
+  const tailTop: Vec3 = [-0.29, 0.105, 0];
+  const tailBottom: Vec3 = [-0.29, -0.105, 0];
+  const positions: number[] = [];
+
+  const triangle = (a: Vec3, b: Vec3, c: Vec3) => {
+    positions.push(...a, ...b, ...c);
+  };
+
+  triangle(nose, top, near);
+  triangle(nose, near, bottom);
+  triangle(nose, bottom, far);
+  triangle(nose, far, top);
+  triangle(rear, near, top);
+  triangle(rear, bottom, near);
+  triangle(rear, far, bottom);
+  triangle(rear, top, far);
+  triangle(rear, tailTop, tailBottom);
+  triangle(rear, tailBottom, tailTop);
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function ReefRingMasses({
+  name,
+  masses,
+  color,
+  emissive,
+}: {
+  name: string;
+  masses: readonly RidgeMass[];
+  color: string;
+  emissive: string;
+}) {
   const ref = useRef<THREE.InstancedMesh>(null);
-  const masses = useMemo(buildRidge, []);
   const dummy = useMemo(() => new THREE.Object3D(), []);
 
   useEffect(() => {
@@ -113,18 +181,17 @@ function DistantRidge() {
   return (
     <instancedMesh
       ref={ref}
-      name="reef-distant-ridge"
+      name={name}
       args={[undefined, undefined, masses.length]}
       frustumCulled={false}
       castShadow={false}
       receiveShadow={false}
     >
-      <dodecahedronGeometry args={[1, 0]} />
+      <icosahedronGeometry args={[1, 1]} />
       <meshStandardMaterial
-        name="reef-distant-ecosystem-rock"
-        color="#294f52"
-        emissive="#12353a"
-        emissiveIntensity={0.15}
+        color={color}
+        emissive={emissive}
+        emissiveIntensity={0.13}
         roughness={1}
         metalness={0}
       />
@@ -142,9 +209,9 @@ function DistantVegetation({ reducedMotion }: { reducedMotion: boolean }) {
     const mesh = ref.current;
     if (!mesh) return;
     vegetation.forEach((plant, index) => {
-      const sway = reducedMotion ? 0 : Math.sin(time * 0.3 + index * 0.73) * 0.07;
+      const sway = reducedMotion ? 0 : Math.sin(time * 0.28 + index * 0.61) * 0.065;
       dummy.position.set(...plant.position);
-      dummy.rotation.set(sway * 0.18, plant.rotation, sway);
+      dummy.rotation.set(sway * 0.16, plant.rotation, sway);
       dummy.scale.set(...plant.scale);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
@@ -159,7 +226,7 @@ function DistantVegetation({ reducedMotion }: { reducedMotion: boolean }) {
   useFrame((state, delta) => {
     if (reducedMotion) return;
     tickRef.current += delta;
-    if (tickRef.current < 0.09) return;
+    if (tickRef.current < 0.1) return;
     tickRef.current = 0;
     applyMatrices(state.clock.elapsedTime);
   });
@@ -167,18 +234,18 @@ function DistantVegetation({ reducedMotion }: { reducedMotion: boolean }) {
   return (
     <instancedMesh
       ref={ref}
-      name="reef-distant-vegetation"
+      name="reef-360-vegetation-patches"
       args={[undefined, undefined, vegetation.length]}
       frustumCulled={false}
       castShadow={false}
       receiveShadow={false}
     >
-      <coneGeometry args={[0.16, 0.72, 5]} />
+      <coneGeometry args={[0.14, 0.68, 5]} />
       <meshStandardMaterial
         color="#376d61"
         emissive="#173f3a"
-        emissiveIntensity={0.12}
-        roughness={0.94}
+        emissiveIntensity={0.11}
+        roughness={0.96}
         metalness={0}
       />
     </instancedMesh>
@@ -188,61 +255,70 @@ function DistantVegetation({ reducedMotion }: { reducedMotion: boolean }) {
 function DistantFishSchool({
   seedOffset,
   position,
-  direction,
+  heading,
   phase,
   reducedMotion,
 }: {
   seedOffset: number;
   position: Vec3;
-  direction: 1 | -1;
+  heading: number;
   phase: number;
   reducedMotion: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const fish = useMemo(() => buildSchool(seedOffset), [seedOffset]);
+  const geometry = useMemo(createDistantFishGeometry, []);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
     fish.forEach((item, index) => {
       dummy.position.set(...item.position);
-      dummy.rotation.set(0, direction > 0 ? item.rotation : Math.PI + item.rotation, 0);
-      dummy.scale.set(1.65 * item.scale, 0.62 * item.scale, 0.48 * item.scale);
+      dummy.rotation.set(0, item.rotation, 0);
+      dummy.scale.setScalar(item.scale);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [direction, dummy, fish]);
+  }, [dummy, fish]);
 
   useFrame(({ clock }) => {
     if (reducedMotion || !groupRef.current) return;
     const time = clock.elapsedTime;
-    const travel = Math.sin(time * 0.075 + phase);
-    groupRef.current.position.x = position[0] + direction * travel * 1.55;
-    groupRef.current.position.y = position[1] + Math.sin(time * 0.11 + phase) * 0.18;
-    groupRef.current.position.z = position[2] + Math.cos(time * 0.065 + phase) * 0.24;
+    const tangentX = Math.cos(heading);
+    const tangentZ = Math.sin(heading);
+    const travel = Math.sin(time * 0.07 + phase) * 1.25;
+    groupRef.current.position.x = position[0] + tangentX * travel;
+    groupRef.current.position.y = position[1] + Math.sin(time * 0.105 + phase) * 0.16;
+    groupRef.current.position.z = position[2] + tangentZ * travel;
   });
 
   return (
-    <group ref={groupRef} position={[...position]}>
+    <group
+      ref={groupRef}
+      position={[position[0], position[1], position[2]]}
+      rotation={[0, heading, 0]}
+    >
       <instancedMesh
         ref={meshRef}
         name={`reef-distant-fish-school-${seedOffset}`}
-        args={[undefined, undefined, fish.length]}
+        args={[geometry, undefined, fish.length]}
         frustumCulled={false}
         castShadow={false}
         receiveShadow={false}
       >
-        <sphereGeometry args={[0.12, 6, 4]} />
         <meshStandardMaterial
-          color="#4a7776"
+          color="#5c8583"
           emissive="#17383b"
-          emissiveIntensity={0.18}
+          emissiveIntensity={0.17}
           roughness={0.88}
           metalness={0}
+          side={THREE.DoubleSide}
         />
       </instancedMesh>
     </group>
@@ -250,27 +326,68 @@ function DistantFishSchool({
 }
 
 /**
- * Cheap middle/background ecosystem pass. It deliberately avoids detailed GLB
- * assets: one instanced ridge, one instanced vegetation field and two tiny fish
- * schools are enough to create parallax, motion and scale behind the hero reef.
+ * Full 360-degree middle/background ecosystem. The camera lives inside these
+ * rings, so every orbit direction retains depth cues instead of revealing a
+ * blank half-scene. Density remains patchy rather than forming a visible wall.
  */
 export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean }) {
+  const midground = useMemo(() => buildRingMasses({
+    count: MIDGROUND_MASS_COUNT,
+    innerRadius: 5.4,
+    outerRadius: 7.1,
+    heightRange: [0.42, 1.18],
+    seedOffset: 1000,
+  }), []);
+  const distant = useMemo(() => buildRingMasses({
+    count: DISTANT_MASS_COUNT,
+    innerRadius: 8.2,
+    outerRadius: 11.8,
+    heightRange: [0.72, 2.15],
+    seedOffset: 3000,
+  }), []);
+
   return (
-    <group name="reef-distant-ecosystem-v1">
-      <DistantRidge />
+    <group name="reef-distant-ecosystem-360-v2">
+      <ReefRingMasses
+        name="reef-midground-satellite-patches"
+        masses={midground}
+        color="#386263"
+        emissive="#163c40"
+      />
+      <ReefRingMasses
+        name="reef-distant-ridge-ring"
+        masses={distant}
+        color="#294f52"
+        emissive="#12353a"
+      />
       <DistantVegetation reducedMotion={reducedMotion} />
+
       <DistantFishSchool
         seedOffset={100}
-        position={[-5.6, 2.4, -7.4]}
-        direction={1}
+        position={[5.9, 2.35, 4.7]}
+        heading={2.25}
         phase={0.4}
         reducedMotion={reducedMotion}
       />
       <DistantFishSchool
         seedOffset={300}
-        position={[3.7, 3.45, -9.3]}
-        direction={-1}
-        phase={2.2}
+        position={[-6.4, 3.15, 3.6]}
+        heading={-2.2}
+        phase={1.6}
+        reducedMotion={reducedMotion}
+      />
+      <DistantFishSchool
+        seedOffset={500}
+        position={[-4.2, 2.55, -7.3]}
+        heading={-0.45}
+        phase={2.8}
+        reducedMotion={reducedMotion}
+      />
+      <DistantFishSchool
+        seedOffset={700}
+        position={[5.1, 3.6, -7.7]}
+        heading={0.55}
+        phase={4.1}
         reducedMotion={reducedMotion}
       />
     </group>
