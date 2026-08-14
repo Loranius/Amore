@@ -12,6 +12,7 @@ import {
   buildReefFishTunnelPassages,
   collectReefFishObstacles,
   reefFishCollisionDelta,
+  reefFishFoundationAvoidanceDelta,
   sampleReefFishTunnelPassage,
   type ReefFishObstacle,
   type ReefFishTunnelPassage,
@@ -23,6 +24,9 @@ import {
 
 const SCHOOL_OF_FISH_MODEL_URL = `${import.meta.env.BASE_URL}models/school_of_fish_reef.glb`;
 const REDUCED_MOTION_PLAYBACK_FACTOR = 0.32;
+const NAVIGATION_RESPONSE = 10;
+const COLLISION_RESPONSE = 18;
+const EMERGENCY_COLLISION_MARGIN = 0.18;
 type ReefFishRouteId = (typeof REEF_FISH_ROUTE_IDS)[number];
 
 export interface ReefFishSchoolMetrics {
@@ -90,10 +94,10 @@ function applyWorldDelta(objects: readonly THREE.Object3D[], delta: THREE.Vector
 /**
  * Native animated fish school sourced from the authored School Of Fish GLB.
  *
- * The authored motion still supplies swimming/body animation, but a renderer
- * navigation pass now runs after it. Three fish are smoothly guided through
- * real year-arch openings, while every fish receives world-space collision
- * correction against visible reef structures so rigs cannot swim through rock.
+ * Authored animation still supplies swimming/body motion, while navigation owns
+ * only a smooth world-space offset. Fish bend around the central solid reef
+ * before collision, three routes may temporarily cross only a real arch opening,
+ * and Box3 correction is retained as a local emergency fallback for side rocks.
  */
 export function ReefFishSchool({
   build,
@@ -102,6 +106,7 @@ export function ReefFishSchool({
 }: ReefFishSchoolProps) {
   const schoolRef = useRef<THREE.Group>(null);
   const obstaclesRef = useRef<ReefFishObstacle[]>([]);
+  const navigationOffsetsRef = useRef(new Map<ReefFishRouteId, THREE.Vector3>());
   const threeScene = useThree((state) => state.scene);
   const { scene, animations } = useGLTF(SCHOOL_OF_FISH_MODEL_URL);
   const routes = useMemo(
@@ -127,6 +132,7 @@ export function ReefFishSchool({
     // ReefWorldComposition and natural arch matrices are mounted before the
     // school. Capture their final visible transforms, not their authored ones.
     obstaclesRef.current = collectReefFishObstacles(threeScene);
+    navigationOffsetsRef.current.clear();
   }, [build, threeScene]);
 
   useEffect(() => {
@@ -157,11 +163,12 @@ export function ReefFishSchool({
     });
   }, [actions, reducedMotion, routes]);
 
-  useFrame(() => {
+  useFrame((_state, deltaSeconds) => {
     if (!schoolRef.current) return;
 
     // Drei's animation mixer updates before this hook in registration order.
-    // Refresh matrices so collision/navigation reads that authored frame.
+    // Every frame begins from authored root motion, then receives one persistent,
+    // damped navigation offset instead of a fresh hard collision snap.
     threeScene.updateMatrixWorld(true);
     const representativeWorld = new THREE.Vector3();
     const guidedWorld = new THREE.Vector3();
@@ -174,6 +181,7 @@ export function ReefFishSchool({
       representative.getWorldPosition(representativeWorld);
       guidedWorld.copy(representativeWorld);
 
+      let tunnelWeight = 0;
       const passage = tunnels.get(route.routeId);
       const action = actions[route.clip.name];
       if (passage && action && route.clip.duration > 0) {
@@ -183,17 +191,48 @@ export function ReefFishSchool({
         );
         const tunnelSample = sampleReefFishTunnelPassage(passage, normalizedPhase);
         if (tunnelSample) {
-          guidedWorld.lerp(tunnelSample.target, tunnelSample.weight);
+          tunnelWeight = tunnelSample.weight;
+          guidedWorld.lerp(tunnelSample.target, tunnelWeight);
         }
       }
 
-      const guideDelta = guidedWorld.clone().sub(representativeWorld);
-      const collisionDelta = reefFishCollisionDelta(
+      // Outside a real tunnel opening the central reef is treated as a no-fly
+      // volume. As tunnel weight rises the avoidance fades continuously, so the
+      // fish can enter the opening without fighting two navigation systems.
+      const foundationDelta = reefFishFoundationAvoidanceDelta(guidedWorld, build)
+        .multiplyScalar(1 - tunnelWeight);
+      guidedWorld.add(foundationDelta);
+
+      const localCollisionDelta = reefFishCollisionDelta(
         guidedWorld,
         obstaclesRef.current,
+        0.34,
       );
-      guideDelta.add(collisionDelta);
-      applyWorldDelta(routeCarriers, guideDelta);
+      guidedWorld.add(localCollisionDelta);
+
+      const targetDelta = guidedWorld.clone().sub(representativeWorld);
+      const currentDelta = navigationOffsetsRef.current.get(route.routeId)
+        ?? new THREE.Vector3();
+      const response = localCollisionDelta.lengthSq() > 1e-8
+        ? COLLISION_RESPONSE
+        : NAVIGATION_RESPONSE;
+      const frame = Math.min(Math.max(deltaSeconds, 0), 0.05);
+      const blend = 1 - Math.exp(-response * frame);
+      currentDelta.lerp(targetDelta, blend);
+
+      // If a fast authored keyframe still crosses a side structure between two
+      // frames, resolve it once and keep that displacement in the persistent
+      // offset. Unlike the old code it will not reset and re-snap next frame.
+      const correctedWorld = representativeWorld.clone().add(currentDelta);
+      const emergencyDelta = reefFishCollisionDelta(
+        correctedWorld,
+        obstaclesRef.current,
+        EMERGENCY_COLLISION_MARGIN,
+      );
+      currentDelta.add(emergencyDelta);
+
+      navigationOffsetsRef.current.set(route.routeId, currentDelta);
+      applyWorldDelta(routeCarriers, currentDelta);
     }
   });
 
