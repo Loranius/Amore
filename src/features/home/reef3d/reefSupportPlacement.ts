@@ -8,10 +8,18 @@ const RAYCASTER = new THREE.Raycaster();
 const SLOT_WORLD_POINT = new THREE.Vector3();
 const CORAL_ARCH_CLEARANCE_OFFSETS = [
   [0, 0],
-  [0.14, 0],
-  [-0.14, 0],
-  [0, 0.14],
-  [0, -0.14],
+  [0.16, 0],
+  [-0.16, 0],
+  [0, 0.16],
+  [0, -0.16],
+  [0.2, 0.2],
+  [-0.2, 0.2],
+  [0.2, -0.2],
+  [-0.2, -0.2],
+  [0.3, 0],
+  [-0.3, 0],
+  [0, 0.3],
+  [0, -0.3],
 ] as const;
 
 interface SerializedReefSupportSlot {
@@ -140,23 +148,24 @@ export function raycastReefSupport(
 }
 
 /**
- * Finds a horizontal terrain anchor only when the coral's vertical clearance
- * column is free of limestone. This prevents a colony rooted on the terrace
- * below an arch from growing upward through the arch body.
+ * Finds a near-horizontal terrain anchor only when a broad clearance column
+ * around the coral is free of limestone. Sampling both cardinal and diagonal
+ * offsets rejects roots that would technically sit on terrain while the coral
+ * body still grows through an adjacent arch edge.
  */
 export function raycastReefCoralTerrainSupport(
   terrainMeshes: readonly THREE.Mesh[],
   archMeshes: readonly THREE.Mesh[],
   x: number,
   z: number,
-  minNormalY = 0.68,
+  minNormalY = 0.74,
 ): THREE.Intersection | null {
   const terrainHit = raycastReefSupport(terrainMeshes, x, z, minNormalY);
   if (!terrainHit) return null;
 
   for (const [offsetX, offsetZ] of CORAL_ARCH_CLEARANCE_OFFSETS) {
     const blocker = raycastReefSupport(archMeshes, x + offsetX, z + offsetZ, -1);
-    if (blocker && blocker.point.y > terrainHit.point.y + 0.025) return null;
+    if (blocker && blocker.point.y > terrainHit.point.y + 0.015) return null;
   }
 
   return terrainHit;
