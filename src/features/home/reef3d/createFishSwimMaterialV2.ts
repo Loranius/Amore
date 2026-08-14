@@ -2,12 +2,20 @@ import * as THREE from 'three';
 
 export type FishSwimUniform = { value: number };
 
-export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshStandardMaterial {
-  const material = new THREE.MeshStandardMaterial({
+/**
+ * Low-cost lit material for the roaming fish.
+ *
+ * The reef is intentionally dark and foggy, so a pure physically-lit material
+ * can collapse small fish into black silhouettes on mobile. Lambert keeps the
+ * low-poly shading while the restrained emissive floor preserves their colour
+ * when they pass through the darker parts of the scene.
+ */
+export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshLambertMaterial {
+  const material = new THREE.MeshLambertMaterial({
     vertexColors: true,
-    color: '#ffffff',
-    roughness: 0.82,
-    metalness: 0,
+    color: '#f4fffc',
+    emissive: '#285b59',
+    emissiveIntensity: 0.42,
     flatShading: true,
     side: THREE.DoubleSide,
   });
@@ -33,6 +41,6 @@ export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshS
       );
   };
 
-  material.customProgramCacheKey = () => 'reef-fish-swim-v2-per-instance';
+  material.customProgramCacheKey = () => 'reef-fish-swim-v3-visible-lambert';
   return material;
 }
