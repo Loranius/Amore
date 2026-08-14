@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
+import distantFishTextureUrl from './assets/distantFishTexture.svg';
 
 type Vec3 = readonly [number, number, number];
 
@@ -20,6 +21,7 @@ type SchoolFish = {
   position: Vec3;
   rotation: number;
   scale: number;
+  tint: string;
 };
 
 const TAU = Math.PI * 2;
@@ -27,6 +29,12 @@ const MIDGROUND_MASS_COUNT = 18;
 const DISTANT_MASS_COUNT = 28;
 const DISTANT_VEGETATION_COUNT = 72;
 const SCHOOL_SIZE = 18;
+const DISTANT_FISH_TINTS = [
+  '#7fc9cf',
+  '#8fc1a0',
+  '#d7b968',
+  '#c88670',
+] as const;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
@@ -109,45 +117,13 @@ function buildSchool(seedOffset: number): SchoolFish[] {
     position: [
       (seededUnit(index + seedOffset, 21) - 0.5) * 1.95,
       (seededUnit(index + seedOffset, 22) - 0.5) * 0.72,
-      (seededUnit(index + seedOffset, 23) - 0.5) * 0.92,
+      (seededUnit(index + seedOffset, 23) - 0.5) * 0.24,
     ],
-    rotation: (seededUnit(index + seedOffset, 24) - 0.5) * 0.3,
-    scale: THREE.MathUtils.lerp(0.72, 1.14, seededUnit(index + seedOffset, 25)),
+    rotation: (seededUnit(index + seedOffset, 24) - 0.5) * 0.2,
+    scale: THREE.MathUtils.lerp(0.64, 0.94, seededUnit(index + seedOffset, 25)),
+    tint: DISTANT_FISH_TINTS[(index + seedOffset) % DISTANT_FISH_TINTS.length]
+      ?? DISTANT_FISH_TINTS[0],
   }));
-}
-
-function createDistantFishGeometry(): THREE.BufferGeometry {
-  const nose: Vec3 = [0.24, 0, 0];
-  const rear: Vec3 = [-0.12, 0, 0];
-  const top: Vec3 = [0, 0.085, 0];
-  const bottom: Vec3 = [0, -0.085, 0];
-  const near: Vec3 = [0, 0, 0.058];
-  const far: Vec3 = [0, 0, -0.058];
-  const tailTop: Vec3 = [-0.29, 0.105, 0];
-  const tailBottom: Vec3 = [-0.29, -0.105, 0];
-  const positions: number[] = [];
-
-  const triangle = (a: Vec3, b: Vec3, c: Vec3) => {
-    positions.push(...a, ...b, ...c);
-  };
-
-  triangle(nose, top, near);
-  triangle(nose, near, bottom);
-  triangle(nose, bottom, far);
-  triangle(nose, far, top);
-  triangle(rear, near, top);
-  triangle(rear, bottom, near);
-  triangle(rear, far, bottom);
-  triangle(rear, top, far);
-  triangle(rear, tailTop, tailBottom);
-  triangle(rear, tailBottom, tailTop);
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  return geometry;
 }
 
 function ReefRingMasses({
@@ -252,6 +228,12 @@ function DistantVegetation({ reducedMotion }: { reducedMotion: boolean }) {
   );
 }
 
+/**
+ * Distant schools use one tiny alpha texture and one instanced quad draw call.
+ * The cards face the reef centre while their local X axis follows the tangent,
+ * so the school reads as real fish from every orbit angle instead of edge-on
+ * tetrahedrons. The muted tint palette is based on permissive CC0 fish sprites.
+ */
 function DistantFishSchool({
   seedOffset,
   position,
@@ -268,24 +250,36 @@ function DistantFishSchool({
   const groupRef = useRef<THREE.Group>(null);
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const fish = useMemo(() => buildSchool(seedOffset), [seedOffset]);
-  const geometry = useMemo(createDistantFishGeometry, []);
+  const texture = useLoader(THREE.TextureLoader, distantFishTextureUrl);
   const dummy = useMemo(() => new THREE.Object3D(), []);
+  const tint = useMemo(() => new THREE.Color(), []);
+  const facingYaw = Math.atan2(position[0], position[2]);
 
-  useEffect(() => () => geometry.dispose(), [geometry]);
+  useEffect(() => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.anisotropy = 2;
+    texture.needsUpdate = true;
+  }, [texture]);
 
   useEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
+
     fish.forEach((item, index) => {
       dummy.position.set(...item.position);
-      dummy.rotation.set(0, item.rotation, 0);
-      dummy.scale.setScalar(item.scale);
+      dummy.rotation.set(0, 0, item.rotation);
+      // Cards face the centre; -X matches the authored tangent travel direction.
+      dummy.scale.set(-item.scale, item.scale, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
+      mesh.setColorAt(index, tint.set(item.tint));
     });
     mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [dummy, fish]);
+  }, [dummy, fish, tint]);
 
   useFrame(({ clock }) => {
     if (reducedMotion || !groupRef.current) return;
@@ -302,23 +296,31 @@ function DistantFishSchool({
     <group
       ref={groupRef}
       position={[position[0], position[1], position[2]]}
-      rotation={[0, heading, 0]}
+      rotation={[0, facingYaw, 0]}
     >
       <instancedMesh
         ref={meshRef}
-        name={`reef-distant-fish-school-${seedOffset}`}
-        args={[geometry, undefined, fish.length]}
+        name={`reef-distant-textured-fish-school-${seedOffset}`}
+        args={[undefined, undefined, fish.length]}
         frustumCulled={false}
         castShadow={false}
         receiveShadow={false}
+        renderOrder={3}
+        userData={{
+          reefDistantFishTexture: 'cc0-inspired-fish-card-v1',
+          reefDistantFishCount: fish.length,
+        }}
       >
-        <meshStandardMaterial
-          color="#5c8583"
-          emissive="#17383b"
-          emissiveIntensity={0.17}
-          roughness={0.88}
-          metalness={0}
+        <planeGeometry args={[0.46, 0.25]} />
+        <meshBasicMaterial
+          map={texture}
+          color="#ffffff"
+          transparent
+          opacity={0.86}
+          alphaTest={0.12}
+          depthWrite={false}
           side={THREE.DoubleSide}
+          toneMapped={false}
         />
       </instancedMesh>
     </group>
@@ -347,7 +349,7 @@ export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean
   }), []);
 
   return (
-    <group name="reef-distant-ecosystem-360-v2">
+    <group name="reef-distant-ecosystem-360-v3-textured-fish">
       <ReefRingMasses
         name="reef-midground-satellite-patches"
         masses={midground}
