@@ -3,8 +3,8 @@ import {
   Float32BufferAttribute,
 } from 'three';
 
-export const REEF_TERRACED_FOUNDATION_VERSION = 'reef-terraced-foundation-v1';
-export const REEF_TERRACED_FOUNDATION_PASS = 'light-continuous-terraces';
+export const REEF_TERRACED_FOUNDATION_VERSION = 'reef-terraced-foundation-v2';
+export const REEF_TERRACED_FOUNDATION_PASS = 'eroded-asymmetric-limestone-terraces';
 export const REEF_SEABED_Y = -0.36;
 
 export type ReefTerraceTier = 'crown' | 'upper' | 'middle' | 'lower' | 'seabed';
@@ -31,7 +31,7 @@ export interface ReefTerracedSurfaceSample {
 }
 
 const TAU = Math.PI * 2;
-const DEFAULT_SEGMENT_COUNT = 56;
+const DEFAULT_SEGMENT_COUNT = 64;
 
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -54,6 +54,20 @@ function stableUnit(seed: number, label: string): number {
   return (hash >>> 0) / 0xffffffff;
 }
 
+function tierIrregularity(level: ReefTerracedFoundationLevel): number {
+  switch (level.id) {
+    case 'crown': return 1.16;
+    case 'upper': return 1.08;
+    case 'middle': return 1;
+    case 'lower': return 0.92;
+  }
+}
+
+/**
+ * Every boundary of one tier shares the same large-scale silhouette. Plateau and
+ * toe therefore cannot cross each other even when erosion is strong. Smaller
+ * boundary-specific noise keeps the scarp from looking like an extruded cookie.
+ */
 function boundaryRadius(
   profile: ReefTerracedFoundationProfile,
   level: ReefTerracedFoundationLevel,
@@ -63,16 +77,38 @@ function boundaryRadius(
   const ratio = boundary === 'plateau'
     ? level.plateauRadiusRatio
     : level.toeRadiusRatio;
-  const key = `${level.id}:${boundary}`;
+  const key = level.id;
+  const amplitude = tierIrregularity(level);
+
+  const axis = stableUnit(profile.seed, `${key}:axis`) * TAU;
   const primaryPhase = stableUnit(profile.seed, `${key}:primary`) * TAU;
   const secondaryPhase = stableUnit(profile.seed, `${key}:secondary`) * TAU;
   const erosionPhase = stableUnit(profile.seed, `${key}:erosion`) * TAU;
-  const primary = Math.sin(angle * 3 + primaryPhase) * 0.025;
-  const secondary = Math.sin(angle * 7 - secondaryPhase) * 0.014;
-  const micro = Math.sin(angle * 11 + primaryPhase * 0.57) * 0.006;
-  const erosionWave = Math.max(0, Math.sin(angle * 5 + erosionPhase));
-  const erosion = -Math.pow(erosionWave, 8) * 0.025;
-  return profile.radius * ratio * (1 + primary + secondary + micro + erosion);
+  const spurPhase = stableUnit(profile.seed, `${key}:spur`) * TAU;
+  const boundaryPhase = stableUnit(profile.seed, `${key}:${boundary}:micro`) * TAU;
+
+  // Broad one-sided mass plus two lower-frequency lobes create an asymmetric
+  // limestone body rather than four concentric circles.
+  const directional = Math.cos(angle - axis) * 0.045 * amplitude;
+  const primary = Math.sin(angle * 2 + primaryPhase) * 0.055 * amplitude;
+  const secondary = Math.sin(angle * 5 - secondaryPhase) * 0.026 * amplitude;
+
+  // Narrow coves remove material; broad positive spurs create shelves and
+  // peninsulas. Both remain deterministic for a relationship seed.
+  const erosionWave = Math.max(0, Math.sin(angle * 3 + erosionPhase));
+  const erosion = -Math.pow(erosionWave, 6) * 0.07 * amplitude;
+  const spurWave = Math.max(0, Math.sin(angle * 2 + spurPhase));
+  const spur = Math.pow(spurWave, 5) * 0.038 * amplitude;
+
+  const micro = Math.sin(angle * 9 + boundaryPhase) * (
+    boundary === 'plateau' ? 0.012 : 0.009
+  );
+  const silhouette = Math.max(
+    0.78,
+    1 + directional + primary + secondary + erosion + spur + micro,
+  );
+
+  return profile.radius * ratio * silhouette;
 }
 
 export function createReefTerracedFoundationProfile({
@@ -98,26 +134,26 @@ export function createReefTerracedFoundationProfile({
       {
         id: 'crown',
         height: floorY + 1.16 * boundedVerticalScale,
-        plateauRadiusRatio: 0.26,
-        toeRadiusRatio: 0.315,
+        plateauRadiusRatio: 0.255,
+        toeRadiusRatio: 0.325,
       },
       {
         id: 'upper',
-        height: floorY + 0.82 * boundedVerticalScale,
-        plateauRadiusRatio: 0.49,
-        toeRadiusRatio: 0.545,
+        height: floorY + 0.8 * boundedVerticalScale,
+        plateauRadiusRatio: 0.47,
+        toeRadiusRatio: 0.55,
       },
       {
         id: 'middle',
-        height: floorY + 0.49 * boundedVerticalScale,
-        plateauRadiusRatio: 0.73,
-        toeRadiusRatio: 0.79,
+        height: floorY + 0.46 * boundedVerticalScale,
+        plateauRadiusRatio: 0.69,
+        toeRadiusRatio: 0.8,
       },
       {
         id: 'lower',
-        height: floorY + 0.21 * boundedVerticalScale,
-        plateauRadiusRatio: 1,
-        toeRadiusRatio: 1.035,
+        height: floorY + 0.18 * boundedVerticalScale,
+        plateauRadiusRatio: 0.96,
+        toeRadiusRatio: 1.055,
       },
     ],
   };
@@ -169,8 +205,8 @@ function appendTriangle(
   for (const point of [first, second, third]) {
     positions.push(point[0], point[1], point[2]);
     uvs.push(
-      0.5 + point[0] / (radius * 2.16),
-      0.5 + point[2] / (radius * 2.16),
+      0.5 + point[0] / (radius * 2.28),
+      0.5 + point[2] / (radius * 2.28),
     );
   }
 }
@@ -187,15 +223,15 @@ function ringPoint(
 }
 
 /**
- * Builds one compact two-material shell. Flat annuli and eroded scarps use
- * separate non-indexed triangles so terrace rims stay crisp without extra
- * meshes or per-frame work.
+ * Builds one compact two-material shell. The silhouette is intentionally
+ * asymmetric, while flat habitat shelves remain broad enough for deterministic
+ * coral placement and arch grounding.
  */
 export function buildReefTerracedFoundationGeometry(
   profile: ReefTerracedFoundationProfile,
   segmentCount = DEFAULT_SEGMENT_COUNT,
 ): BufferGeometry {
-  const segments = Math.max(24, Math.floor(segmentCount));
+  const segments = Math.max(28, Math.floor(segmentCount));
   const topPositions: number[] = [];
   const topUvs: number[] = [];
   const sidePositions: number[] = [];
@@ -228,22 +264,8 @@ export function buildReefTerracedFoundationGeometry(
       const toeCurrent = ringPoint(profile, level, 'toe', angle, nextHeight);
       const toeNext = ringPoint(profile, level, 'toe', nextAngle, nextHeight);
 
-      appendTriangle(
-        sidePositions,
-        sideUvs,
-        plateauCurrent,
-        plateauNext,
-        toeNext,
-        profile.radius,
-      );
-      appendTriangle(
-        sidePositions,
-        sideUvs,
-        plateauCurrent,
-        toeNext,
-        toeCurrent,
-        profile.radius,
-      );
+      appendTriangle(sidePositions, sideUvs, plateauCurrent, plateauNext, toeNext, profile.radius);
+      appendTriangle(sidePositions, sideUvs, plateauCurrent, toeNext, toeCurrent, profile.radius);
 
       if (nextLevel) {
         const outerCurrent = ringPoint(
@@ -260,22 +282,8 @@ export function buildReefTerracedFoundationGeometry(
           nextAngle,
           nextLevel.height,
         );
-        appendTriangle(
-          topPositions,
-          topUvs,
-          toeCurrent,
-          toeNext,
-          outerNext,
-          profile.radius,
-        );
-        appendTriangle(
-          topPositions,
-          topUvs,
-          toeCurrent,
-          outerNext,
-          outerCurrent,
-          profile.radius,
-        );
+        appendTriangle(topPositions, topUvs, toeCurrent, toeNext, outerNext, profile.radius);
+        appendTriangle(topPositions, topUvs, toeCurrent, outerNext, outerCurrent, profile.radius);
       }
     }
   });
