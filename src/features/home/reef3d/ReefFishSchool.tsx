@@ -5,7 +5,6 @@ import { createFishSwimMaterialV2 } from './createFishSwimMaterialV2';
 import { applyReefFishColors, createReefFishRenderGeometry } from './reefFishRenderKit';
 import { buildDepthReefFish, createDepthRoamingState } from './reefFishDepthState';
 import { writeDepthReefFishMatrices } from './reefFishDepthMotion';
-import { applyFishDepthRoleSteeringByIndex } from './reefFishDepthRoleSteering';
 
 export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
@@ -13,7 +12,6 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
   const fish = useMemo(buildDepthReefFish, []);
   const roaming = useMemo(() => createDepthRoamingState(fish), [fish]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const roleSteering = useMemo(() => new THREE.Vector3(), []);
   const geometry = useMemo(() => createReefFishRenderGeometry(fish), [fish]);
   const material = useMemo(() => createFishSwimMaterialV2(swimTime.current), []);
 
@@ -33,26 +31,6 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
   useFrame((state, delta) => {
     swimTime.current.value = reducedMotion ? 0 : state.clock.elapsedTime;
     if (!reducedMotion && meshRef.current) {
-      const dt = THREE.MathUtils.clamp(delta, 0, 0.05);
-      const roleAlpha = 1 - Math.exp(-2.8 * dt);
-
-      fish.forEach((item, index) => {
-        const fishState = roaming[index];
-        if (!fishState) return;
-        roleSteering.set(0, 0, 0);
-        applyFishDepthRoleSteeringByIndex(
-          index,
-          fishState.position,
-          roleSteering,
-          item.cruiseSpeed,
-        );
-        fishState.velocity.addScaledVector(roleSteering, roleAlpha);
-        const maxSpeed = item.cruiseSpeed * 1.1;
-        if (fishState.velocity.lengthSq() > maxSpeed * maxSpeed) {
-          fishState.velocity.setLength(maxSpeed);
-        }
-      });
-
       writeDepthReefFishMatrices(
         meshRef.current,
         dummy,
@@ -69,7 +47,7 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
       ref={meshRef}
       args={[geometry, material, fish.length]}
       frustumCulled={false}
-      name="reef-local-kenney-fish-school-depth-roaming"
+      name="reef-local-fish-school-depth-roaming"
     />
   );
 }

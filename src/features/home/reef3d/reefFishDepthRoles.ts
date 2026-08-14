@@ -57,7 +57,7 @@ const FAR: ReefFishDepthProfile = {
 };
 
 export function getReefFishDepthProfile(index: number): ReefFishDepthProfile {
-  if (index < 2) return NEAR;
-  if (index < 6) return MID;
+  if (index < 3) return NEAR;
+  if (index < 9) return MID;
   return FAR;
 }
