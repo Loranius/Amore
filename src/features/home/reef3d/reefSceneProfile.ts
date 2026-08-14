@@ -22,8 +22,8 @@ export interface ReefCameraFrame {
 }
 
 export const REEF_SCENE_PALETTE = Object.freeze({
-  background: '#0b5066',
-  fog: '#2b7882',
+  background: '#0b566b',
+  fog: '#347f87',
   waterSurface: '#d8edcf',
   waterVeil: '#347d87',
   lightShaft: '#ffe8b8',
@@ -33,16 +33,16 @@ export const REEF_SCENE_PALETTE = Object.freeze({
   contact: '#36575a',
   rockNear: '#89958c',
   rockHero: '#aaa98f',
-  rockDistant: '#5a7b78',
+  rockDistant: '#78847d',
   foundationTop: '#e1d6b7',
   foundationSide: '#b5a685',
   rockEmissive: '#33413a',
-  distantEmissive: '#21484a',
+  distantEmissive: '#294a47',
 } as const);
 
 export const REEF_ATMOSPHERE_PROFILE = Object.freeze({
-  fogNear: 7.1,
-  fogFar: 30.5,
+  fogNear: 5.8,
+  fogFar: 22.5,
   surfaceOpacity: 0.105,
   veilOpacity: 0.1,
   toneMappingExposure: 1.1,
@@ -98,14 +98,13 @@ function positionFromSpherical(
 }
 
 /**
- * Keeps the whole island readable on narrow phones while allowing a complete
- * orbit around the reef. The polar range stays above the seabed so touch drag
- * can inspect the crown and rear structures without putting the camera below
- * the world surface.
+ * Keeps the hero reef dominant on narrow phones while allowing a complete
+ * orbit around it. The polar range stays above the seabed so touch drag can
+ * inspect crown and rear structures without putting the camera underground.
  */
 export function reefCameraFrameForAspect(aspect: number): ReefCameraFrame {
   const portrait = !Number.isFinite(aspect) || aspect < 0.72;
-  const distance = portrait ? 12.45 : 9.35;
+  const distance = portrait ? 11.2 : 8.4;
   const target = REEF_CAMERA_ORBIT_PROFILE.target;
 
   return {
@@ -120,9 +119,9 @@ export function reefCameraFrameForAspect(aspect: number): ReefCameraFrame {
     distance,
     fov: portrait ? 41 : 42,
     near: 0.1,
-    far: 44,
-    minDistance: portrait ? 10.7 : 8.1,
-    maxDistance: portrait ? 14.7 : 12.4,
+    far: 40,
+    minDistance: portrait ? 9.6 : 7.2,
+    maxDistance: portrait ? 14 : 11.8,
     minPolarAngle: REEF_CAMERA_ORBIT_PROFILE.minPolarAngle,
     maxPolarAngle: REEF_CAMERA_ORBIT_PROFILE.maxPolarAngle,
     minAzimuthAngle: REEF_CAMERA_ORBIT_PROFILE.minAzimuthAngle,
