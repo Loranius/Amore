@@ -1,5 +1,5 @@
 export const REEF_BACKDROP_MODEL = 'coral-reef-set-cc0';
-export const REEF_BACKDROP_PRESENTATION = 'merged-distant-arc-v1';
+export const REEF_BACKDROP_PRESENTATION = 'merged-middle-distance-arc-v2';
 export const REEF_BACKDROP_MODEL_PATH = 'models/coral_reef_set_cc0.glb';
 export const REEF_BACKDROP_SOURCE_MESHES = 8;
 export const REEF_BACKDROP_MAX_TRIANGLES = 6_100;

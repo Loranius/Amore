@@ -6,6 +6,7 @@ import { REEF_ROCK_TEXTURE_PATHS } from './reefAssetManifest';
 
 interface ReefRockMaterials {
   distant: THREE.MeshStandardMaterial;
+  hero: THREE.MeshStandardMaterial;
   rock: THREE.MeshStandardMaterial;
 }
 
@@ -45,6 +46,13 @@ export function useReefRockMaterials(): ReefRockMaterials {
       name: 'reef-coral-stone-near',
       color: '#718079',
     });
+    const hero = new THREE.MeshStandardMaterial({
+      ...common,
+      name: 'reef-coral-stone-hero',
+      color: '#71877f',
+      roughness: 0.92,
+      normalScale: new THREE.Vector2(0.24, 0.24),
+    });
     const distant = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-coral-stone-distant',
@@ -52,11 +60,12 @@ export function useReefRockMaterials(): ReefRockMaterials {
       emissive: '#123a3b',
       emissiveIntensity: 0.06,
     });
-    return { distant, rock };
+    return { distant, hero, rock };
   }, [map, normalMap, roughnessMap]);
 
   useEffect(() => () => {
     materials.rock.dispose();
+    materials.hero.dispose();
     materials.distant.dispose();
   }, [materials]);
 

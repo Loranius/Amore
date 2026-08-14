@@ -155,6 +155,9 @@ export default function ReefPreviewScene() {
       data-reef-backdrop-source-meshes={backdropRuntime?.sourceMeshes ?? ''}
       data-reef-backdrop-triangles={backdropRuntime?.triangles ?? ''}
       data-reef-backdrop-draw-calls={backdropRuntime?.drawCalls ?? ''}
+      data-reef-backdrop-width={backdropRuntime?.width ?? ''}
+      data-reef-backdrop-height={backdropRuntime?.height ?? ''}
+      data-reef-backdrop-depth={backdropRuntime?.depth ?? ''}
       data-reef-fish-model={fishRuntime ? REEF_FISH_SCHOOL_MODEL : 'loading'}
       data-reef-fish-meshes={fishRuntime?.meshes ?? ''}
       data-reef-fish-width={fishRuntime?.width ?? ''}

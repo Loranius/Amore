@@ -16,6 +16,7 @@ type PlateLedgeProps = {
   scale: Vec3;
   rotation?: Vec3;
   color: string;
+  material?: Material;
   variant: 0 | 1 | 2 | 3 | 4;
 };
 
@@ -275,6 +276,7 @@ function PlateLedge({
   scale,
   rotation = [0, 0, 0],
   color,
+  material,
   variant,
 }: PlateLedgeProps) {
   const direction = variant % 2 === 0 ? -1 : 1;
@@ -292,9 +294,10 @@ function PlateLedge({
         rotation={[0.025 * direction, yawBias, -0.03 * direction]}
         receiveShadow={false}
         castShadow={false}
+        {...(material ? { material } : {})}
       >
         <dodecahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color={color} roughness={0.98} metalness={0} />
+        {!material && <meshStandardMaterial color={color} roughness={0.98} metalness={0} />}
       </mesh>
 
       <mesh
@@ -311,9 +314,10 @@ function PlateLedge({
         ]}
         receiveShadow={false}
         castShadow={false}
+        {...(material ? { material } : {})}
       >
         <dodecahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color={color} roughness={0.99} metalness={0} />
+        {!material && <meshStandardMaterial color={color} roughness={0.99} metalness={0} />}
       </mesh>
 
       <mesh
@@ -330,9 +334,10 @@ function PlateLedge({
         ]}
         receiveShadow={false}
         castShadow={false}
+        {...(material ? { material } : {})}
       >
         <dodecahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color={color} roughness={0.99} metalness={0} />
+        {!material && <meshStandardMaterial color={color} roughness={0.99} metalness={0} />}
       </mesh>
 
       <mesh
@@ -349,9 +354,10 @@ function PlateLedge({
         ]}
         receiveShadow={false}
         castShadow={false}
+        {...(material ? { material } : {})}
       >
         <dodecahedronGeometry args={[1, 0]} />
-        <meshStandardMaterial color={color} roughness={1} metalness={0} />
+        {!material && <meshStandardMaterial color={color} roughness={1} metalness={0} />}
       </mesh>
     </group>
   );
@@ -477,19 +483,19 @@ export function ReefEnvironment() {
 
       <group name="reef-hero-support">
         {BASE_CORE_MASSES.map((rock, index) => (
-          <RockMass key={`reef-base-core-${index}`} {...rock} />
+          <RockMass key={`reef-base-core-${index}`} {...rock} material={rockMaterials.hero} />
         ))}
         {CORE_BRIDGE_MASSES.map((rock, index) => (
-          <RockMass key={`reef-core-bridge-${index}`} {...rock} />
+          <RockMass key={`reef-core-bridge-${index}`} {...rock} material={rockMaterials.hero} />
         ))}
         {CORE_LOWER_FILL.map((rock, index) => (
-          <RockMass key={`reef-core-fill-${index}`} {...rock} />
+          <RockMass key={`reef-core-fill-${index}`} {...rock} material={rockMaterials.hero} />
         ))}
         {BASE_LEDGE_ROOTS.map((rock, index) => (
-          <RockMass key={`reef-ledge-root-${index}`} {...rock} />
+          <RockMass key={`reef-ledge-root-${index}`} {...rock} material={rockMaterials.hero} />
         ))}
         {BASE_PLATE_LEDGES.map((ledge, index) => (
-          <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} />
+          <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} material={rockMaterials.hero} />
         ))}
         {BASE_DEBRIS.map((rock, index) => (
           <RockMass key={`reef-base-debris-${index}`} {...rock} material={rockMaterials.rock} />

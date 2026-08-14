@@ -131,6 +131,8 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reefFishHeight = Number(await reef.getAttribute('data-reef-fish-height'));
     const reefFishTracks = Number(await reef.getAttribute('data-reef-fish-tracks'));
     const reefBackdropTriangles = Number(await reef.getAttribute('data-reef-backdrop-triangles'));
+    const reefBackdropWidth = Number(await reef.getAttribute('data-reef-backdrop-width'));
+    const reefBackdropHeight = Number(await reef.getAttribute('data-reef-backdrop-height'));
     const reefColonies = Number(await reef.getAttribute('data-reef-colonies'));
     const reefCanopySources = Number(await reef.getAttribute('data-reef-canopy-source-colonies'));
     const reefCanopyBushes = Number(await reef.getAttribute('data-reef-canopy-bushes'));
@@ -150,6 +152,8 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     expect(reefVisibleColonies).toBeLessThanOrEqual(reefColonies);
     expect(reefBackdropTriangles).toBeGreaterThan(0);
     expect(reefBackdropTriangles).toBeLessThanOrEqual(REEF_BACKDROP_MAX_TRIANGLES);
+    expect(reefBackdropWidth).toBeGreaterThan(7);
+    expect(reefBackdropHeight).toBeGreaterThan(0.5);
     await page.screenshot({
       path: 'test-results/home-artifact-reef-pixel-8-pro.png',
       fullPage: true,

@@ -41,8 +41,8 @@ export function ReefStage({
 
   return (
     <>
-      <color attach="background" args={['#073f55']} />
-      <fog attach="fog" args={['#126777', 5.1, 23.5]} />
+      <color attach="background" args={['#063b50']} />
+      <fog attach="fog" args={['#126777', 6.2, 28.5]} />
 
       <ambientLight intensity={0.2} />
       <hemisphereLight args={['#9ce4e8', '#143d42', 0.82]} />
