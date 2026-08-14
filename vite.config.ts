@@ -37,11 +37,24 @@ export default defineConfig({
       workbox: {
         // game.html — окремий документ в iframe; хай кешується як навігація.
         maximumFileSizeToCacheInBytes: 5000000,
+        // Рифова GLB не має завантажуватись користувачам кристала або дерева
+        // під час встановлення service worker. Вона кешується після першого
+        // справжнього відкриття рифу.
+        globIgnores: ['**/models/school_of_fish_reef.glb'],
         navigateFallbackDenylist: [
           /game\.html/,
           /\.mp4$/,
         ],
         runtimeCaching: [
+          {
+            urlPattern: /\/models\/school_of_fish_reef\.glb$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'reef-native-models',
+              expiration: { maxEntries: 2, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             // Публічні фото зі Storage — cache-first, вони незмінні за URL.
             urlPattern: /\/storage\/v1\/object\/public\//,

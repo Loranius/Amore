@@ -6,7 +6,7 @@ import { ReefCleanupLayer } from './ReefCleanupLayer';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefSeaGrass } from './ReefSeaGrass';
 import { ReefSessileLife } from './ReefSessileLife';
-import { ReefFishSchool } from './ReefFishSchool';
+import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 
@@ -18,9 +18,11 @@ import { BackgroundWhale } from './BackgroundWhale';
  * Nothing from the crystal temple or the old laboratory card is mounted here.
  */
 export function ReefStage({
+  onFishReady,
   reducedMotion,
   children,
 }: {
+  onFishReady?: (metrics: ReefFishSchoolMetrics) => void;
   reducedMotion: boolean;
   children: ReactNode;
 }) {
@@ -56,7 +58,7 @@ export function ReefStage({
       <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefSeaGrass reducedMotion={reducedMotion} />
       <ReefSessileLife reducedMotion={reducedMotion} />
-      <ReefFishSchool reducedMotion={reducedMotion} />
+      <ReefFishSchool onReady={onFishReady} reducedMotion={reducedMotion} />
 
       {/* Density now lives in the same world coordinate space as the support
           meshes. The old 0.76 X/Z wrapper was one source of visual detachment. */}

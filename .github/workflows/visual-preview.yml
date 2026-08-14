@@ -1,18 +1,13 @@
 name: Visual Preview
 
 on:
-  # Раніше набір ішов лише на pull request. Робота ж давно йде прямими
-  # пушами в main — і перевірка просто не запускалась: останній її прогін
-  # був за півдня до того, як це помітили, а до того вона була червоною
-  # шість днів поспіль і нікому нічого не казала.
   push:
     branches:
       - main
-    # Ті самі шляхи, що й для pull request: п'ятнадцятихвилинний набір не має
-    # запускатись на зміну документа чи скрипта.
     paths:
       - 'src/**'
       - 'public/**'
+      - 'scripts/reef/**'
       - 'e2e/**'
       - 'index.html'
       - 'vite.config.ts'
@@ -26,6 +21,7 @@ on:
     paths:
       - 'src/**'
       - 'public/**'
+      - 'scripts/reef/**'
       - 'e2e/**'
       - 'index.html'
       - 'vite.config.ts'
@@ -46,7 +42,7 @@ jobs:
   mobile-screenshots:
     name: Pixel 8 Pro screenshots
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout repository
@@ -58,22 +54,13 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Materialize optimized reef fish asset
+        run: bash scripts/reef/materialize_school_fish.sh
+
       - name: Install application dependencies
         run: npm ci
 
       - name: Install isolated Playwright runner
-        # `--no-package-lock` is what makes this step ignore the lock and
-        # re-resolve the whole application tree from `package.json`, and that is
-        # what broke it: `@react-three/postprocessing` is pinned as `^3.0.0`, the
-        # lock holds 3.0.4, and 3.0.5 shipped a peer requirement of
-        # `three >= 0.182.0` against this project's `three@^0.170.0`. The step
-        # installs Playwright and nothing else, so a third party tightening a
-        # peer range has no business failing it — `npm ci` above already
-        # installed the real tree from the lock, correctly.
-        #
-        # Reproduced against a bare copy of package.json: the command fails with
-        # ERESOLVE as written, and succeeds with this flag. The application's own
-        # dependency resolution is untouched, since only `npm ci` decides that.
         run: npm install --no-save --no-package-lock --legacy-peer-deps @playwright/test@1.61.1
 
       - name: Install Chromium and system dependencies
@@ -94,11 +81,6 @@ jobs:
           VISUAL_USER_NAME: ${{ secrets.VISUAL_USER_NAME }}
           VISUAL_USER_PIN: ${{ secrets.VISUAL_USER_PIN }}
 
-      # Знімки — за потреби, а не завжди.
-      #
-      # Кожен прогін клав у сховище 306 МБ відео й трас навіть тоді, коли все
-      # зелене. Дивляться на них рівно тоді, коли щось упало; успішний прогін
-      # лишає по собі рядок «зелено» і нічого більше.
       - name: Upload screenshots, traces and report
         if: failure()
         uses: actions/upload-artifact@v4
