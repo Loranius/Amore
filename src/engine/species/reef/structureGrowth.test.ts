@@ -3,7 +3,16 @@ import { buildArtifactBlueprint, type EvolutionEventInput } from '../../evolutio
 import { buildReefModuleEvolution } from './moduleEvolution';
 import { buildReefGrowthStructureLayout } from './structureGrowth';
 
-function evolution(extraEvents: readonly EvolutionEventInput[] = []) {
+function evolution(
+  extraEvents: readonly EvolutionEventInput[] = [],
+  sharedDaysOff: { date: string; epochIndex: number }[] = Array.from(
+    { length: 9 },
+    (_value, index) => ({
+      date: `2024-${String(index + 1).padStart(2, '0')}-10`,
+      epochIndex: 1,
+    }),
+  ),
+) {
   const mapEvents: EvolutionEventInput[] = Array.from({ length: 8 }, (_value, index) => ({
     id: `place:${index}:visited`,
     occurredAt: `2024-${String(index + 1).padStart(2, '0')}-02`,
@@ -26,32 +35,54 @@ function evolution(extraEvents: readonly EvolutionEventInput[] = []) {
     asOfEpochMs: Date.parse('2026-08-14T00:00:00.000Z'),
     ageDays: 1_327,
     completedYears: 3,
-    sharedDaysOff: Array.from({ length: 9 }, (_value, index) => ({
-      date: `2024-${String(index + 1).padStart(2, '0')}-10`,
-      epochIndex: 2,
-    })),
+    sharedDaysOff,
   });
 }
 
 describe('Reef growth structure layout', () => {
-  it('creates one visible arch per completed year and collision-safe module structures', () => {
-    const layout = buildReefGrowthStructureLayout(evolution());
+  it('turns annual growth zones into varied structures instead of one arch per year', () => {
+    const source = evolution();
+    const layout = buildReefGrowthStructureLayout(source);
+    const annualStructures = [...layout.arches, ...layout.terraces];
 
     expect(layout.version).toBe('reef-growth-structure-layout-v1');
-    expect(layout.arches).toHaveLength(3);
-    expect(layout.outcrops).toHaveLength(8);
-    expect(layout.terraces).toHaveLength(9);
-    expect(layout.arches.map((arch) => arch.yearIndex)).toEqual([1, 2, 3]);
-    expect(layout.diagnostics).toMatchObject({
-      rejectedArchIds: [],
-      rejectedOutcropIds: [],
-      rejectedTerraceIds: [],
-      collisionFree: true,
-    });
+    expect(annualStructures).toHaveLength(
+      source.development.annualZones.filter((zone) => zone.progress > 0).length,
+    );
+    expect(annualStructures.map((item) => item.yearIndex).sort((a, b) => a - b))
+      .toEqual(source.development.annualZones.filter((zone) => zone.progress > 0).map((zone) => zone.yearIndex));
+    expect(layout.arches.length).toBeLessThan(source.development.annualZones.length);
+    expect(layout.terraces.some((item) => item.archetype === 'core')).toBe(true);
+    expect(layout.diagnostics.rejectedArchIds).toEqual([]);
+    expect(layout.diagnostics.rejectedTerraceIds).toEqual([]);
+  });
+
+  it('clusters visited places into bounded satellite habitat instead of one slab per place', () => {
+    const source = evolution();
+    const layout = buildReefGrowthStructureLayout(source);
+
+    expect(source.facts.visitedPlaceCount).toBe(8);
+    expect(source.entities.mapOutcrops).toHaveLength(2);
+    expect(layout.outcrops).toHaveLength(2);
+    expect(layout.diagnostics.rejectedOutcropIds).toEqual([]);
     expect(layout.diagnostics.minimumExternalClearance).toBeGreaterThanOrEqual(0);
   });
 
-  it('is deterministic and keeps prior structure identities when later facts append', () => {
+  it('does not create Schedule terraces; shared days off only alter annual cohesion', () => {
+    const withoutSchedule = evolution([], []);
+    const withSchedule = evolution();
+    const withoutLayout = buildReefGrowthStructureLayout(withoutSchedule);
+    const withLayout = buildReefGrowthStructureLayout(withSchedule);
+
+    expect(withSchedule.entities.scheduleTerraces).toEqual([]);
+    expect(withSchedule.foundation.scheduleTerraces.visibleCount).toBe(0);
+    expect(withLayout.arches.length + withLayout.terraces.length)
+      .toBe(withoutLayout.arches.length + withoutLayout.terraces.length);
+    expect(withSchedule.development.annualZones[1]?.cohesion ?? 0)
+      .toBeGreaterThan(withoutSchedule.development.annualZones[1]?.cohesion ?? 0);
+  });
+
+  it('is deterministic and keeps existing clustered exploration identities when later facts append', () => {
     const before = buildReefGrowthStructureLayout(evolution());
     const after = buildReefGrowthStructureLayout(evolution([{
       id: 'place:later:visited',
@@ -63,6 +94,6 @@ describe('Reef growth structure layout', () => {
 
     expect(buildReefGrowthStructureLayout(evolution())).toEqual(before);
     expect(after.outcrops.slice(0, before.outcrops.length)).toEqual(before.outcrops);
-    expect(after.outcrops).toHaveLength(before.outcrops.length + 1);
+    expect(after.outcrops.length).toBeGreaterThanOrEqual(before.outcrops.length);
   });
 });
