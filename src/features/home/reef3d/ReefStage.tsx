@@ -16,6 +16,7 @@ import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 import { ReefNaturalArchLayer } from './ReefNaturalArchLayer';
 import { ReefWorldComposition } from './ReefWorldComposition';
+import { ReefDistantEcosystem } from './ReefDistantEcosystem';
 import {
   reefCameraFrameForAspect,
   REEF_ATMOSPHERE_PROFILE,
@@ -85,6 +86,7 @@ export function ReefStage({
       <ReefEnvironment build={build} />
       <ReefNaturalArchLayer build={build} />
       <ReefWorldComposition />
+      <ReefDistantEcosystem reducedMotion={reducedMotion} />
       <ReefDensityLayer build={build} />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
