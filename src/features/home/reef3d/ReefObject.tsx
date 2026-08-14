@@ -16,8 +16,7 @@ import {
   type ReefThreeSceneState,
 } from './reefThreeAdapter';
 
-const SCULPT_PASS_34 = 'reef-sculpt-pass-3-4';
-const EMBEDDED_PATCH_COLOR = new THREE.Color('#6f7567');
+const LIVING_CANOPY_SCULPT_PASS = 'reef-living-canopy-sculpt-v1';
 
 function rescaleRange(
   batch: ReefRenderableBatch,
@@ -65,23 +64,6 @@ function rescaleRange(
   runtime.maximumAxialDistance = maximumAxialDistance;
 }
 
-function muteMassiveRange(batch: ReefRenderableBatch, runtime: ReefBatchRuntimeRange): void {
-  for (
-    let index = runtime.range.vertexStart;
-    index < runtime.range.vertexStart + runtime.range.vertexCount;
-    index += 1
-  ) {
-    const offset = index * 3;
-    const sourceR = batch.baseColors[offset] ?? EMBEDDED_PATCH_COLOR.r;
-    const sourceG = batch.baseColors[offset + 1] ?? EMBEDDED_PATCH_COLOR.g;
-    const sourceB = batch.baseColors[offset + 2] ?? EMBEDDED_PATCH_COLOR.b;
-    const blend = 0.82;
-    batch.baseColors[offset] = sourceR + (EMBEDDED_PATCH_COLOR.r - sourceR) * blend;
-    batch.baseColors[offset + 1] = sourceG + (EMBEDDED_PATCH_COLOR.g - sourceG) * blend;
-    batch.baseColors[offset + 2] = sourceB + (EMBEDDED_PATCH_COLOR.b - sourceB) * blend;
-  }
-}
-
 function translateRange(
   batch: ReefRenderableBatch,
   runtime: ReefBatchRuntimeRange,
@@ -113,71 +95,52 @@ function translateRange(
   };
 }
 
-function shouldKeepRange(runtime: ReefBatchRuntimeRange, supportY: number): boolean {
-  const { morphotype, sequence } = runtime.range;
-
-  if (morphotype === 'plating' && supportY > 0.7) {
-    return sequence % 3 !== 0;
-  }
-
-  // Stage 3: amber massive colonies become rare accents instead of a side wall.
-  if (morphotype === 'massive') {
-    return sequence % 2 === 0;
-  }
-
-  return true;
-}
-
 function sculptSupportedRange(
   batch: ReefRenderableBatch,
   runtime: ReefBatchRuntimeRange,
   supportY: number,
 ): void {
-  if (runtime.range.morphotype === 'plating') {
-    rescaleRange(
-      batch,
-      runtime,
-      supportY > 0.7 ? [0.54, 0.62, 0.54] : [0.62, 0.7, 0.62],
-    );
-    return;
-  }
+  const crownFactor = supportY > 0.78 ? 0.88 : 1;
+  const scaleByMorphotype = {
+    branching: [1.42 * crownFactor, 1.18, 1.42 * crownFactor],
+    massive: [1.48 * crownFactor, 0.82, 1.48 * crownFactor],
+    plating: [1.54 * crownFactor, 0.78, 1.54 * crownFactor],
+    encrusting: [1.3 * crownFactor, 0.58, 1.3 * crownFactor],
+    'soft-coral': [1.38 * crownFactor, 1.2, 1.38 * crownFactor],
+    'sea-fan': [1.34 * crownFactor, 1.22, 1.34 * crownFactor],
+  } as const;
 
-  if (runtime.range.morphotype === 'massive') {
-    // Stage 3: turn the remaining amber wedges into low, rock-hugging patches.
-    rescaleRange(batch, runtime, [0.38, 0.18, 0.38]);
-    muteMassiveRange(batch, runtime);
-  }
+  rescaleRange(batch, runtime, scaleByMorphotype[runtime.range.morphotype]);
 }
 
-function pullBranchingRangeInward(
+function groundRangeOnSupport(
   batch: ReefRenderableBatch,
   runtime: ReefBatchRuntimeRange,
   group: THREE.Group,
   supportMeshes: readonly THREE.Mesh[],
   pivotWorld: THREE.Vector3,
-): void {
-  const morphotype = runtime.range.morphotype;
-  if (morphotype !== 'branching' && morphotype !== 'sea-fan') return;
-
+): number | null {
   const radius = Math.hypot(pivotWorld.x, pivotWorld.z);
-  if (radius < 0.68) return;
-  if (runtime.range.sequence % 4 === 0) return;
+  const inwardSteps = radius > 1.15
+    ? [1, 0.84, 0.68, 0.54]
+    : [1, 0.88, 0.72];
 
-  // Pull most outer fans/branches 26-34% toward the hero center. The new root
-  // is accepted only if an actual upward-facing hero-support surface exists.
-  const inward = morphotype === 'sea-fan' ? 0.74 : 0.66;
-  const targetHit = raycastReefSupport(
-    supportMeshes,
-    pivotWorld.x * inward,
-    pivotWorld.z * inward,
-    0.3,
-  );
-  if (!targetHit) return;
+  for (const inward of inwardSteps) {
+    const hit = raycastReefSupport(
+      supportMeshes,
+      pivotWorld.x * inward,
+      pivotWorld.z * inward,
+      0.2,
+    );
+    if (!hit) continue;
 
-  const targetWorld = targetHit.point.clone();
-  targetWorld.y += 0.012;
-  const targetLocal = group.worldToLocal(targetWorld);
-  translateRange(batch, runtime, targetLocal);
+    const targetWorld = hit.point.clone();
+    targetWorld.y += runtime.range.morphotype === 'encrusting' ? 0.008 : 0.018;
+    translateRange(batch, runtime, group.worldToLocal(targetWorld));
+    return hit.point.y;
+  }
+
+  return null;
 }
 
 function syncBatchAttributes(batch: ReefRenderableBatch): void {
@@ -217,10 +180,10 @@ export function ReefObject({
   );
 
   /**
-   * Only production ranges that touch the visible artistic reef survive.
-   * Stage 3 reduces massive colonies to embedded accents. Stage 4 relocates
-   * most outer branching/sea-fan ranges onto real inner terrace support so the
-   * center regains coral structure without reintroducing levitation.
+   * Every portal-derived production range is given a chance to remain visible.
+   * Roots are projected onto the nearest valid terrace, then the accepted
+   * morphotype is enlarged into a readable colony without changing topology,
+   * range identity, material identity or motion bindings.
    */
   useEffect(() => {
     const group = groupRef.current;
@@ -235,22 +198,22 @@ export function ReefObject({
     for (const batch of reefScene.batches) {
       const supportedRanges = [] as typeof batch.runtimeRanges;
       const supportedIndices: number[] = [];
-      const sculptAlreadyApplied = batch.geometry.userData.reefSculptPass === SCULPT_PASS_34;
+      const sculptAlreadyApplied = batch.geometry.userData.reefSculptPass
+        === LIVING_CANOPY_SCULPT_PASS;
 
       for (const runtime of batch.runtimeRanges) {
-        pivot.set(runtime.motion.pivot.x, runtime.motion.pivot.y, runtime.motion.pivot.z);
-        group.localToWorld(pivot);
-
-        const hit = raycastReefSupport(supportMeshes, pivot.x, pivot.z, 0.26);
-        if (!hit) continue;
-
-        const contactGap = Math.abs(pivot.y - hit.point.y);
-        if (contactGap > 0.18) continue;
-        if (!shouldKeepRange(runtime, hit.point.y)) continue;
-
         if (!sculptAlreadyApplied) {
-          sculptSupportedRange(batch, runtime, hit.point.y);
-          pullBranchingRangeInward(batch, runtime, group, supportMeshes, pivot);
+          pivot.set(runtime.motion.pivot.x, runtime.motion.pivot.y, runtime.motion.pivot.z);
+          group.localToWorld(pivot);
+          const supportY = groundRangeOnSupport(
+            batch,
+            runtime,
+            group,
+            supportMeshes,
+            pivot,
+          );
+          if (supportY === null) continue;
+          sculptSupportedRange(batch, runtime, supportY);
         }
 
         supportedRanges.push(runtime);
@@ -265,7 +228,7 @@ export function ReefObject({
       batch.geometry.setIndex(supportedIndices);
       if (!sculptAlreadyApplied) {
         syncBatchAttributes(batch);
-        batch.geometry.userData.reefSculptPass = SCULPT_PASS_34;
+        batch.geometry.userData.reefSculptPass = LIVING_CANOPY_SCULPT_PASS;
       }
       batch.geometry.computeBoundingBox();
       batch.geometry.computeBoundingSphere();
@@ -315,7 +278,7 @@ export function ReefObject({
       ref={groupRef}
       rotation={[-0.08, -0.18, 0]}
       position={[0, 0.02, 0]}
-      scale={[0.68, 1.05, 0.68]}
+      scale={[0.76, 1.08, 0.76]}
     >
       <mesh
         visible={false}

@@ -8,6 +8,7 @@ import {
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { ReefObject } from './ReefObject';
 import { ReefStage } from './ReefStage';
+import { reefDensityCandidateCounts } from './ReefDensityLayer';
 import type { ReefFishSchoolMetrics } from './ReefFishSchool';
 import type { ReefBackdropMetrics } from './ReefBackdropCorals';
 import {
@@ -91,12 +92,17 @@ export default function ReefPreviewScene() {
   }
 
   const { build, diagnostics } = portal.preview;
+  const densityCandidates = reefDensityCandidateCounts(build);
   // Reef acceptance must describe the generated reef, not the decorative
   // underwater world around it. ReefObject exposes exact production geometry
   // diagnostics when its accepted Three scene is created; the global probe is
   // kept separately so world-level performance can still be inspected.
   const reportedDrawCalls = sceneState?.diagnostics.drawCalls ?? null;
   const reportedTriangles = sceneState?.diagnostics.triangles ?? null;
+  const visibleColonyRanges = sceneState?.batches.reduce(
+    (total, batch) => total + batch.runtimeRanges.length,
+    0,
+  ) ?? null;
   const runtimeAcceptance = evaluateReefProductionRuntimeAcceptance({
     contract: build.acceptance,
     buildMs: build.buildMs,
@@ -134,12 +140,16 @@ export default function ReefPreviewScene() {
       data-reef-normalized-events={portal.preview.normalizedEventCount}
       data-reef-adapter-diagnostics={diagnostics.length}
       data-reef-colonies={build.diagnostics.colonyCount}
+      data-reef-canopy-source-colonies={densityCandidates.sourceColonies}
+      data-reef-canopy-bushes={densityCandidates.bushes}
+      data-reef-canopy-cushions={densityCandidates.cushions}
       data-reef-batches={build.diagnostics.batchCount}
       data-reef-foundation-vertices={build.foundation.vertices.length}
       data-reef-vertices={build.diagnostics.vertexCount}
       data-reef-triangles={build.diagnostics.triangleCount}
       data-reef-materials={build.diagnostics.materialCount}
       data-reef-motion-bindings={build.diagnostics.motionBindingCount}
+      data-reef-visible-colonies={visibleColonyRanges ?? ''}
       data-reef-backdrop-model={backdropRuntime ? REEF_BACKDROP_MODEL : 'loading'}
       data-reef-backdrop-presentation={REEF_BACKDROP_PRESENTATION}
       data-reef-backdrop-source-meshes={backdropRuntime?.sourceMeshes ?? ''}
@@ -170,6 +180,7 @@ export default function ReefPreviewScene() {
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
         <ReefStage
+          build={build}
           onBackdropReady={onBackdropReady}
           onFishReady={onFishReady}
           reducedMotion={reducedMotion}

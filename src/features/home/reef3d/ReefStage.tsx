@@ -2,6 +2,7 @@ import { useEffect, useMemo, type ReactNode } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { ReefEnvironment } from './ReefEnvironment';
+import type { ReefPreviewBuild } from './buildReefPreview';
 import { ReefCleanupLayer } from './ReefCleanupLayer';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefSeaGrass } from './ReefSeaGrass';
@@ -22,11 +23,13 @@ import {
  * Nothing from the crystal temple or the old laboratory card is mounted here.
  */
 export function ReefStage({
+  build,
   onBackdropReady,
   onFishReady,
   reducedMotion,
   children,
 }: {
+  build: ReefPreviewBuild;
   onBackdropReady?: (metrics: ReefBackdropMetrics) => void;
   onFishReady?: (metrics: ReefFishSchoolMetrics) => void;
   reducedMotion: boolean;
@@ -69,7 +72,7 @@ export function ReefStage({
 
       {/* Density now lives in the same world coordinate space as the support
           meshes. The old 0.76 X/Z wrapper was one source of visual detachment. */}
-      <ReefDensityLayer />
+      <ReefDensityLayer build={build} />
 
       {children}
 

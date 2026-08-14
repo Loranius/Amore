@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildArtifactBlueprint, type EvolutionEventInput } from '@/engine/evolution';
 import { REEF_COLONY_MORPHOTYPES } from '@/engine/species/reef';
 import { buildReefPreviewFromArtifact } from './buildReefPreview';
+import { reefDensityCandidateCounts } from './ReefDensityLayer';
 import {
   applyReefPresentation,
   REEF_COLONY_SHAPE_PASS,
@@ -108,6 +109,16 @@ function unitLength(array: Float32Array, offset: number): number {
 }
 
 describe('Reef Phase 10 colony shape presentation', () => {
+  it('derives the secondary canopy from accepted portal colonies', () => {
+    const build = buildFixture();
+    const counts = reefDensityCandidateCounts(build);
+
+    expect(counts.sourceColonies).toBe(build.layout.colonies.length);
+    expect(counts.bushes).toBeGreaterThan(0);
+    expect(counts.cushions).toBeGreaterThan(0);
+    expect(counts.bushes + counts.cushions).toBeLessThanOrEqual(counts.sourceColonies);
+  });
+
   it('publishes a distinct bounded silhouette profile for every accepted morphotype', () => {
     expect(Object.keys(REEF_COLONY_SHAPE_PROFILES)).toEqual(REEF_COLONY_MORPHOTYPES);
 

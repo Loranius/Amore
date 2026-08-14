@@ -10,13 +10,13 @@ import type {
   ReefThreeSceneState,
 } from './reefThreeAdapter';
 
-export const REEF_PRESENTATION_VERSION = 'reef-visual-v2';
-export const REEF_COLONY_SHAPE_PASS = 'phase-10-colony-shapes';
+export const REEF_PRESENTATION_VERSION = 'reef-visual-v3';
+export const REEF_COLONY_SHAPE_PASS = 'phase-12-living-canopy';
 
 export const REEF_PRESENTATION_PROFILE = Object.freeze({
   foundationVerticalScale: 0.42,
-  colonyHorizontalScale: 1.55,
-  colonyVerticalScale: 2.6,
+  colonyHorizontalScale: 1.7,
+  colonyVerticalScale: 2.8,
   colonyRootLift: 0.025,
 });
 
@@ -42,24 +42,24 @@ export const REEF_COLONY_SHAPE_PROFILES: Readonly<
   Record<ReefColonyMorphotype, ReefColonyShapeProfile>
 > = Object.freeze({
   branching: {
-    axialScale: 1.08,
-    radialRootScale: 0.72,
-    radialTipScale: 0.96,
-    midBulge: 0.08,
-    edgeExpansion: 0.03,
+    axialScale: 1.18,
+    radialRootScale: 0.9,
+    radialTipScale: 1.25,
+    midBulge: 0.14,
+    edgeExpansion: 0.08,
     lobeCount: 3,
-    lobeAmplitude: 0.035,
+    lobeAmplitude: 0.055,
     twist: 0.9,
     bend: 0.14,
     rimLift: 0,
     depthScale: 1,
   },
   massive: {
-    axialScale: 0.78,
-    radialRootScale: 0.82,
-    radialTipScale: 0.34,
-    midBulge: 0.52,
-    edgeExpansion: 0.16,
+    axialScale: 0.92,
+    radialRootScale: 1.08,
+    radialTipScale: 0.62,
+    midBulge: 0.68,
+    edgeExpansion: 0.22,
     lobeCount: 6,
     lobeAmplitude: 0.06,
     twist: 0.35,
@@ -68,11 +68,11 @@ export const REEF_COLONY_SHAPE_PROFILES: Readonly<
     depthScale: 1,
   },
   plating: {
-    axialScale: 0.52,
-    radialRootScale: 0.52,
-    radialTipScale: 0.72,
-    midBulge: 0.12,
-    edgeExpansion: 0.48,
+    axialScale: 0.6,
+    radialRootScale: 0.76,
+    radialTipScale: 1.28,
+    midBulge: 0.18,
+    edgeExpansion: 0.6,
     lobeCount: 7,
     lobeAmplitude: 0.09,
     twist: 0.45,
@@ -81,11 +81,11 @@ export const REEF_COLONY_SHAPE_PROFILES: Readonly<
     depthScale: 1,
   },
   encrusting: {
-    axialScale: 0.28,
-    radialRootScale: 1.04,
-    radialTipScale: 1.02,
-    midBulge: 0.05,
-    edgeExpansion: 0.18,
+    axialScale: 0.34,
+    radialRootScale: 1.18,
+    radialTipScale: 1.12,
+    midBulge: 0.09,
+    edgeExpansion: 0.28,
     lobeCount: 8,
     lobeAmplitude: 0.07,
     twist: 0.3,
@@ -94,11 +94,11 @@ export const REEF_COLONY_SHAPE_PROFILES: Readonly<
     depthScale: 1,
   },
   'soft-coral': {
-    axialScale: 1.12,
-    radialRootScale: 0.66,
-    radialTipScale: 1.18,
-    midBulge: 0.22,
-    edgeExpansion: 0.08,
+    axialScale: 1.28,
+    radialRootScale: 0.82,
+    radialTipScale: 1.4,
+    midBulge: 0.3,
+    edgeExpansion: 0.12,
     lobeCount: 5,
     lobeAmplitude: 0.11,
     twist: 1.15,
@@ -107,17 +107,17 @@ export const REEF_COLONY_SHAPE_PROFILES: Readonly<
     depthScale: 0.94,
   },
   'sea-fan': {
-    axialScale: 1.18,
-    radialRootScale: 0.58,
-    radialTipScale: 1.25,
-    midBulge: 0.08,
-    edgeExpansion: 0.16,
+    axialScale: 1.32,
+    radialRootScale: 0.72,
+    radialTipScale: 1.48,
+    midBulge: 0.12,
+    edgeExpansion: 0.22,
     lobeCount: 4,
     lobeAmplitude: 0.045,
     twist: 0.18,
     bend: 0.12,
     rimLift: 0.02,
-    depthScale: 0.58,
+    depthScale: 0.5,
   },
 });
 

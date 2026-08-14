@@ -70,8 +70,8 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reef = page.locator('[data-reef-preview="ready"]');
     await expect(reef).toBeVisible({ timeout: 25_000 });
     await expect(reef).toHaveAttribute('data-reef-source', 'portal');
-    await expect(reef).toHaveAttribute('data-reef-presentation', 'reef-visual-v2');
-    await expect(reef).toHaveAttribute('data-reef-shape-pass', 'phase-10-colony-shapes');
+    await expect(reef).toHaveAttribute('data-reef-presentation', 'reef-visual-v3');
+    await expect(reef).toHaveAttribute('data-reef-shape-pass', 'phase-12-living-canopy');
     await expect(reef).toHaveAttribute('data-reef-material-presentation', 'reef-material-v1');
     await expect(reef).toHaveAttribute('data-reef-material-pass', 'phase-11-material-pass');
     await expect(reef).toHaveAttribute(
@@ -131,6 +131,11 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reefFishHeight = Number(await reef.getAttribute('data-reef-fish-height'));
     const reefFishTracks = Number(await reef.getAttribute('data-reef-fish-tracks'));
     const reefBackdropTriangles = Number(await reef.getAttribute('data-reef-backdrop-triangles'));
+    const reefColonies = Number(await reef.getAttribute('data-reef-colonies'));
+    const reefCanopySources = Number(await reef.getAttribute('data-reef-canopy-source-colonies'));
+    const reefCanopyBushes = Number(await reef.getAttribute('data-reef-canopy-bushes'));
+    const reefCanopyCushions = Number(await reef.getAttribute('data-reef-canopy-cushions'));
+    const reefVisibleColonies = Number(await reef.getAttribute('data-reef-visible-colonies'));
     expect(reefDrawCalls).toBeGreaterThan(0);
     expect(reefDrawCalls).toBeLessThanOrEqual(7);
     expect(reefVertices).toBeLessThanOrEqual(24_256);
@@ -138,6 +143,11 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     expect(reefFishWidth).toBeGreaterThanOrEqual(2);
     expect(reefFishHeight).toBeGreaterThanOrEqual(0.5);
     expect(reefFishTracks).toBeGreaterThan(REEF_FISH_ROUTE_COUNT);
+    expect(reefCanopySources).toBe(reefColonies);
+    expect(reefCanopyBushes + reefCanopyCushions).toBeGreaterThan(0);
+    expect(reefCanopyBushes + reefCanopyCushions).toBeLessThanOrEqual(reefColonies);
+    expect(reefVisibleColonies).toBeGreaterThan(0);
+    expect(reefVisibleColonies).toBeLessThanOrEqual(reefColonies);
     expect(reefBackdropTriangles).toBeGreaterThan(0);
     expect(reefBackdropTriangles).toBeLessThanOrEqual(REEF_BACKDROP_MAX_TRIANGLES);
     await page.screenshot({
@@ -149,8 +159,8 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(home).toHaveAttribute('data-home-artifact', 'reef');
     const reloadedReef = page.locator('[data-reef-preview="ready"]');
     await expect(reloadedReef).toBeVisible({ timeout: 25_000 });
-    await expect(reloadedReef).toHaveAttribute('data-reef-presentation', 'reef-visual-v2');
-    await expect(reloadedReef).toHaveAttribute('data-reef-shape-pass', 'phase-10-colony-shapes');
+    await expect(reloadedReef).toHaveAttribute('data-reef-presentation', 'reef-visual-v3');
+    await expect(reloadedReef).toHaveAttribute('data-reef-shape-pass', 'phase-12-living-canopy');
     await expect(reloadedReef).toHaveAttribute('data-reef-material-presentation', 'reef-material-v1');
     await expect(reloadedReef).toHaveAttribute('data-reef-material-pass', 'phase-11-material-pass');
     await expect(reloadedReef).toHaveAttribute(
