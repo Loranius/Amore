@@ -27,6 +27,7 @@ const REDUCED_MOTION_PLAYBACK_FACTOR = 0.32;
 const NAVIGATION_RESPONSE = 10;
 const COLLISION_RESPONSE = 18;
 const EMERGENCY_COLLISION_MARGIN = 0.18;
+const TUNNEL_COLLISION_RELEASE_WEIGHT = 0.025;
 type ReefFishRouteId = (typeof REEF_FISH_ROUTE_IDS)[number];
 
 export interface ReefFishSchoolMetrics {
@@ -94,10 +95,10 @@ function applyWorldDelta(objects: readonly THREE.Object3D[], delta: THREE.Vector
 /**
  * Native animated fish school sourced from the authored School Of Fish GLB.
  *
- * Authored animation still supplies swimming/body motion, while navigation owns
- * only a smooth world-space offset. Fish bend around the central solid reef
- * before collision, three routes may temporarily cross only a real arch opening,
- * and Box3 correction is retained as a local emergency fallback for side rocks.
+ * Authored animation supplies swimming/body motion, navigation owns one smooth
+ * world-space offset, and tunnel guidance becomes authoritative while a fish is
+ * crossing a real arch opening. Local collision remains active for ordinary
+ * rocks, but cannot fight the tunnel by pushing against the arch being crossed.
  */
 export function ReefFishSchool({
   build,
@@ -129,8 +130,6 @@ export function ReefFishSchool({
   }, [scene]);
 
   useLayoutEffect(() => {
-    // ReefWorldComposition and natural arch matrices are mounted before the
-    // school. Capture their final visible transforms, not their authored ones.
     obstaclesRef.current = collectReefFishObstacles(threeScene);
     navigationOffsetsRef.current.clear();
   }, [build, threeScene]);
@@ -166,9 +165,6 @@ export function ReefFishSchool({
   useFrame((_state, deltaSeconds) => {
     if (!schoolRef.current) return;
 
-    // Drei's animation mixer updates before this hook in registration order.
-    // Every frame begins from authored root motion, then receives one persistent,
-    // damped navigation offset instead of a fresh hard collision snap.
     threeScene.updateMatrixWorld(true);
     const representativeWorld = new THREE.Vector3();
     const guidedWorld = new THREE.Vector3();
@@ -196,17 +192,21 @@ export function ReefFishSchool({
         }
       }
 
-      // Outside a real tunnel opening the central reef is treated as a no-fly
-      // volume. As tunnel weight rises the avoidance fades continuously, so the
-      // fish can enter the opening without fighting two navigation systems.
+      const tunnelOwnsArchCrossing = tunnelWeight > TUNNEL_COLLISION_RELEASE_WEIGHT;
+
+      // The central foundation is handled only by the smooth radial field.
+      // During a tunnel crossing this field fades to zero as the guide takes over.
       const foundationDelta = reefFishFoundationAvoidanceDelta(guidedWorld, build)
         .multiplyScalar(1 - tunnelWeight);
       guidedWorld.add(foundationDelta);
 
+      // Arch-rock collision is disabled only while the fish is deliberately in
+      // a real tunnel window. All other rocks remain solid throughout the pass.
       const localCollisionDelta = reefFishCollisionDelta(
         guidedWorld,
         obstaclesRef.current,
         0.34,
+        { ignoreArchRocks: tunnelOwnsArchCrossing },
       );
       guidedWorld.add(localCollisionDelta);
 
@@ -220,14 +220,14 @@ export function ReefFishSchool({
       const blend = 1 - Math.exp(-response * frame);
       currentDelta.lerp(targetDelta, blend);
 
-      // If a fast authored keyframe still crosses a side structure between two
-      // frames, resolve it once and keep that displacement in the persistent
-      // offset. Unlike the old code it will not reset and re-snap next frame.
+      // Final protection is kept for non-arch structures, but it must obey the
+      // same tunnel ownership rule or it would reintroduce frame-to-frame jitter.
       const correctedWorld = representativeWorld.clone().add(currentDelta);
       const emergencyDelta = reefFishCollisionDelta(
         correctedWorld,
         obstaclesRef.current,
         EMERGENCY_COLLISION_MARGIN,
+        { ignoreArchRocks: tunnelOwnsArchCrossing },
       );
       currentDelta.add(emergencyDelta);
 
