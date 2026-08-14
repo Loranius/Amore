@@ -20,9 +20,26 @@ export function createReefFishRenderGeometry(fish: ReefFishInstance[]) {
 
 export function applyReefFishColors(mesh: THREE.InstancedMesh, fish: ReefFishInstance[]) {
   const color = new THREE.Color();
-  fish.forEach((_, index) => {
+
+  fish.forEach((item, index) => {
     color.set(REEF_FISH_TINTS[index % REEF_FISH_TINTS.length]!);
+
+    // Near/larger fish get a small luminance lift so their facets stay readable
+    // against the darkest water without turning into flat glowing objects.
+    const scaleT = THREE.MathUtils.clamp((item.scale - 0.27) / 0.35, 0, 1);
+    color.multiplyScalar(1.06 + scaleT * 0.12);
     mesh.setColorAt(index, color);
   });
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+
+  if (mesh.instanceColor) {
+    mesh.instanceColor.setUsage(THREE.StaticDrawUsage);
+    mesh.instanceColor.needsUpdate = true;
+  }
+
+  // setColorAt lazily creates instanceColor. Force a material refresh so the
+  // shader variant definitely includes USE_INSTANCING_COLOR on every browser.
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  materials.forEach((material) => {
+    material.needsUpdate = true;
+  });
 }

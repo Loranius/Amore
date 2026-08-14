@@ -1,8 +1,28 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useAnimations, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import {
+  REEF_FISH_SCHOOL_POSITION,
+  REEF_FISH_SCHOOL_SCALE,
+} from './reefFishSchoolPresentation';
 
 const SCHOOL_OF_FISH_MODEL_URL = `${import.meta.env.BASE_URL}models/school_of_fish_reef.glb`;
+
+export interface ReefFishSchoolMetrics {
+  depth: number;
+  height: number;
+  meshes: number;
+  width: number;
+}
+
+interface ReefFishSchoolProps {
+  onReady?: ((metrics: ReefFishSchoolMetrics) => void) | undefined;
+  reducedMotion: boolean;
+}
+
+function roundMetric(value: number): number {
+  return Number(value.toFixed(3));
+}
 
 /**
  * Native animated fish school sourced from the School Of Fish GLB.
@@ -11,7 +31,8 @@ const SCHOOL_OF_FISH_MODEL_URL = `${import.meta.env.BASE_URL}models/school_of_fi
  * fish, so we deliberately do not layer the old procedural roaming/steering
  * system on top of it. Three.js only advances the original `swimming` clip.
  */
-export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
+export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) {
+  const schoolRef = useRef<THREE.Group>(null);
   const { scene, animations } = useGLTF(SCHOOL_OF_FISH_MODEL_URL);
   const { actions } = useAnimations(animations, scene);
 
@@ -50,14 +71,43 @@ export function ReefFishSchool({ reducedMotion }: { reducedMotion: boolean }) {
     swim.timeScale = reducedMotion ? 0 : 1;
   }, [actions, reducedMotion]);
 
+  useEffect(() => {
+    const school = schoolRef.current;
+    if (!school || !onReady) return;
+
+    school.updateWorldMatrix(true, true);
+    const bounds = new THREE.Box3().setFromObject(school, true);
+    if (bounds.isEmpty()) return;
+
+    let meshes = 0;
+    scene.traverse((object) => {
+      if (object instanceof THREE.Mesh) meshes += 1;
+    });
+
+    const size = bounds.getSize(new THREE.Vector3());
+    onReady({
+      depth: roundMetric(size.z),
+      height: roundMetric(size.y),
+      meshes,
+      width: roundMetric(size.x),
+    });
+  }, [onReady, scene]);
+
   return (
-    <primitive
-      object={scene}
+    <group
+      ref={schoolRef}
       name="reef-native-school-of-fish"
-      position={[-0.45, 0.55, 0.15]}
-      scale={0.00058}
-      dispose={null}
-    />
+      position={REEF_FISH_SCHOOL_POSITION}
+      scale={REEF_FISH_SCHOOL_SCALE}
+    >
+      <primitive
+        object={scene}
+        position={[0, 0, 0]}
+        rotation={[0, 0, 0]}
+        scale={1}
+        dispose={null}
+      />
+    </group>
   );
 }
 

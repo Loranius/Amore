@@ -1,4 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  REEF_FOUNDATION_PASS,
+  REEF_FOUNDATION_PRESENTATION_VERSION,
+} from '../../src/features/home/reef3d/reefFoundationPresentation';
+import { REEF_FISH_SCHOOL_MODEL } from '../../src/features/home/reef3d/reefFishSchoolPresentation';
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
@@ -58,8 +63,15 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reef).toHaveAttribute('data-reef-shape-pass', 'phase-10-colony-shapes');
     await expect(reef).toHaveAttribute('data-reef-material-presentation', 'reef-material-v1');
     await expect(reef).toHaveAttribute('data-reef-material-pass', 'phase-11-material-pass');
-    await expect(reef).toHaveAttribute('data-reef-foundation-presentation', 'reef-foundation-v1');
-    await expect(reef).toHaveAttribute('data-reef-foundation-pass', 'phase-12-foundation-seafloor');
+    await expect(reef).toHaveAttribute(
+      'data-reef-foundation-presentation',
+      REEF_FOUNDATION_PRESENTATION_VERSION,
+    );
+    await expect(reef).toHaveAttribute('data-reef-foundation-pass', REEF_FOUNDATION_PASS);
+    await expect(reef).toHaveAttribute('data-reef-fish-model', REEF_FISH_SCHOOL_MODEL, {
+      timeout: 25_000,
+    });
+    await expect(reef).toHaveAttribute('data-reef-fish-meshes', '4');
     await expect(reef).toHaveAttribute('data-reef-static-acceptance', 'pass');
     await expect(reef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(reef).toHaveAttribute('data-reef-phase-count', '8');
@@ -82,10 +94,14 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reefDrawCalls = Number(await reef.getAttribute('data-reef-runtime-draw-calls'));
     const reefVertices = Number(await reef.getAttribute('data-reef-vertices'));
     const reefTriangles = Number(await reef.getAttribute('data-reef-triangles'));
+    const reefFishWidth = Number(await reef.getAttribute('data-reef-fish-width'));
+    const reefFishHeight = Number(await reef.getAttribute('data-reef-fish-height'));
     expect(reefDrawCalls).toBeGreaterThan(0);
     expect(reefDrawCalls).toBeLessThanOrEqual(7);
     expect(reefVertices).toBeLessThanOrEqual(24_256);
     expect(reefTriangles).toBeLessThanOrEqual(36_512);
+    expect(reefFishWidth).toBeGreaterThanOrEqual(3);
+    expect(reefFishHeight).toBeGreaterThanOrEqual(0.8);
     await page.screenshot({
       path: 'test-results/home-artifact-reef-pixel-8-pro.png',
       fullPage: true,
@@ -99,8 +115,14 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reloadedReef).toHaveAttribute('data-reef-shape-pass', 'phase-10-colony-shapes');
     await expect(reloadedReef).toHaveAttribute('data-reef-material-presentation', 'reef-material-v1');
     await expect(reloadedReef).toHaveAttribute('data-reef-material-pass', 'phase-11-material-pass');
-    await expect(reloadedReef).toHaveAttribute('data-reef-foundation-presentation', 'reef-foundation-v1');
-    await expect(reloadedReef).toHaveAttribute('data-reef-foundation-pass', 'phase-12-foundation-seafloor');
+    await expect(reloadedReef).toHaveAttribute(
+      'data-reef-foundation-presentation',
+      REEF_FOUNDATION_PRESENTATION_VERSION,
+    );
+    await expect(reloadedReef).toHaveAttribute('data-reef-foundation-pass', REEF_FOUNDATION_PASS);
+    await expect(reloadedReef).toHaveAttribute('data-reef-fish-model', REEF_FISH_SCHOOL_MODEL, {
+      timeout: 25_000,
+    });
     await expect(reloadedReef).toHaveAttribute('data-reef-production-signature', productionSignature ?? '');
     await expect(reloadedReef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(page.getByRole('tab', { name: /Риф/ })).toHaveAttribute('aria-selected', 'true');

@@ -6,7 +6,7 @@ export type DepthReefFishInstance = ReefFishInstance & {
   depthRole: ReefFishDepthRole;
 };
 
-const FISH_COUNT = 8;
+const FISH_COUNT = 12;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
@@ -30,7 +30,7 @@ export function createDepthTarget(index: number, sequence: number): THREE.Vector
 }
 
 export function depthTargetLifetime(index: number, sequence: number): number {
-  return THREE.MathUtils.lerp(3, 7, seededUnit(index, 70 + sequence * 11));
+  return THREE.MathUtils.lerp(3.8, 7.4, seededUnit(index, 70 + sequence * 11));
 }
 
 export function buildDepthReefFish(): DepthReefFishInstance[] {
@@ -42,7 +42,7 @@ export function buildDepthReefFish(): DepthReefFishInstance[] {
       phase: (index / FISH_COUNT) * Math.PI * 2 + THREE.MathUtils.lerp(-0.24, 0.24, seededUnit(index, 27)),
       scale: THREE.MathUtils.lerp(profile.minScale, profile.maxScale, seededUnit(index, 28)),
       cruiseSpeed: THREE.MathUtils.lerp(profile.minCruiseSpeed, profile.maxCruiseSpeed, seededUnit(index, 46)),
-      turnResponsiveness: THREE.MathUtils.lerp(1.25, 2.05, seededUnit(index, 47)),
+      turnResponsiveness: THREE.MathUtils.lerp(1.2, 1.92, seededUnit(index, 47)),
     };
   });
 }

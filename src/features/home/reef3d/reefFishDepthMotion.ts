@@ -7,8 +7,11 @@ import {
   depthTargetLifetime,
   type DepthReefFishInstance,
 } from './reefFishDepthState';
+import { applyFishDepthRoleSteeringByIndex } from './reefFishDepthRoleSteering';
+import { applyDepthSchoolSteering } from './reefFishSchooling';
 
 const FISH_FORWARD_YAW_OFFSET = Math.PI;
+const depthSteering = new THREE.Vector3();
 
 export function writeDepthReefFishMatrices(
   mesh: THREE.InstancedMesh,
@@ -33,6 +36,7 @@ export function writeDepthReefFishMatrices(
       desiredVelocity.normalize().multiplyScalar(item.cruiseSpeed);
     }
 
+    applyDepthSchoolSteering(desiredVelocity, roaming, fish, index, item.cruiseSpeed);
     applyFishSeparationSteering(desiredVelocity, roaming, fish, index, item.cruiseSpeed);
     applyReefRoamingSteering(
       state.position,
@@ -42,6 +46,11 @@ export function writeDepthReefFishMatrices(
       index,
       state.targetSequence,
     );
+
+    depthSteering.set(0, 0, 0);
+    applyFishDepthRoleSteeringByIndex(index, state.position, depthSteering, item.cruiseSpeed);
+    desiredVelocity.add(depthSteering);
+
     if (desiredVelocity.lengthSq() > 0.0001) {
       desiredVelocity.normalize().multiplyScalar(item.cruiseSpeed);
     }

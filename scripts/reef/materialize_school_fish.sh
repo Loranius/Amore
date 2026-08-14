@@ -16,7 +16,7 @@ printf '%s  %s\n' "$B64_SHA" "$BUNDLE" | sha256sum -c -
 base64 -d "$BUNDLE" > "$WORK/materializer.tgz"
 printf '%s  %s\n' "$TGZ_SHA" "$WORK/materializer.tgz" | sha256sum -c -
 mkdir -p "$WORK/tools"
-tar -xzf "$WORK/materializer.tgz" -C "$WORK/tools"
+tar --no-same-owner -xzf "$WORK/materializer.tgz" -C "$WORK/tools"
 
 python3 -m venv "$WORK/venv"
 "$WORK/venv/bin/python" -m pip install --disable-pip-version-check --no-cache-dir numpy==2.2.6 pillow==11.3.0
@@ -43,61 +43,6 @@ grep -F 'CC-BY-4.0' "$SOURCE/license.txt"
 mkdir -p "$(dirname "$OUT")"
 "$PY" "$WORK/tools/repack_school_fish_textures_ci.py" "$WORK/optimized.glb" "$OUT"
 rm -f "$OUT.gz"
-
-# Normalize the authored school into the reef's open-water volume while keeping
-# every animated bone/key unchanged. The runtime renderer still owns the final
-# tiny world scale; this adjusts only the source root matrix so the fish do not
-# spend their full loop hidden inside the central reef mass.
-"$PY" - "$OUT" <<'PY'
-import json
-import struct
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-data = path.read_bytes()
-magic, version, _ = struct.unpack_from('<III', data, 0)
-json_len, json_type = struct.unpack_from('<II', data, 12)
-if magic != 0x46546C67 or version != 2 or json_type != 0x4E4F534A:
-    raise SystemExit('unexpected GLB header')
-
-doc = json.loads(data[20:20 + json_len].decode('utf-8').rstrip(' \x00'))
-bin_header = 20 + json_len
-bin_len, bin_type = struct.unpack_from('<II', data, bin_header)
-if bin_type != 0x004E4942:
-    raise SystemExit('expected GLB BIN chunk')
-binary = bytearray(data[bin_header + 8:bin_header + 8 + bin_len])
-
-scene = doc['scenes'][doc.get('scene', 0)]
-root = doc['nodes'][scene['nodes'][0]]
-matrix = list(root.get('matrix', []))
-if len(matrix) != 16:
-    raise SystemExit('expected Sketchfab root matrix')
-
-runtime_scale = 0.00058
-desired_scale = 0.00072
-ratio = desired_scale / runtime_scale
-for column in range(3):
-    for row in range(3):
-        index = column * 4 + row
-        matrix[index] *= ratio
-matrix[12] += 0.0
-matrix[13] += (1.25 - 0.55) / runtime_scale
-matrix[14] += (1.0 - 0.15) / runtime_scale
-root['matrix'] = matrix
-
-json_bytes = json.dumps(doc, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
-while len(json_bytes) % 4:
-    json_bytes += b' '
-while len(binary) % 4:
-    binary.append(0)
-
-total = 12 + 8 + len(json_bytes) + 8 + len(binary)
-out = bytearray(struct.pack('<III', magic, version, total))
-out += struct.pack('<II', len(json_bytes), 0x4E4F534A) + json_bytes
-out += struct.pack('<II', len(binary), 0x004E4942) + binary
-path.write_bytes(out)
-PY
 
 "$PY" "$WORK/tools/validate_school_fish.py" "$OUT"
 sha256sum "$OUT"

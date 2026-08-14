@@ -2,14 +2,22 @@ import * as THREE from 'three';
 
 export type FishSwimUniform = { value: number };
 
-export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshStandardMaterial {
-  const material = new THREE.MeshStandardMaterial({
+/**
+ * Stable unlit material for the roaming fish.
+ *
+ * The reef uses strong depth fog and directional lighting. On mobile the tiny
+ * low-poly fish were receiving almost no diffuse light, so even bright instance
+ * colours collapsed into dark teal/black silhouettes. Fish colour is gameplay
+ * readability, not a physically-lit surface, so keep the per-instance palette
+ * independent from scene lighting and fog while preserving the swim deformation.
+ */
+export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshBasicMaterial {
+  const material = new THREE.MeshBasicMaterial({
     vertexColors: true,
     color: '#ffffff',
-    roughness: 0.82,
-    metalness: 0,
-    flatShading: true,
     side: THREE.DoubleSide,
+    fog: false,
+    toneMapped: false,
   });
 
   material.onBeforeCompile = (shader) => {
@@ -33,6 +41,6 @@ export function createFishSwimMaterialV2(swimTime: FishSwimUniform): THREE.MeshS
       );
   };
 
-  material.customProgramCacheKey = () => 'reef-fish-swim-v2-per-instance';
+  material.customProgramCacheKey = () => 'reef-fish-swim-v4-unlit-instance-colors';
   return material;
 }

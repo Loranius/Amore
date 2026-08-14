@@ -8,6 +8,8 @@ import {
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { ReefObject } from './ReefObject';
 import { ReefStage } from './ReefStage';
+import type { ReefFishSchoolMetrics } from './ReefFishSchool';
+import { REEF_FISH_SCHOOL_MODEL } from './reefFishSchoolPresentation';
 import {
   REEF_FOUNDATION_PASS,
   REEF_FOUNDATION_PRESENTATION_VERSION,
@@ -51,9 +53,11 @@ function useReducedMotion(): boolean {
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
   const reducedMotion = useReducedMotion();
+  const [fishRuntime, setFishRuntime] = useState<ReefFishSchoolMetrics | null>(null);
   const [worldRuntime, setWorldRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const [sceneState, setSceneState] = useState<ReefThreeSceneState | null>(null);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setWorldRuntime(next), []);
+  const onFishReady = useCallback((next: ReefFishSchoolMetrics) => setFishRuntime(next), []);
   const onSceneReady = useCallback((next: ReefThreeSceneState) => setSceneState(next), []);
 
   if (portal.isPending) return <CrystalPlaceholder />;
@@ -123,6 +127,11 @@ export default function ReefPreviewScene() {
       data-reef-triangles={build.diagnostics.triangleCount}
       data-reef-materials={build.diagnostics.materialCount}
       data-reef-motion-bindings={build.diagnostics.motionBindingCount}
+      data-reef-fish-model={fishRuntime ? REEF_FISH_SCHOOL_MODEL : 'loading'}
+      data-reef-fish-meshes={fishRuntime?.meshes ?? ''}
+      data-reef-fish-width={fishRuntime?.width ?? ''}
+      data-reef-fish-height={fishRuntime?.height ?? ''}
+      data-reef-fish-depth={fishRuntime?.depth ?? ''}
       data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}
       data-reef-runtime-draw-calls={reportedDrawCalls ?? ''}
       data-reef-runtime-triangles={reportedTriangles ?? ''}
@@ -137,7 +146,7 @@ export default function ReefPreviewScene() {
         camera={{ position: [0, 2.65, 8.15], fov: 42, near: 0.1, far: 42 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
-        <ReefStage reducedMotion={reducedMotion}>
+        <ReefStage onFishReady={onFishReady} reducedMotion={reducedMotion}>
           <ReefObject
             build={build}
             reducedMotion={reducedMotion}
