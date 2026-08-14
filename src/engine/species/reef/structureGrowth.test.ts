@@ -49,7 +49,7 @@ describe('Reef growth structure layout', () => {
     expect(annualStructures).toHaveLength(
       source.development.annualZones.filter((zone) => zone.progress > 0).length,
     );
-    expect(annualStructures.map((item) => item.yearIndex).sort((a, b) => a - b))
+    expect(annualStructures.map((item) => item.yearIndex ?? 0).sort((a, b) => a - b))
       .toEqual(source.development.annualZones.filter((zone) => zone.progress > 0).map((zone) => zone.yearIndex));
     expect(layout.arches.length).toBeLessThan(source.development.annualZones.length);
     expect(layout.terraces.some((item) => item.archetype === 'core')).toBe(true);
