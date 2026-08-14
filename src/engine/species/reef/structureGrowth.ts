@@ -8,6 +8,7 @@ import type {
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const TAU = Math.PI * 2;
 const MAXIMUM_ATTEMPTS = 32;
+const MAXIMUM_GUARANTEED_ARCHES = 6;
 
 export interface ReefGrowthStructurePoint {
   x: number;
@@ -203,9 +204,58 @@ function annualPlacementCircle(
   return null;
 }
 
+function archPlacement(
+  zone: ReefAnnualZone,
+  circle: OccupiedCircle,
+  seed: number,
+  id: string,
+): ReefGrowthArchPlacement {
+  const azimuth = Math.atan2(circle.z, circle.x);
+  const span = round6(
+    (1.08 + seededUnit(seed, 'span') * 0.48)
+      * (0.38 + zone.progress * 0.62),
+  );
+  return {
+    id,
+    sourceEntityId: zone.id,
+    yearIndex: zone.yearIndex,
+    center: { x: circle.x, y: 0.03, z: circle.z },
+    rotationY: round6(azimuth + Math.PI * 0.5),
+    span,
+    height: round6(
+      (1.18 + seededUnit(seed, 'height') * 0.68)
+        * (0.35 + zone.progress * 0.65),
+    ),
+    thickness: round6(0.17 + seededUnit(seed, 'thickness') * 0.08),
+    curveDepth: round6((seededUnit(seed, 'curve-depth') - 0.5) * 0.48),
+    footprintRadius: circle.radius,
+    progress: zone.progress,
+    colonization: zone.colonization,
+    biodiversity: zone.biodiversity,
+    cohesion: zone.cohesion,
+    seed,
+  };
+}
+
+function guaranteedCompletedArchCount(completedYears: number): number {
+  if (completedYears <= 0) return 0;
+  // Years must visibly bend the reef, but one arch per year becomes repetitive.
+  // One stable arch for roughly every two completed years keeps a readable
+  // limestone backbone while annual zones remain free to be shelves/ridges/etc.
+  return Math.min(
+    MAXIMUM_GUARANTEED_ARCHES,
+    Math.max(1, Math.ceil(completedYears / 2)),
+  );
+}
+
 /**
  * Pure placement pass for annual habitat zones plus clustered exploration
  * outcrops. Schedule affects cohesion only; it never becomes a terrace/object.
+ *
+ * Annual zones remain morphologically varied, while completed relationship time
+ * also guarantees a sparse limestone arch backbone. This keeps arches as a
+ * persistent time signature without regressing to the old `1 year = 1 arch`
+ * rule or allowing a deterministic seed to produce zero arches forever.
  */
 export function buildReefGrowthStructureLayout(
   evolution: ReefModuleEvolutionPlan,
@@ -239,30 +289,12 @@ export function buildReefGrowthStructureLayout(
 
     if (zone.structureArchetype === 'arch') {
       archCircles.push(accepted);
-      const span = round6(
-        (1.08 + seededUnit(zone.structureSeed, 'span') * 0.48)
-          * (0.38 + zone.progress * 0.62),
-      );
-      arches.push({
-        id: `reef:growth-zone-arch:${zone.yearIndex}`,
-        sourceEntityId: zone.id,
-        yearIndex: zone.yearIndex,
-        center: { x: accepted.x, y: 0.03, z: accepted.z },
-        rotationY: round6(azimuth + Math.PI * 0.5),
-        span,
-        height: round6(
-          (1.18 + seededUnit(zone.structureSeed, 'height') * 0.68)
-            * (0.35 + zone.progress * 0.65),
-        ),
-        thickness: round6(0.17 + seededUnit(zone.structureSeed, 'thickness') * 0.08),
-        curveDepth: round6((seededUnit(zone.structureSeed, 'curve-depth') - 0.5) * 0.48),
-        footprintRadius: accepted.radius,
-        progress: zone.progress,
-        colonization: zone.colonization,
-        biodiversity: zone.biodiversity,
-        cohesion: zone.cohesion,
-        seed: zone.structureSeed,
-      });
+      arches.push(archPlacement(
+        zone,
+        accepted,
+        zone.structureSeed,
+        `reef:growth-zone-arch:${zone.yearIndex}`,
+      ));
       return;
     }
 
@@ -303,6 +335,59 @@ export function buildReefGrowthStructureLayout(
       seed: zone.structureSeed,
     });
   });
+
+  // A relationship with completed years must never render as an archless reef.
+  // Existing annual arch zones count first. Missing arches are added as sparse
+  // connector/backbone structures tied to the oldest completed zones so adding
+  // later history never reshuffles established identities.
+  const completedZones = visibleZones.filter((zone) => zone.complete);
+  const completedArchYears = new Set(
+    arches
+      .filter((arch) => completedZones.some((zone) => zone.yearIndex === arch.yearIndex))
+      .map((arch) => arch.yearIndex),
+  );
+  const desiredCompletedArchCount = guaranteedCompletedArchCount(evolution.facts.completedYears);
+  let completedArchCount = completedArchYears.size;
+
+  for (const zone of completedZones) {
+    if (completedArchCount >= desiredCompletedArchCount) break;
+    if (completedArchYears.has(zone.yearIndex)) continue;
+
+    const connectorId = `reef:growth-time-arch:${zone.yearIndex}`;
+    const connectorSeed = (zone.structureSeed ^ 0x51f15e5d) >>> 0;
+    const footprintRadius = round6(0.46 + seededUnit(connectorSeed, 'footprint') * 0.1);
+    let accepted: OccupiedCircle | null = null;
+
+    for (let attempt = 0; attempt < MAXIMUM_ATTEMPTS; attempt += 1) {
+      const candidate = radialCandidate(
+        { id: connectorId, seed: connectorSeed },
+        zone.yearIndex - 1,
+        attempt,
+        visibleFoundationRadius * 0.36,
+        visibleFoundationRadius * 0.72,
+        footprintRadius,
+      );
+      // Arches may grow from annual terrain, but should not stack on top of
+      // another arch or cut directly through the densest centre of a zone.
+      if (
+        !collides(candidate, archCircles, 0.96)
+        && !collides(candidate, annualCircles, 0.42)
+      ) {
+        accepted = candidate;
+        break;
+      }
+    }
+
+    if (!accepted) {
+      rejectedArchIds.push(connectorId);
+      continue;
+    }
+
+    archCircles.push(accepted);
+    arches.push(archPlacement(zone, accepted, connectorSeed, connectorId));
+    completedArchYears.add(zone.yearIndex);
+    completedArchCount += 1;
+  }
 
   const externalCircles: OccupiedCircle[] = [];
   const outcrops: ReefGrowthOutcropPlacement[] = [];
