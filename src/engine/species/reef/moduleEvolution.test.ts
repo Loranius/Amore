@@ -138,8 +138,15 @@ describe('Reef ecological module evolution', () => {
     expect(evolution.development.colonizationPatches[0]?.photoCount).toBe(1);
     expect(evolution.development.softLifePools).toHaveLength(1);
     expect(evolution.development.softLifePools[0]?.itemCount).toBe(1);
-    expect(evolution.entities.scheduleTerraces).toEqual([]);
-    expect(evolution.foundation.scheduleTerraces.logicalCount).toBe(0);
+    expect(evolution.entities.scheduleTerraces.map((item) => item.id)).toEqual([
+      'reef:schedule-terrace:2024-01',
+      'reef:schedule-terrace:2024-03',
+    ]);
+    expect(evolution.foundation.scheduleTerraces).toEqual({
+      logicalCount: 2,
+      visibleCount: 0,
+      overflowCount: 2,
+    });
   });
 
   it('lets time grow habitat scale while map exploration only expands horizontal reach', () => {
@@ -256,7 +263,7 @@ describe('Reef ecological module evolution', () => {
     expect(oldCoral?.growth ?? 0).toBeGreaterThan(newCoral?.growth ?? 0);
   });
 
-  it('uses shared days off as additive cohesion without spawning schedule structures', () => {
+  it('uses shared days off as additive cohesion without spawning visible schedule structures', () => {
     const withoutSchedule = build([], { sharedDaysOff: [] });
     const sixtyDays = Array.from({ length: 60 }, (_value, index) => ({
       date: `2023-${String(Math.floor(index / 28) + 1).padStart(2, '0')}-${String(index % 28 + 1).padStart(2, '0')}`,
@@ -269,11 +276,11 @@ describe('Reef ecological module evolution', () => {
     expect(after?.togetherness).toBe(1);
     expect(after?.cohesion ?? 0).toBeGreaterThan(before?.cohesion ?? 0);
     expect(after?.fill ?? 0).toBeGreaterThan(before?.fill ?? 0);
-    expect(withSchedule.entities.scheduleTerraces).toEqual([]);
+    expect(withSchedule.entities.scheduleTerraces).toHaveLength(3);
     expect(withSchedule.foundation.scheduleTerraces).toEqual({
-      logicalCount: 0,
+      logicalCount: 3,
       visibleCount: 0,
-      overflowCount: 0,
+      overflowCount: 3,
     });
   });
 
