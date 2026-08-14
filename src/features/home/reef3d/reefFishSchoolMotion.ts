@@ -13,7 +13,7 @@ export const REEF_FISH_ROUTE_IDS = [
 ] as const;
 
 export const REEF_FISH_ROUTE_COUNT = REEF_FISH_ROUTE_IDS.length;
-export const REEF_FISH_ROUTE_PLAYBACK_RATE = 0.72;
+export const REEF_FISH_ROUTE_PLAYBACK_RATE = 0.55;
 
 type ReefFishRouteId = (typeof REEF_FISH_ROUTE_IDS)[number];
 
@@ -30,25 +30,30 @@ export interface ReefFishRouteClip {
   routeId: ReefFishRouteId;
 }
 
-const HORIZONTAL_ROUTE_SPREAD = 1.45;
-const VERTICAL_ROUTE_SPREAD = 0.34;
-const DEPTH_ROUTE_SPREAD = 0.28;
+// The visible school is now roughly half its previous size. Compensate by
+// widening the authored root motion so each fish still travels substantially
+// farther in world space. Depth grows the most: the fish should orbit around
+// the reef instead of reading as one flat band in front of it.
+const HORIZONTAL_ROUTE_SPREAD = 4.6;
+const VERTICAL_ROUTE_SPREAD = 0.42;
+const DEPTH_ROUTE_SPREAD = 1.25;
 
 /**
  * The source asset stores each fish route on its head/root bone in authored
- * model units. These lane centres deliberately distribute the nine fish across
- * the reef and keep their nearest point well behind the mobile camera.
+ * model units. These lane centres distribute the nine fish across separate
+ * broad open-water corridors around the reef. Their phases and depth offsets
+ * intentionally keep the school from bunching over the hero platform.
  */
 const ROUTE_TUNING: Record<ReefFishRouteId, ReefFishRouteTuning> = {
-  Clown1: { phase: 0.04, xCenter: -1500, yCenter: 650, zCenter: -800 },
-  Clown2: { phase: 0.38, xCenter: -820, yCenter: 980, zCenter: -200 },
-  Clown3: { phase: 0.73, xCenter: -40, yCenter: 1250, zCenter: -1100 },
-  blue_tang1: { phase: 0.19, xCenter: 570, yCenter: 820, zCenter: -450 },
-  blue_tang2: { phase: 0.61, xCenter: -1945, yCenter: 1450, zCenter: -1250 },
-  moorish1: { phase: 0.11, xCenter: -1115, yCenter: 1100, zCenter: -650 },
-  moorish2: { phase: 0.49, xCenter: -306, yCenter: 700, zCenter: -100 },
-  Yellow1: { phase: 0.29, xCenter: 316, yCenter: 1550, zCenter: -900 },
-  Yellow2: { phase: 0.86, xCenter: -990, yCenter: 900, zCenter: -300 },
+  Clown1: { phase: 0.03, xCenter: -2500, yCenter: 680, zCenter: -1550 },
+  Clown2: { phase: 0.36, xCenter: -900, yCenter: 1030, zCenter: -2550 },
+  Clown3: { phase: 0.7, xCenter: 1250, yCenter: 1320, zCenter: -1900 },
+  blue_tang1: { phase: 0.18, xCenter: 2700, yCenter: 860, zCenter: -900 },
+  blue_tang2: { phase: 0.59, xCenter: -3300, yCenter: 1480, zCenter: -3150 },
+  moorish1: { phase: 0.1, xCenter: -1850, yCenter: 1130, zCenter: -760 },
+  moorish2: { phase: 0.47, xCenter: 850, yCenter: 760, zCenter: -3000 },
+  Yellow1: { phase: 0.28, xCenter: 3200, yCenter: 1580, zCenter: -2200 },
+  Yellow2: { phase: 0.84, xCenter: -250, yCenter: 940, zCenter: -650 },
 };
 
 function routeIdFromTrack(track: THREE.KeyframeTrack): ReefFishRouteId | null {
@@ -124,7 +129,7 @@ function retargetRoutePosition(
 /**
  * Splits the single authored school clip into nine independently phased clips.
  * Body, fin and tail tracks remain untouched; only the root route position is
- * widened horizontally and confined to safe open-water height/depth lanes.
+ * widened into broad open-water loops with distinct height/depth lanes.
  */
 export function createReefFishRouteClips(source: THREE.AnimationClip): ReefFishRouteClip[] {
   return REEF_FISH_ROUTE_IDS.map((routeId) => {
