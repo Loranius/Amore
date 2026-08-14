@@ -116,13 +116,15 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
   const groupRef = useRef<Group>(null);
   const pointsRef = useRef<Points>(null);
   const positions = useMemo(() => {
-    const count = 64;
+    // Keep the particles in a single Points draw call, but extend them through
+    // the middle/background volume so camera rotation reveals real parallax.
+    const count = 120;
     const values = new Float32Array(count * 3);
     for (let index = 0; index < count; index += 1) {
       const offset = index * 3;
-      values[offset] = (seededUnit(index, 1) - 0.5) * 15;
-      values[offset + 1] = seededUnit(index, 2) * 6.4 - 0.15;
-      values[offset + 2] = (seededUnit(index, 3) - 0.5) * 15 - 1.2;
+      values[offset] = (seededUnit(index, 1) - 0.5) * 20;
+      values[offset + 1] = seededUnit(index, 2) * 7 - 0.15;
+      values[offset + 2] = (seededUnit(index, 3) - 0.5) * 22 - 2.6;
     }
     return values;
   }, []);
@@ -131,9 +133,9 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
     if (reducedMotion) return;
     const elapsed = clock.getElapsedTime();
     if (groupRef.current) {
-      groupRef.current.position.x = Math.sin(elapsed * 0.08) * 0.16;
-      groupRef.current.position.z = Math.cos(elapsed * 0.07) * 0.12;
-      groupRef.current.position.y = Math.sin(elapsed * 0.11) * 0.05;
+      groupRef.current.position.x = Math.sin(elapsed * 0.08) * 0.18;
+      groupRef.current.position.z = Math.cos(elapsed * 0.07) * 0.15;
+      groupRef.current.position.y = Math.sin(elapsed * 0.11) * 0.06;
     }
     if (pointsRef.current) {
       pointsRef.current.rotation.y = Math.sin(elapsed * 0.035) * 0.025;
@@ -151,9 +153,9 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
         </bufferGeometry>
         <pointsMaterial
           color={REEF_SCENE_PALETTE.particles}
-          size={0.035}
+          size={0.034}
           transparent
-          opacity={0.22}
+          opacity={0.2}
           depthWrite={false}
           sizeAttenuation
           toneMapped={false}
@@ -164,16 +166,12 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
 }
 
 /**
- * Lightweight underwater atmosphere.
- *
- * Stage 4 keeps the Stage 2 composition but lowers geometry density and a little
- * particle opacity. Fog and transparency provide the volume impression; no
- * texture downloads, post-processing or expensive volumetrics are introduced.
+ * Lightweight underwater atmosphere. Fog, particles, caustics and broad light
+ * shafts provide depth without post-processing or expensive volumetrics.
  */
 export function ReefWaterAtmosphere({ reducedMotion }: { reducedMotion: boolean }) {
   return (
-    <group name="reef-water-atmosphere-stage-6-final-light">
-      {/* A translucent back veil strengthens depth separation behind the reef. */}
+    <group name="reef-water-atmosphere-stage-7-living-depth">
       <mesh position={[0, 2.6, -10.5]} scale={[14, 7.5, 1]}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial
@@ -185,8 +183,13 @@ export function ReefWaterAtmosphere({ reducedMotion }: { reducedMotion: boolean 
         />
       </mesh>
 
-      {/* Surface shafts stay broad and faint. Coarse geometry is enough because
-          fog and transparency hide the silhouette of the cones. */}
+      <LightShaft
+        position={[-6.1, 3.7, -5.4]}
+        rotation={[0.05, 0, 0.24]}
+        scale={[1.9, 8.4, 1.4]}
+        phase={3.9}
+        reducedMotion={reducedMotion}
+      />
       <LightShaft
         position={[-3.2, 3.6, -1.8]}
         rotation={[0.04, 0, 0.18]}
@@ -206,6 +209,13 @@ export function ReefWaterAtmosphere({ reducedMotion }: { reducedMotion: boolean 
         rotation={[0.05, 0, -0.2]}
         scale={[1.25, 6.4, 1.05]}
         phase={2.7}
+        reducedMotion={reducedMotion}
+      />
+      <LightShaft
+        position={[6.5, 4.2, -6.2]}
+        rotation={[0.04, 0, -0.27]}
+        scale={[1.7, 8.8, 1.3]}
+        phase={5.1}
         reducedMotion={reducedMotion}
       />
 
