@@ -22,7 +22,14 @@ export type ReefFishRoamingState = {
   nextTargetAt: number;
 };
 
-export const REEF_FISH_TINTS = ['#83b5aa', '#759caf', '#b2a675', '#8aa6a2', '#9b82ad'] as const;
+export const REEF_FISH_TINTS = [
+  '#9adfd2',
+  '#8fbbe0',
+  '#d8c47f',
+  '#9fd2c7',
+  '#c2a3dc',
+  '#8fd7bd',
+] as const;
 
 const FISH_COUNT = 8;
 const FISH_FORWARD_YAW_OFFSET = Math.PI;
