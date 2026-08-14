@@ -10,6 +10,10 @@ const WHALE_PART_BASE = `${import.meta.env.BASE_URL}models/glow_whale_native/`;
 const WHALE_PART_COUNT = 15;
 const WHALE_CLIP_NAME = 'move f';
 const DRACO_DECODER_BASE = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
+const WHALE_PLAYBACK_RATE = 0.72;
+const REDUCED_WHALE_PLAYBACK_RATE = 0.24;
+const WHALE_ROUTE_RATE = 0.012;
+const REDUCED_WHALE_ROUTE_RATE = 0.004;
 
 type LoadedWhale = {
   scene: THREE.Group;
@@ -164,7 +168,7 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
       action.play();
     }
 
-    mixer.timeScale = reducedMotion ? 0 : 0.72;
+    mixer.timeScale = reducedMotion ? REDUCED_WHALE_PLAYBACK_RATE : WHALE_PLAYBACK_RATE;
     mixerRef.current = mixer;
 
     return () => {
@@ -178,20 +182,18 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
     const route = routeRef.current;
     if (!route) return;
 
-    if (reducedMotion) {
-      route.position.set(3.4, 3.35, -11.6);
-      return;
-    }
-
     mixerRef.current?.update(delta);
 
     const t = clock.getElapsedTime();
-    const progress = (0.36 + t * 0.012) % 1;
+    const routeRate = reducedMotion ? REDUCED_WHALE_ROUTE_RATE : WHALE_ROUTE_RATE;
+    const progress = (0.36 + t * routeRate) % 1;
+    const verticalAmplitude = reducedMotion ? 0.025 : 0.08;
+    const depthAmplitude = reducedMotion ? 0.07 : 0.22;
 
     route.position.set(
       THREE.MathUtils.lerp(8.2, -8.2, progress),
-      3.25 + Math.sin(t * 0.12) * 0.08,
-      -11.4 + Math.sin(t * 0.08) * 0.22,
+      3.25 + Math.sin(t * 0.12) * verticalAmplitude,
+      -11.4 + Math.sin(t * 0.08) * depthAmplitude,
     );
   });
 
