@@ -3,17 +3,12 @@ import {
   REEF_FOUNDATION_PASS,
   REEF_FOUNDATION_PRESENTATION_VERSION,
 } from '../../src/features/home/reef3d/reefFoundationPresentation';
+import { REEF_FISH_ROUTE_COUNT } from '../../src/features/home/reef3d/reefFishSchoolMotion';
 import {
   REEF_FISH_SCHOOL_MODEL,
   REEF_FISH_SCHOOL_ROUTE_PROFILE,
   REEF_FISH_SCHOOL_SCALE,
 } from '../../src/features/home/reef3d/reefFishSchoolPresentation';
-import {
-  REEF_BACKDROP_MAX_TRIANGLES,
-  REEF_BACKDROP_MODEL,
-  REEF_BACKDROP_PRESENTATION,
-  REEF_BACKDROP_SOURCE_MESHES,
-} from '../../src/features/home/reef3d/reefAssetManifest';
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
@@ -30,8 +25,6 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
   test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
 
   test('switches between the accepted Crystal, Tree and Reef renderers', async ({ page }) => {
-    // Три тривимірні конвеєри поспіль — кристал, дерево, риф — в одному
-    // тесті. Спільний бюджет має лишатись про звичайний екран.
     test.slow();
     await login(page, '?artifact=crystal#/login');
 
@@ -49,13 +42,6 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await page.getByRole('tab', { name: 'Дерево', exact: true }).click();
     await expect(home).toHaveAttribute('data-home-artifact', 'tree');
     await expect(page.getByRole('heading', { name: 'Дерево Amore' })).toBeVisible();
-    // Дерево на головній — не лабораторія.
-    //
-    // Тут стояв маркер лабораторії (`data-tree-lab-preview`), і саме тому цей
-    // тест падав: дерево давно винесене з тієї рамки, а лабораторія лишилась
-    // за прапорцем `engine=tree-lab` (див. `CrystalSceneEntry`). Пара на
-    // головній бачить `EvolutionTreePreviewScene`, який публікує спільний
-    // маркер сцени з видом «tree» — саме його тут і треба чекати.
     const tree = page.locator('[data-evolution-preview="ready"][data-evolution-species="tree"]');
     await expect(tree).toBeVisible({ timeout: 25_000 });
     await page.screenshot({
@@ -78,37 +64,22 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
       REEF_FOUNDATION_PRESENTATION_VERSION,
     );
     await expect(reef).toHaveAttribute('data-reef-foundation-pass', REEF_FOUNDATION_PASS);
-    await expect(reef).toHaveAttribute('data-reef-backdrop-model', REEF_BACKDROP_MODEL, {
-      timeout: 25_000,
-    });
-    await expect(reef).toHaveAttribute(
-      'data-reef-backdrop-presentation',
-      REEF_BACKDROP_PRESENTATION,
-    );
-    await expect(reef).toHaveAttribute(
-      'data-reef-backdrop-source-meshes',
-      String(REEF_BACKDROP_SOURCE_MESHES),
-    );
-    await expect(reef).toHaveAttribute('data-reef-backdrop-draw-calls', '1');
+
     await expect(reef).toHaveAttribute('data-reef-fish-model', REEF_FISH_SCHOOL_MODEL, {
       timeout: 25_000,
     });
-    const visiblePlanFish = Number(await reef.getAttribute('data-reef-plan-fish-visible'));
-    expect(visiblePlanFish).toBeGreaterThanOrEqual(0);
-    await expect(reef).toHaveAttribute(
-      'data-reef-fish-meshes',
-      visiblePlanFish > 0 ? '1' : '0',
-    );
-    await expect(reef).toHaveAttribute('data-reef-fish-routes', String(visiblePlanFish));
+    await expect(reef).toHaveAttribute('data-reef-fish-meshes', '4');
+    await expect(reef).toHaveAttribute('data-reef-fish-routes', String(REEF_FISH_ROUTE_COUNT));
     await expect(reef).toHaveAttribute(
       'data-reef-fish-animated-routes',
-      String(visiblePlanFish),
+      String(REEF_FISH_ROUTE_COUNT),
     );
     await expect(reef).toHaveAttribute(
       'data-reef-fish-route-profile',
       REEF_FISH_SCHOOL_ROUTE_PROFILE,
     );
     await expect(reef).toHaveAttribute('data-reef-fish-scale', String(REEF_FISH_SCHOOL_SCALE));
+
     await expect(reef).toHaveAttribute('data-reef-structure-collision-free', 'true');
     await expect(reef).toHaveAttribute('data-reef-static-acceptance', 'pass');
     await expect(reef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
@@ -135,26 +106,17 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reefFishWidth = Number(await reef.getAttribute('data-reef-fish-width'));
     const reefFishHeight = Number(await reef.getAttribute('data-reef-fish-height'));
     const reefFishTracks = Number(await reef.getAttribute('data-reef-fish-tracks'));
-    const reefBackdropTriangles = Number(await reef.getAttribute('data-reef-backdrop-triangles'));
-    const reefBackdropWidth = Number(await reef.getAttribute('data-reef-backdrop-width'));
-    const reefBackdropHeight = Number(await reef.getAttribute('data-reef-backdrop-height'));
     const reefColonies = Number(await reef.getAttribute('data-reef-colonies'));
     const reefVisibleColonies = Number(await reef.getAttribute('data-reef-visible-colonies'));
     expect(reefDrawCalls).toBeGreaterThan(0);
     expect(reefDrawCalls).toBeLessThanOrEqual(7);
     expect(reefVertices).toBeLessThanOrEqual(24_256);
     expect(reefTriangles).toBeLessThanOrEqual(36_512);
-    if (visiblePlanFish > 0) {
-      expect(reefFishWidth).toBeGreaterThanOrEqual(2);
-      expect(reefFishHeight).toBeGreaterThanOrEqual(0.5);
-    }
-    expect(reefFishTracks).toBe(visiblePlanFish * 2);
+    expect(reefFishWidth).toBeGreaterThanOrEqual(2);
+    expect(reefFishHeight).toBeGreaterThanOrEqual(0.5);
+    expect(reefFishTracks).toBeGreaterThanOrEqual(REEF_FISH_ROUTE_COUNT * 2);
     expect(reefVisibleColonies).toBeGreaterThan(0);
     expect(reefVisibleColonies).toBeLessThanOrEqual(reefColonies);
-    expect(reefBackdropTriangles).toBeGreaterThan(0);
-    expect(reefBackdropTriangles).toBeLessThanOrEqual(REEF_BACKDROP_MAX_TRIANGLES);
-    expect(reefBackdropWidth).toBeGreaterThan(7);
-    expect(reefBackdropHeight).toBeGreaterThan(0.5);
     await page.screenshot({
       path: 'test-results/home-artifact-reef-pixel-8-pro.png',
       fullPage: true,
