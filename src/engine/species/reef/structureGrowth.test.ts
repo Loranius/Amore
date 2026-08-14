@@ -40,19 +40,34 @@ function evolution(
 }
 
 describe('Reef growth structure layout', () => {
-  it('turns annual growth zones into varied structures instead of one arch per year', () => {
+  it('keeps varied annual zones while guaranteeing a sparse completed-year arch backbone', () => {
     const source = evolution();
     const layout = buildReefGrowthStructureLayout(source);
-    const annualStructures = [...layout.arches, ...layout.terraces];
+    const visibleZones = source.development.annualZones.filter((zone) => zone.progress > 0);
+    const baseAnnualStructures = [
+      ...layout.arches.filter((arch) => arch.id.startsWith('reef:growth-zone-arch:')),
+      ...layout.terraces,
+    ];
+    const representedYears = new Set(
+      baseAnnualStructures.map((item) => item.yearIndex ?? 0),
+    );
+    const desiredCompletedArchCount = Math.min(
+      6,
+      Math.max(1, Math.ceil(source.facts.completedYears / 2)),
+    );
+    const completedYearIndices = new Set(
+      source.development.annualZones.filter((zone) => zone.complete).map((zone) => zone.yearIndex),
+    );
+    const completedArchCount = layout.arches.filter(
+      (arch) => completedYearIndices.has(arch.yearIndex),
+    ).length;
 
     expect(layout.version).toBe('reef-growth-structure-layout-v1');
-    expect(annualStructures).toHaveLength(
-      source.development.annualZones.filter((zone) => zone.progress > 0).length,
-    );
-    expect(annualStructures.map((item) => item.yearIndex ?? 0).sort((a, b) => a - b))
-      .toEqual(source.development.annualZones.filter((zone) => zone.progress > 0).map((zone) => zone.yearIndex));
-    expect(layout.arches.length).toBeLessThan(source.development.annualZones.length);
+    expect([...representedYears].sort((a, b) => a - b))
+      .toEqual(visibleZones.map((zone) => zone.yearIndex));
     expect(layout.terraces.some((item) => item.archetype === 'core')).toBe(true);
+    expect(layout.arches.length).toBeGreaterThan(0);
+    expect(completedArchCount).toBeGreaterThanOrEqual(desiredCompletedArchCount);
     expect(layout.diagnostics.rejectedArchIds).toEqual([]);
     expect(layout.diagnostics.rejectedTerraceIds).toEqual([]);
   });
