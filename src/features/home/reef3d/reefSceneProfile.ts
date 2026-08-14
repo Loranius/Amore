@@ -1,5 +1,5 @@
 export const REEF_SCENE_PROFILE_VERSION = 'reef-scene-profile-v1';
-export const REEF_CAMERA_PASS = 'bounded-front-orbit-with-terrace-overview';
+export const REEF_CAMERA_PASS = 'full-360-orbit-with-reef-overview';
 export const REEF_LIGHTING_PASS = 'warm-surface-key-with-cool-water-fill';
 export const REEF_PALETTE_PASS = 'light-limestone-living-coral-palette';
 
@@ -76,10 +76,10 @@ export const REEF_CAMERA_ORBIT_PROFILE = Object.freeze({
   target: [0, 0.78, 0] as ReefSceneVec3,
   initialAzimuth: -0.08,
   initialPolarAngle: 1.25,
-  minAzimuthAngle: -0.62,
-  maxAzimuthAngle: 0.62,
-  minPolarAngle: 1.08,
-  maxPolarAngle: 1.34,
+  minAzimuthAngle: Number.NEGATIVE_INFINITY,
+  maxAzimuthAngle: Number.POSITIVE_INFINITY,
+  minPolarAngle: 0.72,
+  maxPolarAngle: 1.48,
   foregroundClearRadius: 3.2,
 } as const);
 
@@ -98,9 +98,10 @@ function positionFromSpherical(
 }
 
 /**
- * Keeps the whole island readable on narrow phones while preserving the same
- * authored front arc on wider previews. The orbit never reaches the rear
- * rocks that previously became large foreground occluders.
+ * Keeps the whole island readable on narrow phones while allowing a complete
+ * orbit around the reef. The polar range stays above the seabed so touch drag
+ * can inspect the crown and rear structures without putting the camera below
+ * the world surface.
  */
 export function reefCameraFrameForAspect(aspect: number): ReefCameraFrame {
   const portrait = !Number.isFinite(aspect) || aspect < 0.72;
