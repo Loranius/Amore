@@ -91,6 +91,7 @@ export function ReefStage({
       <ReefSeaGrass reducedMotion={reducedMotion} />
       <ReefSessileLife reducedMotion={reducedMotion} />
       <ReefFishSchool
+        build={build}
         count={build.species.moduleEvolution.life.planFish.visibleCount}
         identitySeed={build.species.moduleEvolution.identitySeed}
         onReady={onFishReady}
