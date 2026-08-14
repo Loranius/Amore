@@ -68,13 +68,14 @@ describe('Reef growth structure layout', () => {
     expect(layout.diagnostics.minimumExternalClearance).toBeGreaterThanOrEqual(0);
   });
 
-  it('does not create Schedule terraces; shared days off only alter annual cohesion', () => {
+  it('does not render Schedule terraces; shared days off only alter annual cohesion', () => {
     const withoutSchedule = evolution([], []);
     const withSchedule = evolution();
     const withoutLayout = buildReefGrowthStructureLayout(withoutSchedule);
     const withLayout = buildReefGrowthStructureLayout(withSchedule);
 
-    expect(withSchedule.entities.scheduleTerraces).toEqual([]);
+    expect(withSchedule.entities.scheduleTerraces.length)
+      .toBe(withSchedule.facts.sharedDaysOffMonthCount);
     expect(withSchedule.foundation.scheduleTerraces.visibleCount).toBe(0);
     expect(withLayout.arches.length + withLayout.terraces.length)
       .toBe(withoutLayout.arches.length + withoutLayout.terraces.length);
