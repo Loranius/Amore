@@ -14,6 +14,7 @@ import { ReefSessileLife } from './ReefSessileLife';
 import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
+import { ReefWorldComposition } from './ReefWorldComposition';
 import {
   reefCameraFrameForAspect,
   REEF_ATMOSPHERE_PROFILE,
@@ -81,6 +82,7 @@ export function ReefStage({
       </mesh>
 
       <ReefEnvironment build={build} />
+      <ReefWorldComposition />
       <ReefDensityLayer build={build} />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
