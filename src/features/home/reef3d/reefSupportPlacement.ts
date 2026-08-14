@@ -1,9 +1,37 @@
 import * as THREE from 'three';
+import type { ReefSurfaceSlotCandidate } from './reefSurfaceSlots';
 
 const DOWN = new THREE.Vector3(0, -1, 0);
 const ORIGIN = new THREE.Vector3();
 const WORLD_NORMAL = new THREE.Vector3();
 const RAYCASTER = new THREE.Raycaster();
+const SLOT_WORLD_POINT = new THREE.Vector3();
+
+interface SerializedReefSupportSlot {
+  id: string;
+  position: { x: number; y: number; z: number };
+  availableFromEpoch?: number;
+}
+
+function finite(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function isSerializedSupportSlot(value: unknown): value is SerializedReefSupportSlot {
+  if (!value || typeof value !== 'object') return false;
+  const candidate = value as Partial<SerializedReefSupportSlot>;
+  return typeof candidate.id === 'string'
+    && candidate.id.length > 0
+    && Boolean(candidate.position)
+    && finite(candidate.position?.x)
+    && finite(candidate.position?.y)
+    && finite(candidate.position?.z)
+    && (candidate.availableFromEpoch === undefined || finite(candidate.availableFromEpoch));
+}
+
+function round6(value: number): number {
+  return Math.round(value * 1_000_000) / 1_000_000;
+}
 
 export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
   const root = scene.getObjectByName('reef-hero-support');
@@ -15,6 +43,35 @@ export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
     if (object instanceof THREE.Mesh) meshes.push(object);
   });
   return meshes;
+}
+
+/** Collects authored horizontal shelves so the allocator does not have to hit them by chance. */
+export function collectReefSupportSlotCandidates(
+  supportMeshes: readonly THREE.Mesh[],
+): ReefSurfaceSlotCandidate[] {
+  const candidates: ReefSurfaceSlotCandidate[] = [];
+
+  for (const mesh of supportMeshes) {
+    const serialized = mesh.geometry.userData.reefCoralAttachmentSlots;
+    if (!Array.isArray(serialized)) continue;
+    mesh.updateWorldMatrix(true, false);
+
+    for (const value of serialized) {
+      if (!isSerializedSupportSlot(value)) continue;
+      SLOT_WORLD_POINT.set(value.position.x, value.position.y, value.position.z);
+      mesh.localToWorld(SLOT_WORLD_POINT);
+      candidates.push({
+        id: value.id,
+        x: round6(SLOT_WORLD_POINT.x),
+        z: round6(SLOT_WORLD_POINT.z),
+        ...(value.availableFromEpoch === undefined
+          ? {}
+          : { availableFromEpoch: value.availableFromEpoch }),
+      });
+    }
+  }
+
+  return candidates.sort((left, right) => left.id.localeCompare(right.id));
 }
 
 export function raycastReefSupport(

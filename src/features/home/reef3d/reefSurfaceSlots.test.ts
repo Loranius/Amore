@@ -119,4 +119,33 @@ describe('reef surface slots', () => {
     expect(allocation.diagnostics.allocatedCount).toBe(0);
     expect(allocation.diagnostics.unresolvedRequestIds).toEqual(['visible-fallback']);
   });
+
+  it('does not move an older colony onto a shelf from a future growth epoch', () => {
+    const candidates = [
+      { id: 'current-surface', x: 0, z: 0 },
+      { id: 'future-arch-shelf', x: 1.6, z: 0, availableFromEpoch: 2 },
+    ];
+    const sample: ReefSurfaceSampler = (x, z) => (
+      (x === 0 || x === 1.6) && z === 0 ? { x, y: 0.8, z } : null
+    );
+    const older = allocateReefSurfaceSlots({
+      requests: [{
+        ...request('older-colony', 1, 2, 0),
+        epochIndex: 1,
+      }],
+      candidates,
+      sample,
+    });
+    const contemporary = allocateReefSurfaceSlots({
+      requests: [{
+        ...request('contemporary-colony', 2, 2, 0),
+        epochIndex: 2,
+      }],
+      candidates,
+      sample,
+    });
+
+    expect(older.slots[0]?.candidateId).toBe('current-surface');
+    expect(contemporary.slots[0]?.candidateId).toBe('future-arch-shelf');
+  });
 });

@@ -7,7 +7,10 @@ import {
   type ReefSurfaceSlotDiagnostics,
   type ReefSurfaceSlotRequest,
 } from './reefSurfaceSlots';
-import { raycastReefSupport } from './reefSupportPlacement';
+import {
+  collectReefSupportSlotCandidates,
+  raycastReefSupport,
+} from './reefSupportPlacement';
 import type {
   ReefBatchRuntimeRange,
   ReefRenderableBatch,
@@ -177,6 +180,9 @@ export function applyReefCoralSurfacePlacement({
   const colonyById = new Map(
     build.layout.colonies.map((colony) => [colony.id, colony] as const),
   );
+  const instructionById = new Map(
+    build.species.growth.map((instruction) => [instruction.id, instruction] as const),
+  );
   const runtimePlacements: RuntimePlacement[] = [];
   const pivotWorld = new THREE.Vector3();
 
@@ -185,12 +191,16 @@ export function applyReefCoralSurfacePlacement({
       pivotWorld.set(runtime.motion.pivot.x, runtime.motion.pivot.y, runtime.motion.pivot.z);
       group.localToWorld(pivotWorld);
       const colony = colonyById.get(runtime.range.colonyId);
+      const instruction = colony
+        ? instructionById.get(colony.sourceInstructionId)
+        : undefined;
       runtimePlacements.push({
         batch,
         runtime,
         request: {
           id: runtime.range.id,
           sequence: runtime.range.sequence,
+          ...(instruction ? { epochIndex: instruction.epochIndex } : {}),
           preferred: {
             x: pivotWorld.x,
             y: pivotWorld.y,
@@ -202,10 +212,13 @@ export function applyReefCoralSurfacePlacement({
     }
   }
 
-  const candidates = buildReefSurfaceSlotCandidates({
-    foundationRadius: build.structures.visibleFoundationRadius,
-    seed: build.species.moduleEvolution.identitySeed,
-  });
+  const candidates = [
+    ...buildReefSurfaceSlotCandidates({
+      foundationRadius: build.structures.visibleFoundationRadius,
+      seed: build.species.moduleEvolution.identitySeed,
+    }),
+    ...collectReefSupportSlotCandidates(supportMeshes),
+  ];
   const allocation = allocateReefSurfaceSlots({
     requests: runtimePlacements.map((placement) => placement.request),
     candidates,

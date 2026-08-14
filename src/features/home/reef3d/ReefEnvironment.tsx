@@ -5,10 +5,8 @@ import {
   useRef,
 } from 'react';
 import {
-  CatmullRomCurve3,
   DoubleSide,
   Object3D,
-  Vector3,
   type InstancedMesh,
   type Material,
 } from 'three';
@@ -18,6 +16,11 @@ import type {
   ReefGrowthTerracePlacement,
 } from '@/engine/species/reef';
 import type { ReefPreviewBuild } from './buildReefPreview';
+import {
+  buildReefLimestoneArchGeometry,
+  reefArchFootPoints,
+  REEF_LIMESTONE_ARCH_PASS,
+} from './reefLimestoneArch';
 import {
   buildReefTerracedFoundationGeometry,
   createReefTerracedFoundationProfile,
@@ -212,28 +215,7 @@ function ReefTerracedFoundation({
   );
 }
 
-function worldPointFromLocal(
-  center: { x: number; z: number },
-  rotationY: number,
-  localX: number,
-  localZ: number,
-): { x: number; z: number } {
-  const cosine = Math.cos(rotationY);
-  const sine = Math.sin(rotationY);
-  return {
-    x: center.x + localX * cosine + localZ * sine,
-    z: center.z - localX * sine + localZ * cosine,
-  };
-}
-
-function archFootPoints(arch: ReefGrowthArchPlacement): readonly [{ x: number; z: number }, { x: number; z: number }] {
-  return [
-    worldPointFromLocal(arch.center, arch.rotationY, -arch.span * 0.5, 0),
-    worldPointFromLocal(arch.center, arch.rotationY, arch.span * 0.5, 0),
-  ];
-}
-
-/** One completed relationship year becomes a curved structure planted at both feet. */
+/** One completed relationship year becomes one faceted limestone support mesh. */
 function GrowthArch({
   arch,
   material,
@@ -243,62 +225,27 @@ function GrowthArch({
   material: Material;
   profile: ReefTerracedFoundationProfile;
 }) {
-  const grounded = useMemo(() => {
-    const [leftFoot, rightFoot] = archFootPoints(arch);
-    const leftY = sampleReefTerracedFoundation(profile, leftFoot.x, leftFoot.z).height;
-    const rightY = sampleReefTerracedFoundation(profile, rightFoot.x, rightFoot.z).height;
-    const apexY = Math.max(leftY, rightY) + arch.height;
-    return {
-      leftY,
-      rightY,
-      apexY,
-      curve: new CatmullRomCurve3([
-        new Vector3(-arch.span * 0.5, leftY, 0),
-        new Vector3(
-          -arch.span * 0.34,
-          leftY + (apexY - leftY) * 0.56,
-          arch.curveDepth * 0.42,
-        ),
-        new Vector3(0, apexY, arch.curveDepth),
-        new Vector3(
-          arch.span * 0.34,
-          rightY + (apexY - rightY) * 0.56,
-          arch.curveDepth * 0.42,
-        ),
-        new Vector3(arch.span * 0.5, rightY, 0),
-      ], false, 'centripetal'),
-    };
-  }, [arch, profile]);
+  const geometry = useMemo(
+    () => buildReefLimestoneArchGeometry({ arch, profile }),
+    [arch, profile],
+  );
+
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   return (
-    <group
+    <mesh
       name={arch.id}
       position={[arch.center.x, 0, arch.center.z]}
       rotation={[0, arch.rotationY, 0]}
-    >
-      <mesh material={material} receiveShadow={false} castShadow={false}>
-        <tubeGeometry args={[grounded.curve, 36, arch.thickness, 8, false]} />
-      </mesh>
-      <RockMass
-        position={[-arch.span * 0.48, grounded.leftY - arch.thickness * 0.08, 0]}
-        scale={[arch.thickness * 1.8, arch.thickness * 1.35, arch.thickness * 1.55]}
-        rotation={[0.06, 0.28, -0.04]}
-        material={material}
-      />
-      <RockMass
-        position={[arch.span * 0.48, grounded.rightY - arch.thickness * 0.08, 0]}
-        scale={[arch.thickness * 1.75, arch.thickness * 1.32, arch.thickness * 1.5]}
-        rotation={[-0.04, -0.26, 0.05]}
-        material={material}
-      />
-      <PlateLedge
-        position={[0, grounded.apexY - arch.thickness * 0.22, arch.curveDepth * 0.76]}
-        scale={[arch.span * 0.32, arch.thickness * 0.52, arch.span * 0.2]}
-        rotation={[0.02, arch.rotationY * 0.08, -0.02]}
-        material={material}
-        variant={(arch.yearIndex % 5) as 0 | 1 | 2 | 3 | 4}
-      />
-    </group>
+      geometry={geometry}
+      material={material}
+      receiveShadow={false}
+      castShadow={false}
+      userData={{
+        reefSupportSurface: true,
+        reefLimestoneArchPass: REEF_LIMESTONE_ARCH_PASS,
+      }}
+    />
   );
 }
 
@@ -436,7 +383,7 @@ function buildContactPatches(
   }];
 
   for (const arch of build.structures.arches) {
-    for (const foot of archFootPoints(arch)) {
+    for (const foot of reefArchFootPoints(arch)) {
       const surface = sampleReefTerracedFoundation(profile, foot.x, foot.z);
       patches.push({
         x: foot.x,
@@ -585,7 +532,7 @@ export function ReefEnvironment({ build }: { build: ReefPreviewBuild }) {
           <GrowthArch
             key={arch.id}
             arch={arch}
-            material={rockMaterials.hero}
+            material={rockMaterials.arch}
             profile={profile}
           />
         ))}

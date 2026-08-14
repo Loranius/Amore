@@ -14,11 +14,14 @@ export interface ReefSurfaceSlotCandidate {
   id: string;
   x: number;
   z: number;
+  /** Optional growth epoch that must exist before this support can be used. */
+  availableFromEpoch?: number;
 }
 
 export interface ReefSurfaceSlotRequest {
   id: string;
   sequence: number;
+  epochIndex?: number;
   preferred: ReefSurfacePoint;
   footprintRadius: number;
 }
@@ -56,6 +59,7 @@ interface SampledCandidate {
   id: string;
   kind: ReefAllocatedSurfaceSlot['kind'];
   position: ReefSurfacePoint;
+  availableFromEpoch?: number;
 }
 
 function round6(value: number): number {
@@ -151,6 +155,14 @@ function scoreCandidate(
   return horizontalDistance + verticalDistance * 0.14;
 }
 
+function isAvailableForRequest(
+  candidate: SampledCandidate,
+  request: ReefSurfaceSlotRequest,
+): boolean {
+  if (candidate.availableFromEpoch === undefined || request.epochIndex === undefined) return true;
+  return candidate.availableFromEpoch <= request.epochIndex;
+}
+
 /**
  * Assigns one chronological surface slot to every request whenever any sampled
  * support exists. Preferred anchors win first; unsupported anchors use the
@@ -176,7 +188,16 @@ export function allocateReefSurfaceSlots({
   };
   const registry = candidates.flatMap<SampledCandidate>((candidate) => {
     const position = sampleAt(candidate.x, candidate.z);
-    return position ? [{ id: candidate.id, kind: 'registry', position }] : [];
+    return position
+      ? [{
+          id: candidate.id,
+          kind: 'registry',
+          position,
+          ...(candidate.availableFromEpoch === undefined
+            ? {}
+            : { availableFromEpoch: candidate.availableFromEpoch }),
+        }]
+      : [];
   });
   const orderedRequests = [...requests].sort(
     (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
@@ -193,14 +214,17 @@ export function allocateReefSurfaceSlots({
           position: preferredPosition,
         }, ...registry]
       : [...registry];
-    options.sort((left, right) => (
+    const availableOptions = options.filter((candidate) => (
+      isAvailableForRequest(candidate, request)
+    ));
+    availableOptions.sort((left, right) => (
       scoreCandidate(left, request) - scoreCandidate(right, request)
       || left.id.localeCompare(right.id)
     ));
 
     let accepted: ReefAllocatedSurfaceSlot | null = null;
     for (const clearanceRatio of CLEARANCE_PASSES) {
-      const candidate = options.find((option) => (
+      const candidate = availableOptions.find((option) => (
         canOccupy(option, request, slots, clearanceRatio)
       ));
       if (!candidate) continue;

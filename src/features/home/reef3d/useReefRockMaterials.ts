@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { REEF_ROCK_TEXTURE_PATHS } from './reefAssetManifest';
 
 interface ReefRockMaterials {
+  arch: THREE.MeshStandardMaterial;
   distant: THREE.MeshStandardMaterial;
   foundationSide: THREE.MeshStandardMaterial;
   foundationTop: THREE.MeshStandardMaterial;
@@ -12,7 +13,7 @@ interface ReefRockMaterials {
   rock: THREE.MeshStandardMaterial;
 }
 
-/** One cached 1K PBR texture set and two shared materials for all world rocks. */
+/** One cached 1K PBR texture set and shared materials for all world limestone. */
 export function useReefRockMaterials(): ReefRockMaterials {
   const maxAnisotropy = useThree((state) => state.gl.capabilities.getMaxAnisotropy());
   const [map, normalMap, roughnessMap] = useTexture([
@@ -66,6 +67,17 @@ export function useReefRockMaterials(): ReefRockMaterials {
       emissive: '#1b2e2a',
       emissiveIntensity: 0.035,
     });
+    const arch = new THREE.MeshStandardMaterial({
+      ...common,
+      name: 'reef-limestone-year-arch',
+      color: '#ffffff',
+      vertexColors: true,
+      roughness: 0.94,
+      normalScale: new THREE.Vector2(0.34, 0.34),
+      emissive: '#28342d',
+      emissiveIntensity: 0.045,
+      flatShading: true,
+    });
     const hero = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-coral-stone-hero',
@@ -80,10 +92,11 @@ export function useReefRockMaterials(): ReefRockMaterials {
       emissive: '#123a3b',
       emissiveIntensity: 0.06,
     });
-    return { distant, foundationSide, foundationTop, hero, rock };
+    return { arch, distant, foundationSide, foundationTop, hero, rock };
   }, [map, normalMap, roughnessMap]);
 
   useEffect(() => () => {
+    materials.arch.dispose();
     materials.rock.dispose();
     materials.hero.dispose();
     materials.foundationTop.dispose();
