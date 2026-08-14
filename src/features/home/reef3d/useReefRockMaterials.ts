@@ -94,8 +94,13 @@ export function useReefRockMaterials(): ReefRockMaterials {
       ...common,
       name: 'reef-coral-stone-distant',
       color: REEF_SCENE_PALETTE.rockDistant,
+      roughness: 1,
+      normalScale: new THREE.Vector2(0.18, 0.18),
       emissive: REEF_SCENE_PALETTE.distantEmissive,
-      emissiveIntensity: 0.045,
+      emissiveIntensity: 0.018,
+      transparent: true,
+      opacity: 0.58,
+      depthWrite: false,
     });
     return { arch, distant, foundationSide, foundationTop, hero, rock };
   }, [map, normalMap, roughnessMap]);
