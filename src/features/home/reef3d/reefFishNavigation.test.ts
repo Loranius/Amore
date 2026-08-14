@@ -69,6 +69,7 @@ describe('reef fish navigation', () => {
         new THREE.Vector3(1, 2, 1),
       ),
       label: 'test-rock',
+      kind: 'solid',
     };
     const start = new THREE.Vector3(0.92, 0.2, 0.1);
     const delta = reefFishCollisionDelta(start, [obstacle], 0.2);
@@ -80,6 +81,41 @@ describe('reef fish navigation', () => {
     expect(expanded.containsPoint(corrected)).toBe(false);
   });
 
+  it('lets tunnel guidance ignore arch rocks without disabling other collisions', () => {
+    const archRock: ReefFishObstacle = {
+      box: new THREE.Box3(
+        new THREE.Vector3(-1, 0, -1),
+        new THREE.Vector3(1, 2, 1),
+      ),
+      label: 'natural-arch-rock:0',
+      kind: 'arch-rock',
+    };
+    const sideRock: ReefFishObstacle = {
+      box: new THREE.Box3(
+        new THREE.Vector3(3, 0, -1),
+        new THREE.Vector3(5, 2, 1),
+      ),
+      label: 'side-rock',
+      kind: 'solid',
+    };
+
+    const tunnelPoint = new THREE.Vector3(0, 0.8, 0);
+    expect(reefFishCollisionDelta(
+      tunnelPoint,
+      [archRock, sideRock],
+      0.2,
+      { ignoreArchRocks: true },
+    ).lengthSq()).toBe(0);
+
+    const sidePoint = new THREE.Vector3(4, 0.8, 0);
+    expect(reefFishCollisionDelta(
+      sidePoint,
+      [archRock, sideRock],
+      0.2,
+      { ignoreArchRocks: true },
+    ).length()).toBeGreaterThan(0);
+  });
+
   it('leaves open-water points unchanged', () => {
     const obstacle: ReefFishObstacle = {
       box: new THREE.Box3(
@@ -87,6 +123,7 @@ describe('reef fish navigation', () => {
         new THREE.Vector3(1, 2, 1),
       ),
       label: 'test-rock',
+      kind: 'solid',
     };
     const start = new THREE.Vector3(4, 3, -4);
     const delta = reefFishCollisionDelta(start, [obstacle]);
