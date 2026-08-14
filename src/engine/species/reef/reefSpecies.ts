@@ -24,11 +24,13 @@ import {
   stableSeed,
   vectorTotal,
 } from './math';
+import { REEF_EVENT_SOURCE_MODULES } from './types';
 import type {
   BuildReefSpeciesBlueprintInput,
   ReefColonyMorphotype,
   ReefColonyRole,
   ReefColonyTier,
+  ReefEventSourceModule,
   ReefGrowthGrammar,
   ReefGrowthInstruction,
   ReefLifeStage,
@@ -45,6 +47,97 @@ const FOUNDATION_MORPHOTYPES: readonly ReefColonyMorphotype[] = [
   'massive',
   'soft-coral',
 ];
+const REEF_EVENT_SOURCE_SET = new Set<string>(REEF_EVENT_SOURCE_MODULES);
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+interface ReefScheduleDay {
+  date: string;
+  epochIndex: number;
+}
+
+interface NormalizedReefSchedule {
+  days: ReefScheduleDay[];
+  invalidDates: string[];
+  duplicateDates: string[];
+  futureDates: string[];
+  preRelationshipDates: string[];
+}
+
+function sourceModuleFor(source: string): ReefEventSourceModule | null {
+  const module = source.split('@', 1)[0]?.trim() ?? '';
+  return REEF_EVENT_SOURCE_SET.has(module) ? module as ReefEventSourceModule : null;
+}
+
+function calendarDateNumber(date: { year: number; month: number; day: number }): number {
+  return Date.UTC(date.year, date.month - 1, date.day);
+}
+
+function normalizeSharedDaysOff(
+  artifact: ArtifactBlueprint,
+  asOf: string,
+  values: readonly string[],
+): NormalizedReefSchedule {
+  const relationshipStart = parseCalendarDate(
+    artifact.relationshipStartedAt,
+    artifact.timeZone,
+  );
+  const asOfDate = parseCalendarDate(asOf, artifact.timeZone);
+  if (!relationshipStart || !asOfDate) {
+    throw new Error('Reef Species could not normalize Schedule calendar dates.');
+  }
+
+  const relationshipStartNumber = calendarDateNumber(relationshipStart);
+  const asOfNumber = calendarDateNumber(asOfDate);
+  const accepted = new Map<string, ReefScheduleDay>();
+  const seen = new Set<string>();
+  const invalidDates = new Set<string>();
+  const duplicateDates = new Set<string>();
+  const futureDates = new Set<string>();
+  const preRelationshipDates = new Set<string>();
+
+  for (const rawValue of values) {
+    const value = rawValue.trim();
+    const date = DATE_ONLY_PATTERN.test(value)
+      ? parseCalendarDate(value, artifact.timeZone)
+      : null;
+    if (!date) {
+      invalidDates.add(rawValue);
+      continue;
+    }
+    if (seen.has(value)) {
+      duplicateDates.add(value);
+      continue;
+    }
+    seen.add(value);
+
+    const dateNumber = calendarDateNumber(date);
+    if (dateNumber > asOfNumber) {
+      futureDates.add(value);
+      continue;
+    }
+    if (dateNumber < relationshipStartNumber) {
+      preRelationshipDates.add(value);
+      continue;
+    }
+
+    accepted.set(value, {
+      date: value,
+      epochIndex: relationshipEpochIndex(
+        relationshipStart,
+        date,
+        artifact.leapDayPolicy,
+      ),
+    });
+  }
+
+  return {
+    days: [...accepted.values()].sort((left, right) => left.date.localeCompare(right.date)),
+    invalidDates: [...invalidDates].sort(),
+    duplicateDates: [...duplicateDates].sort(),
+    futureDates: [...futureDates].sort(),
+    preRelationshipDates: [...preRelationshipDates].sort(),
+  };
+}
 
 function isLeapYear(year: number): boolean {
   return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
@@ -86,15 +179,22 @@ function completedRelationshipYears(artifact: ArtifactBlueprint, asOf: string): 
   return relationshipEpochIndex(relationshipStart, currentDate, artifact.leapDayPolicy);
 }
 
-function buildPressures(artifact: ArtifactBlueprint): ReefSpeciesPressures {
+function buildPressures(
+  artifact: ArtifactBlueprint,
+  sharedDaysOffCount: number,
+): ReefSpeciesPressures {
   const vector = artifact.pressureLedger.channels;
   const shares = normalizedShares(vector);
   const dominant = dominantChannel(vector);
   const portalActivity = artifact.pressureLedger.portalActivity;
+  // Schedule contributes as quiet, additive substrate support. It is kept out
+  // of the neutral pressure ledger so it cannot masquerade as portal activity.
+  const togetherness = saturate(sharedDaysOffCount, 18);
 
   return {
     substrateCoverage: saturate(
-      vector.stability * 1.15 + vector.remembrance * 0.48 + portalActivity * 0.32,
+      vector.stability * 1.15 + vector.remembrance * 0.48
+        + portalActivity * 0.32 + togetherness * 0.24,
       1.05,
     ),
     verticalComplexity: saturate(
@@ -111,7 +211,8 @@ function buildPressures(artifact: ArtifactBlueprint): ReefSpeciesPressures {
       0.95,
     ),
     encrustingPotential: saturate(
-      vector.stability * 1.28 + vector.remembrance * 0.38 + portalActivity * 0.18,
+      vector.stability * 1.28 + vector.remembrance * 0.38
+        + portalActivity * 0.18 + togetherness * 0.28,
       0.92,
     ),
     softCoralPotential: saturate(
@@ -119,7 +220,8 @@ function buildPressures(artifact: ArtifactBlueprint): ReefSpeciesPressures {
       1.05,
     ),
     resilience: saturate(
-      vector.stability * 1.22 + vector.significance * 0.42 + vector.remembrance * 0.28,
+      vector.stability * 1.22 + vector.significance * 0.42
+        + vector.remembrance * 0.28 + togetherness * 0.2,
       0.9,
     ),
     diversity: round6(clamp01(channelEvenness(vector) * 0.78 + portalActivity * 0.22)),
@@ -134,6 +236,7 @@ function buildState(
   artifact: ArtifactBlueprint,
   asOf: string,
   pressures: ReefSpeciesPressures,
+  sharedDaysOffCount: number,
 ): ReefSpeciesState {
   const ageDays = daysBetweenExplicit(artifact.relationshipStartedAt, asOf);
   if (ageDays === null) {
@@ -149,8 +252,9 @@ function buildState(
     completedYears,
     epochCount: completedYears + 1,
     eventCount,
+    sharedDaysOffCount,
     stage: stageFor(ageDays),
-    substrateMaturity: saturate(ageDays + eventCount * 28, 680),
+    substrateMaturity: saturate(ageDays + eventCount * 28 + sharedDaysOffCount * 4, 680),
     colonyMaturity: saturate(ageDays + eventCount * 62, 940),
     biodiversityMaturity: round6(clamp01(
       saturate(ageDays + eventCount * 48, 820) * (0.56 + pressures.diversity * 0.44),
@@ -286,6 +390,7 @@ function buildAnnualInstruction(
 
   return {
     id,
+    sourceModule: 'relationship',
     sourceEventId: null,
     sourceEpisodeId: null,
     epochIndex,
@@ -316,6 +421,7 @@ function buildAnnualInstruction(
 function buildEventInstruction(
   artifactSeed: number,
   event: NormalizedEvolutionEvent,
+  sourceModule: ReefEventSourceModule,
   asOf: string,
   grammar: ReefGrowthGrammar,
 ): ReefGrowthInstruction | null {
@@ -343,6 +449,7 @@ function buildEventInstruction(
 
   return {
     id,
+    sourceModule,
     sourceEventId: event.id,
     sourceEpisodeId: event.episodeId,
     epochIndex: event.epochIndex,
@@ -371,11 +478,69 @@ function buildEventInstruction(
   };
 }
 
+function buildScheduleInstructions(
+  artifact: ArtifactBlueprint,
+  schedule: NormalizedReefSchedule,
+  asOf: string,
+  grammar: ReefGrowthGrammar,
+): ReefGrowthInstruction[] {
+  const daysByEpoch = new Map<number, ReefScheduleDay[]>();
+  for (const day of schedule.days) {
+    const epochDays = daysByEpoch.get(day.epochIndex) ?? [];
+    epochDays.push(day);
+    daysByEpoch.set(day.epochIndex, epochDays);
+  }
+
+  return [...daysByEpoch.entries()]
+    .sort(([left], [right]) => left - right)
+    .map(([epochIndex, days]) => {
+      const id = `reef:schedule:${epochIndex}`;
+      const seed = stableSeed(artifact.deterministicSeed, id);
+      const monthCount = new Set(days.map((day) => day.date.slice(0, 7))).size;
+      const daySignal = saturate(days.length, 12);
+      const regularitySignal = saturate(monthCount, 4);
+      const weight = round6(clamp01(0.18 + daySignal * 0.42 + regularitySignal * 0.12));
+      const morphotype: ReefColonyMorphotype = 'encrusting';
+
+      return {
+        id,
+        sourceModule: 'schedule',
+        sourceEventId: null,
+        sourceEpisodeId: null,
+        epochIndex,
+        // Fixed to the relationship epoch boundary: adding another recorded
+        // day changes fullness, never the identity or chronological anchor.
+        sequence: anniversaryEpoch(artifact, epochIndex) * 10 + 3,
+        channel: null,
+        morphotype,
+        role: 'foundation',
+        tier: days.length >= 18 ? 'primary' : days.length >= 5 ? 'companion' : 'micro',
+        emphasized: false,
+        weight,
+        maturity: maturityAt(days[0]?.date ?? asOf, asOf, 120),
+        preferredAzimuthRad: round6(
+          (epochIndex * GOLDEN_ANGLE + seededUnit(seed, 'azimuth') * 0.44) % (Math.PI * 2),
+        ),
+        radialBand: Math.min(
+          grammar.radialBandCount - 1,
+          Math.floor(seededUnit(seed, 'radial-band') * 2),
+        ),
+        verticalBand: 0,
+        footprint: footprintFor(morphotype, weight),
+        heightBias: heightBiasFor(morphotype, weight),
+        branchingBias: branchingBiasFor(morphotype, weight),
+        recruitCount: days.length >= 12 ? 2 : 1,
+        seed,
+      };
+    });
+}
+
 function buildGrowth(
   artifact: ArtifactBlueprint,
   asOf: string,
   completedYears: number,
   grammar: ReefGrowthGrammar,
+  schedule: NormalizedReefSchedule,
 ): { growth: ReefGrowthInstruction[]; diagnostics: ReefSpeciesDiagnostics } {
   const asOfEpoch = Date.parse(asOf);
   if (!Number.isFinite(asOfEpoch)) throw new Error(`Invalid Reef Species asOf: "${asOf}".`);
@@ -384,11 +549,26 @@ function buildGrowth(
     { length: completedYears },
     (_value, index) => buildAnnualInstruction(artifact, grammar, index + 1),
   );
+  const scheduleInstructions = buildScheduleInstructions(artifact, schedule, asOf, grammar);
   const events: ReefGrowthInstruction[] = [];
+  const excludedEventIds: string[] = [];
   const zeroPressureEventIds: string[] = [];
   const futureEventIds: string[] = [];
+  const acceptedEventCountByModule: Record<ReefEventSourceModule, number> = {
+    calendar: 0,
+    plans: 0,
+    wishlist: 0,
+    map: 0,
+    memories: 0,
+    media: 0,
+  };
 
   for (const event of artifact.events) {
+    const sourceModule = sourceModuleFor(event.source);
+    if (!sourceModule) {
+      excludedEventIds.push(event.id);
+      continue;
+    }
     if (event.occurredAtEpochMs > asOfEpoch) {
       futureEventIds.push(event.id);
       continue;
@@ -396,6 +576,7 @@ function buildGrowth(
     const instruction = buildEventInstruction(
       artifact.deterministicSeed,
       event,
+      sourceModule,
       asOf,
       grammar,
     );
@@ -403,10 +584,11 @@ function buildGrowth(
       zeroPressureEventIds.push(event.id);
       continue;
     }
+    acceptedEventCountByModule[sourceModule] += 1;
     events.push(instruction);
   }
 
-  const growth = [...annual, ...events].sort(
+  const growth = [...annual, ...scheduleInstructions, ...events].sort(
     (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
   );
   const emittedColonyIntentCount = growth.reduce(
@@ -417,11 +599,19 @@ function buildGrowth(
   return {
     growth,
     diagnostics: {
-      emptyHistory: events.length === 0,
+      emptyHistory: events.length === 0 && schedule.days.length === 0,
+      excludedEventIds: excludedEventIds.sort(),
       zeroPressureEventIds: zeroPressureEventIds.sort(),
       futureEventIds: futureEventIds.sort(),
+      invalidSharedDayOffDates: schedule.invalidDates,
+      duplicateSharedDayOffDates: schedule.duplicateDates,
+      futureSharedDayOffDates: schedule.futureDates,
+      preRelationshipSharedDayOffDates: schedule.preRelationshipDates,
+      acceptedEventCountByModule,
+      sharedDaysOffCount: schedule.days.length,
       annualInstructionCount: annual.length,
       eventInstructionCount: events.length,
+      scheduleInstructionCount: scheduleInstructions.length,
       emittedColonyIntentCount,
       maximumAcceptedColonies: grammar.maximumAcceptedColonies,
       colonyBudgetExceeded: emittedColonyIntentCount > grammar.maximumAcceptedColonies,
@@ -443,20 +633,23 @@ export function buildReefSpeciesBlueprint(
   const asOfEpoch = parseEvolutionInstant(input.config.asOf);
   if (asOfEpoch === null) throw new Error(`Invalid Reef Species asOf: "${input.config.asOf}".`);
   const asOf = new Date(asOfEpoch).toISOString();
+  const schedule = normalizeSharedDaysOff(
+    input.artifact,
+    asOf,
+    input.config.sharedDaysOff ?? [],
+  );
 
   const currentEvents = input.artifact.events.filter(
-    (event) => event.occurredAtEpochMs <= asOfEpoch,
+    (event) => sourceModuleFor(event.source) !== null && event.occurredAtEpochMs <= asOfEpoch,
   );
-  const currentArtifact = currentEvents.length === input.artifact.events.length
-    ? input.artifact
-    : {
-        ...input.artifact,
-        events: currentEvents,
-        pressureLedger: buildPressureLedger(currentEvents),
-      };
+  const currentArtifact = {
+    ...input.artifact,
+    events: currentEvents,
+    pressureLedger: buildPressureLedger(currentEvents),
+  };
 
-  const pressures = buildPressures(currentArtifact);
-  const state = buildState(currentArtifact, asOf, pressures);
+  const pressures = buildPressures(currentArtifact, schedule.days.length);
+  const state = buildState(currentArtifact, asOf, pressures, schedule.days.length);
   const structure = buildStructure(input.artifact.deterministicSeed);
   const grammar = buildGrammar(input.artifact.deterministicSeed);
   const { growth, diagnostics } = buildGrowth(
@@ -464,6 +657,7 @@ export function buildReefSpeciesBlueprint(
     asOf,
     state.completedYears,
     grammar,
+    schedule,
   );
 
   return {

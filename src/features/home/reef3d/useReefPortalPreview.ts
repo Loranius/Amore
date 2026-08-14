@@ -6,6 +6,7 @@ import { useMapPins } from '@/features/map/useMapPins';
 import { useFinishedMedia } from '@/features/media/useMedia';
 import { useMemories } from '@/features/memories/useMemories';
 import { usePlans } from '@/features/plans/usePlans';
+import { useScheduleTogetherness } from '@/features/schedule/useSharedDaysOff';
 import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
 import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
@@ -73,6 +74,7 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
   const users = useUsers();
   const events = useEvents();
   const plans = usePlans();
+  const togetherness = useScheduleTogetherness();
   const pins = useMapPins();
   const archive = useMemories();
   const finishedMedia = useFinishedMedia();
@@ -96,6 +98,7 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
     || users.isPending
     || events.isPending
     || plans.isPending
+    || togetherness.isPending
     || pins.isPending
     || archive.isPending
     || finishedMedia.isPending
@@ -104,6 +107,7 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
     ?? users.error
     ?? events.error
     ?? plans.error
+    ?? togetherness.error
     ?? pins.error
     ?? archive.error
     ?? finishedMedia.error
@@ -156,6 +160,7 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
       const build = buildReefPreviewFromArtifact({
         artifact: artifactResult.blueprint,
         asOf,
+        sharedDaysOff: togetherness.data ?? [],
       });
       return {
         preview: {
@@ -183,6 +188,7 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
     queryError,
     finishedMedia.data,
     startDateQuery.data,
+    togetherness.data,
     userIds,
     wishlist,
   ]);

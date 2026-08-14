@@ -60,6 +60,7 @@ export interface BuildReefPreviewInput {
   artifact: ArtifactBlueprint;
   asOf: string;
   rulesVersion?: string;
+  sharedDaysOff?: readonly string[];
 }
 
 function nowMs(): number {
@@ -73,12 +74,13 @@ function nowMs(): number {
 export function buildReefPreviewFromArtifact({
   artifact,
   asOf,
-  rulesVersion = 'reef-species-production-v1.0.0',
+  rulesVersion = 'reef-species-production-v1.1.0',
+  sharedDaysOff = [],
 }: BuildReefPreviewInput): ReefPreviewBuild {
   const startedAt = nowMs();
   const species = buildReefSpeciesBlueprint({
     artifact,
-    config: { asOf, rulesVersion },
+    config: { asOf, rulesVersion, sharedDaysOff },
   });
   const layout = buildReefColonyLayout({ species });
   const foundation = buildReefFoundationMesh({ species, layout });

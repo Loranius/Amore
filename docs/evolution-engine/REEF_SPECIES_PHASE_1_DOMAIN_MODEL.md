@@ -8,31 +8,29 @@ It translates the species-neutral Evolution Engine artifact into deterministic r
 
 - one stable substrate and water-current baseline;
 - one explicit growth grammar;
-- append-only annual and event-driven colony instructions;
+- append-only annual, Schedule and event-driven colony instructions;
 - stable colony morphotypes, roles, tiers and IDs;
 - bounded radial and vertical placement bands for later adapters;
 - an explicit colony-intent budget;
 - no positions, mesh, materials, animation or UI state.
 
-The existing Home Reef slot remains an honest placeholder until the Reef Layout and Geometry phases exist.
+The production Reef Layout, Geometry, Material, Life and Three.js adapters consume this domain model without moving portal logic into the renderer.
 
 ## Pipeline boundary
 
 ```text
-Portal Events
+Allowed Portal Facts + Shared Schedule Days
 → Evolution Engine ArtifactBlueprint
 → Reef Species Phase 1
   → ReefStructureInstruction
   → ReefGrowthGrammar
   → ReefGrowthInstruction[]
-→ future Reef Colony Layout
-→ future Reef Geometry
-→ future Reef Material
-→ future Reef Life
-→ future Three.js Renderer
+→ Reef Colony Layout
+→ Reef Geometry / Material / Life
+→ Three.js Renderer
 ```
 
-Reef Species consumes the same normalized history as Crystal and Tree, but translates it independently.
+Reef Species consumes the same normalized history as Crystal and Tree, but translates it independently through a reef-specific source allow-list.
 
 It does not import Tree Species and does not reuse Tree geometry assumptions.
 
@@ -46,6 +44,7 @@ speciesBlueprintVersion = 1
 reef:structure
 reef:growth-grammar
 reef:annual:<relationship-year>
+reef:schedule:<relationship-year>
 reef:event:<accepted-event-id>
 ```
 
@@ -80,7 +79,7 @@ The state also publishes:
 
 - age in days;
 - completed relationship years;
-- epoch and event counts;
+- epoch, accepted event and shared-days-off counts;
 - substrate maturity;
 - colony maturity;
 - biodiversity maturity.
@@ -126,6 +125,23 @@ Zero-pressure events remain diagnostics and do not create colonies.
 
 Future events remain diagnostics until their accepted timestamp is reached.
 
+## Portal source boundary
+
+Only committed facts from these modules can create event instructions or contribute pressure:
+
+```text
+calendar
+plans
+wishlist
+map
+memories
+media
+```
+
+`schedule` is a separate additive input: past dates when both partners marked a day off create at most one low-profile encrusting foundation per relationship year. Schedule facts strengthen substrate maturity, substrate coverage, encrusting potential and resilience, but never inflate portal activity or Evolution channel shares.
+
+The reef rejects all unknown sources by default. In particular, `game`, `culinary`, `where-to`, `shopping` and `piggybank` cannot affect pressures, state or growth, even if a legacy adapter puts such an event into the neutral artifact.
+
 ## Annual recruitment
 
 Each completed relationship year publishes:
@@ -143,6 +159,8 @@ Annual recruitment uses stable foundation morphotypes:
 The selected morphotype and all intent values derive from the artifact seed and annual ID.
 
 Annual instructions are sorted chronologically with event instructions. Later years append new recruitment without rewriting old instructions.
+
+Schedule instructions use stable epoch IDs and seeds. Additional recorded days can fill out that epoch's foundation or add one bounded recruit; they cannot create one colony per database row.
 
 ## Growth grammar
 
@@ -175,6 +193,7 @@ The grammar is renderer-independent. It gives later layout phases stable limits 
 Each `ReefGrowthInstruction` publishes:
 
 - stable ID and seed;
+- explicit source module;
 - source event and episode IDs;
 - epoch and chronological sequence;
 - dominant Evolution channel;
@@ -215,7 +234,7 @@ It also publishes:
 - dominance share;
 - normalized channel shares.
 
-These pressures do not mutate the Evolution ledger.
+These pressures do not mutate the Evolution ledger. Schedule support is applied after the allowed event ledger is rebuilt, so excluded modules have no indirect effect.
 
 ## Structure baseline
 
@@ -267,10 +286,18 @@ The blueprint reports:
 
 ```text
 emptyHistory
+excludedEventIds
 zeroPressureEventIds
 futureEventIds
+invalidSharedDayOffDates
+duplicateSharedDayOffDates
+futureSharedDayOffDates
+preRelationshipSharedDayOffDates
+acceptedEventCountByModule
+sharedDaysOffCount
 annualInstructionCount
 eventInstructionCount
+scheduleInstructionCount
 emittedColonyIntentCount
 maximumAcceptedColonies
 colonyBudgetExceeded
@@ -288,6 +315,8 @@ Automated tests verify:
 - annual recruitment growth through explicit time;
 - maturity changes without morphology changes;
 - future and zero-pressure diagnostics;
+- hard source exclusion with no direct or indirect pressure changes;
+- deterministic Schedule normalization, epoch grouping and bounded growth;
 - bounded normalized values and band indices;
 - input artifact immutability;
 - rejection of invalid `asOf` and empty rules versions.

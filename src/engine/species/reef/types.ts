@@ -21,8 +21,30 @@ export const REEF_COLONY_MORPHOTYPES = [
   'sea-fan',
 ] as const;
 
+/**
+ * Portal modules whose committed facts are allowed to reach Reef Species.
+ * This is intentionally an allow-list: new modules cannot alter the reef
+ * until their meaning and visual grammar have been reviewed explicitly.
+ */
+export const REEF_EVENT_SOURCE_MODULES = [
+  'calendar',
+  'plans',
+  'wishlist',
+  'map',
+  'memories',
+  'media',
+] as const;
+
+export const REEF_INFLUENCE_SOURCES = [
+  'relationship',
+  ...REEF_EVENT_SOURCE_MODULES,
+  'schedule',
+] as const;
+
 export type ReefLifeStage = (typeof REEF_LIFE_STAGES)[number];
 export type ReefColonyMorphotype = (typeof REEF_COLONY_MORPHOTYPES)[number];
+export type ReefEventSourceModule = (typeof REEF_EVENT_SOURCE_MODULES)[number];
+export type ReefInfluenceSource = (typeof REEF_INFLUENCE_SOURCES)[number];
 
 export type ReefColonyRole =
   | 'foundation'
@@ -39,6 +61,13 @@ export interface ReefSpeciesConfig {
   asOf: string;
   /** Bump whenever Reef Species translation or grammar rules change. */
   rulesVersion: string;
+  /**
+   * Past days both partners marked as days off in Schedule.
+   *
+   * These are lived calendar facts, not portal events, so they strengthen
+   * substrate and resilience without inflating event/channel pressure.
+   */
+  sharedDaysOff?: readonly string[];
 }
 
 export interface ReefSpeciesPressures {
@@ -61,6 +90,7 @@ export interface ReefSpeciesState {
   completedYears: number;
   epochCount: number;
   eventCount: number;
+  sharedDaysOffCount: number;
   stage: ReefLifeStage;
   substrateMaturity: number;
   colonyMaturity: number;
@@ -99,6 +129,7 @@ export interface ReefGrowthGrammar {
 /** Species-specific colony intent without coordinates or geometry. */
 export interface ReefGrowthInstruction {
   id: string;
+  sourceModule: ReefInfluenceSource;
   sourceEventId: string | null;
   sourceEpisodeId: string | null;
   epochIndex: number;
@@ -123,10 +154,19 @@ export interface ReefGrowthInstruction {
 
 export interface ReefSpeciesDiagnostics {
   emptyHistory: boolean;
+  /** Events rejected by the reef-specific source allow-list. */
+  excludedEventIds: string[];
   zeroPressureEventIds: string[];
   futureEventIds: string[];
+  invalidSharedDayOffDates: string[];
+  duplicateSharedDayOffDates: string[];
+  futureSharedDayOffDates: string[];
+  preRelationshipSharedDayOffDates: string[];
+  acceptedEventCountByModule: Record<ReefEventSourceModule, number>;
+  sharedDaysOffCount: number;
   annualInstructionCount: number;
   eventInstructionCount: number;
+  scheduleInstructionCount: number;
   emittedColonyIntentCount: number;
   maximumAcceptedColonies: number;
   colonyBudgetExceeded: boolean;

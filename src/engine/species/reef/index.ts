@@ -7,13 +7,17 @@ export * from './materials';
 export * from './life';
 export {
   REEF_COLONY_MORPHOTYPES,
+  REEF_EVENT_SOURCE_MODULES,
+  REEF_INFLUENCE_SOURCES,
   REEF_LIFE_STAGES,
   type BuildReefSpeciesBlueprintInput,
   type ReefColonyMorphotype,
   type ReefColonyRole,
   type ReefColonyTier,
+  type ReefEventSourceModule,
   type ReefGrowthGrammar,
   type ReefGrowthInstruction,
+  type ReefInfluenceSource,
   type ReefLifeStage,
   type ReefSpeciesBlueprint,
   type ReefSpeciesConfig,

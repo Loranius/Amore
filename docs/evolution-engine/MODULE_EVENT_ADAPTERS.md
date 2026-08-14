@@ -89,25 +89,46 @@ receive reduced pressure because the originating module already contributes the
 main event. This prevents the same moment from growing the artifact twice at
 full strength.
 
-### Shopping
+### Media
 
-Bought items are grouped by local calendar day into one tiny stability event.
-The influence is intentionally capped. Everyday groceries must never outgrow a
-trip, fulfilled wish, milestone or completed shared plan.
+Only finished media entries are included. Their completion state is verified;
+when the schema has no dedicated completion timestamp, `created_at` remains an
+explicit historical estimate rather than pretending to be an exact watch date.
 
-Items without `bought_at` are skipped and diagnosed.
+Finished media contributes bounded culture and remembrance pressure.
+
+## Reef-specific source boundary
+
+Reef Species accepts normalized events only from:
+
+- calendar;
+- plans;
+- wishlist;
+- map;
+- memories;
+- media.
+
+The source check happens again inside Reef Species before its pressure ledger
+is rebuilt. This prevents legacy or future adapters from introducing an
+unreviewed indirect influence.
+
+Work Schedule is handled separately from module events. Past dates on which
+both partners marked a day off add bounded, year-grouped substrate support;
+they do not increase portal activity or Evolution channel pressure.
 
 ## Deliberately excluded for now
 
-- work schedules and shared days off;
+- game activity;
+- culinary and recipe records;
+- where-to ideas and bookmarks;
+- shopping items;
+- piggy-bank balances, transactions and targets;
 - current locations and location history;
 - financial balance and free-spending limit;
 - unfinished plans and ideas;
 - unfulfilled wishes;
 - birthdays of relatives;
 - generic holidays;
-- media/watchlist items because the current schema has no reliable completion
-  timestamp;
 - recipes because adding a recipe does not prove a shared experience;
 - plan tasks because they are preparation details, not separate relationship
   milestones.
@@ -125,7 +146,7 @@ Examples:
 - `wish:19:fulfilled`
 - `place:5:visited`
 - `memory:81:preserved`
-- `shopping:2026-07-29:bought`
+- `media:44:finished`
 
 IDs depend on persistent row IDs and occurrence dates, never array positions or
 database response order.
@@ -145,5 +166,5 @@ Supabase rows
   -> ArtifactBlueprint
 ```
 
-The current Home page and renderer remain untouched until Crystal Species and
-the compatibility bridge are ready.
+Home artifact renderers consume the resulting blueprint through their own
+species adapters; module loaders do not import Three.js or renderer state.

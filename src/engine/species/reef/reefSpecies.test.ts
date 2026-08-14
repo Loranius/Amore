@@ -109,11 +109,63 @@ describe('Reef Species Phase 1', () => {
       'memory:first-album:massive:memory',
       'place:lviv:plating:frontier',
       'culture:concert:sea-fan:landmark',
-      'shopping:2025-01-06:encrusting:foundation',
+    ]);
+    expect(reef.growth
+      .filter((instruction) => instruction.sourceEventId !== null)
+      .map((instruction) => instruction.sourceModule)).toEqual([
+      'calendar', 'plans', 'memories', 'map', 'calendar',
     ]);
     expect(reef.diagnostics.annualInstructionCount).toBe(2);
-    expect(reef.diagnostics.eventInstructionCount).toBe(BASE_EVENTS.length);
+    expect(reef.diagnostics.eventInstructionCount).toBe(BASE_EVENTS.length - 1);
+    expect(reef.diagnostics.excludedEventIds).toEqual(['shopping:2025-01-06']);
+    expect(reef.diagnostics.acceptedEventCountByModule).toEqual({
+      calendar: 2,
+      plans: 1,
+      wishlist: 0,
+      map: 1,
+      memories: 1,
+      media: 0,
+    });
     expect(reef.diagnostics.colonyBudgetExceeded).toBe(false);
+  });
+
+  it('accepts the complete reef module allow-list and rejects every excluded product module', () => {
+    const allowedSources = ['calendar', 'plans', 'wishlist', 'map', 'memories', 'media'];
+    const excludedSources = ['game', 'culinary', 'where-to', 'shopping', 'piggybank'];
+    const allowedEvents: EvolutionEventInput[] = allowedSources.map((source, index) => ({
+      id: `allowed:${source}`,
+      occurredAt: `2024-0${index + 2}-01`,
+      source: `${source}@1`,
+      evidence: 'verified',
+      channels: { stability: 0.2 + index * 0.03 },
+      portalActivity: 0.05,
+    }));
+    const excludedEvents: EvolutionEventInput[] = excludedSources.map((source, index) => ({
+      id: `excluded:${source}`,
+      occurredAt: `2025-0${index + 2}-01`,
+      source: `${source}@1`,
+      evidence: 'verified',
+      channels: { significance: 1, stability: 1 },
+      portalActivity: 1,
+    }));
+
+    const baseline = buildReef(allowedEvents);
+    const withExcluded = buildReef([...allowedEvents, ...excludedEvents]);
+
+    expect(withExcluded.growth).toEqual(baseline.growth);
+    expect(withExcluded.pressures).toEqual(baseline.pressures);
+    expect(withExcluded.state).toEqual(baseline.state);
+    expect(withExcluded.diagnostics.excludedEventIds).toEqual(
+      excludedSources.map((source) => `excluded:${source}`).sort(),
+    );
+    expect(withExcluded.diagnostics.acceptedEventCountByModule).toEqual({
+      calendar: 1,
+      plans: 1,
+      wishlist: 1,
+      map: 1,
+      memories: 1,
+      media: 1,
+    });
   });
 
   it('keeps existing colony intent byte-stable when later history is appended', () => {
@@ -161,7 +213,7 @@ describe('Reef Species Phase 1', () => {
         channels: { exploration: 1 },
       },
       {
-        id: 'activity-only', occurredAt: '2025-02-01', source: 'legacy@1',
+        id: 'activity-only', occurredAt: '2025-02-01', source: 'calendar@1',
         evidence: 'historical-estimate', channels: {}, portalActivity: 0.2,
       },
     ]);
@@ -170,7 +222,68 @@ describe('Reef Species Phase 1', () => {
     expect(reef.diagnostics.zeroPressureEventIds).toEqual(['activity-only']);
     expect(reef.growth.some((instruction) => instruction.sourceEventId === 'future:trip')).toBe(false);
     expect(reef.growth.some((instruction) => instruction.sourceEventId === 'activity-only')).toBe(false);
-    expect(reef.state.eventCount).toBe(BASE_EVENTS.length + 1);
+    expect(reef.state.eventCount).toBe(BASE_EVENTS.length);
+  });
+
+  it('turns shared Schedule days into bounded epoch foundations with stable identities', () => {
+    const artifact = buildArtifact();
+    const sharedDaysOff = [
+      '2025-06-10',
+      '2024-02-03',
+      '2024-02-03',
+      '2026-06-15',
+      '2023-12-31',
+      '2027-01-01',
+      'not-a-day',
+    ];
+    const withSchedule = buildReefSpeciesBlueprint({
+      artifact,
+      config: {
+        asOf: '2026-07-01',
+        rulesVersion: 'reef-species-v1.1.0',
+        sharedDaysOff,
+      },
+    });
+    const reversed = buildReefSpeciesBlueprint({
+      artifact,
+      config: {
+        asOf: '2026-07-01',
+        rulesVersion: 'reef-species-v1.1.0',
+        sharedDaysOff: [...sharedDaysOff].reverse(),
+      },
+    });
+    const withoutSchedule = buildReefSpeciesBlueprint({
+      artifact,
+      config: { asOf: '2026-07-01', rulesVersion: 'reef-species-v1.1.0' },
+    });
+    const scheduleGrowth = withSchedule.growth.filter(
+      (instruction) => instruction.sourceModule === 'schedule',
+    );
+
+    expect(withSchedule).toEqual(reversed);
+    expect(scheduleGrowth.map((instruction) => instruction.id)).toEqual([
+      'reef:schedule:0', 'reef:schedule:1', 'reef:schedule:2',
+    ]);
+    expect(scheduleGrowth.every((instruction) => (
+      instruction.morphotype === 'encrusting'
+      && instruction.role === 'foundation'
+      && instruction.channel === null
+    ))).toBe(true);
+    expect(withSchedule.diagnostics).toMatchObject({
+      sharedDaysOffCount: 3,
+      scheduleInstructionCount: 3,
+      duplicateSharedDayOffDates: ['2024-02-03'],
+      futureSharedDayOffDates: ['2027-01-01'],
+      preRelationshipSharedDayOffDates: ['2023-12-31'],
+      invalidSharedDayOffDates: ['not-a-day'],
+    });
+    expect(withSchedule.state.sharedDaysOffCount).toBe(3);
+    expect(withSchedule.pressures.substrateCoverage)
+      .toBeGreaterThan(withoutSchedule.pressures.substrateCoverage);
+    expect(withSchedule.pressures.encrustingPotential)
+      .toBeGreaterThan(withoutSchedule.pressures.encrustingPotential);
+    expect(withSchedule.pressures.resilience).toBeGreaterThan(withoutSchedule.pressures.resilience);
+    expect(withSchedule.pressures.channelShare).toEqual(withoutSchedule.pressures.channelShare);
   });
 
   it('keeps every published grammar value bounded and uses only accepted morphotypes', () => {
