@@ -1,3 +1,4 @@
 export const REEF_FISH_SCHOOL_MODEL = 'school-of-fish-glb';
-export const REEF_FISH_SCHOOL_POSITION: [number, number, number] = [-1.47, 1.9, 0.35];
-export const REEF_FISH_SCHOOL_SCALE = 3;
+export const REEF_FISH_SCHOOL_POSITION: [number, number, number] = [0, 0.55, -1];
+export const REEF_FISH_SCHOOL_SCALE = 2.25;
+export const REEF_FISH_SCHOOL_ROUTE_PROFILE = 'open-water-routes-v2';

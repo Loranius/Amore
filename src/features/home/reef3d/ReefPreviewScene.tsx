@@ -9,7 +9,10 @@ import {
 import { ReefObject } from './ReefObject';
 import { ReefStage } from './ReefStage';
 import type { ReefFishSchoolMetrics } from './ReefFishSchool';
-import { REEF_FISH_SCHOOL_MODEL } from './reefFishSchoolPresentation';
+import {
+  REEF_FISH_SCHOOL_MODEL,
+  REEF_FISH_SCHOOL_ROUTE_PROFILE,
+} from './reefFishSchoolPresentation';
 import {
   REEF_FOUNDATION_PASS,
   REEF_FOUNDATION_PRESENTATION_VERSION,
@@ -132,6 +135,9 @@ export default function ReefPreviewScene() {
       data-reef-fish-width={fishRuntime?.width ?? ''}
       data-reef-fish-height={fishRuntime?.height ?? ''}
       data-reef-fish-depth={fishRuntime?.depth ?? ''}
+      data-reef-fish-routes={fishRuntime?.routes ?? ''}
+      data-reef-fish-scale={fishRuntime?.scale ?? ''}
+      data-reef-fish-route-profile={fishRuntime ? REEF_FISH_SCHOOL_ROUTE_PROFILE : 'loading'}
       data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}
       data-reef-runtime-draw-calls={reportedDrawCalls ?? ''}
       data-reef-runtime-triangles={reportedTriangles ?? ''}

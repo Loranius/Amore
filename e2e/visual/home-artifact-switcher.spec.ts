@@ -3,7 +3,12 @@ import {
   REEF_FOUNDATION_PASS,
   REEF_FOUNDATION_PRESENTATION_VERSION,
 } from '../../src/features/home/reef3d/reefFoundationPresentation';
-import { REEF_FISH_SCHOOL_MODEL } from '../../src/features/home/reef3d/reefFishSchoolPresentation';
+import { REEF_FISH_ROUTE_COUNT } from '../../src/features/home/reef3d/reefFishSchoolMotion';
+import {
+  REEF_FISH_SCHOOL_MODEL,
+  REEF_FISH_SCHOOL_ROUTE_PROFILE,
+  REEF_FISH_SCHOOL_SCALE,
+} from '../../src/features/home/reef3d/reefFishSchoolPresentation';
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
@@ -72,6 +77,12 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
       timeout: 25_000,
     });
     await expect(reef).toHaveAttribute('data-reef-fish-meshes', '4');
+    await expect(reef).toHaveAttribute('data-reef-fish-routes', String(REEF_FISH_ROUTE_COUNT));
+    await expect(reef).toHaveAttribute(
+      'data-reef-fish-route-profile',
+      REEF_FISH_SCHOOL_ROUTE_PROFILE,
+    );
+    await expect(reef).toHaveAttribute('data-reef-fish-scale', String(REEF_FISH_SCHOOL_SCALE));
     await expect(reef).toHaveAttribute('data-reef-static-acceptance', 'pass');
     await expect(reef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(reef).toHaveAttribute('data-reef-phase-count', '8');
@@ -100,8 +111,8 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     expect(reefDrawCalls).toBeLessThanOrEqual(7);
     expect(reefVertices).toBeLessThanOrEqual(24_256);
     expect(reefTriangles).toBeLessThanOrEqual(36_512);
-    expect(reefFishWidth).toBeGreaterThanOrEqual(3);
-    expect(reefFishHeight).toBeGreaterThanOrEqual(0.8);
+    expect(reefFishWidth).toBeGreaterThanOrEqual(2);
+    expect(reefFishHeight).toBeGreaterThanOrEqual(0.5);
     await page.screenshot({
       path: 'test-results/home-artifact-reef-pixel-8-pro.png',
       fullPage: true,
@@ -123,6 +134,10 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reloadedReef).toHaveAttribute('data-reef-fish-model', REEF_FISH_SCHOOL_MODEL, {
       timeout: 25_000,
     });
+    await expect(reloadedReef).toHaveAttribute(
+      'data-reef-fish-route-profile',
+      REEF_FISH_SCHOOL_ROUTE_PROFILE,
+    );
     await expect(reloadedReef).toHaveAttribute('data-reef-production-signature', productionSignature ?? '');
     await expect(reloadedReef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(page.getByRole('tab', { name: /Риф/ })).toHaveAttribute('aria-selected', 'true');
