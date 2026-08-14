@@ -27,10 +27,13 @@ const TUNNEL_ROUTES: readonly ReefFishRouteId[] = [
   'blue_tang1',
   'Yellow2',
 ];
+// These windows intentionally include the authored starting phases for the
+// selected routes (roughly .36, .18 and .84), so all three tunnel behaviours
+// become visible during the first playback cycle after the reef mounts.
 const TUNNEL_PHASES = [
-  [0.08, 0.35],
-  [0.4, 0.67],
-  [0.69, 0.96],
+  [0.28, 0.5],
+  [0.1, 0.32],
+  [0.73, 0.95],
 ] as const;
 const FISH_STRUCTURE_MARGIN = 0.26;
 
