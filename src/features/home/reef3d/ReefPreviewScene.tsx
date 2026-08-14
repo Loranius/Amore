@@ -8,7 +8,6 @@ import {
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { ReefObject } from './ReefObject';
 import { ReefStage } from './ReefStage';
-import { reefDensityCandidateCounts } from './ReefDensityLayer';
 import type { ReefFishSchoolMetrics } from './ReefFishSchool';
 import type { ReefBackdropMetrics } from './ReefBackdropCorals';
 import {
@@ -92,7 +91,6 @@ export default function ReefPreviewScene() {
   }
 
   const { build, diagnostics } = portal.preview;
-  const densityCandidates = reefDensityCandidateCounts(build);
   // Reef acceptance must describe the generated reef, not the decorative
   // underwater world around it. ReefObject exposes exact production geometry
   // diagnostics when its accepted Three scene is created; the global probe is
@@ -137,12 +135,24 @@ export default function ReefPreviewScene() {
       data-reef-couple-id={build.artifact.coupleId}
       data-reef-as-of={build.life.asOf}
       data-reef-stage={build.species.state.stage}
+      data-reef-evolution={build.species.moduleEvolution.version}
+      data-reef-days-together={build.species.moduleEvolution.facts.daysTogether}
+      data-reef-completed-years={build.species.moduleEvolution.facts.completedYears}
+      data-reef-foundation-radius={build.species.moduleEvolution.foundation.substrateRadius}
+      data-reef-outer-growth-radius={build.species.moduleEvolution.foundation.outerGrowthRadius}
+      data-reef-year-arches={build.structures.arches.length}
+      data-reef-map-outcrops={build.structures.outcrops.length}
+      data-reef-schedule-terraces={build.structures.terraces.length}
+      data-reef-structure-collision-free={String(build.structures.diagnostics.collisionFree)}
+      data-reef-plan-fish-logical={build.species.moduleEvolution.life.planFish.logicalCount}
+      data-reef-plan-fish-visible={build.species.moduleEvolution.life.planFish.visibleCount}
+      data-reef-wish-corals={build.species.moduleEvolution.colonies.primaryWishCorals.logicalCount}
+      data-reef-photo-corals={build.species.moduleEvolution.colonies.microPhotoCorals.logicalCount}
+      data-reef-media-corals={build.species.moduleEvolution.colonies.mediaCorals.logicalCount}
+      data-reef-calendar-landmarks={build.species.moduleEvolution.colonies.calendarLandmarks.logicalCount}
       data-reef-normalized-events={portal.preview.normalizedEventCount}
       data-reef-adapter-diagnostics={diagnostics.length}
       data-reef-colonies={build.diagnostics.colonyCount}
-      data-reef-canopy-source-colonies={densityCandidates.sourceColonies}
-      data-reef-canopy-bushes={densityCandidates.bushes}
-      data-reef-canopy-cushions={densityCandidates.cushions}
       data-reef-batches={build.diagnostics.batchCount}
       data-reef-foundation-vertices={build.foundation.vertices.length}
       data-reef-vertices={build.diagnostics.vertexCount}
@@ -179,7 +189,7 @@ export default function ReefPreviewScene() {
       <Canvas
         dpr={[1, 1.5]}
         frameloop={reducedMotion ? 'demand' : 'always'}
-        camera={{ position: [0, 2.65, 8.15], fov: 42, near: 0.1, far: 42 }}
+        camera={{ position: [0, 2.65, 9.15], fov: 42, near: 0.1, far: 42 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
         <ReefStage

@@ -255,7 +255,9 @@ export function buildReefModuleEvolution(
       microPhotoCorals: population(photos.length, VISIBLE_LIMITS.photoCorals),
       mediaCorals: population(media.length, VISIBLE_LIMITS.mediaCorals),
       calendarLandmarks: population(calendar.length, VISIBLE_LIMITS.calendarLandmarks),
-      minimumClearanceRatio: 1.18,
+      // Covers the widest accepted morphotype shape plus a small water gap,
+      // so visible coral bodies can overlap in projection but not interpenetrate.
+      minimumClearanceRatio: 2.15,
     },
     life: {
       planFish: population(plans.length, VISIBLE_LIMITS.planFish),

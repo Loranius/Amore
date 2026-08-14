@@ -1,8 +1,14 @@
 import * as THREE from 'three';
 import { createKenneyFishGeometry } from './kenneyFishGeometry';
-import { REEF_FISH_TINTS, type ReefFishInstance } from './reefFishRoaming';
+import { REEF_FISH_TINTS } from './reefFishRoaming';
 
-export function createReefFishRenderGeometry(fish: ReefFishInstance[]) {
+interface ReefRenderableFish {
+  speed: number;
+  phase: number;
+  scale: number;
+}
+
+export function createReefFishRenderGeometry(fish: readonly ReefRenderableFish[]) {
   const geometry = createKenneyFishGeometry();
   geometry.computeVertexNormals();
   geometry.normalizeNormals();
@@ -18,7 +24,10 @@ export function createReefFishRenderGeometry(fish: ReefFishInstance[]) {
   return geometry;
 }
 
-export function applyReefFishColors(mesh: THREE.InstancedMesh, fish: ReefFishInstance[]) {
+export function applyReefFishColors(
+  mesh: THREE.InstancedMesh,
+  fish: readonly ReefRenderableFish[],
+) {
   const color = new THREE.Color();
 
   fish.forEach((item, index) => {

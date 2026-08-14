@@ -1,5 +1,14 @@
 export { buildReefSpeciesBlueprint } from './reefSpecies';
 export { buildReefModuleEvolution } from './moduleEvolution';
+export { buildReefGrowthStructureLayout } from './structureGrowth';
+export type {
+  ReefGrowthArchPlacement,
+  ReefGrowthOutcropPlacement,
+  ReefGrowthStructureLayout,
+  ReefGrowthStructureLayoutDiagnostics,
+  ReefGrowthStructurePoint,
+  ReefGrowthTerracePlacement,
+} from './structureGrowth';
 export type {
   BuildReefModuleEvolutionInput,
   ReefModuleEvolutionScheduleDay,

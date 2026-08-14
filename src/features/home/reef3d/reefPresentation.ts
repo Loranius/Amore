@@ -15,7 +15,7 @@ export const REEF_COLONY_SHAPE_PASS = 'phase-12-living-canopy';
 
 export const REEF_PRESENTATION_PROFILE = Object.freeze({
   foundationVerticalScale: 0.42,
-  colonyHorizontalScale: 1.7,
+  colonyHorizontalScale: 1,
   colonyVerticalScale: 2.8,
   colonyRootLift: 0.025,
 });

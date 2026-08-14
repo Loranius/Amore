@@ -9,6 +9,7 @@ import {
   buildReefColonyMeshes,
   buildReefColonySkeletons,
   buildReefFoundationMesh,
+  buildReefGrowthStructureLayout,
   buildReefLife,
   buildReefMaterials,
   buildReefSpeciesBlueprint,
@@ -16,6 +17,7 @@ import {
   type ReefColonyMeshState,
   type ReefColonySkeletonState,
   type ReefFoundationMeshState,
+  type ReefGrowthStructureLayout,
   type ReefLifeState,
   type ReefMaterialState,
   type ReefSpeciesBlueprint,
@@ -45,6 +47,7 @@ export interface ReefPreviewDiagnostics {
 export interface ReefPreviewBuild {
   artifact: ArtifactBlueprint;
   species: ReefSpeciesBlueprint;
+  structures: ReefGrowthStructureLayout;
   layout: ReefColonyLayoutState;
   foundation: ReefFoundationMeshState;
   skeletons: ReefColonySkeletonState;
@@ -82,6 +85,7 @@ export function buildReefPreviewFromArtifact({
     artifact,
     config: { asOf, rulesVersion, sharedDaysOff },
   });
+  const structures = buildReefGrowthStructureLayout(species.moduleEvolution);
   const layout = buildReefColonyLayout({ species });
   const foundation = buildReefFoundationMesh({ species, layout });
   const skeletons = buildReefColonySkeletons({ species, layout, foundation });
@@ -134,6 +138,7 @@ export function buildReefPreviewFromArtifact({
   return {
     artifact,
     species,
+    structures,
     layout,
     foundation,
     skeletons,

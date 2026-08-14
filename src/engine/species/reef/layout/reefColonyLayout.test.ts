@@ -54,6 +54,30 @@ const BASE_EVENTS: EvolutionEventInput[] = [
     channels: { stability: 0.3 },
     portalActivity: 0.02,
   },
+  ...Array.from({ length: 3 }, (_value, index): EvolutionEventInput => ({
+    id: `wish:${index}`,
+    occurredAt: `2025-0${index + 2}-12`,
+    source: 'wishlist@1',
+    evidence: 'verified',
+    channels: { achievement: 0.5 + index * 0.08 },
+    portalActivity: 0.12,
+  })),
+  ...Array.from({ length: 3 }, (_value, index): EvolutionEventInput => ({
+    id: `photo:${index}`,
+    occurredAt: `2025-0${index + 5}-16`,
+    source: 'memories@1',
+    evidence: 'verified',
+    channels: { remembrance: 0.46 + index * 0.07 },
+    portalActivity: 0.14,
+  })),
+  ...Array.from({ length: 3 }, (_value, index): EvolutionEventInput => ({
+    id: `media:${index}`,
+    occurredAt: `2025-0${index + 8}-20`,
+    source: 'media@1',
+    evidence: 'verified',
+    channels: index % 2 === 0 ? { exploration: 0.58 } : { culture: 0.62 },
+    portalActivity: 0.1,
+  })),
 ];
 
 function buildSpecies(

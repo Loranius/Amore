@@ -15,7 +15,7 @@ const MORPHOTYPE_EVENTS: EvolutionEventInput[] = [
   {
     id: 'stability:home',
     occurredAt: '2024-01-12',
-    source: 'plans@1',
+    source: 'wishlist@1',
     evidence: 'verified',
     channels: { stability: 0.92 },
     portalActivity: 0.18,
@@ -31,7 +31,7 @@ const MORPHOTYPE_EVENTS: EvolutionEventInput[] = [
   {
     id: 'achievement:goal',
     occurredAt: '2024-05-18',
-    source: 'plans@1',
+    source: 'wishlist@1',
     evidence: 'verified',
     channels: { achievement: 0.92, stability: 0.12 },
     portalActivity: 0.24,
@@ -39,7 +39,7 @@ const MORPHOTYPE_EVENTS: EvolutionEventInput[] = [
   {
     id: 'exploration:lviv',
     occurredAt: '2024-07-20',
-    source: 'map@1',
+    source: 'media@1',
     evidence: 'verified',
     channels: { exploration: 0.94, remembrance: 0.16 },
     portalActivity: 0.26,
@@ -47,7 +47,7 @@ const MORPHOTYPE_EVENTS: EvolutionEventInput[] = [
   {
     id: 'culture:quiet-concert',
     occurredAt: '2024-09-10',
-    source: 'calendar@1',
+    source: 'media@1',
     evidence: 'verified',
     channels: { culture: 0.9, significance: 0.2 },
     portalActivity: 0.2,

@@ -14,31 +14,32 @@ export type ReefFishInstance = {
 
 export const REEF_FISH_TINTS = ['#83b5aa', '#759caf', '#b2a675', '#8aa6a2', '#9b82ad'] as const;
 
-const FISH_COUNT = 8;
 // The vendored Kenney mesh is visually authored opposite our local +Z travel axis.
 // Keep the motion math in velocity space and correct the asset orientation once here.
 const FISH_FORWARD_YAW_OFFSET = Math.PI;
 
-function seededUnit(index: number, salt: number): number {
-  const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
+function seededUnit(index: number, salt: number, identitySeed: number): number {
+  const pairBias = (identitySeed % 1_000_003) * 0.000173;
+  const value = Math.sin(index * 12.9898 + salt * 78.233 + pairBias) * 43758.5453;
   return value - Math.floor(value);
 }
 
-export function buildReefFish(): ReefFishInstance[] {
-  return Array.from({ length: FISH_COUNT }, (_, index) => ({
+export function buildReefFish(count = 8, identitySeed = 0): ReefFishInstance[] {
+  const safeCount = Math.max(0, Math.min(24, Math.floor(count)));
+  return Array.from({ length: safeCount }, (_, index) => ({
     center: [
-      THREE.MathUtils.lerp(-0.28, 0.28, seededUnit(index, 21)),
-      THREE.MathUtils.lerp(0.72, 2.35, seededUnit(index, 22)),
-      THREE.MathUtils.lerp(-0.18, 0.18, seededUnit(index, 23)),
+      THREE.MathUtils.lerp(-0.28, 0.28, seededUnit(index, 21, identitySeed)),
+      THREE.MathUtils.lerp(0.72, 2.35, seededUnit(index, 22, identitySeed)),
+      THREE.MathUtils.lerp(-0.18, 0.18, seededUnit(index, 23, identitySeed)),
     ],
-    radiusX: THREE.MathUtils.lerp(2.8, 4.15, seededUnit(index, 24)),
-    radiusZ: THREE.MathUtils.lerp(2.25, 3.65, seededUnit(index, 25)),
-    speed: THREE.MathUtils.lerp(0.12, 0.23, seededUnit(index, 26)),
+    radiusX: THREE.MathUtils.lerp(2.8, 4.15, seededUnit(index, 24, identitySeed)),
+    radiusZ: THREE.MathUtils.lerp(2.25, 3.65, seededUnit(index, 25, identitySeed)),
+    speed: THREE.MathUtils.lerp(0.12, 0.23, seededUnit(index, 26, identitySeed)),
     phase:
-      (index / FISH_COUNT) * Math.PI * 2
-      + THREE.MathUtils.lerp(-0.24, 0.24, seededUnit(index, 27)),
-    scale: THREE.MathUtils.lerp(0.34, 0.54, seededUnit(index, 28)),
-    heightDrift: THREE.MathUtils.lerp(0.08, 0.26, seededUnit(index, 29)),
+      index * Math.PI * (3 - Math.sqrt(5))
+      + THREE.MathUtils.lerp(-0.24, 0.24, seededUnit(index, 27, identitySeed)),
+    scale: THREE.MathUtils.lerp(0.34, 0.54, seededUnit(index, 28, identitySeed)),
+    heightDrift: THREE.MathUtils.lerp(0.08, 0.26, seededUnit(index, 29, identitySeed)),
   }));
 }
 

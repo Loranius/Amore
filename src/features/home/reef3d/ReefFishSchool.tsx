@@ -1,16 +1,9 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useAnimations, useGLTF } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import {
-  createReefFishRouteClips,
-  REEF_FISH_ROUTE_PLAYBACK_RATE,
-} from './reefFishSchoolMotion';
-import {
-  REEF_FISH_SCHOOL_POSITION,
-  REEF_FISH_SCHOOL_SCALE,
-} from './reefFishSchoolPresentation';
-
-const SCHOOL_OF_FISH_MODEL_URL = `${import.meta.env.BASE_URL}models/school_of_fish_reef.glb`;
+import { createFishSwimMaterialV2 } from './createFishSwimMaterialV2';
+import { buildReefFish, writeReefFishMatrices } from './reefFishMotion';
+import { applyReefFishColors, createReefFishRenderGeometry } from './reefFishRenderKit';
 
 export interface ReefFishSchoolMetrics {
   animatedRoutes: number;
@@ -24,6 +17,8 @@ export interface ReefFishSchoolMetrics {
 }
 
 interface ReefFishSchoolProps {
+  count: number;
+  identitySeed: number;
   onReady?: ((metrics: ReefFishSchoolMetrics) => void) | undefined;
   reducedMotion: boolean;
 }
@@ -33,104 +28,90 @@ function roundMetric(value: number): number {
 }
 
 /**
- * Native animated fish school sourced from the School Of Fish GLB.
+ * One instanced, genuinely moving fish per completed Plan.
  *
- * The model already contains the authored spatial trajectories for all nine
- * fish, so we deliberately do not layer the old procedural roaming/steering
- * system on top of it. Three.js only advances the original `swimming` clip.
+ * The compact Kenney CC0 mesh shares one geometry and one material across the
+ * whole school. Pair DNA changes route radii, phase, height and colour while a
+ * later completed plan appends one route without reseeding the previous fish.
  */
-export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) {
-  const schoolRef = useRef<THREE.Group>(null);
-  const { scene, animations } = useGLTF(SCHOOL_OF_FISH_MODEL_URL);
-  const routes = useMemo(
-    () => animations[0] ? createReefFishRouteClips(animations[0]) : [],
-    [animations],
+export function ReefFishSchool({
+  count,
+  identitySeed,
+  onReady,
+  reducedMotion,
+}: ReefFishSchoolProps) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const swimTime = useMemo(() => ({ value: 0 }), []);
+  const fish = useMemo(
+    () => buildReefFish(count, identitySeed),
+    [count, identitySeed],
   );
-  const routeClips = useMemo(() => routes.map(({ clip }) => clip), [routes]);
-  const { actions } = useAnimations(routeClips, scene);
+  const geometry = useMemo(() => createReefFishRenderGeometry(fish), [fish]);
+  const material = useMemo(() => createFishSwimMaterialV2(swimTime), [swimTime]);
+
+  useEffect(() => () => {
+    geometry.dispose();
+    material.dispose();
+  }, [geometry, material]);
 
   useEffect(() => {
-    scene.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      // Skinned meshes can move beyond their bind-pose bounds during the long
-      // authored school loop. Disabling per-mesh frustum culling prevents fish
-      // from disappearing while crossing the edges of the camera frustum.
-      object.frustumCulled = false;
-      object.castShadow = false;
-      object.receiveShadow = false;
-    });
-  }, [scene]);
+    const mesh = meshRef.current;
+    if (!mesh) return;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    writeReefFishMatrices(mesh, dummy, fish, 0);
+    applyReefFishColors(mesh, fish);
+  }, [dummy, fish]);
+
+  useFrame((state) => {
+    const mesh = meshRef.current;
+    if (!mesh || reducedMotion) return;
+    const elapsed = state.clock.getElapsedTime();
+    swimTime.value = elapsed;
+    writeReefFishMatrices(mesh, dummy, fish, elapsed);
+  });
 
   useEffect(() => {
-    const activeActions = routes.flatMap(({ clip, phase }) => {
-      const action = actions[clip.name];
-      if (!action) return [];
-
-      action.reset();
-      action.setLoop(THREE.LoopRepeat, Infinity);
-      action.time = clip.duration * phase;
-      action.fadeIn(0.25).play();
-      return [action];
-    });
-
-    return () => {
-      activeActions.forEach((action) => action.stop());
-    };
-  }, [actions, routes]);
-
-  useEffect(() => {
-    // Respect the existing portal-wide reduced-motion contract without
-    // swapping models or resetting the animation when the preference changes.
-    routes.forEach(({ clip }) => {
-      const action = actions[clip.name];
-      if (action) action.timeScale = reducedMotion ? 0 : REEF_FISH_ROUTE_PLAYBACK_RATE;
-    });
-  }, [actions, reducedMotion, routes]);
-
-  useEffect(() => {
-    const school = schoolRef.current;
-    if (!school || !onReady) return;
-
-    school.updateWorldMatrix(true, true);
-    const bounds = new THREE.Box3().setFromObject(school, true);
-    if (bounds.isEmpty()) return;
-
-    let meshes = 0;
-    scene.traverse((object) => {
-      if (object instanceof THREE.Mesh) meshes += 1;
-    });
-
-    const size = bounds.getSize(new THREE.Vector3());
+    if (!onReady) return;
+    const maximumX = fish.reduce(
+      (maximum, item) => Math.max(maximum, Math.abs(item.center[0]) + item.radiusX + item.scale),
+      0,
+    );
+    const maximumZ = fish.reduce(
+      (maximum, item) => Math.max(maximum, Math.abs(item.center[2]) + item.radiusZ + item.scale),
+      0,
+    );
+    const minimumY = fish.reduce(
+      (minimum, item) => Math.min(minimum, item.center[1] - item.heightDrift - item.scale),
+      Number.POSITIVE_INFINITY,
+    );
+    const maximumY = fish.reduce(
+      (maximum, item) => Math.max(maximum, item.center[1] + item.heightDrift + item.scale),
+      Number.NEGATIVE_INFINITY,
+    );
+    const routes = fish.length;
     onReady({
-      animatedRoutes: routes.filter(
-        ({ clip }) => clip.tracks.length > 0 && Boolean(actions[clip.name]),
-      ).length,
-      depth: roundMetric(size.z),
-      height: roundMetric(size.y),
-      meshes,
-      routes: routes.length,
-      scale: REEF_FISH_SCHOOL_SCALE,
-      tracks: routes.reduce((total, { clip }) => total + clip.tracks.length, 0),
-      width: roundMetric(size.x),
+      animatedRoutes: routes,
+      depth: roundMetric(maximumZ * 2),
+      height: routes > 0 ? roundMetric(maximumY - minimumY) : 0,
+      meshes: routes > 0 ? 1 : 0,
+      routes,
+      scale: 1,
+      tracks: routes * 2,
+      width: roundMetric(maximumX * 2),
     });
-  }, [actions, onReady, routes, scene]);
+  }, [fish, onReady]);
+
+  if (fish.length === 0) return null;
 
   return (
-    <group
-      ref={schoolRef}
-      name="reef-native-school-of-fish"
-      position={REEF_FISH_SCHOOL_POSITION}
-      scale={REEF_FISH_SCHOOL_SCALE}
-    >
-      <primitive
-        object={scene}
-        position={[0, 0, 0]}
-        rotation={[0, 0, 0]}
-        scale={1}
-        dispose={null}
-      />
-    </group>
+    <instancedMesh
+      ref={meshRef}
+      name="reef-plan-fish-school"
+      args={[geometry, material, fish.length]}
+      frustumCulled={false}
+      castShadow={false}
+      receiveShadow={false}
+    />
   );
 }
-
-useGLTF.preload(SCHOOL_OF_FISH_MODEL_URL);

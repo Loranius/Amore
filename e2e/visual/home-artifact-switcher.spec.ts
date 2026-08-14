@@ -3,7 +3,6 @@ import {
   REEF_FOUNDATION_PASS,
   REEF_FOUNDATION_PRESENTATION_VERSION,
 } from '../../src/features/home/reef3d/reefFoundationPresentation';
-import { REEF_FISH_ROUTE_COUNT } from '../../src/features/home/reef3d/reefFishSchoolMotion';
 import {
   REEF_FISH_SCHOOL_MODEL,
   REEF_FISH_SCHOOL_ROUTE_PROFILE,
@@ -94,17 +93,23 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reef).toHaveAttribute('data-reef-fish-model', REEF_FISH_SCHOOL_MODEL, {
       timeout: 25_000,
     });
-    await expect(reef).toHaveAttribute('data-reef-fish-meshes', '4');
-    await expect(reef).toHaveAttribute('data-reef-fish-routes', String(REEF_FISH_ROUTE_COUNT));
+    const visiblePlanFish = Number(await reef.getAttribute('data-reef-plan-fish-visible'));
+    expect(visiblePlanFish).toBeGreaterThanOrEqual(0);
+    await expect(reef).toHaveAttribute(
+      'data-reef-fish-meshes',
+      visiblePlanFish > 0 ? '1' : '0',
+    );
+    await expect(reef).toHaveAttribute('data-reef-fish-routes', String(visiblePlanFish));
     await expect(reef).toHaveAttribute(
       'data-reef-fish-animated-routes',
-      String(REEF_FISH_ROUTE_COUNT),
+      String(visiblePlanFish),
     );
     await expect(reef).toHaveAttribute(
       'data-reef-fish-route-profile',
       REEF_FISH_SCHOOL_ROUTE_PROFILE,
     );
     await expect(reef).toHaveAttribute('data-reef-fish-scale', String(REEF_FISH_SCHOOL_SCALE));
+    await expect(reef).toHaveAttribute('data-reef-structure-collision-free', 'true');
     await expect(reef).toHaveAttribute('data-reef-static-acceptance', 'pass');
     await expect(reef).toHaveAttribute('data-reef-acceptance', 'pass', { timeout: 25_000 });
     await expect(reef).toHaveAttribute('data-reef-phase-count', '8');
@@ -134,20 +139,16 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reefBackdropWidth = Number(await reef.getAttribute('data-reef-backdrop-width'));
     const reefBackdropHeight = Number(await reef.getAttribute('data-reef-backdrop-height'));
     const reefColonies = Number(await reef.getAttribute('data-reef-colonies'));
-    const reefCanopySources = Number(await reef.getAttribute('data-reef-canopy-source-colonies'));
-    const reefCanopyBushes = Number(await reef.getAttribute('data-reef-canopy-bushes'));
-    const reefCanopyCushions = Number(await reef.getAttribute('data-reef-canopy-cushions'));
     const reefVisibleColonies = Number(await reef.getAttribute('data-reef-visible-colonies'));
     expect(reefDrawCalls).toBeGreaterThan(0);
     expect(reefDrawCalls).toBeLessThanOrEqual(7);
     expect(reefVertices).toBeLessThanOrEqual(24_256);
     expect(reefTriangles).toBeLessThanOrEqual(36_512);
-    expect(reefFishWidth).toBeGreaterThanOrEqual(2);
-    expect(reefFishHeight).toBeGreaterThanOrEqual(0.5);
-    expect(reefFishTracks).toBeGreaterThan(REEF_FISH_ROUTE_COUNT);
-    expect(reefCanopySources).toBe(reefColonies);
-    expect(reefCanopyBushes + reefCanopyCushions).toBeGreaterThan(0);
-    expect(reefCanopyBushes + reefCanopyCushions).toBeLessThanOrEqual(reefColonies);
+    if (visiblePlanFish > 0) {
+      expect(reefFishWidth).toBeGreaterThanOrEqual(2);
+      expect(reefFishHeight).toBeGreaterThanOrEqual(0.5);
+    }
+    expect(reefFishTracks).toBe(visiblePlanFish * 2);
     expect(reefVisibleColonies).toBeGreaterThan(0);
     expect(reefVisibleColonies).toBeLessThanOrEqual(reefColonies);
     expect(reefBackdropTriangles).toBeGreaterThan(0);

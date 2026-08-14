@@ -385,6 +385,10 @@ export function buildReefColonyLayout(
   }
   const config = input.config ?? DEFAULT_REEF_COLONY_LAYOUT_CONFIG;
   validateConfig(config);
+  const minimumClearanceRatio = Math.max(
+    config.minimumClearanceRatio,
+    input.species.moduleEvolution.colonies.minimumClearanceRatio,
+  );
 
   const cells = buildCells(input.species, config);
   const cellsById = new Map(cells.map((cell) => [cell.id, cell] as const));
@@ -429,7 +433,7 @@ export function buildReefColonyLayout(
           cellCapacityRejectionCount += 1;
           continue;
         }
-        if (collides(candidate, colonies, config.minimumClearanceRatio)) {
+        if (collides(candidate, colonies, minimumClearanceRatio)) {
           collisionRejectionCount += 1;
           continue;
         }

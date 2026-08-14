@@ -22,7 +22,6 @@ import {
   saturate,
   seededUnit,
   stableSeed,
-  vectorTotal,
 } from './math';
 import { REEF_EVENT_SOURCE_MODULES } from './types';
 import { buildReefModuleEvolution } from './moduleEvolution';
@@ -35,6 +34,7 @@ import type {
   ReefGrowthGrammar,
   ReefGrowthInstruction,
   ReefLifeStage,
+  ReefModuleEvolutionPlan,
   ReefSpeciesBlueprint,
   ReefSpeciesDiagnostics,
   ReefSpeciesPressures,
@@ -42,12 +42,6 @@ import type {
   ReefStructureInstruction,
 } from './types';
 
-const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const FOUNDATION_MORPHOTYPES: readonly ReefColonyMorphotype[] = [
-  'encrusting',
-  'massive',
-  'soft-coral',
-];
 const REEF_EVENT_SOURCE_SET = new Set<string>(REEF_EVENT_SOURCE_MODULES);
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -138,26 +132,6 @@ function normalizeSharedDaysOff(
     futureDates: [...futureDates].sort(),
     preRelationshipDates: [...preRelationshipDates].sort(),
   };
-}
-
-function isLeapYear(year: number): boolean {
-  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-}
-
-function anniversaryEpoch(artifact: ArtifactBlueprint, epochIndex: number): number {
-  const start = parseCalendarDate(artifact.relationshipStartedAt, artifact.timeZone);
-  if (!start) throw new Error('Reef Species could not resolve relationship start date.');
-  const year = start.year + epochIndex;
-  let month = start.month;
-  let day = start.day;
-  if (month === 2 && day === 29 && !isLeapYear(year)) {
-    if (artifact.leapDayPolicy === 'feb-28') day = 28;
-    else {
-      month = 3;
-      day = 1;
-    }
-  }
-  return Date.UTC(year, month - 1, day);
 }
 
 function stageFor(ageDays: number): ReefLifeStage {
@@ -263,16 +237,20 @@ function buildState(
   };
 }
 
-function buildStructure(artifactSeed: number): ReefStructureInstruction {
+function buildStructure(
+  artifactSeed: number,
+  evolution: ReefModuleEvolutionPlan,
+): ReefStructureInstruction {
   const seed = stableSeed(artifactSeed, 'reef:structure');
+  const maturity = evolution.foundation.radialSaturation;
   return {
     id: 'reef:structure',
     seed,
-    substrateRadius: round6(2.5 + seededUnit(seed, 'substrate-radius') * 0.45),
-    reefHeight: round6(1.72 + seededUnit(seed, 'reef-height') * 0.38),
-    shelfCount: 3 + Math.floor(seededUnit(seed, 'shelf-count') * 3),
-    colonySpacing: round6(0.17 + seededUnit(seed, 'colony-spacing') * 0.045),
-    verticalRelief: round6(0.42 + seededUnit(seed, 'vertical-relief') * 0.18),
+    substrateRadius: evolution.foundation.substrateRadius,
+    reefHeight: round6(1.56 + maturity * 0.92 + seededUnit(seed, 'reef-height') * 0.18),
+    shelfCount: 3 + Math.min(2, Math.floor(maturity * 3)),
+    colonySpacing: round6(0.2 + seededUnit(seed, 'colony-spacing') * 0.035),
+    verticalRelief: round6(0.4 + maturity * 0.24 + seededUnit(seed, 'vertical-relief') * 0.08),
     slopeBias: round6(0.12 + seededUnit(seed, 'slope-bias') * 0.18),
     currentDirectionRad: round6(seededUnit(seed, 'current-direction') * Math.PI * 2),
     currentStrength: round6(0.24 + seededUnit(seed, 'current-strength') * 0.26),
@@ -311,34 +289,6 @@ function eventDominantChannel(vector: EvolutionPressureVector): EvolutionChannel
   return channel;
 }
 
-function morphotypeFor(
-  channel: EvolutionChannel,
-  emphasized: boolean,
-): ReefColonyMorphotype {
-  if (channel === 'significance') return 'massive';
-  if (channel === 'achievement') return 'branching';
-  if (channel === 'remembrance') return 'massive';
-  if (channel === 'exploration') return 'plating';
-  if (channel === 'culture') return emphasized ? 'sea-fan' : 'soft-coral';
-  return 'encrusting';
-}
-
-function roleFor(channel: EvolutionChannel, emphasized: boolean): ReefColonyRole {
-  if (emphasized || channel === 'significance') return 'landmark';
-  if (channel === 'achievement') return 'framework';
-  if (channel === 'remembrance') return 'memory';
-  if (channel === 'exploration') return 'frontier';
-  if (channel === 'culture') return 'ornamental';
-  return 'foundation';
-}
-
-function tierFor(weight: number, emphasized: boolean): ReefColonyTier {
-  if (emphasized) return 'anchor';
-  if (weight >= 0.62) return 'primary';
-  if (weight >= 0.34) return 'companion';
-  return 'micro';
-}
-
 function halfLifeFor(morphotype: ReefColonyMorphotype): number {
   if (morphotype === 'massive' || morphotype === 'encrusting') return 150;
   if (morphotype === 'branching' || morphotype === 'plating') return 105;
@@ -374,51 +324,6 @@ function branchingBiasFor(morphotype: ReefColonyMorphotype, weight: number): num
   return round6(clamp01(base * (0.72 + weight * 0.36)));
 }
 
-function buildAnnualInstruction(
-  artifact: ArtifactBlueprint,
-  grammar: ReefGrowthGrammar,
-  epochIndex: number,
-): ReefGrowthInstruction {
-  const id = `reef:annual:${epochIndex}`;
-  const seed = stableSeed(artifact.deterministicSeed, id);
-  const morphotype = FOUNDATION_MORPHOTYPES[
-    Math.min(
-      FOUNDATION_MORPHOTYPES.length - 1,
-      Math.floor(seededUnit(seed, 'morphotype') * FOUNDATION_MORPHOTYPES.length),
-    )
-  ] ?? 'encrusting';
-  const weight = round6(0.38 + seededUnit(seed, 'weight') * 0.16);
-
-  return {
-    id,
-    sourceModule: 'relationship',
-    sourceEventId: null,
-    sourceEpisodeId: null,
-    epochIndex,
-    sequence: anniversaryEpoch(artifact, epochIndex) * 10,
-    channel: null,
-    morphotype,
-    role: 'foundation',
-    tier: 'primary',
-    emphasized: false,
-    weight,
-    maturity: 1,
-    preferredAzimuthRad: round6(
-      (epochIndex * GOLDEN_ANGLE + seededUnit(seed, 'azimuth') * 0.34) % (Math.PI * 2),
-    ),
-    radialBand: Math.min(
-      grammar.radialBandCount - 1,
-      1 + Math.floor(seededUnit(seed, 'radial-band') * (grammar.radialBandCount - 1)),
-    ),
-    verticalBand: Math.floor(seededUnit(seed, 'vertical-band') * 2),
-    footprint: footprintFor(morphotype, weight),
-    heightBias: heightBiasFor(morphotype, weight),
-    branchingBias: branchingBiasFor(morphotype, weight),
-    recruitCount: grammar.annualRecruitmentCount,
-    seed,
-  };
-}
-
 function buildEventInstruction(
   artifactSeed: number,
   event: NormalizedEvolutionEvent,
@@ -426,27 +331,63 @@ function buildEventInstruction(
   asOf: string,
   grammar: ReefGrowthGrammar,
 ): ReefGrowthInstruction | null {
-  const channel = eventDominantChannel(event.channels);
-  if (channel === null) return null;
+  // Plans become fish and Map facts become satellite rock. They are accepted
+  // reef facts, but must never silently manufacture a coral colony.
+  if (sourceModule === 'plans' || sourceModule === 'map') return null;
 
-  const totalPressure = vectorTotal(event.channels);
-  const weight = saturate(totalPressure + event.portalActivity * 0.16, 1.08);
+  const fallbackChannel: EvolutionChannel = sourceModule === 'memories'
+    ? 'remembrance'
+    : sourceModule === 'media'
+      ? 'culture'
+      : 'significance';
+  const channel = eventDominantChannel(event.channels) ?? fallbackChannel;
+  const totalPressure = EVOLUTION_CHANNELS.reduce(
+    (total, candidate) => total + event.channels[candidate],
+    0,
+  );
+  const signalWeight = saturate(totalPressure + event.portalActivity * 0.16, 1.08);
+  const weight = round6(sourceModule === 'memories'
+    ? 0.2 + signalWeight * 0.24
+    : sourceModule === 'media'
+      ? 0.32 + signalWeight * 0.3
+      : 0.46 + signalWeight * 0.42);
   const emphasized = event.channels.significance >= 0.75
     || (event.channels.significance >= 0.56 && weight >= 0.62);
-  const morphotype = morphotypeFor(channel, emphasized);
   const id = `reef:event:${event.id}`;
   const seed = stableSeed(artifactSeed, id);
-  const radialBase = channel === 'stability' ? 0
-    : channel === 'remembrance' ? 1
-      : channel === 'achievement' ? 2
-        : channel === 'culture' ? 2
-          : channel === 'exploration' ? 3
-            : 1;
+  const morphotype: ReefColonyMorphotype = sourceModule === 'memories'
+    ? 'encrusting'
+    : sourceModule === 'media'
+      ? channel === 'culture' ? 'soft-coral' : 'plating'
+      : sourceModule === 'calendar'
+        ? channel === 'culture' ? 'sea-fan' : 'massive'
+        : channel === 'achievement'
+          ? 'branching'
+          : channel === 'culture' ? 'soft-coral' : 'massive';
+  const role: ReefColonyRole = sourceModule === 'memories'
+    ? 'memory'
+    : sourceModule === 'media'
+      ? 'ornamental'
+      : sourceModule === 'calendar'
+        ? 'landmark'
+        : 'framework';
+  const tier: ReefColonyTier = sourceModule === 'memories'
+    ? 'micro'
+    : sourceModule === 'media'
+      ? 'companion'
+      : emphasized ? 'anchor' : 'primary';
+  const radialBase = sourceModule === 'memories'
+    ? Math.floor(seededUnit(seed, 'photo-radius') * grammar.radialBandCount)
+    : sourceModule === 'media'
+      ? 2
+      : sourceModule === 'calendar'
+        ? 2
+        : 1;
   const verticalBase = morphotype === 'encrusting' ? 0
     : morphotype === 'massive' ? 1
       : morphotype === 'plating' ? 2
         : 2;
-  const recruitCount = emphasized ? 3 : weight >= 0.55 ? 2 : 1;
+  const footprintScale = sourceModule === 'memories' ? 0.42 : 1;
 
   return {
     id,
@@ -457,8 +398,8 @@ function buildEventInstruction(
     sequence: event.occurredAtEpochMs * 10 + 5,
     channel,
     morphotype,
-    role: roleFor(channel, emphasized),
-    tier: tierFor(weight, emphasized),
+    role,
+    tier,
     emphasized,
     weight,
     maturity: maturityAt(event.occurredAt, asOf, halfLifeFor(morphotype)),
@@ -471,86 +412,26 @@ function buildEventInstruction(
       grammar.verticalBandCount - 1,
       verticalBase + Math.floor(seededUnit(seed, 'vertical-band') * 2),
     ),
-    footprint: footprintFor(morphotype, weight),
+    footprint: round6(footprintFor(morphotype, weight) * footprintScale),
     heightBias: heightBiasFor(morphotype, weight),
     branchingBias: branchingBiasFor(morphotype, weight),
-    recruitCount,
+    // A committed portal fact maps to one stable living body. Density is
+    // expressed through many facts, never by cloning one fact into overlaps.
+    recruitCount: 1,
     seed,
   };
-}
-
-function buildScheduleInstructions(
-  artifact: ArtifactBlueprint,
-  schedule: NormalizedReefSchedule,
-  asOf: string,
-  grammar: ReefGrowthGrammar,
-): ReefGrowthInstruction[] {
-  const daysByEpoch = new Map<number, ReefScheduleDay[]>();
-  for (const day of schedule.days) {
-    const epochDays = daysByEpoch.get(day.epochIndex) ?? [];
-    epochDays.push(day);
-    daysByEpoch.set(day.epochIndex, epochDays);
-  }
-
-  return [...daysByEpoch.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([epochIndex, days]) => {
-      const id = `reef:schedule:${epochIndex}`;
-      const seed = stableSeed(artifact.deterministicSeed, id);
-      const monthCount = new Set(days.map((day) => day.date.slice(0, 7))).size;
-      const daySignal = saturate(days.length, 12);
-      const regularitySignal = saturate(monthCount, 4);
-      const weight = round6(clamp01(0.18 + daySignal * 0.42 + regularitySignal * 0.12));
-      const morphotype: ReefColonyMorphotype = 'encrusting';
-
-      return {
-        id,
-        sourceModule: 'schedule',
-        sourceEventId: null,
-        sourceEpisodeId: null,
-        epochIndex,
-        // Fixed to the relationship epoch boundary: adding another recorded
-        // day changes fullness, never the identity or chronological anchor.
-        sequence: anniversaryEpoch(artifact, epochIndex) * 10 + 3,
-        channel: null,
-        morphotype,
-        role: 'foundation',
-        tier: days.length >= 18 ? 'primary' : days.length >= 5 ? 'companion' : 'micro',
-        emphasized: false,
-        weight,
-        maturity: maturityAt(days[0]?.date ?? asOf, asOf, 120),
-        preferredAzimuthRad: round6(
-          (epochIndex * GOLDEN_ANGLE + seededUnit(seed, 'azimuth') * 0.44) % (Math.PI * 2),
-        ),
-        radialBand: Math.min(
-          grammar.radialBandCount - 1,
-          Math.floor(seededUnit(seed, 'radial-band') * 2),
-        ),
-        verticalBand: 0,
-        footprint: footprintFor(morphotype, weight),
-        heightBias: heightBiasFor(morphotype, weight),
-        branchingBias: branchingBiasFor(morphotype, weight),
-        recruitCount: days.length >= 12 ? 2 : 1,
-        seed,
-      };
-    });
 }
 
 function buildGrowth(
   artifact: ArtifactBlueprint,
   asOf: string,
-  completedYears: number,
   grammar: ReefGrowthGrammar,
   schedule: NormalizedReefSchedule,
+  evolution: ReefModuleEvolutionPlan,
 ): { growth: ReefGrowthInstruction[]; diagnostics: ReefSpeciesDiagnostics } {
   const asOfEpoch = Date.parse(asOf);
   if (!Number.isFinite(asOfEpoch)) throw new Error(`Invalid Reef Species asOf: "${asOf}".`);
 
-  const annual = Array.from(
-    { length: completedYears },
-    (_value, index) => buildAnnualInstruction(artifact, grammar, index + 1),
-  );
-  const scheduleInstructions = buildScheduleInstructions(artifact, schedule, asOf, grammar);
   const events: ReefGrowthInstruction[] = [];
   const excludedEventIds: string[] = [];
   const zeroPressureEventIds: string[] = [];
@@ -574,6 +455,10 @@ function buildGrowth(
       futureEventIds.push(event.id);
       continue;
     }
+    acceptedEventCountByModule[sourceModule] += 1;
+    if (eventDominantChannel(event.channels) === null) {
+      zeroPressureEventIds.push(event.id);
+    }
     const instruction = buildEventInstruction(
       artifact.deterministicSeed,
       event,
@@ -581,15 +466,10 @@ function buildGrowth(
       asOf,
       grammar,
     );
-    if (!instruction) {
-      zeroPressureEventIds.push(event.id);
-      continue;
-    }
-    acceptedEventCountByModule[sourceModule] += 1;
-    events.push(instruction);
+    if (instruction) events.push(instruction);
   }
 
-  const growth = [...annual, ...scheduleInstructions, ...events].sort(
+  const growth = [...events].sort(
     (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
   );
   const emittedColonyIntentCount = growth.reduce(
@@ -600,7 +480,8 @@ function buildGrowth(
   return {
     growth,
     diagnostics: {
-      emptyHistory: events.length === 0 && schedule.days.length === 0,
+      emptyHistory: Object.values(acceptedEventCountByModule).every((count) => count === 0)
+        && schedule.days.length === 0,
       excludedEventIds: excludedEventIds.sort(),
       zeroPressureEventIds: zeroPressureEventIds.sort(),
       futureEventIds: futureEventIds.sort(),
@@ -610,9 +491,11 @@ function buildGrowth(
       preRelationshipSharedDayOffDates: schedule.preRelationshipDates,
       acceptedEventCountByModule,
       sharedDaysOffCount: schedule.days.length,
-      annualInstructionCount: annual.length,
+      // Kept for diagnostics compatibility: these counts now describe
+      // geological structures, not synthetic coral instructions.
+      annualInstructionCount: evolution.foundation.arches.logicalCount,
       eventInstructionCount: events.length,
-      scheduleInstructionCount: scheduleInstructions.length,
+      scheduleInstructionCount: evolution.foundation.scheduleTerraces.logicalCount,
       emittedColonyIntentCount,
       maximumAcceptedColonies: grammar.maximumAcceptedColonies,
       colonyBudgetExceeded: emittedColonyIntentCount > grammar.maximumAcceptedColonies,
@@ -658,14 +541,14 @@ export function buildReefSpeciesBlueprint(
     completedYears: state.completedYears,
     sharedDaysOff: schedule.days,
   });
-  const structure = buildStructure(input.artifact.deterministicSeed);
+  const structure = buildStructure(input.artifact.deterministicSeed, moduleEvolution);
   const grammar = buildGrammar(input.artifact.deterministicSeed);
   const { growth, diagnostics } = buildGrowth(
     input.artifact,
     asOf,
-    state.completedYears,
     grammar,
     schedule,
+    moduleEvolution,
   );
 
   return {

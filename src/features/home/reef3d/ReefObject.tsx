@@ -102,12 +102,12 @@ function sculptSupportedRange(
 ): void {
   const crownFactor = supportY > 0.78 ? 0.88 : 1;
   const scaleByMorphotype = {
-    branching: [1.42 * crownFactor, 1.18, 1.42 * crownFactor],
-    massive: [1.48 * crownFactor, 0.82, 1.48 * crownFactor],
-    plating: [1.54 * crownFactor, 0.78, 1.54 * crownFactor],
-    encrusting: [1.3 * crownFactor, 0.58, 1.3 * crownFactor],
-    'soft-coral': [1.38 * crownFactor, 1.2, 1.38 * crownFactor],
-    'sea-fan': [1.34 * crownFactor, 1.22, 1.34 * crownFactor],
+    branching: [1 * crownFactor, 1.18, 1 * crownFactor],
+    massive: [1 * crownFactor, 0.82, 1 * crownFactor],
+    plating: [1 * crownFactor, 0.78, 1 * crownFactor],
+    encrusting: [1 * crownFactor, 0.58, 1 * crownFactor],
+    'soft-coral': [1 * crownFactor, 1.2, 1 * crownFactor],
+    'sea-fan': [1 * crownFactor, 1.22, 1 * crownFactor],
   } as const;
 
   rescaleRange(batch, runtime, scaleByMorphotype[runtime.range.morphotype]);
@@ -120,10 +120,10 @@ function groundRangeOnSupport(
   supportMeshes: readonly THREE.Mesh[],
   pivotWorld: THREE.Vector3,
 ): number | null {
-  const radius = Math.hypot(pivotWorld.x, pivotWorld.z);
-  const inwardSteps = radius > 1.15
-    ? [1, 0.84, 0.68, 0.54]
-    : [1, 0.88, 0.72];
+  // Never slide roots sideways after the collision-safe engine layout. A
+  // colony either grows at its reserved X/Z footprint or remains hidden until
+  // the chronological foundation reaches that place.
+  const inwardSteps = [1];
 
   for (const inward of inwardSteps) {
     const hit = raycastReefSupport(
@@ -278,7 +278,7 @@ export function ReefObject({
       ref={groupRef}
       rotation={[-0.08, -0.18, 0]}
       position={[0, 0.02, 0]}
-      scale={[0.76, 1.08, 0.76]}
+      scale={[1, 1.04, 1]}
     >
       <mesh
         visible={false}

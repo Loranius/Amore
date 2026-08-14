@@ -1,4 +1,11 @@
-import type { Material } from 'three';
+import { useMemo } from 'react';
+import { CatmullRomCurve3, Vector3, type Material } from 'three';
+import type {
+  ReefGrowthArchPlacement,
+  ReefGrowthOutcropPlacement,
+  ReefGrowthTerracePlacement,
+} from '@/engine/species/reef';
+import type { ReefPreviewBuild } from './buildReefPreview';
 import { useReefRockMaterials } from './useReefRockMaterials';
 
 type Vec3 = readonly [number, number, number];
@@ -386,6 +393,127 @@ function SandPatch({
   );
 }
 
+/** One completed relationship year becomes a stable, curved reef arch. */
+function GrowthArch({
+  arch,
+  material,
+}: {
+  arch: ReefGrowthArchPlacement;
+  material: Material;
+}) {
+  const curve = useMemo(() => new CatmullRomCurve3([
+    new Vector3(-arch.span * 0.5, 0, 0),
+    new Vector3(-arch.span * 0.34, arch.height * 0.56, arch.curveDepth * 0.42),
+    new Vector3(0, arch.height, arch.curveDepth),
+    new Vector3(arch.span * 0.34, arch.height * 0.56, arch.curveDepth * 0.42),
+    new Vector3(arch.span * 0.5, 0, 0),
+  ], false, 'centripetal'), [arch.curveDepth, arch.height, arch.span]);
+
+  return (
+    <group
+      name={arch.id}
+      position={[arch.center.x, arch.center.y, arch.center.z]}
+      rotation={[0, arch.rotationY, 0]}
+    >
+      <mesh material={material} receiveShadow={false} castShadow={false}>
+        <tubeGeometry args={[curve, 36, arch.thickness, 8, false]} />
+      </mesh>
+      <RockMass
+        position={[-arch.span * 0.48, -0.06, 0]}
+        scale={[arch.thickness * 1.8, arch.thickness * 1.35, arch.thickness * 1.55]}
+        rotation={[0.06, 0.28, -0.04]}
+        material={material}
+      />
+      <RockMass
+        position={[arch.span * 0.48, -0.06, 0]}
+        scale={[arch.thickness * 1.75, arch.thickness * 1.32, arch.thickness * 1.5]}
+        rotation={[-0.04, -0.26, 0.05]}
+        material={material}
+      />
+      <PlateLedge
+        position={[0, arch.height * 0.94, arch.curveDepth * 0.76]}
+        scale={[arch.span * 0.32, arch.thickness * 0.52, arch.span * 0.2]}
+        rotation={[0.02, arch.rotationY * 0.08, -0.02]}
+        color="#607970"
+        material={material}
+        variant={(arch.yearIndex % 5) as 0 | 1 | 2 | 3 | 4}
+      />
+    </group>
+  );
+}
+
+/** Every visited place opens a separate neighbouring rock for future life. */
+function GrowthOutcrop({
+  outcrop,
+  material,
+}: {
+  outcrop: ReefGrowthOutcropPlacement;
+  material: Material;
+}) {
+  const radius = outcrop.footprintRadius;
+  return (
+    <group
+      name={outcrop.id}
+      position={[outcrop.center.x, outcrop.center.y, outcrop.center.z]}
+      rotation={[0, outcrop.rotationY, 0]}
+    >
+      <RockMass
+        position={[0, outcrop.height * 0.38, 0]}
+        scale={[radius * 0.92, outcrop.height * 0.72, radius * 0.76]}
+        rotation={[0.08, 0.24, -0.06]}
+        material={material}
+      />
+      <RockMass
+        position={[radius * 0.28, outcrop.height * 0.3, -radius * 0.18]}
+        scale={[radius * 0.58, outcrop.height * 0.54, radius * 0.52]}
+        rotation={[-0.04, -0.3, 0.04]}
+        material={material}
+      />
+      <PlateLedge
+        position={[0, outcrop.height * 0.78, 0]}
+        scale={[
+          radius * 0.62 * outcrop.ledgeScale,
+          Math.max(0.07, outcrop.height * 0.14),
+          radius * 0.48,
+        ]}
+        rotation={[0.03, -0.18, 0.02]}
+        color="#58736d"
+        material={material}
+        variant={(outcrop.seed % 5) as 0 | 1 | 2 | 3 | 4}
+      />
+    </group>
+  );
+}
+
+/** One active Schedule month becomes one low chronological terrace. */
+function GrowthTerrace({
+  terrace,
+  material,
+}: {
+  terrace: ReefGrowthTerracePlacement;
+  material: Material;
+}) {
+  return (
+    <group
+      name={terrace.id}
+      position={[terrace.center.x, terrace.center.y, terrace.center.z]}
+      rotation={[0, terrace.rotationY, 0]}
+    >
+      <PlateLedge
+        position={[0, terrace.thickness * 0.8, 0]}
+        scale={[
+          terrace.footprintRadius * 0.62,
+          terrace.thickness,
+          terrace.footprintRadius * 0.48,
+        ]}
+        color="#637a70"
+        material={material}
+        variant={(terrace.seed % 5) as 0 | 1 | 2 | 3 | 4}
+      />
+    </group>
+  );
+}
+
 function DistantSpire({
   position,
   scale,
@@ -469,8 +597,9 @@ function ReefContactShadow() {
  * The hero now uses a three-tier cascade: broad lower ledge, offset middle ledge
  * and compact crown, while the seabed stays continuous around the rock spine.
  */
-export function ReefEnvironment() {
+export function ReefEnvironment({ build }: { build: ReefPreviewBuild }) {
   const rockMaterials = useReefRockMaterials();
+  const { structures } = build;
 
   return (
     <group name="reef-environment-three-tier-cascade">
@@ -482,23 +611,39 @@ export function ReefEnvironment() {
       <ReefContactShadow />
 
       <group name="reef-hero-support">
-        {BASE_CORE_MASSES.map((rock, index) => (
-          <RockMass key={`reef-base-core-${index}`} {...rock} material={rockMaterials.hero} />
+        <group scale={[
+          structures.foundationScaleXZ,
+          structures.foundationScaleY,
+          structures.foundationScaleXZ,
+        ]}>
+          {BASE_CORE_MASSES.map((rock, index) => (
+            <RockMass key={`reef-base-core-${index}`} {...rock} material={rockMaterials.hero} />
+          ))}
+          {CORE_BRIDGE_MASSES.map((rock, index) => (
+            <RockMass key={`reef-core-bridge-${index}`} {...rock} material={rockMaterials.hero} />
+          ))}
+          {CORE_LOWER_FILL.map((rock, index) => (
+            <RockMass key={`reef-core-fill-${index}`} {...rock} material={rockMaterials.hero} />
+          ))}
+          {BASE_LEDGE_ROOTS.map((rock, index) => (
+            <RockMass key={`reef-ledge-root-${index}`} {...rock} material={rockMaterials.hero} />
+          ))}
+          {BASE_PLATE_LEDGES.map((ledge, index) => (
+            <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} material={rockMaterials.hero} />
+          ))}
+          {BASE_DEBRIS.map((rock, index) => (
+            <RockMass key={`reef-base-debris-${index}`} {...rock} material={rockMaterials.rock} />
+          ))}
+        </group>
+
+        {structures.arches.map((arch) => (
+          <GrowthArch key={arch.id} arch={arch} material={rockMaterials.hero} />
         ))}
-        {CORE_BRIDGE_MASSES.map((rock, index) => (
-          <RockMass key={`reef-core-bridge-${index}`} {...rock} material={rockMaterials.hero} />
+        {structures.outcrops.map((outcrop) => (
+          <GrowthOutcrop key={outcrop.id} outcrop={outcrop} material={rockMaterials.hero} />
         ))}
-        {CORE_LOWER_FILL.map((rock, index) => (
-          <RockMass key={`reef-core-fill-${index}`} {...rock} material={rockMaterials.hero} />
-        ))}
-        {BASE_LEDGE_ROOTS.map((rock, index) => (
-          <RockMass key={`reef-ledge-root-${index}`} {...rock} material={rockMaterials.hero} />
-        ))}
-        {BASE_PLATE_LEDGES.map((ledge, index) => (
-          <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} material={rockMaterials.hero} />
-        ))}
-        {BASE_DEBRIS.map((rock, index) => (
-          <RockMass key={`reef-base-debris-${index}`} {...rock} material={rockMaterials.rock} />
+        {structures.terraces.map((terrace) => (
+          <GrowthTerrace key={terrace.id} terrace={terrace} material={rockMaterials.hero} />
         ))}
       </group>
 

@@ -105,18 +105,17 @@ describe('Reef Species Phase 1', () => {
     ]);
     expect(eventMorphotypes).toEqual([
       'calendar:proposal:massive:landmark',
-      'achievement:home:branching:framework',
-      'memory:first-album:massive:memory',
-      'place:lviv:plating:frontier',
+      'memory:first-album:encrusting:memory',
       'culture:concert:sea-fan:landmark',
     ]);
     expect(reef.growth
       .filter((instruction) => instruction.sourceEventId !== null)
       .map((instruction) => instruction.sourceModule)).toEqual([
-      'calendar', 'plans', 'memories', 'map', 'calendar',
+      'calendar', 'memories', 'calendar',
     ]);
+    expect(reef.growth.every((instruction) => instruction.recruitCount === 1)).toBe(true);
     expect(reef.diagnostics.annualInstructionCount).toBe(2);
-    expect(reef.diagnostics.eventInstructionCount).toBe(BASE_EVENTS.length - 1);
+    expect(reef.diagnostics.eventInstructionCount).toBe(3);
     expect(reef.diagnostics.excludedEventIds).toEqual(['shopping:2025-01-06']);
     expect(reef.diagnostics.acceptedEventCountByModule).toEqual({
       calendar: 2,
@@ -188,11 +187,12 @@ describe('Reef Species Phase 1', () => {
     expect(extended.grammar).toEqual(base.grammar);
   });
 
-  it('lets time add annual recruitment and maturity without moving old morphology', () => {
+  it('lets days enlarge the foundation and years add arches without moving old colonies', () => {
     const earlier = buildReef(BASE_EVENTS, '2025-07-01');
     const later = buildReef(BASE_EVENTS, '2026-07-01');
 
-    expect(later.structure).toEqual(earlier.structure);
+    expect(later.structure.substrateRadius).toBeGreaterThan(earlier.structure.substrateRadius);
+    expect(later.structure.reefHeight).toBeGreaterThan(earlier.structure.reefHeight);
     expect(later.grammar).toEqual(earlier.grammar);
     expect(earlier.diagnostics.annualInstructionCount).toBe(1);
     expect(later.diagnostics.annualInstructionCount).toBe(2);
@@ -205,7 +205,7 @@ describe('Reef Species Phase 1', () => {
     }
   });
 
-  it('diagnoses future and zero-pressure facts without publishing colonies from them', () => {
+  it('diagnoses future facts and gives accepted zero-pressure facts their module default', () => {
     const reef = buildReef([
       ...BASE_EVENTS,
       {
@@ -221,7 +221,11 @@ describe('Reef Species Phase 1', () => {
     expect(reef.diagnostics.futureEventIds).toEqual(['future:trip']);
     expect(reef.diagnostics.zeroPressureEventIds).toEqual(['activity-only']);
     expect(reef.growth.some((instruction) => instruction.sourceEventId === 'future:trip')).toBe(false);
-    expect(reef.growth.some((instruction) => instruction.sourceEventId === 'activity-only')).toBe(false);
+    expect(reef.growth.some((instruction) => (
+      instruction.sourceEventId === 'activity-only'
+      && instruction.sourceModule === 'calendar'
+      && instruction.role === 'landmark'
+    ))).toBe(true);
     expect(reef.state.eventCount).toBe(BASE_EVENTS.length);
   });
 
@@ -261,14 +265,13 @@ describe('Reef Species Phase 1', () => {
     );
 
     expect(withSchedule).toEqual(reversed);
-    expect(scheduleGrowth.map((instruction) => instruction.id)).toEqual([
-      'reef:schedule:0', 'reef:schedule:1', 'reef:schedule:2',
-    ]);
-    expect(scheduleGrowth.every((instruction) => (
-      instruction.morphotype === 'encrusting'
-      && instruction.role === 'foundation'
-      && instruction.channel === null
-    ))).toBe(true);
+    expect(scheduleGrowth).toEqual([]);
+    expect(withSchedule.moduleEvolution.entities.scheduleTerraces.map((entity) => entity.id))
+      .toEqual([
+        'reef:schedule-terrace:2024-02',
+        'reef:schedule-terrace:2025-06',
+        'reef:schedule-terrace:2026-06',
+      ]);
     expect(withSchedule.diagnostics).toMatchObject({
       sharedDaysOffCount: 3,
       scheduleInstructionCount: 3,

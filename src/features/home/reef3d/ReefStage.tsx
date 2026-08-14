@@ -8,7 +8,6 @@ import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefSeaGrass } from './ReefSeaGrass';
 import { ReefSessileLife } from './ReefSessileLife';
 import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
-import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 import {
   ReefBackdropCorals,
@@ -37,7 +36,7 @@ export function ReefStage({
 }) {
   const size = useThree((state) => state.size);
   const aspect = size.height > 0 ? size.width / size.height : 1;
-  const cameraDistance = useMemo(() => (aspect < 0.72 ? 11.2 : 8.15), [aspect]);
+  const cameraDistance = useMemo(() => (aspect < 0.72 ? 12.8 : 9.15), [aspect]);
 
   return (
     <>
@@ -61,18 +60,19 @@ export function ReefStage({
         />
       </mesh>
 
-      <ReefEnvironment />
+      <ReefEnvironment build={build} />
       <ReefBackdropCorals onReady={onBackdropReady} />
       <ReefCleanupLayer />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefSeaGrass reducedMotion={reducedMotion} />
       <ReefSessileLife reducedMotion={reducedMotion} />
-      <ReefFishSchool onReady={onFishReady} reducedMotion={reducedMotion} />
-
-      {/* Density now lives in the same world coordinate space as the support
-          meshes. The old 0.76 X/Z wrapper was one source of visual detachment. */}
-      <ReefDensityLayer build={build} />
+      <ReefFishSchool
+        count={build.species.moduleEvolution.life.planFish.visibleCount}
+        identitySeed={build.species.moduleEvolution.identitySeed}
+        onReady={onFishReady}
+        reducedMotion={reducedMotion}
+      />
 
       {children}
 
@@ -84,8 +84,8 @@ export function ReefStage({
         dampingFactor={0.06}
         rotateSpeed={0.58}
         zoomSpeed={0.7}
-        minDistance={6.3}
-        maxDistance={12.4}
+        minDistance={7.1}
+        maxDistance={15.4}
         minPolarAngle={0.58}
         maxPolarAngle={1.42}
         target={[0, 0.85, 0]}
