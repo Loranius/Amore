@@ -40,18 +40,22 @@ export default defineConfig({
         // Рифова GLB не має завантажуватись користувачам кристала або дерева
         // під час встановлення service worker. Вона кешується після першого
         // справжнього відкриття рифу.
-        globIgnores: ['**/models/school_of_fish_reef.glb'],
+        globIgnores: [
+          '**/models/school_of_fish_reef.glb',
+          '**/models/coral_reef_set_cc0.glb',
+          '**/textures/reef/*.webp',
+        ],
         navigateFallbackDenylist: [
           /game\.html/,
           /\.mp4$/,
         ],
         runtimeCaching: [
           {
-            urlPattern: /\/models\/school_of_fish_reef\.glb$/,
+            urlPattern: /\/(?:models\/(?:school_of_fish_reef|coral_reef_set_cc0)\.glb|textures\/reef\/[^/]+\.webp)$/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'reef-native-models',
-              expiration: { maxEntries: 2, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheName: 'reef-visual-assets',
+              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },

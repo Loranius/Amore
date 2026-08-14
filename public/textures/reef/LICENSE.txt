@@ -1,0 +1,14 @@
+Asset: Coral Stone Wall
+Author: Dimitrios Savva
+Source: https://polyhaven.com/a/coral_stone_wall
+License: CC0 (Poly Haven assets are released into the public domain)
+License URL: https://polyhaven.com/license
+
+Source files used:
+- coral_stone_wall_diff_1k.jpg (MD5 a1119e1d4d898370da2b9df6a6efb557)
+- coral_stone_wall_nor_gl_1k.jpg (MD5 a1e4375f26face1e6f63d8bcc7e57c83)
+- coral_stone_wall_rough_1k.jpg (MD5 0fb752fd62d50666ed2d3b533d309221)
+
+The 1K JPEG maps were transcoded to WebP for the mobile scene. The diffuse and
+roughness maps use lossy compression; the OpenGL normal map uses high-quality
+lossy compression. No displacement map is shipped or sampled.

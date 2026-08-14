@@ -1,3 +1,6 @@
+import type { Material } from 'three';
+import { useReefRockMaterials } from './useReefRockMaterials';
+
 type Vec3 = readonly [number, number, number];
 
 type RockMassProps = {
@@ -5,6 +8,7 @@ type RockMassProps = {
   scale: Vec3;
   rotation?: Vec3;
   color?: string;
+  material?: Material;
 };
 
 type PlateLedgeProps = {
@@ -243,6 +247,7 @@ function RockMass({
   scale,
   rotation = [0, 0, 0],
   color = PALETTE.rock,
+  material,
 }: RockMassProps) {
   return (
     <mesh
@@ -251,9 +256,10 @@ function RockMass({
       rotation={[rotation[0], rotation[1], rotation[2]]}
       receiveShadow={false}
       castShadow={false}
+      {...(material ? { material } : {})}
     >
       <dodecahedronGeometry args={[1, 0]} />
-      <meshStandardMaterial color={color} roughness={0.98} metalness={0} />
+      {!material && <meshStandardMaterial color={color} roughness={0.98} metalness={0} />}
     </mesh>
   );
 }
@@ -378,10 +384,12 @@ function DistantSpire({
   position,
   scale,
   rotation = 0,
+  material,
 }: {
   position: Vec3;
   scale: number;
   rotation?: number;
+  material: Material;
 }) {
   return (
     <group
@@ -389,9 +397,23 @@ function DistantSpire({
       rotation={[0, rotation, 0]}
       scale={scale}
     >
-      <RockMass position={[0, 0, 0]} scale={[1.55, 0.72, 1.35]} color="#2f5758" />
-      <RockMass position={[-0.18, 1.02, 0.04]} scale={[0.88, 1.12, 0.82]} rotation={[0.05, 0.24, -0.08]} color="#2a5255" />
-      <RockMass position={[0.14, 2.05, -0.03]} scale={[0.58, 0.86, 0.56]} rotation={[-0.04, -0.2, 0.07]} color="#274d52" />
+      <RockMass
+        position={[0, 0, 0]}
+        scale={[1.55, 0.72, 1.35]}
+        material={material}
+      />
+      <RockMass
+        position={[-0.18, 1.02, 0.04]}
+        scale={[0.88, 1.12, 0.82]}
+        rotation={[0.05, 0.24, -0.08]}
+        material={material}
+      />
+      <RockMass
+        position={[0.14, 2.05, -0.03]}
+        scale={[0.58, 0.86, 0.56]}
+        rotation={[-0.04, -0.2, 0.07]}
+        material={material}
+      />
     </group>
   );
 }
@@ -442,6 +464,8 @@ function ReefContactShadow() {
  * and compact crown, while the seabed stays continuous around the rock spine.
  */
 export function ReefEnvironment() {
+  const rockMaterials = useReefRockMaterials();
+
   return (
     <group name="reef-environment-three-tier-cascade">
       <mesh position={[0, -0.36, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow={false}>
@@ -468,7 +492,7 @@ export function ReefEnvironment() {
           <PlateLedge key={`reef-base-ledge-${index}`} {...ledge} />
         ))}
         {BASE_DEBRIS.map((rock, index) => (
-          <RockMass key={`reef-base-debris-${index}`} {...rock} />
+          <RockMass key={`reef-base-debris-${index}`} {...rock} material={rockMaterials.rock} />
         ))}
       </group>
 
@@ -477,28 +501,48 @@ export function ReefEnvironment() {
       ))}
 
       {NEAR_ROCKS.map((rock, index) => (
-        <RockMass key={`reef-near-rock-${index}`} {...rock} />
+        <RockMass key={`reef-near-rock-${index}`} {...rock} material={rockMaterials.rock} />
       ))}
       {TERRACE_STONES.map((rock, index) => (
-        <RockMass key={`reef-terrace-${index}`} {...rock} />
+        <RockMass key={`reef-terrace-${index}`} {...rock} material={rockMaterials.rock} />
       ))}
 
-      <DistantSpire position={[-6.8, -0.35, -8.7]} scale={1.25} rotation={0.28} />
-      <DistantSpire position={[6.9, -0.6, -9.8]} scale={1.42} rotation={-0.38} />
-      <DistantSpire position={[-2.4, -0.9, -12.8]} scale={0.9} rotation={-0.12} />
-      <DistantSpire position={[2.9, -1.0, -13.6]} scale={0.82} rotation={0.2} />
+      <DistantSpire
+        position={[-6.8, -0.35, -8.7]}
+        scale={1.25}
+        rotation={0.28}
+        material={rockMaterials.distant}
+      />
+      <DistantSpire
+        position={[6.9, -0.6, -9.8]}
+        scale={1.42}
+        rotation={-0.38}
+        material={rockMaterials.distant}
+      />
+      <DistantSpire
+        position={[-2.4, -0.9, -12.8]}
+        scale={0.9}
+        rotation={-0.12}
+        material={rockMaterials.distant}
+      />
+      <DistantSpire
+        position={[2.9, -1.0, -13.6]}
+        scale={0.82}
+        rotation={0.2}
+        material={rockMaterials.distant}
+      />
 
       <RockMass
         position={[-8.9, -0.95, -7.1]}
         scale={[3.9, 1.05, 2.6]}
         rotation={[0.02, 0.38, -0.04]}
-        color="#315959"
+        material={rockMaterials.distant}
       />
       <RockMass
         position={[9.1, -1.05, -7.8]}
         scale={[4.1, 1.12, 2.8]}
         rotation={[-0.03, -0.42, 0.03]}
-        color="#2e5658"
+        material={rockMaterials.distant}
       />
     </group>
   );

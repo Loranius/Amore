@@ -9,6 +9,10 @@ import { ReefSessileLife } from './ReefSessileLife';
 import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
+import {
+  ReefBackdropCorals,
+  type ReefBackdropMetrics,
+} from './ReefBackdropCorals';
 
 /**
  * Dedicated underwater world for the reef.
@@ -18,10 +22,12 @@ import { BackgroundWhale } from './BackgroundWhale';
  * Nothing from the crystal temple or the old laboratory card is mounted here.
  */
 export function ReefStage({
+  onBackdropReady,
   onFishReady,
   reducedMotion,
   children,
 }: {
+  onBackdropReady?: (metrics: ReefBackdropMetrics) => void;
   onFishReady?: (metrics: ReefFishSchoolMetrics) => void;
   reducedMotion: boolean;
   children: ReactNode;
@@ -32,8 +38,8 @@ export function ReefStage({
 
   return (
     <>
-      <color attach="background" args={['#0a4d61']} />
-      <fog attach="fog" args={['#176b77', 5.4, 22.5]} />
+      <color attach="background" args={['#073f55']} />
+      <fog attach="fog" args={['#126777', 5.1, 23.5]} />
 
       <ambientLight intensity={0.2} />
       <hemisphereLight args={['#9ce4e8', '#143d42', 0.82]} />
@@ -53,6 +59,7 @@ export function ReefStage({
       </mesh>
 
       <ReefEnvironment />
+      <ReefBackdropCorals onReady={onBackdropReady} />
       <ReefCleanupLayer />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />

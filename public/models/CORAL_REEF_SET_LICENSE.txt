@@ -1,0 +1,10 @@
+Asset: Coral Reef Set
+Creator: MiniPoly
+Source: https://poly.pizza/m/74GL45Fvdh
+Downloaded file: https://static.poly.pizza/a9cdd3fc-df4b-437d-a3a0-c12cda93e250.glb
+License: CC0 1.0 Universal (public domain dedication)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+The source GLB is stored unchanged. Amore merges its eight static meshes at
+runtime and uses the result only as a distant environmental reef silhouette;
+the user-data-driven production coral remains procedurally generated.

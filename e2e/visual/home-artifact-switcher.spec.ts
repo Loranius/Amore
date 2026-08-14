@@ -9,6 +9,12 @@ import {
   REEF_FISH_SCHOOL_ROUTE_PROFILE,
   REEF_FISH_SCHOOL_SCALE,
 } from '../../src/features/home/reef3d/reefFishSchoolPresentation';
+import {
+  REEF_BACKDROP_MAX_TRIANGLES,
+  REEF_BACKDROP_MODEL,
+  REEF_BACKDROP_PRESENTATION,
+  REEF_BACKDROP_SOURCE_MESHES,
+} from '../../src/features/home/reef3d/reefAssetManifest';
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
@@ -73,6 +79,18 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
       REEF_FOUNDATION_PRESENTATION_VERSION,
     );
     await expect(reef).toHaveAttribute('data-reef-foundation-pass', REEF_FOUNDATION_PASS);
+    await expect(reef).toHaveAttribute('data-reef-backdrop-model', REEF_BACKDROP_MODEL, {
+      timeout: 25_000,
+    });
+    await expect(reef).toHaveAttribute(
+      'data-reef-backdrop-presentation',
+      REEF_BACKDROP_PRESENTATION,
+    );
+    await expect(reef).toHaveAttribute(
+      'data-reef-backdrop-source-meshes',
+      String(REEF_BACKDROP_SOURCE_MESHES),
+    );
+    await expect(reef).toHaveAttribute('data-reef-backdrop-draw-calls', '1');
     await expect(reef).toHaveAttribute('data-reef-fish-model', REEF_FISH_SCHOOL_MODEL, {
       timeout: 25_000,
     });
@@ -107,12 +125,15 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reefTriangles = Number(await reef.getAttribute('data-reef-triangles'));
     const reefFishWidth = Number(await reef.getAttribute('data-reef-fish-width'));
     const reefFishHeight = Number(await reef.getAttribute('data-reef-fish-height'));
+    const reefBackdropTriangles = Number(await reef.getAttribute('data-reef-backdrop-triangles'));
     expect(reefDrawCalls).toBeGreaterThan(0);
     expect(reefDrawCalls).toBeLessThanOrEqual(7);
     expect(reefVertices).toBeLessThanOrEqual(24_256);
     expect(reefTriangles).toBeLessThanOrEqual(36_512);
     expect(reefFishWidth).toBeGreaterThanOrEqual(2);
     expect(reefFishHeight).toBeGreaterThanOrEqual(0.5);
+    expect(reefBackdropTriangles).toBeGreaterThan(0);
+    expect(reefBackdropTriangles).toBeLessThanOrEqual(REEF_BACKDROP_MAX_TRIANGLES);
     await page.screenshot({
       path: 'test-results/home-artifact-reef-pixel-8-pro.png',
       fullPage: true,
