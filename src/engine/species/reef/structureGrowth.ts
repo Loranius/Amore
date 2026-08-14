@@ -1,6 +1,7 @@
 import { round6, seededUnit } from './math';
 import type {
-  ReefModuleEvolutionEntity,
+  ReefAnnualStructureArchetype,
+  ReefAnnualZone,
   ReefModuleEvolutionPlan,
 } from './types';
 
@@ -25,6 +26,10 @@ export interface ReefGrowthArchPlacement {
   thickness: number;
   curveDepth: number;
   footprintRadius: number;
+  progress: number;
+  colonization: number;
+  biodiversity: number;
+  cohesion: number;
   seed: number;
 }
 
@@ -42,10 +47,16 @@ export interface ReefGrowthOutcropPlacement {
 export interface ReefGrowthTerracePlacement {
   id: string;
   sourceEntityId: string;
+  yearIndex: number;
+  archetype: ReefAnnualStructureArchetype;
   center: ReefGrowthStructurePoint;
   rotationY: number;
   footprintRadius: number;
   thickness: number;
+  progress: number;
+  colonization: number;
+  biodiversity: number;
+  cohesion: number;
   seed: number;
 }
 
@@ -67,6 +78,11 @@ export interface ReefGrowthStructureLayout {
   outcrops: ReefGrowthOutcropPlacement[];
   terraces: ReefGrowthTerracePlacement[];
   diagnostics: ReefGrowthStructureLayoutDiagnostics;
+}
+
+interface StableSeededIdentity {
+  id: string;
+  seed: number;
 }
 
 interface OccupiedCircle {
@@ -112,7 +128,7 @@ function minimumClearance(occupied: readonly OccupiedCircle[]): number | null {
 }
 
 function radialCandidate(
-  entity: ReefModuleEvolutionEntity,
+  identity: StableSeededIdentity,
   index: number,
   attempt: number,
   minimumRadius: number,
@@ -120,77 +136,169 @@ function radialCandidate(
   footprintRadius: number,
 ): OccupiedCircle {
   const azimuth = normalizeAngle(
-    seededUnit(entity.seed, 'azimuth') * TAU
+    seededUnit(identity.seed, 'azimuth') * TAU
       + index * GOLDEN_ANGLE
       + attempt * GOLDEN_ANGLE,
   );
-  const distanceSeed = seededUnit(entity.seed, `radius:${attempt}`);
+  const distanceSeed = seededUnit(identity.seed, `radius:${attempt}`);
   const distance = minimumRadius + (maximumRadius - minimumRadius) * distanceSeed;
   return {
-    id: entity.id,
+    id: identity.id,
     x: round6(Math.cos(azimuth) * distance),
     z: round6(Math.sin(azimuth) * distance),
     radius: footprintRadius,
   };
 }
 
+function zoneFootprint(zone: ReefAnnualZone): number {
+  const archetypeScale: Record<ReefAnnualStructureArchetype, number> = {
+    core: 1.2,
+    terrace: 1,
+    ridge: 0.88,
+    arch: 0.78,
+    shelf: 1.08,
+    overhang: 0.92,
+    buttress: 0.82,
+    peninsula: 1.12,
+  };
+  return round6(
+    (0.42 + zone.progress * 0.36 + zone.mapExpansion * 0.16)
+      * archetypeScale[zone.structureArchetype],
+  );
+}
+
+function annualPlacementCircle(
+  zone: ReefAnnualZone,
+  index: number,
+  visibleFoundationRadius: number,
+  annualCircles: readonly OccupiedCircle[],
+): OccupiedCircle | null {
+  const footprintRadius = zoneFootprint(zone);
+  if (zone.structureArchetype === 'core' || index === 0) {
+    return {
+      id: zone.id,
+      x: 0,
+      z: 0,
+      radius: footprintRadius,
+    };
+  }
+
+  // High togetherness/cohesion lets neighbouring annual habitats knit closer
+  // without spawning any Schedule geometry of its own.
+  const clearanceRatio = 1.03 - zone.cohesion * 0.18;
+  for (let attempt = 0; attempt < MAXIMUM_ATTEMPTS; attempt += 1) {
+    const ring = Math.floor((zone.yearIndex - 2) / 4);
+    const candidate = radialCandidate(
+      { id: zone.id, seed: zone.structureSeed },
+      index,
+      attempt,
+      visibleFoundationRadius * (0.22 + ring * 0.08),
+      visibleFoundationRadius * Math.min(0.86, 0.52 + ring * 0.1 + zone.mapExpansion * 0.1),
+      footprintRadius,
+    );
+    if (!collides(candidate, annualCircles, clearanceRatio)) return candidate;
+  }
+  return null;
+}
+
 /**
- * Pure placement pass for time arches, map outcrops and Schedule terraces.
- * It reserves disjoint footprints before Three.js creates any mesh.
+ * Pure placement pass for annual habitat zones plus clustered exploration
+ * outcrops. Schedule affects cohesion only; it never becomes a terrace/object.
  */
 export function buildReefGrowthStructureLayout(
   evolution: ReefModuleEvolutionPlan,
 ): ReefGrowthStructureLayout {
   const visibleFoundationRadius = round6(evolution.foundation.substrateRadius * 0.76);
   const foundationScaleXZ = round6(visibleFoundationRadius / 2.08);
-  const foundationScaleY = round6(0.96 + evolution.foundation.radialSaturation * 0.34);
-  // Geological footprints are already their final visual extents; unlike
-  // living colonies they receive no later 1.54x presentation sculpt.
+  const foundationScaleY = round6(
+    0.94
+      + evolution.foundation.radialSaturation * 0.22
+      + evolution.development.ecology.maturity * 0.12,
+  );
   const minimumClearanceRatio = Math.min(1.18, evolution.colonies.minimumClearanceRatio);
 
   const arches: ReefGrowthArchPlacement[] = [];
+  const terraces: ReefGrowthTerracePlacement[] = [];
+  const annualCircles: OccupiedCircle[] = [];
   const archCircles: OccupiedCircle[] = [];
   const rejectedArchIds: string[] = [];
-  const visibleArches = evolution.entities.yearArches.slice(
-    0,
-    evolution.foundation.arches.visibleCount,
-  );
-  visibleArches.forEach((entity, index) => {
-    const span = round6(1.18 + seededUnit(entity.seed, 'span') * 0.5);
-    const footprintRadius = round6(span * 0.43);
-    let accepted: OccupiedCircle | null = null;
-    for (let attempt = 0; attempt < MAXIMUM_ATTEMPTS; attempt += 1) {
-      const candidate = radialCandidate(
-        entity,
-        index,
-        attempt,
-        visibleFoundationRadius * 0.34,
-        visibleFoundationRadius * 0.64,
-        footprintRadius,
-      );
-      if (!collides(candidate, archCircles, 1.02)) {
-        accepted = candidate;
-        break;
-      }
-    }
+  const rejectedTerraceIds: string[] = [];
+
+  const visibleZones = evolution.development.annualZones.filter((zone) => zone.progress > 0);
+  visibleZones.forEach((zone, index) => {
+    const accepted = annualPlacementCircle(zone, index, visibleFoundationRadius, annualCircles);
     if (!accepted) {
-      rejectedArchIds.push(entity.id);
+      if (zone.structureArchetype === 'arch') rejectedArchIds.push(zone.id);
+      else rejectedTerraceIds.push(zone.id);
       return;
     }
-    archCircles.push(accepted);
+    annualCircles.push(accepted);
     const azimuth = Math.atan2(accepted.z, accepted.x);
-    arches.push({
-      id: `reef:growth-arch:${entity.sourceKey}`,
-      sourceEntityId: entity.id,
-      yearIndex: Number(entity.sourceKey),
-      center: { x: accepted.x, y: 0.05, z: accepted.z },
-      rotationY: round6(azimuth + Math.PI * 0.5),
-      span,
-      height: round6(1.38 + seededUnit(entity.seed, 'height') * 0.74),
-      thickness: round6(0.16 + seededUnit(entity.seed, 'thickness') * 0.075),
-      curveDepth: round6((seededUnit(entity.seed, 'curve-depth') - 0.5) * 0.42),
-      footprintRadius,
-      seed: entity.seed,
+
+    if (zone.structureArchetype === 'arch') {
+      archCircles.push(accepted);
+      const span = round6(
+        (1.08 + seededUnit(zone.structureSeed, 'span') * 0.48)
+          * (0.38 + zone.progress * 0.62),
+      );
+      arches.push({
+        id: `reef:growth-zone-arch:${zone.yearIndex}`,
+        sourceEntityId: zone.id,
+        yearIndex: zone.yearIndex,
+        center: { x: accepted.x, y: 0.03, z: accepted.z },
+        rotationY: round6(azimuth + Math.PI * 0.5),
+        span,
+        height: round6(
+          (1.18 + seededUnit(zone.structureSeed, 'height') * 0.68)
+            * (0.35 + zone.progress * 0.65),
+        ),
+        thickness: round6(0.17 + seededUnit(zone.structureSeed, 'thickness') * 0.08),
+        curveDepth: round6((seededUnit(zone.structureSeed, 'curve-depth') - 0.5) * 0.48),
+        footprintRadius: accepted.radius,
+        progress: zone.progress,
+        colonization: zone.colonization,
+        biodiversity: zone.biodiversity,
+        cohesion: zone.cohesion,
+        seed: zone.structureSeed,
+      });
+      return;
+    }
+
+    const verticalBias: Record<ReefAnnualStructureArchetype, number> = {
+      core: 1.25,
+      terrace: 1,
+      ridge: 1.32,
+      arch: 1,
+      shelf: 0.82,
+      overhang: 1.16,
+      buttress: 1.38,
+      peninsula: 0.92,
+    };
+    terraces.push({
+      id: `reef:growth-zone:${zone.yearIndex}:${zone.structureArchetype}`,
+      sourceEntityId: zone.id,
+      yearIndex: zone.yearIndex,
+      archetype: zone.structureArchetype,
+      center: {
+        x: accepted.x,
+        y: round6(-0.2 + 0.08 * verticalBias[zone.structureArchetype] * zone.progress),
+        z: accepted.z,
+      },
+      rotationY: round6(
+        (zone.structureArchetype === 'core' ? 0 : azimuth)
+          + seededUnit(zone.structureSeed, 'rotation') * 0.72,
+      ),
+      footprintRadius: accepted.radius,
+      thickness: round6(
+        (0.15 + seededUnit(zone.structureSeed, 'thickness') * 0.1)
+          * verticalBias[zone.structureArchetype]
+          * (0.55 + zone.progress * 0.45),
+      ),
+      progress: zone.progress,
+      colonization: zone.colonization,
+      biodiversity: zone.biodiversity,
+      cohesion: zone.cohesion,
+      seed: zone.structureSeed,
     });
   });
 
@@ -202,15 +310,12 @@ export function buildReefGrowthStructureLayout(
     evolution.foundation.satelliteOutcrops.visibleCount,
   );
   visibleOutcrops.forEach((entity, index) => {
-    const footprintRadius = round6(0.42 + seededUnit(entity.seed, 'footprint') * 0.24);
-    // Each stable group of six places opens one farther ring. The envelope is
-    // based on the entity index, not the current total, so adding a new place
-    // never nudges an old outcrop.
-    const ringIndex = Math.floor(index / 6);
-    const minimumOutcropRadius = visibleFoundationRadius * 0.9 + ringIndex * 0.34;
-    const maximumOutcropRadius = visibleFoundationRadius * 1.08
-      + 0.58
-      + ringIndex * 0.42;
+    const footprintRadius = round6(0.34 + seededUnit(entity.seed, 'footprint') * 0.18);
+    // Map rows are pre-clustered by annual zone. New visits expand habitat in
+    // bounded branches instead of producing one giant detached slab per place.
+    const ringIndex = Math.floor(index / 4);
+    const minimumOutcropRadius = visibleFoundationRadius * 0.84 + ringIndex * 0.28;
+    const maximumOutcropRadius = visibleFoundationRadius * 1.02 + 0.46 + ringIndex * 0.34;
     let accepted: OccupiedCircle | null = null;
     for (let attempt = 0; attempt < MAXIMUM_ATTEMPTS; attempt += 1) {
       const candidate = radialCandidate(
@@ -234,54 +339,11 @@ export function buildReefGrowthStructureLayout(
     outcrops.push({
       id: `reef:growth-outcrop:${entity.sourceKey}`,
       sourceEntityId: entity.id,
-      center: { x: accepted.x, y: -0.2, z: accepted.z },
+      center: { x: accepted.x, y: -0.24, z: accepted.z },
       rotationY: round6(seededUnit(entity.seed, 'rotation') * TAU),
       footprintRadius,
-      height: round6(0.42 + seededUnit(entity.seed, 'height') * 0.36),
-      ledgeScale: round6(0.76 + seededUnit(entity.seed, 'ledge') * 0.34),
-      seed: entity.seed,
-    });
-  });
-
-  const terraces: ReefGrowthTerracePlacement[] = [];
-  const rejectedTerraceIds: string[] = [];
-  const visibleTerraces = evolution.entities.scheduleTerraces.slice(
-    0,
-    evolution.foundation.scheduleTerraces.visibleCount,
-  );
-  visibleTerraces.forEach((entity, index) => {
-    // Schedule terraces are low, compact shelves tucked into the chronological
-    // foundation. Keeping their reserved footprint smaller than a satellite
-    // outcrop lets every active month remain legible without intersecting a
-    // neighbouring module structure.
-    const footprintRadius = round6(0.24 + seededUnit(entity.seed, 'footprint') * 0.12);
-    let accepted: OccupiedCircle | null = null;
-    for (let attempt = 0; attempt < MAXIMUM_ATTEMPTS; attempt += 1) {
-      const candidate = radialCandidate(
-        entity,
-        index,
-        attempt,
-        visibleFoundationRadius * 0.34,
-        visibleFoundationRadius * 0.72,
-        footprintRadius,
-      );
-      if (!collides(candidate, externalCircles, minimumClearanceRatio)) {
-        accepted = candidate;
-        break;
-      }
-    }
-    if (!accepted) {
-      rejectedTerraceIds.push(entity.id);
-      return;
-    }
-    externalCircles.push(accepted);
-    terraces.push({
-      id: `reef:growth-terrace:${entity.sourceKey}`,
-      sourceEntityId: entity.id,
-      center: { x: accepted.x, y: -0.18, z: accepted.z },
-      rotationY: round6(seededUnit(entity.seed, 'rotation') * TAU),
-      footprintRadius,
-      thickness: round6(0.14 + seededUnit(entity.seed, 'thickness') * 0.08),
+      height: round6(0.32 + seededUnit(entity.seed, 'height') * 0.28),
+      ledgeScale: round6(0.72 + seededUnit(entity.seed, 'ledge') * 0.28),
       seed: entity.seed,
     });
   });
