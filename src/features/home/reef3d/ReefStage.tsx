@@ -1,6 +1,11 @@
-import { useEffect, useMemo, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
+import {
+  ACESFilmicToneMapping,
+  PerspectiveCamera,
+  SRGBColorSpace,
+} from 'three';
 import { ReefEnvironment } from './ReefEnvironment';
 import type { ReefPreviewBuild } from './buildReefPreview';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
@@ -13,6 +18,13 @@ import {
   ReefBackdropCorals,
   type ReefBackdropMetrics,
 } from './ReefBackdropCorals';
+import {
+  reefCameraFrameForAspect,
+  REEF_ATMOSPHERE_PROFILE,
+  REEF_LIGHTING_PROFILE,
+  REEF_SCENE_PALETTE,
+  type ReefCameraFrame,
+} from './reefSceneProfile';
 
 /**
  * Dedicated underwater world for the reef.
@@ -36,25 +48,39 @@ export function ReefStage({
 }) {
   const size = useThree((state) => state.size);
   const aspect = size.height > 0 ? size.width / size.height : 1;
-  const cameraDistance = useMemo(() => (aspect < 0.72 ? 12.8 : 9.15), [aspect]);
+  const cameraFrame = useMemo(() => reefCameraFrameForAspect(aspect), [aspect]);
 
   return (
     <>
-      <color attach="background" args={['#063b50']} />
-      <fog attach="fog" args={['#126777', 6.2, 28.5]} />
+      <ReefRendererCalibration />
+      <color attach="background" args={[REEF_SCENE_PALETTE.background]} />
+      <fog
+        attach="fog"
+        args={[
+          REEF_SCENE_PALETTE.fog,
+          REEF_ATMOSPHERE_PROFILE.fogNear,
+          REEF_ATMOSPHERE_PROFILE.fogFar,
+        ]}
+      />
 
-      <ambientLight intensity={0.2} />
-      <hemisphereLight args={['#9ce4e8', '#143d42', 0.82]} />
-      <directionalLight position={[-4.5, 10, 4]} intensity={2.18} color="#d8f8ef" />
-      <directionalLight position={[5, 3, -5]} intensity={0.44} color="#4ba8ba" />
-      <directionalLight position={[-5.5, 2.8, 6.5]} intensity={0.18} color="#b9c9ae" />
+      <ambientLight intensity={REEF_LIGHTING_PROFILE.ambientIntensity} />
+      <hemisphereLight
+        args={[
+          REEF_LIGHTING_PROFILE.hemisphere.skyColor,
+          REEF_LIGHTING_PROFILE.hemisphere.groundColor,
+          REEF_LIGHTING_PROFILE.hemisphere.intensity,
+        ]}
+      />
+      <directionalLight {...REEF_LIGHTING_PROFILE.key} />
+      <directionalLight {...REEF_LIGHTING_PROFILE.fill} />
+      <directionalLight {...REEF_LIGHTING_PROFILE.rim} />
 
       <mesh position={[0, 7.2, -2]} rotation={[Math.PI / 2, 0, 0]}>
         <circleGeometry args={[18, 36]} />
         <meshBasicMaterial
-          color="#8bdedc"
+          color={REEF_SCENE_PALETTE.waterSurface}
           transparent
-          opacity={0.09}
+          opacity={REEF_ATMOSPHERE_PROFILE.surfaceOpacity}
           depthWrite={false}
           toneMapped={false}
         />
@@ -84,25 +110,59 @@ export function ReefStage({
         dampingFactor={0.06}
         rotateSpeed={0.58}
         zoomSpeed={0.7}
-        minDistance={7.1}
-        maxDistance={15.4}
-        minPolarAngle={0.58}
-        maxPolarAngle={1.42}
-        target={[0, 0.85, 0]}
+        maxDistance={cameraFrame.maxDistance}
+        minDistance={cameraFrame.minDistance}
+        minPolarAngle={cameraFrame.minPolarAngle}
+        maxPolarAngle={cameraFrame.maxPolarAngle}
+        minAzimuthAngle={cameraFrame.minAzimuthAngle}
+        maxAzimuthAngle={cameraFrame.maxAzimuthAngle}
+        target={[...cameraFrame.target]}
       />
 
-      <ReefCameraPlacement distance={cameraDistance} />
+      <ReefCameraPlacement frame={cameraFrame} />
     </>
   );
 }
 
-function ReefCameraPlacement({ distance }: { distance: number }) {
-  const camera = useThree((state) => state.camera);
+function ReefRendererCalibration() {
+  const gl = useThree((state) => state.gl);
+  const invalidate = useThree((state) => state.invalidate);
 
   useEffect(() => {
-    camera.position.set(0, 2.65, distance);
-    camera.lookAt(0, 0.85, 0);
-  }, [camera, distance]);
+    const previousToneMapping = gl.toneMapping;
+    const previousExposure = gl.toneMappingExposure;
+    const previousOutputColorSpace = gl.outputColorSpace;
+    gl.toneMapping = ACESFilmicToneMapping;
+    gl.toneMappingExposure = REEF_ATMOSPHERE_PROFILE.toneMappingExposure;
+    gl.outputColorSpace = SRGBColorSpace;
+    invalidate();
+
+    return () => {
+      gl.toneMapping = previousToneMapping;
+      gl.toneMappingExposure = previousExposure;
+      gl.outputColorSpace = previousOutputColorSpace;
+    };
+  }, [gl, invalidate]);
+
+  return null;
+}
+
+function ReefCameraPlacement({ frame }: { frame: ReefCameraFrame }) {
+  const camera = useThree((state) => state.camera);
+  const invalidate = useThree((state) => state.invalidate);
+
+  useLayoutEffect(() => {
+    camera.position.set(...frame.position);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(...frame.target);
+    if (camera instanceof PerspectiveCamera) {
+      camera.fov = frame.fov;
+      camera.near = frame.near;
+      camera.far = frame.far;
+      camera.updateProjectionMatrix();
+    }
+    invalidate();
+  }, [camera, frame, invalidate]);
 
   return null;
 }

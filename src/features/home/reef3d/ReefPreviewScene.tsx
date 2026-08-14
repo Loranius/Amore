@@ -23,6 +23,13 @@ import {
   REEF_FOUNDATION_PRESENTATION_VERSION,
 } from './reefFoundationPresentation';
 import {
+  reefCameraFrameForAspect,
+  REEF_CAMERA_PASS,
+  REEF_LIGHTING_PASS,
+  REEF_PALETTE_PASS,
+  REEF_SCENE_PROFILE_VERSION,
+} from './reefSceneProfile';
+import {
   REEF_MATERIAL_PASS,
   REEF_MATERIAL_PRESENTATION_VERSION,
 } from './reefMaterialPresentation';
@@ -33,6 +40,8 @@ import {
 import type { ReefThreeSceneState } from './reefThreeAdapter';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
+
+const DEFAULT_REEF_CAMERA_FRAME = reefCameraFrameForAspect(1);
 
 function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(
@@ -121,6 +130,10 @@ export default function ReefPreviewScene() {
       data-reef-material-pass={REEF_MATERIAL_PASS}
       data-reef-foundation-presentation={REEF_FOUNDATION_PRESENTATION_VERSION}
       data-reef-foundation-pass={REEF_FOUNDATION_PASS}
+      data-reef-scene-profile={REEF_SCENE_PROFILE_VERSION}
+      data-reef-camera-pass={REEF_CAMERA_PASS}
+      data-reef-lighting-pass={REEF_LIGHTING_PASS}
+      data-reef-palette-pass={REEF_PALETTE_PASS}
       data-reef-acceptance={runtimeAcceptance.status}
       data-reef-static-acceptance={build.acceptance.staticStatus}
       data-reef-violations={runtimeAcceptance.violations.join(',')}
@@ -189,7 +202,12 @@ export default function ReefPreviewScene() {
       <Canvas
         dpr={[1, 1.5]}
         frameloop={reducedMotion ? 'demand' : 'always'}
-        camera={{ position: [0, 2.65, 9.15], fov: 42, near: 0.1, far: 42 }}
+        camera={{
+          position: [...DEFAULT_REEF_CAMERA_FRAME.position],
+          fov: DEFAULT_REEF_CAMERA_FRAME.fov,
+          near: DEFAULT_REEF_CAMERA_FRAME.near,
+          far: DEFAULT_REEF_CAMERA_FRAME.far,
+        }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
         <ReefStage

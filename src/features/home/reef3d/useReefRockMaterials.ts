@@ -3,6 +3,7 @@ import { useTexture } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { REEF_ROCK_TEXTURE_PATHS } from './reefAssetManifest';
+import { REEF_SCENE_PALETTE } from './reefSceneProfile';
 
 interface ReefRockMaterials {
   arch: THREE.MeshStandardMaterial;
@@ -47,25 +48,27 @@ export function useReefRockMaterials(): ReefRockMaterials {
     const rock = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-coral-stone-near',
-      color: '#718079',
+      color: REEF_SCENE_PALETTE.rockNear,
+      emissive: REEF_SCENE_PALETTE.rockEmissive,
+      emissiveIntensity: 0.025,
     });
     const foundationTop = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-limestone-terrace-top',
-      color: '#d9cfad',
+      color: REEF_SCENE_PALETTE.foundationTop,
       roughness: 0.9,
       normalScale: new THREE.Vector2(0.28, 0.28),
-      emissive: '#28362f',
-      emissiveIntensity: 0.055,
+      emissive: REEF_SCENE_PALETTE.rockEmissive,
+      emissiveIntensity: 0.045,
     });
     const foundationSide = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-limestone-terrace-side',
-      color: '#a89a7d',
+      color: REEF_SCENE_PALETTE.foundationSide,
       roughness: 0.97,
       normalScale: new THREE.Vector2(0.4, 0.4),
-      emissive: '#1b2e2a',
-      emissiveIntensity: 0.035,
+      emissive: REEF_SCENE_PALETTE.rockEmissive,
+      emissiveIntensity: 0.025,
     });
     const arch = new THREE.MeshStandardMaterial({
       ...common,
@@ -74,23 +77,25 @@ export function useReefRockMaterials(): ReefRockMaterials {
       vertexColors: true,
       roughness: 0.94,
       normalScale: new THREE.Vector2(0.34, 0.34),
-      emissive: '#28342d',
-      emissiveIntensity: 0.045,
+      emissive: REEF_SCENE_PALETTE.rockEmissive,
+      emissiveIntensity: 0.035,
       flatShading: true,
     });
     const hero = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-coral-stone-hero',
-      color: '#8f9b86',
+      color: REEF_SCENE_PALETTE.rockHero,
       roughness: 0.92,
       normalScale: new THREE.Vector2(0.24, 0.24),
+      emissive: REEF_SCENE_PALETTE.rockEmissive,
+      emissiveIntensity: 0.02,
     });
     const distant = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-coral-stone-distant',
-      color: '#466c68',
-      emissive: '#123a3b',
-      emissiveIntensity: 0.06,
+      color: REEF_SCENE_PALETTE.rockDistant,
+      emissive: REEF_SCENE_PALETTE.distantEmissive,
+      emissiveIntensity: 0.045,
     });
     return { arch, distant, foundationSide, foundationTop, hero, rock };
   }, [map, normalMap, roughnessMap]);

@@ -9,8 +9,8 @@ import type {
   ReefThreeSceneState,
 } from './reefThreeAdapter';
 
-export const REEF_MATERIAL_PRESENTATION_VERSION = 'reef-material-v1';
-export const REEF_MATERIAL_PASS = 'phase-11-material-pass';
+export const REEF_MATERIAL_PRESENTATION_VERSION = 'reef-material-v2';
+export const REEF_MATERIAL_PASS = 'phase-12-final-readable-palette';
 
 interface Rgb {
   readonly r: number;
@@ -140,9 +140,9 @@ export const REEF_MATERIAL_PROFILES: Readonly<
 });
 
 export const REEF_FOUNDATION_MATERIAL_PROFILE = Object.freeze({
-  topColor: rgb(0xc8ba93),
-  sideColor: rgb(0x91856f),
-  bottomColor: rgb(0x596568),
+  topColor: rgb(0xddd1ad),
+  sideColor: rgb(0xa99b81),
+  bottomColor: rgb(0x727b78),
   roughness: 0.87,
   clearcoat: 0.025,
   clearcoatRoughness: 0.86,
@@ -225,6 +225,12 @@ function configureMaterial(
   material.opacity = 1;
   material.transparent = false;
   material.vertexColors = true;
+  material.emissive.setRGB(
+    profile.bodyColor.r,
+    profile.bodyColor.g,
+    profile.bodyColor.b,
+  );
+  material.emissiveIntensity = 0.045;
   material.needsUpdate = true;
 }
 
@@ -280,6 +286,12 @@ function presentFoundation(scene: ReefThreeSceneState): void {
   material.opacity = 1;
   material.transparent = false;
   material.vertexColors = true;
+  material.emissive.setRGB(
+    REEF_FOUNDATION_MATERIAL_PROFILE.topColor.r,
+    REEF_FOUNDATION_MATERIAL_PROFILE.topColor.g,
+    REEF_FOUNDATION_MATERIAL_PROFILE.topColor.b,
+  );
+  material.emissiveIntensity = 0.025;
   material.needsUpdate = true;
 }
 
@@ -320,7 +332,7 @@ function measureRange(
 function colorRange(batch: ReefRenderableBatch, runtime: ReefBatchRuntimeRange): void {
   const profile = REEF_MATERIAL_PROFILES[runtime.range.morphotype];
   const metrics = measureRange(batch, runtime);
-  const variation = 0.9 + stableUnit(runtime.range.id) * 0.18;
+  const variation = 0.94 + stableUnit(runtime.range.id) * 0.12;
   const accentPhase = stableUnit(`${runtime.range.id}:accent`) * Math.PI * 2;
 
   for (
@@ -358,7 +370,7 @@ function colorRange(batch: ReefRenderableBatch, runtime: ReefBatchRuntimeRange):
     let color = mix(profile.rootColor, profile.bodyColor, rootMix);
     color = mix(color, profile.tipColor, tipMix * 0.82);
     color = mix(color, profile.edgeColor, edgeMix * (0.22 + accent * 0.18));
-    color = multiply(color, variation * (0.84 + normalLight * 0.22));
+    color = multiply(color, variation * (0.92 + normalLight * 0.16));
     setColor(batch.baseColors, offset, color);
   }
 }

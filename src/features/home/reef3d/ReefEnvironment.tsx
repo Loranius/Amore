@@ -30,6 +30,10 @@ import {
   type ReefTerracedFoundationProfile,
 } from './reefTerracedFoundation';
 import { useReefRockMaterials } from './useReefRockMaterials';
+import {
+  REEF_CAMERA_ORBIT_PROFILE,
+  REEF_SCENE_PALETTE,
+} from './reefSceneProfile';
 
 type Vec3 = readonly [number, number, number];
 
@@ -58,11 +62,6 @@ type ContactPatch = {
   rotation: number;
 };
 
-const PALETTE = {
-  floor: '#74847b',
-  contact: '#173f43',
-} as const;
-
 const NEAR_ROCKS: readonly Omit<RockMassProps, 'material' | 'groundY'>[] = [
   { position: [-5.4, 0, 2.3], scale: [2.45, 0.72, 1.85], rotation: [0.08, 0.28, -0.06] },
   { position: [-4.15, 0, -0.1], scale: [1.75, 0.56, 1.48], rotation: [-0.05, -0.2, 0.08] },
@@ -72,11 +71,8 @@ const NEAR_ROCKS: readonly Omit<RockMassProps, 'material' | 'groundY'>[] = [
   { position: [5.85, 0, -2.85], scale: [2.8, 0.9, 2], rotation: [-0.04, -0.5, 0.03] },
 ] as const;
 
-const TERRACE_STONES: readonly Omit<RockMassProps, 'material' | 'groundY'>[] = [
-  { position: [-3.65, 0, 3.2], scale: [1.25, 0.3, 0.95], rotation: [0, 0.12, 0.05] },
-  { position: [-2.95, 0, 4.05], scale: [1.05, 0.25, 0.82], rotation: [0.03, -0.32, -0.03] },
-  { position: [3.55, 0, 3.35], scale: [1.32, 0.3, 0.96], rotation: [0.02, -0.18, -0.04] },
-  { position: [2.8, 0, 4.2], scale: [0.98, 0.24, 0.78], rotation: [-0.02, 0.38, 0.04] },
+/** Rear framing only: the camera-facing seabed stays clear of large blockers. */
+const REAR_TERRACE_STONES: readonly Omit<RockMassProps, 'material' | 'groundY'>[] = [
   { position: [-3.4, 0, -4.2], scale: [1.4, 0.34, 1], rotation: [0, 0.36, 0] },
   { position: [3.45, 0, -4.35], scale: [1.46, 0.36, 1.05], rotation: [0, -0.3, 0] },
 ] as const;
@@ -428,7 +424,7 @@ function buildContactPatches(
     });
   }
 
-  for (const rock of [...NEAR_ROCKS, ...TERRACE_STONES]) {
+  for (const rock of [...NEAR_ROCKS, ...REAR_TERRACE_STONES]) {
     patches.push({
       x: rock.position[0],
       y: REEF_SEABED_Y + 0.006,
@@ -474,7 +470,7 @@ function ReefContactLayer({ patches }: { patches: readonly ContactPatch[] }) {
     >
       <circleGeometry args={[1, 20]} />
       <meshBasicMaterial
-        color={PALETTE.contact}
+        color={REEF_SCENE_PALETTE.contact}
         transparent
         opacity={0.115}
         depthWrite={false}
@@ -515,11 +511,12 @@ export function ReefEnvironment({ build }: { build: ReefPreviewBuild }) {
       userData={{
         reefFoundationRadius: profile.radius,
         reefFoundationTierCount: profile.levels.length,
+        reefForegroundClearRadius: REEF_CAMERA_ORBIT_PROFILE.foregroundClearRadius,
       }}
     >
       <mesh position={[0, REEF_SEABED_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow={false}>
         <circleGeometry args={[18, 48]} />
-        <meshStandardMaterial color={PALETTE.floor} roughness={1} metalness={0} />
+        <meshStandardMaterial color={REEF_SCENE_PALETTE.seabed} roughness={1} metalness={0} />
       </mesh>
 
       <group name="reef-hero-support">
@@ -564,7 +561,7 @@ export function ReefEnvironment({ build }: { build: ReefPreviewBuild }) {
           material={rockMaterials.rock}
         />
       ))}
-      {TERRACE_STONES.map((rock, index) => (
+      {REAR_TERRACE_STONES.map((rock, index) => (
         <RockMass
           key={`reef-terrace-${index}`}
           {...rock}

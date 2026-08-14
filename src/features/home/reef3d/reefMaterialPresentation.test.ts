@@ -148,6 +148,8 @@ describe('Reef Phase 11 material presentation', () => {
       REEF_MATERIAL_PRESENTATION_VERSION,
     );
     expect(scene.foundation.geometry.userData.reefMaterialPass).toBe(REEF_MATERIAL_PASS);
+    expect(scene.foundation.material.emissiveIntensity).toBeGreaterThan(0);
+    expect(scene.foundation.material.emissive.getHex()).not.toBe(0);
 
     scene.batches.forEach((batch, index) => {
       expect(batch.geometry.userData.reefMaterialPresentationVersion).toBe(
@@ -158,6 +160,8 @@ describe('Reef Phase 11 material presentation', () => {
       expect(uniqueColorCount(batch.baseColors)).toBeGreaterThan(1);
       expect(batch.material.color.toArray()).toEqual([1, 1, 1]);
       expect(batch.material.transmission).toBe(0);
+      expect(batch.material.emissiveIntensity).toBeGreaterThan(0);
+      expect(batch.material.emissive.getHex()).not.toBe(0);
       for (const component of batch.baseColors) {
         expect(Number.isFinite(component)).toBe(true);
         expect(component).toBeGreaterThanOrEqual(0);

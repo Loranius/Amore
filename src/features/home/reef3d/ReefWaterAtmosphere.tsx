@@ -1,6 +1,10 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Group, Mesh, MeshBasicMaterial, Points } from 'three';
+import {
+  REEF_ATMOSPHERE_PROFILE,
+  REEF_SCENE_PALETTE,
+} from './reefSceneProfile';
 
 type Vec3 = readonly [number, number, number];
 
@@ -46,7 +50,7 @@ function AnimatedCaustic({
       <ringGeometry args={[0.58, 1.05, 28]} />
       <meshBasicMaterial
         ref={materialRef}
-        color="#c7fff6"
+        color={REEF_SCENE_PALETTE.caustic}
         transparent
         opacity={0.045}
         depthWrite={false}
@@ -93,7 +97,7 @@ function LightShaft({
       <coneGeometry args={[1, 1, 16, 1, true]} />
       <meshBasicMaterial
         ref={materialRef}
-        color="#bffbf3"
+        color={REEF_SCENE_PALETTE.lightShaft}
         transparent
         opacity={0.034}
         depthWrite={false}
@@ -146,7 +150,7 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
           />
         </bufferGeometry>
         <pointsMaterial
-          color="#d8fffa"
+          color={REEF_SCENE_PALETTE.particles}
           size={0.035}
           transparent
           opacity={0.22}
@@ -168,14 +172,14 @@ function SuspendedParticles({ reducedMotion }: { reducedMotion: boolean }) {
  */
 export function ReefWaterAtmosphere({ reducedMotion }: { reducedMotion: boolean }) {
   return (
-    <group name="reef-water-atmosphere-stage-4">
+    <group name="reef-water-atmosphere-stage-6-final-light">
       {/* A translucent back veil strengthens depth separation behind the reef. */}
       <mesh position={[0, 2.6, -10.5]} scale={[14, 7.5, 1]}>
         <planeGeometry args={[1, 1]} />
         <meshBasicMaterial
-          color="#1c7080"
+          color={REEF_SCENE_PALETTE.waterVeil}
           transparent
-          opacity={0.12}
+          opacity={REEF_ATMOSPHERE_PROFILE.veilOpacity}
           depthWrite={false}
           toneMapped={false}
         />
