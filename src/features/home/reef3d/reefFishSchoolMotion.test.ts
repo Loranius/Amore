@@ -53,7 +53,7 @@ function createSourceClip(): THREE.AnimationClip {
 }
 
 describe('reef fish open-water routes', () => {
-  it('splits the school into independently phased routes without changing body animation', () => {
+  it('splits the school into independently phased broad routes without changing body animation', () => {
     const source = createSourceClip();
     const sourceHead = source.tracks[0]!;
     const sourceSpine = source.tracks[1]!;
@@ -81,9 +81,10 @@ describe('reef fish open-water routes', () => {
 
     expect(componentRange(routedHead!, 0)).toBeGreaterThan(componentRange(sourceHead, 0));
     expect(componentRange(routedHead!, 1)).toBeLessThan(componentRange(sourceHead, 1));
-    expect(componentRange(routedHead!, 2)).toBeLessThan(componentRange(sourceHead, 2));
+    expect(componentRange(routedHead!, 2)).toBeGreaterThan(componentRange(sourceHead, 2));
     expect(componentMean(routedHead!, 2)).toBeLessThan(0);
     expect(componentRange(routedSpine!, 0)).toBeGreaterThan(componentRange(sourceSpine, 0));
+    expect(componentRange(routedSpine!, 2)).toBeGreaterThan(componentRange(sourceSpine, 2));
   });
 
   it('binds GLTFLoader-style track names and advances a fish rig over time', () => {
