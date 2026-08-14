@@ -8,6 +8,7 @@ import {
   buildReefLivingCanopyPlan,
   REEF_LIVING_CANOPY_PASS,
   REEF_LIVING_CANOPY_VERSION,
+  type ReefLivingCanopyPlan,
 } from './reefLivingCanopy';
 import {
   collectReefArchSupportMeshes,
@@ -27,6 +28,90 @@ export interface ReefDensityCandidateCounts {
   morphotypeCounts: Record<ReefColonyMorphotype, number>;
 }
 
+const TAU = Math.PI * 2;
+
+function stableUnit(seed: number, label: string): number {
+  let hash = (seed ^ 0x9e3779b9) >>> 0;
+  for (let index = 0; index < label.length; index += 1) {
+    hash ^= label.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x7feb352d);
+  hash ^= hash >>> 15;
+  return (hash >>> 0) / 0xffffffff;
+}
+
+function morphotypeHotspotIndex(morphotype: ReefColonyMorphotype): number {
+  switch (morphotype) {
+    case 'branching': return 0;
+    case 'massive': return 1;
+    case 'plating': return 2;
+    case 'encrusting': return 3;
+    case 'soft-coral': return 0;
+    case 'sea-fan': return 2;
+  }
+}
+
+function morphotypeHotspotStrength(morphotype: ReefColonyMorphotype): number {
+  switch (morphotype) {
+    case 'encrusting': return 0.8;
+    case 'branching': return 0.74;
+    case 'soft-coral': return 0.72;
+    case 'sea-fan': return 0.68;
+    case 'plating': return 0.63;
+    case 'massive': return 0.56;
+  }
+}
+
+/**
+ * Visual-only ecological clustering. Logical colony identity/order is untouched;
+ * only the preferred renderer anchor is biased toward four stable habitat
+ * patches. Clearance/raycast allocation still decides the final valid surface.
+ */
+function buildHotspotPlan(
+  plan: ReefLivingCanopyPlan,
+  build: ReefPreviewBuild,
+): ReefLivingCanopyPlan {
+  const radius = build.structures.visibleFoundationRadius;
+  const seed = build.species.moduleEvolution.identitySeed;
+  const basePhase = stableUnit(seed, 'reef:canopy-hotspots:phase') * TAU;
+  const radialRatios = [0.38, 0.56, 0.66, 0.48] as const;
+
+  const colonies = plan.colonies.map((colony) => {
+    const sequenceBand = Math.floor(colony.request.sequence / 9) % 2;
+    const hotspotIndex = (
+      morphotypeHotspotIndex(colony.morphotype) + sequenceBand
+    ) % 4;
+    const angle = basePhase
+      + hotspotIndex / 4 * TAU
+      + (stableUnit(colony.seed, 'reef:hotspot:angle') - 0.5) * 0.48;
+    const localRadius = radius * radialRatios[hotspotIndex] * (
+      0.9 + stableUnit(colony.seed, 'reef:hotspot:radius') * 0.2
+    );
+    const targetX = Math.cos(angle) * localRadius;
+    const targetZ = Math.sin(angle) * localRadius;
+    const strength = morphotypeHotspotStrength(colony.morphotype);
+    const preferred = colony.request.preferred;
+    const request = {
+      ...colony.request,
+      preferred: {
+        x: THREE.MathUtils.lerp(preferred.x, targetX, strength),
+        y: preferred.y,
+        z: THREE.MathUtils.lerp(preferred.z, targetZ, strength),
+      },
+    };
+
+    return { ...colony, request };
+  });
+
+  return {
+    ...plan,
+    colonies,
+    requests: colonies.map((colony) => colony.request),
+  };
+}
+
 export function reefDensityCandidateCounts(build: ReefPreviewBuild): ReefDensityCandidateCounts {
   const plan = buildReefLivingCanopyPlan(build);
   return {
@@ -39,7 +124,8 @@ export function reefDensityCandidateCounts(build: ReefPreviewBuild): ReefDensity
 function DensityCorals({ build }: { build: ReefPreviewBuild }) {
   const scene = useThree((state) => state.scene);
   const invalidate = useThree((state) => state.invalidate);
-  const plan = useMemo(() => buildReefLivingCanopyPlan(build), [build]);
+  const basePlan = useMemo(() => buildReefLivingCanopyPlan(build), [build]);
+  const plan = useMemo(() => buildHotspotPlan(basePlan, build), [basePlan, build]);
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const material = useMemo(() => new THREE.MeshStandardMaterial({
     name: 'reef-living-canopy-shared-material',
@@ -62,11 +148,6 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
         foundationRadius: build.structures.visibleFoundationRadius,
         seed: build.species.moduleEvolution.identitySeed,
       }),
-      // The old continuous arch shell is now invisible and no longer matches
-      // the visible irregular rock-chain silhouette. Never plant visible coral
-      // on its authored attachment slots: use only shelves that belong to real
-      // terrain/outcrop/terrace meshes, while the hidden arch still acts as a
-      // clearance blocker for nearby terrain candidates.
       ...collectReefSupportSlotCandidates(terrainSupportMeshes),
     ];
     const allocation = allocateReefSurfaceSlots({
@@ -89,9 +170,8 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
       slots: allocation.slots,
     });
     next.userData.reefSurfaceSlotDiagnostics = allocation.diagnostics;
+    next.userData.reefCanopyLayout = 'stable-hotspots-v1';
 
-    // Keep one stable geometry identity for React Three Fiber while replacing
-    // the generated buffers after support meshes are mounted or rebuilt.
     geometry.dispose();
     geometry.copy(next);
     next.dispose();
@@ -121,18 +201,15 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
       userData={{
         reefLivingCanopyVersion: REEF_LIVING_CANOPY_VERSION,
         reefLivingCanopyPass: REEF_LIVING_CANOPY_PASS,
+        reefCanopyLayout: 'stable-hotspots-v1',
       }}
     />
   );
 }
 
-/**
- * Renderer-only richness pass. It repeats no logical history: every shape is
- * keyed to one accepted colony and uses the same chronological surface slot.
- */
 export function ReefDensityLayer({ build }: { build: ReefPreviewBuild }) {
   return (
-    <group name="reef-density-inner-growth">
+    <group name="reef-density-hotspot-growth">
       <DensityCorals build={build} />
     </group>
   );
