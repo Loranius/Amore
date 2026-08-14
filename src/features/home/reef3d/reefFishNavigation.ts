@@ -17,9 +17,16 @@ export interface ReefFishTunnelPassage {
   phaseEnd: number;
 }
 
+export type ReefFishObstacleKind = 'solid' | 'arch-rock';
+
 export interface ReefFishObstacle {
   box: THREE.Box3;
   label: string;
+  kind?: ReefFishObstacleKind;
+}
+
+export interface ReefFishCollisionOptions {
+  ignoreArchRocks?: boolean;
 }
 
 const TUNNEL_ROUTES: readonly ReefFishRouteId[] = [
@@ -143,6 +150,12 @@ function usableObstacle(object: THREE.Mesh): boolean {
   if (object.geometry.type === 'CircleGeometry') return false;
   if (object.userData.reefContactPatchCount !== undefined) return false;
   if (object.userData.reefSupportSurfaceKind === 'arch') return false;
+
+  // The central foundation is already represented by the continuous radial
+  // avoidance field above. Keeping its large Box3 here made the tunnel guide and
+  // collision fallback fight each other whenever a fish entered a real opening.
+  if (object.name === 'reef-terraced-foundation') return false;
+
   return true;
 }
 
@@ -161,7 +174,11 @@ export function collectReefFishObstacles(scene: THREE.Scene): ReefFishObstacle[]
     if (!usableObstacle(object)) return;
     const box = new THREE.Box3().setFromObject(object, true);
     if (box.isEmpty()) return;
-    obstacles.push({ box, label: object.name || object.geometry.type });
+    obstacles.push({
+      box,
+      label: object.name || object.geometry.type,
+      kind: 'solid',
+    });
   });
 
   const naturalArches = scene.getObjectByName('reef-natural-year-arches');
@@ -177,6 +194,7 @@ export function collectReefFishObstacles(scene: THREE.Scene): ReefFishObstacle[]
         obstacles.push({
           box: geometryBox.clone().applyMatrix4(worldMatrix),
           label: `natural-arch-rock:${index}`,
+          kind: 'arch-rock',
         });
       }
     }
@@ -187,14 +205,17 @@ export function collectReefFishObstacles(scene: THREE.Scene): ReefFishObstacle[]
 
 /**
  * Finds the smallest safe correction when a fish centre enters a structure's
- * safety volume. This is now a final local fallback; the central reef itself is
- * avoided earlier by reefFishFoundationAvoidanceDelta so the correction should
- * not oscillate against authored animation on every frame.
+ * safety volume. This remains a local fallback; the central reef itself is
+ * avoided earlier by reefFishFoundationAvoidanceDelta.
+ *
+ * During a deliberate tunnel crossing the guide owns the fish trajectory and
+ * arch-rock collision is ignored. Otherwise the same rocks remain solid.
  */
 export function reefFishCollisionDelta(
   point: THREE.Vector3,
   obstacles: readonly ReefFishObstacle[],
   margin = FISH_STRUCTURE_MARGIN,
+  options: ReefFishCollisionOptions = {},
 ): THREE.Vector3 {
   const corrected = point.clone();
   const delta = new THREE.Vector3();
@@ -202,6 +223,8 @@ export function reefFishCollisionDelta(
   for (let pass = 0; pass < 4; pass += 1) {
     let moved = false;
     for (const obstacle of obstacles) {
+      if (options.ignoreArchRocks && obstacle.kind === 'arch-rock') continue;
+
       const box = obstacle.box.clone().expandByScalar(margin);
       if (!box.containsPoint(corrected)) continue;
 
