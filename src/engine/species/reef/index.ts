@@ -1,4 +1,9 @@
 export { buildReefSpeciesBlueprint } from './reefSpecies';
+export { buildReefModuleEvolution } from './moduleEvolution';
+export type {
+  BuildReefModuleEvolutionInput,
+  ReefModuleEvolutionScheduleDay,
+} from './moduleEvolution';
 export * from './layout';
 export * from './foundation';
 export * from './skeletons';
@@ -19,6 +24,15 @@ export {
   type ReefGrowthInstruction,
   type ReefInfluenceSource,
   type ReefLifeStage,
+  type ReefModuleEvolutionColonies,
+  type ReefModuleEvolutionEntities,
+  type ReefModuleEvolutionEntity,
+  type ReefModuleEvolutionEntityKind,
+  type ReefModuleEvolutionFacts,
+  type ReefModuleEvolutionFoundation,
+  type ReefModuleEvolutionLife,
+  type ReefModuleEvolutionPlan,
+  type ReefModulePopulation,
   type ReefSpeciesBlueprint,
   type ReefSpeciesConfig,
   type ReefSpeciesDiagnostics,

@@ -46,6 +46,104 @@ export type ReefColonyMorphotype = (typeof REEF_COLONY_MORPHOTYPES)[number];
 export type ReefEventSourceModule = (typeof REEF_EVENT_SOURCE_MODULES)[number];
 export type ReefInfluenceSource = (typeof REEF_INFLUENCE_SOURCES)[number];
 
+export type ReefModuleEvolutionEntityKind =
+  | 'year-arch'
+  | 'plan-fish'
+  | 'wish-coral'
+  | 'photo-coral'
+  | 'media-coral'
+  | 'map-outcrop'
+  | 'calendar-landmark'
+  | 'schedule-terrace';
+
+/**
+ * One append-only visual fact in the reef history. Geometry adapters may
+ * realize the seed differently at each LOD, but the identity never changes.
+ */
+export interface ReefModuleEvolutionEntity {
+  id: string;
+  kind: ReefModuleEvolutionEntityKind;
+  sourceModule: ReefInfluenceSource;
+  sourceEventId: string | null;
+  sourceKey: string;
+  epochIndex: number;
+  sequence: number;
+  seed: number;
+}
+
+export interface ReefModuleEvolutionFacts {
+  daysTogether: number;
+  completedYears: number;
+  completedPlans: number;
+  completedWishes: number;
+  photoCount: number;
+  finishedMediaCount: number;
+  visitedPlaceCount: number;
+  calendarLandmarkCount: number;
+  sharedDaysOffCount: number;
+  sharedDaysOffMonthCount: number;
+}
+
+/** Exact history plus the bounded amount rendered simultaneously on mobile. */
+export interface ReefModulePopulation {
+  logicalCount: number;
+  visibleCount: number;
+  overflowCount: number;
+}
+
+export interface ReefModuleEvolutionFoundation {
+  /** Pair-specific seed footprint before the first relationship day. */
+  seedRadius: number;
+  /** Extra square world units earned by each relationship day. */
+  dailySurfaceAreaGain: number;
+  /** Chronological area before the long-horizon mobile envelope is applied. */
+  chronologicalSurfaceArea: number;
+  substrateRadius: number;
+  maximumSubstrateRadius: number;
+  outerGrowthRadius: number;
+  radialSaturation: number;
+  arches: ReefModulePopulation;
+  satelliteOutcrops: ReefModulePopulation;
+  scheduleTerraces: ReefModulePopulation;
+}
+
+export interface ReefModuleEvolutionColonies {
+  primaryWishCorals: ReefModulePopulation;
+  microPhotoCorals: ReefModulePopulation;
+  mediaCorals: ReefModulePopulation;
+  calendarLandmarks: ReefModulePopulation;
+  /** Separate living bodies must retain this footprint-scaled safety gap. */
+  minimumClearanceRatio: number;
+}
+
+export interface ReefModuleEvolutionLife {
+  planFish: ReefModulePopulation;
+}
+
+export interface ReefModuleEvolutionEntities {
+  yearArches: ReefModuleEvolutionEntity[];
+  planFish: ReefModuleEvolutionEntity[];
+  wishCorals: ReefModuleEvolutionEntity[];
+  photoCorals: ReefModuleEvolutionEntity[];
+  mediaCorals: ReefModuleEvolutionEntity[];
+  mapOutcrops: ReefModuleEvolutionEntity[];
+  calendarLandmarks: ReefModuleEvolutionEntity[];
+  scheduleTerraces: ReefModuleEvolutionEntity[];
+}
+
+/**
+ * Reef-only projection of portal history. Crystal and Tree never consume it.
+ */
+export interface ReefModuleEvolutionPlan {
+  version: 'reef-module-evolution-v1';
+  identitySeed: number;
+  facts: ReefModuleEvolutionFacts;
+  foundation: ReefModuleEvolutionFoundation;
+  colonies: ReefModuleEvolutionColonies;
+  life: ReefModuleEvolutionLife;
+  entities: ReefModuleEvolutionEntities;
+}
+
 export type ReefColonyRole =
   | 'foundation'
   | 'framework'
@@ -183,6 +281,7 @@ export interface ReefSpeciesBlueprint {
   asOf: string;
   pressures: ReefSpeciesPressures;
   state: ReefSpeciesState;
+  moduleEvolution: ReefModuleEvolutionPlan;
   structure: ReefStructureInstruction;
   grammar: ReefGrowthGrammar;
   growth: ReefGrowthInstruction[];

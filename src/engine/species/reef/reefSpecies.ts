@@ -25,6 +25,7 @@ import {
   vectorTotal,
 } from './math';
 import { REEF_EVENT_SOURCE_MODULES } from './types';
+import { buildReefModuleEvolution } from './moduleEvolution';
 import type {
   BuildReefSpeciesBlueprintInput,
   ReefColonyMorphotype,
@@ -650,6 +651,13 @@ export function buildReefSpeciesBlueprint(
 
   const pressures = buildPressures(currentArtifact, schedule.days.length);
   const state = buildState(currentArtifact, asOf, pressures, schedule.days.length);
+  const moduleEvolution = buildReefModuleEvolution({
+    artifact: input.artifact,
+    asOfEpochMs: asOfEpoch,
+    ageDays: state.ageDays,
+    completedYears: state.completedYears,
+    sharedDaysOff: schedule.days,
+  });
   const structure = buildStructure(input.artifact.deterministicSeed);
   const grammar = buildGrammar(input.artifact.deterministicSeed);
   const { growth, diagnostics } = buildGrowth(
@@ -671,6 +679,7 @@ export function buildReefSpeciesBlueprint(
     asOf,
     pressures,
     state,
+    moduleEvolution,
     structure,
     grammar,
     growth,
