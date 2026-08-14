@@ -1,10 +1,21 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useAnimations, useGLTF } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import type { ReefPreviewBuild } from './buildReefPreview';
 import {
   createReefFishRouteClips,
+  REEF_FISH_ROUTE_IDS,
   REEF_FISH_ROUTE_PLAYBACK_RATE,
 } from './reefFishSchoolMotion';
+import {
+  buildReefFishTunnelPassages,
+  collectReefFishObstacles,
+  reefFishCollisionDelta,
+  sampleReefFishTunnelPassage,
+  type ReefFishObstacle,
+  type ReefFishTunnelPassage,
+} from './reefFishNavigation';
 import {
   REEF_FISH_SCHOOL_POSITION,
   REEF_FISH_SCHOOL_SCALE,
@@ -12,6 +23,7 @@ import {
 
 const SCHOOL_OF_FISH_MODEL_URL = `${import.meta.env.BASE_URL}models/school_of_fish_reef.glb`;
 const REDUCED_MOTION_PLAYBACK_FACTOR = 0.32;
+type ReefFishRouteId = (typeof REEF_FISH_ROUTE_IDS)[number];
 
 export interface ReefFishSchoolMetrics {
   animatedRoutes: number;
@@ -25,6 +37,7 @@ export interface ReefFishSchoolMetrics {
 }
 
 interface ReefFishSchoolProps {
+  build: ReefPreviewBuild;
   count?: number;
   identitySeed?: number;
   onReady?: ((metrics: ReefFishSchoolMetrics) => void) | undefined;
@@ -35,17 +48,61 @@ function roundMetric(value: number): number {
   return Number(value.toFixed(3));
 }
 
+function routeIdForCarrier(object: THREE.Object3D): ReefFishRouteId | null {
+  return REEF_FISH_ROUTE_IDS.find((routeId) => {
+    if (!object.name.startsWith(routeId)) return false;
+    const suffix = object.name.slice(routeId.length);
+    return /^head(?:\d|$)/.test(suffix) || /^Spine_01(?:\d|$)/.test(suffix);
+  }) ?? null;
+}
+
+function collectRouteCarriers(scene: THREE.Object3D): Map<ReefFishRouteId, THREE.Object3D[]> {
+  const carriers = new Map<ReefFishRouteId, THREE.Object3D[]>(
+    REEF_FISH_ROUTE_IDS.map((routeId) => [routeId, []]),
+  );
+  scene.traverse((object) => {
+    const routeId = routeIdForCarrier(object);
+    if (routeId) carriers.get(routeId)?.push(object);
+  });
+  return carriers;
+}
+
+function passageByRoute(
+  passages: readonly ReefFishTunnelPassage[],
+): Map<ReefFishRouteId, ReefFishTunnelPassage> {
+  return new Map(passages.map((passage) => [passage.routeId, passage]));
+}
+
+function applyWorldDelta(objects: readonly THREE.Object3D[], delta: THREE.Vector3): void {
+  if (delta.lengthSq() <= 1e-10) return;
+  const world = new THREE.Vector3();
+  for (const object of objects) {
+    const parent = object.parent;
+    if (!parent) continue;
+    object.getWorldPosition(world);
+    world.add(delta);
+    parent.worldToLocal(world);
+    object.position.copy(world);
+    object.updateMatrixWorld(true);
+  }
+}
+
 /**
  * Native animated fish school sourced from the authored School Of Fish GLB.
  *
- * The source clip contains nine rigged fish. We split it into independently
- * phased open-water route clips so the school crosses broad lanes around the
- * reef instead of clustering directly in front of the camera. The legacy
- * count/identity props remain optional only to keep ReefStage source-compatible
- * while the procedural Kenney renderer is removed.
+ * The authored motion still supplies swimming/body animation, but a renderer
+ * navigation pass now runs after it. Three fish are smoothly guided through
+ * real year-arch openings, while every fish receives world-space collision
+ * correction against visible reef structures so rigs cannot swim through rock.
  */
-export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) {
+export function ReefFishSchool({
+  build,
+  onReady,
+  reducedMotion,
+}: ReefFishSchoolProps) {
   const schoolRef = useRef<THREE.Group>(null);
+  const obstaclesRef = useRef<ReefFishObstacle[]>([]);
+  const threeScene = useThree((state) => state.scene);
   const { scene, animations } = useGLTF(SCHOOL_OF_FISH_MODEL_URL);
   const routes = useMemo(
     () => animations[0] ? createReefFishRouteClips(animations[0]) : [],
@@ -53,6 +110,9 @@ export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) 
   );
   const routeClips = useMemo(() => routes.map(({ clip }) => clip), [routes]);
   const { actions } = useAnimations(routeClips, scene);
+  const carriers = useMemo(() => collectRouteCarriers(scene), [scene]);
+  const tunnelPassages = useMemo(() => buildReefFishTunnelPassages(build), [build]);
+  const tunnels = useMemo(() => passageByRoute(tunnelPassages), [tunnelPassages]);
 
   useEffect(() => {
     scene.traverse((object) => {
@@ -62,6 +122,12 @@ export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) 
       object.receiveShadow = false;
     });
   }, [scene]);
+
+  useLayoutEffect(() => {
+    // ReefWorldComposition and natural arch matrices are mounted before the
+    // school. Capture their final visible transforms, not their authored ones.
+    obstaclesRef.current = collectReefFishObstacles(threeScene);
+  }, [build, threeScene]);
 
   useEffect(() => {
     const activeActions = routes.flatMap(({ clip, phase }) => {
@@ -90,6 +156,46 @@ export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) 
       if (action) action.timeScale = playbackRate;
     });
   }, [actions, reducedMotion, routes]);
+
+  useFrame(() => {
+    if (!schoolRef.current) return;
+
+    // Drei's animation mixer updates before this hook in registration order.
+    // Refresh matrices so collision/navigation reads that authored frame.
+    threeScene.updateMatrixWorld(true);
+    const representativeWorld = new THREE.Vector3();
+    const guidedWorld = new THREE.Vector3();
+
+    for (const route of routes) {
+      const routeCarriers = carriers.get(route.routeId) ?? [];
+      const representative = routeCarriers[0];
+      if (!representative) continue;
+
+      representative.getWorldPosition(representativeWorld);
+      guidedWorld.copy(representativeWorld);
+
+      const passage = tunnels.get(route.routeId);
+      const action = actions[route.clip.name];
+      if (passage && action && route.clip.duration > 0) {
+        const normalizedPhase = THREE.MathUtils.euclideanModulo(
+          action.time / route.clip.duration,
+          1,
+        );
+        const tunnelSample = sampleReefFishTunnelPassage(passage, normalizedPhase);
+        if (tunnelSample) {
+          guidedWorld.lerp(tunnelSample.target, tunnelSample.weight);
+        }
+      }
+
+      const guideDelta = guidedWorld.clone().sub(representativeWorld);
+      const collisionDelta = reefFishCollisionDelta(
+        guidedWorld,
+        obstaclesRef.current,
+      );
+      guideDelta.add(collisionDelta);
+      applyWorldDelta(routeCarriers, guideDelta);
+    }
+  });
 
   useEffect(() => {
     const school = schoolRef.current;
