@@ -87,25 +87,19 @@ function boundaryRadius(
   const spurPhase = stableUnit(profile.seed, `${key}:spur`) * TAU;
   const boundaryPhase = stableUnit(profile.seed, `${key}:${boundary}:micro`) * TAU;
 
-  // Broad one-sided mass plus two lower-frequency lobes create an asymmetric
-  // limestone body rather than four concentric circles.
   const directional = Math.cos(angle - axis) * 0.045 * amplitude;
   const primary = Math.sin(angle * 2 + primaryPhase) * 0.055 * amplitude;
   const secondary = Math.sin(angle * 5 - secondaryPhase) * 0.026 * amplitude;
-
-  // Narrow coves remove material; broad positive spurs create shelves and
-  // peninsulas. Both remain deterministic for a relationship seed.
   const erosionWave = Math.max(0, Math.sin(angle * 3 + erosionPhase));
   const erosion = -Math.pow(erosionWave, 6) * 0.07 * amplitude;
   const spurWave = Math.max(0, Math.sin(angle * 2 + spurPhase));
   const spur = Math.pow(spurWave, 5) * 0.038 * amplitude;
-
   const micro = Math.sin(angle * 9 + boundaryPhase) * (
     boundary === 'plateau' ? 0.012 : 0.009
   );
-  const silhouette = Math.max(
-    0.78,
-    1 + directional + primary + secondary + erosion + spur + micro,
+  const silhouette = Math.min(
+    1.1,
+    Math.max(0.78, 1 + directional + primary + secondary + erosion + spur + micro),
   );
 
   return profile.radius * ratio * silhouette;
