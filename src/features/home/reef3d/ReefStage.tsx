@@ -3,7 +3,6 @@ import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { ReefEnvironment } from './ReefEnvironment';
 import type { ReefPreviewBuild } from './buildReefPreview';
-import { ReefCleanupLayer } from './ReefCleanupLayer';
 import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefSeaGrass } from './ReefSeaGrass';
 import { ReefSessileLife } from './ReefSessileLife';
@@ -62,7 +61,6 @@ export function ReefStage({
 
       <ReefEnvironment build={build} />
       <ReefBackdropCorals onReady={onBackdropReady} />
-      <ReefCleanupLayer />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefSeaGrass reducedMotion={reducedMotion} />

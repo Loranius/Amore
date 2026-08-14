@@ -6,6 +6,8 @@ import { REEF_ROCK_TEXTURE_PATHS } from './reefAssetManifest';
 
 interface ReefRockMaterials {
   distant: THREE.MeshStandardMaterial;
+  foundationSide: THREE.MeshStandardMaterial;
+  foundationTop: THREE.MeshStandardMaterial;
   hero: THREE.MeshStandardMaterial;
   rock: THREE.MeshStandardMaterial;
 }
@@ -46,10 +48,28 @@ export function useReefRockMaterials(): ReefRockMaterials {
       name: 'reef-coral-stone-near',
       color: '#718079',
     });
+    const foundationTop = new THREE.MeshStandardMaterial({
+      ...common,
+      name: 'reef-limestone-terrace-top',
+      color: '#d9cfad',
+      roughness: 0.9,
+      normalScale: new THREE.Vector2(0.28, 0.28),
+      emissive: '#28362f',
+      emissiveIntensity: 0.055,
+    });
+    const foundationSide = new THREE.MeshStandardMaterial({
+      ...common,
+      name: 'reef-limestone-terrace-side',
+      color: '#a89a7d',
+      roughness: 0.97,
+      normalScale: new THREE.Vector2(0.4, 0.4),
+      emissive: '#1b2e2a',
+      emissiveIntensity: 0.035,
+    });
     const hero = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-coral-stone-hero',
-      color: '#71877f',
+      color: '#8f9b86',
       roughness: 0.92,
       normalScale: new THREE.Vector2(0.24, 0.24),
     });
@@ -60,12 +80,14 @@ export function useReefRockMaterials(): ReefRockMaterials {
       emissive: '#123a3b',
       emissiveIntensity: 0.06,
     });
-    return { distant, hero, rock };
+    return { distant, foundationSide, foundationTop, hero, rock };
   }, [map, normalMap, roughnessMap]);
 
   useEffect(() => () => {
     materials.rock.dispose();
     materials.hero.dispose();
+    materials.foundationTop.dispose();
+    materials.foundationSide.dispose();
     materials.distant.dispose();
   }, [materials]);
 
