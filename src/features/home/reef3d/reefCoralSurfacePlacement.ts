@@ -19,13 +19,18 @@ import type {
   ReefThreeSceneState,
 } from './reefThreeAdapter';
 
-export const REEF_CORAL_SURFACE_PLACEMENT_PASS = 'reef-coral-surface-placement-v2';
+export const REEF_CORAL_SURFACE_PLACEMENT_PASS = 'reef-coral-surface-placement-v3';
 const LIVING_CANOPY_SCULPT_PASS = 'reef-living-canopy-sculpt-v1';
+const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
 interface RuntimePlacement {
   batch: ReefRenderableBatch;
   runtime: ReefBatchRuntimeRange;
   request: ReefSurfaceSlotRequest;
+}
+
+function surfacePointKey(x: number, z: number): string {
+  return `${x.toFixed(5)}:${z.toFixed(5)}`;
 }
 
 function rescaleRange(
@@ -105,6 +110,67 @@ function translateRange(
   };
 }
 
+/** Rotates one accepted coral range around its planted pivot onto the support normal. */
+function alignRangeToNormal(
+  batch: ReefRenderableBatch,
+  runtime: ReefBatchRuntimeRange,
+  targetNormal: THREE.Vector3,
+): void {
+  const sourceAxis = new THREE.Vector3(
+    runtime.motion.axis.x,
+    runtime.motion.axis.y,
+    runtime.motion.axis.z,
+  ).normalize();
+  const targetAxis = targetNormal.clone().normalize();
+  if (targetAxis.y < 0) targetAxis.negate();
+
+  if (sourceAxis.distanceToSquared(targetAxis) < 1e-8) return;
+
+  const rotation = new THREE.Quaternion().setFromUnitVectors(sourceAxis, targetAxis);
+  const pivot = new THREE.Vector3(
+    runtime.motion.pivot.x,
+    runtime.motion.pivot.y,
+    runtime.motion.pivot.z,
+  );
+  const position = new THREE.Vector3();
+  const normal = new THREE.Vector3();
+
+  for (
+    let index = runtime.range.vertexStart;
+    index < runtime.range.vertexStart + runtime.range.vertexCount;
+    index += 1
+  ) {
+    const offset = index * 3;
+    position.set(
+      batch.basePositions[offset] ?? pivot.x,
+      batch.basePositions[offset + 1] ?? pivot.y,
+      batch.basePositions[offset + 2] ?? pivot.z,
+    );
+    position.sub(pivot).applyQuaternion(rotation).add(pivot);
+    batch.basePositions[offset] = position.x;
+    batch.basePositions[offset + 1] = position.y;
+    batch.basePositions[offset + 2] = position.z;
+
+    normal.set(
+      batch.baseNormals[offset] ?? 0,
+      batch.baseNormals[offset + 1] ?? 1,
+      batch.baseNormals[offset + 2] ?? 0,
+    ).applyQuaternion(rotation).normalize();
+    batch.baseNormals[offset] = normal.x;
+    batch.baseNormals[offset + 1] = normal.y;
+    batch.baseNormals[offset + 2] = normal.z;
+  }
+
+  runtime.motion = {
+    ...runtime.motion,
+    axis: {
+      x: targetAxis.x,
+      y: targetAxis.y,
+      z: targetAxis.z,
+    },
+  };
+}
+
 function sculptRange(
   batch: ReefRenderableBatch,
   runtime: ReefBatchRuntimeRange,
@@ -157,7 +223,8 @@ function storedDiagnostics(scene: ReefThreeSceneState): ReefSurfaceSlotDiagnosti
  * Projects all production colony ranges onto deterministic support slots. The
  * original batch indices and runtime ranges stay intact even if the support
  * registry cannot resolve an anchor, so missing support can never erase coral
- * geometry again.
+ * geometry again. Terrain placements inherit the raycast surface normal so a
+ * coral grows out of the limestone instead of remaining globally vertical.
  */
 export function applyReefCoralSurfacePlacement({
   build,
@@ -223,6 +290,7 @@ export function applyReefCoralSurfacePlacement({
     }),
     ...collectReefSupportSlotCandidates(supportMeshes),
   ];
+  const supportNormalByPoint = new Map<string, THREE.Vector3>();
   const allocation = allocateReefSurfaceSlots({
     requests: runtimePlacements.map((placement) => placement.request),
     candidates,
@@ -233,15 +301,21 @@ export function applyReefCoralSurfacePlacement({
         x,
         z,
       );
-      return hit
-        ? { x: hit.point.x, y: hit.point.y, z: hit.point.z }
-        : null;
+      if (!hit) return null;
+
+      const worldNormal = hit.face
+        ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize()
+        : WORLD_UP.clone();
+      if (worldNormal.y < 0) worldNormal.negate();
+      supportNormalByPoint.set(surfacePointKey(hit.point.x, hit.point.z), worldNormal);
+      return { x: hit.point.x, y: hit.point.y, z: hit.point.z };
     },
   });
   const slotByRangeId = new Map(
     allocation.slots.map((slot) => [slot.requestId, slot] as const),
   );
   const targetWorld = new THREE.Vector3();
+  const worldNormalToLocal = new THREE.Matrix3().getNormalMatrix(group.matrixWorld).invert();
 
   for (const placement of runtimePlacements) {
     const slot = slotByRangeId.get(placement.request.id);
@@ -257,6 +331,12 @@ export function applyReefCoralSurfacePlacement({
         group.worldToLocal(targetWorld),
       );
       sculptRange(placement.batch, placement.runtime, slot.position.y);
+
+      const worldNormal = supportNormalByPoint.get(
+        surfacePointKey(slot.position.x, slot.position.z),
+      ) ?? WORLD_UP;
+      const localNormal = worldNormal.clone().applyMatrix3(worldNormalToLocal).normalize();
+      alignRangeToNormal(placement.batch, placement.runtime, localNormal);
     } else {
       // Catastrophic support loss keeps the accepted range visible at its
       // engine anchor. Diagnostics expose it without deleting its indices.
