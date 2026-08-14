@@ -42,7 +42,7 @@ function stableUnit(seed: number, label: string): number {
   return (hash >>> 0) / 0xffffffff;
 }
 
-function morphotypeHotspotIndex(morphotype: ReefColonyMorphotype): number {
+function morphotypeHotspotIndex(morphotype: ReefColonyMorphotype): 0 | 1 | 2 | 3 {
   switch (morphotype) {
     case 'branching': return 0;
     case 'massive': return 1;
@@ -83,10 +83,11 @@ function buildHotspotPlan(
     const hotspotIndex = (
       morphotypeHotspotIndex(colony.morphotype) + sequenceBand
     ) % 4;
+    const radialRatio = radialRatios[hotspotIndex] ?? radialRatios[0];
     const angle = basePhase
       + hotspotIndex / 4 * TAU
       + (stableUnit(colony.seed, 'reef:hotspot:angle') - 0.5) * 0.48;
-    const localRadius = radius * radialRatios[hotspotIndex] * (
+    const localRadius = radius * radialRatio * (
       0.9 + stableUnit(colony.seed, 'reef:hotspot:radius') * 0.2
     );
     const targetX = Math.cos(angle) * localRadius;
