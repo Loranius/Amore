@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createFishSwimMaterialV2 } from './createFishSwimMaterialV2';
 import { buildReefFish, writeReefFishMatrices } from './reefFishMotion';
-import { applyReefFishColors, createReefFishRenderGeometry } from './reefFishRenderKit';
+import { createReefFishRenderGeometry } from './reefFishRenderKit';
 
 export interface ReefFishSchoolMetrics {
   animatedRoutes: number;
@@ -55,12 +55,11 @@ export function ReefFishSchool({
     material.dispose();
   }, [geometry, material]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const mesh = meshRef.current;
     if (!mesh) return;
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     writeReefFishMatrices(mesh, dummy, fish, 0);
-    applyReefFishColors(mesh, fish);
   }, [dummy, fish]);
 
   useFrame((state) => {
