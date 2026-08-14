@@ -52,18 +52,39 @@ const ROUTE_TUNING: Record<ReefFishRouteId, ReefFishRouteTuning> = {
 };
 
 function routeIdFromTrack(track: THREE.KeyframeTrack): ReefFishRouteId | null {
-  const separator = track.name.indexOf(':');
-  if (separator <= 0) return null;
-  const candidate = track.name.slice(0, separator);
-  return REEF_FISH_ROUTE_IDS.includes(candidate as ReefFishRouteId)
-    ? candidate as ReefFishRouteId
-    : null;
+  const targetName = sanitizedTrackTargetName(track);
+  return REEF_FISH_ROUTE_IDS.find((routeId) => targetName.startsWith(routeId)) ?? null;
 }
 
-function isRoutePositionTrack(track: THREE.KeyframeTrack): boolean {
-  return track.name.includes(':head.')
-    && track.name.endsWith('.position')
-    && track.getValueSize() === 3;
+function trackTargetName(track: THREE.KeyframeTrack): string {
+  const propertySeparator = track.name.lastIndexOf('.');
+  return propertySeparator > 0 ? track.name.slice(0, propertySeparator) : track.name;
+}
+
+function sanitizedTrackTargetName(track: THREE.KeyframeTrack): string {
+  // GLTFLoader sanitizes node names before AnimationClips reach the app. The
+  // authored `Clown1:head.6_10` therefore arrives as `Clown1head6_10`.
+  // Normalizing here supports both the raw asset convention and the runtime
+  // convention instead of coupling route discovery to punctuation that no
+  // longer exists after loading.
+  return THREE.PropertyBinding.sanitizeNodeName(trackTargetName(track));
+}
+
+function routeBoneName(track: THREE.KeyframeTrack, routeId: ReefFishRouteId): string {
+  return sanitizedTrackTargetName(track).slice(routeId.length);
+}
+
+function isRoutePositionTrack(
+  track: THREE.KeyframeTrack,
+  routeId: ReefFishRouteId,
+): boolean {
+  if (!track.name.endsWith('.position') || track.getValueSize() !== 3) return false;
+
+  const boneName = routeBoneName(track, routeId);
+  // The asset authors the same world-space route on the head and first spine
+  // carrier. Retargeting both keeps the rig coherent. Descendant bones such as
+  // head_End and Spine_02 remain untouched.
+  return /^head(?:\d|$)/.test(boneName) || /^Spine_01(?:\d|$)/.test(boneName);
 }
 
 function componentMean(values: THREE.TypedArray, component: number): number {
@@ -78,15 +99,15 @@ function componentMean(values: THREE.TypedArray, component: number): number {
 
 function retargetRoutePosition(
   source: THREE.KeyframeTrack,
+  routeId: ReefFishRouteId,
   tuning: ReefFishRouteTuning,
+  referenceMean: readonly [number, number, number] | null,
 ): THREE.KeyframeTrack {
-  if (!isRoutePositionTrack(source)) return source;
+  if (!referenceMean || !isRoutePositionTrack(source, routeId)) return source;
 
   const track = source.clone();
   const values = track.values;
-  const meanX = componentMean(values, 0);
-  const meanY = componentMean(values, 1);
-  const meanZ = componentMean(values, 2);
+  const [meanX, meanY, meanZ] = referenceMean;
 
   for (let index = 0; index < values.length; index += 3) {
     const x = values[index] ?? meanX;
@@ -108,9 +129,23 @@ function retargetRoutePosition(
 export function createReefFishRouteClips(source: THREE.AnimationClip): ReefFishRouteClip[] {
   return REEF_FISH_ROUTE_IDS.map((routeId) => {
     const tuning = ROUTE_TUNING[routeId];
-    const tracks = source.tracks
-      .filter((track) => routeIdFromTrack(track) === routeId)
-      .map((track) => retargetRoutePosition(track, tuning));
+    const sourceTracks = source.tracks.filter((track) => routeIdFromTrack(track) === routeId);
+    const routePositionTracks = sourceTracks.filter(
+      (track) => isRoutePositionTrack(track, routeId),
+    );
+    const referenceTrack = routePositionTracks.find(
+      (track) => /^head(?:\d|$)/.test(routeBoneName(track, routeId)),
+    ) ?? routePositionTracks[0];
+    const referenceMean = referenceTrack
+      ? [
+          componentMean(referenceTrack.values, 0),
+          componentMean(referenceTrack.values, 1),
+          componentMean(referenceTrack.values, 2),
+        ] as const
+      : null;
+    const tracks = sourceTracks.map(
+      (track) => retargetRoutePosition(track, routeId, tuning, referenceMean),
+    );
 
     return {
       clip: new THREE.AnimationClip(

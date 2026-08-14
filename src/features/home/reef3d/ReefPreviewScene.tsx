@@ -151,6 +151,8 @@ export default function ReefPreviewScene() {
       data-reef-fish-height={fishRuntime?.height ?? ''}
       data-reef-fish-depth={fishRuntime?.depth ?? ''}
       data-reef-fish-routes={fishRuntime?.routes ?? ''}
+      data-reef-fish-animated-routes={fishRuntime?.animatedRoutes ?? ''}
+      data-reef-fish-tracks={fishRuntime?.tracks ?? ''}
       data-reef-fish-scale={fishRuntime?.scale ?? ''}
       data-reef-fish-route-profile={fishRuntime ? REEF_FISH_SCHOOL_ROUTE_PROFILE : 'loading'}
       data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}

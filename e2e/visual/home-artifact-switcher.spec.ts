@@ -97,6 +97,10 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reef).toHaveAttribute('data-reef-fish-meshes', '4');
     await expect(reef).toHaveAttribute('data-reef-fish-routes', String(REEF_FISH_ROUTE_COUNT));
     await expect(reef).toHaveAttribute(
+      'data-reef-fish-animated-routes',
+      String(REEF_FISH_ROUTE_COUNT),
+    );
+    await expect(reef).toHaveAttribute(
       'data-reef-fish-route-profile',
       REEF_FISH_SCHOOL_ROUTE_PROFILE,
     );
@@ -125,6 +129,7 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     const reefTriangles = Number(await reef.getAttribute('data-reef-triangles'));
     const reefFishWidth = Number(await reef.getAttribute('data-reef-fish-width'));
     const reefFishHeight = Number(await reef.getAttribute('data-reef-fish-height'));
+    const reefFishTracks = Number(await reef.getAttribute('data-reef-fish-tracks'));
     const reefBackdropTriangles = Number(await reef.getAttribute('data-reef-backdrop-triangles'));
     expect(reefDrawCalls).toBeGreaterThan(0);
     expect(reefDrawCalls).toBeLessThanOrEqual(7);
@@ -132,6 +137,7 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     expect(reefTriangles).toBeLessThanOrEqual(36_512);
     expect(reefFishWidth).toBeGreaterThanOrEqual(2);
     expect(reefFishHeight).toBeGreaterThanOrEqual(0.5);
+    expect(reefFishTracks).toBeGreaterThan(REEF_FISH_ROUTE_COUNT);
     expect(reefBackdropTriangles).toBeGreaterThan(0);
     expect(reefBackdropTriangles).toBeLessThanOrEqual(REEF_BACKDROP_MAX_TRIANGLES);
     await page.screenshot({

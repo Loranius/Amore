@@ -13,11 +13,13 @@ import {
 const SCHOOL_OF_FISH_MODEL_URL = `${import.meta.env.BASE_URL}models/school_of_fish_reef.glb`;
 
 export interface ReefFishSchoolMetrics {
+  animatedRoutes: number;
   depth: number;
   height: number;
   meshes: number;
   routes: number;
   scale: number;
+  tracks: number;
   width: number;
 }
 
@@ -100,14 +102,18 @@ export function ReefFishSchool({ onReady, reducedMotion }: ReefFishSchoolProps) 
 
     const size = bounds.getSize(new THREE.Vector3());
     onReady({
+      animatedRoutes: routes.filter(
+        ({ clip }) => clip.tracks.length > 0 && Boolean(actions[clip.name]),
+      ).length,
       depth: roundMetric(size.z),
       height: roundMetric(size.y),
       meshes,
       routes: routes.length,
       scale: REEF_FISH_SCHOOL_SCALE,
+      tracks: routes.reduce((total, { clip }) => total + clip.tracks.length, 0),
       width: roundMetric(size.x),
     });
-  }, [onReady, routes.length, scene]);
+  }, [actions, onReady, routes, scene]);
 
   return (
     <group
