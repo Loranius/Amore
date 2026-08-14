@@ -183,7 +183,7 @@ export default function ReefPreviewScene() {
     >
       <Canvas
         dpr={[1, 1.5]}
-        frameloop={reducedMotion ? 'demand' : 'always'}
+        frameloop="always"
         camera={{
           position: [...DEFAULT_REEF_CAMERA_FRAME.position],
           fov: DEFAULT_REEF_CAMERA_FRAME.fov,
