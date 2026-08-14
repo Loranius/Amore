@@ -21,7 +21,8 @@ function materialNames(mesh: THREE.Mesh): string[] {
  * authored transforms. The accepted continuous arch shells remain mounted as
  * invisible support/raycast geometry, while ReefNaturalArchLayer supplies the
  * visible irregular rock-chain silhouette. Decorative grounded rocks are sunk
- * and reduced; distant stacks are compressed into low eroded background masses.
+ * and reduced, and tall distant stacks are removed instead of reading as blue
+ * crystal spires behind the reef.
  */
 export function ReefWorldComposition() {
   const scene = useThree((state) => state.scene);
@@ -61,12 +62,7 @@ export function ReefWorldComposition() {
       }
 
       if (isDistantStone && !isGroundedDecoration) {
-        object.scale.set(
-          object.scale.x * 0.78,
-          object.scale.y * 0.58,
-          object.scale.z * 0.78,
-        );
-        object.position.y *= 0.58;
+        object.visible = false;
       }
     });
 
