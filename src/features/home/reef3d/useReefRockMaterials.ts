@@ -73,12 +73,12 @@ export function useReefRockMaterials(): ReefRockMaterials {
     const arch = new THREE.MeshStandardMaterial({
       ...common,
       name: 'reef-limestone-year-arch',
-      color: '#ffffff',
-      vertexColors: true,
+      color: REEF_SCENE_PALETTE.foundationSide,
+      vertexColors: false,
       roughness: 0.94,
       normalScale: new THREE.Vector2(0.34, 0.34),
       emissive: REEF_SCENE_PALETTE.rockEmissive,
-      emissiveIntensity: 0.035,
+      emissiveIntensity: 0.025,
       flatShading: true,
     });
     const hero = new THREE.MeshStandardMaterial({
