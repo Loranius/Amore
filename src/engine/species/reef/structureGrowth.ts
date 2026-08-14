@@ -26,10 +26,11 @@ export interface ReefGrowthArchPlacement {
   thickness: number;
   curveDepth: number;
   footprintRadius: number;
-  progress: number;
-  colonization: number;
-  biodiversity: number;
-  cohesion: number;
+  /** Optional during renderer migration; new annual-zone layouts always publish it. */
+  progress?: number;
+  colonization?: number;
+  biodiversity?: number;
+  cohesion?: number;
   seed: number;
 }
 
@@ -47,16 +48,17 @@ export interface ReefGrowthOutcropPlacement {
 export interface ReefGrowthTerracePlacement {
   id: string;
   sourceEntityId: string;
-  yearIndex: number;
-  archetype: ReefAnnualStructureArchetype;
+  /** Optional only for legacy fixtures; new layouts always publish annual-zone metadata. */
+  yearIndex?: number;
+  archetype?: ReefAnnualStructureArchetype;
   center: ReefGrowthStructurePoint;
   rotationY: number;
   footprintRadius: number;
   thickness: number;
-  progress: number;
-  colonization: number;
-  biodiversity: number;
-  cohesion: number;
+  progress?: number;
+  colonization?: number;
+  biodiversity?: number;
+  cohesion?: number;
   seed: number;
 }
 
@@ -162,7 +164,7 @@ function zoneFootprint(zone: ReefAnnualZone): number {
     peninsula: 1.12,
   };
   return round6(
-    (0.42 + zone.progress * 0.36 + zone.mapExpansion * 0.16)
+    (0.38 + zone.progress * 0.3 + zone.mapExpansion * 0.14)
       * archetypeScale[zone.structureArchetype],
   );
 }
@@ -185,15 +187,15 @@ function annualPlacementCircle(
 
   // High togetherness/cohesion lets neighbouring annual habitats knit closer
   // without spawning any Schedule geometry of its own.
-  const clearanceRatio = 1.03 - zone.cohesion * 0.18;
+  const clearanceRatio = 0.68 - zone.cohesion * 0.1;
   for (let attempt = 0; attempt < MAXIMUM_ATTEMPTS; attempt += 1) {
     const ring = Math.floor((zone.yearIndex - 2) / 4);
     const candidate = radialCandidate(
       { id: zone.id, seed: zone.structureSeed },
       index,
       attempt,
-      visibleFoundationRadius * (0.22 + ring * 0.08),
-      visibleFoundationRadius * Math.min(0.86, 0.52 + ring * 0.1 + zone.mapExpansion * 0.1),
+      visibleFoundationRadius * (0.3 + ring * 0.08),
+      visibleFoundationRadius * Math.min(0.92, 0.82 + ring * 0.05 + zone.mapExpansion * 0.05),
       footprintRadius,
     );
     if (!collides(candidate, annualCircles, clearanceRatio)) return candidate;
