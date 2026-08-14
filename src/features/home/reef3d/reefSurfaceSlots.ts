@@ -2,7 +2,7 @@ export const REEF_SURFACE_SLOT_VERSION = 'reef-surface-slots-v2';
 
 const TAU = Math.PI * 2;
 const SLOT_SPACING = 0.34;
-const CLEARANCE_PASSES = [1, 0.82, 0.64, 0] as const;
+const CLEARANCE_PASSES = [1, 0.9, 0.82, 0.74] as const;
 
 export interface ReefSurfacePoint {
   x: number;
@@ -129,8 +129,6 @@ function canOccupy(
   occupied: readonly ReefAllocatedSurfaceSlot[],
   clearanceRatio: number,
 ): boolean {
-  if (clearanceRatio <= 0) return true;
-
   for (const slot of occupied) {
     const verticalTolerance = Math.max(
       0.28,
@@ -175,8 +173,9 @@ function isAvailableForRequest(
 /**
  * Assigns one chronological surface slot to every request whenever any sampled
  * support exists. Preferred anchors win first; unsupported anchors use the
- * nearest collision-safe registry slot and only relax clearance as a last
- * resort. No request is silently removed.
+ * nearest collision-safe registry slot. Clearance can relax moderately in
+ * dense reefs, but it never drops to zero and therefore never explicitly
+ * authorizes two coral footprints to occupy the same point.
  */
 export function allocateReefSurfaceSlots({
   requests,
