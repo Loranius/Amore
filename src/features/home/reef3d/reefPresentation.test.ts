@@ -114,9 +114,10 @@ describe('Reef Phase 10 colony shape presentation', () => {
     const counts = reefDensityCandidateCounts(build);
 
     expect(counts.sourceColonies).toBe(build.layout.colonies.length);
-    expect(counts.bushes).toBeGreaterThan(0);
-    expect(counts.cushions).toBeGreaterThan(0);
-    expect(counts.bushes + counts.cushions).toBeLessThanOrEqual(counts.sourceColonies);
+    expect(counts.drawCalls).toBe(1);
+    expect(Object.keys(counts.morphotypeCounts)).toEqual(REEF_COLONY_MORPHOTYPES);
+    expect(Object.values(counts.morphotypeCounts).reduce((total, count) => total + count, 0))
+      .toBe(counts.sourceColonies);
   });
 
   it('publishes a distinct bounded silhouette profile for every accepted morphotype', () => {

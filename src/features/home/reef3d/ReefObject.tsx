@@ -9,6 +9,11 @@ import { applyReefPresentation } from './reefPresentation';
 import { applyReefCoralSurfacePlacement } from './reefCoralSurfacePlacement';
 import { collectReefSupportMeshes } from './reefSupportPlacement';
 import {
+  REEF_OBJECT_POSITION,
+  REEF_OBJECT_ROTATION,
+  REEF_OBJECT_SCALE,
+} from './reefObjectTransform';
+import {
   createReefThreeScene,
   disposeReefThreeScene,
   sampleReefBatchFrame,
@@ -98,9 +103,9 @@ export function ReefObject({
   return (
     <group
       ref={groupRef}
-      rotation={[-0.08, -0.18, 0]}
-      position={[0, 0.02, 0]}
-      scale={[1, 1.04, 1]}
+      rotation={REEF_OBJECT_ROTATION}
+      position={REEF_OBJECT_POSITION}
+      scale={REEF_OBJECT_SCALE}
     >
       <mesh
         visible={false}

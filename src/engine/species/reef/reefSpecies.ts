@@ -324,6 +324,71 @@ function branchingBiasFor(morphotype: ReefColonyMorphotype, weight: number): num
   return round6(clamp01(base * (0.72 + weight * 0.36)));
 }
 
+function seededMorphotype(
+  seed: number,
+  label: string,
+  morphotypes: readonly ReefColonyMorphotype[],
+): ReefColonyMorphotype {
+  const index = Math.min(
+    morphotypes.length - 1,
+    Math.floor(seededUnit(seed, label) * morphotypes.length),
+  );
+  return morphotypes[index] ?? 'massive';
+}
+
+/**
+ * Keeps module meaning intact while preventing real portal histories from
+ * collapsing into only one or two silhouettes. One event still owns exactly
+ * one append-stable colony; its seed selects a bounded visual habit.
+ */
+function morphotypeForEvent(
+  sourceModule: ReefEventSourceModule,
+  channel: EvolutionChannel,
+  channelStrength: number,
+  emphasized: boolean,
+  seed: number,
+): ReefColonyMorphotype {
+  if (sourceModule === 'memories') return 'encrusting';
+  if (sourceModule === 'wishlist') {
+    if (emphasized) return 'massive';
+    if (channelStrength >= 0.7) {
+      return channel === 'achievement'
+        ? 'branching'
+        : channel === 'culture'
+          ? 'soft-coral'
+          : 'massive';
+    }
+    return seededMorphotype(seed, 'wishlist-morphotype', [
+      'branching',
+      'plating',
+      'soft-coral',
+    ]);
+  }
+  if (sourceModule === 'media') {
+    if (channelStrength >= 0.5) return channel === 'culture' ? 'soft-coral' : 'plating';
+    return seededMorphotype(seed, 'media-morphotype', [
+      'plating',
+      'soft-coral',
+      'sea-fan',
+    ]);
+  }
+  if (sourceModule === 'calendar') {
+    if (channel === 'culture' && channelStrength >= 0.5) return 'sea-fan';
+    if (emphasized) return 'massive';
+    if (channelStrength >= 0.7) return 'massive';
+    return seededMorphotype(seed, 'calendar-morphotype', [
+      'massive',
+      'plating',
+      'sea-fan',
+    ]);
+  }
+  return channel === 'achievement'
+    ? 'branching'
+    : channel === 'culture'
+      ? 'soft-coral'
+      : 'massive';
+}
+
 function buildEventInstruction(
   artifactSeed: number,
   event: NormalizedEvolutionEvent,
@@ -355,15 +420,13 @@ function buildEventInstruction(
     || (event.channels.significance >= 0.56 && weight >= 0.62);
   const id = `reef:event:${event.id}`;
   const seed = stableSeed(artifactSeed, id);
-  const morphotype: ReefColonyMorphotype = sourceModule === 'memories'
-    ? 'encrusting'
-    : sourceModule === 'media'
-      ? channel === 'culture' ? 'soft-coral' : 'plating'
-      : sourceModule === 'calendar'
-        ? channel === 'culture' ? 'sea-fan' : 'massive'
-        : channel === 'achievement'
-          ? 'branching'
-          : channel === 'culture' ? 'soft-coral' : 'massive';
+  const morphotype = morphotypeForEvent(
+    sourceModule,
+    channel,
+    event.channels[channel],
+    emphasized,
+    seed,
+  );
   const role: ReefColonyRole = sourceModule === 'memories'
     ? 'memory'
     : sourceModule === 'media'

@@ -77,7 +77,7 @@ function nowMs(): number {
 export function buildReefPreviewFromArtifact({
   artifact,
   asOf,
-  rulesVersion = 'reef-species-production-v1.1.0',
+  rulesVersion = 'reef-species-production-v1.2.0',
   sharedDaysOff = [],
 }: BuildReefPreviewInput): ReefPreviewBuild {
   const startedAt = nowMs();

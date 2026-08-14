@@ -7,6 +7,7 @@ import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefSeaGrass } from './ReefSeaGrass';
 import { ReefSessileLife } from './ReefSessileLife';
 import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
+import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 import {
   ReefBackdropCorals,
@@ -60,6 +61,7 @@ export function ReefStage({
       </mesh>
 
       <ReefEnvironment build={build} />
+      <ReefDensityLayer build={build} />
       <ReefBackdropCorals onReady={onBackdropReady} />
       <ReefWaterAtmosphere reducedMotion={reducedMotion} />
       <BackgroundWhale reducedMotion={reducedMotion} />
