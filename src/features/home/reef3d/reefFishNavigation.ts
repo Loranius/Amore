@@ -36,6 +36,8 @@ const TUNNEL_PHASES = [
   [0.73, 0.95],
 ] as const;
 const FISH_STRUCTURE_MARGIN = 0.26;
+const FISH_FOUNDATION_MARGIN = 0.52;
+const FISH_FOUNDATION_TOP_CLEARANCE = 0.48;
 
 function smoothstep(value: number): number {
   const t = THREE.MathUtils.clamp(value, 0, 1);
@@ -43,7 +45,7 @@ function smoothstep(value: number): number {
 }
 
 /**
- * Creates three deterministic passages perpendicular to year-arch planes.
+ * Creates three deterministic passages perpendicular to real arch planes.
  * Each selected fish reaches the exact centre of an opening at mid-pass, while
  * entry/exit points remain in open water on opposite sides of the arch.
  */
@@ -105,6 +107,37 @@ export function sampleReefFishTunnelPassage(
   return { target, weight };
 }
 
+/**
+ * Pre-emptively keeps authored fish routes out of the solid central reef body.
+ * This is deliberately a continuous radial field rather than a collision hit:
+ * routes begin bending around the reef before a rig penetrates geometry.
+ *
+ * Real arch tunnel guidance can blend this delta down to zero while a fish is
+ * crossing a known opening. Fish above the reef crown are also left untouched.
+ */
+export function reefFishFoundationAvoidanceDelta(
+  point: THREE.Vector3,
+  build: ReefPreviewBuild,
+  margin = FISH_FOUNDATION_MARGIN,
+): THREE.Vector3 {
+  const reefTop = build.species.structure.reefHeight + FISH_FOUNDATION_TOP_CLEARANCE;
+  if (point.y > reefTop) return new THREE.Vector3();
+
+  const safeRadius = build.structures.visibleFoundationRadius + margin;
+  const horizontalRadius = Math.hypot(point.x, point.z);
+  if (horizontalRadius >= safeRadius) return new THREE.Vector3();
+
+  const directionX = horizontalRadius > 1e-6 ? point.x / horizontalRadius : 1;
+  const directionZ = horizontalRadius > 1e-6 ? point.z / horizontalRadius : 0;
+  const distance = safeRadius - horizontalRadius;
+
+  return new THREE.Vector3(
+    directionX * distance,
+    0,
+    directionZ * distance,
+  );
+}
+
 function usableObstacle(object: THREE.Mesh): boolean {
   if (!object.visible) return false;
   if (object.geometry.type === 'CircleGeometry') return false;
@@ -153,9 +186,10 @@ export function collectReefFishObstacles(scene: THREE.Scene): ReefFishObstacle[]
 }
 
 /**
- * Finds the smallest safe correction when a fish centre enters a structure.
- * Downward escape is deliberately forbidden so avoidance can never drive a fish
- * into the seabed. Expanded boxes account for the fish body, not just its root.
+ * Finds the smallest safe correction when a fish centre enters a structure's
+ * safety volume. This is now a final local fallback; the central reef itself is
+ * avoided earlier by reefFishFoundationAvoidanceDelta so the correction should
+ * not oscillate against authored animation on every frame.
  */
 export function reefFishCollisionDelta(
   point: THREE.Vector3,
