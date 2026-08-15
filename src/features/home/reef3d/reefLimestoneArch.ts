@@ -412,7 +412,9 @@ function appendAttachmentShelf(
     * (0.94 + stableUnit(arch.seed, `arch-column:shelf:${index}:width`) * 0.12);
   const radiusZ = arch.thickness * (index === 1 ? 0.82 : 0.7)
     * (0.94 + stableUnit(arch.seed, `arch-column:shelf:${index}:depth`) * 0.12);
-  const topY = bodyCenter.y + bodyRadius * 0.46;
+  // The attachment lip stays fused into the crown, but its flat top must be the
+  // highest surface at its authored anchor so a coral never starts inside rock.
+  const topY = bodyCenter.y + bodyRadius * 0.68;
   const bottomY = topY - Math.max(0.035, arch.thickness * 0.16);
   const centerX = bodyCenter.x
     + (stableUnit(arch.seed, `arch-column:shelf:${index}:x`) - 0.5) * arch.thickness * 0.22;
