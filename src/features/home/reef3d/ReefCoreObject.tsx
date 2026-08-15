@@ -5,8 +5,9 @@ import type { ReefCoreManifest } from '@/engine/species/reef';
 const VOLCANO_RADIAL_SEGMENTS = 72;
 const VOLCANO_SLOPE_RINGS = 24;
 const VOLCANO_CRATER_RINGS = 6;
-const APRON_SEGMENTS = 64;
-const APRON_RINGS = 7;
+const PLATFORM_SEGMENTS = 72;
+const PLATFORM_RINGS = 10;
+const PLATFORM_OUTER_RADIUS = 1.16;
 
 function smoothstep(edge0: number, edge1: number, value: number) {
   const t = THREE.MathUtils.clamp((value - edge0) / Math.max(0.0001, edge1 - edge0), 0, 1);
@@ -152,91 +153,52 @@ function createVolcanoCraterGeometry(core: ReefCoreManifest): THREE.BufferGeomet
 }
 
 function createCorePlatformGeometry(core: ReefCoreManifest): THREE.BufferGeometry {
-  const geometry = new THREE.CylinderGeometry(1, 1, 1, 64, 5, false);
-  const position = geometry.attributes.position as THREE.BufferAttribute;
-  const phaseA = (core.platform.seed % 10_000) / 10_000 * Math.PI * 2;
-  const phaseB = ((core.platform.seed >>> 8) % 10_000) / 10_000 * Math.PI * 2;
-
-  for (let index = 0; index < position.count; index += 1) {
-    const sourceX = position.getX(index);
-    const sourceY = position.getY(index);
-    const sourceZ = position.getZ(index);
-    const angle = Math.atan2(sourceZ, sourceX);
-    const radial01 = Math.min(1, Math.hypot(sourceX, sourceZ));
-    const y01 = sourceY + 0.5;
-    const edgeNoise = 1 + core.platform.irregularity * (
-      Math.sin(angle * 3 + phaseA) * 0.55
-      + Math.cos(angle * 5 - phaseB) * 0.3
-      + Math.sin(angle * 7 + phaseB) * 0.15
-    );
-    const verticalRoughness = core.platform.irregularity * 0.09 * (
-      Math.cos(angle * 4 + phaseA) + Math.sin(angle * 6 - phaseB)
-    );
-    const lowerTaper = 0.88 + y01 * 0.12;
-    const topMask = smoothstep(0.42, 0.5, sourceY);
-    const topRelief = topMask * core.platform.irregularity * core.platform.thickness * (
-      Math.sin(angle * 4 + radial01 * 7 + phaseA) * 0.18
-      + Math.cos(angle * 7 - radial01 * 4 - phaseB) * 0.10
-    ) * smoothstep(0.08, 0.96, radial01);
-
-    position.setXYZ(
-      index,
-      sourceX * core.platform.radiusX * edgeNoise * lowerTaper,
-      sourceY * core.platform.thickness + verticalRoughness + topRelief,
-      sourceZ * core.platform.radiusZ * edgeNoise * lowerTaper,
-    );
-  }
-
-  position.needsUpdate = true;
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  geometry.computeBoundingSphere();
-  return geometry;
-}
-
-function createPlatformApronGeometry(core: ReefCoreManifest): THREE.BufferGeometry {
-  const positions: number[] = [];
+  const positions: number[] = [0, core.platform.thickness * 0.47, 0];
   const indices: number[] = [];
   const phaseA = (core.platform.seed % 10_000) / 10_000 * Math.PI * 2;
   const phaseB = ((core.platform.seed >>> 8) % 10_000) / 10_000 * Math.PI * 2;
-  const stride = APRON_SEGMENTS + 1;
-  const topY = core.platform.thickness * 0.30;
-  const groundY = -core.platform.thickness * 0.54;
+  const topY = core.platform.thickness * 0.47;
+  const groundY = -core.platform.thickness * 0.52;
 
-  for (let ring = 0; ring <= APRON_RINGS; ring += 1) {
-    const u = ring / APRON_RINGS;
-    const drop = smoothstep(0.28, 1, u);
-    for (let segment = 0; segment <= APRON_SEGMENTS; segment += 1) {
-      const angle = segment / APRON_SEGMENTS * Math.PI * 2;
+  for (let ring = 1; ring <= PLATFORM_RINGS; ring += 1) {
+    const radial01 = PLATFORM_OUTER_RADIUS * ring / PLATFORM_RINGS;
+    const edgeDrop = smoothstep(0.98, PLATFORM_OUTER_RADIUS, radial01);
+    for (let segment = 0; segment < PLATFORM_SEGMENTS; segment += 1) {
+      const angle = segment / PLATFORM_SEGMENTS * Math.PI * 2;
       const lobe =
-        Math.sin(angle * 2 + phaseA) * 0.46
-        + Math.cos(angle * 5 - phaseB) * 0.34
-        + Math.sin(angle * 8 + phaseB * 0.7) * 0.20;
-      const radius01 = THREE.MathUtils.lerp(0.82, 1.16, u)
-        * (1 + core.platform.irregularity * lobe * (0.16 + u * 0.34));
-      const terrace = Math.sin(u * Math.PI * 3 + angle * 2 + phaseA)
-        * core.platform.thickness * 0.11 * (1 - u * 0.55);
-      const ridge = Math.max(0, Math.sin(angle * 3 - phaseB + u * 2.8))
-        * core.platform.thickness * 0.12 * Math.sin(Math.PI * u);
-      const yNoise = core.platform.irregularity * 0.10 * (
-        Math.sin(angle * 4 + phaseA + u * 2.1)
-        + Math.cos(angle * 6 - phaseB) * 0.45
-      ) * (0.18 + u * 0.72);
-      const y = THREE.MathUtils.lerp(topY, groundY, drop) + terrace + ridge + yNoise;
+        Math.sin(angle * 3 + phaseA + radial01 * 1.6) * 0.52
+        + Math.cos(angle * 5 - phaseB - radial01) * 0.30
+        + Math.sin(angle * 8 + phaseB * 0.7) * 0.18;
+      const radiusNoise = 1 + core.platform.irregularity * lobe * (0.08 + edgeDrop * 0.28);
+      const plateauRelief = core.platform.irregularity * core.platform.thickness * (
+        Math.sin(angle * 4 + radial01 * 7 + phaseA) * 0.15
+        + Math.cos(angle * 7 - radial01 * 4 - phaseB) * 0.08
+      ) * smoothstep(0.12, 0.94, radial01) * (1 - edgeDrop * 0.55);
+      const outerRidge = Math.max(0, Math.sin(angle * 3 - phaseB + radial01 * 2.8))
+        * core.platform.thickness * 0.10 * smoothstep(0.74, 1.03, radial01) * (1 - edgeDrop);
+      const y = THREE.MathUtils.lerp(topY, groundY, edgeDrop) + plateauRelief + outerRidge;
       positions.push(
-        Math.cos(angle) * core.platform.radiusX * radius01,
+        Math.cos(angle) * core.platform.radiusX * radial01 * radiusNoise,
         y,
-        Math.sin(angle) * core.platform.radiusZ * radius01,
+        Math.sin(angle) * core.platform.radiusZ * radial01 * radiusNoise,
       );
     }
   }
 
-  for (let ring = 0; ring < APRON_RINGS; ring += 1) {
-    for (let segment = 0; segment < APRON_SEGMENTS; segment += 1) {
-      const a = ring * stride + segment;
-      const b = a + 1;
-      const c = a + stride;
-      const d = c + 1;
+  for (let segment = 0; segment < PLATFORM_SEGMENTS; segment += 1) {
+    const next = (segment + 1) % PLATFORM_SEGMENTS;
+    indices.push(0, 1 + segment, 1 + next);
+  }
+
+  for (let ring = 1; ring < PLATFORM_RINGS; ring += 1) {
+    const currentStart = 1 + (ring - 1) * PLATFORM_SEGMENTS;
+    const nextStart = currentStart + PLATFORM_SEGMENTS;
+    for (let segment = 0; segment < PLATFORM_SEGMENTS; segment += 1) {
+      const next = (segment + 1) % PLATFORM_SEGMENTS;
+      const a = currentStart + segment;
+      const b = currentStart + next;
+      const c = nextStart + segment;
+      const d = nextStart + next;
       indices.push(a, c, b, b, c, d);
     }
   }
@@ -250,27 +212,22 @@ function createPlatformApronGeometry(core: ReefCoreManifest): THREE.BufferGeomet
   return geometry;
 }
 
-/** Persistent Phase 1 core plus Phase 6 visual accretion apron. */
+/** Persistent Phase 1 core rendered as a continuous Phase 6 geological shelf. */
 export function ReefCoreObject({ core }: { core: ReefCoreManifest }) {
   const volcanoGeometry = useMemo(() => createVolcanoOuterGeometry(core), [core]);
   const craterGeometry = useMemo(() => createVolcanoCraterGeometry(core), [core]);
   const platformGeometry = useMemo(() => createCorePlatformGeometry(core), [core]);
-  const apronGeometry = useMemo(() => createPlatformApronGeometry(core), [core]);
 
   useEffect(() => () => {
     volcanoGeometry.dispose();
     craterGeometry.dispose();
     platformGeometry.dispose();
-    apronGeometry.dispose();
-  }, [apronGeometry, craterGeometry, platformGeometry, volcanoGeometry]);
+  }, [craterGeometry, platformGeometry, volcanoGeometry]);
 
   return (
     <group>
       <mesh geometry={platformGeometry} rotation={[0, core.platform.rotationRadians, 0]} receiveShadow>
-        <meshStandardMaterial color="#4d554e" roughness={0.99} metalness={0.005} />
-      </mesh>
-      <mesh geometry={apronGeometry} rotation={[0, core.platform.rotationRadians, 0]} receiveShadow>
-        <meshStandardMaterial color="#4e574f" roughness={1} metalness={0} flatShading />
+        <meshStandardMaterial color="#505951" roughness={1} metalness={0} flatShading />
       </mesh>
       <mesh geometry={volcanoGeometry} castShadow receiveShadow>
         <meshStandardMaterial color="#485048" roughness={0.98} metalness={0.005} />

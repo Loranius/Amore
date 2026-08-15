@@ -202,24 +202,25 @@ function connectorFor(layer: ReefAccretionLayer, core: ReefCoreManifest): Connec
   const radialDistance = Math.hypot(layer.position.x, layer.position.z);
   if (radialDistance <= 0.0001) return null;
   const angle = Math.atan2(layer.position.z, layer.position.x);
-  const edgeRadius = ellipseRadiusAtAngle(core, angle) * 0.88;
-  if (radialDistance <= edgeRadius * 1.03) return null;
+  const edgeRadius = ellipseRadiusAtAngle(core, angle) * 0.96;
+  if (radialDistance <= edgeRadius * 1.02) return null;
 
   const edgeX = Math.cos(angle) * edgeRadius;
   const edgeZ = Math.sin(angle) * edgeRadius;
   const dx = layer.position.x - edgeX;
   const dz = layer.position.z - edgeZ;
   const distance = Math.hypot(dx, dz);
-  if (distance < 0.28) return null;
+  if (distance < 0.20) return null;
 
+  const visibleGrowth = 0.22 + Math.max(0, Math.min(1, layer.growth)) * 0.78;
   return {
     x: (edgeX + layer.position.x) * 0.5,
-    y: -core.platform.thickness * 0.49 + Math.min(0.10, layer.thickness * 0.42),
+    y: -core.platform.thickness * 0.42 + Math.min(0.12, layer.thickness * 0.55),
     z: (edgeZ + layer.position.z) * 0.5,
     rotationY: Math.atan2(dx, dz),
-    width: Math.max(0.32, Math.min(layer.radiusX, layer.radiusZ) * 1.20),
-    height: Math.max(0.10, layer.thickness * 1.40),
-    length: distance * 0.58,
+    width: Math.max(0.40, Math.min(layer.radiusX, layer.radiusZ) * 1.35) * visibleGrowth,
+    height: Math.max(0.12, layer.thickness * 1.65) * (0.62 + visibleGrowth * 0.38),
+    length: distance * 0.68,
     toneIndex: layer.toneIndex,
   };
 }
@@ -227,6 +228,7 @@ function connectorFor(layer: ReefAccretionLayer, core: ReefCoreManifest): Connec
 function useLayerGroups(manifest: ReefAccretionManifest, core: ReefCoreManifest) {
   return useMemo(() => {
     const visible = manifest.layers.filter((layer) => layer.growth > 0.015);
+    const allSkirts = manifest.layers.filter((layer) => layer.kind === 'STRUCTURE_SKIRT');
     const skirts = visible.filter((layer) => layer.kind === 'STRUCTURE_SKIRT');
     return {
       sheets: visible.filter((layer) => layer.kind === 'ENCRUSTING_SHEET'),
@@ -234,7 +236,7 @@ function useLayerGroups(manifest: ReefAccretionManifest, core: ReefCoreManifest)
       plates: visible.filter((layer) => layer.kind === 'PLATE_STACK'),
       skirts,
       minerals: visible.filter((layer) => layer.kind === 'MINERAL_TRANSITION'),
-      connectors: skirts
+      connectors: allSkirts
         .map((layer) => connectorFor(layer, core))
         .filter((connector): connector is ConnectorSpec => connector !== null),
     };
