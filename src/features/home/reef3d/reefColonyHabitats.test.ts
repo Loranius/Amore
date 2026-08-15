@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { buildArtifactBlueprint, type EvolutionEventInput } from '@/engine/evolution';
+import type { ReefColonyMorphotype } from '@/engine/species/reef';
 import { buildReefPreviewFromArtifact } from './buildReefPreview';
 import { buildReefLivingCanopyPlan } from './reefLivingCanopy';
 import {
   buildReefColonyHabitatPlan,
+  reefColonyShapeProfile,
   REEF_COLONY_HABITAT_VERSION,
   type ReefColonyHabitatTier,
 } from './reefColonyHabitats';
@@ -99,6 +101,29 @@ function buildMultiMemberFixture(memberCount = 5) {
   };
 }
 
+function withMorphotype<T extends ReturnType<typeof buildMultiMemberFixture>>(
+  fixture: T,
+  morphotype: ReefColonyMorphotype,
+): T {
+  const colonies = fixture.sourcePlan.colonies.map((colony) => ({ ...colony, morphotype }));
+  return {
+    ...fixture,
+    sourcePlan: {
+      ...fixture.sourcePlan,
+      colonies,
+      requests: colonies.map((colony) => colony.request),
+      morphotypeCounts: {
+        branching: morphotype === 'branching' ? colonies.length : 0,
+        massive: morphotype === 'massive' ? colonies.length : 0,
+        plating: morphotype === 'plating' ? colonies.length : 0,
+        encrusting: morphotype === 'encrusting' ? colonies.length : 0,
+        'soft-coral': morphotype === 'soft-coral' ? colonies.length : 0,
+        'sea-fan': morphotype === 'sea-fan' ? colonies.length : 0,
+      },
+    },
+  } as T;
+}
+
 function expectedRatioRange(tier: ReefColonyHabitatTier): readonly [number, number] {
   switch (tier) {
     case 'crown': return [0.16, 0.2];
@@ -109,6 +134,27 @@ function expectedRatioRange(tier: ReefColonyHabitatTier): readonly [number, numb
 }
 
 describe('reef colony habitats', () => {
+  it('defines distinct ecological footprint profiles for the coral morphotypes', () => {
+    const branching = reefColonyShapeProfile('branching');
+    const massive = reefColonyShapeProfile('massive');
+    const plating = reefColonyShapeProfile('plating');
+    const encrusting = reefColonyShapeProfile('encrusting');
+    const soft = reefColonyShapeProfile('soft-coral');
+    const fan = reefColonyShapeProfile('sea-fan');
+
+    expect(branching.footprintShape).toBe('cluster');
+    expect(massive.spacingMultiplier).toBeLessThan(branching.spacingMultiplier);
+    expect(plating.footprintShape).toBe('plate');
+    expect(plating.tangentialStretch).toBeGreaterThan(plating.radialStretch);
+    expect(encrusting.footprintShape).toBe('carpet');
+    expect(encrusting.spacingMultiplier).toBeLessThan(1);
+    expect(soft.footprintShape).toBe('grove');
+    expect(soft.spacingMultiplier).toBeGreaterThan(1);
+    expect(fan.footprintShape).toBe('fan');
+    expect(fan.tangentialStretch / fan.radialStretch).toBeGreaterThan(3);
+    expect(fan.facingMode).toBe('tangent');
+  });
+
   it('creates one stable dominant-morphotype habitat per growth instruction', () => {
     const build = buildFixture();
     const sourcePlan = buildReefLivingCanopyPlan(build);
@@ -127,12 +173,39 @@ describe('reef colony habitats', () => {
       expect(sourceColonies.length).toBeGreaterThan(0);
       expect(new Set(sourceColonies.map((colony) => colony.morphotype)).size).toBe(1);
       expect(habitat.dominantMorphotype).toBe(sourceColonies[0]?.morphotype);
+      expect(habitat.shapeProfile).toBe(
+        reefColonyShapeProfile(habitat.dominantMorphotype),
+      );
       expect([...habitat.memberColonyIds].sort())
         .toEqual(sourceColonies.map((colony) => colony.id).sort());
       expect(habitat.maturity).toBeGreaterThanOrEqual(0);
       expect(habitat.maturity).toBeLessThanOrEqual(1);
       expect(habitat.activeRadius).toBeLessThanOrEqual(habitat.spreadRadius + 1e-6);
     }
+  });
+
+  it('uses morphotype shape profiles to change the physical colony layout', () => {
+    const branchingFixture = withMorphotype(buildMultiMemberFixture(8), 'branching');
+    const platingFixture = withMorphotype(buildMultiMemberFixture(8), 'plating');
+    const branching = buildReefColonyHabitatPlan(
+      branchingFixture.sourcePlan,
+      branchingFixture.build,
+    );
+    const plating = buildReefColonyHabitatPlan(
+      platingFixture.sourcePlan,
+      platingFixture.build,
+    );
+
+    const branchingHabitat = branching.habitats[0];
+    const platingHabitat = plating.habitats[0];
+    expect(branchingHabitat?.shapeProfile.footprintShape).toBe('cluster');
+    expect(platingHabitat?.shapeProfile.footprintShape).toBe('plate');
+    expect(platingHabitat?.spreadRadius ?? 0)
+      .toBeGreaterThan(branchingHabitat?.spreadRadius ?? 0);
+
+    const branchingPositions = branching.plan.colonies.map((colony) => colony.request.preferred);
+    const platingPositions = plating.plan.colonies.map((colony) => colony.request.preferred);
+    expect(platingPositions).not.toEqual(branchingPositions);
   });
 
   it('places habitat centres on broad crown, upper, middle or lower terrace bands', () => {
