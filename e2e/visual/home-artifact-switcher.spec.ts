@@ -9,6 +9,10 @@ import {
   REEF_FISH_SCHOOL_ROUTE_PROFILE,
   REEF_FISH_SCHOOL_SCALE,
 } from '../../src/features/home/reef3d/reefFishSchoolPresentation';
+import {
+  REEF_MATERIAL_PASS,
+  REEF_MATERIAL_PRESENTATION_VERSION,
+} from '../../src/features/home/reef3d/reefMaterialPresentation';
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
 const userPin = process.env.VISUAL_USER_PIN ?? '';
@@ -57,8 +61,11 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reef).toHaveAttribute('data-reef-source', 'portal');
     await expect(reef).toHaveAttribute('data-reef-presentation', 'reef-visual-v3');
     await expect(reef).toHaveAttribute('data-reef-shape-pass', 'phase-12-living-canopy');
-    await expect(reef).toHaveAttribute('data-reef-material-presentation', 'reef-material-v1');
-    await expect(reef).toHaveAttribute('data-reef-material-pass', 'phase-11-material-pass');
+    await expect(reef).toHaveAttribute(
+      'data-reef-material-presentation',
+      REEF_MATERIAL_PRESENTATION_VERSION,
+    );
+    await expect(reef).toHaveAttribute('data-reef-material-pass', REEF_MATERIAL_PASS);
     await expect(reef).toHaveAttribute(
       'data-reef-foundation-presentation',
       REEF_FOUNDATION_PRESENTATION_VERSION,
@@ -128,8 +135,11 @@ test.describe('Home artifact switcher Pixel 8 Pro', () => {
     await expect(reloadedReef).toBeVisible({ timeout: 25_000 });
     await expect(reloadedReef).toHaveAttribute('data-reef-presentation', 'reef-visual-v3');
     await expect(reloadedReef).toHaveAttribute('data-reef-shape-pass', 'phase-12-living-canopy');
-    await expect(reloadedReef).toHaveAttribute('data-reef-material-presentation', 'reef-material-v1');
-    await expect(reloadedReef).toHaveAttribute('data-reef-material-pass', 'phase-11-material-pass');
+    await expect(reloadedReef).toHaveAttribute(
+      'data-reef-material-presentation',
+      REEF_MATERIAL_PRESENTATION_VERSION,
+    );
+    await expect(reloadedReef).toHaveAttribute('data-reef-material-pass', REEF_MATERIAL_PASS);
     await expect(reloadedReef).toHaveAttribute(
       'data-reef-foundation-presentation',
       REEF_FOUNDATION_PRESENTATION_VERSION,
