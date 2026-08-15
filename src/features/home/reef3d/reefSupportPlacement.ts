@@ -51,20 +51,55 @@ function round6(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
 }
 
+function hasIgnoredSupportAncestor(object: THREE.Object3D): boolean {
+  let current: THREE.Object3D | null = object;
+  while (current) {
+    if (current.userData.reefIgnoreSupport === true || current.visible === false) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
+/**
+ * Collects the normal generated habitat plus explicitly authored replacement
+ * support surfaces. The submarine volcano lives beside the legacy production
+ * root during the renderer migration, so it opts in with reefSupportSurface.
+ * Hidden/replaced legacy geology is excluded to prevent floating corals.
+ */
 export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
   const root = scene.getObjectByName('reef-hero-support');
-  if (!root) return [];
-
-  root.updateMatrixWorld(true);
+  scene.updateMatrixWorld(true);
   const meshes: THREE.Mesh[] = [];
-  root.traverse((object) => {
-    if (object instanceof THREE.Mesh) meshes.push(object);
+
+  scene.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    if (hasIgnoredSupportAncestor(object)) return;
+    if (object.geometry.userData.reefIgnoreSupport === true) return;
+
+    let insideHeroRoot = false;
+    if (root) {
+      let parent: THREE.Object3D | null = object;
+      while (parent) {
+        if (parent === root) {
+          insideHeroRoot = true;
+          break;
+        }
+        parent = parent.parent;
+      }
+    }
+
+    const explicitSupport = object.userData.reefSupportSurface === true
+      || object.geometry.userData.reefSupportSurface === true;
+
+    if (insideHeroRoot || explicitSupport) meshes.push(object);
   });
+
   return meshes;
 }
 
 function isReefArchSupport(mesh: THREE.Mesh): boolean {
   return mesh.geometry.userData.reefSupportSurfaceKind === 'arch'
+    || mesh.userData.reefSupportSurfaceKind === 'arch'
     || typeof mesh.geometry.userData.reefSourceArchId === 'string';
 }
 
