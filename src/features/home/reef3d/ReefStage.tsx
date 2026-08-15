@@ -28,13 +28,6 @@ import {
   type ReefCameraFrame,
 } from './reefSceneProfile';
 
-/**
- * Dedicated underwater world for the reef.
- *
- * The reef production object remains untouched. This component owns only the
- * world around it: water colour, depth fog, seabed, atmosphere, life and camera.
- * Nothing from the crystal temple or the old laboratory card is mounted here.
- */
 export function ReefStage({
   build,
   onFishReady,
