@@ -10,7 +10,7 @@ import {
 import { reefArchFootPoints } from './reefLimestoneArch';
 import { useReefRockMaterials } from './useReefRockMaterials';
 
-export const REEF_NATURAL_ARCH_PASS = 'eroded-overlapping-limestone-backbone-v2';
+export const REEF_NATURAL_ARCH_PASS = 'eroded-overlapping-limestone-backbone-v3-volcano-offset';
 const MIN_MASSES_PER_ARCH = 9;
 const MAX_MASSES_PER_ARCH = 13;
 const TAU = Math.PI * 2;
@@ -46,10 +46,44 @@ function localToWorld(
   };
 }
 
+/**
+ * The accepted annual layout can keep its stable logical coordinates, while the
+ * visible limestone backbone is pushed to the outside of the new volcano apron.
+ * This prevents arches from cutting through the cone and keeps them reading as
+ * neighbouring eroded structures rather than a symmetric ring.
+ */
+function moveArchBesideVolcano(
+  source: ReefGrowthArchPlacement,
+  profile: ReefTerracedFoundationProfile,
+): ReefGrowthArchPlacement {
+  const originalRadius = Math.hypot(source.center.x, source.center.z);
+  const baseAngle = originalRadius > 0.08
+    ? Math.atan2(source.center.z, source.center.x)
+    : stableUnit(source.seed, 'volcano-arch:fallback-angle') * TAU;
+  const angleJitter = (stableUnit(source.seed, 'volcano-arch:angle-jitter') - 0.5) * 0.3;
+  const angle = baseAngle + angleJitter;
+  const targetRadius = profile.radius * (
+    1.14 + stableUnit(source.seed, 'volcano-arch:radius') * 0.16
+  );
+
+  return {
+    ...source,
+    center: {
+      ...source.center,
+      x: Math.cos(angle) * Math.max(originalRadius, targetRadius),
+      z: Math.sin(angle) * Math.max(originalRadius, targetRadius),
+    },
+    rotationY: angle
+      + Math.PI * 0.5
+      + (stableUnit(source.seed, 'volcano-arch:tangent-jitter') - 0.5) * 0.24,
+  };
+}
+
 function buildArchInstances(
-  arch: ReefGrowthArchPlacement,
+  sourceArch: ReefGrowthArchPlacement,
   profile: ReefTerracedFoundationProfile,
 ): RockInstance[] {
+  const arch = moveArchBesideVolcano(sourceArch, profile);
   const [leftFoot, rightFoot] = reefArchFootPoints(arch);
   const leftY = sampleReefTerracedFoundation(profile, leftFoot.x, leftFoot.z).height;
   const rightY = sampleReefTerracedFoundation(profile, rightFoot.x, rightFoot.z).height;
@@ -197,6 +231,7 @@ export function ReefNaturalArchLayer({ build }: { build: ReefPreviewBuild }) {
       userData={{
         reefNaturalArchPass: REEF_NATURAL_ARCH_PASS,
         reefNaturalArchMassCount: instances.length,
+        reefNaturalArchVolcanoOffset: true,
       }}
     >
       <icosahedronGeometry args={[1, 1]} />
