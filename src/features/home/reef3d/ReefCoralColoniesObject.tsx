@@ -5,10 +5,10 @@ import type { ReefCoralColoniesManifest, ReefCoralColony } from '@/engine/specie
 const UP = new THREE.Vector3(0, 1, 0);
 
 const TONES: Record<ReefCoralColony['morphotype'], readonly string[]> = {
-  BRANCHING: ['#c87872', '#d08a78', '#b96f82', '#c98d92'],
-  MASSIVE: ['#b88962', '#c1976d', '#a77968', '#b99a7a'],
-  PLATE: ['#b86f82', '#c7838c', '#aa7887', '#cf8b82'],
-  ENCRUSTING: ['#7f927c', '#8c9b78', '#7f8870', '#9a8e73'],
+  BRANCHING: ['#a85f62', '#b56f68', '#9e626c', '#ad7774'],
+  MASSIVE: ['#9d765d', '#a88264', '#936d61', '#9f826c'],
+  PLATE: ['#9c6672', '#a87478', '#916b75', '#ac7773'],
+  ENCRUSTING: ['#77866f', '#808d70', '#737d69', '#89806b'],
 };
 
 function colonyQuaternion(colony: ReefCoralColony): THREE.Quaternion {
@@ -24,6 +24,44 @@ function colonyPosition(colony: ReefCoralColony, lift: number): THREE.Vector3 {
     colony.position.y + colony.normal.y * lift,
     colony.position.z + colony.normal.z * lift,
   );
+}
+
+function createBranchGeometry() {
+  const geometry = new THREE.CylinderGeometry(0.075, 0.14, 1, 7, 4, false);
+  const position = geometry.attributes.position as THREE.BufferAttribute;
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const y01 = y + 0.5;
+    const bend = y01 * y01;
+    position.setXYZ(
+      index,
+      x + bend * 0.09 + Math.sin(y01 * Math.PI * 2.2) * 0.018,
+      y,
+      z + bend * 0.035,
+    );
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function createPlateGeometry() {
+  const geometry = new THREE.CylinderGeometry(1, 0.9, 1, 16, 1, false);
+  const position = geometry.attributes.position as THREE.BufferAttribute;
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const angle = Math.atan2(z, x);
+    const radial = Math.hypot(x, z);
+    const rimWave = radial > 0.72 ? Math.sin(angle * 5) * 0.08 + Math.cos(angle * 3) * 0.045 : 0;
+    position.setY(index, y + rimWave);
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  return geometry;
 }
 
 function setInstance(
@@ -68,16 +106,16 @@ export function ReefCoralColoniesObject({ manifest }: { manifest: ReefCoralColon
   const encrustingRef = useRef<THREE.InstancedMesh>(null);
 
   const geometry = useMemo(() => ({
-    branch: new THREE.CylinderGeometry(0.18, 0.28, 1, 6, 2, false),
-    massive: new THREE.IcosahedronGeometry(1, 1),
-    plate: new THREE.CylinderGeometry(1, 0.72, 1, 12, 1, false),
-    encrusting: new THREE.SphereGeometry(1, 12, 8),
+    branch: createBranchGeometry(),
+    massive: new THREE.IcosahedronGeometry(1, 2),
+    plate: createPlateGeometry(),
+    encrusting: new THREE.IcosahedronGeometry(1, 1),
   }), []);
   const material = useMemo(() => ({
-    branch: new THREE.MeshStandardMaterial({ color: '#c87872', roughness: 0.88, metalness: 0 }),
-    massive: new THREE.MeshStandardMaterial({ color: '#b88962', roughness: 0.92, metalness: 0 }),
-    plate: new THREE.MeshStandardMaterial({ color: '#b86f82', roughness: 0.9, metalness: 0 }),
-    encrusting: new THREE.MeshStandardMaterial({ color: '#7f927c', roughness: 0.94, metalness: 0 }),
+    branch: new THREE.MeshStandardMaterial({ color: '#a85f62', roughness: 0.94, metalness: 0, flatShading: true }),
+    massive: new THREE.MeshStandardMaterial({ color: '#9d765d', roughness: 0.96, metalness: 0, flatShading: true }),
+    plate: new THREE.MeshStandardMaterial({ color: '#9c6672', roughness: 0.95, metalness: 0 }),
+    encrusting: new THREE.MeshStandardMaterial({ color: '#77866f', roughness: 0.98, metalness: 0, flatShading: true }),
   }), []);
 
   useEffect(() => () => {
@@ -93,8 +131,8 @@ export function ReefCoralColoniesObject({ manifest }: { manifest: ReefCoralColon
         mesh,
         index,
         colony,
-        new THREE.Vector3(colony.radius, colony.height, colony.radius * 0.92),
-        Math.max(0.025, colony.height * 0.08),
+        new THREE.Vector3(colony.radius * 0.92, colony.height * 0.82, colony.radius * 0.86),
+        Math.max(0.012, colony.height * 0.03),
       );
     });
     mesh.instanceMatrix.needsUpdate = true;
@@ -109,8 +147,8 @@ export function ReefCoralColoniesObject({ manifest }: { manifest: ReefCoralColon
         mesh,
         index,
         colony,
-        new THREE.Vector3(colony.radius, colony.height, colony.radius * 0.88),
-        Math.max(0.025, colony.height * 0.48),
+        new THREE.Vector3(colony.radius * 0.92, Math.max(0.045, colony.height * 0.34), colony.radius * 0.84),
+        Math.max(0.015, colony.height * 0.18),
       );
     });
     mesh.instanceMatrix.needsUpdate = true;
@@ -125,8 +163,8 @@ export function ReefCoralColoniesObject({ manifest }: { manifest: ReefCoralColon
         mesh,
         index,
         colony,
-        new THREE.Vector3(colony.radius, colony.height, colony.radius * 0.84),
-        Math.max(0.018, colony.height * 0.22),
+        new THREE.Vector3(colony.radius * 1.04, Math.max(0.035, colony.height * 0.48), colony.radius * 0.92),
+        Math.max(0.01, colony.height * 0.05),
       );
     });
     mesh.instanceMatrix.needsUpdate = true;
@@ -139,29 +177,31 @@ export function ReefCoralColoniesObject({ manifest }: { manifest: ReefCoralColon
     let instance = 0;
     branching.forEach((colony) => {
       const baseQuaternion = colonyQuaternion(colony);
-      const basePosition = colonyPosition(colony, 0.025);
+      const basePosition = colonyPosition(colony, 0.012);
       for (let branchIndex = 0; branchIndex < colony.branchCount; branchIndex += 1) {
         const fraction = branchIndex / Math.max(1, colony.branchCount);
-        const angle = fraction * Math.PI * 2 + colony.tangentRotation * 0.22;
-        const branchHeight = colony.height * (0.82 + (branchIndex % 3) * 0.07);
-        const radial = branchIndex === 0 ? 0 : colony.radius * 0.22;
+        const angle = fraction * Math.PI * 2 + colony.tangentRotation * 0.26;
+        const heightVariation = 0.72 + (branchIndex % 4) * 0.065;
+        const branchHeight = colony.height * heightVariation;
+        const radial = branchIndex === 0 ? 0 : colony.radius * (0.18 + (branchIndex % 3) * 0.035);
         const localOffset = new THREE.Vector3(
           Math.cos(angle) * radial,
-          branchHeight * 0.5,
+          branchHeight * 0.47,
           Math.sin(angle) * radial,
         ).applyQuaternion(baseQuaternion);
         const position = basePosition.clone().add(localOffset);
+        const lean = branchIndex === 0 ? 0.05 : 0.16 + (branchIndex % 3) * 0.055;
         const localRotation = new THREE.Quaternion().setFromEuler(new THREE.Euler(
-          branchIndex === 0 ? 0 : 0.14 + (branchIndex % 2) * 0.08,
+          lean,
           angle,
-          0,
+          (branchIndex % 2 === 0 ? -1 : 1) * lean * 0.35,
           'YXZ',
         ));
         const quaternion = baseQuaternion.clone().multiply(localRotation);
         const scale = new THREE.Vector3(
-          colony.radius * 1.55,
+          colony.radius * 1.08,
           branchHeight,
-          colony.radius * 1.55,
+          colony.radius * 1.08,
         );
         const matrix = new THREE.Matrix4().compose(position, quaternion, scale);
         mesh.setMatrixAt(instance, matrix);
@@ -175,37 +215,21 @@ export function ReefCoralColoniesObject({ manifest }: { manifest: ReefCoralColon
   }, [branching]);
 
   return (
-    <group data-reef-coral-renderer="phase-5-instanced">
+    <group
+      name="reef-phase-5-colonies"
+      userData={{ renderer: 'phase-5-instanced-organic' }}
+    >
       {branchInstanceCount > 0 ? (
-        <instancedMesh
-          ref={branchRef}
-          args={[geometry.branch, material.branch, branchInstanceCount]}
-          castShadow
-          receiveShadow
-        />
+        <instancedMesh ref={branchRef} args={[geometry.branch, material.branch, branchInstanceCount]} castShadow receiveShadow />
       ) : null}
       {massive.length > 0 ? (
-        <instancedMesh
-          ref={massiveRef}
-          args={[geometry.massive, material.massive, massive.length]}
-          castShadow
-          receiveShadow
-        />
+        <instancedMesh ref={massiveRef} args={[geometry.massive, material.massive, massive.length]} castShadow receiveShadow />
       ) : null}
       {plates.length > 0 ? (
-        <instancedMesh
-          ref={plateRef}
-          args={[geometry.plate, material.plate, plates.length]}
-          castShadow
-          receiveShadow
-        />
+        <instancedMesh ref={plateRef} args={[geometry.plate, material.plate, plates.length]} castShadow receiveShadow />
       ) : null}
       {encrusting.length > 0 ? (
-        <instancedMesh
-          ref={encrustingRef}
-          args={[geometry.encrusting, material.encrusting, encrusting.length]}
-          receiveShadow
-        />
+        <instancedMesh ref={encrustingRef} args={[geometry.encrusting, material.encrusting, encrusting.length]} receiveShadow />
       ) : null}
     </group>
   );

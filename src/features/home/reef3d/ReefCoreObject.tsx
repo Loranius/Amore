@@ -5,6 +5,8 @@ import type { ReefCoreManifest } from '@/engine/species/reef';
 const VOLCANO_RADIAL_SEGMENTS = 72;
 const VOLCANO_SLOPE_RINGS = 24;
 const VOLCANO_CRATER_RINGS = 6;
+const APRON_SEGMENTS = 64;
+const APRON_RINGS = 6;
 
 function volcanoNoise(core: ReefCoreManifest, angle: number, t: number) {
   const { phaseA, phaseB, ruggedness } = core.morphology;
@@ -26,35 +28,24 @@ function volcanoOuterPoint(
   angle: number,
   t: number,
 ): THREE.Vector3 {
-  const {
-    ruggedness,
-    asymmetry,
-    phaseA,
-    leanX,
-    leanZ,
-  } = core.morphology;
+  const { ruggedness, asymmetry, phaseA, leanX, leanZ } = core.morphology;
   const rimRadius = volcanoRimRadius(core);
   const noise = volcanoNoise(core, angle, t);
   const baseY = -core.platform.thickness * 0.14;
   const summitHeight = core.dimensions.height * 0.92;
-
-  // Broad shield-like foot that tightens into an uneven volcanic cone.
   const coneProfile = rimRadius + (1 - rimRadius) * Math.pow(1 - t, 0.68);
   const lowerShoulder = 1 + Math.sin(Math.PI * Math.min(1, t / 0.42)) * 0.075 * (1 - t);
   const asymmetryBias = 1 + asymmetry * 0.72 * Math.cos(angle - phaseA);
   const roughness = 1 + noise * (0.035 + ruggedness * 0.11) * (0.72 + (1 - t) * 0.28);
   const radial = Math.max(rimRadius * 0.78, coneProfile * lowerShoulder * asymmetryBias * roughness);
-
   const localHeight = Math.pow(t, 0.9) * summitHeight;
   const ridgeHeight = noise * core.dimensions.height * (0.008 + ruggedness * 0.018) * (0.35 + t * 0.65);
   const leanFactor = t * t * 0.52;
 
   return new THREE.Vector3(
-    Math.cos(angle) * core.dimensions.radiusX * radial
-      + leanX * core.dimensions.height * leanFactor,
+    Math.cos(angle) * core.dimensions.radiusX * radial + leanX * core.dimensions.height * leanFactor,
     baseY + localHeight + ridgeHeight,
-    Math.sin(angle) * core.dimensions.radiusZ * radial
-      + leanZ * core.dimensions.height * leanFactor,
+    Math.sin(angle) * core.dimensions.radiusZ * radial + leanZ * core.dimensions.height * leanFactor,
   );
 }
 
@@ -188,22 +179,88 @@ function createCorePlatformGeometry(core: ReefCoreManifest): THREE.BufferGeometr
   return geometry;
 }
 
-/** Persistent Phase 1 presentation: a deterministic underwater volcano and its growth platform. */
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const t = THREE.MathUtils.clamp((value - edge0) / Math.max(0.0001, edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function createPlatformApronGeometry(core: ReefCoreManifest): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const indices: number[] = [];
+  const phaseA = (core.platform.seed % 10_000) / 10_000 * Math.PI * 2;
+  const phaseB = ((core.platform.seed >>> 8) % 10_000) / 10_000 * Math.PI * 2;
+  const stride = APRON_SEGMENTS + 1;
+  const topY = core.platform.thickness * 0.46;
+  const groundY = -core.platform.thickness * 0.50;
+
+  for (let ring = 0; ring <= APRON_RINGS; ring += 1) {
+    const u = ring / APRON_RINGS;
+    const radius01 = THREE.MathUtils.lerp(0.84, 1.22, u);
+    const drop = smoothstep(0.42, 1, u);
+    for (let segment = 0; segment <= APRON_SEGMENTS; segment += 1) {
+      const angle = segment / APRON_SEGMENTS * Math.PI * 2;
+      const macro =
+        Math.sin(angle * 3 + phaseA + u * 1.4) * 0.55
+        + Math.cos(angle * 5 - phaseB - u * 0.8) * 0.3
+        + Math.sin(angle * 7 + phaseB) * 0.15;
+      const edgeNoise = 1 + core.platform.irregularity * macro * (0.58 + u * 0.42);
+      const yNoise = core.platform.irregularity * 0.12 * (
+        Math.sin(angle * 4 + phaseA + u * 2.1)
+        + Math.cos(angle * 6 - phaseB) * 0.45
+      ) * (0.25 + u * 0.75);
+      const y = THREE.MathUtils.lerp(topY, groundY, drop) + yNoise;
+      positions.push(
+        Math.cos(angle) * core.platform.radiusX * radius01 * edgeNoise,
+        y,
+        Math.sin(angle) * core.platform.radiusZ * radius01 * edgeNoise,
+      );
+    }
+  }
+
+  for (let ring = 0; ring < APRON_RINGS; ring += 1) {
+    for (let segment = 0; segment < APRON_SEGMENTS; segment += 1) {
+      const a = ring * stride + segment;
+      const b = a + 1;
+      const c = a + stride;
+      const d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingBox();
+  geometry.computeBoundingSphere();
+  return geometry;
+}
+
+/** Persistent Phase 1 core plus Phase 6 visual accretion apron. */
 export function ReefCoreObject({ core }: { core: ReefCoreManifest }) {
   const volcanoGeometry = useMemo(() => createVolcanoOuterGeometry(core), [core]);
   const craterGeometry = useMemo(() => createVolcanoCraterGeometry(core), [core]);
   const platformGeometry = useMemo(() => createCorePlatformGeometry(core), [core]);
+  const apronGeometry = useMemo(() => createPlatformApronGeometry(core), [core]);
 
   useEffect(() => () => {
     volcanoGeometry.dispose();
     craterGeometry.dispose();
     platformGeometry.dispose();
-  }, [craterGeometry, platformGeometry, volcanoGeometry]);
+    apronGeometry.dispose();
+  }, [apronGeometry, craterGeometry, platformGeometry, volcanoGeometry]);
 
   return (
     <group>
       <mesh geometry={platformGeometry} rotation={[0, core.platform.rotationRadians, 0]} receiveShadow>
-        <meshStandardMaterial color="#474d47" roughness={0.99} metalness={0.005} />
+        <meshStandardMaterial color="#4e554d" roughness={0.99} metalness={0.005} />
+      </mesh>
+      <mesh
+        geometry={apronGeometry}
+        rotation={[0, core.platform.rotationRadians, 0]}
+        receiveShadow
+      >
+        <meshStandardMaterial color="#545c53" roughness={1} metalness={0} flatShading />
       </mesh>
       <mesh geometry={volcanoGeometry} castShadow receiveShadow>
         <meshStandardMaterial color="#454b44" roughness={0.98} metalness={0.005} />
