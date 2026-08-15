@@ -32,7 +32,7 @@ export interface ReefDensityCandidateCounts {
 }
 
 const TAU = Math.PI * 2;
-const REEF_CANOPY_LAYOUT = 'morphology-habitats-with-open-channels-v2';
+const REEF_CANOPY_LAYOUT = 'morphology-habitats-with-open-channels-v3';
 
 function stableUnit(seed: number, label: string): number {
   let hash = (seed ^ 0x9e3779b9) >>> 0;
@@ -85,9 +85,10 @@ function morphotypeHabitatStrength(morphotype: ReefColonyMorphotype): number {
 
 /**
  * Stage 3 visual ecology. Logical colony IDs/order remain untouched; only the
- * renderer anchor is biased into stable morphology-specific habitat patches.
- * The result has dominant coral gardens separated by negative-space channels
- * instead of evenly peppering every available centimetre of rock.
+ * renderer anchor and renderer-only mature hierarchy are biased into stable
+ * morphology-specific habitat patches. Every nineteenth sequence becomes a
+ * stable old-growth anchor, guaranteeing a few legible mature colonies even in
+ * a relatively young reef without making future appends reshuffle older ones.
  */
 function buildHabitatPlan(
   plan: ReefLivingCanopyPlan,
@@ -101,20 +102,23 @@ function buildHabitatPlan(
   const colonies = plan.colonies.map((colony) => {
     const habitatIndex = morphotypeHabitatIndex(colony.morphotype);
     const prominence = reefMorphologyProminence(colony);
-    const dominant = prominence >= 0.94;
+    const sequenceAnchor = colony.request.sequence % 19 === 0;
+    const dominant = colony.emphasized || prominence >= 0.94 || sequenceAnchor;
+    const visualWidthScale = dominant ? 1.26 : 1;
+    const visualHeightScale = dominant ? 1.18 : 1;
     const angleJitter = (stableUnit(colony.seed, 'reef:habitat:angle') - 0.5)
-      * (dominant ? 0.28 : 0.58);
+      * (dominant ? 0.26 : 0.58);
     const angle = basePhase + habitatAngles[habitatIndex] + angleJitter;
     const radialRatio = morphotypeRadialRatio(colony.morphotype);
     const radialJitter = dominant
-      ? 0.95 + stableUnit(colony.seed, 'reef:habitat:radius') * 0.08
+      ? 0.96 + stableUnit(colony.seed, 'reef:habitat:radius') * 0.06
       : 0.88 + stableUnit(colony.seed, 'reef:habitat:radius') * 0.24;
     const localRadius = radius * radialRatio * radialJitter;
     const targetX = Math.cos(angle) * localRadius;
     const targetZ = Math.sin(angle) * localRadius;
     const strength = Math.min(
-      0.94,
-      morphotypeHabitatStrength(colony.morphotype) + (dominant ? 0.05 : 0),
+      0.95,
+      morphotypeHabitatStrength(colony.morphotype) + (dominant ? 0.06 : 0),
     );
     const preferred = colony.request.preferred;
     const request = {
@@ -126,7 +130,15 @@ function buildHabitatPlan(
       },
     };
 
-    return { ...colony, request };
+    return {
+      ...colony,
+      // This is a renderer-local promotion; logical Evolution/Species data is
+      // not mutated and chronological append stability remains unchanged.
+      emphasized: dominant,
+      footprintRadius: colony.footprintRadius * visualWidthScale,
+      targetHeight: colony.targetHeight * visualHeightScale,
+      request,
+    };
   });
 
   return {
