@@ -59,21 +59,19 @@ function projectVolcanoUvs(geometry: THREE.BufferGeometry): void {
   const minY = box?.min.y ?? 0;
   const maxY = box?.max.y ?? 1;
   const height = Math.max(1e-4, maxY - minY);
-
   let maxRadius = 1e-4;
+
   for (let index = 0; index < position.count; index += 1) {
     maxRadius = Math.max(maxRadius, Math.hypot(position.getX(index), position.getZ(index)));
   }
 
   const uv = new Float32Array(position.count * 2);
-
   for (let triangle = 0; triangle < position.count; triangle += 3) {
     const baseU: [number, number, number] = [
       textureU(position.getX(triangle), position.getZ(triangle)),
       textureU(position.getX(triangle + 1), position.getZ(triangle + 1)),
       textureU(position.getX(triangle + 2), position.getZ(triangle + 2)),
     ];
-
     const minU = Math.min(...baseU);
     const maxU = Math.max(...baseU);
     if (maxU - minU > 0.5) {
@@ -91,7 +89,6 @@ function projectVolcanoUvs(geometry: THREE.BufferGeometry): void {
       const z = position.getZ(index);
       const radial = Math.hypot(x, z) / maxRadius;
       const height01 = THREE.MathUtils.clamp((y - minY) / height, 0, 1);
-
       uv[index * 2] = baseU[slot] * 4.2 + height01 * 0.16;
       uv[index * 2 + 1] = radial * 3.4 + (1 - height01) * 0.32;
     }
@@ -291,7 +288,6 @@ function buildFissureRibbonGeometries(
       const taper = THREE.MathUtils.lerp(1, 0.48, t);
       const scarWidth = maxRadius * 0.0125 * widthVariation * taper;
       const coreWidth = scarWidth * (0.22 + (1 - t) * 0.06);
-
       const scar = sampleRibbon(
         mesh,
         raycaster,
@@ -334,6 +330,7 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
   const bump = useMemo(() => albedo.clone(), [albedo]);
   const scarMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const coreMaterialRef = useRef<THREE.MeshBasicMaterial | null>(null);
+  const identitySeed = build.species.moduleEvolution.identitySeed;
   const [eruptionActive, setEruptionActive] = useState(
     () => isReefVolcanoEruptionActive(new Date()),
   );
@@ -353,14 +350,12 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
       scarMaterial.color.set(eruptionActive ? '#1b0d08' : '#12100f');
       scarMaterial.emissive.set(eruptionActive ? '#351006' : '#050404');
       scarMaterial.emissiveIntensity = eruptionActive ? 0.32 : 0.025;
-      scarMaterial.needsUpdate = true;
     }
 
     const coreMaterial = coreMaterialRef.current;
     if (coreMaterial) {
       coreMaterial.color.set(eruptionActive ? '#ff6b21' : '#7b2a19');
       coreMaterial.opacity = eruptionActive ? 0.9 : 0.055;
-      coreMaterial.needsUpdate = true;
     }
     invalidate();
   }, [eruptionActive, invalidate]);
@@ -368,7 +363,6 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
   useLayoutEffect(() => {
     const object = scene.getObjectByName('reef-volcano-support-surface');
     if (!(object instanceof THREE.Mesh)) return undefined;
-
     const volcanoRoot = scene.getObjectByName('reef-submarine-volcano');
     if (!volcanoRoot) return undefined;
 
@@ -379,15 +373,6 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
     const previousUv = geometry.getAttribute('uv');
     const previousUvProjection = geometry.userData.reefVolcanoUvProjection;
     const snapshot = snapshotMaterial(material);
-    const hiddenLegacyLines: Array<{ object: THREE.LineSegments; visible: boolean }> = [];
-
-    volcanoRoot.traverse((child) => {
-      if (!(child instanceof THREE.LineSegments)) return;
-      hiddenLegacyLines.push({ object: child, visible: child.visible });
-      child.visible = false;
-      child.userData.reefVolcanoLegacyFissureHidden = true;
-    });
-
     projectVolcanoUvs(geometry);
 
     const anisotropy = Math.min(8, Math.max(1, gl.capabilities.getMaxAnisotropy()));
@@ -416,10 +401,7 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
     material.flatShading = false;
     material.needsUpdate = true;
 
-    const fissures = buildFissureRibbonGeometries(
-      object,
-      build.species.moduleEvolution.identitySeed,
-    );
+    const fissures = buildFissureRibbonGeometries(object, identitySeed);
     const scarMaterial = new THREE.MeshStandardMaterial({
       color: eruptionActive ? '#1b0d08' : '#12100f',
       roughness: 1,
@@ -458,11 +440,10 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
     coreMesh.userData.reefVolcanoFissureLayer = 'lava-core';
 
     volcanoRoot.add(scarMesh, coreMesh);
-
     object.userData.reefVolcanoReferenceSurface = 'uploaded-glb-texture-v2';
     object.userData.reefVolcanoSeamRepair = 'double-sided+seam-safe-uv-v2';
     object.userData.reefVolcanoTextureSource = 'uploaded Sketchfab GLB basalt surface crop';
-    object.userData.reefVolcanoTextureIdentity = build.species.moduleEvolution.identitySeed;
+    object.userData.reefVolcanoTextureIdentity = identitySeed;
     object.userData.reefVolcanoFissureRenderer = 'inset-ribbon-v1';
     invalidate();
 
@@ -475,14 +456,8 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
       if (scarMaterialRef.current === scarMaterial) scarMaterialRef.current = null;
       if (coreMaterialRef.current === coreMaterial) coreMaterialRef.current = null;
 
-      hiddenLegacyLines.forEach(({ object: line, visible }) => {
-        line.visible = visible;
-        delete line.userData.reefVolcanoLegacyFissureHidden;
-      });
-
       if (previousUv) geometry.setAttribute('uv', previousUv);
       else geometry.deleteAttribute('uv');
-
       if (previousUvProjection === undefined) delete geometry.userData.reefVolcanoUvProjection;
       else geometry.userData.reefVolcanoUvProjection = previousUvProjection;
 
@@ -494,7 +469,7 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
       delete object.userData.reefVolcanoFissureRenderer;
       invalidate();
     };
-  }, [albedo, build, bump, eruptionActive, gl, invalidate, scene]);
+  }, [albedo, bump, gl, identitySeed, invalidate, scene]);
 
   return null;
 }
