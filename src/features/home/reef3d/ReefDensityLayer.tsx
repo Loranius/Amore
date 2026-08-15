@@ -12,6 +12,7 @@ import {
 import {
   buildReefColonyHabitatPlan,
   REEF_COLONY_HABITAT_VERSION,
+  type ReefColonyHabitatSummary,
 } from './reefColonyHabitats';
 import {
   buildReefColonyMaturityPlan,
@@ -136,10 +137,14 @@ function volcanoRegistryCandidates(
 
 function retargetPlanToPreferredSurfaces({
   plan,
+  habitats,
+  identitySeed,
   availableSurfaceTypes,
   candidatesBySurface,
 }: {
   plan: ReefLivingCanopyPlan;
+  habitats: readonly ReefColonyHabitatSummary[];
+  identitySeed: number;
   availableSurfaceTypes: readonly ReefCoralSurfaceType[];
   candidatesBySurface: Readonly<Record<ReefCoralSurfaceType, readonly ReefSurfaceSlotCandidate[]>>;
 }): {
@@ -147,8 +152,44 @@ function retargetPlanToPreferredSurfaces({
   preferredSurfaceByRequestId: Map<string, ReefCoralSurfaceType>;
 } {
   const preferredSurfaceByRequestId = new Map<string, ReefCoralSurfaceType>();
+  const habitatByColonyId = new Map<string, ReefColonyHabitatSummary>();
+  const targetByHabitatId = new Map<string, {
+    surfaceType: ReefCoralSurfaceType;
+    target: ReefSurfaceSlotCandidate | null;
+  }>();
+
+  for (const habitat of habitats) {
+    for (const colonyId of habitat.memberColonyIds) {
+      habitatByColonyId.set(colonyId, habitat);
+    }
+
+    const habitatSeed = Math.floor(
+      stableUnit(identitySeed, `reef:patch-surface:${habitat.id}`) * 0xffffffff,
+    ) >>> 0;
+    const surfaceType = chooseReefCoralPreferredSurface({
+      seed: habitatSeed,
+      morphotype: habitat.dominantMorphotype,
+      availableSurfaceTypes,
+    }) ?? 'terrace';
+    const authored = candidatesBySurface[surfaceType];
+    const targetIndex = authored.length > 0
+      ? Math.min(
+          authored.length - 1,
+          Math.floor(
+            stableUnit(habitatSeed, `reef:patch-surface-target:${surfaceType}`) * authored.length,
+          ),
+        )
+      : -1;
+    targetByHabitatId.set(habitat.id, {
+      surfaceType,
+      target: targetIndex >= 0 ? authored[targetIndex] ?? null : null,
+    });
+  }
+
   const colonies = plan.colonies.map((colony) => {
-    const preferredSurface = chooseReefCoralPreferredSurface({
+    const habitat = habitatByColonyId.get(colony.sourceColonyId);
+    const sharedTarget = habitat ? targetByHabitatId.get(habitat.id) : undefined;
+    const preferredSurface = sharedTarget?.surfaceType ?? chooseReefCoralPreferredSurface({
       seed: colony.seed,
       morphotype: colony.morphotype,
       availableSurfaceTypes,
@@ -156,25 +197,30 @@ function retargetPlanToPreferredSurfaces({
     preferredSurfaceByRequestId.set(colony.request.id, preferredSurface);
 
     const authored = candidatesBySurface[preferredSurface];
-    if (authored.length === 0 || preferredSurface === 'terrace') return colony;
-    const targetIndex = Math.min(
-      authored.length - 1,
-      Math.floor(stableUnit(colony.seed, `reef:surface-target:${preferredSurface}`) * authored.length),
-    );
-    const target = authored[targetIndex];
-    if (!target) return colony;
+    const fallbackIndex = authored.length > 0
+      ? Math.min(
+          authored.length - 1,
+          Math.floor(stableUnit(colony.seed, `reef:surface-target:${preferredSurface}`) * authored.length),
+        )
+      : -1;
+    const target = sharedTarget?.target
+      ?? (fallbackIndex >= 0 ? authored[fallbackIndex] ?? null : null);
+    if (!target || preferredSurface === 'terrace') return colony;
+
+    const offsetX = habitat ? colony.request.preferred.x - habitat.center.x : 0;
+    const offsetZ = habitat ? colony.request.preferred.z - habitat.center.z : 0;
+    const targetX = target.position?.x ?? target.x;
+    const targetZ = target.position?.z ?? target.z;
 
     return {
       ...colony,
       request: {
         ...colony.request,
-        preferred: target.position
-          ? { ...target.position }
-          : {
-              x: target.x,
-              y: colony.request.preferred.y,
-              z: target.z,
-            },
+        preferred: {
+          x: targetX + offsetX,
+          y: target.position?.y ?? colony.request.preferred.y,
+          z: targetZ + offsetZ,
+        },
       },
     };
   });
@@ -257,6 +303,8 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
 
     const retargeted = retargetPlanToPreferredSurfaces({
       plan,
+      habitats: maturityPlan.habitats,
+      identitySeed: build.species.moduleEvolution.identitySeed,
       availableSurfaceTypes,
       candidatesBySurface,
     });
@@ -389,6 +437,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     });
     next.userData.reefSurfaceSlotDiagnostics = allocation.diagnostics;
     next.userData.reefCanopyLayout = REEF_COLONY_HABITAT_VERSION;
+    next.userData.reefCoralPatchVersion = maturityPlan.patchVersion;
     next.userData.reefCoralNaturalPlacementVersion = REEF_CORAL_NATURAL_PLACEMENT_VERSION;
     next.userData.reefCoralSurfaceBindingVersion = REEF_CORAL_SURFACE_BINDING_VERSION;
     next.userData.reefCoralSurfaceColonizationVersion = REEF_CORAL_SURFACE_COLONIZATION_VERSION;
@@ -396,8 +445,8 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     next.userData.reefColonyMaturityStageCounts = maturityPlan.stageCounts;
     next.userData.reefColonyMaturityStates = maturityPlan.states;
     next.userData.reefCoralSurfaceDistribution = surfaceCounts;
-    next.userData.reefColonyHabitatCount = habitatPlan.habitats.length;
-    next.userData.reefColonyHabitatDominantMorphotypes = habitatPlan.habitats.map((habitat) => ({
+    next.userData.reefColonyHabitatCount = maturityPlan.habitats.length;
+    next.userData.reefColonyHabitatDominantMorphotypes = maturityPlan.habitats.map((habitat) => ({
       id: habitat.id,
       morphotype: habitat.dominantMorphotype,
       tier: habitat.tier,
@@ -436,6 +485,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
         reefLivingCanopyVersion: REEF_LIVING_CANOPY_VERSION,
         reefLivingCanopyPass: REEF_LIVING_CANOPY_PASS,
         reefCanopyLayout: REEF_COLONY_HABITAT_VERSION,
+        reefCoralPatchVersion: maturityPlan.patchVersion,
         reefCoralNaturalPlacementVersion: REEF_CORAL_NATURAL_PLACEMENT_VERSION,
         reefCoralSurfaceBindingVersion: REEF_CORAL_SURFACE_BINDING_VERSION,
         reefCoralSurfaceColonizationVersion: REEF_CORAL_SURFACE_COLONIZATION_VERSION,
