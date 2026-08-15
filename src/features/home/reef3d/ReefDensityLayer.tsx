@@ -4,7 +4,6 @@ import * as THREE from 'three';
 import type { ReefColonyMorphotype } from '@/engine/species/reef';
 import type { ReefPreviewBuild } from './buildReefPreview';
 import {
-  buildReefLivingCanopyGeometry,
   buildReefLivingCanopyPlan,
   REEF_LIVING_CANOPY_PASS,
   REEF_LIVING_CANOPY_VERSION,
@@ -14,11 +13,19 @@ import {
   REEF_COLONY_HABITAT_VERSION,
 } from './reefColonyHabitats';
 import {
+  buildReefSurfaceBoundLivingCanopyGeometry,
+  hasReefCoralTerrainFootprintSupport,
+  naturalizeReefLivingCanopyPlan,
+  REEF_CORAL_NATURAL_PLACEMENT_VERSION,
+  REEF_CORAL_SURFACE_BINDING_VERSION,
+} from './reefCoralNaturalPlacement';
+import {
   collectReefArchSupportMeshes,
   collectReefSupportMeshes,
   collectReefSupportSlotCandidates,
   collectReefTerrainSupportMeshes,
   raycastReefCoralTerrainSupport,
+  raycastReefSupport,
 } from './reefSupportPlacement';
 import {
   allocateReefSurfaceSlots,
@@ -48,7 +55,10 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     () => buildReefColonyHabitatPlan(basePlan, build),
     [basePlan, build],
   );
-  const plan = habitatPlan.plan;
+  const plan = useMemo(
+    () => naturalizeReefLivingCanopyPlan(habitatPlan.plan),
+    [habitatPlan.plan],
+  );
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const material = useMemo(() => new THREE.MeshStandardMaterial({
     name: 'reef-living-canopy-shared-material',
@@ -66,12 +76,26 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     const supportMeshes = collectReefSupportMeshes(scene);
     const terrainSupportMeshes = collectReefTerrainSupportMeshes(supportMeshes);
     const archSupportMeshes = collectReefArchSupportMeshes(supportMeshes);
+    const sampleTerrain = (x: number, z: number) => {
+      const hit = raycastReefSupport(terrainSupportMeshes, x, z, 0.74);
+      return hit ? { y: hit.point.y } : null;
+    };
+    const authoredCandidates = collectReefSupportSlotCandidates(terrainSupportMeshes)
+      .filter((candidate) => (
+        !candidate.position
+        || hasReefCoralTerrainFootprintSupport({
+          x: candidate.position.x,
+          z: candidate.position.z,
+          centerY: candidate.position.y,
+          sample: sampleTerrain,
+        })
+      ));
     const candidates = [
       ...buildReefSurfaceSlotCandidates({
         foundationRadius: build.structures.visibleFoundationRadius,
         seed: build.species.moduleEvolution.identitySeed,
       }),
-      ...collectReefSupportSlotCandidates(terrainSupportMeshes),
+      ...authoredCandidates,
     ];
     const allocation = allocateReefSurfaceSlots({
       requests: plan.requests,
@@ -83,17 +107,46 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
           x,
           z,
         );
-        return hit
-          ? { x: hit.point.x, y: hit.point.y, z: hit.point.z }
-          : null;
+        if (!hit) return null;
+        if (!hasReefCoralTerrainFootprintSupport({
+          x: hit.point.x,
+          z: hit.point.z,
+          centerY: hit.point.y,
+          sample: sampleTerrain,
+        })) return null;
+        return { x: hit.point.x, y: hit.point.y, z: hit.point.z };
       },
     });
-    const next = buildReefLivingCanopyGeometry({
+
+    const surfaceNormalByRequestId = new Map<string, { x: number; y: number; z: number }>();
+    for (const slot of allocation.slots) {
+      const hit = raycastReefSupport(
+        terrainSupportMeshes,
+        slot.position.x,
+        slot.position.z,
+        0.74,
+      );
+      if (!hit?.face) continue;
+      const normal = hit.face.normal.clone()
+        .transformDirection(hit.object.matrixWorld)
+        .normalize();
+      if (normal.y < 0) normal.negate();
+      surfaceNormalByRequestId.set(slot.requestId, {
+        x: normal.x,
+        y: normal.y,
+        z: normal.z,
+      });
+    }
+
+    const next = buildReefSurfaceBoundLivingCanopyGeometry({
       plan,
       slots: allocation.slots,
+      surfaceNormalByRequestId,
     });
     next.userData.reefSurfaceSlotDiagnostics = allocation.diagnostics;
     next.userData.reefCanopyLayout = REEF_COLONY_HABITAT_VERSION;
+    next.userData.reefCoralNaturalPlacementVersion = REEF_CORAL_NATURAL_PLACEMENT_VERSION;
+    next.userData.reefCoralSurfaceBindingVersion = REEF_CORAL_SURFACE_BINDING_VERSION;
     next.userData.reefColonyHabitatCount = habitatPlan.habitats.length;
     next.userData.reefColonyHabitatDominantMorphotypes = habitatPlan.habitats.map((habitat) => ({
       id: habitat.id,
@@ -133,6 +186,8 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
         reefLivingCanopyVersion: REEF_LIVING_CANOPY_VERSION,
         reefLivingCanopyPass: REEF_LIVING_CANOPY_PASS,
         reefCanopyLayout: REEF_COLONY_HABITAT_VERSION,
+        reefCoralNaturalPlacementVersion: REEF_CORAL_NATURAL_PLACEMENT_VERSION,
+        reefCoralSurfaceBindingVersion: REEF_CORAL_SURFACE_BINDING_VERSION,
       }}
     />
   );
