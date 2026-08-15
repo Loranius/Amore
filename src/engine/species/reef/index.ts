@@ -52,6 +52,25 @@ export type {
   ReefCompositionScore,
   ReefStructureCompositionDecision,
 } from './composition';
+export {
+  buildReefSurfaceSystem,
+  REEF_SURFACE_CORE_SAMPLES,
+  REEF_SURFACE_MAX_PATCHES,
+  REEF_SURFACE_MIN_NORMAL_Y,
+  REEF_SURFACE_MIN_SUITABILITY,
+  REEF_SURFACE_PLATFORM_SAMPLES,
+  REEF_SURFACE_VERSION,
+  REEF_SURFACE_YEAR_SAMPLES,
+} from './surfaceSystem';
+export type {
+  BuildReefSurfaceSystemInput,
+  ReefSurfaceClass,
+  ReefSurfaceDiagnostics,
+  ReefSurfaceManifest,
+  ReefSurfacePatch,
+  ReefSurfacePoint,
+  ReefSurfaceSourceKind,
+} from './surfaceSystem';
 export type {
   ReefGrowthArchPlacement,
   ReefGrowthOutcropPlacement,

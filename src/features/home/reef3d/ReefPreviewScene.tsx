@@ -6,7 +6,7 @@ import { ReefYearStructuresObject } from './ReefYearStructuresObject';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
 
-/** Portal-facing Phase 3 scene: deterministic core + yearly geology + composition control. */
+/** Portal-facing Phase 4 scene: Phase 3 geology plus a deterministic coral-ready surface map. */
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
 
@@ -21,13 +21,13 @@ export default function ReefPreviewScene() {
       >
         <div>
           <h2>Риф не вдалося побудувати</h2>
-          <p>{portal.error?.message ?? 'Reef composition is unavailable.'}</p>
+          <p>{portal.error?.message ?? 'Reef surface system is unavailable.'}</p>
         </div>
       </div>
     );
   }
 
-  const { core, yearStructures, composition, asOf } = portal.preview;
+  const { core, yearStructures, composition, surfaces, asOf } = portal.preview;
   const coreExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
   const structureExtent = composition.structures.reduce(
     (maximum, structure) => Math.max(
@@ -41,6 +41,7 @@ export default function ReefPreviewScene() {
   const cameraHeight = Math.max(2.7, core.dimensions.height * 0.58, sceneExtent * 0.28);
   const counts = yearStructures.diagnostics.archetypeCounts;
   const score = composition.diagnostics.score;
+  const surfaceDiagnostics = surfaces.diagnostics;
 
   return (
     <div
@@ -48,11 +49,12 @@ export default function ReefPreviewScene() {
       data-home-artifact-preview="reef"
       data-reef-preview="ready"
       data-reef-source="portal"
-      data-reef-scene="phase-3-composition"
-      data-reef-phase="3"
+      data-reef-scene="phase-4-coral-surfaces"
+      data-reef-phase="4"
       data-reef-core-version={core.version}
       data-reef-year-structures-version={yearStructures.version}
       data-reef-composition-version={composition.version}
+      data-reef-surface-version={surfaces.version}
       data-reef-couple-id={core.identity.coupleId}
       data-reef-as-of={asOf}
       data-reef-seed={core.identity.reefSeed}
@@ -62,6 +64,7 @@ export default function ReefPreviewScene() {
       data-reef-core-signature={core.signature}
       data-reef-year-structures-signature={yearStructures.signature}
       data-reef-composition-signature={composition.signature}
+      data-reef-surface-signature={surfaces.signature}
       data-reef-days-together={core.age.daysTogether}
       data-reef-completed-years={core.age.completedYears}
       data-reef-max-years={core.age.maxYears}
@@ -90,6 +93,16 @@ export default function ReefPreviewScene() {
       data-reef-composition-radial-balance-score={score.radialBalance}
       data-reef-composition-silhouette-score={score.silhouette}
       data-reef-composition-collision-score={score.collision}
+      data-reef-surface-patches={surfaceDiagnostics.patchCount}
+      data-reef-surface-eligible={surfaceDiagnostics.eligiblePatchCount}
+      data-reef-surface-rejected-underside={surfaceDiagnostics.rejectedUndersideCount}
+      data-reef-surface-core-patches={surfaceDiagnostics.corePatchCount}
+      data-reef-surface-platform-patches={surfaceDiagnostics.platformPatchCount}
+      data-reef-surface-year-patches={surfaceDiagnostics.yearPatchCount}
+      data-reef-surface-average-suitability={surfaceDiagnostics.averageSuitability}
+      data-reef-surface-average-eligible-suitability={surfaceDiagnostics.averageEligibleSuitability}
+      data-reef-surface-total-capacity={surfaceDiagnostics.totalCapacity}
+      data-reef-surface-mobile-bounded={surfaceDiagnostics.boundedForMobile ? 'true' : 'false'}
       data-reef-map-outcrops={0}
       data-reef-schedule-terraces={0}
       data-reef-plan-fish-logical={0}

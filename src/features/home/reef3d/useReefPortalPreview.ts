@@ -6,10 +6,12 @@ import { supabase } from '@/lib/supabase';
 import {
   buildReefComposition,
   buildReefCore,
+  buildReefSurfaceSystem,
   buildReefYearStructures,
   reefDaysTogether,
   type ReefCompositionManifest,
   type ReefCoreManifest,
+  type ReefSurfaceManifest,
   type ReefYearStructuresManifest,
 } from '@/engine/species/reef';
 import { stableEvolutionCoupleId } from '../crystal3d/evolution/sourceSnapshot';
@@ -20,6 +22,7 @@ export interface ReefPortalPreview {
   core: ReefCoreManifest;
   yearStructures: ReefYearStructuresManifest;
   composition: ReefCompositionManifest;
+  surfaces: ReefSurfaceManifest;
   asOf: string;
 }
 
@@ -58,7 +61,7 @@ function useRelationshipStartDate() {
   });
 }
 
-/** Phase 3 portal adapter: deterministic core + yearly geology + append-only composition. */
+/** Phase 4 portal adapter: core + permanent geology + composition + coral-ready surface map. */
 export function useReefPortalPreview(): UseReefPortalPreviewResult {
   const startDateQuery = useRelationshipStartDate();
   const users = useUsers();
@@ -107,8 +110,9 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
       });
       const yearStructures = buildReefYearStructures({ core });
       const composition = buildReefComposition({ core, yearStructures });
+      const surfaces = buildReefSurfaceSystem({ core, composition });
       return {
-        preview: { core, yearStructures, composition, asOf },
+        preview: { core, yearStructures, composition, surfaces, asOf },
         isPending: false,
         error: null,
       };
