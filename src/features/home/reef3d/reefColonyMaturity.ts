@@ -71,18 +71,22 @@ function effectiveColonyMaturity(
   growthStage: ReefColonyGrowthStage | undefined,
 ): number {
   const habitatBlend = clamp01(colony.maturity * 0.56 + state.maturityScore * 0.44);
-  const staged = habitatBlend * memberStageFactor(growthStage, state.lifecycleStage);
-  return round6(clamp01(staged));
+  return round6(clamp01(
+    habitatBlend * memberStageFactor(growthStage, state.lifecycleStage),
+  ));
 }
 
-/**
- * Turns Evolution Engine ecology into a visible colony lifecycle without changing
- * colony identity or chronological ordering. Young habitats keep a small core,
- * growing habitats thicken established members, and mature habitats reach their
- * full canopy footprint while frontier recruits remain slightly smaller than the
- * established core. Adding data can therefore develop an existing colony instead
- * of making every accepted event read as another equally mature random object.
- */
+function firstHabitatColony(
+  ids: readonly string[],
+  colonies: ReadonlyMap<string, ReefLivingCanopyColony>,
+): ReefLivingCanopyColony | undefined {
+  for (const id of ids) {
+    const colony = colonies.get(id);
+    if (colony) return colony;
+  }
+  return undefined;
+}
+
 export function buildReefColonyMaturityPlan(
   habitatPlan: ReefColonyHabitatPlan,
   build: ReefPreviewBuild,
@@ -103,9 +107,7 @@ export function buildReefColonyMaturityPlan(
   };
 
   for (const habitat of habitatPlan.habitats) {
-    const firstColony = habitat.memberColonyIds
-      .map((id) => colonyBySourceId.get(id))
-      .find((colony): colony is ReefLivingCanopyColony => Boolean(colony));
+    const firstColony = firstHabitatColony(habitat.memberColonyIds, colonyBySourceId);
     const epochIndex = firstColony?.request.epochIndex ?? 0;
     const zone = zones[Math.min(Math.max(0, epochIndex), Math.max(0, zones.length - 1))];
     const localZoneMaturity = zone?.maturity ?? ecology.maturity;
@@ -129,8 +131,6 @@ export function buildReefColonyMaturityPlan(
       localZoneMaturity: round6(localZoneMaturity),
       localColonization: round6(localColonization),
       ecosystemMaturity: round6(ecology.maturity),
-      // Coverage grows more than height: mature colonies read as established
-      // patches rather than simply taller versions of young coral.
       coverageScale: round6(lerp(0.76, 1.06, eased)),
       heightScale: round6(lerp(0.78, 1.05, eased)),
       recruitmentReadiness: round6(clamp01((score - 0.58) / 0.3)),
