@@ -1,4 +1,4 @@
-import { useLayoutEffect } from 'react';
+import { useEffect, useLayoutEffect, useMemo } from 'react';
 import { useTexture } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -6,7 +6,6 @@ import type { ReefPreviewBuild } from './buildReefPreview';
 
 const TAU = Math.PI * 2;
 const VOLCANO_ALBEDO_URL = `${import.meta.env.BASE_URL}assets/reef/volcano/volcano-reference-albedo.webp`;
-const VOLCANO_BUMP_URL = `${import.meta.env.BASE_URL}assets/reef/volcano/volcano-reference-bump.webp`;
 
 interface MaterialSnapshot {
   map: THREE.Texture | null;
@@ -27,14 +26,6 @@ function textureU(x: number, z: number): number {
   return normalized < 0 ? normalized + 1 : normalized;
 }
 
-/**
- * Reprojects the procedural volcano to a cylindrical/slope UV field.
- *
- * The generator emits non-indexed triangles, so triangles which straddle the
- * 0/1 azimuth seam can be fixed locally instead of interpolating across the
- * entire texture. This removes the bright transparent-looking wedge that was
- * visible on mobile when rotating around the cone.
- */
 function projectVolcanoUvs(geometry: THREE.BufferGeometry): void {
   const position = geometry.getAttribute('position');
   if (!position || position.itemSize !== 3 || position.count < 3) return;
@@ -47,10 +38,7 @@ function projectVolcanoUvs(geometry: THREE.BufferGeometry): void {
 
   let maxRadius = 1e-4;
   for (let index = 0; index < position.count; index += 1) {
-    maxRadius = Math.max(
-      maxRadius,
-      Math.hypot(position.getX(index), position.getZ(index)),
-    );
+    maxRadius = Math.max(maxRadius, Math.hypot(position.getX(index), position.getZ(index)));
   }
 
   const uv = new Float32Array(position.count * 2);
@@ -80,9 +68,6 @@ function projectVolcanoUvs(geometry: THREE.BufferGeometry): void {
       const radial = Math.hypot(x, z) / maxRadius;
       const height01 = THREE.MathUtils.clamp((y - minY) / height, 0, 1);
 
-      // Use more vertical repeats than before. This keeps the reference rock
-      // grain compact on the tall silhouette instead of stretching it into
-      // long blurry bands.
       uv[index * 2] = baseU[slot] * 4.2 + height01 * 0.16;
       uv[index * 2 + 1] = radial * 3.4 + (1 - height01) * 0.32;
     }
@@ -108,10 +93,7 @@ function snapshotMaterial(material: THREE.MeshStandardMaterial): MaterialSnapsho
   };
 }
 
-function restoreMaterial(
-  material: THREE.MeshStandardMaterial,
-  snapshot: MaterialSnapshot,
-): void {
+function restoreMaterial(material: THREE.MeshStandardMaterial, snapshot: MaterialSnapshot): void {
   material.map = snapshot.map;
   material.bumpMap = snapshot.bumpMap;
   material.bumpScale = snapshot.bumpScale;
@@ -130,7 +112,10 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
   const scene = useThree((state) => state.scene);
   const gl = useThree((state) => state.gl);
   const invalidate = useThree((state) => state.invalidate);
-  const [albedo, bump] = useTexture([VOLCANO_ALBEDO_URL, VOLCANO_BUMP_URL]);
+  const albedo = useTexture(VOLCANO_ALBEDO_URL);
+  const bump = useMemo(() => albedo.clone(), [albedo]);
+
+  useEffect(() => () => bump.dispose(), [bump]);
 
   useLayoutEffect(() => {
     const object = scene.getObjectByName('reef-volcano-support-surface');
@@ -161,16 +146,13 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
 
     material.map = albedo;
     material.bumpMap = bump;
-    material.bumpScale = 0.11;
+    material.bumpScale = 0.085;
     material.color.set('#d5d9d5');
     material.vertexColors = false;
     material.roughness = 0.97;
     material.metalness = 0;
     material.emissive.set('#0c1211');
     material.emissiveIntensity = 0.025;
-
-    // Keep the aggressive asymmetric cone closed at all camera angles while
-    // the generator still produces a few near-tangent faces around the rim.
     material.side = THREE.DoubleSide;
     material.flatShading = false;
     material.needsUpdate = true;
@@ -185,11 +167,8 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
       if (previousUv) geometry.setAttribute('uv', previousUv);
       else geometry.deleteAttribute('uv');
 
-      if (previousUvProjection === undefined) {
-        delete geometry.userData.reefVolcanoUvProjection;
-      } else {
-        geometry.userData.reefVolcanoUvProjection = previousUvProjection;
-      }
+      if (previousUvProjection === undefined) delete geometry.userData.reefVolcanoUvProjection;
+      else geometry.userData.reefVolcanoUvProjection = previousUvProjection;
 
       restoreMaterial(material, snapshot);
       delete object.userData.reefVolcanoReferenceSurface;
