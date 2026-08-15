@@ -108,15 +108,19 @@ function buildVolcanoProfile(build: ReefPreviewBuild): ReefVolcanoProfile {
     daysTogether: evolution.facts.daysTogether,
     moduleFill: moduleFillFromBuild(build),
   });
-  const baseRadius = Math.max(1.5, build.structures.visibleFoundationRadius * 1.07);
+
+  // The first pass made the centre read as a broad mound on mobile. Keep a
+  // substantial submarine apron, but compress the footprint and spend more of
+  // the growth budget vertically so even a young volcano has a clear cone.
+  const baseRadius = Math.max(1.24, build.structures.visibleFoundationRadius * 0.84);
 
   return {
     ...growth,
     seed: evolution.identitySeed,
     floorY: REEF_SEABED_Y + 0.014,
     baseRadius,
-    coneHeight: 1.04 + growth.growth * 3.78,
-    craterRadius: baseRadius * (0.115 + growth.growth * 0.055),
+    coneHeight: 1.52 + growth.growth * 4.45,
+    craterRadius: baseRadius * (0.1 + growth.growth * 0.05),
     crackStrength: smoothstep(0.4, 1, growth.growth),
   };
 }
@@ -125,10 +129,15 @@ function volcanoBoundaryRadius(profile: ReefVolcanoProfile, angle: number): numb
   const phaseA = stableUnit(profile.seed, 'volcano:boundary:a') * TAU;
   const phaseB = stableUnit(profile.seed, 'volcano:boundary:b') * TAU;
   const phaseC = stableUnit(profile.seed, 'volcano:boundary:c') * TAU;
-  const broad = Math.sin(angle * 2 + phaseA) * 0.055;
-  const medium = Math.sin(angle * 5 - phaseB) * 0.027;
-  const chip = Math.sin(angle * 9 + phaseC) * 0.011;
-  return profile.baseRadius * (1 + broad + medium + chip);
+  const phaseD = stableUnit(profile.seed, 'volcano:boundary:d') * TAU;
+
+  // Deliberately use several low-frequency lobes. A perfect circular footprint
+  // makes the object read as a manufactured cone when viewed from above.
+  const broad = Math.sin(angle * 2 + phaseA) * 0.105;
+  const shoulder = Math.sin(angle * 3 - phaseB) * 0.064;
+  const ridge = Math.sin(angle * 5 + phaseC) * 0.034;
+  const chip = Math.sin(angle * 9 + phaseD) * 0.017;
+  return profile.baseRadius * (1 + broad + shoulder + ridge + chip);
 }
 
 function fissureMask(profile: ReefVolcanoProfile, angle: number): number {
@@ -149,32 +158,82 @@ function volcanoSurfaceY(
 ): number {
   const boundary = volcanoBoundaryRadius(profile, angle);
   const radial = radialDistance / Math.max(1e-6, boundary);
-  if (radial >= 1.09) return profile.floorY;
+  if (radial >= 1.08) return profile.floorY;
 
   const clamped = Math.max(0, radial);
   const craterRatio = profile.craterRadius / profile.baseRadius;
-  const flank = profile.coneHeight * Math.pow(Math.max(0, 1 - clamped), 1.18);
-  const craterWidth = Math.max(0.032, craterRatio * 0.24);
-  const rim = profile.coneHeight
-    * (0.075 + profile.growth * 0.045)
+  const tiltAngle = stableUnit(profile.seed, 'volcano:tilt') * TAU;
+  const tilt = Math.cos(angle - tiltAngle);
+
+  // Steep upper cone + broad low apron: this keeps the base grounded while
+  // creating the recognisable volcanic silhouette that was missing before.
+  const upperCone = profile.coneHeight * Math.pow(Math.max(0, 1 - clamped), 1.54);
+  const lowerMass = profile.coneHeight
+    * 0.19
+    * (1 - smoothstep(0.5, 1.02, clamped));
+
+  // A small deterministic lean breaks the radial symmetry without moving the
+  // volcano away from the logical centre of the reef.
+  const asymmetry = profile.coneHeight
+    * 0.085
+    * tilt
+    * Math.pow(Math.max(0, 1 - clamped), 1.1);
+
+  const craterWidth = Math.max(0.034, craterRatio * 0.29);
+  const rimPhase = stableUnit(profile.seed, 'volcano:rim:phase') * TAU;
+  const rimNoise = 1
+    + Math.sin(angle * 3 + rimPhase) * 0.18
+    + Math.sin(angle * 7 - rimPhase * 0.7) * 0.07;
+  let rim = profile.coneHeight
+    * (0.12 + profile.growth * 0.055)
+    * rimNoise
     * Math.exp(-Math.pow((clamped - craterRatio) / craterWidth, 2));
+
+  // One side of the crater is collapsed. This is intentionally stable per
+  // couple so the profile has an identity instead of looking procedural each run.
+  const breachAngle = tiltAngle + Math.PI * 0.34;
+  const breachMask = Math.pow(Math.max(0, Math.cos(angle - breachAngle)), 8);
+  rim -= profile.coneHeight
+    * 0.095
+    * breachMask
+    * Math.exp(-Math.pow((clamped - craterRatio) / (craterWidth * 1.35), 2));
+
   const bowl = profile.coneHeight
-    * (0.34 + profile.growth * 0.1)
-    * Math.exp(-Math.pow(clamped / Math.max(0.055, craterRatio * 0.78), 4));
-  const apron = (0.24 + profile.growth * 0.1)
-    * (1 - smoothstep(0.76, 1.06, clamped));
+    * (0.44 + profile.growth * 0.11)
+    * Math.exp(-Math.pow(clamped / Math.max(0.05, craterRatio * 0.82), 4.2));
+
+  // One secondary shoulder gives the silhouette a geological buttress instead
+  // of a single mathematical slope.
+  const shoulderAngle = tiltAngle - Math.PI * 0.72;
+  const shoulderMask = Math.pow(Math.max(0, Math.cos(angle - shoulderAngle)), 4);
+  const sideShoulder = profile.coneHeight
+    * 0.105
+    * shoulderMask
+    * Math.exp(-Math.pow((clamped - 0.42) / 0.24, 2));
+
   const roughPhase = stableUnit(profile.seed, 'volcano:roughness') * TAU;
   const roughness = profile.coneHeight
-    * 0.026
-    * Math.sin(angle * 7 + clamped * 16 + roughPhase)
+    * 0.038
+    * Math.sin(angle * 6.5 + clamped * 13 + roughPhase)
     * Math.max(0, 1 - clamped);
   const fissure = profile.coneHeight
-    * 0.052
+    * 0.058
     * profile.crackStrength
     * fissureMask(profile, angle)
-    * Math.pow(Math.max(0, 1 - clamped), 0.8);
-  const edgeFade = 1 - smoothstep(0.94, 1.08, clamped);
-  const relief = Math.max(0, flank + rim - bowl + apron + roughness - fissure);
+    * Math.pow(Math.max(0, 1 - clamped), 0.92);
+
+  const edgeFade = 1 - smoothstep(0.93, 1.07, clamped);
+  const relief = Math.max(
+    0,
+    upperCone
+      + lowerMass
+      + asymmetry
+      + rim
+      + sideShoulder
+      - bowl
+      + roughness
+      - fissure,
+  );
 
   return profile.floorY + relief * edgeFade;
 }
@@ -200,7 +259,10 @@ function appendVertex(
   profile: ReefVolcanoProfile,
 ): void {
   positions.push(point[0], point[1], point[2]);
-  const normalizedHeight = clamp01((point[1] - profile.floorY) / Math.max(0.01, profile.coneHeight));
+  const normalizedHeight = clamp01(
+    (point[1] - profile.floorY) / Math.max(0.01, profile.coneHeight),
+  );
+
   // Keep volcanic basalt dark, but not crushed to black by the underwater
   // lighting/tone-mapping stack. The material below stays white so these
   // vertex colours are not multiplied by a second dark tint.
@@ -441,7 +503,7 @@ export function ReefVolcano({
         rotation={[-Math.PI / 2, 0, 0]}
         renderOrder={4}
       >
-        <circleGeometry args={[profile.craterRadius * 0.72, 40]} />
+        <circleGeometry args={[profile.craterRadius * 0.82, 40]} />
         <meshBasicMaterial
           color={eruptionActive ? '#ff6a22' : '#6d2418'}
           transparent
