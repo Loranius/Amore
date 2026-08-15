@@ -15,6 +15,7 @@ import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 import { ReefNaturalArchLayer } from './ReefNaturalArchLayer';
+import { ReefVolcano } from './ReefVolcano';
 import { ReefWorldComposition } from './ReefWorldComposition';
 import { ReefDistantEcosystem } from './ReefDistantEcosystem';
 import {
@@ -84,6 +85,7 @@ export function ReefStage({
       </mesh>
 
       <ReefEnvironment build={build} />
+      <ReefVolcano build={build} reducedMotion={reducedMotion} />
       <ReefNaturalArchLayer build={build} />
       <ReefWorldComposition />
       <ReefDistantEcosystem reducedMotion={reducedMotion} />
