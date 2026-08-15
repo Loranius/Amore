@@ -90,8 +90,8 @@ export function ReefStage({
       <ReefVolcanoReplacementLayer />
       <group
         name="reef-volcano-midground-placement"
-        position={[0, 0, -1.15]}
-        userData={{ reefVolcanoDepthOffset: -1.15 }}
+        position={[0, 0, -2.25]}
+        userData={{ reefVolcanoDepthOffset: -2.25 }}
       >
         <ReefVolcano build={build} reducedMotion={reducedMotion} />
         <ReefVolcanoSurfacePass build={build} />
