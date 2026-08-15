@@ -164,18 +164,17 @@ function retargetPlanToPreferredSurfaces({
     const target = authored[targetIndex];
     if (!target) return colony;
 
-    const preferred = target.position
-      ? { ...target.position }
-      : {
-          x: target.x,
-          y: colony.request.preferred.y,
-          z: target.z,
-        };
     return {
       ...colony,
       request: {
         ...colony.request,
-        preferred,
+        preferred: target.position
+          ? { ...target.position }
+          : {
+              x: target.x,
+              y: colony.request.preferred.y,
+              z: target.z,
+            },
       },
     };
   });
@@ -265,6 +264,20 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     const colonyByRequestId = new Map(
       ecologicalPlan.colonies.map((colony) => [colony.request.id, colony] as const),
     );
+    const requestById = new Map(
+      ecologicalPlan.requests.map((request) => [request.id, request] as const),
+    );
+    const surfaceOrderByRequestId = new Map(
+      ecologicalPlan.requests.map((request) => {
+        const preferredSurface = retargeted.preferredSurfaceByRequestId.get(request.id);
+        const order = [
+          ...(preferredSurface ? [preferredSurface] : []),
+          ...availableSurfaceTypes.filter((surfaceType) => surfaceType !== preferredSurface),
+        ];
+        return [request.id, order] as const;
+      }),
+    );
+    const hitCache = new Map<string, THREE.Intersection | null>();
 
     const candidates = [
       ...buildReefSurfaceSlotCandidates({
@@ -279,14 +292,16 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
       x: number,
       z: number,
     ): THREE.Intersection | null => {
-      const colony = colonyByRequestId.get(request.id);
-      if (!colony) return null;
-      const preferredSurface = retargeted.preferredSurfaceByRequestId.get(request.id);
-      const orderedSurfaceTypes = [
-        ...(preferredSurface ? [preferredSurface] : []),
-        ...availableSurfaceTypes.filter((surfaceType) => surfaceType !== preferredSurface),
-      ];
+      const cacheKey = `${request.id}:${x}:${z}`;
+      if (hitCache.has(cacheKey)) return hitCache.get(cacheKey) ?? null;
 
+      const colony = colonyByRequestId.get(request.id);
+      if (!colony) {
+        hitCache.set(cacheKey, null);
+        return null;
+      }
+
+      const orderedSurfaceTypes = surfaceOrderByRequestId.get(request.id) ?? availableSurfaceTypes;
       for (const surfaceType of orderedSurfaceTypes) {
         if (!reefCoralMorphotypeCanColonizeSurface(colony.morphotype, surfaceType)) continue;
         const meshes = surfaceMeshes[surfaceType];
@@ -323,9 +338,11 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
           },
         });
         if (!footprintSupported) continue;
+        hitCache.set(cacheKey, hit);
         return hit;
       }
 
+      hitCache.set(cacheKey, null);
       return null;
     };
 
@@ -345,7 +362,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     const surfaceNormalByRequestId = new Map<string, { x: number; y: number; z: number }>();
     const actualSurfaceByRequestId = new Map<string, ReefCoralSurfaceType>();
     for (const slot of allocation.slots) {
-      const request = ecologicalPlan.requests.find((candidate) => candidate.id === slot.requestId);
+      const request = requestById.get(slot.requestId);
       if (!request) continue;
       const hit = hitForRequest(request, slot.position.x, slot.position.z);
       if (!hit?.face || !(hit.object instanceof THREE.Mesh)) continue;
