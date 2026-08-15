@@ -74,7 +74,6 @@ interface CandidateTransform {
   attempt: number;
 }
 
-const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const hex32 = (value: number) => (value >>> 0).toString(16).padStart(8, '0');
 const normalizeAngle = (value: number) => ((value % TAU) + TAU) % TAU;
 const angularDistance = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -189,7 +188,7 @@ function silhouetteScore(structures: readonly ReefYearStructure[]): number {
     const angle = normalizeAngle(Math.atan2(structure.center.z, structure.center.x));
     const sector = Math.min(7, Math.floor(angle / TAU * 8));
     const height = Math.max(0.05, structure.shape.height);
-    sectorHeights[sector] += height;
+    sectorHeights[sector] = (sectorHeights[sector] ?? 0) + height;
     totalHeight += height;
     minimumHeight = Math.min(minimumHeight, height);
     maximumHeight = Math.max(maximumHeight, height);
