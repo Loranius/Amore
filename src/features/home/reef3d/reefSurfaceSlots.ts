@@ -1,4 +1,4 @@
-export const REEF_SURFACE_SLOT_VERSION = 'reef-surface-slots-v2';
+export const REEF_SURFACE_SLOT_VERSION = 'reef-surface-slots-v3';
 
 const TAU = Math.PI * 2;
 const SLOT_SPACING = 0.34;
@@ -8,6 +8,14 @@ export interface ReefSurfacePoint {
   x: number;
   y: number;
   z: number;
+}
+
+/** Optional ecological metadata gathered while sampling the real reef support. */
+export interface ReefSurfaceSample extends ReefSurfacePoint {
+  /** World-space upward component of the supporting surface normal. */
+  normalY?: number;
+  /** Approximate usable support radius when the sampler knows it. */
+  supportRadius?: number;
 }
 
 export interface ReefSurfaceSlotCandidate {
@@ -20,6 +28,10 @@ export interface ReefSurfaceSlotCandidate {
   maxFootprintRadius?: number;
   /** Optional growth epoch that must exist before this support can be used. */
   availableFromEpoch?: number;
+  /** Optional known orientation for authored supports. */
+  normalY?: number;
+  /** Optional approximate free support radius for ecological scoring. */
+  supportRadius?: number;
 }
 
 export interface ReefSurfaceSlotRequest {
@@ -57,15 +69,29 @@ export interface ReefSurfaceSlotAllocation {
   diagnostics: ReefSurfaceSlotDiagnostics;
 }
 
-export type ReefSurfaceSampler = (x: number, z: number) => ReefSurfacePoint | null;
+export type ReefSurfaceSampler = (x: number, z: number) => ReefSurfaceSample | null;
 
-interface SampledCandidate {
+export interface ReefSurfaceScoreCandidate {
   id: string;
   kind: ReefAllocatedSurfaceSlot['kind'];
   position: ReefSurfacePoint;
   availableFromEpoch?: number;
   maxFootprintRadius?: number;
+  normalY?: number;
+  supportRadius?: number;
 }
+
+export interface ReefSurfaceScoreContext {
+  candidate: ReefSurfaceScoreCandidate;
+  request: ReefSurfaceSlotRequest;
+  occupied: readonly ReefAllocatedSurfaceSlot[];
+  /** Legacy nearest-preferred score. Lower remains better. */
+  baseScore: number;
+}
+
+export type ReefSurfaceCandidateScorer = (context: ReefSurfaceScoreContext) => number;
+
+type SampledCandidate = ReefSurfaceScoreCandidate;
 
 function round6(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
@@ -81,6 +107,10 @@ function stableUnit(seed: number, label: string): number {
   hash = Math.imul(hash, 0x7feb352d);
   hash ^= hash >>> 15;
   return (hash >>> 0) / 0xffffffff;
+}
+
+function pointFromSample(sample: ReefSurfaceSample): ReefSurfacePoint {
+  return { x: sample.x, y: sample.y, z: sample.z };
 }
 
 /**
@@ -146,7 +176,7 @@ function canOccupy(
   return true;
 }
 
-function scoreCandidate(
+function baseCandidateScore(
   candidate: SampledCandidate,
   request: ReefSurfaceSlotRequest,
 ): number {
@@ -156,6 +186,23 @@ function scoreCandidate(
   );
   const verticalDistance = Math.abs(candidate.position.y - request.preferred.y);
   return horizontalDistance + verticalDistance * 0.14;
+}
+
+function scoreCandidate(
+  candidate: SampledCandidate,
+  request: ReefSurfaceSlotRequest,
+  occupied: readonly ReefAllocatedSurfaceSlot[],
+  candidateScorer?: ReefSurfaceCandidateScorer,
+): number {
+  const baseScore = baseCandidateScore(candidate, request);
+  if (!candidateScorer) return baseScore;
+  const score = candidateScorer({
+    candidate,
+    request,
+    occupied,
+    baseScore,
+  });
+  return Number.isFinite(score) ? score : baseScore;
 }
 
 function isAvailableForRequest(
@@ -172,22 +219,23 @@ function isAvailableForRequest(
 
 /**
  * Assigns one chronological surface slot to every request whenever any sampled
- * support exists. Preferred anchors win first; unsupported anchors use the
- * nearest collision-safe registry slot. Clearance can relax moderately in
- * dense reefs, but it never drops to zero and therefore never explicitly
- * authorizes two coral footprints to occupy the same point.
+ * support exists. Preferred anchors win first in the legacy path; an optional
+ * deterministic scorer can instead rank real supports by ecology while the
+ * same collision, epoch, footprint and append-only contracts remain enforced.
  */
 export function allocateReefSurfaceSlots({
   requests,
   candidates,
   sample,
+  candidateScorer,
 }: {
   requests: readonly ReefSurfaceSlotRequest[];
   candidates: readonly ReefSurfaceSlotCandidate[];
   sample: ReefSurfaceSampler;
+  candidateScorer?: ReefSurfaceCandidateScorer;
 }): ReefSurfaceSlotAllocation {
-  const cache = new Map<string, ReefSurfacePoint | null>();
-  const sampleAt = (x: number, z: number): ReefSurfacePoint | null => {
+  const cache = new Map<string, ReefSurfaceSample | null>();
+  const sampleAt = (x: number, z: number): ReefSurfaceSample | null => {
     const key = sampleKey(x, z);
     if (cache.has(key)) return cache.get(key) ?? null;
     const result = sample(x, z);
@@ -195,9 +243,14 @@ export function allocateReefSurfaceSlots({
     return result;
   };
   const registry = candidates.flatMap<SampledCandidate>((candidate) => {
+    const sampled = candidate.position
+      ? null
+      : sampleAt(candidate.x, candidate.z);
     const position = candidate.position
       ? { ...candidate.position }
-      : sampleAt(candidate.x, candidate.z);
+      : sampled
+        ? pointFromSample(sampled)
+        : null;
     return position
       ? [{
           id: candidate.id,
@@ -209,6 +262,12 @@ export function allocateReefSurfaceSlots({
           ...(candidate.maxFootprintRadius === undefined
             ? {}
             : { maxFootprintRadius: candidate.maxFootprintRadius }),
+          ...((candidate.normalY ?? sampled?.normalY) === undefined
+            ? {}
+            : { normalY: candidate.normalY ?? sampled?.normalY }),
+          ...((candidate.supportRadius ?? sampled?.supportRadius) === undefined
+            ? {}
+            : { supportRadius: candidate.supportRadius ?? sampled?.supportRadius }),
         }]
       : [];
   });
@@ -219,19 +278,24 @@ export function allocateReefSurfaceSlots({
   const unresolvedRequestIds: string[] = [];
 
   for (const request of orderedRequests) {
-    const preferredPosition = sampleAt(request.preferred.x, request.preferred.z);
-    const options: SampledCandidate[] = preferredPosition
+    const preferredSample = sampleAt(request.preferred.x, request.preferred.z);
+    const options: SampledCandidate[] = preferredSample
       ? [{
           id: `reef:surface-slot:preferred:${request.id}`,
           kind: 'preferred',
-          position: preferredPosition,
+          position: pointFromSample(preferredSample),
+          ...(preferredSample.normalY === undefined ? {} : { normalY: preferredSample.normalY }),
+          ...(preferredSample.supportRadius === undefined
+            ? {}
+            : { supportRadius: preferredSample.supportRadius }),
         }, ...registry]
       : [...registry];
     const availableOptions = options.filter((candidate) => (
       isAvailableForRequest(candidate, request)
     ));
     availableOptions.sort((left, right) => (
-      scoreCandidate(left, request) - scoreCandidate(right, request)
+      scoreCandidate(left, request, slots, candidateScorer)
+      - scoreCandidate(right, request, slots, candidateScorer)
       || left.id.localeCompare(right.id)
     ));
 
