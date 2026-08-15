@@ -1,4 +1,4 @@
-export const REEF_SURFACE_SLOT_VERSION = 'reef-surface-slots-v2';
+export const REEF_SURFACE_SLOT_VERSION = 'reef-surface-slots-v3';
 
 const TAU = Math.PI * 2;
 const SLOT_SPACING = 0.34;
@@ -58,6 +58,11 @@ export interface ReefSurfaceSlotAllocation {
 }
 
 export type ReefSurfaceSampler = (x: number, z: number) => ReefSurfacePoint | null;
+export type ReefRequestSurfaceSampler = (
+  request: ReefSurfaceSlotRequest,
+  x: number,
+  z: number,
+) => ReefSurfacePoint | null;
 
 interface SampledCandidate {
   id: string;
@@ -123,6 +128,10 @@ function sampleKey(x: number, z: number): string {
   return `${round6(x)}:${round6(z)}`;
 }
 
+function requestSampleKey(requestId: string, x: number, z: number): string {
+  return `${requestId}:${sampleKey(x, z)}`;
+}
+
 function canOccupy(
   candidate: SampledCandidate,
   request: ReefSurfaceSlotRequest,
@@ -173,20 +182,24 @@ function isAvailableForRequest(
 /**
  * Assigns one chronological surface slot to every request whenever any sampled
  * support exists. Preferred anchors win first; unsupported anchors use the
- * nearest collision-safe registry slot. Clearance can relax moderately in
- * dense reefs, but it never drops to zero and therefore never explicitly
- * authorizes two coral footprints to occupy the same point.
+ * nearest collision-safe registry slot. A request-aware sampler can impose
+ * species/surface ecology without weakening the allocator's deterministic
+ * ordering or clearance guarantees.
  */
 export function allocateReefSurfaceSlots({
   requests,
   candidates,
   sample,
+  sampleForRequest,
 }: {
   requests: readonly ReefSurfaceSlotRequest[];
   candidates: readonly ReefSurfaceSlotCandidate[];
   sample: ReefSurfaceSampler;
+  sampleForRequest?: ReefRequestSurfaceSampler;
 }): ReefSurfaceSlotAllocation {
   const cache = new Map<string, ReefSurfacePoint | null>();
+  const requestCache = new Map<string, ReefSurfacePoint | null>();
+  const requestAwareSampledCandidateIds = new Set<string>();
   const sampleAt = (x: number, z: number): ReefSurfacePoint | null => {
     const key = sampleKey(x, z);
     if (cache.has(key)) return cache.get(key) ?? null;
@@ -194,24 +207,38 @@ export function allocateReefSurfaceSlots({
     cache.set(key, result);
     return result;
   };
-  const registry = candidates.flatMap<SampledCandidate>((candidate) => {
-    const position = candidate.position
-      ? { ...candidate.position }
-      : sampleAt(candidate.x, candidate.z);
-    return position
-      ? [{
-          id: candidate.id,
-          kind: 'registry',
-          position,
-          ...(candidate.availableFromEpoch === undefined
-            ? {}
-            : { availableFromEpoch: candidate.availableFromEpoch }),
-          ...(candidate.maxFootprintRadius === undefined
-            ? {}
-            : { maxFootprintRadius: candidate.maxFootprintRadius }),
-        }]
-      : [];
-  });
+  const sampleAtForRequest = (
+    request: ReefSurfaceSlotRequest,
+    x: number,
+    z: number,
+  ): ReefSurfacePoint | null => {
+    if (!sampleForRequest) return sampleAt(x, z);
+    const key = requestSampleKey(request.id, x, z);
+    if (requestCache.has(key)) return requestCache.get(key) ?? null;
+    const result = sampleForRequest(request, x, z);
+    requestCache.set(key, result);
+    return result;
+  };
+  const registry = sampleForRequest
+    ? []
+    : candidates.flatMap<SampledCandidate>((candidate) => {
+        const position = candidate.position
+          ? { ...candidate.position }
+          : sampleAt(candidate.x, candidate.z);
+        return position
+          ? [{
+              id: candidate.id,
+              kind: 'registry',
+              position,
+              ...(candidate.availableFromEpoch === undefined
+                ? {}
+                : { availableFromEpoch: candidate.availableFromEpoch }),
+              ...(candidate.maxFootprintRadius === undefined
+                ? {}
+                : { maxFootprintRadius: candidate.maxFootprintRadius }),
+            }]
+          : [];
+      });
   const orderedRequests = [...requests].sort(
     (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
   );
@@ -219,14 +246,38 @@ export function allocateReefSurfaceSlots({
   const unresolvedRequestIds: string[] = [];
 
   for (const request of orderedRequests) {
-    const preferredPosition = sampleAt(request.preferred.x, request.preferred.z);
+    const requestRegistry = sampleForRequest
+      ? candidates.flatMap<SampledCandidate>((candidate) => {
+          const sampleX = candidate.position?.x ?? candidate.x;
+          const sampleZ = candidate.position?.z ?? candidate.z;
+          const position = sampleAtForRequest(request, sampleX, sampleZ);
+          if (!position) return [];
+          requestAwareSampledCandidateIds.add(candidate.id);
+          return [{
+            id: candidate.id,
+            kind: 'registry',
+            position,
+            ...(candidate.availableFromEpoch === undefined
+              ? {}
+              : { availableFromEpoch: candidate.availableFromEpoch }),
+            ...(candidate.maxFootprintRadius === undefined
+              ? {}
+              : { maxFootprintRadius: candidate.maxFootprintRadius }),
+          }];
+        })
+      : registry;
+    const preferredPosition = sampleAtForRequest(
+      request,
+      request.preferred.x,
+      request.preferred.z,
+    );
     const options: SampledCandidate[] = preferredPosition
       ? [{
           id: `reef:surface-slot:preferred:${request.id}`,
           kind: 'preferred',
           position: preferredPosition,
-        }, ...registry]
-      : [...registry];
+        }, ...requestRegistry]
+      : [...requestRegistry];
     const availableOptions = options.filter((candidate) => (
       isAvailableForRequest(candidate, request)
     ));
@@ -270,7 +321,9 @@ export function allocateReefSurfaceSlots({
       version: REEF_SURFACE_SLOT_VERSION,
       requestedCount: requests.length,
       registryCandidateCount: candidates.length,
-      sampledCandidateCount: registry.length,
+      sampledCandidateCount: sampleForRequest
+        ? requestAwareSampledCandidateIds.size
+        : registry.length,
       allocatedCount: slots.length,
       preferredCount,
       relocatedCount,
