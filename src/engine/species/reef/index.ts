@@ -1,6 +1,24 @@
 export { buildReefSpeciesBlueprint } from './reefSpecies';
 export { buildReefModuleEvolution } from './moduleEvolution';
 export { buildReefGrowthStructureLayout } from './structureGrowth';
+export {
+  buildReefCore,
+  reefDaysTogether,
+  REEF_CORE_MAX_DAYS,
+  REEF_CORE_MAX_YEARS,
+  REEF_CORE_SEED_NAMESPACE,
+  REEF_CORE_VERSION,
+  REEF_CORE_YEAR_DAYS,
+} from './reefCore';
+export type {
+  ReefCoreAge,
+  ReefCoreDimensions,
+  ReefCoreIdentity,
+  ReefCoreInput,
+  ReefCoreManifest,
+  ReefCoreMorphology,
+  ReefCorePlatform,
+} from './reefCore';
 export type {
   ReefGrowthArchPlacement,
   ReefGrowthOutcropPlacement,

@@ -1,76 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { evaluateReefProductionRuntimeAcceptance } from '@/engine/productionAcceptance';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
-import {
-  EvolutionRuntimeProbe,
-  type EvolutionRuntimeMetrics,
-} from '../crystal3d/evolution/EvolutionRuntimeProbe';
-import { ReefObject } from './ReefObject';
-import { ReefStage } from './ReefStage';
-import type { ReefFishSchoolMetrics } from './ReefFishSchool';
-import {
-  REEF_FISH_SCHOOL_MODEL,
-  REEF_FISH_SCHOOL_ROUTE_PROFILE,
-} from './reefFishSchoolPresentation';
-import {
-  REEF_FOUNDATION_PASS,
-  REEF_FOUNDATION_PRESENTATION_VERSION,
-} from './reefFoundationPresentation';
-import {
-  reefCameraFrameForAspect,
-  REEF_CAMERA_PASS,
-  REEF_LIGHTING_PASS,
-  REEF_PALETTE_PASS,
-  REEF_SCENE_PROFILE_VERSION,
-} from './reefSceneProfile';
-import {
-  REEF_MATERIAL_PASS,
-  REEF_MATERIAL_PRESENTATION_VERSION,
-} from './reefMaterialPresentation';
-import {
-  REEF_COLONY_SHAPE_PASS,
-  REEF_PRESENTATION_VERSION,
-} from './reefPresentation';
-import type { ReefThreeSceneState } from './reefThreeAdapter';
+import { ReefCoreObject } from './ReefCoreObject';
+import { ReefCoreStage } from './ReefCoreStage';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
 
-const DEFAULT_REEF_CAMERA_FRAME = reefCameraFrameForAspect(1);
-
-function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(
-    () => typeof window !== 'undefined'
-      && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReduced(query.matches);
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
-
-  return reduced;
-}
-
-/**
- * Portal-facing reef scene.
- *
- * Production diagnostics stay available as data attributes for acceptance and
- * automated checks, but they are no longer part of the visual experience.
- * The user sees the generated reef in its own underwater world, not a lab card.
- */
+/** Portal-facing Phase 1 scene: deterministic chronological core only. */
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
-  const reducedMotion = useReducedMotion();
-  const [fishRuntime, setFishRuntime] = useState<ReefFishSchoolMetrics | null>(null);
-  const [worldRuntime, setWorldRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
-  const [sceneState, setSceneState] = useState<ReefThreeSceneState | null>(null);
-  const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setWorldRuntime(next), []);
-  const onFishReady = useCallback((next: ReefFishSchoolMetrics) => setFishRuntime(next), []);
-  const onSceneReady = useCallback((next: ReefThreeSceneState) => setSceneState(next), []);
 
   if (portal.isPending) return <CrystalPlaceholder />;
   if (portal.error || !portal.preview) {
@@ -83,29 +20,16 @@ export default function ReefPreviewScene() {
       >
         <div>
           <h2>Риф не вдалося побудувати</h2>
-          <p>{portal.error?.message ?? 'Portal history is unavailable.'}</p>
+          <p>{portal.error?.message ?? 'Reef Core is unavailable.'}</p>
         </div>
       </div>
     );
   }
 
-  const { build, diagnostics } = portal.preview;
-  // Reef acceptance must describe the generated reef, not the decorative
-  // underwater world around it. ReefObject exposes exact production geometry
-  // diagnostics when its accepted Three scene is created; the global probe is
-  // kept separately so world-level performance can still be inspected.
-  const reportedDrawCalls = sceneState?.diagnostics.drawCalls ?? null;
-  const reportedTriangles = sceneState?.diagnostics.triangles ?? null;
-  const visibleColonyRanges = sceneState?.batches.reduce(
-    (total, batch) => total + batch.runtimeRanges.length,
-    0,
-  ) ?? null;
-  const runtimeAcceptance = evaluateReefProductionRuntimeAcceptance({
-    contract: build.acceptance,
-    buildMs: build.buildMs,
-    drawCalls: reportedDrawCalls,
-    triangles: reportedTriangles,
-  });
+  const { core, asOf } = portal.preview;
+  const horizontalExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
+  const cameraDistance = Math.max(6.6, horizontalExtent * 2.15, core.dimensions.height * 1.4);
+  const cameraHeight = Math.max(2.7, core.dimensions.height * 0.58);
 
   return (
     <div
@@ -113,97 +37,55 @@ export default function ReefPreviewScene() {
       data-home-artifact-preview="reef"
       data-reef-preview="ready"
       data-reef-source="portal"
-      data-reef-scene="underwater-world"
-      data-reef-presentation={REEF_PRESENTATION_VERSION}
-      data-reef-shape-pass={REEF_COLONY_SHAPE_PASS}
-      data-reef-material-presentation={REEF_MATERIAL_PRESENTATION_VERSION}
-      data-reef-material-pass={REEF_MATERIAL_PASS}
-      data-reef-foundation-presentation={REEF_FOUNDATION_PRESENTATION_VERSION}
-      data-reef-foundation-pass={REEF_FOUNDATION_PASS}
-      data-reef-scene-profile={REEF_SCENE_PROFILE_VERSION}
-      data-reef-camera-pass={REEF_CAMERA_PASS}
-      data-reef-lighting-pass={REEF_LIGHTING_PASS}
-      data-reef-palette-pass={REEF_PALETTE_PASS}
-      data-reef-acceptance={runtimeAcceptance.status}
-      data-reef-static-acceptance={build.acceptance.staticStatus}
-      data-reef-violations={runtimeAcceptance.violations.join(',')}
-      data-reef-production-signature={build.acceptance.signature}
-      data-reef-identity-signature={build.acceptance.identitySignature}
-      data-reef-phase-count={build.acceptance.phaseCheckpoints.length}
-      data-reef-phase-order={String(build.acceptance.diagnostics.phaseOrderPreserved)}
-      data-reef-phase-provenance={String(build.acceptance.diagnostics.phaseProvenancePreserved)}
-      data-reef-colony-identity={String(build.acceptance.diagnostics.colonyIdentityChainPreserved)}
-      data-reef-range-binding-chain={String(build.acceptance.diagnostics.rangeBindingChainPreserved)}
-      data-reef-reduced-motion={String(reducedMotion)}
-      data-reef-couple-id={build.artifact.coupleId}
-      data-reef-as-of={build.life.asOf}
-      data-reef-stage={build.species.state.stage}
-      data-reef-evolution={build.species.moduleEvolution.version}
-      data-reef-days-together={build.species.moduleEvolution.facts.daysTogether}
-      data-reef-completed-years={build.species.moduleEvolution.facts.completedYears}
-      data-reef-foundation-radius={build.species.moduleEvolution.foundation.substrateRadius}
-      data-reef-outer-growth-radius={build.species.moduleEvolution.foundation.outerGrowthRadius}
-      data-reef-year-arches={build.structures.arches.length}
-      data-reef-map-outcrops={build.structures.outcrops.length}
-      data-reef-schedule-terraces={build.structures.terraces.length}
-      data-reef-structure-collision-free={String(build.structures.diagnostics.collisionFree)}
-      data-reef-plan-fish-logical={build.species.moduleEvolution.life.planFish.logicalCount}
-      data-reef-plan-fish-visible={build.species.moduleEvolution.life.planFish.visibleCount}
-      data-reef-wish-corals={build.species.moduleEvolution.colonies.primaryWishCorals.logicalCount}
-      data-reef-photo-corals={build.species.moduleEvolution.colonies.microPhotoCorals.logicalCount}
-      data-reef-media-corals={build.species.moduleEvolution.colonies.mediaCorals.logicalCount}
-      data-reef-calendar-landmarks={build.species.moduleEvolution.colonies.calendarLandmarks.logicalCount}
-      data-reef-normalized-events={portal.preview.normalizedEventCount}
-      data-reef-adapter-diagnostics={diagnostics.length}
-      data-reef-colonies={build.diagnostics.colonyCount}
-      data-reef-batches={build.diagnostics.batchCount}
-      data-reef-foundation-vertices={build.foundation.vertices.length}
-      data-reef-vertices={build.diagnostics.vertexCount}
-      data-reef-triangles={build.diagnostics.triangleCount}
-      data-reef-materials={build.diagnostics.materialCount}
-      data-reef-motion-bindings={build.diagnostics.motionBindingCount}
-      data-reef-visible-colonies={visibleColonyRanges ?? ''}
-      data-reef-fish-model={fishRuntime ? REEF_FISH_SCHOOL_MODEL : 'loading'}
-      data-reef-fish-meshes={fishRuntime?.meshes ?? ''}
-      data-reef-fish-width={fishRuntime?.width ?? ''}
-      data-reef-fish-height={fishRuntime?.height ?? ''}
-      data-reef-fish-depth={fishRuntime?.depth ?? ''}
-      data-reef-fish-routes={fishRuntime?.routes ?? ''}
-      data-reef-fish-animated-routes={fishRuntime?.animatedRoutes ?? ''}
-      data-reef-fish-tracks={fishRuntime?.tracks ?? ''}
-      data-reef-fish-scale={fishRuntime?.scale ?? ''}
-      data-reef-fish-route-profile={fishRuntime ? REEF_FISH_SCHOOL_ROUTE_PROFILE : 'loading'}
-      data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}
-      data-reef-runtime-draw-calls={reportedDrawCalls ?? ''}
-      data-reef-runtime-triangles={reportedTriangles ?? ''}
-      data-reef-world-draw-calls={worldRuntime?.drawCalls ?? ''}
-      data-reef-world-triangles={worldRuntime?.triangles ?? ''}
-      data-reef-build-ms={build.buildMs}
-      data-reef-current-cycle={build.life.current.cycleSeconds}
+      data-reef-scene="phase-1-core"
+      data-reef-phase="1"
+      data-reef-core-version={core.version}
+      data-reef-couple-id={core.identity.coupleId}
+      data-reef-as-of={asOf}
+      data-reef-seed={core.identity.reefSeed}
+      data-reef-core-seed={core.identity.coreSeed}
+      data-reef-platform-seed={core.identity.platformSeed}
+      data-reef-identity-signature={core.identity.identitySignature}
+      data-reef-core-signature={core.signature}
+      data-reef-days-together={core.age.daysTogether}
+      data-reef-completed-years={core.age.completedYears}
+      data-reef-max-years={core.age.maxYears}
+      data-reef-progress={core.age.progress}
+      data-reef-growth={core.age.growth}
+      data-reef-core-radius-x={core.dimensions.radiusX}
+      data-reef-core-radius-z={core.dimensions.radiusZ}
+      data-reef-core-height={core.dimensions.height}
+      data-reef-foundation-radius={Math.max(core.platform.radiusX, core.platform.radiusZ)}
+      data-reef-platform-radius-x={core.platform.radiusX}
+      data-reef-platform-radius-z={core.platform.radiusZ}
+      data-reef-year-arches={0}
+      data-reef-map-outcrops={0}
+      data-reef-schedule-terraces={0}
+      data-reef-plan-fish-logical={0}
+      data-reef-plan-fish-visible={0}
+      data-reef-wish-corals={0}
+      data-reef-photo-corals={0}
+      data-reef-media-corals={0}
+      data-reef-calendar-landmarks={0}
+      data-reef-normalized-events={0}
+      data-reef-colonies={0}
+      data-reef-motion-bindings={0}
     >
       <Canvas
+        shadows
         dpr={[1, 1.5]}
-        frameloop="always"
+        frameloop="demand"
         camera={{
-          position: [...DEFAULT_REEF_CAMERA_FRAME.position],
-          fov: DEFAULT_REEF_CAMERA_FRAME.fov,
-          near: DEFAULT_REEF_CAMERA_FRAME.near,
-          far: DEFAULT_REEF_CAMERA_FRAME.far,
+          position: [cameraDistance * 0.42, cameraHeight, cameraDistance],
+          fov: 42,
+          near: 0.1,
+          far: Math.max(80, cameraDistance * 8),
         }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
-        <ReefStage
-          build={build}
-          onFishReady={onFishReady}
-          reducedMotion={reducedMotion}
-        >
-          <ReefObject
-            build={build}
-            reducedMotion={reducedMotion}
-            onSceneReady={onSceneReady}
-          />
-        </ReefStage>
-        <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} warmupFrames={18} />
+        <ReefCoreStage core={core}>
+          <ReefCoreObject core={core} />
+        </ReefCoreStage>
       </Canvas>
     </div>
   );
