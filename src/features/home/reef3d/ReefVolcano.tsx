@@ -11,6 +11,8 @@ const ERUPTION_DURATION_SECONDS = 5 * 60;
 const VOLCANO_SEGMENTS = 72;
 const VOLCANO_RINGS = 22;
 const ERUPTION_PARTICLES = 18;
+const VOLCANO_BASE_COLOR = new THREE.Color('#56615d');
+const VOLCANO_SUMMIT_COLOR = new THREE.Color('#756257');
 
 export interface ReefVolcanoGrowthState {
   ageProgress: number;
@@ -25,6 +27,11 @@ interface ReefVolcanoProfile extends ReefVolcanoGrowthState {
   coneHeight: number;
   craterRadius: number;
   crackStrength: number;
+  boundaryPhases: readonly [number, number, number, number];
+  tiltAngle: number;
+  rimPhase: number;
+  roughPhase: number;
+  fissureAngles: readonly number[];
 }
 
 type Point = readonly [number, number, number];
@@ -60,10 +67,6 @@ export function calculateReefVolcanoGrowth({
 }): ReefVolcanoGrowthState {
   const ageProgress = clamp01(Math.max(0, daysTogether) / MAX_RELATIONSHIP_DAYS);
   const boundedModuleFill = clamp01(moduleFill);
-
-  // Time is the hard ceiling: at 50 years the volcano is always fully formed.
-  // Portal activity accelerates the route toward that ceiling without allowing
-  // a young relationship to instantly jump to the final silhouette.
   const growth = clamp01(
     ageProgress + (1 - ageProgress) * boundedModuleFill * 0.42,
   );
@@ -108,31 +111,36 @@ function buildVolcanoProfile(build: ReefPreviewBuild): ReefVolcanoProfile {
     daysTogether: evolution.facts.daysTogether,
     moduleFill: moduleFillFromBuild(build),
   });
-
-  // The first pass made the centre read as a broad mound on mobile. Keep a
-  // substantial submarine apron, but compress the footprint and spend more of
-  // the growth budget vertically so even a young volcano has a clear cone.
+  const seed = evolution.identitySeed;
   const baseRadius = Math.max(1.24, build.structures.visibleFoundationRadius * 0.84);
+  const fissureCount = 5 + Math.round(growth.growth * 3);
 
   return {
     ...growth,
-    seed: evolution.identitySeed,
+    seed,
     floorY: REEF_SEABED_Y + 0.014,
     baseRadius,
     coneHeight: 1.52 + growth.growth * 4.45,
     craterRadius: baseRadius * (0.1 + growth.growth * 0.05),
     crackStrength: smoothstep(0.4, 1, growth.growth),
+    boundaryPhases: [
+      stableUnit(seed, 'volcano:boundary:a') * TAU,
+      stableUnit(seed, 'volcano:boundary:b') * TAU,
+      stableUnit(seed, 'volcano:boundary:c') * TAU,
+      stableUnit(seed, 'volcano:boundary:d') * TAU,
+    ],
+    tiltAngle: stableUnit(seed, 'volcano:tilt') * TAU,
+    rimPhase: stableUnit(seed, 'volcano:rim:phase') * TAU,
+    roughPhase: stableUnit(seed, 'volcano:roughness') * TAU,
+    fissureAngles: Array.from(
+      { length: fissureCount },
+      (_value, index) => stableUnit(seed, `volcano:fissure:${index}:angle`) * TAU,
+    ),
   };
 }
 
 function volcanoBoundaryRadius(profile: ReefVolcanoProfile, angle: number): number {
-  const phaseA = stableUnit(profile.seed, 'volcano:boundary:a') * TAU;
-  const phaseB = stableUnit(profile.seed, 'volcano:boundary:b') * TAU;
-  const phaseC = stableUnit(profile.seed, 'volcano:boundary:c') * TAU;
-  const phaseD = stableUnit(profile.seed, 'volcano:boundary:d') * TAU;
-
-  // Deliberately use several low-frequency lobes. A perfect circular footprint
-  // makes the object read as a manufactured cone when viewed from above.
+  const [phaseA, phaseB, phaseC, phaseD] = profile.boundaryPhases;
   const broad = Math.sin(angle * 2 + phaseA) * 0.105;
   const shoulder = Math.sin(angle * 3 - phaseB) * 0.064;
   const ridge = Math.sin(angle * 5 + phaseC) * 0.034;
@@ -142,9 +150,7 @@ function volcanoBoundaryRadius(profile: ReefVolcanoProfile, angle: number): numb
 
 function fissureMask(profile: ReefVolcanoProfile, angle: number): number {
   let strongest = 0;
-  const fissureCount = 5 + Math.round(profile.growth * 3);
-  for (let index = 0; index < fissureCount; index += 1) {
-    const fissureAngle = stableUnit(profile.seed, `volcano:fissure:${index}:angle`) * TAU;
+  for (const fissureAngle of profile.fissureAngles) {
     const alignment = Math.max(0, Math.cos(angle - fissureAngle));
     strongest = Math.max(strongest, Math.pow(alignment, 30));
   }
@@ -155,43 +161,33 @@ function volcanoSurfaceY(
   profile: ReefVolcanoProfile,
   radialDistance: number,
   angle: number,
+  boundary = volcanoBoundaryRadius(profile, angle),
 ): number {
-  const boundary = volcanoBoundaryRadius(profile, angle);
   const radial = radialDistance / Math.max(1e-6, boundary);
   if (radial >= 1.08) return profile.floorY;
 
   const clamped = Math.max(0, radial);
   const craterRatio = profile.craterRadius / profile.baseRadius;
-  const tiltAngle = stableUnit(profile.seed, 'volcano:tilt') * TAU;
-  const tilt = Math.cos(angle - tiltAngle);
-
-  // Steep upper cone + broad low apron: this keeps the base grounded while
-  // creating the recognisable volcanic silhouette that was missing before.
+  const tilt = Math.cos(angle - profile.tiltAngle);
   const upperCone = profile.coneHeight * Math.pow(Math.max(0, 1 - clamped), 1.54);
   const lowerMass = profile.coneHeight
     * 0.19
     * (1 - smoothstep(0.5, 1.02, clamped));
-
-  // A small deterministic lean breaks the radial symmetry without moving the
-  // volcano away from the logical centre of the reef.
   const asymmetry = profile.coneHeight
     * 0.085
     * tilt
     * Math.pow(Math.max(0, 1 - clamped), 1.1);
 
   const craterWidth = Math.max(0.034, craterRatio * 0.29);
-  const rimPhase = stableUnit(profile.seed, 'volcano:rim:phase') * TAU;
   const rimNoise = 1
-    + Math.sin(angle * 3 + rimPhase) * 0.18
-    + Math.sin(angle * 7 - rimPhase * 0.7) * 0.07;
+    + Math.sin(angle * 3 + profile.rimPhase) * 0.18
+    + Math.sin(angle * 7 - profile.rimPhase * 0.7) * 0.07;
   let rim = profile.coneHeight
     * (0.12 + profile.growth * 0.055)
     * rimNoise
     * Math.exp(-Math.pow((clamped - craterRatio) / craterWidth, 2));
 
-  // One side of the crater is collapsed. This is intentionally stable per
-  // couple so the profile has an identity instead of looking procedural each run.
-  const breachAngle = tiltAngle + Math.PI * 0.34;
+  const breachAngle = profile.tiltAngle + Math.PI * 0.34;
   const breachMask = Math.pow(Math.max(0, Math.cos(angle - breachAngle)), 8);
   rim -= profile.coneHeight
     * 0.095
@@ -201,27 +197,21 @@ function volcanoSurfaceY(
   const bowl = profile.coneHeight
     * (0.44 + profile.growth * 0.11)
     * Math.exp(-Math.pow(clamped / Math.max(0.05, craterRatio * 0.82), 4.2));
-
-  // One secondary shoulder gives the silhouette a geological buttress instead
-  // of a single mathematical slope.
-  const shoulderAngle = tiltAngle - Math.PI * 0.72;
+  const shoulderAngle = profile.tiltAngle - Math.PI * 0.72;
   const shoulderMask = Math.pow(Math.max(0, Math.cos(angle - shoulderAngle)), 4);
   const sideShoulder = profile.coneHeight
     * 0.105
     * shoulderMask
     * Math.exp(-Math.pow((clamped - 0.42) / 0.24, 2));
-
-  const roughPhase = stableUnit(profile.seed, 'volcano:roughness') * TAU;
   const roughness = profile.coneHeight
     * 0.038
-    * Math.sin(angle * 6.5 + clamped * 13 + roughPhase)
+    * Math.sin(angle * 6.5 + clamped * 13 + profile.roughPhase)
     * Math.max(0, 1 - clamped);
   const fissure = profile.coneHeight
     * 0.058
     * profile.crackStrength
     * fissureMask(profile, angle)
     * Math.pow(Math.max(0, 1 - clamped), 0.92);
-
   const edgeFade = 1 - smoothstep(0.93, 1.07, clamped);
   const relief = Math.max(
     0,
@@ -247,7 +237,7 @@ function surfacePoint(
   const radialDistance = boundary * radialRatio;
   return [
     Math.cos(angle) * radialDistance,
-    volcanoSurfaceY(profile, radialDistance, angle),
+    volcanoSurfaceY(profile, radialDistance, angle, boundary),
     Math.sin(angle) * radialDistance,
   ];
 }
@@ -262,18 +252,12 @@ function appendVertex(
   const normalizedHeight = clamp01(
     (point[1] - profile.floorY) / Math.max(0.01, profile.coneHeight),
   );
-
-  // Keep volcanic basalt dark, but not crushed to black by the underwater
-  // lighting/tone-mapping stack. The material below stays white so these
-  // vertex colours are not multiplied by a second dark tint.
-  const base = new THREE.Color('#56615d');
-  const summit = new THREE.Color('#756257');
-  base.lerp(summit, normalizedHeight * 0.72);
+  const mix = normalizedHeight * 0.72;
   const mineralVariation = 0.94 + Math.sin(point[0] * 2.9 + point[2] * 3.7) * 0.07;
   colors.push(
-    clamp01(base.r * mineralVariation),
-    clamp01(base.g * mineralVariation),
-    clamp01(base.b * mineralVariation),
+    clamp01((VOLCANO_BASE_COLOR.r + (VOLCANO_SUMMIT_COLOR.r - VOLCANO_BASE_COLOR.r) * mix) * mineralVariation),
+    clamp01((VOLCANO_BASE_COLOR.g + (VOLCANO_SUMMIT_COLOR.g - VOLCANO_BASE_COLOR.g) * mix) * mineralVariation),
+    clamp01((VOLCANO_BASE_COLOR.b + (VOLCANO_SUMMIT_COLOR.b - VOLCANO_BASE_COLOR.b) * mix) * mineralVariation),
   );
 }
 
@@ -334,40 +318,6 @@ function buildVolcanoGeometry(profile: ReefVolcanoProfile): THREE.BufferGeometry
   geometry.userData.reefVolcanoGrowth = profile.growth;
   geometry.userData.reefVolcanoModuleFill = profile.moduleFill;
   geometry.userData.reefVolcanoAgeProgress = profile.ageProgress;
-  return geometry;
-}
-
-function buildCrackGeometry(profile: ReefVolcanoProfile): THREE.BufferGeometry {
-  const positions: number[] = [];
-  const fissureCount = 5 + Math.round(profile.growth * 3);
-
-  for (let fissure = 0; fissure < fissureCount; fissure += 1) {
-    const baseAngle = stableUnit(profile.seed, `volcano:fissure:${fissure}:angle`) * TAU;
-    const reach = 0.5 + stableUnit(profile.seed, `volcano:fissure:${fissure}:reach`) * 0.24;
-    let previous: Point | null = null;
-
-    for (let step = 0; step <= 7; step += 1) {
-      const t = step / 7;
-      const radial = THREE.MathUtils.lerp(
-        profile.craterRadius * 0.86,
-        profile.baseRadius * reach,
-        t,
-      );
-      const angle = baseAngle
-        + Math.sin(t * Math.PI * 2 + fissure) * (0.018 + t * 0.035);
-      const point: Point = [
-        Math.cos(angle) * radial,
-        volcanoSurfaceY(profile, radial, angle) + 0.022,
-        Math.sin(angle) * radial,
-      ];
-      if (previous) positions.push(...previous, ...point);
-      previous = point;
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeBoundingSphere();
   return geometry;
 }
 
@@ -439,15 +389,11 @@ export function ReefVolcano({
 }) {
   const profile = useMemo(() => buildVolcanoProfile(build), [build]);
   const geometry = useMemo(() => buildVolcanoGeometry(profile), [profile]);
-  const crackGeometry = useMemo(() => buildCrackGeometry(profile), [profile]);
   const [eruptionActive, setEruptionActive] = useState(
     () => isReefVolcanoEruptionActive(new Date()),
   );
 
-  useEffect(() => () => {
-    geometry.dispose();
-    crackGeometry.dispose();
-  }, [crackGeometry, geometry]);
+  useEffect(() => () => geometry.dispose(), [geometry]);
 
   useEffect(() => {
     const refresh = () => setEruptionActive(isReefVolcanoEruptionActive(new Date()));
@@ -457,9 +403,6 @@ export function ReefVolcano({
   }, []);
 
   const craterFloorY = volcanoSurfaceY(profile, 0, 0) + 0.026;
-  const crackOpacity = eruptionActive
-    ? 0.94
-    : 0.035 + profile.crackStrength * 0.3;
   const lavaOpacity = eruptionActive
     ? 0.92
     : 0.08 + profile.growth * 0.12;
@@ -512,16 +455,6 @@ export function ReefVolcano({
           toneMapped={false}
         />
       </mesh>
-
-      <lineSegments geometry={crackGeometry} renderOrder={5}>
-        <lineBasicMaterial
-          color={eruptionActive ? '#ff8a36' : '#a43a24'}
-          transparent
-          opacity={crackOpacity}
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </lineSegments>
 
       <pointLight
         color="#ff6c2d"
