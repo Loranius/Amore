@@ -17,6 +17,7 @@ import { BackgroundWhale } from './BackgroundWhale';
 import { ReefNaturalArchLayer } from './ReefNaturalArchLayer';
 import { ReefVolcano } from './ReefVolcano';
 import { ReefVolcanoReplacementLayer } from './ReefVolcanoReplacementLayer';
+import { ReefVolcanoSurfacePass } from './ReefVolcanoSurfacePass';
 import { ReefWorldComposition } from './ReefWorldComposition';
 import { ReefDistantEcosystem } from './ReefDistantEcosystem';
 import {
@@ -88,6 +89,7 @@ export function ReefStage({
       <ReefEnvironment build={build} />
       <ReefVolcanoReplacementLayer />
       <ReefVolcano build={build} reducedMotion={reducedMotion} />
+      <ReefVolcanoSurfacePass build={build} />
       <ReefNaturalArchLayer build={build} />
       <ReefWorldComposition />
       <ReefDistantEcosystem reducedMotion={reducedMotion} />
