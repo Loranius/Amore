@@ -120,7 +120,7 @@ function buildSchool(seedOffset: number): SchoolFish[] {
       (seededUnit(index + seedOffset, 23) - 0.5) * 0.24,
     ],
     rotation: (seededUnit(index + seedOffset, 24) - 0.5) * 0.2,
-    scale: THREE.MathUtils.lerp(0.64, 0.94, seededUnit(index + seedOffset, 25)),
+    scale: THREE.MathUtils.lerp(0.43, 0.63, seededUnit(index + seedOffset, 25)),
     tint: DISTANT_FISH_TINTS[(index + seedOffset) % DISTANT_FISH_TINTS.length]
       ?? DISTANT_FISH_TINTS[0],
   }));
@@ -232,7 +232,7 @@ function DistantVegetation({ reducedMotion }: { reducedMotion: boolean }) {
  * Distant schools use one tiny alpha texture and one instanced quad draw call.
  * The cards face the reef centre while their local X axis follows the tangent,
  * so the school reads as real fish from every orbit angle instead of edge-on
- * tetrahedrons. The muted tint palette is based on permissive CC0 fish sprites.
+ * tetrahedrons. The schools live outside the camera orbit and stay background-only.
  */
 function DistantFishSchool({
   seedOffset,
@@ -270,7 +270,6 @@ function DistantFishSchool({
     fish.forEach((item, index) => {
       dummy.position.set(...item.position);
       dummy.rotation.set(0, 0, item.rotation);
-      // Cards face the centre; -X matches the authored tangent travel direction.
       dummy.scale.set(-item.scale, item.scale, 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
@@ -286,9 +285,9 @@ function DistantFishSchool({
     const time = clock.elapsedTime;
     const tangentX = Math.cos(heading);
     const tangentZ = Math.sin(heading);
-    const travel = Math.sin(time * 0.07 + phase) * 1.25;
+    const travel = Math.sin(time * 0.07 + phase) * 0.75;
     groupRef.current.position.x = position[0] + tangentX * travel;
-    groupRef.current.position.y = position[1] + Math.sin(time * 0.105 + phase) * 0.16;
+    groupRef.current.position.y = position[1] + Math.sin(time * 0.105 + phase) * 0.1;
     groupRef.current.position.z = position[2] + tangentZ * travel;
   });
 
@@ -349,7 +348,7 @@ export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean
   }), []);
 
   return (
-    <group name="reef-distant-ecosystem-360-v3-textured-fish">
+    <group name="reef-distant-ecosystem-360-v4-background-schools">
       <ReefRingMasses
         name="reef-midground-satellite-patches"
         masses={midground}
@@ -366,28 +365,28 @@ export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean
 
       <DistantFishSchool
         seedOffset={100}
-        position={[5.9, 2.35, 4.7]}
+        position={[9.1, 2.7, 7.3]}
         heading={2.25}
         phase={0.4}
         reducedMotion={reducedMotion}
       />
       <DistantFishSchool
         seedOffset={300}
-        position={[-6.4, 3.15, 3.6]}
+        position={[-9.9, 3.4, 5.6]}
         heading={-2.2}
         phase={1.6}
         reducedMotion={reducedMotion}
       />
       <DistantFishSchool
         seedOffset={500}
-        position={[-4.2, 2.55, -7.3]}
+        position={[-6.4, 2.9, -11]}
         heading={-0.45}
         phase={2.8}
         reducedMotion={reducedMotion}
       />
       <DistantFishSchool
         seedOffset={700}
-        position={[5.1, 3.6, -7.7]}
+        position={[7.7, 4, -11.6]}
         heading={0.55}
         phase={4.1}
         reducedMotion={reducedMotion}
