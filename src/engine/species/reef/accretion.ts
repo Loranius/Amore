@@ -13,8 +13,6 @@ export const REEF_ACCRETION_PLATE_STACK_LIMIT = 16;
 export const REEF_ACCRETION_STRUCTURE_SKIRT_LIMIT = 32;
 export const REEF_ACCRETION_MINERAL_LIMIT = 16;
 
-const TAU = Math.PI * 2;
-
 export type ReefAccretionKind =
   | 'ENCRUSTING_SHEET'
   | 'SKELETON_BASE'
