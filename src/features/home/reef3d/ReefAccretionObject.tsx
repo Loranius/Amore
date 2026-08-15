@@ -135,8 +135,11 @@ export function ReefAccretionObject({ manifest }: { manifest: ReefAccretionManif
 
   return (
     <group
-      data-reef-accretion-renderer="phase-6-instanced"
-      data-reef-accretion-visible={sheets.length + skeletons.length + plates.length + skirts.length + minerals.length}
+      name="reef-phase-6-accretion"
+      userData={{
+        renderer: 'phase-6-instanced',
+        visibleLayerCount: sheets.length + skeletons.length + plates.length + skirts.length + minerals.length,
+      }}
     >
       {skirts.length > 0 ? (
         <instancedMesh
