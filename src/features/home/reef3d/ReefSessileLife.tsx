@@ -21,11 +21,11 @@ const SOFT_CORALS = [
   { position: [4.85, 0, -3.05] as Vec3, rotation: -0.2, scale: 0.66, color: '#ad7e96' },
 ] as const;
 
+const SOFT_ARM_OFFSETS = [-0.18, 0, 0.19] as const;
+const SOFT_ARM_COUNT = SOFT_CORALS.length * SOFT_ARM_OFFSETS.length;
 const DOWN = new THREE.Vector3(0, -1, 0);
-const GROUND_RAYCASTER = new THREE.Raycaster();
-const GROUND_ORIGIN = new THREE.Vector3();
 
-function visibleGroundMeshes(scene: THREE.Scene): THREE.Mesh[] {
+function collectGroundMeshes(scene: THREE.Scene): THREE.Mesh[] {
   const environment = scene.getObjectByName('reef-environment-light-terraces');
   if (!environment) return [];
   const meshes: THREE.Mesh[] = [];
@@ -38,101 +38,140 @@ function visibleGroundMeshes(scene: THREE.Scene): THREE.Mesh[] {
   return meshes;
 }
 
-function groundYAt(scene: THREE.Scene, x: number, z: number): number {
-  const meshes = visibleGroundMeshes(scene);
-  if (meshes.length === 0) return REEF_SEABED_Y;
-  GROUND_ORIGIN.set(x, 5, z);
-  GROUND_RAYCASTER.set(GROUND_ORIGIN, DOWN);
-  GROUND_RAYCASTER.near = 0;
-  GROUND_RAYCASTER.far = 8;
-  const hit = GROUND_RAYCASTER.intersectObjects(meshes, false)[0];
-  return hit?.point.y ?? REEF_SEABED_Y;
-}
-
-function useGroundedGroup(
-  ref: React.RefObject<THREE.Group | null>,
+function groundYAt(
+  meshes: THREE.Mesh[],
+  raycaster: THREE.Raycaster,
+  origin: THREE.Vector3,
   x: number,
   z: number,
-): void {
-  const scene = useThree((state) => state.scene);
-  const invalidate = useThree((state) => state.invalidate);
-
-  useLayoutEffect(() => {
-    const group = ref.current;
-    if (!group) return;
-    scene.updateMatrixWorld(true);
-    group.position.y = groundYAt(scene, x, z) + 0.012;
-    group.updateMatrixWorld(true);
-    invalidate();
-  }, [invalidate, ref, scene, x, z]);
-}
-
-function Sponge({ position, scale, color }: { position: Vec3; scale: Vec3; color: string }) {
-  const groupRef = useRef<THREE.Group>(null);
-  useGroundedGroup(groupRef, position[0], position[2]);
-
-  return (
-    <group ref={groupRef} position={[position[0], REEF_SEABED_Y, position[2]]}>
-      <mesh position={[0, scale[1] * 0.5, 0]} scale={[scale[0], scale[1], scale[2]]}>
-        <cylinderGeometry args={[0.52, 0.72, 1, 8, 1, true]} />
-        <meshStandardMaterial color={color} roughness={0.96} metalness={0} side={THREE.DoubleSide} />
-      </mesh>
-    </group>
-  );
-}
-
-function SoftCoral({
-  position,
-  rotation,
-  scale,
-  color,
-  reducedMotion,
-}: {
-  position: Vec3;
-  rotation: number;
-  scale: number;
-  color: string;
-  reducedMotion: boolean;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
-  const phase = useMemo(() => position[0] * 0.71 + position[2] * 0.39, [position]);
-  useGroundedGroup(groupRef, position[0], position[2]);
-
-  useFrame((state) => {
-    if (reducedMotion || !groupRef.current) return;
-    groupRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 0.48 + phase) * 0.045;
-  });
-
-  return (
-    <group
-      ref={groupRef}
-      position={[position[0], REEF_SEABED_Y, position[2]]}
-      rotation={[0, rotation, 0]}
-      scale={scale}
-    >
-      {[-0.18, 0, 0.19].map((offset, index) => (
-        <mesh
-          key={`soft-coral-arm-${index}`}
-          position={[offset, 0.18 + index * 0.05, 0]}
-          rotation={[0, 0, offset * 0.65]}
-        >
-          <cylinderGeometry args={[0.035, 0.07, 0.48 + index * 0.08, 6]} />
-          <meshStandardMaterial color={color} roughness={0.94} metalness={0} />
-        </mesh>
-      ))}
-    </group>
-  );
+): number {
+  if (meshes.length === 0) return REEF_SEABED_Y;
+  origin.set(x, 5, z);
+  raycaster.set(origin, DOWN);
+  raycaster.near = 0;
+  raycaster.far = 8;
+  return raycaster.intersectObjects(meshes, false)[0]?.point.y ?? REEF_SEABED_Y;
 }
 
 export function ReefSessileLife({ reducedMotion }: { reducedMotion: boolean }) {
+  const scene = useThree((state) => state.scene);
+  const invalidate = useThree((state) => state.invalidate);
+  const spongeRef = useRef<THREE.InstancedMesh>(null);
+  const softRef = useRef<THREE.InstancedMesh>(null);
+  const softGroundYRef = useRef<number[]>([]);
+  const tickRef = useRef(0);
+  const scratch = useMemo(() => ({
+    raycaster: new THREE.Raycaster(),
+    origin: new THREE.Vector3(),
+    sponge: new THREE.Object3D(),
+    coral: new THREE.Object3D(),
+    arm: new THREE.Object3D(),
+    matrix: new THREE.Matrix4(),
+    color: new THREE.Color(),
+  }), []);
+
+  const updateSoftCorals = (time: number, animated: boolean) => {
+    const mesh = softRef.current;
+    if (!mesh) return;
+    let instanceIndex = 0;
+
+    SOFT_CORALS.forEach((coral, coralIndex) => {
+      const phase = coral.position[0] * 0.71 + coral.position[2] * 0.39;
+      const sway = animated ? Math.sin(time * 0.48 + phase) * 0.045 : 0;
+      scratch.coral.position.set(
+        coral.position[0],
+        softGroundYRef.current[coralIndex] ?? REEF_SEABED_Y,
+        coral.position[2],
+      );
+      scratch.coral.rotation.set(0, coral.rotation, sway);
+      scratch.coral.scale.setScalar(coral.scale);
+      scratch.coral.updateMatrix();
+      scratch.color.set(coral.color);
+
+      SOFT_ARM_OFFSETS.forEach((offset, armIndex) => {
+        scratch.arm.position.set(offset, 0.18 + armIndex * 0.05, 0);
+        scratch.arm.rotation.set(0, 0, offset * 0.65);
+        scratch.arm.scale.set(1, 0.48 + armIndex * 0.08, 1);
+        scratch.arm.updateMatrix();
+        scratch.matrix.multiplyMatrices(scratch.coral.matrix, scratch.arm.matrix);
+        mesh.setMatrixAt(instanceIndex, scratch.matrix);
+        mesh.setColorAt(instanceIndex, scratch.color);
+        instanceIndex += 1;
+      });
+    });
+
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  };
+
+  useLayoutEffect(() => {
+    scene.updateMatrixWorld(true);
+    const groundMeshes = collectGroundMeshes(scene);
+    const spongeMesh = spongeRef.current;
+    const softMesh = softRef.current;
+    if (!spongeMesh || !softMesh) return;
+
+    spongeMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    SPONGES.forEach((sponge, index) => {
+      const y = groundYAt(
+        groundMeshes,
+        scratch.raycaster,
+        scratch.origin,
+        sponge.position[0],
+        sponge.position[2],
+      ) + 0.012;
+      scratch.sponge.position.set(sponge.position[0], y + sponge.scale[1] * 0.5, sponge.position[2]);
+      scratch.sponge.rotation.set(0, 0, 0);
+      scratch.sponge.scale.set(sponge.scale[0], sponge.scale[1], sponge.scale[2]);
+      scratch.sponge.updateMatrix();
+      spongeMesh.setMatrixAt(index, scratch.sponge.matrix);
+      spongeMesh.setColorAt(index, scratch.color.set(sponge.color));
+    });
+    spongeMesh.instanceMatrix.needsUpdate = true;
+    if (spongeMesh.instanceColor) spongeMesh.instanceColor.needsUpdate = true;
+
+    softGroundYRef.current = SOFT_CORALS.map((coral) => groundYAt(
+      groundMeshes,
+      scratch.raycaster,
+      scratch.origin,
+      coral.position[0],
+      coral.position[2],
+    ) + 0.012);
+    softMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    updateSoftCorals(0, false);
+    invalidate();
+  }, [invalidate, scene, scratch]);
+
+  useFrame((state, delta) => {
+    if (reducedMotion) return;
+    tickRef.current += delta;
+    if (tickRef.current < 0.055) return;
+    tickRef.current = 0;
+    updateSoftCorals(state.clock.elapsedTime, true);
+  });
+
   return (
     <>
-      {SPONGES.map((sponge, index) => (
-        <Sponge key={`reef-sponge-${index}`} {...sponge} />
-      ))}
-      {SOFT_CORALS.map((coral, index) => (
-        <SoftCoral key={`reef-soft-coral-${index}`} {...coral} reducedMotion={reducedMotion} />
-      ))}
+      <instancedMesh
+        ref={spongeRef}
+        args={[undefined, undefined, SPONGES.length]}
+        castShadow={false}
+        receiveShadow={false}
+        frustumCulled={false}
+      >
+        <cylinderGeometry args={[0.52, 0.72, 1, 8, 1, true]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.96} metalness={0} side={THREE.DoubleSide} />
+      </instancedMesh>
+      <instancedMesh
+        ref={softRef}
+        args={[undefined, undefined, SOFT_ARM_COUNT]}
+        castShadow={false}
+        receiveShadow={false}
+        frustumCulled={false}
+      >
+        <cylinderGeometry args={[0.035, 0.07, 1, 6]} />
+        <meshStandardMaterial color="#ffffff" roughness={0.94} metalness={0} />
+      </instancedMesh>
     </>
   );
 }
