@@ -265,10 +265,9 @@ function applyMacroRelief(
   if (baseHeight <= profile.floorY + 1e-6) return profile.floorY;
   const crown = profile.levels[0];
   if (!crown) return baseHeight;
-  const relief = crown.height - profile.floorY;
   return Math.max(
     profile.floorY + 0.003,
-    Math.min(crown.height + relief * 0.055, baseHeight + macroReliefOffset(profile, x, z)),
+    Math.min(crown.height, baseHeight + macroReliefOffset(profile, x, z)),
   );
 }
 
