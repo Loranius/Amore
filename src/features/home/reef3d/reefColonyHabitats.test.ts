@@ -49,6 +49,56 @@ function buildFixture() {
   return buildReefPreviewFromArtifact({ artifact, asOf: '2026-07-31' });
 }
 
+function buildMultiMemberFixture(memberCount = 5) {
+  const build = buildFixture();
+  const basePlan = buildReefLivingCanopyPlan(build);
+  const template = basePlan.colonies[0];
+  if (!template) throw new Error('Expected at least one canopy colony in fixture.');
+
+  const layoutTemplate = build.layout.colonies.find(
+    (colony) => colony.id === template.sourceColonyId,
+  );
+  if (!layoutTemplate) throw new Error('Expected matching layout colony in fixture.');
+
+  const members = Array.from({ length: memberCount }, (_value, index) => {
+    if (index === 0) return template;
+    const sourceColonyId = `${template.sourceColonyId}:recruit:${index}`;
+    return {
+      ...template,
+      id: `${template.id}:recruit:${index}`,
+      sourceColonyId,
+      seed: (template.seed + index * 7_919) >>> 0,
+      maturity: Math.max(0, template.maturity - index * 0.08),
+      request: {
+        ...template.request,
+        id: `${template.request.id}:recruit:${index}`,
+        sequence: template.request.sequence + index,
+      },
+    };
+  });
+
+  const syntheticLayout = members.slice(1).map((member) => ({
+    ...layoutTemplate,
+    id: member.sourceColonyId,
+    seed: member.seed,
+  }));
+
+  return {
+    build: {
+      ...build,
+      layout: {
+        ...build.layout,
+        colonies: [...build.layout.colonies, ...syntheticLayout],
+      },
+    },
+    sourcePlan: {
+      ...basePlan,
+      colonies: members,
+      requests: members.map((member) => member.request),
+    },
+  };
+}
+
 function expectedRatioRange(tier: ReefColonyHabitatTier): readonly [number, number] {
   switch (tier) {
     case 'crown': return [0.16, 0.2];
@@ -113,14 +163,13 @@ describe('reef colony habitats', () => {
   });
 
   it('grows chronologically from an old core toward a deterministic perimeter', () => {
-    const build = buildFixture();
-    const sourcePlan = buildReefLivingCanopyPlan(build);
+    const { build, sourcePlan } = buildMultiMemberFixture(5);
     const result = buildReefColonyHabitatPlan(sourcePlan, build);
-    const habitat = result.habitats.find((candidate) => candidate.growth.length >= 2);
+    const habitat = result.habitats[0];
 
     expect(habitat).toBeDefined();
     if (!habitat) return;
-
+    expect(habitat.growth).toHaveLength(5);
     expect(habitat.growth[0]?.stage).toBe('core');
     expect(habitat.growth[0]?.distanceFromCenter).toBe(0);
 
@@ -134,16 +183,14 @@ describe('reef colony habitats', () => {
       expect(current.distanceRatio).toBeLessThanOrEqual(1);
     }
 
-    if (habitat.growth.length >= 5) {
-      expect(habitat.growth.at(-1)?.stage).toBe('frontier');
-    }
+    expect(habitat.growth.at(-1)?.stage).toBe('frontier');
+    expect(habitat.activeRadius).toBe(habitat.growth.at(-1)?.distanceFromCenter);
   });
 
   it('keeps established members fixed when the newest recruit is removed', () => {
-    const build = buildFixture();
-    const sourcePlan = buildReefLivingCanopyPlan(build);
+    const { build, sourcePlan } = buildMultiMemberFixture(5);
     const full = buildReefColonyHabitatPlan(sourcePlan, build);
-    const habitat = full.habitats.find((candidate) => candidate.memberColonyIds.length >= 2);
+    const habitat = full.habitats[0];
 
     expect(habitat).toBeDefined();
     if (!habitat) return;
