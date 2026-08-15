@@ -85,6 +85,23 @@ export type {
   ReefCoralColony,
   ReefCoralMorphotype,
 } from './coralColonies';
+export {
+  buildReefAccretion,
+  REEF_ACCRETION_MAX_LAYERS,
+  REEF_ACCRETION_MINERAL_LIMIT,
+  REEF_ACCRETION_PLATE_STACK_LIMIT,
+  REEF_ACCRETION_SHEET_LIMIT,
+  REEF_ACCRETION_SKELETON_LIMIT,
+  REEF_ACCRETION_STRUCTURE_SKIRT_LIMIT,
+  REEF_ACCRETION_VERSION,
+} from './accretion';
+export type {
+  BuildReefAccretionInput,
+  ReefAccretionDiagnostics,
+  ReefAccretionKind,
+  ReefAccretionLayer,
+  ReefAccretionManifest,
+} from './accretion';
 export type {
   ReefGrowthArchPlacement,
   ReefGrowthOutcropPlacement,

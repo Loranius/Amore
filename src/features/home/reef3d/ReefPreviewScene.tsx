@@ -1,5 +1,6 @@
 import { Canvas } from '@react-three/fiber';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
+import { ReefAccretionObject } from './ReefAccretionObject';
 import { ReefCoralColoniesObject } from './ReefCoralColoniesObject';
 import { ReefCoreObject } from './ReefCoreObject';
 import { ReefCoreStage } from './ReefCoreStage';
@@ -7,7 +8,7 @@ import { ReefYearStructuresObject } from './ReefYearStructuresObject';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
 
-/** Portal-facing Phase 5 scene: deterministic geology, coral surfaces and baseline colonies. */
+/** Portal-facing Phase 6 scene: coral colonies are accumulated into older reef substrate. */
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
 
@@ -22,13 +23,13 @@ export default function ReefPreviewScene() {
       >
         <div>
           <h2>Риф не вдалося побудувати</h2>
-          <p>{portal.error?.message ?? 'Reef coral colonization is unavailable.'}</p>
+          <p>{portal.error?.message ?? 'Reef accretion system is unavailable.'}</p>
         </div>
       </div>
     );
   }
 
-  const { core, yearStructures, composition, surfaces, colonies, asOf } = portal.preview;
+  const { core, yearStructures, composition, surfaces, colonies, accretion, asOf } = portal.preview;
   const coreExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
   const structureExtent = composition.structures.reduce(
     (maximum, structure) => Math.max(
@@ -44,7 +45,14 @@ export default function ReefPreviewScene() {
     ),
     0,
   );
-  const sceneExtent = Math.max(coreExtent, structureExtent, colonyExtent);
+  const accretionExtent = accretion.layers.reduce(
+    (maximum, layer) => Math.max(
+      maximum,
+      Math.hypot(layer.position.x, layer.position.z) + Math.max(layer.radiusX, layer.radiusZ),
+    ),
+    0,
+  );
+  const sceneExtent = Math.max(coreExtent, structureExtent, colonyExtent, accretionExtent);
   const cameraDistance = Math.max(6.6, sceneExtent * 1.72, core.dimensions.height * 1.4);
   const cameraHeight = Math.max(2.7, core.dimensions.height * 0.58, sceneExtent * 0.28);
   const counts = yearStructures.diagnostics.archetypeCounts;
@@ -52,6 +60,8 @@ export default function ReefPreviewScene() {
   const surfaceDiagnostics = surfaces.diagnostics;
   const colonyDiagnostics = colonies.diagnostics;
   const coralCounts = colonyDiagnostics.morphotypeCounts;
+  const accretionDiagnostics = accretion.diagnostics;
+  const accretionCounts = accretionDiagnostics.kindCounts;
 
   return (
     <div
@@ -59,13 +69,14 @@ export default function ReefPreviewScene() {
       data-home-artifact-preview="reef"
       data-reef-preview="ready"
       data-reef-source="portal"
-      data-reef-scene="phase-5-coral-colonization"
-      data-reef-phase="5"
+      data-reef-scene="phase-6-accretion-overlap"
+      data-reef-phase="6"
       data-reef-core-version={core.version}
       data-reef-year-structures-version={yearStructures.version}
       data-reef-composition-version={composition.version}
       data-reef-surface-version={surfaces.version}
       data-reef-colony-version={colonies.version}
+      data-reef-accretion-version={accretion.version}
       data-reef-couple-id={core.identity.coupleId}
       data-reef-as-of={asOf}
       data-reef-seed={core.identity.reefSeed}
@@ -77,6 +88,7 @@ export default function ReefPreviewScene() {
       data-reef-composition-signature={composition.signature}
       data-reef-surface-signature={surfaces.signature}
       data-reef-colony-signature={colonies.signature}
+      data-reef-accretion-signature={accretion.signature}
       data-reef-days-together={core.age.daysTogether}
       data-reef-completed-years={core.age.completedYears}
       data-reef-max-years={core.age.maxYears}
@@ -127,6 +139,17 @@ export default function ReefPreviewScene() {
       data-reef-colony-plate={coralCounts.PLATE}
       data-reef-colony-encrusting={coralCounts.ENCRUSTING}
       data-reef-colony-draw-groups={4}
+      data-reef-accretion-layers={accretionDiagnostics.layerCount}
+      data-reef-accretion-visible={accretionDiagnostics.visibleLayerCount}
+      data-reef-accretion-sources={accretionDiagnostics.coveredSourceCount}
+      data-reef-accretion-average-growth={accretionDiagnostics.averageGrowth}
+      data-reef-accretion-mobile-bounded={accretionDiagnostics.boundedForMobile ? 'true' : 'false'}
+      data-reef-accretion-sheets={accretionCounts.ENCRUSTING_SHEET}
+      data-reef-accretion-skeletons={accretionCounts.SKELETON_BASE}
+      data-reef-accretion-plates={accretionCounts.PLATE_STACK}
+      data-reef-accretion-skirts={accretionCounts.STRUCTURE_SKIRT}
+      data-reef-accretion-minerals={accretionCounts.MINERAL_TRANSITION}
+      data-reef-accretion-draw-groups={5}
       data-reef-map-outcrops={0}
       data-reef-schedule-terraces={0}
       data-reef-plan-fish-logical={0}
@@ -153,6 +176,7 @@ export default function ReefPreviewScene() {
         <ReefCoreStage core={core} sceneExtent={sceneExtent}>
           <ReefCoreObject core={core} />
           <ReefYearStructuresObject core={core} manifest={composition} />
+          <ReefAccretionObject manifest={accretion} />
           <ReefCoralColoniesObject manifest={colonies} />
         </ReefCoreStage>
       </Canvas>
