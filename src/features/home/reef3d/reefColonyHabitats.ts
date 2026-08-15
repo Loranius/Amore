@@ -5,11 +5,21 @@ import type {
   ReefLivingCanopyPlan,
 } from './reefLivingCanopy';
 
-export const REEF_COLONY_HABITAT_VERSION = 'reef-colony-habitats-v1';
+export const REEF_COLONY_HABITAT_VERSION = 'reef-colony-habitats-v2';
 
 const TAU = Math.PI * 2;
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 export type ReefColonyHabitatTier = 'crown' | 'upper' | 'middle' | 'lower';
+export type ReefColonyGrowthStage = 'core' | 'inner' | 'frontier';
+
+export interface ReefColonyHabitatMemberGrowth {
+  colonyId: string;
+  sequence: number;
+  stage: ReefColonyGrowthStage;
+  distanceFromCenter: number;
+  distanceRatio: number;
+}
 
 export interface ReefColonyHabitatSummary {
   id: string;
@@ -18,7 +28,10 @@ export interface ReefColonyHabitatSummary {
   tier: ReefColonyHabitatTier;
   center: { x: number; z: number };
   spreadRadius: number;
+  activeRadius: number;
+  maturity: number;
   memberColonyIds: string[];
+  growth: ReefColonyHabitatMemberGrowth[];
 }
 
 export interface ReefColonyHabitatPlan {
@@ -34,8 +47,21 @@ interface HabitatMember {
   preferredAzimuthRad: number;
 }
 
+interface HabitatRenderMember {
+  request: ReefLivingCanopyColony['request'];
+  facingRad: number;
+}
+
 function round6(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
+}
+
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeAngle(value: number): number {
+  return ((value % TAU) + TAU) % TAU;
 }
 
 function stableUnit(seed: number, label: string): number {
@@ -96,14 +122,62 @@ function dominantMorphotype(members: readonly HabitatMember[]): ReefColonyMorpho
     ?? 'branching';
 }
 
+function habitatMaturity(members: readonly HabitatMember[]): number {
+  if (members.length === 0) return 0;
+  const weighted = members.reduce((total, member, index) => {
+    const ageWeight = 1 + Math.max(0, members.length - index - 1) * 0.08;
+    return total + clamp01(member.colony.maturity) * ageWeight;
+  }, 0);
+  const weights = members.reduce(
+    (total, _member, index) => total + 1 + Math.max(0, members.length - index - 1) * 0.08,
+    0,
+  );
+  return round6(clamp01(weighted / Math.max(1e-6, weights)));
+}
+
+function growthStage(memberIndex: number): ReefColonyGrowthStage {
+  if (memberIndex === 0) return 'core';
+  if (memberIndex <= 3) return 'inner';
+  return 'frontier';
+}
+
 /**
- * Replaces the old four global morphotype hotspots with stable ecological
- * colony habitats. Every source growth instruction owns one deterministic
- * centre on a broad limestone terrace, while recruits from that instruction
- * stay grouped around the centre as one visually coherent colony patch.
+ * Distance is append-only: it depends on the chronological member index, never
+ * on the final member count. Adding a new recruit therefore extends the outer
+ * edge without moving older coral back out of its established core position.
+ */
+function memberGrowthDistance({
+  memberIndex,
+  foundationRadius,
+  firstFootprint,
+  spreadRadius,
+}: {
+  memberIndex: number;
+  foundationRadius: number;
+  firstFootprint: number;
+  spreadRadius: number;
+}): number {
+  if (memberIndex <= 0) return 0;
+  const baseStep = Math.max(
+    foundationRadius * 0.028,
+    Math.min(foundationRadius * 0.052, firstFootprint * 1.18),
+  );
+  return round6(Math.min(
+    spreadRadius,
+    baseStep * Math.sqrt(memberIndex) * 1.06,
+  ));
+}
+
+/**
+ * Builds one stable ecological habitat per source growth instruction.
  *
- * The logical layout, chronological request ids and collision-safe allocator
- * remain untouched. Only renderer preferred anchors change.
+ * V2 changes the internal ecology from fixed rings to chronological outward
+ * growth. The oldest member becomes the colony core. Later recruits follow a
+ * deterministic golden-angle spiral and progressively occupy the perimeter.
+ * Existing members keep their index-derived distance, so future additions do
+ * not reshuffle the established colony. Individual coral maturity still drives
+ * its mesh scale in reefLivingCanopy, making old core members fuller while
+ * younger frontier members read as fresh growth.
  */
 export function buildReefColonyHabitatPlan(
   sourcePlan: ReefLivingCanopyPlan,
@@ -142,7 +216,7 @@ export function buildReefColonyHabitatPlan(
   }
 
   const habitats: ReefColonyHabitatSummary[] = [];
-  const requestByColonyId = new Map<string, ReefLivingCanopyColony['request']>();
+  const renderByColonyId = new Map<string, HabitatRenderMember>();
 
   for (const [sourceInstructionId, unorderedMembers] of groups) {
     const members = [...unorderedMembers].sort((left, right) => (
@@ -169,39 +243,54 @@ export function buildReefColonyHabitatPlan(
       0.06,
       ...members.map((member) => member.colony.request.footprintRadius),
     );
+    const firstFootprint = Math.max(0.06, first.colony.request.footprintRadius);
     const spreadRadius = round6(Math.min(
-      foundationRadius * 0.115,
-      Math.max(foundationRadius * 0.045, maximumFootprint * 2.25),
+      foundationRadius * 0.13,
+      Math.max(foundationRadius * 0.055, maximumFootprint * 2.55),
     ));
     const memberPhase = stableUnit(
       identitySeed,
       `${sourceInstructionId}:member-phase`,
     ) * TAU;
+    const growth: ReefColonyHabitatMemberGrowth[] = [];
+    let activeRadius = 0;
 
     members.forEach((member, memberIndex) => {
-      let offsetX = 0;
-      let offsetZ = 0;
-      if (memberIndex > 0) {
-        const zeroIndex = memberIndex - 1;
-        const ring = Math.floor(zeroIndex / 6) + 1;
-        const slot = zeroIndex % 6;
-        const memberAngle = memberPhase
-          + slot / 6 * TAU
-          + (stableUnit(member.colony.seed, 'habitat-member-angle') - 0.5) * 0.18;
-        const targetDistance = maximumFootprint * (1.15 + (ring - 1) * 0.72)
-          + spreadRadius * 0.16;
-        const distance = Math.min(spreadRadius, targetDistance);
-        offsetX = Math.cos(memberAngle) * distance;
-        offsetZ = Math.sin(memberAngle) * distance;
-      }
+      const distance = memberGrowthDistance({
+        memberIndex,
+        foundationRadius,
+        firstFootprint,
+        spreadRadius,
+      });
+      const memberAngle = memberPhase
+        + memberIndex * GOLDEN_ANGLE
+        + (stableUnit(member.colony.seed, 'habitat-member-angle') - 0.5) * 0.2;
+      const offsetX = Math.cos(memberAngle) * distance;
+      const offsetZ = Math.sin(memberAngle) * distance;
+      const facingJitter = (stableUnit(member.colony.seed, 'habitat-facing') - 0.5) * 0.52;
+      const outwardBias = memberIndex === 0
+        ? 0
+        : Math.sin(memberAngle - hubAngle) * 0.14;
+      const facingRad = normalizeAngle(member.colony.facingRad + facingJitter + outwardBias);
+      activeRadius = Math.max(activeRadius, distance);
 
-      requestByColonyId.set(member.colony.sourceColonyId, {
-        ...member.colony.request,
-        preferred: {
-          x: round6(center.x + offsetX),
-          y: member.colony.request.preferred.y,
-          z: round6(center.z + offsetZ),
+      renderByColonyId.set(member.colony.sourceColonyId, {
+        request: {
+          ...member.colony.request,
+          preferred: {
+            x: round6(center.x + offsetX),
+            y: member.colony.request.preferred.y,
+            z: round6(center.z + offsetZ),
+          },
         },
+        facingRad,
+      });
+      growth.push({
+        colonyId: member.colony.sourceColonyId,
+        sequence: member.colony.request.sequence,
+        stage: growthStage(memberIndex),
+        distanceFromCenter: distance,
+        distanceRatio: spreadRadius <= 1e-6 ? 0 : round6(distance / spreadRadius),
       });
     });
 
@@ -212,30 +301,32 @@ export function buildReefColonyHabitatPlan(
       tier,
       center,
       spreadRadius,
+      activeRadius: round6(activeRadius),
+      maturity: habitatMaturity(members),
       memberColonyIds: members.map((member) => member.colony.sourceColonyId),
+      growth,
     });
   }
 
+  const sequenceByColonyId = new Map(
+    sourcePlan.colonies.map((colony) => [colony.sourceColonyId, colony.request.sequence] as const),
+  );
   habitats.sort((left, right) => {
     const leftSequence = Math.min(
-      ...left.memberColonyIds.map((id) => (
-        sourcePlan.colonies.find((colony) => colony.sourceColonyId === id)?.request.sequence
-        ?? Number.MAX_SAFE_INTEGER
-      )),
+      ...left.memberColonyIds.map((id) => sequenceByColonyId.get(id) ?? Number.MAX_SAFE_INTEGER),
     );
     const rightSequence = Math.min(
-      ...right.memberColonyIds.map((id) => (
-        sourcePlan.colonies.find((colony) => colony.sourceColonyId === id)?.request.sequence
-        ?? Number.MAX_SAFE_INTEGER
-      )),
+      ...right.memberColonyIds.map((id) => sequenceByColonyId.get(id) ?? Number.MAX_SAFE_INTEGER),
     );
     return leftSequence - rightSequence || left.id.localeCompare(right.id);
   });
 
-  const colonies = sourcePlan.colonies.map((colony) => ({
-    ...colony,
-    request: requestByColonyId.get(colony.sourceColonyId) ?? colony.request,
-  }));
+  const colonies = sourcePlan.colonies.map((colony) => {
+    const render = renderByColonyId.get(colony.sourceColonyId);
+    return render
+      ? { ...colony, request: render.request, facingRad: render.facingRad }
+      : colony;
+  });
 
   return {
     version: REEF_COLONY_HABITAT_VERSION,

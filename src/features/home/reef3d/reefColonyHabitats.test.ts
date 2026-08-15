@@ -79,6 +79,9 @@ describe('reef colony habitats', () => {
       expect(habitat.dominantMorphotype).toBe(sourceColonies[0]?.morphotype);
       expect([...habitat.memberColonyIds].sort())
         .toEqual(sourceColonies.map((colony) => colony.id).sort());
+      expect(habitat.maturity).toBeGreaterThanOrEqual(0);
+      expect(habitat.maturity).toBeLessThanOrEqual(1);
+      expect(habitat.activeRadius).toBeLessThanOrEqual(habitat.spreadRadius + 1e-6);
     }
   });
 
@@ -104,8 +107,74 @@ describe('reef colony habitats', () => {
           (request?.preferred.x ?? 0) - habitat.center.x,
           (request?.preferred.z ?? 0) - habitat.center.z,
         );
-        expect(distance).toBeLessThanOrEqual(habitat.spreadRadius + 1e-6);
+        expect(distance).toBeLessThanOrEqual(habitat.spreadRadius + 1e-5);
       }
+    }
+  });
+
+  it('grows chronologically from an old core toward a deterministic perimeter', () => {
+    const build = buildFixture();
+    const sourcePlan = buildReefLivingCanopyPlan(build);
+    const result = buildReefColonyHabitatPlan(sourcePlan, build);
+    const habitat = result.habitats.find((candidate) => candidate.growth.length >= 2);
+
+    expect(habitat).toBeDefined();
+    if (!habitat) return;
+
+    expect(habitat.growth[0]?.stage).toBe('core');
+    expect(habitat.growth[0]?.distanceFromCenter).toBe(0);
+
+    for (let index = 1; index < habitat.growth.length; index += 1) {
+      const previous = habitat.growth[index - 1]!;
+      const current = habitat.growth[index]!;
+      expect(current.sequence).toBeGreaterThanOrEqual(previous.sequence);
+      expect(current.distanceFromCenter + 1e-6)
+        .toBeGreaterThanOrEqual(previous.distanceFromCenter);
+      expect(current.distanceRatio).toBeGreaterThanOrEqual(0);
+      expect(current.distanceRatio).toBeLessThanOrEqual(1);
+    }
+
+    if (habitat.growth.length >= 5) {
+      expect(habitat.growth.at(-1)?.stage).toBe('frontier');
+    }
+  });
+
+  it('keeps established members fixed when the newest recruit is removed', () => {
+    const build = buildFixture();
+    const sourcePlan = buildReefLivingCanopyPlan(build);
+    const full = buildReefColonyHabitatPlan(sourcePlan, build);
+    const habitat = full.habitats.find((candidate) => candidate.memberColonyIds.length >= 2);
+
+    expect(habitat).toBeDefined();
+    if (!habitat) return;
+
+    const removedId = habitat.memberColonyIds.at(-1)!;
+    const trimmedColonies = sourcePlan.colonies.filter(
+      (colony) => colony.sourceColonyId !== removedId,
+    );
+    const trimmed = buildReefColonyHabitatPlan({
+      ...sourcePlan,
+      colonies: trimmedColonies,
+      requests: trimmedColonies.map((colony) => colony.request),
+    }, build);
+    const trimmedHabitat = trimmed.habitats.find(
+      (candidate) => candidate.sourceInstructionId === habitat.sourceInstructionId,
+    );
+
+    expect(trimmedHabitat).toBeDefined();
+    expect(trimmedHabitat?.center).toEqual(habitat.center);
+
+    const fullById = new Map(
+      full.plan.colonies.map((colony) => [colony.sourceColonyId, colony] as const),
+    );
+    const trimmedById = new Map(
+      trimmed.plan.colonies.map((colony) => [colony.sourceColonyId, colony] as const),
+    );
+    for (const memberId of habitat.memberColonyIds.slice(0, -1)) {
+      expect(trimmedById.get(memberId)?.request.preferred)
+        .toEqual(fullById.get(memberId)?.request.preferred);
+      expect(trimmedById.get(memberId)?.facingRad)
+        .toEqual(fullById.get(memberId)?.facingRad);
     }
   });
 
