@@ -40,11 +40,12 @@ describe('reef accretion phase 6', () => {
     expect(sheets.every((layer) => !layer.sourceId.includes('core'))).toBe(true);
   });
 
-  it('keeps accretion identity stable while old material matures', () => {
+  it('keeps layer identity stable while platform material can expand with its substrate', () => {
     const five = phaseAt(5).accretion.layers;
     const nine = phaseAt(9).accretion.layers;
     const laterById = new Map(nine.map((layer) => [layer.id, layer]));
     let compared = 0;
+    let immutableYearLayers = 0;
 
     for (const before of five) {
       const after = laterById.get(before.id);
@@ -55,12 +56,20 @@ describe('reef accretion phase 6', () => {
       expect(after.sourceId).toBe(before.sourceId);
       expect(after.anchorId).toBe(before.anchorId);
       expect(after.identitySignature).toBe(before.identitySignature);
-      expect(after.radiusX).toBe(before.radiusX);
-      expect(after.radiusZ).toBe(before.radiusZ);
-      expect(after.thickness).toBe(before.thickness);
       expect(after.growth).toBeGreaterThanOrEqual(before.growth);
+
+      if (before.sourceId !== 'reef:platform') {
+        immutableYearLayers += 1;
+        expect(after.position.x).toBe(before.position.x);
+        expect(after.position.z).toBe(before.position.z);
+        expect(after.normal).toEqual(before.normal);
+        expect(after.radiusX).toBe(before.radiusX);
+        expect(after.radiusZ).toBe(before.radiusZ);
+        expect(after.thickness).toBe(before.thickness);
+      }
     }
     expect(compared).toBeGreaterThan(0);
+    expect(immutableYearLayers).toBeGreaterThan(0);
   });
 
   it('turns older yearly structures into substrate skirts instead of extra props', () => {
