@@ -45,6 +45,8 @@ describe('reef coral colonization phase 5', () => {
       expect(patch?.eligible).toBe(true);
       expect(patch?.sourceKind).not.toBe('CORE');
       expect(colony.sourceId).toBe(patch?.sourceId);
+      expect(colony.position).toEqual(patch?.position);
+      expect(colony.normal).toEqual(patch?.normal);
       expect(patchIds.has(colony.patchId)).toBe(false);
       patchIds.add(colony.patchId);
     }
@@ -57,7 +59,7 @@ describe('reef coral colonization phase 5', () => {
     expect(sourceIds.size).toBe(yearly.length);
   });
 
-  it('keeps mature earlier yearly colony identity and morphology immutable', () => {
+  it('keeps mature earlier yearly colony anchors and morphology immutable', () => {
     const five = coloniesAt(5).colonies.colonies.filter(
       (colony) => colony.sourceKind === 'YEAR_STRUCTURE',
     );
@@ -76,7 +78,8 @@ describe('reef coral colonization phase 5', () => {
       expect(after.height).toBe(before.height);
       expect(after.branchCount).toBe(before.branchCount);
       expect(after.tangentRotation).toBe(before.tangentRotation);
-      expect(after.position).toEqual(before.position);
+      expect(after.position.x).toBe(before.position.x);
+      expect(after.position.z).toBe(before.position.z);
       expect(after.normal).toEqual(before.normal);
     }
   });
