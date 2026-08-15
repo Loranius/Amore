@@ -78,9 +78,12 @@ function passageByRoute(
   return new Map(passages.map((passage) => [passage.routeId, passage]));
 }
 
-function applyWorldDelta(objects: readonly THREE.Object3D[], delta: THREE.Vector3): void {
+function applyWorldDelta(
+  objects: readonly THREE.Object3D[],
+  delta: THREE.Vector3,
+  world: THREE.Vector3,
+): void {
   if (delta.lengthSq() <= 1e-10) return;
-  const world = new THREE.Vector3();
   for (const object of objects) {
     const parent = object.parent;
     if (!parent) continue;
@@ -92,14 +95,6 @@ function applyWorldDelta(objects: readonly THREE.Object3D[], delta: THREE.Vector
   }
 }
 
-/**
- * Native animated fish school sourced from the authored School Of Fish GLB.
- *
- * Authored animation supplies swimming/body motion, navigation owns one smooth
- * world-space offset, and tunnel guidance becomes authoritative while a fish is
- * crossing a real arch opening. Local collision remains active for ordinary
- * rocks, but cannot fight the tunnel by pushing against the arch being crossed.
- */
 export function ReefFishSchool({
   build,
   onReady,
@@ -108,6 +103,13 @@ export function ReefFishSchool({
   const schoolRef = useRef<THREE.Group>(null);
   const obstaclesRef = useRef<ReefFishObstacle[]>([]);
   const navigationOffsetsRef = useRef(new Map<ReefFishRouteId, THREE.Vector3>());
+  const motionScratch = useRef({
+    representative: new THREE.Vector3(),
+    guided: new THREE.Vector3(),
+    targetDelta: new THREE.Vector3(),
+    corrected: new THREE.Vector3(),
+    carrierWorld: new THREE.Vector3(),
+  });
   const threeScene = useThree((state) => state.scene);
   const { scene, animations } = useGLTF(SCHOOL_OF_FISH_MODEL_URL);
   const routes = useMemo(
@@ -138,7 +140,6 @@ export function ReefFishSchool({
     const activeActions = routes.flatMap(({ clip, phase }) => {
       const action = actions[clip.name];
       if (!action) return [];
-
       action.reset();
       action.setLoop(THREE.LoopRepeat, Infinity);
       action.time = clip.duration * phase;
@@ -164,18 +165,15 @@ export function ReefFishSchool({
 
   useFrame((_state, deltaSeconds) => {
     if (!schoolRef.current) return;
-
-    threeScene.updateMatrixWorld(true);
-    const representativeWorld = new THREE.Vector3();
-    const guidedWorld = new THREE.Vector3();
+    const scratch = motionScratch.current;
 
     for (const route of routes) {
       const routeCarriers = carriers.get(route.routeId) ?? [];
       const representative = routeCarriers[0];
       if (!representative) continue;
 
-      representative.getWorldPosition(representativeWorld);
-      guidedWorld.copy(representativeWorld);
+      representative.getWorldPosition(scratch.representative);
+      scratch.guided.copy(scratch.representative);
 
       let tunnelWeight = 0;
       const passage = tunnels.get(route.routeId);
@@ -188,51 +186,45 @@ export function ReefFishSchool({
         const tunnelSample = sampleReefFishTunnelPassage(passage, normalizedPhase);
         if (tunnelSample) {
           tunnelWeight = tunnelSample.weight;
-          guidedWorld.lerp(tunnelSample.target, tunnelWeight);
+          scratch.guided.lerp(tunnelSample.target, tunnelWeight);
         }
       }
 
       const tunnelOwnsArchCrossing = tunnelWeight > TUNNEL_COLLISION_RELEASE_WEIGHT;
-
-      // The central foundation is handled only by the smooth radial field.
-      // During a tunnel crossing this field fades to zero as the guide takes over.
-      const foundationDelta = reefFishFoundationAvoidanceDelta(guidedWorld, build)
+      const foundationDelta = reefFishFoundationAvoidanceDelta(scratch.guided, build)
         .multiplyScalar(1 - tunnelWeight);
-      guidedWorld.add(foundationDelta);
+      scratch.guided.add(foundationDelta);
 
-      // Arch-rock collision is disabled only while the fish is deliberately in
-      // a real tunnel window. All other rocks remain solid throughout the pass.
       const localCollisionDelta = reefFishCollisionDelta(
-        guidedWorld,
+        scratch.guided,
         obstaclesRef.current,
         0.34,
         { ignoreArchRocks: tunnelOwnsArchCrossing },
       );
-      guidedWorld.add(localCollisionDelta);
+      scratch.guided.add(localCollisionDelta);
+      scratch.targetDelta.copy(scratch.guided).sub(scratch.representative);
 
-      const targetDelta = guidedWorld.clone().sub(representativeWorld);
-      const currentDelta = navigationOffsetsRef.current.get(route.routeId)
-        ?? new THREE.Vector3();
+      let currentDelta = navigationOffsetsRef.current.get(route.routeId);
+      if (!currentDelta) {
+        currentDelta = new THREE.Vector3();
+        navigationOffsetsRef.current.set(route.routeId, currentDelta);
+      }
+
       const response = localCollisionDelta.lengthSq() > 1e-8
         ? COLLISION_RESPONSE
         : NAVIGATION_RESPONSE;
       const frame = Math.min(Math.max(deltaSeconds, 0), 0.05);
-      const blend = 1 - Math.exp(-response * frame);
-      currentDelta.lerp(targetDelta, blend);
+      currentDelta.lerp(scratch.targetDelta, 1 - Math.exp(-response * frame));
 
-      // Final protection is kept for non-arch structures, but it must obey the
-      // same tunnel ownership rule or it would reintroduce frame-to-frame jitter.
-      const correctedWorld = representativeWorld.clone().add(currentDelta);
-      const emergencyDelta = reefFishCollisionDelta(
-        correctedWorld,
+      scratch.corrected.copy(scratch.representative).add(currentDelta);
+      currentDelta.add(reefFishCollisionDelta(
+        scratch.corrected,
         obstaclesRef.current,
         EMERGENCY_COLLISION_MARGIN,
         { ignoreArchRocks: tunnelOwnsArchCrossing },
-      );
-      currentDelta.add(emergencyDelta);
+      ));
 
-      navigationOffsetsRef.current.set(route.routeId, currentDelta);
-      applyWorldDelta(routeCarriers, currentDelta);
+      applyWorldDelta(routeCarriers, currentDelta, scratch.carrierWorld);
     }
   });
 
@@ -269,13 +261,7 @@ export function ReefFishSchool({
       position={REEF_FISH_SCHOOL_POSITION}
       scale={REEF_FISH_SCHOOL_SCALE}
     >
-      <primitive
-        object={scene}
-        position={[0, 0, 0]}
-        rotation={[0, 0, 0]}
-        scale={1}
-        dispose={null}
-      />
+      <primitive object={scene} dispose={null} />
     </group>
   );
 }
