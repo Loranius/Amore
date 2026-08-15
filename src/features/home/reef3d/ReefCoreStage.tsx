@@ -20,18 +20,20 @@ export function ReefCoreStage({
   return (
     <>
       <color attach="background" args={["#071c23"]} />
-      <ambientLight intensity={0.52} />
-      <hemisphereLight args={["#9bc8cf", "#15272a", 1.15]} />
+      <ambientLight intensity={0.72} />
+      <hemisphereLight args={["#a6d1d4", "#1a3030", 1.34]} />
       <directionalLight
         position={[5.5, 9, 5]}
-        intensity={2.05}
-        color="#d4eee7"
+        intensity={1.62}
+        color="#d7eee7"
         castShadow
+        shadow-bias={-0.00035}
+        shadow-normalBias={0.035}
       />
       <directionalLight
         position={[-5, 3.5, -4]}
-        intensity={0.7}
-        color="#4d8693"
+        intensity={0.92}
+        color="#5b95a0"
       />
 
       <mesh
@@ -40,7 +42,7 @@ export function ReefCoreStage({
         receiveShadow
       >
         <circleGeometry args={[Math.max(18, horizontalExtent * 2.4), 64]} />
-        <meshStandardMaterial color="#132e30" roughness={1} metalness={0} />
+        <meshStandardMaterial color="#173437" roughness={1} metalness={0} />
       </mesh>
 
       {children}

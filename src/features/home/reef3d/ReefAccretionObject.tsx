@@ -1,25 +1,42 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import type { ReefAccretionKind, ReefAccretionLayer, ReefAccretionManifest } from '@/engine/species/reef';
+import type {
+  ReefAccretionKind,
+  ReefAccretionLayer,
+  ReefAccretionManifest,
+  ReefCoreManifest,
+} from '@/engine/species/reef';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const PATCH_SEGMENTS = 18;
 const PATCH_RINGS = 4;
+const SHEET_CLUSTER_SIZE = 3;
 
 const TONES: Record<ReefAccretionKind, readonly string[]> = {
   ENCRUSTING_SHEET: ['#747a68', '#6b7466', '#7b7c69', '#697365'],
   SKELETON_BASE: ['#8c8978', '#817f70', '#96917d', '#77776b'],
   PLATE_STACK: ['#9b6c73', '#906e70', '#a17770', '#896a70'],
-  STRUCTURE_SKIRT: ['#61685e', '#596159', '#697065', '#555e56'],
+  STRUCTURE_SKIRT: ['#626b61', '#5b645c', '#6c7368', '#586159'],
   MINERAL_TRANSITION: ['#727565', '#687062', '#797867', '#626b60'],
 };
 
+interface ConnectorSpec {
+  x: number;
+  y: number;
+  z: number;
+  rotationY: number;
+  width: number;
+  height: number;
+  length: number;
+  toneIndex: number;
+}
+
 function patchHeight(kind: 'sheet' | 'skeleton' | 'skirt' | 'mineral', u: number) {
-  const crown = Math.pow(Math.max(0, 1 - u), kind === 'skirt' ? 0.72 : 1.15);
-  if (kind === 'sheet') return crown * 0.46 - u * 0.12;
-  if (kind === 'skeleton') return crown * 0.72 - u * 0.14;
-  if (kind === 'mineral') return crown * 0.34 - u * 0.10;
-  return crown * 0.92 - u * 0.16;
+  const crown = Math.pow(Math.max(0, 1 - u), kind === 'skirt' ? 0.64 : 1.12);
+  if (kind === 'sheet') return crown * 0.38 - u * 0.07;
+  if (kind === 'skeleton') return crown * 0.58 - u * 0.08;
+  if (kind === 'mineral') return crown * 0.28 - u * 0.06;
+  return crown * 0.70 - u * 0.09;
 }
 
 function createOrganicPatchGeometry(kind: 'sheet' | 'skeleton' | 'skirt' | 'mineral') {
@@ -31,8 +48,8 @@ function createOrganicPatchGeometry(kind: 'sheet' | 'skeleton' | 'skirt' | 'mine
     for (let segment = 0; segment < PATCH_SEGMENTS; segment += 1) {
       const angle = segment / PATCH_SEGMENTS * Math.PI * 2;
       const edgeWave = 1
-        + Math.sin(angle * 3 + ring * 0.8) * 0.055
-        + Math.cos(angle * 5 - ring * 0.55) * 0.035;
+        + Math.sin(angle * 3 + ring * 0.8) * 0.07
+        + Math.cos(angle * 5 - ring * 0.55) * 0.045;
       const radius = u * edgeWave;
       const crownNoise = (1 - u) * (
         Math.sin(angle * 4 + ring * 0.9) * 0.045
@@ -69,11 +86,11 @@ function createOrganicPatchGeometry(kind: 'sheet' | 'skeleton' | 'skirt' | 'mine
   for (let segment = 0; segment < PATCH_SEGMENTS; segment += 1) {
     const angle = segment / PATCH_SEGMENTS * Math.PI * 2;
     const edgeWave = 1
-      + Math.sin(angle * 3 + PATCH_RINGS * 0.8) * 0.055
-      + Math.cos(angle * 5 - PATCH_RINGS * 0.55) * 0.035;
+      + Math.sin(angle * 3 + PATCH_RINGS * 0.8) * 0.07
+      + Math.cos(angle * 5 - PATCH_RINGS * 0.55) * 0.045;
     positions.push(
       Math.cos(angle) * edgeWave,
-      kind === 'skirt' ? -0.28 : -0.20,
+      kind === 'skirt' ? -0.09 : -0.055,
       Math.sin(angle) * edgeWave,
     );
   }
@@ -92,6 +109,21 @@ function createOrganicPatchGeometry(kind: 'sheet' | 'skeleton' | 'skirt' | 'mine
   geometry.computeVertexNormals();
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
+  return geometry;
+}
+
+function createConnectorGeometry() {
+  const geometry = new THREE.IcosahedronGeometry(1, 2);
+  const position = geometry.attributes.position as THREE.BufferAttribute;
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const wave = Math.sin(z * 5.2) * 0.08 + Math.cos(x * 4.1) * 0.05;
+    position.setXYZ(index, x * (1 + wave * 0.28), y * (0.74 + wave * 0.18), z);
+  }
+  position.needsUpdate = true;
+  geometry.computeVertexNormals();
   return geometry;
 }
 
@@ -114,46 +146,115 @@ function setLayerInstance(
   mesh: THREE.InstancedMesh,
   index: number,
   layer: ReefAccretionLayer,
-  yScaleMultiplier = 1,
+  yScaleMultiplier: number,
+  radiusScale = 1,
+  position?: THREE.Vector3,
+  toneOffset = 0,
 ) {
   const growth = Math.max(0.001, layer.growth);
   const radialGrowth = 0.30 + growth * 0.70;
-  const verticalGrowth = 0.26 + growth * 0.74;
-  const burialScale = 1 - Math.min(0.28, layer.burial * 0.16);
+  const verticalGrowth = 0.28 + growth * 0.72;
+  const burialScale = 1 - Math.min(0.30, layer.burial * 0.18);
   const matrix = new THREE.Matrix4().compose(
-    layerPosition(layer),
+    position ?? layerPosition(layer),
     layerQuaternion(layer),
     new THREE.Vector3(
-      layer.radiusX * radialGrowth,
-      layer.thickness * verticalGrowth * burialScale * yScaleMultiplier,
-      layer.radiusZ * radialGrowth,
+      layer.radiusX * radialGrowth * radiusScale,
+      layer.thickness * verticalGrowth * burialScale * yScaleMultiplier * radiusScale,
+      layer.radiusZ * radialGrowth * radiusScale,
     ),
   );
   mesh.setMatrixAt(index, matrix);
   const tones = TONES[layer.kind];
-  mesh.setColorAt(index, new THREE.Color(tones[layer.toneIndex % tones.length]));
+  mesh.setColorAt(index, new THREE.Color(tones[(layer.toneIndex + toneOffset) % tones.length]));
 }
 
-function useLayerGroups(manifest: ReefAccretionManifest) {
+function setSheetCluster(mesh: THREE.InstancedMesh, startIndex: number, layer: ReefAccretionLayer) {
+  const base = layerPosition(layer);
+  const quaternion = layerQuaternion(layer);
+  setLayerInstance(mesh, startIndex, layer, 1.55, 1, base);
+
+  for (let satellite = 1; satellite < SHEET_CLUSTER_SIZE; satellite += 1) {
+    const phase = ((layer.seed >>> (satellite * 4)) % 4096) / 4096 * Math.PI * 2;
+    const radius = Math.max(layer.radiusX, layer.radiusZ) * (0.50 + satellite * 0.12);
+    const localOffset = new THREE.Vector3(
+      Math.cos(phase) * radius,
+      0,
+      Math.sin(phase) * radius * 0.82,
+    ).applyQuaternion(quaternion);
+    const satellitePosition = base.clone().add(localOffset);
+    const scale = satellite === 1 ? 0.42 : 0.30;
+    setLayerInstance(mesh, startIndex + satellite, layer, 1.2, scale, satellitePosition, satellite);
+  }
+}
+
+function ellipseRadiusAtAngle(core: ReefCoreManifest, angle: number) {
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  const denominator = Math.sqrt(
+    (cosine * cosine) / Math.max(0.0001, core.platform.radiusX * core.platform.radiusX)
+      + (sine * sine) / Math.max(0.0001, core.platform.radiusZ * core.platform.radiusZ),
+  );
+  return denominator > 0 ? 1 / denominator : 0;
+}
+
+function connectorFor(layer: ReefAccretionLayer, core: ReefCoreManifest): ConnectorSpec | null {
+  const radialDistance = Math.hypot(layer.position.x, layer.position.z);
+  if (radialDistance <= 0.0001) return null;
+  const angle = Math.atan2(layer.position.z, layer.position.x);
+  const edgeRadius = ellipseRadiusAtAngle(core, angle) * 0.88;
+  if (radialDistance <= edgeRadius * 1.03) return null;
+
+  const edgeX = Math.cos(angle) * edgeRadius;
+  const edgeZ = Math.sin(angle) * edgeRadius;
+  const dx = layer.position.x - edgeX;
+  const dz = layer.position.z - edgeZ;
+  const distance = Math.hypot(dx, dz);
+  if (distance < 0.28) return null;
+
+  return {
+    x: (edgeX + layer.position.x) * 0.5,
+    y: -core.platform.thickness * 0.49 + Math.min(0.10, layer.thickness * 0.42),
+    z: (edgeZ + layer.position.z) * 0.5,
+    rotationY: Math.atan2(dx, dz),
+    width: Math.max(0.32, Math.min(layer.radiusX, layer.radiusZ) * 1.20),
+    height: Math.max(0.10, layer.thickness * 1.40),
+    length: distance * 0.58,
+    toneIndex: layer.toneIndex,
+  };
+}
+
+function useLayerGroups(manifest: ReefAccretionManifest, core: ReefCoreManifest) {
   return useMemo(() => {
     const visible = manifest.layers.filter((layer) => layer.growth > 0.015);
+    const skirts = visible.filter((layer) => layer.kind === 'STRUCTURE_SKIRT');
     return {
       sheets: visible.filter((layer) => layer.kind === 'ENCRUSTING_SHEET'),
       skeletons: visible.filter((layer) => layer.kind === 'SKELETON_BASE'),
       plates: visible.filter((layer) => layer.kind === 'PLATE_STACK'),
-      skirts: visible.filter((layer) => layer.kind === 'STRUCTURE_SKIRT'),
+      skirts,
       minerals: visible.filter((layer) => layer.kind === 'MINERAL_TRANSITION'),
+      connectors: skirts
+        .map((layer) => connectorFor(layer, core))
+        .filter((connector): connector is ConnectorSpec => connector !== null),
     };
-  }, [manifest.layers]);
+  }, [core, manifest.layers]);
 }
 
-export function ReefAccretionObject({ manifest }: { manifest: ReefAccretionManifest }) {
-  const { sheets, skeletons, plates, skirts, minerals } = useLayerGroups(manifest);
+export function ReefAccretionObject({
+  manifest,
+  core,
+}: {
+  manifest: ReefAccretionManifest;
+  core: ReefCoreManifest;
+}) {
+  const { sheets, skeletons, plates, skirts, minerals, connectors } = useLayerGroups(manifest, core);
   const sheetRef = useRef<THREE.InstancedMesh>(null);
   const skeletonRef = useRef<THREE.InstancedMesh>(null);
   const plateRef = useRef<THREE.InstancedMesh>(null);
   const skirtRef = useRef<THREE.InstancedMesh>(null);
   const mineralRef = useRef<THREE.InstancedMesh>(null);
+  const connectorRef = useRef<THREE.InstancedMesh>(null);
 
   const geometry = useMemo(() => ({
     sheet: createOrganicPatchGeometry('sheet'),
@@ -161,14 +262,16 @@ export function ReefAccretionObject({ manifest }: { manifest: ReefAccretionManif
     plate: new THREE.CylinderGeometry(1, 0.9, 1, 16, 1, false),
     skirt: createOrganicPatchGeometry('skirt'),
     mineral: createOrganicPatchGeometry('mineral'),
+    connector: createConnectorGeometry(),
   }), []);
 
   const material = useMemo(() => ({
     sheet: new THREE.MeshStandardMaterial({ color: '#747a68', roughness: 0.98, metalness: 0, flatShading: true }),
     skeleton: new THREE.MeshStandardMaterial({ color: '#8c8978', roughness: 0.99, metalness: 0, flatShading: true }),
     plate: new THREE.MeshStandardMaterial({ color: '#9b6c73', roughness: 0.95, metalness: 0 }),
-    skirt: new THREE.MeshStandardMaterial({ color: '#61685e', roughness: 1, metalness: 0, flatShading: true }),
+    skirt: new THREE.MeshStandardMaterial({ color: '#626b61', roughness: 1, metalness: 0, flatShading: true }),
     mineral: new THREE.MeshStandardMaterial({ color: '#727565', roughness: 0.99, metalness: 0, flatShading: true }),
+    connector: new THREE.MeshStandardMaterial({ color: '#5e675e', roughness: 1, metalness: 0, flatShading: true }),
   }), []);
 
   useEffect(() => () => {
@@ -179,7 +282,7 @@ export function ReefAccretionObject({ manifest }: { manifest: ReefAccretionManif
   useLayoutEffect(() => {
     const mesh = sheetRef.current;
     if (!mesh) return;
-    sheets.forEach((layer, index) => setLayerInstance(mesh, index, layer, 2.4));
+    sheets.forEach((layer, index) => setSheetCluster(mesh, index * SHEET_CLUSTER_SIZE, layer));
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [sheets]);
@@ -187,7 +290,7 @@ export function ReefAccretionObject({ manifest }: { manifest: ReefAccretionManif
   useLayoutEffect(() => {
     const mesh = skeletonRef.current;
     if (!mesh) return;
-    skeletons.forEach((layer, index) => setLayerInstance(mesh, index, layer, 2.7));
+    skeletons.forEach((layer, index) => setLayerInstance(mesh, index, layer, 1.85, 1.08));
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [skeletons]);
@@ -195,7 +298,7 @@ export function ReefAccretionObject({ manifest }: { manifest: ReefAccretionManif
   useLayoutEffect(() => {
     const mesh = plateRef.current;
     if (!mesh) return;
-    plates.forEach((layer, index) => setLayerInstance(mesh, index, layer, 0.58));
+    plates.forEach((layer, index) => setLayerInstance(mesh, index, layer, 0.52, 0.92));
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [plates]);
@@ -203,7 +306,7 @@ export function ReefAccretionObject({ manifest }: { manifest: ReefAccretionManif
   useLayoutEffect(() => {
     const mesh = skirtRef.current;
     if (!mesh) return;
-    skirts.forEach((layer, index) => setLayerInstance(mesh, index, layer, 3.7));
+    skirts.forEach((layer, index) => setLayerInstance(mesh, index, layer, 2.05, 1.24));
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [skirts]);
@@ -211,33 +314,58 @@ export function ReefAccretionObject({ manifest }: { manifest: ReefAccretionManif
   useLayoutEffect(() => {
     const mesh = mineralRef.current;
     if (!mesh) return;
-    minerals.forEach((layer, index) => setLayerInstance(mesh, index, layer, 1.9));
+    minerals.forEach((layer, index) => setLayerInstance(mesh, index, layer, 1.25, 1.12));
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [minerals]);
+
+  useLayoutEffect(() => {
+    const mesh = connectorRef.current;
+    if (!mesh) return;
+    connectors.forEach((connector, index) => {
+      const matrix = new THREE.Matrix4().compose(
+        new THREE.Vector3(connector.x, connector.y, connector.z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(0, connector.rotationY, 0)),
+        new THREE.Vector3(connector.width, connector.height, connector.length),
+      );
+      mesh.setMatrixAt(index, matrix);
+      const tones = TONES.STRUCTURE_SKIRT;
+      mesh.setColorAt(index, new THREE.Color(tones[connector.toneIndex % tones.length]));
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  }, [connectors]);
 
   return (
     <group
       name="reef-phase-6-accretion"
       userData={{
-        renderer: 'phase-6-organic-accretion',
+        renderer: 'phase-6-organic-accretion-final',
         visibleLayerCount: sheets.length + skeletons.length + plates.length + skirts.length + minerals.length,
+        connectorCount: connectors.length,
       }}
     >
+      {connectors.length > 0 ? (
+        <instancedMesh ref={connectorRef} args={[geometry.connector, material.connector, connectors.length]} receiveShadow />
+      ) : null}
       {skirts.length > 0 ? (
-        <instancedMesh ref={skirtRef} args={[geometry.skirt, material.skirt, skirts.length]} castShadow receiveShadow />
+        <instancedMesh ref={skirtRef} args={[geometry.skirt, material.skirt, skirts.length]} receiveShadow />
       ) : null}
       {minerals.length > 0 ? (
         <instancedMesh ref={mineralRef} args={[geometry.mineral, material.mineral, minerals.length]} receiveShadow />
       ) : null}
       {sheets.length > 0 ? (
-        <instancedMesh ref={sheetRef} args={[geometry.sheet, material.sheet, sheets.length]} receiveShadow />
+        <instancedMesh
+          ref={sheetRef}
+          args={[geometry.sheet, material.sheet, sheets.length * SHEET_CLUSTER_SIZE]}
+          receiveShadow
+        />
       ) : null}
       {skeletons.length > 0 ? (
-        <instancedMesh ref={skeletonRef} args={[geometry.skeleton, material.skeleton, skeletons.length]} castShadow receiveShadow />
+        <instancedMesh ref={skeletonRef} args={[geometry.skeleton, material.skeleton, skeletons.length]} receiveShadow />
       ) : null}
       {plates.length > 0 ? (
-        <instancedMesh ref={plateRef} args={[geometry.plate, material.plate, plates.length]} castShadow receiveShadow />
+        <instancedMesh ref={plateRef} args={[geometry.plate, material.plate, plates.length]} receiveShadow />
       ) : null}
     </group>
   );

@@ -149,7 +149,7 @@ export default function ReefPreviewScene() {
       data-reef-accretion-plates={accretionCounts.PLATE_STACK}
       data-reef-accretion-skirts={accretionCounts.STRUCTURE_SKIRT}
       data-reef-accretion-minerals={accretionCounts.MINERAL_TRANSITION}
-      data-reef-accretion-draw-groups={5}
+      data-reef-accretion-draw-groups={6}
       data-reef-map-outcrops={0}
       data-reef-schedule-terraces={0}
       data-reef-plan-fish-logical={0}
@@ -176,7 +176,7 @@ export default function ReefPreviewScene() {
         <ReefCoreStage core={core} sceneExtent={sceneExtent}>
           <ReefCoreObject core={core} />
           <ReefYearStructuresObject core={core} manifest={composition} />
-          <ReefAccretionObject manifest={accretion} />
+          <ReefAccretionObject core={core} manifest={accretion} />
           <ReefCoralColoniesObject manifest={colonies} />
         </ReefCoreStage>
       </Canvas>

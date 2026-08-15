@@ -65,17 +65,20 @@ function ridgeGeometry(structure: ReefYearStructure) {
 
 function archGeometry(structure: ReefYearStructure) {
   const s = structure.shape;
+  const phase = (structure.seed % 4096) / 4096 * Math.PI * 2;
+  const leftLift = Math.sin(phase) * s.height * 0.045;
+  const rightLift = Math.cos(phase * 1.7) * s.height * 0.04;
   const points = [
-    new THREE.Vector3(-s.width * 0.5, 0, 0),
-    new THREE.Vector3(-s.width * 0.35, s.height * (0.48 - s.openingAsymmetry * 0.08), s.depth * 0.08),
-    new THREE.Vector3(s.skew * s.width * 0.18, s.height, s.curveDepth * s.depth),
-    new THREE.Vector3(s.width * 0.34, s.height * (0.56 + s.openingAsymmetry * 0.08), -s.depth * 0.06),
-    new THREE.Vector3(s.width * 0.5, 0, 0),
+    new THREE.Vector3(-s.width * 0.5, -s.depth * 0.08, 0),
+    new THREE.Vector3(-s.width * 0.35, s.height * (0.46 - s.openingAsymmetry * 0.09) + leftLift, s.depth * 0.08),
+    new THREE.Vector3(s.skew * s.width * 0.18, s.height * 0.96, s.curveDepth * s.depth),
+    new THREE.Vector3(s.width * 0.34, s.height * (0.54 + s.openingAsymmetry * 0.09) + rightLift, -s.depth * 0.06),
+    new THREE.Vector3(s.width * 0.5, -s.depth * 0.10, 0),
   ];
   return new THREE.TubeGeometry(
     new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.45),
     44,
-    Math.max(0.12, s.depth * 0.33),
+    Math.max(0.12, s.depth * 0.31),
     8,
     false,
   );
@@ -100,19 +103,19 @@ function YearMesh({ structure, material }: { structure: ReefYearStructure; mater
   const scale: [number, number, number] = isArch
     ? [growth, growth, growth]
     : [structure.shape.width * 0.5 * growth, scaleY, structure.shape.depth * 0.5 * growth];
-  const y = isArch
-    ? 0
+  const baseY = isArch
+    ? -Math.max(0.035, structure.shape.depth * 0.08 * growth)
     : isBoulder
-      ? structure.shape.height * 0.42 * growth
-      : structure.shape.height * 0.5 * growth;
+      ? structure.shape.height * 0.36 * growth
+      : structure.shape.height * 0.43 * growth;
   return (
     <mesh
       geometry={geometry}
       material={material}
-      position={[structure.center.x, y, structure.center.z]}
+      position={[structure.center.x, baseY, structure.center.z]}
       rotation={[0, structure.rotationY, 0]}
       scale={scale}
-      castShadow={structure.yearIndex <= 18}
+      castShadow={structure.yearIndex <= 10 && structure.archetype !== 'ARCH'}
       receiveShadow
     />
   );
@@ -126,7 +129,7 @@ export function ReefYearStructuresObject({
   manifest: ReefCompositionManifest;
 }) {
   const material = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: '#5d6157', roughness: 0.96, metalness: 0.01 }),
+    () => new THREE.MeshStandardMaterial({ color: '#60665d', roughness: 0.98, metalness: 0.005 }),
     [],
   );
   useEffect(() => () => material.dispose(), [material]);
