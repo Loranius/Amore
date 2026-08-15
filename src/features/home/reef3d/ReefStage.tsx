@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useMemo, type ReactNode } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import {
@@ -97,13 +97,15 @@ export function ReefStage({
       <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefSeaGrass reducedMotion={reducedMotion} />
       <ReefSessileLife reducedMotion={reducedMotion} />
-      <ReefFishSchool
-        build={build}
-        count={build.species.moduleEvolution.life.planFish.visibleCount}
-        identitySeed={build.species.moduleEvolution.identitySeed}
-        onReady={onFishReady}
-        reducedMotion={reducedMotion}
-      />
+      <Suspense fallback={null}>
+        <ReefFishSchool
+          build={build}
+          count={build.species.moduleEvolution.life.planFish.visibleCount}
+          identitySeed={build.species.moduleEvolution.identitySeed}
+          onReady={onFishReady}
+          reducedMotion={reducedMotion}
+        />
+      </Suspense>
 
       {children}
 
