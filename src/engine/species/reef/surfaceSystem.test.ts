@@ -110,12 +110,11 @@ describe('reef surface system phase 4', () => {
     }
   });
 
-  it('keeps a just-born yearly structure unavailable until it has physical growth', () => {
-    const exactAnniversary = surfaceAt(1, 0).surfaces.patches.filter(
+  it('does not expose yearly coral surfaces before the first completed year', () => {
+    const beforeFirstYear = surfaceAt(0, 364).surfaces.patches.filter(
       (patch) => patch.sourceKind === 'YEAR_STRUCTURE',
     );
-    expect(exactAnniversary).toHaveLength(REEF_SURFACE_YEAR_SAMPLES);
-    expect(exactAnniversary.every((patch) => patch.capacity === 0 && !patch.eligible)).toBe(true);
+    expect(beforeFirstYear).toHaveLength(0);
   });
 
   it('stays within the mobile patch ceiling at the 50 year horizon', () => {

@@ -388,8 +388,8 @@ function structureCandidateBase(
     z: round6(structure.center.z + rotatedLocal.z),
   };
   const radialDistance = Math.hypot(structure.center.x, structure.center.z);
-  const coreExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
-  const radialExposure = clamp01(radialDistance / Math.max(0.01, coreExtent * 2.2));
+  const localScale = Math.max(0.01, structure.footprintRadius * 2.4);
+  const radialExposure = clamp01(radialDistance / Math.max(0.01, radialDistance + localScale));
   const exposure = clamp01(
     0.4 + height01 * 0.25 + radialExposure * 0.22 + (crown ? 0.08 : 0) - (underside ? 0.32 : 0),
   );
