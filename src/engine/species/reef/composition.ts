@@ -17,6 +17,7 @@ const TAU = Math.PI * 2;
 const SECTOR_COUNT = 72;
 const OPEN_RUN_SECTORS = 4;
 const COMPOSITION_SNAPSHOT_SETTLE_DAYS = 30;
+const MIN_FREE_WATER_FRACTION = 0.22;
 
 export interface ReefCompositionScore {
   coreVisibility: number;
@@ -113,9 +114,7 @@ function minimumClearance(structures: readonly ReefYearStructure[]): number | nu
 
 /**
  * Samples the reef from 72 camera azimuths. Only near-side structures that
- * actually project across the central core can reduce visibility. This avoids
- * the old false result where 50 structures on every side were summed together
- * as if a camera could see all occluders in one view.
+ * project across the central core reduce visibility.
  */
 function estimateCoreVisibility(
   core: ReefCoreManifest,
@@ -340,9 +339,9 @@ function candidateTransform(
       + attempt * 0.055
       + seededUnit(structure.seed, `composition-angle:${attempt}`) * 0.16
   );
-  const radialScale = 1.02
-    + attempt * 0.025
-    + seededUnit(structure.seed, `composition-radius:${attempt}`) * 0.09;
+  const radialScale = 1.03
+    + attempt * 0.04
+    + seededUnit(structure.seed, `composition-radius:${attempt}`) * 0.12;
   const angle = baseAngle + angleOffset;
   const radius = baseRadius * radialScale;
 
@@ -378,9 +377,14 @@ function candidateMerit(
     0,
     requiredWaterWindows(structures.length) - evaluated.metrics.waterWindowCount,
   );
+  const freeWaterDeficit = Math.max(
+    0,
+    MIN_FREE_WATER_FRACTION - evaluated.metrics.freeWaterFraction,
+  );
   const hardPenalty = (evaluated.metrics.collisionFree ? 0 : 0.5)
     + (evaluated.metrics.coreVisibility >= REEF_MIN_CORE_VISIBILITY ? 0 : 0.2)
-    + missingWindows * 0.35;
+    + missingWindows * 0.35
+    + freeWaterDeficit * 2.5;
   return evaluated.score.total - hardPenalty;
 }
 
@@ -391,7 +395,8 @@ function isAcceptable(
   return evaluation.score.total >= REEF_COMPOSITION_ACCEPT_SCORE
     && evaluation.metrics.collisionFree
     && evaluation.metrics.coreVisibility >= REEF_MIN_CORE_VISIBILITY
-    && evaluation.metrics.waterWindowCount >= requiredWaterWindows(structureCount);
+    && evaluation.metrics.waterWindowCount >= requiredWaterWindows(structureCount)
+    && evaluation.metrics.freeWaterFraction >= MIN_FREE_WATER_FRACTION;
 }
 
 /**
