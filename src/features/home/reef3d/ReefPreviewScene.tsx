@@ -6,7 +6,6 @@ import {
   EvolutionRuntimeProbe,
   type EvolutionRuntimeMetrics,
 } from '../crystal3d/evolution/EvolutionRuntimeProbe';
-import { ReefObject } from './ReefObject';
 import { ReefStage } from './ReefStage';
 import type { ReefFishSchoolMetrics } from './ReefFishSchool';
 import {
@@ -32,7 +31,6 @@ import {
   REEF_COLONY_SHAPE_PASS,
   REEF_PRESENTATION_VERSION,
 } from './reefPresentation';
-import type { ReefThreeSceneState } from './reefThreeAdapter';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
 
@@ -60,10 +58,8 @@ export default function ReefPreviewScene() {
   const reducedMotion = useReducedMotion();
   const [fishRuntime, setFishRuntime] = useState<ReefFishSchoolMetrics | null>(null);
   const [worldRuntime, setWorldRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
-  const [sceneState, setSceneState] = useState<ReefThreeSceneState | null>(null);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setWorldRuntime(next), []);
   const onFishReady = useCallback((next: ReefFishSchoolMetrics) => setFishRuntime(next), []);
-  const onSceneReady = useCallback((next: ReefThreeSceneState) => setSceneState(next), []);
 
   if (portal.isPending) return <CrystalPlaceholder />;
   if (portal.error || !portal.preview) {
@@ -83,12 +79,9 @@ export default function ReefPreviewScene() {
   }
 
   const { build, diagnostics } = portal.preview;
-  const reportedDrawCalls = sceneState?.diagnostics.drawCalls ?? null;
-  const reportedTriangles = sceneState?.diagnostics.triangles ?? null;
-  const visibleColonyRanges = sceneState?.batches.reduce(
-    (total, batch) => total + batch.runtimeRanges.length,
-    0,
-  ) ?? null;
+  const reportedDrawCalls = build.diagnostics.expectedDrawCalls;
+  const reportedTriangles = build.diagnostics.triangleCount;
+  const visibleColonyRanges = build.diagnostics.colonyCount;
   const runtimeAcceptance = evaluateReefProductionRuntimeAcceptance({
     contract: build.acceptance,
     buildMs: build.buildMs,
@@ -151,7 +144,7 @@ export default function ReefPreviewScene() {
       data-reef-triangles={build.diagnostics.triangleCount}
       data-reef-materials={build.diagnostics.materialCount}
       data-reef-motion-bindings={build.diagnostics.motionBindingCount}
-      data-reef-visible-colonies={visibleColonyRanges ?? ''}
+      data-reef-visible-colonies={visibleColonyRanges}
       data-reef-fish-model={fishRuntime ? REEF_FISH_SCHOOL_MODEL : 'loading'}
       data-reef-fish-meshes={fishRuntime?.meshes ?? ''}
       data-reef-fish-width={fishRuntime?.width ?? ''}
@@ -163,8 +156,8 @@ export default function ReefPreviewScene() {
       data-reef-fish-scale={fishRuntime?.scale ?? ''}
       data-reef-fish-route-profile={fishRuntime ? REEF_FISH_SCHOOL_ROUTE_PROFILE : 'loading'}
       data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}
-      data-reef-runtime-draw-calls={reportedDrawCalls ?? ''}
-      data-reef-runtime-triangles={reportedTriangles ?? ''}
+      data-reef-runtime-draw-calls={reportedDrawCalls}
+      data-reef-runtime-triangles={reportedTriangles}
       data-reef-world-draw-calls={worldRuntime?.drawCalls ?? ''}
       data-reef-world-triangles={worldRuntime?.triangles ?? ''}
       data-reef-build-ms={build.buildMs}
@@ -186,11 +179,7 @@ export default function ReefPreviewScene() {
           onFishReady={onFishReady}
           reducedMotion={reducedMotion}
         >
-          <ReefObject
-            build={build}
-            reducedMotion={reducedMotion}
-            onSceneReady={onSceneReady}
-          />
+          {null}
         </ReefStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} warmupFrames={18} />
       </Canvas>
