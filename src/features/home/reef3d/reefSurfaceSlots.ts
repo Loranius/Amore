@@ -2,6 +2,7 @@ export const REEF_SURFACE_SLOT_VERSION = 'reef-surface-slots-v3';
 
 const TAU = Math.PI * 2;
 const SLOT_SPACING = 0.34;
+const REQUEST_AWARE_CANDIDATE_LIMIT = 64;
 const CLEARANCE_PASSES = [1, 0.9, 0.82, 0.74] as const;
 
 export interface ReefSurfacePoint {
@@ -14,11 +15,8 @@ export interface ReefSurfaceSlotCandidate {
   id: string;
   x: number;
   z: number;
-  /** Exact authored support point, used for shelves that must not be re-raycast. */
   position?: ReefSurfacePoint;
-  /** Largest colony footprint that fits fully on this authored support. */
   maxFootprintRadius?: number;
-  /** Optional growth epoch that must exist before this support can be used. */
   availableFromEpoch?: number;
 }
 
@@ -88,11 +86,6 @@ function stableUnit(seed: number, label: string): number {
   return (hash >>> 0) / 0xffffffff;
 }
 
-/**
- * Creates an absolute, append-only registry. Growing the foundation only adds
- * outer rings; it never moves the slots that already existed closer to the
- * centre.
- */
 export function buildReefSurfaceSlotCandidates({
   foundationRadius,
   seed,
@@ -147,18 +140,13 @@ function canOccupy(
 
     const dx = candidate.position.x - slot.position.x;
     const dz = candidate.position.z - slot.position.z;
-    const minimumDistance = (request.footprintRadius + slot.footprintRadius)
-      * clearanceRatio;
+    const minimumDistance = (request.footprintRadius + slot.footprintRadius) * clearanceRatio;
     if (dx * dx + dz * dz < minimumDistance * minimumDistance - 1e-8) return false;
   }
-
   return true;
 }
 
-function scoreCandidate(
-  candidate: SampledCandidate,
-  request: ReefSurfaceSlotRequest,
-): number {
+function scoreCandidate(candidate: SampledCandidate, request: ReefSurfaceSlotRequest): number {
   const horizontalDistance = Math.hypot(
     candidate.position.x - request.preferred.x,
     candidate.position.z - request.preferred.z,
@@ -179,13 +167,26 @@ function isAvailableForRequest(
   return candidate.availableFromEpoch <= request.epochIndex;
 }
 
-/**
- * Assigns one chronological surface slot to every request whenever any sampled
- * support exists. Preferred anchors win first; unsupported anchors use the
- * nearest collision-safe registry slot. A request-aware sampler can impose
- * species/surface ecology without weakening the allocator's deterministic
- * ordering or clearance guarantees.
- */
+function requestCandidatePool(
+  candidates: readonly ReefSurfaceSlotCandidate[],
+  request: ReefSurfaceSlotRequest,
+): readonly ReefSurfaceSlotCandidate[] {
+  if (candidates.length <= REQUEST_AWARE_CANDIDATE_LIMIT) return candidates;
+  return [...candidates]
+    .sort((left, right) => {
+      const leftX = left.position?.x ?? left.x;
+      const leftZ = left.position?.z ?? left.z;
+      const rightX = right.position?.x ?? right.x;
+      const rightZ = right.position?.z ?? right.z;
+      const leftDistance = (leftX - request.preferred.x) ** 2
+        + (leftZ - request.preferred.z) ** 2;
+      const rightDistance = (rightX - request.preferred.x) ** 2
+        + (rightZ - request.preferred.z) ** 2;
+      return leftDistance - rightDistance || left.id.localeCompare(right.id);
+    })
+    .slice(0, REQUEST_AWARE_CANDIDATE_LIMIT);
+}
+
 export function allocateReefSurfaceSlots({
   requests,
   candidates,
@@ -200,6 +201,7 @@ export function allocateReefSurfaceSlots({
   const cache = new Map<string, ReefSurfacePoint | null>();
   const requestCache = new Map<string, ReefSurfacePoint | null>();
   const requestAwareSampledCandidateIds = new Set<string>();
+
   const sampleAt = (x: number, z: number): ReefSurfacePoint | null => {
     const key = sampleKey(x, z);
     if (cache.has(key)) return cache.get(key) ?? null;
@@ -207,6 +209,7 @@ export function allocateReefSurfaceSlots({
     cache.set(key, result);
     return result;
   };
+
   const sampleAtForRequest = (
     request: ReefSurfaceSlotRequest,
     x: number,
@@ -219,12 +222,11 @@ export function allocateReefSurfaceSlots({
     requestCache.set(key, result);
     return result;
   };
+
   const registry = sampleForRequest
     ? []
     : candidates.flatMap<SampledCandidate>((candidate) => {
-        const position = candidate.position
-          ? { ...candidate.position }
-          : sampleAt(candidate.x, candidate.z);
+        const position = candidate.position ? { ...candidate.position } : sampleAt(candidate.x, candidate.z);
         return position
           ? [{
               id: candidate.id,
@@ -239,6 +241,7 @@ export function allocateReefSurfaceSlots({
             }]
           : [];
       });
+
   const orderedRequests = [...requests].sort(
     (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
   );
@@ -246,8 +249,9 @@ export function allocateReefSurfaceSlots({
   const unresolvedRequestIds: string[] = [];
 
   for (const request of orderedRequests) {
+    const pool = sampleForRequest ? requestCandidatePool(candidates, request) : candidates;
     const requestRegistry = sampleForRequest
-      ? candidates.flatMap<SampledCandidate>((candidate) => {
+      ? pool.flatMap<SampledCandidate>((candidate) => {
           const sampleX = candidate.position?.x ?? candidate.x;
           const sampleZ = candidate.position?.z ?? candidate.z;
           const position = sampleAtForRequest(request, sampleX, sampleZ);
@@ -266,6 +270,7 @@ export function allocateReefSurfaceSlots({
           }];
         })
       : registry;
+
     const preferredPosition = sampleAtForRequest(
       request,
       request.preferred.x,
@@ -278,13 +283,12 @@ export function allocateReefSurfaceSlots({
           position: preferredPosition,
         }, ...requestRegistry]
       : [...requestRegistry];
-    const availableOptions = options.filter((candidate) => (
-      isAvailableForRequest(candidate, request)
-    ));
-    availableOptions.sort((left, right) => (
-      scoreCandidate(left, request) - scoreCandidate(right, request)
-      || left.id.localeCompare(right.id)
-    ));
+    const availableOptions = options
+      .filter((candidate) => isAvailableForRequest(candidate, request))
+      .sort((left, right) => (
+        scoreCandidate(left, request) - scoreCandidate(right, request)
+        || left.id.localeCompare(right.id)
+      ));
 
     let accepted: ReefAllocatedSurfaceSlot | null = null;
     for (const clearanceRatio of CLEARANCE_PASSES) {
@@ -292,7 +296,6 @@ export function allocateReefSurfaceSlots({
         canOccupy(option, request, slots, clearanceRatio)
       ));
       if (!candidate) continue;
-
       const displacement = Math.hypot(
         candidate.position.x - request.preferred.x,
         candidate.position.z - request.preferred.z,
@@ -314,7 +317,6 @@ export function allocateReefSurfaceSlots({
   }
 
   const preferredCount = slots.filter((slot) => slot.kind === 'preferred').length;
-  const relocatedCount = slots.filter((slot) => slot.displacement > 1e-4).length;
   return {
     slots,
     diagnostics: {
@@ -326,7 +328,7 @@ export function allocateReefSurfaceSlots({
         : registry.length,
       allocatedCount: slots.length,
       preferredCount,
-      relocatedCount,
+      relocatedCount: slots.filter((slot) => slot.displacement > 1e-4).length,
       relaxedCount: slots.filter((slot) => slot.clearanceRatio < 1).length,
       unresolvedRequestIds,
     },
