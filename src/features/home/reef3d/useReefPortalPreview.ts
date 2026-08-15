@@ -1,21 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useEvents } from '@/features/_shared/events';
-import { useUsers } from '@/features/_shared/useUsers';
-import { useMapPins } from '@/features/map/useMapPins';
-import { useFinishedMedia } from '@/features/media/useMedia';
-import { useMemories } from '@/features/memories/useMemories';
-import { usePlans } from '@/features/plans/usePlans';
-import { useScheduleTogetherness } from '@/features/schedule/useSharedDaysOff';
+import { useCurrentUser } from '@/providers/AuthProvider';
 import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
-import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
 import {
   buildArtifactFromSnapshot,
   type AdapterDiagnostic,
+  type EvolutionSourceSnapshot,
 } from '@/engine/evolution/adapters';
 import {
-  buildEvolutionSourceSnapshot,
+  buildEvolutionMemoryLinks,
   evolutionWishlistFromPairArchive,
   stableEvolutionCoupleId,
 } from '../crystal3d/evolution/sourceSnapshot';
@@ -26,6 +20,22 @@ import {
 
 const ENGINE_VERSION = '1.0.0';
 const COUPLE_TIME_ZONE = 'Europe/Kyiv';
+const SOURCE_CACHE_VERSION = 1;
+const SOURCE_CACHE_MAX_AGE = 30 * 24 * 60 * 60_000;
+
+interface ReefPortalSources {
+  relationshipStartedAt: string;
+  userIds: number[];
+  sharedDaysOff: string[];
+  snapshot: EvolutionSourceSnapshot;
+}
+
+interface ReefSourceCacheEnvelope {
+  version: number;
+  userId: number;
+  cachedAt: number;
+  sources: ReefPortalSources;
+}
 
 export interface ReefPortalPreview {
   build: ReefPreviewBuild;
@@ -52,107 +62,226 @@ function coupleDay(date: Date, timeZone: string): string {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
-function useRelationshipStartDate() {
-  return useQuery({
-    queryKey: [...qk.settings(), 'relationship_start_date'],
-    staleTime: 60 * 60_000,
-    queryFn: async (): Promise<string | null> => {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'relationship_start_date')
-        .maybeSingle();
-      if (error) throw error;
-      return typeof data?.value === 'string' && data.value.trim() ? data.value : null;
-    },
-  });
+function sourceCacheKey(userId: number): string {
+  return `amore:reef-evolution:${SOURCE_CACHE_VERSION}:${userId}`;
 }
 
-/** Read-only portal adapter. It reuses the accepted Evolution snapshot contract. */
+function readCachedSources(userId: number): ReefPortalSources | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const raw = window.localStorage.getItem(sourceCacheKey(userId));
+    if (!raw) return undefined;
+    const cached = JSON.parse(raw) as Partial<ReefSourceCacheEnvelope>;
+    if (
+      cached.version !== SOURCE_CACHE_VERSION
+      || cached.userId !== userId
+      || typeof cached.cachedAt !== 'number'
+      || Date.now() - cached.cachedAt > SOURCE_CACHE_MAX_AGE
+      || !cached.sources
+    ) return undefined;
+    return cached.sources;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeCachedSources(userId: number, sources: ReefPortalSources): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const cached: ReefSourceCacheEnvelope = {
+      version: SOURCE_CACHE_VERSION,
+      userId,
+      cachedAt: Date.now(),
+      sources,
+    };
+    window.localStorage.setItem(sourceCacheKey(userId), JSON.stringify(cached));
+  } catch {
+    return;
+  }
+}
+
+async function fetchReefPortalSources(): Promise<ReefPortalSources> {
+  const [
+    startDateResult,
+    usersResult,
+    eventsResult,
+    plansResult,
+    scheduleResult,
+    pinsResult,
+    memoriesResult,
+    memoryLinksResult,
+    mediaResult,
+    wishlistArchive,
+  ] = await Promise.all([
+    supabase
+      .from('settings')
+      .select('value')
+      .eq('key', 'relationship_start_date')
+      .maybeSingle(),
+    supabase.from('users').select('id').order('id', { ascending: true }),
+    supabase
+      .from('events')
+      .select('id,date,type,yearly,is_milestone')
+      .or('type.neq.other,is_milestone.eq.true')
+      .order('date', { ascending: true }),
+    supabase
+      .from('plans')
+      .select('id,category,status,start_date,end_date,completed_at,created_at'),
+    supabase
+      .from('work_schedule')
+      .select('date,user_id')
+      .eq('mark', 'Х')
+      .order('date', { ascending: true }),
+    supabase
+      .from('map_pins')
+      .select('id,category,visited_at,created_at,rating,city,country'),
+    supabase
+      .from('memories')
+      .select('id,memory_date,date_precision,taken_at,created_at')
+      .order('memory_date', { ascending: false }),
+    supabase.from('memory_links').select('memory_id,source_type,source_id'),
+    supabase
+      .from('media_items')
+      .select('id,status,created_at')
+      .eq('status', 'done'),
+    fetchPairWishlistEvolutionArchive(),
+  ]);
+
+  if (startDateResult.error) throw startDateResult.error;
+  if (usersResult.error) throw usersResult.error;
+  if (eventsResult.error) throw eventsResult.error;
+  if (plansResult.error) throw plansResult.error;
+  if (scheduleResult.error) throw scheduleResult.error;
+  if (pinsResult.error) throw pinsResult.error;
+  if (memoriesResult.error) throw memoriesResult.error;
+  if (memoryLinksResult.error) throw memoryLinksResult.error;
+  if (mediaResult.error) throw mediaResult.error;
+
+  const relationshipStartedAt = typeof startDateResult.data?.value === 'string'
+    ? startDateResult.data.value.trim()
+    : '';
+  if (!relationshipStartedAt) {
+    throw new Error('Reef production preview requires relationship_start_date.');
+  }
+
+  const userIds = (usersResult.data ?? [])
+    .map((user) => user.id)
+    .filter(Number.isSafeInteger)
+    .sort((left, right) => left - right);
+  if (userIds.length === 0) {
+    throw new Error('Reef production preview could not assemble the couple snapshot.');
+  }
+
+  const offByDate = new Map<string, Set<number>>();
+  for (const row of scheduleResult.data ?? []) {
+    if (typeof row.date !== 'string') continue;
+    const users = offByDate.get(row.date) ?? new Set<number>();
+    users.add(row.user_id);
+    offByDate.set(row.date, users);
+  }
+  const sharedDaysOff = [...offByDate.entries()]
+    .filter(([, ids]) => userIds.every((id) => ids.has(id)))
+    .map(([date]) => date)
+    .sort();
+
+  const linkIds: Record<number, Partial<Record<string, number>>> = {};
+  for (const row of memoryLinksResult.data ?? []) {
+    if (!Number.isSafeInteger(row.memory_id) || !Number.isSafeInteger(row.source_id)) continue;
+    const entry = (linkIds[row.memory_id] ??= {});
+    entry[row.source_type] ??= row.source_id;
+  }
+
+  const snapshot: EvolutionSourceSnapshot = {
+    calendarEvents: (eventsResult.data ?? []).map((event) => ({
+      id: event.id,
+      date: event.date,
+      type: event.type,
+      yearly: event.yearly,
+      isMilestone: event.is_milestone,
+    })),
+    plans: (plansResult.data ?? []).map((plan) => ({
+      id: plan.id,
+      category: plan.category,
+      status: plan.status,
+      startDate: plan.start_date,
+      endDate: plan.end_date,
+      completedAt: plan.completed_at,
+      createdAt: plan.created_at,
+    })),
+    wishlistItems: evolutionWishlistFromPairArchive(wishlistArchive),
+    mapPlaces: (pinsResult.data ?? []).map((pin) => ({
+      id: pin.id,
+      category: pin.category,
+      visitedAt: pin.visited_at,
+      createdAt: pin.created_at,
+      rating: pin.rating,
+      city: pin.city,
+      country: pin.country,
+    })),
+    memories: (memoriesResult.data ?? []).map((memory) => ({
+      id: memory.id,
+      memoryDate: memory.memory_date,
+      datePrecision: memory.date_precision,
+      takenAt: memory.taken_at,
+      createdAt: memory.created_at,
+    })),
+    memoryLinks: buildEvolutionMemoryLinks(linkIds),
+    media: (mediaResult.data ?? []).map((item) => ({
+      id: item.id,
+      status: item.status,
+      createdAt: item.created_at,
+    })),
+  };
+
+  return {
+    relationshipStartedAt,
+    userIds,
+    sharedDaysOff,
+    snapshot,
+  };
+}
+
 export function useReefPortalPreview(): UseReefPortalPreviewResult {
-  const startDateQuery = useRelationshipStartDate();
-  const users = useUsers();
-  const events = useEvents();
-  const plans = usePlans();
-  const togetherness = useScheduleTogetherness();
-  const pins = useMapPins();
-  const archive = useMemories();
-  const finishedMedia = useFinishedMedia();
-  const wishlistArchive = useQuery({
-    queryKey: ['wishlist', 'evolution-archive', 'pair'],
-    queryFn: fetchPairWishlistEvolutionArchive,
-    staleTime: 5 * 60_000,
-  });
+  const me = useCurrentUser();
   const [asOf] = useState(() => coupleDay(new Date(), COUPLE_TIME_ZONE));
+  const sourceQuery = useQuery({
+    queryKey: ['reef', 'evolution-sources', SOURCE_CACHE_VERSION, me.id],
+    queryFn: fetchReefPortalSources,
+    initialData: () => readCachedSources(me.id),
+    initialDataUpdatedAt: 0,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  });
 
-  const userIds = useMemo(
-    () => (users.data ?? []).map((user) => user.id).sort((left, right) => left - right),
-    [users.data],
-  );
-  const wishlist = useMemo(
-    () => evolutionWishlistFromPairArchive(wishlistArchive.data ?? []),
-    [wishlistArchive.data],
-  );
-
-  const isPending = startDateQuery.isPending
-    || users.isPending
-    || events.isPending
-    || plans.isPending
-    || togetherness.isPending
-    || pins.isPending
-    || archive.isPending
-    || finishedMedia.isPending
-    || wishlistArchive.isPending;
-  const queryError = startDateQuery.error
-    ?? users.error
-    ?? events.error
-    ?? plans.error
-    ?? togetherness.error
-    ?? pins.error
-    ?? archive.error
-    ?? finishedMedia.error
-    ?? wishlistArchive.error;
+  useEffect(() => {
+    if (!sourceQuery.data || sourceQuery.dataUpdatedAt <= 0) return;
+    writeCachedSources(me.id, sourceQuery.data);
+  }, [me.id, sourceQuery.data, sourceQuery.dataUpdatedAt]);
 
   return useMemo<UseReefPortalPreviewResult>(() => {
-    if (queryError) {
-      return {
-        preview: null,
-        isPending: false,
-        error: queryError instanceof Error ? queryError : new Error(String(queryError)),
-      };
-    }
-    if (isPending) return { preview: null, isPending: true, error: null };
-    if (!startDateQuery.data) {
-      return {
-        preview: null,
-        isPending: false,
-        error: new Error('Reef production preview requires relationship_start_date.'),
-      };
-    }
-    if (userIds.length === 0 || !archive.data) {
-      return {
-        preview: null,
-        isPending: false,
-        error: new Error('Reef production preview could not assemble the couple snapshot.'),
-      };
+    const sources = sourceQuery.data;
+    if (!sources) {
+      if (sourceQuery.error) {
+        return {
+          preview: null,
+          isPending: false,
+          error: sourceQuery.error instanceof Error
+            ? sourceQuery.error
+            : new Error(String(sourceQuery.error)),
+        };
+      }
+      return { preview: null, isPending: sourceQuery.isPending, error: null };
     }
 
     try {
-      const snapshot = buildEvolutionSourceSnapshot({
-        events: events.data ?? [],
-        plans: plans.data ?? [],
-        wishlist,
-        pins: pins.data ?? [],
-        archive: archive.data,
-        media: finishedMedia.data ?? [],
-      });
       const artifactResult = buildArtifactFromSnapshot({
-        coupleId: stableEvolutionCoupleId(userIds),
+        coupleId: stableEvolutionCoupleId(sources.userIds),
         asOf,
-        snapshot,
+        snapshot: sources.snapshot,
         engineConfig: {
           engineVersion: ENGINE_VERSION,
-          relationshipStartedAt: startDateQuery.data,
+          relationshipStartedAt: sources.relationshipStartedAt,
           timeZone: COUPLE_TIME_ZONE,
           leapDayPolicy: 'feb-28',
         },
@@ -160,7 +289,7 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
       const build = buildReefPreviewFromArtifact({
         artifact: artifactResult.blueprint,
         asOf,
-        sharedDaysOff: togetherness.data ?? [],
+        sharedDaysOff: sources.sharedDaysOff,
       });
       return {
         preview: {
@@ -178,18 +307,5 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
         error: error instanceof Error ? error : new Error(String(error)),
       };
     }
-  }, [
-    archive.data,
-    asOf,
-    events.data,
-    isPending,
-    pins.data,
-    plans.data,
-    queryError,
-    finishedMedia.data,
-    startDateQuery.data,
-    togetherness.data,
-    userIds,
-    wishlist,
-  ]);
+  }, [asOf, sourceQuery.data, sourceQuery.error, sourceQuery.isPending]);
 }
