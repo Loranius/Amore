@@ -1,16 +1,76 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
+import { evaluateReefProductionRuntimeAcceptance } from '@/engine/productionAcceptance';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
-import { ReefAccretionObject } from './ReefAccretionObject';
-import { ReefCoralColoniesObject } from './ReefCoralColoniesObject';
-import { ReefCoreObject } from './ReefCoreObject';
-import { ReefCoreStage } from './ReefCoreStage';
-import { ReefYearStructuresObject } from './ReefYearStructuresObject';
+import {
+  EvolutionRuntimeProbe,
+  type EvolutionRuntimeMetrics,
+} from '../crystal3d/evolution/EvolutionRuntimeProbe';
+import { ReefObject } from './ReefObject';
+import { ReefStage } from './ReefStage';
+import type { ReefFishSchoolMetrics } from './ReefFishSchool';
+import {
+  REEF_FISH_SCHOOL_MODEL,
+  REEF_FISH_SCHOOL_ROUTE_PROFILE,
+} from './reefFishSchoolPresentation';
+import {
+  REEF_FOUNDATION_PASS,
+  REEF_FOUNDATION_PRESENTATION_VERSION,
+} from './reefFoundationPresentation';
+import {
+  reefCameraFrameForAspect,
+  REEF_CAMERA_PASS,
+  REEF_LIGHTING_PASS,
+  REEF_PALETTE_PASS,
+  REEF_SCENE_PROFILE_VERSION,
+} from './reefSceneProfile';
+import {
+  REEF_MATERIAL_PASS,
+  REEF_MATERIAL_PRESENTATION_VERSION,
+} from './reefMaterialPresentation';
+import {
+  REEF_COLONY_SHAPE_PASS,
+  REEF_PRESENTATION_VERSION,
+} from './reefPresentation';
+import type { ReefThreeSceneState } from './reefThreeAdapter';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
 
-/** Portal-facing Phase 6 scene: coral colonies are accumulated into older reef substrate. */
+const DEFAULT_REEF_CAMERA_FRAME = reefCameraFrameForAspect(1);
+
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(
+    () => typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReduced(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  return reduced;
+}
+
+/**
+ * Portal-facing reef scene.
+ *
+ * Production diagnostics stay available as data attributes for acceptance and
+ * automated checks, but they are no longer part of the visual experience.
+ * The user sees the generated reef in its own underwater world, not a lab card.
+ */
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
+  const reducedMotion = useReducedMotion();
+  const [fishRuntime, setFishRuntime] = useState<ReefFishSchoolMetrics | null>(null);
+  const [worldRuntime, setWorldRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
+  const [sceneState, setSceneState] = useState<ReefThreeSceneState | null>(null);
+  const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setWorldRuntime(next), []);
+  const onFishReady = useCallback((next: ReefFishSchoolMetrics) => setFishRuntime(next), []);
+  const onSceneReady = useCallback((next: ReefThreeSceneState) => setSceneState(next), []);
 
   if (portal.isPending) return <CrystalPlaceholder />;
   if (portal.error || !portal.preview) {
@@ -23,45 +83,29 @@ export default function ReefPreviewScene() {
       >
         <div>
           <h2>Риф не вдалося побудувати</h2>
-          <p>{portal.error?.message ?? 'Reef accretion system is unavailable.'}</p>
+          <p>{portal.error?.message ?? 'Portal history is unavailable.'}</p>
         </div>
       </div>
     );
   }
 
-  const { core, yearStructures, composition, surfaces, colonies, accretion, asOf } = portal.preview;
-  const coreExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
-  const structureExtent = composition.structures.reduce(
-    (maximum, structure) => Math.max(
-      maximum,
-      Math.hypot(structure.center.x, structure.center.z) + structure.footprintRadius,
-    ),
+  const { build, diagnostics } = portal.preview;
+  // Reef acceptance must describe the generated reef, not the decorative
+  // underwater world around it. ReefObject exposes exact production geometry
+  // diagnostics when its accepted Three scene is created; the global probe is
+  // kept separately so world-level performance can still be inspected.
+  const reportedDrawCalls = sceneState?.diagnostics.drawCalls ?? null;
+  const reportedTriangles = sceneState?.diagnostics.triangles ?? null;
+  const visibleColonyRanges = sceneState?.batches.reduce(
+    (total, batch) => total + batch.runtimeRanges.length,
     0,
-  );
-  const colonyExtent = colonies.colonies.reduce(
-    (maximum, colony) => Math.max(
-      maximum,
-      Math.hypot(colony.position.x, colony.position.z) + colony.radius,
-    ),
-    0,
-  );
-  const accretionExtent = accretion.layers.reduce(
-    (maximum, layer) => Math.max(
-      maximum,
-      Math.hypot(layer.position.x, layer.position.z) + Math.max(layer.radiusX, layer.radiusZ),
-    ),
-    0,
-  );
-  const sceneExtent = Math.max(coreExtent, structureExtent, colonyExtent, accretionExtent);
-  const cameraDistance = Math.max(6.6, sceneExtent * 1.72, core.dimensions.height * 1.4);
-  const cameraHeight = Math.max(2.7, core.dimensions.height * 0.58, sceneExtent * 0.28);
-  const counts = yearStructures.diagnostics.archetypeCounts;
-  const score = composition.diagnostics.score;
-  const surfaceDiagnostics = surfaces.diagnostics;
-  const colonyDiagnostics = colonies.diagnostics;
-  const coralCounts = colonyDiagnostics.morphotypeCounts;
-  const accretionDiagnostics = accretion.diagnostics;
-  const accretionCounts = accretionDiagnostics.kindCounts;
+  ) ?? null;
+  const runtimeAcceptance = evaluateReefProductionRuntimeAcceptance({
+    contract: build.acceptance,
+    buildMs: build.buildMs,
+    drawCalls: reportedDrawCalls,
+    triangles: reportedTriangles,
+  });
 
   return (
     <div
@@ -69,116 +113,97 @@ export default function ReefPreviewScene() {
       data-home-artifact-preview="reef"
       data-reef-preview="ready"
       data-reef-source="portal"
-      data-reef-scene="phase-6-accretion-overlap"
-      data-reef-phase="6"
-      data-reef-core-version={core.version}
-      data-reef-year-structures-version={yearStructures.version}
-      data-reef-composition-version={composition.version}
-      data-reef-surface-version={surfaces.version}
-      data-reef-colony-version={colonies.version}
-      data-reef-accretion-version={accretion.version}
-      data-reef-couple-id={core.identity.coupleId}
-      data-reef-as-of={asOf}
-      data-reef-seed={core.identity.reefSeed}
-      data-reef-core-seed={core.identity.coreSeed}
-      data-reef-platform-seed={core.identity.platformSeed}
-      data-reef-identity-signature={core.identity.identitySignature}
-      data-reef-core-signature={core.signature}
-      data-reef-year-structures-signature={yearStructures.signature}
-      data-reef-composition-signature={composition.signature}
-      data-reef-surface-signature={surfaces.signature}
-      data-reef-colony-signature={colonies.signature}
-      data-reef-accretion-signature={accretion.signature}
-      data-reef-days-together={core.age.daysTogether}
-      data-reef-completed-years={core.age.completedYears}
-      data-reef-max-years={core.age.maxYears}
-      data-reef-progress={core.age.progress}
-      data-reef-growth={core.age.growth}
-      data-reef-core-radius-x={core.dimensions.radiusX}
-      data-reef-core-radius-z={core.dimensions.radiusZ}
-      data-reef-core-height={core.dimensions.height}
-      data-reef-foundation-radius={coreExtent}
-      data-reef-platform-radius-x={core.platform.radiusX}
-      data-reef-platform-radius-z={core.platform.radiusZ}
-      data-reef-year-structures={composition.diagnostics.structureCount}
-      data-reef-year-boulders={counts.BOULDER}
-      data-reef-year-columns={counts.COLUMN}
-      data-reef-year-ridges={counts.RIDGE}
-      data-reef-year-arches={counts.ARCH}
-      data-reef-year-collision-free={composition.diagnostics.collisionFree ? 'true' : 'false'}
-      data-reef-water-windows={composition.diagnostics.waterWindowCount}
-      data-reef-free-water={composition.diagnostics.freeWaterFraction}
-      data-reef-core-visibility={composition.diagnostics.coreVisibility}
-      data-reef-composition-adjusted={composition.diagnostics.adjustedStructureCount}
-      data-reef-composition-score={score.total}
-      data-reef-composition-core-visibility-score={score.coreVisibility}
-      data-reef-composition-open-water-score={score.openWater}
-      data-reef-composition-height-balance-score={score.heightBalance}
-      data-reef-composition-radial-balance-score={score.radialBalance}
-      data-reef-composition-silhouette-score={score.silhouette}
-      data-reef-composition-collision-score={score.collision}
-      data-reef-surface-patches={surfaceDiagnostics.patchCount}
-      data-reef-surface-eligible={surfaceDiagnostics.eligiblePatchCount}
-      data-reef-surface-rejected-underside={surfaceDiagnostics.rejectedUndersideCount}
-      data-reef-surface-core-patches={surfaceDiagnostics.corePatchCount}
-      data-reef-surface-platform-patches={surfaceDiagnostics.platformPatchCount}
-      data-reef-surface-year-patches={surfaceDiagnostics.yearPatchCount}
-      data-reef-surface-average-suitability={surfaceDiagnostics.averageSuitability}
-      data-reef-surface-average-eligible-suitability={surfaceDiagnostics.averageEligibleSuitability}
-      data-reef-surface-total-capacity={surfaceDiagnostics.totalCapacity}
-      data-reef-surface-mobile-bounded={surfaceDiagnostics.boundedForMobile ? 'true' : 'false'}
-      data-reef-colonies={colonyDiagnostics.colonyCount}
-      data-reef-colony-platform={colonyDiagnostics.platformColonyCount}
-      data-reef-colony-yearly={colonyDiagnostics.yearlyColonyCount}
-      data-reef-colony-sources={colonyDiagnostics.sourceCount}
-      data-reef-colony-skipped-spacing={colonyDiagnostics.skippedBySpacing}
-      data-reef-colony-average-vitality={colonyDiagnostics.averageVitality}
-      data-reef-colony-mobile-bounded={colonyDiagnostics.boundedForMobile ? 'true' : 'false'}
-      data-reef-colony-branching={coralCounts.BRANCHING}
-      data-reef-colony-massive={coralCounts.MASSIVE}
-      data-reef-colony-plate={coralCounts.PLATE}
-      data-reef-colony-encrusting={coralCounts.ENCRUSTING}
-      data-reef-colony-draw-groups={4}
-      data-reef-accretion-layers={accretionDiagnostics.layerCount}
-      data-reef-accretion-visible={accretionDiagnostics.visibleLayerCount}
-      data-reef-accretion-sources={accretionDiagnostics.coveredSourceCount}
-      data-reef-accretion-average-growth={accretionDiagnostics.averageGrowth}
-      data-reef-accretion-mobile-bounded={accretionDiagnostics.boundedForMobile ? 'true' : 'false'}
-      data-reef-accretion-sheets={accretionCounts.ENCRUSTING_SHEET}
-      data-reef-accretion-skeletons={accretionCounts.SKELETON_BASE}
-      data-reef-accretion-plates={accretionCounts.PLATE_STACK}
-      data-reef-accretion-skirts={accretionCounts.STRUCTURE_SKIRT}
-      data-reef-accretion-minerals={accretionCounts.MINERAL_TRANSITION}
-      data-reef-accretion-draw-groups={6}
-      data-reef-map-outcrops={0}
-      data-reef-schedule-terraces={0}
-      data-reef-plan-fish-logical={0}
-      data-reef-plan-fish-visible={0}
-      data-reef-wish-corals={0}
-      data-reef-photo-corals={0}
-      data-reef-media-corals={0}
-      data-reef-calendar-landmarks={0}
-      data-reef-normalized-events={0}
-      data-reef-motion-bindings={0}
+      data-reef-scene="underwater-world"
+      data-reef-presentation={REEF_PRESENTATION_VERSION}
+      data-reef-shape-pass={REEF_COLONY_SHAPE_PASS}
+      data-reef-material-presentation={REEF_MATERIAL_PRESENTATION_VERSION}
+      data-reef-material-pass={REEF_MATERIAL_PASS}
+      data-reef-foundation-presentation={REEF_FOUNDATION_PRESENTATION_VERSION}
+      data-reef-foundation-pass={REEF_FOUNDATION_PASS}
+      data-reef-scene-profile={REEF_SCENE_PROFILE_VERSION}
+      data-reef-camera-pass={REEF_CAMERA_PASS}
+      data-reef-lighting-pass={REEF_LIGHTING_PASS}
+      data-reef-palette-pass={REEF_PALETTE_PASS}
+      data-reef-acceptance={runtimeAcceptance.status}
+      data-reef-static-acceptance={build.acceptance.staticStatus}
+      data-reef-violations={runtimeAcceptance.violations.join(',')}
+      data-reef-production-signature={build.acceptance.signature}
+      data-reef-identity-signature={build.acceptance.identitySignature}
+      data-reef-phase-count={build.acceptance.phaseCheckpoints.length}
+      data-reef-phase-order={String(build.acceptance.diagnostics.phaseOrderPreserved)}
+      data-reef-phase-provenance={String(build.acceptance.diagnostics.phaseProvenancePreserved)}
+      data-reef-colony-identity={String(build.acceptance.diagnostics.colonyIdentityChainPreserved)}
+      data-reef-range-binding-chain={String(build.acceptance.diagnostics.rangeBindingChainPreserved)}
+      data-reef-reduced-motion={String(reducedMotion)}
+      data-reef-couple-id={build.artifact.coupleId}
+      data-reef-as-of={build.life.asOf}
+      data-reef-stage={build.species.state.stage}
+      data-reef-evolution={build.species.moduleEvolution.version}
+      data-reef-days-together={build.species.moduleEvolution.facts.daysTogether}
+      data-reef-completed-years={build.species.moduleEvolution.facts.completedYears}
+      data-reef-foundation-radius={build.species.moduleEvolution.foundation.substrateRadius}
+      data-reef-outer-growth-radius={build.species.moduleEvolution.foundation.outerGrowthRadius}
+      data-reef-year-arches={build.structures.arches.length}
+      data-reef-map-outcrops={build.structures.outcrops.length}
+      data-reef-schedule-terraces={build.structures.terraces.length}
+      data-reef-structure-collision-free={String(build.structures.diagnostics.collisionFree)}
+      data-reef-plan-fish-logical={build.species.moduleEvolution.life.planFish.logicalCount}
+      data-reef-plan-fish-visible={build.species.moduleEvolution.life.planFish.visibleCount}
+      data-reef-wish-corals={build.species.moduleEvolution.colonies.primaryWishCorals.logicalCount}
+      data-reef-photo-corals={build.species.moduleEvolution.colonies.microPhotoCorals.logicalCount}
+      data-reef-media-corals={build.species.moduleEvolution.colonies.mediaCorals.logicalCount}
+      data-reef-calendar-landmarks={build.species.moduleEvolution.colonies.calendarLandmarks.logicalCount}
+      data-reef-normalized-events={portal.preview.normalizedEventCount}
+      data-reef-adapter-diagnostics={diagnostics.length}
+      data-reef-colonies={build.diagnostics.colonyCount}
+      data-reef-batches={build.diagnostics.batchCount}
+      data-reef-foundation-vertices={build.foundation.vertices.length}
+      data-reef-vertices={build.diagnostics.vertexCount}
+      data-reef-triangles={build.diagnostics.triangleCount}
+      data-reef-materials={build.diagnostics.materialCount}
+      data-reef-motion-bindings={build.diagnostics.motionBindingCount}
+      data-reef-visible-colonies={visibleColonyRanges ?? ''}
+      data-reef-fish-model={fishRuntime ? REEF_FISH_SCHOOL_MODEL : 'loading'}
+      data-reef-fish-meshes={fishRuntime?.meshes ?? ''}
+      data-reef-fish-width={fishRuntime?.width ?? ''}
+      data-reef-fish-height={fishRuntime?.height ?? ''}
+      data-reef-fish-depth={fishRuntime?.depth ?? ''}
+      data-reef-fish-routes={fishRuntime?.routes ?? ''}
+      data-reef-fish-animated-routes={fishRuntime?.animatedRoutes ?? ''}
+      data-reef-fish-tracks={fishRuntime?.tracks ?? ''}
+      data-reef-fish-scale={fishRuntime?.scale ?? ''}
+      data-reef-fish-route-profile={fishRuntime ? REEF_FISH_SCHOOL_ROUTE_PROFILE : 'loading'}
+      data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}
+      data-reef-runtime-draw-calls={reportedDrawCalls ?? ''}
+      data-reef-runtime-triangles={reportedTriangles ?? ''}
+      data-reef-world-draw-calls={worldRuntime?.drawCalls ?? ''}
+      data-reef-world-triangles={worldRuntime?.triangles ?? ''}
+      data-reef-build-ms={build.buildMs}
+      data-reef-current-cycle={build.life.current.cycleSeconds}
     >
       <Canvas
-        shadows
         dpr={[1, 1.5]}
-        frameloop="demand"
+        frameloop="always"
         camera={{
-          position: [cameraDistance * 0.42, cameraHeight, cameraDistance],
-          fov: 42,
-          near: 0.1,
-          far: Math.max(90, cameraDistance * 8),
+          position: [...DEFAULT_REEF_CAMERA_FRAME.position],
+          fov: DEFAULT_REEF_CAMERA_FRAME.fov,
+          near: DEFAULT_REEF_CAMERA_FRAME.near,
+          far: DEFAULT_REEF_CAMERA_FRAME.far,
         }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
-        <ReefCoreStage core={core} sceneExtent={sceneExtent}>
-          <ReefCoreObject core={core} />
-          <ReefYearStructuresObject core={core} manifest={composition} />
-          <ReefAccretionObject core={core} manifest={accretion} />
-          <ReefCoralColoniesObject manifest={colonies} />
-        </ReefCoreStage>
+        <ReefStage
+          build={build}
+          onFishReady={onFishReady}
+          reducedMotion={reducedMotion}
+        >
+          <ReefObject
+            build={build}
+            reducedMotion={reducedMotion}
+            onSceneReady={onSceneReady}
+          />
+        </ReefStage>
+        <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} warmupFrames={18} />
       </Canvas>
     </div>
   );

@@ -1,35 +1,36 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useEvents } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
+import { useMapPins } from '@/features/map/useMapPins';
+import { useFinishedMedia } from '@/features/media/useMedia';
+import { useMemories } from '@/features/memories/useMemories';
+import { usePlans } from '@/features/plans/usePlans';
+import { useScheduleTogetherness } from '@/features/schedule/useSharedDaysOff';
+import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
 import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
 import {
-  buildReefAccretion,
-  buildReefComposition,
-  buildReefCoralColonies,
-  buildReefCore,
-  buildReefSurfaceSystem,
-  buildReefYearStructures,
-  reefDaysTogether,
-  type ReefAccretionManifest,
-  type ReefCompositionManifest,
-  type ReefCoralColoniesManifest,
-  type ReefCoreManifest,
-  type ReefSurfaceManifest,
-  type ReefYearStructuresManifest,
-} from '@/engine/species/reef';
-import { stableEvolutionCoupleId } from '../crystal3d/evolution/sourceSnapshot';
+  buildArtifactFromSnapshot,
+  type AdapterDiagnostic,
+} from '@/engine/evolution/adapters';
+import {
+  buildEvolutionSourceSnapshot,
+  evolutionWishlistFromPairArchive,
+  stableEvolutionCoupleId,
+} from '../crystal3d/evolution/sourceSnapshot';
+import {
+  buildReefPreviewFromArtifact,
+  type ReefPreviewBuild,
+} from './buildReefPreview';
 
+const ENGINE_VERSION = '1.0.0';
 const COUPLE_TIME_ZONE = 'Europe/Kyiv';
 
 export interface ReefPortalPreview {
-  core: ReefCoreManifest;
-  yearStructures: ReefYearStructuresManifest;
-  composition: ReefCompositionManifest;
-  surfaces: ReefSurfaceManifest;
-  colonies: ReefCoralColoniesManifest;
-  accretion: ReefAccretionManifest;
-  asOf: string;
+  build: ReefPreviewBuild;
+  diagnostics: AdapterDiagnostic[];
+  normalizedEventCount: number;
 }
 
 export interface UseReefPortalPreviewResult {
@@ -67,18 +68,50 @@ function useRelationshipStartDate() {
   });
 }
 
-/** Phase 6 portal adapter: deterministic geology, colonies and accumulated reef history. */
+/** Read-only portal adapter. It reuses the accepted Evolution snapshot contract. */
 export function useReefPortalPreview(): UseReefPortalPreviewResult {
   const startDateQuery = useRelationshipStartDate();
   const users = useUsers();
+  const events = useEvents();
+  const plans = usePlans();
+  const togetherness = useScheduleTogetherness();
+  const pins = useMapPins();
+  const archive = useMemories();
+  const finishedMedia = useFinishedMedia();
+  const wishlistArchive = useQuery({
+    queryKey: ['wishlist', 'evolution-archive', 'pair'],
+    queryFn: fetchPairWishlistEvolutionArchive,
+    staleTime: 5 * 60_000,
+  });
   const [asOf] = useState(() => coupleDay(new Date(), COUPLE_TIME_ZONE));
 
   const userIds = useMemo(
     () => (users.data ?? []).map((user) => user.id).sort((left, right) => left - right),
     [users.data],
   );
-  const isPending = startDateQuery.isPending || users.isPending;
-  const queryError = startDateQuery.error ?? users.error;
+  const wishlist = useMemo(
+    () => evolutionWishlistFromPairArchive(wishlistArchive.data ?? []),
+    [wishlistArchive.data],
+  );
+
+  const isPending = startDateQuery.isPending
+    || users.isPending
+    || events.isPending
+    || plans.isPending
+    || togetherness.isPending
+    || pins.isPending
+    || archive.isPending
+    || finishedMedia.isPending
+    || wishlistArchive.isPending;
+  const queryError = startDateQuery.error
+    ?? users.error
+    ?? events.error
+    ?? plans.error
+    ?? togetherness.error
+    ?? pins.error
+    ?? archive.error
+    ?? finishedMedia.error
+    ?? wishlistArchive.error;
 
   return useMemo<UseReefPortalPreviewResult>(() => {
     if (queryError) {
@@ -93,34 +126,48 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
       return {
         preview: null,
         isPending: false,
-        error: new Error('Reef Core requires relationship_start_date.'),
+        error: new Error('Reef production preview requires relationship_start_date.'),
       };
     }
-    if (userIds.length === 0) {
+    if (userIds.length === 0 || !archive.data) {
       return {
         preview: null,
         isPending: false,
-        error: new Error('Reef Core could not resolve the couple identity.'),
+        error: new Error('Reef production preview could not assemble the couple snapshot.'),
       };
     }
 
     try {
-      const daysTogether = reefDaysTogether(startDateQuery.data, asOf);
-      if (daysTogether === null) {
-        throw new Error('Reef Core could not derive daysTogether from relationship_start_date.');
-      }
-      const core = buildReefCore({
-        coupleId: stableEvolutionCoupleId(userIds),
-        relationshipStartDate: startDateQuery.data,
-        daysTogether,
+      const snapshot = buildEvolutionSourceSnapshot({
+        events: events.data ?? [],
+        plans: plans.data ?? [],
+        wishlist,
+        pins: pins.data ?? [],
+        archive: archive.data,
+        media: finishedMedia.data ?? [],
       });
-      const yearStructures = buildReefYearStructures({ core });
-      const composition = buildReefComposition({ core, yearStructures });
-      const surfaces = buildReefSurfaceSystem({ core, composition });
-      const colonies = buildReefCoralColonies({ core, surfaces });
-      const accretion = buildReefAccretion({ core, composition, colonies });
+      const artifactResult = buildArtifactFromSnapshot({
+        coupleId: stableEvolutionCoupleId(userIds),
+        asOf,
+        snapshot,
+        engineConfig: {
+          engineVersion: ENGINE_VERSION,
+          relationshipStartedAt: startDateQuery.data,
+          timeZone: COUPLE_TIME_ZONE,
+          leapDayPolicy: 'feb-28',
+        },
+      });
+      const build = buildReefPreviewFromArtifact({
+        artifact: artifactResult.blueprint,
+        asOf,
+        sharedDaysOff: togetherness.data ?? [],
+      });
       return {
-        preview: { core, yearStructures, composition, surfaces, colonies, accretion, asOf },
+        preview: {
+          build,
+          diagnostics: artifactResult.adapterDiagnostics,
+          normalizedEventCount: artifactResult.blueprint.events.length,
+        },
         isPending: false,
         error: null,
       };
@@ -131,5 +178,18 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
         error: error instanceof Error ? error : new Error(String(error)),
       };
     }
-  }, [asOf, isPending, queryError, startDateQuery.data, userIds]);
+  }, [
+    archive.data,
+    asOf,
+    events.data,
+    isPending,
+    pins.data,
+    plans.data,
+    queryError,
+    finishedMedia.data,
+    startDateQuery.data,
+    togetherness.data,
+    userIds,
+    wishlist,
+  ]);
 }
