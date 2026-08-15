@@ -87,12 +87,6 @@ function lerp(start: number, end: number, amount: number): number {
   return start + (end - start) * amount;
 }
 
-/**
- * Phase 1 growth intentionally keeps a visible long tail all the way to year 50.
- * The canonical progress is linear; this display curve gives the young reef
- * enough presence without allowing the first few years to consume the mature
- * size budget.
- */
 function reefCoreGrowth(progress: number): number {
   const t = clamp01(progress);
   return round6(0.35 * t + 0.65 * Math.sqrt(t));
@@ -102,22 +96,10 @@ function hex32(value: number): string {
   return (value >>> 0).toString(16).padStart(8, '0');
 }
 
-/**
- * Converts two explicit portal dates to the Phase 1 day count. Date parsing is
- * delegated to the accepted Evolution calendar so timezone/date-only behavior
- * stays aligned with the rest of Amore.
- */
 export function reefDaysTogether(relationshipStartDate: string, asOf: string): number | null {
   return daysBetweenExplicit(relationshipStartDate, asOf);
 }
 
-/**
- * Canonical deterministic source of truth for Reef Phase 1.
- *
- * Identity is permanent and depends only on the couple and relationship start.
- * Age changes dimensions, never the seed. No module data, annual structures,
- * colonies, fish, atmosphere or renderer state is allowed into this manifest.
- */
 export function buildReefCore(input: ReefCoreInput): ReefCoreManifest {
   const coupleId = normalizedIdentityPart(input.coupleId, 'coupleId');
   const relationshipStartDate = normalizedIdentityPart(
@@ -129,18 +111,18 @@ export function buildReefCore(input: ReefCoreInput): ReefCoreManifest {
     : 0;
   const daysTogether = finiteDays(input.daysTogether);
 
-  // Exact permanent seed contract: hash(coupleId + startDate + namespace).
   const reefSeed = stableHash32(
     `${coupleId}${relationshipStartDate}${REEF_CORE_SEED_NAMESPACE}`,
   );
-  // Exact derived seed contract required by Growth System v1.
   const coreSeed = stableHash32(`${reefSeed}:core`);
   const platformSeed = stableHash32(`${reefSeed}:platform`);
 
   const progress = round6(daysTogether / REEF_CORE_MAX_DAYS);
   const growth = reefCoreGrowth(progress);
   const ageYears = round6(daysTogether / REEF_CORE_YEAR_DAYS);
-  const completedYears = Math.min(REEF_CORE_MAX_YEARS, Math.floor(ageYears));
+  const completedYears = progress >= 1
+    ? REEF_CORE_MAX_YEARS
+    : Math.min(REEF_CORE_MAX_YEARS, Math.floor(ageYears));
 
   const widthBias = lerp(0.94, 1.06, seededUnit(coreSeed, 'width-bias'));
   const depthBias = lerp(0.92, 1.08, seededUnit(coreSeed, 'depth-bias'));
