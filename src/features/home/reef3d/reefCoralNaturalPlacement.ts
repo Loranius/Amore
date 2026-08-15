@@ -6,6 +6,7 @@ import {
 } from 'three';
 import type {
   ReefColonyMorphotype,
+  ReefColonyTier,
   ReefLayoutVec3,
 } from '@/engine/species/reef';
 import {
@@ -278,7 +279,7 @@ function moveGeometryToSurface({
   slot: ReefAllocatedSurfaceSlot;
   seed: number;
   morphotype: ReefColonyMorphotype;
-  tier: 'primary' | 'micro';
+  tier: ReefColonyTier;
   footprintRadius: number;
   surfaceNormal?: ReefLayoutVec3;
 }): ReefCoralSurfaceFrame {
