@@ -4,8 +4,12 @@ import type {
   ReefColonyGrowthStage,
   ReefColonyHabitatPlan,
 } from './reefColonyHabitats';
+import {
+  buildReefCoralPatchPlan,
+  REEF_CORAL_PATCH_VERSION,
+} from './reefCoralPatches';
 
-export const REEF_COLONY_MATURITY_VERSION = 'reef-colony-maturity-v1';
+export const REEF_COLONY_MATURITY_VERSION = 'reef-colony-maturity-v2';
 
 export type ReefColonyLifecycleStage = 'young' | 'growing' | 'mature';
 
@@ -23,6 +27,7 @@ export interface ReefColonyMaturityState {
 
 export interface ReefColonyMaturityPlan {
   version: typeof REEF_COLONY_MATURITY_VERSION;
+  patchVersion: typeof REEF_CORAL_PATCH_VERSION;
   plan: ReefLivingCanopyPlan;
   states: ReefColonyMaturityState[];
   stageCounts: Record<ReefColonyLifecycleStage, number>;
@@ -87,15 +92,22 @@ function firstHabitatColony(
   return undefined;
 }
 
+/**
+ * Maturity is evaluated after event-level habitats have been collapsed into
+ * readable same-species patches. That makes Evolution Engine growth enlarge an
+ * existing colony and recruit around its edge instead of sprinkling unrelated
+ * coral across the whole limestone foundation.
+ */
 export function buildReefColonyMaturityPlan(
   habitatPlan: ReefColonyHabitatPlan,
   build: ReefPreviewBuild,
 ): ReefColonyMaturityPlan {
+  const patchPlan = buildReefCoralPatchPlan(habitatPlan, build);
   const evolution = build.species.moduleEvolution;
   const ecology = evolution.development.ecology;
   const zones = evolution.development.annualZones;
   const colonyBySourceId = new Map(
-    habitatPlan.plan.colonies.map((colony) => [colony.sourceColonyId, colony] as const),
+    patchPlan.plan.colonies.map((colony) => [colony.sourceColonyId, colony] as const),
   );
   const stateByColonyId = new Map<string, ReefColonyMaturityState>();
   const growthStageByColonyId = new Map<string, ReefColonyGrowthStage>();
@@ -106,7 +118,7 @@ export function buildReefColonyMaturityPlan(
     mature: 0,
   };
 
-  for (const habitat of habitatPlan.habitats) {
+  for (const habitat of patchPlan.habitats) {
     const firstColony = firstHabitatColony(habitat.memberColonyIds, colonyBySourceId);
     const epochIndex = firstColony?.request.epochIndex ?? 0;
     const zone = zones[Math.min(Math.max(0, epochIndex), Math.max(0, zones.length - 1))];
@@ -146,7 +158,7 @@ export function buildReefColonyMaturityPlan(
     }
   }
 
-  const colonies = habitatPlan.plan.colonies.map((colony) => {
+  const colonies = patchPlan.plan.colonies.map((colony) => {
     const state = stateByColonyId.get(colony.sourceColonyId);
     if (!state) return colony;
     const effectiveMaturity = effectiveColonyMaturity(
@@ -179,8 +191,9 @@ export function buildReefColonyMaturityPlan(
 
   return {
     version: REEF_COLONY_MATURITY_VERSION,
+    patchVersion: patchPlan.patchVersion,
     plan: {
-      ...habitatPlan.plan,
+      ...patchPlan.plan,
       colonies,
       requests: colonies.map((colony) => colony.request),
     },
