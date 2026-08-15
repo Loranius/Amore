@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   assessVolcanoCoralLocalPoint,
+  chooseReefCoralPreferredSurface,
   classifyReefCoralSurface,
+  reefCoralMorphotypeCanColonizeSurface,
+  reefCoralSurfaceColonizationPolicy,
   VOLCANO_CORAL_SUMMIT_NO_GROW_RATIO,
 } from './reefCoralSurfaceRules';
 
@@ -25,6 +28,53 @@ describe('reef coral surface taxonomy', () => {
 
     expect(classifyReefCoralSurface(terrace)).toBe('terrace');
     geometry.dispose();
+  });
+});
+
+describe('reef coral surface colonization', () => {
+  it('keeps dense terraces generalist while volcanic pioneer habitat stays selective', () => {
+    expect(reefCoralMorphotypeCanColonizeSurface('branching', 'terrace')).toBe(true);
+    expect(reefCoralMorphotypeCanColonizeSurface('branching', 'volcano')).toBe(false);
+    expect(reefCoralMorphotypeCanColonizeSurface('encrusting', 'volcano')).toBe(true);
+    expect(reefCoralMorphotypeCanColonizeSurface('sea-fan', 'arch')).toBe(true);
+    expect(reefCoralMorphotypeCanColonizeSurface('sea-fan', 'volcano')).toBe(false);
+  });
+
+  it('allows steeper attachment on arches and volcano slopes than on terraces', () => {
+    const terrace = reefCoralSurfaceColonizationPolicy('terrace');
+    const volcano = reefCoralSurfaceColonizationPolicy('volcano');
+    const arch = reefCoralSurfaceColonizationPolicy('arch');
+
+    expect(volcano.minNormalY).toBeLessThan(terrace.minNormalY);
+    expect(arch.minNormalY).toBeLessThan(volcano.minNormalY);
+    expect(arch.maxHeightDelta).toBeGreaterThan(terrace.maxHeightDelta);
+  });
+
+  it('chooses a deterministic weighted habitat without assigning forbidden morphotypes', () => {
+    const available = ['terrace', 'volcano', 'arch', 'rock'] as const;
+    const first = chooseReefCoralPreferredSurface({
+      seed: 72_041,
+      morphotype: 'encrusting',
+      availableSurfaceTypes: available,
+    });
+    const second = chooseReefCoralPreferredSurface({
+      seed: 72_041,
+      morphotype: 'encrusting',
+      availableSurfaceTypes: available,
+    });
+    const branchingSelections = Array.from({ length: 48 }, (_value, index) => (
+      chooseReefCoralPreferredSurface({
+        seed: 3_100 + index * 97,
+        morphotype: 'branching',
+        availableSurfaceTypes: available,
+      })
+    ));
+
+    expect(second).toBe(first);
+    expect(first).not.toBeNull();
+    expect(first && reefCoralMorphotypeCanColonizeSurface('encrusting', first)).toBe(true);
+    expect(branchingSelections).not.toContain('volcano');
+    expect(new Set(branchingSelections).size).toBeGreaterThan(1);
   });
 });
 
