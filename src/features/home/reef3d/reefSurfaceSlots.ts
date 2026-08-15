@@ -251,6 +251,8 @@ export function allocateReefSurfaceSlots({
       : sampled
         ? pointFromSample(sampled)
         : null;
+    const normalY = candidate.normalY ?? sampled?.normalY;
+    const supportRadius = candidate.supportRadius ?? sampled?.supportRadius;
     return position
       ? [{
           id: candidate.id,
@@ -262,12 +264,8 @@ export function allocateReefSurfaceSlots({
           ...(candidate.maxFootprintRadius === undefined
             ? {}
             : { maxFootprintRadius: candidate.maxFootprintRadius }),
-          ...((candidate.normalY ?? sampled?.normalY) === undefined
-            ? {}
-            : { normalY: candidate.normalY ?? sampled?.normalY }),
-          ...((candidate.supportRadius ?? sampled?.supportRadius) === undefined
-            ? {}
-            : { supportRadius: candidate.supportRadius ?? sampled?.supportRadius }),
+          ...(normalY === undefined ? {} : { normalY }),
+          ...(supportRadius === undefined ? {} : { supportRadius }),
         }]
       : [];
   });
