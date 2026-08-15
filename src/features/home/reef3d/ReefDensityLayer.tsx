@@ -14,6 +14,10 @@ import {
   REEF_COLONY_HABITAT_VERSION,
 } from './reefColonyHabitats';
 import {
+  buildReefColonyMaturityPlan,
+  REEF_COLONY_MATURITY_VERSION,
+} from './reefColonyMaturity';
+import {
   buildReefSurfaceBoundLivingCanopyGeometry,
   hasReefCoralTerrainFootprintSupport,
   naturalizeReefLivingCanopyPlan,
@@ -203,9 +207,13 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     () => buildReefColonyHabitatPlan(basePlan, build),
     [basePlan, build],
   );
+  const maturityPlan = useMemo(
+    () => buildReefColonyMaturityPlan(habitatPlan, build),
+    [habitatPlan, build],
+  );
   const plan = useMemo(
-    () => naturalizeReefLivingCanopyPlan(habitatPlan.plan),
-    [habitatPlan.plan],
+    () => naturalizeReefLivingCanopyPlan(maturityPlan.plan),
+    [maturityPlan.plan],
   );
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const material = useMemo(() => new THREE.MeshStandardMaterial({
@@ -367,6 +375,9 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     next.userData.reefCoralNaturalPlacementVersion = REEF_CORAL_NATURAL_PLACEMENT_VERSION;
     next.userData.reefCoralSurfaceBindingVersion = REEF_CORAL_SURFACE_BINDING_VERSION;
     next.userData.reefCoralSurfaceColonizationVersion = REEF_CORAL_SURFACE_COLONIZATION_VERSION;
+    next.userData.reefColonyMaturityVersion = REEF_COLONY_MATURITY_VERSION;
+    next.userData.reefColonyMaturityStageCounts = maturityPlan.stageCounts;
+    next.userData.reefColonyMaturityStates = maturityPlan.states;
     next.userData.reefCoralSurfaceDistribution = surfaceCounts;
     next.userData.reefColonyHabitatCount = habitatPlan.habitats.length;
     next.userData.reefColonyHabitatDominantMorphotypes = habitatPlan.habitats.map((habitat) => ({
@@ -386,6 +397,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     geometry,
     habitatPlan,
     invalidate,
+    maturityPlan,
     plan,
     scene,
   ]);
@@ -410,6 +422,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
         reefCoralNaturalPlacementVersion: REEF_CORAL_NATURAL_PLACEMENT_VERSION,
         reefCoralSurfaceBindingVersion: REEF_CORAL_SURFACE_BINDING_VERSION,
         reefCoralSurfaceColonizationVersion: REEF_CORAL_SURFACE_COLONIZATION_VERSION,
+        reefColonyMaturityVersion: REEF_COLONY_MATURITY_VERSION,
       }}
     />
   );
