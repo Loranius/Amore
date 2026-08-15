@@ -5,6 +5,11 @@ import type { ReefColonyMorphotype } from '@/engine/species/reef';
 import type { ReefPreviewBuild } from './buildReefPreview';
 import { buildReefLivingCanopyPlan } from './reefLivingCanopy';
 import {
+  applyReefColonyCompetition,
+  REEF_COLONY_COMPETITION_PASS,
+  REEF_COLONY_COMPETITION_VERSION,
+} from './reefColonyCompetition';
+import {
   buildReefColonyNucleationPlan,
   createReefColonyNucleationScorer,
   REEF_COLONY_NUCLEATION_PASS,
@@ -33,7 +38,7 @@ export interface ReefDensityCandidateCounts {
   morphotypeCounts: Record<ReefColonyMorphotype, number>;
 }
 
-const REEF_CANOPY_LAYOUT = 'ecological-colony-nucleation-v1';
+const REEF_CANOPY_LAYOUT = 'ecological-competition-and-growth-v1';
 
 export function reefDensityCandidateCounts(build: ReefPreviewBuild): ReefDensityCandidateCounts {
   const plan = buildReefLivingCanopyPlan(build);
@@ -48,7 +53,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
   const scene = useThree((state) => state.scene);
   const invalidate = useThree((state) => state.invalidate);
   const basePlan = useMemo(() => buildReefLivingCanopyPlan(build), [build]);
-  const plan = useMemo(() => buildReefColonyNucleationPlan({
+  const nucleationPlan = useMemo(() => buildReefColonyNucleationPlan({
     plan: basePlan,
     foundationRadius: build.structures.visibleFoundationRadius,
     seed: build.species.moduleEvolution.identitySeed,
@@ -58,13 +63,13 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     build.structures.visibleFoundationRadius,
   ]);
   const candidateScorer = useMemo(() => createReefColonyNucleationScorer({
-    plan,
+    plan: nucleationPlan,
     foundationRadius: build.structures.visibleFoundationRadius,
     seed: build.species.moduleEvolution.identitySeed,
   }), [
     build.species.moduleEvolution.identitySeed,
     build.structures.visibleFoundationRadius,
-    plan,
+    nucleationPlan,
   ]);
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const material = useMemo(() => new THREE.MeshStandardMaterial({
@@ -92,7 +97,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     ];
     const worldNormal = new THREE.Vector3();
     const allocation = allocateReefSurfaceSlots({
-      requests: plan.requests,
+      requests: nucleationPlan.requests,
       candidates,
       candidateScorer,
       sample: (x, z) => {
@@ -114,14 +119,21 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
         };
       },
     });
+    const competition = applyReefColonyCompetition({
+      plan: nucleationPlan,
+      slots: allocation.slots,
+    });
     const next = buildReefMorphologyFamiliesGeometry({
-      plan,
+      plan: competition.plan,
       slots: allocation.slots,
     });
     next.userData.reefSurfaceSlotDiagnostics = allocation.diagnostics;
     next.userData.reefCanopyLayout = REEF_CANOPY_LAYOUT;
     next.userData.reefColonyNucleationVersion = REEF_COLONY_NUCLEATION_VERSION;
     next.userData.reefColonyNucleationPass = REEF_COLONY_NUCLEATION_PASS;
+    next.userData.reefColonyCompetitionVersion = REEF_COLONY_COMPETITION_VERSION;
+    next.userData.reefColonyCompetitionPass = REEF_COLONY_COMPETITION_PASS;
+    next.userData.reefColonyCompetitionDiagnostics = competition.diagnostics;
 
     geometry.dispose();
     geometry.copy(next);
@@ -133,7 +145,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     candidateScorer,
     geometry,
     invalidate,
-    plan,
+    nucleationPlan,
     scene,
   ]);
 
@@ -144,7 +156,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
 
   return (
     <mesh
-      name={`reef-density-${REEF_MORPHOLOGY_FAMILIES_PASS}-${REEF_COLONY_NUCLEATION_PASS}`}
+      name={`reef-density-${REEF_MORPHOLOGY_FAMILIES_PASS}-${REEF_COLONY_COMPETITION_PASS}`}
       geometry={geometry}
       material={material}
       castShadow={false}
@@ -155,6 +167,8 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
         reefMorphologyFamiliesPass: REEF_MORPHOLOGY_FAMILIES_PASS,
         reefColonyNucleationVersion: REEF_COLONY_NUCLEATION_VERSION,
         reefColonyNucleationPass: REEF_COLONY_NUCLEATION_PASS,
+        reefColonyCompetitionVersion: REEF_COLONY_COMPETITION_VERSION,
+        reefColonyCompetitionPass: REEF_COLONY_COMPETITION_PASS,
         reefCanopyLayout: REEF_CANOPY_LAYOUT,
       }}
     />
@@ -163,7 +177,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
 
 export function ReefDensityLayer({ build }: { build: ReefPreviewBuild }) {
   return (
-    <group name="reef-density-ecological-nucleation">
+    <group name="reef-density-competition-and-growth">
       <DensityCorals build={build} />
     </group>
   );
