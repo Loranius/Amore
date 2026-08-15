@@ -322,6 +322,23 @@ function buildFissureRibbonGeometries(
   };
 }
 
+function volcanoSurfaceRevision(build: ReefPreviewBuild): string {
+  const evolution = build.species.moduleEvolution;
+  const ecology = evolution.development.ecology;
+  const zones = evolution.development.annualZones
+    .map((zone) => `${zone.progress}:${zone.fill}`)
+    .join('|');
+  return [
+    evolution.identitySeed,
+    evolution.facts.daysTogether,
+    build.structures.visibleFoundationRadius,
+    ecology.colonization,
+    ecology.biodiversity,
+    ecology.cohesion,
+    zones,
+  ].join(':');
+}
+
 export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
   const scene = useThree((state) => state.scene);
   const gl = useThree((state) => state.gl);
@@ -331,6 +348,7 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
   const scarMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const coreMaterialRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const identitySeed = build.species.moduleEvolution.identitySeed;
+  const surfaceRevision = volcanoSurfaceRevision(build);
   const [eruptionActive, setEruptionActive] = useState(
     () => isReefVolcanoEruptionActive(new Date()),
   );
@@ -469,7 +487,7 @@ export function ReefVolcanoSurfacePass({ build }: { build: ReefPreviewBuild }) {
       delete object.userData.reefVolcanoFissureRenderer;
       invalidate();
     };
-  }, [albedo, bump, gl, identitySeed, invalidate, scene]);
+  }, [albedo, bump, gl, identitySeed, invalidate, scene, surfaceRevision]);
 
   return null;
 }
