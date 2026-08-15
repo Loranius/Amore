@@ -6,6 +6,7 @@ const DOWN = new THREE.Vector3(0, -1, 0);
 const ORIGIN = new THREE.Vector3();
 const WORLD_NORMAL = new THREE.Vector3();
 const RAYCASTER = new THREE.Raycaster();
+const RAYCAST_HITS: THREE.Intersection[] = [];
 const SLOT_WORLD_POINT = new THREE.Vector3();
 const CORAL_ARCH_CLEARANCE_OFFSETS = [
   [0, 0],
@@ -61,12 +62,6 @@ function hasIgnoredSupportAncestor(object: THREE.Object3D): boolean {
   return false;
 }
 
-/**
- * Collects the normal generated habitat plus explicitly authored replacement
- * support surfaces. The submarine volcano lives beside the legacy production
- * root during the renderer migration, so it opts in with reefSupportSurface.
- * Hidden/replaced legacy geology is excluded to prevent floating corals.
- */
 export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
   const root = scene.getObjectByName('reef-hero-support');
   scene.updateMatrixWorld(true);
@@ -74,8 +69,7 @@ export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
 
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
-    if (hasIgnoredSupportAncestor(object)) return;
-    if (object.geometry.userData.reefIgnoreSupport === true) return;
+    if (hasIgnoredSupportAncestor(object) || object.geometry.userData.reefIgnoreSupport === true) return;
 
     let insideHeroRoot = false;
     if (root) {
@@ -91,7 +85,6 @@ export function collectReefSupportMeshes(scene: THREE.Object3D): THREE.Mesh[] {
 
     const explicitSupport = object.userData.reefSupportSurface === true
       || object.geometry.userData.reefSupportSurface === true;
-
     if (insideHeroRoot || explicitSupport) meshes.push(object);
   });
 
@@ -104,11 +97,6 @@ function isReefArchSupport(mesh: THREE.Mesh): boolean {
     || typeof mesh.geometry.userData.reefSourceArchId === 'string';
 }
 
-/**
- * Generic colony anchors belong on terrain. Arch bodies are intentionally
- * excluded from the legacy terrain path because dedicated ecology now decides
- * when a colony may mount an arch surface.
- */
 export function collectReefTerrainSupportMeshes(
   supportMeshes: readonly THREE.Mesh[],
 ): THREE.Mesh[] {
@@ -121,7 +109,6 @@ export function collectReefArchSupportMeshes(
   return supportMeshes.filter(isReefArchSupport);
 }
 
-/** Collects authored support slots so the allocator does not have to hit them by chance. */
 export function collectReefSupportSlotCandidates(
   supportMeshes: readonly THREE.Mesh[],
 ): ReefSurfaceSlotCandidate[] {
@@ -169,32 +156,18 @@ export function raycastReefSupport(
   RAYCASTER.set(ORIGIN, DOWN);
   RAYCASTER.near = 0;
   RAYCASTER.far = 6.5;
+  RAYCAST_HITS.length = 0;
+  RAYCASTER.intersectObjects(supportMeshes as THREE.Mesh[], false, RAYCAST_HITS);
 
-  // Three.js types currently require a mutable Object3D array even though the
-  // raycaster only reads it. Keep our public placement API readonly and bridge
-  // the type boundary with a shallow copy at the raycast edge.
-  const hits = RAYCASTER.intersectObjects(Array.from(supportMeshes), false);
-  for (const hit of hits) {
+  for (const hit of RAYCAST_HITS) {
     if (!hit.face) continue;
     WORLD_NORMAL.copy(hit.face.normal).transformDirection(hit.object.matrixWorld);
-    if (WORLD_NORMAL.y < minNormalY) continue;
-    return hit;
+    if (WORLD_NORMAL.y >= minNormalY) return hit;
   }
 
   return null;
 }
 
-/**
- * Finds a near-horizontal terrain anchor only when a broad clearance column
- * around the coral is free of limestone. Sampling both cardinal and diagonal
- * offsets rejects roots that would technically sit on terrain while the coral
- * body still grows through an adjacent arch edge.
- *
- * Ecological surface rules are applied before the clearance test. In
- * particular, the upper quarter and crater of the submarine volcano are a
- * permanent no-grow zone, so slot allocation will choose another habitat
- * instead of planting coral on the active summit.
- */
 export function raycastReefCoralTerrainSupport(
   terrainMeshes: readonly THREE.Mesh[],
   archMeshes: readonly THREE.Mesh[],
@@ -203,8 +176,8 @@ export function raycastReefCoralTerrainSupport(
   minNormalY = 0.74,
 ): THREE.Intersection | null {
   const terrainHit = raycastReefSupport(terrainMeshes, x, z, minNormalY);
-  if (!terrainHit) return null;
-  if (!assessReefCoralSupportHit(terrainHit).allowed) return null;
+  if (!terrainHit || !assessReefCoralSupportHit(terrainHit).allowed) return null;
+  if (archMeshes.length === 0) return terrainHit;
 
   for (const [offsetX, offsetZ] of CORAL_ARCH_CLEARANCE_OFFSETS) {
     const blocker = raycastReefSupport(archMeshes, x + offsetX, z + offsetZ, -1);
