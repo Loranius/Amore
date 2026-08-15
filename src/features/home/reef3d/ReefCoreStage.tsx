@@ -4,15 +4,18 @@ import type { ReefCoreManifest } from '@/engine/species/reef';
 
 export function ReefCoreStage({
   core,
+  sceneExtent,
   children,
 }: {
   core: ReefCoreManifest;
+  sceneExtent?: number;
   children: ReactNode;
 }) {
-  const horizontalExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
+  const coreExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
+  const horizontalExtent = Math.max(coreExtent, sceneExtent ?? 0);
   const targetY = Math.max(0.45, core.dimensions.height * 0.38);
-  const minDistance = Math.max(4.2, horizontalExtent * 1.15);
-  const maxDistance = Math.max(13, horizontalExtent * 3.2);
+  const minDistance = Math.max(4.2, coreExtent * 1.05);
+  const maxDistance = Math.max(13, horizontalExtent * 3.1);
 
   return (
     <>
@@ -36,7 +39,7 @@ export function ReefCoreStage({
         position={[0, -core.platform.thickness * 0.52, 0]}
         receiveShadow
       >
-        <circleGeometry args={[Math.max(18, horizontalExtent * 3.2), 64]} />
+        <circleGeometry args={[Math.max(18, horizontalExtent * 2.4), 64]} />
         <meshStandardMaterial color="#132e30" roughness={1} metalness={0} />
       </mesh>
 

@@ -2,10 +2,11 @@ import { Canvas } from '@react-three/fiber';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
 import { ReefCoreObject } from './ReefCoreObject';
 import { ReefCoreStage } from './ReefCoreStage';
+import { ReefYearStructuresObject } from './ReefYearStructuresObject';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
 
-/** Portal-facing Phase 1 scene: deterministic chronological core only. */
+/** Portal-facing Phase 2 scene: deterministic core + permanent yearly geology. */
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
 
@@ -26,10 +27,19 @@ export default function ReefPreviewScene() {
     );
   }
 
-  const { core, asOf } = portal.preview;
-  const horizontalExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
-  const cameraDistance = Math.max(6.6, horizontalExtent * 2.15, core.dimensions.height * 1.4);
-  const cameraHeight = Math.max(2.7, core.dimensions.height * 0.58);
+  const { core, yearStructures, asOf } = portal.preview;
+  const coreExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
+  const structureExtent = yearStructures.structures.reduce(
+    (maximum, structure) => Math.max(
+      maximum,
+      Math.hypot(structure.center.x, structure.center.z) + structure.footprintRadius,
+    ),
+    0,
+  );
+  const sceneExtent = Math.max(coreExtent, structureExtent);
+  const cameraDistance = Math.max(6.6, sceneExtent * 1.72, core.dimensions.height * 1.4);
+  const cameraHeight = Math.max(2.7, core.dimensions.height * 0.58, sceneExtent * 0.28);
+  const counts = yearStructures.diagnostics.archetypeCounts;
 
   return (
     <div
@@ -37,9 +47,10 @@ export default function ReefPreviewScene() {
       data-home-artifact-preview="reef"
       data-reef-preview="ready"
       data-reef-source="portal"
-      data-reef-scene="phase-1-core"
-      data-reef-phase="1"
+      data-reef-scene="phase-2-year-structures"
+      data-reef-phase="2"
       data-reef-core-version={core.version}
+      data-reef-year-structures-version={yearStructures.version}
       data-reef-couple-id={core.identity.coupleId}
       data-reef-as-of={asOf}
       data-reef-seed={core.identity.reefSeed}
@@ -47,6 +58,7 @@ export default function ReefPreviewScene() {
       data-reef-platform-seed={core.identity.platformSeed}
       data-reef-identity-signature={core.identity.identitySignature}
       data-reef-core-signature={core.signature}
+      data-reef-year-structures-signature={yearStructures.signature}
       data-reef-days-together={core.age.daysTogether}
       data-reef-completed-years={core.age.completedYears}
       data-reef-max-years={core.age.maxYears}
@@ -55,10 +67,16 @@ export default function ReefPreviewScene() {
       data-reef-core-radius-x={core.dimensions.radiusX}
       data-reef-core-radius-z={core.dimensions.radiusZ}
       data-reef-core-height={core.dimensions.height}
-      data-reef-foundation-radius={Math.max(core.platform.radiusX, core.platform.radiusZ)}
+      data-reef-foundation-radius={coreExtent}
       data-reef-platform-radius-x={core.platform.radiusX}
       data-reef-platform-radius-z={core.platform.radiusZ}
-      data-reef-year-arches={0}
+      data-reef-year-structures={yearStructures.diagnostics.structureCount}
+      data-reef-year-boulders={counts.BOULDER}
+      data-reef-year-columns={counts.COLUMN}
+      data-reef-year-ridges={counts.RIDGE}
+      data-reef-year-arches={counts.ARCH}
+      data-reef-year-collision-free={yearStructures.diagnostics.collisionFree ? 'true' : 'false'}
+      data-reef-water-windows={yearStructures.diagnostics.waterWindowCount}
       data-reef-map-outcrops={0}
       data-reef-schedule-terraces={0}
       data-reef-plan-fish-logical={0}
@@ -79,12 +97,13 @@ export default function ReefPreviewScene() {
           position: [cameraDistance * 0.42, cameraHeight, cameraDistance],
           fov: 42,
           near: 0.1,
-          far: Math.max(80, cameraDistance * 8),
+          far: Math.max(90, cameraDistance * 8),
         }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
-        <ReefCoreStage core={core}>
+        <ReefCoreStage core={core} sceneExtent={sceneExtent}>
           <ReefCoreObject core={core} />
+          <ReefYearStructuresObject core={core} manifest={yearStructures} />
         </ReefCoreStage>
       </Canvas>
     </div>

@@ -19,6 +19,22 @@ export type {
   ReefCoreMorphology,
   ReefCorePlatform,
 } from './reefCore';
+export {
+  buildReefYearStructures,
+  REEF_YEAR_GOLDEN_ANGLE_DEGREES,
+  REEF_YEAR_GROWTH_DAYS,
+  REEF_YEAR_PLACEMENT_ATTEMPTS,
+  REEF_YEAR_STRUCTURES_VERSION,
+} from './yearStructures';
+export type {
+  BuildReefYearStructuresInput,
+  ReefYearStructure,
+  ReefYearStructureArchetype,
+  ReefYearStructurePoint,
+  ReefYearStructureShape,
+  ReefYearStructuresDiagnostics,
+  ReefYearStructuresManifest,
+} from './yearStructures';
 export type {
   ReefGrowthArchPlacement,
   ReefGrowthOutcropPlacement,

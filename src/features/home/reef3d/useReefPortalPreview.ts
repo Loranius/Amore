@@ -5,8 +5,10 @@ import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
 import {
   buildReefCore,
+  buildReefYearStructures,
   reefDaysTogether,
   type ReefCoreManifest,
+  type ReefYearStructuresManifest,
 } from '@/engine/species/reef';
 import { stableEvolutionCoupleId } from '../crystal3d/evolution/sourceSnapshot';
 
@@ -14,6 +16,7 @@ const COUPLE_TIME_ZONE = 'Europe/Kyiv';
 
 export interface ReefPortalPreview {
   core: ReefCoreManifest;
+  yearStructures: ReefYearStructuresManifest;
   asOf: string;
 }
 
@@ -52,13 +55,7 @@ function useRelationshipStartDate() {
   });
 }
 
-/**
- * Phase 1 portal adapter.
- *
- * Reef identity and chronological growth must not depend on wishlist, plans,
- * memories, media, map pins, schedule or any other module. Those data sources
- * intentionally stay disconnected until their dedicated later phase.
- */
+/** Phase 2 portal adapter: chronological core + permanent yearly geology only. */
 export function useReefPortalPreview(): UseReefPortalPreviewResult {
   const startDateQuery = useRelationshipStartDate();
   const users = useUsers();
@@ -105,8 +102,9 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
         relationshipStartDate: startDateQuery.data,
         daysTogether,
       });
+      const yearStructures = buildReefYearStructures({ core });
       return {
-        preview: { core, asOf },
+        preview: { core, yearStructures, asOf },
         isPending: false,
         error: null,
       };
