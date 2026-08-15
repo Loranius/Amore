@@ -193,7 +193,7 @@ export function buildReefCoralSurfaceFrame({
 }: {
   seed: number;
   morphotype: ReefColonyMorphotype;
-  surfaceNormal?: ReefLayoutVec3;
+  surfaceNormal?: ReefLayoutVec3 | undefined;
 }): ReefCoralSurfaceFrame {
   const variation = reefCoralNaturalVariation(seed, morphotype);
   const supportNormal = normalizedSupportNormal(surfaceNormal);
@@ -281,7 +281,7 @@ function moveGeometryToSurface({
   morphotype: ReefColonyMorphotype;
   tier: ReefColonyTier;
   footprintRadius: number;
-  surfaceNormal?: ReefLayoutVec3;
+  surfaceNormal?: ReefLayoutVec3 | undefined;
 }): ReefCoralSurfaceFrame {
   const frame = buildReefCoralSurfaceFrame({ seed, morphotype, surfaceNormal });
   const supportNormal = normalizedSupportNormal(frame.supportNormal);
@@ -352,13 +352,12 @@ export function buildReefSurfaceBoundLivingCanopyGeometry({
     const slot = slotByRequestId.get(colony.request.id);
     if (!slot) continue;
 
+    const singleCounts = emptyMorphotypeCounts();
+    singleCounts[colony.morphotype] = 1;
     const singlePlan: ReefLivingCanopyPlan = {
       colonies: [colony],
       requests: [colony.request],
-      morphotypeCounts: {
-        ...emptyMorphotypeCounts(),
-        [colony.morphotype]: 1,
-      },
+      morphotypeCounts: singleCounts,
     };
     const part = buildReefLivingCanopyGeometry({ plan: singlePlan, slots: [slot] });
     moveGeometryToSurface({
