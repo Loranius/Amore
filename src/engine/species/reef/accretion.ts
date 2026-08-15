@@ -107,16 +107,7 @@ function identitySignature(spec: AccretionSpec): string {
     spec.sourceId,
     spec.anchorId,
     spec.birthYear,
-    spec.position.x,
-    spec.position.z,
-    spec.normal.x,
-    spec.normal.y,
-    spec.normal.z,
     spec.tangentRotation,
-    spec.radiusX,
-    spec.radiusZ,
-    spec.thickness,
-    spec.elevation,
     spec.toneIndex,
     spec.stackIndex,
   ].join('\u001f')));
@@ -126,7 +117,16 @@ function finalize(spec: AccretionSpec): ReefAccretionLayer {
   const identity = identitySignature(spec);
   const signature = hex32(stableHash32([
     identity,
+    spec.position.x,
     spec.position.y,
+    spec.position.z,
+    spec.normal.x,
+    spec.normal.y,
+    spec.normal.z,
+    spec.radiusX,
+    spec.radiusZ,
+    spec.thickness,
+    spec.elevation,
     spec.growth,
     spec.burial,
   ].join('\u001f')));
