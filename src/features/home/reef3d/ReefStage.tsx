@@ -88,8 +88,14 @@ export function ReefStage({
 
       <ReefEnvironment build={build} />
       <ReefVolcanoReplacementLayer />
-      <ReefVolcano build={build} reducedMotion={reducedMotion} />
-      <ReefVolcanoSurfacePass build={build} />
+      <group
+        name="reef-volcano-midground-placement"
+        position={[0, 0, -1.15]}
+        userData={{ reefVolcanoDepthOffset: -1.15 }}
+      >
+        <ReefVolcano build={build} reducedMotion={reducedMotion} />
+        <ReefVolcanoSurfacePass build={build} />
+      </group>
       <ReefNaturalArchLayer build={build} />
       <ReefWorldComposition />
       <ReefDistantEcosystem reducedMotion={reducedMotion} />
