@@ -106,8 +106,8 @@ function isReefArchSupport(mesh: THREE.Mesh): boolean {
 
 /**
  * Generic colony anchors belong on terrain. Arch bodies are intentionally
- * excluded because a downward ray can otherwise accept a sloping arch facet
- * and make a vertical coral intersect the limestone.
+ * excluded from the legacy terrain path because dedicated ecology now decides
+ * when a colony may mount an arch surface.
  */
 export function collectReefTerrainSupportMeshes(
   supportMeshes: readonly THREE.Mesh[],
@@ -121,14 +121,15 @@ export function collectReefArchSupportMeshes(
   return supportMeshes.filter(isReefArchSupport);
 }
 
-/** Collects authored horizontal shelves so the allocator does not have to hit them by chance. */
+/** Collects authored support slots so the allocator does not have to hit them by chance. */
 export function collectReefSupportSlotCandidates(
   supportMeshes: readonly THREE.Mesh[],
 ): ReefSurfaceSlotCandidate[] {
   const candidates: ReefSurfaceSlotCandidate[] = [];
 
   for (const mesh of supportMeshes) {
-    const serialized = mesh.geometry.userData.reefCoralAttachmentSlots;
+    const serialized = mesh.userData.reefCoralAttachmentSlots
+      ?? mesh.geometry.userData.reefCoralAttachmentSlots;
     if (!Array.isArray(serialized)) continue;
     mesh.updateWorldMatrix(true, false);
 
