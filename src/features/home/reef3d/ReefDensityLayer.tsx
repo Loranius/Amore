@@ -3,23 +3,13 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ReefColonyMorphotype } from '@/engine/species/reef';
 import type { ReefPreviewBuild } from './buildReefPreview';
-import { buildReefLivingCanopyPlan } from './reefLivingCanopy';
 import {
-  applyReefColonyCompetition,
-  REEF_COLONY_COMPETITION_PASS,
-  REEF_COLONY_COMPETITION_VERSION,
-} from './reefColonyCompetition';
-import {
-  buildReefColonyNucleationPlan,
-  createReefColonyNucleationScorer,
-  REEF_COLONY_NUCLEATION_PASS,
-  REEF_COLONY_NUCLEATION_VERSION,
-} from './reefColonyNucleation';
-import {
-  buildReefMorphologyFamiliesGeometry,
-  REEF_MORPHOLOGY_FAMILIES_PASS,
-  REEF_MORPHOLOGY_FAMILIES_VERSION,
-} from './reefMorphologyFamilies';
+  buildReefLivingCanopyGeometry,
+  buildReefLivingCanopyPlan,
+  REEF_LIVING_CANOPY_PASS,
+  REEF_LIVING_CANOPY_VERSION,
+  type ReefLivingCanopyPlan,
+} from './reefLivingCanopy';
 import {
   collectReefArchSupportMeshes,
   collectReefSupportMeshes,
@@ -38,7 +28,90 @@ export interface ReefDensityCandidateCounts {
   morphotypeCounts: Record<ReefColonyMorphotype, number>;
 }
 
-const REEF_CANOPY_LAYOUT = 'ecological-competition-and-growth-v1';
+const TAU = Math.PI * 2;
+
+function stableUnit(seed: number, label: string): number {
+  let hash = (seed ^ 0x9e3779b9) >>> 0;
+  for (let index = 0; index < label.length; index += 1) {
+    hash ^= label.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  hash ^= hash >>> 16;
+  hash = Math.imul(hash, 0x7feb352d);
+  hash ^= hash >>> 15;
+  return (hash >>> 0) / 0xffffffff;
+}
+
+function morphotypeHotspotIndex(morphotype: ReefColonyMorphotype): 0 | 1 | 2 | 3 {
+  switch (morphotype) {
+    case 'branching': return 0;
+    case 'massive': return 1;
+    case 'plating': return 2;
+    case 'encrusting': return 3;
+    case 'soft-coral': return 0;
+    case 'sea-fan': return 2;
+  }
+}
+
+function morphotypeHotspotStrength(morphotype: ReefColonyMorphotype): number {
+  switch (morphotype) {
+    case 'encrusting': return 0.8;
+    case 'branching': return 0.74;
+    case 'soft-coral': return 0.72;
+    case 'sea-fan': return 0.68;
+    case 'plating': return 0.63;
+    case 'massive': return 0.56;
+  }
+}
+
+/**
+ * Visual-only ecological clustering. Logical colony identity/order is untouched;
+ * only the preferred renderer anchor is biased toward four stable habitat
+ * patches. Clearance/raycast allocation still decides the final valid surface.
+ */
+function buildHotspotPlan(
+  plan: ReefLivingCanopyPlan,
+  build: ReefPreviewBuild,
+): ReefLivingCanopyPlan {
+  const radius = build.structures.visibleFoundationRadius;
+  const seed = build.species.moduleEvolution.identitySeed;
+  const basePhase = stableUnit(seed, 'reef:canopy-hotspots:phase') * TAU;
+  const radialRatios = [0.38, 0.56, 0.66, 0.48] as const;
+
+  const colonies = plan.colonies.map((colony) => {
+    const sequenceBand = Math.floor(colony.request.sequence / 9) % 2;
+    const hotspotIndex = (
+      morphotypeHotspotIndex(colony.morphotype) + sequenceBand
+    ) % 4;
+    const radialRatio = radialRatios[hotspotIndex] ?? radialRatios[0];
+    const angle = basePhase
+      + hotspotIndex / 4 * TAU
+      + (stableUnit(colony.seed, 'reef:hotspot:angle') - 0.5) * 0.48;
+    const localRadius = radius * radialRatio * (
+      0.9 + stableUnit(colony.seed, 'reef:hotspot:radius') * 0.2
+    );
+    const targetX = Math.cos(angle) * localRadius;
+    const targetZ = Math.sin(angle) * localRadius;
+    const strength = morphotypeHotspotStrength(colony.morphotype);
+    const preferred = colony.request.preferred;
+    const request = {
+      ...colony.request,
+      preferred: {
+        x: THREE.MathUtils.lerp(preferred.x, targetX, strength),
+        y: preferred.y,
+        z: THREE.MathUtils.lerp(preferred.z, targetZ, strength),
+      },
+    };
+
+    return { ...colony, request };
+  });
+
+  return {
+    ...plan,
+    colonies,
+    requests: colonies.map((colony) => colony.request),
+  };
+}
 
 export function reefDensityCandidateCounts(build: ReefPreviewBuild): ReefDensityCandidateCounts {
   const plan = buildReefLivingCanopyPlan(build);
@@ -53,33 +126,16 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
   const scene = useThree((state) => state.scene);
   const invalidate = useThree((state) => state.invalidate);
   const basePlan = useMemo(() => buildReefLivingCanopyPlan(build), [build]);
-  const nucleationPlan = useMemo(() => buildReefColonyNucleationPlan({
-    plan: basePlan,
-    foundationRadius: build.structures.visibleFoundationRadius,
-    seed: build.species.moduleEvolution.identitySeed,
-  }), [
-    basePlan,
-    build.species.moduleEvolution.identitySeed,
-    build.structures.visibleFoundationRadius,
-  ]);
-  const candidateScorer = useMemo(() => createReefColonyNucleationScorer({
-    plan: nucleationPlan,
-    foundationRadius: build.structures.visibleFoundationRadius,
-    seed: build.species.moduleEvolution.identitySeed,
-  }), [
-    build.species.moduleEvolution.identitySeed,
-    build.structures.visibleFoundationRadius,
-    nucleationPlan,
-  ]);
+  const plan = useMemo(() => buildHotspotPlan(basePlan, build), [basePlan, build]);
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const material = useMemo(() => new THREE.MeshStandardMaterial({
-    name: 'reef-morphology-families-shared-material',
+    name: 'reef-living-canopy-shared-material',
     color: '#ffffff',
     vertexColors: true,
-    roughness: 0.78,
+    roughness: 0.72,
     metalness: 0,
-    emissive: '#261d2d',
-    emissiveIntensity: 0.06,
+    emissive: '#281f30',
+    emissiveIntensity: 0.075,
     flatShading: true,
     side: THREE.DoubleSide,
   }), []);
@@ -95,11 +151,9 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
       }),
       ...collectReefSupportSlotCandidates(terrainSupportMeshes),
     ];
-    const worldNormal = new THREE.Vector3();
     const allocation = allocateReefSurfaceSlots({
-      requests: nucleationPlan.requests,
+      requests: plan.requests,
       candidates,
-      candidateScorer,
       sample: (x, z) => {
         const hit = raycastReefCoralTerrainSupport(
           terrainSupportMeshes,
@@ -107,33 +161,17 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
           x,
           z,
         );
-        if (!hit) return null;
-        const normalY = hit.face
-          ? worldNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y
-          : 1;
-        return {
-          x: hit.point.x,
-          y: hit.point.y,
-          z: hit.point.z,
-          normalY,
-        };
+        return hit
+          ? { x: hit.point.x, y: hit.point.y, z: hit.point.z }
+          : null;
       },
     });
-    const competition = applyReefColonyCompetition({
-      plan: nucleationPlan,
-      slots: allocation.slots,
-    });
-    const next = buildReefMorphologyFamiliesGeometry({
-      plan: competition.plan,
+    const next = buildReefLivingCanopyGeometry({
+      plan,
       slots: allocation.slots,
     });
     next.userData.reefSurfaceSlotDiagnostics = allocation.diagnostics;
-    next.userData.reefCanopyLayout = REEF_CANOPY_LAYOUT;
-    next.userData.reefColonyNucleationVersion = REEF_COLONY_NUCLEATION_VERSION;
-    next.userData.reefColonyNucleationPass = REEF_COLONY_NUCLEATION_PASS;
-    next.userData.reefColonyCompetitionVersion = REEF_COLONY_COMPETITION_VERSION;
-    next.userData.reefColonyCompetitionPass = REEF_COLONY_COMPETITION_PASS;
-    next.userData.reefColonyCompetitionDiagnostics = competition.diagnostics;
+    next.userData.reefCanopyLayout = 'stable-hotspots-v1';
 
     geometry.dispose();
     geometry.copy(next);
@@ -142,10 +180,9 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
   }, [
     build.species.moduleEvolution.identitySeed,
     build.structures.visibleFoundationRadius,
-    candidateScorer,
     geometry,
     invalidate,
-    nucleationPlan,
+    plan,
     scene,
   ]);
 
@@ -156,20 +193,16 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
 
   return (
     <mesh
-      name={`reef-density-${REEF_MORPHOLOGY_FAMILIES_PASS}-${REEF_COLONY_COMPETITION_PASS}`}
+      name={`reef-density-${REEF_LIVING_CANOPY_PASS}`}
       geometry={geometry}
       material={material}
       castShadow={false}
       receiveShadow={false}
       frustumCulled={false}
       userData={{
-        reefMorphologyFamiliesVersion: REEF_MORPHOLOGY_FAMILIES_VERSION,
-        reefMorphologyFamiliesPass: REEF_MORPHOLOGY_FAMILIES_PASS,
-        reefColonyNucleationVersion: REEF_COLONY_NUCLEATION_VERSION,
-        reefColonyNucleationPass: REEF_COLONY_NUCLEATION_PASS,
-        reefColonyCompetitionVersion: REEF_COLONY_COMPETITION_VERSION,
-        reefColonyCompetitionPass: REEF_COLONY_COMPETITION_PASS,
-        reefCanopyLayout: REEF_CANOPY_LAYOUT,
+        reefLivingCanopyVersion: REEF_LIVING_CANOPY_VERSION,
+        reefLivingCanopyPass: REEF_LIVING_CANOPY_PASS,
+        reefCanopyLayout: 'stable-hotspots-v1',
       }}
     />
   );
@@ -177,7 +210,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
 
 export function ReefDensityLayer({ build }: { build: ReefPreviewBuild }) {
   return (
-    <group name="reef-density-competition-and-growth">
+    <group name="reef-density-hotspot-growth">
       <DensityCorals build={build} />
     </group>
   );

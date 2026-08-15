@@ -14,6 +14,7 @@ import { ReefSessileLife } from './ReefSessileLife';
 import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
+import { ReefNaturalArchLayer } from './ReefNaturalArchLayer';
 import { ReefWorldComposition } from './ReefWorldComposition';
 import { ReefDistantEcosystem } from './ReefDistantEcosystem';
 import {
@@ -30,11 +31,6 @@ import {
  * The reef production object remains untouched. This component owns only the
  * world around it: water colour, depth fog, seabed, atmosphere, life and camera.
  * Nothing from the crystal temple or the old laboratory card is mounted here.
- *
- * Completed-year arches are rendered only by ReefEnvironment/GrowthArch. The
- * old instanced rock overlay was intentionally retired because its independent
- * masses could visually detach and read as levitating stones instead of one
- * load-bearing limestone arch-column.
  */
 export function ReefStage({
   build,
@@ -88,6 +84,7 @@ export function ReefStage({
       </mesh>
 
       <ReefEnvironment build={build} />
+      <ReefNaturalArchLayer build={build} />
       <ReefWorldComposition />
       <ReefDistantEcosystem reducedMotion={reducedMotion} />
       <ReefDensityLayer build={build} />
