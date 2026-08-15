@@ -11,15 +11,16 @@ import {
   type ReefTerracedFoundationProfile,
 } from './reefTerracedFoundation';
 
-export const REEF_LIMESTONE_ARCH_VERSION = 'reef-limestone-arch-v2';
-export const REEF_LIMESTONE_ARCH_PASS = 'asymmetric-eroded-limestone-arch-with-safe-shelves';
+export const REEF_LIMESTONE_ARCH_VERSION = 'reef-limestone-arch-v3';
+export const REEF_LIMESTONE_ARCH_PASS = 'continuous-grounded-limestone-arch-columns';
 
 const TAU = Math.PI * 2;
-const LONGITUDINAL_SEGMENTS = 20;
 const RADIAL_SEGMENTS = 7;
+const PILLAR_SEGMENTS = 6;
+const CROWN_SEGMENTS = 14;
 const SHELF_SEGMENTS = 7;
 const PROTRUSION_COUNT = 7;
-const ATTACHMENT_PROGRESS = [0.25, 0.5, 0.75] as const;
+const ATTACHMENT_PROGRESS = [0.18, 0.5, 0.82] as const;
 const EROSION_AMPLITUDE = 0.31;
 
 type Point = Readonly<{ x: number; y: number; z: number }>;
@@ -43,14 +44,27 @@ interface GeometryBuffers {
   uvs: number[];
 }
 
+interface ArchColumnShape {
+  leftY: number;
+  rightY: number;
+  leftTop: Vector3;
+  rightTop: Vector3;
+  apexY: number;
+  crownSkew: number;
+  centerlineAsymmetry: number;
+  crownCurve: CatmullRomCurve3;
+  leftPillarCurve: CatmullRomCurve3;
+  rightPillarCurve: CatmullRomCurve3;
+}
+
 const ARCH_COLORS = {
   lower: colorTuple('#8f826b'),
   body: colorTuple('#aa9b7d'),
   warm: colorTuple('#b8aa89'),
   upper: colorTuple('#c9ba96'),
-  shelf: colorTuple('#ddcca4'),
-  shelfEdge: colorTuple('#a99a7d'),
-  underside: colorTuple('#756d60'),
+  shelf: colorTuple('#d7c69f'),
+  shelfEdge: colorTuple('#9e9278'),
+  underside: colorTuple('#746c5d'),
 } as const;
 
 function colorTuple(value: string): ColorTuple {
@@ -106,127 +120,236 @@ function appendTriangle(
   for (const point of [first, second, third]) {
     buffers.positions.push(point.x, point.y, point.z);
     buffers.colors.push(color[0], color[1], color[2]);
-    buffers.uvs.push(point.x * 0.52 + 0.5, point.y * 0.46 + point.z * 0.08);
+    buffers.uvs.push(
+      point.x * 0.52 + point.z * 0.09 + 0.5,
+      point.y * 0.46 + point.z * 0.08,
+    );
   }
 }
 
-function bodyRadiusAt(arch: ReefGrowthArchPlacement, progress: number): number {
-  const footWeight = Math.pow(Math.abs(progress - 0.5) * 2, 1.38);
-  const primaryPhase = stableUnit(arch.seed, 'limestone-radius-primary') * TAU;
-  const secondaryPhase = stableUnit(arch.seed, 'limestone-radius-secondary') * TAU;
-  const leftMass = 0.9 + stableUnit(arch.seed, 'limestone-left-mass') * 0.18;
-  const rightMass = 0.9 + stableUnit(arch.seed, 'limestone-right-mass') * 0.18;
-  const sideBias = leftMass + (rightMass - leftMass) * progress;
-  const variation = 1
-    + Math.sin(progress * TAU * 1.7 + primaryPhase) * 0.12
-    + Math.sin(progress * TAU * 4.3 - secondaryPhase) * 0.055;
-  return arch.thickness * (0.96 + footWeight * 0.62) * variation * sideBias;
+function surfaceColor(
+  seed: number,
+  label: string,
+  segment: number,
+  radial: number,
+  progress: number,
+): ColorTuple {
+  const value = stableUnit(seed, `${label}:color:${segment}:${radial}`);
+  if (progress < 0.14 && value < 0.62) return ARCH_COLORS.lower;
+  if (value > 0.8) return ARCH_COLORS.upper;
+  if (value > 0.55) return ARCH_COLORS.warm;
+  return ARCH_COLORS.body;
 }
 
-function buildArchCurve(
+function appendSweep({
+  buffers,
+  curve,
+  segmentCount,
+  seed,
+  label,
+  radiusAt,
+  depthScaleAt,
+  radii,
+}: {
+  buffers: GeometryBuffers;
+  curve: CatmullRomCurve3;
+  segmentCount: number;
+  seed: number;
+  label: string;
+  radiusAt: (progress: number) => number;
+  depthScaleAt: (progress: number) => number;
+  radii: number[];
+}): void {
+  const centers = curve.getSpacedPoints(segmentCount);
+  const frames = curve.computeFrenetFrames(segmentCount, false);
+  const phase = stableUnit(seed, `${label}:facet-phase`) * TAU / RADIAL_SEGMENTS;
+  const scarFacet = Math.floor(stableUnit(seed, `${label}:scar-facet`) * RADIAL_SEGMENTS);
+  const scarProgress = 0.22 + stableUnit(seed, `${label}:scar-progress`) * 0.56;
+  const rings: Vector3[][] = [];
+
+  for (let segment = 0; segment <= segmentCount; segment += 1) {
+    const progress = segment / segmentCount;
+    const center = centers[segment]!;
+    const normal = frames.normals[segment]!;
+    const binormal = frames.binormals[segment]!;
+    const radius = radiusAt(progress);
+    const depthScale = depthScaleAt(progress);
+    radii.push(radius);
+    const ring: Vector3[] = [];
+
+    for (let radial = 0; radial < RADIAL_SEGMENTS; radial += 1) {
+      const angle = phase + radial / RADIAL_SEGMENTS * TAU;
+      const facetVariation = 0.88
+        + stableUnit(seed, `${label}:facet:${segment}:${radial}`) * 0.2;
+      const radialDistance = Math.min(
+        Math.abs(radial - scarFacet),
+        RADIAL_SEGMENTS - Math.abs(radial - scarFacet),
+      );
+      const scarRadialWeight = Math.max(0, 1 - radialDistance / 1.55);
+      const scarLongitudinalWeight = Math.max(
+        0,
+        1 - Math.abs(progress - scarProgress) / 0.17,
+      );
+      const erosion = 1 - scarRadialWeight * scarLongitudinalWeight * EROSION_AMPLITUDE;
+      ring.push(
+        center.clone()
+          .addScaledVector(
+            normal,
+            Math.cos(angle) * radius * facetVariation * erosion,
+          )
+          .addScaledVector(
+            binormal,
+            Math.sin(angle) * radius * depthScale * facetVariation * erosion,
+          ),
+      );
+    }
+    rings.push(ring);
+  }
+
+  for (let segment = 0; segment < segmentCount; segment += 1) {
+    const current = rings[segment]!;
+    const next = rings[segment + 1]!;
+    const progress = segment / segmentCount;
+    for (let radial = 0; radial < RADIAL_SEGMENTS; radial += 1) {
+      const nextRadial = (radial + 1) % RADIAL_SEGMENTS;
+      const color = surfaceColor(seed, label, segment, radial, progress);
+      appendTriangle(
+        buffers,
+        current[radial]!,
+        current[nextRadial]!,
+        next[radial]!,
+        color,
+      );
+      appendTriangle(
+        buffers,
+        current[nextRadial]!,
+        next[nextRadial]!,
+        next[radial]!,
+        color,
+      );
+    }
+  }
+
+  const firstRing = rings[0]!;
+  const lastRing = rings[segmentCount]!;
+  const firstCenter = centers[0]!;
+  const lastCenter = centers[segmentCount]!;
+  for (let radial = 0; radial < RADIAL_SEGMENTS; radial += 1) {
+    const nextRadial = (radial + 1) % RADIAL_SEGMENTS;
+    appendTriangle(
+      buffers,
+      firstCenter,
+      firstRing[nextRadial]!,
+      firstRing[radial]!,
+      ARCH_COLORS.lower,
+    );
+    appendTriangle(
+      buffers,
+      lastCenter,
+      lastRing[radial]!,
+      lastRing[nextRadial]!,
+      ARCH_COLORS.lower,
+    );
+  }
+}
+
+function buildArchColumnShape(
   arch: ReefGrowthArchPlacement,
   profile: ReefTerracedFoundationProfile,
-): {
-  curve: CatmullRomCurve3;
-  leftY: number;
-  rightY: number;
-  apexY: number;
-  shoulderHeights: readonly [number, number];
-  centerlineAsymmetry: number;
-} {
+): ArchColumnShape {
   const [leftFoot, rightFoot] = reefArchFootPoints(arch);
   const leftY = sampleReefTerracedFoundation(profile, leftFoot.x, leftFoot.z).height;
   const rightY = sampleReefTerracedFoundation(profile, rightFoot.x, rightFoot.z).height;
-  const crownDirection = stableUnit(arch.seed, 'limestone-crown-direction') < 0.5 ? -1 : 1;
+  const direction = stableUnit(arch.seed, 'arch-column:direction') < 0.5 ? -1 : 1;
+  const shoulderBias = direction * (
+    0.038 + stableUnit(arch.seed, 'arch-column:shoulder-bias') * 0.028
+  );
+  const leftTopY = leftY + arch.height * (0.58 + shoulderBias);
+  const rightTopY = rightY + arch.height * (0.58 - shoulderBias);
+  const leftTopX = -arch.span * (
+    0.405 + stableUnit(arch.seed, 'arch-column:left-inset') * 0.018
+  );
+  const rightTopX = arch.span * (
+    0.405 + stableUnit(arch.seed, 'arch-column:right-inset') * 0.018
+  );
+  const leftTopZ = (stableUnit(arch.seed, 'arch-column:left-depth') - 0.5)
+    * arch.thickness
+    * 0.62;
+  const rightTopZ = (stableUnit(arch.seed, 'arch-column:right-depth') - 0.5)
+    * arch.thickness
+    * 0.62;
+  const crownSkew = direction * arch.span * (
+    0.11 + stableUnit(arch.seed, 'arch-column:crown-skew') * 0.05
+  );
+  const crownDepth = arch.curveDepth * (
+    0.82 + stableUnit(arch.seed, 'arch-column:crown-depth') * 0.34
+  );
   const apexY = Math.max(leftY, rightY) + arch.height * (
-    0.92 + stableUnit(arch.seed, 'limestone-apex-height') * 0.07
+    0.96 + stableUnit(arch.seed, 'arch-column:apex-height') * 0.035
   );
-  const crownSkew = crownDirection * arch.span * (
-    0.085 + stableUnit(arch.seed, 'limestone-crown-skew') * 0.105
+  const embed = arch.thickness * 0.62;
+  const leftTop = new Vector3(leftTopX, leftTopY, leftTopZ);
+  const rightTop = new Vector3(rightTopX, rightTopY, rightTopZ);
+
+  const leftPillarCurve = new CatmullRomCurve3([
+    new Vector3(-arch.span * 0.5, leftY - embed, 0),
+    new Vector3(
+      -arch.span * 0.49,
+      leftY + arch.height * 0.18,
+      leftTopZ * 0.2,
+    ),
+    new Vector3(
+      -arch.span * 0.465,
+      leftY + arch.height * 0.39,
+      leftTopZ * 0.55,
+    ),
+    leftTop,
+  ], false, 'centripetal');
+  const rightPillarCurve = new CatmullRomCurve3([
+    new Vector3(arch.span * 0.5, rightY - embed, 0),
+    new Vector3(
+      arch.span * 0.49,
+      rightY + arch.height * 0.18,
+      rightTopZ * 0.2,
+    ),
+    new Vector3(
+      arch.span * 0.465,
+      rightY + arch.height * 0.39,
+      rightTopZ * 0.55,
+    ),
+    rightTop,
+  ], false, 'centripetal');
+
+  const leftHaunch = new Vector3(
+    leftTopX + arch.span * 0.13,
+    leftTopY + (apexY - leftTopY) * 0.6,
+    leftTopZ * 0.35 + crownDepth * 0.68,
   );
-  const shoulderBias = crownDirection * (
-    0.08 + stableUnit(arch.seed, 'limestone-shoulder-bias') * 0.09
+  const rightHaunch = new Vector3(
+    rightTopX - arch.span * 0.13,
+    rightTopY + (apexY - rightTopY) * 0.6,
+    rightTopZ * 0.35 + crownDepth * 0.64,
   );
-  const leftShoulderRatio = 0.61 + shoulderBias * 0.5;
-  const rightShoulderRatio = 0.61 - shoulderBias * 0.5;
-  const leftUpperRatio = 0.84 + shoulderBias * 0.28;
-  const rightUpperRatio = 0.84 - shoulderBias * 0.28;
-  const leftShoulderY = leftY + (apexY - leftY) * leftShoulderRatio;
-  const rightShoulderY = rightY + (apexY - rightY) * rightShoulderRatio;
-  const leftDepth = (stableUnit(arch.seed, 'limestone-left-depth') - 0.5)
-    * arch.thickness
-    * 2.1;
-  const rightDepth = (stableUnit(arch.seed, 'limestone-right-depth') - 0.5)
-    * arch.thickness
-    * 2.1;
-  const crownDepth = arch.curveDepth
-    + (stableUnit(arch.seed, 'limestone-crown-depth') - 0.5) * arch.thickness * 1.5;
-  const centerlineAsymmetry = Math.abs(crownSkew)
-    + Math.abs(leftShoulderRatio - rightShoulderRatio) * arch.span;
+  const crownCurve = new CatmullRomCurve3([
+    leftTop,
+    leftHaunch,
+    new Vector3(crownSkew, apexY, crownDepth),
+    rightHaunch,
+    rightTop,
+  ], false, 'centripetal');
 
   return {
     leftY,
     rightY,
+    leftTop,
+    rightTop,
     apexY,
-    shoulderHeights: [leftShoulderY, rightShoulderY],
-    centerlineAsymmetry,
-    curve: new CatmullRomCurve3([
-      new Vector3(-arch.span * 0.5, leftY, 0),
-      new Vector3(
-        -arch.span * 0.445 + crownDirection * arch.span * 0.012,
-        leftY + (apexY - leftY) * (
-          0.21 + stableUnit(arch.seed, 'limestone-left-lower-rise') * 0.08
-        ),
-        arch.curveDepth * 0.1 + leftDepth * 0.72,
-      ),
-      new Vector3(
-        -arch.span * 0.325 + crownDirection * arch.span * 0.03,
-        leftShoulderY,
-        arch.curveDepth * 0.46 + leftDepth,
-      ),
-      new Vector3(
-        -arch.span * 0.16 + crownSkew * 0.42,
-        leftY + (apexY - leftY) * leftUpperRatio,
-        arch.curveDepth * 0.82 + leftDepth * 0.44,
-      ),
-      new Vector3(crownSkew, apexY, crownDepth),
-      new Vector3(
-        arch.span * 0.155 + crownSkew * 0.38,
-        rightY + (apexY - rightY) * rightUpperRatio,
-        arch.curveDepth * 0.78 + rightDepth * 0.44,
-      ),
-      new Vector3(
-        arch.span * 0.32 + crownDirection * arch.span * 0.022,
-        rightShoulderY,
-        arch.curveDepth * 0.42 + rightDepth,
-      ),
-      new Vector3(
-        arch.span * 0.44 - crownDirection * arch.span * 0.014,
-        rightY + (apexY - rightY) * (
-          0.2 + stableUnit(arch.seed, 'limestone-right-lower-rise') * 0.09
-        ),
-        arch.curveDepth * 0.08 + rightDepth * 0.72,
-      ),
-      new Vector3(arch.span * 0.5, rightY, 0),
-    ], false, 'centripetal'),
+    crownSkew,
+    centerlineAsymmetry: Math.abs(crownSkew) + arch.span * 0.06,
+    crownCurve,
+    leftPillarCurve,
+    rightPillarCurve,
   };
-}
-
-function bodyColor(
-  arch: ReefGrowthArchPlacement,
-  segment: number,
-  radial: number,
-  isUpperFacet: boolean,
-): ColorTuple {
-  if (isUpperFacet) {
-    return stableUnit(arch.seed, `limestone-upper:${segment}:${radial}`) > 0.42
-      ? ARCH_COLORS.upper
-      : ARCH_COLORS.warm;
-  }
-  const value = stableUnit(arch.seed, `limestone-body:${segment}:${radial}`);
-  if (value < 0.22) return ARCH_COLORS.lower;
-  if (value > 0.76) return ARCH_COLORS.warm;
-  return ARCH_COLORS.body;
 }
 
 function appendFacetedMass(
@@ -241,9 +364,9 @@ function appendFacetedMass(
   const sides = 6;
   const phase = stableUnit(seed, `${label}:phase`) * TAU;
   const top = new Vector3(
-    center.x + (stableUnit(seed, `${label}:top-x`) - 0.5) * radiusX * 0.2,
+    center.x + (stableUnit(seed, `${label}:top-x`) - 0.5) * radiusX * 0.16,
     center.y + radiusY,
-    center.z + (stableUnit(seed, `${label}:top-z`) - 0.5) * radiusZ * 0.2,
+    center.z + (stableUnit(seed, `${label}:top-z`) - 0.5) * radiusZ * 0.16,
   );
   const bottom = new Vector3(center.x, center.y - radiusY, center.z);
   const equator = Array.from({ length: sides }, (_value, index) => {
@@ -251,7 +374,7 @@ function appendFacetedMass(
     const irregularity = 0.86 + stableUnit(seed, `${label}:side:${index}`) * 0.22;
     return new Vector3(
       center.x + Math.cos(angle) * radiusX * irregularity,
-      center.y + (stableUnit(seed, `${label}:height:${index}`) - 0.5) * radiusY * 0.16,
+      center.y + (stableUnit(seed, `${label}:height:${index}`) - 0.5) * radiusY * 0.14,
       center.z + Math.sin(angle) * radiusZ * irregularity,
     );
   });
@@ -264,38 +387,46 @@ function appendFacetedMass(
   }
 }
 
+function crownRadiusAt(arch: ReefGrowthArchPlacement, progress: number): number {
+  const wave = Math.sin(
+    progress * TAU * 2 + stableUnit(arch.seed, 'arch-column:crown-radius-wave') * TAU,
+  ) * 0.045;
+  return arch.thickness * (
+    1.3 - Math.sin(progress * Math.PI) * 0.25 + wave
+  );
+}
+
 function appendAttachmentShelf(
   buffers: GeometryBuffers,
   arch: ReefGrowthArchPlacement,
-  curve: CatmullRomCurve3,
+  crownCurve: CatmullRomCurve3,
   index: number,
   progress: number,
 ): ReefArchCoralAttachmentSlot {
-  const jitter = (stableUnit(arch.seed, `limestone-shelf:${index}:progress`) - 0.5) * 0.035;
-  const t = Math.max(0.12, Math.min(0.88, progress + jitter));
-  const bodyCenter = curve.getPointAt(t);
-  const bodyRadius = bodyRadiusAt(arch, t);
-  const outward = stableUnit(arch.seed, `limestone-shelf:${index}:side`) < 0.5 ? -1 : 1;
-  const radiusX = arch.thickness * (index === 1 ? 2.15 : 1.78)
-    * (0.94 + stableUnit(arch.seed, `limestone-shelf:${index}:width`) * 0.14);
-  const radiusZ = arch.thickness * (index === 1 ? 1.58 : 1.34)
-    * (0.94 + stableUnit(arch.seed, `limestone-shelf:${index}:depth`) * 0.14);
-  const topY = bodyCenter.y + bodyRadius * (index === 1 ? 0.5 : 0.38);
-  const bottomY = topY - Math.max(0.045, arch.thickness * 0.24);
+  const jitter = (stableUnit(arch.seed, `arch-column:shelf:${index}:progress`) - 0.5) * 0.028;
+  const t = Math.max(0.08, Math.min(0.92, progress + jitter));
+  const bodyCenter = crownCurve.getPointAt(t);
+  const bodyRadius = crownRadiusAt(arch, t);
+  const outward = stableUnit(arch.seed, `arch-column:shelf:${index}:side`) < 0.5 ? -1 : 1;
+  const radiusX = arch.thickness * (index === 1 ? 1.05 : 0.88)
+    * (0.94 + stableUnit(arch.seed, `arch-column:shelf:${index}:width`) * 0.12);
+  const radiusZ = arch.thickness * (index === 1 ? 0.82 : 0.7)
+    * (0.94 + stableUnit(arch.seed, `arch-column:shelf:${index}:depth`) * 0.12);
+  const topY = bodyCenter.y + bodyRadius * 0.46;
+  const bottomY = topY - Math.max(0.035, arch.thickness * 0.16);
   const centerX = bodyCenter.x
-    + (stableUnit(arch.seed, `limestone-shelf:${index}:x`) - 0.5) * arch.thickness * 0.5;
+    + (stableUnit(arch.seed, `arch-column:shelf:${index}:x`) - 0.5) * arch.thickness * 0.22;
   const centerZ = bodyCenter.z + outward * (
-    bodyRadius * (0.96 + stableUnit(arch.seed, `limestone-shelf:${index}:offset`) * 0.14)
-    + radiusZ * 0.42
+    bodyRadius * 0.52 + radiusZ * 0.16
   );
-  const phase = stableUnit(arch.seed, `limestone-shelf:${index}:phase`) * TAU;
+  const phase = stableUnit(arch.seed, `arch-column:shelf:${index}:phase`) * TAU;
   const topRing: Vector3[] = [];
   const bottomRing: Vector3[] = [];
 
   for (let side = 0; side < SHELF_SEGMENTS; side += 1) {
     const angle = phase + side / SHELF_SEGMENTS * TAU;
-    const irregularity = 0.88
-      + stableUnit(arch.seed, `limestone-shelf:${index}:edge:${side}`) * 0.2;
+    const irregularity = 0.9
+      + stableUnit(arch.seed, `arch-column:shelf:${index}:edge:${side}`) * 0.16;
     const x = centerX + Math.cos(angle) * radiusX * irregularity;
     const z = centerZ + Math.sin(angle) * radiusZ * irregularity;
     topRing.push(new Vector3(x, topY, z));
@@ -306,13 +437,7 @@ function appendAttachmentShelf(
   const bottomCenter = new Vector3(centerX, bottomY, centerZ);
   for (let side = 0; side < SHELF_SEGMENTS; side += 1) {
     const next = (side + 1) % SHELF_SEGMENTS;
-    appendTriangle(
-      buffers,
-      topCenter,
-      topRing[next]!,
-      topRing[side]!,
-      ARCH_COLORS.shelf,
-    );
+    appendTriangle(buffers, topCenter, topRing[next]!, topRing[side]!, ARCH_COLORS.shelf);
     appendTriangle(
       buffers,
       bottomCenter,
@@ -343,15 +468,16 @@ function appendAttachmentShelf(
       y: round6(topY + 0.014),
       z: round6(centerZ),
     },
-    radius: round6(Math.min(radiusX, radiusZ) * 0.74),
+    radius: round6(Math.min(radiusX, radiusZ) * 0.72),
     availableFromEpoch: arch.yearIndex,
   };
 }
 
 /**
- * Builds one faceted limestone body per completed-year arch. The body has
- * non-uniform thickness, an asymmetric eroded centreline, embedded feet,
- * fused-looking rock accretions and three offset horizontal attachment shelves.
+ * Builds one unmistakable portal arch per completed relationship year: two
+ * limestone columns are embedded into the substrate and joined by a single
+ * continuous asymmetric crown. Small weathered accretions and attachment lips
+ * are fused into that body instead of floating as independent rock shelves.
  */
 export function buildReefLimestoneArchGeometry({
   arch,
@@ -361,207 +487,101 @@ export function buildReefLimestoneArchGeometry({
   profile: ReefTerracedFoundationProfile;
 }): BufferGeometry {
   const buffers: GeometryBuffers = { positions: [], colors: [], uvs: [] };
-  const {
-    curve,
-    leftY,
-    rightY,
-    apexY,
-    shoulderHeights,
-    centerlineAsymmetry,
-  } = buildArchCurve(arch, profile);
-  const frames = curve.computeFrenetFrames(LONGITUDINAL_SEGMENTS, false);
-  const centers = curve.getSpacedPoints(LONGITUDINAL_SEGMENTS);
-  const rings: Vector3[][] = [];
+  const shape = buildArchColumnShape(arch, profile);
   const radii: number[] = [];
-  const facetPhase = stableUnit(arch.seed, 'limestone-facet-phase') * TAU / RADIAL_SEGMENTS;
-  const primaryScarProgress = 0.18
-    + stableUnit(arch.seed, 'limestone-primary-scar-progress') * 0.64;
-  const secondaryScarProgress = 0.24
-    + stableUnit(arch.seed, 'limestone-secondary-scar-progress') * 0.52;
-  const primaryScarFacet = Math.floor(
-    stableUnit(arch.seed, 'limestone-primary-scar-facet') * RADIAL_SEGMENTS,
+
+  const pillarRadius = (progress: number) => arch.thickness * (
+    1.82 - progress * 0.5 + Math.sin(progress * Math.PI) * 0.06
   );
-  const secondaryScarFacet = Math.floor(
-    stableUnit(arch.seed, 'limestone-secondary-scar-facet') * RADIAL_SEGMENTS,
-  );
+  appendSweep({
+    buffers,
+    curve: shape.leftPillarCurve,
+    segmentCount: PILLAR_SEGMENTS,
+    seed: arch.seed,
+    label: 'arch-column:left',
+    radiusAt: pillarRadius,
+    depthScaleAt: (progress) => 0.9 + progress * 0.06,
+    radii,
+  });
+  appendSweep({
+    buffers,
+    curve: shape.rightPillarCurve,
+    segmentCount: PILLAR_SEGMENTS,
+    seed: arch.seed,
+    label: 'arch-column:right',
+    radiusAt: pillarRadius,
+    depthScaleAt: (progress) => 0.9 + progress * 0.06,
+    radii,
+  });
+  appendSweep({
+    buffers,
+    curve: shape.crownCurve,
+    segmentCount: CROWN_SEGMENTS,
+    seed: arch.seed,
+    label: 'arch-column:crown',
+    radiusAt: (progress) => crownRadiusAt(arch, progress),
+    depthScaleAt: (progress) => 0.9 + Math.sin(progress * Math.PI) * 0.08,
+    radii,
+  });
 
-  for (let segment = 0; segment <= LONGITUDINAL_SEGMENTS; segment += 1) {
-    const progress = segment / LONGITUDINAL_SEGMENTS;
-    const center = centers[segment]!.clone();
-    const normal = frames.normals[segment]!;
-    const binormal = frames.binormals[segment]!;
-    const radius = bodyRadiusAt(arch, progress) * (
-      0.86 + stableUnit(arch.seed, `limestone-segment-scale:${segment}`) * 0.29
-    );
-    const interiorWeight = Math.sin(progress * Math.PI);
-    center
-      .addScaledVector(
-        normal,
-        (stableUnit(arch.seed, `limestone-center-normal:${segment}`) - 0.5)
-          * radius
-          * 0.2
-          * interiorWeight,
-      )
-      .addScaledVector(
-        binormal,
-        (stableUnit(arch.seed, `limestone-center-binormal:${segment}`) - 0.5)
-          * radius
-          * 0.16
-          * interiorWeight,
-      );
-    centers[segment] = center;
-    radii.push(radius);
-    const ring: Vector3[] = [];
-
-    for (let radial = 0; radial < RADIAL_SEGMENTS; radial += 1) {
-      const angle = facetPhase + radial / RADIAL_SEGMENTS * TAU;
-      const facetScale = 0.83
-        + stableUnit(arch.seed, `limestone-facet:${radial}`) * 0.31;
-      const localErosion = 0.81
-        + stableUnit(arch.seed, `limestone-ring:${segment}:facet:${radial}`) * 0.3;
-      const primaryLongitudinalWeight = Math.max(
-        0,
-        1 - Math.abs(progress - primaryScarProgress) / 0.13,
-      );
-      const secondaryLongitudinalWeight = Math.max(
-        0,
-        1 - Math.abs(progress - secondaryScarProgress) / 0.1,
-      );
-      const primaryFacetDistance = Math.min(
-        Math.abs(radial - primaryScarFacet),
-        RADIAL_SEGMENTS - Math.abs(radial - primaryScarFacet),
-      );
-      const secondaryFacetDistance = Math.min(
-        Math.abs(radial - secondaryScarFacet),
-        RADIAL_SEGMENTS - Math.abs(radial - secondaryScarFacet),
-      );
-      const primaryFacetWeight = Math.max(0, 1 - primaryFacetDistance / 1.7);
-      const secondaryFacetWeight = Math.max(0, 1 - secondaryFacetDistance / 1.45);
-      const scarScale = 1
-        - primaryLongitudinalWeight * primaryFacetWeight * EROSION_AMPLITUDE
-        - secondaryLongitudinalWeight * secondaryFacetWeight * EROSION_AMPLITUDE * 0.62;
-      const verticalCompression = 0.76
-        + stableUnit(arch.seed, `limestone-vertical:${segment}:${radial}`) * 0.13;
-      ring.push(
-        center.clone()
-          .addScaledVector(
-            normal,
-            Math.cos(angle) * radius * facetScale * localErosion * scarScale,
-          )
-          .addScaledVector(
-            binormal,
-            Math.sin(angle) * radius * verticalCompression * localErosion * scarScale,
-          ),
-      );
-    }
-    rings.push(ring);
-  }
-
-  for (let segment = 0; segment < LONGITUDINAL_SEGMENTS; segment += 1) {
-    const currentRing = rings[segment]!;
-    const nextRing = rings[segment + 1]!;
-    const currentCenter = centers[segment]!;
-    const nextCenter = centers[segment + 1]!;
-
-    for (let radial = 0; radial < RADIAL_SEGMENTS; radial += 1) {
-      const nextRadial = (radial + 1) % RADIAL_SEGMENTS;
-      const averageY = (
-        currentRing[radial]!.y
-        + currentRing[nextRadial]!.y
-        + nextRing[radial]!.y
-        + nextRing[nextRadial]!.y
-      ) * 0.25;
-      const isUpperFacet = averageY > (currentCenter.y + nextCenter.y) * 0.5;
-      const color = bodyColor(arch, segment, radial, isUpperFacet);
-      appendTriangle(
-        buffers,
-        currentRing[radial]!,
-        currentRing[nextRadial]!,
-        nextRing[radial]!,
-        color,
-      );
-      appendTriangle(
-        buffers,
-        currentRing[nextRadial]!,
-        nextRing[nextRadial]!,
-        nextRing[radial]!,
-        color,
-      );
-    }
-  }
-
-  const firstRing = rings[0]!;
-  const lastRing = rings[LONGITUDINAL_SEGMENTS]!;
-  for (let radial = 0; radial < RADIAL_SEGMENTS; radial += 1) {
-    const nextRadial = (radial + 1) % RADIAL_SEGMENTS;
-    appendTriangle(
-      buffers,
-      centers[0]!,
-      firstRing[nextRadial]!,
-      firstRing[radial]!,
-      ARCH_COLORS.lower,
-    );
-    appendTriangle(
-      buffers,
-      centers[LONGITUDINAL_SEGMENTS]!,
-      lastRing[radial]!,
-      lastRing[nextRadial]!,
-      ARCH_COLORS.lower,
-    );
-  }
-
+  // Buried buttresses make both columns visibly load-bearing.
   appendFacetedMass(
     buffers,
-    { x: -arch.span * 0.5, y: leftY - arch.thickness * 0.18, z: 0 },
-    arch.thickness * 1.72,
-    arch.thickness * 1.08,
-    arch.thickness * 1.46,
-    arch.seed,
-    'limestone-left-buttress',
-  );
-  appendFacetedMass(
-    buffers,
-    { x: arch.span * 0.5, y: rightY - arch.thickness * 0.18, z: 0 },
-    arch.thickness * 1.68,
-    arch.thickness * 1.04,
+    {
+      x: -arch.span * 0.5,
+      y: shape.leftY - arch.thickness * 0.08,
+      z: 0,
+    },
+    arch.thickness * 1.75,
+    arch.thickness * 0.92,
     arch.thickness * 1.42,
     arch.seed,
-    'limestone-right-buttress',
+    'arch-column:left-buttress',
+  );
+  appendFacetedMass(
+    buffers,
+    {
+      x: arch.span * 0.5,
+      y: shape.rightY - arch.thickness * 0.08,
+      z: 0,
+    },
+    arch.thickness * 1.72,
+    arch.thickness * 0.9,
+    arch.thickness * 1.4,
+    arch.seed,
+    'arch-column:right-buttress',
   );
 
+  // Seven small accretions remain physically embedded in the arch surface, so
+  // weathering adds age without recreating the old floating-boulder silhouette.
   for (let index = 0; index < PROTRUSION_COUNT; index += 1) {
-    const baseProgress = 0.1 + index / (PROTRUSION_COUNT - 1) * 0.8;
-    const progress = Math.max(0.08, Math.min(
-      0.92,
-      baseProgress
-        + (stableUnit(arch.seed, `limestone-protrusion:${index}:progress`) - 0.5) * 0.045,
-    ));
-    const center = curve.getPointAt(progress);
-    const radius = bodyRadiusAt(arch, progress);
-    const side = stableUnit(arch.seed, `limestone-protrusion:${index}:side`) < 0.5 ? -1 : 1;
+    const progress = 0.1 + index / (PROTRUSION_COUNT - 1) * 0.8;
+    const center = shape.crownCurve.getPointAt(progress);
+    const radius = crownRadiusAt(arch, progress);
+    const side = stableUnit(arch.seed, `arch-column:accretion:${index}:side`) < 0.5 ? -1 : 1;
     appendFacetedMass(
       buffers,
       {
-        x: center.x + (stableUnit(arch.seed, `limestone-protrusion:${index}:x`) - 0.5)
+        x: center.x + (stableUnit(arch.seed, `arch-column:accretion:${index}:x`) - 0.5)
           * radius
-          * 0.78,
+          * 0.28,
         y: center.y - radius * (
-          0.02 + stableUnit(arch.seed, `limestone-protrusion:${index}:drop`) * 0.16
+          0.06 + stableUnit(arch.seed, `arch-column:accretion:${index}:drop`) * 0.08
         ),
         z: center.z + side * radius * (
-          0.48 + stableUnit(arch.seed, `limestone-protrusion:${index}:offset`) * 0.34
+          0.24 + stableUnit(arch.seed, `arch-column:accretion:${index}:offset`) * 0.12
         ),
       },
-      radius * (0.56 + stableUnit(arch.seed, `limestone-protrusion:${index}:rx`) * 0.34),
-      radius * (0.42 + stableUnit(arch.seed, `limestone-protrusion:${index}:ry`) * 0.3),
-      radius * (0.58 + stableUnit(arch.seed, `limestone-protrusion:${index}:rz`) * 0.36),
+      radius * (0.32 + stableUnit(arch.seed, `arch-column:accretion:${index}:rx`) * 0.12),
+      radius * (0.26 + stableUnit(arch.seed, `arch-column:accretion:${index}:ry`) * 0.1),
+      radius * (0.34 + stableUnit(arch.seed, `arch-column:accretion:${index}:rz`) * 0.12),
       arch.seed,
-      `limestone-protrusion:${index}`,
+      `arch-column:accretion:${index}`,
     );
   }
 
   const attachmentSlots = ATTACHMENT_PROGRESS.map((progress, index) => (
-    appendAttachmentShelf(buffers, arch, curve, index, progress)
+    appendAttachmentShelf(buffers, arch, shape.crownCurve, index, progress)
   ));
 
   const geometry = new BufferGeometry();
@@ -576,17 +596,22 @@ export function buildReefLimestoneArchGeometry({
   geometry.userData.reefSourceArchId = arch.id;
   geometry.userData.reefArchYearIndex = arch.yearIndex;
   geometry.userData.reefArchDrawCalls = 1;
-  geometry.userData.reefArchLongitudinalSegments = LONGITUDINAL_SEGMENTS;
+  geometry.userData.reefArchLongitudinalSegments = PILLAR_SEGMENTS * 2 + CROWN_SEGMENTS;
   geometry.userData.reefArchRadialSegments = RADIAL_SEGMENTS;
   geometry.userData.reefArchProtrusionCount = PROTRUSION_COUNT + 2;
   geometry.userData.reefArchAttachmentCount = attachmentSlots.length;
   geometry.userData.reefArchMinimumRadius = Math.min(...radii);
   geometry.userData.reefArchMaximumRadius = Math.max(...radii);
-  geometry.userData.reefArchFootHeights = [leftY, rightY];
-  geometry.userData.reefArchApexHeight = apexY;
-  geometry.userData.reefArchShoulderHeights = shoulderHeights;
-  geometry.userData.reefArchCenterlineAsymmetry = centerlineAsymmetry;
+  geometry.userData.reefArchFootHeights = [shape.leftY, shape.rightY];
+  geometry.userData.reefArchApexHeight = shape.apexY;
+  geometry.userData.reefArchShoulderHeights = [shape.leftTop.y, shape.rightTop.y];
+  geometry.userData.reefArchCenterlineAsymmetry = shape.centerlineAsymmetry;
   geometry.userData.reefArchErosionAmplitude = EROSION_AMPLITUDE;
+  geometry.userData.reefArchOpeningWidth = Math.max(
+    0,
+    shape.rightTop.x - shape.leftTop.x - arch.thickness * 2.5,
+  );
+  geometry.userData.reefArchEmbeddedFeet = true;
   geometry.userData.reefCoralAttachmentSlots = attachmentSlots;
   geometry.userData.reefSupportSurface = true;
   geometry.userData.reefSupportSurfaceKind = 'arch';
