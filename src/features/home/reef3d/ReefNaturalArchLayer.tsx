@@ -201,6 +201,15 @@ export function ReefNaturalArchLayer({ build }: { build: ReefPreviewBuild }) {
     () => build.structures.arches.flatMap((arch) => buildArchInstances(arch, profile)),
     [build.structures.arches, profile],
   );
+  const attachmentSlots = useMemo(() => instances.map((instance, index) => ({
+    id: `reef:natural-arch:coral-slot:${index}`,
+    position: {
+      x: instance.position.x,
+      y: instance.position.y + instance.scale.y * 0.78,
+      z: instance.position.z,
+    },
+    radius: Math.max(0.09, Math.min(instance.scale.x, instance.scale.z) * 0.42),
+  })), [instances]);
 
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -232,6 +241,9 @@ export function ReefNaturalArchLayer({ build }: { build: ReefPreviewBuild }) {
         reefNaturalArchPass: REEF_NATURAL_ARCH_PASS,
         reefNaturalArchMassCount: instances.length,
         reefNaturalArchVolcanoOffset: true,
+        reefSupportSurface: true,
+        reefSupportSurfaceKind: 'arch',
+        reefCoralAttachmentSlots: attachmentSlots,
       }}
     >
       <icosahedronGeometry args={[1, 1]} />
