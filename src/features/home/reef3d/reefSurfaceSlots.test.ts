@@ -108,6 +108,32 @@ describe('reef surface slots', () => {
     expect(extended.diagnostics.allocatedCount).toBe(3);
   });
 
+  it('supports request-aware ecology without changing deterministic clearance', () => {
+    const candidates = [
+      { id: 'left-habitat', x: -1, z: 0 },
+      { id: 'right-habitat', x: 1, z: 0 },
+    ];
+    const allocation = allocateReefSurfaceSlots({
+      requests: [
+        request('left-colony', 1, 0, 0, 0.18),
+        request('right-colony', 2, 0, 0, 0.18),
+      ],
+      candidates,
+      sample: (x, z) => ({ x, y: 0.4, z }),
+      sampleForRequest: (surfaceRequest, x, z) => {
+        if (surfaceRequest.id === 'left-colony' && x < 0) return { x, y: 0.4, z };
+        if (surfaceRequest.id === 'right-colony' && x > 0) return { x, y: 0.4, z };
+        return null;
+      },
+    });
+
+    expect(allocation.diagnostics.unresolvedRequestIds).toEqual([]);
+    expect(allocation.slots.map((slot) => slot.candidateId))
+      .toEqual(['left-habitat', 'right-habitat']);
+    expect(allocation.slots[0]?.position.x).toBe(-1);
+    expect(allocation.slots[1]?.position.x).toBe(1);
+  });
+
   it('reports total support loss without deleting the request contract', () => {
     const allocation = allocateReefSurfaceSlots({
       requests: [request('visible-fallback', 1, 4, 4)],
