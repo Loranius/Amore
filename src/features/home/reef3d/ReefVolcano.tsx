@@ -201,10 +201,13 @@ function appendVertex(
 ): void {
   positions.push(point[0], point[1], point[2]);
   const normalizedHeight = clamp01((point[1] - profile.floorY) / Math.max(0.01, profile.coneHeight));
-  const base = new THREE.Color('#252a2a');
-  const summit = new THREE.Color('#47352f');
+  // Keep volcanic basalt dark, but not crushed to black by the underwater
+  // lighting/tone-mapping stack. The material below stays white so these
+  // vertex colours are not multiplied by a second dark tint.
+  const base = new THREE.Color('#56615d');
+  const summit = new THREE.Color('#756257');
   base.lerp(summit, normalizedHeight * 0.72);
-  const mineralVariation = 0.92 + Math.sin(point[0] * 2.9 + point[2] * 3.7) * 0.05;
+  const mineralVariation = 0.94 + Math.sin(point[0] * 2.9 + point[2] * 3.7) * 0.07;
   colors.push(
     clamp01(base.r * mineralVariation),
     clamp01(base.g * mineralVariation),
@@ -423,13 +426,13 @@ export function ReefVolcano({
         }}
       >
         <meshStandardMaterial
-          color="#303536"
+          color="#ffffff"
           vertexColors
-          roughness={0.97}
+          roughness={0.92}
           metalness={0}
           flatShading
-          emissive="#281710"
-          emissiveIntensity={0.025 + profile.growth * 0.035}
+          emissive="#1d2523"
+          emissiveIntensity={0.08 + profile.growth * 0.035}
         />
       </mesh>
 
