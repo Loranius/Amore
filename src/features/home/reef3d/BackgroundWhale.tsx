@@ -10,6 +10,7 @@ const WHALE_PART_BASE = `${import.meta.env.BASE_URL}models/glow_whale_native/`;
 const WHALE_PART_COUNT = 15;
 const WHALE_CLIP_NAME = 'move f';
 const DRACO_DECODER_BASE = 'https://www.gstatic.com/draco/versioned/decoders/1.5.7/';
+const WHALE_LOAD_DELAY_MS = 3000;
 const WHALE_PLAYBACK_RATE = 0.72;
 const REDUCED_WHALE_PLAYBACK_RATE = 0.24;
 const WHALE_ROUTE_RATE = 0.012;
@@ -27,9 +28,7 @@ type DecompressionStreamConstructor = new (
 function decodeBase64(value: string): Uint8Array {
   const binary = atob(value.replace(/\s/g, ''));
   const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
 }
 
@@ -39,10 +38,7 @@ async function inflateWhaleAsset(compressed: Uint8Array): Promise<ArrayBuffer> {
       DecompressionStream?: DecompressionStreamConstructor;
     }
   ).DecompressionStream;
-
-  if (!DecompressionStreamApi) {
-    throw new Error('This browser does not support gzip DecompressionStream.');
-  }
+  if (!DecompressionStreamApi) throw new Error('This browser does not support gzip DecompressionStream.');
 
   const source = compressed.buffer.slice(
     compressed.byteOffset,
@@ -51,14 +47,12 @@ async function inflateWhaleAsset(compressed: Uint8Array): Promise<ArrayBuffer> {
   const stream = new Blob([source])
     .stream()
     .pipeThrough(new DecompressionStreamApi('gzip'));
-
   return new Response(stream).arrayBuffer();
 }
 
 function parseWhaleGltf(buffer: ArrayBuffer): Promise<GLTF> {
   const loader = new GLTFLoader();
   const dracoLoader = new DRACOLoader();
-
   dracoLoader.setDecoderPath(DRACO_DECODER_BASE);
   loader.setDRACOLoader(dracoLoader);
   loader.setMeshoptDecoder(MeshoptDecoder);
@@ -84,9 +78,7 @@ async function loadNativeWhale(): Promise<LoadedWhale> {
     Array.from({ length: WHALE_PART_COUNT }, async (_, index) => {
       const name = `part-${String(index).padStart(2, '0')}.txt`;
       const response = await fetch(`${WHALE_PART_BASE}${name}`);
-      if (!response.ok) {
-        throw new Error(`Unable to load whale asset part ${name}: ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`Unable to load whale asset part ${name}: ${response.status}`);
       return response.text();
     }),
   );
@@ -98,18 +90,13 @@ async function loadNativeWhale(): Promise<LoadedWhale> {
 
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh)) return;
-
     object.castShadow = false;
     object.receiveShadow = false;
     object.frustumCulled = !(object instanceof THREE.SkinnedMesh);
 
-    const materials = Array.isArray(object.material)
-      ? object.material
-      : [object.material];
-
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
     for (const material of materials) {
       if (!(material instanceof THREE.MeshStandardMaterial)) continue;
-
       material.metalness = 0;
       material.roughness = Math.max(0.72, material.roughness);
       if (material.emissiveMap) material.emissiveIntensity = 1.35;
@@ -117,17 +104,9 @@ async function loadNativeWhale(): Promise<LoadedWhale> {
     }
   });
 
-  return {
-    scene,
-    animations: gltf.animations,
-  };
+  return { scene, animations: gltf.animations };
 }
 
-/**
- * Native animated Glow Whale used only as distant background life.
- * The source animation and textures stay intact; scene motion merely carries
- * the whole animal slowly behind the reef where fog can establish scale.
- */
 export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
   const routeRef = useRef<THREE.Group>(null);
   const mixerRef = useRef<THREE.AnimationMixer | null>(null);
@@ -135,29 +114,26 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
 
   useEffect(() => {
     let cancelled = false;
-
-    loadNativeWhale()
-      .then((loaded) => {
-        if (cancelled) return;
-        setWhale(loaded);
-      })
-      .catch((error: unknown) => {
-        if (import.meta.env.DEV) {
-          console.warn('[reef] Native whale asset failed to load.', error);
-        }
-      });
+    const timer = window.setTimeout(() => {
+      loadNativeWhale()
+        .then((loaded) => {
+          if (!cancelled) setWhale(loaded);
+        })
+        .catch((error: unknown) => {
+          if (import.meta.env.DEV) console.warn('[reef] Native whale asset failed to load.', error);
+        });
+    }, WHALE_LOAD_DELAY_MS);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timer);
     };
   }, []);
 
   useEffect(() => {
     if (!whale) return;
-
     const mixer = new THREE.AnimationMixer(whale.scene);
-    const clip =
-      THREE.AnimationClip.findByName(whale.animations, WHALE_CLIP_NAME)
+    const clip = THREE.AnimationClip.findByName(whale.animations, WHALE_CLIP_NAME)
       ?? whale.animations[0];
 
     if (clip) {
@@ -181,7 +157,6 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
   useFrame(({ clock }, delta) => {
     const route = routeRef.current;
     if (!route) return;
-
     mixerRef.current?.update(delta);
 
     const t = clock.getElapsedTime();
@@ -189,7 +164,6 @@ export function BackgroundWhale({ reducedMotion }: { reducedMotion: boolean }) {
     const progress = (0.36 + t * routeRate) % 1;
     const verticalAmplitude = reducedMotion ? 0.025 : 0.08;
     const depthAmplitude = reducedMotion ? 0.07 : 0.22;
-
     route.position.set(
       THREE.MathUtils.lerp(8.2, -8.2, progress),
       3.25 + Math.sin(t * 0.12) * verticalAmplitude,
