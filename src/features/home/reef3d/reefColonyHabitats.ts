@@ -5,13 +5,25 @@ import type {
   ReefLivingCanopyPlan,
 } from './reefLivingCanopy';
 
-export const REEF_COLONY_HABITAT_VERSION = 'reef-colony-habitats-v2';
+export const REEF_COLONY_HABITAT_VERSION = 'reef-colony-habitats-v3';
 
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 export type ReefColonyHabitatTier = 'crown' | 'upper' | 'middle' | 'lower';
 export type ReefColonyGrowthStage = 'core' | 'inner' | 'frontier';
+export type ReefColonyFacingMode = 'outward' | 'tangent' | 'mixed';
+export type ReefColonyFootprintShape = 'cluster' | 'plate' | 'carpet' | 'grove' | 'fan';
+
+export interface ReefColonyShapeProfile {
+  footprintShape: ReefColonyFootprintShape;
+  radialStretch: number;
+  tangentialStretch: number;
+  spreadMultiplier: number;
+  spacingMultiplier: number;
+  angularJitterRad: number;
+  facingMode: ReefColonyFacingMode;
+}
 
 export interface ReefColonyHabitatMemberGrowth {
   colonyId: string;
@@ -30,6 +42,7 @@ export interface ReefColonyHabitatSummary {
   spreadRadius: number;
   activeRadius: number;
   maturity: number;
+  shapeProfile: ReefColonyShapeProfile;
   memberColonyIds: string[];
   growth: ReefColonyHabitatMemberGrowth[];
 }
@@ -51,6 +64,63 @@ interface HabitatRenderMember {
   request: ReefLivingCanopyColony['request'];
   facingRad: number;
 }
+
+const MORPHOTYPE_SHAPES: Readonly<Record<ReefColonyMorphotype, ReefColonyShapeProfile>> = {
+  branching: {
+    footprintShape: 'cluster',
+    radialStretch: 1.02,
+    tangentialStretch: 0.9,
+    spreadMultiplier: 0.9,
+    spacingMultiplier: 0.94,
+    angularJitterRad: 0.16,
+    facingMode: 'outward',
+  },
+  massive: {
+    footprintShape: 'cluster',
+    radialStretch: 0.94,
+    tangentialStretch: 0.94,
+    spreadMultiplier: 0.8,
+    spacingMultiplier: 0.82,
+    angularJitterRad: 0.13,
+    facingMode: 'mixed',
+  },
+  plating: {
+    footprintShape: 'plate',
+    radialStretch: 0.72,
+    tangentialStretch: 1.45,
+    spreadMultiplier: 1,
+    spacingMultiplier: 1.02,
+    angularJitterRad: 0.12,
+    facingMode: 'tangent',
+  },
+  encrusting: {
+    footprintShape: 'carpet',
+    radialStretch: 1.2,
+    tangentialStretch: 1.15,
+    spreadMultiplier: 0.88,
+    spacingMultiplier: 0.72,
+    angularJitterRad: 0.24,
+    facingMode: 'mixed',
+  },
+  'soft-coral': {
+    footprintShape: 'grove',
+    radialStretch: 1.08,
+    tangentialStretch: 1.32,
+    spreadMultiplier: 1,
+    spacingMultiplier: 1.14,
+    angularJitterRad: 0.32,
+    facingMode: 'mixed',
+  },
+  'sea-fan': {
+    footprintShape: 'fan',
+    radialStretch: 0.5,
+    tangentialStretch: 1.7,
+    spreadMultiplier: 0.96,
+    spacingMultiplier: 1.08,
+    angularJitterRad: 0.1,
+    facingMode: 'tangent',
+  },
+};
 
 function round6(value: number): number {
   return Math.round(value * 1_000_000) / 1_000_000;
@@ -74,6 +144,12 @@ function stableUnit(seed: number, label: string): number {
   hash = Math.imul(hash, 0x7feb352d);
   hash ^= hash >>> 15;
   return (hash >>> 0) / 0xffffffff;
+}
+
+export function reefColonyShapeProfile(
+  morphotype: ReefColonyMorphotype,
+): ReefColonyShapeProfile {
+  return MORPHOTYPE_SHAPES[morphotype];
 }
 
 function tierForBand(radialBand: number, radialBandCount: number): ReefColonyHabitatTier {
@@ -142,20 +218,22 @@ function growthStage(memberIndex: number): ReefColonyGrowthStage {
 }
 
 /**
- * Distance is append-only: it depends on the chronological member index, never
- * on the final member count. Adding a new recruit therefore extends the outer
- * edge without moving older coral back out of its established core position.
+ * Distance is append-only: it depends on chronological member index, never on
+ * final member count. Shape-specific spacing changes colony density without
+ * moving any established recruit when a later coral appears.
  */
 function memberGrowthDistance({
   memberIndex,
   foundationRadius,
   firstFootprint,
   spreadRadius,
+  spacingMultiplier,
 }: {
   memberIndex: number;
   foundationRadius: number;
   firstFootprint: number;
   spreadRadius: number;
+  spacingMultiplier: number;
 }): number {
   if (memberIndex <= 0) return 0;
   const baseStep = Math.max(
@@ -164,20 +242,96 @@ function memberGrowthDistance({
   );
   return round6(Math.min(
     spreadRadius,
-    baseStep * Math.sqrt(memberIndex) * 1.06,
+    baseStep * spacingMultiplier * Math.sqrt(memberIndex) * 1.06,
   ));
+}
+
+/**
+ * Stretches the spiral direction inside the habitat's radial/tangential frame,
+ * then renormalizes it. Distance therefore stays chronological and append-only,
+ * while the point cloud becomes a compact mound, plate, carpet, grove or fan.
+ */
+function shapedOffset({
+  memberAngle,
+  hubAngle,
+  distance,
+  profile,
+}: {
+  memberAngle: number;
+  hubAngle: number;
+  distance: number;
+  profile: ReefColonyShapeProfile;
+}): { x: number; z: number; angle: number } {
+  if (distance <= 1e-9) return { x: 0, z: 0, angle: hubAngle };
+
+  const relative = memberAngle - hubAngle;
+  let radial = Math.cos(relative) * profile.radialStretch;
+  let tangential = Math.sin(relative) * profile.tangentialStretch;
+  const magnitude = Math.hypot(radial, tangential);
+  if (magnitude <= 1e-9) {
+    radial = 1;
+    tangential = 0;
+  } else {
+    radial /= magnitude;
+    tangential /= magnitude;
+  }
+
+  const radialX = Math.cos(hubAngle);
+  const radialZ = Math.sin(hubAngle);
+  const tangentX = -radialZ;
+  const tangentZ = radialX;
+  const x = (radialX * radial + tangentX * tangential) * distance;
+  const z = (radialZ * radial + tangentZ * tangential) * distance;
+
+  return {
+    x,
+    z,
+    angle: Math.atan2(z, x),
+  };
+}
+
+function shapeFacing({
+  colony,
+  profile,
+  hubAngle,
+  offsetAngle,
+  tangentialSide,
+}: {
+  colony: ReefLivingCanopyColony;
+  profile: ReefColonyShapeProfile;
+  hubAngle: number;
+  offsetAngle: number;
+  tangentialSide: number;
+}): number {
+  const jitter = (stableUnit(colony.seed, 'habitat-facing') - 0.5)
+    * (profile.facingMode === 'mixed' ? 0.52 : 0.28);
+
+  switch (profile.facingMode) {
+    case 'outward':
+      return normalizeAngle(offsetAngle + jitter);
+    case 'tangent':
+      return normalizeAngle(
+        hubAngle + (tangentialSide < 0 ? -Math.PI * 0.5 : Math.PI * 0.5) + jitter,
+      );
+    case 'mixed':
+      return normalizeAngle(
+        colony.facingRad
+          + jitter
+          + Math.sin(offsetAngle - hubAngle) * 0.14,
+      );
+  }
 }
 
 /**
  * Builds one stable ecological habitat per source growth instruction.
  *
- * V2 changes the internal ecology from fixed rings to chronological outward
- * growth. The oldest member becomes the colony core. Later recruits follow a
- * deterministic golden-angle spiral and progressively occupy the perimeter.
- * Existing members keep their index-derived distance, so future additions do
- * not reshuffle the established colony. Individual coral maturity still drives
- * its mesh scale in reefLivingCanopy, making old core members fuller while
- * younger frontier members read as fresh growth.
+ * V3 keeps the chronological core -> inner -> frontier growth from V2, but the
+ * physical footprint now depends on the dominant coral morphotype. Branching
+ * and massive colonies form compact clusters, plating corals widen along the
+ * terrace tangent, encrusting forms make dense carpets, soft corals form looser
+ * groves and sea fans organize into narrow fan-like belts. All deformation is
+ * seed-stable and index-stable, so future recruits extend rather than reshuffle
+ * established coral.
  */
 export function buildReefColonyHabitatPlan(
   sourcePlan: ReefLivingCanopyPlan,
@@ -226,6 +380,8 @@ export function buildReefColonyHabitatPlan(
     const first = members[0];
     if (!first) continue;
 
+    const morphotype = dominantMorphotype(members);
+    const shapeProfile = reefColonyShapeProfile(morphotype);
     const tier = tierForBand(first.radialBand, radialBandCount);
     const baseRadiusRatio = tierRadiusRatio(tier);
     const radialVariation = 0.96
@@ -244,9 +400,13 @@ export function buildReefColonyHabitatPlan(
       ...members.map((member) => member.colony.request.footprintRadius),
     );
     const firstFootprint = Math.max(0.06, first.colony.request.footprintRadius);
-    const spreadRadius = round6(Math.min(
+    const baseSpreadRadius = Math.min(
       foundationRadius * 0.13,
       Math.max(foundationRadius * 0.055, maximumFootprint * 2.55),
+    );
+    const spreadRadius = round6(Math.min(
+      foundationRadius * 0.14,
+      baseSpreadRadius * shapeProfile.spreadMultiplier,
     ));
     const memberPhase = stableUnit(
       identitySeed,
@@ -261,26 +421,35 @@ export function buildReefColonyHabitatPlan(
         foundationRadius,
         firstFootprint,
         spreadRadius,
+        spacingMultiplier: shapeProfile.spacingMultiplier,
       });
       const memberAngle = memberPhase
         + memberIndex * GOLDEN_ANGLE
-        + (stableUnit(member.colony.seed, 'habitat-member-angle') - 0.5) * 0.2;
-      const offsetX = Math.cos(memberAngle) * distance;
-      const offsetZ = Math.sin(memberAngle) * distance;
-      const facingJitter = (stableUnit(member.colony.seed, 'habitat-facing') - 0.5) * 0.52;
-      const outwardBias = memberIndex === 0
-        ? 0
-        : Math.sin(memberAngle - hubAngle) * 0.14;
-      const facingRad = normalizeAngle(member.colony.facingRad + facingJitter + outwardBias);
+        + (stableUnit(member.colony.seed, 'habitat-member-angle') - 0.5)
+          * shapeProfile.angularJitterRad;
+      const offset = shapedOffset({
+        memberAngle,
+        hubAngle,
+        distance,
+        profile: shapeProfile,
+      });
+      const relative = offset.angle - hubAngle;
+      const facingRad = shapeFacing({
+        colony: member.colony,
+        profile: shapeProfile,
+        hubAngle,
+        offsetAngle: memberIndex === 0 ? hubAngle : offset.angle,
+        tangentialSide: Math.sin(relative),
+      });
       activeRadius = Math.max(activeRadius, distance);
 
       renderByColonyId.set(member.colony.sourceColonyId, {
         request: {
           ...member.colony.request,
           preferred: {
-            x: round6(center.x + offsetX),
+            x: round6(center.x + offset.x),
             y: member.colony.request.preferred.y,
-            z: round6(center.z + offsetZ),
+            z: round6(center.z + offset.z),
           },
         },
         facingRad,
@@ -297,12 +466,13 @@ export function buildReefColonyHabitatPlan(
     habitats.push({
       id: `reef:colony-habitat:${sourceInstructionId}`,
       sourceInstructionId,
-      dominantMorphotype: dominantMorphotype(members),
+      dominantMorphotype: morphotype,
       tier,
       center,
       spreadRadius,
       activeRadius: round6(activeRadius),
       maturity: habitatMaturity(members),
+      shapeProfile,
       memberColonyIds: members.map((member) => member.colony.sourceColonyId),
       growth,
     });
