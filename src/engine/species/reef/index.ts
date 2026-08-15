@@ -71,6 +71,20 @@ export type {
   ReefSurfacePoint,
   ReefSurfaceSourceKind,
 } from './surfaceSystem';
+export {
+  buildReefCoralColonies,
+  REEF_CORAL_COLONIES_VERSION,
+  REEF_CORAL_MAX_COUNT,
+  REEF_CORAL_PLATFORM_BASELINE,
+  REEF_CORAL_YEAR_NUCLEATION_CHANCE,
+} from './coralColonies';
+export type {
+  BuildReefCoralColoniesInput,
+  ReefCoralColoniesDiagnostics,
+  ReefCoralColoniesManifest,
+  ReefCoralColony,
+  ReefCoralMorphotype,
+} from './coralColonies';
 export type {
   ReefGrowthArchPlacement,
   ReefGrowthOutcropPlacement,
