@@ -111,28 +111,54 @@ function minimumClearance(structures: readonly ReefYearStructure[]): number | nu
   return Number.isFinite(minimum) ? round6(minimum) : null;
 }
 
+/**
+ * Samples the reef from 72 camera azimuths. Only near-side structures that
+ * actually project across the central core can reduce visibility. This avoids
+ * the old false result where 50 structures on every side were summed together
+ * as if a camera could see all occluders in one view.
+ */
 function estimateCoreVisibility(
   core: ReefCoreManifest,
   structures: readonly ReefYearStructure[],
 ): number {
   if (structures.length === 0) return 1;
   const coreRadius = Math.max(core.dimensions.radiusX, core.dimensions.radiusZ);
-  let occlusion = 0;
-  structures.forEach((structure) => {
-    const distance = Math.max(0.01, Math.hypot(structure.center.x, structure.center.z));
-    const angularFootprint = Math.min(1, structure.footprintRadius / distance);
-    const verticalRatio = Math.min(
-      1.2,
-      structure.shape.height / Math.max(0.01, core.dimensions.height),
-    );
-    const innerPenalty = clamp01(
-      (coreRadius * 1.45 - distance) / Math.max(0.01, coreRadius),
-    );
-    occlusion += angularFootprint
-      * (0.18 + verticalRatio * 0.32)
-      * (1 + innerPenalty * 0.65);
-  });
-  return round6(clamp01(1 - occlusion));
+  const coreHeight = Math.max(0.01, core.dimensions.height);
+  let visibleTotal = 0;
+
+  for (let viewIndex = 0; viewIndex < SECTOR_COUNT; viewIndex += 1) {
+    const viewAngle = (viewIndex + 0.5) / SECTOR_COUNT * TAU;
+    let strongestOcclusion = 0;
+
+    structures.forEach((structure) => {
+      const distance = Math.max(0.01, Math.hypot(structure.center.x, structure.center.z));
+      const structureAngle = Math.atan2(structure.center.z, structure.center.x);
+      const delta = Math.atan2(
+        Math.sin(structureAngle - viewAngle),
+        Math.cos(structureAngle - viewAngle),
+      );
+      const depth = Math.cos(delta) * distance;
+      if (depth <= 0) return;
+
+      const lateral = Math.abs(Math.sin(delta) * distance);
+      const overlapReach = coreRadius + structure.footprintRadius;
+      if (lateral >= overlapReach) return;
+
+      const lateralOverlap = clamp01(1 - lateral / Math.max(0.01, overlapReach));
+      const heightOcclusion = clamp01(structure.shape.height / coreHeight);
+      const proximity = clamp01(
+        (coreRadius * 3.25 - depth) / Math.max(0.01, coreRadius * 2.25),
+      );
+      const occlusion = lateralOverlap
+        * (0.18 + heightOcclusion * 0.72)
+        * (0.72 + proximity * 0.28);
+      strongestOcclusion = Math.max(strongestOcclusion, occlusion);
+    });
+
+    visibleTotal += clamp01(1 - strongestOcclusion);
+  }
+
+  return round6(visibleTotal / SECTOR_COUNT);
 }
 
 function measureWater(
