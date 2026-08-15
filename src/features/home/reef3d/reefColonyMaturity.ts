@@ -3,6 +3,7 @@ import type { ReefPreviewBuild } from './buildReefPreview';
 import type {
   ReefColonyGrowthStage,
   ReefColonyHabitatPlan,
+  ReefColonyHabitatSummary,
 } from './reefColonyHabitats';
 import {
   buildReefCoralPatchPlan,
@@ -29,6 +30,7 @@ export interface ReefColonyMaturityPlan {
   version: typeof REEF_COLONY_MATURITY_VERSION;
   patchVersion: typeof REEF_CORAL_PATCH_VERSION;
   plan: ReefLivingCanopyPlan;
+  habitats: ReefColonyHabitatSummary[];
   states: ReefColonyMaturityState[];
   stageCounts: Record<ReefColonyLifecycleStage, number>;
 }
@@ -197,6 +199,7 @@ export function buildReefColonyMaturityPlan(
       colonies,
       requests: colonies.map((colony) => colony.request),
     },
+    habitats: patchPlan.habitats,
     states,
     stageCounts,
   };
