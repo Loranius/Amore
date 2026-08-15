@@ -76,7 +76,9 @@ interface CandidateTransform {
 
 const hex32 = (value: number) => (value >>> 0).toString(16).padStart(8, '0');
 const normalizeAngle = (value: number) => ((value % TAU) + TAU) % TAU;
-const angularDistance = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+const angularDistance = (a: number, b: number) => Math.abs(
+  Math.atan2(Math.sin(a - b), Math.cos(a - b)),
+);
 
 function compositionCoreForYear(core: ReefCoreManifest, yearIndex: number): ReefCoreManifest {
   return buildReefCore({
@@ -109,23 +111,36 @@ function minimumClearance(structures: readonly ReefYearStructure[]): number | nu
   return Number.isFinite(minimum) ? round6(minimum) : null;
 }
 
-function coreVisibility(core: ReefCoreManifest, structures: readonly ReefYearStructure[]): number {
+function estimateCoreVisibility(
+  core: ReefCoreManifest,
+  structures: readonly ReefYearStructure[],
+): number {
   if (structures.length === 0) return 1;
   const coreRadius = Math.max(core.dimensions.radiusX, core.dimensions.radiusZ);
   let occlusion = 0;
-  for (const structure of structures) {
+  structures.forEach((structure) => {
     const distance = Math.max(0.01, Math.hypot(structure.center.x, structure.center.z));
     const angularFootprint = Math.min(1, structure.footprintRadius / distance);
-    const verticalRatio = Math.min(1.2, structure.shape.height / Math.max(0.01, core.dimensions.height));
-    const innerPenalty = clamp01((coreRadius * 1.45 - distance) / Math.max(0.01, coreRadius));
-    occlusion += angularFootprint * (0.18 + verticalRatio * 0.32) * (1 + innerPenalty * 0.65);
-  }
+    const verticalRatio = Math.min(
+      1.2,
+      structure.shape.height / Math.max(0.01, core.dimensions.height),
+    );
+    const innerPenalty = clamp01(
+      (coreRadius * 1.45 - distance) / Math.max(0.01, coreRadius),
+    );
+    occlusion += angularFootprint
+      * (0.18 + verticalRatio * 0.32)
+      * (1 + innerPenalty * 0.65);
+  });
   return round6(clamp01(1 - occlusion));
 }
 
-function waterMetrics(structures: readonly ReefYearStructure[]): { freeWaterFraction: number; waterWindowCount: number } {
+function measureWater(
+  structures: readonly ReefYearStructure[],
+): { freeWaterFraction: number; waterWindowCount: number } {
   if (structures.length === 0) return { freeWaterFraction: 1, waterWindowCount: 1 };
   const occupied = Array.from({ length: SECTOR_COUNT }, () => false);
+
   structures.forEach((structure) => {
     const distance = Math.max(0.01, Math.hypot(structure.center.x, structure.center.z));
     const centerAngle = normalizeAngle(Math.atan2(structure.center.z, structure.center.x));
@@ -142,26 +157,31 @@ function waterMetrics(structures: readonly ReefYearStructure[]): { freeWaterFrac
   if (firstOccupied < 0) return { freeWaterFraction: 1, waterWindowCount: 1 };
 
   let windows = 0;
-  let freeRun = 0;
+  let run = 0;
   for (let step = 1; step <= SECTOR_COUNT; step += 1) {
     const free = !occupied[(firstOccupied + step) % SECTOR_COUNT];
-    if (free) freeRun += 1;
+    if (free) run += 1;
     else {
-      if (freeRun >= OPEN_RUN_SECTORS) windows += 1;
-      freeRun = 0;
+      if (run >= OPEN_RUN_SECTORS) windows += 1;
+      run = 0;
     }
   }
+
   return {
     freeWaterFraction: round6(freeCount / SECTOR_COUNT),
     waterWindowCount: Math.max(1, windows),
   };
 }
 
-function directionalBalance(structures: readonly ReefYearStructure[], mode: 'height' | 'radial'): number {
+function directionalBalance(
+  structures: readonly ReefYearStructure[],
+  mode: 'height' | 'radial',
+): number {
   if (structures.length === 0) return 1;
   let vectorX = 0;
   let vectorZ = 0;
   let total = 0;
+
   structures.forEach((structure) => {
     const angle = Math.atan2(structure.center.z, structure.center.x);
     const radius = Math.max(0.01, Math.hypot(structure.center.x, structure.center.z));
@@ -172,6 +192,7 @@ function directionalBalance(structures: readonly ReefYearStructure[], mode: 'hei
     vectorZ += Math.sin(angle) * weight;
     total += weight;
   });
+
   const imbalance = total > 0 ? Math.hypot(vectorX, vectorZ) / total : 0;
   const raw = clamp01(1 - imbalance);
   const earlyFloor = structures.length <= 2 ? 0.68 : structures.length === 3 ? 0.5 : 0;
@@ -184,6 +205,7 @@ function silhouetteScore(structures: readonly ReefYearStructure[]): number {
   let totalHeight = 0;
   let minimumHeight = Number.POSITIVE_INFINITY;
   let maximumHeight = 0;
+
   structures.forEach((structure) => {
     const angle = normalizeAngle(Math.atan2(structure.center.z, structure.center.x));
     const sector = Math.min(7, Math.floor(angle / TAU * 8));
@@ -193,6 +215,7 @@ function silhouetteScore(structures: readonly ReefYearStructure[]): number {
     minimumHeight = Math.min(minimumHeight, height);
     maximumHeight = Math.max(maximumHeight, height);
   });
+
   const dominance = totalHeight > 0 ? Math.max(...sectorHeights) / totalHeight : 0;
   const directional = clamp01(1 - Math.max(0, dominance - 0.28) / 0.72);
   const variation = maximumHeight > 0
@@ -202,7 +225,11 @@ function silhouetteScore(structures: readonly ReefYearStructure[]): number {
   return round6(Math.max(earlyFloor, directional * 0.72 + variation * 0.28));
 }
 
-function scoreOpenWater(windowCount: number, freeWaterFraction: number, structureCount: number): number {
+function openWaterScore(
+  windowCount: number,
+  freeWaterFraction: number,
+  structureCount: number,
+): number {
   if (structureCount === 0) return 1;
   const minimumWindows = Math.min(3, structureCount);
   const gapScore = windowCount >= minimumWindows && windowCount <= 5
@@ -217,32 +244,39 @@ export function scoreReefComposition(
   core: ReefCoreManifest,
   structures: readonly ReefYearStructure[],
 ): { score: ReefCompositionScore; metrics: ReefCompositionMetrics } {
-  const visibility = coreVisibility(core, structures);
-  const water = waterMetrics(structures);
+  const visibility = estimateCoreVisibility(core, structures);
+  const water = measureWater(structures);
   const clearance = minimumClearance(structures);
   const collisionFree = clearance === null || clearance >= -1e-6;
-  const collision = clearance === null ? 1 : clamp01((clearance + 0.04) / 0.2);
-  const coreVisibilityScore = clamp01(visibility / 0.5);
-  const openWater = scoreOpenWater(water.waterWindowCount, water.freeWaterFraction, structures.length);
+  const collision = round6(
+    clearance === null ? 1 : clamp01((clearance + 0.04) / 0.2),
+  );
+  const coreVisibility = round6(clamp01(visibility / 0.5));
+  const openWater = openWaterScore(
+    water.waterWindowCount,
+    water.freeWaterFraction,
+    structures.length,
+  );
   const heightBalance = directionalBalance(structures, 'height');
   const radialBalance = directionalBalance(structures, 'radial');
   const silhouette = silhouetteScore(structures);
   const total = round6(
-    coreVisibilityScore * 0.25
+    coreVisibility * 0.25
       + openWater * 0.20
       + heightBalance * 0.15
       + radialBalance * 0.15
       + silhouette * 0.15
       + collision * 0.10,
   );
+
   return {
     score: {
-      coreVisibility: round6(coreVisibilityScore),
+      coreVisibility,
       openWater,
       heightBalance,
       radialBalance,
       silhouette,
-      collision: round6(collision),
+      collision,
       total,
     },
     metrics: {
@@ -255,19 +289,37 @@ export function scoreReefComposition(
   };
 }
 
-function candidateTransform(structure: ReefYearStructure, attempt: number): CandidateTransform {
+function requiredWaterWindows(structureCount: number): number {
+  return Math.min(3, structureCount);
+}
+
+function candidateTransform(
+  structure: ReefYearStructure,
+  attempt: number,
+): CandidateTransform {
   if (attempt === 0) {
-    return { x: structure.center.x, z: structure.center.z, rotationY: structure.rotationY, attempt };
+    return {
+      x: structure.center.x,
+      z: structure.center.z,
+      rotationY: structure.rotationY,
+      attempt,
+    };
   }
+
   const baseAngle = Math.atan2(structure.center.z, structure.center.x);
   const baseRadius = Math.max(0.01, Math.hypot(structure.center.x, structure.center.z));
   const direction = seededUnit(structure.seed, `composition-side:${attempt}`) < 0.5 ? -1 : 1;
   const angleOffset = direction * (
-    0.12 + attempt * 0.055 + seededUnit(structure.seed, `composition-angle:${attempt}`) * 0.16
+    0.12
+      + attempt * 0.055
+      + seededUnit(structure.seed, `composition-angle:${attempt}`) * 0.16
   );
-  const radialScale = 1.02 + attempt * 0.025 + seededUnit(structure.seed, `composition-radius:${attempt}`) * 0.09;
+  const radialScale = 1.02
+    + attempt * 0.025
+    + seededUnit(structure.seed, `composition-radius:${attempt}`) * 0.09;
   const angle = baseAngle + angleOffset;
   const radius = baseRadius * radialScale;
+
   return {
     x: round6(Math.cos(angle) * radius),
     z: round6(Math.sin(angle) * radius),
@@ -276,31 +328,58 @@ function candidateTransform(structure: ReefYearStructure, attempt: number): Cand
   };
 }
 
-function applyTransform(structure: ReefYearStructure, candidate: CandidateTransform): ReefYearStructure {
+function applyTransform(
+  structure: ReefYearStructure,
+  candidate: CandidateTransform,
+): ReefYearStructure {
   return {
     ...structure,
-    center: { ...structure.center, x: candidate.x, z: candidate.z },
+    center: {
+      ...structure.center,
+      x: candidate.x,
+      z: candidate.z,
+    },
     rotationY: candidate.rotationY,
   };
 }
 
-function candidateMerit(core: ReefCoreManifest, structures: readonly ReefYearStructure[]): number {
+function candidateMerit(
+  core: ReefCoreManifest,
+  structures: readonly ReefYearStructure[],
+): number {
   const evaluated = scoreReefComposition(core, structures);
+  const missingWindows = Math.max(
+    0,
+    requiredWaterWindows(structures.length) - evaluated.metrics.waterWindowCount,
+  );
   const hardPenalty = (evaluated.metrics.collisionFree ? 0 : 0.5)
-    + (evaluated.metrics.coreVisibility >= REEF_MIN_CORE_VISIBILITY ? 0 : 0.2);
+    + (evaluated.metrics.coreVisibility >= REEF_MIN_CORE_VISIBILITY ? 0 : 0.2)
+    + missingWindows * 0.35;
   return evaluated.score.total - hardPenalty;
 }
 
+function isAcceptable(
+  evaluation: ReturnType<typeof scoreReefComposition>,
+  structureCount: number,
+): boolean {
+  return evaluation.score.total >= REEF_COMPOSITION_ACCEPT_SCORE
+    && evaluation.metrics.collisionFree
+    && evaluation.metrics.coreVisibility >= REEF_MIN_CORE_VISIBILITY
+    && evaluation.metrics.waterWindowCount >= requiredWaterWindows(structureCount);
+}
+
 /**
- * Phase 3 composition pass. Structures are processed strictly by yearIndex.
- * A new year may only move itself; previously composed years are immutable.
+ * Phase 3 is append-only: Year N can reposition only itself. Earlier composed
+ * years are never regenerated when later history is added.
  */
 export function buildReefComposition({
   core,
   yearStructures,
 }: BuildReefCompositionInput): ReefCompositionManifest {
   const composed: ReefComposedYearStructure[] = [];
-  const source = [...yearStructures.structures].sort((a, b) => a.yearIndex - b.yearIndex);
+  const source = [...yearStructures.structures].sort(
+    (left, right) => left.yearIndex - right.yearIndex,
+  );
 
   for (const structure of source) {
     const scoringCore = compositionCoreForYear(core, structure.yearIndex);
@@ -311,11 +390,7 @@ export function buildReefComposition({
     let bestEvaluation = scoreReefComposition(scoringCore, bestSet);
     let bestMerit = candidateMerit(scoringCore, bestSet);
 
-    const acceptable = bestEvaluation.score.total >= REEF_COMPOSITION_ACCEPT_SCORE
-      && bestEvaluation.metrics.collisionFree
-      && bestEvaluation.metrics.coreVisibility >= REEF_MIN_CORE_VISIBILITY;
-
-    if (!acceptable) {
+    if (!isAcceptable(bestEvaluation, bestSet.length)) {
       for (let attempt = 1; attempt <= REEF_COMPOSITION_ATTEMPTS; attempt += 1) {
         const candidate = candidateTransform(structure, attempt);
         const transformed = applyTransform(structure, candidate);
@@ -344,9 +419,14 @@ export function buildReefComposition({
   }
 
   const finalEvaluation = scoreReefComposition(core, composed);
-  const adjustedStructureCount = composed.filter((structure) => structure.composition.adjusted).length;
+  const adjustedStructureCount = composed.filter(
+    (structure) => structure.composition.adjusted,
+  ).length;
   const signaturePayload = composed
-    .map((structure) => `${structure.signature}:${structure.center.x}:${structure.center.z}:${structure.rotationY}:${structure.composition.attempt}`)
+    .map((structure) => (
+      `${structure.signature}:${structure.center.x}:${structure.center.z}:`
+      + `${structure.rotationY}:${structure.composition.attempt}`
+    ))
     .join('|');
 
   return {
