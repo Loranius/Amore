@@ -3,13 +3,15 @@ import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ReefColonyMorphotype } from '@/engine/species/reef';
 import type { ReefPreviewBuild } from './buildReefPreview';
+import { buildReefLivingCanopyPlan } from './reefLivingCanopy';
 import {
-  buildReefLivingCanopyPlan,
-  type ReefLivingCanopyPlan,
-} from './reefLivingCanopy';
+  buildReefColonyNucleationPlan,
+  createReefColonyNucleationScorer,
+  REEF_COLONY_NUCLEATION_PASS,
+  REEF_COLONY_NUCLEATION_VERSION,
+} from './reefColonyNucleation';
 import {
   buildReefMorphologyFamiliesGeometry,
-  reefMorphologyProminence,
   REEF_MORPHOLOGY_FAMILIES_PASS,
   REEF_MORPHOLOGY_FAMILIES_VERSION,
 } from './reefMorphologyFamilies';
@@ -31,122 +33,7 @@ export interface ReefDensityCandidateCounts {
   morphotypeCounts: Record<ReefColonyMorphotype, number>;
 }
 
-const TAU = Math.PI * 2;
-const REEF_CANOPY_LAYOUT = 'morphology-habitats-with-open-channels-v3';
-
-function stableUnit(seed: number, label: string): number {
-  let hash = (seed ^ 0x9e3779b9) >>> 0;
-  for (let index = 0; index < label.length; index += 1) {
-    hash ^= label.charCodeAt(index);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  hash ^= hash >>> 16;
-  hash = Math.imul(hash, 0x7feb352d);
-  hash ^= hash >>> 15;
-  return (hash >>> 0) / 0xffffffff;
-}
-
-/**
- * Three habitat patches deliberately replace the old four-way scatter. The
- * angular gaps between them stay open as readable channels through the reef.
- */
-function morphotypeHabitatIndex(morphotype: ReefColonyMorphotype): 0 | 1 | 2 {
-  switch (morphotype) {
-    case 'branching': return 0;
-    case 'soft-coral': return 0;
-    case 'plating': return 1;
-    case 'sea-fan': return 1;
-    case 'massive': return 2;
-    case 'encrusting': return 2;
-  }
-}
-
-function morphotypeRadialRatio(morphotype: ReefColonyMorphotype): number {
-  switch (morphotype) {
-    case 'branching': return 0.43;
-    case 'soft-coral': return 0.5;
-    case 'plating': return 0.68;
-    case 'sea-fan': return 0.72;
-    case 'massive': return 0.57;
-    case 'encrusting': return 0.52;
-  }
-}
-
-function morphotypeHabitatStrength(morphotype: ReefColonyMorphotype): number {
-  switch (morphotype) {
-    case 'branching': return 0.88;
-    case 'plating': return 0.87;
-    case 'encrusting': return 0.84;
-    case 'massive': return 0.82;
-    case 'sea-fan': return 0.8;
-    case 'soft-coral': return 0.78;
-  }
-}
-
-/**
- * Stage 3 visual ecology. Logical colony IDs/order remain untouched; only the
- * renderer anchor and renderer-only mature hierarchy are biased into stable
- * morphology-specific habitat patches. Every nineteenth sequence becomes a
- * stable old-growth anchor, guaranteeing a few legible mature colonies even in
- * a relatively young reef without making future appends reshuffle older ones.
- */
-function buildHabitatPlan(
-  plan: ReefLivingCanopyPlan,
-  build: ReefPreviewBuild,
-): ReefLivingCanopyPlan {
-  const radius = build.structures.visibleFoundationRadius;
-  const seed = build.species.moduleEvolution.identitySeed;
-  const basePhase = stableUnit(seed, 'reef:morphology-habitats:phase') * TAU;
-  const habitatAngles = [0.08, 2.12, 4.22] as const;
-
-  const colonies = plan.colonies.map((colony) => {
-    const habitatIndex = morphotypeHabitatIndex(colony.morphotype);
-    const prominence = reefMorphologyProminence(colony);
-    const sequenceAnchor = colony.request.sequence % 19 === 0;
-    const dominant = colony.emphasized || prominence >= 0.94 || sequenceAnchor;
-    const visualWidthScale = dominant ? 1.26 : 1;
-    const visualHeightScale = dominant ? 1.18 : 1;
-    const angleJitter = (stableUnit(colony.seed, 'reef:habitat:angle') - 0.5)
-      * (dominant ? 0.26 : 0.58);
-    const angle = basePhase + habitatAngles[habitatIndex] + angleJitter;
-    const radialRatio = morphotypeRadialRatio(colony.morphotype);
-    const radialJitter = dominant
-      ? 0.96 + stableUnit(colony.seed, 'reef:habitat:radius') * 0.06
-      : 0.88 + stableUnit(colony.seed, 'reef:habitat:radius') * 0.24;
-    const localRadius = radius * radialRatio * radialJitter;
-    const targetX = Math.cos(angle) * localRadius;
-    const targetZ = Math.sin(angle) * localRadius;
-    const strength = Math.min(
-      0.95,
-      morphotypeHabitatStrength(colony.morphotype) + (dominant ? 0.06 : 0),
-    );
-    const preferred = colony.request.preferred;
-    const request = {
-      ...colony.request,
-      preferred: {
-        x: THREE.MathUtils.lerp(preferred.x, targetX, strength),
-        y: preferred.y,
-        z: THREE.MathUtils.lerp(preferred.z, targetZ, strength),
-      },
-    };
-
-    return {
-      ...colony,
-      // This is a renderer-local promotion; logical Evolution/Species data is
-      // not mutated and chronological append stability remains unchanged.
-      emphasized: dominant,
-      footprintRadius: colony.footprintRadius * visualWidthScale,
-      targetHeight: colony.targetHeight * visualHeightScale,
-      request,
-    };
-  });
-
-  return {
-    ...plan,
-    colonies,
-    requests: colonies.map((colony) => colony.request),
-  };
-}
+const REEF_CANOPY_LAYOUT = 'ecological-colony-nucleation-v1';
 
 export function reefDensityCandidateCounts(build: ReefPreviewBuild): ReefDensityCandidateCounts {
   const plan = buildReefLivingCanopyPlan(build);
@@ -161,7 +48,24 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
   const scene = useThree((state) => state.scene);
   const invalidate = useThree((state) => state.invalidate);
   const basePlan = useMemo(() => buildReefLivingCanopyPlan(build), [build]);
-  const plan = useMemo(() => buildHabitatPlan(basePlan, build), [basePlan, build]);
+  const plan = useMemo(() => buildReefColonyNucleationPlan({
+    plan: basePlan,
+    foundationRadius: build.structures.visibleFoundationRadius,
+    seed: build.species.moduleEvolution.identitySeed,
+  }), [
+    basePlan,
+    build.species.moduleEvolution.identitySeed,
+    build.structures.visibleFoundationRadius,
+  ]);
+  const candidateScorer = useMemo(() => createReefColonyNucleationScorer({
+    plan,
+    foundationRadius: build.structures.visibleFoundationRadius,
+    seed: build.species.moduleEvolution.identitySeed,
+  }), [
+    build.species.moduleEvolution.identitySeed,
+    build.structures.visibleFoundationRadius,
+    plan,
+  ]);
   const geometry = useMemo(() => new THREE.BufferGeometry(), []);
   const material = useMemo(() => new THREE.MeshStandardMaterial({
     name: 'reef-morphology-families-shared-material',
@@ -186,9 +90,11 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
       }),
       ...collectReefSupportSlotCandidates(terrainSupportMeshes),
     ];
+    const worldNormal = new THREE.Vector3();
     const allocation = allocateReefSurfaceSlots({
       requests: plan.requests,
       candidates,
+      candidateScorer,
       sample: (x, z) => {
         const hit = raycastReefCoralTerrainSupport(
           terrainSupportMeshes,
@@ -196,9 +102,16 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
           x,
           z,
         );
-        return hit
-          ? { x: hit.point.x, y: hit.point.y, z: hit.point.z }
-          : null;
+        if (!hit) return null;
+        const normalY = hit.face
+          ? worldNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y
+          : 1;
+        return {
+          x: hit.point.x,
+          y: hit.point.y,
+          z: hit.point.z,
+          normalY,
+        };
       },
     });
     const next = buildReefMorphologyFamiliesGeometry({
@@ -207,6 +120,8 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
     });
     next.userData.reefSurfaceSlotDiagnostics = allocation.diagnostics;
     next.userData.reefCanopyLayout = REEF_CANOPY_LAYOUT;
+    next.userData.reefColonyNucleationVersion = REEF_COLONY_NUCLEATION_VERSION;
+    next.userData.reefColonyNucleationPass = REEF_COLONY_NUCLEATION_PASS;
 
     geometry.dispose();
     geometry.copy(next);
@@ -215,6 +130,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
   }, [
     build.species.moduleEvolution.identitySeed,
     build.structures.visibleFoundationRadius,
+    candidateScorer,
     geometry,
     invalidate,
     plan,
@@ -228,7 +144,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
 
   return (
     <mesh
-      name={`reef-density-${REEF_MORPHOLOGY_FAMILIES_PASS}`}
+      name={`reef-density-${REEF_MORPHOLOGY_FAMILIES_PASS}-${REEF_COLONY_NUCLEATION_PASS}`}
       geometry={geometry}
       material={material}
       castShadow={false}
@@ -237,6 +153,8 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
       userData={{
         reefMorphologyFamiliesVersion: REEF_MORPHOLOGY_FAMILIES_VERSION,
         reefMorphologyFamiliesPass: REEF_MORPHOLOGY_FAMILIES_PASS,
+        reefColonyNucleationVersion: REEF_COLONY_NUCLEATION_VERSION,
+        reefColonyNucleationPass: REEF_COLONY_NUCLEATION_PASS,
         reefCanopyLayout: REEF_CANOPY_LAYOUT,
       }}
     />
@@ -245,7 +163,7 @@ function DensityCorals({ build }: { build: ReefPreviewBuild }) {
 
 export function ReefDensityLayer({ build }: { build: ReefPreviewBuild }) {
   return (
-    <group name="reef-density-morphology-habitats">
+    <group name="reef-density-ecological-nucleation">
       <DensityCorals build={build} />
     </group>
   );
