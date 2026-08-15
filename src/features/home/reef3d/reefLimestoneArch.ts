@@ -418,8 +418,11 @@ function appendAttachmentShelf(
   const bottomY = topY - Math.max(0.035, arch.thickness * 0.16);
   const centerX = bodyCenter.x
     + (stableUnit(arch.seed, `arch-column:shelf:${index}:x`) - 0.5) * arch.thickness * 0.22;
+  // Keep the shelf center outside the crown's vertical projection while its
+  // inner edge remains buried in the body. This makes the authored coral slot
+  // land on the shelf itself rather than on a higher crown facet.
   const centerZ = bodyCenter.z + outward * (
-    bodyRadius * 0.52 + radiusZ * 0.16
+    bodyRadius * 1.08 + radiusZ * 0.18
   );
   const phase = stableUnit(arch.seed, `arch-column:shelf:${index}:phase`) * TAU;
   const topRing: Vector3[] = [];
