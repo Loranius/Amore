@@ -66,6 +66,9 @@ describe('reef coral patches', () => {
     if (!templatePatch) return;
 
     const templateId = templatePatch.memberColonyIds[0];
+    expect(templateId).toBeDefined();
+    if (!templateId) return;
+
     const template = habitats.plan.colonies.find((colony) => colony.sourceColonyId === templateId);
     expect(template).toBeDefined();
     if (!template) return;
