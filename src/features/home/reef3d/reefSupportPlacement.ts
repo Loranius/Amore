@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { ReefSurfaceSlotCandidate } from './reefSurfaceSlots';
+import { assessReefCoralSupportHit } from './reefCoralSurfaceRules';
 
 const DOWN = new THREE.Vector3(0, -1, 0);
 const ORIGIN = new THREE.Vector3();
@@ -187,6 +188,11 @@ export function raycastReefSupport(
  * around the coral is free of limestone. Sampling both cardinal and diagonal
  * offsets rejects roots that would technically sit on terrain while the coral
  * body still grows through an adjacent arch edge.
+ *
+ * Ecological surface rules are applied before the clearance test. In
+ * particular, the upper quarter and crater of the submarine volcano are a
+ * permanent no-grow zone, so slot allocation will choose another habitat
+ * instead of planting coral on the active summit.
  */
 export function raycastReefCoralTerrainSupport(
   terrainMeshes: readonly THREE.Mesh[],
@@ -197,6 +203,7 @@ export function raycastReefCoralTerrainSupport(
 ): THREE.Intersection | null {
   const terrainHit = raycastReefSupport(terrainMeshes, x, z, minNormalY);
   if (!terrainHit) return null;
+  if (!assessReefCoralSupportHit(terrainHit).allowed) return null;
 
   for (const [offsetX, offsetZ] of CORAL_ARCH_CLEARANCE_OFFSETS) {
     const blocker = raycastReefSupport(archMeshes, x + offsetX, z + offsetZ, -1);
