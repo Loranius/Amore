@@ -55,13 +55,6 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
-/**
- * Portal-facing reef scene.
- *
- * Production diagnostics stay available as data attributes for acceptance and
- * automated checks, but they are no longer part of the visual experience.
- * The user sees the generated reef in its own underwater world, not a lab card.
- */
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
   const reducedMotion = useReducedMotion();
@@ -90,10 +83,6 @@ export default function ReefPreviewScene() {
   }
 
   const { build, diagnostics } = portal.preview;
-  // Reef acceptance must describe the generated reef, not the decorative
-  // underwater world around it. ReefObject exposes exact production geometry
-  // diagnostics when its accepted Three scene is created; the global probe is
-  // kept separately so world-level performance can still be inspected.
   const reportedDrawCalls = sceneState?.diagnostics.drawCalls ?? null;
   const reportedTriangles = sceneState?.diagnostics.triangles ?? null;
   const visibleColonyRanges = sceneState?.batches.reduce(
