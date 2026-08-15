@@ -4,13 +4,6 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// vite-plugin-pwa замінює ручний service-worker.js + бамп CACHE зі старого
-// репо: workbox сам версіонує прекеш і чистить старе при activate. Правило
-// «після зміни js/css бампни версію» більше не потрібне — білд робить це сам.
-
-// base для GitHub Pages: під проєктним репо сайт живе за /<repo>/, тож шлях
-// підставляє CI через BASE_PATH (див. .github/workflows/deploy.yml). Локально
-// й на кореневому домені лишається '/'.
 const base = process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
@@ -35,11 +28,12 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // game.html — окремий документ в iframe; хай кешується як навігація.
         maximumFileSizeToCacheInBytes: 5000000,
-        // Рифова GLB не має завантажуватись користувачам кристала або дерева
-        // під час встановлення service worker. Вона кешується після першого
-        // справжнього відкриття рифу.
+        globPatterns: [
+          '**/*.{html,webmanifest,ico,png,svg}',
+          'assets/index-*.js',
+          'assets/index-*.css',
+        ],
         globIgnores: [
           '**/models/school_of_fish_reef.glb',
           '**/models/coral_reef_set_cc0.glb',
@@ -51,16 +45,24 @@ export default defineConfig({
         ],
         runtimeCaching: [
           {
-            urlPattern: /\/(?:models\/(?:school_of_fish_reef|coral_reef_set_cc0)\.glb|textures\/reef\/[^/]+\.webp)$/,
+            urlPattern: /\/assets\/[^/]+\.(?:js|css)$/,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'reef-visual-assets',
-              expiration: { maxEntries: 8, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheName: 'app-lazy-chunks',
+              expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 30 },
               cacheableResponse: { statuses: [0, 200] },
             },
           },
           {
-            // Публічні фото зі Storage — cache-first, вони незмінні за URL.
+            urlPattern: /\/(?:models\/(?:school_of_fish_reef|coral_reef_set_cc0)\.glb|models\/glow_whale_native\/part-\d+\.txt|textures\/reef\/[^/]+\.webp|assets\/reef\/volcano\/[^/]+\.webp)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'reef-visual-assets',
+              expiration: { maxEntries: 32, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             urlPattern: /\/storage\/v1\/object\/public\//,
             handler: 'CacheFirst',
             options: {
@@ -72,22 +74,6 @@ export default defineConfig({
       },
     }),
   ],
-  // ── Локальний проксі до Supabase ────────────────────────────
-  // Порожня змінна — і тут нічого немає: у CI та в продакшені сторінка йде до
-  // Supabase напряму, як і йшла.
-  //
-  // Змінна потрібна там, де сторінка до мережі не дістає, а сам Node — дістає
-  // (пісочниця агента). Без неї весь браузерний набір падав локально на
-  // «waiting for button Діма»: логін просто не міг завантажити користувачів, і
-  // жодну справжню ваду з набору побачити було неможливо — лише в логах CI,
-  // по п'ятнадцять хвилин на спробу.
-  //
-  //   LOCAL_SUPABASE_PROXY=https://…supabase.co \
-  //   VITE_SUPABASE_URL=http://127.0.0.1:4173/__supabase npm run build
-  //
-  // Збірку з таким VITE_SUPABASE_URL не можна публікувати — адреса в ній
-  // локальна. Вона й не публікується: деплой збирається окремим кроком у CI зі
-  // справжніми змінними.
   ...(process.env.LOCAL_SUPABASE_PROXY?.trim()
     ? {
         preview: {
@@ -102,7 +88,6 @@ export default defineConfig({
         },
       }
     : {}),
-
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
