@@ -35,6 +35,23 @@ export type {
   ReefYearStructuresDiagnostics,
   ReefYearStructuresManifest,
 } from './yearStructures';
+export {
+  buildReefComposition,
+  scoreReefComposition,
+  REEF_COMPOSITION_ACCEPT_SCORE,
+  REEF_COMPOSITION_ATTEMPTS,
+  REEF_COMPOSITION_VERSION,
+  REEF_MIN_CORE_VISIBILITY,
+} from './composition';
+export type {
+  BuildReefCompositionInput,
+  ReefComposedYearStructure,
+  ReefCompositionDiagnostics,
+  ReefCompositionManifest,
+  ReefCompositionMetrics,
+  ReefCompositionScore,
+  ReefStructureCompositionDecision,
+} from './composition';
 export type {
   ReefGrowthArchPlacement,
   ReefGrowthOutcropPlacement,

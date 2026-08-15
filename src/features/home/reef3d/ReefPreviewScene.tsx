@@ -6,7 +6,7 @@ import { ReefYearStructuresObject } from './ReefYearStructuresObject';
 import { useReefPortalPreview } from './useReefPortalPreview';
 import './reefWorld.css';
 
-/** Portal-facing Phase 2 scene: deterministic core + permanent yearly geology. */
+/** Portal-facing Phase 3 scene: deterministic core + yearly geology + composition control. */
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
 
@@ -21,15 +21,15 @@ export default function ReefPreviewScene() {
       >
         <div>
           <h2>Риф не вдалося побудувати</h2>
-          <p>{portal.error?.message ?? 'Reef Core is unavailable.'}</p>
+          <p>{portal.error?.message ?? 'Reef composition is unavailable.'}</p>
         </div>
       </div>
     );
   }
 
-  const { core, yearStructures, asOf } = portal.preview;
+  const { core, yearStructures, composition, asOf } = portal.preview;
   const coreExtent = Math.max(core.platform.radiusX, core.platform.radiusZ);
-  const structureExtent = yearStructures.structures.reduce(
+  const structureExtent = composition.structures.reduce(
     (maximum, structure) => Math.max(
       maximum,
       Math.hypot(structure.center.x, structure.center.z) + structure.footprintRadius,
@@ -40,6 +40,7 @@ export default function ReefPreviewScene() {
   const cameraDistance = Math.max(6.6, sceneExtent * 1.72, core.dimensions.height * 1.4);
   const cameraHeight = Math.max(2.7, core.dimensions.height * 0.58, sceneExtent * 0.28);
   const counts = yearStructures.diagnostics.archetypeCounts;
+  const score = composition.diagnostics.score;
 
   return (
     <div
@@ -47,10 +48,11 @@ export default function ReefPreviewScene() {
       data-home-artifact-preview="reef"
       data-reef-preview="ready"
       data-reef-source="portal"
-      data-reef-scene="phase-2-year-structures"
-      data-reef-phase="2"
+      data-reef-scene="phase-3-composition"
+      data-reef-phase="3"
       data-reef-core-version={core.version}
       data-reef-year-structures-version={yearStructures.version}
+      data-reef-composition-version={composition.version}
       data-reef-couple-id={core.identity.coupleId}
       data-reef-as-of={asOf}
       data-reef-seed={core.identity.reefSeed}
@@ -59,6 +61,7 @@ export default function ReefPreviewScene() {
       data-reef-identity-signature={core.identity.identitySignature}
       data-reef-core-signature={core.signature}
       data-reef-year-structures-signature={yearStructures.signature}
+      data-reef-composition-signature={composition.signature}
       data-reef-days-together={core.age.daysTogether}
       data-reef-completed-years={core.age.completedYears}
       data-reef-max-years={core.age.maxYears}
@@ -70,13 +73,23 @@ export default function ReefPreviewScene() {
       data-reef-foundation-radius={coreExtent}
       data-reef-platform-radius-x={core.platform.radiusX}
       data-reef-platform-radius-z={core.platform.radiusZ}
-      data-reef-year-structures={yearStructures.diagnostics.structureCount}
+      data-reef-year-structures={composition.diagnostics.structureCount}
       data-reef-year-boulders={counts.BOULDER}
       data-reef-year-columns={counts.COLUMN}
       data-reef-year-ridges={counts.RIDGE}
       data-reef-year-arches={counts.ARCH}
-      data-reef-year-collision-free={yearStructures.diagnostics.collisionFree ? 'true' : 'false'}
-      data-reef-water-windows={yearStructures.diagnostics.waterWindowCount}
+      data-reef-year-collision-free={composition.diagnostics.collisionFree ? 'true' : 'false'}
+      data-reef-water-windows={composition.diagnostics.waterWindowCount}
+      data-reef-free-water={composition.diagnostics.freeWaterFraction}
+      data-reef-core-visibility={composition.diagnostics.coreVisibility}
+      data-reef-composition-adjusted={composition.diagnostics.adjustedStructureCount}
+      data-reef-composition-score={score.total}
+      data-reef-composition-core-visibility-score={score.coreVisibility}
+      data-reef-composition-open-water-score={score.openWater}
+      data-reef-composition-height-balance-score={score.heightBalance}
+      data-reef-composition-radial-balance-score={score.radialBalance}
+      data-reef-composition-silhouette-score={score.silhouette}
+      data-reef-composition-collision-score={score.collision}
       data-reef-map-outcrops={0}
       data-reef-schedule-terraces={0}
       data-reef-plan-fish-logical={0}
@@ -103,7 +116,7 @@ export default function ReefPreviewScene() {
       >
         <ReefCoreStage core={core} sceneExtent={sceneExtent}>
           <ReefCoreObject core={core} />
-          <ReefYearStructuresObject core={core} manifest={yearStructures} />
+          <ReefYearStructuresObject core={core} manifest={composition} />
         </ReefCoreStage>
       </Canvas>
     </div>

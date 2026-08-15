@@ -1,6 +1,10 @@
 import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
-import type { ReefCoreManifest, ReefYearStructure, ReefYearStructuresManifest } from '@/engine/species/reef';
+import type {
+  ReefCompositionManifest,
+  ReefCoreManifest,
+  ReefYearStructure,
+} from '@/engine/species/reef';
 
 function rockGeometry(structure: ReefYearStructure) {
   const geometry = new THREE.IcosahedronGeometry(1, 2);
@@ -47,7 +51,12 @@ function ridgeGeometry(structure: ReefYearStructure) {
     const y = position.getY(i);
     const z = position.getZ(i);
     const crest = 1 - Math.abs(x) * 0.72;
-    position.setXYZ(i, x, y * (0.7 + crest * 0.45) + Math.sin(x * 7 + phase) * 0.08, z + structure.shape.skew * x * 0.15);
+    position.setXYZ(
+      i,
+      x,
+      y * (0.7 + crest * 0.45) + Math.sin(x * 7 + phase) * 0.08,
+      z + structure.shape.skew * x * 0.15,
+    );
   }
   position.needsUpdate = true;
   geometry.computeVertexNormals();
@@ -91,16 +100,41 @@ function YearMesh({ structure, material }: { structure: ReefYearStructure; mater
   const scale: [number, number, number] = isArch
     ? [growth, growth, growth]
     : [structure.shape.width * 0.5 * growth, scaleY, structure.shape.depth * 0.5 * growth];
-  const y = isArch ? 0 : isBoulder ? structure.shape.height * 0.42 * growth : structure.shape.height * 0.5 * growth;
-  return <mesh geometry={geometry} material={material} position={[structure.center.x, y, structure.center.z]} rotation={[0, structure.rotationY, 0]} scale={scale} castShadow={structure.yearIndex <= 18} receiveShadow />;
+  const y = isArch
+    ? 0
+    : isBoulder
+      ? structure.shape.height * 0.42 * growth
+      : structure.shape.height * 0.5 * growth;
+  return (
+    <mesh
+      geometry={geometry}
+      material={material}
+      position={[structure.center.x, y, structure.center.z]}
+      rotation={[0, structure.rotationY, 0]}
+      scale={scale}
+      castShadow={structure.yearIndex <= 18}
+      receiveShadow
+    />
+  );
 }
 
-export function ReefYearStructuresObject({ core, manifest }: { core: ReefCoreManifest; manifest: ReefYearStructuresManifest }) {
-  const material = useMemo(() => new THREE.MeshStandardMaterial({ color: '#5d6157', roughness: 0.96, metalness: 0.01 }), []);
+export function ReefYearStructuresObject({
+  core,
+  manifest,
+}: {
+  core: ReefCoreManifest;
+  manifest: ReefCompositionManifest;
+}) {
+  const material = useMemo(
+    () => new THREE.MeshStandardMaterial({ color: '#5d6157', roughness: 0.96, metalness: 0.01 }),
+    [],
+  );
   useEffect(() => () => material.dispose(), [material]);
   return (
     <group position={[0, -core.platform.thickness * 0.52, 0]}>
-      {manifest.structures.map((structure) => <YearMesh key={structure.id} structure={structure} material={material} />)}
+      {manifest.structures.map((structure) => (
+        <YearMesh key={structure.id} structure={structure} material={material} />
+      ))}
     </group>
   );
 }

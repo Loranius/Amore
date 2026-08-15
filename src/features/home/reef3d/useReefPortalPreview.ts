@@ -4,9 +4,11 @@ import { useUsers } from '@/features/_shared/useUsers';
 import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
 import {
+  buildReefComposition,
   buildReefCore,
   buildReefYearStructures,
   reefDaysTogether,
+  type ReefCompositionManifest,
   type ReefCoreManifest,
   type ReefYearStructuresManifest,
 } from '@/engine/species/reef';
@@ -17,6 +19,7 @@ const COUPLE_TIME_ZONE = 'Europe/Kyiv';
 export interface ReefPortalPreview {
   core: ReefCoreManifest;
   yearStructures: ReefYearStructuresManifest;
+  composition: ReefCompositionManifest;
   asOf: string;
 }
 
@@ -55,7 +58,7 @@ function useRelationshipStartDate() {
   });
 }
 
-/** Phase 2 portal adapter: chronological core + permanent yearly geology only. */
+/** Phase 3 portal adapter: deterministic core + yearly geology + append-only composition. */
 export function useReefPortalPreview(): UseReefPortalPreviewResult {
   const startDateQuery = useRelationshipStartDate();
   const users = useUsers();
@@ -103,8 +106,9 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
         daysTogether,
       });
       const yearStructures = buildReefYearStructures({ core });
+      const composition = buildReefComposition({ core, yearStructures });
       return {
-        preview: { core, yearStructures, asOf },
+        preview: { core, yearStructures, composition, asOf },
         isPending: false,
         error: null,
       };
