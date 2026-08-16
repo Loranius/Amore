@@ -46,6 +46,9 @@ import '@/features/plans/plansReferencePaletteStage1.css';
 // Етап 2: темне тоноване скло замість великих фіолетових блоків —
 // тонші edges, внутрішні highlights, слабші separators і глибший material feel.
 import '@/features/plans/plansReferenceGlassStage2.css';
+// Етап 3: картки планів отримують справжню faceted crystal edge,
+// компактний badge, сильнішу категорійну ідентичність і тихіший chevron.
+import '@/features/plans/plansReferenceCardsStage3.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
