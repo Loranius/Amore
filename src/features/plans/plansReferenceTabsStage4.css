@@ -1,0 +1,210 @@
+/* ============================================================
+   Plans — Reference UI stage 4: faceted segmented control
+   ------------------------------------------------------------
+   Етап 4 UI-pass. Фокус — верхній перемикач «Події / Календар».
+   Активна половина більше не пастельна capsule: центр стає темнішим,
+   а світло концентрується на кристалічних торцях, внутрішніх facet-лініях
+   і тонкому верхньому highlight. Геометрію та поведінку не змінюємо.
+   ============================================================ */
+
+.plans-module {
+  --pm-s4-tab-deep: #2a1737;
+  --pm-s4-tab-mid: #6e3d86;
+  --pm-s4-tab-violet: #a45bc1;
+  --pm-s4-tab-light: #dda8f1;
+  --pm-s4-tab-edge: rgba(239, 210, 252, .72);
+}
+
+/* ── 1. Зовнішнє темне скло ─────────────────────────────── */
+
+.plans-module .pm-tabs {
+  border-color: rgba(204, 181, 223, .095);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.026), transparent 30%),
+    radial-gradient(ellipse at 50% -55%, rgba(157, 98, 188, .05), transparent 60%),
+    linear-gradient(180deg, rgba(22, 14, 37, .86), rgba(8, 5, 17, .84));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    inset 0 -1px 0 rgba(72,49,90,.11),
+    0 9px 24px rgba(2,0,7,.25);
+}
+
+.plans-module .pm-tab:not([aria-selected='true']) {
+  color: rgba(214, 198, 227, .68);
+  text-shadow: 0 1px 0 rgba(0,0,0,.16);
+}
+
+.plans-module .pm-tab:not([aria-selected='true']) .pm-tab-count {
+  color: rgba(222, 205, 234, .72);
+  border-color: rgba(213, 190, 229, .055);
+  background: rgba(124, 88, 148, .07);
+}
+
+/* ── 2. Активний сегмент: темний crystal core ───────────── */
+
+.plans-module .pm-tab[aria-selected='true'] {
+  overflow: hidden;
+  color: #f7edfb;
+  border-color: rgba(231, 195, 246, .36);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.105), transparent 19%),
+    radial-gradient(ellipse at 50% -14%, rgba(234, 192, 249, .22), transparent 41%),
+    linear-gradient(180deg,
+      rgba(139, 79, 164, .92) 0%,
+      rgba(104, 57, 128, .94) 43%,
+      rgba(69, 36, 88, .96) 76%,
+      rgba(48, 25, 63, .97) 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.42),
+    inset 0 -1px 0 rgba(28,13,39,.5),
+    inset 0 0 22px rgba(223,158,244,.07),
+    0 0 0 1px rgba(197, 133, 224, .08),
+    0 0 13px rgba(188, 103, 219, .11);
+  text-shadow: 0 1px 0 rgba(33,11,45,.28);
+}
+
+/* Центральний facet sheen: вузький діагональний відблиск замість
+   суцільної пастельної засвітки. */
+.plans-module .pm-tab[aria-selected='true'] {
+  background-image:
+    linear-gradient(118deg, transparent 18%, rgba(255,255,255,.07) 31%, transparent 43%),
+    linear-gradient(242deg, transparent 57%, rgba(226,174,244,.05) 68%, transparent 80%),
+    linear-gradient(180deg, rgba(255,255,255,.105), transparent 19%),
+    radial-gradient(ellipse at 50% -14%, rgba(234, 192, 249, .22), transparent 41%),
+    linear-gradient(180deg,
+      rgba(139, 79, 164, .92) 0%,
+      rgba(104, 57, 128, .94) 43%,
+      rgba(69, 36, 88, .96) 76%,
+      rgba(48, 25, 63, .97) 100%
+    );
+}
+
+.plans-module .pm-tab[aria-selected='true'] .pm-tab-count {
+  color: #f9effd;
+  border-color: rgba(244, 218, 255, .18);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.16), rgba(255,255,255,.06));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.14),
+    0 0 6px rgba(220, 156, 241, .055);
+}
+
+/* ── 3. Faceted crystal caps ─────────────────────────────── */
+
+.plans-module .pm-tab[aria-selected='true']::before,
+.plans-module .pm-tab[aria-selected='true']::after {
+  top: 1px;
+  bottom: 1px;
+  width: 30px;
+  opacity: .98;
+  border: 0;
+  filter:
+    drop-shadow(0 0 4px rgba(224, 165, 246, .18))
+    drop-shadow(0 0 9px rgba(157, 84, 188, .08));
+}
+
+.plans-module .pm-tab[aria-selected='true']::before {
+  left: 0;
+  clip-path: polygon(
+    100% 0,
+    55% 6%,
+    73% 18%,
+    42% 34%,
+    64% 48%,
+    39% 64%,
+    64% 82%,
+    100% 100%,
+    29% 92%,
+    0 70%,
+    17% 50%,
+    0 27%,
+    31% 7%
+  );
+  background:
+    linear-gradient(63deg, transparent 0 42%, rgba(255,255,255,.5) 43% 48%, transparent 49% 100%),
+    linear-gradient(126deg, rgba(255,255,255,.72) 0 11%, transparent 12% 100%),
+    linear-gradient(235deg, transparent 0 54%, rgba(224,166,244,.26) 55% 69%, transparent 70% 100%),
+    linear-gradient(112deg,
+      #f0d2fb 0%,
+      #c980e5 18%,
+      #82459c 43%,
+      #5c2d72 64%,
+      #a85fc3 82%,
+      #e8bdf5 100%
+    );
+}
+
+.plans-module .pm-tab[aria-selected='true']::after {
+  right: 0;
+  clip-path: polygon(
+    0 0,
+    45% 6%,
+    27% 18%,
+    58% 34%,
+    36% 48%,
+    61% 64%,
+    36% 82%,
+    0 100%,
+    71% 92%,
+    100% 70%,
+    83% 50%,
+    100% 27%,
+    69% 7%
+  );
+  background:
+    linear-gradient(297deg, transparent 0 42%, rgba(255,255,255,.5) 43% 48%, transparent 49% 100%),
+    linear-gradient(234deg, rgba(255,255,255,.72) 0 11%, transparent 12% 100%),
+    linear-gradient(125deg, transparent 0 54%, rgba(224,166,244,.26) 55% 69%, transparent 70% 100%),
+    linear-gradient(248deg,
+      #f0d2fb 0%,
+      #c980e5 18%,
+      #82459c 43%,
+      #5c2d72 64%,
+      #a85fc3 82%,
+      #e8bdf5 100%
+    );
+}
+
+/* ── 4. Interaction: світло підсилюється по facets, не по core ─ */
+
+.plans-module .pm-tab[aria-selected='true']:hover,
+.plans-module .pm-tab[aria-selected='true']:focus-visible {
+  border-color: rgba(236, 202, 250, .44);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.47),
+    inset 0 -1px 0 rgba(28,13,39,.5),
+    inset 0 0 24px rgba(226,163,246,.08),
+    0 0 15px rgba(194,109,224,.14);
+}
+
+.plans-module .pm-tab[aria-selected='true']:hover::before,
+.plans-module .pm-tab[aria-selected='true']:hover::after,
+.plans-module .pm-tab[aria-selected='true']:focus-visible::before,
+.plans-module .pm-tab[aria-selected='true']:focus-visible::after {
+  filter:
+    drop-shadow(0 0 5px rgba(229, 174, 248, .23))
+    drop-shadow(0 0 10px rgba(162, 88, 194, .1));
+}
+
+@media (max-width: 430px) {
+  .plans-module .pm-tab[aria-selected='true']::before,
+  .plans-module .pm-tab[aria-selected='true']::after {
+    width: 27px;
+  }
+}
+
+@media (max-width: 370px) {
+  .plans-module .pm-tab[aria-selected='true']::before,
+  .plans-module .pm-tab[aria-selected='true']::after {
+    width: 23px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans-module .pm-tab,
+  .plans-module .pm-tab::before,
+  .plans-module .pm-tab::after {
+    transition: none;
+  }
+}
