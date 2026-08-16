@@ -23,6 +23,7 @@ import { ReefDistantEcosystem } from './ReefDistantEcosystem';
 import {
   reefCameraFrameForAspect,
   REEF_ATMOSPHERE_PROFILE,
+  REEF_CAMERA_ORBIT_PROFILE,
   REEF_LIGHTING_PROFILE,
   REEF_SCENE_PALETTE,
   type ReefCameraFrame,
@@ -117,6 +118,8 @@ export function ReefStage({
         dampingFactor={0.06}
         rotateSpeed={0.58}
         zoomSpeed={0.7}
+        autoRotate={!reducedMotion}
+        autoRotateSpeed={REEF_CAMERA_ORBIT_PROFILE.autoRotateSpeed}
         maxDistance={cameraFrame.maxDistance}
         minDistance={cameraFrame.minDistance}
         minPolarAngle={cameraFrame.minPolarAngle}
