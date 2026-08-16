@@ -1,0 +1,1193 @@
+<title>Плани як карта: літаючі блоки</title>
+<style>
+  /* ============================================================
+     Шаблон «Карта планів»: список планів і сторінка плану без скролу.
+     ------------------------------------------------------------
+     Референс — знімок власника: окремі блоки, що висять у темряві й
+     з'єднані світними нитками. Форма звідти, кольори — ні: палітра взята з
+     `worldTheme.css`, кольори категорій — з `planConstants.ts`, підписи —
+     з живих екранів (`PlanDetailsPage.tsx`), щоб макет можна було класти
+     поруч із порталом і порівнювати.
+
+     Головне, що тут перевіряється: чи вміщається модуль в один екран без
+     скролу. Тому кожен блок має стелю вмісту, а не «скільки прийде».
+     ============================================================ */
+
+  :root {
+    --page-bg: #f4f1f7;
+    --page-panel: #ffffff;
+    --page-ink: #241c33;
+    --page-muted: #6b6280;
+    --page-line: rgba(60, 44, 88, 0.14);
+    --page-accent: #7b4fa8;
+
+    /* Токени порталу — не змінювати без worldTheme.css. */
+    --world-bg: #221a33;
+    --world-bg-deep: #140f1f;
+    --world-surface: rgba(42, 33, 64, 0.82);
+    --world-surface-soft: rgba(255, 255, 255, 0.07);
+    --world-recess: rgba(9, 6, 16, 0.42);
+    --world-primary: #c9a0e6;
+    --world-accent: #dcb6f5;
+    --world-accent-soft: #b7a6d2;
+    --world-text: #f6efff;
+    --world-text-muted: #c9b8e4;
+    --world-border: rgba(214, 190, 246, 0.16);
+    --world-border-active: rgba(220, 182, 245, 0.42);
+    --world-success: #7fd0a6;
+    --world-warning: #e8c26a;
+    --world-shadow: rgba(6, 4, 12, 0.5);
+
+    --font: 'Nunito', ui-rounded, 'Segoe UI Variable', system-ui, sans-serif;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-bg: #17131f;
+      --page-panel: #201a2c;
+      --page-ink: #f1ecf8;
+      --page-muted: #a397b8;
+      --page-line: rgba(214, 190, 246, 0.16);
+      --page-accent: #dcb6f5;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --page-bg: #17131f;
+    --page-panel: #201a2c;
+    --page-ink: #f1ecf8;
+    --page-muted: #a397b8;
+    --page-line: rgba(214, 190, 246, 0.16);
+    --page-accent: #dcb6f5;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: var(--font);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 32px 20px 64px; display: flex; flex-direction: column; gap: 28px; }
+  header { display: flex; flex-direction: column; gap: 10px; max-width: 64ch; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--page-muted); font-weight: 700; }
+  h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; text-wrap: balance; font-weight: 800; }
+  h2 { margin: 0 0 2px; font-size: 17px; font-weight: 800; }
+  p { margin: 0; color: var(--page-muted); }
+  header p { font-size: 16px; }
+
+  .split { display: grid; grid-template-columns: minmax(0, auto) minmax(320px, 1fr); gap: 36px; align-items: start; }
+  @media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
+
+  /* ── Телефон ───────────────────────────────────────────── */
+
+  .device-col { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+  .device-fit { width: 100%; display: flex; justify-content: center; }
+
+  .phone {
+    width: 412px; height: 915px; flex: none;
+    border-radius: 40px; padding: 6px;
+    background: linear-gradient(160deg, #3a3050, #14101d);
+    box-shadow: 0 30px 70px rgba(12, 8, 24, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    transform-origin: top center;
+  }
+
+  .screen {
+    position: relative; width: 100%; height: 100%;
+    border-radius: 34px; overflow: hidden;
+    background: radial-gradient(120% 80% at 50% 12%, var(--world-bg), var(--world-bg-deep) 78%);
+    color: var(--world-text);
+    isolation: isolate;
+  }
+
+  /* Фон: та сама зала й той самий кристал, що в решті шаблонів модуля. */
+  .backdrop { position: absolute; inset: 0; filter: blur(5px); transform: scale(1.04); }
+
+  .hall {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(88% 52% at 50% 74%, rgba(150, 120, 196, 0.3), transparent 72%),
+      linear-gradient(180deg, rgba(58, 45, 88, 0.5) 0%, rgba(48, 37, 74, 0.38) 46%, rgba(16, 11, 26, 0.92) 88%);
+  }
+  .hall::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 34%;
+    background: linear-gradient(180deg, transparent, rgba(9, 6, 16, 0.78));
+  }
+
+  .stage { position: absolute; inset: 0; perspective: 1000px; perspective-origin: 50% 62%; }
+  .world {
+    position: absolute; left: 50%; top: 80%; width: 0; height: 0;
+    transform-style: preserve-3d;
+    transform: rotateX(8deg) rotateY(var(--turn, -45deg));
+    transition: transform 1100ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .prism { position: absolute; transform-style: preserve-3d; }
+  .facet {
+    position: absolute; left: -27px; top: -330px; width: 54px; height: 330px;
+    background: linear-gradient(174deg, rgba(255,255,255,.9), rgba(226,209,247,.72) 42%, rgba(178,152,214,.62));
+    transform: rotateY(var(--a)) translateZ(47px);
+    box-shadow: inset 0 0 24px rgba(255,255,255,.5);
+  }
+  .facet:nth-child(even) { background: linear-gradient(174deg, rgba(240,231,252,.82), rgba(197,174,232,.66) 46%, rgba(150,126,188,.6)); }
+  .tip {
+    position: absolute; left: -27px; top: -434px; width: 54px; height: 104px;
+    background: linear-gradient(184deg, rgba(255,255,255,.94), rgba(214,194,243,.7));
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    transform: rotateY(var(--a)) translateZ(47px) rotateX(26deg);
+    transform-origin: 50% 100%;
+  }
+  .tip:nth-child(even) { background: linear-gradient(184deg, rgba(236,226,252,.86), rgba(186,162,224,.66)); }
+
+  /* Затемнення: блоки світяться лише тому, що за ними темно. */
+  .wash {
+    position: absolute; inset: 0; pointer-events: none;
+    background:
+      radial-gradient(120% 74% at 50% 78%, rgba(11, 8, 19, 0.66), rgba(11, 8, 19, 0.44)),
+      radial-gradient(120% 100% at 50% 50%, transparent 30%, rgba(9, 6, 16, 0.5));
+  }
+
+  /* ── Шапка екрана ──────────────────────────────────────── */
+
+  .topbar {
+    position: absolute; z-index: 4; left: 16px; right: 16px; top: 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    height: 34px;
+  }
+  .topbar button {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 0; border: 0; background: none;
+    color: var(--world-accent); font: inherit; font-size: 16px; font-weight: 800; cursor: pointer;
+  }
+  .topbar button:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 3px; border-radius: 8px; }
+  .topbar .count { font-size: 12px; font-weight: 700; color: var(--world-text-muted); font-variant-numeric: tabular-nums; }
+  .topbar svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ── Полотно карти ─────────────────────────────────────── */
+
+  .map {
+    position: absolute; z-index: 2;
+    left: 14px; right: 14px; top: 58px; bottom: 102px;
+    display: flex; flex-direction: column; gap: 10px;
+    /* Блоки розходяться по всій висоті, а не збираються догори: карта має
+       займати екран, інакше внизу лишається пляма порожнечі, яку читають як
+       «щось не завантажилось». */
+    justify-content: space-between;
+  }
+  .map[hidden] { display: none; }
+
+  /* Нитки живуть ПІД блоками: там, де крива входить у блок, вона зникає, і
+     виходить те саме, що на знімку, — нитка тримає блок, а не перекреслює. */
+  .threads { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: visible; }
+
+  /* ── Блок ──────────────────────────────────────────────── */
+
+  /* Кут реєструється, щоб обід можна було крутити анімацією: без
+     @property конічний градієнт не інтерполюється й обід стрибає. */
+  @property --rim { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+
+  .blob {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column; gap: 7px;
+    padding: 11px 13px;
+    border: 1px solid var(--world-border);
+    border-radius: 26px 36px 28px 34px / 32px 26px 36px 28px;
+    background:
+      linear-gradient(158deg, rgba(74, 56, 116, 0.62), rgba(34, 25, 56, 0.78)),
+      var(--world-surface);
+    box-shadow:
+      0 0 34px rgba(176, 128, 232, 0.24),
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 16px 34px var(--world-shadow);
+    backdrop-filter: blur(7px);
+    color: var(--world-text);
+    text-align: left; font: inherit;
+    animation: float 7s ease-in-out infinite;
+    animation-delay: var(--drift, 0s);
+  }
+  .blob:nth-child(even) { border-radius: 36px 26px 34px 28px / 26px 34px 28px 36px; }
+
+  /* Світний обід: тонке кільце конічним градієнтом, вирізане маскою. Саме
+     він робить із картки «блок у темряві», а не рамка й не тінь. */
+  .blob::after {
+    content: ''; position: absolute; inset: 0; z-index: 2;
+    border-radius: inherit; padding: 1.4px; pointer-events: none;
+    background: conic-gradient(from var(--rim),
+      rgba(220, 182, 245, 0.24) 0deg,
+      rgba(247, 231, 255, 1) 42deg,
+      rgba(201, 160, 230, 0.46) 96deg,
+      rgba(220, 182, 245, 0.2) 168deg,
+      rgba(244, 224, 255, 0.92) 236deg,
+      rgba(180, 140, 224, 0.36) 300deg,
+      rgba(220, 182, 245, 0.24) 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: rim 18s linear infinite;
+    animation-delay: var(--drift, 0s);
+  }
+
+  @keyframes rim { to { --rim: 360deg; } }
+  @keyframes float {
+    0%, 100% { translate: 0 0; }
+    50% { translate: 0 -4px; }
+  }
+
+  /* План під пальцем: блок підходить ближче, обід яскравішає. */
+  .blob[data-tap="true"] { cursor: pointer; transition: translate 180ms ease, box-shadow 180ms ease; }
+  .blob[data-tap="true"]:hover { translate: 0 -3px; box-shadow: 0 0 34px rgba(196, 148, 245, 0.26), inset 0 1px 0 rgba(255,255,255,.12), 0 20px 40px var(--world-shadow); }
+  .blob:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 3px; }
+
+  .blob-head { display: flex; align-items: center; gap: 10px; }
+  .blob-icon {
+    flex: none; width: 34px; height: 34px; display: grid; place-items: center;
+    border: 1px solid rgba(220, 182, 245, 0.3); border-radius: 12px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--plan-color, var(--world-accent));
+  }
+  .blob-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .blob-title { font-size: 14px; font-weight: 800; }
+  .blob-note { font-size: 12px; color: var(--world-text-muted); }
+  /* Лічильник у заголовку блока. Окремий клас, а не `.blob-note` з
+     `margin-left:auto`: тим самим класом підписані й багаторядкові підказки,
+     і `nowrap` розірвав би їх. Виміряно на макеті — «0 з 3» стало стовпчиком
+     із трьох рядків. */
+  .blob-count {
+    flex: none; margin-left: auto; white-space: nowrap;
+    font-size: 12px; font-weight: 700; color: var(--world-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Сторінка плану ────────────────────────────────────── */
+
+  .hero { gap: 6px; padding: 13px 15px 14px; }
+  .hero-cat {
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+    font-weight: 800; color: var(--plan-color, var(--world-accent));
+  }
+  /* Дві стелі, які тримають висоту блока назви: назва — два рядки, опис —
+     один. Довше обрізається, а не розсуває карту. */
+  .hero h2 {
+    margin: 0; font-size: 20px; line-height: 1.16; font-weight: 800;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+  .hero p {
+    font-size: 12.5px; color: var(--world-text-muted);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .hero-row { display: flex; align-items: flex-start; gap: 11px; padding-right: 30px; }
+  .hero-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .hero .blob-icon { width: 42px; height: 42px; border-radius: 15px; }
+  .hero .blob-icon svg { width: 22px; height: 22px; }
+  .edit {
+    position: absolute; z-index: 3; right: 12px; top: 12px;
+    width: 32px; height: 32px; display: grid; place-items: center;
+    border: 1px solid rgba(220, 182, 245, 0.32); border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06); color: var(--world-accent); cursor: pointer;
+  }
+  .edit svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Ряд із двох блоків. Ширини різні в кожному ряду, а правий блок зсунуто
+     вниз — рівна сітка читається як таблиця, а карта не таблиця.
+
+     Чому ряди, а не два незалежні стовпці: висота ряду — це висота вищого
+     блока, і її видно наперед. Два вільні стовпці рахують висоту кожен свій,
+     і перший же довгий список їде під док. Перша спроба так і зробила —
+     виміряно на макеті: 830 px змісту в 739 px екрана. */
+  .row {
+    display: grid; gap: 11px; align-items: start;
+    grid-template-columns: var(--split, 1fr 1fr);
+  }
+  .row > :nth-child(2) { margin-top: var(--drop, 16px); }
+
+  .fact-value { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .fact-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pill {
+    align-self: flex-start;
+    padding: 2px 10px; border-radius: 999px;
+    background: rgba(127, 208, 166, 0.16); color: var(--world-success);
+    font-size: 12px; font-weight: 800;
+  }
+  .pill[data-tone="soon"] { background: rgba(220, 182, 245, 0.16); color: var(--world-accent); }
+  .pill[data-tone="idle"] { background: rgba(255, 255, 255, 0.07); color: var(--world-text-muted); }
+
+  /* Список підготовки. Стеля — чотири рядки: п'ятий уже просить скрол, а
+     скрол — це те, від чого ця карта й тікає. */
+  .checks { display: flex; flex-direction: column; gap: 5px; }
+  .check {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: 999px;
+    border: 1px solid var(--world-border);
+    background: var(--world-recess);
+    font-size: 12.5px;
+  }
+  /* Пункт — один рядок. Довший обрізається: два рядки на пункт означають, що
+     стеля в чотири пункти більше нічого не гарантує. */
+  .check span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .check i {
+    flex: none; width: 14px; height: 14px; border-radius: 50%;
+    border: 1.6px solid rgba(220, 182, 245, 0.5);
+  }
+  .check[data-done="true"] i { border-color: var(--world-success); background: rgba(127, 208, 166, 0.28); }
+  .check[data-done="true"] span { color: var(--world-text-muted); text-decoration: line-through; }
+  .ghost {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 7px 10px; border-radius: 999px;
+    border: 1px dashed rgba(220, 182, 245, 0.34);
+    background: none; color: var(--world-text-muted);
+    font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .ghost svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+  .ghost:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
+  .ghost--box { flex-direction: column; gap: 5px; padding: 13px 10px; border-radius: 18px; }
+  .ghost--box svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .more { font-size: 12px; color: var(--world-text-muted); padding-left: 4px; }
+
+  /* Бюджет: кільце показує зібране, а не «скільки лишилось», — так само,
+     як у скарбничці. Без бюджету кільце порожнє й нічого не обіцяє. */
+  .money { display: flex; align-items: center; gap: 10px; }
+  .ring {
+    position: relative;
+    flex: none; width: 46px; height: 46px; border-radius: 50%;
+    background: conic-gradient(var(--world-accent) calc(var(--fill, 0) * 1%), rgba(255, 255, 255, 0.09) 0);
+    display: grid; place-items: center;
+  }
+  .ring::after {
+    content: ''; width: 33px; height: 33px; border-radius: 50%;
+    background: rgba(28, 20, 46, 0.92);
+    box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.4);
+  }
+  /* Відсоток центрується сам, а не «десь у кільці»: без inset абсолютний
+     елемент стає там, де його лишив потік, і на макеті 64 % з'їхали ліворуч
+     на самий обід. */
+  .ring b {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    font-size: 12px; font-weight: 800;
+    color: var(--world-text); font-variant-numeric: tabular-nums;
+  }
+  .money-copy { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .money-copy .fact-value { font-size: 15px; }
+  .money-copy .blob-note { font-size: 11.5px; white-space: nowrap; }
+
+  .links { display: flex; flex-direction: column; gap: 5px; }
+  .link-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-radius: 999px;
+    border: 1px solid var(--world-border); background: var(--world-recess);
+    font-size: 12.5px;
+  }
+  .link-row svg { width: 14px; height: 14px; flex: none; fill: none; stroke: var(--world-accent-soft); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .link-row em { margin-left: auto; font-style: normal; font-size: 12px; color: var(--world-text-muted); font-variant-numeric: tabular-nums; }
+
+  /* Стан: чотири робочі статуси з `planConstants.ts` — стільки ж поділок,
+     скільки й станів, а не декоративні смужки. */
+  .status-now {
+    display: flex; align-items: center; gap: 9px;
+    padding: 7px 12px; border-radius: 999px;
+    border: 1px solid var(--world-border-active); background: rgba(201, 160, 230, 0.14);
+    font-size: 13.5px; font-weight: 800;
+  }
+  .status-now i { width: 10px; height: 10px; border-radius: 50%; background: var(--world-accent); }
+  .steps { display: flex; gap: 5px; }
+  .steps span { flex: 1; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.09); }
+  .steps span[data-on="true"] { background: linear-gradient(90deg, var(--world-primary), var(--world-accent)); }
+
+  /* ── Карта планів ──────────────────────────────────────── */
+
+  .plan-blob { gap: 6px; padding: 12px 14px; }
+  .plan-blob .blob-cat {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 800; color: var(--plan-color, var(--world-accent));
+  }
+  .plan-blob .blob-cat svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .plan-blob h3 { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.22; }
+  .plan-blob .when { font-size: 12px; color: var(--world-text-muted); font-variant-numeric: tabular-nums; }
+  .plan-blob .when b { color: var(--world-accent); font-weight: 800; }
+  .plan-blob[data-overdue="true"] .when b { color: #e2707f; }
+
+  .map-hero h3 { font-size: 20px; line-height: 1.18; }
+  .map-hero .blob-icon { width: 42px; height: 42px; border-radius: 15px; }
+  .map-hero .blob-icon svg { width: 21px; height: 21px; }
+  .bar { height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.09); overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--world-primary), var(--world-accent)); }
+
+  .ideas { display: flex; flex-wrap: wrap; gap: 7px; }
+  .idea {
+    padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--world-border); background: var(--world-recess);
+    font-size: 12.5px; font-weight: 700; color: var(--world-text);
+    cursor: pointer;
+  }
+  .idea::before {
+    content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 7px;
+    border-radius: 50%; background: var(--plan-color, var(--world-accent));
+    vertical-align: middle;
+  }
+  .idea--rest { color: var(--world-text-muted); border-style: dashed; }
+  .idea--rest::before { display: none; }
+
+  /* Кнопка «+ План» — блок карти. Форма й обід ті самі, колір інший: єдина
+     дія модуля має бути видно з-поміж шести блоків, не читаючи їх. */
+  .add {
+    align-items: center; justify-content: center; gap: 4px;
+    padding: 12px 6px; cursor: pointer;
+    background: linear-gradient(150deg, rgba(201, 160, 230, 0.94), rgba(150, 95, 189, 0.92));
+    color: #1b1226; font-size: 13px; font-weight: 800;
+    border-color: var(--world-border-active);
+  }
+  .add svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
+
+  .rest {
+    align-self: center; margin-top: 2px;
+    padding: 7px 16px; border-radius: 999px;
+    border: 1px dashed rgba(220, 182, 245, 0.34); background: none;
+    color: var(--world-text-muted); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+
+  /* ── Кнопка дії й док ──────────────────────────────────── */
+
+  .dock {
+    position: absolute; z-index: 5; left: 14px; right: 14px; bottom: 16px;
+    display: flex; align-items: center; gap: 4px; padding: 8px;
+    border-radius: 26px; border: 1px solid var(--world-border);
+    background: rgba(30, 22, 46, 0.86);
+    backdrop-filter: blur(8px);
+  }
+  .dock button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 9px 4px; border: 0; border-radius: 18px; background: none;
+    color: var(--world-text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .dock button[aria-current="page"] { background: rgba(201, 160, 230, 0.22); color: var(--world-accent); }
+  .dock svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .dock .heart { flex: 0 0 54px; }
+  .dock .heart svg { width: 26px; height: 26px; fill: var(--world-primary); stroke: none; }
+
+  /* ── Керування макетом ─────────────────────────────────── */
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .controls button {
+    padding: 9px 15px; border-radius: 999px; border: 1px solid var(--page-line);
+    background: var(--page-panel); color: var(--page-ink);
+    font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .controls button:hover { border-color: var(--page-accent); }
+  .controls button[aria-pressed="true"] { border-color: var(--page-accent); color: var(--page-accent); }
+  .controls button:focus-visible { outline: 2px solid var(--page-accent); outline-offset: 2px; }
+
+  /* ── Специфікація ──────────────────────────────────────── */
+
+  .spec { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+  .card {
+    border: 1px solid var(--page-line); border-radius: 16px;
+    background: var(--page-panel); padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 14px; color: var(--page-muted); }
+  ul.plain b { color: var(--page-ink); }
+  .flag { border-left: 3px solid var(--page-accent); padding-left: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .flag b { font-size: 14px; }
+  .flag p { font-size: 14px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: color-mix(in srgb, var(--page-accent) 10%, transparent); padding: 1px 5px; border-radius: 5px; color: var(--page-ink); }
+
+  .budget { display: flex; flex-direction: column; gap: 8px; }
+  .budget-row { display: grid; grid-template-columns: 132px minmax(0, 1fr) 52px; gap: 10px; align-items: center; font-size: 13px; }
+  .budget-row .rail { height: 10px; border-radius: 999px; background: color-mix(in srgb, var(--page-accent) 12%, transparent); overflow: hidden; }
+  .budget-row .rail i { display: block; height: 100%; background: var(--page-accent); }
+  .budget-row .num { font-family: var(--mono); text-align: right; color: var(--page-muted); font-variant-numeric: tabular-nums; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blob, .blob::after { animation: none; }
+    .world { transition-duration: 1ms; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">Шаблон модуля · Amore</span>
+    <h1>Плани як карта: літаючі блоки замість списку</h1>
+    <p>
+      Форма зі знімка власника: окремі блоки висять у темряві, з'єднані світними
+      нитками. Обидва екрани модуля — і карта планів, і сам план — уміщаються в
+      один екран без скролу. Кольори, підписи й дані — з порталу, не зі знімка.
+    </p>
+  </header>
+
+  <div class="split">
+    <section class="device-col">
+      <div class="device-fit">
+        <div class="phone" id="phone">
+          <div class="screen">
+            <div class="backdrop">
+              <div class="hall"></div>
+              <div class="stage"><div class="world" id="world"><div class="prism" id="prism"></div></div></div>
+            </div>
+            <div class="wash"></div>
+
+            <div class="topbar">
+              <button type="button" id="back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7"/></svg>
+                <span id="back-label">Карта планів</span>
+              </button>
+              <span class="count" id="top-count"></span>
+            </div>
+
+            <div class="map" id="map-list">
+              <svg class="threads" id="threads-list" aria-hidden="true"></svg>
+            </div>
+
+            <div class="map" id="map-plan" hidden>
+              <svg class="threads" id="threads-plan" aria-hidden="true"></svg>
+            </div>
+
+            <nav class="dock">
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v8H4v-8M3 8h18v4H3zM12 8V6a2.5 2.5 0 1 0-2.5 2.5M12 8V6a2.5 2.5 0 1 1 2.5 2.5M12 8v12"/></svg>
+                Вішлист
+              </button>
+              <button type="button" aria-current="page">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6l1.2 1.2L7.5 5M4 12l1.2 1.2L7.5 11M4 18l1.2 1.2L7.5 17"/></svg>
+                Плани
+              </button>
+              <button type="button" class="heart" aria-label="Головна">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13Z"/></svg>
+              </button>
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 9h9l2-7H7M9 19.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 19.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg>
+                Покупки
+              </button>
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>
+                Ще
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls" id="controls">
+        <button type="button" data-screen="list" aria-pressed="true">Карта планів</button>
+        <button type="button" data-screen="plan">Сторінка плану</button>
+        <button type="button" id="toggle-threads" aria-pressed="true">Нитки</button>
+      </div>
+    </section>
+
+    <section class="spec">
+      <div class="card">
+        <h2>Що змінює карта</h2>
+        <ul class="plain">
+          <li><b>Скрол зникає з обох екранів.</b> Сторінка плану була стовпчиком із чотирьох згорток — половину блоків доводилось діставати прокруткою. Тут усі шість видно одразу.</li>
+          <li><b>Згортки зникають разом зі скролом.</b> Якщо блок видно завжди, розкривати його нічим: підготовка, бюджет і зв'язки показують свій зміст, а не свій заголовок.</li>
+          <li><b>Нитки кажуть, що з чим пов'язане.</b> Від назви ростуть дві гілки: ліва — коли → підготовка → пов'язане, права — бюджет → де → стан. Це не декор: порядок ниток — це порядок, у якому план заповнюють. Сусіди в одному ряду нитки не мають — між ними одинадцять пікселів, і крива в такому вікні виходить закарлючкою, а не ниткою.</li>
+          <li><b>Карта планів стає такою самою.</b> Найближчий план — великий блок нагорі, решта — блоки навколо, ідеї — крапки внизу. Той самий екран, лише масштаб інший.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Бюджет екрана: 739 px</h2>
+        <p>
+          Стільки лишається під карту на 412×915 після шапки й дока. Числа нижче
+          виміряні на цьому шаблоні у найважчому з показаних планів — «Вечеря на
+          річницю»: п'ять пунктів підготовки, бюджет із кільцем, місце й опис.
+        </p>
+        <div class="budget">
+          <div class="budget-row"><span>Назва плану</span><span class="rail"><i style="width:16%"></i></span><span class="num">115</span></div>
+          <div class="budget-row"><span>Коли · Бюджет</span><span class="rail"><i style="width:22%"></i></span><span class="num">163</span></div>
+          <div class="budget-row"><span>Підготовка · Де</span><span class="rail"><i style="width:38%"></i></span><span class="num">280</span></div>
+          <div class="budget-row"><span>Пов'язане · Стан</span><span class="rail"><i style="width:24%"></i></span><span class="num">174</span></div>
+          <div class="budget-row"><span>Проміжки</span><span class="rail"><i style="width:4%"></i></span><span class="num">30</span></div>
+        </div>
+        <p>
+          Разом 727 із 739. Запас — дванадцять пікселів, і це не «майже не
+          влізло», а те, заради чого існують стелі: без них цей самий план дає
+          830 px і їде під док. Перша спроба цього шаблону так і зробила.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Стелі, які тримають екран без скролу</h2>
+        <ul class="plain">
+          <li><b>Підготовка — 4 пункти.</b> П'ятий і далі згортаються в рядок «ще N», який відкриває підготовку окремим аркушем.</li>
+          <li><b>Назва плану — 2 рядки, опис — 1.</b> Довше обрізається трьома крапками, а не розсуває блок.</li>
+          <li><b>Пов'язане — 3 рядки за типами</b> (бажання, місця, спогади), із числом навпроти, а не переліком назв.</li>
+          <li><b>Карта — 1 великий блок + 4 звичайні + 3 ідеї.</b> Решта живе за «ще N», яке перекладає карту, а не додає скрол.</li>
+          <li><b>Кнопка «+ План» — теж блок</b>, поруч із ідеями. Плаваюча кнопка над картою накривала останній рядок ідей; на аркуші зі скролом вона мала куди відступити, тут — ні.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Що взято зі знімка, а що з порталу</h2>
+        <ul class="plain">
+          <li><b>Зі знімка:</b> форма блоків із нерівними кутами, світний обід, нитки між блоками, два стовпці зі зсувом, кругла кнопка редагування в куті назви.</li>
+          <li><b>З порталу:</b> усі кольори — токени <code>worldTheme.css</code>; кольори категорій — <code>planConstants.ts</code>; фон — та сама зала з кристалом, що у вішліста й календаря.</li>
+          <li><b>З живих екранів:</b> підписи «Коли», «Стан», «Підготовка», «Бюджет», «Пов'язане» — як у <code>PlanDetailsPage.tsx</code>. На знімку було «Дата» й «Місця»; я лишив те, що вже вивчила пара.</li>
+          <li><b>Поділки стану</b> — чотири робочі статуси з <code>planConstants.ts</code> (ідея, плануємо, готуємося, готово), а не декоративні смужки зі знімка.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Три речі, які варто вирішити до роботи</h2>
+        <div class="flag">
+          <b>«Де» — це одне поле чи список?</b>
+          <p>У базі плану є <code>location_name</code>, одне місце. На знімку блок називався «Місця» й натякав на список — а список місць у нас уже є в «Пов'язаному» (<code>plan_links</code>, тип <code>place</code>). Тут блок показує <code>location_name</code>, а прив'язані місця рахуються в «Пов'язаному». Якщо хочете список — це зміна даних, не розкладки.</p>
+        </div>
+        <div class="flag">
+          <b>Куди на карті стають спогади.</b>
+          <p>У виконаного плану блок «Підготовка» більше нічого не значить, а блок «Спогади про цей момент» з'являється замість нього — на цьому шаблоні цього стану немає. Зроблю окремим станом карти, якщо він потрібен зараз, а не після інтеграції.</p>
+        </div>
+        <div class="flag">
+          <b>Розмиття коштує кадрів.</b>
+          <p>Шість блоків із <code>backdrop-filter</code> над живою 3D-сценою — це шість повноекранних розмиттів на кадр. На слабкому тілі портал уже вимикає ефекти за рівнем пристрою; тут те саме означатиме суцільну заливку замість скла. Це треба виміряти на живому порталі, а не на макеті.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Що тут несправжнє</h2>
+        <ul class="plain">
+          <li>Кристал намальований CSS-гранями; у порталі це Three.js.</li>
+          <li>Плани вигадані. Дати рахуються від сьогоднішньої, щоб «завтра» й «через тиждень» були справжніми.</li>
+          <li>Нитки малюються по фактичній розкладці — беруться справжні прямокутники блоків, а не намальована наперед крива. У порталі це буде той самий підхід.</li>
+          <li>Шрифт системний: артефакт не тягне шрифти ззовні. У порталі — Nunito й Fredoka.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Дані макета. Категорії й статуси — точні копії `planConstants.ts`,
+  // щоб кольори й підписи можна було звіряти з порталом.
+  // ============================================================
+  const CATEGORY = {
+    date: { label: 'Побачення', color: '#FF6B9D', icon: 'glass' },
+    trip: { label: 'Подорож', color: '#5BA3D9', icon: 'plane' },
+    ride: { label: 'Поїздка', color: '#6FB1C4', icon: 'car' },
+    place: { label: 'Місце', color: '#7EC8A9', icon: 'pin' },
+    event: { label: 'Захід', color: '#D9A441', icon: 'ticket' },
+    activity: { label: 'Активність', color: '#E8829C', icon: 'spark' },
+    rest: { label: 'Відпочинок', color: '#B98A9A', icon: 'mug' },
+    holiday: { label: 'Свято', color: '#C9922F', icon: 'spark' },
+    learning: { label: 'Навчання', color: '#9B6EA8', icon: 'book' },
+    home: { label: 'Для дому', color: '#8A9BB8', icon: 'house' },
+    other: { label: 'Інше', color: '#A08D97', icon: 'dots' },
+  };
+
+  const STATUS_ORDER = ['idea', 'planning', 'preparing', 'ready'];
+  const STATUS = {
+    idea: 'Ідея', planning: 'Плануємо', preparing: 'Готуємося', ready: 'Готово',
+    done: 'Виконано', postponed: 'Відкладено', cancelled: 'Скасовано',
+  };
+
+  const ICONS = {
+    car: 'M5 16v2.5h2.5V16M16.5 16v2.5H19V16M4 16h16v-4l-1.6-4H5.6L4 12v4Zm2.5-2h.01M17.5 14h.01',
+    plane: 'M12 3.5 13.5 10l6.5 3v2l-6.5-1.5-1 5 2 1.5v1l-2.5-1-2.5 1v-1l2-1.5-1-5L4 15v-2l6.5-3Z',
+    glass: 'M7 4h10l-4 6v7M9 21h6M4 4l4 6',
+    pin: 'M12 21s6-5.3 6-10a6 6 0 1 0-12 0c0 4.7 6 10 6 10Zm0-8.5a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4Z',
+    ticket: 'M4 8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1.5a2.5 2.5 0 0 0 0 5V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3.5a2.5 2.5 0 0 0 0-5Z',
+    spark: 'M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 20.5l-1.8-5.9L4.5 12.8 10.2 9Z',
+    mug: 'M5 7h11v7a4 4 0 0 1-4 4H9a4 4 0 0 1-4-4Zm11 1.5h2a2.5 2.5 0 0 1 0 5h-2M4 21h13',
+    book: 'M5 4.5h9a2.5 2.5 0 0 1 2.5 2.5v12H7.5A2.5 2.5 0 0 1 5 16.5Zm0 12h11.5M19 4.5v15',
+    house: 'M4 11 12 4.5 20 11v8.5h-5.5v-5h-5v5H4Z',
+    dots: 'M6 12h.01M12 12h.01M18 12h.01',
+    calendar: 'M5 6.5h14v13H5Zm0 4h14M9 4v3M15 4v3',
+    piggy: 'M4 12.5a6 6 0 0 1 6-5h3.5a5.5 5.5 0 0 1 5 3.2l1.5.8v3l-1.8.4-1.2 2v2h-3v-1.4a6.4 6.4 0 0 1-4 0V19h-3v-2.4a6 6 0 0 1-2-3.6Zm2-4L5 5m11 6h.01',
+    check: 'M5 12.5 9.5 17 19 7',
+    gift: 'M4.5 11h15v8.5h-15Zm0-3.5h15V11h-15ZM12 7.5v12M12 7.5c-2.6 0-4.5-.7-4.5-2S9 3.5 12 7.5Zm0 0c2.6 0 4.5-.7 4.5-2S15 3.5 12 7.5Z',
+    flag: 'M6 20V4.5m0 0h11l-2.2 4L17 12.5H6',
+    heart: 'M12 20.4 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13Z',
+    pencil: 'M4 20h4L20 8l-4-4L4 16Zm10-14 4 4',
+    plus: 'M12 5v14M5 12h14',
+  };
+
+  const icon = (name, cls = '') =>
+    `<svg viewBox="0 0 24 24" class="${cls}" aria-hidden="true"><path d="${ICONS[name] ?? ICONS.dots}"/></svg>`;
+
+  const today = new Date();
+  const shift = (days) => { const d = new Date(today); d.setDate(d.getDate() + days); return d; };
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  // Плани вигадані, дати — від сьогоднішньої. `tasks`, `budget`, `saved` і
+  // `links` тримаються поруч із планом, бо саме вони наповнюють блоки.
+  const PLANS = [
+    {
+      id: 1, category: 'ride', status: 'idea',
+      title: 'Їдемо в село на машинці врум врум',
+      note: 'Гарний настрій',
+      date: shift(1), place: null,
+      budget: null, saved: 0,
+      tasks: [
+        { title: 'Перевірити авто', done: false },
+        { title: 'Зібрати речі', done: false },
+        { title: 'Взяти гарний настрій', done: false },
+      ],
+      links: { wish: 2, place: 1, memory: 0 },
+    },
+    {
+      id: 2, category: 'date', status: 'preparing',
+      title: 'Вечеря на річницю',
+      note: 'Столик біля вікна',
+      date: shift(4), place: 'Ресторан «Тераса»',
+      budget: 2500, saved: 1600,
+      tasks: [
+        { title: 'Забронювати столик', done: true },
+        { title: 'Забрати сукню', done: true },
+        { title: 'Купити квіти', done: false },
+        { title: 'Домовитись про таксі', done: false },
+        { title: 'Скласти плейлист', done: false },
+      ],
+      links: { wish: 1, place: 1, memory: 0 },
+    },
+    {
+      id: 3, category: 'trip', status: 'planning',
+      title: 'Вихідні у Карпатах',
+      note: 'Три дні без телефонів',
+      date: shift(23), place: 'Ворохта',
+      budget: 9000, saved: 3200,
+      tasks: [
+        { title: 'Вибрати житло', done: true },
+        { title: 'Купити квитки', done: false },
+        { title: 'Скласти маршрут', done: false },
+      ],
+      links: { wish: 3, place: 2, memory: 0 },
+    },
+    {
+      id: 4, category: 'event', status: 'ready',
+      title: 'Концерт у Львові',
+      note: null,
+      date: shift(12), place: 'Малевич-фест',
+      budget: 1800, saved: 1800,
+      tasks: [
+        { title: 'Квитки', done: true },
+        { title: 'Готель', done: true },
+      ],
+      links: { wish: 0, place: 1, memory: 0 },
+    },
+    {
+      id: 5, category: 'home', status: 'planning',
+      title: 'Полиця в спальню',
+      note: null,
+      date: shift(-3), place: null,
+      budget: 1200, saved: 400,
+      tasks: [{ title: 'Заміряти стіну', done: true }, { title: 'Замовити', done: false }],
+      links: { wish: 1, place: 0, memory: 0 },
+    },
+    { id: 6, category: 'learning', status: 'idea', title: 'Курс італійської', note: null, date: null, place: null, budget: null, saved: 0, tasks: [], links: { wish: 0, place: 0, memory: 0 } },
+    { id: 7, category: 'activity', status: 'idea', title: 'Сплав Дністром', note: null, date: null, place: null, budget: null, saved: 0, tasks: [], links: { wish: 1, place: 1, memory: 0 } },
+    { id: 8, category: 'rest', status: 'idea', title: 'Ніч у скляному домі', note: null, date: null, place: null, budget: null, saved: 0, tasks: [], links: { wish: 1, place: 0, memory: 0 } },
+    { id: 9, category: 'place', status: 'idea', title: 'Пікнік на Трухановому', note: null, date: null, place: null, budget: null, saved: 0, tasks: [], links: { wish: 0, place: 1, memory: 0 } },
+  ];
+
+  const MONTHS = ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня'];
+  const $ = (id) => document.getElementById(id);
+
+  const dateLabel = (d) => d === null ? null : `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+
+  /** Скільки днів до плану — з півночі до півночі, як `daysUntilStart`. */
+  function daysUntil(d) {
+    if (d === null) return null;
+    const midnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    return Math.round((start - midnight) / 86400000);
+  }
+
+  /** Підпис відліку — той самий словник, що `daysLabel` у календарі. */
+  function daysText(days) {
+    if (days === null) return '';
+    if (days === 0) return 'сьогодні';
+    if (days === 1) return 'завтра';
+    if (days === 2) return 'післязавтра';
+    if (days < 0) return `${-days} дн. тому`;
+    if (days < 7) return `через ${days} дн.`;
+    if (days < 31) return `через ${Math.round(days / 7)} тиж.`;
+    return `через ${Math.round(days / 30)} міс.`;
+  }
+
+  const money = (n) => `${n.toLocaleString('uk-UA')} ₴`;
+
+  // ============================================================
+  // Сторінка плану: шість блоків і сім ниток між ними.
+  // ============================================================
+
+  const MAX_TASKS = 4;
+
+  function planScreen(plan) {
+    const cat = CATEGORY[plan.category];
+    const days = daysUntil(plan.date);
+    const shown = plan.tasks.slice(0, MAX_TASKS);
+    const hidden = plan.tasks.length - shown.length;
+    const doneCount = plan.tasks.filter((t) => t.done).length;
+    const fill = plan.budget === null ? 0 : Math.min(100, Math.round((plan.saved / plan.budget) * 100));
+    const linkTotal = plan.links.wish + plan.links.place + plan.links.memory;
+
+    return `
+      <svg class="threads" id="threads-plan" aria-hidden="true"></svg>
+
+      <article class="blob hero" id="b-hero" style="--plan-color:${cat.color};--drift:0s">
+        <button type="button" class="edit" aria-label="Редагувати план">${icon('pencil')}</button>
+        <div class="hero-row">
+          <span class="blob-icon">${icon(cat.icon)}</span>
+          <div class="hero-copy">
+            <span class="hero-cat">${cat.label}</span>
+            <h2>${plan.title}</h2>
+            ${plan.note ? `<p>${plan.note}</p>` : ''}
+          </div>
+        </div>
+      </article>
+
+      <div class="row" style="--split: 1.02fr 0.98fr; --drop: 18px">
+        <article class="blob" id="b-when" style="--drift:-1.4s">
+          <div class="blob-head">
+            <span class="blob-icon">${icon('calendar')}</span>
+            <span class="blob-title">Коли</span>
+          </div>
+          ${plan.date === null
+            ? '<button type="button" class="ghost">Обрати дату</button>'
+            : `<span class="fact-value">${dateLabel(plan.date)}</span>
+               <span class="pill" data-tone="${days < 0 ? 'idle' : 'soon'}">${daysText(days)}</span>`}
+        </article>
+
+        <article class="blob" id="b-money" style="--drift:-2.1s">
+          <div class="blob-head">
+            <span class="blob-icon">${icon('piggy')}</span>
+            <span class="blob-title">Бюджет</span>
+          </div>
+          ${plan.budget === null
+            ? `<span class="blob-note">Ще не визначено</span>
+               <button type="button" class="ghost">${icon('plus')} Додати бюджет</button>`
+            : `<div class="money">
+                 <span class="ring" style="--fill:${fill}"><b>${fill}%</b></span>
+                 <span class="money-copy">
+                   <span class="fact-value">${money(plan.budget)}</span>
+                   <span class="blob-note">зібрано ${money(plan.saved)}</span>
+                 </span>
+               </div>`}
+        </article>
+      </div>
+
+      <div class="row" style="--split: 1.18fr 0.82fr; --drop: 12px">
+        <article class="blob" id="b-tasks" style="--drift:-2.8s">
+          <div class="blob-head">
+            <span class="blob-icon">${icon('check')}</span>
+            <span class="blob-title">Підготовка</span>
+            ${plan.tasks.length ? `<span class="blob-count">${doneCount} з ${plan.tasks.length}</span>` : ''}
+          </div>
+          <div class="checks">
+            ${shown.length === 0
+              ? '<span class="blob-note">Додай перший крок, який наблизить цей план.</span>'
+              : shown.map((t) => `<span class="check" data-done="${t.done}"><i></i><span>${t.title}</span></span>`).join('')}
+          </div>
+          ${hidden > 0 ? `<span class="more">ще ${hidden}</span>` : ''}
+          <button type="button" class="ghost">${icon('plus')} Додати пункт</button>
+        </article>
+
+        <article class="blob" id="b-place" style="--drift:-3.5s">
+          <div class="blob-head">
+            <span class="blob-icon">${icon('pin')}</span>
+            <span class="blob-title">Де</span>
+          </div>
+          ${plan.place === null
+            ? `<button type="button" class="ghost ghost--box">${icon('pin')} Додати місце</button>`
+            : `<span class="fact-value" style="font-size:14px">${plan.place}</span>
+               <span class="blob-note">Збережеться на карті пари</span>`}
+        </article>
+      </div>
+
+      <div class="row" style="--split: 0.96fr 1.04fr; --drop: -8px">
+        <article class="blob" id="b-links" style="--drift:-0.7s">
+          <div class="blob-head">
+            <span class="blob-icon">${icon('gift')}</span>
+            <span class="blob-title">Пов’язане</span>
+            ${linkTotal ? `<span class="blob-count">${linkTotal}</span>` : ''}
+          </div>
+          <div class="links">
+            <span class="link-row">${icon('heart')} Бажання <em>${plan.links.wish || '—'}</em></span>
+            <span class="link-row">${icon('pin')} Місця <em>${plan.links.place || '—'}</em></span>
+            <span class="link-row">${icon('spark')} Спогади <em>${plan.links.memory || '—'}</em></span>
+          </div>
+        </article>
+
+        <article class="blob" id="b-status" style="--drift:-1.9s">
+          <div class="blob-head">
+            <span class="blob-icon">${icon('flag')}</span>
+            <span class="blob-title">Стан</span>
+          </div>
+          <span class="status-now"><i></i>${STATUS[plan.status]}</span>
+          <span class="steps">
+            ${STATUS_ORDER.map((key, index) => `<span data-on="${index <= STATUS_ORDER.indexOf(plan.status)}"></span>`).join('')}
+          </span>
+          <span class="blob-note">${STATUS_ORDER.indexOf(plan.status) + 1} з ${STATUS_ORDER.length} до готовності</span>
+        </article>
+      </div>
+    `;
+  }
+
+  // Порядок ниток = порядок, у якому план заповнюють: назва → коли й бюджет,
+  // коли → підготовка, бюджет → де, і все сходиться в стан.
+  const PLAN_THREADS = [
+    ['b-hero', 'b-when'], ['b-hero', 'b-money'],
+    ['b-when', 'b-tasks'], ['b-money', 'b-place'],
+    ['b-tasks', 'b-links'], ['b-place', 'b-status'],
+  ];
+
+  // ============================================================
+  // Карта планів: найближчий великим блоком, решта навколо.
+  // ============================================================
+
+  const MAX_BLOBS = 4;
+
+  function planBlob(plan, id, drift) {
+    const cat = CATEGORY[plan.category];
+    const days = daysUntil(plan.date);
+    return `
+      <article class="blob plan-blob" id="${id}" data-tap="true" data-plan="${plan.id}"
+        data-overdue="${days !== null && days < 0}" style="--plan-color:${cat.color};--drift:${drift}s" tabindex="0">
+        <span class="blob-cat">${icon(cat.icon)} ${cat.label}</span>
+        <h3>${plan.title}</h3>
+        <span class="when">${dateLabel(plan.date) ?? 'колись'}${days === null ? '' : ` · <b>${daysText(days)}</b>`}</span>
+      </article>`;
+  }
+
+  function listScreen() {
+    const dated = PLANS.filter((p) => p.date !== null).sort((a, b) => a.date - b.date);
+    const ideas = PLANS.filter((p) => p.date === null);
+    // Найближчий — лише з майбутніх, як `nextPlan` у `planModel.ts`. Прострочений
+    // план попереду сьогоднішнього означав би, що найголовніше на екрані вже
+    // минуло; він лишається серед звичайних блоків і світиться червоним.
+    const hero = dated.find((p) => daysUntil(p.date) >= 0) ?? dated[0];
+    const rest = dated.filter((p) => p !== hero).slice(0, MAX_BLOBS);
+    const over = dated.length - 1 - rest.length;
+
+    const cat = CATEGORY[hero.category];
+    const days = daysUntil(hero.date);
+    const doneCount = hero.tasks.filter((t) => t.done).length;
+    const percent = hero.tasks.length === 0 ? 0 : Math.round((doneCount / hero.tasks.length) * 100);
+
+    return `
+      <svg class="threads" id="threads-list" aria-hidden="true"></svg>
+
+      <article class="blob plan-blob map-hero" id="m-hero" data-tap="true" data-plan="${hero.id}"
+        style="--plan-color:${cat.color};--drift:0s" tabindex="0">
+        <div class="blob-head">
+          <span class="blob-icon">${icon(cat.icon)}</span>
+          <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+            <span class="blob-cat">${cat.label} · найближчий</span>
+            <h3>${hero.title}</h3>
+          </div>
+        </div>
+        <span class="when">${dateLabel(hero.date)} · <b>${daysText(days)}</b></span>
+        <span class="bar"><i style="width:${percent}%"></i></span>
+        <span class="blob-note">${hero.tasks.length ? `Підготовка ${doneCount} з ${hero.tasks.length}` : 'Підготовку ще не почали'}</span>
+      </article>
+
+      <div class="row" style="--split: 1.08fr 0.92fr; --drop: 20px">
+        ${rest[0] ? planBlob(rest[0], 'm-1', -1.6) : ''}
+        ${rest[1] ? planBlob(rest[1], 'm-2', -2.4) : ''}
+      </div>
+
+      <div class="row" style="--split: 0.92fr 1.08fr; --drop: -10px">
+        ${rest[2] ? planBlob(rest[2], 'm-3', -3.2) : ''}
+        ${rest[3] ? planBlob(rest[3], 'm-4', -0.8) : ''}
+      </div>
+
+      <div class="row" style="--split: 1fr 84px; --drop: 6px">
+        <article class="blob" id="m-ideas" style="--drift:-2.9s">
+          <div class="blob-head">
+            <span class="blob-icon">${icon('spark')}</span>
+            <span class="blob-title">Ідеї без дати</span>
+            <span class="blob-count">${ideas.length}</span>
+          </div>
+          <div class="ideas">
+            ${ideas.slice(0, 3).map((p) => `<button type="button" class="idea" data-plan="${p.id}" style="--plan-color:${CATEGORY[p.category].color}">${p.title}</button>`).join('')}
+            ${ideas.length > 3 ? `<button type="button" class="idea idea--rest">ще ${ideas.length - 3}</button>` : ''}
+          </div>
+        </article>
+
+        <!-- Кнопка дії — теж блок карти, а не плаваюча кнопка над нею. Плаваюча
+             накривала останній рядок ідей: виміряно на макеті, «+ План» лежав
+             просто на «Пікніку на Трухановому». -->
+        <button type="button" class="blob add" id="m-add" style="--drift:-1.1s">
+          ${icon('plus')}
+          <span>План</span>
+        </button>
+      </div>
+
+      ${over > 0 ? `<button type="button" class="rest">ще ${over} з датою</button>` : ''}
+    `;
+  }
+
+  const LIST_THREADS = [
+    ['m-hero', 'm-1'], ['m-hero', 'm-2'],
+    ['m-1', 'm-3'], ['m-2', 'm-4'],
+    ['m-3', 'm-ideas'], ['m-4', 'm-ideas'],
+  ];
+
+  // ============================================================
+  // Нитки. Малюються ПІСЛЯ розкладки, по справжніх прямокутниках блоків:
+  // формула наперед розійшлася б із текстом, який переноситься.
+  // ============================================================
+
+  function drawThreads(svgId, box, pairs) {
+    const svg = $(svgId);
+    if (!svg) return;
+    const frame = box.getBoundingClientRect();
+    if (frame.width < 1) return;
+
+    const paths = [];
+    for (const [fromId, toId] of pairs) {
+      const a = $(fromId);
+      const b = $(toId);
+      if (!a || !b) continue;
+      const ra = a.getBoundingClientRect();
+      const rb = b.getBoundingClientRect();
+
+      // Скільки блоки перекриваються по вертикалі. Багато — нитка йде вбік,
+      // мало — згори вниз. Без цього сусіди в одному ряду з'єднувались би
+      // петлею через увесь екран.
+      const overlap = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+      const sideways = overlap > Math.min(ra.height, rb.height) * 0.45;
+
+      let from, to, c1, c2;
+      if (sideways) {
+        const leftFirst = ra.left <= rb.left;
+        const first = leftFirst ? ra : rb;
+        const second = leftFirst ? rb : ra;
+        // Проміжок між сусідами в ряду — 11 px, а зсув по вертикалі — сорок.
+        // Крива в такому вікні виходить не ниткою, а закарлючкою: виміряно на
+        // макеті, вона читалась як значок помилки між «Коли» й «Бюджетом».
+        // Тісні пари не з'єднуються взагалі — їх і так тримає спільний батько.
+        if (second.left - first.right < 26) continue;
+        from = { x: first.right - frame.left, y: first.top + first.height * 0.62 - frame.top };
+        to = { x: second.left - frame.left, y: second.top + second.height * 0.42 - frame.top };
+        const bend = Math.max(18, (to.x - from.x) * 0.6);
+        c1 = { x: from.x + bend, y: from.y };
+        c2 = { x: to.x - bend, y: to.y };
+      } else {
+        const upper = ra.top <= rb.top ? ra : rb;
+        const lower = ra.top <= rb.top ? rb : ra;
+        from = { x: upper.left + upper.width * 0.5 - frame.left, y: upper.bottom - frame.top };
+        to = { x: lower.left + lower.width * 0.5 - frame.left, y: lower.top - frame.top };
+        const bend = Math.max(20, (to.y - from.y) * 0.55);
+        c1 = { x: from.x, y: from.y + bend };
+        c2 = { x: to.x, y: to.y - bend };
+      }
+
+      const d = `M ${from.x.toFixed(1)} ${from.y.toFixed(1)} C ${c1.x.toFixed(1)} ${c1.y.toFixed(1)}, ${c2.x.toFixed(1)} ${c2.y.toFixed(1)}, ${to.x.toFixed(1)} ${to.y.toFixed(1)}`;
+      paths.push({ d, from, to });
+    }
+
+    svg.setAttribute('viewBox', `0 0 ${frame.width.toFixed(1)} ${frame.height.toFixed(1)}`);
+    svg.innerHTML = `
+      <defs>
+        <filter id="thread-glow-${svgId}" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="3.4" />
+        </filter>
+      </defs>
+      <g filter="url(#thread-glow-${svgId})" opacity="0.55">
+        ${paths.map((p) => `<path d="${p.d}" fill="none" stroke="rgba(190,142,238,0.75)" stroke-width="5" stroke-linecap="round" />`).join('')}
+      </g>
+      <g>
+        ${paths.map((p) => `<path d="${p.d}" fill="none" stroke="rgba(238,214,255,0.72)" stroke-width="1.4" stroke-linecap="round" />`).join('')}
+      </g>
+      <g>
+        ${paths.map((p) => `
+          <circle cx="${p.from.x.toFixed(1)}" cy="${p.from.y.toFixed(1)}" r="2.6" fill="rgba(244,226,255,0.9)" />
+          <circle cx="${p.to.x.toFixed(1)}" cy="${p.to.y.toFixed(1)}" r="2.6" fill="rgba(244,226,255,0.9)" />`).join('')}
+      </g>`;
+  }
+
+  // ============================================================
+  // Екрани
+  // ============================================================
+
+  let current = 'list';
+  let openPlan = PLANS[0];
+  let threadsOn = true;
+
+  function renderList() {
+    $('map-list').innerHTML = listScreen();
+    for (const node of $('map-list').querySelectorAll('[data-plan]')) {
+      const open = () => showPlan(PLANS.find((p) => p.id === Number(node.dataset.plan)));
+      node.addEventListener('click', open);
+      node.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); }
+      });
+    }
+    requestAnimationFrame(() => drawThreads('threads-list', $('map-list'), LIST_THREADS));
+  }
+
+  function renderPlan() {
+    $('map-plan').innerHTML = planScreen(openPlan);
+    requestAnimationFrame(() => drawThreads('threads-plan', $('map-plan'), PLAN_THREADS));
+  }
+
+  function showList() {
+    current = 'list';
+    $('map-list').hidden = false;
+    $('map-plan').hidden = true;
+    $('back-label').textContent = 'Карта планів';
+    $('top-count').textContent = `${PLANS.length} планів`;
+    syncControls();
+    renderList();
+  }
+
+  function showPlan(plan) {
+    openPlan = plan ?? openPlan;
+    current = 'plan';
+    $('map-list').hidden = true;
+    $('map-plan').hidden = false;
+    $('back-label').textContent = 'Карта планів';
+    $('top-count').textContent = '';
+    syncControls();
+    renderPlan();
+  }
+
+  function syncControls() {
+    for (const button of document.querySelectorAll('#controls [data-screen]')) {
+      button.setAttribute('aria-pressed', String(button.dataset.screen === current));
+    }
+  }
+
+  $('back').addEventListener('click', () => { if (current === 'plan') showList(); });
+
+  for (const button of document.querySelectorAll('#controls [data-screen]')) {
+    button.addEventListener('click', () => (button.dataset.screen === 'list' ? showList() : showPlan(openPlan)));
+  }
+
+  $('toggle-threads').addEventListener('click', () => {
+    threadsOn = !threadsOn;
+    $('toggle-threads').setAttribute('aria-pressed', String(threadsOn));
+    for (const svg of document.querySelectorAll('.threads')) svg.style.display = threadsOn ? '' : 'none';
+  });
+
+  // ── Кристал ─────────────────────────────────────────────
+  (function buildCrystal() {
+    let html = '';
+    for (let i = 0; i < 6; i += 1) html += `<div class="facet" style="--a:${i * 60}deg"></div>`;
+    for (let i = 0; i < 6; i += 1) html += `<div class="tip" style="--a:${i * 60}deg"></div>`;
+    $('prism').innerHTML = html;
+  })();
+
+  // ── Телефон вписується у вікно ──────────────────────────
+  function fit() {
+    const holder = $('phone').parentElement;
+    const scale = Math.min(1, holder.clientWidth / 412, (window.innerHeight - 190) / 915);
+    $('phone').style.transform = `scale(${scale.toFixed(3)})`;
+    holder.style.height = `${915 * scale}px`;
+  }
+
+  window.addEventListener('resize', () => {
+    fit();
+    drawThreads(current === 'list' ? 'threads-list' : 'threads-plan',
+      current === 'list' ? $('map-list') : $('map-plan'),
+      current === 'list' ? LIST_THREADS : PLAN_THREADS);
+  });
+
+  showList();
+  fit();
+</script>
