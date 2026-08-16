@@ -74,9 +74,16 @@
     linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 42%),
     linear-gradient(168deg, var(--accent) 0%, var(--accent-strong) 62%, #6b23c8 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    var(--control-top),
+    var(--control-lip),
     0 0 20px var(--world-glow),
-    0 6px 18px rgba(4, 2, 10, 0.5);
+    var(--control-cast);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+.plans-module .pm-tab[aria-selected='true']:active {
+  translate: 0 2px;
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
 }
 
 /* Кристалічні торці активного сегмента. Одна грань ліворуч, одна праворуч —
@@ -315,8 +322,10 @@
   place-items: center;
   border: 1px solid var(--border);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.05);
+  background-image: var(--control-sheen);
   color: var(--muted);
+  box-shadow: var(--control-top), var(--control-lip-press);
   pointer-events: none;
 }
 
@@ -335,6 +344,13 @@
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--control-top), var(--control-lip-press);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+.plans-module .pm-tile-confirm:active {
+  translate: 0 1px;
+  box-shadow: var(--control-top);
 }
 
 /* ── «Завершені» ─────────────────────────────────────────── */
@@ -348,12 +364,20 @@
   padding: 14px 18px;
   border: 1px solid var(--border);
   border-radius: 18px;
-  background: var(--surface);
+  background-color: var(--surface);
+  background-image: var(--control-sheen);
   color: var(--text);
   font: inherit;
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+  box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+.plans-module .pm-section-toggle:active {
+  translate: 0 2px;
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
 }
 
 .plans-module .pm-section-toggle span {
@@ -384,8 +408,18 @@
   font: inherit;
   font-size: 15px;
   font-weight: 800;
-  box-shadow: 0 0 24px var(--world-glow), 0 14px 30px rgba(4, 2, 10, 0.55);
+  box-shadow:
+    var(--control-top),
+    var(--control-lip),
+    0 0 24px var(--world-glow),
+    0 14px 30px rgba(4, 2, 10, 0.55);
   cursor: pointer;
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+.plans-module .pm-fab:active {
+  translate: 0 2px;
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
 }
 
 .plans-module .pm-fab:focus-visible {
@@ -460,8 +494,17 @@
   place-items: center;
   border: 1px solid var(--border);
   border-radius: 12px;
-  background: var(--world-surface-soft);
+  background-color: var(--world-surface-soft);
+  background-image: var(--control-sheen);
   color: var(--text);
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+.plans-module .cal-nav-btn:active,
+.plans-module .cal-today-btn:active {
+  translate: 0 1px;
+  box-shadow: var(--control-top);
 }
 
 /* Комірка дня — рамка, а не суцільна плитка: на референсі сітка читається
@@ -555,6 +598,13 @@
 @media (prefers-reduced-motion: reduce) {
   .plans-module .pm-sheet,
   .plans-module .pm-skeleton { animation: none; }
+  /* Осідання кнопки лишається — воно і є відповіддю на дотик. Прибирається
+     лише його плавність. */
+  .plans-module .pm-tab,
+  .plans-module .pm-fab,
+  .plans-module .pm-section-toggle,
+  .plans-module .cal-nav-btn,
+  .plans-module .pm-tile-confirm { transition-duration: 1ms; }
 }
 
 /* ── Сторінка плану — той самий модуль, лише глибше ──────
