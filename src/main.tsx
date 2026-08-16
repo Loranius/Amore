@@ -34,6 +34,9 @@ import '@/features/plans/plansCrystalRefresh.css';
 // Фінальний reference-fidelity шар для /plans: фон світу лишається тим самим,
 // але геометрія, щільність і кристалічні акценти наближені до затвердженого UI.
 import '@/features/plans/plansReferenceFidelity.css';
+// Калібрування після живого мобільного скріншота: компактніший календар,
+// легші картки, не-sticky tabs і нижні дії в композиції самого модуля.
+import '@/features/plans/plansReferencePolish.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
