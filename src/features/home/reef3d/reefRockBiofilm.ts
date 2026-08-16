@@ -97,8 +97,13 @@ export function applyReefRockBiofilmMaterial(
         `#include <common>\nvarying vec3 vReefBioWorldPosition;`,
       )
       .replace(
-        '#include <worldpos_vertex>',
-        `#include <worldpos_vertex>\nvReefBioWorldPosition = worldPosition.xyz;`,
+        '#include <project_vertex>',
+        `vec4 reefBioWorldPosition = vec4(transformed, 1.0);
+#ifdef USE_INSTANCING
+  reefBioWorldPosition = instanceMatrix * reefBioWorldPosition;
+#endif
+vReefBioWorldPosition = (modelMatrix * reefBioWorldPosition).xyz;
+#include <project_vertex>`,
       );
 
     shader.fragmentShader = shader.fragmentShader
