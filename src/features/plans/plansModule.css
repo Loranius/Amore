@@ -1,18 +1,22 @@
 /* ============================================================
-   Об'єднаний модуль «Плани» — власна поверхня поверх світу.
+   Модуль «Плани» — вигляд за референсом власника.
    ------------------------------------------------------------
-   Другий модуль зі своєю мовою після вішліста, і мова тут навмисно та сама
-   там, де вона вже склалась: скляна панель вкладок нагорі, приглушений і
-   розмитий світ позаду, одна кнопка дії внизу. Спільне лишається спільним —
-   пара вчить портал один раз.
+   Один файл на весь модуль, і це головне, що тут змінилось. До цього стиль
+   планів жив у ВОСЬМИ файлах (`plansCrystalRefresh.css` і шість
+   `plansReference*.css`), підключених окремими рядками в `main.tsx`. Шість із
+   них оголошували той самий `.pm-tile::after` — саме тому кристалик у кутку
+   картки неможливо було просто прибрати: перемагав той, чий імпорт стояв
+   нижче, і жодна правка не знала, який саме. Тепер селектор оголошується один
+   раз, і `plansModule.test.ts` стереже, щоб їх знову не стало шість.
 
-   Що НЕ те саме: вішліст — це простір із сузір'ям, а тут аркуш із сіткою й
-   плитками. Скло тому не грає в об'єм: воно тільки відділяє папір від фону.
+   Кольори — токени порталу (`index.css`) і світу (`worldTheme.css`). Власні
+   літерали тут лише там, де потрібне скло: прозорість поверх сцени не
+   виражається токеном кольору.
 
-   Файл також перефарбовує сітку календаря й «Наш шлях» у токени світу. Це
-   навмисно тут, а не в їхніх власних файлах: обидва компоненти лишаються
-   придатними поза світом (вони не знають про кристал), а перефарбовує їх той,
-   хто вніс їх у світ.
+   Чого в модулі немає навмисно:
+   • «Кристального шляху» — власник: «прибери його взагалі»;
+   • кристала чи пісочного годинника в правому верхньому кутку картки —
+     «заміни не додавай їх».
    ============================================================ */
 
 .plans-module {
@@ -24,61 +28,104 @@
   padding: 0 0 96px;
 }
 
-/* ── Верхня панель: та сама, що у вішліста ───────────────── */
+/* ── Верхня панель: два кристалічні сегменти ─────────────
+   На референсі це не пастельна пігулка, а темне скло з одним самоцвітом
+   усередині: активна половина світиться, неактивна лишається склом. */
 
 .plans-module .pm-tabs {
   position: sticky;
   top: 0;
   z-index: 5;
   display: flex;
-  gap: 6px;
+  gap: 8px;
   margin: 0 0 2px;
-  padding: 6px;
-  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
-  border-radius: var(--radius-pill, 999px);
-  background: var(--world-surface, rgba(42, 33, 64, 0.82));
-  backdrop-filter: blur(10px);
+  padding: 7px;
+  border: 1px solid var(--world-border);
+  border-radius: var(--radius-pill);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 34%),
+    rgba(16, 10, 30, 0.86);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 26px rgba(4, 2, 10, 0.42);
 }
 
 .plans-module .pm-tab {
+  position: relative;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 11px 8px;
+  gap: 8px;
+  padding: 12px 8px;
   border: 0;
-  border-radius: var(--radius-pill, 999px);
+  border-radius: var(--radius-pill);
   background: none;
-  color: var(--world-text-muted, #c9b8e4);
+  color: var(--muted);
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 200ms ease, color 200ms ease;
+  transition: color 200ms ease, background 200ms ease;
 }
 
 .plans-module .pm-tab[aria-selected='true'] {
-  background: var(--world-primary, #c9a0e6);
-  color: #241636;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 42%),
+    linear-gradient(168deg, var(--accent) 0%, var(--accent-strong) 62%, #6b23c8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 0 20px var(--world-glow),
+    0 6px 18px rgba(4, 2, 10, 0.5);
+}
+
+/* Кристалічні торці активного сегмента. Одна грань ліворуч, одна праворуч —
+   рівно як на референсі, де самоцвіт огранений з боків, а не по колу. */
+.plans-module .pm-tab[aria-selected='true']::before,
+.plans-module .pm-tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  width: 22px;
+  pointer-events: none;
+  background:
+    linear-gradient(126deg, rgba(255, 255, 255, 0.22) 0 32%, transparent 33%),
+    linear-gradient(238deg, rgba(255, 255, 255, 0.12) 0 28%, transparent 29%);
+  opacity: 0.75;
+}
+
+.plans-module .pm-tab[aria-selected='true']::before {
+  left: 2px;
+  border-radius: var(--radius-pill) 0 0 var(--radius-pill);
+}
+
+.plans-module .pm-tab[aria-selected='true']::after {
+  right: 2px;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  scale: -1 1;
 }
 
 .plans-module .pm-tab:focus-visible {
-  outline: 2px solid var(--world-accent, #dcb6f5);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
 .plans-module .pm-tab-count {
-  min-width: 22px;
-  padding: 1px 6px;
-  border-radius: var(--radius-pill, 999px);
-  background: rgba(20, 15, 31, 0.35);
-  font-size: 12px;
+  position: relative;
+  z-index: 1;
+  min-width: 26px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(10, 6, 20, 0.42);
+  font-size: 13px;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .plans-module .pm-tab[aria-selected='true'] .pm-tab-count {
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.26);
+  color: #fff;
 }
 
 /* ── Аркуш ───────────────────────────────────────────────── */
@@ -96,53 +143,47 @@
   from { opacity: 0; transform: translateY(6px); }
 }
 
+/* ── Заголовок секції ────────────────────────────────────
+   На референсі праворуч від назви стоїть не число, а вихід: «Дивитися всі ›»,
+   «Колись ›». Число нічого не додає — воно вже видно по картках. */
+
 .plans-module .pm-section-head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin: 16px 2px 8px;
+  margin: 18px 4px 10px;
 }
 
 .plans-module .pm-section-head h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 800;
-  color: var(--world-text, #f6efff);
+  color: var(--text);
 }
 
-.plans-module .pm-section-head span {
-  font-size: 12px;
-  color: var(--world-text-muted, #c9b8e4);
-  font-variant-numeric: tabular-nums;
-}
-
-.plans-module .pm-section-empty {
-  margin: 0 2px;
-  font-size: 13px;
-  color: var(--world-text-muted, #c9b8e4);
-}
-
-.plans-module .pm-section-toggle {
-  display: flex;
+.plans-module .pm-section-more {
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 16px 0 8px;
-  padding: 11px 14px;
-  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
-  border-radius: 14px;
-  background: var(--world-surface-soft, rgba(255, 255, 255, 0.07));
-  color: var(--world-text, #f6efff);
+  gap: 4px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
   font: inherit;
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   cursor: pointer;
 }
 
-.plans-module .pm-section-toggle span {
-  color: var(--world-text-muted, #c9b8e4);
-  font-variant-numeric: tabular-nums;
+.plans-module .pm-section-more:hover { color: var(--accent); }
+.plans-module .pm-section-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.plans-module .pm-section-more svg { opacity: 0.8; }
+
+.plans-module .pm-section-empty {
+  margin: 0 4px;
+  font-size: 13px;
+  color: var(--muted);
 }
 
 /* ── Плитки планів: два стовпці ──────────────────────────── */
@@ -150,94 +191,177 @@
 .plans-module .pm-tiles {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 9px;
+  gap: 12px;
 }
 
 .plans-module .pm-tile {
   position: relative;
   overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 11px 12px 10px;
-  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
-  border-radius: 16px;
-  background: var(--world-surface, rgba(42, 33, 64, 0.82));
-  box-shadow: 0 10px 24px var(--world-shadow, rgba(6, 4, 12, 0.5));
+  /* Сітка, а не стовпчик: стрілка стоїть ОКРЕМОЮ колонкою праворуч, і текст
+     їй нічого не винен. Перша спроба тримала стрілку накладкою поверх
+     стовпчика — і на живому екрані дата ламалась на три рядки («31 / грудня /
+     2026»), бо тулилась у залишок ширини. */
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  grid-template-rows: auto auto 1fr;
+  column-gap: 8px;
+  row-gap: 6px;
+  min-height: 118px;
+  padding: 12px 12px 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  /* Колір категорії заливає картку зліва й гасне до середини — саме так на
+     референсі відрізняються «Побачення» від «Іншого». */
+  background:
+    linear-gradient(100deg,
+      color-mix(in srgb, var(--plan-color, var(--accent)) 26%, transparent) 0%,
+      color-mix(in srgb, var(--plan-color, var(--accent)) 6%, transparent) 46%,
+      transparent 78%),
+    var(--surface);
+  box-shadow: 0 10px 26px rgba(4, 2, 10, 0.42);
 }
 
-/* Смужка категорії — єдиний колір, який модуль бере не з палітри світу.
-   Категорія плану має власний колір по всьому порталу, і міняти його тут
-   означало б, що «Подорож» синя на одному екрані й бузкова на іншому. */
-.plans-module .pm-tile::before {
+/* Ліва кристалічна грань кольору категорії. ЄДИНЕ оголошення `::after` у
+   модулі — і воно ліворуч. У правому верхньому кутку не малюється нічого:
+   власник прибрав звідти і кристал, і пісочний годинник. */
+.plans-module .pm-tile::after {
   content: '';
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
-  background: var(--plan-color, var(--world-primary, #c9a0e6));
+  width: 5px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--plan-color, var(--accent)) 92%, white 18%) 0%,
+      var(--plan-color, var(--accent)) 46%,
+      color-mix(in srgb, var(--plan-color, var(--accent)) 74%, black) 100%);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--plan-color, var(--accent)) 55%, transparent);
 }
 
 .plans-module .pm-tile--closed { opacity: 0.62; }
 
 /* Відкриття — накладка-кнопка на всю плитку, а не onClick по контейнеру:
    інакше плитку не сфокусувати з клавіатури й читалка не знає, що вона
-   клікабельна. Той самий патерн, що в картці плану. */
+   клікабельна. */
 .plans-module .pm-tile-open {
   position: absolute;
   inset: 0;
+  z-index: 1;
   border-radius: inherit;
 }
 
 .plans-module .pm-tile-open:focus-visible {
-  outline: 2px solid var(--world-accent, #dcb6f5);
+  outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
 
 .plans-module .pm-tile-cat {
+  grid-column: 1;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  color: var(--plan-color, var(--world-primary, #c9a0e6));
-  font-size: 11px;
-  font-weight: 800;
+  gap: 6px;
+  color: var(--plan-color, var(--accent));
+  font-size: 12.5px;
+  font-weight: 700;
 }
 
 .plans-module .pm-tile-title {
+  grid-column: 1;
   margin: 0;
-  font-size: 14px;
+  font-size: 15.5px;
   font-weight: 700;
   line-height: 1.25;
-  color: var(--world-text, #f6efff);
+  color: var(--text);
 }
 
 .plans-module .pm-tile-meta {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  grid-column: 1;
   gap: 4px 8px;
+  align-self: end;
   font-size: 12px;
-  color: var(--world-text-muted, #c9b8e4);
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
+.plans-module .pm-tile-meta > * { white-space: nowrap; }
 .plans-module .pm-tile-someday { font-style: italic; }
-.plans-module .pm-tile-when { color: var(--world-accent, #dcb6f5); }
-.plans-module .pm-tile-overdue { color: var(--world-danger, #e2707f); }
+.plans-module .pm-tile-when { color: var(--muted); }
+
+/* Прострочене — єдиний стан, який на референсі отримує пігулку: він просить
+   уваги, а не просто повідомляє дату. */
+.plans-module .pm-tile-overdue {
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .plans-module .pm-tile-status { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Кругла стрілка праворуч — те, що на референсі стоїть у кожної картки.
+   Своя колонка сітки на всю висоту картки, по центру. */
+.plans-module .pm-tile-go {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  align-self: center;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.plans-module .pm-tile-confirm { grid-column: 1; justify-self: start; }
 
 .plans-module .pm-tile-confirm {
   position: relative;
+  z-index: 2;
   margin-top: 2px;
-  padding: 6px 10px;
-  border: 1px solid var(--world-border-active, rgba(220, 182, 245, 0.42));
-  border-radius: var(--radius-pill, 999px);
+  padding: 6px 12px;
+  border: 1px solid var(--world-border-active);
+  border-radius: var(--radius-pill);
   background: none;
-  color: var(--world-accent, #dcb6f5);
+  color: var(--accent);
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
+}
+
+/* ── «Завершені» ─────────────────────────────────────────── */
+
+.plans-module .pm-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 16px 0 8px;
+  padding: 14px 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plans-module .pm-section-toggle span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Одна кнопка дії ─────────────────────────────────────── */
@@ -249,21 +373,23 @@
   bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 12px 18px;
-  border: 1px solid var(--world-border-active, rgba(220, 182, 245, 0.42));
-  border-radius: var(--radius-pill, 999px);
-  background: linear-gradient(140deg, var(--world-primary, #c9a0e6), #965fbd);
-  color: #1b1226;
+  gap: 8px;
+  padding: 14px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-pill);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 46%),
+    linear-gradient(150deg, var(--accent), var(--accent-strong));
+  color: #fff;
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
-  box-shadow: 0 12px 28px var(--world-shadow, rgba(6, 4, 12, 0.5));
+  box-shadow: 0 0 24px var(--world-glow), 0 14px 30px rgba(4, 2, 10, 0.55);
   cursor: pointer;
 }
 
 .plans-module .pm-fab:focus-visible {
-  outline: 2px solid var(--world-accent, #dcb6f5);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -271,34 +397,29 @@
 
 .plans-module .pm-skeleton {
   border-radius: 18px;
-  background: var(--world-surface-soft, rgba(255, 255, 255, 0.07));
+  background: var(--world-surface-soft);
   animation: pm-pulse 1.4s ease-in-out infinite;
 }
 
 .plans-module .pm-skeleton--month { height: 320px; }
-.plans-module .pm-skeleton--tile { height: 92px; }
+.plans-module .pm-skeleton--tile { height: 118px; }
 
 @keyframes pm-pulse {
   50% { opacity: 0.55; }
 }
 
-.plans-module .pm-error { color: var(--world-text, #f6efff); }
+.plans-module .pm-error { color: var(--text); }
 
-/* ── Календар і «Наш шлях» у кольорах світу ──────────────
-   Перевизначаються ТОКЕНИ, а не перелік класів, — той самий підхід, що у
-   вішліста (`wishlistCrystalWorld.css`). Обидва принесені компоненти написані
-   на `--text`, `--muted`, `--surface`, тож одного блоку досить, щоб вони
-   заговорили мовою світу.
+/* ── Календар у мові модуля ──────────────────────────────
+   Перевизначаються ТОКЕНИ, а не перелік класів: обидва принесені компоненти
+   («Календар» і «Наш шлях») написані на `--text`, `--muted`, `--surface`, тож
+   одного блоку досить, щоб вони заговорили мовою модуля.
 
    Перша спроба перелічувала класи, і живий портал показав, чому це не
-   працює: `.cal-day-event` бере `var(--surface)` і лишився БІЛИМ рядком
-   посеред темного модуля, бо в переліку його не було. Перелік завжди
-   відстає від компонента, який перефарбовує. */
+   працює: `.cal-day-event` брав `var(--surface)` і лишався БІЛИМ рядком
+   посеред темного модуля, бо в переліку його не було. */
 [data-portal-scene='true'] .plans-module,
 [data-portal-scene='true'] .plan-detail-page {
-  /* Колір тексту теж, а не лише токен: назва місяця — це голий `<b>`, який
-     нічого не оголошує й успадковує колір сторінки. Виміряно на живому
-     порталі: «Серпень 2026» лишився темним на темному й читався ледь-ледь. */
   color: var(--world-text);
   --text: var(--world-text);
   --muted: var(--world-text-muted);
@@ -309,41 +430,112 @@
   --danger: var(--world-danger);
   --ok: var(--world-success);
   --warn: var(--world-warning);
-  /* `--bg` теж, і саме його бракувало.
-     Поля вводу в аркушах створення змішуються з фоном СТОРІНКИ
-     (`color-mix(... var(--bg))`), а не з поверхнею. Без цього токена вони
-     лишались майже білими на темному аркуші — власник показав це знімком:
-     «поправ кольори поля вводу і вибору плану (вони зараз сірі)». */
   --bg: var(--world-bg-deep);
 }
 
 .plans-module .cal-month,
 .plans-module .cal-year {
-  padding: 12px;
-  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
-  border-radius: 20px;
-  background: var(--world-surface, rgba(42, 33, 64, 0.82));
-  box-shadow: 0 12px 30px var(--world-shadow, rgba(6, 4, 12, 0.5));
+  padding: 14px 14px 10px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: var(--surface);
+  box-shadow: 0 14px 34px rgba(4, 2, 10, 0.45);
 }
 
-/* Довга назва події не має розпирати картку за екран: список під сіткою
-   живе в тій самій ширині, що й сітка. Виміряно на живому порталі — рядок
-   «День народження Каріни» вилазив за правий край картки. */
-.plans-module .cal-month-list,
-.plans-module .cal-day-block,
-.plans-module .cal-day-event { min-width: 0; max-width: 100%; }
+.plans-module .cal-month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 800;
+}
 
 .plans-module .cal-nav-btn,
 .plans-module .cal-today-btn {
-  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
-  background: var(--world-recess, rgba(9, 6, 16, 0.42));
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--world-surface-soft);
+  color: var(--text);
 }
 
+/* Комірка дня — рамка, а не суцільна плитка: на референсі сітка читається
+   як огранене скло, і саме рамки роблять цей ефект. */
 .plans-module .cal-cell {
-  background: var(--world-surface-soft, rgba(255, 255, 255, 0.07));
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--text);
 }
 
-.plans-module .cal-cell--pad { background: none; }
+.plans-module .cal-cell--pad {
+  border-color: transparent;
+  background: none;
+}
+
+/* Список подій місяця під сіткою в картку не входить.
+   ------------------------------------------------------------
+   На референсі картка місяця закінчується одразу після числа 31, і це не
+   примха композиції: список, який дублює те, що вже показано крапками,
+   подвоює висоту картки й відсуває плани за межу екрана.
+
+   Нічого при цьому не втрачається — дотик по дню відкриває панель дня
+   (`.cal-day-panel`) рівно з тими самими подіями. Ховається переказ, а не
+   доступ до нього. */
+.plans-module .cal-month > .cal-month-list,
+.plans-module .cal-month > .empty-state {
+  display: none;
+}
+
+/* День, у якому щось є, не заливається кольором: на референсі про це кажуть
+   крапки під числом, і залитий фон сперечався б із ними. */
+.plans-module .cal-cell--has {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+/* «Сьогодні» — бірюзова смужка під числом. Єдина бірюзова річ на екрані, і
+   вона означає рівно одне.
+
+   `box-shadow: none` тут не косметика: базовий `.cal-cell--today` в
+   `index.css` малює фіолетове кільце, а кільце на референсі означає ІНШЕ —
+   вибраний день. Два різні стани з однаковим кільцем не розрізнити. */
+.plans-module .cal-cell--today {
+  color: #fff;
+  font-weight: 800;
+  box-shadow: none;
+}
+
+.plans-module .cal-cell--today::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 7px;
+  width: 16px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--today);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--today) 60%, transparent);
+  translate: -50% 0;
+}
+
+/* Вибраний день — фіолетовий контур. Не заливка: залита комірка сперечалася
+   б із кольоровими крапками подій усередині неї. */
+.plans-module .cal-cell--sel {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 14px var(--world-glow);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.plans-module .cal-cell--today.cal-cell--sel::after { bottom: 5px; }
+
+.plans-module .cal-month-list,
+.plans-module .cal-day-block,
+.plans-module .cal-day-event { min-width: 0; max-width: 100%; }
 
 /* ── «Наш шлях» ──────────────────────────────────────────── */
 
@@ -351,18 +543,13 @@
 
 /* ── Поза світом ─────────────────────────────────────────── */
 
-/* Без WebGL сцени немає, і скляна панель висіла б над білим папером сторінки.
-   Модуль тоді бере звичайні токени порталу — структура та сама, шкіра інша. */
+/* Без WebGL сцени немає, і скло висіло б над порожнім фоном. Модуль тоді бере
+   звичайні токени порталу — структура та сама, шкіра інша. Гама одна й та
+   сама в обох випадках: портал більше не має світлої теми. */
 .plans-module:not([data-world='true']) .pm-tabs,
 .plans-module:not([data-world='true']) .pm-tile,
 .plans-module:not([data-world='true']) .cal-month {
-  border-color: var(--border, rgba(0, 0, 0, 0.1));
-  background: var(--surface, #fff);
-}
-
-.plans-module:not([data-world='true']) .pm-tile-title,
-.plans-module:not([data-world='true']) .pm-section-head h2 {
-  color: var(--text, #241c33);
+  background: var(--surface);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -371,12 +558,8 @@
 }
 
 /* ── Сторінка плану — той самий модуль, лише глибше ──────
-   Власник: «третій і четвертий скрін треба адаптувати під модуль, по
-   кольоровій гамі, з таким самим фоном». Сторінка плану лишається окремим
-   маршрутом, але це той самий модуль: та сама сцена позаду, та сама палітра,
-   той самий папір.
-
    Токени вона бере з блоку вище — саме тому там два селектори, а не один. */
+
 [data-portal-scene='true'] .plan-detail-page {
   background: none;
 }

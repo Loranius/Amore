@@ -14,7 +14,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { EventIcon } from '@/components/icons/EventIcon';
 import { BulbIcon } from '@/components/icons/PlanIcon';
-import { PlusIcon } from '@/components/icons/UiIcon';
+import { ChevronRightIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { useDimmedWorld } from '@/features/world/worldDim';
@@ -103,13 +103,6 @@ export function PlansPage() {
 
   const groups = useMemo(() => groupPlans(plans), [plans]);
   const activeCount = groups.upcoming.length + groups.ideas.length;
-
-  // «Кристальний шлях» у списку планів — не нова валюта і не нова таблиця.
-  // Він показує частку завершених планів на шкалі 0…1000, тож візуальний
-  // прогрес із референсу не вигадує окремої бізнес-логіки й не ламає дані.
-  const crystalPathValue = plans.length === 0
-    ? 0
-    : Math.round((groups.closed.length / plans.length) * 1000);
 
   const openNewEvent = (
     type: EventKind = 'anniversary',
@@ -224,11 +217,9 @@ export function PlansPage() {
             onOpenPlan={(id) => navigate(`/plans/${id}`)}
           />
 
-          <CrystalPathProgress value={crystalPathValue} />
-
           <PlanSection
             title="Найближчі плани"
-            note={`${groups.upcoming.length}`}
+            more="Дивитися всі"
             plans={groups.upcoming}
             onConfirm={(id) => confirmPlan.mutate(id)}
             empty="Жодного плану з датою. Додайте перший — він одразу стане в сітці вище."
@@ -236,7 +227,7 @@ export function PlansPage() {
 
           <PlanSection
             title="Ідеї без дати"
-            note="колись"
+            more="Колись"
             plans={groups.ideas}
             onConfirm={(id) => confirmPlan.mutate(id)}
             empty="Ідей поки немає."
@@ -250,7 +241,11 @@ export function PlansPage() {
                 aria-expanded={showClosed}
                 onClick={() => setShowClosed((current) => !current)}
               >
-                Завершені <span>{groups.closed.length}</span>
+                Завершені
+                <span>
+                  {groups.closed.length}
+                  <ChevronRightIcon size={16} />
+                </span>
               </button>
               {showClosed && (
                 <div className="pm-tiles">
@@ -315,35 +310,6 @@ export function PlansPage() {
         />
       )}
     </section>
-  );
-}
-
-function CrystalPathProgress({ value }: { value: number }) {
-  const max = 1000;
-  const safeValue = Math.max(0, Math.min(max, value));
-  const progress = (safeValue / max) * 100;
-
-  return (
-    <div
-      className="pm-crystal-path"
-      role="meter"
-      aria-label={`Кристальний шлях: ${safeValue} із ${max}`}
-      aria-valuemin={0}
-      aria-valuemax={max}
-      aria-valuenow={safeValue}
-    >
-      <span className="pm-crystal-path-title">
-        <i className="pm-crystal-path-icon" aria-hidden="true" />
-        <span>КРИСТАЛЬНИЙ ШЛЯХ</span>
-      </span>
-      <span className="pm-crystal-path-track" aria-hidden="true">
-        <i className="pm-crystal-path-fill" style={{ width: `${progress}%` }} />
-        <i className="pm-crystal-path-marker" style={{ left: `${progress}%` }} />
-      </span>
-      <span className="pm-crystal-path-value">
-        {safeValue} / {max} <b aria-hidden="true">✦</b>
-      </span>
-    </div>
   );
 }
 
@@ -413,24 +379,49 @@ function CalendarCreateChooser({ date, onClose, onPlan, onEvent }: {
   );
 }
 
-function PlanSection({ title, note, plans, onConfirm, empty }: {
+/** Скільки карток видно до того, як секція просить «Дивитися всі». */
+const SECTION_PREVIEW = 4;
+
+/**
+ * Секція планів.
+ *
+ * Праворуч від назви стоїть вихід («Дивитися всі ›», «Колись ›») — так на
+ * референсі. Він розкриває решту КАРТОК ТУТ САМО, а не веде кудись: окремого
+ * екрана «всі плани» в застосунку немає, і вигадувати маршрут заради стрілки
+ * не варто. Кнопка з'являється лише тоді, коли є що розкривати.
+ */
+function PlanSection({ title, more, plans, onConfirm, empty }: {
   title: string;
-  note: string;
+  more: string;
   plans: readonly import('@/types').PlanRow[];
   onConfirm: (id: number) => void;
   empty: string;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const hidden = Math.max(0, plans.length - SECTION_PREVIEW);
+  const shown = expanded ? plans : plans.slice(0, SECTION_PREVIEW);
+
   return (
     <>
       <div className="pm-section-head">
         <h2>{title}</h2>
-        <span>{note}</span>
+        {hidden > 0 && (
+          <button
+            type="button"
+            className="pm-section-more"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            {expanded ? 'Згорнути' : more}
+            <ChevronRightIcon size={16} />
+          </button>
+        )}
       </div>
       {plans.length === 0 ? (
         <p className="pm-section-empty">{empty}</p>
       ) : (
         <div className="pm-tiles">
-          {plans.map((plan) => <PlanTile key={plan.id} plan={plan} onConfirm={onConfirm} />)}
+          {shown.map((plan) => <PlanTile key={plan.id} plan={plan} onConfirm={onConfirm} />)}
         </div>
       )}
     </>

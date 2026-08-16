@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { ChevronRightIcon } from '@/components/icons/UiIcon';
 import { daysLabel } from '@/features/calendar/calendarUtils';
 import { PLAN_CATEGORIES, PLAN_STATUSES } from './planConstants';
 import { daysUntilStart, hasPreciseDate, isClosed, planDateLabel } from './planModel';
@@ -15,6 +16,12 @@ import type { PlanRow } from '@/types';
 // Одне не скоротилось: підтвердження. Запропонований план, який другий
 // партнер ще не підтвердив, вимагає відповіді, і сховати її «до сторінки»
 // означало б, що відповідь не дадуть ніколи.
+//
+// У правому верхньому кутку нічого немає — там був кристал або пісочний
+// годинник, і власник прибрав їх: «іконка кристалів чи пісочного годинника на
+// планах в правому верхньому кутку — не додавай їх». Замість них у нижньому
+// кутку стоїть стрілка з референсу: вона каже, що картка кудись веде, а не
+// малює статус вдруге.
 // ============================================================
 
 export function PlanTile({ plan, onConfirm }: {
@@ -56,6 +63,8 @@ export function PlanTile({ plan, onConfirm }: {
           Підтвердити
         </button>
       )}
+
+      <span className="pm-tile-go" aria-hidden="true"><ChevronRightIcon size={15} /></span>
     </article>
   );
 }

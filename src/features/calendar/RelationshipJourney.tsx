@@ -66,9 +66,22 @@ function makePath(xs: readonly number[]): JourneyPath {
   return { height, d };
 }
 
+/**
+ * Наскільки ДНК пари може відхилити стежку від фіолетового порталу.
+ *
+ * Було: повний оберт (`hueRotation` — це rng()×360), тобто стежка могла
+ * вийти будь-якого кольору. Виміряно на живому екрані цієї пари — вона вийшла
+ * салатовою посеред фіолетового світу. Відколи гама референсу стала базою
+ * порталу, це не «своя барва», а чужа.
+ *
+ * Смуга лишає стежку впізнавано їхньою, але всередині палітри.
+ */
+const JOURNEY_HUE_SPREAD = 34;
+
 function crystalJourneyStyle(seed: string | null): CSSProperties {
   const rotation = seed ? generateArtifactDNA(seed).hueRotation : 0;
-  const hue = (CRYSTAL_CORE_BASE_HUE + rotation) % 360;
+  const shift = (rotation / 360) * (JOURNEY_HUE_SPREAD * 2) - JOURNEY_HUE_SPREAD;
+  const hue = (CRYSTAL_CORE_BASE_HUE + shift + 360) % 360;
   return {
     '--relationship-journey-neon': `hsl(${hue.toFixed(1)} 88% 72%)`,
     '--relationship-journey-neon-core': `hsl(${hue.toFixed(1)} 96% 88%)`,
