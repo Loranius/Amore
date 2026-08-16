@@ -1,0 +1,564 @@
+/* ============================================================
+   Карта плану: літаючі блоки замість аркуша зі згортками.
+   ------------------------------------------------------------
+   Мова взята з референсу власника (макет — `docs/prototypes/plans-map.html`):
+   окремі блоки висять у темряві, з'єднані світними нитками. Кольори — ні:
+   усе з `worldTheme.css`, кольори категорій — з `planConstants.ts`.
+
+   Головне правило файлу: сторінка плану вміщається в екран без скролу. Тому
+   ряди мають наперед відому висоту (висота ряду — висота вищого блока), а
+   довгі списки обриваються рядком «ще N» замість того, щоб рости. Стелі
+   живуть у `planMapLayout.ts` — тут лише те, що з них видно.
+
+   Поза світом (немає WebGL — немає сцени) блоки світитись не можуть: сяйво
+   існує тільки тому, що за ним темно. Там модуль бере звичайні токени
+   сторінки — структура та сама, шкіра інша.
+   ============================================================ */
+
+/* ── Скільки місця займає карта ──────────────────────────
+
+   Карта мусить зайняти рівно те, що лишилось, — не менше (внизу зяяла б
+   порожнеча) і не більше (з'явився б скрол, заради відсутності якого все це
+   й робиться).
+
+   Рахувати це від `100dvh` не можна, і це виміряно на живому порталі:
+   viewport 915, а контентна коробка `.content` — 741. Різниця (док, падінги,
+   безпечна зона, рядок «Карта планів») набирається з чотирьох джерел, і
+   будь-яка константа в CSS розійдеться з ними на першій же зміні дока.
+   Перша спроба взяла `calc(100dvh - 152px)` і дала 102 px скролу.
+
+   Тому висоту віддано flexbox: ланцюжок від прокрутного контейнера до карти
+   тягнеться на всю доступну висоту, і жодного числа в ньому немає. */
+.content > .page-fade:has(> .plan-detail-page--map) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.plan-detail-page--map {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  /* Нижній відступ сторінки тут зайвий: місце під док уже тримає падінг
+     `.content`, а ці 48 px просто відбирались у карти. */
+  padding-bottom: 0;
+}
+
+.plan-map {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Блоки розходяться по всій висоті, а не збираються догори: карта має
+     займати екран, інакше внизу лишається пляма порожнечі, яку читають як
+     «щось не довантажилось». */
+  justify-content: space-between;
+  /* Запасний варіант для браузера без `:has()`: карта не тягнеться, зате й
+     скролу не створює — знизу просто лишиться повітря. */
+  min-height: calc(100dvh - 260px);
+}
+
+/* ── Нитки ───────────────────────────────────────────────── */
+
+/* Під блоками, а не над: там, де крива входить у блок, вона зникає — нитка
+   тримає блок, а не перекреслює його. */
+.plan-map .pmap-threads {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.plan-map .pmap-threads-glow path {
+  fill: none;
+  stroke: var(--world-primary, #c9a0e6);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.3;
+  filter: blur(3px);
+}
+
+.plan-map .pmap-threads-core path {
+  fill: none;
+  stroke: var(--world-accent, #dcb6f5);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0.72;
+}
+
+.plan-map .pmap-threads-nodes circle {
+  fill: var(--world-accent, #dcb6f5);
+  opacity: 0.9;
+}
+
+/* ── Блок ────────────────────────────────────────────────── */
+
+/* Кут реєструється, щоб обід можна було крутити анімацією: без @property
+   конічний градієнт не інтерполюється й обід стрибає. */
+@property --pmap-rim {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.plan-map .pmap-block {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  border-radius: 26px 36px 28px 34px / 32px 26px 36px 28px;
+  background:
+    linear-gradient(158deg, rgba(74, 56, 116, 0.62), rgba(34, 25, 56, 0.78)),
+    var(--world-surface, rgba(42, 33, 64, 0.82));
+  box-shadow:
+    0 0 34px rgba(176, 128, 232, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 16px 34px var(--world-shadow, rgba(6, 4, 12, 0.5));
+  color: var(--world-text, #f6efff);
+  text-align: left;
+  font: inherit;
+  animation: pmap-float 7s ease-in-out infinite;
+  animation-delay: var(--pmap-drift, 0s);
+}
+
+/* Нерівні кути — з референсу. Другий блок ряду дзеркалить перший, щоб два
+   сусіди не виглядали однаковою карткою. */
+.plan-map .pmap-row > :nth-child(2) {
+  border-radius: 36px 26px 34px 28px / 26px 34px 28px 36px;
+}
+
+/* Світний обід: тонке кільце конічним градієнтом, вирізане маскою. Саме він
+   робить із картки «блок у темряві», а не рамка й не тінь. */
+.plan-map .pmap-block::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1.4px;
+  pointer-events: none;
+  background: conic-gradient(from var(--pmap-rim),
+    rgba(220, 182, 245, 0.24) 0deg,
+    rgba(247, 231, 255, 1) 42deg,
+    rgba(201, 160, 230, 0.46) 96deg,
+    rgba(220, 182, 245, 0.2) 168deg,
+    rgba(244, 224, 255, 0.92) 236deg,
+    rgba(180, 140, 224, 0.36) 300deg,
+    rgba(220, 182, 245, 0.24) 360deg);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: pmap-rim 18s linear infinite;
+  animation-delay: var(--pmap-drift, 0s);
+}
+
+@keyframes pmap-rim {
+  to { --pmap-rim: 360deg; }
+}
+
+@keyframes pmap-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -4px; }
+}
+
+.plan-map button.pmap-block,
+.plan-map .pmap-block[data-tap='true'] {
+  cursor: pointer;
+  transition: translate 180ms ease, box-shadow 180ms ease;
+}
+
+.plan-map .pmap-block:focus-visible,
+.plan-map .pmap-block :focus-visible {
+  outline: 2px solid var(--world-accent, #dcb6f5);
+  outline-offset: 3px;
+}
+
+.plan-map .pmap-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plan-map .pmap-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(220, 182, 245, 0.3);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--plan-color, var(--world-accent, #dcb6f5));
+}
+
+.plan-map .pmap-title {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.plan-map .pmap-note {
+  font-size: 12px;
+  color: var(--world-text-muted, #c9b8e4);
+}
+
+/* Лічильник у заголовку блока. Окремий клас, а не `.pmap-note` з
+   `margin-left:auto`: тим самим класом підписані й багаторядкові підказки, і
+   `nowrap` розірвав би їх. Виміряно на макеті — «0 з 3» ставало стовпчиком із
+   трьох рядків. */
+.plan-map .pmap-count {
+  flex: none;
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--world-text-muted, #c9b8e4);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Ряд ─────────────────────────────────────────────────── */
+
+/* Ширини різні в кожному ряду, а правий блок зсунуто вниз: рівна сітка
+   читається як таблиця, а карта не таблиця.
+
+   Чому ряди, а не два вільні стовпці: висота ряду — це висота вищого блока, і
+   її видно наперед. Два вільні стовпці рахують висоту кожен свій, і перший же
+   довгий список їде під док. Виміряно на макеті: 830 px змісту в 739 px
+   екрана. */
+.plan-map .pmap-row {
+  display: grid;
+  gap: 11px;
+  align-items: start;
+  grid-template-columns: var(--pmap-split, 1fr 1fr);
+}
+
+.plan-map .pmap-row > :nth-child(2) {
+  margin-top: var(--pmap-drop, 16px);
+}
+
+/* ── Назва плану ─────────────────────────────────────────── */
+
+.plan-map .pmap-hero {
+  gap: 6px;
+  padding: 13px 15px 14px;
+}
+
+.plan-map .pmap-hero-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding-right: 30px;
+}
+
+.plan-map .pmap-hero-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-map .pmap-hero .pmap-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 15px;
+}
+
+.plan-map .pmap-category {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--plan-color, var(--world-accent, #dcb6f5));
+}
+
+/* Дві стелі, які тримають висоту блока назви: назва — два рядки, опис —
+   один. Довше обрізається, а не розсуває карту. */
+.plan-map .pmap-hero h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.16;
+  font-weight: 800;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+
+.plan-map .pmap-hero p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--world-text-muted, #c9b8e4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-map .pmap-edit {
+  position: absolute;
+  z-index: 3;
+  right: 12px;
+  top: 12px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(220, 182, 245, 0.32);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--world-accent, #dcb6f5);
+  cursor: pointer;
+}
+
+/* ── Вміст блоків ────────────────────────────────────────── */
+
+.plan-map .pmap-value {
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-map .pmap-pill {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(220, 182, 245, 0.16);
+  color: var(--world-accent, #dcb6f5);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.plan-map .pmap-pill[data-tone='past'] {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--world-text-muted, #c9b8e4);
+}
+
+.plan-map .pmap-pill[data-tone='overdue'] {
+  background: rgba(226, 112, 127, 0.16);
+  color: var(--world-danger, #e2707f);
+}
+
+.plan-map .pmap-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.plan-map .pmap-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  border-radius: var(--radius-pill, 999px);
+  background: var(--world-recess, rgba(9, 6, 16, 0.42));
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+}
+
+/* Пункт — один рядок. Довший обрізається: два рядки на пункт означають, що
+   стеля в чотири пункти більше нічого не гарантує. */
+.plan-map .pmap-line > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.plan-map .pmap-line em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--world-text-muted, #c9b8e4);
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-map button.pmap-line { cursor: pointer; }
+
+.plan-map .pmap-check {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.6px solid rgba(220, 182, 245, 0.5);
+}
+
+.plan-map .pmap-line[data-done='true'] .pmap-check {
+  border-color: var(--world-success, #7fd0a6);
+  background: rgba(127, 208, 166, 0.28);
+}
+
+.plan-map .pmap-line[data-done='true'] > span {
+  color: var(--world-text-muted, #c9b8e4);
+  text-decoration: line-through;
+}
+
+.plan-map .pmap-more {
+  padding-left: 4px;
+  font-size: 12px;
+  color: var(--world-text-muted, #c9b8e4);
+}
+
+.plan-map .pmap-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border: 1px dashed rgba(220, 182, 245, 0.34);
+  border-radius: var(--radius-pill, 999px);
+  background: none;
+  color: var(--world-text-muted, #c9b8e4);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.plan-map .pmap-ghost--box {
+  flex-direction: column;
+  gap: 5px;
+  padding: 13px 10px;
+  border-radius: 18px;
+}
+
+/* Бюджет: кільце показує зібране, а не «скільки лишилось», — так само, як у
+   скарбничці. Без бюджету кільця немає, і воно нічого не обіцяє. */
+.plan-map .pmap-money {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plan-map .pmap-ring {
+  position: relative;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(
+    var(--world-accent, #dcb6f5) calc(var(--pmap-fill, 0) * 1%),
+    rgba(255, 255, 255, 0.09) 0);
+}
+
+.plan-map .pmap-ring::after {
+  content: '';
+  width: 33px;
+  height: 33px;
+  border-radius: 50%;
+  background: var(--world-surface-strong, #2a2140);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Відсоток центрується сам, а не «десь у кільці»: без inset абсолютний
+   елемент стає там, де його лишив потік, і на макеті 64 % з'їхали на обід. */
+.plan-map .pmap-ring b {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-map .pmap-money-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.plan-map .pmap-money-copy .pmap-value { font-size: 15px; }
+.plan-map .pmap-money-copy .pmap-note { font-size: 11.5px; white-space: nowrap; }
+
+/* Стан: стільки поділок, скільки робочих статусів у `planConstants.ts`, — це
+   шкала стану, а не декоративні смужки. */
+.plan-map .pmap-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 12px;
+  border: 1px solid var(--world-border-active, rgba(220, 182, 245, 0.42));
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(201, 160, 230, 0.14);
+  color: inherit;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.plan-map .pmap-steps {
+  display: flex;
+  gap: 5px;
+}
+
+.plan-map .pmap-steps span {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-pill, 999px);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.plan-map .pmap-steps span[data-on='true'] {
+  background: linear-gradient(90deg, var(--world-primary, #c9a0e6), var(--world-accent, #dcb6f5));
+}
+
+.plan-map .pmap-delete {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 0;
+  border-radius: var(--radius-pill, 999px);
+  background: none;
+  color: var(--world-text-muted, #c9b8e4);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* ── Поза світом ─────────────────────────────────────────── */
+
+/* Без WebGL сцени немає, і блоки світились би в порожнечу над білим папером.
+   Той самий підхід, що в `plansModule.css`: структура лишається, шкіра
+   міняється. */
+.plan-map:not([data-world='true']) .pmap-block {
+  background: var(--surface, #fff);
+  border-color: var(--border, rgba(0, 0, 0, 0.1));
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.1);
+  color: var(--text, #241c33);
+  animation: none;
+}
+
+.plan-map:not([data-world='true']) .pmap-block::after { display: none; }
+
+.plan-map:not([data-world='true']) .pmap-line {
+  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+  border-color: var(--border, rgba(0, 0, 0, 0.1));
+}
+
+.plan-map:not([data-world='true']) .pmap-threads-core path { stroke: var(--accent, #7b4fa8); }
+.plan-map:not([data-world='true']) .pmap-threads-glow path { opacity: 0.14; }
+.plan-map:not([data-world='true']) .pmap-threads-nodes circle { fill: var(--accent, #7b4fa8); }
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-map .pmap-block,
+  .plan-map .pmap-block::after {
+    animation: none;
+  }
+}
