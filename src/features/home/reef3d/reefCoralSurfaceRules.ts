@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import type { ReefColonyMorphotype } from '@/engine/species/reef';
 
-export const REEF_CORAL_SURFACE_RULES_VERSION = 'reef-coral-surface-rules-v1';
-export const REEF_CORAL_SURFACE_COLONIZATION_VERSION = 'reef-coral-surface-colonization-v1';
+export const REEF_CORAL_SURFACE_RULES_VERSION = 'reef-coral-surface-rules-v2';
+export const REEF_CORAL_SURFACE_COLONIZATION_VERSION = 'reef-coral-surface-colonization-v2';
 export const VOLCANO_CORAL_SUMMIT_NO_GROW_RATIO = 0.72;
 export const VOLCANO_CORAL_CRATER_MIN_HEIGHT_RATIO = 0.5;
 export const VOLCANO_CORAL_CRATER_RADIUS_RATIO = 0.23;
@@ -65,28 +65,32 @@ const SURFACE_COLONIZATION: Readonly<Record<
     },
   },
   arch: {
-    // Eroded limestone crowns favour light, attached forms over bulky colonies.
+    // The arch pass is a secondary habitat, not a second reef carpet. Authored
+    // attachment slots already cap footprint and spacing, while these affinities
+    // deliberately favour light attached forms so limestone ribs do not stay dead.
     minNormalY: 0.28,
     maxHeightDelta: 0.3,
     morphotypeWeight: {
-      branching: 0.18,
+      branching: 0.2,
       massive: 0.1,
-      plating: 0.28,
-      encrusting: 0.58,
-      'soft-coral': 0.56,
-      'sea-fan': 0.72,
+      plating: 0.46,
+      encrusting: 0.82,
+      'soft-coral': 0.72,
+      'sea-fan': 0.95,
     },
   },
   rock: {
+    // Peripheral rock stays less attractive than the main terraces, but it is
+    // viable enough to break up empty dead rims with small natural colonies.
     minNormalY: 0.52,
     maxHeightDelta: 0.22,
     morphotypeWeight: {
-      branching: 0.58,
+      branching: 0.62,
       massive: 0.72,
-      plating: 0.44,
-      encrusting: 0.82,
-      'soft-coral': 0.62,
-      'sea-fan': 0.56,
+      plating: 0.52,
+      encrusting: 0.86,
+      'soft-coral': 0.68,
+      'sea-fan': 0.64,
     },
   },
   unknown: {
