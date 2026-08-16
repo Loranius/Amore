@@ -1,0 +1,306 @@
+/* ============================================================
+   Plans — Reference UI stage 1: colour hierarchy
+   ------------------------------------------------------------
+   Перший етап нового UI-pass за затвердженим референсом.
+   Тут свідомо НЕ міняємо геометрію, висоти, порядок DOM або бізнес-логіку.
+   Завдання цього шару — розвести матеріали за світлістю:
+     1) майже чорний navy-violet світ;
+     2) темне скло великих поверхонь;
+     3) трохи світліші інтерактивні клітинки/картки;
+     4) lavender/pink лише як активний акцент.
+   Наступні етапи окремо займуться facets, badges, typography і separators.
+   ============================================================ */
+
+.plans-module {
+  --pm-s1-void: #0b0714;
+  --pm-s1-panel: rgba(18, 11, 33, .82);
+  --pm-s1-panel-raised: rgba(24, 15, 42, .84);
+  --pm-s1-panel-soft: rgba(31, 21, 50, .67);
+  --pm-s1-cell: rgba(54, 43, 73, .31);
+  --pm-s1-cell-hover: rgba(66, 49, 87, .38);
+  --pm-s1-line: rgba(178, 157, 209, .14);
+  --pm-s1-line-soft: rgba(178, 157, 209, .08);
+  --pm-s1-line-hot: rgba(224, 178, 250, .62);
+  --pm-s1-text: #f8f2ff;
+  --pm-s1-muted: rgba(210, 194, 224, .7);
+  --pm-s1-muted-soft: rgba(188, 170, 204, .56);
+  --pm-s1-lavender: #c887e5;
+  --pm-s1-lavender-hot: #e7b1fb;
+  --pm-s1-purple: #8954ac;
+  --pm-s1-pink: #f45b9e;
+  --pm-s1-shadow: rgba(4, 1, 10, .34);
+}
+
+/* ── 1. Верхній segmented control ────────────────────────── */
+
+.plans-module .pm-tabs {
+  border-color: var(--pm-s1-line);
+  background:
+    radial-gradient(circle at 50% -70%, rgba(164, 104, 202, .09), transparent 58%),
+    linear-gradient(180deg, rgba(28, 18, 47, .9), rgba(14, 9, 27, .88));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    inset 0 -1px 0 rgba(78, 54, 100, .16),
+    0 10px 28px var(--pm-s1-shadow);
+}
+
+.plans-module .pm-tab {
+  color: rgba(221, 207, 234, .72);
+}
+
+.plans-module .pm-tab-count {
+  border-color: rgba(223, 202, 239, .07);
+  background: rgba(151, 116, 177, .08);
+}
+
+.plans-module .pm-tab[aria-selected='true'] {
+  color: #21122b;
+  border-color: rgba(241, 211, 255, .68);
+  background:
+    radial-gradient(ellipse at 50% -25%, rgba(255,255,255,.5), transparent 42%),
+    linear-gradient(180deg, #d49bea 0%, #bc77db 54%, #9d58c0 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.68),
+    inset 0 -7px 15px rgba(65,27,91,.16),
+    0 0 15px rgba(188,108,225,.13);
+}
+
+.plans-module .pm-tab[aria-selected='true'] .pm-tab-count {
+  border-color: rgba(255,255,255,.17);
+  background: rgba(255,255,255,.26);
+}
+
+/* ── 2. Календар: головна темна surface ─────────────────── */
+
+.plans-module .cal-month {
+  border-color: var(--pm-s1-line);
+  background:
+    radial-gradient(circle at 50% -14%, rgba(153, 91, 190, .075), transparent 44%),
+    linear-gradient(180deg, rgba(25, 16, 44, .88), rgba(13, 8, 25, .84));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    0 14px 34px rgba(3,1,8,.29);
+}
+
+.plans-module .cal-month::before {
+  opacity: .56;
+  background:
+    linear-gradient(120deg, transparent 12%, rgba(255,255,255,.018) 30%, transparent 46%),
+    linear-gradient(300deg, transparent 60%, rgba(157,94,194,.025));
+}
+
+.plans-module .cal-month-nav > b {
+  color: var(--pm-s1-text);
+}
+
+.plans-module .cal-nav-btn {
+  border-color: rgba(187, 161, 214, .12);
+  background:
+    linear-gradient(180deg, rgba(56, 39, 76, .28), rgba(11, 7, 23, .58));
+  color: rgba(247,239,255,.94);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    0 6px 14px rgba(3,1,8,.18);
+}
+
+.plans-module .cal-dow {
+  color: rgba(205, 191, 220, .7);
+}
+
+.plans-module .cal-cell {
+  border-color: rgba(195, 176, 216, .055);
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.025), rgba(255,255,255,.005)),
+    var(--pm-s1-cell);
+  color: rgba(244,238,250,.86);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.012),
+    inset 0 -1px 0 rgba(5,2,10,.16);
+}
+
+.plans-module button.cal-cell:hover {
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.03), rgba(255,255,255,.006)),
+    var(--pm-s1-cell-hover);
+}
+
+.plans-module .cal-cell--today,
+.plans-module .cal-cell--sel {
+  border-color: rgba(229, 176, 250, .88);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(203,130,233,.09), transparent 48%),
+    rgba(63, 43, 82, .42);
+  box-shadow:
+    inset 0 0 0 1px rgba(238,205,252,.15),
+    0 0 11px rgba(192,111,225,.18);
+}
+
+.plans-module .cal-cell--today.cal-cell--sel {
+  box-shadow:
+    inset 0 0 0 1px rgba(246,222,255,.21),
+    0 0 14px rgba(201,119,233,.22);
+}
+
+/* Детальний день, якщо його відкрили, теж підпорядковується тій самій шкалі. */
+.plans-module .cal-day-panel {
+  border-top-color: var(--pm-s1-line-soft);
+}
+
+.plans-module .cal-day-event {
+  border-color: rgba(188,165,211,.09);
+  background: rgba(29,19,47,.62);
+  color: var(--pm-s1-text);
+}
+
+/* ── 3. Crystal path: тонкий accent між темними surfaces ─── */
+
+.plans-module .pm-crystal-path {
+  color: var(--pm-s1-muted);
+}
+
+.plans-module .pm-crystal-path-track {
+  background: rgba(158, 135, 180, .09);
+  box-shadow: inset 0 1px 2px rgba(2,1,6,.35);
+}
+
+.plans-module .pm-crystal-path-fill {
+  background: linear-gradient(90deg, #9a55bb, #d887ed);
+  box-shadow: 0 0 7px rgba(195,115,225,.25);
+}
+
+.plans-module .pm-crystal-path-value {
+  color: rgba(225,214,236,.8);
+}
+
+.plans-module .pm-crystal-path-value b {
+  color: var(--pm-s1-lavender-hot);
+}
+
+/* ── 4. Єдиний великий panel списку ─────────────────────── */
+
+.plans-module .pm-crystal-path + .pm-section-head {
+  border-color: var(--pm-s1-line);
+  background:
+    radial-gradient(circle at 50% -28%, rgba(143,83,179,.055), transparent 44%),
+    linear-gradient(180deg, rgba(24,15,42,.85), rgba(16,10,30,.84));
+}
+
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles,
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head,
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head + .pm-tiles {
+  border-left-color: var(--pm-s1-line);
+  border-right-color: var(--pm-s1-line);
+  background: rgba(16, 10, 30, .84);
+}
+
+.plans-module .pm-section-head h2 {
+  color: var(--pm-s1-text);
+}
+
+.plans-module .pm-crystal-path + .pm-section-head > span::after {
+  color: rgba(208,193,221,.66);
+}
+
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head > span::after {
+  color: rgba(190,174,204,.57);
+}
+
+/* ── 5. План-картки: ink-purple, не «фіолетова плитка» ───── */
+
+.plans-module .pm-tile {
+  border-color: rgba(184,162,207,.105);
+  background:
+    radial-gradient(circle at 8% -4%, color-mix(in srgb, var(--plan-color) 7%, transparent), transparent 35%),
+    linear-gradient(145deg, rgba(34,23,53,.76), rgba(14,9,27,.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.018),
+    0 7px 17px rgba(3,1,8,.18);
+}
+
+.plans-module .pm-tile:hover,
+.plans-module .pm-tile:focus-within {
+  border-color: rgba(203,177,225,.16);
+  background:
+    radial-gradient(circle at 8% -4%, color-mix(in srgb, var(--plan-color) 8%, transparent), transparent 35%),
+    linear-gradient(145deg, rgba(39,26,59,.78), rgba(16,10,29,.84));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.024),
+    0 9px 20px rgba(3,1,8,.22);
+}
+
+.plans-module .pm-tile-title {
+  color: var(--pm-s1-text);
+}
+
+.plans-module .pm-tile-meta {
+  color: var(--pm-s1-muted-soft);
+}
+
+.plans-module .pm-tile-open::after {
+  border-color: rgba(200,178,220,.085);
+  background: rgba(73,49,96,.11);
+  color: rgba(229,211,240,.58);
+}
+
+/* ── 6. Completed footer + primary Add action ────────────── */
+
+.plans-module .pm-sheet > .pm-section-toggle {
+  border-color: var(--pm-s1-line);
+  border-top-color: var(--pm-s1-line-soft);
+  background: rgba(16, 10, 30, .86);
+  color: var(--pm-s1-text);
+  box-shadow: 0 11px 27px rgba(3,1,8,.2);
+}
+
+.plans-module .pm-section-toggle span,
+.plans-module .pm-section-toggle::after {
+  color: rgba(210,194,222,.63);
+}
+
+.plans-module .pm-fab {
+  border-color: rgba(241,211,255,.58);
+  background:
+    radial-gradient(circle at 30% -8%, rgba(255,255,255,.45), transparent 38%),
+    linear-gradient(135deg, #d39aec 0%, #b973d8 55%, #9856b9 100%);
+  color: #211229;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.62),
+    inset 0 -6px 14px rgba(70,29,98,.14),
+    0 9px 23px rgba(17,5,27,.31),
+    0 0 14px rgba(185,105,218,.11);
+}
+
+/* ── 7. Нижній dock: найтемніша UI-surface після світу ───── */
+
+body:has(.plans-module) .bottom-nav {
+  border-color: rgba(176,154,199,.12);
+  background:
+    radial-gradient(circle at 50% -42%, rgba(130,79,164,.055), transparent 56%),
+    linear-gradient(180deg, rgba(24,15,40,.95), rgba(12,7,24,.96));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    0 13px 34px rgba(2,1,6,.38);
+}
+
+body:has(.plans-module) .bottom-nav-indicator {
+  border-color: rgba(208,181,228,.12);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(185,117,218,.07), transparent 58%),
+    linear-gradient(180deg, rgba(71,47,91,.29), rgba(41,27,57,.21));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+body:has(.plans-module) .nav-btn {
+  color: rgba(201,185,214,.67);
+}
+
+body:has(.plans-module) .nav-btn.active {
+  color: #e7d1f4;
+}
+
+body:has(.plans-module) .nav-btn-home .nav-icon-home {
+  color: #c87fe3;
+  filter: drop-shadow(0 0 7px rgba(194,113,224,.2));
+}
+
+/* Stage 1 intentionally stops here: no geometry/facet/typography changes. */
