@@ -14,16 +14,6 @@ function materialNames(mesh: THREE.Mesh): string[] {
   return materials.map((material) => material.name);
 }
 
-/**
- * Renderer-only composition pass for decorative limestone around the hero reef.
- *
- * Data-driven foundation, terraces and visited-place outcrops keep their
- * authored transforms. The accepted continuous arch shells remain mounted as
- * invisible support/raycast geometry, while ReefNaturalArchLayer supplies the
- * visible irregular rock-chain silhouette. Decorative grounded rocks are sunk
- * and reduced, and tall distant stacks are removed instead of reading as blue
- * crystal spires behind the reef.
- */
 export function ReefWorldComposition() {
   const scene = useThree((state) => state.scene);
   const invalidate = useThree((state) => state.invalidate);
@@ -48,22 +38,23 @@ export function ReefWorldComposition() {
         visible: object.visible,
       });
 
-      if (isArchSupport) {
-        object.visible = false;
-      }
+      if (isArchSupport) object.visible = false;
 
       if (isGroundedDecoration) {
-        object.scale.set(
-          object.scale.x * 0.58,
-          object.scale.y * 0.72,
-          object.scale.z * 0.58,
-        );
-        object.position.y -= 0.18;
+        const radialDistance = Math.hypot(object.position.x, object.position.z);
+        if (radialDistance < 7.4) {
+          object.visible = false;
+        } else {
+          object.scale.set(
+            object.scale.x * 0.38,
+            object.scale.y * 0.52,
+            object.scale.z * 0.38,
+          );
+          object.position.y -= 0.26;
+        }
       }
 
-      if (isDistantStone && !isGroundedDecoration) {
-        object.visible = false;
-      }
+      if (isDistantStone && !isGroundedDecoration) object.visible = false;
     });
 
     scene.updateMatrixWorld(true);
