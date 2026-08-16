@@ -43,6 +43,9 @@ import '@/features/plans/plansReferencePanelPass.css';
 // Етап 1 нового UI-pass: темніша navy-violet ієрархія surfaces та контроль
 // яскравих lavender/pink акцентів без зміни геометрії або логіки модуля.
 import '@/features/plans/plansReferencePaletteStage1.css';
+// Етап 2: темне тоноване скло замість великих фіолетових блоків —
+// тонші edges, внутрішні highlights, слабші separators і глибший material feel.
+import '@/features/plans/plansReferenceGlassStage2.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
