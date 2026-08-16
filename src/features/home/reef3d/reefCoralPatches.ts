@@ -12,7 +12,7 @@ import {
   type ReefColonyHabitatTier,
 } from './reefColonyHabitats';
 
-export const REEF_CORAL_PATCH_VERSION = 'reef-coral-patches-v1';
+export const REEF_CORAL_PATCH_VERSION = 'reef-coral-patches-v2-tier-density';
 
 const TAU = Math.PI * 2;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
@@ -61,12 +61,12 @@ function normalizeAngle(value: number): number {
 
 function patchCapacity(morphotype: ReefColonyMorphotype): number {
   switch (morphotype) {
-    case 'branching': return 7;
-    case 'massive': return 5;
-    case 'plating': return 5;
-    case 'encrusting': return 8;
-    case 'soft-coral': return 7;
-    case 'sea-fan': return 5;
+    case 'branching': return 9;
+    case 'massive': return 7;
+    case 'plating': return 7;
+    case 'encrusting': return 10;
+    case 'soft-coral': return 9;
+    case 'sea-fan': return 7;
   }
 }
 
@@ -85,6 +85,15 @@ function tierSpreadRatio(tier: ReefColonyHabitatTier): number {
     case 'upper': return 0.082;
     case 'middle': return 0.095;
     case 'lower': return 0.105;
+  }
+}
+
+function tierMemberSpacingScale(tier: ReefColonyHabitatTier): number {
+  switch (tier) {
+    case 'crown': return 0.92;
+    case 'upper': return 0.88;
+    case 'middle': return 0.82;
+    case 'lower': return 0.86;
   }
 }
 
@@ -158,11 +167,13 @@ function shapedOffset({
   memberIndex,
   patchAngle,
   foundationRadius,
+  tier,
 }: {
   colony: ReefLivingCanopyColony;
   memberIndex: number;
   patchAngle: number;
   foundationRadius: number;
+  tier: ReefColonyHabitatTier;
 }): { x: number; z: number; distance: number; facingRad: number } {
   if (memberIndex === 0) {
     return {
@@ -184,7 +195,11 @@ function shapedOffset({
   const irregularity = 0.84 + stableUnit(colony.seed, 'reef:patch-distance') * 0.28;
   const distance = Math.min(
     maximumDistance,
-    baseStep * Math.sqrt(memberIndex) * profile.spacingMultiplier * irregularity,
+    baseStep
+      * Math.sqrt(memberIndex)
+      * profile.spacingMultiplier
+      * tierMemberSpacingScale(tier)
+      * irregularity,
   );
   const angle = patchAngle
     + memberIndex * GOLDEN_ANGLE
@@ -236,13 +251,6 @@ function patchSpreadRadius({
   );
 }
 
-/**
- * Converts many event-level habitats into a small number of readable coral
- * colonies. A patch is one morphotype on one terrace tier; when it reaches its
- * species-specific capacity, a new patch opens. Existing members never move
- * when later recruits are appended because patch index and local member index
- * are chronology-stable.
- */
 export function buildReefCoralPatchPlan(
   source: ReefColonyHabitatPlan,
   build: ReefPreviewBuild,
@@ -305,6 +313,7 @@ export function buildReefCoralPatchPlan(
           memberIndex,
           patchAngle: center.angle,
           foundationRadius,
+          tier,
         });
         activeRadius = Math.max(activeRadius, offset.distance);
         renderByColonyId.set(member.colony.sourceColonyId, {
@@ -345,10 +354,10 @@ export function buildReefCoralPatchPlan(
     }
   }
 
+  const sequenceById = new Map(
+    source.plan.colonies.map((colony) => [colony.sourceColonyId, colony.request.sequence] as const),
+  );
   habitats.sort((left, right) => {
-    const sequenceById = new Map(
-      source.plan.colonies.map((colony) => [colony.sourceColonyId, colony.request.sequence] as const),
-    );
     const leftSequence = Math.min(
       ...left.memberColonyIds.map((id) => sequenceById.get(id) ?? Number.MAX_SAFE_INTEGER),
     );
