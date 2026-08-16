@@ -49,6 +49,9 @@ import '@/features/plans/plansReferenceGlassStage2.css';
 // Етап 3: картки планів отримують справжню faceted crystal edge,
 // компактний badge, сильнішу категорійну ідентичність і тихіший chevron.
 import '@/features/plans/plansReferenceCardsStage3.css';
+// Етап 4: активний segmented control стає темним crystal-core,
+// а яскравість концентрується у багатошарових faceted торцях і highlights.
+import '@/features/plans/plansReferenceTabsStage4.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
