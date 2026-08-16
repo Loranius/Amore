@@ -30,7 +30,7 @@ export default defineConfig({
       workbox: {
         maximumFileSizeToCacheInBytes: 5000000,
         cleanupOutdatedCaches: true,
-        navigateFallback: undefined,
+        navigateFallback: null,
         globPatterns: [
           '**/*.{webmanifest,ico,png,svg}',
           'assets/index-*.js',
