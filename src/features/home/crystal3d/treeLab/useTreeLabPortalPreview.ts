@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useEvents } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
@@ -15,6 +15,11 @@ import {
 } from '@/engine/evolution/adapters';
 import type { OrganicMeshLod } from '@/engine/labs/organic';
 import { resolveTreeProductionAsOf } from '@/engine/productionAcceptance';
+import {
+  applyEvolutionSandboxSources,
+  relationshipDaysBetween,
+  useEvolutionSandbox,
+} from '@/features/home/evolutionSandbox';
 import {
   buildEvolutionSourceSnapshot,
   evolutionWishlistFromPairArchive,
@@ -79,6 +84,11 @@ export function useTreeLabPortalPreview(
     staleTime: 5 * 60_000,
   });
   const [asOf] = useState(() => resolveTreeProductionAsOf(new Date(), COUPLE_TIME_ZONE));
+  const {
+    enabled: sandboxEnabled,
+    values: sandboxValues,
+    registerBaseline,
+  } = useEvolutionSandbox();
 
   const userIds = useMemo(
     () => (users.data ?? []).map((user) => user.id).sort((left, right) => left - right),
@@ -88,6 +98,30 @@ export function useTreeLabPortalPreview(
     () => evolutionWishlistFromPairArchive(wishlistArchive.data ?? []),
     [wishlistArchive.data],
   );
+
+  useEffect(() => {
+    if (!startDateQuery.data) return;
+    registerBaseline('tree', {
+      relationshipDays: relationshipDaysBetween(startDateQuery.data, asOf),
+      calendarEvents: (events.data ?? []).length,
+      completedPlans: (plans.data ?? []).filter((plan) => plan.status === 'done').length,
+      fulfilledWishes: wishlist.filter((wish) => wish.fulfilled).length,
+      visitedPlaces: (pins.data ?? []).filter((pin) => Boolean(pin.visited_at)).length,
+      memories: archive.data?.photos.length ?? 0,
+      finishedMedia: (finishedMedia.data ?? []).length,
+      sharedDaysOff: 0,
+    });
+  }, [
+    archive.data,
+    asOf,
+    events.data,
+    finishedMedia.data,
+    pins.data,
+    plans.data,
+    registerBaseline,
+    startDateQuery.data,
+    wishlist,
+  ]);
 
   const isPending = startDateQuery.isPending
     || users.isPending
@@ -132,7 +166,7 @@ export function useTreeLabPortalPreview(
     }
 
     try {
-      const snapshot = buildEvolutionSourceSnapshot({
+      const sourceSnapshot = buildEvolutionSourceSnapshot({
         events: events.data ?? [],
         plans: plans.data ?? [],
         wishlist,
@@ -140,13 +174,20 @@ export function useTreeLabPortalPreview(
         archive: archive.data,
         media: finishedMedia.data ?? [],
       });
+      const effectiveSources = applyEvolutionSandboxSources({
+        enabled: sandboxEnabled,
+        values: sandboxValues,
+        asOf,
+        relationshipStartedAt: startDateQuery.data,
+        snapshot: sourceSnapshot,
+      });
       const artifactResult = buildArtifactFromSnapshot({
         coupleId: stableEvolutionCoupleId(userIds),
         asOf,
-        snapshot,
+        snapshot: effectiveSources.snapshot,
         engineConfig: {
           engineVersion: ENGINE_VERSION,
-          relationshipStartedAt: startDateQuery.data,
+          relationshipStartedAt: effectiveSources.relationshipStartedAt,
           timeZone: COUPLE_TIME_ZONE,
           leapDayPolicy: 'feb-28',
         },
@@ -185,6 +226,8 @@ export function useTreeLabPortalPreview(
     plans.data,
     queryError,
     finishedMedia.data,
+    sandboxEnabled,
+    sandboxValues,
     startDateQuery.data,
     userIds,
     wishlist,
