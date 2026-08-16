@@ -9,8 +9,12 @@ import {
   buildReefCoralPatchPlan,
   REEF_CORAL_PATCH_VERSION,
 } from './reefCoralPatches';
+import {
+  applyReefCoralCoverage,
+  type ReefCoralCoverageSummary,
+} from './reefCoralCoverage';
 
-export const REEF_COLONY_MATURITY_VERSION = 'reef-colony-maturity-v2';
+export const REEF_COLONY_MATURITY_VERSION = 'reef-colony-maturity-v3';
 
 export type ReefColonyLifecycleStage = 'young' | 'growing' | 'mature';
 
@@ -33,6 +37,7 @@ export interface ReefColonyMaturityPlan {
   habitats: ReefColonyHabitatSummary[];
   states: ReefColonyMaturityState[];
   stageCounts: Record<ReefColonyLifecycleStage, number>;
+  coverage: ReefCoralCoverageSummary;
 }
 
 function clamp01(value: number): number {
@@ -94,12 +99,6 @@ function firstHabitatColony(
   return undefined;
 }
 
-/**
- * Maturity is evaluated after event-level habitats have been collapsed into
- * readable same-species patches. That makes Evolution Engine growth enlarge an
- * existing colony and recruit around its edge instead of sprinkling unrelated
- * coral across the whole limestone foundation.
- */
 export function buildReefColonyMaturityPlan(
   habitatPlan: ReefColonyHabitatPlan,
   build: ReefPreviewBuild,
@@ -191,16 +190,23 @@ export function buildReefColonyMaturityPlan(
     };
   });
 
+  const maturedPlan: ReefLivingCanopyPlan = {
+    ...patchPlan.plan,
+    colonies,
+    requests: colonies.map((colony) => colony.request),
+  };
+  const coverage = applyReefCoralCoverage({
+    plan: maturedPlan,
+    habitats: patchPlan.habitats,
+  });
+
   return {
     version: REEF_COLONY_MATURITY_VERSION,
     patchVersion: patchPlan.patchVersion,
-    plan: {
-      ...patchPlan.plan,
-      colonies,
-      requests: colonies.map((colony) => colony.request),
-    },
-    habitats: patchPlan.habitats,
+    plan: coverage.plan,
+    habitats: coverage.habitats,
     states,
     stageCounts,
+    coverage: coverage.summary,
   };
 }
