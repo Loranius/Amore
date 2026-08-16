@@ -21,48 +21,27 @@
   /* Свій фон модуль більше не малює: за ним стоїть кристал. Раніше тут був
      градієнт `.pink-page`, і він закривав сцену цілком. */
   background: none;
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+  /* Місце під док тримає падінг `.content`; власний відступ тут відсував би
+     нижню панель від нього. */
+  padding-bottom: 0;
 }
 
-/* ── Шапка ───────────────────────────────────────────────── */
-
-.shopping[data-world='true'] .shopping-hero {
-  border: 1px solid var(--world-border);
-  border-radius: 20px;
-  background: var(--world-surface);
-  box-shadow: 0 12px 30px var(--world-shadow);
-  backdrop-filter: blur(10px);
-}
-
-.shopping[data-world='true'] .shopping-hero h1,
 .shopping[data-world='true'] .shopping-group-head h2 {
   color: var(--world-text);
 }
 
-.shopping[data-world='true'] .shopping-eyebrow,
-.shopping[data-world='true'] .shopping-hero p {
-  color: var(--world-text-muted);
-}
+/* ── Нижня панель ────────────────────────────────────────── */
 
-.shopping[data-world='true'] .shopping-hero-icon,
-.shopping[data-world='true'] .shopping-hero-count {
+/* Панель стоїть над сценою й лишається там при прокруті, тож розмиття тут
+   не оздоблення: без нього кристал читається крізь неї і поле вводу
+   доводиться шукати очима. */
+.shopping[data-world='true'] .shopping-dock {
   border: 1px solid var(--world-border);
-  background: var(--world-surface-soft);
-  color: var(--world-accent);
+  border-radius: 22px;
+  background: var(--world-surface-strong);
+  box-shadow: 0 -10px 30px var(--world-shadow);
+  backdrop-filter: blur(12px);
 }
-
-/* ── Поле вводу ──────────────────────────────────────────── */
-
-.shopping[data-world='true'] .shopping-composer {
-  border: 1px solid var(--world-border);
-  border-radius: 20px;
-  background: var(--world-surface);
-  box-shadow: 0 12px 30px var(--world-shadow);
-  backdrop-filter: blur(10px);
-}
-
-.shopping[data-world='true'] .shopping-composer-copy h2 { color: var(--world-text); }
-.shopping[data-world='true'] .shopping-composer-copy p { color: var(--world-text-muted); }
 
 /* Поле — виїмка в камені (§17), а не білий аркуш. */
 .shopping[data-world='true'] .shopping-input {
@@ -88,6 +67,55 @@
   translate: 0 2px;
   box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
 }
+
+/* ── Шаблон ──────────────────────────────────────────────── */
+
+/* Кнопка шаблона навмисно ТИХІША за «Додати»: обидві додають товар, але поле
+   вводу — головний шлях, а полиця — короткий. Дві однаково яскраві кнопки
+   поряд змушували б вибирати там, де вибору немає. */
+.shopping[data-world='true'] .shopping-template-toggle {
+  border: 1px solid var(--world-border-active);
+  background-color: var(--world-surface-soft);
+  background-image: var(--control-sheen);
+  color: var(--world-text);
+  box-shadow: var(--control-top);
+}
+
+.shopping[data-world='true'] .shopping-template-toggle > svg { color: var(--world-accent); }
+
+.shopping[data-world='true'] .shopping-template-toggle--open {
+  background-color: color-mix(in srgb, var(--world-primary) 24%, transparent);
+}
+
+.shopping[data-world='true'] .shopping-shelf {
+  border: 1px solid var(--world-border);
+  background: var(--world-recess);
+}
+
+.shopping[data-world='true'] .shopping-shelf-head strong { color: var(--world-accent); }
+.shopping[data-world='true'] .shopping-shelf-head button { color: var(--world-text-muted); }
+.shopping[data-world='true'] .shopping-shelf-group h3 { color: var(--world-text-muted); }
+.shopping[data-world='true'] .shopping-shelf-group h3 span { color: var(--world-accent); }
+
+.shopping[data-world='true'] .shopping-shelf-item {
+  border: 1px solid var(--world-border-active);
+  background-color: var(--world-surface);
+  background-image: var(--control-sheen);
+  color: var(--world-text);
+  box-shadow: var(--control-top);
+}
+
+.shopping[data-world='true'] .shopping-shelf-item span { color: var(--world-accent); }
+
+.shopping[data-world='true'] .shopping-shelf-item--listed {
+  border-color: color-mix(in srgb, var(--world-success) 40%, transparent);
+  background-color: color-mix(in srgb, var(--world-success) 14%, transparent);
+  background-image: none;
+  color: var(--world-text-muted);
+  box-shadow: none;
+}
+
+.shopping[data-world='true'] .shopping-shelf-item--listed span { color: var(--world-success); }
 
 /* ── Групи й товари ──────────────────────────────────────── */
 

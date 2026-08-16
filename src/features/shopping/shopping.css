@@ -5,125 +5,68 @@
    тонкими рамками й короткими transform/opacity реакціями.
    ============================================================ */
 
+/* ── Висота сторінки ────────────────────────────────────────
+   Ланцюжок від прокрутного контейнера до сторінки, без жодної константи —
+   той самий прийом, що тримає карту плану (`plansMap.css`). Потрібен він
+   тут заради нижньої панелі: щоб вона стояла внизу ЕКРАНА і тоді, коли
+   список короткий, сторінка мусить займати всю доступну висоту, а не
+   рівно стільки, скільки в ній вмісту. */
+.content > .page-fade:has(> .shopping-page) {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
 .shopping-page {
   position: relative;
   isolation: isolate;
-  display: grid;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   gap: 0;
-  padding-bottom: 30px;
+  /* Нижнього відступу немає навмисно: місце під док уже тримає падінг
+     `.content`, а зайві 30 px відсували б панель від нього. */
+  padding-bottom: 0;
 }
 
-/* ── Компактна шапка ────────────────────────────────────────── */
-.shopping-hero {
-  position: relative;
+/* Список і архів. Росте вгору, панель лишається під ним. */
+.shopping-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Нижня панель: ввід і шаблон ─────────────────────────────
+   Власник: «поле вводу покупок переносимо в нижню частину модуля».
+   Не просто в кінець розмітки, а на місце: списком користуються в магазині
+   однією рукою, і поле, яке доводиться догортати, — це поле, яким не
+   користуються.
+
+   `sticky`, а не `fixed`, і це не смак. Fixed-нащадок усередині `.content`
+   залежить від того, чи створює хтось із предків containing block (а
+   `overflow: clip` там уже стоїть), і поводиться по-різному в браузерах.
+   Sticky живе всередині прокрутного контейнера й таких питань не ставить.
+
+   `bottom: 0`, і це не «притиснути до самого низу вікна». Виміряно на живому
+   порталі: липка коробка тут рахується від КОНТЕНТНОЇ коробки `.content`, а
+   не від падінгової. Нижній падінг `.content` — це і є місце під док, тож
+   нуль ставить панель рівно над ним: панель 811..827, док починається з 831.
+   Перша спроба взяла `bottom: calc(safe-area + 88px)`, повторивши те число
+   явно, і підняла панель рівно на ті 88 px — вимірялось 739 замість 827.
+   Тобто число тут не потрібне взагалі: місце під док уже пораховане один
+   раз, у падінгу. */
+.shopping-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 14px;
-  min-height: 118px;
-  margin-bottom: 16px;
-  padding: 20px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent) 17%, transparent);
-  border-radius: 28px;
-  background:
-    radial-gradient(circle at 92% 12%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 31%),
-    linear-gradient(138deg, color-mix(in srgb, var(--accent) 7%, var(--surface)), var(--surface));
-}
-
-.shopping-hero::after {
-  content: '';
-  position: absolute;
-  right: -24px;
-  bottom: -40px;
-  width: 122px;
-  height: 122px;
-  border: 22px solid color-mix(in srgb, var(--accent) 7%, transparent);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.shopping-hero-icon {
-  display: grid;
-  width: 58px;
-  height: 58px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--accent) 21%, transparent);
-  border-radius: 21px;
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  color: var(--accent);
-}
-
-.shopping-hero-copy {
-  min-width: 0;
-}
-
-.shopping-eyebrow {
-  display: block;
-  margin-bottom: 4px;
-  color: color-mix(in srgb, var(--accent) 78%, var(--text));
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-
-.shopping-hero h1 {
-  margin: 0;
-  font-size: clamp(27px, 7vw, 36px);
-  font-weight: 760;
-  line-height: 1.05;
-  letter-spacing: -.04em;
-}
-
-.shopping-hero p {
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.shopping-hero-count {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  min-width: 42px;
-  height: 42px;
-  place-items: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
-  color: color-mix(in srgb, var(--accent) 82%, var(--text));
-  font-size: 14px;
-  font-weight: 850;
-  font-variant-numeric: tabular-nums;
-}
-
-/* ── Швидке додавання ───────────────────────────────────────── */
-.shopping-composer {
-  position: relative;
-  display: grid;
-  gap: 13px;
-  margin-bottom: 24px;
-  padding: 18px;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px;
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
   border-radius: 24px;
   background: var(--surface);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 5%, transparent);
-}
-
-.shopping-composer-copy h2 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 750;
-  letter-spacing: -.02em;
-}
-
-.shopping-composer-copy p {
-  max-width: 48ch;
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 11.5px;
-  line-height: 1.45;
+  box-shadow: 0 -6px 22px color-mix(in srgb, var(--bg) 60%, transparent);
 }
 
 .shopping-composer-row {
@@ -133,9 +76,180 @@
   align-items: stretch;
 }
 
+/* ── Кнопка «Шаблон» ─────────────────────────────────────────
+   Стоїть ПІД полем, як і просив власник. Полиця, яку вона відкриває, лежить
+   у розмітці ВИЩЕ поля — інакше вона розкривалась би вниз, за нижній край
+   екрана. */
+.shopping-template-toggle {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease;
+}
+
+.shopping-template-toggle strong {
+  font-size: 12.5px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.shopping-template-toggle > svg:first-child {
+  color: var(--accent);
+}
+
+/* Стрілка вниз означає «згорнути» лише тоді, коли полиця відкрита; поки
+   вона закрита, розкриття йде вгору — і стрілка дивиться туди ж. */
+.shopping-template-toggle > svg:last-child {
+  transform: rotate(180deg);
+  transition: transform .18s ease;
+}
+
+.shopping-template-toggle--open {
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+}
+
+.shopping-template-toggle--open > svg:last-child {
+  transform: rotate(0deg);
+}
+
+/* ── Полиця шаблона ──────────────────────────────────────────
+   «Коли акардеон з шаблону відкривається, вся продукція там вже розсортована
+   по категоріям». Полиці задані даними (`shoppingTemplates.ts`); тут лише
+   геометрія.
+
+   Висота обмежена і має власний прокрут: сорок з гаком товарів на весь екран
+   закрили б список, заради якого сюди й заходять. */
+.shopping-shelf {
+  display: grid;
+  gap: 8px;
+  padding: 10px 10px 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg));
+  animation: shopping-shelf-in .18s ease both;
+}
+
+.shopping-shelf-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.shopping-shelf-head strong {
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+}
+
+.shopping-shelf-head button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* Затухання внизу — не оздоблення. Виміряно на живому екрані: межа прокруту
+   різала нижній ряд кнопок рівно навпіл, і півкнопки читаються як недомальована
+   верстка, а не як «тут є ще». Маска робить обрив навмисним. */
+.shopping-shelf-scroll {
+  display: grid;
+  gap: 11px;
+  max-height: min(42vh, 320px);
+  padding-bottom: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  mask-image: linear-gradient(180deg, #000 calc(100% - 22px), transparent);
+}
+
+.shopping-shelf-group h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 750;
+}
+
+.shopping-shelf-group h3 span {
+  display: flex;
+  color: var(--accent);
+}
+
+.shopping-shelf-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.shopping-shelf-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 11px 0 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .12s ease, background-color .14s ease, border-color .14s ease;
+}
+
+.shopping-shelf-item span {
+  display: flex;
+  color: var(--accent);
+}
+
+.shopping-shelf-item:active {
+  transform: scale(.96);
+}
+
+/* Уже в списку. Не ховаємо: зникла позиція читається як «я промахнувся»,
+   а підписана — як «це вже зроблено». */
+.shopping-shelf-item--listed {
+  border-color: color-mix(in srgb, var(--ok) 34%, transparent);
+  background: color-mix(in srgb, var(--ok) 9%, var(--surface));
+  color: var(--muted);
+  cursor: default;
+  opacity: .72;
+}
+
+.shopping-shelf-item--listed span {
+  color: var(--ok);
+}
+
+@keyframes shopping-shelf-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Поле в панелі, а не в картці: висота під один-два рядки. Сімдесят пікселів
+   з попередньої розкладки в доку відбирали б у списку цілу позицію. */
 .shopping-input {
   width: 100%;
-  min-height: 70px;
+  min-height: 48px;
   padding: 13px 14px;
   resize: none;
   border: 1px solid color-mix(in srgb, var(--text) 11%, transparent);
@@ -163,8 +277,8 @@
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 2px;
-  min-height: 70px;
+  gap: 1px;
+  min-height: 48px;
   padding: 9px;
   border: 0;
   border-radius: 18px;
@@ -177,10 +291,8 @@
 }
 
 .shopping-add-button > span {
-  min-height: 22px;
-  font-size: 25px;
-  font-weight: 400;
-  line-height: .85;
+  display: flex;
+  align-items: center;
 }
 
 .shopping-add-button strong {
@@ -653,23 +765,8 @@
 
 /* ── Телефони ───────────────────────────────────────────────── */
 @media (max-width: 560px) {
-  .shopping-hero {
-    grid-template-columns: 52px minmax(0, 1fr) auto;
-    min-height: 108px;
-    padding: 17px;
-    border-radius: 25px;
-  }
-
-  .shopping-hero-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: 18px;
-  }
-
-  .shopping-composer {
-    padding: 15px;
+  .shopping-dock {
     border-radius: 22px;
-    box-shadow: none;
   }
 
   .shopping-group {
@@ -682,24 +779,6 @@
 }
 
 @media (max-width: 380px) {
-  .shopping-hero {
-    grid-template-columns: 46px minmax(0, 1fr) auto;
-    gap: 10px;
-    padding: 15px;
-  }
-
-  .shopping-hero-icon {
-    width: 46px;
-    height: 46px;
-    border-radius: 16px;
-  }
-
-  .shopping-hero-count {
-    min-width: 36px;
-    height: 36px;
-    font-size: 12px;
-  }
-
   .shopping-composer-row {
     grid-template-columns: minmax(0, 1fr) 76px;
     gap: 7px;

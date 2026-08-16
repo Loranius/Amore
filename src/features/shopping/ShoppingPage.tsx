@@ -11,18 +11,39 @@
 // каже атласу, де стати камері (`provision` — дзеркало планів), а приглушення
 // відсуває сцену за модуль.
 //
-// Структура екрана НЕ змінюється: власник просив рівно тон, «ми просто
-// адаптуємо кольорову гамму в одному тоні як в планах». Тому тут лише
-// обгортка світу, а вигляд поверхонь — у `shoppingWorld.css`.
+// РОЗКЛАДКА, як її описав власник: «зверху є шапка з найменуванням модуля —
+// його прибираємо. Поле вводу покупок переносимо в нижню частину модуля. Також
+// під полем додай кнопку шаблон».
+//
+// Звідси три речі, які варто пояснити один раз:
+//
+// - Шапки немає взагалі. Назву модуля вже каже док, а панель на 118 px
+//   забирала верх екрана в списку, заради якого сюди й заходять.
+// - Ввід стоїть унизу й лишається на місці при прокруті (`.shopping-dock`).
+//   Це не оздоблення: списком користуються в магазині однією рукою, і поле,
+//   яке треба догортати, — це поле, яким не користуються.
+// - Полиця шаблона відкривається НАД полем, хоч кнопка стоїть під ним. Інакше
+//   вона розкривалась би вниз, за нижній край екрана.
 // ============================================================
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { SHOPPING_CATEGORIES } from '@/app/constants';
 import {
   BagIcon,
+  BoxIcon,
   CheckIcon,
   ChevronDownIcon,
+  LayersIcon,
   PencilIcon,
+  PlusIcon,
   RefreshIcon,
+  StarIcon,
   TrashIcon,
 } from '@/components/icons/UiIcon';
 import { useUsersMap } from '@/features/_shared/useUsers';
@@ -32,6 +53,13 @@ import {
   parseShoppingInput,
 } from './useShoppingItems';
 import { EditItemModal } from './EditItemModal';
+import {
+  TEMPLATE_GROUPS,
+  listedKeys,
+  templateKey,
+  type TemplateGroup,
+  type TemplateItem,
+} from './shoppingTemplates';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { useDimmedWorld } from '@/features/world/worldDim';
@@ -40,6 +68,19 @@ import './shopping.css';
 import './shoppingCompact.css';
 import './shoppingWorld.css';
 import type { ShoppingItemRow, ShoppingCategory } from '@/types';
+
+/**
+ * Значок полиці шаблона.
+ *
+ * Іконки, не емодзі: власник обрав це ще в чорновику модуля. Категорії
+ * списку нижче поки лишились емодзі — їхня заміна потребує дванадцяти нових
+ * значків і чекає на свій захід (ADR-0032).
+ */
+const TEMPLATE_GROUP_ICONS: Record<TemplateGroup['id'], ReactNode> = {
+  food: <BagIcon size={15} />,
+  home: <BoxIcon size={15} />,
+  treats: <StarIcon size={15} />,
+};
 
 const CATEGORY_VISUALS: Record<string, { icon: string; color: string }> = {
   Овочі: { icon: '🥦', color: '#65a978' },
@@ -82,6 +123,7 @@ export function ShoppingPage() {
 
   const [input, setInput] = useState('');
   const [adding, setAdding] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [editing, setEditing] = useState<ShoppingItemRow | null>(null);
   const [completingIds, setCompletingIds] = useState<Set<number>>(() => new Set());
@@ -163,59 +205,20 @@ export function ShoppingPage() {
     completionTimers.current.set(item.id, timer);
   };
 
-  const statusText = active.length === 0
-    ? 'На сьогодні все куплено'
-    : `${active.length} ${active.length === 1 ? 'покупка' : active.length < 5 ? 'покупки' : 'покупок'} залишилось`;
+  // Що вже лежить в активному списку — щоб полиця не давала додати друге
+  // молоко мовчки. Порівняння по канонічному ключу: «молоко» з поля вводу і
+  // «Молоко» з полиці — та сама покупка.
+  const listed = useMemo(() => listedKeys(active.map((item) => item.title)), [active]);
+
+  const addFromTemplate = (item: TemplateItem) => {
+    if (listed.has(templateKey(item.title))) return;
+    add.mutate([{ title: item.title, qty: null, category: item.category }]);
+  };
 
   return (
     <section className="shopping shopping-page" data-world={webglSupported ? 'true' : undefined}>
 
-      <header className="shopping-hero">
-        <span className="shopping-hero-icon" aria-hidden="true"><BagIcon size={28} /></span>
-        <div className="shopping-hero-copy">
-          <span className="shopping-eyebrow">Спільний список</span>
-          <h1>Покупки</h1>
-          <p>{statusText}</p>
-        </div>
-        {active.length > 0 && (
-          <span className="shopping-hero-count" aria-label={statusText}>{active.length}</span>
-        )}
-      </header>
-
-      <section className="shopping-composer" aria-labelledby="shopping-composer-title">
-        <div className="shopping-composer-copy">
-          <h2 id="shopping-composer-title">Що потрібно купити?</h2>
-          <p>Можна вписати кілька товарів через кому — вони самі розкладуться за категоріями.</p>
-        </div>
-        <div className="shopping-composer-row">
-          <textarea
-            id="shopping-input"
-            name="input"
-            className="shopping-input"
-            rows={2}
-            placeholder="Молоко, хліб, 2 яблука…"
-            value={input}
-            onChange={(event) => setInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                void submitAdd();
-              }
-            }}
-            disabled={adding}
-          />
-          <button
-            type="button"
-            className="shopping-add-button"
-            onClick={() => void submitAdd()}
-            disabled={adding || !input.trim()}
-          >
-            <span aria-hidden="true">{adding ? '•••' : '+'}</span>
-            <strong>{adding ? 'Сортую' : 'Додати'}</strong>
-          </button>
-        </div>
-      </section>
-
+      <div className="shopping-body">
       {isPending ? (
         <ShoppingSkeleton />
       ) : isError ? (
@@ -232,7 +235,7 @@ export function ShoppingPage() {
         <section className="shopping-state shopping-state--empty">
           <span aria-hidden="true"><CheckIcon size={30} /></span>
           <h2>Список чистий</h2>
-          <p>Додайте наступну покупку у поле вище.</p>
+          <p>Додайте наступну покупку в поле внизу — або візьміть готове з шаблону.</p>
         </section>
       ) : (
         <div className="shopping-groups" aria-label="Потрібно купити">
@@ -300,6 +303,60 @@ export function ShoppingPage() {
           </div>
         )}
       </details>
+      </div>
+
+      {/* Нижня частина модуля: полиця шаблона, поле вводу, кнопка шаблона.
+          Полиця стоїть ПЕРЕД полем у розмітці навмисно — док притиснутий до
+          низу, тож усе, що після кнопки, розкривалось би за край екрана. */}
+      <div className="shopping-dock">
+        {templateOpen && (
+          <TemplateShelf
+            listed={listed}
+            onPick={addFromTemplate}
+            onClose={() => setTemplateOpen(false)}
+          />
+        )}
+
+        <div className="shopping-composer-row">
+          <textarea
+            id="shopping-input"
+            name="input"
+            className="shopping-input"
+            rows={1}
+            placeholder="Молоко, хліб, 2 яблука…"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                void submitAdd();
+              }
+            }}
+            disabled={adding}
+          />
+          <button
+            type="button"
+            className="shopping-add-button"
+            onClick={() => void submitAdd()}
+            disabled={adding || !input.trim()}
+          >
+            <span aria-hidden="true">{adding ? <DotsGlyph /> : <PlusIcon size={20} />}</span>
+            <strong>{adding ? 'Сортую' : 'Додати'}</strong>
+          </button>
+        </div>
+
+        <button
+          type="button"
+          className={`shopping-template-toggle${templateOpen ? ' shopping-template-toggle--open' : ''}`}
+          onClick={() => setTemplateOpen((open) => !open)}
+          aria-expanded={templateOpen}
+          aria-controls="shopping-template-shelf"
+        >
+          <LayersIcon size={16} />
+          <strong>Шаблон</strong>
+          <ChevronDownIcon size={16} />
+        </button>
+      </div>
 
       {editing && (
         <EditItemModal
@@ -308,6 +365,78 @@ export function ShoppingPage() {
           onSave={(patch) => edit.mutate(patch)}
         />
       )}
+    </section>
+  );
+}
+
+/** Три крапки очікування — тим самим значком, що й решта кнопки. */
+function DotsGlyph() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <circle cx="4" cy="10" r="1.6" />
+      <circle cx="10" cy="10" r="1.6" />
+      <circle cx="16" cy="10" r="1.6" />
+    </svg>
+  );
+}
+
+interface TemplateShelfProps {
+  listed: ReadonlySet<string>;
+  onPick: (item: TemplateItem) => void;
+  onClose: () => void;
+}
+
+/**
+ * Полиця шаблона — базові товари, вже розкладені по полицях.
+ *
+ * Розкладка задана даними, а не розміткою: власник просив, щоб «вся продукція
+ * там вже розсортована по категоріям», і саме `TEMPLATE_GROUPS` каже, що де
+ * лежить. Компонент їх лише малює.
+ *
+ * Дотик по товару додає його одразу — жодного проміжного кроку, як і просив
+ * власник. Товар, який уже в списку, підписаний і не реагує: додати друге
+ * молоко можна полем вводу, але не мовчазним повторним дотиком.
+ */
+function TemplateShelf({ listed, onPick, onClose }: TemplateShelfProps) {
+  return (
+    <section className="shopping-shelf" id="shopping-template-shelf" aria-label="Шаблон покупок">
+      <header className="shopping-shelf-head">
+        <strong>Базові покупки</strong>
+        <button type="button" onClick={onClose} aria-label="Згорнути шаблон">
+          <ChevronDownIcon size={16} />
+        </button>
+      </header>
+
+      <div className="shopping-shelf-scroll">
+        {TEMPLATE_GROUPS.map((group) => (
+          <section key={group.id} className="shopping-shelf-group">
+            <h3>
+              <span aria-hidden="true">{TEMPLATE_GROUP_ICONS[group.id]}</span>
+              {group.title}
+            </h3>
+            <div className="shopping-shelf-items">
+              {group.items.map((item) => {
+                const already = listed.has(templateKey(item.title));
+                return (
+                  <button
+                    key={item.title}
+                    type="button"
+                    className={`shopping-shelf-item${already ? ' shopping-shelf-item--listed' : ''}`}
+                    onClick={() => onPick(item)}
+                    disabled={already}
+                    aria-label={already ? `${item.title} — уже в списку` : `Додати ${item.title}`}
+                  >
+                    <span aria-hidden="true">
+                      {already ? <CheckIcon size={13} /> : <PlusIcon size={13} />}
+                    </span>
+                    {item.title}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
     </section>
   );
 }
