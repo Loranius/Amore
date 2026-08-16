@@ -27,6 +27,10 @@ import '@/features/wishlist/wishlistPearlBubbles.css';
 // wishlistPearlContrast.css: перший малював 6px обідок, другий існував
 // щоб той обідок прибрати — разом вони давали 1px рамку за 152 рядки.
 import '@/features/wishlist/wishlistBubbleGlass.css';
+// Візуальний crystal-glass pass для об'єднаного модуля «Плани».
+// Імпортується останнім, щоб бути чистим presentation override без змін
+// календарної/планової логіки та без переписування базових стилів модуля.
+import '@/features/plans/plansCrystalRefresh.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
