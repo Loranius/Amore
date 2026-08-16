@@ -1,0 +1,222 @@
+/* ============================================================
+   Plans — Reference UI stage 3: faceted plan cards
+   ------------------------------------------------------------
+   Етап 3 UI-pass. Фокус лише на картках планів: темніше скло,
+   справжня кристалічна ліва грань, компактний badge справа,
+   чіткіший category accent і менш помітний chevron.
+   Layout, дані та поведінку не змінюємо.
+   ============================================================ */
+
+.plans-module {
+  --pm-s3-card-line: rgba(203, 181, 221, .075);
+  --pm-s3-card-line-hot: rgba(220, 197, 237, .13);
+  --pm-s3-card-top: rgba(31, 21, 48, .67);
+  --pm-s3-card-bottom: rgba(8, 5, 17, .73);
+}
+
+/* ── 1. Card material ────────────────────────────────────── */
+
+.plans-module .pm-tile {
+  isolation: isolate;
+  overflow: hidden;
+  border-color: var(--pm-s3-card-line);
+  background:
+    linear-gradient(118deg, rgba(255,255,255,.032) 0%, rgba(255,255,255,.012) 18%, transparent 38%),
+    radial-gradient(ellipse at 8% 0%, color-mix(in srgb, var(--plan-color) 8%, transparent), transparent 37%),
+    linear-gradient(145deg, var(--pm-s3-card-top), var(--pm-s3-card-bottom));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.026),
+    inset 0 -1px 0 rgba(2,0,6,.2),
+    0 6px 14px rgba(2,0,6,.13);
+}
+
+.plans-module .pm-tile:hover,
+.plans-module .pm-tile:focus-within {
+  border-color: var(--pm-s3-card-line-hot);
+  background:
+    linear-gradient(118deg, rgba(255,255,255,.038) 0%, rgba(255,255,255,.014) 18%, transparent 38%),
+    radial-gradient(ellipse at 8% 0%, color-mix(in srgb, var(--plan-color) 10%, transparent), transparent 37%),
+    linear-gradient(145deg, rgba(35,24,53,.7), rgba(10,6,20,.76));
+}
+
+/* ── 2. Left crystal shard ───────────────────────────────── */
+
+.plans-module .pm-tile::before {
+  top: 5px;
+  bottom: 5px;
+  left: 0;
+  width: 10px;
+  border-radius: 0 4px 4px 0;
+  clip-path: polygon(
+    38% 0,
+    100% 8%,
+    70% 23%,
+    100% 39%,
+    72% 52%,
+    100% 69%,
+    63% 100%,
+    23% 92%,
+    0 70%,
+    19% 52%,
+    0 30%,
+    20% 12%
+  );
+  background:
+    linear-gradient(104deg, transparent 0 42%, rgba(255,255,255,.64) 43% 50%, transparent 51% 100%),
+    linear-gradient(76deg, rgba(255,255,255,.36) 0 18%, transparent 19% 100%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--plan-color) 36%, #fff) 0%,
+      color-mix(in srgb, var(--plan-color) 88%, #fff) 15%,
+      var(--plan-color) 42%,
+      color-mix(in srgb, var(--plan-color) 78%, #3d1d50) 71%,
+      color-mix(in srgb, var(--plan-color) 48%, #1a0d25) 100%
+    );
+  opacity: .9;
+  filter:
+    drop-shadow(1px 0 2px color-mix(in srgb, var(--plan-color) 28%, transparent))
+    drop-shadow(0 0 5px color-mix(in srgb, var(--plan-color) 14%, transparent));
+  box-shadow: none;
+}
+
+/* Друга facet-ілюзія: світло від shard м'яко заходить у саму картку. */
+.plans-module .pm-tile {
+  background-color: transparent;
+}
+
+.plans-module .pm-tile-cat,
+.plans-module .pm-tile-title,
+.plans-module .pm-tile-meta,
+.plans-module .pm-tile-confirm {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── 3. Compact crystal badge ────────────────────────────── */
+
+.plans-module .pm-tile::after {
+  right: 10px;
+  top: 9px;
+  width: 21px;
+  height: 21px;
+  border: 1px solid rgba(224, 197, 241, .11);
+  border-radius: 50%;
+  clip-path: none;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 29%, rgba(9,5,17,.27) 30% 100%),
+    radial-gradient(circle at 37% 27%, rgba(255,255,255,.68) 0 7%, transparent 8% 100%),
+    conic-gradient(from 20deg,
+      #e7b4f7 0 13%,
+      #8a4fa6 13% 29%,
+      #c67cde 29% 46%,
+      #633776 46% 63%,
+      #b969d0 63% 80%,
+      #e7b4f7 80% 100%
+    );
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 0 7px rgba(190,111,220,.09);
+  opacity: .9;
+}
+
+/* Візуально card badge має бути secondary, тому category визначає картку,
+   а не великий однаково-фіолетовий кристал справа. */
+.plans-module .pm-tile:hover::after,
+.plans-module .pm-tile:focus-within::after {
+  border-color: rgba(232, 205, 247, .16);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.1),
+    0 0 8px rgba(196,118,225,.12);
+}
+
+/* ── 4. Category identity ────────────────────────────────── */
+
+.plans-module .pm-tile-cat {
+  padding-right: 28px;
+  color: color-mix(in srgb, var(--plan-color) 84%, #efe4f7);
+  font-weight: 800;
+  letter-spacing: .012em;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--plan-color) 12%, transparent);
+}
+
+.plans-module .pm-tile-cat svg {
+  opacity: .92;
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--plan-color) 20%, transparent));
+}
+
+/* Main title stays neutral — category colour is an accent, not body ink. */
+.plans-module .pm-tile-title {
+  color: rgba(249,244,253,.94);
+  font-weight: 750;
+  text-shadow: 0 1px 0 rgba(0,0,0,.12);
+}
+
+.plans-module .pm-tile-meta {
+  color: rgba(205,190,217,.6);
+}
+
+.plans-module .pm-tile-someday {
+  color: rgba(192,175,205,.54);
+}
+
+.plans-module .pm-tile-when,
+.plans-module .pm-tile-overdue {
+  border-color: color-mix(in srgb, var(--plan-color) 16%, transparent);
+  background: color-mix(in srgb, var(--plan-color) 10%, rgba(30,18,45,.16));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.015);
+}
+
+/* ── 5. Chevron: tiny engraved affordance ────────────────── */
+
+.plans-module .pm-tile-open::after {
+  right: 9px;
+  bottom: 8px;
+  width: 18px;
+  height: 18px;
+  border-color: rgba(206, 184, 223, .045);
+  background: rgba(91, 64, 111, .045);
+  color: rgba(224, 207, 235, .44);
+  font-size: 13px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.012);
+  opacity: .76;
+}
+
+.plans-module .pm-tile:hover .pm-tile-open::after,
+.plans-module .pm-tile:focus-within .pm-tile-open::after {
+  color: rgba(235,218,246,.58);
+  border-color: rgba(216,193,232,.075);
+}
+
+/* ── 6. Closed cards retain crystal language, but recede ─── */
+
+.plans-module .pm-tile--closed {
+  opacity: .62;
+  filter: saturate(.7) brightness(.9);
+}
+
+.plans-module .pm-tile--closed::before,
+.plans-module .pm-tile--closed::after {
+  opacity: .52;
+}
+
+@media (max-width: 430px) {
+  .plans-module .pm-tile::before {
+    width: 9px;
+  }
+
+  .plans-module .pm-tile::after {
+    width: 20px;
+    height: 20px;
+  }
+
+  .plans-module .pm-tile-cat {
+    padding-right: 26px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans-module .pm-tile,
+  .plans-module .pm-tile::after,
+  .plans-module .pm-tile-open::after {
+    transition: none;
+  }
+}
