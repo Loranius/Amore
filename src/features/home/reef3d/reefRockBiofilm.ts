@@ -76,12 +76,14 @@ export function applyReefRockBiofilmMaterial(
   material: THREE.MeshStandardMaterial,
   profile: ReefRockBiofilmProfile,
 ): void {
-  const previousCacheKey = material.customProgramCacheKey.bind(material);
   const cacheKey = profileCacheKey(profile);
 
   material.userData.reefRockBiofilmVersion = profile.version;
   material.userData.reefRockBiofilmProfile = { ...profile };
-  material.customProgramCacheKey = () => `${previousCacheKey()}|${cacheKey}`;
+  // Do not chain the previous cache function: the constructor sandbox can
+  // rebuild the reef many times in one session and would otherwise grow the
+  // cache key on every slider movement.
+  material.customProgramCacheKey = () => cacheKey;
   material.onBeforeCompile = (shader) => {
     shader.uniforms.reefBioPatternSeed = { value: profile.patternSeed };
     shader.uniforms.reefBioCoverage = { value: profile.coverage };
