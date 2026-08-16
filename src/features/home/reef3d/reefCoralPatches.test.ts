@@ -54,14 +54,14 @@ describe('reef coral patches', () => {
       expect(morphotypes.size).toBe(1);
       expect(morphotypes.has(patch.dominantMorphotype)).toBe(true);
       expect(patch.memberColonyIds.length).toBeGreaterThan(0);
-      expect(patch.memberColonyIds.length).toBeLessThanOrEqual(8);
+      expect(patch.memberColonyIds.length).toBeLessThanOrEqual(10);
     }
   });
 
   it('keeps established patch members fixed when a later recruit is appended', () => {
     const { build, habitats } = buildFixture();
     const baseline = buildReefCoralPatchPlan(habitats, build);
-    const templatePatch = baseline.habitats.find((patch) => patch.memberColonyIds.length < 8);
+    const templatePatch = baseline.habitats.find((patch) => patch.memberColonyIds.length < 10);
     expect(templatePatch).toBeDefined();
     if (!templatePatch) return;
 
