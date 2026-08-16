@@ -4,15 +4,21 @@
      Чорновик модуля «Покупки» — у мові вішліста й планів.
      ------------------------------------------------------------
      Це макет структури, а не порталу: кристал намальований CSS-гранями, товари
-     вигадані. Під перевіркою чотири речі, і всі чотири — рішення, а не
-     картинка:
+     вигадані.
 
-     1. Оберт. Покупки стають по ІНШИЙ бік від головної: кристал повертається
-        на 45° зліва направо, тоді як плани й вішліст повертають його ліворуч.
-     2. Дві вкладки замість аркуша з `<details>`: «Купити» і «Куплено».
-     3. Одна кнопка дії: вільний ввід переїжджає з верху сторінки в аркуш.
-     4. Режим «у магазині» — третій стан модуля: крупніші рядки, згасла сцена,
-        смуга режиму замість вкладок, куплене зникає одразу.
+     Модуль навмисно найпростіший у порталі. Власник описав його одним
+     реченням: «є список покупок, є додана покупка, зайшов в магазин,
+     пройшовся по списку, натиснув на кружечок поряд з покупкою — закреслює
+     покупку як куплену, і все».
+
+     Тому тут немає ні вкладок, ні режимів, ні архіву окремим екраном: один
+     список, одна кнопка дії, і кружечок, який закреслює рядок НА МІСЦІ.
+     Куплене нікуди не їде — воно лишається там, де ви його бачили, просто
+     закресленим.
+
+     Під перевіркою лишається одне рішення про світ: оберт. Покупки стають по
+     інший бік від головної — кристал повертається на 45° зліва направо, тоді
+     як плани й вішліст повертають його ліворуч.
 
      Палітра — токени порталу (`worldTheme.css`), кольори категорій — з
      `ShoppingPage.tsx`, підписи — з живого екрана.
@@ -159,37 +165,25 @@
     background: radial-gradient(120% 70% at 50% 78%, rgba(11, 8, 19, 0.62), rgba(11, 8, 19, 0.34));
   }
 
-  /* ── Верхня панель: та сама, що у вішліста й планів ─────── */
+  /* ── Шапка: один рядок ─────────────────────────────────
+     Вкладок немає, бо перемикати нема між чим — список один. Замість панелі
+     тут рівно те, що пара хоче знати з порога: скільки лишилось. */
 
-  .tabs {
-    position: absolute; left: 16px; right: 16px; top: 18px; z-index: 3;
-    display: flex; gap: 6px; padding: 6px;
-    border-radius: 999px;
-    border: 1px solid var(--world-border);
-    background: rgba(42, 33, 64, 0.62);
-    backdrop-filter: blur(10px);
+  .topline {
+    position: absolute; left: 16px; right: 16px; top: 20px; z-index: 3;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .topline h2 { margin: 0; font-size: 20px; font-weight: 800; }
+  .topline .left {
+    margin-left: auto; font-size: 13px; font-weight: 700;
+    color: var(--world-text-muted); font-variant-numeric: tabular-nums;
   }
 
-  .tab {
-    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
-    padding: 11px 8px; border: 0; border-radius: 999px;
-    background: none; color: var(--world-text-muted);
-    font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
-    transition: background 200ms ease, color 200ms ease;
-  }
-  .tab[aria-selected="true"] { background: rgba(201, 160, 230, 0.6); color: #241636; }
-  .tab:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
-  .tab .count {
-    min-width: 22px; padding: 1px 6px; border-radius: 999px;
-    background: rgba(20, 15, 31, 0.35); font-size: 12px; font-variant-numeric: tabular-nums;
-  }
-  .tab[aria-selected="true"] .count { background: rgba(255, 255, 255, 0.42); }
-
-  /* ── Аркуш модуля ──────────────────────────────────────── */
+  /* ── Список ────────────────────────────────────────────── */
 
   .sheet {
     position: absolute; z-index: 2;
-    left: 0; right: 0; top: 82px; bottom: 96px;
+    left: 0; right: 0; top: 62px; bottom: 96px;
     overflow-y: auto; overscroll-behavior: contain;
     /* Нижній відступ під кнопку дії: без нього останній товар лишається під
        нею й дочитати його неможливо. */
@@ -197,22 +191,16 @@
     scrollbar-width: none;
   }
   .sheet::-webkit-scrollbar { display: none; }
-  .sheet[hidden] { display: none; }
 
-  .progress {
-    display: flex; align-items: center; gap: 10px;
-    margin: 2px 2px 12px;
-    font-size: 13px; color: var(--world-text-muted);
+  .bar {
+    height: 6px; margin: 2px 2px 12px;
+    border-radius: 999px; background: rgba(255, 255, 255, 0.09); overflow: hidden;
   }
-  .progress .rail {
-    flex: 1; height: 6px; border-radius: 999px;
-    background: rgba(255, 255, 255, 0.09); overflow: hidden;
-  }
-  .progress .rail i {
+  .bar i {
     display: block; height: 100%; border-radius: 999px;
     background: linear-gradient(90deg, var(--world-primary), var(--world-accent));
+    transition: width 260ms ease;
   }
-  .progress b { color: var(--world-text); font-variant-numeric: tabular-nums; }
 
   /* Категорія — скляна картка, як плитка плану. Колір категорії лишається
      єдиним кольором, який модуль бере не з палітри світу. */
@@ -223,16 +211,12 @@
     box-shadow: 0 12px 30px var(--world-shadow);
   }
 
-  .group-head {
-    display: flex; align-items: center; gap: 9px;
-    margin-bottom: 8px;
-  }
+  .group-head { display: flex; align-items: center; gap: 9px; margin-bottom: 8px; }
   .group-icon {
     width: 30px; height: 30px; flex: none; display: grid; place-items: center;
     border-radius: 10px;
     background: color-mix(in srgb, var(--cat) 26%, transparent);
     color: var(--cat);
-    font-size: 15px;
   }
   .group-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
   .group-head h3 { margin: 0; font-size: 14px; font-weight: 800; }
@@ -242,28 +226,33 @@
   }
 
   .item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 7px 4px;
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 4px;
     border-top: 1px solid rgba(214, 190, 246, 0.08);
   }
   .group-list .item:first-child { border-top: 0; }
 
   .check {
-    width: 26px; height: 26px; flex: none;
+    width: 28px; height: 28px; flex: none;
     display: grid; place-items: center;
     border: 1.8px solid var(--world-border-active); border-radius: 50%;
     background: none; color: #241636; cursor: pointer;
-    transition: background 180ms ease, border-color 180ms ease;
+    transition: background 200ms ease, border-color 200ms ease;
   }
-  .check svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
-  .item[data-done="true"] .check { background: var(--world-success); border-color: var(--world-success); }
-  .item[data-done="true"] .check svg { opacity: 1; }
+  .check svg {
+    width: 16px; height: 16px; fill: none; stroke: currentColor;
+    stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round;
+    opacity: 0; transition: opacity 200ms ease;
+  }
   .check:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
 
-  .item-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-  .item-title { font-size: 14px; font-weight: 700; }
-  .item[data-done="true"] .item-title { color: var(--world-text-muted); text-decoration: line-through; }
-  .item-note { font-size: 11.5px; color: var(--world-text-muted); }
+  /* Куплене нікуди не їде: рядок лишається на місці, просто закреслений. */
+  .item[data-bought="true"] .check { background: var(--world-success); border-color: var(--world-success); }
+  .item[data-bought="true"] .check svg { opacity: 1; }
+  .item[data-bought="true"] .item-title { color: var(--world-text-muted); text-decoration: line-through; }
+  .item[data-bought="true"] .item-qty { opacity: 0.5; }
+
+  .item-title { min-width: 0; font-size: 14px; font-weight: 700; transition: color 200ms ease; }
   .item-qty {
     margin-left: auto; flex: none;
     padding: 3px 9px; border-radius: 999px;
@@ -272,84 +261,22 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* ── «Куплено» ─────────────────────────────────────────── */
-
-  .day-head {
-    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
-    margin: 14px 2px 8px;
-  }
-  .day-head h3 { margin: 0; font-size: 14px; font-weight: 800; }
-  .day-head span { font-size: 12px; color: var(--world-text-muted); }
-
-  .undo {
-    margin-left: auto; flex: none;
-    padding: 5px 11px; border-radius: 999px;
-    border: 1px solid var(--world-border); background: none;
-    color: var(--world-text-muted); font: inherit; font-size: 12px; font-weight: 700;
+  /* Прибирання купленого — окремий свідомий дотик, а не автоматика: список
+     має коротшати тоді, коли цього хоче пара, а не коли вирішив застосунок. */
+  .clear {
+    display: block; width: 100%; margin: 4px 0 0;
+    padding: 11px; border-radius: 999px;
+    border: 1px dashed rgba(220, 182, 245, 0.34); background: none;
+    color: var(--world-text-muted); font: inherit; font-size: 13px; font-weight: 700;
     cursor: pointer;
   }
-  .undo:hover { border-color: var(--world-border-active); color: var(--world-accent); }
+  .clear[hidden] { display: none; }
+  .clear:hover { border-color: var(--world-border-active); color: var(--world-accent); }
 
-  .bought-note {
-    margin: 14px 2px 0; font-size: 12px; color: var(--world-text-muted);
+  .empty {
+    margin-top: 40px; text-align: center;
+    font-size: 14px; color: var(--world-text-muted);
   }
-
-  /* ── Режим «у магазині» ────────────────────────────────
-     Третій стан модуля, а не варіант списку. Телефон у руці, візок у другій,
-     світло магазину — тому все крупніше, сцена відходить майже повністю, а
-     верхня панель міняється на смугу режиму. */
-
-  .store-enter {
-    flex: none; display: inline-flex; align-items: center; gap: 6px;
-    padding: 5px 11px; border-radius: 999px;
-    border: 1px solid var(--world-border); background: var(--world-surface-soft);
-    color: var(--world-text); font: inherit; font-size: 12px; font-weight: 700;
-    cursor: pointer;
-  }
-  .store-enter svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-  .store-enter:hover { border-color: var(--world-border-active); color: var(--world-accent); }
-
-  /* Сцена не зникає зовсім — вона гасне. Це той самий світ, просто зараз він
-     не головне: у магазині головне рядок, який треба прочитати з витягнутої
-     руки. */
-  .screen[data-store="true"] .backdrop { opacity: 0.22; }
-  .screen[data-store="true"] .wash { background: rgba(9, 6, 16, 0.55); }
-  .screen[data-store="true"] .tabs { display: none; }
-  .screen[data-store="true"] .progress { display: none; }
-
-  .store-bar {
-    position: absolute; left: 16px; right: 16px; top: 18px; z-index: 3;
-    display: none; align-items: center; gap: 8px;
-    padding: 9px 10px 9px 14px;
-    border-radius: 22px;
-    border: 1px solid var(--world-border-active);
-    background: rgba(42, 33, 64, 0.92);
-    backdrop-filter: blur(10px);
-  }
-  .screen[data-store="true"] .store-bar { display: flex; }
-  .store-bar svg { width: 18px; height: 18px; flex: none; fill: none; stroke: var(--world-accent); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-  .store-bar-copy { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-  .store-bar b { font-size: 14px; font-weight: 800; }
-  .store-bar small { font-size: 11.5px; color: var(--world-text-muted); font-variant-numeric: tabular-nums; }
-  .store-bar .spacer { flex: 1; }
-
-  .store-undo, .store-done {
-    flex: none; padding: 8px 13px; border-radius: 999px;
-    border: 1px solid var(--world-border); background: none;
-    color: var(--world-text-muted); font: inherit; font-size: 13px; font-weight: 800;
-    cursor: pointer;
-  }
-  .store-undo[disabled] { opacity: 0.35; cursor: default; }
-  .store-done { border-color: var(--world-border-active); color: var(--world-accent); }
-
-  /* Крупніше все, чого торкаються або що читають на ходу. */
-  .screen[data-store="true"] .group { padding: 12px 14px 10px; }
-  .screen[data-store="true"] .group-head h3 { font-size: 15px; }
-  .screen[data-store="true"] .item { padding: 11px 4px; gap: 14px; }
-  .screen[data-store="true"] .check { width: 34px; height: 34px; }
-  .screen[data-store="true"] .check svg { width: 19px; height: 19px; }
-  .screen[data-store="true"] .item-title { font-size: 17px; }
-  .screen[data-store="true"] .item-qty { font-size: 13.5px; padding: 5px 12px; }
 
   /* ── Кнопка дії ────────────────────────────────────────── */
 
@@ -406,9 +333,7 @@
     border: 1px solid var(--world-border); background: var(--world-surface-soft);
     font-size: 12.5px; font-weight: 700;
   }
-  .parsed-chip i {
-    width: 7px; height: 7px; border-radius: 50%; background: var(--cat);
-  }
+  .parsed-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--cat); }
   .parsed-chip small { color: var(--world-text-muted); font-weight: 600; }
 
   .composer-actions { display: flex; gap: 8px; }
@@ -469,7 +394,6 @@
   .flag p { font-size: 14px; }
   code { font-family: var(--mono); font-size: 0.92em; background: color-mix(in srgb, var(--page-accent) 10%, transparent); padding: 1px 5px; border-radius: 5px; color: var(--page-ink); }
 
-  /* Компас: де стоїть кожен модуль навколо артефакта. */
   .compass { display: flex; flex-direction: column; gap: 8px; }
   .compass-row {
     display: grid; grid-template-columns: 96px minmax(0, 1fr) 62px; gap: 10px; align-items: center;
@@ -489,18 +413,19 @@
 
   @media (prefers-reduced-motion: reduce) {
     .world { transition-duration: 1ms; }
+    .bar i, .check, .check svg, .item-title { transition-duration: 1ms; }
   }
 </style>
 
 <div class="page">
   <header>
     <span class="eyebrow">Чорновик модуля · Amore</span>
-    <h1>Покупки стають по інший бік від головної</h1>
+    <h1>Покупки: один список і кружечок</h1>
     <p>
-      Третій модуль, який впускає світ. Мова та сама, що у вішліста й планів:
-      скляна панель вкладок нагорі, приглушена сцена позаду, одна кнопка дії.
-      Нове тут два: напрямок оберту — 45° зліва направо, а не ліворуч, як на
-      планах і вішлісті, — і режим «у магазині», якого в порталі ще немає.
+      Найпростіший модуль порталу, і навмисно. Список, кнопка «додати», кружечок
+      біля товару — дотик закреслює його як куплений, і на цьому все. Ні
+      вкладок, ні режимів, ні окремого архіву. Зі світу тут одне рішення:
+      кристал повертається на 45° зліва направо — по інший бік від головної.
     </p>
   </header>
 
@@ -508,51 +433,22 @@
     <section class="device-col">
       <div class="device-fit">
         <div class="phone" id="phone">
-          <div class="screen" id="screen">
+          <div class="screen">
             <div class="backdrop">
               <div class="hall"></div>
               <div class="stage"><div class="world" id="world"><div class="prism" id="prism"></div></div></div>
             </div>
             <div class="wash"></div>
 
-            <div class="tabs" role="tablist" aria-label="Розділи покупок">
-              <button type="button" class="tab" role="tab" id="tab-buy" aria-selected="true" aria-controls="panel-buy">
-                Купити <span class="count" id="count-buy">0</span>
-              </button>
-              <button type="button" class="tab" role="tab" id="tab-done" aria-selected="false" aria-controls="panel-done">
-                Куплено <span class="count" id="count-done">0</span>
-              </button>
+            <div class="topline">
+              <h2>Покупки</h2>
+              <span class="left" id="left">0 лишилось</span>
             </div>
 
-            <div class="store-bar" id="store-bar">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 9h9l2-7H7M9 19.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 19.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg>
-              <span class="store-bar-copy">
-                <b>У магазині</b>
-                <small id="store-left">0 лишилось</small>
-              </span>
-              <span class="spacer"></span>
-              <button type="button" class="store-undo" id="store-undo" disabled>↺</button>
-              <button type="button" class="store-done" id="store-done">Готово</button>
-            </div>
-
-            <div class="sheet" id="panel-buy" role="tabpanel" aria-labelledby="tab-buy">
-              <div class="progress">
-                <span>Зібрано <b id="progress-text">0 з 0</b></span>
-                <span class="rail"><i id="progress-fill" style="width:0%"></i></span>
-                <button type="button" class="store-enter" id="store-enter">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 9h9l2-7H7M9 19.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 19.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg>
-                  У магазині
-                </button>
-              </div>
+            <div class="sheet">
+              <div class="bar" aria-hidden="true"><i id="bar-fill" style="width:0%"></i></div>
               <div id="groups"></div>
-            </div>
-
-            <div class="sheet" id="panel-done" role="tabpanel" aria-labelledby="tab-done" hidden>
-              <div id="days"></div>
-              <p class="bought-note">
-                Куплене старше за два тижні згортається в рядок «раніше» — список
-                історії не має рости без кінця.
-              </p>
+              <button type="button" class="clear" id="clear" hidden></button>
             </div>
 
             <button type="button" class="fab" id="fab">
@@ -604,7 +500,6 @@
         <button type="button" data-turn="-45">Плани · 45°</button>
         <button type="button" data-turn="0">Головна · 0°</button>
         <button type="button" data-turn="45" aria-pressed="true">Покупки · −45°</button>
-        <button type="button" id="toggle-store" aria-pressed="false">Режим «у магазині»</button>
       </div>
     </section>
 
@@ -642,13 +537,23 @@
       </div>
 
       <div class="card">
-        <h2>Що змінюється в самому модулі</h2>
+        <h2>Увесь модуль — чотири дії</h2>
         <ul class="plain">
-          <li><b>Дві вкладки замість `&lt;details&gt;`.</b> «Купити» і «Куплено» — та сама скляна панель, що у вішліста й планів. Куплене більше не висить згорткою в кінці списку.</li>
-          <li><b>Шапка зникає.</b> «Спільний список / Покупки / N залишилось» повторювало те, що й так написано в доку й на вкладці. Замість неї — тонкий рядок прогресу: <b>зібрано 4 з 12</b>.</li>
-          <li><b>Ввід переїжджає в аркуш.</b> Поле «Що потрібно купити?» займало перший екран щоразу, навіть коли пара просто дивиться список у магазині. Тепер це одна кнопка дії — «+ Покупки», — і той самий вільний ввід із розбором на категорії всередині.</li>
-          <li><b>Категорія стає скляною карткою</b> з кольоровим значком, а не заголовком із емодзі посеред сторінки. Колір категорії лишається — це єдиний колір, який модуль бере не з палітри світу.</li>
-          <li><b>«Куплено» групується по днях</b> і показує, хто купив; повернути товар у список можна прямо звідти.</li>
+          <li><b>Подивитися, що лишилось.</b> Список категоріями, зверху «Покупки · N лишилось» і смужка. Ніяких вкладок: перемикати нема між чим.</li>
+          <li><b>Додати.</b> Одна кнопка дії, і в аркуші той самий вільний ввід, що й сьогодні. Нове тільки одне: видно, як рядок розкладеться на товари, ще ДО додавання.</li>
+          <li><b>Закреслити куплене.</b> Дотик по кружечку — рядок лишається на місці, просто закреслений. У магазині видно і те, що взяв, і те, що ні. Другий дотик повертає назад.</li>
+          <li><b>Прибрати куплене.</b> Один рядок унизу: «Прибрати куплені · N». Свідомий дотик, а не автоматика через N днів.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Чого в модулі немає — і не буде</h2>
+        <ul class="plain">
+          <li><b>Вкладок «Купити / Куплено».</b> Куплене лишається в списку закресленим, тож окремому екрану нема чого показувати. Сьогоднішня згортка «Куплено» зникає разом із ними.</li>
+          <li><b>Режиму «у магазині».</b> Прибраний за словом власника: «цей модуль має бути простим».</li>
+          <li><b>Емодзі в категоріях</b> — тільки іконки, одним набором із рештою порталу. Кольори категорій лишаються ті самі.</li>
+          <li><b>Позначки «з плану».</b> У <code>shopping_items</code> немає посилання на план; малювати те, чого немає в даних, я не буду.</li>
+          <li><b>Екрана «хто купив».</b> У базі <code>bought_by</code> лишається, просто модуль на ньому нічого не будує.</li>
         </ul>
       </div>
 
@@ -656,41 +561,20 @@
         <h2>Що лишається як є</h2>
         <ul class="plain">
           <li>Розбір вільного вводу (<code>parseShoppingInput</code>, Edge Function) і дванадцять категорій із <code>app/constants</code>.</li>
-          <li>Мутації, оптимістичні рядки з від'ємним id, анімація «переношу в куплене».</li>
-          <li>Аркуш редагування товару.</li>
+          <li>Мутації, оптимістичні рядки з від'ємним id, аркуш редагування товару.</li>
           <li>Додавання покупок із плану (блок «Пов'язане» на сторінці плану).</li>
         </ul>
       </div>
 
       <div class="card">
-        <h2>Вирішено власником</h2>
-        <ul class="plain">
-          <li><b>Іконки, не емодзі.</b> Емодзі з категорій прибрані назовсім — у чорновику лишився один варіант, перемикати нічого. Кольори категорій лишаються ті самі, що в <code>ShoppingPage.tsx</code>.</li>
-          <li><b>Позначки «з плану» не буде.</b> Не малюю нічого — і в базу нічого не додаю. Товар, доданий зі сторінки плану, лишається звичайним товаром.</li>
-          <li><b>Кнопка дії — як у решті модулів.</b> Плаваюча, з тією самою межею: на середині прокрутки під нею ховається один рядок. Однаково в трьох модулях краще, ніж по-своєму в кожному.</li>
-          <li><b>Режим «у магазині» — у чорновику.</b> Дивіться нижче; кнопка «У магазині» стоїть у рядку прогресу, а під телефоном є та сама.</li>
-        </ul>
-      </div>
-
-      <div class="card">
-        <h2>Режим «у магазині»</h2>
-        <p>
-          Третій стан модуля, а не варіант списку: телефон у руці, візок у
-          другій, чуже світло. Тому змінюється не тема, а поведінка.
-        </p>
-        <ul class="plain">
-          <li><b>Рядок росте з 14 до 17 px, позначка — з 26 до 34.</b> У це влучають пальцем не дивлячись; сьогоднішня позначка розрахована на уважний дотик за столом.</li>
-          <li><b>Сцена гасне до 22 %.</b> Світ лишається, але зараз він не головне. Це найтемніший стан порталу — і єдиний, де темрява має практичну причину, а не настрій.</li>
-          <li><b>Вкладки міняються на смугу режиму:</b> «У магазині», <b>скільки лишилось · скільки зібрано</b>, «↺» і «Готово». «Куплено» під час походу не потрібне — воно й так наповнюється.</li>
-          <li><b>Куплене зникає зі списку одразу</b> (220 мс замість 430). У магазині список має коротшати: закреслені рядки, що лишаються на місці, змушують щоразу шукати наступний непозначений.</li>
-          <li><b>«↺» повертає останнє позначене.</b> Головна помилка в магазині — відмітив не той рядок; без відкату її виправляють через вкладку «Куплено», тобто виходом із режиму.</li>
-          <li><b>Кнопка «+ Покупки» лишається.</b> Саме в магазині й згадують, що треба ще хліба.</li>
-        </ul>
+        <h2>Два обміни, про які варто знати</h2>
         <div class="flag">
-          <b>Три речі, які треба вирішити, якщо режим лишається.</b>
-          <p><b>Екран, що не гасне.</b> Wake Lock API працює в Chrome і Safari 16.4+, але вимагає жесту й гасне при згортанні. Пропоную вмикати мовчки на вході в режим і не показувати нічого, якщо браузер не вміє.</p>
-          <p><b>Док.</b> Зараз лишається — вийти має бути можливо завжди. Але це 90 px, тобто мінус один рядок; можна ховати його в режимі й лишати тільки «Готово».</p>
-          <p><b>Вхід.</b> Зараз кнопка в рядку прогресу. Альтернатива — вмикати автоматично, коли в списку більше N товарів, але автоматика тут вгадувала б намір: список на двадцять рядків складають і вдома.</p>
+          <b>Скрол тут лишається, і це навмисно.</b>
+          <p>На сторінці плану ми прибрали скрол стелями вмісту. Тут це неможливо чесно: список покупок буває на сорок рядків, і «ще 28» замість них — не спрощення, а приховування.</p>
+        </div>
+        <div class="flag">
+          <b>Кнопка дії перекриває рядок на прокрутці.</b>
+          <p>Та сама межа, що вже записана за планами: плаваюча кнопка лежить над списком. Знизу залишено 84 px, тож дочитати до кінця можна, але поки гортаєш — один рядок під кнопкою. Лишаємо однаково в трьох модулях, як ви й сказали.</p>
         </div>
       </div>
 
@@ -699,7 +583,6 @@
         <ul class="plain">
           <li>Кристал намальований CSS-гранями; у порталі це Three.js, і оберт веде директор сцени.</li>
           <li>Товари вигадані. Розбір вводу в аркуші — теж макет: у порталі рядок їде в Edge Function, а не в регулярку на дві коми.</li>
-          <li>Дати в «Куплено» рахуються від сьогоднішньої, щоб «сьогодні» й «учора» були справжніми.</li>
           <li>Шрифт системний: артефакт не тягне шрифти ззовні. У порталі — Nunito й Fredoka.</li>
         </ul>
       </div>
@@ -709,8 +592,8 @@
 
 <script>
   // ============================================================
-  // Дані макета. Категорії, кольори й емодзі — точні копії
-  // `ShoppingPage.tsx`, щоб макет можна було класти поруч із живим екраном.
+  // Дані макета. Категорії й кольори — точні копії `ShoppingPage.tsx`, щоб
+  // макет можна було класти поруч із живим екраном.
   // ============================================================
   const CATEGORIES = {
     'Овочі': { color: '#65a978', icon: 'leaf' },
@@ -744,183 +627,94 @@
 
   const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name] ?? ICONS.bag}"/></svg>`;
 
+  /** Категорія підписується іконкою: емодзі власник відхилив. */
+  const glyph = (name) => icon(CATEGORIES[name].icon);
+
   // Список вигаданий, але правдоподібний: саме такий вигляд має «звичайний
   // четвер» — кілька категорій по два-три рядки, а не рівна сітка.
   const ITEMS = [
-    { title: 'Молоко', qty: '2 л', category: 'Напої', bought: false },
-    { title: 'Кава в зернах', qty: null, category: 'Напої', bought: false },
-    { title: 'Помідори', qty: '1 кг', category: 'Овочі', bought: false },
-    { title: 'Огірки', qty: null, category: 'Овочі', bought: false },
-    { title: 'Салат', qty: null, category: 'Овочі', bought: true },
-    { title: 'Яблука', qty: '1 кг', category: 'Фрукти', bought: false },
-    { title: 'Куряче філе', qty: '600 г', category: "М'ясо", bought: false },
-    { title: 'Фарш', qty: null, category: "М'ясо", bought: true },
-    { title: 'Гель для душу', qty: null, category: 'Гігієна', bought: false },
-    { title: 'Зубна паста', qty: null, category: 'Гігієна', bought: false },
-    { title: 'Губки для посуду', qty: null, category: 'Побут', bought: false },
-    { title: 'Пакети для сміття', qty: '35 л', category: 'Побут', bought: false },
-  ];
-
-  // Куплене за останні дні — з іменем того, хто купив.
-  const BOUGHT = [
-    { title: 'Хліб', qty: null, category: 'Інше', who: 'Діма', days: 0 },
-    { title: 'Сир', qty: '200 г', category: 'Інше', who: 'Лєна', days: 0 },
-    { title: 'Мінеральна вода', qty: '6 шт', category: 'Напої', who: 'Діма', days: 1 },
-    { title: 'Банани', qty: null, category: 'Фрукти', who: 'Лєна', days: 1 },
-    { title: 'Пральний порошок', qty: null, category: 'Побут', who: 'Діма', days: 3 },
-    { title: 'Шампунь', qty: null, category: 'Гігієна', who: 'Лєна', days: 3 },
+    { id: 1, title: 'Молоко', qty: '2 л', category: 'Напої', bought: false },
+    { id: 2, title: 'Кава в зернах', qty: null, category: 'Напої', bought: false },
+    { id: 3, title: 'Помідори', qty: '1 кг', category: 'Овочі', bought: true },
+    { id: 4, title: 'Огірки', qty: null, category: 'Овочі', bought: false },
+    { id: 5, title: 'Салат', qty: null, category: 'Овочі', bought: false },
+    { id: 6, title: 'Яблука', qty: '1 кг', category: 'Фрукти', bought: false },
+    { id: 7, title: 'Куряче філе', qty: '600 г', category: "М'ясо", bought: false },
+    { id: 8, title: 'Фарш', qty: null, category: "М'ясо", bought: true },
+    { id: 9, title: 'Гель для душу', qty: null, category: 'Гігієна', bought: false },
+    { id: 10, title: 'Зубна паста', qty: null, category: 'Гігієна', bought: false },
+    { id: 11, title: 'Губки для посуду', qty: null, category: 'Побут', bought: false },
+    { id: 12, title: 'Пакети для сміття', qty: '35 л', category: 'Побут', bought: false },
   ];
 
   const ORDER = Object.keys(CATEGORIES);
   const $ = (id) => document.getElementById(id);
+  let nextId = 100;
 
-  /** Режим «у магазині»: третій стан модуля, а не варіант списку. */
-  let store = false;
-  /** Що позначили в цьому поході — щоб «↺» повертало саме останнє. */
-  const marked = [];
-  /** Категорія підписується іконкою. Емодзі власник відхилив: у світі вони
-   *  чужорідні, а решта модулів малює одним набором іконок. */
-  const glyph = (name) => icon(CATEGORIES[name].icon);
-
-  function drawGroups() {
-    const active = ITEMS.filter((item) => !item.bought);
+  function draw() {
     const byCategory = new Map();
-    for (const item of active) {
+    for (const item of ITEMS) {
       const rows = byCategory.get(item.category) ?? [];
       rows.push(item);
       byCategory.set(item.category, rows);
     }
 
-    const html = ORDER
+    $('groups').innerHTML = ORDER
       .filter((name) => byCategory.has(name))
       .map((name) => {
         const cat = CATEGORIES[name];
-        const rows = byCategory.get(name);
+        // Усередині категорії куплене осідає донизу: рядок лишається в списку,
+        // але не стоїть між двома ще не взятими.
+        const rows = byCategory.get(name).slice().sort((a, b) => Number(a.bought) - Number(b.bought));
+        // У заголовку категорії — скільки ще НЕ взяли. «1 з 3» читалось
+        // двозначно: чи то одне лишилось, чи то одне зроблено.
+        const left = rows.filter((row) => !row.bought).length;
         return `
           <section class="group" style="--cat:${cat.color}">
             <div class="group-head">
               <span class="group-icon" aria-hidden="true">${glyph(name)}</span>
               <h3>${name}</h3>
-              <span class="group-count">${rows.length}</span>
+              <span class="group-count">${left === 0 ? 'усе' : `${left} лишилось`}</span>
             </div>
             <div class="group-list">
               ${rows.map((item) => `
-                <div class="item" data-done="false">
-                  <button type="button" class="check" data-title="${item.title}" aria-label="Позначити «${item.title}» купленим">
+                <div class="item" data-bought="${item.bought}">
+                  <button type="button" class="check" data-id="${item.id}"
+                    aria-pressed="${item.bought}"
+                    aria-label="${item.bought ? `Повернути «${item.title}» у список` : `Позначити «${item.title}» купленим`}">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.5 17 19 7"/></svg>
                   </button>
-                  <span class="item-copy"><span class="item-title">${item.title}</span></span>
+                  <span class="item-title">${item.title}</span>
                   ${item.qty ? `<span class="item-qty">${item.qty}</span>` : ''}
                 </div>`).join('')}
             </div>
           </section>`;
       })
-      .join('');
+      .join('') || '<p class="empty">Список порожній. Додайте покупку кнопкою внизу.</p>';
 
-    $('groups').innerHTML = html;
-
-    // Позначка купленого — саме те, заради чого модуль відкривають у магазині,
-    // тож у макеті вона справжня: рядок гасне й зникає з групи.
+    // Дотик по кружечку — єдина дія в списку, і вона миттєва: жодних
+    // підтверджень, жодного зникання рядка.
     for (const button of $('groups').querySelectorAll('.check')) {
       button.addEventListener('click', () => {
-        const row = button.closest('.item');
-        row.dataset.done = 'true';
-        window.setTimeout(() => {
-          const item = ITEMS.find((entry) => entry.title === button.dataset.title);
-          if (item) item.bought = true;
-          BOUGHT.unshift({ ...item, who: 'Діма', days: 0 });
-          marked.push(item.title);
-          drawAll();
-        }, store ? 220 : 430);
+        const item = ITEMS.find((entry) => entry.id === Number(button.dataset.id));
+        if (item) item.bought = !item.bought;
+        draw();
       });
     }
-  }
 
-  function dayLabel(days) {
-    if (days === 0) return 'Сьогодні';
-    if (days === 1) return 'Учора';
-    const date = new Date();
-    date.setDate(date.getDate() - days);
-    return date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' });
-  }
-
-  function drawBought() {
-    const byDay = new Map();
-    for (const item of BOUGHT) {
-      const rows = byDay.get(item.days) ?? [];
-      rows.push(item);
-      byDay.set(item.days, rows);
-    }
-
-    $('days').innerHTML = [...byDay.entries()]
-      .sort((a, b) => a[0] - b[0])
-      .map(([days, rows]) => `
-        <div class="day-head"><h3>${dayLabel(days)}</h3><span>${rows.length}</span></div>
-        <section class="group" style="--cat:${CATEGORIES[rows[0].category].color}">
-          <div class="group-list">
-            ${rows.map((item) => `
-              <div class="item" data-done="true">
-                <button type="button" class="check" aria-label="Повернути «${item.title}» у список">
-                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.5 17 19 7"/></svg>
-                </button>
-                <span class="item-copy">
-                  <span class="item-title">${item.title}</span>
-                  <span class="item-note">купив(ла) ${item.who}</span>
-                </span>
-                <button type="button" class="undo">Повернути</button>
-              </div>`).join('')}
-          </div>
-        </section>`)
-      .join('');
-  }
-
-  function drawProgress() {
+    const bought = ITEMS.filter((item) => item.bought).length;
     const total = ITEMS.length;
-    const done = ITEMS.filter((item) => item.bought).length;
-    $('progress-text').textContent = `${done} з ${total}`;
-    $('progress-fill').style.width = `${total === 0 ? 0 : Math.round((done / total) * 100)}%`;
-    $('count-buy').textContent = String(total - done);
-    $('count-done').textContent = String(BOUGHT.length);
+    $('left').textContent = `${total - bought} лишилось`;
+    $('bar-fill').style.width = `${total === 0 ? 0 : Math.round((bought / total) * 100)}%`;
+    $('clear').hidden = bought === 0;
+    $('clear').textContent = `Прибрати куплені · ${bought}`;
   }
 
-  function drawAll() {
-    drawGroups();
-    drawBought();
-    drawProgress();
-    drawStoreBar();
-  }
-
-  // ── Режим «у магазині» ──────────────────────────────────
-  // Що він змінює: сцена гасне, вкладки міняються на смугу режиму, рядки
-  // крупнішають, а куплене зникає зі списку одразу — у магазині список має
-  // коротшати, а не покриватись закресленим.
-  function drawStoreBar() {
-    const left = ITEMS.filter((item) => !item.bought).length;
-    $('store-left').textContent = `${left} лишилось · зібрано ${marked.length}`;
-    $('store-undo').disabled = marked.length === 0;
-  }
-
-  function setStore(next) {
-    store = next;
-    $('screen').dataset.store = String(store);
-    $('toggle-store').setAttribute('aria-pressed', String(store));
-    if (store) showTab('buy');
-    drawAll();
-  }
-
-  $('store-enter').addEventListener('click', () => setStore(true));
-  $('store-done').addEventListener('click', () => setStore(false));
-  $('toggle-store').addEventListener('click', () => setStore(!store));
-
-  // Повернення останнього — головна помилка в магазині: відмітив не той рядок.
-  $('store-undo').addEventListener('click', () => {
-    const title = marked.pop();
-    if (!title) return;
-    const item = ITEMS.find((entry) => entry.title === title);
-    if (item) item.bought = false;
-    const index = BOUGHT.findIndex((entry) => entry.title === title && entry.days === 0);
-    if (index >= 0) BOUGHT.splice(index, 1);
-    drawAll();
+  $('clear').addEventListener('click', () => {
+    for (let index = ITEMS.length - 1; index >= 0; index -= 1) {
+      if (ITEMS[index].bought) ITEMS.splice(index, 1);
+    }
+    draw();
   });
 
   // ── Аркуш додавання ─────────────────────────────────────
@@ -953,8 +747,7 @@
   }
 
   function drawParsed() {
-    const lines = parse($('composer-input').value);
-    $('parsed').innerHTML = lines.map((line) => {
+    $('parsed').innerHTML = parse($('composer-input').value).map((line) => {
       const cat = CATEGORIES[line.category];
       return `<span class="parsed-chip" style="--cat:${cat.color}">
         <i></i>${line.title}${line.qty ? ` · ${line.qty}` : ''} <small>${line.category}</small>
@@ -966,28 +759,17 @@
   $('composer-cancel').addEventListener('click', () => { $('overlay').hidden = true; });
   $('composer-input').addEventListener('input', drawParsed);
   $('composer-add').addEventListener('click', () => {
-    for (const line of parse($('composer-input').value)) ITEMS.push({ ...line, bought: false });
+    for (const line of parse($('composer-input').value)) {
+      ITEMS.push({ id: nextId, ...line, bought: false });
+      nextId += 1;
+    }
     $('overlay').hidden = true;
     $('composer-input').value = '';
-    showTab('buy');
-    drawAll();
+    draw();
   });
   $('overlay').addEventListener('click', (event) => {
     if (event.target === $('overlay')) $('overlay').hidden = true;
   });
-
-  // ── Вкладки ─────────────────────────────────────────────
-  function showTab(name) {
-    for (const key of ['buy', 'done']) {
-      const selected = key === name;
-      $(`tab-${key}`).setAttribute('aria-selected', String(selected));
-      $(`panel-${key}`).hidden = !selected;
-    }
-    // Кнопка дії живе лише там, де є що додавати.
-    $('fab').style.display = name === 'buy' ? '' : 'none';
-  }
-  $('tab-buy').addEventListener('click', () => showTab('buy'));
-  $('tab-done').addEventListener('click', () => showTab('done'));
 
   // ── Кристал ─────────────────────────────────────────────
   (function buildCrystal() {
@@ -1014,8 +796,7 @@
   }
   window.addEventListener('resize', fit);
 
-  drawAll();
-  showTab('buy');
+  draw();
   $('world').style.setProperty('--turn', '45deg');
   fit();
 </script>
