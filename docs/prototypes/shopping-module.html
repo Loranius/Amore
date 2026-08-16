@@ -1,0 +1,908 @@
+<title>Покупки: модуль у світі</title>
+<style>
+  /* ============================================================
+     Чорновик модуля «Покупки» — у мові вішліста й планів.
+     ------------------------------------------------------------
+     Це макет структури, а не порталу: кристал намальований CSS-гранями, товари
+     вигадані. Під перевіркою три речі, і всі три — рішення, а не картинка:
+
+     1. Оберт. Покупки стають по ІНШИЙ бік від головної: кристал повертається
+        на 45° зліва направо, тоді як плани й вішліст повертають його ліворуч.
+     2. Дві вкладки замість аркуша з `<details>`: «Купити» і «Куплено».
+     3. Одна кнопка дії: вільний ввід переїжджає з верху сторінки в аркуш.
+
+     Палітра — токени порталу (`worldTheme.css`), кольори категорій — з
+     `ShoppingPage.tsx`, підписи — з живого екрана.
+     ============================================================ */
+
+  :root {
+    --page-bg: #f4f1f7;
+    --page-panel: #ffffff;
+    --page-ink: #241c33;
+    --page-muted: #6b6280;
+    --page-line: rgba(60, 44, 88, 0.14);
+    --page-accent: #7b4fa8;
+
+    /* Токени порталу — не змінювати без worldTheme.css. */
+    --world-bg: #221a33;
+    --world-bg-deep: #140f1f;
+    --world-surface-strong: #2a2140;
+    --world-surface: rgba(42, 33, 64, 0.82);
+    --world-surface-soft: rgba(255, 255, 255, 0.07);
+    --world-recess: rgba(9, 6, 16, 0.42);
+    --world-primary: #c9a0e6;
+    --world-accent: #dcb6f5;
+    --world-text: #f6efff;
+    --world-text-muted: #c9b8e4;
+    --world-border: rgba(214, 190, 246, 0.16);
+    --world-border-active: rgba(220, 182, 245, 0.42);
+    --world-success: #7fd0a6;
+    --world-shadow: rgba(6, 4, 12, 0.5);
+
+    --font: 'Nunito', ui-rounded, 'Segoe UI Variable', system-ui, sans-serif;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page-bg: #17131f;
+      --page-panel: #201a2c;
+      --page-ink: #f1ecf8;
+      --page-muted: #a397b8;
+      --page-line: rgba(214, 190, 246, 0.16);
+      --page-accent: #dcb6f5;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --page-bg: #17131f;
+    --page-panel: #201a2c;
+    --page-ink: #f1ecf8;
+    --page-muted: #a397b8;
+    --page-line: rgba(214, 190, 246, 0.16);
+    --page-accent: #dcb6f5;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--page-ink);
+    font-family: var(--font);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1180px; margin: 0 auto; padding: 32px 20px 64px; display: flex; flex-direction: column; gap: 28px; }
+  header { display: flex; flex-direction: column; gap: 10px; max-width: 64ch; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--page-muted); font-weight: 700; }
+  h1 { margin: 0; font-size: clamp(26px, 4vw, 38px); line-height: 1.15; text-wrap: balance; font-weight: 800; }
+  h2 { margin: 0 0 2px; font-size: 17px; font-weight: 800; }
+  p { margin: 0; color: var(--page-muted); }
+  header p { font-size: 16px; }
+
+  .split { display: grid; grid-template-columns: minmax(0, auto) minmax(320px, 1fr); gap: 36px; align-items: start; }
+  @media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
+
+  /* ── Телефон ───────────────────────────────────────────── */
+
+  .device-col { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+  .device-fit { width: 100%; display: flex; justify-content: center; }
+
+  .phone {
+    width: 412px; height: 915px; flex: none;
+    border-radius: 40px; padding: 6px;
+    background: linear-gradient(160deg, #3a3050, #14101d);
+    box-shadow: 0 30px 70px rgba(12, 8, 24, 0.42), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    transform-origin: top center;
+  }
+
+  .screen {
+    position: relative; width: 100%; height: 100%;
+    border-radius: 34px; overflow: hidden;
+    background: radial-gradient(120% 80% at 50% 12%, var(--world-bg), var(--world-bg-deep) 78%);
+    color: var(--world-text);
+    isolation: isolate;
+  }
+
+  .backdrop { position: absolute; inset: 0; filter: blur(4px); transform: scale(1.03); }
+
+  .hall {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(88% 52% at 50% 74%, rgba(150, 120, 196, 0.34), transparent 72%),
+      linear-gradient(180deg, rgba(58, 45, 88, 0.55) 0%, rgba(48, 37, 74, 0.42) 46%, rgba(20, 15, 31, 0.9) 88%);
+  }
+  .hall::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 34%;
+    background: linear-gradient(180deg, transparent, rgba(9, 6, 16, 0.75));
+  }
+
+  .stage { position: absolute; inset: 0; perspective: 1000px; perspective-origin: 50% 62%; }
+
+  /* УВАГА про знак. У CSS тут крутиться сам камінь, в атласі
+     (`crystalAtlas.ts`) — камера навколо нього. Тому знаки протилежні:
+     азимут +45° в атласі = `rotateY(-45deg)` тут. Покупки в атласі мають
+     від'ємний азимут, тобто в макеті це +45°. */
+  .world {
+    position: absolute; left: 50%; top: 78%; width: 0; height: 0;
+    transform-style: preserve-3d;
+    transform: rotateX(8deg) rotateY(var(--turn, 45deg));
+    transition: transform 1100ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .prism { position: absolute; transform-style: preserve-3d; }
+
+  .facet {
+    position: absolute; left: -27px; top: -330px; width: 54px; height: 330px;
+    background: linear-gradient(174deg, rgba(255,255,255,.9), rgba(226,209,247,.72) 42%, rgba(178,152,214,.62));
+    transform: rotateY(var(--a)) translateZ(47px);
+    box-shadow: inset 0 0 24px rgba(255,255,255,.5);
+  }
+  .facet:nth-child(even) { background: linear-gradient(174deg, rgba(240,231,252,.82), rgba(197,174,232,.66) 46%, rgba(150,126,188,.6)); }
+
+  .tip {
+    position: absolute; left: -27px; top: -434px; width: 54px; height: 104px;
+    background: linear-gradient(184deg, rgba(255,255,255,.94), rgba(214,194,243,.7));
+    clip-path: polygon(50% 0, 100% 100%, 0 100%);
+    transform: rotateY(var(--a)) translateZ(47px) rotateX(26deg);
+    transform-origin: 50% 100%;
+  }
+  .tip:nth-child(even) { background: linear-gradient(184deg, rgba(236,226,252,.86), rgba(186,162,224,.66)); }
+
+  .wash {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(120% 70% at 50% 78%, rgba(11, 8, 19, 0.62), rgba(11, 8, 19, 0.34));
+  }
+
+  /* ── Верхня панель: та сама, що у вішліста й планів ─────── */
+
+  .tabs {
+    position: absolute; left: 16px; right: 16px; top: 18px; z-index: 3;
+    display: flex; gap: 6px; padding: 6px;
+    border-radius: 999px;
+    border: 1px solid var(--world-border);
+    background: rgba(42, 33, 64, 0.62);
+    backdrop-filter: blur(10px);
+  }
+
+  .tab {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+    padding: 11px 8px; border: 0; border-radius: 999px;
+    background: none; color: var(--world-text-muted);
+    font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: background 200ms ease, color 200ms ease;
+  }
+  .tab[aria-selected="true"] { background: rgba(201, 160, 230, 0.6); color: #241636; }
+  .tab:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
+  .tab .count {
+    min-width: 22px; padding: 1px 6px; border-radius: 999px;
+    background: rgba(20, 15, 31, 0.35); font-size: 12px; font-variant-numeric: tabular-nums;
+  }
+  .tab[aria-selected="true"] .count { background: rgba(255, 255, 255, 0.42); }
+
+  /* ── Аркуш модуля ──────────────────────────────────────── */
+
+  .sheet {
+    position: absolute; z-index: 2;
+    left: 0; right: 0; top: 82px; bottom: 96px;
+    overflow-y: auto; overscroll-behavior: contain;
+    /* Нижній відступ під кнопку дії: без нього останній товар лишається під
+       нею й дочитати його неможливо. */
+    padding: 8px 16px 84px;
+    scrollbar-width: none;
+  }
+  .sheet::-webkit-scrollbar { display: none; }
+  .sheet[hidden] { display: none; }
+
+  .progress {
+    display: flex; align-items: center; gap: 10px;
+    margin: 2px 2px 12px;
+    font-size: 13px; color: var(--world-text-muted);
+  }
+  .progress .rail {
+    flex: 1; height: 6px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.09); overflow: hidden;
+  }
+  .progress .rail i {
+    display: block; height: 100%; border-radius: 999px;
+    background: linear-gradient(90deg, var(--world-primary), var(--world-accent));
+  }
+  .progress b { color: var(--world-text); font-variant-numeric: tabular-nums; }
+
+  /* Категорія — скляна картка, як плитка плану. Колір категорії лишається
+     єдиним кольором, який модуль бере не з палітри світу. */
+  .group {
+    margin-bottom: 10px; padding: 10px 12px 8px;
+    border: 1px solid var(--world-border); border-radius: 20px;
+    background: var(--world-surface);
+    box-shadow: 0 12px 30px var(--world-shadow);
+  }
+
+  .group-head {
+    display: flex; align-items: center; gap: 9px;
+    margin-bottom: 8px;
+  }
+  .group-icon {
+    width: 30px; height: 30px; flex: none; display: grid; place-items: center;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--cat) 26%, transparent);
+    color: var(--cat);
+    font-size: 15px;
+  }
+  .group-icon svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .group-head h3 { margin: 0; font-size: 14px; font-weight: 800; }
+  .group-count {
+    margin-left: auto; font-size: 12px; font-weight: 700;
+    color: var(--world-text-muted); font-variant-numeric: tabular-nums;
+  }
+
+  .item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 4px;
+    border-top: 1px solid rgba(214, 190, 246, 0.08);
+  }
+  .group-list .item:first-child { border-top: 0; }
+
+  .check {
+    width: 26px; height: 26px; flex: none;
+    display: grid; place-items: center;
+    border: 1.8px solid var(--world-border-active); border-radius: 50%;
+    background: none; color: #241636; cursor: pointer;
+    transition: background 180ms ease, border-color 180ms ease;
+  }
+  .check svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .item[data-done="true"] .check { background: var(--world-success); border-color: var(--world-success); }
+  .item[data-done="true"] .check svg { opacity: 1; }
+  .check:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 2px; }
+
+  .item-copy { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+  .item-title { font-size: 14px; font-weight: 700; }
+  .item[data-done="true"] .item-title { color: var(--world-text-muted); text-decoration: line-through; }
+  .item-note { font-size: 11.5px; color: var(--world-text-muted); }
+  .item-qty {
+    margin-left: auto; flex: none;
+    padding: 3px 9px; border-radius: 999px;
+    background: var(--world-recess); border: 1px solid var(--world-border);
+    font-size: 12px; font-weight: 700; color: var(--world-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── «Куплено» ─────────────────────────────────────────── */
+
+  .day-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    margin: 14px 2px 8px;
+  }
+  .day-head h3 { margin: 0; font-size: 14px; font-weight: 800; }
+  .day-head span { font-size: 12px; color: var(--world-text-muted); }
+
+  .undo {
+    margin-left: auto; flex: none;
+    padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--world-border); background: none;
+    color: var(--world-text-muted); font: inherit; font-size: 12px; font-weight: 700;
+    cursor: pointer;
+  }
+  .undo:hover { border-color: var(--world-border-active); color: var(--world-accent); }
+
+  .bought-note {
+    margin: 14px 2px 0; font-size: 12px; color: var(--world-text-muted);
+  }
+
+  /* ── Кнопка дії ────────────────────────────────────────── */
+
+  .fab {
+    position: absolute; z-index: 4; right: 16px; bottom: 108px;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 12px 18px; border: 1px solid var(--world-border-active);
+    border-radius: 999px;
+    background: linear-gradient(140deg, var(--world-primary), #965fbd);
+    color: #1b1226; font: inherit; font-size: 14px; font-weight: 800;
+    box-shadow: 0 12px 28px var(--world-shadow);
+    cursor: pointer;
+  }
+  .fab svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+  .fab:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 3px; }
+
+  /* ── Аркуш додавання ───────────────────────────────────── */
+
+  .overlay {
+    position: absolute; inset: 0; z-index: 6;
+    display: flex; align-items: flex-end;
+    background: rgba(9, 6, 16, 0.55);
+    backdrop-filter: blur(2px);
+  }
+  .overlay[hidden] { display: none; }
+
+  .composer {
+    width: 100%;
+    padding: 12px 16px 20px;
+    border-radius: 26px 26px 0 0;
+    border-top: 1px solid var(--world-border);
+    background: var(--world-surface-strong);
+    box-shadow: 0 -18px 40px rgba(6, 4, 12, 0.5);
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .composer-handle {
+    width: 44px; height: 4px; border-radius: 999px; align-self: center;
+    background: rgba(214, 190, 246, 0.3);
+  }
+  .composer h3 { margin: 0; font-size: 17px; font-weight: 800; }
+  .composer p { font-size: 13px; color: var(--world-text-muted); }
+  .composer textarea {
+    width: 100%; min-height: 74px; resize: none;
+    padding: 11px 13px; border-radius: 16px;
+    border: 1px solid var(--world-border); background: var(--world-recess);
+    color: var(--world-text); font: inherit; font-size: 14px;
+  }
+  .composer textarea:focus-visible { outline: 2px solid var(--world-accent); outline-offset: 1px; }
+
+  .parsed { display: flex; flex-wrap: wrap; gap: 6px; }
+  .parsed-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 999px;
+    border: 1px solid var(--world-border); background: var(--world-surface-soft);
+    font-size: 12.5px; font-weight: 700;
+  }
+  .parsed-chip i {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--cat);
+  }
+  .parsed-chip small { color: var(--world-text-muted); font-weight: 600; }
+
+  .composer-actions { display: flex; gap: 8px; }
+  .composer-actions button {
+    flex: 1; padding: 12px; border-radius: 999px;
+    border: 1px solid var(--world-border); background: none;
+    color: var(--world-text); font: inherit; font-size: 14px; font-weight: 800; cursor: pointer;
+  }
+  .composer-actions .primary {
+    border-color: var(--world-border-active);
+    background: linear-gradient(140deg, var(--world-primary), #965fbd);
+    color: #1b1226;
+  }
+
+  /* ── Док ───────────────────────────────────────────────── */
+
+  .dock {
+    position: absolute; z-index: 4; left: 14px; right: 14px; bottom: 16px;
+    display: flex; align-items: center; gap: 4px; padding: 8px;
+    border-radius: 26px; border: 1px solid var(--world-border);
+    background: rgba(30, 22, 46, 0.86);
+    backdrop-filter: blur(8px);
+  }
+  .dock button {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 9px 4px; border: 0; border-radius: 18px; background: none;
+    color: var(--world-text-muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+  }
+  .dock button[aria-current="page"] { background: rgba(201, 160, 230, 0.22); color: var(--world-accent); }
+  .dock svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .dock .heart { flex: 0 0 54px; }
+  .dock .heart svg { width: 26px; height: 26px; fill: var(--world-primary); stroke: none; }
+
+  /* ── Керування макетом ─────────────────────────────────── */
+
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 460px; }
+  .controls button {
+    padding: 9px 15px; border-radius: 999px; border: 1px solid var(--page-line);
+    background: var(--page-panel); color: var(--page-ink);
+    font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .controls button:hover { border-color: var(--page-accent); }
+  .controls button[aria-pressed="true"] { border-color: var(--page-accent); color: var(--page-accent); }
+  .controls button:focus-visible { outline: 2px solid var(--page-accent); outline-offset: 2px; }
+
+  /* ── Специфікація ──────────────────────────────────────── */
+
+  .spec { display: flex; flex-direction: column; gap: 22px; min-width: 0; }
+  .card {
+    border: 1px solid var(--page-line); border-radius: 16px;
+    background: var(--page-panel); padding: 18px 20px;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  ul.plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 7px; font-size: 14px; color: var(--page-muted); }
+  ul.plain b { color: var(--page-ink); }
+  .flag { border-left: 3px solid var(--page-accent); padding-left: 14px; display: flex; flex-direction: column; gap: 6px; }
+  .flag b { font-size: 14px; }
+  .flag p { font-size: 14px; }
+  code { font-family: var(--mono); font-size: 0.92em; background: color-mix(in srgb, var(--page-accent) 10%, transparent); padding: 1px 5px; border-radius: 5px; color: var(--page-ink); }
+
+  /* Компас: де стоїть кожен модуль навколо артефакта. */
+  .compass { display: flex; flex-direction: column; gap: 8px; }
+  .compass-row {
+    display: grid; grid-template-columns: 96px minmax(0, 1fr) 62px; gap: 10px; align-items: center;
+    font-size: 13px;
+  }
+  .compass-row .rail { position: relative; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--page-accent) 10%, transparent); }
+  .compass-row .rail::before {
+    content: ''; position: absolute; left: 50%; top: -3px; bottom: -3px; width: 1px;
+    background: color-mix(in srgb, var(--page-accent) 40%, transparent);
+  }
+  .compass-row .pin {
+    position: absolute; top: -2px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--page-accent); translate: -50% 0;
+  }
+  .compass-row .pin[data-now="true"] { box-shadow: 0 0 0 4px color-mix(in srgb, var(--page-accent) 22%, transparent); }
+  .compass-row .deg { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; color: var(--page-muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .world { transition-duration: 1ms; }
+  }
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">Чорновик модуля · Amore</span>
+    <h1>Покупки стають по інший бік від головної</h1>
+    <p>
+      Третій модуль, який впускає світ. Мова та сама, що у вішліста й планів:
+      скляна панель вкладок нагорі, приглушена сцена позаду, одна кнопка дії.
+      Нове тут одне — напрямок: кристал повертається на 45° зліва направо, а не
+      ліворуч, як на планах і вішлісті.
+    </p>
+  </header>
+
+  <div class="split">
+    <section class="device-col">
+      <div class="device-fit">
+        <div class="phone" id="phone">
+          <div class="screen">
+            <div class="backdrop">
+              <div class="hall"></div>
+              <div class="stage"><div class="world" id="world"><div class="prism" id="prism"></div></div></div>
+            </div>
+            <div class="wash"></div>
+
+            <div class="tabs" role="tablist" aria-label="Розділи покупок">
+              <button type="button" class="tab" role="tab" id="tab-buy" aria-selected="true" aria-controls="panel-buy">
+                Купити <span class="count" id="count-buy">0</span>
+              </button>
+              <button type="button" class="tab" role="tab" id="tab-done" aria-selected="false" aria-controls="panel-done">
+                Куплено <span class="count" id="count-done">0</span>
+              </button>
+            </div>
+
+            <div class="sheet" id="panel-buy" role="tabpanel" aria-labelledby="tab-buy">
+              <div class="progress">
+                <span>Зібрано <b id="progress-text">0 з 0</b></span>
+                <span class="rail"><i id="progress-fill" style="width:0%"></i></span>
+              </div>
+              <div id="groups"></div>
+            </div>
+
+            <div class="sheet" id="panel-done" role="tabpanel" aria-labelledby="tab-done" hidden>
+              <div id="days"></div>
+              <p class="bought-note">
+                Куплене старше за два тижні згортається в рядок «раніше» — список
+                історії не має рости без кінця.
+              </p>
+            </div>
+
+            <button type="button" class="fab" id="fab">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+              Покупки
+            </button>
+
+            <div class="overlay" id="overlay" hidden>
+              <div class="composer" role="dialog" aria-modal="true" aria-labelledby="composer-title">
+                <span class="composer-handle" aria-hidden="true"></span>
+                <h3 id="composer-title">Що потрібно купити?</h3>
+                <p>Кілька товарів через кому — вони самі розкладуться за категоріями.</p>
+                <textarea id="composer-input" rows="3">молоко 2, хліб, яблука 1 кг, гель для душу</textarea>
+                <div class="parsed" id="parsed"></div>
+                <div class="composer-actions">
+                  <button type="button" id="composer-cancel">Скасувати</button>
+                  <button type="button" class="primary" id="composer-add">Додати</button>
+                </div>
+              </div>
+            </div>
+
+            <nav class="dock">
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12v8H4v-8M3 8h18v4H3zM12 8V6a2.5 2.5 0 1 0-2.5 2.5M12 8V6a2.5 2.5 0 1 1 2.5 2.5M12 8v12"/></svg>
+                Вішлист
+              </button>
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6l1.2 1.2L7.5 5M4 12l1.2 1.2L7.5 11M4 18l1.2 1.2L7.5 17"/></svg>
+                Плани
+              </button>
+              <button type="button" class="heart" aria-label="Головна">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.4 4.6 13a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9A4.6 4.6 0 1 1 19.4 13Z"/></svg>
+              </button>
+              <button type="button" aria-current="page">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h2l2 9h9l2-7H7M9 19.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2ZM17 19.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z"/></svg>
+                Покупки
+              </button>
+              <button type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h.01M12 12h.01M18 12h.01"/></svg>
+                Ще
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls" id="controls">
+        <button type="button" data-turn="-90">Вішлист · 90°</button>
+        <button type="button" data-turn="-45">Плани · 45°</button>
+        <button type="button" data-turn="0">Головна · 0°</button>
+        <button type="button" data-turn="45" aria-pressed="true">Покупки · −45°</button>
+        <button type="button" id="toggle-glyph" aria-pressed="false">Емодзі категорій</button>
+      </div>
+    </section>
+
+    <section class="spec">
+      <div class="card">
+        <h2>Оберт: перший модуль праворуч від головної</h2>
+        <p>
+          Сьогодні Покупки стоять на азимуті +90° — там само, де вішліст, лише
+          нижче по тілу. Власник просить інше: <b>45° зліва направо</b>, тобто по
+          інший бік від головної. Тоді порядок у доку й порядок у світі — це один
+          порядок.
+        </p>
+        <div class="compass">
+          <div class="compass-row"><span>Вішлист</span><span class="rail"><i class="pin" style="left:100%"></i></span><span class="deg">+90°</span></div>
+          <div class="compass-row"><span>Плани</span><span class="rail"><i class="pin" style="left:75%"></i></span><span class="deg">+45°</span></div>
+          <div class="compass-row"><span>Головна</span><span class="rail"><i class="pin" style="left:50%"></i></span><span class="deg">0°</span></div>
+          <div class="compass-row"><span>Покупки</span><span class="rail"><i class="pin" data-now="true" style="left:25%"></i></span><span class="deg">−45°</span></div>
+        </div>
+        <p>
+          У коді це один рядок у <code>crystalAtlas.ts</code>:
+          <code>provision</code> отримує <code>azimuth: -QUARTER * 0.5</code>
+          замість <code>QUARTER</code>. Висота лишається низькою (0.38) — це
+          щоденне й практичне, найспокійніша поза в атласі.
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>Чи не зламає це атлас</h2>
+        <ul class="plain">
+          <li><b>Правило «або поворот, або підйом» тримається.</b> Найближчі сусіди нової пози — головна (45° убік) і спогади (45° убік), обидва більше за поріг 0.25 рад. Перевірка <code>spreads the regions far enough apart</code> лишається зеленою.</li>
+          <li><b>Ритм трьох ближніх модулів не чіпається.</b> Тест <code>steps the three near modules a quarter of a quarter apart</code> перевіряє головну, плани й вішліст — Покупок у ньому немає.</li>
+          <li><b>Коментар у коді треба переписати.</b> Там зараз пояснено, чому <code>provision</code> ділить азимут із <code>aspiration</code>. Після зміни це неправда, і коментар, який бреше, гірший за відсутній.</li>
+          <li><b>Тест на новий напрямок варто додати:</b> покупки й плани дзеркальні відносно головної (<code>shopping.azimuth === -plans.azimuth</code>). Інакше наступна правка атласу мовчки зсуне саме те, що ви щойно попросили.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Що змінюється в самому модулі</h2>
+        <ul class="plain">
+          <li><b>Дві вкладки замість `&lt;details&gt;`.</b> «Купити» і «Куплено» — та сама скляна панель, що у вішліста й планів. Куплене більше не висить згорткою в кінці списку.</li>
+          <li><b>Шапка зникає.</b> «Спільний список / Покупки / N залишилось» повторювало те, що й так написано в доку й на вкладці. Замість неї — тонкий рядок прогресу: <b>зібрано 4 з 12</b>.</li>
+          <li><b>Ввід переїжджає в аркуш.</b> Поле «Що потрібно купити?» займало перший екран щоразу, навіть коли пара просто дивиться список у магазині. Тепер це одна кнопка дії — «+ Покупки», — і той самий вільний ввід із розбором на категорії всередині.</li>
+          <li><b>Категорія стає скляною карткою</b> з кольоровим значком, а не заголовком із емодзі посеред сторінки. Колір категорії лишається — це єдиний колір, який модуль бере не з палітри світу.</li>
+          <li><b>«Куплено» групується по днях</b> і показує, хто купив; повернути товар у список можна прямо звідти.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Що лишається як є</h2>
+        <ul class="plain">
+          <li>Розбір вільного вводу (<code>parseShoppingInput</code>, Edge Function) і дванадцять категорій із <code>app/constants</code>.</li>
+          <li>Мутації, оптимістичні рядки з від'ємним id, анімація «переношу в куплене».</li>
+          <li>Аркуш редагування товару.</li>
+          <li>Додавання покупок із плану (блок «Пов'язане» на сторінці плану).</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>Чотири речі, які варто вирішити до роботи</h2>
+        <div class="flag">
+          <b>Емодзі чи іконки в категоріях.</b>
+          <p>Сьогодні категорії підписані емодзі (🥦, 🍎, 🥩). У світі вони виглядають чужорідно: вішліст і плани малюють іконками одного набору. Кнопка «Емодзі категорій» під телефоном перемикає обидва варіанти — подивіться й скажіть. Кольори категорій я в будь-якому разі лишаю.</p>
+        </div>
+        <div class="flag">
+          <b>Покупки з плану ніяк не помічені — і не можуть бути.</b>
+          <p>У таблиці <code>shopping_items</code> немає посилання на план: те, що додали зі сторінки плану, стає звичайним товаром. Позначку «з плану “Вечеря на річницю”» намалювати можна лише після колонки в базі. Малювати її «поки що ні на чому» я не буду.</p>
+        </div>
+        <div class="flag">
+          <b>Скрол тут лишається, і це навмисно.</b>
+          <p>На сторінці плану ми прибрали скрол стелями вмісту. Тут це неможливо чесно: список покупок буває на сорок рядків, і «ще 28» замість них — це не спрощення, а приховування. Тому Покупки гортаються, а без скролу лишається сторінка плану.</p>
+        </div>
+        <div class="flag">
+          <b>Кнопка дії перекриває останній рядок на прокрутці.</b>
+          <p>Та сама межа, що вже записана за планами в <code>MODULE_STATUS.md</code>: плаваюча кнопка лежить над списком, і на середині прокрутки під нею ховається рядок. Знизу залишено 84 px, тож дочитати список до кінця можна, але поки гортаєш — один рядок під кнопкою. Або лишаємо як у решті модулів, або робимо кнопку смугою над доком (тоді знизу дві смуги). Скажіть, який обмін вам ближчий.</p>
+        </div>
+        <div class="flag">
+          <b>Режим «у магазині» — окреме питання.</b>
+          <p>Великі рядки, екран не гасне, куплене одразу ховається. Це справжня потреба (телефон у руці, візок у другій), але це вже третій стан модуля, а не варіант списку. Скажіть, чи потрібен, — зроблю окремим чорновиком.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Що тут несправжнє</h2>
+        <ul class="plain">
+          <li>Кристал намальований CSS-гранями; у порталі це Three.js, і оберт веде директор сцени.</li>
+          <li>Товари вигадані. Розбір вводу в аркуші — теж макет: у порталі рядок їде в Edge Function, а не в регулярку на дві коми.</li>
+          <li>Дати в «Куплено» рахуються від сьогоднішньої, щоб «сьогодні» й «учора» були справжніми.</li>
+          <li>Шрифт системний: артефакт не тягне шрифти ззовні. У порталі — Nunito й Fredoka.</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // Дані макета. Категорії, кольори й емодзі — точні копії
+  // `ShoppingPage.tsx`, щоб макет можна було класти поруч із живим екраном.
+  // ============================================================
+  const CATEGORIES = {
+    'Овочі': { emoji: '🥦', color: '#65a978', icon: 'leaf' },
+    'Фрукти': { emoji: '🍎', color: '#d96f78', icon: 'apple' },
+    "М'ясо": { emoji: '🥩', color: '#b96a68', icon: 'meat' },
+    'Морепродукти': { emoji: '🐟', color: '#6299b5', icon: 'fish' },
+    'Напої': { emoji: '🥤', color: '#7b8ec1', icon: 'cup' },
+    'Побут': { emoji: '🧽', color: '#c69754', icon: 'spray' },
+    'Посуд': { emoji: '🍽️', color: '#9481a9', icon: 'plate' },
+    'Гігієна': { emoji: '🧴', color: '#5fa8a0', icon: 'bottle' },
+    'Косметика': { emoji: '✨', color: '#c774a2', icon: 'spark' },
+    'Канцелярія': { emoji: '✏️', color: '#c48d4e', icon: 'pencil' },
+    'Спорт': { emoji: '🏃', color: '#7394b0', icon: 'run' },
+    'Інше': { emoji: '🛍️', color: '#9a7d8a', icon: 'bag' },
+  };
+
+  const ICONS = {
+    leaf: 'M5 19c0-7 5-11 14-12 0 9-4 13-11 13H5Zm2 0c1.5-3 4-5.5 7-7',
+    apple: 'M12 8.5c-3.5-3-7 0-7 4s3 8 5 8 1.5-1 2-1 0 1 2 1 5-4 5-8-3.5-7-7-4Zm0 0V5m0 0c0-1 1-2 2.5-2',
+    meat: 'M13.6 4.6a4.4 4.4 0 0 1 4.4 4.4 4.4 4.4 0 0 1-1.6 3.4c-.9.8-1.3 1.6-1.5 2.5-.3 1.5-1.5 2.6-3 2.6a3 3 0 0 1-3-3 3 3 0 0 1-3-3c0-1.5 1.1-2.7 2.6-3 .9-.2 1.7-.6 2.5-1.5a4.4 4.4 0 0 1 2.6-2.4ZM8.9 16.9 5 20.8',
+    fish: 'M3 12c3-4 7-5 11-5 3 0 5 2 6 5-1 3-3 5-6 5-4 0-8-1-11-5Zm14-1h.01M7 8.5 5 5m2 11-2 3',
+    cup: 'M7.5 5h9l-1.1 13.2a2 2 0 0 1-2 1.8h-2.8a2 2 0 0 1-2-1.8L7.5 5Zm.5 6h8',
+    spray: 'M9 10h6v9a1.5 1.5 0 0 1-1.5 1.5h-3A1.5 1.5 0 0 1 9 19v-9Zm1.5 0V7h3v3m-3-3V4.5h3V7m3.5 1.5h2.5',
+    plate: 'M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm0-4a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
+    bottle: 'M9 21h6a2 2 0 0 0 2-2v-8l-2-3V6H9v2L7 11v8a2 2 0 0 0 2 2ZM10 3h4v3h-4Z',
+    spark: 'M12 3.5 13.8 9l5.7 1.8-5.7 1.8L12 20.5l-1.8-5.9L4.5 12.8 10.2 9Z',
+    pencil: 'M4 20h4L20 8l-4-4L4 16Zm10-14 4 4',
+    run: 'M13 4.5a1.4 1.4 0 1 0 0 .01M9 21l3-5-2.5-3 1-5-3.5 2-1 3M12 13l4 1 1.5 4M11 8l4-1 3 2.5',
+    bag: 'M6 8h12l-1 12H7L6 8Zm3 0V6a3 3 0 0 1 6 0v2',
+  };
+
+  const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[name] ?? ICONS.bag}"/></svg>`;
+
+  // Список вигаданий, але правдоподібний: саме такий вигляд має «звичайний
+  // четвер» — кілька категорій по два-три рядки, а не рівна сітка.
+  const ITEMS = [
+    { title: 'Молоко', qty: '2 л', category: 'Напої', bought: false },
+    { title: 'Кава в зернах', qty: null, category: 'Напої', bought: false },
+    { title: 'Помідори', qty: '1 кг', category: 'Овочі', bought: false },
+    { title: 'Огірки', qty: null, category: 'Овочі', bought: false },
+    { title: 'Салат', qty: null, category: 'Овочі', bought: true },
+    { title: 'Яблука', qty: '1 кг', category: 'Фрукти', bought: false },
+    { title: 'Куряче філе', qty: '600 г', category: "М'ясо", bought: false },
+    { title: 'Фарш', qty: null, category: "М'ясо", bought: true },
+    { title: 'Гель для душу', qty: null, category: 'Гігієна', bought: false },
+    { title: 'Зубна паста', qty: null, category: 'Гігієна', bought: false },
+    { title: 'Губки для посуду', qty: null, category: 'Побут', bought: false },
+    { title: 'Пакети для сміття', qty: '35 л', category: 'Побут', bought: false },
+  ];
+
+  // Куплене за останні дні — з іменем того, хто купив.
+  const BOUGHT = [
+    { title: 'Хліб', qty: null, category: 'Інше', who: 'Діма', days: 0 },
+    { title: 'Сир', qty: '200 г', category: 'Інше', who: 'Лєна', days: 0 },
+    { title: 'Мінеральна вода', qty: '6 шт', category: 'Напої', who: 'Діма', days: 1 },
+    { title: 'Банани', qty: null, category: 'Фрукти', who: 'Лєна', days: 1 },
+    { title: 'Пральний порошок', qty: null, category: 'Побут', who: 'Діма', days: 3 },
+    { title: 'Шампунь', qty: null, category: 'Гігієна', who: 'Лєна', days: 3 },
+  ];
+
+  const ORDER = Object.keys(CATEGORIES);
+  const $ = (id) => document.getElementById(id);
+  let useEmoji = false;
+
+  function glyph(name) {
+    const cat = CATEGORIES[name];
+    return useEmoji ? cat.emoji : icon(cat.icon);
+  }
+
+  function drawGroups() {
+    const active = ITEMS.filter((item) => !item.bought);
+    const byCategory = new Map();
+    for (const item of active) {
+      const rows = byCategory.get(item.category) ?? [];
+      rows.push(item);
+      byCategory.set(item.category, rows);
+    }
+
+    const html = ORDER
+      .filter((name) => byCategory.has(name))
+      .map((name) => {
+        const cat = CATEGORIES[name];
+        const rows = byCategory.get(name);
+        return `
+          <section class="group" style="--cat:${cat.color}">
+            <div class="group-head">
+              <span class="group-icon" aria-hidden="true">${glyph(name)}</span>
+              <h3>${name}</h3>
+              <span class="group-count">${rows.length}</span>
+            </div>
+            <div class="group-list">
+              ${rows.map((item) => `
+                <div class="item" data-done="false">
+                  <button type="button" class="check" data-title="${item.title}" aria-label="Позначити «${item.title}» купленим">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.5 17 19 7"/></svg>
+                  </button>
+                  <span class="item-copy"><span class="item-title">${item.title}</span></span>
+                  ${item.qty ? `<span class="item-qty">${item.qty}</span>` : ''}
+                </div>`).join('')}
+            </div>
+          </section>`;
+      })
+      .join('');
+
+    $('groups').innerHTML = html;
+
+    // Позначка купленого — саме те, заради чого модуль відкривають у магазині,
+    // тож у макеті вона справжня: рядок гасне й зникає з групи.
+    for (const button of $('groups').querySelectorAll('.check')) {
+      button.addEventListener('click', () => {
+        const row = button.closest('.item');
+        row.dataset.done = 'true';
+        window.setTimeout(() => {
+          const item = ITEMS.find((entry) => entry.title === button.dataset.title);
+          if (item) item.bought = true;
+          BOUGHT.unshift({ ...item, who: 'Діма', days: 0 });
+          drawAll();
+        }, 430);
+      });
+    }
+  }
+
+  function dayLabel(days) {
+    if (days === 0) return 'Сьогодні';
+    if (days === 1) return 'Учора';
+    const date = new Date();
+    date.setDate(date.getDate() - days);
+    return date.toLocaleDateString('uk-UA', { day: 'numeric', month: 'long' });
+  }
+
+  function drawBought() {
+    const byDay = new Map();
+    for (const item of BOUGHT) {
+      const rows = byDay.get(item.days) ?? [];
+      rows.push(item);
+      byDay.set(item.days, rows);
+    }
+
+    $('days').innerHTML = [...byDay.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([days, rows]) => `
+        <div class="day-head"><h3>${dayLabel(days)}</h3><span>${rows.length}</span></div>
+        <section class="group" style="--cat:${CATEGORIES[rows[0].category].color}">
+          <div class="group-list">
+            ${rows.map((item) => `
+              <div class="item" data-done="true">
+                <button type="button" class="check" aria-label="Повернути «${item.title}» у список">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5 9.5 17 19 7"/></svg>
+                </button>
+                <span class="item-copy">
+                  <span class="item-title">${item.title}</span>
+                  <span class="item-note">купив(ла) ${item.who}</span>
+                </span>
+                <button type="button" class="undo">Повернути</button>
+              </div>`).join('')}
+          </div>
+        </section>`)
+      .join('');
+  }
+
+  function drawProgress() {
+    const total = ITEMS.length;
+    const done = ITEMS.filter((item) => item.bought).length;
+    $('progress-text').textContent = `${done} з ${total}`;
+    $('progress-fill').style.width = `${total === 0 ? 0 : Math.round((done / total) * 100)}%`;
+    $('count-buy').textContent = String(total - done);
+    $('count-done').textContent = String(BOUGHT.length);
+  }
+
+  function drawAll() {
+    drawGroups();
+    drawBought();
+    drawProgress();
+  }
+
+  // ── Аркуш додавання ─────────────────────────────────────
+  // Розбір тут навмисно примітивний — рівно щоб показати, ЩО пара побачить
+  // після коми. Справжній розбір робить Edge Function.
+  const GUESS = [
+    [/молок|кефір|вода|сік|кава|чай/i, 'Напої'],
+    [/яблук|банан|груш|апельсин/i, 'Фрукти'],
+    [/помідор|огірк|салат|картопл|цибул/i, 'Овочі'],
+    [/філе|фарш|м'ясо|курк|ковбас/i, "М'ясо"],
+    [/гель|шампунь|паста|мило/i, 'Гігієна'],
+    [/губк|порошок|пакет|серветк/i, 'Побут'],
+  ];
+
+  function parse(text) {
+    return text
+      .split(',')
+      .map((chunk) => chunk.trim())
+      .filter(Boolean)
+      .map((chunk) => {
+        const qty = chunk.match(/\s(\d+[^,]*)$/);
+        const title = (qty ? chunk.slice(0, qty.index) : chunk).trim();
+        const found = GUESS.find(([test]) => test.test(title));
+        return {
+          title: title.charAt(0).toUpperCase() + title.slice(1),
+          qty: qty ? qty[1].trim() : null,
+          category: found ? found[1] : 'Інше',
+        };
+      });
+  }
+
+  function drawParsed() {
+    const lines = parse($('composer-input').value);
+    $('parsed').innerHTML = lines.map((line) => {
+      const cat = CATEGORIES[line.category];
+      return `<span class="parsed-chip" style="--cat:${cat.color}">
+        <i></i>${line.title}${line.qty ? ` · ${line.qty}` : ''} <small>${line.category}</small>
+      </span>`;
+    }).join('');
+  }
+
+  $('fab').addEventListener('click', () => { $('overlay').hidden = false; drawParsed(); });
+  $('composer-cancel').addEventListener('click', () => { $('overlay').hidden = true; });
+  $('composer-input').addEventListener('input', drawParsed);
+  $('composer-add').addEventListener('click', () => {
+    for (const line of parse($('composer-input').value)) ITEMS.push({ ...line, bought: false });
+    $('overlay').hidden = true;
+    $('composer-input').value = '';
+    showTab('buy');
+    drawAll();
+  });
+  $('overlay').addEventListener('click', (event) => {
+    if (event.target === $('overlay')) $('overlay').hidden = true;
+  });
+
+  // ── Вкладки ─────────────────────────────────────────────
+  function showTab(name) {
+    for (const key of ['buy', 'done']) {
+      const selected = key === name;
+      $(`tab-${key}`).setAttribute('aria-selected', String(selected));
+      $(`panel-${key}`).hidden = !selected;
+    }
+    // Кнопка дії живе лише там, де є що додавати.
+    $('fab').style.display = name === 'buy' ? '' : 'none';
+  }
+  $('tab-buy').addEventListener('click', () => showTab('buy'));
+  $('tab-done').addEventListener('click', () => showTab('done'));
+
+  // ── Кристал ─────────────────────────────────────────────
+  (function buildCrystal() {
+    let html = '';
+    for (let i = 0; i < 6; i += 1) html += `<div class="facet" style="--a:${i * 60}deg"></div>`;
+    for (let i = 0; i < 6; i += 1) html += `<div class="tip" style="--a:${i * 60}deg"></div>`;
+    $('prism').innerHTML = html;
+  })();
+
+  for (const button of document.querySelectorAll('#controls [data-turn]')) {
+    button.addEventListener('click', () => {
+      for (const other of document.querySelectorAll('#controls [data-turn]')) other.removeAttribute('aria-pressed');
+      button.setAttribute('aria-pressed', 'true');
+      $('world').style.setProperty('--turn', `${button.dataset.turn}deg`);
+    });
+  }
+
+  $('toggle-glyph').addEventListener('click', () => {
+    useEmoji = !useEmoji;
+    $('toggle-glyph').setAttribute('aria-pressed', String(useEmoji));
+    $('toggle-glyph').textContent = useEmoji ? 'Іконки категорій' : 'Емодзі категорій';
+    drawAll();
+  });
+
+  // ── Телефон вписується у вікно ──────────────────────────
+  function fit() {
+    const holder = $('phone').parentElement;
+    const scale = Math.min(1, holder.clientWidth / 412, (window.innerHeight - 190) / 915);
+    $('phone').style.transform = `scale(${scale.toFixed(3)})`;
+    holder.style.height = `${915 * scale}px`;
+  }
+  window.addEventListener('resize', fit);
+
+  drawAll();
+  showTab('buy');
+  $('world').style.setProperty('--turn', '45deg');
+  fit();
+</script>
