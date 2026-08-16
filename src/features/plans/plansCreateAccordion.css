@@ -81,10 +81,27 @@
   cursor: pointer;
 }
 .plan-create-type-option svg { flex: 0 0 auto; }
-.plan-create-type-option span {
+/* Опис вибору не обрізається в один рядок.
+   ------------------------------------------------------------
+   Було `white-space: nowrap` з трьома крапками, і на телефоні з двох кнопок
+   читалось «Поїздка, побачення, міс…» — тобто рівно та частина, заради якої
+   підпис і існує. Назва лишається одним рядком (вона коротка й мусить бути
+   помітною), опис переноситься на два. */
+.plan-create-type-option span { min-width: 0; }
+
+.plan-create-type-option strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.plan-create-type-option small {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.3;
 }
 .plan-create-type-option.active {
   border-color: color-mix(in srgb, var(--plan-create-accent) 42%, transparent);

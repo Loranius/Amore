@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ChevronRightIcon } from '@/components/icons/UiIcon';
+import { PlanCrystalEdge } from './PlanCrystalEdge';
 import { daysLabel } from '@/features/calendar/calendarUtils';
 import { PLAN_CATEGORIES, PLAN_STATUSES } from './planConstants';
 import { daysUntilStart, hasPreciseDate, isClosed, planDateLabel } from './planModel';
@@ -43,6 +44,8 @@ export function PlanTile({ plan, onConfirm }: {
       className={`pm-tile${closed ? ' pm-tile--closed' : ''}`}
       style={{ '--plan-color': cat.color } as React.CSSProperties}
     >
+      <PlanCrystalEdge />
+
       <Link className="pm-tile-open" to={`/plans/${plan.id}`} aria-label={`Відкрити «${plan.title}»`} />
 
       <span className="pm-tile-cat">
