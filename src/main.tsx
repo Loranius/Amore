@@ -27,6 +27,31 @@ import '@/features/wishlist/wishlistPearlBubbles.css';
 // wishlistPearlContrast.css: перший малював 6px обідок, другий існував
 // щоб той обідок прибрати — разом вони давали 1px рамку за 152 рядки.
 import '@/features/wishlist/wishlistBubbleGlass.css';
+// Візуальний crystal-glass pass для об'єднаного модуля «Плани».
+// Імпортується останнім, щоб бути чистим presentation override без змін
+// календарної/планової логіки та без переписування базових стилів модуля.
+import '@/features/plans/plansCrystalRefresh.css';
+// Фінальний reference-fidelity шар для /plans: фон світу лишається тим самим,
+// але геометрія, щільність і кристалічні акценти наближені до затвердженого UI.
+import '@/features/plans/plansReferenceFidelity.css';
+// Калібрування після живого мобільного скріншота: компактніший календар,
+// легші картки, не-sticky tabs і нижні дії в композиції самого модуля.
+import '@/features/plans/plansReferencePolish.css';
+// Третій прохід за референсом: ще нижчий календар і один візуально зшитий
+// glass-panel навколо «Найближчих», «Ідей», «Завершених» та кнопки додавання.
+import '@/features/plans/plansReferencePanelPass.css';
+// Етап 1 нового UI-pass: темніша navy-violet ієрархія surfaces та контроль
+// яскравих lavender/pink акцентів без зміни геометрії або логіки модуля.
+import '@/features/plans/plansReferencePaletteStage1.css';
+// Етап 2: темне тоноване скло замість великих фіолетових блоків —
+// тонші edges, внутрішні highlights, слабші separators і глибший material feel.
+import '@/features/plans/plansReferenceGlassStage2.css';
+// Етап 3: картки планів отримують справжню faceted crystal edge,
+// компактний badge, сильнішу категорійну ідентичність і тихіший chevron.
+import '@/features/plans/plansReferenceCardsStage3.css';
+// Етап 4: активний segmented control стає темним crystal-core,
+// а яскравість концентрується у багатошарових faceted торцях і highlights.
+import '@/features/plans/plansReferenceTabsStage4.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
