@@ -12,6 +12,7 @@ import { ReefWaterAtmosphere } from './ReefWaterAtmosphere';
 import { ReefSeaGrass } from './ReefSeaGrass';
 import { ReefSessileLife } from './ReefSessileLife';
 import { ReefMicroLifeLayer } from './ReefMicroLifeLayer';
+import { ReefRockBiofilmLayer } from './ReefRockBiofilmLayer';
 import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
@@ -92,6 +93,7 @@ export function ReefStage({
         <ReefVolcanoSurfacePass build={build} />
       </group>
       <ReefNaturalArchLayer build={build} />
+      <ReefRockBiofilmLayer build={build} />
       <ReefWorldComposition />
       <ReefDistantEcosystem reducedMotion={reducedMotion} />
       <ReefDensityLayer build={build} />
