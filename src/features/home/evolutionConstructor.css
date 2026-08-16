@@ -1,0 +1,282 @@
+.evolution-constructor-fab {
+  position: fixed;
+  right: 16px;
+  bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  z-index: 74;
+  width: 48px;
+  height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  background: rgba(24, 20, 38, 0.82);
+  color: #fff;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  padding: 0;
+  box-shadow: 0 10px 30px rgba(10, 7, 18, 0.28);
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  touch-action: manipulation;
+}
+
+.evolution-constructor-fab span {
+  display: block;
+  width: 19px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: transform 180ms ease, width 180ms ease;
+}
+
+.evolution-constructor-fab span:nth-child(2) {
+  width: 14px;
+  justify-self: end;
+}
+
+.evolution-constructor-fab.is-active {
+  border-color: rgba(255, 174, 222, 0.72);
+  background: rgba(116, 55, 105, 0.88);
+  box-shadow: 0 10px 32px rgba(117, 45, 101, 0.34);
+}
+
+.evolution-constructor-fab:focus-visible,
+.evolution-constructor button:focus-visible,
+.evolution-constructor input:focus-visible {
+  outline: 2px solid rgba(255, 190, 230, 0.95);
+  outline-offset: 3px;
+}
+
+.evolution-constructor {
+  position: fixed;
+  right: 12px;
+  bottom: calc(146px + env(safe-area-inset-bottom, 0px));
+  z-index: 76;
+  width: min(400px, calc(100vw - 24px));
+  max-height: calc(100dvh - 176px - env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 24px;
+  background:
+    linear-gradient(150deg, rgba(51, 35, 67, 0.95), rgba(17, 20, 34, 0.96) 54%, rgba(18, 25, 37, 0.96));
+  box-shadow: 0 22px 70px rgba(4, 5, 12, 0.48);
+  backdrop-filter: blur(24px) saturate(1.15);
+  -webkit-backdrop-filter: blur(24px) saturate(1.15);
+}
+
+.evolution-constructor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 18px 12px;
+}
+
+.evolution-constructor__header p,
+.evolution-constructor__header h2,
+.evolution-constructor__mode small,
+.evolution-constructor__control small {
+  margin: 0;
+}
+
+.evolution-constructor__header p {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.evolution-constructor__header h2 {
+  margin-top: 2px;
+  font-size: 22px;
+  line-height: 1.08;
+  font-weight: 760;
+}
+
+.evolution-constructor__close {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.evolution-constructor__mode {
+  margin: 0 14px 10px;
+  padding: 11px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.evolution-constructor__mode span,
+.evolution-constructor__mode small {
+  display: block;
+}
+
+.evolution-constructor__mode span {
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.evolution-constructor__mode small {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.56);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.evolution-constructor__mode.is-active {
+  border-color: rgba(255, 174, 222, 0.25);
+  background: rgba(177, 81, 147, 0.12);
+}
+
+.evolution-constructor__scroll {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 14px 4px;
+  scrollbar-width: thin;
+}
+
+.evolution-constructor__section {
+  padding: 13px 0 5px;
+  border-top: 1px solid rgba(255, 255, 255, 0.075);
+}
+
+.evolution-constructor__section:first-child {
+  border-top: 0;
+}
+
+.evolution-constructor__section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px 8px;
+}
+
+.evolution-constructor__section-title span {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.evolution-constructor__section-title strong {
+  font-size: 12px;
+  font-weight: 760;
+}
+
+.evolution-constructor__control {
+  display: block;
+  padding: 10px 10px 12px;
+  margin-bottom: 7px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.evolution-constructor__control-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.evolution-constructor__control-head > span {
+  min-width: 0;
+}
+
+.evolution-constructor__control strong,
+.evolution-constructor__control small {
+  display: block;
+}
+
+.evolution-constructor__control strong {
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.evolution-constructor__control small {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.47);
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.evolution-constructor__control output {
+  flex: 0 0 auto;
+  min-width: 48px;
+  padding: 3px 7px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.07);
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 740;
+}
+
+.evolution-constructor input[type='range'] {
+  width: 100%;
+  height: 28px;
+  margin: 7px 0 0;
+  accent-color: #ef9bcd;
+}
+
+.evolution-constructor__footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 9px;
+  padding: 11px 14px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 12, 22, 0.24);
+}
+
+.evolution-constructor__footer button {
+  min-height: 44px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.evolution-constructor__reset {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.evolution-constructor__reset:disabled {
+  opacity: 0.36;
+}
+
+.evolution-constructor__done {
+  min-width: 88px;
+  border: 1px solid rgba(255, 190, 229, 0.36);
+  background: rgba(180, 80, 148, 0.24);
+  color: #fff;
+}
+
+@media (min-width: 768px) {
+  .evolution-constructor-fab {
+    right: 22px;
+    bottom: 24px;
+  }
+
+  .evolution-constructor {
+    right: 22px;
+    bottom: 84px;
+    max-height: calc(100dvh - 108px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .evolution-constructor-fab span {
+    transition: none;
+  }
+}
