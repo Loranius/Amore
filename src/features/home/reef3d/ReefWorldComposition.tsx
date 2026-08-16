@@ -14,6 +14,15 @@ function materialNames(mesh: THREE.Mesh): string[] {
   return materials.map((material) => material.name);
 }
 
+function hasAncestor(object: THREE.Object3D, name: string): boolean {
+  let parent = object.parent;
+  while (parent) {
+    if (parent.name === name) return true;
+    parent = parent.parent;
+  }
+  return false;
+}
+
 export function ReefWorldComposition() {
   const scene = useThree((state) => state.scene);
   const invalidate = useThree((state) => state.invalidate);
@@ -28,8 +37,15 @@ export function ReefWorldComposition() {
       const isArchSupport = object.userData.reefSupportSurfaceKind === 'arch';
       const isGroundedDecoration = object.userData.reefGroundedRock === true;
       const isDistantStone = names.includes('reef-coral-stone-distant');
+      const isHeroShelf = names.includes('reef-coral-stone-hero')
+        && hasAncestor(object, 'reef-hero-support');
 
-      if (!isArchSupport && !isGroundedDecoration && !isDistantStone) return;
+      if (
+        !isArchSupport
+        && !isGroundedDecoration
+        && !isDistantStone
+        && !isHeroShelf
+      ) return;
 
       snapshots.push({
         object,
@@ -39,6 +55,15 @@ export function ReefWorldComposition() {
       });
 
       if (isArchSupport) object.visible = false;
+
+      if (isHeroShelf) {
+        object.scale.set(
+          object.scale.x * 1.12,
+          object.scale.y * 0.68,
+          object.scale.z * 1.12,
+        );
+        object.position.y -= 0.055;
+      }
 
       if (isGroundedDecoration) {
         const radialDistance = Math.hypot(object.position.x, object.position.z);
