@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -101,5 +101,45 @@ describe('world theme tokens (Crystal World brief §8–§9)', () => {
     // world with a single warm note in it.
     const warm = [...declaredIn(THEME, ':root {')].filter((token) => /warm|rose/.test(token));
     expect(warm).toEqual(['--world-warm']);
+  });
+});
+
+// ============================================================
+// Рецепт активної кнопки — один на портал.
+// ------------------------------------------------------------
+// Історія цього файлу вже містить відповідь, що буває інакше: до референсу
+// власника в модулі «Плани» накопичилось вісім шарів стилю, шість із яких
+// перевизначали той самий псевдоелемент. Починалось так само — з другої копії
+// значення, яку ніхто не помітив.
+//
+// Тому градієнт активної кнопки живе в `--control-fill`, а плани, покупки й
+// вішліст на нього посилаються. Перевірка тримає саме це.
+// ============================================================
+describe('the active-button recipe stays one recipe', () => {
+  const PORTAL = readFileSync(join(ROOT, 'src/index.css'), 'utf8');
+
+  /** Фіолетове тіло кнопки — те, що робить її «Календарем» із планів. */
+  const BODY = /#7a3fd0|#52259a|#35156b/;
+
+  it('declares the fill once, in the token layer', () => {
+    expect(PORTAL).toMatch(/--control-fill:/);
+    expect(PORTAL.match(/--control-fill:/g)).toHaveLength(1);
+  });
+
+  it('is never spelled out a second time anywhere in src', () => {
+    // Знайти всі файли стилю й перевірити кожен: перелік у тесті застаріває
+    // рівно тоді, коли додається наступний модуль.
+    const walk = (dir: string): string[] =>
+      readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) return walk(path);
+        return entry.name.endsWith('.css') ? [path] : [];
+      });
+
+    const offenders = walk(join(ROOT, 'src'))
+      .filter((path) => !path.endsWith('src/index.css'))
+      .filter((path) => BODY.test(readFileSync(path, 'utf8')));
+
+    expect(offenders, 'ці файли повторюють градієнт замість var(--control-fill)').toEqual([]);
   });
 });

@@ -74,9 +74,7 @@
      самим темним фіолетовим об'ємним градієнтом, але без кристалізованого
      ефекту на активних кнопках». Тому тут лише світло згори вниз — жодної
      огранки. */
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 46%),
-    linear-gradient(180deg, #7a3fd0 0%, #52259a 58%, #35156b 100%);
+  background-image: var(--control-fill);
   box-shadow:
     var(--control-top),
     var(--control-lip),
@@ -396,9 +394,7 @@
   padding: 14px 22px;
   border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-pill);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 46%),
-    linear-gradient(180deg, #7a3fd0 0%, #52259a 58%, #35156b 100%);
+  background-image: var(--control-fill);
   color: #fff;
   font: inherit;
   font-size: 15px;

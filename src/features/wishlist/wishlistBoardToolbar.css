@@ -25,6 +25,46 @@
   -webkit-backdrop-filter: none;
 }
 
+/* ── Активна вкладка власника ─────────────────────────────────
+   «Мої / Лєни / Спільні» — та сама кнопка, що «Календар» у планах: власник
+   показав обидва екрани й попросив звести їх до однієї мови.
+
+   Правило живе ТУТ, а не в глобальному `.tab-bar-btn.active`, бо `TabBar` —
+   спільний компонент: його носять кулінарія, вотчліст, карта й графік, і
+   жоден із них під нову гаму ще не переглядався. Перефарбувати їх наосліп
+   означало б змінити чотири екрани, яких ніхто не бачив.
+
+   Вага селектора (0,4,0) навмисно вища за `.wishlist > .tab-bar
+   .tab-bar-btn.active` (0,3,0) з `wishlistHero.css` і за глобальний
+   `.tab-bar-btn.active` (0,2,0), тож порядок імпортів тут ні на що не
+   впливає — це перевірено на живому екрані, а не виведено.
+
+   Виміряно, ЩО саме тут перемагало досі: `[data-portal-scene='true']
+   .wishlist.pink-page` перевизначає `--accent` на `--world-accent`, тож
+   глобальне правило малювало кнопку світлим бузком #d3a6ff. Ні
+   `wishlistHero.css`, ні `wishlistTabTransition.css` не діяли взагалі: обидва
+   чекають `.wishlist > .tab-bar`, а стрічка давно лежить усередині
+   `.wl-wishlist-controls`. */
+.wishlist .wl-wishlist-controls .tab-bar-btn.active {
+  background-color: transparent;
+  background-image: var(--control-fill);
+  color: #fff;
+  box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+.wishlist .wl-wishlist-controls .tab-bar-btn.active:active {
+  translate: 0 2px;
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
+}
+
+/* Лічильник у активній кнопці: на темному тілі біла плівка читається, а
+   успадкований `color-mix(--text 12%)` — ні. */
+.wishlist .wl-wishlist-controls .tab-bar-btn.active .tab-bar-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
 .wl-board-toolbar {
   margin: 4px 3px 0;
   padding-top: 4px;

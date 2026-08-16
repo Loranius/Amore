@@ -202,11 +202,27 @@
   cursor: pointer;
 }
 
+/* Активний сегмент — та сама кнопка, що «Календар» у планах.
+   ------------------------------------------------------------
+   Власник показав два екрани вішліста й попросив: «стилізувати і оформити
+   візуально в стилі кнопок "Календар" "+ Подія" як в модулі плани». Рецепт
+   один на портал (`--control-fill` + `--control-*`), тож звірятись тут нема
+   з чим — це буквально те саме тіло.
+
+   Підйому через `transform` більше немає: об'єм тепер каже тінь, а
+   `transform` заважав би натиску осісти. */
 [data-portal-scene='true'] .wishlist .wl-world-chip[aria-pressed='true'] {
-  border-color: var(--world-border-active);
-  background: color-mix(in srgb, var(--world-primary) 22%, transparent);
+  border-color: rgba(255, 255, 255, 0.22);
+  background-color: transparent;
+  background-image: var(--control-fill);
   color: var(--world-text);
-  transform: translateY(-1px);
+  box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+[data-portal-scene='true'] .wishlist .wl-world-chip[aria-pressed='true']:active {
+  translate: 0 2px;
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-chip:disabled {
@@ -221,20 +237,31 @@
   font-size: 12px;
 }
 
-/* Первинна дія — та сама мова, що й у решті світу (§16). */
+/* Первинна дія — дослівно «+ Додати» з планів (§16).
+   Світло тут ще й світиться назовні (`--world-glow`), як у `.pm-fab`: це
+   єдина дія аркуша, і вона має бути помітною, не змінюючи тіла. */
 [data-portal-scene='true'] .wishlist .wl-world-add {
   min-height: 46px;
   margin-top: 2px;
-  border: 1px solid var(--world-border-active);
+  border: 1px solid rgba(255, 255, 255, 0.22);
   border-radius: var(--radius-md);
-  background: var(--world-primary-soft);
-  color: var(--world-bg-deep);
+  background-color: transparent;
+  background-image: var(--control-fill);
+  color: var(--world-text);
   font: inherit;
   font-weight: 800;
   cursor: pointer;
   box-shadow:
-    inset 0 1px 0 var(--world-glow),
-    0 6px 16px var(--world-shadow);
+    var(--control-top),
+    var(--control-lip),
+    0 0 24px var(--world-glow),
+    var(--control-cast);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+[data-portal-scene='true'] .wishlist .wl-world-add:active:not(:disabled) {
+  translate: 0 2px;
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-add:disabled {
