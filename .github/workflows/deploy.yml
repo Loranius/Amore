@@ -68,6 +68,21 @@ jobs:
           console.log('Verified required production variables.');
           NODE
 
+      - name: Validate Supabase public credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$({ curl --silent --show-error --output /tmp/supabase-probe.json --write-out '%{http_code}' \
+            --header "apikey: $VITE_SUPABASE_ANON_KEY" \
+            --header "Authorization: Bearer $VITE_SUPABASE_ANON_KEY" \
+            "$VITE_SUPABASE_URL/rest/v1/users?select=id&limit=1"; } || true)"
+          if [[ ! "$status" =~ ^2 ]]; then
+            echo "Supabase production credential probe failed with HTTP $status" >&2
+            cat /tmp/supabase-probe.json >&2 || true
+            exit 1
+          fi
+          echo "Supabase production credentials verified."
+
       - name: Build
         run: npm run build
 
