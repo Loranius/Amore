@@ -181,12 +181,18 @@
 }
 
 /* Активний модуль — знову чотири канали (§15): підкладка щільніша,
-   кант яскравіший, іконка світліша, і сам індикатор трохи піднятий
-   внутрішнім відблиском. */
+   кант яскравіший, іконка світліша, і сам індикатор піднятий над докою.
+
+   Об'єм тут той самий, що в кнопок порталу (`--control-*`), і це не
+   повторення заради краси: цей блок ПЕРЕВИЗНАЧАВ базовий індикатор і мовчки
+   з'їдав його відблиск. Виходило, що активний пункт виглядав об'ємним лише
+   там, де сцени немає, — власник побачив це як «кнопка змінена лише в
+   покупках». */
 [data-portal-scene='true'] .bottom-nav-indicator {
-  background: color-mix(in srgb, var(--world-primary) 20%, transparent);
+  background-color: color-mix(in srgb, var(--world-primary) 26%, transparent);
+  background-image: var(--control-sheen);
   border: 1px solid var(--world-border-active);
-  box-shadow: inset 0 1px 0 var(--world-glow);
+  box-shadow: var(--control-top), var(--control-lip-press);
 }
 
 /* Зменшений рух стосується й інтерфейсу, не лише камери (§47). */

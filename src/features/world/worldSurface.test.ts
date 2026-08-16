@@ -189,6 +189,53 @@ describe('restraint (brief §11, §13, §16)', () => {
   });
 });
 
+describe('the dock, after the two ways it went wrong', () => {
+  // Both checks are regressions, not taste. The owner reported them in one
+  // sentence — «кнопка змінена лише покупках… також відцентруй його, бо він
+  // щось дуже занесений вправо» — and they turned out to be two independent
+  // defects that this layer and its neighbour each caused once.
+
+  it('keeps the shared volume recipe when it repaints the active pill', () => {
+    // The defect: this rule overrode the base indicator and quietly dropped
+    // the `--control-*` relief with it, so the active item looked volumetric
+    // only on routes with no scene behind them. Shopping was the last such
+    // route, which is why the owner saw exactly one correct button.
+    //
+    // The guard is the recipe, not the values: an override that repaints the
+    // pill is fine, an override that flattens it is the bug coming back.
+    const body = ruleFor("[data-portal-scene='true'] .bottom-nav-indicator");
+    expect(body).toMatch(/--control-sheen/);
+    expect(body).toMatch(/box-shadow:[^;]*--control-/);
+  });
+
+  it('never takes the dock out of fixed positioning', () => {
+    // The other half. `artifactWorld.css` lifted the shell's children above
+    // the scene with `position: relative`, and the dock was in that list —
+    // so `left`/`right` stopped sizing it. Measured on the live portal: a
+    // 412 px box from x=14 instead of 384, its centre 14 px right of the
+    // screen's. That is the whole of "занесений вправо".
+    //
+    // The dock does not need the rule: `index.css` already gives it
+    // `z-index: 50`, well above the `z-index: 1` its neighbours get here.
+    const world = readFileSync(join(ROOT, 'src/features/world/artifactWorld.css'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    let scanned = 0;
+    for (const [, selectors, declarations] of world.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      scanned += 1;
+      if (!/position\s*:\s*(relative|static|absolute)/.test(declarations!)) continue;
+      for (const selector of selectors!.split(',')) {
+        expect(selector.trim().endsWith('.bottom-nav'), selector).toBe(false);
+      }
+    }
+    // The first version of this loop destructured the match as
+    // `[selectors, declarations]` — which is `[whole match, selectors]` — so
+    // it read selector text where it expected declarations, matched nothing,
+    // and passed while the defect was reinstated. The count is the proof
+    // that the scan found rules at all.
+    expect(scanned).toBeGreaterThan(5);
+  });
+});
+
 describe('where the surfaces apply (brief preamble, §18)', () => {
   it('never paints anything outside the world', () => {
     // The scoping rule this phase rests on: a dark card on a light page is

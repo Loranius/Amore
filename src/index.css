@@ -389,10 +389,22 @@ textarea::placeholder {
   transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
   z-index: 0;
 }
+/* `min-width: 0` — не косметика, а причина, чому док стояв криво.
+   ------------------------------------------------------------
+   Флекс-пункт за замовчуванням не звужується вужче за свій вміст
+   (`min-width: auto`), а «Вішлист» і «Покупки» з падінгами по 10 px разом
+   виходили ширшими за док: виміряно на живому екрані — ряд 396 px у коробці
+   368 px. Зайві 28 px розпирали ряд праворуч, і середина — серце — сиділа на
+   14 px правіше центру екрана. Саме це власник і побачив як «занесений
+   вправо».
+
+   Тому пункти отримують право стискатись, а бічні падінги зменшені до
+   значення, за якого найдовший підпис усе одно вміщається. */
 .nav-btn {
   position: relative;
   z-index: 1;
   flex: 1 1 0;
+  min-width: 0;
   appearance: none;
   border: 0;
   background: transparent;
@@ -402,7 +414,7 @@ textarea::placeholder {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 6px 10px;
+  padding: 6px 4px;
   border-radius: 22px;
   cursor: pointer;
   text-decoration: none;
@@ -411,7 +423,7 @@ textarea::placeholder {
 /* display:flex — інакше svg сідає на базову лінію тексту й з'їжджає
    вниз відносно підпису під ним. */
 .nav-icon { display: flex; align-items: center; }
-.nav-label { font-size: 11px; }
+.nav-label { font-size: 11px; white-space: nowrap; }
 .nav-btn-home .nav-icon-home { display: flex; color: var(--accent); }
 /* Серце «Головної» — заповнене: це підпис застосунку, а не ще один
    пункт. Заливка тут, а не пропом, бо NavItem віддає значок як є, і
