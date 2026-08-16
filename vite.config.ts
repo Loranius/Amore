@@ -29,8 +29,10 @@ export default defineConfig({
       },
       workbox: {
         maximumFileSizeToCacheInBytes: 5000000,
+        cleanupOutdatedCaches: true,
+        navigateFallback: undefined,
         globPatterns: [
-          '**/*.{html,webmanifest,ico,png,svg}',
+          '**/*.{webmanifest,ico,png,svg}',
           'assets/index-*.js',
           'assets/index-*.css',
         ],
@@ -44,6 +46,16 @@ export default defineConfig({
           /\.mp4$/,
         ],
         runtimeCaching: [
+          {
+            urlPattern: ({ request }) => request.mode === 'navigate',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'app-shell-pages',
+              networkTimeoutSeconds: 4,
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 7 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /\/assets\/[^/]+\.(?:js|css)$/,
             handler: 'CacheFirst',
