@@ -10,15 +10,22 @@ import {
 import { reefArchFootPoints } from './reefLimestoneArch';
 import { useReefRockMaterials } from './useReefRockMaterials';
 
-export const REEF_NATURAL_ARCH_PASS = 'eroded-overlapping-limestone-backbone-v3-volcano-offset';
-const MIN_MASSES_PER_ARCH = 9;
-const MAX_MASSES_PER_ARCH = 13;
+export const REEF_NATURAL_ARCH_PASS = 'fused-eroded-limestone-ribs-v4';
+const MIN_MASSES_PER_ARCH = 6;
+const MAX_MASSES_PER_ARCH = 9;
 const TAU = Math.PI * 2;
 
 type RockInstance = {
   position: THREE.Vector3;
   rotation: THREE.Euler;
   scale: THREE.Vector3;
+  supportsCoral: boolean;
+};
+
+type ArchSample = {
+  world: { x: number; z: number };
+  baseY: number;
+  interior: number;
 };
 
 function stableUnit(seed: number, label: string): number {
@@ -46,12 +53,6 @@ function localToWorld(
   };
 }
 
-/**
- * The accepted annual layout can keep its stable logical coordinates, while the
- * visible limestone backbone is pushed to the outside of the new volcano apron.
- * This prevents arches from cutting through the cone and keeps them reading as
- * neighbouring eroded structures rather than a symmetric ring.
- */
 function moveArchBesideVolcano(
   source: ReefGrowthArchPlacement,
   profile: ReefTerracedFoundationProfile,
@@ -60,8 +61,8 @@ function moveArchBesideVolcano(
   const baseAngle = originalRadius > 0.08
     ? Math.atan2(source.center.z, source.center.x)
     : stableUnit(source.seed, 'volcano-arch:fallback-angle') * TAU;
-  const angleJitter = (stableUnit(source.seed, 'volcano-arch:angle-jitter') - 0.5) * 0.3;
-  const angle = baseAngle + angleJitter;
+  const angle = baseAngle
+    + (stableUnit(source.seed, 'volcano-arch:angle-jitter') - 0.5) * 0.3;
   const targetRadius = profile.radius * (
     1.14 + stableUnit(source.seed, 'volcano-arch:radius') * 0.16
   );
@@ -79,6 +80,37 @@ function moveArchBesideVolcano(
   };
 }
 
+function archSample({
+  arch,
+  leftY,
+  rightY,
+  t,
+  phase,
+  depthPhase,
+  crownSkew,
+}: {
+  arch: ReefGrowthArchPlacement;
+  leftY: number;
+  rightY: number;
+  t: number;
+  phase: number;
+  depthPhase: number;
+  crownSkew: number;
+}): ArchSample {
+  const interior = Math.sin(Math.PI * t);
+  const localX = THREE.MathUtils.lerp(-arch.span * 0.5, arch.span * 0.5, t)
+    + crownSkew * interior * interior
+    + Math.sin(t * TAU * 1.55 + phase) * arch.thickness * 0.22 * interior;
+  const localZ = arch.curveDepth * interior
+    + Math.sin(t * TAU * 1.7 + depthPhase) * arch.thickness * 0.34 * interior;
+
+  return {
+    world: localToWorld(arch, localX, localZ),
+    baseY: THREE.MathUtils.lerp(leftY, rightY, t),
+    interior,
+  };
+}
+
 function buildArchInstances(
   sourceArch: ReefGrowthArchPlacement,
   profile: ReefTerracedFoundationProfile,
@@ -88,7 +120,7 @@ function buildArchInstances(
   const leftY = sampleReefTerracedFoundation(profile, leftFoot.x, leftFoot.z).height;
   const rightY = sampleReefTerracedFoundation(profile, rightFoot.x, rightFoot.z).height;
   const massCount = THREE.MathUtils.clamp(
-    Math.round(arch.span / Math.max(0.06, arch.thickness * 0.74)),
+    Math.round(arch.span / Math.max(0.08, arch.thickness * 1.12)),
     MIN_MASSES_PER_ARCH,
     MAX_MASSES_PER_ARCH,
   );
@@ -96,95 +128,99 @@ function buildArchInstances(
   const depthPhase = stableUnit(arch.seed, 'natural-arch:depth-phase') * TAU;
   const crownDirection = stableUnit(arch.seed, 'natural-arch:crown-direction') < 0.5 ? -1 : 1;
   const crownSkew = crownDirection * arch.span * (
-    0.08 + stableUnit(arch.seed, 'natural-arch:crown-skew') * 0.1
+    0.06 + stableUnit(arch.seed, 'natural-arch:crown-skew') * 0.08
   );
-  const heightScale = 0.88 + stableUnit(arch.seed, 'natural-arch:height') * 0.12;
+  const heightScale = 0.84 + stableUnit(arch.seed, 'natural-arch:height') * 0.12;
 
-  const chain = Array.from({ length: massCount }, (_value, index): RockInstance => {
+  const samples = Array.from({ length: massCount }, (_value, index) => archSample({
+    arch,
+    leftY,
+    rightY,
+    t: massCount <= 1 ? 0.5 : index / (massCount - 1),
+    phase,
+    depthPhase,
+    crownSkew,
+  }));
+
+  const chain = samples.map((sample, index): RockInstance => {
     const t = massCount <= 1 ? 0.5 : index / (massCount - 1);
-    const interior = Math.sin(Math.PI * t);
-    const footWeight = Math.pow(Math.abs(t - 0.5) * 2, 1.7);
-    const xNoise = Math.sin(t * TAU * 1.7 + phase) * arch.thickness * 0.38 * interior;
-    const localX = THREE.MathUtils.lerp(-arch.span * 0.5, arch.span * 0.5, t)
-      + crownSkew * interior * interior
-      + xNoise;
-    const localZ = arch.curveDepth * interior
-      + Math.sin(t * TAU * 1.9 + depthPhase) * arch.thickness * 0.62 * interior
-      + (stableUnit(arch.seed, `natural-arch:${index}:depth`) - 0.5)
-        * arch.thickness
-        * 0.44
-        * interior;
-    const world = localToWorld(arch, localX, localZ);
-    const baseY = THREE.MathUtils.lerp(leftY, rightY, t);
-    const crown = Math.pow(interior, 0.72) * arch.height * heightScale;
-    const verticalNoise = Math.sin(t * TAU * 2.2 + phase * 0.73)
-      * arch.thickness
-      * 0.48
-      * interior;
+    const footWeight = Math.pow(Math.abs(t - 0.5) * 2, 1.5);
+    const previous = samples[Math.max(0, index - 1)] ?? sample;
+    const next = samples[Math.min(samples.length - 1, index + 1)] ?? sample;
+    const tangentX = next.world.x - previous.world.x;
+    const tangentZ = next.world.z - previous.world.z;
+    const tangentYaw = Math.atan2(-tangentZ, tangentX);
     const radius = arch.thickness
-      * (1.18 + footWeight * 0.92)
-      * (0.9 + stableUnit(arch.seed, `natural-arch:${index}:radius`) * 0.28);
+      * (1.02 + footWeight * 0.54)
+      * (0.94 + stableUnit(arch.seed, `natural-arch:${index}:radius`) * 0.18);
+    const crown = Math.pow(sample.interior, 0.6) * arch.height * heightScale;
+    const verticalNoise = Math.sin(t * TAU * 1.8 + phase * 0.7)
+      * arch.thickness
+      * 0.22
+      * sample.interior;
 
     return {
-      position: new THREE.Vector3(world.x, baseY + crown + verticalNoise, world.z),
+      position: new THREE.Vector3(
+        sample.world.x,
+        sample.baseY + crown + verticalNoise - radius * (0.2 + sample.interior * 0.08),
+        sample.world.z,
+      ),
       rotation: new THREE.Euler(
-        (stableUnit(arch.seed, `natural-arch:${index}:rx`) - 0.5) * 0.34,
-        arch.rotationY
-          + (stableUnit(arch.seed, `natural-arch:${index}:ry`) - 0.5) * 0.48,
-        (stableUnit(arch.seed, `natural-arch:${index}:rz`) - 0.5) * 0.38,
+        (stableUnit(arch.seed, `natural-arch:${index}:rx`) - 0.5) * 0.18,
+        tangentYaw + (stableUnit(arch.seed, `natural-arch:${index}:ry`) - 0.5) * 0.14,
+        (stableUnit(arch.seed, `natural-arch:${index}:rz`) - 0.5) * 0.2,
       ),
-      // Broad overlap along the arch tangent removes the bead-chain silhouette.
       scale: new THREE.Vector3(
-        radius * (1.2 + stableUnit(arch.seed, `natural-arch:${index}:sx`) * 0.34),
-        radius * (0.84 + footWeight * 0.34 + stableUnit(arch.seed, `natural-arch:${index}:sy`) * 0.28),
-        radius * (0.92 + stableUnit(arch.seed, `natural-arch:${index}:sz`) * 0.28),
+        radius * (2.05 + stableUnit(arch.seed, `natural-arch:${index}:sx`) * 0.34),
+        radius * (0.68 + footWeight * 0.36 + stableUnit(arch.seed, `natural-arch:${index}:sy`) * 0.16),
+        radius * (1.02 + stableUnit(arch.seed, `natural-arch:${index}:sz`) * 0.18),
       ),
+      supportsCoral: sample.interior > 0.18,
     };
   });
 
-  // Two buried buttresses make each foot visually grow from the foundation
-  // rather than balancing on a single polygonal rock.
   const buttresses = [
     { foot: leftFoot, y: leftY, side: -1 },
     { foot: rightFoot, y: rightY, side: 1 },
-  ].flatMap(({ foot, y, side }, footIndex): RockInstance[] => {
+  ].map(({ foot, y, side }, footIndex): RockInstance => {
     const inward = localToWorld(
       arch,
-      side * arch.span * 0.38,
-      arch.curveDepth * 0.08,
+      side * arch.span * 0.36,
+      arch.curveDepth * 0.1,
     );
-    const towardCenter = new THREE.Vector3(inward.x - foot.x, 0, inward.z - foot.z).normalize();
-    return [0, 1].map((layer) => {
-      const scale = arch.thickness * (2.05 - layer * 0.42);
-      return {
-        position: new THREE.Vector3(
-          foot.x + towardCenter.x * arch.thickness * (0.36 + layer * 0.48),
-          y + scale * (0.34 + layer * 0.42),
-          foot.z + towardCenter.z * arch.thickness * (0.36 + layer * 0.48),
-        ),
-        rotation: new THREE.Euler(
-          (stableUnit(arch.seed, `buttress:${footIndex}:${layer}:rx`) - 0.5) * 0.22,
-          arch.rotationY + side * (0.12 + layer * 0.08),
-          side * (0.08 + layer * 0.05),
-        ),
-        scale: new THREE.Vector3(
-          scale * (1.18 + layer * 0.08),
-          scale * (0.78 + layer * 0.12),
-          scale * 0.9,
-        ),
-      };
-    });
+    const inwardDirection = new THREE.Vector3(
+      inward.x - foot.x,
+      0,
+      inward.z - foot.z,
+    ).normalize();
+    const yaw = Math.atan2(-inwardDirection.z, inwardDirection.x);
+    const baseScale = arch.thickness * (
+      1.75 + stableUnit(arch.seed, `buttress:${footIndex}:scale`) * 0.18
+    );
+
+    return {
+      position: new THREE.Vector3(
+        foot.x + inwardDirection.x * arch.thickness * 0.7,
+        y + baseScale * 0.22,
+        foot.z + inwardDirection.z * arch.thickness * 0.7,
+      ),
+      rotation: new THREE.Euler(
+        (stableUnit(arch.seed, `buttress:${footIndex}:rx`) - 0.5) * 0.12,
+        yaw,
+        side * 0.07,
+      ),
+      scale: new THREE.Vector3(
+        baseScale * 1.8,
+        baseScale * 0.72,
+        baseScale * 1.08,
+      ),
+      supportsCoral: false,
+    };
   });
 
   return [...buttresses, ...chain];
 }
 
-/**
- * Visual year-arch layer made from broad, overlapping eroded limestone masses.
- * The accepted continuous arch remains invisible as support/raycast geometry;
- * the visible silhouette has heavier feet, an irregular crown and no repeated
- * bead-chain rhythm.
- */
 export function ReefNaturalArchLayer({ build }: { build: ReefPreviewBuild }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const rockMaterials = useReefRockMaterials();
@@ -201,15 +237,17 @@ export function ReefNaturalArchLayer({ build }: { build: ReefPreviewBuild }) {
     () => build.structures.arches.flatMap((arch) => buildArchInstances(arch, profile)),
     [build.structures.arches, profile],
   );
-  const attachmentSlots = useMemo(() => instances.map((instance, index) => ({
-    id: `reef:natural-arch:coral-slot:${index}`,
-    position: {
-      x: instance.position.x,
-      y: instance.position.y + instance.scale.y * 0.78,
-      z: instance.position.z,
-    },
-    radius: Math.max(0.09, Math.min(instance.scale.x, instance.scale.z) * 0.42),
-  })), [instances]);
+  const attachmentSlots = useMemo(() => instances
+    .filter((instance) => instance.supportsCoral)
+    .map((instance, index) => ({
+      id: `reef:natural-arch:coral-slot:${index}`,
+      position: {
+        x: instance.position.x,
+        y: instance.position.y + instance.scale.y * 0.66,
+        z: instance.position.z,
+      },
+      radius: Math.max(0.09, Math.min(instance.scale.x, instance.scale.z) * 0.34),
+    })), [instances]);
 
   useLayoutEffect(() => {
     const mesh = ref.current;
@@ -246,7 +284,7 @@ export function ReefNaturalArchLayer({ build }: { build: ReefPreviewBuild }) {
         reefCoralAttachmentSlots: attachmentSlots,
       }}
     >
-      <icosahedronGeometry args={[1, 1]} />
+      <dodecahedronGeometry args={[1, 0]} />
     </instancedMesh>
   );
 }
