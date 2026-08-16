@@ -19,6 +19,12 @@ export interface BuildReefRockBiofilmProfileInput {
   substrateMaturity: number;
 }
 
+type ReefBiofilmShader = {
+  uniforms: Record<string, { value: unknown }>;
+  vertexShader: string;
+  fragmentShader: string;
+};
+
 function clamp01(value: number): number {
   return Math.max(0, Math.min(1, value));
 }
@@ -57,39 +63,50 @@ export function buildReefRockBiofilmProfile({
   };
 }
 
-function profileCacheKey(profile: ReefRockBiofilmProfile): string {
-  return [
-    profile.version,
-    profile.patternSeed.toFixed(4),
-    profile.coverage.toFixed(4),
-    profile.algaeTintStrength.toFixed(4),
-    profile.creviceDarkening.toFixed(4),
-    profile.roughnessVariation.toFixed(4),
-  ].join(':');
+function writeUniform(
+  shader: ReefBiofilmShader,
+  name: string,
+  value: number,
+): void {
+  const uniform = shader.uniforms[name];
+  if (uniform) uniform.value = value;
+  else shader.uniforms[name] = { value };
+}
+
+function syncProfileUniforms(
+  shader: ReefBiofilmShader,
+  profile: ReefRockBiofilmProfile,
+): void {
+  writeUniform(shader, 'reefBioPatternSeed', profile.patternSeed);
+  writeUniform(shader, 'reefBioCoverage', profile.coverage);
+  writeUniform(shader, 'reefBioTintStrength', profile.algaeTintStrength);
+  writeUniform(shader, 'reefBioCreviceDarkening', profile.creviceDarkening);
+  writeUniform(shader, 'reefBioRoughnessVariation', profile.roughnessVariation);
 }
 
 /**
  * Adds deterministic world-space biofilm, dark recesses and roughness breakup
  * to an existing MeshStandardMaterial without creating another mesh/draw call.
+ * The shader program is installed once; constructor slider changes only update
+ * uniforms so interactive evolution previews do not churn the GPU program cache.
  */
 export function applyReefRockBiofilmMaterial(
   material: THREE.MeshStandardMaterial,
   profile: ReefRockBiofilmProfile,
 ): void {
-  const cacheKey = profileCacheKey(profile);
-
   material.userData.reefRockBiofilmVersion = profile.version;
   material.userData.reefRockBiofilmProfile = { ...profile };
-  // Do not chain the previous cache function: the constructor sandbox can
-  // rebuild the reef many times in one session and would otherwise grow the
-  // cache key on every slider movement.
-  material.customProgramCacheKey = () => cacheKey;
+
+  const compiledShader = material.userData.reefRockBiofilmShader as ReefBiofilmShader | undefined;
+  if (compiledShader) syncProfileUniforms(compiledShader, profile);
+  if (material.userData.reefRockBiofilmInstalled === true) return;
+
+  material.userData.reefRockBiofilmInstalled = true;
+  material.customProgramCacheKey = () => REEF_ROCK_BIOFILM_VERSION;
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.reefBioPatternSeed = { value: profile.patternSeed };
-    shader.uniforms.reefBioCoverage = { value: profile.coverage };
-    shader.uniforms.reefBioTintStrength = { value: profile.algaeTintStrength };
-    shader.uniforms.reefBioCreviceDarkening = { value: profile.creviceDarkening };
-    shader.uniforms.reefBioRoughnessVariation = { value: profile.roughnessVariation };
+    const activeProfile = material.userData.reefRockBiofilmProfile as ReefRockBiofilmProfile;
+    const reefShader = shader as ReefBiofilmShader;
+    syncProfileUniforms(reefShader, activeProfile);
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -167,6 +184,8 @@ roughnessFactor = clamp(
   1.0
 );`,
       );
+
+    material.userData.reefRockBiofilmShader = reefShader;
   };
   material.needsUpdate = true;
 }
