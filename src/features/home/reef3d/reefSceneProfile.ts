@@ -1,5 +1,5 @@
-export const REEF_SCENE_PROFILE_VERSION = 'reef-scene-profile-v1';
-export const REEF_CAMERA_PASS = 'full-360-orbit-with-reef-overview';
+export const REEF_SCENE_PROFILE_VERSION = 'reef-scene-profile-v2-360-visual-pass';
+export const REEF_CAMERA_PASS = 'slow-auto-360-orbit-with-reef-overview';
 export const REEF_LIGHTING_PASS = 'warm-surface-key-with-cool-water-fill';
 export const REEF_PALETTE_PASS = 'light-limestone-living-coral-palette';
 
@@ -81,6 +81,12 @@ export const REEF_CAMERA_ORBIT_PROFILE = Object.freeze({
   minPolarAngle: 0.72,
   maxPolarAngle: 1.48,
   foregroundClearRadius: 3.2,
+  /**
+   * Drei/three OrbitControls default speed 2 ~= one turn per 30 s.
+   * 0.32 keeps the reef observably alive without turning the landing screen
+   * into a carousel: roughly one complete inspection orbit every 3 minutes.
+   */
+  autoRotateSpeed: 0.32,
 } as const);
 
 function positionFromSpherical(
