@@ -10,6 +10,7 @@ import {
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
+import { MODULE_SPIN_RATE } from '@/features/world/sceneDirector';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
 import {
@@ -139,6 +140,12 @@ export default function EvolutionCrystalPreviewScene() {
             veinBearings={veinBearings}
             veinReach={crystalSubstrateSceneRadius(pipeline.geometry)}
             pose={pose}
+            // Кристал обертається лише там, де він фон. Власник: «після
+            // відкриття модуля… кристал в модулі на фоні починає повільно
+            // обертатись навколо своєї осі». На головній він сам предмет
+            // розмови й стоїть — тому ознакою служить регіон, а не маршрут
+            // списком: будь-який новий модуль отримає обертання без правки.
+            spin={region === 'centre' ? 0 : MODULE_SPIN_RATE}
             // Крутити сцену пальцем можна лише вдома: у модулі камера стає в
             // позу маршруту й лишається там, інакше дошка бажань і глядач
             // дивляться в різні боки.

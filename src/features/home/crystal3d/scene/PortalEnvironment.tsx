@@ -413,12 +413,18 @@ export function PortalCameraRig({
   controls,
   pose,
   mode,
+  spin = 0,
 }: {
   frame: PortalCameraFrame;
   controls: RefObject<OrbitControlsImpl | null>;
   pose?: WorldCameraPose | undefined;
   /** Режим руху світу; читається щокадру, тож приходить рефом (§27). */
   mode?: { current: Exclude<WorldMotionMode, 'navigation'> } | undefined;
+  /**
+   * Скільки кристал повертається сам, рад/с. Нуль на головній: там він
+   * предмет розмови, а не фон. Рішення приймає той, хто знає маршрут.
+   */
+  spin?: number | undefined;
 }) {
   const camera = useThree((state) => state.camera);
   const director = useRef<SceneDirectorState>(createSceneDirector(pose ?? CRYSTAL_CENTRE_POSE));
@@ -448,6 +454,7 @@ export function PortalCameraRig({
       mode: mode?.current ?? 'idle',
       dt: delta,
       drift,
+      spin,
     });
 
     const view = sceneDirectorPose(director.current);

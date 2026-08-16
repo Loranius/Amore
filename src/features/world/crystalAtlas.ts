@@ -104,11 +104,11 @@ const CRYSTAL_ATLAS: Readonly<Record<WorldRegion, WorldCameraPose>> = {
   // artifact's right, the stone appears to swing left, and the right edge of
   // the screen opens. That is where the wishes come in from.
   //
-  // It shares a bearing with `provision` (Shopping), and that is allowed
-  // rather than overlooked: the atlas asks each region to be *either* a real
-  // turn *or* a real climb away from every other, and these two are as far
-  // apart in height as the atlas goes — the crown at 0.86 against a low side
-  // facet at 0.38. Same compass point, opposite ends of the body.
+  // It used to share a bearing with `provision` (Shopping). It no longer does:
+  // the owner asked for Shopping to sit on the OTHER side of Home, so the two
+  // are now a full quarter apart. The note is kept because the reasoning it
+  // recorded — that a shared bearing is allowed when the climb is real — is
+  // still the atlas rule; it simply no longer applies to this pair.
   aspiration: pose({ azimuth: QUARTER, targetHeight: 0.86, elevation: -0.05, distance: 0.78 }),
 
   // An upper forward facet: what has been decided is still ahead, and faces
@@ -128,7 +128,16 @@ const CRYSTAL_ATLAS: Readonly<Record<WorldRegion, WorldCameraPose>> = {
   // A lower side facet, near and plain. §21 asks for closer and lower, but
   // warns in the same breath to keep a large readable foreground — so this is
   // the least dramatic pose in the atlas, on purpose.
-  provision: pose({ azimuth: QUARTER, targetHeight: 0.38, elevation: 0.08, distance: 0.92 }),
+  //
+  // The bearing is the mirror of Plans, and the owner asked for exactly that:
+  // «модуль покупки… кристал на фоні обертається на 45 градусів зліва на
+  // право». Plans turn the stone one way, Shopping the other, so the order in
+  // the dock and the order around the artifact are the same order — Wishlist
+  // +90°, Plans +45°, Home 0°, Shopping −45°.
+  //
+  // A negative azimuth puts the camera to the artifact's left, so the stone
+  // swings right: left to right, as asked.
+  provision: pose({ azimuth: -QUARTER * 0.5, targetHeight: 0.38, elevation: 0.08, distance: 0.92 }),
 
   // Inside the body. Closest of all, looking into the stone rather than at
   // it, because what is kept is embedded rather than displayed (§21, §33).

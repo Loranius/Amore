@@ -55,6 +55,8 @@ export interface PortalStageProps {
    * через дітей `<Canvas>`, і це працює завжди.
    */
   pose?: WorldCameraPose | undefined;
+  /** Власне обертання кристала у фоні модуля, рад/с. */
+  spin?: number | undefined;
   /** Режим руху світу (§27). Реф — його читає цикл рендера, не DOM. */
   motionMode?: { current: Exclude<WorldMotionMode, 'navigation'> } | undefined;
   /**
@@ -80,6 +82,7 @@ export function PortalStage({
   veinBearings,
   veinReach,
   pose,
+  spin,
   motionMode,
   allowOrbit = true,
   children,
@@ -150,7 +153,7 @@ export function PortalStage({
         veinBearings={veinBearings}
         veinReach={veinReach}
       />
-      <PortalCameraRig frame={frame} controls={controls} pose={pose} mode={motionMode} />
+      <PortalCameraRig frame={frame} controls={controls} pose={pose} mode={motionMode} spin={spin} />
 
       {children}
 

@@ -8,6 +8,7 @@ import { CRYSTAL_CENTRE_POSE, crystalPoseForRegion } from './crystalAtlas';
 import {
   advanceSceneDirector,
   createSceneDirector,
+  MODULE_SPIN_RATE,
   effectiveMotionMode,
   sceneDirectorPose,
   shortestTurn,
@@ -33,10 +34,11 @@ function run(
   target: WorldCameraPose,
   seconds: number,
   mode: Exclude<WorldMotionMode, 'navigation'> = 'idle',
+  spin = 0,
 ): SceneDirectorState {
   let next = state;
   for (let t = 0; t < seconds; t += FRAME_MS) {
-    next = advanceSceneDirector(next, { target, mode, dt: FRAME_MS });
+    next = advanceSceneDirector(next, { target, mode, dt: FRAME_MS, spin });
   }
   return next;
 }
@@ -289,5 +291,73 @@ describe('reading the camera back (ADR-0022)', () => {
       expect(read.azimuth, region).toBeCloseTo(pose.azimuth, 9);
       expect(read.elevation, region).toBeCloseTo(pose.elevation, 9);
     }
+  });
+});
+
+describe('обертання кристала у фоні модуля', () => {
+  // Прохання власника: «після відкриття модуля і завершення прокрутки
+  // кристала, кристал в модулі на фоні починає повільно обертатись навколо
+  // своєї осі». Слово «після» тут головне — і саме воно перевіряється.
+
+  it('мовчить, поки камера ще летить', () => {
+    // Обертання поверх перельоту читалося б як камера, що не може спинитись.
+    const flying = run(createSceneDirector(CROWN), SHOP, 0.2, 'idle', MODULE_SPIN_RATE);
+    expect(flying.travelling).toBe(true);
+    expect(flying.spinAngle).toBeLessThan(1e-3);
+  });
+
+  it('набирає повний оберт приблизно за дві хвилини', () => {
+    // Швидкість обрав власник із трьох варіантів.
+    const settled = run(createSceneDirector(SHOP), SHOP, 120, 'idle', MODULE_SPIN_RATE);
+    // Кут тримається в межах оберту, тож повний круг — це повернення до нуля.
+    const turns = (120 * MODULE_SPIN_RATE) / (2 * Math.PI);
+    expect(turns).toBeCloseTo(1, 6);
+    expect(settled.spinAngle).toBeGreaterThan(0);
+  });
+
+  it('за півхвилини повертає чверть оберту', () => {
+    const settled = run(createSceneDirector(SHOP), SHOP, 30, 'idle', MODULE_SPIN_RATE);
+    // Підсилення дихання наростає не миттєво (IDLE_GAIN_HALF_LIFE), тож перші
+    // частки секунди обертання ще тихе — звідси допуск.
+    expect(settled.spinAngle).toBeGreaterThan(Math.PI / 2 - 0.05);
+    expect(settled.spinAngle).toBeLessThanOrEqual(Math.PI / 2);
+  });
+
+  it('завмирає під модалкою й під пальцем', () => {
+    for (const mode of ['modal', 'interaction'] as const) {
+      const before = run(createSceneDirector(SHOP), SHOP, 10, 'idle', MODULE_SPIN_RATE);
+      const after = run(before, SHOP, 10, mode, MODULE_SPIN_RATE);
+      // §27: інтерфейс не має плавати над рухомим світом. Кут не відкочується
+      // назад — він просто перестає рости.
+      expect(after.spinAngle - before.spinAngle).toBeLessThan(0.05);
+      expect(after.spinAngle).toBeGreaterThanOrEqual(before.spinAngle);
+    }
+  });
+
+  it('не обертається під зменшеним рухом і не втрачає набутого кута', () => {
+    const turned = run(createSceneDirector(SHOP), SHOP, 20, 'idle', MODULE_SPIN_RATE);
+    const reduced = run(turned, SHOP, 20, 'reduced', MODULE_SPIN_RATE);
+    expect(reduced.spinAngle).toBe(turned.spinAngle);
+  });
+
+  it('без прохання не обертається взагалі', () => {
+    // Головна: кристал там не фон, а предмет розмови.
+    const home = run(createSceneDirector(SHOP), SHOP, 60, 'idle');
+    expect(home.spinAngle).toBe(0);
+  });
+
+  it('додає оберт до пози, а не підмінює нею ціль', () => {
+    const settled = run(createSceneDirector(SHOP), SHOP, 20, 'idle', MODULE_SPIN_RATE);
+    const view = sceneDirectorPose(settled);
+    // Допуск — це амплітуда дихання (IDLE_AZIMUTH_AMPLITUDE = 0.014 рад):
+    // азимут несе І оберт, І дихання, і вимагати від нього рівно оберту
+    // означало б вимагати, щоб дихання зникло.
+    expect(Math.abs((view.azimuth - SHOP.azimuth) - settled.spinAngle))
+      .toBeLessThanOrEqual(0.015);
+    // Решта пози не поїхала: обертання — це азимут і нічого більше. Допуски
+    // знову дихання, тільки його власні амплітуди — 0.006 по відстані й
+    // 0.004 по висоті.
+    expect(Math.abs(view.distance - SHOP.distance)).toBeLessThanOrEqual(0.007);
+    expect(Math.abs(view.targetHeight - SHOP.targetHeight)).toBeLessThanOrEqual(0.005);
   });
 });

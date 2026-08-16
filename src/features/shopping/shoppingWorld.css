@@ -1,0 +1,173 @@
+/* ============================================================
+   Покупки у світі — той самий тон, що в планах.
+   ------------------------------------------------------------
+   Власник просив рівно тон, і нічого більше: «ми просто адаптуємо кольорову
+   гамму в одному тоні як в планах». Тому тут немає жодної зміни розкладки —
+   ні вкладок, ні нової структури, ні перенесеного вводу. Композицію екрана
+   лишили як була; змінилось те, з чого зроблені його поверхні.
+
+   Шар накладається поверх `shopping.css` і `shoppingCompact.css`, а не
+   переписує їх: обидва тримають розкладку, яка працює, і переписувати її
+   заради кольору означало б переробити модуль, якого ніхто не просив
+   переробляти.
+
+   Ознака `[data-world='true']` — це «сцена справді є». Без WebGL модуль бере
+   ті самі токени, тільки без скла: прозорість над порожнечею читається як
+   недомальована сторінка.
+   ============================================================ */
+
+.shopping[data-world='true'] {
+  position: relative;
+  /* Свій фон модуль більше не малює: за ним стоїть кристал. Раніше тут був
+     градієнт `.pink-page`, і він закривав сцену цілком. */
+  background: none;
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+}
+
+/* ── Шапка ───────────────────────────────────────────────── */
+
+.shopping[data-world='true'] .shopping-hero {
+  border: 1px solid var(--world-border);
+  border-radius: 20px;
+  background: var(--world-surface);
+  box-shadow: 0 12px 30px var(--world-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.shopping[data-world='true'] .shopping-hero h1,
+.shopping[data-world='true'] .shopping-group-head h2 {
+  color: var(--world-text);
+}
+
+.shopping[data-world='true'] .shopping-eyebrow,
+.shopping[data-world='true'] .shopping-hero p {
+  color: var(--world-text-muted);
+}
+
+.shopping[data-world='true'] .shopping-hero-icon,
+.shopping[data-world='true'] .shopping-hero-count {
+  border: 1px solid var(--world-border);
+  background: var(--world-surface-soft);
+  color: var(--world-accent);
+}
+
+/* ── Поле вводу ──────────────────────────────────────────── */
+
+.shopping[data-world='true'] .shopping-composer {
+  border: 1px solid var(--world-border);
+  border-radius: 20px;
+  background: var(--world-surface);
+  box-shadow: 0 12px 30px var(--world-shadow);
+  backdrop-filter: blur(10px);
+}
+
+.shopping[data-world='true'] .shopping-composer-copy h2 { color: var(--world-text); }
+.shopping[data-world='true'] .shopping-composer-copy p { color: var(--world-text-muted); }
+
+/* Поле — виїмка в камені (§17), а не білий аркуш. */
+.shopping[data-world='true'] .shopping-input {
+  border: 1px solid var(--world-border);
+  background: var(--world-recess);
+  color: var(--world-text);
+}
+
+.shopping[data-world='true'] .shopping-input::placeholder { color: var(--world-text-muted); }
+
+.shopping[data-world='true'] .shopping-add-button {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background-color: transparent;
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 46%),
+    linear-gradient(180deg, #7a3fd0 0%, #52259a 58%, #35156b 100%);
+  color: #fff;
+  box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+.shopping[data-world='true'] .shopping-add-button:active {
+  translate: 0 2px;
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
+}
+
+/* ── Групи й товари ──────────────────────────────────────── */
+
+.shopping[data-world='true'] .shopping-group {
+  border: 1px solid var(--world-border);
+  border-radius: 20px;
+  background: var(--world-surface);
+  box-shadow: 0 12px 30px var(--world-shadow);
+}
+
+.shopping[data-world='true'] .shopping-group-count {
+  background: var(--world-surface-soft);
+  color: var(--world-text-muted);
+}
+
+.shopping[data-world='true'] .shopping-item {
+  border-color: rgba(214, 190, 246, 0.08);
+  background: none;
+  color: var(--world-text);
+}
+
+.shopping[data-world='true'] .shopping-item strong { color: var(--world-text); }
+.shopping[data-world='true'] .shopping-item span,
+.shopping[data-world='true'] .shopping-item small { color: var(--world-text-muted); }
+
+/* Кружечок — те, чим модуль користуються в магазині. Він отримує той самий
+   об'єм, що й кнопки порталу: у нього цілять пальцем не дивлячись. */
+.shopping[data-world='true'] .shopping-check {
+  border: 1.8px solid var(--world-border-active);
+  background: var(--world-recess);
+  box-shadow: var(--control-top);
+}
+
+.shopping[data-world='true'] .shopping-check--on {
+  border-color: var(--world-success);
+  background: color-mix(in srgb, var(--world-success) 32%, transparent);
+  color: #10251f;
+}
+
+.shopping[data-world='true'] .shopping-item-actions button {
+  border: 1px solid var(--world-border);
+  background: var(--world-surface-soft);
+  color: var(--world-text-muted);
+}
+
+.shopping[data-world='true'] .shopping-delete { color: var(--world-danger); }
+
+/* ── Архів і стани ───────────────────────────────────────── */
+
+.shopping[data-world='true'] .shopping-archive {
+  border: 1px solid var(--world-border);
+  border-radius: 18px;
+  background: var(--world-surface);
+}
+
+.shopping[data-world='true'] .shopping-archive summary { color: var(--world-text); }
+.shopping[data-world='true'] .shopping-archive-copy small { color: var(--world-text-muted); }
+
+.shopping[data-world='true'] .shopping-state {
+  border: 1px solid var(--world-border);
+  border-radius: 20px;
+  background: var(--world-surface);
+  color: var(--world-text);
+}
+
+.shopping[data-world='true'] .shopping-state p { color: var(--world-text-muted); }
+
+.shopping[data-world='true'] .shopping-skeleton span {
+  background: var(--world-surface-soft);
+}
+
+/* ── Аркуш редагування ───────────────────────────────────── */
+
+/* Модалки модуля беруть ту саму мову, що й аркуші планів: власник просив
+   «просто кольорову гамму модалок і кнопок зроби як в планах». */
+[data-portal-scene='true'] .shopping-edit-sheet {
+  border: 1px solid var(--world-border);
+  background: var(--world-surface-strong);
+  color: var(--world-text);
+}
+
+[data-portal-scene='true'] .shopping-edit-head h2 { color: var(--world-text); }
+[data-portal-scene='true'] .shopping-edit-close { color: var(--world-text-muted); }

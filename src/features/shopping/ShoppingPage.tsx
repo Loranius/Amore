@@ -4,6 +4,16 @@
 // Логіка лишається простою: довільний ввід розбирається на товари й
 // категорії, активне групується, куплене ховається в компактний архів.
 // Цей компонент відповідає лише за людяну мобільну подачу.
+//
+// Третій модуль, який впускає світ. Власник: «модуль покупки… кристал на фоні
+// також розмитий і обертається на 45 градусів зліва на право і продовжує
+// повільно обертатись на фоні». Три хуки нижче — це весь механізм: маршрут
+// каже атласу, де стати камері (`provision` — дзеркало планів), а приглушення
+// відсуває сцену за модуль.
+//
+// Структура екрана НЕ змінюється: власник просив рівно тон, «ми просто
+// адаптуємо кольорову гамму в одному тоні як в планах». Тому тут лише
+// обгортка світу, а вигляд поверхонь — у `shoppingWorld.css`.
 // ============================================================
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { SHOPPING_CATEGORIES } from '@/app/constants';
@@ -22,8 +32,13 @@ import {
   parseShoppingInput,
 } from './useShoppingItems';
 import { EditItemModal } from './EditItemModal';
+import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
+import { useArtifactWorld } from '@/features/world/artifactWorldContext';
+import { useDimmedWorld } from '@/features/world/worldDim';
+import '@/features/world/worldDim.css';
 import './shopping.css';
 import './shoppingCompact.css';
+import './shoppingWorld.css';
 import type { ShoppingItemRow, ShoppingCategory } from '@/types';
 
 const CATEGORY_VISUALS: Record<string, { icon: string; color: string }> = {
@@ -48,6 +63,12 @@ function categoryVisual(category: string) {
 }
 
 export function ShoppingPage() {
+  // Світ позаду, як у вішліста й планів: сцена лишається фоном, дотики —
+  // сторінці.
+  const { webglSupported } = useArtifactWorld();
+  useWorldVisibleRoute();
+  useDimmedWorld(webglSupported);
+
   const {
     data: items = [],
     isPending,
@@ -147,7 +168,7 @@ export function ShoppingPage() {
     : `${active.length} ${active.length === 1 ? 'покупка' : active.length < 5 ? 'покупки' : 'покупок'} залишилось`;
 
   return (
-    <section className="shopping shopping-page pink-page">
+    <section className="shopping shopping-page" data-world={webglSupported ? 'true' : undefined}>
 
       <header className="shopping-hero">
         <span className="shopping-hero-icon" aria-hidden="true"><BagIcon size={28} /></span>

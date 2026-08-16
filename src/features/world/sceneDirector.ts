@@ -36,6 +36,20 @@ const IDLE_GAIN: Readonly<Record<WorldMotionMode, number>> = {
   reduced: 0,
 };
 
+/**
+ * Скільки кристал повертається сам, поки лежить фоном модуля, рад/с.
+ *
+ * Прохання власника: «після відкриття модуля і завершення прокрутки кристала,
+ * кристал в модулі на фоні починає повільно обертатись навколо своєї осі», і
+ * на запитання про швидкість він обрав оберт приблизно за дві хвилини.
+ *
+ * Це НЕ те саме, що `IDLE_*` нижче. Ті — дихання: синус із амплітудою 0.8°,
+ * який повертається туди, звідки почав. Це — рух в один бік без кінця, і
+ * тому він окремий: скласти їх в одну формулу означало б, що зміна дихання
+ * міняє швидкість обертання.
+ */
+export const MODULE_SPIN_RATE = (2 * Math.PI) / 120;
+
 /** What the couple turned by hand, on top of whatever the route asked for. */
 export interface ManualTurn {
   azimuth: number;
@@ -55,6 +69,14 @@ export interface SceneDirectorState {
   idleGain: number;
   /** Seconds of idle motion accumulated. Only advances while the idle is on. */
   clock: number;
+  /**
+   * Куди довернувся кристал власним обертанням, рад.
+   *
+   * Тримається в межах одного оберту: за годину в модулі сире число виросло б
+   * до сотень радіан, і точність синуса на ньому просіла б там, де її ніхто не
+   * шукатиме.
+   */
+  spinAngle: number;
   /** True while the base pose has not yet reached the target. */
   travelling: boolean;
 }
@@ -66,6 +88,14 @@ export interface SceneDirectorInput {
   mode: Exclude<WorldMotionMode, 'navigation'>;
   /** Seconds since the last step. */
   dt: number;
+  /**
+   * Скільки кристал повертається сам цього кадру, рад/с.
+   *
+   * Вирішує той, хто знає маршрут: у модулі кристал — фон і обертається, на
+   * головній він сам предмет розмови й стоїть. Директор про маршрути не знає
+   * і знати не повинен.
+   */
+  spin?: number;
   /**
    * How far the orbit controls moved the camera away from what the director
    * last wrote — that is, what the couple's finger did.
@@ -142,6 +172,7 @@ export function createSceneDirector(target: WorldCameraPose = CRYSTAL_CENTRE_POS
     manual: NO_MANUAL_TURN,
     idleGain: 0,
     clock: 0,
+    spinAngle: 0,
     travelling: false,
   };
 }
@@ -181,6 +212,10 @@ export function advanceSceneDirector(
       manual: retargeted ? NO_MANUAL_TURN : turned,
       idleGain: 0,
       clock: state.clock,
+      // §47: під зменшеним рухом кристал не обертається. Кут лишається там,
+      // де був, а не скидається: повернення до звичайного режиму не має
+      // виглядати стрибком.
+      spinAngle: state.spinAngle,
       travelling: false,
     };
   }
@@ -215,6 +250,7 @@ export function advanceSceneDirector(
       elevation: turned.elevation * (1 - k),
     };
 
+  const spin = Number.isFinite(input.spin) ? input.spin! : 0;
   const wanted = IDLE_GAIN[settled ? input.mode : 'navigation'];
   const gainStep = approach(dt, IDLE_GAIN_HALF_LIFE);
   const idleGain = state.idleGain + (wanted - state.idleGain) * gainStep;
@@ -228,8 +264,19 @@ export function advanceSceneDirector(
     // resumes from where it stopped instead of jumping to where it would have
     // been had the couple not been reading.
     clock: state.clock + dt * idleGain,
+    // Обертання йде на тому ж підсиленні, що й дихання, і це навмисно: воно
+    // мовчить, поки камера летить, і завмирає під модалкою чи пальцем — тобто
+    // рівно тоді, коли §27 забороняє рухати світ під інтерфейсом.
+    spinAngle: wrapAngle(state.spinAngle + dt * spin * idleGain),
     travelling: !settled,
   };
+}
+
+/** Кут у межах одного оберту, щоб число не росло без кінця. */
+function wrapAngle(angle: number): number {
+  const turn = 2 * Math.PI;
+  const wrapped = angle % turn;
+  return wrapped < 0 ? wrapped + turn : wrapped;
 }
 
 /** What the camera should be at, all three contributions composed. */
@@ -239,6 +286,7 @@ export function sceneDirectorPose(state: SceneDirectorState): WorldCameraPose {
   return {
     azimuth: state.base.azimuth
       + state.manual.azimuth
+      + state.spinAngle
       + Math.sin((2 * Math.PI * t) / IDLE_AZIMUTH_PERIOD) * IDLE_AZIMUTH_AMPLITUDE * gain,
     targetHeight: state.base.targetHeight
       + Math.sin((2 * Math.PI * t) / IDLE_HEIGHT_PERIOD + 1.7) * IDLE_HEIGHT_AMPLITUDE * gain,

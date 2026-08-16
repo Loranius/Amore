@@ -187,6 +187,25 @@ describe('region → crystal pose (brief §21)', () => {
     expect(plans.azimuth - home.azimuth).toBeCloseTo(wishlist.azimuth - plans.azimuth, 10);
   });
 
+  it('mirrors Shopping and Plans around Home', () => {
+    // ЗМІНЕНА ВИМОГА, і змінив її власник: «модуль покупки… кристал на фоні
+    // обертається на 45 градусів зліва на право», тоді як плани повертають
+    // камінь у інший бік. Тобто порядок у доку — вішліст, плани, головна,
+    // покупки — це і порядок навколо артефакта.
+    //
+    // Тест існує саме тому, що до цього Покупки ділили азимут із вішлістом і
+    // ніхто цього не помічав: без перевірки наступна правка атласу мовчки
+    // зсуне те, що власник щойно попросив.
+    const home = crystalPoseForRegion(worldRegionForRoute('/'));
+    const plans = crystalPoseForRegion(worldRegionForRoute('/plans'));
+    const shopping = crystalPoseForRegion(worldRegionForRoute('/shopping'));
+
+    expect(home.azimuth).toBe(0);
+    expect(shopping.azimuth).toBeCloseTo(-plans.azimuth, 10);
+    // І це саме чверть чверті в обидва боки, а не будь-яке дзеркало.
+    expect(Math.abs(shopping.azimuth)).toBeCloseTo(Math.PI / 4, 10);
+  });
+
   it('keeps every elevation a sine, not a height', () => {
     // The unit matters and was got wrong once: `elevation` is the sine of the
     // angle the eye stands at, so |value| < 1 or the camera is asked to stand
