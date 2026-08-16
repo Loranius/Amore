@@ -25,9 +25,9 @@ type SchoolFish = {
 };
 
 const TAU = Math.PI * 2;
-const MIDGROUND_MASS_COUNT = 18;
-const DISTANT_MASS_COUNT = 28;
-const DISTANT_VEGETATION_COUNT = 72;
+const MIDGROUND_MASS_COUNT = 12;
+const DISTANT_MASS_COUNT = 18;
+const DISTANT_VEGETATION_COUNT = 48;
 const SCHOOL_SIZE = 18;
 const DISTANT_FISH_TINTS = [
   '#7fc9cf',
@@ -68,13 +68,13 @@ function buildRingMasses({
       heightRange[1],
       seededUnit(seededIndex, 3),
     );
-    const width = THREE.MathUtils.lerp(0.78, 1.92, seededUnit(seededIndex, 4));
-    const depth = THREE.MathUtils.lerp(0.72, 1.58, seededUnit(seededIndex, 5));
+    const width = THREE.MathUtils.lerp(0.62, 1.35, seededUnit(seededIndex, 4));
+    const depth = THREE.MathUtils.lerp(0.58, 1.12, seededUnit(seededIndex, 5));
 
     return {
       position: [
         Math.cos(angle) * radius,
-        -0.5 + height * 0.31,
+        -0.54 + height * 0.27,
         Math.sin(angle) * radius,
       ],
       rotation: [
@@ -88,18 +88,18 @@ function buildRingMasses({
 }
 
 function buildVegetation(): VegetationInstance[] {
-  const clusterCount = 8;
+  const clusterCount = 10;
   return Array.from({ length: DISTANT_VEGETATION_COUNT }, (_value, index) => {
     const cluster = index % clusterCount;
     const clusterAngle = cluster / clusterCount * TAU + seededUnit(cluster, 31) * 0.28;
-    const angle = clusterAngle + (seededUnit(index, 11) - 0.5) * 0.52;
-    const radius = THREE.MathUtils.lerp(5.1, 9.2, seededUnit(index, 12));
-    const scale = THREE.MathUtils.lerp(0.48, 1.18, seededUnit(index, 13));
+    const angle = clusterAngle + (seededUnit(index, 11) - 0.5) * 0.44;
+    const radius = THREE.MathUtils.lerp(12.4, 17.2, seededUnit(index, 12));
+    const scale = THREE.MathUtils.lerp(0.34, 0.78, seededUnit(index, 13));
 
     return {
       position: [
         Math.cos(angle) * radius,
-        -0.27,
+        -0.3,
         Math.sin(angle) * radius,
       ],
       rotation: -angle + seededUnit(index, 14) * 0.5,
@@ -228,12 +228,6 @@ function DistantVegetation({ reducedMotion }: { reducedMotion: boolean }) {
   );
 }
 
-/**
- * Distant schools use one tiny alpha texture and one instanced quad draw call.
- * The cards face the reef centre while their local X axis follows the tangent,
- * so the school reads as real fish from every orbit angle instead of edge-on
- * tetrahedrons. The schools live outside the camera orbit and stay background-only.
- */
 function DistantFishSchool({
   seedOffset,
   position,
@@ -285,9 +279,9 @@ function DistantFishSchool({
     const time = clock.elapsedTime;
     const tangentX = Math.cos(heading);
     const tangentZ = Math.sin(heading);
-    const travel = Math.sin(time * 0.07 + phase) * 0.75;
+    const travel = Math.sin(time * 0.07 + phase) * 0.5;
     groupRef.current.position.x = position[0] + tangentX * travel;
-    groupRef.current.position.y = position[1] + Math.sin(time * 0.105 + phase) * 0.1;
+    groupRef.current.position.y = position[1] + Math.sin(time * 0.105 + phase) * 0.08;
     groupRef.current.position.z = position[2] + tangentZ * travel;
   });
 
@@ -315,7 +309,7 @@ function DistantFishSchool({
           map={texture}
           color="#ffffff"
           transparent
-          opacity={0.86}
+          opacity={0.82}
           alphaTest={0.12}
           depthWrite={false}
           side={THREE.DoubleSide}
@@ -326,29 +320,24 @@ function DistantFishSchool({
   );
 }
 
-/**
- * Full 360-degree middle/background ecosystem. The camera lives inside these
- * rings, so every orbit direction retains depth cues instead of revealing a
- * blank half-scene. Density remains patchy rather than forming a visible wall.
- */
 export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean }) {
   const midground = useMemo(() => buildRingMasses({
     count: MIDGROUND_MASS_COUNT,
-    innerRadius: 5.4,
-    outerRadius: 7.1,
-    heightRange: [0.42, 1.18],
+    innerRadius: 11.8,
+    outerRadius: 14.8,
+    heightRange: [0.35, 0.95],
     seedOffset: 1000,
   }), []);
   const distant = useMemo(() => buildRingMasses({
     count: DISTANT_MASS_COUNT,
-    innerRadius: 8.2,
-    outerRadius: 11.8,
-    heightRange: [0.72, 2.15],
+    innerRadius: 15.5,
+    outerRadius: 20.5,
+    heightRange: [0.6, 1.55],
     seedOffset: 3000,
   }), []);
 
   return (
-    <group name="reef-distant-ecosystem-360-v4-background-schools">
+    <group name="reef-distant-ecosystem-360-v5-clear-orbit">
       <ReefRingMasses
         name="reef-midground-satellite-patches"
         masses={midground}
@@ -365,28 +354,28 @@ export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean
 
       <DistantFishSchool
         seedOffset={100}
-        position={[9.1, 2.7, 7.3]}
+        position={[12.8, 2.8, 10.4]}
         heading={2.25}
         phase={0.4}
         reducedMotion={reducedMotion}
       />
       <DistantFishSchool
         seedOffset={300}
-        position={[-9.9, 3.4, 5.6]}
+        position={[-13.8, 3.3, 8.2]}
         heading={-2.2}
         phase={1.6}
         reducedMotion={reducedMotion}
       />
       <DistantFishSchool
         seedOffset={500}
-        position={[-6.4, 2.9, -11]}
+        position={[-9.4, 2.9, -15.7]}
         heading={-0.45}
         phase={2.8}
         reducedMotion={reducedMotion}
       />
       <DistantFishSchool
         seedOffset={700}
-        position={[7.7, 4, -11.6]}
+        position={[10.7, 4, -16.2]}
         heading={0.55}
         phase={4.1}
         reducedMotion={reducedMotion}
