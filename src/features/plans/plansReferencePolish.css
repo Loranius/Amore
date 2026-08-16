@@ -1,0 +1,450 @@
+/* ============================================================
+   Plans — post-screenshot reference polish
+   ------------------------------------------------------------
+   Калібрування за живими мобільними скріншотами після першого fidelity
+   pass. Фон/3D-сцена не змінюються. Цей шар лише ущільнює геометрію,
+   зменшує візуальну вагу карток і повертає нижні дії в композицію
+   референсу замість постійного FAB поверх контенту.
+   ============================================================ */
+
+.plans-module {
+  gap: 7px;
+  padding-bottom: 98px;
+}
+
+/* Верхня капсула в референсі живе в потоці, а не прилипає поверх
+   «Кристального шляху» під час прокрутки. */
+.plans-module .pm-tabs {
+  position: relative;
+  top: auto;
+  min-height: 57px;
+  padding: 4px;
+  border-radius: 29px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.055),
+    inset 0 -1px 0 rgba(104,68,132,.18),
+    0 10px 27px rgba(7,3,15,.19);
+}
+
+.plans-module .pm-tab {
+  min-height: 49px;
+  padding: 9px 10px;
+  border-radius: 25px;
+  font-size: 15px;
+}
+
+.plans-module .pm-tab[aria-selected='true'] {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.72),
+    inset 0 -7px 16px rgba(91,40,128,.12),
+    0 0 17px rgba(213,145,246,.15);
+}
+
+.plans-module .pm-tab[aria-selected='true']::before,
+.plans-module .pm-tab[aria-selected='true']::after {
+  top: 2px;
+  bottom: 2px;
+  width: 27px;
+  opacity: .74;
+}
+
+/* ── Календар: приблизно на 20% нижчий ──────────────────── */
+
+.plans-module .cal-month {
+  padding: 11px 10px 12px;
+  border-radius: 22px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    0 13px 31px rgba(5,2,12,.22);
+}
+
+.plans-module .cal-month-nav {
+  grid-template-columns: 41px minmax(0, 1fr) 41px;
+  gap: 7px;
+  margin-bottom: 9px;
+}
+
+.plans-module .cal-month-nav > b {
+  font-size: 17px;
+}
+
+.plans-module .cal-nav-btn {
+  width: 39px;
+  height: 39px;
+  border-radius: 13px;
+}
+
+.plans-module .cal-today-btn {
+  right: 46px;
+  padding: 4px 7px;
+  font-size: 9px;
+}
+
+.plans-module .cal-dow {
+  margin: 0 1px 6px;
+  font-size: 10.3px;
+  letter-spacing: .035em;
+}
+
+.plans-module .cal-grid {
+  gap: 4px;
+}
+
+.plans-module .cal-cell {
+  aspect-ratio: 1 / .78;
+  padding: 3px 2px 9px;
+  border-radius: 8px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.038), rgba(255,255,255,.009)),
+    rgba(82, 63, 105, .23);
+}
+
+.plans-module .cal-cell-n {
+  font-size: 12.5px;
+}
+
+.plans-module .cal-cell-dots {
+  bottom: 4px;
+}
+
+.plans-module .cal-cell-dots i {
+  width: 4px;
+  height: 4px;
+}
+
+.plans-module .cal-cell--today,
+.plans-module .cal-cell--sel {
+  box-shadow:
+    inset 0 0 0 1px rgba(246,219,255,.18),
+    0 0 10px rgba(219,149,250,.2);
+}
+
+/* Детальний день з'являється тільки після явного тапу; сам місяць
+   у спокої закінчується одразу після сітки. */
+.plans-module .cal-day-panel {
+  margin-top: 9px;
+  padding-top: 8px;
+}
+
+/* ── Кристальний шлях: декоративна лінія, не окремий великий блок ─ */
+
+.plans-module .pm-crystal-path {
+  grid-template-columns: max-content minmax(62px, 1fr) max-content;
+  gap: 8px;
+  min-height: 34px;
+  margin: 3px 3px 0;
+}
+
+.plans-module .pm-crystal-path-title {
+  gap: 5px;
+  font-size: 9.6px;
+  letter-spacing: .03em;
+}
+
+.plans-module .pm-crystal-path-icon {
+  width: 12px;
+  height: 17px;
+}
+
+.plans-module .pm-crystal-path-track {
+  height: 3px;
+}
+
+.plans-module .pm-crystal-path-marker {
+  width: 11px;
+  height: 15px;
+}
+
+.plans-module .pm-crystal-path-value {
+  gap: 3px;
+  font-size: 10px;
+}
+
+/* ── Секції й картки: менше «важких React-карток» ───────── */
+
+.plans-module .pm-sheet {
+  gap: 0;
+}
+
+.plans-module .pm-section-head {
+  margin: 10px 3px 7px;
+}
+
+.plans-module .pm-section-head h2 {
+  font-size: 15.5px;
+}
+
+.plans-module .pm-section-head span {
+  font-size: 10.8px;
+}
+
+.plans-module .pm-tiles {
+  gap: 7px;
+}
+
+.plans-module .pm-tile {
+  min-height: 101px;
+  gap: 5px;
+  padding: 10px 10px 9px 16px;
+  border-radius: 16px;
+  border-color: rgba(225,197,248,.12);
+  background:
+    radial-gradient(circle at 7% 0%, color-mix(in srgb, var(--plan-color) 9%, transparent), transparent 34%),
+    linear-gradient(145deg, rgba(57,40,79,.38), rgba(27,18,46,.57));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.028),
+    0 8px 19px rgba(6,3,13,.16);
+  -webkit-backdrop-filter: blur(13px) saturate(108%);
+  backdrop-filter: blur(13px) saturate(108%);
+}
+
+/* Ліва грань стає ширшою за лінію, але тоншою за попередній великий
+   декоративний кристал — саме як facet-strip у референсі. */
+.plans-module .pm-tile::before {
+  top: 5px;
+  bottom: 5px;
+  width: 8px;
+  border-radius: 0 5px 5px 0;
+  clip-path: polygon(
+    38% 0, 100% 10%, 68% 27%, 100% 43%, 70% 59%,
+    100% 77%, 60% 100%, 20% 90%, 0 67%, 18% 44%, 0 20%
+  );
+  opacity: .8;
+  box-shadow:
+    0 0 6px color-mix(in srgb, var(--plan-color) 28%, transparent),
+    0 0 12px color-mix(in srgb, var(--plan-color) 12%, transparent);
+}
+
+.plans-module .pm-tile::after {
+  right: 9px;
+  top: 9px;
+  width: 20px;
+  height: 20px;
+  filter: drop-shadow(0 0 5px rgba(198,132,230,.22));
+}
+
+.plans-module .pm-tile-cat {
+  padding-right: 24px;
+  font-size: 10px;
+}
+
+.plans-module .pm-tile-title {
+  padding-right: 14px;
+  font-size: 13.5px;
+  line-height: 1.24;
+}
+
+.plans-module .pm-tile-meta {
+  gap: 4px 6px;
+  padding-right: 21px;
+  font-size: 10.3px;
+}
+
+.plans-module .pm-tile-when,
+.plans-module .pm-tile-overdue {
+  padding: 2px 5px;
+}
+
+.plans-module .pm-tile-open::after {
+  right: 9px;
+  bottom: 8px;
+  width: 21px;
+  height: 21px;
+  font-size: 16px;
+  opacity: .72;
+}
+
+/* ── «Завершені» + «Додати» в одному нижньому поясі ─────── */
+
+.plans-module .pm-section-toggle {
+  width: 100%;
+  min-height: 48px;
+  margin: 13px 0 0;
+  padding: 0 14px;
+  border-radius: 15px;
+}
+
+/* На календарі FAB більше не плаває над серединою списку. Він стає
+   частиною кінця композиції. Якщо є «Завершені», обидва елементи сидять
+   в одному рядку, як на референсі; без завершених кнопка просто стає
+   останньою дією праворуч. */
+.plans-module[data-section='calendar'] .pm-fab {
+  position: static;
+  align-self: flex-end;
+  min-width: 145px;
+  min-height: 48px;
+  margin-top: 9px;
+  padding: 10px 14px 10px 17px;
+  border-radius: 25px;
+  font-size: 13.5px;
+}
+
+.plans-module[data-section='calendar'] .pm-fab::after {
+  width: 15px;
+  height: 20px;
+}
+
+/* У типовому стані з завершеними планами робимо одну горизонтальну пару.
+   parent має padding-bottom 98px; bottom:98px ставить нижню грань FAB рівно
+   на нижню грань останнього елемента потоку (toggle), не прив'язуючись до
+   конкретної висоти екрана. */
+.plans-module[data-section='calendar']:has(.pm-section-toggle:not([aria-expanded='true'])) .pm-section-toggle {
+  width: calc(100% - 164px);
+}
+
+.plans-module[data-section='calendar']:has(.pm-section-toggle:not([aria-expanded='true'])) .pm-fab {
+  position: absolute;
+  right: 0;
+  bottom: 98px;
+  margin: 0;
+}
+
+/* При розкритих завершених плитках повертаємо кнопку в потік, щоб вона
+   не перескакувала поверх самих карток. */
+.plans-module[data-section='calendar']:has(.pm-section-toggle[aria-expanded='true']) .pm-fab {
+  position: static;
+}
+
+/* Вкладка «Події» лишає плаваючу дію: там немає нижнього списку планів,
+   із яким її треба композиційно зводити. */
+.plans-module[data-section='events'] .pm-fab {
+  min-height: 48px;
+  min-width: 132px;
+}
+
+/* ── Нижній док: трохи легший, щоб не сперечався з контентом ─ */
+
+body:has(.plans-module) .bottom-nav {
+  border-color: rgba(226,198,248,.15);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.038),
+    0 11px 29px rgba(5,2,12,.29);
+}
+
+body:has(.plans-module) .bottom-nav-inner {
+  min-height: 68px;
+  padding: 4px;
+}
+
+body:has(.plans-module) .bottom-nav-indicator {
+  top: 4px;
+  bottom: 4px;
+  border-color: rgba(235,207,252,.16);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(224,175,247,.075), transparent 58%),
+    linear-gradient(180deg, rgba(108,76,136,.23), rgba(74,50,99,.17));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+body:has(.plans-module) .nav-btn.active {
+  color: #ead2fb;
+}
+
+/* На дуже вузьких екранах дві колонки зберігаються — це ключова
+   композиція референсу. Зменшуємо внутрішню геометрію, а не ламаємо її. */
+@media (max-width: 430px) {
+  .plans-module {
+    gap: 6px;
+    padding-bottom: 96px;
+  }
+
+  .plans-module .pm-tabs {
+    min-height: 55px;
+    border-radius: 28px;
+  }
+
+  .plans-module .pm-tab {
+    min-height: 47px;
+    font-size: 14.5px;
+  }
+
+  .plans-module .cal-month {
+    padding: 10px 9px 11px;
+    border-radius: 21px;
+  }
+
+  .plans-module .cal-month-nav {
+    grid-template-columns: 39px minmax(0, 1fr) 39px;
+    margin-bottom: 8px;
+  }
+
+  .plans-module .cal-nav-btn {
+    width: 37px;
+    height: 37px;
+  }
+
+  .plans-module .cal-cell {
+    aspect-ratio: 1 / .76;
+    padding-bottom: 8px;
+  }
+
+  .plans-module .pm-crystal-path {
+    gap: 6px;
+    min-height: 32px;
+    margin-inline: 2px;
+  }
+
+  .plans-module .pm-crystal-path-title {
+    font-size: 9px;
+  }
+
+  .plans-module .pm-crystal-path-value {
+    font-size: 9.5px;
+  }
+
+  .plans-module .pm-tile {
+    min-height: 98px;
+    padding: 9px 9px 8px 15px;
+    border-radius: 15px;
+  }
+
+  .plans-module .pm-tile-title {
+    font-size: 13.2px;
+  }
+
+  .plans-module[data-section='calendar']:has(.pm-section-toggle:not([aria-expanded='true'])) .pm-section-toggle {
+    width: calc(100% - 158px);
+  }
+
+  .plans-module[data-section='calendar']:has(.pm-section-toggle:not([aria-expanded='true'])) .pm-fab {
+    bottom: 96px;
+    min-width: 140px;
+  }
+
+  body:has(.plans-module) .bottom-nav-inner {
+    min-height: 66px;
+  }
+}
+
+@media (max-width: 370px) {
+  .plans-module .cal-cell {
+    aspect-ratio: 1 / .74;
+  }
+
+  .plans-module .pm-tile {
+    min-height: 96px;
+  }
+
+  .plans-module .pm-tile-title {
+    font-size: 12.7px;
+  }
+
+  .plans-module[data-section='calendar']:has(.pm-section-toggle:not([aria-expanded='true'])) .pm-section-toggle {
+    width: calc(100% - 148px);
+  }
+
+  .plans-module[data-section='calendar']:has(.pm-section-toggle:not([aria-expanded='true'])) .pm-fab {
+    min-width: 132px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans-module .pm-tab,
+  .plans-module .pm-tile,
+  .plans-module .pm-fab,
+  .plans-module .cal-cell,
+  .plans-module .cal-nav-btn,
+  body:has(.plans-module) .bottom-nav-indicator {
+    transition: none;
+  }
+}
