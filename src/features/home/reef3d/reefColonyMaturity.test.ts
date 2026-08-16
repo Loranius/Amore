@@ -7,6 +7,7 @@ import {
   buildReefColonyMaturityPlan,
   REEF_COLONY_MATURITY_VERSION,
 } from './reefColonyMaturity';
+import { REEF_CORAL_MAX_COVERAGE_RATIO } from './reefCoralCoverage';
 
 const EVENTS: EvolutionEventInput[] = [
   ...Array.from({ length: 6 }, (_value, index): EvolutionEventInput => ({
@@ -60,20 +61,31 @@ function maturityPlan(asOf: string) {
 }
 
 describe('reef colony maturity lifecycle', () => {
-  it('keeps colony identity and request ordering while changing visible maturity', () => {
+  it('keeps visible colony identity and source ordering while enforcing the habitat budget', () => {
     const { habitats, maturity } = maturityPlan('2026-07-31');
+    const sourceIds = habitats.plan.colonies.map((colony) => colony.sourceColonyId);
+    const sourceIdSet = new Set(sourceIds);
+    const visibleIds = maturity.plan.colonies.map((colony) => colony.sourceColonyId);
+    const visibleIdSet = new Set(visibleIds);
 
     expect(maturity.version).toBe(REEF_COLONY_MATURITY_VERSION);
-    expect(maturity.plan.colonies.map((colony) => colony.sourceColonyId))
-      .toEqual(habitats.plan.colonies.map((colony) => colony.sourceColonyId));
+    expect(visibleIds.every((id) => sourceIdSet.has(id))).toBe(true);
+    expect(visibleIds).toEqual(sourceIds.filter((id) => visibleIdSet.has(id)));
     expect(maturity.plan.requests.map((request) => request.id))
-      .toEqual(habitats.plan.requests.map((request) => request.id));
-    expect(maturity.states).toHaveLength(habitats.habitats.length);
+      .toEqual(maturity.plan.colonies.map((colony) => colony.request.id));
     expect(
       maturity.stageCounts.young
         + maturity.stageCounts.growing
         + maturity.stageCounts.mature,
     ).toBe(maturity.states.length);
+    expect(maturity.coverage.sourceColonyCount).toBe(sourceIds.length);
+    expect(maturity.coverage.visibleColonyCount).toBe(visibleIds.length);
+    expect(maturity.coverage.maxCoverageRatio).toBe(REEF_CORAL_MAX_COVERAGE_RATIO);
+
+    for (const habitat of maturity.coverage.habitats) {
+      expect(habitat.coverageRatio)
+        .toBeLessThanOrEqual(REEF_CORAL_MAX_COVERAGE_RATIO + 1e-6);
+    }
 
     for (const colony of maturity.plan.colonies) {
       expect(colony.maturity).toBeGreaterThanOrEqual(0);
@@ -117,17 +129,25 @@ describe('reef colony maturity lifecycle', () => {
     if (!layoutTemplate) throw new Error('Expected a matching layout colony.');
 
     const members = Array.from({ length: 5 }, (_value, index) => {
-      if (index === 0) return template;
-      const sourceColonyId = `${template.sourceColonyId}:maturity-recruit:${index}`;
+      const source = index === 0
+        ? template
+        : {
+            ...template,
+            id: `${template.id}:maturity-recruit:${index}`,
+            sourceColonyId: `${template.sourceColonyId}:maturity-recruit:${index}`,
+            seed: (template.seed + index * 7_123) >>> 0,
+            request: {
+              ...template.request,
+              id: `${template.request.id}:maturity-recruit:${index}`,
+              sequence: template.request.sequence + index,
+            },
+          };
       return {
-        ...template,
-        id: `${template.id}:maturity-recruit:${index}`,
-        sourceColonyId,
-        seed: (template.seed + index * 7_123) >>> 0,
+        ...source,
+        footprintRadius: 0.055,
         request: {
-          ...template.request,
-          id: `${template.request.id}:maturity-recruit:${index}`,
-          sequence: template.request.sequence + index,
+          ...source.request,
+          footprintRadius: 0.055,
         },
       };
     });
@@ -150,7 +170,7 @@ describe('reef colony maturity lifecycle', () => {
     };
     const habitats = buildReefColonyHabitatPlan(sourcePlan, syntheticBuild);
     const maturity = buildReefColonyMaturityPlan(habitats, syntheticBuild);
-    const habitat = habitats.habitats[0];
+    const habitat = maturity.habitats[0];
     if (!habitat) throw new Error('Expected a synthetic habitat.');
     const byId = new Map(
       maturity.plan.colonies.map((colony) => [colony.sourceColonyId, colony] as const),
