@@ -37,6 +37,9 @@ import '@/features/plans/plansReferenceFidelity.css';
 // Калібрування після живого мобільного скріншота: компактніший календар,
 // легші картки, не-sticky tabs і нижні дії в композиції самого модуля.
 import '@/features/plans/plansReferencePolish.css';
+// Третій прохід за референсом: ще нижчий календар і один візуально зшитий
+// glass-panel навколо «Найближчих», «Ідей», «Завершених» та кнопки додавання.
+import '@/features/plans/plansReferencePanelPass.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
