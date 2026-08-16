@@ -10,7 +10,7 @@ import {
 import { reefArchFootPoints } from './reefLimestoneArch';
 import { useReefRockMaterials } from './useReefRockMaterials';
 
-export const REEF_NATURAL_ARCH_PASS = 'fused-eroded-limestone-ribs-v4';
+export const REEF_NATURAL_ARCH_PASS = 'fused-eroded-limestone-ribs-v5';
 const MIN_MASSES_PER_ARCH = 6;
 const MAX_MASSES_PER_ARCH = 9;
 const TAU = Math.PI * 2;
@@ -131,6 +131,7 @@ function buildArchInstances(
     0.06 + stableUnit(arch.seed, 'natural-arch:crown-skew') * 0.08
   );
   const heightScale = 0.84 + stableUnit(arch.seed, 'natural-arch:height') * 0.12;
+  const coralSlotPhase = stableUnit(arch.seed, 'natural-arch:coral-slot-phase') < 0.5 ? 0 : 1;
 
   const samples = Array.from({ length: massCount }, (_value, index) => archSample({
     arch,
@@ -158,6 +159,8 @@ function buildArchInstances(
       * arch.thickness
       * 0.22
       * sample.interior;
+    const insideLivingBand = sample.interior > 0.18;
+    const sparseSlot = index % 2 === coralSlotPhase;
 
     return {
       position: new THREE.Vector3(
@@ -175,7 +178,10 @@ function buildArchInstances(
         radius * (0.68 + footWeight * 0.36 + stableUnit(arch.seed, `natural-arch:${index}:sy`) * 0.16),
         radius * (1.02 + stableUnit(arch.seed, `natural-arch:${index}:sz`) * 0.18),
       ),
-      supportsCoral: sample.interior > 0.18,
+      // Only alternating interior masses publish a coral slot. The phase is
+      // deterministic per arch, leaving large stretches of readable bare rock
+      // while still guaranteeing several viable attachment points on long ribs.
+      supportsCoral: insideLivingBand && sparseSlot,
     };
   });
 
@@ -278,6 +284,7 @@ export function ReefNaturalArchLayer({ build }: { build: ReefPreviewBuild }) {
       userData={{
         reefNaturalArchPass: REEF_NATURAL_ARCH_PASS,
         reefNaturalArchMassCount: instances.length,
+        reefNaturalArchCoralSlotCount: attachmentSlots.length,
         reefNaturalArchVolcanoOffset: true,
         reefSupportSurface: true,
         reefSupportSurfaceKind: 'arch',
