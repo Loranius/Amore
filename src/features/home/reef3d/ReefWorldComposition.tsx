@@ -57,12 +57,16 @@ export function ReefWorldComposition() {
       if (isArchSupport) object.visible = false;
 
       if (isHeroShelf) {
+        const horizontalScale = Math.max(object.scale.x, object.scale.z, 1e-6);
+        const tallMass = object.scale.y / horizontalScale > 0.48;
+        const horizontalFactor = tallMass ? 1.28 : 1.12;
+        const verticalFactor = tallMass ? 0.44 : 0.68;
         object.scale.set(
-          object.scale.x * 1.12,
-          object.scale.y * 0.68,
-          object.scale.z * 1.12,
+          object.scale.x * horizontalFactor,
+          object.scale.y * verticalFactor,
+          object.scale.z * horizontalFactor,
         );
-        object.position.y -= 0.055;
+        object.position.y -= tallMass ? 0.12 : 0.055;
       }
 
       if (isGroundedDecoration) {
