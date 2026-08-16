@@ -9,6 +9,11 @@ import {
   type EvolutionSourceSnapshot,
 } from '@/engine/evolution/adapters';
 import {
+  applyEvolutionSandboxSources,
+  relationshipDaysBetween,
+  useEvolutionSandbox,
+} from '@/features/home/evolutionSandbox';
+import {
   buildEvolutionMemoryLinks,
   evolutionWishlistFromPairArchive,
   stableEvolutionCoupleId,
@@ -244,6 +249,11 @@ async function fetchReefPortalSources(): Promise<ReefPortalSources> {
 export function useReefPortalPreview(): UseReefPortalPreviewResult {
   const me = useCurrentUser();
   const [asOf] = useState(() => coupleDay(new Date(), COUPLE_TIME_ZONE));
+  const {
+    enabled: sandboxEnabled,
+    values: sandboxValues,
+    registerBaseline,
+  } = useEvolutionSandbox();
   const sourceQuery = useQuery({
     queryKey: ['reef', 'evolution-sources', SOURCE_CACHE_VERSION, me.id],
     queryFn: fetchReefPortalSources,
@@ -258,6 +268,21 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
     if (!sourceQuery.data || sourceQuery.dataUpdatedAt <= 0) return;
     writeCachedSources(me.id, sourceQuery.data);
   }, [me.id, sourceQuery.data, sourceQuery.dataUpdatedAt]);
+
+  useEffect(() => {
+    const sources = sourceQuery.data;
+    if (!sources) return;
+    registerBaseline('reef', {
+      relationshipDays: relationshipDaysBetween(sources.relationshipStartedAt, asOf),
+      calendarEvents: sources.snapshot.calendarEvents.length,
+      completedPlans: sources.snapshot.plans.filter((plan) => plan.status === 'done').length,
+      fulfilledWishes: sources.snapshot.wishlistItems.filter((wish) => wish.fulfilled).length,
+      visitedPlaces: sources.snapshot.mapPlaces.filter((place) => Boolean(place.visitedAt)).length,
+      memories: sources.snapshot.memories.length,
+      finishedMedia: sources.snapshot.media.filter((item) => item.status === 'done').length,
+      sharedDaysOff: sources.sharedDaysOff.length,
+    });
+  }, [asOf, registerBaseline, sourceQuery.data]);
 
   return useMemo<UseReefPortalPreviewResult>(() => {
     const sources = sourceQuery.data;
@@ -275,13 +300,21 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
     }
 
     try {
+      const effectiveSources = applyEvolutionSandboxSources({
+        enabled: sandboxEnabled,
+        values: sandboxValues,
+        asOf,
+        relationshipStartedAt: sources.relationshipStartedAt,
+        snapshot: sources.snapshot,
+        sharedDaysOff: sources.sharedDaysOff,
+      });
       const artifactResult = buildArtifactFromSnapshot({
         coupleId: stableEvolutionCoupleId(sources.userIds),
         asOf,
-        snapshot: sources.snapshot,
+        snapshot: effectiveSources.snapshot,
         engineConfig: {
           engineVersion: ENGINE_VERSION,
-          relationshipStartedAt: sources.relationshipStartedAt,
+          relationshipStartedAt: effectiveSources.relationshipStartedAt,
           timeZone: COUPLE_TIME_ZONE,
           leapDayPolicy: 'feb-28',
         },
@@ -289,7 +322,7 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
       const build = buildReefPreviewFromArtifact({
         artifact: artifactResult.blueprint,
         asOf,
-        sharedDaysOff: sources.sharedDaysOff,
+        sharedDaysOff: effectiveSources.sharedDaysOff,
       });
       return {
         preview: {
@@ -307,5 +340,12 @@ export function useReefPortalPreview(): UseReefPortalPreviewResult {
         error: error instanceof Error ? error : new Error(String(error)),
       };
     }
-  }, [asOf, sourceQuery.data, sourceQuery.error, sourceQuery.isPending]);
+  }, [
+    asOf,
+    sandboxEnabled,
+    sandboxValues,
+    sourceQuery.data,
+    sourceQuery.error,
+    sourceQuery.isPending,
+  ]);
 }
