@@ -1,0 +1,344 @@
+/* ============================================================
+   Plans — grouped reference panel pass
+   ------------------------------------------------------------
+   Третій калібрувальний прохід за живим мобільним скріншотом.
+   Мета: дотягнути саме композицію референсу — нижчий календар,
+   тонший segmented control і один великий glass-panel навколо списків.
+   Бізнес-логіка, дані та 3D-фон не змінюються.
+   ============================================================ */
+
+/* Верхня капсула в референсі помітно нижча за попередню версію. */
+.plans-module .pm-tabs {
+  min-height: 48px;
+  padding: 3px;
+  border-radius: 25px;
+}
+
+.plans-module .pm-tab {
+  min-height: 42px;
+  padding: 7px 9px;
+  border-radius: 22px;
+  font-size: 14.5px;
+}
+
+.plans-module .pm-tab[aria-selected='true'] {
+  background:
+    radial-gradient(ellipse at 50% -28%, rgba(255,255,255,.55), transparent 43%),
+    linear-gradient(180deg, #d9a4f2 0%, #c27fe2 52%, #a961cc 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.72),
+    inset 0 -6px 14px rgba(78,31,111,.13),
+    0 0 16px rgba(202,124,239,.16);
+}
+
+.plans-module .pm-tab[aria-selected='true']::before,
+.plans-module .pm-tab[aria-selected='true']::after {
+  top: 1px;
+  bottom: 1px;
+  width: 25px;
+  opacity: .82;
+}
+
+.plans-module .pm-tab-count {
+  min-width: 23px;
+  padding: 1px 6px;
+  font-size: 11.5px;
+}
+
+/* Календар — головна різниця зі скріншотом: клітинки стають нижчими,
+   щоб місячна карта мала пропорцію референсу, а не квадратну сітку. */
+.plans-module .cal-month {
+  padding: 9px 9px 10px;
+  border-radius: 21px;
+}
+
+.plans-module .cal-month-nav {
+  grid-template-columns: 38px minmax(0, 1fr) 38px;
+  margin-bottom: 7px;
+}
+
+.plans-module .cal-month-nav > b {
+  font-size: 16.5px;
+}
+
+.plans-module .cal-nav-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+}
+
+.plans-module .cal-dow {
+  margin-bottom: 5px;
+  font-size: 10px;
+}
+
+.plans-module .cal-grid {
+  gap: 4px;
+}
+
+.plans-module .cal-cell {
+  aspect-ratio: 1 / .67;
+  padding: 2px 2px 8px;
+  border-radius: 8px;
+}
+
+.plans-module .cal-cell-n {
+  font-size: 12px;
+}
+
+.plans-module .cal-cell-dots {
+  bottom: 3px;
+}
+
+.plans-module .cal-cell-dots i {
+  width: 4px;
+  height: 4px;
+}
+
+/* Шлях у референсі — тонка вставка між двома великими зонами. */
+.plans-module .pm-crystal-path {
+  min-height: 29px;
+  margin: 2px 4px 1px;
+  gap: 7px;
+}
+
+.plans-module .pm-crystal-path-title {
+  font-size: 9.2px;
+}
+
+.plans-module .pm-crystal-path-icon {
+  width: 11px;
+  height: 15px;
+}
+
+.plans-module .pm-crystal-path-track {
+  height: 2px;
+}
+
+.plans-module .pm-crystal-path-marker {
+  width: 10px;
+  height: 14px;
+}
+
+.plans-module .pm-crystal-path-value {
+  font-size: 9.6px;
+}
+
+/* ============================================================
+   ЄДИНИЙ PANEL ДЛЯ ПЛАНІВ
+   JSX вже дає потрібну послідовність:
+   path → head → tiles → head → tiles → completed.
+   Тому окремі DOM-вузли зшиваємо рамкою й одним фоном без нової логіки.
+   ============================================================ */
+
+.plans-module .pm-crystal-path + .pm-section-head {
+  margin: 7px 0 0;
+  padding: 12px 14px 7px;
+  border: 1px solid rgba(221,191,245,.17);
+  border-bottom: 0;
+  border-radius: 20px 20px 0 0;
+  background:
+    radial-gradient(circle at 50% -28%, rgba(184,122,221,.08), transparent 44%),
+    linear-gradient(180deg, rgba(43,30,65,.73), rgba(30,20,51,.73));
+}
+
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles {
+  padding: 0 14px 11px;
+  border-left: 1px solid rgba(221,191,245,.17);
+  border-right: 1px solid rgba(221,191,245,.17);
+  background: rgba(30,20,51,.73);
+}
+
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head {
+  margin: 0;
+  padding: 4px 14px 7px;
+  border-left: 1px solid rgba(221,191,245,.17);
+  border-right: 1px solid rgba(221,191,245,.17);
+  background: rgba(30,20,51,.73);
+}
+
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head + .pm-tiles {
+  padding: 0 14px 11px;
+  border-left: 1px solid rgba(221,191,245,.17);
+  border-right: 1px solid rgba(221,191,245,.17);
+  background: rgba(30,20,51,.73);
+}
+
+/* Праві підписи як у референсі. Це лише presentation label — самі картки
+   лишаються клікабельними, тож не створюємо фальшиву додаткову кнопку. */
+.plans-module .pm-crystal-path + .pm-section-head > span,
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head > span {
+  font-size: 0;
+}
+
+.plans-module .pm-crystal-path + .pm-section-head > span::after {
+  content: 'Дивитися всі  ›';
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(229,211,242,.75);
+}
+
+.plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head > span::after {
+  content: 'Колись  ›';
+  font-size: 10.5px;
+  font-weight: 700;
+  color: rgba(221,202,235,.67);
+}
+
+.plans-module .pm-section-head h2 {
+  font-size: 15px;
+}
+
+/* Картки у референсі горизонтальні. Попередня версія все ще була майже
+   квадратною, тому прибираємо приблизно п'яту частину висоти. */
+.plans-module .pm-tile {
+  min-height: 82px;
+  gap: 4px;
+  padding: 8px 9px 8px 16px;
+  border-radius: 15px;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.025),
+    0 6px 15px rgba(5,2,12,.14);
+}
+
+.plans-module .pm-tile::before {
+  top: 4px;
+  bottom: 4px;
+  width: 8px;
+}
+
+.plans-module .pm-tile::after {
+  right: 9px;
+  top: 8px;
+  width: 18px;
+  height: 18px;
+}
+
+.plans-module .pm-tile-cat {
+  padding-right: 22px;
+  font-size: 9.5px;
+}
+
+.plans-module .pm-tile-title {
+  padding-right: 12px;
+  font-size: 12.8px;
+  line-height: 1.2;
+}
+
+.plans-module .pm-tile-meta {
+  gap: 3px 5px;
+  padding-right: 18px;
+  font-size: 9.6px;
+}
+
+.plans-module .pm-tile-open::after {
+  right: 8px;
+  bottom: 7px;
+  width: 19px;
+  height: 19px;
+  font-size: 14px;
+  opacity: .58;
+}
+
+/* Завершені стає нижньою частиною великого panel. FAB накладається праворуч
+   усередині цього самого поясу — як у затвердженому референсі. */
+.plans-module .pm-sheet > .pm-section-toggle {
+  width: 100%;
+  min-height: 62px;
+  margin: 0;
+  padding: 8px 174px 10px 14px;
+  border: 1px solid rgba(221,191,245,.17);
+  border-top-color: rgba(221,191,245,.1);
+  border-radius: 0 0 20px 20px;
+  background: rgba(30,20,51,.73);
+  box-shadow: 0 12px 29px rgba(5,2,12,.17);
+}
+
+.plans-module .pm-sheet > .pm-section-toggle span {
+  margin-left: auto;
+}
+
+.plans-module[data-section='calendar']:has(.pm-section-toggle:not([aria-expanded='true'])) .pm-section-toggle {
+  width: 100%;
+}
+
+.plans-module[data-section='calendar']:has(.pm-section-toggle:not([aria-expanded='true'])) .pm-fab {
+  right: 14px;
+  bottom: 98px;
+  min-width: 145px;
+  min-height: 46px;
+  border-radius: 24px;
+}
+
+/* Розкриті завершені повертаються до звичайного потоку: важливіше не
+   перекривати картки, ніж зберігати декоративне зшивання. */
+.plans-module .pm-section-toggle[aria-expanded='true'] {
+  padding-right: 14px;
+  border-radius: 0;
+}
+
+/* Док ближчий до референсу: трохи нижчий і з тоншим active-segment. */
+body:has(.plans-module) .bottom-nav-inner {
+  min-height: 64px;
+}
+
+body:has(.plans-module) .bottom-nav-indicator {
+  top: 5px;
+  bottom: 5px;
+  border-radius: 24px;
+}
+
+body:has(.plans-module) .nav-label {
+  font-size: 10px;
+}
+
+@media (max-width: 430px) {
+  .plans-module {
+    gap: 6px;
+  }
+
+  .plans-module .pm-tabs {
+    min-height: 47px;
+  }
+
+  .plans-module .pm-tab {
+    min-height: 41px;
+    font-size: 14px;
+  }
+
+  .plans-module .cal-month {
+    padding: 8px 8px 9px;
+  }
+
+  .plans-module .cal-cell {
+    aspect-ratio: 1 / .65;
+  }
+
+  .plans-module .pm-crystal-path + .pm-section-head,
+  .plans-module .pm-crystal-path + .pm-section-head + .pm-tiles,
+  .plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head,
+  .plans-module .pm-crystal-path + .pm-section-head + .pm-tiles + .pm-section-head + .pm-tiles {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .plans-module .pm-tile {
+    min-height: 80px;
+    padding-top: 8px;
+    padding-bottom: 7px;
+  }
+}
+
+@media (max-width: 370px) {
+  .plans-module .pm-crystal-path + .pm-section-head > span::after {
+    content: 'Всі  ›';
+  }
+
+  .plans-module .pm-tile-title {
+    font-size: 12.3px;
+  }
+
+  .plans-module .pm-tile-meta {
+    font-size: 9.2px;
+  }
+}
