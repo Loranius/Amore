@@ -1,0 +1,564 @@
+/* ============================================================
+   Plans — crystal glass visual refresh
+   ------------------------------------------------------------
+   Pure presentation layer over the existing Plans/Calendar behavior.
+   No plan/event semantics change here: the module keeps the same data,
+   actions, routes and calendar interactions, but reads as one coherent
+   crystal surface instead of stacked generic glass cards.
+   ============================================================ */
+
+.plans-module {
+  --pm-glass: rgba(28, 20, 48, 0.72);
+  --pm-glass-strong: rgba(35, 25, 59, 0.88);
+  --pm-glass-soft: rgba(94, 67, 126, 0.16);
+  --pm-line: rgba(222, 190, 255, 0.22);
+  --pm-line-hot: rgba(226, 174, 255, 0.58);
+  --pm-lilac: #d8a7f4;
+  --pm-lilac-deep: #9b62c7;
+  --pm-pink: #ff72b3;
+  --pm-ink: #f8f1ff;
+  --pm-muted: #cbb9de;
+  gap: 14px;
+}
+
+/* ── Crystal segmented control ───────────────────────────── */
+
+.plans-module .pm-tabs {
+  position: sticky;
+  top: 0;
+  isolation: isolate;
+  overflow: hidden;
+  gap: 7px;
+  padding: 7px;
+  border: 1px solid var(--pm-line);
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 54%),
+    rgba(31, 22, 52, 0.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 14px 35px rgba(7, 3, 15, 0.3);
+  backdrop-filter: blur(18px) saturate(125%);
+}
+
+.plans-module .pm-tabs::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(115deg, transparent 18%, rgba(255,255,255,.055) 43%, transparent 66%);
+  z-index: -1;
+}
+
+.plans-module .pm-tab {
+  position: relative;
+  min-height: 50px;
+  padding: 12px 10px;
+  border: 1px solid transparent;
+  border-radius: 21px;
+  color: rgba(242, 228, 255, 0.78);
+  font-size: 15px;
+  letter-spacing: .01em;
+  transition:
+    transform 170ms ease,
+    color 170ms ease,
+    border-color 170ms ease,
+    box-shadow 170ms ease,
+    background 170ms ease;
+}
+
+.plans-module .pm-tab[aria-selected='true'] {
+  color: #24122e;
+  border-color: rgba(247, 224, 255, 0.56);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255,255,255,.52), transparent 46%),
+    linear-gradient(135deg, #e1b6f8 0%, #c58ee6 48%, #b679d8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.68),
+    inset 0 -8px 18px rgba(107, 49, 145, .14),
+    0 0 26px rgba(194, 126, 232, .18);
+}
+
+.plans-module .pm-tab[aria-selected='true']::before,
+.plans-module .pm-tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  top: 7px;
+  bottom: 7px;
+  width: 18px;
+  opacity: .42;
+  pointer-events: none;
+}
+
+.plans-module .pm-tab[aria-selected='true']::before {
+  left: 5px;
+  clip-path: polygon(100% 0, 55% 18%, 78% 50%, 55% 82%, 100% 100%, 0 76%, 18% 50%, 0 24%);
+  background: linear-gradient(90deg, rgba(255,255,255,.75), rgba(198,132,232,.14));
+}
+
+.plans-module .pm-tab[aria-selected='true']::after {
+  right: 5px;
+  clip-path: polygon(0 0, 45% 18%, 22% 50%, 45% 82%, 0 100%, 100% 76%, 82% 50%, 100% 24%);
+  background: linear-gradient(270deg, rgba(255,255,255,.75), rgba(198,132,232,.14));
+}
+
+.plans-module .pm-tab:active { transform: scale(.985); }
+
+.plans-module .pm-tab-count {
+  min-width: 24px;
+  padding: 2px 7px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.075);
+  color: inherit;
+}
+
+.plans-module .pm-tab[aria-selected='true'] .pm-tab-count {
+  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.32);
+}
+
+/* ── Month: one crystal-glass slab ───────────────────────── */
+
+.plans-module .cal-month {
+  position: relative;
+  overflow: hidden;
+  padding: 14px 12px 13px;
+  border: 1px solid var(--pm-line);
+  border-radius: 27px;
+  background:
+    radial-gradient(circle at 50% -18%, rgba(206, 146, 244, .12), transparent 46%),
+    linear-gradient(180deg, rgba(49, 36, 72, .79), rgba(26, 19, 45, .77));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.055),
+    0 18px 42px rgba(5, 2, 12, .28);
+  backdrop-filter: blur(20px) saturate(120%);
+}
+
+.plans-module .cal-month::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(122deg, transparent 9%, rgba(255,255,255,.035) 27%, transparent 43%),
+    linear-gradient(300deg, transparent 60%, rgba(190,129,228,.045));
+}
+
+.plans-module .cal-month-nav {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 13px;
+}
+
+.plans-module .cal-month-nav > b {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: center;
+  color: var(--pm-ink);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: .005em;
+}
+
+.plans-module .cal-month-nav .cal-nav-btn:first-child { grid-column: 1; }
+.plans-module .cal-month-nav .cal-nav-btn:last-child { grid-column: 3; }
+
+.plans-module .cal-nav-btn {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(220, 190, 247, .18);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(93, 69, 124, .22), rgba(25, 18, 42, .48));
+  color: var(--pm-ink);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+.plans-module .cal-nav-btn:active { transform: scale(.94); }
+
+.plans-module .cal-today-btn {
+  position: absolute;
+  right: 50px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(215,174,244,.2);
+  background: rgba(96,67,127,.24);
+  color: var(--pm-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.plans-module .cal-dow {
+  margin: 0 1px 7px;
+  color: rgba(222, 207, 238, .82);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .055em;
+}
+
+.plans-module .cal-grid {
+  align-items: start;
+  gap: 5px;
+}
+
+.plans-module .cal-cell {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 1 / .96;
+  display: grid;
+  place-items: center;
+  padding: 4px 2px 12px;
+  border: 1px solid rgba(225, 204, 244, .08);
+  border-radius: 10px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    rgba(89, 69, 111, .22);
+  color: rgba(249, 242, 255, .9);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+  transition: transform 150ms ease, border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
+}
+
+.plans-module .cal-cell--pad {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.plans-module button.cal-cell:active { transform: scale(.92); }
+
+.plans-module .cal-cell--today {
+  border-color: rgba(227, 177, 255, .92);
+  background: rgba(143, 91, 174, .25);
+  box-shadow:
+    inset 0 0 0 1px rgba(239, 210, 255, .3),
+    0 0 15px rgba(211, 137, 246, .16);
+}
+
+.plans-module .cal-cell--sel {
+  border-color: rgba(241, 202, 255, .86);
+  background: linear-gradient(145deg, rgba(207,151,239,.22), rgba(105,64,139,.22));
+  box-shadow: 0 0 18px rgba(217, 154, 248, .17);
+}
+
+.plans-module .cal-cell-n { font-size: 13px; }
+
+.plans-module .cal-cell-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  transform: translateX(-50%);
+  gap: 3px;
+}
+
+.plans-module .cal-cell-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* Calendar details/list become subordinate glass rows. */
+.plans-module .cal-month-list,
+.plans-module .cal-day-panel {
+  margin-top: 14px;
+}
+
+.plans-module .cal-day-block { margin-top: 10px; }
+
+.plans-module .cal-day-num {
+  margin: 0 2px 6px;
+  color: var(--pm-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.plans-module .cal-day-event {
+  min-height: 48px;
+  border: 1px solid rgba(218, 190, 242, .13);
+  border-radius: 14px;
+  background: rgba(64, 47, 85, .2);
+  color: var(--pm-ink);
+}
+
+/* ── Section rhythm ──────────────────────────────────────── */
+
+.plans-module .pm-section-head {
+  margin: 17px 3px 9px;
+  align-items: center;
+}
+
+.plans-module .pm-section-head h2 {
+  font-size: 16px;
+  letter-spacing: -.01em;
+}
+
+.plans-module .pm-section-head span {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(111, 78, 143, .16);
+  color: var(--pm-muted);
+  font-size: 11px;
+}
+
+/* ── Plan crystals ───────────────────────────────────────── */
+
+.plans-module .pm-tiles {
+  gap: 9px;
+}
+
+.plans-module .pm-tile {
+  isolation: isolate;
+  min-height: 100px;
+  gap: 6px;
+  padding: 13px 13px 12px 17px;
+  border: 1px solid rgba(220, 190, 244, .16);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 12% 4%, color-mix(in srgb, var(--plan-color) 12%, transparent), transparent 44%),
+    linear-gradient(145deg, rgba(64, 46, 86, .44), rgba(31, 22, 51, .62));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    0 12px 27px rgba(6, 3, 13, .23);
+  backdrop-filter: blur(15px) saturate(115%);
+  transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+}
+
+.plans-module .pm-tile::before {
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 9px;
+  border-radius: 0 6px 6px 0;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.72), transparent 14%, color-mix(in srgb, var(--plan-color) 80%, #fff) 48%, transparent 88%),
+    var(--plan-color);
+  clip-path: polygon(38% 0, 100% 13%, 76% 35%, 100% 52%, 72% 72%, 100% 100%, 28% 91%, 0 55%, 18% 24%);
+  opacity: .78;
+  box-shadow: 0 0 14px color-mix(in srgb, var(--plan-color) 46%, transparent);
+}
+
+.plans-module .pm-tile::after {
+  content: '';
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 22px;
+  height: 22px;
+  z-index: 0;
+  border: 1px solid rgba(224, 191, 252, .18);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255,255,255,.45), transparent 20%),
+    conic-gradient(from 45deg, rgba(213,154,245,.8), rgba(104,65,138,.2), rgba(226,177,251,.72), rgba(104,65,138,.2), rgba(213,154,245,.8));
+  box-shadow: 0 0 12px rgba(194,128,232,.14);
+  clip-path: polygon(50% 0, 88% 24%, 100% 64%, 72% 100%, 28% 100%, 0 64%, 12% 24%);
+}
+
+.plans-module .pm-tile:hover,
+.plans-module .pm-tile:focus-within {
+  transform: translateY(-2px);
+  border-color: rgba(224, 189, 249, .28);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.055),
+    0 16px 32px rgba(6, 3, 13, .31);
+}
+
+.plans-module .pm-tile:active { transform: translateY(0) scale(.99); }
+
+.plans-module .pm-tile-cat {
+  padding-right: 26px;
+  font-size: 10.5px;
+  letter-spacing: .015em;
+}
+
+.plans-module .pm-tile-title {
+  padding-right: 10px;
+  color: var(--pm-ink);
+  font-size: 14px;
+  line-height: 1.28;
+}
+
+.plans-module .pm-tile-meta {
+  margin-top: auto;
+  gap: 5px 7px;
+  color: rgba(211, 194, 228, .72);
+  font-size: 11px;
+}
+
+.plans-module .pm-tile-when,
+.plans-module .pm-tile-overdue {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--plan-color) 11%, rgba(80, 57, 104, .2));
+}
+
+.plans-module .pm-tile-open::after {
+  content: '›';
+  position: absolute;
+  right: 12px;
+  bottom: 10px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(226, 199, 247, .14);
+  border-radius: 50%;
+  background: rgba(107, 76, 137, .16);
+  color: rgba(241, 224, 255, .72);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.plans-module .pm-tile-confirm {
+  z-index: 2;
+  align-self: flex-start;
+  padding: 6px 10px;
+  background: rgba(159, 104, 194, .13);
+}
+
+.plans-module .pm-tile--closed {
+  opacity: .58;
+  filter: saturate(.72);
+}
+
+/* ── Closed strip ────────────────────────────────────────── */
+
+.plans-module .pm-section-toggle {
+  min-height: 50px;
+  margin-top: 18px;
+  padding: 0 16px;
+  border-color: rgba(219, 189, 243, .17);
+  border-radius: 18px;
+  background:
+    linear-gradient(145deg, rgba(77, 56, 99, .25), rgba(33, 24, 51, .4));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.025);
+}
+
+.plans-module .pm-section-toggle::after {
+  content: '›';
+  margin-left: 2px;
+  color: rgba(230, 204, 250, .66);
+  font-size: 22px;
+  transition: transform 170ms ease;
+}
+
+.plans-module .pm-section-toggle[aria-expanded='true']::after { transform: rotate(90deg); }
+
+/* ── Floating crystal action ─────────────────────────────── */
+
+.plans-module .pm-fab {
+  right: 14px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 88px);
+  min-height: 48px;
+  padding: 11px 16px;
+  border: 1px solid rgba(242, 208, 255, .52);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 30% 0%, rgba(255,255,255,.4), transparent 36%),
+    linear-gradient(135deg, #d8a3f3, #b56fd9 62%, #985ab9);
+  color: #24122e;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.58),
+    0 10px 26px rgba(38, 15, 53, .34),
+    0 0 20px rgba(203, 132, 237, .15);
+}
+
+.plans-module .pm-fab::after {
+  content: '';
+  width: 15px;
+  height: 20px;
+  margin-left: 2px;
+  background: linear-gradient(160deg, #fff, #d89ff2 35%, #7a3c9e 100%);
+  clip-path: polygon(50% 0, 100% 34%, 79% 79%, 50% 100%, 21% 79%, 0 34%);
+  box-shadow: 0 0 10px rgba(255,255,255,.55);
+  opacity: .86;
+}
+
+.plans-module .pm-fab:active { transform: translateY(1px) scale(.97); }
+
+/* ── World mode: keep background present, UI readable ───── */
+
+[data-portal-scene='true'] .plans-module .pm-tabs,
+[data-portal-scene='true'] .plans-module .cal-month,
+[data-portal-scene='true'] .plans-module .pm-tile,
+[data-portal-scene='true'] .plans-module .pm-section-toggle {
+  -webkit-backdrop-filter: blur(18px) saturate(120%);
+}
+
+@media (max-width: 430px) {
+  .plans-module { gap: 12px; }
+
+  .plans-module .pm-tab {
+    min-height: 47px;
+    padding: 10px 7px;
+    font-size: 14px;
+  }
+
+  .plans-module .cal-month {
+    padding: 12px 10px 11px;
+    border-radius: 24px;
+  }
+
+  .plans-module .cal-month-nav {
+    grid-template-columns: 40px 1fr 40px;
+    margin-bottom: 11px;
+  }
+
+  .plans-module .cal-nav-btn {
+    width: 39px;
+    height: 39px;
+    border-radius: 13px;
+  }
+
+  .plans-module .cal-month-nav > b { font-size: 17px; }
+
+  .plans-module .cal-grid { gap: 4px; }
+
+  .plans-module .cal-cell {
+    border-radius: 9px;
+    padding-bottom: 10px;
+  }
+
+  .plans-module .cal-cell-n { font-size: 12.5px; }
+
+  .plans-module .pm-tiles { gap: 8px; }
+
+  .plans-module .pm-tile {
+    min-height: 96px;
+    padding: 12px 11px 11px 15px;
+    border-radius: 16px;
+  }
+
+  .plans-module .pm-tile-title { font-size: 13.5px; }
+
+  .plans-module .pm-fab {
+    right: 12px;
+    padding: 10px 14px;
+    min-height: 46px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 350px) {
+  .plans-module .pm-tiles { grid-template-columns: 1fr; }
+  .plans-module .cal-dow { font-size: 9.5px; }
+  .plans-module .cal-cell-n { font-size: 11.5px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans-module .pm-tab,
+  .plans-module .pm-tile,
+  .plans-module .pm-fab,
+  .plans-module .cal-cell,
+  .plans-module .cal-nav-btn {
+    transition: none;
+  }
+}
