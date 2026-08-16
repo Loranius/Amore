@@ -104,6 +104,13 @@ export function PlansPage() {
   const groups = useMemo(() => groupPlans(plans), [plans]);
   const activeCount = groups.upcoming.length + groups.ideas.length;
 
+  // «Кристальний шлях» у списку планів — не нова валюта і не нова таблиця.
+  // Він показує частку завершених планів на шкалі 0…1000, тож візуальний
+  // прогрес із референсу не вигадує окремої бізнес-логіки й не ламає дані.
+  const crystalPathValue = plans.length === 0
+    ? 0
+    : Math.round((groups.closed.length / plans.length) * 1000);
+
   const openNewEvent = (
     type: EventKind = 'anniversary',
     date?: string,
@@ -217,6 +224,8 @@ export function PlansPage() {
             onOpenPlan={(id) => navigate(`/plans/${id}`)}
           />
 
+          <CrystalPathProgress value={crystalPathValue} />
+
           <PlanSection
             title="Найближчі плани"
             note={`${groups.upcoming.length}`}
@@ -306,6 +315,35 @@ export function PlansPage() {
         />
       )}
     </section>
+  );
+}
+
+function CrystalPathProgress({ value }: { value: number }) {
+  const max = 1000;
+  const safeValue = Math.max(0, Math.min(max, value));
+  const progress = (safeValue / max) * 100;
+
+  return (
+    <div
+      className="pm-crystal-path"
+      role="meter"
+      aria-label={`Кристальний шлях: ${safeValue} із ${max}`}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={safeValue}
+    >
+      <span className="pm-crystal-path-title">
+        <i className="pm-crystal-path-icon" aria-hidden="true" />
+        <span>КРИСТАЛЬНИЙ ШЛЯХ</span>
+      </span>
+      <span className="pm-crystal-path-track" aria-hidden="true">
+        <i className="pm-crystal-path-fill" style={{ width: `${progress}%` }} />
+        <i className="pm-crystal-path-marker" style={{ left: `${progress}%` }} />
+      </span>
+      <span className="pm-crystal-path-value">
+        {safeValue} / {max} <b aria-hidden="true">✦</b>
+      </span>
+    </div>
   );
 }
 

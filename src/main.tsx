@@ -31,6 +31,9 @@ import '@/features/wishlist/wishlistBubbleGlass.css';
 // Імпортується останнім, щоб бути чистим presentation override без змін
 // календарної/планової логіки та без переписування базових стилів модуля.
 import '@/features/plans/plansCrystalRefresh.css';
+// Фінальний reference-fidelity шар для /plans: фон світу лишається тим самим,
+// але геометрія, щільність і кристалічні акценти наближені до затвердженого UI.
+import '@/features/plans/plansReferenceFidelity.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');

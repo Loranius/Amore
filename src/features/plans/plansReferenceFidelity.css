@@ -1,0 +1,757 @@
+/* ============================================================
+   Plans — reference fidelity pass
+   ------------------------------------------------------------
+   Останній presentation layer для /plans. Він не міняє фон світу,
+   запити або модель даних: лише наближає форму, ритм і кристалічну
+   палітру до затвердженого мобільного референсу.
+   ============================================================ */
+
+.plans-module {
+  --pm-ref-panel: rgba(25, 16, 45, 0.72);
+  --pm-ref-panel-strong: rgba(31, 21, 54, 0.86);
+  --pm-ref-cell: rgba(86, 66, 111, 0.27);
+  --pm-ref-line: rgba(221, 194, 249, 0.18);
+  --pm-ref-line-bright: rgba(233, 192, 255, 0.66);
+  --pm-ref-lavender: #d6a1f1;
+  --pm-ref-lavender-hot: #efbaff;
+  --pm-ref-purple: #9d5fc7;
+  --pm-ref-pink: #ff73b2;
+  --pm-ref-text: #fbf6ff;
+  --pm-ref-muted: rgba(226, 211, 239, 0.72);
+  max-width: 780px;
+  margin-inline: auto;
+  gap: 9px;
+  padding-bottom: 124px;
+}
+
+/* ── Верхній crystal segmented control ──────────────────── */
+
+.plans-module .pm-tabs {
+  min-height: 64px;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid rgba(225, 196, 250, 0.21);
+  border-radius: 32px;
+  background:
+    radial-gradient(circle at 50% -70%, rgba(197, 142, 236, 0.18), transparent 58%),
+    linear-gradient(180deg, rgba(45, 32, 69, 0.82), rgba(25, 17, 43, 0.79));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 -1px 0 rgba(105, 69, 132, 0.2),
+    0 14px 36px rgba(7, 3, 15, 0.24);
+  -webkit-backdrop-filter: blur(20px) saturate(128%);
+  backdrop-filter: blur(20px) saturate(128%);
+}
+
+.plans-module .pm-tabs::after {
+  opacity: 0.9;
+  background:
+    linear-gradient(112deg, transparent 12%, rgba(255,255,255,.05) 33%, transparent 50%),
+    linear-gradient(292deg, transparent 55%, rgba(189,126,226,.06));
+}
+
+.plans-module .pm-tab {
+  min-height: 54px;
+  padding: 12px 11px;
+  border-radius: 28px;
+  color: rgba(238, 224, 250, 0.8);
+  font-size: 15.5px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.plans-module .pm-tab[aria-selected='true'] {
+  overflow: hidden;
+  color: #24132f;
+  border-color: rgba(247, 223, 255, 0.73);
+  background:
+    radial-gradient(ellipse at 50% -20%, rgba(255,255,255,.62), transparent 44%),
+    linear-gradient(180deg, #ddb0f5 0%, #c990e8 52%, #b974d8 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.78),
+    inset 0 -9px 20px rgba(91, 40, 128, .15),
+    0 0 22px rgba(213, 145, 246, .2);
+}
+
+.plans-module .pm-tab[aria-selected='true']::before,
+.plans-module .pm-tab[aria-selected='true']::after {
+  top: 2px;
+  bottom: 2px;
+  width: 31px;
+  opacity: 0.82;
+  filter: drop-shadow(0 0 4px rgba(243, 215, 255, .24));
+}
+
+.plans-module .pm-tab[aria-selected='true']::before {
+  left: 1px;
+  clip-path: polygon(
+    100% 0, 58% 9%, 74% 27%, 48% 44%, 75% 62%,
+    55% 82%, 100% 100%, 26% 92%, 0 68%, 17% 48%, 0 25%, 31% 7%
+  );
+  background:
+    linear-gradient(112deg, rgba(255,255,255,.92), rgba(228,174,251,.38) 38%, rgba(119,66,151,.16) 76%);
+}
+
+.plans-module .pm-tab[aria-selected='true']::after {
+  right: 1px;
+  clip-path: polygon(
+    0 0, 42% 9%, 26% 27%, 52% 44%, 25% 62%,
+    45% 82%, 0 100%, 74% 92%, 100% 68%, 83% 48%, 100% 25%, 69% 7%
+  );
+  background:
+    linear-gradient(248deg, rgba(255,255,255,.92), rgba(228,174,251,.38) 38%, rgba(119,66,151,.16) 76%);
+}
+
+.plans-module .pm-tab-count {
+  min-width: 25px;
+  padding: 2px 7px;
+  border-color: rgba(242, 222, 255, 0.08);
+  background: rgba(255,255,255,.055);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.plans-module .pm-tab[aria-selected='true'] .pm-tab-count {
+  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.34);
+}
+
+/* ── Календар: компактна темна плита як у референсі ─────── */
+
+.plans-module .cal-month {
+  overflow: hidden;
+  padding: 14px 12px 16px;
+  border: 1px solid rgba(225, 197, 248, 0.2);
+  border-radius: 25px;
+  background:
+    radial-gradient(circle at 50% -12%, rgba(197, 141, 234, .12), transparent 45%),
+    linear-gradient(180deg, rgba(43, 30, 66, .79), rgba(24, 16, 43, .76));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.052),
+    0 17px 42px rgba(5,2,12,.26);
+  -webkit-backdrop-filter: blur(20px) saturate(118%);
+  backdrop-filter: blur(20px) saturate(118%);
+}
+
+.plans-module .cal-month::before {
+  opacity: .75;
+  background:
+    linear-gradient(120deg, transparent 12%, rgba(255,255,255,.028) 30%, transparent 46%),
+    linear-gradient(300deg, transparent 58%, rgba(185,116,224,.04));
+}
+
+.plans-module .cal-month-nav {
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.plans-module .cal-month-nav > b {
+  color: var(--pm-ref-text);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: .002em;
+}
+
+.plans-module .cal-nav-btn {
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(222, 193, 246, 0.17);
+  border-radius: 15px;
+  background:
+    linear-gradient(180deg, rgba(81, 56, 108, .25), rgba(20, 13, 35, .5));
+  color: #f7efff;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.04),
+    0 7px 16px rgba(8,4,16,.14);
+}
+
+.plans-module .cal-today-btn {
+  right: 52px;
+  border-color: rgba(215,174,244,.18);
+  background: rgba(89,60,119,.2);
+  color: var(--pm-ref-muted);
+}
+
+.plans-module .cal-dow {
+  margin: 0 1px 8px;
+  color: rgba(225, 211, 239, .82);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.plans-module .cal-grid {
+  gap: 5px;
+}
+
+.plans-module .cal-cell {
+  aspect-ratio: 1 / .92;
+  padding: 4px 2px 11px;
+  border: 1px solid rgba(228, 208, 247, .075);
+  border-radius: 9px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.012)),
+    var(--pm-ref-cell);
+  color: rgba(250, 246, 255, .9);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.02),
+    inset 0 -1px 0 rgba(19,12,31,.13);
+}
+
+.plans-module .cal-cell--today,
+.plans-module .cal-cell--sel {
+  border-color: rgba(239, 188, 255, .94);
+  background:
+    radial-gradient(circle at 50% 28%, rgba(221,160,247,.13), transparent 48%),
+    rgba(88, 59, 113, .29);
+  box-shadow:
+    inset 0 0 0 1px rgba(246, 219, 255, .22),
+    0 0 13px rgba(219, 149, 250, .26);
+}
+
+.plans-module .cal-cell--today.cal-cell--sel {
+  box-shadow:
+    inset 0 0 0 1px rgba(249, 226, 255, .31),
+    0 0 17px rgba(222, 151, 253, .31);
+}
+
+.plans-module .cal-cell-n {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.plans-module .cal-cell--has .cal-cell-n {
+  font-weight: 800;
+}
+
+.plans-module .cal-cell-dots {
+  bottom: 6px;
+  gap: 3px;
+}
+
+.plans-module .cal-cell-dots i {
+  width: 5px;
+  height: 5px;
+  box-shadow: 0 0 7px rgba(240, 166, 255, .42);
+}
+
+/* У референсі місячна картка закінчується сіткою. Деталі конкретного дня
+   лишаються доступні після тапу, але дубль усіх birthday/holiday під сіткою
+   не витягує календар на пів екрана. */
+.plans-module .cal-month > .cal-month-list,
+.plans-module .cal-month > .empty-state {
+  display: none;
+}
+
+.plans-module .cal-day-panel {
+  margin-top: 13px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(225, 195, 247, .1);
+}
+
+.plans-module .cal-day-event {
+  min-height: 46px;
+  border-color: rgba(218, 190, 242, .12);
+  border-radius: 13px;
+  background: rgba(62, 44, 83, .2);
+}
+
+/* ── Кристальний шлях ────────────────────────────────────── */
+
+.plans-module .pm-crystal-path {
+  display: grid;
+  grid-template-columns: max-content minmax(58px, 1fr) max-content;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  margin: 4px 4px 2px;
+  color: var(--pm-ref-muted);
+}
+
+.plans-module .pm-crystal-path-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: .035em;
+  white-space: nowrap;
+}
+
+.plans-module .pm-crystal-path-icon,
+.plans-module .pm-crystal-path-marker {
+  display: block;
+  flex: 0 0 auto;
+  background:
+    linear-gradient(145deg, #fff 0%, #dda7f5 26%, #a45fc9 61%, #5e337e 100%);
+  clip-path: polygon(50% 0, 87% 26%, 100% 63%, 72% 100%, 28% 100%, 0 63%, 13% 26%);
+  filter:
+    drop-shadow(0 0 4px rgba(220, 157, 249, .72))
+    drop-shadow(0 0 9px rgba(151, 86, 193, .24));
+}
+
+.plans-module .pm-crystal-path-icon {
+  width: 15px;
+  height: 21px;
+  transform: rotate(9deg);
+}
+
+.plans-module .pm-crystal-path-track {
+  position: relative;
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(208, 177, 232, .11);
+  box-shadow: inset 0 1px 2px rgba(6,3,12,.24);
+}
+
+.plans-module .pm-crystal-path-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  min-width: 2px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #a95dcc, #e29df4);
+  box-shadow: 0 0 8px rgba(218, 144, 244, .35);
+}
+
+.plans-module .pm-crystal-path-marker {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 18px;
+  transform: translate(-50%, -50%);
+}
+
+.plans-module .pm-crystal-path-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: rgba(239, 227, 249, .83);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.plans-module .pm-crystal-path-value b {
+  color: var(--pm-ref-lavender-hot);
+  font-size: 9px;
+}
+
+/* ── Заголовки секцій ────────────────────────────────────── */
+
+.plans-module .pm-section-head {
+  margin: 13px 3px 8px;
+}
+
+.plans-module .pm-section-head h2 {
+  color: var(--pm-ref-text);
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: -.012em;
+}
+
+.plans-module .pm-section-head span {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: rgba(221, 204, 236, .69);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.plans-module .pm-section-empty {
+  margin: 0 3px;
+  padding: 12px 13px;
+  border: 1px solid rgba(221, 193, 244, .1);
+  border-radius: 16px;
+  background: rgba(48, 34, 68, .2);
+  color: var(--pm-ref-muted);
+}
+
+/* ── Картки планів ───────────────────────────────────────── */
+
+.plans-module .pm-tiles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plans-module .pm-tile {
+  min-height: 122px;
+  gap: 6px;
+  padding: 12px 12px 11px 18px;
+  border: 1px solid rgba(225, 197, 248, .14);
+  border-radius: 17px;
+  background:
+    radial-gradient(circle at 7% 0%, color-mix(in srgb, var(--plan-color) 11%, transparent), transparent 36%),
+    linear-gradient(145deg, rgba(59, 41, 82, .43), rgba(28, 19, 48, .61));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    0 11px 26px rgba(6,3,13,.2);
+  -webkit-backdrop-filter: blur(15px) saturate(112%);
+  backdrop-filter: blur(15px) saturate(112%);
+}
+
+.plans-module .pm-tile::before {
+  top: 6px;
+  bottom: 6px;
+  width: 11px;
+  border-radius: 0 7px 7px 0;
+  clip-path: polygon(
+    37% 0, 100% 9%, 72% 25%, 100% 42%, 71% 58%,
+    100% 76%, 62% 100%, 22% 91%, 0 68%, 17% 45%, 0 20%
+  );
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,.82) 0%,
+      color-mix(in srgb, var(--plan-color) 35%, #fff) 15%,
+      var(--plan-color) 50%,
+      color-mix(in srgb, var(--plan-color) 72%, #4b2461) 82%,
+      rgba(255,255,255,.33) 100%
+    );
+  opacity: .87;
+  box-shadow:
+    0 0 8px color-mix(in srgb, var(--plan-color) 36%, transparent),
+    0 0 16px color-mix(in srgb, var(--plan-color) 17%, transparent);
+}
+
+.plans-module .pm-tile::after {
+  right: 10px;
+  top: 10px;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(circle at 36% 26%, rgba(255,255,255,.78), transparent 17%),
+    conic-gradient(from 34deg, #e7b8fb, #82509f 18%, #b878d4 40%, #5c356f 61%, #d89cf0 83%, #e7b8fb);
+  clip-path: polygon(50% 0, 86% 17%, 100% 54%, 77% 91%, 50% 100%, 16% 76%, 5% 39%, 24% 13%);
+  box-shadow: none;
+  filter: drop-shadow(0 0 7px rgba(198, 132, 230, .28));
+}
+
+.plans-module .pm-tile-cat {
+  padding-right: 29px;
+  font-size: 10.5px;
+  font-weight: 900;
+}
+
+.plans-module .pm-tile-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  padding-right: 18px;
+  color: var(--pm-ref-text);
+  font-size: 14.2px;
+  font-weight: 800;
+  line-height: 1.28;
+}
+
+.plans-module .pm-tile-meta {
+  margin-top: auto;
+  gap: 5px 7px;
+  padding-right: 26px;
+  color: rgba(215, 199, 230, .72);
+  font-size: 10.8px;
+  line-height: 1.25;
+}
+
+.plans-module .pm-tile-when,
+.plans-module .pm-tile-overdue {
+  padding: 2px 6px;
+  border: 1px solid color-mix(in srgb, var(--plan-color) 15%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--plan-color) 9%, rgba(71, 50, 93, .19));
+  font-weight: 800;
+}
+
+.plans-module .pm-tile-someday {
+  color: rgba(213, 196, 229, .65);
+  font-style: italic;
+}
+
+.plans-module .pm-tile-open::after {
+  right: 10px;
+  bottom: 10px;
+  width: 25px;
+  height: 25px;
+  border-color: rgba(229, 203, 249, .12);
+  background: rgba(98, 68, 127, .14);
+  color: rgba(245, 228, 255, .72);
+  font-size: 19px;
+}
+
+.plans-module .pm-tile:hover,
+.plans-module .pm-tile:focus-within {
+  transform: translateY(-1px);
+  border-color: rgba(229, 198, 250, .25);
+}
+
+.plans-module .pm-tile:active {
+  transform: scale(.985);
+}
+
+.plans-module .pm-tile-confirm {
+  padding: 5px 9px;
+  border-color: color-mix(in srgb, var(--plan-color) 26%, transparent);
+  background: color-mix(in srgb, var(--plan-color) 9%, transparent);
+  font-size: 10.5px;
+}
+
+/* ── Завершені ───────────────────────────────────────────── */
+
+.plans-module .pm-section-toggle {
+  min-height: 53px;
+  margin: 17px 0 6px;
+  padding: 0 16px;
+  border: 1px solid rgba(222, 194, 247, .14);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(67, 48, 88, .24), rgba(27, 18, 46, .38));
+  color: var(--pm-ref-text);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.02);
+}
+
+.plans-module .pm-section-toggle span {
+  margin-left: auto;
+  color: rgba(229, 211, 243, .65);
+}
+
+.plans-module .pm-section-toggle::after {
+  margin-left: 9px;
+  color: rgba(231, 208, 249, .64);
+}
+
+/* ── Floating «Додати» ───────────────────────────────────── */
+
+.plans-module .pm-fab {
+  right: 18px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 98px);
+  min-width: 143px;
+  min-height: 52px;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 15px 11px 18px;
+  border: 1px solid rgba(247, 220, 255, .64);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 31% -6%, rgba(255,255,255,.55), transparent 39%),
+    linear-gradient(135deg, #dfaef5 0%, #c587e5 52%, #aa65cd 100%);
+  color: #24132f;
+  font-size: 14px;
+  font-weight: 900;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.72),
+    inset 0 -7px 16px rgba(83,35,118,.12),
+    0 11px 27px rgba(35,14,49,.31),
+    0 0 18px rgba(206,133,239,.15);
+}
+
+.plans-module .pm-fab::after {
+  width: 18px;
+  height: 24px;
+  margin-left: 1px;
+  background:
+    linear-gradient(153deg, #fff 0%, #e5b6f8 28%, #ad68cf 61%, #6d3a8a 100%);
+  clip-path: polygon(50% 0, 92% 28%, 100% 64%, 70% 100%, 28% 88%, 0 58%, 13% 25%);
+  filter: drop-shadow(0 0 5px rgba(255,255,255,.42));
+}
+
+/* ── Нижній док тільки на сторінці планів ───────────────── */
+
+body:has(.plans-module) .bottom-nav {
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+  padding: 0;
+  border: 1px solid rgba(226, 198, 248, .18);
+  border-radius: 34px;
+  background:
+    radial-gradient(circle at 50% -40%, rgba(186, 126, 225, .1), transparent 55%),
+    linear-gradient(180deg, rgba(43, 29, 65, .9), rgba(27, 18, 46, .92));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    0 14px 36px rgba(5,2,12,.34);
+  -webkit-backdrop-filter: blur(24px) saturate(125%);
+  backdrop-filter: blur(24px) saturate(125%);
+}
+
+body:has(.plans-module) .bottom-nav-inner {
+  min-height: 72px;
+  gap: 0;
+  padding: 5px 4px;
+}
+
+body:has(.plans-module) .bottom-nav-indicator {
+  top: 4px;
+  bottom: 4px;
+  border: 1px solid rgba(235, 207, 252, .2);
+  border-radius: 27px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(224, 175, 247, .1), transparent 58%),
+    linear-gradient(180deg, rgba(111, 78, 139, .3), rgba(77, 52, 102, .22));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.045),
+    0 0 16px rgba(195, 126, 228, .08);
+}
+
+body:has(.plans-module) .nav-btn {
+  min-width: 0;
+  padding: 7px 3px;
+  color: rgba(220, 203, 234, .72);
+}
+
+body:has(.plans-module) .nav-btn.active {
+  color: #efd9ff;
+}
+
+body:has(.plans-module) .nav-label {
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+body:has(.plans-module) .nav-btn-home .nav-icon-home {
+  color: #cf8fec;
+  filter: drop-shadow(0 0 8px rgba(209, 137, 238, .27));
+}
+
+/* ── Адаптивність ────────────────────────────────────────── */
+
+@media (max-width: 430px) {
+  .plans-module {
+    gap: 8px;
+    padding-bottom: 122px;
+  }
+
+  .plans-module .pm-tabs {
+    min-height: 61px;
+    border-radius: 30px;
+  }
+
+  .plans-module .pm-tab {
+    min-height: 51px;
+    font-size: 15px;
+  }
+
+  .plans-module .cal-month {
+    padding: 13px 10px 15px;
+    border-radius: 24px;
+  }
+
+  .plans-module .cal-month-nav {
+    grid-template-columns: 43px minmax(0, 1fr) 43px;
+  }
+
+  .plans-module .cal-nav-btn {
+    width: 41px;
+    height: 41px;
+    border-radius: 14px;
+  }
+
+  .plans-module .cal-grid {
+    gap: 4px;
+  }
+
+  .plans-module .cal-cell {
+    border-radius: 9px;
+    padding-bottom: 10px;
+  }
+
+  .plans-module .pm-crystal-path {
+    gap: 8px;
+    margin-inline: 3px;
+  }
+
+  .plans-module .pm-crystal-path-title {
+    gap: 5px;
+    font-size: 9.6px;
+  }
+
+  .plans-module .pm-crystal-path-icon {
+    width: 13px;
+    height: 19px;
+  }
+
+  .plans-module .pm-crystal-path-value {
+    font-size: 10px;
+  }
+
+  .plans-module .pm-tile {
+    min-height: 118px;
+    padding: 11px 10px 10px 17px;
+  }
+
+  .plans-module .pm-tile-title {
+    font-size: 13.8px;
+  }
+
+  .plans-module .pm-fab {
+    right: 16px;
+  }
+}
+
+@media (max-width: 370px) {
+  .plans-module .pm-tab {
+    font-size: 14px;
+  }
+
+  .plans-module .pm-tab[aria-selected='true']::before,
+  .plans-module .pm-tab[aria-selected='true']::after {
+    width: 24px;
+  }
+
+  .plans-module .cal-dow {
+    font-size: 9.5px;
+  }
+
+  .plans-module .cal-cell-n {
+    font-size: 11.8px;
+  }
+
+  .plans-module .pm-crystal-path {
+    grid-template-columns: auto minmax(44px, 1fr) auto;
+    gap: 6px;
+  }
+
+  .plans-module .pm-crystal-path-title > span:last-child {
+    max-width: 72px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .plans-module .pm-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .plans-module .pm-tile {
+    min-height: 116px;
+    padding-left: 15px;
+  }
+
+  .plans-module .pm-tile-title {
+    font-size: 13px;
+  }
+
+  .plans-module .pm-tile-meta {
+    font-size: 10px;
+  }
+
+  body:has(.plans-module) .nav-label {
+    font-size: 9.5px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plans-module .pm-tab,
+  .plans-module .pm-tile,
+  .plans-module .pm-fab,
+  .plans-module .cal-cell,
+  .plans-module .cal-nav-btn,
+  body:has(.plans-module) .bottom-nav-indicator {
+    transition: none;
+  }
+}
