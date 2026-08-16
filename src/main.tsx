@@ -40,6 +40,9 @@ import '@/features/plans/plansReferencePolish.css';
 // Третій прохід за референсом: ще нижчий календар і один візуально зшитий
 // glass-panel навколо «Найближчих», «Ідей», «Завершених» та кнопки додавання.
 import '@/features/plans/plansReferencePanelPass.css';
+// Етап 1 нового UI-pass: темніша navy-violet ієрархія surfaces та контроль
+// яскравих lavender/pink акцентів без зміни геометрії або логіки модуля.
+import '@/features/plans/plansReferencePaletteStage1.css';
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');
