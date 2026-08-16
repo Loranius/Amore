@@ -13,8 +13,12 @@ import {
   applyReefCoralCoverage,
   type ReefCoralCoverageSummary,
 } from './reefCoralCoverage';
+import {
+  applyReefCoralTierBalance,
+  REEF_CORAL_TIER_BALANCE_VERSION,
+} from './reefCoralTierBalance';
 
-export const REEF_COLONY_MATURITY_VERSION = 'reef-colony-maturity-v3';
+export const REEF_COLONY_MATURITY_VERSION = 'reef-colony-maturity-v4-tier-balance';
 
 export type ReefColonyLifecycleStage = 'young' | 'growing' | 'mature';
 
@@ -33,6 +37,7 @@ export interface ReefColonyMaturityState {
 export interface ReefColonyMaturityPlan {
   version: typeof REEF_COLONY_MATURITY_VERSION;
   patchVersion: typeof REEF_CORAL_PATCH_VERSION;
+  tierBalanceVersion: typeof REEF_CORAL_TIER_BALANCE_VERSION;
   plan: ReefLivingCanopyPlan;
   habitats: ReefColonyHabitatSummary[];
   states: ReefColonyMaturityState[];
@@ -145,7 +150,7 @@ export function buildReefColonyMaturityPlan(
       localColonization: round6(localColonization),
       ecosystemMaturity: round6(ecology.maturity),
       coverageScale: round6(lerp(0.76, 1.06, eased)),
-      heightScale: round6(lerp(0.78, 1.05, eased)),
+      heightScale: round6(lerp(0.8, 1.08, eased)),
       recruitmentReadiness: round6(clamp01((score - 0.58) / 0.3)),
     };
     states.push(state);
@@ -195,14 +200,19 @@ export function buildReefColonyMaturityPlan(
     colonies,
     requests: colonies.map((colony) => colony.request),
   };
-  const coverage = applyReefCoralCoverage({
+  const tierBalance = applyReefCoralTierBalance({
     plan: maturedPlan,
+    habitats: patchPlan.habitats,
+  });
+  const coverage = applyReefCoralCoverage({
+    plan: tierBalance.plan,
     habitats: patchPlan.habitats,
   });
 
   return {
     version: REEF_COLONY_MATURITY_VERSION,
     patchVersion: patchPlan.patchVersion,
+    tierBalanceVersion: tierBalance.version,
     plan: coverage.plan,
     habitats: coverage.habitats,
     states,
