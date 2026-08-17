@@ -434,3 +434,49 @@
     transition: none;
   }
 }
+
+/* ------------------------------------------------------------
+   Ключові події. Не рівень, а шаблон: назва підставляється разом
+   зі значенням, а вже створений ключ вимкнений — як товар, що вже
+   лежить у полиці покупок.
+   ------------------------------------------------------------ */
+.cal-entry-keys {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+.cal-entry-keys > small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.cal-entry-key-option {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 22%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--cal-entry-accent) 5%, var(--surface));
+  color: var(--cal-entry-accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.cal-entry-key-option > span { display: grid; min-width: 0; gap: 2px; }
+.cal-entry-key-option strong { color: var(--text); font-size: 11.5px; }
+.cal-entry-key-option small { color: var(--muted); font-size: 9.5px; line-height: 1.3; }
+.cal-entry-key-option.active {
+  border-color: color-mix(in srgb, var(--cal-entry-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--cal-entry-accent) 14%, var(--surface));
+}
+.cal-entry-key-option:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}

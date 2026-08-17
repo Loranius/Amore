@@ -119,6 +119,7 @@
   pointer-events: none;
 }
 .rj-star--core::after { inset: -130%; opacity: .72; }
+.rj-star--important::after { inset: -85%; opacity: .44; }
 .rj-star--regular::after { inset: -70%; opacity: .34; }
 
 /* Дотик мусить бути зручним навіть у найменшої зірки. */
@@ -147,7 +148,7 @@
   left: 50%;
   display: -webkit-box;
   width: max-content;
-  max-width: 13ch;
+  max-width: 16ch;
   overflow: hidden;
   color: color-mix(in srgb, var(--text) 88%, var(--relationship-journey-neon, var(--accent)));
   font-size: 10px;

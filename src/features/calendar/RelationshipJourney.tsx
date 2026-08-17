@@ -13,7 +13,7 @@ import { HeartIcon } from '@/components/icons/NavIcon';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { generateArtifactDNA } from '@/features/home/artifact/artifactDNA';
 import { useCrystalSeed } from '@/features/home/useHome';
-import type { EventRow } from '@/types';
+import type { EventRow, EventSignificance } from '@/types';
 import {
   buildConstellation,
   type ConstellationStar,
@@ -61,13 +61,13 @@ function crystalJourneyStyle(seed: string | null): CSSProperties {
 }
 
 function starTone(star: ConstellationStar): string {
-  if (star.core) return 'core';
-  return star.level === 'key' ? 'key' : 'regular';
+  return star.core ? 'core' : star.level;
 }
 
-function starCaption(star: ConstellationStar): string {
-  if (star.core) return 'Ключова подія';
-  return star.level === 'key' ? 'Велика подія' : 'Подія';
+function starCaption(star: ConstellationStar, significance: EventSignificance): string {
+  if (star.core) return significance === 'marriage' ? 'Одруження' : 'Початок відносин';
+  if (significance === 'relationship_start') return 'Початок відносин';
+  return star.level === 'important' ? 'Важлива подія' : 'Подія';
 }
 
 const ConstellationStarButton = memo(function ConstellationStarButton({
@@ -83,7 +83,9 @@ const ConstellationStarButton = memo(function ConstellationStarButton({
   height: number;
   onOpen: (event: EventRow) => void;
 }) {
-  const labelled = star.core || star.level === 'key';
+  // Підпис лише на ключових. На живому екрані підписи ще й на «важливих»
+  // дали чотири назви в тісному кадрі телефона, і дві з них зіткнулись.
+  const labelled = star.level === 'key';
   const style = {
     left: `${(star.x / width) * 100}%`,
     top: `${(star.y / height) * 100}%`,
@@ -97,7 +99,7 @@ const ConstellationStarButton = memo(function ConstellationStarButton({
       className={`rj-star rj-star--${starTone(star)}`}
       style={style}
       onClick={() => onOpen(event)}
-      aria-label={`${starCaption(star)}: ${event.title}, ${dateLabel(event.date)}`}
+      aria-label={`${starCaption(star, event.significance)}: ${event.title}, ${dateLabel(event.date)}`}
     >
       <span className="rj-star-body" aria-hidden="true" />
       {labelled && <span className="rj-star-label" aria-hidden="true">{event.title}</span>}
@@ -125,7 +127,7 @@ export function RelationshipJourney({
       moments.map((event) => ({
         id: event.id,
         date: event.date,
-        milestone: Boolean(event.is_milestone),
+        significance: event.significance,
       })),
     ),
     [moments],

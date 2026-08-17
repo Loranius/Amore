@@ -6,18 +6,21 @@ import {
   type ConstellationInput,
 } from './constellationLayout';
 
-const event = (id: number, date: string, milestone = false): ConstellationInput =>
-  ({ id, date, milestone });
+const event = (
+  id: number,
+  date: string,
+  significance: ConstellationInput['significance'] = 'regular',
+): ConstellationInput => ({ id, date, significance });
 
 /** Сім подій цієї пари — той самий набір, на якому мірявся живий екран. */
 const COUPLE: ConstellationInput[] = [
-  event(1, '2022-05-22'),
+  event(1, '2022-05-22', 'important'),
   event(2, '2022-10-04'),
-  event(3, '2022-12-26', true),
+  event(3, '2022-12-26', 'relationship_start'),
   event(4, '2023-07-08'),
-  event(5, '2026-07-13'),
+  event(5, '2026-07-13', 'important'),
   event(6, '2026-07-25'),
-  event(7, '2026-08-06'),
+  event(7, '2026-08-06', 'important'),
 ];
 
 describe('buildConstellation', () => {
@@ -38,7 +41,7 @@ describe('buildConstellation', () => {
     expect(buildConstellation(COUPLE)).toEqual(buildConstellation([...COUPLE].reverse()));
   });
 
-  it('ядро — найраніша ключова подія, і воно в центрі кадру', () => {
+  it('поки одруження немає, ядро — початок відносин, і воно в центрі кадру', () => {
     const { stars } = buildConstellation(COUPLE);
     const core = stars.filter((star) => star.core);
     expect(core).toHaveLength(1);
@@ -47,17 +50,52 @@ describe('buildConstellation', () => {
   });
 
   it('без ключових подій ядра немає', () => {
-    const { stars } = buildConstellation([event(1, '2024-01-01'), event(2, '2024-02-01')]);
+    const { stars } = buildConstellation([event(1, '2024-01-01'), event(2, '2024-02-01', 'important')]);
     expect(stars.some((star) => star.core)).toBe(false);
   });
 
-  it('ядром стає найраніша ключова, а не найперша подія', () => {
-    const stars = buildConstellation([
-      event(1, '2022-05-22'),
-      event(2, '2022-12-26', true),
-      event(3, '2023-01-01', true),
-    ]).stars;
+  it('«важлива» ядром не стає — ядро тільки з двох ключових видів', () => {
+    const { stars } = buildConstellation([
+      event(1, '2022-05-22', 'important'),
+      event(2, '2022-12-26', 'important'),
+    ]);
+    expect(stars.some((star) => star.core)).toBe(false);
+  });
+});
+
+describe('еволюція ядра', () => {
+  const WITH_MARRIAGE: ConstellationInput[] = [...COUPLE, event(8, '2027-06-12', 'marriage')];
+
+  it('одруження забирає центр у початку відносин', () => {
+    const { stars } = buildConstellation(WITH_MARRIAGE);
+    const core = stars.filter((star) => star.core);
+    expect(core).toHaveLength(1);
+    expect(core[0]!.id).toBe(8);
+    expect(core[0]).toMatchObject({ x: CONSTELLATION_WIDTH / 2, y: CONSTELLATION_HEIGHT / 2 });
+  });
+
+  it('одруження забирає центр навіть коли воно пізніше за датою', () => {
+    const { stars } = buildConstellation([
+      event(1, '2020-01-01', 'relationship_start'),
+      event(2, '2030-01-01', 'marriage'),
+    ]);
     expect(stars.find((star) => star.core)!.id).toBe(2);
+  });
+
+  it('початок відносин лишається ключовим, просто вже не в центрі', () => {
+    const { stars } = buildConstellation(WITH_MARRIAGE);
+    const start = stars.find((star) => star.id === 3)!;
+    expect(start.level).toBe('key');
+    expect(start.core).toBe(false);
+  });
+
+  it('окрім двох зірок ролі, весілля нікого не зсуває', () => {
+    const before = buildConstellation(COUPLE);
+    const after = buildConstellation(WITH_MARRIAGE);
+    for (const star of before.stars.filter((candidate) => !candidate.core)) {
+      const moved = after.stars.find((candidate) => candidate.id === star.id)!;
+      expect({ x: moved.x, y: moved.y }).toEqual({ x: star.x, y: star.y });
+    }
   });
 });
 
@@ -151,11 +189,24 @@ describe('геометрія', () => {
     }
   });
 
-  it('ключові зірки більші за звичайні, а ядро — найбільше', () => {
-    const { stars } = buildConstellation(COUPLE);
+  it('три рівні читаються розміром: ядро > ключова > важлива > звичайна', () => {
+    const { stars } = buildConstellation([...COUPLE, event(8, '2027-06-12', 'marriage')]);
     const core = stars.find((star) => star.core)!;
+    const key = stars.find((star) => star.level === 'key' && !star.core)!;
+    const important = stars.find((star) => star.level === 'important')!;
     const regular = stars.find((star) => star.level === 'regular')!;
-    expect(core.radius).toBeGreaterThan(regular.radius);
+    expect(core.radius).toBeGreaterThan(key.radius);
+    expect(key.radius).toBeGreaterThan(important.radius);
+    expect(important.radius).toBeGreaterThan(regular.radius);
+  });
+
+  it('важливі зірки тримаються ближче до ядра, ніж звичайні', () => {
+    const { stars, width, height } = buildConstellation(COUPLE);
+    const reach = (star: (typeof stars)[number]) =>
+      Math.hypot(star.x - width / 2, (star.y - height / 2) / 1.34);
+    const important = stars.filter((star) => star.level === 'important').map(reach);
+    const regular = stars.filter((star) => star.level === 'regular').map(reach);
+    expect(Math.max(...important)).toBeLessThan(Math.min(...regular));
   });
 
   it('координати завжди скінченні', () => {

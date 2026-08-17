@@ -20,16 +20,17 @@
 // на сімох подіях пристойний вигляд, а на тридцяти — сітку з перетинами.
 // Один промінь на зірку робить павутину неможливою за побудовою.
 // ============================================================
+import { type EventSignificance } from '@/types';
 import { stableHash32 } from '@/engine/evolution/seed';
 
-/** Рівень події. `important` з'явиться разом із міграцією `significance`. */
-export type ConstellationLevel = 'key' | 'regular';
+/** Вага зірки в кадрі: три розміри, три орбіти. */
+export type ConstellationLevel = 'key' | 'important' | 'regular';
 
 export interface ConstellationInput {
   id: number;
   /** ISO `YYYY-MM-DD`. Порівнюється як рядок — без локалі. */
   date: string;
-  milestone: boolean;
+  significance: EventSignificance;
 }
 
 export interface ConstellationStar {
@@ -89,14 +90,16 @@ const ANGLE_JITTER = 0.42;
 const STAR_GAP = 1.7;
 
 const ORBIT: Record<ConstellationLevel, { min: number; max: number }> = {
-  key: { min: 14, max: 25 },
-  regular: { min: 28, max: 41 },
+  key: { min: 13, max: 22 },
+  important: { min: 22, max: 32 },
+  regular: { min: 31, max: 42 },
 };
 
 const CORE_RADIUS = 4.6;
 const STAR_RADIUS: Record<ConstellationLevel, number> = {
-  key: 3.2,
-  regular: 2.3,
+  key: 3.4,
+  important: 2.9,
+  regular: 2.1,
 };
 
 interface Placed {
@@ -110,7 +113,22 @@ function clamp(value: number, minimum: number, maximum: number): number {
 }
 
 function levelOf(event: ConstellationInput): ConstellationLevel {
-  return event.milestone ? 'key' : 'regular';
+  if (event.significance === 'marriage' || event.significance === 'relationship_start') return 'key';
+  return event.significance === 'important' ? 'important' : 'regular';
+}
+
+/**
+ * Ядро — роль, а не подія: одруження забирає центр у початку відносин.
+ *
+ * Стосунки ростуть, і головна дата пари з часом змінюється. Поки одруження
+ * немає, центр належить початку відносин; щойно воно з'являється, центр
+ * переходить до нього, а початок відносин лишається ключовим і йде в
+ * ближнє кільце. Рівень, який поставила пара, при цьому не чіпається.
+ */
+function coreIdOf(events: readonly ConstellationInput[]): number | null {
+  const marriage = events.find((event) => event.significance === 'marriage');
+  if (marriage) return marriage.id;
+  return events.find((event) => event.significance === 'relationship_start')?.id ?? null;
 }
 
 /** Хронологія: ISO-дата, далі `id` — щоб порядок був повним і стабільним. */
@@ -174,7 +192,7 @@ export function buildConstellation(events: readonly ConstellationInput[]): Const
     return { stars: [], edges: [], width: CONSTELLATION_WIDTH, height: CONSTELLATION_HEIGHT };
   }
 
-  const coreId = chain.find((event) => event.milestone)?.id ?? null;
+  const coreId = coreIdOf(chain);
   const orderById = new Map(chain.map((event, index) => [event.id, index]));
 
   // Розміщення — у порядку створення, щоб поява нової події не пересунула

@@ -54,6 +54,26 @@ export type PinCategory = 'visited' | 'restaurant' | 'favorite';
 export type EventType = 'birthday' | 'anniversary' | 'holiday' | 'other';
 
 /**
+ * Вага події в історії пари. Три рівні, з яких верхній — закритий набір:
+ * ключовою можна зробити лише початок відносин або одруження, і кожне з
+ * них існує в однині.
+ *
+ * Закритість тут не обмеження заради обмеження. Поки рівень був вільним
+ * прапорцем, у пари-власника ключових набралось чотири, і ядром сузір'я
+ * стала «Річниця першого повідомлення» замість початку відносин.
+ */
+export type EventSignificance = 'regular' | 'important' | 'relationship_start' | 'marriage';
+
+/** Ключові події — ті, що можуть бути ядром сузір'я. Одруження старше. */
+export const KEY_SIGNIFICANCE = ['marriage', 'relationship_start'] as const;
+
+export type KeySignificance = (typeof KEY_SIGNIFICANCE)[number];
+
+export function isKeySignificance(value: EventSignificance): value is KeySignificance {
+  return value === 'marriage' || value === 'relationship_start';
+}
+
+/**
  * Категорії й статуси модуля «Плани».
  *
  * Старий набір (`date|dream|trip|goal|other` × `planned|active|done`) жив
@@ -205,7 +225,15 @@ export interface EventRow {
   yearly: boolean | null;
   /** Плани: заповнено лише для type:'other', інакше null. Див. PlanMetadata. */
   metadata: PlanMetadata | null;
-  /** Заручини/весілля/народження дитини тощо — окремо від metadata (та зайнята під плани). */
+  /**
+   * Вага події. Ключових видів рівно два, і кожен існує в парі в однині —
+   * це стереже частковий унікальний індекс у БД, а не модалка.
+   */
+  significance: EventSignificance;
+  /**
+   * Рахується базою як `significance <> 'regular'` (generated column).
+   * Лишається входом рушія й наявних запитів; писати в неї не можна.
+   */
   is_milestone: boolean;
   /** Кого стосується подія, якщо це користувач застосунку. null — людина
    *  поза застосунком (батьки, друзі) або подія взагалі не про людину. */
@@ -443,12 +471,18 @@ export interface DishRow {
 // ────────────────────────────────────────────────────────────
 
 /** Insert: перелічені ключі обов'язкові, решта (id, дефолтні, nullable) — опційні. */
-type InsertOf<R, RequiredK extends keyof R> = Pick<R, RequiredK> & Partial<Omit<R, RequiredK>>;
+type InsertOf<R, RequiredK extends keyof R, GeneratedK extends keyof R = never> =
+  Pick<R, RequiredK> & Partial<Omit<R, RequiredK | GeneratedK>>;
 
-type TableDef<R, RequiredK extends keyof R> = {
+/**
+ * `GeneratedK` — колонки, які рахує сама база (generated always as …).
+ * Читати їх можна, писати — ні, і тип має казати те саме, що БД: інакше
+ * помилка знайдеться лише під час запиту, вже на телефоні пари.
+ */
+type TableDef<R, RequiredK extends keyof R, GeneratedK extends keyof R = never> = {
   Row: R;
-  Insert: InsertOf<R, RequiredK>;
-  Update: Partial<R>;
+  Insert: InsertOf<R, RequiredK, GeneratedK>;
+  Update: Partial<Omit<R, GeneratedK>>;
   Relationships: [];
 };
 
@@ -456,7 +490,7 @@ export interface Database {
   public: {
     Tables: {
       users:              TableDef<UsersRow, 'name'>;
-      events:             TableDef<EventRow, 'title' | 'date'>;
+      events:             TableDef<EventRow, 'title' | 'date', 'is_milestone'>;
       media_items:        TableDef<MediaItemRow, 'type' | 'title' | 'status'>;
       swipe_votes:        TableDef<SwipeVoteRow, 'user_id' | 'tmdb_id' | 'title' | 'direction'>;
       shopping_items:     TableDef<ShoppingItemRow, 'title' | 'category'>;

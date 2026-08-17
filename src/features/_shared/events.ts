@@ -13,7 +13,7 @@ import type { EventRow } from '@/types';
 export async function loadEvents(): Promise<EventRow[]> {
   const { data, error } = await supabase
     .from('events')
-    .select('id,title,description,date,created_by,type,yearly,metadata,is_milestone,person_user_id')
+    .select('id,title,description,date,created_by,type,yearly,metadata,significance,is_milestone,person_user_id')
     // Звичайні `other` — залишки старої моделі планів. Виняток — рядок,
     // який явно позначили великою віхою: він належить історії пари.
     .or('type.neq.other,is_milestone.eq.true')
