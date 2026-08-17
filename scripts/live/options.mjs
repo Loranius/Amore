@@ -114,6 +114,15 @@ export function shotName(route, device, tier, { still = false } = {}) {
   return still ? `${withTier}-still` : withTier;
 }
 
+/** «120,340» → { x: 120, y: 340 }. CSS-пікселі від лівого верхнього кута кадру. */
+function parsePoint(value) {
+  const parts = String(value).split(',').map((part) => Number(part.trim()));
+  if (parts.length !== 2 || parts.some((part) => !Number.isFinite(part))) {
+    throw new OptionError(`--tap-at приймає «x,y» у пікселях; дано «${value}».`);
+  }
+  return { x: parts[0], y: parts[1] };
+}
+
 function asList(value) {
   return String(value).split(',').map((item) => item.trim()).filter((item) => item !== '');
 }
@@ -129,6 +138,7 @@ export function parseShotArgs(argv) {
   const devices = [];
   const probes = [];
   const taps = [];
+  const tapPoints = [];
   const options = {
     tier: DEFAULTS.tier,
     port: DEFAULTS.port,
@@ -152,6 +162,9 @@ export function parseShotArgs(argv) {
       case 'probe': probes.push(...asList(value)); break;
       case 'tier': options.tier = value; break;
       case 'tap': taps.push(...asList(value)); break;
+      // Дотик по координаті, а не по селектору. Для сцени це єдиний спосіб:
+      // зірки живуть у полотні, і селектора в них немає.
+      case 'tap-at': tapPoints.push(parsePoint(value)); break;
       case 'theme': options.theme = value; break;
       case 'out': options.out = value; break;
       case 'port': options.port = Number(value); break;
@@ -188,6 +201,7 @@ export function parseShotArgs(argv) {
     out: options.out,
     settle: options.settle,
     taps,
+    tapPoints,
     theme: options.theme,
     keepServer: options.keepServer,
     headed: options.headed,

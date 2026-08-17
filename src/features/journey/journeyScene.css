@@ -136,3 +136,134 @@
   font-weight: 800;
   cursor: pointer;
 }
+
+/* ============================================================
+   Деталі розкритої події.
+   ------------------------------------------------------------
+   Панель, а не модалка. Подія відкрита, поки камера стоїть біля її зірки, і
+   накрити цю зірку затемненням означало б сховати те, заради чого пара сюди
+   летіла. Тому фон панелі напівпрозорий і розмиває лише те, що під нею.
+
+   Полотно при цьому НЕ стискається. Місце під панель звільняє камера — вона
+   цілиться повз подію (`SPLIT_SHIFT` у `JourneyCameraRig`). Стиснути полотно
+   було б простіше описати, але кожен крок такої анімації перевиділяє буфер
+   малювання, і на телефоні це ривок посеред переходу.
+   ============================================================ */
+.jn-details {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  margin-top: auto;
+  padding: 20px 18px calc(env(safe-area-inset-bottom, 0) + 20px);
+  border-top: 1px solid var(--world-border, rgba(198, 160, 255, .16));
+  border-radius: 26px 26px 0 0;
+  background: color-mix(in srgb, var(--world-bg-deep, #0b0714) 84%, transparent);
+  gap: 6px;
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+}
+
+.jn-details-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid var(--world-border, rgba(198, 160, 255, .14));
+  border-radius: 50%;
+  background: transparent;
+  color: var(--world-text-muted, var(--muted));
+  cursor: pointer;
+}
+
+.jn-details-level {
+  margin: 0;
+  color: var(--jn-level, var(--world-accent, #d3a6ff));
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+/* Ті самі три кольори, що й у зірок: рівень читається однаково скрізь. */
+.jn-details[data-level='important'] { --jn-level: hsl(44 92% 62%); }
+.jn-details[data-level='regular'] { --jn-level: hsl(184 76% 58%); }
+
+.jn-details-title {
+  margin: 0;
+  padding-right: 38px;
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.jn-details-date {
+  display: flex;
+  align-items: baseline;
+  margin: 0;
+  gap: 8px;
+  color: var(--world-text-muted, var(--muted));
+  font-size: 13px;
+}
+.jn-details-since {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 14%, transparent);
+  color: var(--jn-level, var(--world-accent, #d3a6ff));
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.jn-details-note {
+  margin: 4px 0 0;
+  color: var(--world-text, var(--text));
+  font-size: 13.5px;
+  line-height: 1.5;
+  opacity: .86;
+}
+
+.jn-details-edit {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  gap: 7px;
+  padding: 0 18px;
+  border: 1px solid var(--world-border, rgba(198, 160, 255, .18));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--world-text, var(--text));
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/*
+ * На широкому екрані деталі стають збоку, і камера зсуває подію ліворуч —
+ * дзеркально до того, що на телефоні вона зсуває її вгору.
+ */
+@media (min-width: 900px) {
+  .jn-details {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(420px, 38vw);
+    align-content: center;
+    padding: 28px;
+    border: 0;
+    border-left: 1px solid var(--world-border, rgba(198, 160, 255, .16));
+    border-radius: 0;
+    margin-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .jn-details { animation: jn-details-in .34s cubic-bezier(.2, .7, .3, 1) both; }
+}
+
+@keyframes jn-details-in {
+  from { opacity: 0; translate: 0 18px; }
+  to { opacity: 1; translate: 0 0; }
+}

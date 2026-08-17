@@ -93,3 +93,25 @@ describe('arguments', () => {
     expect(() => parseShotArgs(['--zoom=2'])).toThrow(OptionError);
   });
 });
+
+describe('--tap-at', () => {
+  it('розбирає координату в пікселях', () => {
+    expect(parseShotArgs(['home', '--tap-at=120,340']).tapPoints).toEqual([{ x: 120, y: 340 }]);
+  });
+
+  it('складається, як і --tap', () => {
+    expect(parseShotArgs(['home', '--tap-at=10,20', '--tap-at=30,40']).tapPoints).toHaveLength(2);
+  });
+
+  it('без нього список порожній, а не undefined', () => {
+    expect(parseShotArgs(['home']).tapPoints).toEqual([]);
+  });
+
+  it('сміття падає одразу, а не тапає в нуль', () => {
+    // Мовчазний тап у (NaN, NaN) дав би знімок «нічого не сталось», і його
+    // прочитали б як «дотик не працює».
+    expect(() => parseShotArgs(['home', '--tap-at=120'])).toThrow(OptionError);
+    expect(() => parseShotArgs(['home', '--tap-at=абв,340'])).toThrow(OptionError);
+    expect(() => parseShotArgs(['home', '--tap-at=1,2,3'])).toThrow(OptionError);
+  });
+});

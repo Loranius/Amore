@@ -156,3 +156,19 @@ export function journeyFraming(shape: JourneyShape, viewport: JourneyViewport): 
     up,
   };
 }
+
+/**
+ * З якої відстані дивитись на одну розкриту подію.
+ *
+ * Кадр у focus-режимі ділиться з деталями, тож вирішує ВУЖЧА зі сторін —
+ * та сама логіка, що й у кадруванні сузір'я, тільки мішень тут одна й кругла.
+ */
+export function focusDistance(radius: number, viewport: JourneyViewport): number {
+  const halfFovY = (viewport.fovY * Math.PI) / 360;
+  const tanY = Math.tan(halfFovY);
+  const tanX = tanY * Math.max(0.05, viewport.aspect);
+  const tightest = Math.min(tanY, tanX);
+  // Множник лишає сонцю приблизно половину вузької сторони: більше — і воно
+  // впирається в край, менше — і подія читається дрібною крапкою.
+  return Math.max(radius * 2.2, (radius / tightest) * 2.1);
+}

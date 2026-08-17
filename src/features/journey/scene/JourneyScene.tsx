@@ -1,15 +1,33 @@
-import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { ACESFilmicToneMapping, SRGBColorSpace } from 'three';
 import { crystalRenderScale } from '@/engine/renderer';
 import { readWorldQuality } from '@/features/world/worldDim';
 import { buildConstellation3D } from '../constellation3d';
 import type { ConstellationEvent } from '../constellationRules';
-import { journeyPalette } from '../journeyPalette';
+import {
+  INITIAL_JOURNEY_STATE,
+  cameraLocked,
+  journeyReducer,
+  showsFocus,
+  type JourneyEvent,
+  type JourneyMode,
+} from '../journeyMode';
+import { hslToRgb, journeyPalette, levelColour } from '../journeyPalette';
 import { ConstellationLines } from './ConstellationLines';
-import { JourneyCameraRig } from './JourneyCameraRig';
+import { FocusStar } from './FocusStar';
+import { JourneyCameraRig, type JourneyFocusTarget } from './JourneyCameraRig';
 import { JourneyConstellation, birthDuration } from './JourneyConstellation';
 import { JourneyEnvironment, JOURNEY_SKY_RADIUS } from './JourneyEnvironment';
+import { StarPointer } from './StarPointer';
 import type { JourneyFraming } from './journeyFraming';
 
 // ============================================================
@@ -20,20 +38,29 @@ import type { JourneyFraming } from './journeyFraming';
 // маршрут не вмикає `data-portal-scene`, тож світу тут не видно взагалі, а
 // його цикл кадрів на час занурення зупинений (`useWorldFrameloop`).
 //
-// **Годинник появи живе в рефі, а не в стані.** Сузір'я народжується секунд
-// три; тримати ці секунди станом означало б перемальовувати React-дерево
-// щокадру заради чисел, які потрібні лише всередині `useFrame`.
+// **Годинники живуть у рефах, а не в стані.** Сузір'я народжується секунди зо
+// три, сонце проявляється півсекунди; тримати ці числа станом означало б
+// перемальовувати React-дерево щокадру заради значень, потрібних лише
+// всередині `useFrame`. У стані живе тільки те, що міняє РОЗКЛАДКУ — режим.
 //
-// Готовність позначається атрибутом `data-journey="ready"` на обгортці. Це не
-// діагностика для краси: живий харнес мусить чекати на ОЗНАКУ, а не на час —
-// знімок «через три секунди» вже показував кадр, якого користувач ніколи не
-// бачить (пастка №5 у `scripts/live/README.md`).
+// Готовність позначається атрибутом `data-journey="ready"`. Це не діагностика
+// для краси: живий харнес мусить чекати на ОЗНАКУ, а не на час — знімок «через
+// три секунди» вже показував кадр, якого користувач ніколи не бачить (пастка
+// №5 у `scripts/live/README.md`).
 // ============================================================
 
 export interface JourneySceneProps {
   events: readonly ConstellationEvent[];
   seed: string | null;
   reducedMotion: boolean;
+  /** Режим сцени назовні — сторінка малює під нього деталі й розкладку. */
+  onMode?: (mode: JourneyMode, focusId: number | null) => void;
+  /** Пара попросила додати подію довгим натисканням по порожньому небу. */
+  onRequestAdd?: () => void;
+  /** Сторінка просить закрити подію. Зростає з кожним натисканням. */
+  dismissSignal?: number;
+  /** Модалку додавання закрито. Зростає з кожним закриттям. */
+  addClosedSignal?: number;
 }
 
 /** Секунди від початку сцени, у рефі. */
@@ -44,14 +71,21 @@ export interface JourneyRuntime {
   triangles: number;
 }
 
+/** За скільки секунд сонце проявляється або гасне. */
+const REVEAL_SECONDS = 0.5;
+
 function SceneClock({
   clock,
+  reveal,
+  revealing,
   settleAt,
   skyLoaded,
   arrived,
   onSettled,
 }: {
   clock: Clock;
+  reveal: Clock;
+  revealing: { current: boolean };
   settleAt: number;
   skyLoaded: { current: boolean };
   arrived: { current: boolean };
@@ -62,7 +96,14 @@ function SceneClock({
     // Крок обрізається зверху навмисно: під програмним рендерером кадри йдуть
     // по три на секунду, і необрізаний крок перестрибнув би половину появи —
     // пара на телефоні побачила б рівний рух, а харнес порожнє небо.
-    clock.current += Math.min(delta, 0.05);
+    const step = Math.min(delta, 0.05);
+    clock.current += step;
+
+    // Сонце проявляється й гасне тим самим числом в обидва боки: перехід туди
+    // й назад мусить читатись однаково, інакше повернення виглядає різкішим.
+    const direction = revealing.current ? 1 : -1;
+    reveal.current = Math.max(0, Math.min(1, reveal.current + (direction * step) / REVEAL_SECONDS));
+
     if (announced.current) return;
     if (!skyLoaded.current || !arrived.current || clock.current < settleAt) return;
     announced.current = true;
@@ -75,12 +116,20 @@ function SceneClock({
 }
 
 /** Каже нагору, що небо доїхало. Всередині `Suspense` — інакше його ще немає. */
-function SkyLoaded({ flag }: { flag: { current: boolean } }) {
-  flag.current = true;
+function SkyLoaded({ onLoaded }: { onLoaded: () => void }) {
+  useEffect(onLoaded, [onLoaded]);
   return null;
 }
 
-export function JourneyScene({ events, seed, reducedMotion }: JourneySceneProps) {
+export function JourneyScene({
+  events,
+  seed,
+  reducedMotion,
+  onMode,
+  onRequestAdd,
+  dismissSignal = 0,
+  addClosedSignal = 0,
+}: JourneySceneProps) {
   const constellation = useMemo(() => buildConstellation3D(events), [events]);
   const palette = useMemo(() => journeyPalette(seed), [seed]);
   const shape = useMemo(
@@ -96,17 +145,86 @@ export function JourneyScene({ events, seed, reducedMotion }: JourneySceneProps)
     [constellation],
   );
 
+  const [state, dispatch] = useReducer(journeyReducer, INITIAL_JOURNEY_STATE);
+  const send = useCallback((event: JourneyEvent) => dispatch(event), []);
+
   const clock = useRef(0);
+  const reveal = useRef(0);
+  const revealing = useRef(false);
+  revealing.current = state.mode === 'focusing' || state.mode === 'eventFocus';
+
   const skyLoaded = useRef(false);
   const arrived = useRef(false);
   const [runtime, setRuntime] = useState<JourneyRuntime | null>(null);
   const [framing, setFraming] = useState<JourneyFraming | null>(null);
 
+  const markSkyLoaded = useCallback(() => {
+    skyLoaded.current = true;
+    send({ type: 'skyReady' });
+  }, [send]);
   const markArrived = useCallback(() => {
     arrived.current = true;
-  }, []);
+    send({ type: 'introDone' });
+  }, [send]);
   const markSettled = useCallback((measured: JourneyRuntime) => setRuntime(measured), []);
   const markFramed = useCallback((measured: JourneyFraming) => setFraming(measured), []);
+  const markFocusArrived = useCallback(() => send({ type: 'focusArrived' }), [send]);
+  const markReturnArrived = useCallback(() => send({ type: 'returnArrived' }), [send]);
+
+  const focusStar = useMemo(
+    () => (state.focusId === null
+      ? null
+      : constellation.stars.find((star) => star.id === state.focusId) ?? null),
+    [constellation.stars, state.focusId],
+  );
+
+  /**
+   * Сонце помітно більше за зірку, але не втричі.
+   *
+   * Стала частина переважає: якби розмір ішов пропорційно рівню, ключова подія
+   * і звичайна відкривались би в різному масштабі, і розкладка деталей
+   * стрибала б залежно від того, що пара тапнула.
+   */
+  const focusRadius = focusStar ? 2.6 + focusStar.radius * 0.9 : 0;
+
+  const focusTarget: JourneyFocusTarget | null = useMemo(
+    () => (focusStar
+      ? { position: [focusStar.x, focusStar.y, focusStar.z] as const, radius: focusRadius }
+      : null),
+    [focusStar, focusRadius],
+  );
+
+  const focusColour = useMemo(
+    () => (focusStar
+      ? hslToRgb(focusStar.core ? palette.keyCore : levelColour(palette, focusStar.level))
+      : ([1, 1, 1] as [number, number, number])),
+    [focusStar, palette],
+  );
+
+  useEffect(() => onMode?.(state.mode, state.focusId), [onMode, state.mode, state.focusId]);
+
+  // Сторінка просить закрити подію. Нуль — початкове значення, не сигнал.
+  useEffect(() => {
+    if (dismissSignal > 0) send({ type: 'dismiss' });
+  }, [dismissSignal, send]);
+
+  // Модалку закрито. Без цього машина лишалась би в `addingEvent` назавжди, і
+  // друге довге натискання вже нічого не відкривало б.
+  useEffect(() => {
+    if (addClosedSignal > 0) send({ type: 'addClosed' });
+  }, [addClosedSignal, send]);
+
+  const handlePick = useCallback((id: number | null) => {
+    // Дотик повз зірку закриває відкриту подію — те саме, що зробив би дотик
+    // повз будь-що відкрите. У спокої машина його просто проігнорує.
+    if (id === null) send({ type: 'dismiss' });
+    else send({ type: 'selectStar', id });
+  }, [send]);
+
+  const handleLongPress = useCallback(() => {
+    send({ type: 'requestAdd' });
+    onRequestAdd?.();
+  }, [onRequestAdd, send]);
 
   const settleAt = reducedMotion ? 0 : birthDuration(constellation.stars.length);
 
@@ -123,6 +241,8 @@ export function JourneyScene({ events, seed, reducedMotion }: JourneySceneProps)
     <div
       className="journey-scene"
       data-journey={runtime ? 'ready' : 'loading'}
+      data-journey-mode={state.mode}
+      data-journey-focus={state.focusId ?? ''}
       data-journey-quality={quality}
       data-journey-pixel-ratio={pixelRatio.toFixed(2)}
       data-journey-stars={constellation.stars.length}
@@ -158,6 +278,8 @@ export function JourneyScene({ events, seed, reducedMotion }: JourneySceneProps)
       >
         <SceneClock
           clock={clock}
+          reveal={reveal}
+          revealing={revealing}
           settleAt={settleAt}
           skyLoaded={skyLoaded}
           arrived={arrived}
@@ -170,7 +292,7 @@ export function JourneyScene({ events, seed, reducedMotion }: JourneySceneProps)
         */}
         <Suspense fallback={null}>
           <JourneyEnvironment />
-          <SkyLoaded flag={skyLoaded} />
+          <SkyLoaded onLoaded={markSkyLoaded} />
         </Suspense>
 
         <ConstellationLines
@@ -185,14 +307,40 @@ export function JourneyScene({ events, seed, reducedMotion }: JourneySceneProps)
           palette={palette}
           clock={clock}
           reducedMotion={reducedMotion}
+          focusId={state.focusId}
+          reveal={reveal}
+        />
+
+        {focusStar && showsFocus(state.mode) && (
+          <Suspense fallback={null}>
+            <FocusStar
+              position={[focusStar.x, focusStar.y, focusStar.z]}
+              colour={focusColour}
+              radius={focusRadius}
+              reveal={reveal}
+              reducedMotion={reducedMotion}
+            />
+          </Suspense>
+        )}
+
+        <StarPointer
+          stars={constellation.stars}
+          onPick={handlePick}
+          onLongPress={handleLongPress}
+          disabled={cameraLocked(state.mode) || state.mode === 'addingEvent'}
         />
 
         <JourneyCameraRig
           shape={shape}
           centre={centre}
           reducedMotion={reducedMotion}
+          mode={state.mode}
+          focus={focusTarget}
+          saveView={state.saveView}
           onFramed={markFramed}
           onArrived={markArrived}
+          onFocusArrived={markFocusArrived}
+          onReturnArrived={markReturnArrived}
         />
       </Canvas>
     </div>
