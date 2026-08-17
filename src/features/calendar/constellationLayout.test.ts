@@ -4,7 +4,6 @@ import {
   CONSTELLATION_HEIGHT,
   CONSTELLATION_WIDTH,
   labelSizeOf,
-  overlapArea,
   segmentsCross,
   type ConstellationInput,
 } from './constellationLayout';
@@ -325,35 +324,58 @@ describe('перетини променів', () => {
   });
 });
 
-describe('підписи', () => {
-  it('жоден підпис не виходить за кадр', () => {
+describe('поводир до назви', () => {
+  it('ламана починається осторонь зірки, а не в її центрі', () => {
     for (const star of buildConstellation(COUPLE).stars) {
-      const { width, height } = labelSizeOf(star);
-      expect(star.labelX - width / 2).toBeGreaterThanOrEqual(-0.001);
-      expect(star.labelX + width / 2).toBeLessThanOrEqual(CONSTELLATION_WIDTH + 0.001);
-      expect(star.labelY - height / 2).toBeGreaterThanOrEqual(-0.001);
-      expect(star.labelY + height / 2).toBeLessThanOrEqual(CONSTELLATION_HEIGHT + 0.001);
+      const lift = Math.hypot(star.leader.startX - star.x, star.leader.startY - star.y);
+      expect(lift).toBeGreaterThan(star.radius);
     }
   });
 
-  it('підписи не накривають один одного', () => {
-    const rects = buildConstellation(COUPLE).stars.map((star) => {
-      const { width, height } = labelSizeOf(star);
-      return {
-        left: star.labelX - width / 2,
-        right: star.labelX + width / 2,
-        top: star.labelY - height / 2,
-        bottom: star.labelY + height / 2,
-      };
-    });
-    for (let i = 0; i < rects.length; i += 1) {
-      for (let j = i + 1; j < rects.length; j += 1) {
-        expect(overlapArea(rects[i]!, rects[j]!)).toBe(0);
-      }
+  it('діагональ переходить у горизонталь: у другому коліні висота стала', () => {
+    for (const star of buildConstellation(COUPLE).stars) {
+      expect(star.leader.endY).toBe(star.leader.bendY);
+      expect(star.leader.endX).not.toBe(star.leader.bendX);
     }
   });
 
-  it('довша назва дає ширший і вищий підпис', () => {
+  it('перше коліно справді діагональне — по 45°', () => {
+    for (const star of buildConstellation(COUPLE).stars) {
+      const runX = Math.abs(star.leader.bendX - star.leader.startX);
+      const runY = Math.abs(star.leader.bendY - star.leader.startY);
+      expect(runX).toBeCloseTo(runY, 6);
+    }
+  });
+
+  it('назва лишається в кадрі: горизонталь і текст за нею не виходять за край', () => {
+    for (const star of buildConstellation(COUPLE).stars) {
+      const { width } = labelSizeOf(star);
+      const textEnd = star.leader.align === 'start'
+        ? star.leader.endX + width
+        : star.leader.endX - width;
+      expect(textEnd).toBeGreaterThanOrEqual(-0.001);
+      expect(textEnd).toBeLessThanOrEqual(CONSTELLATION_WIDTH + 0.001);
+    }
+  });
+
+  it('зірка біля правого краю відводить назву ліворуч', () => {
+    const { stars } = buildConstellation([
+      event(1, '2024-01-01'),
+      event(2, '2024-02-01'),
+    ]);
+    const rightmost = stars.reduce((a, b) => (a.x > b.x ? a : b));
+    if (rightmost.x > CONSTELLATION_WIDTH * 0.6) {
+      expect(rightmost.leader.endX).toBeLessThan(rightmost.x);
+    }
+  });
+
+  it('зірка під верхнім краєм відводить назву донизу', () => {
+    for (const star of buildConstellation(COUPLE).stars) {
+      if (star.y < 12) expect(star.leader.bendY).toBeGreaterThan(star.y);
+    }
+  });
+
+  it('довша назва дає ширший і вищий блок', () => {
     const short = labelSizeOf({ level: 'regular', core: false, titleLength: 6 });
     const long = labelSizeOf({ level: 'regular', core: false, titleLength: 28 });
     expect(long.width).toBeGreaterThan(short.width);
