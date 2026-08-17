@@ -259,7 +259,6 @@ export function PlansPage() {
         <div className="pm-sheet pm-sheet--journey">
           <RelationshipJourney
             events={journeyEvents}
-            onOpen={openExistingEvent}
             onAdd={() => openNewEvent('anniversary', undefined, 'events')}
           />
         </div>

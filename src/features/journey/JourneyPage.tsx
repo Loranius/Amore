@@ -6,25 +6,33 @@
 //
 // Кристал ховати не довелось: світ видимий лише під `[data-portal-scene]`,
 // який ставить `useWorldVisibleRoute`. Ця сторінка його не викликає — і тим
-// самим лишається на власному небі, не пов'язаному з артефактом.
+// самим лишається на власному небі, не пов'язаному з артефактом. Поки вона
+// відкрита, світовому полотну ще й зупинено цикл кадрів: контекст живий, але
+// невидиму сцену ніхто не малює.
+//
+// Саме небо — WebGL, не CSS: скайбокс навколо камери, зірки подій у X/Y/Z,
+// обертання на 360°. Що з цього чому саме так — у `scene/`.
 // ============================================================
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CloseIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { useEvents } from '@/features/_shared/events';
 import { useCrystalSeed } from '@/features/home/useHome';
 import { useCalendarMutations } from '@/features/calendar/useCalendar';
 import { AddEventModal } from '@/features/calendar/AddEventModal';
-import { readWorldQuality } from '@/features/world/worldDim';
 import { useImmersiveRoute } from '@/features/world/useImmersiveRoute';
 import type { EventRow } from '@/types';
-import { ConstellationSky } from './ConstellationSky';
-import { buildStarfield, steadyShadow } from './starfield';
-import nebulaUrl from '@/assets/journey/nebula.webp';
+import type { ConstellationEvent } from './constellationRules';
+import { JourneyScene } from './scene/JourneyScene';
 import './journeyScene.css';
 
 function isJourneyEvent(event: EventRow): boolean {
   return event.type === 'anniversary';
+}
+
+/** Розкладці потрібні три поля, і жодного більше. */
+function toConstellationEvent(event: EventRow): ConstellationEvent {
+  return { id: event.id, date: event.date, significance: event.significance };
 }
 
 export function JourneyPage() {
@@ -32,42 +40,29 @@ export function JourneyPage() {
   const navigate = useNavigate();
   const { seed } = useCrystalSeed();
   const { data: events = [] } = useEvents();
-  const { addEvent, updateEvent } = useCalendarMutations();
-  const [editing, setEditing] = useState<EventRow | null>(null);
+  const { addEvent } = useCalendarMutations();
   const [creating, setCreating] = useState(false);
 
-  // Профіль читається один раз: він не змінюється, поки сторінка відкрита, а
-  // перечитувати його щокадру означало б платити за відповідь, яка вже є.
-  const [quality] = useState(readWorldQuality);
+  // Читається один раз: поки сторінка відкрита, відповідь не змінюється, а
+  // підписка на медіазапит коштувала б слухача заради цього.
+  const [reducedMotion] = useState(
+    () => typeof window !== 'undefined'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+  );
 
   const moments = useMemo(() => events.filter(isJourneyEvent), [events]);
-  const field = useMemo(() => buildStarfield(seed ?? 'amore', quality), [quality, seed]);
-  const steady = useMemo(() => steadyShadow(field.steady), [field.steady]);
+  const sceneEvents = useMemo(() => moments.map(toConstellationEvent), [moments]);
 
   return (
-    <div className="journey-scene" data-quality={quality}>
-      <div className="jn-space" aria-hidden="true">
-        <div className="jn-depth" />
-        <div className="jn-nebula" style={{ backgroundImage: `url(${nebulaUrl})` }} />
-        <div className="jn-drift jn-drift--cool" />
-        <div className="jn-drift jn-drift--warm" />
-        {steady && <div className="jn-dust" style={{ boxShadow: steady } as CSSProperties} />}
-        {field.twinkling.map((star, index) => (
-          <span
-            key={index}
-            className="jn-twinkle"
-            style={{
-              left: `${(star.x * 100).toFixed(3)}%`,
-              top: `${(star.y * 100).toFixed(3)}%`,
-              width: `${star.size.toFixed(2)}px`,
-              height: `${star.size.toFixed(2)}px`,
-              '--twinkle-alpha': star.alpha.toFixed(3),
-              '--twinkle-period': `${star.period.toFixed(2)}s`,
-              '--twinkle-delay': `${star.delay.toFixed(2)}s`,
-            } as CSSProperties}
-          />
-        ))}
-      </div>
+    <div className="journey-page">
+      {moments.length === 0 ? (
+        <section className="jn-empty">
+          <strong>Небо ще порожнє</strong>
+          <p>Перша подія засвітить першу зірку, і шлях почнеться з неї.</p>
+        </section>
+      ) : (
+        <JourneyScene events={sceneEvents} seed={seed} reducedMotion={reducedMotion} />
+      )}
 
       <header className="jn-chrome">
         <button
@@ -85,17 +80,6 @@ export function JourneyPage() {
         <span className="jn-count">{moments.length}</span>
       </header>
 
-      <div className="jn-stage">
-        {moments.length === 0 ? (
-          <section className="jn-empty">
-            <strong>Небо ще порожнє</strong>
-            <p>Перша подія засвітить першу зірку, і шлях почнеться з неї.</p>
-          </section>
-        ) : (
-          <ConstellationSky events={moments} onOpen={setEditing} />
-        )}
-      </div>
-
       <footer className="jn-foot">
         <p>Кожна нова подія засвітить свою зірку й дотягне промінь до попередньої.</p>
         <button type="button" className="jn-add" onClick={() => setCreating(true)}>
@@ -103,18 +87,12 @@ export function JourneyPage() {
         </button>
       </footer>
 
-      {(creating || editing) && (
+      {creating && (
         <AddEventModal
-          event={editing}
+          event={null}
           initialType="anniversary"
-          onClose={() => {
-            setCreating(false);
-            setEditing(null);
-          }}
-          onSubmit={(input) => {
-            if (editing) updateEvent.mutate({ id: editing.id, input });
-            else addEvent.mutate(input);
-          }}
+          onClose={() => setCreating(false)}
+          onSubmit={(input) => addEvent.mutate(input)}
         />
       )}
     </div>

@@ -7,6 +7,7 @@ import {
   goToRoute,
   openPortal,
   probeSelectors,
+  readJourneyMetrics,
   readSceneMetrics,
   tapSelector,
 } from './portal.mjs';
@@ -86,6 +87,7 @@ async function main() {
           await portal.page.screenshot({ path: file });
 
           const metrics = await readSceneMetrics(portal.page);
+          const journey = await readJourneyMetrics(portal.page);
           const probes = await probeSelectors(portal.page, options.probes);
 
           console.log(`\n${route}  ·  ${device.name} ${device.width}×${device.height}@${device.scale}  ·  ${options.tier.name}`);
@@ -96,6 +98,20 @@ async function main() {
               `  сцена   якість ${value(metrics.quality)}, тіл ${value(metrics.bodies)},`
               + ` мешів ${value(metrics.meshes)}, draw calls ${value(metrics.drawCalls)},`
               + ` трикутників ${value(metrics.renderedTriangles)}`,
+            );
+          }
+          if (journey !== null) {
+            const value = (raw) => (raw === null || raw === '' ? '—' : raw);
+            console.log(
+              `  шлях    ${value(journey.state)} (${value(journey.quality)},`
+              + ` ×${value(journey.pixelRatio)}), зірок ${value(journey.stars)},`
+              + ` променів ${value(journey.edges)}, радіус ${value(journey.radial)},`
+              + ` півдовжина ${value(journey.axial)}, камера ${value(journey.distance)},`
+              + ` вісь часу ${value(journey.timeAxis)}`,
+            );
+            console.log(
+              `          draw calls ${value(journey.drawCalls)},`
+              + ` трикутників ${value(journey.triangles)}`,
             );
           }
           for (const [selector, found] of Object.entries(probes)) {

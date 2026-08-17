@@ -39,6 +39,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, Sparkles } from '@react-three/drei';
 import * as THREE from 'three';
+import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
 import {
   useCrystalDNA,
   useMilestoneEvents,
@@ -321,11 +322,16 @@ export default function CrystalScene() {
   );
 
   const sparkleCount = Math.min(60, 14 + branches.length * 1.2);
+  const frameloop = useWorldFrameloop();
 
   return (
     <>
       <div className="crystal-wrap">
-        <Canvas dpr={[1, 2]} camera={{ position: [0, 0.2, 5.4], fov: 42 }}>
+        {/* Поки відкрито занурений маршрут («Наш шлях»), кристала не видно
+            взагалі, і малювати йому кадри означає малювати дві сцени, з яких
+            одна невидима. Контекст при цьому лишається живим — світ мусить
+            пережити сторінку (ADR-0020). */}
+        <Canvas dpr={[1, 2]} frameloop={frameloop} camera={{ position: [0, 0.2, 5.4], fov: 42 }}>
           {/* Класичний трипунктовий риг замість «ambient + одне світло +
               рожевий підсвіт». Головне тут — КОНТРОВЕ світло позаду згори:
               саме воно окреслює грані яскравою лінією й читається як край
