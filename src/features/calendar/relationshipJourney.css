@@ -57,11 +57,27 @@
   contain: paint;
 }
 
+/*
+ * Небо — фотографія туманності з референсу власника, а не градієнт.
+ * Поверх неї лягає темна вуаль: без неї підписи тонуть у світлих ділянках.
+ */
 .rj-sky {
   position: relative;
-  aspect-ratio: var(--rj-ratio, 100 / 134);
+  aspect-ratio: var(--rj-ratio, 100 / 168);
   width: 100%;
   padding: 0;
+  background-image: var(--rj-nebula);
+  background-position: center;
+  background-size: cover;
+}
+.rj-sky::before {
+  position: absolute;
+  background:
+    radial-gradient(120% 70% at 50% 50%, transparent, color-mix(in srgb, var(--surface) 62%, transparent) 100%),
+    linear-gradient(180deg, color-mix(in srgb, var(--surface) 55%, transparent), transparent 22%, transparent 78%, color-mix(in srgb, var(--surface) 65%, transparent));
+  content: '';
+  inset: 0;
+  pointer-events: none;
 }
 
 .rj-beams {
@@ -83,12 +99,26 @@
 
 .rj-stars { position: absolute; inset: 0; }
 
+/*
+ * Колір зірки — орієнтир за рівнем, а не прикраса.
+ *
+ * Портал одноколірний за ADR-0031, і три відтінки тут — свідомий виняток:
+ * на карті з семи підписів рівень має читатись до того, як почнеш читати.
+ * Ключова лишається фіолетовою (тобто барвою ДНК пари) — саме тому вона й
+ * далі виглядає головною серед різнобарв'я.
+ */
+.rj-star--core,
+.rj-star--key { --star-hue: var(--relationship-journey-neon, var(--accent)); --star-core: var(--relationship-journey-neon-core, #fff); }
+.rj-star--important { --star-hue: hsl(44 92% 62%); --star-core: hsl(48 100% 86%); }
+.rj-star--regular { --star-hue: hsl(184 76% 58%); --star-core: hsl(180 92% 84%); }
+
 /* Зірка. Позиція — центр диска, тому зсув на половину власного розміру. */
 .rj-star {
   position: absolute;
   display: grid;
   width: var(--star-size, 5%);
-  aspect-ratio: 1;
+  /* 1.52 / 1.7024 — пропорція моделі: зірка вища за ширину. */
+  aspect-ratio: .893;
   padding: 0;
   border: 0;
   background: transparent;
@@ -97,22 +127,42 @@
   place-items: center;
   -webkit-tap-highlight-color: transparent;
 }
+/*
+ * Чотирипроменева зірка — силует узятий з моделей власника
+ * (`amore_star_*_glb`), але намальований, а не змонтований.
+ *
+ * Моделі це пласкі плити на десять вершин: контур із восьми точок, внутрішні
+ * кути на 14.1% зовнішнього радіуса, вертикаль 0.851 проти горизонталі 0.76.
+ * Ці числа тут дослівно. А от матеріал моделей не підійшов: непрозорий
+ * MeshStandard із тьмяним emissive (темнішим за базовий колір), тобто на
+ * туманності вони читались би паперовими вирізками, а не світлом. Плюс
+ * другий WebGL-контекст у картці заради семи пласких чотирикутників.
+ *
+ * Тому силует іде в `clip-path`, а світло — радіальним градієнтом під ним:
+ * гаряче ядро, спад до кінчиків. Форма референсу, світіння якого моделі не
+ * мали, і нуль вартості 3D.
+ */
 .rj-star-body {
   display: block;
   width: 100%;
   height: 100%;
-  border-radius: 50%;
   background:
-    radial-gradient(circle,
+    radial-gradient(closest-side,
       #fff 0%,
-      var(--relationship-journey-neon-core, #fff) 28%,
-      var(--relationship-journey-neon, var(--accent)) 58%,
-      transparent 74%);
+      var(--star-core, #fff) 20%,
+      var(--star-hue, var(--accent)) 48%,
+      color-mix(in srgb, var(--star-hue, var(--accent)) 55%, transparent) 100%);
+  clip-path: polygon(
+    100% 50%, 57.07% 42.93%,
+    50% 0%, 42.93% 42.93%,
+    0% 50%, 42.93% 57.07%,
+    50% 100%, 57.07% 57.07%);
 }
+
 .rj-star::after {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--relationship-journey-neon, var(--accent)) 42%, transparent), transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--star-hue, var(--accent)) 42%, transparent), transparent 70%);
   content: '';
   inset: -95%;
   opacity: .5;
@@ -132,36 +182,59 @@
   transform: translate(-50%, -50%);
 }
 .rj-star:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--relationship-journey-neon, var(--accent)) 60%, transparent);
+  outline: 3px solid color-mix(in srgb, var(--star-hue, var(--accent)) 60%, transparent);
   outline-offset: 4px;
   border-radius: 50%;
 }
 
 /*
- * Підпис живе під зіркою. `nowrap` на живому екрані обрізав назви на пів
- * слова («Річниця першог…»), тож текст переноситься у два рядки, а ширина
- * рахується від кадру, а не від диска зірки — інакше вузька зірка ріже підпис.
+ * Підпис має кожна подія — інакше карту доводиться читати дотиками.
+ *
+ * Живуть вони окремим шаром і позиціонуються в координатах неба: розкладка
+ * затискає центр підпису так, щоб він не виїхав за кадр, і обирає бік
+ * (згори/знизу) за фактичним перекриттям із уже вирішеними.
  */
-.rj-star-label {
+.rj-labels { position: absolute; inset: 0; pointer-events: none; }
+.rj-label {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
   display: -webkit-box;
   width: max-content;
-  max-width: 16ch;
+  max-width: 15ch;
   overflow: hidden;
-  color: color-mix(in srgb, var(--text) 88%, var(--relationship-journey-neon, var(--accent)));
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.24;
+  /* Кегль лишається тут: `max-width` міряється в `ch`, а без власного
+     font-size вони рахувались би від успадкованого — і підпис виходив
+     удвічі ширшим за модель розкладки. Виміряно: 132 px замість ~62. */
+  font-size: 9.5px;
   text-align: center;
-  text-shadow: 0 1px 5px var(--surface), 0 0 12px var(--surface), 0 0 20px var(--surface);
-  transform: translateX(-50%);
+  /* Розкладка віддає ЦЕНТР підпису — місце вона обирає сама з чотирьох
+     навколо зірки, тож зміщення тут однакове для всіх варіантів. */
+  transform: translate(-50%, -50%);
+  -webkit-box-orient: vertical;
+}
+.rj-label-title {
+  display: -webkit-box;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--star-hue, var(--accent)) 30%, var(--text));
+  font-weight: 700;
+  line-height: 1.22;
+  text-shadow: 0 1px 4px #000, 0 0 10px #000, 0 0 16px #000;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  pointer-events: none;
 }
-.rj-star--core .rj-star-label { max-width: 15ch; font-size: 11.5px; }
+.rj-label-date {
+  display: block;
+  margin-top: 1px;
+  color: color-mix(in srgb, var(--text) 52%, transparent);
+  font-size: .82em;
+  white-space: nowrap;
+  font-weight: 600;
+  text-shadow: 0 1px 4px #000, 0 0 10px #000;
+}
+.rj-label--core { max-width: 17ch; font-size: 11.5px; }
+.rj-label--key { max-width: 16ch; font-size: 10.5px; }
+.rj-label--core, .rj-label--key { --star-hue: var(--relationship-journey-neon, var(--accent)); }
+.rj-label--important { --star-hue: hsl(44 92% 62%); }
+.rj-label--regular { --star-hue: hsl(184 76% 58%); }
 
 .relationship-journey-future {
   position: relative;
@@ -192,6 +265,10 @@
    Порядок задає `--star-delay` / `--beam-delay` з розкладки.
    ------------------------------------------------------------ */
 @media (prefers-reduced-motion: no-preference) {
+  .rj-label {
+    animation: rj-label-birth .5s ease-out backwards;
+    animation-delay: var(--star-delay, 0s);
+  }
   .rj-star {
     animation: rj-star-birth .62s cubic-bezier(.22, 1, .36, 1) backwards;
     animation-delay: var(--star-delay, 0s);
@@ -209,10 +286,14 @@
   60% { opacity: 1; }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
+@keyframes rj-label-birth {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 @keyframes rj-beam-draw {
   to { stroke-dashoffset: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rj-star, .rj-beam { animation: none !important; }
+  .rj-star, .rj-beam, .rj-label { animation: none !important; }
 }

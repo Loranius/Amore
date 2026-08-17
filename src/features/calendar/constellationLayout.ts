@@ -38,6 +38,15 @@ export interface ConstellationInput {
   /** ISO `YYYY-MM-DD`. Порівнюється як рядок — без локалі. */
   date: string;
   significance: EventSignificance;
+  /**
+   * Довжина назви в символах — рівно стільки розкладка знає про текст.
+   *
+   * Без неї габарит підпису доводилось брати константою на рівень, і модель
+   * розходилась із реальністю: «Познайомився з мамою Оксаною» займає три
+   * рядки й 48 px, а «Пропозиція» — один і 24. Три перетини підписів на
+   * живому екрані взялись саме звідти.
+   */
+  titleLength: number;
 }
 
 export interface ConstellationStar {
@@ -50,6 +59,19 @@ export interface ConstellationStar {
   radius: number;
   /** Місце в ланцюгу за датою, з нуля. Керує чергою появи. */
   order: number;
+  /** Довжина назви — потрібна, щоб оцінити габарит підпису. */
+  titleLength: number;
+  /**
+   * Центр підпису в координатах полотна.
+   *
+   * Підпис має кожна подія, тож у тісному кадрі телефона вони налазять.
+   * Розкладка пробує чотири місця навколо зірки — знизу, згори, праворуч,
+   * ліворуч — і бере перше, де нічого не накриває. Координата вже затиснута
+   * в межі кадру: «Здав на права» колись перетворилось на «в на права», бо
+   * підпис ширший за зірку й виїжджав за край.
+   */
+  labelX: number;
+  labelY: number;
 }
 
 export interface ConstellationEdge {
@@ -70,12 +92,18 @@ export interface ConstellationLayout {
 
 /** Портретне полотно: модуль живе на телефоні. */
 export const CONSTELLATION_WIDTH = 100;
-export const CONSTELLATION_HEIGHT = 134;
+export const CONSTELLATION_HEIGHT = 168;
 
 const CENTRE_X = CONSTELLATION_WIDTH / 2;
 const CENTRE_Y = CONSTELLATION_HEIGHT / 2;
-/** Кадр вищий за ширину — орбіти розтягнуті, щоб не збиватись у смугу. */
-const ORBIT_ASPECT = 1.34;
+/**
+ * Кадр вищий за ширину — орбіти розтягнуті, щоб не збиватись у смугу.
+ *
+ * Піднято разом із висотою полотна: підпис із датою вдвічі вищий за колишній
+ * (36–48 px проти 22), і на кадрі 100×134 сім таких не розходились — три
+ * перетини лишались за будь-якого вибору боку.
+ */
+const ORBIT_ASPECT = 1.62;
 const MARGIN = 7;
 /** Скільки позицій пробує нова зірка, перш ніж узяти найкращу з невдалих. */
 const PLACEMENT_ATTEMPTS = 28;
@@ -183,6 +211,63 @@ function coreIdOf(events: readonly ConstellationInput[]): number | null {
   const marriage = events.find((event) => event.significance === 'marriage');
   if (marriage) return marriage.id;
   return events.find((event) => event.significance === 'relationship_start')?.id ?? null;
+}
+
+/**
+ * Метрики підпису в координатах полотна, за рівнем.
+ *
+ * Виміряні на живому екрані в кадрі 378×507, не вгадані: `maxChars` дублює
+ * `max-width` у `ch` зі стилю, `charWidth` — фактична ширина знака при тому
+ * кеглі, `titleLine` і `dateLine` — висоти рядків назви й дати.
+ */
+const LABEL_METRICS: Record<'core' | ConstellationLevel, {
+  maxChars: number;
+  charWidth: number;
+  titleLine: number;
+  dateLine: number;
+}> = {
+  core: { maxChars: 17, charWidth: 1.95, titleLine: 3.71, dateLine: 2.99 },
+  key: { maxChars: 16, charWidth: 1.78, titleLine: 3.39, dateLine: 2.73 },
+  important: { maxChars: 15, charWidth: 1.61, titleLine: 3.06, dateLine: 2.47 },
+  regular: { maxChars: 15, charWidth: 1.61, titleLine: 3.06, dateLine: 2.47 },
+};
+
+/** Стеля переносу назви — та сама, що `-webkit-line-clamp` у стилі. */
+const LABEL_MAX_LINES = 2;
+/** Ширина рядка дати у знаках: «12 серпня 2023» без «р.». */
+const DATE_CHARS = 14;
+/** Просвіт між диском зірки й підписом. */
+const LABEL_GAP = 1.8;
+
+export interface Rect { left: number; top: number; right: number; bottom: number; }
+
+export function labelSizeOf(
+  star: { level: ConstellationLevel; core: boolean; titleLength: number },
+): { width: number; height: number } {
+  const metric = LABEL_METRICS[star.core ? 'core' : star.level];
+  const lines = Math.min(
+    LABEL_MAX_LINES,
+    Math.max(1, Math.ceil(star.titleLength / metric.maxChars)),
+  );
+  const titleWidth = Math.min(star.titleLength, metric.maxChars) * metric.charWidth;
+  return {
+    width: Math.max(titleWidth, DATE_CHARS * metric.charWidth * 0.82),
+    height: lines * metric.titleLine + metric.dateLine + 0.3,
+  };
+}
+
+/** Прямокутник підпису з центром у точці, затиснутий у межі кадру. */
+function rectAt(centreX: number, centreY: number, width: number, height: number): Rect {
+  const x = clamp(centreX, width / 2, CONSTELLATION_WIDTH - width / 2);
+  const y = clamp(centreY, height / 2, CONSTELLATION_HEIGHT - height / 2);
+  return { left: x - width / 2, right: x + width / 2, top: y - height / 2, bottom: y + height / 2 };
+}
+
+/** Площа накриття двох прямокутників; нуль — не торкаються. */
+export function overlapArea(a: Rect, b: Rect): number {
+  const width = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+  const height = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+  return width > 0 && height > 0 ? width * height : 0;
 }
 
 /** Хронологія: ISO-дата, далі `id` — щоб порядок був повним і стабільним. */
@@ -358,8 +443,42 @@ export function buildConstellation(events: readonly ConstellationInput[]): Const
       y: spot.y,
       radius: spot.radius,
       order: orderById.get(event.id)!,
+      labelX: spot.x,
+      labelY: spot.y,
+      titleLength: event.titleLength,
     };
   });
+
+  // Місце підпису обирається жадібно, у хронологічному порядку: кожен новий
+  // бере перше з чотирьох, де нічого не накриває. Порядок переваги — знизу,
+  // згори, праворуч, ліворуч: підпис під зіркою читається найприродніше.
+  //
+  // Двох варіантів не вистачало. І згори, і знизу давали по одному накриттю,
+  // жадібність брала менше зло — і підпис «Купили Nissan Tiida» лишався на
+  // підписі ядра. Виміряно на живому екрані.
+  const taken: Rect[] = [];
+  for (const star of stars) {
+    const { width, height } = labelSizeOf(star);
+    const gap = star.radius + LABEL_GAP;
+    const candidates: Rect[] = [
+      rectAt(star.x, star.y + gap + height / 2, width, height),
+      rectAt(star.x, star.y - gap - height / 2, width, height),
+      rectAt(star.x + gap + width / 2, star.y, width, height),
+      rectAt(star.x - gap - width / 2, star.y, width, height),
+    ];
+
+    let best = candidates[0]!;
+    let bestCost = Number.POSITIVE_INFINITY;
+    for (const candidate of candidates) {
+      const cost = taken.reduce((sum, rect) => sum + overlapArea(candidate, rect), 0);
+      if (cost === 0) { best = candidate; break; }
+      if (cost < bestCost) { bestCost = cost; best = candidate; }
+    }
+
+    star.labelX = (best.left + best.right) / 2;
+    star.labelY = (best.top + best.bottom) / 2;
+    taken.push(best);
+  }
 
   const edges: ConstellationEdge[] = [];
   for (let index = 1; index < chain.length; index += 1) {

@@ -18,6 +18,7 @@ import {
   buildConstellation,
   type ConstellationStar,
 } from './constellationLayout';
+import nebulaUrl from '@/assets/journey/nebula.webp';
 import './relationshipJourney.css';
 
 /** HSL hue базового `BASE_PALETTE.core[0]` (#6d4fa8) у crystalCluster.ts. */
@@ -48,6 +49,16 @@ function dateLabel(date: string): string {
     month: 'long',
     year: 'numeric',
   });
+}
+
+/**
+ * Дата під назвою — без «р.» у кінці.
+ *
+ * Локаль додає його завжди, і чотирнадцять знаків замість одинадцяти рівно на
+ * стільки й переносили рядок: «22 травня 2022 р.» ламалось надвоє під зіркою.
+ */
+function shortDateLabel(date: string): string {
+  return dateLabel(date).replace(/\s*р\.$/, '');
 }
 
 function crystalJourneyStyle(seed: string | null): CSSProperties {
@@ -83,9 +94,6 @@ const ConstellationStarButton = memo(function ConstellationStarButton({
   height: number;
   onOpen: (event: EventRow) => void;
 }) {
-  // Підпис лише на ключових. На живому екрані підписи ще й на «важливих»
-  // дали чотири назви в тісному кадрі телефона, і дві з них зіткнулись.
-  const labelled = star.level === 'key';
   const style = {
     left: `${(star.x / width) * 100}%`,
     top: `${(star.y / height) * 100}%`,
@@ -102,7 +110,6 @@ const ConstellationStarButton = memo(function ConstellationStarButton({
       aria-label={`${starCaption(star, event.significance)}: ${event.title}, ${dateLabel(event.date)}`}
     >
       <span className="rj-star-body" aria-hidden="true" />
-      {labelled && <span className="rj-star-label" aria-hidden="true">{event.title}</span>}
     </button>
   );
 });
@@ -128,6 +135,7 @@ export function RelationshipJourney({
         id: event.id,
         date: event.date,
         significance: event.significance,
+        titleLength: event.title.length,
       })),
     ),
     [moments],
@@ -162,7 +170,10 @@ export function RelationshipJourney({
             <>
               <div
                 className="rj-sky"
-                style={{ '--rj-ratio': `${sky.width} / ${sky.height}` } as CSSProperties}
+                style={{
+                  '--rj-ratio': `${sky.width} / ${sky.height}`,
+                  '--rj-nebula': `url(${nebulaUrl})`,
+                } as CSSProperties}
               >
                 <svg
                   className="rj-beams"
@@ -183,6 +194,28 @@ export function RelationshipJourney({
                     />
                   ))}
                 </svg>
+
+                {/*
+                  Підписи окремим шаром, а не всередині кнопки: їх треба
+                  ставити в координатах неба, щоб затиснути в кадр. Усередині
+                  кнопки відлік іде від диска зірки, і крайній підпис виїжджав.
+                */}
+                <div className="rj-labels" aria-hidden="true">
+                  {sky.stars.map((star) => (
+                    <span
+                      key={star.id}
+                      className={`rj-label rj-label--${starTone(star)}`}
+                      style={{
+                        left: `${(star.labelX / sky.width) * 100}%`,
+                        top: `${(star.labelY / sky.height) * 100}%`,
+                        '--star-delay': `${(star.order * BIRTH_STEP).toFixed(2)}s`,
+                      } as CSSProperties}
+                    >
+                      <span className="rj-label-title">{byId.get(star.id)!.title}</span>
+                      <span className="rj-label-date">{shortDateLabel(byId.get(star.id)!.date)}</span>
+                    </span>
+                  ))}
+                </div>
 
                 <div className="rj-stars">
                   {sky.stars.map((star) => (
