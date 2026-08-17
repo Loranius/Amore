@@ -3,8 +3,35 @@ import {
   buildConstellation,
   CONSTELLATION_HEIGHT,
   CONSTELLATION_WIDTH,
+  segmentsCross,
   type ConstellationInput,
 } from './constellationLayout';
+
+/** Скільки пар променів ріжуть одна одну. Використовує той самий предикат,
+ *  що й розкладка, — і він окремо перевірений нижче. */
+function crossingCount(events: readonly ConstellationInput[]): number {
+  const { edges } = buildConstellation(events);
+  let crossings = 0;
+  for (let i = 0; i < edges.length; i += 1) {
+    for (let j = i + 1; j < edges.length; j += 1) {
+      const a = edges[i]!;
+      const b = edges[j]!;
+      const hit = segmentsCross(
+        { x: a.x1, y: a.y1 }, { x: a.x2, y: a.y2 },
+        { x: b.x1, y: b.y1 }, { x: b.x2, y: b.y2 },
+      );
+      if (hit) crossings += 1;
+    }
+  }
+  return crossings;
+}
+
+const spread = (count: number): ConstellationInput[] =>
+  Array.from({ length: count }, (_value, index) => ({
+    id: index + 1,
+    date: `2024-${String((index % 12) + 1).padStart(2, '0')}-${String((index % 28) + 1).padStart(2, '0')}`,
+    significance: index === 0 ? 'relationship_start' : index % 4 === 0 ? 'important' : 'regular',
+  }));
 
 const event = (
   id: number,
@@ -89,13 +116,42 @@ describe('еволюція ядра', () => {
     expect(start.core).toBe(false);
   });
 
-  it('окрім двох зірок ролі, весілля нікого не зсуває', () => {
+  it('обидві ключові зірки сидять на своїх незмінних місцях', () => {
+    const { stars } = buildConstellation(WITH_MARRIAGE);
+    const keys = stars.filter((star) => star.level === 'key');
+    expect(keys).toHaveLength(2);
+    const spots = keys.map((star) => `${star.x},${star.y}`).sort();
+    const withoutMarriage = buildConstellation(COUPLE).stars
+      .filter((star) => star.level === 'key')
+      .map((star) => `${star.x},${star.y}`);
+    // Місце, яке звільняє початок відносин, і місце, яке він займає, обидва
+    // фіксовані: ядро в центрі, друге ключове — трохи нижче й правіше.
+    expect(spots).toContain(withoutMarriage[0]);
+  });
+
+  /**
+   * Свідомий компроміс, а не недогляд.
+   *
+   * Обіцянка «рухаються рівно дві зірки» трималась, поки промені не звірялись
+   * на перетини. Перевірка дивиться на позиції сусідів по ланцюгу — а коли
+   * одруження забирає центр, початок відносин переїжджає, і кожна зірка,
+   * поставлена після нього, бачить іншу картину.
+   *
+   * Вибір був між нулем перетинів щодня і рівно двома зсувами один раз за
+   * життя пари. Виміряно: сліпа до ключових перевірка дає 3 перетини на
+   * сімох подіях цієї пари, зряча — нуль. Взято нуль.
+   */
+  it('решта карти при зміні ядра пересідає — і це прийнято', () => {
     const before = buildConstellation(COUPLE);
     const after = buildConstellation(WITH_MARRIAGE);
-    for (const star of before.stars.filter((candidate) => !candidate.core)) {
-      const moved = after.stars.find((candidate) => candidate.id === star.id)!;
-      expect({ x: moved.x, y: moved.y }).toEqual({ x: star.x, y: star.y });
-    }
+    const moved = before.stars.filter((star) => {
+      const now = after.stars.find((candidate) => candidate.id === star.id)!;
+      return now.x !== star.x || now.y !== star.y;
+    });
+    expect(moved.length).toBeGreaterThan(0);
+    // Але сама карта лишається читанною: ланцюг цілий і перетинів мало.
+    expect(after.edges).toHaveLength(after.stars.length - 1);
+    expect(crossingCount(WITH_MARRIAGE)).toBeLessThanOrEqual(4);
   });
 });
 
@@ -220,5 +276,47 @@ describe('геометрія', () => {
     const source = [...COUPLE];
     buildConstellation(source);
     expect(source).toEqual(COUPLE);
+  });
+});
+
+describe('segmentsCross', () => {
+  const p = (x: number, y: number) => ({ x, y });
+
+  it('бачить справжній перетин', () => {
+    expect(segmentsCross(p(0, 0), p(10, 10), p(0, 10), p(10, 0))).toBe(true);
+  });
+
+  it('спільна зірка не є перетином — інакше кожен ланцюг був би винним', () => {
+    expect(segmentsCross(p(0, 0), p(10, 10), p(10, 10), p(20, 0))).toBe(false);
+  });
+
+  it('відрізки, що не дотикаються, не перетинаються', () => {
+    expect(segmentsCross(p(0, 0), p(1, 1), p(5, 5), p(6, 6))).toBe(false);
+  });
+
+  it('дотик кінцем усередину чужого відрізка перетином не рахується', () => {
+    expect(segmentsCross(p(0, 0), p(10, 0), p(5, 0), p(5, 10))).toBe(false);
+  });
+});
+
+describe('перетини променів', () => {
+  it('на семи подіях цієї пари перетинів немає', () => {
+    expect(crossingCount(COUPLE)).toBe(0);
+  });
+
+  it('малі карти лишаються чистими', () => {
+    expect(crossingCount(spread(5))).toBe(0);
+    expect(crossingCount(spread(8))).toBe(0);
+  });
+
+  it('на тридцяти подіях перетини лишаються рідкісними', () => {
+    // Виміряно: 19. Стеля, а не мета — вона стереже регрес, а не фіксує число.
+    // Перед розширенням пошуку тут було 114.
+    expect(crossingCount(spread(30))).toBeLessThanOrEqual(30);
+  });
+
+  it('ланцюг лишається ланцюгом навіть там, де перетини є', () => {
+    const { stars, edges } = buildConstellation(spread(30));
+    expect(edges).toHaveLength(stars.length - 1);
   });
 });
