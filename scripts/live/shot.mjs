@@ -32,7 +32,8 @@ const USAGE = `
   --tier=high|balanced|low           профіль пристрою (типово high)
   --theme=dark|light                 тема порталу
   --probe=<css>                      порахувати й обміряти елементи; можна кілька
-  --tap=<css>                        тапнути перший збіг і зняти другий кадр
+  --tap=<css>                        тапнути перший збіг і зняти кадр; можна кілька,
+                                     вони йдуть послідовно (модалка → її вміст)
   --settle=<мс>                      скільки чекати після появи сцени (типово ${DEFAULTS.settle})
   --out=<тека>                       куди складати знімки (типово ${DEFAULTS.out})
   --port=<порт>                      dev-сервер (типово ${DEFAULTS.port})
@@ -102,14 +103,25 @@ async function main() {
             if (found.count > 0) console.log(`    ${JSON.stringify(found.boxes)}`);
           }
 
-          if (options.tap !== null) {
-            const hit = await tapSelector(portal.page, options.tap);
-            if (hit) {
-              const tapFile = `${outDir}/${name}-tap.png`;
-              await portal.page.screenshot({ path: tapFile });
-              console.log(`  тап     ${options.tap} → ${tapFile}`);
-            } else {
-              console.log(`  тап     ${options.tap} — не знайдено`);
+          // Тапи йдуть послідовно: другий шукає те, що з'явилось після
+          // першого. Один тап не діставав до вмісту, який відкривається
+          // всередині модалки — акордеон значення події перевірити було нічим.
+          for (const [index, selector] of options.taps.entries()) {
+            const hit = await tapSelector(portal.page, selector);
+            if (!hit) {
+              console.log(`  тап     ${selector} — не знайдено`);
+              break;
+            }
+            const suffix = options.taps.length > 1 ? `-tap${index + 1}` : '-tap';
+            const tapFile = `${outDir}/${name}${suffix}.png`;
+            await portal.page.screenshot({ path: tapFile });
+            console.log(`  тап     ${selector} → ${tapFile}`);
+            if (options.probes.length > 0) {
+              const after = await probeSelectors(portal.page, options.probes);
+              for (const [probe, found] of Object.entries(after)) {
+                console.log(`    після тапу ${probe} × ${found.count}`);
+                if (found.count > 0) console.log(`      ${JSON.stringify(found.boxes)}`);
+              }
             }
           }
 

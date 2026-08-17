@@ -9,13 +9,23 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
+import { useEvents } from '@/features/_shared/events';
 import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
 import { BellIcon, ChevronDownIcon } from '@/components/icons/UiIcon';
+import { HeartIcon } from '@/components/icons/NavIcon';
 import type { NewEventInput } from './useCalendar';
-import type { EventRow, EventType } from '@/types';
+import type { EventRow, EventSignificance, EventType } from '@/types';
+import { KEY_EVENT_TEMPLATES, takenKeySignificance } from './keyEvents';
 import './calendarEventForm.css';
 
 type CalendarEntryType = Extract<EventType, 'anniversary' | 'birthday' | 'holiday'>;
+
+const SIGNIFICANCE_LABEL: Record<EventSignificance, string> = {
+  regular: 'Звичайна',
+  important: 'Важлива',
+  relationship_start: 'Початок відносин',
+  marriage: 'Одруження',
+};
 
 function ModalShell({ children, onClose }: {
   children: ReactNode;
@@ -67,12 +77,16 @@ export function AddEventModal({
   const [date, setDate] = useState(event?.date ?? initialDate ?? '');
   const [description, setDescription] = useState(event?.description ?? '');
   const [yearly, setYearly] = useState(event ? Boolean(event.yearly) : type === 'birthday');
-  const [isMilestone, setIsMilestone] = useState(event?.is_milestone ?? false);
+  const [significance, setSignificance] = useState<EventSignificance>(
+    event?.significance ?? 'regular',
+  );
   const [personId, setPersonId] = useState<number | null>(event?.person_user_id ?? null);
   const [typeOpen, setTypeOpen] = useState(false);
   const [significanceOpen, setSignificanceOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(Boolean(event?.description));
   const { data: users = [] } = useUsers();
+  const { data: allEvents = [] } = useEvents();
+  const takenKeys = takenKeySignificance(allEvents, event);
 
   const selectCalendarType = (next: Extract<CalendarEntryType, 'birthday' | 'holiday'>) => {
     setType(next);
@@ -93,7 +107,7 @@ export function AddEventModal({
       description: description.trim() || null,
       type,
       yearly,
-      is_milestone: relationshipEvent ? isMilestone : false,
+      significance: relationshipEvent ? significance : 'regular',
       person_user_id: birthdayEvent ? personId : null,
     });
     onClose();
@@ -126,7 +140,7 @@ export function AddEventModal({
       : 'Наприклад, наша маленька дата або забронювати столик';
 
   const calendarTypeLabel = birthdayEvent ? 'День народження' : 'Дата / нагадування';
-  const significanceLabel = isMilestone ? 'Велика подія' : 'Подія';
+  const significanceLabel = SIGNIFICANCE_LABEL[significance];
 
   return (
     <ModalShell onClose={onClose}>
@@ -215,7 +229,11 @@ export function AddEventModal({
               onClick={() => setSignificanceOpen((current) => !current)}
             >
               <span className="cal-entry-accordion-icon" aria-hidden="true">
-                {isMilestone ? <SparkIcon size={18} /> : <EventIcon type="anniversary" size={18} />}
+                {significance === 'regular'
+                  ? <EventIcon type="anniversary" size={18} />
+                  : significance === 'important'
+                    ? <SparkIcon size={18} />
+                    : <HeartIcon size={18} />}
               </span>
               <span className="cal-entry-accordion-copy">
                 <small id="cal-entry-significance-title">Значення події</small>
@@ -225,38 +243,73 @@ export function AddEventModal({
             </button>
 
             {significanceOpen && (
-              <div className="cal-entry-type-grid" aria-label="Значення події">
-                <button
-                  type="button"
-                  className={`cal-entry-type-option${!isMilestone ? ' active' : ''}`}
-                  aria-pressed={!isMilestone}
-                  onClick={() => {
-                    setIsMilestone(false);
-                    setSignificanceOpen(false);
-                  }}
-                >
-                  <EventIcon type="anniversary" size={18} />
-                  <span>
-                    <strong>Подія</strong>
-                    <small>Важливий момент вашої історії</small>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className={`cal-entry-type-option cal-entry-type-option--major${isMilestone ? ' active' : ''}`}
-                  aria-pressed={isMilestone}
-                  onClick={() => {
-                    setIsMilestone(true);
-                    setSignificanceOpen(false);
-                  }}
-                >
-                  <SparkIcon size={18} />
-                  <span>
-                    <strong>Велика подія</strong>
-                    <small>Ключова віха ваших стосунків</small>
-                  </span>
-                </button>
-              </div>
+              <>
+                <div className="cal-entry-type-grid" aria-label="Значення події">
+                  <button
+                    type="button"
+                    className={`cal-entry-type-option${significance === 'regular' ? ' active' : ''}`}
+                    aria-pressed={significance === 'regular'}
+                    onClick={() => {
+                      setSignificance('regular');
+                      setSignificanceOpen(false);
+                    }}
+                  >
+                    <EventIcon type="anniversary" size={18} />
+                    <span>
+                      <strong>Звичайна</strong>
+                      <small>Момент, який хочеться пам’ятати</small>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`cal-entry-type-option cal-entry-type-option--major${significance === 'important' ? ' active' : ''}`}
+                    aria-pressed={significance === 'important'}
+                    onClick={() => {
+                      setSignificance('important');
+                      setSignificanceOpen(false);
+                    }}
+                  >
+                    <SparkIcon size={18} />
+                    <span>
+                      <strong>Важлива</strong>
+                      <small>Велика віха: заручини, переїзд, подорож</small>
+                    </span>
+                  </button>
+                </div>
+
+                {/*
+                  Ключових видів рівно два, і вибираються вони не рівнем, а
+                  шаблоном: назва підставляється разом зі значенням. Уже
+                  створений ключ вимкнений — як товар, що вже в полиці покупок.
+                */}
+                <div className="cal-entry-keys" aria-label="Ключові події">
+                  <small>Ключові події</small>
+                  {KEY_EVENT_TEMPLATES.map((template) => {
+                    const active = significance === template.significance;
+                    const taken = takenKeys.has(template.significance);
+                    return (
+                      <button
+                        key={template.significance}
+                        type="button"
+                        className={`cal-entry-key-option${active ? ' active' : ''}`}
+                        aria-pressed={active}
+                        disabled={taken}
+                        onClick={() => {
+                          setSignificance(template.significance);
+                          if (!title.trim()) setTitle(template.title);
+                          setSignificanceOpen(false);
+                        }}
+                      >
+                        <HeartIcon size={17} />
+                        <span>
+                          <strong>{template.title}</strong>
+                          <small>{taken ? 'Вже є у вашій історії' : template.hint}</small>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
           </section>
         )}

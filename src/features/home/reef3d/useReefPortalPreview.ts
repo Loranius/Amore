@@ -126,7 +126,7 @@ async function fetchReefPortalSources(): Promise<ReefPortalSources> {
     supabase.from('users').select('id').order('id', { ascending: true }),
     supabase
       .from('events')
-      .select('id,date,type,yearly,is_milestone')
+      .select('id,date,type,yearly,significance,is_milestone')
       .or('type.neq.other,is_milestone.eq.true')
       .order('date', { ascending: true }),
     supabase

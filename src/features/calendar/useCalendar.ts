@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import type { EventRow, InsertRow } from '@/types';
+import type { EventRow, EventSignificance, InsertRow } from '@/types';
 
 // Запит подій живе у _shared (спільний із головною). Реекспорт — щоб
 // наявні імпорти календаря не мінялися.
@@ -23,7 +23,8 @@ export interface NewEventInput {
   description: string | null;
   type: EventRow['type'];
   yearly: boolean;
-  is_milestone: boolean;
+  /** `is_milestone` більше не пишеться: база рахує його з `significance`. */
+  significance: EventSignificance;
   /** Чий це день народження, якщо людина є в застосунку. */
   person_user_id: number | null;
 }
@@ -43,7 +44,7 @@ export function useCalendarMutations() {
         description: input.description,
         type: input.type,
         yearly: input.yearly,
-        is_milestone: input.is_milestone,
+        significance: input.significance,
         person_user_id: input.person_user_id,
         created_by: user.id,
       };
@@ -58,7 +59,7 @@ export function useCalendarMutations() {
   // Редагування. Донедавна модуль умів лише створити й видалити: одруківка
   // в назві лікувалась видаленням і повторним створенням — а разом із
   // рядком зникали й `metadata.done_at`, і зв'язок із кристалом (він
-  // рахує події за `is_milestone` та `type`).
+  // рахує події за `significance` та `type`).
   const updateEvent = useMutation({
     mutationFn: async (v: { id: number; input: NewEventInput }) => {
       const { error } = await supabase
@@ -69,7 +70,7 @@ export function useCalendarMutations() {
           description: v.input.description,
           type: v.input.type,
           yearly: v.input.yearly,
-          is_milestone: v.input.is_milestone,
+          significance: v.input.significance,
           person_user_id: v.input.person_user_id,
         })
         .eq('id', v.id);
@@ -100,7 +101,7 @@ export function useCalendarMutations() {
         description: null,
         type: 'holiday',
         yearly: true,
-        is_milestone: false,
+        significance: 'regular',
         person_user_id: null,
         created_by: user.id,
       }));

@@ -128,12 +128,12 @@ export function parseShotArgs(argv) {
   const routes = [];
   const devices = [];
   const probes = [];
+  const taps = [];
   const options = {
     tier: DEFAULTS.tier,
     port: DEFAULTS.port,
     out: DEFAULTS.out,
     settle: DEFAULTS.settle,
-    tap: null,
     theme: null,
     keepServer: false,
     headed: false,
@@ -151,7 +151,7 @@ export function parseShotArgs(argv) {
       case 'device': devices.push(...asList(value)); break;
       case 'probe': probes.push(...asList(value)); break;
       case 'tier': options.tier = value; break;
-      case 'tap': options.tap = value; break;
+      case 'tap': taps.push(...asList(value)); break;
       case 'theme': options.theme = value; break;
       case 'out': options.out = value; break;
       case 'port': options.port = Number(value); break;
@@ -187,7 +187,7 @@ export function parseShotArgs(argv) {
     port: options.port,
     out: options.out,
     settle: options.settle,
-    tap: options.tap,
+    taps,
     theme: options.theme,
     keepServer: options.keepServer,
     headed: options.headed,

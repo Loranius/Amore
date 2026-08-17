@@ -22,7 +22,7 @@ const event = (
   type: EventRow['type'] = 'birthday',
 ): EventRow => ({
   id: nextId++, title: 'Подія', description: null, date, created_by: 1,
-  type, yearly, metadata: null, is_milestone: false, person_user_id: null,
+  type, yearly, metadata: null, significance: 'regular', is_milestone: false, person_user_id: null,
 } as EventRow);
 
 describe('dayInMonth', () => {
