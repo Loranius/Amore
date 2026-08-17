@@ -50,6 +50,23 @@ export interface ConstellationStar {
   radius: number;
   /** Місце в ланцюгу за датою, з нуля. Керує чергою появи. */
   order: number;
+  /**
+   * З якого боку від зірки стає підпис.
+   *
+   * Підписи тепер має кожна подія, а не лише ключові, тож у тісному кадрі
+   * телефона вони почали б налазити один на одного. Зірки з нижньої частини
+   * неба підписуються згори — так сусіди по вертикалі розходяться.
+   */
+  /** З якого боку від зірки стає підпис. */
+  labelAbove: boolean;
+  /**
+   * Куди по горизонталі стає центр підпису, у координатах полотна.
+   *
+   * Не збігається з `x` зірки: підпис ширший за неї і біля краю виїхав би за
+   * кадр. «Здав на права» вже перетворювалось на «в на права» — проба
+   * показала x = −2.
+   */
+  labelX: number;
 }
 
 export interface ConstellationEdge {
@@ -183,6 +200,48 @@ function coreIdOf(events: readonly ConstellationInput[]): number | null {
   const marriage = events.find((event) => event.significance === 'marriage');
   if (marriage) return marriage.id;
   return events.find((event) => event.significance === 'relationship_start')?.id ?? null;
+}
+
+/**
+ * Габарит підпису в координатах полотна, за рівнем.
+ *
+ * Виміряно на живому екрані в кадрі 378×507: ядро 107×27 px, ключова ~92×24,
+ * решта 81×22. Один розмір на всіх уже пропустив перетин — підпис ядра
+ * ширший за модель і ліг на «Купили Nissan Tiida».
+ */
+const LABEL_SIZE: Record<'core' | ConstellationLevel, { width: number; height: number }> = {
+  core: { width: 28.3, height: 7.1 },
+  key: { width: 24.3, height: 6.3 },
+  important: { width: 21.4, height: 5.8 },
+  regular: { width: 21.4, height: 5.8 },
+};
+/** Просвіт між диском зірки й підписом. */
+const LABEL_GAP = 1.8;
+
+interface Rect { left: number; top: number; right: number; bottom: number; }
+
+export function labelSizeOf(star: { level: ConstellationLevel; core: boolean }) {
+  return LABEL_SIZE[star.core ? 'core' : star.level];
+}
+
+function labelRect(
+  star: { labelX: number; y: number; radius: number; level: ConstellationLevel; core: boolean },
+  above: boolean,
+): Rect {
+  const { width, height } = labelSizeOf(star);
+  const top = above
+    ? star.y - star.radius - LABEL_GAP - height
+    : star.y + star.radius + LABEL_GAP;
+  return {
+    left: star.labelX - width / 2,
+    right: star.labelX + width / 2,
+    top,
+    bottom: top + height,
+  };
+}
+
+function overlaps(a: Rect, b: Rect): boolean {
+  return a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 }
 
 /** Хронологія: ISO-дата, далі `id` — щоб порядок був повним і стабільним. */
@@ -358,8 +417,29 @@ export function buildConstellation(events: readonly ConstellationInput[]): Const
       y: spot.y,
       radius: spot.radius,
       order: orderById.get(event.id)!,
+      labelAbove: false,
+      labelX: spot.x,
     };
   });
+
+  // Бік підпису обирається жадібно й у хронологічному порядку: кожен новий
+  // бере той бік, де менше налазить на вже вирішені. Спроба розводити їх
+  // горизонтально провалилась — зсув назовні виносив крайні за кадр, а після
+  // затиску штовхав сусідів назустріч («Пропозиція» лягла на «Річницю
+  // знайомства»). Вертикаль дає більше місця й не має країв.
+  const taken: Rect[] = [];
+  for (const star of stars) {
+    const half = labelSizeOf(star).width / 2;
+    star.labelX = clamp(star.x, half, CONSTELLATION_WIDTH - half);
+    const below = labelRect(star, false);
+    const above = labelRect(star, true);
+    const belowHits = taken.filter((rect) => overlaps(below, rect)).length;
+    const aboveHits = taken.filter((rect) => overlaps(above, rect)).length;
+    const goAbove = aboveHits < belowHits
+      || (aboveHits === belowHits && star.y > CONSTELLATION_HEIGHT * 0.55);
+    star.labelAbove = goAbove;
+    taken.push(goAbove ? above : below);
+  }
 
   const edges: ConstellationEdge[] = [];
   for (let index = 1; index < chain.length; index += 1) {

@@ -83,9 +83,6 @@ const ConstellationStarButton = memo(function ConstellationStarButton({
   height: number;
   onOpen: (event: EventRow) => void;
 }) {
-  // Підпис лише на ключових. На живому екрані підписи ще й на «важливих»
-  // дали чотири назви в тісному кадрі телефона, і дві з них зіткнулись.
-  const labelled = star.level === 'key';
   const style = {
     left: `${(star.x / width) * 100}%`,
     top: `${(star.y / height) * 100}%`,
@@ -102,7 +99,6 @@ const ConstellationStarButton = memo(function ConstellationStarButton({
       aria-label={`${starCaption(star, event.significance)}: ${event.title}, ${dateLabel(event.date)}`}
     >
       <span className="rj-star-body" aria-hidden="true" />
-      {labelled && <span className="rj-star-label" aria-hidden="true">{event.title}</span>}
     </button>
   );
 });
@@ -183,6 +179,27 @@ export function RelationshipJourney({
                     />
                   ))}
                 </svg>
+
+                {/*
+                  Підписи окремим шаром, а не всередині кнопки: їх треба
+                  ставити в координатах неба, щоб затиснути в кадр. Усередині
+                  кнопки відлік іде від диска зірки, і крайній підпис виїжджав.
+                */}
+                <div className="rj-labels" aria-hidden="true">
+                  {sky.stars.map((star) => (
+                    <span
+                      key={star.id}
+                      className={`rj-label rj-label--${starTone(star)}${star.labelAbove ? ' rj-label--above' : ''}`}
+                      style={{
+                        left: `${(star.labelX / sky.width) * 100}%`,
+                        top: `${((star.labelAbove ? star.y - star.radius : star.y + star.radius) / sky.height) * 100}%`,
+                        '--star-delay': `${(star.order * BIRTH_STEP).toFixed(2)}s`,
+                      } as CSSProperties}
+                    >
+                      {byId.get(star.id)!.title}
+                    </span>
+                  ))}
+                </div>
 
                 <div className="rj-stars">
                   {sky.stars.map((star) => (

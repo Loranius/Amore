@@ -3,6 +3,7 @@ import {
   buildConstellation,
   CONSTELLATION_HEIGHT,
   CONSTELLATION_WIDTH,
+  labelSizeOf,
   segmentsCross,
   type ConstellationInput,
 } from './constellationLayout';
@@ -318,5 +319,59 @@ describe('перетини променів', () => {
   it('ланцюг лишається ланцюгом навіть там, де перетини є', () => {
     const { stars, edges } = buildConstellation(spread(30));
     expect(edges).toHaveLength(stars.length - 1);
+  });
+});
+
+describe('бік підпису', () => {
+  it('зірки з нижньої половини неба підписуються згори', () => {
+    for (const star of buildConstellation(COUPLE).stars) {
+      expect(star.labelAbove).toBe(star.y > CONSTELLATION_HEIGHT * 0.55);
+    }
+  });
+
+  it('ядро в центрі підписується знизу', () => {
+    const core = buildConstellation(COUPLE).stars.find((star) => star.core)!;
+    expect(core.labelAbove).toBe(false);
+  });
+});
+
+describe('підписи', () => {
+  it('жоден підпис не виїжджає за кадр', () => {
+    for (const star of buildConstellation(COUPLE).stars) {
+      expect(star.labelX).toBeGreaterThanOrEqual(0);
+      expect(star.labelX).toBeLessThanOrEqual(CONSTELLATION_WIDTH);
+    }
+  });
+
+  it('підпис іде за зіркою, поки та не підходить до краю', () => {
+    for (const star of buildConstellation(COUPLE).stars) {
+      const half = labelSizeOf(star).width / 2;
+      const expected = Math.min(Math.max(star.x, half), CONSTELLATION_WIDTH - half);
+      expect(star.labelX).toBeCloseTo(expected, 6);
+    }
+  });
+
+  it('підписи не налазять один на одного', () => {
+    const { stars } = buildConstellation(COUPLE);
+    const rects = stars.map((star) => {
+      const { width, height } = labelSizeOf(star);
+      const top = star.labelAbove
+        ? star.y - star.radius - 1.8 - height
+        : star.y + star.radius + 1.8;
+      return {
+        left: star.labelX - width / 2,
+        right: star.labelX + width / 2,
+        top,
+        bottom: top + height,
+      };
+    });
+    for (let i = 0; i < rects.length; i += 1) {
+      for (let j = i + 1; j < rects.length; j += 1) {
+        const a = rects[i]!;
+        const b = rects[j]!;
+        const hit = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+        expect(hit).toBe(false);
+      }
+    }
   });
 });
