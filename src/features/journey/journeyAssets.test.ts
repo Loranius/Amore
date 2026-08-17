@@ -65,67 +65,44 @@ function imageBytes(document: GlbDocument, bin: Buffer, index: number): Buffer {
   return bin.subarray(start, start + view.byteLength);
 }
 
-/**
- * Габарит WebP із контейнера RIFF.
- *
- * Три форми, і всі три треба знати: `VP8 ` (з втратами), `VP8L` (без втрат) і
- * `VP8X` (розширений — саме його віддає Chromium, бо дописує профіль ICC).
- */
-function webpCanvas(webp: Buffer): { width: number; height: number; fourcc: string } {
-  expect(webp.toString('ascii', 0, 4)).toBe('RIFF');
-  expect(webp.toString('ascii', 8, 12)).toBe('WEBP');
-  const fourcc = webp.toString('ascii', 12, 16);
-  if (fourcc === 'VP8X') {
-    return {
-      fourcc,
-      width: (webp.readUIntLE(24, 3) & 0xffffff) + 1,
-      height: (webp.readUIntLE(27, 3) & 0xffffff) + 1,
-    };
-  }
-  if (fourcc === 'VP8L') {
-    const bits = webp.readUInt32LE(21);
-    return { fourcc, width: (bits & 0x3fff) + 1, height: ((bits >>> 14) & 0x3fff) + 1 };
-  }
-  expect(fourcc).toBe('VP8 ');
-  expect(webp.readUInt32LE(23) & 0x00ffffff).toBe(0x2a019d); // ключовий кадр
-  return {
-    fourcc,
-    width: webp.readUInt16LE(26) & 0x3fff,
-    height: webp.readUInt16LE(28) & 0x3fff,
-  };
-}
-
 describe('скайбокс «Нашого шляху»', () => {
-  it('лишається під стелею, заради якої його перетискали', () => {
+  it('лишається під стелею', () => {
     const { byteLength, document } = readGlb(publicAsset(JOURNEY_SKYBOX_PATH));
-    // Оригінал зі Sketchfab важив 8 511 640 байтів — понад вісім мегабайтів
-    // однією PNG. Якщо тут знову з'явиться щось таке, це має падати.
     expect(byteLength).toBeLessThan(JOURNEY_SKYBOX_MAX_BYTES);
     expect(triangleCount(document)).toBeLessThanOrEqual(JOURNEY_MAX_TRIANGLES);
   });
 
-  it('везе панораму саме як WebP і саме через розширення', () => {
+  it('везе панораму БЕЗ ВТРАТ — стискання з’їдало колір зірок', () => {
+    /*
+     * Регрес, який побачив власник, а не тест.
+     *
+     * Текстура їхала WebP q80 (0.71 МБ замість 8.09). За різкістю втрати не
+     * було взагалі — середній модуль градієнта на живому екрані 4.114 проти
+     * 4.088. Але WebP підвибирає КОЛІР удвічі, а панорама розтягнута на екрані
+     * приблизно втричі: червоні та сині іскри окремих зірок злились у рівний
+     * фіолет, і фон почав читатись дешевим.
+     *
+     * Тому джерело лишається без втрат. Якщо колись з'явиться кодек із
+     * повною кольоровістю (4:4:4), його можна буде взяти — але не 4:2:0.
+     */
     const { document } = readGlb(publicAsset(JOURNEY_SKYBOX_PATH));
     expect(document.images).toHaveLength(1);
-    expect(document.images![0]!.mimeType).toBe('image/webp');
-    // Запасної PNG немає, тож розширення мусить бути ОБОВ'ЯЗКОВИМ: інакше
-    // завантажувач без його підтримки мовчки дістав би текстуру без джерела.
-    expect(document.extensionsUsed).toContain('EXT_texture_webp');
-    expect(document.extensionsRequired).toContain('EXT_texture_webp');
-    const texture = document.textures![0]!;
-    expect(texture.source).toBeUndefined();
-    expect(texture.extensions?.EXT_texture_webp?.source).toBe(0);
+    expect(document.images![0]!.mimeType).toBe('image/png');
+    expect(document.extensionsRequired ?? []).not.toContain('EXT_texture_webp');
+    expect(document.textures![0]!.source).toBe(0);
   });
 
   it('тримає роздільність 2048 — на 1536 точкові зірки змазуються', () => {
     const { document, bin } = readGlb(publicAsset(JOURNEY_SKYBOX_PATH));
-    const webp = imageBytes(document, bin, 0);
-    const { width, height, fourcc } = webpCanvas(webp);
-    expect(width).toBe(JOURNEY_SKYBOX_TEXTURE_SIZE);
-    expect(height).toBe(JOURNEY_SKYBOX_TEXTURE_SIZE);
-    // VP8L — це WebP БЕЗ втрат, і на зоряному шумі він важить як PNG. Якщо
-    // текстуру колись перезберуть у ньому, стеля ваги впаде разом із цим.
-    expect(fourcc).not.toBe('VP8L');
+    const png = imageBytes(document, bin, 0);
+    // Сигнатура PNG і габарит із IHDR — перший блок після неї.
+    expect(png.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+    expect(png.toString('ascii', 12, 16)).toBe('IHDR');
+    expect(png.readUInt32BE(16)).toBe(JOURNEY_SKYBOX_TEXTURE_SIZE);
+    expect(png.readUInt32BE(20)).toBe(JOURNEY_SKYBOX_TEXTURE_SIZE);
+    // Тип 2 — truecolor без палітри. Індексована панорама вбила б колір так
+    // само, як це зробила підвибірка.
+    expect(png[25]).toBe(2);
   });
 
   it('лишається двостороннім — камера дивиться зсередини сфери', () => {
@@ -150,6 +127,8 @@ describe('атрибуція', () => {
     expect(text.match(/^License: CC-BY-4\.0$/gm)).toHaveLength(2);
     expect(text).toContain('alexandr.melas');
     expect(text).toContain('Kasugay');
-    expect(text).toContain('EXT_texture_webp');
+    // CC-BY вимагає позначати зміни. Обидва асети їдуть незміненими — і саме
+    // це має бути написано, а не лишатись здогадом.
+    expect(text.match(/^The source GLB is stored unchanged\.$/gm)).toHaveLength(2);
   });
 });

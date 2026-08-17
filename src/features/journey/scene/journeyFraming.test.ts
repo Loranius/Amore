@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { journeyFraming, type JourneyShape, type JourneyViewport } from './journeyFraming';
+import { focusDistance, journeyFraming, type JourneyShape, type JourneyViewport } from './journeyFraming';
 
 /** Телефон пари: 412×915. */
 const PHONE: JourneyViewport = { aspect: 412 / 915, fovY: 52 };
@@ -150,5 +150,38 @@ describe('journeyFraming', () => {
 
   it('те саме сузір’я на тому самому екрані кадрується однаково', () => {
     expect(journeyFraming(COUPLE, PHONE)).toEqual(journeyFraming(COUPLE, PHONE));
+  });
+});
+
+describe('focusDistance', () => {
+  const RADIUS = 3.4;
+
+  it('сонце вміщається у ВУЖЧУ сторону кадру', () => {
+    for (const viewport of [PHONE, WIDE, { aspect: 0.4, fovY: 52 }]) {
+      const distance = focusDistance(RADIUS, viewport);
+      const tanY = Math.tan((viewport.fovY * Math.PI) / 360);
+      const tanX = tanY * viewport.aspect;
+      expect(RADIUS).toBeLessThanOrEqual(distance * Math.min(tanY, tanX));
+    }
+  });
+
+  it('вузький екран відсуває камеру далі за широкий', () => {
+    expect(focusDistance(RADIUS, PHONE)).toBeGreaterThan(focusDistance(RADIUS, WIDE));
+  });
+
+  it('більша подія відсуває камеру далі', () => {
+    expect(focusDistance(6, PHONE)).toBeGreaterThan(focusDistance(3, PHONE));
+  });
+
+  it('камера ніколи не опиняється всередині сонця', () => {
+    for (const radius of [0.5, 3.4, 12]) {
+      for (const viewport of [PHONE, WIDE, { aspect: 4, fovY: 52 }]) {
+        expect(focusDistance(radius, viewport)).toBeGreaterThan(radius);
+      }
+    }
+  });
+
+  it('вироджений кадр не дає нескінченності', () => {
+    expect(Number.isFinite(focusDistance(RADIUS, { aspect: 0, fovY: 52 }))).toBe(true);
   });
 });

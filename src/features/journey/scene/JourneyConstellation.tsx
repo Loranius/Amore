@@ -37,7 +37,7 @@ import { createStarShape } from './starSilhouette';
 const HALO_BASE = 2.4;
 const HALO_SCALE = 3.4;
 
-function haloSize(radius: number): number {
+export function haloSize(radius: number): number {
   return HALO_BASE + radius * HALO_SCALE;
 }
 
@@ -121,6 +121,10 @@ export interface JourneyConstellationProps {
   clock: { current: number };
   /** Пара просила спокою: зірки з'являються всі разом. */
   reducedMotion: boolean;
+  /** Подія, яка зараз розкривається. Її зірка поступається місцем сонцю. */
+  focusId?: number | null;
+  /** Наскільки сонце вже проявилось, 0…1. Реф — щоб не смикати дерево. */
+  reveal?: { current: number };
 }
 
 /** Наскільки зірка вже народилась, 0…1. */
@@ -140,6 +144,8 @@ export function JourneyConstellation({
   palette,
   clock,
   reducedMotion,
+  focusId = null,
+  reveal,
 }: JourneyConstellationProps) {
   const bodyRef = useRef<InstancedMesh>(null);
   const haloRef = useRef<InstancedMesh>(null);
@@ -169,8 +175,14 @@ export function JourneyConstellation({
     const facing = state.camera.quaternion;
     const { matrix, position, scale } = scratch.current;
 
+    // Обрана зірка гасне рівно настільки, наскільки проявилось сонце: обидва
+    // тіла стоять в одній світовій точці, і перехід читається як наближення, а
+    // не як «зникло і з'явилось».
+    const yielded = focusId === null ? 0 : Math.max(0, Math.min(1, reveal?.current ?? 0));
+
     stars.forEach((star, index) => {
-      const grown = reducedMotion ? 1 : birthProgress(star.order, clock.current);
+      const born = reducedMotion ? 1 : birthProgress(star.order, clock.current);
+      const grown = star.id === focusId ? born * (1 - yielded) : born;
       position.set(star.x, star.y, star.z);
 
       const size = star.radius * grown;
@@ -198,7 +210,7 @@ export function JourneyConstellation({
         ref={haloRef}
         args={[haloGeometry, undefined, stars.length]}
         frustumCulled={false}
-        renderOrder={1}
+        renderOrder={2}
       >
         <instancedBufferAttribute
           attach="geometry-attributes-instanceTint"
@@ -219,7 +231,7 @@ export function JourneyConstellation({
         ref={bodyRef}
         args={[bodyGeometry, undefined, stars.length]}
         frustumCulled={false}
-        renderOrder={2}
+        renderOrder={3}
       >
         <instancedBufferAttribute
           attach="geometry-attributes-instanceTint"

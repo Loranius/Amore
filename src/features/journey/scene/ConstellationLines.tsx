@@ -76,7 +76,7 @@ export function ConstellationLines({
   if (edges.length === 0) return null;
 
   return (
-    <lineSegments ref={linesRef} geometry={geometry} frustumCulled={false} renderOrder={0}>
+    <lineSegments ref={linesRef} geometry={geometry} frustumCulled={false} renderOrder={1}>
       <lineBasicMaterial
         color={palette.key}
         transparent

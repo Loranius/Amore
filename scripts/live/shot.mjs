@@ -9,6 +9,7 @@ import {
   probeSelectors,
   readJourneyMetrics,
   readSceneMetrics,
+  tapPoint,
   tapSelector,
 } from './portal.mjs';
 
@@ -117,6 +118,20 @@ async function main() {
           for (const [selector, found] of Object.entries(probes)) {
             console.log(`  ${selector} × ${found.count}`);
             if (found.count > 0) console.log(`    ${JSON.stringify(found.boxes)}`);
+          }
+
+          // Дотики по координаті — для сцени, де селектора немає.
+          for (const [index, point] of options.tapPoints.entries()) {
+            await tapPoint(portal.page, point);
+            const suffix = options.tapPoints.length > 1 ? `-at${index + 1}` : '-at';
+            const tapFile = `${outDir}/${name}${suffix}.png`;
+            await portal.page.screenshot({ path: tapFile });
+            const after = await readJourneyMetrics(portal.page);
+            console.log(`  дотик   ${point.x},${point.y} → ${tapFile}`);
+            if (after !== null) {
+              console.log(`          режим ${after.state === null ? '—' : after.mode ?? '—'},`
+                + ` подія ${after.focus === '' || after.focus === null ? '—' : after.focus}`);
+            }
           }
 
           // Тапи йдуть послідовно: другий шукає те, що з'явилось після

@@ -247,8 +247,14 @@ export async function goToRoute(page, path, { settle }) {
   // доїде скайбокс, прилетить камера й народяться всі зірки, а під SwiftShader
   // кадри йдуть по три на секунду. Те, що на телефоні займе три секунди, тут
   // триває півхвилини — тому чекати треба ознаку, а не «розумний» ліміт.
+  // Двадцять секунд на саму ПОЯВУ вузла, а не на готовність сцени.
+  //
+  // Було три, і цього не вистачало: маршрут лінивий, модуль сцени великий, а
+  // dev-сервер компілює його на першому заході. Вузол не встигав змонтуватись,
+  // перевірка мовчки пропускалась — і знімок виходив із недобудованої сцени,
+  // яку потім читали як ваду. Рівно та пастка, від якої цей файл і застерігає.
   const journey = await page
-    .waitForSelector('[data-journey]', { timeout: 3_000 })
+    .waitForSelector('[data-journey]', { timeout: 20_000 })
     .then(() => true)
     .catch(() => false);
   if (journey) {
@@ -300,6 +306,9 @@ export async function readJourneyMetrics(page) {
     const attr = (name) => node.getAttribute(name);
     return {
       state: attr('data-journey'),
+      mode: attr('data-journey-mode'),
+      focus: attr('data-journey-focus'),
+      bloom: attr('data-journey-bloom'),
       quality: attr('data-journey-quality'),
       pixelRatio: attr('data-journey-pixel-ratio'),
       stars: attr('data-journey-stars'),
@@ -333,6 +342,21 @@ export async function probeSelectors(page, selectors) {
     }
     return result;
   }, selectors);
+}
+
+/**
+ * Тап по КООРДИНАТІ, а не по селектору.
+ *
+ * Для сцени це єдиний спосіб: зірки живуть у полотні, і селектора в них немає.
+ * Йде повним циклом `down → up`, бо сцена розрізняє дотик і перетягування саме
+ * за рухом між ними.
+ */
+export async function tapPoint(page, { x, y }, { after = 1200 } = {}) {
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.up();
+  await page.waitForTimeout(after);
+  return true;
 }
 
 /** Тап по першому збігу — те саме, що робить палець, разом із очікуванням. */
