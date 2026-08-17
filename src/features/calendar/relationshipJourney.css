@@ -301,3 +301,20 @@
 @media (prefers-reduced-motion: reduce) {
   .rj-star, .rj-beam, .rj-leader { animation: none !important; }
 }
+
+/* Розгортання картки в повноекранний маршрут. */
+.relationship-journey-expand {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--accent);
+  rotate: 45deg;
+}
+.relationship-journey-expand:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 2px;
+}

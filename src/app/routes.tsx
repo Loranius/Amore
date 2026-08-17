@@ -33,6 +33,7 @@ const MediaPage = lazy(() => import('@/features/media/MediaPage').then((m) => ({
 const CulinaryPage = lazy(() => import('@/features/culinary/CulinaryPage').then((m) => ({ default: m.CulinaryPage })));
 const PiggyBankPage = lazy(() => import('@/features/piggybank/PiggyBankPage').then((m) => ({ default: m.PiggyBankPage })));
 const PlansPage = lazy(() => import('@/features/plans/PlansPage').then((m) => ({ default: m.PlansPage })));
+const JourneyPage = lazy(() => import('@/features/journey/JourneyPage').then((m) => ({ default: m.JourneyPage })));
 const PlanDetailsPage = lazy(() => import('@/features/plans/PlanDetailsPage').then((m) => ({ default: m.PlanDetailsPage })));
 const MapPage = lazy(() => import('@/features/map/MapPage').then((m) => ({ default: m.MapPage })));
 const WhereToPage = lazy(() => import('@/features/whereto/WhereToPage').then((m) => ({ default: m.WhereToPage })));
@@ -72,6 +73,9 @@ export const router = createHashRouter([
           { path: 'wishlist', element: page(<WishlistPage />) },
           { path: 'plans', element: page(<PlansPage />) },
           { path: 'plans/:id', element: page(<PlanDetailsPage />) },
+          // Єдиний маршрут, що забирає екран цілком: док і бічна панель
+          // ідуть з дороги, кристала немає. Див. `useImmersiveRoute`.
+          { path: 'journey', element: page(<JourneyPage />) },
           { path: 'piggybank', element: page(<PiggyBankPage />) },
           // Стара адреса «Фінансів»: закладки й посилання в Telegram
           // не мусять ламатись через перейменування модуля.

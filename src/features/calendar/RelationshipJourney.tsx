@@ -6,18 +6,18 @@
 // датою. Ані «сьогодні», ані поділу на минуле й майбутнє тут немає — небо
 // не має напрямку читання, у ньому є тільки історія пари.
 //
-// Геометрія рахується в `constellationLayout.ts`; цей файл лише малює.
+// Саме небо (промені, зірки, поводир) малює `ConstellationSky` — спільний
+// компонент для цієї картки й повноекранного маршруту `/journey`. Тут лишилась
+// тільки оболонка картки: шапка, порожній стан і вхід у повний екран.
 // ============================================================
-import { memo, useMemo, useState, type CSSProperties } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { HeartIcon } from '@/components/icons/NavIcon';
-import { PlusIcon } from '@/components/icons/UiIcon';
+import { ArrowUpIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { generateArtifactDNA } from '@/features/home/artifact/artifactDNA';
 import { useCrystalSeed } from '@/features/home/useHome';
-import type { EventRow, EventSignificance } from '@/types';
-import {
-  buildConstellation,
-  type ConstellationStar,
-} from './constellationLayout';
+import { ConstellationSky } from '@/features/journey/ConstellationSky';
+import type { EventRow } from '@/types';
 import nebulaUrl from '@/assets/journey/nebula.webp';
 import './relationshipJourney.css';
 
@@ -36,29 +36,8 @@ const CRYSTAL_CORE_BASE_HUE = 260.2247191011;
  */
 const JOURNEY_HUE_SPREAD = 34;
 
-/** Пауза між появою сусідніх зірок, с. */
-const BIRTH_STEP = 0.16;
-
 function isJourneyEvent(event: EventRow): boolean {
   return event.type === 'anniversary';
-}
-
-function dateLabel(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString('uk-UA', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-}
-
-/**
- * Дата під назвою — без «р.» у кінці.
- *
- * Локаль додає його завжди, і чотирнадцять знаків замість одинадцяти рівно на
- * стільки й переносили рядок: «22 травня 2022 р.» ламалось надвоє під зіркою.
- */
-function shortDateLabel(date: string): string {
-  return dateLabel(date).replace(/\s*р\.$/, '');
 }
 
 function crystalJourneyStyle(seed: string | null): CSSProperties {
@@ -68,56 +47,9 @@ function crystalJourneyStyle(seed: string | null): CSSProperties {
   return {
     '--relationship-journey-neon': `hsl(${hue.toFixed(1)} 88% 72%)`,
     '--relationship-journey-neon-core': `hsl(${hue.toFixed(1)} 96% 88%)`,
+    '--rj-nebula': `url(${nebulaUrl})`,
   } as CSSProperties;
 }
-
-function starTone(star: ConstellationStar): string {
-  return star.core ? 'core' : star.level;
-}
-
-function starCaption(star: ConstellationStar, significance: EventSignificance): string {
-  if (star.core) return significance === 'marriage' ? 'Одруження' : 'Початок відносин';
-  if (significance === 'relationship_start') return 'Початок відносин';
-  return star.level === 'important' ? 'Важлива подія' : 'Подія';
-}
-
-const ConstellationStarButton = memo(function ConstellationStarButton({
-  star,
-  event,
-  width,
-  height,
-  named,
-  onName,
-  onOpen,
-}: {
-  star: ConstellationStar;
-  event: EventRow;
-  width: number;
-  height: number;
-  named: boolean;
-  onName: (id: number) => void;
-  onOpen: (event: EventRow) => void;
-}) {
-  const style = {
-    left: `${(star.x / width) * 100}%`,
-    top: `${(star.y / height) * 100}%`,
-    '--star-size': `${(star.radius * 2 / width) * 100}%`,
-    '--star-delay': `${(star.order * BIRTH_STEP).toFixed(2)}s`,
-  } as CSSProperties;
-
-  return (
-    <button
-      type="button"
-      className={`rj-star rj-star--${starTone(star)}${named ? ' rj-star--named' : ''}`}
-      style={style}
-      aria-pressed={named}
-      onClick={() => (named ? onOpen(event) : onName(star.id))}
-      aria-label={`${starCaption(star, event.significance)}: ${event.title}, ${dateLabel(event.date)}`}
-    >
-      <span className="rj-star-body" aria-hidden="true" />
-    </button>
-  );
-});
 
 export function RelationshipJourney({
   events,
@@ -129,30 +61,9 @@ export function RelationshipJourney({
   onAdd: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
   const { seed } = useCrystalSeed();
   const journeyStyle = useMemo(() => crystalJourneyStyle(seed), [seed]);
-
   const moments = useMemo(() => events.filter(isJourneyEvent), [events]);
-  const byId = useMemo(() => new Map(moments.map((event) => [event.id, event])), [moments]);
-  const sky = useMemo(
-    () => buildConstellation(
-      moments.map((event) => ({
-        id: event.id,
-        date: event.date,
-        significance: event.significance,
-        titleLength: event.title.length,
-      })),
-    ),
-    [moments],
-  );
-
-  const selected = useMemo(() => {
-    if (selectedId === null) return null;
-    const star = sky.stars.find((candidate) => candidate.id === selectedId);
-    const event = star ? byId.get(star.id) : undefined;
-    return star && event ? { star, event } : null;
-  }, [byId, selectedId, sky.stars]);
 
   return (
     <details
@@ -168,6 +79,18 @@ export function RelationshipJourney({
           <strong>Наш шлях</strong>
         </span>
         <span className="relationship-journey-summary-count">{moments.length}</span>
+        {/*
+          Розгортання — окрема кнопка, а не дотик по карті: на самому небі вже
+          живе дотик по зірці, і сплутати їх було б надто легко.
+        */}
+        <Link
+          to="/journey"
+          className="relationship-journey-expand"
+          aria-label="Відкрити карту на весь екран"
+          onClick={(clickEvent) => clickEvent.stopPropagation()}
+        >
+          <ArrowUpIcon size={16} />
+        </Link>
       </summary>
 
       {expanded && (
@@ -181,94 +104,7 @@ export function RelationshipJourney({
             </section>
           ) : (
             <>
-              <div
-                className="rj-sky"
-                onClick={(clickEvent) => {
-                  if (clickEvent.target === clickEvent.currentTarget) setSelectedId(null);
-                }}
-                style={{
-                  '--rj-ratio': `${sky.width} / ${sky.height}`,
-                  '--rj-nebula': `url(${nebulaUrl})`,
-                } as CSSProperties}
-              >
-                <svg
-                  className="rj-beams"
-                  viewBox={`0 0 ${sky.width} ${sky.height}`}
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  {sky.edges.map((edge, index) => (
-                    <line
-                      key={`${edge.fromId}-${edge.toId}`}
-                      className="rj-beam"
-                      x1={edge.x1}
-                      y1={edge.y1}
-                      x2={edge.x2}
-                      y2={edge.y2}
-                      pathLength={1}
-                      style={{ '--beam-delay': `${((index + 1) * BIRTH_STEP).toFixed(2)}s` } as CSSProperties}
-                    />
-                  ))}
-                </svg>
-
-                {/*
-                  Назва не висить постійно — її показує дотик, по одній за
-                  раз. Сім підписів у кадрі телефона налазять одне на одного
-                  за будь-якого розведення (шість проходів, усі виміряні), а
-                  одна ламана-поводир завжди має куди лягти.
-                */}
-                <svg
-                  className="rj-leaders"
-                  viewBox={`0 0 ${sky.width} ${sky.height}`}
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  {selected && (
-                    <g className={`rj-leader rj-leader--${starTone(selected.star)}`}>
-                      <polyline
-                        className="rj-leader-line"
-                        points={[
-                          `${selected.star.leader.startX},${selected.star.leader.startY}`,
-                          `${selected.star.leader.bendX},${selected.star.leader.bendY}`,
-                          `${selected.star.leader.endX},${selected.star.leader.endY}`,
-                        ].join(' ')}
-                        pathLength={1}
-                      />
-                      <text
-                        className="rj-leader-title"
-                        x={selected.star.leader.endX}
-                        y={selected.star.leader.endY - 0.9}
-                        textAnchor={selected.star.leader.align}
-                      >
-                        {selected.event.title}
-                      </text>
-                      <text
-                        className="rj-leader-date"
-                        x={selected.star.leader.endX}
-                        y={selected.star.leader.endY + 2.9}
-                        textAnchor={selected.star.leader.align}
-                      >
-                        {shortDateLabel(selected.event.date)}
-                      </text>
-                    </g>
-                  )}
-                </svg>
-
-                <div className="rj-stars">
-                  {sky.stars.map((star) => (
-                    <ConstellationStarButton
-                      key={star.id}
-                      star={star}
-                      event={byId.get(star.id)!}
-                      width={sky.width}
-                      height={sky.height}
-                      named={selectedId === star.id}
-                      onName={setSelectedId}
-                      onOpen={onOpen}
-                    />
-                  ))}
-                </div>
-              </div>
+              <ConstellationSky events={moments} onOpen={onOpen} />
 
               <footer className="relationship-journey-future">
                 <strong>Історія триває</strong>

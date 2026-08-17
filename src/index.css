@@ -2435,3 +2435,31 @@ textarea::placeholder {
 @media (prefers-reduced-motion: reduce) {
   .page-skeleton-block { animation: none; }
 }
+
+/* ------------------------------------------------------------
+   Режим занурення: маршрут забирає екран цілком.
+
+   Перший такий маршрут — «Наш шлях» (`/journey`). Досі док ховали лише за
+   станом (`:has()` на відкритій модалці у вішліста), і для маршруту це не
+   годиться: сторінка не «відкрита поверх», вона і є екран.
+
+   Ховаємо через `visibility` + зсув, а не `display: none` — щоб перехід був
+   плавним і фокус не стрибав по дереву.
+   ------------------------------------------------------------ */
+[data-immersive='true'] .bottom-nav,
+[data-immersive='true'] .sidebar {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(calc(100% + 40px));
+}
+
+/* Доковий відступ у 88 px тут нічого не резервує — доку немає. */
+[data-immersive='true'] .app-shell > .content {
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-immersive='true'] .bottom-nav,
+  [data-immersive='true'] .sidebar { transform: none; }
+}

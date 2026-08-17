@@ -7,6 +7,18 @@ description: Portal-wide UX, theming, navigation, and onboarding for Amore (a co
 
 ## Current state (read this before assuming something exists)
 
+- **Повноекранний маршрут тепер існує — рівно один.** `/journey` («Наш шлях»)
+  забирає екран цілком через `useImmersiveRoute()` (`src/features/world/`),
+  який ставить `data-immersive="true"` на `<html>`; під цим атрибутом у
+  `src/index.css` ховаються `.bottom-nav` і `.sidebar`, а доковий відступ
+  `.content` знімається. Якщо потрібен другий такий екран — вживайте цей хук,
+  а не новий механізм. Док у решті застосунку ховається лише за станом
+  (`:has()` на відкритій модалці), і для маршруту це не годиться.
+- **Кристал за сторінкою вмикається, а не вимикається.** Світ видимий тільки
+  під `[data-portal-scene='true']` від `useWorldVisibleRoute()`. Сторінка, якій
+  кристал не потрібен, просто не викликає хук — окремого «сховати» немає й не
+  треба.
+
 - **Theming today is light/dark only.** `ThemeProvider.tsx` sets
   `data-theme="light"|"dark"` on `<html>`; every token lives in `:root` /
   `[data-theme="dark"]` in `src/index.css` (the "Pink Portal" token system —
