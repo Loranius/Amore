@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { evaluateReefProductionRuntimeAcceptance } from '@/engine/productionAcceptance';
+import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
 import {
   EvolutionRuntimeProbe,
@@ -56,6 +57,7 @@ function useReducedMotion(): boolean {
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
   const reducedMotion = useReducedMotion();
+  const frameloop = useWorldFrameloop();
   const [fishRuntime, setFishRuntime] = useState<ReefFishSchoolMetrics | null>(null);
   const [worldRuntime, setWorldRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setWorldRuntime(next), []);
@@ -165,7 +167,9 @@ export default function ReefPreviewScene() {
     >
       <Canvas
         dpr={[1, 1.5]}
-        frameloop="always"
+        // Занурений маршрут забирає екран собі; риф лишається живим, але
+        // кадрів для невидимої сцени не малює.
+        frameloop={frameloop}
         camera={{
           position: [...DEFAULT_REEF_CAMERA_FRAME.position],
           fov: DEFAULT_REEF_CAMERA_FRAME.fov,

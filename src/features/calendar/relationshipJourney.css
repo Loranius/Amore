@@ -1,320 +1,75 @@
 /* ============================================================
-   «Наш шлях» у вкладці календаря «Наші свята».
-   Сузір'я: одна подія — одна зірка, промінь до попередньої за датою.
+   Вхід у «Наш шлях» із вкладки «Події».
+   ------------------------------------------------------------
+   Рядок, а не картка. Все, що малювало пласке сузір'я — небо, промені,
+   зірки, поводирі з підписами — пішло звідси разом із переходом модуля в
+   справжню 3D-сцену (`features/journey/scene/`). Друга подача того самого
+   сузір'я не мала б сенсу: у кадрі 100×168 і в просторі це РІЗНІ сузір'я,
+   бо в другому працює глибина.
    ============================================================ */
 .relationship-journey {
-  margin: 14px 0 18px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
-  border-radius: 24px;
-  background: var(--surface);
-}
-.relationship-journey > summary {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 12px;
   padding: 13px 15px;
-  cursor: pointer;
-  list-style: none;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
+  border-radius: 22px;
+  margin: 14px 0 18px;
+  background:
+    radial-gradient(140% 120% at 12% 50%, color-mix(in srgb, var(--accent) 11%, transparent), transparent 62%),
+    var(--surface);
+  color: inherit;
+  text-decoration: none;
   -webkit-tap-highlight-color: transparent;
 }
-.relationship-journey > summary::-webkit-details-marker { display: none; }
-.relationship-journey-summary-icon {
+
+.relationship-journey-icon {
   display: grid;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 13px;
+  border-radius: 14px;
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   color: var(--accent);
 }
-.relationship-journey-summary-copy { display: grid; min-width: 0; flex: 1 1 auto; gap: 1px; }
-.relationship-journey-summary-copy small { color: var(--muted); font-size: 10.5px; }
-.relationship-journey-summary-copy strong { font-size: 15px; }
-.relationship-journey-summary-count {
-  display: grid;
-  min-width: 29px;
-  height: 29px;
-  place-items: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 800;
-}
 
-/* ------------------------------------------------------------
-   Небо. Темніше за картку — сузір'я має світитись, а не лежати.
-   ------------------------------------------------------------ */
-.relationship-journey-shell {
-  position: relative;
+.relationship-journey-copy { display: grid; min-width: 0; flex: 1 1 auto; gap: 2px; }
+.relationship-journey-copy strong { font-size: 15px; }
+.relationship-journey-copy small {
   overflow: hidden;
-  border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
-  background:
-    radial-gradient(120% 80% at 50% 42%, color-mix(in srgb, var(--relationship-journey-neon, var(--accent)) 13%, transparent), transparent 68%),
-    linear-gradient(168deg, color-mix(in srgb, var(--accent) 9%, var(--surface)), var(--surface) 72%);
-  contain: paint;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
 }
 
-/*
- * Небо — фотографія туманності з референсу власника, а не градієнт.
- * Поверх неї лягає темна вуаль: без неї підписи тонуть у світлих ділянках.
- */
-.rj-sky {
-  position: relative;
-  aspect-ratio: var(--rj-ratio, 100 / 168);
-  width: 100%;
-  padding: 0;
-  background-image: var(--rj-nebula);
-  background-position: center;
-  background-size: cover;
-}
-.rj-sky::before {
-  position: absolute;
-  background:
-    radial-gradient(120% 70% at 50% 50%, transparent, color-mix(in srgb, var(--surface) 62%, transparent) 100%),
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 55%, transparent), transparent 22%, transparent 78%, color-mix(in srgb, var(--surface) 65%, transparent));
-  content: '';
-  inset: 0;
-  pointer-events: none;
-}
-
-.rj-beams {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-.rj-beam {
-  fill: none;
-  stroke: var(--relationship-journey-neon-core, var(--relationship-journey-neon, var(--accent)));
-  stroke-width: 0.42;
-  stroke-linecap: round;
-  opacity: .72;
-  vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 0 3px var(--relationship-journey-neon, var(--accent)));
-}
-
-.rj-stars { position: absolute; inset: 0; }
-
-/*
- * Колір зірки — орієнтир за рівнем, а не прикраса.
- *
- * Портал одноколірний за ADR-0031, і три відтінки тут — свідомий виняток:
- * на карті з семи підписів рівень має читатись до того, як почнеш читати.
- * Ключова лишається фіолетовою (тобто барвою ДНК пари) — саме тому вона й
- * далі виглядає головною серед різнобарв'я.
- */
-.rj-star--core,
-.rj-star--key { --star-hue: var(--relationship-journey-neon, var(--accent)); --star-core: var(--relationship-journey-neon-core, #fff); }
-.rj-star--important { --star-hue: hsl(44 92% 62%); --star-core: hsl(48 100% 86%); }
-.rj-star--regular { --star-hue: hsl(184 76% 58%); --star-core: hsl(180 92% 84%); }
-
-/* Зірка. Позиція — центр диска, тому зсув на половину власного розміру. */
-.rj-star {
-  position: absolute;
+.relationship-journey-go {
   display: grid;
-  width: var(--star-size, 5%);
-  /* 1.52 / 1.7024 — пропорція моделі: зірка вища за ширину. */
-  aspect-ratio: .893;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  transform: translate(-50%, -50%);
-  cursor: pointer;
-  place-items: center;
-  -webkit-tap-highlight-color: transparent;
-}
-/*
- * Чотирипроменева зірка — силует узятий з моделей власника
- * (`amore_star_*_glb`), але намальований, а не змонтований.
- *
- * Моделі це пласкі плити на десять вершин: контур із восьми точок, внутрішні
- * кути на 14.1% зовнішнього радіуса, вертикаль 0.851 проти горизонталі 0.76.
- * Ці числа тут дослівно. А от матеріал моделей не підійшов: непрозорий
- * MeshStandard із тьмяним emissive (темнішим за базовий колір), тобто на
- * туманності вони читались би паперовими вирізками, а не світлом. Плюс
- * другий WebGL-контекст у картці заради семи пласких чотирикутників.
- *
- * Тому силует іде в `clip-path`, а світло — радіальним градієнтом під ним:
- * гаряче ядро, спад до кінчиків. Форма референсу, світіння якого моделі не
- * мали, і нуль вартості 3D.
- */
-.rj-star-body {
-  display: block;
-  width: 100%;
-  height: 100%;
-  background:
-    radial-gradient(closest-side,
-      #fff 0%,
-      var(--star-core, #fff) 20%,
-      var(--star-hue, var(--accent)) 48%,
-      color-mix(in srgb, var(--star-hue, var(--accent)) 55%, transparent) 100%);
-  clip-path: polygon(
-    100% 50%, 57.07% 42.93%,
-    50% 0%, 42.93% 42.93%,
-    0% 50%, 42.93% 57.07%,
-    50% 100%, 57.07% 57.07%);
-}
-
-.rj-star::after {
-  position: absolute;
-  border-radius: 50%;
-  background: radial-gradient(circle, color-mix(in srgb, var(--star-hue, var(--accent)) 42%, transparent), transparent 70%);
-  content: '';
-  inset: -95%;
-  opacity: .5;
-  pointer-events: none;
-}
-.rj-star--core::after { inset: -130%; opacity: .72; }
-.rj-star--important::after { inset: -85%; opacity: .44; }
-.rj-star--regular::after { inset: -70%; opacity: .34; }
-
-/* Дотик мусить бути зручним навіть у найменшої зірки. */
-.rj-star::before {
-  position: absolute;
-  content: '';
-  inset: 50%;
-  width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-}
-.rj-star:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--star-hue, var(--accent)) 60%, transparent);
-  outline-offset: 4px;
-  border-radius: 50%;
-}
-
-/*
- * Поводир до назви — ламана, як на зоряних картах.
- *
- * Розміри тут у ОДИНИЦЯХ ПОЛОТНА, не в пікселях: кадр 100×168 розтягується до
- * 378×635, тобто множник 3.78. Перший підхід задав кегль 5.4 «px» і дістав
- * двадцять — назва вийшла на пів екрана.
- *
- * Постійних підписів більше немає: сім назв у кадрі телефона налазять одна на
- * одну за будь-якого розведення (шість проходів, усі виміряні). Назву показує
- * дотик, по одній за раз — і місця тоді вистачає завжди.
- *
- * Перший дотик називає зірку, другий відкриває подію. Дотик по порожньому
- * небу гасить назву.
- */
-.rj-leaders {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-.rj-leader-line {
-  fill: none;
-  stroke: color-mix(in srgb, var(--star-hue, var(--accent)) 70%, #fff);
-  stroke-width: 0.9;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-  filter: drop-shadow(0 0 2px var(--star-hue, var(--accent)));
-}
-.rj-leader-title,
-.rj-leader-date {
-  paint-order: stroke;
-  stroke: #000;
-  stroke-width: 0.7;
-  stroke-linejoin: round;
-}
-.rj-leader-title {
-  fill: color-mix(in srgb, var(--star-hue, var(--accent)) 26%, #fff);
-  font-size: 2.6px;
-  font-weight: 700;
-}
-.rj-leader-date {
-  fill: color-mix(in srgb, #fff 58%, transparent);
-  font-size: 2.1px;
-  font-weight: 600;
-}
-.rj-leader--core { --star-hue: var(--relationship-journey-neon, var(--accent)); }
-.rj-leader--key { --star-hue: var(--relationship-journey-neon, var(--accent)); }
-.rj-leader--important { --star-hue: hsl(44 92% 62%); }
-.rj-leader--regular { --star-hue: hsl(184 76% 58%); }
-
-/* Названа зірка світиться помітніше — видно, яку саме обрано. */
-.rj-star--named::after { inset: -150%; opacity: .85; }
-
-.relationship-journey-future {
-  position: relative;
-  z-index: 2;
-  display: grid;
-  justify-items: center;
-  padding: 4px 18px 20px;
-  text-align: center;
-}
-.relationship-journey-future strong { font-size: 14px; }
-.relationship-journey-future p { max-width: 30ch; margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.4; }
-
-.relationship-journey-empty {
-  position: relative;
-  z-index: 5;
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  padding: 46px 22px 32px;
-  text-align: center;
-}
-.relationship-journey-empty > span { color: var(--accent); }
-.relationship-journey-empty strong { font-size: 16px; }
-.relationship-journey-empty p { max-width: 34ch; margin: 0 0 8px; color: var(--muted); font-size: 11.5px; line-height: 1.42; }
-
-/* ------------------------------------------------------------
-   Народження. Зірка спалахує, слідом дотягується промінь.
-   Порядок задає `--star-delay` / `--beam-delay` з розкладки.
-   ------------------------------------------------------------ */
-@media (prefers-reduced-motion: no-preference) {
-  .rj-leader { animation: rj-leader-draw .28s ease-out; }
-  .rj-star {
-    animation: rj-star-birth .62s cubic-bezier(.22, 1, .36, 1) backwards;
-    animation-delay: var(--star-delay, 0s);
-  }
-  .rj-beam {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: rj-beam-draw .5s ease-out forwards;
-    animation-delay: var(--beam-delay, 0s);
-  }
-}
-
-@keyframes rj-star-birth {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(.1); }
-  60% { opacity: 1; }
-  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-}
-@keyframes rj-leader-draw {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes rj-beam-draw {
-  to { stroke-dashoffset: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rj-star, .rj-beam, .rj-leader { animation: none !important; }
-}
-
-/* Розгортання картки в повноекранний маршрут. */
-.relationship-journey-expand {
-  display: grid;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   flex: 0 0 auto;
   place-items: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
   color: var(--accent);
-  rotate: 45deg;
 }
-.relationship-journey-expand:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  outline-offset: 2px;
+
+/* Порожній стан не веде нікуди: вести туди, де ще нічого немає, — обман. */
+.relationship-journey--empty .relationship-journey-copy small { white-space: normal; }
+
+@media (hover: hover) {
+  a.relationship-journey:hover {
+    border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  a.relationship-journey:hover .relationship-journey-go {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a.relationship-journey,
+  .relationship-journey-go {
+    transition: border-color .18s ease, background-color .18s ease;
+  }
 }

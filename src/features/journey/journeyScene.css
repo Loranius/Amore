@@ -1,98 +1,47 @@
 /* ============================================================
    «Наш шлях» на весь екран.
    ------------------------------------------------------------
-   Чотири шари знизу вгору: глибина, туманності, далекі зірки, сузір'я.
-   Кожен має свою роль, і жоден не повторює сусіда.
+   Небо тепер малює WebGL, і CSS до нього не має жодного стосунку. Тут
+   лишився лише хром поверх сцени: вихід, назва, лічильник, кнопка події.
+
+   Що звідси пішло разом із переходом у 3D: шар глибини, шар туманностей,
+   дрейф двох плям, фонові зірки й мерехтіння. Тримати їх «про запас» під
+   скайбоксом було б гірше за відсутність — два неба світились би одне крізь
+   одне, а слабкий профіль платив би за обидва.
    ============================================================ */
 
 /*
- * Сцена — `fixed`, а не `absolute`: `.content` прокручується й обрізає
- * переповнення, а небо мусить лежати від краю до краю.
+ * Сторінка — `fixed`, а не `absolute`: `.content` прокручується й обрізає
+ * переповнення, а сцена мусить лежати від краю до краю.
  *
  * `transform` тут ЗАБОРОНЕНИЙ. Він зробив би цей елемент контейнером для
  * вкладених `position: fixed` — та сама пастка, що описана на `.page-fade`
  * (`index.css`), де через неї полотно вийшло 380 px у кадрі 412 px.
  */
-.journey-scene {
+.journey-page {
   position: fixed;
-  inset: 0;
   display: flex;
   overflow: hidden;
   flex-direction: column;
   background: var(--world-bg-deep, #0b0714);
   color: var(--world-text, var(--text));
-}
-
-/* ------------------------------------------------------------
-   Шар 1 — глибина. Нерухома, це «низ» кадру.
-   ------------------------------------------------------------ */
-.jn-space { position: absolute; inset: 0; pointer-events: none; }
-.jn-depth {
-  position: absolute;
-  background:
-    radial-gradient(120% 70% at 50% 38%,
-      color-mix(in srgb, var(--world-bg, #150d26) 92%, var(--world-primary, #b06bff)),
-      var(--world-bg-deep, #0b0714) 78%);
   inset: 0;
 }
 
-/* ------------------------------------------------------------
-   Шар 2 — туманності. Фотографія власника плюс дві процедурні плями.
-   Сама фотографія не рухається: рух растру читається як «повзе текстура».
-   Рух дають плями.
-   ------------------------------------------------------------ */
-.jn-nebula {
+/*
+ * Полотно лежить під хромом і займає весь кадр.
+ *
+ * Пропорцію більше ніхто не тримає — і це не недогляд. Пласке сузір'я
+ * рахувалось під кадр 100×168, тож розтягнути його означало б показати інше
+ * сузір'я; у просторі кадр задає лише поле зору камери, а сама розкладка від
+ * форми екрана не залежить взагалі.
+ */
+.journey-scene {
   position: absolute;
-  background-position: center;
-  background-size: cover;
+  z-index: 0;
   inset: 0;
-  opacity: .62;
 }
-.jn-drift {
-  position: absolute;
-  width: 88vw;
-  height: 88vw;
-  border-radius: 50%;
-  filter: blur(28px);
-  mix-blend-mode: screen;
-  opacity: .34;
-}
-.jn-drift--cool {
-  top: -14vh;
-  left: -22vw;
-  background: radial-gradient(closest-side,
-    color-mix(in srgb, var(--world-primary, #b06bff) 46%, transparent), transparent 72%);
-}
-.jn-drift--warm {
-  right: -26vw;
-  bottom: -10vh;
-  background: radial-gradient(closest-side,
-    color-mix(in srgb, var(--world-warm, #ff7ea4) 34%, transparent), transparent 70%);
-}
-
-/* ------------------------------------------------------------
-   Шар 3 — далекі зірки.
-
-   Щільне тло — ОДИН елемент із довгим `box-shadow`: сто п'ятдесят вузлів
-   заради нерухомих крапок були б марною роботою для дерева.
-   Мерехтить меншість, і кожна анімує лише `opacity` — компонувальнику від
-   цього не треба перераховувати розкладку.
-   ------------------------------------------------------------ */
-.jn-dust {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 1px;
-  height: 1px;
-  border-radius: 50%;
-}
-.jn-twinkle {
-  position: absolute;
-  border-radius: 50%;
-  background: #fff;
-  opacity: var(--twinkle-alpha, .5);
-  transform: translate(-50%, -50%);
-}
+.journey-scene canvas { display: block; touch-action: none; }
 
 /* ------------------------------------------------------------
    Хром: вихід, назва, лічильник. Нічого зайвого — сцена належить небу.
@@ -104,7 +53,10 @@
   align-items: center;
   gap: 12px;
   padding: calc(env(safe-area-inset-top, 0) + 14px) 16px 6px;
+  /* Хром не має ловити обертання: дотик повз кнопку належить сцені. */
+  pointer-events: none;
 }
+.jn-chrome > * { pointer-events: auto; }
 .jn-exit {
   display: grid;
   width: 38px;
@@ -119,7 +71,7 @@
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
 }
-.jn-title { display: grid; flex: 1 1 auto; gap: 1px; }
+.jn-title { display: grid; flex: 1 1 auto; gap: 1px; text-shadow: 0 1px 12px rgba(0, 0, 0, .55); }
 .jn-title small { color: var(--world-text-muted, var(--muted)); font-size: 10.5px; }
 .jn-title strong { font-size: 16px; }
 .jn-count {
@@ -132,32 +84,21 @@
   color: var(--world-accent, #d3a6ff);
   font-size: 11px;
   font-weight: 800;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
-/*
- * Сцена вписує небо зі ЗБЕРЕЖЕННЯМ пропорції полотна.
- *
- * Це не косметика: `buildConstellation` рахує координати під кадр 100×168.
- * Якби повний екран розтягував небо під себе, координати були б інші — і пара
- * побачила б два різні сузір'я замість одного більшого.
- */
-.jn-stage {
+.jn-empty {
   position: relative;
-  z-index: 2;
+  z-index: 1;
   display: grid;
-  min-height: 0;
   flex: 1 1 auto;
-  padding: 0 10px;
-  place-items: center;
+  align-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
 }
-.jn-stage .rj-sky {
-  width: min(100%, calc((100dvh - 210px) / 1.68));
-  max-height: 100%;
-  background-image: none;
-}
-.jn-stage .rj-sky::before { content: none; }
-
-.jn-empty { display: grid; justify-items: center; gap: 6px; padding: 24px; text-align: center; }
 .jn-empty strong { font-size: 17px; }
 .jn-empty p { max-width: 30ch; margin: 0; color: var(--world-text-muted, var(--muted)); font-size: 12px; line-height: 1.45; }
 
@@ -167,14 +108,18 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  margin-top: auto;
   padding: 8px 16px calc(env(safe-area-inset-bottom, 0) + 16px);
+  pointer-events: none;
 }
+.jn-foot > * { pointer-events: auto; }
 .jn-foot p {
   margin: 0;
   flex: 1 1 auto;
   color: var(--world-text-muted, var(--muted));
   font-size: 11px;
   line-height: 1.4;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, .55);
 }
 .jn-add {
   display: flex;
@@ -190,47 +135,4 @@
   font: inherit;
   font-weight: 800;
   cursor: pointer;
-}
-
-/* ------------------------------------------------------------
-   Рух. Уся амбієнтна анімація живе під `no-preference` — та сама ідіома,
-   що вже в `relationshipJourney.css`: анімацію не додають, а потім
-   скасовують, її просто не вмикають.
-   ------------------------------------------------------------ */
-@media (prefers-reduced-motion: no-preference) {
-  .jn-twinkle {
-    animation: jn-twinkle var(--twinkle-period, 5s) ease-in-out infinite alternate;
-    animation-delay: var(--twinkle-delay, 0s);
-  }
-  .jn-drift--cool { animation: jn-drift-cool 96s ease-in-out infinite alternate; }
-  .jn-drift--warm { animation: jn-drift-warm 74s ease-in-out infinite alternate; }
-}
-
-@keyframes jn-twinkle {
-  from { opacity: calc(var(--twinkle-alpha, .5) * .3); }
-  to { opacity: var(--twinkle-alpha, .5); }
-}
-@keyframes jn-drift-cool {
-  from { translate: 0 0; scale: 1; }
-  to { translate: 7vw 5vh; scale: 1.14; }
-}
-@keyframes jn-drift-warm {
-  from { translate: 0 0; scale: 1.08; }
-  to { translate: -6vw -4vh; scale: 1; }
-}
-
-/*
- * Слабкий профіль не платить за рух і розмиття: під анімованим шаром браузер
- * перераховує їх щокадру. Гейт списаний із `worldDim.css`, де ця ціна вже
- * названа для світу.
- */
-.journey-scene[data-quality='low'] .jn-drift,
-.journey-scene[data-quality='fallback'] .jn-drift {
-  animation: none !important;
-  filter: none;
-  opacity: .26;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .jn-twinkle, .jn-drift { animation: none !important; }
 }

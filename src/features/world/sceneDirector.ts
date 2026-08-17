@@ -152,8 +152,16 @@ export function shortestTurn(from: number, to: number): number {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
 
-/** Fraction of the remaining distance to cover in `dt`, given a half-life. */
-function approach(dt: number, halfLife: number): number {
+/**
+ * Fraction of the remaining distance to cover in `dt`, given a half-life.
+ *
+ * Exported because «Наш шлях» flies its own camera and needs the same
+ * behaviour, not a second implementation of it. The reason this file rejects
+ * tweens (see the header) applies there word for word: a tween has to be
+ * cancelled or queued when the couple taps a second star mid-flight, whereas
+ * an exponential approach only ever has a current target.
+ */
+export function approach(dt: number, halfLife: number): number {
   if (dt <= 0) return 0;
   return 1 - Math.pow(2, -dt / halfLife);
 }

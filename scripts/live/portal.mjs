@@ -241,6 +241,20 @@ export async function goToRoute(page, path, { settle }) {
     await page.waitForSelector('[data-evolution-runtime="ready"]', { timeout: 20_000 }).catch(() => {});
   }
 
+  // «Наш шлях» — власна сцена з власним полотном, тож і власна ознака.
+  //
+  // Запас часу тут навмисно великий, і це наслідок пастки №6: сцена чекає, поки
+  // доїде скайбокс, прилетить камера й народяться всі зірки, а під SwiftShader
+  // кадри йдуть по три на секунду. Те, що на телефоні займе три секунди, тут
+  // триває півхвилини — тому чекати треба ознаку, а не «розумний» ліміт.
+  const journey = await page
+    .waitForSelector('[data-journey]', { timeout: 3_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (journey) {
+    await page.waitForSelector('[data-journey="ready"]', { timeout: 180_000 }).catch(() => {});
+  }
+
   // Зображення теж ознака: недовантажене фото дає порожню сферу, і знімок
   // виглядає як вада верстки. Виміряно — саме так і трапилось одного разу.
   await page
@@ -269,6 +283,35 @@ export async function readSceneMetrics(page) {
       triangles: attr('data-evolution-triangles'),
       drawCalls: attr('data-evolution-draw-calls'),
       renderedTriangles: attr('data-evolution-rendered-triangles'),
+    };
+  });
+}
+
+/**
+ * Те, що публікує про себе сцена «Нашого шляху».
+ *
+ * Окремо від `readSceneMetrics`, бо це інше полотно з іншим набором чисел:
+ * там тіла й меші рушія, тут зірки, промені й кадрування камери.
+ */
+export async function readJourneyMetrics(page) {
+  return page.evaluate(() => {
+    const node = document.querySelector('[data-journey]');
+    if (node === null) return null;
+    const attr = (name) => node.getAttribute(name);
+    return {
+      state: attr('data-journey'),
+      quality: attr('data-journey-quality'),
+      pixelRatio: attr('data-journey-pixel-ratio'),
+      stars: attr('data-journey-stars'),
+      edges: attr('data-journey-edges'),
+      reach: attr('data-journey-reach'),
+      radial: attr('data-journey-radial'),
+      axial: attr('data-journey-axial'),
+      span: attr('data-journey-span'),
+      timeAxis: attr('data-journey-time-axis'),
+      distance: attr('data-journey-distance'),
+      drawCalls: attr('data-journey-draw-calls'),
+      triangles: attr('data-journey-triangles'),
     };
   });
 }
