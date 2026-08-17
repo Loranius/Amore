@@ -17,7 +17,7 @@
 // правди — сторінка й машина — розійшлися б на першому ж перериванні польоту.
 // ============================================================
 import { useCallback, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CloseIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { useEvents } from '@/features/_shared/events';
 import { useCrystalSeed } from '@/features/home/useHome';
@@ -43,6 +43,15 @@ function toConstellationEvent(event: EventRow): ConstellationEvent {
 export function JourneyPage() {
   useImmersiveRoute();
   const navigate = useNavigate();
+  /**
+   * `?bloom=off` вимикає сяйво.
+   *
+   * Той самий прийом, що вже є в порталу для `?gfx=bloom`: єдиний спосіб зняти
+   * два кадри однієї сцени з різницею в одному проході й порівняти їх, а не
+   * сперечатись про пам'ять. У звичайному житті прапорця немає в адресі, і
+   * сяйво просто працює.
+   */
+  const [search] = useSearchParams();
   const { seed } = useCrystalSeed();
   const { data: events = [] } = useEvents();
   const { addEvent, updateEvent } = useCalendarMutations();
@@ -95,6 +104,7 @@ export function JourneyPage() {
           onRequestAdd={handleRequestAdd}
           dismissSignal={dismissSignal}
           addClosedSignal={addClosedSignal}
+          bloom={search.get('bloom') !== 'off'}
         />
       )}
 

@@ -1,5 +1,6 @@
 import {
   Suspense,
+  lazy,
   useCallback,
   useEffect,
   useMemo,
@@ -29,6 +30,14 @@ import { JourneyConstellation, birthDuration } from './JourneyConstellation';
 import { JourneyEnvironment, JOURNEY_SKY_RADIUS } from './JourneyEnvironment';
 import { StarPointer } from './StarPointer';
 import type { JourneyFraming } from './journeyFraming';
+
+/**
+ * Сяйво події — окремим чанком.
+ *
+ * `postprocessing` важить сотні кілобайт, а потрібен лише тому, хто відкрив
+ * подію на сильному пристрої. Головний чанк його не бачить.
+ */
+const JourneyBloom = lazy(() => import('./JourneyBloom'));
 
 // ============================================================
 // Сцена «Наш шлях».
@@ -61,6 +70,8 @@ export interface JourneySceneProps {
   dismissSignal?: number;
   /** Модалку додавання закрито. Зростає з кожним закриттям. */
   addClosedSignal?: number;
+  /** Вимкнути сяйво примусово — для порівняльних знімків. */
+  bloom?: boolean;
 }
 
 /** Секунди від початку сцени, у рефі. */
@@ -129,6 +140,7 @@ export function JourneyScene({
   onRequestAdd,
   dismissSignal = 0,
   addClosedSignal = 0,
+  bloom = true,
 }: JourneySceneProps) {
   const constellation = useMemo(() => buildConstellation3D(events), [events]);
   const palette = useMemo(() => journeyPalette(seed), [seed]);
@@ -237,6 +249,8 @@ export function JourneyScene({
     typeof window === 'undefined' ? 1 : window.devicePixelRatio,
   ));
 
+  const bloomOn = bloom && quality === 'high' && showsFocus(state.mode);
+
   return (
     <div
       className="journey-scene"
@@ -253,6 +267,7 @@ export function JourneyScene({
       data-journey-span={constellation.span.toFixed(2)}
       data-journey-distance={framing ? framing.distance.toFixed(2) : ''}
       data-journey-time-axis={framing ? (framing.up[2] === 1 ? 'vertical' : 'horizontal') : ''}
+      data-journey-bloom={String(bloomOn)}
       data-journey-draw-calls={runtime?.drawCalls ?? ''}
       data-journey-triangles={runtime?.triangles ?? ''}
     >
@@ -320,6 +335,17 @@ export function JourneyScene({
               reveal={reveal}
               reducedMotion={reducedMotion}
             />
+          </Suspense>
+        )}
+
+        {/*
+          Сяйво живе лише поки подія в кадрі й лише на сильному профілі. Прохід
+          читає й пише повний екран щокадру — саме те, чого слабкому телефону
+          бракує найперше.
+        */}
+        {bloomOn && (
+          <Suspense fallback={null}>
+            <JourneyBloom />
           </Suspense>
         )}
 

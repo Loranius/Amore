@@ -9,13 +9,15 @@ Source: https://sketchfab.com/3d-models/billions-stars-skybox-hdri-panorama-7e3e
 License: CC-BY-4.0
 License URL: http://creativecommons.org/licenses/by/4.0/
 
-Modified from the original, as CC-BY-4.0 permits. Geometry, UVs, material
-and node hierarchy are untouched; the single 2048x2048 emissive texture was
-re-encoded from PNG (8 087 KiB) to WebP quality 80 (691 KiB) at the same
-resolution, and the texture is referenced through EXT_texture_webp. The
-container shrank from 8.12 MB to 0.71 MB. Downscaling was measured and
-rejected: at 1536 px the point stars smear (star-pixel PSNR falls from
-23.1 dB to 15.6 dB).
+The source GLB is stored unchanged.
+
+A WebP re-encode was tried and reverted after measurement. It cost nothing in
+sharpness (mean gradient magnitude on the live screen: 4.114 vs 4.088 for PNG)
+but WebP subsamples chroma 2:1, and this panorama is magnified about 3x on
+screen -- the red and blue sparks of individual stars merged into flat purple.
+Lossless WebP weighs 7.98 MB, so it wins nothing. Downscaling is worse still:
+at 1536 px the point stars smear (star-pixel PSNR falls from 23.1 dB to
+15.6 dB).
 
 --------------------------------------------------------------------
 amore_journey_sun.glb
@@ -26,6 +28,8 @@ Source: https://sketchfab.com/3d-models/sun-318145fc2fd94890929179039da4355d
 License: CC-BY-4.0
 License URL: http://creativecommons.org/licenses/by/4.0/
 
-The source GLB is stored unchanged. Its baked baseColor texture is used at
-runtime as a luminance source; the per-event colour is applied through an
-emissive multiplier so the baked detail survives instead of being tinted.
+The source GLB is stored unchanged.
+
+Its baked baseColor texture is used at runtime as a luminance source; the
+per-event colour is applied through an emissive multiplier so the baked detail
+survives instead of being tinted. Nothing in the file itself is altered.

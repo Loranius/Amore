@@ -308,6 +308,7 @@ export async function readJourneyMetrics(page) {
       state: attr('data-journey'),
       mode: attr('data-journey-mode'),
       focus: attr('data-journey-focus'),
+      bloom: attr('data-journey-bloom'),
       quality: attr('data-journey-quality'),
       pixelRatio: attr('data-journey-pixel-ratio'),
       stars: attr('data-journey-stars'),
