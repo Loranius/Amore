@@ -4,6 +4,7 @@ import {
   CONSTELLATION_HEIGHT,
   CONSTELLATION_WIDTH,
   labelSizeOf,
+  overlapArea,
   segmentsCross,
   type ConstellationInput,
 } from './constellationLayout';
@@ -32,13 +33,15 @@ const spread = (count: number): ConstellationInput[] =>
     id: index + 1,
     date: `2024-${String((index % 12) + 1).padStart(2, '0')}-${String((index % 28) + 1).padStart(2, '0')}`,
     significance: index === 0 ? 'relationship_start' : index % 4 === 0 ? 'important' : 'regular',
+    titleLength: 12 + (index % 17),
   }));
 
 const event = (
   id: number,
   date: string,
   significance: ConstellationInput['significance'] = 'regular',
-): ConstellationInput => ({ id, date, significance });
+  titleLength = 16,
+): ConstellationInput => ({ id, date, significance, titleLength });
 
 /** Сім подій цієї пари — той самий набір, на якому мірявся живий екран. */
 const COUPLE: ConstellationInput[] = [
@@ -322,56 +325,44 @@ describe('перетини променів', () => {
   });
 });
 
-describe('бік підпису', () => {
-  it('зірки з нижньої половини неба підписуються згори', () => {
-    for (const star of buildConstellation(COUPLE).stars) {
-      expect(star.labelAbove).toBe(star.y > CONSTELLATION_HEIGHT * 0.55);
-    }
-  });
-
-  it('ядро в центрі підписується знизу', () => {
-    const core = buildConstellation(COUPLE).stars.find((star) => star.core)!;
-    expect(core.labelAbove).toBe(false);
-  });
-});
-
 describe('підписи', () => {
-  it('жоден підпис не виїжджає за кадр', () => {
+  it('жоден підпис не виходить за кадр', () => {
     for (const star of buildConstellation(COUPLE).stars) {
-      expect(star.labelX).toBeGreaterThanOrEqual(0);
-      expect(star.labelX).toBeLessThanOrEqual(CONSTELLATION_WIDTH);
-    }
-  });
-
-  it('підпис іде за зіркою, поки та не підходить до краю', () => {
-    for (const star of buildConstellation(COUPLE).stars) {
-      const half = labelSizeOf(star).width / 2;
-      const expected = Math.min(Math.max(star.x, half), CONSTELLATION_WIDTH - half);
-      expect(star.labelX).toBeCloseTo(expected, 6);
-    }
-  });
-
-  it('підписи не налазять один на одного', () => {
-    const { stars } = buildConstellation(COUPLE);
-    const rects = stars.map((star) => {
       const { width, height } = labelSizeOf(star);
-      const top = star.labelAbove
-        ? star.y - star.radius - 1.8 - height
-        : star.y + star.radius + 1.8;
+      expect(star.labelX - width / 2).toBeGreaterThanOrEqual(-0.001);
+      expect(star.labelX + width / 2).toBeLessThanOrEqual(CONSTELLATION_WIDTH + 0.001);
+      expect(star.labelY - height / 2).toBeGreaterThanOrEqual(-0.001);
+      expect(star.labelY + height / 2).toBeLessThanOrEqual(CONSTELLATION_HEIGHT + 0.001);
+    }
+  });
+
+  it('підписи не накривають один одного', () => {
+    const rects = buildConstellation(COUPLE).stars.map((star) => {
+      const { width, height } = labelSizeOf(star);
       return {
         left: star.labelX - width / 2,
         right: star.labelX + width / 2,
-        top,
-        bottom: top + height,
+        top: star.labelY - height / 2,
+        bottom: star.labelY + height / 2,
       };
     });
     for (let i = 0; i < rects.length; i += 1) {
       for (let j = i + 1; j < rects.length; j += 1) {
-        const a = rects[i]!;
-        const b = rects[j]!;
-        const hit = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
-        expect(hit).toBe(false);
+        expect(overlapArea(rects[i]!, rects[j]!)).toBe(0);
       }
     }
+  });
+
+  it('довша назва дає ширший і вищий підпис', () => {
+    const short = labelSizeOf({ level: 'regular', core: false, titleLength: 6 });
+    const long = labelSizeOf({ level: 'regular', core: false, titleLength: 28 });
+    expect(long.width).toBeGreaterThan(short.width);
+    expect(long.height).toBeGreaterThan(short.height);
+  });
+
+  it('назва не росте нескінченно: перенос має стелю у два рядки', () => {
+    const two = labelSizeOf({ level: 'regular', core: false, titleLength: 26 });
+    const many = labelSizeOf({ level: 'regular', core: false, titleLength: 200 });
+    expect(many.height).toBe(two.height);
   });
 });
