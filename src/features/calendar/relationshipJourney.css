@@ -188,53 +188,60 @@
 }
 
 /*
- * Підпис має кожна подія — інакше карту доводиться читати дотиками.
+ * Поводир до назви — ламана, як на зоряних картах.
  *
- * Живуть вони окремим шаром і позиціонуються в координатах неба: розкладка
- * затискає центр підпису так, щоб він не виїхав за кадр, і обирає бік
- * (згори/знизу) за фактичним перекриттям із уже вирішеними.
+ * Розміри тут у ОДИНИЦЯХ ПОЛОТНА, не в пікселях: кадр 100×168 розтягується до
+ * 378×635, тобто множник 3.78. Перший підхід задав кегль 5.4 «px» і дістав
+ * двадцять — назва вийшла на пів екрана.
+ *
+ * Постійних підписів більше немає: сім назв у кадрі телефона налазять одна на
+ * одну за будь-якого розведення (шість проходів, усі виміряні). Назву показує
+ * дотик, по одній за раз — і місця тоді вистачає завжди.
+ *
+ * Перший дотик називає зірку, другий відкриває подію. Дотик по порожньому
+ * небу гасить назву.
  */
-.rj-labels { position: absolute; inset: 0; pointer-events: none; }
-.rj-label {
+.rj-leaders {
   position: absolute;
-  display: -webkit-box;
-  width: max-content;
-  max-width: 15ch;
-  overflow: hidden;
-  /* Кегль лишається тут: `max-width` міряється в `ch`, а без власного
-     font-size вони рахувались би від успадкованого — і підпис виходив
-     удвічі ширшим за модель розкладки. Виміряно: 132 px замість ~62. */
-  font-size: 9.5px;
-  text-align: center;
-  /* Розкладка віддає ЦЕНТР підпису — місце вона обирає сама з чотирьох
-     навколо зірки, тож зміщення тут однакове для всіх варіантів. */
-  transform: translate(-50%, -50%);
-  -webkit-box-orient: vertical;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
 }
-.rj-label-title {
-  display: -webkit-box;
-  overflow: hidden;
-  color: color-mix(in srgb, var(--star-hue, var(--accent)) 30%, var(--text));
+.rj-leader-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--star-hue, var(--accent)) 70%, #fff);
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 2px var(--star-hue, var(--accent)));
+}
+.rj-leader-title,
+.rj-leader-date {
+  paint-order: stroke;
+  stroke: #000;
+  stroke-width: 0.7;
+  stroke-linejoin: round;
+}
+.rj-leader-title {
+  fill: color-mix(in srgb, var(--star-hue, var(--accent)) 26%, #fff);
+  font-size: 2.6px;
   font-weight: 700;
-  line-height: 1.22;
-  text-shadow: 0 1px 4px #000, 0 0 10px #000, 0 0 16px #000;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
-.rj-label-date {
-  display: block;
-  margin-top: 1px;
-  color: color-mix(in srgb, var(--text) 52%, transparent);
-  font-size: .82em;
-  white-space: nowrap;
+.rj-leader-date {
+  fill: color-mix(in srgb, #fff 58%, transparent);
+  font-size: 2.1px;
   font-weight: 600;
-  text-shadow: 0 1px 4px #000, 0 0 10px #000;
 }
-.rj-label--core { max-width: 17ch; font-size: 11.5px; }
-.rj-label--key { max-width: 16ch; font-size: 10.5px; }
-.rj-label--core, .rj-label--key { --star-hue: var(--relationship-journey-neon, var(--accent)); }
-.rj-label--important { --star-hue: hsl(44 92% 62%); }
-.rj-label--regular { --star-hue: hsl(184 76% 58%); }
+.rj-leader--core { --star-hue: var(--relationship-journey-neon, var(--accent)); }
+.rj-leader--key { --star-hue: var(--relationship-journey-neon, var(--accent)); }
+.rj-leader--important { --star-hue: hsl(44 92% 62%); }
+.rj-leader--regular { --star-hue: hsl(184 76% 58%); }
+
+/* Названа зірка світиться помітніше — видно, яку саме обрано. */
+.rj-star--named::after { inset: -150%; opacity: .85; }
 
 .relationship-journey-future {
   position: relative;
@@ -265,10 +272,7 @@
    Порядок задає `--star-delay` / `--beam-delay` з розкладки.
    ------------------------------------------------------------ */
 @media (prefers-reduced-motion: no-preference) {
-  .rj-label {
-    animation: rj-label-birth .5s ease-out backwards;
-    animation-delay: var(--star-delay, 0s);
-  }
+  .rj-leader { animation: rj-leader-draw .28s ease-out; }
   .rj-star {
     animation: rj-star-birth .62s cubic-bezier(.22, 1, .36, 1) backwards;
     animation-delay: var(--star-delay, 0s);
@@ -286,7 +290,7 @@
   60% { opacity: 1; }
   to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 }
-@keyframes rj-label-birth {
+@keyframes rj-leader-draw {
   from { opacity: 0; }
   to { opacity: 1; }
 }
@@ -295,5 +299,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rj-star, .rj-beam, .rj-label { animation: none !important; }
+  .rj-star, .rj-beam, .rj-leader { animation: none !important; }
 }

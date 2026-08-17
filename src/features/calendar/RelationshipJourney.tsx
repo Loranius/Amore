@@ -86,12 +86,16 @@ const ConstellationStarButton = memo(function ConstellationStarButton({
   event,
   width,
   height,
+  named,
+  onName,
   onOpen,
 }: {
   star: ConstellationStar;
   event: EventRow;
   width: number;
   height: number;
+  named: boolean;
+  onName: (id: number) => void;
   onOpen: (event: EventRow) => void;
 }) {
   const style = {
@@ -104,9 +108,10 @@ const ConstellationStarButton = memo(function ConstellationStarButton({
   return (
     <button
       type="button"
-      className={`rj-star rj-star--${starTone(star)}`}
+      className={`rj-star rj-star--${starTone(star)}${named ? ' rj-star--named' : ''}`}
       style={style}
-      onClick={() => onOpen(event)}
+      aria-pressed={named}
+      onClick={() => (named ? onOpen(event) : onName(star.id))}
       aria-label={`${starCaption(star, event.significance)}: ${event.title}, ${dateLabel(event.date)}`}
     >
       <span className="rj-star-body" aria-hidden="true" />
@@ -124,6 +129,7 @@ export function RelationshipJourney({
   onAdd: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
   const { seed } = useCrystalSeed();
   const journeyStyle = useMemo(() => crystalJourneyStyle(seed), [seed]);
 
@@ -140,6 +146,13 @@ export function RelationshipJourney({
     ),
     [moments],
   );
+
+  const selected = useMemo(() => {
+    if (selectedId === null) return null;
+    const star = sky.stars.find((candidate) => candidate.id === selectedId);
+    const event = star ? byId.get(star.id) : undefined;
+    return star && event ? { star, event } : null;
+  }, [byId, selectedId, sky.stars]);
 
   return (
     <details
@@ -170,6 +183,9 @@ export function RelationshipJourney({
             <>
               <div
                 className="rj-sky"
+                onClick={(clickEvent) => {
+                  if (clickEvent.target === clickEvent.currentTarget) setSelectedId(null);
+                }}
                 style={{
                   '--rj-ratio': `${sky.width} / ${sky.height}`,
                   '--rj-nebula': `url(${nebulaUrl})`,
@@ -196,26 +212,47 @@ export function RelationshipJourney({
                 </svg>
 
                 {/*
-                  Підписи окремим шаром, а не всередині кнопки: їх треба
-                  ставити в координатах неба, щоб затиснути в кадр. Усередині
-                  кнопки відлік іде від диска зірки, і крайній підпис виїжджав.
+                  Назва не висить постійно — її показує дотик, по одній за
+                  раз. Сім підписів у кадрі телефона налазять одне на одного
+                  за будь-якого розведення (шість проходів, усі виміряні), а
+                  одна ламана-поводир завжди має куди лягти.
                 */}
-                <div className="rj-labels" aria-hidden="true">
-                  {sky.stars.map((star) => (
-                    <span
-                      key={star.id}
-                      className={`rj-label rj-label--${starTone(star)}`}
-                      style={{
-                        left: `${(star.labelX / sky.width) * 100}%`,
-                        top: `${(star.labelY / sky.height) * 100}%`,
-                        '--star-delay': `${(star.order * BIRTH_STEP).toFixed(2)}s`,
-                      } as CSSProperties}
-                    >
-                      <span className="rj-label-title">{byId.get(star.id)!.title}</span>
-                      <span className="rj-label-date">{shortDateLabel(byId.get(star.id)!.date)}</span>
-                    </span>
-                  ))}
-                </div>
+                <svg
+                  className="rj-leaders"
+                  viewBox={`0 0 ${sky.width} ${sky.height}`}
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  {selected && (
+                    <g className={`rj-leader rj-leader--${starTone(selected.star)}`}>
+                      <polyline
+                        className="rj-leader-line"
+                        points={[
+                          `${selected.star.leader.startX},${selected.star.leader.startY}`,
+                          `${selected.star.leader.bendX},${selected.star.leader.bendY}`,
+                          `${selected.star.leader.endX},${selected.star.leader.endY}`,
+                        ].join(' ')}
+                        pathLength={1}
+                      />
+                      <text
+                        className="rj-leader-title"
+                        x={selected.star.leader.endX}
+                        y={selected.star.leader.endY - 0.9}
+                        textAnchor={selected.star.leader.align}
+                      >
+                        {selected.event.title}
+                      </text>
+                      <text
+                        className="rj-leader-date"
+                        x={selected.star.leader.endX}
+                        y={selected.star.leader.endY + 2.9}
+                        textAnchor={selected.star.leader.align}
+                      >
+                        {shortDateLabel(selected.event.date)}
+                      </text>
+                    </g>
+                  )}
+                </svg>
 
                 <div className="rj-stars">
                   {sky.stars.map((star) => (
@@ -225,6 +262,8 @@ export function RelationshipJourney({
                       event={byId.get(star.id)!}
                       width={sky.width}
                       height={sky.height}
+                      named={selectedId === star.id}
+                      onName={setSelectedId}
                       onOpen={onOpen}
                     />
                   ))}
