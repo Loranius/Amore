@@ -16,7 +16,6 @@ import { buildConstellation3D } from '../constellation3d';
 import type { ConstellationEvent } from '../constellationRules';
 import {
   INITIAL_JOURNEY_STATE,
-  cameraLocked,
   journeyReducer,
   showsFocus,
   type JourneyEvent,
@@ -32,12 +31,19 @@ import { StarPointer } from './StarPointer';
 import type { JourneyFraming } from './journeyFraming';
 
 /**
- * Сяйво події — окремим чанком.
+ * Сяйво — окремим чанком, але НЕ за вимогою.
  *
- * `postprocessing` важить сотні кілобайт, а потрібен лише тому, хто відкрив
- * подію на сильному пристрої. Головний чанк його не бачить.
+ * `postprocessing` важить сотні кілобайт, тож у головному чанку його немає.
+ * Але вантажити його в мить дотику не можна, і це виміряно: браузер тягнув
+ * чанк рівно тоді, коли починався політ до події, і найдовший кадр виходив
+ * **1367 мс**. Пара бачила ривок саме там, де мала бачити рух.
+ *
+ * Тому чанк замовляється заздалегідь — поки їде небо, — а композитор
+ * монтується, щойно сцена вляглась: у ту мить нічого не рухається, і платити
+ * за виділення буферів там непомітно.
  */
 const JourneyBloom = lazy(() => import('./JourneyBloom'));
+const preloadBloom = () => import('./JourneyBloom');
 
 // ============================================================
 // Сцена «Наш шлях».
@@ -84,6 +90,14 @@ export interface JourneyRuntime {
 
 /** За скільки секунд сонце проявляється або гасне. */
 const REVEAL_SECONDS = 0.5;
+
+/**
+ * Скільки прохід сяйва працює вхолосту після монтування, мс.
+ *
+ * Досить кількох кадрів навіть на найповільнішому пристрої; більше — марна
+ * робота, менше — ризик, що жоден кадр не встиг намалюватись.
+ */
+const BLOOM_WARMUP_MS = 400;
 
 function SceneClock({
   clock,
@@ -215,6 +229,18 @@ export function JourneyScene({
 
   useEffect(() => onMode?.(state.mode, state.focusId), [onMode, state.mode, state.focusId]);
 
+  /*
+   * Відкриту подію видалили — сцені треба повернутись.
+   *
+   * Знайдено аудитом, не екраном: партнер може стерти подію, поки вона
+   * розкрита. Тоді `focusId` лишався вказувати в порожнечу, ціль польоту
+   * ставала `null`, і камера зависала в «летить» НАЗАВЖДИ — з вимкненим
+   * керуванням, тобто пара лишалась у кадрі, з якого нічого не видно.
+   */
+  useEffect(() => {
+    if (state.focusId !== null && focusStar === null) send({ type: 'dismiss' });
+  }, [focusStar, send, state.focusId]);
+
   // Сторінка просить закрити подію. Нуль — початкове значення, не сигнал.
   useEffect(() => {
     if (dismissSignal > 0) send({ type: 'dismiss' });
@@ -249,7 +275,42 @@ export function JourneyScene({
     typeof window === 'undefined' ? 1 : window.devicePixelRatio,
   ));
 
-  const bloomOn = bloom && quality === 'high' && showsFocus(state.mode);
+  const bloomEligible = bloom && quality === 'high';
+  /*
+   * Композитор МОНТУЄТЬСЯ у спокої, а ПРАЦЮЄ лише поки подія в кадрі.
+   *
+   * Три виміри знадобилось, щоб розділити ці дві речі:
+   *   — монтування за вимогою → браузер тягне чанк у мить дотику, 1367 мс;
+   *   — увімкнений назавжди → мережа зникла, але середній кадр 574 → 1013 мс;
+   *   — знову за focus → середній кадр повернувся, найгірший став 1962 мс,
+   *     бо буфери й шейдери проходу народжувались рівно на дотику.
+   *
+   * `enabled` вимикає прохід, не звільняючи його ресурсів, тож налаштування
+   * платиться один раз у спокої, а кадр — лише там, де сяйво видно.
+   */
+  const bloomMounted = bloomEligible && runtime !== null;
+  const bloomVisible = bloomEligible && showsFocus(state.mode);
+
+  /*
+   * Прогрів: перші кадри після монтування прохід працює з нульовою
+   * інтенсивністю. Кадр від цього не змінюється, але шейдери компілюються —
+   * а компілювались вони інакше рівно в мить дотику.
+   */
+  const [bloomWarming, setBloomWarming] = useState(false);
+  useEffect(() => {
+    if (!bloomMounted) return undefined;
+    setBloomWarming(true);
+    const timer = setTimeout(() => setBloomWarming(false), BLOOM_WARMUP_MS);
+    return () => clearTimeout(timer);
+  }, [bloomMounted]);
+
+  const bloomActive = bloomVisible || bloomWarming;
+
+  // Чанк замовляється поки їде небо: до першого дотику він уже в кеші, і
+  // монтування композитора не тягне за собою мережу.
+  useEffect(() => {
+    if (bloomEligible) void preloadBloom();
+  }, [bloomEligible]);
 
   return (
     <div
@@ -267,7 +328,7 @@ export function JourneyScene({
       data-journey-span={constellation.span.toFixed(2)}
       data-journey-distance={framing ? framing.distance.toFixed(2) : ''}
       data-journey-time-axis={framing ? (framing.up[2] === 1 ? 'vertical' : 'horizontal') : ''}
-      data-journey-bloom={String(bloomOn)}
+      data-journey-bloom={bloomMounted ? (bloomVisible ? 'active' : 'idle') : 'off'}
       data-journey-draw-calls={runtime?.drawCalls ?? ''}
       data-journey-triangles={runtime?.triangles ?? ''}
     >
@@ -326,26 +387,32 @@ export function JourneyScene({
           reveal={reveal}
         />
 
-        {focusStar && showsFocus(state.mode) && (
-          <Suspense fallback={null}>
-            <FocusStar
-              position={[focusStar.x, focusStar.y, focusStar.z]}
-              colour={focusColour}
-              radius={focusRadius}
-              reveal={reveal}
-              reducedMotion={reducedMotion}
-            />
-          </Suspense>
-        )}
+        {/*
+          Сонце змонтоване ЗАВЖДИ, а не лише коли подія відкрита.
+          
+          Причина та сама, що й у сяйва: матеріал зі своїм шейдером компілюється
+          при першому малюванні, і якщо це малювання припадає на дотик, пара
+          дістає ривок. У спокої сонце має нульовий масштаб — один виклик
+          малювання, який не зафарбовує жодного пікселя, і прогрітий шейдер.
+        */}
+        <Suspense fallback={null}>
+          <FocusStar
+            position={focusStar ? [focusStar.x, focusStar.y, focusStar.z] : centre}
+            colour={focusColour}
+            radius={focusRadius}
+            reveal={reveal}
+            reducedMotion={reducedMotion}
+          />
+        </Suspense>
 
         {/*
           Сяйво живе лише поки подія в кадрі й лише на сильному профілі. Прохід
           читає й пише повний екран щокадру — саме те, чого слабкому телефону
           бракує найперше.
         */}
-        {bloomOn && (
+        {bloomMounted && (
           <Suspense fallback={null}>
-            <JourneyBloom />
+            <JourneyBloom active={bloomActive} visible={bloomVisible} />
           </Suspense>
         )}
 
@@ -353,7 +420,16 @@ export function JourneyScene({
           stars={constellation.stars}
           onPick={handlePick}
           onLongPress={handleLongPress}
-          disabled={cameraLocked(state.mode) || state.mode === 'addingEvent'}
+          /*
+           * Дотик лишається живим і під час польоту.
+           *
+           * Спершу тут стояв `cameraLocked`, і це змішувало дві різні речі:
+           * замкнути ОРБІТУ, поки камера веде себе сама, — правильно; відмовити
+           * в дотику — ні. Машина станів навмисно дозволяє перецілитись на іншу
+           * зірку на півдорозі (і це покрито тестом), а стара умова робила ту
+           * гілку недосяжною.
+           */
+          disabled={state.mode === 'loading' || state.mode === 'addingEvent'}
         />
 
         <JourneyCameraRig

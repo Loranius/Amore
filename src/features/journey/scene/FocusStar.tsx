@@ -77,9 +77,7 @@ export function FocusStar({ position, colour, radius, reveal, reducedMotion }: F
     const shown = Math.max(0, Math.min(1, reveal.current));
     // Сонце РОСТЕ з нуля в тій самій світовій точці, де гасне зірка: перехід
     // читається як наближення, а не як «зникло і з'явилось».
-    const size = radius * shown;
-    group.scale.setScalar(size);
-    group.visible = shown > 0.001;
+    group.scale.setScalar(radius * shown);
     material.uniforms.uOpacity!.value = shown;
     if (!reducedMotion) group.rotation.y += SPIN_RATE * Math.min(delta, 0.05);
   });
@@ -87,6 +85,14 @@ export function FocusStar({ position, colour, radius, reveal, reducedMotion }: F
   if (!geometry) return null;
 
   return (
+    /*
+     * `visible` НЕ вимикається у спокої, і це не недогляд.
+     *
+     * Матеріал зі своїм шейдером компілюється при першому малюванні. Якщо це
+     * малювання припадає на дотик, пара дістає ривок рівно там, де мала
+     * побачити рух. Нульовий масштаб лишає один виклик малювання, який не
+     * зафарбовує жодного пікселя, — і шейдер уже прогрітий.
+     */
     <group ref={groupRef} position={position as unknown as [number, number, number]} scale={0}>
       {/*
         Порядок нуль — раніше за промені й зірки. Глибина затуляє лише те, що

@@ -239,3 +239,27 @@ describe('машина не ламається', () => {
     }
   });
 });
+
+describe('подія зникла з-під ніг', () => {
+  /*
+   * Знайдено аудитом, а не екраном.
+   *
+   * Партнер може стерти подію, поки вона розкрита. До виправлення `focusId`
+   * лишався вказувати в порожнечу, ціль польоту ставала `null`, і камера
+   * зависала в «летить» назавжди — з вимкненим керуванням. Сцена помічає
+   * зникнення й сама надсилає `dismiss`; тут перевіряється, що машина його
+   * приймає з БУДЬ-ЯКОГО стану, де подія може бути відкрита.
+   */
+  it('закриття працює і в польоті, і у відкритій події', () => {
+    for (const mode of ['focusing', 'eventFocus'] as JourneyMode[]) {
+      const next = journeyReducer({ mode, focusId: 4, saveView: false }, { type: 'dismiss' });
+      expect(next.mode).toBe('returning');
+      expect(next.focusId).toBeNull();
+    }
+  });
+
+  it('повторне закриття не перезапускає повернення', () => {
+    const returning = run(...READY, { type: 'selectStar', id: 4 }, { type: 'dismiss' });
+    expect(journeyReducer(returning, { type: 'dismiss' })).toBe(returning);
+  });
+});

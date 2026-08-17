@@ -35,6 +35,12 @@ import {
 //
 // **Обертання** — drei `OrbitControls`, як у рифі. Панорамування вимкнене: воно
 // вміє відвести пару від власного сузір'я так, що дороги назад вона не знайде.
+//
+// Один поділ обов'язків, який варто назвати окремо: **поки триває політ, камеру
+// веде тільки він.** `controls.update()` виводить позицію зі свого сферичного
+// стану й залишкового демпфування, тож виклик його щокадру означав би двох
+// господарів на одну позицію — і саме це дає дрижання. Орбіта дізнається, де
+// опинилась камера, один раз, на прибутті.
 // ============================================================
 
 /** За скільки секунд політ долає половину решти відстані. */
@@ -70,6 +76,19 @@ const ARRIVED_MIN = 0.05;
  * переходу. Камера ж і так летить: зсув їде разом із польотом задарма.
  */
 const SPLIT_SHIFT = 0.38;
+
+/**
+ * Синхронізує стан орбіти з тим, куди камеру поставив політ.
+ *
+ * Кличеться РАЗ на прибуття, а не щокадру. `OrbitControls.update()` виводить
+ * позицію камери зі свого внутрішнього сферичного стану й залишкового
+ * демпфування — тобто під час польоту він переписував би те, що щойно поставив
+ * `lerp`. Два господарі на одну позицію камери й дають дрижання.
+ */
+function syncOrbit(controls: OrbitControlsImpl, target: Vector3): void {
+  controls.target.copy(target);
+  controls.update();
+}
 
 export interface JourneyFocusTarget {
   position: readonly [number, number, number];
@@ -205,12 +224,13 @@ export function JourneyCameraRig({
       const rate = approach(step, FOCUS_HALF_LIFE);
       controls.target.lerp(aim, rate);
       camera.position.lerp(desired, rate);
-      controls.update();
+      // Камеру наводить політ, а не орбіта: `controls.update()` тут переписав
+      // би позицію власним сферичним станом і залишковим демпфуванням.
+      camera.lookAt(controls.target);
       const close = Math.max(ARRIVED_MIN, focusDistance(focus.radius, viewport) * ARRIVED_FRACTION);
       if (camera.position.distanceTo(desired) <= close) {
         camera.position.copy(desired);
-        controls.target.copy(aim);
-        controls.update();
+        syncOrbit(controls, aim);
         onFocusArrived?.();
       }
       return;
@@ -228,12 +248,11 @@ export function JourneyCameraRig({
       const rate = approach(step, FOCUS_HALF_LIFE);
       controls.target.lerp(target, rate);
       camera.position.lerp(position, rate);
-      controls.update();
+      camera.lookAt(controls.target);
       const close = Math.max(ARRIVED_MIN, framing.distance * ARRIVED_FRACTION);
       if (camera.position.distanceTo(position) <= close) {
         camera.position.copy(position);
-        controls.target.copy(target);
-        controls.update();
+        syncOrbit(controls, target);
         saved.current = null;
         onReturnArrived?.();
       }
@@ -248,11 +267,11 @@ export function JourneyCameraRig({
     const distance = spare.length();
     const next = distance + (framing.distance - distance) * approach(step, INTRO_HALF_LIFE);
     camera.position.copy(controls.target).add(spare.setLength(next));
-    controls.update();
+    camera.lookAt(controls.target);
 
     if (Math.abs(next - framing.distance) <= framing.distance * ARRIVED_FRACTION) {
       camera.position.copy(controls.target).add(spare.setLength(framing.distance));
-      controls.update();
+      syncOrbit(controls, controls.target.clone());
       introFlying.current = false;
       if (!announced.current) {
         announced.current = true;
