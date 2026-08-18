@@ -29,6 +29,7 @@ const ShoppingPage = lazy(() => import('@/features/shopping/ShoppingPage').then(
 const WishlistPage = lazy(() => import('@/features/wishlist/WishlistPage').then((m) => ({ default: m.WishlistPage })));
 const SchedulePage = lazy(() => import('@/features/schedule/SchedulePage').then((m) => ({ default: m.SchedulePage })));
 const MemoriesPage = lazy(() => import('@/features/memories/MemoriesPage').then((m) => ({ default: m.MemoriesPage })));
+const MomentPage = lazy(() => import('@/features/memories/MomentPage').then((m) => ({ default: m.MomentPage })));
 const MediaPage = lazy(() => import('@/features/media/MediaPage').then((m) => ({ default: m.MediaPage })));
 const CulinaryPage = lazy(() => import('@/features/culinary/CulinaryPage').then((m) => ({ default: m.CulinaryPage })));
 const PiggyBankPage = lazy(() => import('@/features/piggybank/PiggyBankPage').then((m) => ({ default: m.PiggyBankPage })));
@@ -96,6 +97,9 @@ export const router = createHashRouter([
           { path: 'calendar/photos', element: <Navigate to="/memories" replace /> },
 
           { path: 'memories', element: page(<MemoriesPage />) },
+          // Спогад має власну адресу: пара ділиться посиланням, а «назад» із
+          // повного екрана мусить вести в галерею, а не з застосунку.
+          { path: 'memories/:id', element: page(<MomentPage />) },
           { path: 'media', element: page(<MediaPage />) },
           { path: 'whereto', element: page(<WhereToPage />) },
           { path: 'map', element: page(<MapPage />) },

@@ -1,50 +1,36 @@
 // ============================================================
-// MemoriesPage — «Спогади», центральний фотоархів пари.
+// MemoriesPage — «Спогади», фотощоденник пари.
 // ------------------------------------------------------------
-// Замінює PhotoCalendarPage, у якого модель була «одне фото на
-// користувача на день». Тут дата — контейнер на будь-яку кількість фото,
-// а вигляд огляду обирає користувач (стрічка / альбом / мозаїка).
-// Екран дня спільний для всіх трьох.
+// Один екран і один вхід. Попередня редакція давала три вигляди (стрічка /
+// альбом / мозаїка), перемикач між ними й два різні входи додавання — і
+// кожен із них показував ті самі фото інакше розкладеними. Модель теж була
+// інша: одиницею архіву було ФОТО, згруповане по днях.
+//
+// Тепер одиниця — СПОГАД: назва, дата, місце, кілька слів і альбом знімків.
+// Галерея показує його полароїдом, а все інше відкривається на власній
+// сторінці.
+//
+// Розподіл між сусідніми модулями, щоб ніхто не додав сюди зайвого:
+// «Спогади» — що вже було; «Наш шлях» — віхи; «Плани» — чого ще хочеться.
 // ============================================================
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { currentYearMonth, stepMonth } from '@/features/_shared/month';
-import { MemoriesViewPicker } from './MemoriesViewPicker';
-import { MemoriesAlbum, MemoriesFeed, MemoriesMosaicMonth } from './MemoriesOverviews';
-import { MemoryDayView } from './MemoryDayView';
-import { MemoryImportModal } from './MemoryImportModal';
-import { MemoryUploadModal } from './MemoryUploadModal';
-import { MemoryViewer } from './MemoryViewer';
-import { groupMemoriesByDate } from './memoriesDate';
-import { useMemoriesView } from './memoriesView';
-import { useMemories, useMemoriesMutations } from './useMemories';
+import { PlusIcon } from '@/components/icons/UiIcon';
+import { MemoryCard } from './MemoryCard';
+import { MomentComposer } from './MomentComposer';
+import { useMoments } from './useMoments';
 import './memories.css';
-import type { MemoryRow } from '@/types';
 
 export function MemoriesPage() {
   const me = useCurrentUser();
-  const { data, isPending, isError, refetch, isFetching } = useMemories();
-  const { upload, uploadMany, saveOrder, unlink, remove } = useMemoriesMutations();
-  const [view, setView] = useMemoriesView();
-  const [openDate, setOpenDate] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<MemoryRow | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [importing, setImporting] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [{ yr, mo }, setYm] = useState(currentYearMonth);
-
-  const groups = useMemo(() => groupMemoriesByDate(data?.photos ?? []), [data?.photos]);
-  const links = data?.links ?? {};
-  const linkIds = data?.linkIds ?? {};
-  const days = data?.days ?? {};
-
-  const dayGroup = openDate ? groups.find((g) => g.date === openDate) : undefined;
+  const { data, isPending, isError, refetch, isFetching } = useMoments();
+  const [composing, setComposing] = useState(false);
 
   if (isPending) {
     return (
       <section className="memories">
-        <div className="mem-skeleton" aria-hidden="true">
-          {[0, 1, 2].map((i) => <div key={i} className="mem-skeleton-block" />)}
+        <div className="mm-grid" aria-hidden="true">
+          {[0, 1, 2, 3].map((i) => <div key={i} className="mm-skeleton" />)}
         </div>
       </section>
     );
@@ -53,7 +39,7 @@ export function MemoriesPage() {
   if (isError) {
     return (
       <section className="memories">
-        <div className="empty-state mem-error">
+        <div className="empty-state">
           <p>Не вдалось завантажити спогади.</p>
           <button type="button" className="btn" onClick={() => void refetch()} disabled={isFetching}>
             {isFetching ? 'Пробую…' : 'Спробувати ще раз'}
@@ -63,117 +49,46 @@ export function MemoriesPage() {
     );
   }
 
-  if (dayGroup) {
-    return (
-      <section className="memories">
-        <MemoryDayView
-          date={dayGroup.date}
-          photos={dayGroup.photos}
-          links={links}
-          description={days[dayGroup.date] ?? null}
-          savingOrder={saveOrder.isPending}
-          onBack={() => setOpenDate(null)}
-          onOpen={setLightbox}
-          onSaveOrder={(patch) => saveOrder.mutate(patch)}
-        />
-      {lightbox && (
-        <MemoryViewer
-          photo={lightbox}
-          sources={links[lightbox.id] ?? []}
-          sourceIds={linkIds[lightbox.id] ?? {}}
-          busy={unlink.isPending || remove.isPending}
-          onClose={() => setLightbox(null)}
-          onUnlink={(source) => unlink.mutate({ memoryId: lightbox.id, source })}
-          onDelete={() => remove.mutate(lightbox, { onSuccess: () => setLightbox(null) })}
-        />
-      )}
-      </section>
-    );
-  }
-
-  const totalPhotos = data?.photos.length ?? 0;
-  const earliest = groups[groups.length - 1]?.date;
+  const moments = data?.moments ?? [];
+  const earliest = moments[moments.length - 1]?.memory_date;
 
   return (
     <section className="memories">
-      <header className="mem-head">
-        <div>
-          <h1>Спогади</h1>
-          <p className="mem-sub">
-            {totalPhotos === 0
-              ? 'Архів поки порожній'
-              : `${totalPhotos} фото · від ${earliest?.slice(0, 4) ?? ''}`}
-          </p>
-        </div>
-        {/* Два входи, а не один із перемикачем усередині: додати один
-            знімок — це підпис і точність дати, а завантажити сотню — це
-            зовсім інший екран, із розкладкою по днях. */}
-        <div className="mem-add">
-          <button type="button" className="btn btn-ghost" onClick={() => setImporting(true)}>Багато</button>
-          <button type="button" className="btn" onClick={() => setAdding(true)}>+ Додати</button>
-        </div>
+      <header className="mm-head">
+        <h1>Спогади</h1>
+        <p className="mm-sub">
+          {moments.length === 0
+            ? 'Тут буде ваш фотощоденник'
+            : `${moments.length} · ${data?.photoCount ?? 0} фото · від ${earliest?.slice(0, 4) ?? ''}`}
+        </p>
       </header>
 
-      <MemoriesViewPicker value={view} onChange={setView} />
-
-      {totalPhotos === 0 ? (
-        <p className="empty-state">Спогадів ще немає. Додай перше фото!</p>
-      ) : view === 'feed' ? (
-        <MemoriesFeed
-          groups={groups} links={links} days={days}
-          onOpenDay={setOpenDate} onOpenPhoto={setLightbox}
-        />
-      ) : view === 'album' ? (
-        <MemoriesAlbum
-          groups={groups} links={links} days={days}
-          onOpenDay={setOpenDate} onOpenPhoto={setLightbox}
-        />
+      {moments.length === 0 ? (
+        <p className="empty-state">
+          Ще жодного спогаду. Натисни «+» і збережи перший.
+        </p>
       ) : (
-        <MemoriesMosaicMonth
-          groups={groups} links={links} days={days}
-          year={yr} month={mo}
-          onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
-          onOpenDay={setOpenDate} onOpenPhoto={setLightbox}
-        />
+        <div className="mm-grid">
+          {moments.map((moment) => <MemoryCard key={moment.id} moment={moment} />)}
+        </div>
       )}
 
-      {adding && (
-        <MemoryUploadModal
+      {/* Один вхід, а не меню «Спогад / Особливий день»: концепт просить
+          відкривати створення одразу, без проміжного вибору. */}
+      <button
+        type="button"
+        className="mm-fab"
+        onClick={() => setComposing(true)}
+        aria-label="Новий спогад"
+      >
+        <PlusIcon size={26} />
+      </button>
+
+      {composing && (
+        <MomentComposer
           userId={me.id}
-          busy={upload.isPending}
-          onClose={() => setAdding(false)}
-          onSubmit={(input) => upload.mutate(input, { onSuccess: () => setAdding(false) })}
-        />
-      )}
-
-      {importing && (
-        <MemoryImportModal
-          busy={uploadMany.isPending}
-          progress={progress}
-          onClose={() => { setImporting(false); setProgress(null); }}
-          onSubmit={(items) => {
-            setProgress({ done: 0, total: items.length });
-            uploadMany.mutate(
-              {
-                items,
-                userId: me.id,
-                onProgress: (done, total) => setProgress({ done, total }),
-              },
-              { onSettled: () => { setImporting(false); setProgress(null); } },
-            );
-          }}
-        />
-      )}
-
-      {lightbox && (
-        <MemoryViewer
-          photo={lightbox}
-          sources={links[lightbox.id] ?? []}
-          sourceIds={linkIds[lightbox.id] ?? {}}
-          busy={unlink.isPending || remove.isPending}
-          onClose={() => setLightbox(null)}
-          onUnlink={(source) => unlink.mutate({ memoryId: lightbox.id, source })}
-          onDelete={() => remove.mutate(lightbox, { onSuccess: () => setLightbox(null) })}
+          places={data?.places ?? []}
+          onClose={() => setComposing(false)}
         />
       )}
     </section>
