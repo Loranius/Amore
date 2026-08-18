@@ -29,6 +29,12 @@ const TAG_DATE_TIME_ORIGINAL = 0x9003;
 const TAG_DATE_TIME_DIGITIZED = 0x9004;
 /** DateTime в IFD0 — час останньої зміни файлу; запасний варіант. */
 const TAG_DATE_TIME = 0x0132;
+/** Вказівник на GPS-IFD в IFD0. */
+const TAG_GPS_IFD = 0x8825;
+const TAG_GPS_LAT_REF = 0x0001;
+const TAG_GPS_LAT = 0x0002;
+const TAG_GPS_LNG_REF = 0x0003;
+const TAG_GPS_LNG = 0x0004;
 const TYPE_ASCII = 2;
 
 /** 'YYYY:MM:DD HH:MM:SS' → 'YYYY-MM-DDTHH:MM:SSZ' або null. */
@@ -102,40 +108,52 @@ function scanIfd(
  * Час зйомки з JPEG у вигляді '…Z' (настінний час камери, див. шапку).
  * `null`, якщо файл не JPEG, без EXIF або з непридатною датою.
  */
+/**
+ * Дійти до TIFF-заголовка всередині JPEG.
+ *
+ * Винесено окремо, бо цей шлях (SOI → APP1 → 'Exif\0\0' → TIFF) однаковий
+ * і для дати, і для координат. Читати його двічі означало б два місця, де
+ * можна по-різному помилитись у межах буфера.
+ */
+function openTiff(buffer: ArrayBuffer): { reader: Reader; ifd0: number } | null {
+  const view = new DataView(buffer);
+  if (view.byteLength < 4 || view.getUint16(0) !== SOI) return null;
+
+  // Шукаємо сегмент APP1 серед маркерів JPEG.
+  let offset = 2;
+  let app1 = -1;
+  while (offset + 4 <= view.byteLength) {
+    const marker = view.getUint16(offset);
+    if ((marker & 0xff00) !== 0xff00) break;
+    const length = view.getUint16(offset + 2);
+    if (length < 2) break;
+    if (marker === APP1) {
+      app1 = offset + 4;
+      break;
+    }
+    // FFDA — початок стисненого потоку, далі метаданих немає.
+    if (marker === 0xffda) break;
+    offset += 2 + length;
+  }
+  if (app1 < 0 || app1 + 6 > view.byteLength) return null;
+
+  if (ascii({ view, little: true, base: 0 }, app1, 4) !== 'Exif') return null;
+  const tiff = app1 + 6;
+  if (tiff + 8 > view.byteLength) return null;
+
+  const byteOrder = view.getUint16(tiff);
+  if (byteOrder !== 0x4949 && byteOrder !== 0x4d4d) return null;
+  const little = byteOrder === 0x4949;
+  if (view.getUint16(tiff + 2, little) !== 0x002a) return null;
+
+  return { reader: { view, little, base: tiff }, ifd0: view.getUint32(tiff + 4, little) };
+}
+
 export function readExifTakenAt(buffer: ArrayBuffer): string | null {
   try {
-    const view = new DataView(buffer);
-    if (view.byteLength < 4 || view.getUint16(0) !== SOI) return null;
-
-    // Шукаємо сегмент APP1 серед маркерів JPEG.
-    let offset = 2;
-    let app1 = -1;
-    while (offset + 4 <= view.byteLength) {
-      const marker = view.getUint16(offset);
-      if ((marker & 0xff00) !== 0xff00) break;
-      const length = view.getUint16(offset + 2);
-      if (length < 2) break;
-      if (marker === APP1) {
-        app1 = offset + 4;
-        break;
-      }
-      // FFDA — початок стисненого потоку, далі метаданих немає.
-      if (marker === 0xffda) break;
-      offset += 2 + length;
-    }
-    if (app1 < 0 || app1 + 6 > view.byteLength) return null;
-
-    if (ascii({ view, little: true, base: 0 }, app1, 4) !== 'Exif') return null;
-    const tiff = app1 + 6;
-    if (tiff + 8 > view.byteLength) return null;
-
-    const byteOrder = view.getUint16(tiff);
-    if (byteOrder !== 0x4949 && byteOrder !== 0x4d4d) return null;
-    const little = byteOrder === 0x4949;
-    if (view.getUint16(tiff + 2, little) !== 0x002a) return null;
-
-    const r: Reader = { view, little, base: tiff };
-    const ifd0 = view.getUint32(tiff + 4, little);
+    const opened = openTiff(buffer);
+    if (!opened) return null;
+    const { reader: r, ifd0 } = opened;
     const root = scanIfd(r, ifd0, [TAG_EXIF_IFD, TAG_DATE_TIME]);
 
     // Пріоритет: коли знято → коли оцифровано → коли змінено файл.
@@ -166,4 +184,92 @@ export function readExifTakenAt(buffer: ArrayBuffer): string | null {
 /** Календарний день зі часу зйомки ('YYYY-MM-DD'), або null. */
 export function exifDay(takenAt: string | null): string | null {
   return takenAt ? takenAt.slice(0, 10) : null;
+}
+
+// ============================================================
+// Координати зйомки.
+// ------------------------------------------------------------
+// EXIF тримає широту й довготу трьома раціональними числами (градуси,
+// хвилини, секунди) плюс окремий однобуквений напрямок ('N'/'S', 'E'/'W').
+// Знак у самих числах не зберігається взагалі, тож без напрямку південна
+// півкуля читалася б північною — і фото з Кейптауна опинилось би в Іспанії.
+// ============================================================
+
+/** Три раціональні числа підряд: градуси, хвилини, секунди. */
+function rational3(r: Reader, offset: number): [number, number, number] | null {
+  const at = r.base + offset;
+  if (at < 0 || at + 24 > r.view.byteLength) return null;
+  const parts: number[] = [];
+  for (let i = 0; i < 3; i += 1) {
+    const numerator = r.view.getUint32(at + i * 8, r.little);
+    const denominator = r.view.getUint32(at + i * 8 + 4, r.little);
+    // Нульовий знаменник трапляється в секундах у камер, які пишуть цілі
+    // хвилини. Це не пошкодження файлу — це нуль.
+    parts.push(denominator === 0 ? 0 : numerator / denominator);
+  }
+  return [parts[0]!, parts[1]!, parts[2]!];
+}
+
+/** Градуси-хвилини-секунди в десяткові градуси з урахуванням напрямку. */
+function toDecimal(dms: [number, number, number], ref: string): number {
+  const value = dms[0] + dms[1] / 60 + dms[2] / 3600;
+  return ref === 'S' || ref === 'W' ? -value : value;
+}
+
+export interface ExifLocation {
+  lat: number;
+  lng: number;
+}
+
+/**
+ * Координати зйомки з JPEG, або `null`.
+ *
+ * `null` повертається не лише коли GPS у файлі немає, а й коли він там є,
+ * але непридатний:
+ *
+ *  - **рівно (0, 0)** — це точка в Гвінейській затоці, і камера пише її
+ *    саме тоді, коли супутників не спіймала. Жодна пара там не була;
+ *  - значення поза межами глобуса — пошкоджений файл.
+ *
+ * Мовчазний нуль гірший за відсутність: він поставив би спогад на карту в
+ * місце, де ніхто не був, і пара мусила б це помітити сама.
+ */
+export function readExifLocation(buffer: ArrayBuffer): ExifLocation | null {
+  try {
+    const opened = openTiff(buffer);
+    if (!opened) return null;
+    const { reader: r, ifd0 } = opened;
+
+    const root = scanIfd(r, ifd0, [TAG_GPS_IFD]);
+    const gpsIfd = root.get(TAG_GPS_IFD);
+    if (gpsIfd === undefined) return null;
+
+    const gps = scanIfd(r, gpsIfd, [TAG_GPS_LAT_REF, TAG_GPS_LAT, TAG_GPS_LNG_REF, TAG_GPS_LNG]);
+
+    const latAt = gps.get(TAG_GPS_LAT);
+    const lngAt = gps.get(TAG_GPS_LNG);
+    const latRefAt = gps.get(TAG_GPS_LAT_REF);
+    const lngRefAt = gps.get(TAG_GPS_LNG_REF);
+    if (latAt === undefined || lngAt === undefined) return null;
+    if (latRefAt === undefined || lngRefAt === undefined) return null;
+
+    const latDms = rational3(r, latAt);
+    const lngDms = rational3(r, lngAt);
+    if (!latDms || !lngDms) return null;
+
+    const latRef = (ascii(r, latRefAt, gps.get(-TAG_GPS_LAT_REF) ?? 2) ?? '').trim().toUpperCase();
+    const lngRef = (ascii(r, lngRefAt, gps.get(-TAG_GPS_LNG_REF) ?? 2) ?? '').trim().toUpperCase();
+    if (!'NS'.includes(latRef) || !'EW'.includes(lngRef)) return null;
+
+    const lat = toDecimal(latDms, latRef);
+    const lng = toDecimal(lngDms, lngRef);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return null;
+    if (lat === 0 && lng === 0) return null;
+
+    return { lat, lng };
+  } catch {
+    // Той самий принцип, що й із датою: битий файл не валить імпорт сотні.
+    return null;
+  }
 }
