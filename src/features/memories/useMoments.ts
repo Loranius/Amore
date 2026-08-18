@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+import { compress } from '@/lib/images';
 import { qk } from '@/lib/queryKeys';
 import { useToast } from '@/providers/ToastProvider';
 import { nearestPin } from './momentPlace';
@@ -139,10 +140,17 @@ export interface NewPhoto {
   takenAt: string | null;
 }
 
-/** Куди лягає файл у сховищі. Ім'я з часу й випадкового суфікса — без колізій. */
-function storagePath(momentId: number, index: number, file: File): string {
-  const clean = file.name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-40);
-  return `moments/${momentId}/${Date.now()}-${index}-${clean}`;
+/**
+ * Куди лягає файл у сховищі.
+ *
+ * Ім'я будується з часу й порядкового номера — без випадковості: два
+ * знімки з однієї партії відрізняються індексом, дві партії — часом.
+ * Розширення бере стиснений результат, бо після `compress` файл майже
+ * завжди WebP, хай яким прийшов із камери.
+ */
+function storagePath(momentId: number, index: number, file: File, ext: string): string {
+  const stem = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-32);
+  return `moments/${momentId}/${Date.now()}-${index}-${stem}.${ext}`;
 }
 
 async function uploadPhotos(
@@ -155,10 +163,45 @@ async function uploadPhotos(
 ): Promise<MemoryRow[]> {
   const saved: MemoryRow[] = [];
   for (const [index, item] of photos.entries()) {
-    const path = storagePath(momentId, startOrder + index, item.file);
+    /*
+     * Стиснути ПЕРЕД заливкою, тим самим шляхом, що й решта порталу.
+     *
+     * Це не економія «про всяк випадок», а дві окремі речі, без яких
+     * модуль ламається:
+     *
+     *  1. **HEIC.** Знімок з iPhone приходить у форматі, якого браузер не
+     *     показує взагалі. `compress` веде його через `normalize`, тобто
+     *     через HEIC→JPEG; без цього фотографія лягла б у сховище й
+     *     лишилась порожньою рамкою назавжди.
+     *  2. **Розмір.** Оригінал сучасної камери — 3–12 МБ і до 50
+     *     мегапікселів. Такий файл не лише коштує трафіку: Supabase
+     *     ВІДМОВЛЯЄТЬСЯ будувати з нього мініатюру («source image
+     *     resolution is too large to process»), і галерея змушена тягнути
+     *     повний оригінал. В архіві пари такий знімок уже є — 6144×8160,
+     *     10.9 МБ.
+     *
+     * 1600 по довгій стороні при 0.84 — ті самі числа, що в старому
+     * архіві фото й у планах: різні цифри тут дали б різну якість у
+     * сусідніх модулях без жодної причини.
+     */
+    let blob: Blob = item.file;
+    let ext = 'jpg';
+    let contentType = item.file.type || 'image/jpeg';
+    try {
+      const out = await compress(item.file, 1600, 0.84);
+      blob = out.blob;
+      ext = out.ext;
+      contentType = out.contentType;
+    } catch (e) {
+      // Стиснення — не умова збереження спогаду. Але HEIC без нього не
+      // покажеться, тому про невдачу треба знати з консолі.
+      console.warn('[Спогади] стиснення не вдалося, вантажу оригінал:', e);
+    }
+
+    const path = storagePath(momentId, startOrder + index, item.file, ext);
     const { error: upErr } = await supabase.storage
       .from(MEMORIES_BUCKET)
-      .upload(path, item.file, { cacheControl: '31536000', upsert: false });
+      .upload(path, blob, { cacheControl: '31536000', upsert: false, contentType });
     if (upErr) throw upErr;
 
     const { data: publicUrl } = supabase.storage.from(MEMORIES_BUCKET).getPublicUrl(path);

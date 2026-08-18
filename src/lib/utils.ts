@@ -36,11 +36,6 @@ export function pluralUA(n: number, forms: readonly [string, string, string]): s
   return forms[2];
 }
 
-/** 'YYYY-MM' поточного місяця — ключ для schedule / photoCalendar. */
-export function monthKey(d: Date = new Date()): string {
-  return todayISO(d).slice(0, 7);
-}
-
 /**
  * 'YYYY-MM-DD' → локальна опівніч. Зворотний бік `todayISO`.
  *

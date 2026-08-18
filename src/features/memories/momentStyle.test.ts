@@ -1,42 +1,96 @@
 import { describe, expect, it } from 'vitest';
-import { albumColumns, momentTilt, photoAspect } from './momentStyle';
+import {
+  albumColumns,
+  fanLeaves,
+  FAN_STEP_DEG,
+  MAX_FAN_LEAVES,
+  photoAspect,
+} from './momentStyle';
 
-describe('нахил полароїда', () => {
-  it('той самий спогад нахилений однаково — завжди', () => {
+describe('віяло знімків', () => {
+  it('один знімок — жодного листа', () => {
+    // Спогад із самою обкладинкою: віяло було б обіцянкою, за якою нічого
+    // немає, і картка брехала б про кількість фото.
+    expect(fanLeaves(0)).toEqual([]);
+  });
+
+  it('кількість листів обмежена, хай би скільки фото в спогаді', () => {
     /*
-     * Головна вимога, і вона не про красу. Випадковий нахил означав би, що
-     * прокрутка вниз і назад пересуває картки під пальцем, а React,
-     * оновивши список, перекладає всю галерею наново.
+     * П'ятий лист лягає під уже намальовані й не додає жодного пікселя,
+     * зате коштує ще одне завантаження на кожну картку галереї.
      */
-    expect(momentTilt(42)).toBe(momentTilt(42));
+    expect(fanLeaves(3)).toHaveLength(3);
+    expect(fanLeaves(9)).toHaveLength(MAX_FAN_LEAVES);
+    expect(fanLeaves(200)).toHaveLength(MAX_FAN_LEAVES);
   });
 
-  it('тримається в межах, які просив власник', () => {
-    // «Дуже легкий нахил у межах приблизно ±1–2°». На 3° сусідні картки вже
-    // розходяться кутами, і між ними з'являються клини порожнечі.
-    for (let id = 1; id <= 500; id += 1) {
-      expect(Math.abs(momentTilt(id))).toBeLessThanOrEqual(1.8);
+  it('листи розходяться в обидва боки', () => {
+    const rotates = fanLeaves(MAX_FAN_LEAVES).map((l) => l.rotate);
+    expect(rotates.some((r) => r > 0)).toBe(true);
+    expect(rotates.some((r) => r < 0)).toBe(true);
+  });
+
+  it('жоден лист не стоїть рівно за головним кадром', () => {
+    // Нульовий поворот означав би лист, схований під обкладинкою повністю —
+    // завантажене фото, якого не видно.
+    for (const leaf of fanLeaves(MAX_FAN_LEAVES)) {
+      expect(Math.abs(leaf.rotate)).toBeGreaterThan(0);
     }
   });
 
-  it('жодна картка не стоїть рівно', () => {
-    // Рівна картка серед нахилених читається як помилка верстки, а не задум.
-    for (let id = 1; id <= 500; id += 1) {
-      expect(Math.abs(momentTilt(id))).toBeGreaterThanOrEqual(0.6);
+  it('малює від найдальшого листа до найближчого', () => {
+    /*
+     * Порядок повернення — порядок малювання. Якби найближчий лист ішов
+     * першим, дальші лягали б ПОВЕРХ нього, і віяло читалось би вивернутим
+     * навиворіт. Перевіряємо саме монотонність: кут спадає до центру.
+     */
+    const leaves = fanLeaves(MAX_FAN_LEAVES);
+    for (let i = 1; i < leaves.length; i += 1) {
+      expect(Math.abs(leaves[i]!.rotate)).toBeLessThanOrEqual(Math.abs(leaves[i - 1]!.rotate));
     }
   });
 
-  it('нахиляє в обидва боки', () => {
-    const tilts = Array.from({ length: 60 }, (_v, i) => momentTilt(i + 1));
-    expect(tilts.some((t) => t > 0)).toBe(true);
-    expect(tilts.some((t) => t < 0)).toBe(true);
+  it('дальший лист дрібніший за ближчий', () => {
+    // Перспектива стопки: що глибше, то менше. Однаковий розмір читався б
+    // як помилка накладання, а не як глибина.
+    const leaves = fanLeaves(MAX_FAN_LEAVES);
+    for (let i = 1; i < leaves.length; i += 1) {
+      expect(leaves[i]!.scale).toBeGreaterThanOrEqual(leaves[i - 1]!.scale);
+    }
+    expect(leaves.every((l) => l.scale > 0 && l.scale <= 1)).toBe(true);
   });
 
-  it('сусідні id не дають однакового нахилу', () => {
-    // Без фіналізатора хешу картки лягали б сходинкою: 12, 13 і 14 під
-    // майже однаковим кутом читаються як одна нахилена стопка.
-    expect(momentTilt(12)).not.toBe(momentTilt(13));
-    expect(momentTilt(13)).not.toBe(momentTilt(14));
+  it('найбільший кут уміщається в поле, лишене під віяло', () => {
+    /*
+     * Головне обмеження всієї розкладки, і єдине, яке видно лише в числах.
+     *
+     * Лист крутиться навколо нижнього краю (50%, 100%), тож його верхній
+     * кут виїжджає вбік на (0.5·cos θ + sin θ − 0.5) власної ширини. Лист —
+     * 0.68 клітинки сітки, і ще стиснутий власним `scale`. Поле під віяло з
+     * кожного боку (`--mm-fan-room`) — 16% клітинки; більший виліт наїхав би
+     * на сусідню картку.
+     */
+    const LEAF_WIDTH_OF_CELL = 0.68;
+    const FAN_ROOM_OF_CELL = 0.16;
+
+    for (const leaf of fanLeaves(MAX_FAN_LEAVES)) {
+      const rad = (Math.abs(leaf.rotate) * Math.PI) / 180;
+      const reachOfLeaf = 0.5 * Math.cos(rad) + Math.sin(rad) - 0.5;
+      const reachOfCell = reachOfLeaf * LEAF_WIDTH_OF_CELL * leaf.scale;
+      expect(reachOfCell).toBeLessThanOrEqual(FAN_ROOM_OF_CELL);
+    }
+  });
+
+  it('крок повороту лишається таким, під який рахувалось поле', () => {
+    // Запобіжник на «підкрутити на око»: зміна кроку без перерахунку поля
+    // видно не на картці, а лише коли віяло вже налізло на сусіда.
+    expect(FAN_STEP_DEG).toBe(7.5);
+    expect(MAX_FAN_LEAVES).toBe(4);
+  });
+
+  it('відʼємна чи дробова кількість не ламає розкладку', () => {
+    expect(fanLeaves(-3)).toEqual([]);
+    expect(fanLeaves(2.7)).toHaveLength(2);
   });
 });
 

@@ -61,17 +61,6 @@ export function CameraIcon({ size = 24, className = '' }: IconProps) {
 }
 
 /** Календар із серцем — сабтаб «Події»: не будь-які дати, а наші дні. */
-export function CalendarHeartIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <rect x="3.6" y="5.2" width="16.8" height="15.2" rx="2.4" />
-      <path d="M3.6 9.8h16.8M8.2 3.4v3.4M15.8 3.4v3.4" />
-      <path d="M12 17.6c-1.1-.78-3.3-2.3-3.3-4a1.8 1.8 0 0 1 3.3-.94 1.8 1.8 0 0 1 3.3.94c0 1.7-2.2 3.22-3.3 4Z" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-/** Годинник — сабтаб «Графік». */
 export function ClockIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>

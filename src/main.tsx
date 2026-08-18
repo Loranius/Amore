@@ -21,17 +21,11 @@ import { ConfirmProvider } from '@/providers/ConfirmProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import App from '@/App';
 import '@/index.css';
-import '@/features/wishlist/wishlistMist.css';
-import '@/features/wishlist/wishlistPearlBubbles.css';
-// Останній шар поверхні бульбашок. Замінив wishlistPearlRim.css і
-// wishlistPearlContrast.css: перший малював 6px обідок, другий існував
-// щоб той обідок прибрати — разом вони давали 1px рамку за 152 рядки.
-import '@/features/wishlist/wishlistBubbleGlass.css';
-// Стилю планів тут більше немає, і це навмисно. Вісім шарів
-// (`plansCrystalRefresh` + шість `plansReference*`) зведені в один
-// `plansModule.css`, який імпортує сам модуль. Глобальний імпорт стилю
-// сторінки — це те, що дозволило їм накопичитись: файл, підключений тут,
-// діє скрізь і не належить нікому.
+// Стилю сторінок тут більше немає, і це навмисно. Файл, підключений у
+// точці входу, діє на КОЖНОМУ маршруті й не належить нікому — саме так
+// у планів колись накопичилось вісім шарів, і саме так три файли
+// вішліста (33 КБ) вантажились на головній, у покупках і на карті, де
+// жодного бажання немає. Стиль сторінки імпортує сама сторінка.
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('#root не знайдено в index.html');

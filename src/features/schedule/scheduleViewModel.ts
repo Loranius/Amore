@@ -41,10 +41,3 @@ export function statusText(status: DayStatus): string {
   return 'Спільного вихідного немає';
 }
 
-export function fmtDatePlanDate(date: string): string {
-  return new Date(`${date}T00:00:00`).toLocaleDateString('uk-UA', {
-    day: 'numeric',
-    month: 'long',
-    weekday: 'short',
-  });
-}

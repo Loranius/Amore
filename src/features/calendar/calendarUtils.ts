@@ -110,12 +110,6 @@ export function formatOccurrence(ev: EnrichedEvent): string {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} р.`;
 }
 
-/** Дата настання у 'YYYY-MM-DD' — для підписів через formatDateUA. */
-export function occurrenceISO(ev: EnrichedEvent): string {
-  const d = ev.nextDate;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 /**
  * Котрі роковини настануть цього разу.
  *

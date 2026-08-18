@@ -5,6 +5,7 @@ import { CATEGORIES, CATEGORY_ORDER, groupPinsByCity } from './mapConstants';
 import { pinHasSecondText, pinPrimaryText } from './mapPinView';
 import { directionsUrl } from '@/lib/mapbox';
 import { formatDateUA } from '@/features/_shared/month';
+import { Photo } from '@/components/ui/Photo';
 import { TabBar } from '@/components/ui/TabBar';
 import { CompassIcon, MapPinIcon, PinCategoryIcon } from '@/components/icons/MapIcon';
 import { SearchIcon, StarIcon } from '@/components/icons/UiIcon';
@@ -143,7 +144,10 @@ function PinCard({
         aria-label={`Відкрити «${pin.title}»`}
       />
       {pin.photo_url ? (
-        <img className="pin-card-photo" loading="lazy" src={pin.photo_url} alt="" />
+        // Картка показує кадр 96×96, а в сховищі міток лежать знімки по
+        // 900 КБ у середньому — на списку з тридцяти міток це були
+        // десятки мегабайтів заради нігтикових прев'ю.
+        <Photo className="pin-card-photo" loading="lazy" src={pin.photo_url} cssWidth={96} alt="" />
       ) : (
         <div className="pin-card-photo-placeholder" style={{ color: cat.color }}>
           <PinCategoryIcon cat={pin.category} size={30} />

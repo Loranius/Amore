@@ -11,6 +11,7 @@
 // виправити пізніше.
 // ============================================================
 import { useState } from 'react';
+import { Photo } from '@/components/ui/Photo';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { CATEGORIES } from './mapConstants';
@@ -73,9 +74,12 @@ export function PinModal({ pin, onClose, onSave, onDelete }: PinModalProps) {
       <div className="modal-sheet pin-view-modal" role="dialog" aria-modal="true">
         {pin.photo_url ? (
           <div className="pin-view-photo-wrap">
-            <img
+            {/* Шапка модалки — щонайбільше 260 px заввишки на всю ширину
+                аркуша; повний розмір лишається за лайтбоксом. */}
+            <Photo
               className="pin-view-photo"
               src={pin.photo_url}
+              cssWidth={420}
               alt=""
               onClick={() => setLightbox(pin.photo_url)}
             />

@@ -8,8 +8,9 @@
 // смикання свайпом. Занизький поріг перегортає кадр, коли пара просто
 // хотіла роздивитись; зависокий змушує тягти пів екрана.
 // ============================================================
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Photo } from '@/components/ui/Photo';
 import { CloseIcon } from '@/components/icons/UiIcon';
 import type { MemoryRow } from '@/types';
 
@@ -23,6 +24,15 @@ const SWIPE_MIN_PX = 56;
  */
 const SWIPE_AXIS_RATIO = 1.4;
 
+/**
+ * Ширина кадру на повному екрані, у CSS-пікселях.
+ *
+ * Тут єдине місце модуля, де фото дивляться впритул, тож просимо стільки,
+ * скільки може показати найширший телефон. Менше було б видно — саме на
+ * цьому екрані пара й помітила б економію.
+ */
+const FULL_CSS_WIDTH = 540;
+
 interface PhotoLightboxProps {
   photos: readonly MemoryRow[];
   startId: number;
@@ -34,9 +44,21 @@ export function PhotoLightbox({ photos, startId, onClose }: PhotoLightboxProps) 
   const [index, setIndex] = useState(startIndex);
   const touch = useRef<{ x: number; y: number } | null>(null);
 
-  const go = (delta: number) =>
-    setIndex((i) => Math.min(photos.length - 1, Math.max(0, i + delta)));
+  /*
+   * Крок через функціональний `setIndex`, а не через поточний `index`.
+   * Саме це робить `go` незалежним від стану — і дозволяє ефекту нижче
+   * мати чесний список залежностей.
+   */
+  const go = useCallback(
+    (delta: number) => setIndex((i) => Math.min(photos.length - 1, Math.max(0, i + delta))),
+    [photos.length],
+  );
 
+  /*
+   * Залежності тут обов'язкові. Перша редакція лишила ефект без масиву
+   * взагалі — і слухач клавіатури знімався й вішався заново на КОЖНОМУ
+   * рендері компонента, тобто на кожен свайп і кожну зміну кадру.
+   */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -45,7 +67,7 @@ export function PhotoLightbox({ photos, startId, onClose }: PhotoLightboxProps) 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, [go, onClose]);
 
   const photo = photos[index];
   if (!photo || typeof document === 'undefined') return null;
@@ -82,7 +104,7 @@ export function PhotoLightbox({ photos, startId, onClose }: PhotoLightboxProps) 
         <CloseIcon size={24} />
       </button>
 
-      <img key={photo.id} src={photo.photo_url} alt="" decoding="async" />
+      <Photo key={photo.id} src={photo.photo_url} cssWidth={FULL_CSS_WIDTH} alt="" decoding="async" />
 
       {photos.length > 1 && (
         <div className="mm-light-dots" aria-hidden="true">
