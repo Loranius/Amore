@@ -14,6 +14,7 @@ const row = (id: number, significance: EventSignificance): EventRow => ({
   significance,
   is_milestone: significance !== 'regular',
   person_user_id: null,
+  star_color: null,
 });
 
 describe('KEY_EVENT_TEMPLATES', () => {

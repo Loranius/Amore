@@ -9,7 +9,7 @@ import {
 } from 'three';
 import type { Star3D } from '../constellation3d';
 import { hslToRgb, type JourneyPalette } from '../journeyPalette';
-import { pathReveal, pulsePosition } from './constellationLife';
+import { pathReveal, pathSegments, pulsePosition } from './constellationLife';
 
 // ============================================================
 // Шлях між подіями.
@@ -34,14 +34,16 @@ import { pathReveal, pulsePosition } from './constellationLife';
 // у нулі осі, збоку від власного місця в ланцюгу.
 // ============================================================
 
-/** Товщина шляху. Помітно тонша за найдрібнішу зірку — це зв'язок, не подія. */
-const PATH_RADIUS = 0.16;
+/**
+ * Товщина шляху. Помітно тонша за найдрібнішу зірку — це зв'язок, не подія.
+ *
+ * Зменшено з 0.16 після виміру у focus-режимі: труба має сталу товщину у
+ * СВІТІ, тож здалеку вона стрічка, а впритул — смуга через увесь кадр. На
+ * розкритій події вона виходила помітнішою за саму подію.
+ */
+const PATH_RADIUS = 0.12;
 /** Скільки поперечних граней у труби. П'ять досить: труба тонша за піксель здалеку. */
 const PATH_SIDES = 5;
-/** Скільки відрізків на один проліт між подіями. */
-const SEGMENTS_PER_LEG = 14;
-/** Стеля відрізків: пара з сорока подіями не мусить платити за шість сотень. */
-const MAX_SEGMENTS = 420;
 
 const PATH_VERTEX = /* glsl */ `
   varying vec2 vPath;
@@ -99,14 +101,13 @@ export function ConstellationPath({
     // `centripetal` — не смак, а запобіжник: `chordal` і `catmullrom` роблять
     // петлю на різкому повороті, а ядро в нулі осі саме такий поворот і дає.
     const curve = new CatmullRomCurve3(points, false, 'centripetal', 0.5);
-    const segments = Math.min(MAX_SEGMENTS, (chain.length - 1) * SEGMENTS_PER_LEG);
-    return new TubeGeometry(curve, segments, PATH_RADIUS, PATH_SIDES, false);
+    return new TubeGeometry(curve, pathSegments(chain.length), PATH_RADIUS, PATH_SIDES, false);
   }, [chain]);
 
   useEffect(() => () => geometry?.dispose(), [geometry]);
 
   const orders = useMemo(() => chain.map((star) => star.order), [chain]);
-  const colour = useMemo(() => hslToRgb(palette.key), [palette.key]);
+  const colour = useMemo(() => hslToRgb(palette.path), [palette.path]);
 
   useFrame(() => {
     const material = materialRef.current;
