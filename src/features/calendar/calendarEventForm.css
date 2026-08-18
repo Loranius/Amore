@@ -1,6 +1,19 @@
 /* ============================================================
-   Календарна подія — той самий visual language, що AddPlanModal.
-   Великий вступ, акцентне поле, компактні скляні секції та pill-actions.
+   Подія календаря й «Нашого шляху» — одна спокійна поверхня.
+   ------------------------------------------------------------
+   До переробки тут було три акордеони, кожен у власній «скляній» картці, і
+   поле назви на дві строки. Власник назвав це адміністративною формою посеред
+   атмосферної сцени, і це справедливо: вкладені поверхні змушують пару
+   вгадувати, що всередині, а кожен акордеон коштує дотику ще до того, як
+   почалось заповнення.
+
+   Тепер поверхня одна. Вибір іде сегментами, підписи полів однакові, усі поля
+   видно одразу. Заголовків секцій немає — їх роль виконує підпис поля.
+
+   Мова сегментів узята з `.pm-tabs` у `plans/plansModule.css`: темне скло, у
+   якому світиться лише обрана половина. Взірець, а не селектори — правила
+   звідти сюди не копіюються, бо один стиль у двох файлах уже одного разу
+   розрісся до восьми.
    ============================================================ */
 
 .cal-entry-overlay {
@@ -11,7 +24,7 @@
 
 .cal-entry-sheet {
   --cal-entry-accent: var(--accent);
-  width: min(100%, 560px);
+  width: min(100%, 540px);
   max-height: min(90dvh, 760px);
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -26,357 +39,450 @@
 
 .cal-entry-form {
   display: grid;
-  gap: 20px;
-  padding: 24px 20px 20px;
+  gap: 18px;
+  padding: 24px 20px 0;
 }
+
+/* ── Шапка ───────────────────────────────────────────────── */
 
 .cal-entry-head {
   display: grid;
-  gap: 7px;
-}
-
-.cal-entry-eyebrow {
-  color: color-mix(in srgb, var(--cal-entry-accent) 78%, var(--text));
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: .11em;
-  text-transform: uppercase;
+  gap: 6px;
 }
 
 .cal-entry-head h2 {
   margin: 0;
-  font-size: clamp(22px, 6vw, 29px);
-  line-height: 1.12;
-  letter-spacing: -.035em;
+  font-size: clamp(21px, 5.4vw, 26px);
+  line-height: 1.14;
+  letter-spacing: -.03em;
 }
 
 .cal-entry-head p {
   margin: 0;
   max-width: 42ch;
   color: var(--muted);
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 12.5px;
+  line-height: 1.5;
 }
 
-.cal-entry-title-field {
+/* ── Спільна мова полів ──────────────────────────────────── */
+
+.cal-entry-field-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.cal-entry-field-label em {
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: .02em;
+  opacity: .7;
+  text-transform: none;
+}
+
+.cal-entry-choice {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cal-entry-choice legend {
+  padding: 0;
+}
+
+/* ── Назва ───────────────────────────────────────────────── */
+
+.cal-entry-name {
   position: relative;
   display: block;
 }
 
-.cal-entry-title-field textarea {
+.cal-entry-name input {
   display: block;
   width: 100%;
-  min-height: 108px;
-  resize: none;
-  padding: 18px 18px 30px;
-  border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 34%, transparent);
-  border-radius: 21px;
+  min-height: 56px;
+  padding: 14px 62px 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 30%, transparent);
+  border-radius: 18px;
   outline: none;
   background: color-mix(in srgb, var(--cal-entry-accent) 5%, var(--bg));
   color: var(--text);
   font: inherit;
-  font-size: 19px;
+  font-size: 17px;
   font-weight: 700;
-  line-height: 1.35;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
 }
 
-.cal-entry-title-field textarea::placeholder {
-  color: color-mix(in srgb, var(--muted) 78%, transparent);
+.cal-entry-name input::placeholder {
+  color: color-mix(in srgb, var(--muted) 76%, transparent);
   font-weight: 500;
 }
 
-.cal-entry-title-field textarea:focus {
-  border-color: color-mix(in srgb, var(--cal-entry-accent) 72%, transparent);
+.cal-entry-name input:focus {
+  border-color: color-mix(in srgb, var(--cal-entry-accent) 70%, transparent);
   background: color-mix(in srgb, var(--cal-entry-accent) 8%, var(--bg));
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--cal-entry-accent) 10%, transparent);
 }
 
-.cal-entry-title-field small {
+.cal-entry-name small {
   position: absolute;
-  right: 15px;
-  bottom: 11px;
+  right: 16px;
+  bottom: 18px;
   color: var(--muted);
   font-size: 10.5px;
   font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
 
-.cal-entry-accordion,
-.cal-entry-field-card,
-.cal-entry-people-card,
-.cal-entry-toggle-card {
-  overflow: hidden;
+/* ── Сегменти ────────────────────────────────────────────── */
+
+.cal-entry-segments {
+  display: flex;
+  gap: 6px;
+  padding: 5px;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--bg) 55%, var(--surface));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 62%, var(--surface));
 }
 
-.cal-entry-accordion-toggle {
+.cal-entry-segment {
   display: flex;
-  width: 100%;
-  min-height: 62px;
+  min-height: 44px;
+  flex: 1 1 0;
   align-items: center;
-  gap: 11px;
-  padding: 10px 13px;
+  justify-content: center;
+  min-width: 0;
+  gap: 6px;
+  /*
+   * Тісні поля навмисно: найдовший підпис у сегменті — «День народження», і
+   * на 412 px він при 13 px і відступах по 10 переносився на другий рядок,
+   * роблячи рядок сегментів удвічі вищим за сусідні. Обрізати підпис не можна
+   * (тип події — не та річ, яку пара має вгадувати), тож стиснуто поля.
+   */
+  padding: 0 8px;
   border: 0;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.cal-entry-accordion-toggle--note {
-  min-height: 54px;
-}
-
-.cal-entry-accordion-icon {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--cal-entry-accent) 12%, var(--surface));
-  color: var(--cal-entry-accent);
-}
-
-.cal-entry-accordion-copy {
-  display: grid;
-  min-width: 0;
-  flex: 1 1 auto;
-  gap: 1px;
-}
-
-.cal-entry-accordion-copy small,
-.cal-entry-field-label {
-  color: var(--muted);
-  font-size: 10.5px;
-}
-
-.cal-entry-accordion-copy strong {
-  overflow: hidden;
-  font-size: 13px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cal-entry-accordion-optional {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.cal-entry-accordion-toggle > svg {
-  flex: 0 0 auto;
-  color: var(--muted);
-  transition: transform .18s ease;
-}
-
-.cal-entry-accordion-toggle.open > svg {
-  transform: rotate(180deg);
-}
-
-.cal-entry-type-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
-  padding: 0 10px 10px;
-  animation: cal-entry-reveal .18s ease both;
-}
-
-.cal-entry-type-option {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 13px;
-  background: var(--surface);
-  color: var(--muted);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.cal-entry-type-option > svg {
-  color: currentColor;
-}
-
-.cal-entry-type-option > span {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.cal-entry-type-option strong {
-  color: var(--text);
-  font-size: 11.5px;
-}
-
-.cal-entry-type-option small {
-  color: var(--muted);
-  font-size: 9.5px;
-  line-height: 1.3;
-}
-
-.cal-entry-type-option.active {
-  border-color: color-mix(in srgb, var(--cal-entry-accent) 42%, transparent);
-  background: color-mix(in srgb, var(--cal-entry-accent) 10%, var(--surface));
-  color: color-mix(in srgb, var(--cal-entry-accent) 78%, var(--text));
-  font-weight: 750;
-}
-
-.cal-entry-type-option--major.active {
-  border-color: color-mix(in srgb, #a675c6 54%, transparent);
-  background: color-mix(in srgb, #a675c6 11%, var(--surface));
-  color: #b88ad5;
-}
-
-.cal-entry-people-card {
-  display: grid;
-  gap: 10px;
-  padding: 12px 13px 13px;
-}
-
-.cal-entry-people-card .chips {
-  margin: 0;
-}
-
-.cal-entry-field-card {
-  display: grid;
-  gap: 7px;
-  padding: 11px 13px 13px;
-}
-
-.cal-entry-date-card input[type='date'] {
-  width: 100%;
-  min-height: 42px;
-  padding: 9px 11px;
-  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 13px;
-  outline: none;
-  background: color-mix(in srgb, var(--bg) 72%, var(--surface));
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.cal-entry-date-card input[type='date']:focus {
-  border-color: color-mix(in srgb, var(--cal-entry-accent) 55%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cal-entry-accent) 9%, transparent);
-}
-
-.cal-entry-note {
-  display: block;
-  padding: 0 11px 11px;
-  animation: cal-entry-reveal .18s ease both;
-}
-
-.cal-entry-note textarea {
-  display: block;
-  width: 100%;
-  min-height: 78px;
-  resize: vertical;
-  padding: 11px 12px;
-  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 13px;
-  outline: none;
-  background: color-mix(in srgb, var(--bg) 70%, var(--surface));
-  color: var(--text);
-  font: inherit;
-  font-size: 13px;
-  line-height: 1.45;
-}
-
-.cal-entry-note textarea:focus {
-  border-color: color-mix(in srgb, var(--cal-entry-accent) 50%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cal-entry-accent) 8%, transparent);
-}
-
-.cal-entry-toggle-card {
-  display: flex;
-  align-items: center;
-  gap: 11px;
-  padding: 11px 13px;
-  cursor: pointer;
-}
-
-.cal-entry-toggle-card input {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 auto;
-  accent-color: var(--cal-entry-accent);
-}
-
-.cal-entry-toggle-card > span {
-  display: grid;
-  min-width: 0;
-  gap: 2px;
-}
-
-.cal-entry-toggle-card strong {
-  font-size: 12.5px;
-}
-
-.cal-entry-toggle-card small {
-  color: var(--muted);
-  font-size: 9.8px;
-  line-height: 1.35;
-}
-
-.cal-entry-reminder-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: -3px 0 0;
-  padding: 10px 12px;
-  border-radius: 15px;
-  background: color-mix(in srgb, var(--cal-entry-accent) 7%, transparent);
-  color: var(--muted);
-  font-size: 10.5px;
-  line-height: 1.45;
-}
-
-.cal-entry-reminder-note svg {
-  flex: 0 0 auto;
-  margin-top: 1px;
-  color: color-mix(in srgb, var(--cal-entry-accent) 75%, var(--text));
-}
-
-.cal-entry-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding-top: 2px;
-}
-
-.cal-entry-cancel {
-  border: 0;
+  border-radius: 999px;
   background: none;
   color: var(--muted);
   font: inherit;
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
+  transition: color .2s ease, background .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.cal-entry-segment > span {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.cal-entry-segment.active {
+  background: color-mix(in srgb, var(--cal-entry-accent) 88%, transparent);
+  color: #fff;
+}
+
+.cal-entry-segment:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--cal-entry-accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* ── Ключові події ───────────────────────────────────────────
+   Не сегменти того самого вибору, хоч і задають те саме поле:
+   вони підставляють назву й вимикаються, коли ключ у парі вже є.
+   ------------------------------------------------------------ */
+
+.cal-entry-keys {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 8px;
+  gap: 6px;
+}
+
+.cal-entry-key {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  align-content: center;
+  min-height: 44px;
+  min-width: 0;
+  gap: 8px;
+  padding: 8px 11px;
+  border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 20%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cal-entry-accent) 4%, var(--surface));
+  color: var(--cal-entry-accent);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .18s ease, background .18s ease;
+}
+
+.cal-entry-key > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.cal-entry-key strong {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.cal-entry-key small {
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.3;
+}
+
+.cal-entry-key.active {
+  border-color: color-mix(in srgb, var(--cal-entry-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--cal-entry-accent) 13%, var(--surface));
+}
+
+.cal-entry-key:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.cal-entry-key:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--cal-entry-accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* ── Колір зірки ─────────────────────────────────────────────
+   Preview показує відтінок так, як його побачить небо: світна
+   серцевина в ореолі того ж кольору. Плаский кружечок брехав би —
+   на додатковому змішуванні поверх туманності колір читається
+   інакше, ніж на суцільній заливці.
+   ------------------------------------------------------------ */
+
+.cal-entry-colour-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--bg) 62%, var(--surface));
+}
+
+/*
+ * Preview — ВИХІД, а не ще один вибір.
+ *
+ * Виміряно на живому екрані: у першій редакції він стояв просто поруч із
+ * кружечками, тієї самої величини й на тій самій відстані, — і читався
+ * восьмою кнопкою. Тепер він у власному стовпці з підписом і відділений
+ * лінією, тобто виглядає як відповідь, а не як питання.
+ */
+.cal-entry-colour-shown {
+  display: grid;
+  width: 76px;
+  flex: 0 0 auto;
+  justify-items: center;
+  gap: 6px;
+  padding-right: 16px;
+  border-right: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+}
+
+.cal-entry-colour-shown small {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.cal-entry-colour-preview {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 50%, #fff 0%, var(--shade) 26%, transparent 62%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--shade) 40%, transparent), transparent 72%);
+  transition: background .2s ease;
+}
+
+.cal-entry-colour-swatches {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+/*
+ * Ціль дотику 44 px, кружечок 30. Кнопка прозора, колір несе внутрішня
+ * крапка — інакше довелось би вибирати між пальцем і щільним рядом.
+ */
+.cal-entry-swatch {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.cal-entry-swatch-dot {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 30px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--shade) 88%, #fff), var(--shade) 70%);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, transparent);
+  transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+}
+
+.cal-entry-swatch:hover .cal-entry-swatch-dot {
+  transform: scale(1.1);
+}
+
+.cal-entry-swatch.active .cal-entry-swatch-dot {
+  border-color: var(--text);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 14%, transparent),
+    0 0 14px color-mix(in srgb, var(--shade) 55%, transparent);
+}
+
+.cal-entry-swatch:focus-visible {
+  border-radius: 50%;
+  outline: 2px solid color-mix(in srgb, var(--cal-entry-accent) 70%, transparent);
+  outline-offset: -4px;
+}
+
+/*
+ * «Авто» показує САМЕ ТОЙ відтінок, який дістанеться події, а не сірий
+ * кружечок: інакше пара обирала б наосліп між «якимось» і конкретним. Від
+ * решти його відрізняє пунктирний обідок усередині, а не колір.
+ */
+.cal-entry-swatch--auto .cal-entry-swatch-dot::after {
+  position: absolute;
+  inset: 5px;
+  border: 1.5px dashed color-mix(in srgb, #000 58%, transparent);
+  border-radius: 50%;
+  content: '';
+}
+
+/* ── Люди, дата, нотатка, «щороку» ───────────────────────── */
+
+.cal-entry-choice .chips {
+  margin: 0;
+}
+
+.cal-entry-date,
+.cal-entry-note {
+  display: block;
+}
+
+.cal-entry-date input[type='date'],
+.cal-entry-note textarea {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 14px;
+  outline: none;
+  background: color-mix(in srgb, var(--bg) 70%, var(--surface));
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.cal-entry-date input[type='date'] {
+  min-height: 48px;
+  font-weight: 650;
+}
+
+.cal-entry-note textarea {
+  min-height: 66px;
+  resize: vertical;
+  line-height: 1.45;
+}
+
+.cal-entry-date input[type='date']:focus,
+.cal-entry-note textarea:focus {
+  border-color: color-mix(in srgb, var(--cal-entry-accent) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cal-entry-accent) 9%, transparent);
+}
+
+.cal-entry-yearly {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 55%, var(--surface));
+  cursor: pointer;
+}
+
+.cal-entry-yearly input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--cal-entry-accent);
+}
+
+.cal-entry-yearly > span {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+/* ── Дії ─────────────────────────────────────────────────────
+   Липкі знизу: форма прокручується всередині аркуша, і «Зберегти»
+   не повинно тікати з-під пальця на довгій формі.
+   ------------------------------------------------------------ */
+
+.cal-entry-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin: 4px -20px 0;
+  padding: 14px 20px calc(16px + env(safe-area-inset-bottom, 0));
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  background: var(--surface);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.cal-entry-cancel {
+  min-height: 44px;
+  padding-inline: 8px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .cal-entry-save {
   min-height: 44px;
-  padding-inline: 20px;
+  padding-inline: 22px;
   border-radius: 999px;
   background: var(--cal-entry-accent);
 }
 
-@keyframes cal-entry-reveal {
-  from { opacity: 0; transform: translateY(-5px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+/* ── Вузькі й низькі екрани ──────────────────────────────── */
 
 @media (min-width: 640px) {
   .cal-entry-overlay {
@@ -402,10 +508,6 @@
   .cal-entry-head p {
     display: none;
   }
-
-  .cal-entry-title-field textarea {
-    min-height: 86px;
-  }
 }
 
 @media (max-width: 380px) {
@@ -417,66 +519,38 @@
     padding-inline: 15px;
   }
 
-  .cal-entry-type-grid {
+  .cal-entry-actions {
+    margin-inline: -15px;
+    padding-inline: 15px;
+  }
+
+  /* Два ключі поруч на 320 px дають по 130 px на підпис — це вже не підпис. */
+  .cal-entry-keys {
     grid-template-columns: 1fr;
   }
 
-  .cal-entry-accordion-optional {
-    display: none;
+  .cal-entry-segment {
+    font-size: 12px;
+  }
+
+  .cal-entry-colour-row {
+    gap: 12px;
+  }
+
+  .cal-entry-colour-shown {
+    width: 64px;
+    padding-right: 12px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cal-entry-accordion-toggle > svg,
-  .cal-entry-type-grid,
-  .cal-entry-note {
-    animation: none;
+  .cal-entry-segment,
+  .cal-entry-swatch-dot,
+  .cal-entry-colour-preview {
     transition: none;
   }
-}
 
-/* ------------------------------------------------------------
-   Ключові події. Не рівень, а шаблон: назва підставляється разом
-   зі значенням, а вже створений ключ вимкнений — як товар, що вже
-   лежить у полиці покупок.
-   ------------------------------------------------------------ */
-.cal-entry-keys {
-  display: grid;
-  gap: 6px;
-  margin-top: 8px;
-  padding-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-}
-.cal-entry-keys > small {
-  color: var(--muted);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: .07em;
-  text-transform: uppercase;
-}
-.cal-entry-key-option {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  align-items: center;
-  min-width: 0;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 22%, transparent);
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--cal-entry-accent) 5%, var(--surface));
-  color: var(--cal-entry-accent);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.cal-entry-key-option > span { display: grid; min-width: 0; gap: 2px; }
-.cal-entry-key-option strong { color: var(--text); font-size: 11.5px; }
-.cal-entry-key-option small { color: var(--muted); font-size: 9.5px; line-height: 1.3; }
-.cal-entry-key-option.active {
-  border-color: color-mix(in srgb, var(--cal-entry-accent) 55%, transparent);
-  background: color-mix(in srgb, var(--cal-entry-accent) 14%, var(--surface));
-}
-.cal-entry-key-option:disabled {
-  cursor: not-allowed;
-  opacity: .45;
+  .cal-entry-swatch:hover .cal-entry-swatch-dot {
+    transform: none;
+  }
 }
