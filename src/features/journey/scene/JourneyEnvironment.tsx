@@ -1,11 +1,13 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useGLTF } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import {
   BackSide,
   BufferGeometry,
   Mesh,
   MeshBasicMaterial,
   SRGBColorSpace,
+  type Mesh as MeshType,
   type Texture,
 } from 'three';
 import { JOURNEY_SKYBOX_PATH, journeyAssetUrl } from '../journeyAssets';
@@ -37,6 +39,16 @@ const SKYBOX_URL = journeyAssetUrl(JOURNEY_SKYBOX_PATH);
  */
 export const JOURNEY_SKY_RADIUS = 600;
 
+/**
+ * Скільки секунд бере повний оберт неба.
+ *
+ * Двадцять хвилин — це майже нуль на око й помітно на відчуття: пара, яка
+ * дивиться на сузір'я хвилину, бачить, що космос навколо не намальований, а
+ * живий. Швидше — і небо починає крутитись, тобто перетягує увагу на себе;
+ * повільніше — і різниці з нерухомою картинкою немає взагалі.
+ */
+const SKY_TURN_SECONDS = 1200;
+
 interface SkyboxSource {
   geometry: BufferGeometry | null;
   texture: Texture | null;
@@ -55,8 +67,14 @@ function readSkybox(scene: { traverse: (visit: (node: unknown) => void) => void 
   return { geometry, texture };
 }
 
-export function JourneyEnvironment() {
+export interface JourneyEnvironmentProps {
+  /** Пара просила спокою: небо стоїть. */
+  reducedMotion?: boolean;
+}
+
+export function JourneyEnvironment({ reducedMotion = false }: JourneyEnvironmentProps) {
   const { scene } = useGLTF(SKYBOX_URL);
+  const skyRef = useRef<MeshType>(null);
   const { geometry, texture } = useMemo(() => readSkybox(scene), [scene]);
 
   const material = useMemo(() => {
@@ -79,10 +97,19 @@ export function JourneyEnvironment() {
   // матеріал не звільнить ніхто, крім нас.
   useEffect(() => () => material?.dispose(), [material]);
 
+  useFrame((_state, delta) => {
+    const sky = skyRef.current;
+    if (!sky || reducedMotion) return;
+    // Крок обрізається зверху з тієї ж причини, що й усюди в цій сцені: під
+    // програмним рендерером кадр триває третину секунди.
+    sky.rotation.y += ((2 * Math.PI) / SKY_TURN_SECONDS) * Math.min(delta, 0.05);
+  });
+
   if (!geometry || !material) return null;
 
   return (
     <mesh
+      ref={skyRef}
       geometry={geometry}
       material={material}
       scale={JOURNEY_SKY_RADIUS}

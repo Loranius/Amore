@@ -3,7 +3,7 @@ import { useThree } from '@react-three/fiber';
 import { PerspectiveCamera, Vector3 } from 'three';
 import type { Star3D } from '../constellation3d';
 import { pickStar, type ScreenStar } from '../starPicking';
-import { haloSize } from './JourneyConstellation';
+import { starAura } from './constellationLife';
 
 // ============================================================
 // Що зробив палець.
@@ -62,7 +62,9 @@ export function StarPointer({ stars, onPick, onLongPress, disabled = false }: St
           y: (-point.y * 0.5 + 0.5) * size.height,
           // Ціль дотику міряється по СЯЙВУ, а не по силуету: пара сприймає
           // ореол як частину зірки й цілиться саме в нього.
-          radius: distance > 0.001 ? (haloSize(star.radius) / distance) * pixelsPerRadian * 0.5 : 0,
+          radius: distance > 0.001
+            ? (starAura(star).halo / distance) * pixelsPerRadian * 0.5
+            : 0,
           // `project` дає z > 1 для того, що позаду камери.
           visible: point.z < 1,
         };
