@@ -116,7 +116,7 @@
 
 .wm-image-mode-option[data-selected='true'] .wm-image-mode-check {
   border-color: var(--accent);
-  background: var(--accent);
+  background: var(--accent-strong);
   color: white;
 }
 

@@ -269,7 +269,7 @@
 }
 
 .wl-board-filter.active .wl-board-filter-icon {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
 }
 

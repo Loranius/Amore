@@ -58,7 +58,7 @@
   position: relative; z-index: 2; justify-self: start; margin-top: 3px;
   padding: 6px 13px; border-radius: 999px; font: inherit; font-size: 12px;
   font-weight: 700; cursor: pointer; border: 0;
-  background: var(--accent); color: #fff;
+  background: var(--accent-strong); color: #fff;
 }
 
 /* ── Форма створення ───────────────────────────────────────── */

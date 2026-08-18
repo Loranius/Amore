@@ -34,7 +34,7 @@
 
 .sched .sched-edit-compact.is-active {
   border-color: transparent;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
 }
 

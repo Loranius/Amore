@@ -52,7 +52,7 @@
 
 .sched .sched-edit-toggle.is-active {
   border-color: transparent;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
 }
 
@@ -120,7 +120,7 @@
   border: 0;
   border-radius: var(--radius-pill);
   padding: 9px 13px;
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
   font: inherit;
   font-size: 12px;

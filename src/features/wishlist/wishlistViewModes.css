@@ -126,7 +126,7 @@
 
 .wl-board-view-option.active .wl-board-view-icon,
 .wl-board-view-option.active .wl-board-view-check {
-  background: var(--accent);
+  background: var(--accent-strong);
   color: #fff;
 }
 
