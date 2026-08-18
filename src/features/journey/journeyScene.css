@@ -23,7 +23,7 @@
   display: flex;
   overflow: hidden;
   flex-direction: column;
-  background: var(--world-bg-deep, #0b0714);
+  background: var(--world-bg-deep, #0b0811);
   color: var(--world-text, var(--text));
   inset: 0;
 }
@@ -65,7 +65,7 @@
   place-items: center;
   border: 1px solid var(--world-border, rgba(198, 160, 255, .14));
   border-radius: 50%;
-  background: color-mix(in srgb, var(--world-bg-deep, #0b0714) 62%, transparent);
+  background: color-mix(in srgb, var(--world-bg-deep, #0b0811) 62%, transparent);
   color: var(--world-text, var(--text));
   cursor: pointer;
   -webkit-backdrop-filter: blur(8px);
@@ -169,7 +169,7 @@
       color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 9%, transparent),
       transparent 120px
     ),
-    color-mix(in srgb, var(--world-bg-deep, #0b0714) 84%, transparent);
+    color-mix(in srgb, var(--world-bg-deep, #0b0811) 84%, transparent);
   gap: 6px;
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
@@ -303,7 +303,7 @@
         transparent,
         color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 8%, transparent) 92%
       ),
-      color-mix(in srgb, var(--world-bg-deep, #0b0714) 84%, transparent);
+      color-mix(in srgb, var(--world-bg-deep, #0b0811) 84%, transparent);
   }
 
   /* Смужка теж повертається на чверть оберту: вона тепер уздовж лівого краю. */
