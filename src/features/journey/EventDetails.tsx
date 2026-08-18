@@ -1,6 +1,8 @@
+import type { CSSProperties } from 'react';
 import { CloseIcon, PencilIcon } from '@/components/icons/UiIcon';
 import type { EventRow } from '@/types';
 import { levelOf, type ConstellationLevel } from './constellationRules';
+import { starColour } from './starPalette';
 
 // ============================================================
 // Деталі розкритої події.
@@ -12,6 +14,16 @@ import { levelOf, type ConstellationLevel } from './constellationRules';
 // Панель НЕ модалка. Вона живе поруч зі сценою, а не поверх неї: подія
 // відкрита, поки камера стоїть біля її зірки, і накрити цю зірку затемненням
 // означало б сховати те, заради чого пара сюди летіла.
+//
+// **Акцент бере колір САМЕ ЦІЄЇ зірки, а не таблицю рівнів.** Раніше три
+// кольори лежали правилами в CSS (`[data-level='important']` — жовтий,
+// `regular` — бірюзовий), і після появи родин відтінків та вибору пари панель
+// почала прямо суперечити небу: зірка фіолетова, підпис жовтий. Тепер колір
+// приходить із того самого `starColour`, що фарбує зірку, і розійтись їм ніде.
+//
+// Акцент лишається ТОНКИМ: смужка, підпис рівня, значок «скільки минуло» й
+// ледь помітне світіння вгорі. Картка не фарбується цілком — вона мусить
+// читатись як частина порталу, а не як кольорова наліпка.
 // ============================================================
 
 const LEVEL_LABEL: Record<ConstellationLevel, string> = {
@@ -74,9 +86,19 @@ export function EventDetails({
 }) {
   const level = levelOf(event);
   const since = sinceLabel(event.date, new Date());
+  // Той самий виклик, що фарбує зірку: вибір пари, а якщо його немає —
+  // відтінок родини за рівнем, виведений із `id`.
+  const accent = starColour({ id: event.id, level, starColor: event.star_color });
 
   return (
-    <aside className="jn-details" data-level={level} aria-label={`Подія «${event.title}»`}>
+    <aside
+      className="jn-details"
+      // `data-level` лишається: за нього чіпляється складання й живий харнес.
+      // Колір він більше не задає — задає його ця змінна.
+      data-level={level}
+      style={{ '--jn-level': accent } as CSSProperties}
+      aria-label={`Подія «${event.title}»`}
+    >
       <button type="button" className="jn-details-close" aria-label="Закрити подію" onClick={onClose}>
         <CloseIcon size={16} />
       </button>

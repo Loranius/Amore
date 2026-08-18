@@ -154,13 +154,48 @@
   z-index: 2;
   display: grid;
   margin-top: auto;
-  padding: 20px 18px calc(env(safe-area-inset-bottom, 0) + 20px);
-  border-top: 1px solid var(--world-border, rgba(198, 160, 255, .16));
+  padding: 22px 18px calc(env(safe-area-inset-bottom, 0) + 20px);
+  border-top: 1px solid color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 26%, var(--world-border, rgba(198, 160, 255, .16)));
   border-radius: 26px 26px 0 0;
-  background: color-mix(in srgb, var(--world-bg-deep, #0b0714) 84%, transparent);
+  /*
+   * Колір зірки заходить у панель ДВІЧІ й обидва рази ледь-ледь: тонкою
+   * смужкою по верхньому краю й розмитим світінням під нею. Пофарбувати
+   * поверхню цілком було б простіше, але тоді картка перестала б належати
+   * порталу — вона стала б наліпкою кольору події.
+   */
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 9%, transparent),
+      transparent 120px
+    ),
+    color-mix(in srgb, var(--world-bg-deep, #0b0714) 84%, transparent);
   gap: 6px;
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
+}
+
+/*
+ * Смужка кольору зірки — рівно те, що пара обрала.
+ *
+ * Окремим шаром, а не рамкою: рамка на скруглених кутах гасне саме там, де на
+ * неї дивляться, а лінія всередині лишається чіткою по всій ширині.
+ */
+.jn-details::before {
+  position: absolute;
+  top: 0;
+  right: 22%;
+  left: 22%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--jn-level, var(--world-primary, #b06bff)),
+    transparent
+  );
+  content: '';
+  opacity: .8;
 }
 
 .jn-details-close {
@@ -186,9 +221,14 @@
   letter-spacing: .04em;
   text-transform: uppercase;
 }
-/* Ті самі три кольори, що й у зірок: рівень читається однаково скрізь. */
-.jn-details[data-level='important'] { --jn-level: hsl(44 92% 62%); }
-.jn-details[data-level='regular'] { --jn-level: hsl(184 76% 58%); }
+/*
+ * Кольору тут більше немає, і це виправлення, а не спрощення.
+ *
+ * Раніше три відтінки лежали правилами саме тут, і після появи родин
+ * (`starPalette.ts`) та вибору пари панель почала суперечити небу: зірка
+ * фіолетова, підпис жовтий. Тепер `--jn-level` ставить сам компонент із того
+ * самого виклику, що фарбує зірку.
+ */
 
 .jn-details-title {
   margin: 0;
@@ -253,9 +293,33 @@
     align-content: center;
     padding: 28px;
     border: 0;
-    border-left: 1px solid var(--world-border, rgba(198, 160, 255, .16));
+    border-left: 1px solid color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 22%, var(--world-border, rgba(198, 160, 255, .16)));
     border-radius: 0;
     margin-top: 0;
+    /* Збоку світіння йде від краю панелі, а не згори. */
+    background:
+      linear-gradient(
+        270deg,
+        transparent,
+        color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 8%, transparent) 92%
+      ),
+      color-mix(in srgb, var(--world-bg-deep, #0b0714) 84%, transparent);
+  }
+
+  /* Смужка теж повертається на чверть оберту: вона тепер уздовж лівого краю. */
+  .jn-details::before {
+    top: 26%;
+    right: auto;
+    bottom: 26%;
+    left: 0;
+    width: 2px;
+    height: auto;
+    background: linear-gradient(
+      180deg,
+      transparent,
+      var(--jn-level, var(--world-primary, #b06bff)),
+      transparent
+    );
   }
 }
 

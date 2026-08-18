@@ -1,31 +1,39 @@
 // ============================================================
-// AddEventModal — контекстна форма особистого календаря.
+// AddEventModal — форма події календаря й «Нашого шляху».
 // ------------------------------------------------------------
-// Візуально наслідує AddPlanModal: великий вступ, акцентне поле назви,
-// компактні акордеони й однакова нижня панель дій. Дані та семантика
-// лишаються розділеними: anniversary — «Наш шлях», birthday / holiday —
-// лише календар.
+// **Одна спокійна поверхня, а не форма з вкладеними картками.** До переробки
+// тут було три акордеони (тип, значення, нотатка), кожен у власній «скляній»
+// картці, і `textarea` на дві строки під назву. Власник назвав це прямо:
+// адміністративна форма посеред атмосферної сцени. Тепер усе видно одразу,
+// вибір іде сегментами, а поверхня одна.
+//
+// **Модалка обслуговує ТРИ типи** — `anniversary` (подія шляху), `birthday`
+// і `holiday` (лише календар), — і кожен має свою гілку: вибір людини, вибір
+// типу, шаблони ключових подій, `yearly` за замовчуванням. Переробка чіпає
+// подачу; жодне поле `NewEventInput` від неї не змінилось. Це найдорожче місце
+// для тихої поломки, і саме тому всі три перевіряються на живому екрані.
+//
+// **Колір зірки пропонується лише подіям шляху.** Календарна позначка зіркою
+// не стає, і давати їй вибір кольору означало б обіцяти те, чого не буде.
+//
+// Згадки про Telegram-нагадування тут більше немає — рішення власника. Самі
+// нагадування працюють як працювали: їх шле бек за `yearly` й типом, а рядок
+// у формі був лише обіцянкою, яку форма не виконує.
 // ============================================================
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
 import { useEvents } from '@/features/_shared/events';
 import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
-import { BellIcon, ChevronDownIcon } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
+import { levelOf } from '@/features/journey/constellationRules';
 import type { NewEventInput } from './useCalendar';
 import type { EventRow, EventSignificance, EventType } from '@/types';
 import { KEY_EVENT_TEMPLATES, takenKeySignificance } from './keyEvents';
+import { StarColourPicker } from './StarColourPicker';
 import './calendarEventForm.css';
 
 type CalendarEntryType = Extract<EventType, 'anniversary' | 'birthday' | 'holiday'>;
-
-const SIGNIFICANCE_LABEL: Record<EventSignificance, string> = {
-  regular: 'Звичайна',
-  important: 'Важлива',
-  relationship_start: 'Початок відносин',
-  marriage: 'Одруження',
-};
 
 function ModalShell({ children, onClose }: {
   children: ReactNode;
@@ -57,6 +65,26 @@ function entryType(event: EventRow | null, initialType: CalendarEntryType): Cale
   return initialType;
 }
 
+/** Сегмент вибору. Мова взята з `.pm-tabs` планів, але стилі свої. */
+function Segment({ active, onClick, icon, children }: {
+  active: boolean;
+  onClick: () => void;
+  icon: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={`cal-entry-segment${active ? ' active' : ''}`}
+      aria-pressed={active}
+      onClick={onClick}
+    >
+      <span aria-hidden="true">{icon}</span>
+      {children}
+    </button>
+  );
+}
+
 export function AddEventModal({
   event,
   initialDate,
@@ -81,22 +109,13 @@ export function AddEventModal({
     event?.significance ?? 'regular',
   );
   const [personId, setPersonId] = useState<number | null>(event?.person_user_id ?? null);
-  /*
-   * Колір зірки поки лише ПЕРЕНОСИТЬСЯ, а не обирається: вибір з'явиться
-   * разом із переробкою модалки. Тримати його тут уже зараз обов'язково —
-   * інакше правка назви події тихо стирала б колір, який пара вибрала.
-   */
-  const [starColor] = useState<string | null>(event?.star_color ?? null);
-  const [typeOpen, setTypeOpen] = useState(false);
-  const [significanceOpen, setSignificanceOpen] = useState(false);
-  const [noteOpen, setNoteOpen] = useState(Boolean(event?.description));
+  const [starColor, setStarColor] = useState<string | null>(event?.star_color ?? null);
   const { data: users = [] } = useUsers();
   const { data: allEvents = [] } = useEvents();
   const takenKeys = takenKeySignificance(allEvents, event);
 
   const selectCalendarType = (next: Extract<CalendarEntryType, 'birthday' | 'holiday'>) => {
     setType(next);
-    setTypeOpen(false);
     if (next === 'birthday') {
       setYearly(true);
       return;
@@ -115,7 +134,9 @@ export function AddEventModal({
       yearly,
       significance: relationshipEvent ? significance : 'regular',
       person_user_id: birthdayEvent ? personId : null,
-      star_color: starColor,
+      // Колір належить лише зірці. Календарна позначка забирає його з собою в
+      // базу порожнім, щоб зміна типу не лишала за собою мертвого значення.
+      star_color: relationshipEvent ? starColor : null,
     });
     onClose();
   };
@@ -126,28 +147,11 @@ export function AddEventModal({
       ? 'Дата залишиться в календарі й отримає щорічні нагадування.'
       : 'Позначка залишиться тільки в календарі й не потрапить у список планів.';
 
-  const eyebrow = event
-    ? 'Редагування події'
-    : relationshipEvent
-      ? 'Нова подія нашого шляху'
-      : 'Нова подія календаря';
-
-  const headline = event
-    ? relationshipEvent
-      ? 'Оновити важливий момент'
-      : 'Оновити календарну подію'
-    : relationshipEvent
-      ? 'Що сталося у вашій історії?'
-      : 'Що хочете не забути?';
-
   const titlePlaceholder = relationshipEvent
-    ? 'Наприклад, уперше поїхали разом у подорож'
+    ? 'Уперше поїхали разом у подорож'
     : birthdayEvent
-      ? 'Наприклад, день народження мами'
-      : 'Наприклад, наша маленька дата або забронювати столик';
-
-  const calendarTypeLabel = birthdayEvent ? 'День народження' : 'Дата / нагадування';
-  const significanceLabel = SIGNIFICANCE_LABEL[significance];
+      ? 'День народження мами'
+      : 'Забронювати столик';
 
   return (
     <ModalShell onClose={onClose}>
@@ -159,16 +163,20 @@ export function AddEventModal({
         }}
       >
         <header className="cal-entry-head">
-          <span className="cal-entry-eyebrow">{eyebrow}</span>
-          <h2 id="cal-entry-title">{headline}</h2>
+          <h2 id="cal-entry-title">{event ? 'Редагувати подію' : 'Нова подія'}</h2>
+          {/*
+            Підзаголовок лишається контекстним: він єдине, що каже парі, чи
+            подія потрапить на шлях, чи залишиться позначкою в календарі.
+          */}
           <p>{contextHint}</p>
         </header>
 
-        <label className="cal-entry-title-field">
-          <textarea
+        <label className="cal-entry-name">
+          <span className="cal-entry-field-label">Назва</span>
+          <input
             id="event-title"
             name="title"
-            rows={2}
+            type="text"
             maxLength={120}
             value={title}
             onChange={(inputEvent) => setTitle(inputEvent.target.value)}
@@ -178,152 +186,107 @@ export function AddEventModal({
           <small>{title.trim().length}/120</small>
         </label>
 
+        {/*
+          Тип обирається лише для НОВОЇ календарної події. Змінити тип уже
+          створеної не можна й не було можна: подія шляху й позначка календаря
+          живуть за різними правилами, і мовчазний перехід між ними забрав би
+          в пари зірку.
+        */}
         {!event && !relationshipEvent && (
-          <section className="cal-entry-accordion" aria-labelledby="cal-entry-type-title">
-            <button
-              type="button"
-              className={`cal-entry-accordion-toggle${typeOpen ? ' open' : ''}`}
-              aria-expanded={typeOpen}
-              onClick={() => setTypeOpen((current) => !current)}
-            >
-              <span className="cal-entry-accordion-icon" aria-hidden="true">
-                <EventIcon type={type} size={18} />
-              </span>
-              <span className="cal-entry-accordion-copy">
-                <small id="cal-entry-type-title">Тип події</small>
-                <strong>{calendarTypeLabel}</strong>
-              </span>
-              <ChevronDownIcon size={17} />
-            </button>
-
-            {typeOpen && (
-              <div className="cal-entry-type-grid" aria-label="Типи календарних подій">
-                <button
-                  type="button"
-                  className={`cal-entry-type-option${type === 'holiday' ? ' active' : ''}`}
-                  aria-pressed={type === 'holiday'}
-                  onClick={() => selectCalendarType('holiday')}
-                >
-                  <EventIcon type="holiday" size={18} />
-                  <span>
-                    <strong>Дата / нагадування</strong>
-                    <small>Свято, маленька дата або нагадування</small>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className={`cal-entry-type-option${type === 'birthday' ? ' active' : ''}`}
-                  aria-pressed={type === 'birthday'}
-                  onClick={() => selectCalendarType('birthday')}
-                >
-                  <EventIcon type="birthday" size={18} />
-                  <span>
-                    <strong>День народження</strong>
-                    <small>Дата з щорічним нагадуванням</small>
-                  </span>
-                </button>
-              </div>
-            )}
-          </section>
+          <fieldset className="cal-entry-choice">
+            <legend className="cal-entry-field-label">Тип події</legend>
+            <div className="cal-entry-segments">
+              <Segment
+                active={type === 'holiday'}
+                onClick={() => selectCalendarType('holiday')}
+                icon={<EventIcon type="holiday" size={17} />}
+              >
+                Дата
+              </Segment>
+              <Segment
+                active={birthdayEvent}
+                onClick={() => selectCalendarType('birthday')}
+                icon={<EventIcon type="birthday" size={17} />}
+              >
+                День народження
+              </Segment>
+            </div>
+          </fieldset>
         )}
 
         {relationshipEvent && (
-          <section className="cal-entry-accordion" aria-labelledby="cal-entry-significance-title">
-            <button
-              type="button"
-              className={`cal-entry-accordion-toggle${significanceOpen ? ' open' : ''}`}
-              aria-expanded={significanceOpen}
-              onClick={() => setSignificanceOpen((current) => !current)}
-            >
-              <span className="cal-entry-accordion-icon" aria-hidden="true">
-                {significance === 'regular'
-                  ? <EventIcon type="anniversary" size={18} />
-                  : significance === 'important'
-                    ? <SparkIcon size={18} />
-                    : <HeartIcon size={18} />}
-              </span>
-              <span className="cal-entry-accordion-copy">
-                <small id="cal-entry-significance-title">Значення події</small>
-                <strong>{significanceLabel}</strong>
-              </span>
-              <ChevronDownIcon size={17} />
-            </button>
+          <fieldset className="cal-entry-choice">
+            <legend className="cal-entry-field-label">Значення</legend>
+            <div className="cal-entry-segments">
+              <Segment
+                active={significance === 'regular'}
+                onClick={() => setSignificance('regular')}
+                icon={<EventIcon type="anniversary" size={17} />}
+              >
+                Звичайна
+              </Segment>
+              <Segment
+                active={significance === 'important'}
+                onClick={() => setSignificance('important')}
+                icon={<SparkIcon size={17} />}
+              >
+                Важлива
+              </Segment>
+            </div>
 
-            {significanceOpen && (
-              <>
-                <div className="cal-entry-type-grid" aria-label="Значення події">
+            {/*
+              Ключових видів рівно два, і вони НЕ сегменти того самого вибору,
+              хоч і задають те саме поле. Поведінка в них інша: вони
+              підставляють назву й вимикаються, коли ключ у парі вже є. Чотири
+              сегменти з такими підписами до того ж не влазять у телефон.
+            */}
+            <div className="cal-entry-keys" aria-label="Ключові події">
+              {KEY_EVENT_TEMPLATES.map((template) => {
+                const active = significance === template.significance;
+                const taken = takenKeys.has(template.significance);
+                return (
                   <button
+                    key={template.significance}
                     type="button"
-                    className={`cal-entry-type-option${significance === 'regular' ? ' active' : ''}`}
-                    aria-pressed={significance === 'regular'}
+                    className={`cal-entry-key${active ? ' active' : ''}`}
+                    aria-pressed={active}
+                    disabled={taken}
                     onClick={() => {
-                      setSignificance('regular');
-                      setSignificanceOpen(false);
+                      setSignificance(template.significance);
+                      if (!title.trim()) setTitle(template.title);
                     }}
                   >
-                    <EventIcon type="anniversary" size={18} />
+                    <HeartIcon size={15} />
                     <span>
-                      <strong>Звичайна</strong>
-                      <small>Момент, який хочеться пам’ятати</small>
+                      <strong>{template.title}</strong>
+                      <small>{taken ? 'Вже є у вашій історії' : template.hint}</small>
                     </span>
                   </button>
-                  <button
-                    type="button"
-                    className={`cal-entry-type-option cal-entry-type-option--major${significance === 'important' ? ' active' : ''}`}
-                    aria-pressed={significance === 'important'}
-                    onClick={() => {
-                      setSignificance('important');
-                      setSignificanceOpen(false);
-                    }}
-                  >
-                    <SparkIcon size={18} />
-                    <span>
-                      <strong>Важлива</strong>
-                      <small>Велика віха: заручини, переїзд, подорож</small>
-                    </span>
-                  </button>
-                </div>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
 
-                {/*
-                  Ключових видів рівно два, і вибираються вони не рівнем, а
-                  шаблоном: назва підставляється разом зі значенням. Уже
-                  створений ключ вимкнений — як товар, що вже в полиці покупок.
-                */}
-                <div className="cal-entry-keys" aria-label="Ключові події">
-                  <small>Ключові події</small>
-                  {KEY_EVENT_TEMPLATES.map((template) => {
-                    const active = significance === template.significance;
-                    const taken = takenKeys.has(template.significance);
-                    return (
-                      <button
-                        key={template.significance}
-                        type="button"
-                        className={`cal-entry-key-option${active ? ' active' : ''}`}
-                        aria-pressed={active}
-                        disabled={taken}
-                        onClick={() => {
-                          setSignificance(template.significance);
-                          if (!title.trim()) setTitle(template.title);
-                          setSignificanceOpen(false);
-                        }}
-                      >
-                        <HeartIcon size={17} />
-                        <span>
-                          <strong>{template.title}</strong>
-                          <small>{taken ? 'Вже є у вашій історії' : template.hint}</small>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
-          </section>
+        {relationshipEvent && (
+          <StarColourPicker
+            /*
+             * У нової події `id` ще немає, і нуль тут не заглушка: `starSeed`
+             * від нього дає такий самий стабільний відтінок, як від будь-якого
+             * іншого числа. Пара побачить не той відтінок, який дістанеться
+             * події після збереження, — але лише поки не обере колір сама, і
+             * саме тому чип підписаний «Авто», а не назвою кольору.
+             */
+            eventId={event?.id ?? 0}
+            level={levelOf({ significance })}
+            value={starColor}
+            onChange={setStarColor}
+          />
         )}
 
         {birthdayEvent && users.length > 0 && (
-          <section className="cal-entry-people-card">
-            <span className="cal-entry-field-label">Чий день народження</span>
+          <fieldset className="cal-entry-choice">
+            <legend className="cal-entry-field-label">Чий день народження</legend>
             <div className="chips">
               {users.map((user) => (
                 <button
@@ -343,10 +306,10 @@ export function AddEventModal({
                 Родич або близька людина
               </button>
             </div>
-          </section>
+          </fieldset>
         )}
 
-        <label className="cal-entry-field-card cal-entry-date-card">
+        <label className="cal-entry-date">
           <span className="cal-entry-field-label">Дата</span>
           <input
             id="event-date"
@@ -357,36 +320,26 @@ export function AddEventModal({
           />
         </label>
 
-        <section className="cal-entry-accordion">
-          <button
-            type="button"
-            className={`cal-entry-accordion-toggle cal-entry-accordion-toggle--note${noteOpen ? ' open' : ''}`}
-            aria-expanded={noteOpen}
-            onClick={() => setNoteOpen((current) => !current)}
-          >
-            <span className="cal-entry-accordion-copy">
-              <small>Додаткова деталь</small>
-              <strong>{description.trim() ? 'Нотатку додано' : 'Додати нотатку'}</strong>
-            </span>
-            <span className="cal-entry-accordion-optional">необов’язково</span>
-            <ChevronDownIcon size={17} />
-          </button>
+        {/*
+          Нотатка видима завжди. Акордеон економив 90 пікселів і коштував
+          дотику й здогадки — а причина, з якої пара сюди прийшла, часто саме
+          в ній.
+        */}
+        <label className="cal-entry-note">
+          <span className="cal-entry-field-label">
+            Нотатка <em>необов’язково</em>
+          </span>
+          <textarea
+            id="event-description"
+            name="description"
+            rows={2}
+            value={description}
+            onChange={(inputEvent) => setDescription(inputEvent.target.value)}
+            placeholder={relationshipEvent ? 'Чому цей момент важливий для вас?' : 'Додаткова примітка'}
+          />
+        </label>
 
-          {noteOpen && (
-            <label className="cal-entry-note">
-              <textarea
-                id="event-description"
-                name="description"
-                rows={3}
-                value={description}
-                onChange={(inputEvent) => setDescription(inputEvent.target.value)}
-                placeholder={relationshipEvent ? 'Чому цей момент важливий для вас?' : 'Додаткова примітка'}
-              />
-            </label>
-          )}
-        </section>
-
-        <label className="cal-entry-toggle-card">
+        <label className="cal-entry-yearly">
           <input
             id="event-yearly"
             name="yearly"
@@ -395,21 +348,13 @@ export function AddEventModal({
             onChange={(inputEvent) => setYearly(inputEvent.target.checked)}
           />
           <span>
-            <strong>
-              {relationshipEvent
-                ? 'Відзначати щороку'
-                : birthdayEvent
-                  ? 'Нагадувати щороку'
-                  : 'Повторювати щороку'}
-            </strong>
-            <small>Подія автоматично з’являтиметься в календарі наступних років.</small>
+            {relationshipEvent
+              ? 'Відзначати щороку'
+              : birthdayEvent
+                ? 'Нагадувати щороку'
+                : 'Повторювати щороку'}
           </span>
         </label>
-
-        <p className="cal-entry-reminder-note">
-          <BellIcon size={15} />
-          Нагадаємо в Telegram за 3 дні, за день і зранку в сам день.
-        </p>
 
         <div className="cal-entry-actions">
           <button type="button" className="cal-entry-cancel" onClick={onClose}>Скасувати</button>

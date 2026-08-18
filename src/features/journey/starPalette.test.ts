@@ -3,6 +3,7 @@ import { hslToRgb } from './journeyPalette';
 import {
   coreColour,
   HALO_TINT_GAIN,
+  offeredShades,
   shadeHue,
   starColour,
   starSeed,
@@ -187,5 +188,41 @@ describe('ядро', () => {
     const core = coreColour('hsl(206 34% 84%)');
     const [r, g, b] = hslToRgb(core);
     expect(Math.max(r, g, b) - Math.min(r, g, b)).toBeGreaterThan(0.03);
+  });
+});
+
+describe('що показати парі у виборі кольору', () => {
+  it('родину рівня, і рівно її', () => {
+    for (const level of LEVELS) {
+      expect(offeredShades(level, null).map((shade) => shade.token))
+        .toEqual(STAR_FAMILIES[level].map((shade) => shade.token));
+    }
+  });
+
+  it('уже обраний відтінок ЧУЖОЇ родини лишається в ряду', () => {
+    /*
+     * Пара обрала фуксію звичайній події, потім підняла її до ключової. База
+     * такий токен приймає, і зірка й далі фуксія — отже вибір мусить лишитись
+     * видимим. Інакше він тихо зник би з очей, а мовчки забирати вибір не
+     * можна навіть тоді, коли він не за схемою.
+     */
+    const offered = offeredShades('key', 'magenta').map((shade) => shade.token);
+    expect(offered).toContain('magenta');
+    expect(offered).toHaveLength(STAR_FAMILIES.key.length + 1);
+  });
+
+  it('свій відтінок не дублюється', () => {
+    expect(offeredShades('key', 'gold')).toHaveLength(STAR_FAMILIES.key.length);
+  });
+
+  it('невідомий токен нічого не додає', () => {
+    expect(offeredShades('regular', '#b06bff')).toHaveLength(STAR_FAMILIES.regular.length);
+    expect(offeredShades('regular', undefined)).toHaveLength(STAR_FAMILIES.regular.length);
+  });
+
+  it('віддає копію: ряд не можна зіпсувати ззовні', () => {
+    const first = offeredShades('regular', null);
+    first.pop();
+    expect(offeredShades('regular', null)).toHaveLength(STAR_FAMILIES.regular.length);
   });
 });
