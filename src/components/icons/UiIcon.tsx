@@ -18,24 +18,6 @@ export function CheckIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
-export function UndoIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M4.4 8.6h9.8a5.4 5.4 0 0 1 0 10.8H8" />
-      <path d="m8 4.4-3.6 4.2L8 12.8" />
-    </svg>
-  );
-}
-
-export function EyeIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M2.6 12s3.6-6.2 9.4-6.2S21.4 12 21.4 12s-3.6 6.2-9.4 6.2S2.6 12 2.6 12Z" />
-      <circle cx="12" cy="12" r="2.7" />
-    </svg>
-  );
-}
-
 export function PencilIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
@@ -65,18 +47,6 @@ export function CalendarIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
-export function WarningIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M10.7 4.2 2.9 17.6a1.5 1.5 0 0 0 1.3 2.3h15.6a1.5 1.5 0 0 0 1.3-2.3L13.3 4.2a1.5 1.5 0 0 0-2.6 0Z" />
-      <path d="M12 9.6v4.1" />
-      <circle cx="12" cy="16.7" r=".95" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-/** Зірка. `filled` — для шкали оцінки, де порожня й повна мусять
- *  відрізнятись формою, а не лише кольором. */
 export function StarIcon({ size = 24, className = '', filled = false }: IconProps & { filled?: boolean }) {
   return (
     <svg {...iconAttrs(size, className)} fill={filled ? 'currentColor' : 'none'}>
@@ -147,15 +117,6 @@ export function ArrowUpIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
-export function ArrowDownIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M12 4.6v14.2M5.8 12.6 12 18.8l6.2-6.2" />
-    </svg>
-  );
-}
-
-/** Стрілки врізнобіч — розгорнути карту на весь екран. */
 export function ExpandIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
@@ -202,18 +163,6 @@ export function ChevronRightIcon({ size = 24, className = '' }: IconProps) {
 }
 
 /** Дві стрілки по колу — подія повторюється щороку. */
-export function RepeatIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M4.4 9.4h12.4a2.8 2.8 0 0 1 2.8 2.8v.4" />
-      <path d="m7.6 6.2-3.2 3.2 3.2 3.2" />
-      <path d="M19.6 14.6H7.2a2.8 2.8 0 0 1-2.8-2.8v-.4" />
-      <path d="m16.4 17.8 3.2-3.2-3.2-3.2" />
-    </svg>
-  );
-}
-
-/** Кругова стрілка — обробити ще раз. */
 export function RefreshIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
@@ -335,26 +284,6 @@ export function CreditCardIcon({ size = 24, className = '' }: IconProps) {
 }
 
 /** Хмарка — обговорення цілі. */
-export function CommentIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M20.4 12.6a7.4 7.4 0 0 1-8 7.36l-5.2 1.44 1.44-4.1A7.4 7.4 0 1 1 20.4 12.6Z" />
-      <path d="M8.8 11.6h6.4M8.8 14.8h4" />
-    </svg>
-  );
-}
-
-/** Крапка — «живе зараз». Стан, а не дія: тому просте коло, а не знак
-    відтворення, який читався б кнопкою. */
-export function DotIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-/** Дві риски — пауза. */
 export function PauseIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
@@ -365,37 +294,6 @@ export function PauseIcon({ size = 24, className = '' }: IconProps) {
 
 /** Літак — надіслати. Стрілка вгору тут читалась «нагору сторінки», а
     не «відправити». */
-export function SendIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M20.6 3.4 10.4 13.6" />
-      <path d="M20.6 3.4 14.2 20.6l-3.8-7-7-3.8L20.6 3.4Z" />
-    </svg>
-  );
-}
-
-/** Лінія вгору — орієнтовний шлях до суми. */
-export function TrendIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="m3.4 16.4 5-5 3.6 3.6 6.2-6.6" />
-      <path d="M14.6 8.4h4.6V13" />
-      <path d="M3.4 20.4h17.2" />
-    </svg>
-  );
-}
-
-/** Дзвіночок — нагадування. */
-export function BellIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M18 9.4a6 6 0 1 0-12 0c0 5.2-2 6.7-2 6.7h16s-2-1.5-2-6.7Z" />
-      <path d="M13.7 19.4a2 2 0 0 1-3.4 0" />
-    </svg>
-  );
-}
-
-/** Коробка — порожній архів. */
 export function BoxIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>

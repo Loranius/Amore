@@ -55,6 +55,15 @@ import {
 } from './useWishlist';
 import type { WishlistItemV3 } from './wishlistRpc';
 import '@/features/world/worldDim.css';
+// Три файли нижче раніше висіли в `main.tsx` і вантажились на кожному
+// маршруті порталу. Переїхали сюди без жодної зміни правил: вони
+// стилюють виключно простір `.wishlist`.
+import './wishlistMist.css';
+import './wishlistPearlBubbles.css';
+// Останній шар поверхні бульбашок. Замінив wishlistPearlRim.css і
+// wishlistPearlContrast.css: перший малював 6px обідок, другий існував
+// щоб той обідок прибрати — разом вони давали 1px рамку за 152 рядки.
+import './wishlistBubbleGlass.css';
 import './wishlistCrystalWorld.css';
 import './wishlistSpheres.css';
 import './wishlistV3.mobile.css';

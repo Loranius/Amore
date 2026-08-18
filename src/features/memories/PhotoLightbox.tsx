@@ -8,7 +8,7 @@
 // смикання свайпом. Занизький поріг перегортає кадр, коли пара просто
 // хотіла роздивитись; зависокий змушує тягти пів екрана.
 // ============================================================
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Photo } from '@/components/ui/Photo';
 import { CloseIcon } from '@/components/icons/UiIcon';
@@ -44,9 +44,21 @@ export function PhotoLightbox({ photos, startId, onClose }: PhotoLightboxProps) 
   const [index, setIndex] = useState(startIndex);
   const touch = useRef<{ x: number; y: number } | null>(null);
 
-  const go = (delta: number) =>
-    setIndex((i) => Math.min(photos.length - 1, Math.max(0, i + delta)));
+  /*
+   * Крок через функціональний `setIndex`, а не через поточний `index`.
+   * Саме це робить `go` незалежним від стану — і дозволяє ефекту нижче
+   * мати чесний список залежностей.
+   */
+  const go = useCallback(
+    (delta: number) => setIndex((i) => Math.min(photos.length - 1, Math.max(0, i + delta))),
+    [photos.length],
+  );
 
+  /*
+   * Залежності тут обов'язкові. Перша редакція лишила ефект без масиву
+   * взагалі — і слухач клавіатури знімався й вішався заново на КОЖНОМУ
+   * рендері компонента, тобто на кожен свайп і кожну зміну кадру.
+   */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -55,7 +67,7 @@ export function PhotoLightbox({ photos, startId, onClose }: PhotoLightboxProps) 
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  });
+  }, [go, onClose]);
 
   const photo = photos[index];
   if (!photo || typeof document === 'undefined') return null;
