@@ -11,6 +11,7 @@ import {
 } from 'three';
 import type { Star3D } from '../constellation3d';
 import { starTints, type JourneyPalette } from '../journeyPalette';
+import { auraGlows, birthProgress, starAura, starBreath } from './constellationLife';
 import { createStarShape } from './starSilhouette';
 
 // ============================================================
@@ -18,33 +19,18 @@ import { createStarShape } from './starSilhouette';
 // ------------------------------------------------------------
 // Два виклики малювання на будь-яку кількість подій: один інстансований силует
 // і один інстансований ореол. Це не передчасна економія — на слабкому профілі
-// сцену вже ділять з небом і променями, і сорок окремих сіток тут коштували б
+// сцену вже ділять з небом і шляхом, і сорок окремих сіток тут коштували б
 // сорок викликів рівно ні за що.
 //
 // Обидві сітки плоскі й повертаються лицем до камери спільним кватерніоном.
 // Об'ємної зірки немає свідомо: промені мають лишатись гострими з будь-якого
 // ракурсу, а справжня тривимірна зірка з половини ракурсів показує ребро.
+//
+// **Рівень видно чотирма способами, не одним.** Розмір тіла задає розкладка,
+// а ореол, силу сяйва й характер дихання — `constellationLife`. Так зроблено
+// на прохання власника: колір скоро стане вибором пари, і ієрархія не може
+// триматись на ньому одному.
 // ============================================================
-
-/**
- * Розмір ореолу: стала частина плюс частка від зірки.
- *
- * Чиста пропорція не годиться, і це виміряно. Ядро втричі більше за звичайну
- * зірку, тож при множнику ореол ядра виходив утричі більшим — і лише він
- * показував колір, а звичайна зірка глухла в туманності. Стала частина дає
- * найдрібнішій зірці сяйво, яке ще видно.
- */
-const HALO_BASE = 2.4;
-const HALO_SCALE = 3.4;
-
-export function haloSize(radius: number): number {
-  return HALO_BASE + radius * HALO_SCALE;
-}
-
-/** Скільки секунд світиться кожна наступна зірка під час появи. */
-const BIRTH_STEP = 0.24;
-/** Скільки триває поява однієї зірки. */
-const BIRTH_RISE = 0.55;
 
 /**
  * М'яка пляма без текстури.
@@ -55,11 +41,14 @@ const BIRTH_RISE = 0.55;
  */
 const HALO_VERTEX = /* glsl */ `
   attribute vec3 instanceTint;
+  attribute float instanceGlow;
   varying vec2 vUv;
   varying vec3 vTint;
+  varying float vGlow;
   void main() {
     vUv = uv;
     vTint = instanceTint;
+    vGlow = instanceGlow;
     gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
   }
 `;
@@ -67,6 +56,7 @@ const HALO_VERTEX = /* glsl */ `
 const HALO_FRAGMENT = /* glsl */ `
   varying vec2 vUv;
   varying vec3 vTint;
+  varying float vGlow;
   uniform float uOpacity;
   void main() {
     float distance = length(vUv - 0.5) * 2.0;
@@ -77,7 +67,10 @@ const HALO_FRAGMENT = /* glsl */ `
     // додатковому змішуванні поверх світлої туманності білішає, а пляма
     // вчетверо більша встигає показати відтінок. Множник — щоб той відтінок
     // пробився крізь туманність, яка вже й сама світиться.
-    gl_FragColor = vec4(vTint * 1.35, glow * uOpacity);
+    //
+    // Атрибут vGlow несе РІВЕНЬ події: ключова подія світить помітно сильніше
+    // за звичайну навіть тоді, коли обидві однакового кольору.
+    gl_FragColor = vec4(vTint * 1.35, glow * uOpacity * vGlow);
   }
 `;
 
@@ -93,10 +86,13 @@ const HALO_FRAGMENT = /* glsl */ `
  */
 const BODY_VERTEX = /* glsl */ `
   attribute vec3 instanceTint;
+  attribute float instanceGlow;
   varying vec3 vTint;
   varying vec2 vLocal;
+  varying float vGlow;
   void main() {
     vTint = instanceTint;
+    vGlow = instanceGlow;
     // Силует нормований так, що верхній промінь сягає одиниці, тож локальна
     // відстань одразу читається як частка розміру зірки.
     vLocal = position.xy;
@@ -107,8 +103,11 @@ const BODY_VERTEX = /* glsl */ `
 const BODY_FRAGMENT = /* glsl */ `
   varying vec3 vTint;
   varying vec2 vLocal;
+  varying float vGlow;
   void main() {
-    float core = 1.0 - smoothstep(0.0, 0.34, length(vLocal));
+    // Осердя ширше в події, яка світить сильніше: у ключової воно читається
+    // як розжарена серцевина, у звичайної — як іскра.
+    float core = 1.0 - smoothstep(0.0, 0.28 + vGlow * 0.09, length(vLocal));
     vec3 colour = mix(vTint * 1.25, vec3(1.0), core * 0.9);
     gl_FragColor = vec4(colour, 1.0);
   }
@@ -119,24 +118,12 @@ export interface JourneyConstellationProps {
   palette: JourneyPalette;
   /** Секунди від початку сцени. Реф, а не значення: див. шапку `JourneyScene`. */
   clock: { current: number };
-  /** Пара просила спокою: зірки з'являються всі разом. */
+  /** Пара просила спокою: зірки з'являються всі разом і не дихають. */
   reducedMotion: boolean;
   /** Подія, яка зараз розкривається. Її зірка поступається місцем сонцю. */
   focusId?: number | null;
   /** Наскільки сонце вже проявилось, 0…1. Реф — щоб не смикати дерево. */
   reveal?: { current: number };
-}
-
-/** Наскільки зірка вже народилась, 0…1. */
-export function birthProgress(order: number, clock: number): number {
-  const start = order * BIRTH_STEP;
-  if (clock <= start) return 0;
-  return Math.min(1, (clock - start) / BIRTH_RISE);
-}
-
-/** Скільки секунд триває поява всього сузір'я. */
-export function birthDuration(count: number): number {
-  return count === 0 ? 0 : (count - 1) * BIRTH_STEP + BIRTH_RISE;
 }
 
 export function JourneyConstellation({
@@ -164,6 +151,9 @@ export function JourneyConstellation({
   // через пробіли — мовчки лишає білий. На живому екрані це зробило всі вісім
   // зірок однаковим нейтральним світінням.
   const tints = useMemo(() => starTints(stars, palette), [stars, palette]);
+  const glows = useMemo(() => auraGlows(stars), [stars]);
+  // Ореол, дихання й фаза — раз на зміну набору, а не щокадру.
+  const auras = useMemo(() => stars.map(starAura), [stars]);
 
   useFrame((state) => {
     const body = bodyRef.current;
@@ -174,6 +164,7 @@ export function JourneyConstellation({
     // кожної площини, і рахувати його по разу на зірку немає з чого.
     const facing = state.camera.quaternion;
     const { matrix, position, scale } = scratch.current;
+    const now = clock.current;
 
     // Обрана зірка гасне рівно настільки, наскільки проявилось сонце: обидва
     // тіла стоять в одній світовій точці, і перехід читається як наближення, а
@@ -181,18 +172,24 @@ export function JourneyConstellation({
     const yielded = focusId === null ? 0 : Math.max(0, Math.min(1, reveal?.current ?? 0));
 
     stars.forEach((star, index) => {
-      const born = reducedMotion ? 1 : birthProgress(star.order, clock.current);
+      const aura = auras[index]!;
+      const born = reducedMotion ? 1 : birthProgress(star.order, now);
       const grown = star.id === focusId ? born * (1 - yielded) : born;
       position.set(star.x, star.y, star.z);
 
-      const size = star.radius * grown;
+      // Дихання — це і є «сузір'я живе». Амплітуда навмисно дрібна: пара має
+      // побачити рух краєм ока, а не мерехтіння.
+      const breath = reducedMotion ? 1 : starBreath(aura, now);
+      const size = star.radius * grown * breath;
       scale.set(size, size, size);
       matrix.compose(position, facing, scale);
       body.setMatrixAt(index, matrix);
 
       // Ореол росте разом із появою зірки, але від СТАЛОГО розміру, а не від
-      // нуля: інакше нова зірка спалахувала б точкою без сяйва.
-      const glow = haloSize(star.radius) * grown;
+      // нуля: інакше нова зірка спалахувала б точкою без сяйва. Дихає він
+      // ширше за тіло — так корона читається як газ, а не як оболонка.
+      const corona = reducedMotion ? 1 : 1 + (breath - 1) * 1.7;
+      const glow = aura.halo * grown * corona;
       scale.set(glow, glow, glow);
       matrix.compose(position, facing, scale);
       halo.setMatrixAt(index, matrix);
@@ -216,6 +213,10 @@ export function JourneyConstellation({
           attach="geometry-attributes-instanceTint"
           args={[tints, 3]}
         />
+        <instancedBufferAttribute
+          attach="geometry-attributes-instanceGlow"
+          args={[glows, 1]}
+        />
         <shaderMaterial
           vertexShader={HALO_VERTEX}
           fragmentShader={HALO_FRAGMENT}
@@ -233,9 +234,18 @@ export function JourneyConstellation({
         frustumCulled={false}
         renderOrder={3}
       >
+        {/*
+          Свої копії масивів: `instancedBufferAttribute` віддає буфер відеокарті,
+          і два меші, що поділяють один `Float32Array`, поділили б і його
+          життєвий цикл.
+        */}
         <instancedBufferAttribute
           attach="geometry-attributes-instanceTint"
           args={[new Float32Array(tints), 3]}
+        />
+        <instancedBufferAttribute
+          attach="geometry-attributes-instanceGlow"
+          args={[new Float32Array(glows), 1]}
         />
         {/*
           Свій шейдер, а не `MeshBasicMaterial` із `vertexColors`: колір

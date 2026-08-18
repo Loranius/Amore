@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   buildConstellation3D,
   CORE_STAR_RADIUS,
+  pathAngle,
   timeAxis,
+  type Edge3D,
   type Star3D,
 } from './constellation3d';
 import type { ConstellationEvent } from './constellationRules';
@@ -234,6 +236,68 @@ describe('промені', () => {
   });
 });
 
+describe('шлях, а не павутина', () => {
+  /*
+   * Вада, яку власник назвав словами «структура читається як network graph».
+   *
+   * Причина була в коді, а не у враженні: кут зірки брався від ПОРЯДКУ
+   * СТВОРЕННЯ через золотий кут, тобто дві сусідні за датою події сідали в
+   * напрямках, що різняться на 137°. Ланцюг за датою мусив після цього
+   * щоразу перестрибувати через усю трубу.
+   *
+   * Виміряно на цій самій парі: до зміни ланцюг мав довжину 130.38 при
+   * протяжності часу 33.15 — майже вчетверо довший за шлях, який описує.
+   * Після — 64.21, тобто менш ніж удвічі. Саме це число й стереже тест: воно
+   * не про «красиво», воно про те, чи ланцюг узагалі веде кудись.
+   */
+  function chainLength(edges: readonly Edge3D[]): number {
+    return edges.reduce(
+      (total, edge) => total + Math.hypot(
+        edge.to.x - edge.from.x,
+        edge.to.y - edge.from.y,
+        edge.to.z - edge.from.z,
+      ),
+      0,
+    );
+  }
+
+  it('ланцюг не довший за два своїх часових прольоти', () => {
+    const { edges, span } = buildConstellation3D(COUPLE);
+    expect(chainLength(edges) / span).toBeLessThan(2.2);
+  });
+
+  it('кут зірки веде час, а не ранг', () => {
+    // Дрібний відхил лишається навмисно — інакше сузір'я читалось би
+    // кресленням. Ширшим він стає лише там, де зірці тісно й вона мусить
+    // шукати місце: сходинка пошуку розширюється аж до повного кола.
+    const { stars } = buildConstellation3D(COUPLE);
+    for (const star of stars) {
+      if (star.core) continue;
+      const angle = Math.atan2(star.y, star.x);
+      let drift = angle - pathAngle(star.z);
+      while (drift > Math.PI) drift -= 2 * Math.PI;
+      while (drift < -Math.PI) drift += 2 * Math.PI;
+      expect(Math.abs(drift)).toBeLessThan(0.6);
+    }
+  });
+
+  it('кут не залежить від того, СКІЛЬКИ подій уже є', () => {
+    /*
+     * Головна причина взяти час замість рангу. Ранг події змінюється, щойно
+     * пара додасть щось раніше за неї, — а кут, виведений із власної дати,
+     * не змінюється ніколи. Тест дивиться на ту саму подію в наборі з двох і
+     * в наборі з восьми.
+     */
+    const alone: ConstellationEvent[] = [
+      { id: 1, date: '2022-12-26', significance: 'relationship_start' },
+      { id: 7, date: '2025-09-30', significance: 'important' },
+    ];
+    const lonely = starById(buildConstellation3D(alone).stars, 7);
+    const crowded = starById(buildConstellation3D(COUPLE).stars, 7);
+    expect(Math.atan2(lonely.y, lonely.x)).toBeCloseTo(Math.atan2(crowded.y, crowded.x), 9);
+  });
+});
+
 describe('простір між зірками', () => {
   it('жодні дві зірки не злипаються', () => {
     const { stars } = buildConstellation3D(COUPLE);
@@ -315,12 +379,22 @@ describe('кадрування', () => {
     }
   });
 
-  it('radial накриває найдальший відступ від осі часу', () => {
-    // Це число вирішує, наскільки далеко камері відходити на ВУЗЬКОМУ екрані,
-    // і саме його бракувало, коли з восьми зірок у кадр потрапило шість.
-    const { stars, radial, reach } = buildConstellation3D(COUPLE);
+  it('radial накриває найдальший відступ від СЕРЕДИНИ сузір’я', () => {
+    /*
+     * Це число вирішує, наскільки далеко камері відходити на ВУЗЬКОМУ екрані,
+     * і саме його бракувало, коли з восьми зірок у кадр потрапило шість.
+     *
+     * Міряється від середини, а не від осі часу, і формулювання тут змінилось
+     * разом із кутом. Поки напрямок зірки брався від золотого кута, сузір'я
+     * було симетричним навколо осі, і середина лежала на ній — обидві мірки
+     * збігались. Гвинт симетрію знімає: пологий оберт кладе всі зірки по один
+     * бік осі, тож середина відходить убік. Правильна мірка для кадру — та, що
+     * від точки, навколо якої камера обертається, а це середина.
+     */
+    const { stars, radial, reach, centre } = buildConstellation3D(COUPLE);
     for (const star of stars) {
-      expect(Math.hypot(star.x, star.y) + star.radius).toBeLessThanOrEqual(radial + 1e-9);
+      expect(Math.hypot(star.x - centre.x, star.y - centre.y) + star.radius)
+        .toBeLessThanOrEqual(radial + 1e-9);
     }
     expect(radial).toBeLessThanOrEqual(reach + 1e-9);
     expect(radial).toBeGreaterThan(0);

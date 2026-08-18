@@ -22,10 +22,11 @@ import {
   type JourneyMode,
 } from '../journeyMode';
 import { hslToRgb, journeyPalette, levelColour } from '../journeyPalette';
-import { ConstellationLines } from './ConstellationLines';
+import { ConstellationPath } from './ConstellationPath';
 import { FocusStar } from './FocusStar';
 import { JourneyCameraRig, type JourneyFocusTarget } from './JourneyCameraRig';
-import { JourneyConstellation, birthDuration } from './JourneyConstellation';
+import { JourneyConstellation } from './JourneyConstellation';
+import { birthDuration } from './constellationLife';
 import { JourneyEnvironment, JOURNEY_SKY_RADIUS } from './JourneyEnvironment';
 import { StarPointer } from './StarPointer';
 import type { JourneyFraming } from './journeyFraming';
@@ -158,19 +159,29 @@ export function JourneyScene({
 }: JourneySceneProps) {
   const constellation = useMemo(() => buildConstellation3D(events), [events]);
   const palette = useMemo(() => journeyPalette(seed), [seed]);
-  const shape = useMemo(
-    () => ({ radial: constellation.radial, axial: constellation.axial }),
+  /*
+   * Камера кадрує САМІ ЗІРКИ, а не габаритну коробку сузір'я.
+   *
+   * Коробка має вісім кутів, і зірки в них не стоять: відколи кут веде час,
+   * сузір'я лягає пологою дугою по один бік осі. Виміряно на живому екрані —
+   * під коробку шлях займав 58% ширини широкого кадру й половину висоти,
+   * решта була порожнеча. Це і є вада «простір домінує над сузір'ям».
+   *
+   * Координати — відносно середини, бо камера обертається навколо неї.
+   */
+  const bodies = useMemo(
+    () => constellation.stars.map((star) => ({
+      x: star.x - constellation.centre.x,
+      y: star.y - constellation.centre.y,
+      z: star.z - constellation.centre.z,
+      radius: star.radius,
+    })),
     [constellation],
   );
   const centre = useMemo(
     () => [constellation.centre.x, constellation.centre.y, constellation.centre.z] as const,
     [constellation],
   );
-  const orderById = useMemo(
-    () => new Map(constellation.stars.map((star) => [star.id, star.order])),
-    [constellation],
-  );
-
   const [state, dispatch] = useReducer(journeyReducer, INITIAL_JOURNEY_STATE);
   const send = useCallback((event: JourneyEvent) => dispatch(event), []);
 
@@ -210,8 +221,13 @@ export function JourneyScene({
    * Стала частина переважає: якби розмір ішов пропорційно рівню, ключова подія
    * і звичайна відкривались би в різному масштабі, і розкладка деталей
    * стрибала б залежно від того, що пара тапнула.
+   *
+   * Зменшено з `2.6 + r·0.9`. Разом із `FOCUS_MARGIN` у кадруванні це й дає
+   * те, що просив власник: розкрита подія бере близько третини вузької
+   * сторони, і навколо неї лишається видимим шматок сузір'я. Раніше сонце
+   * заповнювало кадр майже цілком, і шлях зникав із очей повністю.
    */
-  const focusRadius = focusStar ? 2.6 + focusStar.radius * 0.9 : 0;
+  const focusRadius = focusStar ? 1.8 + focusStar.radius * 0.6 : 0;
 
   const focusTarget: JourneyFocusTarget | null = useMemo(
     () => (focusStar
@@ -367,13 +383,16 @@ export function JourneyScene({
           а сузір'я до нього стосунку не має й чекати не мусить.
         */}
         <Suspense fallback={null}>
-          <JourneyEnvironment />
+          <JourneyEnvironment reducedMotion={reducedMotion} />
           <SkyLoaded onLoaded={markSkyLoaded} />
         </Suspense>
 
-        <ConstellationLines
-          edges={constellation.edges}
-          orderById={orderById}
+        {/*
+          Шлях іде тими самими зірками й у тому самому порядку: `stars`
+          повертаються з розкладки вже за датою, тобто це і є ланцюг.
+        */}
+        <ConstellationPath
+          chain={constellation.stars}
           palette={palette}
           clock={clock}
           reducedMotion={reducedMotion}
@@ -433,7 +452,7 @@ export function JourneyScene({
         />
 
         <JourneyCameraRig
-          shape={shape}
+          bodies={bodies}
           centre={centre}
           reducedMotion={reducedMotion}
           mode={state.mode}

@@ -8,8 +8,8 @@ import { cameraLocked, type JourneyMode } from '../journeyMode';
 import {
   focusDistance,
   journeyFraming,
+  type JourneyBody,
   type JourneyFraming,
-  type JourneyShape,
 } from './journeyFraming';
 
 // ============================================================
@@ -97,7 +97,8 @@ export interface JourneyFocusTarget {
 }
 
 export interface JourneyCameraRigProps {
-  shape: JourneyShape;
+  /** Зірки сузір'я відносно його середини — те, що камера мусить умістити. */
+  bodies: readonly JourneyBody[];
   /** Середина сузір'я — те, навколо чого обертається камера у спокої. */
   centre: readonly [number, number, number];
   reducedMotion: boolean;
@@ -113,7 +114,7 @@ export interface JourneyCameraRigProps {
 }
 
 export function JourneyCameraRig({
-  shape,
+  bodies,
   centre,
   reducedMotion,
   mode,
@@ -149,7 +150,7 @@ export function JourneyCameraRig({
     fovY: camera instanceof PerspectiveCamera ? camera.fov : 52,
   }), [size.width, size.height, camera]);
 
-  const framing = useMemo(() => journeyFraming(shape, viewport), [shape, viewport]);
+  const framing = useMemo(() => journeyFraming(bodies, viewport), [bodies, viewport]);
 
   useEffect(() => onFramed?.(framing), [framing, onFramed]);
 
