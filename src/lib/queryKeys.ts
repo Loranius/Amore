@@ -44,9 +44,18 @@ export const qk = {
 
   // «Спогади». Стрічка гортає всю хронологію одним запитом, місяць —
   // окремим: календарю не потрібні тисячі рядків, щоб намалювати сітку.
+  //
+  // `memories` — старий архів ФОТО (Плани й рушій Еволюції читають саме
+  // цей ключ; його не можна віддати новому модулю, навіть якщо назва
+  // здається природною для нього). `moments` — новий архів СПОГАДІВ.
+  // Різні ключі навмисно: колись під тим самим ключем `['memories']`
+  // React Query бере лише один `queryFn` на ключ, тож другий спостерігач
+  // мовчки отримував чужу форму даних — рушій Еволюції падав на
+  // `archive.data?.photos` там, де приходив `{ moments, photoCount }`.
   memories: () => ['memories'] as const,
   memoriesMonth: (month: string) => ['memories', 'month', month] as const,
   memoriesDay: (date: string) => ['memories', 'day', date] as const,
+  moments: () => ['moments'] as const,
 
   freeLimit: () => ['freeLimit'] as const,
   savingsGoals: () => ['savingsGoals'] as const,
@@ -81,14 +90,18 @@ export const realtimeInvalidation: Record<
   wishlist_items: [['wishlist']],
   shopping_items: [qk.shopping()],
   photo_calendar: [['photoCalendar']],
-  memories: [['memories']],
-  memory_moments: [['memories']],
-  memory_links: [['memories']],
-  memory_days: [['memories']],
+  // Фото належать обом архівам (старому за фотографіями, новому за
+  // спогадами), тож зміна `memories` мусить скинути обидва ключі.
+  memories: [qk.memories(), qk.moments()],
+  memory_moments: [qk.moments()],
+  memory_links: [qk.memories()],
+  memory_days: [qk.memories()],
   plans: [qk.plans()],
   plan_tasks: [qk.planTasks()],
   plan_links: [qk.planLinks()],
   work_schedule: [['schedule'], qk.sharedDaysOff(), qk.scheduleTogetherness()],
-  map_pins: [qk.mapPins()],
+  // Підпис місця в спогаді читається з мітки карти напряму — зміна
+  // назви чи міста мітки мусить оновити й архів спогадів.
+  map_pins: [qk.mapPins(), qk.moments()],
   user_locations: [qk.userLocations()],
 } as const;

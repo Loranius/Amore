@@ -1,330 +1,685 @@
 /* ============================================================
-   «Спогади» — фотоархів. Токени беруться з :root застосунку, власної
-   палітри модуль не заводить.
+   «Спогади» — фотощоденник пари.
+   ------------------------------------------------------------
+   Модуль не заводить власної палітри: усе — з токенів порталу
+   (`--surface-*`, `--glass-*`, `--shadow-*`). Це важливо саме тут, бо
+   полароїд — світла рамка на темному тлі, і спокуса вписати «свій» білий
+   найбільша: за пів року вона дала б білу пляму, що не збігається ні з
+   чим у порталі.
+
+   Дві геометричні речі рахуються НЕ тут, а в `momentStyle.ts`: нахил
+   картки й пропорція кадру в альбомі. Причина в тому, що обидві мусять
+   бути однакові при кожному перемальовуванні, а CSS такого не вміє —
+   `:nth-child` прив'язався б до позиції в списку, і доданий спогад
+   перекладав би всю галерею.
    ============================================================ */
 
 .memories { padding-bottom: 40px; }
 
-.mem-head {
-  display: flex; align-items: flex-end; justify-content: space-between;
-  gap: 12px; margin-bottom: 12px;
-}
-.mem-head h1 { margin: 0; font-size: 25px; }
-.mem-sub { margin: 2px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+/* ── Шапка ─────────────────────────────────────────────────── */
 
-/* ── Плитка знімка ─────────────────────────────────────────── */
-.mem-photo {
-  position: relative; overflow: hidden; border: 0; padding: 0; width: 100%;
-  border-radius: 4px; background: color-mix(in srgb, var(--text) 8%, transparent);
-  cursor: pointer; display: block;
-}
-.mem-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-/* Кружечок 18px під значок 12px: місця обмаль, тому обведення тут
-   тонше за загальне — на кольоровому кружку 1.7px злипались у пляму. */
-.mem-src {
-  position: absolute; right: 5px; top: 5px; width: 18px; height: 18px;
-  border-radius: 999px; display: grid; place-items: center;
-  color: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .3);
-}
-.mem-src svg { stroke-width: 2; }
-.mem-src--place { background: #5ba3d9; }
-.mem-src--wish { background: #9b6ea8; }
-.mem-src--goal { background: #bd82e8; }
-.mem-src--event { background: #d9a441; }
-.mem-capdot {
-  position: absolute; left: 5px; bottom: 5px; width: 6px; height: 6px;
-  border-radius: 999px; background: #fff; box-shadow: 0 0 0 2px rgb(0 0 0 / .28);
-}
-
-/* Три колонки з квадратними клітинками. Великий кадр — рівно 2×2, тож
-   поруч із ним у третій стовпець стають два квадрати й рядок сходиться.
-   Саме це замощення прибрало дірки, які дала перша спроба на шести
-   колонках із різними пропорціями. */
-.mem-mosaic {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  grid-auto-rows: 1fr;
-  gap: 3px;
-  margin-bottom: 16px;
-}
-.mem-mosaic > .mem-photo { aspect-ratio: 1; }
-.mem-photo--big { grid-column: span 2; grid-row: span 2; aspect-ratio: 1; }
-
-/* ── A. Стрічка ────────────────────────────────────────────── */
-.mem-daybar {
-  position: sticky; top: 0; z-index: 5; width: 100%;
-  display: flex; align-items: baseline; gap: 8px; text-align: left;
-  border: 0; background: linear-gradient(var(--bg) 74%, transparent);
-  color: var(--text); font: inherit; padding: 10px 2px 7px; cursor: pointer;
-}
-/* Дата й лічильник не стискаються, опис забирає решту й обрізається.
-   Без flex-shrink:0 «14 липня» ламалось на два рядки, а «18 фото» — на
-   «18» і «фото». */
-.mem-daybar b { font-size: 15.5px; flex: 0 0 auto; white-space: nowrap; }
-.mem-daybar span {
-  font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums;
-  flex: 0 0 auto; white-space: nowrap;
-}
-.mem-daybar em {
-  font-style: italic; font-size: 12px; color: var(--muted);
-  flex: 1 1 auto; min-width: 0;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-
-/* ── B. Альбом ─────────────────────────────────────────────── */
-.mem-album { display: grid; gap: 14px; }
-.mem-spread {
-  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
-  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 12px; padding: 14px 13px 16px;
-}
-.mem-spread-hd { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
-.mem-spread-hd b { font-size: 16px; }
-.mem-spread-hd span {
-  font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
-  color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums;
-}
-.mem-spread-note {
-  margin: 0 0 10px; font-family: Georgia, 'Times New Roman', serif;
-  font-style: italic; font-size: 13px; color: var(--muted); line-height: 1.45;
-}
-.mem-paperwall { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
-/* Паспарту бере тон із --surface, а не чистий білий: у темній темі білий
-   прямокутник під фото світиться, як лампа. */
-.mem-mount {
-  position: relative; padding: 6px 6px 0; background: var(--surface);
-  border-radius: 2px; box-shadow: 0 4px 14px rgb(0 0 0 / .14);
-}
-.mem-mount-photo { display: block; width: 100%; border: 0; padding: 0; background: none; cursor: pointer; }
-.mem-mount-photo img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; }
-.mem-mount-cap {
-  display: block; padding: 5px 2px 7px; min-height: 1.2em;
-  font-family: Georgia, 'Times New Roman', serif; font-style: italic;
-  font-size: 11.5px; color: var(--muted); line-height: 1.3;
-}
-.mem-corner { position: absolute; width: 13px; height: 13px; z-index: 3; }
-.mem-corner--tl { top: 2px; left: 2px; background: linear-gradient(135deg, rgb(58 37 48 / .34) 0 46%, transparent 47%); }
-.mem-corner--br { bottom: 2px; right: 2px; background: linear-gradient(315deg, rgb(58 37 48 / .34) 0 46%, transparent 47%); }
-.tilt-a { rotate: -1.1deg; }
-.tilt-b { rotate: .9deg; }
-.mem-more {
-  margin-top: 12px; width: 100%; border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  background: var(--surface); color: var(--text); border-radius: 10px;
-  padding: 8px 12px; font: inherit; font-size: 12.5px; cursor: pointer;
-}
-
-/* ── C. Мозаїка ────────────────────────────────────────────── */
-.mem-cal-nav {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; margin-bottom: 10px; font-weight: 600;
-}
-.mem-nav-btn {
-  width: 34px; height: 34px; border-radius: 10px; font-size: 17px; cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  background: var(--surface); color: var(--text);
-}
-.mem-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 5px; }
-.mem-dow span {
-  text-align: center; font-size: 10px; letter-spacing: .06em;
-  color: var(--muted); font-weight: 700;
-}
-/* align-items: start — обов'язково. За замовчуванням клітинка розтягується
-   на висоту рядка, і це перебиває aspect-ratio: у рядках БЕЗ фото висоту
-   задавав самий лише номер дня, тож порожні дні виходили пласкими
-   смужками замість квадратів. */
-.mem-cgrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; align-items: start; }
-.mem-cell {
-  aspect-ratio: 1; border: 0; padding: 0; border-radius: 9px; position: relative;
-  overflow: hidden; cursor: pointer; font: inherit; color: var(--text);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-}
-.mem-cell--empty { cursor: default; }
-.mem-cell:disabled { cursor: default; }
-.mem-cell img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.mem-cell-veil {
-  position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(180deg, rgb(0 0 0 / .22), transparent 42%, rgb(0 0 0 / .3));
-}
-.mem-cell-n { position: absolute; left: 5px; top: 3px; z-index: 2; font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mem-cell--has .mem-cell-n { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / .55); }
-.mem-cell-cnt {
-  position: absolute; right: 4px; bottom: 3px; z-index: 2; font-size: 10px;
-  font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / .6);
+.mm-head { margin-bottom: 14px; }
+.mm-head h1 { margin: 0; font-size: 25px; letter-spacing: -0.01em; }
+.mm-sub {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
-.mem-cell--today { box-shadow: inset 0 0 0 2px var(--accent); }
 
-/* ── Екран дня ─────────────────────────────────────────────── */
-.mem-day-hd { margin-bottom: 8px; }
-.mem-back { border: 0; background: none; color: var(--accent); font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; padding: 0 0 6px; }
-.mem-day-hd h2 { margin: 0; font-size: 22px; }
-.mem-day-meta { margin: 3px 0 0; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.mem-day-desc {
-  margin: 8px 0 0; font-family: Georgia, 'Times New Roman', serif; font-style: italic;
-  font-size: 13.5px; color: var(--muted); line-height: 1.5;
-}
-.mem-filters { display: flex; gap: 6px; overflow-x: auto; padding: 12px 0 10px; scrollbar-width: none; }
-.mem-filters::-webkit-scrollbar { display: none; }
-.mem-chip {
-  flex: 0 0 auto; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 12px; cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  background: var(--surface); color: var(--text);
-}
-.mem-chip[aria-pressed='true'] { background: var(--text); border-color: var(--text); color: var(--bg); font-weight: 700; }
-.mem-part {
-  margin: 12px 0 6px; font-size: 10.5px; letter-spacing: .12em;
-  text-transform: uppercase; color: var(--muted); font-weight: 800;
+/* ── Галерея полароїдів ────────────────────────────────────── */
+
+/* Дві колонки на телефоні, три — коли ширини справді вистачає.
+   Проміжок більший за звичайний (16px): картки нахилені, і при щільній
+   сітці кути сусідів починають торкатись. */
+.mm-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 14px;
 }
 
-/* ── Завантаження й помилка ────────────────────────────────── */
-.mem-skeleton { display: grid; gap: 10px; }
-.mem-skeleton-block {
-  height: 120px; border-radius: 12px;
-  background: linear-gradient(90deg,
-    var(--surface) 0%,
-    color-mix(in srgb, var(--text) 7%, var(--surface)) 50%,
-    var(--surface) 100%);
-  background-size: 220% 100%;
-  animation: mem-shimmer 1.4s ease-in-out infinite;
+@media (min-width: 720px) {
+  .mm-grid { grid-template-columns: repeat(3, 1fr); gap: 22px 18px; }
 }
-@keyframes mem-shimmer { to { background-position-x: -220%; } }
-.mem-error { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 
-/* ── Ручний порядок дня ────────────────────────────────────── */
-.mem-day-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.mem-order-toggle {
-  flex: 0 0 auto; border-radius: 999px; padding: 5px 12px; font: inherit;
-  font-size: 12px; font-weight: 700; cursor: pointer;
-  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  background: var(--surface); color: var(--text);
+/* Полароїд: світла рамка, широке поле знизу під підпис.
+   Пропорції взяті з реальної картки Polaroid — поле під кадром приблизно
+   вдвічі вище за верхнє й бічні. */
+.mm-card {
+  display: block;
+  padding: 8px 8px 0;
+  border-radius: 5px;
+  background: linear-gradient(180deg, #f6f3ef, #e9e3dc);
+  box-shadow: var(--shadow-md);
+  color: #2a2430;
+  text-decoration: none;
+  transition: translate 120ms ease, box-shadow 120ms ease;
 }
-.mem-order { margin-top: 12px; }
-.mem-order-hint { margin: 0 0 10px; font-size: 12px; color: var(--muted); line-height: 1.45; }
-.mem-order-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.mem-order-row {
-  display: flex; align-items: center; gap: 9px; padding: 6px 8px 6px 6px;
-  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  border-radius: 12px; background: var(--surface);
+
+.mm-card:active { translate: 0 2px; box-shadow: var(--shadow-sm); }
+.mm-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+.mm-card-frame {
+  position: relative;
+  display: block;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 2px;
+  /* Кадр темніший за рамку: без цього фото з білим небом зливається з
+     полем полароїда, і картка читається як порожня. */
+  background: #201b28;
 }
-.mem-order-n {
-  flex: 0 0 auto; width: 18px; text-align: center; font-size: 11px;
-  font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums;
+
+.mm-card-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.mem-order-row img {
-  flex: 0 0 auto; width: 46px; height: 46px; object-fit: cover;
-  border-radius: 8px; display: block;
+
+.mm-card-blank {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(45deg, #2a2432 0 8px, #241f2c 8px 16px);
 }
-/* min-width: 0 — інакше довгий підпис розпирає рядок і виштовхує стрілки
-   за край екрана телефона. */
-.mem-order-cap {
-  flex: 1 1 auto; min-width: 0; font-size: 12.5px; color: var(--muted);
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+
+/* Лічильник кадрів. Не «+3», а просте число: пара читає його як «скільки
+   тут фото», і арифметика зі знаком тільки заважає. */
+.mm-card-count {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: rgba(12, 8, 20, 0.62);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
-.mem-order-btns { flex: 0 0 auto; display: flex; gap: 5px; }
-.mem-order-btn {
-  width: 34px; height: 34px; border-radius: 10px; cursor: pointer;
+
+.mm-card-foot {
+  display: block;
+  padding: 9px 3px 11px;
+  min-height: 44px;
+}
+
+.mm-card-foot b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.25;
+  /* Рівно два рядки: назва довша за це в сітці 2×N однаково не читається,
+     а картка від неї росла б удвічі проти сусідів. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mm-card-foot i {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 11px;
+  color: #6b6072;
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-skeleton {
+  aspect-ratio: 0.82;
+  border-radius: 5px;
+  background: var(--surface-2);
+  animation: mm-pulse 1.4s ease-in-out infinite;
+}
+.mm-skeleton--hero { aspect-ratio: auto; height: 62vh; border-radius: 0; }
+
+@keyframes mm-pulse { 50% { opacity: 0.55; } }
+
+/* ── Кнопка «+» ────────────────────────────────────────────── */
+
+.mm-fab {
+  position: fixed;
+  z-index: 6;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background-image: var(--control-fill);
+  color: #fff;
+  box-shadow: var(--control-top), var(--control-lip), 0 14px 30px rgba(4, 2, 10, 0.55);
+  cursor: pointer;
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+.mm-fab:active { translate: 0 2px; box-shadow: var(--control-top), var(--control-lip-press); }
+.mm-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ============================================================
+   Композер — повноекранний нотатник
+   ============================================================ */
+
+.mm-composer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.mm-comp-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px;
+  background: var(--glass-read);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.mm-icon-btn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+.mm-icon-btn:active { background: var(--surface-2); }
+
+.mm-save {
+  padding: 9px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-pill);
+  background-image: var(--control-fill);
+  color: #fff;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 800;
+  box-shadow: var(--control-top), var(--control-lip);
+  cursor: pointer;
+}
+.mm-save:disabled { opacity: 0.45; box-shadow: none; cursor: default; }
+
+.mm-comp-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 120px);
+}
+
+/* Поля без рамок: це нотатник, а не анкета. Рамка навколо назви робить із
+   екрана форму, і вся ідея «пара просто пише» зникає. */
+.mm-title-input,
+.mm-note-input {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  padding: 0;
+}
+.mm-title-input {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+.mm-note-input {
+  margin-top: 10px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.mm-title-input::placeholder { color: color-mix(in srgb, var(--muted) 55%, transparent); }
+.mm-note-input::placeholder { color: color-mix(in srgb, var(--muted) 55%, transparent); }
+.mm-title-input:focus, .mm-note-input:focus { outline: none; }
+
+.mm-meta-rows { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+
+.mm-meta-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  box-shadow: var(--glass-stroke);
+}
+.mm-meta-row--place { cursor: default; padding-right: 6px; }
+.mm-meta-row svg { color: var(--accent); flex: 0 0 auto; }
+
+.mm-meta-x {
+  width: 24px; height: 24px;
   display: grid; place-items: center;
-  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  background: var(--bg); color: var(--text);
+  border: 0; border-radius: 999px;
+  background: none; color: var(--muted); cursor: pointer;
 }
-.mem-order-btn:disabled { opacity: .35; cursor: default; }
-.mem-order-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.mm-meta-x:active { background: var(--surface-3); }
 
-/* ── Масовий імпорт ────────────────────────────────────────── */
-.mem-add { display: flex; align-items: center; gap: 7px; flex: 0 0 auto; }
-/* Глобального .btn:disabled у застосунку немає, і на цьому екрані це
-   помітно: «Додати» заблоковане, доки група без дати не отримає дату, а
-   виглядає воно точнісінько як робоче. Правило тримаємо в межах модуля,
-   щоб не перемальовувати кнопки всіх інших. */
-.mem-import .btn:disabled,
-.mem-order .btn:disabled { opacity: .45; cursor: default; }
-.mem-import-sum { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.mem-import-hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); line-height: 1.45; }
-.mem-import-list { display: grid; gap: 7px; max-height: 46vh; overflow-y: auto; }
-.mem-import-row {
-  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
-  padding: 8px 9px; border-radius: 12px; background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+/* Дату відкриває рядок і пункт меню; сам input лишається в потоці
+   (`showPicker` не працює на `display: none`), але не займає місця. */
+.mm-date-input {
+  position: absolute;
+  width: 1px; height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
-/* Група без дати — єдине, що заважає завантажити; вона мусить впадати в
-   око, а не губитись поміж готових днів. */
-.mem-import-row--todo {
-  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
-}
-.mem-import-thumbs { display: flex; }
-.mem-import-thumb {
-  width: 22px; height: 30px; border-radius: 4px; margin-right: -9px;
-  background: color-mix(in srgb, var(--text) 14%, transparent);
-  box-shadow: 0 0 0 2px var(--surface);
-}
-.mem-import-lbl { display: flex; flex-direction: column; min-width: 0; }
-.mem-import-lbl b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mem-import-lbl span { font-size: 11px; color: var(--muted); }
-.mem-import-fix {
-  border-radius: 999px; padding: 5px 11px; font: inherit; font-size: 11.5px;
-  font-weight: 700; cursor: pointer; border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  background: var(--bg); color: var(--text);
-}
-.mem-import-editor {
-  grid-column: 1 / -1; display: grid; gap: 8px; padding-top: 9px;
-  border-top: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-}
-.mem-import-preview { margin: 0; font-size: 12px; color: var(--muted); }
-.mem-import-progress { margin: 10px 0 0; font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
 
-.mem-upload-preview {
-  width: 100%; max-height: 220px; object-fit: cover;
-  border-radius: 12px; margin-bottom: 4px;
+.mm-comp-hint {
+  margin: 28px 0 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  text-align: center;
 }
-.mem-upload-hint { margin: -2px 0 10px; font-size: 12.5px; color: var(--muted); }
+
+/* Додані знімки — рівна сітка, без нахилів: тут це робочий стіл, а не
+   готовий альбом, і рівні квадрати легше перебирати очима. */
+.mm-stage {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 20px;
+}
+@media (min-width: 560px) { .mm-stage { grid-template-columns: repeat(4, 1fr); } }
+
+.mm-stage-item {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.mm-stage-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mm-stage-item.is-cover { box-shadow: inset 0 0 0 2px var(--accent); }
+
+.mm-stage-item figcaption {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 4px;
+  background: linear-gradient(transparent, rgba(8, 5, 14, 0.7));
+}
+.mm-stage-item figcaption button {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 999px;
+  background: rgba(10, 6, 18, 0.5);
+  color: #fff; cursor: pointer;
+}
+.mm-stage-item figcaption button[aria-pressed='true'] { color: var(--accent); }
+
+/* ── Скріпка й віяло ───────────────────────────────────────── */
+
+.mm-clip-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 61;
+  border: 0;
+  background: rgba(6, 4, 12, 0.45);
+  cursor: default;
+}
+
+.mm-clip {
+  position: fixed;
+  z-index: 62;
+  right: 18px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.mm-clip-menu {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+/* Віяло розкривається вгору. Рухаються тільки `opacity` й `translate` —
+   решта властивостей змусила б браузер перераховувати розкладку на
+   кожному кадрі. Затримка кожного пункту задається в JSX: вона залежить
+   від позиції знизу, а CSS такого без `:nth-child` не знає. */
+.mm-clip-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 15px 9px 11px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--glass-read);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-md);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+
+  opacity: 0;
+  translate: 0 14px;
+  pointer-events: none;
+  transition: opacity 150ms ease, translate 180ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.mm-clip.is-open .mm-clip-item {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+}
+
+.mm-clip-item i {
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--accent);
+  font-style: normal;
+}
+
+.mm-clip-btn {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background-image: var(--control-fill);
+  color: #fff;
+  box-shadow: var(--control-top), var(--control-lip), 0 14px 30px rgba(4, 2, 10, 0.55);
+  cursor: pointer;
+  transition: rotate 200ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.mm-clip.is-open .mm-clip-btn { rotate: 135deg; }
+.mm-clip-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mem-skeleton-block { animation: none; }
+  .mm-clip-item, .mm-clip-btn { transition: none; }
 }
 
-/* ── Повний екран знімка ───────────────────────────────────── */
-.mem-viewer {
-  position: fixed; inset: 0; z-index: 120; background: #110e14; color: #fff;
-  display: flex; flex-direction: column; animation: mem-viewer-in .18s ease;
+/* ── Аркуш вибору місця ────────────────────────────────────── */
+
+.mm-sheet {
+  position: fixed;
+  z-index: 63;
+  inset: auto 0 0 0;
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  border-radius: 20px 20px 0 0;
+  background: var(--glass-read);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+  backdrop-filter: blur(var(--glass-blur-strong));
+  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-lg);
 }
-@keyframes mem-viewer-in { from { opacity: 0; } }
-.mem-viewer-x {
-  position: absolute; top: max(14px, env(safe-area-inset-top)); right: 12px; z-index: 3;
-  border: 0; background: rgb(255 255 255 / .14); color: #fff;
-  width: 36px; height: 36px; border-radius: 999px; cursor: pointer;
+
+.mm-sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.mm-sheet-head b { font-size: 16px; }
+
+.mm-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 13px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--glass-stroke);
+}
+.mm-search svg { color: var(--muted); flex: 0 0 auto; }
+.mm-search input {
+  flex: 1 1 auto;
+  border: 0; background: none; color: var(--text); font: inherit; font-size: 15px;
+}
+.mm-search input:focus { outline: none; }
+
+.mm-sheet-body { flex: 1 1 auto; overflow-y: auto; margin: 10px -4px; padding: 0 4px; }
+
+.mm-place-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.mm-place-row:active { background: var(--surface-2); }
+.mm-place-row svg { color: var(--accent); flex: 0 0 auto; }
+.mm-place-row b { display: block; font-size: 14.5px; font-weight: 600; }
+.mm-place-row i {
+  display: block; font-style: normal; font-size: 11.5px; color: var(--muted);
+}
+.mm-place-row--exif i { color: var(--accent); }
+
+.mm-sheet-note { margin: 12px 4px; font-size: 13px; color: var(--muted); }
+.mm-sheet-clear { width: 100%; }
+
+/* ============================================================
+   Сторінка спогаду
+   ============================================================ */
+
+/* Сторінка виходить за padding оболонки: обкладинка мусить іти від краю
+   до краю, інакше вона читається карткою, а не самим спогадом. */
+.mm-page { margin: calc(-1 * var(--page-pad, 16px)); }
+.mm-page > *:not(.mm-hero) { padding-left: var(--page-pad, 16px); padding-right: var(--page-pad, 16px); }
+
+.mm-hero { position: relative; }
+
+.mm-hero-shot {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.mm-hero-shot img {
+  display: block;
+  width: 100%;
+  /* Не фіксована висота: 68vh на телефоні — це майже весь екран, а на
+     широкому вона перетворила б портрет на смугу. */
+  max-height: 68vh;
+  object-fit: cover;
+}
+
+/* Розчинення в тлі. Градієнт іде до самого `--bg`, тому шва між
+   обкладинкою й сторінкою не видно на жодній яскравості кадру. */
+.mm-hero-veil {
+  position: absolute;
+  inset: auto 0 -1px 0;
+  height: 46%;
+  background: linear-gradient(transparent, color-mix(in srgb, var(--bg) 72%, transparent) 52%, var(--bg));
+  pointer-events: none;
+}
+
+.mm-hero-bar {
+  position: absolute;
+  inset: calc(env(safe-area-inset-top, 0px) + 10px) 12px auto 12px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* Кнопки лежать НА фото, тож мають власне тло: без нього світлий кадр
+   з'їдає їх повністю. */
+.mm-round {
+  width: 40px; height: 40px;
   display: grid; place-items: center;
+  border: 0; border-radius: 999px;
+  background: rgba(10, 6, 18, 0.42);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  box-shadow: var(--glass-stroke);
+  cursor: pointer;
 }
-.mem-viewer-stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 8px; }
-.mem-viewer-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
-.mem-viewer-foot {
-  padding: 14px 18px calc(20px + env(safe-area-inset-bottom));
-  display: grid; gap: 9px; background: #110e14;
-}
-.mem-viewer-cap {
-  margin: 0; font-family: Georgia, 'Times New Roman', serif; font-style: italic;
-  font-size: 15px; line-height: 1.45;
-}
-.mem-viewer-meta { margin: 0; font-size: 12px; color: rgb(255 255 255 / .6); font-variant-numeric: tabular-nums; }
-.mem-viewer-sources { display: flex; gap: 8px; flex-wrap: wrap; }
-.mem-viewer-badge {
-  border: 0; border-radius: 999px; padding: 6px 12px; font: inherit;
-  font-size: 12px; font-weight: 700; color: #fff; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 5px;
-}
-.mem-viewer-more {
-  justify-self: start; border: 1px solid rgb(255 255 255 / .22); background: none;
-  color: rgb(255 255 255 / .78); border-radius: 999px; padding: 7px 14px;
-  font: inherit; font-size: 12.5px; cursor: pointer;
-}
-.mem-viewer-choice { display: grid; gap: 7px; }
-.mem-viewer-act {
-  text-align: left; border: 1px solid rgb(255 255 255 / .2); background: rgb(255 255 255 / .06);
-  color: #fff; border-radius: 12px; padding: 11px 13px; font: inherit; font-size: 13px; cursor: pointer;
-}
-.mem-viewer-act--danger { border-color: color-mix(in srgb, var(--danger) 62%, transparent); color: #ffb3b0; }
-.mem-viewer-act:disabled { opacity: .55; cursor: default; }
+.mm-round:active { background: rgba(10, 6, 18, 0.62); }
 
-@media (prefers-reduced-motion: reduce) {
-  .mem-viewer { animation: none; }
+.mm-menu-scrim { position: fixed; inset: 0; z-index: 8; border: 0; background: none; cursor: default; }
+
+.mm-menu {
+  position: absolute;
+  z-index: 9;
+  right: 12px;
+  top: calc(env(safe-area-inset-top, 0px) + 56px);
+  min-width: 168px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  background: var(--glass-read);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-lg);
+}
+.mm-menu button {
+  padding: 11px 12px;
+  border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--text);
+  font: inherit; font-size: 14.5px; text-align: left; cursor: pointer;
+}
+.mm-menu button:active { background: var(--surface-2); }
+.mm-menu button.is-danger { color: var(--danger, #f2708a); }
+
+.mm-page-head { margin-top: -6px; }
+.mm-page-head h1 { margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -0.015em; }
+
+.mm-page-meta {
+  margin: 7px 0 0;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
+  font-size: 13px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.mm-page-meta em { font-style: normal; opacity: 0.55; }
+.mm-page-place { display: inline-flex; align-items: center; gap: 4px; }
+.mm-page-place svg { color: var(--accent); }
+
+.mm-page-note { margin: 12px 0 0; font-size: 15px; line-height: 1.5; }
+
+/* ── Альбом ────────────────────────────────────────────────── */
+
+/* Колонки — flex, а не `column-count`: набір іде в JS (`albumColumns`),
+   щоб перше фото стало ПОРУЧ із другим, а не над ним. */
+.mm-album { display: flex; gap: 10px; margin-top: 22px; }
+.mm-album-lane { flex: 1 1 0; display: flex; flex-direction: column; gap: 10px; }
+
+.mm-album-shot {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-sm);
+  cursor: zoom-in;
+}
+.mm-album-shot img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.mm-album-shot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+/* ── Повний екран ──────────────────────────────────────────── */
+
+.mm-light {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  /* Суцільне, а не скло: під фото має бути порожнеча, інакше кольори
+     кадру читаються поверх кольорів порталу. Живий екран показав, чому
+     94% недостатньо — навіть 6% прозорості лишало примарний контур
+     сторінки під низом, помітний саме на яскравих фото. */
+  background: #04020a;
+  touch-action: pan-y;
+}
+
+.mm-light img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  /* Кадр з'являється без зсуву: рух тут відволікав би від самого фото. */
+  animation: mm-fade 160ms ease;
+}
+
+@keyframes mm-fade { from { opacity: 0; } }
+
+.mm-light-x {
+  position: absolute;
+  z-index: 2;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  right: 12px;
+  width: 44px; height: 44px;
+  display: grid; place-items: center;
+  border: 0; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+
+.mm-light-dots {
+  position: absolute;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
+  left: 0; right: 0;
+  display: flex; justify-content: center; gap: 6px;
+}
+.mm-light-dots span {
+  width: 6px; height: 6px; border-radius: 999px;
+  background: rgba(255, 255, 255, 0.3);
+}
+.mm-light-dots span.is-now { background: #fff; }
+
+/* Смуги вздовж країв: миша й клавіатура отримують навігацію, палець —
+   не отримує нічого зайвого під кадром. */
+.mm-light-nav {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 22%;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.mm-light-nav--prev { left: 0; }
+.mm-light-nav--next { right: 0; }
+.mm-light-nav:disabled { cursor: default; }
+
+@media (hover: none) {
+  /* На телефоні смуги перекривали б свайп власними кліками. */
+  .mm-light-nav { display: none; }
 }
