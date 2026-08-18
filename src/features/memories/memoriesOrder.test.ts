@@ -16,6 +16,7 @@ import type { MemoryRow } from '@/types';
 const photo = (id: number, sortOrder = 0): MemoryRow => ({
   id,
   photo_url: `https://example/${id}.jpg`,
+  moment_id: null,
   storage_bucket: null,
   storage_path: null,
   memory_date: '2026-07-14',

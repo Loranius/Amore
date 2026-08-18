@@ -68,6 +68,7 @@ describe('Evolution real-data snapshot mapping', () => {
       photos: [{
         id: 30,
         photo_url: 'https://example.test/memory.webp',
+  moment_id: null,
         storage_bucket: null,
         storage_path: null,
         memory_date: '2025-04-03',

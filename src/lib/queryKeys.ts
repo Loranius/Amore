@@ -82,6 +82,7 @@ export const realtimeInvalidation: Record<
   shopping_items: [qk.shopping()],
   photo_calendar: [['photoCalendar']],
   memories: [['memories']],
+  memory_moments: [['memories']],
   memory_links: [['memories']],
   memory_days: [['memories']],
   plans: [qk.plans()],

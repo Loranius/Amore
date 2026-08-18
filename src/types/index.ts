@@ -353,9 +353,48 @@ export type MemoryPrecision = 'day' | 'month' | 'year' | 'approx';
 /** Модуль, який приніс фото в архів. Спогад без жодного зв'язку — доданий вручну. */
 export type MemorySource = 'wish' | 'place' | 'goal' | 'event';
 
+/**
+ * Спогад пари — назва, короткий опис, дата, місце й обкладинка.
+ *
+ * **Фото лежать в іншій таблиці, і вона зветься `memories`.** Це виглядає
+ * плутано, і причина названа тут, щоб ніхто не «полагодив» це мимохідь:
+ * таблицю `memories` читають ще плани (`usePlanLinks`) і риф-прев'ю рушія
+ * Еволюції (`useReefPortalPreview`), а живі реакції продуктових модулів у
+ * рушій заборонено чіпати до фази інтеграції. Тож перейменувати її не можна,
+ * і момент дістав власне ім'я замість того, щоб забрати чуже.
+ */
+export interface MemoryMomentRow {
+  id: number;
+  /**
+   * Може бути порожньою, і це не недогляд: у 37 днів, які мігрували з
+   * пофотографічної моделі, заголовка ніколи не існувало, а вигадувати його
+   * за пару не можна. Порожню назву інтерфейс показує датою.
+   */
+  title: string;
+  /** Кілька слів про момент. Стеля 30 символів стоїть у `CHECK` бази. */
+  note: string | null;
+  /** Дата САМОГО моменту, окремо від `created_at`. */
+  memory_date: string;
+  /** Обкладинка — `memories.id`. Перше додане фото стає нею автоматично. */
+  cover_photo_id: number | null;
+  /** Місце — мітка з «Нашої карти» (`map_pins.id`), а не власні координати. */
+  place_pin_id: number | null;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * Одне ФОТО в архіві.
+ *
+ * Ім'я таблиці (`memories`) старше за модель: колись спогад і був одним
+ * знімком. Див. `MemoryMomentRow` про те, чому вона так і лишилась.
+ */
 export interface MemoryRow {
   id: number;
   photo_url: string;
+  /** До якого спогаду належить. `null` — знімок ще не прив'язаний. */
+  moment_id: number | null;
   /** Заповнені лише для файлів, завантажених самим архівом; для чужих — null. */
   storage_bucket: string | null;
   storage_path: string | null;
@@ -507,6 +546,7 @@ export interface Database {
       work_schedule:      TableDef<WorkScheduleRow, 'date' | 'user_id' | 'mark'>;
       photo_calendar:     TableDef<PhotoCalendarRow, 'date' | 'user_id' | 'photo_url'>;
       memories:           TableDef<MemoryRow, 'photo_url' | 'memory_date'>;
+      memory_moments:     TableDef<MemoryMomentRow, 'memory_date'>;
       memory_days:        TableDef<MemoryDayRow, 'memory_date'>;
       memory_links:       TableDef<MemoryLinkRow, 'memory_id' | 'source_type' | 'source_id'>;
       plans:              TableDef<PlanRow, 'title'>;
@@ -689,7 +729,7 @@ export type RealtimeTable =
   | 'media_items' | 'dishes' | 'wishlist_items'
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
   | 'map_pins' | 'user_locations'
-  | 'memories' | 'memory_links' | 'memory_days'
+  | 'memories' | 'memory_moments' | 'memory_links' | 'memory_days'
   | 'plans' | 'plan_tasks' | 'plan_links';
 
 export type RealtimeEventType = 'INSERT' | 'UPDATE' | 'DELETE';

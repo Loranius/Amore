@@ -26,6 +26,7 @@ afterEach(() => { process.env.TZ = originalTZ; vi.useRealTimers(); });
 
 const photo = (over: Partial<MemoryRow> & { id: number }): MemoryRow => ({
   photo_url: `https://example/${over.id}.jpg`,
+  moment_id: null,
   storage_bucket: null,
   storage_path: null,
   memory_date: '2026-07-14',
