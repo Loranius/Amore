@@ -11,11 +11,31 @@
 //
 // Віяло малюється лише коли фото більше одного. Порожнє віяло під
 // одиноким знімком обіцяло б те, чого в спогаді немає.
+//
+// **Кадри йдуть мініатюрами, і це не оптимізація «про всяк випадок».**
+// Виміряно на живому порталі: галерея тягнула 15.83 МБ, щоб намалювати
+// картки 127×127. Ширини нижче — CSS-пікселі; щільність екрана
+// домножується всередині `thumbUrl`.
 // ============================================================
+
 import { Link } from 'react-router-dom';
+import { Photo } from '@/components/ui/Photo';
 import { fanLeaves } from './momentStyle';
 import { formatMemoryDate } from './memoriesDate';
 import type { Moment } from './useMoments';
+
+/** Ширина головного кадру в сітці: 68% клітинки, тобто ~128 CSS-пікселів. */
+const COVER_CSS_WIDTH = 132;
+
+/**
+ * Лист віяла просимо ще меншим, і якість йому теж занижуємо.
+ *
+ * Видно з нього хіба смужку вздовж краю, та й ту під затемненням у 38%.
+ * Платити за такий кадр повну якість — це платити за пікселі, яких ніхто
+ * не побачить.
+ */
+const LEAF_CSS_WIDTH = 96;
+const LEAF_QUALITY = 55;
 
 export function MemoryCard({ moment }: { moment: Moment }) {
   const title = moment.title.trim();
@@ -38,15 +58,24 @@ export function MemoryCard({ moment }: { moment: Moment }) {
               style={{ transform: `rotate(${leaf.rotate}deg) scale(${leaf.scale})` }}
               aria-hidden="true"
             >
-              <img src={photo.photo_url} alt="" loading="lazy" decoding="async" draggable={false} />
+              <Photo
+                src={photo.photo_url}
+                cssWidth={LEAF_CSS_WIDTH}
+                quality={LEAF_QUALITY}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                draggable={false}
+              />
             </span>
           );
         })}
 
         <span className="mm-card-frame">
           {moment.cover ? (
-            <img
+            <Photo
               src={moment.cover.photo_url}
+              cssWidth={COVER_CSS_WIDTH}
               alt=""
               loading="lazy"
               decoding="async"

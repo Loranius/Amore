@@ -10,6 +10,7 @@
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Photo } from '@/components/ui/Photo';
 import { CloseIcon } from '@/components/icons/UiIcon';
 import type { MemoryRow } from '@/types';
 
@@ -22,6 +23,15 @@ const SWIPE_MIN_PX = 56;
  * телефоні майже жоден жест не буває строго по одній осі.
  */
 const SWIPE_AXIS_RATIO = 1.4;
+
+/**
+ * Ширина кадру на повному екрані, у CSS-пікселях.
+ *
+ * Тут єдине місце модуля, де фото дивляться впритул, тож просимо стільки,
+ * скільки може показати найширший телефон. Менше було б видно — саме на
+ * цьому екрані пара й помітила б економію.
+ */
+const FULL_CSS_WIDTH = 540;
 
 interface PhotoLightboxProps {
   photos: readonly MemoryRow[];
@@ -82,7 +92,7 @@ export function PhotoLightbox({ photos, startId, onClose }: PhotoLightboxProps) 
         <CloseIcon size={24} />
       </button>
 
-      <img key={photo.id} src={photo.photo_url} alt="" decoding="async" />
+      <Photo key={photo.id} src={photo.photo_url} cssWidth={FULL_CSS_WIDTH} alt="" decoding="async" />
 
       {photos.length > 1 && (
         <div className="mm-light-dots" aria-hidden="true">

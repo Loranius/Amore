@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { exifDay, readExifLocation, readExifTakenAt } from '@/lib/exif';
 import { reverseGeocode } from '@/lib/mapbox';
+import { Photo } from '@/components/ui/Photo';
 import { useToast } from '@/providers/ToastProvider';
 import { CalendarIcon, CloseIcon, ImageIcon, LayersIcon, StarIcon, TrashIcon } from '@/components/icons/UiIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
@@ -48,6 +49,9 @@ interface MomentComposerProps {
 }
 
 type Sheet = 'place' | null;
+
+/** Плитка вже збереженого знімка в композері — сітка 3–4 колонки. */
+const STAGE_CSS_WIDTH = 128;
 
 export function MomentComposer({
   userId,
@@ -291,7 +295,13 @@ export function MomentComposer({
           <div className="mm-stage">
             {saved.map((photo) => (
               <figure key={`s${photo.id}`} className={`mm-stage-item${coverId === photo.id ? ' is-cover' : ''}`}>
-                <img src={photo.photo_url} alt="" loading="lazy" decoding="async" />
+                <Photo
+                  src={photo.photo_url}
+                  cssWidth={STAGE_CSS_WIDTH}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
                 <figcaption>
                   <button
                     type="button"

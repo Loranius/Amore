@@ -14,6 +14,7 @@
 // ============================================================
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { Photo } from '@/components/ui/Photo';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { ChevronLeftIcon } from '@/components/icons/UiIcon';
@@ -35,6 +36,15 @@ import './memories.css';
  * це межа, за якою два стовпці полароїдів стають ширшими за долоню й
  * альбом починає читатись як банер.
  */
+/**
+ * Ширини, з якими кадри реально лягають на екран, у CSS-пікселях.
+ *
+ * Обкладинка йде на всю ширину сторінки, тож беремо найширший телефон із
+ * запасом; кадр альбому — це половина ширини мінус проміжок.
+ */
+const HERO_CSS_WIDTH = 480;
+const ALBUM_CSS_WIDTH = 200;
+
 function useAlbumLanes(): number {
   const read = () => (typeof window !== 'undefined' && window.innerWidth >= 720 ? 3 : 2);
   const [lanes, setLanes] = useState(read);
@@ -91,7 +101,7 @@ export function MomentPage() {
             type="button" className="mm-hero-shot"
             onClick={() => setLightbox(moment.cover!.id)} aria-label="Відкрити фото"
           >
-            <img src={moment.cover.photo_url} alt="" decoding="async" />
+            <Photo src={moment.cover.photo_url} cssWidth={HERO_CSS_WIDTH} alt="" decoding="async" />
           </button>
         )}
         <div className="mm-hero-veil" aria-hidden="true" />
@@ -164,7 +174,13 @@ export function MomentPage() {
                   onClick={() => setLightbox(photo.id)}
                   aria-label="Відкрити фото"
                 >
-                  <img src={photo.photo_url} alt="" loading="lazy" decoding="async" />
+                  <Photo
+                    src={photo.photo_url}
+                    cssWidth={ALBUM_CSS_WIDTH}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
                 </button>
               ))}
             </div>
