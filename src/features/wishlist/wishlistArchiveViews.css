@@ -54,7 +54,7 @@
   border-radius: 22px;
   background: color-mix(in srgb, var(--surface) 84%, transparent);
   box-shadow:
-    0 12px 28px color-mix(in srgb, var(--text) 7%, transparent),
+    0 12px 28px rgba(4, 2, 10, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.62);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -161,7 +161,7 @@
     linear-gradient(100deg, color-mix(in srgb, var(--wl-memory-accent) 6%, var(--surface)), var(--surface) 46%),
     var(--surface);
   box-shadow:
-    0 14px 32px color-mix(in srgb, var(--text) 8%, transparent),
+    0 14px 32px rgba(4, 2, 10, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.65);
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }

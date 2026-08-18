@@ -84,7 +84,7 @@
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 20px;
   background: #1f1820;
-  box-shadow: 0 16px 36px color-mix(in srgb, var(--text) 15%, transparent);
+  box-shadow: 0 16px 36px rgba(4, 2, 10, 0.55);
 }
 
 .wl-archive-cloud-sheet-primary-video {

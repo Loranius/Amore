@@ -324,7 +324,7 @@
   border: 1px solid color-mix(in srgb, var(--shopping-category) 15%, color-mix(in srgb, var(--text) 6%, transparent));
   border-radius: 22px;
   background: var(--surface);
-  box-shadow: 0 5px 17px color-mix(in srgb, var(--text) 3.5%, transparent);
+  box-shadow: 0 5px 17px rgba(4, 2, 10, 0.4);
   animation: shopping-section-in .22s ease both;
 }
 

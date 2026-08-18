@@ -75,7 +75,7 @@ body.wl-cloud-sheet-open .bottom-nav {
   height: 42px;
   border-color: rgba(255, 255, 255, 0.68);
   background: color-mix(in srgb, var(--surface) 84%, transparent);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--text) 14%, transparent);
+  box-shadow: 0 8px 24px rgba(4, 2, 10, 0.48);
   font-size: 22px;
 }
 

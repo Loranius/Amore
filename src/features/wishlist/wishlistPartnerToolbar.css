@@ -8,7 +8,7 @@
   border: 1px solid color-mix(in srgb, var(--wl-partner-accent) 15%, transparent);
   border-radius: 22px;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 7%, transparent);
+  box-shadow: 0 12px 30px rgba(4, 2, 10, 0.48);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }

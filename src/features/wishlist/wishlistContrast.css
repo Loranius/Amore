@@ -73,7 +73,7 @@
 .wishlist .wl-board-toolbar {
   border-color: color-mix(in srgb, var(--accent) 20%, transparent);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow: 0 10px 26px color-mix(in srgb, var(--text) 9%, transparent);
+  box-shadow: 0 10px 26px rgba(4, 2, 10, 0.48);
 }
 
 .wishlist .wl-board-filter:not(.active),
@@ -114,7 +114,7 @@
 
 .wishlist .wl-card-v3 {
   border-color: color-mix(in srgb, var(--accent) 18%, transparent);
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--text) 13%, transparent);
+  box-shadow: 0 14px 34px rgba(4, 2, 10, 0.48);
 }
 
 .wishlist .wl-priority-picker-trigger {

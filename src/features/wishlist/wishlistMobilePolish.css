@@ -100,7 +100,7 @@
     padding-block: 12px max(20px, env(safe-area-inset-bottom));
     border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
     background: linear-gradient(to top, var(--surface) 76%, color-mix(in srgb, var(--surface) 92%, transparent));
-    box-shadow: 0 -12px 28px color-mix(in srgb, var(--text) 7%, transparent);
+    box-shadow: 0 -12px 28px rgba(4, 2, 10, 0.48);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }

@@ -10,7 +10,7 @@
   background:
     radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--wl-shared-accent) 10%, transparent), transparent 36%),
     color-mix(in srgb, var(--surface) 89%, transparent);
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 7%, transparent);
+  box-shadow: 0 12px 30px rgba(4, 2, 10, 0.48);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }

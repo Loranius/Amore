@@ -32,7 +32,7 @@
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
   border-radius: 18px;
   background: var(--surface);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow: 0 10px 24px rgba(4, 2, 10, 0.48);
   isolation: isolate;
 }
 
@@ -86,7 +86,7 @@
   border-radius: 22px;
   color: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 78%, var(--text));
   background: color-mix(in srgb, var(--surface) 76%, transparent);
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 9%, transparent);
+  box-shadow: 0 12px 30px rgba(4, 2, 10, 0.48);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -206,7 +206,7 @@
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
   border-radius: 17px;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--text) 7%, transparent);
+  box-shadow: 0 8px 20px rgba(4, 2, 10, 0.48);
 }
 
 .plan-link-picker-add {

@@ -13,7 +13,7 @@
   background:
     radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 30%),
     linear-gradient(145deg, color-mix(in srgb, var(--accent) 6%, var(--surface)), var(--surface));
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 6%, transparent);
+  box-shadow: 0 12px 30px rgba(4, 2, 10, 0.48);
 }
 
 .piggy-balance-head {

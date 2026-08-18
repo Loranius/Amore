@@ -55,7 +55,7 @@
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
   border-radius: 18px;
   background: var(--surface);
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow: 0 10px 24px rgba(4, 2, 10, 0.48);
 }
 
 .plan-memory-card img {

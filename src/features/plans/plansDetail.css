@@ -36,7 +36,7 @@
       color-mix(in srgb, var(--plan-detail-accent) 2%, var(--surface))
     );
   box-shadow:
-    0 22px 54px color-mix(in srgb, var(--text) 9%, transparent),
+    0 22px 54px rgba(4, 2, 10, 0.55),
     inset 0 1px 0 color-mix(in srgb, white 48%, transparent);
 }
 
@@ -232,7 +232,7 @@
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
   border-radius: 18px;
   background: var(--surface);
-  box-shadow: 0 9px 24px color-mix(in srgb, var(--text) 6%, transparent);
+  box-shadow: 0 9px 24px rgba(4, 2, 10, 0.48);
 }
 
 .plan-disclosure > summary {

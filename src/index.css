@@ -690,6 +690,12 @@ textarea::placeholder {
   inset: 0;
   z-index: 200;
   background: rgba(0, 0, 0, 0.45);
+  /* Розмиття тут безпечне, і це не здогадка: пара «fixed + backdrop-filter»
+     ламає прокрутку в Safari на iOS тому, що браузер перемальовує розмиту
+     ділянку на кожному кадрі. Оверлей не прокручується взагалі — він
+     нерухомий, поки модалка відкрита. */
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -704,12 +710,23 @@ textarea::placeholder {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  background: var(--surface);
+  /*
+   * Оболонка одна на ВСІ модалки порталу, тож вона й найдешевший спосіб
+   * підняти їх усі. Була непрозорою плитою без тіні взагалі — тобто нічим
+   * не відрізнялась від сторінки під собою, крім кольору.
+   *
+   * `--glass-read`, а не легке скло: у модалці завжди текст і поля вводу, і
+   * контраст не може залежати від того, що випадково опинилось під нею.
+   */
+  background: var(--glass-read);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
   border-radius: 18px;
   padding: 22px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-lg);
 }
 .modal-title { margin: 0; }
 .modal-sub { margin: 0; color: var(--muted); font-size: 13px; }

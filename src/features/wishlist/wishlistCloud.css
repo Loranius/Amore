@@ -86,7 +86,7 @@
     radial-gradient(circle at 36% 28%, rgba(255, 255, 255, 0.46), transparent 34%),
     color-mix(in srgb, var(--accent) 10%, var(--surface));
   box-shadow:
-    0 14px 34px color-mix(in srgb, var(--text) 16%, transparent),
+    0 14px 34px rgba(4, 2, 10, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.48),
     inset 0 -7px 18px rgba(66, 42, 84, 0.08);
   cursor: pointer;
@@ -132,7 +132,7 @@
 .wl-cloud-bubble[data-priority='low'] {
   border-color: rgba(255, 255, 255, 0.48);
   box-shadow:
-    0 12px 28px color-mix(in srgb, var(--text) 13%, transparent),
+    0 12px 28px rgba(4, 2, 10, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.48);
 }
 
@@ -229,7 +229,7 @@
     color-mix(in srgb, var(--accent) 5%, var(--surface)) 52%
   );
   background-size: 220% 100%;
-  box-shadow: 0 14px 34px color-mix(in srgb, var(--text) 9%, transparent);
+  box-shadow: 0 14px 34px rgba(4, 2, 10, 0.48);
   animation: wl-cloud-shimmer 1.35s linear infinite;
 }
 
@@ -301,7 +301,7 @@
   background: color-mix(in srgb, var(--surface) 76%, transparent);
   color: var(--text);
   font: 800 18px/1 system-ui, sans-serif;
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--text) 12%, transparent);
+  box-shadow: 0 8px 22px rgba(4, 2, 10, 0.48);
   cursor: pointer;
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -550,7 +550,7 @@
   background: color-mix(in srgb, var(--surface) 78%, transparent);
   color: var(--wl-cloud-sheet-accent);
   font-size: 20px;
-  box-shadow: 0 9px 22px color-mix(in srgb, var(--text) 8%, transparent);
+  box-shadow: 0 9px 22px rgba(4, 2, 10, 0.48);
 }
 
 .wl-cloud-sheet-action--danger {

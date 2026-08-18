@@ -31,7 +31,7 @@
   border: 1px solid color-mix(in srgb, var(--warn) 18%, transparent);
   border-radius: 20px;
   background: color-mix(in srgb, var(--warn) 5%, var(--surface));
-  box-shadow: 0 10px 25px color-mix(in srgb, var(--text) 6%, transparent);
+  box-shadow: 0 10px 25px rgba(4, 2, 10, 0.48);
 }
 
 /* ── Вільний ліміт — нижче спільних цілей ─────────────────── */
@@ -41,7 +41,7 @@
   border: 1px solid color-mix(in srgb, var(--accent) 10%, transparent);
   border-radius: 24px;
   background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--text) 7%, transparent);
+  box-shadow: 0 12px 30px rgba(4, 2, 10, 0.48);
 }
 
 .fin-card-hdr {

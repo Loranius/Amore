@@ -11,7 +11,7 @@
   border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
   border-radius: clamp(28px, 4vw, 38px);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
-  box-shadow: 0 24px 58px color-mix(in srgb, var(--text) 7%, transparent);
+  box-shadow: 0 24px 58px rgba(4, 2, 10, 0.55);
 }
 
 .wl-skeleton-hero-copy {
