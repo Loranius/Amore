@@ -35,9 +35,14 @@ function isJourneyEvent(event: EventRow): boolean {
   return event.type === 'anniversary';
 }
 
-/** Розкладці потрібні три поля, і жодного більше. */
+/** Сцені потрібні чотири поля, і жодного більше. */
 function toConstellationEvent(event: EventRow): ConstellationEvent {
-  return { id: event.id, date: event.date, significance: event.significance };
+  return {
+    id: event.id,
+    date: event.date,
+    significance: event.significance,
+    starColor: event.star_color,
+  };
 }
 
 export function JourneyPage() {

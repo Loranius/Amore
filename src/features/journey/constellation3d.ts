@@ -56,6 +56,8 @@ export interface Vec3 {
 export interface Star3D extends Vec3 {
   id: number;
   level: ConstellationLevel;
+  /** Токен кольору, обраний парою. `null` — відтінок бере родина рівня. */
+  starColor: string | null;
   /** Ядро сузір'я. Стоїть у нулі, скільки б років не було на осі. */
   core: boolean;
   /** Радіус самої зірки в одиницях сцени. */
@@ -348,6 +350,7 @@ export function buildConstellation3D(
     return {
       id: event.id,
       level: levelOf(event),
+      starColor: event.starColor ?? null,
       core,
       // Ядро сідає в нуль; його власне місце лишається зайнятим у `placed`.
       x: core ? 0 : home.x,

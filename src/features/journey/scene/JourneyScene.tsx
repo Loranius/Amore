@@ -21,7 +21,8 @@ import {
   type JourneyEvent,
   type JourneyMode,
 } from '../journeyMode';
-import { hslToRgb, journeyPalette, levelColour } from '../journeyPalette';
+import { journeyPalette } from '../journeyPalette';
+import { focusRgb, starSeed } from '../starPalette';
 import { ConstellationPath } from './ConstellationPath';
 import { FocusStar } from './FocusStar';
 import { JourneyCameraRig, type JourneyFocusTarget } from './JourneyCameraRig';
@@ -237,11 +238,17 @@ export function JourneyScene({
   );
 
   const focusColour = useMemo(
-    () => (focusStar
-      ? hslToRgb(focusStar.core ? palette.keyCore : levelColour(palette, focusStar.level))
-      : ([1, 1, 1] as [number, number, number])),
-    [focusStar, palette],
+    () => (focusStar ? focusRgb(focusStar) : ([1, 1, 1] as [number, number, number])),
+    [focusStar],
   );
+
+  /*
+   * Насіння поверхні — те саме число, що дає зірці її відтінок і ритм
+   * мерехтіння. Одне джерело варіації на подію, а не три різні: інакше
+   * оглядова зірка й розкрита подія були б двома різними зірками з одним
+   * підписом.
+   */
+  const focusSeed = focusStar ? starSeed(focusStar.id) : 0;
 
   useEffect(() => onMode?.(state.mode, state.focusId), [onMode, state.mode, state.focusId]);
 
@@ -399,7 +406,6 @@ export function JourneyScene({
         />
         <JourneyConstellation
           stars={constellation.stars}
-          palette={palette}
           clock={clock}
           reducedMotion={reducedMotion}
           focusId={state.focusId}
@@ -418,6 +424,8 @@ export function JourneyScene({
           <FocusStar
             position={focusStar ? [focusStar.x, focusStar.y, focusStar.z] : centre}
             colour={focusColour}
+            seed={focusSeed}
+            detail={quality === 'low' ? 'lite' : 'full'}
             radius={focusRadius}
             reveal={reveal}
             reducedMotion={reducedMotion}

@@ -4,6 +4,7 @@ import {
   birthDuration,
   birthProgress,
   pathReveal,
+  pathSegments,
   pulsePosition,
   starAura,
   starBreath,
@@ -66,6 +67,33 @@ describe('шлях прокладається слідом за зірками',
     const clock = 0.4;
     expect(birthProgress(2, clock)).toBe(0);
     expect(pathReveal(ORDERS, clock)).toBeCloseTo(birthProgress(1, clock) / 3, 9);
+  });
+});
+
+describe('бюджет шляху', () => {
+  /*
+   * Кількість подій у пари росте роками й нічим не обмежена. Без стелі сорок
+   * подій дали б 546 відрізків труби, сто — 1386, і геометрія шляху почала б
+   * коштувати більше за все інше в сцені разом.
+   */
+  it('одна подія й порожнеча не будують нічого', () => {
+    expect(pathSegments(0)).toBe(0);
+    expect(pathSegments(1)).toBe(0);
+  });
+
+  it('звичайній парі вистачає прольотів, а не стелі', () => {
+    expect(pathSegments(8)).toBe(98);
+  });
+
+  it('стеля не пробивається жодною кількістю подій', () => {
+    for (const count of [40, 100, 1000, 10_000]) {
+      expect(pathSegments(count)).toBeLessThanOrEqual(420);
+    }
+  });
+
+  it('до стелі росте, після — не росте взагалі', () => {
+    expect(pathSegments(20)).toBeLessThan(pathSegments(21));
+    expect(pathSegments(200)).toBe(pathSegments(2000));
   });
 });
 

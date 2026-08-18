@@ -1,16 +1,21 @@
 // ============================================================
-// Барва «Нашого шляху».
+// Барва «Нашого шляху» — те, що належить ПАРІ, а не події.
 // ------------------------------------------------------------
-// Три рівні події — три кольори, і власник обрав їх сам: звичайна бірюзова,
-// важлива жовта, ключова лишається неоном пари. Неон виводиться з ДНК пари,
-// тобто небо в кожних своє, але в межах палітри порталу.
+// Тут лишився один колір: неон пари, яким світиться шлях між подіями. Він
+// виводиться з ДНК пари, тобто небо в кожних своє, але в межах палітри
+// порталу.
 //
-// Переїхало сюди з `RelationshipJourney.tsx`, коли кольори знадобились сцені:
-// у CSS вони жили змінними, а WebGL змінних не читає. Два джерела на один
-// колір розійшлися б за перший же тиждень.
+// **Кольори самих зірок сюди більше не належать.** Раніше рівень події мав
+// рівно один колір, і всі три жили тут. Тепер у кожного рівня родина з шести
+// відтінків, а пара може обрати свій — це `starPalette.ts`. Розділено не
+// заради охайності: перелік відтінків повторюється в `CHECK` бази, і тримати
+// його поряд із відтінком, що залежить від ДНК і в базі не існує, означало б
+// два різні життєві цикли в одному файлі.
+//
+// `hslToRgb` лишився тут, бо ним користуються обидва: це переклад, а не
+// палітра.
 // ============================================================
 import { generateArtifactDNA } from '@/features/home/artifact/artifactDNA';
-import type { ConstellationLevel } from './constellationRules';
 
 /** HSL hue базового `BASE_PALETTE.core[0]` (#6d4fa8) у crystalCluster.ts. */
 const CRYSTAL_CORE_BASE_HUE = 260.2247191011;
@@ -28,12 +33,8 @@ const CRYSTAL_CORE_BASE_HUE = 260.2247191011;
 const JOURNEY_HUE_SPREAD = 34;
 
 export interface JourneyPalette {
-  /** Неон пари — колір ключових подій і ядра. */
-  key: string;
-  /** Світле осердя ключової зірки. */
-  keyCore: string;
-  important: string;
-  regular: string;
+  /** Неон пари — колір шляху між подіями. */
+  path: string;
 }
 
 export function journeyHue(seed: string | null): number {
@@ -43,20 +44,7 @@ export function journeyHue(seed: string | null): number {
 }
 
 export function journeyPalette(seed: string | null): JourneyPalette {
-  const hue = journeyHue(seed).toFixed(1);
-  return {
-    key: `hsl(${hue} 88% 72%)`,
-    keyCore: `hsl(${hue} 96% 88%)`,
-    // Жовта й бірюзова не залежать від пари навмисно: вони означають РІВЕНЬ, і
-    // якби вони теж їхали за ДНК, у двох пар «важлива» була б різного кольору.
-    important: 'hsl(44 92% 62%)',
-    regular: 'hsl(184 76% 58%)',
-  };
-}
-
-export function levelColour(palette: JourneyPalette, level: ConstellationLevel): string {
-  if (level === 'key') return palette.key;
-  return level === 'important' ? palette.important : palette.regular;
+  return { path: `hsl(${journeyHue(seed).toFixed(1)} 88% 72%)` };
 }
 
 /**
@@ -93,26 +81,4 @@ export function hslToRgb(colour: string): [number, number, number] {
     return p;
   };
   return [channel(1 / 3), channel(0), channel(-1 / 3)];
-}
-
-/**
- * Кольори зірок як плаский масив RGB для інстансованого атрибута.
- *
- * Живе тут, а не в компоненті сцени, з однієї причини: у vitest сцена не
- * рендериться взагалі, тож помилка в кольорі в компоненті ловилась би лише
- * знімком. Вада, через яку це винесли, саме так і жила.
- */
-export function starTints(
-  stars: readonly { core: boolean; level: ConstellationLevel }[],
-  palette: JourneyPalette,
-): Float32Array {
-  const array = new Float32Array(stars.length * 3);
-  stars.forEach((star, index) => {
-    // Ядро світліше за решту ключових — воно тримає сузір'я на собі.
-    const [r, g, b] = hslToRgb(star.core ? palette.keyCore : levelColour(palette, star.level));
-    array[index * 3] = r;
-    array[index * 3 + 1] = g;
-    array[index * 3 + 2] = b;
-  });
-  return array;
 }

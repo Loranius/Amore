@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Color } from 'three';
-import { hslToRgb, journeyHue, journeyPalette, levelColour, starTints } from './journeyPalette';
+import { hslToRgb, journeyHue, journeyPalette } from './journeyPalette';
 
 describe('відтінок пари', () => {
   it('без насіння небо лишається базовим фіолетовим порталу', () => {
@@ -26,25 +26,26 @@ describe('відтінок пари', () => {
   });
 });
 
-describe('кольори рівнів', () => {
-  it('важлива й звичайна не залежать від пари', () => {
-    // Рівень означає те саме в усіх парах; якби він їхав за ДНК, «важлива» в
-    // двох пар була б різного кольору.
-    expect(journeyPalette('couple-1').important).toBe(journeyPalette('couple-2').important);
-    expect(journeyPalette('couple-1').regular).toBe(journeyPalette('couple-2').regular);
+describe('палітра пари', () => {
+  it('несе рівно один колір — шлях', () => {
+    /*
+     * Раніше тут жили ще й три кольори рівнів. Вони переїхали в
+     * `starPalette.ts` разом із появою родин: перелік відтінків повторюється в
+     * `CHECK` бази, і тримати його поряд із відтінком, якого в базі немає
+     * взагалі, означало б два різні життєві цикли в одному файлі.
+     */
+    expect(Object.keys(journeyPalette('couple-1'))).toEqual(['path']);
   });
 
-  it('ключова бере неон пари', () => {
-    const palette = journeyPalette('couple-1');
-    expect(levelColour(palette, 'key')).toBe(palette.key);
-    expect(levelColour(palette, 'important')).toBe(palette.important);
-    expect(levelColour(palette, 'regular')).toBe(palette.regular);
+  it('шлях бере неон пари, тож у двох пар він різний', () => {
+    expect(journeyPalette('couple-1').path).not.toBe(journeyPalette('couple-2').path);
   });
 
-  it('обрані власником кольори не змінились', () => {
-    const palette = journeyPalette(null);
-    expect(palette.important).toBe('hsl(44 92% 62%)'); // жовта
-    expect(palette.regular).toBe('hsl(184 76% 58%)'); // бірюзова
+  it('колір шляху — розбірний HSL у межах 0…1', () => {
+    for (const channel of hslToRgb(journeyPalette('couple-42').path)) {
+      expect(channel).toBeGreaterThanOrEqual(0);
+      expect(channel).toBeLessThanOrEqual(1);
+    }
   });
 });
 
@@ -59,16 +60,6 @@ describe('hslToRgb', () => {
     expect(hslToRgb('hsl(200 0% 40%)')).toEqual([0.4, 0.4, 0.4]);
   });
 
-  it('кольори палітри лишаються в межах 0…1', () => {
-    const palette = journeyPalette('couple-42');
-    for (const colour of [palette.key, palette.keyCore, palette.important, palette.regular]) {
-      for (const channel of hslToRgb(colour)) {
-        expect(channel).toBeGreaterThanOrEqual(0);
-        expect(channel).toBeLessThanOrEqual(1);
-      }
-    }
-  });
-
   it('жовта справді жовта, бірюзова справді бірюзова', () => {
     const [yellowR, yellowG, yellowB] = hslToRgb('hsl(44 92% 62%)');
     expect(yellowR).toBeGreaterThan(yellowB);
@@ -80,70 +71,6 @@ describe('hslToRgb', () => {
 
   it('не HSL — це помилка, а не мовчазний чорний', () => {
     expect(() => hslToRgb('#b06bff')).toThrow();
-  });
-});
-
-describe('starTints', () => {
-  const palette = journeyPalette('couple-42');
-  const stars = [
-    { core: true, level: 'key' as const },
-    { core: false, level: 'key' as const },
-    { core: false, level: 'important' as const },
-    { core: false, level: 'regular' as const },
-  ];
-
-  function rgbAt(tints: Float32Array, index: number): [number, number, number] {
-    return [tints[index * 3]!, tints[index * 3 + 1]!, tints[index * 3 + 2]!];
-  }
-
-  it('дає по три числа на зірку', () => {
-    expect(starTints(stars, palette)).toHaveLength(stars.length * 3);
-  });
-
-  it('жодна зірка не виходить білою', () => {
-    /*
-     * Регрес, який знайшов ЛИШЕ живий екран.
-     *
-     * Кольори будувались через `THREE.Color.set()`, а його розбірник знає лише
-     * старий синтаксис `hsl(184, 76%, 58%)` з комами. Наш запис сучасний, через
-     * пробіли (він їде ще й у CSS-змінні), і на ньому `set()` мовчки лишає
-     * білий. На знімку всі вісім зірок вийшли однаковим нейтральним світінням:
-     * бірюзова звичайна, жовта важлива й неонова ключова стали нерозрізненні.
-     */
-    const tints = starTints(stars, palette);
-    for (let index = 0; index < stars.length; index += 1) {
-      const [r, g, b] = rgbAt(tints, index);
-      const spread = Math.max(r, g, b) - Math.min(r, g, b);
-      expect(spread).toBeGreaterThan(0.05);
-    }
-  });
-
-  it('три рівні дають три РІЗНІ відтінки', () => {
-    const tints = starTints(stars, palette);
-    const [key, important, regular] = [1, 2, 3].map((index) => rgbAt(tints, index));
-    const apart = (a: number[], b: number[]) => Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
-    expect(apart(key!, important!)).toBeGreaterThan(0.25);
-    expect(apart(important!, regular!)).toBeGreaterThan(0.25);
-    expect(apart(key!, regular!)).toBeGreaterThan(0.25);
-  });
-
-  it('звичайна справді бірюзова, важлива справді жовта', () => {
-    const tints = starTints(stars, palette);
-    const [, importantG, importantB] = rgbAt(tints, 2);
-    const [regularR, regularG, regularB] = rgbAt(tints, 3);
-    expect(importantG).toBeGreaterThan(importantB);
-    expect(regularG).toBeGreaterThan(regularR);
-    expect(regularB).toBeGreaterThan(regularR);
-  });
-
-  it('ядро світліше за звичайну ключову', () => {
-    const tints = starTints(stars, palette);
-    const luminance = (rgb: number[]) => 0.2126 * rgb[0]! + 0.7152 * rgb[1]! + 0.0722 * rgb[2]!;
-    expect(luminance(rgbAt(tints, 0))).toBeGreaterThan(luminance(rgbAt(tints, 1)));
-  });
-
-  it('порожній набір дає порожній масив', () => {
-    expect(starTints([], palette)).toHaveLength(0);
   });
 });
 

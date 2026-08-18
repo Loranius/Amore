@@ -27,6 +27,8 @@ export interface NewEventInput {
   significance: EventSignificance;
   /** Чий це день народження, якщо людина є в застосунку. */
   person_user_id: number | null;
+  /** Токен кольору зірки. `null` — хай сцена візьме відтінок за рівнем. */
+  star_color: string | null;
 }
 
 
@@ -46,6 +48,7 @@ export function useCalendarMutations() {
         yearly: input.yearly,
         significance: input.significance,
         person_user_id: input.person_user_id,
+        star_color: input.star_color,
         created_by: user.id,
       };
       const { error } = await supabase.from('events').insert(row);
@@ -72,6 +75,7 @@ export function useCalendarMutations() {
           yearly: v.input.yearly,
           significance: v.input.significance,
           person_user_id: v.input.person_user_id,
+          star_color: v.input.star_color,
         })
         .eq('id', v.id);
       if (error) throw error;
@@ -103,6 +107,7 @@ export function useCalendarMutations() {
         yearly: true,
         significance: 'regular',
         person_user_id: null,
+        star_color: null,
         created_by: user.id,
       }));
       const { error } = await supabase.from('events').insert(rows);

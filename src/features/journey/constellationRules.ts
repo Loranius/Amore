@@ -21,6 +21,15 @@ export interface ConstellationEvent {
   /** ISO `YYYY-MM-DD`. Порівнюється як рядок — без локалі. */
   date: string;
   significance: EventSignificance;
+  /**
+   * Токен кольору, який обрала пара. `null` — беремо відтінок родини за
+   * рівнем.
+   *
+   * Лежить тут, а не в розкладці: колір не впливає на жодну координату, але
+   * він частина ЗМІСТУ події так само, як її вага, і «правила змісту» — це
+   * рівно те місце, де про нього треба питати.
+   */
+  starColor?: string | null;
 }
 
 export function levelOf(event: { significance: EventSignificance }): ConstellationLevel {

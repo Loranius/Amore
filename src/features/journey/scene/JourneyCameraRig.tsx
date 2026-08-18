@@ -8,6 +8,7 @@ import { cameraLocked, type JourneyMode } from '../journeyMode';
 import {
   focusDistance,
   journeyFraming,
+  journeySplit,
   type JourneyBody,
   type JourneyFraming,
 } from './journeyFraming';
@@ -64,18 +65,6 @@ const ARRIVED_FRACTION = 0.015;
  */
 const ARRIVED_MIN = 0.05;
 
-/**
- * Наскільки подія зсувається з центру кадру, щоб звільнити місце деталям.
- *
- * Частка ПІВсторони кадру: 0.38 ставить сонце приблизно на третину висоти від
- * верху — вище за центр, як просив власник, але не впритул до шапки.
- *
- * Зсувається КАМЕРА, а не полотно. Спокуса стиснути полотно через CSS велика —
- * розкладка тоді описується одним правилом, — але кожен крок такої анімації
- * перевиділяє буфер малювання, і на телефоні це помітний ривок посеред
- * переходу. Камера ж і так летить: зсув їде разом із польотом задарма.
- */
-const SPLIT_SHIFT = 0.38;
 
 /**
  * Синхронізує стан орбіти з тим, куди камеру поставив політ.
@@ -192,18 +181,16 @@ export function JourneyCameraRig({
 
     // На вузькому екрані деталі стають унизу, тож подія йде вгору; на широкому
     // деталі стають праворуч, тож подія йде ліворуч.
-    const distance = focusDistance(focus.radius, viewport);
-    const halfFovY = (viewport.fovY * Math.PI) / 360;
+    // Скільки й куди — рахує `journeySplit`; тут це лише кладеться на осі
+    // камери. Знак живе там разом із тестом: одна з двох гілок його вже
+    // збивала, і сонце їхало ПІД панель деталей замість того, щоб відсунутись.
+    const split = journeySplit(viewport, focusDistance(focus.radius, viewport));
     const forward = approachDirection.current.clone().negate();
     const right = new Vector3().crossVectors(forward, camera.up).normalize();
     const trueUp = new Vector3().crossVectors(right, forward);
-    if (viewport.aspect < 1) {
-      // Приціл нижче за подію — отже подія вище за центр кадру.
-      splitShift.current.copy(trueUp).multiplyScalar(-SPLIT_SHIFT * distance * Math.tan(halfFovY));
-    } else {
-      splitShift.current.copy(right)
-        .multiplyScalar(-SPLIT_SHIFT * distance * Math.tan(halfFovY) * viewport.aspect);
-    }
+    splitShift.current
+      .copy(right).multiplyScalar(split.right)
+      .addScaledVector(trueUp, split.up);
   }, [mode, focus, saveView, camera, framing.direction, viewport]);
 
   useFrame((_state, delta) => {

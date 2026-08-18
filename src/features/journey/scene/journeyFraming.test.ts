@@ -4,6 +4,7 @@ import type { ConstellationEvent } from '../constellationRules';
 import {
   focusDistance,
   journeyFraming,
+  journeySplit,
   type JourneyBody,
   type JourneyViewport,
 } from './journeyFraming';
@@ -269,5 +270,49 @@ describe('focusDistance', () => {
 
   it('вироджений кадр не дає нескінченності', () => {
     expect(Number.isFinite(focusDistance(RADIUS, { aspect: 0, fovY: 52 }))).toBe(true);
+  });
+});
+
+describe('journeySplit', () => {
+  /*
+   * Регрес, який знайшов живий екран, і знайшов лише після того, як сонце
+   * перестало заповнювати кадр цілком.
+   *
+   * Камера дивиться на ПРИЦІЛ, тобто приціл лягає в центр кадру, а подія
+   * опиняється з протилежного боку від зсуву. Портретна гілка це робила
+   * правильно, широка — навпаки: приціл їхав ліворуч, отже подія йшла
+   * ПРАВОРУЧ, рівно під панель деталей, яка там і стоїть.
+   */
+  const DISTANCE = 30;
+
+  it('на телефоні деталі знизу — приціл іде ВНИЗ, отже подія вгору', () => {
+    const split = journeySplit(PHONE, DISTANCE);
+    expect(split.up).toBeLessThan(0);
+    expect(split.right).toBe(0);
+  });
+
+  it('на широкому деталі праворуч — приціл іде ПРАВОРУЧ, отже подія ліворуч', () => {
+    const split = journeySplit(WIDE, DISTANCE);
+    expect(split.right).toBeGreaterThan(0);
+    expect(split.up).toBe(0);
+  });
+
+  it('зсув росте разом із відстанню: частка кадру лишається тією самою', () => {
+    const near = journeySplit(WIDE, 10);
+    const far = journeySplit(WIDE, 40);
+    expect(far.right / near.right).toBeCloseTo(4, 6);
+  });
+
+  it('подія не виїжджає за край: зсув менший за півсторону кадру', () => {
+    for (const viewport of [PHONE, WIDE, { aspect: 0.32, fovY: 52 }]) {
+      const split = journeySplit(viewport, DISTANCE);
+      const halfHeight = DISTANCE * Math.tan((viewport.fovY * Math.PI) / 360);
+      expect(Math.abs(split.up)).toBeLessThan(halfHeight);
+      expect(Math.abs(split.right)).toBeLessThan(halfHeight * Math.max(1, viewport.aspect));
+    }
+  });
+
+  it('вироджена ширина кадру не дає нуля чи NaN у знаменнику', () => {
+    expect(Number.isFinite(journeySplit({ aspect: 0, fovY: 52 }, DISTANCE).up)).toBe(true);
   });
 });

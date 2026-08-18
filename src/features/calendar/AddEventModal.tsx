@@ -81,6 +81,12 @@ export function AddEventModal({
     event?.significance ?? 'regular',
   );
   const [personId, setPersonId] = useState<number | null>(event?.person_user_id ?? null);
+  /*
+   * Колір зірки поки лише ПЕРЕНОСИТЬСЯ, а не обирається: вибір з'явиться
+   * разом із переробкою модалки. Тримати його тут уже зараз обов'язково —
+   * інакше правка назви події тихо стирала б колір, який пара вибрала.
+   */
+  const [starColor] = useState<string | null>(event?.star_color ?? null);
   const [typeOpen, setTypeOpen] = useState(false);
   const [significanceOpen, setSignificanceOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(Boolean(event?.description));
@@ -109,6 +115,7 @@ export function AddEventModal({
       yearly,
       significance: relationshipEvent ? significance : 'regular',
       person_user_id: birthdayEvent ? personId : null,
+      star_color: starColor,
     });
     onClose();
   };
