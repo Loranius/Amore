@@ -68,7 +68,6 @@ const ROUTE_REGIONS: readonly (readonly [string, WorldRegion])[] = [
   ['/piggybank', 'foundation'],
   ['/culinary', 'hearth'],
   ['/whereto', 'outward'],
-  ['/map', 'external'],
   ['/game', 'threshold'],
 ];
 

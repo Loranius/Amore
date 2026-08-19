@@ -1,16 +1,21 @@
 // ============================================================
-// useMapPins — піни карти (порт fetchPins/savePin/... даних)
+// Мітки місць: запит `map_pins` і мутації над ними.
 // ------------------------------------------------------------
-// Запит map_pins + мутації. Фото: HEIC-normalize + compress → Storage.
-// Місто дотягується reverse-геокодом при збереженні; для старих пінів
-// без city — лінивий бекфіл.
+// Хук переїхав сюди з `features/map` разом із рештою карти (ADR-0039):
+// окремого модуля «Наша карта» більше немає, а мітки — це вимір архіву
+// спогадів. Читають його ще Плани (посилання плану на місце) і рушій
+// Еволюції (кількість відвіданих місць живить кристал), тож ім'я й форма
+// експортів лишились незмінними — переїзд не мав ставати міграцією.
+//
+// Фото: HEIC-normalize + compress → Storage. Місто дотягується зворотним
+// геокодом при збереженні; для старих міток без `city` — лінивий бекфіл.
 // ============================================================
 import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, publicUrl } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
 import { compress, normalize } from '@/lib/images';
-import { reverseGeocode } from '@/lib/mapbox';
+import { reverseGeocode } from '@/lib/geo';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { MapPinRow, PinCategory, InsertRow } from '@/types';

@@ -27,7 +27,27 @@ import { chromium } from 'playwright-core';
 //    після появи полотна, показує кадр, якого користувач не бачить.
 // ============================================================
 
-const RELAY_HOSTS = ['**://*.supabase.co/**', '**://res.cloudinary.com/**'];
+/**
+ * Зовнішні хости, які браузер харнесу дістає ЛИШЕ через Node.
+ *
+ * У пісочниці в безголового Chromium немає прямого виходу назовні, тож
+ * будь-який сторонній домен віддає `TypeError: Failed to fetch` — і мовчки,
+ * бо це не помилка сторінки, а обірвана мережа.
+ *
+ * **Додавати сюди треба КОЖНОГО нового зовнішнього постачальника.** Карта
+ * спогадів це вже довела: MapLibre створив полотно, WebGL завівся, canvas
+ * стояв на місці — і жодного запиту до тайлів не пішло взагалі. У коді
+ * все виглядало правильно; видно було тільки те, що екран лишився з
+ * написом «Завантажую карту…».
+ */
+const RELAY_HOSTS = [
+  '**://*.supabase.co/**',
+  '**://res.cloudinary.com/**',
+  // Тайли й стиль карти спогадів (ADR-0039).
+  '**://tiles.openfreemap.org/**',
+  // Геокодер: пошук місця й підпис точки, поставленої пальцем.
+  '**://nominatim.openstreetmap.org/**',
+];
 
 /**
  * Де взяти Chromium.
@@ -195,7 +215,16 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
     }
   }, { memory: tier.memory, cores: tier.cores, wanted: theme });
 
-  for (const pattern of RELAY_HOSTS) await page.route(pattern, relay);
+  /*
+   * Реле вішається на КОНТЕКСТ, а не на сторінку.
+   *
+   * `page.route` не бачить запитів із Web Worker, а карта тягне тайли саме
+   * звідти. Виглядало це так: стиль, спрайти й TileJSON приїхали по 200,
+   * жодної помилки в консолі — і жодного запиту на `.pbf`, тобто карта
+   * назавжди лишалась із написом «Завантажую карту…». `context.route`
+   * покриває і сторінку, і воркери.
+   */
+  for (const pattern of RELAY_HOSTS) await context.route(pattern, relay);
 
   const credentials = readCredentials();
   await page.goto(`${baseUrl}#/login`, { waitUntil: 'load', timeout: 60_000 });

@@ -747,7 +747,7 @@ export interface RealtimeChange<T extends RealtimeTable = RealtimeTable> {
 }
 
 // ────────────────────────────────────────────────────────────
-// 9. ЗОВНІШНІ API (TMDB, Mapbox)
+// 9. ЗОВНІШНІ API (TMDB, геокодер)
 // ────────────────────────────────────────────────────────────
 
 /** Результат пошуку TMDB, уже приведений до нашої форми. */
@@ -783,8 +783,15 @@ export interface SwipeCard {
   rating: string | null;
 }
 
-/** Мінімум полів фічі Mapbox Geocoding API, які реально читаються. */
-export interface MapboxFeature {
+/**
+ * Мінімум полів геокодованого місця, які портал реально читає.
+ *
+ * Форма успадкована від Mapbox Geocoding API й пережила його: перехід на
+ * Nominatim (ADR-0039) торкнувся джерела, а не читача. `center` лишається
+ * в порядку [довгота, широта] — його розбирає `placeFromFeature`, і
+ * переставлені місцями координати ставили б мітки в океан.
+ */
+export interface GeoFeature {
   text?: string;
   place_name?: string;
   center: [number, number];

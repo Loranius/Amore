@@ -10,6 +10,7 @@ import {
 import { useTheme } from '@/providers/ThemeProvider';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
+import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
 import { MODULE_SPIN_RATE } from '@/features/world/sceneDirector';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
@@ -99,6 +100,21 @@ export default function EvolutionCrystalPreviewScene() {
     `${metrics.buildMs.toFixed(1)} ms`,
   ].join(' · ');
 
+  /*
+   * Кадри — лише коли сцену видно.
+   *
+   * Це полотно живе на КОЖНОМУ маршруті модуля й малює кадри без упину,
+   * навіть коли поверх нього непрозорий повний екран — карта спогадів або
+   * «Наш шлях». Дві сцени одночасно на телефоні — подвійний рахунок за
+   * батарею за одну картинку.
+   *
+   * Сусідні полотна (`CrystalScene`, `ReefPreviewScene`) цей гак уже
+   * поважають; ці два — ні, і це був недогляд. Пауза не звільняє контекст
+   * WebGL: повернення на звичайний екран вмикає кадри тим самим станом,
+   * без перезбирання (ADR-0020).
+   */
+  const frameloop = useWorldFrameloop();
+
   return (
     <>
       <div
@@ -119,6 +135,7 @@ export default function EvolutionCrystalPreviewScene() {
         data-portal-environment-triangles={PORTAL_ENVIRONMENT_TRIANGLES}
       >
         <Canvas
+          frameloop={frameloop}
           // Render scale, not optics, is how a dense screen is paid for — see
           // crystalRenderScale. Kept in the engine so the tier and the scale
           // cannot drift apart.

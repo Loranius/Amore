@@ -11,7 +11,7 @@
 // без конфігу. Переїзд на createBrowserRouter — заміна одного рядка.
 //
 // Розділи вантажаться ліниво, і це не мікрооптимізація. Статичні імпорти
-// зшивали ВСІ сторінки в один вхідний бандл: mapbox-gl приїздив кожному,
+// зшивали ВСІ сторінки в один вхідний бандл: рушій карти приїздив кожному,
 // хто просто відкрив головну й ніколи не заходив на карту. Головна й
 // логін лишаються статичними — це перше, що бачить користувач, і ділити
 // їх означало б показати порожній екран замість них.
@@ -36,7 +36,6 @@ const PiggyBankPage = lazy(() => import('@/features/piggybank/PiggyBankPage').th
 const PlansPage = lazy(() => import('@/features/plans/PlansPage').then((m) => ({ default: m.PlansPage })));
 const JourneyPage = lazy(() => import('@/features/journey/JourneyPage').then((m) => ({ default: m.JourneyPage })));
 const PlanDetailsPage = lazy(() => import('@/features/plans/PlanDetailsPage').then((m) => ({ default: m.PlanDetailsPage })));
-const MapPage = lazy(() => import('@/features/map/MapPage').then((m) => ({ default: m.MapPage })));
 const WhereToPage = lazy(() => import('@/features/whereto/WhereToPage').then((m) => ({ default: m.WhereToPage })));
 const GamePage = lazy(() => import('@/features/game/GamePage').then((m) => ({ default: m.GamePage })));
 
@@ -102,7 +101,10 @@ export const router = createHashRouter([
           { path: 'memories/:id', element: page(<MomentPage />) },
           { path: 'media', element: page(<MediaPage />) },
           { path: 'whereto', element: page(<WhereToPage />) },
-          { path: 'map', element: page(<MapPage />) },
+          // «Наша карта» більше не окремий модуль: карта стала другим
+          // виміром «Спогадів» (ADR-0039). Перенаправлення лишається,
+          // бо на /map ведуть закладки й старі посилання в планах.
+          { path: 'map', element: <Navigate to="/memories" replace /> },
           { path: 'culinary', element: page(<CulinaryPage />) },
           { path: 'game', element: page(<GamePage />) },
 

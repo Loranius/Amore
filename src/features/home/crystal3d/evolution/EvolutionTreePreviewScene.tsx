@@ -15,6 +15,7 @@ import { TreeTexturedStage } from '../treeScene/TreeTexturedStage';
 import { TreeLifeDetailsPolished } from '../treeScene/TreeLifeDetailsPolished';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
+import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from './EvolutionRuntimeProbe';
 import { TreeLabObject } from '../treeLab/TreeLabObject';
 import { resolveTreeLabLod } from '../treeLab/featureFlag';
@@ -46,6 +47,21 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
     [fit.soilRadius, fit.crownRadius],
   );
 
+  /*
+   * Кадри — лише коли сцену видно.
+   *
+   * Це полотно живе на КОЖНОМУ маршруті модуля й малює кадри без упину,
+   * навіть коли поверх нього непрозорий повний екран — карта спогадів або
+   * «Наш шлях». Дві сцени одночасно на телефоні — подвійний рахунок за
+   * батарею за одну картинку.
+   *
+   * Сусідні полотна (`CrystalScene`, `ReefPreviewScene`) цей гак уже
+   * поважають; ці два — ні, і це був недогляд. Пауза не звільняє контекст
+   * WebGL: повернення на звичайний екран вмикає кадри тим самим станом,
+   * без перезбирання (ADR-0020).
+   */
+  const frameloop = useWorldFrameloop();
+
   return (
     <div
       className="crystal-wrap evolution-preview-wrap"
@@ -57,6 +73,7 @@ function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; theme: 'lig
       data-evolution-rendered-triangles={runtime?.triangles ?? ''}
     >
       <Canvas
+        frameloop={frameloop}
         dpr={[1, crystalRenderScale('balanced', typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
         camera={{ position: [0, 0.9, 7.1], fov: 42 }}
         gl={{ alpha: false, antialias: true }}

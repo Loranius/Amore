@@ -100,6 +100,15 @@ export default defineConfig({
         },
       }
     : {}),
+  /*
+   * Воркери збираються як ES-модулі, а не як IIFE.
+   *
+   * Воркер MapLibre створюється через `new Worker(url, { type: 'module' })`.
+   * За типовим `format: 'iife'` збирач віддав би класичний скрипт, браузер
+   * не зміг би розібрати його як модуль — і карта лишилась би без тайлів
+   * рівно так само, як без явної адреси воркера взагалі.
+   */
+  worker: { format: 'es' },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

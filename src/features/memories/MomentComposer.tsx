@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { exifDay, readExifLocation, readExifTakenAt } from '@/lib/exif';
-import { reverseGeocode } from '@/lib/mapbox';
+import { reverseGeocode } from '@/lib/geo';
 import { Photo } from '@/components/ui/Photo';
 import { useToast } from '@/providers/ToastProvider';
 import { CalendarIcon, CloseIcon, ImageIcon, LayersIcon, StarIcon, TrashIcon } from '@/components/icons/UiIcon';
@@ -44,6 +44,13 @@ interface MomentComposerProps {
   moment?: Moment;
   /** Мітки карти для вибору місця. */
   places?: readonly MomentPlace[];
+  /**
+   * Місце, обране НЕ у формі, а на карті.
+   *
+   * `pinId` — коли пара торкнулась наявної мітки; `null` — коли поставила
+   * нову точку пальцем, і мітку ще треба буде завести.
+   */
+  initialPlace?: { pinId: number | null; value: PlaceCandidate };
   onClose: () => void;
   onSaved?: (momentId: number) => void;
 }
@@ -57,6 +64,7 @@ export function MomentComposer({
   userId,
   moment,
   places = [],
+  initialPlace,
   onClose,
   onSaved,
 }: MomentComposerProps) {
@@ -68,7 +76,8 @@ export function MomentComposer({
   const [note, setNote] = useState(moment?.note ?? '');
   const [memoryDate, setMemoryDate] = useState(moment?.memory_date ?? defaultMemoryDate());
   const [place, setPlace] = useState<{ pinId: number | null; value: PlaceCandidate } | null>(
-    moment?.place
+    initialPlace ??
+    (moment?.place
       ? {
           pinId: moment.place.id,
           value: {
@@ -79,7 +88,7 @@ export function MomentComposer({
             lng: moment.place.lng,
           },
         }
-      : null,
+      : null),
   );
 
   const [staged, setStaged] = useState<StagedPhoto[]>([]);
@@ -98,7 +107,8 @@ export function MomentComposer({
    * її рішення, і наступний доданий знімок його не перепише.
    */
   const dateTouched = useRef(moment !== undefined);
-  const placeTouched = useRef(moment?.place != null);
+  // Місце з карти — теж рішення пари, і EXIF не має права його перебити.
+  const placeTouched = useRef(moment?.place != null || initialPlace !== undefined);
 
   const oneRef = useRef<HTMLInputElement>(null);
   const manyRef = useRef<HTMLInputElement>(null);

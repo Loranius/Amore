@@ -54,7 +54,6 @@ export const ROUTES = {
   culinary: '#/culinary',
   whereto: '#/whereto',
   piggybank: '#/piggybank',
-  map: '#/map',
   game: '#/game',
   login: '#/login',
 };

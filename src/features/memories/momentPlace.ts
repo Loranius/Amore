@@ -1,4 +1,4 @@
-import type { MapboxFeature } from '@/types';
+import type { GeoFeature } from '@/types';
 
 // ============================================================
 // Місце спогаду.
@@ -11,7 +11,7 @@ import type { MapboxFeature } from '@/types';
 // Наслідок, за який доводиться платити: перед тим як прив'язати місце,
 // треба знайти, чи такої мітки ще немає. Саме це й рахує `nearestPin`.
 //
-// Модуль чистий: ні мережі, ні бази. Пошук у Mapbox і вставка мітки живуть
+// Модуль чистий: ні мережі, ні бази. Пошук у геокодері й вставка мітки живуть
 // у хуках, а тут — тільки арифметика й розбір відповіді.
 // ============================================================
 
@@ -114,11 +114,11 @@ export function nearestPin<T extends PinLike>(
 /**
  * Відповідь геокодера → кандидат на мітку.
  *
- * `center` у Mapbox іде як [довгота, широта] — саме в такому порядку, і це
+ * `center` іде як [довгота, широта] — саме в такому порядку, і це
  * найчастіша помилка при роботі з GeoJSON. Місто й країна беруться з
- * контексту фічі, який Mapbox додає завжди, незалежно від `types=`.
+ * контексту фічі, який геокодер заповнює завжди.
  */
-export function placeFromFeature(feature: MapboxFeature): PlaceCandidate | null {
+export function placeFromFeature(feature: GeoFeature): PlaceCandidate | null {
   const [lng, lat] = feature.center ?? [];
   if (typeof lat !== 'number' || typeof lng !== 'number') return null;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
