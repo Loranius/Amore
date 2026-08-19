@@ -90,11 +90,19 @@ function starCount(quality: PortalEnvironmentProps['quality']): number {
 /**
  * Наскільки кінці арки заходять усередину сусідніх колон.
  *
- * Без overlap модель закінчується рівно на осі колони. На косих ракурсах
- * торець арки тоді читається як окремий зрізаний шматок/наплив. Ховаємо торець
- * у камені колони, не додаючи нових mesh або draw call'ів.
+ * Попередні 0.95 прибрали щілину, але на фронтальному мобільному ракурсі
+ * перетворили п'яту арки на масивний прямокутний наплив. Третини радіуса
+ * достатньо, щоб сховати торець у камені й не роздувати стик.
  */
-const ARCH_PILLAR_OVERLAP = 0.95;
+const ARCH_PILLAR_OVERLAP = 0.34;
+
+/**
+ * Невеликий підйом п'яти арки над попереднім рівнем.
+ *
+ * Він не переносить арку під справжню верхівку колони — там її сховає UI, —
+ * а лише садить нижній профіль чистіше на декоративну частину стику.
+ */
+const ARCH_PILLAR_SEAT_LIFT = 0.07;
 
 export function PortalEnvironment({
   seed,
@@ -182,7 +190,11 @@ export function PortalEnvironment({
       const pillar = pillars[index]!;
       position.set(pillar.position[0], pillar.position[1], pillar.position[2]);
       scale.set(pillar.scale[0], pillar.scale[1], pillar.scale[2]);
-      quaternion.setFromEuler(new THREE.Euler(0, pillar.rotationY, 0));
+      // Колона більше не отримує випадковий додатковий поворот у місці стику.
+      // Радіальна орієнтація тримає капітель узгоджено з кільцем аркади, тому
+      // одна й та сама п'ята арки не сідає на різні грані сусідніх колон.
+      const radialRotation = Math.atan2(pillar.position[0], pillar.position[2]);
+      quaternion.setFromEuler(new THREE.Euler(0, radialRotation, 0));
       mesh.setMatrixAt(index, matrix.compose(position, quaternion, scale));
     }
     mesh.count = pillars.length;
@@ -198,10 +210,13 @@ export function PortalEnvironment({
     const scale = new THREE.Vector3();
     for (let index = 0; index < arches.length; index += 1) {
       const arch = arches[index]!;
-      position.set(arch.position[0], arch.position[1], arch.position[2]);
-      // `arch.scale[2]` дорівнює радіусу колони, на якій стоїть проліт.
-      // Додаємо майже один радіус з кожного боку: торці арки опиняються
-      // всередині колон і перестають читатись окремими зрізами на косих кутах.
+      position.set(
+        arch.position[0],
+        arch.position[1] + ARCH_PILLAR_SEAT_LIFT,
+        arch.position[2],
+      );
+      // Невеликий overlap ховає торець арки всередині колони, але не формує
+      // великий прямокутний блок поверх капітелі, як попереднє значення 0.95.
       const halfSpan = arch.scale[0] + arch.scale[2] * ARCH_PILLAR_OVERLAP;
       scale.set(halfSpan, arch.scale[1], arch.scale[2]);
       const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, arch.rotationY, 0));
