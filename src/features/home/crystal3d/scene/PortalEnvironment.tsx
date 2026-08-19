@@ -87,6 +87,15 @@ function starCount(quality: PortalEnvironmentProps['quality']): number {
   return 90;
 }
 
+/**
+ * Наскільки кінці арки заходять усередину сусідніх колон.
+ *
+ * Без overlap модель закінчується рівно на осі колони. На косих ракурсах
+ * торець арки тоді читається як окремий зрізаний шматок/наплив. Ховаємо торець
+ * у камені колони, не додаючи нових mesh або draw call'ів.
+ */
+const ARCH_PILLAR_OVERLAP = 0.95;
+
 export function PortalEnvironment({
   seed,
   theme,
@@ -190,7 +199,11 @@ export function PortalEnvironment({
     for (let index = 0; index < arches.length; index += 1) {
       const arch = arches[index]!;
       position.set(arch.position[0], arch.position[1], arch.position[2]);
-      scale.set(arch.scale[0], arch.scale[1], arch.scale[2]);
+      // `arch.scale[2]` дорівнює радіусу колони, на якій стоїть проліт.
+      // Додаємо майже один радіус з кожного боку: торці арки опиняються
+      // всередині колон і перестають читатись окремими зрізами на косих кутах.
+      const halfSpan = arch.scale[0] + arch.scale[2] * ARCH_PILLAR_OVERLAP;
+      scale.set(halfSpan, arch.scale[1], arch.scale[2]);
       const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, arch.rotationY, 0));
       mesh.setMatrixAt(index, matrix.compose(position, spin, scale));
     }
