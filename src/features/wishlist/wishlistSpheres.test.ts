@@ -100,7 +100,12 @@ describe('the price stays low (§18)', () => {
     // живуть, — але перевіряються ті самі властивості.
     const dim = readFileSync(join(ROOT, 'src/features/world/worldDim.css'), 'utf8')
       .replace(/\/\*[\s\S]*?\*\//g, '');
-    const at = dim.indexOf("[data-world-scene='dim'] .artifact-world {");
+    // Саме ПОЧАТОК рядка: у файлі є ще й правило світлої теми
+    // (`html[data-theme='light'][data-world-scene='dim'] .artifact-world`),
+    // яке містить цей самий селектор підрядком і стоїть вище. Пошук
+    // підрядком брав його — і тест падав на тому, що в світлій темі
+    // розмиття немає, хоча перевіряти він мусить типове правило.
+    const at = dim.search(/^\[data-world-scene='dim'\] \.artifact-world \{/m);
     expect(at, 'правило розмиття має існувати').toBeGreaterThan(-1);
     const scene = dim.slice(at, dim.indexOf('}', at));
     expect(dim).toMatch(/\.artifact-world::after \{[^}]*background:/);

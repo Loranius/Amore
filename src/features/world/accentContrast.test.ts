@@ -25,9 +25,29 @@ import { describe, expect, it } from 'vitest';
 const ROOT = join(__dirname, '../../..');
 const INDEX = readFileSync(join(ROOT, 'src/index.css'), 'utf8');
 
-function token(name: string): string {
-  const match = new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(INDEX);
-  if (!match) throw new Error(`токена ${name} немає в index.css`);
+/**
+ * Значення токена в межах одного блоку теми.
+ *
+ * Раніше тут стояв пошук по всьому файлу, і він брав ПЕРШЕ входження — поки
+ * тема була одна, це працювало. Тем знову дві (ADR-0040), і пошук по файлу
+ * означав би, що світла не перевіряється взагалі: усі числа нижче припадали
+ * б на темну, а зламати можна саме світлу, бо в ній акцент мусить бути
+ * ТЕМНІШИМ за заливку, а не світлішим.
+ */
+function block(selector: string): string {
+  const at = INDEX.indexOf(selector);
+  if (at === -1) throw new Error(`блоку ${selector} немає в index.css`);
+  return INDEX.slice(at, INDEX.indexOf('\n}', at));
+}
+
+const THEMES = {
+  dark: block(':root {'),
+  light: block("[data-theme='light'] {"),
+} as const;
+
+function token(name: string, theme: keyof typeof THEMES = 'dark'): string {
+  const match = new RegExp(`${name}:\\s*(#[0-9a-fA-F]{6})`).exec(THEMES[theme]);
+  if (!match) throw new Error(`токена ${name} немає в темі ${theme}`);
   return match[1]!.toLowerCase();
 }
 
@@ -65,10 +85,53 @@ describe('ролі акценту розрізняються', () => {
     expect(token('--accent')).not.toBe(token('--accent-strong'));
   });
 
-  it('плаский акцент СВІТЛІШИЙ за заливку, а не навпаки', () => {
-    // Якщо їх колись переставлять місцями, обидва пороги вище ще можуть
-    // випадково зійтись, а ролі вже будуть переплутані.
-    expect(luminance(token('--accent'))).toBeGreaterThan(luminance(token('--accent-strong')));
+  it('ролі не переставлені місцями', () => {
+    /*
+     * Було: «плаский акцент СВІТЛІШИЙ за заливку». На темному ґрунті це
+     * правда, але це наслідок, а не правило: у світлій темі все навпаки —
+     * щоб читатись на рожевому аркуші, лінійний акцент мусить бути
+     * ТЕМНІШИМ за заливку. Правило, що працює в обох, одне: `--accent`
+     * контрастує з ґрунтом КРАЩЕ за `--accent-strong`, бо саме він
+     * призначений бути на ньому текстом.
+     *
+     * Виміряно: темна 5.90 проти 3.71, світла 6.2 проти 4.7.
+     */
+    for (const theme of ['dark', 'light'] as const) {
+      const line = contrast(token('--accent', theme), token('--bg', theme));
+      const fill = contrast(token('--accent-strong', theme), token('--bg', theme));
+      expect(line, `${theme}: лінійний акцент має читатись краще за заливку`)
+        .toBeGreaterThan(fill);
+    }
+  });
+});
+
+describe('світла тема тримає ті самі пороги', () => {
+  /*
+   * Аркуш власника ці пороги не проходить: підписи кнопок на ньому білі на
+   * ніжно-рожевому, тобто близько 2.2:1. Тому рожевий аркуша лишився там, де
+   * він великий і під ним немає тексту, а під білим текстом стоїть глибша
+   * малина. Числа нижче — причина, чому саме така.
+   */
+  it('заливка під білим текстом проходить AA', () => {
+    expect(contrast('#ffffff', token('--accent-strong', 'light'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('заливка лишається видимою на рожевому аркуші', () => {
+    expect(contrast(token('--accent-strong', 'light'), token('--bg', 'light')))
+      .toBeGreaterThanOrEqual(3);
+  });
+
+  it('лінійний акцент читається на аркуші як текст', () => {
+    expect(contrast(token('--accent', 'light'), token('--bg', 'light')))
+      .toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('основний і приглушений текст читаються обидва', () => {
+    // Приглушений — теж текст: підказки в полях і другорядні підписи мають
+    // той самий поріг 4.5, і саме тому `--muted` у світлій темі виглядає
+    // темнішим, ніж звично для «приглушеного».
+    expect(contrast(token('--text', 'light'), token('--bg', 'light'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(token('--muted', 'light'), token('--bg', 'light'))).toBeGreaterThanOrEqual(4.5);
   });
 });
 
