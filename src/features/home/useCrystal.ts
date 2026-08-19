@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
 import { useStartDate, usePhotoPool } from './useHome';
 import { daysBetween } from './homeUtils';
-import { useMapPins } from '@/features/map/useMapPins';
+import { useMapPins } from '@/features/memories/useMapPins';
 import { useMediaItems } from '@/features/media/useMedia';
 import { useCoupleWishStats } from '@/features/wishlist/useWishlist';
 import { useGoals } from '@/features/piggybank/useBudget';

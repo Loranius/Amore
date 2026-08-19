@@ -6,7 +6,7 @@ import {
   placeLabel,
   SAME_PLACE_METRES,
 } from './momentPlace';
-import type { MapboxFeature } from '@/types';
+import type { GeoFeature } from '@/types';
 
 describe('підпис місця', () => {
   it('назва й місто через кому — так, як просив власник', () => {
@@ -99,7 +99,7 @@ describe('пошук наявної мітки', () => {
 });
 
 describe('розбір відповіді геокодера', () => {
-  const feature = (over: Partial<MapboxFeature> = {}): MapboxFeature => ({
+  const feature = (over: Partial<GeoFeature> = {}): GeoFeature => ({
     text: 'Тераса',
     center: [26.98, 49.42],
     context: [
@@ -109,7 +109,7 @@ describe('розбір відповіді геокодера', () => {
     ...over,
   });
 
-  it('координати читаються в порядку Mapbox: [довгота, широта]', () => {
+  it('координати читаються в порядку GeoJSON: [довгота, широта]', () => {
     /*
      * Найчастіша помилка при роботі з GeoJSON, і найдорожча тут: переплутані
      * місцями числа поставили б хмельницьку терасу в Судан.
@@ -138,8 +138,8 @@ describe('розбір відповіді геокодера', () => {
   });
 
   it('фіча без координат відкидається, а не дає NaN у базі', () => {
-    expect(placeFromFeature({ center: [NaN, 49] } as unknown as MapboxFeature)).toBeNull();
-    expect(placeFromFeature({ text: 'x' } as unknown as MapboxFeature)).toBeNull();
+    expect(placeFromFeature({ center: [NaN, 49] } as unknown as GeoFeature)).toBeNull();
+    expect(placeFromFeature({ text: 'x' } as unknown as GeoFeature)).toBeNull();
   });
 
   it('координати поза глобусом відкидаються', () => {

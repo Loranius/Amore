@@ -764,3 +764,190 @@
   /* На телефоні смуги перекривали б свайп власними кліками. */
   .mm-light-nav { display: none; }
 }
+
+/* ============================================================
+   Карта спогадів
+   ------------------------------------------------------------
+   Місця більше не мають власного розділу: карта — це другий спосіб
+   дивитись на той самий архів (ADR-0039). Тому вона повноекранна й
+   відкривається поверх галереї, а не збоку від неї.
+   ============================================================ */
+
+.mm-map {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: var(--bg);
+}
+
+/*
+ * Специфічність тут не зайва: MapLibre вішає на контейнер власний клас
+ * `.maplibregl-map` зі своїм `position: relative`, і при однаковій вазі
+ * (0,1,0) перемагає той стиль, що прийшов у бандлі пізніше.
+ *
+ * Живий екран показав, чим це закінчується: контейнер лишався заввишки
+ * НУЛЬ пікселів. Помилок не було жодної, стиль, спрайти й TileJSON
+ * приїхали по 200 — просто карта нульової висоти не знає, які тайли їй
+ * потрібні, і не просить жодного. Екран назавжди лишався з написом
+ * «Завантажую карту…».
+ */
+.mm-map .mm-map-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Підпис OpenStreetMap — вимога ліцензії ODbL, прибирати не можна.
+   Приглушуємо, але лишаємо читаним. */
+.mm-map .maplibregl-ctrl-attrib {
+  background: rgba(10, 7, 17, 0.62);
+  font-size: 10.5px;
+}
+.mm-map .maplibregl-ctrl-attrib a { color: var(--muted); }
+
+/*
+ * Відкритий аркуш не має ховати підпис.
+ *
+ * Аркуш стоїть біля нижнього краю й на живому екрані накривав його
+ * цілком. Для ліцензії ODbL «підпис є, але його не видно» — те саме, що
+ * підпису немає, тож на час аркуша піднімаємо ряд контролів над ним.
+ * Висота аркуша змінна (в мітки зі спогадом є ще й фото), тому підняття
+ * задане з запасом на найвищий випадок.
+ */
+.mm-map:has(.mm-map-sheet) .maplibregl-ctrl-bottom-left,
+.mm-map:has(.mm-map-sheet) .maplibregl-ctrl-bottom-right {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 152px);
+}
+.mm-map:has(.mm-map-sheet-photo) .maplibregl-ctrl-bottom-left,
+.mm-map:has(.mm-map-sheet-photo) .maplibregl-ctrl-bottom-right {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 296px);
+}
+
+.mm-map-bar {
+  position: absolute;
+  z-index: 2;
+  inset: calc(env(safe-area-inset-top, 0px) + 12px) 12px auto 12px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.mm-map-bar > * { pointer-events: auto; }
+
+.mm-map-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ── Мітка ─────────────────────────────────────────────────── */
+
+/* Крапля з фотографією всередині. Розмір 44 px — той самий поріг дотику,
+   що й у решті порталу: менша мітка на карті не влучається пальцем. */
+.mm-map-pin {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: 0 6px 16px rgba(4, 2, 10, 0.55);
+  cursor: pointer;
+  /* Хвостик донизу: мітка мусить показувати ТОЧКУ, а не пляму навколо неї.
+     Разом із `anchor: 'bottom'` це ставить вістря рівно на координату. */
+  transform: translateY(-4px);
+}
+.mm-map-pin img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Місце зі спогадом виділене акцентом: на карті одразу видно, де вже є
+   що згадати, а де лише позначка. */
+.mm-map-pin.is-moment { border-color: var(--accent); }
+
+.mm-map-pin.is-blank {
+  background: var(--surface-3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* Точка, яку пара щойно поставила пальцем. Пульсує, щоб її було видно
+   серед міток — вона ще не збережена й потребує рішення. */
+.mm-map-draft {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 32%, transparent);
+  animation: mm-draft-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes mm-draft-pulse {
+  50% { box-shadow: 0 0 0 12px color-mix(in srgb, var(--accent) 12%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-map-draft { animation: none; }
+}
+
+/* ── Аркуш дії ─────────────────────────────────────────────── */
+
+.mm-map-sheet {
+  position: absolute;
+  z-index: 3;
+  inset: auto 12px calc(env(safe-area-inset-bottom, 0px) + 12px) 12px;
+  padding: 14px 16px 16px;
+  border-radius: 20px;
+  background: var(--glass-read);
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+  backdrop-filter: blur(var(--glass-blur-strong));
+  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-lg);
+}
+
+.mm-map-sheet b { display: block; font-size: 16px; line-height: 1.3; }
+.mm-map-sheet p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+
+.mm-map-sheet-photo {
+  display: block;
+  width: 100%;
+  height: 132px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 12px;
+  background: var(--surface-2);
+}
+
+.mm-map-sheet-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.mm-map-sheet-actions .btn { flex: 1 1 0; }
+
+/* ── Кнопка карти в галереї ────────────────────────────────── */
+
+/* Дзеркало до «+»: те саме оформлення, той самий розмір, той самий
+   відступ від нижнього краю — але зліва. */
+.mm-map-fab {
+  position: fixed;
+  z-index: 6;
+  left: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  background-image: var(--control-fill);
+  color: #fff;
+  box-shadow: var(--control-top), var(--control-lip), 0 14px 30px rgba(4, 2, 10, 0.55);
+  cursor: pointer;
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+.mm-map-fab:active { translate: 0 2px; box-shadow: var(--control-top), var(--control-lip-press); }
+.mm-map-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

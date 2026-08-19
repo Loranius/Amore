@@ -19,7 +19,6 @@ import {
   PotIcon, SettingsIcon, TicketIcon,
 } from '@/components/icons/NavIcon';
 import { GiftIcon } from '@/components/icons/UiIcon';
-import { MapPinIcon } from '@/components/icons/MapIcon';
 
 export type NavIconComponent = (props: IconProps) => ReactNode;
 
@@ -93,7 +92,6 @@ export const MORE_GROUPS: NavGroup[] = [
     label: 'Інше',
     items: [
       { to: '/piggybank', Icon: PiggyBankIcon, label: 'Скарбничка' },
-      { to: '/map', Icon: MapPinIcon, label: 'Наша карта' },
       { to: '/game', Icon: GamepadIcon, label: 'Гра' },
     ],
   },

@@ -13,7 +13,7 @@ import { CloseIcon, GiftIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { CameraIcon, CartIcon } from '@/components/icons/NavIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
 import { useSharedWishlistItems, useWishlistItems } from '@/features/wishlist/useWishlist';
-import { useMapPins } from '@/features/map/useMapPins';
+import { useMapPins } from '@/features/memories/useMapPins';
 import { useMemories } from '@/features/memories/useMemories';
 import { formatMemoryDate } from '@/features/memories/memoriesDate';
 import { useShoppingMutations } from '@/features/shopping/useShoppingItems';
@@ -37,7 +37,9 @@ const TARGET_META: Record<PlanLinkTarget, {
   place: {
     label: 'Місце',
     description: 'Додати точку з вашої карти',
-    to: '/map',
+    // Карта більше не окремий розділ — вона другий вимір «Спогадів»
+    // (ADR-0039), і відкривається значком ліворуч унизу галереї.
+    to: '/memories',
     Icon: MapPinIcon,
   },
   memory: {

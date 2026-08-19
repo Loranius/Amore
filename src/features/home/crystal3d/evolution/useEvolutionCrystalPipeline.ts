@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useEvents } from '@/features/_shared/events';
 import { useUsers } from '@/features/_shared/useUsers';
-import { useMapPins } from '@/features/map/useMapPins';
+import { useMapPins } from '@/features/memories/useMapPins';
 import { useFinishedMedia } from '@/features/media/useMedia';
 import { useMemories } from '@/features/memories/useMemories';
 import { useScheduleTogetherness } from '@/features/schedule/useSharedDaysOff';
