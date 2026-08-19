@@ -421,7 +421,7 @@
   background: var(--glass-read);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-md);
+  box-shadow: var(--glass-edge), var(--shadow-md);
   color: var(--text);
   font: inherit;
   font-size: 14px;
@@ -484,7 +484,7 @@
   background: var(--glass-read);
   -webkit-backdrop-filter: blur(var(--glass-blur-strong));
   backdrop-filter: blur(var(--glass-blur-strong));
-  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-lg);
+  box-shadow: var(--glass-edge), var(--shadow-lg);
 }
 
 .mm-sheet-head {
@@ -645,7 +645,7 @@
   background: var(--glass-read);
   -webkit-backdrop-filter: blur(var(--glass-blur));
   backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-lg);
+  box-shadow: var(--glass-edge), var(--shadow-lg);
 }
 .mm-menu button {
   padding: 11px 12px;
@@ -905,7 +905,7 @@
   background: var(--glass-read);
   -webkit-backdrop-filter: blur(var(--glass-blur-strong));
   backdrop-filter: blur(var(--glass-blur-strong));
-  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-lg);
+  box-shadow: var(--glass-edge), var(--shadow-lg);
 }
 
 .mm-map-sheet b { display: block; font-size: 16px; line-height: 1.3; }

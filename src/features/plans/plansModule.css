@@ -47,7 +47,7 @@
   background: var(--glass-2);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-md);
+  box-shadow: var(--glass-edge), var(--shadow-md);
 }
 
 .plans-module .pm-tab {
@@ -215,7 +215,7 @@
     var(--glass-read);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-md);
+  box-shadow: var(--glass-edge), var(--shadow-md);
 }
 
 /* Грань — окремий елемент (`PlanCrystalEdge`), а не псевдоелемент: огранка
@@ -478,7 +478,7 @@
   background: var(--glass-read);
   backdrop-filter: blur(var(--glass-blur-strong));
   -webkit-backdrop-filter: blur(var(--glass-blur-strong));
-  box-shadow: var(--glass-stroke), var(--glass-top), var(--shadow-lg);
+  box-shadow: var(--glass-edge), var(--shadow-lg);
 }
 
 .plans-module .cal-month-nav {
@@ -516,14 +516,23 @@
    як огранене скло, і саме рамки роблять цей ефект. */
 .plans-module .cal-cell {
   border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: rgba(255, 255, 255, 0.035);
+  /* Те саме ребро, що на великих поверхнях, лише тихіше: без світла згори
+     тридцять одна комірка читалась як сітка намальованих прямокутників, а
+     не як огранене скло. Наплив тут не потрібен — на 46 px він займав би
+     половину комірки й з'їдав контраст числа. */
+  box-shadow: var(--glass-top);
   color: var(--text);
 }
 
+/* Порожні комірки до першого числа місяця — місце, а не поверхня.
+   Світло згори, яке отримали всі комірки, домалювало їм верхнє ребро, і
+   в першому ряду серпня повисло пʼять світлих дуг без чисел. */
 .plans-module .cal-cell--pad {
   border-color: transparent;
   background: none;
+  box-shadow: none;
 }
 
 /* Список подій місяця під сіткою в картку не входить.
@@ -575,7 +584,12 @@
    б із кольоровими крапками подій усередині неї. */
 .plans-module .cal-cell--sel {
   border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent), 0 0 14px var(--world-glow);
+  /* Ореол замість власного числа сяйва: обраний день на референсі світить
+     на сусідні комірки, і саме це відрізняє його від «сьогодні» з
+     бірюзовою смужкою. Заливки як була дванадцятивідсоткова, так і
+     лишається — залита комірка сперечалася б із кольоровими крапками
+     подій усередині неї. */
+  box-shadow: inset 0 0 0 1px var(--accent), var(--glow-halo);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 

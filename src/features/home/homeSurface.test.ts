@@ -145,7 +145,17 @@ describe('no white flash (brief §49)', () => {
     // Seven pages never painted a background — they stood on the document's
     // colour. Now the document belongs to the world, so the container holds
     // the paper until each page's own phase moves it into the world.
-    expect(bare(INDEX)).toMatch(/\.app-shell > \.content \{\s*background: var\(--bg\);/);
+    //
+    // The paper is `--page-ground`, not `--bg` directly: the crystal pass put
+    // two soft blooms above the flat colour, because glass over an even slab
+    // does not read as glass. What §49 actually needs is unchanged and is
+    // checked as such — the container paints *something opaque*, and the last
+    // layer under the blooms is still the ground colour, so no bloom can make
+    // the first frame light.
+    expect(bare(INDEX)).toMatch(/\.app-shell > \.content \{\s*background: var\(--page-ground\);/);
+    const ground = bare(INDEX).match(/--page-ground:([^;]*);/);
+    expect(ground, 'index.css must define --page-ground').not.toBeNull();
+    expect(ground![1]!.trim().endsWith('var(--bg)')).toBe(true);
     expect(bare(INDEX)).toMatch(/\[data-portal-scene='true'\] \.app-shell > \.content \{\s*background: none;/);
   });
 
