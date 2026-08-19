@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { PORTAL_GROUND_Y } from './portalScene';
 
 interface FloatingTempleSceneProps {
+  seed: number;
   theme: 'light' | 'dark';
   quality: 'high' | 'balanced' | 'low' | 'fallback';
   daisScale: number;
@@ -39,14 +40,18 @@ const ARM_SEGMENTS: readonly (readonly [
   [[0.72, -0.96, -3.05], [0.55, -1.22, -4.08]],
 ];
 
-function disturbRock(geometry: THREE.BufferGeometry, amount: number): THREE.BufferGeometry {
+function disturbRock(
+  geometry: THREE.BufferGeometry,
+  amount: number,
+  phase: number,
+): THREE.BufferGeometry {
   const positions = geometry.getAttribute('position');
   for (let index = 0; index < positions.count; index += 1) {
     const x = positions.getX(index);
     const y = positions.getY(index);
     const z = positions.getZ(index);
-    const wave = Math.sin(x * 4.7 + y * 8.3 + z * 5.9) * 0.5
-      + Math.sin(x * 11.1 - y * 3.7 + z * 7.4) * 0.5;
+    const wave = Math.sin(x * 4.7 + y * 8.3 + z * 5.9 + phase) * 0.5
+      + Math.sin(x * 11.1 - y * 3.7 + z * 7.4 - phase * 0.63) * 0.5;
     const scale = 1 + wave * amount;
     positions.setXYZ(index, x * scale, y * scale, z * scale);
   }
@@ -77,6 +82,7 @@ function cylinderMatrix(
 }
 
 export function FloatingTempleScene({
+  seed,
   theme,
   quality,
   daisScale,
@@ -146,6 +152,7 @@ export function FloatingTempleScene({
 
   const geometry = useMemo(() => {
     const rockDetail = quality === 'high' ? 2 : 1;
+    const phase = (Math.abs(seed) % 10_000) * 0.011;
     return {
       column: new THREE.CylinderGeometry(1, 1.08, 1, 12, 1),
       base: new THREE.CylinderGeometry(1.36, 1.52, 0.18, 12, 1),
@@ -155,14 +162,14 @@ export function FloatingTempleScene({
       arm: new THREE.CylinderGeometry(1, 1.15, 1, 10, 1),
       guardian: new THREE.CylinderGeometry(0.16, 0.24, 0.56, 7, 1),
       guardianHead: new THREE.IcosahedronGeometry(0.14, 1),
-      island: disturbRock(new THREE.IcosahedronGeometry(1, rockDetail), 0.13),
+      island: disturbRock(new THREE.IcosahedronGeometry(1, rockDetail), 0.13, phase),
       palm: new THREE.SphereGeometry(1, 18, 10),
       topSlab: new THREE.CylinderGeometry(1, 1.04, 0.22, 48, 1),
       mossCap: new THREE.CylinderGeometry(1, 1.03, 0.09, 32, 1),
       topRing: new THREE.TorusGeometry(1, 0.15, 8, 48),
       ringLip: new THREE.TorusGeometry(1, 0.055, 6, 48),
     };
-  }, [quality]);
+  }, [quality, seed]);
 
   useEffect(() => () => {
     for (const item of Object.values(geometry)) item.dispose();
