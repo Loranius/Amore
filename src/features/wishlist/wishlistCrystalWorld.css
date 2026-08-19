@@ -237,37 +237,8 @@
   font-size: 12px;
 }
 
-/* Первинна дія — дослівно «+ Додати» з планів (§16).
-   Світло тут ще й світиться назовні (`--world-glow`), як у `.pm-fab`: це
-   єдина дія аркуша, і вона має бути помітною, не змінюючи тіла. */
-[data-portal-scene='true'] .wishlist .wl-world-add {
-  min-height: 46px;
-  margin-top: 2px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: var(--radius-md);
-  background-color: transparent;
-  background-image: var(--control-fill);
-  color: var(--world-text);
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-  box-shadow:
-    var(--control-top),
-    var(--control-lip),
-    0 0 24px var(--world-glow),
-    var(--control-cast);
-  transition: translate 90ms ease, box-shadow 90ms ease;
-}
-
-[data-portal-scene='true'] .wishlist .wl-world-add:active:not(:disabled) {
-  translate: 0 2px;
-  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
-}
-
-[data-portal-scene='true'] .wishlist .wl-world-add:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
+/* Кнопка «+ Додати бажання» переїхала з аркуша на спільний `.fab`
+   (`index.css`), і власний рецепт тут став мертвим разом із нею. */
 
 @media (prefers-reduced-motion: reduce) {
   [data-portal-scene='true'] .wishlist .wl-world-sheet {

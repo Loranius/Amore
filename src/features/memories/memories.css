@@ -189,25 +189,8 @@
 
 /* ── Кнопка «+» ────────────────────────────────────────────── */
 
-.mm-fab {
-  position: fixed;
-  z-index: 6;
-  right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
-  width: 58px;
-  height: 58px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  background-image: var(--control-fill);
-  color: #fff;
-  box-shadow: var(--control-top), var(--control-lip), 0 14px 30px rgba(4, 2, 10, 0.55);
-  cursor: pointer;
-  transition: translate 90ms ease, box-shadow 90ms ease;
-}
-.mm-fab:active { translate: 0 2px; box-shadow: var(--control-top), var(--control-lip-press); }
-.mm-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Кнопки «+» і карти беруть спільний `.fab` з `index.css`: рецепт був
+   виписаний тут дослівно, і ще двічі в порталі. */
 
 /* ============================================================
    Композер — повноекранний нотатник
@@ -932,22 +915,4 @@
 
 /* Дзеркало до «+»: те саме оформлення, той самий розмір, той самий
    відступ від нижнього краю — але зліва. */
-.mm-map-fab {
-  position: fixed;
-  z-index: 6;
-  left: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
-  width: 58px;
-  height: 58px;
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
-  background-image: var(--control-fill);
-  color: #fff;
-  box-shadow: var(--control-top), var(--control-lip), 0 14px 30px rgba(4, 2, 10, 0.55);
-  cursor: pointer;
-  transition: translate 90ms ease, box-shadow 90ms ease;
-}
-.mm-map-fab:active { translate: 0 2px; box-shadow: var(--control-top), var(--control-lip-press); }
-.mm-map-fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+

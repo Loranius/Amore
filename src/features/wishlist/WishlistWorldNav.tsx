@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PlusIcon } from '@/components/icons/UiIcon';
 import type { WishlistViewMode } from './wishlistBoardView';
 
 // ============================================================
@@ -87,6 +88,20 @@ export function WishlistWorldNav({
         <LayersIcon />
       </button>
 
+      {/* Додавання винесене з аркуша на коло, як у «Спогадах» (прохання
+          власника). В аркуші лишились фільтри й вигляд — те, заради чого
+          його відкривають; другої кнопки «додати» там більше немає, бо два
+          однакові входи на одному екрані — це не вибір, а сумнів. */}
+      <button
+        type="button"
+        className="fab"
+        aria-label="Додати бажання"
+        disabled={busy}
+        onClick={onAdd}
+      >
+        <PlusIcon size={26} />
+      </button>
+
       {open && (
         <>
           <div
@@ -136,14 +151,6 @@ export function WishlistWorldNav({
               ))}
             </div>
 
-            <button
-              type="button"
-              className="wl-world-add"
-              disabled={busy}
-              onClick={() => { setOpen(false); onAdd(); }}
-            >
-              + Додати бажання
-            </button>
           </div>
         </>
       )}

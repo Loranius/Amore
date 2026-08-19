@@ -103,6 +103,40 @@
   inherits: false;
 }
 
+/* ── Шкіра картки: ролі, а не літерали ──────────────────────
+   Виміряно на живому екрані у світлій темі: картки лишились темними
+   сіро-фіолетовими на рожевому аркуші, а підписи всередині — темними на
+   темному. Причина не в тому, що модуль «не знав» про тему, а в тому, що
+   поверх токенів лежав хардкоджений фіолетовий градієнт, а всі внутрішні
+   заливки були білим із прозорістю — на світлому вони просто зникають.
+
+   Тому шкіра винесена в п'ять ролей. Темні значення тут, світлі — нижче
+   під `[data-theme='light']`; решта файлу на них посилається. */
+.plan-map {
+  /* Наліт поверх поверхні: те, що робить картку об'ємом, а не плямою. */
+  --pmap-skin: linear-gradient(158deg, rgba(74, 56, 116, 0.62), rgba(34, 25, 56, 0.78));
+  /* Внутрішня заливка — значки, кружечки, поле «Обрати дату». */
+  --pmap-inset: rgba(255, 255, 255, 0.06);
+  --pmap-inset-strong: rgba(255, 255, 255, 0.09);
+  /* Заливка, тонована акцентом: пігулки дат, смуга готовності. */
+  --pmap-tint: rgba(220, 182, 245, 0.16);
+  /* Світло по верхньому ребру й ореол назовні. */
+  --pmap-edge: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  --pmap-halo: 0 0 34px rgba(176, 128, 232, 0.24);
+}
+
+[data-theme='light'] .plan-map {
+  /* Наліт світлий: на рожевому аркуші картка світліша за фон, а не
+     темніша. Той самий кут 158°, та сама роль. */
+  --pmap-skin: linear-gradient(158deg, rgba(255, 255, 255, 0.72), rgba(255, 246, 249, 0.5));
+  /* Заливка темна з прозорістю, а не біла: біла на білому — це ніщо. */
+  --pmap-inset: rgba(140, 60, 85, 0.07);
+  --pmap-inset-strong: rgba(140, 60, 85, 0.11);
+  --pmap-tint: color-mix(in srgb, var(--accent) 14%, transparent);
+  --pmap-edge: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --pmap-halo: 0 0 30px rgba(168, 47, 85, 0.1);
+}
+
 .plan-map .pmap-block {
   position: relative;
   z-index: 1;
@@ -114,11 +148,11 @@
   border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
   border-radius: 26px 36px 28px 34px / 32px 26px 36px 28px;
   background:
-    linear-gradient(158deg, rgba(74, 56, 116, 0.62), rgba(34, 25, 56, 0.78)),
+    var(--pmap-skin),
     var(--world-surface, rgba(42, 33, 64, 0.82));
   box-shadow:
-    0 0 34px rgba(176, 128, 232, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    var(--pmap-halo),
+    var(--pmap-edge),
     0 16px 34px var(--world-shadow, rgba(6, 4, 12, 0.5));
   color: var(--world-text, #f6efff);
   text-align: left;
@@ -194,7 +228,7 @@
   place-items: center;
   border: 1px solid rgba(220, 182, 245, 0.3);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--pmap-inset);
   color: var(--plan-color, var(--world-accent, #dcb6f5));
 }
 
@@ -311,7 +345,7 @@
   place-items: center;
   border: 1px solid rgba(220, 182, 245, 0.32);
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--pmap-inset);
   color: var(--world-accent, #dcb6f5);
   cursor: pointer;
 }
@@ -328,14 +362,14 @@
   align-self: flex-start;
   padding: 2px 10px;
   border-radius: var(--radius-pill, 999px);
-  background: rgba(220, 182, 245, 0.16);
+  background: var(--pmap-tint);
   color: var(--world-accent, #dcb6f5);
   font-size: 12px;
   font-weight: 800;
 }
 
 .plan-map .pmap-pill[data-tone='past'] {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--pmap-inset);
   color: var(--world-text-muted, #c9b8e4);
 }
 
@@ -449,7 +483,7 @@
   place-items: center;
   background: conic-gradient(
     var(--world-accent, #dcb6f5) calc(var(--pmap-fill, 0) * 1%),
-    rgba(255, 255, 255, 0.09) 0);
+    var(--pmap-inset-strong) 0);
 }
 
 .plan-map .pmap-ring::after {
@@ -458,7 +492,9 @@
   height: 33px;
   border-radius: 50%;
   background: var(--world-surface-strong, #2a2140);
-  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.4);
+  /* Внутрішня тінь кільця — чорна, і на світлій картці вона перетворювала
+     нуль відсотків на брудну пляму. Той самий тон, що й решта заглиблень. */
+  box-shadow: inset 0 0 12px var(--pmap-inset-strong);
 }
 
 /* Відсоток центрується сам, а не «десь у кільці»: без inset абсолютний
@@ -492,7 +528,7 @@
   padding: 7px 12px;
   border: 1px solid var(--world-border-active, rgba(220, 182, 245, 0.42));
   border-radius: var(--radius-pill, 999px);
-  background: rgba(201, 160, 230, 0.14);
+  background: var(--pmap-tint);
   color: inherit;
   font: inherit;
   font-size: 13.5px;
@@ -509,7 +545,7 @@
   flex: 1;
   height: 6px;
   border-radius: var(--radius-pill, 999px);
-  background: rgba(255, 255, 255, 0.09);
+  background: var(--pmap-inset-strong);
 }
 
 .plan-map .pmap-steps span[data-on='true'] {
