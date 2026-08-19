@@ -12,6 +12,8 @@ import { useAuth, useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useUsers } from '@/features/_shared/useUsers';
 import { TabBar } from '@/components/ui/TabBar';
+import { MoonIcon, SunIcon } from '@/components/icons/UiIcon';
+import { useTheme } from '@/providers/ThemeProvider';
 import { usePhotoManager, usePhotoMutations, useUserSizes, useSaveSizes } from './useSettings';
 import type { InsertRow, UserName, UserSizesRow } from '@/types';
 
@@ -69,6 +71,10 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
         <div className="settings-divider" />
 
+        <ThemeSection />
+
+        <div className="settings-divider" />
+
         <button type="button" className="btn btn-danger" onClick={logout}>
           Вийти
         </button>
@@ -87,6 +93,42 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
 function userEmoji(name: UserName): string {
   return name === 'Лєна' ? '👩' : '🧔';
+}
+
+/**
+ * Вибір теми.
+ *
+ * Сегмент, а не перемикач: тем рівно дві й обидві мають імена, тож
+ * показати обидві чесніше, ніж ховати одну за станом тумблера. Той самий
+ * вибір намальований на обох аркушах референсу.
+ */
+function ThemeSection() {
+  const { theme, setTheme } = useTheme();
+  return (
+    <section className="settings-section">
+      <div className="settings-section-title">Тема</div>
+      <div className="theme-switch" role="group" aria-label="Тема порталу">
+        <button
+          type="button"
+          className={`theme-switch-btn${theme === 'light' ? ' is-on' : ''}`}
+          aria-pressed={theme === 'light'}
+          onClick={() => setTheme('light')}
+        >
+          <SunIcon size={18} />
+          Світла
+        </button>
+        <button
+          type="button"
+          className={`theme-switch-btn${theme === 'dark' ? ' is-on' : ''}`}
+          aria-pressed={theme === 'dark'}
+          onClick={() => setTheme('dark')}
+        >
+          <MoonIcon size={18} />
+          Темна
+        </button>
+      </div>
+    </section>
+  );
 }
 
 function SizesSection() {

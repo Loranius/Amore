@@ -121,9 +121,14 @@ describe('the active-button recipe stays one recipe', () => {
   /** Фіолетове тіло кнопки — те, що робить її «Календарем» із планів. */
   const BODY = /#7a3fd0|#52259a|#35156b/;
 
-  it('declares the fill once, in the token layer', () => {
-    expect(PORTAL).toMatch(/--control-fill:/);
-    expect(PORTAL.match(/--control-fill:/g)).toHaveLength(1);
+  it('declares the fill in the token layer, once per theme', () => {
+    // Було «рівно один раз». Тем знову дві (ADR-0040), і рожеве тіло кнопки
+    // не виводиться з фіолетового множенням — тож одне оголошення на тему й
+    // є той самий «один рецепт». Що перевірка стереже насправді, видно з
+    // наступного випадку: жодного оголошення ПОЗА шаром токенів.
+    const declarations = PORTAL.match(/--control-fill:/g) ?? [];
+    expect(declarations.length).toBeGreaterThan(0);
+    expect(declarations.length).toBeLessThanOrEqual(2);
   });
 
   it('is never spelled out a second time anywhere in src', () => {

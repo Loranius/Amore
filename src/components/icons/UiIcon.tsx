@@ -302,3 +302,22 @@ export function BoxIcon({ size = 24, className = '' }: IconProps) {
     </svg>
   );
 }
+
+/** Сонце — світла тема. Промені окремими рисками, щоб на 18 px не злипались. */
+export function SunIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.6v2.2M12 19.2v2.2M4.36 4.36l1.56 1.56M18.08 18.08l1.56 1.56M2.6 12h2.2M19.2 12h2.2M4.36 19.64l1.56-1.56M18.08 5.92l1.56-1.56" />
+    </svg>
+  );
+}
+
+/** Місяць — темна тема. */
+export function MoonIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M20.2 14.3A8.4 8.4 0 0 1 9.7 3.8a8.4 8.4 0 1 0 10.5 10.5Z" />
+    </svg>
+  );
+}
