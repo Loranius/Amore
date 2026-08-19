@@ -48,6 +48,7 @@ export const ROUTES = {
   plans: '#/plans',
   shopping: '#/shopping',
   memories: '#/memories',
+  journey: '#/journey',
   calendar: '#/calendar',
   schedule: '#/schedule',
   media: '#/media',

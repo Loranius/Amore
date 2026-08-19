@@ -19,12 +19,31 @@
  * (`index.css`), де через неї полотно вийшло 380 px у кадрі 412 px.
  */
 .journey-page {
+  /*
+   * Екран пінує чорнило до нічного, і решта файлу цього не помічає.
+   *
+   * «Наш шлях» — нічне небо в обох темах: сузір'я і є вміст, а зірки видно
+   * вночі. Коли токени світу пішли за світлою темою, весь хром цього
+   * екрана — заголовок, підказка, лічильник — став темно-рожевим на
+   * темно-фіолетовій туманності й зник.
+   *
+   * Перевизначення локальні навмисно: так усі шістнадцять правил нижче,
+   * які беруть `--world-text`, лишились без жодної правки, а знання «тут
+   * завжди ніч» живе в одному місці.
+   */
+  --world-text: var(--night-ink);
+  --world-text-muted: var(--night-ink-muted);
+  --world-accent: var(--night-ink-accent);
+  --world-primary: var(--night-primary);
+  --world-border: var(--night-border);
+  --world-bg-deep: var(--night-bg);
+
   position: fixed;
   display: flex;
   overflow: hidden;
   flex-direction: column;
-  background: var(--world-bg-deep, #0b0811);
-  color: var(--world-text, var(--text));
+  background: var(--world-bg-deep);
+  color: var(--world-text);
   inset: 0;
 }
 
@@ -115,27 +134,18 @@
 .jn-foot > * { pointer-events: auto; }
 .jn-foot p {
   margin: 0;
+  /* Кнопка вийшла з потоку (`.fab` — `position: fixed`), тож підказка
+     лишилась у футері сама. Праворуч від неї тепер порожньо рівно там, де
+     висить коло: без цього відступу текст ішов би під нього. */
+  margin-right: 74px;
   flex: 1 1 auto;
   color: var(--world-text-muted, var(--muted));
   font-size: 11px;
   line-height: 1.4;
   text-shadow: 0 1px 12px rgba(0, 0, 0, .55);
 }
-.jn-add {
-  display: flex;
-  min-height: 44px;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  padding: 0 18px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--world-primary, var(--accent));
-  color: #fff;
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
+/* Кнопка додавання переїхала на спільний `.fab` (`index.css`): власник
+   попросив коло з плюсом усюди, як у «Спогадах». */
 
 /* ============================================================
    Деталі розкритої події.

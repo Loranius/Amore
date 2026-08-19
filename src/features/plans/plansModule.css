@@ -391,40 +391,9 @@
 
 /* ── Одна кнопка дії ─────────────────────────────────────── */
 
-.plans-module .pm-fab {
-  position: fixed;
-  z-index: 6;
-  right: 16px;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 22px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: var(--radius-pill);
-  background-image: var(--control-fill);
-  color: #fff;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 800;
-  box-shadow:
-    var(--control-top),
-    var(--control-lip),
-    0 0 24px var(--world-glow),
-    0 14px 30px rgba(4, 2, 10, 0.55);
-  cursor: pointer;
-  transition: translate 90ms ease, box-shadow 90ms ease;
-}
-
-.plans-module .pm-fab:active {
-  translate: 0 2px;
-  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
-}
-
-.plans-module .pm-fab:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
+/* Кнопка додавання бере спільний `.fab` з `index.css`. Тут був четвертий
+   екземпляр того самого рецепта — і єдиний, що встиг розійтися: пігулка з
+   підписом замість кола. */
 
 /* ── Очікування й помилка ────────────────────────────────── */
 
@@ -624,7 +593,6 @@
   /* Осідання кнопки лишається — воно і є відповіддю на дотик. Прибирається
      лише його плавність. */
   .plans-module .pm-tab,
-  .plans-module .pm-fab,
   .plans-module .pm-section-toggle,
   .plans-module .cal-nav-btn,
   .plans-module .pm-tile-confirm { transition-duration: 1ms; }

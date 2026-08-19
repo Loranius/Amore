@@ -138,8 +138,15 @@ export function JourneyPage() {
       ) : (
         <footer className="jn-foot">
           <p>Торкніться зірки, щоб відкрити подію.</p>
-          <button type="button" className="jn-add" onClick={() => setCreating(true)}>
-            <PlusIcon size={16} /> Подія
+          {/* Коло, як у «Спогадах». На зануреному маршруті дока немає, і
+              кнопка сідає нижче — про це знає сам `.fab`. */}
+          <button
+            type="button"
+            className="fab"
+            aria-label="Додати подію"
+            onClick={() => setCreating(true)}
+          >
+            <PlusIcon size={26} />
           </button>
         </footer>
       )}

@@ -97,7 +97,7 @@ export function MemoriesPage() {
 
       <button
         type="button"
-        className="mm-map-fab"
+        className="fab fab--left"
         onClick={() => setMapOpen(true)}
         aria-label="Карта спогадів"
       >
@@ -108,7 +108,7 @@ export function MemoriesPage() {
           відкривати створення одразу, без проміжного вибору. */}
       <button
         type="button"
-        className="mm-fab"
+        className="fab"
         onClick={() => { setFromMap(null); setComposing(true); }}
         aria-label="Новий спогад"
       >

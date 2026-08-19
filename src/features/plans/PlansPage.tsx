@@ -264,15 +264,18 @@ export function PlansPage() {
         </div>
       )}
 
+      {/* Коло, а не пігулка з підписом. Дію називає `aria-label`: підпис
+          усередині кола не вміщається, а «Додати»/«Подія» поруч зі знаком
+          плюс — це те саме слово двічі. */}
       <button
         type="button"
-        className="pm-fab"
+        className="fab"
+        aria-label={section === 'calendar' ? 'Додати подію в календар' : 'Додати подію'}
         onClick={() => (section === 'calendar'
           ? openCalendarCreate()
           : openNewEvent('anniversary', undefined, 'events'))}
       >
-        <PlusIcon size={17} />
-        {section === 'calendar' ? 'Додати' : 'Подія'}
+        <PlusIcon size={26} />
       </button>
 
       {createChooserOpen && section === 'calendar' && (

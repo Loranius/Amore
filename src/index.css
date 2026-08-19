@@ -948,6 +948,61 @@ textarea::placeholder {
   opacity: 0.55;
 }
 
+/* ── Кругла кнопка дії ──────────────────────────────────────
+   Одна на весь портал. До цієї правки той самий рецепт стояв ТРИЧІ —
+   `.mm-fab`, `.mm-map-fab`, `.pm-fab` — і розходився: у планів була
+   пігулка з підписом і власне сяйво, у спогадів коло без підпису. Власник
+   попросив коло всюди, тож копії стають одним класом, а не чотирма.
+
+   Висота над доком (92 px) — не окреме число, а змінна: на зануреному
+   маршруті («Наш шлях») дока немає, і кнопка мусить сісти нижче, інакше
+   висить посеред екрана. */
+.fab {
+  position: fixed;
+  z-index: 6;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--fab-lift, 92px));
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius-pill);
+  background-image: var(--control-fill);
+  color: #fff;
+  cursor: pointer;
+  /* Вішліст тримає свої контроли в шарі `pointer-events: none` на весь
+     екран; без цього рядка кнопка в ньому не ловила б дотик. */
+  pointer-events: auto;
+  /* Тінь із токена, а не власний чорний літерал: у світлій темі чорна тінь
+     під рожевою кнопкою дає сірий обідок. */
+  box-shadow: var(--control-top), var(--control-lip), var(--shadow-lg);
+  transition: translate 90ms ease, box-shadow 90ms ease;
+}
+
+/* Дзеркало ліворуч — карта в «Спогадах». Той самий рецепт, інший бік. */
+.fab--left {
+  right: auto;
+  left: 16px;
+}
+
+.fab:active {
+  translate: 0 2px;
+  box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
+}
+
+.fab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.fab:disabled { opacity: 0.55; cursor: default; translate: none; }
+
+/* Занурений маршрут ховає док, і кнопка сідає на його місце. Атрибут стоїть
+   на `<html>`, кнопка — його нащадок, тож пробіл тут правильний. */
+[data-immersive='true'] .fab { --fab-lift: 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fab { transition: none; }
+}
+
 .btn-danger { background-color: var(--danger); }
 .btn-ghost {
   background-color: color-mix(in srgb, var(--text) 10%, transparent);
