@@ -2104,9 +2104,9 @@ textarea::placeholder {
 .home-hero-anniversary {
   margin-top: 4px;
   display: inline-block;
-  /* Скло на сцені, а не на папері: `--surface` у світлій темі дав би
-     світлу пігулку посеред ночі. */
-  background: rgba(22, 16, 35, 0.72);
+  /* Скло на сцені, а не на папері: `--surface` іде за темою інтерфейсу, а
+     цей клаптик лежить на небі — уночі темному, вдень блакитному. */
+  background: var(--scene-scrim);
   border-radius: 999px;
   padding: 3px 12px;
   font-size: 11px;

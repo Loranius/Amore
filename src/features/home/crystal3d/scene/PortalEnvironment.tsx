@@ -246,7 +246,7 @@ export function PortalEnvironment({
             color={palette.dais}
             emissive={palette.daisEmissive}
             emissiveIntensity={0.16}
-            metalness={0.72}
+            metalness={palette.daisMetalness}
             roughness={0.38}
             clearcoat={0.34}
             clearcoatRoughness={0.18}
@@ -265,7 +265,7 @@ export function PortalEnvironment({
           <meshStandardMaterial
             color={palette.inlay}
             emissive={palette.runeGlow}
-            emissiveIntensity={theme === 'dark' ? 2.45 : 2.15}
+            emissiveIntensity={palette.inlayEmissive}
             metalness={0.08}
             roughness={0.22}
             toneMapped={false}
