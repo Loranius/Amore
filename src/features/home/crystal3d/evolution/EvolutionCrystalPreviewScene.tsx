@@ -12,6 +12,7 @@ import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
 import { MODULE_SPIN_RATE } from '@/features/world/sceneDirector';
+import { useEvolutionSandbox } from '@/features/home/evolutionSandbox';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
 import {
@@ -46,6 +47,7 @@ export default function EvolutionCrystalPreviewScene() {
   // means nothing to a couple looking at their crystal.
   const [diagnosticsVisible] = useState(isEvolutionDiagnosticsEnabled);
   const { theme } = useTheme();
+  const { freeCameraActive } = useEvolutionSandbox();
   const [reduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
@@ -175,6 +177,7 @@ export default function EvolutionCrystalPreviewScene() {
             // позу маршруту й лишається там, інакше дошка бажань і глядач
             // дивляться в різні боки.
             allowOrbit={region === 'centre'}
+            freeCamera={freeCameraActive}
             motionMode={motionMode}
           >
             <EvolutionCrystalObject

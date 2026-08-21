@@ -29,8 +29,12 @@ export interface EvolutionSandboxSources {
 
 interface EvolutionSandboxContextValue {
   enabled: boolean;
+  /** Тимчасовий інструмент власника для огляду 3D-сцени без режисера камери. */
+  freeCameraActive: boolean;
   values: EvolutionSandboxValues;
   baselines: Partial<Record<EvolutionSandboxArtifact, EvolutionSandboxValues>>;
+  enterFreeCamera: () => void;
+  exitFreeCamera: () => void;
   registerBaseline: (artifact: EvolutionSandboxArtifact, baseline: EvolutionSandboxValues) => void;
   prepare: (artifact: EvolutionSandboxArtifact) => void;
   setValue: (key: keyof EvolutionSandboxValues, value: number) => void;
@@ -82,6 +86,7 @@ function valuesEqual(left: EvolutionSandboxValues | undefined, right: EvolutionS
 
 export function EvolutionSandboxProvider({ children }: { children: ReactNode }) {
   const [enabled, setEnabled] = useState(false);
+  const [freeCameraActive, setFreeCameraActive] = useState(false);
   const [values, setValues] = useState<EvolutionSandboxValues>(EMPTY_VALUES);
   const [baselines, setBaselines] = useState<Partial<Record<
     EvolutionSandboxArtifact,
@@ -119,10 +124,16 @@ export function EvolutionSandboxProvider({ children }: { children: ReactNode }) 
     if (artifact && baselines[artifact]) setValues(baselines[artifact]!);
   }, [baselines]);
 
+  const enterFreeCamera = useCallback(() => setFreeCameraActive(true), []);
+  const exitFreeCamera = useCallback(() => setFreeCameraActive(false), []);
+
   const context = useMemo<EvolutionSandboxContextValue>(() => ({
     enabled,
+    freeCameraActive,
     values,
     baselines,
+    enterFreeCamera,
+    exitFreeCamera,
     registerBaseline,
     prepare,
     setValue,
@@ -131,6 +142,9 @@ export function EvolutionSandboxProvider({ children }: { children: ReactNode }) 
   }), [
     baselines,
     enabled,
+    enterFreeCamera,
+    exitFreeCamera,
+    freeCameraActive,
     prepare,
     registerBaseline,
     reset,

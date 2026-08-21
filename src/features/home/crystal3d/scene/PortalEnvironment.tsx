@@ -430,6 +430,7 @@ export function PortalCameraRig({
   pose,
   mode,
   spin = 0,
+  freeCamera = false,
 }: {
   frame: PortalCameraFrame;
   controls: RefObject<OrbitControlsImpl | null>;
@@ -441,6 +442,8 @@ export function PortalCameraRig({
    * предмет розмови, а не фон. Рішення приймає той, хто знає маршрут.
    */
   spin?: number | undefined;
+  /** Коли true, OrbitControls одноосібно володіє камерою для огляду сцени. */
+  freeCamera?: boolean | undefined;
 }) {
   const camera = useThree((state) => state.camera);
   const director = useRef<SceneDirectorState>(createSceneDirector(pose ?? CRYSTAL_CENTRE_POSE));
@@ -448,10 +451,27 @@ export function PortalCameraRig({
   // насправді опинилась, — і є те, що зробив палець через OrbitControls:
   // інакше кожен кадр стирав би ручний оберт.
   const written = useRef<{ azimuth: number; elevation: number } | null>(null);
+  const wasFreeCamera = useRef(freeCamera);
 
   useFrame((_, delta) => {
     const orbit = controls.current;
     const target = pose ?? CRYSTAL_CENTRE_POSE;
+
+    // У режимі огляду режисер не має права щокадру повертати камеру назад.
+    // OrbitControls зберігає поточну позицію на вході й керує нею напряму.
+    if (freeCamera) {
+      wasFreeCamera.current = true;
+      written.current = null;
+      return;
+    }
+
+    // Вихід із режиму — новий чистий кадр, а не велетенський «ручний дрейф»
+    // між останньою вільною позицією і старим записом режисера.
+    if (wasFreeCamera.current) {
+      director.current = createSceneDirector(target);
+      written.current = null;
+      wasFreeCamera.current = false;
+    }
 
     let drift = NO_MANUAL_TURN;
     if (written.current && orbit) {

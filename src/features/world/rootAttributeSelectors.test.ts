@@ -6,8 +6,8 @@ import { describe, expect, it } from 'vitest';
 // ============================================================
 // Атрибути кореня комбінуються, а не вкладаються.
 // ------------------------------------------------------------
-// `data-theme`, `data-world-scene`, `data-world-quality`, `data-immersive`
-// і `data-portal-scene` ставляться на ОДИН елемент —
+// `data-theme`, `data-world-scene`, `data-world-quality`, `data-immersive`,
+// `data-free-camera` і `data-portal-scene` ставляться на ОДИН елемент —
 // `document.documentElement`. Тож селектор із пробілом між двома з них
 // («нащадок») не може збігтись ніколи: елемента, вкладеного в `<html>` і
 // водночас із другим атрибутом кореня, не існує.
@@ -29,6 +29,7 @@ const ROOT_ATTRS = [
   'data-world-scene',
   'data-world-quality',
   'data-immersive',
+  'data-free-camera',
   'data-portal-scene',
 ];
 

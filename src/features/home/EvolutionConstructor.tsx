@@ -143,7 +143,24 @@ export function EvolutionConstructor() {
 
   useEffect(() => {
     if (!visible) setOpen(false);
-  }, [visible]);
+    if (!visible || artifactKey !== 'crystal') sandbox.exitFreeCamera();
+  }, [artifactKey, sandbox.exitFreeCamera, visible]);
+
+  useEffect(() => {
+    if (!sandbox.freeCameraActive) return undefined;
+
+    const root = document.documentElement;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') sandbox.exitFreeCamera();
+    };
+
+    root.setAttribute('data-free-camera', 'true');
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      root.removeAttribute('data-free-camera');
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [sandbox.exitFreeCamera, sandbox.freeCameraActive]);
 
   useEffect(() => {
     if (open && !sandbox.enabled) sandbox.prepare(artifactKey);
@@ -156,19 +173,26 @@ export function EvolutionConstructor() {
     setOpen(true);
   };
 
+  const enterFreeCamera = () => {
+    setOpen(false);
+    sandbox.enterFreeCamera();
+  };
+
   return (
     <>
-      <button
-        type="button"
-        className={`evolution-constructor-fab${sandbox.enabled ? ' is-active' : ''}`}
-        onClick={openConstructor}
-        aria-label="Відкрити конструктор еволюції"
-        aria-expanded={open}
-      >
-        <span />
-        <span />
-        <span />
-      </button>
+      {!sandbox.freeCameraActive && (
+        <button
+          type="button"
+          className={`evolution-constructor-fab${sandbox.enabled ? ' is-active' : ''}`}
+          onClick={openConstructor}
+          aria-label="Відкрити конструктор еволюції"
+          aria-expanded={open}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+      )}
 
       {open && (
         <section
@@ -202,6 +226,20 @@ export function EvolutionConstructor() {
           </div>
 
           <div className="evolution-constructor__scroll">
+            {artifactKey === 'crystal' && (
+              <button
+                type="button"
+                className="evolution-constructor__free-camera"
+                onClick={enterFreeCamera}
+              >
+                <span>
+                  <strong>Вільна камера</strong>
+                  <small>Оглянути кристал, подіум, колони й арки з усіх боків</small>
+                </span>
+                <b aria-hidden="true">360°</b>
+              </button>
+            )}
+
             <div className="evolution-constructor__section">
               <div className="evolution-constructor__section-title">
                 <span>Час разом</span>
@@ -267,6 +305,23 @@ export function EvolutionConstructor() {
             </button>
           </footer>
         </section>
+      )}
+
+      {sandbox.freeCameraActive && (
+        <aside className="evolution-free-camera" aria-label="Режим вільної камери">
+          <div className="evolution-free-camera__help">
+            <strong>Вільна камера</strong>
+            <span>1 палець — обертання · 2 пальці — рух і масштаб</span>
+          </div>
+          <button
+            type="button"
+            className="evolution-free-camera__exit"
+            onClick={sandbox.exitFreeCamera}
+            aria-label="Вийти з режиму вільної камери"
+          >
+            ×
+          </button>
+        </aside>
       )}
     </>
   );

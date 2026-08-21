@@ -66,6 +66,11 @@ export interface PortalStageProps {
    * від'їжджав на інший, і половину бажань доводилось дошукувати обертом.
    */
   allowOrbit?: boolean | undefined;
+  /**
+   * Режим огляду з конструктора: відпускає режисер камери та додає zoom/pan.
+   * Після вимкнення PortalCameraRig повертає канонічний кадр сцени.
+   */
+  freeCamera?: boolean | undefined;
   children: ReactNode;
 }
 
@@ -83,6 +88,7 @@ export function PortalStage({
   spin,
   motionMode,
   allowOrbit = true,
+  freeCamera = false,
   children,
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
@@ -154,20 +160,34 @@ export function PortalStage({
         veinBearings={veinBearings}
         veinReach={veinReach}
       />
-      <PortalCameraRig frame={frame} controls={controls} pose={pose} mode={motionMode} spin={spin} />
+      <PortalCameraRig
+        frame={frame}
+        controls={controls}
+        pose={pose}
+        mode={motionMode}
+        spin={spin}
+        freeCamera={freeCamera}
+      />
 
       {children}
 
       <OrbitControls
+        key={freeCamera ? 'free-camera' : 'directed-camera'}
         ref={controls}
-        enablePan={false}
-        enableZoom={false}
-        enableRotate={allowOrbit}
+        enablePan={freeCamera}
+        enableZoom={freeCamera}
+        enableRotate={freeCamera || allowOrbit}
         enableDamping={!reduceMotion}
         dampingFactor={0.08}
+        rotateSpeed={freeCamera ? 0.72 : 1}
+        zoomSpeed={0.78}
+        panSpeed={0.68}
+        screenSpacePanning={freeCamera}
+        minDistance={freeCamera ? Math.max(0.6, frame.distance * 0.16) : 0}
+        maxDistance={freeCamera ? frame.distance * 3.2 : Infinity}
         // Сцена стоїть на землі: дозволити камері пірнути під підлогу
         // означало б показати виворіт подіуму й вивернуті нормалі поля.
-        minPolarAngle={Math.PI * 0.22}
+        minPolarAngle={Math.PI * (freeCamera ? 0.06 : 0.22)}
         maxPolarAngle={Math.PI * 0.5}
         // Цілі тут більше немає, і це не пропуск: її щокадру ставить
         // PortalCameraRig, бо вона залежить від пози маршруту (targetHeight),
