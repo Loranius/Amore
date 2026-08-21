@@ -40,6 +40,7 @@ import {
 import {
   PORTAL_FIELD_DROP,
   PORTAL_GROUND_Y,
+  PORTAL_TEMPLE_FLOOR_Y,
   PORTAL_LAMP_RADIUS,
   PORTAL_PALETTES,
   portalLampReach,
@@ -53,6 +54,13 @@ import {
   portalPillarInstances,
   type PortalCameraFrame,
 } from './portalScene';
+import {
+  buildPortalCelestialArcGeometry,
+  buildPortalColonnadeDecorGeometry,
+  buildPortalCrystalLampGeometry,
+  buildPortalGroundDecorGeometry,
+  buildPortalHazeField,
+} from './portalSceneDecor';
 
 export interface PortalEnvironmentProps {
   /** Насіння артефакта: небо в кожної пари своє й незмінне. */
@@ -61,6 +69,8 @@ export interface PortalEnvironmentProps {
   /** Профіль якості з пайплайну кристала — сцена не має права коштувати
    *  більше за сам артефакт на слабкому пристрої. */
   quality: 'high' | 'balanced' | 'low' | 'fallback';
+  /** Stops atmospheric drift and emissive breathing for accessibility. */
+  reduceMotion: boolean;
   /** Кадр камери для поточного аспекту; сцена й камера мусять читати
    *  одні й ті самі числа, тож він приходить згори. */
   frame: PortalCameraFrame;
@@ -87,19 +97,59 @@ function starCount(quality: PortalEnvironmentProps['quality']): number {
   return 90;
 }
 
+function hazeCount(quality: PortalEnvironmentProps['quality']): number {
+  if (quality === 'high') return 7;
+  if (quality === 'balanced') return 6;
+  if (quality === 'low') return 5;
+  return 3;
+}
+
+const ATMOSPHERE_VERTEX_SHADER = /* glsl */`
+  attribute vec3 color;
+  attribute float pointSize;
+  attribute float pointAlpha;
+  varying vec3 vColor;
+  varying float vAlpha;
+
+  void main() {
+    vColor = color;
+    vAlpha = pointAlpha;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = pointSize;
+  }
+`;
+
+const ATMOSPHERE_FRAGMENT_SHADER = /* glsl */`
+  varying vec3 vColor;
+  varying float vAlpha;
+
+  void main() {
+    float radius = length(gl_PointCoord - vec2(0.5)) * 2.0;
+    float falloff = smoothstep(1.0, 0.0, radius);
+    float alpha = vAlpha * falloff * falloff;
+    if (alpha < 0.002) discard;
+    gl_FragColor = vec4(vColor, alpha);
+  }
+`;
+
 export function PortalEnvironment({
   seed,
   theme,
   quality,
+  reduceMotion,
   frame,
   aspect,
   daisScale,
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
   const maximumAnisotropy = useThree((state) => state.gl.capabilities.getMaxAnisotropy());
+  const pixelRatio = useThree((state) => state.gl.getPixelRatio());
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
   const archesRef = useRef<THREE.InstancedMesh>(null);
   const lampsRef = useRef<THREE.InstancedMesh>(null);
+  const skyRef = useRef<THREE.Group>(null);
+  const relicGlowMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const crystalLampMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
 
   const relicBodyGeometry = useMemo(() => buildPortalRelicBodyGeometry(), []);
   const relicEngravingGeometry = useMemo(() => buildPortalRelicEngravingGeometry(), []);
@@ -124,10 +174,39 @@ export function PortalEnvironment({
   const tileNormal = tiles?.normal ?? null;
   const tileRoughness = tiles?.roughness ?? null;
   const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(), []);
+  const groundDecorGeometry = useMemo(
+    () => buildPortalGroundDecorGeometry(
+      seed,
+      daisScale,
+      PORTAL_TEMPLE_FLOOR_Y,
+      {
+        rock: palette.decorRock,
+        rockAccent: palette.decorRockAccent,
+        moss: palette.decorMoss,
+        grass: palette.decorGrass,
+        plinth: palette.decorPlinth,
+      },
+    ),
+    [daisScale, palette.decorGrass, palette.decorMoss, palette.decorPlinth, palette.decorRock, palette.decorRockAccent, seed],
+  );
+  const crystalLampGeometry = useMemo(
+    () => buildPortalCrystalLampGeometry(seed, daisScale, PORTAL_TEMPLE_FLOOR_Y),
+    [daisScale, seed],
+  );
+  const celestialArcGeometry = useMemo(() => buildPortalCelestialArcGeometry(seed), [seed]);
   const pillarGeometry = useMemo(() => buildModelledPillar(), []);
   const lampGeometry = useMemo(() => buildPortalLampGeometry(), []);
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
+  const haze = useMemo(() => buildPortalHazeField(seed, hazeCount(quality)), [quality, seed]);
   const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
+  const colonnadeDecorGeometry = useMemo(
+    () => buildPortalColonnadeDecorGeometry(seed, pillars, {
+      banner: palette.decorBanner,
+      vine: palette.decorVine,
+      vineAccent: palette.decorVineAccent,
+    }),
+    [palette.decorBanner, palette.decorVine, palette.decorVineAccent, pillars, seed],
+  );
   const lamps = useMemo(() => portalLampInstances(frame, aspect), [frame, aspect]);
   const arches = useMemo(() => portalArchInstances(frame, aspect), [frame, aspect]);
 
@@ -143,12 +222,44 @@ export function PortalEnvironment({
     lampGeometry.dispose();
   }, [relicBodyGeometry, relicEngravingGeometry, relicGlowGeometry, brushedMetal, brushedMetalNormal, archGeometry, floorGeometry, pillarGeometry, lampGeometry]);
 
+  useEffect(() => () => groundDecorGeometry.dispose(), [groundDecorGeometry]);
+  useEffect(() => () => colonnadeDecorGeometry.dispose(), [colonnadeDecorGeometry]);
+  useEffect(() => () => crystalLampGeometry.dispose(), [crystalLampGeometry]);
+  useEffect(() => () => celestialArcGeometry.dispose(), [celestialArcGeometry]);
+
   const starGeometry = useMemo(() => {
+    const count = stars.count + haze.count;
+    const positions = new Float32Array(count * 3);
+    const colours = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    const alphas = new Float32Array(count);
+    positions.set(stars.positions);
+    colours.set(stars.colors);
+    const ratio = Math.min(1.5, Math.max(1, pixelRatio));
+    for (let index = 0; index < stars.count; index += 1) {
+      const brightness = Math.max(
+        stars.colors[index * 3]!,
+        stars.colors[index * 3 + 1]!,
+        stars.colors[index * 3 + 2]!,
+      );
+      sizes[index] = (1.15 + brightness * 0.95) * ratio;
+      alphas[index] = palette.starOpacity * (0.45 + brightness * 0.55);
+    }
+    const hazeColour = new THREE.Color(palette.haze);
+    for (let index = 0; index < haze.count; index += 1) {
+      const target = stars.count + index;
+      positions.set(haze.positions.subarray(index * 3, index * 3 + 3), target * 3);
+      hazeColour.toArray(colours, target * 3);
+      sizes[target] = haze.sizes[index]! * ratio;
+      alphas[target] = palette.hazeOpacity * haze.alphas[index]!;
+    }
     const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(stars.positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(stars.colors, 3));
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
+    geometry.setAttribute('pointSize', new THREE.BufferAttribute(sizes, 1));
+    geometry.setAttribute('pointAlpha', new THREE.BufferAttribute(alphas, 1));
     return geometry;
-  }, [stars]);
+  }, [haze, palette.haze, palette.hazeOpacity, palette.starOpacity, pixelRatio, stars]);
 
   useEffect(() => () => starGeometry.dispose(), [starGeometry]);
 
@@ -213,6 +324,21 @@ export function PortalEnvironment({
     mesh.computeBoundingSphere();
   }, [arches]);
 
+  useFrame(({ clock }, delta) => {
+    if (!reduceMotion && skyRef.current !== null) {
+      skyRef.current.rotation.y = (skyRef.current.rotation.y + delta * 0.0024) % (Math.PI * 2);
+    }
+    const breath = reduceMotion
+      ? 1
+      : 0.95 + Math.sin(clock.elapsedTime * 0.72 + seed * 0.001) * 0.05;
+    if (relicGlowMaterialRef.current !== null) {
+      relicGlowMaterialRef.current.emissiveIntensity = palette.inlayEmissive * breath;
+    }
+    if (crystalLampMaterialRef.current !== null) {
+      crystalLampMaterialRef.current.emissiveIntensity = palette.decorCrystalEmissive * breath;
+    }
+  });
+
   return (
     <>
       <fog attach="fog" args={[palette.fog, frame.fogNear, frame.fogFar]} />
@@ -233,7 +359,7 @@ export function PortalEnvironment({
           сенсу класти камінь. */}
       <mesh
         geometry={floorGeometry}
-        position={[0, PORTAL_GROUND_Y - PORTAL_FIELD_DROP + 0.02, 0]}
+        position={[0, PORTAL_TEMPLE_FLOOR_Y, 0]}
       >
         <meshStandardMaterial
           map={tileTexture}
@@ -243,6 +369,33 @@ export function PortalEnvironment({
           color={palette.slab}
           roughness={palette.floorRoughness}
           metalness={0}
+        />
+      </mesh>
+
+      {/* Нерівномірні острівці між релікварієм і колонадою повертають сцені
+          середній план. Каміння, мох, трава й тумби злиті в одну геометрію та
+          стоять поза металом, тож не підміняють data-owned кристали. */}
+      <mesh geometry={groundDecorGeometry} frustumCulled={false}>
+        <meshStandardMaterial
+          vertexColors
+          roughness={0.96}
+          metalness={0}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+
+      {/* Чотири малі кристали — світильники храму, а не історія пари: вони
+          стоять на однакових кам'яних тумбах поза релікварієм і не ростуть
+          від даних. Емісія дає акцент без жодного нового point light. */}
+      <mesh geometry={crystalLampGeometry} frustumCulled={false}>
+        <meshStandardMaterial
+          ref={crystalLampMaterialRef}
+          color={palette.decorCrystal}
+          emissive={palette.decorCrystalGlow}
+          emissiveIntensity={palette.decorCrystalEmissive}
+          roughness={0.2}
+          metalness={0.04}
+          toneMapped={false}
         />
       </mesh>
 
@@ -279,6 +432,7 @@ export function PortalEnvironment({
         </mesh>
         <mesh geometry={relicGlowGeometry}>
           <meshStandardMaterial
+            ref={relicGlowMaterialRef}
             color={palette.inlay}
             emissive={palette.runeGlow}
             emissiveIntensity={palette.inlayEmissive}
@@ -307,6 +461,18 @@ export function PortalEnvironment({
       >
         <meshStandardMaterial map={colonnadeMap} color={palette.pillar} roughness={0.94} metalness={0.02} />
       </instancedMesh>
+
+      {/* Чотири полотнища й три лози порушують стерильну повторюваність
+          вісімнадцяти однакових прольотів. Увесь шар уже в світових
+          координатах і злитий в один двосторонній buffer. */}
+      <mesh geometry={colonnadeDecorGeometry} frustumCulled={false}>
+        <meshStandardMaterial
+          vertexColors
+          roughness={0.9}
+          metalness={0}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
 
       {/* Вогні на колонах. Геометрія горить на всіх — вона майже безкоштовна,
           — а справжнє джерело світла запалює лише передня пара: кожен point
@@ -356,18 +522,33 @@ export function PortalEnvironment({
         />
       ))}
 
-      <points geometry={starGeometry}>
-        <pointsMaterial
-          size={1.7}
-          sizeAttenuation={false}
-          vertexColors
-          transparent
-          opacity={palette.starOpacity}
-          depthWrite={false}
-          // Зорі за туманом: інакше вся оболонка втопилась би у fogFar.
-          fog={false}
-        />
-      </points>
+      {/* Зорі й кілька великих м'яких плям туманності йдуть одним point pass.
+          Дуги — окрема лінійна геометрія. Разом вони дають глибину верхній
+          половині кадру, але лишають її переважно порожньою. */}
+      <group ref={skyRef}>
+        <points geometry={starGeometry} frustumCulled={false}>
+          <shaderMaterial
+            vertexShader={ATMOSPHERE_VERTEX_SHADER}
+            fragmentShader={ATMOSPHERE_FRAGMENT_SHADER}
+            transparent
+            depthWrite={false}
+            depthTest
+            blending={THREE.AdditiveBlending}
+            toneMapped={false}
+            fog={false}
+          />
+        </points>
+        <lineSegments geometry={celestialArcGeometry} frustumCulled={false}>
+          <lineBasicMaterial
+            color={palette.celestialArc}
+            transparent
+            opacity={palette.celestialArcOpacity}
+            depthWrite={false}
+            toneMapped={false}
+            fog={false}
+          />
+        </lineSegments>
+      </group>
 
       {/* Слабке світло від кореня (§10 брифу). Дешевше за будь-яку «пляму» в
           геометрії й на відміну від неї реагує на нахил каменю.

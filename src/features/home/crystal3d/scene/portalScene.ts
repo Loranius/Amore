@@ -29,6 +29,13 @@ import {
   buildPortalArchGeometry as buildModelledArch,
   buildPortalPillarGeometry as buildModelledPillar,
 } from './portalColonnadeMesh';
+import {
+  PORTAL_DECOR_DRAW_CALLS,
+  PORTAL_DECOR_TRIANGLES,
+  buildPortalColonnadeDecorGeometry,
+  buildPortalCrystalLampGeometry,
+  buildPortalGroundDecorGeometry,
+} from './portalSceneDecor';
 
 /** Площина, на якій стоїть артефакт; уся сцена відраховується від неї. */
 export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
@@ -41,9 +48,10 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  *
  * Поле + підлога храму + три оптичні шари релікварію (бронза, гравіювання,
  * фіолетове скло) + колони (один InstancedMesh на все кільце) + вогні на них
- * (так само один) + арки (так само один) + зорі.
+ * (так само один) + арки + зорі/туманність + чотири декор-проходи: ґрунт,
+ * колонада, кристальні маяки та небесні дуги.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 9;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 9 + PORTAL_DECOR_DRAW_CALLS;
 
 /**
  * Скільки трикутників додає оточення. Той самий привід, що й у draw
@@ -54,7 +62,7 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 9;
  * будувати геометрію двічі. За тим, щоб воно не розійшлось із реальними
  * буферами, стежить portalScene.test.ts.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 22_992;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 22_992 + PORTAL_DECOR_TRIANGLES;
 
 /** Сегментів у диску поля; єдине місце, що задає його вартість. */
 const FIELD_SEGMENTS = 64;
@@ -81,6 +89,26 @@ export function measurePortalEnvironmentTriangles(
   const costFrame = portalCameraFrame(0.5, 1);
   const standingPillars = portalPillarInstances(costFrame, 0.5).length;
   const standingArches = portalArchInstances(costFrame, 0.5).length;
+  const pillarInstances = portalPillarInstances(costFrame, 0.5);
+  const decorPalette = {
+    rock: '#888888',
+    rockAccent: '#aaaaaa',
+    moss: '#557755',
+    grass: '#446644',
+    plinth: '#777777',
+  };
+  const groundDecor = buildPortalGroundDecorGeometry(
+    _seed,
+    1,
+    PORTAL_TEMPLE_FLOOR_Y,
+    decorPalette,
+  );
+  const colonnadeDecor = buildPortalColonnadeDecorGeometry(_seed, pillarInstances, {
+    banner: '#665588',
+    vine: '#335544',
+    vineAccent: '#557766',
+  });
+  const crystalLamps = buildPortalCrystalLampGeometry(_seed, 1, PORTAL_TEMPLE_FLOOR_Y);
   const triangles = (geometry: THREE.BufferGeometry): number => {
     const index = geometry.getIndex();
     return index === null
@@ -97,7 +125,10 @@ export function measurePortalEnvironmentTriangles(
     + triangles(pillar) * standingPillars
     + triangles(lamp) * standingPillars
     + triangles(arch) * standingArches
-    + triangles(floor);
+    + triangles(floor)
+    + triangles(groundDecor)
+    + triangles(colonnadeDecor)
+    + triangles(crystalLamps);
 
   relicBody.dispose();
   relicEngraving.dispose();
@@ -106,6 +137,9 @@ export function measurePortalEnvironmentTriangles(
   lamp.dispose();
   arch.dispose();
   floor.dispose();
+  groundDecor.dispose();
+  colonnadeDecor.dispose();
+  crystalLamps.dispose();
   return total;
 }
 
@@ -447,6 +481,8 @@ export function portalDaisScale(visibleCrystalRadius: number): number {
 }
 /** Наскільки навколишнє поле нижче за верх подіуму. */
 export const PORTAL_FIELD_DROP = 0.3;
+/** Visible temple tiles sit just above the dark field so their seams stay legible. */
+export const PORTAL_TEMPLE_FLOOR_Y = PORTAL_GROUND_Y - PORTAL_FIELD_DROP + 0.02;
 
 export function buildPortalDaisGeometry(): THREE.LatheGeometry {
   const points = DAIS_PROFILE.map(([radius, y]) => new THREE.Vector2(radius, y));
@@ -1363,6 +1399,22 @@ export interface PortalPalette {
   runeGlow: string;
   inlay: string;
   pillar: string;
+  /** Presentation-only life between the reliquary and the colonnade. */
+  decorRock: string;
+  decorRockAccent: string;
+  decorMoss: string;
+  decorGrass: string;
+  decorPlinth: string;
+  decorBanner: string;
+  decorVine: string;
+  decorVineAccent: string;
+  decorCrystal: string;
+  decorCrystalGlow: string;
+  decorCrystalEmissive: number;
+  celestialArc: string;
+  celestialArcOpacity: number;
+  haze: string;
+  hazeOpacity: number;
   /** Чаша вогню на колоні. */
   lamp: string;
   /** Саме полум'я — і колір джерела світла, що від нього запалюється. */
@@ -1480,6 +1532,21 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     runeGlow: '#a37ce8',
     inlay: '#8b5fd8',
     pillar: '#f0e9dc',
+    decorRock: '#b9b3a9',
+    decorRockAccent: '#d1c9ba',
+    decorMoss: '#82956f',
+    decorGrass: '#6f875d',
+    decorPlinth: '#c8c0b0',
+    decorBanner: '#8172a5',
+    decorVine: '#4f7654',
+    decorVineAccent: '#71926a',
+    decorCrystal: '#bca9e8',
+    decorCrystalGlow: '#9469da',
+    decorCrystalEmissive: 0.32,
+    celestialArc: '#8176b9',
+    celestialArcOpacity: 0.09,
+    haze: '#aebde3',
+    hazeOpacity: 0.075,
     lamp: '#c9bda6',
     lampGlow: '#ff9c47',
     // 11 → 2.4. Вогонь у чаші при сонці майже не читається, і це правда, а
@@ -1528,6 +1595,21 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     runeGlow: '#b96ff2',
     inlay: '#9747d8',
     pillar: '#4b4070',
+    decorRock: '#514c62',
+    decorRockAccent: '#6b6379',
+    decorMoss: '#30483c',
+    decorGrass: '#3f5d4b',
+    decorPlinth: '#443b59',
+    decorBanner: '#34244f',
+    decorVine: '#29463a',
+    decorVineAccent: '#3d6750',
+    decorCrystal: '#b987f2',
+    decorCrystalGlow: '#a54fe8',
+    decorCrystalEmissive: 2.05,
+    celestialArc: '#846dd1',
+    celestialArcOpacity: 0.16,
+    haze: '#705ab5',
+    hazeOpacity: 0.14,
     lamp: '#1b1628',
     lampGlow: '#ff8c34',
     lampIntensity: 13,

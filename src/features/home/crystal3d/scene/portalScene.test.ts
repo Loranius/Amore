@@ -703,9 +703,9 @@ describe('portal geometry', () => {
   });
 
   it('accounts for every object the environment draws', () => {
-    // Поле, підлога храму, три шари релікварію, колони (один InstancedMesh на
-    // все кільце), вогні на них (так само один), арки й зорі.
-    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(9);
+    // Базові дев'ять проходів плюс ґрунт, оздоблення колонади, кристальні
+    // маяки та небесні дуги. Туманність ділить наявний point pass із зорями.
+    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(13);
   });
 
   it('lights the crystal from the colonnade without lighting the whole field', () => {

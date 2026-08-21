@@ -154,6 +154,7 @@ export function PortalStage({
         seed={seed}
         theme={theme}
         quality={quality}
+        reduceMotion={reduceMotion}
         frame={frame}
         aspect={aspect}
         daisScale={daisScale}
