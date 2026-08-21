@@ -1,0 +1,19 @@
+Asset: Floor Tiles 04
+Source: https://polyhaven.com/ar/a/floor_tiles_04
+Author: Rob Tuytel
+License: CC0 1.0 Universal
+
+Files used from the 1K JPG set:
+- floor_tiles_04_diff_1k.jpg
+- floor_tiles_04_nor_gl_1k.jpg
+- floor_tiles_04_rough_1k.jpg
+
+Changes for Amore:
+- resized all maps to 512 x 512 and converted them to WebP for mobile delivery;
+- converted the diffuse map to greyscale so the theme palette owns the stone colour;
+- lifted roughness by 1.65x to keep the temple floor matte under portal lighting.
+
+Amore filenames:
+- floor-stone-albedo.webp
+- floor-stone-normal.webp
+- floor-stone-roughness.webp

@@ -1008,8 +1008,14 @@ export function buildPortalPillarGeometry(): THREE.BufferGeometry {
 /** Де підлога починається і де закінчується, у світових одиницях. */
 const FLOOR_INNER = 0.6;
 const FLOOR_OUTER = 17;
-/** Скільки разів плитка вкладається на один світовий юніт. */
-const FLOOR_TILING = 0.55;
+/**
+ * Скільки разів текстура вкладається на один світовий юніт.
+ *
+ * 0.55 перетворювало великі храмові плити на дрібну сітку: на вузькому
+ * телефоні вона зливалася в штрихування й забирала увагу в кристала. 0.14
+ * лишає у видимому прольоті кілька великих блоків, як у референсі храму.
+ */
+export const PORTAL_FLOOR_TILING = 0.14;
 
 /**
  * Кам'яна підлога навколо подіуму.
@@ -1046,7 +1052,7 @@ export function buildPortalTempleFloorGeometry(): THREE.BufferGeometry {
       const x = Math.sin(angle) * radius;
       const z = Math.cos(angle) * radius;
       positions.push(x, 0, z);
-      uvs.push(x * FLOOR_TILING, z * FLOOR_TILING);
+      uvs.push(x * PORTAL_FLOOR_TILING, z * PORTAL_FLOOR_TILING);
     }
   }
   const stride = sectors + 1;
@@ -1351,6 +1357,10 @@ export interface PortalPalette {
   daisEmissive: string;
   /** Ритуальна плита — той самий камінь, що подіум, але світліший на зламі. */
   slab: string;
+  /** Скаляр PBR-карти підлоги: камінь матовий в обох порах доби. */
+  floorRoughness: number;
+  /** Сила мікрорельєфу швів; уночі трохи вища, бо розсіяного світла менше. */
+  floorNormalScale: number;
   /** Різьблення на кільці плити. */
   rune: string;
   runeGlow: string;
@@ -1467,6 +1477,8 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     // помилка матеріалу, а не як святиня.
     daisEmissive: '#000000',
     slab: '#f0eade',
+    floorRoughness: 1,
+    floorNormalScale: 0.18,
     rune: '#b3a288',
     runeGlow: '#a37ce8',
     inlay: '#8b5fd8',
@@ -1513,6 +1525,8 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     dais: '#5b362e',
     daisEmissive: '#10070a',
     slab: '#494757',
+    floorRoughness: 1,
+    floorNormalScale: 0.26,
     rune: '#1d1115',
     runeGlow: '#b96ff2',
     inlay: '#9747d8',

@@ -97,6 +97,20 @@ describe('світло порталу (§10 брифу кристала)', () =>
     expect(day.lampIntensity).toBeLessThan(night.lampIntensity / 2);
   });
 
+  it('лишає камінь підлоги матовим і читабельним в обох темах', () => {
+    const day = PORTAL_PALETTES.light;
+    const night = PORTAL_PALETTES.dark;
+    for (const theme of THEMES) {
+      const floor = PORTAL_PALETTES[theme];
+      expect(floor.floorRoughness, theme).toBeGreaterThanOrEqual(0.9);
+      expect(floor.floorNormalScale, theme).toBeGreaterThan(0);
+      expect(floor.floorNormalScale, theme).toBeLessThanOrEqual(0.3);
+    }
+
+    expect(day.slab).not.toBe(night.slab);
+    expect(day.floorNormalScale).toBeLessThan(night.floorNormalScale);
+  });
+
   it('не має жодного жовтого джерела, що дістає до кристала', () => {
     // Полум'я в чашах лишається помаранчевим — це декорація сцени, і §10
     // говорить про світло на артефакті. Перевіряється саме те: скільки його

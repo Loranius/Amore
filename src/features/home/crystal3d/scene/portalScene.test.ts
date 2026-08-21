@@ -11,6 +11,7 @@ import {
   PORTAL_ENVIRONMENT_DRAW_CALLS,
   PORTAL_ENVIRONMENT_TRIANGLES,
   PORTAL_FIELD_DROP,
+  PORTAL_FLOOR_TILING,
   PORTAL_GROUND_Y,
   PORTAL_COLONNADE_COUNT,
   PORTAL_COLONNADE_RADIUS,
@@ -19,6 +20,7 @@ import {
   buildPortalRitualSlabGeometry,
   buildPortalPillarGeometry,
   buildPortalStarField,
+  buildPortalTempleFloorGeometry,
   measurePortalEnvironmentTriangles,
   portalArchInstances,
   PORTAL_INLAY_CLEARANCE,
@@ -74,6 +76,27 @@ const AGES: readonly (readonly [number, number])[] = [
   [1.42, 3.19],
   [WIDEST_CRYSTAL_RADIUS, 2.71],
 ];
+
+describe('portal temple floor', () => {
+  it('keeps the clean stone blocks large and projects them without distortion', () => {
+    const geometry = buildPortalTempleFloorGeometry();
+    const position = geometry.getAttribute('position') as THREE.BufferAttribute;
+    const uv = geometry.getAttribute('uv') as THREE.BufferAttribute;
+
+    // The texture contains several blocks per repeat. At 0.14 repeats per
+    // world unit they read as temple slabs; the old 0.55 became dense stripes
+    // at the shallow mobile camera angle.
+    expect(PORTAL_FLOOR_TILING).toBeGreaterThanOrEqual(0.1);
+    expect(PORTAL_FLOOR_TILING).toBeLessThanOrEqual(0.18);
+    expect(uv.count).toBe(position.count);
+    for (let index = 0; index < position.count; index += 1) {
+      expect(uv.getX(index)).toBeCloseTo(position.getX(index) * PORTAL_FLOOR_TILING, 5);
+      expect(uv.getY(index)).toBeCloseTo(position.getZ(index) * PORTAL_FLOOR_TILING, 5);
+    }
+
+    geometry.dispose();
+  });
+});
 
 describe('portal camera frame', () => {
   it('stands on the same plane the renderer puts the artifact on', () => {

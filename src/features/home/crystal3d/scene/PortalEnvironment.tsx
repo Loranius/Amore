@@ -96,6 +96,7 @@ export function PortalEnvironment({
   daisScale,
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
+  const maximumAnisotropy = useThree((state) => state.gl.capabilities.getMaxAnisotropy());
   const pillarsRef = useRef<THREE.InstancedMesh>(null);
   const archesRef = useRef<THREE.InstancedMesh>(null);
   const lampsRef = useRef<THREE.InstancedMesh>(null);
@@ -106,11 +107,19 @@ export function PortalEnvironment({
   const brushedMetal = useMemo(() => buildPortalBrushedMetalTexture(), []);
   const brushedMetalNormal = useMemo(() => buildPortalBrushedMetalNormalTexture(), []);
   const brushedNormalScale = useMemo(() => new THREE.Vector2(0.18, 0.32), []);
+  const floorNormalScale = useMemo(
+    () => new THREE.Vector2(palette.floorNormalScale, palette.floorNormalScale),
+    [palette.floorNormalScale],
+  );
   const archGeometry = useMemo(() => buildModelledArch(), []);
-  const tiles = useMemo(() => portalTileTextures(), []);
+  const tiles = useMemo(
+    () => portalTileTextures(maximumAnisotropy),
+    [maximumAnisotropy],
+  );
   const colonnadeMap = useMemo(() => portalColonnadeTexture(), []);
   const tileTexture = tiles?.albedo ?? null;
   const tileNormal = tiles?.normal ?? null;
+  const tileRoughness = tiles?.roughness ?? null;
   const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(), []);
   const pillarGeometry = useMemo(() => buildModelledPillar(), []);
   const lampGeometry = useMemo(() => buildPortalLampGeometry(), []);
@@ -226,8 +235,10 @@ export function PortalEnvironment({
         <meshStandardMaterial
           map={tileTexture}
           normalMap={tileNormal}
+          normalScale={floorNormalScale}
+          roughnessMap={tileRoughness}
           color={palette.slab}
-          roughness={0.96}
+          roughness={palette.floorRoughness}
           metalness={0}
         />
       </mesh>

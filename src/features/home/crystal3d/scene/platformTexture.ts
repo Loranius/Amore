@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import platformUrl from '@/assets/portal/platform.webp';
 import colonnadeUrl from '@/assets/portal/colonnade.webp';
-import tilesUrl from '@/assets/portal/tiles.webp';
-import tilesNormalUrl from '@/assets/portal/tiles-normal.webp';
+import floorStoneAlbedoUrl from '@/assets/portal/floor-stone-albedo.webp';
+import floorStoneNormalUrl from '@/assets/portal/floor-stone-normal.webp';
+import floorStoneRoughnessUrl from '@/assets/portal/floor-stone-roughness.webp';
 
 /**
  * The platform's stone.
@@ -36,36 +37,73 @@ export function disposePortalPlatformTexture(): void {
 export interface PortalTileTextures {
   albedo: THREE.Texture;
   normal: THREE.Texture;
+  roughness: THREE.Texture;
 }
 
+export const PORTAL_FLOOR_TEXTURE_RESOLUTION = 512;
+export const PORTAL_FLOOR_MAX_ANISOTROPY = 8;
+export const PORTAL_FLOOR_TEXTURE_FILES = [
+  'floor-stone-albedo.webp',
+  'floor-stone-normal.webp',
+  'floor-stone-roughness.webp',
+] as const;
+
 /**
- * The floor's tiles, supplied by the owner.
+ * The floor's clean, mobile-sized PBR set.
  *
- * Greyscaled for the same reason the platform's stone was: an albedo map
- * multiplies the material colour, so in colour it would paint the floor its
- * own sandstone whatever the theme says. The normal map keeps its colour — it
- * is a vector, not a hue.
+ * The previous albedo and normal files had a stretched half-frame baked into
+ * the pixels, so no UV change could make them sharp. This CC0 stone set is
+ * greyscaled for the same reason as the platform: an albedo map multiplies the
+ * material colour, so neutral stone accepts the day or night palette instead
+ * of painting both themes beige. Normal and roughness maps stay linear.
  *
- * Wrapped rather than clamped: the floor lays the pattern out by arc length and
- * radius, so the coordinates run far past one, and clamping would smear the
- * map's last row across the whole ring.
+ * Wrapped rather than clamped: the top-down UVs run far past one, and clamping
+ * would smear the map's last row across the whole floor. Anisotropy is capped
+ * at eight: it materially sharpens the shallow mobile camera angle without
+ * requesting the desktop maximum on every device.
  */
 let tiles: PortalTileTextures | null = null;
 
-export function portalTileTextures(): PortalTileTextures | null {
-  if (typeof document === 'undefined') return null;
-  if (tiles !== null) return tiles;
-  const loader = new THREE.TextureLoader();
-  const albedo = loader.load(tilesUrl);
-  const normal = loader.load(tilesNormalUrl);
-  for (const texture of [albedo, normal]) {
+export function portalFloorAnisotropy(rendererMaximum: number): number {
+  if (!Number.isFinite(rendererMaximum)) return 1;
+  return Math.min(
+    PORTAL_FLOOR_MAX_ANISOTROPY,
+    Math.max(1, Math.floor(rendererMaximum)),
+  );
+}
+
+function applyFloorSampling(
+  textures: PortalTileTextures,
+  rendererMaximum: number,
+): void {
+  const anisotropy = portalFloorAnisotropy(rendererMaximum);
+  for (const texture of [textures.albedo, textures.normal, textures.roughness]) {
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
-    texture.anisotropy = 4;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    if (texture.anisotropy !== anisotropy) {
+      texture.anisotropy = anisotropy;
+      texture.needsUpdate = true;
+    }
   }
+}
+
+export function portalTileTextures(rendererMaximumAnisotropy = 4): PortalTileTextures | null {
+  if (typeof document === 'undefined') return null;
+  if (tiles !== null) {
+    applyFloorSampling(tiles, rendererMaximumAnisotropy);
+    return tiles;
+  }
+  const loader = new THREE.TextureLoader();
+  const albedo = loader.load(floorStoneAlbedoUrl);
+  const normal = loader.load(floorStoneNormalUrl);
+  const roughness = loader.load(floorStoneRoughnessUrl);
   albedo.colorSpace = THREE.SRGBColorSpace;
   normal.colorSpace = THREE.NoColorSpace;
-  tiles = { albedo, normal };
+  roughness.colorSpace = THREE.NoColorSpace;
+  tiles = { albedo, normal, roughness };
+  applyFloorSampling(tiles, rendererMaximumAnisotropy);
   return tiles;
 }
 
@@ -73,6 +111,7 @@ export function portalTileTextures(): PortalTileTextures | null {
 export function disposePortalTileTextures(): void {
   tiles?.albedo.dispose();
   tiles?.normal.dispose();
+  tiles?.roughness.dispose();
   tiles = null;
 }
 
