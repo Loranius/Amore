@@ -54,6 +54,57 @@ export const PORTAL_ARCH_INNER_FOOT = 0.79;
 export const PORTAL_ARCH_DEPTH = 1.72;
 
 /**
+ * Чиста мармурова панель усередині старого атласу колонади.
+ *
+ * Атлас має непрозорий сірий фон навколо UV-островів моделі. Стандартні UV,
+ * які створює `ExtrudeGeometry`, виходять за 0..1 і з ClampToEdge тягнуть цей
+ * фон на половину нової арки. Нормалізуємо кожен профіль у внутрішню область
+ * великої мармурової панелі, лишаючи запас від її сірих країв.
+ */
+export const PORTAL_ARCH_ATLAS_REGION = Object.freeze({
+  uMin: 92 / 512,
+  uMax: 410 / 512,
+  // WebGL UV рахує V знизу, тоді як координати перевіреного crop — згори.
+  vMin: 1 - 430 / 512,
+  vMax: 1 - 82 / 512,
+});
+
+function remapArchUvsToMarblePanel(geometry: THREE.BufferGeometry): void {
+  const uv = geometry.getAttribute('uv');
+  let minU = Number.POSITIVE_INFINITY;
+  let maxU = Number.NEGATIVE_INFINITY;
+  let minV = Number.POSITIVE_INFINITY;
+  let maxV = Number.NEGATIVE_INFINITY;
+
+  for (let vertex = 0; vertex < uv.count; vertex += 1) {
+    const u = uv.getX(vertex);
+    const v = uv.getY(vertex);
+    minU = Math.min(minU, u);
+    maxU = Math.max(maxU, u);
+    minV = Math.min(minV, v);
+    maxV = Math.max(maxV, v);
+  }
+
+  const rangeU = maxU - minU;
+  const rangeV = maxV - minV;
+  if (!(rangeU > 0) || !(rangeV > 0)) {
+    throw new Error('Portal arch UV range is degenerate.');
+  }
+
+  const { uMin, uMax, vMin, vMax } = PORTAL_ARCH_ATLAS_REGION;
+  for (let vertex = 0; vertex < uv.count; vertex += 1) {
+    const localU = (uv.getX(vertex) - minU) / rangeU;
+    const localV = (uv.getY(vertex) - minV) / rangeV;
+    uv.setXY(
+      vertex,
+      THREE.MathUtils.lerp(uMin, uMax, localU),
+      THREE.MathUtils.lerp(vMin, vMax, localV),
+    );
+  }
+  uv.needsUpdate = true;
+}
+
+/**
  * Замкнений профіль піварки без прямокутного спандрела над капітеллю.
  *
  * Початкова вбудована модель була прямокутною стіною з вирізаним отвором:
@@ -90,6 +141,7 @@ function archBand(
     steps: 1,
   });
   geometry.translate(0, 0, -depth * 0.5);
+  remapArchUvsToMarblePanel(geometry);
   geometry.clearGroups();
   return geometry;
 }

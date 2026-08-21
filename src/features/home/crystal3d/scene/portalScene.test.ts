@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import {
+  PORTAL_ARCH_ATLAS_REGION,
   PORTAL_ARCH_DEPTH,
   PORTAL_ARCH_INNER_FOOT,
   PORTAL_ARCH_PROFILE_SEGMENTS,
@@ -359,6 +360,19 @@ describe('portal pillars', () => {
     expect(archBounds.min.z).toBeCloseTo(-PORTAL_ARCH_DEPTH * 0.5, 6);
     expect(archBounds.max.z).toBeCloseTo(PORTAL_ARCH_DEPTH * 0.5, 6);
     expect(archUv.count).toBe(archPosition.count);
+    for (let vertex = 0; vertex < archUv.count; vertex += 1) {
+      expect(archUv.getX(vertex)).toBeGreaterThanOrEqual(PORTAL_ARCH_ATLAS_REGION.uMin);
+      expect(archUv.getX(vertex)).toBeLessThanOrEqual(PORTAL_ARCH_ATLAS_REGION.uMax);
+      expect(archUv.getY(vertex)).toBeGreaterThanOrEqual(PORTAL_ARCH_ATLAS_REGION.vMin);
+      expect(archUv.getY(vertex)).toBeLessThanOrEqual(PORTAL_ARCH_ATLAS_REGION.vMax);
+    }
+    // UV-острів арки живе всередині мармурової панелі атласу. Старі
+    // ExtrudeGeometry UV мали u=-1 та v=-0.72 і через ClampToEdge читали
+    // непрозорий сірий фон по краях colonnade.webp.
+    expect(PORTAL_ARCH_ATLAS_REGION.uMin).toBeGreaterThan(0.1);
+    expect(PORTAL_ARCH_ATLAS_REGION.uMax).toBeLessThan(0.9);
+    expect(PORTAL_ARCH_ATLAS_REGION.vMin).toBeGreaterThan(0.1);
+    expect(PORTAL_ARCH_ATLAS_REGION.vMax).toBeLessThan(0.9);
     expect(archGeometry.groups.length).toBeLessThanOrEqual(1);
     expect(archPosition.count / 3).toBeGreaterThan(300);
     expect(archPosition.count / 3).toBeLessThan(500);
