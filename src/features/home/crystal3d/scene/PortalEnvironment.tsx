@@ -174,11 +174,13 @@ export function PortalEnvironment({
   const tileNormal = tiles?.normal ?? null;
   const tileRoughness = tiles?.roughness ?? null;
   const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(), []);
+  const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
   const groundDecorGeometry = useMemo(
     () => buildPortalGroundDecorGeometry(
       seed,
       daisScale,
       PORTAL_TEMPLE_FLOOR_Y,
+      pillars,
       {
         rock: palette.decorRock,
         rockAccent: palette.decorRockAccent,
@@ -187,7 +189,7 @@ export function PortalEnvironment({
         plinth: palette.decorPlinth,
       },
     ),
-    [daisScale, palette.decorGrass, palette.decorMoss, palette.decorPlinth, palette.decorRock, palette.decorRockAccent, seed],
+    [daisScale, palette.decorGrass, palette.decorMoss, palette.decorPlinth, palette.decorRock, palette.decorRockAccent, pillars, seed],
   );
   const crystalLampGeometry = useMemo(
     () => buildPortalCrystalLampGeometry(seed, daisScale, PORTAL_TEMPLE_FLOOR_Y),
@@ -198,7 +200,6 @@ export function PortalEnvironment({
   const lampGeometry = useMemo(() => buildPortalLampGeometry(), []);
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
   const haze = useMemo(() => buildPortalHazeField(seed, hazeCount(quality)), [quality, seed]);
-  const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
   const colonnadeDecorGeometry = useMemo(
     () => buildPortalColonnadeDecorGeometry(seed, pillars, {
       banner: palette.decorBanner,
@@ -372,15 +373,16 @@ export function PortalEnvironment({
         />
       </mesh>
 
-      {/* Нерівномірні острівці між релікварієм і колонадою повертають сцені
-          середній план. Каміння, мох, трава й тумби злиті в одну геометрію та
-          стоять поза металом, тож не підміняють data-owned кристали. */}
+      {/* Дрібні камені й рослини тепер тримаються основ колон, а низькі тумби
+          маяків стоять у середньому плані. Усе злите в один buffer і не
+          конкурує з data-owned кристалами на подіумі. */}
       <mesh geometry={groundDecorGeometry} frustumCulled={false}>
         <meshStandardMaterial
           vertexColors
           roughness={0.96}
           metalness={0}
           side={THREE.DoubleSide}
+          flatShading
         />
       </mesh>
 
@@ -396,6 +398,7 @@ export function PortalEnvironment({
           roughness={0.2}
           metalness={0.04}
           toneMapped={false}
+          flatShading
         />
       </mesh>
 

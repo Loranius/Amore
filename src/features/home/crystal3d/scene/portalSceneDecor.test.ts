@@ -5,6 +5,7 @@ import {
   PORTAL_CELESTIAL_ARC_COUNT,
   PORTAL_CELESTIAL_ARC_SEGMENTS,
   PORTAL_CRYSTAL_LAMP_COUNT,
+  PORTAL_CRYSTAL_PLINTH_HEIGHT,
   PORTAL_DECOR_DRAW_CALLS,
   PORTAL_GROUND_CLUSTER_COUNT,
   PORTAL_GROUND_DECOR_CLEARANCE,
@@ -19,9 +20,15 @@ import {
   portalGroundClusterPlacements,
   portalVinePillars,
 } from './portalSceneDecor';
-import { PORTAL_TEMPLE_FLOOR_Y, portalCameraFrame, portalPillarInstances } from './portalScene';
+import {
+  PORTAL_COLONNADE_RADIUS,
+  PORTAL_TEMPLE_FLOOR_Y,
+  portalCameraFrame,
+  portalPillarInstances,
+} from './portalScene';
 
 const FLOOR_Y = PORTAL_TEMPLE_FLOOR_Y;
+const PILLARS = portalPillarInstances(portalCameraFrame(0.46, 1.5), 0.46);
 const PALETTE = {
   rock: '#b9b3a9',
   rockAccent: '#d1c9ba',
@@ -44,28 +51,39 @@ function triangles(geometry: ReturnType<typeof buildPortalGroundDecorGeometry>):
 
 describe('portal ground decor', () => {
   it('is deterministic per couple but not shared by every couple', () => {
-    const first = portalGroundClusterPlacements(4242, 1.2, FLOOR_Y);
-    expect(portalGroundClusterPlacements(4242, 1.2, FLOOR_Y)).toEqual(first);
-    expect(portalGroundClusterPlacements(4243, 1.2, FLOOR_Y)).not.toEqual(first);
+    const first = portalGroundClusterPlacements(4242, PILLARS, FLOOR_Y);
+    expect(portalGroundClusterPlacements(4242, PILLARS, FLOOR_Y)).toEqual(first);
+    expect(portalGroundClusterPlacements(4243, PILLARS, FLOOR_Y)).not.toEqual(first);
     expect(first).toHaveLength(PORTAL_GROUND_CLUSTER_COUNT);
   });
 
-  it('never grows scenery through the metal reliquary', () => {
+  it('ties small plant accents to the rear colonnade instead of the open floor', () => {
+    for (const cluster of portalGroundClusterPlacements(99, PILLARS, FLOOR_Y)) {
+      const radius = Math.hypot(cluster.position[0], cluster.position[2]);
+      const nearestPillar = Math.min(...PILLARS.map((pillar) => Math.hypot(
+        cluster.position[0] - pillar.position[0],
+        cluster.position[2] - pillar.position[2],
+      )));
+      expect(radius).toBeGreaterThan(PORTAL_COLONNADE_RADIUS - 1.1);
+      expect(radius).toBeLessThan(PORTAL_COLONNADE_RADIUS);
+      expect(nearestPillar).toBeLessThan(0.9);
+      expect(cluster.position[1]).toBe(FLOOR_Y);
+      expect(cluster.scale).toBeLessThanOrEqual(0.7);
+    }
+  });
+
+  it('keeps the low beacon plinths clear of the metal reliquary', () => {
     for (const scale of [1, 1.25, 1.75]) {
       const edge = PORTAL_RELIC_OUTER_RADIUS * scale + PORTAL_GROUND_DECOR_CLEARANCE;
-      for (const cluster of portalGroundClusterPlacements(99, scale, FLOOR_Y)) {
-        expect(Math.hypot(cluster.position[0], cluster.position[2])).toBeGreaterThan(edge);
-        expect(cluster.position[1]).toBe(FLOOR_Y);
-      }
       for (const lamp of portalCrystalLampPlacements(99, scale, FLOOR_Y)) {
-        expect(Math.hypot(lamp.position[0], lamp.position[2])).toBeGreaterThan(edge);
-        expect(lamp.position[1]).toBeGreaterThan(FLOOR_Y);
+        expect(Math.hypot(lamp.position[0], lamp.position[2])).toBeGreaterThan(edge + 3.5);
+        expect(lamp.position[1]).toBeCloseTo(FLOOR_Y + PORTAL_CRYSTAL_PLINTH_HEIGHT);
       }
     }
   });
 
   it('merges stones, plants and plinths into one coloured mobile buffer', () => {
-    const geometry = buildPortalGroundDecorGeometry(4242, 1.2, FLOOR_Y, PALETTE);
+    const geometry = buildPortalGroundDecorGeometry(4242, 1.2, FLOOR_Y, PILLARS, PALETTE);
     const position = geometry.getAttribute('position');
     const colour = geometry.getAttribute('color');
 
@@ -74,6 +92,8 @@ describe('portal ground decor', () => {
     expect(geometry.groups.length).toBeLessThanOrEqual(1);
     expect(triangles(geometry)).toBeGreaterThan(400);
     expect(triangles(geometry)).toBeLessThan(1_500);
+    expect(geometry.boundingBox?.min.y).toBeGreaterThan(FLOOR_Y - 0.02);
+    expect(geometry.boundingBox?.max.y).toBeLessThan(FLOOR_Y + 0.2);
 
     geometry.dispose();
   });
@@ -82,7 +102,7 @@ describe('portal ground decor', () => {
     const counts: number[] = [];
     for (const seed of [1, 77, 4242]) {
       for (const scale of [1, 1.75]) {
-        const geometry = buildPortalGroundDecorGeometry(seed, scale, FLOOR_Y, PALETTE);
+        const geometry = buildPortalGroundDecorGeometry(seed, scale, FLOOR_Y, PILLARS, PALETTE);
         counts.push(triangles(geometry));
         geometry.dispose();
       }
@@ -92,7 +112,7 @@ describe('portal ground decor', () => {
 });
 
 describe('portal colonnade decor', () => {
-  const pillars = portalPillarInstances(portalCameraFrame(0.46, 1.5), 0.46);
+  const pillars = PILLARS;
 
   it('uses sparse, non-overlapping accents across the full arcade', () => {
     const banners = portalBannerPillars(pillars);
@@ -136,8 +156,10 @@ describe('portal atmospheric decor', () => {
     const placements = portalCrystalLampPlacements(4242, 1.2, FLOOR_Y);
     const geometry = buildPortalCrystalLampGeometry(4242, 1.2, FLOOR_Y);
     expect(placements).toHaveLength(PORTAL_CRYSTAL_LAMP_COUNT);
-    expect(triangles(geometry)).toBe(PORTAL_CRYSTAL_LAMP_COUNT * 8);
+    expect(triangles(geometry)).toBe(PORTAL_CRYSTAL_LAMP_COUNT * 36);
     expect(geometry.getAttribute('color').count).toBe(geometry.getAttribute('position').count);
+    expect(geometry.boundingBox?.min.y).toBeCloseTo(FLOOR_Y + PORTAL_CRYSTAL_PLINTH_HEIGHT);
+    expect(geometry.boundingBox?.max.y).toBeLessThan(FLOOR_Y + 0.4);
     geometry.dispose();
   });
 
