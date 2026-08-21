@@ -8,6 +8,8 @@ import {
 import {
   PORTAL_DAIS_TOP_RADIUS,
   PORTAL_DAIS_OUTER_RADIUS,
+  PORTAL_DAIS_CLEARANCE,
+  PORTAL_DAIS_MAX_SCALE,
   PORTAL_ENVIRONMENT_DRAW_CALLS,
   PORTAL_ENVIRONMENT_TRIANGLES,
   PORTAL_FIELD_DROP,
@@ -33,6 +35,7 @@ import {
   portalPillarInstances,
   PORTAL_LAMP_LIGHT_COUNT,
 } from './portalScene';
+import { PORTAL_RELIC_TOP_RUNE_RADIUS } from './portalRelicPedestal';
 
 /** Насіння артефакта для сцени; будь-яке стале підійде. */
 const SEED = 4242;
@@ -59,7 +62,6 @@ const ASPECTS = [0.42, 0.46, 0.62, 0.75, 1.33, 1.9];
  * виходити за край, і саме тому в таблиці два різні радіуси.
  */
 const WIDEST_CRYSTAL_RADIUS = 1.5;
-const WIDEST_ROCK_RADIUS = 2.5;
 const TALLEST_ARTIFACT_HEIGHT = 3.19;
 
 /**
@@ -450,22 +452,32 @@ describe('portal geometry', () => {
     }
   });
 
-  it('grows the dais top to stay wider than the rock it carries', () => {
-    // Це і є причина, з якої подіум перестав бути константою: камінь
-    // розростається з місцями, де пара була (ADR-0004), а плита — ні, тож
-    // друза вилазила за обвід і ховала інкрустацію під собою.
+  it('grows the dais top to stay wider than the visible crystal cluster', () => {
+    // П'єдестал масштабується від видимих кристалів, а не від прихованої
+    // підкладки: головний артефакт має лишатись домінантою мобільного кадру.
     // Up to the ceiling only. Past it the podium stops growing on purpose —
     // the front pillars stand on the field and a plinth that reached them
     // would be pierced by their bases — and the next test states what happens
     // there instead of pretending it does not.
-    const carried = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(Number.MAX_SAFE_INTEGER) / 1.34;
-    for (const rock of [0.9, 1.1, 1.315, carried * 0.99]) {
-      const top = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(rock);
-      expect(top).toBeGreaterThan(rock);
-      // Верхній напис лежить на 1.215 з 1.3 — він мусить лишатись видимим
-      // навколо engine-owned substrate.
-      expect(top * (1.215 / PORTAL_DAIS_TOP_RADIUS)).toBeGreaterThan(rock);
+    const carried = PORTAL_DAIS_TOP_RADIUS * PORTAL_DAIS_MAX_SCALE / PORTAL_DAIS_CLEARANCE;
+    for (const radius of [0.9, 1.1, 1.315, carried * 0.99]) {
+      const scale = portalDaisScale(radius);
+      expect(PORTAL_DAIS_TOP_RADIUS * scale).toBeGreaterThan(radius);
+      // Стриманий напис також лишається видимим за крайніми кристалами.
+      expect(PORTAL_RELIC_TOP_RUNE_RADIUS * scale).toBeGreaterThan(radius);
     }
+  });
+
+  it('keeps the current and mature mobile pedestal compact', () => {
+    // У поточному чотирирічному стані базовий п'єдестал уже має достатній
+    // запас, тому він не повинен роздуватись. На зрілому стані край усе ще
+    // менший за 1.5 радіуса кристальної композиції.
+    expect(portalDaisScale(1)).toBe(1);
+    const matureScale = portalDaisScale(WIDEST_CRYSTAL_RADIUS);
+    expect(PORTAL_DAIS_TOP_RADIUS * matureScale)
+      .toBeGreaterThan(WIDEST_CRYSTAL_RADIUS * 1.15);
+    expect(PORTAL_DAIS_OUTER_RADIUS * matureScale)
+      .toBeLessThan(WIDEST_CRYSTAL_RADIUS * 1.5);
   });
 
   it('never shrinks the dais below the designed scene', () => {
@@ -477,7 +489,7 @@ describe('portal geometry', () => {
   });
 
   it('stops the dais before it reaches the pillars', () => {
-    // Стеля DAIS_MAX_SCALE існує рівно заради цього: колони стоять на полі,
+    // Стеля PORTAL_DAIS_MAX_SCALE існує рівно заради цього: колони стоять на полі,
     // і плита, що доросла до них, проткнулась би їхніми цоколями.
     const maxScale = portalDaisScale(Number.MAX_SAFE_INTEGER);
     // Консервативно беремо повний зовнішній край нового релікварію.
@@ -491,21 +503,15 @@ describe('portal geometry', () => {
     }
   });
 
-  it('says where it stops carrying the rock', () => {
-    // The bound used to be an honest apology: the ceiling bit at roughly a
-    // fifteen-year druse and the rock reached the rim, accepted because the
-    // alternative was a plinth grown out to the pillars and pierced by their
-    // bases. That constraint is gone — the colonnade is a ring several podium
-    // widths out — so the ceiling could be lifted, and the widest druse the
-    // pipeline produces is now carried with room to spare.
-    //
-    // It still exists, because a podium that grows without limit stops being a
-    // podium and becomes the floor.
+  it('carries every visible crystal cluster before reaching its scale ceiling', () => {
+    // Стеля лишається запобіжником: подіум, що росте безмежно, перестає бути
+    // подіумом і стає другою підлогою. Реальний діапазон кристалів до неї не
+    // доходить.
     const carried = PORTAL_DAIS_TOP_RADIUS * portalDaisScale(Number.MAX_SAFE_INTEGER);
 
-    expect(carried).toBeGreaterThan(WIDEST_ROCK_RADIUS);
-    expect(PORTAL_DAIS_TOP_RADIUS * portalDaisScale(WIDEST_ROCK_RADIUS))
-      .toBeGreaterThan(WIDEST_ROCK_RADIUS);
+    expect(carried).toBeGreaterThan(WIDEST_CRYSTAL_RADIUS);
+    expect(PORTAL_DAIS_TOP_RADIUS * portalDaisScale(WIDEST_CRYSTAL_RADIUS))
+      .toBeGreaterThan(WIDEST_CRYSTAL_RADIUS);
     // And well inside the colonnade, which is the thing it must not reach.
     expect(carried).toBeLessThan(PORTAL_COLONNADE_RADIUS * 0.6);
   });

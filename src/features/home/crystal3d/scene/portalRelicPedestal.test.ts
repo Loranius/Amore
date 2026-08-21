@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
   PORTAL_RELIC_DEPTH,
+  PORTAL_RELIC_FLAT_TOP_RADIUS,
   PORTAL_RELIC_GLOW_Y,
   PORTAL_RELIC_OUTER_RADIUS,
+  PORTAL_RELIC_RING_RADIAL_SEGMENTS,
+  PORTAL_RELIC_RING_SEGMENTS,
   PORTAL_RELIC_TOP_RADIUS,
   buildPortalBrushedMetalTexture,
   buildPortalBrushedMetalNormalTexture,
@@ -33,8 +36,10 @@ describe('portal relic pedestal', () => {
       const radius = Math.hypot(position.getX(index), position.getZ(index));
       const y = position.getY(index);
       if (radius < 1e-6 && Math.abs(y) < 1e-6) centreOnGround = true;
-      if (Math.abs(radius - 1.05) < 1e-4 && Math.abs(y) < 1e-6) topEdgeOnGround = true;
-      if (radius <= 1.051 && Math.abs(y) < 1e-6) {
+      if (Math.abs(radius - PORTAL_RELIC_FLAT_TOP_RADIUS) < 1e-4 && Math.abs(y) < 1e-6) {
+        topEdgeOnGround = true;
+      }
+      if (radius <= PORTAL_RELIC_FLAT_TOP_RADIUS + 1e-3 && Math.abs(y) < 1e-6) {
         if (normal.getY(index) > 0.9) upwardTopVertices += 1;
         if (normal.getY(index) < -0.9) downwardTopVertices += 1;
       }
@@ -44,9 +49,36 @@ describe('portal relic pedestal', () => {
     expect(topEdgeOnGround).toBe(true);
     expect(upwardTopVertices).toBeGreaterThan(0);
     expect(downwardTopVertices).toBe(0);
-    expect(PORTAL_RELIC_TOP_RADIUS).toBeGreaterThan(1.05);
+    expect(PORTAL_RELIC_TOP_RADIUS).toBeGreaterThan(PORTAL_RELIC_FLAT_TOP_RADIUS);
     expect(body.boundingBox!.min.y).toBeCloseTo(-PORTAL_RELIC_DEPTH, 6);
     expect(body.boundingBox!.max.x).toBeCloseTo(PORTAL_RELIC_OUTER_RADIUS, 6);
+    body.dispose();
+  });
+
+  it('projects the top normal detail as one flat surface instead of a radial fan', () => {
+    const body = buildPortalRelicBodyGeometry();
+    const position = body.getAttribute('position');
+    const uv = body.getAttribute('uv');
+    let topVertices = 0;
+
+    for (let index = 0; index < position.count; index += 1) {
+      const x = position.getX(index);
+      const y = position.getY(index);
+      const z = position.getZ(index);
+      const radius = Math.hypot(x, z);
+      if (Math.abs(y) > 1e-6 || radius > PORTAL_RELIC_FLAT_TOP_RADIUS + 1e-6) continue;
+      topVertices += 1;
+      expect(uv.getX(index)).toBeCloseTo(
+        0.5 + x / (PORTAL_RELIC_FLAT_TOP_RADIUS * 2),
+        6,
+      );
+      expect(uv.getY(index)).toBeCloseTo(
+        0.5 + z / (PORTAL_RELIC_FLAT_TOP_RADIUS * 2),
+        6,
+      );
+    }
+
+    expect(topVertices).toBeGreaterThan(100);
     body.dispose();
   });
 
@@ -65,8 +97,10 @@ describe('portal relic pedestal', () => {
     }
 
     const total = geometries.reduce((sum, geometry) => sum + triangles(geometry), 0);
-    expect(total).toBeGreaterThan(2_000);
-    expect(total).toBeLessThan(8_000);
+    expect(PORTAL_RELIC_RING_SEGMENTS).toBeGreaterThanOrEqual(64);
+    expect(PORTAL_RELIC_RING_RADIAL_SEGMENTS).toBeGreaterThanOrEqual(8);
+    expect(total).toBeGreaterThan(8_000);
+    expect(total).toBeLessThan(10_000);
     geometries.forEach((geometry) => geometry.dispose());
   });
 

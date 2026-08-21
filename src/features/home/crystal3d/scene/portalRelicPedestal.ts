@@ -14,45 +14,80 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-/** Flat setting that carries the quartz vein and every ground-rooted crystal. */
-export const PORTAL_RELIC_TOP_RADIUS = 1.3;
+/** Flat centre that carries the quartz vein and every ground-rooted crystal. */
+export const PORTAL_RELIC_FLAT_TOP_RADIUS = 1.04;
+/** Raised top setting, before the scene's artifact-dependent XZ scale. */
+export const PORTAL_RELIC_TOP_RADIUS = 1.24;
 /** Furthest metal edge, before the scene's artifact-dependent XZ scale. */
-export const PORTAL_RELIC_OUTER_RADIUS = 1.76;
+export const PORTAL_RELIC_OUTER_RADIUS = 1.56;
 /** Full model depth. The surrounding floor hides the lowest foundation tier. */
-export const PORTAL_RELIC_DEPTH = 0.55;
+export const PORTAL_RELIC_DEPTH = 0.44;
 /** Centre of the luminous side band, measured down from the crystal plane. */
-export const PORTAL_RELIC_GLOW_Y = -0.205;
+export const PORTAL_RELIC_GLOW_Y = -0.17;
+/** Radius of the restrained mineral inscription on the top shoulder. */
+export const PORTAL_RELIC_TOP_RUNE_RADIUS = 1.13;
 
 const RADIAL_SEGMENTS = 64;
-const RING_SEGMENTS = 48;
+export const PORTAL_RELIC_RING_SEGMENTS = 64;
+export const PORTAL_RELIC_RING_RADIAL_SEGMENTS = 8;
 
 const BODY_PROFILE: readonly (readonly [number, number])[] = [
   [0, 0],
-  [1.05, 0],
-  [1.1, -0.012],
-  [1.15, -0.035],
-  [1.29, -0.035],
-  [1.34, -0.065],
-  [1.34, -0.095],
-  [1.45, -0.095],
-  [1.45, -0.14],
-  [1.56, -0.14],
-  [1.6, -0.176],
-  [1.6, -0.234],
-  [1.68, -0.234],
-  [1.72, -0.274],
-  [1.72, -0.382],
-  [1.76, -0.422],
-  [1.76, -0.49],
-  [1.7, -PORTAL_RELIC_DEPTH],
+  [PORTAL_RELIC_FLAT_TOP_RADIUS, 0],
+  [1.08, -0.01],
+  [1.12, -0.026],
+  [PORTAL_RELIC_TOP_RADIUS, -0.026],
+  [1.27, -0.052],
+  [1.27, -0.076],
+  [1.35, -0.076],
+  [1.38, -0.106],
+  [1.45, -0.106],
+  [1.49, -0.14],
+  [1.49, -0.196],
+  [1.53, -0.196],
+  [PORTAL_RELIC_OUTER_RADIUS, -0.232],
+  [PORTAL_RELIC_OUTER_RADIUS, -0.332],
+  [1.55, -0.36],
+  [1.55, -0.395],
+  [1.5, -PORTAL_RELIC_DEPTH],
   [0, -PORTAL_RELIC_DEPTH],
 ];
 
 function horizontalTorus(radius: number, tube: number, y: number): THREE.TorusGeometry {
-  const geometry = new THREE.TorusGeometry(radius, tube, 6, RING_SEGMENTS);
+  const geometry = new THREE.TorusGeometry(
+    radius,
+    tube,
+    PORTAL_RELIC_RING_RADIAL_SEGMENTS,
+    PORTAL_RELIC_RING_SEGMENTS,
+  );
   geometry.rotateX(Math.PI * 0.5);
   geometry.translate(0, y, 0);
   return geometry;
+}
+
+/**
+ * LatheGeometry unwraps a horizontal cap as angle × profile distance. At its
+ * centre every triangle then owns a different U direction, so a normal map
+ * turns a physically flat disc into a visible low-poly fan. Reproject only
+ * the load-bearing cap from world XZ; the side wall keeps its circumferential
+ * lathe UVs for the brushed-metal grain.
+ */
+function projectFlatTopUvs(geometry: THREE.BufferGeometry): void {
+  const position = geometry.getAttribute('position');
+  const uv = geometry.getAttribute('uv');
+  for (let index = 0; index < position.count; index += 1) {
+    const x = position.getX(index);
+    const y = position.getY(index);
+    const z = position.getZ(index);
+    const radius = Math.hypot(x, z);
+    if (Math.abs(y) > 1e-6 || radius > PORTAL_RELIC_FLAT_TOP_RADIUS + 1e-6) continue;
+    uv.setXY(
+      index,
+      0.5 + x / (PORTAL_RELIC_FLAT_TOP_RADIUS * 2),
+      0.5 + z / (PORTAL_RELIC_FLAT_TOP_RADIUS * 2),
+    );
+  }
+  uv.needsUpdate = true;
 }
 
 function box(
@@ -97,27 +132,28 @@ export function buildPortalRelicBodyGeometry(): THREE.BufferGeometry {
     .reverse()
     .map(([radius, y]) => new THREE.Vector2(radius, y));
   const body = new THREE.LatheGeometry(profile, RADIAL_SEGMENTS);
+  projectFlatTopUvs(body);
   const parts: THREE.BufferGeometry[] = [
     body,
-    horizontalTorus(1.305, 0.018, -0.032),
-    horizontalTorus(1.69, 0.02, -0.276),
+    horizontalTorus(1.245, 0.014, -0.027),
+    horizontalTorus(1.535, 0.016, -0.233),
   ];
   return merge(parts, 'body');
 }
 
 function topRuneGeometry(): THREE.BufferGeometry[] {
   const parts: THREE.BufferGeometry[] = [];
-  const count = 20;
+  const count = 16;
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2;
-    const radius = 1.215;
+    const radius = PORTAL_RELIC_TOP_RUNE_RADIUS;
     const x = Math.sin(angle) * radius;
     const z = Math.cos(angle) * radius;
     // Two short strokes form an angular mineral glyph. Both live in the same
     // merged buffer, so the full inscription remains one draw call.
     parts.push(
-      box([0.07, 0.009, 0.014], [x, -0.026, z], [0, angle - 0.42, 0]),
-      box([0.07, 0.009, 0.014], [x, -0.026, z], [0, angle + 0.42, 0]),
+      box([0.055, 0.006, 0.011], [x, -0.021, z], [0, angle - 0.42, 0]),
+      box([0.055, 0.006, 0.011], [x, -0.021, z], [0, angle + 0.42, 0]),
     );
   }
   return parts;
@@ -125,15 +161,15 @@ function topRuneGeometry(): THREE.BufferGeometry[] {
 
 function sideRuneGeometry(): THREE.BufferGeometry[] {
   const parts: THREE.BufferGeometry[] = [];
-  const count = 14;
+  const count = 12;
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2;
-    const radius = PORTAL_RELIC_OUTER_RADIUS + 0.006;
+    const radius = PORTAL_RELIC_OUTER_RADIUS + 0.004;
     const x = Math.sin(angle) * radius;
     const z = Math.cos(angle) * radius;
     parts.push(
-      box([0.075, 0.012, 0.012], [x, -0.327, z], [0, angle, 0.68]),
-      box([0.075, 0.012, 0.012], [x, -0.327, z], [0, angle, -0.68]),
+      box([0.06, 0.009, 0.01], [x, -0.286, z], [0, angle, 0.64]),
+      box([0.06, 0.009, 0.01], [x, -0.286, z], [0, angle, -0.64]),
     );
   }
   return parts;
@@ -142,9 +178,9 @@ function sideRuneGeometry(): THREE.BufferGeometry[] {
 /** Recess-darkened rings and inscriptions, merged into one optical layer. */
 export function buildPortalRelicEngravingGeometry(): THREE.BufferGeometry {
   return merge([
-    horizontalTorus(1.345, 0.011, -0.066),
-    horizontalTorus(1.505, 0.01, -0.139),
-    horizontalTorus(1.708, 0.01, -0.377),
+    horizontalTorus(1.27, 0.009, -0.053),
+    horizontalTorus(1.43, 0.008, -0.105),
+    horizontalTorus(1.548, 0.008, -0.333),
     ...topRuneGeometry(),
     ...sideRuneGeometry(),
   ], 'engraving');
@@ -152,12 +188,12 @@ export function buildPortalRelicEngravingGeometry(): THREE.BufferGeometry {
 
 /** Violet glass band and top seal share one emissive layer. */
 export function buildPortalRelicGlowGeometry(): THREE.BufferGeometry {
-  const band = new THREE.CylinderGeometry(1.607, 1.607, 0.046, RADIAL_SEGMENTS, 1, true);
+  const band = new THREE.CylinderGeometry(1.495, 1.495, 0.04, RADIAL_SEGMENTS, 1, true);
   band.translate(0, PORTAL_RELIC_GLOW_Y, 0);
 
   return merge([
     band,
-    horizontalTorus(1.08, 0.014, 0.012),
+    horizontalTorus(PORTAL_RELIC_FLAT_TOP_RADIUS, 0.012, 0.011),
   ], 'glow');
 }
 

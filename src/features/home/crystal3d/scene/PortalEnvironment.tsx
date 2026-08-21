@@ -106,7 +106,10 @@ export function PortalEnvironment({
   const relicGlowGeometry = useMemo(() => buildPortalRelicGlowGeometry(), []);
   const brushedMetal = useMemo(() => buildPortalBrushedMetalTexture(), []);
   const brushedMetalNormal = useMemo(() => buildPortalBrushedMetalNormalTexture(), []);
-  const brushedNormalScale = useMemo(() => new THREE.Vector2(0.18, 0.32), []);
+  // The old strength exposed the lathe's radial tangent fan as broad wedges
+  // on the top plate. UVs are planar there now; the lower amplitude keeps the
+  // brushed grain as micro-detail instead of a second faceting system.
+  const brushedNormalScale = useMemo(() => new THREE.Vector2(0.07, 0.12), []);
   const floorNormalScale = useMemo(
     () => new THREE.Vector2(palette.floorNormalScale, palette.floorNormalScale),
     [palette.floorNormalScale],
@@ -260,9 +263,9 @@ export function PortalEnvironment({
             emissive={palette.daisEmissive}
             emissiveIntensity={0.16}
             metalness={palette.daisMetalness}
-            roughness={0.38}
-            clearcoat={0.34}
-            clearcoatRoughness={0.18}
+            roughness={0.68}
+            clearcoat={0.16}
+            clearcoatRoughness={0.42}
           />
         </mesh>
         <mesh geometry={relicEngravingGeometry}>
@@ -271,7 +274,7 @@ export function PortalEnvironment({
             emissive={palette.daisEmissive}
             emissiveIntensity={0.08}
             metalness={0.7}
-            roughness={0.5}
+            roughness={0.58}
           />
         </mesh>
         <mesh geometry={relicGlowGeometry}>
