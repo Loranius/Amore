@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import {
+  buildPortalArchGeometry as buildModelledArch,
+  buildPortalPillarGeometry as buildModelledPillar,
+} from './portalColonnadeMesh';
+import {
   PORTAL_DAIS_TOP_RADIUS,
   PORTAL_DAIS_OUTER_RADIUS,
   PORTAL_ENVIRONMENT_DRAW_CALLS,
@@ -297,6 +301,52 @@ describe('portal pillars', () => {
     // Every column stands on the same course: one row, one height.
     const heights = new Set(pillars.map((pillar) => pillar.scale[1]));
     expect(heights.size).toBe(1);
+  });
+
+  it('seats every arch on the modelled capital instead of through the shaft', () => {
+    const pillarGeometry = buildModelledPillar();
+    const archGeometry = buildModelledArch();
+    pillarGeometry.computeBoundingBox();
+    archGeometry.computeBoundingBox();
+
+    const pillarBounds = pillarGeometry.boundingBox!;
+    const archBounds = archGeometry.boundingBox!;
+    const frame = portalCameraFrame(0.46, WIDEST_CRYSTAL_RADIUS);
+    const pillars = portalPillarInstances(frame, 0.46);
+    const arches = portalArchInstances(frame, 0.46);
+
+    expect(arches).toHaveLength(pillars.length);
+    for (let index = 0; index < pillars.length; index += 1) {
+      const pillar = pillars[index]!;
+      const next = pillars[(index + 1) % pillars.length]!;
+      const arch = arches[index]!;
+      const pillarTop = pillar.position[1] + pillarBounds.max.y * pillar.scale[1];
+      const archBottom = arch.position[1] + archBounds.min.y * arch.scale[1];
+      const verticalOverlap = pillarTop - archBottom;
+
+      // Старий рендер лишав над аркою 5.36 одиниці колони: п'ята лежала
+      // посередині стовпа. Тепер вона лише на волосину входить у капітель.
+      expect(verticalOverlap).toBeGreaterThan(0.01);
+      expect(verticalOverlap).toBeLessThan(pillar.scale[0] * 0.12);
+
+      const chord = Math.hypot(
+        next.position[0] - pillar.position[0],
+        next.position[2] - pillar.position[2],
+      );
+      const horizontalOverlap = arch.scale[0] - chord * 0.5;
+      expect(horizontalOverlap).toBeGreaterThan(0);
+      expect(horizontalOverlap).toBeLessThan(pillar.scale[0] * 0.5);
+
+      // Орієнтація капітелі належить чистій розкладці, а не прихованій
+      // React-корекції, тому обидва боки стику бачать ту саму грань.
+      expect(pillar.rotationY).toBeCloseTo(
+        Math.atan2(pillar.position[0], pillar.position[2]),
+        9,
+      );
+    }
+
+    pillarGeometry.dispose();
+    archGeometry.dispose();
   });
 
   it('never lets a pillar stand in front of the druse', () => {

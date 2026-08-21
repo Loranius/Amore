@@ -25,6 +25,7 @@ import {
 // правилами не пишуться. Процедурні лишились нижче — вони визначають пропорції,
 // проти яких розкладка й досі перевіряється.
 import {
+  PORTAL_PILLAR_ASPECT,
   buildPortalArchGeometry as buildModelledArch,
   buildPortalPillarGeometry as buildModelledPillar,
 } from './portalColonnadeMesh';
@@ -836,7 +837,7 @@ export const PORTAL_PILLARS: readonly PortalPillarPlacement[] = [
 
 export interface PortalPillarInstance {
   position: readonly [number, number, number];
-  /** Множник до базової геометрії висотою 1 і радіусом 1. */
+  /** Множник до нормалізованої геометрії; її точний aspect задає модель. */
   scale: readonly [number, number, number];
   rotationY: number;
 }
@@ -866,7 +867,16 @@ export const PORTAL_COLONNADE_COUNT = 18;
  * кристалом. Винесене за камеру, кільце тим самим боком проходить позаду неї —
  * у кадр не входить нічого, а аркада лишається замкненою.
  */
-const COLONNADE_PILLAR_HEIGHT = 6.6;
+/**
+ * Фактична висота колони від підлоги до верхівки капітелі.
+ *
+ * Раніше 6.6 помилково використовувалось як Y-scale моделі, хоча сама модель
+ * уже має висоту 1.3132. У світі колона виростала до 8.67, а п'ята арки
+ * лишалась на 3.30 — арка проходила просто крізь середину стовпа, і над нею
+ * стирчав випадковий «другий поверх». 3.34 зберігає попередню видиму висоту
+ * арки, але тепер це висота самої колони, а не прихований множник.
+ */
+const COLONNADE_PILLAR_WORLD_HEIGHT = 3.34;
 const COLONNADE_PILLAR_RADIUS = 0.52;
 export const PORTAL_COLONNADE_RADIUS = 13.2;
 
@@ -906,11 +916,14 @@ export function portalPillarInstances(
         PORTAL_GROUND_Y - PORTAL_FIELD_DROP,
         Math.cos(angle) * PORTAL_COLONNADE_RADIUS,
       ],
-      scale: [COLONNADE_PILLAR_RADIUS, COLONNADE_PILLAR_HEIGHT, COLONNADE_PILLAR_RADIUS],
-      // Кожна колона розвернута на власний кут, щоб грані восьмигранника не
-      // збігались по всьому кільцю — інакше кільце читається як один
-      // повторений спрайт.
-      rotationY: angle + index * 0.37,
+      scale: [
+        COLONNADE_PILLAR_RADIUS,
+        COLONNADE_PILLAR_WORLD_HEIGHT / PORTAL_PILLAR_ASPECT,
+        COLONNADE_PILLAR_RADIUS,
+      ],
+      // Капітель має дивитись радіально: випадковий додатковий поворот робив
+      // однакову п'яту арки різною на двох сусідніх колонах.
+      rotationY: Math.atan2(Math.sin(angle), Math.cos(angle)),
     });
   }
   return instances;
@@ -949,10 +962,16 @@ export function portalArchInstances(
     instances.push({
       position: [
         (left.position[0] + right.position[0]) * 0.5,
-        left.position[1] + left.scale[1] * ARCH_SPRING,
+        left.position[1]
+          + left.scale[1] * PORTAL_PILLAR_ASPECT
+          - ARCH_PILLAR_VERTICAL_OVERLAP,
         (left.position[2] + right.position[2]) * 0.5,
       ],
-      scale: [chord * 0.5, ARCH_RISE, left.scale[0]],
+      scale: [
+        chord * 0.5 + left.scale[0] * ARCH_PILLAR_HORIZONTAL_OVERLAP,
+        ARCH_RISE,
+        left.scale[0],
+      ],
       // Площина арки мусить стояти вздовж хорди, інакше проліт дивиться
       // ребром і зникає.
       rotationY: Math.atan2(dx, dz) + Math.PI / 2,
@@ -1164,14 +1183,21 @@ export interface PortalArchInstance {
 }
 
 /**
- * На якій частці висоти колони лежить п'ята арки.
+ * Наскільки торець арки заходить за вісь колони.
  *
- * Не під капітеллю, хоч архітектурно їй там і місце. Колони навмисно вищі за
- * кадр — вони мусять виходити за верхній край, щоб зала не мала стелі, — і
- * п'ята, поставлена під капітеллю, опинялась на y≈2.8 при верхньому краї кадру
- * 3.28, тобто арки не було видно взагалі. Виміряно, а не вгадано.
+ * Третини радіуса досить, щоб торець зник усередині капітелі на косому
+ * ракурсі, але стик не перетворився на квадратний наплив.
  */
-const ARCH_SPRING = 0.49;
+const ARCH_PILLAR_HORIZONTAL_OVERLAP = 0.34;
+
+/**
+ * Вертикальне перекриття п'яти арки з верхівкою капітелі.
+ *
+ * Нуль ризикує показати волосяну щілину через похибку матриці; велике
+ * значення знову втопить арку в стовпі. Це перекриття менше десятої радіуса
+ * колони й існує лише як безпечний шов.
+ */
+const ARCH_PILLAR_VERTICAL_OVERLAP = 0.035;
 /**
  * Підйом арки над п'ятою, у світових одиницях.
  *
@@ -1234,7 +1260,7 @@ export function portalLampInstances(
   const nearest = [...towardCamera].sort((left, right) => left - right).slice(0, PORTAL_LAMP_LIGHT_COUNT);
   const litThreshold = nearest[nearest.length - 1] ?? 0;
   return pillars.map((pillar, index) => {
-    const height = pillar.scale[1] * LAMP_HEIGHT_SHARE;
+    const height = pillar.scale[1] * PORTAL_PILLAR_ASPECT * LAMP_HEIGHT_SHARE;
     // Усередину кільця, до осі — не «вліво/вправо», що мало сенс лише поки
     // колони стояли двома рядами.
     const radius = Math.hypot(pillar.position[0], pillar.position[2]) || 1;
