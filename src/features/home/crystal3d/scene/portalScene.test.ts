@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import {
+  PORTAL_ARCH_DEPTH,
+  PORTAL_ARCH_INNER_FOOT,
+  PORTAL_ARCH_PROFILE_SEGMENTS,
   buildPortalArchGeometry as buildModelledArch,
   buildPortalPillarGeometry as buildModelledPillar,
 } from './portalColonnadeMesh';
@@ -336,6 +339,29 @@ describe('portal pillars', () => {
 
     const pillarBounds = pillarGeometry.boundingBox!;
     const archBounds = archGeometry.boundingBox!;
+    const archPosition = archGeometry.getAttribute('position');
+    const archUv = archGeometry.getAttribute('uv');
+    let maxEndY = 0;
+    let innerFoot = Number.POSITIVE_INFINITY;
+    for (let vertex = 0; vertex < archPosition.count; vertex += 1) {
+      const x = archPosition.getX(vertex);
+      const y = archPosition.getY(vertex);
+      if (Math.abs(x) > 0.995) maxEndY = Math.max(maxEndY, y);
+      if (Math.abs(y) < 1e-6) innerFoot = Math.min(innerFoot, Math.abs(x));
+    }
+
+    // Стара модель мала вершини x=±1 і на y=0, і на y=0.8054: тобто
+    // повнорозмірну прямокутну стіну над кожною капітеллю. Справжня арка
+    // торкається крайньої x лише короткою п'ятою на нульовій площині.
+    expect(maxEndY).toBeLessThan(0.01);
+    expect(innerFoot).toBeCloseTo(PORTAL_ARCH_INNER_FOOT, 2);
+    expect(PORTAL_ARCH_PROFILE_SEGMENTS).toBeGreaterThanOrEqual(24);
+    expect(archBounds.min.z).toBeCloseTo(-PORTAL_ARCH_DEPTH * 0.5, 6);
+    expect(archBounds.max.z).toBeCloseTo(PORTAL_ARCH_DEPTH * 0.5, 6);
+    expect(archUv.count).toBe(archPosition.count);
+    expect(archGeometry.groups.length).toBeLessThanOrEqual(1);
+    expect(archPosition.count / 3).toBeGreaterThan(300);
+    expect(archPosition.count / 3).toBeLessThan(500);
     const frame = portalCameraFrame(0.46, WIDEST_CRYSTAL_RADIUS);
     const pillars = portalPillarInstances(frame, 0.46);
     const arches = portalArchInstances(frame, 0.46);
@@ -360,7 +386,14 @@ describe('portal pillars', () => {
       );
       const horizontalOverlap = arch.scale[0] - chord * 0.5;
       expect(horizontalOverlap).toBeGreaterThan(0);
-      expect(horizontalOverlap).toBeLessThan(pillar.scale[0] * 0.5);
+      expect(horizontalOverlap).toBeLessThan(pillar.scale[0] * 0.6);
+
+      // Центр вузької п'яти збігається з віссю капітелі, а її глибина не
+      // виступає за модельну верхівку колони.
+      const footCenter = ((1 + PORTAL_ARCH_INNER_FOOT) * 0.5) * arch.scale[0];
+      expect(Math.abs(footCenter - chord * 0.5)).toBeLessThan(pillar.scale[0] * 0.08);
+      expect(archBounds.max.z * arch.scale[2])
+        .toBeLessThanOrEqual(pillarBounds.max.z * pillar.scale[2]);
 
       // Орієнтація капітелі належить чистій розкладці, а не прихованій
       // React-корекції, тому обидва боки стику бачать ту саму грань.

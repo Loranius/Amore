@@ -21,9 +21,9 @@ import {
   buildPortalRelicEngravingGeometry,
   buildPortalRelicGlowGeometry,
 } from './portalRelicPedestal';
-// Колона й арка приходять моделлю: різьблення капітелі й профіль архівольта
-// правилами не пишуться. Процедурні лишились нижче — вони визначають пропорції,
-// проти яких розкладка й досі перевіряється.
+// Колона приходить моделлю заради різьблення капітелі. Арка — профільований
+// локальний архівольт без модельного прямокутного спандрела; обидві геометрії
+// нормалізовані, а розкладка нижче володіє їхніми світовими трансформами.
 import {
   PORTAL_PILLAR_ASPECT,
   buildPortalArchGeometry as buildModelledArch,
@@ -54,7 +54,7 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 9;
  * будувати геометрію двічі. За тим, щоб воно не розійшлось із реальними
  * буферами, стежить portalScene.test.ts.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 17_296;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 22_992;
 
 /** Сегментів у диску поля; єдине місце, що задає його вартість. */
 const FIELD_SEGMENTS = 64;
@@ -78,10 +78,9 @@ export function measurePortalEnvironmentTriangles(
   const lamp = buildPortalLampGeometry();
   const arch = buildModelledArch();
   const floor = buildPortalTempleFloorGeometry();
-  const standingPillars = portalPillarInstances(
-    portalCameraFrame(0.5, 1),
-    0.5,
-  ).length;
+  const costFrame = portalCameraFrame(0.5, 1);
+  const standingPillars = portalPillarInstances(costFrame, 0.5).length;
+  const standingArches = portalArchInstances(costFrame, 0.5).length;
   const triangles = (geometry: THREE.BufferGeometry): number => {
     const index = geometry.getIndex();
     return index === null
@@ -93,11 +92,11 @@ export function measurePortalEnvironmentTriangles(
     + triangles(relicBody)
     + triangles(relicEngraving)
     + triangles(relicGlow)
-    // Колонада — кільце з розривом, тож рахується стільки колон, скільки
-    // справді стоїть, і стільки арок, скільки між ними прольотів.
+    // Колонада — замкнене кільце: рахується фактична кількість і колон, і
+    // прольотів. standingPillars - 1 недораховував одну завершальну арку.
     + triangles(pillar) * standingPillars
     + triangles(lamp) * standingPillars
-    + triangles(arch) * (standingPillars - 1)
+    + triangles(arch) * standingArches
     + triangles(floor);
 
   relicBody.dispose();
@@ -1188,10 +1187,11 @@ export interface PortalArchInstance {
 /**
  * Наскільки торець арки заходить за вісь колони.
  *
- * Третини радіуса досить, щоб торець зник усередині капітелі на косому
- * ракурсі, але стик не перетворився на квадратний наплив.
+ * Половина радіуса центрує вузьку профільовану п'яту на капітелі. Старій
+ * прямокутній стіні такий overlap справді створив би наплив; новий архівольт
+ * торкається y=0 лише в межах власної кам'яної стрічки.
  */
-const ARCH_PILLAR_HORIZONTAL_OVERLAP = 0.34;
+const ARCH_PILLAR_HORIZONTAL_OVERLAP = 0.5;
 
 /**
  * Вертикальне перекриття п'яти арки з верхівкою капітелі.
