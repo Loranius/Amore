@@ -27,13 +27,19 @@ type SchoolFish = {
 const TAU = Math.PI * 2;
 const MIDGROUND_MASS_COUNT = 12;
 const DISTANT_MASS_COUNT = 18;
-const DISTANT_VEGETATION_COUNT = 48;
-const SCHOOL_SIZE = 18;
+const MAX_DISTANT_VEGETATION_COUNT = 48;
+const DISTANT_SCHOOL_SIZE = 18;
 const DISTANT_FISH_TINTS = [
   '#7fc9cf',
   '#8fc1a0',
   '#d7b968',
   '#c88670',
+] as const;
+const DISTANT_SCHOOLS = [
+  { seedOffset: 100, position: [12.8, 2.8, 10.4] as Vec3, heading: 2.25, phase: 0.4 },
+  { seedOffset: 300, position: [-13.8, 3.3, 8.2] as Vec3, heading: -2.2, phase: 1.6 },
+  { seedOffset: 500, position: [-9.4, 2.9, -15.7] as Vec3, heading: -0.45, phase: 2.8 },
+  { seedOffset: 700, position: [10.7, 4, -16.2] as Vec3, heading: 0.55, phase: 4.1 },
 ] as const;
 
 function seededUnit(index: number, salt: number): number {
@@ -87,9 +93,10 @@ function buildRingMasses({
   });
 }
 
-function buildVegetation(): VegetationInstance[] {
-  const clusterCount = 10;
-  return Array.from({ length: DISTANT_VEGETATION_COUNT }, (_value, index) => {
+function buildVegetation(count: number): VegetationInstance[] {
+  const safeCount = Math.max(0, Math.min(MAX_DISTANT_VEGETATION_COUNT, Math.floor(count)));
+  const clusterCount = Math.max(1, Math.min(10, safeCount));
+  return Array.from({ length: safeCount }, (_value, index) => {
     const cluster = index % clusterCount;
     const clusterAngle = cluster / clusterCount * TAU + seededUnit(cluster, 31) * 0.28;
     const angle = clusterAngle + (seededUnit(index, 11) - 0.5) * 0.44;
@@ -113,7 +120,7 @@ function buildVegetation(): VegetationInstance[] {
 }
 
 function buildSchool(seedOffset: number): SchoolFish[] {
-  return Array.from({ length: SCHOOL_SIZE }, (_value, index) => ({
+  return Array.from({ length: DISTANT_SCHOOL_SIZE }, (_value, index) => ({
     position: [
       (seededUnit(index + seedOffset, 21) - 0.5) * 1.95,
       (seededUnit(index + seedOffset, 22) - 0.5) * 0.72,
@@ -175,9 +182,15 @@ function ReefRingMasses({
   );
 }
 
-function DistantVegetation({ reducedMotion }: { reducedMotion: boolean }) {
+function DistantVegetation({
+  count,
+  reducedMotion,
+}: {
+  count: number;
+  reducedMotion: boolean;
+}) {
   const ref = useRef<THREE.InstancedMesh>(null);
-  const vegetation = useMemo(buildVegetation, []);
+  const vegetation = useMemo(() => buildVegetation(count), [count]);
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const tickRef = useRef(0);
 
@@ -295,7 +308,6 @@ function DistantFishSchool({
         ref={meshRef}
         name={`reef-distant-textured-fish-school-${seedOffset}`}
         args={[undefined, undefined, fish.length]}
-        frustumCulled={false}
         castShadow={false}
         receiveShadow={false}
         renderOrder={3}
@@ -320,7 +332,15 @@ function DistantFishSchool({
   );
 }
 
-export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean }) {
+export function ReefDistantEcosystem({
+  fishSchoolCount,
+  reducedMotion,
+  vegetationCount,
+}: {
+  fishSchoolCount: number;
+  reducedMotion: boolean;
+  vegetationCount: number;
+}) {
   const midground = useMemo(() => buildRingMasses({
     count: MIDGROUND_MASS_COUNT,
     innerRadius: 11.8,
@@ -335,6 +355,10 @@ export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean
     heightRange: [0.6, 1.55],
     seedOffset: 3000,
   }), []);
+  const schools = DISTANT_SCHOOLS.slice(
+    0,
+    Math.max(0, Math.min(DISTANT_SCHOOLS.length, Math.floor(fishSchoolCount))),
+  );
 
   return (
     <group name="reef-distant-ecosystem-360-v5-clear-orbit">
@@ -350,36 +374,15 @@ export function ReefDistantEcosystem({ reducedMotion }: { reducedMotion: boolean
         color="#294f52"
         emissive="#12353a"
       />
-      <DistantVegetation reducedMotion={reducedMotion} />
+      <DistantVegetation count={vegetationCount} reducedMotion={reducedMotion} />
 
-      <DistantFishSchool
-        seedOffset={100}
-        position={[12.8, 2.8, 10.4]}
-        heading={2.25}
-        phase={0.4}
-        reducedMotion={reducedMotion}
-      />
-      <DistantFishSchool
-        seedOffset={300}
-        position={[-13.8, 3.3, 8.2]}
-        heading={-2.2}
-        phase={1.6}
-        reducedMotion={reducedMotion}
-      />
-      <DistantFishSchool
-        seedOffset={500}
-        position={[-9.4, 2.9, -15.7]}
-        heading={-0.45}
-        phase={2.8}
-        reducedMotion={reducedMotion}
-      />
-      <DistantFishSchool
-        seedOffset={700}
-        position={[10.7, 4, -16.2]}
-        heading={0.55}
-        phase={4.1}
-        reducedMotion={reducedMotion}
-      />
+      {schools.map((school) => (
+        <DistantFishSchool
+          key={school.seedOffset}
+          {...school}
+          reducedMotion={reducedMotion}
+        />
+      ))}
     </group>
   );
 }
