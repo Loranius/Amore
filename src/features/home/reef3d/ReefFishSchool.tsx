@@ -28,7 +28,6 @@ const NAVIGATION_RESPONSE = 10;
 const COLLISION_RESPONSE = 18;
 const EMERGENCY_COLLISION_MARGIN = 0.18;
 const TUNNEL_COLLISION_RELEASE_WEIGHT = 0.025;
-const NAVIGATION_UPDATE_INTERVAL = 1 / 30;
 type ReefFishRouteId = (typeof REEF_FISH_ROUTE_IDS)[number];
 
 export interface ReefFishSchoolMetrics {
@@ -104,7 +103,6 @@ export function ReefFishSchool({
   const schoolRef = useRef<THREE.Group>(null);
   const obstaclesRef = useRef<ReefFishObstacle[]>([]);
   const navigationOffsetsRef = useRef(new Map<ReefFishRouteId, THREE.Vector3>());
-  const navigationAccumulatorRef = useRef(0);
   const motionScratch = useRef({
     representative: new THREE.Vector3(),
     guided: new THREE.Vector3(),
@@ -167,10 +165,6 @@ export function ReefFishSchool({
 
   useFrame((_state, deltaSeconds) => {
     if (!schoolRef.current) return;
-    navigationAccumulatorRef.current += Math.min(Math.max(deltaSeconds, 0), 0.05);
-    if (navigationAccumulatorRef.current < NAVIGATION_UPDATE_INTERVAL) return;
-    const navigationDeltaSeconds = navigationAccumulatorRef.current;
-    navigationAccumulatorRef.current %= NAVIGATION_UPDATE_INTERVAL;
     const scratch = motionScratch.current;
 
     for (const route of routes) {
@@ -219,7 +213,7 @@ export function ReefFishSchool({
       const response = localCollisionDelta.lengthSq() > 1e-8
         ? COLLISION_RESPONSE
         : NAVIGATION_RESPONSE;
-      const frame = Math.min(navigationDeltaSeconds, 0.05);
+      const frame = Math.min(Math.max(deltaSeconds, 0), 0.05);
       currentDelta.lerp(scratch.targetDelta, 1 - Math.exp(-response * frame));
 
       scratch.corrected.copy(scratch.representative).add(currentDelta);
@@ -271,3 +265,5 @@ export function ReefFishSchool({
     </group>
   );
 }
+
+useGLTF.preload(SCHOOL_OF_FISH_MODEL_URL);

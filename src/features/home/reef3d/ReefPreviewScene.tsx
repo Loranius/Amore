@@ -29,10 +29,6 @@ import {
   REEF_MATERIAL_PRESENTATION_VERSION,
 } from './reefMaterialPresentation';
 import {
-  resolveReefRenderProfile,
-  type ReefRenderProfile,
-} from './reefPerformanceProfile';
-import {
   REEF_COLONY_SHAPE_PASS,
   REEF_PRESENTATION_VERSION,
 } from './reefPresentation';
@@ -58,46 +54,9 @@ function useReducedMotion(): boolean {
   return reduced;
 }
 
-function currentReefRenderProfile(): ReefRenderProfile {
-  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return resolveReefRenderProfile({
-      coarsePointer: true,
-      devicePixelRatio: 1,
-      viewportWidth: 430,
-    });
-  }
-
-  const device = navigator as Navigator & { deviceMemory?: number };
-  return resolveReefRenderProfile({
-    coarsePointer: window.matchMedia('(pointer: coarse)').matches,
-    devicePixelRatio: window.devicePixelRatio,
-    hardwareConcurrency: navigator.hardwareConcurrency,
-    viewportWidth: window.innerWidth,
-    ...(device.deviceMemory === undefined ? {} : { deviceMemory: device.deviceMemory }),
-  });
-}
-
-function useReefRenderProfile(): ReefRenderProfile {
-  const [profile, setProfile] = useState(currentReefRenderProfile);
-
-  useEffect(() => {
-    const pointer = window.matchMedia('(pointer: coarse)');
-    const update = () => setProfile(currentReefRenderProfile());
-    window.addEventListener('resize', update);
-    pointer.addEventListener('change', update);
-    return () => {
-      window.removeEventListener('resize', update);
-      pointer.removeEventListener('change', update);
-    };
-  }, []);
-
-  return profile;
-}
-
 export default function ReefPreviewScene() {
   const portal = useReefPortalPreview();
   const reducedMotion = useReducedMotion();
-  const renderProfile = useReefRenderProfile();
   const frameloop = useWorldFrameloop();
   const [fishRuntime, setFishRuntime] = useState<ReefFishSchoolMetrics | null>(null);
   const [worldRuntime, setWorldRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
@@ -160,12 +119,6 @@ export default function ReefPreviewScene() {
       data-reef-colony-identity={String(build.acceptance.diagnostics.colonyIdentityChainPreserved)}
       data-reef-range-binding-chain={String(build.acceptance.diagnostics.rangeBindingChainPreserved)}
       data-reef-reduced-motion={String(reducedMotion)}
-      data-reef-render-quality={renderProfile.quality}
-      data-reef-render-max-dpr={renderProfile.maxDpr}
-      data-reef-render-native-fish={String(renderProfile.useNativeFish)}
-      data-reef-render-whale={String(renderProfile.showWhale)}
-      data-reef-render-light-shafts={renderProfile.lightShaftCount}
-      data-reef-render-caustics={renderProfile.causticCount}
       data-reef-couple-id={build.artifact.coupleId}
       data-reef-as-of={build.life.asOf}
       data-reef-stage={build.species.state.stage}
@@ -194,11 +147,7 @@ export default function ReefPreviewScene() {
       data-reef-materials={build.diagnostics.materialCount}
       data-reef-motion-bindings={build.diagnostics.motionBindingCount}
       data-reef-visible-colonies={visibleColonyRanges}
-      data-reef-fish-model={fishRuntime
-        ? renderProfile.useNativeFish
-          ? REEF_FISH_SCHOOL_MODEL
-          : 'kenney-instanced-fish'
-        : 'loading'}
+      data-reef-fish-model={fishRuntime ? REEF_FISH_SCHOOL_MODEL : 'loading'}
       data-reef-fish-meshes={fishRuntime?.meshes ?? ''}
       data-reef-fish-width={fishRuntime?.width ?? ''}
       data-reef-fish-height={fishRuntime?.height ?? ''}
@@ -207,11 +156,7 @@ export default function ReefPreviewScene() {
       data-reef-fish-animated-routes={fishRuntime?.animatedRoutes ?? ''}
       data-reef-fish-tracks={fishRuntime?.tracks ?? ''}
       data-reef-fish-scale={fishRuntime?.scale ?? ''}
-      data-reef-fish-route-profile={fishRuntime
-        ? renderProfile.useNativeFish
-          ? REEF_FISH_SCHOOL_ROUTE_PROFILE
-          : 'lightweight-orbits-v1'
-        : 'loading'}
+      data-reef-fish-route-profile={fishRuntime ? REEF_FISH_SCHOOL_ROUTE_PROFILE : 'loading'}
       data-reef-expected-draw-calls={build.diagnostics.expectedDrawCalls}
       data-reef-runtime-draw-calls={reportedDrawCalls}
       data-reef-runtime-triangles={reportedTriangles}
@@ -221,7 +166,7 @@ export default function ReefPreviewScene() {
       data-reef-current-cycle={build.life.current.cycleSeconds}
     >
       <Canvas
-        dpr={[1, renderProfile.maxDpr]}
+        dpr={[1, 1.5]}
         // Занурений маршрут забирає екран собі; риф лишається живим, але
         // кадрів для невидимої сцени не малює.
         frameloop={frameloop}
@@ -231,17 +176,12 @@ export default function ReefPreviewScene() {
           near: DEFAULT_REEF_CAMERA_FRAME.near,
           far: DEFAULT_REEF_CAMERA_FRAME.far,
         }}
-        gl={{
-          antialias: renderProfile.antialias,
-          alpha: false,
-          powerPreference: 'high-performance',
-        }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
         <ReefStage
           build={build}
           onFishReady={onFishReady}
           reducedMotion={reducedMotion}
-          renderProfile={renderProfile}
         >
           {null}
         </ReefStage>

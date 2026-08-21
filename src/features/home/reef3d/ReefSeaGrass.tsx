@@ -12,14 +12,14 @@ type LifeInstance = {
   tone: number;
 };
 
-const MAX_SEA_GRASS_COUNT = 52;
+const SEA_GRASS_COUNT = 52;
 
 function seededUnit(index: number, salt: number): number {
   const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
   return value - Math.floor(value);
 }
 
-function buildSeaGrass(count: number): LifeInstance[] {
+function buildSeaGrass(): LifeInstance[] {
   const clusters = [
     { center: [-4.35, -0.18, 1.65] as Vec3, radius: 1.45 },
     { center: [4.15, -0.2, 1.1] as Vec3, radius: 1.35 },
@@ -27,8 +27,7 @@ function buildSeaGrass(count: number): LifeInstance[] {
     { center: [4.75, -0.24, -2.35] as Vec3, radius: 1.5 },
   ] as const;
 
-  const safeCount = Math.max(0, Math.min(MAX_SEA_GRASS_COUNT, Math.floor(count)));
-  return Array.from({ length: safeCount }, (_, index) => {
+  return Array.from({ length: SEA_GRASS_COUNT }, (_, index) => {
     const cluster = clusters[index % clusters.length]!;
     const angle = seededUnit(index, 1) * Math.PI * 2;
     const radius = Math.sqrt(seededUnit(index, 2)) * cluster.radius;
@@ -44,16 +43,10 @@ function buildSeaGrass(count: number): LifeInstance[] {
   });
 }
 
-export function ReefSeaGrass({
-  count,
-  reducedMotion,
-}: {
-  count: number;
-  reducedMotion: boolean;
-}) {
+export function ReefSeaGrass({ reducedMotion }: { reducedMotion: boolean }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const grass = useMemo(() => buildSeaGrass(count), [count]);
+  const grass = useMemo(buildSeaGrass, []);
   const tickRef = useRef(0);
 
   useEffect(() => {

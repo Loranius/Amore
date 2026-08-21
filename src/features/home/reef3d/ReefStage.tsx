@@ -14,15 +14,14 @@ import { ReefSessileLife } from './ReefSessileLife';
 import { ReefMicroLifeLayer } from './ReefMicroLifeLayer';
 import { ReefRockBiofilmLayer } from './ReefRockBiofilmLayer';
 import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
-import { ReefLightweightFishSchool } from './ReefLightweightFishSchool';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 import { ReefNaturalArchLayer } from './ReefNaturalArchLayer';
 import { ReefVolcano } from './ReefVolcano';
+import { ReefVolcanoReplacementLayer } from './ReefVolcanoReplacementLayer';
 import { ReefVolcanoSurfacePass } from './ReefVolcanoSurfacePass';
 import { ReefWorldComposition } from './ReefWorldComposition';
 import { ReefDistantEcosystem } from './ReefDistantEcosystem';
-import type { ReefRenderProfile } from './reefPerformanceProfile';
 import {
   reefCameraFrameForAspect,
   REEF_ATMOSPHERE_PROFILE,
@@ -36,13 +35,11 @@ export function ReefStage({
   build,
   onFishReady,
   reducedMotion,
-  renderProfile,
   children,
 }: {
   build: ReefPreviewBuild;
   onFishReady?: (metrics: ReefFishSchoolMetrics) => void;
   reducedMotion: boolean;
-  renderProfile: ReefRenderProfile;
   children: ReactNode;
 }) {
   const size = useThree((state) => state.size);
@@ -71,15 +68,11 @@ export function ReefStage({
         ]}
       />
       <directionalLight {...REEF_LIGHTING_PROFILE.key} />
-      {renderProfile.directionalLights >= 2 && (
-        <directionalLight {...REEF_LIGHTING_PROFILE.fill} />
-      )}
-      {renderProfile.directionalLights >= 3 && (
-        <directionalLight {...REEF_LIGHTING_PROFILE.rim} />
-      )}
+      <directionalLight {...REEF_LIGHTING_PROFILE.fill} />
+      <directionalLight {...REEF_LIGHTING_PROFILE.rim} />
 
       <mesh position={[0, 7.2, -2]} rotation={[Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[18, renderProfile.quality === 'high' ? 36 : 24]} />
+        <circleGeometry args={[18, 36]} />
         <meshBasicMaterial
           color={REEF_SCENE_PALETTE.waterSurface}
           transparent
@@ -90,6 +83,7 @@ export function ReefStage({
       </mesh>
 
       <ReefEnvironment build={build} />
+      <ReefVolcanoReplacementLayer />
       <group
         name="reef-volcano-midground-placement"
         position={[0, 0, -6.75]}
@@ -99,50 +93,24 @@ export function ReefStage({
         <ReefVolcanoSurfacePass build={build} />
       </group>
       <ReefNaturalArchLayer build={build} />
-      {renderProfile.showBiofilm && <ReefRockBiofilmLayer build={build} />}
+      <ReefRockBiofilmLayer build={build} />
       <ReefWorldComposition />
-      <ReefDistantEcosystem
-        reducedMotion={reducedMotion}
-        vegetationCount={renderProfile.distantVegetationCount}
-        fishSchoolCount={renderProfile.distantFishSchoolCount}
-      />
+      <ReefDistantEcosystem reducedMotion={reducedMotion} />
       <ReefDensityLayer build={build} />
-      {renderProfile.showMicroLife && <ReefMicroLifeLayer build={build} />}
-      <ReefWaterAtmosphere
-        reducedMotion={reducedMotion}
-        lightShaftCount={renderProfile.lightShaftCount}
-        causticCount={renderProfile.causticCount}
-        particleCount={renderProfile.particleCount}
-      />
-      {renderProfile.showWhale && <BackgroundWhale reducedMotion={reducedMotion} />}
-      <ReefSeaGrass
-        reducedMotion={reducedMotion}
-        count={renderProfile.seaGrassCount}
-      />
-      {renderProfile.showSessileLife && (
-        <ReefSessileLife reducedMotion={reducedMotion} />
-      )}
-      {renderProfile.useNativeFish ? (
-        <Suspense fallback={null}>
-          <ReefFishSchool
-            build={build}
-            count={build.species.moduleEvolution.life.planFish.visibleCount}
-            identitySeed={build.species.moduleEvolution.identitySeed}
-            onReady={onFishReady}
-            reducedMotion={reducedMotion}
-          />
-        </Suspense>
-      ) : (
-        <ReefLightweightFishSchool
-          count={Math.min(
-            build.species.moduleEvolution.life.planFish.visibleCount,
-            renderProfile.lightweightFishLimit,
-          )}
+      <ReefMicroLifeLayer build={build} />
+      <ReefWaterAtmosphere reducedMotion={reducedMotion} />
+      <BackgroundWhale reducedMotion={reducedMotion} />
+      <ReefSeaGrass reducedMotion={reducedMotion} />
+      <ReefSessileLife reducedMotion={reducedMotion} />
+      <Suspense fallback={null}>
+        <ReefFishSchool
+          build={build}
+          count={build.species.moduleEvolution.life.planFish.visibleCount}
           identitySeed={build.species.moduleEvolution.identitySeed}
           onReady={onFishReady}
           reducedMotion={reducedMotion}
         />
-      )}
+      </Suspense>
 
       {children}
 
