@@ -2,6 +2,10 @@ import { useState } from 'react';
 import { Lightbox } from '@/components/ui/Lightbox';
 import { WishlistPage as WishlistPageBase } from './WishlistPageBase';
 import './wishlistArchiveCollaborative.css';
+// Має йти після стилів базової сторінки: цей шар перекриває старе
+// fixed/absolute-позиціонування world-nav і тримає accordion у DOM-потоці
+// одразу під «Мої / Лени / Спільні».
+import './wishlistTopAccordion.css';
 
 // ============================================================
 // Вішліст — сторінка поверх бази.
