@@ -29,6 +29,17 @@
   pointer-events: none;
 }
 
+/*
+ * .modal-sheet is a scrollable column flex container with a viewport max-height.
+ * The disclosure cards use overflow:hidden for rounded corners, so their flex
+ * auto-min-size is zero and the parent used to shrink them before scrolling.
+ * On phones that clipped the photo/details headers and, when opened, the panel
+ * itself. Keep both accordion cards content-sized and let the modal scroll.
+ */
+.wishlist .wm-wish-editor > :is(.wm-photo-disclosure, .wm-details-disclosure) {
+  flex: 0 0 auto;
+}
+
 @media (max-width: 719px) {
   .wishlist {
     padding-bottom: calc(132px + env(safe-area-inset-bottom, 0px));
