@@ -1,4 +1,4 @@
-/* Wishlist world: owner tabs + overlay accordion. */
+/* Wishlist world: owner tabs + accordion directly underneath. */
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
   position: relative;
   z-index: 70;
@@ -23,7 +23,7 @@
   margin: 0;
   padding: 6px 7px;
   border: 0;
-  border-radius: 28px 28px 0 0;
+  border-radius: 28px;
   background: transparent;
   box-shadow: none;
 }
@@ -35,11 +35,15 @@
   white-space: nowrap;
 }
 
+/* Accordion is a normal sibling after the owner tabs, not a portal child.
+   The negative top margin only cancels most of the controls' bottom margin,
+   leaving a small visible gap under «Мої / Лени / Спільні». */
 [data-portal-scene='true'] .wishlist .wl-world-accordion {
   position: relative;
+  z-index: 72;
   display: block;
-  width: 100%;
-  border-top: 1px solid color-mix(in srgb, var(--world-border-active) 42%, var(--world-border));
+  width: min(calc(100% - 28px), 640px);
+  margin: -10px auto 18px;
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-nav-toggle {
@@ -51,36 +55,38 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 0;
-  border-radius: 0 0 27px 27px;
-  background: color-mix(in srgb, var(--world-surface-soft) 68%, transparent);
+  border: 1px solid color-mix(in srgb, var(--world-border-active) 58%, var(--world-border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--world-surface-strong) 94%, transparent);
   color: var(--world-text-muted);
-  box-shadow: none;
-  transform: none;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--world-glow) 60%, transparent),
+    0 10px 24px color-mix(in srgb, var(--world-shadow) 46%, transparent);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-nav-toggle::before {
-  content: '';
+[data-portal-scene='true'] .wishlist .wl-world-nav-grip {
   position: absolute;
   top: 7px;
   left: 50%;
   width: 42px;
   height: 3px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--world-border-active) 68%, transparent);
+  background: color-mix(in srgb, var(--world-border-active) 72%, transparent);
   transform: translateX(-50%);
+  pointer-events: none;
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-nav-toggle > svg {
-  margin-top: 7px;
+  margin-top: 8px;
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion[data-open='true'] .wl-world-nav-toggle {
-  background: color-mix(in srgb, var(--world-accent) 7%, var(--world-surface-soft));
+  border-color: color-mix(in srgb, var(--world-accent) 42%, var(--world-border));
+  background: color-mix(in srgb, var(--world-accent) 8%, var(--world-surface-strong));
   color: var(--world-text);
 }
 
@@ -91,10 +97,11 @@
 [data-portal-scene='true'] .wishlist .wl-world-nav-toggle:focus-visible,
 [data-portal-scene='true'] .wishlist .wl-world-chip:focus-visible {
   outline: 2px solid var(--world-accent);
-  outline-offset: -3px;
+  outline-offset: 2px;
 }
 
-/* Floating card: opens over the bubbles and never participates in layout. */
+/* Floating card: opens below the trigger and over the bubbles. It never
+   participates in layout, so expanding filters does not move the scene. */
 [data-portal-scene='true'] .wishlist .wl-world-sheet {
   position: absolute;
   z-index: 90;
@@ -251,7 +258,7 @@
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
     min-height: 62px;
     padding: 5px;
-    border-radius: 26px 26px 0 0;
+    border-radius: 26px;
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar .tab-bar-btn {
@@ -260,9 +267,14 @@
     font-size: 13px;
   }
 
+  [data-portal-scene='true'] .wishlist .wl-world-accordion {
+    width: calc(100% - 24px);
+    margin-top: -10px;
+  }
+
   [data-portal-scene='true'] .wishlist .wl-world-nav-toggle {
     height: 40px;
-    border-radius: 0 0 25px 25px;
+    border-radius: 17px;
   }
 
   [data-portal-scene='true'] .wishlist .wl-world-sheet {
