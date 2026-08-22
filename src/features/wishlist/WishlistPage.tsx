@@ -6,6 +6,9 @@ import './wishlistArchiveCollaborative.css';
 // fixed/absolute-позиціонування world-nav і тримає accordion у DOM-потоці
 // одразу під «Мої / Лени / Спільні».
 import './wishlistTopAccordion.css';
+// Останній touch-only шар: Android може залишити :hover після тапу, тому
+// закритий accordion примусово повертається в прозорий стан.
+import './wishlistAccordionTouchState.css';
 
 // ============================================================
 // Вішліст — сторінка поверх бази.
