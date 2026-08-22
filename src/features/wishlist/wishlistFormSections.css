@@ -212,3 +212,431 @@
     flex-basis: 28px;
   }
 }
+
+/* Compact wish composer: keep the frequent path visible and move optional
+   work behind calm, keyboard-accessible disclosure rows. */
+.wishlist .wm-wish-editor {
+  width: min(94vw, 520px);
+  gap: 18px;
+  padding: 24px;
+  overflow-x: hidden;
+}
+
+.wishlist .wm-wish-editor .wm-form-heading {
+  gap: 5px;
+  padding-right: 48px;
+}
+
+.wishlist .wm-wish-editor .wm-form-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+}
+
+.wishlist .wm-wish-editor .modal-title {
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: clamp(26px, 5vw, 32px);
+  line-height: 1.08;
+}
+
+.wishlist .wm-wish-editor .wm-form-heading > p {
+  max-width: 410px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.wishlist .wm-wish-editor :is(.wm-scope-field, .wm-title-field, .wm-link-field) {
+  margin: 0;
+  gap: 8px;
+}
+
+.wishlist .wm-wish-editor .form-field > span {
+  font-size: 14px;
+}
+
+.wishlist .wm-wish-editor .wm-scope-field .tab-bar {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  gap: 8px;
+}
+
+.wishlist .wm-wish-editor .wm-scope-field .tab-bar-btn {
+  min-width: 0;
+  min-height: 48px;
+  flex: 1 1 0;
+  justify-content: center;
+  padding: 10px 9px;
+  border: 1px solid var(--wl-control-border);
+  border-radius: 16px;
+  background: var(--wl-control-bg-muted);
+  color: var(--wl-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.wishlist .wm-wish-editor .wm-scope-field .tab-bar-btn.active {
+  border-color: color-mix(in srgb, var(--accent) 68%, transparent);
+  background-color: var(--accent-strong);
+  background-image: var(--control-fill);
+  color: #fff;
+  box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
+}
+
+.wishlist .wm-wish-editor .wm-title-field input {
+  min-height: 56px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  font-weight: 700;
+}
+
+.wishlist .wm-wish-editor .wm-label-optional {
+  color: var(--wl-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wishlist .wm-wish-editor .wm-link-inline {
+  position: relative;
+}
+
+.wishlist .wm-wish-editor .wm-link-inline input {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 58px 12px 16px;
+  border-radius: 16px;
+}
+
+.wishlist .wm-wish-editor .wm-link-preview-button {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  place-items: center;
+  translate: 0 -50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--text) 8%);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.wishlist .wm-wish-editor .wm-link-preview-button:disabled {
+  cursor: default;
+  opacity: 0.46;
+}
+
+.wishlist .wm-wish-editor .wm-link-loading-icon {
+  animation: wm-link-status-spin 720ms linear infinite;
+}
+
+.wishlist .wm-wish-editor :is(.wm-photo-disclosure, .wm-details-disclosure) {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--text) 7%);
+  border-radius: 20px;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent) 6%, var(--surface)),
+      color-mix(in srgb, var(--surface) 97%, transparent)
+    );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 38%, transparent);
+}
+
+.wishlist .wm-wish-editor :is(.wm-photo-summary, .wm-details-summary) {
+  width: 100%;
+  padding: 12px;
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.wishlist .wm-wish-editor .wm-photo-summary {
+  grid-template-columns: 72px minmax(0, 1fr) 22px;
+}
+
+.wishlist .wm-wish-editor .wm-photo-summary-visual {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface-3));
+  color: color-mix(in srgb, var(--accent) 56%, var(--muted));
+}
+
+.wishlist .wm-wish-editor .wm-photo-summary-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wishlist .wm-wish-editor .wm-disclosure-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+
+.wishlist .wm-wish-editor .wm-disclosure-copy strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.25;
+}
+
+.wishlist .wm-wish-editor .wm-disclosure-copy small {
+  color: var(--wl-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.wishlist .wm-wish-editor .wm-disclosure-chevron {
+  color: var(--wl-text-secondary);
+  transition: transform 180ms ease;
+}
+
+.wishlist .wm-wish-editor :is(.wm-photo-summary, .wm-details-summary)[aria-expanded='true']
+  .wm-disclosure-chevron {
+  transform: rotate(180deg);
+}
+
+.wishlist .wm-wish-editor :is(.wm-photo-summary, .wm-details-summary):disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.wishlist .wm-wish-editor :is(.wm-photo-panel, .wm-details-panel) {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  background: color-mix(in srgb, var(--surface) 38%, transparent);
+}
+
+.wishlist .wm-wish-editor .wm-photo-picker {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+}
+
+.wishlist .wm-wish-editor .wm-photo-preview {
+  display: grid;
+  width: 92px;
+  height: 92px;
+  overflow: hidden;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-3));
+}
+
+.wishlist .wm-wish-editor .wm-photo-preview :is(img, .wl-product-visual) {
+  width: 100%;
+  height: 100%;
+}
+
+.wishlist .wm-wish-editor .wm-photo-placeholder {
+  color: color-mix(in srgb, var(--accent) 58%, var(--muted));
+}
+
+.wishlist .wm-wish-editor .wm-photo-actions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.wishlist .wm-wish-editor .wm-photo-actions .btn-secondary {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 12px;
+}
+
+.wishlist .wm-wish-editor .wm-visibility-field {
+  margin: 0;
+  gap: 8px;
+}
+
+.wishlist .wm-wish-editor .wm-visibility-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--wl-control-border);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-3) 78%, transparent);
+}
+
+.wishlist .wm-wish-editor .wm-visibility-option {
+  min-height: 46px;
+  padding: 9px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--wl-text-secondary);
+  text-align: center;
+}
+
+.wishlist .wm-wish-editor .wm-visibility-option > svg {
+  margin: 0;
+}
+
+.wishlist .wm-wish-editor .wm-visibility-option strong {
+  color: inherit;
+  font-size: 13px;
+}
+
+.wishlist .wm-wish-editor .wm-visibility-option[aria-pressed='true'] {
+  border: 0;
+  background-color: var(--accent-strong);
+  background-image: var(--control-fill);
+  color: #fff;
+  box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
+}
+
+.wishlist .wm-wish-editor .wm-visibility-hint {
+  color: var(--wl-text-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.wishlist .wm-wish-editor .wm-details-summary {
+  grid-template-columns: 42px minmax(0, 1fr) 22px;
+  padding-block: 13px;
+}
+
+.wishlist .wm-wish-editor .wm-details-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 11%, var(--surface-3));
+  color: color-mix(in srgb, var(--accent) 66%, var(--text));
+}
+
+.wishlist .wm-wish-editor .wm-details-panel .form-field {
+  margin: 0;
+}
+
+.wishlist .wm-wish-editor .wm-details-panel textarea {
+  min-height: 92px;
+}
+
+.wishlist .wm-wish-editor .wm-form-actions {
+  width: 100%;
+  margin: 0;
+  padding-top: 2px;
+}
+
+.wishlist .wm-wish-editor .wm-form-actions .wm-form-submit {
+  width: 100%;
+  min-height: 54px;
+  flex: 1 1 auto;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+@media (max-width: 560px) {
+  .wishlist .wm-wish-editor {
+    gap: 14px;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  }
+
+  .wishlist .wm-wish-editor .wm-form-heading {
+    padding-inline: 2px 46px;
+  }
+
+  .wishlist .wm-wish-editor .modal-title {
+    font-size: 28px;
+  }
+
+  .wishlist .wm-wish-editor .wm-form-heading > p {
+    font-size: 13px;
+  }
+
+  .wishlist .wm-wish-editor .wm-scope-field .tab-bar {
+    gap: 6px;
+  }
+
+  .wishlist .wm-wish-editor .wm-scope-field .tab-bar-btn {
+    min-height: 46px;
+    padding-inline: 7px;
+    font-size: 12px;
+  }
+
+  .wishlist .wm-wish-editor .wm-photo-summary {
+    grid-template-columns: 64px minmax(0, 1fr) 20px;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .wishlist .wm-wish-editor .wm-photo-summary-visual {
+    width: 64px;
+    height: 64px;
+    border-radius: 15px;
+  }
+
+  .wishlist .wm-wish-editor .wm-form-actions {
+    bottom: calc(-1 * max(16px, env(safe-area-inset-bottom)));
+    margin-inline: -2px;
+    padding: 12px 0 max(16px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 390px) {
+  .wishlist .wm-wish-editor {
+    padding-inline: 14px;
+  }
+
+  .wishlist .wm-wish-editor .wm-scope-field .tab-bar-btn {
+    gap: 5px;
+    padding-inline: 5px;
+    font-size: 11px;
+  }
+
+  .wishlist .wm-wish-editor .wm-photo-picker {
+    grid-template-columns: 76px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .wishlist .wm-wish-editor .wm-photo-preview {
+    width: 76px;
+    height: 76px;
+  }
+
+  .wishlist .wm-wish-editor .wm-visibility-option {
+    gap: 6px;
+    padding-inline: 7px;
+  }
+
+  .wishlist .wm-wish-editor .wm-visibility-option strong {
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wishlist .wm-wish-editor :is(.wm-disclosure-chevron, .wm-link-loading-icon) {
+    transition: none;
+    animation: none;
+  }
+}
