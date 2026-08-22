@@ -1,5 +1,5 @@
 // ============================================================
-// Supabase Edge Function: db-notify  v5
+// Supabase Edge Function: db-notify  v6
 // Таблиці: transactions, personal_wishes, wishlist_items,
 //          savings_goals, shopping_items, free_limit,
 //          photo_calendar, dates
@@ -217,6 +217,11 @@ async function handleFreeLimitProposal(record: any, oldRecord: any) {
 // Нове бажання → лише партнеру (не власнику).
 // Резерв → НІКОЛИ власнику (сюрприз зберігається).
 async function handleWishlist(type: string, record: any, oldRecord: any) {
+  // Таємне бажання не повинно залишати навіть побічного сліду в Telegram.
+  // Перевіряємо до читання користувачів і до формування тексту: DB webhook
+  // спрацьовує на всі INSERT/UPDATE таблиці, а приватність задає сам рядок.
+  if (record?.is_secret) return "wishlist_secret_ignored";
+
   const users = await getAllUsers();
   const owner = users.find((u: any) => u.id === record.owner) || null;
 

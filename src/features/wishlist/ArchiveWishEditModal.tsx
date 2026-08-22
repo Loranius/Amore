@@ -115,6 +115,7 @@ export function ArchiveWishEditModal({
       item={item}
       partner={partner ?? null}
       defaultScope={defaultScope}
+      defaultSecret={item.is_secret}
       onClose={onClose}
       onSubmit={submit}
       onPhotoClick={onPhotoClick}

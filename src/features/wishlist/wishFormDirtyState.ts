@@ -1,5 +1,6 @@
 export interface WishFormDraftSnapshot {
   scope: string;
+  isSecret: boolean;
   title: string;
   link: string;
   imageUrl: string;
@@ -11,6 +12,7 @@ export interface WishFormDraftSnapshot {
 
 const SNAPSHOT_KEYS = [
   'scope',
+  'isSecret',
   'title',
   'link',
   'imageUrl',

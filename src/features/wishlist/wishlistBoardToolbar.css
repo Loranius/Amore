@@ -25,6 +25,17 @@
   -webkit-backdrop-filter: none;
 }
 
+.wishlist .wl-visibility-tabs {
+  margin: 4px 3px 0;
+  padding-top: 6px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.wishlist .wl-visibility-tabs .tab-bar {
+  width: 100%;
+  margin: 0;
+}
+
 /* ── Активна вкладка власника ─────────────────────────────────
    «Мої / Лєни / Спільні» — та сама кнопка, що «Календар» у планах: власник
    показав обидва екрани й попросив звести їх до однієї мови.
@@ -309,6 +320,39 @@
   color: var(--muted);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.wl-secret-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  min-height: 210px;
+  place-items: center;
+  align-content: center;
+  gap: 6px;
+  padding: 30px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 26px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  color: var(--muted);
+  text-align: center;
+}
+
+.wl-secret-empty > svg {
+  margin-bottom: 3px;
+  color: var(--accent);
+}
+
+.wl-secret-empty strong {
+  color: var(--text);
+  font-family: 'Fredoka', 'Nunito', sans-serif;
+  font-size: 19px;
+}
+
+.wl-secret-empty p {
+  max-width: 390px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 @keyframes wl-priority-panel-in {

@@ -18,6 +18,7 @@ import {
   completeWishlistGift,
   createWishlistItem,
   fetchFulfilledWishlistV3,
+  fetchSecretWishlistV1,
   fetchWishlistStatsV3,
   fetchWishlistV3,
   markWishlistPreparing,
@@ -55,6 +56,14 @@ export function useWishlistItems(ownerId: number | null) {
     enabled: ownerId !== null,
     queryFn: async (): Promise<WishlistItemV3[]> =>
       fetchWishlistV3({ ownerId, shared: false }),
+  });
+}
+
+/** Таємні бажання — окремий RPC без owner-параметра, лише для автора. */
+export function useSecretWishlistItems(ownerId: number) {
+  return useQuery({
+    queryKey: qk.wishlistSecret(ownerId),
+    queryFn: fetchSecretWishlistV1,
   });
 }
 
@@ -152,12 +161,16 @@ function wishMatchesPayload(item: WishlistItemV3, payload: WishFormPayload): boo
     && item.priority === payload.priority;
 }
 
-export function useWishlistMutations(ownerId: number | null) {
+export function useWishlistMutations(ownerId: number | null, secretMode = false) {
   const client = useQueryClient();
   const me = useCurrentUser();
   const toast = useToast();
   const { data: users } = useUsers();
-  const key = ownerId !== null ? qk.wishlist(ownerId) : qk.wishlistShared();
+  const key = secretMode
+    ? qk.wishlistSecret(me.id)
+    : ownerId !== null
+      ? qk.wishlist(ownerId)
+      : qk.wishlistShared();
 
   const snapshot = () => client.getQueryData<WishlistItemV3[]>(key);
   const rollback = (prev: WishlistItemV3[] | undefined) => {
@@ -173,9 +186,11 @@ export function useWishlistMutations(ownerId: number | null) {
       payload: WishFormPayload;
       owner?: number;
       isShared?: boolean;
+      isSecret?: boolean;
       expectedVersion?: number;
     }) => {
       const shared = input.isShared ?? ownerId === null;
+      const secret = input.isSecret ?? false;
       const targetOwner = input.owner ?? ownerId ?? me.id;
 
       try {
@@ -187,6 +202,7 @@ export function useWishlistMutations(ownerId: number | null) {
             payload: input.payload,
             ownerId: targetOwner,
             shared,
+            secret,
           });
         }
       } catch (error) {
@@ -195,15 +211,18 @@ export function useWishlistMutations(ownerId: number | null) {
         // Update may have committed before the response was lost. Read the
         // server state before allowing another edit with an obsolete version.
         try {
-          const serverItems = await fetchWishlistV3({
-            ownerId: shared ? null : targetOwner,
-            shared,
-          });
+          const serverItems = secret
+            ? await fetchSecretWishlistV1()
+            : await fetchWishlistV3({
+                ownerId: shared ? null : targetOwner,
+                shared,
+              });
           const committed = serverItems.some((item) =>
             input.id !== null
               ? item.id === input.id && wishMatchesPayload(item, input.payload)
               : item.owner === targetOwner
                 && item.is_shared === shared
+                && item.is_secret === secret
                 && wishMatchesPayload(item, input.payload),
           );
           if (committed) return;

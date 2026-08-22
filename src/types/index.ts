@@ -490,6 +490,7 @@ export interface WishlistItemRow {
   gift_date: string | null;
   owner: number;
   is_shared: boolean;
+  is_secret: boolean;
   reserved: boolean;
   reserved_by: number | null;
   price: number | null;

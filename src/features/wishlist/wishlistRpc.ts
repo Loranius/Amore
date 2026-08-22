@@ -221,6 +221,16 @@ export async function fetchWishlistV3(input: {
   });
   if (error) throw new Error(error.message);
   const rows = assertRows<WishlistItemV3>(data, 'Wishlist');
+  const visibleRows = rows.map((row) => ({ ...row, is_secret: false }));
+  registerWishlistProcessedRows(visibleRows);
+  return visibleRows;
+}
+
+export async function fetchSecretWishlistV1(): Promise<WishlistItemV3[]> {
+  const { data, error } = await rpc('get_secret_wishlist_items_v1');
+  if (error) throw new Error(error.message);
+  const rows = assertRows<WishlistItemV3>(data, 'Secret Wishlist')
+    .map((row) => ({ ...row, is_secret: true }));
   registerWishlistProcessedRows(rows);
   return rows;
 }
@@ -251,15 +261,17 @@ export async function createWishlistItem(input: {
   payload: WishlistMutationPayload;
   ownerId: number;
   shared: boolean;
+  secret: boolean;
 }): Promise<number> {
   const tracked = createRequestTracker.acquire(input);
 
   try {
-    const wishId = await callNumber('create_wishlist_item_idempotent_v4', {
+    const wishId = await callNumber('create_wishlist_item_idempotent_v5', {
       p_request_id: tracked.requestId,
       ...mutationArgs(input.payload),
       p_owner_id: input.ownerId,
       p_is_shared: input.shared,
+      p_is_secret: input.secret,
     });
     createRequestTracker.release(tracked.key);
     return wishId;

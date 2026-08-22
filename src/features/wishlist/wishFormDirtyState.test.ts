@@ -3,6 +3,7 @@ import { hasUnsavedWishChanges, type WishFormDraftSnapshot } from './wishFormDir
 
 const INITIAL: WishFormDraftSnapshot = {
   scope: 'me',
+  isSecret: false,
   title: 'Навушники',
   link: 'https://example.com/item',
   imageUrl: 'https://example.com/image.jpg',
@@ -14,6 +15,7 @@ const INITIAL: WishFormDraftSnapshot = {
 
 const SNAPSHOT_KEYS: Array<keyof WishFormDraftSnapshot> = [
   'scope',
+  'isSecret',
   'title',
   'link',
   'imageUrl',
@@ -28,13 +30,19 @@ describe('hasUnsavedWishChanges', () => {
     expect(hasUnsavedWishChanges(INITIAL, { ...INITIAL }, false)).toBe(false);
   });
 
-  it.each(SNAPSHOT_KEYS)('detects a changed %s field', (key) => {
+  it.each(SNAPSHOT_KEYS.filter((key) => key !== 'isSecret'))('detects a changed %s field', (key) => {
     expect(
       hasUnsavedWishChanges(
         INITIAL,
         { ...INITIAL, [key]: `${INITIAL[key]}-changed` },
         false,
       ),
+    ).toBe(true);
+  });
+
+  it('detects a changed visibility', () => {
+    expect(
+      hasUnsavedWishChanges(INITIAL, { ...INITIAL, isSecret: true }, false),
     ).toBe(true);
   });
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { PlusIcon } from '@/components/icons/UiIcon';
+import { LockIcon, PlusIcon } from '@/components/icons/UiIcon';
 import type { WishlistViewMode } from './wishlistBoardView';
 
 // ============================================================
@@ -22,6 +22,7 @@ import type { WishlistViewMode } from './wishlistBoardView';
 // ============================================================
 
 export type WishlistWorldTab = 'me' | 'partner' | 'shared';
+export type WishlistVisibilityMode = 'visible' | 'secret';
 
 export interface WishlistWorldNavProps {
   /** Виконані бажання замість активних. */
@@ -34,6 +35,9 @@ export interface WishlistWorldNavProps {
   onViewChange: (view: WishlistViewMode) => void;
   onAdd: () => void;
   busy: boolean;
+  visibility: WishlistVisibilityMode | null;
+  onVisibilityChange: (visibility: WishlistVisibilityMode) => void;
+  secretAvailable: boolean;
 }
 
 /**
@@ -73,6 +77,9 @@ export function WishlistWorldNav({
   onViewChange,
   onAdd,
   busy,
+  visibility,
+  onVisibilityChange,
+  secretAvailable,
 }: WishlistWorldNavProps) {
   const [open, setOpen] = useState(false);
 
@@ -116,6 +123,31 @@ export function WishlistWorldNav({
             aria-label="Налаштування вішліста"
           >
             <div className="wl-world-sheet-handle" aria-hidden="true" />
+
+            {visibility && secretAvailable && (
+              <div
+                className="wl-world-group wl-world-visibility"
+                role="group"
+                aria-label="Видимість бажань"
+              >
+                <button
+                  type="button"
+                  className="wl-world-chip"
+                  aria-pressed={visibility === 'visible'}
+                  onClick={() => onVisibilityChange('visible')}
+                >
+                  Видимі
+                </button>
+                <button
+                  type="button"
+                  className="wl-world-chip"
+                  aria-pressed={visibility === 'secret'}
+                  onClick={() => onVisibilityChange('secret')}
+                >
+                  <LockIcon size={15} /> Таємні
+                </button>
+              </div>
+            )}
 
             <div className="wl-world-group" role="group" aria-label="Стан бажань">
               <button

@@ -13,7 +13,10 @@ import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { WishlistBubbleView } from './WishlistBubbleView';
 import { WishlistSphereView } from './WishlistSphereView';
-import { WishlistWorldNav } from './WishlistWorldNav';
+import {
+  WishlistWorldNav,
+  type WishlistVisibilityMode,
+} from './WishlistWorldNav';
 import { useDimmedWorld } from '@/features/world/worldDim';
 import { WishlistFeedView } from './WishlistFeedView';
 import { WishlistPolaroidView } from './WishlistPolaroidView';
@@ -48,6 +51,7 @@ import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import { useWishlistViewPreference } from './useWishlistViewPreference';
 import {
   useWishlistItems,
+  useSecretWishlistItems,
   useSharedWishlistItems,
   useCoupleWishStats,
   useWishlistMutations,
@@ -72,7 +76,7 @@ import './wishlistArchiveRedesign.css';
 import './wishlistFoundation.css';
 import './wishlistHero.css';
 import { TogetherIcon } from '@/components/icons/WishIcon';
-import { CheckIcon, GiftIcon, LayersIcon } from '@/components/icons/UiIcon';
+import { CheckIcon, GiftIcon, LayersIcon, LockIcon } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 
 type Tab = 'me' | 'partner' | 'shared';
@@ -173,6 +177,7 @@ export function WishlistPage() {
   const [archiveOpen, setArchiveOpen] = useState(
     archiveRequested && tabFromUrl !== 'partner',
   );
+  const [visibilityMode, setVisibilityMode] = useState<WishlistVisibilityMode>('visible');
   const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
   const [sharedFilter, setSharedFilter] = useState<SharedWishFilter>('all');
   const [boardViews, setBoardViews] = useState<BoardViews>(initialBoardViews);
@@ -190,24 +195,31 @@ export function WishlistPage() {
   }, [archiveRequested, notificationRequest, tabFromUrl]);
 
   const isOwnTab = tab === 'me';
+  const isSecretMode = isOwnTab && visibilityMode === 'secret';
   const ownerId = tab === 'shared' ? null : isOwnTab ? me.id : (partner?.id ?? null);
 
   // All three active scopes load in parallel. This keeps tab counters accurate
   // and makes switching tabs instant without changing the RPC contract.
   const ownQuery = useWishlistItems(me.id);
+  const secretQuery = useSecretWishlistItems(me.id);
   const partnerWishlistQuery = useWishlistItems(partner?.id ?? null);
   const sharedQuery = useSharedWishlistItems();
   const { data: stats } = useCoupleWishStats();
 
   const ownItems = ownQuery.data ?? [];
+  const secretItems = secretQuery.data ?? [];
   const partnerItems = partnerWishlistQuery.data ?? [];
   const sharedItems = sharedQuery.data ?? [];
   const activeQuery = tab === 'me'
-    ? ownQuery
+    ? (isSecretMode ? secretQuery : ownQuery)
     : tab === 'partner'
       ? partnerWishlistQuery
       : sharedQuery;
-  const items = tab === 'me' ? ownItems : tab === 'partner' ? partnerItems : sharedItems;
+  const items = tab === 'me'
+    ? (isSecretMode ? secretItems : ownItems)
+    : tab === 'partner'
+      ? partnerItems
+      : sharedItems;
   const isPending = activeQuery.isPending;
   const isFetching = activeQuery.isFetching;
   const isError = activeQuery.isError;
@@ -249,7 +261,7 @@ export function WishlistPage() {
     markPurchased,
     fulfill,
     changeScope,
-  } = useWishlistMutations(ownerId);
+  } = useWishlistMutations(ownerId, isSecretMode);
   const quickFulfill = useQuickWishlistCompletion();
   const confirmDialog = useConfirm();
 
@@ -281,7 +293,7 @@ export function WishlistPage() {
   const submit = async (
     id: number | null,
     payload: WishFormPayload,
-    scope: { owner: number; isShared: boolean },
+    scope: { owner: number; isShared: boolean; isSecret: boolean },
   ): Promise<void> => {
     try {
       await save.mutateAsync({
@@ -289,8 +301,13 @@ export function WishlistPage() {
         payload,
         owner: scope.owner,
         isShared: scope.isShared,
+        isSecret: scope.isSecret,
         expectedVersion: editing?.version ?? 0,
       });
+      if (id === null && scope.isSecret) {
+        setVisibilityMode('secret');
+        setArchiveOpen(false);
+      }
     } catch (error) {
       if (id !== null && (error as Error).message.includes('wish_version_conflict')) {
         const refreshed = await refetchItems();
@@ -394,11 +411,17 @@ export function WishlistPage() {
   // лише через окрему кнопку «Виконані бажання: …» над панеллю. Власник
   // попросив прибрати ту кнопку й дати «Виконані» просто в аркуші: пара має
   // бачити, що вони здійснили одне для одного, там само, де все інше.
-  const canShowArchive = true;
+  const canShowArchive = !isSecretMode;
   const archiveOwnerId = tab === 'me' ? me.id : tab === 'partner' ? partner.id : null;
 
   const changeTab = (nextTab: Tab) => {
     setTab(nextTab);
+    if (nextTab === 'partner') setArchiveOpen(false);
+  };
+
+  const changeVisibility = (nextVisibility: WishlistVisibilityMode) => {
+    setVisibilityMode(nextVisibility);
+    setArchiveOpen(false);
   };
 
   const changeBoardView = (nextView: WishlistBoardViewState) => {
@@ -452,6 +475,24 @@ export function WishlistPage() {
       <div className="wl-wishlist-controls">
         <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
 
+        {!worldVisible && isOwnTab && (secretItems.length > 0 || isSecretMode) && (
+          <div className="wl-visibility-tabs">
+            <TabBar<WishlistVisibilityMode>
+              value={visibilityMode}
+              onChange={changeVisibility}
+              items={[
+                { value: 'visible', label: 'Видимі', icon: <HeartIcon size={14} /> },
+                {
+                  value: 'secret',
+                  label: 'Таємні',
+                  icon: <LockIcon size={14} />,
+                  count: secretItems.length,
+                },
+              ]}
+            />
+          </div>
+        )}
+
         {!worldVisible && !archiveOpen && !isPending && !isError && contextItems.length > 0 && (
           <WishlistBoardToolbar
             value={activeBoardView}
@@ -472,6 +513,9 @@ export function WishlistPage() {
           onViewChange={(view) => changeBoardView({ ...activeBoardView, view })}
           onAdd={() => setAdding(true)}
           busy={mutationBusy}
+          visibility={isOwnTab ? visibilityMode : null}
+          onVisibilityChange={changeVisibility}
+          secretAvailable={secretItems.length > 0 || isSecretMode}
         />
       )}
 
@@ -551,6 +595,12 @@ export function WishlistPage() {
                         <p>{sharedEmptyCopy.description}</p>
                       </div>
                     </div>
+                  ) : isSecretMode ? (
+                    <div className="wl-secret-empty">
+                      <LockIcon size={26} />
+                      <strong>Таємних бажань поки немає</strong>
+                      <p>Створи бажання й обери «Таємне» — партнер його не побачить.</p>
+                    </div>
                   ) : (
                     <p className="empty-state">Твій список порожній. Час додати нову забаганку.</p>
                   )}
@@ -599,6 +649,7 @@ export function WishlistPage() {
           item={editing}
           partner={partner}
           defaultScope={tab}
+          defaultSecret={isSecretMode}
           onClose={() => {
             setAdding(false);
             setEditing(null);

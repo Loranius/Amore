@@ -50,7 +50,8 @@
   .empty-state,
   .wl-board-filter-empty,
   .wl-partner-empty,
-  .wl-shared-empty
+  .wl-shared-empty,
+  .wl-secret-empty
 ) {
   width: 100%;
   flex: 1 0 100%;

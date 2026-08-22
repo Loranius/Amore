@@ -40,7 +40,7 @@ import type { AppUser } from '@/types';
 import './wishlistFormSections.css';
 import './wishlistUnsavedChanges.css';
 import { TogetherIcon } from '@/components/icons/WishIcon';
-import { CloseIcon, ImageIcon, UserIcon } from '@/components/icons/UiIcon';
+import { CloseIcon, ImageIcon, LockIcon, UserIcon } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 
 type Scope = 'me' | 'partner' | 'shared';
@@ -52,11 +52,12 @@ interface WishFormModalProps {
   item: WishlistItemV3 | null;
   partner: AppUser | null;
   defaultScope: Scope;
+  defaultSecret: boolean;
   onClose: () => void;
   onSubmit: (
     id: number | null,
     payload: WishFormPayload,
-    scope: { owner: number; isShared: boolean },
+    scope: { owner: number; isShared: boolean; isSecret: boolean },
   ) => Promise<void>;
   onPhotoClick: (src: string) => void;
 }
@@ -79,6 +80,7 @@ export function WishFormModal({
   item,
   partner,
   defaultScope,
+  defaultSecret,
   onClose,
   onSubmit,
   onPhotoClick,
@@ -89,6 +91,7 @@ export function WishFormModal({
   const queryClient = useQueryClient();
   const initialImagePreference = normalizeWishlistImagePreference(item?.image_preference);
   const [scope, setScope] = useState<Scope>(defaultScope);
+  const [isSecret, setIsSecret] = useState(item?.is_secret ?? defaultSecret);
 
   const [title, setTitle] = useState(item?.title ?? '');
   const [link, setLink] = useState(item?.link ?? '');
@@ -130,6 +133,7 @@ export function WishFormModal({
   const lastFocusedBeforeClose = useRef<HTMLElement | null>(null);
   const initialSnapshot = useRef<WishFormDraftSnapshot>({
     scope: defaultScope,
+    isSecret: item?.is_secret ?? defaultSecret,
     title: item?.title ?? '',
     link: item?.link ?? '',
     imageUrl: item?.image_url ?? '',
@@ -157,6 +161,7 @@ export function WishFormModal({
     initialSnapshot.current,
     {
       scope,
+      isSecret,
       title,
       link,
       imageUrl: imgUrl,
@@ -450,7 +455,11 @@ export function WishFormModal({
           priority: (priority || null) as WishFormPayload['priority'],
           description: description.trim() || null,
         },
-        { owner, isShared: scope === 'shared' },
+        {
+          owner,
+          isShared: scope === 'shared',
+          isSecret: scope === 'me' && isSecret,
+        },
       );
 
       onClose();
@@ -520,7 +529,9 @@ export function WishFormModal({
               <TabBar<Scope>
                 value={scope}
                 onChange={(value) => {
-                  if (!saving) setScope(value);
+                  if (saving) return;
+                  setScope(value);
+                  if (value !== 'me') setIsSecret(false);
                 }}
                 items={[
                   { value: 'me', label: 'Моє', icon: <HeartIcon size={14} /> },
@@ -533,6 +544,51 @@ export function WishFormModal({
                   { value: 'shared', label: 'Спільне', icon: <TogetherIcon size={14} /> },
                 ]}
               />
+            </div>
+          )}
+
+          {!isEdit && scope === 'me' && (
+            <div className="form-field wm-visibility-field">
+              <span>Хто побачить бажання</span>
+              <div
+                className="wm-visibility-picker"
+                role="group"
+                aria-label="Видимість бажання"
+              >
+                <button
+                  type="button"
+                  className="wm-visibility-option"
+                  aria-pressed={!isSecret}
+                  disabled={saving}
+                  onClick={() => setIsSecret(false)}
+                >
+                  <HeartIcon size={18} />
+                  <span>
+                    <strong>Видиме</strong>
+                    <small>Партнер побачить його у твоєму списку</small>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="wm-visibility-option"
+                  aria-pressed={isSecret}
+                  disabled={saving}
+                  onClick={() => setIsSecret(true)}
+                >
+                  <LockIcon size={18} />
+                  <span>
+                    <strong>Таємне</strong>
+                    <small>Доступне лише тобі, без сповіщення партнеру</small>
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isEdit && item.is_secret && (
+            <div className="wm-secret-status" role="status">
+              <LockIcon size={17} />
+              <span><strong>Таємне бажання</strong> — його бачиш лише ти.</span>
             </div>
           )}
 

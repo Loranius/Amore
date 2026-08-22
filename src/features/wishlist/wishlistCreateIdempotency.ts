@@ -4,6 +4,7 @@ export interface WishlistCreateRequestInput {
   payload: WishlistMutationPayload;
   ownerId: number;
   shared: boolean;
+  secret: boolean;
 }
 
 interface PendingCreateRequest {
@@ -24,6 +25,7 @@ export function wishlistCreateRequestKey(input: WishlistCreateRequestInput): str
   return JSON.stringify([
     input.ownerId,
     input.shared,
+    input.secret,
     input.payload.title,
     input.payload.description,
     input.payload.link,

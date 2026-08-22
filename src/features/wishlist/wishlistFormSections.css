@@ -97,6 +97,86 @@
   width: 100%;
 }
 
+.wishlist .wm-visibility-field {
+  gap: 8px;
+}
+
+.wishlist .wm-visibility-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.wishlist .wm-visibility-option {
+  min-height: 74px;
+  padding: 11px 12px;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--text) 7%);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%);
+  color: color-mix(in srgb, var(--muted) 82%, var(--text));
+  text-align: left;
+  cursor: pointer;
+}
+
+.wishlist .wm-visibility-option > svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.wishlist .wm-visibility-option > span {
+  display: grid;
+  gap: 3px;
+}
+
+.wishlist .wm-visibility-option strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.wishlist .wm-visibility-option small {
+  color: inherit;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.wishlist .wm-visibility-option[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+  background: color-mix(in srgb, var(--accent) 15%, var(--surface));
+  color: color-mix(in srgb, var(--accent) 72%, var(--text));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 46%, transparent);
+}
+
+.wishlist .wm-visibility-option:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.wishlist .wm-visibility-option:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.wishlist .wm-secret-status {
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: color-mix(in srgb, var(--muted) 76%, var(--text));
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.wishlist .wm-secret-status svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
 @media (max-width: 560px) {
   .wishlist .wm-form-modal {
     gap: 12px;
@@ -113,6 +193,10 @@
   }
 
   .wishlist .wm-form-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wishlist .wm-visibility-picker {
     grid-template-columns: 1fr;
   }
 }

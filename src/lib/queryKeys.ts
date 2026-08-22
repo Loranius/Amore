@@ -23,6 +23,7 @@ export const qk = {
 
   wishlist: (ownerId?: number) =>
     (ownerId === undefined ? (['wishlist'] as const) : (['wishlist', ownerId] as const)),
+  wishlistSecret: (ownerId: number) => ['wishlist', 'secret', ownerId] as const,
   wishlistFulfilled: (ownerId: number) => ['wishlist', 'fulfilled', ownerId] as const,
   wishlistShared: () => ['wishlist', 'shared'] as const,
   wishlistSharedFulfilled: () => ['wishlist', 'shared', 'fulfilled'] as const,

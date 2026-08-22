@@ -8,6 +8,7 @@ import {
 const baseInput: WishlistCreateRequestInput = {
   ownerId: 1,
   shared: false,
+  secret: false,
   payload: {
     title: 'Мрія',
     description: null,
@@ -50,6 +51,11 @@ describe('Wishlist create idempotency', () => {
     };
 
     expect(wishlistCreateRequestKey(second)).not.toBe(wishlistCreateRequestKey(first));
+  });
+
+  it('keeps visible and secret creates in separate retry namespaces', () => {
+    expect(wishlistCreateRequestKey({ ...baseInput, secret: true }))
+      .not.toBe(wishlistCreateRequestKey(baseInput));
   });
 
   it('keeps the same domain create request when only presentation preference changes', () => {
