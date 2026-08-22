@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const FORM = readFileSync(join(__dirname, 'WishFormModal.tsx'), 'utf8');
 const STYLES = readFileSync(join(__dirname, 'wishlistFormSections.css'), 'utf8');
+const MOBILE_STYLES = readFileSync(join(__dirname, 'wishlistV3.mobile.css'), 'utf8');
 
 describe('WishFormModal quick-create layout', () => {
   it('keeps the frequent fields visible and optional work collapsed', () => {
@@ -44,6 +45,12 @@ describe('WishFormModal quick-create layout', () => {
     );
     expect(STYLES).not.toMatch(
       /\.wm-wish-editor \.wm-visibility-picker\s*\{[^}]*grid-template-columns:\s*1fr/,
+    );
+  });
+
+  it('keeps accordion cards content-sized inside the scrollable flex modal', () => {
+    expect(MOBILE_STYLES).toMatch(
+      /\.wm-wish-editor\s*>\s*:is\(\.wm-photo-disclosure,\s*\.wm-details-disclosure\)\s*\{[^}]*flex:\s*0\s+0\s+auto/,
     );
   });
 });
