@@ -197,3 +197,34 @@
 
 [data-portal-scene='true'] .shopping-edit-head h2 { color: var(--world-text); }
 [data-portal-scene='true'] .shopping-edit-close { color: var(--world-text-muted); }
+
+/* ── Спрощена нижня композиція ─────────────────────────────
+   Куплений архів більше не є частиною екрану. Нижній composer тепер має
+   вертикальний порядок: повноширинне поле, під ним така сама по ширині
+   кнопка «Додати», а вже після неї — тихіший «Шаблон». */
+.shopping .shopping-archive {
+  display: none;
+}
+
+.shopping .shopping-composer-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.shopping .shopping-add-button {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-inline: 16px;
+}
+
+.shopping .shopping-add-button > span {
+  display: none;
+}
+
+.shopping .shopping-add-button strong {
+  font-size: 14px;
+  font-weight: 800;
+}
