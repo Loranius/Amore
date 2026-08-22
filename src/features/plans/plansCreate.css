@@ -33,6 +33,17 @@
   padding: 24px 20px 20px;
 }
 
+/*
+ * Швидкі необов'язкові налаштування стоять вище за велике текстове поле.
+ * Так користувач спочатку бачить компактні тип/фото/нотатки, а назву вводить
+ * уже внизу модалки без великого textarea, що перекриває весь перший екран.
+ * `order` працює і для grid-items, тому DOM/валідацію форми міняти не треба.
+ */
+.plan-create-head { order: 0; }
+.plan-create-accordion { order: 1; }
+.plan-create-title-field { order: 2; }
+.plan-create-actions { order: 3; }
+
 .plan-create-head {
   display: grid;
   gap: 7px;
