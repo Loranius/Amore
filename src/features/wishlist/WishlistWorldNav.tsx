@@ -1,13 +1,13 @@
 import { useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LockIcon, PlusIcon } from '@/components/icons/UiIcon';
+import { ChevronDownIcon, LockIcon, PlusIcon } from '@/components/icons/UiIcon';
 import type { WishlistViewMode } from './wishlistBoardView';
 
 // ============================================================
 // Навігація вішліста у світі — верхній accordion над сценою.
 // ------------------------------------------------------------
 // Вкладки власників живуть у верхній панелі, а фільтри відкриваються поверх
-// поля бажань. Розгортання не повинно змінювати геометрію сфери/бульбашок.
+// поля бажань. Розгортання не змінює геометрію сфери/бульбашок.
 // ============================================================
 
 export type WishlistWorldTab = 'me' | 'partner' | 'shared';
@@ -31,14 +31,6 @@ const VIEWS: readonly { value: WishlistViewMode; label: string }[] = [
   { value: 'feed', label: 'Список' },
   { value: 'polaroid', label: 'Полароїд' },
 ];
-
-function ChevronIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="m6.5 9 5.5 5.5L17.5 9" />
-    </svg>
-  );
-}
 
 function FilterViewIcon() {
   return (
@@ -68,107 +60,113 @@ export function WishlistWorldNav({
   const panelId = useId();
 
   useEffect(() => {
-    setControlsHost(document.querySelector<HTMLElement>('.wishlist .wl-wishlist-controls'));
+    const host = document.querySelector<HTMLElement>('.wishlist .wl-wishlist-controls');
+    setControlsHost(host);
   }, []);
 
-  const accordion = controlsHost ? createPortal(
-    <div className={`wl-world-accordion${open ? ' is-open' : ''}`}>
-      <button
-        type="button"
-        className="wl-world-nav-toggle"
-        aria-expanded={open}
-        aria-controls={panelId}
-        aria-label={open ? 'Згорнути фільтри вішліста' : 'Розгорнути фільтри вішліста'}
-        onClick={() => setOpen((current) => !current)}
-      >
-        <ChevronIcon />
-      </button>
-
-      {open && (
+  const accordion = controlsHost
+    ? createPortal(
         <div
-          id={panelId}
-          className="wl-world-sheet"
-          role="region"
-          aria-label="Фільтри та види вішліста"
+          className={`wl-world-accordion${open ? ' is-open' : ''}`}
+          data-open={open ? 'true' : 'false'}
         >
-          <div className="wl-world-sheet-heading">
-            <span>
-              <FilterViewIcon />
-              <strong>Фільтри та види</strong>
-            </span>
-          </div>
+          <button
+            type="button"
+            className="wl-world-nav-toggle"
+            aria-expanded={open}
+            aria-controls={panelId}
+            aria-label={open ? 'Згорнути фільтри вішліста' : 'Розгорнути фільтри вішліста'}
+            onClick={() => setOpen((current) => !current)}
+          >
+            <ChevronDownIcon size={21} />
+          </button>
 
-          {visibility && secretAvailable && (
+          {open && (
             <div
-              className="wl-world-group wl-world-group--two wl-world-visibility"
-              role="group"
-              aria-label="Видимість бажань"
+              id={panelId}
+              className="wl-world-sheet"
+              role="region"
+              aria-label="Фільтри та види вішліста"
             >
-              <button
-                type="button"
-                className="wl-world-chip"
-                aria-pressed={visibility === 'visible'}
-                onClick={() => onVisibilityChange('visible')}
+              <div className="wl-world-sheet-heading">
+                <span>
+                  <FilterViewIcon />
+                  <strong>Фільтри та види</strong>
+                </span>
+              </div>
+
+              {visibility && secretAvailable && (
+                <div
+                  className="wl-world-group wl-world-group--two wl-world-visibility"
+                  role="group"
+                  aria-label="Видимість бажань"
+                >
+                  <button
+                    type="button"
+                    className="wl-world-chip"
+                    aria-pressed={visibility === 'visible'}
+                    onClick={() => onVisibilityChange('visible')}
+                  >
+                    Видимі
+                  </button>
+                  <button
+                    type="button"
+                    className="wl-world-chip"
+                    aria-pressed={visibility === 'secret'}
+                    onClick={() => onVisibilityChange('secret')}
+                  >
+                    <LockIcon size={15} /> Таємні
+                  </button>
+                </div>
+              )}
+
+              <div
+                className="wl-world-group wl-world-group--two"
+                role="group"
+                aria-label="Стан бажань"
               >
-                Видимі
-              </button>
-              <button
-                type="button"
-                className="wl-world-chip"
-                aria-pressed={visibility === 'secret'}
-                onClick={() => onVisibilityChange('secret')}
+                <button
+                  type="button"
+                  className="wl-world-chip"
+                  aria-pressed={!archiveOpen}
+                  onClick={() => onArchiveChange(false)}
+                >
+                  Активні
+                </button>
+                <button
+                  type="button"
+                  className="wl-world-chip"
+                  aria-pressed={archiveOpen}
+                  disabled={!archiveAvailable}
+                  onClick={() => onArchiveChange(true)}
+                >
+                  Виконані
+                </button>
+              </div>
+
+              <div
+                className="wl-world-group wl-world-group--views"
+                role="group"
+                aria-label="Вигляд бажань"
               >
-                <LockIcon size={15} /> Таємні
-              </button>
+                {VIEWS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    className="wl-world-chip"
+                    aria-pressed={item.value === view}
+                    onClick={() => onViewChange(item.value)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
-
-          <div
-            className="wl-world-group wl-world-group--two"
-            role="group"
-            aria-label="Стан бажань"
-          >
-            <button
-              type="button"
-              className="wl-world-chip"
-              aria-pressed={!archiveOpen}
-              onClick={() => onArchiveChange(false)}
-            >
-              Активні
-            </button>
-            <button
-              type="button"
-              className="wl-world-chip"
-              aria-pressed={archiveOpen}
-              disabled={!archiveAvailable}
-              onClick={() => onArchiveChange(true)}
-            >
-              Виконані
-            </button>
-          </div>
-
-          <div
-            className="wl-world-group wl-world-group--views"
-            role="group"
-            aria-label="Вигляд бажань"
-          >
-            {VIEWS.map((item) => (
-              <button
-                key={item.value}
-                type="button"
-                className="wl-world-chip"
-                aria-pressed={item.value === view}
-                onClick={() => onViewChange(item.value)}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>,
-    controlsHost,
-  ) : null;
+        </div>,
+        controlsHost,
+      )
+    : null;
 
   return (
     <>

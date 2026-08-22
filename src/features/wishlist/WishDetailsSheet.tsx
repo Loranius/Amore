@@ -18,7 +18,15 @@ import type { WishlistItemV3 } from './wishlistRpc';
 import './wishlistCloud.css';
 import './wishlistCloudModalFix.css';
 import { SparkIcon } from '@/components/icons/EventIcon';
-import { BagIcon, CheckIcon, ExternalLinkIcon, GiftIcon, PencilIcon, TrashIcon } from '@/components/icons/UiIcon';
+import {
+  BagIcon,
+  CheckIcon,
+  ExternalLinkIcon,
+  GiftIcon,
+  PencilIcon,
+  SwapIcon,
+  TrashIcon,
+} from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 
 export interface WishDetailsSheetProps {
@@ -318,7 +326,7 @@ export function WishDetailsSheet({
                 disabled={busy}
                 onClick={() => closeAndRun(() => onMove(item))}
               >
-                <span aria-hidden="true">↔</span>
+                <SwapIcon size={15} />
                 Перенести
               </button>
             )}
