@@ -1,7 +1,7 @@
 import type { TreeLeafGeometryConfig } from './types';
 
 export const DEFAULT_TREE_LEAF_GEOMETRY_CONFIG: TreeLeafGeometryConfig = {
-  rulesVersion: 'tree-leaf-geometry-v1.1.1',
+  rulesVersion: 'tree-leaf-geometry-v1.2.0',
   renderFractionByLod: {
     high: 0.8,
     medium: 0.76,

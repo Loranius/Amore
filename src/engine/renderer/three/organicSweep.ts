@@ -24,6 +24,13 @@ function applyBranchBarkSurface(
     'barkCharacter',
     new THREE.Float32BufferAttribute(bark.branchRoughnessCharacters, 1),
   );
+  geometry.setAttribute(
+    'barkMask',
+    new THREE.Float32BufferAttribute(
+      new Float32Array(mesh.diagnostics.vertexCount).fill(1),
+      1,
+    ),
+  );
   geometry.userData['treeBarkSurface'] = {
     version: bark.treeBarkSurfaceVersion,
     rulesVersion: bark.rulesVersion,
@@ -34,6 +41,8 @@ function applyBranchBarkSurface(
     uniqueTints: bark.diagnostics.uniqueTintCount,
     minimumRoughnessCharacter: bark.diagnostics.minimumRoughnessCharacter,
     maximumRoughnessCharacter: bark.diagnostics.maximumRoughnessCharacter,
+    barkMaskAttributeId: 'tree:bark:surface-mask',
+    maskedBarkVertices: mesh.diagnostics.vertexCount,
   };
 }
 

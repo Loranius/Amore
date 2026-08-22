@@ -62,6 +62,12 @@ function applyStaticBarkSurface(
     'barkCharacter',
     new THREE.Float32BufferAttribute(bark.staticRoughnessCharacters, 1),
   );
+  const barkMask = new Float32Array(rootGeometry.diagnostics.vertexCount);
+  barkMask.fill(1, 0, bark.diagnostics.staticBarkVertexCount);
+  geometry.setAttribute(
+    'barkMask',
+    new THREE.Float32BufferAttribute(barkMask, 1),
+  );
   geometry.userData['treeBarkSurface'] = {
     version: bark.treeBarkSurfaceVersion,
     rulesVersion: bark.rulesVersion,
@@ -72,6 +78,9 @@ function applyStaticBarkSurface(
     staticBarkVertices: bark.diagnostics.staticBarkVertexCount,
     preservedTerrainVertices: bark.diagnostics.preservedTerrainVertexCount,
     soilTerrainTintPreserved: bark.diagnostics.soilTerrainTintPreserved,
+    barkMaskAttributeId: 'tree:bark:surface-mask',
+    maskedBarkVertices: bark.diagnostics.staticBarkVertexCount,
+    maskedTerrainVertices: bark.diagnostics.preservedTerrainVertexCount,
   };
 }
 

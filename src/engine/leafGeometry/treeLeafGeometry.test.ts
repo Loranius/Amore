@@ -43,6 +43,31 @@ describe('Tree Leaf Geometry', () => {
     }
   });
 
+  it('gives medium and high leaves an asymmetric curled blade without extra draw calls', () => {
+    for (const state of [
+      buildTreeLabPreview('medium').leaves,
+      buildTreeLabPreview('high').leaves,
+    ]) {
+      const rowCount = state.template.vertexCount / 2;
+      const rows = Array.from({ length: rowCount }, (_value, row) => {
+        const left = row * 6;
+        const right = left + 3;
+        return {
+          centerX: ((state.template.positions[left] ?? 0)
+            + (state.template.positions[right] ?? 0)) / 2,
+          edgeDepthDelta: Math.abs(
+            (state.template.positions[left + 2] ?? 0)
+              - (state.template.positions[right + 2] ?? 0),
+          ),
+        };
+      });
+
+      expect(rows.some((row) => Math.abs(row.centerX) > 0.001)).toBe(true);
+      expect(rows.some((row) => row.edgeDepthDelta > 0.001)).toBe(true);
+      expect(state.diagnostics.estimatedDrawCalls).toBe(1);
+    }
+  });
+
   it('keeps lower LOD leaf identities and transforms stable in higher LODs', () => {
     const low = buildTreeLabPreview('low').leaves;
     const medium = buildTreeLabPreview('medium').leaves;

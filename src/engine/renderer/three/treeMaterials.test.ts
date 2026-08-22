@@ -20,6 +20,17 @@ describe('Three.js Tree Material adapter', () => {
     expect(pair.foliage.vertexColors).toBe(false);
     expect(pair.bark.userData['treeVertexTintEnabled']).toBe(true);
     expect(pair.foliage.userData['treeVertexTintEnabled']).toBe(false);
+    expect(pair.bark.userData['treeMaterialColorSpace']).toBe('tree-linear-srgb-v1');
+    expect(pair.foliage.userData['treeMaterialColorSpace']).toBe('tree-linear-srgb-v1');
+
+    const expectedBark = new THREE.Color()
+      .setRGB(state.palette.bark.r, state.palette.bark.g, state.palette.bark.b)
+      .convertSRGBToLinear();
+    expect(pair.bark.color.r).toBeCloseTo(expectedBark.r, 7);
+    expect(pair.bark.color.g).toBeCloseTo(expectedBark.g, 7);
+    expect(pair.bark.color.b).toBeCloseTo(expectedBark.b, 7);
+    expect(pair.bark.color.r).toBeLessThan(state.palette.bark.r);
+    expect(pair.foliage.color.g).toBeLessThan(state.palette.foliage.g);
 
     pair.bark.dispose();
     pair.foliage.dispose();
