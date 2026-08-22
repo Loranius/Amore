@@ -77,7 +77,10 @@ export function WishlistWorldNav({
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={open ? 'Згорнути фільтри вішліста' : 'Розгорнути фільтри вішліста'}
-        onClick={() => setOpen((current) => !current)}
+        onClick={(event) => {
+          event.currentTarget.blur();
+          setOpen((current) => !current);
+        }}
       >
         <span className="wl-top-filter-grip" aria-hidden="true" />
         <ChevronDownIcon size={21} />
