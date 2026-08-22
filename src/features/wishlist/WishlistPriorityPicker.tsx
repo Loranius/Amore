@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import './wishlistPriorityPicker.css';
 import { WISH_PRIORITY_ICON, type WishIconComponent } from '@/components/icons/WishIcon';
 import { CheckIcon, ChevronDownIcon, MinusIcon } from '@/components/icons/UiIcon';
@@ -110,6 +111,71 @@ export function WishlistPriorityPicker({
     };
   }, [open, value]);
 
+  const priorityDialog = open ? (
+    <div
+      className="wl-priority-picker-backdrop"
+      role="presentation"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) close(true);
+      }}
+    >
+      <div
+        ref={sheetRef}
+        className="wl-priority-picker-sheet"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <div className="wl-priority-picker-handle" aria-hidden="true" />
+        <div className="wl-priority-picker-header">
+          <div>
+            <span className="wl-priority-picker-eyebrow">Вага мрії</span>
+            <h3 id={titleId}>Оберіть розмір бульбашки</h3>
+          </div>
+          <button
+            type="button"
+            className="wl-priority-picker-close"
+            aria-label="Закрити вибір пріоритету"
+            onClick={() => close(true)}
+          >
+            ×
+          </button>
+        </div>
+
+        <div className="wl-priority-picker-options" role="radiogroup" aria-labelledby={titleId}>
+          {OPTIONS.map((option) => {
+            const active = option.value === value;
+            return (
+              <button
+                key={option.value || 'none'}
+                type="button"
+                className={`wl-priority-picker-option${active ? ' is-active' : ''}`}
+                role="radio"
+                aria-checked={active}
+                data-priority-value={option.value || 'none'}
+                onClick={() => {
+                  onChange(option.value);
+                  close(true);
+                }}
+              >
+                <span className="wl-priority-picker-icon" aria-hidden="true">
+                  <option.Icon size={18} />
+                </span>
+                <span className="wl-priority-picker-copy">
+                  <strong>{option.label}</strong>
+                  <small>{option.description}</small>
+                </span>
+                <span className="wl-priority-picker-radio" aria-hidden="true">
+                  {active ? <CheckIcon size={15} /> : null}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <>
       <button
@@ -129,70 +195,7 @@ export function WishlistPriorityPicker({
         <span className="wl-priority-picker-chevron" aria-hidden="true"><ChevronDownIcon size={16} /></span>
       </button>
 
-      {open && (
-        <div
-          className="wl-priority-picker-backdrop"
-          role="presentation"
-          onPointerDown={(event) => {
-            if (event.target === event.currentTarget) close(true);
-          }}
-        >
-          <div
-            ref={sheetRef}
-            className="wl-priority-picker-sheet"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={titleId}
-          >
-            <div className="wl-priority-picker-handle" aria-hidden="true" />
-            <div className="wl-priority-picker-header">
-              <div>
-                <span className="wl-priority-picker-eyebrow">Вага мрії</span>
-                <h3 id={titleId}>Оберіть розмір бульбашки</h3>
-              </div>
-              <button
-                type="button"
-                className="wl-priority-picker-close"
-                aria-label="Закрити вибір пріоритету"
-                onClick={() => close(true)}
-              >
-                ×
-              </button>
-            </div>
-
-            <div className="wl-priority-picker-options" role="radiogroup" aria-labelledby={titleId}>
-              {OPTIONS.map((option) => {
-                const active = option.value === value;
-                return (
-                  <button
-                    key={option.value || 'none'}
-                    type="button"
-                    className={`wl-priority-picker-option${active ? ' is-active' : ''}`}
-                    role="radio"
-                    aria-checked={active}
-                    data-priority-value={option.value || 'none'}
-                    onClick={() => {
-                      onChange(option.value);
-                      close(true);
-                    }}
-                  >
-                    <span className="wl-priority-picker-icon" aria-hidden="true">
-                      <option.Icon size={18} />
-                    </span>
-                    <span className="wl-priority-picker-copy">
-                      <strong>{option.label}</strong>
-                      <small>{option.description}</small>
-                    </span>
-                    <span className="wl-priority-picker-radio" aria-hidden="true">
-                      {active ? <CheckIcon size={15} /> : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
+      {priorityDialog ? createPortal(priorityDialog, document.body) : null}
     </>
   );
 }
