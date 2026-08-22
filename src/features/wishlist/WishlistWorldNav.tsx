@@ -162,7 +162,7 @@ export function WishlistWorldNav({
 
       <button
         type="button"
-        className="fab wl-world-fab"
+        className="fab"
         aria-label="Додати бажання"
         disabled={busy}
         onClick={onAdd}
