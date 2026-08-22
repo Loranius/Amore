@@ -1,36 +1,47 @@
 /* ============================================================
-   Wishlist — верхній accordion під «Мої / Лени / Спільні».
+   Wishlist — owner tabs + accordion як одна поверхня.
    ------------------------------------------------------------
-   Власний namespace `wl-top-filter-*` навмисний: старий Crystal World CSS
-   має legacy-рецепти для `.wl-world-nav-toggle/.wl-world-sheet`, які колись
-   малювали нижню панель. Цей accordion більше не може успадкувати їхнє
-   absolute/fixed-позиціонування й тому завжди лишається під owner tabs.
+   Accordion монтується всередину `.wl-wishlist-controls`, тому тут немає
+   другої картки під tabs. Один outer border/background/shadow належить
+   батьківській панелі; trigger є лише її нижньою інтерактивною смугою.
+   Семантичні `--world-*` токени автоматично дають темну й світлу версію.
    ============================================================ */
 
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
   position: relative;
   z-index: 70;
+  isolation: isolate;
+  box-sizing: border-box;
   width: min(calc(100% - 28px), 640px);
-  margin: 10px auto 0;
+  margin: 10px auto 18px;
   padding: 0;
   overflow: visible;
-  border: 1px solid color-mix(in srgb, var(--world-border-active) 72%, var(--world-border));
-  border-radius: 28px 28px 0 0;
-  background: color-mix(in srgb, var(--world-surface-strong) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--world-border-active) 68%, var(--world-border));
+  border-radius: 30px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--world-surface-strong) 98%, transparent) 0%,
+      color-mix(in srgb, var(--world-surface) 96%, transparent) 100%
+    );
   box-shadow:
-    inset 0 1px 0 var(--world-glow),
-    0 18px 48px color-mix(in srgb, var(--world-shadow) 78%, transparent);
+    inset 0 1px 0 color-mix(in srgb, var(--world-glow) 74%, transparent),
+    0 18px 46px color-mix(in srgb, var(--world-shadow) 72%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
 }
 
+/* Owner tabs мають власний внутрішній відступ унизу, щоб 3D-lip активної
+   кнопки не впирався у trigger і не виглядав обрізаним. */
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
+  position: relative;
+  z-index: 2;
   width: 100%;
-  min-height: 64px;
+  min-height: 70px;
   margin: 0;
-  padding: 6px 7px;
+  padding: 7px 8px 11px;
   border: 0;
-  border-radius: 28px 28px 0 0;
+  border-radius: 30px 30px 0 0;
   background: transparent;
   box-shadow: none;
 }
@@ -42,15 +53,16 @@
   white-space: nowrap;
 }
 
-/* WishlistWorldNav рендериться DOM-sibling одразу після wl-wishlist-controls.
-   Відступу зверху немає: trigger візуально є нижньою частиною тієї ж панелі. */
-[data-portal-scene='true'] .wishlist .wl-top-filter-accordion {
+/* Portal вставляє accordion другим child після TabBar. Він більше не має
+   власних border/background/shadow — це продовження тієї самої картки. */
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls > .wl-top-filter-accordion {
   position: relative;
-  z-index: 72;
+  z-index: 3;
   display: block;
   box-sizing: border-box;
-  width: min(calc(100% - 28px), 640px);
-  margin: 0 auto 18px;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0;
 }
 
 [data-portal-scene='true'] .wishlist .wl-top-filter-toggle {
@@ -58,42 +70,61 @@
   z-index: 2;
   display: flex;
   width: 100%;
-  height: 42px;
+  height: 38px;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--world-border-active) 72%, var(--world-border));
-  border-top: 0;
-  border-radius: 0 0 27px 27px;
-  background: color-mix(in srgb, var(--world-surface-strong) 96%, transparent);
+  border: 0;
+  border-radius: 0 0 29px 29px;
+  background: transparent;
   color: var(--world-text-muted);
-  box-shadow: 0 12px 28px color-mix(in srgb, var(--world-shadow) 46%, transparent);
+  box-shadow: none;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+/* Легка внутрішня межа замість окремої рамки. Вона коротша за картку, тому
+   не перерізає активний owner-tab від краю до краю. */
+[data-portal-scene='true'] .wishlist .wl-top-filter-toggle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 18px;
+  left: 18px;
+  height: 1px;
+  background: color-mix(in srgb, var(--world-border-active) 46%, transparent);
+  pointer-events: none;
 }
 
 [data-portal-scene='true'] .wishlist .wl-top-filter-grip {
   position: absolute;
-  top: 7px;
+  top: 6px;
   left: 50%;
   width: 42px;
-  height: 3px;
+  height: 4px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--world-border-active) 72%, transparent);
+  background: color-mix(in srgb, var(--world-accent) 58%, transparent);
+  box-shadow: 0 1px 5px color-mix(in srgb, var(--world-glow) 54%, transparent);
   transform: translateX(-50%);
   pointer-events: none;
 }
 
 [data-portal-scene='true'] .wishlist .wl-top-filter-toggle > svg {
-  margin-top: 8px;
+  width: 20px;
+  height: 20px;
+  margin-top: 10px;
   fill: none;
   stroke: currentColor;
+  stroke-width: 2;
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+[data-portal-scene='true'] .wishlist .wl-top-filter-toggle:hover,
 [data-portal-scene='true'] .wishlist .wl-top-filter-accordion[data-open='true'] .wl-top-filter-toggle {
-  background: color-mix(in srgb, var(--world-accent) 8%, var(--world-surface-strong));
+  background: color-mix(in srgb, var(--world-accent) 6%, transparent);
   color: var(--world-text);
 }
 
@@ -101,18 +132,35 @@
   transform: rotate(180deg);
 }
 
+[data-portal-scene='true'] .wishlist .wl-top-filter-toggle:active {
+  background: color-mix(in srgb, var(--world-accent) 10%, transparent);
+}
+
 [data-portal-scene='true'] .wishlist .wl-top-filter-toggle:focus-visible,
 [data-portal-scene='true'] .wishlist .wl-top-filter-chip:focus-visible {
   outline: 2px solid var(--world-accent);
-  outline-offset: 2px;
+  outline-offset: -3px;
 }
 
-/* Тільки trigger займає місце в layout. Sheet накриває сфери, а не штовхає
-   їх вниз, як і просив власник. */
+/* Світла тема має м'якшу тінь і більш теплий handle; темна лишається
+   глибшою. Кольори все одно беруться тільки з theme tokens. */
+[data-theme='light'][data-portal-scene='true'] .wishlist .wl-wishlist-controls {
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--world-glow) 56%, transparent),
+    0 16px 38px color-mix(in srgb, var(--world-shadow) 58%, transparent);
+}
+
+[data-theme='light'][data-portal-scene='true'] .wishlist .wl-top-filter-grip {
+  background: color-mix(in srgb, var(--world-primary) 62%, transparent);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--world-glow) 42%, transparent);
+}
+
+/* Тільки trigger займає layout. Sheet висить поверх сфер і не штовхає
+   wishlist-сцену вниз. */
 [data-portal-scene='true'] .wishlist .wl-top-filter-sheet {
   position: absolute;
   z-index: 90;
-  top: calc(100% + 7px);
+  top: calc(100% + 8px);
   left: 0;
   box-sizing: border-box;
   width: 100%;
@@ -121,7 +169,7 @@
   display: grid;
   gap: 11px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--world-border-active) 72%, var(--world-border));
+  border: 1px solid color-mix(in srgb, var(--world-border-active) 68%, var(--world-border));
   border-radius: 24px;
   background:
     linear-gradient(
@@ -132,7 +180,7 @@
   color: var(--world-text);
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, var(--world-glow) 60%, transparent),
-    0 22px 52px color-mix(in srgb, var(--world-shadow) 88%, transparent);
+    0 22px 52px color-mix(in srgb, var(--world-shadow) 84%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   pointer-events: auto;
@@ -211,11 +259,16 @@
   line-height: 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: transform 90ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
+  transition:
+    transform 90ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
 }
 
 [data-portal-scene='true'] .wishlist .wl-top-filter-chip[aria-pressed='true'] {
-  border-color: rgba(255, 255, 255, 0.24);
+  border-color: color-mix(in srgb, var(--world-accent) 58%, var(--world-border));
   background-color: transparent;
   background-image: var(--control-fill);
   color: var(--world-text);
@@ -240,20 +293,16 @@
 }
 
 @media (max-width: 560px) {
-  [data-portal-scene='true'] .wishlist .wl-wishlist-controls,
-  [data-portal-scene='true'] .wishlist .wl-top-filter-accordion {
-    width: calc(100% - 24px);
-  }
-
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
+    width: calc(100% - 24px);
     margin-top: 8px;
-    border-radius: 26px 26px 0 0;
+    border-radius: 28px;
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
-    min-height: 62px;
-    padding: 5px;
-    border-radius: 26px 26px 0 0;
+    min-height: 68px;
+    padding: 6px 6px 10px;
+    border-radius: 28px 28px 0 0;
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar .tab-bar-btn {
@@ -263,8 +312,13 @@
   }
 
   [data-portal-scene='true'] .wishlist .wl-top-filter-toggle {
-    height: 40px;
-    border-radius: 0 0 25px 25px;
+    height: 36px;
+    border-radius: 0 0 27px 27px;
+  }
+
+  [data-portal-scene='true'] .wishlist .wl-top-filter-toggle::before {
+    right: 14px;
+    left: 14px;
   }
 
   [data-portal-scene='true'] .wishlist .wl-top-filter-sheet {
