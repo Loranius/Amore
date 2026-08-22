@@ -93,6 +93,8 @@ function materialRecipe(
 ): TreeMaterialRecipe {
   const id = `tree:material:${role}`;
   const resolvedRoughness = round6(clamp01(roughness));
+  const emissiveColor = role === 'foliage' ? color : { r: 0, g: 0, b: 0 };
+  const emissiveIntensity = role === 'foliage' ? 0.12 : 0;
   // Nothing on this tree is flat-shaded any more, bark least of all.
   //
   // Bark used to be, and that single boolean was the whole of the "square,
@@ -112,6 +114,8 @@ function materialRecipe(
     role,
     colorKey(color),
     resolvedRoughness.toFixed(6),
+    colorKey(emissiveColor),
+    emissiveIntensity.toFixed(6),
     flatShading ? 'flat' : 'smooth',
     side,
   ].join('|');
@@ -124,8 +128,8 @@ function materialRecipe(
     color,
     roughness: resolvedRoughness,
     metalness: 0,
-    emissiveColor: { r: 0, g: 0, b: 0 },
-    emissiveIntensity: 0,
+    emissiveColor,
+    emissiveIntensity,
     opacity: 1,
     transparent: false,
     depthWrite: true,
@@ -153,12 +157,15 @@ export function buildTreeMaterialState(input: BuildTreeMaterialInput): TreeMater
   const foliageHue = 0.285
     + (seededUnit(species.artifactSeed, 'tree-material:foliage:hue') - 0.5) * 0.045
     + species.pressures.asymmetry * 0.012;
-  const foliageSaturation = 0.34
-    + species.pressures.foliagePotential * 0.18
-    + species.pressures.crownSpread * 0.05;
-  const foliageLightness = 0.29
-    + species.state.foliageMaturity * 0.105
-    + composition.score.negativeSpace * 0.025;
+  // Keep the canopy in a natural middle-green range. The previous saturation
+  // combined with dark back-facing cards made adjacent leaves jump from near
+  // black to neon green under the same light.
+  const foliageSaturation = 0.21
+    + species.pressures.foliagePotential * 0.09
+    + species.pressures.crownSpread * 0.025;
+  const foliageLightness = 0.31
+    + species.state.foliageMaturity * 0.095
+    + composition.score.negativeSpace * 0.02;
 
   const bark = quantizeRgb(
     hslToRgb(barkHue, barkSaturation, barkLightness),
@@ -177,7 +184,7 @@ export function buildTreeMaterialState(input: BuildTreeMaterialInput): TreeMater
   const foliageMaterial = materialRecipe(
     'foliage',
     foliageColor.color,
-    0.86 - species.pressures.foliagePotential * 0.13,
+    0.9 - species.pressures.foliagePotential * 0.09,
     config.rulesVersion.trim(),
   );
   const materials = [barkMaterial, foliageMaterial];

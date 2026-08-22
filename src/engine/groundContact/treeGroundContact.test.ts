@@ -39,6 +39,9 @@ describe('Tree Ground Contact Lab', () => {
     expect(first.ground.levelY).toBeLessThan(first.collar.center.y);
     expect(first.diagnostics.visiblePathFraction).toBeGreaterThan(0);
     expect(first.diagnostics.visiblePathFraction).toBeLessThan(1);
+    expect(first.collar.ringCount).toBe(7);
+    expect(first.collar.profileExponent).toBeGreaterThan(1);
+    expect(first.collar.topRadius).toBeLessThan(preview.species.structure.baseRadius);
     expect(first.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
     expect(first.diagnostics.estimatedAdditionalMaterials).toBe(0);
   });

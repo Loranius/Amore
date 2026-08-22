@@ -16,7 +16,7 @@ describe('Tree Material Lab', () => {
     // v1.0.0 стала v1.1.0 разом зі зміною кори, про це дізнався лише
     // браузерний набір — через шість днів і як «червона перевірка, яку всі
     // ігнорують». Тепер бамп ламає цей тест одразу й вимагає пояснення.
-    expect(DEFAULT_TREE_MATERIAL_CONFIG.rulesVersion).toBe('tree-material-v1.1.0');
+    expect(DEFAULT_TREE_MATERIAL_CONFIG.rulesVersion).toBe('tree-material-v1.2.0');
     const materials = buildTreeLabPreview('medium').materials;
     for (const material of materials.materials) {
       expect(material.signature.startsWith(`${DEFAULT_TREE_MATERIAL_CONFIG.rulesVersion}|`)).toBe(true);
@@ -44,6 +44,17 @@ describe('Tree Material Lab', () => {
       expectQuantized(color.g, DEFAULT_TREE_MATERIAL_CONFIG.quantizationSteps);
       expectQuantized(color.b, DEFAULT_TREE_MATERIAL_CONFIG.quantizationSteps);
     }
+  });
+
+  it('keeps foliage in a soft middle-green range and fills deep card shadows', () => {
+    const state = buildTreeLabPreview('medium').materials;
+    const foliage = state.materials.find((material) => material.role === 'foliage')!;
+
+    expect(state.palette.foliage.g - state.palette.foliage.r).toBeLessThan(0.25);
+    expect(state.palette.foliage.g - state.palette.foliage.b).toBeLessThan(0.3);
+    expect(foliage.emissiveColor).toEqual(foliage.color);
+    expect(foliage.emissiveIntensity).toBe(0.12);
+    expect(foliage.roughness).toBeGreaterThan(0.8);
   });
 
   it('keeps material identity independent from geometry LOD', () => {

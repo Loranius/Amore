@@ -31,6 +31,8 @@ describe('Three.js Tree Material adapter', () => {
     expect(pair.bark.color.b).toBeCloseTo(expectedBark.b, 7);
     expect(pair.bark.color.r).toBeLessThan(state.palette.bark.r);
     expect(pair.foliage.color.g).toBeLessThan(state.palette.foliage.g);
+    expect(pair.foliage.emissive.g).toBeCloseTo(pair.foliage.color.g, 7);
+    expect(pair.foliage.emissiveIntensity).toBe(0.12);
 
     pair.bark.dispose();
     pair.foliage.dispose();

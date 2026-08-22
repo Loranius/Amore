@@ -73,15 +73,49 @@ describe('Organic sweep bark relief', () => {
 });
 
 describe('Trunk collar', () => {
-  it('ends exactly on the trunk, leaving no lip where the two meshes meet', () => {
-    // The collar is separate geometry from the sweep, so any ratio other than
-    // one puts a step at the join — which is precisely the seam between stump
-    // and trunk that the owner reported.
-    expect(DEFAULT_TREE_GROUND_CONTACT_CONFIG.collarTopRadiusRatio).toBe(1);
+  it('eases inside the trunk envelope instead of ending as a visible lip', () => {
+    expect(DEFAULT_TREE_GROUND_CONTACT_CONFIG.collarTopRadiusRatio).toBeLessThan(1);
+    expect(DEFAULT_TREE_GROUND_CONTACT_CONFIG.collarProfileExponent).toBeGreaterThan(1);
   });
 
   it('flares wide enough at the ground to read as one form with the roots', () => {
-    expect(DEFAULT_TREE_GROUND_CONTACT_CONFIG.collarBottomRadiusRatio).toBeGreaterThan(1.8);
+    expect(DEFAULT_TREE_GROUND_CONTACT_CONFIG.collarBottomRadiusRatio).toBeGreaterThan(1.7);
+  });
+
+  it('uses a smooth multi-ring profile whose tangent becomes vertical at the trunk', () => {
+    const build = buildTreeLabPreview('medium');
+    const roots = build.rootGeometry;
+    const collar = build.groundContact.collar;
+    const segments = collar.radialSegmentsByLod.medium;
+    const collarStart = roots.diagnostics.vertexCount
+      - roots.diagnostics.terrainVertexCount
+      - roots.diagnostics.collarVertexCount;
+    const means: number[] = [];
+
+    expect(roots.diagnostics.collarVertexCount).toBe(segments * collar.ringCount);
+    for (let ring = 0; ring < collar.ringCount; ring += 1) {
+      let radiusTotal = 0;
+      for (let slot = 0; slot < segments; slot += 1) {
+        const vertex = collarStart + ring * segments + slot;
+        const offset = vertex * 3;
+        radiusTotal += Math.hypot(
+          roots.mesh.positions[offset]! - collar.center.x,
+          roots.mesh.positions[offset + 2]! - collar.center.z,
+        );
+      }
+      means.push(radiusTotal / segments);
+    }
+
+    expect(means.every((radius, index) => index === 0 || radius < means[index - 1]!)).toBe(true);
+    const firstStep = means[0]! - means[1]!;
+    const finalStep = means.at(-2)! - means.at(-1)!;
+    expect(finalStep).toBeLessThan(firstStep * 0.2);
+
+    const topRingStart = collarStart + (collar.ringCount - 1) * segments;
+    for (let slot = 0; slot < segments; slot += 1) {
+      const normalY = roots.mesh.normals[(topRingStart + slot) * 3 + 1]!;
+      expect(Math.abs(normalY)).toBeLessThan(0.000001);
+    }
   });
 });
 
@@ -102,7 +136,7 @@ describe('Trunk collar wood', () => {
     const total = roots.diagnostics.vertexCount;
     const terrain = roots.diagnostics.terrainVertexCount;
     const collarStart = total - terrain - collarVertices;
-    const segments = collarVertices / 3;
+    const segments = build.groundContact.collar.radialSegmentsByLod.medium;
     const radii: number[] = [];
     for (let slot = 0; slot < segments; slot += 1) {
       const offset = (collarStart + slot) * 3;

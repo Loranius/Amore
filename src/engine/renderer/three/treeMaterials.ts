@@ -8,7 +8,7 @@ import type {
 
 export const TREE_MATERIAL_COLOR_SPACE_VERSION = 'tree-linear-srgb-v1';
 export const TREE_BARK_GRAIN_VERSION = 'tree-bark-grain-v1';
-export const TREE_FOLIAGE_SURFACE_VERSION = 'tree-foliage-surface-v1';
+export const TREE_FOLIAGE_SURFACE_VERSION = 'tree-foliage-surface-v2';
 
 /**
  * Tree palettes are authored as familiar sRGB values while Three.js material
@@ -131,14 +131,14 @@ float treeLeafMidrib = 1.0 - smoothstep( 0.015, 0.105, abs( vTreeLeafUv.x - 0.5 
 float treeLeafVeins = 0.5 + 0.5 * sin(
   vTreeLeafUv.y * 54.0 + abs( vTreeLeafUv.x - 0.5 ) * 35.0
 );
-float treeLeafBaseShade = mix( 0.82, 1.055, smoothstep( 0.0, 0.88, vTreeLeafUv.y ) );
+float treeLeafBaseShade = mix( 0.96, 1.01, smoothstep( 0.0, 0.88, vTreeLeafUv.y ) );
 float treeLeafSurface = treeLeafBaseShade
-  * ( 0.94 + treeLeafVeins * 0.075 )
-  * ( 0.88 + treeLeafMidrib * 0.12 );
+  * ( 0.992 + treeLeafVeins * 0.016 )
+  * ( 0.98 + treeLeafMidrib * 0.02 );
 diffuseColor.rgb *= vec3(
-  treeLeafSurface * 0.985,
-  treeLeafSurface * 1.025,
-  treeLeafSurface * 0.965
+  treeLeafSurface * 0.998,
+  treeLeafSurface * 1.004,
+  treeLeafSurface * 0.996
 );
 `;
 

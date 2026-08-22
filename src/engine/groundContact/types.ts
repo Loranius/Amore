@@ -15,6 +15,7 @@ export interface TreeGroundContactConfig {
   collarHeightBaseRadiusRatio: number;
   collarBottomRadiusRatio: number;
   collarTopRadiusRatio: number;
+  collarProfileExponent: number;
   collarRadialSegmentsByLod: Readonly<Record<OrganicMeshLod, number>>;
 }
 
@@ -42,7 +43,8 @@ export interface TreeTrunkContactCollarDescriptor {
   topY: number;
   bottomRadius: number;
   topRadius: number;
-  ringCount: 3;
+  ringCount: 7;
+  profileExponent: number;
   radialSegmentsByLod: Readonly<Record<OrganicMeshLod, number>>;
 }
 

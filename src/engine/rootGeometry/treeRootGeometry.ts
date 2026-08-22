@@ -92,28 +92,29 @@ function appendContactCollar(
 ): { mesh: OrganicSweepMesh; vertexCount: number; triangleCount: number } {
   const phase = barkReliefPhase(ORGANIC_TRUNK_BRANCH_ID);
   const segments = contact.collar.radialSegmentsByLod[lod];
-  const yValues = [
-    contact.collar.bottomY,
-    contact.collar.center.y,
-    contact.collar.topY,
-  ];
-  const midpointRadius = (contact.collar.bottomRadius + contact.collar.topRadius) * 0.5;
-  const radii = [
-    contact.collar.bottomRadius,
-    midpointRadius,
-    contact.collar.topRadius,
-  ];
+  const ringCount = contact.collar.ringCount;
   const vertexOffset = mesh.positions.length / 3;
   const positions = [...mesh.positions];
   const normals = [...mesh.normals];
   const uvs = [...mesh.uvs];
   const indices = [...mesh.indices];
   const height = Math.max(1e-9, contact.collar.topY - contact.collar.bottomY);
-  const slope = (contact.collar.bottomRadius - contact.collar.topRadius) / height;
+  const radiusSpan = contact.collar.bottomRadius - contact.collar.topRadius;
+  const profileExponent = contact.collar.profileExponent;
 
-  for (let ring = 0; ring < yValues.length; ring += 1) {
-    const y = yValues[ring]!;
-    const radius = radii[ring]!;
+  for (let ring = 0; ring < ringCount; ring += 1) {
+    const t = ring / (ringCount - 1);
+    const remaining = 1 - t;
+    const y = contact.collar.bottomY + height * t;
+    const radius = contact.collar.topRadius
+      + radiusSpan * Math.pow(remaining, profileExponent);
+    // -dr/dy. It reaches zero at the top because exponent > 1, so the last
+    // collar normals are radial like the lower trunk instead of announcing a
+    // separate cone with a hard lighting seam.
+    const inwardSlope = radiusSpan
+      * profileExponent
+      * Math.pow(remaining, profileExponent - 1)
+      / height;
     for (let segment = 0; segment < segments; segment += 1) {
       const angle = (segment / segments) * Math.PI * 2;
       const cosine = Math.cos(angle);
@@ -129,15 +130,15 @@ function appendContactCollar(
       // напрямок, відхилений до тангенційного на (∂r/∂θ)/r.
       const normal = normalize({
         x: cosine - (-sine) * relief.angularSlope,
-        y: slope,
+        y: inwardSlope,
         z: sine - cosine * relief.angularSlope,
       });
       normals.push(normal.x, normal.y, normal.z);
-      uvs.push(segment / segments, ring / (yValues.length - 1));
+      uvs.push(segment / segments, t);
     }
   }
 
-  for (let ring = 0; ring < yValues.length - 1; ring += 1) {
+  for (let ring = 0; ring < ringCount - 1; ring += 1) {
     for (let segment = 0; segment < segments; segment += 1) {
       const next = (segment + 1) % segments;
       const lowerLeft = vertexOffset + ring * segments + segment;
@@ -148,8 +149,8 @@ function appendContactCollar(
     }
   }
 
-  const collarVertexCount = segments * yValues.length;
-  const collarTriangleCount = segments * (yValues.length - 1) * 2;
+  const collarVertexCount = segments * ringCount;
+  const collarTriangleCount = segments * (ringCount - 1) * 2;
   return {
     mesh: {
       ...mesh,
@@ -159,7 +160,7 @@ function appendContactCollar(
       indices,
       diagnostics: {
         ...mesh.diagnostics,
-        ringCount: mesh.diagnostics.ringCount + yValues.length,
+        ringCount: mesh.diagnostics.ringCount + ringCount,
         vertexCount: mesh.diagnostics.vertexCount + collarVertexCount,
         triangleCount: mesh.diagnostics.triangleCount + collarTriangleCount,
       },

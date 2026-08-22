@@ -29,7 +29,7 @@ export interface TreeMaterialRecipe {
   roughness: number;
   metalness: 0;
   emissiveColor: TreeRgb;
-  emissiveIntensity: 0;
+  emissiveIntensity: number;
   opacity: 1;
   transparent: false;
   depthWrite: true;

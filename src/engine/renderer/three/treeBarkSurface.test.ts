@@ -59,7 +59,7 @@ describe('Three Tree Bark Surface adapters', () => {
     expect(pair.bark.customProgramCacheKey()).toContain(build.barkSurface.signature);
     expect(pair.foliage.userData['treeBarkSurface']).toBeUndefined();
     expect(pair.foliage.userData['treeFoliageSurface']).toMatchObject({
-      version: 'tree-foliage-surface-v1',
+      version: 'tree-foliage-surface-v2',
       extraDrawCalls: 0,
       extraMaterials: 0,
     });
@@ -98,6 +98,7 @@ describe('Three Tree Bark Surface adapters', () => {
     expect(foliageShader.vertexShader).toContain('varying vec2 vTreeLeafUv;');
     expect(foliageShader.fragmentShader).toContain('treeLeafMidrib');
     expect(foliageShader.fragmentShader).toContain('treeLeafVeins');
+    expect(foliageShader.fragmentShader).toContain('mix( 0.96, 1.01');
 
     pair.bark.dispose();
     pair.foliage.dispose();

@@ -32,6 +32,7 @@ function validateInput(input: BuildTreeGroundContactInput): void {
     ['collarHeightBaseRadiusRatio', config.collarHeightBaseRadiusRatio],
     ['collarBottomRadiusRatio', config.collarBottomRadiusRatio],
     ['collarTopRadiusRatio', config.collarTopRadiusRatio],
+    ['collarProfileExponent', config.collarProfileExponent],
   ] as const) {
     if (!Number.isFinite(value) || value <= 0) {
       throw new Error(`Tree Ground Contact ${name} must be positive and finite.`);
@@ -42,6 +43,9 @@ function validateInput(input: BuildTreeGroundContactInput): void {
   }
   if (config.collarBottomRadiusRatio < config.collarTopRadiusRatio) {
     throw new Error('Tree Ground Contact collar must taper toward the trunk.');
+  }
+  if (config.collarProfileExponent <= 1) {
+    throw new Error('Tree Ground Contact collar profile exponent must be greater than one.');
   }
   for (const lod of ['high', 'medium', 'low'] as const) {
     const segments = config.collarRadialSegmentsByLod[lod];
@@ -203,7 +207,8 @@ export function buildTreeGroundContact(
       topY: round6(basePosition.y + collarHeight),
       bottomRadius: round6(species.structure.baseRadius * config.collarBottomRadiusRatio),
       topRadius: round6(species.structure.baseRadius * config.collarTopRadiusRatio),
-      ringCount: 3,
+      ringCount: 7,
+      profileExponent: round6(config.collarProfileExponent),
       radialSegmentsByLod: { ...config.collarRadialSegmentsByLod },
     },
     diagnostics: {
