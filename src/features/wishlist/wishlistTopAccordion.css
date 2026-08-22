@@ -1,15 +1,8 @@
-/* ============================================================
-   Wishlist World — верхній accordion «Фільтри та види».
-   ------------------------------------------------------------
-   Власники бажань займають окремий повний рядок. Accordion тепер живе
-   ПІД ним і використовує рівно ту саму ширину, тому його toggle більше не
-   може залізти на «Мої». Сцена сфер окремо розгортається на весь viewport.
-   ============================================================ */
-
+/* Wishlist world: owner tabs + full-width accordion. */
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
   position: relative;
   z-index: 70;
-  display: block;
+  display: grid;
   width: min(calc(100% - 28px), 640px);
   margin: 10px auto 18px;
   padding: 0;
@@ -24,8 +17,6 @@
   -webkit-backdrop-filter: blur(18px);
 }
 
-/* Перемикач власника знову отримує всю ширину панелі. Раніше ми відкусили
-   справа 58px під chevron, і саме це стискало рядок та створювало накладання. */
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
   width: 100%;
   min-height: 64px;
@@ -44,13 +35,15 @@
   white-space: nowrap;
 }
 
-/* Accordion — другий рядок тієї самої картки, а не control поверх вкладок. */
 [data-portal-scene='true'] .wishlist .wl-world-accordion {
   position: relative;
+  display: grid;
   width: 100%;
   border-top: 1px solid color-mix(in srgb, var(--world-border-active) 42%, var(--world-border));
 }
 
+/* Reset the old floating world-nav transform. Without this reset the new
+   full-width row inherits translateX(-50%) and only its right half is visible. */
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle {
   position: relative;
   inset: auto;
@@ -66,35 +59,40 @@
   background: color-mix(in srgb, var(--world-surface-soft) 54%, transparent);
   color: var(--world-text-muted);
   box-shadow: none;
+  transform: none;
+  translate: none;
   cursor: pointer;
   pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle::before {
+  content: '';
   position: absolute;
   top: 7px;
+  left: 50%;
   width: 38px;
   height: 3px;
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--world-border-active) 64%, transparent);
-  content: '';
+  transform: translateX(-50%);
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle svg,
 [data-portal-scene='true'] .wishlist .wl-world-sheet-collapse svg {
   width: 21px;
   height: 21px;
-  margin-top: 7px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle svg {
+  margin-top: 7px;
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion.is-open .wl-world-nav-toggle {
@@ -113,17 +111,14 @@
   outline-offset: -3px;
 }
 
-/* Панель розкривається на 100% ширини контейнера власників. */
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-sheet {
   position: relative;
   inset: auto;
-  right: auto;
-  bottom: auto;
-  left: auto;
   box-sizing: border-box;
   width: 100%;
   min-height: 0;
   max-height: none;
+  margin: 0;
   padding: 12px 14px 17px;
   display: grid;
   gap: 11px;
@@ -131,30 +126,22 @@
   border: 0;
   border-top: 1px solid color-mix(in srgb, var(--world-border-active) 38%, var(--world-border));
   border-radius: 0;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--world-accent) 5%, var(--world-surface-strong)),
-      var(--world-surface-strong)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--world-accent) 5%, var(--world-surface-strong)),
+    var(--world-surface-strong)
+  );
   color: var(--world-text);
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   pointer-events: auto;
-  overscroll-behavior: auto;
   animation: wl-world-accordion-in 210ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes wl-world-accordion-in {
-  from {
-    opacity: 0;
-    transform: translateY(-7px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-sheet-heading {
@@ -246,12 +233,7 @@
   line-height: 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition:
-    translate 90ms ease,
-    border-color 160ms ease,
-    background-color 160ms ease,
-    box-shadow 160ms ease,
-    color 160ms ease;
+  transition: translate 90ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-chip[aria-pressed='true'] {
@@ -272,9 +254,6 @@
   cursor: default;
 }
 
-/* Поле сфер не успадковує вузьку ширину службових контролів. Фізика вимірює
-   цей DOM-вузол через getBoundingClientRect(), тож тепер її робоча площа —
-   весь viewport, від лівого до правого краю екрана. */
 [data-portal-scene='true'] .wishlist .wl-sphere-field {
   box-sizing: border-box;
   width: 100vw;
@@ -282,7 +261,6 @@
   margin-inline: calc(50% - 50vw);
 }
 
-/* FAB лишається окремою дією праворуч над доком. */
 [data-portal-scene='true'] .wishlist .wl-world-fab {
   position: fixed;
   z-index: 72;
@@ -306,7 +284,6 @@
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
-    width: 100%;
     min-height: 62px;
     padding: 5px;
   }
@@ -320,6 +297,7 @@
   [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle {
     width: 100%;
     height: 40px;
+    transform: none;
   }
 
   [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-sheet {
