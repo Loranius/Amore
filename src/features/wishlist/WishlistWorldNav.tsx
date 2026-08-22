@@ -5,9 +5,10 @@ import type { WishlistViewMode } from './wishlistBoardView';
 // ============================================================
 // Навігація вішліста у світі — accordion під перемикачем власника.
 // ------------------------------------------------------------
-// Рендеримо accordion звичайним sibling одразу після `.wl-wishlist-controls`.
-// Без portal/querySelector: його вертикальна позиція визначається DOM-потоком,
-// а відкритий sheet лишається absolute і накриває бульбашки, не штовхаючи їх.
+// ВАЖЛИВО: класи цього accordion навмисно НЕ використовують старі
+// `.wl-world-nav-*` / `.wl-world-sheet`. У wishlistCrystalWorld.css ці
+// legacy-класи досі мають fixed/absolute-рецепт колишньої нижньої панелі.
+// Окремий namespace не дає старому CSS фізично витягнути accordion у кут.
 // ============================================================
 
 export type WishlistWorldTab = 'me' | 'partner' | 'shared';
@@ -61,29 +62,29 @@ export function WishlistWorldNav({
   return (
     <>
       <div
-        className={`wl-world-accordion${open ? ' is-open' : ''}`}
+        className="wl-top-filter-accordion"
         data-open={open ? 'true' : 'false'}
       >
         <button
           type="button"
-          className="wl-world-nav-toggle"
+          className="wl-top-filter-toggle"
           aria-expanded={open}
           aria-controls={panelId}
           aria-label={open ? 'Згорнути фільтри вішліста' : 'Розгорнути фільтри вішліста'}
           onClick={() => setOpen((current) => !current)}
         >
-          <span className="wl-world-nav-grip" aria-hidden="true" />
+          <span className="wl-top-filter-grip" aria-hidden="true" />
           <ChevronDownIcon size={21} />
         </button>
 
         {open && (
           <div
             id={panelId}
-            className="wl-world-sheet"
+            className="wl-top-filter-sheet"
             role="region"
             aria-label="Фільтри та види вішліста"
           >
-            <div className="wl-world-sheet-heading">
+            <div className="wl-top-filter-heading">
               <span>
                 <FilterViewIcon />
                 <strong>Фільтри та види</strong>
@@ -92,13 +93,13 @@ export function WishlistWorldNav({
 
             {visibility && secretAvailable && (
               <div
-                className="wl-world-group wl-world-group--two wl-world-visibility"
+                className="wl-top-filter-group wl-top-filter-group--two"
                 role="group"
                 aria-label="Видимість бажань"
               >
                 <button
                   type="button"
-                  className="wl-world-chip"
+                  className="wl-top-filter-chip"
                   aria-pressed={visibility === 'visible'}
                   onClick={() => onVisibilityChange('visible')}
                 >
@@ -106,7 +107,7 @@ export function WishlistWorldNav({
                 </button>
                 <button
                   type="button"
-                  className="wl-world-chip"
+                  className="wl-top-filter-chip"
                   aria-pressed={visibility === 'secret'}
                   onClick={() => onVisibilityChange('secret')}
                 >
@@ -116,13 +117,13 @@ export function WishlistWorldNav({
             )}
 
             <div
-              className="wl-world-group wl-world-group--two"
+              className="wl-top-filter-group wl-top-filter-group--two"
               role="group"
               aria-label="Стан бажань"
             >
               <button
                 type="button"
-                className="wl-world-chip"
+                className="wl-top-filter-chip"
                 aria-pressed={!archiveOpen}
                 onClick={() => onArchiveChange(false)}
               >
@@ -130,7 +131,7 @@ export function WishlistWorldNav({
               </button>
               <button
                 type="button"
-                className="wl-world-chip"
+                className="wl-top-filter-chip"
                 aria-pressed={archiveOpen}
                 disabled={!archiveAvailable}
                 onClick={() => onArchiveChange(true)}
@@ -140,7 +141,7 @@ export function WishlistWorldNav({
             </div>
 
             <div
-              className="wl-world-group wl-world-group--views"
+              className="wl-top-filter-group wl-top-filter-group--views"
               role="group"
               aria-label="Вигляд бажань"
             >
@@ -148,7 +149,7 @@ export function WishlistWorldNav({
                 <button
                   key={item.value}
                   type="button"
-                  className="wl-world-chip"
+                  className="wl-top-filter-chip"
                   aria-pressed={item.value === view}
                   onClick={() => onViewChange(item.value)}
                 >

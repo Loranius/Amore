@@ -1,4 +1,12 @@
-/* Wishlist world: owner tabs with a stable accordion directly underneath. */
+/* ============================================================
+   Wishlist — верхній accordion під «Мої / Лени / Спільні».
+   ------------------------------------------------------------
+   Власний namespace `wl-top-filter-*` навмисний: старий Crystal World CSS
+   має legacy-рецепти для `.wl-world-nav-toggle/.wl-world-sheet`, які колись
+   малювали нижню панель. Цей accordion більше не може успадкувати їхнє
+   absolute/fixed-позиціонування й тому завжди лишається під owner tabs.
+   ============================================================ */
+
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
   position: relative;
   z-index: 70;
@@ -34,20 +42,18 @@
   white-space: nowrap;
 }
 
-/* DOM sibling immediately after owner controls. No negative margin and no
-   fixed/portal positioning, so it cannot jump above «Мої / Лени / Спільні». */
-[data-portal-scene='true'] .wishlist .wl-world-accordion {
-  position: relative !important;
-  inset: auto !important;
+/* WishlistWorldNav рендериться DOM-sibling одразу після wl-wishlist-controls.
+   Відступу зверху немає: trigger візуально є нижньою частиною тієї ж панелі. */
+[data-portal-scene='true'] .wishlist .wl-top-filter-accordion {
+  position: relative;
   z-index: 72;
   display: block;
   box-sizing: border-box;
   width: min(calc(100% - 28px), 640px);
-  margin: 0 auto 18px !important;
-  transform: none !important;
+  margin: 0 auto 18px;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-nav-toggle {
+[data-portal-scene='true'] .wishlist .wl-top-filter-toggle {
   position: relative;
   z-index: 2;
   display: flex;
@@ -67,7 +73,7 @@
   transition: background-color 160ms ease, color 160ms ease;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-nav-grip {
+[data-portal-scene='true'] .wishlist .wl-top-filter-grip {
   position: absolute;
   top: 7px;
   left: 50%;
@@ -79,29 +85,31 @@
   pointer-events: none;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-nav-toggle > svg {
+[data-portal-scene='true'] .wishlist .wl-top-filter-toggle > svg {
   margin-top: 8px;
+  fill: none;
+  stroke: currentColor;
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-accordion[data-open='true'] .wl-world-nav-toggle {
+[data-portal-scene='true'] .wishlist .wl-top-filter-accordion[data-open='true'] .wl-top-filter-toggle {
   background: color-mix(in srgb, var(--world-accent) 8%, var(--world-surface-strong));
   color: var(--world-text);
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-accordion[data-open='true'] .wl-world-nav-toggle > svg {
+[data-portal-scene='true'] .wishlist .wl-top-filter-accordion[data-open='true'] .wl-top-filter-toggle > svg {
   transform: rotate(180deg);
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-nav-toggle:focus-visible,
-[data-portal-scene='true'] .wishlist .wl-world-chip:focus-visible {
+[data-portal-scene='true'] .wishlist .wl-top-filter-toggle:focus-visible,
+[data-portal-scene='true'] .wishlist .wl-top-filter-chip:focus-visible {
   outline: 2px solid var(--world-accent);
   outline-offset: 2px;
 }
 
-/* The expanded controls overlay the bubbles. Only the 42px trigger takes
-   layout space; opening this sheet never pushes the sphere field down. */
-[data-portal-scene='true'] .wishlist .wl-world-sheet {
+/* Тільки trigger займає місце в layout. Sheet накриває сфери, а не штовхає
+   їх вниз, як і просив власник. */
+[data-portal-scene='true'] .wishlist .wl-top-filter-sheet {
   position: absolute;
   z-index: 90;
   top: calc(100% + 7px);
@@ -128,22 +136,22 @@
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   pointer-events: auto;
-  animation: wl-world-accordion-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: wl-top-filter-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes wl-world-accordion-in {
+@keyframes wl-top-filter-in {
   from { opacity: 0; transform: translateY(-5px) scale(.995); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-sheet-heading {
+[data-portal-scene='true'] .wishlist .wl-top-filter-heading {
   min-height: 34px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-sheet-heading > span {
+[data-portal-scene='true'] .wishlist .wl-top-filter-heading > span {
   min-width: 0;
   display: inline-flex;
   align-items: center;
@@ -151,7 +159,7 @@
   color: color-mix(in srgb, var(--world-text) 90%, var(--world-text-muted));
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-sheet-heading > span > svg {
+[data-portal-scene='true'] .wishlist .wl-top-filter-heading > span > svg {
   width: 22px;
   height: 22px;
   flex: 0 0 22px;
@@ -162,7 +170,7 @@
   stroke-linejoin: round;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-sheet-heading strong {
+[data-portal-scene='true'] .wishlist .wl-top-filter-heading strong {
   overflow: hidden;
   font-size: 14px;
   font-weight: 800;
@@ -170,20 +178,20 @@
   white-space: nowrap;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-group {
+[data-portal-scene='true'] .wishlist .wl-top-filter-group {
   display: grid;
   gap: 8px;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-group--two {
+[data-portal-scene='true'] .wishlist .wl-top-filter-group--two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-group--views {
+[data-portal-scene='true'] .wishlist .wl-top-filter-group--views {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-chip {
+[data-portal-scene='true'] .wishlist .wl-top-filter-chip {
   width: 100%;
   min-width: 0;
   min-height: 50px;
@@ -206,7 +214,7 @@
   transition: transform 90ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, color 160ms ease;
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-chip[aria-pressed='true'] {
+[data-portal-scene='true'] .wishlist .wl-top-filter-chip[aria-pressed='true'] {
   border-color: rgba(255, 255, 255, 0.24);
   background-color: transparent;
   background-image: var(--control-fill);
@@ -214,12 +222,12 @@
   box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-chip[aria-pressed='true']:active {
+[data-portal-scene='true'] .wishlist .wl-top-filter-chip[aria-pressed='true']:active {
   transform: translateY(2px);
   box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-chip:disabled {
+[data-portal-scene='true'] .wishlist .wl-top-filter-chip:disabled {
   opacity: 0.42;
   cursor: default;
 }
@@ -231,24 +239,9 @@
   margin-inline: calc(50% - 50vw);
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-fab {
-  position: fixed;
-  z-index: 72;
-  right: calc(env(safe-area-inset-right, 0px) + 20px);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
-  width: 60px;
-  height: 60px;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  pointer-events: auto;
-}
-
 @media (max-width: 560px) {
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls,
-  [data-portal-scene='true'] .wishlist .wl-world-accordion {
+  [data-portal-scene='true'] .wishlist .wl-top-filter-accordion {
     width: calc(100% - 24px);
   }
 
@@ -269,45 +262,40 @@
     font-size: 13px;
   }
 
-  [data-portal-scene='true'] .wishlist .wl-world-nav-toggle {
+  [data-portal-scene='true'] .wishlist .wl-top-filter-toggle {
     height: 40px;
     border-radius: 0 0 25px 25px;
   }
 
-  [data-portal-scene='true'] .wishlist .wl-world-sheet {
+  [data-portal-scene='true'] .wishlist .wl-top-filter-sheet {
     padding: 13px 12px 15px;
     gap: 9px;
     border-radius: 22px;
   }
 
-  [data-portal-scene='true'] .wishlist .wl-world-chip {
+  [data-portal-scene='true'] .wishlist .wl-top-filter-chip {
     min-height: 48px;
     padding-inline: 8px;
     border-radius: 17px;
     font-size: 13px;
   }
-
-  [data-portal-scene='true'] .wishlist .wl-world-fab {
-    right: calc(env(safe-area-inset-right, 0px) + 18px);
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 94px);
-  }
 }
 
 @media (max-width: 370px) {
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar .tab-bar-btn,
-  [data-portal-scene='true'] .wishlist .wl-world-chip {
+  [data-portal-scene='true'] .wishlist .wl-top-filter-chip {
     font-size: 12px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-portal-scene='true'] .wishlist .wl-world-sheet {
+  [data-portal-scene='true'] .wishlist .wl-top-filter-sheet {
     animation: none;
   }
 
-  [data-portal-scene='true'] .wishlist .wl-world-nav-toggle,
-  [data-portal-scene='true'] .wishlist .wl-world-nav-toggle > svg,
-  [data-portal-scene='true'] .wishlist .wl-world-chip {
+  [data-portal-scene='true'] .wishlist .wl-top-filter-toggle,
+  [data-portal-scene='true'] .wishlist .wl-top-filter-toggle > svg,
+  [data-portal-scene='true'] .wishlist .wl-top-filter-chip {
     transition: none;
   }
 }
