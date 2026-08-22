@@ -1,4 +1,4 @@
-/* Wishlist world: owner tabs + full-width accordion. */
+/* Wishlist world: owner tabs + overlay accordion. */
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
   position: relative;
   z-index: 70;
@@ -6,7 +6,7 @@
   width: min(calc(100% - 28px), 640px);
   margin: 10px auto 18px;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid color-mix(in srgb, var(--world-border-active) 72%, var(--world-border));
   border-radius: 28px;
   background: color-mix(in srgb, var(--world-surface-strong) 94%, transparent);
@@ -15,6 +15,10 @@
     0 18px 48px color-mix(in srgb, var(--world-shadow) 78%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
+}
+
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls:has(.wl-world-accordion.is-open) {
+  border-radius: 28px 28px 0 0;
 }
 
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
@@ -42,12 +46,10 @@
   border-top: 1px solid color-mix(in srgb, var(--world-border-active) 42%, var(--world-border));
 }
 
-/* Reset the old floating world-nav transform. Without this reset the new
-   full-width row inherits translateX(-50%) and only its right half is visible. */
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle {
   position: relative;
   inset: auto;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   width: 100%;
   height: 42px;
@@ -55,7 +57,7 @@
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: 0 0 27px 27px;
   background: color-mix(in srgb, var(--world-surface-soft) 54%, transparent);
   color: var(--world-text-muted);
   box-shadow: none;
@@ -65,6 +67,12 @@
   pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
   transition: background-color 160ms ease, color 160ms ease;
+}
+
+[data-portal-scene='true'] .wishlist .wl-world-accordion.is-open .wl-world-nav-toggle {
+  border-radius: 0;
+  background: color-mix(in srgb, var(--world-accent) 8%, var(--world-surface-soft));
+  color: var(--world-text);
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle::before {
@@ -79,10 +87,10 @@
   transform: translateX(-50%);
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle svg,
-[data-portal-scene='true'] .wishlist .wl-world-sheet-collapse svg {
+[data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle svg {
   width: 21px;
   height: 21px;
+  margin-top: 7px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -91,50 +99,46 @@
   transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-[data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle svg {
-  margin-top: 7px;
-}
-
-[data-portal-scene='true'] .wishlist .wl-world-accordion.is-open .wl-world-nav-toggle {
-  background: color-mix(in srgb, var(--world-accent) 8%, var(--world-surface-soft));
-  color: var(--world-text);
-}
-
 [data-portal-scene='true'] .wishlist .wl-world-accordion.is-open .wl-world-nav-toggle svg {
   transform: rotate(180deg);
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle:focus-visible,
-[data-portal-scene='true'] .wishlist .wl-world-sheet-collapse:focus-visible,
 [data-portal-scene='true'] .wishlist .wl-world-chip:focus-visible {
   outline: 2px solid var(--world-accent);
   outline-offset: -3px;
 }
 
+/* Important: this panel is absolutely positioned. Opening it never changes
+   the layout height, so the sphere field keeps exactly the same coordinates. */
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-sheet {
-  position: relative;
-  inset: auto;
+  position: absolute;
+  z-index: 80;
+  top: 100%;
+  left: -1px;
   box-sizing: border-box;
-  width: 100%;
+  width: calc(100% + 2px);
   min-height: 0;
   max-height: none;
   margin: 0;
-  padding: 12px 14px 17px;
+  padding: 14px 14px 17px;
   display: grid;
   gap: 11px;
   overflow: visible;
-  border: 0;
-  border-top: 1px solid color-mix(in srgb, var(--world-border-active) 38%, var(--world-border));
-  border-radius: 0;
+  border: 1px solid color-mix(in srgb, var(--world-border-active) 72%, var(--world-border));
+  border-top: 0;
+  border-radius: 0 0 28px 28px;
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--world-accent) 5%, var(--world-surface-strong)),
     var(--world-surface-strong)
   );
   color: var(--world-text);
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--world-glow) 60%, transparent),
+    0 22px 48px color-mix(in srgb, var(--world-shadow) 82%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   pointer-events: auto;
   animation: wl-world-accordion-in 210ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -148,7 +152,7 @@
   min-height: 40px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
 }
 
@@ -177,27 +181,6 @@
   font-weight: 800;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-[data-portal-scene='true'] .wishlist .wl-world-sheet-collapse {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  flex: 0 0 38px;
-  place-items: center;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--world-accent) 48%, var(--world-border));
-  border-radius: 50%;
-  background-color: transparent;
-  background-image: var(--control-fill);
-  color: var(--world-text);
-  box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
-  cursor: pointer;
-}
-
-[data-portal-scene='true'] .wishlist .wl-world-sheet-collapse svg {
-  margin-top: 0;
-  transform: rotate(180deg);
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-group {
@@ -283,6 +266,10 @@
     border-radius: 26px;
   }
 
+  [data-portal-scene='true'] .wishlist .wl-wishlist-controls:has(.wl-world-accordion.is-open) {
+    border-radius: 26px 26px 0 0;
+  }
+
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
     min-height: 62px;
     padding: 5px;
@@ -301,9 +288,9 @@
   }
 
   [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-sheet {
-    width: 100%;
-    padding: 11px 12px 15px;
+    padding: 12px 12px 15px;
     gap: 9px;
+    border-radius: 0 0 26px 26px;
   }
 
   [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-chip {

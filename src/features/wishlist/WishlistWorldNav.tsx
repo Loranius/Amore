@@ -6,21 +6,17 @@ import type { WishlistViewMode } from './wishlistBoardView';
 // ============================================================
 // Навігація вішліста у світі — верхній accordion над сценою.
 // ------------------------------------------------------------
-// Вкладки власників уже живуть у верхній панелі. Службові фільтри більше не
-// мають окремої плаваючої кнопки зліва внизу: цей компонент порталом додає
-// accordion у ту саму панель, не змінюючи контракт WishlistPage.
+// Вкладки власників живуть у верхній панелі, а фільтри відкриваються поверх
+// поля бажань. Розгортання не повинно змінювати геометрію сфери/бульбашок.
 // ============================================================
 
 export type WishlistWorldTab = 'me' | 'partner' | 'shared';
 export type WishlistVisibilityMode = 'visible' | 'secret';
 
 export interface WishlistWorldNavProps {
-  /** Виконані бажання замість активних. */
   archiveOpen: boolean;
   onArchiveChange: (open: boolean) => void;
-  /** Чи має ця вкладка архів узагалі. */
   archiveAvailable: boolean;
-  /** Як показувати бажання: кристалами, списком або полароїдами. */
   view: WishlistViewMode;
   onViewChange: (view: WishlistViewMode) => void;
   onAdd: () => void;
@@ -100,14 +96,6 @@ export function WishlistWorldNav({
               <FilterViewIcon />
               <strong>Фільтри та види</strong>
             </span>
-            <button
-              type="button"
-              className="wl-world-sheet-collapse"
-              aria-label="Згорнути фільтри"
-              onClick={() => setOpen(false)}
-            >
-              <ChevronIcon />
-            </button>
           </div>
 
           {visibility && secretAvailable && (
