@@ -1,0 +1,48 @@
+/* ============================================================
+   Wishlist accordion — touch state reset.
+   ------------------------------------------------------------
+   Mobile Chrome/Android can keep :hover latched after a tap. The main
+   accordion stylesheet intentionally gives hover a subtle surface tint,
+   so after closing the sheet that latched hover looked like a stale grey
+   "open" state. On coarse/touch pointers, visual state now follows only
+   data-open / :active. Real hover is left to mouse-capable devices.
+   ============================================================ */
+
+[data-portal-scene='true'] .wishlist .wl-top-filter-toggle {
+  appearance: none;
+  -webkit-appearance: none;
+  touch-action: manipulation;
+}
+
+[data-portal-scene='true'] .wishlist .wl-top-filter-toggle:focus:not(:focus-visible) {
+  outline: none;
+}
+
+@media (hover: none), (pointer: coarse) {
+  [data-portal-scene='true'] .wishlist
+    .wl-top-filter-accordion[data-open='false']
+    .wl-top-filter-toggle,
+  [data-portal-scene='true'] .wishlist
+    .wl-top-filter-accordion[data-open='false']
+    .wl-top-filter-toggle:hover,
+  [data-portal-scene='true'] .wishlist
+    .wl-top-filter-accordion[data-open='false']
+    .wl-top-filter-toggle:focus:not(:focus-visible) {
+    background: transparent;
+    color: var(--world-text-muted);
+  }
+
+  [data-portal-scene='true'] .wishlist
+    .wl-top-filter-accordion[data-open='true']
+    .wl-top-filter-toggle,
+  [data-portal-scene='true'] .wishlist
+    .wl-top-filter-accordion[data-open='true']
+    .wl-top-filter-toggle:hover {
+    background: color-mix(in srgb, var(--world-accent) 6%, transparent);
+    color: var(--world-text);
+  }
+
+  [data-portal-scene='true'] .wishlist .wl-top-filter-toggle:active {
+    background: color-mix(in srgb, var(--world-accent) 10%, transparent);
+  }
+}
