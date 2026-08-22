@@ -1,15 +1,13 @@
-import { useEffect, useId, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useId, useState } from 'react';
 import { ChevronDownIcon, LockIcon, PlusIcon } from '@/components/icons/UiIcon';
 import type { WishlistViewMode } from './wishlistBoardView';
 
 // ============================================================
 // Навігація вішліста у світі — accordion під перемикачем власника.
 // ------------------------------------------------------------
-// Accordion порталом монтується ВСЕРЕДИНУ `.wl-wishlist-controls`, одразу
-// після TabBar. Це важливо: верхня панель має власні transform/позиційні
-// правила у world-режимі, тому sibling міг візуально опинятися вище неї.
-// Відкритий sheet лишається absolute і накриває бульбашки, не штовхаючи їх.
+// Рендеримо accordion звичайним sibling одразу після `.wl-wishlist-controls`.
+// Без portal/querySelector: його вертикальна позиція визначається DOM-потоком,
+// а відкритий sheet лишається absolute і накриває бульбашки, не штовхаючи їх.
 // ============================================================
 
 export type WishlistWorldTab = 'me' | 'partner' | 'shared';
@@ -58,121 +56,110 @@ export function WishlistWorldNav({
   secretAvailable,
 }: WishlistWorldNavProps) {
   const [open, setOpen] = useState(false);
-  const [controlsHost, setControlsHost] = useState<HTMLElement | null>(null);
   const panelId = useId();
-
-  useEffect(() => {
-    setControlsHost(document.querySelector<HTMLElement>('.wishlist .wl-wishlist-controls'));
-  }, []);
-
-  const accordion = controlsHost
-    ? createPortal(
-        <div
-          className={`wl-world-accordion${open ? ' is-open' : ''}`}
-          data-open={open ? 'true' : 'false'}
-        >
-          <button
-            type="button"
-            className="wl-world-nav-toggle"
-            aria-expanded={open}
-            aria-controls={panelId}
-            aria-label={open ? 'Згорнути фільтри вішліста' : 'Розгорнути фільтри вішліста'}
-            onClick={() => setOpen((current) => !current)}
-          >
-            <span className="wl-world-nav-grip" aria-hidden="true" />
-            <ChevronDownIcon size={21} />
-          </button>
-
-          {open && (
-            <div
-              id={panelId}
-              className="wl-world-sheet"
-              role="region"
-              aria-label="Фільтри та види вішліста"
-            >
-              <div className="wl-world-sheet-heading">
-                <span>
-                  <FilterViewIcon />
-                  <strong>Фільтри та види</strong>
-                </span>
-              </div>
-
-              {visibility && secretAvailable && (
-                <div
-                  className="wl-world-group wl-world-group--two wl-world-visibility"
-                  role="group"
-                  aria-label="Видимість бажань"
-                >
-                  <button
-                    type="button"
-                    className="wl-world-chip"
-                    aria-pressed={visibility === 'visible'}
-                    onClick={() => onVisibilityChange('visible')}
-                  >
-                    Видимі
-                  </button>
-                  <button
-                    type="button"
-                    className="wl-world-chip"
-                    aria-pressed={visibility === 'secret'}
-                    onClick={() => onVisibilityChange('secret')}
-                  >
-                    <LockIcon size={15} /> Таємні
-                  </button>
-                </div>
-              )}
-
-              <div
-                className="wl-world-group wl-world-group--two"
-                role="group"
-                aria-label="Стан бажань"
-              >
-                <button
-                  type="button"
-                  className="wl-world-chip"
-                  aria-pressed={!archiveOpen}
-                  onClick={() => onArchiveChange(false)}
-                >
-                  Активні
-                </button>
-                <button
-                  type="button"
-                  className="wl-world-chip"
-                  aria-pressed={archiveOpen}
-                  disabled={!archiveAvailable}
-                  onClick={() => onArchiveChange(true)}
-                >
-                  Виконані
-                </button>
-              </div>
-
-              <div
-                className="wl-world-group wl-world-group--views"
-                role="group"
-                aria-label="Вигляд бажань"
-              >
-                {VIEWS.map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    className="wl-world-chip"
-                    aria-pressed={item.value === view}
-                    onClick={() => onViewChange(item.value)}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>,
-        controlsHost,
-      )
-    : null;
 
   return (
     <>
-      {accordion}
+      <div
+        className={`wl-world-accordion${open ? ' is-open' : ''}`}
+        data-open={open ? 'true' : 'false'}
+      >
+        <button
+          type="button"
+          className="wl-world-nav-toggle"
+          aria-expanded={open}
+          aria-controls={panelId}
+          aria-label={open ? 'Згорнути фільтри вішліста' : 'Розгорнути фільтри вішліста'}
+          onClick={() => setOpen((current) => !current)}
+        >
+          <span className="wl-world-nav-grip" aria-hidden="true" />
+          <ChevronDownIcon size={21} />
+        </button>
+
+        {open && (
+          <div
+            id={panelId}
+            className="wl-world-sheet"
+            role="region"
+            aria-label="Фільтри та види вішліста"
+          >
+            <div className="wl-world-sheet-heading">
+              <span>
+                <FilterViewIcon />
+                <strong>Фільтри та види</strong>
+              </span>
+            </div>
+
+            {visibility && secretAvailable && (
+              <div
+                className="wl-world-group wl-world-group--two wl-world-visibility"
+                role="group"
+                aria-label="Видимість бажань"
+              >
+                <button
+                  type="button"
+                  className="wl-world-chip"
+                  aria-pressed={visibility === 'visible'}
+                  onClick={() => onVisibilityChange('visible')}
+                >
+                  Видимі
+                </button>
+                <button
+                  type="button"
+                  className="wl-world-chip"
+                  aria-pressed={visibility === 'secret'}
+                  onClick={() => onVisibilityChange('secret')}
+                >
+                  <LockIcon size={15} /> Таємні
+                </button>
+              </div>
+            )}
+
+            <div
+              className="wl-world-group wl-world-group--two"
+              role="group"
+              aria-label="Стан бажань"
+            >
+              <button
+                type="button"
+                className="wl-world-chip"
+                aria-pressed={!archiveOpen}
+                onClick={() => onArchiveChange(false)}
+              >
+                Активні
+              </button>
+              <button
+                type="button"
+                className="wl-world-chip"
+                aria-pressed={archiveOpen}
+                disabled={!archiveAvailable}
+                onClick={() => onArchiveChange(true)}
+              >
+                Виконані
+              </button>
+            </div>
+
+            <div
+              className="wl-world-group wl-world-group--views"
+              role="group"
+              aria-label="Вигляд бажань"
+            >
+              {VIEWS.map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  className="wl-world-chip"
+                  aria-pressed={item.value === view}
+                  onClick={() => onViewChange(item.value)}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       <button
         type="button"
         className="fab wl-world-fab"

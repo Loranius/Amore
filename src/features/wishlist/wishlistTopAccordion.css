@@ -1,14 +1,13 @@
-/* Wishlist world: owner tabs + accordion directly underneath. */
+/* Wishlist world: owner tabs with a stable accordion directly underneath. */
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
   position: relative;
   z-index: 70;
-  display: grid;
   width: min(calc(100% - 28px), 640px);
-  margin: 10px auto 18px;
+  margin: 10px auto 0;
   padding: 0;
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--world-border-active) 72%, var(--world-border));
-  border-radius: 28px;
+  border-radius: 28px 28px 0 0;
   background: color-mix(in srgb, var(--world-surface-strong) 96%, transparent);
   box-shadow:
     inset 0 1px 0 var(--world-glow),
@@ -23,7 +22,7 @@
   margin: 0;
   padding: 6px 7px;
   border: 0;
-  border-radius: 28px;
+  border-radius: 28px 28px 0 0;
   background: transparent;
   box-shadow: none;
 }
@@ -35,15 +34,17 @@
   white-space: nowrap;
 }
 
-/* Accordion is a normal sibling after the owner tabs, not a portal child.
-   The negative top margin only cancels most of the controls' bottom margin,
-   leaving a small visible gap under «Мої / Лени / Спільні». */
+/* DOM sibling immediately after owner controls. No negative margin and no
+   fixed/portal positioning, so it cannot jump above «Мої / Лени / Спільні». */
 [data-portal-scene='true'] .wishlist .wl-world-accordion {
-  position: relative;
+  position: relative !important;
+  inset: auto !important;
   z-index: 72;
   display: block;
+  box-sizing: border-box;
   width: min(calc(100% - 28px), 640px);
-  margin: -10px auto 18px;
+  margin: 0 auto 18px !important;
+  transform: none !important;
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-nav-toggle {
@@ -55,16 +56,15 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid color-mix(in srgb, var(--world-border-active) 58%, var(--world-border));
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--world-surface-strong) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--world-border-active) 72%, var(--world-border));
+  border-top: 0;
+  border-radius: 0 0 27px 27px;
+  background: color-mix(in srgb, var(--world-surface-strong) 96%, transparent);
   color: var(--world-text-muted);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--world-glow) 60%, transparent),
-    0 10px 24px color-mix(in srgb, var(--world-shadow) 46%, transparent);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--world-shadow) 46%, transparent);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+  transition: background-color 160ms ease, color 160ms ease;
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-nav-grip {
@@ -85,7 +85,6 @@
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion[data-open='true'] .wl-world-nav-toggle {
-  border-color: color-mix(in srgb, var(--world-accent) 42%, var(--world-border));
   background: color-mix(in srgb, var(--world-accent) 8%, var(--world-surface-strong));
   color: var(--world-text);
 }
@@ -100,12 +99,12 @@
   outline-offset: 2px;
 }
 
-/* Floating card: opens below the trigger and over the bubbles. It never
-   participates in layout, so expanding filters does not move the scene. */
+/* The expanded controls overlay the bubbles. Only the 42px trigger takes
+   layout space; opening this sheet never pushes the sphere field down. */
 [data-portal-scene='true'] .wishlist .wl-world-sheet {
   position: absolute;
   z-index: 90;
-  top: calc(100% + 8px);
+  top: calc(100% + 7px);
   left: 0;
   box-sizing: border-box;
   width: 100%;
@@ -128,7 +127,6 @@
     0 22px 52px color-mix(in srgb, var(--world-shadow) 88%, transparent);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
-  isolation: isolate;
   pointer-events: auto;
   animation: wl-world-accordion-in 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -249,16 +247,20 @@
 }
 
 @media (max-width: 560px) {
-  [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
+  [data-portal-scene='true'] .wishlist .wl-wishlist-controls,
+  [data-portal-scene='true'] .wishlist .wl-world-accordion {
     width: calc(100% - 24px);
+  }
+
+  [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
     margin-top: 8px;
-    border-radius: 26px;
+    border-radius: 26px 26px 0 0;
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
     min-height: 62px;
     padding: 5px;
-    border-radius: 26px;
+    border-radius: 26px 26px 0 0;
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar .tab-bar-btn {
@@ -267,18 +269,12 @@
     font-size: 13px;
   }
 
-  [data-portal-scene='true'] .wishlist .wl-world-accordion {
-    width: calc(100% - 24px);
-    margin-top: -10px;
-  }
-
   [data-portal-scene='true'] .wishlist .wl-world-nav-toggle {
     height: 40px;
-    border-radius: 17px;
+    border-radius: 0 0 25px 25px;
   }
 
   [data-portal-scene='true'] .wishlist .wl-world-sheet {
-    top: calc(100% + 7px);
     padding: 13px 12px 15px;
     gap: 9px;
     border-radius: 22px;
@@ -298,11 +294,7 @@
 }
 
 @media (max-width: 370px) {
-  [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar .tab-bar-btn {
-    padding-inline: 5px;
-    font-size: 12px;
-  }
-
+  [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar .tab-bar-btn,
   [data-portal-scene='true'] .wishlist .wl-world-chip {
     font-size: 12px;
   }
