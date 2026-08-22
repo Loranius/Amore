@@ -12,13 +12,11 @@
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { EventIcon } from '@/components/icons/EventIcon';
-import { BulbIcon } from '@/components/icons/PlanIcon';
 import { ChevronRightIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { useDimmedWorld } from '@/features/world/worldDim';
-import { currentYearMonth, formatDateUA, stepMonth } from '@/features/_shared/month';
+import { currentYearMonth, stepMonth } from '@/features/_shared/month';
 import { useCalendarMutations, useEvents } from '@/features/calendar/useCalendar';
 import { enrichEvent, sortEnriched } from '@/features/calendar/calendarUtils';
 import { CalendarMonthView } from '@/features/calendar/CalendarViews';
@@ -71,8 +69,6 @@ export function PlansPage() {
   const [addingPlan, setAddingPlan] = useState(false);
   const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
   const [eventModal, setEventModal] = useState<EventModal>(null);
-  const [createChooserOpen, setCreateChooserOpen] = useState(false);
-  const [createChooserDate, setCreateChooserDate] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
 
   const plansQuery = usePlans();
@@ -123,25 +119,12 @@ export function PlansPage() {
     setEventModal({ row: event, type, surface });
   };
 
-  const openCalendarCreate = (date?: string) => {
-    setCreateChooserDate(date ?? null);
-    setCreateChooserOpen(true);
-  };
-
-  const closeCalendarCreate = () => {
-    setCreateChooserOpen(false);
-    setCreateChooserDate(null);
-  };
-
-  const choosePlan = () => {
-    closeCalendarCreate();
+  // Глобальний плюс у модулі означає рівно одну дію — новий план.
+  // Якщо користувач стоїть на «Подіях», повертаємо календар у фокус, але
+  // не показуємо проміжний вибір типу створення.
+  const openPlanComposer = () => {
+    if (section !== 'calendar') setSection('calendar');
     setAddingPlan(true);
-  };
-
-  const chooseCalendarEvent = () => {
-    const date = createChooserDate ?? undefined;
-    closeCalendarCreate();
-    openNewEvent('holiday', date, 'calendar');
   };
 
   const closeAddPlan = () => {
@@ -208,9 +191,10 @@ export function PlansPage() {
             mo={mo}
             onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
             onGoToday={() => setYm(currentYearMonth())}
-            // Тап по конкретному дню передає дату в спільний вибір
-            // «План / Подія». Якщо користувач обирає подію — дата вже стоїть.
-            onAddOn={(date) => openCalendarCreate(date)}
+            // Перший тап по дню лише вибирає його. Повторний тап по тому
+            // самому дню (або кнопка в панелі дня) одразу відкриває модалку
+            // календарної події з уже підставленою датою.
+            onAddOn={(date) => openNewEvent('holiday', date, 'calendar')}
             onOpenEvent={(event) => openExistingEvent(
               enriched.find((item) => item.id === event.id) ?? event,
             )}
@@ -264,30 +248,18 @@ export function PlansPage() {
         </div>
       )}
 
-      {/* Коло, а не пігулка з підписом. Дію називає `aria-label`: підпис
-          усередині кола не вміщається, а «Додати»/«Подія» поруч зі знаком
-          плюс — це те саме слово двічі. */}
+      {/* Плюс більше не питає «План чи подія?»: у модулі це завжди план.
+          Календарна подія створюється контекстно — другим тапом по даті. */}
       <button
         type="button"
         className="fab"
-        aria-label={section === 'calendar' ? 'Додати подію в календар' : 'Додати подію'}
-        onClick={() => (section === 'calendar'
-          ? openCalendarCreate()
-          : openNewEvent('anniversary', undefined, 'events'))}
+        aria-label="Додати план"
+        onClick={openPlanComposer}
       >
         <PlusIcon size={26} />
       </button>
 
-      {createChooserOpen && section === 'calendar' && (
-        <CalendarCreateChooser
-          date={createChooserDate}
-          onClose={closeCalendarCreate}
-          onPlan={choosePlan}
-          onEvent={chooseCalendarEvent}
-        />
-      )}
-
-      {addingPlan && section === 'calendar' && (
+      {addingPlan && (
         <AddPlanModal
           busy={addPlan.isPending}
           createdPlanId={createdPlanId}
@@ -312,72 +284,6 @@ export function PlansPage() {
         />
       )}
     </section>
-  );
-}
-
-function CalendarCreateChooser({ date, onClose, onPlan, onEvent }: {
-  date: string | null;
-  onClose: () => void;
-  onPlan: () => void;
-  onEvent: () => void;
-}) {
-  return (
-    <div
-      className="modal-overlay plan-create-overlay"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="modal-sheet plan-create-sheet"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="calendar-create-title"
-      >
-        <div className="plan-create-form">
-          <header className="plan-create-head">
-            <span className="plan-create-eyebrow">Додати в календар</span>
-            <h2 id="calendar-create-title">Що створюємо?</h2>
-            <p>
-              {date
-                ? `Дата вже вибрана: ${formatDateUA(date)}. Оберіть, що має на ній з’явитися.`
-                : 'План піде ще й у список нижче. Подія залишиться тільки позначкою в календарі.'}
-            </p>
-          </header>
-
-          <div className="plan-create-type-grid" aria-label="Що додати в календар">
-            <button
-              type="button"
-              className="plan-create-type-option"
-              onClick={onPlan}
-            >
-              <BulbIcon size={18} />
-              <span style={{ display: 'grid', gap: 2, textAlign: 'left' }}>
-                <strong>План</strong>
-                <small>Поїздка, побачення, місце або інша спільна справа.</small>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="plan-create-type-option"
-              onClick={onEvent}
-            >
-              <EventIcon type="holiday" size={18} />
-              <span style={{ display: 'grid', gap: 2, textAlign: 'left' }}>
-                <strong>Подія</strong>
-                <small>День народження, свято, особиста дата або нагадування.</small>
-              </span>
-            </button>
-          </div>
-
-          <div className="plan-create-actions">
-            <button type="button" className="plan-create-cancel" onClick={onClose}>
-              Скасувати
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
