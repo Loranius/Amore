@@ -138,10 +138,17 @@ export function CalendarMonthView({
             <button
               key={day}
               type="button"
-              // Повторний тап по вибраному дню знімає вибір — так само,
-              // як він його поставив. Окрема кнопка «закрити» для цього
-              // не потрібна.
-              onClick={() => setSelected(isSel ? null : day)}
+              // Перший тап вибирає день і показує його контекст нижче.
+              // Другий тап по вже вибраному дню — короткий шлях до створення
+              // календарної події на цю дату. Це однаково працює мишкою,
+              // клавіатурою й на touch-екрані без залежності від dblclick.
+              onClick={() => {
+                if (isSel) {
+                  onAddOn(iso);
+                  return;
+                }
+                setSelected(day);
+              }}
               aria-pressed={isSel}
               aria-label={cellLabel(day, mo, list.length, dayPlans.length)}
               className={
@@ -293,7 +300,7 @@ function DayPanel({
         </>
       )}
       <button type="button" className="cal-day-panel-add" onClick={() => onAddOn(iso)}>
-        <PlusIcon size={15} /> Додати на {formatDateUA(iso, { year: false })}
+        <PlusIcon size={15} /> Додати подію на {formatDateUA(iso, { year: false })}
       </button>
     </div>
   );
