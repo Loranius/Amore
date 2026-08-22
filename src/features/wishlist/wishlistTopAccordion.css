@@ -1,10 +1,9 @@
 /* ============================================================
    Wishlist World — верхній accordion «Фільтри та види».
    ------------------------------------------------------------
-   Це фінальний шар поверх старого bottom-sheet рецепта. Компонент більше не
-   рендерить `.wl-world-nav`, тому стара нижня кнопка шарів зникає сама; новий
-   accordion порталом стає дочірнім елементом `.wl-wishlist-controls` і
-   візуально продовжує панель «Мої / Лени / Спільні».
+   Власники бажань займають окремий повний рядок. Accordion тепер живе
+   ПІД ним і використовує рівно ту саму ширину, тому його toggle більше не
+   може залізти на «Мої». Сцена сфер окремо розгортається на весь viewport.
    ============================================================ */
 
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
@@ -25,14 +24,13 @@
   -webkit-backdrop-filter: blur(18px);
 }
 
-/* Залишаємо праворуч один слот під chevron accordion. Сама геометрія й
-   активна фіолетова пластина TabBar не дублюються — це вже стабільний
-   компонент верхнього перемикача. */
+/* Перемикач власника знову отримує всю ширину панелі. Раніше ми відкусили
+   справа 58px під chevron, і саме це стискало рядок та створювало накладання. */
 [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
-  width: calc(100% - 58px);
+  width: 100%;
   min-height: 64px;
   margin: 0;
-  padding: 6px 3px 6px 7px;
+  padding: 6px 7px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -46,41 +44,51 @@
   white-space: nowrap;
 }
 
+/* Accordion — другий рядок тієї самої картки, а не control поверх вкладок. */
 [data-portal-scene='true'] .wishlist .wl-world-accordion {
+  position: relative;
   width: 100%;
+  border-top: 1px solid color-mix(in srgb, var(--world-border-active) 42%, var(--world-border));
 }
 
-/* Chevron сидить у тому самому першому рядку, що й імена. Він absolute
-   від `.wl-wishlist-controls`, тому закритий accordion не створює другого
-   рядка й не краде місце в сцени. */
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle {
-  position: absolute;
-  z-index: 2;
-  top: 8px;
-  right: 7px;
-  display: grid;
-  width: 48px;
-  height: 48px;
-  place-items: center;
+  position: relative;
+  inset: auto;
+  z-index: 1;
+  display: flex;
+  width: 100%;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
   padding: 0;
-  border: 1px solid var(--world-border);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--world-surface-soft) 94%, transparent);
-  color: var(--world-text);
-  box-shadow: inset 0 1px 0 var(--world-glow);
+  border: 0;
+  border-radius: 0;
+  background: color-mix(in srgb, var(--world-surface-soft) 54%, transparent);
+  color: var(--world-text-muted);
+  box-shadow: none;
   cursor: pointer;
   pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
   transition:
     background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
+    color 160ms ease;
+}
+
+[data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle::before {
+  position: absolute;
+  top: 7px;
+  width: 38px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--world-border-active) 64%, transparent);
+  content: '';
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle svg,
 [data-portal-scene='true'] .wishlist .wl-world-sheet-collapse svg {
-  width: 22px;
-  height: 22px;
+  width: 21px;
+  height: 21px;
+  margin-top: 7px;
   fill: none;
   stroke: currentColor;
   stroke-width: 2;
@@ -90,11 +98,8 @@
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion.is-open .wl-world-nav-toggle {
-  border-color: color-mix(in srgb, var(--world-accent) 48%, var(--world-border));
-  background: color-mix(in srgb, var(--world-accent) 13%, var(--world-surface-soft));
-  box-shadow:
-    inset 0 1px 0 var(--world-glow),
-    0 7px 18px color-mix(in srgb, var(--world-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--world-accent) 8%, var(--world-surface-soft));
+  color: var(--world-text);
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-accordion.is-open .wl-world-nav-toggle svg {
@@ -105,27 +110,26 @@
 [data-portal-scene='true'] .wishlist .wl-world-sheet-collapse:focus-visible,
 [data-portal-scene='true'] .wishlist .wl-world-chip:focus-visible {
   outline: 2px solid var(--world-accent);
-  outline-offset: 2px;
+  outline-offset: -3px;
 }
 
-/* Не modal і не bottom sheet: панель є другим поверхом того самого top-card.
-   Вона займає місце в потоці, тому при розгортанні сцена спокійно відсувається
-   вниз замість того, щоб ховатись під великою нижньою шторкою. */
+/* Панель розкривається на 100% ширини контейнера власників. */
 [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-sheet {
   position: relative;
   inset: auto;
   right: auto;
   bottom: auto;
   left: auto;
+  box-sizing: border-box;
   width: 100%;
   min-height: 0;
   max-height: none;
-  padding: 13px 16px 18px;
+  padding: 12px 14px 17px;
   display: grid;
   gap: 11px;
   overflow: visible;
   border: 0;
-  border-top: 1px solid color-mix(in srgb, var(--world-border-active) 46%, var(--world-border));
+  border-top: 1px solid color-mix(in srgb, var(--world-border-active) 38%, var(--world-border));
   border-radius: 0;
   background:
     linear-gradient(
@@ -188,8 +192,6 @@
   white-space: nowrap;
 }
 
-/* Другий collapse-control повторює створений мокап: у розгорнутій частині
-   є очевидний шлях сховати accordion без повернення пальця у верхній ряд. */
 [data-portal-scene='true'] .wishlist .wl-world-sheet-collapse {
   display: grid;
   width: 38px;
@@ -207,6 +209,7 @@
 }
 
 [data-portal-scene='true'] .wishlist .wl-world-sheet-collapse svg {
+  margin-top: 0;
   transform: rotate(180deg);
 }
 
@@ -269,8 +272,17 @@
   cursor: default;
 }
 
-/* FAB лишається там, де він був на мокапі: окреме коло праворуч над доком.
-   Його позиція більше не залежить від колишнього fullscreen `.wl-world-nav`. */
+/* Поле сфер не успадковує вузьку ширину службових контролів. Фізика вимірює
+   цей DOM-вузол через getBoundingClientRect(), тож тепер її робоча площа —
+   весь viewport, від лівого до правого краю екрана. */
+[data-portal-scene='true'] .wishlist .wl-sphere-field {
+  box-sizing: border-box;
+  width: 100vw;
+  max-width: none;
+  margin-inline: calc(50% - 50vw);
+}
+
+/* FAB лишається окремою дією праворуч над доком. */
 [data-portal-scene='true'] .wishlist .wl-world-fab {
   position: fixed;
   z-index: 72;
@@ -294,9 +306,9 @@
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
-    width: calc(100% - 54px);
+    width: 100%;
     min-height: 62px;
-    padding: 5px 2px 5px 5px;
+    padding: 5px;
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar .tab-bar-btn {
@@ -306,14 +318,13 @@
   }
 
   [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-nav-toggle {
-    top: 8px;
-    right: 6px;
-    width: 44px;
-    height: 44px;
+    width: 100%;
+    height: 40px;
   }
 
   [data-portal-scene='true'] .wishlist .wl-world-accordion .wl-world-sheet {
-    padding: 12px 13px 15px;
+    width: 100%;
+    padding: 11px 12px 15px;
     gap: 9px;
   }
 
