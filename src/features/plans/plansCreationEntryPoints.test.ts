@@ -14,7 +14,10 @@ describe('plans creation entry points', () => {
   });
 
   it('opens a calendar event directly for a chosen date', () => {
-    expect(PLANS_PAGE).toContain("onAddOn={(date) => openNewEvent('holiday', date, 'calendar')}");
+    // `openNewEvent` lost its third argument (`surface`) when the «Події»/
+    // «Календар» tabs were removed (ADR-0041) — there is no longer a
+    // section to route the modal into, so the call is two arguments now.
+    expect(PLANS_PAGE).toContain("onAddOn={(date) => openNewEvent('holiday', date)}");
   });
 
   it('uses the second tap on the selected day as the event shortcut', () => {

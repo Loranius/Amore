@@ -118,7 +118,9 @@ export function JourneyPage() {
           type="button"
           className="jn-exit"
           aria-label={split ? 'Повернутись до сузір’я' : 'Закрити карту'}
-          onClick={() => (split ? dismiss() : navigate('/plans?tab=events'))}
+          // Головна — єдиний вхід у це небо: лічильник днів веде сюди
+          // напряму, і повертатись логічно туди ж, а не в «Плани».
+          onClick={() => (split ? dismiss() : navigate('/'))}
         >
           <CloseIcon size={18} />
         </button>

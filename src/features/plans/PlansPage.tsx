@@ -1,5 +1,5 @@
 // ============================================================
-// «Плани» — об'єднаний модуль: події пари й календар з планами.
+// «Плани» — об'єднаний модуль: календар і плани пари.
 // ------------------------------------------------------------
 // У календарі живуть ДВІ різні сутності:
 //   plan  — те, що пара збирається зробити; має статус, бюджет, задачі й
@@ -7,11 +7,16 @@
 //   event — дата / свято / день народження; лишається позначкою в календарі
 //           й отримує Telegram-нагадування, але НЕ стає планом.
 //
-// «Події» нагорі — окремий контекст: це тільки «Наш шлях» (anniversary),
-// тобто моменти історії пари, а не звичайні календарні нагадування.
+// Вкладки «Події»/«Календар» тут більше немає. «Події» була входом лише в
+// «Наш шлях» (anniversary) — і власник попросив прибрати проміжну зупинку:
+// тепер сузір'я відкривається дотиком по лічильнику днів на головній
+// (`Hero.tsx`), а модуль планів завжди показує календар одразу.
+// Позначки типу anniversary в календарній сітці не зникли: тап по такій
+// даті й далі відкриває редагування на місці — це вже не «Наш шлях», а
+// звичайна календарна позначка, як день народження чи свято.
 // ============================================================
 import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ChevronRightIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
@@ -20,7 +25,6 @@ import { currentYearMonth, stepMonth } from '@/features/_shared/month';
 import { useCalendarMutations, useEvents } from '@/features/calendar/useCalendar';
 import { enrichEvent, sortEnriched } from '@/features/calendar/calendarUtils';
 import { CalendarMonthView } from '@/features/calendar/CalendarViews';
-import { RelationshipJourney } from '@/features/calendar/RelationshipJourney';
 import { AddEventModal } from '@/features/calendar/AddEventModal';
 import { AddPlanModal } from './AddPlanModal';
 import { PlanTile } from './PlanTile';
@@ -31,39 +35,22 @@ import './plans.css';
 import './plansModule.css';
 import type { EventRow, EventType } from '@/types';
 
-/** Розділ модуля. Календар перший: власник просив, щоб його бачили одразу. */
-type Section = 'calendar' | 'events';
-
 type EventKind = Extract<EventType, 'anniversary' | 'birthday' | 'holiday'>;
 
 type EventModal = {
   row: EventRow | null;
   date?: string | undefined;
   type: EventKind;
-  surface: Section;
 } | null;
-
-function requestedSection(value: string | null): Section {
-  return value === 'events' ? 'events' : 'calendar';
-}
 
 export function PlansPage() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
 
   // Модуль впускає світ, як вішліст: сцена лишається фоном, дотики — сторінці.
   const { webglSupported } = useArtifactWorld();
   const worldVisible = webglSupported;
   useWorldVisibleRoute();
   useDimmedWorld(worldVisible);
-
-  const section = requestedSection(searchParams.get('tab'));
-  const setSection = (next: Section) => {
-    const params = new URLSearchParams(searchParams);
-    if (next === 'calendar') params.delete('tab');
-    else params.set('tab', next);
-    setSearchParams(params, { replace: true });
-  };
 
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
   const [addingPlan, setAddingPlan] = useState(false);
@@ -92,20 +79,11 @@ export function PlansPage() {
     () => calendarEvents.map(enrichEvent).sort(sortEnriched),
     [calendarEvents],
   );
-  const journeyEvents = useMemo(
-    () => calendarEvents.filter((event) => event.type === 'anniversary'),
-    [calendarEvents],
-  );
 
   const groups = useMemo(() => groupPlans(plans), [plans]);
-  const activeCount = groups.upcoming.length + groups.ideas.length;
 
-  const openNewEvent = (
-    type: EventKind = 'anniversary',
-    date?: string,
-    surface: Section = type === 'anniversary' ? 'events' : 'calendar',
-  ) => {
-    setEventModal({ row: null, type, date, surface });
+  const openNewEvent = (type: EventKind = 'holiday', date?: string) => {
+    setEventModal({ row: null, type, date });
   };
 
   const openExistingEvent = (event: EventRow) => {
@@ -114,16 +92,13 @@ export function PlansPage() {
       : event.type === 'holiday'
         ? 'holiday'
         : 'anniversary';
-    const surface: Section = type === 'anniversary' ? 'events' : 'calendar';
-    setSection(surface);
-    setEventModal({ row: event, type, surface });
+    setEventModal({ row: event, type });
   };
 
-  // Глобальний плюс у модулі означає рівно одну дію — новий план.
-  // Якщо користувач стоїть на «Подіях», повертаємо календар у фокус, але
-  // не показуємо проміжний вибір типу створення.
+  // Плюс означає рівно одну дію — новий план. Календарна подія
+  // створюється контекстно: другий тап по вже вибраному дню в сітці
+  // відкриває її модалку з датою (`onAddOn` нижче).
   const openPlanComposer = () => {
-    if (section !== 'calendar') setSection('calendar');
     setAddingPlan(true);
   };
 
@@ -140,29 +115,7 @@ export function PlansPage() {
     <section
       className="plans-module"
       data-world={worldVisible ? 'true' : undefined}
-      data-section={section}
     >
-      <div className="pm-tabs" role="tablist" aria-label="Розділи планів">
-        <button
-          type="button"
-          role="tab"
-          className="pm-tab"
-          aria-selected={section === 'events'}
-          onClick={() => setSection('events')}
-        >
-          Події <span className="pm-tab-count">{journeyEvents.length}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className="pm-tab"
-          aria-selected={section === 'calendar'}
-          onClick={() => setSection('calendar')}
-        >
-          Календар <span className="pm-tab-count">{activeCount}</span>
-        </button>
-      </div>
-
       {failed ? (
         <div className="empty-state pm-error" role="alert">
           <p>Не вдалося завантажити плани й події.</p>
@@ -182,7 +135,7 @@ export function PlansPage() {
             <div className="pm-skeleton pm-skeleton--tile" />
           </div>
         </div>
-      ) : section === 'calendar' ? (
+      ) : (
         <div className="pm-sheet">
           <CalendarMonthView
             events={calendarEvents}
@@ -194,7 +147,7 @@ export function PlansPage() {
             // Перший тап по дню лише вибирає його. Повторний тап по тому
             // самому дню (або кнопка в панелі дня) одразу відкриває модалку
             // календарної події з уже підставленою датою.
-            onAddOn={(date) => openNewEvent('holiday', date, 'calendar')}
+            onAddOn={(date) => openNewEvent('holiday', date)}
             onOpenEvent={(event) => openExistingEvent(
               enriched.find((item) => item.id === event.id) ?? event,
             )}
@@ -239,13 +192,6 @@ export function PlansPage() {
             </>
           )}
         </div>
-      ) : (
-        <div className="pm-sheet pm-sheet--journey">
-          <RelationshipJourney
-            events={journeyEvents}
-            onAdd={() => openNewEvent('anniversary', undefined, 'events')}
-          />
-        </div>
       )}
 
       {/* Плюс більше не питає «План чи подія?»: у модулі це завжди план.
@@ -271,7 +217,7 @@ export function PlansPage() {
         />
       )}
 
-      {eventModal && section === eventModal.surface && (
+      {eventModal && (
         <AddEventModal
           event={eventModal.row}
           initialDate={eventModal.date}

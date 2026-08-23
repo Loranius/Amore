@@ -2146,7 +2146,35 @@ textarea::placeholder {
   color: var(--scene-ink);
   margin: 0;
 }
-.home-hero-counter { display: flex; flex-direction: column; align-items: center; gap: 2px; margin-top: 2px; }
+/* Лічильник — двері, а не текст: дотик відкриває «Наш шлях».
+   ------------------------------------------------------------
+   Обведення бере `--scene-ink-accent`, не `--accent`: елемент лежить на
+   сцені, а не на поверхні інтерфейсу, і в світлій темі `--accent` —
+   глибока малина, яка на блакитному небі читається чужою плямою. */
+.home-hero-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+  padding: 4px 18px;
+  border-radius: 18px;
+  color: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: translate 90ms ease, opacity 160ms ease;
+}
+.home-hero-counter:active { translate: 0 1px; opacity: 0.8; }
+.home-hero-counter:focus-visible {
+  outline: 2px solid var(--scene-ink-accent);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  .home-hero-counter:hover { opacity: 0.88; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-counter { transition: none; }
+}
 .home-hero-counter-number {
   font-family: 'Fredoka', sans-serif;
   font-size: 34px;
