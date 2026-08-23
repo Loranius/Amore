@@ -8,8 +8,15 @@
 // Рядок найближчого свята звідси прибрано: календар і так має власний
 // розділ, а на головній він відсував артефакт нижче — тобто головне на
 // цій сторінці поступалось місцем нагадуванню, яке його дублює.
+//
+// Лічильник — двері в «Наш шлях» (ADR-0037 §переїзд). Модуль планів мав
+// окрему вкладку «Події» з рядком-входом у це саме сузір'я; власник
+// попросив прибрати проміжну зупинку — дотик по днях розгортає небо
+// напряму. Це не рефакторинг, а зникнення другого шляху: після переїзду
+// «Наш шлях» відкривається ЛИШЕ звідси.
 // ============================================================
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useStartDate } from './useHome';
 import { daysBetween, formatSinceDate, nextAnniversaryLabel } from './homeUtils';
@@ -33,13 +40,17 @@ export function Hero() {
     <section className="home-hero">
       <p className="home-hero-greeting">{greeting}</p>
       {startDate && (
-        <div className="home-hero-counter">
+        <Link
+          to="/journey"
+          className="home-hero-counter"
+          aria-label="Відкрити «Наш шлях» — карту подій вашого стосунку"
+        >
           <span className="home-hero-counter-number">
             {daysBetween(startDate).toLocaleString('uk-UA')}
           </span>
           <span className="home-hero-counter-label">днів разом · з {formatSinceDate(startDate)}</span>
           <span className="home-hero-anniversary">{nextAnniversaryLabel(startDate)}</span>
-        </div>
+        </Link>
       )}
     </section>
   );
