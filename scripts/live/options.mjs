@@ -128,6 +128,20 @@ function asList(value) {
 }
 
 /**
+ * `--seed=ключ=значення` → пара для `localStorage`.
+ *
+ * Значення може містити знак рівності (JSON-масив ключів, наприклад), тож
+ * ділимо рівно один раз — по першому.
+ */
+export function parseSeed(raw) {
+  const at = raw.indexOf('=');
+  if (at <= 0) {
+    throw new OptionError('--seed приймає форму ключ=значення, напр. --seed=amore:theme=light.');
+  }
+  return [raw.slice(0, at), raw.slice(at + 1)];
+}
+
+/**
  * Розбирає рядок команди.
  *
  * Усе, що не починається з `--`, є маршрутом. Прапорці приймають форму
@@ -139,6 +153,7 @@ export function parseShotArgs(argv) {
   const probes = [];
   const taps = [];
   const tapPoints = [];
+  const seed = [];
   const options = {
     tier: DEFAULTS.tier,
     port: DEFAULTS.port,
@@ -166,6 +181,11 @@ export function parseShotArgs(argv) {
       // зірки живуть у полотні, і селектора в них немає.
       case 'tap-at': tapPoints.push(parsePoint(value)); break;
       case 'theme': options.theme = value; break;
+      // Сховище ДО запуску застосунку: свіжий контекст браузера — це завжди
+      // «перший раз», а частина порталу побудована саме на пам'яті між
+      // візитами (підпис «У кристалі N нових митей» на першому візиті мовчить
+      // за задумом). Без засіву знімок такої гілки не покаже взагалі.
+      case 'seed': seed.push(parseSeed(value)); break;
       case 'out': options.out = value; break;
       case 'port': options.port = Number(value); break;
       case 'settle': options.settle = Number(value); break;
@@ -202,6 +222,7 @@ export function parseShotArgs(argv) {
     settle: options.settle,
     taps,
     tapPoints,
+    seed,
     theme: options.theme,
     keepServer: options.keepServer,
     headed: options.headed,

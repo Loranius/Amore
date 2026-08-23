@@ -2305,6 +2305,36 @@ textarea::placeholder {
   font-weight: 600;
   color: var(--scene-ink);
 }
+/* «У кристалі 2 нові миті» — відповідь на питання, заради якого пара
+   й відкриває головну.
+   ------------------------------------------------------------
+   Рядок рідкісний за природою: він з'являється лише тоді, коли з
+   минулого візиту справді щось додалося. Тому він тихий, а не
+   акцентний — постійний акцент тут був би третім на екрані, де вже є
+   число днів (`--scene-ink-accent`) і плашка річниці, а `DESIGN.md`
+   тримає правило «Два акценти».
+
+   Без плашки навмисно: друга капсула під першою читалась би як пара
+   однакових бейджів, а це не бейдж, а речення. */
+.home-hero-growth {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--scene-ink);
+  /* Текст лежить на небі, тож тінь тут працює як контраст, а не як
+     декорація: без неї рядок губиться на світлих ділянках неба дерева. */
+  text-shadow: 0 1px 2px var(--scene-scrim);
+  animation: home-growth-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes home-growth-in {
+  from { opacity: 0; translate: 0 4px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-growth { animation: none; }
+}
+
 /* Спільна рамка 3D-сцени та нейтрального стану завантаження. */
 .crystal-wrap {
   position: relative;

@@ -18,7 +18,10 @@
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
+import { usePartner } from '@/features/_shared/useUsers';
+import { useWorldGrowth } from '@/features/world/growthChannel';
 import { useStartDate } from './useHome';
+import { growthCaption } from './growthSinceLastVisit';
 import { daysBetween, formatSinceDate, nextAnniversaryLabel } from './homeUtils';
 
 const COMMON = ['Хай, бубос 💛', 'Привіт, пупс 🌸', 'Шо ти там, крошка? 😏'];
@@ -30,6 +33,20 @@ const PERSONAL: Record<string, string[]> = {
 export function Hero() {
   const me = useCurrentUser();
   const startDate = useStartDate();
+  const growth = useWorldGrowth();
+  const partner = usePartner();
+
+  /*
+   * Рядок про приріст стоїть у ШАПЦІ, а не в сцені, і це вимога, а не
+   * смак: `.artifact-world` має `aria-hidden="true"` (§48), тож текст
+   * усередині полотна для читача просто не існує. Сцена рахує, шапка
+   * говорить — див. `growthChannel.ts`.
+   *
+   * `null` тут звичайний стан: перший візит, нічого нового, або
+   * артефакт, чий конвеєр іще не звітує. У всіх трьох випадках шапка
+   * мовчить, замість писати «+0».
+   */
+  const growthLine = growth === null ? null : growthCaption(growth, partner);
 
   const greeting = useMemo(() => {
     const pool = [...COMMON, ...(PERSONAL[me.name] ?? [])];
@@ -52,6 +69,7 @@ export function Hero() {
           <span className="home-hero-anniversary">{nextAnniversaryLabel(startDate)}</span>
         </Link>
       )}
+      {growthLine && <p className="home-hero-growth">{growthLine}</p>}
     </section>
   );
 }

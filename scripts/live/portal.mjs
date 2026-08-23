@@ -177,7 +177,19 @@ async function relay(route) {
  *
  * Повертає сторінку, зібрані повідомлення консолі й функцію закриття.
  */
-export async function openPortal({ baseUrl, device, tier, theme = null, headed = false, still = false }) {
+/**
+ * Стан, який портал пам'ятає МІЖ візитами.
+ *
+ * Свіжий контекст браузера — це завжди «перший раз», і частина порталу
+ * саме на цьому й побудована: підпис «У кристалі N нових митей»
+ * порівнює події з тим, що пара бачила минулого разу, тож на першому
+ * візиті його не буває взагалі. Без засіву знімок такої вади не покаже
+ * — він покаже екран, на якому все правильно мовчить.
+ *
+ * Пишеться до завантаження застосунку, тим самим `addInitScript`, що й
+ * тема: після старту гак уже прочитав сховище й другого разу не читає.
+ */
+export async function openPortal({ baseUrl, device, tier, theme = null, headed = false, still = false, seed = [] }) {
   const executablePath = resolveChromium();
   const browser = await chromium.launch({
     ...(executablePath ? { executablePath } : {}),
@@ -212,13 +224,16 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
   page.on('console', (message) => logs.push({ type: message.type(), text: message.text() }));
   page.on('pageerror', (error) => logs.push({ type: 'pageerror', text: error.message }));
 
-  await page.addInitScript(({ memory, cores, wanted }) => {
+  await page.addInitScript(({ memory, cores, wanted, entries }) => {
     Object.defineProperty(navigator, 'deviceMemory', { get: () => memory });
     Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => cores });
     if (wanted !== null) {
       try { window.localStorage.setItem('amore:theme', wanted); } catch { /* приватний режим */ }
     }
-  }, { memory: tier.memory, cores: tier.cores, wanted: theme });
+    for (const [key, value] of entries) {
+      try { window.localStorage.setItem(key, value); } catch { /* приватний режим */ }
+    }
+  }, { memory: tier.memory, cores: tier.cores, wanted: theme, entries: seed });
 
   /*
    * Реле вішається на КОНТЕКСТ, а не на сторінку.

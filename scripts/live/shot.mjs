@@ -40,6 +40,8 @@ const USAGE = `
   --out=<тека>                       куди складати знімки (типово ${DEFAULTS.out})
   --port=<порт>                      dev-сервер (типово ${DEFAULTS.port})
   --keep-server                      не гасити піднятий сервер після роботи
+  --seed=<ключ>=<значення>           записати в localStorage до запуску застосунку;
+                                     можна кілька (напр. пам'ять минулого візиту)
   --still                            заморозити сцену (для порівняння знімків)
   --headed                           показати вікно браузера
 
@@ -78,6 +80,7 @@ async function main() {
         theme: options.theme,
         headed: options.headed,
         still: options.still,
+        seed: options.seed,
       });
       try {
         for (const route of options.routes) {

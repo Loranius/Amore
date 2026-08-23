@@ -28,6 +28,12 @@ import {
   useArtifactWorld,
   type ArtifactWorldValue,
 } from './artifactWorldContext';
+import {
+  WorldGrowthContext,
+  WorldGrowthReportContext,
+  type GrowthReporter,
+} from './growthChannel';
+import type { GrowthSummary } from '../home/growthSinceLastVisit';
 import './artifactWorld.css';
 
 const CrystalScene = lazy(() => import('../home/crystal3d/CrystalSceneEntry'));
@@ -112,9 +118,29 @@ export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
     [artifact, selectArtifact, webglSupported],
   );
 
+  /*
+   * Приріст живе ТУТ, а не в `ArtifactWorldValue`, і канал розділено на
+   * значення й передавач — див. `growthChannel.ts`. Коротко: сцена
+   * підписана лише на передавач, тож поява підпису не перемальовує
+   * полотно.
+   *
+   * Скидається при зміні артефакта: конвеєр дерева ще не звітує, і
+   * підпис від кристала, що лишився б висіти над деревом, був би
+   * рядком про об'єкт, якого на екрані немає.
+   */
+  const [growth, setGrowth] = useState<GrowthSummary | null>(null);
+  const reportGrowth = useCallback<GrowthReporter>((next) => setGrowth(next), []);
+  useEffect(() => {
+    setGrowth(null);
+  }, [artifact]);
+
   return (
     <ArtifactWorldContext.Provider value={value}>
-      {children}
+      <WorldGrowthReportContext.Provider value={reportGrowth}>
+        <WorldGrowthContext.Provider value={growth}>
+          {children}
+        </WorldGrowthContext.Provider>
+      </WorldGrowthReportContext.Provider>
     </ArtifactWorldContext.Provider>
   );
 }

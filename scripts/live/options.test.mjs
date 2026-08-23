@@ -4,6 +4,7 @@ import {
   DEVICES,
   OptionError,
   ROUTES,
+  parseSeed,
   parseShotArgs,
   plannedShots,
   routePath,
@@ -113,5 +114,35 @@ describe('--tap-at', () => {
     expect(() => parseShotArgs(['home', '--tap-at=120'])).toThrow(OptionError);
     expect(() => parseShotArgs(['home', '--tap-at=абв,340'])).toThrow(OptionError);
     expect(() => parseShotArgs(['home', '--tap-at=1,2,3'])).toThrow(OptionError);
+  });
+});
+
+describe('--seed: пам’ять минулого візиту', () => {
+  /*
+   * Свіжий контекст браузера — це завжди «перший раз». Підпис «У
+   * кристалі N нових митей» на першому візиті мовчить за задумом, тож без
+   * засіву знімок показував би екран, на якому все правильно мовчить, і
+   * зламану гілку так не побачити.
+   */
+  it('ділить рівно по першому знаку рівності', () => {
+    // Значення — JSON-масив, у ньому свої символи; ділити по всіх «=»
+    // означало б порізати сам список.
+    expect(parseSeed('amore:evolutionSeenEventIds=["a","b"]'))
+      .toEqual(['amore:evolutionSeenEventIds', '["a","b"]']);
+    expect(parseSeed('k=a=b')).toEqual(['k', 'a=b']);
+  });
+
+  it('порожній ключ — помилка, а не мовчазний запис', () => {
+    expect(() => parseSeed('=щось')).toThrow(OptionError);
+    expect(() => parseSeed('безрівності')).toThrow(OptionError);
+  });
+
+  it('складається з кількох прапорців', () => {
+    const parsed = parseShotArgs(['home', '--seed=a=1', '--seed=b=2']);
+    expect(parsed.seed).toEqual([['a', '1'], ['b', '2']]);
+  });
+
+  it('без прапорця засіву немає', () => {
+    expect(parseShotArgs(['home']).seed).toEqual([]);
   });
 });

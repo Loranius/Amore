@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalVeinBearings } from '@/engine/geometry';
 import { crystalRenderScale } from '@/engine/renderer';
@@ -13,6 +13,9 @@ import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
 import { MODULE_SPIN_RATE } from '@/features/world/sceneDirector';
 import { useEvolutionSandbox } from '@/features/home/evolutionSandbox';
+import { useGrowthSinceLastVisit } from '@/features/home/useGrowthSinceLastVisit';
+import type { GrowthEvent } from '@/features/home/growthSinceLastVisit';
+import { useWorldGrowthReporter } from '@/features/world/growthChannel';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import { PortalStage } from '../scene/PortalStage';
 import {
@@ -91,6 +94,36 @@ export default function EvolutionCrystalPreviewScene() {
    */
   const frameloop = useWorldFrameloop();
 
+  /*
+   * «Що виросло з минулого разу» — звідси, бо саме тут лежать події, з
+   * яких кристал і зібрано. Рахувати їх удруге в шапці означало б
+   * тримати ДРУГЕ визначення того, що вважати подією пари, і воно
+   * розійшлося б із рушієм тихо: підпис показував би «+2», коли
+   * кристал виріс на три.
+   *
+   * `attribution` у нормалізованій події необов'язковий — джерело може
+   * не знати автора. Тоді `actorId: null`, і підпис просто не називає
+   * нікого (`growthCaption`).
+   *
+   * Гаки стоять ТУТ, до ранніх виходів нижче, з тієї ж причини, що й
+   * `useWorldFrameloop`.
+   */
+  const events = pipeline?.artifact.events;
+  const growthEvents = useMemo<readonly GrowthEvent[] | null>(
+    () => events?.map((event) => ({
+      id: event.id,
+      actorId: event.attribution?.actorId ?? null,
+    })) ?? null,
+    [events],
+  );
+  const growth = useGrowthSinceLastVisit(growthEvents);
+  const reportGrowth = useWorldGrowthReporter();
+  useEffect(() => {
+    reportGrowth(growth);
+    // Знімаємо за собою: аварійний рендерер і риф підпису не мають, і
+    // рядок про кристал не повинен їх пережити.
+    return () => reportGrowth(null);
+  }, [growth, reportGrowth]);
 
   if (error) {
     console.error('[Evolution crystal preview] fallback to legacy renderer:', error);
