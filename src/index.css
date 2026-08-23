@@ -478,7 +478,7 @@ textarea {
 /* ── Базові кольори полів вводу ────────────────────────────────
    Досі кольори мали лише поля всередині .form-field. Будь-яке поле поза
    ним — а таких по порталу десятки: пошук у вішлисті, «Що треба
-   зробити?» у планах, суми у скарбничці — лишалось із типовими
+   зробити?» у планах, суми бюджету в плані — лишалось із типовими
    стилями браузера, тобто БІЛИМ прямокутником із чорним текстом. У
    світлій темі це майже не видно, у темній — біла пляма посеред
    екрана, і саме тому баг прожив так довго.
@@ -491,8 +491,9 @@ textarea {
    Перший підхід був `input:not([type=checkbox]):not([type=radio])…` —
    і це виявилось пасткою: кожен :not() додає вагу свого аргументу, тож
    вісім таких дали (0,8,1) і правило почало перебивати модульні стилі.
-   Помітно це стало на полі внеску у скарбничці: воно має border:0 і
-   прозорий фон, а «найслабше» правило домальовувало йому рамку.
+   Помітно це стало на полі суми у «Скарбничці» (модуль відтоді
+   видалено, ADR-0049): воно мало border:0 і прозорий фон, а
+   «найслабше» правило домальовувало йому рамку.
 
    Перемикачі, повзунки, вибір файлу й кольору виключені: у них фон і
    рамка означають зовсім інше, і задавати їх тут — псувати. */
@@ -660,7 +661,7 @@ textarea::placeholder {
    * просто зникає.
    *
    * Виміряно на живому порталі: на кожному розділі під кнопкою «Ще»
-   * (`/memories`, `/media`, `/schedule`, `/piggybank`, `/culinary`,
+   * (`/memories`, `/media`, `/schedule`, `/culinary`,
    * `/whereto`, `/game`) обчислений стиль дока був
    * `background-color: rgba(0, 0, 0, 0)` і `background-image: none` —
    * тобто док був ПОВНІСТЮ прозорий, і підписи лежали просто на фото
@@ -2579,64 +2580,8 @@ textarea::placeholder {
 @media (prefers-reduced-motion: reduce) {
   .crystal-loading-glow { animation: none; opacity: .8; }
 }
-/* ============================================================
-   ФІНАНСИ (budget) — вільний ліміт + спільні цілі
-   ============================================================ */
-.budget { display: flex; flex-direction: column; gap: 16px; }
-
-/* Фон/радіус — з .card (PiggyBankPage: className="card fin-card"); тут лише паддінг. */
-.fin-card { padding: 16px; }
-.fin-card-hdr { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
-.fin-card-title { font-weight: 700; }
-.fin-limit-current { font-weight: 700; color: var(--accent); }
-.fin-hint { font-size: 13px; color: var(--muted); margin: 4px 0; }
-.fin-await { color: var(--accent); }
-
-.fin-slider-display { text-align: center; font-size: 26px; font-weight: 800; color: var(--accent); margin: 10px 0; }
-.fin-slider { width: 100%; accent-color: var(--accent); }
-.fin-propose-btn { width: 100%; margin-top: 10px; }
-
-.fin-proposal-panel {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-}
-.fin-proposal-text { font-weight: 600; margin: 0 0 10px; }
-.fin-proposal-actions { display: flex; gap: 8px; }
-.fin-proposal-actions .btn, .fin-proposal-actions .btn-secondary { flex: 1; }
-
-/* ── TintedRow — спільний контейнер: .goal-row/.date-plan-card/
-   .notif-item були байт-у-байт однаковим CSS-блоком, тепер один
-   layout-примітив (src/components/ui/TintedRow.tsx). Класи вмісту
-   (goal-row-name, date-plan-card-title, notif-item-title тощо)
-   лишаються окремі — стилізують текст, не контейнер. */
-.tinted-row {
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  background: color-mix(in srgb, var(--text) 4%, transparent);
-  border-radius: var(--radius-md);
-  padding: 12px 14px;
-}
-
-/* ── Перемикач вигляду розділу (Спогади, Карта) ────────────── */
-.view-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 14px; }
-.view-option {
-  display: flex; flex-direction: column; align-items: center; gap: 3px;
-  border: 1px solid var(--hair, color-mix(in srgb, var(--text) 12%, transparent));
-  background: var(--surface); color: var(--text);
-  border-radius: var(--radius-md); padding: 9px 6px; font: inherit; cursor: pointer;
-  transition: border-color .18s, background .18s;
-}
-.view-option.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
-/* display:flex — значок не сидить на базовій лінії й не з'їжджає
-   відносно підпису під ним. */
-.view-icon { display: flex; align-items: center; }
-.view-copy { display: flex; flex-direction: column; align-items: center; }
-.view-copy strong { font-size: 12.5px; }
-.view-copy small { font-size: 10px; color: var(--muted); text-align: center; line-height: 1.25; }
+/* Блок «ФІНАНСИ (budget)» жив тут; модуль «Скарбничка» видалено
+   (ADR-0049). */
 
 /* ============================================================
    КУДИ ПІТИ (whereto) — events-finder

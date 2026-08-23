@@ -25,10 +25,10 @@ const FEATURES = join(__dirname, '..', '..', 'features');
  * якого екран існує. У них свої двері — привітання з лічильником і
  * панель-пігулка. Виняток названий, а не забутий (ADR-0046).
  */
+/* «Скарбничка» була дев'ятою в цьому списку; модуль видалено (ADR-0049). */
 const DOCUMENT_PAGES = [
   'memories/MemoriesPage.tsx',
   'media/MediaPage.tsx',
-  'piggybank/PiggyBankPage.tsx',
   'schedule/SchedulePage.tsx',
   'shopping/ShoppingPage.tsx',
   'plans/PlansPage.tsx',

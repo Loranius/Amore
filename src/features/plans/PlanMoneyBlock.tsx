@@ -1,34 +1,28 @@
 // ============================================================
-// Гроші плану: очікувана вартість + загальна скарбничка.
+// Гроші плану: очікувана вартість.
 // ------------------------------------------------------------
-// План більше не створює фінансову «ціль» і не резервує гроші. Він лише
-// зберігає, скільки може коштувати, та показує поточну спільну заначку
-// для орієнтиру.
+// План не створює фінансову «ціль» і не резервує гроші. Він лише
+// зберігає, скільки може коштувати.
+//
+// Порівняння зі «скарбничкою» звідси пішло разом із самим модулем
+// (ADR-0049). Тут був рядок «Зараз у скарбничці» з посиланням на неї та
+// смуга «вистачає / не вистачає N» — усе це трималось на чужому модулі
+// й показувало суму, яка під цей план однаково не резервувалась.
 // ============================================================
-import { useState, type CSSProperties } from 'react';
-import { Link } from 'react-router-dom';
-import { PiggyBankIcon } from '@/components/icons/NavIcon';
-import { fmtMoney } from '@/features/piggybank/useBudget';
-import { usePiggyBank } from '@/features/piggybank/usePiggyBank';
+import { useState } from 'react';
+import { fmtMoney } from '@/lib/money';
 import { usePlanMutations } from './usePlans';
-import './planMoneyBalance.css';
 import type { PlanRow } from '@/types';
 
-export function PlanMoneyBlock({ plan, accent, embedded = false }: {
+export function PlanMoneyBlock({ plan, embedded = false }: {
   plan: PlanRow;
-  accent: string;
   embedded?: boolean;
 }) {
-  const { data: piggyBank, isPending: piggyPending } = usePiggyBank();
   const { updatePlan } = usePlanMutations();
   const [editingBudget, setEditingBudget] = useState(false);
   const [budgetDraft, setBudgetDraft] = useState('');
 
   const budget = plan.budget === null ? null : Math.max(0, Number(plan.budget));
-  const saved = Math.max(0, Number(piggyBank?.balance ?? 0));
-  const gap = budget === null ? null : Math.max(0, budget - saved);
-  const enough = budget !== null && saved >= budget;
-  const comparisonStyle = { '--plan-money-accent': accent } as CSSProperties;
 
   const saveBudget = () => {
     const raw = budgetDraft.trim().replace(/\s/g, '').replace(',', '.');
@@ -51,7 +45,7 @@ export function PlanMoneyBlock({ plan, accent, embedded = false }: {
               setEditingBudget(true);
             }}
           >
-            {plan.budget === null ? 'Додати бюджет' : `Змінити бюджет · ${fmtMoney(plan.budget)}`}
+            {plan.budget === null ? 'Додати бюджет' : 'Змінити бюджет'}
           </button>
         )}
       </header>
@@ -84,31 +78,21 @@ export function PlanMoneyBlock({ plan, accent, embedded = false }: {
         </div>
       )}
 
-      <Link className="plan-money-piggy" to="/piggybank" style={comparisonStyle}>
-        <span className="plan-money-piggy-icon" aria-hidden="true"><PiggyBankIcon size={20} /></span>
-        <span>
-          <small>Зараз у скарбничці</small>
-          <strong>{piggyPending ? 'Завантаження…' : fmtMoney(saved)}</strong>
-        </span>
-      </Link>
-
       {budget === null ? (
         <p className="plan-money-empty">Вкажи приблизну вартість плану, коли вона стане зрозумілою.</p>
       ) : (
-        <div className={`plan-money-comparison${enough ? ' is-enough' : ''}`}>
-          <div className="plan-money-bar" aria-hidden="true">
-            <span style={{ width: `${Math.min(100, budget > 0 ? (saved / budget) * 100 : 100)}%`, background: accent }} />
-          </div>
-          <p className="plan-money-sum">
-            План: <b>{fmtMoney(budget)}</b>
-            {enough ? <> · у скарбничці достатньо</> : gap !== null ? <> · не вистачає {fmtMoney(gap)}</> : null}
-          </p>
-        </div>
+        /*
+         * Сума стоїть в одному місці, і це тіло блоку, а не кнопка.
+         *
+         * До цього її несли обидва: кнопка «Змінити бюджет · 25 000 ₴» і
+         * рядок «План: 25 000 ₴» під нею. Поки поруч жило порівняння зі
+         * «Скарбничкою», тіло блоку мало що додати; коли порівняння пішло
+         * (ADR-0049), лишилось те саме число двічі за 40 пікселів.
+         */
+        <p className="plan-money-sum">
+          Очікувана вартість: <b>{fmtMoney(budget)}</b>
+        </p>
       )}
-
-      <p className="plan-money-hint">
-        Сума зі скарбнички показана лише для орієнтиру й не резервується під цей план автоматично.
-      </p>
     </section>
   );
 }

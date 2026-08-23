@@ -31,7 +31,7 @@ import { CameraIcon, PiggyBankIcon } from '@/components/icons/NavIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
 import { TargetIcon } from '@/components/icons/PlanIcon';
 import { daysLabel } from '@/features/calendar/calendarUtils';
-import { fmtMoney, useGoals } from '@/features/piggybank/useBudget';
+import { fmtMoney } from '@/lib/money';
 import {
   PLAN_CATEGORIES,
   PLAN_PRECISION_LABEL,
@@ -45,7 +45,6 @@ import {
   planDateLabel,
   readiness,
 } from './planModel';
-import { planMoney } from './planMoney';
 import { linksOfPlan } from './planLinkModel';
 import { capped, VISIBLE_TASKS } from './planMapLayout';
 import { PlanMapThreads, type ThreadPair } from './PlanMapThreads';
@@ -111,7 +110,6 @@ export function PlanDetailsPage() {
   const confirmDialog = useConfirm();
   const { data: plans = [], isPending } = usePlans();
   const { data: tasks = [] } = usePlanTasks(planId);
-  const { data: goals = [] } = useGoals();
   const { data: allLinks = [] } = usePlanLinks();
   const { updatePlan, setStatus, removePlan, toggleTask } = usePlanMutations();
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -143,7 +141,6 @@ export function PlanDetailsPage() {
   const closed = isClosed(plan);
   const done = plan.status === 'done';
   const ready = readiness(tasks);
-  const money = planMoney(plan, goals);
   const planLinks = linksOfPlan(plan, allLinks);
   const wishCount = planLinks.filter((link) => link.target_type === 'wish').length;
   const placeCount = planLinks.filter((link) => link.target_type === 'place').length;
@@ -157,10 +154,6 @@ export function PlanDetailsPage() {
     || a.id - b.id
   ));
   const visible = capped(orderedTasks, VISIBLE_TASKS);
-
-  const fill = plan.budget === null || plan.budget <= 0
-    ? 0
-    : Math.min(100, Math.round((money.saved / plan.budget) * 100));
 
   const statusStep = ACTIVE_STATUSES.indexOf(plan.status);
 
@@ -249,13 +242,19 @@ export function PlanDetailsPage() {
                 <span className="pmap-ghost"><PlusIcon size={14} /> Додати бюджет</span>
               </>
             ) : (
+              /*
+               * Одне число, бо друге більше нічого не означає.
+               *
+               * Тут стояло кільце «N%» і рядок «зібрано N ₴». Обидва
+               * рахувались від `money.saved`, яке після видалення
+               * «Скарбнички» (ADR-0049) назавжди дорівнює нулю: кільце
+               * показувало 0% під будь-яким бюджетом, а підпис — «зібрано
+               * 0 ₴». Не порожньо, а неправдиво — а це гірше.
+               */
               <div className="pmap-money">
-                <span className="pmap-ring" style={{ '--pmap-fill': fill } as CSSProperties}>
-                  <b>{fill}%</b>
-                </span>
                 <span className="pmap-money-copy">
                   <span className="pmap-value">{fmtMoney(plan.budget)}</span>
-                  <span className="pmap-note">зібрано {fmtMoney(money.saved)}</span>
+                  <span className="pmap-note">очікувана вартість</span>
                 </span>
               </div>
             )}
@@ -414,8 +413,8 @@ export function PlanDetailsPage() {
       )}
 
       {sheet === 'money' && (
-        <MapSheet title="Бюджет" copy="Скільки може коштувати й скільки вже зібрано." onClose={() => setSheet(null)}>
-          <PlanMoneyBlock plan={plan} accent={cat.color} embedded />
+        <MapSheet title="Бюджет" copy="Скільки цей план може коштувати." onClose={() => setSheet(null)}>
+          <PlanMoneyBlock plan={plan} embedded />
         </MapSheet>
       )}
 

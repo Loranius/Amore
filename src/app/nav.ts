@@ -15,7 +15,7 @@ import type { ReactNode } from 'react';
 import type { IconProps } from '@/components/icons/iconBase';
 import {
   CameraIcon, CartIcon, ClockIcon,
-  FilmIcon, GamepadIcon, HeartIcon, MoreIcon, PiggyBankIcon, PlansIcon,
+  FilmIcon, GamepadIcon, HeartIcon, MoreIcon, PlansIcon,
   PotIcon, SettingsIcon, TicketIcon,
 } from '@/components/icons/NavIcon';
 import { GiftIcon } from '@/components/icons/UiIcon';
@@ -91,7 +91,6 @@ export const MORE_GROUPS: NavGroup[] = [
   {
     label: 'Інше',
     items: [
-      { to: '/piggybank', Icon: PiggyBankIcon, label: 'Скарбничка' },
       { to: '/game', Icon: GamepadIcon, label: 'Гра' },
     ],
   },

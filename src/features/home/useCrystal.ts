@@ -14,7 +14,6 @@ import { daysBetween } from './homeUtils';
 import { useMapPins } from '@/features/memories/useMapPins';
 import { useMediaItems } from '@/features/media/useMedia';
 import { useCoupleWishStats } from '@/features/wishlist/useWishlist';
-import { useGoals } from '@/features/piggybank/useBudget';
 import { useEvents } from '@/features/_shared/events';
 import { useDishes } from '@/features/culinary/useDishes';
 
@@ -97,11 +96,10 @@ export function useCrystalDNA(): {
   const series = useMediaItems('series');
   const books = useMediaItems('book');
   const wishStats = useCoupleWishStats();
-  const goals = useGoals();
   const events = useEvents();
   const dishes = useDishes();
 
-  const queries = [photos, pins, movies, series, books, wishStats, goals, events, dishes];
+  const queries = [photos, pins, movies, series, books, wishStats, events, dishes];
   const isPending = queries.some((q) => q.isPending);
   const isError = queries.some((q) => q.isError);
 
@@ -115,20 +113,20 @@ export function useCrystalDNA(): {
         .length,
       booksRead: (books.data ?? []).filter((b) => b.status === 'done').length,
       wishesDone: wishStats.data?.done ?? 0,
-      goalsAchieved: (goals.data ?? []).filter(
-        (g) =>
-          g.status === 'confirmed' &&
-          g.saved_amount != null &&
-          g.target_amount != null &&
-          g.saved_amount >= g.target_amount,
-      ).length,
+      /*
+       * Нуль тут — не заглушка, а факт: модуль «Скарбничка» видалено
+       * (ADR-0049), і функції накопичень у порталі більше немає. Модель
+       * застарілого рендерера правильно робить кристал щільнішим від
+       * відкладених грошей — просто відкладати тепер нíчого.
+       */
+      goalsAchieved: 0,
       anniversaries: (events.data ?? []).filter((e) => e.type === 'anniversary').length,
       recipesSaved: (dishes.data ?? []).length,
       distinctCountries: new Set(
         (pins.data ?? []).map((p) => p.country).filter((c): c is string => !!c),
       ).size,
       milestones: (events.data ?? []).filter((e) => e.is_milestone).length,
-      totalSaved: (goals.data ?? []).reduce((sum, g) => sum + (g.saved_amount ?? 0), 0),
+      totalSaved: 0,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
@@ -140,7 +138,6 @@ export function useCrystalDNA(): {
     series.data,
     books.data,
     wishStats.data,
-    goals.data,
     events.data,
     dishes.data,
   ]);
@@ -279,38 +276,6 @@ export function useCrystalWishes(): { wishes: CrystalWish[]; isPending: boolean 
 export interface DatedItem {
   id: number;
   date: string;
-}
-
-/**
- * Досягнуті спільні цілі (Connection domain — «Goals → Stability Pressure»
- * + власна гілка-goal). useGoals() не вибирає created_at (не потрібен решті
- * фічі бюджету), тому окремий вузький запит — той самий патерн, що
- * useCrystalWishes. Немає окремої дати «досягнення» в схемі — created_at
- * (дата пропозиції цілі) чесний доступний проксі.
- */
-export function useAchievedGoals(): { achievedGoals: DatedItem[]; isPending: boolean } {
-  const query = useQuery({
-    queryKey: [...qk.savingsGoals(), 'achieved-dated'],
-    queryFn: async (): Promise<DatedItem[]> => {
-      const { data, error } = await supabase
-        .from('savings_goals')
-        .select('id,saved_amount,target_amount,status,created_at')
-        .returns<
-          { id: number; saved_amount: number | null; target_amount: number | null; status: string; created_at: string }[]
-        >();
-      if (error) throw error;
-      return (data ?? [])
-        .filter(
-          (g) =>
-            g.status === 'confirmed' &&
-            g.saved_amount != null &&
-            g.target_amount != null &&
-            g.saved_amount >= g.target_amount,
-        )
-        .map((g) => ({ id: g.id, date: g.created_at }));
-    },
-  });
-  return { achievedGoals: query.data ?? [], isPending: query.isPending };
 }
 
 /** Річниці (Connection domain) — events.type === 'anniversary'. */

@@ -45,7 +45,6 @@ import {
   useMilestoneEvents,
   useCrystalPlaces,
   useCrystalWishes,
-  useAchievedGoals,
   useAnniversaryEvents,
   useCreationSources,
 } from '../useCrystal';
@@ -220,7 +219,6 @@ export default function CrystalScene() {
   const { countries, cities, isPending: placesPending } = useCrystalPlaces();
   const { wishes, isPending: wishesPending } = useCrystalWishes();
   const { data: archive, isPending: memoriesPending } = useMemories();
-  const { achievedGoals, isPending: goalsPending } = useAchievedGoals();
   const { anniversaries, isPending: anniversariesPending } = useAnniversaryEvents();
   const { recipes, movies, books, isPending: creationPending } = useCreationSources();
 
@@ -231,7 +229,6 @@ export default function CrystalScene() {
     placesPending ||
     wishesPending ||
     memoriesPending ||
-    goalsPending ||
     anniversariesPending ||
     creationPending;
 
@@ -278,9 +275,16 @@ export default function CrystalScene() {
       usage: dna,
       countries,
       cities,
+      /*
+       * Порожньо назавжди — і це факт, а не заглушка: модуль
+       * «Скарбничка» видалено (ADR-0049), досягнутих фінансових цілей у
+       * порталі більше не буває. Поле лишається в моделі застарілого
+       * рендерера, бо воно там не єдине й виривати його означало б
+       * переписати аварійний шлях заради нуля.
+       */
+      achievedGoals: [],
       milestones,
       wishes,
-      achievedGoals,
       anniversaries,
       recipes,
       movies,
@@ -297,7 +301,6 @@ export default function CrystalScene() {
       cities,
       milestones,
       wishes,
-      achievedGoals,
       anniversaries,
       recipes,
       movies,

@@ -65,7 +65,6 @@ const ROUTE_REGIONS: readonly (readonly [string, WorldRegion])[] = [
   ['/memories', 'memory'],
   ['/schedule', 'routine'],
   ['/media', 'leisure'],
-  ['/piggybank', 'foundation'],
   ['/culinary', 'hearth'],
   ['/whereto', 'outward'],
   ['/game', 'threshold'],

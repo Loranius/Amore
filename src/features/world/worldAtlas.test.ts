@@ -26,11 +26,12 @@ import {
  * Every authenticated route the router serves a *page* for, from
  * `app/routes.tsx`.
  *
- * Two addresses are deliberately absent, for the same reason. `/calendar`
+ * Three addresses are deliberately absent, for the same reason. `/calendar`
  * went when the owner merged Calendar into Plans ("об'єднати плани і
  * календар"); `/map` went when the standalone map module was folded into
- * Memories (ADR-0039). Both now redirect, and a redirect has no region of
- * its own — it has arrived somewhere else before the camera is asked
+ * Memories (ADR-0039); `/piggybank` went when the owner deleted the module
+ * outright (ADR-0049). All three now redirect, and a redirect has no region
+ * of its own — it has arrived somewhere else before the camera is asked
  * anything.
  */
 const ROUTES = [
@@ -42,7 +43,6 @@ const ROUTES = [
   '/memories',
   '/schedule',
   '/media',
-  '/piggybank',
   '/culinary',
   '/whereto',
   '/game',

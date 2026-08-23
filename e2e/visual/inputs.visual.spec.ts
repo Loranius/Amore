@@ -16,12 +16,17 @@ import { expect, test } from '@playwright/test';
 const visualUserName = process.env.VISUAL_USER_NAME;
 const visualUserPin = process.env.VISUAL_USER_PIN;
 
-/** Маршрути з формами. Хеш — бо роутер HashRouter (GitHub Pages). */
+/**
+ * Маршрути з формами. Хеш — бо роутер HashRouter (GitHub Pages).
+ *
+ * `/#/piggybank` звідси прибрано разом із модулем (ADR-0049): адреса
+ * лишилась перенаправленням на головну, де форм немає, — і перевірка
+ * мовчки проходила б на чужому екрані.
+ */
 const ROUTES = [
   '/#/plans',
   '/#/shopping',
   '/#/wishlist',
-  '/#/piggybank',
   '/#/calendar',
   '/#/map',
   '/#/memories',

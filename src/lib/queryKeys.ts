@@ -58,12 +58,6 @@ export const qk = {
   memoriesDay: (date: string) => ['memories', 'day', date] as const,
   moments: () => ['moments'] as const,
 
-  freeLimit: () => ['freeLimit'] as const,
-  savingsGoals: () => ['savingsGoals'] as const,
-  savingsGoalContributions: (goalId?: string) =>
-    (goalId === undefined
-      ? (['savingsGoalContributions'] as const)
-      : (['savingsGoalContributions', goalId] as const)),
   sharedDaysOff: () => ['sharedDaysOff'] as const,
   scheduleTogetherness: () => ['scheduleTogetherness'] as const,
 
@@ -84,8 +78,6 @@ export const realtimeInvalidation: Record<
   ReadonlyArray<readonly unknown[]>
 > = {
   events: [qk.events()],
-  free_limit: [qk.freeLimit()],
-  savings_goals: [qk.savingsGoals()],
   media_items: [qk.media()],
   dishes: [qk.dishes()],
   wishlist_items: [['wishlist']],

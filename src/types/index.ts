@@ -156,8 +156,6 @@ export type SwipeDirection = 'up' | 'down' | 'left' | 'right';
 
 export type DishCategory = 'meat' | 'vegan' | 'fast' | 'other';
 
-export type GoalStatus = 'pending' | 'confirmed';
-
 /** «подія» / «місце» — саме українськими словами, так повертає events-finder. */
 export type WhereToKind = 'подія' | 'місце';
 
@@ -421,28 +419,14 @@ export interface MemoryDayRow {
   updated_by: number | null;
 }
 
-/** Єдиний рядок (id = 1) — ліміт «вільних» витрат + поточна пропозиція. */
-export interface FreeLimitRow {
-  id: number;
-  limit_value: number | null;
-  proposal_value: number | null;
-  /** Ім'я того, хто запропонував (історично текст, не FK). */
-  proposed_by: string | null;
-}
-
-export interface SavingsGoalRow {
-  id: number;
-  name: string;
-  target_amount: number | null;
-  url: string | null;
-  description: string | null;
-  status: GoalStatus;
-  /** Ім'я того, хто запропонував (історично текст, не FK). */
-  proposed_by: string | null;
-  saved_amount: number | null;
-  /** plans.id, коли ціль збирають під конкретний план. */
-  plan_id: number | null;
-}
+/*
+ * `FreeLimitRow` і `SavingsGoalRow` жили тут під модуль «Скарбничка».
+ * Модуль видалено (ADR-0049), і типи пішли за ним: тип таблиці, яку
+ * ніхто не читає, — це обіцянка коду, що модуль ось-ось повернеться.
+ *
+ * Самі таблиці в базі ЛИШИЛИСЬ. Видалити код можна назад одним `git
+ * revert`, видалити рядки пари — ні, і про це власника ніхто не просив.
+ */
 
 
 export interface MapPinRow {
@@ -553,8 +537,6 @@ export interface Database {
       plans:              TableDef<PlanRow, 'title'>;
       plan_tasks:         TableDef<PlanTaskRow, 'plan_id' | 'title'>;
       plan_links:         TableDef<PlanLinkRow, 'plan_id' | 'target_type' | 'target_id'>;
-      free_limit:         TableDef<FreeLimitRow, 'id'>;
-      savings_goals:      TableDef<SavingsGoalRow, 'name'>;
       map_pins:           TableDef<MapPinRow, 'title' | 'category' | 'lat' | 'lng'>;
       location_history:   TableDef<LocationHistoryRow, 'user_id' | 'lat' | 'lng'>;
       user_locations:     TableDef<UserLocationRow, 'user_id' | 'lat' | 'lng'>;
@@ -726,7 +708,7 @@ export type EdgeFunctionName = keyof EdgeFunctions;
 
 /** Таблиці, на які підписується клієнт (публікація supabase_realtime). */
 export type RealtimeTable =
-  | 'events' | 'free_limit' | 'savings_goals'
+  | 'events'
   | 'media_items' | 'dishes' | 'wishlist_items'
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
   | 'map_pins' | 'user_locations'

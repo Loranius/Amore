@@ -46,7 +46,6 @@ const loadMemories = () => import('@/features/memories/MemoriesPage');
 const loadMoment = () => import('@/features/memories/MomentPage');
 const loadMedia = () => import('@/features/media/MediaPage');
 const loadCulinary = () => import('@/features/culinary/CulinaryPage');
-const loadPiggyBank = () => import('@/features/piggybank/PiggyBankPage');
 const loadPlans = () => import('@/features/plans/PlansPage');
 const loadJourney = () => import('@/features/journey/JourneyPage');
 const loadPlanDetails = () => import('@/features/plans/PlanDetailsPage');
@@ -60,7 +59,6 @@ const MemoriesPage = lazyRoute(loadMemories, (m) => m.MemoriesPage);
 const MomentPage = lazyRoute(loadMoment, (m) => m.MomentPage);
 const MediaPage = lazyRoute(loadMedia, (m) => m.MediaPage);
 const CulinaryPage = lazyRoute(loadCulinary, (m) => m.CulinaryPage);
-const PiggyBankPage = lazyRoute(loadPiggyBank, (m) => m.PiggyBankPage);
 const PlansPage = lazyRoute(loadPlans, (m) => m.PlansPage);
 const JourneyPage = lazyRoute(loadJourney, (m) => m.JourneyPage);
 const PlanDetailsPage = lazyRoute(loadPlanDetails, (m) => m.PlanDetailsPage);
@@ -126,16 +124,16 @@ export const router = createHashRouter([
           // Єдиний маршрут, що забирає екран цілком: док і бічна панель
           // ідуть з дороги, кристала немає. Див. `useImmersiveRoute`.
           { path: 'journey', element: page(<JourneyPage />) },
-          { path: 'piggybank', element: page(<PiggyBankPage />) },
-          // Стара адреса «Фінансів»: закладки й посилання в Telegram
-          // не мусять ламатись через перейменування модуля.
-          { path: 'budget', element: <Navigate to="/piggybank" replace /> },
+          // «Скарбничка» видалена (ADR-0049). Обидві її адреси —
+          // теперішня й давня «фінансова» — ведуть на головну: збережене
+          // посилання мусить приводити кудись, а не в порожній екран.
+          { path: 'piggybank', element: <Navigate to="/" replace /> },
+          { path: 'budget', element: <Navigate to="/" replace /> },
           { path: 'shopping', element: page(<ShoppingPage />) },
 
           // Календар більше не окремий модуль: він став вкладкою всередині
           // «Планів». Адреса лишається перенаправленням, бо на неї ведуть
-          // збережені посилання й сповіщення — так само, як /budget веде в
-          // «Скарбничку».
+          // збережені посилання й сповіщення.
           { path: 'calendar', element: <Navigate to="/plans" replace /> },
           // «Графік» був сабтабом календаря й тому ховався за ним. Тепер це
           // власний розділ у «Ще»; стара адреса лишається редиректом, щоб

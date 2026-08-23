@@ -54,7 +54,6 @@ export const ROUTES = {
   media: '#/media',
   culinary: '#/culinary',
   whereto: '#/whereto',
-  piggybank: '#/piggybank',
   game: '#/game',
   login: '#/login',
 };

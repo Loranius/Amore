@@ -25,6 +25,10 @@ import { chromium } from 'playwright-core';
 // 5. **Час.** Директор сцени веде камеру в позу маршруту близько секунди
 //    (ADR-0022), а текстури доїжджають ще пізніше. Знімок, зроблений одразу
 //    після появи полотна, показує кадр, якого користувач не бачить.
+// 6. **Кнопка React Query Devtools** накриває правий край дока. Вона є лише
+//    в dev-збірці, а харнес знімає саме dev-сервер — тож `--tap` по «Ще»
+//    звітував про успіх і не відкривав меню: клік з'їдав девтул. Ховається
+//    стилем нижче.
 // ============================================================
 
 /**
@@ -220,6 +224,33 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
   });
 
   const page = await context.newPage();
+
+  /*
+   * Пастка №6 зі списку вгорі: девтули React Query накривають док.
+   *
+   * Вона живе лише в dev-збірці — пара її ніколи не побачить, — але
+   * харнес знімає саме dev-сервер. Виміряно `elementsFromPoint` у точці
+   * кнопки «Ще» (376, 875): найвищим елементом там `button.tsqd-open-btn`,
+   * а не пункт навігації. Тому `--tap` по «Ще» ЗВІТУВАВ про успіх і не
+   * відкривав меню: клік з'їдав девтул.
+   *
+   * Це рівно та вада, від якої харнес і мусить берегти, — знімок, на
+   * якому «нічого не сталось», виглядає як робочий екран. Ховаємо
+   * стилем, а не прапорцем збірки: девтули лишаються доступні тому, хто
+   * запустить `--headed` і сам їх покличе.
+   */
+  await page.addStyleTag({ content: '.tsqd-open-btn, .tsqd-parent-container { display: none !important; }' })
+    .catch(() => { /* сторінка ще порожня — стиль додасться нижче */ });
+  await page.addInitScript(() => {
+    const hide = () => {
+      const style = document.createElement('style');
+      style.textContent = '.tsqd-open-btn, .tsqd-parent-container { display: none !important; }';
+      document.head.append(style);
+    };
+    if (document.head) hide();
+    else document.addEventListener('DOMContentLoaded', hide, { once: true });
+  });
+
   const logs = [];
   page.on('console', (message) => logs.push({ type: message.type(), text: message.text() }));
   page.on('pageerror', (error) => logs.push({ type: 'pageerror', text: error.message }));
