@@ -16,6 +16,7 @@ import { qk } from '@/lib/queryKeys';
 import { compress, normalize } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
 import type { InsertRow, UserSizesRow } from '@/types';
+import { randomToken } from '@/lib/entropy';
 
 const PHOTO_BUCKET = 'family_photos';
 
@@ -60,7 +61,7 @@ export function usePhotoMutations() {
       } catch (e) {
         console.warn('usePhotoMutations upload: стиснення не вдалося, ллю оригінал', e);
       }
-      const name = `photo_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+      const name = `photo_${Date.now()}_${randomToken()}.${ext}`;
       const { error } = await supabase.storage
         .from(PHOTO_BUCKET)
         .upload(name, blob, { upsert: false, contentType });

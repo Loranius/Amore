@@ -53,6 +53,7 @@ import { useCrystalSeed } from '../useHome';
 import { useMemories } from '@/features/memories/useMemories';
 import { useClusterGrowthFlash } from '../useCrystalSeen';
 import { hashSeedString } from '../mulberry32';
+import { randomInt } from '@/lib/entropy';
 import {
   generateArtifactDNA,
   computeEvolutionPressures,
@@ -250,7 +251,7 @@ export default function CrystalScene() {
   const [seedOverride, setSeedOverride] = useState<string | null>(null);
   const effectiveSeed = seedOverride ?? seed ?? '';
   const regenerate = () => {
-    const chunk = () => Math.floor(Math.random() * 0x10000).toString(16).toUpperCase().padStart(4, '0');
+    const chunk = () => randomInt(0, 0xffff).toString(16).toUpperCase().padStart(4, '0');
     setSeedOverride(`${chunk()}-${chunk()}-${chunk()}`);
   };
 

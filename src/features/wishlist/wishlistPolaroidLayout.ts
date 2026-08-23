@@ -1,3 +1,4 @@
+import { freshSeed } from '@/lib/entropy';
 export interface WishlistPolaroidPlacement {
   rotate: number;
   x: number;
@@ -5,15 +6,8 @@ export interface WishlistPolaroidPlacement {
   tapeRotate: number;
 }
 
-export function freshWishlistPolaroidSeed(): number {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const value = new Uint32Array(1);
-    crypto.getRandomValues(value);
-    return value[0] ?? Date.now();
-  }
-
-  return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
-}
+/** Свіжий seed розкладки полароїдів. Спільне джерело — `freshSeed`. */
+export const freshWishlistPolaroidSeed = freshSeed;
 
 export function wishlistPolaroidLayout(
   seed: number,

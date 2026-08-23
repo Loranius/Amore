@@ -13,6 +13,7 @@ import { qk } from '@/lib/queryKeys';
 import { tmdbDiscover } from '@/lib/tmdb';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { SwipeCard, SwipeType, SwipeDirection, MediaStatus } from '@/types';
+import { randomInt } from '@/lib/entropy';
 
 const STATUS_BY_DIR: Record<Exclude<SwipeDirection, 'down'>, MediaStatus> = {
   up: 'done',
@@ -60,7 +61,9 @@ export function useSwipeDeck(
   const initStack = useCallback(async () => {
     setLoading(true);
     setExhausted(false);
-    const startPage = Math.floor(Math.random() * 50) + 1;
+    // Випадкова сторінка — це і є різноманіття колоди: без неї пара
+    // щоразу бачила б ті самі найпопулярніші назви.
+    const startPage = randomInt(1, 50);
 
     /*
      * Сторінки беруться ПАРАЛЕЛЬНО, а не по одній у циклі.

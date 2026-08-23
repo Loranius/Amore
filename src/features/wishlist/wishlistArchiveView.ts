@@ -1,5 +1,6 @@
 // Вибір вигляду архіву. Логіка читання/запису — у спільному
 // `_shared/viewPreference`; тут лишається лише конфігурація архіву.
+import { freshSeed } from '@/lib/entropy';
 import {
   normalizeView,
   readViewPreference,
@@ -32,15 +33,14 @@ export function writeWishlistArchiveView(
   writeViewPreference<WishlistArchiveViewMode, WishlistArchiveScope>(CONFIG, scope, view);
 }
 
-export function freshArchivePolaroidSeed(): number {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const value = new Uint32Array(1);
-    crypto.getRandomValues(value);
-    return value[0] ?? Date.now();
-  }
-
-  return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
-}
+/**
+ * Свіжий seed розкладки архіву.
+ *
+ * Була третьою дослівною копією тієї самої функції (полароїди вішліста,
+ * хмара бажань, архів). Копії не розійшлись лише тому, що їх не встигли
+ * змінити.
+ */
+export const freshArchivePolaroidSeed = freshSeed;
 
 export function archivePolaroidLayout(seed: number, id: number, index: number) {
   let hash = 2166136261;

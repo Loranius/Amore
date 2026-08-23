@@ -12,6 +12,7 @@ import type { ManualArchiveGiftPayload } from './wishlistArchiveMutations';
 import './wishlistArchiveManualGift.css';
 import { CloseIcon, GiftIcon, ImageIcon } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
+import { uuidV4 } from '@/lib/entropy';
 
 interface ArchiveGiftFormModalProps {
   partnerName: string;
@@ -36,13 +37,6 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-function requestId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}-0000-4000-8000-000000000000`;
-}
-
 export function ArchiveGiftFormModal({
   partnerName,
   onClose,
@@ -50,7 +44,7 @@ export function ArchiveGiftFormModal({
 }: ArchiveGiftFormModalProps) {
   const me = useCurrentUser();
   const toast = useToast();
-  const requestIdRef = useRef(requestId());
+  const requestIdRef = useRef(uuidV4());
   const saveLock = useRef(false);
   const [title, setTitle] = useState('');
   const [giftedOn, setGiftedOn] = useState(todayInputValue);

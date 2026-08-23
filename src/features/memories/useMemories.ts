@@ -16,6 +16,7 @@ import { compress } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
 import { normalizeMemoryDate } from './memoriesDate';
 import type { MemoryDayRow, MemoryLinkRow, MemoryPrecision, MemoryRow, MemorySource } from '@/types';
+import { randomToken } from '@/lib/entropy';
 
 export const MEMORIES_BUCKET = 'photo-calendar';
 
@@ -135,7 +136,7 @@ async function uploadOne(input: UploadMemoryInput): Promise<MemoryRow> {
   const [y, m] = memoryDate.split('-');
   // Унікальне ім'я замість `date_userId`: на одну дату тепер може
   // припадати скільки завгодно знімків, і старий шлях їх би затирав.
-  const unique = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  const unique = `${Date.now().toString(36)}${randomToken()}`;
   const path = `${y}/${m}/${memoryDate}_${input.userId}_${unique}.${ext}`;
 
   const { error: upErr } = await supabase.storage

@@ -19,6 +19,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { usePartner } from '@/features/_shared/useUsers';
+import { pickOne } from '@/lib/entropy';
 import { useWorldGrowth } from '@/features/world/growthChannel';
 import { useStartDate } from './useHome';
 import { growthCaption } from './growthSinceLastVisit';
@@ -50,7 +51,10 @@ export function Hero() {
 
   const greeting = useMemo(() => {
     const pool = [...COMMON, ...(PERSONAL[me.name] ?? [])];
-    return pool[Math.floor(Math.random() * pool.length)]!;
+    // Випадковість тут — задум, а не недогляд: привітання щоразу інше.
+    // `MODULE_STATUS.md` називає це відомою межею — рядок доводиться
+    // виключати при попіксельному порівнянні знімків.
+    return pickOne(pool) ?? COMMON[0]!;
   }, [me.name]);
 
   return (

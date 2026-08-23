@@ -11,6 +11,7 @@ import { DISH_CATS, DISH_CAT_ORDER } from './culinaryConstants';
 import { useDishes, useDishMutations } from './useDishes';
 import { DishModal, RecipeModal } from './DishModal';
 import type { DishRow, DishCategory } from '@/types';
+import { pickOne } from '@/lib/entropy';
 
 type CatFilter = 'all' | DishCategory;
 
@@ -33,13 +34,9 @@ export function Favorites() {
     [dishes, cat],
   );
 
-  const roll = () => {
-    if (!visible.length) {
-      setRolled(null);
-      return;
-    }
-    setRolled(visible[Math.floor(Math.random() * visible.length)]!);
-  };
+  // Порожній пул `pickOne` віддає як `null` — окрема гілка на нього була
+  // б тим самим кодом удвічі.
+  const roll = () => setRolled(pickOne(visible));
 
   const onDelete = async (id: number) => {
     if (await confirmDialog('Видалити страву?')) remove.mutate(id);

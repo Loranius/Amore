@@ -14,7 +14,8 @@ Before changing code:
 4. Read the current volume in `docs/02_VOLUMES/` and its checklist in `docs/03_CHECKLISTS/`.
 5. For Amore crystal work, read `docs/01_CONTRACTS/CRYSTAL_ATTACHMENT_INTEGRITY_PROFILE.md`.
 6. Before changing a product module, read `docs/MODULE_STATUS.md` — it states what each module's current state is, what "done" means, and which defects CI already knows about. Update it in the same change whenever a module's state changes; a status file nobody updates is worse than none.
-7. Read every upstream volume contract used by the task.
+7. Before changing anything a couple sees, read `PRODUCT.md` and `DESIGN.md`. `PRODUCT.md` is the north star — who this is for, what "успіх" means on each screen, and what the owner has marked immutable. `DESIGN.md` is the committed visual world, and its named rules (Two Accents, Rare Colour, Fredoka Restraint, Shadow Is A Shadow, One Blur) are binding on new UI, not advisory. `.impeccable/design.json` is its machine-readable sidecar: keep the two in step, and never edit the sidecar alone.
+8. Read every upstream volume contract used by the task.
 
 Do not load every document without need. Read the index, then open only the relevant normative files.
 
@@ -42,14 +43,19 @@ For every implementation task:
 5. Add or update tests in the same change.
 6. Run format, lint, typecheck, unit, contract, determinism, serialization, and build gates that apply.
 7. Run `python scripts/validate_documentation.py` when documentation changes.
-8. For any change a couple would see, verify it on the running portal with `npm run live -- <route>` before claiming it works, and report what was measured. Read `scripts/live/README.md` first: it lists five ways a live screenshot has already lied in this project — a stale service worker, missing CORS on textures, no WebGL, an unspoofed device tier, and screenshots taken before the scene settles. Do not hand-roll a new harness; the traps are closed in that one.
+8. For any change a couple would see, verify it on the running portal with `npm run live -- <route>` before claiming it works, and report what was measured. Read `scripts/live/README.md` first: it lists six ways a live screenshot has already lied in this project — a stale service worker, missing CORS on textures, no WebGL, an unspoofed device tier, screenshots taken before the scene settles, and time itself running about twenty times slow under SwiftShader. The first five are closed in the harness; the sixth cannot be closed, so never make a frame-rate or duration claim from that sandbox.
+
+   Extend that harness rather than writing a second one. A fresh browser context is always a *first* visit, so any behaviour that depends on memory between visits needs `--seed=<key>=<value>`; without it the screenshot shows a screen on which everything is correctly silent.
 9. Report changed files, satisfied requirement IDs, commands executed, results, and remaining risks.
 
 ## Prohibitions
 
 - No architectural redesign without an accepted ADR.
 - No hidden global mutable state.
-- No `Math.random()`, wall-clock dependence, locale-dependent sorting, unordered iteration in canonical output, `NaN`, `Infinity`, or implicit nondeterministic IDs.
+- No wall-clock dependence, locale-dependent sorting, unordered iteration in canonical output, `NaN`, `Infinity`, or implicit nondeterministic IDs.
+- **Nondeterminism has exactly one address.** In `src/engine/**` there is none at all — no `Math.random()`, and no import of `@/lib/entropy` to reach it indirectly. Everywhere else in `src/`, `Math.random()` is called only inside `src/lib/entropy.ts`, where every draw carries a named reason; modules take a function whose name says why the coin is thrown. `src/lib/noRawRandom.test.ts` enforces both halves.
+
+  This replaces a blanket ban on `Math.random()`. That ban could not be obeyed — rolling a random dish *is* the button, confetti without randomness is not confetti, and storage filenames must not collide — so it was not obeyed: fourteen call sites had accumulated under it, each looking innocent. A rule that cannot be followed is not a rule, it is a fiction that hides its own violations. Prefer a boundary someone can check over a prohibition nobody can keep.
 - No production placeholders, fake implementations, silent fallbacks, swallowed errors, or tests that assert only that code runs.
 - No direct database/network calls inside deterministic evaluation functions.
 - No mutation after publication.

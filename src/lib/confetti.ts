@@ -5,21 +5,28 @@
 // Стан React тут не потрібен — це разова глобальна анімація.
 // CSS (.confetti-piece + keyframes) — в index.css.
 // ============================================================
+import { chance, pickOne, randomFloat } from './entropy';
+
 const COLORS = [
   '#C16BFF', '#bd82e8', '#985bc4', '#DFB3FF',
   '#FFD700', '#CC85FF', '#E5C0FF', '#d7a8f9',
   '#A8D8EA', '#FFE066',
 ];
 
-const rand = (min: number, max: number) => Math.random() * (max - min) + min;
-const pick = <T,>(arr: readonly T[]): T => arr[Math.floor(Math.random() * arr.length)]!;
+// Випадковість тут — сама суть ефекту, і саме тому вона береться з
+// `@/lib/entropy`, а не з `Math.random()` напряму: заборона в `CLAUDE.md`
+// має сенс лише тоді, коли з неї немає тихих винятків. Косметичний бік
+// `entropy` під сподом і є `Math.random()` — триста криптографічних
+// кидків на один сплеск були б платою ні за що.
+const rand = (min: number, max: number) => randomFloat(min, max);
+const pick = <T,>(arr: readonly T[]): T => pickOne(arr)!;
 
 function createPiece(): HTMLDivElement {
   const el = document.createElement('div');
   el.className = 'confetti-piece';
 
   const size = rand(6, 13);
-  const isRect = Math.random() > 0.4;
+  const isRect = chance(0.6);
   el.style.cssText = `
     left: ${rand(5, 95)}%;
     width: ${size}px;

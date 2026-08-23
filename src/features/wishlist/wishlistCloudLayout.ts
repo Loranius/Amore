@@ -1,5 +1,6 @@
 import { WISH_PRIORITY_ICON, type WishIconComponent } from '@/components/icons/WishIcon';
 import './wishlistGiftPortrait.css';
+import { freshSeed } from '@/lib/entropy';
 
 export type WishlistCloudPriority = 'high' | 'medium' | 'low';
 
@@ -62,14 +63,7 @@ export function wishlistCloudPriorityPresentation(
  * Свіжий seed розкладки. Той самий підхід, що вже працює для полароїдів
  * (`freshWishlistPolaroidSeed`) — не новий механізм, а той самий.
  */
-export function freshWishlistCloudSeed(): number {
-  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-    const value = new Uint32Array(1);
-    crypto.getRandomValues(value);
-    return value[0] ?? Date.now();
-  }
-  return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
-}
+export const freshWishlistCloudSeed = freshSeed;
 
 /**
  * Розкладка однієї бульбашки.
