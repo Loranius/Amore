@@ -236,11 +236,22 @@
 }
 .mm-save:disabled { opacity: 0.45; box-shadow: none; cursor: default; }
 
+/* Композер — блокнот, а не анкета.
+   ------------------------------------------------------------
+   Порядок згори вниз: назва → текст на всю висоту, що лишилась →
+   знімки → підвал із датою, місцем і підказкою.
+
+   Так стоїть телефонний блокнот, і це прохання власника: зверху те, що
+   пишеш, знизу службове. Раніше дата з підказкою займали місце одразу
+   під назвою — тобто перше, що бачила пара, було не полем для запису, а
+   двома рядками про те, як цим користуватись. */
 .mm-comp-body {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 120px);
+  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 20px);
 }
 
 /* Поля без рамок: це нотатник, а не анкета. Рамка навколо назви робить із
@@ -261,16 +272,34 @@
   letter-spacing: -0.01em;
   line-height: 1.25;
 }
+/* Текст займає всю висоту, що лишилась, і росте разом із вмістом.
+   `min-height` тримає поле великим навіть на порожньому спогаді: саме
+   велике порожнє поле й читається як «пиши сюди». */
 .mm-note-input {
-  margin-top: 10px;
-  font-size: 15px;
-  color: var(--muted);
+  flex: 1 1 auto;
+  min-height: 34vh;
+  margin-top: 12px;
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--text);
+  resize: none;
+  /* `field-sizing` уміють не всі браузери; там, де не вміють, поле просто
+     лишається на всю доступну висоту, і це теж правильна поведінка. */
+  field-sizing: content;
 }
 .mm-title-input::placeholder { color: color-mix(in srgb, var(--muted) 55%, transparent); }
 .mm-note-input::placeholder { color: color-mix(in srgb, var(--muted) 55%, transparent); }
 .mm-title-input:focus, .mm-note-input:focus { outline: none; }
 
-.mm-meta-rows { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+/* Підвал не заповзає під скріпку: вона висить у правому нижньому куті
+   на 18px від краю, тож праворуч лишається її ширина плюс проміжок. */
+.mm-comp-foot {
+  flex: 0 0 auto;
+  margin-top: 18px;
+  padding-right: 74px;
+}
+
+.mm-meta-rows { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .mm-meta-row {
   display: inline-flex;
@@ -306,11 +335,13 @@
   pointer-events: none;
 }
 
+/* Підказка стоїть під датою, ліворуч: у підвалі вона службовий рядок, а
+   не звертання по центру екрана. */
 .mm-comp-hint {
-  margin: 28px 0 0;
-  font-size: 13.5px;
+  margin: 10px 0 0;
+  font-size: 13px;
   color: var(--muted);
-  text-align: center;
+  text-align: left;
 }
 
 /* Додані знімки — рівна сітка, без нахилів: тут це робочий стіл, а не
