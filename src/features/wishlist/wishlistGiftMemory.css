@@ -35,7 +35,7 @@
   height: 46px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 13%, var(--surface));
   font-size: 24px;
 }
@@ -46,7 +46,7 @@
   gap: 12px;
   padding: 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 13%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
 
@@ -57,7 +57,7 @@
   height: 54px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   object-fit: cover;
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   color: var(--accent);
@@ -97,7 +97,7 @@
   min-width: 0;
   padding: 12px;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 19px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--surface) 96%, transparent);
 }
 
@@ -125,7 +125,7 @@
   min-height: 150px;
   overflow: hidden;
   place-items: center;
-  border-radius: 15px;
+  border-radius: var(--radius-md);
   background:
     radial-gradient(circle at 50% 38%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 44%),
     color-mix(in srgb, var(--accent) 5%, var(--surface));
@@ -185,7 +185,7 @@
   gap: 8px;
   margin-top: 12px;
   padding: 10px 12px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 7%, transparent);
   color: var(--muted);
   font-size: 12px;
@@ -228,7 +228,7 @@
   .gift-memory-modal {
     width: 100%;
     max-height: 94dvh;
-    border-radius: 26px 26px 0 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
 
   .gift-memory-preview img,

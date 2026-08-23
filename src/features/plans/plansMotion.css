@@ -89,7 +89,7 @@
   width: fit-content;
   padding: 2px 4px;
   margin: -2px -4px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
 }
 
 .plans-featured-countdown.is-fresh {

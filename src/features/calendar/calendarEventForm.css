@@ -30,7 +30,7 @@
   overscroll-behavior: contain;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 18%, transparent);
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   background:
     radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--cal-entry-accent) 14%, transparent), transparent 34%),
     var(--surface);
@@ -109,7 +109,7 @@
   min-height: 56px;
   padding: 14px 62px 14px 16px;
   border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 30%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   outline: none;
   background: color-mix(in srgb, var(--cal-entry-accent) 5%, var(--bg));
   color: var(--text);
@@ -147,7 +147,7 @@
   gap: 6px;
   padding: 5px;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--bg) 62%, var(--surface));
 }
 
@@ -167,7 +167,7 @@
    */
   padding: 0 8px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--muted);
   font: inherit;
@@ -216,7 +216,7 @@
   gap: 8px;
   padding: 8px 11px;
   border: 1px solid color-mix(in srgb, var(--cal-entry-accent) 20%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--cal-entry-accent) 4%, var(--surface));
   color: var(--cal-entry-accent);
   font: inherit;
@@ -271,7 +271,7 @@
   gap: 18px;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--bg) 62%, var(--surface));
 }
 
@@ -392,7 +392,7 @@
   width: 100%;
   padding: 12px 14px;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   outline: none;
   background: color-mix(in srgb, var(--bg) 70%, var(--surface));
   color: var(--text);
@@ -425,7 +425,7 @@
   gap: 12px;
   padding: 10px 14px;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--bg) 55%, var(--surface));
   cursor: pointer;
 }
@@ -476,7 +476,7 @@
 .cal-entry-save {
   min-height: 44px;
   padding-inline: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--cal-entry-accent);
 }
 
@@ -495,7 +495,7 @@
 
   .cal-entry-sheet {
     max-height: calc(100dvh - 16px - env(safe-area-inset-bottom));
-    border-radius: 23px 23px 18px 18px;
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-card) var(--radius-card);
   }
 
   .cal-entry-form {
@@ -510,7 +510,7 @@
 
 @media (max-width: 380px) {
   .cal-entry-sheet {
-    border-radius: 23px;
+    border-radius: var(--radius-lg);
   }
 
   .cal-entry-form {

@@ -20,7 +20,7 @@
   gap: 8px;
   padding: 7px 11px;
   border: 1px solid color-mix(in srgb, var(--accent) 13%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface) 76%, transparent);
   color: var(--text);
   font-family: 'Fredoka', 'Nunito', sans-serif;
@@ -66,7 +66,7 @@
   margin: 0;
   padding: 15px 16px;
   border: 1px solid color-mix(in srgb, var(--wl-cloud-sheet-accent) 13%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--wl-cloud-sheet-accent) 7%, var(--surface));
   color: color-mix(in srgb, var(--text) 88%, var(--wl-cloud-sheet-accent));
   font-family: 'Nunito', sans-serif;
@@ -80,7 +80,7 @@
   display: block;
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.58);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background: #1f1820;
   box-shadow: 0 16px 36px rgba(4, 2, 10, 0.55);
 }

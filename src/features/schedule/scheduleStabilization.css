@@ -15,7 +15,7 @@
   padding: 11px 11px 13px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--surface);
 }
 

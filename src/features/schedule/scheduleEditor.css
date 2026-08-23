@@ -22,7 +22,7 @@
 .sched-editor-apply,
 .sched-editor-template-grid button {
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
   font: inherit;

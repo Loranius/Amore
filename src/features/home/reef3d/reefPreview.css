@@ -3,7 +3,7 @@
   position: relative;
   overflow: hidden;
   border: 1px solid rgb(85 188 202 / 24%);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background:
     radial-gradient(circle at 50% 18%, rgb(184 246 247 / 58%), transparent 42%),
     radial-gradient(circle at 18% 72%, rgb(66 162 178 / 24%), transparent 38%),
@@ -53,7 +53,7 @@
   z-index: 4;
   pointer-events: none;
   border: 1px solid rgb(255 255 255 / 62%);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: 0 7px 20px rgb(8 65 77 / 17%);
   font-size: 10px;
   font-weight: 750;
@@ -137,7 +137,7 @@
 @media (max-width: 430px) {
   .reef-production-wrap,
   .reef-production-error {
-    border-radius: 20px;
+    border-radius: var(--radius-lg);
   }
 
   .reef-production-wrap {

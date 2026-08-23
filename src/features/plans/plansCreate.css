@@ -19,7 +19,7 @@
   overscroll-behavior: contain;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--plan-create-accent) 18%, transparent);
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   background:
     radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--plan-create-accent) 14%, transparent), transparent 34%),
     var(--surface);
@@ -86,7 +86,7 @@
   resize: none;
   padding: 18px 18px 30px;
   border: 1px solid color-mix(in srgb, var(--plan-create-accent) 34%, transparent);
-  border-radius: 21px;
+  border-radius: var(--radius-lg);
   outline: none;
   background: color-mix(in srgb, var(--plan-create-accent) 5%, var(--bg));
   color: var(--text);
@@ -167,7 +167,7 @@
 .plan-create-continue {
   min-height: 44px;
   padding-inline: 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--plan-create-accent);
 }
 
@@ -184,7 +184,7 @@
   width: 76px;
   height: 76px;
   margin-bottom: 3px;
-  border-radius: 26px;
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--plan-create-accent) 14%, var(--surface));
   color: var(--plan-create-accent);
   box-shadow: 0 16px 42px color-mix(in srgb, var(--plan-create-accent) 16%, transparent);
@@ -234,7 +234,7 @@
 
   .plan-create-sheet {
     max-height: calc(100dvh - 16px - env(safe-area-inset-bottom));
-    border-radius: 23px 23px 18px 18px;
+    border-radius: var(--radius-lg) var(--radius-lg) var(--radius-card) var(--radius-card);
   }
 
   .plan-create-form {
@@ -253,7 +253,7 @@
 
 @media (max-width: 380px) {
   .plan-create-sheet {
-    border-radius: 23px;
+    border-radius: var(--radius-lg);
   }
 
   .plan-create-form,

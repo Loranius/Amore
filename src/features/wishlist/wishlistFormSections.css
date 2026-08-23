@@ -30,7 +30,7 @@
   gap: 13px;
   padding: 15px;
   border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--text) 5%);
-  border-radius: 21px;
+  border-radius: var(--radius-lg);
   background:
     linear-gradient(
       145deg,
@@ -54,7 +54,7 @@
   flex: 0 0 30px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 11%, var(--surface));
   color: color-mix(in srgb, var(--accent) 82%, var(--text));
   font-size: 12px;
@@ -114,7 +114,7 @@
   align-items: flex-start;
   gap: 9px;
   border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--text) 7%);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--surface) 92%, var(--accent) 8%);
   color: color-mix(in srgb, var(--muted) 82%, var(--text));
   text-align: left;
@@ -165,7 +165,7 @@
   align-items: center;
   gap: 8px;
   border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   color: color-mix(in srgb, var(--muted) 76%, var(--text));
   font-size: 12px;
@@ -189,7 +189,7 @@
   .wishlist .wm-form-section {
     gap: 12px;
     padding: 14px;
-    border-radius: 19px;
+    border-radius: var(--radius-card);
   }
 
   .wishlist .wm-form-detail-grid {
@@ -267,7 +267,7 @@
   justify-content: center;
   padding: 10px 9px;
   border: 1px solid var(--wl-control-border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: var(--wl-control-bg-muted);
   color: var(--wl-text-secondary);
   font-size: 13px;
@@ -285,7 +285,7 @@
 .wishlist .wm-wish-editor .wm-title-field input {
   min-height: 56px;
   padding: 14px 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   font-weight: 700;
 }
 
@@ -303,7 +303,7 @@
   width: 100%;
   min-height: 52px;
   padding: 12px 58px 12px 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
 }
 
 .wishlist .wm-wish-editor .wm-link-preview-button {
@@ -317,7 +317,7 @@
   place-items: center;
   translate: 0 -50%;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--text) 8%);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   color: var(--accent);
   cursor: pointer;
@@ -335,7 +335,7 @@
 .wishlist .wm-wish-editor :is(.wm-photo-disclosure, .wm-details-disclosure) {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--accent) 16%, var(--text) 7%);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background:
     linear-gradient(
       145deg,
@@ -369,7 +369,7 @@
   overflow: hidden;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface-3));
   color: color-mix(in srgb, var(--accent) 56%, var(--muted));
 }
@@ -437,7 +437,7 @@
   overflow: hidden;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 8%, var(--surface-3));
 }
 
@@ -477,7 +477,7 @@
   gap: 4px;
   padding: 4px;
   border: 1px solid var(--wl-control-border);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--surface-3) 78%, transparent);
 }
 
@@ -489,7 +489,7 @@
   justify-content: center;
   gap: 8px;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--wl-text-secondary);
   text-align: center;
@@ -528,7 +528,7 @@
   width: 42px;
   height: 42px;
   place-items: center;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 11%, var(--surface-3));
   color: color-mix(in srgb, var(--accent) 66%, var(--text));
 }
@@ -551,7 +551,7 @@
   width: 100%;
   min-height: 54px;
   flex: 1 1 auto;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   font-size: 15px;
   font-weight: 900;
 }
@@ -593,7 +593,7 @@
   .wishlist .wm-wish-editor .wm-photo-summary-visual {
     width: 64px;
     height: 64px;
-    border-radius: 15px;
+    border-radius: var(--radius-md);
   }
 
   .wishlist .wm-wish-editor .wm-form-actions {

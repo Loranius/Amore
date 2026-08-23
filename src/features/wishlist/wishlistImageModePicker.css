@@ -57,7 +57,7 @@
   min-height: 70px;
   padding: 10px;
   border: 1px solid color-mix(in srgb, var(--muted) 18%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface) 76%, transparent);
   color: var(--text);
   text-align: left;
@@ -79,7 +79,7 @@
   width: 32px;
   height: 32px;
   place-items: center;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   font-size: 16px;
 }

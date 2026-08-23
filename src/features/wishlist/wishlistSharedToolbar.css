@@ -6,7 +6,7 @@
   margin-block: 18px 20px;
   padding: 16px 18px;
   border: 1px solid color-mix(in srgb, var(--wl-shared-accent) 16%, transparent);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background:
     radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--wl-shared-accent) 10%, transparent), transparent 36%),
     color-mix(in srgb, var(--surface) 89%, transparent);
@@ -36,7 +36,7 @@
   flex: 0 0 auto;
   gap: 6px;
   padding: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--wl-shared-accent) 9%, transparent);
 }
 
@@ -47,7 +47,7 @@
   gap: 7px;
   padding: 7px 11px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--muted);
   font: inherit;
@@ -64,7 +64,7 @@
   height: 21px;
   place-items: center;
   padding-inline: 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, currentColor 10%, transparent);
   color: inherit;
   font-size: 10px;
@@ -84,7 +84,7 @@
   place-items: center;
   padding: 30px;
   border: 1px dashed color-mix(in srgb, var(--wl-shared-accent) 28%, transparent);
-  border-radius: 26px;
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--wl-shared-accent) 5%, var(--surface));
   text-align: center;
 }

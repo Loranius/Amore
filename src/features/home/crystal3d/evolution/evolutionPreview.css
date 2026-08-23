@@ -8,7 +8,7 @@
   z-index: 4;
   pointer-events: none;
   border: 1px solid rgb(255 255 255 / 72%);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgb(87 35 57 / 72%);
   box-shadow: 0 6px 18px rgb(75 28 49 / 18%);
   color: #fcf8ff;

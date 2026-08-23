@@ -4,7 +4,7 @@
   margin-block: 16px 20px;
   padding: 6px;
   border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow:
     0 12px 30px rgba(4, 2, 10, 0.48),
@@ -87,7 +87,7 @@
   gap: 10px;
   padding: 7px 8px 7px 7px;
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: transparent;
   color: var(--text);
   font: inherit;
@@ -123,7 +123,7 @@
   height: 32px;
   flex: 0 0 32px;
   place-items: center;
-  border-radius: 11px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 13%, transparent);
   color: color-mix(in srgb, var(--accent) 82%, var(--text));
   font-size: 14px;
@@ -171,7 +171,7 @@
   height: 24px;
   place-items: center;
   padding-inline: 5px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 11%, transparent);
   color: color-mix(in srgb, var(--accent) 86%, var(--text));
   font-size: 11px;
@@ -213,7 +213,7 @@
   gap: 6px;
   padding: 7px 8px;
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 15px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--surface) 68%, transparent);
   color: color-mix(in srgb, var(--muted) 88%, var(--text));
   font: inherit;
@@ -236,7 +236,7 @@
   width: 27px;
   height: 27px;
   place-items: center;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   color: color-mix(in srgb, var(--accent) 76%, var(--text));
   font-size: 12px;
@@ -258,7 +258,7 @@
   height: 21px;
   place-items: center;
   padding-inline: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, currentColor 11%, transparent);
   color: inherit;
   font-size: 9px;
@@ -291,7 +291,7 @@
   place-items: center;
   padding: 28px;
   border: 1px dashed color-mix(in srgb, var(--accent) 23%, transparent);
-  border-radius: 25px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--accent) 4%, var(--surface));
   text-align: center;
 }
@@ -327,7 +327,7 @@
   gap: 6px;
   padding: 30px;
   border: 1px dashed color-mix(in srgb, var(--accent) 30%, transparent);
-  border-radius: 26px;
+  border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
   color: var(--muted);
   text-align: center;
@@ -382,7 +382,7 @@
   .wl-wishlist-controls {
     margin-block: 14px 17px;
     padding: 5px;
-    border-radius: 22px;
+    border-radius: var(--radius-lg);
   }
 
   .wl-board-toolbar {

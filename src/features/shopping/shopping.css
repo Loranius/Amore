@@ -64,7 +64,7 @@
   margin-top: 14px;
   padding: 10px;
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: 0 -6px 22px color-mix(in srgb, var(--bg) 60%, transparent);
 }
@@ -88,7 +88,7 @@
   min-height: 40px;
   padding: 0 13px;
   border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 7%, var(--surface));
   color: var(--text);
   font: inherit;
@@ -134,7 +134,7 @@
   gap: 8px;
   padding: 10px 10px 4px;
   border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 4%, var(--bg));
   animation: shopping-shelf-in .18s ease both;
 }
@@ -160,7 +160,7 @@
   height: 26px;
   place-items: center;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -207,7 +207,7 @@
   min-height: 32px;
   padding: 0 11px 0 8px;
   border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -253,7 +253,7 @@
   padding: 13px 14px;
   resize: none;
   border: 1px solid color-mix(in srgb, var(--text) 11%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   outline: none;
   background: color-mix(in srgb, var(--accent) 2.5%, var(--bg));
   color: var(--text);
@@ -281,7 +281,7 @@
   min-height: 48px;
   padding: 9px;
   border: 0;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: linear-gradient(145deg, color-mix(in srgb, var(--accent) 83%, white), var(--accent));
   color: #fff;
   font: inherit;
@@ -322,7 +322,7 @@
   contain-intrinsic-size: auto 170px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--shopping-category) 15%, color-mix(in srgb, var(--text) 6%, transparent));
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: 0 5px 17px rgba(4, 2, 10, 0.4);
   animation: shopping-section-in .22s ease both;
@@ -343,7 +343,7 @@
   width: 36px;
   height: 36px;
   place-items: center;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--shopping-category) 12%, var(--surface));
   font-size: 18px;
 }
@@ -443,7 +443,7 @@
   max-width: 100%;
   padding: 3px 7px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--shopping-category, var(--accent)) 8%, var(--bg));
   color: var(--muted);
   font-size: 9.5px;
@@ -479,7 +479,7 @@
   place-items: center;
   padding: 0;
   border: 0;
-  border-radius: 11px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -520,7 +520,7 @@
   margin: 3px 0 8px;
   padding: 34px 20px;
   border: 1px dashed color-mix(in srgb, var(--accent) 25%, transparent);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--accent) 3%, var(--surface));
   text-align: center;
 }
@@ -531,7 +531,7 @@
   height: 50px;
   place-items: center;
   margin-bottom: 2px;
-  border-radius: 19px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   color: var(--accent);
   font-size: 24px;
@@ -569,7 +569,7 @@
 .shopping-skeleton span {
   display: block;
   height: 58px;
-  border-radius: 17px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--text) 6%, var(--surface));
   animation: shopping-skeleton-pulse 1.2s ease-in-out infinite alternate;
 }
@@ -585,7 +585,7 @@
   margin-top: 20px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
 }
 
@@ -672,7 +672,7 @@
   width: min(100%, 520px);
   padding: 0;
   overflow: hidden;
-  border-radius: 27px;
+  border-radius: var(--radius-xl);
 }
 
 .shopping-edit-head {
@@ -732,7 +732,7 @@
 .shopping-edit-form .form-field input,
 .shopping-edit-form .form-field select {
   min-height: 47px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 2%, var(--bg));
 }
 
@@ -746,7 +746,7 @@
 .shopping-edit-actions .btn {
   min-height: 46px;
   margin: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
 }
 
 @keyframes shopping-section-in {
@@ -766,7 +766,7 @@
 /* ── Телефони ───────────────────────────────────────────────── */
 @media (max-width: 560px) {
   .shopping-dock {
-    border-radius: 22px;
+    border-radius: var(--radius-lg);
   }
 
   .shopping-group {
@@ -796,7 +796,7 @@
   .shopping-group-icon {
     width: 32px;
     height: 32px;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
     font-size: 16px;
   }
 

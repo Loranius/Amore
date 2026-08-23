@@ -75,7 +75,7 @@
     padding-bottom: max(20px, env(safe-area-inset-bottom));
     overflow-y: auto;
     scroll-padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
-    border-radius: 28px 28px 0 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
   }
@@ -151,7 +151,7 @@
     height: auto;
     max-height: min(78dvh, 620px);
     padding-top: 24px;
-    border-radius: 28px 28px 0 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
 }
 

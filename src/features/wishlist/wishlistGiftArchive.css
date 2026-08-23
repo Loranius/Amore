@@ -17,7 +17,7 @@
   gap: 8px;
   padding: 30px 22px;
   border: 1px dashed color-mix(in srgb, var(--accent) 28%, transparent);
-  border-radius: 25px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface) 90%, transparent);
   color: var(--text);
   text-align: center;
@@ -28,7 +28,7 @@
   width: 54px;
   height: 54px;
   place-items: center;
-  border-radius: 19px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
   font-size: 27px;
@@ -58,7 +58,7 @@
   margin-bottom: 18px;
   padding: 13px 15px;
   border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: 19px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }
 
@@ -68,7 +68,7 @@
   height: 38px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 13%, transparent);
   color: var(--accent);
   font-size: 18px;

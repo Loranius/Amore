@@ -17,7 +17,7 @@
   padding: 0;
   overflow: visible;
   border: 1px solid color-mix(in srgb, var(--world-border-active) 68%, var(--world-border));
-  border-radius: 30px;
+  border-radius: var(--radius-xl);
   background:
     linear-gradient(
       180deg,
@@ -39,7 +39,7 @@
   margin: 0;
   padding: 7px 8px 11px;
   border: 0;
-  border-radius: 30px 30px 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   background: transparent;
   box-shadow: none;
 }
@@ -73,7 +73,7 @@
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 0 0 29px 29px;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
   background: transparent;
   color: var(--world-text-muted);
   box-shadow: none;
@@ -103,7 +103,7 @@
   left: 50%;
   width: 42px;
   height: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--world-accent) 58%, transparent);
   box-shadow: 0 1px 5px color-mix(in srgb, var(--world-glow) 54%, transparent);
   transform: translateX(-50%);
@@ -168,7 +168,7 @@
   gap: 11px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--world-border-active) 68%, var(--world-border));
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   background:
     linear-gradient(
       180deg,
@@ -245,7 +245,7 @@
   justify-content: center;
   gap: 7px;
   border: 1px solid color-mix(in srgb, var(--world-border-active) 52%, var(--world-border));
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: var(--world-surface-soft);
   color: var(--world-text-muted);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--world-glow) 58%, transparent);
@@ -292,13 +292,13 @@
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls {
     width: calc(100% - 24px);
     margin-top: 8px;
-    border-radius: 28px;
+    border-radius: var(--radius-xl);
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar {
     min-height: 68px;
     padding: 6px 6px 10px;
-    border-radius: 28px 28px 0 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
 
   [data-portal-scene='true'] .wishlist .wl-wishlist-controls > .tab-bar .tab-bar-btn {
@@ -309,7 +309,7 @@
 
   [data-portal-scene='true'] .wishlist .wl-top-filter-toggle {
     height: 36px;
-    border-radius: 0 0 27px 27px;
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
   }
 
   [data-portal-scene='true'] .wishlist .wl-top-filter-toggle::before {
@@ -320,13 +320,13 @@
   [data-portal-scene='true'] .wishlist .wl-top-filter-sheet {
     padding: 13px 12px 15px;
     gap: 9px;
-    border-radius: 22px;
+    border-radius: var(--radius-lg);
   }
 
   [data-portal-scene='true'] .wishlist .wl-top-filter-chip {
     min-height: 48px;
     padding-inline: 8px;
-    border-radius: 17px;
+    border-radius: var(--radius-card);
     font-size: 13px;
   }
 }

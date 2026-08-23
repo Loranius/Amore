@@ -12,7 +12,7 @@
   justify-items: center;
   padding: 25px 18px;
   border: 1px dashed color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 28%, transparent);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background:
     radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 11%, transparent), transparent 52%),
     color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 3%, var(--surface));
@@ -25,7 +25,7 @@
   height: 48px;
   place-items: center;
   margin-bottom: 9px;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 12%, var(--surface));
   color: var(--plan-detail-accent, var(--accent));
 }
@@ -53,7 +53,7 @@
   overflow: hidden;
   min-width: 0;
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: var(--surface);
   box-shadow: 0 10px 24px rgba(4, 2, 10, 0.48);
 }
@@ -137,7 +137,7 @@
 
 .plan-memories-skeleton span {
   aspect-ratio: 4 / 3;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--text) 6%, var(--surface));
   animation: plan-memory-skeleton 1.4s ease-in-out infinite alternate;
 }

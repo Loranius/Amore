@@ -9,7 +9,7 @@
   padding: 21px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  border-radius: 27px;
+  border-radius: var(--radius-xl);
   background:
     radial-gradient(circle at 88% 12%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 30%),
     linear-gradient(145deg, color-mix(in srgb, var(--accent) 6%, var(--surface)), var(--surface));
@@ -29,7 +29,7 @@
   width: 52px;
   height: 52px;
   flex: 0 0 auto;
-  border-radius: 19px;
+  border-radius: var(--radius-card);
   color: color-mix(in srgb, var(--accent) 80%, var(--text));
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
@@ -68,7 +68,7 @@
   min-height: 40px;
   padding: 9px 14px;
   border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   color: color-mix(in srgb, var(--accent) 84%, var(--text));
   background: color-mix(in srgb, var(--accent) 7%, var(--surface));
   font: inherit;
@@ -111,7 +111,7 @@
   gap: 14px;
   width: min(100%, 520px);
   padding-top: 18px;
-  border-radius: 26px;
+  border-radius: var(--radius-xl);
 }
 
 .piggy-balance-sheet > p {
@@ -124,19 +124,19 @@
 .piggy-balance-modal-icon {
   width: 48px;
   height: 48px;
-  border-radius: 17px;
+  border-radius: var(--radius-card);
 }
 
 @media (max-width: 359px) {
   .piggy-balance {
     padding: 18px;
-    border-radius: 23px;
+    border-radius: var(--radius-lg);
   }
 
   .piggy-balance-icon {
     width: 46px;
     height: 46px;
-    border-radius: 16px;
+    border-radius: var(--radius-card);
   }
 }
 

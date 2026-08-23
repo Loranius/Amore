@@ -10,7 +10,7 @@
   gap: 16px;
   padding: 18px 20px;
   border: 1px solid color-mix(in srgb, var(--wl-memory-accent) 18%, transparent);
-  border-radius: 25px;
+  border-radius: var(--radius-lg);
   background:
     radial-gradient(circle at 88% 16%, color-mix(in srgb, var(--wl-memory-accent) 12%, transparent), transparent 34%),
     color-mix(in srgb, var(--surface) 92%, transparent);
@@ -34,7 +34,7 @@
   width: 52px;
   height: 52px;
   place-items: center;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--wl-memory-accent) 12%, var(--surface));
   color: var(--wl-memory-accent);
   font-size: 25px;
@@ -86,7 +86,7 @@
   padding: clamp(22px, 4vw, 38px);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--wl-memory-accent) 20%, transparent);
-  border-radius: clamp(28px, 4vw, 36px);
+  border-radius: clamp(var(--radius-xl), 4vw, var(--radius-dock));
   background:
     radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--wl-memory-accent) 18%, transparent), transparent 33%),
     linear-gradient(135deg, color-mix(in srgb, var(--wl-memory-accent) 11%, var(--surface)), var(--surface));
@@ -101,7 +101,7 @@
   gap: 7px;
   padding: 9px 12px;
   border: 1px solid color-mix(in srgb, var(--wl-memory-accent) 17%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   color: var(--text);
   font: inherit;
@@ -144,7 +144,7 @@
   width: 72px;
   height: 72px;
   place-items: center;
-  border-radius: 25px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--surface) 65%, transparent);
   box-shadow: 0 14px 30px color-mix(in srgb, var(--wl-memory-accent) 15%, transparent);
   font-size: 34px;
@@ -161,7 +161,7 @@
 
 .wl-archive-wrap--page .wl-archive-summary {
   margin-bottom: 24px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--wl-memory-accent) 7%, var(--surface));
 }
 
@@ -178,7 +178,7 @@
 
 .wl-archive-wrap--page .wl-gift-memory-card {
   overflow: hidden;
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
 }
 
 .wl-archive-wrap--page .wl-gift-memory-media {
@@ -226,7 +226,7 @@
   .wl-archive-page-symbol {
     width: 54px;
     height: 54px;
-    border-radius: 19px;
+    border-radius: var(--radius-card);
     font-size: 26px;
   }
 

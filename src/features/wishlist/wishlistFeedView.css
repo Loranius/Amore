@@ -28,7 +28,7 @@
   padding: 12px 46px 12px 12px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: 27px;
+  border-radius: var(--radius-xl);
   background:
     linear-gradient(
       112deg,
@@ -56,7 +56,7 @@
   right: 15px;
   width: 22px;
   height: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   content: '';
   pointer-events: none;
@@ -85,7 +85,7 @@
   overflow: hidden;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--accent) 11%, transparent);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background:
     radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.88), transparent 38%),
     color-mix(in srgb, var(--accent) 5%, var(--surface));
@@ -205,7 +205,7 @@
   overflow: hidden;
   padding: 5px 10px;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
   color: color-mix(in srgb, var(--accent) 78%, var(--text));
   font-size: 10px;
@@ -263,11 +263,11 @@
     grid-template-columns: 124px minmax(0, 1fr);
     gap: 15px;
     padding: 10px 38px 10px 10px;
-    border-radius: 24px;
+    border-radius: var(--radius-lg);
   }
 
   .wl-feed-card__media {
-    border-radius: 18px;
+    border-radius: var(--radius-card);
   }
 
   .wl-feed-card__content {
@@ -310,11 +310,11 @@
     grid-template-columns: 108px minmax(0, 1fr);
     gap: 13px;
     padding: 9px 34px 9px 9px;
-    border-radius: 22px;
+    border-radius: var(--radius-lg);
   }
 
   .wl-feed-card__media {
-    border-radius: 17px;
+    border-radius: var(--radius-card);
   }
 
   .wl-feed-card__title {

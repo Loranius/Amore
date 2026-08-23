@@ -92,7 +92,7 @@
 }
 
 .plans-module .pm-section-more:hover { color: var(--accent); }
-.plans-module .pm-section-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 8px; }
+.plans-module .pm-section-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 .plans-module .pm-section-more svg { opacity: 0.8; }
 
 .plans-module .pm-section-empty {
@@ -127,7 +127,7 @@
   min-height: 92px;
   padding: 9px 9px 9px 17px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   /* Колір категорії заливає картку зліва й гасне до середини — саме так на
      референсі відрізняються «Побачення» від «Іншого». */
   /* Колір категорії ослаблено з 26% до 15% і його спад скорочено.
@@ -290,7 +290,7 @@
   margin: 16px 0 8px;
   padding: 14px 18px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background-color: var(--surface);
   background-image: var(--control-sheen);
   color: var(--text);
@@ -324,7 +324,7 @@
 /* ── Очікування й помилка ────────────────────────────────── */
 
 .plans-module .pm-skeleton {
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: var(--world-surface-soft);
   animation: pm-pulse 1.4s ease-in-out infinite;
 }
@@ -365,7 +365,7 @@
 .plans-module .cal-year {
   padding: 14px 14px 10px;
   border: 1px solid var(--border);
-  border-radius: 24px;
+  border-radius: var(--radius-lg);
   /* `--glass-read`, а не `--glass-2`: тут тридцять одне число, і контраст
      не може залежати від того, яка частина кристала опинилась під панеллю.
      Прозорість 88% — саме та межа, за якою розмиття перестає рятувати
@@ -391,7 +391,7 @@
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background-color: var(--world-surface-soft);
   background-image: var(--control-sheen);
   color: var(--text);

@@ -19,7 +19,7 @@ section.wishlist.pink-page > .tab-bar::before {
   left: var(--wl-tab-inset);
   width: calc((100% - 12px) / 3);
   border: 1px solid color-mix(in srgb, var(--accent) 9%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
   box-shadow:
     0 7px 18px color-mix(in srgb, var(--accent) 12%, transparent),

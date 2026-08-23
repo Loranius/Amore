@@ -53,7 +53,7 @@
 }
 
 .mm-card:active { translate: 0 2px; }
-.mm-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; border-radius: 6px; }
+.mm-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; border-radius: var(--radius-sm); }
 
 /* Стопка: головний кадр у потоці, листи віяла — за ним.
    Поля з боків і є тим місцем, куди листи виїжджають. */
@@ -73,7 +73,7 @@
   right: var(--mm-fan-room);
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   transform-origin: 50% 100%;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), var(--shadow-sm);
 }
@@ -101,7 +101,7 @@
   display: block;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   /* Темніше за ґрунт: фото з білим небом інакше зливається з тлом
      сторінки, і картка читається як порожня діра. */
   background: #201b28;
@@ -131,7 +131,7 @@
   min-width: 22px;
   height: 22px;
   padding: 0 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   display: grid;
   place-items: center;
   background: rgba(12, 8, 20, 0.82);
@@ -172,7 +172,7 @@
 
 .mm-skeleton {
   aspect-ratio: 0.86;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--surface-2);
   animation: mm-pulse 1.4s ease-in-out infinite;
 }
@@ -215,7 +215,7 @@
   display: grid;
   place-items: center;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: var(--text);
   cursor: pointer;
@@ -292,7 +292,7 @@
 .mm-meta-x {
   width: 24px; height: 24px;
   display: grid; place-items: center;
-  border: 0; border-radius: 999px;
+  border: 0; border-radius: var(--radius-pill);
   background: none; color: var(--muted); cursor: pointer;
 }
 .mm-meta-x:active { background: var(--surface-3); }
@@ -346,7 +346,7 @@
 .mm-stage-item figcaption button {
   width: 28px; height: 28px;
   display: grid; place-items: center;
-  border: 0; border-radius: 999px;
+  border: 0; border-radius: var(--radius-pill);
   background: rgba(10, 6, 18, 0.5);
   color: #fff; cursor: pointer;
 }
@@ -416,7 +416,7 @@
   display: grid;
   place-items: center;
   width: 30px; height: 30px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-3);
   color: var(--accent);
   font-style: normal;
@@ -428,7 +428,7 @@
   display: grid;
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background-image: var(--control-fill);
   color: #fff;
   box-shadow: var(--control-top), var(--control-lip), 0 14px 30px rgba(4, 2, 10, 0.55);
@@ -452,7 +452,7 @@
   display: flex;
   flex-direction: column;
   padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
-  border-radius: 20px 20px 0 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   background: var(--glass-read);
   box-shadow: var(--glass-edge), var(--shadow-lg);
 }
@@ -590,7 +590,7 @@
 .mm-round {
   width: 40px; height: 40px;
   display: grid; place-items: center;
-  border: 0; border-radius: 999px;
+  border: 0; border-radius: var(--radius-pill);
   background: rgba(10, 6, 18, 0.74);
   color: #fff;
   box-shadow: var(--glass-stroke);
@@ -694,7 +694,7 @@
   right: 12px;
   width: 44px; height: 44px;
   display: grid; place-items: center;
-  border: 0; border-radius: 999px;
+  border: 0; border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.1);
   color: #fff;
   cursor: pointer;
@@ -707,7 +707,7 @@
   display: flex; justify-content: center; gap: 6px;
 }
 .mm-light-dots span {
-  width: 6px; height: 6px; border-radius: 999px;
+  width: 6px; height: 6px; border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.3);
 }
 .mm-light-dots span.is-now { background: #fff; }
@@ -820,7 +820,7 @@
   height: 44px;
   padding: 0;
   border: 2px solid rgba(255, 255, 255, 0.9);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   background: var(--surface-2);
   box-shadow: 0 6px 16px rgba(4, 2, 10, 0.55);
@@ -845,7 +845,7 @@
 .mm-map-draft {
   width: 22px;
   height: 22px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   border: 3px solid #fff;
   box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 32%, transparent);
@@ -867,7 +867,7 @@
   z-index: 3;
   inset: auto 12px calc(env(safe-area-inset-bottom, 0px) + 12px) 12px;
   padding: 14px 16px 16px;
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background: var(--glass-read);
   box-shadow: var(--glass-edge), var(--shadow-lg);
 }
@@ -880,7 +880,7 @@
   width: 100%;
   height: 132px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   margin-bottom: 12px;
   background: var(--surface-2);
 }

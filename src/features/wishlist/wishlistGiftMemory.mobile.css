@@ -18,7 +18,7 @@
   height: 40px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--muted);
   font: inherit;
@@ -58,7 +58,7 @@
     width: 42px;
     height: 5px;
     margin: 1px auto 12px;
-    border-radius: 999px;
+    border-radius: var(--radius-pill);
     background: color-mix(in srgb, var(--muted) 34%, transparent);
   }
 
@@ -110,7 +110,7 @@
   .gift-memory-icon {
     width: 40px;
     height: 40px;
-    border-radius: 13px;
+    border-radius: var(--radius-md);
     font-size: 21px;
   }
 

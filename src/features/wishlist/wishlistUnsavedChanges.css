@@ -14,7 +14,7 @@
   width: min(92vw, 390px);
   padding: 22px;
   border: 1px solid color-mix(in srgb, var(--danger) 16%, transparent);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: 0 24px 70px rgba(4, 2, 10, 0.55);
   animation: wm-unsaved-dialog-in 190ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -26,7 +26,7 @@
   height: 44px;
   margin-bottom: 13px;
   place-items: center;
-  border-radius: 15px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--danger) 10%, var(--surface));
   color: var(--danger);
   font-size: 22px;
@@ -70,7 +70,7 @@
     border-right: 0;
     border-bottom: 0;
     border-left: 0;
-    border-radius: 26px 26px 0 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
 
   .wm-unsaved-actions {

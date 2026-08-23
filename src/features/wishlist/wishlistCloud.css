@@ -257,7 +257,7 @@
   padding: 10px 18px calc(22px + env(safe-area-inset-bottom, 0px));
   border: 1px solid rgba(255, 255, 255, 0.42);
   border-bottom: 0;
-  border-radius: 30px 30px 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   background:
     linear-gradient(
       160deg,
@@ -279,7 +279,7 @@
   width: 44px;
   height: 5px;
   margin: 1px auto 12px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--text) 18%, transparent);
 }
 
@@ -360,7 +360,7 @@
   gap: 6px;
   padding: 6px 10px;
   border: 1px solid color-mix(in srgb, var(--wl-cloud-sheet-accent) 18%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--wl-cloud-sheet-accent) 9%, var(--surface));
   color: color-mix(in srgb, var(--wl-cloud-sheet-accent) 80%, var(--text));
   font-size: 11px;
@@ -401,7 +401,7 @@
 .wl-cloud-sheet-price {
   align-self: start;
   padding: 7px 11px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--wl-cloud-sheet-accent) 11%, var(--surface));
   color: color-mix(in srgb, var(--wl-cloud-sheet-accent) 76%, var(--text));
   font-size: 15px;
@@ -424,7 +424,7 @@
   gap: 10px;
   padding: 10px 13px;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--surface) 72%, transparent);
   color: var(--text);
   font-size: 13px;
@@ -460,7 +460,7 @@
   min-height: 44px;
   align-items: center;
   padding: 10px 13px;
-  border-radius: 15px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--wl-cloud-sheet-accent) 7%, transparent);
   color: color-mix(in srgb, var(--muted) 78%, var(--text));
   font-size: 12px;
@@ -475,7 +475,7 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 16px;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   font: inherit;
   font-size: 13px;
   font-weight: 900;
@@ -526,7 +526,7 @@
   gap: 7px;
   padding: 9px 6px;
   border: 0;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: transparent;
   color: color-mix(in srgb, var(--muted) 75%, var(--text));
   font: inherit;
@@ -628,7 +628,7 @@
     gap: 18px;
     padding: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.42);
-    border-radius: 30px;
+    border-radius: var(--radius-xl);
   }
 
   .wl-cloud-sheet-handle {
@@ -638,7 +638,7 @@
   .wl-cloud-sheet-hero {
     min-height: 100%;
     padding: 24px;
-    border-radius: 24px;
+    border-radius: var(--radius-lg);
     background:
       radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.66), transparent 52%),
       color-mix(in srgb, var(--wl-cloud-sheet-accent) 8%, var(--surface));
@@ -667,7 +667,7 @@
 
   .wl-cloud-sheet {
     padding-inline: 15px;
-    border-radius: 27px 27px 0 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   }
 
   .wl-cloud-sheet-hero {

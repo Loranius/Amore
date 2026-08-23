@@ -2,7 +2,7 @@
 .plan-create-accordion {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--bg) 55%, var(--surface));
 }
 
@@ -28,7 +28,7 @@
   height: 36px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--plan-create-accent) 12%, var(--surface));
   color: var(--plan-create-accent);
 }
@@ -73,7 +73,7 @@
   gap: 8px;
   padding: 9px 10px;
   border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 13px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--muted);
   font: inherit;

@@ -24,7 +24,7 @@
   min-height: 34px;
   padding: 8px 10px 8px 36px;
   border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 5%, var(--surface));
 }
 
@@ -36,7 +36,7 @@
   width: 18px;
   height: 18px;
   place-items: center;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
   content: 'i';
@@ -99,7 +99,7 @@
   bottom: 7px;
   padding: 5px 8px;
   border: 1px solid color-mix(in srgb, var(--ok) 22%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   box-shadow: 0 5px 14px rgba(4, 2, 10, 0.4);
   color: var(--ok);

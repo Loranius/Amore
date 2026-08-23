@@ -135,11 +135,27 @@
      Тому lg піднятий, а xl доданий саме для великих поверхонь. sm і md не
      чіпані навмисно: на чипах і полях вводу 10/14 уже правильні, і
      піднімати їх означало б перетворити дрібні елементи на пігулки. */
+  --radius-hair: 4px;
   --radius-sm: 10px;
   --radius-md: 14px;
+  --radius-card: 16px;
   --radius-lg: 22px;
   --radius-xl: 28px;
+  --radius-dock: 32px;
   --radius-pill: 999px;
+  /* Три щаблі дописані після перерахунку, а не з бажання симетрії.
+     ------------------------------------------------------------
+     Шкала існувала, і її ігнорували: з 312 оголошень радіуса токенами
+     користувались 62. Решта 250 розсипались континуумом від 2px до 38px
+     — тобто в порталі був не набір кутів, а всі цілі числа підряд.
+
+     `hair` (4px) — кути полароїда, крапки календаря, зразки кольору:
+     округлювати їх до 10px означало б помітно змінити дрібні елементи.
+     `card` (16px) — `DESIGN.md` називав цей радіус для карток, але
+     токена під нього не було, тож картки писали 16px руками (а хто не
+     згадав — 17, 18 або 19).
+     `dock` (32px) — радіус дока й екрана входу; був хардкодом у двох
+     місцях, які мусять збігатись. */
   /* ── Тінь і сяйво — це РІЗНІ ролі ─────────────────────────
      Було: усі три тіні будувались із `--text`, тобто з майже білого
      (`#f4eeff`). На темному тлі біла тінь — це сяйво, а не тінь: нічого не
@@ -483,7 +499,7 @@ textarea {
 :where(input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='submit'], [type='button'], [type='reset'], [type='image']), select, textarea) {
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
@@ -632,7 +648,7 @@ textarea::placeholder {
   bottom: calc(env(safe-area-inset-bottom, 0) + 14px);
   z-index: 50;
   padding: 8px;
-  border-radius: 32px;
+  border-radius: var(--radius-dock);
   /*
    * Док однаковий на КОЖНОМУ маршруті, і це виправлення вади, а не смак.
    *
@@ -683,7 +699,7 @@ textarea::placeholder {
   top: 0;
   bottom: 0;
   left: 0;
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   /* Капсула активного пункту дока — теж тіло, а не пляма: той самий рецепт
      об'єму, що й у кнопок, лише тихіший. */
   background-color: color-mix(in srgb, var(--accent) 18%, transparent);
@@ -721,7 +737,7 @@ textarea::placeholder {
   align-items: center;
   gap: 2px;
   padding: 6px 4px;
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   text-decoration: none;
 }
@@ -755,7 +771,7 @@ textarea::placeholder {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-decoration: none;
 }
@@ -846,7 +862,7 @@ textarea::placeholder {
 .more-menu-sheet {
   width: 100%;
   background: var(--surface);
-  border-radius: 20px 20px 0 0;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   padding: 20px 16px calc(env(safe-area-inset-bottom, 0) + 16px);
   transform: translateY(100%);
   transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
@@ -878,7 +894,7 @@ textarea::placeholder {
   align-items: center;
   gap: 6px;
   padding: 12px 6px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   text-decoration: none;
 }
@@ -890,7 +906,7 @@ textarea::placeholder {
   width: 100%;
   padding: 12px;
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--text) 8%, transparent);
   color: var(--text);
   font: inherit;
@@ -1103,7 +1119,7 @@ textarea::placeholder {
   max-width: 380px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 28px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   padding: 40px 32px;
   display: flex;
@@ -1138,7 +1154,7 @@ textarea::placeholder {
 .user-btn {
   appearance: none;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   padding: 18px 24px;
   font: inherit;
   font-family: 'Fredoka', sans-serif;
@@ -1227,7 +1243,7 @@ textarea::placeholder {
   margin-top: 8px;
   appearance: none;
   border: 0;
-  border-radius: 16px;
+  border-radius: var(--radius-card);
   padding: 12px 22px;
   font: inherit;
   font-weight: 700;
@@ -1306,7 +1322,7 @@ textarea::placeholder {
 .form-field textarea {
   padding: 10px 12px;
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
@@ -1336,7 +1352,7 @@ textarea::placeholder {
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
   background-color: color-mix(in srgb, var(--text) 6%, transparent);
   color: var(--text);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   font: inherit;
   cursor: pointer;
@@ -1399,7 +1415,7 @@ textarea::placeholder {
 .wm-photo-preview {
   width: 84px;
   height: 84px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   background: color-mix(in srgb, var(--text) 8%, transparent);
   display: grid;
@@ -1421,7 +1437,7 @@ textarea::placeholder {
   place-items: center;
   padding: 20px;
 }
-.wl-lb-img { max-width: 100%; max-height: 100%; border-radius: 10px; }
+.wl-lb-img { max-width: 100%; max-height: 100%; border-radius: var(--radius-sm); }
 .wl-lb-close {
   position: absolute;
   top: calc(env(safe-area-inset-top, 0) + 12px);
@@ -1540,7 +1556,7 @@ textarea::placeholder {
      упритул до олівця, і промах пальцем відкривав діалог видалення. */
   width: 36px; height: 36px;
   margin-left: 4px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 .cal-del-btn:focus-visible { outline: 2px solid var(--danger); outline-offset: -2px; }
@@ -1552,12 +1568,12 @@ textarea::placeholder {
 .cal-yearly-toggle input { margin-top: 2px; flex: 0 0 auto; }
 .cal-field-hint { margin: -2px 0 8px 26px; font-size: 12px; color: var(--muted); line-height: 1.4; }
 .cal-reminder-note {
-  margin: 4px 0 2px; padding: 9px 11px; border-radius: 12px;
+  margin: 4px 0 2px; padding: 9px 11px; border-radius: var(--radius-md);
   font-size: 12.5px; color: var(--muted); line-height: 1.4;
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .cal-person-chip {
-  margin-left: 7px; padding: 1px 7px; border-radius: 999px;
+  margin-left: 7px; padding: 1px 7px; border-radius: var(--radius-pill);
   font-size: 11px; font-weight: 700; vertical-align: 1px;
   background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text);
 }
@@ -1568,7 +1584,7 @@ textarea::placeholder {
   gap: 10px; margin-bottom: 10px; font-size: 16px;
 }
 .cal-nav-btn {
-  width: 36px; height: 36px; border-radius: 10px; cursor: pointer;
+  width: 36px; height: 36px; border-radius: var(--radius-sm); cursor: pointer;
   display: grid; place-items: center;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
   background: var(--surface); color: var(--text);
@@ -1577,7 +1593,7 @@ textarea::placeholder {
    рядком: рядок навігації і так по центру, а зайвий ряд відсунув би
    сітку вниз рівно на висоту кнопки. */
 .cal-today-btn {
-  flex: 0 0 auto; margin-left: auto; padding: 6px 12px; border-radius: 999px;
+  flex: 0 0 auto; margin-left: auto; padding: 6px 12px; border-radius: var(--radius-pill);
   font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 10%, transparent); color: var(--accent);
@@ -1595,7 +1611,7 @@ textarea::placeholder {
   align-items: start; margin-bottom: 16px;
 }
 .cal-cell {
-  position: relative; aspect-ratio: 1; border-radius: 9px;
+  position: relative; aspect-ratio: 1; border-radius: var(--radius-sm);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
   background: color-mix(in srgb, var(--text) 4%, transparent);
   border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer;
@@ -1618,9 +1634,9 @@ textarea::placeholder {
 /* Позначка плану — смужка, а не крапка. Кольору тут мало: категорії
    планів і типи подій уже ділять ту саму палітру, тож на п'яти пікселях
    вони б не розрізнялись. Форма розрізняє. */
-.cal-cell-dots i.cal-dot-plan { width: 8px; height: 3px; border-radius: 2px; }
+.cal-cell-dots i.cal-dot-plan { width: 8px; height: 3px; border-radius: var(--radius-hair); }
 .cal-year-dots i.cal-dot-plan {
-  width: 11px; height: 4px; border-radius: 2px; background: var(--accent);
+  width: 11px; height: 4px; border-radius: var(--radius-hair); background: var(--accent);
 }
 
 /* ── Панель вибраного дня ──────────────────────────────────── */
@@ -1662,7 +1678,7 @@ textarea::placeholder {
 .cal-day-plan-tag {
   flex: 0 0 auto; font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
   text-transform: uppercase; color: var(--muted);
-  padding: 2px 6px; border-radius: 999px;
+  padding: 2px 6px; border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--text) 7%, transparent);
 }
 .cal-day-plan-span { flex: 0 0 auto; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -1712,7 +1728,7 @@ textarea::placeholder {
 .cal-skeleton { display: flex; flex-direction: column; gap: 6px; }
 .cal-skeleton-row {
   height: 62px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: linear-gradient(
     90deg,
     var(--surface) 0%,
@@ -1738,7 +1754,7 @@ textarea::placeholder {
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
   background: transparent;
   color: var(--text);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 7px 12px;
   font: inherit;
   cursor: pointer;
@@ -1789,7 +1805,7 @@ textarea::placeholder {
 .sched-nav-btn {
   width: 40px; height: 40px;
   border: 0;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
   font-size: 20px;
@@ -1797,7 +1813,7 @@ textarea::placeholder {
 }
 .sched-month-label { font-weight: 600; font-size: 17px; }
 .sched-edit-toggle.is-active { background: var(--accent-strong); color: #fff; }
-.card { background: var(--surface); border-radius: 16px; padding: 14px; }
+.card { background: var(--surface); border-radius: var(--radius-card); padding: 14px; }
 .sched-board-title { margin: 0 0 10px; font-size: 16px; }
 
 .sched-grid, .pcal-grid {
@@ -1814,7 +1830,7 @@ textarea::placeholder {
 .sched-cell {
   aspect-ratio: 1;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--text) 5%, transparent);
   color: var(--text);
   display: flex;
@@ -1868,7 +1884,7 @@ textarea::placeholder {
   color: var(--muted);
 }
 .heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.heat-swatch { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+.heat-swatch { width: 12px; height: 12px; border-radius: var(--radius-hair); display: inline-block; }
 .heat-swatch--both-off { background: #9747d1; }
 .heat-swatch--lena-off { background: #f6c6a8; }
 .heat-swatch--dima-off { background: #b7c3ea; }
@@ -1879,7 +1895,7 @@ textarea::placeholder {
   border: 1px dashed color-mix(in srgb, var(--text) 20%, transparent);
   background: transparent;
   color: var(--text);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 14px;
   text-align: center;
   cursor: pointer;
@@ -1928,7 +1944,7 @@ textarea::placeholder {
   width: 100%;
   padding: 11px 14px;
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -1939,48 +1955,48 @@ textarea::placeholder {
   left: 0; right: 0;
   margin-top: 6px;
   background: var(--surface);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
   max-height: 60dvh;
   overflow-y: auto;
 }
 .media-search-empty { padding: 14px; color: var(--muted); text-align: center; }
 .media-search-card { display: flex; gap: 10px; padding: 8px 10px; align-items: center; }
-.media-search-poster { width: 42px; border-radius: 6px; }
-.media-search-poster-empty { width: 42px; height: 60px; display: grid; place-items: center; background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: 6px; }
+.media-search-poster { width: 42px; border-radius: var(--radius-sm); }
+.media-search-poster-empty { width: 42px; height: 60px; display: grid; place-items: center; background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: var(--radius-sm); }
 .media-search-info { flex: 1; min-width: 0; }
 .media-search-title { font-weight: 600; }
 .media-search-meta { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
 .media-search-overview { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .media-search-add-btn { flex: 0 0 auto; width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--accent-strong); color: #fff; font-size: 20px; cursor: pointer; }
 .media-search-modal-header { display: flex; gap: 12px; margin-bottom: 6px; }
-.media-search-modal-poster { width: 60px; border-radius: 8px; }
+.media-search-modal-poster { width: 60px; border-radius: var(--radius-sm); }
 .media-search-modal-title { font-weight: 700; }
 .media-search-modal-year { font-size: 13px; color: var(--muted); }
 
 .media-stats { margin-bottom: 12px; }
-.media-stat { display: inline-flex; flex-direction: column; align-items: center; background: var(--surface); border-radius: 12px; padding: 8px 16px; }
+.media-stat { display: inline-flex; flex-direction: column; align-items: center; background: var(--surface); border-radius: var(--radius-md); padding: 8px 16px; }
 .media-stat-num { font-weight: 700; color: var(--accent); }
 .media-stat-label { font-size: 11px; color: var(--muted); }
 
 .media-filters { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; }
-.media-filter-btn { white-space: nowrap; border: 0; border-radius: 999px; padding: 7px 12px; background: var(--surface); color: var(--muted); font: inherit; cursor: pointer; }
+.media-filter-btn { white-space: nowrap; border: 0; border-radius: var(--radius-pill); padding: 7px 12px; background: var(--surface); color: var(--muted); font: inherit; cursor: pointer; }
 .media-filter-btn.active { background: var(--accent-strong); color: #fff; }
 
 .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 12px; }
-.media-card { background: var(--surface); border-radius: 14px; overflow: hidden; position: relative; display: flex; flex-direction: column; }
+.media-card { background: var(--surface); border-radius: var(--radius-md); overflow: hidden; position: relative; display: flex; flex-direction: column; }
 .media-poster-wrap { border: 0; padding: 0; background: none; cursor: pointer; aspect-ratio: 2/3; overflow: hidden; }
 .media-poster { width: 100%; height: 100%; object-fit: cover; }
 .media-poster-placeholder { width: 100%; height: 100%; display: grid; place-items: center; font-size: 40px; background: color-mix(in srgb, var(--text) 6%, transparent); }
 .media-card-body { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .media-card-title { margin: 0; font-weight: 600; font-size: 14px; }
-.media-status-badge { align-self: flex-start; font-size: 11px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-radius: 999px; padding: 2px 8px; }
-.media-review-btn { border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); background: transparent; color: var(--text); border-radius: 8px; padding: 5px; font: inherit; font-size: 12px; cursor: pointer; }
+.media-status-badge { align-self: flex-start; font-size: 11px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-radius: var(--radius-pill); padding: 2px 8px; }
+.media-review-btn { border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); background: transparent; color: var(--text); border-radius: var(--radius-sm); padding: 5px; font: inherit; font-size: 12px; cursor: pointer; }
 .media-ratings-mini { display: flex; gap: 6px; font-size: 11px; color: var(--muted); }
 .media-card-delete, .delete-btn { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 16px; cursor: pointer; }
 
 .rate-number-row { display: flex; flex-wrap: wrap; gap: 6px; }
-.rate-num-btn { width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); border-radius: 8px; background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+.rate-num-btn { width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
 .rate-num-btn.active { background: var(--accent-strong); color: #fff; border-color: transparent; }
 
 /* Деталі media */
@@ -1988,16 +2004,16 @@ textarea::placeholder {
 .media-detail-backdrop { position: relative; min-height: 140px; display: flex; align-items: flex-end; }
 .media-detail-backdrop-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.4; }
 .media-detail-hero { position: relative; display: flex; gap: 12px; padding: 14px; }
-.media-detail-poster, .media-detail-poster-ph { width: 80px; border-radius: 8px; }
+.media-detail-poster, .media-detail-poster-ph { width: 80px; border-radius: var(--radius-sm); }
 .media-detail-poster-ph { height: 120px; display: grid; place-items: center; background: color-mix(in srgb, var(--text) 10%, transparent); font-size: 32px; }
 .media-detail-title { font-size: 20px; font-weight: 700; }
 .media-detail-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-.media-detail-badge { font-size: 12px; background: color-mix(in srgb, var(--text) 10%, transparent); border-radius: 999px; padding: 2px 8px; }
+.media-detail-badge { font-size: 12px; background: color-mix(in srgb, var(--text) 10%, transparent); border-radius: var(--radius-pill); padding: 2px 8px; }
 .media-detail-rating-star { font-size: 12px; color: var(--accent); }
 .media-detail-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .media-detail-overview { margin: 0; font-size: 14px; color: var(--text); }
-.media-detail-trailer-btn { border: 0; border-radius: 10px; padding: 11px; background: #ff0000; color: #fff; font: inherit; cursor: pointer; }
-.media-detail-trailer { position: relative; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; }
+.media-detail-trailer-btn { border: 0; border-radius: var(--radius-sm); padding: 11px; background: #ff0000; color: #fff; font: inherit; cursor: pointer; }
+.media-detail-trailer { position: relative; aspect-ratio: 16/9; border-radius: var(--radius-sm); overflow: hidden; }
 .media-detail-trailer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .media-detail-trailer-loading { color: var(--muted); }
 .media-detail-reviews-title { font-weight: 600; margin-bottom: 6px; }
@@ -2020,7 +2036,7 @@ textarea::placeholder {
   gap: 8px;
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   padding: 11px;
   margin-bottom: 12px;
   background: var(--surface);
@@ -2038,7 +2054,7 @@ textarea::placeholder {
 .swipe-panel { margin-bottom: 16px; }
 
 .swipe-type-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
-.swipe-type-btn { flex: 1; border: 0; border-radius: 999px; padding: 8px; background: var(--surface); color: var(--muted); font: inherit; cursor: pointer; }
+.swipe-type-btn { flex: 1; border: 0; border-radius: var(--radius-pill); padding: 8px; background: var(--surface); color: var(--muted); font: inherit; cursor: pointer; }
 .swipe-type-btn.active { background: var(--accent-strong); color: #fff; }
 
 /* Висота колоди рахується від ЕКРАНА, а не стоїть константою.
@@ -2067,7 +2083,7 @@ textarea::placeholder {
 .swipe-card {
   position: absolute;
   inset: 0;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   overflow: hidden;
   background: #000;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
@@ -2136,7 +2152,7 @@ textarea::placeholder {
   align-items: center;
   gap: 10px;
   padding: 14px 24px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(10, 8, 16, 0.8);
   border: 2px solid rgba(255, 255, 255, 0.9);
   color: #fff;
@@ -2182,11 +2198,11 @@ textarea::placeholder {
 
 /* Деталі свайпу */
 .detail-modal { max-width: 480px; }
-.detail-poster { width: 100px; border-radius: 10px; }
+.detail-poster { width: 100px; border-radius: var(--radius-sm); }
 .detail-title { margin: 8px 0 4px; }
 .detail-meta { display: flex; gap: 10px; color: var(--muted); font-size: 13px; }
 .detail-overview { font-size: 14px; }
-.detail-player-wrap { position: relative; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; }
+.detail-player-wrap { position: relative; aspect-ratio: 16/9; border-radius: var(--radius-sm); overflow: hidden; }
 .detail-player { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .detail-no-trailer { color: var(--muted); }
 
@@ -2204,7 +2220,7 @@ textarea::placeholder {
   border: 1px solid color-mix(in srgb, var(--text) 16%, transparent);
   background: transparent;
   color: var(--text);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 9px 15px;
   font: inherit;
   cursor: pointer;
@@ -2236,9 +2252,9 @@ textarea::placeholder {
 .rcp-view-ing-amount { flex: 0 0 auto; color: var(--muted); font-size: 13px; }
 .rcp-view-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 
-.btn-secondary { border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); background: transparent; color: var(--text); border-radius: 10px; padding: 9px 12px; font: inherit; cursor: pointer; }
+.btn-secondary { border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); background: transparent; color: var(--text); border-radius: var(--radius-sm); padding: 9px 12px; font: inherit; cursor: pointer; }
 
-.rcp-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; border: 0; background: color-mix(in srgb, var(--text) 5%, transparent); border-radius: 10px; padding: 11px 14px; font: inherit; color: var(--text); cursor: pointer; }
+.rcp-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; border: 0; background: color-mix(in srgb, var(--text) 5%, transparent); border-radius: var(--radius-sm); padding: 11px 14px; font: inherit; color: var(--text); cursor: pointer; }
 .fin-acc-arrow { transition: transform 0.2s; }
 .fin-acc-arrow.open { transform: rotate(90deg); }
 .rcp-editor { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -2246,7 +2262,7 @@ textarea::placeholder {
 .rcp-editor input, .rcp-editor textarea, .rcp-editor select {
   padding: 9px 11px;
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--text);
   font: inherit;
@@ -2258,7 +2274,7 @@ textarea::placeholder {
 
 /* Улюблені */
 
-.dish-roll { display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--surface); border-radius: 16px; padding: 18px; margin-bottom: 14px; }
+.dish-roll { display: flex; flex-direction: column; align-items: center; gap: 10px; background: var(--surface); border-radius: var(--radius-card); padding: 18px; margin-bottom: 14px; }
 .dish-roll-btn { padding: 10px 24px; }
 .dish-result { font-size: 20px; font-weight: 700; text-align: center; min-height: 26px; }
 .dish-result.rolled { animation: dish-pop 0.3s ease; }
@@ -2266,7 +2282,7 @@ textarea::placeholder {
 .dish-add-btn { width: 100%; margin-bottom: 14px; }
 
 .dish-list { display: flex; flex-direction: column; gap: 6px; }
-.dish-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: 12px; padding: 10px 12px; }
+.dish-row { display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: var(--radius-md); padding: 10px 12px; }
 .dish-cat-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 .dish-title { flex: 1; margin: 0; font-weight: 500; }
 .dish-title--link { cursor: pointer; color: var(--accent); }
@@ -2361,7 +2377,7 @@ textarea::placeholder {
   gap: 2px;
   margin-top: 2px;
   padding: 4px 18px;
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   color: inherit;
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
@@ -2393,7 +2409,7 @@ textarea::placeholder {
   /* Скло на сцені, а не на папері: `--surface` іде за темою інтерфейсу, а
      цей клаптик лежить на небі — уночі темному, вдень блакитному. */
   background: var(--scene-scrim);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 12px;
   font-size: 11px;
   font-weight: 600;
@@ -2452,7 +2468,7 @@ textarea::placeholder {
   left: 4px;
   bottom: 6px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(49, 37, 58, 0.72);
   color: #fff;
   font-size: 11px;
@@ -2472,7 +2488,7 @@ textarea::placeholder {
   height: 40px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.94);
   color: #965ac1;
   box-shadow: var(--shadow-sm);
@@ -2530,7 +2546,7 @@ textarea::placeholder {
 .fin-proposal-panel {
   margin-top: 14px;
   padding: 14px;
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
 }
@@ -2558,7 +2574,7 @@ textarea::placeholder {
   display: flex; flex-direction: column; align-items: center; gap: 3px;
   border: 1px solid var(--hair, color-mix(in srgb, var(--text) 12%, transparent));
   background: var(--surface); color: var(--text);
-  border-radius: 12px; padding: 9px 6px; font: inherit; cursor: pointer;
+  border-radius: var(--radius-md); padding: 9px 6px; font: inherit; cursor: pointer;
   transition: border-color .18s, background .18s;
 }
 .view-option.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
@@ -2579,7 +2595,7 @@ textarea::placeholder {
   align-items: center;
   gap: 7px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 9px 16px;
   background: var(--surface);
   color: var(--text);
@@ -2601,7 +2617,7 @@ textarea::placeholder {
 /* Фон/радіус/паддінг уже з .card (WhereToPage.tsx: className="card wt-card") — тут лише розкладка. */
 .wt-card { display: flex; flex-direction: column; gap: 6px; }
 .wt-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.wt-badge { font-size: 12px; border-radius: 999px; padding: 3px 10px; font-weight: 600; }
+.wt-badge { font-size: 12px; border-radius: var(--radius-pill); padding: 3px 10px; font-weight: 600; }
 .wt-badge--place { background: color-mix(in srgb, #5FA777 20%, transparent); color: #4a8a60; }
 .wt-badge--event { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .wt-price { font-weight: 700; }
@@ -2694,7 +2710,7 @@ textarea::placeholder {
 }
 .sizes-group {
   background: var(--bg);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -2715,7 +2731,7 @@ textarea::placeholder {
   gap: 8px;
   padding: 16px;
   border: 2px dashed color-mix(in srgb, var(--text) 20%, transparent);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   color: var(--muted);
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease;
@@ -2730,7 +2746,7 @@ textarea::placeholder {
 .photo-upload-progress {
   position: relative;
   height: 26px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   overflow: hidden;
 }
@@ -2761,7 +2777,7 @@ textarea::placeholder {
 .photo-manager-thumb {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--bg);
 }
@@ -2886,7 +2902,7 @@ textarea::placeholder {
 .swipe-genre {
   flex: 0 0 auto;
   padding: 7px 14px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--surface-2);
   color: var(--muted);

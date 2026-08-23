@@ -9,7 +9,7 @@
   min-height: 245px;
   padding: clamp(24px, 4vw, 48px);
   border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
-  border-radius: clamp(28px, 4vw, 38px);
+  border-radius: clamp(var(--radius-xl), 4vw, var(--radius-dock));
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   box-shadow: 0 24px 58px rgba(4, 2, 10, 0.55);
 }
@@ -36,7 +36,7 @@
 .wl-skeleton-metric {
   width: 145px;
   height: 35px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
 }
 
@@ -52,7 +52,7 @@
 .wl-skeleton-symbol {
   width: clamp(82px, 10vw, 116px);
   height: clamp(82px, 10vw, 116px);
-  border-radius: 34px;
+  border-radius: var(--radius-dock);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface));
 }
 
@@ -70,7 +70,7 @@
     min-height: 0;
     gap: 18px;
     padding: 24px 20px 20px;
-    border-radius: 28px;
+    border-radius: var(--radius-xl);
   }
 
   .wl-skeleton-hero-actions {
@@ -83,7 +83,7 @@
   .wl-skeleton-symbol {
     width: 54px;
     height: 54px;
-    border-radius: 19px;
+    border-radius: var(--radius-card);
   }
 
   .wl-skeleton-cta {

@@ -177,7 +177,7 @@
   margin-top: auto;
   padding: 22px 18px calc(env(safe-area-inset-bottom, 0) + 20px);
   border-top: 1px solid color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 26%, var(--world-border, rgba(198, 160, 255, .16)));
-  border-radius: 26px 26px 0 0;
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   /*
    * Колір зірки заходить у панель ДВІЧІ й обидва рази ледь-ледь: тонкою
    * смужкою по верхньому краю й розмитим світінням під нею. Пофарбувати
@@ -206,7 +206,7 @@
   right: 22%;
   left: 22%;
   height: 2px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: linear-gradient(
     90deg,
     transparent,
@@ -266,7 +266,7 @@
 }
 .jn-details-since {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 14%, transparent);
   color: var(--jn-level, var(--world-accent, #d3a6ff));
   font-size: 11px;
@@ -290,7 +290,7 @@
   gap: 7px;
   padding: 0 18px;
   border: 1px solid var(--world-border, rgba(198, 160, 255, .18));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: transparent;
   color: var(--world-text, var(--text));
   font: inherit;

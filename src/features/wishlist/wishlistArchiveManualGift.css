@@ -20,7 +20,7 @@
   margin: 16px 0 20px;
   padding: 14px 16px;
   border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--accent) 7%, var(--surface));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
 }
@@ -31,7 +31,7 @@
   height: 43px;
   flex: 0 0 auto;
   place-items: center;
-  border-radius: 15px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   font-size: 21px;
 }

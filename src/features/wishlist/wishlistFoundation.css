@@ -67,7 +67,7 @@
   width: min(100%, 560px);
   height: 48px;
   margin-inline: auto;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 .wl-skeleton-line,
@@ -75,7 +75,7 @@
 .wl-skeleton-cta,
 .wl-skeleton-stat,
 .wl-skeleton-media {
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface));
 }
 

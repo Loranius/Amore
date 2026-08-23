@@ -37,7 +37,7 @@
    доводиться шукати очима. */
 .shopping[data-world='true'] .shopping-dock {
   border: 1px solid var(--world-border);
-  border-radius: 22px;
+  border-radius: var(--radius-lg);
   background: var(--world-surface-strong);
   box-shadow: 0 -10px 30px var(--world-shadow);
 }
@@ -118,7 +118,7 @@
 
 .shopping[data-world='true'] .shopping-group {
   border: 1px solid var(--world-border);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background: var(--world-surface);
   box-shadow: 0 12px 30px var(--world-shadow);
 }
@@ -183,7 +183,7 @@
   height: 42px;
   flex: 0 0 42px;
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--world-text-muted);
   box-shadow: none;
@@ -224,7 +224,7 @@
 
 .shopping[data-world='true'] .shopping-archive {
   border: 1px solid var(--world-border);
-  border-radius: 18px;
+  border-radius: var(--radius-card);
   background: var(--world-surface);
 }
 
@@ -233,7 +233,7 @@
 
 .shopping[data-world='true'] .shopping-state {
   border: 1px solid var(--world-border);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   background: var(--world-surface);
   color: var(--world-text);
 }

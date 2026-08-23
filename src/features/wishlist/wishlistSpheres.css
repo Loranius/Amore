@@ -336,7 +336,7 @@
   min-height: 38px;
   padding: 8px 16px;
   border: 1px solid var(--world-border, rgba(255, 255, 255, 0.18));
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--world-surface, rgba(32, 24, 52, 0.7));
   color: var(--world-text, #f2ecff);
   font: inherit;
