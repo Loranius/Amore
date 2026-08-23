@@ -1054,9 +1054,21 @@ textarea::placeholder {
 }
 
 .btn-danger { background-color: var(--danger); }
+/* Привидна кнопка — тиха поверхня, а не первинна дія у сірому.
+   ------------------------------------------------------------
+   Тут перекривався лише `background-color`, а `.btn` малює ще й
+   `background-image: var(--control-sheen)` — градієнт первинної дії.
+   Він лишався, тож «Скасувати» поруч із «Зберегти» виглядало
+   ЗАЛИТИМ, а головна дія — тьмянішою за нього. У модалці, де
+   скасування помітніше за збереження, пара тисне не те.
+
+   Тіло теж тихіше: без відблиску згори й без відкинутої тіні —
+   вона лежить на поверхні, а не підноситься над нею. */
 .btn-ghost {
   background-color: color-mix(in srgb, var(--text) 10%, transparent);
+  background-image: none;
   color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border), var(--control-lip);
 }
 
 /* ── Boot-екран ───────────────────────────────────────────────
@@ -1345,13 +1357,40 @@ textarea::placeholder {
      для підпису (<span>), а полю форсуємо 16px окремо. */
   font-size: 16px;
 }
+/* Смуга дій — одна на всі модалки порталу.
+   ------------------------------------------------------------
+   До цієї правки їх було чотири різні: `.modal-actions` (більшість),
+   `.cal-entry-actions`, `.plan-create-actions`, `.shopping-edit-actions`,
+   `.wl-archive-gift-actions`, `.wl-archive-page-actions`,
+   `.mm-map-sheet-actions`, `.wl-cloud-sheet-actions`. Разом із ними
+   розходились і самі кнопки: скасування писали трьома словниками
+   (`.btn-ghost`, `.btn-secondary`, власні `-cancel`), головну дію —
+   двома (`.btn`, `.btn-primary`).
+
+   Наслідок бачила пара, а не розробник: у кожній модалці кнопка «зберегти»
+   опинялась іншого розміру й в іншому місці, тож щоразу її доводилось
+   шукати заново.
+
+   Канон: один ряд унизу аркуша, вирівняний праворуч; другорядна дія
+   ліворуч від головної; обидві заввишки 48px — щоб палець не мусив
+   цілитись.
+
+   Один названий виняток — композер спогаду: там «Готово» стоїть угорі
+   праворуч, бо це повноекранний блокнот, і саме так стоїть телефонний
+   блокнот. Це конвенція платформи, а не розбіжність порталу. */
 .modal-actions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
+  align-items: center;
   margin-top: 6px;
 }
-.modal-actions .btn { flex: 0 0 auto; padding: 10px 18px; }
+.modal-actions .btn,
+.modal-actions .btn-ghost {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 10px 18px;
+}
 .wl-head .btn { flex: 0 0 auto; padding: 8px 16px; }
 
 .wishlist-grid {

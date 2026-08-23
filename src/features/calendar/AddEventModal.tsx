@@ -356,9 +356,9 @@ export function AddEventModal({
           </span>
         </label>
 
-        <div className="cal-entry-actions">
-          <button type="button" className="cal-entry-cancel" onClick={onClose}>Скасувати</button>
-          <button type="submit" className="btn cal-entry-save" disabled={!title.trim() || !date}>Зберегти</button>
+        <div className="modal-actions cal-entry-actions">
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Скасувати</button>
+          <button type="submit" className="btn" disabled={!title.trim() || !date}>Зберегти</button>
         </div>
       </form>
     </ModalShell>

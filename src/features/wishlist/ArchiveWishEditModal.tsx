@@ -1,7 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCurrentUser } from '@/providers/AuthProvider';
 import { useToast } from '@/providers/ToastProvider';
-import { usePartnerQuery } from '@/features/_shared/useUsers';
 import { WishFormModal } from './WishFormModal';
 import type { WishFormPayload } from './useWishlist';
 import {
@@ -25,10 +23,8 @@ export function ArchiveWishEditModal({
   onClose,
   onPhotoClick,
 }: ArchiveWishEditModalProps) {
-  const me = useCurrentUser();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const { partner } = usePartnerQuery();
 
   const query = useQuery({
     queryKey: ['wishlist', 'archive-edit', shared ? 'shared' : ownerId, wishId],
@@ -79,11 +75,13 @@ export function ArchiveWishEditModal({
   }
 
   const item = query.data;
-  const defaultScope = item.is_shared
-    ? 'shared'
-    : item.owner === me.id
-      ? 'me'
-      : 'partner';
+  /*
+   * Чуже бажання теж відкривається як 'me': перемикач «для кого» при
+   * редагуванні схований, а власник тепер береться із запису, а не з
+   * цього значення (див. `WishFormModal`). Варіанта 'partner' у списку
+   * більше немає — пара створює або свої бажання, або спільні.
+   */
+  const defaultScope = item.is_shared ? 'shared' : 'me';
 
   const submit = async (
     id: number | null,
@@ -113,7 +111,6 @@ export function ArchiveWishEditModal({
     <WishFormModal
       key={`archive-edit-${item.id}-${item.version}`}
       item={item}
-      partner={partner ?? null}
       defaultScope={defaultScope}
       defaultSecret={item.is_secret}
       onClose={onClose}

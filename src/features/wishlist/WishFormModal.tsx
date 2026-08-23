@@ -36,7 +36,6 @@ import {
   type WishlistItemV3,
 } from './wishlistRpc';
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
-import type { AppUser } from '@/types';
 import './wishlistFormSections.css';
 import './wishlistUnsavedChanges.css';
 import { TogetherIcon } from '@/components/icons/WishIcon';
@@ -48,18 +47,27 @@ import {
   LayersIcon,
   LockIcon,
   RefreshIcon,
-  UserIcon,
 } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 
-type Scope = 'me' | 'partner' | 'shared';
+/**
+ * Для кого бажання.
+ *
+ * `'partner'` звідси прибрано за рішенням власника: пара створює або
+ * СВОЇ бажання, або спільні. Загадувати бажання за іншу людину — це не
+ * список бажань, а завдання їй; та й «Для Лєни» в чужому списку ставило
+ * запис, якого Лєна не просила.
+ *
+ * Наслідок у коді один і приємний: `owner` більше не залежить від
+ * вибору взагалі — власником завжди є той, хто створює.
+ */
+type Scope = 'me' | 'shared';
 type WishlistPriorityV3 = 'high' | 'medium' | 'low';
 type LinkPreviewStatus = 'idle' | 'loading' | 'success' | 'empty' | 'error';
 type ImageReprocessStatus = 'idle' | 'processing' | 'success' | 'error';
 
 interface WishFormModalProps {
   item: WishlistItemV3 | null;
-  partner: AppUser | null;
   defaultScope: Scope;
   defaultSecret: boolean;
   onClose: () => void;
@@ -87,7 +95,6 @@ function normalizeWishlistPriority(value: unknown): WishlistPriorityV3 | '' {
 
 export function WishFormModal({
   item,
-  partner,
   defaultScope,
   defaultSecret,
   onClose,
@@ -454,7 +461,6 @@ export function WishFormModal({
         imageUrl = uploaded.url;
       }
 
-      const owner = scope === 'partner' && partner ? partner.id : me.id;
       submitStarted = true;
       await onSubmit(
         item?.id ?? null,
@@ -470,7 +476,20 @@ export function WishFormModal({
           description: description.trim() || null,
         },
         {
-          owner,
+          /*
+           * Власник береться з ЗАПИСУ, а не з перемикача.
+           *
+           * Раніше він рахувався як `scope === 'partner' ? partner.id :
+           * me.id`, і це працювало лише тому, що при редагуванні
+           * перемикач був схований, а `defaultScope` приносив
+           * 'partner'. Щойно 'partner' пішов зі списку, така формула
+           * почала б ПРИСВОЮВАТИ собі чуже бажання при кожному
+           * редагуванні.
+           *
+           * Похідна від запису чесніша й у будь-якому разі: власник —
+           * це факт бажання, а не варіант, обраний у формі.
+           */
+          owner: item ? item.owner : me.id,
           isShared: scope === 'shared',
           isSecret: scope === 'me' && isSecret,
         },
@@ -541,12 +560,6 @@ export function WishFormModal({
               }}
               items={[
                 { value: 'me', label: 'Моє', icon: <HeartIcon size={15} /> },
-                {
-                  value: 'partner',
-                  label: `Для ${partner?.name ?? 'партнера'}`,
-                  icon: <UserIcon size={15} />,
-                  disabled: !partner,
-                },
                 { value: 'shared', label: 'Спільне', icon: <TogetherIcon size={15} /> },
               ]}
             />
@@ -718,32 +731,22 @@ export function WishFormModal({
         {!isEdit && scope === 'me' && (
           <div className="form-field wm-visibility-field">
             <span>Видимість</span>
-            <div
-              className="wm-visibility-picker"
-              role="group"
-              aria-label="Видимість бажання"
-            >
-              <button
-                type="button"
-                className="wm-visibility-option"
-                aria-pressed={!isSecret}
-                disabled={saving}
-                onClick={() => setIsSecret(false)}
-              >
-                <HeartIcon size={17} />
-                <strong>Видиме партнеру</strong>
-              </button>
-              <button
-                type="button"
-                className="wm-visibility-option"
-                aria-pressed={isSecret}
-                disabled={saving}
-                onClick={() => setIsSecret(true)}
-              >
-                <LockIcon size={17} />
-                <strong>Таємне</strong>
-              </button>
-            </div>
+            {/* Той самий сегментний перемикач, що й «Для кого» вище.
+                Тут стояв власний: дві картки заввишки 74px із рамками й
+                власним тлом. Два різні перемикачі в одній модалці
+                читаються як дві різні системи, а не як одна форма — і
+                вищий із них ще й додавав їй пів екрана. */}
+            <TabBar<'open' | 'secret'>
+              value={isSecret ? 'secret' : 'open'}
+              onChange={(value) => {
+                if (saving) return;
+                setIsSecret(value === 'secret');
+              }}
+              items={[
+                { value: 'open', label: 'Видиме партнеру', icon: <HeartIcon size={15} /> },
+                { value: 'secret', label: 'Таємне', icon: <LockIcon size={15} /> },
+              ]}
+            />
             <small className="wm-visibility-hint">
               {isSecret
                 ? 'Таємне бажання бачитимеш лише ти.'
@@ -825,10 +828,22 @@ export function WishFormModal({
           {saving ? 'Зберігаємо бажання. Не закривай сторінку.' : ''}
         </p>
 
-        <div className="modal-actions wm-form-actions">
+        {/* Смуга дій — канонічна: скасування ліворуч, головна дія
+            праворуч, обидві того самого розміру, що й у решті модалок.
+            Тут кнопка була одна й на всю ширину, тобто в іншому місці
+            й іншого розміру, ніж будь-де ще в порталі. */}
+        <div className="modal-actions">
           <button
             type="button"
-            className="btn wm-form-submit"
+            className="btn btn-ghost"
+            onClick={requestClose}
+            disabled={saving}
+          >
+            Скасувати
+          </button>
+          <button
+            type="button"
+            className="btn"
             onClick={() => void save()}
             disabled={!title.trim() || saving}
           >

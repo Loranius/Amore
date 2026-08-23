@@ -165,25 +165,8 @@
   padding-top: 2px;
 }
 
-.plan-create-cancel,
-.plan-create-done {
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.plan-create-save,
-.plan-create-continue {
-  min-height: 44px;
-  padding-inline: 18px;
-  border-radius: var(--radius-pill);
-  background: var(--plan-create-accent);
-}
-
+/* `.plan-create-cancel` жив тут; смуга дій переїхала на спільний канон
+   (`.modal-actions` + `.btn btn-ghost` + `.btn`). */
 .plan-create-success {
   justify-items: center;
   min-height: 390px;
@@ -209,15 +192,12 @@
   overflow-wrap: anywhere;
 }
 
+/* Смуга дій екрана успіху — той самий канон (`.modal-actions`), лише
+   вирівняна по центру, бо весь екран успіху центрований. */
 .plan-create-success-actions {
-  display: grid;
-  gap: 10px;
-  width: min(100%, 310px);
+  justify-content: center;
+  width: min(100%, 340px);
   margin-top: 6px;
-}
-
-.plan-create-continue {
-  width: 100%;
 }
 
 .plan-create-done {

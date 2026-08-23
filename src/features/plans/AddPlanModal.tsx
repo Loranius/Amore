@@ -246,11 +246,11 @@ export function AddPlanModal({
               )}
             </section>
 
-            <div className="plan-create-actions">
-              <button type="button" className="plan-create-cancel" onClick={requestClose} disabled={busy || closing}>
+            <div className="modal-actions plan-create-actions">
+              <button type="button" className="btn btn-ghost" onClick={requestClose} disabled={busy || closing}>
                 Скасувати
               </button>
-              <button type="submit" className="btn plan-create-save" disabled={busy || closing || !title.trim()}>
+              <button type="submit" className="btn" disabled={busy || closing || !title.trim()}>
                 {busy ? 'Зберігаю…' : 'Зберегти ідею'}
               </button>
             </div>
@@ -262,17 +262,20 @@ export function AddPlanModal({
             <h2 id="plan-create-title">{title.trim()}</h2>
             <p>Він збережений серед ідей. Можна залишити його так або одразу додати дату, кроки й бюджет.</p>
 
-            <div className="plan-create-success-actions">
+            {/* Порядок як у каноні: тиха дія ліворуч, головна праворуч.
+                Тут вони стояли навпаки — «Продовжити планування» вгорі,
+                «Залишити як ідею» під ним, — тобто ще й іншою віссю. */}
+            <div className="modal-actions plan-create-success-actions">
+              <button type="button" className="btn btn-ghost" onClick={requestClose} disabled={closing}>
+                Залишити як ідею
+              </button>
               <button
                 type="button"
-                className="btn plan-create-continue"
+                className="btn"
                 onClick={() => requestContinue(createdPlanId)}
                 disabled={closing}
               >
                 Продовжити планування
-              </button>
-              <button type="button" className="plan-create-done" onClick={requestClose} disabled={closing}>
-                Залишити як ідею
               </button>
             </div>
           </section>

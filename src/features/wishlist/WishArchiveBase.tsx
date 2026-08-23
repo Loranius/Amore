@@ -647,7 +647,7 @@ export function WishArchive({
                   : 'Додай подарунок, який уже отримував раніше, або заверши актуальну мрію.'}
               </p>
               {!isShared && (
-                <button type="button" className="btn-primary" onClick={() => setAddingGift(true)}>
+                <button type="button" className="btn" onClick={() => setAddingGift(true)}>
                   <PlusIcon size={15} /> Додати давній подарунок
                 </button>
               )}

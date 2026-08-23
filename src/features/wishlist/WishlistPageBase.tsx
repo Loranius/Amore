@@ -667,8 +667,10 @@ export function WishlistPage() {
         <WishFormModal
           key={editing ? `edit-${editing.id}-${editing.version}` : 'new-wish'}
           item={editing}
-          partner={partner}
-          defaultScope={tab}
+          /* Вкладка партнера більше не пропонує створити бажання ЗА
+             нього: варіанта 'partner' у формі немає, а власник при
+             редагуванні береться із самого запису. */
+          defaultScope={tab === 'shared' ? 'shared' : 'me'}
           defaultSecret={isSecretMode}
           onClose={() => {
             setAdding(false);

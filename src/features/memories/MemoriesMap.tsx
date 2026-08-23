@@ -350,7 +350,7 @@ export function MemoriesMap({
         <div className="mm-map-sheet">
           <b>{draft.place ? placeLabel(draft.place) : 'Визначаю місце…'}</b>
           <p>Зберегти тут спогад?</p>
-          <div className="mm-map-sheet-actions">
+          <div className="modal-actions mm-map-sheet-actions">
             <button type="button" className="btn btn-ghost" onClick={() => setDraft(null)}>
               Скасувати
             </button>
@@ -382,7 +382,7 @@ export function MemoriesMap({
               ? openPin.moment.title.trim() || 'Тут уже є спогад'
               : 'Місце без спогаду'}
           </p>
-          <div className="mm-map-sheet-actions">
+          <div className="modal-actions mm-map-sheet-actions">
             <button type="button" className="btn btn-ghost" onClick={() => setOpenPin(null)}>
               Закрити
             </button>

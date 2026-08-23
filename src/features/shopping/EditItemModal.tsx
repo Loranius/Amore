@@ -102,7 +102,7 @@ export function EditItemModal({ item, onClose, onSave }: EditItemModalProps) {
             </select>
           </label>
 
-          <div className="shopping-edit-actions">
+          <div className="modal-actions">
             <button type="button" className="btn btn-ghost" onClick={onClose}>
               Скасувати
             </button>

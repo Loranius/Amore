@@ -156,7 +156,23 @@ describe('active state (brief §15)', () => {
   });
 });
 
-describe('restraint (brief §11, §13, §16)', () => {
+/** Ділить `box-shadow` на шари, не рвучи вкладені `fn(a, b)`. */
+function splitShadowLayers(value: string): string[] {
+  const layers: string[] = [];
+  let depth = 0;
+  let current = '';
+  for (const char of value) {
+    if (char === '(') depth += 1;
+    else if (char === ')') depth -= 1;
+    if (char === ',' && depth === 0) { layers.push(current); current = ''; continue; }
+    current += char;
+  }
+  if (current.trim()) layers.push(current);
+  return layers;
+}
+
+describe('restraint (brief §11, §13, §16)', 
+() => {
   it('blurs exactly one thing', () => {
     // §13: "Do not put expensive blur on every card." The dock is one
     // element on the screen and lies directly on the artifact; a list of
@@ -183,7 +199,11 @@ describe('restraint (brief §11, §13, §16)', () => {
     const shadows = [...NO_COMMENTS.matchAll(/box-shadow:([^;]+);/g)].map((m) => m[1]!);
     expect(shadows.length).toBeGreaterThan(0);
     for (const shadow of shadows) {
-      for (const layer of shadow.split(/,(?![^()]*\))/)) {
+      // Розділювач шарів мусить пропускати коми ВСЕРЕДИНІ дужок:
+      // `color-mix(in srgb, …)` містить їх, і наївний split рвав такий
+      // шар на уламки. Сторож, який плутається на дозволеному значенні,
+      // так само промовчить на забороненому.
+      for (const layer of splitShadowLayers(shadow)) {
         if (/var\(--world-glow\)/.test(layer)) {
           // Coloured light is allowed only as a hairline inset edge.
           expect(layer.trim(), layer).toMatch(/^inset 0 1px 0/);

@@ -92,16 +92,18 @@
     min-height: 180px;
   }
 
-  .wishlist .modal-actions {
-    position: sticky;
-    z-index: 4;
-    bottom: calc(-1 * max(20px, env(safe-area-inset-bottom)));
-    margin-inline: -2px;
-    padding-block: 12px max(20px, env(safe-area-inset-bottom));
-    border-top: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
-    background: linear-gradient(to top, var(--surface) 76%, color-mix(in srgb, var(--surface) 92%, transparent));
-    box-shadow: 0 -12px 28px rgba(4, 2, 10, 0.48);
-  }
+  /* Смуга дій НЕ липка, і це не спрощення.
+     ------------------------------------------------------------
+     Тут стояв `position: sticky` з градієнтом і тінню — щоб кнопка
+     лишалась під рукою на довгій формі. Ціна виявилась більшою за
+     користь: аркуш модалки сам напівпрозорий
+     (`--glass-read` = `--surface-2 88%`), тож будь-яка непрозора смуга
+     дає видимий шов. На екрані це читалось як сіра плита за кнопкою
+     «Створити бажання» — і читалось ЗАВЖДИ, зокрема на короткій формі,
+     якій нікуди прокручуватись.
+
+     Форма вміщається в екран із згорнутими «Додатковими деталями», а
+     розгорнута просто прокручується, як усі інші модалки порталу. */
 
   .wishlist .modal-actions > button {
     min-height: 48px;

@@ -322,13 +322,13 @@ export function ArchiveGiftFormModal({
           </label>
         </section>
 
-        <div className="wl-archive-gift-actions">
-          <button type="button" className="btn-secondary" disabled={saving} onClick={onClose}>
+        <div className="modal-actions wl-archive-gift-actions">
+          <button type="button" className="btn btn-ghost" disabled={saving} onClick={onClose}>
             Скасувати
           </button>
           <button
             type="button"
-            className="btn-primary"
+            className="btn"
             disabled={saving || !title.trim() || !giftedOn}
             onClick={() => void save()}
           >
