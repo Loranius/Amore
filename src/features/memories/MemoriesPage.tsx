@@ -17,8 +17,14 @@
 // Розподіл між сусідніми модулями, щоб ніхто не додав сюди зайвого:
 // «Спогади» — що вже було; «Наш шлях» — віхи; «Плани» — чого ще хочеться.
 // ============================================================
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSettledPending } from '@/lib/useSettledPending';
+import {
+  hasMoreMemories,
+  initialMemoriesCount,
+  nextMemoriesCount,
+} from './memoriesPaging';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { FoldedMapIcon } from '@/components/icons/ViewIcon';
@@ -47,8 +53,46 @@ export function MemoriesPage() {
   const [mapOpen, setMapOpen] = useState(false);
   /** Місце, з яким відкрити композер після вибору точки на карті. */
   const [fromMap, setFromMap] = useState<{ pinId: number | null; value: PlaceCandidate } | null>(null);
+  // Хуки ДО ранніх виходів нижче: порядок виклику хуків між рендерами
+  // мусить лишатись однаковим.
+  const skeletonVisible = useSettledPending(isPending);
 
-  if (isPending) {
+  const total = data?.moments.length ?? 0;
+  const [shown, setShown] = useState(() => initialMemoriesCount(total));
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // Архів приїхав (або змінився) — рахуємо першу пачку від його розміру.
+  useEffect(() => {
+    setShown(initialMemoriesCount(total));
+  }, [total]);
+
+  // Пара догортала до позначки — додаємо наступну пачку.
+  //
+  // `rootMargin` знизу навмисно щедрий: пачка мусить приїхати ДО того, як
+  // список скінчиться під пальцем, інакше нарощування читається як ривок
+  // саме там, де ми його й прибираємо.
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      setShown((current) => nextMemoriesCount(current, total));
+    }, { rootMargin: '600px 0px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [total, shown]);
+
+  // Порядок гілок тут вирішує все, і це виміряно.
+  //
+  // Спершу було `if (isPending) { … skeletonVisible && <скелет> }` — тобто
+  // зовнішню гілку обирало завантаження, а скелет лише ховався всередині.
+  // Наслідок: щойно дані приїжджали, гілка мінялась ЦІЛКОМ, і мінімальний
+  // час показу не діяв — на живому екрані скелет блимнув на 10 мс, тобто
+  // рівно тим блиманням, яке поріг мав прибрати.
+  //
+  // Тепер зовнішню гілку обирає САМ скелет: поки він тримається, сторінка
+  // показує його, навіть якщо дані вже є.
+  if (skeletonVisible) {
     return (
       <section className="memories">
         <div className="mm-grid" aria-hidden="true">
@@ -57,6 +101,9 @@ export function MemoriesPage() {
       </section>
     );
   }
+
+  // Вікно очікування до порога: порожньо, але висота розділу вже своя.
+  if (isPending) return <section className="memories" aria-busy="true" />;
 
   if (isError) {
     return (
@@ -90,9 +137,19 @@ export function MemoriesPage() {
           Ще жодного спогаду. Натисни «+» і збережи перший.
         </p>
       ) : (
-        <div className="mm-grid">
-          {moments.map((moment) => <MemoryCard key={moment.id} moment={moment} />)}
-        </div>
+        <>
+          <div className="mm-grid">
+            {moments.slice(0, shown).map((moment) => (
+              <MemoryCard key={moment.id} moment={moment} />
+            ))}
+          </div>
+          {/* Позначка кінця списку. Порожня за призначенням: вона нічого
+              не показує, лише повідомляє, що пара догортала — і тоді
+              з'являється наступна пачка (`memoriesPaging.ts`). */}
+          {hasMoreMemories(shown, moments.length) && (
+            <div ref={sentinelRef} className="mm-more-sentinel" aria-hidden="true" />
+          )}
+        </>
       )}
 
       <button

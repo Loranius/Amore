@@ -25,6 +25,7 @@ import { MoveWishModal } from './MoveWishModal';
 import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
 import { WishArchive } from './WishArchive';
 import { WishlistGridSkeleton, WishlistPageSkeleton } from './WishlistSkeleton';
+import { useSettledPending } from '@/lib/useSettledPending';
 import { WishlistHero } from './WishlistHero';
 import { WishlistPartnerToolbar } from './WishlistPartnerToolbar';
 import { WishlistSharedToolbar } from './WishlistSharedToolbar';
@@ -223,6 +224,11 @@ export function WishlistPage() {
   const isPending = activeQuery.isPending;
   const isFetching = activeQuery.isFetching;
   const isError = activeQuery.isError;
+  // Обидва скелети — за порогом. Хуки стоять ТУТ, а не біля місця
+  // використання: нижче є ранній вихід (`if (partnerPending) return …`),
+  // і хук після нього порушив би порядок виклику між рендерами.
+  const partnerSkeletonVisible = useSettledPending(partnerPending);
+  const gridSkeletonVisible = useSettledPending(isPending);
   const refetchItems = activeQuery.refetch;
   const partnerCounts = partnerWishFilterCounts(partnerItems, me.id);
   const sharedCounts = sharedWishFilterCounts(sharedItems, me.id, partner?.id ?? -1);
@@ -368,7 +374,17 @@ export function WishlistPage() {
 
   // Не будуємо вкладку партнера до отримання фактичного іншого користувача.
   // Так у DOM ніколи не з'являється тимчасове «Бажання Партнера».
-  if (partnerPending) return <WishlistPageSkeleton />;
+  //
+  // Скелет — за порогом (`useSettledPending`): на теплому кеші відповідь
+  // приходить швидше, ніж око встигає прочитати сім порожніх бульбашок, і
+  // безумовний показ давав саме блимання, а не відчуття швидкості.
+  // Порожня сторінка тут не «нічого не сталось», а те, що видно частку
+  // секунди між двома розділами.
+  // Скелет перевіряється ПЕРШИМ, а завантаження другим: інакше приїзд
+  // даних міняв би гілку цілком і мінімальний час показу не діяв би
+  // (див. той самий висновок у `MemoriesPage`).
+  if (partnerSkeletonVisible) return <WishlistPageSkeleton />;
+  if (partnerPending) return <section className="wishlist pink-page" aria-busy="true" />;
 
   if (partnerError || !partner) {
     return (
@@ -551,11 +567,15 @@ export function WishlistPage() {
 
           {ownerId === null && tab !== 'shared' ? (
             <p className="empty-state">Користувача не знайдено.</p>
-          ) : isPending ? (
+          ) : gridSkeletonVisible ? (
+            // Скелет попереду `isPending` — та сама причина, що й вище:
+            // саме він, а не завантаження, тримає гілку, поки не вийде
+            // мінімальний час показу. Без цього сім порожніх бульбашок
+            // блимали на кожному заході в розділ.
             <div role="status" aria-live="polite" aria-label="Завантаження бажань">
               <WishlistGridSkeleton />
             </div>
-          ) : isError ? (
+          ) : isPending ? null : isError ? (
             <div className="empty-state" role="alert">
               <p>Не вдалось завантажити бажання. Перевір з’єднання й повтори.</p>
               <button
