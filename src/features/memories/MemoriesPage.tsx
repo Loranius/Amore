@@ -29,6 +29,8 @@ import { useCurrentUser } from '@/providers/AuthProvider';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { FoldedMapIcon } from '@/components/icons/ViewIcon';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { CameraIcon } from '@/components/icons/NavIcon';
 import { MemoryCard } from './MemoryCard';
 import { MomentComposer } from './MomentComposer';
 import { useMoments } from './useMoments';
@@ -132,9 +134,11 @@ export function MemoriesPage() {
       />
 
       {moments.length === 0 ? (
-        <p className="empty-state">
-          Ще жодного спогаду. Натисни «+» і збережи перший.
-        </p>
+        <EmptyState
+          icon={<CameraIcon size={26} />}
+          title="Ще жодного спогаду"
+          hint="Фото, дата й кілька слів — цього досить. Спогади лягають у стрічку й живлять кристал на головній."
+        />
       ) : (
         <>
           <div className="mm-grid">

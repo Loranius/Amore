@@ -12,10 +12,13 @@ import { useSwipeDeck } from './useSwipeDeck';
 import { SWIPE_VERDICTS } from './swipeDirections';
 import { useTmdbGenres } from '@/features/media/useTmdb';
 import type { SwipeType, SwipeCard, SwipeDirection } from '@/types';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { FilmIcon } from '@/components/icons/NavIcon';
+import { VerdictIcon } from './VerdictIcon';
 
 const TYPE_TABS: { type: SwipeType; label: string }[] = [
-  { type: 'movie', label: '🎬 Фільми' },
-  { type: 'series', label: '📺 Серіали' },
+  { type: 'movie', label: 'Фільми' },
+  { type: 'series', label: 'Серіали' },
 ];
 
 export function SwipeDeck({ enabled }: { enabled: boolean }) {
@@ -105,12 +108,16 @@ export function SwipeDeck({ enabled }: { enabled: boolean }) {
         {loading ? (
           <p className="empty-state">Завантаження…</p>
         ) : exhausted ? (
-          <div className="swipe-empty">
-            <p className="empty-state">Картки скінчились 🎬</p>
-            <button type="button" className="btn" onClick={() => void reload()}>
-              Оновити
-            </button>
-          </div>
+          <EmptyState
+            icon={<FilmIcon size={26} />}
+            title="Картки скінчились"
+            hint="Ви переглянули все, що знайшлося за цим фільтром. Спробуйте інші жанри або оновіть колоду."
+            action={(
+              <button type="button" className="btn" onClick={() => void reload()}>
+                Оновити колоду
+              </button>
+            )}
+          />
         ) : (
           visible
             .map((card, i) => (
@@ -142,7 +149,7 @@ export function SwipeDeck({ enabled }: { enabled: boolean }) {
               title={verdict.label}
               aria-label={verdict.label}
             >
-              {verdict.glyph}
+              <VerdictIcon name={verdict.icon} />
             </button>
           ))}
         </div>

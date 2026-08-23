@@ -1,0 +1,49 @@
+/* ============================================================
+   Порожній стан.
+   ------------------------------------------------------------
+   Не по центру екрана, а трохи вище центру: погляд шукає вміст у
+   верхній третині, і блок, посаджений строго посередині, читається як
+   випадково впущений.
+
+   Значок приглушений і великий; він не має бути акцентом — його робота
+   лише сказати «екран цілий».
+   ============================================================ */
+.empty-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 48px 24px 56px;
+  text-align: center;
+}
+
+.empty-block__icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.empty-block__title {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.empty-block__hint {
+  margin: 0;
+  max-width: 34ch;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.empty-block__action {
+  margin-top: 6px;
+}

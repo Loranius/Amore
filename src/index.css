@@ -1898,6 +1898,35 @@ textarea::placeholder {
    тепер приходить у слот `action`, тож її розміри лишились при ній. */
 .page-head__action .btn { padding: 8px 16px; }
 
+/* Пошук і свайп в одному ряду.
+   ------------------------------------------------------------
+   Виміряно на живому екрані (412×915): над першим постером стояло
+   П'ЯТЬ рядів керування — вкладки типу, пошук, свайп, картка
+   середнього рейтингу й чипи статусу. Перший вміст починався на 375-му
+   пікселі, тобто 41% екрана віддано контролам ще до того, як пара щось
+   побачила.
+
+   Рейтинг переїхав у рядок стану заголовка (він статистика, не
+   контрол), а пошук зі свайпом стали одним рядом: обидва відповідають
+   на питання «що б додати». Лишилось три ряди. */
+.media-find {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.media-find .media-search-wrap { flex: 1 1 auto; margin-bottom: 0; }
+.media-find .swipe-toggle-btn {
+  flex: 0 0 auto;
+  width: auto;
+  margin-bottom: 0;
+  padding: 11px 14px;
+}
+/* На вузькому екрані підпис «Свайп» поступається місцем пошуку. */
+@media (max-width: 380px) {
+  .media-find .swipe-toggle-btn span { display: none; }
+}
+
 .media-search-wrap { position: relative; margin-bottom: 14px; }
 .media-search-inp {
   width: 100%;
@@ -1984,8 +2013,32 @@ textarea::placeholder {
 .media-detail-modal .modal-actions { padding: 0 14px 14px; }
 
 /* Свайп */
-.swipe-toggle-btn { width: 100%; border: 0; border-radius: 12px; padding: 11px; margin-bottom: 12px; background: var(--surface); color: var(--text); font: inherit; cursor: pointer; }
+/* Кнопка свайпу — значки замість «🔥 Свайп ▼».
+   Емодзі в керуванні читається як тимчасова заглушка, а стрілочка ▼ ще
+   й не обертається: стан «розгорнуто» доводилось підміняти іншим
+   символом замість того, щоб повернути той самий. */
+.swipe-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 11px;
+  margin-bottom: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
 .swipe-toggle-btn.open { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+.swipe-toggle-chev { transition: rotate 180ms ease; }
+.swipe-toggle-chev.open { rotate: 180deg; }
+@media (prefers-reduced-motion: reduce) {
+  .swipe-toggle-chev { transition: none; }
+}
 .swipe-panel { margin-bottom: 16px; }
 
 .swipe-type-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
@@ -2099,14 +2152,32 @@ textarea::placeholder {
   -webkit-backdrop-filter: blur(6px);
 }
 
-.swipe-verdict-glyph { font-size: 24px; }
+/* Значок вердикту — мальований, тож центрується сіткою, а не кеглем.
+   Раніше тут стояли емодзі: три з чотирьох малювала система з власною
+   палітрою, і зелена галочка лишалась зеленою на зеленому колі. */
+.swipe-verdict-glyph { display: grid; place-items: center; color: #fff; }
 
 @media (max-width: 380px) {
   .swipe-verdict-badge { font-size: 19px; padding: 12px 18px; }
 }
 
 .swipe-actions { display: flex; justify-content: center; gap: 14px; margin-top: 14px; }
-.swipe-act { width: 52px; height: 52px; border: 0; border-radius: 50%; font-size: 22px; cursor: pointer; background: var(--surface); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12); }
+.swipe-act {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  /* Білий значок на кольоровому колі: колір несе вердикт, значок — дію. */
+  color: #fff;
+  cursor: pointer;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: translate 90ms ease;
+}
+.swipe-act:active { translate: 0 2px; }
+@media (prefers-reduced-motion: reduce) { .swipe-act { transition: none; } }
 /* Кнопка-дублер несе ТОЙ САМИЙ колір, що й заливка картки під час жесту:
    інакше пара вчила б два різні словники для однієї дії. */
 .swipe-act-up { background: var(--swipe-done); }
@@ -2512,16 +2583,27 @@ textarea::placeholder {
 .whereto { display: flex; flex-direction: column; gap: 14px; }
 .wt-head { display: flex; flex-direction: column; gap: 10px; }
 .wt-city-btn {
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 9px 16px;
   background: var(--surface);
   color: var(--text);
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
   align-self: flex-start;
 }
-.wt-search-btn { width: 100%; }
+.wt-city-btn svg { color: var(--accent); flex: 0 0 auto; }
+.wt-search-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
 
 .wt-results { display: flex; flex-direction: column; gap: 12px; }
 /* Фон/радіус/паддінг уже з .card (WhereToPage.tsx: className="card wt-card") — тут лише розкладка. */

@@ -153,24 +153,41 @@
   color: #10251f;
 }
 
-/* Редагування й видалення — окремі великі touch targets. На телефоні вони
-   більше не повинні виглядати як дві злиплі сірі піктограми. */
+/* Редагування й видалення — окремі великі touch targets: на телефоні
+   вони не повинні бути двома злиплими значками. Але «окремі й великі»
+   не означає «залиті» — див. наступний блок. */
 .shopping[data-world='true'] .shopping-item-actions {
   gap: 7px;
   opacity: 1;
 }
 
+/* Дії рядка — тихі, доки їх не торкнулись.
+   ------------------------------------------------------------
+   Тут стояли ДВІ залиті кнопки на кожному рядку: бузкова «олівець» і
+   червона «кошик», обидві з кантом, внутрішнім відблиском і власною
+   тінню. Наслідків було три, і жоден не косметичний:
+
+   1. Список читався як таблиця з елементами керування, а не як
+      записка на холодильнику. Найважче в рядку — назва покупки —
+      важило менше за дві кнопки поруч.
+   2. Червоне стояло на кожному рядку постійно, хоча нічого
+      небезпечного не відбувається: небезпека — це мить натискання, а
+      не стан списку.
+   3. Найруйнівніша дія була найпомітнішою й такою ж завбільшки, як
+      нешкідливе редагування. Промах пальцем коштував покупки.
+
+   Тепер обидві дії — тихі значки без заливки, і колір з'являється
+   лише під пальцем: бузковий для редагування, червоний для видалення.
+   Ціль лишається 42px — приглушений вигляд не має коштувати влучності. */
 .shopping[data-world='true'] .shopping-item-actions button {
   width: 42px;
   height: 42px;
   flex: 0 0 42px;
-  border: 1px solid color-mix(in srgb, var(--world-accent) 34%, var(--world-border));
-  border-radius: 13px;
-  background: color-mix(in srgb, var(--world-primary) 15%, var(--world-surface-soft));
-  color: var(--world-accent);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--world-glow) 72%, transparent),
-    0 5px 14px color-mix(in srgb, var(--world-shadow) 42%, transparent);
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--world-text-muted);
+  box-shadow: none;
   touch-action: manipulation;
 }
 
@@ -179,12 +196,21 @@
   height: 18px;
 }
 
+.shopping[data-world='true'] .shopping-item-actions button:hover:not(:disabled),
+.shopping[data-world='true'] .shopping-item-actions button:focus-visible {
+  border-color: color-mix(in srgb, var(--world-accent) 34%, var(--world-border));
+  background: color-mix(in srgb, var(--world-primary) 15%, var(--world-surface-soft));
+  color: var(--world-accent);
+}
+
 .shopping[data-world='true'] .shopping-item-actions button:active:not(:disabled) {
   transform: scale(.94);
   background: color-mix(in srgb, var(--world-primary) 25%, var(--world-surface-soft));
 }
 
-.shopping[data-world='true'] .shopping-item-actions .shopping-delete {
+/* Червоне — лише в мить дотику до видалення. */
+.shopping[data-world='true'] .shopping-item-actions .shopping-delete:hover:not(:disabled),
+.shopping[data-world='true'] .shopping-item-actions .shopping-delete:focus-visible {
   border-color: color-mix(in srgb, var(--world-danger) 46%, var(--world-border));
   background: color-mix(in srgb, var(--world-danger) 12%, var(--world-surface-soft));
   color: var(--world-danger);
@@ -192,6 +218,7 @@
 
 .shopping[data-world='true'] .shopping-item-actions .shopping-delete:active:not(:disabled) {
   background: color-mix(in srgb, var(--world-danger) 20%, var(--world-surface-soft));
+  color: var(--world-danger);
 }
 
 /* ── Архів і стани ───────────────────────────────────────── */

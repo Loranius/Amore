@@ -11,19 +11,23 @@ import { TabBar } from '@/components/ui/TabBar';
 type Tab = 'constructor' | 'favorites';
 
 import { PageHeader } from '@/components/ui/PageHeader';
+import { HeartIcon, PotIcon } from '@/components/icons/NavIcon';
 
 export function CulinaryPage() {
   const [tab, setTab] = useState<Tab>('constructor');
 
   return (
     <section className="culinary pink-page">
-      <PageHeader title="Кулінарія" eyebrow="Що готуємо" />
+      {/* Надзаголовок НЕ «Що готуємо» — конструктор нижче ставить це
+          питання дослівно, і два однакові рядки поспіль читаються як
+          збій верстки. Та сама пастка, що й у «Скарбничці». */}
+      <PageHeader title="Кулінарія" eyebrow="Рецепти й ідеї" />
       <TabBar<Tab>
         value={tab}
         onChange={setTab}
         items={[
-          { value: 'constructor', label: 'Конструктор', icon: '🔮' },
-          { value: 'favorites', label: 'Улюблені', icon: '❤️' },
+          { value: 'constructor', label: 'Конструктор', icon: <PotIcon size={16} /> },
+          { value: 'favorites', label: 'Улюблені', icon: <HeartIcon size={16} filled /> },
         ]}
       />
 

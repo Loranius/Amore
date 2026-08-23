@@ -20,7 +20,16 @@ export interface SwipeVerdict {
   /** Що пара побачить у центрі картки під час жесту. */
   label: string;
   /** Значок кнопки-дублера під колодою. */
-  glyph: string;
+  /**
+   * Ім'я значка з набору — НЕ емодзі.
+   *
+   * Тут стояли `🕐`, `✅`, `▶` і текстовий `✕`: чотири кнопки одного
+   * ряду, з яких три малювала система, а одну — шрифт. Вони не збігались
+   * ні за товщиною лінії, ні за оптичним розміром, ні за кольором:
+   * емодзі приходить із власною палітрою й ігнорує `currentColor`, тому
+   * зелена галочка лишалась зеленою на зеленому колі.
+   */
+  icon: SwipeVerdictIcon;
   /** Токен кольору вердикту. */
   colourVar: string;
 }
@@ -30,13 +39,15 @@ export interface SwipeVerdict {
  * повторює розташування самих жестів: «в планах» ліворуч, «пропустити»
  * донизу, «переглянуто» догори, «дивимось» праворуч.
  */
+export type SwipeVerdictIcon = 'clock' | 'close' | 'check' | 'play';
+
 export const SWIPE_VERDICTS: readonly SwipeVerdict[] = [
-  { direction: 'left', label: 'В планах', glyph: '🕐', colourVar: '--swipe-want' },
-  { direction: 'down', label: 'Пропустити', glyph: '✕', colourVar: '--swipe-skip' },
+  { direction: 'left', label: 'В планах', icon: 'clock', colourVar: '--swipe-want' },
+  { direction: 'down', label: 'Пропустити', icon: 'close', colourVar: '--swipe-skip' },
   // «Переглянуто», а не «Подивились»: так це називає власник, і так само
   // підписана кнопка. Один жест — одна назва.
-  { direction: 'up', label: 'Переглянуто', glyph: '✅', colourVar: '--swipe-done' },
-  { direction: 'right', label: 'Дивимось', glyph: '▶', colourVar: '--swipe-watching' },
+  { direction: 'up', label: 'Переглянуто', icon: 'check', colourVar: '--swipe-done' },
+  { direction: 'right', label: 'Дивимось', icon: 'play', colourVar: '--swipe-watching' },
 ];
 
 export const VERDICT_BY_DIRECTION: Record<SwipeDirection, SwipeVerdict> =

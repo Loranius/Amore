@@ -12,6 +12,10 @@ import type { WhereToLocation, WhereToEvent } from '@/types';
 
 import { PageHeader } from '@/components/ui/PageHeader';
 
+import { MapPinIcon } from '@/components/icons/MapIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { RefreshIcon, SearchIcon } from '@/components/icons/UiIcon';
+
 export function WhereToPage() {
   const { data: location } = useWhereToLocation();
   const saveLoc = useSaveLocation();
@@ -72,7 +76,8 @@ export function WhereToPage() {
       />
       <div className="wt-head">
         <button type="button" className="wt-city-btn" onClick={() => setCityModal(true)}>
-          {location ? `📍 ${location.city} · змінити` : '📍 Обрати місто'}
+          <MapPinIcon size={16} />
+          <span>{location ? `${location.city} · змінити` : 'Обрати місто'}</span>
         </button>
         <button
           type="button"
@@ -80,7 +85,8 @@ export function WhereToPage() {
           onClick={() => runSearch(false)}
           disabled={searchMut.isPending}
         >
-          {searchMut.isPending ? '🔎 Шукаю…' : '🔎 Пошук подій'}
+          <SearchIcon size={17} />
+          <span>{searchMut.isPending ? 'Шукаю…' : 'Пошук подій'}</span>
         </button>
       </div>
 
@@ -105,13 +111,29 @@ export function WhereToPage() {
               <EventCard key={i} ev={ev} onOpen={() => setEmbed(ev)} />
             ))}
             <button type="button" className="btn-secondary wt-more-btn" onClick={() => runSearch(true)}>
-              🔄 Ще варіанти
+              <RefreshIcon size={16} />
+              <span>Ще варіанти</span>
             </button>
           </>
         ) : (
-          <p className="empty-state">
-            {location ? 'Натисни «Пошук подій» 🔎' : 'Спершу обери місто 📍'}
-          </p>
+          <EmptyState
+            icon={location ? <SearchIcon size={26} /> : <MapPinIcon size={26} />}
+            title={location ? 'Ще нічого не шукали' : 'Місто не обране'}
+            /* Місто в підказці НЕ згадується, і це не забудькуватість.
+               Перша редакція писала «у ${location.city}» і дала «у
+               Вінниця» замість «у Вінниці»: «у» вимагає місцевого
+               відмінка, а відмінювати довільну назву міста портал не
+               вміє (Вінниця→Вінниці, Львів→Львові, Одеса→Одесі).
+               Місто й так стоїть на кнопці просто над цим текстом. */
+            hint={location
+              ? 'Пошук збере концерти, вистави й цікаві місця на найближчі дні.'
+              : 'Події шукаються по місту — оберіть його, і портал знайде, куди піти.'}
+            action={location ? undefined : (
+              <button type="button" className="btn" onClick={() => setCityModal(true)}>
+                Обрати місто
+              </button>
+            )}
+          />
         )}
       </div>
 

@@ -15,6 +15,7 @@ import { MediaCard } from './MediaCard';
 import { MediaDetailModal } from './MediaDetailModal';
 import { ReviewPanel } from './ReviewPanel';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { ChevronDownIcon, SwapIcon } from '@/components/icons/UiIcon';
 import { MediaFormModal, AddFromSearchModal } from './MediaModals';
 import { SwipeDeck } from '@/features/swipe/SwipeDeck';
 import type { MediaItemRow, MediaType, MediaStatus, TmdbSearchResult } from '@/types';
@@ -72,6 +73,15 @@ export function MediaPage() {
       <PageHeader
         title="Вотчліст"
         eyebrow="Фільми, серіали, книги"
+        /* Середній рейтинг стояв ОКРЕМОЮ карткою над сіткою — тобто
+           статистика займала цілий ряд там, де вже було чотири ряди
+           керування. Це не контрол: натиснути на нього не можна, а
+           змінити його можна лише переглянувши щось нове. Його місце —
+           у рядку стану заголовка, разом із лічильником. */
+        meta={[
+          `${counts.all} у списку`,
+          avgRating ? `★ ${avgRating} середня` : null,
+        ].filter(Boolean).join(' · ')}
         action={(
           <button type="button" className="btn" onClick={() => setForm({ item: null })}>
             + Додати
@@ -86,8 +96,12 @@ export function MediaPage() {
         items={MEDIA_TYPES.map((t) => ({ value: t, label: TYPE_LABELS[t] }))}
       />
 
-      {/* Пошук TMDB — лише фільми/серіали */}
+      {/* Пошук і свайп — один ряд: обидва відповідають на те саме
+          питання «що б додати», а стояли двома рядами один під одним.
+          Для книжок TMDB не працює, тож ряду немає зовсім — інакше
+          лишалась би порожня смуга. */}
       {type !== 'book' && (
+      <div className="media-find">
         <div className="media-search-wrap">
           <input
             id="media-search"
@@ -136,29 +150,23 @@ export function MediaPage() {
             </div>
           )}
         </div>
-      )}
 
-      {/* Панель свайпу (згорнута за замовч.; TMDB не смикаємо доки закрито) */}
-      <button
-        type="button"
-        className={`swipe-toggle-btn${swipeOpen ? ' open' : ''}`}
-        onClick={() => setSwipeOpen((v) => !v)}
-      >
-        🔥 Свайп {swipeOpen ? '▲' : '▼'}
-      </button>
+        {/* Свайп — згорнутий; TMDB не смикаємо, доки закрито. */}
+        <button
+          type="button"
+          className={`swipe-toggle-btn${swipeOpen ? ' open' : ''}`}
+          onClick={() => setSwipeOpen((v) => !v)}
+          aria-expanded={swipeOpen}
+        >
+          <SwapIcon size={17} />
+          <span>Свайп</span>
+          <ChevronDownIcon size={16} className={swipeOpen ? 'swipe-toggle-chev open' : 'swipe-toggle-chev'} />
+        </button>
+      </div>
+      )}
       {swipeOpen && (
         <div className="swipe-panel open">
           <SwipeDeck enabled={swipeOpen} />
-        </div>
-      )}
-
-      {/* Статистика */}
-      {avgRating && (
-        <div className="media-stats">
-          <div className="media-stat">
-            <span className="media-stat-num">★ {avgRating}</span>
-            <span className="media-stat-label">сер. рейтинг</span>
-          </div>
         </div>
       )}
 

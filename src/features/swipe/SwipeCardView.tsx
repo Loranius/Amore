@@ -17,6 +17,7 @@ import { motion, useMotionValue, useTransform, animate, type PanInfo } from 'fra
 import { SWIPE_VERDICTS } from './swipeDirections';
 import { verdictTint } from './swipeFeedback';
 import type { SwipeCard, SwipeDirection } from '@/types';
+import { VerdictIcon } from './VerdictIcon';
 
 const OFFSET_T = 80; // поріг зриву (px), як старий T
 const VELOCITY_T = 500; // або достатня швидкість флику
@@ -137,7 +138,7 @@ export function SwipeCardView({ card, active, depth, onSwipe, onTap }: SwipeCard
           aria-hidden="true"
         >
           <span className="swipe-verdict-badge">
-            <span className="swipe-verdict-glyph">{verdict.glyph}</span>
+            <span className="swipe-verdict-glyph"><VerdictIcon name={verdict.icon} size={26} /></span>
             {verdict.label}
           </span>
         </motion.div>
