@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useCurrentUser } from '@/providers/AuthProvider';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import {
   EVOLUTION_SANDBOX_DAYS_PER_YEAR,
@@ -9,6 +8,7 @@ import {
   type EvolutionSandboxArtifact,
   type EvolutionSandboxValues,
 } from './evolutionSandbox';
+import { isEvolutionConstructorEnabled } from './evolutionConstructorFlag';
 import './evolutionConstructor.css';
 
 const ARTIFACT_LABEL: Record<EvolutionSandboxArtifact, string> = {
@@ -122,15 +122,16 @@ function RangeControl({
 }
 
 export function EvolutionConstructor() {
-  const me = useCurrentUser();
   const { pathname } = useLocation();
   const { artifact } = useArtifactWorld();
   const sandbox = useEvolutionSandbox();
   const [open, setOpen] = useState(false);
 
   const artifactKey = artifact as EvolutionSandboxArtifact;
-  const isDima = me.name === 'Діма';
-  const visible = isDima && pathname === '/';
+  // Читається один раз за монтування: адресу конструктор не слухає, і
+  // перечитувати її щокадру означало б лише зайву роботу.
+  const [enabled] = useState(isEvolutionConstructorEnabled);
+  const visible = enabled && pathname === '/';
   const years = Math.min(
     50,
     Math.round((sandbox.values.relationshipDays / EVOLUTION_SANDBOX_DAYS_PER_YEAR) * 10) / 10,

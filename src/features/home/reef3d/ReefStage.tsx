@@ -14,6 +14,7 @@ import { ReefSessileLife } from './ReefSessileLife';
 import { ReefMicroLifeLayer } from './ReefMicroLifeLayer';
 import { ReefRockBiofilmLayer } from './ReefRockBiofilmLayer';
 import { ReefFishSchool, type ReefFishSchoolMetrics } from './ReefFishSchool';
+import { SceneDecorationBoundary } from '../SceneDecorationBoundary';
 import { ReefDensityLayer } from './ReefDensityLayer';
 import { BackgroundWhale } from './BackgroundWhale';
 import { ReefNaturalArchLayer } from './ReefNaturalArchLayer';
@@ -102,15 +103,20 @@ export function ReefStage({
       <BackgroundWhale reducedMotion={reducedMotion} />
       <ReefSeaGrass reducedMotion={reducedMotion} />
       <ReefSessileLife reducedMotion={reducedMotion} />
-      <Suspense fallback={null}>
-        <ReefFishSchool
-          build={build}
-          count={build.species.moduleEvolution.life.planFish.visibleCount}
-          identitySeed={build.species.moduleEvolution.identitySeed}
-          onReady={onFishReady}
-          reducedMotion={reducedMotion}
-        />
-      </Suspense>
+      {/* Межа НАВКОЛО Suspense, не всередині: Suspense ловить очікування,
+          а не помилку, тож без неї відсутня модель риб забирала весь риф
+          у фолбек «рендерер не працює». Виміряно на живому екрані. */}
+      <SceneDecorationBoundary what="зграя риб">
+        <Suspense fallback={null}>
+          <ReefFishSchool
+            build={build}
+            count={build.species.moduleEvolution.life.planFish.visibleCount}
+            identitySeed={build.species.moduleEvolution.identitySeed}
+            onReady={onFishReady}
+            reducedMotion={reducedMotion}
+          />
+        </Suspense>
+      </SceneDecorationBoundary>
 
       {children}
 
