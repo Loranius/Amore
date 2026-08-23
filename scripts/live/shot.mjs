@@ -42,6 +42,7 @@ const USAGE = `
   --keep-server                      не гасити піднятий сервер після роботи
   --seed=<ключ>=<значення>           записати в localStorage до запуску застосунку;
                                      можна кілька (напр. пам'ять минулого візиту)
+  --no-login                         не входити в портал (щоб зняти сам екран входу)
   --still                            заморозити сцену (для порівняння знімків)
   --headed                           показати вікно браузера
 
@@ -81,6 +82,7 @@ async function main() {
         headed: options.headed,
         still: options.still,
         seed: options.seed,
+        login: options.login,
       });
       try {
         for (const route of options.routes) {

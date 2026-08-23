@@ -230,7 +230,10 @@
 
 .sched .sched-cell--both-off {
   background: linear-gradient(145deg, #a85bdf, #8535be);
-  box-shadow: 0 7px 16px rgba(133, 53, 190, 0.23);
+  /* Було `0 7px 16px rgba(133,53,190,.23)` — фіолетове світіння під
+     фіолетовою клітинкою. The Shadow Is A Shadow Rule: тінь темна й
+     падає вниз, кольорового світла під елементом не буває. */
+  box-shadow: var(--shadow-sm);
 }
 
 .sched .sched-cell--both-off .sched-cell-symbol {

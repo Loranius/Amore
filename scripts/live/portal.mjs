@@ -189,7 +189,7 @@ async function relay(route) {
  * Пишеться до завантаження застосунку, тим самим `addInitScript`, що й
  * тема: після старту гак уже прочитав сховище й другого разу не читає.
  */
-export async function openPortal({ baseUrl, device, tier, theme = null, headed = false, still = false, seed = [] }) {
+export async function openPortal({ baseUrl, device, tier, theme = null, headed = false, still = false, seed = [], login = true }) {
   const executablePath = resolveChromium();
   const browser = await chromium.launch({
     ...(executablePath ? { executablePath } : {}),
@@ -245,6 +245,19 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
    * покриває і сторінку, і воркери.
    */
   for (const pattern of RELAY_HOSTS) await context.route(pattern, relay);
+
+  /*
+   * Екран входу не можна зняти, поки скрипт сам через нього проходить.
+   *
+   * А знімати його треба: це ПЕРШЕ, що пара бачить при холодному
+   * старті, і саме він найдовше лишався поза оглядом — усі перевірки
+   * починались уже всередині порталу.
+   */
+  if (!login) {
+    await page.goto(`${baseUrl}#/login`, { waitUntil: 'load', timeout: 60_000 });
+    await page.waitForTimeout(1200);
+    return { page, logs, close: async () => { await browser.close(); } };
+  }
 
   const credentials = readCredentials();
   await page.goto(`${baseUrl}#/login`, { waitUntil: 'load', timeout: 60_000 });

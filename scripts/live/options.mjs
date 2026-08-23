@@ -163,6 +163,7 @@ export function parseShotArgs(argv) {
     keepServer: false,
     headed: false,
     still: false,
+    login: true,
   };
 
   for (const raw of argv) {
@@ -190,6 +191,8 @@ export function parseShotArgs(argv) {
       case 'port': options.port = Number(value); break;
       case 'settle': options.settle = Number(value); break;
       case 'still': options.still = value !== 'false'; break;
+      // Не входити в портал: єдиний спосіб зняти сам екран входу.
+      case 'no-login': options.login = value === 'false'; break;
       case 'keep-server': options.keepServer = value !== 'false'; break;
       case 'headed': options.headed = value !== 'false'; break;
       default:
@@ -227,6 +230,7 @@ export function parseShotArgs(argv) {
     keepServer: options.keepServer,
     headed: options.headed,
     still: options.still,
+    login: options.login,
   };
 }
 

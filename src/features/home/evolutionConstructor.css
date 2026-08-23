@@ -36,7 +36,9 @@
 .evolution-constructor-fab.is-active {
   border-color: rgba(255, 174, 222, 0.72);
   background: rgba(116, 55, 105, 0.88);
-  box-shadow: 0 10px 32px rgba(117, 45, 101, 0.34);
+  /* Кольорове світіння заборонене навіть в інструменті розробки:
+     правило або діє скрізь, або не діє (Shadow Is A Shadow). */
+  box-shadow: var(--shadow-md);
 }
 
 .evolution-constructor-fab:focus-visible,
