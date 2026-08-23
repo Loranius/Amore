@@ -28,6 +28,7 @@ import {
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { FoldedMapIcon } from '@/components/icons/ViewIcon';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { MemoryCard } from './MemoryCard';
 import { MomentComposer } from './MomentComposer';
 import { useMoments } from './useMoments';
@@ -123,14 +124,12 @@ export function MemoriesPage() {
 
   return (
     <section className="memories">
-      <header className="mm-head">
-        <h1>Спогади</h1>
-        <p className="mm-sub">
-          {moments.length === 0
-            ? 'Тут буде ваш фотощоденник'
-            : `${moments.length} · ${data?.photoCount ?? 0} фото · від ${earliest?.slice(0, 4) ?? ''}`}
-        </p>
-      </header>
+      <PageHeader
+        title="Спогади"
+        meta={moments.length === 0
+          ? 'Тут буде ваш фотощоденник'
+          : `${moments.length} · ${data?.photoCount ?? 0} фото · від ${earliest?.slice(0, 4) ?? ''}`}
+      />
 
       {moments.length === 0 ? (
         <p className="empty-state">

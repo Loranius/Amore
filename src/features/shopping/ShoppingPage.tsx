@@ -103,6 +103,8 @@ function categoryVisual(category: string) {
   return CATEGORY_VISUALS[category] ?? CATEGORY_VISUALS['Інше']!;
 }
 
+import { PageHeader } from '@/components/ui/PageHeader';
+
 export function ShoppingPage() {
   // Світ позаду, як у вішліста й планів: сцена лишається фоном, дотики —
   // сторінці.
@@ -217,6 +219,7 @@ export function ShoppingPage() {
 
   return (
     <section className="shopping shopping-page" data-world={webglSupported ? 'true' : undefined}>
+      <PageHeader title="Покупки" eyebrow="Спільний список" />
 
       <div className="shopping-body">
       {isPending ? (

@@ -22,12 +22,6 @@
   gap: 12px;
 }
 
-.piggy-balance-head > div {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
 .piggy-balance-icon,
 .piggy-balance-modal-icon {
   display: grid;
@@ -38,14 +32,6 @@
   border-radius: 19px;
   color: color-mix(in srgb, var(--accent) 80%, var(--text));
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-}
-
-.piggy-balance-eyebrow {
-  color: color-mix(in srgb, var(--accent) 78%, var(--text));
-  font-size: 10px;
-  font-weight: 850;
-  letter-spacing: .09em;
-  text-transform: uppercase;
 }
 
 .piggy-balance h2 {

@@ -44,6 +44,8 @@ type EventModal = {
   type: EventKind;
 } | null;
 
+import { PageHeader } from '@/components/ui/PageHeader';
+
 export function PlansPage() {
   const navigate = useNavigate();
 
@@ -122,6 +124,7 @@ export function PlansPage() {
       className="plans-module"
       data-world={worldVisible ? 'true' : undefined}
     >
+      <PageHeader title="Плани" eyebrow="Календар і задуми" />
       {failed ? (
         <div className="empty-state pm-error" role="alert">
           <p>Не вдалося завантажити плани й події.</p>

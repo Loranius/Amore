@@ -12,6 +12,11 @@
   margin-bottom: 16px;
 }
 
+/* `.sched-title` тут була `Fredoka clamp(27px, 7vw, 38px)` — тобто назва
+   розділу кричала гучніше за головну, і саме це порушувало The Fredoka
+   Restraint Rule. Разом із `.sched-subtitle` вона переїхала в спільні
+   двері `PageHeader` (ADR-0046). Надзаголовок лишається тут, бо його
+   ділить `.sched-section-kicker` усередині сторінки. */
 .sched-kicker,
 .sched-section-kicker {
   display: block;
@@ -21,21 +26,6 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.sched-title {
-  margin: 0;
-  font-family: 'Fredoka', sans-serif;
-  font-size: clamp(27px, 7vw, 38px);
-  line-height: 1;
-}
-
-.sched-subtitle {
-  max-width: 520px;
-  margin: 7px 0 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.45;
 }
 
 .sched .sched-edit-toggle {
@@ -585,10 +575,6 @@
 @media (max-width: 520px) {
   .sched-hero {
     align-items: center;
-  }
-
-  .sched-subtitle {
-    font-size: 12px;
   }
 
   .sched .sched-edit-toggle {

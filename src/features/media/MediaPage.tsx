@@ -14,6 +14,7 @@ import { useTmdbSearch } from './useTmdb';
 import { MediaCard } from './MediaCard';
 import { MediaDetailModal } from './MediaDetailModal';
 import { ReviewPanel } from './ReviewPanel';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { MediaFormModal, AddFromSearchModal } from './MediaModals';
 import { SwipeDeck } from '@/features/swipe/SwipeDeck';
 import type { MediaItemRow, MediaType, MediaStatus, TmdbSearchResult } from '@/types';
@@ -68,12 +69,15 @@ export function MediaPage() {
 
   return (
     <section className="media pink-page">
-      <div className="media-head">
-        <h1>Вотчліст</h1>
-        <button type="button" className="btn" onClick={() => setForm({ item: null })}>
-          + Додати
-        </button>
-      </div>
+      <PageHeader
+        title="Вотчліст"
+        eyebrow="Фільми, серіали, книги"
+        action={(
+          <button type="button" className="btn" onClick={() => setForm({ item: null })}>
+            + Додати
+          </button>
+        )}
+      />
 
       {/* Вкладки типу */}
       <TabBar<MediaType>

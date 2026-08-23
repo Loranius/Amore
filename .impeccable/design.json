@@ -1,118 +1,294 @@
 {
-  "schemaVersion": 2,
-  "generatedAt": "2026-08-23T00:00:00Z",
-  "title": "Design System: Amore",
-  "extensions": {
-    "colorMeta": {
-      "accent": { "role": "primary", "displayName": "Бузковий акцент", "canonical": "#b06bff",
-        "tonalRamp": ["#1b0d2b","#2e1449","#452069","#5d2c8b","#7740ad","#9255cf","#b06bff","#d9bcff"] },
-      "accent-strong": { "role": "primary", "displayName": "Глибока орхідея", "canonical": "#8b3df0",
-        "tonalRamp": ["#170a29","#261044","#3a1866","#4f2189","#672cae","#7a34cf","#8b3df0","#c9a3fb"] },
-      "bg": { "role": "neutral", "displayName": "Ніч", "canonical": "#100b18",
-        "tonalRamp": ["#080510","#100b18","#191424","#231e2f","#2f293b","#463f55","#6e6681","#b2a8c7"] },
-      "surface": { "role": "neutral", "displayName": "Поверхня картки", "canonical": "#191424",
-        "tonalRamp": ["#0c0812","#131020","#191424","#231e2f","#2f293b","#403950","#5f5670","#8f86a3"] },
-      "text": { "role": "neutral", "displayName": "Чорнило", "canonical": "#f5f4f6",
-        "tonalRamp": ["#2b2830","#3d3945","#544f5e","#6e6879","#8b8496","#aaa4b4","#d2ccdb","#f5f4f6"] },
-      "light-accent": { "role": "primary", "displayName": "Малиновий акцент (день)", "canonical": "#a82f55",
-        "tonalRamp": ["#2a0c16","#451325","#611b35","#7f2444","#a82f55","#c65475","#e08fa5","#f5dfe4"] },
-      "ok": { "role": "tertiary", "displayName": "Бірюза підтвердження", "canonical": "#3fd8c8", "tonalRamp": [] },
-      "danger": { "role": "tertiary", "displayName": "Кораловий сигнал", "canonical": "#ff5f7e", "tonalRamp": [] }
-    },
-    "typographyMeta": {
-      "display": { "displayName": "Fredoka Display", "purpose": "Звертання до пари: вітання, назва артефакта, вхід. Рідко." },
-      "body": { "displayName": "Nunito Body", "purpose": "Усе інше — текст, нотатки, описи." },
-      "label": { "displayName": "Nunito Label", "purpose": "Підписи доку, чипи, дати. Числа tabular-nums." }
-    },
-    "shadows": [
-      { "name": "shadow-sm", "value": "0 2px 8px rgba(4, 2, 10, 0.45)", "purpose": "Дрібні підняті елементи." },
-      { "name": "shadow-md", "value": "0 10px 26px rgba(4, 2, 10, 0.5)", "purpose": "Картки й кадри." },
-      { "name": "shadow-lg", "value": "0 24px 60px rgba(4, 2, 10, 0.6)", "purpose": "Док і модалки." },
-      { "name": "control-top", "value": "inset 0 1px 0 rgba(255, 255, 255, 0.34)", "purpose": "Верхній відблиск тіла." },
-      { "name": "control-lip", "value": "inset 0 -3px 0 rgba(6, 3, 14, 0.34)", "purpose": "Нижня грань — те, що робить кнопку предметом." },
-      { "name": "control-cast", "value": "0 6px 16px rgba(4, 2, 10, 0.5)", "purpose": "Відкинута тінь тіла." }
-    ],
-    "motion": [
-      { "name": "press", "value": "90ms ease", "purpose": "Осідання кнопки під пальцем." },
-      { "name": "sheet-in", "value": "220ms ease", "purpose": "Поява аркуша модуля. Грає ОДИН раз — не на скелеті." },
-      { "name": "dock-indicator", "value": "0.45s cubic-bezier(0.34, 1.56, 0.64, 1)", "purpose": "Переїзд капсули активного модуля." }
-    ],
-    "breakpoints": [
-      { "name": "grid-3col", "value": "720px" },
-      { "name": "desktop", "value": "1024px" }
+ "schemaVersion": 2,
+ "generatedAt": "2026-08-23T00:00:00Z",
+ "title": "Design System: Amore",
+ "extensions": {
+  "colorMeta": {
+   "accent": {
+    "role": "primary",
+    "displayName": "Бузковий акцент",
+    "canonical": "#b06bff",
+    "tonalRamp": [
+     "#1b0d2b",
+     "#2e1449",
+     "#452069",
+     "#5d2c8b",
+     "#7740ad",
+     "#9255cf",
+     "#b06bff",
+     "#d9bcff"
     ]
+   },
+   "accent-strong": {
+    "role": "primary",
+    "displayName": "Глибока орхідея",
+    "canonical": "#8b3df0",
+    "tonalRamp": [
+     "#170a29",
+     "#261044",
+     "#3a1866",
+     "#4f2189",
+     "#672cae",
+     "#7a34cf",
+     "#8b3df0",
+     "#c9a3fb"
+    ]
+   },
+   "bg": {
+    "role": "neutral",
+    "displayName": "Ніч",
+    "canonical": "#100b18",
+    "tonalRamp": [
+     "#080510",
+     "#100b18",
+     "#191424",
+     "#231e2f",
+     "#2f293b",
+     "#463f55",
+     "#6e6681",
+     "#b2a8c7"
+    ]
+   },
+   "surface": {
+    "role": "neutral",
+    "displayName": "Поверхня картки",
+    "canonical": "#191424",
+    "tonalRamp": [
+     "#0c0812",
+     "#131020",
+     "#191424",
+     "#231e2f",
+     "#2f293b",
+     "#403950",
+     "#5f5670",
+     "#8f86a3"
+    ]
+   },
+   "text": {
+    "role": "neutral",
+    "displayName": "Чорнило",
+    "canonical": "#f5f4f6",
+    "tonalRamp": [
+     "#2b2830",
+     "#3d3945",
+     "#544f5e",
+     "#6e6879",
+     "#8b8496",
+     "#aaa4b4",
+     "#d2ccdb",
+     "#f5f4f6"
+    ]
+   },
+   "light-accent": {
+    "role": "primary",
+    "displayName": "Малиновий акцент (день)",
+    "canonical": "#a82f55",
+    "tonalRamp": [
+     "#2a0c16",
+     "#451325",
+     "#611b35",
+     "#7f2444",
+     "#a82f55",
+     "#c65475",
+     "#e08fa5",
+     "#f5dfe4"
+    ]
+   },
+   "ok": {
+    "role": "tertiary",
+    "displayName": "Бірюза підтвердження",
+    "canonical": "#3fd8c8",
+    "tonalRamp": []
+   },
+   "danger": {
+    "role": "tertiary",
+    "displayName": "Кораловий сигнал",
+    "canonical": "#ff5f7e",
+    "tonalRamp": []
+   }
   },
-  "components": [
-    {
-      "name": "Primary Button", "kind": "button", "refersTo": "button-primary",
-      "description": "Основна дія. Тіло з відблиском, губою й тінню; осідає під пальцем.",
-      "html": "<button class=\"ds-btn-primary\">Зберегти</button>",
-      "css": ".ds-btn-primary { border: 0; border-radius: 14px; padding: 12px 20px; font-family: Nunito, system-ui, sans-serif; font-size: 14px; font-weight: 700; color: #fff; cursor: pointer; background-color: #8b3df0; background-image: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 52%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -3px 0 rgba(6,3,14,0.34), 0 6px 16px rgba(4,2,10,0.5); transition: translate 90ms ease, box-shadow 90ms ease; } .ds-btn-primary:active { translate: 0 2px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -1px 0 rgba(6,3,14,0.4), 0 2px 6px rgba(4,2,10,0.45); } .ds-btn-primary:focus-visible { outline: 2px solid #b06bff; outline-offset: 2px; }"
-    },
-    {
-      "name": "Floating Action Button", "kind": "button", "refersTo": "fab",
-      "description": "Круглий «плюс». Один жест — одна дія; меню «що створити» тут заборонене.",
-      "html": "<button class=\"ds-fab\" aria-label=\"Додати\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg></button>",
-      "css": ".ds-fab { width: 58px; height: 58px; border: 0; border-radius: 999px; display: grid; place-items: center; color: #fff; cursor: pointer; background-color: #8b3df0; background-image: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 52%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -3px 0 rgba(6,3,14,0.34), 0 10px 26px rgba(4,2,10,0.5); transition: translate 90ms ease; } .ds-fab:active { translate: 0 2px; } .ds-fab:focus-visible { outline: 2px solid #b06bff; outline-offset: 3px; }"
-    },
-    {
-      "name": "Card", "kind": "card", "refersTo": "card",
-      "description": "Поверхня вмісту. Скла немає навмисно — розмивається лише док.",
-      "html": "<div class=\"ds-card\"><b class=\"ds-card-title\">Тераса</b><span class=\"ds-card-meta\">12 липня 2026</span></div>",
-      "css": ".ds-card { background: #191424; border-radius: 16px; padding: 14px; box-shadow: 0 10px 26px rgba(4,2,10,0.5); display: grid; gap: 4px; } .ds-card-title { font-family: Nunito, system-ui, sans-serif; font-size: 16px; font-weight: 700; color: #f5f4f6; } .ds-card-meta { font-family: Nunito, system-ui, sans-serif; font-size: 12px; color: #b2a8c7; font-variant-numeric: tabular-nums; }"
-    },
-    {
-      "name": "Filter Chip", "kind": "chip", "refersTo": "chip",
-      "description": "Капсула фільтра. Ряд гортається вбік, коли чипів більше, ніж уміщається.",
-      "html": "<button class=\"ds-chip\">Комедія</button> <button class=\"ds-chip ds-chip--on\" aria-pressed=\"true\">Бойовик</button>",
-      "css": ".ds-chip { flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(198,160,255,0.14); background: #231e2f; color: #b2a8c7; font-family: Nunito, system-ui, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; } .ds-chip--on { background: #8b3df0; border-color: #8b3df0; color: #fff; } .ds-chip:focus-visible { outline: 2px solid #b06bff; outline-offset: 2px; }"
-    },
-    {
-      "name": "Bottom Dock", "kind": "nav", "refersTo": "dock",
-      "description": "Плаваюча пігулка, п'ять слотів, кристал у центрі. Єдине місце з розмиттям.",
-      "html": "<nav class=\"ds-dock\"><button class=\"ds-dock-btn\">Вішлист</button><button class=\"ds-dock-btn ds-dock-btn--on\">Плани</button><button class=\"ds-dock-btn\">Покупки</button></nav>",
-      "css": ".ds-dock { display: flex; gap: 4px; padding: 8px; border-radius: 32px; background: rgba(35,30,47,0.86); backdrop-filter: blur(14px); border: 1px solid rgba(198,160,255,0.14); box-shadow: inset 0 1px 0 rgba(176,107,255,0.24), 0 14px 34px rgba(4,2,10,0.58); } .ds-dock-btn { flex: 1 1 0; min-width: 0; border: 0; background: transparent; border-radius: 22px; padding: 8px 10px; font-family: Nunito, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #b2a8c7; cursor: pointer; } .ds-dock-btn--on { color: #f5f4f6; background-color: color-mix(in srgb, #b06bff 26%, transparent); background-image: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 52%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -1px 0 rgba(6,3,14,0.4); }"
-    },
-    {
-      "name": "Swipe Verdict", "kind": "custom", "refersTo": null,
-      "description": "Заливка картки під пальцем. Підпис у ЦЕНТРІ картки, постер лишається видимим.",
-      "html": "<div class=\"ds-verdict\"><span class=\"ds-verdict-badge\"><span>✅</span>Переглянуто</span></div>",
-      "css": ".ds-verdict { position: relative; display: grid; place-items: center; min-height: 220px; border-radius: 18px; background: rgba(31,157,85,0.74); } .ds-verdict-badge { display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 999px; background: rgba(10,8,16,0.55); border: 2px solid rgba(255,255,255,0.9); color: #fff; font-family: Nunito, system-ui, sans-serif; font-size: 22px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }"
-    }
+  "typographyMeta": {
+   "display": {
+    "displayName": "Fredoka Display",
+    "purpose": "Звертання до пари: вітання, назва артефакта, вхід. Рідко."
+   },
+   "body": {
+    "displayName": "Nunito Body",
+    "purpose": "Усе інше — текст, нотатки, описи."
+   },
+   "label": {
+    "displayName": "Nunito Label",
+    "purpose": "Підписи доку, чипи, дати. Числа tabular-nums."
+   }
+  },
+  "shadows": [
+   {
+    "name": "shadow-sm",
+    "value": "0 2px 8px rgba(4, 2, 10, 0.45)",
+    "purpose": "Дрібні підняті елементи."
+   },
+   {
+    "name": "shadow-md",
+    "value": "0 10px 26px rgba(4, 2, 10, 0.5)",
+    "purpose": "Картки й кадри."
+   },
+   {
+    "name": "shadow-lg",
+    "value": "0 24px 60px rgba(4, 2, 10, 0.6)",
+    "purpose": "Док і модалки."
+   },
+   {
+    "name": "control-top",
+    "value": "inset 0 1px 0 rgba(255, 255, 255, 0.34)",
+    "purpose": "Верхній відблиск тіла."
+   },
+   {
+    "name": "control-lip",
+    "value": "inset 0 -3px 0 rgba(6, 3, 14, 0.34)",
+    "purpose": "Нижня грань — те, що робить кнопку предметом."
+   },
+   {
+    "name": "control-cast",
+    "value": "0 6px 16px rgba(4, 2, 10, 0.5)",
+    "purpose": "Відкинута тінь тіла."
+   }
   ],
-  "narrative": {
-    "northStar": "Живий архів пари",
-    "overview": "Amore — не звіт і не панель. Це тепла шкатулка, у яку пара складає те, з чого складається спільне життя: фотографії, дати, бажання, місця, покупки. Речі, які тримаєш у руках. А з цього архіву росте тривимірний кристал — і саме він, а не список, є тим, заради чого сюди вертаються.\n\nЗвідси випливає весь тон. Поверхні мають вагу й товщину, бо це предмети, а не рядки таблиці. Кнопка осідає під пальцем на два пікселі. Фотографія лежить із віялом інших знімків за нею, як стосик, з якого щойно витягли карту. Модулі названі словами пари — «Наш шлях», «Скарбничка», «Куди піти», — а не жанром.\n\nСвіт має дві пори доби, а не дві шкіри: нічний фіолетовий портал і той самий грецький храм опівдні з блакитним небом. Тема міняє світло, а не продукт; те, що з'явилось в одній, мусить існувати в другій.",
-    "keyCharacteristics": [
-      "Предмети, а не прямокутники: відблиск згори, губа знизу, відкинута тінь.",
-      "Кристал у центрі доку — артефакт, а не ще один пункт меню.",
-      "Колір рідкісний і функціональний; фіолет несе стан, не декорацію.",
-      "Дві теми як пори доби одного місця.",
-      "Українська мова всюди, включно з мікрокопі й помилками."
-    ],
-    "rules": [
-      { "name": "The Two Accents Rule", "body": "--accent іде на текст, лінію й сяйво; --accent-strong — тільки під білий текст. Плутати їх означає або нечитний підпис, або тьмяну кнопку.", "section": "colors" },
-      { "name": "The Rare Colour Rule", "body": "Колір несе стан: обрано, прострочено, сьогодні, вердикт. Поверхня, що просто «гарного кольору», — помилка.", "section": "colors" },
-      { "name": "The Fredoka Restraint Rule", "body": "Дисплейний шрифт — для звертання до пари, а не для кожного заголовка.", "section": "typography" },
-      { "name": "The Shadow Is A Shadow Rule", "body": "Тінь темна й падає вниз. Кольорове світіння під кнопкою заборонене; єдине дозволене кольорове світло — однопіксельний внутрішній кант.", "section": "elevation" },
-      { "name": "The One Blur Rule", "body": "Розмивається рівно одне — док. Усе інше тримає читабельність заливкою.", "section": "elevation" }
-    ],
-    "dos": [
-      "Do розводити --accent (текст, лінія, сяйво) і --accent-strong (заливка під білим): це різні ролі, а не відтінки одного.",
-      "Do давати елементу товщину — відблиск, губу, тінь і осідання на 2px.",
-      "Do тримати число tabular-nums, щоб дати не стрибали.",
-      "Do робити фокус зміною ФОРМИ (контур зі зміщенням), а не лише кольору.",
-      "Do підтримувати обидві теми одночасно: додав в одну — додай у другу.",
-      "Do називати модуль словом пари («Наш шлях»), а не жанром."
-    ],
-    "donts": [
-      "Don't робити з цього корпоративну SaaS-панель: сірі таблиці, сині посилання, дешбордна щільність.",
-      "Don't зісковзувати в неоновий кіберпанк: жодного кольорового світіння під кнопкою, жодних світних контурів.",
-      "Don't робити дитячий застосунок: кислотні градієнти, мультяшні маскоти, емодзі замість іконок.",
-      "Don't вішати backdrop-filter на картки — розмивається лише док.",
-      "Don't ставити колір на поверхню «для краси»: колір несе стан.",
-      "Don't класти колір у не-останній шар background — оголошення стає недійсним, і браузер мовчки викидає весь фон.",
-      "Don't підписувати дисплейним Fredoka все підряд."
-    ]
+  "motion": [
+   {
+    "name": "press",
+    "value": "90ms ease",
+    "purpose": "Осідання кнопки під пальцем."
+   },
+   {
+    "name": "sheet-in",
+    "value": "220ms ease",
+    "purpose": "Поява аркуша модуля. Грає ОДИН раз — не на скелеті."
+   },
+   {
+    "name": "dock-indicator",
+    "value": "0.45s cubic-bezier(0.34, 1.56, 0.64, 1)",
+    "purpose": "Переїзд капсули активного модуля."
+   }
+  ],
+  "breakpoints": [
+   {
+    "name": "grid-3col",
+    "value": "720px"
+   },
+   {
+    "name": "desktop",
+    "value": "1024px"
+   }
+  ]
+ },
+ "components": [
+  {
+   "name": "Primary Button",
+   "kind": "button",
+   "refersTo": "button-primary",
+   "description": "Основна дія. Тіло з відблиском, губою й тінню; осідає під пальцем.",
+   "html": "<button class=\"ds-btn-primary\">Зберегти</button>",
+   "css": ".ds-btn-primary { border: 0; border-radius: 14px; padding: 12px 20px; font-family: Nunito, system-ui, sans-serif; font-size: 14px; font-weight: 700; color: #fff; cursor: pointer; background-color: #8b3df0; background-image: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 52%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -3px 0 rgba(6,3,14,0.34), 0 6px 16px rgba(4,2,10,0.5); transition: translate 90ms ease, box-shadow 90ms ease; } .ds-btn-primary:active { translate: 0 2px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -1px 0 rgba(6,3,14,0.4), 0 2px 6px rgba(4,2,10,0.45); } .ds-btn-primary:focus-visible { outline: 2px solid #b06bff; outline-offset: 2px; }"
+  },
+  {
+   "name": "Floating Action Button",
+   "kind": "button",
+   "refersTo": "fab",
+   "description": "Круглий «плюс». Один жест — одна дія; меню «що створити» тут заборонене.",
+   "html": "<button class=\"ds-fab\" aria-label=\"Додати\"><svg width=\"26\" height=\"26\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\"><path d=\"M12 5v14M5 12h14\"/></svg></button>",
+   "css": ".ds-fab { width: 58px; height: 58px; border: 0; border-radius: 999px; display: grid; place-items: center; color: #fff; cursor: pointer; background-color: #8b3df0; background-image: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 52%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -3px 0 rgba(6,3,14,0.34), 0 10px 26px rgba(4,2,10,0.5); transition: translate 90ms ease; } .ds-fab:active { translate: 0 2px; } .ds-fab:focus-visible { outline: 2px solid #b06bff; outline-offset: 3px; }"
+  },
+  {
+   "name": "Card",
+   "kind": "card",
+   "refersTo": "card",
+   "description": "Поверхня вмісту. Скла немає навмисно — розмивається лише док.",
+   "html": "<div class=\"ds-card\"><b class=\"ds-card-title\">Тераса</b><span class=\"ds-card-meta\">12 липня 2026</span></div>",
+   "css": ".ds-card { background: #191424; border-radius: 16px; padding: 14px; box-shadow: 0 10px 26px rgba(4,2,10,0.5); display: grid; gap: 4px; } .ds-card-title { font-family: Nunito, system-ui, sans-serif; font-size: 16px; font-weight: 700; color: #f5f4f6; } .ds-card-meta { font-family: Nunito, system-ui, sans-serif; font-size: 12px; color: #b2a8c7; font-variant-numeric: tabular-nums; }"
+  },
+  {
+   "name": "Filter Chip",
+   "kind": "chip",
+   "refersTo": "chip",
+   "description": "Капсула фільтра. Ряд гортається вбік, коли чипів більше, ніж уміщається.",
+   "html": "<button class=\"ds-chip\">Комедія</button> <button class=\"ds-chip ds-chip--on\" aria-pressed=\"true\">Бойовик</button>",
+   "css": ".ds-chip { flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; border: 1px solid rgba(198,160,255,0.14); background: #231e2f; color: #b2a8c7; font-family: Nunito, system-ui, sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; } .ds-chip--on { background: #8b3df0; border-color: #8b3df0; color: #fff; } .ds-chip:focus-visible { outline: 2px solid #b06bff; outline-offset: 2px; }"
+  },
+  {
+   "name": "Bottom Dock",
+   "kind": "nav",
+   "refersTo": "dock",
+   "description": "Плаваюча пігулка, п'ять слотів, кристал у центрі. Єдине місце з розмиттям.",
+   "html": "<nav class=\"ds-dock\"><button class=\"ds-dock-btn\">Вішлист</button><button class=\"ds-dock-btn ds-dock-btn--on\">Плани</button><button class=\"ds-dock-btn\">Покупки</button></nav>",
+   "css": ".ds-dock { display: flex; gap: 4px; padding: 8px; border-radius: 32px; background: rgba(35,30,47,0.86); backdrop-filter: blur(14px); border: 1px solid rgba(198,160,255,0.14); box-shadow: inset 0 1px 0 rgba(176,107,255,0.24), 0 14px 34px rgba(4,2,10,0.58); } .ds-dock-btn { flex: 1 1 0; min-width: 0; border: 0; background: transparent; border-radius: 22px; padding: 8px 10px; font-family: Nunito, system-ui, sans-serif; font-size: 12px; font-weight: 600; color: #b2a8c7; cursor: pointer; } .ds-dock-btn--on { color: #f5f4f6; background-color: color-mix(in srgb, #b06bff 26%, transparent); background-image: linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0) 52%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.34), inset 0 -1px 0 rgba(6,3,14,0.4); }"
+  },
+  {
+   "name": "Swipe Verdict",
+   "kind": "custom",
+   "refersTo": null,
+   "description": "Заливка картки під пальцем. Підпис у ЦЕНТРІ картки, постер лишається видимим.",
+   "html": "<div class=\"ds-verdict\"><span class=\"ds-verdict-badge\"><span>✅</span>Переглянуто</span></div>",
+   "css": ".ds-verdict { position: relative; display: grid; place-items: center; min-height: 220px; border-radius: 18px; background: rgba(31,157,85,0.74); } .ds-verdict-badge { display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 999px; background: rgba(10,8,16,0.55); border: 2px solid rgba(255,255,255,0.9); color: #fff; font-family: Nunito, system-ui, sans-serif; font-size: 22px; font-weight: 800; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }"
   }
+ ],
+ "narrative": {
+  "northStar": "Живий архів пари",
+  "overview": "Amore — не звіт і не панель. Це тепла шкатулка, у яку пара складає те, з чого складається спільне життя: фотографії, дати, бажання, місця, покупки. Речі, які тримаєш у руках. А з цього архіву росте тривимірний кристал — і саме він, а не список, є тим, заради чого сюди вертаються.\n\nЗвідси випливає весь тон. Поверхні мають вагу й товщину, бо це предмети, а не рядки таблиці. Кнопка осідає під пальцем на два пікселі. Фотографія лежить із віялом інших знімків за нею, як стосик, з якого щойно витягли карту. Модулі названі словами пари — «Наш шлях», «Скарбничка», «Куди піти», — а не жанром.\n\nСвіт має дві пори доби, а не дві шкіри: нічний фіолетовий портал і той самий грецький храм опівдні з блакитним небом. Тема міняє світло, а не продукт; те, що з'явилось в одній, мусить існувати в другій.",
+  "keyCharacteristics": [
+   "Предмети, а не прямокутники: відблиск згори, губа знизу, відкинута тінь.",
+   "Кристал у центрі доку — артефакт, а не ще один пункт меню.",
+   "Колір рідкісний і функціональний; фіолет несе стан, не декорацію.",
+   "Дві теми як пори доби одного місця.",
+   "Українська мова всюди, включно з мікрокопі й помилками."
+  ],
+  "rules": [
+   {
+    "name": "The Two Accents Rule",
+    "body": "--accent іде на текст, лінію й сяйво; --accent-strong — тільки під білий текст. Плутати їх означає або нечитний підпис, або тьмяну кнопку.",
+    "section": "colors"
+   },
+   {
+    "name": "The Rare Colour Rule",
+    "body": "Колір несе стан: обрано, прострочено, сьогодні, вердикт. Поверхня, що просто «гарного кольору», — помилка.",
+    "section": "colors"
+   },
+   {
+    "name": "The Fredoka Restraint Rule",
+    "body": "Дисплейний шрифт — для звертання до пари, а не для кожного заголовка.",
+    "section": "typography"
+   },
+   {
+    "name": "The One Front Door Rule",
+    "body": "Кожен модуль-документ починається спільним PageHeader із фіксованим порядком: надзаголовок → назва → рядок стану, дія праворуч. Світові екрани (головна, «Вішліст») його не мають, бо малюють вміст поверх сцени, — це названий виняток, який стереже pageHeader.test.ts з обох боків.",
+    "section": "typography"
+   },
+   {
+    "name": "The Shadow Is A Shadow Rule",
+    "body": "Тінь темна й падає вниз. Кольорове світіння під кнопкою заборонене; єдине дозволене кольорове світло — однопіксельний внутрішній кант.",
+    "section": "elevation"
+   },
+   {
+    "name": "The One Blur Rule",
+    "body": "Розмивається рівно одне — док. Усе інше тримає читабельність заливкою.",
+    "section": "elevation"
+   }
+  ],
+  "dos": [
+   "Do розводити --accent (текст, лінія, сяйво) і --accent-strong (заливка під білим): це різні ролі, а не відтінки одного.",
+   "Do давати елементу товщину — відблиск, губу, тінь і осідання на 2px.",
+   "Do тримати число tabular-nums, щоб дати не стрибали.",
+   "Do робити фокус зміною ФОРМИ (контур зі зміщенням), а не лише кольору.",
+   "Do підтримувати обидві теми одночасно: додав в одну — додай у другу.",
+   "Do називати модуль словом пари («Наш шлях»), а не жанром."
+  ],
+  "donts": [
+   "Don't робити з цього корпоративну SaaS-панель: сірі таблиці, сині посилання, дешбордна щільність.",
+   "Don't зісковзувати в неоновий кіберпанк: жодного кольорового світіння під кнопкою, жодних світних контурів.",
+   "Don't робити дитячий застосунок: кислотні градієнти, мультяшні маскоти, емодзі замість іконок.",
+   "Don't вішати backdrop-filter на картки — розмивається лише док.",
+   "Don't ставити колір на поверхню «для краси»: колір несе стан.",
+   "Don't класти колір у не-останній шар background — оголошення стає недійсним, і браузер мовчки викидає весь фон.",
+   "Don't підписувати дисплейним Fredoka все підряд."
+  ]
+ }
 }

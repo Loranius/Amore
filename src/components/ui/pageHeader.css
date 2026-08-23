@@ -1,0 +1,70 @@
+/* ============================================================
+   Двері модуля.
+   ------------------------------------------------------------
+   Розміри взяті не з голови, а з того, що вже було найближче до
+   правила: «Спогади» мали 25px, і саме 25px `DESIGN.md` називає
+   дисплейним рівнем.
+
+   Але шрифт тут **Nunito, не Fredoka**, і це прямо The Fredoka
+   Restraint Rule: дисплейний шрифт стоїть там, де система звертається
+   до пари особисто — вітання, назва артефакта, вхід. Назва розділу
+   таким звертанням не є. «Графік» був підписаний Fredoka 38px і через
+   це виглядав головнішим за головну.
+   ============================================================ */
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.page-head__text {
+  min-width: 0;
+}
+
+/* Надзаголовок — приналежність, не опис. Акцентом, бо це єдине місце
+   заголовка, де колір щось означає (Rare Colour Rule). */
+.page-head__eyebrow {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.page-head__title {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+/* Один рядок під назвою несе два дуже різні вантажі — лічильники
+   («37 · 61 фото · від 2023») і речення-опис. Тому `tabular-nums`: без
+   нього лічильник стрибає при кожній новій світлині. */
+.page-head__meta {
+  margin: 3px 0 0;
+  max-width: 52ch;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Дія не стискається й не переносить підпис: вона вужча за текст, і
+   поступатись шириною має саме текст. */
+.page-head__action {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 360px) {
+  .page-head__title { font-size: 22px; }
+}

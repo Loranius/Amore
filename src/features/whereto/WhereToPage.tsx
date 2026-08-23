@@ -10,6 +10,8 @@ import { useWhereToLocation, useSaveLocation, useEventsSearch } from './useWhere
 import { Card } from '@/components/ui/Card';
 import type { WhereToLocation, WhereToEvent } from '@/types';
 
+import { PageHeader } from '@/components/ui/PageHeader';
+
 export function WhereToPage() {
   const { data: location } = useWhereToLocation();
   const saveLoc = useSaveLocation();
@@ -63,6 +65,11 @@ export function WhereToPage() {
 
   return (
     <section className="whereto pink-page">
+      <PageHeader
+        title="Куди піти"
+        eyebrow="Події поруч"
+        meta="Концерти, вистави й місця у вашому місті."
+      />
       <div className="wt-head">
         <button type="button" className="wt-city-btn" onClick={() => setCityModal(true)}>
           {location ? `📍 ${location.city} · змінити` : '📍 Обрати місто'}

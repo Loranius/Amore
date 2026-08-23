@@ -29,6 +29,8 @@ function initialYearMonth(params: URLSearchParams): { yr: number; mo: number } {
   return yearMonthFromParam(params.get('month')) ?? currentYearMonth();
 }
 
+import { PageHeader } from '@/components/ui/PageHeader';
+
 export function SchedulePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { data: users = [] } = useUsers();
@@ -195,7 +197,11 @@ export function SchedulePage() {
     // розділів порталу.
     <section className="sched pink-page">
       <header className="sched-hero">
-        <div><span className="sched-kicker">Календар пари</span><h1 className="sched-title">Графік</h1><p className="sched-subtitle">Побачте, коли ви обоє вільні, та заплануйте час разом.</p></div>
+        <PageHeader
+          eyebrow="Календар пари"
+          title="Графік"
+          meta="Побачте, коли ви обоє вільні, та заплануйте час разом."
+        />
       </header>
 
       <section className={`sched-next-card${nextSharedDate ? '' : ' sched-next-card--empty'}`} aria-label="Наступний спільний вихідний">

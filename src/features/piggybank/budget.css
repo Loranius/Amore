@@ -4,14 +4,9 @@
   color: var(--text);
 }
 
-.budget-title {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
+/* `.budget-title` був схований для екранного диктора, а видима назва
+   жила всередині картки. Тепер модуль має ті самі двері, що й решта —
+   `PageHeader` (ADR-0046). */
 
 /* Стан помилки: текст + кнопка повтору в один стовпчик по центру, як в
    інших екранах із retry (історія внесків, обговорення, архів). */

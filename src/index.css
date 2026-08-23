@@ -1865,9 +1865,9 @@ textarea::placeholder {
 /* ============================================================
    ВОТЧЛІСТ (media) + СВАЙП
    ============================================================ */
-.media-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.media-head h1 { margin: 0; }
-.media-head .btn { flex: 0 0 auto; padding: 8px 16px; }
+/* `.media-head` замінено на `PageHeader` (ADR-0046). Кнопка «+ Додати»
+   тепер приходить у слот `action`, тож її розміри лишились при ній. */
+.page-head__action .btn { padding: 8px 16px; }
 
 .media-search-wrap { position: relative; margin-bottom: 14px; }
 .media-search-inp {
@@ -2422,7 +2422,6 @@ textarea::placeholder {
    ФІНАНСИ (budget) — вільний ліміт + спільні цілі
    ============================================================ */
 .budget { display: flex; flex-direction: column; gap: 16px; }
-.budget-title { margin: 0; }
 
 /* Фон/радіус — з .card (PiggyBankPage: className="card fin-card"); тут лише паддінг. */
 .fin-card { padding: 16px; }

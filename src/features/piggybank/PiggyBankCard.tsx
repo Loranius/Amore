@@ -28,12 +28,18 @@ export function PiggyBankCard() {
 
   return (
     <section className="piggy-balance" aria-labelledby="piggy-balance-title">
+      {/* Картка більше не вдає заголовок сторінки.
+          ------------------------------------------------------------
+          Тут стояли надзаголовок «Спільні відкладені гроші» й <h2>
+          «Скарбничка» — тобто картка була фактичними дверима модуля,
+          бо справжніх не було. Щойно модуль отримав спільний
+          `PageHeader` (ADR-0046), назва почала звучати двічі підряд, а
+          надзаголовок — двома різними формулюваннями поспіль.
+
+          Лишається те, чим картка є насправді: скільки відкладено. */}
       <header className="piggy-balance-head">
         <span className="piggy-balance-icon" aria-hidden="true"><PiggyBankIcon size={28} /></span>
-        <div>
-          <span className="piggy-balance-eyebrow">Спільні відкладені гроші</span>
-          <h2 id="piggy-balance-title">Скарбничка</h2>
-        </div>
+        <h2 id="piggy-balance-title">Відкладено разом</h2>
       </header>
 
       {isPending ? (

@@ -10,11 +10,14 @@ import { TabBar } from '@/components/ui/TabBar';
 
 type Tab = 'constructor' | 'favorites';
 
+import { PageHeader } from '@/components/ui/PageHeader';
+
 export function CulinaryPage() {
   const [tab, setTab] = useState<Tab>('constructor');
 
   return (
     <section className="culinary pink-page">
+      <PageHeader title="Кулінарія" eyebrow="Що готуємо" />
       <TabBar<Tab>
         value={tab}
         onChange={setTab}
