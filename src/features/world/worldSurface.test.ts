@@ -161,9 +161,19 @@ describe('restraint (brief §11, §13, §16)', () => {
     // §13: "Do not put expensive blur on every card." The dock is one
     // element on the screen and lies directly on the artifact; a list of
     // thirty cards is not.
+    //
+    // The dock's own surface no longer lives in this file. It used to sit
+    // under `[data-portal-scene='true']`, i.e. it only applied where the
+    // scene shows — while the base rule in index.css was invalid CSS the
+    // browser dropped (a colour in a non-final background layer), so on
+    // every route without a scene the dock was fully transparent. The one
+    // recipe now lives in index.css; see `dockSurface.test.ts`.
+    //
+    // The invariant this test protects is unchanged and still checked:
+    // this file blurs NOTHING of its own, so no card list can quietly
+    // acquire a backdrop-filter here.
     const blurs = NO_COMMENTS.match(/backdrop-filter/g) ?? [];
-    expect(blurs).toHaveLength(1);
-    expect(ruleFor("[data-portal-scene='true'] .bottom-nav")).toMatch(/backdrop-filter/);
+    expect(blurs).toHaveLength(0);
   });
 
   it('never glows in colour', () => {

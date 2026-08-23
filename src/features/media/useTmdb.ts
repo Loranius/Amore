@@ -6,8 +6,8 @@
 // ============================================================
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { tmdbSearch, tmdbDetails } from '@/lib/tmdb';
-import type { MediaType, MediaItemRow } from '@/types';
+import { tmdbSearch, tmdbDetails, tmdbGenres } from '@/lib/tmdb';
+import type { MediaType, MediaItemRow, SwipeType } from '@/types';
 
 /** Дебаунс значення (400мс, як старий searchTimer). */
 function useDebounced<T>(value: T, delay = 400): T {
@@ -27,6 +27,24 @@ export function useTmdbSearch(query: string, type: MediaType) {
     enabled,
     staleTime: 5 * 60_000,
     queryFn: () => tmdbSearch(debounced, type),
+  });
+}
+
+/**
+ * Список жанрів для фільтра свайпу.
+ *
+ * `staleTime: Infinity` — не оптимізація «про всяк випадок»: набір
+ * жанрів TMDB не змінюється роками, і перепитувати його на кожному
+ * відкритті панелі означало б платити запитом за незмінну відповідь.
+ * `gcTime` теж довгий, щоб список пережив закриття панелі.
+ */
+export function useTmdbGenres(type: SwipeType, enabled: boolean) {
+  return useQuery({
+    queryKey: ['tmdb', 'genres', type],
+    enabled,
+    staleTime: Infinity,
+    gcTime: 24 * 60 * 60_000,
+    queryFn: () => tmdbGenres(type),
   });
 }
 

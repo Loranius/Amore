@@ -761,6 +761,12 @@ export interface TmdbSearchResult {
   overview: string;
 }
 
+/** Жанр TMDB: рівно те, чим підписана кнопка фільтра свайпу. */
+export interface TmdbGenre {
+  id: number;
+  name: string;
+}
+
 /** Деталі фільму/серіалу з TMDB — те, що реально використовується. */
 export interface TmdbDetails {
   title: string;

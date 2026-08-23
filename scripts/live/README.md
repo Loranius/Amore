@@ -30,7 +30,8 @@ npm run live -- --help
    свіжому сервері. Двічі поспіль перевірку «виправлено» було зроблено на
    старому файлі. Тому `serviceWorkers: 'block'`.
 2. **CORS для текстур і взагалі вихід назовні.** Supabase, Cloudinary, тайли
-   карти (`tiles.openfreemap.org`) і геокодер (`nominatim.openstreetmap.org`)
+   карти (`tiles.openfreemap.org`), геокодер (`nominatim.openstreetmap.org`)
+   і TMDB разом із її постерами (`api.themoviedb.org`, `image.tmdb.org`)
    ідуть реле через Node, і до відповіді **обов'язково** додається
    `access-control-allow-origin: *`. Без нього WebGL мовчки відмовляється
    брати текстуру: мережа каже «200», а фото на камені немає.

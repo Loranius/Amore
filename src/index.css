@@ -634,25 +634,43 @@ textarea::placeholder {
   padding: 8px;
   border-radius: 32px;
   /*
-   * Док — найбільша суцільна поверхня порталу: він на кожному екрані й не
-   * зникає. Непрозорим він і був найбільшою фіолетовою плитою.
+   * Док однаковий на КОЖНОМУ маршруті, і це виправлення вади, а не смак.
    *
-   * **Розмиття тут навмисно слабше за решту (12px, не 18).** Це єдиний
-   * `position: fixed` елемент зі склом, який ПРОКРУЧУЄТЬСЯ разом зі
-   * сторінкою, а саме така пара — відома причина ривків у Safari на iOS:
-   * браузер перемальовує розмиту ділянку на кожному кадрі прокрутки. Тому
-   * заливка тут щільніша, ніж зазвичай (`--glass-2` поверх `--surface`), і
-   * не покладається на розмиття: якщо його доведеться прибрати після
-   * перевірки на справжньому телефоні, док не розвалиться, а лише втратить
-   * глибину. Один рядок назад.
+   * **Було `background: var(--glass-2), var(--surface)` — і браузер
+   * викидав це оголошення цілком.** `--glass-2` розкривається у ДВА
+   * значення, і друге з них — колір (`color-mix(…)`). У CSS колір
+   * дозволений лише в ОСТАННЬОМУ шарі фону; колір усередині списку
+   * робить усе оголошення недійсним. Помилки при цьому немає — правило
+   * просто зникає.
+   *
+   * Виміряно на живому порталі: на кожному розділі під кнопкою «Ще»
+   * (`/memories`, `/media`, `/schedule`, `/piggybank`, `/culinary`,
+   * `/whereto`, `/game`) обчислений стиль дока був
+   * `background-color: rgba(0, 0, 0, 0)` і `background-image: none` —
+   * тобто док був ПОВНІСТЮ прозорий, і підписи лежали просто на фото
+   * галереї. У «Планах» і «Вішлисті» цього не було видно лише тому, що
+   * там док перекривало окреме правило сцени
+   * (`[data-portal-scene='true']` у `worldSurface.css`).
+   *
+   * Тепер рецепт один на весь портал — той самий, що власник бачив у
+   * «Планах» і «Вішлисті», і саме його попросив скрізь. Правило сцени
+   * після цього стало дослівною копією й прибране: два однакові рецепти
+   * розійшлись би на першій же правці.
+   *
+   * **Розмиття 14px і щільна заливка.** Док — єдиний `position: fixed`
+   * елемент зі склом, який прокручується разом зі сторінкою, а це відома
+   * причина ривків у Safari на iOS. Тому читабельність тримає сама
+   * заливка (0.86 непрозорості), а не розмиття: якщо його доведеться
+   * прибрати після перевірки на справжньому телефоні, док не розвалиться,
+   * а лише втратить глибину.
    */
-  background: var(--glass-2), var(--surface);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  /* Рамка бере токен, а не чорний із прозорістю: на темному фоні чорна рамка
-     невидима, і док зливався з екраном. На референсі його межа світиться. */
-  border: 1px solid var(--border);
-  box-shadow: var(--glass-top), var(--glass-bloom), var(--shadow-lg);
+  background: var(--world-surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--world-border);
+  box-shadow:
+    inset 0 1px 0 var(--world-glow),
+    0 14px 34px var(--world-shadow);
 }
 .bottom-nav-inner {
   position: relative;
@@ -1945,7 +1963,29 @@ textarea::placeholder {
 .swipe-type-btn { flex: 1; border: 0; border-radius: 999px; padding: 8px; background: var(--surface); color: var(--muted); font: inherit; cursor: pointer; }
 .swipe-type-btn.active { background: var(--accent-strong); color: #fff; }
 
-.swipe-stack { position: relative; height: 460px; touch-action: none; }
+/* Висота колоди рахується від ЕКРАНА, а не стоїть константою.
+   ------------------------------------------------------------
+   Було рівно `460px`, і поки над колодою стояли самі вкладки типу, це
+   вміщалось. Ряд жанрів додав 48 px — і кнопки під колодою поїхали ПІД
+   док. Виміряно на живому екрані, телефон 412×915: низ ряду кнопок 872,
+   верх дока 831, тобто перекриття 41 px із 52 — а `elementFromPoint` у
+   центрі кнопки повертав `nav-btn`, тобто док. Дотик по «Переглянуто»
+   відкривав розділ замість того, щоб позначити фільм.
+
+   Звідки 504 px: усе, що НЕ колода, у найвищому випадку — шапка,
+   вкладки типу, пошук, кнопка «Свайп», вкладки фільм/серіал, ряд жанрів,
+   сам ряд кнопок і док із safe-area. Колоді лишається решта, але не
+   більше за 460 (на планшеті картка не мусить рости нескінченно) і не
+   менше за 280 (нижче постер перестає читатись).
+
+   `dvh`, а не `vh`: на мобільному Safari адресний рядок з'їдає частину
+   `vh`, і колода вилазила б за екран рівно там, де це найбільше
+   заважає. */
+.swipe-stack {
+  position: relative;
+  height: clamp(280px, calc(100dvh - 504px), 460px);
+  touch-action: none;
+}
 .swipe-card {
   position: absolute;
   inset: 0;
@@ -1963,24 +2003,87 @@ textarea::placeholder {
 .swipe-card-info { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px; color: #fff; pointer-events: none; }
 .swipe-card-title { margin: 0; font-size: 20px; font-weight: 700; }
 .swipe-card-meta { display: flex; gap: 10px; font-size: 13px; opacity: 0.9; }
-.swipe-overlay {
-  position: absolute;
-  top: 20px;
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-weight: 700;
-  color: #fff;
-  pointer-events: none;
+/* ── Вердикт свайпу ─────────────────────────────────────────
+   Заливає КАРТКУ ЦІЛКОМ, підпис — рівно в її центрі.
+
+   Було інакше: маленька пігулка, прибита до краю (`top: 20px`,
+   `left: 16px`). Пара дивиться на постер, тобто в середину картки, і
+   підпис вгорі йшов повз погляд — власник назвав це «текст десь
+   наверху». Тепер відповідь на «що буде, якщо відпустити» з'являється
+   там, куди пара й дивиться.
+
+   Кольори — токени, а не літерали: «зелений» у світлій і темній темі
+   різний, і жити він мусить там, де живе тема. */
+:root {
+  --swipe-done: #1f9d55;
+  --swipe-watching: #7c3aed;
+  --swipe-want: #2563eb;
+  --swipe-skip: #64748b;
 }
-.swipe-overlay-up { left: 50%; transform: translateX(-50%); background: var(--ok); }
-.swipe-overlay-down { left: 50%; transform: translateX(-50%); top: auto; bottom: 20px; background: #888; }
-.swipe-overlay-left { left: 16px; background: #4a86e8; }
-.swipe-overlay-right { right: 16px; background: var(--accent); }
+
+[data-theme='light'] {
+  /* Світліші й насиченіші: заливка лягає на постер, а не на темний
+     ґрунт, тож на денному аркуші тон мусить бути щільнішим, щоб
+     читатись як той самий колір. */
+  --swipe-done: #15803d;
+  --swipe-watching: #6d28d9;
+  --swipe-want: #1d4ed8;
+  --swipe-skip: #475569;
+}
+
+.swipe-verdict {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  pointer-events: none;
+  /* Заливка напівпрозора за призначенням: постер мусить лишатись
+     видимим під нею, інакше пара перестає бачити, ЩО саме позначає.
+     Стеля прозорості — `VERDICT_MAX_TINT` у `swipeFeedback.ts`. */
+  background: var(--swipe-verdict-colour);
+}
+
+.swipe-verdict--up { --swipe-verdict-colour: var(--swipe-done); }
+.swipe-verdict--right { --swipe-verdict-colour: var(--swipe-watching); }
+.swipe-verdict--left { --swipe-verdict-colour: var(--swipe-want); }
+.swipe-verdict--down { --swipe-verdict-colour: var(--swipe-skip); }
+
+/* Підпис стоїть на власній темній плашці, а не просто на заливці.
+   Причина: заливка кольорова й напівпрозора, тобто під нею просвічує
+   довільний постер — від чорного кадру до засніженого. Білий текст
+   без підкладки читався б на одному й зникав на іншому. */
+.swipe-verdict-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  border-radius: 999px;
+  background: rgba(10, 8, 16, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.swipe-verdict-glyph { font-size: 24px; }
+
+@media (max-width: 380px) {
+  .swipe-verdict-badge { font-size: 19px; padding: 12px 18px; }
+}
 
 .swipe-actions { display: flex; justify-content: center; gap: 14px; margin-top: 14px; }
 .swipe-act { width: 52px; height: 52px; border: 0; border-radius: 50%; font-size: 22px; cursor: pointer; background: var(--surface); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12); }
-.swipe-act-up { background: var(--ok); }
-.swipe-act-right { background: var(--accent); }
+/* Кнопка-дублер несе ТОЙ САМИЙ колір, що й заливка картки під час жесту:
+   інакше пара вчила б два різні словники для однієї дії. */
+.swipe-act-up { background: var(--swipe-done); }
+.swipe-act-right { background: var(--swipe-watching); }
+.swipe-act-left { background: var(--swipe-want); }
+.swipe-act-down { background: var(--swipe-skip); }
 .swipe-empty { display: grid; place-items: center; gap: 12px; height: 100%; }
 
 /* Деталі свайпу */
@@ -2631,4 +2734,48 @@ textarea::placeholder {
 @media (prefers-reduced-motion: reduce) {
   [data-immersive='true'] .bottom-nav,
   [data-immersive='true'] .sidebar { transform: none; }
+}
+
+/* ── Фільтр жанрів свайпу ───────────────────────────────────
+   Ряд гортається вбік: жанрів у TMDB під два десятки, і вертикальний
+   список з'їв би саму колоду. Смуга прокрутки схована — на телефоні
+   ряд гортають пальцем, а на десктопі він і так уміщається. */
+.swipe-genres {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0 10px;
+  /* Щоб крайні чипи не прилипали до країв екрана під час гортання. */
+  scroll-padding-inline: 8px;
+}
+.swipe-genres::-webkit-scrollbar { display: none; }
+
+.swipe-genre {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.swipe-genre.active {
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
+  color: #fff;
+}
+
+.swipe-genre--clear {
+  background: transparent;
+  color: var(--accent);
+  border-style: dashed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .swipe-genre { transition: none; }
 }
