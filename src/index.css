@@ -998,7 +998,20 @@ textarea::placeholder {
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.012) 60%),
     color-mix(in srgb, var(--surface-2) 97%, transparent);
   border-radius: var(--radius-xl);
-  padding: 22px;
+  /*
+   * Паддінг названий токеном, бо його читає липка смуга дій.
+   *
+   * Вона мусить лягати від краю до краю аркуша, тобто виходити за
+   * паддінг від'ємними полями. Число 22 було вписане в обидва місця
+   * руками — і на першому ж аркуші з іншим паддінгом розійшлось:
+   * редактор бажання має 24px (16px на вузькому), і смуга вилазила за
+   * аркуш на 5px з кожного боку (виміряно: смуга 397px в аркуші 387px).
+   *
+   * Аркуш зі своїм паддінгом тепер зобов'язаний перевизначити й токен —
+   * інакше не працює те саме, що не працювало.
+   */
+  --sheet-pad: 22px;
+  padding: var(--sheet-pad);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1496,17 +1509,16 @@ textarea::placeholder {
  * гортається, правило нічого не змінює — липкий елемент просто стоїть
  * там, де стояв.
  *
- * Від'ємні поля рівні паддінгу аркуша (22px): смуга мусить лягати від
- * краю до краю, інакше вміст видно в 22-піксельних щілинах по боках.
- * Модалки з власним паддінгом (деталі медіа — `padding: 0`) ці поля
- * скидають у себе.
+ * Від'ємні поля рівні паддінгу аркуша — тому він і названий токеном
+ * `--sheet-pad`: смуга мусить лягати від краю до краю, інакше вміст видно
+ * в щілинах по боках, а при чужому числі вона вилазить за аркуш.
  */
 .modal-sheet > .modal-actions {
   position: sticky;
-  bottom: -22px;
+  bottom: calc(-1 * var(--sheet-pad));
   z-index: 1;
-  margin: 6px -22px -22px;
-  padding: 12px 22px calc(22px + env(safe-area-inset-bottom, 0px));
+  margin: 6px calc(-1 * var(--sheet-pad)) calc(-1 * var(--sheet-pad));
+  padding: 12px var(--sheet-pad) calc(var(--sheet-pad) + env(safe-area-inset-bottom, 0px));
   background: var(--surface-2);
   border-top: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
@@ -2184,6 +2196,7 @@ textarea::placeholder {
  * тап повз неї.
  */
 .media-detail-modal {
+  --sheet-pad: 0px;
   padding: 0;
   gap: 0;
   overflow: hidden;
@@ -2260,11 +2273,10 @@ textarea::placeholder {
 /* Смуга дій відділена рискою: тіло під нею гортається, і без межі
    останній рядок опису обрізається просто під кнопками — на знімку з
    довгим описом він розрізаний посеред літер. */
-/* Аркуш деталей має `padding: 0`, тож від'ємні поля спільного правила
-   тут зайві — смуга й так від краю до краю. */
+/* Аркуш деталей має `--sheet-pad: 0px`, тож від'ємні поля спільного
+   правила самі стають нулем; лишається дати смузі власний внутрішній
+   відступ, бо аркуш його не дає. */
 .media-detail-modal .modal-actions {
-  margin: 0;
-  bottom: 0;
   padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
   border-top: 1px solid color-mix(in srgb, var(--text) 9%, transparent);

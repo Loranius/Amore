@@ -153,6 +153,9 @@ export function AddEventModal({
       ? 'День народження мами'
       : 'Забронювати столик';
 
+  /** Що заважає зберегти, або `null`. Порядок — згори вниз по формі. */
+  const blocker = !title.trim() ? 'Впиши назву' : !date ? 'Обери дату' : null;
+
   return (
     <ModalShell onClose={onClose}>
       <form
@@ -356,9 +359,18 @@ export function AddEventModal({
           </span>
         </label>
 
+        {/*
+          * Вимкнена кнопка каже, ЧОГО бракує.
+          *
+          * «Зберегти» гасне за двох умов — порожня назва або порожня дата, —
+          * і жодна з них раніше не називалась. Пара бачила сіру кнопку й
+          * мусила здогадуватись, яке з полів її тримає. Той самий прийом,
+          * що вже стоїть у композері спогадів (`ISSUE_HINT`).
+          */}
         <div className="modal-actions cal-entry-actions">
+          {blocker && <span className="cal-entry-blocker">{blocker}</span>}
           <button type="button" className="btn btn-ghost" onClick={onClose}>Скасувати</button>
-          <button type="submit" className="btn" disabled={!title.trim() || !date}>Зберегти</button>
+          <button type="submit" className="btn" disabled={blocker !== null}>Зберегти</button>
         </div>
       </form>
     </ModalShell>

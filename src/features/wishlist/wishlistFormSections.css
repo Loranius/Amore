@@ -154,10 +154,13 @@
 
 /* Compact wish composer: keep the frequent path visible and move optional
    work behind calm, keyboard-accessible disclosure rows. */
+/* `--sheet-pad` разом із `padding`: липка смуга дій (`index.css`) читає
+   саме токен, і аркуш зі своїм паддінгом мусить назвати його теж. */
 .wishlist .wm-wish-editor {
   width: min(94vw, 520px);
   gap: 18px;
-  padding: 24px;
+  --sheet-pad: 24px;
+  padding: var(--sheet-pad);
   overflow-x: hidden;
 }
 
@@ -442,6 +445,7 @@
 @media (max-width: 560px) {
   .wishlist .wm-wish-editor {
     gap: 14px;
+    --sheet-pad: 16px;
     padding: max(18px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
   }
 
