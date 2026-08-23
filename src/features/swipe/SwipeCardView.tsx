@@ -3,12 +3,19 @@
 // ------------------------------------------------------------
 // Драг через framer-motion замість ручних touch/mouse-обробників.
 // Напрям визначається за офсетом/швидкістю; логіка та пороги — як у
-// старому attachTouch (вертикаль домінує над горизонталлю; тап без
-// руху → деталі). up=Подивились · down=Пропустити · left=В планах ·
-// right=Дивимось.
+// старому attachTouch: вертикаль домінує над горизонталлю, тап без руху
+// відкриває деталі.
+//
+// Що саме означає кожен напрям — НЕ тут. Підпис, значок і колір усіх
+// чотирьох живуть у `swipeDirections.ts`, а сила заливки рахується в
+// `swipeFeedback.ts`. Доки опис був у трьох місцях (тут, у кнопках
+// колоди і в CSS), вони встигли розійтись: картка казала одне, кнопка
+// під нею — інше.
 // ============================================================
 import { useState } from 'react';
 import { motion, useMotionValue, useTransform, animate, type PanInfo } from 'framer-motion';
+import { SWIPE_VERDICTS } from './swipeDirections';
+import { verdictTint } from './swipeFeedback';
 import type { SwipeCard, SwipeDirection } from '@/types';
 
 const OFFSET_T = 80; // поріг зриву (px), як старий T
@@ -34,11 +41,25 @@ export function SwipeCardView({ card, active, depth, onSwipe, onTap }: SwipeCard
     Math.abs(ly ?? 0) > Math.abs(lx ?? 0) ? 0 : (lx ?? 0) * 0.06,
   );
 
-  // Прозорості оверлеїв за напрямом (0..0.6).
-  const upO = useTransform(y, [-150, -40], [0.6, 0]);
-  const downO = useTransform(y, [40, 150], [0, 0.6]);
-  const leftO = useTransform(x, [-150, -40], [0.6, 0]);
-  const rightO = useTransform(x, [40, 150], [0, 0.6]);
+  /*
+   * Заливка картки за напрямом.
+   *
+   * Рахується з ОБОХ осей разом (`verdictTint`), а не з проєкції на одну.
+   * Раніше кожен оверлей дивився на свою вісь незалежно, і рух під 45°
+   * підсвічував два вердикти різними кольорами водночас — хоча
+   * відпускання пальця дає рівно один. Тепер підказка обіцяє саме те,
+   * що станеться.
+   */
+  const upTint = useTransform<number, number>([x, y], ([lx, ly]) => verdictTint(lx ?? 0, ly ?? 0, 'up'));
+  const downTint = useTransform<number, number>([x, y], ([lx, ly]) => verdictTint(lx ?? 0, ly ?? 0, 'down'));
+  const leftTint = useTransform<number, number>([x, y], ([lx, ly]) => verdictTint(lx ?? 0, ly ?? 0, 'left'));
+  const rightTint = useTransform<number, number>([x, y], ([lx, ly]) => verdictTint(lx ?? 0, ly ?? 0, 'right'));
+  const tintByDirection: Record<SwipeDirection, typeof upTint> = {
+    up: upTint,
+    down: downTint,
+    left: leftTint,
+    right: rightTint,
+  };
 
   const flyOut = (dir: SwipeDirection) => {
     setLeaving(true);
@@ -105,22 +126,22 @@ export function SwipeCardView({ card, active, depth, onSwipe, onTap }: SwipeCard
         </div>
       </div>
 
-      {active && (
-        <>
-          <motion.div className="swipe-overlay swipe-overlay-up" style={{ opacity: upO }}>
-            ✅ Подивились
-          </motion.div>
-          <motion.div className="swipe-overlay swipe-overlay-down" style={{ opacity: downO }}>
-            ✕ Пропустити
-          </motion.div>
-          <motion.div className="swipe-overlay swipe-overlay-left" style={{ opacity: leftO }}>
-            🕐 В планах
-          </motion.div>
-          <motion.div className="swipe-overlay swipe-overlay-right" style={{ opacity: rightO }}>
-            ▶ Дивимось
-          </motion.div>
-        </>
-      )}
+      {/* Вердикт заливає КАРТКУ ЦІЛКОМ, а підпис стоїть у її центрі.
+          Пара дивиться на постер, тобто в середину, — і саме там мусить
+          з'явитись відповідь на «що буде, якщо відпустити». */}
+      {active && SWIPE_VERDICTS.map((verdict) => (
+        <motion.div
+          key={verdict.direction}
+          className={`swipe-verdict swipe-verdict--${verdict.direction}`}
+          style={{ opacity: tintByDirection[verdict.direction] }}
+          aria-hidden="true"
+        >
+          <span className="swipe-verdict-badge">
+            <span className="swipe-verdict-glyph">{verdict.glyph}</span>
+            {verdict.label}
+          </span>
+        </motion.div>
+      ))}
     </motion.div>
   );
 }

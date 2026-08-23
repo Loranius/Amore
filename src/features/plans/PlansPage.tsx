@@ -17,6 +17,7 @@
 // ============================================================
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSettledPending } from '@/lib/useSettledPending';
 import { ChevronRightIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
@@ -110,6 +111,11 @@ export function PlansPage() {
 
   const busy = plansQuery.isPending || eventsQuery.isPending;
   const failed = plansQuery.isError || eventsQuery.isError;
+  // Скелет за порогом: на теплому кеші дані приходять швидше, ніж око
+  // встигає його прочитати, а `pm-sheet-in` устигає програтись двічі —
+  // один раз на скелеті, другий на вмісті. Саме це власник описав як
+  // «плани просто тупим ривком завантажуються».
+  const skeletonVisible = useSettledPending(busy);
 
   return (
     <section
@@ -127,15 +133,21 @@ export function PlansPage() {
             Спробувати ще
           </button>
         </div>
-      ) : busy ? (
-        <div className="pm-sheet" aria-busy="true">
+      ) : skeletonVisible ? (
+        // Скелет перевіряється ПЕРЕД `busy`: саме він тримає гілку, поки
+        // не вийде мінімальний час показу (див. `useSettledPending`).
+        //
+        // `pm-sheet--loading` знімає вхідну анімацію саме зі скелета:
+        // інакше `pm-sheet-in` грає двічі поспіль на двох різних
+        // розкладках, і перехід читається як ривок.
+        <div className="pm-sheet pm-sheet--loading" aria-busy="true">
           <div className="pm-skeleton pm-skeleton--month" />
           <div className="pm-tiles">
             <div className="pm-skeleton pm-skeleton--tile" />
             <div className="pm-skeleton pm-skeleton--tile" />
           </div>
         </div>
-      ) : (
+      ) : busy ? null : (
         <div className="pm-sheet">
           <CalendarMonthView
             events={calendarEvents}

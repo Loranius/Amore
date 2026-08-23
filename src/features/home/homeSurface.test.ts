@@ -115,10 +115,17 @@ describe('blur budget (brief §44)', () => {
     // §44: one stronger parent glass surface, not an independent heavy
     // backdrop-filter per element. Measured on the live portal, Home had two —
     // the dock and the switcher, stacked.
+    //
+    // The dock's surface (and its blur) moved to index.css, because the
+    // scene-scoped copy here only applied where the scene shows — and the
+    // base rule it was covering for was invalid CSS the browser dropped,
+    // leaving the dock transparent on every other route. What matters for
+    // §44 is unchanged: the switcher still adds no glass of its own, and
+    // the world file adds none either.
     const home = (bare(SWITCHER).match(/backdrop-filter/g) ?? []).length;
     const world = (bare(SURFACE).match(/backdrop-filter/g) ?? []).length;
     expect(home).toBe(0);
-    expect(world).toBe(1);
+    expect(world).toBe(0);
   });
 });
 

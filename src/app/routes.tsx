@@ -16,8 +16,9 @@
 // логін лишаються статичними — це перше, що бачить користувач, і ділити
 // їх означало б показати порожній екран замість них.
 // ============================================================
-import { lazy, Suspense, type ReactNode } from 'react';
+import { Suspense, type ReactNode } from 'react';
 import { createHashRouter, Navigate } from 'react-router-dom';
+import { lazyRoute } from './lazyRoute';
 import { Layout } from '@/components/layout/Layout';
 import { RouteErrorBoundary } from '@/components/layout/RouteErrorBoundary';
 import { RequireAuth, RedirectIfAuthed } from '@/components/guards/RequireAuth';
@@ -25,19 +26,68 @@ import { LoginPage } from '@/features/auth/LoginPage';
 import { HomePage } from '@/features/home/HomePage';
 import { PageSkeleton } from '@/components/ui/PageSkeleton';
 
-const ShoppingPage = lazy(() => import('@/features/shopping/ShoppingPage').then((m) => ({ default: m.ShoppingPage })));
-const WishlistPage = lazy(() => import('@/features/wishlist/WishlistPage').then((m) => ({ default: m.WishlistPage })));
-const SchedulePage = lazy(() => import('@/features/schedule/SchedulePage').then((m) => ({ default: m.SchedulePage })));
-const MemoriesPage = lazy(() => import('@/features/memories/MemoriesPage').then((m) => ({ default: m.MemoriesPage })));
-const MomentPage = lazy(() => import('@/features/memories/MomentPage').then((m) => ({ default: m.MomentPage })));
-const MediaPage = lazy(() => import('@/features/media/MediaPage').then((m) => ({ default: m.MediaPage })));
-const CulinaryPage = lazy(() => import('@/features/culinary/CulinaryPage').then((m) => ({ default: m.CulinaryPage })));
-const PiggyBankPage = lazy(() => import('@/features/piggybank/PiggyBankPage').then((m) => ({ default: m.PiggyBankPage })));
-const PlansPage = lazy(() => import('@/features/plans/PlansPage').then((m) => ({ default: m.PlansPage })));
-const JourneyPage = lazy(() => import('@/features/journey/JourneyPage').then((m) => ({ default: m.JourneyPage })));
-const PlanDetailsPage = lazy(() => import('@/features/plans/PlanDetailsPage').then((m) => ({ default: m.PlanDetailsPage })));
-const WhereToPage = lazy(() => import('@/features/whereto/WhereToPage').then((m) => ({ default: m.WhereToPage })));
-const GamePage = lazy(() => import('@/features/game/GamePage').then((m) => ({ default: m.GamePage })));
+/*
+ * Завантажувач і `lazy` розділені навмисно.
+ *
+ * `lazy(() => import(…))` ховає сам `import()` усередині компонента, і
+ * дістати його ззовні неможливо — а саме він потрібен, щоб ПРОГРІТИ чанк
+ * до того, як пара торкнеться доку (`routePrefetch.ts`). Тому завантажувач
+ * названий окремо, а `lazy` бере вже його.
+ *
+ * Специфікатор мусить лишатись тим самим рядком в обох місцях: Vite
+ * склеює `import()` за текстом специфікатора, і копія з іншим написанням
+ * (аліас проти відносного шляху) дала б ДРУГИЙ чанк — тобто прогрів
+ * гріл би не те, що потім поїде.
+ */
+const loadShopping = () => import('@/features/shopping/ShoppingPage');
+const loadWishlist = () => import('@/features/wishlist/WishlistPage');
+const loadSchedule = () => import('@/features/schedule/SchedulePage');
+const loadMemories = () => import('@/features/memories/MemoriesPage');
+const loadMoment = () => import('@/features/memories/MomentPage');
+const loadMedia = () => import('@/features/media/MediaPage');
+const loadCulinary = () => import('@/features/culinary/CulinaryPage');
+const loadPiggyBank = () => import('@/features/piggybank/PiggyBankPage');
+const loadPlans = () => import('@/features/plans/PlansPage');
+const loadJourney = () => import('@/features/journey/JourneyPage');
+const loadPlanDetails = () => import('@/features/plans/PlanDetailsPage');
+const loadWhereTo = () => import('@/features/whereto/WhereToPage');
+const loadGame = () => import('@/features/game/GamePage');
+
+const ShoppingPage = lazyRoute(loadShopping, (m) => m.ShoppingPage);
+const WishlistPage = lazyRoute(loadWishlist, (m) => m.WishlistPage);
+const SchedulePage = lazyRoute(loadSchedule, (m) => m.SchedulePage);
+const MemoriesPage = lazyRoute(loadMemories, (m) => m.MemoriesPage);
+const MomentPage = lazyRoute(loadMoment, (m) => m.MomentPage);
+const MediaPage = lazyRoute(loadMedia, (m) => m.MediaPage);
+const CulinaryPage = lazyRoute(loadCulinary, (m) => m.CulinaryPage);
+const PiggyBankPage = lazyRoute(loadPiggyBank, (m) => m.PiggyBankPage);
+const PlansPage = lazyRoute(loadPlans, (m) => m.PlansPage);
+const JourneyPage = lazyRoute(loadJourney, (m) => m.JourneyPage);
+const PlanDetailsPage = lazyRoute(loadPlanDetails, (m) => m.PlanDetailsPage);
+const WhereToPage = lazyRoute(loadWhereTo, (m) => m.WhereToPage);
+const GamePage = lazyRoute(loadGame, (m) => m.GamePage);
+
+/**
+ * Чанки, які варто прогріти, поки пара дивиться на головну.
+ *
+ * **Порядок тут — це порядок прогріву, і він не декоративний.** Перші три
+ * — сусіди по доку, тобто найімовірніший наступний дотик; «Спогади» йдуть
+ * четвертими, бо це найчастіший перехід із «Ще».
+ *
+ * Решта розділів навмисно НЕ входить: прогрів — це той самий трафік, лише
+ * заздалегідь, і тягнути «Медіа» (152 КБ) чи карту (952 КБ) тому, хто до
+ * них не збирається, дорожче за паузу перед самим переходом.
+ */
+export const PREFETCHED_ROUTE_CHUNKS: readonly (() => Promise<unknown>)[] = [
+  // `preload`, а не сирий `loadX`: він не лише тягне модуль, а й запам'ятовує
+  // готовий компонент, тож прогрітий розділ рендериться без `Suspense`
+  // взагалі. Сирий імпорт прогрів би мережу й лишив би скелет на місці —
+  // саме так це й було виміряно на продакшн-збірці.
+  WishlistPage.preload,
+  PlansPage.preload,
+  ShoppingPage.preload,
+  MemoriesPage.preload,
+];
 
 /** Один Suspense на розділ, а не один на весь Layout: інакше очікування
  *  чанка знімало б із екрана навігацію разом зі сторінкою. */

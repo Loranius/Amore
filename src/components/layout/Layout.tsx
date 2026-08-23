@@ -25,6 +25,8 @@ import { BottomNav } from './BottomNav';
 import { MoreMenu } from './MoreMenu';
 import { SettingsModal } from '@/features/settings/SettingsModal';
 import { useWishlistStorageCleanup } from '@/features/wishlist/useWishlistStorageCleanup';
+import { PREFETCHED_ROUTE_CHUNKS } from '@/app/routes';
+import { prefetchRouteChunks } from '@/app/routePrefetch';
 import { ArtifactWorld, ArtifactWorldProvider } from '@/features/world/ArtifactWorld';
 import { EvolutionConstructor } from '@/features/home/EvolutionConstructor';
 import { EvolutionSandboxProvider } from '@/features/home/evolutionSandbox';
@@ -47,6 +49,12 @@ export function Layout() {
   useEffect(() => {
     contentRef.current?.scrollTo({ top: 0 });
   }, [pathname]);
+
+  // Сусіди по доку гріються на дозвіллі — див. `routePrefetch.ts`. Місце
+  // тут, а не в кожній сторінці: Layout монтується один раз на сесію, і
+  // прогрів мусить статись один раз, незалежно від того, з якого розділу
+  // пара почала.
+  useEffect(() => prefetchRouteChunks(PREFETCHED_ROUTE_CHUNKS), []);
 
   useEffect(() => {
     if (contentRef.current) {

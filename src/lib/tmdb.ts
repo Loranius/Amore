@@ -5,9 +5,38 @@
 // env із фолбеком. Усі відповіді TMDB нетипізовані ззовні, тож
 // звужуємо їх на межі вручну до наших типів (TmdbSearchResult тощо).
 // ============================================================
-import type { TmdbSearchResult, TmdbDetails, SwipeCard, MediaType, SwipeType } from '@/types';
+import type { TmdbSearchResult, TmdbDetails, TmdbGenre, SwipeCard, MediaType, SwipeType } from '@/types';
 
-const KEY = import.meta.env.VITE_TMDB_KEY ?? '1b28cacaab2f90a8c2bd0c383c636f01';
+/** Ключ, з яким портал жив до появи змінної оточення. */
+const FALLBACK_KEY = '1b28cacaab2f90a8c2bd0c383c636f01';
+
+/**
+ * Ключ TMDB, і `??` тут було НЕ ДОСИТЬ.
+ *
+ * **Виміряна вада.** Було `import.meta.env.VITE_TMDB_KEY ?? FALLBACK`, а
+ * `??` підставляє запасне значення лише для `null` і `undefined` —
+ * ПОРОЖНІЙ РЯДОК він пропускає як цілком годяще значення. У `.env.local`
+ * лежало саме `VITE_TMDB_KEY=` без значення, тож ключем ставав `''`, і
+ * TMDB відповідала 401 на кожен запит: не працювали ні свайп, ні пошук,
+ * ні деталі. Перевірено обидва ключі окремо — порожній дає 401, запасний
+ * дає 200.
+ *
+ * Видно цього не було, бо всі три виклики ловлять помилку й повертають
+ * порожній список: колода просто писала «Картки скінчились», тобто
+ * несправність виглядала як нормальний кінець стрічки.
+ */
+export function resolveTmdbKey(raw: unknown): string {
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (trimmed !== '') return trimmed;
+  if (typeof raw === 'string') {
+    // Саме попередження, а не мовчазна підміна: порожня змінна в
+    // середовищі — це помилка налаштування, і про неї треба знати.
+    console.warn('[TMDB] VITE_TMDB_KEY порожній — беру запасний ключ.');
+  }
+  return FALLBACK_KEY;
+}
+
+const KEY = resolveTmdbKey(import.meta.env.VITE_TMDB_KEY);
 const BASE = 'https://api.themoviedb.org/3';
 const IMG_SM = 'https://image.tmdb.org/t/p/w185';
 const IMG_LG = 'https://image.tmdb.org/t/p/w500';
@@ -117,11 +146,48 @@ export async function tmdbDetails(
   }
 }
 
-/** Стрічка популярного для свайпу; фільтрує неевропейські назви. */
-export async function tmdbDiscover(type: SwipeType, page: number): Promise<SwipeCard[]> {
-  const t = apiType(type);
+/**
+ * Жанри TMDB для типу.
+ *
+ * Список у TMDB свій на кожен тип (у фільмів є «Бойовик», у серіалів —
+ * «Sci-Fi & Fantasy»), тож і питати треба окремо. Українською: пара
+ * читає портал українською, і жанри — теж текст.
+ *
+ * Порожній список при збої навмисний: фільтр — це зручність, а не умова
+ * роботи колоди. Не приїхали жанри — свайп працює без фільтра, як і
+ * працював.
+ */
+export async function tmdbGenres(type: SwipeType): Promise<TmdbGenre[]> {
   try {
-    const data = await getJson(`/discover/${t}?sort_by=popularity.desc&page=${page}`);
+    const data = await getJson(`/genre/${apiType(type)}/list`, 'uk-UA');
+    const list = (data.genres as { id: number; name: string }[] | undefined) ?? [];
+    return list
+      .filter((g) => typeof g.id === 'number' && typeof g.name === 'string' && g.name.length > 0)
+      .map((g) => ({ id: g.id, name: g.name }));
+  } catch (e) {
+    console.error('tmdbGenres error:', e);
+    return [];
+  }
+}
+
+/**
+ * Стрічка популярного для свайпу; фільтрує неевропейські назви.
+ *
+ * `genreIds` порожній — жанрового звуження немає. TMDB склеює
+ * `with_genres` комами як АБО, тобто «Комедія, Жахи» дасть і те, і те, а
+ * не перетин: пара обирає настрій, а не будує запит.
+ */
+export async function tmdbDiscover(
+  type: SwipeType,
+  page: number,
+  genreIds: readonly number[] = [],
+): Promise<SwipeCard[]> {
+  const t = apiType(type);
+  const genreParam = genreIds.length > 0
+    ? `&with_genres=${genreIds.join(',')}`
+    : '';
+  try {
+    const data = await getJson(`/discover/${t}?sort_by=popularity.desc&page=${page}${genreParam}`);
     const results = (data.results as TmdbRaw[]) ?? [];
     return results
       .filter((r) => {

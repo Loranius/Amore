@@ -6,7 +6,7 @@
 // (крім 'down' = пропустити). Логіка напрямів збережена:
 //   up=done · right=watching · left=want · down=skip.
 // ============================================================
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
@@ -20,9 +20,28 @@ const STATUS_BY_DIR: Record<Exclude<SwipeDirection, 'down'>, MediaStatus> = {
   left: 'want',
 };
 
-export function useSwipeDeck(type: SwipeType, enabled: boolean) {
+export function useSwipeDeck(
+  type: SwipeType,
+  enabled: boolean,
+  /**
+   * Обрані жанри. Порожньо — колода без звуження, як було завжди.
+   *
+   * Масив приходить ззовні, тому в залежностях ефекту лежить його
+   * СКЛЕЄНИЙ ключ, а не сам масив: новий масив із тим самим вмістом
+   * інакше перезбирав би колоду на кожному рендері панелі.
+   */
+  genreIds: readonly number[] = [],
+) {
   const me = useCurrentUser();
   const client = useQueryClient();
+  // Склеєний ключ, і вже з нього — сталий масив. Саме він іде в
+  // залежності: інакше `[]`, створений у батька на кожному рендері,
+  // перезбирав би колоду безкінечно.
+  const genreKey = genreIds.join(',');
+  const genres = useMemo(
+    () => (genreKey === '' ? [] : genreKey.split(',').map(Number)),
+    [genreKey],
+  );
 
   const [cards, setCards] = useState<SwipeCard[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,25 +60,43 @@ export function useSwipeDeck(type: SwipeType, enabled: boolean) {
   const initStack = useCallback(async () => {
     setLoading(true);
     setExhausted(false);
-    pageRef.current = Math.floor(Math.random() * 50) + 1;
-    swipedIds.current = await fetchSwipedIds();
+    const startPage = Math.floor(Math.random() * 50) + 1;
 
+    /*
+     * Сторінки беруться ПАРАЛЕЛЬНО, а не по одній у циклі.
+     *
+     * Було так: `while (collected.length < 15 && attempts < 12)` — до
+     * дванадцяти послідовних походів у TMDB, кожен чекає на попередній,
+     * і лише потім колода з'являлась на екрані. Плюс окремий похід у
+     * Supabase перед ними всіма. На звичайній мережі це секунди
+     * порожнього екрана, і саме вони читались як «вотчліст гальмує».
+     *
+     * Трьох сторінок вистачає: TMDB віддає по 20 карток, тобто до 60 на
+     * старті проти потрібних 15 — навіть якщо більшість уже свайпнута.
+     * А список свайпнутих їде ОДНОЧАСНО з ними, а не перед ними: він
+     * потрібен лише для фільтрації результату.
+     */
+    const [swiped, ...batches] = await Promise.all([
+      fetchSwipedIds(),
+      ...[0, 1, 2].map((offset) => tmdbDiscover(type, startPage + offset, genres)),
+    ]);
+    swipedIds.current = swiped;
+    pageRef.current = startPage + 3;
+
+    // Дедуплікація потрібна саме тут: три сторінки поспіль у TMDB можуть
+    // перетинатись, коли список популярного зсувається між запитами.
+    const seen = new Set<number>();
     const collected: SwipeCard[] = [];
-    let attempts = 0;
-    while (collected.length < 15 && attempts < 12) {
-      attempts++;
-      const batch = await tmdbDiscover(type, pageRef.current);
-      pageRef.current++;
-      if (!batch.length) {
-        pageRef.current = Math.floor(Math.random() * 100) + 1;
-        continue;
-      }
-      collected.push(...batch.filter((c) => !swipedIds.current.has(c.tmdb_id)));
+    for (const card of batches.flat()) {
+      if (swiped.has(card.tmdb_id) || seen.has(card.tmdb_id)) continue;
+      seen.add(card.tmdb_id);
+      collected.push(card);
     }
+
     setCards(collected);
     setExhausted(collected.length === 0);
     setLoading(false);
-  }, [type, fetchSwipedIds]);
+  }, [type, genres, fetchSwipedIds]);
 
   // (Пере)ініціалізація при відкритті панелі / зміні типу.
   useEffect(() => {
@@ -71,14 +108,14 @@ export function useSwipeDeck(type: SwipeType, enabled: boolean) {
     if (refilling.current || cards.length > 5) return;
     refilling.current = true;
     try {
-      const more = await tmdbDiscover(type, pageRef.current);
+      const more = await tmdbDiscover(type, pageRef.current, genres);
       pageRef.current++;
       const fresh = more.filter((c) => !swipedIds.current.has(c.tmdb_id));
       if (fresh.length) setCards((prev) => [...prev, ...fresh]);
     } finally {
       refilling.current = false;
     }
-  }, [cards.length, type]);
+  }, [cards.length, type, genres]);
 
   const saveVote = useCallback(
     async (card: SwipeCard, direction: SwipeDirection) => {

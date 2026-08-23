@@ -9,6 +9,8 @@ import { useState } from 'react';
 import { SwipeCardView } from './SwipeCardView';
 import { SwipeDetailModal } from './SwipeDetailModal';
 import { useSwipeDeck } from './useSwipeDeck';
+import { SWIPE_VERDICTS } from './swipeDirections';
+import { useTmdbGenres } from '@/features/media/useTmdb';
 import type { SwipeType, SwipeCard, SwipeDirection } from '@/types';
 
 const TYPE_TABS: { type: SwipeType; label: string }[] = [
@@ -18,8 +20,33 @@ const TYPE_TABS: { type: SwipeType; label: string }[] = [
 
 export function SwipeDeck({ enabled }: { enabled: boolean }) {
   const [type, setType] = useState<SwipeType>('movie');
-  const { cards, loading, exhausted, commitTop, reload } = useSwipeDeck(type, enabled);
+  // Жанри окремі на кожен тип: у TMDB списки різні (у фільмів «Бойовик»,
+  // у серіалів «Sci-Fi & Fantasy»), тож обране для фільмів не має сенсу
+  // для серіалів — і не переноситься.
+  const [genresByType, setGenresByType] = useState<Record<SwipeType, number[]>>({
+    movie: [],
+    series: [],
+  });
+  const selectedGenres = genresByType[type];
+  const { data: genres = [] } = useTmdbGenres(type, enabled);
+  const { cards, loading, exhausted, commitTop, reload } = useSwipeDeck(
+    type,
+    enabled,
+    selectedGenres,
+  );
   const [detail, setDetail] = useState<SwipeCard | null>(null);
+
+  const toggleGenre = (id: number) => {
+    setGenresByType((current) => {
+      const chosen = current[type];
+      return {
+        ...current,
+        [type]: chosen.includes(id)
+          ? chosen.filter((g) => g !== id)
+          : [...chosen, id],
+      };
+    });
+  };
 
   // Показуємо верхні 3, верхня — остання в DOM (найвищий z-index через depth=0).
   const visible = cards.slice(0, 3);
@@ -43,6 +70,36 @@ export function SwipeDeck({ enabled }: { enabled: boolean }) {
           </button>
         ))}
       </div>
+
+      {/* Фільтр жанрів. Ряд гортається вбік: жанрів у TMDB під два
+          десятки, і вертикальний список з'їв би саму колоду. */}
+      {genres.length > 0 && (
+        <div className="swipe-genres" role="group" aria-label="Фільтр за жанром">
+          {selectedGenres.length > 0 && (
+            <button
+              type="button"
+              className="swipe-genre swipe-genre--clear"
+              onClick={() => setGenresByType((c) => ({ ...c, [type]: [] }))}
+            >
+              Усі жанри
+            </button>
+          )}
+          {genres.map((genre) => {
+            const on = selectedGenres.includes(genre.id);
+            return (
+              <button
+                key={genre.id}
+                type="button"
+                className={`swipe-genre${on ? ' active' : ''}`}
+                aria-pressed={on}
+                onClick={() => toggleGenre(genre.id)}
+              >
+                {genre.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="swipe-stack">
         {loading ? (
@@ -72,19 +129,22 @@ export function SwipeDeck({ enabled }: { enabled: boolean }) {
       </div>
 
       {!loading && !exhausted && (
+        // Кнопки беруть підпис і значок звідти ж, звідки картка
+        // (`swipeDirections.ts`). Доки опис був у двох місцях, свайп
+        // казав «Подивились», а власник називав дію «Переглянуто».
         <div className="swipe-actions">
-          <button type="button" className="swipe-act swipe-act-left" onClick={() => act('left')} title="В планах">
-            🕐
-          </button>
-          <button type="button" className="swipe-act swipe-act-down" onClick={() => act('down')} title="Пропустити">
-            ✕
-          </button>
-          <button type="button" className="swipe-act swipe-act-up" onClick={() => act('up')} title="Подивились">
-            ✅
-          </button>
-          <button type="button" className="swipe-act swipe-act-right" onClick={() => act('right')} title="Дивимось">
-            ▶
-          </button>
+          {SWIPE_VERDICTS.map((verdict) => (
+            <button
+              key={verdict.direction}
+              type="button"
+              className={`swipe-act swipe-act-${verdict.direction}`}
+              onClick={() => act(verdict.direction)}
+              title={verdict.label}
+              aria-label={verdict.label}
+            >
+              {verdict.glyph}
+            </button>
+          ))}
         </div>
       )}
 
