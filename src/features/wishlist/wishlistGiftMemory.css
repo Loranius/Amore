@@ -19,10 +19,6 @@
   margin-bottom: 14px;
 }
 
-.gift-memory-heading .modal-title {
-  margin: 0;
-}
-
 .gift-memory-heading p {
   margin: 3px 0 0;
   color: var(--muted);

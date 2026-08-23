@@ -16,11 +16,12 @@
 
 /* Field labels must remain clearly distinct from hints and entered values. */
 .wishlist .form-field > span,
-.wishlist .form-field > label,
-.wishlist .modal-title {
+.wishlist .form-field > label {
   color: var(--text);
   font-weight: 800;
 }
+/* `.wishlist .modal-title` стояв у цьому ж списку й задавав ту саму
+   вагу 800 і той самий колір, що тепер має канон в `index.css`. */
 
 .wishlist :is(input, textarea, select) {
   border-color: var(--wl-control-border);

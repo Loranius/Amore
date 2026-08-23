@@ -490,10 +490,8 @@
   background: color-mix(in srgb, var(--text) 18%, transparent);
 }
 
-.plan-detail-sheet .modal-title {
-  margin: 0;
-  font-size: 20px;
-}
+/* `.plan-detail-sheet .modal-title` жив тут (margin 0 + 20px) і став
+   дослівним повтором канону в `index.css` — див. коментар там. */
 
 .plan-detail-sheet-copy {
   margin: -6px 0 2px;
