@@ -80,15 +80,26 @@ describe('scope (brief §42, §55)', () => {
 });
 
 describe('surfaces (brief §10, §44)', () => {
-  it('blurs the sheet and nothing else', () => {
-    // §44 asks for one stronger parent glass surface rather than an
-    // independent backdrop-filter per element. The sheet is that surface. The
-    // 46px round button is not: a backdrop pass on it buys nothing the
-    // translucent fill and the hairline edge do not already give.
-    const blurs = BARE.match(/backdrop-filter:\s*blur/g) ?? [];
-    expect(blurs).toHaveLength(1);
-    const sheet = BARE.slice(BARE.indexOf('.wl-world-sheet {'));
-    expect(sheet.slice(0, sheet.indexOf('}'))).toMatch(/backdrop-filter:\s*blur/);
+  it('не розмиває нічого: під ним і так уже розмито', () => {
+    /*
+     * **Вимога змінилась, і змінилась через вимір.**
+     *
+     * Тест раніше вимагав РІВНО ОДНЕ розмиття — на аркуші, — виходячи з
+     * §44: одна сильніша скляна поверхня замість кількох незалежних. Це
+     * було правильно як половина правила. Друга половина знайшлась
+     * пізніше: поки модуль відкритий, `worldDim` накриває весь
+     * `.artifact-world` вуаллю І розмиває його власним
+     * `filter: blur(4px)`.
+     *
+     * Тобто аркуш розмивав тло, яке вже розмите й уже приглушене.
+     * Побачити різницю неможливо, а платить за неї браузер щокадру, бо
+     * під вуаллю крутиться анімоване полотно.
+     *
+     * Лишилось два розмиття на весь портал, і обидва стоять над ЖИВИМ,
+     * нерозмитим тлом: док (`.bottom-nav`) і вуаль над фото героя
+     * спогадів (`.mm-hero-veil`).
+     */
+    expect(BARE).not.toMatch(/backdrop-filter/);
   });
 
   it('takes the paper away without making the page transparent', () => {

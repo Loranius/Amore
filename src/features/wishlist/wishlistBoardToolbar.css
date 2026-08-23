@@ -9,8 +9,6 @@
   box-shadow:
     0 12px 30px rgba(4, 2, 10, 0.48),
     inset 0 1px 0 rgba(255, 255, 255, 0.62);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
 }
 
 .wishlist .wl-wishlist-controls > .tab-bar {
@@ -21,8 +19,6 @@
   border: 0;
   background: transparent;
   box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
 }
 
 .wishlist .wl-visibility-tabs {

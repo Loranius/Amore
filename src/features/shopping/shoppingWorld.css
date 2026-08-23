@@ -40,7 +40,6 @@
   border-radius: 22px;
   background: var(--world-surface-strong);
   box-shadow: 0 -10px 30px var(--world-shadow);
-  backdrop-filter: blur(12px);
 }
 
 /* Поле — виїмка в камені (§17), а не білий аркуш. */

@@ -38,8 +38,6 @@
     0 10px 24px color-mix(in srgb, var(--wl-hero-accent, var(--accent)) 12%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.58);
   cursor: pointer;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   transition:
     border-color 180ms ease,
     background-color 180ms ease,

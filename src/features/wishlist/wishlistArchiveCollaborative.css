@@ -41,8 +41,7 @@
   inset: 0;
   z-index: 1200;
   padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
-  background: color-mix(in srgb, #111 52%, transparent);
-  backdrop-filter: blur(12px);
+  background: color-mix(in srgb, #111 66%, transparent);
   display: grid;
   place-items: center;
 }

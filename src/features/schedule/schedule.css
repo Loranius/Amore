@@ -436,8 +436,7 @@
   align-items: flex-end;
   justify-content: center;
   padding: 14px;
-  background: rgba(23, 16, 28, 0.48);
-  backdrop-filter: blur(4px);
+  background: rgba(23, 16, 28, 0.62);
   animation: sched-overlay-in 0.18s ease both;
 }
 

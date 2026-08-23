@@ -459,8 +459,6 @@
   padding: 14px 20px calc(16px + env(safe-area-inset-bottom, 0));
   border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
   background: var(--surface);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
 }
 
 .cal-entry-cancel {

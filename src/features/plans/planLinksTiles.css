@@ -87,8 +87,6 @@
   color: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 78%, var(--text));
   background: color-mix(in srgb, var(--surface) 76%, transparent);
   box-shadow: 0 12px 30px rgba(4, 2, 10, 0.48);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .plan-link-media img {
@@ -131,12 +129,10 @@
   border: 1px solid rgba(255,255,255,.32);
   border-radius: 999px;
   color: #fff;
-  background: rgba(33, 24, 39,.46);
+  background: rgba(33, 24, 39,.78);
   font-size: 10.5px;
   font-weight: 800;
   line-height: 1;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .plan-links .plan-link-copy,
@@ -187,10 +183,8 @@
   border: 1px solid rgba(255,255,255,.28);
   border-radius: 11px;
   color: #fff;
-  background: rgba(33, 24, 39,.48);
+  background: rgba(33, 24, 39,.8);
   cursor: pointer;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   transition: background 160ms ease, transform 160ms ease;
 }
 
@@ -222,8 +216,6 @@
   color: #fff;
   background: color-mix(in srgb, var(--plan-detail-accent, var(--accent)) 72%, rgba(33, 24, 39,.46));
   box-shadow: 0 8px 18px rgba(0,0,0,.14);
-  backdrop-filter: blur(9px);
-  -webkit-backdrop-filter: blur(9px);
 }
 
 .plan-links .plan-link-kind-picker {

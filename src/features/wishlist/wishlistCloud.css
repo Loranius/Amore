@@ -244,9 +244,7 @@
   justify-content: center;
   overflow-y: auto;
   padding: max(12px, env(safe-area-inset-top)) 0 0;
-  background: color-mix(in srgb, #27202c 42%, transparent);
-  backdrop-filter: blur(16px) saturate(0.9);
-  -webkit-backdrop-filter: blur(16px) saturate(0.9);
+  background: color-mix(in srgb, #27202c 62%, transparent);
   animation: wl-cloud-overlay-in 180ms ease both;
 }
 
@@ -269,8 +267,6 @@
   box-shadow:
     0 -22px 68px rgba(34, 24, 41, 0.3),
     inset 0 1px 0 rgba(255, 255, 255, 0.62);
-  backdrop-filter: blur(28px) saturate(1.08);
-  -webkit-backdrop-filter: blur(28px) saturate(1.08);
   overscroll-behavior: contain;
   animation: wl-cloud-sheet-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -304,8 +300,6 @@
   font: 800 18px/1 system-ui, sans-serif;
   box-shadow: 0 8px 22px rgba(4, 2, 10, 0.48);
   cursor: pointer;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .wl-cloud-sheet-hero {

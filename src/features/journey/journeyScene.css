@@ -87,24 +87,29 @@
   background: color-mix(in srgb, var(--world-bg-deep, #0b0811) 62%, transparent);
   color: var(--world-text, var(--text));
   cursor: pointer;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
 }
 .jn-title { display: grid; flex: 1 1 auto; gap: 1px; text-shadow: 0 1px 12px rgba(0, 0, 0, .55); }
 .jn-title small { color: var(--world-text-muted, var(--muted)); font-size: 10.5px; }
 .jn-title strong { font-size: 16px; }
+/* Лічильник подій лежить на ЖИВОМУ небі, а не на приглушеному тлі
+   модуля: «Наш шлях» має власну сцену, і `worldDim` її не накриває.
+   Тло тут було 16% бузку плюс розмиття — і коли розмиття пішло,
+   бузкове число опинилось просто на туманності, де воно не читається.
+   Виміряно на знімку: у правому верхньому куті під ним якраз яскрава
+   ділянка зоряного поля. Тепер тло темне й непрозоре, як у кнопки
+   виходу поруч. */
 .jn-count {
   display: grid;
   min-width: 29px;
   height: 29px;
   place-items: center;
   border-radius: 50%;
-  background: color-mix(in srgb, var(--world-primary, #b06bff) 16%, transparent);
+  background: color-mix(in srgb, var(--world-bg-deep, #0b0811) 76%, transparent);
+  border: 1px solid color-mix(in srgb, var(--world-primary, #b06bff) 34%, transparent);
   color: var(--world-accent, #d3a6ff);
   font-size: 11px;
   font-weight: 800;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  font-variant-numeric: tabular-nums;
 }
 
 .jn-empty {
@@ -152,7 +157,13 @@
    ------------------------------------------------------------
    Панель, а не модалка. Подія відкрита, поки камера стоїть біля її зірки, і
    накрити цю зірку затемненням означало б сховати те, заради чого пара сюди
-   летіла. Тому фон панелі напівпрозорий і розмиває лише те, що під нею.
+   летіла. Тому фон панелі напівпрозорий.
+
+   Розмиття під нею БУЛО й пішло. Воно коштувало найдорожче з усіх у
+   порталі: єдина поверхня над полотном, яке малюється безперервно, тож
+   браузер перераховував розмиття щокадру, поки панель відкрита. Замість
+   нього — щільніша заливка: 92% замість 84%. Зорі під панеллю все одно
+   не видно (їх ховала й розмита версія), а рахунок за кадр зник.
 
    Полотно при цьому НЕ стискається. Місце під панель звільняє камера — вона
    цілиться повз подію (`SPLIT_SHIFT` у `JourneyCameraRig`). Стиснути полотно
@@ -179,10 +190,8 @@
       color-mix(in srgb, var(--jn-level, var(--world-primary, #b06bff)) 9%, transparent),
       transparent 120px
     ),
-    color-mix(in srgb, var(--world-bg-deep, #0b0811) 84%, transparent);
+    color-mix(in srgb, var(--world-bg-deep, #0b0811) 92%, transparent);
   gap: 6px;
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
 }
 
 /*

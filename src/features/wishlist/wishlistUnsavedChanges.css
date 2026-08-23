@@ -6,9 +6,7 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(21, 15, 25, 0.54);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(21, 15, 25, 0.68);
   animation: wm-unsaved-fade-in 160ms ease both;
 }
 

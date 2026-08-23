@@ -71,8 +71,6 @@
     0 28px 46px -20px color-mix(in srgb, var(--wl-glass-tint) 32%, transparent),
     /* мокрий край плівки */
     inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   filter: none;
   isolation: isolate;
 }

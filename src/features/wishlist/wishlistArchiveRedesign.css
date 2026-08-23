@@ -102,14 +102,12 @@
   padding: 9px 12px;
   border: 1px solid color-mix(in srgb, var(--wl-memory-accent) 17%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 76%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   color: var(--text);
   font: inherit;
   font-size: 12px;
   font-weight: 850;
   cursor: pointer;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .wl-archive-page-copy {

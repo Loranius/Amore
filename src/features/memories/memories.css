@@ -134,9 +134,7 @@
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background: rgba(12, 8, 20, 0.62);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  background: rgba(12, 8, 20, 0.82);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -208,8 +206,6 @@
   gap: 12px;
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px;
   background: var(--glass-read);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
 }
 
@@ -397,8 +393,6 @@
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--glass-read);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--glass-edge), var(--shadow-md);
   color: var(--text);
   font: inherit;
@@ -460,8 +454,6 @@
   padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 16px);
   border-radius: 20px 20px 0 0;
   background: var(--glass-read);
-  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
-  backdrop-filter: blur(var(--glass-blur-strong));
   box-shadow: var(--glass-edge), var(--shadow-lg);
 }
 
@@ -599,9 +591,7 @@
   width: 40px; height: 40px;
   display: grid; place-items: center;
   border: 0; border-radius: 999px;
-  background: rgba(10, 6, 18, 0.42);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
+  background: rgba(10, 6, 18, 0.74);
   color: #fff;
   box-shadow: var(--glass-stroke);
   cursor: pointer;
@@ -621,8 +611,6 @@
   padding: 6px;
   border-radius: var(--radius-md);
   background: var(--glass-read);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--glass-edge), var(--shadow-lg);
 }
 .mm-menu button {
@@ -881,8 +869,6 @@
   padding: 14px 16px 16px;
   border-radius: 20px;
   background: var(--glass-read);
-  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
-  backdrop-filter: blur(var(--glass-blur-strong));
   box-shadow: var(--glass-edge), var(--shadow-lg);
 }
 

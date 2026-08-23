@@ -11,8 +11,6 @@
   box-shadow:
     0 12px 32px rgba(4, 2, 10, 0.48),
     inset 0 1px 0 color-mix(in srgb, white 55%, transparent);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
 }
 
 .wishlist > .tab-bar .tab-bar-btn {
@@ -208,8 +206,6 @@
   box-shadow: 0 18px 38px color-mix(in srgb, var(--wl-hero-accent) 15%, transparent);
   font-size: clamp(36px, 5vw, 54px);
   transform: rotate(4deg);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
 .wl-hero-add {

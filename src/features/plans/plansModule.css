@@ -141,8 +141,6 @@
       color-mix(in srgb, var(--plan-color, var(--accent)) 4%, transparent) 34%,
       transparent 58%),
     var(--glass-read);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   box-shadow: var(--glass-edge), var(--shadow-md);
 }
 
@@ -373,8 +371,6 @@
      Прозорість 88% — саме та межа, за якою розмиття перестає рятувати
      читаність. */
   background: var(--glass-read);
-  backdrop-filter: blur(var(--glass-blur-strong));
-  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
   box-shadow: var(--glass-edge), var(--shadow-lg);
 }
 
