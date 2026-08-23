@@ -60,9 +60,22 @@
   transition: translate 90ms ease, box-shadow 90ms ease;
 }
 
-.shopping[data-world='true'] .shopping-add-button:active {
+.shopping[data-world='true'] .shopping-add-button:active:not(:disabled) {
   translate: 0 2px;
   box-shadow: var(--control-top), var(--control-lip-press), var(--control-cast-press);
+}
+
+/* Вимкнена кнопка перестає бути кнопкою, а не блідне.
+   Те саме рішення, що й для спільної `.btn:disabled`: `opacity` на
+   залитій орхідеї давала блідо-бузкове тіло з сірим підписом, тобто
+   кнопка виглядала несправною, а не вимкненою. */
+.shopping[data-world='true'] .shopping-add-button:disabled {
+  border-color: var(--world-border);
+  background-image: none;
+  background-color: var(--world-surface-soft);
+  color: var(--world-text-muted);
+  box-shadow: none;
+  opacity: 1;
 }
 
 /* ── Шаблон ──────────────────────────────────────────────── */
