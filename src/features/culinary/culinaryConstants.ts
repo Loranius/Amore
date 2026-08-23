@@ -3,11 +3,24 @@
 // ============================================================
 import type { DishCategory, CulinaryStepDef } from '@/types';
 
+/*
+ * Категорії страв. Підпис — словами, без емодзі.
+ *
+ * Було «🥩 М'ясне», «🥦 Вега», «⚡ Швидке», «🍽️ Інше». Емодзі малює
+ * система, а не портал: він не бере колір активного чипа, не
+ * масштабується разом із текстом і на кожній платформі виглядає
+ * по-своєму. Той самий висновок уже записаний у `TabBar` — і саме
+ * кулінарія лишалась єдиним місцем, де емодзі так і сиділи в
+ * керуванні.
+ *
+ * Колір лишається: він розрізняє категорії у списку страв (крапка
+ * `.dish-cat-dot`) і несе значення, а не прикрашає.
+ */
 export const DISH_CATS: Record<DishCategory, { label: string; color: string }> = {
-  meat: { label: "🥩 М'ясне", color: '#C45B79' },
-  vegan: { label: '🥦 Вега', color: '#5FA777' },
-  fast: { label: '⚡ Швидке', color: '#D9A441' },
-  other: { label: '🍽️ Інше', color: '#9B6EA8' },
+  meat: { label: "М'ясне", color: '#C45B79' },
+  vegan: { label: 'Вега', color: '#5FA777' },
+  fast: { label: 'Швидке', color: '#D9A441' },
+  other: { label: 'Інше', color: '#9B6EA8' },
 };
 
 export const DISH_CAT_ORDER: DishCategory[] = ['meat', 'vegan', 'fast', 'other'];

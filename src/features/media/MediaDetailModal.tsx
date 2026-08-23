@@ -5,6 +5,8 @@
 // лише за кліком (не автозавантаження). Відгуки — з рядка item.
 // ============================================================
 import { useEffect, useState } from 'react';
+import { FilmIcon } from '@/components/icons/NavIcon';
+import { PencilIcon, PlayIcon } from '@/components/icons/UiIcon';
 import { useTmdbDetails } from './useTmdb';
 import type { MediaItemRow } from '@/types';
 import type { ReviewWho } from './useMedia';
@@ -44,13 +46,13 @@ export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetai
             {poster ? (
               <img className="media-detail-poster" src={poster} alt="" />
             ) : (
-              <div className="media-detail-poster-ph">🎬</div>
+              <div className="media-detail-poster-ph"><FilmIcon size={30} /></div>
             )}
             <div className="media-detail-hero-info">
               <div className="media-detail-title">{details?.title ?? item.title}</div>
               <div className="media-detail-meta">
                 {isPending ? (
-                  <span className="media-detail-badge">⏳ Завантаження…</span>
+                  <span className="media-detail-badge">Завантаження…</span>
                 ) : details ? (
                   <>
                     {details.year && <span className="media-detail-badge">{details.year}</span>}
@@ -84,7 +86,8 @@ export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetai
                 </div>
               ) : (
                 <button type="button" className="media-detail-trailer-btn" onClick={() => setPlayTrailer(true)}>
-                  ▶ Дивитись трейлер на YouTube
+                  <PlayIcon size={16} />
+                  <span>Дивитись трейлер</span>
                 </button>
               )
             ) : (
@@ -93,24 +96,38 @@ export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetai
 
           <div className="media-detail-reviews">
             <div className="media-detail-reviews-title">Відгуки</div>
+            {/*
+              * Увесь рядок — кнопка, а не олівець у кутку.
+              *
+              * Виміряно на живому екрані: `.media-detail-review-edit`
+              * займав 17×21 px без жодного паддінга — учетверо менше за
+              * будь-який поріг дотику, — і був ЄДИНИМ способом лишити
+              * відгук із цієї модалки. Головна дія екрана деталей була
+              * найдрібнішою річчю на ньому.
+              */}
             {(['dima', 'lena'] as ReviewWho[]).map((who) => {
               const rating = who === 'dima' ? item.rating_dima : item.rating_lena;
               const comment = who === 'dima' ? item.comment_dima : item.comment_lena;
+              const name = who === 'dima' ? 'Діма' : 'Лєна';
               return (
-                <div key={who} className="media-detail-review-row">
-                  <span className="media-detail-review-who">{who === 'dima' ? 'Діма' : 'Лєна'}</span>
+                <button
+                  key={who}
+                  type="button"
+                  className="media-detail-review-row"
+                  onClick={() => onReview(item, who)}
+                  aria-label={rating || comment
+                    ? `Змінити відгук: ${name}`
+                    : `Додати відгук: ${name}`}
+                >
+                  <span className="media-detail-review-who">{name}</span>
                   <span className="media-detail-review-rating">{rating ? `★ ${rating}/10` : '—'}</span>
                   <span className="media-detail-review-comment">
-                    {comment || <i style={{ color: 'var(--muted)' }}>Немає відгуку</i>}
+                    {comment || <i>Немає відгуку</i>}
                   </span>
-                  <button
-                    type="button"
-                    className="media-detail-review-edit"
-                    onClick={() => onReview(item, who)}
-                  >
-                    ✏️
-                  </button>
-                </div>
+                  <span className="media-detail-review-edit" aria-hidden="true">
+                    <PencilIcon size={15} />
+                  </span>
+                </button>
               );
             })}
           </div>
@@ -121,7 +138,7 @@ export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetai
             Закрити
           </button>
           <button type="button" className="btn" onClick={() => onEdit(item)}>
-            ✏️ Редагувати
+            Редагувати
           </button>
         </div>
       </div>

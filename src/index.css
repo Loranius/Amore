@@ -1463,11 +1463,53 @@ textarea::placeholder {
   align-items: center;
   margin-top: 6px;
 }
+/* Значок і підпис стоять в один рядок. Без цього `.btn` лишається
+   `display: inline-block`, і кнопка «В покупки» ставила візок ПОВЕРХ
+   тексту в два рядки — видно на знімку перегляду рецепта. */
 .modal-actions .btn,
 .modal-actions .btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   flex: 0 0 auto;
   min-height: 48px;
   padding: 10px 18px;
+}
+
+/*
+ * «Зберегти» не їде за нижній край.
+ *
+ * Аркуш модалки гортається сам (`max-height: 85dvh` + `overflow-y:
+ * auto`), і смуга дій — останній елемент у ньому. Поки вміст короткий,
+ * цього не видно; на довгому — ні.
+ *
+ * Виміряно на живому екрані. Редактор страви з 11 інгредієнтами:
+ * аркуш 372×778 при вікні 915, смуга дій за кілька екранів прокрутки
+ * вниз. Перегляд рецепта тієї ж страви: аркуш починається на y=69, а
+ * «Закрити» й «В покупки» — на **y=1558**, тобто на 600 з гаком
+ * пікселів нижче за екран. Кнопки, яких пара не бачить, і єдиний
+ * очевидний вихід — тап повз модалку.
+ *
+ * `position: sticky` тут працює саме тому, що прокручується сам
+ * аркуш: смуга лишається на його нижньому краї. Там, де аркуш не
+ * гортається, правило нічого не змінює — липкий елемент просто стоїть
+ * там, де стояв.
+ *
+ * Від'ємні поля рівні паддінгу аркуша (22px): смуга мусить лягати від
+ * краю до краю, інакше вміст видно в 22-піксельних щілинах по боках.
+ * Модалки з власним паддінгом (деталі медіа — `padding: 0`) ці поля
+ * скидають у себе.
+ */
+.modal-sheet > .modal-actions {
+  position: sticky;
+  bottom: -22px;
+  z-index: 1;
+  margin: 6px -22px -22px;
+  padding: 12px 22px calc(22px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface-2);
+  border-top: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 .wl-head .btn { flex: 0 0 auto; padding: 8px 16px; }
 
@@ -2131,7 +2173,22 @@ textarea::placeholder {
 .rate-num-btn.active { background: var(--accent-strong); color: #fff; border-color: transparent; }
 
 /* Деталі media */
-.media-detail-modal { padding: 0; overflow: hidden; max-width: 520px; }
+/*
+ * Тіло гортається, шапка й дії — ні.
+ *
+ * Було `overflow: hidden` на всій модалці й жодного прокручування
+ * усередині. Поки опис короткий, це видно не було; на довгому — а в
+ * TMDB опис буває вдвічі довший за той, що на знімку, — аркуш упирався
+ * у власну `max-height` (виміряно: 777.75px), і зайве просто зникало
+ * разом зі смугою дій під ним. Модалка, з якої лишається один вихід —
+ * тап повз неї.
+ */
+.media-detail-modal {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+  max-width: 520px;
+}
 .media-detail-backdrop { position: relative; min-height: 140px; display: flex; align-items: flex-end; }
 .media-detail-backdrop-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0.4; }
 .media-detail-hero { position: relative; display: flex; gap: 12px; padding: 14px; }
@@ -2141,19 +2198,77 @@ textarea::placeholder {
 .media-detail-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .media-detail-badge { font-size: 12px; background: color-mix(in srgb, var(--text) 10%, transparent); border-radius: var(--radius-pill); padding: 2px 8px; }
 .media-detail-rating-star { font-size: 12px; color: var(--accent); }
-.media-detail-body { padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+.media-detail-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  /* `min-height: 0` обов'язковий: без нього flex-елемент не стискається
+     нижче свого вмісту, і `overflow-y` не має чого прокручувати. */
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .media-detail-overview { margin: 0; font-size: 14px; color: var(--text); }
-.media-detail-trailer-btn { border: 0; border-radius: var(--radius-sm); padding: 11px; background: #ff0000; color: #fff; font: inherit; cursor: pointer; }
+/* Трейлер — не головна дія цього екрана.
+   Кнопка була `#ff0000`: чистий фірмовий червоний YouTube, найгучніше
+   на всій модалці, гучніше за «Редагувати». Правило «Rare Colour» у
+   DESIGN.md саме про це — власний акцент порталу не поступається
+   чужому бренду. Тепер це тиха кнопка з рамкою, як «Скасувати». */
+.media-detail-trailer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.media-detail-trailer-btn svg { color: var(--accent); flex: 0 0 auto; }
 .media-detail-trailer { position: relative; aspect-ratio: 16/9; border-radius: var(--radius-sm); overflow: hidden; }
 .media-detail-trailer iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 .media-detail-trailer-loading { color: var(--muted); }
 .media-detail-reviews-title { font-weight: 600; margin-bottom: 6px; }
-.media-detail-review-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
+/* Рядок відгуку — кнопка на всю ширину (див. коментар у компоненті). */
+.media-detail-review-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 0;
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.media-detail-review-row:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+.media-detail-review-comment i { color: var(--muted); }
 .media-detail-review-who { font-weight: 600; min-width: 42px; }
 .media-detail-review-rating { color: var(--accent); font-size: 13px; }
 .media-detail-review-comment { flex: 1; font-size: 13px; color: var(--muted); }
-.media-detail-review-edit { border: 0; background: transparent; cursor: pointer; font-size: 14px; }
-.media-detail-modal .modal-actions { padding: 0 14px 14px; }
+.media-detail-review-edit { display: grid; place-items: center; flex: 0 0 auto; color: var(--muted); }
+/* Смуга дій відділена рискою: тіло під нею гортається, і без межі
+   останній рядок опису обрізається просто під кнопками — на знімку з
+   довгим описом він розрізаний посеред літер. */
+/* Аркуш деталей має `padding: 0`, тож від'ємні поля спільного правила
+   тут зайві — смуга й так від краю до краю. */
+.media-detail-modal .modal-actions {
+  margin: 0;
+  bottom: 0;
+  padding: 12px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  border-top: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+}
 
 /* Свайп */
 /* Кнопка свайпу — значки замість «🔥 Свайп ▼».
@@ -2385,7 +2500,14 @@ textarea::placeholder {
 
 .btn-secondary { border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); background: transparent; color: var(--text); border-radius: var(--radius-sm); padding: 9px 12px; font: inherit; cursor: pointer; }
 
-.rcp-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; border: 0; background: color-mix(in srgb, var(--text) 5%, transparent); border-radius: var(--radius-sm); padding: 11px 14px; font: inherit; color: var(--text); cursor: pointer; }
+.rcp-toggle { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 0; background: color-mix(in srgb, var(--text) 5%, transparent); border-radius: var(--radius-sm); padding: 11px 14px; font: inherit; color: var(--text); cursor: pointer; }
+.rcp-toggle-label { display: flex; align-items: center; gap: 8px; min-width: 0; font-weight: 600; }
+.rcp-toggle-label svg { color: var(--accent); flex: 0 0 auto; }
+.rcp-toggle-label small { color: var(--muted); font-weight: 500; font-size: 12px; }
+/* Стрілка вниз обертається на 180°, а не «›» на 90°: значок той самий,
+   що й у решті порталу, і його поворот читається як «розгорнуто». */
+.rcp-toggle-arrow { display: grid; place-items: center; color: var(--muted); transition: transform .2s; }
+.rcp-toggle-arrow.open { transform: rotate(180deg); }
 .fin-acc-arrow { transition: transform 0.2s; }
 .fin-acc-arrow.open { transform: rotate(90deg); }
 .rcp-editor { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
@@ -2399,8 +2521,69 @@ textarea::placeholder {
   font: inherit;
 }
 .rcp-servings-inp { width: 80px; }
-.rcp-ing-row { display: grid; grid-template-columns: 1fr 70px 90px 32px; gap: 6px; align-items: center; }
+/*
+ * Інгредієнт — два рядки, і кнопка «прибрати» нарешті на своєму місці.
+ *
+ * Дві виміряні вади в одному правилі.
+ *
+ *  1. `grid-template-columns: 1fr 70px 90px 32px` лишало під назву 118px
+ *     на телефоні 412px. У живому редакторі це «Свинина (вирі», «Буйон
+ *     курини», «Пармезан тер» — пара не бачить, що редагує.
+ *  2. Кнопка носила `.delete-btn`, а той — `position: absolute; top: 6px;
+ *     right: 6px`. Рядок позиціонованим не був, тож ВСІ вісім хрестиків
+ *     складались у верхньому правому куті сторінки — той самий самотній
+ *     «×», що видно на знімку кулінарії поверх усього модуля. Прибрати
+ *     конкретний інгредієнт було неможливо.
+ *
+ * Тепер назва йде на всю ширину поруч із власною кнопкою, а кількість і
+ * одиниця — під нею.
+ */
+.rcp-ing-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px 44px;
+  grid-template-areas:
+    'name   name del'
+    'amount unit unit';
+  gap: 6px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
+  border-radius: var(--radius-sm);
+}
 .rcp-ing-row input, .rcp-ing-row select { width: 100%; }
+.rcp-ing-name { grid-area: name; }
+.rcp-ing-amount { grid-area: amount; }
+.rcp-ing-unit { grid-area: unit; }
+.rcp-ing-del {
+  grid-area: del;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  cursor: pointer;
+}
+.rcp-add-ing-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 40%, transparent);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.rcp-add-ing-btn svg { color: var(--accent); }
+
+/* Смуга дій страви — на спільному канонi (`.modal-sheet > .modal-actions`
+   в `index.css`), який вона ж і породила. */
 .rcp-hint { color: var(--muted); font-weight: 400; }
 
 /* Улюблені */
@@ -2417,7 +2600,22 @@ textarea::placeholder {
 .dish-cat-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
 .dish-title { flex: 1; margin: 0; font-weight: 500; }
 .dish-title--link { cursor: pointer; color: var(--accent); }
-.dish-row-actions { display: flex; gap: 4px; }
+.dish-row-actions { display: flex; gap: 4px; flex: 0 0 auto; }
+/* 40px — не «краще виглядає», а поріг дотику. Було 16px емодзі з 4px
+   паддінга, тобто ціль близько 24px. */
+.dish-row-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dish-row-btn:hover { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); }
+.dish-row-btn--danger:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 .dish-edit-btn { border: 0; background: transparent; font-size: 16px; cursor: pointer; padding: 4px; }
 
 /* ============================================================

@@ -7,6 +7,8 @@
 import { useMemo, useState } from 'react';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { TabBar } from '@/components/ui/TabBar';
+import { CloseIcon, PencilIcon, PlusIcon, SwapIcon } from '@/components/icons/UiIcon';
+import { BookIcon } from '@/components/icons/PlanIcon';
 import { DISH_CATS, DISH_CAT_ORDER } from './culinaryConstants';
 import { useDishes, useDishMutations } from './useDishes';
 import { DishModal, RecipeModal } from './DishModal';
@@ -50,7 +52,7 @@ export function Favorites() {
         value={cat}
         onChange={setCat}
         items={[
-          { value: 'all', label: 'Всі', icon: '🎲', count: dishes.length },
+          { value: 'all', label: 'Всі', icon: <SwapIcon size={15} />, count: dishes.length },
           ...DISH_CAT_ORDER.map((key) => ({
             value: key as CatFilter,
             label: DISH_CATS[key].label,
@@ -62,20 +64,23 @@ export function Favorites() {
       {/* Рандом */}
       <div className="dish-roll">
         <button type="button" className="btn dish-roll-btn" onClick={roll}>
-          🎲 Рандом
+          <SwapIcon size={16} />
+          <span>Рандом</span>
         </button>
         <div className={`dish-result${rolled ? ' rolled' : ''}`}>
           {rolled ? rolled.title : visible.length ? 'Натисни «Рандом»' : 'Пул порожній'}
         </div>
         {rolled && hasRecipe(rolled) && (
-          <button type="button" className="btn-secondary" onClick={() => setViewing(rolled)}>
-            📖 Рецепт
+          <button type="button" className="btn btn-ghost" onClick={() => setViewing(rolled)}>
+            <BookIcon size={16} />
+            <span>Рецепт</span>
           </button>
         )}
       </div>
 
       <button type="button" className="btn dish-add-btn" onClick={() => setAdding(true)}>
-        + Додати страву
+        <PlusIcon size={16} />
+        <span>Додати страву</span>
       </button>
 
       {/* Список */}
@@ -99,17 +104,28 @@ export function Favorites() {
                 >
                   {d.title}
                 </p>
+                {/*
+                  * Кнопка видалення БІЛЬШЕ не носить `.delete-btn`.
+                  *
+                  * Той клас — `position: absolute; top: 6px; right: 6px`,
+                  * розрахований на картку з `position: relative`.
+                  * `.dish-row` позиціонованим не був, тож хрестики всіх
+                  * страв злітали у верхній правий кут СТОРІНКИ й лягали
+                  * один на одного — самотній «×» поверх усього модуля на
+                  * знімку кулінарії. Прибрати конкретну страву цією
+                  * кнопкою було неможливо.
+                  */}
                 <div className="dish-row-actions">
                   {recipe && (
-                    <button type="button" className="dish-edit-btn" onClick={() => setViewing(d)} title="Рецепт">
-                      📖
+                    <button type="button" className="dish-row-btn" onClick={() => setViewing(d)} aria-label={`Рецепт: ${d.title}`}>
+                      <BookIcon size={17} />
                     </button>
                   )}
-                  <button type="button" className="dish-edit-btn" onClick={() => setEditing(d)} title="Редагувати">
-                    ✏️
+                  <button type="button" className="dish-row-btn" onClick={() => setEditing(d)} aria-label={`Редагувати: ${d.title}`}>
+                    <PencilIcon size={16} />
                   </button>
-                  <button type="button" className="delete-btn" onClick={() => onDelete(d.id)} title="Видалити">
-                    ×
+                  <button type="button" className="dish-row-btn dish-row-btn--danger" onClick={() => onDelete(d.id)} aria-label={`Видалити: ${d.title}`}>
+                    <CloseIcon size={16} />
                   </button>
                 </div>
               </div>
