@@ -11,7 +11,7 @@
 // container. Both deliberate: the scene must not travel with a shopping list,
 // and must not catch its scroll.
 // ============================================================
-import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CrystalPlaceholder } from '../home/CrystalPlaceholder';
 import { CrystalErrorBoundary } from '../home/crystal3d/CrystalErrorBoundary';
 import { useWebglSupport } from '../home/crystal3d/useWebglSupport';
@@ -79,6 +79,33 @@ export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
     }
     setArtifact(next);
   }, []);
+
+  /*
+   * Обраний артефакт оголошується на КОРЕНІ, поруч із `data-theme`.
+   *
+   * Не заради симетрії. Чорнило тексту на сцені (`--scene-ink*`) досі
+   *вибиралось лише за темою, і для кристала це працювало: його небо
+   * теж іде за темою. Небо дерева — НІ. Воно денне завжди, і в темній
+   * темі майже біле чорнило лягало на світле небо.
+   *
+   * Виміряно на живому екрані (412×915@2, тема dark, світ «Дерево»):
+   *   `.home-title`      15.16 → **1.52**   (треба 4.5)
+   *   лічильник днів      9.54 → **1.35**   (треба 3.0)
+   *   підпис під ним     11.11 → **1.59**   (треба 4.5)
+   *   привітання         17.36 → **3.41**   (треба 4.5)
+   * Тобто заголовок і число ставали фактично невидимими. У СВІТЛІЙ темі
+   * ті самі елементи читаються бездоганно — темне чорнило випадково
+   * збігалося з денним небом дерева.
+   *
+   * Атрибут стоїть на `<html>`, бо текст шапки (`.home-*`) лежить у
+   * `.home`, а не всередині `.artifact-world`: вони СУСІДИ, тож
+   * `data-artifact-world` на самому світі до них не дістає.
+   */
+  useEffect(() => {
+    const root = document.documentElement;
+    root.setAttribute('data-artifact', artifact);
+    return () => root.removeAttribute('data-artifact');
+  }, [artifact]);
 
   const value = useMemo<ArtifactWorldValue>(
     () => ({ artifact, selectArtifact, webglSupported }),
