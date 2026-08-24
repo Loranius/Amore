@@ -11,21 +11,10 @@
 // на 60 одиниць коштувала б draw call і виняток із туману заради
 // пікселів, які й так однакові.
 // ============================================================
-import { useEffect, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import {
-  buildPortalArchGeometry as buildModelledArch,
-  buildPortalPillarGeometry as buildModelledPillar,
-} from './portalColonnadeMesh';
-import { portalColonnadeTexture, portalTileTextures } from './platformTexture';
-import {
-  buildPortalBrushedMetalNormalTexture,
-  buildPortalBrushedMetalTexture,
-  buildPortalRelicBodyGeometry,
-  buildPortalRelicEngravingGeometry,
-  buildPortalRelicGlowGeometry,
-} from './portalRelicPedestal';
+import { PortalRuin } from './PortalRuin';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -38,27 +27,15 @@ import {
   type WorldMotionMode,
 } from '@/features/world/sceneDirector';
 import {
-  PORTAL_FIELD_DROP,
   PORTAL_GROUND_Y,
-  PORTAL_TEMPLE_FLOOR_Y,
-  PORTAL_LAMP_RADIUS,
   PORTAL_PALETTES,
-  portalLampReach,
   portalCameraTurn,
   portalCameraView,
-  buildPortalTempleFloorGeometry,
-  portalArchInstances,
-  buildPortalLampGeometry,
   buildPortalStarField,
-  portalLampInstances,
-  portalPillarInstances,
   type PortalCameraFrame,
 } from './portalScene';
 import {
   buildPortalCelestialArcGeometry,
-  buildPortalColonnadeDecorGeometry,
-  buildPortalCrystalLampGeometry,
-  buildPortalGroundDecorGeometry,
   buildPortalHazeField,
 } from './portalSceneDecor';
 
@@ -75,8 +52,6 @@ export interface PortalEnvironmentProps {
    *  одні й ті самі числа, тож він приходить згори. */
   frame: PortalCameraFrame;
   aspect: number;
-  /** Масштаб подіуму під розмір друзи — див. portalDaisScale. */
-  daisScale: number;
   /**
    * Напрямки кварцової жили лишаються частиною контракту сцени для наступного
    * персоналізованого inlay-pass. Круглий механічний релікварій навмисно не
@@ -138,94 +113,15 @@ export function PortalEnvironment({
   quality,
   reduceMotion,
   frame,
-  aspect,
-  daisScale,
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
-  const maximumAnisotropy = useThree((state) => state.gl.capabilities.getMaxAnisotropy());
   const pixelRatio = useThree((state) => state.gl.getPixelRatio());
-  const pillarsRef = useRef<THREE.InstancedMesh>(null);
-  const archesRef = useRef<THREE.InstancedMesh>(null);
-  const lampsRef = useRef<THREE.InstancedMesh>(null);
   const skyRef = useRef<THREE.Group>(null);
-  const relicGlowMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
-  const crystalLampMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
 
-  const relicBodyGeometry = useMemo(() => buildPortalRelicBodyGeometry(), []);
-  const relicEngravingGeometry = useMemo(() => buildPortalRelicEngravingGeometry(), []);
-  const relicGlowGeometry = useMemo(() => buildPortalRelicGlowGeometry(), []);
-  const brushedMetal = useMemo(() => buildPortalBrushedMetalTexture(), []);
-  const brushedMetalNormal = useMemo(() => buildPortalBrushedMetalNormalTexture(), []);
-  // The old strength exposed the lathe's radial tangent fan as broad wedges
-  // on the top plate. UVs are planar there now; the lower amplitude keeps the
-  // brushed grain as micro-detail instead of a second faceting system.
-  const brushedNormalScale = useMemo(() => new THREE.Vector2(0.07, 0.12), []);
-  const floorNormalScale = useMemo(
-    () => new THREE.Vector2(palette.floorNormalScale, palette.floorNormalScale),
-    [palette.floorNormalScale],
-  );
-  const archGeometry = useMemo(() => buildModelledArch(), []);
-  const tiles = useMemo(
-    () => portalTileTextures(maximumAnisotropy),
-    [maximumAnisotropy],
-  );
-  const colonnadeMap = useMemo(() => portalColonnadeTexture(), []);
-  const tileTexture = tiles?.albedo ?? null;
-  const tileNormal = tiles?.normal ?? null;
-  const tileRoughness = tiles?.roughness ?? null;
-  const floorGeometry = useMemo(() => buildPortalTempleFloorGeometry(), []);
-  const pillars = useMemo(() => portalPillarInstances(frame, aspect), [frame, aspect]);
-  const groundDecorGeometry = useMemo(
-    () => buildPortalGroundDecorGeometry(
-      seed,
-      daisScale,
-      PORTAL_TEMPLE_FLOOR_Y,
-      pillars,
-      {
-        rock: palette.decorRock,
-        rockAccent: palette.decorRockAccent,
-        moss: palette.decorMoss,
-        grass: palette.decorGrass,
-        plinth: palette.decorPlinth,
-      },
-    ),
-    [daisScale, palette.decorGrass, palette.decorMoss, palette.decorPlinth, palette.decorRock, palette.decorRockAccent, pillars, seed],
-  );
-  const crystalLampGeometry = useMemo(
-    () => buildPortalCrystalLampGeometry(seed, daisScale, PORTAL_TEMPLE_FLOOR_Y),
-    [daisScale, seed],
-  );
   const celestialArcGeometry = useMemo(() => buildPortalCelestialArcGeometry(seed), [seed]);
-  const pillarGeometry = useMemo(() => buildModelledPillar(), []);
-  const lampGeometry = useMemo(() => buildPortalLampGeometry(), []);
   const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
   const haze = useMemo(() => buildPortalHazeField(seed, hazeCount(quality)), [quality, seed]);
-  const colonnadeDecorGeometry = useMemo(
-    () => buildPortalColonnadeDecorGeometry(seed, pillars, {
-      banner: palette.decorBanner,
-      vine: palette.decorVine,
-      vineAccent: palette.decorVineAccent,
-    }),
-    [palette.decorBanner, palette.decorVine, palette.decorVineAccent, pillars, seed],
-  );
-  const lamps = useMemo(() => portalLampInstances(frame, aspect), [frame, aspect]);
-  const arches = useMemo(() => portalArchInstances(frame, aspect), [frame, aspect]);
 
-  useEffect(() => () => {
-    relicBodyGeometry.dispose();
-    relicEngravingGeometry.dispose();
-    relicGlowGeometry.dispose();
-    brushedMetal.dispose();
-    brushedMetalNormal.dispose();
-    archGeometry.dispose();
-    floorGeometry.dispose();
-    pillarGeometry.dispose();
-    lampGeometry.dispose();
-  }, [relicBodyGeometry, relicEngravingGeometry, relicGlowGeometry, brushedMetal, brushedMetalNormal, archGeometry, floorGeometry, pillarGeometry, lampGeometry]);
-
-  useEffect(() => () => groundDecorGeometry.dispose(), [groundDecorGeometry]);
-  useEffect(() => () => colonnadeDecorGeometry.dispose(), [colonnadeDecorGeometry]);
-  useEffect(() => () => crystalLampGeometry.dispose(), [crystalLampGeometry]);
   useEffect(() => () => celestialArcGeometry.dispose(), [celestialArcGeometry]);
 
   const starGeometry = useMemo(() => {
@@ -264,79 +160,17 @@ export function PortalEnvironment({
 
   useEffect(() => () => starGeometry.dispose(), [starGeometry]);
 
-  // InstancedMesh матриці ставимо до першого кадру: інакше вся колонада
-  // блимнула б в origin.
-  useLayoutEffect(() => {
-    const mesh = lampsRef.current;
-    if (mesh === null) return;
-    const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
-    const scale = new THREE.Vector3(
-      PORTAL_LAMP_RADIUS,
-      PORTAL_LAMP_RADIUS,
-      PORTAL_LAMP_RADIUS,
-    );
-    for (let index = 0; index < lamps.length; index += 1) {
-      const lamp = lamps[index]!;
-      position.set(lamp.position[0], lamp.position[1], lamp.position[2]);
-      mesh.setMatrixAt(index, matrix.compose(position, new THREE.Quaternion(), scale));
-    }
-    mesh.count = lamps.length;
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [lamps]);
 
-  useLayoutEffect(() => {
-    const mesh = pillarsRef.current;
-    if (mesh === null) return;
-    const matrix = new THREE.Matrix4();
-    const quaternion = new THREE.Quaternion();
-    const position = new THREE.Vector3();
-    const scale = new THREE.Vector3();
-    for (let index = 0; index < pillars.length; index += 1) {
-      const pillar = pillars[index]!;
-      position.set(pillar.position[0], pillar.position[1], pillar.position[2]);
-      scale.set(pillar.scale[0], pillar.scale[1], pillar.scale[2]);
-      // Розкладка володіє і позицією, і орієнтацією стику. Рендер лише
-      // застосовує опубліковану матрицю, щоб тест і екран не бачили різне.
-      quaternion.setFromEuler(new THREE.Euler(0, pillar.rotationY, 0));
-      mesh.setMatrixAt(index, matrix.compose(position, quaternion, scale));
-    }
-    mesh.count = pillars.length;
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [pillars]);
-
-  useLayoutEffect(() => {
-    const mesh = archesRef.current;
-    if (mesh === null) return;
-    const matrix = new THREE.Matrix4();
-    const position = new THREE.Vector3();
-    const scale = new THREE.Vector3();
-    for (let index = 0; index < arches.length; index += 1) {
-      const arch = arches[index]!;
-      position.set(arch.position[0], arch.position[1], arch.position[2]);
-      scale.set(arch.scale[0], arch.scale[1], arch.scale[2]);
-      const spin = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, arch.rotationY, 0));
-      mesh.setMatrixAt(index, matrix.compose(position, spin, scale));
-    }
-    mesh.count = arches.length;
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-  }, [arches]);
-
-  useFrame(({ clock }, delta) => {
+  /*
+   * Лишилось тільки небо.
+   *
+   * Тут же «дихала» емісія релікварію й чотирьох світильників храму —
+   * разом із самим храмом вони пішли. Руїна не світиться: вона камінь,
+   * і єдине, що має світитись у цьому кадрі, — кристал пари.
+   */
+  useFrame((_, delta) => {
     if (!reduceMotion && skyRef.current !== null) {
       skyRef.current.rotation.y = (skyRef.current.rotation.y + delta * 0.0024) % (Math.PI * 2);
-    }
-    const breath = reduceMotion
-      ? 1
-      : 0.95 + Math.sin(clock.elapsedTime * 0.72 + seed * 0.001) * 0.05;
-    if (relicGlowMaterialRef.current !== null) {
-      relicGlowMaterialRef.current.emissiveIntensity = palette.inlayEmissive * breath;
-    }
-    if (crystalLampMaterialRef.current !== null) {
-      crystalLampMaterialRef.current.emissiveIntensity = palette.decorCrystalEmissive * breath;
     }
   });
 
@@ -344,186 +178,20 @@ export function PortalEnvironment({
     <>
       <fog attach="fog" args={[palette.fog, frame.fogNear, frame.fogFar]} />
 
-      {/* Поле навколо подіуму. Далекий край з'їдає туман — це і є
-          горизонт, від якого відраховується «далеко». */}
-      <mesh
-        position={[0, PORTAL_GROUND_Y - PORTAL_FIELD_DROP, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-      >
-        <circleGeometry args={[42, 64]} />
-        <meshStandardMaterial color={palette.field} roughness={1} metalness={0} />
-      </mesh>
+      {/*
+        Руїна замість зібраного з частин храму.
+        ------------------------------------------------------------
+        Тут стояли підлога, вісімнадцять колон з арками, полотнища, лози,
+        чотири світильники з власними point light'ами й металевий
+        релікварій — усе процедурне, з власними числами в кожного.
 
-      {/* Підлога храму: плити по кільцях навколо подіуму. Лежить трохи вище за
-          поле, щоб шви між плитами показували темряву під ними, а не z-fight
-          із заливкою. Далі шістнадцяти юнітів її з'їдає туман — далі й немає
-          сенсу класти камінь. */}
-      <mesh
-        geometry={floorGeometry}
-        position={[0, PORTAL_TEMPLE_FLOOR_Y, 0]}
-      >
-        <meshStandardMaterial
-          map={tileTexture}
-          normalMap={tileNormal}
-          normalScale={floorNormalScale}
-          roughnessMap={tileRoughness}
-          color={palette.slab}
-          roughness={palette.floorRoughness}
-          metalness={0}
-        />
-      </mesh>
-
-      {/* Дрібні камені й рослини тепер тримаються основ колон, а низькі тумби
-          маяків стоять у середньому плані. Усе злите в один buffer і не
-          конкурує з data-owned кристалами на подіумі. */}
-      <mesh geometry={groundDecorGeometry} frustumCulled={false}>
-        <meshStandardMaterial
-          vertexColors
-          roughness={0.96}
-          metalness={0}
-          side={THREE.DoubleSide}
-          flatShading
-        />
-      </mesh>
-
-      {/* Чотири малі кристали — світильники храму, а не історія пари: вони
-          стоять на однакових кам'яних тумбах поза релікварієм і не ростуть
-          від даних. Емісія дає акцент без жодного нового point light. */}
-      <mesh geometry={crystalLampGeometry} frustumCulled={false}>
-        <meshStandardMaterial
-          ref={crystalLampMaterialRef}
-          color={palette.decorCrystal}
-          emissive={palette.decorCrystalGlow}
-          emissiveIntensity={palette.decorCrystalEmissive}
-          roughness={0.2}
-          metalness={0.04}
-          toneMapped={false}
-          flatShading
-        />
-      </mesh>
-
-      {/* Артефактний релікварій. Верх лишається точно на PORTAL_GROUND_Y —
-          кварцова жила та всі кристали продовжують стояти на своїй незмінній
-          площині. Росте лише ширина XZ; товщина металу не залежить від віку
-          пари й тому не тягне сцену вниз із кожною річницею. */}
-      <group
-        position={[0, PORTAL_GROUND_Y, 0]}
-        scale={[daisScale, 1, daisScale]}
-      >
-        <mesh geometry={relicBodyGeometry}>
-          <meshPhysicalMaterial
-            roughnessMap={brushedMetal}
-            normalMap={brushedMetalNormal}
-            normalScale={brushedNormalScale}
-            color={palette.dais}
-            emissive={palette.daisEmissive}
-            emissiveIntensity={0.16}
-            metalness={palette.daisMetalness}
-            roughness={0.68}
-            clearcoat={0.16}
-            clearcoatRoughness={0.42}
-          />
-        </mesh>
-        <mesh geometry={relicEngravingGeometry}>
-          <meshStandardMaterial
-            color={palette.rune}
-            emissive={palette.daisEmissive}
-            emissiveIntensity={0.08}
-            metalness={0.7}
-            roughness={0.58}
-          />
-        </mesh>
-        <mesh geometry={relicGlowGeometry}>
-          <meshStandardMaterial
-            ref={relicGlowMaterialRef}
-            color={palette.inlay}
-            emissive={palette.runeGlow}
-            emissiveIntensity={palette.inlayEmissive}
-            metalness={0.08}
-            roughness={0.22}
-            toneMapped={false}
-          />
-        </mesh>
-      </group>
-
-      <instancedMesh
-        ref={pillarsRef}
-        args={[pillarGeometry, undefined, pillars.length]}
-        frustumCulled={false}
-      >
-        <meshStandardMaterial map={colonnadeMap} color={palette.pillar} roughness={0.94} metalness={0.02} />
-      </instancedMesh>
-
-      {/* Арки між сусідніми колонами. Той самий матеріал, що й колони: арка — це
-          той самий камінь, і найменша різниця в тоні прочиталась би як
-          прибудова, а не як проліт. */}
-      <instancedMesh
-        ref={archesRef}
-        args={[archGeometry, undefined, arches.length]}
-        frustumCulled={false}
-      >
-        <meshStandardMaterial map={colonnadeMap} color={palette.pillar} roughness={0.94} metalness={0.02} />
-      </instancedMesh>
-
-      {/* Чотири полотнища й три лози порушують стерильну повторюваність
-          вісімнадцяти однакових прольотів. Увесь шар уже в світових
-          координатах і злитий в один двосторонній buffer. */}
-      <mesh geometry={colonnadeDecorGeometry} frustumCulled={false}>
-        <meshStandardMaterial
-          vertexColors
-          roughness={0.9}
-          metalness={0}
-          side={THREE.DoubleSide}
-        />
-      </mesh>
-
-      {/* Вогні на колонах. Геометрія горить на всіх — вона майже безкоштовна,
-          — а справжнє джерело світла запалює лише передня пара: кожен point
-          light коштує роботи в кожному фрагменті сцени. */}
-      <instancedMesh
-        ref={lampsRef}
-        args={[lampGeometry, undefined, lamps.length]}
-        frustumCulled={false}
-      >
-        <meshStandardMaterial
-          color={palette.lamp}
-          emissive={palette.lampGlow}
-          // Стримана навмисно. Сцена йде крізь ACES-тонмапінг, який усе, що
-          // яскравіше за одиницю, тягне до білого — на 3.4 полум'я виходило
-          // білим шпилем, тобто колір, який мав робити його вогнем, зникав саме
-          // тому, що його було багато.
-          emissiveIntensity={1.35}
-          roughness={0.46}
-          metalness={0.22}
-          flatShading
-        />
-      </instancedMesh>
-      {lamps.filter((lamp) => lamp.lit).map((lamp) => (
-        <pointLight
-          key={`${lamp.position[0]}:${lamp.position[2]}`}
-          position={[lamp.position[0], lamp.position[1], lamp.position[2]]}
-          // Згасання по квадрату, а межа — від самої колонади, а не від камери.
-          //
-          // Було `frame.distance * 1.35`, і намір у коментарі стояв прямо
-          // протилежний: «вогонь мусить дійти до кристала». Виміряно — цей
-          // намір не виконувався ніколи і виконувався не так, як хотіли.
-          // Лампи стоять на нерухомому радіусі 13.2, а камера відходить разом
-          // із кристалом, тож межа їхала за нею:
-          //
-          //   колонія 1 рік    межа 4.3 — вогонь не діставав навіть до половини
-          //   колонія 25 років межа 34.6 — мив геть усе, подіум включно
-          //
-          // На артефакт це давало 0 у молодої пари і 0.15 помаранчевого
-          // (#ff8c34) у двадцятип'ятирічної. §10 забороняє жовте джерело, тож
-          // межа тепер належить сцені: вогонь доходить рівно до краю подіуму й
-          // не далі, на будь-якому віці стосунків. Плями на підлозі стають
-          // рівними між собою замість того, щоб рости разом із кристалом.
-          distance={portalLampReach(lamp.position, daisScale)}
-          decay={2}
-          intensity={palette.lampIntensity}
-          color={palette.lampGlow}
-        />
-      ))}
+        Власник замінив це однією авторською руїною. Кристал росте з її
+        п'єдесталу: `PortalRuin` саджає верх `Stand` рівно на
+        `PORTAL_GROUND_Y`, тож площина, на якій стоять кристали, не
+        зрушила ані на одиницю — про заміну сцени не знає жоден інший
+        файл.
+      */}
+      <PortalRuin theme={theme} quality={quality} />
 
       {/* Зорі й кілька великих м'яких плям туманності йдуть одним point pass.
           Дуги — окрема лінійна геометрія. Разом вони дають глибину верхній
