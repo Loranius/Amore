@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildArtifactBlueprint, type EvolutionEventInput } from '../../evolution';
 import { buildCrystalSpeciesBlueprint } from './crystalSpecies';
+import { coupleTint } from './growthModel';
 
 // ============================================================
 // Три умови, які власник назвав необговорюваними.
@@ -161,5 +162,102 @@ describe('§3 завершений рік більше не змінюється
     const events = history(6, 8);
     expect(buildCrystal(events, '2030-06-01').mother.axialScale)
       .toBeGreaterThan(buildCrystal(events, '2026-06-01').mother.axialScale);
+  });
+});
+
+describe('§4 колір пари — з дати початку, і назавжди', () => {
+  /*
+   * Четверта умова власника: «колір кристала у кожної пари
+   * індивідуальний». Джерело він обрав сам — дата початку стосунків.
+   */
+
+  it('та сама дата завжди дає той самий колір', () => {
+    // Це і є сенс «ідентичності»: колір не має права поповзти між двома
+    // відкриттями головної.
+    expect(coupleTint('2022-12-26')).toEqual(coupleTint('2022-12-26'));
+  });
+
+  it('палітра справді розгорнута, а сусідні відтінки — розрізнювані', () => {
+    /*
+     * «Індивідуальний» тут означає перевірну річ, і не ту, якою вона
+     * здається спершу.
+     *
+     * Перша редакція стверджувала «різні дати → різні кольори». Це
+     * НЕПРАВДА за побудовою: дуга родини ділиться на дев'ять щаблів, тож
+     * дві дати можуть сісти на один — і мусять, інакше щаблі не мали б
+     * сенсу. Твердження впало на реальних датах (2018-12-15 і 2019-01-15
+     * дають той самий `1.000,0.438,0.766`), і правильно зробило.
+     *
+     * Правда, яку варто стерегти, інша: палітра НЕ вироджена — вона
+     * справді розходиться по родині, — і два РІЗНІ відтінки видно
+     * оком, а не лише в числах.
+     */
+    const dates: string[] = [];
+    for (let year = 2018; year < 2026; year += 1) {
+      for (const month of ['01', '04', '07', '10']) dates.push(`${year}-${month}-15`);
+    }
+    const seen = new Map<string, readonly number[]>();
+    for (const date of dates) {
+      const rgb = coupleTint(date).rgb;
+      seen.set(rgb.join(','), rgb);
+    }
+
+    // Дев'ять щаблів на тридцяти двох датах: виродження в один-два тони
+    // означало б, що дата на колір майже не впливає.
+    expect(seen.size, 'палітра вироджена').toBeGreaterThanOrEqual(6);
+
+    const distance = (a: readonly number[], b: readonly number[]) =>
+      Math.hypot(a[0]! - b[0]!, a[1]! - b[1]!, a[2]! - b[2]!);
+    const shades = [...seen.values()];
+    for (let i = 0; i < shades.length; i += 1) {
+      for (let j = i + 1; j < shades.length; j += 1) {
+        // Найтісніша пара сусідніх щаблів, виміряна на цій дузі, — 0.14.
+        expect(distance(shades[i]!, shades[j]!)).toBeGreaterThan(0.1);
+      }
+    }
+  });
+
+  it('колір лишається каменем, а не фарбою', () => {
+    /*
+     * Крізь кристал видно світло, тож жоден канал не має падати надто
+     * низько: тіло, залите чистим тоном, читається пластиком. Смуга та
+     * сама, що була відкалібрована для трьох мінеральних тонів.
+     */
+    for (const date of ['2022-12-26', '2020-01-01', '2018-08-08', '2025-05-05']) {
+      const { rgb, iridescence } = coupleTint(date);
+      for (const channel of rgb) {
+        expect(channel, `${date}: канал поза смугою`).toBeGreaterThan(0.25);
+        expect(channel).toBeLessThanOrEqual(1);
+      }
+      // Хоч один канал майже повний — інакше це сірий, а не відтінок.
+      expect(Math.max(...rgb), `${date}: немає провідного каналу`).toBeGreaterThan(0.9);
+      expect(iridescence).toBeGreaterThanOrEqual(0.14);
+      expect(iridescence).toBeLessThanOrEqual(0.42);
+    }
+  });
+
+  it('порожня дата лишає кристал білим, а не вигадує колір', () => {
+    expect(coupleTint('').rgb).toEqual([1, 1, 1]);
+    expect(coupleTint('   ').rgb).toEqual([1, 1, 1]);
+  });
+
+  it('монарх і всі його роки одного кольору', () => {
+    /*
+     * Друга половина «цільності». Раніше монарх мав один тон, а кожна
+     * дитина — свій, за подарунки того року. Колір належить парі, а не
+     * рокові, тож у одного кристала він може бути лише один.
+     */
+    const crystal = buildCrystal(history(5, 6), '2028-06-01');
+    for (const child of crystal.formations) {
+      expect(child.tintRgb, child.id).toEqual(crystal.mother.tintRgb);
+      expect(child.iridescence, child.id).toBe(crystal.mother.iridescence);
+    }
+  });
+
+  it('колір не змінюється, скільки б пара не прожила', () => {
+    const events = history(6, 8);
+    const young = buildCrystal(events, '2025-06-01');
+    const old = buildCrystal(events, '2031-06-01');
+    expect(old.mother.tintRgb).toEqual(young.mother.tintRgb);
   });
 });

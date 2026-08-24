@@ -10,8 +10,6 @@ import {
   MONARCH_FULL_TERM_YEARS,
   MONARCH_MAX_FACETS,
   MONARCH_MIN_FACETS,
-  WISH_CHANNEL_CAP,
-  WISH_TOTAL_CAP,
   anniversaryOn,
   childAzimuthRad,
   childDimensions,
@@ -37,7 +35,6 @@ import {
   monarchRadialScale,
   relationshipYears,
   veteranGirth,
-  wishTint,
 } from './growthModel';
 
 const YEAR = 365;
@@ -456,98 +453,6 @@ describe('child crystals', () => {
       seen.add(azimuth);
     }
     expect(seen.size).toBe(40);
-  });
-});
-
-describe('colour from fulfilled wishes', () => {
-  it('leaves a year with no gifts as the white crystal it was born', () => {
-    const tint = wishTint({ forFirst: 0, shared: 0, forSecond: 0 });
-    expect(tint.rgb).toEqual([1, 1, 1]);
-    expect(tint.iridescence).toBe(0);
-  });
-
-  it('never leaves a balanced couple colourless (ADR-0016)', () => {
-    // This reverses the rule it replaces, which asserted `[1, 1, 1]` here and
-    // called the resulting white the reward for balance, paid in iridescence.
-    // Measured on the owner's own portal, that reward is indistinguishable from
-    // having granted nothing at all: the live couple's fourth year was 2/2/2
-    // and published exactly `[1, 1, 1]`. Balance still drives iridescence — it
-    // just no longer cancels the colour on its way there.
-    const balanced = wishTint({ forFirst: 10, shared: 10, forSecond: 10 });
-    expect(balanced.iridescence).toBeCloseTo(1, 6);
-    expect(Math.min(...balanced.rgb)).toBeLessThan(0.7);
-
-    // Balance may cost a little chroma — the blend of three hues sits nearer
-    // the middle than any one of them does — but it may never cost most of it.
-    // Measured at the same total granted: 0.745 balanced against 0.825 for the
-    // most one-sided, which is 90%.
-    const distance = (tint: { rgb: readonly [number, number, number] }): number =>
-      tint.rgb.reduce((total, channel) => total + (1 - channel), 0);
-    for (const lopsided of [
-      { forFirst: 30, shared: 0, forSecond: 0 },
-      { forFirst: 0, shared: 30, forSecond: 0 },
-      { forFirst: 0, shared: 0, forSecond: 30 },
-    ]) {
-      expect(distance(balanced)).toBeGreaterThan(distance(wishTint(lopsided)) * 0.8);
-    }
-
-    // The small case matters more than the extreme one, because it is the one
-    // real couples are in: 2/2/2 has to be visibly coloured.
-    const small = wishTint({ forFirst: 2, shared: 2, forSecond: 2 });
-    expect(Math.min(...small.rgb)).toBeLessThan(0.95);
-  });
-
-  it('points the colour at whoever was given to', () => {
-    // Each channel now aims at a mineral hue rather than at an RGB channel —
-    // rose, amethyst, aquamarine — so the assertion is that the three are
-    // distinguishable and each leans the way its own stone does.
-    const rose = wishTint({ forFirst: 10, shared: 0, forSecond: 0 });
-    const amethyst = wishTint({ forFirst: 0, shared: 10, forSecond: 0 });
-    const aqua = wishTint({ forFirst: 0, shared: 0, forSecond: 10 });
-
-    // Rose is the warmest, aqua the coolest, amethyst between them.
-    expect(rose.rgb[0]).toBeGreaterThan(amethyst.rgb[0]);
-    expect(amethyst.rgb[0]).toBeGreaterThan(aqua.rgb[0]);
-    expect(aqua.rgb[2]).toBeGreaterThanOrEqual(amethyst.rgb[2]);
-    expect(amethyst.rgb[2]).toBeGreaterThan(rose.rgb[2]);
-
-    // One-sided giving earns no rainbow, whichever side it is.
-    for (const tint of [rose, amethyst, aqua]) expect(tint.iridescence).toBe(0);
-  });
-
-  it('deepens with the total granted, then stops at the cap', () => {
-    // Depth reads the *total* now, not the largest single channel — the defect
-    // this replaces made 3/3/3 and 3/0/0 pull identically, so giving three
-    // times as much bought nothing.
-    const distance = (tint: { rgb: readonly [number, number, number] }): number =>
-      tint.rgb.reduce((total, channel) => total + (1 - channel), 0);
-
-    const few = wishTint({ forFirst: 2, shared: 0, forSecond: 0 });
-    const many = wishTint({ forFirst: 9, shared: 0, forSecond: 0 });
-    expect(distance(many)).toBeGreaterThan(distance(few));
-
-    const one = wishTint({ forFirst: 3, shared: 0, forSecond: 0 });
-    const three = wishTint({ forFirst: 3, shared: 3, forSecond: 3 });
-    expect(distance(three)).toBeGreaterThan(distance(one));
-
-    // Past both caps — the per-channel one for the hue, the total for the
-    // depth — nothing moves again.
-    expect(wishTint({ forFirst: 400, shared: 0, forSecond: 0 }))
-      .toEqual(wishTint({ forFirst: WISH_TOTAL_CAP, shared: 0, forSecond: 0 }));
-    expect(WISH_TOTAL_CAP).toBeGreaterThanOrEqual(WISH_CHANNEL_CAP);
-  });
-
-  it('stays a translucent stone rather than stained glass', () => {
-    // Even the most one-sided year keeps enough light in the other channels
-    // to read as crystal.
-    const extreme = wishTint({ forFirst: 10, shared: 0, forSecond: 0 });
-    expect(Math.min(...extreme.rgb)).toBeGreaterThan(0.2);
-  });
-
-  it('produces finite colours for nonsense counts', () => {
-    const tint = wishTint({ forFirst: Number.NaN, shared: -5, forSecond: Number.POSITIVE_INFINITY });
-    expect(tint.rgb.every(Number.isFinite)).toBe(true);
-    expect(Number.isFinite(tint.iridescence)).toBe(true);
   });
 });
 

@@ -14,6 +14,7 @@
 // ============================================================
 import type { LeapDayPolicy } from '../../evolution/types';
 import { GROUND_LEAN_SCALE } from '../../growth';
+import { stableHash32 } from '../../evolution';
 import { clamp01, round6, seededUnit } from './math';
 
 const DAYS_PER_YEAR = 365;
@@ -924,39 +925,6 @@ export const WISH_CHANNEL_CAP = 10;
 /** Wishes granted in total beyond which the colour stops deepening. */
 export const WISH_TOTAL_CAP = 14;
 
-/**
- * The colour each channel points at.
- *
- * The mapping used to be the identity — `forFirst` drove red, `shared` green,
- * `forSecond` blue — and that is what made an even split render **white**:
- * three equal RGB channels are grey by definition, and grey over white is
- * white. So the couple who gave each other the most, and gave most evenly, got
- * a crystal with no colour in it.
- *
- * Pointing each channel at a *mineral* colour removes the coincidence. An even
- * split lands on the blend of the three — `[0.66, 0.50, 0.85]`, amethyst — which
- * is a colour, and at full depth the strongest one the crystal can reach rather
- * than the palest.
- *
- * The chroma is in the anchors rather than in a normalisation step. A first
- * attempt used paler anchors and rescaled the blend, and it came out weaker
- * than the mapping it replaced: dividing by the largest channel drives that
- * channel to white and can only darken the others, so a pale anchor set has
- * nothing left to give. These three carry their own separation — 0.35 between
- * the darkest and lightest channel — and the depth term does the rest.
- *
- * Chosen to stay inside one stone: rose quartz, amethyst and aquamarine are all
- * pale silicates, so any mix of them still reads as quartz rather than as dye.
- */
-const WISH_HUE_FOR_FIRST: readonly [number, number, number] = [1, 0.35, 0.55];
-const WISH_HUE_SHARED: readonly [number, number, number] = [0.62, 0.35, 1];
-const WISH_HUE_FOR_SECOND: readonly [number, number, number] = [0.35, 0.8, 1];
-
-/**
- * Never all the way to the pure hue: a crystal is translucent stone, not
- * stained glass, and it has to keep reading as crystal at every tint.
- */
-const WISH_MAX_PULL = 0.75;
 
 export interface CrystalTint {
   /** Linear RGB in 0..1; pure white only when nothing was granted at all. */
@@ -968,67 +936,135 @@ export interface CrystalTint {
 const WHITE: CrystalTint = { rgb: [1, 1, 1], iridescence: 0 };
 
 /**
- * Colour of the crystal from the wishes the couple granted each other.
+ * Колір пари — з дати, коли все почалось.
+ * ------------------------------------------------------------
+ * Власник назвав умову прямо: «колір кристала у кожної пари
+ * індивідуальний». І обрав джерело: дата початку стосунків.
  *
- * Not a literal RGB triple. Mapping counts straight onto channels would make a
- * couple with no gifts *black*, contradicting the white crystal every body is
- * born as.
+ * Це рішення з наслідком, і його варто назвати вголос. Колір **не
+ * росте**: він ідентичність, а не показник. Пара не може «заробити»
+ * інший відтінок, і саме цього власник хотів — інші розглянуті джерела
+ * (відтінок їхніх фото, колір зірки «Нашого шляху») рухались би з
+ * активністю, а те, що рухається, вже вимірюють висота, грані й кільце
+ * років. Кристал натомість має щось, що є з першого дня.
  *
- * **Direction and depth are separate, and that is the fix.** They used not to
- * be: the hue was the three counts normalised by the largest of them, and the
- * pull was that largest count. Two consequences, both wrong, both measured on
- * real data:
+ * Замінює `wishTint` — колір від подарованих бажань (ADR-0004). Та
+ * модель була продумана, але відповідала на інше питання: скільки пара
+ * одне одному дарує. Дві відповіді на «якого кольору кристал» — це одна
+ * відповідь забагато, і саме тому стара тут видалена, а не лишена
+ * поруч під прапорцем.
  *
- * - **Equal counts cancelled.** Normalising three equal numbers gives
- *   `[1, 1, 1]`, and over white that is white. The live couple's fourth year
- *   granted 2 / 2 / 2 and published a tint of exactly `[1, 1, 1]` —
- *   indistinguishable from a couple who had granted nothing. The note this
- *   replaces called that the reward for balance, paid in iridescence. On screen
- *   it is the absence of colour, and the owner asked for it to be healed.
- * - **Depth read one channel only.** 3/3/3 and 3/0/0 pulled equally, so giving
- *   three times as much bought nothing.
- *
- * Now the **total** decides how far from white the crystal moves, so more
- * giving is always more colour; the **mix** decides which way, by blending
- * three mineral hues rather than three raw channels, so an even split lands on
- * the blend instead of on grey. Iridescence still rewards balance — now as a
- * second signal on top of a real colour rather than as a substitute for one.
+ * **Чому відтягування від білого, а не прямий колір.** Крізь кристал
+ * видно світло; тіло, залите чистим тоном, читається пластиком, а не
+ * каменем. Тут `1 - (1 - hue) * pull` — та сама конструкція, що була в
+ * `wishTint`, і те саме калібрування: найтемніший канал сідає близько
+ * 0.35, як у трьох мінеральних тонів, які там стояли.
  */
-export function wishTint(tally: WishGiftTally): CrystalTint {
-  const count = (value: number): number => Math.max(0, Number.isFinite(value) ? value : 0);
-  const unit = (value: number): number => clamp01(count(value) / WISH_CHANNEL_CAP);
-  const first = unit(tally.forFirst);
-  const shared = unit(tally.shared);
-  const second = unit(tally.forSecond);
+export function coupleTint(relationshipStartedAt: string): CrystalTint {
+  const source = typeof relationshipStartedAt === 'string' ? relationshipStartedAt.trim() : '';
+  // Порожня дата — білий кристал, тобто той самий стан, у якому кожне тіло
+  // народжується. Вигадати колір із нічого гірше, ніж не мати його.
+  if (source === '') return WHITE;
 
-  const spread = first + shared + second;
-  if (spread <= 0) return WHITE;
-
-  // How far from white: everything they granted, saturating.
-  const depth = clamp01(
-    (count(tally.forFirst) + count(tally.shared) + count(tally.forSecond)) / WISH_TOTAL_CAP,
+  const seed = stableHash32(`couple:tint:${source}`);
+  /*
+   * Відтінок береться з ДУГИ, а не з усього кола, і це не обмеження
+   * заради обмеження — це друга вимога, яка діє одночасно з першою.
+   *
+   * Наслідок, названий вголос: дві різні дати МОЖУТЬ дати той самий
+   * відтінок — щаблів дев'ять, дат безліч. «Індивідуальний» тут означає
+   * «свій і незмінний», а не «унікальний у світі».
+   *
+   * §6 брифу: «весь кристал лишається в одній трояндово-аметистовій
+   * родині з будь-якого кута; жодних жовтих граней, золота, тонкої
+   * плівки». `onePalette.test.ts` тримає це як твердження й ловив саме
+   * ту ваду, коли колір плив за домінантним каналом: бурштин за
+   * досягнення, блакить за подорожі, зелень за сталість — пара, яка
+   * багато мандрувала, отримувала бірюзовий кристал.
+   *
+   * Повне коло дало б те саме за іншою причиною: пара з «зеленою» датою
+   * отримала б кристал поза родиною порталу.
+   *
+   * Тож дуга від троянди (340°) через аметист (280°) до синього (220°) —
+   * рівно та родина, у якій уже стоять три мінеральні тони моделі, що
+   * була тут до цього. Індивідуальність лишається: 120° — це десятки
+   * розрізнюваних відтінків, і тест на це поруч.
+   */
+  /*
+   * Дуга ділиться на ЩАБЛІ, а не читається як континуум.
+   *
+   * Перша редакція брала будь-яку точку дуги, і на п'яти датах дві
+   * зійшлись на відстані 0.049 у RGB: `0.947,0.532,1.000` проти
+   * `0.899,0.532,1.000` — той самий фіолетовий, різниця лише в червоному
+   * каналі на п'ять відсотків. Формально «різні кольори», на екрані —
+   * один. Тест на розрізнюваність це й упіймав.
+   *
+   * Щаблі роблять обіцянку перевірною: сусідні відрізняються настільки,
+   * наскільки ми це виміряли, і жодна пара дат не може випадково впасти
+   * в щілину між ними.
+   */
+  const step = Math.min(
+    COUPLE_HUE_STEPS - 1,
+    Math.floor(seededUnit(seed, 'couple:hue') * COUPLE_HUE_STEPS),
   );
-  // Which way: the three mineral hues in the proportion the couple gave them.
-  const hue = (channel: number): number => (
-    (WISH_HUE_FOR_FIRST[channel]! * first
-      + WISH_HUE_SHARED[channel]! * shared
-      + WISH_HUE_FOR_SECOND[channel]! * second) / spread
-  );
-  const pull = depth * WISH_MAX_PULL;
-
-  const strongest = Math.max(first, shared, second);
-  const weakest = Math.min(first, shared, second);
+  const turn = COUPLE_HUE_ARC_START + (step / (COUPLE_HUE_STEPS - 1)) * COUPLE_HUE_ARC_SPAN;
+  const rgb = hueToLinearRgb(turn, COUPLE_TINT_SATURATION);
 
   return {
     rgb: [
-      round6(1 - (1 - hue(0)) * pull),
-      round6(1 - (1 - hue(1)) * pull),
-      round6(1 - (1 - hue(2)) * pull),
+      round6(1 - (1 - rgb[0]) * COUPLE_TINT_PULL),
+      round6(1 - (1 - rgb[1]) * COUPLE_TINT_PULL),
+      round6(1 - (1 - rgb[2]) * COUPLE_TINT_PULL),
     ],
-    // Balance, scaled by how much there was to balance: one wish each is even,
-    // but it is not yet a rainbow.
-    iridescence: round6((weakest / strongest) * depth),
+    // Іризація теж від дати, але власним кидком: два кристали одного
+    // відтінку все одно різні на грані. Смуга вузька — це камінь, а не
+    // мильна бульбашка.
+    iridescence: round6(
+      COUPLE_IRIDESCENCE_MIN
+      + seededUnit(seed, 'couple:iridescence')
+        * (COUPLE_IRIDESCENCE_MAX - COUPLE_IRIDESCENCE_MIN),
+    ),
   };
+}
+
+/** Скільки розрізнюваних відтінків тримає дуга родини. */
+const COUPLE_HUE_STEPS = 9;
+
+/** Дуга родини: 220° (синій) → 340° (троянда), у частках кола. */
+const COUPLE_HUE_ARC_START = 220 / 360;
+const COUPLE_HUE_ARC_SPAN = 120 / 360;
+
+/** Наскільки далеко від білого тягнеться колір пари. */
+const COUPLE_TINT_PULL = 0.72;
+/** Наскільки насичений сам тон, перш ніж його розбавить білим. */
+const COUPLE_TINT_SATURATION = 0.78;
+const COUPLE_IRIDESCENCE_MIN = 0.14;
+const COUPLE_IRIDESCENCE_MAX = 0.42;
+
+/**
+ * Відтінок на колі → лінійний RGB.
+ *
+ * Власна реалізація, а не бібліотека: ядро не тягне залежностей, і шість
+ * рядків арифметики дешевші за пакет. Насиченість тут — наскільки
+ * найтемніший канал відходить від одиниці; яскравість завжди 1, бо
+ * темнішання робить `pull`, а не сам тон.
+ */
+function hueToLinearRgb(
+  turn: number,
+  saturation: number,
+): readonly [number, number, number] {
+  const hue = (((turn % 1) + 1) % 1) * 6;
+  const sector = Math.floor(hue);
+  const rise = hue - sector;
+  const low = 1 - saturation;
+  const up = low + saturation * rise;
+  const down = 1 - saturation * rise;
+  if (sector === 0) return [1, up, low];
+  if (sector === 1) return [down, 1, low];
+  if (sector === 2) return [low, 1, up];
+  if (sector === 3) return [low, down, 1];
+  if (sector === 4) return [up, low, 1];
+  return [1, low, down];
 }
 
 // ── Lights inside the monarch, from media ───────────────────

@@ -25,11 +25,10 @@ import {
   monarchRadialScale,
   veteranGirth,
   relationshipYears,
-  wishTint,
+  coupleTint,
   yearActivity,
   yearFill,
   yearTogetherness,
-  type WishGiftTally,
 } from './growthModel';
 import type {
   CrystalArchetype,
@@ -129,7 +128,6 @@ function deliberateActCount(events: readonly NormalizedEvolutionEvent[]): number
 export function buildMotherInstruction(
   artifact: ArtifactBlueprint,
   asOf: string,
-  partners: CrystalColorPartners = null,
 ): CrystalGrowthInstruction {
   const seed = stableSeed(artifact.deterministicSeed, CRYSTAL_MONARCH_BODY_ID);
   const motherArchetypes: readonly CrystalArchetype[] = ['prismatic', 'massive', 'intergrown'];
@@ -144,7 +142,7 @@ export function buildMotherInstruction(
   // because no single module drives more than one of them.
   const daysTogether = daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0;
   const occurred = occurredEvents(artifact, asOf);
-  const colonyTint = wishTint(wishTally(occurred, partners));
+  const colonyTint = coupleTint(artifact.relationshipStartedAt);
   const axialScale = monarchAxialScale(daysTogether);
   // Past the full term the height stops and the couple's history goes into
   // width instead — the owner's rule, and the reason the height curve can stop
@@ -177,18 +175,18 @@ export function buildMotherInstruction(
     attachmentDepth: 0.34,
     // The monarch stands on the axis; nothing to offset her by.
     ringDistance: 0,
-    // The colour of the whole druse, from every wish the couple has granted.
-    //
-    // It used to be `[1, 1, 1]` here and a per-year tint on the children, and
-    // the colour reached only the *core* — the inner light — never the shell.
-    // The owner asked for the opposite: the whole crystal carrying the giving,
-    // in proportion to it. So the monarch publishes one tint for the colony and
-    // Volume VI paints every body's shell with it (see `bodyColor`).
-    //
-    // `wishTint` is already proportional: no wishes leaves it white, and the
-    // pull toward the hue rises with the count until the cap. Aggregated over
-    // the whole history rather than one year, so the artifact answers "how much
-    // have we given each other" and not "how much did we give last year".
+    /*
+     * Колір усієї друзи — з дати, коли все почалось.
+     *
+     * Монарх публікує ОДИН тон на колонію, і Volume VI фарбує ним
+     * оболонку кожного тіла (`bodyColor`). Раніше тут стояв колір від
+     * подарованих бажань, а в кожної дитини — свій, за її рік. Обидва
+     * пішли: власник назвав колір ідентичністю пари, а ідентичність не
+     * може бути різною в різних частинах одного кристала.
+     *
+     * Це й друга половина «цільності». Тіло стало одне після того, як
+     * пішла спідниця (ADR-0058); тепер і колір один.
+     */
     tintRgb: colonyTint.rgb,
     iridescence: colonyTint.iridescence,
     // Where the couple has been is the ground they grow from.
@@ -232,7 +230,6 @@ function eventsWithin(
  * growth history on its own.
  */
 /** Which partner each colour channel belongs to; see `CrystalSpeciesConfig`. */
-export type CrystalColorPartners = { first: number | null; second: number | null } | null;
 
 /**
  * Everything the colony needs beyond the artifact itself.
@@ -242,13 +239,11 @@ export type CrystalColorPartners = { first: number | null; second: number | null
  * unlabelled trailing values is one transposition away from a silent defect.
  */
 export interface CrystalColonyContext {
-  partners: CrystalColorPartners;
   /** `YYYY-MM-DD` days both partners had off. See `CrystalSpeciesConfig`. */
   sharedDaysOff: readonly string[];
 }
 
 export const EMPTY_COLONY_CONTEXT: CrystalColonyContext = {
-  partners: null,
   sharedDaysOff: [],
 };
 
@@ -264,37 +259,6 @@ function withinYear(value: string, startsAt: string, endsAt: string): boolean {
  * the colour is about what they gave each other, so fulfilling your own wish
  * leaves the crystal exactly as white as it was.
  */
-/**
- * Granted wishes across a span of events, split by who they were for.
- *
- * Used both per year and — since the owner asked for the whole crystal to carry
- * the couple's giving rather than each year carrying its own — across the whole
- * history at once.
- */
-function wishTally(
-  yearEvents: readonly NormalizedEvolutionEvent[],
-  partners: CrystalColorPartners,
-): WishGiftTally {
-  const tally: WishGiftTally = { forFirst: 0, shared: 0, forSecond: 0 };
-  if (partners === null) return tally;
-
-  for (const event of yearEvents) {
-    if (eventModule(event.source) !== 'wishlist') continue;
-    const attribution = event.attribution;
-    if (attribution === undefined) continue;
-
-    if (attribution.shared) {
-      tally.shared += 1;
-      continue;
-    }
-    const { subjectId, actorId } = attribution;
-    if (subjectId === null || actorId === null || subjectId === actorId) continue;
-    if (subjectId === partners.first && actorId === partners.second) tally.forFirst += 1;
-    else if (subjectId === partners.second && actorId === partners.first) tally.forSecond += 1;
-  }
-
-  return tally;
-}
 
 export function buildAnnualFormations(
   artifact: ArtifactBlueprint,
@@ -306,6 +270,8 @@ export function buildAnnualFormations(
   const monarchNow = monarchAxialScale(
     daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0,
   );
+  // Один тон на всю колонію — див. монарха.
+  const colonyTint = coupleTint(artifact.relationshipStartedAt);
   const monarchRadialNow = monarchRadialScale(
     monarchNow,
     occurredEvents(artifact, asOf).length,
@@ -380,7 +346,7 @@ export function buildAnnualFormations(
       const colonyAtYearEnd = year.complete ? year.index + 1 : years.length;
       const size = childDimensions(monarchAtYearEnd, fill, colonyAtYearEnd, seed);
       const ringIndex = childRingIndex(year.index);
-      const tint = wishTint(wishTally(yearEvents, context.partners));
+
 
       return {
         id,
@@ -414,8 +380,9 @@ export function buildAnnualFormations(
           ringOccupancy: ringOccupancy.get(ringIndex) ?? 1,
         }),
         // A year with no gifts stays the white every crystal is born as.
-        tintRgb: tint.rgb,
-        iridescence: tint.iridescence,
+        // Той самий колір, що й у монарха: він належить парі, а не року.
+        tintRgb: colonyTint.rgb,
+        iridescence: colonyTint.iridescence,
         // Only the monarch speaks for the ground.
         groundSpread: 1,
         seed,

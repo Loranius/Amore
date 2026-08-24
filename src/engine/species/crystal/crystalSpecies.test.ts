@@ -226,83 +226,24 @@ describe('Crystal Species', () => {
   });
 });
 
-describe('Crystal Species annual colour (ADR-0004)', () => {
-  const PARTNERS = { first: 1, second: 2 };
+/*
+ * Колір річних кристалів від подарованих бажань — прибрано.
+ * ------------------------------------------------------------
+ * Тут стояв блок із п'яти перевірок моделі ADR-0004: рік без подарунків
+ * лишається білим, тон хилиться до того, кому дарували, збалансований
+ * рік винагороджується іризацією, і так далі.
+ *
+ * Модель була продумана, але відповідала на питання «скільки пара одне
+ * одному дарує». Власник назвав колір ІДЕНТИЧНІСТЮ пари й обрав інше
+ * джерело — дату початку стосунків (ADR-0059). Дві відповіді на «якого
+ * кольору кристал» — це одна відповідь забагато, тож стара модель
+ * видалена разом із `wishTint`, а не лишена поруч.
+ *
+ * Нові умови кольору стереже `ownerRules.test.ts` §4: та сама дата дає
+ * той самий колір завжди, різні дати дають розрізнювані кольори, і всі
+ * тіла одного кристала одного тону.
+ */
 
-  function withGifts(gifts: readonly { subject: number; actor: number; shared?: boolean }[]) {
-    return buildCrystalSpeciesBlueprint({
-      artifact: buildArtifact([
-        ...BASE_EVENTS,
-        ...gifts.map((gift, index) => ({
-          id: `gift:${index}`,
-          occurredAt: '2025-03-1' + String(index % 10),
-          source: 'wishlist@1',
-          evidence: 'verified' as const,
-          channels: { achievement: 0.5, significance: 0.4 },
-          portalActivity: 0.2,
-          attribution: {
-            subjectId: gift.subject,
-            actorId: gift.actor,
-            shared: gift.shared === true,
-          },
-        })),
-      ]),
-      config: { asOf: '2026-07-01', rulesVersion: 'crystal-1.0.0', colorPartners: PARTNERS },
-    });
-  }
-
-  const secondYear = (crystal: ReturnType<typeof withGifts>) =>
-    crystal.formations.find((formation) => formation.id === 'crystal:year:2')!;
-
-  it('leaves a year with no gifts white', () => {
-    expect(secondYear(withGifts([])).tintRgb).toEqual([1, 1, 1]);
-    expect(secondYear(withGifts([])).iridescence).toBe(0);
-  });
-
-  it('tints toward whichever partner was given to', () => {
-    const toFirst = secondYear(withGifts(
-      Array.from({ length: 6 }, () => ({ subject: 1, actor: 2 })),
-    )).tintRgb;
-    const toSecond = secondYear(withGifts(
-      Array.from({ length: 6 }, () => ({ subject: 2, actor: 1 })),
-    )).tintRgb;
-
-    expect(toFirst[0]).toBeGreaterThan(toFirst[2]);
-    expect(toSecond[2]).toBeGreaterThan(toSecond[0]);
-  });
-
-  it('ignores a wish somebody granted themselves', () => {
-    // The colour is about what they gave *each other*.
-    const selfGranted = secondYear(withGifts(
-      Array.from({ length: 6 }, () => ({ subject: 1, actor: 1 })),
-    ));
-    expect(selfGranted.tintRgb).toEqual([1, 1, 1]);
-  });
-
-  it('rewards a balanced year with iridescence rather than grey', () => {
-    const balanced = secondYear(withGifts([
-      ...Array.from({ length: 3 }, () => ({ subject: 1, actor: 2 })),
-      ...Array.from({ length: 3 }, () => ({ subject: 2, actor: 1 })),
-      ...Array.from({ length: 3 }, () => ({ subject: 1, actor: 2, shared: true })),
-    ]));
-    const lopsided = secondYear(withGifts(
-      Array.from({ length: 9 }, () => ({ subject: 1, actor: 2 })),
-    ));
-
-    expect(balanced.iridescence).toBeGreaterThan(lopsided.iridescence);
-    expect(Math.min(...balanced.tintRgb)).toBeGreaterThan(Math.min(...lopsided.tintRgb));
-  });
-
-  it('stays white when the app could not say who is who', () => {
-    const uncoloured = buildCrystalSpeciesBlueprint({
-      artifact: buildArtifact(BASE_EVENTS),
-      config: { asOf: '2026-07-01', rulesVersion: 'crystal-1.0.0' },
-    });
-    for (const formation of uncoloured.formations) {
-      expect(formation.tintRgb).toEqual([1, 1, 1]);
-    }
-  });
-});
 
 describe('Crystal Species monarch dimensions are independent', () => {
   function monarchFor(extra: readonly EvolutionEventInput[]) {

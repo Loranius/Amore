@@ -43,18 +43,13 @@ export function buildCrystalSpeciesBlueprint(
   const pressures = buildCrystalPressures(currentArtifact);
   const ageDays = relationshipAgeDays(currentArtifact, asOf);
   const state = buildCrystalState(currentArtifact, ageDays, pressures, asOf);
-  // The colony's colour comes from every wish the couple has granted, so the
-  // monarch needs the same partner attribution the year crystals get.
-  const mother = buildMotherInstruction(
-    currentArtifact,
-    asOf,
-    input.config.colorPartners ?? null,
-  );
+  // Колір колонії тепер від дати початку стосунків, тож монархові вже не
+  // треба знати, хто кому що подарував (ADR-0059).
+  const mother = buildMotherInstruction(currentArtifact, asOf);
   // The full artifact, not the filtered one: the formation builders bound
   // themselves by asOf, and diagnostics must still be able to name the facts
   // that lie in the future.
   const { formations, diagnostics } = buildCrystalFormations(input.artifact, asOf, {
-    partners: input.config.colorPartners ?? null,
     sharedDaysOff: input.config.sharedDaysOff ?? [],
   });
   const colonies = buildColonies(currentArtifact.deterministicSeed, formations);
