@@ -89,10 +89,29 @@ describe('Crystal material — rank in the colony', () => {
       if (role === 'focal') continue;
       for (const value of values) expect(value).toBeLessThan(focal);
     }
-    // Rank, not shadow: measured at 15% between the monarch and the skirt.
+    /*
+     * Ранг, а не тінь — і межі беруться з самої драбини ролей.
+     *
+     * `roleValue`: focal 1 → support 0.95 → family 0.92 → companion 0.88
+     * → micro 0.85. Поріг стояв `> 0.08` і був виміряний «між монархом і
+     * спідницею», тобто на всій драбині від focal до micro: (1−0.85)/1
+     * ≈ 15%.
+     *
+     * Спідниці більше немає — кристал мусить бути цільним, — і колонія
+     * тепер займає лише верх драбини: монарх (focal) плюс роки
+     * (support для завершених, family для того, що триває). Найширший
+     * можливий розмах став (1−0.92)/1 = рівно 0.08, і `> 0.08` почало
+     * падати на 0.0799997 — не через колір, а через те, що зникла
+     * найтемніша сходинка.
+     *
+     * Тож нижня межа — один ПОВНИЙ щабель драбини, а не число з
+     * попередньої конфігурації колонії. Верхня лишається: якщо розмах
+     * колись перевищить чверть, це вже не ранг, а тінь.
+     */
     const all = [...byRole.values()].flat();
     const spread = (Math.max(...all) - Math.min(...all)) / Math.max(...all);
-    expect(spread).toBeGreaterThan(0.08);
+    const FULL_RUNG = 0.08 - 1e-6;
+    expect(spread).toBeGreaterThanOrEqual(FULL_RUNG);
     expect(spread).toBeLessThan(0.25);
   });
 

@@ -17,7 +17,6 @@ import {
   childDimensions,
   childClearance,
   childDistance,
-  skirtDistance,
   childGrowthProgress,
   childRadialBias,
   childRingIndex,
@@ -404,39 +403,6 @@ describe('child crystals', () => {
     expect(CHILD_MIN_CLEARANCE).toBeLessThan(0.08 * 0.5);
   });
 
-  it('keeps the skirt outside every ring of years, not only the first', () => {
-    // The fixed 0.24 this replaces crossed the year ring in both directions:
-    // outside it at four years, inside it at twenty-five. Then the first fix
-    // cleared only ring 0, which a nine-year couple already outgrows — the
-    // sweep put ring 1 a full 0.032 *inside* its own hem.
-    for (const years of [1, 4, 9, 25, 60]) {
-      const monarchAxial = monarchAxialScale(years * YEAR);
-      const monarchRadial = monarchRadialScale(monarchAxial, 200);
-      const widest = childDimensions(monarchAxial, 1).radialScale;
-      const skirtRadial = 0.14 * 0.3;
-      const outermostRingIndex = childRingIndex(Math.max(0, years - 1));
-
-      const occupancy = Math.max(1, years - outermostRingIndex * CHILD_RING_CAPACITY);
-      const ring = childDistance({
-        monarchRadialScale: monarchRadial,
-        childRadialScale: widest,
-        widestChildRadialScale: widest,
-        ringIndex: outermostRingIndex,
-        ringOccupancy: occupancy,
-      });
-      const skirt = skirtDistance({
-        monarchRadialScale: monarchRadial,
-        widestChildRadialScale: widest,
-        skirtRadialScale: skirtRadial,
-        outermostRingIndex,
-        outermostRingOccupancy: occupancy,
-        skirtCount: 6,
-      });
-
-      // Clear of the outermost year's outer surface, by the skirt's own radius.
-      expect(skirt - skirtRadial, `${years}y`).toBeGreaterThan(ring + widest);
-    }
-  });
 
   it('seats a full ring without its own members touching', () => {
     // The circle constraint the placement was not asking about: eight bodies of

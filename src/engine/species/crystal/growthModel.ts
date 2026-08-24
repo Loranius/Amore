@@ -357,8 +357,14 @@ export function childGrowthProgress(year: RelationshipYear, asOf: string): numbe
 
 // ── Child crystals ──────────────────────────────────────────
 
-/** A child never exceeds half the monarch she was frozen beside. */
-export const CHILD_MONARCH_SHARE = 0.5;
+/**
+ * Стеля дитини проти монарха, біля якого вона застигла.
+ *
+ * 0.5 → 0.4 на прохання власника. Половина читалась як «майже такий
+ * самий»: на знімку монарх і найповніша дитина відрізнялись настільки
+ * мало, що кільце виглядало не свитою, а другим рядом кристалів.
+ */
+export const CHILD_MONARCH_SHARE = 0.4;
 
 /**
  * How many years a colony seats before its members start giving up room.
@@ -658,7 +664,7 @@ export function yearFill(
  * as a chip, and `yearFill`'s own floor alone let one fall to 15%.
  */
 const CHILD_HEIGHT_MIN_SHARE = 0.18;
-const CHILD_HEIGHT_MAX_SHARE = 0.52;
+const CHILD_HEIGHT_MAX_SHARE = 0.4;
 
 /**
  * A child's own height-to-width ratio, seeded inside the brief's 2.5–3.2.
@@ -689,6 +695,26 @@ export function childDimensions(
   // "a later event still grows the year in progress" test caught it, comparing
   // 0.080642 with 0.080642. Mapping keeps every year responsive across the
   // whole range while still landing inside the brief's 18–52%.
+  /*
+   * Тіснота колонії береться СТАНОМ НА РІК ДИТИНИ, а не на сьогодні.
+   *
+   * Це те, що робить завершений рік справді незмінним. Раніше сюди
+   * приходив сьогоднішній розмір колонії, і кожна нова річниця тихо
+   * стискала всі попередні роки: дитина 2025-го була 0.130216 з погляду
+   * 2026-го й 0.118537 з погляду 2030-го. `PRODUCT.md` каже прямо —
+   * «минуле не переписується».
+   *
+   * Спроба лишити стиснення лише на радіусі була гірша за ваду, яку
+   * лікувала: висота застигала, ширина ні, тож аспект поповз угору й
+   * `gemSilhouette.test.ts` упіймав дитину 3.85 при стелі 3.4 — тобто
+   * голку замість гранованого самоцвіту. Стискати треба обидва виміри
+   * разом або жоден.
+   *
+   * Сама причина стиснення лишається чинною й виміряною: двадцять тіл
+   * завширшки `2r` потребують `20·2r` кола. Але відповідає за це
+   * РОЗКЛАДКА — кільця (`childRingIndex`, `ringSeatingRadius`), а не
+   * подальше схуднення тіл, які вже застигли.
+   */
   const t = clamp01(childMonarchShare(colonySize) * clamp01(fill) / CHILD_MONARCH_SHARE);
   const axialScale = round6(monarchAxialNow * (
     CHILD_HEIGHT_MIN_SHARE + (CHILD_HEIGHT_MAX_SHARE - CHILD_HEIGHT_MIN_SHARE) * t
@@ -738,58 +764,7 @@ export function childClearance(monarchRadialScale: number, childRadialScale: num
   return round6(CHILD_MIN_CLEARANCE + CHILD_CORNER_ALLOWANCE * (monarch + child));
 }
 
-/**
- * Engine units between the year ring's outer edge and the skirt.
- *
- * The skirt used to sit at a fixed 0.24 from the axis while the year ring was
- * derived from the monarch's own girth, and the two crossed: at four years the
- * plans stood 0.08 outside the years, and at twenty-five the *years* had grown
- * past them, so the marks of finished plans ended up scattered among and behind
- * the crystals they were meant to sit in front of. Deriving both from the same
- * radii is what keeps the order fixed at every age.
- */
-const SKIRT_CLEARANCE = 0.02;
 
-/**
- * Distance from the monarch's axis to a plan crystal's axis.
- *
- * Outside **every** ring of years, so the skirt reads as a hem around the whole
- * colony rather than as gravel dropped between its members. Uses the widest a
- * year crystal could be rather than the years this couple actually filled, so a
- * couple who backfills an empty year later does not find their plan crystals
- * suddenly overlapped by it.
- *
- * `outermostRingIndex` is the one thing here that is not a proportion, and
- * leaving it out is what let a nine-year couple's ring 1 sit **0.032 inside**
- * its own skirt. A hem that only clears the first ring is not a hem.
- */
-export function skirtDistance(input: {
-  monarchRadialScale: number;
-  widestChildRadialScale: number;
-  skirtRadialScale: number;
-  outermostRingIndex: number;
-  outermostRingOccupancy: number;
-  skirtCount: number;
-}): number {
-  const ring = Number.isFinite(input.outermostRingIndex)
-    ? Math.max(0, Math.floor(input.outermostRingIndex))
-    : 0;
-  const outermostYearRing = Math.max(
-    input.monarchRadialScale
-      + childClearance(input.monarchRadialScale, input.widestChildRadialScale)
-      + input.widestChildRadialScale,
-    ringSeatingRadius(input.outermostRingOccupancy, input.widestChildRadialScale),
-  ) + ring * childRingStep(input.widestChildRadialScale);
-
-  return round6(Math.max(
-    outermostYearRing
-      + input.widestChildRadialScale
-      + input.skirtRadialScale
-      + SKIRT_CLEARANCE,
-    // The hem is a circle too, and it holds up to twenty-four bodies.
-    ringSeatingRadius(input.skirtCount, input.skirtRadialScale),
-  ));
-}
 
 /**
  * How far a year's crystal leans away **from the monarch's axis**, in degrees.

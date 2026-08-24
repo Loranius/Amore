@@ -18,13 +18,11 @@ import {
   childDistance,
   childGrowthProgress,
   childRadialBias,
-  CHILD_RING_CAPACITY,
   childRingIndex,
   groundSpread,
   monarchAxialScale,
   monarchFacetCount,
   monarchRadialScale,
-  skirtDistance,
   veteranGirth,
   relationshipYears,
   wishTint,
@@ -337,11 +335,34 @@ export function buildAnnualFormations(
       const modules = new Set(yearEvents.map((event) => eventModule(event.source)));
       const activity = yearActivity(modules.size, yearEvents.length);
 
-      // Every year is measured against the monarch as she stands today, so
-      // the ring stays proportional to her and a couple who filled in their
-      // early years sees those crystals grow. What stops at the anniversary
-      // is the year's *fill* — its share of the maximum — not its size in
-      // absolute units.
+      /*
+       * Дитина застигає У СВОЄМУ РОЦІ.
+       * ------------------------------------------------------------
+       * Тут стояло протилежне: кожен рік мірявся об монарха, ЯКИМ ВІН Є
+       * СЬОГОДНІ, «щоб кільце лишалось пропорційним до неї». Наслідок —
+       * усі діти росли разом із монархом вічно, і кільце показувало не
+       * історію, а одну й ту саму пропорцію в кожному віці пари.
+       *
+       * Власник назвав інше правило: висота дитини — це висота монарха
+       * НА КІНЕЦЬ ЇЇ РОКУ, і більше вона не змінюється ніколи. З цього
+       * виходить дві речі одразу.
+       *
+       * Перша: «дочірні ніколи не наздоганяють монарха» виконується ЗА
+       * ПОБУДОВОЮ, а не перевіркою після. Монарх лише росте, дитина
+       * зафіксована на частці минулого значення — наздогнати нічим.
+       *
+       * Друга, і заради неї це й робилось: кільце стає літописом. Видно,
+       * який рік був сильніший, бо різні роки більше не однакові за
+       * визначенням.
+       *
+       * Рік, який ще триває, міряється сьогоднішнім монархом — інакше
+       * поточна дитина не росла б разом із парою до самої річниці.
+       */
+      const monarchAtYearEnd = year.complete
+        ? monarchAxialScale(
+          daysBetweenExplicit(artifact.relationshipStartedAt, year.endsAt) ?? 0,
+        )
+        : monarchNow;
       const progress = childGrowthProgress(year, asOf);
       // Time the two of them actually had together, from the work schedule.
       // Bucketed here rather than by the app so the engine keeps its own clock
@@ -350,7 +371,14 @@ export function buildAnnualFormations(
         context.sharedDaysOff.filter((day) => withinYear(day, year.startsAt, year.endsAt)).length,
       );
       const fill = yearFill(progress, activity, togetherness);
-      const size = childDimensions(monarchNow, fill, years.length, seed);
+      /*
+       * Розмір колонії — теж станом на рік дитини: на кінець року `k`
+       * тіл було `k + 1`. Число, яке після річниці вже ніколи не
+       * зміниться, тож і дитина не зміниться. Рік, який ще триває,
+       * бачить колонію такою, яка вона зараз.
+       */
+      const colonyAtYearEnd = year.complete ? year.index + 1 : years.length;
+      const size = childDimensions(monarchAtYearEnd, fill, colonyAtYearEnd, seed);
       const ringIndex = childRingIndex(year.index);
       const tint = wishTint(wishTally(yearEvents, context.partners));
 
@@ -395,100 +423,22 @@ export function buildAnnualFormations(
     });
 }
 
-/** Beyond this the skirt reads as gravel; further plans thicken it instead. */
-const SKIRT_MAX_BODIES = 24;
-
 /**
- * A small crystal for every completed plan (ADR-0004).
+ * Усе, що росте біля монарха, — і це рівно роки.
+ * ------------------------------------------------------------
+ * Тут була ще «спідниця»: до двадцяти чотирьох дрібних кристалів, по
+ * одному на кожен виконаний план, які стояли БІЛЯ монарха й не кріпились
+ * до неї. Саме вони робили з артефакта купу окремих тіл — власник
+ * сформулював вимогу прямо: «кристал у нас має бути цільним».
  *
- * These do not grow. A plan is something the couple finished, so its crystal
- * is a mark rather than an organism — it appears beside the monarch, never
- * attached to her, and stays the size it arrived at.
- */
-export function buildSkirtFormations(
-  artifact: ArtifactBlueprint,
-  asOf: string,
-): CrystalGrowthInstruction[] {
-  const asOfEpoch = parseEvolutionInstant(asOf);
-  if (asOfEpoch === null) return [];
-
-  // The skirt is placed against the same two radii the year ring is, so the
-  // two can never cross however the monarch's proportions move. See
-  // `skirtDistance`; the fixed 0.24 it replaces did cross, in both directions.
-  const monarchAxialNow = monarchAxialScale(
-    daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0,
-  );
-  const monarchRadialNow = monarchRadialScale(
-    monarchAxialNow,
-    deliberateActCount(occurredEvents(artifact, asOf)),
-  );
-  // The hem has to clear every ring the couple has opened, not just the first.
-  const yearCount = relationshipYears(
-    artifact.relationshipStartedAt, asOf, artifact.leapDayPolicy,
-  ).length;
-  const widestChildRadialScale = childDimensions(monarchAxialNow, 1, yearCount, 0).radialScale;
-  const outermostRingIndex = childRingIndex(Math.max(0, yearCount - 1));
-  const outermostRingOccupancy = Math.max(
-    1,
-    yearCount - outermostRingIndex * CHILD_RING_CAPACITY,
-  );
-
-  const completed = artifact.events
-    .filter((event) => eventModule(event.source) === 'plans')
-    .filter((event) => event.occurredAtEpochMs <= asOfEpoch)
-    .slice(0, SKIRT_MAX_BODIES);
-
-  return completed.map((event, index) => {
-    const id = `crystal:plan:${event.id}`;
-    const seed = stableSeed(artifact.deterministicSeed, id);
-    // Enough size spread that the ring reads as pebbles of a real place
-    // rather than a row of identical pins.
-    const scale = 0.09 + seededUnit(seed, 'size') * 0.05;
-
-    return {
-      id,
-      sourceEventId: event.id,
-      sourceEpisodeId: event.episodeId,
-      epochIndex: event.epochIndex,
-      channel: null,
-      kind: 'skirt' as const,
-      tier: 'micro' as const,
-      archetype: 'prismatic' as const,
-      emphasized: false,
-      weight: 0.2,
-      maturity: 1,
-      axialScale: round6(scale),
-      radialScale: round6(scale * 0.3),
-      facetCount: 5,
-      azimuthRad: childAzimuthRad(index + 3),
-      elevation: 1,
-      // The same lean as a year crystal. A plan crystal is a smaller mark, not
-      // a different mineral — standing it upright among leaning siblings read
-      // as a pebble somebody dropped rather than as part of the colony.
-      radialBias: childRadialBias(seed),
-      attachmentDepth: 0.12,
-      ringDistance: round6(
-        skirtDistance({
-          monarchRadialScale: monarchRadialNow,
-          widestChildRadialScale,
-          skirtRadialScale: scale * 0.3,
-          outermostRingIndex,
-          outermostRingOccupancy,
-          skirtCount: completed.length,
-        })
-        + seededUnit(seed, 'ring') * 0.03,
-      ),
-      tintRgb: [1, 1, 1] as const,
-      iridescence: 0,
-      groundSpread: 1,
-      seed,
-    };
-  });
-}
-
-/**
- * Everything the crystal grows besides the monarch, in a stable order:
- * years first, then the skirt.
+ * Ідея спідниці була не безглузда — виконаний план справді варто чимось
+ * позначити. Але позначка коштувала єдиного, заради чого об'єкт існує:
+ * замість одного кристала, який росте, пара бачила двадцять п'ять
+ * дрібних, серед яких головний просто найбільший.
+ *
+ * Виконані плани не зникли з моделі: вони й далі рахуються як події
+ * свого модуля й через `yearActivity` роблять свій рік повнішим — тобто
+ * впливають на те, як виглядає рік, а не додають нове тіло в кадр.
  */
 export function buildCrystalFormations(
   artifact: ArtifactBlueprint,
@@ -498,10 +448,7 @@ export function buildCrystalFormations(
   const asOfEpoch = parseEvolutionInstant(asOf);
   if (asOfEpoch === null) throw new Error(`Invalid Crystal Species asOf: "${asOf}".`);
 
-  const formations = [
-    ...buildAnnualFormations(artifact, asOf, context),
-    ...buildSkirtFormations(artifact, asOf),
-  ];
+  const formations = [...buildAnnualFormations(artifact, asOf, context)];
 
   return {
     formations,

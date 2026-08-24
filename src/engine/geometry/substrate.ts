@@ -183,6 +183,22 @@ interface VeinCapsule {
 const BRANCH_REACH_GAIN = 0.3;
 
 /**
+ * Скільки гілка тягнеться за кристал САМА, без міток карти.
+ *
+ * Досі весь виліт гілки давав `spread`, тобто місця на карті. Поки біля
+ * монарха стояло два десятки тіл, це не мало значення: жила виходила
+ * рваною від самої їх кількості. Коли «спідницю» прибрали заради
+ * цільного кристала, тіл лишилось четверо на рівних кутах — і жила
+ * стала диском, тобто рівно тим, що власник відкинув («не круглої,
+ * овальної чи радіально симетричної форми»).
+ *
+ * Пара, яка не поставила жодної мітки, не має отримувати круглу
+ * підкладку. Мітки карти й далі ПОДОВЖУЮТЬ гілку через
+ * `BRANCH_REACH_GAIN`; це число — те, що жила робить без них.
+ */
+const BRANCH_BASE_REACH = 0.6;
+
+/**
  * Places visited, as the vein reads them.
  *
  * The map module used to multiply the whole substrate radius, which grew the
@@ -248,7 +264,7 @@ function veinCapsules(bodies: readonly GrowthBody[], artifactSeed: number): {
     if (distance <= 1e-6) continue;
     // The tip runs past the crystal and is thinner than the branch behind it,
     // so each direction tapers out into the stone rather than ending in a stub.
-    const extension = cover + distance * spread * BRANCH_REACH_GAIN;
+    const extension = cover + distance * (BRANCH_BASE_REACH + spread * BRANCH_REACH_GAIN);
     const stretch = (distance + extension) / distance;
     capsules.push({
       x: body.anchor.x * stretch,
