@@ -374,7 +374,6 @@
 .wl-cloud-sheet-title {
   margin: 0;
   color: var(--text);
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: clamp(24px, 7vw, 34px);
   font-weight: 700;
   line-height: 1.08;

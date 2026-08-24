@@ -18,12 +18,23 @@
 
     <link rel="icon" type="image/png" href="%BASE_URL%icons/icon-192.png" />
 
-    <!-- Fredoka/Nunito — лише для «Pink Portal» екранів (Login/Home),
-         решта застосунку лишається на системному шрифті. -->
+    <!-- Один шрифт на весь портал — Nunito.
+         ------------------------------------------------------------
+         Тут просилась ще й Fredoka, «для заголовків». Виміряно двома
+         способами: набори Google Fonts для Fredoka — `hebrew, latin,
+         latin-ext`, БЕЗ кирилиці; і в рендері її три ваги на рядку
+         «Нове бажання» дають однакову щільність 6.15, тобто малює їх
+         запасний шрифт, а не вона. У латиниці ті самі ваги дають
+         9.11 / 10.84 / 12.24 — різні, як і належить.
+
+         Отже в україномовному порталі Fredoka не намалювала жодної
+         літери за весь час. Тридцять сім оголошень, названий розділ у
+         DESIGN.md і один зайвий шрифт у кожному холодному старті — усе
+         заради родини, яка не вміє мови продукту (ADR-0052). -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap"
       rel="stylesheet"
     />
 

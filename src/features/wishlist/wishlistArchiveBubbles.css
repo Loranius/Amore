@@ -23,7 +23,6 @@
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--surface) 76%, transparent);
   color: var(--text);
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: 14px;
   font-weight: 800;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
@@ -69,7 +68,7 @@
   border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--wl-cloud-sheet-accent) 7%, var(--surface));
   color: color-mix(in srgb, var(--text) 88%, var(--wl-cloud-sheet-accent));
-  font-family: 'Nunito', sans-serif;
+  /* Родина не оголошується: вона одна на портал і приїжджає від `body`. */
   font-size: 14px;
   font-weight: 700;
   line-height: 1.55;

@@ -109,7 +109,7 @@
     },
     "typographyMeta": {
       "display": {
-        "displayName": "Fredoka Display",
+        "displayName": "Nunito Display",
         "purpose": "Звертання до пари: вітання, назва артефакта, вхід. Рідко."
       },
       "body": {
@@ -261,7 +261,7 @@
         "section": "colors"
       },
       {
-        "name": "The Fredoka Restraint Rule",
+        "name": "The Nunito Restraint Rule",
         "body": "Дисплейний шрифт — для звертання до пари, а не для кожного заголовка.",
         "section": "typography"
       },
@@ -306,7 +306,7 @@
       "Don't вішати backdrop-filter на картки — розмивається лише док.",
       "Don't ставити колір на поверхню «для краси»: колір несе стан.",
       "Don't класти колір у не-останній шар background — оголошення стає недійсним, і браузер мовчки викидає весь фон.",
-      "Don't підписувати дисплейним Fredoka все підряд."
+      "Don't підписувати дисплейним Nunito все підряд."
     ]
   }
 }

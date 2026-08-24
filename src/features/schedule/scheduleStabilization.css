@@ -50,7 +50,6 @@
 .sched-completion-value {
   align-self: center;
   color: var(--accent);
-  font-family: 'Fredoka', sans-serif;
   font-size: 15px;
   font-weight: 800;
 }

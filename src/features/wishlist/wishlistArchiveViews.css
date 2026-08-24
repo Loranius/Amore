@@ -109,7 +109,6 @@
 
 .wl-archive-view-option-copy strong {
   overflow: hidden;
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: 13px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -254,7 +253,6 @@
   display: -webkit-box;
   overflow: hidden;
   color: var(--text);
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: clamp(20px, 3vw, 27px);
   line-height: 1.12;
   text-overflow: ellipsis;
@@ -396,7 +394,6 @@
   display: -webkit-box;
   overflow: hidden;
   color: #3b3440;
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: clamp(16px, 3vw, 22px);
   line-height: 1.14;
   text-overflow: ellipsis;

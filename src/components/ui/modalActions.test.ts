@@ -171,7 +171,7 @@ describe('канони модалки', () => {
      * не змінює нічого сьогодні й тихо розходиться завтра.
      *
      * Власний заголовок дозволений, коли він ІНШИЙ: редактор бажання —
-     * повноекранний аркуш із дисплейною назвою на Fredoka 26–32px.
+     * повноекранний аркуш із дисплейною назвою 26–32px.
      */
     const cssFiles: string[] = [];
     const walk = (dir: string) => {
@@ -319,5 +319,58 @@ describe('хрестик модалки', () => {
     expect(withoutClose, 'ці модалки лишились без хрестика').toEqual([]);
     // Виняток перевіряється окремо, щоб він не міг зникнути мовчки.
     expect(NO_CLOSE_EXCEPTIONS).toContain('providers/ConfirmProvider.tsx');
+  });
+});
+
+
+// ============================================================
+// Один шрифт на портал.
+// ------------------------------------------------------------
+// Було два — і другий, Fredoka, не мав кирилиці, тобто в
+// україномовному продукті не малював нічого (ADR-0052). Гірше за
+// «зайвий шрифт»: 25 оголошень тихо падали на Nunito, а 12 — на
+// СИСТЕМНИЙ шрифт, тож екран входу й головна виглядали на кожному
+// телефоні по-своєму.
+// ============================================================
+
+describe('шрифт', () => {
+  it('font-family оголошений рівно один раз на весь портал', () => {
+    const declarations: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) walk(full);
+        else if (entry.endsWith('.css')) {
+          const clean = readFileSync(full, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+          for (const m of clean.matchAll(/font-family:\s*([^;]+);/g)) {
+            if (m[1]!.trim() === 'inherit') continue;
+            declarations.push(`${rel(full)} — ${m[1]!.trim()}`);
+          }
+        }
+      }
+    };
+    walk(FEATURES);
+    walk(join(__dirname, '..'));
+    const index = readFileSync(INDEX_CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const m of index.matchAll(/font-family:\s*([^;]+);/g)) {
+      if (m[1]!.trim() === 'inherit') continue;
+      declarations.push(`index.css — ${m[1]!.trim()}`);
+    }
+    expect(declarations, 'родина мусить оголошуватись лише в базовому правилі').toEqual([
+      "index.css — 'Nunito', system-ui, sans-serif",
+    ]);
+  });
+
+  it('портал не просить шрифта, якого не вміє показати', () => {
+    /*
+     * Набори Google Fonts для Fredoka — `hebrew, latin, latin-ext`.
+     * Кирилиці немає, отже в цьому продукті вона не малює нічого; при
+     * цьому кожен холодний старт платив за її завантаження.
+     */
+    const html = readFileSync(join(__dirname, '..', '..', '..', 'index.html'), 'utf8');
+    const request = /fonts\.googleapis\.com\/css2\?family=([^"']+)/.exec(html);
+    expect(request, 'запит шрифтів зник із index.html').not.toBeNull();
+    expect(request![1]).not.toMatch(/Fredoka/);
+    expect(request![1]).toMatch(/^Nunito:/);
   });
 });

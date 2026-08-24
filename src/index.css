@@ -441,6 +441,26 @@ body {
   background: transparent;
   caret-color: var(--accent);
   color: var(--text);
+  /*
+   * Єдиний font-family у порталі. Другого немає ніде — це стереже тест.
+   *
+   * Було два: Nunito на `body` і Fredoka в 37 оголошеннях «для
+   * заголовків». Виміряно двома незалежними способами, що Fredoka не
+   * малювала в цьому продукті нічого:
+   *
+   *  - набори Google Fonts для неї — `hebrew, latin, latin-ext`, без
+   *    кирилиці;
+   *  - у рендері її ваги 500/600/700 на рядку «Нове бажання» дають
+   *    однакову щільність 6.15 (це запасний шрифт), тоді як на латиниці
+   *    ті самі ваги дають 9.11 / 10.84 / 12.24.
+   *
+   * Наслідок був видимий, просто ніхто не називав його шрифтом: 25
+   * оголошень писали `'Fredoka', 'Nunito'` і тихо падали на Nunito, а 12
+   * писали `'Fredoka', sans-serif` — і падали на СИСТЕМНИЙ шрифт. Тобто
+   * екран входу, привітання, лічильник днів і числа графіка малювались
+   * не тим, чим решта порталу, і на кожному телефоні по-різному
+   * (ADR-0052).
+   */
   font-family: 'Nunito', system-ui, sans-serif;
   /* iOS: не роздувати шрифт в landscape; не давати "гумовому" відскоку
      краю сторінки оголювати порожнечу за межами відео-фону. */
@@ -1036,8 +1056,8 @@ textarea::placeholder {
  * уперше.
  *
  * Ті, кому потрібен ІНШИЙ заголовок, лишаються при своєму: редактор
- * бажання — це повноекранний аркуш із дисплейною назвою на Fredoka
- * 26–32px, і його правило специфічніше за це.
+ * бажання — це повноекранний аркуш із дисплейною назвою 26–32px, і
+ * його правило специфічніше за це.
  */
 /*
  * Хрестик у правому верхньому куті аркуша — один на портал.
@@ -1326,13 +1346,21 @@ textarea::placeholder {
   color: var(--accent);
   font-weight: 800;
 }
-/* Fredoka тут доречна й прямо дозволена: `DESIGN.md` називає екран
-   входу серед трьох місць, де система звертається до пари особисто.
-   Кегль зведено з 27px до дисплейних 25px. */
+/* Дисплейний рівень шкали: 27px зведено до 25px. */
+/*
+ * Вага 800, а не 600.
+ *
+ * Тут була `font-family: 'Fredoka', sans-serif` — і саме `sans-serif`
+ * малював цей заголовок: Fredoka не має кирилиці. Тобто екран входу
+ * стояв на СИСТЕМНОМУ шрифті, різному на кожному телефоні, поки решта
+ * порталу була на Nunito. Nunito 600 на 25px читається помітно легшою
+ * за системний напівжирний, тож кегль лишається, а вага йде до 800 —
+ * тієї самої, що в `PageHeader` і `.modal-title` (ADR-0052).
+ */
 .auth-title {
-  font-family: 'Fredoka', sans-serif;
   font-size: 25px;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: -.02em;
   margin: 0;
   color: var(--text);
   line-height: 1.25;
@@ -1347,9 +1375,8 @@ textarea::placeholder {
   border-radius: var(--radius-lg);
   padding: 18px 24px;
   font: inherit;
-  font-family: 'Fredoka', sans-serif;
   font-size: 19px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
   cursor: pointer;
   background-color: var(--surface-2);
@@ -1386,9 +1413,8 @@ textarea::placeholder {
   border-radius: 50%;
   aspect-ratio: 1;
   font: inherit;
-  font-family: 'Fredoka', sans-serif;
   font-size: 21px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text);
   cursor: pointer;
   background: var(--surface);
@@ -1427,7 +1453,7 @@ textarea::placeholder {
 }
 .auth-success-heart::before { top: -50%; left: 0; }
 .auth-success-heart::after { top: 0; left: 50%; }
-.auth-success-title { font-family: 'Fredoka', sans-serif; font-size: 25px; margin: 14px 0 0; color: var(--text); }
+.auth-success-title { font-size: 25px; font-weight: 800; letter-spacing: -.02em; margin: 14px 0 0; color: var(--text); }
 .auth-success-sub { margin: 0; color: var(--muted); font-size: 14px; }
 .auth-success-btn {
   margin-top: 8px;
@@ -2763,9 +2789,9 @@ textarea::placeholder {
    стали темно-рожевими на темно-фіолетовому й зникли. Тема темнить
    інтерфейс — не ніч. */
 .home-title {
-  font-family: 'Fredoka', sans-serif;
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 800;
+  letter-spacing: -.02em;
   color: var(--scene-ink);
   margin: 4px 0 0;
   text-align: center;
@@ -2773,9 +2799,8 @@ textarea::placeholder {
 /* Hero — привітання й лічильник над артефактом */
 .home-hero { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .home-hero-greeting {
-  font-family: 'Fredoka', sans-serif;
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--scene-ink);
   margin: 0;
 }
@@ -2809,12 +2834,13 @@ textarea::placeholder {
   .home-hero-counter { transition: none; }
 }
 .home-hero-counter-number {
-  font-family: 'Fredoka', sans-serif;
   font-size: 34px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1;
   color: var(--scene-ink-accent);
-  letter-spacing: -0.5px;
+  /* -0.5px було розраховано на системний шрифт, який тут малював число.
+     Nunito ширша на 10% (виміряно), тож трекінг в em і щільніший. */
+  letter-spacing: -.03em;
 }
 .home-hero-counter-label { font-size: 12px; color: var(--scene-ink-muted); }
 .home-hero-anniversary {
@@ -3207,8 +3233,8 @@ textarea::placeholder {
   text-align: center;
 }
 .route-error-title {
-  font-family: 'Fredoka', sans-serif;
   font-size: 19px;
+  font-weight: 800;
   margin: 0 0 8px;
 }
 .route-error-text {

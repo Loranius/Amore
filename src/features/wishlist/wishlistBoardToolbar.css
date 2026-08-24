@@ -307,7 +307,6 @@
   display: block;
   margin-bottom: 5px;
   color: var(--text);
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: 18px;
 }
 
@@ -340,7 +339,6 @@
 
 .wl-secret-empty strong {
   color: var(--text);
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: 19px;
 }
 

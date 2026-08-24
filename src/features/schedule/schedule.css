@@ -12,10 +12,9 @@
   margin-bottom: 16px;
 }
 
-/* `.sched-title` тут була `Fredoka clamp(27px, 7vw, 38px)` — тобто назва
-   розділу кричала гучніше за головну, і саме це порушувало The Fredoka
-   Restraint Rule. Разом із `.sched-subtitle` вона переїхала в спільні
-   двері `PageHeader` (ADR-0046). Надзаголовок лишається тут, бо його
+/* `.sched-title` тут була `clamp(27px, 7vw, 38px)` — тобто назва розділу
+   кричала гучніше за головну. Разом із `.sched-subtitle` вона переїхала
+   в спільні двері `PageHeader` (ADR-0046). Надзаголовок лишається тут, бо його
    ділить `.sched-section-kicker` усередині сторінки. */
 .sched-kicker,
 .sched-section-kicker {
@@ -163,8 +162,13 @@
 .sched-stat strong {
   display: block;
   color: var(--accent);
-  font-family: 'Fredoka', sans-serif;
+  /* 800, а не типова вага <strong>.
+     Тут падало на СИСТЕМНИЙ шрифт: Fredoka не має кирилиці, а запасним
+     стояв `sans-serif`. Nunito на 700 при 23px читається легшою за те,
+     що бачила пара; трекінг — бо Nunito на 10% ширша (виміряно). */
   font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -.02em;
   line-height: 1;
 }
 
@@ -378,8 +382,9 @@
 }
 
 .sched-upcoming-date strong {
-  font-family: 'Fredoka', sans-serif;
   font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -.02em;
   line-height: 1;
 }
 

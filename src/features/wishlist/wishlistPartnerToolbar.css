@@ -19,7 +19,6 @@
 
 .wl-partner-toolbar-copy strong {
   color: var(--text);
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: 15px;
 }
 
@@ -103,7 +102,6 @@
   display: block;
   margin-bottom: 5px;
   color: var(--text);
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: 19px;
 }
 

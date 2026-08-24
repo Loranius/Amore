@@ -167,7 +167,6 @@
 .home-artifact-preview-message h2 {
   margin: 0 0 8px;
   color: var(--text);
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: clamp(22px, 6vw, 30px);
   line-height: 1.08;
 }

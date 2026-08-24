@@ -172,7 +172,6 @@
   display: -webkit-box;
   overflow: hidden;
   color: #3b3440;
-  font-family: 'Fredoka', 'Nunito', sans-serif;
   font-size: clamp(14px, 4.1vw, 18px);
   font-weight: 700;
   line-height: 1.16;
