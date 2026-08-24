@@ -123,9 +123,13 @@
   background: color-mix(in srgb, var(--surface) 88%, transparent);
 }
 
+/* 44px — поріг дотику; було 42. Стрілки стали значками набору замість
+   символів «‹»/«›», тож кнопка вирівнює вміст сіткою. */
 .sched .sched-nav-btn {
-  width: 42px;
-  height: 42px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface));
   color: var(--accent);
@@ -135,6 +139,82 @@
   font-size: 18px;
   font-weight: 800;
   text-transform: capitalize;
+}
+
+/* ── Ключ до сітки: колір + підпис + число ──────────────────
+   Замінив і плитки статистики згори, і легенду знизу — вони казали те
+   саме різними словами, до того ж легенда стояла під доком (ADR-0055). */
+.sched-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sched-key-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* «Разом» — єдиний рядок з акцентною рамкою: це та відповідь, заради
+   якої екран відкривають. */
+.sched-key-item--both {
+  border-color: color-mix(in srgb, var(--sched-both) 40%, transparent);
+  background: color-mix(in srgb, var(--sched-both) 12%, var(--surface));
+  color: var(--text);
+}
+
+.sched-key-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sched-key-item b {
+  margin-left: auto;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.sched-key-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-hair);
+  background: var(--text);
+}
+
+.sched-key-item--both .sched-key-swatch { background: var(--sched-both); }
+.sched-key-item--her .sched-key-swatch { background: var(--sched-her); }
+.sched-key-item--him .sched-key-swatch { background: var(--sched-him); }
+
+/* Крапка плану — єдине, чого немає в ключі згори, тож і підпис до неї
+   лишається біля сітки. */
+.sched-plan-note {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -4px 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.sched-key-swatch--plan {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
 }
 
 .sched-stats {
@@ -198,8 +278,20 @@
   text-transform: uppercase;
 }
 
+/*
+ * Клітинка — стовпчик: число, під ним смужка стану.
+ *
+ * `min-height: 44px` — поріг дотику. Виміряно до зміни: 42×42, тобто
+ * кнопка, у яку пара цілиться щодня, була нижча за поріг.
+ */
 .sched .sched-cell {
   min-width: 0;
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   border-radius: var(--radius-md);
   transition: transform 0.13s ease, box-shadow 0.13s ease, filter 0.13s ease;
 }
@@ -218,47 +310,72 @@
   outline-offset: 1px;
 }
 
+/*
+ * Число в центрі, стан — під ним.
+ *
+ * Було: число в кутку 11px, а посередині символ вагою 900. Тобто в
+ * клітинці 42×42 змагались дві однаково гучні речі, і жодна з них не
+ * була тим, що шукає око — датою.
+ */
 .sched .sched-cell-num {
-  position: absolute;
-  top: 7px;
-  left: 8px;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Літери «Л»/«Д» лишились текстом, а «обидва вільні» стало значком
-   серця — тож клітинка вирівнює обидва однаково. */
+/*
+ * Смужка стану під числом.
+ *
+ * Особисті вихідні більше не заливають клітинку. Причина не в смаку:
+ * екран відкривають з ОДНИМ питанням — коли ми вільні разом, — а три
+ * насичені заливки давали три однакові голоси, і відповідь тонула серед
+ * контексту. Тепер залита клітинка означає рівно одне.
+ *
+ * Смужка, а не крапка: колір тут єдиний носій сенсу, і смужка дає йому
+ * утричі більше пікселів на тій самій висоті.
+ */
 .sched-cell-symbol {
-  display: grid;
-  place-items: center;
-  font-size: clamp(12px, 4vw, 18px);
-  font-weight: 900;
+  display: block;
+  width: 16px;
+  height: 3px;
+  border-radius: var(--radius-hair);
+  background: transparent;
 }
 
 .sched .sched-cell--both-off {
-  background: linear-gradient(145deg, #a85bdf, #8535be);
-  /* Було `0 7px 16px rgba(133,53,190,.23)` — фіолетове світіння під
-     фіолетовою клітинкою. The Shadow Is A Shadow Rule: тінь темна й
-     падає вниз, кольорового світла під елементом не буває. */
+  background: var(--sched-both);
   box-shadow: var(--shadow-sm);
 }
 
-.sched .sched-cell--both-off .sched-cell-symbol {
-  color: #fff;
-}
+/*
+ * Число на «разом» — чисте біле й на суцільному тоні.
+ *
+ * Було на градієнті `#a85bdf → #8535be`, і на світлому кінці контраст
+ * білого падав до **4.02:1** — нижче AA. Єдина клітинка, яка не
+ * проходила, і водночас найважливіша. Суцільний `--sched-both` тримає
+ * один контраст по всій площі.
+ */
+.sched .sched-cell--both-off .sched-cell-num { color: #fff; }
+.sched .sched-cell--both-off .sched-cell-symbol { background: rgba(255, 255, 255, 0.85); }
 
-.sched .sched-cell--lena-off {
-  background: linear-gradient(145deg, #f9d6bf, #f1b68f);
-}
+/* Число особистого вихідного — повним кольором тексту, а не приглушеним.
+   Інакше день, коли хтось вільний, читався так само тихо, як порожній:
+   три рівні (разом → сам → нічого) мусять розрізнятись і без кольору. */
+.sched .sched-cell--lena-off { background: color-mix(in srgb, var(--sched-her) 13%, var(--surface)); }
+.sched .sched-cell--lena-off .sched-cell-num,
+.sched .sched-cell--dima-off .sched-cell-num { color: var(--text); }
+.sched .sched-cell--lena-off .sched-cell-symbol { background: var(--sched-her); }
 
-.sched .sched-cell--dima-off {
-  background: linear-gradient(145deg, #d4dbf5, #aebce9);
-}
+.sched .sched-cell--dima-off { background: color-mix(in srgb, var(--sched-him) 13%, var(--surface)); }
+.sched .sched-cell--dima-off .sched-cell-symbol { background: var(--sched-him); }
 
+/* Крапка переїхала з НИЗУ вгору: смужка стану тепер стоїть саме внизу,
+   і на знімку 12 серпня вони налазили одна на одну. */
 .sched-cell-plan-dot {
   position: absolute;
-  right: 6px;
-  bottom: 6px;
+  right: 5px;
+  top: 5px;
   width: 7px;
   height: 7px;
   border: 2px solid var(--surface);

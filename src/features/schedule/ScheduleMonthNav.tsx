@@ -1,3 +1,4 @@
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons/UiIcon';
 import { MONTHS_UA, currentYearMonth, stepMonth } from '@/features/_shared/month';
 
 export function ScheduleMonthNav({
@@ -14,7 +15,7 @@ export function ScheduleMonthNav({
 
   return (
     <div className="sched-nav">
-      <button type="button" className="sched-nav-btn" onClick={() => onChange(stepMonth(yr, mo, -1))} aria-label="Попередній місяць">‹</button>
+      <button type="button" className="sched-nav-btn" onClick={() => onChange(stepMonth(yr, mo, -1))} aria-label="Попередній місяць"><ChevronLeftIcon size={18} /></button>
       <div className="sched-month-center">
         <span className="sched-month-label">{MONTHS_UA[mo - 1]} {yr}</span>
         <button
@@ -26,7 +27,7 @@ export function ScheduleMonthNav({
           {isCurrentMonth ? 'Поточний місяць' : 'Сьогодні'}
         </button>
       </div>
-      <button type="button" className="sched-nav-btn" onClick={() => onChange(stepMonth(yr, mo, 1))} aria-label="Наступний місяць">›</button>
+      <button type="button" className="sched-nav-btn" onClick={() => onChange(stepMonth(yr, mo, 1))} aria-label="Наступний місяць"><ChevronRightIcon size={18} /></button>
     </div>
   );
 }

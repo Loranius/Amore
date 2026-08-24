@@ -198,10 +198,28 @@ export function SchedulePage() {
     // розділів порталу.
     <section className="sched pink-page">
       <header className="sched-hero">
+        {/*
+          * «Редагувати» — у слоті дії спільних дверей (ADR-0046).
+          *
+          * Кнопка стояла окремим правовирівняним рядком між карткою
+          * місяця й статусами заповнення — тобто висіла в порожнечі, не
+          * належачи ні тому, ні тому. Слот дії `PageHeader` існує рівно
+          * для дії рівня екрана, а режим редагування саме такий.
+          */}
         <PageHeader
           eyebrow="Календар пари"
           title="Графік"
           meta="Побачте, коли ви обоє вільні, та заплануйте час разом."
+          action={(
+            <button
+              type="button"
+              className={`sched-edit-compact${editMode ? ' is-active' : ''}`}
+              onClick={toggleEditMode}
+              aria-pressed={editMode}
+            >
+              {editMode ? 'Завершити' : 'Редагувати'}
+            </button>
+          )}
         />
       </header>
 
@@ -219,16 +237,6 @@ export function SchedulePage() {
 
       <div className="sched-month-toolbar">
         <ScheduleMonthNav yr={yr} mo={mo} onChange={changeMonth} />
-        <div className="sched-edit-row">
-          <button
-            type="button"
-            className={`sched-edit-compact${editMode ? ' is-active' : ''}`}
-            onClick={toggleEditMode}
-            aria-pressed={editMode}
-          >
-            {editMode ? 'Завершити' : 'Редагувати'}
-          </button>
-        </div>
       </div>
 
       <ScheduleCompletionStatus

@@ -1,4 +1,3 @@
-import { HeartIcon } from '@/components/icons/NavIcon';
 import { DAYS_UA, daysInMonth, firstMondayOffset, ymd } from '@/features/_shared/month';
 import type { PlanRow } from '@/types';
 import type { DayStatus } from './scheduleViewModel';
@@ -28,13 +27,44 @@ export function ScheduleMonthOverview({
 
   return (
     <>
+      {/*
+        * Легенда стоїть НАД сіткою й несе числа.
+        *
+        * Дві виміряні вади в одному місці. Плитки «9 спільні / 10 Діма /
+        * 16 Лєна» стояли згори, а легенда кольорів — знизу, на y=905 при
+        * вікні 915: тобто код кольору пояснювався під доком, там, де
+        * його ніхто не бачить. І казали вони те саме різними словами.
+        *
+        * Тепер це один рядок: колір, підпис і число разом. Хто дивиться
+        * на сітку — бачить, що означає тон; хто рахує — бачить скільки.
+        */}
       {usersCount >= 2 && (
-        <div className="sched-stats" aria-label="Статистика вихідних цього місяця">
-          <div className="sched-stat sched-stat--shared"><strong>{statusCounts.both}</strong><span>спільні</span></div>
-          <div className="sched-stat"><strong>{statusCounts.dima}</strong><span>Діма вільний</span></div>
-          <div className="sched-stat"><strong>{statusCounts.lena}</strong><span>Лєна вільна</span></div>
+        <div className="sched-key" aria-label="Скільки вихідних цього місяця">
+          <span className="sched-key-item sched-key-item--both">
+            <i className="sched-key-swatch" />
+            <span className="sched-key-label">разом</span>
+            <b>{statusCounts.both}</b>
+          </span>
+          <span className="sched-key-item sched-key-item--her">
+            <i className="sched-key-swatch" />
+            <span className="sched-key-label">Лєна</span>
+            <b>{statusCounts.lena}</b>
+          </span>
+          <span className="sched-key-item sched-key-item--him">
+            <i className="sched-key-swatch" />
+            <span className="sched-key-label">Діма</span>
+            <b>{statusCounts.dima}</b>
+          </span>
         </div>
       )}
+
+      {/* Підпис до крапки — НАД сіткою, разом із ключем.
+          Знизу він опинявся під доком: рівно та сама вада, від якої
+          сюди переїхала легенда кольорів. */}
+      <p className="sched-plan-note">
+        <i className="sched-key-swatch sched-key-swatch--plan" />
+        крапка в кутку дня — на нього вже є план
+      </p>
 
       <div className="card sched-board sched-board--overview">
         <div className="sched-grid">
@@ -57,11 +87,11 @@ export function ScheduleMonthOverview({
                 aria-label={`${fmtLongDate(date)}. ${statusText(status)}${plans.length ? '. Є план на цей день' : ''}`}
               >
                 <span className="sched-cell-num">{day}</span>
-                <span className="sched-cell-symbol" aria-hidden="true">
-                  {status === 'both-off'
-                    ? <HeartIcon size={11} filled />
-                    : status === 'lena-off' ? 'Л' : status === 'dima-off' ? 'Д' : ''}
-                </span>
+                {/* Смужка, а не літера «Л»/«Д»: колір уже сказав, хто
+                    вільний, а літера була третім сигналом на 42 пікселях
+                    і змагалась із самою датою. Хто саме — читає легенда
+                    згори й `aria-label` клітинки. */}
+                <span className="sched-cell-symbol" aria-hidden="true" />
                 {plans.length > 0 && <span className={`sched-cell-plan-dot${confirmed ? ' is-confirmed' : ''}`} title={confirmed ? 'Підтверджений план' : 'Запропонований план'} />}
               </button>
             );
@@ -69,14 +99,7 @@ export function ScheduleMonthOverview({
         </div>
       </div>
 
-      {usersCount >= 2 && (
-        <div className="heat-legend">
-          <span><i className="heat-swatch heat-swatch--both-off" /> обоє вільні</span>
-          <span><i className="heat-swatch heat-swatch--lena-off" /> Лєна вільна</span>
-          <span><i className="heat-swatch heat-swatch--dima-off" /> Діма вільний</span>
-          <span><i className="heat-swatch heat-swatch--plan" /> є план</span>
-        </div>
-      )}
+
     </>
   );
 }

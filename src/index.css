@@ -78,6 +78,19 @@
   --danger: #ff5f7e;
   --ok: #3fd8c8;
   --warn: #f0a63a;
+
+  /* ── Хто вільний: три стани графіка ───────────────────────
+     Було дев'ять хардкоджених hex у трьох місцях — і легенда вчила
+     ІНШИХ кольорів, ніж малював календар (`#9747d1` проти `#8535be`).
+     Тобто підпис під сіткою пояснював код, якого в сітці немає.
+
+     Тони особистих днів навмисно однакової світлоти: якби один був
+     яскравіший, місяць читався б так, ніби чиїсь вихідні важливіші.
+     «Разом» — акцент порталу, бо це єдина відповідь, заради якої цей
+     екран відкривають. */
+  --sched-both: #9a67e0;
+  --sched-her: #e0759b;
+  --sched-him: #4fa8c8;
   /* Мітка «сьогодні» — власна роль, а не відтінок `--ok`. На референсі це
      єдина бірюзова річ на екрані, і вона означає рівно одне. */
   --today: #3fd8d8;
@@ -300,6 +313,12 @@
   --danger: #ff5f7e;
   --ok: #3fd8c8;
   --warn: #f0a63a;
+
+  /* Світліший ґрунт вимагає щільніших тонів: ті самі три стани, але
+     темніші, інакше на денному аркуші вони бліднуть до однакового. */
+  --sched-both: #7b3fc4;
+  --sched-her: #c2416c;
+  --sched-him: #1f7d9e;
   --today: #3fd8d8;
   --page-gradient: linear-gradient(168deg, #161023 0%, #120d1c 52%, #0b0811 100%);
 
@@ -2141,39 +2160,23 @@ textarea::placeholder {
   cursor: default;
   position: relative;
 }
-.sched-boards--editing .sched-cell { cursor: pointer; }
 .sched-cell--empty { background: transparent; }
 .sched-cell--today { outline: 2px solid var(--accent); }
 .sched-cell-num { font-size: 12px; color: var(--muted); position: relative; }
-.sched-cell-heart { color: var(--accent); font-size: 9px; margin-left: 1px; }
 .sched-cell-letter { font-size: 15px; font-weight: 700; min-height: 18px; }
-.sched-cell-letter--work { color: #4a86e8; }
-.sched-cell-letter--off { color: var(--accent); }
 
-/* Спільний графік (Календар → Графік): хто вільний якого дня.
-   both-off — темно-рожевий (найпомітніший, «побачення»), lena-off/
-   dima-off — два м'які пастельні тони під стиль Pink Portal,
-   none — колір НЕ міняється (лишається base .sched-cell). */
-.heat-summary { text-align: center; font-size: 14px; color: var(--text); margin: 0 0 10px; }
-.sched-cell--both-off { background: #9747d1; }
-.sched-cell--both-off .sched-cell-num,
-.sched-cell--both-off .sched-cell-heart { color: #fff; }
-/* Пастельні плашки (лише лєна/діма вільні) лишаються світлими в обох
-   темах — текст на них теж фіксовано темний, інакше в dark-темі
-   var(--text) (світлий кремовий) став би нечитабельним на світлому фоні. */
-.sched-cell--lena-off { background: #f6c6a8; }
-.sched-cell--dima-off { background: #b7c3ea; }
-.sched-cell--lena-off .sched-cell-num,
-.sched-cell--dima-off .sched-cell-num,
-.sched-cell--lena-off .sched-cell-who,
-.sched-cell--dima-off .sched-cell-who { color: #31253a; }
-.sched-cell-who {
-  font-size: 9px;
-  font-weight: 700;
-  margin-left: 2px;
-  color: var(--text);
-  opacity: 0.7;
-}
+/*
+ * ДРУГИЙ набір кольорів календаря жив тут — і саме тому легенда брехала.
+ *
+ * `.sched-cell--both-off` було описане двічі: тут `#9747d1`, а в
+ * `schedule.css` градієнт `#a85bdf → #8535be`. Вигравав другий (вища
+ * специфічність через `.sched`), але свотчі легенди читали ПЕРШИЙ. Тобто
+ * підпис під сіткою вчив коду, якого в сітці немає.
+ *
+ * Разом із ним пішли `.sched-cell-heart`, `.sched-cell-who`,
+ * `.sched-cell-letter--work/--off`, `.heat-summary` і `.sched-boards--*`
+ * — жодного з цих класів у коді вже немає (ADR-0055).
+ */
 .heat-legend {
   display: flex;
   flex-wrap: wrap;
@@ -2185,9 +2188,12 @@ textarea::placeholder {
 }
 .heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .heat-swatch { width: 12px; height: 12px; border-radius: var(--radius-hair); display: inline-block; }
-.heat-swatch--both-off { background: #9747d1; }
-.heat-swatch--lena-off { background: #f6c6a8; }
-.heat-swatch--dima-off { background: #b7c3ea; }
+/* Свотчі беруть ТІ САМІ токени, що й клітинки. Це не охайність: доки
+   вони були окремими числами, легенда могла розійтись із сіткою — і
+   розійшлась. */
+.heat-swatch--both-off { background: var(--sched-both); }
+.heat-swatch--lena-off { background: var(--sched-her); }
+.heat-swatch--dima-off { background: var(--sched-him); }
 /* inline-flex — значок стоїть у рядку з назвою, а не над нею; flex:0 0
    auto на svg, бо в flex-контейнері він інакше стискається. */
 .notif-item-title { font-weight: 600; display: inline-flex; align-items: center; gap: 7px; }
