@@ -5,10 +5,15 @@
   z-index: 74;
   width: 48px;
   height: 48px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: rgba(24, 20, 38, 0.82);
-  color: #fff;
+  /* Токенами, а не числом. Тут стояв `rgba(24, 20, 38, 0.82)` — темний
+     фіолет кристала, — і кнопка лишалась фіолетовою в кожному світі й у
+     кожній темі: на білому аркуші дерева вона була єдиною темною плямою
+     на екрані. Ознака та сама, що й у кульок вішліста: колір, написаний
+     числом, теми не чує (ADR-0057). */
+  background: color-mix(in srgb, var(--surface-2) 82%, transparent);
+  color: var(--text);
   display: grid;
   place-content: center;
   gap: 4px;
@@ -32,8 +37,9 @@
 }
 
 .evolution-constructor-fab.is-active {
-  border-color: rgba(255, 174, 222, 0.72);
-  background: rgba(116, 55, 105, 0.88);
+  border-color: color-mix(in srgb, var(--accent) 62%, transparent);
+  background: color-mix(in srgb, var(--accent-strong) 88%, transparent);
+  color: #fff;
   /* Кольорове світіння заборонене навіть в інструменті розробки:
      правило або діє скрізь, або не діє (Shadow Is A Shadow). */
   box-shadow: var(--shadow-md);
@@ -42,7 +48,7 @@
 .evolution-constructor-fab:focus-visible,
 .evolution-constructor button:focus-visible,
 .evolution-constructor input:focus-visible {
-  outline: 2px solid rgba(255, 190, 230, 0.95);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 
@@ -364,7 +370,7 @@
 }
 
 .evolution-free-camera__exit:focus-visible {
-  outline: 2px solid rgba(255, 190, 230, 0.95);
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
 

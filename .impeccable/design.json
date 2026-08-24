@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-23T00:00:00Z",
+  "generatedAt": "2026-08-24T00:00:00Z",
   "title": "Design System: Amore",
   "extensions": {
     "colorMeta": {
@@ -105,6 +105,66 @@
         "displayName": "Кораловий сигнал",
         "canonical": "#ff5f7e",
         "tonalRamp": []
+      },
+      "tree-accent": {
+        "role": "primary",
+        "displayName": "Карамель дерева (ніч)",
+        "canonical": "#d3a273",
+        "tonalRamp": [
+          "#170f07",
+          "#2b1c0d",
+          "#422b15",
+          "#5d3d1d",
+          "#805328",
+          "#ab6f36",
+          "#d2a06f",
+          "#ebd6c1"
+        ]
+      },
+      "tree-light-accent": {
+        "role": "primary",
+        "displayName": "Зелень дерева (день)",
+        "canonical": "#3f6b1f",
+        "tonalRamp": [
+          "#15240a",
+          "#233b11",
+          "#335719",
+          "#467722",
+          "#5d9e2e",
+          "#82cb4d",
+          "#b1df90",
+          "#e9f6df"
+        ]
+      },
+      "reef-accent": {
+        "role": "primary",
+        "displayName": "Світло рифу (глибина)",
+        "canonical": "#6ba6ff",
+        "tonalRamp": [
+          "#000c1f",
+          "#001638",
+          "#002357",
+          "#00317a",
+          "#0043a8",
+          "#0059e0",
+          "#428eff",
+          "#adceff"
+        ]
+      },
+      "reef-light-accent": {
+        "role": "primary",
+        "displayName": "Бірюза рифу (мілина)",
+        "canonical": "#0d6e6b",
+        "tonalRamp": [
+          "#052928",
+          "#084443",
+          "#0c6462",
+          "#108985",
+          "#16b6b1",
+          "#32e7e1",
+          "#7ff0ec",
+          "#dbfbfa"
+        ]
       }
     },
     "typographyMeta": {
