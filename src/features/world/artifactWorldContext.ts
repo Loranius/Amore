@@ -31,6 +31,8 @@ export interface ArtifactWorldValue {
    * created just to ask the same question.
    */
   webglSupported: boolean;
+  /** Перепитати браузер про 3D-контекст — див. `useWebglSupport`. */
+  retryWebgl: () => void;
 }
 
 export const ArtifactWorldContext = createContext<ArtifactWorldValue | null>(null);

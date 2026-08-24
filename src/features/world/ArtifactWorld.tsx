@@ -67,7 +67,7 @@ function persistArtifact(artifact: HomeArtifact): void {
  * moment they visited the shopping list.
  */
 export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
-  const webglSupported = useWebglSupport();
+  const { supported: webglSupported, retry: retryWebgl } = useWebglSupport();
   const [artifact, setArtifact] = useState<HomeArtifact>(() => resolveHomeArtifact(
     typeof window === 'undefined' ? '' : window.location.search,
     storedArtifact(),
@@ -114,8 +114,8 @@ export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
   }, [artifact]);
 
   const value = useMemo<ArtifactWorldValue>(
-    () => ({ artifact, selectArtifact, webglSupported }),
-    [artifact, selectArtifact, webglSupported],
+    () => ({ artifact, selectArtifact, webglSupported, retryWebgl }),
+    [artifact, selectArtifact, webglSupported, retryWebgl],
   );
 
   /*
@@ -159,12 +159,18 @@ export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
  * Everything a couple needs to read lives in the foreground.
  */
 export function ArtifactWorld() {
-  const { artifact, webglSupported } = useArtifactWorld();
+  const { artifact, webglSupported, retryWebgl } = useArtifactWorld();
 
   // Never substitute another artifact's silhouette for the selected one. If
   // WebGL is unavailable or the renderer throws, the world keeps its sky and
   // shows a neutral explanation rather than a stand-in object.
+  // Кнопка «спробувати ще раз» лише там, де пробувати є що: коли сцена
+  // впала вже після монтування, контекст був — і повторна проба скаже
+  // «є» знову, нічого не полагодивши.
   const rendererFallback = <HomeArtifactWebglFallback artifact={artifact} />;
+  const webglFallback = (
+    <HomeArtifactWebglFallback artifact={artifact} onRetry={retryWebgl} />
+  );
 
   return (
     <div className="artifact-world" data-artifact-world={artifact} aria-hidden="true">
@@ -178,7 +184,7 @@ export function ArtifactWorld() {
                 : <CrystalScene key={artifact} artifact={artifact} />}
             </Suspense>
           </CrystalErrorBoundary>
-        ) : rendererFallback}
+        ) : webglFallback}
       </div>
     </div>
   );
