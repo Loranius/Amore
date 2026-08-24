@@ -122,7 +122,7 @@ export function useDishMutations() {
     },
     onSuccess: () => {
       invalidate();
-      toast.show('❤️ Збережено в улюблені');
+      toast.show('Збережено в улюблені');
     },
     onError: (e) => toast.show('Не вдалось зберегти: ' + (e as Error).message),
   });
@@ -138,7 +138,7 @@ export function useDishMutations() {
     },
     onSuccess: (count) => {
       void client.invalidateQueries({ queryKey: qk.shopping() });
-      if (count) toast.show(`🛒 ${count} інгр. додано в покупки`);
+      if (count) toast.show(`${count} інгр. додано в покупки`);
     },
     onError: () => toast.show('Не вдалось додати в покупки'),
   });

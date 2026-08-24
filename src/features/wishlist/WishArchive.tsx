@@ -1,5 +1,6 @@
 import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { PencilIcon } from '@/components/icons/UiIcon';
 import { WishArchive as WishArchiveBase } from './WishArchiveBase';
 import { ArchiveWishEditModal } from './ArchiveWishEditModal';
 import type { WishlistArchiveScope } from './wishlistRpc';
@@ -35,7 +36,7 @@ function ArchiveEditAction({ onEdit }: { onEdit: () => void }) {
 
   return createPortal(
     <button type="button" className="wl-archive-edit-completed" onClick={onEdit}>
-      <span aria-hidden="true">✎</span>
+      <span aria-hidden="true"><PencilIcon size={14} /></span>
       Редагувати бажання
     </button>,
     target,

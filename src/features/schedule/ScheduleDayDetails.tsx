@@ -5,6 +5,7 @@
 // Тому рядок веде на сторінку плану, а кнопка — у самі «Плани»:
 // графік показує, а створюють в одному місці.
 // ============================================================
+import { CloseIcon } from '@/components/icons/UiIcon';
 import { type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { todayLocal } from '@/features/_shared/month';
@@ -27,7 +28,7 @@ export function ScheduleDayDetails({ date, status, plans, onClose, onPlan }: {
         <div className="sched-day-handle" />
         <div className="sched-day-head">
           <div><span>{fmtLongDate(date)}</span><h2>{statusText(status)}</h2></div>
-          <button type="button" onClick={onClose} aria-label="Закрити">×</button>
+          <button type="button" onClick={onClose} aria-label="Закрити"><CloseIcon size={16} /></button>
         </div>
         {plans.length > 0 ? (
           <div className="sched-day-plans">

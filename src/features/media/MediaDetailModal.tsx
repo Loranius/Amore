@@ -4,6 +4,7 @@
 // TMDB-деталі тягне useTmdbDetails; трейлер вбудовується у <iframe>
 // лише за кліком (не автозавантаження). Відгуки — з рядка item.
 // ============================================================
+import { StarIcon } from '@/components/icons/UiIcon';
 import { useEffect, useState } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
 import { FilmIcon } from '@/components/icons/NavIcon';
@@ -58,7 +59,7 @@ export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetai
                 ) : details ? (
                   <>
                     {details.year && <span className="media-detail-badge">{details.year}</span>}
-                    {details.rating && <span className="media-detail-rating-star">★ {details.rating}</span>}
+                    {details.rating && <span className="media-detail-rating-star"><StarIcon size={13} /> {details.rating}</span>}
                     {details.runtime && <span className="media-detail-badge">{details.runtime} хв</span>}
                     {details.genres.map((g) => (
                       <span key={g} className="media-detail-badge">
@@ -122,7 +123,7 @@ export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetai
                     : `Додати відгук: ${name}`}
                 >
                   <span className="media-detail-review-who">{name}</span>
-                  <span className="media-detail-review-rating">{rating ? `★ ${rating}/10` : '—'}</span>
+                  <span className="media-detail-review-rating">{rating ? <><StarIcon size={12} /> {rating}/10</> : '—'}</span>
                   <span className="media-detail-review-comment">
                     {comment || <i>Немає відгуку</i>}
                   </span>

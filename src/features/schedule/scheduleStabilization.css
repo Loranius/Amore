@@ -49,6 +49,8 @@
 
 .sched-completion-value {
   align-self: center;
+  display: grid;
+  place-items: center;
   color: var(--accent);
   font-size: 15px;
   font-weight: 800;

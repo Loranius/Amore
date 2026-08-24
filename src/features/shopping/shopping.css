@@ -345,7 +345,10 @@
   place-items: center;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--shopping-category) 12%, var(--surface));
-  font-size: 18px;
+  /* Значок бере колір категорії — той самий, що заливка під ним і крапка
+     в рядку. Емодзі кольору не брало, тож пляма й символ поруч
+     розповідали різне (ADR-0054). */
+  color: var(--shopping-category);
 }
 
 .shopping-group-head h2 {

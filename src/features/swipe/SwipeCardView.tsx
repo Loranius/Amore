@@ -12,6 +12,8 @@
 // колоди і в CSS), вони встигли розійтись: картка казала одне, кнопка
 // під нею — інше.
 // ============================================================
+import { FilmIcon } from '@/components/icons/NavIcon';
+import { StarIcon } from '@/components/icons/UiIcon';
 import { useState } from 'react';
 import { motion, useMotionValue, useTransform, animate, type PanInfo } from 'framer-motion';
 import { SWIPE_VERDICTS } from './swipeDirections';
@@ -116,14 +118,14 @@ export function SwipeCardView({ card, active, depth, onSwipe, onTap }: SwipeCard
       {card.poster_path ? (
         <img className="swipe-poster" src={card.poster_path} alt="" loading="lazy" draggable={false} />
       ) : (
-        <div className="swipe-poster-placeholder">🎬</div>
+        <div className="swipe-poster-placeholder" aria-hidden="true"><FilmIcon size={30} /></div>
       )}
       <div className="swipe-card-gradient" />
       <div className="swipe-card-info">
         <p className="swipe-card-title">{card.title}</p>
         <div className="swipe-card-meta">
           {card.year && <span>{card.year}</span>}
-          {card.rating && <span>★ {card.rating}</span>}
+          {card.rating && <span><StarIcon size={12} /> {card.rating}</span>}
         </div>
       </div>
 

@@ -1285,7 +1285,10 @@ textarea::placeholder {
   background: var(--world-bg-deep);
 }
 .boot-heart {
-  font-size: 48px;
+  /* Було `♡` кеглем 48px — символ, якого може не бути в шрифті; тепер
+     мальоване серце, і розмір задає сам значок. */
+  display: grid;
+  place-items: center;
   color: var(--world-primary);
   animation: boot-pulse 1.1s ease-in-out infinite;
 }
@@ -2260,7 +2263,7 @@ textarea::placeholder {
 .media-search-empty { padding: 14px; color: var(--muted); text-align: center; }
 .media-search-card { display: flex; gap: 10px; padding: 8px 10px; align-items: center; }
 .media-search-poster { width: 42px; border-radius: var(--radius-sm); }
-.media-search-poster-empty { width: 42px; height: 60px; display: grid; place-items: center; background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: var(--radius-sm); }
+.media-search-poster-empty { width: 42px; height: 60px; display: grid; place-items: center; color: var(--muted); background: color-mix(in srgb, var(--text) 8%, transparent); border-radius: var(--radius-sm); }
 .media-search-info { flex: 1; min-width: 0; }
 .media-search-title { font-weight: 600; }
 .media-search-meta { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
@@ -2284,13 +2287,29 @@ textarea::placeholder {
 .media-card { background: var(--surface); border-radius: var(--radius-md); overflow: hidden; position: relative; display: flex; flex-direction: column; }
 .media-poster-wrap { border: 0; padding: 0; background: none; cursor: pointer; aspect-ratio: 2/3; overflow: hidden; }
 .media-poster { width: 100%; height: 100%; object-fit: cover; }
-.media-poster-placeholder { width: 100%; height: 100%; display: grid; place-items: center; font-size: 40px; background: color-mix(in srgb, var(--text) 6%, transparent); }
+.media-poster-placeholder { width: 100%; height: 100%; display: grid; place-items: center; color: var(--muted); background: color-mix(in srgb, var(--text) 6%, transparent); }
 .media-card-body { padding: 10px; display: flex; flex-direction: column; gap: 6px; }
 .media-card-title { margin: 0; font-weight: 600; font-size: 14px; }
 .media-status-badge { align-self: flex-start; font-size: 11px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); border-radius: var(--radius-pill); padding: 2px 8px; }
-.media-review-btn { border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); background: transparent; color: var(--text); border-radius: var(--radius-sm); padding: 5px; font: inherit; font-size: 12px; cursor: pointer; }
+/* 36px і рядок зі значком: кнопка відгуку — головна дія картки. */
+.media-review-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  background: transparent;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.media-review-btn svg { flex: 0 0 auto; color: var(--accent); }
 .media-ratings-mini { display: flex; gap: 6px; font-size: 11px; color: var(--muted); }
-.media-card-delete, .delete-btn { position: absolute; top: 6px; right: 6px; width: 26px; height: 26px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 16px; cursor: pointer; }
+.media-card-delete, .delete-btn { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(0, 0, 0, 0.5); color: #fff; font-size: 16px; cursor: pointer; }
 
 .rate-number-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .rate-num-btn { width: 34px; height: 34px; border: 1px solid color-mix(in srgb, var(--text) 14%, transparent); border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; cursor: pointer; }
@@ -2601,16 +2620,49 @@ textarea::placeholder {
 .cul-nav .btn, .cul-nav .btn-secondary { flex: 1; }
 
 .cul-loading { text-align: center; padding: 30px 12px; }
-.cul-loading-emoji { font-size: 46px; animation: cul-bob 1.4s ease-in-out infinite; }
+/* Значок очікування — мальований, і саме тому має власну плашку: емодзі
+   несло свій колір і свій розмір, значок бере акцент порталу. */
+.cul-loading-emoji {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  margin: 0 auto;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  animation: cul-bob 1.4s ease-in-out infinite;
+}
+/* Помилка не «сумний смайл», а той самий значок у тоні небезпеки:
+   стан читається кольором, а не мімікою. */
+.cul-loading-emoji--sad {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  animation: none;
+}
 @keyframes cul-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 .cul-loading-text { font-weight: 600; margin: 10px 0 4px; }
 
 .discover-title { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
-.discover-meta { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+/* Рядки зі значком: значок і текст на одній базовій лінії, не стовпчиком. */
+.discover-meta,
+.cul-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.discover-meta { margin: 0 0 10px; }
+.cul-tools { margin: 0 0 12px; }
+.discover-meta svg,
+.cul-tools svg { flex: 0 0 auto; }
 .cul-desc { font-size: 14px; margin: 0 0 10px; }
-.cul-tools { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
 .discover-actions { display: flex; gap: 8px; margin-top: 12px; }
-.discover-actions .btn-secondary { flex: 1; }
+.discover-actions .btn { flex: 1 1 0; min-width: 0; }
+/* Підпис може не вміститись у половину рядка на вузькому екрані —
+   хай переноситься, а не вилазить за кнопку. */
+.discover-actions .btn span { white-space: normal; }
 
 /* Перегляд/введення рецепта */
 .rcp-view-subtitle { font-weight: 600; margin: 14px 0 6px; }
@@ -3049,16 +3101,35 @@ textarea::placeholder {
 /* Фон/радіус/паддінг уже з .card (WhereToPage.tsx: className="card wt-card") — тут лише розкладка. */
 .wt-card { display: flex; flex-direction: column; gap: 6px; }
 .wt-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.wt-badge { font-size: 12px; border-radius: var(--radius-pill); padding: 3px 10px; font-weight: 600; }
+/* Значок і слово в один рядок: бейдж тепер носить мальовану мітку
+   замість емодзі, і вона мусить стояти на одній лінії з підписом. */
+.wt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  border-radius: var(--radius-pill);
+  padding: 4px 10px;
+  font-weight: 600;
+}
 .wt-badge--place { background: color-mix(in srgb, #5FA777 20%, transparent); color: #4a8a60; }
 .wt-badge--event { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .wt-price { font-weight: 700; }
 .wt-title { font-size: 18px; font-weight: 700; margin: 0; }
 .wt-meta { font-size: 13px; color: var(--muted); margin: 0; }
-.wt-offnote { font-size: 13px; color: var(--accent); margin: 0; }
+.wt-offnote {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--accent);
+  margin: 0;
+}
+.wt-offnote svg { flex: 0 0 auto; }
 .wt-desc { font-size: 14px; margin: 4px 0 0; }
 .wt-open-btn { width: 100%; margin-top: 8px; }
 .wt-more-btn { width: 100%; }
+.wt-embed-ext { display: inline-flex; align-items: center; gap: 5px; }
 
 /* Ембед-перегляд сайту */
 .wt-embed-overlay { padding: 0; align-items: stretch; }
@@ -3066,7 +3137,19 @@ textarea::placeholder {
 .wt-embed-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface); border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent); }
 .wt-embed-title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wt-embed-ext { color: var(--accent); text-decoration: none; font-size: 14px; white-space: nowrap; }
-.wt-embed-close { border: 0; background: transparent; font-size: 20px; cursor: pointer; color: var(--text); }
+/* 40px — поріг дотику: це єдиний вихід із повноекранного ембеда. */
+.wt-embed-close {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  color: var(--text);
+}
 .wt-embed-hint { padding: 8px 14px; margin: 0; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--text) 3%, transparent); }
 .wt-embed-frame { flex: 1; width: 100%; border: 0; }
 

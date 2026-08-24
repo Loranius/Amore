@@ -1,3 +1,4 @@
+import { CheckIcon } from '@/components/icons/UiIcon';
 import { DAYS_UA, daysInMonth, firstMondayOffset, ymd } from '@/features/_shared/month';
 import type { AppUser } from '@/types';
 import type { ScheduleMark } from './useSchedule';
@@ -65,7 +66,7 @@ export function ScheduleEditorCalendar({
             >
               <span className="sched-cell-num">{day}</span>
               <span className="sched-cell-letter">{mark}</span>
-              {isSelected && <span className="sched-editor-check" aria-hidden="true">✓</span>}
+              {isSelected && <span className="sched-editor-check" aria-hidden="true"><CheckIcon size={11} /></span>}
             </button>
           );
         })}

@@ -1,3 +1,4 @@
+import { HeartIcon } from '@/components/icons/NavIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useUsers } from '@/features/_shared/useUsers';
@@ -205,7 +206,9 @@ export function SchedulePage() {
       </header>
 
       <section className={`sched-next-card${nextSharedDate ? '' : ' sched-next-card--empty'}`} aria-label="Наступний спільний вихідний">
-        <div className="sched-next-icon" aria-hidden="true">{nextSharedDate ? '♥' : '♡'}</div>
+        <div className="sched-next-icon" aria-hidden="true">
+          <HeartIcon size={22} filled={nextSharedDate !== null} />
+        </div>
         <div className="sched-next-copy">
           <span>{nextSharedDate ? 'Наступний спільний вихідний' : 'Спільний вихідний ще не знайдено'}</span>
           <strong>{nextSharedDate ? fmtLongDate(nextSharedDate) : 'Заповніть графік на найближчі дні'}</strong>

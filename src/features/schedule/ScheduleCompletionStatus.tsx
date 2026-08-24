@@ -1,3 +1,4 @@
+import { CheckIcon } from '@/components/icons/UiIcon';
 import type { AppUser } from '@/types';
 import type { MarksMap } from './useSchedule';
 import './scheduleStabilization.css';
@@ -46,7 +47,7 @@ export function ScheduleCompletionStatus({
               <strong>{user.name}</strong>
               <span>{complete ? 'Графік заповнено' : filled === 0 ? 'Ще не заповнено' : `${filled} із ${total} днів`}</span>
             </div>
-            <div className="sched-completion-value" aria-label={`${progress}%`}>{complete ? '✓' : `${progress}%`}</div>
+            <div className="sched-completion-value" aria-label={`${progress}%`}>{complete ? <CheckIcon size={15} /> : `${progress}%`}</div>
             {!complete && (
               <div className="sched-completion-actions">
                 <button type="button" className="sched-completion-action" onClick={() => onEditUser(user.id)}>

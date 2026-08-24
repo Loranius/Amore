@@ -1,3 +1,4 @@
+import { BagIcon, MinusIcon, SunIcon } from '@/components/icons/UiIcon';
 import type { ScheduleMark } from './useSchedule';
 import { markLabel } from './scheduleEditorModel';
 
@@ -41,7 +42,11 @@ export function ScheduleEditorControls({
               onClick={() => onMarkChange(mark)}
               disabled={isPending}
             >
-              <span aria-hidden="true">{mark === 'Р' ? '💼' : mark === 'Х' ? '🌿' : '○'}</span>
+              {/* Значки замість 💼🌿○: емодзі не бере колір активної кнопки,
+                  а саме колір тут і каже, що обрано. */}
+              <span aria-hidden="true">
+                {mark === 'Р' ? <BagIcon size={15} /> : mark === 'Х' ? <SunIcon size={15} /> : <MinusIcon size={15} />}
+              </span>
               {markLabel(mark)}
             </button>
           ))}

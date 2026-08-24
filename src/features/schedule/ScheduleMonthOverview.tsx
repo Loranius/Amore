@@ -1,3 +1,4 @@
+import { HeartIcon } from '@/components/icons/NavIcon';
 import { DAYS_UA, daysInMonth, firstMondayOffset, ymd } from '@/features/_shared/month';
 import type { PlanRow } from '@/types';
 import type { DayStatus } from './scheduleViewModel';
@@ -56,7 +57,11 @@ export function ScheduleMonthOverview({
                 aria-label={`${fmtLongDate(date)}. ${statusText(status)}${plans.length ? '. Є план на цей день' : ''}`}
               >
                 <span className="sched-cell-num">{day}</span>
-                <span className="sched-cell-symbol" aria-hidden="true">{status === 'both-off' ? '♥' : status === 'lena-off' ? 'Л' : status === 'dima-off' ? 'Д' : ''}</span>
+                <span className="sched-cell-symbol" aria-hidden="true">
+                  {status === 'both-off'
+                    ? <HeartIcon size={11} filled />
+                    : status === 'lena-off' ? 'Л' : status === 'dima-off' ? 'Д' : ''}
+                </span>
                 {plans.length > 0 && <span className={`sched-cell-plan-dot${confirmed ? ' is-confirmed' : ''}`} title={confirmed ? 'Підтверджений план' : 'Запропонований план'} />}
               </button>
             );

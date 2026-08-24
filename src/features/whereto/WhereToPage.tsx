@@ -16,7 +16,11 @@ import { PageHeader } from '@/components/ui/PageHeader';
 
 import { MapPinIcon } from '@/components/icons/MapIcon';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { RefreshIcon, SearchIcon } from '@/components/icons/UiIcon';
+import {
+  CalendarIcon, CloseIcon, ExternalLinkIcon, RefreshIcon, SearchIcon,
+} from '@/components/icons/UiIcon';
+import { TicketIcon } from '@/components/icons/NavIcon';
+import { CompassIcon } from '@/components/icons/MapIcon';
 
 export function WhereToPage() {
   const { data: location } = useWhereToLocation();
@@ -95,13 +99,13 @@ export function WhereToPage() {
       <div className="wt-results">
         {searchMut.isPending ? (
           <Card className="cul-loading">
-            <div className="cul-loading-emoji">🗺️</div>
+            <div className="cul-loading-emoji" aria-hidden="true"><CompassIcon size={30} /></div>
             <p className="cul-loading-text">Клод моніторить {location?.city}…</p>
             <p className="cul-step-hint">Шукаю події й цікаві місця на найближчі дні</p>
           </Card>
         ) : searchMut.isError ? (
           <Card className="cul-loading">
-            <div className="cul-loading-emoji">😕</div>
+            <div className="cul-loading-emoji cul-loading-emoji--sad" aria-hidden="true"><CompassIcon size={30} /></div>
             <p className="cul-loading-text">Не вдалось знайти події</p>
             <p className="cul-step-hint">
               {searchMut.error instanceof Error ? searchMut.error.message : 'Спробуй ще раз за хвилину'}
@@ -112,7 +116,7 @@ export function WhereToPage() {
             {results.map((ev, i) => (
               <EventCard key={i} ev={ev} onOpen={() => setEmbed(ev)} />
             ))}
-            <button type="button" className="btn-secondary wt-more-btn" onClick={() => runSearch(true)}>
+            <button type="button" className="btn btn-ghost wt-more-btn" onClick={() => runSearch(true)}>
               <RefreshIcon size={16} />
               <span>Ще варіанти</span>
             </button>
@@ -157,19 +161,25 @@ function EventCard({ ev, onOpen }: { ev: WhereToEvent; onOpen: () => void }) {
     <div className="card wt-card">
       <div className="wt-card-head">
         {ev.kind === 'місце' ? (
-          <span className="wt-badge wt-badge--place">🌳 місце</span>
+          <span className="wt-badge wt-badge--place"><MapPinIcon size={13} /> місце</span>
         ) : (
-          <span className="wt-badge wt-badge--event">🎫 подія</span>
+          <span className="wt-badge wt-badge--event"><TicketIcon size={13} /> подія</span>
         )}
         {ev.price && <span className="wt-price">{ev.price}</span>}
       </div>
       <p className="wt-title">{ev.title}</p>
       {meta && <p className="wt-meta">{meta}</p>}
-      {ev.off_note && <p className="wt-offnote">🗓 {ev.off_note}</p>}
+      {ev.off_note && (
+        <p className="wt-offnote">
+          <CalendarIcon size={14} />
+          <span>{ev.off_note}</span>
+        </p>
+      )}
       {ev.description && <p className="wt-desc">{ev.description}</p>}
       {ev.url && (
         <button type="button" className="btn wt-open-btn" onClick={onOpen}>
-          ✨ Прийняти й відкрити
+          <ExternalLinkIcon size={16} />
+          <span>Прийняти й відкрити</span>
         </button>
       )}
     </div>
@@ -366,11 +376,11 @@ function EmbedModal({ ev, onClose }: { ev: WhereToEvent; onClose: () => void }) 
           <span className="wt-embed-title">{ev.title}</span>
           {ev.url && (
             <a className="wt-embed-ext" href={ev.url} target="_blank" rel="noopener noreferrer">
-              У браузері ↗
+              У браузері <ExternalLinkIcon size={13} />
             </a>
           )}
-          <button type="button" className="wt-embed-close" onClick={onClose}>
-            ✕
+          <button type="button" className="wt-embed-close" onClick={onClose} aria-label="Закрити">
+            <CloseIcon size={16} />
           </button>
         </div>
         <p className="wt-embed-hint">

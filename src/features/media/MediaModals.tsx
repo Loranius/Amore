@@ -1,6 +1,7 @@
 // ============================================================
 // Модалки media: ручне додавання/редагування + додавання з пошуку
 // ============================================================
+import { StarIcon } from '@/components/icons/UiIcon';
 import { useState } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
 import { STATUS_CONFIG, TYPE_LABELS } from './mediaConstants';
@@ -105,7 +106,7 @@ export function AddFromSearchModal({ type, item, onClose, onAdd }: AddFromSearch
             {item.year && (
               <div className="media-search-modal-year">
                 {item.year}
-                {item.rating && ` · ★ ${item.rating}`}
+                {item.rating && <> · <StarIcon size={12} /> {item.rating}</>}
               </div>
             )}
           </div>

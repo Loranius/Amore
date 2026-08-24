@@ -1,6 +1,7 @@
 // ============================================================
 // SwipeDetailModal — деталі картки свайпу + трейлер (порт openDetailModal)
 // ============================================================
+import { StarIcon } from '@/components/icons/UiIcon';
 import { useEffect } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
 import { useQuery } from '@tanstack/react-query';
@@ -36,7 +37,7 @@ export function SwipeDetailModal({ card, type, onClose }: Props) {
         <h3 className="detail-title">{card.title}</h3>
         <div className="detail-meta">
           {card.year && <span>{card.year}</span>}
-          {card.rating && <span>★ {card.rating}</span>}
+          {card.rating && <span><StarIcon size={12} /> {card.rating}</span>}
         </div>
         {card.overview && <p className="detail-overview">{card.overview}</p>}
 

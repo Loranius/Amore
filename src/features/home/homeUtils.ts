@@ -37,7 +37,7 @@ export function nextAnniversaryLabel(startDate: string): string {
   const years = nextAnn.getFullYear() - start.getFullYear();
 
   if (diffDays === 0) return `🎉 Сьогодні ${years} рік разом!`;
-  if (diffDays === 1) return `💕 Завтра ${years} рік разом`;
-  if (diffDays <= 30) return `💕 Річниця через ${diffDays} дн. (${years} р.)`;
+  if (diffDays === 1) return `Завтра ${years} рік разом`;
+  if (diffDays <= 30) return `Річниця через ${diffDays} дн. (${years} р.)`;
   return `Річниця через ~${Math.round(diffDays / 30)} міс.`;
 }

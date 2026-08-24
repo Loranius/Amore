@@ -74,7 +74,6 @@
   border-radius: var(--radius-card);
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   color: var(--accent);
-  font-size: 25px;
 }
 
 .sched-next-copy {
@@ -227,7 +226,11 @@
   font-weight: 800;
 }
 
+/* Літери «Л»/«Д» лишились текстом, а «обидва вільні» стало значком
+   серця — тож клітинка вирівнює обидва однаково. */
 .sched-cell-symbol {
+  display: grid;
+  place-items: center;
   font-size: clamp(12px, 4vw, 18px);
   font-weight: 900;
 }

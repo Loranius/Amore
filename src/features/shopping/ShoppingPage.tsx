@@ -46,6 +46,10 @@ import {
   StarIcon,
   TrashIcon,
 } from '@/components/icons/UiIcon';
+import {
+  BottleIcon, DumbbellIcon, FishIcon, FruitIcon, LipstickIcon, MeatIcon,
+  PenIcon, PlateIcon, ShoppingBagIcon, SpongeIcon, ToiletriesIcon, VegetableIcon,
+} from '@/components/icons/ShopIcon';
 import { useUsersMap } from '@/features/_shared/useUsers';
 import {
   useShoppingItems,
@@ -82,19 +86,31 @@ const TEMPLATE_GROUP_ICONS: Record<TemplateGroup['id'], ReactNode> = {
   treats: <StarIcon size={15} />,
 };
 
-const CATEGORY_VISUALS: Record<string, { icon: string; color: string }> = {
-  Овочі: { icon: '🥦', color: '#65a978' },
-  Фрукти: { icon: '🍎', color: '#d96f78' },
-  "М'ясо": { icon: '🥩', color: '#b96a68' },
-  Морепродукти: { icon: '🐟', color: '#6299b5' },
-  Напої: { icon: '🥤', color: '#7b8ec1' },
-  Побут: { icon: '🧽', color: '#c69754' },
-  Посуд: { icon: '🍽️', color: '#9481a9' },
-  Гігієна: { icon: '🧴', color: '#5fa8a0' },
-  Косметика: { icon: '✨', color: '#c774a2' },
-  Канцелярія: { icon: '✏️', color: '#c48d4e' },
-  Спорт: { icon: '🏃', color: '#7394b0' },
-  Інше: { icon: '🛍️', color: '#9a7d8a' },
+/*
+ * Категорія = мальований значок + колір.
+ *
+ * Значки були емодзі (🥦🍎🥩🐟🥤🧽🍽️🧴✨✏️🏃🛍️), і саме тут це
+ * коштувало найдорожче: колір категорії несе значення — та сама пляма
+ * стоїть і на заголовку групи, і на крапці рядка, — а емодзі кольору
+ * не бере. Тобто значок і колір поруч розповідали різне.
+ *
+ * Тепер значок мальований і бере `currentColor`, тож група читається
+ * однією плямою. Набір власний (`ShopIcon`), а не позичений: «Посуд» —
+ * тарілка, а не каструля з кулінарії (ADR-0054).
+ */
+const CATEGORY_VISUALS: Record<string, { icon: ReactNode; color: string }> = {
+  Овочі: { icon: <VegetableIcon size={18} />, color: '#65a978' },
+  Фрукти: { icon: <FruitIcon size={18} />, color: '#d96f78' },
+  "М'ясо": { icon: <MeatIcon size={18} />, color: '#b96a68' },
+  Морепродукти: { icon: <FishIcon size={18} />, color: '#6299b5' },
+  Напої: { icon: <BottleIcon size={18} />, color: '#7b8ec1' },
+  Побут: { icon: <SpongeIcon size={18} />, color: '#c69754' },
+  Посуд: { icon: <PlateIcon size={18} />, color: '#9481a9' },
+  Гігієна: { icon: <ToiletriesIcon size={18} />, color: '#5fa8a0' },
+  Косметика: { icon: <LipstickIcon size={18} />, color: '#c774a2' },
+  Канцелярія: { icon: <PenIcon size={18} />, color: '#c48d4e' },
+  Спорт: { icon: <DumbbellIcon size={18} />, color: '#7394b0' },
+  Інше: { icon: <ShoppingBagIcon size={18} />, color: '#9a7d8a' },
 };
 
 const COMPLETE_ANIMATION_MS = 430;

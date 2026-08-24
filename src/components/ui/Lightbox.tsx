@@ -4,6 +4,7 @@
 // Спільний UI-компонент: клік по підкладці/хрестику або свайп вниз —
 // закриває. Керується батьком через src|null.
 // ============================================================
+import { CloseIcon } from '@/components/icons/UiIcon';
 import { useEffect, useRef } from 'react';
 
 interface LightboxProps {
@@ -43,7 +44,7 @@ export function Lightbox({ src, onClose }: LightboxProps) {
       }}
     >
       <button type="button" className="wl-lb-close" aria-label="Закрити" onClick={onClose}>
-        ✕
+        <CloseIcon size={18} />
       </button>
       <img className="wl-lb-img" src={src} alt="" />
     </div>

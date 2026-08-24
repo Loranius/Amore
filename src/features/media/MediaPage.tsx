@@ -5,12 +5,14 @@
 // середній рейтинг, сітка карток і згортна панель свайпу. Модалки:
 // деталі, відгук, додати/редагувати, додати з пошуку.
 // ============================================================
+import { StarIcon } from '@/components/icons/UiIcon';
 import { useMemo, useState } from 'react';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { TabBar } from '@/components/ui/TabBar';
 import { STATUS_CONFIG, STATUS_ORDER, MEDIA_TYPES, TYPE_LABELS } from './mediaConstants';
 import { useMediaItems, useMediaMutations, type ReviewWho } from './useMedia';
 import { useTmdbSearch } from './useTmdb';
+import { FilmIcon } from '@/components/icons/NavIcon';
 import { MediaCard } from './MediaCard';
 import { MediaDetailModal } from './MediaDetailModal';
 import { ReviewPanel } from './ReviewPanel';
@@ -80,7 +82,7 @@ export function MediaPage() {
            у рядку стану заголовка, разом із лічильником. */
         meta={[
           `${counts.all} у списку`,
-          avgRating ? `★ ${avgRating} середня` : null,
+          avgRating ? `${avgRating} середня` : null,
         ].filter(Boolean).join(' · ')}
         action={(
           <button type="button" className="btn" onClick={() => setForm({ item: null })}>
@@ -117,20 +119,20 @@ export function MediaPage() {
               {searching ? (
                 <p className="media-search-empty">Пошук…</p>
               ) : searchResults.length === 0 ? (
-                <p className="media-search-empty">Нічого не знайдено 🔍</p>
+                <p className="media-search-empty">Нічого не знайдено</p>
               ) : (
                 searchResults.map((r) => (
                   <div key={r.tmdb_id} className="media-search-card">
                     {r.poster_url ? (
                       <img className="media-search-poster" src={r.poster_url} alt="" loading="lazy" />
                     ) : (
-                      <div className="media-search-poster-empty">🎬</div>
+                      <div className="media-search-poster-empty" aria-hidden="true"><FilmIcon size={20} /></div>
                     )}
                     <div className="media-search-info">
                       <div className="media-search-title">{r.title}</div>
                       <div className="media-search-meta">
                         {r.year && <span>{r.year}</span>}
-                        {r.rating && <span>★ {r.rating}</span>}
+                        {r.rating && <span><StarIcon size={12} /> {r.rating}</span>}
                       </div>
                       {r.overview && (
                         <div className="media-search-overview">{r.overview.slice(0, 90)}</div>
