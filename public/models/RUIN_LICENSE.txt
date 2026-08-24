@@ -1,0 +1,22 @@
+Ruin
+
+Original model: "Ruin"
+Creator: Chloe Boswell (@GGMcNoodle)
+Source: https://sketchfab.com/3d-models/ruin-c64426b976a545e1b2ea2349f881babd
+Sketchfab model id: c64426b976a545e1b2ea2349f881babd
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+License: https://creativecommons.org/licenses/by/4.0/
+
+This project uses an optimized derivative as the stage of the Amore crystal
+world. The authored ruin — floor, pedestal, colonnade and scattered masonry —
+remains the source of the visual asset.
+
+Changes made for web use (scripts/models/compress-ruin.mjs):
+- the authored `Gem` node was removed, because the couple's own crystal grows
+  in that place;
+- textures were downscaled by role (512 px for floor, pedestal and pillars;
+  256 px for the small masonry debris) and re-encoded from PNG/JPEG to WebP;
+- unreferenced materials, textures and accessors left by the removal were
+  pruned.
+
+Geometry, UVs, node structure and material assignments are otherwise unchanged.

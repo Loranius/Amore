@@ -152,8 +152,23 @@ describe('Universal Growth Engine', () => {
     const centers = state.growthCenters ?? [];
     const bodyById = new Map(state.bodies.map((body) => [body.id, body] as const));
 
-    expect(blueprint.growthCenters).toHaveLength(BASE_EVENTS.length);
-    expect(centers).toHaveLength(BASE_EVENTS.length);
+    /*
+     * Один центр на ФОРМАЦІЮ, а не на подію.
+     *
+     * Тут стояло `BASE_EVENTS.length`, і це був останній слід моделі,
+     * яку ADR-0004 скасував ще тоді: тіло стояло за один рядок порталу,
+     * тож їх кількість росла без стелі. Твердження пережило ту зміну
+     * тільки тому, що «спідниця» давала по тілу на виконаний план і
+     * число випадково збігалось.
+     *
+     * Спідниці більше немає — кристал мусить бути цільним, — і формації
+     * тепер рівно роки стосунків. Правильна інваріанта та сама, що й
+     * була задумана: скільки формацій опублікував вид, стільки центрів
+     * і будує рушій росту. Просто рахується вона від формацій.
+     */
+    const published = blueprint.growthCenters ?? [];
+    expect(published.length).toBeGreaterThan(0);
+    expect(centers).toHaveLength(published.length);
     expect(state.colonies.map((colony) => colony.id)).toEqual(centers.map((center) => center.id));
 
     for (const center of centers) {

@@ -18,7 +18,6 @@ import {
   PORTAL_PALETTES,
   PORTAL_RIM_LIGHT,
   portalCameraFrame,
-  portalDaisScale,
 } from './portalScene';
 
 export interface PortalStageProps {
@@ -26,8 +25,15 @@ export interface PortalStageProps {
   theme: 'light' | 'dark';
   quality: 'high' | 'balanced' | 'low' | 'fallback';
   reduceMotion: boolean;
-  /** Радіус видимих кристалів — подіум лишає навколо них обмежений запас. */
-  artifactSceneRadius: number;
+  /**
+   * Радіус видимих кристалів.
+   *
+   * Подіум під нього більше не масштабується: руїна — це місце сталого
+   * розміру, і підганятись тепер мусить кристал (`PortalRuin`). Проп
+   * лишається, бо саме він понесе цю підгонку, коли кристал перепишуть;
+   * доти сцена його не читає, і це названо, а не сховано.
+   */
+  artifactSceneRadius?: number | undefined;
   /** Радіус самих кристалів — кадр камери будується під нього. */
   crystalsSceneRadius: number;
   /**
@@ -79,7 +85,6 @@ export function PortalStage({
   theme,
   quality,
   reduceMotion,
-  artifactSceneRadius,
   crystalsSceneRadius,
   artifactSceneHeight,
   veinBearings,
@@ -98,7 +103,6 @@ export function PortalStage({
     () => portalCameraFrame(aspect, crystalsSceneRadius, artifactSceneHeight),
     [aspect, crystalsSceneRadius, artifactSceneHeight],
   );
-  const daisScale = useMemo(() => portalDaisScale(artifactSceneRadius), [artifactSceneRadius]);
   const palette = PORTAL_PALETTES[theme];
 
   return (
@@ -157,7 +161,6 @@ export function PortalStage({
         reduceMotion={reduceMotion}
         frame={frame}
         aspect={aspect}
-        daisScale={daisScale}
         veinBearings={veinBearings}
         veinReach={veinReach}
       />

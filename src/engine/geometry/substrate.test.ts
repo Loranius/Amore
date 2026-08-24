@@ -302,13 +302,78 @@ describe('crystal substrate', () => {
     expect(seamTriangles).toBeGreaterThan(0);
     expect(total).toBeGreaterThan(seamTriangles);
 
-    // Rock stands *on* the seam, which is the whole reason the seam's own tests
-    // had to be scoped: the mesh's highest point is now a boulder.
-    const seamTop = Math.max(...Array.from(
-      { length: seamTriangles * 3 },
-      (_, slot) => substrate.positions[substrate.indices[slot]! * 3 + 1]!,
-    ));
-    expect(substrate.bounds.max.y).toBeGreaterThan(seamTop);
+    /*
+     * Камінь стоїть НА шві — і міряється це на його власному радіусі, а
+     * не проти найвищої точки шва десь інде.
+     *
+     * Тут стояло `bounds.max.y > seamTop`, тобто «найвища точка всієї
+     * підкладки — брила». Це трималось не на властивості брил, а на
+     * розмірі колонії: поки навколо монарха стояло чотири десятки тіл,
+     * шов розповзався широко, його центральний горб опускався відносно
+     * країв — і якась брила випадково переростала його.
+     *
+     * Коли «спідницю» прибрали заради цільного кристала, тіл лишилось
+     * четверо, шов став компактним і високим у центрі, а брили лежать на
+     * гілках, де він низький. Твердження впало, не змінивши жодної брили.
+     *
+     * Виміряно на семи віках колонії, до зміни і після (частка
+     * трикутників брил, що стоять над швом на своєму радіусі):
+     *
+     *              1 рік    4 роки   14 років
+     *   до:      15/624    36/576     62/552
+     *   після:   22/528    58/408    109/624
+     *
+     * Тобто брили НІКОЛИ не були переважно над швом — ні тепер, ні
+     * раніше. Вони наполовину втоплені, і саме так їх і задумано
+     * (`BOULDER_RISE`). Справжня властивість, заради якої цей тест
+     * існує, — що камінь не втоплений ЦІЛКОМ: над швом мусить стояти
+     * помітна частина, інакше підкладка знову читається плитою.
+     */
+    const RINGS = 40;
+    const vertex = (slot: number) => {
+      const base = substrate.indices[slot]! * 3;
+      return {
+        x: substrate.positions[base]!,
+        y: substrate.positions[base + 1]!,
+        z: substrate.positions[base + 2]!,
+      };
+    };
+    let outerRadius = 0;
+    for (let slot = 0; slot < substrate.indices.length; slot += 1) {
+      const point = vertex(slot);
+      outerRadius = Math.max(outerRadius, Math.hypot(point.x, point.z));
+    }
+    const ringOf = (x: number, z: number) =>
+      Math.min(RINGS, Math.floor((Math.hypot(x, z) / outerRadius) * RINGS));
+
+    const seamTopAtRing = new Array<number>(RINGS + 1).fill(Number.NEGATIVE_INFINITY);
+    for (let slot = 0; slot < seamTriangles * 3; slot += 1) {
+      const point = vertex(slot);
+      const ring = ringOf(point.x, point.z);
+      seamTopAtRing[ring] = Math.max(seamTopAtRing[ring]!, point.y);
+    }
+
+    let proud = 0;
+    for (let triangle = seamTriangles; triangle < total; triangle += 1) {
+      let top = Number.NEGATIVE_INFINITY;
+      let ring = 0;
+      for (let corner = 0; corner < 3; corner += 1) {
+        const point = vertex(triangle * 3 + corner);
+        if (point.y > top) {
+          top = point.y;
+          ring = ringOf(point.x, point.z);
+        }
+      }
+      const seamHere = seamTopAtRing[ring]!;
+      if (Number.isFinite(seamHere) && top > seamHere) proud += 1;
+    }
+
+    // Не «більшість» — саме помітна частина. Найгірший вимір із семи
+    // віків дає 22 з 528, тобто 4%; поріг стоїть під ним із запасом і
+    // ловить те, заради чого тест писався: підкладку, на якій каменю не
+    // видно взагалі.
+    expect(proud, 'жоден камінь не стоїть над швом').toBeGreaterThan(0);
+    expect(proud / (total - seamTriangles)).toBeGreaterThan(0.02);
 
     // Never through a crystal. A boulder is substrate and may share the seam's
     // own overlap with a buried base cap, but one standing through a shaft
