@@ -1143,8 +1143,21 @@ textarea::placeholder {
 /* Кнопка — об'ємна, за рецептом із `:root`. `background-color` окремо від
    `background-image` навмисно: скорочення `background` стерло б відблиск,
    і кожен колірний варіант нижче мовчки ставав би плоским. */
+/*
+ * Значок і підпис в один рядок — на всіх кнопках, а не лише в модалках.
+ *
+ * `inline-flex` тут стояв тільки під `.modal-actions .btn`: я закрив
+ * симптом там, де його побачив («В покупки» ставила візок над текстом),
+ * і та сама вада відразу вилізла в налаштуваннях — «Редагувати розміри»
+ * тримала олівець окремим рядком угорі. Кнопка з двох елементів — це
+ * норма, а не виняток модалки.
+ */
 .btn {
   appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 0;
   border-radius: var(--radius-md);
   padding: 12px;
@@ -1575,15 +1588,10 @@ textarea::placeholder {
   align-items: center;
   margin-top: 6px;
 }
-/* Значок і підпис стоять в один рядок. Без цього `.btn` лишається
-   `display: inline-block`, і кнопка «В покупки» ставила візок ПОВЕРХ
-   тексту в два рядки — видно на знімку перегляду рецепта. */
+/* Рядок зі значком тепер задає сам `.btn` (див. його правило вище); тут
+   лишається те, що стосується саме смуги дій. */
 .modal-actions .btn,
 .modal-actions .btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
   flex: 0 0 auto;
   min-height: 48px;
   padding: 10px 18px;
@@ -2034,7 +2042,12 @@ textarea::placeholder {
 
 /* Чипи в модалках (тип події / категорія / статус) */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+/* Те саме, що й у `.btn`: чип із значком не мусить ставати двоповерховим
+   (у налаштуваннях так вело себе ім'я користувача). */
 .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
   background: transparent;
   color: var(--text);
@@ -3077,6 +3090,26 @@ textarea::placeholder {
 .settings-section { display: flex; flex-direction: column; gap: 10px; }
 .settings-section-title { font-weight: 700; font-size: 15px; }
 
+/*
+ * «Вийти» — тиха й на всю ширину смуги.
+ *
+ * Була `btn btn-danger`: рожева заливка на всю ширину, найгучніше на
+ * екрані налаштувань — гучніше за будь-яке «Зберегти» в порталі. Вихід
+ * не головна дія й не часта; він мусить бути знайденим, а не помітним
+ * першим. Тон небезпеки лишається в тексті й рамці (ADR-0053).
+ */
+.settings-actions .settings-logout {
+  flex: 1 1 auto;
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 34%, transparent);
+}
+.settings-actions .settings-logout:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+/* Кнопка редагування — на всю ширину під таблицею, як єдина дія блоку. */
+.sizes-edit-btn { width: 100%; }
+
 /* ── Вибір теми ─────────────────────────────────────────────
    Жолоб зі скла й два сегменти — те саме, що на обох аркушах референсу.
    Активний не просто залитий, а світить: ореол — це те, чим «обрано»
@@ -3159,7 +3192,7 @@ textarea::placeholder {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
-.photo-upload-icon { font-size: 20px; }
+.photo-upload-icon { display: grid; place-items: center; color: var(--accent); }
 .photo-upload-label { font-size: 13.5px; }
 
 .photo-upload-progress {
@@ -3206,8 +3239,12 @@ textarea::placeholder {
   position: absolute;
   top: 4px;
   right: 4px;
-  width: 22px;
-  height: 22px;
+  /* 30px, а не 22: це єдиний спосіб прибрати фото, і він був удвічі
+     менший за поріг дотику. */
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.55);

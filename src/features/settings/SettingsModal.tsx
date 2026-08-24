@@ -13,10 +13,13 @@ import { useAuth, useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useUsers } from '@/features/_shared/useUsers';
 import { TabBar } from '@/components/ui/TabBar';
-import { MoonIcon, SunIcon } from '@/components/icons/UiIcon';
+import {
+  ImageIcon, ListIcon, MoonIcon, PencilIcon, PlusIcon, SunIcon, TrashIcon, UserIcon,
+} from '@/components/icons/UiIcon';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useTheme } from '@/providers/ThemeProvider';
 import { usePhotoManager, usePhotoMutations, useUserSizes, useSaveSizes } from './useSettings';
-import type { InsertRow, UserName, UserSizesRow } from '@/types';
+import type { InsertRow, UserSizesRow } from '@/types';
 
 interface SettingsModalProps {
   open: boolean;
@@ -29,7 +32,12 @@ type Section = 'sizes' | 'photos';
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { user, logout } = useAuth();
+  const confirmDialog = useConfirm();
   const [section, setSection] = useState<Section>('sizes');
+
+  const confirmLogout = async () => {
+    if (await confirmDialog('Вийти з порталу? Щоб повернутись, знадобиться PIN.')) logout();
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -63,8 +71,8 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
           value={section}
           onChange={setSection}
           items={[
-            { value: 'sizes', label: 'Розміри', icon: '📏' },
-            { value: 'photos', label: 'Фото', icon: '🖼' },
+            { value: 'sizes', label: 'Розміри', icon: <ListIcon size={15} /> },
+            { value: 'photos', label: 'Фото', icon: <ImageIcon size={15} /> },
           ]}
         />
 
@@ -75,15 +83,24 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
         <ThemeSection />
 
-        <div className="settings-divider" />
-
-        <button type="button" className="btn btn-danger" onClick={logout}>
-          Вийти
-        </button>
-
-        <button type="button" className="btn btn-ghost" onClick={onClose}>
-          Закрити
-        </button>
+        {/*
+          * «Вийти» тиха, і це не боязкість.
+          *
+          * Була `btn btn-danger` на всю ширину — найгучніше на екрані,
+          * гучніше за будь-яке «Зберегти» в порталі. Вихід не є ані
+          * головною дією налаштувань, ані частою; він просто мусить
+          * бути знайденим. І він тепер питає: пароль у порталі — PIN, і
+          * випадковий тап коштує повторного входу вдвох.
+          *
+          * «Закрити» звідси пішла: хрестик угорі робить те саме
+          * (ADR-0051), а дві кнопки з одним значенням — це вибір, якого
+          * немає.
+          */}
+        <div className="modal-actions settings-actions">
+          <button type="button" className="btn btn-ghost settings-logout" onClick={() => void confirmLogout()}>
+            Вийти з порталу
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -92,10 +109,6 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 // ============================================================
 // РОЗМІРИ
 // ============================================================
-
-function userEmoji(name: UserName): string {
-  return name === 'Лєна' ? '👩' : '🧔';
-}
 
 /**
  * Вибір теми.
@@ -145,8 +158,12 @@ function SizesSection() {
 
   return (
     <section className="settings-section">
-      <div className="settings-section-title">Розміри 📏</div>
-
+      {/*
+        * Заголовка секції тут немає навмисно.
+        *
+        * Був рядок «Розміри 📏» — тобто те саме слово, що на активній
+        * вкладці двома рядками вище. Вкладка вже сказала, де ми.
+        */}
       {users.length > 1 && (
         <div className="chips">
           {users.map((u) => (
@@ -159,7 +176,8 @@ function SizesSection() {
                 setEditing(false);
               }}
             >
-              {userEmoji(u.name)} {u.name}
+              <UserIcon size={14} />
+              <span>{u.name}</span>
             </button>
           ))}
         </div>
@@ -191,43 +209,73 @@ function SizesView({
   const v = (val: string | number | null | undefined, unit = ''): string =>
     val !== null && val !== undefined && val !== '' ? `${val}${unit}` : '—';
 
+  /*
+   * Порожні розміри показуються порожнім станом, а не стіною прочерків.
+   *
+   * На знімку власника з дванадцяти значень сім були «—». Таблиця, у
+   * якій більшість рядків нічого не каже, — це не «ще не заповнено», це
+   * шум, крізь який треба шукати те одне, що заповнене.
+   */
+  const filled = [
+    sizes?.height, sizes?.chest, sizes?.waist, sizes?.hips,
+    sizes?.intl_size, sizes?.eu_size, sizes?.ua_size,
+    sizes?.insole_cm, sizes?.shoe_eu, sizes?.shoe_us,
+    sizes?.bra, sizes?.underwear, sizes?.ring_ring, sizes?.ring_index,
+  ].filter((one) => one !== null && one !== undefined && one !== '').length;
+
+  if (filled === 0) {
+    return (
+      <EmptyState
+        icon={<ListIcon size={26} />}
+        title="Розміри ще не заповнені"
+        hint="Зріст, одяг, взуття й каблучки — щоб не питати одне в одного перед подарунком."
+        action={(
+          <button type="button" className="btn" onClick={onEdit}>
+            Заповнити розміри
+          </button>
+        )}
+      />
+    );
+  }
+
   return (
     <>
       <div className="sizes-grid">
         <div className="sizes-group">
-          <div className="sizes-group-title">📏 Базові габарити</div>
+          <div className="sizes-group-title">Габарити</div>
           <div className="sizes-row"><span>Зріст</span><b>{v(sizes?.height, ' см')}</b></div>
           <div className="sizes-row"><span>Груди</span><b>{v(sizes?.chest, ' см')}</b></div>
           <div className="sizes-row"><span>Талія</span><b>{v(sizes?.waist, ' см')}</b></div>
           <div className="sizes-row"><span>Стегна</span><b>{v(sizes?.hips, ' см')}</b></div>
         </div>
         <div className="sizes-group">
-          <div className="sizes-group-title">👗 Одяг</div>
+          <div className="sizes-group-title">Одяг</div>
           <div className="sizes-row"><span>Міжнар.</span><b>{v(sizes?.intl_size)}</b></div>
           <div className="sizes-row"><span>EU</span><b>{v(sizes?.eu_size)}</b></div>
           <div className="sizes-row"><span>UA</span><b>{v(sizes?.ua_size)}</b></div>
         </div>
         <div className="sizes-group">
-          <div className="sizes-group-title">👟 Взуття</div>
+          <div className="sizes-group-title">Взуття</div>
           <div className="sizes-row"><span>Устілка</span><b>{v(sizes?.insole_cm, ' см')}</b></div>
           <div className="sizes-row"><span>EU</span><b>{v(sizes?.shoe_eu)}</b></div>
           <div className="sizes-row"><span>US</span><b>{v(sizes?.shoe_us)}</b></div>
         </div>
         {isFemale && (
           <div className="sizes-group">
-            <div className="sizes-group-title">🩱 Нижня білизна</div>
+            <div className="sizes-group-title">Білизна</div>
             <div className="sizes-row"><span>Бюстгальтер</span><b>{v(sizes?.bra)}</b></div>
             <div className="sizes-row"><span>Труси</span><b>{v(sizes?.underwear)}</b></div>
           </div>
         )}
         <div className="sizes-group">
-          <div className="sizes-group-title">💍 Аксесуари</div>
-          <div className="sizes-row"><span>Каблучка (безім.)</span><b>{v(sizes?.ring_ring)}</b></div>
-          <div className="sizes-row"><span>Каблучка (вказ.)</span><b>{v(sizes?.ring_index)}</b></div>
+          <div className="sizes-group-title">Каблучки</div>
+          <div className="sizes-row"><span>Безіменний</span><b>{v(sizes?.ring_ring)}</b></div>
+          <div className="sizes-row"><span>Вказівний</span><b>{v(sizes?.ring_index)}</b></div>
         </div>
       </div>
-      <button type="button" className="btn-secondary" onClick={onEdit}>
-        ✏️ Редагувати розміри
+      <button type="button" className="btn btn-ghost sizes-edit-btn" onClick={onEdit}>
+        <PencilIcon size={15} />
+        <span>Редагувати розміри</span>
       </button>
     </>
   );
@@ -319,7 +367,7 @@ function SizesEditForm({
   return (
     <div className="sizes-edit">
       <div className="sizes-form-group">
-        <div className="sizes-group-title">📏 Базові</div>
+        <div className="sizes-group-title">Габарити</div>
         <label className="form-field">
           <span>Зріст (см)</span>
           <input id="sz-height" name="height" type="number" value={form.height} onChange={set('height')} />
@@ -339,7 +387,7 @@ function SizesEditForm({
       </div>
 
       <div className="sizes-form-group">
-        <div className="sizes-group-title">👗 Одяг</div>
+        <div className="sizes-group-title">Одяг</div>
         <label className="form-field">
           <span>Міжнар.</span>
           <input id="sz-intl" name="intlSize" type="text" value={form.intl_size} onChange={set('intl_size')} />
@@ -355,7 +403,7 @@ function SizesEditForm({
       </div>
 
       <div className="sizes-form-group">
-        <div className="sizes-group-title">👟 Взуття</div>
+        <div className="sizes-group-title">Взуття</div>
         <label className="form-field">
           <span>Устілка (см)</span>
           <input
@@ -379,7 +427,7 @@ function SizesEditForm({
 
       {isFemale && (
         <div className="sizes-form-group">
-          <div className="sizes-group-title">🩱 Нижня білизна</div>
+          <div className="sizes-group-title">Білизна</div>
           <label className="form-field">
             <span>Бюстгальтер</span>
             <input id="sz-bra" name="bra" type="text" value={form.bra} onChange={set('bra')} />
@@ -392,7 +440,7 @@ function SizesEditForm({
       )}
 
       <div className="sizes-form-group">
-        <div className="sizes-group-title">💍 Каблучки</div>
+        <div className="sizes-group-title">Каблучки</div>
         <label className="form-field">
           <span>Безіменний</span>
           <input id="sz-ring" name="ringRing" type="text" value={form.ring_ring} onChange={set('ring_ring')} />
@@ -404,7 +452,7 @@ function SizesEditForm({
       </div>
 
       <div className="modal-actions">
-        <button type="button" className="btn-secondary" onClick={onDone}>
+        <button type="button" className="btn btn-ghost" onClick={onDone}>
           Скасувати
         </button>
         <button type="button" className="btn" onClick={submit} disabled={save.isPending}>
@@ -470,7 +518,7 @@ function PhotosSection() {
 
   return (
     <section className="settings-section">
-      <div className="settings-section-title">Фото полароїда 🖼</div>
+      {/* Назви секції немає: вкладка «Фото» вже двома рядками вище. */}
       <p className="settings-section-desc">
         Фото з&apos;являються на головному екрані. Рекомендований формат — квадрат.
       </p>
@@ -484,7 +532,7 @@ function PhotosSection() {
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
       >
-        <span className="photo-upload-icon">＋</span>
+        <span className="photo-upload-icon" aria-hidden="true"><PlusIcon size={22} /></span>
         <span className="photo-upload-label">Додати фото</span>
         <input
           id="settings-photo-file"
@@ -526,11 +574,11 @@ function PhotosSection() {
               <button
                 type="button"
                 className="photo-manager-del"
-                title="Видалити"
+                aria-label="Видалити фото"
                 disabled={deletingName === p.name}
                 onClick={() => void onDelete(p.name)}
               >
-                ✕
+                <TrashIcon size={14} />
               </button>
             </div>
           ))
