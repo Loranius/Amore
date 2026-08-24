@@ -1,10 +1,20 @@
+// ============================================================
+// Сітка мрій 2×N.
+// ------------------------------------------------------------
+// Один із ДВОХ виглядів вішліста; другий — бульбашки. Раніше їх було
+// три: «стрічка» й «полароїд» показували те саме різними обгортками
+// (ADR-0056).
+//
+// Оболонка лишається `WishCard` — вона тримає аркуш деталей і дії; сітка
+// дає лише тригер. Тому перехід між виглядами не міняє нічого, крім
+// того, як мрія виглядає до дотику.
+// ============================================================
 import { WishCard } from './WishCard';
-import { WishlistPolaroidCard } from './WishlistPolaroidCard';
+import { WishlistGridCard } from './WishlistGridCard';
 import type { WishlistItemV3 } from './wishlistRpc';
 
-interface WishlistPolaroidViewProps {
+interface WishlistGridViewProps {
   items: WishlistItemV3[];
-  seed: number;
   busy: boolean;
   isItemOwn: (item: WishlistItemV3) => boolean;
   canManageReservation: (item: WishlistItemV3) => boolean;
@@ -17,9 +27,8 @@ interface WishlistPolaroidViewProps {
   onMove: (item: WishlistItemV3) => void;
 }
 
-export function WishlistPolaroidView({
+export function WishlistGridView({
   items,
-  seed,
   busy,
   isItemOwn,
   canManageReservation,
@@ -30,10 +39,10 @@ export function WishlistPolaroidView({
   onPurchased,
   onFulfill,
   onMove,
-}: WishlistPolaroidViewProps) {
+}: WishlistGridViewProps) {
   return (
-    <div className="wl-polaroid-view" aria-label="Полароїди бажань">
-      {items.map((item, index) => (
+    <div className="wl-grid-view" aria-label="Сітка бажань">
+      {items.map((item) => (
         <WishCard
           key={item.id}
           item={item}
@@ -48,10 +57,8 @@ export function WishlistPolaroidView({
           onFulfill={onFulfill}
           onMove={onMove}
           renderTrigger={({ openDetails, detailsOpen }) => (
-            <WishlistPolaroidCard
+            <WishlistGridCard
               item={item}
-              index={index}
-              seed={seed}
               busy={busy}
               detailsOpen={detailsOpen}
               onOpen={openDetails}

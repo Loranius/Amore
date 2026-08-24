@@ -20,7 +20,7 @@ class MemoryStorage {
 
 describe('wishlist view preference', () => {
   it('migrates the legacy table value to feed', () => {
-    expect(normalizeWishlistStoredView('table')).toBe('feed');
+    expect(normalizeWishlistStoredView('table')).toBe('grid');
   });
 
   it('ignores malformed and unsupported stored values', () => {
@@ -31,21 +31,21 @@ describe('wishlist view preference', () => {
     const unsupported = new MemoryStorage();
     unsupported.setItem(WISHLIST_VIEW_STORAGE_KEY, JSON.stringify({
       me: 'cards',
-      partner: 'feed',
+      partner: 'grid',
       shared: 17,
     }));
-    expect(readWishlistViewPreferences(unsupported)).toEqual({ partner: 'feed' });
+    expect(readWishlistViewPreferences(unsupported)).toEqual({ partner: 'grid' });
   });
 
   it('stores each Wishlist scope without overwriting the others', () => {
     const storage = new MemoryStorage();
 
-    writeWishlistViewPreference('me', 'feed', storage);
-    writeWishlistViewPreference('shared', 'polaroid', storage);
+    writeWishlistViewPreference('me', 'grid', storage);
+    writeWishlistViewPreference('shared', 'grid', storage);
 
     expect(readWishlistViewPreferences(storage)).toEqual({
-      me: 'feed',
-      shared: 'polaroid',
+      me: 'grid',
+      shared: 'grid',
     });
   });
 });

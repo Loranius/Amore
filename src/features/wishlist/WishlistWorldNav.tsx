@@ -30,8 +30,7 @@ export interface WishlistWorldNavProps {
 
 const VIEWS: readonly { value: WishlistViewMode; label: string }[] = [
   { value: 'bubbles', label: 'Кристали' },
-  { value: 'feed', label: 'Список' },
-  { value: 'polaroid', label: 'Полароїд' },
+  { value: 'grid', label: 'Список' },
 ];
 
 function FilterViewIcon() {

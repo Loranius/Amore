@@ -6,6 +6,7 @@ import {
   ensureServer,
   goToRoute,
   openPortal,
+  probeInk,
   probeSelectors,
   readJourneyMetrics,
   readSceneMetrics,
@@ -34,6 +35,7 @@ const USAGE = `
   --tier=high|balanced|low           профіль пристрою (типово high)
   --theme=dark|light                 тема порталу
   --probe=<css>                      порахувати й обміряти елементи; можна кілька
+  --ink=<css>                        колір елемента числом: чорнило, тло, контраст, відтінок
   --tap=<css>                        тапнути перший збіг і зняти кадр; можна кілька,
                                      вони йдуть послідовно (модалка → її вміст)
   --settle=<мс>                      скільки чекати після появи сцени (типово ${DEFAULTS.settle})
@@ -95,6 +97,7 @@ async function main() {
           const metrics = await readSceneMetrics(portal.page);
           const journey = await readJourneyMetrics(portal.page);
           const probes = await probeSelectors(portal.page, options.probes);
+          const inks = await probeInk(portal.page, options.inks);
 
           console.log(`\n${route}  ·  ${device.name} ${device.width}×${device.height}@${device.scale}  ·  ${options.tier.name}`);
           console.log(`  знімок  ${file}`);
@@ -123,6 +126,20 @@ async function main() {
           for (const [selector, found] of Object.entries(probes)) {
             console.log(`  ${selector} × ${found.count}`);
             if (found.count > 0) console.log(`    ${JSON.stringify(found.boxes)}`);
+          }
+          for (const [selector, ink] of Object.entries(inks)) {
+            if (ink === null) {
+              console.log(`  колір   ${selector} — не знайдено`);
+              continue;
+            }
+            if (ink.unresolved) {
+              console.log(`  колір   ${selector} — не розібрано: ${ink.unresolved}`);
+              continue;
+            }
+            console.log(
+              `  колір   ${selector}: ${ink.ink} (відтінок ${ink.inkHue ?? '—'}°)`
+              + ` на ${ink.background}, контраст ${ink.contrast}:1`,
+            );
           }
 
           // Дотики по координаті — для сцени, де селектора немає.
@@ -157,6 +174,26 @@ async function main() {
               for (const [probe, found] of Object.entries(after)) {
                 console.log(`    після тапу ${probe} × ${found.count}`);
                 if (found.count > 0) console.log(`      ${JSON.stringify(found.boxes)}`);
+              }
+            }
+            // Колір теж перевимірюється після тапу: те, що треба зважити,
+            // здебільшого з'являється саме тут — архів, модалка, аркуш.
+            if (options.inks.length > 0) {
+              const after = await probeInk(portal.page, options.inks);
+              for (const [selector, ink] of Object.entries(after)) {
+                if (ink === null) {
+                  console.log(`    після тапу колір ${selector} — не знайдено`);
+                  continue;
+                }
+                if (ink.unresolved) {
+                  console.log(`    після тапу колір ${selector} — не розібрано: ${ink.unresolved}`);
+                  continue;
+                }
+                console.log(
+                  `    після тапу колір ${selector}: ${ink.ink}`
+                  + ` (відтінок ${ink.inkHue ?? '—'}°) на ${ink.background},`
+                  + ` контраст ${ink.contrast}:1`,
+                );
               }
             }
           }

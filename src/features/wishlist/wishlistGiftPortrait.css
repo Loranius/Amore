@@ -29,11 +29,11 @@
 }
 
 .wishlist .wishlist-grid .wl-cloud-bubble[data-priority='medium'] {
-  --wl-gift-accent: #a778c9;
+  --wl-gift-accent: var(--wl-bubble-tint-medium);
 }
 
 .wishlist .wishlist-grid .wl-cloud-bubble[data-priority='low'] {
-  --wl-gift-accent: #9b87aa;
+  --wl-gift-accent: var(--wl-bubble-tint-low);
 }
 
 /* Keep the historical oval-producing layer permanently disabled. */

@@ -1,0 +1,107 @@
+/* ============================================================
+   Сітка мрій 2×N — за зразком галереї спогадів.
+   ------------------------------------------------------------
+   Дві колонки на телефоні, три від 720px: те саме число, що й у
+   `.mm-grid`, і не випадково — обидві сітки показують квадратні кадри
+   з підписом під ними, тож ритм має бути один на портал.
+   ============================================================ */
+.wl-grid-view {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 10px;
+}
+
+@media (min-width: 720px) {
+  .wl-grid-view { grid-template-columns: repeat(3, 1fr); gap: 22px 14px; }
+}
+
+.wl-grid-card {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: translate 120ms ease;
+}
+
+.wl-grid-card:active { translate: 0 2px; }
+.wl-grid-card:disabled { cursor: default; opacity: .6; }
+
+.wl-grid-card-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  /* Щільніше за ґрунт: фото товару часто йде з білим тлом і без цього
+     зливалося б зі сторінкою в порожню пляму. */
+  background: color-mix(in srgb, var(--text) 8%, var(--surface));
+  box-shadow: var(--shadow-md);
+}
+
+.wl-grid-card-frame img,
+.wl-grid-card-frame picture {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wl-grid-card-blank {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  color: color-mix(in srgb, var(--accent) 60%, var(--muted));
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--text) 5%, transparent) 0 8px,
+    transparent 8px 16px
+  );
+}
+
+/* Пріоритет — тонким кантом кадру, а не плашкою поверх фото: у сітці
+   2×N будь-яка плашка з'їдає той самий кут, де стоїть головне у знімку. */
+.wl-grid-card[data-priority='high'] .wl-grid-card-frame {
+  box-shadow: var(--shadow-md), inset 0 0 0 2px color-mix(in srgb, var(--accent) 62%, transparent);
+}
+
+.wl-grid-card-foot {
+  display: block;
+  padding: 9px 2px 0;
+}
+
+.wl-grid-card-foot b {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+  /* Рівно два рядки: довша назва в сітці однаково не читається, а картка
+     від неї росла б удвічі проти сусідів. */
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.wl-grid-card-foot i {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.wl-grid-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: var(--radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wl-grid-card { transition: none; }
+}

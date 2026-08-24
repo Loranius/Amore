@@ -150,6 +150,7 @@ export function parseShotArgs(argv) {
   const routes = [];
   const devices = [];
   const probes = [];
+  const inks = [];
   const taps = [];
   const tapPoints = [];
   const seed = [];
@@ -175,6 +176,8 @@ export function parseShotArgs(argv) {
     switch (key) {
       case 'device': devices.push(...asList(value)); break;
       case 'probe': probes.push(...asList(value)); break;
+      // Колір числом: чорнило, тло й контраст. Око вже помилялось із темою.
+      case 'ink': inks.push(...asList(value)); break;
       case 'tier': options.tier = value; break;
       case 'tap': taps.push(...asList(value)); break;
       // Дотик по координаті, а не по селектору. Для сцени це єдиний спосіб:
@@ -218,6 +221,7 @@ export function parseShotArgs(argv) {
     routes,
     devices: viewports,
     probes,
+    inks,
     tier: { name: options.tier, ...tier },
     port: options.port,
     out: options.out,

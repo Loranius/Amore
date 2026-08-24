@@ -17,6 +17,7 @@ import { ArchiveGiftFormModal } from './ArchiveGiftFormModal';
 import { ProgressivePhoto } from './ProgressivePhoto';
 import { WishlistArchiveViewPicker } from './WishlistArchiveViewPicker';
 import { WishlistBubblePhysics } from './WishlistBubblePhysics';
+import { WishlistGridCard } from './WishlistGridCard';
 import {
   freshWishlistCloudSeed,
   normalizeWishlistCloudPriority,
@@ -27,13 +28,7 @@ import {
   useCreateManualArchiveGift,
   useWishlistArchive,
 } from './useWishlistArchive';
-import {
-  archivePolaroidLayout,
-  freshArchivePolaroidSeed,
-  readWishlistArchiveView,
-  writeWishlistArchiveView,
-  type WishlistArchiveViewMode,
-} from './wishlistArchiveView';
+import type { WishlistViewMode } from './wishlistBoardView';
 import type {
   GiftMemoryArchiveItem,
   WishlistArchiveScope,
@@ -42,7 +37,7 @@ import './wishlistArchiveBubbles.css';
 import './wishlistArchiveViews.css';
 import { SparkIcon } from '@/components/icons/EventIcon';
 import { TogetherIcon } from '@/components/icons/WishIcon';
-import { ExternalLinkIcon, GiftIcon, PlayIcon, PlusIcon } from '@/components/icons/UiIcon';
+import { ChevronLeftIcon, ExternalLinkIcon, GiftIcon, PlayIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
 
 type ArchiveGroup = {
@@ -62,6 +57,17 @@ interface WishArchiveProps {
   focusWishId?: number | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /*
+   * Вигляд архіву — той самий, що й у активних мрій, і зберігається там
+   * само. Раніше архів тримав власну копію налаштування, тож пара бачила
+   * ДВА перемикачі поспіль (аркуш світу згори і власний архівний нижче),
+   * які показували різні значення й керували різними екранами.
+   * `showViewPicker` вимкнений там, де перемикач уже стоїть вище
+   * (ADR-0056).
+   */
+  view: WishlistViewMode;
+  onViewChange: (view: WishlistViewMode) => void;
+  showViewPicker: boolean;
 }
 
 interface ArchiveMemorySheetProps {
@@ -72,19 +78,13 @@ interface ArchiveMemorySheetProps {
   onPhotoClick: (src: string) => void;
 }
 
-interface ArchiveItemProps {
+interface ArchiveBubbleProps {
   item: GiftMemoryArchiveItem;
   index: number;
-  actorName: string;
+  seed: number;
   isFocused: boolean;
   onOpen: (item: GiftMemoryArchiveItem) => void;
 }
-
-interface ArchiveSeededProps extends ArchiveItemProps {
-  seed: number;
-}
-
-type ArchivePolaroidProps = ArchiveSeededProps;
 
 function momentValue(item: GiftMemoryArchiveItem): string | null {
   return item.completed_at ?? item.fulfilled_at;
@@ -148,7 +148,7 @@ export function archiveCountText(count: number, shared: boolean): string {
   return `${count} ${many}`;
 }
 
-function ArchiveBubble({ item, seed, index, isFocused, onOpen }: ArchiveSeededProps) {
+function ArchiveBubble({ item, seed, index, isFocused, onOpen }: ArchiveBubbleProps) {
   const priority = normalizeWishlistCloudPriority(item.priority);
   const priorityPresentation = wishlistCloudPriorityPresentation(item.priority);
   const placement = useMemo(
@@ -196,102 +196,6 @@ function ArchiveBubble({ item, seed, index, isFocused, onOpen }: ArchiveSeededPr
             {item.reaction_video_url ? <PlayIcon size={30} /> : <HeartIcon size={30} />}
           </span>
         )}
-      </button>
-    </article>
-  );
-}
-
-function ArchiveFeedCard({
-  item,
-  actorName,
-  isFocused,
-  onOpen,
-}: ArchiveItemProps) {
-  const image = archiveBubbleImage(item);
-  const date = formatMoment(momentValue(item));
-
-  return (
-    <article
-      className={`wl-archive-feed-card${isFocused ? ' wl-archive-view-card--focused' : ''}`}
-      data-wish-id={item.id}
-    >
-      <button
-        type="button"
-        className="wl-archive-feed-trigger"
-        aria-label={`Відкрити подарований спогад «${item.title}». ${date}`}
-        aria-haspopup="dialog"
-        onClick={() => onOpen(item)}
-      >
-        <span className="wl-archive-feed-media">
-          {image ? (
-            <img src={image} alt="" loading="lazy" decoding="async" />
-          ) : (
-            <span aria-hidden="true">{item.reaction_video_url ? <PlayIcon size={30} /> : <HeartIcon size={30} />}</span>
-          )}
-        </span>
-
-        <span className="wl-archive-feed-copy">
-          <span className="wl-archive-feed-kicker">
-            <time dateTime={momentValue(item) ?? undefined}>{date}</time>
-            <span>Від {actorName}</span>
-          </span>
-          <strong>{item.title}</strong>
-          <span className={`wl-archive-feed-description${item.description ? '' : ' is-empty'}`}>
-            {item.description ?? 'Опис до цього спогаду не додано.'}
-          </span>
-          <span className="wl-archive-feed-meta">
-            <span>{item.price != null ? `${item.price.toLocaleString('uk-UA')} ₴` : 'Ціну не вказано'}</span>
-            <span aria-hidden="true">Відкрити ›</span>
-          </span>
-        </span>
-      </button>
-    </article>
-  );
-}
-
-function ArchivePolaroidCard({
-  item,
-  index,
-  actorName,
-  isFocused,
-  seed,
-  onOpen,
-}: ArchivePolaroidProps) {
-  const image = archiveBubbleImage(item);
-  const date = formatMoment(momentValue(item));
-  const layout = archivePolaroidLayout(seed, item.id, index);
-  const style = {
-    '--wl-archive-polaroid-rotate': `${layout.rotate}deg`,
-    '--wl-archive-polaroid-x': `${layout.x}px`,
-    '--wl-archive-polaroid-y': `${layout.y}px`,
-    '--wl-archive-polaroid-tape-rotate': `${layout.tapeRotate}deg`,
-  } as CSSProperties;
-
-  return (
-    <article
-      className={`wl-archive-polaroid-card${isFocused ? ' wl-archive-view-card--focused' : ''}`}
-      style={style}
-      data-wish-id={item.id}
-    >
-      <button
-        type="button"
-        className="wl-archive-polaroid-trigger"
-        aria-label={`Відкрити подарований спогад «${item.title}». ${date}`}
-        aria-haspopup="dialog"
-        onClick={() => onOpen(item)}
-      >
-        <span className="wl-archive-polaroid-media">
-          {image ? (
-            <img src={image} alt="" loading="lazy" decoding="async" />
-          ) : (
-            <span aria-hidden="true">{item.reaction_video_url ? <PlayIcon size={30} /> : <HeartIcon size={30} />}</span>
-          )}
-        </span>
-        <span className="wl-archive-polaroid-caption">
-          <strong>{item.title}</strong>
-          <small>{date}</small>
-          <span>Від {actorName}</span>
-        </span>
       </button>
     </article>
   );
@@ -462,6 +366,9 @@ export function WishArchive({
   focusWishId = null,
   open: controlledOpen,
   onOpenChange,
+  view: viewMode,
+  onViewChange,
+  showViewPicker,
 }: WishArchiveProps) {
   const isShared = scope === 'shared';
   const me = useCurrentUser();
@@ -469,10 +376,6 @@ export function WishArchive({
   const [internalOpen, setInternalOpen] = useState(openRequested);
   const [selectedItem, setSelectedItem] = useState<GiftMemoryArchiveItem | null>(null);
   const [addingGift, setAddingGift] = useState(false);
-  const [viewMode, setViewMode] = useState<WishlistArchiveViewMode>(() =>
-    readWishlistArchiveView(scope)
-  );
-  const [polaroidSeed, setPolaroidSeed] = useState(freshArchivePolaroidSeed);
   // Бульбашки архіву — та сама логіка, що й на дошці бажань: розкладка
   // нова на кожне відкриття архіву, стала поки він відкритий.
   const [bubbleSeed] = useState(freshWishlistCloudSeed);
@@ -483,7 +386,6 @@ export function WishArchive({
   const createManualGift = useCreateManualArchiveGift();
   const groups = useMemo(() => groupArchive(items), [items]);
   const orderedItems = useMemo(() => groups.flatMap((group) => group.items), [groups]);
-  const latestMoment = orderedItems[0] ? momentValue(orderedItems[0]) : null;
   const title = isShared ? 'Наші здійснені мрії' : 'Подаровані спогади';
   const entryDescription = isShared
     ? 'Моменти, які ви створили та здійснили разом.'
@@ -500,16 +402,6 @@ export function WishArchive({
   const openSelectedItem = useCallback((item: GiftMemoryArchiveItem) => {
     setSelectedItem(item);
   }, []);
-
-  const changeViewMode = (nextView: WishlistArchiveViewMode) => {
-    if (nextView === 'polaroid') setPolaroidSeed(freshArchivePolaroidSeed());
-    setViewMode(nextView);
-    writeWishlistArchiveView(scope, nextView);
-  };
-
-  useEffect(() => {
-    setViewMode(readWishlistArchiveView(scope));
-  }, [scope]);
 
   useEffect(() => {
     if (!openRequested) return;
@@ -570,44 +462,41 @@ export function WishArchive({
     <>
       {viewMode === 'bubbles' && items.length > 0 && <WishlistBubblePhysics />}
       <div className="wl-archive-wrap wl-archive-wrap--page" ref={wrapRef}>
-        <header className="wl-archive-page-header">
+        {/*
+          * Шапки архіву тут більше немає, і це не спрощення заради
+          * спрощення.
+          *
+          * Стояло три блоки поспіль, які казали те саме: заголовок
+          * «Подаровані спогади» з підписом «4 подаровані спогади», під
+          * ним картка з тим самим числом і датою, під нею — ДРУГИЙ вибір
+          * вигляду (перший лишався від активних мрій вище). Тобто пара
+          * гортала три екрани службового тексту, щоб дійти до самих
+          * спогадів (ADR-0056).
+          *
+          * Лишились дві речі, які справді керують: повернення до
+          * активних мрій і «давній подарунок».
+          */}
+        <div className="wl-archive-topbar">
           <button
             type="button"
             className="wl-archive-back"
             onClick={() => setArchiveOpen(false)}
           >
-            <span aria-hidden="true">←</span>
+            <ChevronLeftIcon size={16} />
             До активних мрій
           </button>
 
-          <div className="wl-archive-page-copy">
-            <span className="wl-archive-page-eyebrow">
-              {isShared ? 'Спільна історія' : 'Історія подарунків'}
-            </span>
-            <h2>{title}</h2>
-            <p>
-              {items.length > 0
-                ? archiveCountText(items.length, isShared)
-                : entryDescription}
-            </p>
-          </div>
-
-          <div className="wl-archive-page-actions">
-            {!isShared && (
-              <button
-                type="button"
-                className="wl-archive-add-gift"
-                onClick={() => setAddingGift(true)}
-              >
-                <PlusIcon size={15} />
-                Давній подарунок
-              </button>
-            )}
-            <span className="wl-archive-page-symbol" aria-hidden="true">
-              {isShared ? <TogetherIcon size={22} /> : <GiftIcon size={22} />}
-            </span>
-          </div>
-        </header>
+          {!isShared && (
+            <button
+              type="button"
+              className="wl-archive-add-gift"
+              onClick={() => setAddingGift(true)}
+            >
+              <PlusIcon size={15} />
+              Давній подарунок
+            </button>
+          )}
+        </div>
 
         <div className="wl-archive-body">
           {isPending ? (
@@ -647,20 +536,6 @@ export function WishArchive({
             </div>
           ) : (
             <>
-              <div className="wl-archive-summary">
-                <span className="wl-archive-summary-icon" aria-hidden="true"><SparkIcon size={20} /></span>
-                <span className="wl-archive-summary-copy">
-                  <strong>{archiveCountText(items.length, isShared)}</strong>
-                  <small>
-                    {latestMoment
-                      ? `Останній спогад — ${formatMoment(latestMoment)}`
-                      : isShared
-                        ? 'Ваша спільна історія здійснених мрій'
-                        : 'Ваша спільна історія подарунків'}
-                  </small>
-                </span>
-              </div>
-
               <div className="wl-archive-controls">
                 <div className="wl-archive-cloud-years" aria-label="Роки архіву">
                   {groups.map((group) => (
@@ -670,7 +545,9 @@ export function WishArchive({
                     </span>
                   ))}
                 </div>
-                <WishlistArchiveViewPicker value={viewMode} onChange={changeViewMode} />
+                {showViewPicker && (
+                  <WishlistArchiveViewPicker value={viewMode} onChange={onViewChange} />
+                )}
               </div>
 
               {viewMode === 'bubbles' ? (
@@ -684,36 +561,23 @@ export function WishArchive({
                       item={item}
                       seed={bubbleSeed}
                       index={index}
-                      actorName={actorNameFor(item, usersMap)}
-                      isFocused={focusWishId === item.id}
-                      onOpen={openSelectedItem}
-                    />
-                  ))}
-                </div>
-              ) : viewMode === 'feed' ? (
-                <div className="wl-archive-view-grid wl-archive-view-grid--feed" aria-label="Стрічка подарованих спогадів">
-                  {orderedItems.map((item, index) => (
-                    <ArchiveFeedCard
-                      key={item.id}
-                      item={item}
-                      index={index}
-                      actorName={actorNameFor(item, usersMap)}
                       isFocused={focusWishId === item.id}
                       onOpen={openSelectedItem}
                     />
                   ))}
                 </div>
               ) : (
-                <div className="wl-archive-view-grid wl-archive-view-grid--polaroid" aria-label="Полароїди подарованих спогадів">
-                  {orderedItems.map((item, index) => (
-                    <ArchivePolaroidCard
+                /* Той самий компонент, що й у активних мрій: архів не має
+                   власної картки, тож і розійтись їм нема як. Другий
+                   рядок — дата подарунка замість ціни: у виконаної мрії
+                   ціна вже нічого не питає. */
+                <div className="wl-grid-view" aria-label="Список подарованих спогадів">
+                  {orderedItems.map((item) => (
+                    <WishlistGridCard
                       key={item.id}
                       item={item}
-                      index={index}
-                      actorName={actorNameFor(item, usersMap)}
-                      isFocused={focusWishId === item.id}
-                      seed={polaroidSeed}
-                      onOpen={openSelectedItem}
+                      metaOverride={formatMoment(momentValue(item))}
+                      onOpen={() => openSelectedItem(item)}
                     />
                   ))}
                 </div>

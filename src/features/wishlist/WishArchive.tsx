@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { PencilIcon } from '@/components/icons/UiIcon';
 import { WishArchive as WishArchiveBase } from './WishArchiveBase';
 import { ArchiveWishEditModal } from './ArchiveWishEditModal';
+import type { WishlistViewMode } from './wishlistBoardView';
 import type { WishlistArchiveScope } from './wishlistRpc';
 import './wishlistArchiveCollaborative.css';
 
@@ -15,6 +16,9 @@ interface WishArchiveProps {
   focusWishId?: number | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  view: WishlistViewMode;
+  onViewChange: (view: WishlistViewMode) => void;
+  showViewPicker: boolean;
 }
 
 function ArchiveEditAction({ onEdit }: { onEdit: () => void }) {

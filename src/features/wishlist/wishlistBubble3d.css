@@ -1,4 +1,59 @@
 /* Stage 1: volumetric glass shell + stable image presentation modes. */
+
+/*
+ * Чорнило скла — токеном, бо воно різне в темах.
+ *
+ * Тінь на «дальньому» боці кульки була вписана числом: `rgba(71, 42, 91)`,
+ * тобто фіолетовий `#472a5b`. У темній темі це працює — кульки й лягають
+ * у фіолетову гаму порталу. У світлій портал кримсоновий
+ * (`--world-accent: #9c2b50`), а обводка лишалась фіолетовою: власник
+ * побачив саме це — кульки не з тієї теми.
+ *
+ * Значення тримається трійкою чисел, а не кольором, бо всі чотири місця
+ * нижче задають власну прозорість через `rgba(…)`.
+ *
+ * Темна лишається як була — власник просив саме так.
+ *
+ * ВАЖЛИВО, і це коштувало одного хибного «виправлено»: сам обідок, який
+ * власник назвав фіолетовим, малює НЕ цей файл. Його малюють
+ * `wishlistGiftPortrait.css` (тон сфери за пріоритетом) і
+ * `wishlistBubbleGlass.css` (термінатор і плівка на краю) — обидва з
+ * довшими селекторами, тож вони виграють. Токени живуть тут, бо тут
+ * єдиний `:root`-блок бульбашки; споживають їх три файли.
+ */
+:root {
+  --wl-bubble-ink: 71, 42, 91;
+  --wl-bubble-ink-soft: 66, 39, 85;
+  /* Тон самої сфери за пріоритетом (wishlistGiftPortrait.css). */
+  --wl-bubble-tint-medium: #a778c9;
+  --wl-bubble-tint-low: #9b87aa;
+  /* Термінатор кулі — де сфера йде в тінь (wishlistBubbleGlass.css). */
+  --wl-bubble-shade: #694f7c;
+  --wl-bubble-shade-deep: #4c345d;
+  /* Дві фіолетові ноти іризуючої плівки на самому обідку. Блакитна й
+     тепла лишаються в обох темах: перелив із однієї родини — це вже не
+     мильна плівка, а фарба. */
+  --wl-bubble-film-edge: 210, 148, 255;
+  --wl-bubble-film-mid: 199, 148, 255;
+}
+
+[data-theme='light'] {
+  /*
+   * Кожне число нижче — той самий колір, повернутий за відтінком із
+   * 275° (фіолет) на 338° (троянда). Світлота й насиченість збережені
+   * до відсотка, тож жодна куля не стала темнішою чи блідішою — лише
+   * змінила родину, рівно так, як це робить `--accent` між темами.
+   */
+  --wl-bubble-ink: 138, 74, 99;
+  --wl-bubble-ink-soft: 130, 70, 94;
+  --wl-bubble-tint-medium: #c87896;
+  --wl-bubble-tint-low: #aa8794;
+  --wl-bubble-shade: #7c4f60;
+  --wl-bubble-shade-deep: #5d3443;
+  --wl-bubble-film-edge: 255, 148, 187;
+  --wl-bubble-film-mid: 255, 148, 184;
+}
+
 .wl-cloud-item::before,
 .wl-cloud-item::after {
   position: absolute;
@@ -51,7 +106,7 @@
     0 25px 50px color-mix(in srgb, var(--accent) 20%, transparent),
     0 9px 19px color-mix(in srgb, var(--text) 16%, transparent),
     inset 10px 12px 21px rgba(255, 255, 255, 0.52),
-    inset -14px -17px 27px rgba(71, 42, 91, 0.14),
+    inset -14px -17px 27px rgba(var(--wl-bubble-ink), 0.14),
     inset 0 0 0 1px rgba(255, 255, 255, 0.52),
     inset 0 0 22px color-mix(in srgb, var(--accent) 9%, transparent);
 }
@@ -87,7 +142,7 @@
   border-radius: inherit;
   background:
     radial-gradient(ellipse at 69% 89%, rgba(255, 255, 255, 0.5), transparent 24%),
-    radial-gradient(circle at 76% 69%, transparent 55%, rgba(66, 39, 85, 0.12) 76%, transparent 91%),
+    radial-gradient(circle at 76% 69%, transparent 55%, rgba(var(--wl-bubble-ink-soft), 0.12) 76%, transparent 91%),
     radial-gradient(circle, transparent 72%, rgba(255, 255, 255, 0.62) 91%, rgba(255, 255, 255, 0.15) 100%),
     linear-gradient(142deg, rgba(255, 255, 255, 0.2), transparent 37%);
   content: '';
@@ -99,7 +154,7 @@
     0 31px 62px color-mix(in srgb, var(--accent) 26%, transparent),
     0 11px 23px color-mix(in srgb, var(--text) 17%, transparent),
     inset 11px 13px 24px rgba(255, 255, 255, 0.55),
-    inset -15px -19px 29px rgba(71, 42, 91, 0.15),
+    inset -15px -19px 29px rgba(var(--wl-bubble-ink), 0.15),
     inset 0 0 0 1px rgba(255, 255, 255, 0.56),
     inset 0 0 26px color-mix(in srgb, var(--accent) 11%, transparent);
 }
@@ -114,7 +169,7 @@
     0 36px 70px color-mix(in srgb, var(--accent) 30%, transparent),
     0 13px 26px color-mix(in srgb, var(--text) 18%, transparent),
     inset 11px 13px 24px rgba(255, 255, 255, 0.58),
-    inset -15px -19px 29px rgba(71, 42, 91, 0.14),
+    inset -15px -19px 29px rgba(var(--wl-bubble-ink), 0.14),
     inset 0 0 0 1px rgba(255, 255, 255, 0.64),
     inset 0 0 28px color-mix(in srgb, var(--accent) 13%, transparent);
 }

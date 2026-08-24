@@ -14,7 +14,6 @@ interface WishlistBoardToolbarProps {
   counts: Record<WishlistPriorityFilter, number>;
   resultCount: number;
   onChange: (value: WishlistBoardViewState) => void;
-  onPolaroidReshuffle: () => void;
 }
 
 const PRIORITY_FILTERS: Array<{
@@ -37,8 +36,7 @@ const VIEW_MODES: Array<{
   Icon: WishIconComponent;
 }> = [
   { value: 'bubbles', label: 'Бульбашки', description: 'Жива хмара мрій', Icon: WISH_VIEW_ICON.bubbles },
-  { value: 'feed', label: 'Стрічка', description: 'Фото й деталі в ряд', Icon: WISH_VIEW_ICON.feed },
-  { value: 'polaroid', label: 'Полароїд', description: 'Закріплені фото', Icon: WISH_VIEW_ICON.polaroid },
+  { value: 'grid', label: 'Список', description: 'Фото, назва й ціна', Icon: WISH_VIEW_ICON.grid },
 ];
 
 const DEFAULT_PRIORITY_FILTER = PRIORITY_FILTERS[0]!;
@@ -48,7 +46,6 @@ export function WishlistBoardToolbar({
   counts,
   resultCount,
   onChange,
-  onPolaroidReshuffle,
 }: WishlistBoardToolbarProps) {
   const panelId = useId();
   const [open, setOpen] = useState(false);
@@ -61,7 +58,6 @@ export function WishlistBoardToolbar({
   };
 
   const selectView = (view: WishlistViewMode) => {
-    if (view === 'polaroid') onPolaroidReshuffle();
     onChange({ ...value, view });
   };
 

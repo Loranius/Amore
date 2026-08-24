@@ -76,20 +76,20 @@
   margin-top: 22px;
 }
 
-.wl-archive-page-header {
-  position: relative;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+/* Шапка архіву — рівно два керма.
+   ------------------------------------------------------------
+   Тут стояло три блоки, які казали одне: заголовок «Подаровані
+   спогади», під ним картка «4 подаровані спогади» з датою, під нею
+   другий вибір вигляду (перший лишався від активних мрій вище).
+   Пара гортала службовий текст, щоб дійти до самих спогадів.
+   Лишилось те, що справді керує: повернення й «давній подарунок»
+   (ADR-0056). */
+.wl-archive-topbar {
+  display: flex;
   align-items: center;
-  gap: 22px;
-  padding: clamp(22px, 4vw, 38px);
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--wl-memory-accent) 20%, transparent);
-  border-radius: clamp(var(--radius-xl), 4vw, var(--radius-dock));
-  background:
-    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--wl-memory-accent) 18%, transparent), transparent 33%),
-    linear-gradient(135deg, color-mix(in srgb, var(--wl-memory-accent) 11%, var(--surface)), var(--surface));
-  box-shadow: 0 24px 56px rgba(4, 2, 10, 0.55);
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .wl-archive-back {
@@ -109,63 +109,12 @@
   cursor: pointer;
 }
 
-.wl-archive-page-copy {
-  min-width: 0;
-  text-align: center;
-}
-
-.wl-archive-page-eyebrow {
-  color: var(--wl-memory-accent);
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-}
-
-.wl-archive-page-copy h2 {
-  margin: 7px 0 5px;
-  color: var(--text);
-  font-size: clamp(30px, 5vw, 48px);
-  line-height: 1.04;
-  letter-spacing: -0.03em;
-  text-wrap: balance;
-}
-
-.wl-archive-page-copy p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.wl-archive-page-symbol {
-  display: grid;
-  width: 72px;
-  height: 72px;
-  place-items: center;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--surface) 65%, transparent);
-  box-shadow: 0 14px 30px color-mix(in srgb, var(--wl-memory-accent) 15%, transparent);
-  font-size: 34px;
-  transform: rotate(4deg);
-}
-
 .wl-archive-wrap--page .wl-archive-body {
   margin-top: 22px;
   padding: 0;
   border: 0;
   background: transparent;
   box-shadow: none;
-}
-
-.wl-archive-wrap--page .wl-archive-summary {
-  margin-bottom: 24px;
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--wl-memory-accent) 7%, var(--surface));
-}
-
-.wl-archive-wrap--page .wl-archive-timeline {
-  display: grid;
-  gap: 30px;
 }
 
 .wl-archive-wrap--page .wl-gift-memory-grid {
@@ -188,17 +137,10 @@
 }
 
 @media (max-width: 820px) {
-  .wl-archive-page-header {
-    grid-template-columns: 1fr auto;
-  }
 
   .wl-archive-back {
     grid-column: 1 / -1;
     justify-self: start;
-  }
-
-  .wl-archive-page-copy {
-    text-align: left;
   }
 
   .wl-archive-wrap--page .wl-gift-memory-grid {
@@ -215,21 +157,6 @@
   .wl-archive-entry-action {
     grid-column: 2;
     justify-self: start;
-  }
-
-  .wl-archive-page-header {
-    padding: 21px 18px;
-  }
-
-  .wl-archive-page-symbol {
-    width: 54px;
-    height: 54px;
-    border-radius: var(--radius-card);
-    font-size: 26px;
-  }
-
-  .wl-archive-page-copy h2 {
-    font-size: 32px;
   }
 
   .wl-archive-wrap--page .wl-gift-memory-media {

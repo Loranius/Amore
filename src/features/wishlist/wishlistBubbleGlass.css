@@ -62,8 +62,8 @@
       color-mix(in srgb, var(--wl-glass-tint) 5%, white) 0%,
       color-mix(in srgb, var(--wl-glass-tint) 17%, white) 32%,
       color-mix(in srgb, var(--wl-glass-tint) 38%, white) 64%,
-      color-mix(in srgb, var(--wl-glass-tint) 60%, #694f7c) 90%,
-      color-mix(in srgb, var(--wl-glass-tint) 70%, #4c345d) 100%
+      color-mix(in srgb, var(--wl-glass-tint) 60%, var(--wl-bubble-shade)) 90%,
+      color-mix(in srgb, var(--wl-glass-tint) 70%, var(--wl-bubble-shade-deep)) 100%
     );
   box-shadow:
     /* контактна тінь — бульбашка стоїть над сторінкою, а не в ній */
@@ -147,13 +147,13 @@
   border-radius: 50%;
   background: conic-gradient(
     from var(--wl-film-angle, 218deg),
-    rgba(210, 148, 255, 0.9),
+    rgba(var(--wl-bubble-film-edge), 0.9),
     rgba(255, 255, 255, 0.14) 13%,
     rgba(138, 206, 255, 0.85) 29%,
     rgba(255, 255, 255, 0.12) 45%,
-    rgba(199, 148, 255, 0.74) 61%,
+    rgba(var(--wl-bubble-film-mid), 0.74) 61%,
     rgba(255, 224, 158, 0.62) 79%,
-    rgba(210, 148, 255, 0.9)
+    rgba(var(--wl-bubble-film-edge), 0.9)
   );
   box-shadow: none;
   content: '';
@@ -206,8 +206,8 @@
     color-mix(in srgb, var(--wl-glass-tint) 5%, white) 0%,
     color-mix(in srgb, var(--wl-glass-tint) 17%, white) 32%,
     color-mix(in srgb, var(--wl-glass-tint) 38%, white) 64%,
-    color-mix(in srgb, var(--wl-glass-tint) 58%, #694f7c) 92%,
-    color-mix(in srgb, var(--wl-glass-tint) 68%, #4c345d) 100%
+    color-mix(in srgb, var(--wl-glass-tint) 58%, var(--wl-bubble-shade)) 92%,
+    color-mix(in srgb, var(--wl-glass-tint) 68%, var(--wl-bubble-shade-deep)) 100%
   );
 }
 

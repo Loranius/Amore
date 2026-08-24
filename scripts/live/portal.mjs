@@ -438,6 +438,116 @@ export async function probeSelectors(page, selectors) {
 }
 
 /**
+ * Колір елемента — числом, а не оком.
+ *
+ * Це існує тому, що око вже помилялось: бузкову кнопку в світлій темі
+ * я двічі оголосив «рожевою» на знімку й один раз — «фіолетовою», не
+ * маючи жодного числа. `--probe` міряє геометрію, і поки колір міряти
+ * було нічим, кожен висновок про тему був здогадом.
+ *
+ * Повертає чорнило, тло під ним (перше НЕпрозоре вгору по предках) і
+ * контраст між ними за WCAG — тобто рівно те, чим тема або доводиться,
+ * або спростовується.
+ */
+export async function probeInk(page, selectors) {
+  if (selectors.length === 0) return {};
+  return page.evaluate((list) => {
+    /*
+     * Тільки `rgb()`/`rgba()`. Перша редакція брала будь-які числа з
+     * рядка — і на `color-mix(in srgb, …)`, який Chromium подеколи не
+     * згортає, вигрібала «82» з відсотка й звітувала майже чорне
+     * чорнило там, де воно рожеве. Невідома форма має СКАЗАТИ, що вона
+     * невідома, а не вгадатись.
+     */
+    const parse = (value) => {
+      const text = value.trim();
+      const rgb = /^rgba?\(([^)]+)\)/.exec(text);
+      if (rgb) {
+        const nums = (rgb[1].match(/[\d.]+/g) ?? []).map(Number);
+        if (nums.length < 3) return null;
+        return { r: nums[0], g: nums[1], b: nums[2], a: nums.length > 3 ? nums[3] : 1 };
+      }
+      /*
+       * `color(srgb r g b)` — саме цю форму Chromium повертає для
+       * `color-mix(in srgb, …)`, а портал будує нею майже кожен колір
+       * модуля. Канали тут 0…1, не 0…255.
+       */
+      const srgb = /^color\(srgb ([^)]+)\)/.exec(text);
+      if (srgb) {
+        const nums = (srgb[1].match(/[\d.]+/g) ?? []).map(Number);
+        if (nums.length < 3) return null;
+        return {
+          r: nums[0] * 255,
+          g: nums[1] * 255,
+          b: nums[2] * 255,
+          a: nums.length > 3 ? nums[3] : 1,
+        };
+      }
+      return null;
+    };
+
+    const opaqueBehind = (node) => {
+      let current = node;
+      while (current) {
+        const colour = parse(getComputedStyle(current).backgroundColor);
+        if (colour && colour.a >= 0.95) return colour;
+        current = current.parentElement;
+      }
+      return { r: 255, g: 255, b: 255, a: 1 };
+    };
+
+    const channel = (value) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = ({ r, g, b }) =>
+      0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
+    const hex = ({ r, g, b }) =>
+      `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+
+    /** Відтінок у градусах: саме він відрізняє фіолет від троянди. */
+    const hue = ({ r, g, b }) => {
+      const [R, G, B] = [r / 255, g / 255, b / 255];
+      const max = Math.max(R, G, B);
+      const min = Math.min(R, G, B);
+      const d = max - min;
+      if (d === 0) return null;
+      let h;
+      if (max === R) h = ((G - B) / d) % 6;
+      else if (max === G) h = (B - R) / d + 2;
+      else h = (R - G) / d + 4;
+      return Math.round(((h * 60) + 360) % 360);
+    };
+
+    const result = {};
+    for (const selector of list) {
+      const node = document.querySelector(selector);
+      if (!node) {
+        result[selector] = null;
+        continue;
+      }
+      const raw = getComputedStyle(node).color;
+      const ink = parse(raw);
+      if (!ink) {
+        result[selector] = { unresolved: raw };
+        continue;
+      }
+      const back = opaqueBehind(node);
+      const light = luminance(ink);
+      const dark = luminance(back);
+      const ratio = (Math.max(light, dark) + 0.05) / (Math.min(light, dark) + 0.05);
+      result[selector] = {
+        ink: hex(ink),
+        inkHue: hue(ink),
+        background: hex(back),
+        contrast: Math.round(ratio * 100) / 100,
+      };
+    }
+    return result;
+  }, selectors);
+}
+
+/**
  * Тап по КООРДИНАТІ, а не по селектору.
  *
  * Для сцени це єдиний спосіб: зірки живуть у полотні, і селектора в них немає.

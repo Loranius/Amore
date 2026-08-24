@@ -1,23 +1,22 @@
-import type { WishlistArchiveViewMode } from './wishlistArchiveView';
+import type { WishlistViewMode } from './wishlistBoardView';
 import { WISH_VIEW_ICON, type WishIconComponent } from '@/components/icons/WishIcon';
 import { CheckIcon } from '@/components/icons/UiIcon';
 
 interface WishlistArchiveViewPickerProps {
-  value: WishlistArchiveViewMode;
-  onChange: (value: WishlistArchiveViewMode) => void;
+  value: WishlistViewMode;
+  onChange: (value: WishlistViewMode) => void;
 }
 
 // Значки — з тієї самої таблиці, що й у панелі дошки: це той самий
 // вибір вигляду, лише над архівом замість активних мрій.
 const MODES: Array<{
-  value: WishlistArchiveViewMode;
+  value: WishlistViewMode;
   label: string;
   description: string;
   Icon: WishIconComponent;
 }> = [
   { value: 'bubbles', label: 'Бульбашки', description: 'Жива хмара спогадів', Icon: WISH_VIEW_ICON.bubbles },
-  { value: 'feed', label: 'Стрічка', description: 'Фото та деталі в ряд', Icon: WISH_VIEW_ICON.feed },
-  { value: 'polaroid', label: 'Полароїд', description: 'Закріплені фотографії', Icon: WISH_VIEW_ICON.polaroid },
+  { value: 'grid', label: 'Список', description: 'Фото, назва й ціна', Icon: WISH_VIEW_ICON.grid },
 ];
 
 export function WishlistArchiveViewPicker({

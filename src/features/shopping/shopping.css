@@ -328,20 +328,35 @@
   animation: shopping-section-in .22s ease both;
 }
 
+/*
+ * Заголовок групи стоїть на тій самій осі, що й рядки під ним.
+ *
+ * Порахована геометрія до зміни: кружечок «куплено» в рядку має центр за
+ * 26.5px від краю картки (10px паддінга списку + 2px рядка + півширини
+ * 29px), кнопка кошика — за 28px від правого. А в заголовку значок
+ * категорії стояв на 31px, лічильник на 27px. Тобто три елементи, які
+ * око читає як один стовпчик, лежали на трьох різних вертикалях, і
+ * найпомітніше це було біля круглих кутів картки.
+ *
+ * Колонка тепер 29px — рівно як кружечок, — а плитка значка ширша за неї
+ * й центрується (`justify-self: center`), тож вилазить симетрично й
+ * центр лишається на осі.
+ */
 .shopping-group-head {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-columns: 29px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
-  padding: 11px 13px 9px;
+  padding: 11px 12px 9px;
   border-bottom: 1px solid color-mix(in srgb, var(--shopping-category) 10%, transparent);
   background: linear-gradient(90deg, color-mix(in srgb, var(--shopping-category) 6%, var(--surface)), var(--surface) 66%);
 }
 
 .shopping-group-icon {
   display: grid;
-  width: 36px;
-  height: 36px;
+  justify-self: center;
+  width: 34px;
+  height: 34px;
   place-items: center;
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--shopping-category) 12%, var(--surface));
@@ -358,10 +373,12 @@
   letter-spacing: -.01em;
 }
 
+/* 32px — рівно як кнопка кошика в рядку, тож центри збігаються (28px від
+   правого краю в обох). */
 .shopping-group-count {
   display: grid;
-  min-width: 28px;
-  height: 28px;
+  min-width: 32px;
+  height: 32px;
   place-items: center;
   border-radius: 50%;
   background: color-mix(in srgb, var(--shopping-category) 10%, var(--surface));

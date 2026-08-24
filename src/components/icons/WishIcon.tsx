@@ -97,8 +97,14 @@ export const WISH_ALL_ICON: WishIconComponent = LayersIcon;
  * «Стрічка» бере той самий список, що в «Спогадах» і календарі: це той
  * самий вигляд, і власний значок тут лише навчив би читати його вдруге.
  */
+/*
+ * Два вигляди вішліста, два значки.
+ *
+ * `feed` і `polaroid` жили тут, поки виглядів було три; вони показували
+ * те саме різними обгортками (ADR-0056). `PolaroidIcon` лишається в
+ * наборі — його носять «Спогади».
+ */
 export const WISH_VIEW_ICON = {
   bubbles: BubblesIcon,
-  feed: ListIcon,
-  polaroid: PolaroidIcon,
-} satisfies Record<'bubbles' | 'feed' | 'polaroid', WishIconComponent>;
+  grid: ListIcon,
+} satisfies Record<'bubbles' | 'grid', WishIconComponent>;

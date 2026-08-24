@@ -18,8 +18,7 @@ import {
   type WishlistVisibilityMode,
 } from './WishlistWorldNav';
 import { useDimmedWorld } from '@/features/world/worldDim';
-import { WishlistFeedView } from './WishlistFeedView';
-import { WishlistPolaroidView } from './WishlistPolaroidView';
+import { WishlistGridView } from './WishlistGridView';
 import { WishFormModal } from './WishFormModal';
 import { MoveWishModal } from './MoveWishModal';
 import { GiftCompletionModal, type GiftCompletionDraft } from './GiftCompletionModal';
@@ -46,7 +45,6 @@ import {
   wishlistPriorityFilterCounts,
   type WishlistBoardViewState,
 } from './wishlistBoardView';
-import { freshWishlistPolaroidSeed } from './wishlistPolaroidLayout';
 import { partnerGenitive } from './partnerLabel';
 import { useQuickWishlistCompletion } from './useQuickWishlistCompletion';
 import { useWishlistViewPreference } from './useWishlistViewPreference';
@@ -82,7 +80,6 @@ import { HeartIcon } from '@/components/icons/NavIcon';
 
 type Tab = 'me' | 'partner' | 'shared';
 type BoardViews = Record<Tab, WishlistBoardViewState>;
-type PolaroidSeeds = Record<Tab, number>;
 
 function requestedTab(value: string | null): Tab {
   return value === 'partner' || value === 'shared' ? value : 'me';
@@ -99,14 +96,6 @@ function initialBoardViews(): BoardViews {
     me: { ...DEFAULT_WISHLIST_BOARD_VIEW },
     partner: { ...DEFAULT_WISHLIST_BOARD_VIEW },
     shared: { ...DEFAULT_WISHLIST_BOARD_VIEW },
-  };
-}
-
-function initialPolaroidSeeds(): PolaroidSeeds {
-  return {
-    me: freshWishlistPolaroidSeed(),
-    partner: freshWishlistPolaroidSeed(),
-    shared: freshWishlistPolaroidSeed(),
   };
 }
 
@@ -182,7 +171,6 @@ export function WishlistPage() {
   const [partnerFilter, setPartnerFilter] = useState<PartnerWishFilter>('available');
   const [sharedFilter, setSharedFilter] = useState<SharedWishFilter>('all');
   const [boardViews, setBoardViews] = useState<BoardViews>(initialBoardViews);
-  const [polaroidSeeds, setPolaroidSeeds] = useState<PolaroidSeeds>(initialPolaroidSeeds);
   const [preferredView, setPreferredView] = useWishlistViewPreference(tab);
   const actionLock = useRef(false);
 
@@ -445,13 +433,6 @@ export function WishlistPage() {
     if (nextView.view !== preferredView) setPreferredView(nextView.view);
   };
 
-  const reshufflePolaroids = () => {
-    setPolaroidSeeds((current) => ({
-      ...current,
-      [tab]: freshWishlistPolaroidSeed(),
-    }));
-  };
-
   const sharedViewProps = {
     items: visibleItems,
     busy: mutationBusy,
@@ -515,7 +496,6 @@ export function WishlistPage() {
             counts={boardFilterCounts}
             resultCount={visibleItems.length}
             onChange={changeBoardView}
-            onPolaroidReshuffle={reshufflePolaroids}
           />
         )}
       </div>
@@ -545,6 +525,13 @@ export function WishlistPage() {
           focusWishId={archiveFocusWishId}
           open
           onOpenChange={setArchiveOpen}
+          view={activeBoardView.view}
+          onViewChange={(view) => changeBoardView({ ...activeBoardView, view })}
+          /* У світі перемикач вигляду вже стоїть в аркуші (WishlistWorldNav)
+             — другий, власний архівний, і був тим дублюванням. Без світу
+             панель дошки при відкритому архіві ховається, тож перемикач
+             лишається тільки тут. */
+          showViewPicker={!worldVisible}
         />
       ) : (
         <>
@@ -625,13 +612,8 @@ export function WishlistPage() {
                     <p className="empty-state">Твій список порожній. Час додати нову забаганку.</p>
                   )}
                 </div>
-              ) : activeBoardView.view === 'feed' ? (
-                <WishlistFeedView {...sharedViewProps} />
-              ) : activeBoardView.view === 'polaroid' ? (
-                <WishlistPolaroidView
-                  {...sharedViewProps}
-                  seed={polaroidSeeds[tab]}
-                />
+              ) : activeBoardView.view === 'grid' ? (
+                <WishlistGridView {...sharedViewProps} />
               ) : (
                 // Сфери — головна мова вішліста, поки маршрут показує світ.
                 // Без світу лишаються бульбашки: вони не потребують ані
@@ -639,7 +621,7 @@ export function WishlistPage() {
                 worldVisible ? (
                   <WishlistSphereView
                     {...sharedViewProps}
-                    onShowAll={() => changeBoardView({ ...activeBoardView, view: 'feed' })}
+                    onShowAll={() => changeBoardView({ ...activeBoardView, view: 'grid' })}
                   />
                 ) : (
                   <WishlistBubbleView {...sharedViewProps} />
@@ -656,6 +638,9 @@ export function WishlistPage() {
                   focusWishId={archiveFocusWishId}
                   open={false}
                   onOpenChange={setArchiveOpen}
+                  view={activeBoardView.view}
+                  onViewChange={(view) => changeBoardView({ ...activeBoardView, view })}
+                  showViewPicker={!worldVisible}
                 />
               )}
             </>

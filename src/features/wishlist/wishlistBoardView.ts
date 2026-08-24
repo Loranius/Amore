@@ -2,7 +2,16 @@ import type { WishlistItemV3 } from './wishlistRpc';
 
 export type WishlistPriorityFilter = 'all' | 'high' | 'medium' | 'low';
 export type WishlistSort = 'newest' | 'priority' | 'price';
-export type WishlistViewMode = 'bubbles' | 'feed' | 'polaroid';
+/*
+ * Два вигляди, не три.
+ *
+ * Було `bubbles | feed | polaroid`. Полароїд і стрічка показували те
+ * саме різними обгортками, і жодна з них не давала того, заради чого
+ * список узагалі відкривають: фото, назву й ціну поруч, кілька штук на
+ * екран. Тепер саме це й робить `grid` — сітка 2×N за зразком галереї
+ * спогадів (ADR-0056).
+ */
+export type WishlistViewMode = 'bubbles' | 'grid';
 
 export interface WishlistBoardViewState {
   priority: WishlistPriorityFilter;

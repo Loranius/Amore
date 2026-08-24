@@ -1,7 +1,8 @@
 // ============================================================
 // Вибір вигляду дошки вішлиста — тонка обгортка над спільним механізмом
 // (`_shared/viewPreference`). Раніше вся логіка читання/запису жила тут
-// і майже дослівно повторювалась у `wishlistArchiveView.ts`.
+// і майже дослівно повторювалась в архіві, поки той тримав власний
+// вигляд. Тепер вигляд у вішліста один на всі екрани (ADR-0056).
 // Публічний API навмисно не змінився: `WishlistPage` не чіпаємо.
 // ============================================================
 import {
@@ -22,10 +23,12 @@ export const WISHLIST_VIEW_STORAGE_KEY = 'amore:wishlist:view-modes:v1';
 
 const CONFIG: ViewPreferenceConfig<WishlistViewMode> = {
   storageKey: WISHLIST_VIEW_STORAGE_KEY,
-  modes: ['bubbles', 'feed', 'polaroid'],
+  modes: ['bubbles', 'grid'],
   fallback: 'bubbles',
   // 'table' — назва вигляду до перейменування; збережені вибори лишились.
-  aliases: { table: 'feed' },
+  /* Старі режими не скидаються, а переводяться: пара вже зробила вибір
+     (ADR-0056). */
+  aliases: { table: 'grid', feed: 'grid', polaroid: 'grid' },
 };
 
 export const DEFAULT_WISHLIST_VIEW_PREFERENCES: WishlistViewPreferences = {
