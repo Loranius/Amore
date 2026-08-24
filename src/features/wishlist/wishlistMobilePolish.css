@@ -118,11 +118,6 @@
     min-height: 108px;
   }
 
-  .wishlist .gift-memory-close {
-    width: 44px;
-    height: 44px;
-  }
-
   .wishlist .wl-move-options {
     grid-template-columns: 1fr;
   }
@@ -142,10 +137,30 @@
     padding-top: 0;
   }
 
+  /*
+   * Аркуш заввишки з вміст, а не з екран.
+   *
+   * Тут стояло `height: 100dvh`, і це не те саме, що `max-height`: аркуш
+   * розтягувався на весь екран НЕЗАЛЕЖНО від того, скільки в ньому
+   * вмісту. На знімку власника «Нове бажання» під кнопками «Скасувати» й
+   * «Створити бажання» лишалась порожня смуга висотою мало не з чверть
+   * екрана — сам аркуш, якому нічим було її зайняти.
+   *
+   * Тепер аркуш притиснутий донизу й росте вгору рівно настільки,
+   * наскільки треба; стеля лишається — 100dvh. Коли пара розкриє фото й
+   * додаткові деталі, він дійде до неї, і виглядатиме як раніше.
+   *
+   * `.wl-move-sheet` нижче вже жив за цим правилом (`height: auto`) — і
+   * саме тому саме він єдиний із вішлістових аркушів не мав цієї смуги.
+   */
+  .wishlist .modal-overlay {
+    align-items: flex-end;
+  }
+
   .wishlist .modal-sheet {
-    height: 100dvh;
+    height: auto;
     max-height: 100dvh;
-    border-radius: 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     padding-top: max(20px, env(safe-area-inset-top));
   }
 

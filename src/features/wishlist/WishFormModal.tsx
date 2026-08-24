@@ -5,6 +5,7 @@
 // вставлене прямим URL або завантажене з пристрою.
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { useQueryClient } from '@tanstack/react-query';
 import { normalizeToPreview } from '@/lib/images';
 import {
@@ -526,15 +527,7 @@ export function WishFormModal({
         aria-describedby="wish-modal-description"
         aria-busy={saving}
       >
-        <button
-          type="button"
-          className="gift-memory-close"
-          aria-label="Закрити"
-          disabled={saving}
-          onClick={requestClose}
-        >
-          <CloseIcon size={22} />
-        </button>
+        <ModalClose onClose={requestClose} disabled={saving} />
 
         <div className="wm-form-heading">
           <span className="wm-form-eyebrow">Wishlist</span>

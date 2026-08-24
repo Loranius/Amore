@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { normalizeToPreview } from '@/lib/images';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -166,15 +167,7 @@ export function ArchiveGiftFormModal({
         aria-labelledby="archive-gift-modal-title"
         aria-busy={saving}
       >
-        <button
-          type="button"
-          className="gift-memory-close"
-          aria-label="Закрити"
-          disabled={saving}
-          onClick={onClose}
-        >
-          ×
-        </button>
+        <ModalClose onClose={onClose} disabled={saving} />
 
         <div className="wm-form-heading wl-archive-gift-heading">
           <span className="wm-form-eyebrow">Архів подарунків</span>

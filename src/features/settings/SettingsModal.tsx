@@ -8,6 +8,7 @@
 // підхоплює нове.
 // ============================================================
 import { useEffect, useState, type ChangeEvent, type DragEvent } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { useAuth, useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useUsers } from '@/features/_shared/useUsers';
@@ -54,6 +55,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         aria-modal="true"
         aria-label="Налаштування"
       >
+        <ModalClose onClose={onClose} />
         <h2 className="modal-title">Налаштування</h2>
         {user && <p className="modal-sub">Профіль: {user.name}</p>}
 

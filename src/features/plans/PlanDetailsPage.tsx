@@ -16,6 +16,7 @@
 // кроки → пов'язане), права про забезпечення (бюджет → місця → стан).
 // ============================================================
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import {
@@ -595,6 +596,7 @@ function MapSheet({ title, copy, onClose, children }: {
     >
       <div className="modal-sheet plan-detail-sheet" role="dialog" aria-modal="true" aria-label={title}>
         <span className="plan-detail-sheet-handle" aria-hidden="true" />
+        <ModalClose onClose={onClose} />
         <h2 className="modal-title">{title}</h2>
         <p className="plan-detail-sheet-copy">{copy}</p>
         {children}

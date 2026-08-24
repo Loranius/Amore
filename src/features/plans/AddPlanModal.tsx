@@ -5,6 +5,7 @@
 // окремо, тому форма не перетворюється на анкету.
 // ============================================================
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { CheckIcon, ChevronDownIcon, CloseIcon } from '@/components/icons/UiIcon';
 import { CameraIcon } from '@/components/icons/NavIcon';
 import { PLAN_CATEGORIES, PLAN_CATEGORY_ORDER } from './planConstants';
@@ -92,6 +93,8 @@ export function AddPlanModal({
         aria-labelledby="plan-create-title"
         style={style}
       >
+        {/* Хрестик спільний на обидві гілки — форму й екран успіху. */}
+        <ModalClose onClose={requestClose} disabled={busy} />
         {createdPlanId === null ? (
           <form
             className="plan-create-form"

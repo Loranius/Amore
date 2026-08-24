@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { useToast } from '@/providers/ToastProvider';
 import { WishFormModal } from './WishFormModal';
 import type { WishFormPayload } from './useWishlist';
@@ -61,9 +62,7 @@ export function ArchiveWishEditModal({
         }}
       >
         <div className="modal-sheet wl-archive-edit-state" role="alert">
-          <button type="button" className="gift-memory-close" aria-label="Закрити" onClick={onClose}>
-            ×
-          </button>
+          <ModalClose onClose={onClose} />
           <strong>Не вдалося відкрити бажання</strong>
           <p>Онови архів і спробуй ще раз.</p>
           <button type="button" className="btn-secondary" onClick={() => void query.refetch()}>

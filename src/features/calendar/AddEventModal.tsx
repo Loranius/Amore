@@ -21,6 +21,7 @@
 // у формі був лише обіцянкою, яку форма не виконує.
 // ============================================================
 import { useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import type { ReactNode } from 'react';
 import { useUsers } from '@/features/_shared/useUsers';
 import { useEvents } from '@/features/_shared/events';
@@ -52,6 +53,7 @@ function ModalShell({ children, onClose }: {
         aria-modal="true"
         aria-labelledby="cal-entry-title"
       >
+        <ModalClose onClose={onClose} />
         {children}
       </div>
     </div>

@@ -1012,6 +1012,8 @@ textarea::placeholder {
    */
   --sheet-pad: 22px;
   padding: var(--sheet-pad);
+  /* Точка відліку для `.modal-close` — див. його правило нижче. */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1037,6 +1039,77 @@ textarea::placeholder {
  * бажання — це повноекранний аркуш із дисплейною назвою на Fredoka
  * 26–32px, і його правило специфічніше за це.
  */
+/*
+ * Хрестик у правому верхньому куті аркуша — один на портал.
+ *
+ * Рецепт узятий із редагування покупки, і саме на нього вказав власник:
+ * коло 38px, тиха заливка, справжній значок замість текстового «×».
+ * Вішліст носив свій варіант (квадрат 40px із рамкою й гліфом 25px), а
+ * дванадцять модалок не мали хрестика ВЗАГАЛІ — там єдиним виходом
+ * угорі був тап повз аркуш, жест, якого ніхто не показував.
+ *
+ * `position: absolute` — щоб кут не залежав від того, що в аркуші: у
+ * покупках хрестик був елементом шапки з `space-between`, і повторити
+ * це в дванадцяти чужих розкладках означало б переписати дванадцять
+ * розкладок.
+ *
+ * 16px, а не `--sheet-pad`: аркуші мають паддінг від 0 (деталі медіа) до
+ * 24 (редактор бажання), і хрестик, що їздить за ним, — це знову різні
+ * кути в різних модалках, тобто рівно те, що просили прибрати.
+ */
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 4;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  color: var(--text);
+  cursor: pointer;
+}
+
+/*
+ * Намальовано 38px, ловиться 44px.
+ *
+ * 38 — це розмір зразка, і міняти його не можна: власник вказав саме на
+ * нього. Але 38px — нижче за будь-який поріг дотику, і вішліст це вже
+ * знав: він піднімав свій хрестик до 44px на телефоні. Замість вибору
+ * між виглядом і влучанням кнопка отримує невидиме поле навколо себе.
+ */
+.modal-close::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+}
+
+.modal-close:hover { background: color-mix(in srgb, var(--text) 12%, var(--surface)); }
+.modal-close:active { translate: 0 1px; }
+.modal-close:disabled { cursor: default; opacity: .5; }
+
+/* Заголовок не заповзає під хрестик: 38px кнопки, 16px відступу справа
+   й 8px повітря між ними.
+   ------------------------------------------------------------
+   Шапки, названі по-своєму, перелічені поіменно навмисно. `*` тут
+   зачепив би й вміст, який стоїть НИЖЧЕ хрестика й місця під нього не
+   потребує, — а зайвий відступ у 62px на телефоні 412px це шоста
+   частина ширини. */
+.modal-sheet > .modal-title,
+.modal-sheet > * > .modal-title,
+.cal-entry-head,
+.plan-create-head,
+.media-search-modal-header,
+.rcp-view-card > .rcp-servings-line,
+.detail-modal > .detail-title {
+  padding-right: 62px;
+}
+
 .modal-title {
   margin: 0;
   font-size: 20px;

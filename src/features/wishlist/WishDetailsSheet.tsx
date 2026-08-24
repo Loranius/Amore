@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { createPortal } from 'react-dom';
 import { useUsersMap } from '@/features/_shared/useUsers';
 import {
@@ -223,15 +224,7 @@ export function WishDetailsSheet({
         onPointerDown={(event) => event.stopPropagation()}
       >
         <div className="wl-cloud-sheet-handle" aria-hidden="true" />
-        <button
-          type="button"
-          className="wl-cloud-sheet-close"
-          aria-label="Закрити деталі мрії"
-          onClick={onClose}
-          autoFocus
-        >
-          ×
-        </button>
+        <ModalClose onClose={onClose} label="Закрити деталі мрії" />
 
         <div className="wl-cloud-sheet-content">
           <div className="wl-cloud-sheet-top">

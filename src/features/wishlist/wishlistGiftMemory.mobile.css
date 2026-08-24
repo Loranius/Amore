@@ -8,32 +8,13 @@
   display: none;
 }
 
-.gift-memory-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 4;
-  display: grid;
-  width: 40px;
-  height: 40px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--muted);
-  font: inherit;
-  font-size: 25px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.gift-memory-close:disabled {
-  cursor: default;
-  opacity: 0.5;
-}
+/* `.gift-memory-close` жив тут: квадрат 40px із рамкою й текстовим «×»
+   на 25px. П'ять модалок вішліста носили його, решта порталу — або
+   круглий хрестик покупок, або жодного. Тепер усі носять `.modal-close`
+   (`index.css`). */
 
 .gift-memory-heading {
-  padding-right: 48px;
+  padding-right: 62px;
 }
 
 .gift-memory-preview video,
@@ -62,14 +43,9 @@
     background: color-mix(in srgb, var(--muted) 34%, transparent);
   }
 
-  .gift-memory-close {
-    top: 16px;
-    right: 12px;
-  }
-
   .gift-memory-heading {
     align-items: flex-start;
-    padding-right: 44px;
+    padding-right: 62px;
   }
 
   .gift-memory-wish strong {

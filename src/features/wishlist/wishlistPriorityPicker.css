@@ -77,6 +77,8 @@
 .wl-priority-picker-sheet {
   width: min(100%, 520px);
   max-height: min(82dvh, 620px);
+  /* Точка відліку для спільного `.modal-close`. */
+  position: relative;
   padding: 8px 14px max(18px, env(safe-area-inset-bottom));
   overflow-y: auto;
   border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--border));
@@ -104,7 +106,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 4px 2px 13px;
+  padding: 4px 56px 13px 2px;
 }
 
 .wl-priority-picker-eyebrow {
@@ -125,20 +127,8 @@
   line-height: 1.2;
 }
 
-.wl-priority-picker-close {
-  display: grid;
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  place-items: center;
-  padding: 0;
-  border: 1px solid color-mix(in srgb, var(--text) 9%, var(--surface-2));
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--muted);
-  font: 500 25px/1 system-ui, sans-serif;
-  cursor: pointer;
-}
+/* `.wl-priority-picker-close` жив тут — четвертий вигляд хрестика в
+   порталі. Тепер спільний `.modal-close` (ADR-0051). */
 
 .wl-priority-picker-options {
   display: grid;

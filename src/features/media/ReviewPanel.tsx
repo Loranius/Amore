@@ -5,6 +5,7 @@
 // підтягує його поточні значення.
 // ============================================================
 import { useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import type { MediaItemRow } from '@/types';
 import type { ReviewWho } from './useMedia';
 
@@ -42,6 +43,7 @@ export function ReviewPanel({ item, preselect = 'dima', onClose, onSave }: Revie
       }}
     >
       <div className="modal-sheet" role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} />
         <h2 className="modal-title">Відгук — {item.title}</h2>
 
         <div className="form-field">

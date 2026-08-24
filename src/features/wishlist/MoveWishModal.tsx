@@ -4,10 +4,11 @@
 // при повільній мережі або помилці користувач не втрачає контекст.
 // ============================================================
 import { useEffect, useRef } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { AppUser, WishlistItemRow } from '@/types';
 import { TogetherIcon } from '@/components/icons/WishIcon';
-import { CloseIcon, InboxIcon, SwapIcon, UserIcon } from '@/components/icons/UiIcon';
+import { InboxIcon, SwapIcon, UserIcon } from '@/components/icons/UiIcon';
 
 interface MoveWishModalProps {
   item: WishlistItemRow;
@@ -81,15 +82,7 @@ export function MoveWishModal({ item, partner, saving, onClose, onMove }: MoveWi
         aria-labelledby="move-wish-title"
         aria-busy={saving}
       >
-        <button
-          type="button"
-          className="gift-memory-close"
-          aria-label="Закрити"
-          disabled={saving}
-          onClick={onClose}
-        >
-          <CloseIcon size={17} />
-        </button>
+        <ModalClose onClose={onClose} disabled={saving} />
         <h2 id="move-wish-title" className="modal-title wl-move-title">
           <SwapIcon size={18} /> Перенести «{item.title}»
         </h2>

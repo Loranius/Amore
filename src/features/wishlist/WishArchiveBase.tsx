@@ -9,6 +9,7 @@ import {
   useState,
   type CSSProperties,
 } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { createPortal } from 'react-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useUsersMap } from '@/features/_shared/useUsers';
@@ -350,15 +351,7 @@ function ArchiveMemorySheet({
         onPointerDown={(event) => event.stopPropagation()}
       >
         <div className="wl-cloud-sheet-handle" aria-hidden="true" />
-        <button
-          type="button"
-          className="wl-cloud-sheet-close"
-          aria-label="Закрити спогад"
-          onClick={onClose}
-          autoFocus
-        >
-          ×
-        </button>
+        <ModalClose onClose={onClose} label="Закрити спогад" />
 
         <div className="wl-cloud-sheet-content">
           <div className="wl-cloud-sheet-top">

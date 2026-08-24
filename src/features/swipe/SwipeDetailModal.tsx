@@ -2,6 +2,7 @@
 // SwipeDetailModal — деталі картки свайпу + трейлер (порт openDetailModal)
 // ============================================================
 import { useEffect } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { useQuery } from '@tanstack/react-query';
 import { tmdbTrailer } from '@/lib/tmdb';
 import type { SwipeCard, SwipeType } from '@/types';
@@ -30,6 +31,7 @@ export function SwipeDetailModal({ card, type, onClose }: Props) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet detail-modal" role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} />
         {card.poster_path && <img className="detail-poster" src={card.poster_path} alt="" />}
         <h3 className="detail-title">{card.title}</h3>
         <div className="detail-meta">

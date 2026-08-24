@@ -5,6 +5,7 @@
 // показує денний кеш (без нового веб-пошуку), «Ще варіанти» — свіжий.
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { OBLASTS, readWhereToCache, writeWhereToCache } from './whereToConstants';
 import { useWhereToLocation, useSaveLocation, useEventsSearch } from './useWhereTo';
 import { Card } from '@/components/ui/Card';
@@ -285,6 +286,7 @@ function CityModal({
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet" role="dialog" aria-modal="true" aria-labelledby="wt-city-heading">
+        <ModalClose onClose={onClose} />
         <h2 className="modal-title" id="wt-city-heading">Де ви зараз?</h2>
         <p className="modal-sub">Місто вирішує, де шукати події. Область підставиться сама.</p>
 

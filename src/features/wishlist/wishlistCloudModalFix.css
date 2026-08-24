@@ -64,16 +64,8 @@ body.wl-cloud-sheet-open .bottom-nav {
   background: color-mix(in srgb, var(--text) 18%, transparent);
 }
 
-.wl-cloud-sheet-close {
-  top: 14px;
-  right: 14px;
-  width: 42px;
-  height: 42px;
-  border-color: rgba(255, 255, 255, 0.68);
-  background: color-mix(in srgb, var(--surface) 84%, transparent);
-  box-shadow: 0 8px 24px rgba(4, 2, 10, 0.48);
-  font-size: 22px;
-}
+/* Правки під `.wl-cloud-sheet-close` жили тут. Хрестик спільний
+   (`.modal-close` в `index.css`), і власних розмірів більше не має. */
 
 .wl-cloud-sheet-content {
   display: grid;
@@ -245,11 +237,6 @@ body.wl-cloud-sheet-open .bottom-nav {
 
   .wl-cloud-sheet-handle {
     display: none;
-  }
-
-  .wl-cloud-sheet-close {
-    top: 18px;
-    right: 18px;
   }
 
   .wl-cloud-sheet-content {

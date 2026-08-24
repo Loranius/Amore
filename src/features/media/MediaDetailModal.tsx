@@ -5,6 +5,7 @@
 // лише за кліком (не автозавантаження). Відгуки — з рядка item.
 // ============================================================
 import { useEffect, useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { FilmIcon } from '@/components/icons/NavIcon';
 import { PencilIcon, PlayIcon } from '@/components/icons/UiIcon';
 import { useTmdbDetails } from './useTmdb';
@@ -40,6 +41,7 @@ export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetai
       }}
     >
       <div className="modal-sheet media-detail-modal" role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} />
         <div className="media-detail-backdrop">
           {details?.backdrop && <img className="media-detail-backdrop-img" src={details.backdrop} alt="" />}
           <div className="media-detail-hero">

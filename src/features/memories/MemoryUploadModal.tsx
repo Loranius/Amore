@@ -7,6 +7,7 @@
 // поставити старе фото в правильне місце хронології.
 // ============================================================
 import { useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { todayISO } from '@/lib/utils';
 import { normalizeMemoryDate, formatMemoryDate } from './memoriesDate';
 import type { UploadMemoryInput } from './useMemories';
@@ -75,6 +76,7 @@ export function MemoryUploadModal({
   return (
     <div className="modal-overlay" onClick={(e) => { if (e.target === e.currentTarget && !busy) close(); }}>
       <div className="modal-sheet" role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} />
         <h2 className="modal-title">{title}</h2>
         {description && <p className="mem-upload-context">{description}</p>}
 

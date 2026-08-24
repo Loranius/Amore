@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { createPortal } from 'react-dom';
 import './wishlistPriorityPicker.css';
 import { WISH_PRIORITY_ICON, type WishIconComponent } from '@/components/icons/WishIcon';
@@ -132,14 +133,7 @@ export function WishlistPriorityPicker({
             <span className="wl-priority-picker-eyebrow">Вага мрії</span>
             <h3 id={titleId}>Оберіть розмір бульбашки</h3>
           </div>
-          <button
-            type="button"
-            className="wl-priority-picker-close"
-            aria-label="Закрити вибір пріоритету"
-            onClick={() => close(true)}
-          >
-            ×
-          </button>
+          <ModalClose onClose={() => close(true)} label="Закрити вибір пріоритету" />
         </div>
 
         <div className="wl-priority-picker-options" role="radiogroup" aria-labelledby={titleId}>

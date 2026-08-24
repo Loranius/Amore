@@ -283,24 +283,8 @@
   background: color-mix(in srgb, var(--text) 18%, transparent);
 }
 
-.wl-cloud-sheet-close {
-  position: absolute;
-  z-index: 5;
-  top: 18px;
-  right: 18px;
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.48);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--surface) 76%, transparent);
-  color: var(--text);
-  font: 800 18px/1 system-ui, sans-serif;
-  box-shadow: 0 8px 22px rgba(4, 2, 10, 0.48);
-  cursor: pointer;
-}
+/* `.wl-cloud-sheet-close` жив тут — 42px коло з білою рамкою. Тепер
+   спільний `.modal-close` (ADR-0051). */
 
 .wl-cloud-sheet-hero {
   display: grid;

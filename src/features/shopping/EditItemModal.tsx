@@ -6,8 +6,8 @@
 // ============================================================
 import { useState } from 'react';
 import { SHOPPING_CATEGORIES } from '@/app/constants';
-import { CloseIcon } from '@/components/icons/UiIcon';
 import { toShoppingCategory } from '@/lib/guards';
+import { ModalClose } from '@/components/ui/ModalClose';
 import type { ShoppingItemRow, ShoppingCategory } from '@/types';
 
 interface EditItemModalProps {
@@ -45,14 +45,21 @@ export function EditItemModal({ item, onClose, onSave }: EditItemModalProps) {
         aria-modal="true"
         aria-labelledby="shopping-edit-title"
       >
+        {/*
+          * Хрестик переїхав у спільний компонент.
+          *
+          * Саме цей вигляд власник назвав зразком для всього порталу, тож
+          * рецепт тепер живе в `index.css`, а не в стилях покупок. Тут він
+          * лише виїхав із шапки в кут аркуша: у потоці він тримався
+          * `justify-content: space-between`, а повторити це в дванадцяти
+          * чужих розкладках було нічим.
+          */}
+        <ModalClose onClose={onClose} />
         <header className="shopping-edit-head">
           <div>
             <small>Покупка</small>
             <h2 id="shopping-edit-title">Редагувати товар</h2>
           </div>
-          <button type="button" className="shopping-edit-close" onClick={onClose} aria-label="Закрити">
-            <CloseIcon size={19} />
-          </button>
         </header>
 
         <form

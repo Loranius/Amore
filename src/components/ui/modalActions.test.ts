@@ -248,3 +248,76 @@ describe('паддінг аркуша названий, а не вписаний
     expect(offenders, 'ці аркуші міняють паддінг, не назвавши --sheet-pad').toEqual([]);
   });
 });
+
+// ============================================================
+// Хрестик — один на всі модалки.
+// ------------------------------------------------------------
+// Стан до зміни: `shopping-edit-close` (коло 38px), `gift-memory-close`
+// (квадрат 40px, текстовий «×») у п'яти модалках вішліста, і ЖОДНОГО
+// хрестика в дванадцяти інших. Власник указав на перший і попросив його
+// скрізь (ADR-0051).
+// ============================================================
+
+/** Модалки, у яких хрестика немає навмисно. */
+const NO_CLOSE_EXCEPTIONS = [
+  // Підтвердження — це питання з двома відповідями. Третя кнопка, яка
+  // не значить ні «так», ні «ні», робить діалог двозначним саме там, де
+  // двозначність найдорожча: перед видаленням.
+  'providers/ConfirmProvider.tsx',
+];
+
+describe('хрестик модалки', () => {
+  it('рецепт живе в index.css, а не в модулях', () => {
+    const body = ruleBody(readFileSync(INDEX_CSS, 'utf8'), '.modal-close');
+    expect(body, '.modal-close мусить мати правило').not.toBeNull();
+    expect(body).toMatch(/position:\s*absolute/);
+    expect(body).toMatch(/width:\s*38px/);
+    expect(body).toMatch(/border-radius:\s*50%/);
+  });
+
+  it('модулі не тримають власних хрестиків', () => {
+    /*
+     * Два словники вже розійшлись одного разу. Клас із власною назвою —
+     * це нова гілка, яка сьогодні виглядає так само, а завтра ні.
+     */
+    const cssFiles: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(dir)) {
+        const full = join(dir, entry);
+        if (statSync(full).isDirectory()) walk(full);
+        else if (entry.endsWith('.css')) cssFiles.push(full);
+      }
+    };
+    walk(FEATURES);
+
+    const offenders: string[] = [];
+    for (const file of cssFiles) {
+      const clean = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      for (const match of clean.matchAll(/\.([a-z0-9-]*-close)\s*[,{]/g)) {
+        const name = match[1]!;
+        // Хрестики поза модалками — це інші речі: закрити повноекранну
+        // карту, згорнути панель шляху, вийти з меню «Ще».
+        if (['modal-close', 'wt-embed-close', 'jn-details-close', 'more-menu-close', 'wl-lb-close'].includes(name)) continue;
+        offenders.push(`${rel(file)} — .${name}`);
+      }
+    }
+    expect([...new Set(offenders)], 'модалка завела власний хрестик замість .modal-close').toEqual([]);
+  });
+
+  it('кожна модалка порталу має спосіб закритись угорі', () => {
+    /*
+     * Дванадцять модалок не мали хрестика взагалі, і єдиним виходом
+     * угорі був тап повз аркуш — жест, якого ніхто не показує.
+     */
+    const withoutClose: string[] = [];
+    for (const file of sourceFiles(FEATURES)) {
+      const source = stripComments(readFileSync(file, 'utf8'));
+      if (!source.includes('modal-sheet')) continue;
+      if (source.includes('<ModalClose')) continue;
+      withoutClose.push(rel(file));
+    }
+    expect(withoutClose, 'ці модалки лишились без хрестика').toEqual([]);
+    // Виняток перевіряється окремо, щоб він не міг зникнути мовчки.
+    expect(NO_CLOSE_EXCEPTIONS).toContain('providers/ConfirmProvider.tsx');
+  });
+});

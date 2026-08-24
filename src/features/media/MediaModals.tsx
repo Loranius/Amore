@@ -2,6 +2,7 @@
 // Модалки media: ручне додавання/редагування + додавання з пошуку
 // ============================================================
 import { useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { STATUS_CONFIG, TYPE_LABELS } from './mediaConstants';
 import type { MediaItemRow, MediaType, MediaStatus, TmdbSearchResult } from '@/types';
 
@@ -34,6 +35,7 @@ export function MediaFormModal({ type, item, onClose, onAdd, onEdit }: MediaForm
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet" role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} />
         <h2 className="modal-title">{isEdit ? 'Редагувати' : `Додати ${TYPE_LABELS[type]}`}</h2>
 
         <label className="form-field">
@@ -95,6 +97,7 @@ export function AddFromSearchModal({ type, item, onClose, onAdd }: AddFromSearch
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet" role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} />
         <div className="media-search-modal-header">
           {item.poster_url && <img className="media-search-modal-poster" src={item.poster_url} alt="" />}
           <div>

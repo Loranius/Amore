@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { normalizeToPreview } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
 import type { WishlistItemV3 } from './wishlistRpc';
 import { TogetherIcon } from '@/components/icons/WishIcon';
-import { CloseIcon, GiftIcon, LockIcon, VideoIcon } from '@/components/icons/UiIcon';
+import { GiftIcon, LockIcon, VideoIcon } from '@/components/icons/UiIcon';
 import { CameraIcon, HeartIcon } from '@/components/icons/NavIcon';
 import {
   validateGiftMemoryPhoto,
@@ -145,15 +146,7 @@ export function GiftCompletionModal({
       >
         <div className="gift-memory-drag-handle" aria-hidden="true" />
 
-        <button
-          type="button"
-          className="gift-memory-close"
-          aria-label="Закрити"
-          disabled={saving}
-          onClick={onClose}
-        >
-          <CloseIcon size={17} />
-        </button>
+        <ModalClose onClose={onClose} disabled={saving} />
 
         <div className="gift-memory-heading">
           <div className="gift-memory-icon" aria-hidden="true">

@@ -166,7 +166,7 @@
 
 .wishlist .wm-wish-editor .wm-form-heading {
   gap: 5px;
-  padding-right: 48px;
+  padding-right: 62px;
 }
 
 .wishlist .wm-wish-editor .wm-form-eyebrow {
@@ -450,7 +450,7 @@
   }
 
   .wishlist .wm-wish-editor .wm-form-heading {
-    padding-inline: 2px 46px;
+    padding-inline: 2px 62px;
   }
 
   .wishlist .wm-wish-editor .modal-title {

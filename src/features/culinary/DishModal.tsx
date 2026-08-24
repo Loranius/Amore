@@ -2,6 +2,7 @@
 // RecipeModal (перегляд) + DishModal (додати/редагувати + редактор рецепта)
 // ============================================================
 import { useState } from 'react';
+import { ModalClose } from '@/components/ui/ModalClose';
 import { ChevronDownIcon, CloseIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { CartIcon } from '@/components/icons/NavIcon';
 import { BookIcon } from '@/components/icons/PlanIcon';
@@ -25,6 +26,7 @@ export function RecipeModal({
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet rcp-view-card" role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} />
         <h2 className="modal-title">{dish.title}</h2>
         {r?.servings && <p className="rcp-servings-line">Порцій: {r.servings}</p>}
 
@@ -161,6 +163,7 @@ export function DishModal({ dish, onClose, onAdd, onEdit }: DishModalProps) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-sheet rcp-modal-card" role="dialog" aria-modal="true">
+        <ModalClose onClose={onClose} />
         <h2 className="modal-title">{isEdit ? 'Редагувати страву' : 'Нова страва'}</h2>
 
         <label className="form-field">
