@@ -56,7 +56,19 @@ export const ANNUAL_DENSITY_FLOOR = 0.35;
  * не обсяг. Сто покупок не мають переважити рік, у якому були й спогади,
  * і плани, і подорож.
  */
-const HEAD_BREADTH_GAIN = 0.55;
+const HEAD_BREADTH_GAIN = 0.4;
+
+/**
+ * Яку частку масштабу голова бере у висоту.
+ *
+ * Перша редакція мала 0.62, і при повній широті купол виходив 2.5:1 —
+ * млинець. На знімку з телефона це й було видно: широка пласка брила
+ * на весь кадр, у якій колонії читались колючками по краю, а не
+ * рельєфом. Живий масив ближчий до півкулі, ніж до тарілки, тож 0.82
+ * при найширшому радіусі 1.4 дає приблизно 1.7:1 — купол, який ще
+ * лежить, але вже стоїть.
+ */
+const HEAD_RISE_SHARE = 0.82;
 
 export interface ReefHeadSize {
   /** Радіус голови в одиницях виду. */
@@ -102,7 +114,7 @@ export function reefHeadSize(daysTogether: number, breadth: number): ReefHeadSiz
   );
   return {
     radius: round6(scale * (1 + HEAD_BREADTH_GAIN * wide)),
-    rise: round6(scale * 0.62),
+    rise: round6(scale * HEAD_RISE_SHARE),
   };
 }
 

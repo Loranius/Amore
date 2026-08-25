@@ -38,7 +38,7 @@ import type { GrowthSummary } from '../home/growthSinceLastVisit';
 import './artifactWorld.css';
 
 const CrystalScene = lazy(() => import('../home/crystal3d/CrystalSceneEntry'));
-const ReefScene = lazy(() => import('../home/reef3d/ReefPreviewScene'));
+const ReefScene = lazy(() => import('../home/reef3d/world/ReefWorldScene'));
 
 function storedArtifact(): string | null {
   if (typeof window === 'undefined') return null;

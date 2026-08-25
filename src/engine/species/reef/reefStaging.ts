@@ -21,7 +21,7 @@ import type { ReefHeadSize } from './colonyFormations';
  * острів. 1.6 — те, за чим голова ще читається головним предметом, а
  * камінь уже читається основою, а не обідком.
  */
-const ROCK_SPREAD = 1.6;
+const ROCK_SPREAD = 1.42;
 
 /** Яку частку підйому голови має камінь: пласкіший за неї, і помітно. */
 const ROCK_RISE_SHARE = 0.42;
@@ -73,29 +73,64 @@ export interface ReefCameraFrame {
   height: number;
 }
 
-/**
- * Скільки місця треба лишити навколо рифа.
- *
- * Не «поділити на тангенс половини кута» — це дало б кадр, у якому риф
- * торкається країв екрана. 2.35 виміряно тим самим способом, що й у
- * кристала: беремо найширше й найвище, що є в сцені, і додаємо стільки,
- * щоб на вузькому телефоні лишалась вода навколо.
- */
-const FRAME_MARGIN = 2.35;
+/** Вертикальний кут камери рифа. Сцена бере його ЗВІДСИ, а не свій. */
+export const REEF_CAMERA_FOV_DEG = 44;
+
+/** Скільки води лишається навколо рифа: 1.0 — риф упритул до країв. */
+const FRAME_MARGIN = 1.06;
+
+/** Наскільки камера піднята над ціллю, у частках відстані. */
+const FRAME_HEIGHT = 0.34;
 
 /**
  * Кадр камери на весь риф.
  *
- * Рахується від КАМЕНЯ, а не від голови: камінь ширший, і саме він
- * визначає, де край картинки. Ціль стоїть на середині висоти голови —
- * так на екрані порівну води зверху й каменя знизу.
+ * ДВІ ПОМИЛКИ, ОБИДВІ ВИДНО НА ЗНІМКАХ, І ОБИДВІ ТУТ ВИПРАВЛЕНІ.
+ *
+ * Перша: відстань бралась як «найширше × 2.35», без співвідношення
+ * сторін. На телефоні риф вилазив за обидва краї, бо у вертикального
+ * кадру горизонтальний кут вужчий за вертикальний рівно в `aspect`
+ * разів.
+ *
+ * Друга, тонша: виправлення першої рахувало риф ПЛОСКИМ — мовляв, він
+ * увесь лежить на площині цілі. Для широкого тіла зблизька це неправда:
+ * його ближній край на цілий радіус ближчий за центр і проєктується
+ * помітно більшим. На широкому екрані камера від того сідала на 2.40
+ * там, де радіус голови 1.19, — риф заповнював екран і різався краями.
+ *
+ * Тому міряється КУТОВИЙ розмір описаної сфери: щоб тіло радіуса `R`
+ * вміщалось у півкут `θ`, треба `d ≥ R / sin(θ)`. Синус, а не тангенс:
+ * тангенс — це для плоскої мішені на відстані, синус — для тіла, яке
+ * має товщину.
  */
-export function reefCameraFrame(head: ReefHeadSize, standing: ReefStanding): ReefCameraFrame {
-  const widest = Math.max(standing.rock.radius, head.radius);
+export function reefCameraFrame(
+  head: ReefHeadSize,
+  standing: ReefStanding,
+  aspect: number,
+): ReefCameraFrame {
   const top = standing.headLift + head.rise;
+  const centreY = top * 0.5;
+  const safeAspect = Number.isFinite(aspect) && aspect > 0.05 ? aspect : 1;
+
+  /*
+   * Радіус описаної сфери — від цілі до найдальшої точки ГОЛОВИ.
+   * Каменю дозволено виходити за краї: він основа, як підлога в
+   * кімнаті, і вміщувати його означало б зменшити риф у півтора раза
+   * заради того, чого ніхто не роздивляється.
+   */
+  const rim = Math.hypot(head.radius, standing.headLift - centreY);
+  const radius = Math.max(rim, top - centreY);
+
+  const halfVertical = (REEF_CAMERA_FOV_DEG * Math.PI) / 360;
+  const halfHorizontal = Math.atan(Math.tan(halfVertical) * safeAspect);
+  const distance = Math.max(
+    radius / Math.sin(halfVertical),
+    radius / Math.sin(halfHorizontal),
+  ) * FRAME_MARGIN;
+
   return {
-    target: { x: 0, y: round6(top * 0.5), z: 0 },
-    distance: round6(widest * FRAME_MARGIN),
-    height: round6(0.42),
+    target: { x: 0, y: round6(centreY), z: 0 },
+    distance: round6(distance),
+    height: FRAME_HEIGHT,
   };
 }

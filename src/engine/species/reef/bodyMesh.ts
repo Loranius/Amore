@@ -57,10 +57,20 @@ const AZIMUTH_SEGMENTS = 8;
  */
 const PROFILE: ReadonlyArray<readonly [number, number]> = [
   [0.0, 1.0],
-  [0.45, 0.88],
-  [0.78, 0.66],
-  [1.0, 0.36],
+  [0.4, 0.95],
+  [0.72, 0.82],
+  [0.93, 0.6],
 ];
+
+/**
+ * Наскільки маківка підіймається над верхнім кільцем, у частках висоти.
+ *
+ * Мало — і це головне. Перша редакція звужувала верхнє кільце до 0.36 і
+ * ставила вістря ще на третину висоти вище: на знімку колонії вийшли не
+ * коралом, а колючками — чорні шипи по краю купола. Корал тупий; його
+ * палець закінчується округлою шапкою, а не голкою.
+ */
+const TIP_RISE = 0.07;
 
 /** Наскільки глибоко основа втоплена в купол, у частках радіуса тіла. */
 const SINK_OF_RADIUS = 0.85;
@@ -246,7 +256,7 @@ export function buildReefColonyMesh(
 
     // Маківка: одна вершина над верхнім кільцем, віяло на нього.
     const apex = positions.length / 3;
-    const tip = added(foot, scaled(axis, body.height * (1 + PROFILE[PROFILE.length - 1]![1] * 0.9)));
+    const tip = added(foot, scaled(axis, body.height * (1 + TIP_RISE)));
     positions.push(round6(tip.x), round6(tip.y), round6(tip.z));
     normals.push(round6(axis.x), round6(axis.y), round6(axis.z));
     const topRing = firstVertex + (ringCount - 1) * AZIMUTH_SEGMENTS;
