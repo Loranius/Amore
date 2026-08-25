@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  RUIN_FLOOR_TOP_Y,
   RUIN_PEDESTAL_BROAD_RADIUS,
   RUIN_PEDESTAL_TOP_RADIUS,
   RUIN_PEDESTAL_TOP_Y,
@@ -189,7 +190,14 @@ describe('константи руїни описують саму руїну', (
     expect(RUIN_PEDESTAL_BROAD_RADIUS).toBeGreaterThan(RUIN_PEDESTAL_TOP_RADIUS * 2);
   });
 
-  it('зсув саджає верх підставки рівно на площину кристалів', () => {
+  it('верх підлоги стоїть там, де каже константа', () => {
+    const floor = NODES.get('Floor')!;
+    expect(floor, 'вузол Floor зник із асета').toBeDefined();
+    const top = Math.max(...floor.map((point) => point[1]));
+    expect(RUIN_FLOOR_TOP_Y).toBeCloseTo(top, 3);
+  });
+
+  it('зсув саджає ПІДЛОГУ рівно на площину кристалів', () => {
     // Те, заради чого константи існують: після зсуву верх `Stand` мусить
     // збігтися з `PORTAL_GROUND_Y` — площиною, на якій стоять усі тіла.
     //
@@ -197,9 +205,22 @@ describe('константи руїни описують саму руїну', (
     // шести означало б перевіряти не посадку, а округлення: асет дає
     // 0.39671, константа каже 0.3967, різниця 1.1e-5 — і це та сама
     // тисячна долі міліметра сцени, якої ніхто не побачить.
+    /*
+     * Сідає підлога, а не верх п'єдесталу. Поки сідав п'єдестал, жила
+     * радіусом 0.33 спиралась на його виступ радіусом 0.0962 — тобто
+     * ні на що, — і її бік був відкритий смугою 0.0887, або 7.6%
+     * видимої висоти монарха. Виступ самої жили при цьому становив
+     * 2.6%, тож опускати його проти цієї плями було безсило.
+     */
     const scale = portalRuinScale();
-    const top = Math.max(...STAND.map((point) => point[1]));
-    expect(portalRuinOffsetY(scale) + top * scale).toBeCloseTo(PORTAL_GROUND_Y, 4);
+    const floor = NODES.get('Floor')!;
+    const floorTop = Math.max(...floor.map((point) => point[1]));
+    expect(portalRuinOffsetY(scale) + floorTop * scale).toBeCloseTo(PORTAL_GROUND_Y, 4);
+
+    // І п'єдестал відтепер СТОЇТЬ над цією площиною, а не збігається з
+    // нею: чорний уступ навколо основи — це те, з чого кристал виліз.
+    const standTop = Math.max(...STAND.map((point) => point[1]));
+    expect(portalRuinOffsetY(scale) + standTop * scale).toBeGreaterThan(PORTAL_GROUND_Y);
   });
 
   it('колони не заходять у центр, де росте кристал', () => {
