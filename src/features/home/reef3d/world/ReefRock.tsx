@@ -17,9 +17,17 @@ import type { ReefStanding } from '@/engine/species/reef/reefStaging';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import { reefGeometryOf } from './reefGeometry';
 
+/*
+ * ПІСОК СВІТЛИЙ, і це половина атмосфери референсів.
+ *
+ * Було `#16303f` у темній темі — темніше за саму воду. Через це риф
+ * стояв ніби в ямі: дно поглинало світло, замість відбивати його. На
+ * всіх п'яти кадрах власника дно СВІТЛІШЕ за воду над ним, і саме воно
+ * підсвічує риф знизу — тому й камінь на них не має чорного боку.
+ */
 const ROCK: Readonly<Record<ReefTheme, { stone: string; sand: string }>> = {
-  dark: { stone: '#2b3a44', sand: '#16303f' },
-  light: { stone: '#9aa7a6', sand: '#dfe7dc' },
+  dark: { stone: '#4a5a63', sand: '#a9bcbd' },
+  light: { stone: '#b3bdb9', sand: '#eef2e6' },
 };
 
 interface ReefRockProps {
@@ -36,7 +44,7 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
     [seed, standing.rock],
   );
   const palette = ROCK[theme];
-  const sandRadius = standing.rock.radius * 14;
+  const sandRadius = standing.rock.radius * 30;
 
   return (
     <group>
@@ -44,11 +52,12 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
         <meshStandardMaterial color={palette.stone} roughness={0.95} metalness={0} flatShading />
       </mesh>
       {/*
-        * Пісок має бути ВЕЛИКИЙ і тьмяний. Перша редакція давала диск на
+        * Пісок має бути ВЕЛИКИЙ і світлий. Перша редакція давала диск на
         * шість радіусів каменя: у кадрі він читався пласкою тарілкою з
-        * видимим краєм, на якій лежить риф. Чотирнадцять радіусів
-        * означає, що край тоне в тумані раніше, ніж його видно, — а
-        * туман тут і є горизонт.
+        * видимим краєм, на якій лежить риф. Чотирнадцяти теж не
+        * вистачило — рівний край далі було видно. Тридцять радіусів
+        * означає, що на тій відстані туман уже щільніший за 0.999, тобто
+        * краю немає взагалі: горизонт тут робить вода, а не геометрія.
         */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
         <circleGeometry args={[sandRadius, 48]} />

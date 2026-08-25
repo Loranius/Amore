@@ -92,6 +92,47 @@ function surfaceNoise(seed: number, azimuth: number, band: number): number {
 }
 
 /**
+ * Справжня точка поверхні купола — та, на якій стоїть меш.
+ *
+ * ЧОМУ ЦЕ ОКРЕМА ФУНКЦІЯ. Купол зміщений частками й хвилею до ±30%
+ * радіуса. Усе, що на ньому сидить, порахувавши ІДЕАЛЬНИЙ еліпсоїд,
+ * половину часу висить у воді, а другу половину стирчить із каменю.
+ * На знімку це видно одразу: дрібнота, розкладена по ідеальній
+ * поверхні, плавала над куполом.
+ *
+ * Тому поверхня має рівно одне визначення, і воно тут — і для меша, і
+ * для всього, що на нього сідає.
+ *
+ * @param azimuth радіани по колу
+ * @param band 0 біля основи, 1 на маківці
+ */
+export function reefHeadSurfacePoint(
+  head: ReefHeadSize,
+  seed: number,
+  azimuth: number,
+  band: number,
+): { point: { x: number; y: number; z: number }; normal: { x: number; y: number; z: number } } {
+  const radius = Math.max(1e-4, head.radius);
+  const rise = Math.max(1e-4, head.rise);
+  const phi = band * (Math.PI / 2);
+  const noise = surfaceNoise(seed, azimuth, band);
+  const ring = Math.cos(phi) * noise;
+  const x = radius * ring * Math.sin(azimuth);
+  const z = radius * ring * Math.cos(azimuth);
+  const y = rise * Math.sin(phi) * noise;
+
+  const nx = x / (radius * radius);
+  const ny = y / (rise * rise);
+  const nz = z / (radius * radius);
+  const length = Math.max(1e-9, Math.hypot(nx, ny, nz));
+
+  return {
+    point: { x: round6(x), y: round6(y), z: round6(z) },
+    normal: { x: round6(nx / length), y: round6(ny / length), z: round6(nz / length) },
+  };
+}
+
+/**
  * Купол голови як замкнене тіло.
  *
  * Замкнене, а не відкрита чаша: нижня кришка потрібна, бо камера рифа
