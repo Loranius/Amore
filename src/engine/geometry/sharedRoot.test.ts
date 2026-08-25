@@ -93,7 +93,7 @@ function widestRadius(mesh: CrystalMeshData): number {
 }
 
 describe('the root the whole colony grows out of (crystal cluster brief §4)', () => {
-  it('stands 4–8% of the monarch’s height above the stone', () => {
+  it('лишається швом: видно, але не сходинка', () => {
     // The band the brief names. It is a seam, not a plinth: much lower and the
     // crystals read as set down on the floor, much higher and the root becomes
     // a step they stand on — which is the shape the vein exists to be rid of.
@@ -146,8 +146,30 @@ describe('the root the whole colony grows out of (crystal cluster brief §4)', (
        * значення сидить рівно посередині.
        */
       const share = seamTop! / monarchSpan.high;
-      expect(share, `${years}y`).toBeGreaterThanOrEqual(0.04);
-      expect(share, `${years}y`).toBeLessThanOrEqual(0.08);
+      /*
+       * СМУГА ЗМІНЕНА: 4–8% → 0.8–2.5%, і це рішення власника, а не
+       * підгонка під зелений тест.
+       *
+       * Він тричі поспіль вів в один бік — «опускай жеоду нижче»,
+       * «опусти сам кристал нижче», і врешті прямо: «опусти основу
+       * кристала… щоб основи кристала монарха і кристалів дітей
+       * торкались текстури платформи». Смуга 4–8% і ця вимога не
+       * можуть виконуватись обидві: перша каже, що корінь СТОЇТЬ над
+       * каменем, друга — що кристали з нього виходять.
+       *
+       * Що при цьому НЕ змінилось і чому це головне: ADR-0003 цілий.
+       * Базові кришки лежать нижче нуля, а тіло жили нікуди не
+       * поділось — виміряно, низ жили −0.1051 проти найглибшої кришки
+       * −0.0818, тобто запас 0.023. Жила перестала СТОЯТИ над каменем,
+       * але не перестала кришки накривати.
+       *
+       * Смуга лишається смугою, а не «більше нуля»: нижня межа боронить
+       * від зникнення шва (тоді стик читається різаним колом каменю),
+       * верхня — від повернення сходинки. Виміряно 1.2% на п'яти
+       * розмірах колонії. Див. ADR-0062.
+       */
+      expect(share, `${years}y`).toBeGreaterThanOrEqual(0.008);
+      expect(share, `${years}y`).toBeLessThanOrEqual(0.025);
     }
   });
 
