@@ -18,11 +18,12 @@
 // що тануть, не діставши дна, і яскрава стеля над ними. Без них вода
 // читається кольоровим тлом, а не товщею, крізь яку дивишся.
 // ============================================================
-import { AdditiveBlending, Color, DoubleSide, FogExp2 } from 'three';
+import { AdditiveBlending, BackSide, Color, DoubleSide, FogExp2 } from 'three';
 import { useThree } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import { buildReefShaftGeometry } from './reefShafts';
+import { buildReefWaterDome } from './reefWaterDome';
 
 /**
  * Вода двох тем.
@@ -94,6 +95,15 @@ export function ReefWater({ theme, sceneRadius, seed }: ReefWaterProps): React.J
   const scene = useThree((state) => state.scene);
   const water = WATER[theme];
 
+  const dome = useMemo(
+    () => buildReefWaterDome(sceneRadius * CEILING_AT * 3, {
+      ceiling: water.ceiling,
+      deep: water.deep,
+    }),
+    [sceneRadius, water.ceiling, water.deep],
+  );
+  useEffect(() => () => dome.dispose(), [dome]);
+
   const fog = useMemo(
     // Щільність рахується від розміру сцени: на рифі двадцятип'ятирічної
     // пари стала щільність з'їла б дальні колонії, а на однорічному
@@ -122,19 +132,13 @@ export function ReefWater({ theme, sceneRadius, seed }: ReefWaterProps): React.J
   return (
     <>
       {/*
-        * Поверхня — одна площина високо вгорі. Її не роздивляються: вона
-        * дає верхньому краю кадру світло, від якого низ читається
-        * глибиною. Без неї над рифом рівний колір, і глибина зникає.
+        * КУПОЛ, а не стеля. Диск мав край, і за ним проглядало тло
+        * іншого кольору — «небо шматками», як це назвав власник, ще й
+        * рівними хордами по сегментах. У купола краю немає, а колір він
+        * бере з висоти: угорі поверхня, на горизонті — колір туману.
         */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, sceneRadius * CEILING_AT, 0]}>
-        <circleGeometry args={[sceneRadius * CEILING_AT * 3.6, 24]} />
-        {/*
-          * Туман на стелі ОБОВ'ЯЗКОВИЙ. Перша редакція вимикала його —
-          * і на світлій темі край диска було видно рівною лінією через
-          * пів кадру, як зріз декорації. З туманом поверхня тане в тій
-          * самій воді, крізь яку на неї дивляться, і краю немає.
-          */}
-        <meshBasicMaterial color={water.ceiling} />
+      <mesh geometry={dome} renderOrder={-1}>
+        <meshBasicMaterial vertexColors side={BackSide} fog={false} depthWrite={false} />
       </mesh>
       <mesh geometry={shafts} renderOrder={2}>
         {/*

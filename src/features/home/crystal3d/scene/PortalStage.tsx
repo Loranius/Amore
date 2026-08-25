@@ -6,9 +6,10 @@
 // нього розраховує камера. Тримати їх у різних компонентах означало б
 // передавати аспект трьома шляхами — тож вони живуть разом.
 // ============================================================
-import { useMemo, useRef, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
+import { PORTAL_ORBIT_DAMPING, coarsePointerNow, portalOrbitRotateSpeed } from './portalOrbit';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
 import type { WorldCameraPose } from '@/features/world/crystalAtlas';
@@ -98,6 +99,8 @@ export function PortalStage({
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
   const controls = useRef<OrbitControlsImpl>(null);
+  // Питається РАЗ: миша не з'являється на телефоні посеред жесту.
+  const [coarsePointer] = useState(coarsePointerNow);
   const aspect = size.height > 0 ? size.width / size.height : 1;
   const frame = useMemo(
     () => portalCameraFrame(aspect, crystalsSceneRadius, artifactSceneHeight),
@@ -182,8 +185,18 @@ export function PortalStage({
         enableZoom={freeCamera}
         enableRotate={freeCamera || allowOrbit}
         enableDamping={!reduceMotion}
-        dampingFactor={0.08}
-        rotateSpeed={freeCamera ? 0.72 : 1}
+        /*
+         * Згасання й швидкість повороту живуть у `portalOrbit.ts` разом
+         * із таблицею, за якою їх обрано: три застосовує згасання НА
+         * КАДР, тож на телефоні з нижчою частотою колишні 0.08 давали за
+         * 200 мс лише 39% жесту. Саме це власник назвав «повільним і
+         * важким».
+         */
+        dampingFactor={PORTAL_ORBIT_DAMPING}
+        rotateSpeed={portalOrbitRotateSpeed(coarsePointer, freeCamera)}
+        // Жести двома пальцями лишаються типовими: у режимі головної
+        // масштаб і зсув однаково вимкнені, а перевизначати їх означало б
+        // забрати в сторінки щипок.
         zoomSpeed={0.78}
         panSpeed={0.68}
         screenSpacePanning={freeCamera}

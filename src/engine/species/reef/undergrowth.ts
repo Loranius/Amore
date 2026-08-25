@@ -188,7 +188,7 @@ export function reefUndergrowth(
      * Він має рацію — край каменя гуляє до +30%, і водорість там
      * проросла б крізь породу.
      */
-    const distance = standing.rock.radius * (1.38 + 1.5 * radicalInverse2(index));
+    const distance = standing.rock.radius * (1.8 + 2.2 * radicalInverse2(index));
     const salt = `reef:weed:${index}`;
     growths.push({
       kind: 'weed',
@@ -199,11 +199,16 @@ export function reefUndergrowth(
       },
       normal: { x: 0, y: 1, z: 0 },
       /*
-       * Водорість ВИСОКА: пів радіуса голови й більше. На знімку з
-       * меншим розміром вона губилась між дрібнотою, і вертикалі, заради
-       * якої вона існує, не з'являлось.
+       * Висока — але не на весь екран.
+       *
+       * 0.62–1.17 радіуса голови було завелико: на ТЕЛЕФОНІ камера
+       * стоїть утричі далі (кадр рахується з описаної сфери й
+       * співвідношення сторін), тож водорості опинялись між нею й
+       * рифом і затуляли пів кадру двома зеленими стрічками. На
+       * широкому екрані та сама розкладка виглядала правильно — саме
+       * тому перевіряти треба обидва.
        */
-      size: round6(radius * (0.62 + 0.55 * seededUnit(seed, `${salt}:size`))),
+      size: round6(radius * (0.42 + 0.34 * seededUnit(seed, `${salt}:size`))),
       spinRad: round6(seededUnit(seed, `${salt}:spin`) * Math.PI * 2),
       colourIndex: index % 2 === 0 ? 0 : 5,
     });
