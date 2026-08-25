@@ -231,7 +231,21 @@ const VEIN_PROUD_OF_MONARCH_HEIGHT = 0.012;
  * generous constant here is what turned the first vein into a pale splash
  * covering the platform.
  */
-const BASE_MARGIN = 1.12;
+const BASE_MARGIN = 1.14;
+/*
+ * 1.12 → 1.14, і промах був старий, а не новий.
+ *
+ * `baseCoverOf` міряє кришку від `renderedRadius` — це радіус до ГРАНІ.
+ * Готове тіло ширше: анізотропія архетипу додає до 1.18, власний
+ * розхил ще 1.05, і жоден із цих множників сюди не доходить. Поки
+ * товщина дітей бралась навмання, найтовстіший кінець смуги випадав
+ * рідко, і 1.12 вистачало щоразу.
+ *
+ * Відколи повний рік сідає на цей кінець свідомо (ADR-0065), не
+ * вистачило: виміряно, жила 0.130207 проти дитини 0.130301 — недобір
+ * **0.0001**, тобто ADR-0003 падав на одну десятитисячну. Тест
+ * `reaches past the outermost daughter` упіймав це першим прогоном.
+ */
 
 /**
  * How wide the quartz has to be to swallow one crystal's base cap.

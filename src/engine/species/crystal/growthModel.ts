@@ -705,8 +705,31 @@ const CHILD_HEIGHT_MAX_SHARE = 0.4;
  * comes out at about **0.75×** this. 3.4–4.3 lands the measured aspect on the
  * brief's 2.5–3.2.
  */
-const CHILD_ASPECT_MIN = 3.4;
+const CHILD_ASPECT_MIN = 3.6;
 const CHILD_ASPECT_MAX = 4.3;
+/*
+ * 3.4 → 3.6, і це наслідок того, що товщина перестала бути монеткою.
+ *
+ * Поки аспект тягли навмання, найтовстіший край смуги випадав рідко, і
+ * ніхто не бачив, що номінальні 3.4 дають ВИМІРЯНИЙ аспект 2.16 при
+ * брифовій підлозі 2.2. Відколи повний рік сідає на цей край свідомо,
+ * промах став видимим одразу — `gemSilhouette.test.ts` упіймав його на
+ * першому ж прогоні.
+ *
+ * Тобто смуга була трохи ширшою за брифову з самого початку, і тримала
+ * її лише випадковість. Це і є та вада, яку зміна не створила, а
+ * оприлюднила.
+ */
+/**
+ * Наскільки насіння може зрушити тіло вздовж смуги аспекту.
+ *
+ * Вужче за саму смугу (0.9) навмисно: наповненість має вести, а
+ * тремтіння — лише не давати шести рокам вийти однією формою. При
+ * 0.25 два роки з однаковою наповненістю різняться щонайбільше на
+ * чверть щабля, а рік, повніший на десяту частину, все одно виходить
+ * товщим за сусіда.
+ */
+const CHILD_ASPECT_JITTER = 0.25;
 
 export function childDimensions(
   monarchAxialNow: number,
@@ -744,11 +767,35 @@ export function childDimensions(
   const axialScale = round6(monarchAxialNow * (
     CHILD_HEIGHT_MIN_SHARE + (CHILD_HEIGHT_MAX_SHARE - CHILD_HEIGHT_MIN_SHARE) * t
   ));
-  // Slimmer than the monarch, and by a wide margin now that she is a gem: she
-  // sits near 1.9 and they sit near 2.9, so she reads as the one body the ring
-  // is arranged around rather than as the largest of seven similar ones.
-  const aspect = CHILD_ASPECT_MIN
-    + seededUnit(seed, 'child:aspect') * (CHILD_ASPECT_MAX - CHILD_ASPECT_MIN);
+  /*
+   * Товщина йде за НАПОВНЕНІСТЮ року, а не за монеткою.
+   *
+   * Власник: «чим наповненіші модулі за нинішній рік, тим нинішній
+   * дочірній кристал буде більшим І ТОВСТІШИМ».
+   *
+   * Висота за наповненістю була й раніше, а от стрункість бралась
+   * випадково з [3.4, 4.3]. Через це порожній рік міг вийти
+   * ТОВСТІШИМ за повний: він нижчий, але з нижчим аспектом. Тобто
+   * товщина не просто не несла сенсу — вона іноді казала протилежне.
+   *
+   * Тепер наповненість веде тіло по смузі: повний рік стоїть на
+   * найтовстішому її кінці, порожній на найтоншому. Насіння лишається,
+   * але вужчим тремтінням: референс показує шість різних дочірніх
+   * силуетів, і зводити їх до однієї форми означало б повернути
+   * «зменшений монарх», який прибрали в Pass 9.
+   *
+   * Смуга та сама — її калібрували під брифові 2.5–3.2 виміряного
+   * аспекту, і `gemSilhouette.test.ts` стереже саме її.
+   */
+  const stoutness = clamp01(fill);
+  const jitter = (seededUnit(seed, 'child:aspect') - 0.5) * CHILD_ASPECT_JITTER;
+  const aspect = Math.min(
+    CHILD_ASPECT_MAX,
+    Math.max(
+      CHILD_ASPECT_MIN,
+      CHILD_ASPECT_MAX - (CHILD_ASPECT_MAX - CHILD_ASPECT_MIN) * stoutness + jitter,
+    ),
+  );
   return { axialScale, radialScale: round6(axialScale / (2 * aspect)) };
 }
 
