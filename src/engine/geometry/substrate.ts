@@ -227,8 +227,21 @@ function baseCoverOf(body: GrowthBody): number {
   return Math.max(1e-4, (body.renderedRadius / upward) * BASE_MARGIN);
 }
 
-/** The node under the monarch, per unit of the monarch's own radius. */
-const NODE_RADIUS = 1.25;
+/**
+ * The node under the monarch, per unit of the monarch's own radius.
+ *
+ * 1.6 → 1.25 (ADR-0061) → 1.18. Останній крок — наслідок того, що діти
+ * підсунулись до монарха впритул: коротші гілки менше витягують контур,
+ * і жила знову поповзла до диска (виміряно шир/вузьк 1.93 при потрібних
+ * 2.0). Вузол задає саме ВУЗЬКИЙ напрямок, тож стиснути його — це
+ * повернути форму, не розсуваючи підкладку.
+ *
+ * Підлога тверда: вузол мусить накривати базову кришку монарха, а вона
+ * потребує 1.12 його радіуса (`BASE_MARGIN`). Тобто 1.18 лишає шість
+ * відсотків запасу, і саме `covers every crystal footprint` не дасть
+ * піти нижче непоміченим.
+ */
+const NODE_RADIUS = 1.18;
 
 /** Short side fingers off the main branches. */
 const SIDE_CRACK_MIN = 3;

@@ -430,8 +430,32 @@ export function childMonarchShare(colonySize: number): number {
  *
  * It only has to hold at the *base*: a leaning child diverges from the monarch
  * all the way up, so the gap at the ground is the smallest gap there is.
+ *
+ * **0.012 → 0.006 на прохання власника «підсунь дочірні впритул».**
+ * Разом із `CHILD_CORNER_ALLOWANCE` (0.12 → 0.055) це звузило просвіт
+ * між оболонками з 0.0178 до величини під десяту частину ширини самої
+ * дитини — колонія читається одним зрощеним тілом, а не кільцем
+ * навколо.
+ *
+ * Вікно виявилось вузьким, і обидва його краї виміряні:
+ *
+ *   0.004 / 0.045   найтісніша вершина за 0.0012 від монарха — це той
+ *                   самий порядок, що позначений нижче як відмова;
+ *   0.006 / 0.055   проходить обидві межі; узято це;
+ *   0.008 / 0.075   діти вже відходять — 16% ширини дитини замість 10%.
+ *
+ * Нижче не пускає власна історія цього файлу: пласкі 0.012 колись
+ * давали 0.0035 на чотирьох роках і **0.0010** на двадцяти п'яти, і
+ * саме тому з'явився запас на кути.
+ *
+ * Головне: за це більше не відповідає арифметика констант.
+ * `growthModel.test.ts` звіряв опубліковану відстань із
+ * `childClearance(...)` — тобто з тими самими константами, з яких вона
+ * порахована, і лишався б зеленим за будь-яких чисел. Тепер міряються
+ * ОПУБЛІКОВАНІ оболонки (`colonyClearance.test.ts`), і саме цей вимір
+ * упіймав, що 0.004/0.045 — перебір.
  */
-export const CHILD_MIN_CLEARANCE = 0.012;
+export const CHILD_MIN_CLEARANCE = 0.006;
 
 /**
  * Extra clearance proportional to the two radii, for the corners a stated
@@ -448,7 +472,7 @@ export const CHILD_MIN_CLEARANCE = 0.012;
  * Twelve per cent of the two radii covers both bodies' corner excess about
  * three times over, and it costs a fifth of what the old flat standoff did.
  */
-const CHILD_CORNER_ALLOWANCE = 0.12;
+const CHILD_CORNER_ALLOWANCE = 0.055;
 /**
  * Years per ring before a new, wider ring opens.
  *

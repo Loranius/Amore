@@ -104,11 +104,22 @@ function signedUnit(seed: number, label: string): number {
  * How deep the monarch stands in the quartz vein, as a fraction of her visible
  * length.
  *
- * Ten percent. Enough that the seam closes over her base and the meeting line
- * is quartz rather than a clean circle of stone; not so much that the crystal
- * loses height, which is the one thing it is supposed to communicate.
+ * Було десять відсотків: рівно стільки, щоб шов закрився над основою й
+ * лінія зустрічі була кварцом, а не чистим колом каменю.
+ *
+ * **0.10 → 0.18 на прохання власника: «опусти сам кристал нижче, ота
+ * геометрично рівна платформа виглядає вичурно».** Платформа — це
+ * пласка верхня поверхня жили навколо основи, і чим вище стоїть
+ * кристал, тим більше її видно кільцем. Занурення ховає це кільце під
+ * самим кристалом, і жеода читається як порода, з якої він вилазить, а
+ * не як тарілка, на якій він стоїть.
+ *
+ * Верхня межа лишається тією самою й названа так само: занурення
+ * коштує висоти, а висота — це єдине, що кристал зобов'язаний
+ * повідомляти. Вісімнадцять відсотків — це ще та частина профілю, що
+ * майже не звужується, тож видима висота падає менше, ніж число.
  */
-const MONARCH_GROUND_SINK = 0.1;
+const MONARCH_GROUND_SINK = 0.16;
 
 /**
  * The shared crystal profile: a narrow base, a shaft that widens gently to a
