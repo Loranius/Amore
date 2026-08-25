@@ -15,7 +15,13 @@
 // Три види, і кожен узятий з референсів:
 //   `blade`  — пучок стрічок, що тягнуться вгору (трава й м'які корали);
 //   `tuft`   — кулька з голок (актинія, губка, їжак);
-//   `pebble` — камінець на піску, той самий, що лежить купками внизу.
+//   `pebble` — камінець на піску, той самий, що лежить купками внизу;
+//   `weed`   — висока водорість, що тягнеться до світла й гойдається.
+//
+// Водорості стоять окремо від решти: їх мало, вони високі, і саме вони
+// дають кадру вертикаль. Без них риф лежить пласко, хай яка густа на
+// ньому дрібнота — це видно на першому й третьому референсах, де
+// стрічки тягнуться від дна до самого верху кадру.
 //
 // РОЗКЛАДКА НЕ ВИПАДКОВА, А НИЗЬКОРОЗБІЖНА — золотий кут по азимуту й
 // ван дер Корпут по висоті, як у річних колоній. Причина та сама:
@@ -27,7 +33,7 @@ import { reefColonyLayout, type ReefColonyAnchor, type ReefHeadSize } from './co
 import { reefHeadSurfacePoint } from './headMesh';
 import type { ReefStanding } from './reefStaging';
 
-export type ReefGrowthKind = 'blade' | 'tuft' | 'pebble';
+export type ReefGrowthKind = 'blade' | 'tuft' | 'pebble' | 'weed';
 
 /**
  * Палітра життя: те, чим риф укритий поза кольором пари.
@@ -48,6 +54,10 @@ export const REEF_LIFE_COLOURS: ReadonlyArray<readonly [number, number, number]>
 
 /** Камені кольору не мають — вони камені. */
 export const REEF_PEBBLE_COLOUR: readonly [number, number, number] = [0.62, 0.63, 0.6];
+
+/** Скільки високих водоростей навколо рифа. */
+const WEED_MIN = 12;
+const WEED_MAX = 26;
 
 /** Скільки дрібноти на найменшому й найбільшому рифі. */
 const GROWTH_MIN = 96;
@@ -164,6 +174,40 @@ export function reefUndergrowth(
    */
   const inner = standing.rock.radius * 1.4;
   const outer = standing.rock.radius * 3.2;
+
+  /*
+   * Водорості — окремим колом і рідше. Вони високі, тож на місці
+   * дрібноти читалися б лісом, а риф за ними зник би.
+   */
+  const weeds = Math.round(WEED_MIN + (WEED_MAX - WEED_MIN) * spread);
+  for (let index = 0; index < weeds; index += 1) {
+    const azimuth = index * GOLDEN_ANGLE_RAD + 0.4;
+    /*
+     * 1.38, а не ближче: власний тест «те, що на піску, лежить ЗА
+     * каменем» упіймав спробу підсунути водорості на 1.15 радіуса.
+     * Він має рацію — край каменя гуляє до +30%, і водорість там
+     * проросла б крізь породу.
+     */
+    const distance = standing.rock.radius * (1.38 + 1.5 * radicalInverse2(index));
+    const salt = `reef:weed:${index}`;
+    growths.push({
+      kind: 'weed',
+      point: {
+        x: round6(Math.cos(azimuth) * distance),
+        y: 0,
+        z: round6(Math.sin(azimuth) * distance),
+      },
+      normal: { x: 0, y: 1, z: 0 },
+      /*
+       * Водорість ВИСОКА: пів радіуса голови й більше. На знімку з
+       * меншим розміром вона губилась між дрібнотою, і вертикалі, заради
+       * якої вона існує, не з'являлось.
+       */
+      size: round6(radius * (0.62 + 0.55 * seededUnit(seed, `${salt}:size`))),
+      spinRad: round6(seededUnit(seed, `${salt}:spin`) * Math.PI * 2),
+      colourIndex: index % 2 === 0 ? 0 : 5,
+    });
+  }
   for (let index = 0; index < total - onHead; index += 1) {
     const azimuth = index * GOLDEN_ANGLE_RAD;
     const distance = inner + (outer - inner) * Math.sqrt(radicalInverse2(index));

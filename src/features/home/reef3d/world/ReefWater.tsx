@@ -127,8 +127,14 @@ export function ReefWater({ theme, sceneRadius, seed }: ReefWaterProps): React.J
         * глибиною. Без неї над рифом рівний колір, і глибина зникає.
         */}
       <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, sceneRadius * CEILING_AT, 0]}>
-        <circleGeometry args={[sceneRadius * CEILING_AT * 2.4, 24]} />
-        <meshBasicMaterial color={water.ceiling} fog={false} />
+        <circleGeometry args={[sceneRadius * CEILING_AT * 3.6, 24]} />
+        {/*
+          * Туман на стелі ОБОВ'ЯЗКОВИЙ. Перша редакція вимикала його —
+          * і на світлій темі край диска було видно рівною лінією через
+          * пів кадру, як зріз декорації. З туманом поверхня тане в тій
+          * самій воді, крізь яку на неї дивляться, і краю немає.
+          */}
+        <meshBasicMaterial color={water.ceiling} />
       </mesh>
       <mesh geometry={shafts} renderOrder={2}>
         {/*

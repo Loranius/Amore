@@ -11,11 +11,15 @@
 // (замкнений, без вироджених трикутників, з невидимою кришкою),
 // доведено й про камінь.
 // ============================================================
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { AdditiveBlending, type MeshBasicMaterial } from 'three';
+import { useFrame } from '@react-three/fiber';
 import { buildReefHeadMesh } from '@/engine/species/reef/headMesh';
 import type { ReefStanding } from '@/engine/species/reef/reefStaging';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import { reefGeometryOf } from './reefGeometry';
+import { buildReefSeabed } from './reefSeabed';
+import { buildReefCausticsTexture } from './reefCaustics';
 
 /*
  * ПІСОК СВІТЛИЙ, і це половина атмосфери референсів.
@@ -25,10 +29,29 @@ import { reefGeometryOf } from './reefGeometry';
  * всіх п'яти кадрах власника дно СВІТЛІШЕ за воду над ним, і саме воно
  * підсвічує риф знизу — тому й камінь на них не має чорного боку.
  */
-const ROCK: Readonly<Record<ReefTheme, { stone: string; sand: string }>> = {
-  dark: { stone: '#4a5a63', sand: '#a9bcbd' },
-  light: { stone: '#b3bdb9', sand: '#eef2e6' },
+/*
+ * КАМІНЬ СВІТЛІШАЄ РАЗОМ ІЗ ДНОМ.
+ *
+ * Коли пісок став світлим, камінь `#4a5a63` перетворився на чорну діру
+ * посеред нього: різниця яскравості вийшла втричі. Виступ рифа — це
+ * той самий вапняк, присипаний тим самим піском, і читатись він має
+ * породою, а не проваллям.
+ *
+ * Пісок — теплий. Під водою його тягне в сірий, і перша редакція
+ * зробила його сіро-зеленим одразу; на референсах він лишається
+ * піщаним, а синім його робить товща води, тобто туман, а не колір.
+ */
+const ROCK: Readonly<Record<ReefTheme, { stone: string; sand: string; caustic: string }>> = {
+  dark: { stone: '#78827c', sand: '#b8ae95', caustic: '#9fe4ff' },
+  light: { stone: '#c0c3b6', sand: '#e8dfc4', caustic: '#ffffff' },
 };
+
+/** Наскільки яскрава сітка світла на дні. */
+const CAUSTIC_STRENGTH: Readonly<Record<ReefTheme, number>> = { dark: 0.55, light: 0.38 };
+
+/** Скільки разів каустика вкладається в дно і як швидко пливе. */
+const CAUSTIC_TILES = 13;
+const CAUSTIC_DRIFT = 0.012;
 
 interface ReefRockProps {
   standing: ReefStanding;
@@ -44,25 +67,91 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
     [seed, standing.rock],
   );
   const palette = ROCK[theme];
-  const sandRadius = standing.rock.radius * 30;
+
+  /*
+   * Дно — сітка з рельєфом, а не коло.
+   *
+   * Тридцять радіусів каменя, але сітка згущується до центру: далеке
+   * однаково з'їдає туман, і рівномірна сітка витратила б туди
+   * дев'ять десятих вершин.
+   */
+  const seabed = useMemo(
+    () => buildReefSeabed(standing.rock.radius, standing.rock.radius * 13),
+    [standing.rock.radius],
+  );
+  useEffect(() => () => seabed.geometry.dispose(), [seabed]);
+
+  const caustics = useMemo(() => {
+    const texture = buildReefCausticsTexture();
+    if (texture) texture.repeat.set(CAUSTIC_TILES, CAUSTIC_TILES);
+    return texture;
+  }, []);
+  useEffect(() => () => caustics?.dispose(), [caustics]);
+  const causticsMaterial = useRef<MeshBasicMaterial>(null);
+
+  /*
+   * Сітка світла ПЛИВЕ. Нерухома каустика — це візерунок на килимі;
+   * рухома — поверхня води над головою. Рух повільний і в двох осях із
+   * різною швидкістю, щоб не читався прокруткою шпалер.
+   */
+  useFrame((state) => {
+    if (!caustics) return;
+    const time = state.clock.elapsedTime;
+    caustics.offset.set(time * CAUSTIC_DRIFT, time * CAUSTIC_DRIFT * 0.62);
+    const material = causticsMaterial.current;
+    if (material) {
+      // Дихання яскравості: хвиля нагорі не стоїть на місці.
+      material.opacity = CAUSTIC_STRENGTH[theme] * (0.78 + 0.22 * Math.sin(time * 0.45));
+    }
+  });
 
   return (
     <group>
-      <mesh geometry={geometry} castShadow={false} receiveShadow>
+      {/*
+        * Камінь сідає НИЖЧЕ за найглибшу западину дна: інакше на
+        * якомусь боці між ним і піском лишалась би щілина, крізь яку
+        * видно порожнечу.
+        */}
+      <mesh geometry={geometry} position={[0, seabed.lowest - 0.001, 0]} receiveShadow>
         <meshStandardMaterial color={palette.stone} roughness={0.95} metalness={0} flatShading />
       </mesh>
-      {/*
-        * Пісок має бути ВЕЛИКИЙ і світлий. Перша редакція давала диск на
-        * шість радіусів каменя: у кадрі він читався пласкою тарілкою з
-        * видимим краєм, на якій лежить риф. Чотирнадцяти теж не
-        * вистачило — рівний край далі було видно. Тридцять радіусів
-        * означає, що на тій відстані туман уже щільніший за 0.999, тобто
-        * краю немає взагалі: горизонт тут робить вода, а не геометрія.
-        */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]} receiveShadow>
-        <circleGeometry args={[sandRadius, 48]} />
-        <meshStandardMaterial color={palette.sand} roughness={1} metalness={0} />
+      <mesh geometry={seabed.geometry} receiveShadow>
+        <meshStandardMaterial
+          color={palette.sand}
+          vertexColors
+          roughness={1}
+          metalness={0}
+        />
       </mesh>
+      {/*
+        * Каустика лягає на ТУ САМУ сітку, а не на площину над нею:
+        * інакше вона висіла б над дюнами й читалась плівкою. Другий
+        * прохід тією ж геометрією — один зайвий виклик малювання на
+        * головну ознаку того, що це вода.
+        */}
+      {caustics ? (
+        <mesh geometry={seabed.geometry} renderOrder={1}>
+          <meshBasicMaterial
+            ref={causticsMaterial}
+            map={caustics}
+            color={palette.caustic}
+            /*
+              * `vertexColors` тут гасить каустику вдалині тим самим
+              * серпанком, що й пісок, а `fog={false}` — обов'язковий:
+              * туман на ДОДАВАЛЬНОМУ шарі не гасить його, а додає свій
+              * колір, і дно вдалині ставало білою стіною.
+              */
+            vertexColors
+            fog={false}
+            transparent
+            opacity={CAUSTIC_STRENGTH[theme]}
+            depthWrite={false}
+            blending={AdditiveBlending}
+            polygonOffset
+            polygonOffsetFactor={-1}
+          />
+        </mesh>
+      ) : null}
     </group>
   );
 }

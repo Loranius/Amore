@@ -16,6 +16,7 @@ import { ReefColonies } from './ReefColonies';
 import { ReefRock } from './ReefRock';
 import { ReefSchool } from './ReefSchool';
 import { ReefUndergrowth } from './ReefUndergrowth';
+import { ReefMotes } from './ReefMotes';
 import { ReefWater } from './ReefWater';
 import type { ReefMeshes } from './useReefMeshes';
 
@@ -74,6 +75,12 @@ export function ReefWorld({ plan, meshes, theme, reduceMotion }: ReefWorldProps)
       <ReefColonies plan={plan} meshes={meshes} theme={theme} lift={standing.headLift} />
       <ReefUndergrowth plan={plan} standing={standing} lift={standing.headLift} />
       <ReefSchool plan={plan} lift={standing.headLift} reduceMotion={reduceMotion} />
+      <ReefMotes
+        reach={standing.rock.radius}
+        theme={theme}
+        seed={plan.headSeed}
+        reduceMotion={reduceMotion}
+      />
       <OrbitControls
         ref={controls}
         target={[frame.target.x, frame.target.y, frame.target.z]}

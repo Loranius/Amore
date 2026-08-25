@@ -189,3 +189,65 @@ export function buildReefPebbleMesh(): ReefMeshData {
   }
   return finish(parts);
 }
+
+/** Кущ водорості: скільки стрічок, скільки в них колін, як вигинаються. */
+const WEED_STRANDS = 5;
+const WEED_JOINTS = 5;
+const WEED_WIDTH = 0.09;
+const WEED_CURVE = 0.5;
+
+/** Наскільки корінь утоплений у пісок. */
+const WEED_ROOT = 0.06;
+
+/**
+ * Висока водорість — КУЩ, а не одна стрічка.
+ *
+ * Перша редакція давала єдину стрічку, і на знімку вона читалась
+ * пласкою зеленою смугою, що висить у воді: у одної стрічки немає ані
+ * об'єму, ані місця, де вона починається. Кущ із п'яти, кожна зі своєю
+ * висотою й вигином, читається рослиною з першого погляду.
+ *
+ * Корінь іде НИЖЧЕ нуля: інакше на дюні стеблина зависає над піском, і
+ * рослина знову втрачає землю під собою.
+ *
+ * Коліна потрібні не для краси: сцена гойдає кущ, обертаючи його
+ * цілком, і прямі палиці під таким рухом читались би стрілками
+ * годинника. Вигнуті стрічки під тим самим поворотом читаються течією.
+ */
+export function buildReefWeedMesh(): ReefMeshData {
+  const parts = emptyMesh();
+  for (let strand = 0; strand < WEED_STRANDS; strand += 1) {
+    const azimuth = (strand / WEED_STRANDS) * Math.PI * 2 + 0.3;
+    const dirX = Math.cos(azimuth);
+    const dirZ = Math.sin(azimuth);
+    const height = 0.62 + 0.38 * ((strand * 3) % 5) / 4;
+    const curve = WEED_CURVE * (0.5 + 0.5 * ((strand * 7) % 4) / 3);
+    // Стрічка стоїть упоперек власного напряму — так її видно збоку.
+    const acrossX = -dirZ;
+    const acrossZ = dirX;
+    const base = parts.positions.length / 3;
+
+    for (let joint = 0; joint <= WEED_JOINTS; joint += 1) {
+      const along = joint / WEED_JOINTS;
+      const bend = curve * along * along;
+      const width = WEED_WIDTH * (1 - 0.6 * along);
+      for (const side of [-1, 1]) {
+        parts.positions.push(
+          round6(dirX * bend + acrossX * side * width),
+          round6(along * height - WEED_ROOT),
+          round6(dirZ * bend + acrossZ * side * width),
+        );
+        parts.normals.push(round6(-dirZ), 0, round6(dirX));
+      }
+    }
+
+    for (let joint = 0; joint < WEED_JOINTS; joint += 1) {
+      const low = base + joint * 2;
+      parts.indices.push(low, low + 1, low + 2);
+      parts.indices.push(low + 1, low + 3, low + 2);
+      parts.indices.push(low + 2, low + 1, low);
+      parts.indices.push(low + 2, low + 3, low + 1);
+    }
+  }
+  return finish(parts);
+}

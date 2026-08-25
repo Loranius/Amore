@@ -10,6 +10,7 @@ import {
   buildReefBladeMesh,
   buildReefPebbleMesh,
   buildReefTuftMesh,
+  buildReefWeedMesh,
 } from './undergrowthMesh';
 
 const HEAD = reefHeadSize(12 * 365, 6);
@@ -132,6 +133,56 @@ describe('дрібнота — не літопис', () => {
   it('та сама пара — та сама шкіра', () => {
     expect(grown(4, 11)).toEqual(grown(4, 11));
     expect(grown(4, 11)).not.toEqual(grown(4, 12));
+  });
+});
+
+describe('водорість дає кадру вертикаль', () => {
+  it('кущів кілька, і всі вони на піску', () => {
+    /*
+     * Водорість — єдине в цій сцені, що тягнеться вгору. Без неї риф
+     * лежить пласко, хай яка густа на ньому дрібнота: це видно на
+     * першому й третьому референсах, де стрічки йдуть від дна до верху
+     * кадру.
+     */
+    const weeds = grown().filter((growth) => growth.kind === 'weed');
+    expect(weeds.length).toBeGreaterThanOrEqual(7);
+    for (const weed of weeds) {
+      expect(weed.point.y, 'водорість не на піску').toBe(0);
+      expect(Math.hypot(weed.point.x, weed.point.z)).toBeGreaterThan(STANDING.rock.radius * 1.3);
+    }
+  });
+
+  it('кущ ВИЩИЙ за дрібноту в кілька разів', () => {
+    const weeds = grown().filter((growth) => growth.kind === 'weed');
+    const small = grown().filter((growth) => growth.kind === 'tuft');
+    const tallest = Math.max(...small.map((growth) => growth.size));
+    expect(Math.min(...weeds.map((growth) => growth.size))).toBeGreaterThan(tallest * 2);
+  });
+
+  it('кущ — не одна стрічка', () => {
+    /*
+     * Перша редакція давала єдину стрічку, і на знімку вона читалась
+     * пласкою зеленою смугою, що висить у воді: у одної стрічки немає
+     * ані об'єму, ані місця, де вона починається.
+     */
+    /*
+     * Міряються НОРМАЛІ, а не азимути вершин. Перша редакція перевірки
+     * брала азимути — і мутація «одна стрічка» проходила її повністю,
+     * бо вздовж вигину азимут вершини й так гуляє. Кожна стрічка —
+     * пласка, тож у неї рівно одна нормаль: скільки різних нормалей,
+     * стільки й стрічок, і саме це відрізняє кущ від смуги.
+     */
+    const weed = buildReefWeedMesh();
+    const facing = new Set<string>();
+    for (let at = 0; at < weed.normals.length; at += 3) {
+      facing.add(`${weed.normals[at]!.toFixed(3)}:${weed.normals[at + 2]!.toFixed(3)}`);
+    }
+    expect(facing.size, 'кущ дивиться в один бік — це смуга').toBeGreaterThanOrEqual(4);
+  });
+
+  it('корінь утоплений — кущ не висить над дюною', () => {
+    const weed = buildReefWeedMesh();
+    expect(weed.bounds.min.y).toBeLessThan(0);
   });
 });
 
