@@ -96,4 +96,22 @@ describe('заглушка каже парі, що сталось і що роб
     expect(VIEW).toContain('onRetry');
     expect(VIEW).toContain('Спробувати ще раз');
   });
+
+  it('не каже про WebGL, коли причина в ненавантаженому файлі', () => {
+    /*
+     * Другий знімок із того самого телефона: на екрані «WebGL
+     * недоступний», а в консолі — 404 на моделі руїни. WebGL працював.
+     *
+     * Заглушка має право бути неточною в деталях, але не має права
+     * називати НЕ ТУ причину: з «браузер не дав полотно» пара нічого не
+     * зробить, а з «файл не доїхав» — оновить сторінку.
+     */
+    expect(VIEW, 'причина має приходити ззовні').toContain('reason');
+    expect(VIEW).toContain("reason === 'asset'");
+    // Текст про вкладки й економію лишається СУВОРО в гілці WebGL.
+    const assetBranch = VIEW.slice(VIEW.indexOf("reason === 'asset'"), VIEW.indexOf("reason === 'scene'"));
+    expect(assetBranch).not.toContain('вкладки');
+    expect(assetBranch).not.toContain('економі');
+    expect(assetBranch).toContain('Оновити сторінку');
+  });
 });

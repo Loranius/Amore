@@ -49,7 +49,26 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { PORTAL_GROUND_Y } from './portalScene';
 
-export const RUIN_MODEL_URL = '/models/amore_ruin.glb';
+/**
+ * Адреса асета — ЧЕРЕЗ `BASE_URL`, а не з голого слеша.
+ *
+ * Тут стояло `'/models/amore_ruin.glb'`, і на локальному сервері це
+ * працювало, бо там база — корінь. Портал живе на
+ * `loranius.github.io/Amore/`, тож той самий рядок вирішувався в
+ * `loranius.github.io/models/amore_ruin.glb` і повертав **404**.
+ *
+ * Наслідок пара бачила не як «немає файлу». `useGLTF` кидає, сцена
+ * падає в запасний рендерер, і на екрані з'являється «WebGL
+ * недоступний / 3D-кристал не вдалося відкрити» — тобто повідомлення
+ * про зовсім іншу причину. Власник надіслав саме цей екран, і перший
+ * розбір пішов шукати стелю WebGL-контекстів.
+ *
+ * Решта асетів у проєкті вже рахує адресу через `BASE_URL`
+ * (`journeyAssets.ts`, `reefAssetManifest.ts`, `GamePage.tsx`). Цей
+ * рядок був єдиним винятком; `assetUrls.test.ts` більше не дасть
+ * з'явитись наступному.
+ */
+export const RUIN_MODEL_URL = `${import.meta.env.BASE_URL}models/amore_ruin.glb`;
 
 /** Верхня площина п'єдесталу у СВІТОВИХ одиницях асета. Виміряно. */
 export const RUIN_PEDESTAL_TOP_Y = 0.3967;

@@ -1,26 +1,30 @@
 // ============================================================
-// CrystalErrorBoundary — нейтральний фолбек при падінні 3D-сцени
+// CrystalErrorBoundary — заглушка, яка знає, ЧОМУ впала сцена
 // ------------------------------------------------------------
-// Three.js/WebGL — новий, ще не перевірений локально стек (немає npm у
-// середовищі розробки). Якщо ініціалізація впаде на будь-якому пристрої —
-// показуємо переданий стан помилки замість білого екрана.
+// Межа ловить будь-яку помилку 3D-сцени, щоб замість білого екрана пара
+// побачила пояснення. Але саме пояснення досі було одне на всі причини —
+// «WebGL недоступний», — і на телефоні власника воно збрехало: WebGL
+// працював, а 404 повернула модель руїни (`sceneFailure.ts`).
+//
+// Тому `fallback` тепер функція від помилки, а не готовий вузол: межа
+// знає, що сталось, і мусить це передати далі, а не з'їсти.
 // ============================================================
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 
 interface Props {
-  fallback: ReactNode;
+  fallback: (error: Error) => ReactNode;
   children: ReactNode;
 }
 
 interface State {
-  hasError: boolean;
+  error: Error | null;
 }
 
 export class CrystalErrorBoundary extends Component<Props, State> {
-  override state: State = { hasError: false };
+  override state: State = { error: null };
 
-  static getDerivedStateFromError(): State {
-    return { hasError: true };
+  static getDerivedStateFromError(error: Error): State {
+    return { error };
   }
 
   override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -28,6 +32,7 @@ export class CrystalErrorBoundary extends Component<Props, State> {
   }
 
   override render() {
-    return this.state.hasError ? this.props.fallback : this.props.children;
+    const { error } = this.state;
+    return error === null ? this.props.children : this.props.fallback(error);
   }
 }

@@ -14,6 +14,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CrystalPlaceholder } from '../home/CrystalPlaceholder';
 import { CrystalErrorBoundary } from '../home/crystal3d/CrystalErrorBoundary';
+import { sceneFailureReason } from '../home/crystal3d/sceneFailure';
 import { useWebglSupport } from '../home/crystal3d/useWebglSupport';
 import { HomeArtifactWebglFallback } from '../home/HomeArtifactPreviewFallback';
 import { PortalBackdrop } from '../home/PortalBackdrop';
@@ -164,10 +165,12 @@ export function ArtifactWorld() {
   // Never substitute another artifact's silhouette for the selected one. If
   // WebGL is unavailable or the renderer throws, the world keeps its sky and
   // shows a neutral explanation rather than a stand-in object.
-  // Кнопка «спробувати ще раз» лише там, де пробувати є що: коли сцена
-  // впала вже після монтування, контекст був — і повторна проба скаже
-  // «є» знову, нічого не полагодивши.
-  const rendererFallback = <HomeArtifactWebglFallback artifact={artifact} />;
+  //
+  // Кнопка «спробувати ще раз» лише там, де пробувати є що. Для відсутнього
+  // WebGL це повторна проба контексту; для сцени, яка впала після
+  // монтування, повторна проба сказала б «контекст є» і нічого не
+  // полагодила — там єдине, що допомагає, це перезавантажити сторінку, і
+  // саме це заглушка й пропонує, коли причина в ненавантаженому файлі.
   const webglFallback = (
     <HomeArtifactWebglFallback artifact={artifact} onRetry={retryWebgl} />
   );
@@ -177,7 +180,15 @@ export function ArtifactWorld() {
       <PortalBackdrop />
       <div className="artifact-world__scene">
         {webglSupported ? (
-          <CrystalErrorBoundary key={artifact} fallback={rendererFallback}>
+          <CrystalErrorBoundary
+            key={artifact}
+            fallback={(error) => (
+              <HomeArtifactWebglFallback
+                artifact={artifact}
+                reason={sceneFailureReason(error)}
+              />
+            )}
+          >
             <Suspense fallback={<CrystalPlaceholder />}>
               {artifact === 'reef'
                 ? <ReefScene />
