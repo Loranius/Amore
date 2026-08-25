@@ -14,6 +14,7 @@ import type { ReefPlan } from '@/engine/species/reef/reefAssembly';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import { ReefColonies } from './ReefColonies';
 import { ReefRock } from './ReefRock';
+import { ReefSchool } from './ReefSchool';
 import { ReefWater } from './ReefWater';
 import type { ReefMeshes } from './useReefMeshes';
 
@@ -70,6 +71,7 @@ export function ReefWorld({ plan, meshes, theme, reduceMotion }: ReefWorldProps)
       <ReefWater theme={theme} sceneRadius={standing.rock.radius} />
       <ReefRock standing={standing} seed={plan.headSeed} theme={theme} />
       <ReefColonies plan={plan} meshes={meshes} theme={theme} lift={standing.headLift} />
+      <ReefSchool plan={plan} lift={standing.headLift} reduceMotion={reduceMotion} />
       <OrbitControls
         ref={controls}
         target={[frame.target.x, frame.target.y, frame.target.z]}
