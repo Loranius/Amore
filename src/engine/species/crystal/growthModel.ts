@@ -12,7 +12,6 @@
 // count follows the years a couple has been together, and the modules
 // change size, facets, colour and sparkle instead of adding bodies.
 // ============================================================
-import type { LeapDayPolicy } from '../../evolution/types';
 import { GROUND_LEAN_SCALE } from '../../growth';
 import { stableHash32 } from '../../evolution';
 import { clamp01, round6, seededUnit } from './math';
@@ -21,12 +20,17 @@ import { clamp01, round6, seededUnit } from './math';
  * він однаковий для кристала й рифа. Тут лишається реекспорт: назви вже
  * розійшлись по десятках місць, а сама модель більше не дублюється.
  */
+import type { RelationshipYear } from '../shared/relationshipYear';
+
 export {
   PORTAL_MODULE_COUNT,
   SHARED_DAYS_OFF_FULL_YEAR,
+  anniversaryOn,
+  relationshipYears,
   yearActivity,
   yearFill,
   yearTogetherness,
+  type RelationshipYear,
 } from '../shared/relationshipYear';
 
 const DAYS_PER_YEAR = 365;
@@ -269,78 +273,6 @@ export function monarchFacetCount(
 }
 
 // ── Relationship years ──────────────────────────────────────
-
-export interface RelationshipYear {
-  /** 0 for the first year of the relationship. */
-  index: number;
-  /** Anniversary the year opens on, `YYYY-MM-DD`. */
-  startsAt: string;
-  /** Anniversary it closes on, `YYYY-MM-DD`. */
-  endsAt: string;
-  /** True once `endsAt` has passed: the crystal for it is frozen. */
-  complete: boolean;
-}
-
-function isLeapYear(year: number): boolean {
-  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-}
-
-function pad(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-/**
- * The anniversary date in a given calendar year, honouring the couple's
- * leap-day policy. Mirrors the rule the calendar adapter already applies
- * to yearly events so a Feb 29 relationship does not drift between them.
- */
-export function anniversaryOn(
-  startedAt: string,
-  year: number,
-  leapDayPolicy: LeapDayPolicy,
-): string | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(startedAt);
-  if (!match) return null;
-  const month = Number(match[2]);
-  const day = Number(match[3]);
-  if (month === 2 && day === 29 && !isLeapYear(year)) {
-    return leapDayPolicy === 'feb-28' ? `${year}-02-28` : `${year}-03-01`;
-  }
-  return `${year}-${pad(month)}-${pad(day)}`;
-}
-
-/**
- * Every relationship year up to and including the one in progress.
- *
- * The count is what decides how many child crystals exist, so it is the
- * single place the body count comes from. A couple always has at least
- * one year — the one they are living now.
- */
-export function relationshipYears(
-  startedAt: string,
-  asOf: string,
-  leapDayPolicy: LeapDayPolicy,
-): RelationshipYear[] {
-  const start = /^(\d{4})-(\d{2})-(\d{2})/.exec(startedAt);
-  const now = /^(\d{4})-(\d{2})-(\d{2})/.exec(asOf);
-  if (!start || !now) return [];
-
-  const startYear = Number(start[1]);
-  const years: RelationshipYear[] = [];
-  // A relationship cannot plausibly outrun this, and the bound keeps a
-  // malformed date from spinning the loop.
-  const MAX_YEARS = 150;
-
-  for (let index = 0; index < MAX_YEARS; index += 1) {
-    const startsAt = anniversaryOn(startedAt, startYear + index, leapDayPolicy);
-    const endsAt = anniversaryOn(startedAt, startYear + index + 1, leapDayPolicy);
-    if (startsAt === null || endsAt === null) break;
-    if (startsAt > asOf) break;
-    years.push({ index, startsAt, endsAt, complete: endsAt <= asOf });
-  }
-
-  return years;
-}
 
 /** Twelve discrete steps; a newborn crystal is one twelfth, never nothing. */
 export const CHILD_GROWTH_STEPS = 12;

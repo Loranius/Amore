@@ -119,11 +119,11 @@ export function reefHeadSize(daysTogether: number, breadth: number): ReefHeadSiz
  * твердження про сьогоднішній код, тож воно ще й перевіряється числом.
  */
 export function reefAnnualColonySize(
-  headRadiusAtYearEnd: number,
+  headScaleAtYearEnd: number,
   fill: number,
   seed: number,
 ): ReefAnnualColonySize {
-  const head = Number.isFinite(headRadiusAtYearEnd) ? Math.max(0, headRadiusAtYearEnd) : 0;
+  const head = Number.isFinite(headScaleAtYearEnd) ? Math.max(0, headScaleAtYearEnd) : 0;
   const full = clamp01(fill);
   const share = ANNUAL_MIN_SHARE + (ANNUAL_HEAD_SHARE - ANNUAL_MIN_SHARE) * full;
 

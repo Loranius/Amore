@@ -23,6 +23,7 @@
 // вихідних, і що з цього виходить як «наповненість». Форма, розмір,
 // колір і розкладка лишаються за видом — у рифа вони інші за побудовою.
 // ============================================================
+import type { LeapDayPolicy } from '../../evolution/types';
 
 /**
  * Частини порталу, на які рік може спиратись: календар, плани, вішліст,
@@ -163,4 +164,83 @@ export function coupleHueStep(
   const unit = (Math.abs(seed) % 1_000_003) / 1_000_003;
   const step = Math.min(count - 1, Math.floor(unit * count));
   return round6(step / (count - 1));
+}
+
+// ── Межі року ───────────────────────────────────────────────
+//
+// Сам ПОДІЛ часу на роки теж однаковий для видів, і жив він у кристала.
+// Риф, якому він однаково потрібен, мусив би або тягнути його з чужого
+// виду через межу, або завести другу копію — рівно те, задля позбавлення
+// чого цей файл і з'явився.
+
+export interface RelationshipYear {
+  /** 0 for the first year of the relationship. */
+  index: number;
+  /** Anniversary the year opens on, `YYYY-MM-DD`. */
+  startsAt: string;
+  /** Anniversary it closes on, `YYYY-MM-DD`. */
+  endsAt: string;
+  /** True once `endsAt` has passed: the crystal for it is frozen. */
+  complete: boolean;
+}
+
+function isLeapYear(year: number): boolean {
+  return year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+}
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+/**
+ * The anniversary date in a given calendar year, honouring the couple's
+ * leap-day policy. Mirrors the rule the calendar adapter already applies
+ * to yearly events so a Feb 29 relationship does not drift between them.
+ */
+export function anniversaryOn(
+  startedAt: string,
+  year: number,
+  leapDayPolicy: LeapDayPolicy,
+): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(startedAt);
+  if (!match) return null;
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month === 2 && day === 29 && !isLeapYear(year)) {
+    return leapDayPolicy === 'feb-28' ? `${year}-02-28` : `${year}-03-01`;
+  }
+  return `${year}-${pad(month)}-${pad(day)}`;
+}
+
+/**
+ * Every relationship year up to and including the one in progress.
+ *
+ * The count is what decides how many child crystals exist, so it is the
+ * single place the body count comes from. A couple always has at least
+ * one year — the one they are living now.
+ */
+export function relationshipYears(
+  startedAt: string,
+  asOf: string,
+  leapDayPolicy: LeapDayPolicy,
+): RelationshipYear[] {
+  const start = /^(\d{4})-(\d{2})-(\d{2})/.exec(startedAt);
+  const now = /^(\d{4})-(\d{2})-(\d{2})/.exec(asOf);
+  if (!start || !now) return [];
+
+  const startYear = Number(start[1]);
+  const years: RelationshipYear[] = [];
+  // A relationship cannot plausibly outrun this, and the bound keeps a
+  // malformed date from spinning the loop.
+  const MAX_YEARS = 150;
+
+  for (let index = 0; index < MAX_YEARS; index += 1) {
+    const startsAt = anniversaryOn(startedAt, startYear + index, leapDayPolicy);
+    const endsAt = anniversaryOn(startedAt, startYear + index + 1, leapDayPolicy);
+    if (startsAt === null || endsAt === null) break;
+    if (startsAt > asOf) break;
+    years.push({ index, startsAt, endsAt, complete: endsAt <= asOf });
+  }
+
+  return years;
 }
