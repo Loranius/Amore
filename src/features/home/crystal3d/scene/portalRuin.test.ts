@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_CRYSTAL_COMPOSITION_CONFIG, buildCrystalComposition } from '@/engine/composition';
+import { buildArtifactBlueprint, type EvolutionEventInput } from '@/engine/evolution';
+import { DEFAULT_GROWTH_ENGINE_CONFIG, buildGrowthState } from '@/engine/growth';
+import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '@/engine/species/crystal';
+import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG } from '@/engine/geometry/config';
+import { buildCrystalGeometry } from '@/engine/geometry/engine';
+import { CRYSTAL_SUBSTRATE_BODY_ID } from '@/engine/geometry/substrate';
+import { crystalSceneHeight } from '@/engine/renderer/three';
 import {
   RUIN_FLOOR_TOP_Y,
   RUIN_PEDESTAL_BROAD_RADIUS,
@@ -232,5 +240,90 @@ describe('константи руїни описують саму руїну', (
       closest = Math.min(closest, Math.hypot(point[0], point[2]));
     }
     expect(closest).toBeGreaterThan(RUIN_PEDESTAL_BROAD_RADIUS);
+  });
+});
+
+// ============================================================
+// Камінь під кристалом дає руїна — і це треба МІРЯТИ, а не вірити.
+// ------------------------------------------------------------
+// Портал більше не малює опубліковану жилу (ADR-0063): власник назвав
+// те, що від неї лишалось, п'єдесталом, який підіймає кристал. Меш
+// нікуди не подівся — рушій публікує його, і гарантія ADR-0003
+// («жодна базова кришка не видима») для будь-якого іншого споживача
+// чинна як була.
+//
+// Але В ЦІЙ СЦЕНІ її тепер тримає кам'яний настил руїни, а не жила. Це
+// перекладає гарантію з рушія на асет, і саме тому тут з'являється
+// вимір: настил має бути ТОВЩИЙ за найглибшу закопану основу.
+//
+// Число, через яке цей тест і написано: при зануренні монарха 0.16
+// кришка сягала 0.1898 проти товщини настилу 0.1846 — тобто виходила
+// на 0.0052 нижче. Знизу цього не побачити ніколи, але саме такі
+// «майже вкладається» й перетворюються на дірку після наступної зміни.
+// ============================================================
+
+const MODULES = ['memories', 'plans', 'wishlist', 'calendar', 'media', 'shopping'];
+
+function ownerColony() {
+  const events: EvolutionEventInput[] = [];
+  for (let day = 0; day < 1338; day += 9) {
+    const module = MODULES[day % MODULES.length]!;
+    const date = new Date(Date.UTC(2022, 11, 26) + day * 86400000).toISOString().slice(0, 10);
+    events.push({
+      id: `${module}:${day}`,
+      occurredAt: date,
+      source: `${module}@1`,
+      evidence: 'verified',
+      channels: { remembrance: 0.5, stability: 0.3, exploration: 0.2 },
+      portalActivity: 0.2,
+    });
+  }
+  const artifact = buildArtifactBlueprint({
+    coupleId: 'amore',
+    config: {
+      engineVersion: '1.0.0',
+      relationshipStartedAt: '2022-12-26',
+      timeZone: 'Europe/Kyiv',
+      leapDayPolicy: 'feb-28',
+    },
+    events,
+  });
+  const species = buildCrystalSpeciesBlueprint({
+    artifact,
+    config: { asOf: '2026-08-26', rulesVersion: '1.0.0' },
+  });
+  const growth = buildGrowthState({
+    blueprint: crystalToGrowthBlueprint(species),
+    config: DEFAULT_GROWTH_ENGINE_CONFIG,
+  });
+  const composition = buildCrystalComposition({ growth, config: DEFAULT_CRYSTAL_COMPOSITION_CONFIG });
+  return buildCrystalGeometry({ growth, composition, config: DEFAULT_CRYSTAL_GEOMETRY_CONFIG });
+}
+
+describe('настил руїни накриває те, що ховала жила', () => {
+  it('жодна закопана основа не виходить нижче за низ настилу', () => {
+    const floor = NODES.get('Floor')!;
+    const thickness = Math.max(...floor.map((point) => point[1]))
+      - Math.min(...floor.map((point) => point[1]));
+
+    const geometry = ownerColony();
+    const bodies = geometry.meshes.filter((mesh) => mesh.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID);
+    /*
+     * Одиниці. Рушій живе у власних, сцена — у своїх, і множник між
+     * ними той самий, яким `crystalSceneHeight` переводить висоту.
+     * Беремо його з самої функції, а не константою: інакше цей тест
+     * розійдеться зі справжнім масштабом тихо.
+     */
+    let engineTop = 0;
+    for (const mesh of bodies) engineTop = Math.max(engineTop, mesh.bounds.max.y);
+    const fit = crystalSceneHeight(geometry) / engineTop;
+    expect(fit).toBeGreaterThan(0);
+
+    const deepest = -Math.min(...bodies.map((mesh) => mesh.bounds.min.y)) * fit;
+    expect(deepest, 'основи мають бути закопані').toBeGreaterThan(0);
+    expect(
+      deepest,
+      `найглибша основа ${deepest.toFixed(4)} проти настилу ${thickness.toFixed(4)}`,
+    ).toBeLessThan(thickness);
   });
 });
