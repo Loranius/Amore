@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { REEF_EVENT_SOURCE_MODULES } from '../reef/types';
 import {
   PORTAL_MODULES,
   PORTAL_MODULE_COUNT,
@@ -34,7 +33,8 @@ const bare = (source: string) =>
 describe('модель року живе в одному місці', () => {
   it.each([
     ['кристал', '../crystal/growthModel.ts'],
-    ['риф', '../reef/moduleEvolution.ts'],
+    ['риф', '../reef/reefAssembly.ts'],
+    ['риф: закон росту', '../reef/colonyFormations.ts'],
   ])('%s не має власної копії', (_species, path) => {
     const source = bare(read(path));
     for (const name of ['yearActivity', 'yearTogetherness', 'yearFill']) {
@@ -46,7 +46,8 @@ describe('модель року живе в одному місці', () => {
 
   it.each([
     ['кристал', '../crystal/growthModel.ts'],
-    ['риф', '../reef/moduleEvolution.ts'],
+    ['риф', '../reef/reefAssembly.ts'],
+    ['риф: закон росту', '../reef/colonyFormations.ts'],
   ])('%s не тримає власних сталих року', (_species, path) => {
     /*
      * Числа були однакові в обох копіях — 12, 60, 0.5, 0.3 — і саме тому
@@ -65,13 +66,36 @@ describe('модель року живе в одному місці', () => {
     }
   });
 
-  it('обидва види рахують ТІ САМІ шість модулів', () => {
+  it.each([
+    ['кристал', '../crystal/growthModel.ts'],
+    ['кристал: формації', '../crystal/formations.ts'],
+    ['риф', '../reef/reefAssembly.ts'],
+    ['риф: закон росту', '../reef/colonyFormations.ts'],
+  ])('%s не тримає власного СПИСКУ модулів', (_species, path) => {
     /*
-     * Кристал тримав число з коментарем, риф — список. Склад збігався,
-     * але порівняти їх не було з чим, тож будь-яка правка одного боку
-     * розійшлась би тихо.
+     * Раніше тут звірялись два списки: `REEF_EVENT_SOURCE_MODULES` у
+     * рифа й `PORTAL_MODULES` у спільному шарі. Тепер звіряти нема з
+     * чим — риф свого списку не має взагалі, бо стара підсистема, яка
+     * його тримала, видалена.
+     *
+     * Тому перевірка перевернулась: замість «два списки збігаються» —
+     * «другого списку не існує».
+     *
+     * Ловиться літерал, який перелічує ВСІ шість частин, а не три й
+     * більше. Перша редакція брала три — і падала на
+     * `DELIBERATE_MODULES` кристала, яка списком порталу не є: це
+     * свідома ПІДМНОЖИНА для обхвату монарха, з власним поясненням на
+     * десять рядків. Заборонити підмножини означало б заборонити видам
+     * мати власні думки про модулі; заборонена тут рівно одна річ —
+     * друга копія канонічного переліку.
      */
-    expect([...REEF_EVENT_SOURCE_MODULES].sort()).toEqual([...PORTAL_MODULES].sort());
+    const source = bare(read(path));
+    const literals = source.match(/\[[^\]]*\]/g) ?? [];
+    for (const literal of literals) {
+      const named = PORTAL_MODULES.filter((module) => literal.includes(`'${module}'`));
+      expect(named.length, `власний список модулів: ${literal.slice(0, 60)}`)
+        .toBeLessThan(PORTAL_MODULE_COUNT);
+    }
     expect(PORTAL_MODULE_COUNT).toBe(6);
   });
 });
