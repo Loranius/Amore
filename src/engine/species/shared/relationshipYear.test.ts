@@ -5,6 +5,7 @@ import { REEF_EVENT_SOURCE_MODULES } from '../reef/types';
 import {
   PORTAL_MODULES,
   PORTAL_MODULE_COUNT,
+  portalModuleOf,
   yearActivity,
   yearFill,
   yearTogetherness,
@@ -110,5 +111,32 @@ describe('наповненість року поводиться однаков�
     // Лифт додатковий: рік, про який графік мовчить, просто нічого не дістає.
     expect(yearFill(1, 0.8, 0)).toBeLessThan(yearFill(1, 0.8, 1));
     expect(yearFill(1, 1, 1)).toBeCloseTo(yearFill(1, 1, 0), 6);
+  });
+});
+
+describe('portalModuleOf — один розбір джерела на всі види', () => {
+  it('дістає модуль із джерела виду `модуль@ключ`', () => {
+    expect(portalModuleOf('memories@1234')).toBe('memories');
+    expect(portalModuleOf('plans@abc@def')).toBe('plans');
+    expect(portalModuleOf('media')).toBe('media');
+  });
+
+  it('усі частини стосунків розпізнаються', () => {
+    for (const module of PORTAL_MODULES) {
+      expect(portalModuleOf(`${module}@1`), module).toBe(module);
+    }
+  });
+
+  it('службові модулі й сміття дають null', () => {
+    /*
+     * Покупки — не частина стосунків: рік, у якому пара купила молока,
+     * не став від цього прожитішим (ADR-0017). Тому вони мусять
+     * відпадати ТУТ, а не мовчки рахуватись сьомим модулем.
+     */
+    expect(portalModuleOf('shopping@1')).toBeNull();
+    expect(portalModuleOf('')).toBeNull();
+    expect(portalModuleOf('@1')).toBeNull();
+    expect(portalModuleOf('memoriesX@1')).toBeNull();
+    expect(portalModuleOf(undefined as unknown as string)).toBeNull();
   });
 });

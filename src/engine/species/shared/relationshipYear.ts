@@ -50,6 +50,28 @@ export type PortalModule = (typeof PORTAL_MODULES)[number];
 
 export const PORTAL_MODULE_COUNT = PORTAL_MODULES.length;
 
+/**
+ * З якої частини порталу прийшла подія.
+ *
+ * Джерело події має вигляд `memories@1234` — модуль, собака, ключ рядка.
+ * Розбирали його ТРИ місця: кристал (`eventModule`, повертав будь-який
+ * рядок), риф (`sourceModuleFor`, звіряв зі своїм списком) і сам
+ * `moduleEvolution`. Один формат, три читачі, жодного спільного тесту —
+ * та сама схема, з якої почалась історія цього файлу.
+ *
+ * Повертає `null` для всього, що не є частиною стосунків: покупки —
+ * службовий модуль, і рік, у якому пара купила молока, не став від
+ * цього прожитішим.
+ */
+export function portalModuleOf(source: string): PortalModule | null {
+  const raw = typeof source === 'string' ? source : '';
+  const at = raw.indexOf('@');
+  const name = (at === -1 ? raw : raw.slice(0, at)).trim();
+  return (PORTAL_MODULES as readonly string[]).includes(name)
+    ? name as PortalModule
+    : null;
+}
+
 /** Подій в одному модулі, після яких наступні додають мало. */
 export const YEAR_DEPTH_HALF_SATURATION = 12;
 

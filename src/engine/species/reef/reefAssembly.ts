@@ -24,8 +24,10 @@
 // більше не робить — це не росте від самого лише плину днів.
 // ============================================================
 import type { LeapDayPolicy } from '../../evolution/types';
+import type { ArtifactBlueprint } from '../../evolution/types';
 import {
   PORTAL_MODULES,
+  portalModuleOf,
   relationshipYears,
   yearActivity,
   yearFill,
@@ -200,4 +202,27 @@ export function buildReefPlan(input: BuildReefPlanInput): ReefPlan {
     breadth,
     daysTogether,
   };
+}
+
+/**
+ * Історія рифа з артефакту Еволюції.
+ *
+ * Риф бере з нормалізованої події рівно два поля — коли і звідки. Усе
+ * інше, чим багатий артефакт (канали тиску, свідчення, атрибуція), для
+ * закону росту не важить, і брати його означало б прив'язати вид до
+ * форми, яку він не використовує.
+ *
+ * Події поза частинами стосунків (покупки) відкидаються тут, а не
+ * всередині складання: складання рахує роки, а не вирішує, що таке
+ * стосунки.
+ */
+export function reefHistoryFromArtifact(
+  artifact: ArtifactBlueprint,
+): ReefHistoryEvent[] {
+  const history: ReefHistoryEvent[] = [];
+  for (const event of artifact.events) {
+    const module = portalModuleOf(event.source);
+    if (module !== null) history.push({ occurredAt: event.occurredAt, module });
+  }
+  return history;
 }
