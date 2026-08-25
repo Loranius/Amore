@@ -551,24 +551,46 @@ describe('crystal substrate — quartz vein shape', () => {
         seamPoints.push(point);
       }
     }
-    const proud = Math.max(...seamHeights);
+    /*
+     * Губа — з профілю, а не найвища точка шва: відколи в жеоди є стінка
+     * по периметру, найвищий шов це стінка. Смуга боронить від сходинки
+     * ПІД кристалами, і саме губа за це відповідає.
+     */
+    const proud = substrate.profile.seamRimHeight!;
 
     expect(proud).toBeGreaterThan(0);
     expect(proud).toBeLessThan(tallest * 0.09);
+    // Стінка стоїть вище губи — інакше жеода не порожнина, а тарілка.
+    expect(Math.max(...seamHeights)).toBeGreaterThan(proud);
 
     const floor = Math.min(...seamHeights);
-    let lip = 0;
+    const wall = substrate.profile.geodeWallHeight!;
+    let atRim = 0;
+    let atWall = 0;
     let trough = 0;
     for (const point of seamPoints) {
       const height = point.y;
       expect(height).toBeGreaterThanOrEqual(floor - 1e-6);
-      expect(height).toBeLessThanOrEqual(proud + 1e-6);
-      if (Math.abs(height - proud) < 1e-6) lip += 1;
+      // Стеля шва — вершина стінки жеоди. Вона АБСОЛЮТНА, а не
+      // надбудова над губою: `topHeightAt` віддає `max(шов, стінка)`,
+      // тож жодна точка не має права стати вищою за саму стінку.
+      expect(height).toBeLessThanOrEqual(wall + 1e-6);
+      if (Math.abs(height - proud) < 1e-6) atRim += 1;
+      if (Math.abs(height - wall) < 1e-6) atWall += 1;
       // Below the platform but well clear of the vein's own underside: the
       // fissure has to be a fissure, not a hole through the solid.
       if (height < -1e-6 && height > floor + 1e-6) trough += 1;
     }
-    expect(lip).toBeGreaterThan(0);
+    /*
+     * Три яруси мусять існувати ОДНОЧАСНО, бо жеода — це саме вони:
+     * губа біля кристалів, стінка по периметру, провалля між ними.
+     * Перша редакція цієї перевірки рахувала «губу» й «стінку» тим
+     * самим числом (`seamRimHeight` двічі), тож пропустила б жеоду
+     * зовсім без стінки.
+     */
+    expect(atRim, 'губи біля кристалів немає').toBeGreaterThan(0);
+    expect(atWall, 'стінки жеоди немає').toBeGreaterThan(0);
+    expect(wall).toBeGreaterThan(proud);
     expect(trough).toBeGreaterThan(0);
   });
 
@@ -600,7 +622,7 @@ describe('crystal substrate — quartz vein shape', () => {
         seamPoints.push(point);
       }
     }
-    const proud = Math.max(...seamHeights);
+    const rim = substrate.profile.seamRimHeight!;
     const seamFloor = Math.min(...seamHeights);
     // The cap's *own* reach — a crystal's radius as its tilted base projects it
     // — not the cover the vein is built with. The cover carries a margin on top
@@ -621,7 +643,14 @@ describe('crystal substrate — quartz vein shape', () => {
       );
       if (!overACap) continue;
       held += 1;
-      expect(y).toBeCloseTo(proud, 6);
+      /*
+       * Порівняння з ГУБОЮ, а не з найвищою точкою шва. Властивість, яку
+       * стереже цей тест, — ADR-0003: поверхня над закопаною базовою
+       * кришкою не сідає, інакше кришку видно згори. Губа за це й
+       * відповідає; стінка жеоди стоїть осторонь кристалів і сюди не
+       * дістає.
+       */
+      expect(y).toBeCloseTo(rim, 6);
     }
     expect(held).toBeGreaterThan(0);
   });
@@ -730,5 +759,144 @@ describe('crystal substrate — quartz vein shape', () => {
       expect(first.positions[offset + 2]!).toBeGreaterThanOrEqual(first.bounds.min.z);
       expect(first.positions[offset + 2]!).toBeLessThanOrEqual(first.bounds.max.z);
     }
+  });
+});
+
+// ============================================================
+// Жеода — розкрита порода, з якої встає монарх
+// ------------------------------------------------------------
+// План назвав жеоді дві роботи, і обидві перевіряються тут числом,
+// а не оком:
+//
+// 1. **Ховає стик кристала з підставкою** — щоб правило «жодна базова
+//    кришка не видима» трималось геометрією, а не обіцянкою.
+// 2. **Дає масштаб** — діти стоять усередині жеоди, монарх виходить за
+//    її край.
+//
+// Третє — те, чого план не сказав уголос, але без чого жеода не жеода:
+// вона РОЗКРИТА. Замкнене кільце породи по периметру — це чаша, а не
+// тріщина, з якої щось виросло.
+// ============================================================
+describe('crystal substrate — жеода', () => {
+  /**
+   * Гребінь породи по колу: 36 комірок по 10°, у кожній — найвища точка
+   * шва в цьому напрямку.
+   *
+   * Азимут нормалізується в [0,360), а не лишається в [−180,180]. Це не
+   * косметика: у першій редакції комірка на самому краю діапазону
+   * ловила одну-дві вершини замість трьох, і її низьке значення
+   * виглядало як розлом. Через це перевірка «жеода розкрита» проходила
+   * навіть із ПОВНІСТЮ зімкненою стінкою — тобто стерегла не те.
+   */
+  const BEARING_BINS = 36;
+
+  function crestByBearing(substrate: ReturnType<typeof pipeline>['substrate']) {
+    const seamTriangles = substrate.profile.seamTriangleCount!;
+    const crest = new Array<number>(BEARING_BINS).fill(-Infinity);
+    for (let triangle = 0; triangle < seamTriangles; triangle += 1) {
+      for (let slot = 0; slot < 3; slot += 1) {
+        const index = substrate.indices[triangle * 3 + slot]!;
+        const x = substrate.positions[index * 3]!;
+        const y = substrate.positions[index * 3 + 1]!;
+        const z = substrate.positions[index * 3 + 2]!;
+        const degrees = ((Math.atan2(x, z) * 180) / Math.PI + 360) % 360;
+        const bin = Math.floor(degrees / (360 / BEARING_BINS)) % BEARING_BINS;
+        crest[bin] = Math.max(crest[bin]!, y);
+      }
+    }
+    return crest;
+  }
+
+  it('порода встає по периметру вище за губу', () => {
+    const { substrate } = pipeline();
+    const wall = substrate.profile.geodeWallHeight!;
+    const rim = substrate.profile.seamRimHeight!;
+    expect(wall).toBeGreaterThan(0);
+    // Стінка мусить бути помітно вищою за губу, інакше вона не читається
+    // як порода — лише як товща сама губа.
+    expect(wall).toBeGreaterThan(rim * 1.5);
+  });
+
+  it('жеода розкрита: у стінці є розломи, а не одна щербина', () => {
+    /*
+     * Оце і є різниця між жеодою й горщиком. Розломи розставлені
+     * seed'ом (`geode:break:*`), а їхня глибина — `GEODE_BREAK_DEPTH`.
+     *
+     * Міряються саме СУЦІЛЬНІ ПРОСІКИ, а не найнижча точка. Перша
+     * редакція перевіряла «найнижчий напрямок нижчий за половину
+     * найвищого» — і проходила з `GEODE_BREAK_DEPTH = 0`, тобто з
+     * замкненим кільцем породи. Провалля там давали не розломи, а
+     * поодинокі напрямки, де стінку тисне кристал, що стоїть близько
+     * до контуру. Розлом широкий (0.32–0.62 рад) і займає щонайменше
+     * дві сусідні комірки; тиск кристала — одну.
+     *
+     * Виміряно на цьому seed'і: з розломами — три просіки завширшки по
+     * дві комірки; без них — жодної (лишаються два поодинокі напрямки
+     * від дітей).
+     */
+    const { substrate } = pipeline();
+    const wall = substrate.profile.geodeWallHeight!;
+    const crest = crestByBearing(substrate);
+    const open = crest.map((height) => height < wall * 0.6);
+
+    let gaps = 0;
+    for (let bin = 0; bin < BEARING_BINS; bin += 1) {
+      if (!open[bin] || open[(bin - 1 + BEARING_BINS) % BEARING_BINS]) continue;
+      let length = 0;
+      while (length < BEARING_BINS && open[(bin + length) % BEARING_BINS]) length += 1;
+      if (length >= 2) gaps += 1;
+    }
+    // Два, а не три: сусідні розломи можуть злитись в один ширший, і це
+    // не поламана жеода. Нуль — поламана.
+    expect(gaps, 'стінка зімкнена: жеода стала горщиком').toBeGreaterThanOrEqual(2);
+  });
+
+  it('монарх виходить за край жеоди з великим запасом', () => {
+    /*
+     * Друга робота жеоди — масштаб. Порода, що сягає монарха, з'їдає
+     * його: кристал має ЗВОДИТИСЬ із неї, а не визирати.
+     */
+    const { growth, substrate } = pipeline();
+    const monarch = Math.max(...growth.bodies.map((body) => body.renderedLength));
+    expect(substrate.profile.geodeWallHeight!).toBeLessThan(monarch * 0.2);
+  });
+
+  it('стінка не залазить на кристали', () => {
+    /*
+     * Виміряний випадок: без прив'язки до `clearanceOf` порода
+     * підіймалась до 0.057 при губі 0.0246 просто тому, що зовнішня
+     * дитина стоїть близько до контуру. Для ADR-0003 це не порушення —
+     * кришка лишалась закопаною, — але виглядало як кристал, наполовину
+     * проковтнутий каменем.
+     */
+    const { growth, substrate } = pipeline();
+    const seamTriangles = substrate.profile.seamTriangleCount!;
+    const rim = substrate.profile.seamRimHeight!;
+    for (let triangle = 0; triangle < seamTriangles; triangle += 1) {
+      for (let slot = 0; slot < 3; slot += 1) {
+        const index = substrate.indices[triangle * 3 + slot]!;
+        const x = substrate.positions[index * 3]!;
+        const y = substrate.positions[index * 3 + 1]!;
+        const z = substrate.positions[index * 3 + 2]!;
+        for (const body of growth.bodies) {
+          const reach = Math.hypot(x - body.anchor.x, z - body.anchor.z);
+          // Усередині власного сліду кристала поверхня — це губа й тільки
+          // губа. Радіус беремо з тіла, а не з покриву: покрив ширший,
+          // і саме на його зовнішній частині стінці вже можна рости.
+          if (reach > body.renderedRadius) continue;
+          expect(y, `${body.id}: порода піднялась усередині сліду`)
+            .toBeLessThanOrEqual(rim + 1e-6);
+        }
+      }
+    }
+  });
+
+  it('та сама пара — та сама жеода', () => {
+    // Розломи беруться з seed'а артефакту, тож між двома збірками вони
+    // не мають права поповзти.
+    const first = pipeline().substrate;
+    const second = pipeline().substrate;
+    expect(second.positions).toEqual(first.positions);
+    expect(second.profile.geodeWallHeight).toBe(first.profile.geodeWallHeight);
   });
 });

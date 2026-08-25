@@ -58,7 +58,17 @@ const OUTLINE_SEGMENTS = 96;
  * close under her without the fan of large sectors review rejected as a
  * pinwheel.
  */
-const TOP_RINGS: readonly number[] = [0.84, 0.68, 0.52, 0.37, 0.23, 0.11];
+/*
+ * Перше кільце — 0.92, а не 0.84, відколи в жеоди є стінка.
+ *
+ * Стінка живе на смузі `radial > GEODE_WALL_START` (0.84), а зовнішнє
+ * кільце стоїть на `radial = 1`. Двох кілець вистачає, щоб стінка
+ * ІСНУВАЛА, але не щоб її було видно такою, як вона порахована: між
+ * ними натягується прямий скат, і згладжування підйому (`3-2t`) разом
+ * із розломами зникає в одному трикутнику. Третє кільце посередині
+ * смуги коштує 96 вершин і повертає стінці її форму.
+ */
+const TOP_RINGS: readonly number[] = [0.92, 0.84, 0.68, 0.52, 0.37, 0.23, 0.11];
 
 /** How much wider the buried floor is than the outline at the surface. */
 const FLOOR_FLARE = 1.06;
@@ -93,6 +103,63 @@ const TROUGH_DEPTH = 1.3;
  */
 const RIM_HOLD = 0.94;
 const TROUGH_FALL = 0.75;
+
+/**
+ * Стінка жеоди — порода, що встає по периметру.
+ * ------------------------------------------------------------
+ * Власник назвав умову: «кристал росте з жеоди». Шов, тріщина й губа
+ * тут уже були, і вони справді читаються як розколотий камінь — але
+ * камінь ПЛАСКИЙ. Жеода — порожнина: у неї є стінка, і кристали стоять
+ * усередині неї, а не на ній.
+ *
+ * Губа, яка вже існує, стоїть навколо КОЖНОГО кристала (`RIM_HOLD`), а
+ * зовнішній край натомість падає в тріщину. Тобто рельєф був
+ * протилежний до потрібного, і стінку не можна було дістати
+ * налаштуванням наявних чисел — її треба додати.
+ *
+ * Висота — частка довжини монарха, як і `VEIN_PROUD_OF_MONARCH_HEIGHT`,
+ * і з тієї ж причини: прив'язка до товщини робила б стінку функцією
+ * того, наскільки монарх гладкий, а не наскільки він великий.
+ */
+const GEODE_WALL_HEIGHT = 0.15;
+
+/**
+ * Звідки стінка починає підійматись, у частках відстані до контуру.
+ *
+ * 0.62 → 0.84, і це вимір, а не смак. При 0.62 стінка починалась там,
+ * де ще йде тріщина, і **засипала її**: `trough` у
+ * `substrate.test.ts` став нулем, тобто западини між кристалами не
+ * лишилось зовсім. А тріщина — це і є порожнина, з якої росте кристал;
+ * жеода без неї стає тарілкою з бортиком.
+ *
+ * Тепер стінка починається за тріщиною, майже біля контуру, і робить
+ * рівно те, чим є, — обідок розколотої породи.
+ */
+const GEODE_WALL_START = 0.84;
+
+/**
+ * Наскільки глибокі розломи в стінці.
+ *
+ * Жеода — це камінь, який РОЗКОЛОЛИ, а не чаша. Суцільне кільце сховало б
+ * дітей і замкнуло б кристал у відро. Розломи опускають стінку майже до
+ * шва, і саме крізь них видно, що всередині.
+ *
+ * 0 лишило б стінку суцільною, 1 зрізало б її дощенту.
+ */
+const GEODE_BREAK_DEPTH = 0.78;
+
+/** Скільки розломів. Просте число, щоб вони не збіглися з сегментами. */
+const GEODE_BREAK_COUNT = 3;
+
+/**
+ * За скільки покривів кристала стінка набирає повну силу.
+ *
+ * Перша редакція вимагала цілого зайвого покриву (`clearance - 1`), і
+ * стінки не з'являлось узагалі: на контурі, де вона й мусить стояти,
+ * запас над покривом невеликий, тож згладжування гасило її до значень
+ * НИЖЧЕ губи. Виміряно: `proud` дорівнював губі на всіх кільцях.
+ */
+const GEODE_CLEAR_RUN = 0.35;
 
 /**
  * Vein thickness above the platform's stone, per unit of the node radius.
@@ -381,6 +448,38 @@ function boundsOf(positions: readonly number[]): CrystalMeshBounds {
 }
 
 /**
+ * Висота стінки жеоди в напрямку `angle`, на відстані `radial` від осі
+ * (у частках контуру).
+ *
+ * Розломи розставлені seed'ом, а не рівномірно: три однакові виїмки
+ * через 120° читались би як деталь моделі, а не як тріщина.
+ */
+function geodeWallAt(
+  radial: number,
+  angle: number,
+  wallHeight: number,
+  seed: number,
+): number {
+  if (radial <= GEODE_WALL_START) return 0;
+  const rise = Math.min(1, (radial - GEODE_WALL_START) / (1 - GEODE_WALL_START));
+  const eased = rise * rise * (3 - 2 * rise);
+
+  // Найглибший із розломів у цьому напрямку й вирішує.
+  let openness = 0;
+  for (let index = 0; index < GEODE_BREAK_COUNT; index += 1) {
+    const at = seededUnit(seed, `geode:break:${index}`) * Math.PI * 2;
+    const width = 0.32 + seededUnit(seed, `geode:break:${index}:width`) * 0.3;
+    let delta = Math.abs(angle - at) % (Math.PI * 2);
+    if (delta > Math.PI) delta = Math.PI * 2 - delta;
+    if (delta >= width) continue;
+    const inside = 1 - delta / width;
+    openness = Math.max(openness, inside * inside * (3 - 2 * inside));
+  }
+
+  return wallHeight * eased * (1 - GEODE_BREAK_DEPTH * openness);
+}
+
+/**
  * Published profile. The vein is not a lathe, so this describes its envelope
  * rather than its construction — it exists because `CrystalMeshData` carries a
  * profile for every mesh, and readers use it for bounds and identity.
@@ -561,7 +660,11 @@ export function buildCrystalSubstrateMesh(
   // floor with a margin, so the trough can never cut through the underside and
   // open the solid it is part of.
   const troughDepth = round6(Math.min(nodeRadius * TROUGH_DEPTH, depth * 0.55));
-  const profile = veinProfile(widest, height, depth, veinBearings(bodies));
+  // Стінка жеоди — порода, що встає по периметру. Див. `GEODE_WALL_HEIGHT`.
+  const wallHeight = round6(monarchLength * GEODE_WALL_HEIGHT);
+  // Профіль оголошує НАЙВИЩУ точку тіла: висота стінки, а не губи. Інакше
+  // споживачі профілю (обрізка, межі) вважали б жеоду нижчою, ніж вона є.
+  const profile = veinProfile(widest, height + wallHeight, depth, veinBearings(bodies));
 
   const positions: number[] = [];
   const indices: number[] = [];
@@ -595,11 +698,57 @@ export function buildCrystalSubstrateMesh(
    */
   const topHeightAt = (x: number, z: number): number => {
     const clearance = clearanceOf(x, z);
-    if (clearance <= RIM_HOLD) return height;
-    const fall = Math.min(1, (clearance - RIM_HOLD) / TROUGH_FALL);
-    // Eased, so the rim rolls into the trough instead of stepping into it.
-    const eased = fall * fall * (3 - 2 * fall);
-    return height - (height + troughDepth) * eased;
+    const seam = clearance <= RIM_HOLD
+      ? height
+      : (() => {
+        const fall = Math.min(1, (clearance - RIM_HOLD) / TROUGH_FALL);
+        // Eased, so the rim rolls into the trough instead of stepping into it.
+        const eased = fall * fall * (3 - 2 * fall);
+        return height - (height + troughDepth) * eased;
+      })();
+
+    /*
+     * Стінка жеоди додається ПОВЕРХ шва, а не замість нього: `Math.max`
+     * нижче, бо це дві різні речі про одну поверхню. Шов каже, де
+     * камінь тримається біля кристала й де провалюється між ними;
+     * стінка — де порода встає по краю. Де вони сперечаються, виграє
+     * вища: жеода не може бути нижчою за власну губу.
+     *
+     * Але стінка відступає там, де стоїть кристал.
+     *
+     * Без цього вона залазила на базову кришку зовнішньої дитини:
+     * виміряно 0.057 при губі 0.0246, тобто порода підіймалась на
+     * висоту, удвічі більшу за губу, просто тому, що дитина стоїть
+     * близько до контуру. Для ADR-0003 це не порушення — кришка
+     * лишається закопаною, — але виглядало б як кристал, наполовину
+     * проковтнутий каменем.
+     *
+     * Тому та сама відстань, якою міряється губа (`clearanceOf`),
+     * тримає й стінку: усередині власного покриву кристала її немає
+     * зовсім, і повну висоту вона набирає лише на подвійному покриві.
+     */
+    if (clearance <= 1) return seam;
+    const room = Math.min(1, (clearance - 1) / GEODE_CLEAR_RUN);
+    const angle = Math.atan2(x, z);
+    const edge = veinRadiusAt(angle, capsules, nodeRadius)
+      * (1 + edgeNoise(artifactSeed, angle) * EDGE_NOISE);
+    const radial = Math.hypot(x, z) / Math.max(1e-6, edge);
+    const wall = geodeWallAt(radial, angle, wallHeight, artifactSeed)
+      * (room * room * (3 - 2 * room));
+    /*
+     * Стінка діє ЛИШЕ вище губи.
+     *
+     * Без цієї межі вона мовчки засипала тріщину: на схилі й у розломах
+     * вона дає малі додатні значення, і `Math.max` підіймав ними дно
+     * западини до нуля, не перевищивши при цьому губи. Виміряно —
+     * `trough` у `substrate.test.ts` став нулем при незмінному `proud`,
+     * тобто фісури не стало, а стінки так і не з'явилось.
+     *
+     * Правило, яке це виражає: нижче губи — порожнина жеоди, і порода
+     * там не будується. Вище губи — стінка.
+     */
+    if (wall <= height) return seam;
+    return Math.max(seam, wall);
   };
 
   const inner = Math.max(1e-4, monarchRadius * 0.92);
@@ -632,7 +781,9 @@ export function buildCrystalSubstrateMesh(
   // The outer lip is the one top ring pinned flat: it is where the crack meets
   // the platform, and a lip that wandered would read as a torn edge rather than
   // as stone that split.
-  pushRing(1, height);
+  // Зовнішнє кільце більше не пласке: саме воно й несе стінку жеоди, тож
+  // його висота береться з тієї самої функції, що й уся верхня поверхня.
+  pushRing(1, null);
   for (const toward of TOP_RINGS) pushRing(toward, null);
 
   const floorCenter = positions.length / 3;
@@ -792,7 +943,7 @@ export function buildCrystalSubstrateMesh(
     bodyId: CRYSTAL_SUBSTRATE_BODY_ID,
     hostBodyId: null,
     lod: 'high',
-    profile: { ...profile, seamTriangleCount },
+    profile: { ...profile, seamTriangleCount, seamRimHeight: height, geodeWallHeight: wallHeight },
     positions,
     normals: [],
     indices,

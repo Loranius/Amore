@@ -109,15 +109,58 @@ describe('the root the whole colony grows out of (crystal cluster brief §4)', (
       // bounding box and passed for as long as the two happened to be close;
       // it failed the moment the rubble was allowed to sit further out and
       // grew taller. Geometry publishes `seamTriangleCount` for exactly this.
-      const seamTriangles = root.profile.seamTriangleCount ?? 0;
-      expect(seamTriangles, `${years}y has a seam at all`).toBeGreaterThan(0);
-      let seamTop = -Infinity;
-      for (let slot = 0; slot < seamTriangles * 3; slot += 1) {
-        seamTop = Math.max(seamTop, root.positions[root.indices[slot]! * 3 + 1]!);
-      }
-      const share = seamTop / (monarchSpan.high - monarchSpan.low);
+      /*
+       * Губа береться з профілю, а не з найвищої точки шва.
+       *
+       * Той самий крок, який цей тест уже робив раніше: коли на шов
+       * поклали брили, «найвища точка меша» перестала означати «шов», і
+       * вимір звузили до `seamTriangleCount`. Тепер повторилось на
+       * рівень глибше — у жеоди з'явилась СТІНКА по периметру, тож
+       * найвища точка самого шва це стінка, а не губа.
+       *
+       * Смуга 4–8% боронить від «сходинки, на якій стоять кристали», а
+       * це властивість шва ПІД КРИСТАЛАМИ. Стінка встає осторонь від
+       * них і на цю властивість не впливає — за те, щоб вона не
+       * поглинула дітей, відповідає наступний тест.
+       */
+      const seamTop = root.profile.seamRimHeight;
+      expect(seamTop, `${years}y публікує губу`).toBeGreaterThan(0);
+      const share = seamTop! / (monarchSpan.high - monarchSpan.low);
       expect(share, `${years}y`).toBeGreaterThanOrEqual(0.04);
       expect(share, `${years}y`).toBeLessThanOrEqual(0.08);
+    }
+  });
+
+  it('стінка жеоди не поглинає жодного кристала', () => {
+    /*
+     * Обіцянка, яку дає попередній тест, коли бере губу з профілю
+     * замість найвищої точки шва: стінка законно стоїть вище губи, але
+     * лише ОСТОРОНЬ від кристалів.
+     *
+     * Перевіряється на всіх розмірах колонії, а не лише на трьох роках,
+     * бо ризик росте саме з кількістю дітей: що їх більше, то ближче
+     * зовнішнє кільце підходить до контуру жили — і то ймовірніше, що
+     * порода встане просто на дитині. Виміряний випадок: 0.057 при губі
+     * 0.0246, тобто камінь удвічі вищий за губу на самому кристалі.
+     */
+    for (const [years, count] of SIZES) {
+      const { geometry, growth } = colony(years, count);
+      const root = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+      const rim = root.profile.seamRimHeight;
+      expect(rim, `${years}y публікує губу`).toBeGreaterThan(0);
+      const seamTriangles = root.profile.seamTriangleCount!;
+      for (let slot = 0; slot < seamTriangles * 3; slot += 1) {
+        const index = root.indices[slot]!;
+        const x = root.positions[index * 3]!;
+        const y = root.positions[index * 3 + 1]!;
+        const z = root.positions[index * 3 + 2]!;
+        for (const body of growth.bodies) {
+          const reach = Math.hypot(x - body.anchor.x, z - body.anchor.z);
+          if (reach > body.renderedRadius) continue;
+          expect(y, `${years}y ${body.id}: порода піднялась усередині сліду`)
+            .toBeLessThanOrEqual(rim! + 1e-6);
+        }
+      }
     }
   });
 
