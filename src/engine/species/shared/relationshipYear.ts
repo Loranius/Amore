@@ -127,3 +127,40 @@ export function yearFill(progress: number, activity: number, togetherness = 0): 
   const lived = recorded + (1 - recorded) * TOGETHERNESS_LIFT * clamp01(togetherness);
   return round6(clamp01(progress) * (EMPTY_YEAR_FLOOR + (1 - EMPTY_YEAR_FLOOR) * lived));
 }
+
+/**
+ * Крок пари на кольоровій дузі свого виду, від 0 до 1.
+ *
+ * **Спільна тут ІДЕНТИЧНІСТЬ, а не палітра.** Правило власника — «колір
+ * у кожної пари індивідуальний і формується від дати початку» — не
+ * залежить від того, кристал це чи риф. А от сама дуга залежить:
+ * трояндово-аметистова родина кристала не має нічого спільного з тим,
+ * у чому має бути риф.
+ *
+ * Тому спільним стає рівно те, що однакове: детермінований крок від
+ * дати, поділений на щаблі. Куди його покласти — вирішує вид.
+ *
+ * Наслідок, названий вголос: дві різні дати МОЖУТЬ дати той самий крок.
+ * Щаблів кілька, дат безліч. «Індивідуальний» означає «свій і
+ * незмінний», а не «унікальний у світі».
+ *
+ * @param steps скільки розрізнюваних щаблів має дуга виду
+ * @returns 0..1, або `null` для порожньої дати — вид сам вирішує, що
+ *   означає «кольору ще немає», і вигадувати його за нього не можна
+ */
+export function coupleHueStep(
+  relationshipStartedAt: string,
+  steps: number,
+  hash: (value: string) => number,
+): number | null {
+  const source = typeof relationshipStartedAt === 'string' ? relationshipStartedAt.trim() : '';
+  if (source === '') return null;
+  const count = Number.isFinite(steps) ? Math.max(2, Math.floor(steps)) : 2;
+  const seed = hash(`couple:tint:${source}`);
+  // Той самий розклад, що використовував кристал: рівномірний щабель,
+  // а не неперервне значення — сусідні дати мають давати ВИДИМО різні
+  // відтінки, інакше «індивідуальність» існує лише в числах.
+  const unit = (Math.abs(seed) % 1_000_003) / 1_000_003;
+  const step = Math.min(count - 1, Math.floor(unit * count));
+  return round6(step / (count - 1));
+}
