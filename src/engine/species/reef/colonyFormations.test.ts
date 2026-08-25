@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { yearFill } from '../shared/relationshipYear';
 import {
   ANNUAL_BODIES_MAX,
+  reefColonyAnchor,
+  reefColonyAzimuthRad,
+  reefColonyLayout,
+  reefColonyBand,
   ANNUAL_BODIES_MIN,
   ANNUAL_HEAD_SHARE,
   reefAnnualColonySize,
@@ -144,5 +148,127 @@ describe('модель року — та сама, що в кристала', ()
     // була й одного разу вже розійшлась із оригіналом.
     expect(reefAnnualColonySize(1, yearFill(1, 1), 0).radius)
       .toBeGreaterThan(reefAnnualColonySize(1, yearFill(1, 0), 0).radius);
+  });
+});
+
+describe('розкладка колоній на голові', () => {
+  const head = reefHeadSize(8 * 365, 5);
+
+  it('додавання нового року не рухає жодного попереднього', () => {
+    /*
+     * ГОЛОВНЕ ТВЕРДЖЕННЯ ЦЬОГО ФАЙЛУ.
+     *
+     * Наївне «розставити N колоній рівно по колу» виглядає природним і
+     * руйнує заморозку: щойно приходить наступний рік, кожен попередній
+     * зсувається, тобто минуле переписується на кожну річницю. На
+     * кристалі ця вада вже була, і впіймали її не тести форми.
+     *
+     * Тут вона неможлива за побудовою — місце залежить лише від номера,
+     * — і саме це й перевіряється: колонія третього року однакова в
+     * пари з чотирма роками й у пари з двадцятьма.
+     */
+    /*
+     * Кличеться `reefColonyLayout` — той самий виклик, що робитиме
+     * сцена, — а не прив'язка з тим самим індексом двічі.
+     *
+     * Це виправлення власної сліпоти: перша редакція саме так і робила,
+     * і мутація «азимут від КІЛЬКОСТІ років» пройшла всі двадцять один
+     * тест. Тест не передавав кількості, а справжній споживач передав би
+     * — тобто перевірявся не той API.
+     */
+    const short = reefColonyLayout(head, 4);
+    const long = reefColonyLayout(head, 20);
+    expect(short).toHaveLength(4);
+    for (let index = 0; index < short.length; index += 1) {
+      expect(long[index], `рік ${index} зсунувся`).toEqual(short[index]);
+    }
+  });
+
+  it('колонії не сідають одна на одну', () => {
+    /*
+     * Розсіювання перевіряється числом, а не вірою в золотий кут: він
+     * добрий на площині, а тут купол, і смуга по висоті вужча за повну.
+     *
+     * Виміряно на двадцяти роках: найтісніша пара стоїть на 0.28
+     * радіуса голови. Радіус найбільшої річної колонії — 0.4 радіуса
+     * голови, тож шапки перекриваються, і це правильно: колонії
+     * зростаються в риф, а не стоять окремими кущиками. Забороняється
+     * інше — щоб два роки збіглись у ТУ САМУ точку.
+     */
+    const anchors = Array.from({ length: 20 }, (_, index) => reefColonyAnchor(head, index));
+    let closest = Number.POSITIVE_INFINITY;
+    for (let a = 0; a < anchors.length; a += 1) {
+      for (let b = a + 1; b < anchors.length; b += 1) {
+        closest = Math.min(closest, Math.hypot(
+          anchors[a]!.point.x - anchors[b]!.point.x,
+          anchors[a]!.point.y - anchors[b]!.point.y,
+          anchors[a]!.point.z - anchors[b]!.point.z,
+        ));
+      }
+    }
+    expect(closest / head.radius, 'два роки збіглись').toBeGreaterThan(0.1);
+  });
+
+  it('роки розходяться по всьому колу, а не збиваються збоку', () => {
+    // Купол видно з одного боку, тож розкладка, що зібрала перші п'ять
+    // років в одну чверть, лишила б половину голови голою.
+    const quadrants = new Set(
+      Array.from({ length: 8 }, (_, index) =>
+        Math.floor(reefColonyAzimuthRad(index) / (Math.PI / 2))),
+    );
+    expect(quadrants.size, 'перші вісім років в одній частині кола').toBe(4);
+  });
+
+  it('жодна колонія не сідає ні на дно, ні на саму маківку', () => {
+    /*
+     * Обидва краї виключені з причин, а не для симетрії. Унизу колонія
+     * потонула б у камені. На маківці купол вироджується в точку, і
+     * будь-який азимут дає те саме місце — усі роки збіглись би.
+     */
+    for (let index = 0; index < 30; index += 1) {
+      const band = reefColonyBand(index);
+      expect(band, `рік ${index}`).toBeGreaterThanOrEqual(0.18);
+      expect(band).toBeLessThanOrEqual(0.86);
+    }
+  });
+
+  it('нормаль дивиться назовні купола, а не вгору', () => {
+    /*
+     * Купол приплюснутий (підйом менший за радіус), тож нормаль сфери
+     * тут збрехала б: різниця між нею й справжньою — це різниця між
+     * «росте вгору» і «росте вбік».
+     */
+    for (let index = 0; index < 12; index += 1) {
+      const anchor = reefColonyAnchor(head, index);
+      const outward = anchor.point.x * anchor.normal.x + anchor.point.z * anchor.normal.z;
+      expect(outward, `рік ${index} нормаль дивиться всередину`).toBeGreaterThan(0);
+      expect(anchor.normal.y, `рік ${index}`).toBeGreaterThan(0);
+      const length = Math.hypot(anchor.normal.x, anchor.normal.y, anchor.normal.z);
+      expect(length).toBeCloseTo(1, 5);
+
+      /*
+       * І це НЕ нормаль сфери — вимір, який розрізняє.
+       *
+       * Три твердження вище справджуються й для сфери, тож перша
+       * редакція цього тесту пропустила мутацію «нормаль як у сфери».
+       * Купол приплюснутий (`rise` менший за `radius`), і в градієнті
+       * еліпсоїда `y` ділиться на менше число, ніж `x` і `z`. Отже
+       * справжня нормаль дивиться ВИЩЕ за сферичну в тій самій точці, і
+       * різниця між ними — це різниця між «росте вгору» і «росте вбік».
+       */
+      const sphereY = anchor.point.y / Math.max(1e-9, Math.hypot(
+        anchor.point.x, anchor.point.y, anchor.point.z,
+      ));
+      expect(anchor.normal.y, `рік ${index} нормаль сферична`).toBeGreaterThan(sphereY);
+    }
+  });
+
+  it('точка справді лежить на поверхні голови', () => {
+    for (let index = 0; index < 12; index += 1) {
+      const { point } = reefColonyAnchor(head, index);
+      const onSurface = (point.x * point.x + point.z * point.z) / (head.radius * head.radius)
+        + (point.y * point.y) / (head.rise * head.rise);
+      expect(onSurface, `рік ${index}`).toBeCloseTo(1, 4);
+    }
   });
 });

@@ -145,3 +145,129 @@ export function reefAnnualColonySize(
  * тому, що копія тут уже була й одного разу вже розійшлась із оригіналом.
  */
 export { yearFill };
+
+// ── Розкладка річних колоній на голові ──────────────────────
+//
+// НАЙВАЖЛИВІШЕ ТУТ — не форма, а СТАЛІСТЬ. Місце колонії має залежати
+// лише від номера свого року й ні від чого більше. Наївне «розставити N
+// колоній рівно по колу» виглядає природним і руйнує заморозку: щойно
+// з'являється наступний рік, кожен попередній зсувається, тобто минуле
+// переписується на кожну річницю.
+//
+// На кристалі ця сама вада вже була, і впіймали її не тести форми, а
+// окремий файл про правила власника. Тому розкладка тут будується на
+// послідовностях, які залежать ВИКЛЮЧНО від індексу: золотий кут по
+// азимуту й радикальна інверсія за основою 2 по висоті. Обидві дають
+// добре розсіяний набір при будь-якій кількості, і жоден член не
+// рухається, коли додається наступний.
+
+/** Золотий кут: найрівномірніше розсіювання, яке не залежить від кількості. */
+const GOLDEN_ANGLE_RAD = Math.PI * (3 - Math.sqrt(5));
+
+/**
+ * Смуга на куполі, у якій сидять колонії, у частках дуги від низу до маківки.
+ *
+ * Ні найнижчий край, ні сама маківка не годяться. Унизу колонія
+ * потонула б у камені, на маківці всі роки збились би в одну точку —
+ * купол там вироджується, і будь-який азимут дає те саме місце.
+ */
+const COLONY_BAND_LOW = 0.18;
+const COLONY_BAND_HIGH = 0.86;
+
+export interface ReefColonyAnchor {
+  /** Точка на поверхні голови. */
+  point: { x: number; y: number; z: number };
+  /** Зовнішня нормаль купола в цій точці — куди колонія росте. */
+  normal: { x: number; y: number; z: number };
+  azimuthRad: number;
+  /** 0 біля основи, 1 біля маківки. */
+  band: number;
+}
+
+/**
+ * Радикальна інверсія за основою 2 (послідовність ван дер Корпута).
+ *
+ * Дає числа, які лягають у проміжок дедалі щільніше й РІВНОМІРНО на
+ * будь-якому префіксі: 1/2, 1/4, 3/4, 1/8… Саме та властивість, що
+ * потрібна: перші три роки розкладені так само добре, як перші
+ * двадцять, і додавання двадцять першого не рухає жодного.
+ */
+function radicalInverse2(index: number): number {
+  let bits = Math.max(0, Math.floor(index)) + 1;
+  let result = 0;
+  let denominator = 0.5;
+  while (bits > 0) {
+    result += (bits % 2) * denominator;
+    bits = Math.floor(bits / 2);
+    denominator *= 0.5;
+  }
+  return result;
+}
+
+/** Азимут року — лише від його номера. */
+export function reefColonyAzimuthRad(yearIndex: number): number {
+  const index = Number.isFinite(yearIndex) ? Math.max(0, Math.floor(yearIndex)) : 0;
+  const raw = index * GOLDEN_ANGLE_RAD;
+  return round6(raw - Math.PI * 2 * Math.floor(raw / (Math.PI * 2)));
+}
+
+/** Висота року на куполі — теж лише від його номера. */
+export function reefColonyBand(yearIndex: number): number {
+  const index = Number.isFinite(yearIndex) ? Math.max(0, Math.floor(yearIndex)) : 0;
+  return round6(COLONY_BAND_LOW + (COLONY_BAND_HIGH - COLONY_BAND_LOW) * radicalInverse2(index));
+}
+
+/**
+ * Де саме на голові сидить колонія цього року.
+ *
+ * Купол —півеліпсоїд із радіусом `head.radius` і підйомом `head.rise`,
+ * тож нормаль береться з градієнта його рівняння, а не з припущення,
+ * що це сфера: на приплюснутому куполі різниця між ними та сама, що
+ * між «росте вгору» і «росте вбік».
+ */
+export function reefColonyAnchor(head: ReefHeadSize, yearIndex: number): ReefColonyAnchor {
+  const azimuth = reefColonyAzimuthRad(yearIndex);
+  const band = reefColonyBand(yearIndex);
+  const phi = band * (Math.PI / 2);
+  const ring = Math.cos(phi);
+  const radius = Math.max(1e-6, head.radius);
+  const rise = Math.max(1e-6, head.rise);
+
+  const x = radius * ring * Math.sin(azimuth);
+  const z = radius * ring * Math.cos(azimuth);
+  const y = rise * Math.sin(phi);
+
+  // Градієнт (x²+z²)/R² + y²/H² = 1.
+  const nx = x / (radius * radius);
+  const ny = y / (rise * rise);
+  const nz = z / (radius * radius);
+  const length = Math.max(1e-9, Math.hypot(nx, ny, nz));
+
+  return {
+    point: { x: round6(x), y: round6(y), z: round6(z) },
+    normal: { x: round6(nx / length), y: round6(ny / length), z: round6(nz / length) },
+    azimuthRad: azimuth,
+    band,
+  };
+}
+
+/**
+ * Розкладка ВСІХ річних колоній — те, що кличе сцена.
+ *
+ * Існує окремо від `reefColonyAnchor` не для зручності, а тому що
+ * тестувати треба саме цей виклик. Перша редакція перевіряла стійкість
+ * місця, кличучи прив'язку з тим самим індексом двічі, — і була сліпа
+ * до єдиної вади, яку мала ловити: мутація, що почала рахувати азимут
+ * від КІЛЬКОСТІ років, пройшла всі двадцять один тест. Бо тест не
+ * передавав кількості, а справжній споживач передав би.
+ *
+ * Тепер властивість формулюється так, як її бачить пара: розкладка на
+ * чотири роки — це початок розкладки на двадцять.
+ */
+export function reefColonyLayout(
+  head: ReefHeadSize,
+  yearCount: number,
+): ReefColonyAnchor[] {
+  const count = Number.isFinite(yearCount) ? Math.max(0, Math.floor(yearCount)) : 0;
+  return Array.from({ length: count }, (_, index) => reefColonyAnchor(head, index));
+}
