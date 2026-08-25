@@ -16,6 +16,18 @@ import type { LeapDayPolicy } from '../../evolution/types';
 import { GROUND_LEAN_SCALE } from '../../growth';
 import { stableHash32 } from '../../evolution';
 import { clamp01, round6, seededUnit } from './math';
+/*
+ * Рік стосунків живе у спільному шарі (`shared/relationshipYear.ts`), бо
+ * він однаковий для кристала й рифа. Тут лишається реекспорт: назви вже
+ * розійшлись по десятках місць, а сама модель більше не дублюється.
+ */
+export {
+  PORTAL_MODULE_COUNT,
+  SHARED_DAYS_OFF_FULL_YEAR,
+  yearActivity,
+  yearFill,
+  yearTogetherness,
+} from '../shared/relationshipYear';
 
 const DAYS_PER_YEAR = 365;
 
@@ -550,127 +562,7 @@ export interface ChildDimensions {
   radialScale: number;
 }
 
-/**
- * Portal modules a year can draw on: calendar, plans, wishlist, map,
- * memories, media.
- *
- * Shopping was here and is not any more, and media was not and now is
- * (ADR-0017). Both were the same defect from opposite ends: a convenience
- * module counted as a part of the relationship the year had touched, while a
- * year spent watching and reading together counted as nothing at all.
- *
- * Kept here as a number rather than imported from the adapter layer, which
- * Volume II has no business reaching into. `portalModules.test.ts` checks it
- * against the real adapter source list so the two cannot drift.
- */
-export const PORTAL_MODULE_COUNT = 6;
 
-/** Events in a single module beyond which more of the same adds little. */
-const YEAR_DEPTH_HALF_SATURATION = 12;
-
-/**
- * How lived-in a year was, from 0 to 1.
- *
- * Weighted toward *breadth* — how many parts of the portal the year touched —
- * rather than volume. Counting events made the measure almost entirely a
- * photo count: in a real couple's fullest year, 48 of 80 events were photos,
- * and photos already drive the monarch's facets, so volume both double-counted
- * one module and drowned out the other five. Measured on that couple's four
- * years, counting gave 0.25 / 0.14 / 0.33 / 0.87 — ranking a year of nothing
- * but six photos *above* a year with a trip, an anniversary and a photo.
- *
- * This is the "module fill" the owner asked for from the start.
- */
-export function yearActivity(moduleCount: number, eventCount: number): number {
-  // `Math.max(0, NaN)` is NaN and `Infinity / (Infinity + 12)` is NaN, so a
-  // count has to be proved finite before it is used, not merely floored.
-  const count = (value: number): number => (Number.isFinite(value) ? Math.max(0, value) : 0);
-  const breadth = clamp01(count(moduleCount) / PORTAL_MODULE_COUNT);
-  const events = count(eventCount);
-  const depth = events / (events + YEAR_DEPTH_HALF_SATURATION);
-  return round6(0.6 * breadth + 0.4 * depth);
-}
-
-/**
- * How full a year is, from 0 to 1 — the fraction of the maximum a year's
- * crystal is entitled to.
- *
- * This is the quantity that stops at the anniversary. It is *not* the same
- * as the crystal being immutable: a couple who joined the portal in their
- * third year needs to be able to go back and fill in the first two, and
- * content dated inside a year belongs to that year whenever it is added.
- * What a closed year no longer does is grow with time or with anything
- * that happened outside it.
- *
- * The floor is what a year with nothing in it still gets. It was 0.55, which
- * compressed a real couple's three closed years into 0.66/0.61/0.70 — a nine
- * percent spread, invisible on screen, so three very different years looked
- * identical. A lower floor lets a well-filled year actually look like one.
- */
-const EMPTY_YEAR_FLOOR = 0.3;
-
-/**
- * Shared days off in a whole year that count as "as much time together as this
- * measure can see".
- *
- * Two people on shifts who land the same day off five times a month are living
- * a different relationship from two who manage it twice a year, and no module
- * in the portal was saying so. Sixty is a rate rather than a ceiling on the
- * couple: past it the year is simply full on this axis.
- */
-export const SHARED_DAYS_OFF_FULL_YEAR = 60;
-
-/**
- * How much of the gap between a year's activity and a full year time together
- * can close.
- *
- * **Additive, never subtractive, and that is the whole design.** The first
- * version blended the two — `0.65·activity + 0.35·togetherness` — and a test
- * caught what that means in practice: a couple who starts keeping the work
- * schedule and has a genuinely quiet year gets `togetherness = 0`, so their
- * already-published year crystal *shrinks*. Adopting a module may never cost a
- * couple anything they already had; that is the same rule ADR-0004 states for
- * facets, and it applies to every signal that arrives late.
- *
- * Half, so a year lived entirely together but recorded nowhere still reads as
- * less full than a year that was both.
- */
-const TOGETHERNESS_LIFT = 0.5;
-
-/**
- * How much of a year the two of them actually had off together, 0 to 1.
- *
- * Counted flat against a whole year rather than against the months the schedule
- * happens to cover, and the live data is what decided that. The first version
- * normalised by coverage — an honest-looking idea: two covered months at a good
- * rate should read as a good year. On the owner's own portal that turned 18
- * shared days off across two covered months into a *full* year on this axis,
- * because 18 days in two months extrapolates to 108 in twelve. One good stretch
- * of a newly adopted module was outvoting everything the couple had recorded.
- *
- * Flat counting says only what is known: eighteen days is eighteen days, worth
- * 30% of the lift, and the couple earns the rest by keeping the schedule. It
- * cannot punish thin coverage either, because the lift is additive — a year the
- * schedule says nothing about simply gets nothing, which is what it should get.
- */
-export function yearTogetherness(sharedDaysOff: number): number {
-  const days = Number.isFinite(sharedDaysOff) ? Math.max(0, sharedDaysOff) : 0;
-  return round6(clamp01(days / SHARED_DAYS_OFF_FULL_YEAR));
-}
-
-/**
- * @param togetherness 0 when the work schedule says nothing about this year,
- * which leaves the fill exactly as activity alone would have set it.
- */
-export function yearFill(
-  progress: number,
-  activity: number,
-  togetherness = 0,
-): number {
-  const recorded = clamp01(activity);
-  const lived = recorded + (1 - recorded) * TOGETHERNESS_LIFT * clamp01(togetherness);
-  return round6(clamp01(progress) * (EMPTY_YEAR_FLOOR + (1 - EMPTY_YEAR_FLOOR) * lived));
-}
 
 /**
  * Size of a year's crystal, as a share of the monarch as she stands today.

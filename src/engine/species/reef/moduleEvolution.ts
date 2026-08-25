@@ -1,5 +1,21 @@
 import type { ArtifactBlueprint, NormalizedEvolutionEvent } from '../../evolution';
 import { clamp01, round6, saturate, seededUnit, stableSeed } from './math';
+/*
+ * Рік стосунків — той самий, що в кристала (`shared/relationshipYear.ts`).
+ *
+ * Тут стояли ВЛАСНІ копії `yearActivity`, `yearTogetherness` і `yearFill`
+ * разом із чотирма сталими. Формули збігались дослівно, числа теж
+ * (12, 60, 0.5, 0.3), і трималось це лише на тому, що копію колись
+ * зробили з оригіналу. Одна відмінність уже встигла з'явитись: копія не
+ * мала захисту від нескінченних і нечислових лічильників, тобто два
+ * види по-різному поводились на поганих даних.
+ */
+import {
+  PORTAL_MODULE_COUNT,
+  yearActivity,
+  yearFill,
+  yearTogetherness,
+} from '../shared/relationshipYear';
 import {
   REEF_ANNUAL_STRUCTURE_ARCHETYPES,
   REEF_EVENT_SOURCE_MODULES,
@@ -24,11 +40,6 @@ import type {
 
 const EVENT_SOURCE_SET = new Set<string>(REEF_EVENT_SOURCE_MODULES);
 const MAXIMUM_SUBSTRATE_RADIUS = 6.4;
-const PORTAL_MODULE_COUNT = REEF_EVENT_SOURCE_MODULES.length;
-const YEAR_DEPTH_CONSTANT = 12;
-const SHARED_DAYS_OFF_FULL_YEAR = 60;
-const TOGETHERNESS_LIFT = 0.5;
-const QUIET_YEAR_FLOOR = 0.3;
 const MONTHLY_GROWTH_STEPS = 12;
 const DAYS_PER_YEAR = 365.2425;
 const EVENT_MATURITY_HALF_SATURATION_DAYS = DAYS_PER_YEAR * 2;
@@ -160,20 +171,6 @@ function currentYearProgress(ageDays: number, completedYears: number): { progres
   return { progress: round6(stage / MONTHLY_GROWTH_STEPS), stage };
 }
 
-function yearActivity(moduleCount: number, eventCount: number): number {
-  const breadth = clamp01(moduleCount / PORTAL_MODULE_COUNT);
-  const depth = eventCount <= 0 ? 0 : eventCount / (eventCount + YEAR_DEPTH_CONSTANT);
-  return round6(clamp01(0.6 * breadth + 0.4 * depth));
-}
-
-function yearTogetherness(sharedDaysOff: number): number {
-  return round6(clamp01(sharedDaysOff / SHARED_DAYS_OFF_FULL_YEAR));
-}
-
-function yearFill(progress: number, activity: number, togetherness: number): number {
-  const lived = activity + (1 - activity) * TOGETHERNESS_LIFT * togetherness;
-  return round6(clamp01(progress * (QUIET_YEAR_FLOOR + (1 - QUIET_YEAR_FLOOR) * lived)));
-}
 
 function annualArchetype(
   identitySeed: number,
