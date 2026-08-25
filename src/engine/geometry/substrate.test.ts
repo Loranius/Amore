@@ -290,183 +290,27 @@ describe('crystal substrate', () => {
     expect(seen.fissure).toBeGreaterThan(0);
   });
 
-  it('heaps broken rock on the seam for the crystals to come out of', () => {
-    // The seam alone read as a plinth, and a plinth is what any smooth
-    // continuous surface under a crystal reads as. The reference the owner
-    // supplied is unambiguous about the alternative: a cluster erupts from a
-    // heap of broken rock, with the light coming up between the stones.
-    const { growth, substrate } = pipeline();
-    const seamTriangles = substrate.profile.seamTriangleCount!;
-    const total = substrate.indices.length / 3;
-
-    expect(seamTriangles).toBeGreaterThan(0);
-    expect(total).toBeGreaterThan(seamTriangles);
-
-    /*
-     * Камінь стоїть НА шві — і міряється це на його власному радіусі, а
-     * не проти найвищої точки шва десь інде.
-     *
-     * Тут стояло `bounds.max.y > seamTop`, тобто «найвища точка всієї
-     * підкладки — брила». Це трималось не на властивості брил, а на
-     * розмірі колонії: поки навколо монарха стояло чотири десятки тіл,
-     * шов розповзався широко, його центральний горб опускався відносно
-     * країв — і якась брила випадково переростала його.
-     *
-     * Коли «спідницю» прибрали заради цільного кристала, тіл лишилось
-     * четверо, шов став компактним і високим у центрі, а брили лежать на
-     * гілках, де він низький. Твердження впало, не змінивши жодної брили.
-     *
-     * Виміряно на семи віках колонії, до зміни і після (частка
-     * трикутників брил, що стоять над швом на своєму радіусі):
-     *
-     *              1 рік    4 роки   14 років
-     *   до:      15/624    36/576     62/552
-     *   після:   22/528    58/408    109/624
-     *
-     * Тобто брили НІКОЛИ не були переважно над швом — ні тепер, ні
-     * раніше. Вони наполовину втоплені, і саме так їх і задумано
-     * (`BOULDER_RISE`). Справжня властивість, заради якої цей тест
-     * існує, — що камінь не втоплений ЦІЛКОМ: над швом мусить стояти
-     * помітна частина, інакше підкладка знову читається плитою.
-     */
-    const RINGS = 40;
-    const vertex = (slot: number) => {
-      const base = substrate.indices[slot]! * 3;
-      return {
-        x: substrate.positions[base]!,
-        y: substrate.positions[base + 1]!,
-        z: substrate.positions[base + 2]!,
-      };
-    };
-    let outerRadius = 0;
-    for (let slot = 0; slot < substrate.indices.length; slot += 1) {
-      const point = vertex(slot);
-      outerRadius = Math.max(outerRadius, Math.hypot(point.x, point.z));
-    }
-    const ringOf = (x: number, z: number) =>
-      Math.min(RINGS, Math.floor((Math.hypot(x, z) / outerRadius) * RINGS));
-
-    const seamTopAtRing = new Array<number>(RINGS + 1).fill(Number.NEGATIVE_INFINITY);
-    for (let slot = 0; slot < seamTriangles * 3; slot += 1) {
-      const point = vertex(slot);
-      const ring = ringOf(point.x, point.z);
-      seamTopAtRing[ring] = Math.max(seamTopAtRing[ring]!, point.y);
-    }
-
-    let proud = 0;
-    for (let triangle = seamTriangles; triangle < total; triangle += 1) {
-      let top = Number.NEGATIVE_INFINITY;
-      let ring = 0;
-      for (let corner = 0; corner < 3; corner += 1) {
-        const point = vertex(triangle * 3 + corner);
-        if (point.y > top) {
-          top = point.y;
-          ring = ringOf(point.x, point.z);
-        }
-      }
-      const seamHere = seamTopAtRing[ring]!;
-      if (Number.isFinite(seamHere) && top > seamHere) proud += 1;
-    }
-
-    // Не «більшість» — саме помітна частина. Найгірший вимір із семи
-    // віків дає 22 з 528, тобто 4%; поріг стоїть під ним із запасом і
-    // ловить те, заради чого тест писався: підкладку, на якій каменю не
-    // видно взагалі.
-    expect(proud, 'жоден камінь не стоїть над швом').toBeGreaterThan(0);
-    expect(proud / (total - seamTriangles)).toBeGreaterThan(0.02);
-
-    // Never through a crystal. A boulder is substrate and may share the seam's
-    // own overlap with a buried base cap, but one standing through a shaft
-    // would be raw interpenetration of two closed solids — which the crystal
-    // attachment profile forbids outright.
-    for (let triangle = seamTriangles; triangle < total; triangle += 1) {
-      for (let slot = 0; slot < 3; slot += 1) {
-        const index = substrate.indices[triangle * 3 + slot]!;
-        const x = substrate.positions[index * 3]!;
-        const z = substrate.positions[index * 3 + 2]!;
-        for (const body of growth.bodies) {
-          const reach = Math.hypot(x - body.anchor.x, z - body.anchor.z);
-          expect(reach, body.id).toBeGreaterThan(body.renderedRadius * 0.4);
-        }
-      }
-    }
-  });
-
   it('is deterministic for the same couple', () => {
     expect(pipeline().substrate).toEqual(pipeline().substrate);
   });
 });
 
-describe('crystal substrate ground spread (ADR-0004)', () => {
-  /** Same growth state with a different published `groundSpread` on the monarch. */
-  function withSpread(growth: ReturnType<typeof pipeline>['growth'], spread: number) {
-    return {
-      ...growth,
-      bodies: growth.bodies.map((body) => (
-        body.id === 'crystal:mother'
-          ? { ...body, attributes: { ...body.attributes, groundSpread: spread } }
-          : body
-      )),
-    };
-  }
-
-  it('runs the vein further out with the monarch`s published spread', () => {
-    // Places visited reach geometry only as a number on the monarch's
-    // attributes; the volume never learns what a place is.
-    //
-    // What that number does has changed. It used to scale the whole substrate
-    // radius, which could only ever grow a circle — the shape the vein exists
-    // to replace. It now lengthens the branches, so travel shows as the seam
-    // running further into the stone rather than as a bigger pad.
-    const { growth } = pipeline();
-    const homebody = withSpread(growth, 1);
-    const travelled = withSpread(growth, 1.45);
-
-    const near = veinReach(homebody.bodies, growth.artifactSeed);
-    const far = veinReach(travelled.bodies, growth.artifactSeed);
-    expect(far).toBeGreaterThan(near * 1.15);
-
-    // Saturating, and still local to the crystal group at any input: the gold
-    // rings and the runes own the rest of the dais.
-    const absurd = veinReach(withSpread(growth, 12).bodies, growth.artifactSeed);
-    expect(absurd).toBeCloseTo(far, 6);
-    const widestBody = Math.max(...growth.bodies.map(
-      (body) => Math.hypot(body.anchor.x, body.anchor.z) + body.renderedRadius,
-    ));
-    expect(absurd).toBeLessThan(widestBody * 1.6 + 0.15);
-  });
-
-  it('still covers every base at the widest spread', () => {
-    // A longer branch may only add area — the union it is part of is what
-    // carries ADR-0003 — so the guarantee has to survive the extreme.
-    const { growth } = pipeline();
-    const travelled = withSpread(growth, 1.5);
-    const wider = buildCrystalGeometry({
-      growth: travelled,
-      composition: buildCrystalComposition({
-        growth: travelled,
-        config: DEFAULT_CRYSTAL_COMPOSITION_CONFIG,
-      }),
-      config: DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
-    }).meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
-
-    for (const body of travelled.bodies) {
-      const { tangent, bitangent } = orthonormalBasis(body.direction);
-      for (let step = 0; step < 180; step += 1) {
-        const angle = (step / 180) * Math.PI * 2;
-        const cos = Math.cos(angle) * body.renderedRadius;
-        const sin = Math.sin(angle) * body.renderedRadius;
-        expect(outsideVeinBy(
-          travelled.bodies,
-          growth.artifactSeed,
-          body.anchor.x + tangent.x * cos + bitangent.x * sin,
-          body.anchor.z + tangent.z * cos + bitangent.z * sin,
-        ), body.id).toBeLessThan(0);
-      }
-    }
-    expect(wider.bounds.min.y).toBeLessThan(Math.min(...travelled.bodies.map((b) => b.anchor.y)));
-  });
-});
+// ============================================================
+// Тут був `describe('crystal substrate ground spread (ADR-0004)')`.
+// ------------------------------------------------------------
+// Два тести стерегли те, що мітки карти подовжують гілки жили:
+// `groundSpread` приходив на атрибутах монарха й додавав до 30% вильоту.
+//
+// ADR-0061 це скасував. Причина виміряна: підкладка виходила в 1.58 раза
+// ширшою за самі кристали, і саме подорожі робили її такою — пара, яка
+// багато їздила, отримувала не багатшу жеоду, а більшу калюжу каменю
+// навколо неї. Тепер жила — комір навколо дітей (1.13 ширини кристалів),
+// а мітки карти в геометрію підкладки не входять зовсім.
+//
+// Тести не «тимчасово вимкнені»: властивості, яку вони стерегли, більше
+// немає. Те, що лишилось від них живим — «жила накриває кожну базову
+// кришку» — стереже `covers every crystal footprint` вище.
+// ============================================================
 
 describe('crystal substrate — quartz vein shape', () => {
   it('is an irregular seam, not a disc', () => {
@@ -501,15 +345,30 @@ describe('crystal substrate — quartz vein shape', () => {
       growth.bodies[0]!,
     );
 
-    // Wide node at the monarch: the vein is thickest where the druse stands.
+    /*
+     * Вузол під монархом накриває ЙОГО ВЛАСНУ базову кришку — у кожному
+     * напрямку, а не «в півтора рази ширший за радіус».
+     *
+     * Стара редакція просила саме `renderedRadius * 1.5`, тобто
+     * переказувала константу `NODE_RADIUS = 1.6` з невеликим запасом. Це
+     * не властивість продукту, а копія числа: коли ADR-0061 звузив
+     * вузол до 1.25 заради неправильної форми, тест упав, хоча нічого,
+     * що він мав боронити, не зламалось.
+     *
+     * Справжня межа — ADR-0003: кришка нахиленого тіла лягає на камінь
+     * еліпсом із піввіссю `radius / sin θ`, і жила мусить її накрити.
+     * Її й рахуємо, замість того щоб згадувати константу.
+     */
+    const monarchCover = (monarch.renderedRadius / Math.max(0.35, Math.abs(monarch.direction.y)))
+      * 1.12;
     const acrossTheNode = Math.min(
-      ...Array.from({ length: 8 }, (_, step) => crystalVeinRadiusAt(
+      ...Array.from({ length: 64 }, (_, step) => crystalVeinRadiusAt(
         growth.bodies,
         growth.artifactSeed,
-        (step / 8) * Math.PI * 2,
+        (step / 64) * Math.PI * 2,
       )),
     );
-    expect(acrossTheNode).toBeGreaterThan(monarch.renderedRadius * 1.5);
+    expect(acrossTheNode, 'вузол вужчий за кришку монарха').toBeGreaterThan(monarchCover);
 
     for (const body of growth.bodies) {
       if (body.id === monarch.id) continue;

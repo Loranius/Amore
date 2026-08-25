@@ -1,10 +1,8 @@
 import { round6, seededUnit } from '../growth/math';
 import type { GrowthBody } from '../growth';
 import { rebuildCrystalMeshNormals } from './mesh';
-import { intersectHalfSpaces, polytopeTolerance } from './polytope';
 import type {
   CrystalBodyProfile,
-  CrystalFacePlane,
   CrystalMeshBounds,
   CrystalMeshData,
   CrystalProfileRow,
@@ -215,7 +213,7 @@ function baseCoverOf(body: GrowthBody): number {
 }
 
 /** The node under the monarch, per unit of the monarch's own radius. */
-const NODE_RADIUS = 1.6;
+const NODE_RADIUS = 1.25;
 
 /** Short side fingers off the main branches. */
 const SIDE_CRACK_MIN = 3;
@@ -240,52 +238,24 @@ interface VeinCapsule {
 }
 
 /**
- * The most a well-travelled couple may lengthen a branch, as a fraction of the
- * distance out to the crystal that branch feeds.
+ * Скільки гілка тягнеться за кристал, у частках відстані до нього.
  *
- * Bounded rather than open-ended because the vein has to stay a local feature of
- * the crystal group: the gold rings and the runes own the rest of the dais, and
- * a seam that reached them would read as a second fracture system.
- */
-const BRANCH_REACH_GAIN = 0.3;
-
-/**
- * Скільки гілка тягнеться за кристал САМА, без міток карти.
- *
- * Досі весь виліт гілки давав `spread`, тобто місця на карті. Поки біля
- * монарха стояло два десятки тіл, це не мало значення: жила виходила
- * рваною від самої їх кількості. Коли «спідницю» прибрали заради
- * цільного кристала, тіл лишилось четверо на рівних кутах — і жила
- * стала диском, тобто рівно тим, що власник відкинув («не круглої,
+ * Це те, що лишає жилі неправильну форму: гілки виходять лише в
+ * напрямках дітей, тож підкладка не диск. Без жодного вильоту вона
+ * стала б рівно диском — тим, що власник відкинув («не круглої,
  * овальної чи радіально симетричної форми»).
  *
- * Пара, яка не поставила жодної мітки, не має отримувати круглу
- * підкладку. Мітки карти й далі ПОДОВЖУЮТЬ гілку через
- * `BRANCH_REACH_GAIN`; це число — те, що жила робить без них.
- */
-const BRANCH_BASE_REACH = 0.6;
-
-/**
- * Places visited, as the vein reads them.
+ * **Число впало з 0.6 до 0.18** разом із ADR-0061. Мітки карти більше
+ * не подовжують гілку взагалі: `groundSpread` давав до +0.3 зверху, і
+ * саме він робив підкладку ширшою за все, на чому вона стоїть. Пара,
+ * яка багато подорожувала, отримувала не багатшу жеоду, а більшу
+ * калюжу каменю.
  *
- * The map module used to multiply the whole substrate radius, which grew the
- * base as a circle — the one shape review asked to be rid of. The number still
- * arrives the same way and the stored data is untouched (`groundSpread` is
- * published 1..1.5 by `growthModel`); it now runs the branches further out into
- * the stone instead, and saturates well inside the platform.
- *
- * Returns 0..1, not a multiplier: what it scales is an extension, so a couple
- * that has been nowhere gets branches that stop at their crystals.
+ * Межа знизу тверда й не залежить від цього числа: гілка мусить
+ * накрити базову кришку дитини (`cover`), інакше падає ADR-0003.
+ * Виліт — це те, що ПОНАД накриттям.
  */
-function veinSpreadOf(bodies: readonly GrowthBody[]): number {
-  for (const body of bodies) {
-    const published = body.attributes['groundSpread'];
-    if (typeof published === 'number' && Number.isFinite(published) && published > 1) {
-      return Math.min(1, (published - 1) / 0.45);
-    }
-  }
-  return 0;
-}
+const BRANCH_BASE_REACH = 0.18;
 
 /** Smooth seeded noise around the circle, so the edge breaks without spiking. */
 function edgeNoise(seed: number, angle: number): number {
@@ -317,21 +287,21 @@ function veinCapsules(bodies: readonly GrowthBody[], artifactSeed: number): {
     (widest, body) => (body.renderedRadius > widest.renderedRadius ? body : widest),
     bodies[0]!,
   );
-  const spread = veinSpreadOf(bodies);
   const nodeRadius = Math.max(1e-4, monarch.renderedRadius * NODE_RADIUS);
   const capsules: VeinCapsule[] = [];
 
   for (const body of bodies) {
     if (body.id === monarch.id) continue;
     // Reach past the crystal, not merely up to it: the branch has to swallow
-    // the whole base disc, and `spread` may only ever lengthen it.
+    // the whole base disc — that is ADR-0003, and it is the floor the vein
+    // may never go below.
     const cover = baseCoverOf(body);
     capsules.push({ x: body.anchor.x, z: body.anchor.z, radius: cover });
     const distance = Math.hypot(body.anchor.x, body.anchor.z);
     if (distance <= 1e-6) continue;
     // The tip runs past the crystal and is thinner than the branch behind it,
     // so each direction tapers out into the stone rather than ending in a stub.
-    const extension = cover + distance * (BRANCH_BASE_REACH + spread * BRANCH_REACH_GAIN);
+    const extension = cover + distance * BRANCH_BASE_REACH;
     const stretch = (distance + extension) / distance;
     capsules.push({
       x: body.anchor.x * stretch,
@@ -556,60 +526,6 @@ function veinBearings(bodies: readonly GrowthBody[]): number[] {
  * slightly drawn-in floor, and a floor cap. Returns null when there is nothing
  * to carry.
  */
-/**
- * How many boulders ring the seam, and how large they are relative to the node.
- *
- * The reference the owner supplied for this is unambiguous: a crystal cluster
- * does not rise from a flat plate, it erupts from **a heap of broken rock**,
- * and the light comes up from between the stones rather than out of a groove.
- * The seam alone read as a plinth however it was shaped, because a plinth is
- * exactly what a smooth continuous surface under a crystal is.
- *
- * These are the same half-space intersection the crystals are built from
- * (ADR-0006), which is the point of putting them here rather than in a mesh
- * library: a boulder is a faceted convex solid, and we already have an exact,
- * deterministic way to make one. They differ only in that their planes point
- * anywhere at all rather than holding a hexagonal habit.
- */
-const BOULDER_COUNT = 44;
-const BOULDER_PLANES = 9;
-const BOULDER_SIZE_MIN = 0.34;
-const BOULDER_SIZE_MAX = 0.85;
-/** How far a boulder's own planes may sit from its centre, as a fraction of its size. */
-const BOULDER_OFFSET_MIN = 0.62;
-const BOULDER_OFFSET_MAX = 1;
-/** How much of a boulder stands above the seam's lip. Under half: they are half-buried. */
-const BOULDER_RISE = 0.72;
-
-/**
- * One boulder, as the intersection of planes pointing in seeded directions.
- *
- * Deliberately not a sphere pushed around by noise. A noisy sphere is smooth
- * everywhere and reads as a potato; rock breaks along flat conchoidal faces,
- * and flat faces are what catch the key light differently from one another —
- * the same reason the crystals are built this way.
- */
-function boulderPlanes(seed: number, index: number): CrystalFacePlane[] {
-  const planes: CrystalFacePlane[] = [];
-  for (let face = 0; face < BOULDER_PLANES; face += 1) {
-    const label = `boulder:${index}:${face}`;
-    // Evenly spread directions, then jittered: a purely random set clumps and
-    // leaves the solid unbounded on one side often enough to matter.
-    const cosine = 1 - 2 * ((face + 0.5) / BOULDER_PLANES);
-    const sine = Math.sqrt(Math.max(0, 1 - cosine * cosine));
-    const around = face * 2.39996 + seededUnit(seed, `${label}:around`) * 0.9;
-    const normal = {
-      x: Math.cos(around) * sine,
-      y: cosine,
-      z: Math.sin(around) * sine,
-    };
-    const offset = BOULDER_OFFSET_MIN
-      + seededUnit(seed, `${label}:offset`) * (BOULDER_OFFSET_MAX - BOULDER_OFFSET_MIN);
-    planes.push({ normal, offset, kind: 'prism' });
-  }
-  return planes;
-}
-
 export function buildCrystalSubstrateMesh(
   bodies: readonly GrowthBody[],
   artifactSeed: number,
@@ -824,118 +740,6 @@ export function buildCrystalSubstrateMesh(
   // gives every triangle its own copies — vertex indices do not survive it,
   // while triangle order does, one for one.
   const seamTriangleCount = indices.length / 3;
-
-  // ── Boulders ──────────────────────────────────────────────
-  // Laid on the seam rather than replacing it. The plate still carries
-  // ADR-0003's guarantee — it is the thing wide and deep enough that no base
-  // cap is ever exposed from below — and rock heaped on top of a guarantee does
-  // not weaken it. What the boulders add is the reason the crystals are here:
-  // stone that broke, with the seam's light coming up between the pieces.
-  const bodyAxes = bodies.map((body) => ({
-    x: body.anchor.x,
-    z: body.anchor.z,
-    clear: body.renderedRadius * 1.05,
-  }));
-  for (let index = 0; index < BOULDER_COUNT; index += 1) {
-    const label = `boulder:${index}`;
-    // Spread by golden angle so they never fall into a visible ring, then
-    // jittered off it.
-    const angle = index * 2.39996 + seededUnit(artifactSeed, `${label}:angle`) * 0.7;
-    const reach = veinRadiusAt(angle, capsules, nodeRadius);
-    // Biased outward. The middle of the seam is where the crystals stand, so a
-    // boulder aimed there is a boulder that will be rejected; candidates spent
-    // on ground that can never take one are candidates wasted, and the first
-    // pass placed twenty-six to keep one.
-    // How far out along a branch a stone lies, as a share of that branch's
-    // reach.
-    //
-    // Widened from 0.42–1.16 when the owner halved the monarch's diameter
-    // (2026-08-10). The old band was set while the crystals were stout and the
-    // binding constraint was the gap *between* them; measured after the halving,
-    // 97–100% of boulders were being trimmed against a crystal and the largest
-    // survivors sat in the trough, so nothing stood above the seam's lip at
-    // three colony sizes out of five — and the reference is unambiguous that a
-    // cluster erupts from broken rock rather than standing on a step.
-    //
-    // The room did not disappear, it moved outward. Swept by measuring the
-    // shortest clearance over the lip across five colony sizes:
-    //
-    //   0.42 + 1.16    nothing above the lip at 4, 7 and 14 years
-    //   0.42 + 1.47    0.0025 — positive, but by a hair
-    //   0.55 + 1.60    0.0177 with at least 384 boulder triangles everywhere
-    const along = 0.55 + seededUnit(artifactSeed, `${label}:along`) * 1.05;
-    const x = Math.sin(angle) * reach * along;
-    const z = Math.cos(angle) * reach * along;
-    let size = nodeRadius * (
-      BOULDER_SIZE_MIN
-      + seededUnit(artifactSeed, `${label}:size`) * (BOULDER_SIZE_MAX - BOULDER_SIZE_MIN)
-    );
-    // Never through a crystal. A boulder is substrate, so it may share the
-    // seam's own overlap with a buried base cap, but one standing *through* a
-    // shaft would be raw interpenetration of two closed solids — exactly what
-    // the attachment profile forbids.
-    //
-    // Trimmed to the gap rather than rejected for being in one. Rejecting on
-    // proximity threw away five boulders in six and left a bare seam with two
-    // rocks on it; and it is the wrong shape of rule anyway — a small stone
-    // nestled against a crystal's foot is exactly what the reference shows,
-    // while a large one there would be the violation. So the gap decides the
-    // size, and the size is what the guarantee is stated over: every vertex of
-    // this boulder stays outside the crystal's own radius.
-    const gap = bodyAxes.reduce(
-      (nearest, axis) => Math.min(nearest, Math.hypot(x - axis.x, z - axis.z) - axis.clear),
-      Number.POSITIVE_INFINITY,
-    );
-    if (gap <= 0) continue;
-    const solid = intersectHalfSpaces(
-      boulderPlanes(artifactSeed, index),
-      polytopeTolerance(1),
-    );
-    if (solid === null) continue;
-    // Trim against the solid's **corners**, not its planes. `size` scales the
-    // plane distances, and with nine planes a corner between three of them sits
-    // well outside the nearest face — measured on the built hulls, up to 1.6×.
-    // Trimming by `size` alone therefore let a boulder's corner cross a crystal
-    // it was supposed to stop short of, and the sweep caught exactly that on a
-    // thin first-year body once the children were thickened: a vertex 0.0019
-    // from an axis that wanted 0.0022.
-    //
-    // The same shape of defect as the child clearance in ADR-0016 — a radius
-    // that describes a face being used as though it described the whole solid.
-    let cornerReach = 0;
-    for (const vertex of solid.vertices) {
-      cornerReach = Math.max(cornerReach, Math.hypot(vertex.x, vertex.z));
-    }
-    size = Math.min(size, gap / Math.max(cornerReach, 1e-6));
-    // Below this it is gravel rendered as a dozen triangles nobody can resolve.
-    if (size < nodeRadius * BOULDER_SIZE_MIN * 0.5) continue;
-
-    // Sunk so its widest part is at the stone's own surface: a boulder resting
-    // *on* the plate reads as a pebble placed there, one half-buried reads as
-    // rock the seam broke through.
-    const seat = topHeightAt(x, z) + size * BOULDER_RISE;
-    // Squatter than it is wide, and turned. Rock that has been sitting is
-    // never taller than it is broad.
-    const squash = 0.62 + seededUnit(artifactSeed, `${label}:squash`) * 0.24;
-    const spin = seededUnit(artifactSeed, `${label}:spin`) * Math.PI * 2;
-    const cos = Math.cos(spin);
-    const sin = Math.sin(spin);
-
-    const first = positions.length / 3;
-    for (const vertex of solid.vertices) {
-      positions.push(
-        round6(x + (vertex.x * cos - vertex.z * sin) * size),
-        round6(seat + vertex.y * size * squash),
-        round6(z + (vertex.x * sin + vertex.z * cos) * size),
-      );
-    }
-    for (const face of solid.faces) {
-      const loop = face.loop;
-      for (let corner = 1; corner + 1 < loop.length; corner += 1) {
-        indices.push(first + loop[0]!, first + loop[corner]!, first + loop[corner + 1]!);
-      }
-    }
-  }
 
   const triangleCount = indices.length / 3;
   return rebuildCrystalMeshNormals({

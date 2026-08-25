@@ -142,9 +142,15 @@ export default function EvolutionCrystalPreviewScene() {
   if (isPending || !pipeline) return <CrystalPlaceholder />;
 
   const metrics = pipeline.metrics;
-  // The reliquary replaces the old quartz ground mesh visually. Size it from
-  // the crystals that remain visible, otherwise the hidden vein still inflates
-  // the bronze disc until its rim fills the phone viewport.
+  /*
+   * Радіус самих кристалів — це те, під що будується кадр камери.
+   *
+   * Жила сюди не входить навмисно, і після ADR-0061 це важить менше, ніж
+   * важило: вона більше не в 1.58 раза ширша за кристали, а в 1.13, тож
+   * різниця між двома відповідями стиснулась із «камера відлітає через
+   * камінь» до кількох відсотків. Коментар, що стояв тут, посилався на
+   * бронзовий диск релікварію, якого в сцені немає з часів `ruin.glb`.
+   */
   const visibleCrystalRadius = crystalSceneRadius(
     pipeline.geometry,
     { includeSubstrate: false },
@@ -217,7 +223,11 @@ export default function EvolutionCrystalPreviewScene() {
               geometry={pipeline.geometry}
               material={pipeline.material}
               life={pipeline.life}
-              substrateVisible={false}
+              // ADR-0061: жеода — те, з чого встає кристал, і вона знову
+              // на екрані. Її ховали 2026-08-10, коли ту саму роботу
+              // візуально виконував релікварій процедурного храму; храм
+              // замінено на `ruin.glb`, релікварій зник разом із ним, і
+              // під друзою три тижні не було нічого.
             />
           </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

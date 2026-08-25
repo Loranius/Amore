@@ -184,6 +184,33 @@ describe('the root the whole colony grows out of (crystal cluster brief §4)', (
     }
   });
 
+  it('жила — комір навколо дітей, а не калюжа під ними', () => {
+    /*
+     * ADR-0061, і це те число, заради якого його писали.
+     *
+     * Було: підкладка виходила в 1.58 раза ширшою за самі кристали,
+     * бо виліт гілки давав 0.6 відстані плюс до 0.3 від міток карти.
+     * На екрані це читалось як осип аметисту, що накриває п'єдестал
+     * руїни й вихлюпується на підлогу.
+     *
+     * Стало: 1.10–1.25 на всіх розмірах колонії. Жила лишається
+     * ширшою за кристали — інакше впаде ADR-0003, — але рівно
+     * настільки, щоб накрити їхні кришки й поставити стінку жеоди.
+     */
+    for (const [years, count] of SIZES) {
+      const { geometry } = colony(years, count);
+      let crystals = 0;
+      let vein = 0;
+      for (const mesh of geometry.meshes) {
+        const reach = widestRadius(mesh);
+        if (mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) vein = reach;
+        else crystals = Math.max(crystals, reach);
+      }
+      expect(vein, `${years}y жила має накривати кристали`).toBeGreaterThan(crystals);
+      expect(vein / crystals, `${years}y жила розповзлась`).toBeLessThan(1.35);
+    }
+  });
+
   it('is the crystals’ own colour, darker — not a colour of its own', () => {
     // The defect this replaces: the root was built from three hand-set
     // constants (0.245 / 0.238 / 0.283, blue highest) chosen when it only had
