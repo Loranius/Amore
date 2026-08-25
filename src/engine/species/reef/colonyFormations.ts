@@ -40,6 +40,16 @@ export const ANNUAL_BODIES_MIN = 3;
 export const ANNUAL_BODIES_MAX = 18;
 
 /**
+ * Густина року, з якої все починається: порожній рік — не порожнеча.
+ *
+ * Експортується, бо розкладка тіл усередині колонії мусить знати, де в
+ * неї нуль. Інакше 0.35 довелось би написати вдруге в іншому файлі —
+ * рівно той спосіб, яким «наповненість року» вже одного разу
+ * розійшлася сама з собою.
+ */
+export const ANNUAL_DENSITY_FLOOR = 0.35;
+
+/**
  * Наскільки широта життя розширює голову.
  *
  * Те саме, що в кристала: рахуються РІЗНІ модулі, які жили того року, а
@@ -134,7 +144,7 @@ export function reefAnnualColonySize(
   return {
     radius: round6(head * share),
     bodies,
-    density: round6(0.35 + 0.65 * full),
+    density: round6(ANNUAL_DENSITY_FLOOR + (1 - ANNUAL_DENSITY_FLOOR) * full),
   };
 }
 
