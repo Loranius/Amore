@@ -6,7 +6,11 @@ export { DEFAULT_ORGANIC_SURFACE_CONFIG } from './surfaceConfig';
 export { barkRelief, barkReliefPhase } from './barkRelief';
 export type { BarkReliefSample } from './barkRelief';
 export { ORGANIC_TRUNK_BRANCH_ID } from './surfaceTypes';
-export { buildOrganicSweepMesh } from './multiJunctionSweepMesh';
+export {
+  buildBudgetedOrganicSweepMesh,
+  buildOrganicSweepMesh,
+  type BudgetedOrganicSweepMesh,
+} from './multiJunctionSweepMesh';
 export type {
   BarkReliefConfig,
   OrganicBranchCurve,

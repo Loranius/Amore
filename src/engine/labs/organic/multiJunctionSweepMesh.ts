@@ -508,3 +508,79 @@ export function buildOrganicSweepMesh(
     return patch ? insertPatch(mesh, patch) : mesh;
   }, base);
 }
+
+export interface BudgetedOrganicSweepMesh {
+  mesh: OrganicSweepMesh;
+  /** Крок уздовж кривої, заданий конфігом для цього LOD. */
+  axialStrideConfigured: number;
+  /** Крок, на якому сітка нарешті влізла в стелю. */
+  axialStrideUsed: number;
+  /** Стеля, під яку підганяли. */
+  triangleBudget: number;
+  /** Чи не влізло навіть на найгрубішому кроці. */
+  budgetExceeded: boolean;
+}
+
+/**
+ * Та сама сітка, але під стелею трикутників.
+ *
+ * ЩО ЦЕ ЛАГОДИТЬ. Кожен інший учасник дерева має опубліковану стелю й не може
+ * вирости понад неї: листя обмежене `maxInstancesByLod`, корені — власним
+ * бюджетом (і відколи його полагодили, вони під нього стискаються), дрібнота
+ * на землі — своєю кількістю. Стовбур такої стелі не мав ЖОДНОЇ: він просто
+ * ріс із роками пари, а загальний бюджет дерева перевіряли вже після
+ * складання й, у разі перевищення, писали м'яке порушення, якого ніхто не
+ * читав.
+ *
+ * Виміряно на синтетичних історіях (40 зерен на вік, medium): у ВОСЬМИ З
+ * СОРОКА восьмирічних пар дерево виходило за мобільну стелю 18 000, у
+ * п'ятнадцятирічних — у двох із сорока; найважче дало 18 786. Кожна п'ята
+ * пара певного віку, а не рідкісна аномалія.
+ *
+ * ЧИМ ПРОРІДЖУЄМО. Кроком уздовж кривої, а не сегментами по колу. Рельєф
+ * кори — радіальний (три долі й обертон), і зменшення кола перетворює
+ * стовбур на шестерню; це вже записано в коментарі до `radialSegmentsByLod`
+ * і коштувало окремої правки. Крива ж стовбура плавна, і кільця через одне
+ * на ній не видно — перевірено знімком, коли крок піднімали з 1 на 2
+ * (13 151 → 9 205 трикутників, силует той самий).
+ *
+ * Якщо не влізло навіть на найгрубішому дозволеному кроці, сітка
+ * повертається як є, з піднятим `budgetExceeded`. Кидати помилку тут НЕ
+ * можна: у коренів це вже пробували, і портал показував парі заглушку
+ * замість дерева. Краще дерево трохи понад стелю, ніж порожнє місце.
+ */
+export function buildBudgetedOrganicSweepMesh(
+  frameState: OrganicCurveFrameState,
+  lod: OrganicMeshLod,
+  budget: { maxTriangles: number; maxAxialStride: number },
+  config: OrganicSurfaceConfig = DEFAULT_ORGANIC_SURFACE_CONFIG,
+): BudgetedOrganicSweepMesh {
+  const configured = Math.max(1, Math.floor(config.axialStrideByLod[lod]));
+  // Стеля кроку ніколи не опускає задане конфігом: якщо той свідомо просить
+  // грубішу сітку, він має рацію. Та сама межа, що в коренів із підлогою
+  // сегментів, тільки з іншого боку.
+  const coarsest = Math.max(configured, Math.floor(budget.maxAxialStride));
+
+  const buildAt = (stride: number): OrganicSweepMesh => buildOrganicSweepMesh(
+    frameState,
+    lod,
+    stride === configured
+      ? config
+      : { ...config, axialStrideByLod: { ...config.axialStrideByLod, [lod]: stride } },
+  );
+
+  let stride = configured;
+  let mesh = buildAt(stride);
+  while (mesh.diagnostics.triangleCount > budget.maxTriangles && stride < coarsest) {
+    stride += 1;
+    mesh = buildAt(stride);
+  }
+
+  return {
+    mesh,
+    axialStrideConfigured: configured,
+    axialStrideUsed: stride,
+    triangleBudget: budget.maxTriangles,
+    budgetExceeded: mesh.diagnostics.triangleCount > budget.maxTriangles,
+  };
+}

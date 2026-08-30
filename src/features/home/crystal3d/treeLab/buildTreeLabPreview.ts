@@ -52,10 +52,11 @@ import {
 import {
   buildOrganicCurveFrames,
   buildOrganicSkeleton,
-  buildOrganicSweepMesh,
+  buildBudgetedOrganicSweepMesh,
   type OrganicCurveFrameState,
   type OrganicMeshLod,
   type OrganicSkeletonState,
+  type BudgetedOrganicSweepMesh,
   type OrganicSweepMesh,
 } from '@/engine/labs/organic';
 import {
@@ -64,7 +65,9 @@ import {
   type TreePhenologyState,
 } from '@/engine/phenology';
 import {
+  TREE_TRUNK_MAX_AXIAL_STRIDE,
   buildTreeProductionAcceptance,
+  treeTrunkTriangleBudget,
   type TreeProductionAcceptanceState,
   type TreeProductionAsOfPolicy,
   type TreeProductionPhaseCheckpointInput,
@@ -140,6 +143,14 @@ export interface TreeLabPreviewBuild {
   life: TreeLifeState;
   productionAcceptance: TreeProductionAcceptanceState;
   mesh: OrganicSweepMesh;
+  /**
+   * Як стовбур ужився зі своєю стелею: заданий крок, використаний крок,
+   * сама стеля і чи не вліз навіть на найгрубішому кроці.
+   *
+   * Публікується, щоб «дерево стало простішим» було ЧИСЛОМ, а не здогадкою
+   * з екрана — так само, як `radialSegmentsUsed` у коренів.
+   */
+  trunkBudget: BudgetedOrganicSweepMesh;
   buildMs: number;
 }
 
@@ -250,7 +261,26 @@ export function buildTreeLabPreviewFromArtifact({
     config: DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG,
   });
   const soilSurface = buildTreeSoilSurface({ species, terrain, rootGeometry, materials, config: DEFAULT_TREE_SOIL_SURFACE_CONFIG });
-  const mesh = buildOrganicSweepMesh(frames, lod);
+  /*
+   * Стовбур тепер теж має стелю.
+   *
+   * Він був єдиним учасником дерева без неї: листя обмежене
+   * `maxInstancesByLod`, корені стискаються під власний бюджет, дрібнота на
+   * землі — під свою кількість, а стовбур просто ріс. Загальну стелю
+   * перевіряли вже після складання й писали м'яке порушення, якого ніхто не
+   * читав: виміряно, що його ламала кожна п'ята восьмирічна пара.
+   *
+   * Частка стовбура — не константа, а решта від загальної стелі після всіх,
+   * у кого своя вже є (`treeTrunkTriangleBudget`).
+   */
+  const trunk = buildBudgetedOrganicSweepMesh(frames, lod, {
+    maxTriangles: treeTrunkTriangleBudget(lod, {
+      leafTriangles: leaves.diagnostics.renderedTriangleCount,
+      rootTriangles: rootGeometry.diagnostics.triangleCount,
+    }),
+    maxAxialStride: TREE_TRUNK_MAX_AXIAL_STRIDE,
+  });
+  const mesh = trunk.mesh;
   const barkSurface = buildTreeBarkSurface({
     species,
     frames,
@@ -362,6 +392,7 @@ export function buildTreeLabPreviewFromArtifact({
     groundDetails,
     life,
     productionAcceptance,
+    trunkBudget: trunk,
     mesh,
     buildMs,
   };

@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   TREE_PRODUCTION_HIGH_DETAIL_BUDGET,
   TREE_PRODUCTION_MOBILE_BUDGET,
+  TREE_TRUNK_MAX_AXIAL_STRIDE,
+  treeTrunkTriangleBudget,
 } from '@/engine/productionAcceptance';
+import {
+  DEFAULT_ORGANIC_SURFACE_CONFIG,
+  buildBudgetedOrganicSweepMesh,
+} from '@/engine/labs/organic';
 import { createThreeOrganicSweepGeometry } from '@/engine/renderer/three';
 import {
   buildTreeLabPreview,
@@ -26,15 +32,15 @@ import {
  * на рік — щоб жоден рік не був порожнім: порожній рік не дає ні тіла, ні
  * коренів, і дерево знову виходить маленьким.
  */
-function agedArtifact(years: number): ArtifactBlueprint {
-  const start = new Date(Date.UTC(2026 - years, 7, 30));
+function agedArtifact(years: number, salt = 0): ArtifactBlueprint {
+  const start = new Date(Date.UTC(2026 - years, 7, 30 - salt));
   const spanMs = years * 365.2425 * 86_400_000;
   const total = years * 12;
   const events: EvolutionEventInput[] = [];
   for (let index = 0; index < total; index += 1) {
     const day = new Date(start.getTime() + ((index + 0.5) * spanMs) / total);
     events.push({
-      id: `aged:${years}:${index}`,
+      id: `aged:${years}:${salt}:${index}`,
       occurredAt: `${day.toISOString().slice(0, 10)}T12:00:00+03:00`,
       source: 'memories-preview@1',
       evidence: 'verified',
@@ -43,7 +49,7 @@ function agedArtifact(years: number): ArtifactBlueprint {
     });
   }
   return buildArtifactBlueprint({
-    coupleId: `amore:aged-${years}`,
+    coupleId: `amore:aged-${years}-${salt}`,
     config: {
       engineVersion: 'tree-preview-1.0.0',
       relationshipStartedAt: start.toISOString().slice(0, 10),
@@ -224,8 +230,18 @@ describe('Tree production preview pipeline', () => {
      * тест перевіряє саме те, що ламалось: дерево БУДУЄТЬСЯ в кожному віці.
      */
     for (const years of [1, 3, 5, 6, 7, 8, 10, 15]) {
+      /*
+       * Кілька зерен на вік, а не одне.
+       *
+       * Обидві вади, які цей файл стереже, були ЗЕРНОЗАЛЕЖНІ: корені падали
+       * на 6, 8 і 10 роках, але проходили на 7, а стовбур виходив за бюджет у
+       * восьми парах із сорока восьмирічних. Один прогін на вік ловить таке
+       * випадково — саме тому попередня редакція цього тесту й пропустила
+       * стовбур, спіймавши корені.
+       */
+      for (let salt = 0; salt < 4; salt += 1) {
       const build = buildTreeLabPreviewFromArtifact({
-        artifact: agedArtifact(years),
+        artifact: agedArtifact(years, salt),
         asOf: '2026-08-30T12:00:00+03:00',
         lod: 'medium',
         rulesVersion: 'tree-species-aged',
@@ -242,24 +258,92 @@ describe('Tree production preview pipeline', () => {
       expect(roots.missingRootMeshIds).toEqual([]);
 
       /*
-       * НАЗВАНА МЕЖА, а не прихована.
+       * СТЕЛЯ ТЕПЕР СПРАВЖНЯ, БЕЗ ЗАПАСУ.
        *
-       * Загальна стеля дерева на мобільному — 18 000 трикутників, і на
-       * восьмирічному дереві виміряно 18 078: перевищення на 78, тобто на
-       * 0.4%. Це м'яке порушення — контракт його ЗВІТУЄ, і ніхто нічого не
-       * кидає, — і воно лишається чесно записаним тут, замість того щоб
-       * бути стеленим під поріг, який нічого не ловить.
+       * Тут стояло `× 1.05` із чесним поясненням, що восьмирічне дерево дає
+       * 18 078 проти 18 000 і що це м'яке порушення, яке контракт звітує.
+       * Запас прибрано, бо причину усунуто: стовбур був єдиним учасником без
+       * власної стелі й тепер її має — виміряно, що на 40 зернах восьмого
+       * року за бюджет виходило вісім дерев, а тепер жодне (найважче 17 875).
        *
-       * Тому межа тесту — 5% понад стелю: більше означає, що щось поїхало,
-       * менше вже виміряно й прийнято.
+       * Тобто це не послаблення тесту навпаки, а те, заради чого послаблення
+       * взагалі вводилось: воно було позначкою «тут борг», і борг сплачено.
        */
       const contract = build.productionAcceptance.diagnostics;
-      expect(contract.triangles).toBeLessThanOrEqual(
-        TREE_PRODUCTION_MOBILE_BUDGET.maxTriangles * 1.05,
-      );
+      expect({ years, salt, violations: build.productionAcceptance.violations })
+        .toEqual({ years, salt, violations: [] });
+      expect(contract.triangles)
+        .toBeLessThanOrEqual(TREE_PRODUCTION_MOBILE_BUDGET.maxTriangles);
       expect(contract.estimatedDrawCalls)
         .toBeLessThanOrEqual(TREE_PRODUCTION_MOBILE_BUDGET.maxDrawCalls);
+
+      // Стовбур мав право спростити себе, але не грубше за дозволену межу
+      // й ніколи не тонше за задане конфігом.
+      const trunk = build.trunkBudget;
+      expect(trunk.axialStrideUsed).toBeGreaterThanOrEqual(trunk.axialStrideConfigured);
+      expect(trunk.axialStrideUsed).toBeLessThanOrEqual(TREE_TRUNK_MAX_AXIAL_STRIDE);
+      expect(trunk.budgetExceeded).toBe(false);
+      }
     }
+  });
+
+  it('gives the trunk what is left, not a fixed slice of the budget', () => {
+    /*
+     * ПЕРША РЕДАКЦІЯ ЦЬОГО ПРАВИЛА БУЛА ГІРША, І ЦЕ ВИМІРЯНО.
+     *
+     * Вона ділила бюджет на фіксовані частки за опублікованими стелями всіх
+     * учасників: стовбуру діставалось 18 000 − 720×8 − 1 300 − 24×24 =
+     * 10 364, хай яка крона насправді виросла. На 40 зернах восьмого року
+     * така частка проріджувала 25 дерев із 40 — тоді як за бюджет виходило
+     * вісім. Стовбур платив за листя, якого немає.
+     *
+     * Жива стеля проріджує 12 із 40 і не пропускає жодного порушення.
+     *
+     * Перевірка прямо про це: більша крона МУСИТЬ лишати стовбуру менше.
+     * Мутація «рахувати від стель, а не від спожитого» робить обидва числа
+     * однаковими.
+     */
+    const roomy = treeTrunkTriangleBudget('medium', { leafTriangles: 1_000, rootTriangles: 900 });
+    const crowded = treeTrunkTriangleBudget('medium', { leafTriangles: 5_600, rootTriangles: 1_300 });
+
+    expect(roomy).toBeGreaterThan(crowded);
+    expect(roomy - crowded).toBe(4_600 + 400);
+    // І ніколи не від'ємна: дерево з неможливою кроною не має просити
+    // від стовбура боргу.
+    expect(treeTrunkTriangleBudget('medium', { leafTriangles: 999_999, rootTriangles: 0 })).toBe(0);
+  });
+
+  it('never makes the trunk coarser than the budget allows, nor finer than the config asks', () => {
+    /*
+     * Дві межі підгонки, і обидві названі.
+     *
+     * Знизу — конфіг: якщо він свідомо просить певний крок, стеля не має
+     * права зробити сітку ГУСТІШОЮ за нього. Зверху — чотири: далі крива
+     * стовбура стає ламаною й згин починає читатись колінами.
+     */
+    const build = buildTreeLabPreview('medium');
+    const impossible = buildBudgetedOrganicSweepMesh(
+      build.frames,
+      'medium',
+      { maxTriangles: 1, maxAxialStride: TREE_TRUNK_MAX_AXIAL_STRIDE },
+      DEFAULT_ORGANIC_SURFACE_CONFIG,
+    );
+
+    expect(impossible.axialStrideUsed).toBe(TREE_TRUNK_MAX_AXIAL_STRIDE);
+    // Не влізло — але сітка ПОВЕРНУЛАСЬ. Кидати помилку тут не можна: у
+    // коренів це вже пробували, і портал показував парі заглушку замість
+    // дерева. Краще дерево трохи понад стелю, ніж порожнє місце.
+    expect(impossible.budgetExceeded).toBe(true);
+    expect(impossible.mesh.diagnostics.triangleCount).toBeGreaterThan(0);
+
+    const untouched = buildBudgetedOrganicSweepMesh(
+      build.frames,
+      'medium',
+      { maxTriangles: 1_000_000, maxAxialStride: TREE_TRUNK_MAX_AXIAL_STRIDE },
+      DEFAULT_ORGANIC_SURFACE_CONFIG,
+    );
+    expect(untouched.axialStrideUsed).toBe(untouched.axialStrideConfigured);
+    expect(untouched.budgetExceeded).toBe(false);
   });
 
 });
