@@ -9,9 +9,50 @@ import {
   buildTreeLabPreviewFromArtifact,
 } from './buildTreeLabPreview';
 import {
+  buildArtifactBlueprint,
+  type ArtifactBlueprint,
+  type EvolutionEventInput,
+} from '@/engine/evolution';
+import {
   buildTreeSpeciesPreviewArtifact,
   TREE_SPECIES_PREVIEW_AS_OF,
 } from './treeSpeciesFixture';
+
+/**
+ * Синтетична пара, що прожила `years` років, по 12 подій на рік.
+ *
+ * Потрібна тому, що фікстура — це пара на два з половиною роки, і рівно ця
+ * її коротка історія тримала в тіні падіння, описане нижче. Дванадцять подій
+ * на рік — щоб жоден рік не був порожнім: порожній рік не дає ні тіла, ні
+ * коренів, і дерево знову виходить маленьким.
+ */
+function agedArtifact(years: number): ArtifactBlueprint {
+  const start = new Date(Date.UTC(2026 - years, 7, 30));
+  const spanMs = years * 365.2425 * 86_400_000;
+  const total = years * 12;
+  const events: EvolutionEventInput[] = [];
+  for (let index = 0; index < total; index += 1) {
+    const day = new Date(start.getTime() + ((index + 0.5) * spanMs) / total);
+    events.push({
+      id: `aged:${years}:${index}`,
+      occurredAt: `${day.toISOString().slice(0, 10)}T12:00:00+03:00`,
+      source: 'memories-preview@1',
+      evidence: 'verified',
+      channels: { remembrance: 0.5, culture: 0.3, exploration: 0.4 },
+      portalActivity: 0.3,
+    });
+  }
+  return buildArtifactBlueprint({
+    coupleId: `amore:aged-${years}`,
+    config: {
+      engineVersion: 'tree-preview-1.0.0',
+      relationshipStartedAt: start.toISOString().slice(0, 10),
+      timeZone: 'Europe/Kyiv',
+      leapDayPolicy: 'feb-28',
+    },
+    events,
+  });
+}
 
 function withoutBuildTime<T extends { buildMs: number }>(value: T): Omit<T, 'buildMs'> {
   const { buildMs: _buildMs, ...stable } = value;
@@ -163,4 +204,62 @@ describe('Tree production preview pipeline', () => {
 
     geometry.dispose();
   });
+  it('grows an old couple a tree at all, and keeps it inside the published budget', () => {
+    /*
+     * ЦЕЙ ТЕСТ — ТЕ, ЧОГО БРАКУВАЛО, І ЧОМУ ВАДУ НІХТО НЕ БАЧИВ.
+     *
+     * Усі перевірки бюджету будували ОДНУ фікстуру — пару на два з
+     * половиною роки. Вона вміщується в стелю з запасом, тож контракт
+     * звітував «pass», а на дорослому дереві рушій КИДАВ ПОМИЛКУ:
+     * геометрія коренів виходила за власний бюджет, портал ловив виняток і
+     * показував заглушку. Пара після ~6 років не бачила б свого дерева
+     * взагалі — і жоден зелений прогін цього не сказав би.
+     *
+     * Виміряно тоді (12 подій на рік, medium): 6 років — 1 320 трикутників
+     * коренів, 8 — 1 347, 10 — 1 365, проти бюджету 1 300. На 7 роках
+     * проходило (1 068), тобто це залежало не від віку, а від форми, яку
+     * дала архітектура на цьому зерні: орлянка.
+     *
+     * Тепер бюджет стискає сітку замість того, щоб об неї розбиватись, і
+     * тест перевіряє саме те, що ламалось: дерево БУДУЄТЬСЯ в кожному віці.
+     */
+    for (const years of [1, 3, 5, 6, 7, 8, 10, 15]) {
+      const build = buildTreeLabPreviewFromArtifact({
+        artifact: agedArtifact(years),
+        asOf: '2026-08-30T12:00:00+03:00',
+        lod: 'medium',
+        rulesVersion: 'tree-species-aged',
+      });
+      const roots = build.rootGeometry.diagnostics;
+
+      // Корені влізли — власним стисканням, якщо інакше не виходило.
+      expect({ years, exceeded: roots.triangleBudgetExceeded || roots.vertexBudgetExceeded })
+        .toEqual({ years, exceeded: false });
+      expect(roots.radialSegmentsUsed).toBeGreaterThanOrEqual(7);
+      expect(roots.radialSegmentsUsed).toBeLessThanOrEqual(roots.radialSegmentsConfigured);
+      // І жодного кореня при цьому не загубилось.
+      expect(roots.renderedRootCount).toBe(roots.sourceRootCount);
+      expect(roots.missingRootMeshIds).toEqual([]);
+
+      /*
+       * НАЗВАНА МЕЖА, а не прихована.
+       *
+       * Загальна стеля дерева на мобільному — 18 000 трикутників, і на
+       * восьмирічному дереві виміряно 18 078: перевищення на 78, тобто на
+       * 0.4%. Це м'яке порушення — контракт його ЗВІТУЄ, і ніхто нічого не
+       * кидає, — і воно лишається чесно записаним тут, замість того щоб
+       * бути стеленим під поріг, який нічого не ловить.
+       *
+       * Тому межа тесту — 5% понад стелю: більше означає, що щось поїхало,
+       * менше вже виміряно й прийнято.
+       */
+      const contract = build.productionAcceptance.diagnostics;
+      expect(contract.triangles).toBeLessThanOrEqual(
+        TREE_PRODUCTION_MOBILE_BUDGET.maxTriangles * 1.05,
+      );
+      expect(contract.estimatedDrawCalls)
+        .toBeLessThanOrEqual(TREE_PRODUCTION_MOBILE_BUDGET.maxDrawCalls);
+    }
+  });
+
 });

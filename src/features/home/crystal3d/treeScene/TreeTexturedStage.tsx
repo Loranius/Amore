@@ -87,8 +87,18 @@ const terrainHeight = (x: number, z: number, radius: number) => {
 };
 
 function buildTerrainGeometry(radius: number) {
-  const rings = 28;
-  const segments = 88;
+  /*
+   * 18×56, а було 28×88 — тобто 1 960 трикутників замість 4 840.
+   *
+   * Числа не з голови: розклад живої сцени (`npm run live -- … --breakdown`)
+   * показав, що терен — третя за вагою річ у кадрі, 13.2% усіх трикутників,
+   * і йде вона на пагорб, який на телефоні майже весь перекритий травою,
+   * камінням і самим деревом. Рельєф тут — плавна купольна функція з
+   * ридж-шумом; 56 сегментів по колу дають крок 6.4° замість 4.1°, і на
+   * силуеті це не читається, бо силует пагорба закриває передній план.
+   */
+  const rings = 18;
+  const segments = 56;
   const positions: number[] = [0, 0, 0];
   const uvs: number[] = [0.5, 0.5];
   const indices: number[] = [];
@@ -307,7 +317,15 @@ export function TreeTexturedStage({
       <fog attach="fog" args={[palette.fog, frame.distance * 0.84, frame.distance + 32]} />
 
       <mesh frustumCulled={false}>
-        <sphereGeometry args={[skyRadius, 48, 24]} />
+        {/*
+          * 32×16 замість 48×24: 960 трикутників замість 2 208.
+          *
+          * Небо — це ТЕКСТУРА на сфері, тож щільність сітки не має стосунку
+          * до плавності градієнта: вона впливає лише на те, наскільки
+          * спотворяться UV біля полюсів. Камера дивиться майже в горизонт,
+          * де спотворення найменше.
+          */}
+        <sphereGeometry args={[skyRadius, 32, 16]} />
         <meshBasicMaterial map={textures.sky} side={THREE.BackSide} depthWrite={false} fog={false} />
       </mesh>
 
@@ -346,29 +364,36 @@ export function TreeTexturedStage({
         <meshStandardMaterial color="#ffffff" roughness={0.94} metalness={0} />
       </instancedMesh>
 
+      {/*
+        * Три пагорби на обрії й сонце: 990 і 688 трикутників замість 1 964 і
+        * 1 760. Разом із небом і тереном це 20% сцени, витрачені на тло, яке
+        * телефон показує кількома десятками пікселів. Гало сонця — прозорі
+        * кулі з непрозорістю 0.035 і 0.085; грані на них не видно за
+        * побудовою, тож там сітка найгрубіша, а сам диск лишили щільнішим.
+        */}
       <mesh position={[hillRadius * 0.72, groundY - hillRadius * 0.43, -hillRadius * 1.32]} scale={[1.55, 0.28, 1]}>
-        <sphereGeometry args={[hillRadius * 0.9, 32, 14, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[hillRadius * 0.9, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color={palette.distantGrass} roughness={1} metalness={0} />
       </mesh>
       <mesh position={[-hillRadius * 1.18, groundY - hillRadius * 0.62, -hillRadius * 2.12]} scale={[2.05, 0.31, 1.15]}>
-        <sphereGeometry args={[hillRadius * 0.82, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[hillRadius * 0.82, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color={palette.hazeHill} roughness={1} metalness={0} />
       </mesh>
       <mesh position={[hillRadius * 1.08, groundY - hillRadius * 0.8, -hillRadius * 3.05]} scale={[2.75, 0.28, 1.35]}>
-        <sphereGeometry args={[hillRadius * 0.86, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <sphereGeometry args={[hillRadius * 0.86, 18, 7, 0, Math.PI * 2, 0, Math.PI / 2]} />
         <meshStandardMaterial color={palette.hazeHillFar} roughness={1} metalness={0} />
       </mesh>
 
       <mesh position={[-9.5, groundY + 8.5, -17]}>
-        <sphereGeometry args={[1.7, 20, 14]} />
+        <sphereGeometry args={[1.7, 12, 8]} />
         <meshBasicMaterial color={palette.sunHalo} transparent opacity={0.035} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh position={[-9.5, groundY + 8.5, -17]}>
-        <sphereGeometry args={[1.02, 20, 14]} />
+        <sphereGeometry args={[1.02, 12, 8]} />
         <meshBasicMaterial color={palette.sunHalo} transparent opacity={0.085} depthWrite={false} toneMapped={false} />
       </mesh>
       <mesh position={[-9.5, groundY + 8.5, -17]}>
-        <sphereGeometry args={[0.58, 24, 16]} />
+        <sphereGeometry args={[0.58, 16, 12]} />
         <meshBasicMaterial color={palette.sun} toneMapped={false} />
       </mesh>
 

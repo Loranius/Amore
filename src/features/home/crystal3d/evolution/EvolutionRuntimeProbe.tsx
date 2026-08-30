@@ -9,6 +9,24 @@ export interface EvolutionRuntimeMetrics {
   lines: number;
 }
 
+/**
+ * Ключ, під яким сцена лежить на `window` у dev-збірці.
+ *
+ * Навіщо. `gl.info.render.triangles` каже, скільки трикутників намальовано, і
+ * не каже ЧИМ. Питання «на що витрачені 36 754 трикутники дерева» без цього
+ * доводиться відповідати читанням коду й арифметикою на папері — а саме там
+ * і жила помилка, яку тут уже ловили: гіпотеза про бюджет дерева обіцяла
+ * −40%, дала −5%, бо три названі підозрювані разом важили менше за
+ * четвертого, якого ніхто не зважував.
+ *
+ * Тому обхід сцени — не «зручність», а те, без чого бюджетна робота
+ * ворожить. Живий харнес читає це через `--breakdown`.
+ *
+ * ТІЛЬКИ dev. У продакшн-збірці рядок вирізається разом із гілкою, тож пара
+ * ніколи не отримує посилання на сцену в глобальному просторі.
+ */
+export const EVOLUTION_SCENE_HANDLE = '__amoreEvolutionScene';
+
 export function EvolutionRuntimeProbe({
   onMetrics,
   warmupFrames = 24,
@@ -17,8 +35,18 @@ export function EvolutionRuntimeProbe({
   warmupFrames?: number;
 }) {
   const gl = useThree((state) => state.gl);
+  const scene = useThree((state) => state.scene);
   const frameRef = useRef(0);
   const lastRef = useRef('');
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return undefined;
+    const holder = window as unknown as Record<string, unknown>;
+    holder[EVOLUTION_SCENE_HANDLE] = scene;
+    return () => {
+      delete holder[EVOLUTION_SCENE_HANDLE];
+    };
+  }, [scene]);
 
   useEffect(() => {
     frameRef.current = 0;

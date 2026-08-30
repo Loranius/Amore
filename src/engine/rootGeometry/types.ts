@@ -25,6 +25,16 @@ export interface TreeRootGeometryDiagnostics {
   contactApplied: boolean;
   groundLevelY: number | null;
   visiblePathFraction: number | null;
+  /** Радіальні сегменти, задані конфігом для цього LOD. */
+  radialSegmentsConfigured: number;
+  /**
+   * Скільки їх лишилось після підгонки під бюджет.
+   *
+   * Менше за `radialSegmentsConfigured` означає, що корені довелось
+   * спростити, аби сітка влізла в стелю. Публікується, щоб «дерево стало
+   * простішим» було ЧИСЛОМ у діагностиці, а не здогадкою з екрана.
+   */
+  radialSegmentsUsed: number;
   collarVertexCount: number;
   collarTriangleCount: number;
   terrainApplied: boolean;

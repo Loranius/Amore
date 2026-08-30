@@ -164,6 +164,7 @@ export function parseShotArgs(argv) {
     headed: false,
     still: false,
     login: true,
+    breakdown: false,
   };
 
   for (const raw of argv) {
@@ -195,6 +196,9 @@ export function parseShotArgs(argv) {
       case 'still': options.still = value !== 'false'; break;
       // Не входити в портал: єдиний спосіб зняти сам екран входу.
       case 'no-login': options.login = value === 'false'; break;
+      // Розклад сцени по об'єктах. Сума трикутників не каже, куди вони пішли,
+      // а бюджетна робота питає саме це — і вже раз помилилась, бо не питала.
+      case 'breakdown': options.breakdown = value !== 'false'; break;
       case 'keep-server': options.keepServer = value !== 'false'; break;
       case 'headed': options.headed = value !== 'false'; break;
       default:
@@ -233,6 +237,7 @@ export function parseShotArgs(argv) {
     keepServer: options.keepServer,
     headed: options.headed,
     still: options.still,
+    breakdown: options.breakdown,
     login: options.login,
   };
 }

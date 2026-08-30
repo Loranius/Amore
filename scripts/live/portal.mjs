@@ -315,7 +315,31 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
  * атрибутом. Час додається лише після неї — на приїзд камери й текстур.
  */
 export async function goToRoute(page, path, { settle }) {
-  await page.evaluate((hash) => { window.location.hash = hash.replace(/^#/, ''); }, path);
+  /*
+   * ПАСТКА №9: маршрут із запитом мовчки втрачав запит.
+   *
+   * Тут стояв лише `window.location.hash = …`, бо портал маршрутизується
+   * хешем. Для `#/plans` це правда, а для `/?treeLod=low` — ні: рядок запиту
+   * у хеш не потрапляє, сторінка лишається з тим `location.search`, з яким
+   * завантажилась (тобто порожнім), і знімок показує ЗОВСІМ ІНШУ гілку, ніж
+   * просили.
+   *
+   * Коштувало це хибного висновку рівно один раз: три прогони з
+   * `?treeLod=low|medium|high` дали три однакові розклади сцени, і з цього
+   * мало не народилось «прапорець LOD у дерева мертвий». Насправді мертвим
+   * був перехід — у рушії LOD міняє сітку втричі (2 328 / 7 553 / 9 474
+   * трикутники стовбура).
+   *
+   * Тому запит — це повне перезавантаження. Сесія переживає його в
+   * localStorage, тож логін не втрачається.
+   */
+  const query = path.startsWith('?') || path.startsWith('/?');
+  if (query) {
+    await page.evaluate((href) => { window.location.href = href; }, path);
+    await page.waitForLoadState('domcontentloaded').catch(() => {});
+  } else {
+    await page.evaluate((hash) => { window.location.hash = hash.replace(/^#/, ''); }, path);
+  }
   await page.waitForTimeout(400);
 
   // Спершу ознака, і аж потім час.
@@ -383,6 +407,70 @@ export async function readSceneMetrics(page) {
       drawCalls: attr('data-evolution-draw-calls'),
       renderedTriangles: attr('data-evolution-rendered-triangles'),
     };
+  });
+}
+
+/**
+ * Із чого складається сцена — по об'єктах, а не однією сумою.
+ *
+ * `gl.info.render.triangles` каже СКІЛЬКИ намальовано й не каже ЧИМ, а
+ * бюджетна робота питає саме друге. Тут це вже коштувало хибного висновку:
+ * гіпотеза «листя, терен і трава — головні витрати дерева» обіцяла −40%,
+ * дала −5%, бо всі троє разом важили менше за четвертого, якого ніхто не
+ * зважував. Обхід сцени робить таку помилку неможливою: видно всіх.
+ *
+ * Читає `window.__amoreEvolutionScene`, який `EvolutionRuntimeProbe` кладе
+ * тільки в dev-збірці. У продакшні його немає, і функція чесно поверне null
+ * замість того, щоб вигадати число.
+ *
+ * Рахує ГЕОМЕТРІЮ, а не намальоване: інстанси множаться на `count`, невидиме
+ * (`visible === false`) позначається окремо, бо воно є в пам'яті й нема в
+ * кадрі. Сума по видимих має сходитись із `renderedTriangles` — розбіжність
+ * означає, що щось малюється двічі або відсікається камерою, і це теж знахідка.
+ */
+export async function readSceneBreakdown(page) {
+  return page.evaluate(() => {
+    const scene = window.__amoreEvolutionScene;
+    if (!scene) return null;
+    const rows = [];
+    scene.traverse((object) => {
+      const geometry = object.geometry;
+      if (!geometry) return;
+      const index = geometry.index;
+      const position = geometry.attributes?.position;
+      if (!position) return;
+      const perInstance = index ? index.count / 3 : position.count / 3;
+      const instances = typeof object.count === 'number' ? object.count : 1;
+      let visible = object.visible;
+      for (let node = object.parent; node && visible; node = node.parent) {
+        if (!node.visible) visible = false;
+      }
+      // Ім'я рідко ставлять руками, тож беремо перше, що є: власне ім'я,
+      // ім'я найближчого названого предка, інакше матеріал і вид геометрії —
+      // «Mesh» на тридцяти рядках не відповідає ні на що.
+      let label = object.name;
+      if (!label) {
+        for (let node = object.parent; node && !label; node = node.parent) {
+          if (node.name) label = `${node.name}/${object.type}`;
+        }
+      }
+      if (!label) {
+        const material = Array.isArray(object.material) ? object.material[0] : object.material;
+        const parts = [geometry.type, material?.name || material?.type].filter(Boolean);
+        label = parts.join(' · ') || object.type;
+      }
+      rows.push({
+        name: label,
+        type: object.type,
+        instances,
+        triangles: Math.round(perInstance * instances),
+        visible,
+      });
+    });
+    rows.sort((left, right) => right.triangles - left.triangles);
+    const total = rows.reduce((sum, row) => sum + (row.visible ? row.triangles : 0), 0);
+    const hidden = rows.reduce((sum, row) => sum + (row.visible ? 0 : row.triangles), 0);
+    return { rows, total, hidden };
   });
 }
 

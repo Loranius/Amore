@@ -9,6 +9,7 @@ import {
   probeInk,
   probeSelectors,
   readJourneyMetrics,
+  readSceneBreakdown,
   readSceneMetrics,
   tapPoint,
   tapSelector,
@@ -96,6 +97,9 @@ async function main() {
 
           const metrics = await readSceneMetrics(portal.page);
           const journey = await readJourneyMetrics(portal.page);
+          const breakdown = options.breakdown
+            ? await readSceneBreakdown(portal.page)
+            : null;
           const probes = await probeSelectors(portal.page, options.probes);
           const inks = await probeInk(portal.page, options.inks);
 
@@ -122,6 +126,25 @@ async function main() {
               `          draw calls ${value(journey.drawCalls)},`
               + ` трикутників ${value(journey.triangles)}`,
             );
+          }
+          if (options.breakdown) {
+            if (breakdown === null) {
+              console.log('  розклад —  сцена не віддала себе: ручка є лише в dev-збірці.');
+            } else {
+              console.log(
+                `  розклад  видимих ${breakdown.total} трикутників`
+                + (breakdown.hidden > 0 ? `, прихованих ${breakdown.hidden}` : ''),
+              );
+              for (const row of breakdown.rows) {
+                if (row.triangles === 0) continue;
+                const share = breakdown.total > 0
+                  ? ` ${(row.triangles / breakdown.total * 100).toFixed(1)}%`
+                  : '';
+                const many = row.instances > 1 ? ` ×${row.instances}` : '';
+                const dark = row.visible ? '' : ' (приховано)';
+                console.log(`    ${String(row.triangles).padStart(6)}${share.padStart(7)}  ${row.name}${many}${dark}`);
+              }
+            }
           }
           for (const [selector, found] of Object.entries(probes)) {
             console.log(`  ${selector} × ${found.count}`);

@@ -21,7 +21,7 @@ export const DEFAULT_ORGANIC_SURFACE_CONFIG: OrganicSurfaceConfig = {
   },
   axialStrideByLod: {
     high: 1,
-    medium: 1,
+    medium: 2,
     low: 3,
   },
   bark: {

@@ -84,6 +84,16 @@ function validateInput(input: BuildTreeRootGeometryInput): void {
  * одній висоті. Осьову координату міряємо від центру коміра — там же, звідки
  * розгортка починає рахувати довжину дуги стовбура.
  */
+/**
+ * Нижче семи корені перестають бути деревом.
+ *
+ * Не смак: у коментарі до `radialSegmentsByLod` записано, що на ШЕСТИ вони
+ * читались «пласкими гострими шипами, що лежать на ґрунті, а не деревом, яке
+ * входить у землю». Підгонка під бюджет має право спрощувати корені, але не
+ * має права перетворювати їх на те, що вже одного разу відкинули.
+ */
+const ROOT_RADIAL_SEGMENT_FLOOR = 7;
+
 function appendContactCollar(
   mesh: OrganicSweepMesh,
   contact: TreeGroundContactState,
@@ -210,22 +220,93 @@ export function buildTreeRootGeometry(
   validateInput(input);
   const { roots, contact, terrain, lod, config } = input;
   const sourceFrames = contact?.visibleRootFrames ?? roots.frames;
-  const rawMesh = buildOrganicSweepMesh(sourceFrames, lod, config.surface);
-  const collarResult = contact
-    ? appendContactCollar(rawMesh, contact, lod, config.surface.bark)
-    : { mesh: rawMesh, vertexCount: 0, triangleCount: 0 };
-  const terrainResult = terrain
-    ? appendTerrainSurface(collarResult.mesh, terrain)
-    : { mesh: collarResult.mesh, vertexCount: 0, triangleCount: 0 };
-  const mesh = terrainResult.mesh;
+  const vertexBudget = config.maximumVerticesByLod[lod];
+  const triangleBudget = config.maximumTrianglesByLod[lod];
+
+  /*
+   * БЮДЖЕТ, ЯКИЙ ТЕПЕР СТИСКАЄ, А НЕ ВИБУХАЄ.
+   *
+   * Було так: сітку будували раз, і якщо вона не влізла в бюджет — кидали
+   * помилку. Портал ловить її й показує заглушку, тобто пара не бачить
+   * СВОГО ДЕРЕВА ВЗАГАЛІ.
+   *
+   * І це не теорія. Виміряно на синтетичних історіях (12 подій на рік,
+   * medium): на 6, 8 і 10 роках корені виходили 1 320, 1 347 і 1 365
+   * трикутників проти бюджету 1 300 — тобто дерево падало на 1.5–5%
+   * перевищення. На 7 роках воно проходило (1 068): справа не у віці як
+   * такому, а в тому, яку форму дала кореням архітектура на цьому зерні.
+   * Тобто в дорослого дерева це ОРЛЯНКА.
+   *
+   * Ніхто цього не бачив, бо приймальний тест будував лише фікстуру на
+   * два з половиною роки, а вона в бюджет уміщається.
+   *
+   * Тепер бюджет — це стеля, під яку сітку ПІДГАНЯЮТЬ: радіальні сегменти
+   * зменшуються від заданих у конфізі до підлоги, і береться перша сітка,
+   * що влізла. Підлога — сім: у коментарі до `radialSegmentsByLod` уже
+   * записано, що на шести корені читались «пласкими гострими шипами», і
+   * ця межа лишається чинною.
+   *
+   * Кидати помилку рушій і далі вміє — але тільки якщо навіть на підлозі
+   * не влізло. Тоді це справді поламаний контракт, а не велике дерево.
+   *
+   * Комір і терен від цього не страждають: у коміра власне джерело
+   * сегментів (`contact.collar.radialSegmentsByLod`), а терен
+   * прикладається готовим. Вони разом дають 420 трикутників сталої ваги,
+   * решта — самі корені, тож 9 → 8 знімає рівно стільки, скільки треба
+   * (945 → 840, разом 1 260).
+   */
+  const configuredSegments = config.surface.radialSegmentsByLod[lod];
+  /*
+   * Підлога НІКОЛИ не піднімає задане в конфізі.
+   *
+   * Перша редакція цього циклу писала `segments >= ROOT_RADIAL_SEGMENT_FLOOR`
+   * і на `low` не робила жодної ітерації: там задано п'ять сегментів, тобто
+   * менше за підлогу в сім. Змінна лишалась порожньою, а `attempt!` — моє ж
+   * ствердження «тут не буває null» — ховало це від типів, доки не впав
+   * власний тест на LOD. Підлога обмежує МОЄ спрощення, а не вибір конфігу:
+   * якщо той свідомо просить грубші корені, він має рацію.
+   */
+  const segmentFloor = Math.min(configuredSegments, ROOT_RADIAL_SEGMENT_FLOOR);
+
+  const attemptAt = (segments: number) => {
+    const surface = segments === configuredSegments
+      ? config.surface
+      : {
+        ...config.surface,
+        radialSegmentsByLod: { ...config.surface.radialSegmentsByLod, [lod]: segments },
+      };
+    const builtMesh = buildOrganicSweepMesh(sourceFrames, lod, surface);
+    const builtCollar = contact
+      ? appendContactCollar(builtMesh, contact, lod, surface.bark)
+      : { mesh: builtMesh, vertexCount: 0, triangleCount: 0 };
+    const builtTerrain = terrain
+      ? appendTerrainSurface(builtCollar.mesh, terrain)
+      : { mesh: builtCollar.mesh, vertexCount: 0, triangleCount: 0 };
+    return {
+      mesh: builtTerrain.mesh,
+      rawMesh: builtMesh,
+      collarResult: builtCollar,
+      terrainResult: builtTerrain,
+      segments,
+    };
+  };
+
+  let attempt = attemptAt(configuredSegments);
+  for (let segments = configuredSegments - 1; segments >= segmentFloor; segments -= 1) {
+    const fits = attempt.mesh.diagnostics.vertexCount <= vertexBudget
+      && attempt.mesh.diagnostics.triangleCount <= triangleBudget;
+    if (fits) break;
+    attempt = attemptAt(segments);
+  }
+
+  const { mesh, rawMesh, collarResult, terrainResult } = attempt;
+  const radialSegmentsUsed = attempt.segments;
   const expectedRootIds = roots.roots.map((root) => root.id);
   const renderedRootIds = rawMesh.branches.map((branch) => branch.branchId);
   const renderedRootSet = new Set(renderedRootIds);
   const expectedRootSet = new Set(expectedRootIds);
   const missingRootMeshIds = expectedRootIds.filter((id) => !renderedRootSet.has(id));
   const unexpectedMeshBranchIds = renderedRootIds.filter((id) => !expectedRootSet.has(id));
-  const vertexBudget = config.maximumVerticesByLod[lod];
-  const triangleBudget = config.maximumTrianglesByLod[lod];
   const vertexBudgetExceeded = mesh.diagnostics.vertexCount > vertexBudget;
   const triangleBudgetExceeded = mesh.diagnostics.triangleCount > triangleBudget;
 
@@ -233,8 +314,11 @@ export function buildTreeRootGeometry(
     throw new Error('Tree Root Geometry mesh provenance does not match accepted root IDs.');
   }
   if (vertexBudgetExceeded || triangleBudgetExceeded) {
+    // Дійшли до підлоги радіальних сегментів і все одно не влізли. Це вже не
+    // «велике дерево», а поламаний контракт — і тут помилка доречна.
     throw new Error(
-      `Tree Root Geometry exceeded the ${lod} mobile mesh budget: `
+      `Tree Root Geometry exceeded the ${lod} mobile mesh budget at `
+        + `${radialSegmentsUsed} radial segments: `
         + `${mesh.diagnostics.vertexCount}/${vertexBudget} vertices, `
         + `${mesh.diagnostics.triangleCount}/${triangleBudget} triangles.`,
     );
@@ -262,6 +346,13 @@ export function buildTreeRootGeometry(
       contactApplied: contact !== undefined,
       groundLevelY: contact?.ground.levelY ?? null,
       visiblePathFraction: contact?.diagnostics.visiblePathFraction ?? null,
+      radialSegmentsConfigured: configuredSegments,
+      /**
+       * Скільки їх лишилось після підгонки під бюджет. Менше за
+       * `radialSegmentsConfigured` означає, що дерево виросло настільки, що
+       * корені довелось спростити — і це видно числом, а не здогадкою.
+       */
+      radialSegmentsUsed,
       collarVertexCount: collarResult.vertexCount,
       collarTriangleCount: collarResult.triangleCount,
       terrainApplied: terrain !== undefined,
