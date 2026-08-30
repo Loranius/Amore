@@ -176,13 +176,39 @@ export function coupleHueStep(
   steps: number,
   hash: (value: string) => number,
 ): number | null {
+  return coupleTraitStep(relationshipStartedAt, steps, hash, 'tint');
+}
+
+/**
+ * Будь-яка риса пари, взята з дати початку.
+ *
+ * Узагальнення `coupleHueStep`, і воно знадобилось не одразу: доти від
+ * дати брався тільки КОЛІР. Власник попросив, щоб форма кристала теж
+ * різнилась між парами — «або гострокінечний, або тупий, як сталагміт,
+ * або ще якийсь третій». Форма — така сама риса: своя, незмінна, взята
+ * з єдиної події, яку пара не обирає щодня.
+ *
+ * `trait` РОЗВОДИТЬ малюнки. Без нього колір і форма тягнулись би з
+ * одного числа, і пари з рожевим кристалом усі як одна мали б однакову
+ * огранку — риса, яка нічого не додає, бо повторює вже сказане.
+ *
+ * @param steps скільки розрізнюваних щаблів має ця риса
+ * @returns 0..1, або `null` для порожньої дати — вид сам вирішує, що
+ *   означає «риси ще немає», і вигадувати її за нього не можна
+ */
+export function coupleTraitStep(
+  relationshipStartedAt: string,
+  steps: number,
+  hash: (value: string) => number,
+  trait: string,
+): number | null {
   const source = typeof relationshipStartedAt === 'string' ? relationshipStartedAt.trim() : '';
   if (source === '') return null;
   const count = Number.isFinite(steps) ? Math.max(2, Math.floor(steps)) : 2;
-  const seed = hash(`couple:tint:${source}`);
+  const seed = hash(`couple:${trait}:${source}`);
   // Той самий розклад, що використовував кристал: рівномірний щабель,
   // а не неперервне значення — сусідні дати мають давати ВИДИМО різні
-  // відтінки, інакше «індивідуальність» існує лише в числах.
+  // риси, інакше «індивідуальність» існує лише в числах.
   const unit = (Math.abs(seed) % 1_000_003) / 1_000_003;
   const step = Math.min(count - 1, Math.floor(unit * count));
   return round6(step / (count - 1));

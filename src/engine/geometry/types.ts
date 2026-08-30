@@ -79,6 +79,26 @@ export interface CrystalBodyProfile {
   /** Shared cross-section. Optional so older persisted profiles stay readable. */
   ring?: CrystalRingFacet[];
   /**
+   * Радіус, на якому тіло РЕАЛЬНО різалось, у власних одиницях.
+   *
+   * З'явився разом із габітусами. Доти він завжди дорівнював
+   * `body.renderedRadius`, тож `mesh.ts` спокійно брав допуск від тіла, а
+   * `profile.ts` — від тієї самої величини. Обхват габітусу (`girth`)
+   * цю рівність розірвав: тупа форма ріжеться на 1.22 радіуса, голка на
+   * 0.64, і допуск злиття кутів `polytopeTolerance` розійшовся б між
+   * профілем і сіткою на ті самі відсотки.
+   *
+   * Чим це погано, сказано в самому `polytopeTolerance`: «оболонка,
+   * зміряна на одному допуску й намальована на іншому, перестає
+   * містити тіло». Тобто це не педантизм — це та сама вада, від якої
+   * той допуск і звели в одне місце.
+   *
+   * Необов'язковий, щоб збережені знімки Geometry State v1 лишались
+   * читабельними; читач без нього падає назад на радіус тіла — рівно
+   * те, що там і було записано.
+   */
+  cutRadius?: number;
+  /**
    * The half-spaces the body is cut from, in its own frame.
    *
    * Since ADR-0006 this — not `rows` — is what the crystal actually *is*. A

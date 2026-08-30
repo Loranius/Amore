@@ -8,6 +8,7 @@ import {
 } from '../growth/math';
 import type { GrowthAttributeValue, GrowthBody, GrowthTier } from '../growth';
 import { buildCrystalFacePlanes, transformCrystalPlane } from './planes';
+import { crystalHabitShape } from './habit';
 import { intersectHalfSpaces, polytopeTolerance } from './polytope';
 import type {
   CrystalBodyProfile,
@@ -312,9 +313,22 @@ export function buildCrystalProfile(
   const formationKind = stringAttribute(body.attributes.formationKind, 'unknown');
   const mother = formationKind === 'mother' || body.kind === 'crystal:mother';
   const sourceArchetype = stringAttribute(body.attributes.archetype, 'prismatic');
-  // The mother may carry a seeded geological label, but its composition role
-  // requires a recognisable central prism in every renderer quality tier.
-  const archetype = mother ? 'prismatic' : sourceArchetype;
+  /*
+   * ГАБІТУС МОНАРХА БІЛЬШЕ НЕ СТИРАЄТЬСЯ.
+   *
+   * Тут стояло `mother ? 'prismatic' : sourceArchetype` з поясненням,
+   * що «роль композиції вимагає впізнаваної центральної призми». Ціна
+   * була така: в кожної пари світу монарх мав рівно одну форму, і саме
+   * та річ, на яку дивляться, єдина не різнилась. Власник це й побачив.
+   *
+   * Впізнаваність центру дає не форма, а розмір і місце: монарх
+   * найвищий і стоїть по осі колонії. Форму тепер дає дата початку
+   * (`coupleCrystalHabit`), і всі чотири габітуси лишаються призмою з
+   * короною — різняться обхватом, кутом корони й тим, зрізана вона чи
+   * зведена в точку.
+   */
+  const archetype = sourceArchetype;
+  const habitShape = mother ? crystalHabitShape(archetype) : null;
   const attached = body.hostBodyId !== null && body.attachment !== null;
   // The monarch stands *in* the quartz vein, not on it.
   //
@@ -336,22 +350,46 @@ export function buildCrystalProfile(
   const geometryAnchor = extraSink > 0
     ? add(body.anchor, scale(body.direction, -extraSink))
     : body.anchor;
-  const radius = Math.max(0.0001, body.renderedRadius);
+  /*
+   * ОБХВАТ — те, чим габітус має право різнити тіла, і єдине таке право.
+   *
+   * Висоту він не чіпає навмисно: висота монарха — це роки пари
+   * (ADR-0004), і форма, взята з дати початку, не сміє робити пару
+   * старшою чи молодшою, ніж вона є. А от товщина ні про що не звітує,
+   * тож саме вона несе різницю силуету: голка 0.64 радіуса проти плити
+   * 1.3 — це вдвічі, і це видно з іншого кінця кімнати.
+   *
+   * Множник лягає ТУТ, а не на `body.renderedRadius` вище: `extraSink`
+   * рахує глибину занурення від виміряного радіуса тіла, і габітус не
+   * повинен закопувати товсті форми глибше.
+   */
+  const radius = Math.max(0.0001, body.renderedRadius * (habitShape?.girth ?? 1));
 
   // Blunt and broken terminations still exist — they are what makes a colony
   // read as grown rather than manufactured — but they are now variations on
   // one prism, not separate shapes. Both are expressed as where the crown
   // planes converge (see `buildCrystalFacePlanes`), not as a tip radius: a
   // lathe needed a radius to close its fan, and there is no fan any more.
-  const blunt = !mother && (archetype === 'tabular' || archetype === 'massive');
+  const blunt = habitShape !== null
+    ? habitShape.blunt
+    : archetype === 'tabular' || archetype === 'massive';
   const broken = !mother && archetype === 'etched';
 
   // The monarch keeps a slight elliptical cross-section so it never reads as a
   // machined cylinder, but 0.78/1.12 was a 1.44:1 slab that looked flat from
   // the front and thin from the side. 1.18:1 keeps the organic asymmetry while
   // presenting a consistent silhouette as the camera orbits.
-  const scales = mother ? { scaleX: 0.94, scaleZ: 1.06 } : profileScales(archetype);
-  const tuning = shapeTuning(archetype, mother);
+  const scales = habitShape !== null
+    ? { scaleX: habitShape.scaleX, scaleZ: habitShape.scaleZ }
+    : profileScales(archetype);
+  const tuning = habitShape !== null
+    ? {
+      asymmetry: habitShape.asymmetry,
+      twist: habitShape.twist,
+      lean: habitShape.lean,
+      phase: habitShape.phase,
+    }
+    : shapeTuning(archetype, mother);
   const leanAngle = seededUnit(body.seed, 'geometry:lean-angle') * Math.PI * 2;
   const leanMagnitude = radius * tuning.lean * (
     0.5 + seededUnit(body.seed, 'geometry:lean-strength') * 0.5
@@ -385,6 +423,13 @@ export function buildCrystalProfile(
     // The monarch is the one body that grew slowly enough to develop the
     // subsidiary forms; everything standing around her grew fast.
     habit: mother ? 'mature' : 'juvenile',
+    // Смуга кута корони — те, чим гострокінечний габітус відрізняється
+    // від тупого. Діти лишаються на загальній смузі: вони ростуть
+    // швидко й терміналів не встигають розвинути.
+    ...(habitShape === null ? {} : {
+      crownMinDeg: habitShape.crownMinDeg,
+      crownMaxDeg: habitShape.crownMaxDeg,
+    }),
     lod,
   }).map((face) => transformCrystalPlane(
     face,
@@ -413,6 +458,7 @@ export function buildCrystalProfile(
     geometryLength: round6(geometryLength),
     rows,
     scales,
+    cutRadius: round6(radius),
     axisLeanX,
     axisLeanZ,
     burialStartY,
@@ -430,6 +476,7 @@ export function buildCrystalProfile(
     geometryAnchor: roundVec(geometryAnchor),
     scaleX: scales.scaleX,
     scaleZ: scales.scaleZ,
+    cutRadius: round6(radius),
     // Published as zero rather than dropped: the field is part of Geometry
     // State v1 and a reader may still be looking at it. Nothing twists now.
     twistTotal: 0,

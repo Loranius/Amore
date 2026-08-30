@@ -261,7 +261,12 @@ export function buildCrystalMesh(body: GrowthBody, lod: CrystalLodLevel): Crysta
     return buildLatheCrystalMesh(body, lod, profile);
   }
 
-  const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius));
+  // Той самий радіус, на якому різав профіль, а не радіус тіла: відколи
+  // габітус має власний обхват, це різні числа (`cutRadius`).
+  const polytope = intersectHalfSpaces(
+    planes,
+    polytopeTolerance(profile.cutRadius ?? body.renderedRadius),
+  );
   if (polytope === null) {
     throw new Error(`Crystal Geometry could not mesh a solid for "${body.id}".`);
   }

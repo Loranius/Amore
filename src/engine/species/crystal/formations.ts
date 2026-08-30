@@ -30,6 +30,7 @@ import {
   yearFill,
   yearTogetherness,
 } from './growthModel';
+import { coupleCrystalHabit } from './habit';
 import type {
   CrystalArchetype,
   CrystalColonyBlueprint,
@@ -130,11 +131,22 @@ export function buildMotherInstruction(
   asOf: string,
 ): CrystalGrowthInstruction {
   const seed = stableSeed(artifact.deterministicSeed, CRYSTAL_MONARCH_BODY_ID);
-  const motherArchetypes: readonly CrystalArchetype[] = ['prismatic', 'massive', 'intergrown'];
-  const archetypeIndex = Math.min(
-    motherArchetypes.length - 1,
-    Math.floor(seededUnit(seed, 'archetype') * motherArchetypes.length),
-  );
+
+  /*
+   * ФОРМА МОНАРХА — ВІД ДАТИ, як і колір.
+   *
+   * Тут стояв вибір із трьох архетипів за насінням артефакту — і він
+   * нічого не важив: `buildCrystalProfile` перезаписувала його рядком
+   * `mother ? 'prismatic' : sourceArchetype`. Тобто в кожної пари світу
+   * монарх мав рівно одну форму, і саме та річ, на яку дивляться,
+   * єдина не різнилась.
+   *
+   * Тепер габітус береться з дати початку тим самим розкладом, що й
+   * колір, але іншим малюнком (`coupleTraitStep`). Дата — єдина подія,
+   * якої пара не обирає щодня, і саме тому вона годиться для риси, що
+   * не змінюється ніколи.
+   */
+  const habit = coupleCrystalHabit(artifact.relationshipStartedAt);
 
   // Three dimensions, three independent sources (ADR-0004). Height answers
   // "how long have we been together", girth "how much have we put in", facets
@@ -159,7 +171,7 @@ export function buildMotherInstruction(
     channel: null,
     kind: 'mother',
     tier: 'king',
-    archetype: motherArchetypes[archetypeIndex] ?? 'prismatic',
+    archetype: habit,
     emphasized: false,
     weight: 1,
     // Size now comes from the curves above, so maturity no longer scales the

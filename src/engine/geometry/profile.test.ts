@@ -5,6 +5,7 @@ import { add, orthonormalBasis, scale } from '../growth/math';
 import { buildCrystalMesh, splitCrystalMeshFaces } from './mesh';
 import { intersectHalfSpaces, polytopeTolerance } from './polytope';
 import { buildCrystalFacePlanes } from './planes';
+import { crystalHabitShape } from './habit';
 import { buildCrystalProfile } from './profile';
 import { pointInsideCrystalSolid } from './trim';
 
@@ -125,13 +126,24 @@ describe('Crystal organic profile phase 3a', () => {
     // still reads rows — the trim's occupancy test above all — treats them as
     // "the body is at most this wide here", so an envelope that cut inside the
     // crystal would let the trim delete triangles that are genuinely visible.
-    for (const body of [motherBody(), crystalBody()]) {
+    // Монарх у кожному з чотирьох габітусів плюс дитина: обхват габітусу
+    // змінює радіус, на якому тіло ріжеться, а звіт мусить містити тіло
+    // за будь-якого обхвату.
+    const bodies = [
+      ...(['prismatic', 'massive', 'needle', 'tabular'] as const).map((habit) => ({
+        ...motherBody(),
+        attributes: { formationKind: 'mother', archetype: habit },
+      })),
+      crystalBody(),
+    ];
+    for (const body of bodies) {
       for (let seed = 1; seed <= 8; seed += 1) {
         const shaped = { ...body, seed: seed * 3571 };
         const profile = buildCrystalProfile(shaped, 'high');
         const polytope = intersectHalfSpaces(
           profile.planes!,
-          polytopeTolerance(shaped.renderedRadius),
+          // Радіус різу, а не радіус тіла — див. `cutRadius`.
+          polytopeTolerance(profile.cutRadius ?? shaped.renderedRadius),
         )!;
         const rows = profile.rows;
 
@@ -149,30 +161,148 @@ describe('Crystal organic profile phase 3a', () => {
     }
   });
 
+  it('draws the crystal at the same tolerance its envelope was measured at', () => {
+    /*
+     * ЧЕСНО ПРО МЕЖУ ЦЬОГО ТЕСТУ.
+     *
+     * `polytopeTolerance` зведено в одне місце з причини, записаної в
+     * ньому ж: профіль і сітка розв'язують ОДИН многогранник, тож
+     * оболонка, зміряна на одному допуску й намальована на іншому,
+     * перестає містити тіло. Доти рівність трималась сама — обидва
+     * брали `body.renderedRadius`. Обхват габітусу її розірвав: тупа
+     * форма ріжеться на 1.22 радіуса, голка на 0.64. Тому профіль тепер
+     * публікує `cutRadius`, а `mesh.ts` бере його.
+     *
+     * Але я це ВИМІРЯВ, перш ніж називати вадою, і виміряне каже інше:
+     * на 3 600 тілах (4 габітуси × 300 зерен × 3 довжини) розв'язок із
+     * допуском від радіуса тіла й розв'язок із допуском від радіуса
+     * різу збіглися ДО ОСТАННЬОГО БІТА — 0 розбіжностей, максимальне
+     * відхилення координати 0. Поріг злиття кутів (`radius × CORNER_MERGE`)
+     * лежить на порядки нижче за реальні відстані між вершинами, тож
+     * зміна його на третину не зливає інший набір.
+     *
+     * Отже це виправлення ІНВАРІАНТА, а не полагоджений баг, і рядок про
+     * кількість вершин нижче сьогодні не ловить нічого: поверніть
+     * `mesh.ts` на радіус тіла — тест і далі пройде. Він стоїть як
+     * сторож на майбутнє, коли габітуси розійдуться сильніше.
+     *
+     * А ось що ловить по-справжньому — перевірка самого `cutRadius`:
+     * прибрати множник обхвату, і три габітуси з чотирьох упадуть.
+     */
+    for (const habit of ['prismatic', 'massive', 'needle', 'tabular'] as const) {
+      const body = {
+        ...motherBody(),
+        attributes: { formationKind: 'mother', archetype: habit },
+      };
+      const profile = buildCrystalProfile(body, 'high');
+      const shape = crystalHabitShape(habit);
+
+      // Радіус різу — це радіус тіла, помножений на обхват форми, і ніщо
+      // інше: якби сюди просочилась висота, габітус робив би пару старшою.
+      expect(profile.cutRadius)
+        .toBeCloseTo(body.renderedRadius * shape.girth, 6);
+
+      const solved = intersectHalfSpaces(
+        profile.planes!,
+        polytopeTolerance(profile.cutRadius!),
+      )!;
+      const mesh = buildCrystalMesh(body, 'high');
+      expect(mesh.positions.length / 3).toBe(solved.vertices.length);
+    }
+  });
+
   it('keeps the mother silhouette visibly organic even at low LOD', () => {
     const mother = motherBody();
     const profile = buildCrystalProfile(mother, 'low');
     const leanMagnitude = Math.hypot(profile.axisLeanX, profile.axisLeanZ);
 
-    expect(profile.archetype).toBe('prismatic');
+    /*
+     * Габітус монарха БІЛЬШЕ НЕ ЗАБЕТОНОВАНИЙ.
+     *
+     * Тут стояло `toBe('prismatic')` — і воно проходило не тому, що
+     * фікстура просила призму (вона просить `massive`), а тому, що
+     * профіль перезаписував габітус монарха рядком
+     * `mother ? 'prismatic' : sourceArchetype`. Тобто в кожної пари
+     * світу монарх мав одну форму.
+     *
+     * Тепер форму дає дата початку, і профіль її поважає.
+     */
+    expect(profile.archetype).toBe('massive');
     expect(profile.burialStartY).toBe(0);
     expect(profile.burialCompression).toBe(1);
     // Lean ceiling dropped from 0.26 to 0.09 of the radius (2026-08-03): the
     // monarch is the colony's axis and has to read as near-vertical. It still
     // leans — a perfectly upright crystal reads as placed rather than grown.
     expect(leanMagnitude).toBeGreaterThan(0);
-    expect(leanMagnitude).toBeLessThanOrEqual(mother.renderedRadius * 0.09);
-    // Cross-section rounded from 1.44:1 to 1.18:1 (2026-08-02 monarch reshape)
-    // — the monarch was reading as a flat slab. Asymmetry is retained
-    // deliberately; it just no longer dominates the shape.
-    expect(profile.scaleX).toBe(0.94); // ADR-0019: X/Z 0.94/1.06
-    expect(profile.scaleZ).toBe(1.06);
+    const shape = crystalHabitShape('massive');
+    expect(leanMagnitude)
+      .toBeLessThanOrEqual(mother.renderedRadius * shape.girth * shape.lean);
+    /*
+     * Переріз береться з габітусу, а не з константи.
+     *
+     * Тут стояло `toBe(0.94)` / `toBe(1.06)` — числа призми, вбиті в
+     * тест. Вони проходили рівно з тієї ж причини, що й `'prismatic'`
+     * вище: профіль стирав габітус монарха. Форма тіла — це властивість
+     * пари, тож і тест питає таблицю форм, а не пам'ять автора.
+     *
+     * Сам по собі рядок нижче нічого не стереже — він переказує
+     * таблицю. Стереже його сусід, `each habit gives the monarch its own
+     * body`: там усі чотири габітуси мусять дати ЧОТИРИ різні перерізи.
+     * Разом вони кажуть «монарх бере переріз саме зі своєї форми».
+     */
+    expect({ x: profile.scaleX, z: profile.scaleZ })
+      .toEqual({ x: shape.scaleX, z: shape.scaleZ });
+    // І він лишається органічним: коло читалось би точеним циліндром.
+    expect(profile.scaleX).not.toBe(profile.scaleZ);
     // Low LOD spends fewer crown planes and no bevels, but it must still be the
     // same crystal: the habit is semantics (ADR-0004), not detail.
     const planes = profile.planes!;
     expect(planes.filter((plane) => plane.kind === 'bevel')).toHaveLength(0);
     expect(planes.filter((plane) => plane.kind === 'prism').length)
       .toBe(buildCrystalProfile(mother, 'high').planes!.filter((plane) => plane.kind === 'prism').length);
+  });
+
+  it('gives each habit the monarch its own body, and never its own age', () => {
+    /*
+     * Прохання власника було буквальне: «кристал має мати різні форми —
+     * гострокінечний, або такий тупий, як зараз, або ще якийсь третій,
+     * щоб у кожної пари було більше варіацій». Цей тест і є та вимога,
+     * записана числами.
+     *
+     * Чотири габітуси мусять дати чотири РІЗНІ тіла — і різнитись саме
+     * тим, чим форма має право різнити: перерізом, обхватом, кутом
+     * корони. Мутація «повертати PRISMATIC на будь-яке ім'я» валить
+     * перші три перевірки.
+     */
+    const habits = ['prismatic', 'massive', 'needle', 'tabular'] as const;
+    const profiles = habits.map((habit) => buildCrystalProfile(
+      { ...motherBody(), attributes: { formationKind: 'mother', archetype: habit } },
+      'high',
+    ));
+
+    // Переріз: чотири імені — чотири різні пари (X, Z).
+    const sections = new Set(profiles.map((profile) => `${profile.scaleX}:${profile.scaleZ}`));
+    expect(sections.size).toBe(habits.length);
+
+    // Обхват: найтовща форма мусить бути помітно товщою за найтоншу, а
+    // не на відсоток. Виміряно: голка 0.64 проти плити 1.3 — рівно 2.03
+    // раза, і саме це видно з іншого кінця кімнати.
+    const widest = (profile: typeof profiles[number]): number => Math.max(
+      ...profile.rows.map((row) => Math.max(row.radiusX, row.radiusZ)),
+    );
+    const widths = profiles.map(widest);
+    expect(Math.max(...widths) / Math.min(...widths)).toBeGreaterThan(1.6);
+
+    /*
+     * А ось ВИСОТА мусить лишитись однаковою до знака.
+     *
+     * Це не косметика, а межа між двома законами: висота монарха — це
+     * роки пари (ADR-0004), і форма, взята з дати початку, не сміє
+     * робити пару старшою. Якби габітус чіпав `geometryLength`, дві
+     * пари з однаковим стажем мали б різний вік на вигляд.
+     */
+    const heights = new Set(profiles.map((profile) => profile.geometryLength));
+    expect(heights.size).toBe(1);
   });
 
   it('keeps the facet count off the level-of-detail knob', () => {
@@ -285,10 +415,18 @@ describe('Crystal organic profile phase 3a', () => {
     // The shoulder is measured off the published envelope, which since
     // ADR-0006 is sampled at the solid's own vertex heights and so reports the
     // silhouette exactly rather than at a fixed grid.
+    // Пробігом по всіх чотирьох габітусах, а не по одному: «своя корона»
+    // має бути правдою в кожній формі, і саме тут ховалась би вада
+    // «одна форма розсипає силует, решта штампує».
+    for (const habit of ['prismatic', 'massive', 'needle', 'tabular'] as const) {
     const shoulders = new Set<number>();
 
     for (let seed = 1; seed <= 40; seed += 1) {
-      const profile = buildCrystalProfile({ ...motherBody(), seed: seed * 7919 }, 'high');
+      const profile = buildCrystalProfile({
+        ...motherBody(),
+        attributes: { formationKind: 'mother', archetype: habit },
+        seed: seed * 7919,
+      }, 'high');
       const rows = profile.rows;
       const top = rows[rows.length - 1]!.y;
       const widestIndex = rows.reduce(
@@ -323,8 +461,19 @@ describe('Crystal organic profile phase 3a', () => {
       }
     }
 
-    // Twenty distinct shoulder heights over forty seeds: each crystal's own.
-    expect(shoulders.size).toBeGreaterThan(10);
+    /*
+     * Вісім різних висот плеча на сорок зерен — щонайменше.
+     *
+     * Поріг був `> 10` і впав на габітусі `massive`: 9 сегментів проти
+     * 12 у призми, 16 у голки, 14 у плити. Це не вада — тупа форма має
+     * коротшу смугу плеча (0.736–0.847 проти 0.565–0.911 у плити), тож
+     * і різних значень у ній фізично менше.
+     *
+     * Тому поріг опущено до 8 — під найвужчу з чотирьох виміряних форм,
+     * а не під найширшу. Штамп (одна форма на всіх) дав би рівно 1.
+     */
+    expect(shoulders.size).toBeGreaterThanOrEqual(8);
+    }
   });
 
   it('keeps the monarch nearer vertical than the crystals around it', () => {
@@ -765,51 +914,110 @@ describe('crystal faceting — the termination is lattice, not proportion', () =
    * ceiling of 54. So the crystal already had one fixed crown angle; it had it
    * by accident, through a clamp, behind code that claimed otherwise.
    */
-  it('gives every crown plane the lattice angle, however long the prism grows', () => {
-    const short = buildCrystalProfile(
-      crystalBody({ ...motherBody(), renderedLength: 0.7, renderedRadius: 0.3 }),
-      'high',
-    );
-    const tall = buildCrystalProfile(
-      crystalBody({ ...motherBody(), renderedLength: 3.4, renderedRadius: 0.18 }),
-      'high',
-    );
+  it('gives every crown plane its habit angle, however long the prism grows', () => {
+    /*
+     * ЩО ЗМІНИЛОСЬ У ЦЬОМУ ТЕСТІ Й ЧОМУ.
+     *
+     * Він вимагав ОДИН кут корони на всі тіла світу — 51°47′ кварцу — і
+     * ловив реальну ваду: кут, виведений із пропорцій тіла, робив із
+     * кристала шпиль, що гострішає з ростом. Це лишається правдою і
+     * лишається тут.
+     *
+     * Але «один кут на всіх» більше не наш закон. Форму монарха тепер
+     * дає габітус пари, і кут корони — головне, чим гострокінечна форма
+     * відрізняється від тупої. Тож інваріант звузився з «однакове в
+     * усьому світі» до «однакове в межах форми, попри довжину тіла», і
+     * додався другий, якого раніше не могло бути: між формами кут мусить
+     * РІЗНИТИСЬ, і то помітно.
+     *
+     * Ліквідувати старий тест і написати новий було б дешевше й гірше:
+     * стара вада (кут від пропорцій) досі можлива, і її ловить саме
+     * порівняння короткого тіла з довгим усередині кожної форми.
+     */
+    const habits = ['needle', 'prismatic', 'massive', 'tabular'] as const;
+    const medians: number[] = [];
 
-    for (const profile of [short, tall]) {
-      const crowns = (profile.planes ?? []).filter((plane) => plane.kind === 'crown');
-      expect(crowns.length).toBeGreaterThan(3);
-      const pitches = crowns.map(
-        (plane) => Math.asin(Math.max(-1, Math.min(1, plane.normal.y))) * (180 / Math.PI),
-      );
-      for (const pitch of pitches) {
-        // 38.22° is the complement of the face's 51.78°. The published planes
-        // have been through the body's anisotropy and lean, and an affine map
-        // takes planes to planes but does not preserve their angles, so the
-        // tolerance is the distortion rather than slack in the angle itself.
-        expect(pitch).toBeGreaterThan(30);
-        expect(pitch).toBeLessThan(46);
-      }
-      // Two bodies of very different aspect, one angle: the spread inside a
-      // body is anisotropy, and the two bodies' medians agree.
-      const median = (values: number[]): number => {
-        const sorted = [...values].sort((left, right) => left - right);
-        return sorted[Math.floor(sorted.length / 2)]!;
+    const median = (values: number[]): number => {
+      const sorted = [...values].sort((left, right) => left - right);
+      return sorted[Math.floor(sorted.length / 2)]!;
+    };
+
+    for (const habit of habits) {
+      const shape = crystalHabitShape(habit);
+      // Нахил грані від горизонталі — доповнення кута корони до прямого.
+      const centre = 90 - (shape.crownMinDeg + shape.crownMaxDeg) / 2;
+      const attributes = { formationKind: 'mother', archetype: habit };
+      const aspects = {
+        short: buildCrystalProfile(
+          crystalBody({ ...motherBody(), attributes, renderedLength: 0.7, renderedRadius: 0.3 }),
+          'high',
+        ),
+        tall: buildCrystalProfile(
+          crystalBody({ ...motherBody(), attributes, renderedLength: 3.4, renderedRadius: 0.18 }),
+          'high',
+        ),
       };
-      expect(median(pitches)).toBeGreaterThan(33);
-      expect(median(pitches)).toBeLessThan(43);
+      const perAspect: number[] = [];
+
+      for (const profile of Object.values(aspects)) {
+        const crowns = (profile.planes ?? []).filter((plane) => plane.kind === 'crown');
+        expect(crowns.length).toBeGreaterThan(3);
+        const pitches = crowns.map(
+          (plane) => Math.asin(Math.max(-1, Math.min(1, plane.normal.y))) * (180 / Math.PI),
+        );
+
+        /*
+         * Зріз верхівки — ОДНА майже горизонтальна площина, і тільки в
+         * тупих форм. Вона не має права ховатись у смузі кута корони: це
+         * інша річ, і рахувати її разом із гранями означало б розмити
+         * смугу настільки, що вона перестала б будь-що ловити.
+         *
+         * Виміряно: 79.6° у `massive`, 76.1° у `tabular`, рівно по одній;
+         * у гострокінечних форм таких площин нуль.
+         */
+        const cap = pitches.filter((pitch) => pitch > 60);
+        expect(cap).toHaveLength(shape.blunt ? 1 : 0);
+
+        const faces = pitches.filter((pitch) => pitch <= 60);
+        for (const pitch of faces) {
+          /*
+           * ±9° — це спотворення, а не свобода кута.
+           *
+           * Опубліковані площини вже пройшли анізотропію тіла й нахил, а
+           * афінне відображення переводить площини в площини, але кутів
+           * не зберігає. Найгірше дістається плиті (переріз 0.72/1.20):
+           * виміряний максимум відхилення 8.35°, у решти форм 1.4–3.0°.
+           */
+          expect(Math.abs(pitch - centre)).toBeLessThanOrEqual(9);
+        }
+        perAspect.push(median(faces));
+      }
+
+      /*
+       * Та сама форма на короткому й довгому тілі — той самий кут.
+       * Саме це ловило стару ваду: кут від пропорцій розійшовся б на
+       * десятки градусів між тілом 0.7×0.3 і тілом 3.4×0.18.
+       * Виміряно: найбільший розбіг серед чотирьох форм 0.71°.
+       */
+      expect(Math.abs(perAspect[0]! - perAspect[1]!)).toBeLessThan(1.5);
+      expect(Math.abs(median(perAspect) - centre)).toBeLessThan(3.5);
+      medians.push(median(perAspect));
     }
+
+    /*
+     * І головне, заради чого габітус узагалі існує: між формами кут
+     * корони мусить різнитись, і в тому самому порядку, що й смуги в
+     * таблиці — голка найгостріша, плита найтупіша.
+     *
+     * Виміряно: 21.8° / 38.3° / 47.5° / 49.2°. Мутація «повертати
+     * PRISMATIC на будь-яке ім'я» дала б чотири рівні числа.
+     */
+    for (let index = 1; index < medians.length; index += 1) {
+      expect(medians[index]!).toBeGreaterThan(medians[index - 1]!);
+    }
+    expect(medians[medians.length - 1]! - medians[0]!).toBeGreaterThan(20);
   });
 
-  /**
-   * The r/z distinction, which is what makes a quartz point read as one.
-   *
-   * A termination carries two rhombohedra at the same angle — r and z, the same
-   * form rotated 60°. z grows faster, travels further from the centre and is
-   * eaten by its neighbours, so z faces come out markedly smaller. Every crown
-   * plane used to pass through one apex, which made the tip a ring of near-equal
-   * triangles: the "designed roof" the review named, and the finding Pass 1
-   * confirmed by measuring seven faces inside a 4° band.
-   */
   it('alternates major and minor termination faces around the tip', () => {
     const body = motherBody();
     const profile = buildCrystalProfile(body, 'high');

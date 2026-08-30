@@ -186,9 +186,18 @@ const CROWN_FACE_MAX_DEG = 56;
  * a dome. What differs between the faces is azimuth, apex drift, and how far
  * each minor face has retreated.
  */
-function crownFaceDeg(seed: number): number {
-  return CROWN_FACE_MIN_DEG
-    + seededUnit(seed, 'planes:crown-pitch') * (CROWN_FACE_MAX_DEG - CROWN_FACE_MIN_DEG);
+function crownFaceDeg(seed: number, minDeg?: number, maxDeg?: number): number {
+  /*
+   * Смуга приходить ЗВЕРХУ, коли тіло має габітус.
+   *
+   * Це і є та величина, якою гострокінечний кристал відрізняється від
+   * тупого: вищий кут — вища корона й довший шпиль. Доти смуга була
+   * одна на всіх (49°–56°), тобто термінал кожної пари світу мав
+   * однаковий нахил.
+   */
+  const low = Number.isFinite(minDeg) ? minDeg! : CROWN_FACE_MIN_DEG;
+  const high = Number.isFinite(maxDeg) ? maxDeg! : CROWN_FACE_MAX_DEG;
+  return low + seededUnit(seed, 'planes:crown-pitch') * (high - low);
 }
 
 /**
@@ -389,6 +398,14 @@ export interface CrystalPlaneInput {
   bevels: number;
   /** Termination is cut back rather than pointed. */
   blunt: boolean;
+  /**
+   * Смуга кута корони цього габітусу, градуси.
+   *
+   * Необов'язкова: діти ростуть швидко й терміналів не розвивають, тож
+   * лишаються на загальній смузі.
+   */
+  crownMinDeg?: number;
+  crownMaxDeg?: number;
   /** Termination is missing: the crystal broke. */
   broken: boolean;
   /**
@@ -666,7 +683,7 @@ export function buildCrystalFacePlanes(
   // Taking the face's own inclination for the normal is an inversion that
   // renders: it turned a termination meant to be a quarter of the body into one
   // four percent of it, and the crystal became a column with a nub.
-  const crownDeg = crownFaceDeg(body.seed);
+  const crownDeg = crownFaceDeg(body.seed, input.crownMinDeg, input.crownMaxDeg);
   const pitch = (90 - crownDeg) * (Math.PI / 180);
   const cosPitch = Math.cos(pitch);
   const sinPitch = Math.sin(pitch);
