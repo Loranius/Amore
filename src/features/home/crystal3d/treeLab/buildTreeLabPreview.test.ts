@@ -47,9 +47,18 @@ describe('Tree production preview pipeline', () => {
     expect(build.species.species).toBe('tree');
     expect(build.species.coupleId).toBe('amore:tree-species-preview');
     expect(build.species.state.stage).toBe('young');
-    expect(build.species.diagnostics.annualInstructionCount).toBe(2);
-    expect(build.species.diagnostics.eventInstructionCount).toBe(8);
-    expect(build.field.diagnostics.attractorCount).toBe(15);
+    /*
+     * Три гілки на три роки стосунків — і ЖОДНОЇ від події.
+     *
+     * Було 2 річні плюс 8 від подій. Це закон «один рядок порталу =
+     * одне тіло», який ADR-0004 прибрав із кристала; дерево лишалось
+     * останнім видом, що ним ріс. Притягачів від того не поменшало
+     * пропорційно (15 → 12): рік несе стільки листя, скільки його
+     * прожили, тож крона лишилась, а тіла зникли.
+     */
+    expect(build.species.diagnostics.annualInstructionCount).toBe(3);
+    expect(build.species.diagnostics.eventInstructionCount).toBe(0);
+    expect(build.field.diagnostics.attractorCount).toBe(12);
     expect(build.field.diagnostics.truncatedInstructionIds).toEqual([]);
     expect(build.skeleton.seed).toBe(build.field.seed);
     expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);

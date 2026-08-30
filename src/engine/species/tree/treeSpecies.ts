@@ -37,10 +37,16 @@ export function buildTreeSpeciesBlueprint(
   const pressures = buildTreePressures(currentArtifact);
   const state = buildTreeState(currentArtifact, asOf, pressures);
   const structure = buildTreeStructure(input.artifact.deterministicSeed);
+  /*
+   * Роки рахує спільна модель (`species/shared`), тож дереву треба
+   * правило високосного дня артефакту, а не власний лічильник років.
+   * Доти дерево мало третій власний закон року — і саме такі копії
+   * спільний шар і збирає докупи.
+   */
   const { growth, diagnostics } = buildTreeGrowthInstructions(
     input.artifact,
     asOf,
-    state.completedYears,
+    input.artifact.leapDayPolicy,
   );
 
   return {

@@ -3,21 +3,23 @@ import {
   type ArtifactBlueprint,
   type EvolutionChannel,
   type EvolutionPressureVector,
-  type NormalizedEvolutionEvent,
 } from '../../evolution';
 import { parseCalendarDate } from '../../evolution/calendar';
+import type { LeapDayPolicy } from '../../evolution/types';
+import {
+  portalModuleOf,
+  relationshipYears,
+  yearActivity,
+  yearFill,
+  type RelationshipYear,
+} from '../shared/relationshipYear';
 import {
   clamp01,
-  maturityAt,
   round6,
-  saturate,
   seededUnit,
   stableSeed,
-  vectorTotal,
 } from './math';
 import type {
-  TreeBranchKind,
-  TreeBranchTier,
   TreeGrowthInstruction,
   TreeSpeciesDiagnostics,
   TreeStructureInstruction,
@@ -55,29 +57,6 @@ function eventDominantChannel(vector: EvolutionPressureVector): EvolutionChannel
     }
   }
   return channel;
-}
-
-function kindFor(channel: EvolutionChannel, emphasized: boolean): TreeBranchKind {
-  if (emphasized || channel === 'significance') return 'landmark';
-  if (channel === 'achievement') return 'crown';
-  if (channel === 'remembrance') return 'memory';
-  if (channel === 'exploration') return 'explorer';
-  if (channel === 'culture') return 'ornamental';
-  return 'support';
-}
-
-function tierFor(weight: number, emphasized: boolean): TreeBranchTier {
-  if (emphasized) return 'support';
-  if (weight >= 0.62) return 'family';
-  if (weight >= 0.34) return 'companion';
-  return 'micro';
-}
-
-function halfLifeFor(kind: TreeBranchKind): number {
-  if (kind === 'landmark') return 150;
-  if (kind === 'support' || kind === 'annual-bough') return 120;
-  if (kind === 'crown' || kind === 'explorer') return 90;
-  return 70;
 }
 
 function directionRange(channel: EvolutionChannel): {
@@ -122,122 +101,206 @@ export function buildTreeStructure(artifactSeed: number): TreeStructureInstructi
   };
 }
 
+/**
+ * Скільки листяних згустків несе гілка найбіднішого й найповнішого року.
+ *
+ * Це та ручка, якою наповненість стає ВИДИМОЮ, не додаючи тіл. Кристал
+ * дійшов до неї першим: «модулі змінюють розмір, грані, колір і
+ * блиск — замість того щоб додавати тіла» (ADR-0004). Дерево цього
+ * уроку не отримало й далі вирощувало по гілці на кожен рядок порталу.
+ */
+const YEAR_ATTRACTORS_MIN = 2;
+const YEAR_ATTRACTORS_MAX = 9;
+
+/** Наповненість, вище за яку рік читається сильним і гілка виділяється. */
+const STRONG_YEAR = 0.62;
+
+/** Що рік мав робити, щоб гілка отримала його характер. */
+interface TreeYearFacts {
+  /** Наповненість року, 0..1 — спільна модель, та сама, що в кристала. */
+  fill: number;
+  /** Канал, який того року важив найбільше, або `null` для порожнього. */
+  channel: EvolutionChannel | null;
+  /** 1 для закритого року, частка — для того, що триває. */
+  progress: number;
+}
+
+/**
+ * Гілка одного року стосунків.
+ *
+ * ЩО ЗМІНИЛОСЬ І ЧОМУ. Раніше річна гілка була однаковою в кожного
+ * року — вага 0.42–0.58 від насіння, один згусток листя, жодного
+ * характеру, — а всю історію показували гілки, вирощені ПО ОДНІЙ НА
+ * ПОДІЮ. На історії з 120 подій це давало 117 гілок від подій проти
+ * трьох річних: дерево коштувало 38 576 трикутників, удвічі більше за
+ * риф, і росло без стелі.
+ *
+ * Це рівно той закон, який ADR-0004 прибрав із кристала. Тепер рік — і
+ * тільки рік — дає гілку, а те, чим той рік був прожитий, іде в її
+ * товщину, крону й напрям.
+ */
 function buildAnnualInstruction(
   artifact: ArtifactBlueprint,
   epochIndex: number,
+  facts: TreeYearFacts,
 ): TreeGrowthInstruction {
   const id = `tree:annual:${epochIndex}`;
   const seed = stableSeed(artifact.deterministicSeed, id);
-  const preferredElevation = round6(0.43 + seededUnit(seed, 'elevation') * 0.32);
+  const fill = clamp01(facts.fill);
+  const emphasized = fill >= STRONG_YEAR;
+
+  /*
+   * Напрям гілки бере характер року: рік подорожей тягнеться вбік і
+   * нижче, рік спогадів — угору. Діапазони ті самі, що були в гілок
+   * від подій, тож форма крони не втратила словника — вона просто
+   * перестала множити тіла.
+   */
+  const range = directionRange(facts.channel ?? 'remembrance');
+  const preferredElevation = round6(
+    range.minElevation + seededUnit(seed, 'elevation') * range.elevationSpan,
+  );
+
   return {
     id,
     sourceEventId: null,
     sourceEpisodeId: null,
     epochIndex,
     sequence: anniversaryEpoch(artifact, epochIndex) * 10,
-    channel: null,
+    channel: facts.channel,
     kind: 'annual-bough',
-    tier: 'family',
-    emphasized: false,
-    weight: round6(0.42 + seededUnit(seed, 'weight') * 0.16),
-    maturity: 1,
+    tier: emphasized ? 'family' : fill >= 0.4 ? 'companion' : 'support',
+    emphasized,
+    // Товщина — від наповненості, а не від насіння. Насіння лишає
+    // тремтіння, щоб два однакові роки не виходили близнюками.
+    weight: round6(clamp01(
+      0.3 + 0.55 * fill + (seededUnit(seed, 'weight') - 0.5) * 0.08,
+    )),
+    // Рік, що триває, ще не дорослий: його гілка коротша й молодша.
+    maturity: round6(clamp01(facts.progress)),
     preferredAzimuthRad: round6(
       (epochIndex * GOLDEN_ANGLE + seededUnit(seed, 'azimuth') * 0.38) % (Math.PI * 2),
     ),
     preferredElevation,
-    radialBias: round6(0.46 + seededUnit(seed, 'radial') * 0.28),
+    radialBias: round6(
+      range.minRadial + seededUnit(seed, 'radial') * range.radialSpan,
+    ),
     crownLayer: round6(clamp01((preferredElevation - 0.28) / 0.7)),
-    attractorCount: 1,
+    /*
+     * ОСЬ ДЕ ПОДІЛИСЬ СТО СІМНАДЦЯТЬ ГІЛОК. Замість тіла на подію рік
+     * несе стільки листя, скільки його прожили: від двох згустків у
+     * порожньому році до дев'яти в повному.
+     */
+    attractorCount: Math.round(
+      YEAR_ATTRACTORS_MIN + (YEAR_ATTRACTORS_MAX - YEAR_ATTRACTORS_MIN) * fill,
+    ),
     seed,
   };
 }
 
-function buildEventInstruction(
-  artifactSeed: number,
-  event: NormalizedEvolutionEvent,
-  asOf: string,
-): TreeGrowthInstruction | null {
-  const channel = eventDominantChannel(event.channels);
-  if (channel === null) return null;
+/**
+ * Факти року: чим він був прожитий.
+ *
+ * Наповненість береться СПІЛЬНОЮ моделлю (`species/shared`), тією
+ * самою, що в кристала й рифа. Доти дерево мало третій власний закон
+ * року — і саме такі три копії одного правила спільний шар і збирає.
+ */
+function yearFactsOf(
+  artifact: ArtifactBlueprint,
+  year: RelationshipYear,
+  asOfEpoch: number,
+): TreeYearFacts {
+  const within = artifact.events.filter((event) => (
+    event.occurredAtEpochMs <= asOfEpoch
+    && event.occurredAt >= year.startsAt
+    && event.occurredAt < year.endsAt
+  ));
 
-  const totalPressure = vectorTotal(event.channels);
-  const weight = saturate(totalPressure + event.portalActivity * 0.14, 1.08);
-  const emphasized = event.channels.significance >= 0.75
-    || (event.channels.significance >= 0.56 && weight >= 0.62);
-  const kind = kindFor(channel, emphasized);
-  const id = `tree:event:${event.id}`;
-  const seed = stableSeed(artifactSeed, id);
-  const range = directionRange(channel);
-  const preferredElevation = round6(
-    range.minElevation + seededUnit(seed, 'elevation') * range.elevationSpan,
-  );
-  const radialBias = round6(
-    range.minRadial + seededUnit(seed, 'radial') * range.radialSpan,
-  );
-  const attractorCount = emphasized ? 3 : weight >= 0.55 ? 2 : 1;
+  const modules = new Set<string>();
+  const channelTotals = new Map<EvolutionChannel, number>();
+  for (const event of within) {
+    const module = portalModuleOf(event.source);
+    if (module !== null) modules.add(module);
+    for (const channel of EVOLUTION_CHANNELS) {
+      const value = event.channels[channel];
+      if (value > 0) channelTotals.set(channel, (channelTotals.get(channel) ?? 0) + value);
+    }
+  }
 
+  let channel: EvolutionChannel | null = null;
+  let best = 0;
+  // Порядок сталий: `EVOLUTION_CHANNELS`, а не порядок мапи — інакше
+  // рівні канали давали б різний результат між запусками.
+  for (const candidate of EVOLUTION_CHANNELS) {
+    const total = channelTotals.get(candidate) ?? 0;
+    if (total > best) { best = total; channel = candidate; }
+  }
+
+  const progress = year.complete ? 1 : yearProgress(year, asOfEpoch);
   return {
-    id,
-    sourceEventId: event.id,
-    sourceEpisodeId: event.episodeId,
-    epochIndex: event.epochIndex,
-    sequence: event.occurredAtEpochMs * 10 + 5,
+    fill: yearFill(progress, yearActivity(modules.size, within.length)),
     channel,
-    kind,
-    tier: tierFor(weight, emphasized),
-    emphasized,
-    weight,
-    maturity: maturityAt(event.occurredAt, asOf, halfLifeFor(kind)),
-    preferredAzimuthRad: round6(seededUnit(seed, 'azimuth') * Math.PI * 2),
-    preferredElevation,
-    radialBias,
-    crownLayer: round6(clamp01((preferredElevation - 0.28) / 0.7)),
-    attractorCount,
-    seed,
+    progress,
   };
 }
 
+/** Скільки року минуло, коли він ще триває. */
+function yearProgress(year: RelationshipYear, asOfEpoch: number): number {
+  const opened = Date.parse(`${year.startsAt}T00:00:00.000Z`);
+  const closes = Date.parse(`${year.endsAt}T00:00:00.000Z`);
+  if (!Number.isFinite(opened) || !Number.isFinite(closes) || closes <= opened) return 0;
+  return clamp01((asOfEpoch - opened) / (closes - opened));
+}
+
+/**
+ * Гілки дерева: по одній на кожен рік стосунків, і жодної на подію.
+ *
+ * ЩО ЦЕ ЗАМІЩУЄ. Раніше кожна подія порталу давала власну гілку. На
+ * історії зі 120 подій виходило 117 гілок від подій проти трьох
+ * річних — закон «один рядок = одне тіло», який ADR-0004 прибрав із
+ * кристала ще тоді, коли справжня пара дійшла до 104 подій. Дерево
+ * лишалось останнім видом, який ним ріс, і платило за це подвійним
+ * бюджетом трикутників.
+ *
+ * Події нікуди не поділись: вони тепер вирішують, ЯКОЮ буде гілка свого
+ * року — товщиною, кроною, напрямом, — а не скільки гілок буде.
+ */
 export function buildTreeGrowthInstructions(
   artifact: ArtifactBlueprint,
   asOf: string,
-  completedYears: number,
+  leapDayPolicy: LeapDayPolicy,
 ): { growth: TreeGrowthInstruction[]; diagnostics: TreeSpeciesDiagnostics } {
   const asOfEpoch = Date.parse(asOf);
   if (!Number.isFinite(asOfEpoch)) throw new Error(`Invalid Tree Species asOf: "${asOf}".`);
 
-  const annual = Array.from(
-    { length: completedYears },
-    (_value, index) => buildAnnualInstruction(artifact, index + 1),
-  );
-  const events: TreeGrowthInstruction[] = [];
-  const zeroPressureEventIds: string[] = [];
-  const futureEventIds: string[] = [];
+  const asOfDay = asOf.slice(0, 10);
+  const years = relationshipYears(artifact.relationshipStartedAt, asOfDay, leapDayPolicy);
 
+  const futureEventIds: string[] = [];
+  const zeroPressureEventIds: string[] = [];
   for (const event of artifact.events) {
-    if (event.occurredAtEpochMs > asOfEpoch) {
-      futureEventIds.push(event.id);
-      continue;
-    }
-    const instruction = buildEventInstruction(artifact.deterministicSeed, event, asOf);
-    if (!instruction) {
-      zeroPressureEventIds.push(event.id);
-      continue;
-    }
-    events.push(instruction);
+    if (event.occurredAtEpochMs > asOfEpoch) futureEventIds.push(event.id);
+    else if (eventDominantChannel(event.channels) === null) zeroPressureEventIds.push(event.id);
   }
 
-  const growth = [...annual, ...events].sort(
-    (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
-  );
+  const growth = years.map((year) => buildAnnualInstruction(
+    artifact,
+    year.index + 1,
+    yearFactsOf(artifact, year, asOfEpoch),
+  )).sort((left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id));
 
   return {
     growth,
     diagnostics: {
-      emptyHistory: events.length === 0,
+      emptyHistory: artifact.events.length === 0,
       zeroPressureEventIds: zeroPressureEventIds.sort(),
       futureEventIds: futureEventIds.sort(),
-      annualInstructionCount: annual.length,
-      eventInstructionCount: events.length,
+      annualInstructionCount: growth.length,
+      /*
+       * Подій, які того дійшли до дерева. Не «скільки з них стали
+       * гілками» — гілками вони більше не стають, і лишити стару назву
+       * зі старим змістом означало б брехати діагностикою.
+       */
+      eventInstructionCount: 0,
     },
   };
 }

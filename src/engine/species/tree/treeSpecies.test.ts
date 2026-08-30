@@ -74,25 +74,35 @@ describe('Tree Species', () => {
     expect(buildTree([...BASE_EVENTS].reverse())).toEqual(buildTree());
   });
 
-  it('translates anniversaries and event channels into stable branch intent', () => {
+  it('рік дає гілку, а подія — характер цієї гілки', () => {
+    /*
+     * ЩО ТУТ ЗАМІЩЕНО. Знімок описував закон «один рядок порталу = одна
+     * гілка»: із чотирьох подій виростало чотири гілки від подій і одна
+     * річна. Той самий закон ADR-0004 прибрав із кристала, коли
+     * справжня пара дійшла до 104 подій, а дерево лишалось останнім
+     * видом, який ним ріс, — і платило подвійним бюджетом трикутників.
+     *
+     * Тепер гілок рівно стільки, скільки років стосунків. Події
+     * вирішують, ЯКОЮ буде гілка свого року: товщиною, кроною,
+     * напрямом.
+     */
     const tree = buildTree();
 
     expect({
       species: `${tree.species}@${tree.speciesBlueprintVersion}`,
       stage: tree.state.stage,
       annual: tree.diagnostics.annualInstructionCount,
+      fromEvents: tree.diagnostics.eventInstructionCount,
       growth: tree.growth.map(
-        (instruction) => `${instruction.id}:${instruction.kind}:${instruction.tier}:${instruction.attractorCount}`,
+        (instruction) => `${instruction.id}:${instruction.tier}:${instruction.attractorCount}`,
       ),
     }).toMatchInlineSnapshot(`
       {
-        "annual": 1,
+        "annual": 2,
+        "fromEvents": 0,
         "growth": [
-          "tree:event:calendar:proposal:landmark:support:3",
-          "tree:event:place:lviv:explorer:companion:2",
-          "tree:annual:1:annual-bough:family:1",
-          "tree:event:wish:camera:crown:companion:2",
-          "tree:event:shopping:2025-01-06:support:micro:1",
+          "tree:annual:1:companion:5",
+          "tree:annual:2:support:3",
         ],
         "species": "tree@1",
         "stage": "young",
@@ -100,7 +110,21 @@ describe('Tree Species', () => {
     `);
   });
 
-  it('keeps existing branch intent byte-stable when a later event is appended', () => {
+  it('дописана подія міняє гілку СВОГО року й не чіпає інших', () => {
+    /*
+     * ЦЕ ЗАМІНА, А НЕ ПОСЛАБЛЕННЯ. Раніше тут стояло «жодна наявна
+     * гілка не змінюється, коли дописано подію» — і воно було правдою
+     * лише тому, що кожна подія приносила ВЛАСНУ гілку, ні на що не
+     * впливаючи.
+     *
+     * За новим законом подія робить свій рік повнішим, тож гілка того
+     * року товщає. Це та сама названа межа, що в кристала й рифа:
+     * «заморожений» стосується ЧАСУ, а не вмісту — пара, яка прийшла на
+     * портал пізніше, мусить мати змогу заповнити минулі роки.
+     *
+     * Незмінним лишається все інше: стовбур, і гілки років, до яких
+     * дописане не має стосунку.
+     */
     const base = buildTree(BASE_EVENTS.slice(0, 3));
     const extended = buildTree([
       ...BASE_EVENTS.slice(0, 3),
@@ -114,9 +138,16 @@ describe('Tree Species', () => {
       },
     ]);
 
-    const existingIds = new Set(base.growth.map((instruction) => instruction.id));
-    expect(extended.growth.filter((instruction) => existingIds.has(instruction.id))).toEqual(base.growth);
     expect(extended.structure).toEqual(base.structure);
+    expect(extended.growth).toHaveLength(base.growth.length);
+
+    // Подія від 2025-06-20 належить другому року (від 2024-01-01).
+    const touched = extended.growth.filter((instruction, index) => (
+      JSON.stringify(instruction) !== JSON.stringify(base.growth[index])
+    ));
+    expect(touched.map((instruction) => instruction.id)).toEqual(['tree:annual:2']);
+    expect(touched[0]!.attractorCount)
+      .toBeGreaterThan(base.growth.find((g) => g.id === 'tree:annual:2')!.attractorCount);
   });
 
   it('lets time add annual growth and maturity without moving old morphology', () => {
@@ -124,15 +155,36 @@ describe('Tree Species', () => {
     const later = buildTree(BASE_EVENTS, '2026-07-01');
 
     expect(later.structure).toEqual(earlier.structure);
-    expect(later.diagnostics.annualInstructionCount).toBe(2);
-    expect(earlier.diagnostics.annualInstructionCount).toBe(1);
+    // Гілок стільки, скільки років стосунків, включно з тим, що триває.
+    expect(earlier.diagnostics.annualInstructionCount).toBe(2);
+    expect(later.diagnostics.annualInstructionCount).toBe(3);
 
-    for (const before of earlier.growth) {
+    /*
+     * ЗАМОРОЗКА, І ЇЇ МЕЖА.
+     *
+     * Рік, який на ранню дату вже ЗАКРИВСЯ, не міняється від плину
+     * часу: ані товщина, ані крона, ані напрям.
+     *
+     * А рік, який тоді ще тривав, — міняється, і мусить: він росте до
+     * своєї річниці, як і поточна дитина кристала. Перша редакція цього
+     * тесту вимагала незмінності від УСІХ гілок і на новому законі
+     * падала саме на році, що тривав, — тобто вимагала, щоб поточний
+     * рік не жив.
+     */
+    const closedEarlier = earlier.growth.filter((instruction) => instruction.maturity >= 1);
+    expect(closedEarlier.length).toBeGreaterThan(0);
+    for (const before of closedEarlier) {
       const after = later.growth.find((instruction) => instruction.id === before.id);
-      expect(after).toBeDefined();
-      expect(withoutMaturity(after!)).toEqual(withoutMaturity(before));
+      expect(after, before.id).toBeDefined();
+      expect(withoutMaturity(after!), before.id).toEqual(withoutMaturity(before));
       expect(after!.maturity).toBeGreaterThanOrEqual(before.maturity);
     }
+
+    // А той, що тривав, за рік таки виріс.
+    const running = earlier.growth.find((instruction) => instruction.maturity < 1);
+    expect(running).toBeDefined();
+    const grown = later.growth.find((instruction) => instruction.id === running!.id)!;
+    expect(grown.maturity).toBeGreaterThan(running!.maturity);
   });
 
   it('diagnoses future and zero-pressure facts without growing branches from them', () => {
@@ -162,33 +214,37 @@ describe('Tree Species', () => {
     expect(tree.state.eventCount).toBe(BASE_EVENTS.length + 1);
   });
 
-  it('preserves organic attractors and skeleton nodes when later growth is appended', () => {
-    const baseTree = buildTree(BASE_EVENTS.slice(0, 3));
-    const extendedTree = buildTree([
-      ...BASE_EVENTS.slice(0, 3),
-      {
-        id: 'memory:summer',
-        occurredAt: '2025-06-20',
-        source: 'memories@1',
-        evidence: 'verified',
-        channels: { remembrance: 0.45 },
-      },
-    ]);
-    const baseField = treeToOrganicField(baseTree);
-    const extendedField = treeToOrganicField(extendedTree);
-    const baseSkeleton = buildOrganicSkeleton({
-      seed: baseField.seed,
-      attractors: baseField.attractors,
-      config: baseField.skeletonConfig,
-    });
-    const extendedSkeleton = buildOrganicSkeleton({
-      seed: extendedField.seed,
-      attractors: extendedField.attractors,
-      config: extendedField.skeletonConfig,
-    });
+  it('новий рік дописується в кінець, не рухаючи попередніх', () => {
+    /*
+     * Додавання ЧАСОМ, а не подією — і це виправлення, а не спрощення.
+     *
+     * Перша редакція дописувала подію й вимагала, щоб префікс поля
+     * притягачів не зрушив. За старим законом це виконувалось само
+     * собою: подія приносила власну гілку в кінець. За новим подія
+     * робить свій рік повнішим, тобто законно міняє його гілку — і
+     * дописування в кінець тепер робить саме ЧАС, як воно й є з
+     * деревом.
+     */
+    const earlier = treeToOrganicField(buildTree(BASE_EVENTS, '2025-07-01'));
+    const later = treeToOrganicField(buildTree(BASE_EVENTS, '2026-07-01'));
 
-    expect(extendedField.attractors.slice(0, baseField.attractors.length)).toEqual(baseField.attractors);
-    expect(extendedSkeleton.nodes.slice(0, baseSkeleton.nodes.length)).toEqual(baseSkeleton.nodes);
+    const closedPrefix = earlier.attractors.filter(
+      (attractor) => attractor.id.startsWith('tree:annual:1:'),
+    );
+    expect(closedPrefix.length).toBeGreaterThan(0);
+    expect(later.attractors.slice(0, closedPrefix.length)).toEqual(closedPrefix);
+
+    const earlierSkeleton = buildOrganicSkeleton({
+      seed: earlier.seed,
+      attractors: closedPrefix,
+      config: earlier.skeletonConfig,
+    });
+    const laterSkeleton = buildOrganicSkeleton({
+      seed: later.seed,
+      attractors: later.attractors.slice(0, closedPrefix.length),
+      config: later.skeletonConfig,
+    });
+    expect(laterSkeleton.nodes).toEqual(earlierSkeleton.nodes);
   });
 
   it('truncates only the newest instructions at an explicit adapter budget', () => {
@@ -200,18 +256,23 @@ describe('Tree Species', () => {
       maxBranchSegments: 8,
     });
 
+    /*
+     * Обрізається НАЙНОВІШЕ, і тепер це видно чистіше: найстарший рік
+     * віддає свої притягачі перший, а рік, що триває, зникає повністю.
+     */
     expect(field.attractors).toHaveLength(4);
     expect(field.attractors.map((attractor) => attractor.id)).toEqual([
-      'tree:event:calendar:proposal:attractor:0',
-      'tree:event:calendar:proposal:attractor:1',
-      'tree:event:calendar:proposal:attractor:2',
-      'tree:event:place:lviv:attractor:0',
+      'tree:annual:1:attractor:0',
+      'tree:annual:1:attractor:1',
+      'tree:annual:1:attractor:2',
+      'tree:annual:1:attractor:3',
     ]);
-    expect(field.diagnostics.truncatedInstructionIds).toEqual([
-      'tree:event:place:lviv',
-      'tree:annual:1',
-      'tree:event:wish:camera',
-      'tree:event:shopping:2025-01-06',
-    ]);
+    /*
+     * Обидва роки в списку, і це правильно: перший віддав чотири
+     * притягачі з п'яти, другий — жодного. «Обрізаний» означає «щось
+     * втратив», а не «зник цілком».
+     */
+    expect(field.diagnostics.truncatedInstructionIds)
+      .toEqual(['tree:annual:1', 'tree:annual:2']);
   });
 });
