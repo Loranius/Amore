@@ -1,88 +1,83 @@
 import * as THREE from 'three';
-import type { TreeLifeFrame } from '../../treeLife';
-
-interface TreeLeafBaseTransform {
-  position: THREE.Vector3;
-  quaternion: THREE.Quaternion;
-  scale: THREE.Vector3;
-}
+import type { TreeLifeFrame, TreeLifeState } from '../../treeLife';
+import {
+  applyThreeTreeLeafSway,
+  setThreeTreeLeafSwayFrame,
+  type TreeLeafSwayUniforms,
+} from './treeLeafSway';
 
 export interface ThreeTreeLifeBinding {
   root: THREE.Object3D;
   leafMesh: THREE.InstancedMesh;
-  baseLeafTransforms: readonly TreeLeafBaseTransform[];
-  scratch: {
-    euler: THREE.Euler;
-    deltaQuaternion: THREE.Quaternion;
-    quaternion: THREE.Quaternion;
-    matrix: THREE.Matrix4;
-  };
+  /**
+   * Однострої хитання листя, узяті з матеріалу крони.
+   *
+   * `null` означає, що матеріал не пройшов через `applyFoliageSurfaceShader`
+   * — тоді листя просто стоїть, а не падає. Крона без вітру виглядає тихою;
+   * крона, що кинула виняток, не виглядає ніяк.
+   */
+  swayUniforms: TreeLeafSwayUniforms | null;
 }
 
-/** Captures renderer-only base matrices once; accepted leaf geometry is untouched. */
+function readSwayUniforms(mesh: THREE.InstancedMesh): TreeLeafSwayUniforms | null {
+  const material = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+  const uniforms = material?.userData?.['treeLeafSwayUniforms'] as
+    TreeLeafSwayUniforms | undefined;
+  return uniforms ?? null;
+}
+
+/**
+ * Готує крону до хитання: профілі лягають в атрибут інстанса ОДИН раз.
+ *
+ * ЩО ТУТ БУЛО. Прив'язка знімала базові матриці всіх листків, щоб потім
+ * щокадру їх розкладати, домножувати й збирати назад. Того більше немає:
+ * незмінне (швидкість, фаза, амплітуди) поїхало в атрибут, змінне (час і
+ * масштаб) стало двома одностроями, а матриці інстансів лишились статичними.
+ */
 export function createThreeTreeLifeBinding(
   root: THREE.Object3D,
   leafMesh: THREE.InstancedMesh,
+  life: TreeLifeState,
 ): ThreeTreeLifeBinding {
-  const matrix = new THREE.Matrix4();
-  const baseLeafTransforms: TreeLeafBaseTransform[] = [];
-
-  for (let index = 0; index < leafMesh.count; index += 1) {
-    leafMesh.getMatrixAt(index, matrix);
-    const position = new THREE.Vector3();
-    const quaternion = new THREE.Quaternion();
-    const scale = new THREE.Vector3();
-    matrix.decompose(position, quaternion, scale);
-    baseLeafTransforms.push({ position, quaternion, scale });
-  }
-  leafMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  applyThreeTreeLeafSway(leafMesh, life);
+  // Статичні: буфер матриць більше не переписується жодного кадру.
+  leafMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
 
   root.userData['treeLife'] = {
     leafInstances: leafMesh.count,
     additionalDrawCalls: 0,
+    matrixUpdatesPerFrame: 0,
   };
 
-  return {
-    root,
-    leafMesh,
-    baseLeafTransforms,
-    scratch: {
-      euler: new THREE.Euler(0, 0, 0, 'XYZ'),
-      deltaQuaternion: new THREE.Quaternion(),
-      quaternion: new THREE.Quaternion(),
-      matrix: new THREE.Matrix4(),
-    },
-  };
+  return { root, leafMesh, swayUniforms: readSwayUniforms(leafMesh) };
 }
 
-/** Applies one read-only sampled frame without changing topology or materials. */
+/**
+ * Один кадр: поворот крони цілком і два числа для листя.
+ *
+ * Гілка лишається на процесорі навмисно — це ТРИ числа на все дерево, і
+ * вершинний шейдер тут не заощадив би нічого, зате додав би другий шлях до
+ * того самого повороту.
+ *
+ * ADR-0008 і далі чинний: дерево повертається й дихає, але не переїжджає.
+ */
 export function applyThreeTreeLifeFrame(
   binding: ThreeTreeLifeBinding,
   frame: TreeLifeFrame,
+  life: TreeLifeState,
+  reducedMotion?: boolean,
 ): void {
   binding.root.rotation.set(
     frame.branchRotationX,
     frame.branchRotationY,
     frame.branchRotationZ,
   );
-
-  for (const leaf of frame.leaves) {
-    const base = binding.baseLeafTransforms[leaf.sequence];
-    if (!base) continue;
-    binding.scratch.euler.set(leaf.pitchRad, 0, leaf.rollRad, 'XYZ');
-    binding.scratch.deltaQuaternion.setFromEuler(binding.scratch.euler);
-    binding.scratch.quaternion
-      .copy(base.quaternion)
-      .multiply(binding.scratch.deltaQuaternion);
-    binding.scratch.matrix.compose(
-      base.position,
-      binding.scratch.quaternion,
-      base.scale,
+  if (binding.swayUniforms) {
+    setThreeTreeLeafSwayFrame(
+      binding.swayUniforms,
+      life,
+      frame.elapsedSeconds,
+      reducedMotion,
     );
-    binding.leafMesh.setMatrixAt(leaf.sequence, binding.scratch.matrix);
-  }
-
-  if (frame.leaves.length > 0) {
-    binding.leafMesh.instanceMatrix.needsUpdate = true;
   }
 }

@@ -12,6 +12,40 @@ import type {
   TreeLifeState,
 } from './types';
 
+/*
+ * ЧИСЛА ЗАКОНУ ХИТАННЯ ЛИСТКА — В ОДНОМУ МІСЦІ.
+ *
+ * Доти вони стояли літералами в `sampleTreeLifeFrame`, і це було нормально,
+ * доки закон рахувався рівно один раз — на процесорі. Відколи те саме
+ * хитання рахує ще й вершинний шейдер, будь-яке число тут існує у ДВОХ
+ * реалізаціях, і розійтись вони можуть тихо: на екрані листок просто почне
+ * хитатись інакше, і ніхто не скаже, коли саме це сталось.
+ *
+ * Тому GLSL збирається з ЦИХ констант (`treeLeafSway.ts`), а не з
+ * переписаних від руки. Одне джерело, дві мови.
+ */
+export const TREE_LEAF_PITCH_PHASE_RATIO = 0.73;
+export const TREE_LEAF_PITCH_PHASE_OFFSET = 0.48;
+
+/**
+ * Хитання одного листка в мить `elapsedSeconds`.
+ *
+ * Чиста функція профілю й часу — саме тому її можна віддати шейдеру: усе, що
+ * вона читає, або незмінне (профіль), або однакове для всіх (час і масштаб).
+ */
+export function treeLeafSwayAt(
+  profile: Pick<TreeLeafLifeProfile, 'speed' | 'phaseRad' | 'pitchAmplitudeRad' | 'rollAmplitudeRad'>,
+  elapsedSeconds: number,
+  scale: number,
+): { pitchRad: number; rollRad: number } {
+  const phase = elapsedSeconds * profile.speed + profile.phaseRad;
+  return {
+    pitchRad: Math.sin(phase * TREE_LEAF_PITCH_PHASE_RATIO + TREE_LEAF_PITCH_PHASE_OFFSET)
+      * profile.pitchAmplitudeRad * scale,
+    rollRad: Math.sin(phase) * profile.rollAmplitudeRad * scale,
+  };
+}
+
 function motionRound(value: number): number {
   const rounded = round6(value);
   return Object.is(rounded, -0) ? 0 : rounded;
@@ -129,7 +163,21 @@ export function buildTreeLifeState(input: BuildTreeLifeInput): TreeLifeState {
       maxLeafProfiles: input.config.maxLeafProfiles,
       truncatedLeafInstanceIds,
       profileBudgetReached: truncatedLeafInstanceIds.length > 0,
-      estimatedMatrixUpdatesPerFrame: leaves.length,
+      /*
+       * НУЛЬ, І ЦЕ НЕ ОПИСКА.
+       *
+       * Тут стояло `leaves.length`, і воно було правдою: рендер щокадру
+       * розкладав кватерніон кожного листка, збирав матрицю назад і
+       * відправляв увесь буфер матриць на відео. На живих даних це 651
+       * листок за кадр — єдина покадрова витрата всієї сцени дерева.
+       *
+       * Відколи хитання листя рахує вершинний шейдер, за кадр змінюються
+       * рівно два числа-однострої (час і масштаб), а матриці інстансів
+       * лишаються статичними від першого кадру до останнього. Закон при
+       * цьому НЕ ЗМІНИВСЯ — його переніс `treeLeafSwayAt`, спільний для
+       * процесора й GLSL.
+       */
+      estimatedMatrixUpdatesPerFrame: 0,
       estimatedAdditionalDrawCalls: 0,
     },
   };
@@ -154,14 +202,12 @@ export function sampleTreeLifeFrame(input: SampleTreeLifeInput): TreeLifeFrame {
       Math.sin(primaryWave * 0.81 + 1.37) * branch.swayZAmplitudeRad * scale,
     ),
     leaves: input.life.leaves.map((leaf) => {
-      const phase = elapsed * leaf.speed + leaf.phaseRad;
+      const sway = treeLeafSwayAt(leaf, elapsed, scale);
       return {
         leafInstanceId: leaf.leafInstanceId,
         sequence: leaf.sequence,
-        pitchRad: motionRound(
-          Math.sin(phase * 0.73 + 0.48) * leaf.pitchAmplitudeRad * scale,
-        ),
-        rollRad: motionRound(Math.sin(phase) * leaf.rollAmplitudeRad * scale),
+        pitchRad: motionRound(sway.pitchRad),
+        rollRad: motionRound(sway.rollRad),
       };
     }),
   };

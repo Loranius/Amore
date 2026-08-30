@@ -183,11 +183,16 @@ describe('Tree production preview pipeline', () => {
     // 72 -> 24 with tree-ground-detail v1.1.0 (see groundDetail/config.ts).
     expect(build.groundDetails.instances).toHaveLength(24);
     expect(build.groundDetails.diagnostics.totalMaterialCount).toBe(3);
-    expect(build.life.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(
-      build.life.leaves.length,
-    );
+    /*
+     * Нуль замість `leaves.length`: хитання листя переїхало у вершинний
+     * шейдер, тож матриці інстансів більше не переписуються жодного кадру.
+     * Профілі при цьому нікуди не поділись — вони й далі по одному на листок,
+     * просто лежать в атрибуті інстанса, а не в покадровому обході.
+     */
+    expect(build.life.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(0);
+    expect(build.life.leaves.length).toBeGreaterThan(0);
     expect(build.life.leaves.length).toBeLessThanOrEqual(build.leaves.instances.length);
-    expect(contract.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(build.life.leaves.length);
+    expect(contract.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(0);
     expect(build.mesh.diagnostics.junctionCount).toBe(build.frames.diagnostics.junctionCount);
   });
 

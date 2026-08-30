@@ -1,4 +1,11 @@
 import * as THREE from 'three';
+import {
+  TREE_LEAF_SWAY_VERSION,
+  TREE_LEAF_SWAY_NORMAL_BODY,
+  TREE_LEAF_SWAY_POSITION_BODY,
+  TREE_LEAF_SWAY_VERTEX_PARS,
+  createTreeLeafSwayUniforms,
+} from './treeLeafSway';
 import type { TreeBarkSurfaceState } from '../../barkSurface';
 import type {
   TreeMaterialRecipe,
@@ -195,15 +202,46 @@ function applyBarkSurfaceShader(
 }
 
 function applyFoliageSurfaceShader(material: THREE.MeshStandardMaterial): void {
+  /*
+   * Хитання листя живе В ЦЬОМУ Ж матеріалі, а не в другому.
+   *
+   * Спокуса завести окремий «вітряний» матеріал була, і вона хибна: у дерева
+   * рівно два матеріали, кора й листя (це правило взяте з п'яти референсів і
+   * записане в брифі виду), а третій коштував би окремий draw call на ту саму
+   * крону. Тому вітер додається в наявний шейдер листя тим самим
+   * `onBeforeCompile`, що вже малює його поверхню.
+   */
+  const swayUniforms = createTreeLeafSwayUniforms();
+  material.userData['treeLeafSwayUniforms'] = swayUniforms;
+
   material.onBeforeCompile = (shader) => {
+    shader.uniforms['uLeafSwayTime'] = swayUniforms.uLeafSwayTime;
+    shader.uniforms['uLeafSwayScale'] = swayUniforms.uLeafSwayScale;
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
-        `#include <common>\n${TREE_FOLIAGE_VERTEX_PARS}`,
+        `#include <common>\n${TREE_FOLIAGE_VERTEX_PARS}\n${TREE_LEAF_SWAY_VERTEX_PARS}`,
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>\n${TREE_FOLIAGE_VERTEX_BODY}`,
+      )
+      /*
+       * ДВІ ВСТАВКИ, У ПОРЯДКУ САМОГО ШЕЙДЕРА.
+       *
+       * `beginnormal_vertex` оголошує `objectNormal`, `begin_vertex` —
+       * `transformed`, і саме в цьому порядку. Тому нахил рахується разом із
+       * нормаллю, а до вершини прикладається нижче. Перша редакція робила все
+       * одним шматком у `beginnormal_vertex`, зверталась там до ще не
+       * оголошеної `transformed` — і крона зникла з екрана цілком.
+       */
+      .replace(
+        '#include <beginnormal_vertex>',
+        `#include <beginnormal_vertex>\n${TREE_LEAF_SWAY_NORMAL_BODY}`,
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>\n${TREE_LEAF_SWAY_POSITION_BODY}`,
       );
     shader.fragmentShader = shader.fragmentShader
       .replace(
@@ -218,10 +256,12 @@ function applyFoliageSurfaceShader(material: THREE.MeshStandardMaterial): void {
   material.customProgramCacheKey = () => [
     TREE_FOLIAGE_SURFACE_VERSION,
     TREE_MATERIAL_COLOR_SPACE_VERSION,
+    TREE_LEAF_SWAY_VERSION,
   ].join('|');
   material.userData['treeFoliageSurface'] = {
     version: TREE_FOLIAGE_SURFACE_VERSION,
     textureSource: 'procedural-shader',
+    swayVersion: TREE_LEAF_SWAY_VERSION,
     extraDrawCalls: 0,
     extraMaterials: 0,
   };

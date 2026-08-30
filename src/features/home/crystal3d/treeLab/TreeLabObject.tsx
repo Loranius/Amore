@@ -104,11 +104,11 @@ export function TreeLabObject({
 
   useEffect(() => {
     if (!motionRoot.current) return undefined;
-    lifeBinding.current = createThreeTreeLifeBinding(motionRoot.current, leafMesh);
+    lifeBinding.current = createThreeTreeLifeBinding(motionRoot.current, leafMesh, life);
     return () => {
       lifeBinding.current = null;
     };
-  }, [leafMesh]);
+  }, [leafMesh, life]);
 
   useFrame(({ clock }) => {
     if (!lifeBinding.current) return;
@@ -119,6 +119,8 @@ export function TreeLabObject({
         elapsedSeconds: clock.getElapsedTime(),
         reducedMotion,
       }),
+      life,
+      reducedMotion,
     );
   });
 

@@ -36,3 +36,10 @@ export {
 export type { ThreeCrystalRenderBundle } from './bundle';
 export { fitThreeTree, measureThreeTreeReach } from './treeFit';
 export type { ThreeTreeFit, ThreeTreeFitContent, ThreeTreeReach } from './treeFit';
+export {
+  TREE_LEAF_SWAY_ATTRIBUTE,
+  TREE_LEAF_SWAY_VERSION,
+  applyThreeTreeLeafSway,
+  setThreeTreeLeafSwayFrame,
+  type TreeLeafSwayUniforms,
+} from './treeLeafSway';

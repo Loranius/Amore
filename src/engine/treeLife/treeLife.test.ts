@@ -23,7 +23,21 @@ describe('Tree Life Lab', () => {
     expect(first.leaves.length).toBeLessThanOrEqual(DEFAULT_TREE_LIFE_CONFIG.maxLeafProfiles);
     expect(first.diagnostics.emittedLeafProfileCount).toBe(first.leaves.length);
     expect(first.diagnostics.estimatedAdditionalDrawCalls).toBe(0);
-    expect(first.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(first.leaves.length);
+    /*
+     * НУЛЬ, А БУЛО `first.leaves.length`, і це не послаблення тесту.
+     *
+     * Стара цифра описувала реальну ціну: рендер щокадру розкладав кватерніон
+     * кожного листка, збирав матрицю назад і відправляв увесь буфер матриць
+     * на відео — на живих даних 651 листок за кадр, єдина покадрова витрата
+     * сцени дерева.
+     *
+     * Відколи хитання листя рахує вершинний шейдер, за кадр змінюються рівно
+     * два однострої, а матриці інстансів статичні. Закон хитання при цьому НЕ
+     * ЗМІНИВСЯ: його дає `treeLeafSwayAt`, спільна для процесора й GLSL, і
+     * `renderer/three/treeLife.test.ts` доводить числом, що листок опиняється
+     * рівно там само, де його ставила стара матриця.
+     */
+    expect(first.diagnostics.estimatedMatrixUpdatesPerFrame).toBe(0);
   });
 
   it('samples repeatable finite sway and obeys reduced motion', () => {
