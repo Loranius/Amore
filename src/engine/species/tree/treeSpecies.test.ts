@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildArtifactBlueprint, type EvolutionEventInput } from '../../evolution';
 import { buildOrganicSkeleton } from '../../labs/organic';
-import { treeToOrganicField } from './organicAdapter';
+import { DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG, treeToOrganicField } from './organicAdapter';
 import { buildTreeSpeciesBlueprint } from './treeSpecies';
 
 const BASE_EVENTS: EvolutionEventInput[] = [
@@ -254,6 +254,8 @@ describe('Tree Species', () => {
       maxNodes: 80,
       maxGeneration: 3,
       maxBranchSegments: 8,
+      elevationFan: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.elevationFan,
+      radialFan: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.radialFan,
     });
 
     /*

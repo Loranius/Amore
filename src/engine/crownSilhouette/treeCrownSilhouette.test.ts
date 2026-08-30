@@ -29,7 +29,36 @@ describe('Tree Crown Silhouette', () => {
     expect(first.diagnostics.adjustedOuterLeafCount).toBeGreaterThan(0);
     expect(first.diagnostics.adjustedMiddleLeafCount).toBeGreaterThan(0);
     expect(first.diagnostics.frontClosureLeafCount).toBeGreaterThan(0);
-    expect(first.diagnostics.frontClosureInwardLeafCount).toBeGreaterThan(0);
+
+    /*
+     * ЗАТЯГУВАННЯ ВСЕРЕДИНУ НЕ ПРАЦЮЄ, І ЦЕ ЗАФІКСОВАНО НАВМИСНО.
+     *
+     * Тут стояло `frontClosureInwardLeafCount > 0`, і воно проходило — на
+     * ОДНОМУ листку з 369. Тобто перевірка звітувала «механізм живий», а
+     * механізм рухав рівно одну картку: орлянка, яку будь-яка зміна форми
+     * крони перекидає в нуль. Так і сталось, коли крона перестала бути шаром.
+     *
+     * ПРИЧИНА ВИМІРЯНА, і вона не в кроні. `sourceRadialRatio` ділить
+     * ГОРИЗОНТАЛЬНУ відстань листка на `bounds.radius` — а це ОБ'ЄМНИЙ радіус
+     * від центроїда композиції по ВСІХ вибірках гілок, включно зі стовбуром
+     * від самої землі. Тобто знаменник міряє переважно висоту дерева (2.95),
+     * а чисельник — ширину крони (до 1.6). Виміряно: найбільше відношення
+     * серед 432 листків — 0.519, а `frontClosureTargetRadialRatio` = 0.5.
+     * Затягування вмикається лише вище цільового відношення, тож воно
+     * недосяжне майже за побудовою — не «зламалось», а не працювало ніколи.
+     *
+     * ЧОМУ НЕ ВИПРАВЛЕНО ТУТ. Полагодити знаменник означає перешкалювати
+     * `maximumRadialOffsetRatio`, `envelopeResponse` і `middleLayerResponse` —
+     * усі вони підбирались на цій самій хибній шкалі й діють на КОЖЕН листок,
+     * а не лише на затягування. Це окрема робота зі своїм виміром, і робити
+     * її мимохідь усередині зміни про крону означало б зсунути силует наосліп.
+     *
+     * Тому стан названо числом: коли знаменник полагодять, обидва рядки нижче
+     * впадуть — і той, хто це зробить, побачить це місце.
+     */
+    expect(first.diagnostics.frontClosureInwardLeafCount).toBe(0);
+    expect(Math.max(...first.profiles.map((profile) => profile.sourceRadialRatio)))
+      .toBeLessThan(DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.frontClosureTargetRadialRatio + 0.05);
     expect(first.diagnostics.adjustedLeafCount).toBe(
       first.diagnostics.adjustedOuterLeafCount + first.diagnostics.adjustedMiddleLeafCount,
     );
