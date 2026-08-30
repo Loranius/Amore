@@ -9,9 +9,14 @@
 // Без цього трава на схилі купола росла б крізь камінь убік, і це
 // читалось би вадою, а не рифом.
 // ============================================================
-import { useLayoutEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Color, DoubleSide, FrontSide, InstancedMesh, Object3D, Quaternion, Vector3 } from 'three';
+import {
+  applyReefSwayPhases,
+  createReefGrowthMaterial,
+  setReefSwayFrame,
+} from './reefUndergrowthSway';
+import { Color, InstancedMesh, Object3D, Quaternion, Vector3 } from 'three';
 import {
   buildReefBladeMesh,
   buildReefPebbleMesh,
@@ -31,10 +36,11 @@ import { reefGeometryOf } from './reefGeometry';
 
 const UP = new Vector3(0, 1, 0);
 
-/** Вісь і розмах гойдання: течія йде в один бік, як і належить течії. */
-const SWAY_AXIS = new Vector3(0, 0, 1);
-const SWAY_ANGLE = 0.16;
-const SWAY_RATE = 0.55;
+/*
+ * Вісь, розмах і темп течії переїхали у `reefUndergrowthSway.ts`, бо їх тепер
+ * читає GLSL. Числа не змінились — це те саме гойдання, лише рахує його
+ * відеокарта.
+ */
 
 const SCRATCH_NORMAL = new Vector3();
 const SCRATCH_SPIN = new Quaternion();
@@ -62,10 +68,17 @@ interface ReefUndergrowthProps {
   standing: ReefStanding;
   /** Підйом голови: те, що сидить на куполі, їде разом із ним. */
   lift: number;
+  /**
+   * Зменшена анімація.
+   *
+   * Цього тут не було, і зелень гойдалась завжди — єдина зі своїх сусідів:
+   * риби, порошинки й згасання орбіти `reduceMotion` поважали.
+   */
+  reduceMotion: boolean;
 }
 
 export function ReefUndergrowth({
-  plan, standing, lift,
+  plan, standing, lift, reduceMotion,
 }: ReefUndergrowthProps): React.JSX.Element {
   const growths = useMemo(
     () => reefUndergrowth(plan.head, standing, plan.colonies.length, plan.headSeed),
@@ -97,6 +110,7 @@ export function ReefUndergrowth({
           items={groups[kind]}
           lift={lift}
           sway={kind === 'weed' || kind === 'blade'}
+          reduceMotion={reduceMotion}
         />
       ))}
     </>
@@ -104,7 +118,7 @@ export function ReefUndergrowth({
 }
 
 function GrowthInstances({
-  kind, geometry, items, lift, sway,
+  kind, geometry, items, lift, sway, reduceMotion,
 }: {
   kind: ReefGrowthKind;
   geometry: ReturnType<typeof reefGeometryOf>;
@@ -112,32 +126,33 @@ function GrowthInstances({
   lift: number;
   /** Чи гойдає це течія: водорості й трава — так, камінь — ні. */
   sway: boolean;
+  reduceMotion: boolean;
 }): React.JSX.Element | null {
   const mesh = useRef<InstancedMesh>(null);
   const scratch = useMemo(() => new Object3D(), []);
+  const surface = useMemo(() => createReefGrowthMaterial(kind, sway), [kind, sway]);
+  useEffect(() => () => surface.material.dispose(), [surface]);
 
   /*
-   * Гойдання — поворот УСЬОГО тіла, а не згин вершин.
+   * Гойдання — поворот УСЬОГО тіла, а не згин вершин, і тепер його рахує
+   * вершинний шейдер.
    *
-   * Згин вимагав би або власного шейдера, або перерахунку вершин на
-   * кожному кадрі для кожної стрічки. Поворот цілого тіла коштує один
-   * запис матриці, а на вигнутій стрічці читається течією — саме тому
-   * стрічка й вигнута.
+   * Тут стояв покадровий обхід: кожне тіло ставилось на місце заново
+   * (позиція, два кватерніони, масштаб, збірка матриці), докручувався нахил
+   * течії, матриця збиралась удруге й записувалась — після чого весь буфер
+   * їхав на відео. Виміряно: 59 стрічок і 18 водоростей, тобто 77 тіл за
+   * кадр, і кожне дорожче за листок дерева, бо збірок матриці дві.
+   *
+   * Тепер за кадр міняється ОДНЕ число на вид — час. Фаза кожного тіла
+   * лежить в атрибуті інстанса, а матриці статичні від першого кадру.
+   *
+   * Стара приписка казала, що згин вимагав би власного шейдера, і тому
+   * обрано поворот цілого тіла. Шейдер тепер є — але поворот лишається той
+   * самий, до останнього знака: це перенесення, а не переробка вигляду.
    */
   useFrame((state) => {
-    const instances = mesh.current;
-    if (!sway || !instances) return;
-    const time = state.clock.elapsedTime;
-    items.forEach((growth, index) => {
-      place(scratch, growth, lift);
-      const phase = growth.spinRad;
-      const lean = Math.sin(time * SWAY_RATE + phase) * SWAY_ANGLE
-        * (growth.kind === 'weed' ? 1 : 0.45);
-      scratch.rotateOnAxis(SWAY_AXIS, lean);
-      scratch.updateMatrix();
-      instances.setMatrixAt(index, scratch.matrix);
-    });
-    instances.instanceMatrix.needsUpdate = true;
+    if (!sway || !surface.uniforms) return;
+    setReefSwayFrame(surface.uniforms, kind, state.clock.elapsedTime, reduceMotion);
   });
 
   useLayoutEffect(() => {
@@ -157,18 +172,16 @@ function GrowthInstances({
 
     instances.instanceMatrix.needsUpdate = true;
     if (instances.instanceColor) instances.instanceColor.needsUpdate = true;
-  }, [items, kind, lift, scratch]);
+    if (sway) applyReefSwayPhases(instances, items.map((growth) => growth.spinRad));
+  }, [items, kind, lift, scratch, sway]);
 
   if (items.length === 0) return null;
 
   return (
-    <instancedMesh ref={mesh} args={[geometry, undefined, items.length]} receiveShadow>
-      <meshStandardMaterial
-        roughness={kind === 'pebble' ? 0.95 : 0.72}
-        side={kind === 'weed' || kind === 'blade' ? DoubleSide : FrontSide}
-        metalness={0}
-        flatShading
-      />
-    </instancedMesh>
+    <instancedMesh
+      ref={mesh}
+      args={[geometry, surface.material, items.length]}
+      receiveShadow
+    />
   );
 }

@@ -92,7 +92,12 @@ export function ReefWorld({ plan, meshes, theme, reduceMotion }: ReefWorldProps)
       <ReefWater theme={theme} sceneRadius={standing.rock.radius} seed={plan.headSeed} />
       <ReefRock standing={standing} seed={plan.headSeed} theme={theme} />
       <ReefColonies plan={plan} meshes={meshes} theme={theme} lift={standing.headLift} />
-      <ReefUndergrowth plan={plan} standing={standing} lift={standing.headLift} />
+      <ReefUndergrowth
+        plan={plan}
+        standing={standing}
+        lift={standing.headLift}
+        reduceMotion={reduceMotion}
+      />
       <ReefSchool plan={plan} lift={standing.headLift} reduceMotion={reduceMotion} />
       <ReefMotes
         reach={standing.rock.radius}
