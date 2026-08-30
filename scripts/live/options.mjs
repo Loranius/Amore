@@ -75,6 +75,28 @@ export const DEFAULTS = {
 
 class OptionError extends Error {}
 
+/**
+ * Смуга для профілю світла: `y0-y1` або `y0-y1,x0-x1`, у пікселях знімка.
+ *
+ * Без діапазону по X береться вся ширина — тіло однаково знаходиться за
+ * плато, а тло стає крайніми плато й відкидається як силует.
+ */
+export function parseBand(value) {
+  const parts = String(value ?? '').split(',');
+  const range = (text, what) => {
+    const match = /^(\d+)-(\d+)$/.exec(String(text).trim());
+    if (!match) throw new OptionError(`--profile: ${what} має вигляд 100-200, а не «${text}».`);
+    const from = Number(match[1]);
+    const to = Number(match[2]);
+    if (to <= from) throw new OptionError(`--profile: ${what} — кінець має бути більшим за початок.`);
+    return [from, to];
+  };
+  const [y0, y1] = range(parts[0], 'смуга по Y');
+  if (parts.length === 1) return { y0, y1, x0: null, x1: null };
+  const [x0, x1] = range(parts[1], 'смуга по X');
+  return { y0, y1, x0, x1 };
+}
+
 function pick(map, value, what) {
   if (Object.prototype.hasOwnProperty.call(map, value)) return map[value];
   throw new OptionError(
@@ -165,6 +187,7 @@ export function parseShotArgs(argv) {
     still: false,
     login: true,
     breakdown: false,
+    profile: null,
   };
 
   for (const raw of argv) {
@@ -199,6 +222,8 @@ export function parseShotArgs(argv) {
       // Розклад сцени по об'єктах. Сума трикутників не каже, куди вони пішли,
       // а бюджетна робота питає саме це — і вже раз помилилась, бо не питала.
       case 'breakdown': options.breakdown = value !== 'false'; break;
+      // Профіль світла по смузі: `--profile=y0-y1` або `--profile=y0-y1,x0-x1`.
+      case 'profile': options.profile = parseBand(value); break;
       case 'keep-server': options.keepServer = value !== 'false'; break;
       case 'headed': options.headed = value !== 'false'; break;
       default:
@@ -238,6 +263,7 @@ export function parseShotArgs(argv) {
     headed: options.headed,
     still: options.still,
     breakdown: options.breakdown,
+    profile: options.profile,
     login: options.login,
   };
 }

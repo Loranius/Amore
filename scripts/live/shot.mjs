@@ -1,7 +1,16 @@
 #!/usr/bin/env node
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
 import { DEFAULTS, OptionError, ROUTES, parseShotArgs, shotName } from './options.mjs';
+import {
+  TONE_MAPPING_ACES,
+  TONE_MAPPING_NONE,
+  decodePng,
+  facetSeparations,
+  findPlateaus,
+  scanBand,
+} from './luminance.mjs';
 import {
   ensureServer,
   goToRoute,
@@ -11,6 +20,7 @@ import {
   readJourneyMetrics,
   readSceneBreakdown,
   readSceneMetrics,
+  readToneMapping,
   tapPoint,
   tapSelector,
 } from './portal.mjs';
@@ -100,6 +110,7 @@ async function main() {
           const breakdown = options.breakdown
             ? await readSceneBreakdown(portal.page)
             : null;
+          const tone = options.profile ? await readToneMapping(portal.page) : null;
           const probes = await probeSelectors(portal.page, options.probes);
           const inks = await probeInk(portal.page, options.inks);
 
@@ -144,6 +155,42 @@ async function main() {
                 const dark = row.visible ? '' : ' (приховано)';
                 console.log(`    ${String(row.triangles).padStart(6)}${share.padStart(7)}  ${row.name}${many}${dark}`);
               }
+            }
+          }
+          if (options.profile) {
+            const image = decodePng(readFileSync(file));
+            const band = {
+              y0: Math.max(0, Math.min(image.height - 1, options.profile.y0)),
+              y1: Math.max(1, Math.min(image.height, options.profile.y1)),
+              x0: Math.max(0, options.profile.x0 ?? 0),
+              x1: Math.min(image.width, options.profile.x1 ?? image.width),
+            };
+            const curve = tone?.toneMapping ?? TONE_MAPPING_NONE;
+            const exposure = tone?.toneMappingExposure ?? tone?.exposure ?? 1;
+            const columns = scanBand(image, band, { toneMapping: curve, exposure });
+            const report = facetSeparations(findPlateaus(columns));
+            const named = curve === TONE_MAPPING_ACES
+              ? `ACES, експозиція ${exposure}`
+              : curve === TONE_MAPPING_NONE
+                ? 'без кривої'
+                : `крива №${curve} — НЕ обернена, числа нижче в байтах екрана`;
+            console.log(`  профіль  смуга y${band.y0}..${band.y1}, x${band.x0}..${band.x1} · ${named}`);
+            if (report.plateaus.length === 0) {
+              console.log('           жодного плато: у цій смузі тіла немає або воно все в градієнті');
+            } else {
+              for (const plateau of report.plateaus) {
+                console.log(
+                  `    x${String(plateau.from + band.x0).padStart(4)}..${String(plateau.to + band.x0).padEnd(4)}`
+                  + `  яскравість сцени ${plateau.luminance.toFixed(4)}`,
+                );
+              }
+              const percents = report.steps.map((step) => `${(step * 100).toFixed(0)}%`);
+              console.log(`           між сусідніми гранями: ${percents.join(' · ') || '—'}`);
+              console.log(
+                `           МЕДІАНА ${(report.median * 100).toFixed(0)}%`
+                + `, МАКСИМУМ ${(report.max * 100).toFixed(0)}%`
+                + `  (кристал читається кристалом від 30%)`,
+              );
             }
           }
           for (const [selector, found] of Object.entries(probes)) {

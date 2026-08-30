@@ -27,6 +27,16 @@ export interface EvolutionRuntimeMetrics {
  */
 export const EVOLUTION_SCENE_HANDLE = '__amoreEvolutionScene';
 
+/**
+ * Крива тонування й експозиція — ті, що застосовані НАСПРАВДІ.
+ *
+ * Профіль світла (`npm run live -- … --profile`) мусить обернути саме ту
+ * криву, якою кадр стиснуто, інакше він «виправляє» те, чого не робили.
+ * Припускати її не можна: R3F ставить ACES за замовчуванням, але `flat` на
+ * полотні це вимикає, і жодного попередження при цьому не буде.
+ */
+export const EVOLUTION_TONE_HANDLE = '__amoreEvolutionTone';
+
 export function EvolutionRuntimeProbe({
   onMetrics,
   warmupFrames = 24,
@@ -43,10 +53,15 @@ export function EvolutionRuntimeProbe({
     if (!import.meta.env.DEV) return undefined;
     const holder = window as unknown as Record<string, unknown>;
     holder[EVOLUTION_SCENE_HANDLE] = scene;
+    holder[EVOLUTION_TONE_HANDLE] = {
+      toneMapping: gl.toneMapping,
+      exposure: gl.toneMappingExposure,
+    };
     return () => {
       delete holder[EVOLUTION_SCENE_HANDLE];
+      delete holder[EVOLUTION_TONE_HANDLE];
     };
-  }, [scene]);
+  }, [scene, gl]);
 
   useEffect(() => {
     frameRef.current = 0;

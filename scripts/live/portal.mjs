@@ -475,6 +475,17 @@ export async function readSceneBreakdown(page) {
 }
 
 /**
+ * Крива тонування, якою стиснуто кадр.
+ *
+ * Читається зі сцени, а не припускається: R3F ставить ACES за замовчуванням,
+ * але `flat` на полотні це вимикає, і профіль, який обернув би криву даремно,
+ * звітував би про світло, якого немає.
+ */
+export async function readToneMapping(page) {
+  return page.evaluate(() => window.__amoreEvolutionTone ?? null);
+}
+
+/**
  * Те, що публікує про себе сцена «Нашого шляху».
  *
  * Окремо від `readSceneMetrics`, бо це інше полотно з іншим набором чисел:
