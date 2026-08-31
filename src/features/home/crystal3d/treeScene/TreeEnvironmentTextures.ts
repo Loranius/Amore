@@ -181,43 +181,57 @@ function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
 }
 
 export function createGrassBladeTexture(theme: Theme) {
+  /*
+   * ПУЧОК, А НЕ ОДНА БИЛИНА — і це та причина, з якої трава читалась
+   * шпичаками навіть після того, як їй полагодили колір.
+   *
+   * Тут малювалась ОДНА билина на полотні 96x256, тобто вп'ятеро вища за
+   * власну ширину. Кущик складається з п'яти таких карток навхрест, отже
+   * виходила зірка з тонких голок. Виміряно на живому екрані: пропорція
+   * плями трави (висота до ширини) — медіана 4.38, найбільші 28x126 і
+   * 21x136. Луг не буває з голок.
+   *
+   * Ширша картка сама собою не рятує: вона розтягнула б ту саму билину в
+   * товсту. Тому пучок мусить бути в САМІЙ текстурі — кілька билин, що
+   * розходяться віялом зі спільної основи. Тоді картка з пропорцією,
+   * близькою до одиниці, читається жмутком, а не голкою.
+   */
   const p = PALETTE[theme];
-  const el = canvas(96, 256);
+  const el = canvas(256, 256);
   const ctx = el.getContext('2d');
   if (!ctx) throw new Error('Canvas 2D unavailable');
   ctx.clearRect(0, 0, el.width, el.height);
 
-  const g = ctx.createLinearGradient(0, 256, 0, 0);
-  g.addColorStop(0, rgba(p.grassDark, 1));
-  g.addColorStop(0.42, rgba(p.grassA, 1));
-  g.addColorStop(1, rgba(p.grassB, 1));
-  ctx.fillStyle = g;
+  const bladeCount = 7;
+  for (let i = 0; i < bladeCount; i += 1) {
+    // Билини розходяться віялом від спільної основи; крайні коротші за
+    // середні, як у справжньому жмутку.
+    const spread = (i / (bladeCount - 1) - 0.5) * 2;
+    const baseX = 128 + spread * 26 + (hash2(i, 1, 71) - 0.5) * 12;
+    const tipX = 128 + spread * 104 + (hash2(i, 2, 73) - 0.5) * 22;
+    const height = 236 * (1 - Math.abs(spread) * 0.34) * (0.86 + hash2(i, 3, 79) * 0.24);
+    const tipY = 256 - height;
+    const halfWidth = 7 + hash2(i, 4, 83) * 5;
+    const bend = (hash2(i, 5, 89) - 0.5) * 26;
 
-  ctx.beginPath();
-  ctx.moveTo(22, 256);
-  ctx.bezierCurveTo(20, 184, 28, 78, 45, 3);
-  ctx.bezierCurveTo(61, 88, 70, 190, 68, 256);
-  ctx.closePath();
-  ctx.fill();
+    const g = ctx.createLinearGradient(0, 256, 0, tipY);
+    g.addColorStop(0, rgba(p.grassDark, 1));
+    g.addColorStop(0.45, rgba(p.grassA, 1));
+    g.addColorStop(1, rgba(p.grassB, 1));
+    ctx.fillStyle = g;
 
-  ctx.strokeStyle = rgba(p.grassB, 0.42);
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(46, 247);
-  ctx.quadraticCurveTo(45, 126, 45, 12);
-  ctx.stroke();
-
-  for (let i = 0; i < 22; i += 1) {
-    const y = 30 + hash2(i, 1, 89) * 202;
-    ctx.strokeStyle = rgba(p.grassDark, 0.055 + hash2(i, 2, 97) * 0.08);
-    ctx.lineWidth = 0.65;
     ctx.beginPath();
-    ctx.moveTo(33 + hash2(i, 4, 99) * 5, y);
-    ctx.lineTo(58 + hash2(i, 5, 100) * 4, y - 8 - hash2(i, 3, 101) * 8);
-    ctx.stroke();
+    ctx.moveTo(baseX - halfWidth, 256);
+    ctx.quadraticCurveTo((baseX + tipX) * 0.5 - halfWidth + bend, (256 + tipY) * 0.5, tipX, tipY);
+    ctx.quadraticCurveTo((baseX + tipX) * 0.5 + halfWidth + bend, (256 + tipY) * 0.5, baseX + halfWidth, 256);
+    ctx.closePath();
+    ctx.fill();
   }
 
-  return configure(new THREE.CanvasTexture(el));
+  const texture = new THREE.CanvasTexture(el);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  return texture;
 }
 
 function skyTexture(theme: Theme) {

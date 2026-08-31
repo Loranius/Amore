@@ -147,12 +147,22 @@ function buildGrassTuftGeometry() {
   const positions: number[] = [];
   const uvs: number[] = [];
   const indices: number[] = [];
+  /*
+   * КАРТКА ШИРША, НІЖ ВИЩА — жмуток, а не голка.
+   *
+   * Було 0.13 на 0.42, тобто втричі вища за власну ширину; разом із
+   * текстурою в одну билину це давало зірку зі шпичаків. Виміряно на
+   * екрані: пропорція плями трави мала медіану 4.38.
+   *
+   * Тепер текстура несе сім билин віялом (`createGrassBladeTexture`), тож
+   * картці треба ширини, щоб те віяло було видно.
+   */
   const cards = [
-    { yaw: 0, width: 0.13, height: 0.42, x: 0, z: 0 },
-    { yaw: 1.08, width: 0.11, height: 0.36, x: 0.025, z: 0.008 },
-    { yaw: -1.02, width: 0.105, height: 0.34, x: -0.022, z: 0.018 },
-    { yaw: 2.06, width: 0.085, height: 0.29, x: 0.015, z: -0.018 },
-    { yaw: -2.14, width: 0.08, height: 0.27, x: -0.018, z: -0.012 },
+    { yaw: 0, width: 0.30, height: 0.25, x: 0, z: 0 },
+    { yaw: 1.08, width: 0.26, height: 0.22, x: 0.025, z: 0.008 },
+    { yaw: -1.02, width: 0.25, height: 0.21, x: -0.022, z: 0.018 },
+    { yaw: 2.06, width: 0.21, height: 0.18, x: 0.015, z: -0.018 },
+    { yaw: -2.14, width: 0.20, height: 0.17, x: -0.018, z: -0.012 },
   ] as const;
   const baseY = -0.21;
 
@@ -204,10 +214,30 @@ function buildGrassInstances(hillRadius: number, soilRadius: number, groundY: nu
   const maxRadius = hillRadius * 0.76;
   const golden = Math.PI * (3 - Math.sqrt(5));
 
+  /*
+   * КУПИНАМИ, А НЕ РІВНО ПО ВСІЙ ГАЛЯВИНІ.
+   *
+   * Розкладка золотим кутом — це НАЙРІВНІШИЙ можливий розподіл на крузі;
+   * саме тому нею сіють соняшникове насіння. Для лугу це рівно навпаки те,
+   * що треба: трава росте купинами, між якими видно землю, і рівний розсів
+   * читається як візерунок, а не як заріст.
+   *
+   * Тому центри купин лишаються на золотому куті (щоб вони самі не збивались
+   * у грудку), а кожен кущик сідає біля свого центру.
+   */
+  const clumpCount = Math.max(1, Math.round(count / 7));
   for (let i = 0; i < count; i += 1) {
-    const radialSeed = hash2(i, 2, 101);
-    const angle = i * golden + (hash2(i, 3, 103) - 0.5) * 0.82;
-    const radius = Math.sqrt(minRadius * minRadius + (maxRadius * maxRadius - minRadius * minRadius) * radialSeed);
+    const clump = i % clumpCount;
+    const radialSeed = hash2(clump, 2, 101);
+    const clumpAngle = clump * golden + (hash2(clump, 3, 103) - 0.5) * 0.82;
+    const clumpRadius = Math.sqrt(
+      minRadius * minRadius + (maxRadius * maxRadius - minRadius * minRadius) * radialSeed,
+    );
+    // Розкид усередині купини росте з відстанню від дерева, щоб дальні
+    // купини не виглядали дрібнішими за ближні.
+    const scatter = 0.22 + (clumpRadius / maxRadius) * 0.5;
+    const angle = clumpAngle + (hash2(i, 11, 149) - 0.5) * scatter * 0.9;
+    const radius = clumpRadius + (hash2(i, 12, 151) - 0.5) * scatter * 2.4;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius;
     const localY = terrainHeight(x, z, hillRadius);
