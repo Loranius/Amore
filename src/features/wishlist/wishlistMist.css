@@ -98,13 +98,13 @@
   border: 1px solid rgba(255, 255, 255, 0.78);
   background:
     radial-gradient(circle at 34% 24%, rgba(255, 255, 255, 0.56), transparent 31%),
-    radial-gradient(circle at 72% 76%, rgba(217, 174, 232, 0.1), transparent 42%),
+    radial-gradient(circle at 72% 76%, hsl(calc(var(--wl-world-hue) + 18deg) 56% 80% / 0.1), transparent 42%),
     color-mix(in srgb, var(--accent) 5%, var(--surface));
   box-shadow:
     0 20px 46px color-mix(in srgb, var(--accent) 17%, transparent),
-    0 7px 19px rgba(67, 46, 82, 0.12),
+    0 7px 19px hsl(calc(var(--wl-world-hue) + 9deg) 28% 25% / 0.12),
     inset 0 1px 1px rgba(255, 255, 255, 0.82),
-    inset 0 -13px 24px rgba(59, 39, 74, 0.075);
+    inset 0 -13px 24px hsl(calc(var(--wl-world-hue) + 8deg) 31% 22% / 0.075);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -121,12 +121,12 @@
   background: conic-gradient(
     from 215deg,
     rgba(255, 255, 255, 0.9),
-    rgba(220, 182, 247, 0.72) 13%,
-    rgba(188, 219, 255, 0.68) 27%,
-    rgba(224, 193, 249, 0.62) 42%,
+    hsl(calc(var(--wl-world-hue) + 9deg) 80% 84% / 0.72) 13%,
+    hsl(calc(var(--wl-world-hue) - 54deg) 100% 87% / 0.68) 27%,
+    hsl(calc(var(--wl-world-hue) + 7deg) 82% 87% / 0.62) 42%,
     rgba(255, 255, 255, 0.88) 56%,
-    rgba(255, 213, 185, 0.55) 69%,
-    rgba(177, 222, 247, 0.61) 83%,
+    hsl(calc(var(--wl-world-hue-warm) + 61deg) 100% 86% / 0.55) 69%,
+    hsl(calc(var(--wl-world-hue) - 65deg) 81% 83% / 0.61) 83%,
     rgba(255, 255, 255, 0.9)
   );
   content: '';
@@ -148,9 +148,9 @@
   background:
     radial-gradient(ellipse 32% 16% at 31% 13%, rgba(255, 255, 255, 0.78), transparent 72%),
     radial-gradient(ellipse 12% 7% at 19% 28%, rgba(255, 255, 255, 0.62), transparent 74%),
-    radial-gradient(ellipse 20% 10% at 78% 72%, rgba(193, 220, 255, 0.2), transparent 78%),
-    radial-gradient(ellipse 27% 13% at 70% 88%, rgba(215, 174, 245, 0.18), transparent 82%),
-    linear-gradient(to bottom, transparent 55%, rgba(58, 36, 73, 0.085));
+    radial-gradient(ellipse 20% 10% at 78% 72%, hsl(calc(var(--wl-world-hue) - 52deg) 100% 88% / 0.2), transparent 78%),
+    radial-gradient(ellipse 27% 13% at 70% 88%, hsl(calc(var(--wl-world-hue) + 9deg) 78% 82% / 0.18), transparent 82%),
+    linear-gradient(to bottom, transparent 55%, hsl(calc(var(--wl-world-hue) + 10deg) 34% 21% / 0.085));
   content: '';
   pointer-events: none;
 }
@@ -169,26 +169,26 @@
 .wishlist .wl-cloud-bubble[data-priority='high'] {
   box-shadow:
     0 24px 58px color-mix(in srgb, var(--accent) 25%, transparent),
-    0 8px 22px rgba(67, 46, 82, 0.13),
+    0 8px 22px hsl(calc(var(--wl-world-hue) + 9deg) 28% 25% / 0.13),
     inset 0 1px 1px rgba(255, 255, 255, 0.86),
-    inset 0 -14px 25px rgba(59, 39, 74, 0.075);
+    inset 0 -14px 25px hsl(calc(var(--wl-world-hue) + 8deg) 31% 22% / 0.075);
 }
 
 .wishlist .wl-cloud-bubble[data-priority='medium'] {
   box-shadow:
     0 20px 48px color-mix(in srgb, var(--accent) 20%, transparent),
-    0 7px 20px rgba(67, 46, 82, 0.12),
+    0 7px 20px hsl(calc(var(--wl-world-hue) + 9deg) 28% 25% / 0.12),
     inset 0 1px 1px rgba(255, 255, 255, 0.84),
-    inset 0 -13px 24px rgba(59, 39, 74, 0.07);
+    inset 0 -13px 24px hsl(calc(var(--wl-world-hue) + 8deg) 31% 22% / 0.07);
 }
 
 .wishlist .wl-cloud-bubble[data-priority='low'] {
   border-color: rgba(255, 255, 255, 0.7);
   box-shadow:
     0 17px 40px color-mix(in srgb, var(--accent) 14%, transparent),
-    0 6px 17px rgba(67, 46, 82, 0.1),
+    0 6px 17px hsl(calc(var(--wl-world-hue) + 9deg) 28% 25% / 0.1),
     inset 0 1px 1px rgba(255, 255, 255, 0.78),
-    inset 0 -11px 21px rgba(59, 39, 74, 0.065);
+    inset 0 -11px 21px hsl(calc(var(--wl-world-hue) + 8deg) 31% 22% / 0.065);
 }
 
 .wishlist .wl-cloud-bubble:hover,
@@ -196,9 +196,9 @@
   border-color: rgba(255, 255, 255, 0.94);
   box-shadow:
     0 27px 66px color-mix(in srgb, var(--accent) 29%, transparent),
-    0 9px 25px rgba(67, 46, 82, 0.14),
+    0 9px 25px hsl(calc(var(--wl-world-hue) + 9deg) 28% 25% / 0.14),
     inset 0 1px 1px rgba(255, 255, 255, 0.9),
-    inset 0 -14px 26px rgba(59, 39, 74, 0.07);
+    inset 0 -14px 26px hsl(calc(var(--wl-world-hue) + 8deg) 31% 22% / 0.07);
 }
 
 .wishlist .wl-cloud-item--pressed .wl-cloud-bubble {
@@ -232,10 +232,10 @@
   z-index: -1;
   inset: -23%;
   background:
-    radial-gradient(circle at 43% 48%, rgba(236, 214, 251, 0.58) 0 24%, transparent 57%),
-    radial-gradient(ellipse 53% 39% at 27% 35%, rgba(220, 184, 246, 0.42), transparent 72%),
-    radial-gradient(ellipse 48% 34% at 78% 69%, rgba(197, 143, 235, 0.27), transparent 76%),
-    radial-gradient(ellipse 34% 25% at 68% 22%, rgba(223, 197, 244, 0.18), transparent 78%);
+    radial-gradient(circle at 43% 48%, hsl(calc(var(--wl-world-hue) + 10deg) 82% 91% / 0.58) 0 24%, transparent 57%),
+    radial-gradient(ellipse 53% 39% at 27% 35%, hsl(calc(var(--wl-world-hue) + 9deg) 78% 84% / 0.42), transparent 72%),
+    radial-gradient(ellipse 48% 34% at 78% 69%, hsl(calc(var(--wl-world-hue) + 9deg) 70% 74% / 0.27), transparent 76%),
+    radial-gradient(ellipse 34% 25% at 68% 22%, hsl(calc(var(--wl-world-hue) + 7deg) 68% 86% / 0.18), transparent 78%);
   opacity: 0.76;
   filter: blur(clamp(13px, calc(var(--wl-cloud-size) * 0.095), 22px));
   transform:
@@ -253,11 +253,11 @@
   background: conic-gradient(
     from 35deg,
     transparent,
-    rgba(220, 184, 246, 0.2),
+    hsl(calc(var(--wl-world-hue) + 9deg) 78% 84% / 0.2),
     transparent 32%,
-    rgba(202, 210, 250, 0.13) 49%,
+    hsl(calc(var(--wl-world-hue) - 36deg) 83% 89% / 0.13) 49%,
     transparent 65%,
-    rgba(197, 143, 235, 0.16),
+    hsl(calc(var(--wl-world-hue) + 9deg) 70% 74% / 0.16),
     transparent
   );
   opacity: 0.48;

@@ -54,6 +54,73 @@
   --wl-bubble-film-mid: 255, 148, 184;
 }
 
+/* ============================================================
+   Ті самі кульки в дереві й рифі.
+   ------------------------------------------------------------
+   Скло бульбашки було фіолетовим у кожному світі: власник побачив
+   бузкові кулі на зеленому лузі. Причина та сама, що й у планів —
+   колір стояв числом там, де мав стояти токен світу.
+
+   МЕТОД ТОЙ САМИЙ, ЯКИМ ФІОЛЕТ СТАВ ТРОЯНДОЮ ВИЩЕ: кожне число нижче —
+   це кристалічний колір, ПОВЕРНУТИЙ ЗА ВІДТІНКОМ. Світлота й насиченість
+   збережені до відсотка (у трійках це видно прямо — ті самі числа в
+   іншому порядку), тож жодна куля не стала темнішою чи блідішою. Разом
+   із відтінком їде й взаємний зсув нот плівки (−6°), інакше перелив
+   перестав би бути переливом.
+
+   Якір кожного світу — його `--accent`: карамель дерева 35°, зелень
+   світлого дерева 95°, блакить рифу 215°, бірюза мілководдя 182°.
+
+   СПЕЦИФІЧНІСТЬ, А НЕ ПОРЯДОК. `html[data-artifact='tree']` — (0,1,1),
+   тобто б'є `[data-theme='light']` (0,1,0). Тому світлий блок кожного
+   світу мусить бути компаундним (0,2,1), інакше на світлій темі дерева
+   світились би ТЕМНІ кульки — і виглядало б це не як помилка, а як
+   дивний колір. Стереже `wishlistBubbleWorlds.test.ts`.
+   ============================================================ */
+html[data-artifact='tree'] {
+  --wl-bubble-ink: 91, 71, 42;
+  --wl-bubble-ink-soft: 85, 66, 39;
+  --wl-bubble-tint-medium: #c9a778;
+  --wl-bubble-tint-low: #aa9b87;
+  --wl-bubble-shade: #7c694f;
+  --wl-bubble-shade-deep: #5d4c34;
+  --wl-bubble-film-edge: 255, 210, 148;
+  --wl-bubble-film-mid: 255, 199, 148;
+}
+
+html[data-theme='light'][data-artifact='tree'] {
+  --wl-bubble-ink: 62, 91, 42;
+  --wl-bubble-ink-soft: 58, 85, 39;
+  --wl-bubble-tint-medium: #9ac978;
+  --wl-bubble-tint-low: #96aa87;
+  --wl-bubble-shade: #627c4f;
+  --wl-bubble-shade-deep: #455d34;
+  --wl-bubble-film-edge: 193, 255, 148;
+  --wl-bubble-film-mid: 204, 255, 148;
+}
+
+html[data-artifact='reef'] {
+  --wl-bubble-ink: 42, 62, 91;
+  --wl-bubble-ink-soft: 39, 58, 85;
+  --wl-bubble-tint-medium: #789ac9;
+  --wl-bubble-tint-low: #8796aa;
+  --wl-bubble-shade: #4f627c;
+  --wl-bubble-shade-deep: #34455d;
+  --wl-bubble-film-edge: 148, 193, 255;
+  --wl-bubble-film-mid: 148, 204, 255;
+}
+
+html[data-theme='light'][data-artifact='reef'] {
+  --wl-bubble-ink: 42, 89, 91;
+  --wl-bubble-ink-soft: 39, 83, 85;
+  --wl-bubble-tint-medium: #78c6c9;
+  --wl-bubble-tint-low: #87a9aa;
+  --wl-bubble-shade: #4f7b7c;
+  --wl-bubble-shade-deep: #345b5d;
+  --wl-bubble-film-edge: 148, 252, 255;
+  --wl-bubble-film-mid: 148, 255, 247;
+}
+
 .wl-cloud-item::before,
 .wl-cloud-item::after {
   position: absolute;

@@ -46,15 +46,45 @@ describe('the sphere is glass, not an avatar', () => {
     const glass = block('.wl-sphere-field .wl-sphere__body::after');
     expect(glass).toMatch(/z-index:\s*[1-9]/);
     expect(glass).toMatch(/radial-gradient/);
-    // Рожева димка названа вимогою окремо, тож і перевіряється окремо: у
-    // шарі мусить бути справді рожевий, а не ще один бузковий.
-    const pinks = [...glass.matchAll(/rgba\((\d+),\s*(\d+),\s*(\d+)/g)]
-      .map(([, r, g, b]) => ({ r: Number(r), g: Number(g), b: Number(b) }));
-    expect(pinks.some((c) => c.r > 200 && c.b > 150 && c.r - c.g > 60)).toBe(true);
+    // Тепла димка названа вимогою окремо, тож і перевіряється окремо: у
+    // шарі мусить бути ДРУГА нота, а не ще одна така сама.
+    //
+    // Раніше вона перевірялась як «рожевий у числах» (r > 200, b > 150,
+    // r − g > 60). Числа пішли: відтінок кулі тепер віддає світ
+    // (`--wl-world-hue`), а тепла нота — `--wl-world-hue-warm`. Вимога від
+    // цього не змінилась, змінилось, ЧИМ її міряти: у кристала ця нота
+    // рожева, у дерева глиняна, у рифа коралова — і в кожному світі вона
+    // мусить бути ІНШОЮ, ніж тіло кулі.
+    expect(glass).toContain('--wl-world-hue-warm');
 
     // І блік — над усім: скло перед предметом, а не поруч із ним.
     const specular = block('.wl-sphere-field .wl-sphere__body::before');
     expect(specular).toMatch(/z-index:\s*[1-9]/);
+  });
+
+  it('gives every world a warm note distinct from the sphere body', () => {
+    /*
+     * Дві ноти скла — холодне тіло й тепла димка — тримають ілюзію скла: з
+     * однієї родини це вже не перелив, а фарба. Раніше обидві стояли
+     * числами й були кристалічними, тож дерево й риф світились бузковим.
+     *
+     * Поріг 40° — це та відстань, за якої око бачить ДВА кольори. Менше —
+     * і димка зливається з тілом.
+     */
+    const blocks = [...CSS.matchAll(
+      /(:root|html\[[^{]*\])\s*\{([^}]*--wl-world-hue[^}]*)\}/g,
+    )];
+    expect(blocks.length).toBeGreaterThanOrEqual(5);
+    for (const [, selector, body] of blocks) {
+      const cool = /--wl-world-hue:\s*(\d+)deg/.exec(body!);
+      const warm = /--wl-world-hue-warm:\s*(\d+)deg/.exec(body!);
+      expect(cool, `${selector} без холодної ноти`).not.toBeNull();
+      expect(warm, `${selector} без теплої ноти`).not.toBeNull();
+      const apart = Math.abs(Number(cool![1]) - Number(warm![1])) % 360;
+      const distance = Math.min(apart, 360 - apart);
+      expect(distance, `${selector}: ноти за ${distance}° одна від одної`)
+        .toBeGreaterThanOrEqual(40);
+    }
   });
 
   it('keeps the object recognisable rather than turning it into a pink blur', () => {

@@ -23,7 +23,19 @@ export type PlanIconComponent = (props: IconProps) => ReactNode;
 export interface PlanCategoryDef {
   label: string;
   Icon: PlanIconComponent;
-  /** Колір смужки й крапки. Текст цим кольором не фарбуємо. */
+  /**
+   * Колір смужки, крапки й підпису категорії — ТОКЕНОМ, а не числом.
+   *
+   * Тут стояли одинадцять шістнадцяткових чисел, і саме тому плани
+   * лишались рожево-фіолетовими в кожному світі: портал перевдягається
+   * у дерево й риф цілком, а ці числа не знали про це нічого. Власник
+   * побачив рівно це — бокові смужки з кристалічної гами на зеленому
+   * дереві.
+   *
+   * Значення живуть у `index.css` (кристал) і `artifactThemes.css`
+   * (дерево, риф — темні й світлі), як і решта токенів світу. Тут
+   * лишається лише ІМ'Я ролі.
+   */
   color: string;
 }
 
@@ -34,17 +46,17 @@ export interface PlanCategoryDef {
  * заводить щотижня, «Навчання» й «Для дому» — кілька разів на рік.
  */
 export const PLAN_CATEGORIES: Record<PlanCategory, PlanCategoryDef> = {
-  date: { label: 'Побачення', Icon: GlassesIcon, color: '#FF6B9D' },
-  trip: { label: 'Подорож', Icon: PlaneIcon, color: '#5BA3D9' },
-  ride: { label: 'Поїздка', Icon: CarIcon, color: '#6FB1C4' },
-  place: { label: 'Місце', Icon: MapPinIcon, color: '#7EC8A9' },
-  event: { label: 'Захід', Icon: TicketIcon, color: '#D9A441' },
-  activity: { label: 'Активність', Icon: ActivityIcon, color: '#E8829C' },
-  rest: { label: 'Відпочинок', Icon: MugIcon, color: '#B98A9A' },
-  holiday: { label: 'Свято', Icon: SparkIcon, color: '#C9922F' },
-  learning: { label: 'Навчання', Icon: BookIcon, color: '#9B6EA8' },
-  home: { label: 'Для дому', Icon: HouseIcon, color: '#8A9BB8' },
-  other: { label: 'Інше', Icon: DotsIcon, color: '#A08D97' },
+  date: { label: 'Побачення', Icon: GlassesIcon, color: 'var(--plan-cat-date)' },
+  trip: { label: 'Подорож', Icon: PlaneIcon, color: 'var(--plan-cat-trip)' },
+  ride: { label: 'Поїздка', Icon: CarIcon, color: 'var(--plan-cat-ride)' },
+  place: { label: 'Місце', Icon: MapPinIcon, color: 'var(--plan-cat-place)' },
+  event: { label: 'Захід', Icon: TicketIcon, color: 'var(--plan-cat-event)' },
+  activity: { label: 'Активність', Icon: ActivityIcon, color: 'var(--plan-cat-activity)' },
+  rest: { label: 'Відпочинок', Icon: MugIcon, color: 'var(--plan-cat-rest)' },
+  holiday: { label: 'Свято', Icon: SparkIcon, color: 'var(--plan-cat-holiday)' },
+  learning: { label: 'Навчання', Icon: BookIcon, color: 'var(--plan-cat-learning)' },
+  home: { label: 'Для дому', Icon: HouseIcon, color: 'var(--plan-cat-home)' },
+  other: { label: 'Інше', Icon: DotsIcon, color: 'var(--plan-cat-other)' },
 };
 
 export const PLAN_CATEGORY_ORDER: PlanCategory[] = [

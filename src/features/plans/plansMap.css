@@ -114,27 +114,32 @@
    під `[data-theme='light']`; решта файлу на них посилається. */
 .plan-map {
   /* Наліт поверх поверхні: те, що робить картку об'ємом, а не плямою. */
-  --pmap-skin: linear-gradient(158deg, rgba(74, 56, 116, 0.62), rgba(34, 25, 56, 0.78));
+  /* Шкіра вузла — у кольорах СВІТУ, а не кристала: до `--world-node-*`
+     тут стояли фіолетові числа, і карта плану лишалась кристалічною в
+     дереві й рифі, хоч підписи й лінії вже перефарбовувались. */
+  --pmap-skin: linear-gradient(158deg,
+    rgba(var(--world-node-top), 0.62), rgba(var(--world-node-bottom), 0.78));
   /* Внутрішня заливка — значки, кружечки, поле «Обрати дату». */
   --pmap-inset: rgba(255, 255, 255, 0.06);
   --pmap-inset-strong: rgba(255, 255, 255, 0.09);
   /* Заливка, тонована акцентом: пігулки дат, смуга готовності. */
-  --pmap-tint: rgba(220, 182, 245, 0.16);
+  --pmap-tint: rgba(var(--world-node-tint), 0.16);
   /* Світло по верхньому ребру й ореол назовні. */
   --pmap-edge: inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  --pmap-halo: 0 0 34px rgba(176, 128, 232, 0.24);
+  --pmap-halo: 0 0 34px rgba(var(--world-node-tint), 0.24);
 }
 
 [data-theme='light'] .plan-map {
   /* Наліт світлий: на рожевому аркуші картка світліша за фон, а не
      темніша. Той самий кут 158°, та сама роль. */
-  --pmap-skin: linear-gradient(158deg, rgba(255, 255, 255, 0.72), rgba(255, 246, 249, 0.5));
+  --pmap-skin: linear-gradient(158deg,
+    rgba(var(--world-node-top), 0.72), rgba(var(--world-node-bottom), 0.5));
   /* Заливка темна з прозорістю, а не біла: біла на білому — це ніщо. */
-  --pmap-inset: rgba(140, 60, 85, 0.07);
-  --pmap-inset-strong: rgba(140, 60, 85, 0.11);
+  --pmap-inset: rgba(var(--world-node-tint), 0.07);
+  --pmap-inset-strong: rgba(var(--world-node-tint), 0.11);
   --pmap-tint: color-mix(in srgb, var(--accent) 14%, transparent);
   --pmap-edge: inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  --pmap-halo: 0 0 30px rgba(168, 47, 85, 0.1);
+  --pmap-halo: 0 0 30px rgba(var(--world-node-tint), 0.1);
 }
 
 .plan-map .pmap-block {
@@ -145,7 +150,7 @@
   gap: 7px;
   min-width: 0;
   padding: 11px 13px;
-  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  border: 1px solid var(--world-border, rgba(var(--world-node-tint), 0.16));
   border-radius: var(--radius-xl) var(--radius-dock) var(--radius-xl) var(--radius-dock) / var(--radius-dock) var(--radius-xl) var(--radius-dock) var(--radius-xl);
   background:
     var(--pmap-skin),
@@ -178,13 +183,13 @@
   padding: 1.4px;
   pointer-events: none;
   background: conic-gradient(from var(--pmap-rim),
-    rgba(220, 182, 245, 0.24) 0deg,
-    rgba(247, 231, 255, 1) 42deg,
-    rgba(201, 160, 230, 0.46) 96deg,
-    rgba(220, 182, 245, 0.2) 168deg,
-    rgba(244, 224, 255, 0.92) 236deg,
-    rgba(180, 140, 224, 0.36) 300deg,
-    rgba(220, 182, 245, 0.24) 360deg);
+    rgba(var(--world-node-tint), 0.24) 0deg,
+    color-mix(in srgb, rgb(var(--world-node-tint)) 22%, #ffffff) 42deg,
+    rgba(var(--world-node-tint), 0.46) 96deg,
+    rgba(var(--world-node-tint), 0.2) 168deg,
+    color-mix(in srgb, rgb(var(--world-node-tint)) 26%, #ffffff) 236deg,
+    rgba(var(--world-node-tint), 0.36) 300deg,
+    rgba(var(--world-node-tint), 0.24) 360deg);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -226,7 +231,7 @@
   height: 34px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(220, 182, 245, 0.3);
+  border: 1px solid rgba(var(--world-node-tint), 0.3);
   border-radius: var(--radius-md);
   background: var(--pmap-inset);
   color: var(--plan-color, var(--world-accent, #dcb6f5));
@@ -343,7 +348,7 @@
   height: 32px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(220, 182, 245, 0.32);
+  border: 1px solid rgba(var(--world-node-tint), 0.32);
   border-radius: 50%;
   background: var(--pmap-inset);
   color: var(--world-accent, #dcb6f5);
@@ -390,7 +395,7 @@
   gap: 8px;
   width: 100%;
   padding: 6px 10px;
-  border: 1px solid var(--world-border, rgba(214, 190, 246, 0.16));
+  border: 1px solid var(--world-border, rgba(var(--world-node-tint), 0.16));
   border-radius: var(--radius-pill, 999px);
   background: var(--world-recess, rgba(9, 6, 16, 0.42));
   color: inherit;
@@ -423,7 +428,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 1.6px solid rgba(220, 182, 245, 0.5);
+  border: 1.6px solid rgba(var(--world-node-tint), 0.5);
 }
 
 .plan-map .pmap-line[data-done='true'] .pmap-check {
@@ -448,7 +453,7 @@
   justify-content: center;
   gap: 6px;
   padding: 7px 10px;
-  border: 1px dashed rgba(220, 182, 245, 0.34);
+  border: 1px dashed rgba(var(--world-node-tint), 0.34);
   border-radius: var(--radius-pill, 999px);
   background: none;
   color: var(--world-text-muted, #c9b8e4);

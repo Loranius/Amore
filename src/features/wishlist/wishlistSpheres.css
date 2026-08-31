@@ -12,6 +12,61 @@
    цього, а ілюзія важливіша за фізичну коректність.
    ============================================================ */
 
+/* ============================================================
+   ВІДТІНОК СФЕРИ — ОДНИМ ЧИСЛОМ НА СВІТ.
+   ------------------------------------------------------------
+   Тут стояло тридцять три `rgba(…)`, і всі до одного — фіолетові:
+   `178,126,240` на світлому боці, `58,32,92` у тіні, `240,130,198` на
+   обідці подарунка. Портал перевдягався в дерево й риф цілком, а кулі
+   лишались кристалічними — власник побачив бузкові сфери на зеленому лузі.
+
+   ЧОМУ САМЕ `hsl()`, А НЕ ТРИНАДЦЯТЬ ТОКЕНІВ. Ці тридцять три значення —
+   не тринадцять різних кольорів, а ОДИН відтінок у тринадцятьох
+   світлотах: виміряно, холодні лежать у 255-273°, теплі у 315-330°.
+   Токен на кожне значення означав би тринадцять чисел на світ, які треба
+   тримати в злагоді вручну. Записані як `hsl()`, вони віддають світові
+   рівно те, що від нього залежить — ВІДТІНОК, — а світлоту й насиченість
+   лишають на місці. Кожна куля лишається такою самою світлою й
+   насиченою, якою була; змінюється родина.
+
+   Дрібні зсуви (±11°) збережені як `calc(… + Ndeg)`: у переливі скла вони
+   й роблять перелив, і згорнути їх в одне число означало б зробити
+   градієнт пласким.
+
+   Якір кожного світу — його `--accent`. Друга нота названа «теплою» за
+   роллю, а не за температурою: у кристала це рожевий, у рифа корал, а в
+   дерева — листяне золото. Важливо лише те, що вона ІНША: дві ноти з
+   однієї родини — це вже не перелив скла, а фарба. Мінімум 40° між ними
+   стереже `wishlistSpheres.test.ts`.
+   ============================================================ */
+:root {
+  --wl-world-hue: 266deg;
+  --wl-world-hue-warm: 323deg;
+}
+
+html[data-artifact='tree'] {
+  --wl-world-hue: 35deg;
+  /* 82°, а не 12°: перша спроба поставила глину, і дві ноти скла зійшлись
+     на 23° — тобто перестали бути двома. Перевірка це й упіймала. Тепер
+     друга нота — листяне золото, і вона лишається в родині дерева. */
+  --wl-world-hue-warm: 82deg;
+}
+
+html[data-theme='light'][data-artifact='tree'] {
+  --wl-world-hue: 95deg;
+  --wl-world-hue-warm: 30deg;
+}
+
+html[data-artifact='reef'] {
+  --wl-world-hue: 215deg;
+  --wl-world-hue-warm: 10deg;
+}
+
+html[data-theme='light'][data-artifact='reef'] {
+  --wl-world-hue: 182deg;
+  --wl-world-hue-warm: 15deg;
+}
+
 .wl-sphere-field {
   position: relative;
   /* Поле займає екран під вкладками — сузір'я розкладається в його пікселях. */
@@ -89,23 +144,23 @@
      вимога прямим текстом, і фіолетовий їй не суперечить. */
   background:
     radial-gradient(circle at 27% 19%, rgba(255, 255, 255, 0.6), transparent 16%),
-    radial-gradient(circle at 72% 81%, rgba(178, 126, 240, 0.5), transparent 38%),
+    radial-gradient(circle at 72% 81%, hsl(calc(var(--wl-world-hue) + 1deg) 79% 72% / 0.5), transparent 38%),
     /* Центр навмисно порожній. Скло тримається на краях, а посередині його
        товща найтонша — саме тому крізь неї видно предмет. Перша спроба
        поклала сюди суцільний градієнт на всю кулю, і на 60–95 px це вийшла
        молочна пелена: та сама доза, що на 160-піксельній бульбашці лягала по
        краю, тут накрила фото цілком. */
-    radial-gradient(circle at 50% 50%, transparent 46%, rgba(126, 92, 182, 0.3) 88%),
-    linear-gradient(145deg, rgba(233, 223, 252, 0.1), rgba(104, 74, 158, 0.16));
+    radial-gradient(circle at 50% 50%, transparent 46%, hsl(calc(var(--wl-world-hue) - 3deg) 38% 54% / 0.3) 88%),
+    linear-gradient(145deg, hsl(calc(var(--wl-world-hue) - 5deg) 83% 93% / 0.1), hsl(calc(var(--wl-world-hue) - 5deg) 36% 45% / 0.16));
   box-shadow:
-    0 18px 38px rgba(150, 96, 224, 0.3),
-    0 10px 22px rgba(12, 8, 24, 0.45),
+    0 18px 38px hsl(calc(var(--wl-world-hue) - 1deg) 67% 63% / 0.3),
+    0 10px 22px hsl(calc(var(--wl-world-hue) - 11deg) 50% 6% / 0.45),
     /* Внутрішні тіні мілкі: 22 px розмиття на 70-піксельній кулі дістає до
        середини, 12 — лишається на краю, де об'єм і читається. */
     inset 7px 8px 12px -4px rgba(255, 255, 255, 0.5),
-    inset -9px -11px 16px -6px rgba(58, 32, 92, 0.5),
+    inset -9px -11px 16px -6px hsl(var(--wl-world-hue) 48% 24% / 0.5),
     inset 0 0 0 1.5px rgba(255, 255, 255, 0.3),
-    inset 0 0 16px -2px rgba(186, 138, 246, 0.4);
+    inset 0 0 16px -2px hsl(calc(var(--wl-world-hue) + 1deg) 86% 75% / 0.4);
   scale: 1;
   animation: wl-sphere-float var(--sphere-period, 7s) ease-in-out var(--sphere-phase, 0s) infinite alternate;
   transition: scale 320ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 320ms ease;
@@ -186,11 +241,11 @@
   border-radius: 50%;
   background:
     radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.28), transparent 44%),
-    radial-gradient(circle at 74% 80%, transparent 36%, rgba(48, 24, 78, 0.4) 96%),
+    radial-gradient(circle at 74% 80%, transparent 36%, hsl(calc(var(--wl-world-hue) + 1deg) 53% 20% / 0.4) 96%),
     /* Центр лишається найпрозорішим — це і є те місце, де дивляться на
        предмет. Виміряно крупним планом: на темному фото густа димка з'їдала
        його цілком, а вимога «щоб було видно саме фото» нікуди не поділась. */
-    radial-gradient(circle at 50% 50%, rgba(255, 176, 216, 0.09) 26%, rgba(240, 130, 198, 0.34) 70%, rgba(214, 104, 186, 0.56) 100%);
+    radial-gradient(circle at 50% 50%, hsl(calc(var(--wl-world-hue-warm) + 7deg) 100% 85% / 0.09) 26%, hsl(var(--wl-world-hue-warm) 79% 73% / 0.34) 70%, hsl(calc(var(--wl-world-hue-warm) - 8deg) 57% 62% / 0.56) 100%);
   pointer-events: none;
 }
 
@@ -199,7 +254,7 @@
   position: absolute;
   inset: 30%;
   border-radius: 50%;
-  background: radial-gradient(circle at 42% 38%, rgba(255, 255, 255, 0.7), rgba(200, 168, 255, 0.35) 55%, transparent 78%);
+  background: radial-gradient(circle at 42% 38%, rgba(255, 255, 255, 0.7), hsl(calc(var(--wl-world-hue) - 4deg) 100% 83% / 0.35) 55%, transparent 78%);
 }
 
 /* ── Внутрішнє світіння ─────────────────────────────────
@@ -210,7 +265,7 @@
   z-index: 2;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle at 50% 58%, rgba(206, 148, 255, 0.34), transparent 66%);
+  background: radial-gradient(circle at 50% 58%, hsl(calc(var(--wl-world-hue) + 7deg) 100% 79% / 0.34), transparent 66%);
   mix-blend-mode: screen;
   opacity: 0.85;
   animation: wl-sphere-glow calc(var(--sphere-period, 7s) * 1.6) ease-in-out var(--sphere-phase, 0s) infinite alternate;
@@ -230,7 +285,7 @@
     rgba(255, 255, 255, 0.9) 0%,
     rgba(255, 255, 255, 0.1) 34%,
     transparent 58%,
-    rgba(206, 168, 255, 0.55) 100%
+    hsl(var(--wl-world-hue) 100% 83% / 0.55) 100%
   );
   -webkit-mask: radial-gradient(closest-side circle, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
   mask: radial-gradient(closest-side circle, transparent calc(100% - 2px), #000 calc(100% - 1.5px));
@@ -245,7 +300,7 @@
   border-radius: 50%;
   background:
     radial-gradient(ellipse at 68% 90%, rgba(255, 255, 255, 0.5), transparent 24%),
-    radial-gradient(circle at 74% 66%, transparent 52%, rgba(58, 32, 92, 0.24) 76%, transparent 92%);
+    radial-gradient(circle at 74% 66%, transparent 52%, hsl(var(--wl-world-hue) 48% 24% / 0.24) 76%, transparent 92%);
   pointer-events: none;
 }
 
@@ -260,15 +315,15 @@
   animation-play-state: paused;
   box-shadow:
     inset 0 1px 1px rgba(255, 255, 255, 0.5),
-    inset 0 -12px 22px -12px rgba(206, 160, 255, 0.85),
-    0 14px 34px rgba(12, 8, 24, 0.5);
+    inset 0 -12px 22px -12px hsl(calc(var(--wl-world-hue) + 3deg) 100% 81% / 0.85),
+    0 14px 34px hsl(calc(var(--wl-world-hue) - 11deg) 50% 6% / 0.5);
 }
 
 /* Фото активного бажання стає максимально читабельним — саме тут різкість і
    потрібна, а не в спокої. */
 .wl-sphere-field .wl-sphere[data-focused='true'] .wl-sphere__image {
   opacity: 0.98;
-  filter: saturate(1) contrast(1.04) brightness(1.02) drop-shadow(0 0 8px rgba(214, 176, 255, 0.45));
+  filter: saturate(1) contrast(1.04) brightness(1.02) drop-shadow(0 0 8px hsl(calc(var(--wl-world-hue) + 3deg) 100% 85% / 0.45));
 }
 
 .wl-sphere-field .wl-sphere[data-focused='true'] .wl-sphere__glow {
@@ -337,7 +392,7 @@
   padding: 8px 16px;
   border: 1px solid var(--world-border, rgba(255, 255, 255, 0.18));
   border-radius: var(--radius-pill);
-  background: var(--world-surface, rgba(32, 24, 52, 0.7));
+  background: var(--world-surface, hsl(calc(var(--wl-world-hue) - 9deg) 37% 15% / 0.7));
   color: var(--world-text, #f2ecff);
   font: inherit;
   font-weight: 700;
