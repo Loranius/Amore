@@ -51,7 +51,7 @@ import {
 } from '@/engine/leafOrientation';
 import {
   buildOrganicCurveFrames,
-  buildOrganicSkeleton,
+  buildSelfOrganizingSkeleton,
   buildBudgetedOrganicSweepMesh,
   type OrganicCurveFrameState,
   type OrganicMeshLod,
@@ -224,7 +224,15 @@ export function buildTreeLabPreviewFromArtifact({
   const startedAt = now();
   const species = buildTreeSpeciesBlueprint({ artifact, config: { asOf, rulesVersion: speciesRulesVersion } });
   const field = treeToOrganicField(species);
-  const skeleton = buildOrganicSkeleton({ seed: field.seed, attractors: field.attractors, config: field.skeletonConfig });
+  /*
+   * Дерево росте самоорганізацією, а не просторовою колонізацією (ADR-0072).
+   * Опублікований скелет має ту саму форму, тож усе нижче за течією —
+   * кадри кривих, композиція, крона, корені, меш, бюджети — не змінилось.
+   */
+  const skeleton = buildSelfOrganizingSkeleton({
+    seed: field.seed,
+    config: field.selfOrganizingConfig,
+  });
   const frames = buildOrganicCurveFrames(skeleton);
   const composition = buildTreeComposition({ species, skeleton, frames, config: DEFAULT_TREE_COMPOSITION_CONFIG });
   const roots = buildTreeRootArchitecture({ species, composition, frames, config: DEFAULT_TREE_ROOT_ARCHITECTURE_CONFIG });

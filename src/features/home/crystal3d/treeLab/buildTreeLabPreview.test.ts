@@ -108,7 +108,37 @@ describe('Tree production preview pipeline', () => {
     expect(build.field.diagnostics.attractorCount).toBe(12);
     expect(build.field.diagnostics.truncatedInstructionIds).toEqual([]);
     expect(build.skeleton.seed).toBe(build.field.seed);
-    expect(build.skeleton.rulesVersion).toBe(build.field.skeletonConfig.rulesVersion);
+
+    /*
+     * СКЕЛЕТ РОСТЕ З ПОРОДИ — і після ADR-0072 це перевіряється в іншому
+     * місці, бо змінився механізм, а не намір.
+     *
+     * Раніше тут звірялась `skeletonConfig.rulesVersion`: скелет будувала
+     * просторова колонізація по атракторах. Тепер дерево росте
+     * самоорганізацією, і зв'язок із парою став ПРЯМІШИМ, ніж був:
+     *
+     *   • один цикл росту — один прожитий рік;
+     *   • сила кожного року окремо — з того, наскільки широко його прожили.
+     *
+     * Поле атракторів лишається поруч і досі рахується з тих самих
+     * інструкцій (тому перевірки вище незмінні): на ньому тримається
+     * просторова колонізація, з якою новий закон можна зіставити.
+     */
+    const growth = build.field.selfOrganizingConfig;
+    expect(build.skeleton.rulesVersion).toBe(growth.rulesVersion);
+    expect(growth.rulesVersion).toContain(build.species.rulesVersion);
+    expect(growth.cycles).toBe(build.species.growth.length);
+    expect(growth.vigourByCycle).toHaveLength(build.species.growth.length);
+    // Рік із ширшим життям дає більше сили — інакше історія не була б формою.
+    const richest = build.species.growth.reduce((best, item) =>
+      item.weight > best.weight ? item : best);
+    const poorest = build.species.growth.reduce((worst, item) =>
+      item.weight < worst.weight ? item : worst);
+    if (richest !== poorest) {
+      const index = (target: typeof richest) => build.species.growth.indexOf(target);
+      expect(growth.vigourByCycle![index(richest)]!)
+        .toBeGreaterThan(growth.vigourByCycle![index(poorest)]!);
+    }
   });
 
   it('publishes a passing production contract for low, medium and high LOD', () => {

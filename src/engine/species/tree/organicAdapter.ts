@@ -1,8 +1,10 @@
-import type {
-  OrganicAttractor,
-  OrganicSkeletonConfig,
+import {
+  DEFAULT_SELF_ORGANIZING_CONFIG,
+  type OrganicAttractor,
+  type OrganicSkeletonConfig,
+  type SelfOrganizingConfig,
 } from '../../labs/organic';
-import { round6, seededUnit } from './math';
+import { clamp01, round6, seededUnit } from './math';
 import type {
   TreeBranchKind,
   TreeGrowthInstruction,
@@ -30,6 +32,27 @@ export interface TreeOrganicFieldDiagnostics {
   truncatedInstructionIds: string[];
 }
 
+/**
+ * Сила року — те, чим широта прожитого стає розміром дерева.
+ *
+ * Порода вже порахувала за рік `weight` (0.3..0.85 від наповненості року) і
+ * `maturity` (наскільки рік завершений). Тут вони стають силою росту:
+ *
+ *   • базова сила — щоб навіть найтихіший рік лишив по собі пагін, а не нічого;
+ *   • частка від `weight` — щоб широкий рік було ВИДНО на силуеті;
+ *   • множення на `maturity` — щоб рік, який ще триває, не рахувався
+ *     прожитим наперед. Дерево пари росте разом із ними, а не стрибає на
+ *     повний рік уперед 26 грудня.
+ */
+const YEAR_VIGOUR_BASE = 7;
+const YEAR_VIGOUR_SPAN = 9;
+
+function yearVigour(instruction: TreeGrowthInstruction): number {
+  const breadth = clamp01(instruction.weight);
+  const ripeness = clamp01(instruction.maturity);
+  return round6((YEAR_VIGOUR_BASE + YEAR_VIGOUR_SPAN * breadth) * (0.35 + 0.65 * ripeness));
+}
+
 export interface TreeOrganicField {
   organicTreeFieldVersion: 1;
   sourceSpeciesBlueprintVersion: `tree:${TreeSpeciesBlueprint['speciesBlueprintVersion']}`;
@@ -38,6 +61,15 @@ export interface TreeOrganicField {
   seed: number;
   attractors: OrganicAttractor[];
   skeletonConfig: OrganicSkeletonConfig;
+  /**
+   * Налаштування самоорганізаційного росту — те, чим дерево тепер і росте.
+   *
+   * `skeletonConfig` поруч лишається навмисно: на ньому тримається просторова
+   * колонізація, якою ще користуються лабораторні порівняння, і викидати її
+   * тим самим рухом, яким замінюють закон, означало б позбутись єдиного, з
+   * чим новий закон можна зіставити.
+   */
+  selfOrganizingConfig: SelfOrganizingConfig;
   diagnostics: TreeOrganicFieldDiagnostics;
 }
 
@@ -282,6 +314,16 @@ export function treeToOrganicField(
       lateralJitter: structure.lateralJitter,
       baseRadius: structure.baseRadius,
       radiusDecay: structure.radiusDecay,
+    },
+    selfOrganizingConfig: {
+      ...DEFAULT_SELF_ORGANIZING_CONFIG,
+      rulesVersion: `${DEFAULT_SELF_ORGANIZING_CONFIG.rulesVersion}:${blueprint.rulesVersion}`,
+      // Один цикл росту — один рік стосунків.
+      cycles: blueprint.growth.length,
+      vigourByCycle: blueprint.growth.map(yearVigour),
+      // Верхівкове панування — риса пари, а не константа: дерево тієї, чиє
+      // життя ширше, розкидається вільніше, ніж тягнеться вгору.
+      apicalControl: round6(clamp01(0.72 - 0.16 * clamp01(structure.upwardBias * 2))),
     },
     diagnostics: {
       instructionCount: blueprint.growth.length,

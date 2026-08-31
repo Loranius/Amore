@@ -55,6 +55,12 @@ export interface OrganicSkeletonDiagnostics {
   truncatedAttractorIds: string[];
   fallbackHostAttractorIds: string[];
   maxGeneration: number;
+  /**
+   * Скільки вузлів відмерло від нестачі світла. Нуль у просторової колонізації
+   * — вона нічого не скидала; у самоорганізаційній моделі це число й показує,
+   * наскільки крона піднялась над власним низом.
+   */
+  shedNodeCount?: number;
 }
 
 export interface OrganicSkeletonState {

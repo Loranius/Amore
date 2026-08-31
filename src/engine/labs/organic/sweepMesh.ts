@@ -368,6 +368,48 @@ function maximumFrameRadius(frameState: OrganicCurveFrameState): number {
   );
 }
 
+/**
+ * Найбільша похибка силуету, яку дозволено кільцю, у одиницях сцени.
+ *
+ * ЗВІДКИ ЧИСЛО. Багатокутник із `N` сторін описує коло з похибкою
+ * `r · (1 − cos(π/N))` — саме на стільки його обрис западає всередину справжнього
+ * кола. Дерево пари заввишки 5.7 одиниці займає на телефоні близько 360 пікселів,
+ * тобто один піксель — це приблизно 0.016 одиниці. 0.006 — трохи менше за третину
+ * пікселя: похибка, якої на екрані не видно навіть упритул.
+ *
+ * Це і є той поріг, за яким сторони перестають щось давати.
+ */
+const SILHOUETTE_TOLERANCE = 0.008;
+
+/**
+ * Менше трьох сторін труби не буває, а чотири — найменше, що ще має обсяг.
+ * Трикутний переріз на просвіт читається як пласка стрічка.
+ */
+const MINIMUM_RADIAL_SEGMENTS = 4;
+
+/**
+ * Скільки сторін має кільце цієї гілки.
+ *
+ * ЩО БУЛО ДО ЦЬОГО. Сходинки за поколінням: стовбур діставав повні 13 сторін,
+ * друге покоління 11, решта 9 — із підлогами 7 і 6. Підлоги стерегли рельєф
+ * кори, якому треба близько чотирьох вершин на лопать.
+ *
+ * ЧОМУ ЦЕ БУЛО ЗАЙВЕ. Рельєф на тонких гілках НЕ МАЛЮЄТЬСЯ ВЗАГАЛІ:
+ * `barkRelief` гасить його глибину як `radius / fadeRadius`, і в самому файлі
+ * написано «twigs stay smooth». Тобто дев'ять сторін на гілочці завтовшки
+ * 0.014 стерегли рельєф, якого там немає, — а платило за них усе дерево.
+ *
+ * Доки гілок було тринадцять, це нічого не коштувало. Самоорганізаційна модель
+ * дала їх 56-104, майже всі тонкі, і ця дрібниця стала головною статтею
+ * витрат: виміряно 21 933 трикутники на трьох роках і 26 992 на шести проти
+ * мобільної стелі 18 000.
+ *
+ * ЩО ТЕПЕР. Там, де рельєф видно (радіус від `fadeRadius`), кільце лишається
+ * повним — його вимагає рельєф, а не силует. Нижче — стільки сторін, скільки
+ * треба, щоб обрис не западав більш ніж на `SILHOUETTE_TOLERANCE`. Це
+ * ФІЗИЧНА межа, а не смак: тонша гілка займає менше пікселів, тож і сторін їй
+ * треба менше, і закон каже це прямо замість сходинок за поколінням.
+ */
 function radialSegmentsForCurve(
   curve: OrganicBranchCurve,
   lod: OrganicMeshLod,
@@ -381,15 +423,22 @@ function radialSegmentsForCurve(
     curve.junction?.collarRadius ?? 0,
     ...curve.samples.map((sample) => sample.radius),
   );
-  const radiusRatio = curveRadius / Math.max(1e-6, maximumRadius);
 
-  if (curve.branchId === ORGANIC_TRUNK_BRANCH_ID || curve.generation === 0 || radiusRatio >= 0.5) {
+  // Стовбур і все, на чому видно рельєф, лишаються повними.
+  if (curve.branchId === ORGANIC_TRUNK_BRANCH_ID
+    || curve.generation === 0
+    || curveRadius >= config.bark.fadeRadius) {
     return baseSegments;
   }
-  if (curve.generation <= 1 || radiusRatio >= 0.22) {
-    return Math.max(7, baseSegments - 2);
+  void maximumRadius;
+
+  // Найменше `N`, за якого `r · (1 − cos(π/N))` уміщується в допуск.
+  for (let segments = MINIMUM_RADIAL_SEGMENTS; segments < baseSegments; segments += 1) {
+    if (curveRadius * (1 - Math.cos(Math.PI / segments)) <= SILHOUETTE_TOLERANCE) {
+      return segments;
+    }
   }
-  return Math.max(6, baseSegments - 4);
+  return baseSegments;
 }
 
 export function buildOrganicSweepMesh(
