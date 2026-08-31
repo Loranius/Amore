@@ -53,6 +53,42 @@ function irregularRootMask(wx: number, wz: number, soilRadius: number) {
   return clamp01(1 - (radial - edge) / fade);
 }
 
+/**
+ * Кладе колір у восьмибітне полотно, повернувши його в sRGB.
+ *
+ * БЕЗ ЦЬОГО ЗЕМЛЯ БУЛА ВЧЕТВЕРО ТЕМНІШОЮ ЗА ВЛАСНУ ПАЛІТРУ.
+ *
+ * `THREE.Color` за увімкненого `ColorManagement` (типово з three r152) тримає
+ * складові в ЛІНІЙНОМУ просторі: `new THREE.Color('#5f7c48')` дає `r = 0.117`,
+ * а не `0.373`. Полотно ж — восьмибітне sRGB. Отже `color.r * 255` писав 30
+ * замість 95, і так для кожного пікселя землі.
+ *
+ * ВИМІРЯНО НА ЖИВОМУ ЕКРАНІ, і збіг точний: передній план малювався з
+ * медіанною яскравістю 27, тоді як рівний `#808080` на тому самому місці дає
+ * 93-109. Арифметика сходиться до одиниці: sRGB 0.373 -> лінійне 0.117 ->
+ * назад у байт 30.
+ *
+ * ЧОМУ ЦЬОГО НІХТО НЕ ПОМІЧАВ. Туман освітлює далечінь до 143, тож здавалось,
+ * ніби земля природно темніє до глядача. Насправді вона була темна вся, а
+ * градієнт малював туман. Вада давня: ті самі 29-32 на знімках задовго до
+ * заміни моделі росту.
+ *
+ * Решта текстур цього файлу віддають канвасу РЯДОК (`rgba(p.grassA, ...)`),
+ * тобто йдуть повз `THREE.Color` і цієї вади не мали. Уражений був лише цей
+ * попіксельний шлях.
+ */
+export function writeSrgbPixel(
+  target: Uint8ClampedArray,
+  offset: number,
+  color: THREE.Color,
+): void {
+  const encoded = color.clone().convertLinearToSRGB();
+  target[offset] = Math.round(clamp01(encoded.r) * 255);
+  target[offset + 1] = Math.round(clamp01(encoded.g) * 255);
+  target[offset + 2] = Math.round(clamp01(encoded.b) * 255);
+  target[offset + 3] = 255;
+}
+
 function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
   const p = PALETTE[theme];
   const size = 512;
@@ -87,11 +123,26 @@ function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
       color.lerp(earth, earthMask);
       color.offsetHSL(0, 0, (hash2(x * 3, y * 3, 37) - 0.5) * (earthMask > 0.5 ? 0.075 : 0.045));
 
+      /*
+       * НАЗАД У sRGB, ПЕРШ НІЖ ПИСАТИ В ПОЛОТНО — і без цього рядка земля
+       * була вчетверо темнішою за власну палітру.
+       *
+       * `THREE.Color` за увімкненого `ColorManagement` (типово з three r152)
+       * тримає складові в ЛІНІЙНОМУ просторі: `new THREE.Color('#5f7c48')`
+       * дає `r = 0.117`, а не `0.373`. Полотно ж — восьмибітне sRGB. Отже
+       * `color.r * 255` записував 30 замість 95, і так для кожного пікселя.
+       *
+       * ВИМІРЯНО НА ЖИВОМУ ЕКРАНІ, і збіг точний. Земля на передньому плані
+       * малювалась із медіанною яскравістю 27, тоді як рівний сірий `#808080`
+       * на тому самому місці дає 93-109. Обчислення сходиться до одиниці:
+       * sRGB 0.373 -> лінійне 0.117 -> назад у байт 30.
+       *
+       * Вада стара, не з цієї зміни: ті самі 29-32 на знімках до заміни
+       * моделі росту. Її ховав туман — він освітлює далечінь до 143, тож
+       * здавалось, що земля просто темніє до глядача, а не що вона темна вся.
+       */
       const i = (y * size + x) * 4;
-      image.data[i] = Math.round(clamp01(color.r) * 255);
-      image.data[i + 1] = Math.round(clamp01(color.g) * 255);
-      image.data[i + 2] = Math.round(clamp01(color.b) * 255);
-      image.data[i + 3] = 255;
+      writeSrgbPixel(image.data, i, color);
     }
   }
   ctx.putImageData(image, 0, 0);
