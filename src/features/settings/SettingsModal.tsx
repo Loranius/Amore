@@ -8,6 +8,7 @@
 // підхоплює нове.
 // ============================================================
 import { useEffect, useState, type ChangeEvent, type DragEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { ModalClose } from '@/components/ui/ModalClose';
 import { useAuth, useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
@@ -78,6 +79,23 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
         {section === 'sizes' && <SizesSection />}
         {section === 'photos' && <PhotosSection />}
+
+        <div className="settings-divider" />
+
+        {/*
+          * Вхід у заповнення історії.
+          *
+          * Не в доці й не в «Ще»: це не модуль, а робота, яку роблять
+          * кілька разів за життя порталу. Але й не захована — пара, яка
+          * разом давно, інакше ніколи не дізнається, що її минулі роки
+          * можна підняти з порожньої стелі.
+          */}
+        <section className="settings-section">
+          <div className="settings-section-title">Наша історія</div>
+          <Link className="btn btn-ghost settings-history" to="/start" onClick={onClose}>
+            Заповнити минулі роки
+          </Link>
+        </section>
 
         <div className="settings-divider" />
 

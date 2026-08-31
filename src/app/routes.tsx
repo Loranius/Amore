@@ -51,6 +51,7 @@ const loadJourney = () => import('@/features/journey/JourneyPage');
 const loadPlanDetails = () => import('@/features/plans/PlanDetailsPage');
 const loadWhereTo = () => import('@/features/whereto/WhereToPage');
 const loadGame = () => import('@/features/game/GamePage');
+const loadHistorySweep = () => import('@/features/onboarding/HistorySweepPage');
 
 const ShoppingPage = lazyRoute(loadShopping, (m) => m.ShoppingPage);
 const WishlistPage = lazyRoute(loadWishlist, (m) => m.WishlistPage);
@@ -60,6 +61,7 @@ const MomentPage = lazyRoute(loadMoment, (m) => m.MomentPage);
 const MediaPage = lazyRoute(loadMedia, (m) => m.MediaPage);
 const CulinaryPage = lazyRoute(loadCulinary, (m) => m.CulinaryPage);
 const PlansPage = lazyRoute(loadPlans, (m) => m.PlansPage);
+const HistorySweepPage = lazyRoute(loadHistorySweep, (m) => m.HistorySweepPage);
 const JourneyPage = lazyRoute(loadJourney, (m) => m.JourneyPage);
 const PlanDetailsPage = lazyRoute(loadPlanDetails, (m) => m.PlanDetailsPage);
 const WhereToPage = lazyRoute(loadWhereTo, (m) => m.WhereToPage);
@@ -155,6 +157,12 @@ export const router = createHashRouter([
           { path: 'map', element: <Navigate to="/memories" replace /> },
           { path: 'culinary', element: page(<CulinaryPage />) },
           { path: 'game', element: page(<GamePage />) },
+
+          // Заповнення історії: пара, яка разом давно, інакше отримує
+          // однакові порожні роки. Окремий маршрут, а не модалка, бо це
+          // довга робота на кілька заходів, і на неї треба вміти
+          // повернутись за посиланням.
+          { path: 'start', element: page(<HistorySweepPage />) },
 
           // Невідомий шлях під логіном → на головну.
           { path: '*', element: <Navigate to="/" replace /> },

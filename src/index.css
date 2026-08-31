@@ -3218,6 +3218,14 @@ textarea::placeholder {
   background: color-mix(in srgb, var(--text) 10%, transparent);
 }
 .settings-section { display: flex; flex-direction: column; gap: 10px; }
+/*
+ * Вхід у заповнення історії — посилання, що виглядає кнопкою.
+ *
+ * Стиль тут, а не в `historySweep.css`: той файл підключає САМА сторінка
+ * заповнення, тобто він доїжджає лише після того, як на неї зайшли. Кнопка
+ * в налаштуваннях лишилась би без вигляду рівно доти, доки вона потрібна.
+ */
+.settings-history { text-decoration: none; }
 .settings-section-title { font-weight: 700; font-size: 15px; }
 
 /*

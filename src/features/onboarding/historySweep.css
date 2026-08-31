@@ -1,0 +1,201 @@
+/* ============================================================
+   «Наша історія» — заповнення минулих років.
+   ------------------------------------------------------------
+   Жодного власного кольору: усе з токенів світу, тож екран однаково
+   вдягається в кристал, дерево й риф (ADR-0076). Смуга років бере
+   `--accent`, бо це не оздоба, а стан — скільки життя в кожному році.
+   ============================================================ */
+
+.sweep-page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sweep-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Питання — дисплейний рівень: на екрані воно одне, і воно головне. */
+.sweep-question {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+.sweep-hint {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.sweep-error {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--text);
+  font-size: 14px;
+}
+
+/* Ряд полів: на телефоні — стовпчиком, бо поле дати й так на всю ширину. */
+.sweep-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sweep-input {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.sweep-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sweep-chip {
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.sweep-chip--on {
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  color: var(--text);
+}
+
+.sweep-added {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sweep-added-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Смуга років ─────────────────────────────────────────────
+   Індикатор прогресу тут не «крок 2 з 4», а самі роки пари. */
+
+.sweep-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+
+.sweep-strip-line {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.sweep-strip-line strong {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.sweep-strip-empty {
+  color: var(--muted);
+}
+
+.sweep-strip-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 132px;
+}
+
+.sweep-strip-year {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+}
+
+.sweep-strip-track {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+/*
+ * Висота анімована навмисно: перша ж щорічна дата піднімає ВСІ роки
+ * одразу, і цей стрибок — головне, що пара має побачити. Без переходу
+ * він виглядав би як перемальовування екрана.
+ */
+.sweep-strip-fill {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 82%, transparent),
+    var(--accent));
+  transition: height 620ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Поточний рік ще триває — смужка світліша, бо це не підсумок. */
+.sweep-strip-fill--current {
+  background: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+/* Підпис року — рівень Label; на одинадцяти роках він тісний, тому
+   малюється через один (див. `YearStrip`), а не дрібнішим за ramp. */
+.sweep-strip-label {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--muted);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sweep-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sweep-strip-fill { transition: none; }
+}
