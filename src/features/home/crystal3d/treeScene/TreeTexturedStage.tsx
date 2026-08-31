@@ -37,13 +37,13 @@ type GroundInstance = {
 
 const PALETTE = {
   light: {
-    sky: '#8fc6e6', fog: '#d8e8e4', distantGrass: '#829d66',
+    sky: '#8fc6e6', fog: '#a9d4ea', distantGrass: '#829d66',
     stoneA: '#858a7f', stoneB: '#687066', hazeHill: '#91aa91', hazeHillFar: '#adbfba',
     shadow: '#263527', sun: '#fff2bd', sunHalo: '#fff4c7', sunLight: '#ffe8bd',
     skyLight: '#d8ecff', groundLight: '#73845a', rim: '#c8ddff',
   },
   dark: {
-    sky: '#78b7d7', fog: '#bfd8db', distantGrass: '#6c8755',
+    sky: '#78b7d7', fog: '#96c9df', distantGrass: '#6c8755',
     stoneA: '#737a70', stoneB: '#596159', hazeHill: '#78947f', hazeHillFar: '#9aafa2',
     shadow: '#1f2b22', sun: '#ffe9a8', sunHalo: '#ffedb8', sunLight: '#ffdfad',
     skyLight: '#c8e2f3', groundLight: '#5b704f', rim: '#bdd8f6',
@@ -361,7 +361,39 @@ export function TreeTexturedStage({
   return (
     <>
       <color attach="background" args={[palette.sky]} />
-      <fog attach="fog" args={[palette.fog, frame.distance * 0.84, frame.distance + 32]} />
+      {/*
+        * ТУМАН МАЄ АДРЕСУ: далекий край лугу.
+        *
+        * Обрій був ТВЕРДОЮ ЛІНІЄЮ, і причина не в небі, а в геометрії:
+        * горизонт у цьому кадрі — це буквально КРАЙ ТЕРЕНУ, коло радіусом
+        * `hillRadius`, за яким одразу небо. Виміряно на знімку 1280×800:
+        * над лінією яскравість 184, під нею 151 — тридцять три рівні
+        * стрибком, а найбільший крок між сусідніми рядками 15.6.
+        *
+        * Старий туман до того краю не діставав: `far` стояв на
+        * `distance + 32`, тобто 41 одиниця, а край лугу лежить на
+        * `distance + hillRadius` — 17.3. Луг на обрії був затуманений на
+        * 28% і кінчався ребром.
+        *
+        * Тепер `far` СТОЇТЬ НА ТОМУ КРАЮ, а колір туману дорівнює кольору
+        * неба біля обрію (`skyMid` із `TreeEnvironmentTextures`). Отже луг
+        * доходить до краю вже небом і ребра не лишає.
+        *
+        * Розгортка смуги (перепад через обрій / зеленість далини / середини):
+        *
+        *   без туману на краю      33 рівні / 27.7 / 30.4
+        *   0.00..1.00 hillRadius   11 рівнів / 13.2 / 26.5
+        *   0.40..1.00 hillRadius    2 рівні  / 13.2 / 26.9
+        *   0.55..1.06 hillRadius    2 рівні  / 13.1 / 27.4
+        *
+        * Взято останнє: обрій уже м'який, а серпанок починається аж за
+        * половиною лугу, тож середина кадру лишається зеленою, а не сивіє
+        * одразу за деревом.
+        */}
+      <fog
+        attach="fog"
+        args={[palette.fog, frame.distance + hillRadius * 0.55, frame.distance + hillRadius * 1.06]}
+      />
 
       <mesh frustumCulled={false}>
         {/*
@@ -448,37 +480,21 @@ export function TreeTexturedStage({
       </instancedMesh>
 
       {/*
-        * Три пагорби на обрії й сонце: 990 і 688 трикутників замість 1 964 і
-        * 1 760. Разом із небом і тереном це 20% сцени, витрачені на тло, яке
-        * телефон показує кількома десятками пікселів. Гало сонця — прозорі
-        * кулі з непрозорістю 0.035 і 0.085; грані на них не видно за
-        * побудовою, тож там сітка найгрубіша, а сам диск лишили щільнішим.
+        * ТУТ СТОЯЛИ ТРИ ПАГОРБИ Й СОНЦЕ — 1 678 трикутників, яких більше
+        * НЕ ВИДНО.
+        *
+        * Пагорби сиділи на 19.9, 26.2 і 33.7 одиниці від камери, сонце на
+        * 29.1, а туман тепер насичується на 17.3 — на далекому краї лугу.
+        * Отже всі шість тіл малювались рівно кольором туману, тобто кольором
+        * неба. Перевірено попіксельним порівнянням знімків із ними й без них
+        * (`npm run live:diff`): різниця нижча за власний шум сцени.
+        *
+        * Сонце до того ж СПЕРЕЧАЛОСЬ зі світлом: диск стояв ліворуч-ЗА
+        * деревом (-9.5, 8.5, -17), а промінь, що ліпить форму, йде
+        * ліворуч-ПЕРЕД ним (-7, 10, 5). Тінь на лузі падала від променя, і
+        * намальоване сонце їй суперечило. Прибрано те, що суперечило й було
+        * невидиме, а не пересунуто те, що працює.
         */}
-      <mesh position={[hillRadius * 0.72, groundY - hillRadius * 0.43, -hillRadius * 1.32]} scale={[1.55, 0.28, 1]}>
-        <sphereGeometry args={[hillRadius * 0.9, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={palette.distantGrass} roughness={1} metalness={0} />
-      </mesh>
-      <mesh position={[-hillRadius * 1.18, groundY - hillRadius * 0.62, -hillRadius * 2.12]} scale={[2.05, 0.31, 1.15]}>
-        <sphereGeometry args={[hillRadius * 0.82, 20, 8, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={palette.hazeHill} roughness={1} metalness={0} />
-      </mesh>
-      <mesh position={[hillRadius * 1.08, groundY - hillRadius * 0.8, -hillRadius * 3.05]} scale={[2.75, 0.28, 1.35]}>
-        <sphereGeometry args={[hillRadius * 0.86, 18, 7, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={palette.hazeHillFar} roughness={1} metalness={0} />
-      </mesh>
-
-      <mesh position={[-9.5, groundY + 8.5, -17]}>
-        <sphereGeometry args={[1.7, 12, 8]} />
-        <meshBasicMaterial color={palette.sunHalo} transparent opacity={0.035} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[-9.5, groundY + 8.5, -17]}>
-        <sphereGeometry args={[1.02, 12, 8]} />
-        <meshBasicMaterial color={palette.sunHalo} transparent opacity={0.085} depthWrite={false} toneMapped={false} />
-      </mesh>
-      <mesh position={[-9.5, groundY + 8.5, -17]}>
-        <sphereGeometry args={[0.58, 16, 12]} />
-        <meshBasicMaterial color={palette.sun} toneMapped={false} />
-      </mesh>
 
       <PortalCameraRig frame={frame} controls={controls} pose={pose} mode={motionMode} />
       {children}

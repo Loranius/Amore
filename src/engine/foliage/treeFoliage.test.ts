@@ -28,9 +28,27 @@ describe('Tree Foliage', () => {
   it('emits normalized local cluster data outside the branch surface', () => {
     const build = buildTreeLabPreview('medium');
 
+    const samplesById = new Map(
+      build.frames.curves.flatMap((curve) => (
+        curve.samples.map((sample) => [sample.id, sample] as const)
+      )),
+    );
+
     for (const cluster of build.foliage.clusters) {
-      expect(cluster.role).not.toBe('trunk');
-      expect(cluster.generation).toBeGreaterThanOrEqual(1);
+      /*
+       * Стовбур тепер теж носить листя — але лише на молодій верхівці, а не
+       * на голій корі внизу (ADR-0075). Бічні гілки лишаються від першого
+       * покоління й вище.
+       */
+      if (cluster.role === 'trunk') {
+        const sample = samplesById.get(cluster.sourceSampleId);
+        expect(sample).toBeDefined();
+        expect(sample!.normalizedDistance).toBeGreaterThanOrEqual(
+          DEFAULT_TREE_FOLIAGE_CONFIG.trunkTerminalStart,
+        );
+      } else {
+        expect(cluster.generation).toBeGreaterThanOrEqual(1);
+      }
       expect(cluster.radius).toBeGreaterThanOrEqual(DEFAULT_TREE_FOLIAGE_CONFIG.minClusterRadius);
       expect(cluster.radius).toBeLessThanOrEqual(DEFAULT_TREE_FOLIAGE_CONFIG.maxClusterRadius);
       expect(cluster.density).toBeGreaterThanOrEqual(0);
@@ -68,6 +86,91 @@ describe('Tree Foliage', () => {
     expect(build.leaves.instances.length).toBeGreaterThanOrEqual(
       Math.floor(build.foliage.diagnostics.totalLeafCount * 0.68),
     );
+  });
+
+  /*
+   * ЖОДНОЇ ГОЛОЇ ГІЛКИ — і саме цього не було видно жодному тесту, поки
+   * дерево не зняли з екрана.
+   *
+   * До ADR-0075 бюджет листя вичерпувався на 43-му згустку з 140, і 32 гілки
+   * з 50 не діставали жодного листка: крона читалась помпонами на палицях.
+   * Усі числа тут стояли «правильні» — стелі не перевищено, детермінізм
+   * тримався, — бо ЖОДЕН тест не питав, чи листя ДІСТАЛОСЬ УСІМ.
+   */
+  it('leaves no eligible branch bare', () => {
+    const build = buildTreeLabPreview('medium');
+
+    expect(build.foliage.diagnostics.branchIdsWithoutFoliage).toEqual([]);
+  });
+
+  /*
+   * ВЕРХІВКА НЕ ХВОРОСТИНА. До ADR-0075 верх дерева пари стояв на 4.44, а
+   * найвищий згусток листя — на 3.82: гола сьома частина висоти. Причиною був
+   * НЕ стовбур, а бюджет: до наймолодших гілок листя просто не доходило, бо
+   * весь запас з'їдали перші сорок три згустки.
+   *
+   * Перевірено мутацією: із поверненим бюджетом 12-20 листків цей тест падає.
+   * Поріг у 7% висоти — молодий приріст останніх сантиметрів голий і в
+   * природі, а от сьома частина висоти — ні.
+   */
+  it('carries foliage to the top of the tree', () => {
+    const build = buildTreeLabPreview('medium');
+    const topY = Math.max(...build.skeleton.nodes.map((node) => node.position.y));
+    const groundY = Math.min(...build.skeleton.nodes.map((node) => node.position.y));
+    const highestCluster = Math.max(...build.foliage.clusters.map((c) => c.position.y));
+
+    expect(topY - highestCluster).toBeLessThan((topY - groundY) * 0.07);
+  });
+
+  /*
+   * САМ СТОВБУР ТЕЖ ОБЛИСТЯНИЙ — угорі.
+   *
+   * Стовбур був виключений із листя ТИПОМ (`Exclude<TreeCompositionRole,
+   * 'trunk'>`), тож його верхня частина лишалась голою жердиною, повз яку
+   * листя росло тільки збоку. Виміряно: три згустки на висотах 2.85, 3.26 і
+   * 3.82 — саме та ділянка стовбура, що була порожньою.
+   *
+   * Нижня частина стовбура мусить лишатись голою: там кора, і це навмисно.
+   */
+  it('leafs the upper stem but keeps the lower trunk bare', () => {
+    const build = buildTreeLabPreview('medium');
+    const samplesById = new Map(
+      build.frames.curves.flatMap((curve) => (
+        curve.samples.map((sample) => [sample.id, sample] as const)
+      )),
+    );
+    const trunkClusters = build.foliage.clusters.filter((cluster) => cluster.role === 'trunk');
+
+    expect(trunkClusters.length).toBeGreaterThan(0);
+    for (const cluster of trunkClusters) {
+      expect(samplesById.get(cluster.sourceSampleId)!.normalizedDistance)
+        .toBeGreaterThanOrEqual(DEFAULT_TREE_FOLIAGE_CONFIG.trunkTerminalStart);
+    }
+  });
+
+  /*
+   * ЖОДНОГО ГОЛОГО КІНЧИКА. Згустки ставали на 0.475, 0.65 і 0.825 довжини
+   * гілки, тож зовнішня шоста частина кожної гілки лишалась палицею —
+   * виміряно 33 голих кінчики з 50. У природі кінчик найлистяніший, бо він
+   * наймолодший.
+   *
+   * Поріг 0.35 одиниці сцени — приблизно два радіуси згустка: якщо ближче за
+   * це листя немає, кінчик голий і оком.
+   */
+  it('leaves no branch tip bare', () => {
+    const build = buildTreeLabPreview('medium');
+    const bare = build.frames.curves.filter((curve) => {
+      const branch = build.composition.branches.find((b) => b.branchId === curve.branchId);
+      if (!branch || branch.role === 'trunk') return false;
+      const tip = curve.samples[curve.samples.length - 1]!.position;
+      return !build.foliage.clusters.some((cluster) => Math.hypot(
+        cluster.position.x - tip.x,
+        cluster.position.y - tip.y,
+        cluster.position.z - tip.z,
+      ) < 0.35);
+    });
+
+    expect(bare.map((curve) => curve.branchId)).toEqual([]);
   });
 
   it('does not mutate species, frames or composition', () => {

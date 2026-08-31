@@ -3,17 +3,39 @@ import type { GrowthVec3 } from '../growth';
 import type { OrganicCurveFrameState } from '../labs/organic';
 import type { TreeSpeciesBlueprint } from '../species/tree';
 
-export type FoliageBranchRole = Exclude<TreeCompositionRole, 'trunk'>;
+/**
+ * Листя сидить на КОЖНІЙ гілці, включно зі стовбуром.
+ *
+ * Досі стовбур був виключений типом (`Exclude<…, 'trunk'>`), і його верхня
+ * частина лишалась голою жердиною, повз яку листя росло тільки збоку.
+ * Виміряно: три згустки лягають на висоти 2.85, 3.26 і 3.82 — саме ту
+ * ділянку стовбура, що була порожньою (ADR-0075).
+ *
+ * Стовбур має власний поріг початку (`trunkTerminalStart`): унизу кора,
+ * листя лише на молодій верхівці.
+ */
+export type FoliageBranchRole = TreeCompositionRole;
 
 export interface TreeFoliageConfig {
   /** Bump whenever cluster placement or budget formulas change. */
   rulesVersion: string;
   minimumGeneration: number;
   terminalStart: number;
+  /** Той самий поріг, але для стовбура: нижче нього — гола кора. */
+  trunkTerminalStart: number;
   maxClusters: number;
   maxLeaves: number;
   minLeavesPerCluster: number;
   maxLeavesPerCluster: number;
+  /**
+   * Цільова відстань між згустками вздовж гілки, в одиницях сцени.
+   *
+   * Довга гілка дістає більше згустків, ніж коротка: без цього три згустки
+   * розтягувались по двометровій гілці й між ними лишався голий дріт.
+   */
+  clusterSpacing: number;
+  /** Стеля згустків на одній гілці — щоб довга гілка не з'їла весь бюджет. */
+  maxClustersPerBranch: number;
   minClusterRadius: number;
   maxClusterRadius: number;
   clustersByRole: Readonly<Record<FoliageBranchRole, number>>;

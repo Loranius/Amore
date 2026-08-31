@@ -64,12 +64,25 @@ function validateInput(input: BuildTreeLeafGeometryInput): void {
   }
 }
 
+/*
+ * ОКРУГЛЕННЯ, А НЕ ВІДКИДАННЯ — і різниця тут не косметична.
+ *
+ * `Math.floor` віднімає до цілого листка від КОЖНОГО згустка, тож похибка
+ * росте тим більше, чим згустки дрібніші. Поки в згустку було 12-20 листків,
+ * втрата ховалась у шумі: 12 * 0.76 = 9.12 -> 9, тобто 0.75 замість 0.76.
+ * Після ADR-0075 у згустку 2-6 листків, і та сама формула дає 2 * 0.76 = 1.52
+ * -> 1, тобто ТРЕТИНУ листя геть. Виміряно на живому дереві: 514 інстансів
+ * замість очікуваних 594, і чужий тест на межу 68% упав.
+ *
+ * `Math.round` не має систематичного нахилу в жоден бік, тож частка LOD
+ * лишається тим, чим названа, за будь-якого розміру згустка.
+ */
 function targetInstanceCount(
   cluster: TreeFoliageCluster,
   fraction: number,
 ): number {
   if (cluster.leafCount <= 0) return 0;
-  return Math.max(1, Math.min(cluster.leafCount, Math.floor(cluster.leafCount * fraction)));
+  return Math.max(1, Math.min(cluster.leafCount, Math.round(cluster.leafCount * fraction)));
 }
 
 function buildInstance(

@@ -113,6 +113,7 @@ function buildSurfaceMesh(
   radialSegments: number,
   ringCount: number,
   artifactSeed: number,
+  rimLobeDepth: number,
 ): TreeTerrainSurfaceMesh {
   const positions: number[] = [center.x, groundLevelY, center.z];
   const uvs: number[] = [0.5, 0.5];
@@ -131,8 +132,43 @@ function buildSurfaceMesh(
       const wave = Math.sin(angle * 3 + phase) * 0.55
         + Math.cos(angle * 5 - phase * 0.7) * 0.3
         + Math.sin(angle * 2 + phase * 0.4) * 0.15;
-      const x = center.x + Math.cos(angle) * radius;
-      const z = center.z + Math.sin(angle) * radius;
+      /*
+       * КРАЙ ҐРУНТУ — НЕ ЦИРКУЛЬ.
+       *
+       * Досі `radius` не залежав від кута взагалі, тож ґрунт навколо стовбура
+       * лежав ідеальним колом, і на знімку читався гумовим килимком, а не
+       * землею. Тією самою хвилею, що вже ліпить рельєф по висоті, тепер
+       * ліпиться й обрис.
+       *
+       * ЛІПИТЬСЯ ЛИШЕ КРАЙ, І ЦЕ НЕ ОХАЙНІСТЬ. Плато мусить лишатись
+       * круглим: воно накриває коріння, і рушій це перевіряє
+       * (`plateauRadius >= rootCoverageRadius`). Якби множник діяв на всі
+       * кільця однаково, за глибини 0.12 плато стягнулось би до 0.88 свого
+       * радіуса — і кінці коренів вийшли б з-під землі, тоді як опублікована
+       * перевірка й далі казала б «усе гаразд», бо міряє НЕЗМІНЕНЕ число.
+       *
+       * Тому втягування росте від нуля на плато до повного на краю — тим
+       * самим `smoothRelief`, яким іде рельєф.
+       *
+       * Стеля глибини — з умови, що кільця не міняються місцями. Плато
+       * займає 0.9 радіуса, тож поза ним лежить рівно одне кільце: зовнішнє
+       * на 1.0, сусіднє на 6/7 = 0.857 і зовсім без втягування. Звідси
+       * 1 - глибина > 0.857, тобто глибина < 0.143. Взято 0.12.
+       *
+       * Тут була ще й зайва спроба: кільця згущувались до краю показником
+       * 0.55, «щоб на край припало два кільця замість одного». Складка,
+       * заради якої це робилось, бралась не з числа кілець, а з глибини 0.5;
+       * а от рівної землі під корінням та зміна лишала менше — 1.013 радіуса
+       * покриття замість 1.046. Прибрано.
+       *
+       * Хвиля тільки ВТЯГУЄ край усередину (множник у [1-глибина, 1]), тож
+       * `surfaceRadius` лишається чесною верхньою межею — усе, що на неї
+       * покладається (трава, каміння, UV), не зачеплено.
+       */
+      const rimLobe = 1 - rimLobeDepth * smoothRelief * (0.5 - wave * 0.5);
+      const shapedRadius = radius * rimLobe;
+      const x = center.x + Math.cos(angle) * shapedRadius;
+      const z = center.z + Math.sin(angle) * shapedRadius;
       const y = groundLevelY + reliefAmplitude * smoothRelief * wave;
       positions.push(round6(x), round6(y), round6(z));
       uvs.push(
@@ -212,6 +248,7 @@ export function buildTreeTerrainBinding(
     radialSegments,
     ringCount,
     species.artifactSeed,
+    config.rimLobeDepth,
   );
   const yValues = mesh.positions.filter((_, index) => index % 3 === 1);
   const minimumY = round6(Math.min(...yValues));

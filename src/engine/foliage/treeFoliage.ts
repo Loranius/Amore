@@ -16,6 +16,7 @@ import type {
   BuildTreeFoliageInput,
   FoliageBranchRole,
   TreeFoliageCluster,
+  TreeFoliageConfig,
   TreeFoliageState,
 } from './types';
 
@@ -30,8 +31,19 @@ function validateInput(input: BuildTreeFoliageInput): void {
   if (!Number.isFinite(config.terminalStart) || config.terminalStart < 0 || config.terminalStart >= 1) {
     throw new Error('Tree Foliage terminalStart must be in the [0, 1) range.');
   }
+  if (
+    !Number.isFinite(config.trunkTerminalStart)
+    || config.trunkTerminalStart < 0
+    || config.trunkTerminalStart >= 1
+  ) {
+    throw new Error('Tree Foliage trunkTerminalStart must be in the [0, 1) range.');
+  }
+  if (!Number.isFinite(config.clusterSpacing) || config.clusterSpacing <= 0) {
+    throw new Error('Tree Foliage clusterSpacing must be a positive number.');
+  }
   for (const [name, value] of [
     ['maxClusters', config.maxClusters],
+    ['maxClustersPerBranch', config.maxClustersPerBranch],
     ['maxLeaves', config.maxLeaves],
     ['minLeavesPerCluster', config.minLeavesPerCluster],
     ['maxLeavesPerCluster', config.maxLeavesPerCluster],
@@ -51,7 +63,7 @@ function validateInput(input: BuildTreeFoliageInput): void {
   ) {
     throw new Error('Tree Foliage cluster radius range is invalid.');
   }
-  for (const role of ['primary', 'secondary', 'twig'] as const) {
+  for (const role of ['trunk', 'primary', 'secondary', 'twig'] as const) {
     if (!Number.isInteger(config.clustersByRole[role]) || config.clustersByRole[role] <= 0) {
       throw new Error(`Tree Foliage clustersByRole.${role} must be a positive integer.`);
     }
@@ -82,8 +94,43 @@ function nearestSample(
   ), samples[0]!);
 }
 
-function foliageRole(branch: TreeCompositionBranch): FoliageBranchRole | null {
-  return branch.role === 'trunk' ? null : branch.role;
+/**
+ * Де на гілці починається листя.
+ *
+ * У бічних гілок — з `terminalStart`; у стовбура — значно вище, бо внизу
+ * стовбур укритий корою, а не листям.
+ */
+function terminalStartFor(role: FoliageBranchRole, config: TreeFoliageConfig): number {
+  return role === 'trunk' ? config.trunkTerminalStart : config.terminalStart;
+}
+
+/**
+ * Скільки згустків несе ця гілка: рівно стільки, скільки вміщує її довжина.
+ *
+ * Роль дає нижню межу, довжина може її підняти до `maxClustersPerBranch`.
+ * Довжина береться ламаною по вибірках — тими самими округленими числами, що
+ * й уся інша геометрія, тож результат детермінований.
+ */
+function slotCountFor(
+  curve: OrganicBranchCurve,
+  role: FoliageBranchRole,
+  config: TreeFoliageConfig,
+): number {
+  let length = 0;
+  for (let index = 1; index < curve.samples.length; index += 1) {
+    const previous = curve.samples[index - 1]!.position;
+    const current = curve.samples[index]!.position;
+    length += Math.hypot(
+      current.x - previous.x,
+      current.y - previous.y,
+      current.z - previous.z,
+    );
+  }
+  const span = length * (1 - terminalStartFor(role, config));
+  return Math.min(
+    config.maxClustersPerBranch,
+    Math.max(config.clustersByRole[role], Math.round(span / config.clusterSpacing)),
+  );
 }
 
 interface ClusterCandidate {
@@ -114,16 +161,29 @@ function buildCandidate(
   input: BuildTreeFoliageInput,
 ): ClusterCandidate {
   const id = `tree:foliage:${branch.branchId}:${slot}`;
+  const terminalStart = terminalStartFor(role, input.config);
   const jitter = (seededUnit(artifactSeed, `${id}:distance`) * 2 - 1)
-    * (1 - input.config.terminalStart)
+    * (1 - terminalStart)
     / Math.max(slotCount * 5, 1);
+  /*
+   * ОСТАННІЙ ЗГУСТОК СІДАЄ НА САМИЙ КІНЧИК.
+   *
+   * Було `(slot + 1) / (slotCount + 1)`, тобто згустки ставали на 0.475,
+   * 0.65 і 0.825 довжини — і зовнішня шоста частина КОЖНОЇ гілки лишалась
+   * голою палицею. На знімку це читалось найгірше саме на довгих бічних
+   * гілках: гілка йде вбік, а листя на ній кінчається задовго до кінця.
+   *
+   * У природі все навпаки: кінчик гілки — наймолодший приріст і
+   * найлистяніше місце. Тепер `(slot + 1) / slotCount` дає 0.53, 0.77 і
+   * 1.0 — останній згусток стоїть на вершечку.
+   */
   const targetDistance = clamp01(
-    input.config.terminalStart
-      + ((slot + 1) / (slotCount + 1)) * (1 - input.config.terminalStart)
+    terminalStart
+      + ((slot + 1) / slotCount) * (1 - terminalStart)
       + jitter,
   );
   const terminalSamples = curve.samples.filter(
-    (sample) => sample.normalizedDistance >= input.config.terminalStart,
+    (sample) => sample.normalizedDistance >= terminalStart,
   );
   const sample = nearestSample(terminalSamples.length > 0 ? terminalSamples : curve.samples, targetDistance);
   const radialUnit = seededUnit(artifactSeed, `${id}:radius`);
@@ -141,7 +201,7 @@ function buildCandidate(
   const outwardBias = 0.32 + seededUnit(artifactSeed, `${id}:direction`) * 0.28;
   const direction = normalize(add(sample.tangent, scale(radialNormal, outwardBias)), sample.tangent);
   const leafSpan = input.config.maxLeavesPerCluster - input.config.minLeavesPerCluster + 1;
-  const roleBoost = role === 'twig' ? 2 : role === 'secondary' ? 1 : 0;
+  const roleBoost = role === 'twig' ? 2 : role === 'secondary' || role === 'trunk' ? 1 : 0;
   const leafCount = Math.min(
     input.config.maxLeavesPerCluster,
     input.config.minLeavesPerCluster
@@ -202,13 +262,19 @@ export function buildTreeFoliage(input: BuildTreeFoliageInput): TreeFoliageState
 
   for (const curve of input.frames.curves) {
     const branch = branchesById.get(curve.branchId);
-    if (!branch || branch.generation < input.config.minimumGeneration || curve.samples.length === 0) {
+    if (!branch || curve.samples.length === 0) continue;
+    /*
+     * Стовбур проходить повз поріг покоління навмисно: він завжди нульового
+     * покоління, а `minimumGeneration` існує, щоб відсіяти надто МОЛОДІ гілки,
+     * а не найстаршу. Свій поріг у стовбура інший — по довжині, не по
+     * поколінню (`trunkTerminalStart`).
+     */
+    if (branch.role !== 'trunk' && branch.generation < input.config.minimumGeneration) {
       continue;
     }
-    const role = foliageRole(branch);
-    if (!role) continue;
+    const role = branch.role;
     eligibleBranchIds.push(branch.branchId);
-    const slotCount = input.config.clustersByRole[role];
+    const slotCount = slotCountFor(curve, role, input.config);
 
     for (let slot = 0; slot < slotCount; slot += 1) {
       const candidate = buildCandidate(

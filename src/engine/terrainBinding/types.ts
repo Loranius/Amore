@@ -12,6 +12,13 @@ export interface TreeTerrainBindingConfig {
   minimumSurfaceRadiusBaseRatio: number;
   plateauRootCoverageRatio: number;
   reliefAmplitudeBaseRadiusRatio: number;
+  /**
+   * Наскільки хвиля втягує КРАЙ ґрунту всередину, у частках радіуса.
+   *
+   * Нуль — ідеальне коло, тобто те, що читалось килимком. Верхня межа
+   * лишається `surfaceRadius` за будь-якої глибини.
+   */
+  rimLobeDepth: number;
   maximumVerticesByLod: Readonly<Record<OrganicMeshLod, number>>;
   maximumTrianglesByLod: Readonly<Record<OrganicMeshLod, number>>;
 }
