@@ -96,7 +96,28 @@ function makeGrassTuftGeometry() {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
-  geometry.computeVertexNormals();
+
+  /*
+   * НОРМАЛЬ УГОРУ — І БЕЗ ЦЬОГО ТРАВА БУЛА ЧОРНОЮ.
+   *
+   * Кущик — п'ять вертикальних карток навхрест. `computeVertexNormals` дає
+   * кожній нормаль ПЕРПЕНДИКУЛЯРНО до площини, тобто вбік; на
+   * `meshStandardMaterial` це означає, що картка, відвернута від сонця,
+   * освітлення не дістає взагалі.
+   *
+   * ВИМІРЯНО НА ЖИВОМУ ЕКРАНІ: ці кущики малювались як rgb(1,1,3) — тобто
+   * чорні шпичаки на освітленому лузі, схожі на дорожні фішки. Знайти їх
+   * удалось лише вимкненням: коли з іншої системи прибрали всі 235 кущиків,
+   * шпичаки лишились на місці, отже вони були не звідти.
+   *
+   * Жива трава так не поводиться: пучок розсіює світло й читається м'яким
+   * об'ємом, освітленим згори. Тому нормаль тут спільна й спрямована вгору —
+   * той самий прийом, що й у `TreeTexturedStage`, і саме він садить кущик у
+   * те саме світло, що й землю під ним.
+   */
+  const upward = new Float32Array((positions.length / 3) * 3);
+  for (let index = 1; index < upward.length; index += 3) upward[index] = 1;
+  geometry.setAttribute('normal', new THREE.BufferAttribute(upward, 3));
   return geometry;
 }
 
@@ -185,11 +206,29 @@ function BreezeGrass({ theme, hillRadius, soilRadius, groundY, reducedMotion }: 
 
   return (
     <instancedMesh ref={ref} args={[geometry, undefined, items.length]}>
+      {/*
+        * `FrontSide`, А НЕ `DoubleSide` — БЕЗ ЦЬОГО ПІВКАРТКИ ЧОРНІ.
+        *
+        * Нормаль кущика спрямована вгору (див. `makeGrassTuftGeometry`), але
+        * three для двобічного матеріалу ПЕРЕВЕРТАЄ її на задніх гранях:
+        * `normal *= faceDirection` у `normal_fragment_begin.glsl`. Отже задня
+        * половина кожної картки діставала нормаль (0,-1,0), тобто світло лише
+        * знизу, і малювалась як rgb(3,2,5) при лузі поруч rgb(64,73,41).
+        *
+        * На екрані це були чорні шпичаки, схожі на дорожні фішки. Вони
+        * пережили і виправлення кольору землі, і саму нормаль угору — саме
+        * тому, що причина була не в нормалі, а в тому, що її перевертають.
+        *
+        * Односторонні картки тут нічого не коштують: кущик складений із
+        * п'яти, схрещених під різними кутами, тож із будь-якого боку видно
+        * щонайменше дві. Це дешевше за подвоєння трикутників заради
+        * зворотної намотки.
+        */}
       <meshStandardMaterial
         map={texture}
         color="#ffffff"
         roughness={0.96}
-        side={THREE.DoubleSide}
+        side={THREE.FrontSide}
         transparent
         alphaTest={0.2}
       />

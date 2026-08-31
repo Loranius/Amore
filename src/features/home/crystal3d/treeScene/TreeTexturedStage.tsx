@@ -175,7 +175,24 @@ function buildGrassTuftGeometry() {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
-  geometry.computeVertexNormals();
+
+  /*
+   * НОРМАЛЬ УГОРУ, А НЕ ВБІК — і без цього трава темніє плямами.
+   *
+   * Кущик — це п'ять вертикальних карток, схрещених навхрест.
+   * `computeVertexNormals` дав би кожній нормаль ПЕРПЕНДИКУЛЯРНО до її
+   * площини, тобто вбік; отже картка, відвернута від сонця, почорніла б, а
+   * сусідня в тому ж кущику світилась би. Кущик замигтів би гранями, як
+   * зім'ятий папір.
+   *
+   * Жива трава так не поводиться: вона розсіює світло всім пучком і
+   * читається як м'який об'єм, освітлений згори. Тому нормаль тут спільна й
+   * спрямована вгору — той самий прийом, яким саджають траву в іграх, і
+   * саме він садить кущик у те саме світло, що й землю під ним.
+   */
+  const upward = new Float32Array((positions.length / 3) * 3);
+  for (let index = 1; index < upward.length; index += 3) upward[index] = 1;
+  geometry.setAttribute('normal', new THREE.BufferAttribute(upward, 3));
   geometry.computeBoundingSphere();
   return geometry;
 }
@@ -348,14 +365,24 @@ export function TreeTexturedStage({
       </mesh>
 
       <instancedMesh ref={grassRef} args={[undefined, undefined, grassInstances.length]} geometry={grassGeometry}>
-        <meshBasicMaterial
+        {/*
+          * Ламберт, а не `basic`: трава стояла НЕОСВІТЛЕНА на освітленій
+          * землі й через це читалась наліпкою — пласкими темними шпичаками,
+          * що не належать сцені. Помітно це стало аж тоді, коли землю
+          * полагодили: доти обидві були однаково темні, і різниці не було
+          * видно.
+          *
+          * Ламберт дорожчий за `basic` рівно на розсіяне світло — ні
+          * дзеркального відблиску, ні шорсткості тут не треба, бо трава
+          * матова.
+          */}
+        <meshLambertMaterial
           map={textures.grassBlade}
           color="#ffffff"
-          side={THREE.DoubleSide}
+          side={THREE.FrontSide}
           transparent
           alphaTest={0.16}
           depthWrite
-          toneMapped
         />
       </instancedMesh>
 
