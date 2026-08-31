@@ -256,6 +256,10 @@ describe('Tree Species', () => {
       maxBranchSegments: 8,
       elevationFan: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.elevationFan,
       radialFan: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.radialFan,
+      yearVigourBase: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.yearVigourBase,
+      yearVigourSpan: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.yearVigourSpan,
+      yearVigourKnee: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.yearVigourKnee,
+      yearVigourMaximum: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.yearVigourMaximum,
     });
 
     /*

@@ -382,6 +382,23 @@ function maximumFrameRadius(frameState: OrganicCurveFrameState): number {
 const SILHOUETTE_TOLERANCE = 0.008;
 
 /**
+ * Радіус основи, на якому виміряно допуск вище.
+ *
+ * ДОПУСК МАСШТАБУЄТЬСЯ РАЗОМ ІЗ ДЕРЕВОМ, і це не поблажка, а те саме
+ * міркування, доведене до кінця. Півпікселя виміряно на дереві заввишки 5.7
+ * з основою 0.079, яке камера кадрує на весь екран. Але камера кадрує КОЖНЕ
+ * дерево на весь екран — отже вдвічі товще дерево показує кожну гілку вдвічі
+ * дрібнішою, і та сама половина пікселя відповідає вдвічі більшому допуску у
+ * світових одиницях.
+ *
+ * Без цього пара, що жила всіма шістьма модулями, вибивала мобільну стелю:
+ * виміряно 22 045 трикутників при 18 000. Різати натомість силу росту
+ * означало б відібрати в дерева здатність відповідати на життя пари — а її
+ * щойно з такими труднощами здобули.
+ */
+const SILHOUETTE_REFERENCE_RADIUS = 0.079;
+
+/**
  * Менше трьох сторін труби не буває, а чотири — найменше, що ще має обсяг.
  * Трикутний переріз на просвіт читається як пласка стрічка.
  */
@@ -430,11 +447,16 @@ function radialSegmentsForCurve(
     || curveRadius >= config.bark.fadeRadius) {
     return baseSegments;
   }
-  void maximumRadius;
+
+  // Допуск у частках дерева, а не в абсолютних одиницях: камера кадрує
+  // будь-яке дерево на весь екран, тож більше дерево має право на грубші
+  // кільця в тих самих пікселях.
+  const tolerance = SILHOUETTE_TOLERANCE
+    * (Math.max(maximumRadius, 1e-6) / SILHOUETTE_REFERENCE_RADIUS);
 
   // Найменше `N`, за якого `r · (1 − cos(π/N))` уміщується в допуск.
   for (let segments = MINIMUM_RADIAL_SEGMENTS; segments < baseSegments; segments += 1) {
-    if (curveRadius * (1 - Math.cos(Math.PI / segments)) <= SILHOUETTE_TOLERANCE) {
+    if (curveRadius * (1 - Math.cos(Math.PI / segments)) <= tolerance) {
       return segments;
     }
   }

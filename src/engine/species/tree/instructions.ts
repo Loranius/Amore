@@ -185,6 +185,7 @@ function buildAnnualInstruction(
       range.minRadial + seededUnit(seed, 'radial') * range.radialSpan,
     ),
     crownLayer: round6(clamp01((preferredElevation - 0.28) / 0.7)),
+    fill: round6(fill),
     /*
      * ОСЬ ДЕ ПОДІЛИСЬ СТО СІМНАДЦЯТЬ ГІЛОК. Замість тіла на подію рік
      * несе стільки листя, скільки його прожили: від двох згустків у

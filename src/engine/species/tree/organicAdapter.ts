@@ -22,6 +22,14 @@ export interface TreeOrganicAdapterConfig {
   elevationFan: number;
   /** Ширина віяла року по радіусу крони, у його частках. */
   radialFan: number;
+  /** Сила, яку дістає навіть найтихіший рік. */
+  yearVigourBase: number;
+  /** Скільки сили додає повністю прожитий рік понад базу. */
+  yearVigourSpan: number;
+  /** Де сила починає насичуватись. Нижче — росте як є. */
+  yearVigourKnee: number;
+  /** Асимптота сили: дерево наближається до неї, ніколи не досягаючи. */
+  yearVigourMaximum: number;
 }
 
 export interface TreeOrganicFieldDiagnostics {
@@ -44,13 +52,52 @@ export interface TreeOrganicFieldDiagnostics {
  *     прожитим наперед. Дерево пари росте разом із ними, а не стрибає на
  *     повний рік уперед 26 грудня.
  */
-const YEAR_VIGOUR_BASE = 7;
-const YEAR_VIGOUR_SPAN = 9;
-
-function yearVigour(instruction: TreeGrowthInstruction): number {
-  const breadth = clamp01(instruction.weight);
+function yearVigour(
+  instruction: TreeGrowthInstruction,
+  base: number,
+  span: number,
+): number {
+  /*
+   * `fill`, А НЕ `weight` — і це та різниця, через яку дерево не чуло модулів.
+   *
+   * `weight` — це ТОВЩИНА гілки, і в неї вбудовано поріг: `0.3 + 0.55 * fill`.
+   * Поріг там доречний (навіть тихий рік має лишити видиму гілку), але як
+   * міра прожитого `weight` непридатний: порожній рік до повного виходить
+   * лише 1.51 раза, і скільки той діапазон не розтягуй множником, поріг їде
+   * разом із ним. Виміряно розгорткою: за баз 7, 5, 3.5, 2.5 і 1.5
+   * відношення висоти «шість модулів до одного» лишалось 1.12-1.16, зате
+   * бюджет вилітав.
+   *
+   * `fill` порога не має — це чисті 0.6 широти плюс 0.4 глибини.
+   */
+  const lived = clamp01(instruction.fill);
   const ripeness = clamp01(instruction.maturity);
-  return round6((YEAR_VIGOUR_BASE + YEAR_VIGOUR_SPAN * breadth) * (0.35 + 0.65 * ripeness));
+  return round6((base + span * lived) * (0.35 + 0.65 * ripeness));
+}
+
+/**
+ * Насичує силу року, лишаючи її зростання строго монотонним.
+ *
+ * Щойно сила пішла від справжньої наповненості року, дерево почало
+ * по-справжньому відповідати на життя пари — і найактивніші пари вибили
+ * мобільну стелю трикутників: виміряно 22 045 при 18 000.
+ *
+ * Обрізати зверху не можна (див. коментар до `YEAR_VIGOUR_KNEE`), тож тут
+ * коліно: нижче за нього нічого не змінюється, вище — залишок відстані до
+ * максимуму з'їдається експонентою. Кожен наступний модуль додає менше за
+ * попередній, але ЗАВЖДИ додає.
+ */
+function saturatedYearVigour(
+  instruction: TreeGrowthInstruction,
+  base: number,
+  span: number,
+  knee: number,
+  maximum: number,
+): number {
+  const raw = yearVigour(instruction, base, span);
+  if (raw <= knee) return round6(raw);
+  const headroom = Math.max(1e-6, maximum - knee);
+  return round6(knee + headroom * (1 - Math.exp(-(raw - knee) / headroom)));
 }
 
 export interface TreeOrganicField {
@@ -155,6 +202,60 @@ function usableHalfWidth(center: number, fan: number, min: number, max: number):
   return Math.max(0, Math.min(fan / 2, center - min, max - center));
 }
 
+/*
+ * СИЛА РОКУ — І ЧОМУ ТУТ БУЛО ЗАВУЗЬКО.
+ *
+ * Дерево росте від того, наскільки широко пара прожила рік: `weight`
+ * інструкції — це `0.3 + 0.55 * fill`, а `fill` тримається на `yearActivity`,
+ * тобто на 0.6 широти (скількох РІЗНИХ модулів рік торкнувся) плюс 0.4
+ * глибини. Зв'язок з модулями, отже, справжній і з правильним знаменником:
+ * `PORTAL_MODULES` — це рівно ті шість джерел, які рушій чує.
+ *
+ * АЛЕ ЙОГО НЕ БУЛО ВИДНО. Виміряно на парах, чиї роки торкались різної
+ * кількості модулів, по 24 події на рік:
+ *
+ *   модулів 1 -> сила 12.7, висота 5.73, гілок  61
+ *   модулів 3 -> сила 13.3, висота 5.88, гілок  79
+ *   модулів 6 -> сила 14.1, висота 6.40, гілок 101
+ *
+ * Тобто вшестеро ширше життя давало на 11% більше сили. Причина — два
+ * поверхи порогів, що множаться: `0.3 + 0.55 * fill` у породі (порожній рік
+ * уже має 35% ваги повного) і база сили тут. За `base = 7, span = 9`
+ * порожній рік до повного виходив лише 1.51 раза.
+ *
+ * Обидва числа нижче ВИМІРЯНО розгорткою, і саме на розмах, а не на око.
+ */
+const YEAR_VIGOUR_BASE = 7;
+const YEAR_VIGOUR_SPAN = 9;
+/*
+ * М'ЯКЕ НАСИЧЕННЯ СИЛИ — і чому не проста стеля.
+ *
+ * Перша редакція просто обрізала силу зверху. Власні перевірки це й
+ * спіймали: за стелі 14 шість модулів давали 15.0, обрізались до 14 — і
+ * п'ятий модуль переставав щось додавати. Тобто жорстка стеля клепає рівно
+ * той сигнал, який має берегти, і за 12 відношення гілок навіть інвертувалось
+ * (0.80).
+ *
+ * Тут натомість коліно: до `KNEE` сила йде як є, вище — плавно підходить до
+ * `MAX`, ніколи його не досягаючи. Кожен наступний модуль додає МЕНШЕ за
+ * попередній, але додає — а це саме те, як росте живе дерево: у нього є зріст
+ * виду, до якого воно наближається, а не стіна, в яку впирається.
+ *
+ * Числа виміряно на бюджеті, на 24 деревах активної пари (6 віків × 4 зерна)
+ * за кроку стиснення стовбура 8 — і саме бюджет тут і в'яже:
+ *
+ *   без насичення: відповідь 1.26x, найгірше 18 437, порушень 1 з 24
+ *   коліно 13.5/16: 1.23x, 18 185, порушень 1 з 24
+ *   коліно 13/15.5: 1.20x, 17 731, порушень 0 з 24
+ *   коліно 12/15.5: 1.17x, 17 784, порушень 0 з 24
+ *
+ * Тобто 1.26x у відповіді коштувало б одного дерева з двадцяти чотирьох на
+ * 2.4% за мобільною стелею. Стеля — це обіцянка справжньому телефону, тож
+ * узято найбільшу відповідь, яка ВМІЩУЄТЬСЯ, а не найбільшу можливу.
+ */
+const YEAR_VIGOUR_KNEE = 13;
+const YEAR_VIGOUR_MAX = 15.5;
+
 export const DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG: TreeOrganicAdapterConfig = {
   rulesVersion: 'tree-organic-adapter-v0.2.0',
   maxAttractors: 32,
@@ -163,6 +264,10 @@ export const DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG: TreeOrganicAdapterConfig = {
   maxBranchSegments: 10,
   elevationFan: ATTRACTOR_ELEVATION_FAN,
   radialFan: ATTRACTOR_RADIAL_FAN,
+  yearVigourBase: YEAR_VIGOUR_BASE,
+  yearVigourSpan: YEAR_VIGOUR_SPAN,
+  yearVigourKnee: YEAR_VIGOUR_KNEE,
+  yearVigourMaximum: YEAR_VIGOUR_MAX,
 };
 
 
@@ -320,7 +425,13 @@ export function treeToOrganicField(
       rulesVersion: `${DEFAULT_SELF_ORGANIZING_CONFIG.rulesVersion}:${blueprint.rulesVersion}`,
       // Один цикл росту — один рік стосунків.
       cycles: blueprint.growth.length,
-      vigourByCycle: blueprint.growth.map(yearVigour),
+      vigourByCycle: blueprint.growth.map((instruction) => saturatedYearVigour(
+        instruction,
+        config.yearVigourBase,
+        config.yearVigourSpan,
+        config.yearVigourKnee,
+        config.yearVigourMaximum,
+      )),
       // Верхівкове панування — риса пари, а не константа: дерево тієї, чиє
       // життя ширше, розкидається вільніше, ніж тягнеться вгору.
       apicalControl: round6(clamp01(0.72 - 0.16 * clamp01(structure.upwardBias * 2))),
