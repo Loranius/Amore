@@ -385,13 +385,39 @@ export function TreeTexturedStage({
         <meshStandardMaterial map={textures.ground} roughness={0.96} metalness={0} />
       </mesh>
 
+      {/*
+        * ДВІ ТІНІ, ОБИДВІ З М'ЯКИМ КРАЄМ. Тінь від контакту тримає дерево на
+        * землі, тінь крони кладе на луг пляму від того, що над ним.
+        *
+        * Було: рівна непрозорість 0.10 і 0.04 на диску з різким краєм. На
+        * ґрунті яскравістю 85 це різниця в кілька рівнів — виміряно, що
+        * затемнення під деревом не було взагалі. Тепер спад радіальний
+        * (`contactShadow`), а сила така, щоб її було видно числом, а не
+        * тільки в коді.
+        */}
       <mesh position={[0.08, groundY + 0.018, -0.04]} rotation={[-Math.PI / 2, 0, 0]} scale={[rootShadowScaleX, rootShadowScaleZ, 1]}>
         <circleGeometry args={[1, 40]} />
-        <meshBasicMaterial color={palette.shadow} transparent opacity={0.1} depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
+        <meshBasicMaterial
+          map={textures.contactShadow}
+          color={palette.shadow}
+          transparent
+          opacity={0.55}
+          depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={-1}
+        />
       </mesh>
       <mesh position={[0.72, groundY + 0.014, -0.5]} rotation={[-Math.PI / 2, 0, -0.18]} scale={[crownShadowScaleX, crownShadowScaleZ, 1]}>
         <circleGeometry args={[1, 48]} />
-        <meshBasicMaterial color={palette.shadow} transparent opacity={0.04} depthWrite={false} polygonOffset polygonOffsetFactor={-1} />
+        <meshBasicMaterial
+          map={textures.contactShadow}
+          color={palette.shadow}
+          transparent
+          opacity={0.3}
+          depthWrite={false}
+          polygonOffset
+          polygonOffsetFactor={-1}
+        />
       </mesh>
 
       <instancedMesh ref={grassRef} args={[undefined, undefined, grassInstances.length]} geometry={grassGeometry}>

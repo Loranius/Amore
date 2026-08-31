@@ -180,6 +180,46 @@ function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
   return configure(new THREE.CanvasTexture(el));
 }
 
+/**
+ * М'яка тінь від контакту: щільна під самим стовбуром, тане до краю.
+ *
+ * ЧОМУ НЕ ПРОСТО КРУГ. Тінь малювалась `circleGeometry` з РІВНОЮ
+ * непрозорістю — тобто диском із різким краєм, який сам собою читається
+ * наліпкою. Та ще й непрозорість була 0.10 і 0.04: на ґрунті яскравістю 85
+ * це різниця в кілька рівнів, тобто невидима. Виміряно на живому екрані —
+ * ґрунт біля стовбура (70) виходив СВІТЛІШИМ за край ґрунтового диска (33),
+ * тобто затемнення під деревом не було взагалі, і дерево стояло НА землі,
+ * а не в ній.
+ *
+ * Квадрат спаду (`t * t`) навмисно: лінійний дає видиме кільце там, де
+ * градієнт закінчується, а квадратичний згасає непомітно.
+ */
+export function createContactShadowTexture() {
+  const size = 128;
+  const el = canvas(size, size);
+  const ctx = el.getContext('2d');
+  if (!ctx) throw new Error('Canvas 2D unavailable');
+  const image = ctx.createImageData(size, size);
+  const centre = (size - 1) / 2;
+
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const distance = Math.hypot(x - centre, y - centre) / centre;
+      const t = clamp01(1 - distance);
+      const i = (y * size + x) * 4;
+      image.data[i] = 0;
+      image.data[i + 1] = 0;
+      image.data[i + 2] = 0;
+      image.data[i + 3] = Math.round(t * t * 255);
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+
+  const texture = new THREE.CanvasTexture(el);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 export function createGrassBladeTexture(theme: Theme) {
   /*
    * ПУЧОК, А НЕ ОДНА БИЛИНА — і це та причина, з якої трава читалась
@@ -279,12 +319,14 @@ export function useTreeEnvironmentTextures(theme: Theme, hillRadius: number, soi
   const textures = useMemo(() => ({
     ground: groundTexture(theme, hillRadius, soilRadius),
     grassBlade: createGrassBladeTexture(theme),
+    contactShadow: createContactShadowTexture(),
     sky: skyTexture(theme),
   }), [theme, hillRadius, soilRadius]);
 
   useEffect(() => () => {
     textures.ground.dispose();
     textures.grassBlade.dispose();
+    textures.contactShadow.dispose();
     textures.sky.dispose();
   }, [textures]);
 
