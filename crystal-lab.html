@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="uk" data-theme="dark" data-artifact="crystal">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Лабораторія кристала</title>
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      /* Сцена на весь екран і без жодного інтерфейсу: усе, що не кристал,
+         потрапило б у смугу яскравості й зіпсувало б вимір. */
+      .lab-stage { position: fixed; inset: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/labs/crystalLab.tsx"></script>
+  </body>
+</html>

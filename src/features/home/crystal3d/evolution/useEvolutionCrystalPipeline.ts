@@ -11,42 +11,15 @@ import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistE
 import { qk } from '@/lib/queryKeys';
 import { supabase } from '@/lib/supabase';
 import type { ArtifactBlueprint } from '@/engine/evolution';
-import {
-  buildArtifactFromSnapshot,
-  type AdapterDiagnostic,
-} from '@/engine/evolution/adapters';
-import {
-  buildCrystalSpeciesBlueprint,
-  crystalToGrowthBlueprint,
-  type CrystalSpeciesBlueprint,
-} from '@/engine/species/crystal';
-import {
-  DEFAULT_GROWTH_ENGINE_CONFIG,
-  buildGrowthState,
-  type GrowthState,
-} from '@/engine/growth';
-import {
-  DEFAULT_CRYSTAL_COMPOSITION_CONFIG,
-  buildCrystalComposition,
-  type CrystalCompositionState,
-} from '@/engine/composition';
-import {
-  DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
-  buildCrystalGeometry,
-  type CrystalGeometryState,
-} from '@/engine/geometry';
-import {
-  DEFAULT_CRYSTAL_MATERIAL_CONFIG,
-  buildCrystalMaterialState,
-  type CrystalMaterialQuality,
-  type CrystalMaterialState,
-} from '@/engine/material';
-import {
-  DEFAULT_CRYSTAL_LIFE_CONFIG,
-  buildCrystalLifeState,
-  type CrystalLifeState,
-} from '@/engine/life';
+import type { AdapterDiagnostic } from '@/engine/evolution/adapters';
+import type { CrystalSpeciesBlueprint } from '@/engine/species/crystal';
+import type { GrowthState } from '@/engine/growth';
+import type { CrystalCompositionState } from '@/engine/composition';
+import type { CrystalGeometryState } from '@/engine/geometry';
+import type { CrystalMaterialQuality, CrystalMaterialState } from '@/engine/material';
+import type { CrystalLifeState } from '@/engine/life';
 import { resolveCrystalRendererQuality } from '@/engine/renderer';
+import { buildCrystalPipelineStates } from './crystalPipeline';
 import {
   applyEvolutionSandboxSources,
   relationshipDaysBetween,
@@ -59,9 +32,7 @@ import {
   stableEvolutionCoupleId,
 } from './sourceSnapshot';
 
-const ENGINE_VERSION = '1.0.0';
-const SPECIES_RULES_VERSION = '1.0.0';
-const COUPLE_TIME_ZONE = 'Europe/Kyiv';
+
 
 export interface EvolutionCrystalMetrics {
   buildMs: number;
@@ -124,7 +95,6 @@ function readQuality(): CrystalMaterialQuality {
  * governs level of detail, sparkles and optical features — things that may
  * differ between devices without changing what the couple's crystal *is*.
  */
-const MAX_PUBLISHED_BODIES = 128;
 
 function useEvolutionStartDate() {
   return useQuery({
@@ -271,61 +241,26 @@ export function useEvolutionCrystalPipeline(
         snapshot: sourceSnapshot,
         sharedDaysOff: togetherness.data ?? [],
       });
-      const artifactResult = buildArtifactFromSnapshot({
+      /*
+       * Сам ланцюг живе в `crystalPipeline.ts` — його ділить лабораторія
+       * кристала, і друга копія тут означала б, що вимір із лабораторії
+       * нічого не доводить про портал.
+       */
+      const states = buildCrystalPipelineStates({
         coupleId,
         asOf,
+        relationshipStartedAt: effectiveSources.relationshipStartedAt,
         snapshot: effectiveSources.snapshot,
-        engineConfig: {
-          engineVersion: ENGINE_VERSION,
-          relationshipStartedAt: effectiveSources.relationshipStartedAt,
-          timeZone: COUPLE_TIME_ZONE,
-          leapDayPolicy: 'feb-28',
-        },
+        sharedDaysOff: effectiveSources.sharedDaysOff,
+        quality,
+        reducedMotion,
+        ...(colorPartners ? { colorPartners } : {}),
       });
-      const species = buildCrystalSpeciesBlueprint({
-        artifact: artifactResult.blueprint,
-        config: {
-          asOf,
-          rulesVersion: SPECIES_RULES_VERSION,
-          ...(colorPartners ? { colorPartners } : {}),
-          // Days the two of them had off together. Not portal events — see
-          // `CrystalSpeciesConfig`.
-          sharedDaysOff: effectiveSources.sharedDaysOff,
-        },
-      });
-      const growth = buildGrowthState({
-        blueprint: crystalToGrowthBlueprint(species),
-        config: {
-          ...DEFAULT_GROWTH_ENGINE_CONFIG,
-          maxBodies: MAX_PUBLISHED_BODIES,
-        },
-      });
-      const composition = buildCrystalComposition({
-        growth,
-        config: DEFAULT_CRYSTAL_COMPOSITION_CONFIG,
-      });
-      const geometry = buildCrystalGeometry({
-        growth,
-        composition,
-        config: DEFAULT_CRYSTAL_GEOMETRY_CONFIG,
-      });
-      const material = buildCrystalMaterialState({
-        species,
-        composition,
-        geometry,
-        config: { ...DEFAULT_CRYSTAL_MATERIAL_CONFIG, quality },
-      });
-      const life = buildCrystalLifeState({
-        species,
-        composition,
-        material,
-        config: {
-          ...DEFAULT_CRYSTAL_LIFE_CONFIG,
-          quality,
-          reducedMotion,
-          mediaFinishedCount: effectiveSources.snapshot.media.length,
-        },
-      });
+      const { species, growth, composition, geometry, material, life } = states;
+      const artifactResult = {
+        blueprint: states.artifact,
+        adapterDiagnostics: states.adapterDiagnostics,
+      };
       const finished = performance.now();
 
       return {
