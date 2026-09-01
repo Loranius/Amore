@@ -113,6 +113,12 @@ function withTermsOff(material: CrystalMaterialState, off: readonly string[]): C
    * скло, ядро й небо вже зняті — лишається дзеркало самого матеріалу.
    */
   const dullSurface = off.includes('specular');
+  /*
+   * Проба «чи фарба взагалі доходить». Два навмисно дикі тони: якщо
+   * грані й від них не розійдуться, атрибут кольору до шейдера не
+   * доходить, і вся розмова про фарбу на грані була про мертвий код.
+   */
+  const paintProbe = off.includes('paintProbe');
 
   return {
     ...material,
@@ -128,6 +134,14 @@ function withTermsOff(material: CrystalMaterialState, off: readonly string[]): C
           : {}),
         ...(flatFacets
           ? { facets: { tints: [{ r: 1, g: 1, b: 1 }], cumulativeWeights: [1] } }
+          : {}),
+        ...(paintProbe
+          ? {
+            facets: {
+              tints: [{ r: 0.2, g: 0.2, b: 0.2 }, { r: 2, g: 2, b: 2 }],
+              cumulativeWeights: [0.5, 1],
+            },
+          }
           : {}),
       };
     }),
