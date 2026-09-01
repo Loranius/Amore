@@ -1,5 +1,5 @@
 // ============================================================
-// Вимір кристала без порталу.
+// Вимір артефакта без порталу — кристал або дерево.
 // ------------------------------------------------------------
 // `amore-crystal-look`: кристал, який читається кристалом, має сусідні
 // грані, що різняться на 30%+; нижче ~10% він виглядатиме гладкою
@@ -14,7 +14,12 @@
 // Сама арифметика світла — з `luminance.mjs`: якщо вона розійдеться,
 // вимір із лабораторії перестане означати те саме, що вимір із порталу.
 //
-//   node scripts/lab/crystal.mjs --years=11 --band=380-520
+//   node scripts/lab/artifact.mjs --years=11 --band=380-520
+//   node scripts/lab/artifact.mjs --species=tree --years=1
+//
+// Драйвер один на обидва види навмисно: браузер, SwiftShader, підміна
+// профілю, контрольний кадр і арифметика світла мусять бути ті самі,
+// інакше числа двох видів не можна класти поруч.
 // ============================================================
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,6 +43,10 @@ function band(text) {
   return { y0: Number(match[1]), y1: Number(match[2]), x0: 0, x1: 0 };
 }
 
+const species = arg('species', 'crystal');
+if (species !== 'crystal' && species !== 'tree') {
+  throw new Error(`--species приймає crystal або tree, не «${species}».`);
+}
 const years = arg('years', '11');
 /*
  * Обнулити один доданок і перезняти — уся техніка цього проєкту. Різниця
@@ -64,7 +73,7 @@ const portal = await openPortal({
 });
 
 try {
-  const url = `${server.url}crystal-lab.html?years=${years}&quality=${quality}&theme=${theme}`
+  const url = `${server.url}${species}-lab.html?years=${years}&quality=${quality}&theme=${theme}`
     + (off === '' ? '' : `&off=${off}`);
   await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
   await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
@@ -77,7 +86,7 @@ try {
 
   mkdirSync(OUT, { recursive: true });
   const tag = off === '' ? 'base' : `off-${off.replace(/,/g, '+')}`;
-  const file = join(OUT, `crystal-lab-${years}y-${quality}-${theme}-${tag}.png`);
+  const file = join(OUT, `${species}-lab-${years}y-${quality}-${theme}-${tag}.png`);
   writeFileSync(file, await portal.page.screenshot());
 
   /*
@@ -94,12 +103,17 @@ try {
    * 11 916 > 2 284 у будь-якому разі. Порівнювати треба сцену з собою,
    * а не з частиною себе.
    */
-  const controlUrl = `${url}&crystal=off`;
-  await portal.page.goto(controlUrl, { waitUntil: 'load', timeout: 60_000 });
-  await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
-  await portal.page.waitForTimeout(9_000);
-  const control = decodePng(await portal.page.screenshot());
-  const controlColumns = scanBand(control, { ...rows, x1: control.width }, await readToneMapping(portal.page));
+  const controlUrl = species === 'crystal' ? `${url}&crystal=off` : null;
+  let controlColumns = null;
+  if (controlUrl !== null) {
+    await portal.page.goto(controlUrl, { waitUntil: 'load', timeout: 60_000 });
+    await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
+    await portal.page.waitForTimeout(9_000);
+    const control = decodePng(await portal.page.screenshot());
+    controlColumns = scanBand(
+      control, { ...rows, x1: control.width }, await readToneMapping(portal.page),
+    );
+  }
 
   await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
   await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
@@ -113,17 +127,19 @@ try {
    * Скільки стовпців смуги кристал справді змінив. Нуль означає, що його
    * в кадрі немає, хай яким здоровим виглядає профіль.
    */
-  let changed = 0;
-  for (let x = 0; x < Math.min(columns.length, controlColumns.length); x += 1) {
-    if (Math.abs(columns[x] - controlColumns[x]) > 0.01) changed += 1;
+  if (controlColumns !== null) {
+    let changed = 0;
+    for (let x = 0; x < Math.min(columns.length, controlColumns.length); x += 1) {
+      if (Math.abs(columns[x] - controlColumns[x]) > 0.01) changed += 1;
+    }
+    if (changed < 20) {
+      throw new Error(
+        'Кристала в кадрі немає: контрольний знімок (crystal=off) відрізняється лише в '
+        + `${changed} стовпцях зі ${columns.length}. Профіль не знімається.`,
+      );
+    }
+    console.log(`кристал змінив ${changed} стовпців смуги зі ${columns.length}`);
   }
-  if (changed < 20) {
-    throw new Error(
-      `Кристала в кадрі немає: контрольний знімок (crystal=off) відрізняється лише в `
-      + `${changed} стовпцях зі ${columns.length}. Профіль не знімається — він показав би сцену без кристала.`,
-    );
-  }
-  console.log(`кристал змінив ${changed} стовпців смуги зі ${columns.length}`);
   const all = findPlateaus(columns);
   const bounds = /^(\d+)-(\d+)$/.exec(xRange);
   const plateaus = bounds

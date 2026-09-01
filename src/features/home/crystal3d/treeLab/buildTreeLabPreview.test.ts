@@ -398,3 +398,75 @@ describe('Tree production preview pipeline', () => {
   });
 
 });
+
+/*
+ * ГОЛЕ ДЕРЕВО (ADR-0091).
+ *
+ * Власник: «листя, яке росте разом із кроною, щоб дерево не було голим».
+ * Виміряно тоді на дереві лабораторії — розподіл листя по десятинах висоти:
+ *
+ *   рік  4:   5  7 22 23 24  4  3  6  4  2
+ *   рік 40:  26 62  7  2  2  2  0  0  0  0
+ *
+ * Вісімдесят вісім відсотків листя сорокарічного дерева сиділо в НИЖНІЙ
+ * П'ЯТІЙ частині його висоти, а решта стояла голою лозиною. Листя не було
+ * винним: воно сідає на гілки, а гілок вище просто не було — лідер щоцикла
+ * тікав угору, і пазушні бруньки під ним не встигали вирости.
+ *
+ * Тому інваріант тут про РОЗПОДІЛ, а не про кількість: скільки б листя не
+ * влізло в бюджет, воно не сміє збиватись у спідницю біля землі.
+ */
+describe('дерево не голе', () => {
+  const bottomFifthShare = (years: number, salt: number) => {
+    const build = buildTreeLabPreviewFromArtifact({
+      artifact: agedArtifact(years, salt),
+      asOf: '2026-08-30T12:00:00+03:00',
+      lod: 'medium',
+      rulesVersion: 'tree-species-aged',
+    });
+    let top = 0;
+    const positions = build.mesh.positions;
+    for (let index = 1; index < positions.length; index += 3) {
+      if (positions[index]! > top) top = positions[index]!;
+    }
+    const leaves = build.leaves.instances;
+    expect(leaves.length).toBeGreaterThan(0);
+    const low = leaves.filter((leaf) => leaf.position.y < top * 0.2).length;
+    return low / leaves.length;
+  };
+
+  it('не збиває листя дорослого дерева у спідницю біля землі', () => {
+    for (let salt = 0; salt < 4; salt += 1) {
+      const share = bottomFifthShare(40, salt);
+      expect({ salt, tooLow: share > 0.6 }).toEqual({ salt, tooLow: false });
+    }
+  });
+
+  /*
+   * Стовбур мусить ТОВЩАТИ: «3 рік стовбур стає грубшим… 40 років — міцний
+   * товстий стовбур». Доти він не товщав узагалі — радіус основи тримався
+   * 0.131 на четвертому році й 0.125 на сороковому, бо `treeTrunkRadiusScale`
+   * множив число, якого самоорганізаційна модель не читає.
+   */
+  it('вирощує грубший стовбур із роками', () => {
+    const baseRadius = (years: number) => {
+      const build = buildTreeLabPreviewFromArtifact({
+        artifact: agedArtifact(years, 0),
+        asOf: '2026-08-30T12:00:00+03:00',
+        lod: 'medium',
+        rulesVersion: 'tree-species-aged',
+      });
+      let top = 0;
+      for (let index = 1; index < build.mesh.positions.length; index += 3) {
+        if (build.mesh.positions[index]! > top) top = build.mesh.positions[index]!;
+      }
+      return Math.max(...build.skeleton.nodes
+        .filter((node) => node.position.y < top * 0.05)
+        .map((node) => node.radius));
+    };
+
+    const young = baseRadius(4);
+    const mature = baseRadius(20);
+    expect(mature).toBeGreaterThan(young * 1.15);
+  });
+});

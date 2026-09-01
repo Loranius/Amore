@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="uk" data-theme="dark" data-artifact="tree">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Лабораторія дерева</title>
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      /* Жодного інтерфейсу: усе, що не дерево, потрапило б у вимір. */
+      #root > * { position: fixed; inset: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/labs/treeLab.tsx"></script>
+  </body>
+</html>

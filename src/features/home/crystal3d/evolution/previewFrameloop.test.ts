@@ -15,12 +15,18 @@ import { describe, expect, it } from 'vitest';
 //
 // Тест дивиться в текст файлів навмисно: підняти обидві сцени в jsdom
 // означає підняти WebGL, якого там немає.
+//
+// СТЕРЕЖЕТЬСЯ ФАЙЛ ІЗ ПОЛОТНОМ, А НЕ ФАЙЛ ІЗ НАЗВОЮ СЦЕНИ. Дерево свій
+// `<Canvas>` переїхало: `EvolutionTreePreviewScene` тягнув за собою Supabase
+// (через `useTreeLabPortalPreview`), тож сцену світу винесено в `TreeInWorld`,
+// щоб лабораторія могла показати ТЕ САМЕ дерево без бекенда. Інваріант від
+// цього не змінився — його адреса змінилась, і список нижче йде за нею.
 // ============================================================
 
 const read = (name: string) => readFileSync(join(__dirname, name), 'utf8');
 
 describe('превʼю еволюції: кадри лише коли видно', () => {
-  for (const name of ['EvolutionCrystalPreviewScene.tsx', 'EvolutionTreePreviewScene.tsx']) {
+  for (const name of ['EvolutionCrystalPreviewScene.tsx', 'TreeInWorld.tsx']) {
     it(`${name} питає про паузу і віддає її полотну`, () => {
       const source = read(name);
       expect(source).toMatch(/const frameloop = useWorldFrameloop\(\)/);

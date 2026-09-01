@@ -334,6 +334,11 @@ describe('Tree Species', () => {
       yearVigourSpan: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.yearVigourSpan,
       yearVigourKnee: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.yearVigourKnee,
       yearVigourMaximum: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.yearVigourMaximum,
+      apicalControlYoung: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.apicalControlYoung,
+      apicalControlMature: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.apicalControlMature,
+      apicalControlCoupleSpan: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.apicalControlCoupleSpan,
+      pipeExponentYoung: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.pipeExponentYoung,
+      pipeExponentMature: DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.pipeExponentMature,
     });
 
     /*
@@ -354,5 +359,49 @@ describe('Tree Species', () => {
      */
     expect(field.diagnostics.truncatedInstructionIds)
       .toEqual(['tree:annual:1', 'tree:annual:2']);
+  });
+});
+
+/*
+ * ВІКОВЕ ПОСЛАБЛЕННЯ ЛІДЕРА (ADR-0091).
+ *
+ * Верхівкове панування λ — це частка річної сили, яку забирає лідер. Доки
+ * воно було сталим, сорокарічне дерево вирощувало голу лозину й лишало всю
+ * крону спідницею біля землі: 88% листя сиділо в нижній п'ятій частині
+ * висоти. Живе дерево так поводиться лише замолоду (ексурентна крона), а з
+ * віком лідер губиться серед рівних йому гілок (декурентна).
+ */
+describe('Tree Species — верхівкове панування з віком', () => {
+  const apicalAt = (asOf: string) =>
+    treeToOrganicField(buildTree(BASE_EVENTS, asOf)).selfOrganizingConfig.apicalControl;
+
+  it('слабшає з роками, а не лишається сталим', () => {
+    const young = apicalAt('2025-07-01');
+    const middle = apicalAt('2040-07-01');
+    const old = apicalAt('2064-07-01');
+
+    expect(young).toBeGreaterThan(middle);
+    expect(middle).toBeGreaterThan(old);
+  });
+
+  it('лишається в межах молодого й зрілого значень', () => {
+    const { apicalControlYoung, apicalControlMature, apicalControlCoupleSpan } =
+      DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG;
+
+    for (const asOf of ['2024-07-01', '2030-07-01', '2050-07-01', '2100-07-01']) {
+      const lambda = apicalAt(asOf);
+      expect(lambda).toBeLessThanOrEqual(apicalControlYoung);
+      expect(lambda).toBeGreaterThanOrEqual(apicalControlMature - apicalControlCoupleSpan);
+    }
+  });
+
+  /*
+   * ЗАСТЕРЕЖЕННЯ, А НЕ ПРИКРАСА. Виміряно: за зрілого λ 0.56 сорокарічне
+   * дерево ОСІДАЄ до висоти 6.3 — нижче за власне чотирирічне, бо крона
+   * затінює ослаблого лідера й скидає його. 0.60 стоїть рівно на цьому краю,
+   * тож тест ловить саме перехід межі, а не «значення змінилось».
+   */
+  it('не опускає зріле значення нижче межі осідання', () => {
+    expect(DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.apicalControlMature).toBeGreaterThanOrEqual(0.6);
   });
 });

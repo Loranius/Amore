@@ -30,7 +30,7 @@
 /** Скільки років до дорослого дерева. Число власника. */
 export const TREE_FULL_TERM_YEARS = 40;
 
-const DAYS_PER_YEAR = 365.2425;
+export const DAYS_PER_YEAR = 365.2425;
 
 /**
  * Частка зросту стовбура, яку має пара цього віку.
