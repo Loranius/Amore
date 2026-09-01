@@ -106,6 +106,13 @@ function withTermsOff(material: CrystalMaterialState, off: readonly string[]): C
   ));
   const zeroEmissive = off.includes('emissive');
   const flatFacets = off.includes('facetTint');
+  /*
+   * Дзеркальна складова. Дифузне світло на ПЛАСКІЙ грані від напрямленого
+   * джерела стале (нормаль стала, виміряно: розкид усередині грані 0.0–0.1°),
+   * тож градієнт на 85 пікселів мусить давати щось видозалежне. Обідок,
+   * скло, ядро й небо вже зняті — лишається дзеркало самого матеріалу.
+   */
+  const dullSurface = off.includes('specular');
 
   return {
     ...material,
@@ -116,6 +123,9 @@ function withTermsOff(material: CrystalMaterialState, off: readonly string[]): C
         ...body,
         shader,
         ...(zeroEmissive ? { emissiveIntensity: 0 } : {}),
+        ...(dullSurface
+          ? { roughness: 1, metalness: 0, clearcoat: 0, reflectivity: 0, envMapIntensity: 0 }
+          : {}),
         ...(flatFacets
           ? { facets: { tints: [{ r: 1, g: 1, b: 1 }], cumulativeWeights: [1] } }
           : {}),
