@@ -20,6 +20,7 @@ import { formatSinceDate } from '@/features/home/homeUtils';
 import { ANNIVERSARY_SUGGESTIONS, useHistorySweep } from './useHistorySweep';
 import { YEAR_MILESTONES, quietestYearIndex } from './sweepModel';
 import { SweepPlaces } from './SweepPlaces';
+import { SweepSpecies } from './SweepSpecies';
 import { SweepWatched } from './SweepWatched';
 import { YearStrip } from './YearStrip';
 import './historySweep.css';
@@ -256,6 +257,8 @@ export function HistorySweepPage() {
       ) : (
         <YearStrip years={years} emptyCount={sweep.summary.emptyCount} />
       )}
+
+      {sweep.step === 'years' && <SweepSpecies yearCount={years.length} />}
 
       {sweep.step === 'years' && (
         <div className="sweep-actions">
